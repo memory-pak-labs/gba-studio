@@ -185,7 +185,7 @@ def toolchain_files(env):
     devkitarm = Path(env.get("DEVKITARM", str(devkitpro / "devkitARM")))
     def executable(file):
         windows_file = file.with_name(file.name + ".exe")
-        return windows_file if not file.is_file() and windows_file.is_file() else file
+        return windows_file if windows_file.is_file() else file
     compiler = executable(devkitarm / "bin/arm-none-eabi-g++")
     files = [compiler, executable(devkitarm / "bin/arm-none-eabi-objcopy"), executable(devkitpro / "tools/bin/gbafix")]
     # The driver can stay unchanged while cc1plus, binutils or libgcc change.
