@@ -28,7 +28,7 @@ function electronExecutablePath() {
       ].find((item) => existsSync(item)) ?? join(appRoot, "release/mac-universal/gba-studio.app/Contents/MacOS/gba-studio");
     }
     if (process.platform === "win32") {
-      return join(appRoot, "release/win-unpacked/GBA Studio.exe");
+      return resolveElectronExecutablePath({ appRoot, usePackagedApp });
     }
     return [
       join(appRoot, "release/linux-unpacked/gba-studio"),

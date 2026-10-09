@@ -1,0 +1,167 @@
+name: Desktop packages
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: desktop-packages-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  engine-pack:
+    name: Compile ARM Engine Pack
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - name: Build with the pinned devkitPro image
+        run: |
+          docker run --rm -v "$GITHUB_WORKSPACE:/work" \
+            -w /work/packages/GBAStudioEngine \
+            devkitpro/devkitarm@sha256:15b79ce75822c289538d8153da5fa7aafe5e6adc32ad8a575a197beca0f0761b \
+            bash -eu -c 'apt-get update && apt-get install -y --no-install-recommends clang python3-pil && make -j2 package'
+          sudo chown -R "$(id -u):$(id -g)" packages/GBAStudioEngine/dist
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: ARM-Engine-Pack
+          path: packages/GBAStudioEngine/dist/GBAStudioEnginePack/
+          if-no-files-found: error
+          retention-days: 1
+
+  desktop:
+    name: Package and smoke (${{ matrix.platform }})
+    needs: engine-pack
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: linux
+            runner: ubuntu-24.04
+            script: dist:linux
+          - platform: windows
+            runner: windows-2022
+            script: dist:win
+    defaults:
+      run:
+        working-directory: apps/desktop-electron
+    env:
+      CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+          cache-dependency-path: apps/desktop-electron/package-lock.json
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
+        with:
+          python-version: '3.11'
+      - run: python -m pip install Pillow
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: ARM-Engine-Pack
+          path: packages/GBAStudioEngine/dist/GBAStudioEnginePack
+      - name: Linux desktop dependencies and compiler tools
+        if: matrix.platform == 'linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends xvfb libgtk-3-0 libnss3 libasound2t64 libgbm1
+          docker run --rm -v "$RUNNER_TEMP:/stage" \
+            devkitpro/devkitarm@sha256:15b79ce75822c289538d8153da5fa7aafe5e6adc32ad8a575a197beca0f0761b \
+            bash -eu -c 'cp -a /opt/devkitpro /stage/devkitpro'
+          echo "DEVKITPRO=$RUNNER_TEMP/devkitpro" >> "$GITHUB_ENV"
+          echo "DEVKITARM=$RUNNER_TEMP/devkitpro/devkitARM" >> "$GITHUB_ENV"
+          echo "$RUNNER_TEMP/devkitpro/devkitARM/bin" >> "$GITHUB_PATH"
+          echo "$RUNNER_TEMP/devkitpro/tools/bin" >> "$GITHUB_PATH"
+      - uses: msys2/setup-msys2@ec48f7c5447b3140e2b088413ae3a55687bccb6e # v2
+        id: msys
+        if: matrix.platform == 'windows'
+        with:
+          location: C:\msys64
+          msystem: UCRT64
+          update: true
+          install: make curl gnupg
+      - name: Install Windows devkitPro tools with signature verification
+        if: matrix.platform == 'windows'
+        shell: msys2 {0}
+        run: |
+          set -eu
+          keyring=https://raw.githubusercontent.com/devkitPro/devkitpro-keyring/ed77f4db0fb9dbc7dcaa9aa3f5a4d981dac07832
+          for file in devkitpro.gpg devkitpro-trusted devkitpro-revoked; do
+            curl --fail --location "$keyring/$file" -o "/usr/share/pacman/keyrings/$file"
+          done
+          pacman-key --populate devkitpro
+          cat >> /etc/pacman.conf <<'REPOS'
+          [dkp-libs]
+          Server = https://pkg.devkitpro.org/packages
+          [dkp-windows]
+          Server = https://pkg.devkitpro.org/packages/windows/$arch
+          REPOS
+          pacman -Sy --needed --noconfirm devkitARM gba-tools
+          echo "DEVKITPRO=$(cygpath -m /opt/devkitpro)" >> "$GITHUB_ENV"
+          echo "DEVKITARM=$(cygpath -m /opt/devkitpro/devkitARM)" >> "$GITHUB_ENV"
+          cygpath -w /usr/bin >> "$GITHUB_PATH"
+          cygpath -w /opt/devkitpro/devkitARM/bin >> "$GITHUB_PATH"
+          cygpath -w /opt/devkitpro/tools/bin >> "$GITHUB_PATH"
+      - run: npm ci
+      - name: Verify the WebPlayer core
+        run: npm run verify:mgba-web
+      - name: Package x64 desktop
+        run: npm run ${{ matrix.script }}
+      - name: Check installer files
+        run: npm run smoke:ci-artifacts -- --platform ${{ matrix.platform }}
+      - name: Smoke Linux packaged editor and complete project
+        if: matrix.platform == 'linux'
+        run: |
+          deb=$(find release -maxdepth 1 -name '*.deb' -print -quit)
+          test -n "$deb"
+          sudo dpkg -i "$deb"
+          installed=$(dpkg -L gba-studio | grep '/gba-studio$' | head -1)
+          test -x "$installed"
+          export GBA_STUDIO_PACKAGED_APP_PATH="$installed"
+          xvfb-run -a node scripts/smoke-electron-welcome.mjs --packaged
+          xvfb-run -a node scripts/smoke-electron-exemplo-template.mjs --packaged
+      - name: Smoke Windows packaged editor and complete project
+        if: matrix.platform == 'windows'
+        run: |
+          $installer = Get-ChildItem release -Filter *.exe | Select-Object -First 1
+          $installedRoot = Join-Path $env:RUNNER_TEMP 'GBA Studio installed'
+          $process = Start-Process -FilePath $installer.FullName -ArgumentList '/S', "/D=$installedRoot" -Wait -PassThru
+          if ($process.ExitCode -ne 0) { throw "NSIS installation failed: $($process.ExitCode)" }
+          $env:GBA_STUDIO_PACKAGED_APP_PATH = Join-Path $installedRoot 'gba-studio.exe'
+          if (!(Test-Path $env:GBA_STUDIO_PACKAGED_APP_PATH)) { throw 'Installed executable missing' }
+          node scripts/smoke-electron-welcome.mjs --packaged
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          node scripts/smoke-electron-exemplo-template.mjs --packaged
+      - name: Upload smoke evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: Evidence-${{ matrix.platform }}
+          path: |
+            apps/desktop-electron/artifacts/welcome/latest/
+            apps/desktop-electron/artifacts/exemplo-template/latest/
+            apps/desktop-electron/artifacts/ci-artifacts/latest/
+          retention-days: 1
+          if-no-files-found: ignore
+      - name: Upload validated installer candidates
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: GBA-Studio-${{ matrix.platform }}-x64
+          path: |
+            apps/desktop-electron/release/*.exe
+            apps/desktop-electron/release/*.zip
+            apps/desktop-electron/release/*.AppImage
+            apps/desktop-electron/release/*.deb
+            apps/desktop-electron/release/*.tar.gz
+          if-no-files-found: error
+          retention-days: 1

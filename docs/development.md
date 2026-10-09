@@ -82,9 +82,32 @@ Preparação técnica não substitui revisão visual nem licença de redistribui
 
 ## CI e releases
 
-A CI executa `npm run test:all`, tipos, build e testes host do motor
-no Linux. O gate completo local, outros sistemas, empacotamento e hardware
-possuem limites distintos de evidência.
+A CI executa `npm run test:all`, tipos e build no Linux e Windows, além dos
+testes host do motor nos dois sistemas. Confira o resultado da execução;
+ter um job configurado não significa que os testes passaram.
+
+O workflow manual **Desktop packages** compila a biblioteca ARM em uma imagem
+devkitPro identificada pelo digest e gera candidatos x64: NSIS/ZIP no Windows,
+AppImage/DEB/TAR.GZ no Linux. Ele verifica os arquivos e executa smokes do editor
+empacotado e do projeto completo, incluindo exportação, ROM e abertura do Play.
+Os artefatos e evidências ficam disponíveis por um dia; não cria uma Release.
+
+Esses candidatos incluem o Engine Pack, mas precisam de **Python 3 com Pillow,
+devkitPro/devkitARM e GNU make/bash no computador do usuário** para compilar ROMs.
+Configure `DEVKITPRO`, `DEVKITARM` e `PATH` conforme a instalação oficial.
+`GBA_STUDIO_PYTHON` permite escolher o executável Python. O instalador Windows
+não possui assinatura digital; esta etapa é independente dos testes.
+
+Para reproduzir o empacotamento após compilar o Pack, em `apps/desktop-electron`:
+
+```sh
+npm run dist:win    # na máquina Windows
+npm run dist:linux  # na máquina Linux
+```
+
+O gate completo local, o teste da instalação, o Play renderizado e o hardware
+possuem limites distintos de evidência. Consulte as evidências do run antes
+de distribuir um candidato como versão validada.
 
 Instaladores oficiais são publicados por mantenedores após validação própria.
 Assinatura e notarização usam credenciais privadas fora do repositório; PRs de

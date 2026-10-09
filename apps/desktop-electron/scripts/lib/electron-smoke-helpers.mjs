@@ -1,6 +1,6 @@
 import { existsSync } from "node:fs";
 import { cp } from "node:fs/promises";
-import { join, relative, sep } from "node:path";
+import { join, posix, relative, sep } from "node:path";
 
 const electronRunAsNodeKeys = ["ELECTRON_RUN_AS_NODE", "ATOM_SHELL_INTERNAL_RUN_AS_NODE"];
 
@@ -28,11 +28,11 @@ function firstExistingPath(paths) {
 
 export function packagedDarwinElectronExecutableCandidates(appRoot) {
   return [
-    join(appRoot, "release/mac-universal/gba-studio.app/Contents/MacOS/gba-studio"),
-    join(appRoot, "release/mac-arm64/gba-studio.app/Contents/MacOS/gba-studio"),
-    join(appRoot, "release/mac/gba-studio.app/Contents/MacOS/gba-studio"),
-    join(appRoot, "release/mac-arm64/GBA Studio.app/Contents/MacOS/GBA Studio"),
-    join(appRoot, "release/mac/GBA Studio.app/Contents/MacOS/GBA Studio")
+    posix.join(appRoot, "release/mac-universal/gba-studio.app/Contents/MacOS/gba-studio"),
+    posix.join(appRoot, "release/mac-arm64/gba-studio.app/Contents/MacOS/gba-studio"),
+    posix.join(appRoot, "release/mac/gba-studio.app/Contents/MacOS/gba-studio"),
+    posix.join(appRoot, "release/mac-arm64/GBA Studio.app/Contents/MacOS/GBA Studio"),
+    posix.join(appRoot, "release/mac/GBA Studio.app/Contents/MacOS/GBA Studio")
   ];
 }
 
@@ -52,7 +52,10 @@ export function electronExecutablePath({ appRoot, usePackagedApp }) {
       return firstExistingPath(packagedDarwinElectronExecutableCandidates(appRoot));
     }
     if (process.platform === "win32") {
-      return join(appRoot, "release/win-unpacked/GBA Studio.exe");
+      return firstExistingPath([
+        join(appRoot, "release/win-unpacked/gba-studio.exe"),
+        join(appRoot, "release/win-unpacked/GBA Studio.exe")
+      ]);
     }
     return firstExistingPath([
       join(appRoot, "release/linux-unpacked/gba-studio"),
