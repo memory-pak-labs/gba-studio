@@ -35,6 +35,17 @@ code = r'''
 #include <cstring>
 #include "gbs/ui.hpp"
 #include "generated.hpp"
+// This contract exercises UI state; hardware drawing is stubbed on every host.
+extern "C" {
+void gbs_hw_begin_hud_layout(int) {}
+void gbs_hw_end_hud_layout() {}
+void gbs_hw_invalidate_hud_layout() {}
+void gbs_hw_draw_hud_layout_component(int, int, int, int, int, const char*, int, const void*, int) {}
+void gbs_hw_draw_hud_bar(const char*, const char*, int) {}
+void gbs_hw_draw_overlay_rect(int, int, int, int, int) {}
+void gbs_hw_draw_text_box(int, int, int, int, const char*, int) {}
+void gbs_hw_load_obj_tiles(const uint8_t*, uint32_t, uint32_t) {}
+}
 struct Room { const char* name; };
 const Room rooms[] = {{"blank"}, {"authored"}, {"no-hud"}, {nullptr}};
 struct Project { const Room* rooms; } project {rooms};
