@@ -381,6 +381,7 @@ void test_runtime_boot_resets_pending_dma_uploads() {
     int source = 1;
     int destination = 0;
     hardware_init_calls = 0;
+    hardware_performance_counter_init_calls = 0;
     render_init_calls = 0;
     audio_init_calls = 0;
     hardware_backdrop_color = 0x63BF;
@@ -397,6 +398,7 @@ void test_runtime_boot_resets_pending_dma_uploads() {
     assert(stats.dropped == 0);
     assert(stats.peak_queued == 0);
     assert(hardware_init_calls == 1);
+    assert(hardware_performance_counter_init_calls == 1);
     assert(render_init_calls == 1);
     assert(audio_init_calls == 1);
     assert(gbs::backdrop_color() == 0x63BF);
