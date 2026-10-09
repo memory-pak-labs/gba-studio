@@ -32,6 +32,7 @@ it("copies authored project files without copying generated builds and caches", 
 
 afterEach(() => {
   vi.unstubAllGlobals();
+  vi.unstubAllEnvs();
 });
 
 describe("cdpSession", () => {
@@ -71,6 +72,17 @@ describe("cdpSession", () => {
 });
 
 describe("createElectronSmokeEnv", () => {
+  it("removes external compiler and Python discovery only for the offline installation smoke", () => {
+    vi.stubEnv("GBA_STUDIO_OFFLINE_SMOKE", "1");
+    const env = createElectronSmokeEnv({ Path: "C:/external/bin", PATH: "/external/bin", MAKE: "/external/make", PYTHONHOME: "/external/python", GBA_STUDIO_SMOKE_CDP_PORT: "9339" });
+    expect(env.Path).toBeUndefined();
+    expect(env.PATH).toBe("");
+    expect(env.MAKE).toBeUndefined();
+    expect(env.PYTHONHOME).toBeUndefined();
+    expect(env.DEVKITPRO).toBe("missing-external-toolchain");
+    expect(env.GBA_STUDIO_PYTHON).toBe("missing-external-python");
+    expect(env.GBA_STUDIO_SMOKE_CDP_PORT).toBe("9339");
+  });
   it("removes Electron run-as-node flags that break browser boot and CDP", () => {
     const env = createElectronSmokeEnv({
       ELECTRON_RUN_AS_NODE: "1",

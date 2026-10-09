@@ -2129,6 +2129,7 @@ async function main() {
         ok: true,
         generatedAt: new Date().toISOString(),
         packagedApp: usePackagedApp,
+        offlineRuntime: process.env.GBA_STUDIO_OFFLINE_SMOKE === "1" ? { externalToolsRemoved: true, networkIsolation: process.env.GBA_STUDIO_OFFLINE_NETWORK ?? "not-enforced" } : undefined,
         source: {
           id: canonicalP0Source.id,
           role: canonicalP0Source.role,

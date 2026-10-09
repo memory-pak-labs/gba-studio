@@ -107,8 +107,15 @@ jobs:
           installed=$(dpkg -L "$package" | grep '^/opt/.*/gba-studio$' | head -1)
           test -f "$installed" && test -x "$installed"
           export GBA_STUDIO_PACKAGED_APP_PATH="$installed"
-          xvfb-run -a node scripts/smoke-electron-welcome.mjs --packaged
-          xvfb-run -a node scripts/smoke-electron-exemplo-template.mjs --packaged
+          node_exe=$(command -v node)
+          sudo env GBA_STUDIO_PACKAGED_APP_PATH="$installed" GBA_STUDIO_OFFLINE_SMOKE=1 \
+            GBA_STUDIO_OFFLINE_NETWORK=namespace-no-uplink \
+            unshare --net bash -eu -c '
+              ip link set lo up
+              setpriv --reuid "$2" --regid "$3" --init-groups xvfb-run -a "$1" scripts/smoke-electron-welcome.mjs --packaged
+              setpriv --reuid "$2" --regid "$3" --init-groups xvfb-run -a "$1" scripts/smoke-electron-exemplo-template.mjs --packaged
+              setpriv --reuid "$2" --regid "$3" --init-groups xvfb-run -a "$1" scripts/smoke-electron-exemplo-scenes.mjs --packaged
+            ' bash "$node_exe" "$(id -u)" "$(id -g)"
       - name: Smoke Windows packaged editor and complete project
         if: matrix.platform == 'windows'
         run: |
@@ -118,9 +125,18 @@ jobs:
           if ($process.ExitCode -ne 0) { throw "NSIS installation failed: $($process.ExitCode)" }
           $env:GBA_STUDIO_PACKAGED_APP_PATH = Join-Path $installedRoot 'gba-studio.exe'
           if (!(Test-Path $env:GBA_STUDIO_PACKAGED_APP_PATH)) { throw 'Installed executable missing' }
+          $python = Join-Path $installedRoot 'resources\Runtime\Python\python.exe'
+          foreach ($program in @($env:GBA_STUDIO_PACKAGED_APP_PATH, $python)) {
+            New-NetFirewallRule -DisplayName "GBA Studio offline $program" -Direction Outbound -Action Block -Program $program -Profile Any | Out-Null
+          }
+          & $python -I -c "import socket; s=socket.socket();s.settimeout(5);assert s.connect_ex(('1.1.1.1',443)) != 0, 'Internet still reachable'"
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          $env:GBA_STUDIO_OFFLINE_NETWORK = 'outbound-firewall'
           node scripts/smoke-electron-welcome.mjs --packaged
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           node scripts/smoke-electron-exemplo-template.mjs --packaged
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          node scripts/smoke-electron-exemplo-scenes.mjs --packaged
       - name: Upload smoke evidence
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
@@ -129,6 +145,7 @@ jobs:
           path: |
             apps/desktop-electron/artifacts/welcome/latest/
             apps/desktop-electron/artifacts/exemplo-template/latest/
+            apps/desktop-electron/artifacts/exemplo-scene-playtest/latest/
             apps/desktop-electron/artifacts/ci-artifacts/latest/
           retention-days: 1
           if-no-files-found: ignore

@@ -50,5 +50,18 @@
       "url": "https://raw.githubusercontent.com/devkitPro/gba-tools/054d507f90d32784274b6cf7e03f1c43d02d7a57/COPYING",
       "sha256": "8ceb4b9ee5adedde47b31e975c1d90c73ad27b6b165a1dcd80c7c545eb65b903"
     }
+  },
+  "correspondingSources": {
+    "buildRecipes": "https://github.com/xpack-dev-tools/arm-none-eabi-gcc-xpack/tree/e6e900a4c40f0be10dae62f089a8269ac69b5899/build-assets",
+    "compilerSources": [
+      "https://developer.arm.com/-/media/Files/downloads/gnu/15.2.rel1/src/gcc.tar.xz",
+      "https://developer.arm.com/-/media/Files/downloads/gnu/15.2.rel1/src/newlib-cygwin.tar.xz",
+      "https://github.com/xpack-dev-tools/binutils-gdb/archive/refs/tags/binutils-2.45-arm-none-eabi-15.2.rel1.tar.gz",
+      "https://github.com/xpack-dev-tools/binutils-gdb/archive/refs/tags/gdb-16-arm-none-eabi-15.2.rel1.tar.gz"
+    ],
+    "dependenciesAndPatches": "https://github.com/xpack-dev-tools/arm-none-eabi-gcc-xpack/blob/e6e900a4c40f0be10dae62f089a8269ac69b5899/build-assets/scripts/versioning.sh",
+    "msys2SourcePool": "https://repo.msys2.org/msys/sources/",
+    "msys2Recipes": "https://github.com/msys2/MSYS2-packages",
+    "ubuntuSources": "https://archive.ubuntu.com/ubuntu/pool/"
   }
 }
