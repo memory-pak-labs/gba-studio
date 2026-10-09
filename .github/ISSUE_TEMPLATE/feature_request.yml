@@ -1,0 +1,21 @@
+name: Propor uma melhoria
+description: Explique uma necessidade e a alteração proposta.
+title: "[Feature]: "
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problema ou necessidade
+    validations:
+      required: true
+  - type: textarea
+    id: solution
+    attributes:
+      label: Solução proposta
+    validations:
+      required: true
+  - type: textarea
+    id: impact
+    attributes:
+      label: Impacto e alternativas
+      description: Considere editor, formato de projeto, motor e limites do GBA.

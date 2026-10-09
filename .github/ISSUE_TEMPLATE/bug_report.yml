@@ -1,0 +1,45 @@
+name: Relatar um bug
+description: Informe um problema reproduzível no GBA Studio.
+title: "[Bug]: "
+body:
+  - type: markdown
+    attributes:
+      value: Não inclua dados privados, credenciais ou recursos sem licença. Use o relato privado para vulnerabilidades.
+  - type: input
+    id: version
+    attributes:
+      label: Versão ou commit
+      placeholder: 0.1.0-beta.3 ou commit de develop
+    validations:
+      required: true
+  - type: input
+    id: environment
+    attributes:
+      label: Sistema e arquitetura
+      description: Inclua emulador ou hardware quando aplicável.
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Passos para reproduzir
+      description: Se possível, anexe um projeto mínimo que possa redistribuir.
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Resultado esperado
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: Resultado observado
+    validations:
+      required: true
+  - type: textarea
+    id: evidence
+    attributes:
+      label: Logs e evidências
+      description: Remova credenciais, dados pessoais e caminhos privados.

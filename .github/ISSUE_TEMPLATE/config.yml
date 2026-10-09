@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Dúvidas de uso e discussão
+    url: https://github.com/memory-pak-labs/gba-studio/discussions
+    about: Converse sobre uso, arquitetura e propostas amplas.
+  - name: Relato privado de segurança
+    url: https://github.com/memory-pak-labs/gba-studio/security/advisories/new
+    about: Envie vulnerabilidades ao mantenedor sem publicar os detalhes.
