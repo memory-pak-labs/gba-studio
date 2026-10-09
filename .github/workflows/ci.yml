@@ -69,6 +69,8 @@ jobs:
     name: Engine host tests (Windows)
     runs-on: windows-2022
     timeout-minutes: 25
+    env:
+      PYTHONUTF8: '1'
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
@@ -80,8 +82,7 @@ jobs:
           install: >-
             make
             grep
-            mingw-w64-ucrt-x86_64-python
-            mingw-w64-ucrt-x86_64-python-pillow
+            python
             mingw-w64-ucrt-x86_64-clang
       - name: Test engine on Windows
         shell: msys2 {0}

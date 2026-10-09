@@ -53,6 +53,7 @@ jobs:
         working-directory: apps/desktop-electron
     env:
       CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+      PYTHONUTF8: '1'
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
@@ -125,7 +126,8 @@ jobs:
           deb=$(find release -maxdepth 1 -name '*.deb' -print -quit)
           test -n "$deb"
           sudo dpkg -i "$deb"
-          installed=$(dpkg -L gba-studio | grep '/gba-studio$' | head -1)
+          package=$(dpkg-deb -f "$deb" Package)
+          installed=$(dpkg -L "$package" | grep '/gba-studio$' | head -1)
           test -x "$installed"
           export GBA_STUDIO_PACKAGED_APP_PATH="$installed"
           xvfb-run -a node scripts/smoke-electron-welcome.mjs --packaged
