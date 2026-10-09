@@ -105,6 +105,11 @@ do aplicativo (`GBA_STUDIO_OFFLINE_SMOKE=1`) e exporta o exemplo completo. O
 preparo dos instaladores requer conexão apenas no build para baixar os arquivos
 fixados e conferir seus hashes; a geração de ROM pelo usuário funciona offline.
 
+Se o Docker Hub limitar downloads, o campo opcional `engine_pack_run_id` aceita
+uma execução anterior com o artefato `ARM-Engine-Pack`. O workflow só reutiliza
+o pack quando o commit é ancestral da revisão atual e não há diferenças em
+`packages/GBAStudioEngine`; a instalação e os smokes continuam obrigatórios.
+
 Para reproduzir o empacotamento após compilar o Pack, em `apps/desktop-electron`:
 
 ```sh

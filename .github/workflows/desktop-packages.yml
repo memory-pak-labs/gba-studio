@@ -2,9 +2,15 @@ name: Desktop packages
 
 on:
   workflow_dispatch:
+    inputs:
+      engine_pack_run_id:
+        description: 'Optional prior run with an identical engine source tree and ARM-Engine-Pack artifact'
+        type: string
+        default: ''
 
 permissions:
   contents: read
+  actions: read
 
 concurrency:
   group: desktop-packages-${{ github.ref }}
@@ -19,7 +25,27 @@ jobs:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           persist-credentials: false
+          fetch-depth: 0
+      - name: Verify the source identity of a reused Engine Pack
+        if: inputs.engine_pack_run_id != ''
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PACK_RUN_ID: ${{ inputs.engine_pack_run_id }}
+        run: |
+          case "$PACK_RUN_ID" in ''|*[!0-9]*) echo 'Invalid prior run ID'; exit 1;; esac
+          source_sha=$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$PACK_RUN_ID" --jq '.head_sha')
+          git merge-base --is-ancestor "$source_sha" HEAD
+          test -z "$(git diff --name-only "$source_sha" HEAD -- packages/GBAStudioEngine)"
+          echo "Reuse ARM Engine Pack from unchanged engine source: $source_sha"
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        if: inputs.engine_pack_run_id != ''
+        with:
+          name: ARM-Engine-Pack
+          path: packages/GBAStudioEngine/dist/GBAStudioEnginePack
+          run-id: ${{ inputs.engine_pack_run_id }}
+          github-token: ${{ github.token }}
       - name: Build with the pinned devkitPro image
+        if: inputs.engine_pack_run_id == ''
         run: |
           docker run --rm -v "$GITHUB_WORKSPACE:/work" \
             -w /work/packages/GBAStudioEngine \
