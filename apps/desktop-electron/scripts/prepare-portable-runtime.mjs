@@ -1,7 +1,7 @@
 import { createHash } from "node:crypto";
 import { execFileSync } from "node:child_process";
 import { existsSync } from "node:fs";
-import { appendFile, chmod, copyFile, cp, mkdir, open, readFile, readdir, rename, rm, writeFile } from "node:fs/promises";
+import { appendFile, chmod, copyFile, cp, mkdir, open, readFile, readdir, realpath, rename, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -104,11 +104,23 @@ export async function preparePortableRuntime() {
     }
     hostLibraries = await linuxSharedLibraries([...await executableFiles(bin), ...await executableFiles(compilerRoot), path.join(gbaBin, "gbafix")], path.join(toolchain, "lib-host"));
     for (const name of ["make", "bash", "coreutils"]) await cp(`/usr/share/doc/${name}`, path.join(runtime, "Licenses", name), { recursive: true });
-    const packages = ["make", "bash", "coreutils", "dash", "libtinfo6", "libgcc-s1", "libstdc++6"];
+    const packages = new Set(["make", "bash", "coreutils", "dash"]);
+    for (const library of Object.values(hostLibraries)) {
+      if (library.startsWith(`${compilerRoot}/`)) continue; // Upstream compiler notices are already retained.
+      let owner;
+      const resolved = await realpath(library);
+      for (const candidate of new Set([resolved, library, resolved.replace(/^\/usr\/lib\//, "/lib/"), library.replace(/^\/lib\//, "/usr/lib/")])) {
+        try { owner = execFileSync("dpkg-query", ["-S", candidate], { encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] }).trim().split("\n")[0].split(": ")[0]; break; }
+        catch { /* Ubuntu's merged /usr paths can differ from the package database. */ }
+      }
+      if (!owner) throw new Error(`Pacote/licença da biblioteca host não identificado: ${library}`);
+      packages.add(owner);
+    }
     hostPackageVersions = execFileSync("dpkg-query", ["-W", "-f=${binary:Package}\t${Version}\t${source:Package}\t${source:Version}\n", ...packages], { encoding: "utf8" }).trim().split("\n");
     for (const name of packages) {
-      const copyright = `/usr/share/doc/${name}/copyright`;
-      if (existsSync(copyright)) { await mkdir(path.join(runtime, "Licenses", name), { recursive: true }); await copyFile(copyright, path.join(runtime, "Licenses", name, "copyright")); }
+      const copyright = `/usr/share/doc/${name.split(":")[0]}/copyright`;
+      if (!existsSync(copyright)) throw new Error(`Licença host ausente: ${name}`);
+      await mkdir(path.join(runtime, "Licenses", name), { recursive: true }); await copyFile(copyright, path.join(runtime, "Licenses", name, "copyright"));
     }
   }
   const pythonVersion = execFileSync(python, ["-I", "-c", "import PIL,sys;print(sys.version);print(PIL.__version__)"], { encoding: "utf8" });
