@@ -13,7 +13,6 @@ namespace {
 
 ProfilerRegion s_regions[profiler_max_regions] = {};
 size_t s_region_count = 0;
-uint8_t s_active_region = 0xFF;
 uint32_t s_frame_total_ticks = 0;
 uint32_t s_last_frame_total_ticks = 0;
 uint32_t s_frame_count = 0;
@@ -36,7 +35,6 @@ void profiler_reset() {
         s_regions[i] = ProfilerRegion {};
     }
     s_region_count = 0;
-    s_active_region = 0xFF;
     s_frame_total_ticks = 0;
     s_last_frame_total_ticks = 0;
     s_frame_count = 0;
@@ -52,7 +50,6 @@ uint8_t profiler_begin(const char* label) {
         region.label[i] = label[i];
     }
     s_region_count++;
-    s_active_region = index;
     region.last_ticks = read_ticks();
     return index;
 }
@@ -74,7 +71,6 @@ void profiler_end(uint8_t region) {
         r.max_ticks = delta;
     }
     s_frame_total_ticks += delta;
-    s_active_region = 0xFF;
 }
 
 void profiler_frame_begin() {
