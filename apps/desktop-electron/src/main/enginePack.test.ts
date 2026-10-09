@@ -327,6 +327,24 @@ describe("Engine Pack doctor integration", () => {
     expect(await readFile(path.join(projectDir, "build/reuse.gba"), "utf8")).toBe("rom-bytes");
   });
 
+  it("remaps equivalent staged paths reported by a POSIX make launcher", async () => {
+    const { enginePackPath, buildPath, root } = await makeSpacingSensitiveBuild();
+    const projectDir = path.join(root, "Project With Spaces");
+    await mkdir(projectDir);
+    await writeFile(path.join(projectDir, "gbastudio_project.json"), JSON.stringify({ build: { target: "paths" } }));
+    const helper = path.join(enginePackPath, "tools", "gbsbuild-spaces.js");
+    const source = await readFile(helper, "utf8");
+    await writeFile(helper, source
+      .replace('`PROJECT_DIR=${projectDir}`', "'PROJECT_DIR=' + projectDir.replaceAll(String.fromCharCode(92), '/') + '/.'")
+      .replace('`BUILD_DIR=${buildDir}`', "'BUILD_DIR=' + buildDir.replaceAll(String.fromCharCode(92), '/') + '/.'"));
+    const result = await runGbsbuildDryRun({ enginePackPath, gbsbuildPath: buildPath, projectDir });
+    expect(result.exitCode).toBe(0);
+    expect(result.summary?.projectDir).toBe(projectDir);
+    expect(result.summary?.buildDir).toBe(path.join(projectDir, "build"));
+    expect(result.summary?.command).toContain(`PROJECT_DIR=${projectDir}`);
+    expect(result.summary?.command).toContain(`BUILD_DIR=${path.join(projectDir, "build")}`);
+  });
+
   it("reports concurrent staging as a build error without sharing output", async () => {
     const {enginePackPath,buildPath,root}=await makeSpacingSensitiveBuild();
     const projectDir=path.join(root,"Shared Project"); await mkdir(projectDir);

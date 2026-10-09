@@ -13,7 +13,7 @@ export function resolveEngineToolInvocation(
   if (/\.py$/i.test(toolPath)) {
     return {
       executable: env.GBA_STUDIO_PYTHON?.trim() || (platform === "win32" ? "python" : "python3"),
-      args: [toolPath, ...args]
+      args: ["-X", "utf8", toolPath, ...args]
     };
   }
   if (platform === "win32" && /\.(cmd|bat)$/i.test(toolPath)) {

@@ -111,11 +111,11 @@ def build_make_invocation(args):
         args.make,
         *job_flags,
         "-f",
-        str(makefile),
-        f"PROJECT_DIR={project_dir}",
-        f"ENGINE_PACK={engine_pack}",
+        makefile.as_posix(),
+        f"PROJECT_DIR={project_dir.as_posix()}",
+        f"ENGINE_PACK={engine_pack.as_posix()}",
         f"TARGET={target}",
-        f"BUILD_DIR={build_dir}",
+        f"BUILD_DIR={build_dir.as_posix()}",
         f"PROJECT_SOURCES={' '.join(project_sources)}",
         f"ROM_TITLE={rom_title}",
         f"GAME_CODE={game_code}",
@@ -124,21 +124,21 @@ def build_make_invocation(args):
     ]
 
     if args.devkitpro:
-        display_command.append(f"DEVKITPRO={absolute_path(args.devkitpro)}")
+        display_command.append(f"DEVKITPRO={absolute_path(args.devkitpro).as_posix()}")
     if args.devkitarm:
-        display_command.append(f"DEVKITARM={absolute_path(args.devkitarm)}")
+        display_command.append(f"DEVKITARM={absolute_path(args.devkitarm).as_posix()}")
 
     display_command.append(make_target)
 
-    make_command = [args.make, *job_flags, "-f", str(makefile)]
+    make_command = [args.make, *job_flags, "-f", makefile.as_posix()]
     if args.clean:
         make_command.append("clean")
     make_command.append(make_target)
 
     make_env = os.environ.copy()
-    make_env["PROJECT_DIR"] = str(project_dir)
-    make_env["ENGINE_PACK"] = str(engine_pack)
-    make_env["BUILD_DIR"] = str(build_dir)
+    make_env["PROJECT_DIR"] = project_dir.as_posix()
+    make_env["ENGINE_PACK"] = engine_pack.as_posix()
+    make_env["BUILD_DIR"] = build_dir.as_posix()
     make_env["TARGET"] = target
     make_env["PROJECT_SOURCES"] = " ".join(project_sources)
     make_env["ROM_TITLE"] = rom_title
@@ -146,9 +146,9 @@ def build_make_invocation(args):
     make_env["MAKER_CODE"] = maker_code
     make_env["ROM_VERSION"] = rom_version
     if args.devkitpro:
-        make_env["DEVKITPRO"] = str(absolute_path(args.devkitpro))
+        make_env["DEVKITPRO"] = absolute_path(args.devkitpro).as_posix()
     if args.devkitarm:
-        make_env["DEVKITARM"] = str(absolute_path(args.devkitarm))
+        make_env["DEVKITARM"] = absolute_path(args.devkitarm).as_posix()
 
     return make_command, make_env, display_command
 
@@ -183,8 +183,11 @@ def digest_tree(root):
 def toolchain_files(env):
     devkitpro = Path(env.get("DEVKITPRO", "/opt/devkitpro"))
     devkitarm = Path(env.get("DEVKITARM", str(devkitpro / "devkitARM")))
-    compiler = devkitarm / "bin/arm-none-eabi-g++"
-    files = [compiler, devkitarm / "bin/arm-none-eabi-objcopy", devkitpro / "tools/bin/gbafix"]
+    def executable(file):
+        windows_file = file.with_name(file.name + ".exe")
+        return windows_file if not file.is_file() and windows_file.is_file() else file
+    compiler = executable(devkitarm / "bin/arm-none-eabi-g++")
+    files = [compiler, executable(devkitarm / "bin/arm-none-eabi-objcopy"), executable(devkitpro / "tools/bin/gbafix")]
     # The driver can stay unchanged while cc1plus, binutils or libgcc change.
     for query in ("-print-prog-name=cc1plus", "-print-prog-name=as", "-print-prog-name=ld", "-print-libgcc-file-name"):
         result = subprocess.run([str(compiler), query], env=env, capture_output=True, text=True, check=True)
@@ -414,7 +417,7 @@ def locked_build(command, env, build, clean, cache_enabled):
     stamp = build / ".gbs-compile-config"
     if not stamp.exists() or stamp.read_bytes() != config_bytes:
         stamp.write_bytes(config_bytes)
-    env["GBS_COMPILE_CONFIG"] = str(stamp).replace(" ", "\\ ")
+    env["GBS_COMPILE_CONFIG"] = stamp.as_posix().replace(" ", "\\ ")
     result = subprocess.run(command, env=env, check=False)
     if result.returncode:
         return result.returncode

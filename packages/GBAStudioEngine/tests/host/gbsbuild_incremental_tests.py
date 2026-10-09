@@ -3,7 +3,7 @@ import hashlib
 import importlib.util
 import json
 import os
-from pathlib import Path
+from pathlib import Path, PureWindowsPath
 import shutil
 import subprocess
 import sys
@@ -156,6 +156,17 @@ class IncrementalBuildTests(unittest.TestCase):
         makefile=self.pack/"templates/Makefile.gba"
         makefile.write_text(makefile.read_text()+"\n# compile configuration revision\n")
         self.assertEqual(len(self.run_build()),2)
+    def test_windows_executable_suffixes_are_hashed_for_cache_invalidation(self):
+        spec = importlib.util.spec_from_file_location("gbsbuild_tested", TOOL)
+        tool = importlib.util.module_from_spec(spec); spec.loader.exec_module(tool)
+        expected = {}
+        for relative in ("devkitARM/bin/arm-none-eabi-g++", "devkitARM/bin/arm-none-eabi-objcopy", "tools/bin/gbafix"):
+            original = self.devkit/relative
+            executable = original.with_name(original.name + ".exe")
+            original.rename(executable)
+            expected[str(executable.resolve())] = hashlib.sha256(executable.read_bytes()).hexdigest()
+        env = {**self.env, "DEVKITPRO": str(self.devkit), "DEVKITARM": str(self.devkit/"devkitARM")}
+        self.assertEqual(tool.toolchain_files(env), expected)
     def test_failed_build_cannot_reuse_previous_rom(self):
         self.run_build();(self.project/"shared.hpp").unlink()
         self.run_build(success=False)
@@ -346,6 +357,21 @@ class IncrementalBuildTests(unittest.TestCase):
             clean=False, jobs=None)
         args.__dict__.update(overrides)
         return tool, args
+
+    def test_native_windows_paths_reach_make_with_forward_slashes(self):
+        tool, args = self.invocation(engine_pack=r"C:\GBA Studio\pack",
+            project_dir=r"C:\Games\My Game", build_dir=r"C:\Games\My Game\build",
+            devkitpro=r"C:\devkitPro", devkitarm=r"C:\devkitPro\devkitARM", skip_validation=True)
+        with patch.object(tool, "absolute_path", side_effect=PureWindowsPath), \
+                patch.object(tool, "load_project_manifest", return_value={}):
+            command, env, display = tool.build_make_invocation(args)
+        self.assertEqual(env["PROJECT_DIR"], "C:/Games/My Game")
+        self.assertEqual(env["ENGINE_PACK"], "C:/GBA Studio/pack")
+        self.assertEqual(env["BUILD_DIR"], "C:/Games/My Game/build")
+        self.assertEqual(env["DEVKITPRO"], "C:/devkitPro")
+        self.assertEqual(env["DEVKITARM"], "C:/devkitPro/devkitARM")
+        self.assertIn("C:/GBA Studio/pack/templates/Makefile.gba", command)
+        self.assertIn("PROJECT_DIR=C:/Games/My Game", display)
 
     def test_default_jobs_are_bounded_by_cpu_sources_and_four(self):
         tool, args = self.invocation()

@@ -24,14 +24,14 @@ describe("Engine Pack Python tools", () => {
     const tool = "C:\\Program Files\\GBA Studio\\resources\\assetc.py";
     const args = ["--project-dir", "C:\\Jogos\\Meu jogo & teste", "ação"];
     expect(resolveEngineToolInvocation(tool, args, { platform: "win32", env: {} })).toEqual({
-      executable: "python", args: [tool, ...args]
+      executable: "python", args: ["-X", "utf8", tool, ...args]
     });
   });
 
   it("honors an explicitly configured Python executable on Linux", () => {
     expect(resolveEngineToolInvocation("/opt/GBA Studio/tools/gbsbuild.py", ["--json"], {
       platform: "linux", env: { GBA_STUDIO_PYTHON: "/opt/Python 3/bin/python3" }
-    })).toEqual({ executable: "/opt/Python 3/bin/python3", args: ["/opt/GBA Studio/tools/gbsbuild.py", "--json"] });
+    })).toEqual({ executable: "/opt/Python 3/bin/python3", args: ["-X", "utf8", "/opt/GBA Studio/tools/gbsbuild.py", "--json"] });
   });
 
   it("keeps native and macOS wrapper invocations unchanged", () => {

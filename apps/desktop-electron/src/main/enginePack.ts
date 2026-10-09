@@ -425,16 +425,19 @@ function remapBuildDryRunSummary(summary: EnginePackBuildDryRunSummary, prepared
   }
 
   const replacements = [
-    [`PROJECT_DIR=${prepared.stagedProjectDir}`, `PROJECT_DIR=${prepared.originalProjectDir}`],
-    [`BUILD_DIR=${prepared.stagedBuildDir}`, `BUILD_DIR=${prepared.originalBuildDir}`],
-    [`ENGINE_PACK=${prepared.stagedEnginePackPath}`, `ENGINE_PACK=${prepared.originalEnginePackPath}`]
-  ].filter((item): item is [string, string] => Boolean(item[0] && item[1]));
+    ["PROJECT_DIR", prepared.stagedProjectDir, prepared.originalProjectDir],
+    ["BUILD_DIR", prepared.stagedBuildDir, prepared.originalBuildDir],
+    ["ENGINE_PACK", prepared.stagedEnginePackPath, prepared.originalEnginePackPath]
+  ].filter((item): item is [string, string, string] => Boolean(item[1] && item[2]));
+  const samePath = (value: string | null | undefined, staged: string | undefined) =>
+    Boolean(value && staged && path.resolve(value) === path.resolve(staged));
 
   return {
     ...summary,
-    command: summary.command.map((item) => replacements.reduce((value, [from, to]) => value === from ? to : value, item)),
-    projectDir: summary.projectDir === prepared.stagedProjectDir ? prepared.originalProjectDir : summary.projectDir,
-    buildDir: summary.buildDir === prepared.stagedBuildDir ? prepared.originalBuildDir : summary.buildDir
+    command: summary.command.map((item) => replacements.reduce((value, [key, from, to]) =>
+      value.startsWith(`${key}=`) && samePath(value.slice(key.length + 1), from) ? `${key}=${to}` : value, item)),
+    projectDir: samePath(summary.projectDir, prepared.stagedProjectDir) ? prepared.originalProjectDir : summary.projectDir,
+    buildDir: samePath(summary.buildDir, prepared.stagedBuildDir) ? prepared.originalBuildDir : summary.buildDir
   };
 }
 
