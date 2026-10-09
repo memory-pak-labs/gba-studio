@@ -125,7 +125,7 @@ jobs:
         run: |
           deb=$(find release -maxdepth 1 -name '*.deb' -print -quit)
           test -n "$deb"
-          sudo dpkg -i "$deb"
+          sudo apt-get install -y "$PWD/$deb"
           package=$(dpkg-deb -f "$deb" Package)
           installed=$(dpkg -L "$package" | grep '/gba-studio$' | head -1)
           test -x "$installed"
