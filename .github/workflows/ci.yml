@@ -86,4 +86,4 @@ jobs:
             mingw-w64-ucrt-x86_64-clang
       - name: Test engine on Windows
         shell: msys2 {0}
-        run: make -C packages/GBAStudioEngine host-test
+        run: make -k -C packages/GBAStudioEngine host-test

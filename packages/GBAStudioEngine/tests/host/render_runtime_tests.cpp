@@ -84,11 +84,6 @@ int16_t first_hblank_scroll = 0;
 int hblank_affine_calls = 0;
 int internal_hblank_service_calls = 0;
 int hblank_disable_calls = 0;
-int hblank_affine_layer = -1;
-int16_t hblank_affine_pa = 0;
-int16_t hblank_affine_pc = 0;
-int32_t hblank_affine_x = 0;
-int32_t hblank_affine_y = 0;
 int hblank_vcount = 0;
 int text_input_keyboard_calls = 0;
 int last_text_input_keyboard_x = 0;
@@ -157,11 +152,6 @@ void reset_spy() {
     hblank_affine_calls = 0;
     internal_hblank_service_calls = 0;
     hblank_disable_calls = 0;
-    hblank_affine_layer = -1;
-    hblank_affine_pa = 0;
-    hblank_affine_pc = 0;
-    hblank_affine_x = 0;
-    hblank_affine_y = 0;
     hblank_vcount = 0;
     text_input_keyboard_calls = 0;
     last_text_input_keyboard_x = 0;
@@ -604,7 +594,9 @@ void test_hblank_affine_raster_applies_the_next_visible_line() {
     assert(affine_dma_words[6]==1234u && affine_dma_words[7]==5678u);
     gbs::emit_interrupt(gbs::InterruptSource::HBlank);
     assert(internal_hblank_service_calls==1 && hblank_affine_calls==0);
+    const int disable_calls_before = hblank_disable_calls;
     gbs::disable_hblank_effects();
+    assert(hblank_disable_calls == disable_calls_before + 1);
     gbs::remove_internal_interrupt_callback(gbs::InterruptSource::HBlank,handle);
     gbs::disable_internal_interrupt(gbs::InterruptSource::HBlank);
 }
@@ -786,13 +778,8 @@ void gbs_hw_start_hblank_bg_scroll(int layer, const int16_t* offsets) {
 }
 void gbs_hw_disable_hblank_effects(void) { ++hblank_disable_calls; }
 int gbs_hw_get_vcount(void) { return hblank_vcount; }
-void gbs_hw_apply_affine_bg_raster_line(int layer, int16_t pa, int16_t pc, int32_t x, int32_t y) {
+void gbs_hw_apply_affine_bg_raster_line(int, int16_t, int16_t, int32_t, int32_t) {
     ++hblank_affine_calls;
-    hblank_affine_layer = layer;
-    hblank_affine_pa = pa;
-    hblank_affine_pc = pc;
-    hblank_affine_x = x;
-    hblank_affine_y = y;
 }
 
 void gbs_hw_set_bg_scroll(int layer, int x, int y) {
