@@ -1,0 +1,95 @@
+{
+  "schema": 1,
+  "targets": [
+    {
+      "id": "topdown_large",
+      "kind": "topdown",
+      "rooms": 8,
+      "npcs_per_room": 4,
+      "portals_per_room": 2,
+      "stress_profile": "topdown_many_rooms",
+      "streaming_policy": { "mode": "progressive_prefetch", "max_new_banks_per_frame": 2, "max_uploads_per_frame": 2, "editorial_dma_budget_bytes": 32768 }
+    },
+    {
+      "id": "platformer_large",
+      "kind": "platformer",
+      "rooms": 4,
+      "stress_profile": "platformer_runtime",
+      "streaming_policy": { "mode": "progressive_prefetch", "max_new_banks_per_frame": 2, "max_uploads_per_frame": 2, "editorial_dma_budget_bytes": 32768 }
+    },
+    {
+      "id": "isometric_large",
+      "kind": "isometric",
+      "rooms": 4,
+      "actors_per_room": 5,
+      "stress_profile": "isometric_runtime",
+      "streaming_policy": { "mode": "progressive_prefetch", "max_new_banks_per_frame": 2, "max_uploads_per_frame": 2, "editorial_dma_budget_bytes": 32768 }
+    },
+    {
+      "id": "sprites_oam_heavy",
+      "kind": "topdown",
+      "rooms": 2,
+      "stress_profile": "sprites_oam_heavy",
+      "streaming_policy": { "mode": "progressive_prefetch", "max_new_banks_per_frame": 2, "max_uploads_per_frame": 2, "editorial_dma_budget_bytes": 32768 }
+    },
+    {
+      "id": "tilesets_vram_heavy",
+      "kind": "topdown",
+      "rooms": 3,
+      "stress_profile": "tilesets_vram_heavy",
+      "streaming_policy": { "mode": "progressive_prefetch", "max_new_banks_per_frame": 2, "max_uploads_per_frame": 2, "editorial_dma_budget_bytes": 32768 }
+    },
+    {
+      "id": "audio_heavy",
+      "kind": "topdown",
+      "rooms": 2,
+      "stress_profile": "audio_heavy",
+      "streaming_policy": { "mode": "progressive_prefetch", "max_new_banks_per_frame": 2, "max_uploads_per_frame": 2, "editorial_dma_budget_bytes": 32768 }
+    },
+    {
+      "id": "shmup_large",
+      "kind": "shmup",
+      "rooms": 6,
+      "waves": 8,
+      "enemies_per_wave": 12,
+      "stress_profile": "shmup_runtime",
+      "streaming_policy": { "mode": "transition_atomic", "max_new_banks_per_frame": 0, "max_uploads_per_frame": 0, "editorial_dma_budget_bytes": 32768 }
+    },
+    {
+      "id": "point_click_large",
+      "kind": "point_click",
+      "rooms": 8,
+      "scenes": 8,
+      "hotspots_per_scene": 12,
+      "stress_profile": "point_click_runtime",
+      "streaming_policy": { "mode": "transition_atomic", "max_new_banks_per_frame": 0, "max_uploads_per_frame": 0, "editorial_dma_budget_bytes": 32768 }
+    },
+    {
+      "id": "dungeon_crawler_large",
+      "kind": "dungeon_crawler",
+      "rooms": 6,
+      "width_tiles": 15,
+      "height_tiles": 15,
+      "stress_profile": "dungeon_crawler_runtime",
+      "streaming_policy": { "mode": "resident", "max_new_banks_per_frame": 0, "max_uploads_per_frame": 0, "editorial_dma_budget_bytes": 32768 }
+    },
+    {
+      "id": "racing_large",
+      "kind": "racing",
+      "rooms": 6,
+      "width_tiles": 30,
+      "height_tiles": 80,
+      "stress_profile": "racing_runtime",
+      "streaming_policy": { "mode": "resident", "max_new_banks_per_frame": 0, "max_uploads_per_frame": 0, "editorial_dma_budget_bytes": 32768 }
+    },
+    {
+      "id": "hardware_contention",
+      "kind": "topdown",
+      "rooms": 3,
+      "npcs_per_room": 8,
+      "portals_per_room": 2,
+      "stress_profile": "hardware_contention",
+      "streaming_policy": { "mode": "progressive_prefetch", "max_new_banks_per_frame": 2, "max_uploads_per_frame": 2, "editorial_dma_budget_bytes": 32768 }
+    }
+  ]
+}

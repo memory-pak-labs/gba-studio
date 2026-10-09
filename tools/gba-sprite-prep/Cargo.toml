@@ -1,0 +1,14 @@
+[package]
+name = "gba-sprite-prep"
+version = "0.1.0"
+edition = "2021"
+license = "MIT"
+
+[dependencies]
+image = { version = "0.24", default-features = false, features = ["png", "jpeg", "gif"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+spritefusion-pixel-snapper = { git = "https://github.com/Hugo-Dz/spritefusion-pixel-snapper.git", rev = "586836f38b107ba530c4014767cc05e4c70336ac" }
+
+[dev-dependencies]
+pretty_assertions = "1"

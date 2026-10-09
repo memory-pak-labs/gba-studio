@@ -1,0 +1,43 @@
+{
+  "schema": 1,
+  "backend": "gbastudio_engine",
+  "kind": "menu",
+  "runtime_profile": "menu",
+  "runtime_adapter": {
+    "base_runtime": "menu",
+    "adapter": "native",
+    "project_block": "menu_project",
+    "native": true
+  },
+  "entry": "main.cpp",
+  "project_data": "menu_project_data.hpp",
+  "generated_assets": [],
+  "build": {
+    "target": "exported_menu",
+    "make_target": "all"
+  },
+  "requires": {
+    "engine_pack": ">=1.59.0",
+    "features": [
+      "menu_runtime",
+      "engine_sdk.menu_project_data_contract",
+      "asset-export-menu-project-data",
+      "menu_screen_stack",
+      "menu_item_conditions",
+      "menu_toggle_items",
+      "menu_logo_title_screens",
+      "menu_click_boxes",
+      "menu_checked_values",
+      "menu_slider_items",
+      "menu_save_data",
+      "menu_autosave_slot0",
+      "menu_hud_screen_stack",
+      "save.export_project_config",
+      "asset-export-runtime-profile-manifest",
+      "runtime_profiles.menu_native_contract",
+      "dialogue.visual_box",
+      "ui.menu_selection",
+      "events.interaction"
+    ]
+  }
+}

@@ -1,0 +1,8 @@
+#define GBS_DUNGEON_CRAWLER_PROJECT_DATA_HEADER "dungeon_crawler_project_data.hpp"
+#define GBS_DUNGEON_CRAWLER_RUNTIME_ENTRY gbs_run_dungeon_crawler
+#define GBS_DUNGEON_CRAWLER_RUNTIME_ENTER gbs_enter_dungeon_crawler
+#define GBS_DUNGEON_CRAWLER_RUNTIME_UPDATE gbs_update_dungeon_crawler
+#define GBS_DUNGEON_CRAWLER_RUNTIME_RENDER gbs_render_dungeon_crawler
+#define GBS_DUNGEON_CRAWLER_RUNTIME_LEAVE gbs_leave_dungeon_crawler
+#define GBS_MULTI_RUNTIME 1
+#include "dungeon_crawler_runtime.inc"

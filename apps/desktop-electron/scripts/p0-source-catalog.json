@@ -1,0 +1,1036 @@
+{
+  "schemaVersion": 1,
+  "canonicalP0": {
+    "id": "exemplo-gba-p0",
+    "role": "canonical-p0",
+    "globalAcceptance": true,
+    "projectPath": "default-assets/templates/exemplo-gba/exemplo-gba.gba-project",
+    "acceptanceSurfaces": [
+      "editor",
+      "preview",
+      "play-window",
+      "rom"
+    ],
+    "assetPolicy": {
+      "scanRoot": "Assets",
+      "baseline": "git-tracked-canonical-files",
+      "approved": [
+        {
+          "path": "Assets/backgrounds/armazem-das-mares-gba.png",
+          "sha256": "808820ff31540bdf0f7f9da778610d76cfe119e195d6ae22e5ac12930594393d",
+          "contract": "play-background-fidelity-v1-user-approved-2026-10-02"
+        },
+        {
+          "path": "Assets/backgrounds/circuit-final-loop-v2-runtime.png",
+          "sha256": "7e1297682bbf62544310cea1cb4ce70ee21c66e8706ef0269cfa48d5f0e67e3f",
+          "contract": "play-background-fidelity-v1-user-approved-2026-10-02"
+        },
+        {
+          "path": "Assets/backgrounds/gender-selection-gba.png",
+          "sha256": "2ec9ad340c314a4bbaa5d98b440c2851f1f1294a2ae90d471d121e27b79e65ae",
+          "contract": "active-p0-assets-user-approved-2026-09-29"
+        },
+        {
+          "path": "Assets/backgrounds/name-input-bg-gba.png",
+          "sha256": "2ec9ad340c314a4bbaa5d98b440c2851f1f1294a2ae90d471d121e27b79e65ae",
+          "contract": "active-p0-assets-user-approved-2026-09-29"
+        },
+        {
+          "path": "Assets/backgrounds/observatorio-do-farol-gba.png",
+          "sha256": "5322e4cd1be4c19dbd2cfff13ce1c0d16b5f0947b9cf1ba4b76650afed07285f",
+          "contract": "play-background-fidelity-v1-user-approved-2026-10-02"
+        },
+        {
+          "path": "Assets/sprites/menu-confirm.png",
+          "sha256": "217fe91c68ba1e5fcf37903e31d5c1754cc3f44753e91d77967d0454dfbd1e48",
+          "contract": "active-p0-assets-user-approved-2026-09-29"
+        },
+        {
+          "path": "Assets/sprites/menu-entry-back.png",
+          "sha256": "af6fe496e5766e443041c58ed45f47063f4e03357b525a5b3ed41c793eee5704",
+          "contract": "active-p0-assets-user-approved-2026-09-29"
+        },
+        {
+          "path": "Assets/sprites/menu-female.png",
+          "sha256": "b8c188370eca3fbd41fcd1c91b535ffa49b30a8097f8c9a469f2bd84b65424ab",
+          "contract": "active-p0-assets-user-approved-2026-09-29"
+        },
+        {
+          "path": "Assets/sprites/menu-gender-title.png",
+          "sha256": "b6f3d8db7a2aaa8fdd23c028165f92be42b77c23e154b5f12b483323571c2464",
+          "contract": "active-p0-assets-user-approved-2026-09-29"
+        },
+        {
+          "path": "Assets/sprites/menu-inicial-credits.png",
+          "sha256": "f115857de1412f9ffba6100186459d3cd2ab0aeb04123169d1f6723cdfb21b1f",
+          "contract": "active-p0-assets-user-approved-2026-09-29"
+        },
+        {
+          "path": "Assets/sprites/menu-inicial-language.png",
+          "sha256": "5e9f4616f14fd594e76323720c0a9cd5c8d4cdcb6a9e28b5aeff913918cc9f71",
+          "contract": "active-p0-assets-user-approved-2026-09-29"
+        },
+        {
+          "path": "Assets/sprites/menu-inicial-load-game.png",
+          "sha256": "dda75475f7d0f1b040461994409721af852f72d51e2502982251fcf30584e0b9",
+          "contract": "active-p0-assets-user-approved-2026-09-29"
+        },
+        {
+          "path": "Assets/sprites/menu-inicial-new-game.png",
+          "sha256": "809114174c8a078a62c31301d3225d919b7619f43f4d4bd0dac1a454ddba38e8",
+          "contract": "active-p0-assets-user-approved-2026-09-29"
+        },
+        {
+          "path": "Assets/sprites/menu-inicial-settings.png",
+          "sha256": "e766846268a5ec0ebf159952f6be3467f4f31120e6f9638f959235cfad8862c7",
+          "contract": "active-p0-assets-user-approved-2026-09-29"
+        },
+        {
+          "path": "Assets/sprites/menu-male.png",
+          "sha256": "a25aa122a1bf956b6c3472fb08439eae7af7fba658007262a94e0731daeabcab",
+          "contract": "active-p0-assets-user-approved-2026-09-29"
+        },
+        {
+          "path": "Assets/sprites/menu-player-name-title.png",
+          "sha256": "bc71560a40d275a1cbeb9c9ed2455e72e53a2048d1972c754360d6527d47dae9",
+          "contract": "active-p0-assets-user-approved-2026-09-29"
+        },
+        {
+          "path": "Assets/sprites/opening-v3-gaivota-24x16.png",
+          "sha256": "b4346c395cfaa50e479d4782e69c7232f079e4e5d27b322262c22b2898235e0c",
+          "contract": "active-p0-assets-user-approved-2026-09-29"
+        },
+        {
+          "path": "Assets/sprites/opening-v3-guardia-idle-48x64.png",
+          "sha256": "af2c80534f985b4a171294a41b6a6e716be0ff14b2aa2954be35a2d94c2ae380",
+          "contract": "active-p0-assets-user-approved-2026-09-29"
+        },
+        {
+          "path": "Assets/sprites/opening-v3-guardia-signal-48x64.png",
+          "sha256": "8738d0df9bb0942a19103fceb028329684a922a49634c4515adb18881c447ca1",
+          "contract": "active-p0-assets-user-approved-2026-09-29"
+        },
+        {
+          "path": "Assets/sprites/opening-v3-guardia-turn-48x64.png",
+          "sha256": "13efa145c3c95504b59a82cc2eb436ce751c471ffd2efcef1a15a93022a1c60d",
+          "contract": "active-p0-assets-user-approved-2026-09-29"
+        },
+        {
+          "path": "Assets/sprites/opening-v3-menino-24x32.png",
+          "sha256": "13fab53838304ce82b4632161f227cc7b9a973077ec6727458ad9ba2c0a388dc",
+          "contract": "active-p0-assets-user-approved-2026-09-29"
+        },
+        {
+          "path": "Assets/sprites/point-click-cursor.png",
+          "sha256": "2128a2c31ae447549b1aa295215cfcfad4233e3af89c1ad91e478d98dfcac1f8",
+          "contract": "active-p0-assets-user-approved-2026-09-29"
+        },
+        {
+          "path": "Assets/backgrounds/council-v5-background.png",
+          "sha256": "98a6ccb4597f25f2156e30fed19ce7f9e9f88a5403ea5b46f1cefb1281c1cdff",
+          "contract": "play-background-fidelity-v1-user-approved-2026-10-02"
+        },
+        {
+          "path": "Assets/sprites/council-v5-guardian.png",
+          "sha256": "3bfc21f7ad507c5f47185f88d3dcc5f7b36afdcae0bbda04b9679a25ee7065bc",
+          "contract": "other-scene-actors-v1-user-approved-2026-10-01"
+        },
+        {
+          "path": "Assets/sprites/council-v5-nara.png",
+          "sha256": "cd3676e33e4fd023f2bd5aa8e279ac3e7e9217d454daf0def888d637cef1f69c",
+          "contract": "other-scene-actors-v1-user-approved-2026-10-01"
+        },
+        {
+          "path": "Assets/backgrounds/route-map-paged-v2.png",
+          "sha256": "6887d224a8490c8858fc5e66c779932ad8264f3a87535168e88c64755d88de0c",
+          "contract": "play-background-fidelity-v1-user-approved-2026-10-02"
+        },
+        {
+          "path": "Assets/sprites/route-airship-v2.png",
+          "sha256": "6ecb8e65271ff381671cb69e79455f20d77b8532a8d8977b960f6cc84b918868",
+          "contract": "world-map-v2-user-approved-source"
+        },
+        {
+          "path": "Assets/sprites/nara-racer.png",
+          "sha256": "d933dc6a743c06312ea3c343079080430272e43ff0fe1bed0a5d5cc016446185",
+          "contract": "racing-v2-user-approved-visual"
+        },
+        {
+          "path": "Assets/sprites/rival-racer.png",
+          "sha256": "e9245467a79a7c57dbefb1eacd1511ce3d5bf8148e184343166e74508431b6ce",
+          "contract": "racing-v2-user-approved-visual"
+        },
+        {
+          "path": "Assets/backgrounds/porto-lume-shmup-wide-v3-local-banks.png",
+          "sha256": "6e5825ee65d8781b0a6ee5854585c88f7a44d67264b6d78610e0d341b032e82a",
+          "contract": "tempestade-v3-user-approved-visual"
+        },
+        {
+          "path": "Assets/sprites/tempestade-v3-boss-lighthouse.png",
+          "sha256": "1b6c5dae96e02b844ce99ed943153faec785a95331975e3abd8007926714aa90",
+          "contract": "other-scene-actors-v1-user-approved-2026-10-01"
+        },
+        {
+          "path": "Assets/sprites/tempestade-v3-drone-horizontal.png",
+          "sha256": "4159bf7a1515acf622602db5c00e40874b353006eb45aa3076781f5d203dec13",
+          "contract": "tempestade-v3-user-approved-visual"
+        },
+        {
+          "path": "Assets/sprites/tempestade-v3-drone-vertical.png",
+          "sha256": "33aa60167e8c32313525e0538ae569d760a9d47d12a38489656b0e32423ce511",
+          "contract": "tempestade-v3-user-approved-visual"
+        },
+        {
+          "path": "Assets/sprites/tempestade-v3-player.png",
+          "sha256": "3eb41a92131ae9e71c384aea57457e6222ce298b64dc040549d5edb901802f8a",
+          "contract": "tempestade-v3-user-approved-visual"
+        },
+        {
+          "path": "Assets/ui/frame-acao-v2.png",
+          "sha256": "63cb4aa77e41e4878272c5cfd7ae1c06e71e4edf37fcb4bbb8dad65c477de635",
+          "contract": "hud-frame-v2-user-approved-visual"
+        },
+        {
+          "path": "Assets/ui/frame-cartografia-v2.png",
+          "sha256": "69cc020bdeee3110eb21ba5509059031ca4017e2e8edd8b50600dd8f1f697354",
+          "contract": "hud-frame-v2-user-approved-visual"
+        },
+        {
+          "path": "Assets/ui/frame-circuito-v2.png",
+          "sha256": "7b47b1c876257c3afaadab21fac31253237a29104a10421a8c061479fa3ab29b",
+          "contract": "hud-frame-v2-user-approved-visual"
+        },
+        {
+          "path": "Assets/ui/frame-lumen-v2.png",
+          "sha256": "e07c5627d5f760e0e12bf6a9fe4d8b402ad1e2f3797c56b8c23bf214740c7907",
+          "contract": "hud-frame-v2-user-approved-visual"
+        },
+        {
+          "path": "Assets/ui/frame-menus-v2.png",
+          "sha256": "ad12db74ab48cabc994da238a0cddc25ed1c376321a13209f4ad15b2a3c90fff",
+          "contract": "hud-frame-v2-user-approved-visual"
+        },
+        {
+          "path": "Assets/ui/frame-narrativa-v2.png",
+          "sha256": "51db631f72304400bdc94109c4dba47a222079ca344de18ff4bf8058e29b9807",
+          "contract": "hud-frame-v2-user-approved-visual"
+        },
+        {
+          "path": "Assets/ui/frame-tatica-v2.png",
+          "sha256": "992b292bf1ffdf40b386a29dc4196beea2e1c083a8269a645c7ebaaae8a5766d",
+          "contract": "hud-frame-v2-user-approved-visual"
+        },
+        {
+          "path": "Assets/ui/frame-usina-v2.png",
+          "sha256": "2d971e4469ce4b58c7ab93b0488f93b86a87b480f16e0158a06f78bf44f23bd7",
+          "contract": "hud-frame-v2-user-approved-visual"
+        },
+        {
+          "path": "Assets/backgrounds/tactical-v5-surface.png",
+          "sha256": "df1a3c5538911918664da5cc510c78329ab64752b01c81e6b5ae9b70d236589b",
+          "contract": "arena-tatica-v5-user-approved-visual"
+        },
+        {
+          "path": "Assets/ui/tactical-v5-hud.png",
+          "sha256": "930ae3c711646aae75460b3e291902cb17e6076715cf9c29fb9b146dd0ddd8df",
+          "contract": "arena-tatica-v5-user-approved-visual"
+        },
+        {
+          "path": "Assets/sprites/tactical-nara-v5.png",
+          "sha256": "3c8b653e7b9a113184a956b9202777441c1119c0a70d0aab8c6a8ca5d90bb72b",
+          "contract": "arena-tatica-v5-hurt-v2-user-approved-visual"
+        },
+        {
+          "path": "Assets/sprites/tactical-sentinel-v5.png",
+          "sha256": "a2b38a3671857e7650cb3b51f034a85c6656ff0f83baff91de307b26e2668c25",
+          "contract": "arena-tatica-v5-hurt-v2-user-approved-visual"
+        },
+        {
+          "path": "Assets/fonts/gba-dialogue-font-v3.png",
+          "sha256": "c11501185dfdd6bd20b63b9670796c32445663bdd572789d9934c29b4eec3798",
+          "contract": "dialogue-font-v4-latin-user-approved"
+        },
+        {
+          "path": "Assets/backgrounds/opening-v4-per-tile-14-banks.png",
+          "sha256": "071905536628830df779a17d758eb4c9373baf14076612927680cb5f03d5ee74",
+          "contract": "opening-v4-user-approved-14-banks"
+        },
+        {
+          "path": "Assets/backgrounds/title-day-centered-240x160-4bpp.png",
+          "sha256": "34de4e4b73def5a18a7e55d6fac176ca2b6fd99e2d39231935a2bcd075f6daf9",
+          "contract": "title-v2-user-approved-runtime-attention"
+        },
+        {
+          "path": "Assets/sprites/title-logo-actor-128x88.png",
+          "sha256": "f2fa056433d6b43629edb8ef65a9d1fb0ced41b391030a84bdf96931f021c3e0",
+          "contract": "title-v2-user-approved-runtime-attention"
+        },
+        {
+          "path": "Assets/sprites/press-start-actor-88x32.png",
+          "sha256": "b3c0d69aa24afe1b4d4bde7aca15ba10a8f7fb03b94150271b34dffecdd2669c",
+          "contract": "title-v2-user-approved-runtime-attention"
+        },
+        {
+          "path": "Assets/sprites/tactical-cursor-diamond-32x16-v1.png",
+          "sha256": "823a618bb9aff43fea787d681f4bba03f65bfee8dd13c33e916e5b89268af809",
+          "contract": "tactical-diamond-v1-user-approved-32x16"
+        },
+        {
+          "path": "Assets/sprites/tactical-range-diamond-32x16-v1.png",
+          "sha256": "0ddafc12ba15fd63a9e05339b8640c64ecf5e9e90156015e2820a61cd034eff6",
+          "contract": "tactical-diamond-v1-user-approved-32x16"
+        },
+        {
+          "path": "Assets/sprites/tactical-target-diamond-32x16-v1.png",
+          "sha256": "4318099a7566f2f55756d4754cef4c36564a25742851b290e02e13705fa67110",
+          "contract": "tactical-diamond-v1-user-approved-32x16"
+        },
+        {
+          "path": "Assets/sprites/point-click-dock-mechanic.png",
+          "sha256": "92affc7975e87a8392a85e50349eb4676bb84a92e4441ccc92775c88936df5f9",
+          "contract": "point-click-npc-32x48-v2-user-approved-visual"
+        },
+        {
+          "path": "Assets/sprites/point-click-keeper-lantern.png",
+          "sha256": "1f329d1a7e6ac111a171e186ebf813105eac8100bc062e370729bde93a357232",
+          "contract": "point-click-npc-32x48-v2-user-approved-visual"
+        },
+        {
+          "path": "Assets/sprites/point-click-lia-scroll.png",
+          "sha256": "5fd4d8fea4d5ecb1553502165f50a22b1207843bcbcb8c6f29483a3d59be2ee0",
+          "contract": "point-click-npc-32x48-v2-user-approved-visual"
+        },
+        {
+          "path": "Assets/backgrounds/penedos-platformer-v8.png",
+          "sha256": "4f8e1ccca29ee918020b058548c2c6f8eac28af9beff2acce6c9c09090ca13c4",
+          "contract": "platformer-v8-user-approved-source-runtime-attention"
+        },
+        {
+          "path": "Assets/sprites/penedos-v7-player.png",
+          "sha256": "0c8a1c5e8213b62def59561c90f31f1b223f4ff074872e75413735c7df700484",
+          "contract": "other-scene-actors-v1-user-approved-2026-10-01"
+        },
+        {
+          "path": "Assets/sprites/penedos-v7-crab.png",
+          "sha256": "6ad0cf3353f370d2215c31dd004a0749c8bd4a3208d3bd47fe650d869f59a2fa",
+          "contract": "other-scene-actors-v1-user-approved-2026-10-01"
+        },
+        {
+          "path": "Assets/sprites/penedos-v7-moth.png",
+          "sha256": "1a970bac9056a46a7aecace9c0642e93a0186feab98f77ef15dd09e3af0c7442",
+          "contract": "other-scene-actors-v1-user-approved-2026-10-01"
+        },
+        {
+          "path": "Assets/sprites/penedos-v7-slime.png",
+          "sha256": "7746e3e7b5f427d0b83a88184f165a2e6096ffc8ada19e014a86e67b878cfeb6",
+          "contract": "other-scene-actors-v1-user-approved-2026-10-01"
+        },
+        {
+          "path": "Assets/sprites/penedos-v7-rock.png",
+          "sha256": "eb653df6c1b695b606f457b0f84b6bd69e11c43ceef68eefca5fc9add4695c0e",
+          "contract": "other-scene-actors-v1-user-approved-2026-10-01"
+        },
+        {
+          "path": "Assets/sprites/penedos-v7-npc.png",
+          "sha256": "06ff313d2c1839c68ea6d3830508630fc85fe4703e47556166c5304ed113a226",
+          "contract": "other-scene-actors-v1-user-approved-2026-10-01"
+        },
+        {
+          "path": "Assets/sprites/penedos-v7-checkpoint.png",
+          "sha256": "d6d699809f4c13f023e29678741b76cda3b18d83f637eb14ff435f88a3facfba",
+          "contract": "other-scene-actors-v1-user-approved-2026-10-01"
+        },
+        {
+          "path": "Assets/sprites/penedos-v7-signpost.png",
+          "sha256": "50f27a61c2e60612cf710308f4ca9f14ca63c8cf6d64bf2f0f055d0e7df81089",
+          "contract": "other-scene-actors-v1-user-approved-2026-10-01"
+        },
+        {
+          "path": "Assets/sprites/nara-topdown.png",
+          "sha256": "d60684b930e4b210e1c6a07962e4ca2993b0c7ea8bd2f3fd1a83f6faf4c7875c",
+          "contract": "topdown-player-32x64-9-frames"
+        },
+        {
+          "path": "Assets/sprites/player-pilot-32x32.png",
+          "sha256": "4089313016c9bc9674ec2ce6857efd4b3a6ab4c14fde5fa03c613aa611fc1472",
+          "contract": "porto-lume-topdown-player-32x32-8-directional-frames"
+        },
+        {
+          "path": "Assets/sprites/npc-captain-pilot-32x32.png",
+          "sha256": "44ba073d05e121562f64fdb4505ef33df9a827201a4e6587d8158fe4404e4acf",
+          "contract": "porto-lume-topdown-npc-32x32-8-directional-frames"
+        },
+        {
+          "path": "Assets/sprites/traveler-pilot-32x32.png",
+          "sha256": "4beb55d8269e894805d768eeb567b09cde2813ff0dba1f5c83506bd63dc767b0",
+          "contract": "porto-lume-topdown-npc-32x32-8-directional-frames"
+        },
+        {
+          "path": "Assets/sprites/mechanic-pilot-32x32.png",
+          "sha256": "446a12d681ea866d309a03a778d0df89540b5884c948adb409046591b5f3dc97",
+          "contract": "porto-lume-topdown-npc-32x32-8-directional-frames"
+        },
+        {
+          "path": "Assets/sprites/cartographer-pilot-32x32.png",
+          "sha256": "9ead522ec3998b5abeb4b582bbc104acd0155dcaa958e508d46457466fbeb467",
+          "contract": "porto-lume-topdown-npc-32x32-8-directional-frames"
+        },
+        {
+          "path": "Assets/sprites/fisherchild-pilot-32x32.png",
+          "sha256": "94cf165566205a54cae5e9b5d73164b5102f1668c8cecaa02d77487286f1eae6",
+          "contract": "porto-lume-topdown-npc-32x32-8-directional-frames"
+        },
+        {
+          "path": "Assets/sprites/lighthousekeeper-pilot-32x32.png",
+          "sha256": "eccfecbe2f82352050cfeca6b5ac119b1e5e110842aad31e08648c462fa8e091",
+          "contract": "porto-lume-topdown-npc-32x32-8-directional-frames"
+        },
+        {
+          "path": "Assets/backgrounds/porto-lume-exterior-topdown-gba.png",
+          "sha256": "02193f95986e003ee017fb9e7e28d719fbe0318557ce326873e74556b8f700c6",
+          "contract": "porto-lume-topdown-background-480x320-assetc-per-tile"
+        },
+        {
+          "path": "Assets/backgrounds/farol-interior-topdown-gba.png",
+          "sha256": "fca87f4510a4426ac2ae30e71c6c862541c9cc8285e00b98fff666f2fcaf7e23",
+          "contract": "lighthouse-interior-topdown-background-480x320-assetc-per-tile"
+        },
+        {
+          "path": "Assets/backgrounds/farol-interior-topdown-360x240-gba.png",
+          "sha256": "e8944a17ea51d4c2ca65432331a3cb36545fa7a2d4aefbd9b24d01f077924181",
+          "contract": "lighthouse-interior-topdown-background-360x240-assetc-4bpp"
+        },
+        {
+          "path": "Assets/sprites/nara-mercado-isometric-v2.png",
+          "sha256": "0305edfe85d6253f8eea6be3f9fb93dcc18bbe8d97e70e5be67fd49cf3068b29",
+          "contract": "isometric-market-actor-48x48-16-frames-4-objs"
+        },
+        {
+          "path": "Assets/sprites/market-trader-v2.png",
+          "sha256": "45732c29219b2b73452a771f27873bf755b17d8386d63997765d4bd11858dde6",
+          "contract": "isometric-market-actor-48x48-16-frames-4-objs"
+        },
+        {
+          "path": "Assets/backgrounds/arena-gba.png",
+          "sha256": "16df2d3c529bdff6f9342aa2a71be958fe68fd0b80c5e1c05d2b916e5fb3129b",
+          "contract": "luta-background-240x160-assetc-4bpp-16-banks"
+        },
+        {
+          "path": "Assets/sprites/nara-fighter.png",
+          "sha256": "9cb22e4861725b9a6e74274c7c5756360b2d0204d2696724159b3e99bfe44bf5",
+          "contract": "luta-player-64x64-6-frames-adaptive-15color"
+        },
+        {
+          "path": "Assets/sprites/rival-fighter.png",
+          "sha256": "fcd446b1fb7c7bcba6549d545c62859e88fe91a292704af230993bf66cc43376",
+          "contract": "luta-rival-64x64-6-frames-adaptive-15color"
+        },
+        {
+          "path": "Assets/backgrounds/mercado-adventure-surface.png",
+          "sha256": "cb4944b1b5f9d0837908711db5c743b5a23ff5c6ca9e505c5114d495b8808255",
+          "contract": "mercado-adventure-2026-09-27-user-approved-play-rom"
+        },
+        {
+          "path": "Assets/backgrounds/mercado-adventure-foreground.png",
+          "sha256": "09e9776f99091f4753e9474cacbf9f3731843a285c8b159503760efec7133844",
+          "contract": "mercado-adventure-2026-09-27-user-approved-play-rom"
+        },
+        {
+          "path": "Assets/sprites/market-adventure-merchant.png",
+          "sha256": "672d6d808cd22bc08823a7b70caccb66efe69bab38ba4b3a3105b2b1a77a8d68",
+          "contract": "other-scene-actors-v1-user-approved-2026-10-01"
+        },
+        {
+          "path": "Assets/sprites/market-adventure-guard.png",
+          "sha256": "7ad4bac9e1dd0e87e52610a335fc63470d604b96dcddedc8ed4706e3eb591fb5",
+          "contract": "mercado-adventure-2026-09-27-user-approved-play-rom"
+        },
+        {
+          "path": "Assets/backgrounds/usina-exploration-background-v3-4bpp.png",
+          "sha256": "ab72f82cbb17d0f0234d60df315ab14eb4acbd024c1450da5405e92825a9193c",
+          "contract": "usina-v3-2026-09-24-user-approved-play-rom"
+        },
+        {
+          "path": "Assets/backgrounds/usina-combat-background-v3-4bpp.png",
+          "sha256": "cafc1a82ed253a2b8b7d88f0bfe36b1f2850436ef2111918946d83e88932f3ba",
+          "contract": "usina-v3-2026-09-24-user-approved-play-rom"
+        },
+        {
+          "path": "Assets/backgrounds/usina-exit-background-v3-4bpp.png",
+          "sha256": "616e5b2fde975d64abecb8ea87fc8950fd2e4643a89c7b6448cee0d169aee689",
+          "contract": "usina-v3-2026-09-24-user-approved-play-rom"
+        },
+        {
+          "path": "Assets/sprites/sentinel-depth-far-mid-near-192x64-v3-4bpp.png",
+          "sha256": "5f7ab181c7d5f83fc14b1908bd7eefecec8f8f64e8ab0361efeed7e2d2cde0c1",
+          "contract": "usina-v3-2026-09-24-user-approved-play-rom"
+        },
+        {
+          "path": "Assets/sprites/usina-energy-cell-v3-4bpp.png",
+          "sha256": "73924f37e56fc3b7e955e4706a2e5bced530a4eeb439dd519bbadc7ca249bf13",
+          "contract": "usina-v3-2026-09-24-user-approved-play-rom"
+        },
+        {
+          "path": "Assets/sprites/hud-usina-exploration-v3-4bpp.png",
+          "sha256": "b7026521777d5d7b8c166248e1796f035ef3bc74282cfbc21b919aa35b25d53c",
+          "contract": "usina-v3-2026-09-24-user-approved-play-rom"
+        },
+        {
+          "path": "Assets/sprites/hud-usina-combat-v3-4bpp.png",
+          "sha256": "5392cb4b42aa1b3c0273343ebd71d91df4dbcb4a0d8dd8d2587876380dca5846",
+          "contract": "usina-v3-2026-09-24-user-approved-play-rom"
+        },
+        {
+          "path": "Assets/sprites/hud-usina-exit-v3-4bpp.png",
+          "sha256": "724d3ef4c8b7b8a1392269cb53592fba7b89242a3912629d0f1034adcd852e5e",
+          "contract": "usina-v3-2026-09-24-user-approved-play-rom"
+        },
+        {
+          "path": "Assets/backgrounds/menu-inicial-v3-gba.png",
+          "sha256": "2ec9ad340c314a4bbaa5d98b440c2851f1f1294a2ae90d471d121e27b79e65ae",
+          "contract": "menu-reset-2026-09-24-exact-file-visual-only"
+        },
+        {
+          "path": "Assets/sprites/gender-player-male-32x64.png",
+          "sha256": "09d0f98b003dd9ed40b0af1ae200f7cff7baf95c3b918764f0de6804e082069c",
+          "contract": "menu-reset-2026-09-24-exact-file-visual-only"
+        },
+        {
+          "path": "Assets/sprites/gender-player-female-32x64.png",
+          "sha256": "505fe2fd1fc40e290d9cf3747d69a6b947c5d378360082518597cfe2bfd75bd5",
+          "contract": "menu-reset-2026-09-24-exact-file-visual-only"
+        },
+        {
+          "path": "Assets/backgrounds/gender-selection-approved-v2-gba.png",
+          "sha256": "134e057318411dd6c72d46267347e229bf5fed0a19d5f78269bed7a0ac4823dd",
+          "contract": "character-selection-user-approved-2026-09-30"
+        },
+        {
+          "path": "Assets/sprites/gender-portrait-male-gba.png",
+          "sha256": "e9cb5a541db113f879056a86563e3b79eebbe7361f143d54ccb7f3932b15038b",
+          "contract": "character-selection-user-approved-2026-09-30"
+        },
+        {
+          "path": "Assets/sprites/gender-portrait-female-gba.png",
+          "sha256": "cebbf3f3fde313dfb881a207f1ce8597ea6a259fbebd905fd0be0ac2613339bb",
+          "contract": "character-selection-user-approved-2026-09-30"
+        },
+        {
+          "path": "Assets/sprites/gender-gold-frame-male-gba.png",
+          "sha256": "a5c9b8d558437d5ea269e75f8b2b58dbf154dbd45c13ec5105ce80aaf2b8a8fb",
+          "contract": "character-selection-user-approved-2026-09-30"
+        },
+        {
+          "path": "Assets/backgrounds/name-input-approved-v2-gba.png",
+          "sha256": "84c409dac0b80b0bffc1190808ac0fd1e79a4d3e9cb4b53bfdee29d97ccc3f9b",
+          "contract": "character-selection-user-approved-2026-09-30"
+        },
+        {
+          "path": "Assets/sprites/name-portrait-male-gba.png",
+          "sha256": "a5fa43fe490dff2fb7d5ed06a30cee6a110cd17667a796e379defd7e626b34b6",
+          "contract": "other-scene-actors-v1-user-approved-2026-10-01"
+        },
+        {
+          "path": "Assets/sprites/name-portrait-female-gba.png",
+          "sha256": "f1f51e78b7ec4da03c77349ed7b1089705a669a260f58601bee5c84978f1f093",
+          "contract": "other-scene-actors-v1-user-approved-2026-10-01"
+        },
+        {
+          "path": "Assets/backgrounds/neutral-carregar_jogo-gba.png",
+          "sha256": "691b0924601d69040d11df706357dfb9dc1fe628fd85f1f0a0b237bc66fc3d27",
+          "contract": "neutral-menus-v3-bg-v2-actors-user-approved-2026-09-30"
+        },
+        {
+          "path": "Assets/backgrounds/neutral-configuracoes-gba.png",
+          "sha256": "b951169d26b248b39c34f8548df29a263ce46aba80b274f0bf0aea4f9a560a96",
+          "contract": "neutral-menus-v3-bg-v2-actors-user-approved-2026-09-30"
+        },
+        {
+          "path": "Assets/backgrounds/neutral-creditos-gba.png",
+          "sha256": "cf413e4fddc45fbf966c9ef1ff8c317629a1983a65e73f9081ef233defbba579",
+          "contract": "neutral-menus-v3-bg-v2-actors-user-approved-2026-09-30"
+        },
+        {
+          "path": "Assets/backgrounds/neutral-inventario-gba.png",
+          "sha256": "839cd62bc53e9096569cc1996ad14de621032da44d22b5d0eb5d864d3088c0e9",
+          "contract": "neutral-menus-v3-bg-v2-actors-user-approved-2026-09-30"
+        },
+        {
+          "path": "Assets/backgrounds/neutral-mapa_menu-gba.png",
+          "sha256": "403b41481224382e3831eaf5e23e9e436e6fea961f60085bdc59da5605c0b0d1",
+          "contract": "neutral-menus-v3-bg-v2-actors-user-approved-2026-09-30"
+        },
+        {
+          "path": "Assets/backgrounds/neutral-menu_start-gba.png",
+          "sha256": "ed17cf76292484b53bde883a1c5270b3f5453fbf8b08443117495def5887e7e5",
+          "contract": "neutral-menus-v3-bg-v2-actors-user-approved-2026-09-30"
+        },
+        {
+          "path": "Assets/backgrounds/neutral-missoes-gba.png",
+          "sha256": "6f742a6feb23fade9b75fc9973e15cfbf758a0bd982ef136dc4262e895faa5cb",
+          "contract": "neutral-menus-v3-bg-v2-actors-user-approved-2026-09-30"
+        },
+        {
+          "path": "Assets/backgrounds/neutral-salvar-gba.png",
+          "sha256": "80db4de3ccbeb3488c4124e16d640400db3931d080f7f8d617380958b9dd12a6",
+          "contract": "neutral-menus-v3-bg-v2-actors-user-approved-2026-09-30"
+        },
+        {
+          "path": "Assets/fonts/neutral-menu-font-gba.png",
+          "sha256": "ad8c4991158a27af14e8ae5ca27e35f9d91a7683d6b3fd19680e9b96e4927147",
+          "contract": "neutral-menus-v3-bg-v2-actors-user-approved-2026-09-30"
+        },
+        {
+          "path": "Assets/sprites/neutral-arrow-right-gba.png",
+          "sha256": "4667f4778683f7ccf27a0f3294f3459d5138b7e0ceec9f308506820d801d061d",
+          "contract": "neutral-menus-v3-bg-v2-actors-user-approved-2026-09-30"
+        },
+        {
+          "path": "Assets/sprites/neutral-bag-gba.png",
+          "sha256": "2d92ea94208dd4ad17c85b50ea4518a87fd09f4af128957c54028592c4359b17",
+          "contract": "neutral-menus-v3-bg-v2-actors-user-approved-2026-09-30"
+        },
+        {
+          "path": "Assets/sprites/neutral-compact-bag-gba.png",
+          "sha256": "580c6b2539f4a385f4ec1281a20f833d8e039b3b0d559d4df0885f17fb0915a2",
+          "contract": "neutral-menus-v3-bg-v2-actors-user-approved-2026-09-30"
+        },
+        {
+          "path": "Assets/sprites/neutral-compact-gear-gba.png",
+          "sha256": "0ac2896ea98204165b2cde4627d29ccd8a829b4a58d3d8af1986ed56f082ac98",
+          "contract": "neutral-menus-v3-bg-v2-actors-user-approved-2026-09-30"
+        },
+        {
+          "path": "Assets/sprites/neutral-compact-item-aderencia-gba.png",
+          "sha256": "042d700b2b2100187fe7f5a56bed76686f7891c1f702950750cb7ad5a10d19e9",
+          "contract": "neutral-menus-v3-bg-v2-actors-user-approved-2026-09-30"
+        },
+        {
+          "path": "Assets/sprites/neutral-compact-item-blindagem-gba.png",
+          "sha256": "1a7b6deb568483189d74f42d2d8de61a5ee7c9053a24fc829db0e5c50539fc5c",
+          "contract": "neutral-menus-v3-bg-v2-actors-user-approved-2026-09-30"
+        },
+        {
+          "path": "Assets/sprites/neutral-compact-item-celula-gba.png",
+          "sha256": "8f88a1c18923f1bda945909ffddbd7ed3ebc704967d4e2495af4efd09215d35c",
+          "contract": "neutral-menus-v3-bg-v2-actors-user-approved-2026-09-30"
+        },
+        {
+          "path": "Assets/sprites/neutral-compact-item-estrutura-gba.png",
+          "sha256": "089a971b8f3842f5de589add78d65b91519404f2d4212809e5300ce1aeb59eb2",
+          "contract": "neutral-menus-v3-bg-v2-actors-user-approved-2026-09-30"
+        },
+        {
+          "path": "Assets/sprites/neutral-compact-item-impulso-gba.png",
+          "sha256": "154203abb988e4ba0def8666ccd9b5062ad7e0d2c63d1c31ffc3683db5b941d3",
+          "contract": "neutral-menus-v3-bg-v2-actors-user-approved-2026-09-30"
+        },
+        {
+          "path": "Assets/sprites/neutral-compact-map-gba.png",
+          "sha256": "7cc05fb14a694468bf3e0eb08189580a96f4192d404c1e289c6d55c5bf58887a",
+          "contract": "neutral-menus-v3-bg-v2-actors-user-approved-2026-09-30"
+        },
+        {
+          "path": "Assets/sprites/neutral-compact-marker-armazem-gba.png",
+          "sha256": "181383b476cc5f4167278a169aca5b2f1b57904c16222f1f96b124ea8a929477",
+          "contract": "neutral-menus-v3-bg-v2-actors-user-approved-2026-09-30"
+        },
+        {
+          "path": "Assets/sprites/neutral-compact-marker-circuito-gba.png",
+          "sha256": "217d475f12599411bebbe9d873cb634a8e939bfd3e2b4f7bfe3a6438830d32a5",
+          "contract": "neutral-menus-v3-bg-v2-actors-user-approved-2026-09-30"
+        },
+        {
+          "path": "Assets/sprites/neutral-compact-marker-conselho-gba.png",
+          "sha256": "2ecab6fc9d165eb10067ecf1f249022eb7963fd51872719e0819fcbd11977f81",
+          "contract": "neutral-menus-v3-bg-v2-actors-user-approved-2026-09-30"
+        },
+        {
+          "path": "Assets/sprites/neutral-compact-marker-mercado-gba.png",
+          "sha256": "74f975b6aad1ddf0e2031554b72b5858cbd57eec8340b4aa9077d5fdf0b63fa9",
+          "contract": "neutral-menus-v3-bg-v2-actors-user-approved-2026-09-30"
+        },
+        {
+          "path": "Assets/sprites/neutral-compact-marker-observatorio-gba.png",
+          "sha256": "aa0c04ca3ed9b2deb176f210d1250decdc48e1350e41e1ff1bcd32affc269488",
+          "contract": "neutral-menus-v3-bg-v2-actors-user-approved-2026-09-30"
+        },
+        {
+          "path": "Assets/sprites/neutral-compact-marker-penedos-gba.png",
+          "sha256": "352f8892b2027da3f8fcd0d9a2c9b46fd2bb246e2efd1d79dc5c8f736960c1ca",
+          "contract": "neutral-menus-v3-bg-v2-actors-user-approved-2026-09-30"
+        },
+        {
+          "path": "Assets/sprites/neutral-compact-marker-porto-gba.png",
+          "sha256": "6aad5bebf8db272b86ce9732b36dfefcd058880f548d84f314a593e417376296",
+          "contract": "neutral-menus-v3-bg-v2-actors-user-approved-2026-09-30"
+        },
+        {
+          "path": "Assets/sprites/neutral-compact-marker-usina-gba.png",
+          "sha256": "84ce9392a1697da21f518f958c80f9c781ccf1dcaec67a4d1677cd5847f3bf27",
+          "contract": "neutral-menus-v3-bg-v2-actors-user-approved-2026-09-30"
+        },
+        {
+          "path": "Assets/sprites/neutral-compact-mission-gba.png",
+          "sha256": "e8151c6348530de7fec5cc448ac46528856d05dc87cd97a3e10b9a5686e5e5eb",
+          "contract": "neutral-menus-v3-bg-v2-actors-user-approved-2026-09-30"
+        },
+        {
+          "path": "Assets/sprites/neutral-compact-return-gba.png",
+          "sha256": "737dec4a99704b70dd910f0d48f306b085056795251b3a34541a220227d234e7",
+          "contract": "neutral-menus-v3-bg-v2-actors-user-approved-2026-09-30"
+        },
+        {
+          "path": "Assets/sprites/neutral-compact-save-gba.png",
+          "sha256": "0976bf2cd92508df71cccfd3e10436eb5baf1c7c2e4eb9225d9a2e5dd85984aa",
+          "contract": "neutral-menus-v3-bg-v2-actors-user-approved-2026-09-30"
+        },
+        {
+          "path": "Assets/sprites/neutral-detail-item-aderencia-gba.png",
+          "sha256": "647c097076819b4f8e1987618b1b2f970ae0d0840c277bbc572dda21cbda14aa",
+          "contract": "neutral-menus-v3-bg-v2-actors-user-approved-2026-09-30"
+        },
+        {
+          "path": "Assets/sprites/neutral-detail-item-blindagem-gba.png",
+          "sha256": "d15c79175803808ce15bdc9e1cb1ded6e21b86c3567f418262771d4822a78df6",
+          "contract": "neutral-menus-v3-bg-v2-actors-user-approved-2026-09-30"
+        },
+        {
+          "path": "Assets/sprites/neutral-detail-item-celula-gba.png",
+          "sha256": "6d584b36cd121c80f57133807c7bfab5d6e0c174ed7ceee5fb78aa5e991864ca",
+          "contract": "neutral-menus-v3-bg-v2-actors-user-approved-2026-09-30"
+        },
+        {
+          "path": "Assets/sprites/neutral-detail-item-estrutura-gba.png",
+          "sha256": "0c22de9562e3e79cbc5e89848c447bd8ea4c13e87ad1c29765188bc9321d2985",
+          "contract": "neutral-menus-v3-bg-v2-actors-user-approved-2026-09-30"
+        },
+        {
+          "path": "Assets/sprites/neutral-detail-item-impulso-gba.png",
+          "sha256": "a7e532260b3b3f6c223182d0b686d1cb0f4949750f323ed7a3272ced790f36a1",
+          "contract": "neutral-menus-v3-bg-v2-actors-user-approved-2026-09-30"
+        },
+        {
+          "path": "Assets/sprites/neutral-gear-gba.png",
+          "sha256": "21b55b968992371de80f63e7be4954c40d2f4267dd72fdfe241b02cc1e491cbc",
+          "contract": "neutral-menus-v3-bg-v2-actors-user-approved-2026-09-30"
+        },
+        {
+          "path": "Assets/sprites/neutral-item-aderencia-gba.png",
+          "sha256": "aa6514abf8d7a2239870f2caa8c72175682760c6acb69857fa84b6276fbf7a27",
+          "contract": "neutral-menus-v3-bg-v2-actors-user-approved-2026-09-30"
+        },
+        {
+          "path": "Assets/sprites/neutral-item-blindagem-gba.png",
+          "sha256": "0ee2a4b14238d2566a8d4019479b9957c8771d7549c18ef5f7ed676a48285610",
+          "contract": "neutral-menus-v3-bg-v2-actors-user-approved-2026-09-30"
+        },
+        {
+          "path": "Assets/sprites/neutral-item-celula-gba.png",
+          "sha256": "88c5ad781d6aff88a8a6f883c4c3be022152de42197b5fce7ae529e25f68d08b",
+          "contract": "neutral-menus-v3-bg-v2-actors-user-approved-2026-09-30"
+        },
+        {
+          "path": "Assets/sprites/neutral-item-estrutura-gba.png",
+          "sha256": "ccfbf9230a08841698b5a3608675872d5b59d0ecfc23f648da0be56d2463f55d",
+          "contract": "neutral-menus-v3-bg-v2-actors-user-approved-2026-09-30"
+        },
+        {
+          "path": "Assets/sprites/neutral-item-impulso-gba.png",
+          "sha256": "ae6fd1e67872f16b3c7eb54f2b987d6fff08db052a1ed65489aee9ee7a8642e5",
+          "contract": "neutral-menus-v3-bg-v2-actors-user-approved-2026-09-30"
+        },
+        {
+          "path": "Assets/sprites/neutral-map-gba.png",
+          "sha256": "dd25709daa499a02a5af2405b1826919028f94cbd8f4a7c22a37b784b629dd11",
+          "contract": "neutral-menus-v3-bg-v2-actors-user-approved-2026-09-30"
+        },
+        {
+          "path": "Assets/sprites/neutral-marker-armazem-gba.png",
+          "sha256": "c7da7f29902cb939232767c6c69aee74b57fff4a1c6b52f9c479b6787dea3575",
+          "contract": "neutral-menus-v3-bg-v2-actors-user-approved-2026-09-30"
+        },
+        {
+          "path": "Assets/sprites/neutral-marker-circuito-gba.png",
+          "sha256": "32b0176e3666fa0b3a9aac7defade792afc00f3351a333dcdd69a33d13116b65",
+          "contract": "neutral-menus-v3-bg-v2-actors-user-approved-2026-09-30"
+        },
+        {
+          "path": "Assets/sprites/neutral-marker-conselho-gba.png",
+          "sha256": "24c3748048611d5e283ef8260f4c87ebc5541bae1750270f8563e5a44b68469b",
+          "contract": "neutral-menus-v3-bg-v2-actors-user-approved-2026-09-30"
+        },
+        {
+          "path": "Assets/sprites/neutral-marker-mercado-gba.png",
+          "sha256": "c5e8cf3d3837c45547bac79f6d86f51cc93f59fe8748050be17e124ef58c92db",
+          "contract": "neutral-menus-v3-bg-v2-actors-user-approved-2026-09-30"
+        },
+        {
+          "path": "Assets/sprites/neutral-marker-observatorio-gba.png",
+          "sha256": "599ebc461b671bf62f1b62072deb780cbbc14a859247f08feebb3c9b8b398fb9",
+          "contract": "neutral-menus-v3-bg-v2-actors-user-approved-2026-09-30"
+        },
+        {
+          "path": "Assets/sprites/neutral-marker-penedos-gba.png",
+          "sha256": "c2c16ccce4f198b4953761eb542021fad769492acd943380dea4b12d430695c6",
+          "contract": "neutral-menus-v3-bg-v2-actors-user-approved-2026-09-30"
+        },
+        {
+          "path": "Assets/sprites/neutral-marker-porto-gba.png",
+          "sha256": "c6e5c9e92ccd3295257e3c160311ee45f316f56f7586cbf85ecff3ff663a30bb",
+          "contract": "neutral-menus-v3-bg-v2-actors-user-approved-2026-09-30"
+        },
+        {
+          "path": "Assets/sprites/neutral-marker-usina-gba.png",
+          "sha256": "dd0d11125de40621fcdae2b11e74af295b39e1c36f5ec774553384483fa74913",
+          "contract": "neutral-menus-v3-bg-v2-actors-user-approved-2026-09-30"
+        },
+        {
+          "path": "Assets/sprites/neutral-mission-gba.png",
+          "sha256": "656e8391b820db7983137759af117c77e769960ec9f2e65ae9b0de25f59cbdc7",
+          "contract": "neutral-menus-v3-bg-v2-actors-user-approved-2026-09-30"
+        },
+        {
+          "path": "Assets/sprites/neutral-portrait-female-gba.png",
+          "sha256": "655e9be913a75595680af3db7a0b5b18475d0e19b1bde887e9cb8bed8072a644",
+          "contract": "neutral-menus-v3-bg-v2-actors-user-approved-2026-09-30"
+        },
+        {
+          "path": "Assets/sprites/neutral-portrait-male-gba.png",
+          "sha256": "96545e4ca69055100a71509192ed3fccf1ea291807deebda74c22f96a5fd35f1",
+          "contract": "neutral-menus-v3-bg-v2-actors-user-approved-2026-09-30"
+        },
+        {
+          "path": "Assets/sprites/neutral-portrait-small-female-gba.png",
+          "sha256": "bbeca8ace597071991cab492387c2d1af545dd69741a059f1ac37fa046927f70",
+          "contract": "neutral-menus-v3-bg-v2-actors-user-approved-2026-09-30"
+        },
+        {
+          "path": "Assets/sprites/neutral-portrait-small-male-gba.png",
+          "sha256": "4f03b7673f8d36802e65efd72f55519997aaa3167943ea8ea6f4fe6a655ea8f4",
+          "contract": "neutral-menus-v3-bg-v2-actors-user-approved-2026-09-30"
+        },
+        {
+          "path": "Assets/sprites/neutral-return-gba.png",
+          "sha256": "4de73f92c36896e0939b008c7237a69dec9d32008810b445fd0065936ccbe5f7",
+          "contract": "neutral-menus-v3-bg-v2-actors-user-approved-2026-09-30"
+        },
+        {
+          "path": "Assets/sprites/neutral-save-gba.png",
+          "sha256": "5403a1d383108dbdbdbe3d2eb1520bfa8b8b7578b23539b1d08c7727d7277b07",
+          "contract": "neutral-menus-v3-bg-v2-actors-user-approved-2026-09-30"
+        },
+        {
+          "path": "Assets/sprites/neutral-selection-frame-gba.png",
+          "sha256": "9d62148cfa4b1f68361a488ee79265a199e41fb967f6281f4ace91cf0fcf0d1e",
+          "contract": "neutral-menus-v3-bg-v2-actors-user-approved-2026-09-30"
+        },
+        {
+          "path": "Assets/backgrounds/penedos-v13-fundo-240x160.png",
+          "sha256": "19f4fe8326d1c01b47519e7c4efe03352e6d568a645219340021e235c4faad25",
+          "contract": "penedos-v13-user-approved-viewport-2026-10-01"
+        },
+        {
+          "path": "Assets/backgrounds/penedos-v13-terreno-240x160.png",
+          "sha256": "abc6cf354b3ae967dbaf920486b14f466479e8f31d9ab2b055916c3eb69437ef",
+          "contract": "penedos-v13-user-approved-viewport-2026-10-01"
+        },
+        {
+          "path": "Assets/sprites/penedos-v10-nara.png",
+          "sha256": "99074ed308c0035f765d830225cdd2f7cf7be908261e4b5b19473cc5d58e9e76",
+          "contract": "penedos-v13-user-approved-viewport-2026-10-01"
+        },
+        {
+          "path": "Assets/sprites/penedos-v10-trabalhador.png",
+          "sha256": "81917b6952e475e72e0f819c7f526e6d4e9f5197c45b07e6881e05f7bf1fd3c2",
+          "contract": "penedos-v13-user-approved-viewport-2026-10-01"
+        },
+        {
+          "path": "Assets/sprites/penedos-v10-caranguejo.png",
+          "sha256": "07abb61cd1c9439676fbdffd5baeee3a52e35e2ac2915625feaf2087f56b23aa",
+          "contract": "penedos-v13-user-approved-viewport-2026-10-01"
+        },
+        {
+          "path": "Assets/sprites/penedos-v10-mariposa.png",
+          "sha256": "8ad32fb3ad018fd55096b1a5d8fd72322c3fca560d847397a522e2cb7d5d0fc5",
+          "contract": "penedos-v13-user-approved-viewport-2026-10-01"
+        },
+        {
+          "path": "Assets/sprites/penedos-v10-marco.png",
+          "sha256": "79acb84fafe2434cd101a4bbe495175c040413780fbdc95089531996dc312006",
+          "contract": "penedos-v13-user-approved-viewport-2026-10-01"
+        }
+      ],
+      "retired": [
+        {
+          "path": "Assets/backgrounds/opening-v3-background-240x160.png",
+          "sha256": "e7cee4d5e46dac5238eb18b51de0fbe9e7712791c4cab9ebe01d9831610014a7",
+          "contract": "exemplo-gba-opening-v3-composition",
+          "reason": "Fundo V3 substituído pelo V4 aprovado após revisão de qualidade; preservado como histórico."
+        },
+        {
+          "path": "Assets/backgrounds/opening-v2-background-240x160.png",
+          "sha256": "b1577c986f1e824d790116e07174afd173f42fdd372d3a1bedb8a7fdfea76376",
+          "contract": "exemplo-gba-opening-v2-composition",
+          "reason": "Composição V2 aprovada anteriormente, substituída na cena de abertura; preservada como histórico."
+        },
+        {
+          "path": "Assets/sprites/opening-v2-guardia-idle-48x64.png",
+          "sha256": "4b82f85a8c042cec051848fcb414c2c9353d588a838481dcbbecfdd956652714",
+          "contract": "exemplo-gba-opening-v2-composition",
+          "reason": "Composição V2 aprovada anteriormente, substituída na cena de abertura; preservada como histórico."
+        },
+        {
+          "path": "Assets/sprites/opening-v2-guardia-turn-48x64.png",
+          "sha256": "e88fb504418a77edddf1c3141bcc63fb684609ca9265123ab3333b8e086acd60",
+          "contract": "exemplo-gba-opening-v2-composition",
+          "reason": "Composição V2 aprovada anteriormente, substituída na cena de abertura; preservada como histórico."
+        },
+        {
+          "path": "Assets/sprites/opening-v2-guardia-signal-48x64.png",
+          "sha256": "e4540cf8ff02f740c4d15c0e075cc4f29f6343f1c66c19a5dab33dca949bac15",
+          "contract": "exemplo-gba-opening-v2-composition",
+          "reason": "Composição V2 aprovada anteriormente, substituída na cena de abertura; preservada como histórico."
+        },
+        {
+          "path": "Assets/sprites/opening-v2-menino-24x32.png",
+          "sha256": "9e38bcc8ce0c8405169b2aefc1906790573440ecc7da3059a43a2ccb4e567d38",
+          "contract": "exemplo-gba-opening-v2-composition",
+          "reason": "Composição V2 aprovada anteriormente, substituída na cena de abertura; preservada como histórico."
+        },
+        {
+          "path": "Assets/sprites/opening-v2-gaivota-24x16.png",
+          "sha256": "df272227166dce037bcbdfa5439ac99c1d52679a305b3029e617b074edb3624f",
+          "contract": "exemplo-gba-opening-v2-composition",
+          "reason": "Composição V2 aprovada anteriormente, substituída na cena de abertura; preservada como histórico."
+        },
+        {
+          "path": "Assets/sprites/market-trader-v2-idle.png",
+          "sha256": "2ee9e546f95b8b12c67ccaeff9c2cf6f81b1cd25ba932a8d3000e11103391694",
+          "contract": "exemplo-gba-mercado-suspenso-trader-idle-resident-v1",
+          "reason": "Asset do Mercado aprovado anteriormente, substituído na cena atual; preservado como histórico."
+        },
+        {
+          "path": "Assets/sprites/market-merchant-isometric-v1-idle.png",
+          "sha256": "b059452680c51baff42e6ad0619a790bbcb9aa1b657ada5560f0ce780509684c",
+          "contract": "exemplo-gba-mercado-suspenso-npcs-v1-48x64",
+          "reason": "Asset do Mercado aprovado anteriormente, substituído na cena atual; preservado como histórico."
+        },
+        {
+          "path": "Assets/sprites/market-guard-isometric-v1-idle.png",
+          "sha256": "ad60c2078b9f408871b16f8fd426095c79bc3ca8790d430949ad3a312c0abc34",
+          "contract": "exemplo-gba-mercado-suspenso-npcs-v1-48x64",
+          "reason": "Asset do Mercado aprovado anteriormente, substituído na cena atual; preservado como histórico."
+        },
+        {
+          "path": "Assets/sprites/market-adventurer-isometric-v1-idle.png",
+          "sha256": "e91f77ea1d6d72ff4b80d339c357d31f63fe6f567f2c82237b007b8281928579",
+          "contract": "exemplo-gba-mercado-suspenso-player-v1-48x64",
+          "reason": "Asset do Mercado aprovado anteriormente, substituído na cena atual; preservado como histórico."
+        },
+        {
+          "path": "Assets/backgrounds/mercado-suspenso-modules-v5.png",
+          "sha256": "c57c4ac7a20995a92319610ab52b13b4fb779019895c0a3121c1168a673dea6b",
+          "contract": "exemplo-gba-mercado-suspenso-isometrica-v1",
+          "reason": "Asset do Mercado aprovado anteriormente, substituído na cena atual; preservado como histórico."
+        },
+        {
+          "path": "Assets/backgrounds/tactical-v3-coastal-surface.png",
+          "sha256": "aa5d31fb7a51d25e24b8520ff742d43b1e5d7259e89ec80fc216727f0f3c34ca",
+          "contract": "exemplo-gba-arena-tatica-costeira-v3",
+          "reason": "Pacote tático V3 aprovado anteriormente, substituído pela V5 aprovada; preservado como histórico."
+        },
+        {
+          "path": "Assets/ui/tactical-v3-hud.png",
+          "sha256": "b8a552895f5da7bae2b670aa001514e834c6bd3621c234462b5c2904b8bb484a",
+          "contract": "exemplo-gba-arena-tatica-costeira-v3",
+          "reason": "Pacote tático V3 aprovado anteriormente, substituído pela V5 aprovada; preservado como histórico."
+        },
+        {
+          "path": "Assets/sprites/tactical-nara-v3.png",
+          "sha256": "a67536dc7db5471c8bb1ec8980db9fd5dc02312db5b1c36a8ddf960c9b805f2d",
+          "contract": "exemplo-gba-arena-tatica-costeira-v3",
+          "reason": "Pacote tático V3 aprovado anteriormente, substituído pela V5 aprovada; preservado como histórico."
+        },
+        {
+          "path": "Assets/sprites/tactical-sentinel-v3.png",
+          "sha256": "e84dba1f0809270bbec1288cf3f6d2e2dc5bce3e160633a162241ced8871e6de",
+          "contract": "exemplo-gba-arena-tatica-costeira-v3",
+          "reason": "Pacote tático V3 aprovado anteriormente, substituído pela V5 aprovada; preservado como histórico."
+        },
+        {
+          "path": "Assets/sprites/tactical-feedback-v3.png",
+          "sha256": "6c592cdbbbad0172aed9ccd0984209c86a972c8cb0aeb4302f9b2c4b8d273ec0",
+          "contract": "exemplo-gba-arena-tatica-costeira-v3",
+          "reason": "Pacote tático V3 aprovado anteriormente, substituído pela V5 aprovada; preservado como histórico."
+        },
+        {
+          "path": "Assets/backgrounds/mercado-suspenso-tileset-v4-gba.png",
+          "sha256": "2b24ca8c4f6d19503f25f13c2a79a1c4454c01ff6b8b7ca85ad2990103e5cb9c",
+          "contract": "isometric-market-tileset-256x256-32x32-64-slots",
+          "reason": "Substituído pelo atlas modular v5 aprovado; mantido apenas como evidência técnica."
+        }
+      ],
+      "pending": [
+        {
+          "path": "Assets/backgrounds/armazem-das-mares-gba.png",
+          "sha256": "cffbf97bc7fc2e2478507c19c18263f3ef6f83f1c8ec0e3585f8bf297547d24d",
+          "status": "candidate",
+          "reason": "Pacote point-and-click candidato; requer revisão visual, assetc, ROM e hardware antes da promoção."
+        },
+        {
+          "path": "Assets/backgrounds/observatorio-do-farol-gba.png",
+          "sha256": "6035e1dc441138ea68468e018304509bd0372b33cfbf8890d397d5ad96388d0d",
+          "status": "candidate",
+          "reason": "Pacote point-and-click candidato; requer revisão visual, assetc, ROM e hardware antes da promoção."
+        },
+        {
+          "path": "Assets/sprites/point-click-brass-lantern.png",
+          "sha256": "26b7b69073d633592670e1ca2273e98603ff2aa8d8596bbeb0f9e31c7777483b",
+          "status": "candidate",
+          "reason": "Sprite derivado candidato do pacote point-and-click; não aprovado visualmente."
+        },
+        {
+          "path": "Assets/sprites/point-click-chart-compass.png",
+          "sha256": "e573ce392ed3f0c8440c15ff28f390773383cacedca2b1f3443d4482c317e227",
+          "status": "candidate",
+          "reason": "Sprite derivado candidato do pacote point-and-click; não aprovado visualmente."
+        },
+        {
+          "path": "Assets/sprites/point-click-red-chest.png",
+          "sha256": "d33ed1a05128bc7ec5ca18142ba65dfdb551cc228e7ba02b7f0dc257e9a5d485",
+          "status": "candidate",
+          "reason": "Sprite derivado candidato do pacote point-and-click; não aprovado visualmente."
+        },
+        {
+          "path": "Assets/sprites/point-click-storm-lamp.png",
+          "sha256": "d4ae66e9b9b27eb3d7e43d32d8517834eca486af2fbf6267e58f5055596e032e",
+          "status": "candidate",
+          "reason": "Sprite derivado candidato do pacote point-and-click; não aprovado visualmente."
+        },
+        {
+          "path": "Assets/sprites/point-click-tide-gauge.png",
+          "sha256": "0843df67fb1ed03acb19e8bfbc59558bcd38f41c240adcd87a0017bc73a62143",
+          "status": "candidate",
+          "reason": "Sprite derivado candidato do pacote point-and-click; não aprovado visualmente."
+        }
+      ]
+    },
+    "description": "O projeto exemplo completo é o P0 canônico usado para aprovar o comportamento do produto."
+  },
+  "technicalFixture": {
+    "status": "retired",
+    "id": "electron-p0-technical-fixture",
+    "role": "technical-contract-fixture",
+    "projectPath": "fixtures/electron-p0-playtest.gba-project",
+    "assetsRoot": "fixtures/Assets",
+    "acceptanceSurfaces": [
+      "unit",
+      "export",
+      "runtime-contract"
+    ],
+    "globalAcceptance": false,
+    "excludedFromCanonicalAcceptance": true,
+    "description": "Fixture reduzida para contratos técnicos do fluxo top-down."
+  }
+}

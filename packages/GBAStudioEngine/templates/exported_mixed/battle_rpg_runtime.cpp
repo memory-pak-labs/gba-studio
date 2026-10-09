@@ -1,0 +1,8 @@
+#define GBS_BATTLE_RPG_PROJECT_DATA_HEADER "battle_rpg_project_data.hpp"
+#define GBS_BATTLE_RPG_RUNTIME_ENTRY gbs_run_battle_rpg
+#define GBS_BATTLE_RPG_RUNTIME_ENTER gbs_enter_battle_rpg
+#define GBS_BATTLE_RPG_RUNTIME_UPDATE gbs_update_battle_rpg
+#define GBS_BATTLE_RPG_RUNTIME_RENDER gbs_render_battle_rpg
+#define GBS_BATTLE_RPG_RUNTIME_LEAVE gbs_leave_battle_rpg
+#define GBS_MULTI_RUNTIME 1
+#include "battle_rpg_runtime.inc"

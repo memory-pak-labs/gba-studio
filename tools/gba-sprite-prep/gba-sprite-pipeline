@@ -1,0 +1,123 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+usage() {
+  cat <<'EOF'
+Uso:
+  gba-sprite-pipeline <imagem-entrada> <pasta-saida> \
+    --project <arquivo.gba-project> --actor <id-ou-nome> \
+    --profile <perfil> [opcoes do gba-sprite-prep]
+
+Opcoes do pipeline:
+  --project <arquivo>     Projeto de origem; uma copia sera criada na pasta de saida
+  --actor <id-ou-nome>    Ator que recebera o sprite e a animacao
+  --sprite-name <nome>    Nome do PNG gerado (padrao: generated_sprite.png)
+  --engine-pack <pasta>   Engine Pack (padrao: packages/GBAStudioEngine/dist/GBAStudioEnginePack)
+
+Exemplo:
+  gba-sprite-pipeline sheet-ia.png resultado \
+    --project jogo.gba-project --actor actor-player \
+    --profile topdown --frames 6 --animation-name walk_down
+EOF
+}
+
+if [ "$#" -lt 2 ]; then
+  usage >&2
+  exit 2
+fi
+
+INPUT="$1"
+OUTPUT_ROOT="$2"
+shift 2
+
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+REPO_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
+PROJECT=""
+ACTOR=""
+SPRITE_NAME="generated_sprite.png"
+ENGINE_PACK="$REPO_ROOT/packages/GBAStudioEngine/dist/GBAStudioEnginePack"
+PREP_ARGS=()
+
+while [ "$#" -gt 0 ]; do
+  case "$1" in
+    --project)
+      PROJECT="${2:-}"
+      shift 2
+      ;;
+    --actor)
+      ACTOR="${2:-}"
+      shift 2
+      ;;
+    --sprite-name)
+      SPRITE_NAME="${2:-}"
+      shift 2
+      ;;
+    --engine-pack)
+      ENGINE_PACK="${2:-}"
+      shift 2
+      ;;
+    --help|-h)
+      usage
+      exit 0
+      ;;
+    --no-snap|--no-loop)
+      PREP_ARGS+=("$1")
+      shift
+      ;;
+    *)
+      if [ "$#" -lt 2 ]; then
+        echo "Opcao incompleta: $1" >&2
+        exit 2
+      fi
+      PREP_ARGS+=("$1" "$2")
+      shift 2
+      ;;
+  esac
+done
+
+if [ -z "$PROJECT" ] || [ -z "$ACTOR" ]; then
+  echo "--project e --actor sao obrigatorios." >&2
+  usage >&2
+  exit 2
+fi
+if [ "$(basename "$SPRITE_NAME")" != "$SPRITE_NAME" ] || [[ "$SPRITE_NAME" != *.png ]]; then
+  echo "--sprite-name precisa ser apenas um nome de arquivo terminado em .png." >&2
+  exit 2
+fi
+if [ -e "$OUTPUT_ROOT" ] && [ -n "$(find "$OUTPUT_ROOT" -mindepth 1 -maxdepth 1 -print -quit 2>/dev/null)" ]; then
+  echo "A pasta de saida precisa estar vazia: $OUTPUT_ROOT" >&2
+  exit 2
+fi
+
+mkdir -p "$OUTPUT_ROOT/prepared" "$OUTPUT_ROOT/project" "$OUTPUT_ROOT/.internal"
+PROJECT_OUTPUT="$OUTPUT_ROOT/project/$(basename "$PROJECT")"
+PREPARED_PNG="$OUTPUT_ROOT/prepared/$SPRITE_NAME"
+ENGINE_EXPORT="$OUTPUT_ROOT/engine-export"
+ENGINE_RUNNER="$OUTPUT_ROOT/.internal/engine-workflow.mjs"
+
+cargo run --quiet --manifest-path "$SCRIPT_DIR/Cargo.toml" -- \
+  "$INPUT" "$PREPARED_PNG" \
+  "${PREP_ARGS[@]}" \
+  --project "$PROJECT" \
+  --project-output "$PROJECT_OUTPUT" \
+  --actor "$ACTOR"
+
+"$REPO_ROOT/apps/desktop-electron/node_modules/.bin/esbuild" \
+  "$SCRIPT_DIR/engine-workflow-cli.ts" \
+  --bundle \
+  --platform=node \
+  --format=esm \
+  --outfile="$ENGINE_RUNNER" \
+  --log-level=warning
+
+node "$ENGINE_RUNNER" \
+  --project "$PROJECT_OUTPUT" \
+  --destination "$ENGINE_EXPORT" \
+  --engine-pack "$ENGINE_PACK" \
+  --actor "$ACTOR"
+
+echo "Pipeline concluido: $OUTPUT_ROOT"
+echo "Preview: $OUTPUT_ROOT/prepared/${SPRITE_NAME%.png}.preview.png"
+echo "Projeto: $PROJECT_OUTPUT"
+echo "Engine Pack export: $ENGINE_EXPORT"
+echo "Evidencia: $ENGINE_EXPORT/sprite_pipeline_evidence.json"

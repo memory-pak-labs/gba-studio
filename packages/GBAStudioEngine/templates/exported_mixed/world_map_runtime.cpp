@@ -1,0 +1,8 @@
+#define GBS_WORLD_MAP_PROJECT_DATA_HEADER "world_map_project_data.hpp"
+#define GBS_WORLD_MAP_RUNTIME_ENTRY gbs_run_world_map
+#define GBS_WORLD_MAP_RUNTIME_ENTER gbs_enter_world_map
+#define GBS_WORLD_MAP_RUNTIME_UPDATE gbs_update_world_map
+#define GBS_WORLD_MAP_RUNTIME_RENDER gbs_render_world_map
+#define GBS_WORLD_MAP_RUNTIME_LEAVE gbs_leave_world_map
+#define GBS_MULTI_RUNTIME 1
+#include "world_map_runtime.inc"

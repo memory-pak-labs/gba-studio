@@ -1,0 +1,181 @@
+.settings-workspace-global .settings-layout {
+  grid-template-columns: 285px minmax(0, 1fr);
+  border: 0;
+  border-radius: 0;
+  min-height: 0;
+}
+
+.settings-workspace-global .settings-nav {
+  padding: 22px 20px;
+  gap: 20px;
+  border-right-color: var(--studio-color-border);
+}
+
+.settings-workspace-global .settings-nav-title strong {
+  }
+
+.settings-workspace-global .settings-nav-title > span,
+.settings-workspace-global .settings-nav-copy > span {
+  display: none;
+}
+
+.settings-workspace-global .settings-search label > span {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+}
+
+.settings-workspace-global .settings-search input {
+  min-height: 38px;
+  padding-left: 32px;
+}
+.settings-workspace-global .settings-search { padding: 0; }
+.settings-workspace-global .settings-search label { position: relative; }
+.settings-workspace-global .settings-search-icon { position: absolute; left: 10px; top: 10px; color: var(--studio-color-text-secondary); pointer-events: none; }
+
+.settings-workspace-global .settings-nav-list { gap: 30px; }
+.settings-workspace-global .settings-nav-group { gap: 10px; }
+.settings-workspace-global .settings-nav-group h4 {
+  color: var(--studio-color-text-secondary);
+}
+.settings-workspace-global .settings-nav-group-list { gap: 5px; }
+.settings-workspace-global .settings-nav-item {
+  min-height: 40px;
+  align-items: center;
+  gap: 9px;
+  padding: 7px 10px;
+}
+.settings-workspace-global .settings-nav-copy strong {
+  white-space: normal;
+  overflow: visible;
+  text-overflow: clip;
+}
+.settings-workspace-global .settings-nav-icon { color: var(--studio-color-text-secondary); }
+.settings-workspace-global .settings-nav-item.active {
+  background: var(--studio-color-accent-soft);
+  border-color: transparent;
+  color: var(--studio-color-accent);
+}
+.settings-workspace-global .settings-nav-item.active .settings-nav-icon { color: var(--studio-color-accent); }
+
+.settings-workspace-global .settings-main-panel {
+  padding: 38px 32px;
+  background: var(--studio-color-surface);
+  align-content: start;
+}
+
+.settings-interface-page {
+  min-width: 0;
+  color: var(--studio-color-text-primary);
+}
+.settings-interface-page h2,
+.settings-interface-page h3,
+.settings-interface-page p { margin: 0; }
+.settings-interface-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 20px;
+  padding-bottom: 28px;
+  border-bottom: 1px solid var(--studio-color-border);
+}
+.settings-interface-heading { display: flex; align-items: center; flex-wrap: wrap; gap: 14px; }
+.settings-interface-heading h2 { line-height: 1.25; }
+.settings-interface-device {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 5px 12px;
+  border-radius: 20px;
+  color: var(--studio-color-text-secondary);
+  background: var(--studio-color-surface-muted);
+  }
+.settings-interface-header p { margin-top: 10px; color: var(--studio-color-text-secondary); }
+.settings-interface-reset {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 40px;
+  padding: 8px 14px;
+  white-space: nowrap;
+  background: var(--studio-color-surface);
+  border-color: var(--studio-color-border-strong);
+  }
+.settings-interface-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(280px, 44%);
+  align-items: center;
+  gap: 24px;
+  padding: 26px 0;
+  border-bottom: 1px solid var(--studio-color-border);
+}
+.settings-interface-copy h3 { line-height: 1.35; }
+.settings-interface-copy p { color: var(--studio-color-text-secondary); margin-top: 5px; line-height: 1.45; }
+.settings-interface-language.studio-language-switcher { display: block; padding: 0; min-width: 0; background: transparent; border: 0; }
+.settings-interface-language > .studio-language-flag,
+.settings-interface-language > strong { display: none; }
+.settings-interface-language select {
+  position: static;
+  opacity: 1;
+  cursor: pointer;
+  width: 100%;
+  min-height: 45px;
+  border: 1px solid var(--studio-color-border-strong);
+  border-radius: 7px;
+  background: var(--studio-color-surface);
+  color: var(--studio-color-text-primary);
+  padding: 9px 14px;
+  }
+.settings-interface-theme-row { align-items: start; }
+.settings-interface-themes { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 24px; }
+.settings-interface-theme-choice { position: relative; display: grid; gap: 10px; text-align: center; cursor: pointer; min-width: 0; }
+.settings-interface-theme-choice input,
+.settings-interface-segments input { position: absolute; opacity: 0; width: 1px; height: 1px; }
+.settings-interface-theme-image { position: relative; display: block; padding: 5px; border: 1px solid var(--studio-color-border); border-radius: 9px; background: var(--studio-color-surface-muted); }
+.settings-interface-theme-image img { width: 100%; display: block; aspect-ratio: 16 / 9; object-fit: cover; border-radius: 5px; }
+.settings-interface-theme-selected { position: absolute; right: 11px; top: 11px; display: flex; color: var(--studio-color-text-secondary); }
+.settings-interface-theme-choice input:checked + .settings-interface-theme-image { border-color: var(--studio-color-accent); outline: 1px solid var(--studio-color-accent-border); }
+.settings-interface-theme-choice input:checked + .settings-interface-theme-image .settings-interface-theme-selected { color: var(--studio-color-on-accent); background: var(--studio-color-accent-solid); border-radius: 50%; }
+.settings-interface-theme-choice input:focus-visible + span,
+.settings-interface-segments input:focus-visible + span { outline: 2px solid var(--studio-color-accent); outline-offset: 3px; }
+.settings-interface-segments { display: flex; min-width: 0; }
+.settings-interface-segments label { display: flex; position: relative; flex: 1; min-width: 0; cursor: pointer; }
+.settings-interface-segments label > span {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  min-height: 44px;
+  padding: 8px;
+  background: var(--studio-color-surface-muted);
+  border: 1px solid var(--studio-color-border);
+  color: var(--studio-color-text-secondary);
+  white-space: nowrap;
+}
+.settings-interface-segments label + label > span { border-left: 0; }
+.settings-interface-segments label:first-child > span { border-radius: 7px 0 0 7px; }
+.settings-interface-segments label:last-child > span { border-radius: 0 7px 7px 0; }
+.settings-interface-segments input:checked + span { color: var(--studio-color-accent); background: var(--studio-color-accent-soft); border-color: var(--studio-color-accent-border); box-shadow: inset 0 0 0 1px var(--studio-color-accent-border); }
+.settings-interface-advanced { margin-top: 24px; border: 1px solid var(--studio-color-border); border-radius: 8px; }
+.settings-interface-advanced summary { display: grid; grid-template-columns: 24px minmax(0, 1fr) 20px; align-items: center; gap: 13px; padding: 18px; list-style: none; cursor: pointer; }
+.settings-interface-advanced summary::-webkit-details-marker { display: none; }
+.settings-interface-advanced summary strong { display: block; }
+.settings-interface-advanced summary small { display: block; color: var(--studio-color-text-secondary); margin-top: 4px; }
+.settings-interface-advanced[open] .settings-interface-advanced-chevron { transform: rotate(90deg); }
+.settings-interface-ranges { padding: 0 18px 12px; }
+.settings-interface-ranges .settings-ui-appearance-range { border-top: 1px solid var(--studio-color-border); padding: 16px 0; }
+.settings-interface-autosave { display: flex; gap: 13px; align-items: center; margin-top: 24px !important; border-top: 1px solid var(--studio-color-border); padding-top: 24px; color: var(--studio-color-text-secondary); }
+.settings-interface-autosave svg { flex-shrink: 0; }
+
+@media (max-width: 1100px) {
+  .settings-workspace-global .settings-layout { grid-template-columns: 220px minmax(0, 1fr); }
+  .settings-workspace-global .settings-nav { padding: 20px 15px; }
+  .settings-workspace-global .settings-main-panel { padding: 22px; }
+  .settings-interface-heading h2 { }
+  .settings-interface-header { flex-wrap: wrap; }
+  .settings-interface-row { grid-template-columns: minmax(0, 1fr); gap: 14px; padding: 20px 0; }
+  .settings-interface-themes { max-width: 440px; }
+}

@@ -1,0 +1,84 @@
+.settings-workspace-export .settings-layout { grid-template-columns: 280px minmax(0, 1fr); border: 0; border-radius: 0; min-height: 0; }
+.settings-workspace-export .settings-nav { padding: 24px; gap: 22px; border-right-color: var(--studio-color-border); }
+.settings-workspace-export .settings-nav-title > span,
+.settings-workspace-export .settings-nav-copy > span { display: none; }
+.settings-workspace-export .settings-search { padding: 0; }
+.settings-workspace-export .settings-search label { position: relative; }
+.settings-workspace-export .settings-search label > span { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
+.settings-workspace-export .settings-search input { min-height: 38px; padding-left: 32px; }
+.settings-workspace-export .settings-search-icon { position: absolute; left: 10px; top: 10px; color: var(--studio-color-text-secondary); pointer-events: none; }
+.settings-workspace-export .settings-nav-list { gap: 24px; }
+.settings-workspace-export .settings-nav-group { gap: 10px; }
+.settings-workspace-export .settings-nav-group h4 { color: var(--studio-color-text-secondary); }
+.settings-workspace-export .settings-nav-group-list { gap: 5px; }
+.settings-workspace-export .settings-nav-item { min-height: 42px; align-items: center; gap: 13px; padding: 7px 12px; }
+.settings-workspace-export .settings-nav-copy strong { white-space: normal; overflow: visible; text-overflow: clip; }
+.settings-workspace-export .settings-nav-icon { color: var(--studio-color-text-secondary); }
+.settings-workspace-export .settings-nav-icon svg { width: 20px; height: 20px; }
+.settings-workspace-export .settings-nav-item.active { background: var(--studio-color-accent-soft); border-color: transparent; color: var(--studio-color-accent); }
+.settings-workspace-export .settings-nav-item.active .settings-nav-icon { color: var(--studio-color-accent); }
+.settings-workspace-export .settings-main-panel { padding: 30px 34px 20px; background: var(--studio-color-surface); display: flex; flex-direction: column; gap: 20px; }
+.settings-workspace-export .settings-continuous-page { flex: 1; display: flex; flex-direction: column; min-width: 0; }
+.settings-workspace-export .export-settings-page { background: transparent; border: 0; border-radius: 0; min-width: 0; overflow: visible; }
+.export-project-page { display: flex; flex-direction: column; flex: 1; }
+.export-settings-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 24px; padding: 3px 0 22px; border-bottom: 1px solid var(--studio-color-border); }
+.export-settings-header h2, .export-settings-block h3, .export-settings-block p, .export-settings-header p { margin: 0; }
+.export-settings-title { display: flex; align-items: center; flex-wrap: wrap; gap: 20px; }
+.export-project-scope { display: inline-flex; align-items: center; gap: 9px; padding: 6px 14px; border-radius: var(--studio-radius-pill); background: var(--studio-color-bg-app); color: var(--studio-color-text-secondary); white-space: nowrap; }
+.export-settings-header p { color: var(--studio-color-text-secondary); margin-top: 9px; }
+.export-settings-header > button { display: inline-flex; align-items: center; justify-content: center; gap: 10px; flex-shrink: 0; min-height: 42px; background: var(--studio-color-surface); color: var(--studio-color-text-primary); border-color: var(--studio-color-border-strong); }
+.export-settings-block { padding: 22px 0 26px; border-bottom: 1px solid var(--studio-color-border); }
+.export-settings-block p { margin-top: 4px; color: var(--studio-color-text-secondary); }
+.export-project-fields { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); column-gap: 32px; row-gap: 16px; margin-top: 22px; }
+.export-project-fields > *, .export-project-fields .settings-text-control { min-width: 0; }
+.export-project-fields .export-full-row { grid-column: 1 / -1; }
+.settings-workspace-export .export-project-fields .settings-edit-row { display: grid; grid-template-columns: 118px minmax(0, 1fr); align-items: center; gap: 16px; padding: 0; border: 0; }
+.settings-workspace-export .settings-edit-row > span { white-space: normal; overflow: visible; text-overflow: clip; color: var(--studio-color-text-secondary); }
+.settings-workspace-export .export-project-fields .settings-edit-row :is(input, select) { width: 100%; min-height: 40px; box-sizing: border-box; background: var(--studio-color-input-bg); border: 1px solid var(--studio-color-border-strong); border-radius: var(--studio-radius-control); color: var(--studio-color-text-primary); padding: 7px 12px; }
+.settings-workspace-export .settings-path-control { min-width: 0; display: flex; align-items: center; gap: 12px; }
+.settings-workspace-export .settings-path-control input { min-width: 0; flex: 1; }
+.settings-workspace-export .settings-path-control button { min-height: 40px; display: inline-flex; align-items: center; gap: 10px; padding: 8px 12px; }
+.settings-workspace-export .export-output-block .settings-edit-row { grid-template-columns: 154px minmax(0, 1fr); }
+.settings-workspace-export .export-output-block .export-output-hint { margin-left: 170px; }
+.export-output-hint { display: block; color: var(--studio-color-text-muted); margin: 7px 0 0 134px; overflow-wrap: anywhere; }
+.export-output-block { border-bottom: 0; padding-bottom: 22px; }
+.export-rom-advanced { border: 1px solid var(--studio-color-border); border-radius: var(--studio-radius-panel); }
+.export-rom-advanced summary { display: grid; grid-template-columns: 24px minmax(0, 1fr) 20px; align-items: center; gap: 18px; padding: 18px 20px; list-style: none; cursor: pointer; }
+.export-rom-advanced summary::-webkit-details-marker { display: none; }
+.export-rom-advanced summary strong, .export-rom-advanced summary small { display: block; }
+.export-rom-advanced summary small { color: var(--studio-color-text-secondary); margin-top: 4px; }
+.export-rom-advanced[open] .export-advanced-chevron { transform: rotate(90deg); }
+.export-rom-advanced > .settings-edit-list { padding: 0 20px 14px; }
+.export-rom-footer { margin-top: auto; min-width: 0; padding-top: 20px; }
+.export-path-status { display: flex; align-items: center; gap: 10px; margin: 0 0 18px; }
+.export-path-status.ok { color: var(--studio-color-ok); }
+.export-path-status.warning { color: var(--studio-color-warning); }
+.export-rom-actions { border-top: 1px solid var(--studio-color-border); display: flex; justify-content: flex-end; flex-wrap: wrap; gap: 12px; padding-top: 18px; }
+.export-rom-actions button { display: inline-flex; align-items: center; justify-content: center; gap: 10px; min-height: 44px; padding: 10px 17px; background: var(--studio-color-surface); border-color: var(--studio-color-border-strong); }
+.settings-workspace-export .export-rom-actions .export-generate-rom { background: var(--studio-color-accent-solid); color: var(--studio-color-on-accent); border-color: var(--studio-color-accent-solid); }
+.settings-workspace-export .export-rom-actions .export-generate-rom:hover:not(:disabled) { filter: brightness(1.08); }
+.settings-workspace-export .settings-edit-row { border-top-color: var(--studio-color-border); }
+.settings-workspace-export .settings-editor-card { background: transparent; border: 0; }
+.settings-workspace-export .settings-section-editable { padding: 16px 0; }
+.settings-workspace-export .settings-support-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.settings-workspace-export .settings-path-validation { grid-column: 1 / -1; }
+.export-extra-tools { border: 1px solid var(--studio-color-border); border-radius: var(--studio-radius-panel); }
+.export-extra-tools > summary { padding: 16px; cursor: pointer; }
+.export-extra-tools > section { border: 0; }
+@media (max-width: 1200px) {
+  .settings-workspace-export .settings-layout { grid-template-columns: 230px minmax(0, 1fr); }
+  .settings-workspace-export .settings-nav { padding: 22px 16px; }
+  .settings-workspace-export .settings-main-panel { padding: 24px; }
+  .export-project-fields { column-gap: 24px; }
+  .settings-workspace-export .export-project-fields .settings-edit-row { grid-template-columns: minmax(0, 1fr); gap: 8px; }
+  .settings-workspace-export .export-output-block .settings-edit-row { grid-template-columns: minmax(0, 1fr); }
+  .settings-workspace-export .export-output-block .export-output-hint { margin-left: 0; }
+  .export-settings-header { flex-wrap: wrap; gap: 12px; }
+}
+@media (max-width: 1000px) {
+  .settings-workspace-export .settings-layout { grid-template-columns: 210px minmax(0, 1fr); }
+  .settings-workspace-export .settings-main-panel { padding: 20px; }
+  .settings-workspace-export .settings-support-grid { grid-template-columns: minmax(0, 1fr); }
+  .export-rom-actions { gap: 8px; }
+  .export-rom-actions button { padding: 8px 12px; }
+}

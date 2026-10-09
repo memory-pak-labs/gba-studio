@@ -1,0 +1,34 @@
+{
+  "schema": 1,
+  "backend": "gbastudio_engine",
+  "kind": "topdown",
+  "build": {
+    "target": "exported_topdown",
+    "make_target": "all"
+  },
+  "entry": "main.cpp",
+  "project_data": "gbastudio_project_data.hpp",
+  "generated_assets": [
+    "player_sprite_asset.hpp"
+  ],
+  "requires": {
+    "engine_pack": ">=0.36.0",
+    "features": [
+      "topdown_project_data",
+      "topdown_runtime.camera_zones",
+      "room_streaming",
+      "dialogue",
+      "audio",
+      "audio.runtime_bus_volume",
+      "audio.runtime_bus_fade",
+      "audio.runtime_bus_mute_all_profiles",
+      "audio.pcm_sfx_event_options",
+      "sprite_animation",
+      "resource_managers",
+      "tilemap-slope-flags",
+      "actor_command_batch_apply",
+      "save.universal_runtime_envelope",
+      "save.export_project_config"
+    ]
+  }
+}

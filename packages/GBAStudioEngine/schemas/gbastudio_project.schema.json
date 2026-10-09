@@ -1,0 +1,104 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://gbastudio.local/schemas/gbastudio_project.schema.json",
+  "title": "GBAStudio Engine exported project manifest",
+  "type": "object",
+  "required": [
+    "schema",
+    "backend",
+    "kind",
+    "entry",
+    "project_data",
+    "generated_assets",
+    "requires"
+  ],
+  "properties": {
+    "schema": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "backend": {
+      "const": "gbastudio_engine"
+    },
+    "kind": {
+      "type": "string",
+      "enum": [
+        "topdown",
+        "platformer",
+        "isometric",
+        "dungeon_crawler",
+        "racing",
+        "battle_rpg",
+        "mixed"
+      ]
+    },
+    "entry": {
+      "type": "string",
+      "minLength": 1
+    },
+    "project_data": {
+      "type": "string",
+      "minLength": 1
+    },
+    "generated_assets": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      },
+      "uniqueItems": true
+    },
+    "requires": {
+      "type": "object",
+      "properties": {
+        "engine_pack": {
+          "type": "string"
+        },
+        "features": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "uniqueItems": true
+        }
+      },
+      "additionalProperties": true
+    },
+    "build": {
+      "type": "object",
+      "properties": {
+        "target": {
+          "type": "string",
+          "pattern": "^[A-Za-z_][A-Za-z0-9_-]*$"
+        },
+        "make_target": {
+          "type": "string",
+          "enum": [
+            "all",
+            "clean"
+          ]
+        },
+        "sources": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string",
+            "pattern": "^[A-Za-z_][A-Za-z0-9_-]*\\.cpp$"
+          },
+          "uniqueItems": true
+        }
+      },
+      "additionalProperties": true
+    },
+    "asset_pack_report": {
+      "type": "string",
+      "minLength": 1
+    },
+    "asset_count": {
+      "type": "integer",
+      "minimum": 0
+    }
+  },
+  "additionalProperties": true
+}

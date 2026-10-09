@@ -1,0 +1,640 @@
+[data-studio-theme="dark"] .app-topbar {
+  background: color-mix(in srgb, var(--studio-color-bg-app) 96%, transparent);
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.04) inset;
+}
+
+[data-studio-theme="dark"] .workspace-list {
+  background: var(--studio-color-surface);
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.04) inset,
+    var(--studio-shadow-soft);
+}
+
+[data-studio-theme="dark"] .workspace.active {
+  color: var(--studio-color-on-accent);
+}
+
+[data-studio-theme="dark"] .workspace:not(.active) {
+  color: var(--studio-color-text-secondary);
+}
+
+[data-studio-theme="dark"] .workspace:hover:not(.active):not(:disabled) {
+  color: var(--studio-color-accent);
+}
+
+[data-studio-theme="dark"] .topbar-actions button:not(.run-button):not(.theme-toggle-button) {
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.04) inset;
+}
+
+[data-studio-theme="dark"] .studio-language-switcher {
+  background: var(--studio-color-surface-raised);
+  border-color: var(--studio-color-border);
+}
+
+[data-studio-theme="dark"] .theme-toggle-button[aria-pressed="true"] {
+  background: var(--studio-color-accent-soft);
+  border-color: var(--studio-color-accent-border);
+  color: var(--studio-color-accent);
+}
+
+[data-studio-theme="dark"] .project-action-menu {
+  background: var(--studio-color-surface-raised);
+  border-color: var(--studio-color-border);
+  box-shadow: var(--studio-shadow-raised);
+}
+
+[data-studio-theme="dark"] .project-action-menu button {
+  color: var(--studio-color-text-primary);
+}
+
+[data-studio-theme="dark"] .workspace-inspector-rail-toggle,
+[data-studio-theme="dark"] .workspace-explorer-rail-toggle,
+[data-studio-theme="dark"] .editor-side-stack-toggle {
+  background: var(--studio-color-accent-soft);
+  border-color: var(--studio-color-accent-border);
+  color: var(--studio-color-accent);
+}
+
+[data-studio-theme="dark"] .workspace-inspector-rail-toggle:hover,
+[data-studio-theme="dark"] .workspace-explorer-rail-toggle:hover,
+[data-studio-theme="dark"] .editor-side-stack-toggle:hover {
+  background: var(--studio-color-surface-hover);
+  border-color: var(--studio-color-accent);
+  color: var(--studio-color-accent);
+}
+
+[data-studio-theme="dark"] .welcome-shell {
+  background: var(--studio-color-bg-app);
+}
+
+[data-studio-theme="dark"] .welcome-sidebar,
+[data-studio-theme="dark"] .welcome-main {
+  background: var(--studio-color-surface-muted);
+  border-color: var(--studio-color-border);
+}
+
+[data-studio-theme="dark"] .welcome-brand h1,
+[data-studio-theme="dark"] .welcome-create h2,
+[data-studio-theme="dark"] .welcome-template-area h2,
+[data-studio-theme="dark"] .welcome-recent strong {
+  color: var(--studio-color-text-primary);
+}
+
+[data-studio-theme="dark"] .welcome-brand p,
+[data-studio-theme="dark"] .welcome-status,
+[data-studio-theme="dark"] .welcome-footer,
+[data-studio-theme="dark"] .welcome-recent small,
+[data-studio-theme="dark"] .welcome-template-card small,
+[data-studio-theme="dark"] .welcome-create small,
+[data-studio-theme="dark"] .welcome-recent span {
+  color: var(--studio-color-text-secondary);
+}
+
+[data-studio-theme="dark"] .welcome-language,
+[data-studio-theme="dark"] .welcome-template-card,
+[data-studio-theme="dark"] .welcome-create input {
+  background: var(--studio-color-surface-raised);
+  border-color: var(--studio-color-border);
+  color: var(--studio-color-text-primary);
+}
+
+[data-studio-theme="dark"] :where(
+  .events-layout,
+  .rooms-editor-layout,
+  .sprites-layout,
+  .dialogues-layout,
+  .files-layout,
+  .audio-layout,
+  .settings-layout,
+  .dialogues-rail,
+  .dialogues-editor,
+  .dialogues-inspector-card,
+  .dialogues-side-card,
+  .files-preview-card,
+  .settings-main-panel,
+  .settings-nav,
+  .settings-section-card,
+  .settings-section-hero,
+  .settings-inspector-card,
+  .settings-intent-panel,
+  .settings-preset-panel,
+  .settings-path-validation,
+  .settings-diagnostic-card,
+  .event-category-panel,
+  .event-graph-panel,
+  .event-inspector-panel,
+  .event-editor,
+  .event-command-palette,
+  .event-command-menu,
+  .events-filter-bar,
+  .room-inspector-panel,
+  .room-tool-context-panel,
+  .room-detail-editor,
+  .room-collision-editor,
+  .room-paint-panel,
+  .room-paint-advanced,
+  .room-connections-editor,
+  .room-entities-editor,
+  .room-selected-entity-inspector,
+  .room-name-prompt,
+  .editor-explorer-context-menu,
+  .editor-side-stack,
+  .room-collision-floating-toolbar,
+  .room-paint-floating-toolbar-row,
+  .sprite-sheet-card,
+  .sprites-active-tool-panel,
+  .sprite-reference-panel,
+  .sprite-composer-panel,
+  .sprite-animation-editor,
+  .sprites-summary-card,
+  .audio-validation-card,
+  .audio-basic-panel,
+  .audio-editor,
+  .audio-mixing-panel,
+  .audio-export-panel,
+  .audio-filter-bar,
+  .audio-transport,
+  .audio-composer-context,
+  .audio-pattern-sequence,
+  .audio-step-tracker,
+  .audio-inspector-panel,
+  .audio-rail-summary,
+  .files-inspector-panel,
+  .files-workflow-bar,
+  .files-summary-card,
+  .sprites-filter-bar,
+  .rooms-filter-bar
+) {
+  background: var(--studio-color-surface);
+  border-color: var(--studio-color-border);
+  box-shadow: none;
+  color: var(--studio-color-text-primary);
+}
+
+[data-studio-theme="dark"] :where(
+  .events-rail,
+  .event-side-stack,
+  .events-canvas-stage,
+  .rooms-rail,
+  .rooms-inspector,
+  .rooms-canvas-stage,
+  .sprites-rail,
+  .sprites-inspector,
+  .sprites-canvas-stage,
+  .files-gallery,
+  .files-details-panel,
+  .audio-rail,
+  .audio-side-panel,
+  .settings-nav
+) {
+  background: var(--studio-color-surface-muted);
+}
+
+[data-studio-theme="dark"] .audio-composer-stage {
+  background: var(--studio-color-bg-canvas);
+}
+
+[data-studio-theme="dark"] :where(
+  .events-canvas-stage .event-graph-panel,
+  .event-graph-zoom,
+  .events-tool-strip,
+  .rooms-editor-context-bar,
+  .sprites-tool-strip,
+  .dialogues-editor-toolbar,
+  .files-details-panel
+) {
+  background: var(--studio-color-surface-muted);
+  border-color: var(--studio-color-border);
+}
+
+[data-studio-theme="dark"] .event-graph-canvas,
+[data-studio-theme="dark"] .events-canvas-stage,
+[data-studio-theme="dark"] .rooms-canvas-world {
+  background-color: transparent;
+}
+
+[data-studio-theme="dark"] .event-graph-viewport {
+  background-attachment: local;
+  background-color: var(--studio-color-bg-canvas);
+  background-image:
+    linear-gradient(color-mix(in srgb, var(--studio-color-grid-line) 75%, transparent) 1px, transparent 1px),
+    linear-gradient(90deg, color-mix(in srgb, var(--studio-color-grid-line) 75%, transparent) 1px, transparent 1px),
+    linear-gradient(color-mix(in srgb, var(--studio-color-grid-line) 38%, transparent) 1px, transparent 1px),
+    linear-gradient(90deg, color-mix(in srgb, var(--studio-color-grid-line) 38%, transparent) 1px, transparent 1px);
+  background-position: 0 0;
+  background-repeat: repeat;
+  background-size: 96px 96px, 96px 96px, 24px 24px, 24px 24px;
+}
+
+[data-studio-theme="dark"] .rooms-canvas-world-scroll {
+  background-attachment: local;
+  background-color: var(--studio-color-bg-canvas);
+  background-image:
+    linear-gradient(color-mix(in srgb, var(--studio-color-grid-line) 75%, transparent) 1px, transparent 1px),
+    linear-gradient(90deg, color-mix(in srgb, var(--studio-color-grid-line) 75%, transparent) 1px, transparent 1px),
+    linear-gradient(color-mix(in srgb, var(--studio-color-grid-line) 38%, transparent) 1px, transparent 1px),
+    linear-gradient(90deg, color-mix(in srgb, var(--studio-color-grid-line) 38%, transparent) 1px, transparent 1px);
+  background-position: 0 0;
+  background-repeat: repeat;
+  background-size: 112px 112px, 112px 112px, 28px 28px, 28px 28px;
+}
+
+[data-studio-theme="dark"] :where(
+  .events-header h3,
+  .rooms-header h3,
+  .sprites-header h3,
+  .audio-header h3,
+  .dialogues-header h3,
+  .settings-header h3,
+  .settings-nav-title strong,
+  .settings-nav-copy strong,
+  .settings-nav-copy span,
+  .event-inspector-header h4,
+  .rooms-inspector-header h4,
+  .sprites-inspector-header h4,
+  .files-details-panel h4,
+  .audio-inspector-header h4,
+  .dialogues-card-title h4,
+  .settings-inspector-header strong,
+  .event-graph-panel-header h4,
+  .room-entity-title strong,
+  .sprite-library-title strong,
+  .audio-side-panel h4,
+  .dialogues-side-card strong
+) {
+  color: var(--studio-color-text-primary);
+}
+
+[data-studio-theme="dark"] :where(
+  .events-header p,
+  .rooms-header p,
+  .sprites-header p,
+  .audio-header p,
+  .dialogues-header p,
+  .settings-header p,
+  .event-inspector-header p,
+  .event-inspector-header > span,
+  .rooms-inspector-header p,
+  .sprites-inspector-header p,
+  .sprites-inspector-header > span,
+  .audio-inspector-header p,
+  .audio-inspector-header > span,
+  .dialogues-inspector-card p,
+  .dialogues-inspector-card dt,
+  .dialogues-side-card p,
+  .dialogues-side-card span,
+  .files-inspector-panel p,
+  .files-preview-header p,
+  .settings-inspector-header span,
+  .settings-edit-row span,
+  .settings-value-list span,
+  .event-graph-count,
+  .event-graph-row span,
+  .muted,
+  label,
+  .sprites-filter-bar label,
+  .files-search-field label,
+  .audio-filter-bar label
+) {
+  color: var(--studio-color-text-secondary);
+}
+
+[data-studio-theme="dark"] :where(
+  input:not([type="checkbox"]):not([type="radio"]):not([type="range"]),
+  select,
+  textarea
+) {
+  background: var(--studio-color-input-bg);
+  border-color: var(--studio-color-border);
+  color: var(--studio-color-text-primary);
+}
+
+[data-studio-theme="dark"] :where(
+  .event-summary-strip span,
+  .sprite-summary-strip span,
+  .audio-summary-strip span,
+  .files-summary-card,
+  .rooms-summary-card,
+  .dialogues-summary-card,
+  .settings-summary-card,
+  .settings-summary-strip span,
+  .event-graph-node,
+  .sprite-sheet-card,
+  .asset-row,
+  .audio-card,
+  .dialogue-row,
+  .event-card,
+  .event-command-template-card,
+  .event-binding-picker,
+  .room-card,
+  .room-stage-card,
+  .file-kind-strip span
+) {
+  background: var(--studio-color-surface-raised);
+  border-color: var(--studio-color-border);
+  color: var(--studio-color-text-primary);
+}
+
+[data-studio-theme="dark"] :where(
+  .event-summary-strip strong,
+  .sprite-summary-strip strong,
+  .audio-summary-strip strong,
+  .files-summary-card dd,
+  .rooms-summary-card strong,
+  .settings-summary-strip strong
+) {
+  color: var(--studio-color-text-primary);
+}
+
+[data-studio-theme="dark"] .rooms-summary-card.primary,
+[data-studio-theme="dark"] .sprites-summary-card.primary,
+[data-studio-theme="dark"] .files-summary-card.primary {
+  background: var(--studio-color-accent-soft);
+  border-color: var(--studio-color-accent-border);
+}
+
+[data-studio-theme="dark"] .rooms-summary-card.primary strong,
+[data-studio-theme="dark"] .rooms-summary-card.primary span,
+[data-studio-theme="dark"] .sprites-summary-card.primary strong,
+[data-studio-theme="dark"] .sprites-summary-card.primary span,
+[data-studio-theme="dark"] .files-summary-card.primary dd,
+[data-studio-theme="dark"] .files-summary-card.primary dt {
+  color: var(--studio-color-accent);
+}
+
+[data-studio-theme="dark"] .event-graph-node {
+  --event-node-soft-bg: var(--studio-color-surface-raised);
+  --event-node-chip-bg: color-mix(in srgb, var(--event-node-accent) 20%, var(--studio-color-surface-raised));
+  --event-node-chip-text: var(--studio-color-text-primary);
+  background: var(--studio-color-surface-raised);
+  color: var(--studio-color-text-primary);
+}
+
+[data-studio-theme="dark"] .event-graph-node.context {
+  background: linear-gradient(180deg, var(--studio-color-surface-raised), var(--studio-color-surface));
+}
+
+[data-studio-theme="dark"] .event-graph-node-panel,
+[data-studio-theme="dark"] .event-graph-node-port {
+  background: var(--studio-color-surface-muted);
+  border-color: var(--studio-color-border);
+  color: var(--studio-color-text-secondary);
+}
+
+[data-studio-theme="dark"] .event-graph-lines path {
+  stroke: var(--studio-color-text-muted);
+}
+
+[data-studio-theme="dark"] .event-graph-lines path.selected {
+  stroke: var(--studio-color-accent);
+}
+
+[data-studio-theme="dark"] .warning-chip {
+  background: var(--studio-color-warning-bg);
+  border-color: var(--studio-color-warning-border);
+  color: var(--studio-color-warning-text);
+}
+
+[data-studio-theme="dark"] .danger-chip {
+  background: var(--studio-color-danger-bg);
+  border-color: var(--studio-color-danger-border);
+  color: var(--studio-color-danger-text);
+}
+
+[data-studio-theme="dark"] .ok-chip {
+  background: var(--studio-color-ok-bg);
+  border-color: var(--studio-color-ok-border);
+  color: var(--studio-color-ok-text);
+}
+
+[data-studio-theme="dark"] :where(
+  .asset-row:hover,
+  .audio-card:hover,
+  .audio-side-row:hover,
+  .sprite-reference-row:hover,
+  .dialogue-row:hover,
+  .event-card:hover
+) {
+  background: var(--studio-color-surface-hover);
+}
+
+[data-studio-theme="dark"] :is(
+  .asset-row.active,
+  .audio-card:has(button[aria-pressed="true"]),
+  .dialogue-row.active,
+  .event-step-row.selected
+) {
+  background: var(--studio-color-surface-selected);
+}
+
+[data-studio-theme="dark"] .room-tilemap-grid button,
+[data-studio-theme="dark"] .room-collision-grid button,
+[data-studio-theme="dark"] .audio-tracker-cells button {
+  background: var(--studio-color-surface-raised);
+  border-color: var(--studio-color-border);
+}
+
+[data-studio-theme="dark"] .sprite-composer-stage {
+  background:
+    linear-gradient(45deg, #2a313c 25%, transparent 25%),
+    linear-gradient(-45deg, #2a313c 25%, transparent 25%),
+    linear-gradient(45deg, transparent 75%, #2a313c 75%),
+    linear-gradient(-45deg, transparent 75%, #2a313c 75%),
+    #1f252e;
+  background-position: 0 0, 0 8px, 8px -8px, -8px 0;
+  background-size: 16px 16px;
+}
+
+[data-studio-theme="dark"] .room-stage-canvas,
+[data-studio-theme="dark"] .files-details-panel {
+  background: var(--studio-color-bg-canvas);
+}
+
+[data-studio-theme="dark"] .audio-composer-stage:has(.audio-empty-composer),
+[data-studio-theme="dark"] .audio-composer-stage:has(.audio-empty-state),
+[data-studio-theme="dark"] .audio-stage-empty,
+[data-studio-theme="dark"] .audio-composer-empty {
+  background: var(--studio-color-bg-canvas);
+}
+
+[data-studio-theme="dark"] .welcome-theme-toggle {
+  background: var(--studio-color-surface-raised);
+  border-color: var(--studio-color-border);
+  color: var(--studio-color-text-primary);
+}
+
+[data-studio-theme="dark"] .welcome-theme-toggle[aria-pressed="true"] {
+  background: var(--studio-color-accent-soft);
+  border-color: var(--studio-color-accent-border);
+  color: var(--studio-color-accent);
+}
+
+[data-studio-theme="dark"] .ui-segmented,
+[data-studio-theme="dark"] :where(
+  .workspace-list,
+  .event-filter-segment,
+  .sprite-mode-segment,
+  .audio-workspace-mode,
+  .files-segmented-control,
+  .room-tool-segment
+) {
+  background: var(--studio-filter-bg);
+  border-color: var(--studio-filter-border);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
+}
+
+[data-studio-theme="dark"] .settings-value-row strong {
+  background: var(--studio-readonly-bg);
+  border-color: var(--studio-readonly-border);
+  color: var(--studio-readonly-text);
+}
+
+[data-studio-theme="dark"] .settings-edit-row input,
+[data-studio-theme="dark"] .settings-edit-row select {
+  background: var(--studio-color-input-bg);
+  color: var(--studio-color-text-primary);
+}
+
+[data-studio-theme="dark"] .rooms-validation-panel {
+  background: var(--studio-color-surface-raised);
+  border-color: var(--studio-color-border);
+}
+
+
+/* Keep panel hierarchy and state colors distinct from the game artwork. */
+[data-studio-theme="dark"] .topbar-brand { border-color: var(--studio-color-border); }
+[data-studio-theme="dark"] .topbar-brand-logo,
+[data-studio-theme="dark"] .welcome-brand-logo { filter: brightness(1.8) saturate(0.65); }
+
+[data-studio-theme="dark"] :is(.settings-nav, .rooms-rail, .sprites-rail, .audio-rail, .dialogues-rail) {
+  border-color: var(--studio-color-border);
+}
+
+[data-studio-theme="dark"] :is(.settings-nav-item.active, .settings-intent-card.applied) {
+  background: var(--studio-color-surface-selected);
+  border-color: var(--studio-color-accent-border);
+}
+[data-studio-theme="dark"] .settings-nav-item.active .settings-nav-copy strong { color: var(--studio-color-accent); }
+[data-studio-theme="dark"] .settings-nav-copy span { color: var(--studio-color-text-secondary); }
+[data-studio-theme="dark"] .settings-nav-group h4 { color: var(--studio-color-text-muted); }
+[data-studio-theme="dark"] .settings-intent-card { background: var(--studio-color-surface-raised); }
+[data-studio-theme="dark"] .settings-intent-card-title small {
+  background: var(--studio-color-accent-soft);
+  color: var(--studio-color-accent);
+}
+[data-studio-theme="dark"] .settings-section-badge {
+  background: var(--studio-color-accent-soft);
+  color: var(--studio-color-accent);
+}
+
+[data-studio-theme="dark"] :is(.room-stage-card-header, .room-stage-card-footer) {
+  background: var(--studio-color-surface);
+  border-color: var(--studio-color-border);
+  color: var(--studio-color-text-primary);
+}
+[data-studio-theme="dark"] :is(.room-stage-card-tags span, .room-stage-card-footer span) { color: var(--studio-color-text-secondary); }
+[data-studio-theme="dark"] :is(.room-stage-card-tags span.active, .room-stage-card-tags span.player-present, .room-stage-card-footer span.active, .room-stage-card-footer span.player-present) {
+  background: var(--studio-color-accent-soft);
+  color: var(--studio-color-accent);
+}
+
+[data-studio-theme="dark"] :is(
+  .sprite-sheet-rail-row.active,
+  .sprite-animation-rail-row.active,
+  .sprite-sheet-source-toggle button.active,
+  .sprite-option-segment button.active,
+  .sprite-sheet-interaction-toggle button.active,
+  .sprite-sheet-size-presets button.active,
+  .sprite-metasprite-frame-strip button.active,
+  .sprite-metasprite-tile-strip button.active,
+  .sprite-composer-frame-strip button.active,
+  .sprite-composer-tile-strip button.active,
+  .sprite-composer-badges span
+) {
+  background: var(--studio-color-accent-soft);
+  border-color: var(--studio-color-accent-border);
+  color: var(--studio-color-accent);
+}
+[data-studio-theme="dark"] .sprite-animation-rail-row.active small { color: var(--studio-color-text-secondary); }
+[data-studio-theme="dark"] .sprite-composer-stage .sprite-metasprite-canvas {
+  background:
+    linear-gradient(90deg, color-mix(in srgb, var(--studio-color-grid-line) 60%, transparent) 1px, transparent 1px),
+    linear-gradient(180deg, color-mix(in srgb, var(--studio-color-grid-line) 60%, transparent) 1px, transparent 1px),
+    var(--studio-color-bg-canvas);
+  background-size: var(--sprite-canvas-grid-step, 64px) var(--sprite-canvas-grid-step, 64px);
+  border-color: var(--studio-color-accent-border);
+}
+[data-studio-theme="dark"] .sprite-frame-region { color: var(--studio-color-text-primary); }
+[data-studio-theme="dark"] .sprite-composer-empty {
+  background: var(--studio-color-surface);
+  border-color: var(--studio-color-border);
+}
+
+[data-studio-theme="dark"] :is(input, select, textarea):disabled {
+  background: var(--studio-disabled-bg);
+  border-color: var(--studio-disabled-border);
+  color: var(--studio-disabled-text);
+}
+[data-studio-theme="dark"] :is(input, textarea)[readonly] {
+  background: var(--studio-readonly-bg);
+  color: var(--studio-readonly-text);
+}
+[data-studio-theme="dark"] :is(input, textarea)::placeholder { color: var(--studio-color-text-muted); opacity: 1; }
+[data-studio-theme="dark"] :is(button, input, select, textarea, summary, a):focus-visible {
+  outline: 2px solid var(--studio-color-accent);
+  outline-offset: 2px;
+}
+/* Search/tempo fields stay visually part of their containing control. */
+[data-studio-theme="dark"] :is(.audio-groove-search, .audio-groove-tempo) input { background: transparent; }
+[data-studio-theme="dark"] .audio-groove-library { background: var(--studio-color-surface-muted); }
+[data-studio-theme="dark"] .audio-groove-switch input::before { background: var(--studio-color-on-accent); }
+[data-studio-theme="dark"] .audio-groove-switch input:checked { background: var(--studio-color-accent-solid); }
+
+[data-studio-theme="dark"] .sprite-gba-budget-header span { color: var(--studio-color-text-secondary); }
+[data-studio-theme="dark"] :is(.rooms-filter-chip-group, .files-filter-chip-group, .audio-filter-chip-group) button {
+  background: var(--studio-filter-bg);
+  border-color: var(--studio-filter-border);
+  color: var(--studio-filter-text);
+}
+[data-studio-theme="dark"] :is(.rooms-filter-chip-group, .files-filter-chip-group, .audio-filter-chip-group) button.active {
+  background: var(--studio-filter-selected-bg);
+  border-color: var(--studio-filter-selected-border);
+  color: var(--studio-filter-selected-text);
+}
+[data-studio-theme="dark"] .dialogues-filter-chip-group button:disabled {
+  background: var(--studio-disabled-bg);
+  border-color: var(--studio-disabled-border);
+  color: var(--studio-disabled-text);
+}
+[data-studio-theme="dark"] .welcome-secondary {
+  background: var(--studio-control-secondary-bg);
+  border-color: var(--studio-control-secondary-border);
+  color: var(--studio-control-secondary-text);
+}
+[data-studio-theme="dark"] .welcome-secondary:hover:not(:disabled) {
+  background: var(--studio-control-hover-bg);
+  border-color: var(--studio-control-hover-border);
+}
+[data-studio-theme="dark"] .welcome-create label span { color: var(--studio-color-text-secondary); }
+[data-studio-theme="dark"] .welcome-recent span.welcome-play { color: var(--studio-color-on-accent); }
+[data-studio-theme="dark"] .studio-language-flag { background: #176b4b; color: #ffffff; }
+
+[data-studio-theme="dark"] :is(
+  .sprite-animation-library,
+  .sprite-sheet-palette-toolbar,
+  .sprite-inspector-section,
+  .sprite-state-direction-panel,
+  .sprites-editor-timeline-row,
+  .sprites-active-tool-panel
+) { border-color: var(--studio-color-border); }
+
+[data-studio-theme="dark"] .rooms-inspector-header > span {
+  background: var(--studio-color-accent-soft);
+  border-color: var(--studio-color-accent-border);
+  color: var(--studio-color-accent);
+}
+[data-studio-theme="dark"] .sprite-canvas-view-strip button.active {
+  background: var(--studio-filter-selected-bg);
+  color: var(--studio-filter-selected-text);
+  border-color: var(--studio-filter-selected-border);
+}

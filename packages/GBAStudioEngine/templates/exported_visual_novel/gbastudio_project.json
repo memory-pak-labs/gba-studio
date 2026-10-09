@@ -1,0 +1,39 @@
+{
+  "schema": 1,
+  "backend": "gbastudio_engine",
+  "kind": "visual_novel",
+  "runtime_profile": "visual_novel",
+  "runtime_adapter": {
+    "base_runtime": "visual_novel",
+    "adapter": "native",
+    "project_block": "visual_novel_project",
+    "native": true
+  },
+  "build": {
+    "target": "exported_visual_novel",
+    "make_target": "all"
+  },
+  "entry": "main.cpp",
+  "project_data": "visual_novel_project_data.hpp",
+  "generated_assets": [],
+  "requires": {
+    "engine_pack": ">=1.46.0",
+    "features": [
+      "visual_novel_runtime",
+      "engine_sdk.visual_novel_project_data_contract",
+      "asset-export-visual-novel-project-data",
+      "visual_novel_choice_conditions",
+      "visual_novel_choice_scene_targets",
+      "visual_novel_choice_scripts",
+      "visual_novel_line_history",
+      "visual_novel_save_data",
+      "visual_novel_autosave_slot0",
+      "visual_novel_hud_scene_history",
+      "save.export_project_config",
+      "asset-export-runtime-profile-manifest",
+      "runtime_profiles.visual_novel_native_contract",
+      "dialogue.choice_prompt",
+      "events.choice_groups"
+    ]
+  }
+}

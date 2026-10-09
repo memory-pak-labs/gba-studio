@@ -1,0 +1,22 @@
+{
+  "schema": 1,
+  "backend": "gbastudio_engine",
+  "kind": "dungeon_crawler",
+  "runtime_profile": "dungeon_crawler",
+  "build": {
+    "target": "exported_dungeon_crawler",
+    "make_target": "all"
+  },
+  "entry": "main.cpp",
+  "project_data": "dungeon_crawler_project_data.hpp",
+  "generated_assets": [],
+  "requires": {
+    "engine_pack": ">=2.24.0",
+    "features": [
+      "dungeon_crawler_runtime",
+      "engine_sdk.dungeon_crawler_project_data_contract",
+      "dungeon_crawler_runtime.grid_movement",
+      "dungeon_crawler_runtime.first_person_view"
+    ]
+  }
+}

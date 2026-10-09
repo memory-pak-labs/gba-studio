@@ -1,0 +1,224 @@
+{
+  "schema": 1,
+  "backend": "gbastudio_engine",
+  "kind": "isometric",
+  "template_dir": "../../../dist/GBAStudioEnginePack/templates/exported_isometric",
+  "entry": "main.cpp",
+  "project_data": "isometric_project_data.hpp",
+  "generated_assets": [],
+  "build": {
+    "target": "verify_generated_isometric",
+    "make_target": "all"
+  },
+  "requires": {
+    "engine_pack": ">=1.17.0",
+    "features": [
+      "isometric_runtime",
+      "engine_sdk.isometric_project_data_contract",
+      "asset-export-isometric-project-data",
+      "isometric_runtime.room_warp",
+      "asset_export_resource_bank_upload_sources",
+      "asset_export_semantic_asset_refs"
+    ]
+  },
+  "isometric_project": {
+    "assets": {
+      "bg_palettes": [
+        "verify_isometric_room_bg"
+      ],
+      "tile_assets": [
+        "verify_isometric_room_bg"
+      ]
+    },
+    "initial_room": 0,
+    "backdrop_color": 123,
+    "resource_banks": "asset_pack",
+    "grid": {
+      "tile_width_pixels": 32,
+      "tile_height_pixels": 16,
+      "origin": {
+        "x": 120,
+        "y": 24
+      }
+    },
+    "rooms": [
+      {
+        "name": "verify_iso_room",
+        "width_tiles": 3,
+        "height_tiles": 3,
+        "visual_tiles": [
+          1,
+          1,
+          1,
+          1,
+          2,
+          1,
+          1,
+          1,
+          1
+        ],
+        "collision_flags": [
+          1,
+          1,
+          1,
+          1,
+          0,
+          1,
+          1,
+          1,
+          1
+        ],
+        "camera": {
+          "position": {
+            "x": 0,
+            "y": 0
+          },
+          "bounds": {
+            "x": 0,
+            "y": 0,
+            "width": 96,
+            "height": 48
+          },
+          "bounds_enabled": true
+        },
+        "on_enter": [
+          {
+            "op": "set_variable",
+            "variable": 1,
+            "value": 4
+          }
+        ],
+        "actors": [
+          {
+            "tile": {
+              "x": 1,
+              "y": 1,
+              "z": 0
+            },
+            "screen_offset": {
+              "x": -8,
+              "y": -16
+            },
+            "tile_index": 0,
+            "palette": 0,
+            "visible": true
+          },
+          {
+            "tile": {
+              "x": 1,
+              "y": 0,
+              "z": 0
+            },
+            "screen_offset": {
+              "x": -8,
+              "y": -16
+            },
+            "tile_index": 0,
+            "palette": 0,
+            "visible": true,
+            "hflip": true,
+            "on_interact": [
+              {
+                "op": "show_dialogue",
+                "line": 0
+              },
+              {
+                "op": "warp",
+                "room": 1,
+                "x": 2,
+                "y": 2
+              }
+            ],
+            "on_start": [
+              {
+                "op": "set_actor_visible",
+                "actor": 1,
+                "visible": 1
+              }
+            ],
+            "on_update": [
+              {
+                "op": "set_camera_position",
+                "x": 0,
+                "y": 0
+              }
+            ]
+          }
+        ],
+        "resource_bank_group": "room_0"
+      },
+      {
+        "name": "verify_iso_warp_room",
+        "width_tiles": 3,
+        "height_tiles": 3,
+        "visual_tiles": [
+          1,
+          1,
+          1,
+          1,
+          3,
+          1,
+          1,
+          1,
+          1
+        ],
+        "collision_flags": [
+          1,
+          1,
+          1,
+          1,
+          0,
+          1,
+          1,
+          1,
+          1
+        ],
+        "on_enter": [
+          {
+            "op": "set_variable",
+            "variable": 6,
+            "value": 1
+          }
+        ],
+        "actors": [
+          {
+            "tile": {
+              "x": 2,
+              "y": 2,
+              "z": 0
+            },
+            "screen_offset": {
+              "x": -8,
+              "y": -16
+            },
+            "tile_index": 0,
+            "palette": 0,
+            "visible": true
+          }
+        ],
+        "resource_bank_group": "room_0"
+      }
+    ],
+    "save": {
+      "enabled": true,
+      "signature": "GBIS",
+      "offset": 1024,
+      "slot_capacity": 1024,
+      "slot_count": 1,
+      "version": 1
+    }
+  },
+  "asset_pack": {
+    "assets": [
+      {
+        "name": "verify_isometric_room_bg",
+        "id": "verify_isometric_room_bg",
+        "bank_group": "room_0",
+        "kind": "bg",
+        "png": "tiny.png",
+        "header": "verify_isometric_room_bg.hpp",
+        "symbol": "verify_isometric_room_bg"
+      }
+    ]
+  }
+}

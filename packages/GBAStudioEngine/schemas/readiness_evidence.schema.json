@@ -1,0 +1,207 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://gbastudio.local/schemas/readiness_evidence.schema.json",
+  "title": "GBAStudio Engine backend promotion readiness evidence",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "manual_mgba_stress_smoke",
+    "hardware_or_ci_validation",
+    "gba_studio_engine_primary_rollout"
+  ],
+  "properties": {
+    "manual_mgba_stress_smoke": {
+      "$ref": "#/$defs/manual_mgba_stress_smoke_gate"
+    },
+    "hardware_or_ci_validation": {
+      "$ref": "#/$defs/hardware_or_ci_validation_gate"
+    },
+    "gba_studio_engine_primary_rollout": {
+      "$ref": "#/$defs/gba_studio_engine_primary_rollout_gate"
+    }
+  },
+  "$defs": {
+    "gate_object": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "ok"
+      ],
+      "properties": {
+        "ok": {
+          "type": "boolean"
+        },
+        "source": {
+          "type": "string",
+          "minLength": 1
+        },
+        "checked_at": {
+          "type": "string",
+          "minLength": 1
+        },
+        "message": {
+          "type": "string",
+          "minLength": 1
+        },
+        "review_environment": {
+          "type": "string",
+          "minLength": 1
+        },
+        "evidence_type": {
+          "type": "string",
+          "enum": [
+            "manual_mgba_stress_smoke",
+            "hardware_real",
+            "cross_platform_ci",
+            "local_cross_platform_dry_run",
+            "gba_studio_engine_primary_rollout"
+          ]
+        },
+        "validated_platforms": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "enum": [
+              "macos",
+              "windows",
+              "linux"
+            ]
+          },
+          "uniqueItems": true
+        }
+      }
+    },
+    "true_gate_condition": {
+      "properties": {
+        "ok": {
+          "const": true
+        }
+      },
+      "required": [
+        "ok"
+      ]
+    },
+    "manual_mgba_stress_smoke_gate": {
+      "oneOf": [
+        {
+          "type": "boolean"
+        },
+        {
+          "allOf": [
+            {
+              "$ref": "#/$defs/gate_object"
+            },
+            {
+              "if": {
+                "$ref": "#/$defs/true_gate_condition"
+              },
+              "then": {
+                "required": [
+                  "source",
+                  "checked_at",
+                  "evidence_type",
+                  "review_environment"
+                ],
+                "properties": {
+                  "evidence_type": {
+                    "const": "manual_mgba_stress_smoke"
+                  }
+                }
+              }
+            }
+          ]
+        }
+      ]
+    },
+    "hardware_or_ci_validation_gate": {
+      "oneOf": [
+        {
+          "type": "boolean"
+        },
+        {
+          "allOf": [
+            {
+              "$ref": "#/$defs/gate_object"
+            },
+            {
+              "if": {
+                "$ref": "#/$defs/true_gate_condition"
+              },
+              "then": {
+                "required": [
+                  "source",
+                  "checked_at",
+                  "evidence_type"
+                ],
+                "properties": {
+                  "evidence_type": {
+                    "enum": [
+                      "hardware_real",
+                      "cross_platform_ci",
+                      "local_cross_platform_dry_run"
+                    ]
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "ok": {
+                    "const": true
+                  },
+                  "evidence_type": {
+                    "enum": [
+                      "cross_platform_ci",
+                      "local_cross_platform_dry_run"
+                    ]
+                  }
+                },
+                "required": [
+                  "ok",
+                  "evidence_type"
+                ]
+              },
+              "then": {
+                "required": [
+                  "validated_platforms"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    "gba_studio_engine_primary_rollout_gate": {
+      "oneOf": [
+        {
+          "type": "boolean"
+        },
+        {
+          "allOf": [
+            {
+              "$ref": "#/$defs/gate_object"
+            },
+            {
+              "if": {
+                "$ref": "#/$defs/true_gate_condition"
+              },
+              "then": {
+                "required": [
+                  "source",
+                  "checked_at",
+                  "evidence_type"
+                ],
+                "properties": {
+                  "evidence_type": {
+                    "const": "gba_studio_engine_primary_rollout"
+                  }
+                }
+              }
+            }
+          ]
+        }
+      ]
+    }
+  }
+}

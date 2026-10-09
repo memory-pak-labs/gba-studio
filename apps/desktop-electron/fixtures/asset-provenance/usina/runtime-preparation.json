@@ -1,0 +1,185 @@
+{
+  "status": "palette-prepared",
+  "assets": [
+    {
+      "source": "assets/usina-exploration-background-240x160.png",
+      "prepared": "prepared/usina-exploration-background-v3-4bpp.png",
+      "consumer": "BG 4bpp",
+      "size": [
+        240,
+        160
+      ],
+      "visibleColors": 15,
+      "sha256": "ab72f82cbb17d0f0234d60df315ab14eb4acbd024c1450da5405e92825a9193c",
+      "note": "Shared 15-color RGB555 palette; no dithering"
+    },
+    {
+      "source": "assets/usina-combat-background-240x160.png",
+      "prepared": "prepared/usina-combat-background-v3-4bpp.png",
+      "consumer": "BG 4bpp",
+      "size": [
+        240,
+        160
+      ],
+      "visibleColors": 14,
+      "sha256": "cafc1a82ed253a2b8b7d88f0bfe36b1f2850436ef2111918946d83e88932f3ba",
+      "note": "Shared 15-color RGB555 palette; no dithering"
+    },
+    {
+      "source": "assets/usina-exit-background-240x160.png",
+      "prepared": "prepared/usina-exit-background-v3-4bpp.png",
+      "consumer": "BG 4bpp",
+      "size": [
+        240,
+        160
+      ],
+      "visibleColors": 15,
+      "sha256": "616e5b2fde975d64abecb8ea87fc8950fd2e4643a89c7b6448cee0d169aee689",
+      "note": "Shared 15-color RGB555 palette; no dithering"
+    },
+    {
+      "source": "assets/sentinel-depth-far-mid-near-192x64.png",
+      "prepared": "prepared/sentinel-depth-far-mid-near-192x64-v3-4bpp.png",
+      "consumer": "OBJ 4bpp",
+      "size": [
+        192,
+        64
+      ],
+      "visibleColors": 14,
+      "sha256": "5f7ab181c7d5f83fc14b1908bd7eefecec8f8f64e8ab0361efeed7e2d2cde0c1",
+      "note": "15-color sheet palette; binary source alpha"
+    },
+    {
+      "source": "assets/sentinel-combat-idle-alert-hit-192x64.png",
+      "prepared": "prepared/sentinel-combat-idle-alert-hit-192x64-v3-4bpp.png",
+      "consumer": "OBJ 4bpp",
+      "size": [
+        192,
+        64
+      ],
+      "visibleColors": 14,
+      "sha256": "80a7a82e049993da173e5b14473d36cf7f904b22ef5bab83df878e228d166a0f",
+      "note": "15-color sheet palette; binary source alpha"
+    },
+    {
+      "source": "assets/player-hand-use-48x48.png",
+      "prepared": "prepared/player-hand-use-48x48-v3-4bpp.png",
+      "consumer": "OBJ 4bpp",
+      "size": [
+        48,
+        48
+      ],
+      "visibleColors": 12,
+      "sha256": "395269f9376397267cd30313f42b3bc241519a5aaa0522ea14c7e524d462b01f",
+      "note": "15-color sheet palette; binary source alpha"
+    },
+    {
+      "source": "assets/pipe-eel-48x48.png",
+      "prepared": "prepared/pipe-eel-48x48-v3-4bpp.png",
+      "consumer": "OBJ 4bpp",
+      "size": [
+        48,
+        48
+      ],
+      "visibleColors": 14,
+      "sha256": "972451ded2eef088fe89e655e6b0a2f69c138f7008d9d6e1c8db3339d3a7b0e4",
+      "note": "15-color sheet palette; binary source alpha"
+    },
+    {
+      "source": "assets/brass-key-16x32.png",
+      "prepared": "prepared/brass-key-16x32-v3-4bpp.png",
+      "consumer": "OBJ 4bpp",
+      "size": [
+        16,
+        32
+      ],
+      "visibleColors": 13,
+      "sha256": "0ac4780d46464eca498f0644336f6b2636ba3182e5a8751caac08a50b6d63374",
+      "note": "15-color sheet palette; binary source alpha"
+    },
+    {
+      "source": "assets/warning-lantern-24x32.png",
+      "prepared": "prepared/warning-lantern-24x32-v3-4bpp.png",
+      "consumer": "OBJ 4bpp",
+      "size": [
+        24,
+        32
+      ],
+      "visibleColors": 14,
+      "sha256": "0d967a3f83143dbd97836d3f9efa7b653b06247c1bbbc37da61fe13544ab860a",
+      "note": "15-color sheet palette; binary source alpha"
+    },
+    {
+      "source": "assets/valve-wheel-32x32.png",
+      "prepared": "prepared/valve-wheel-32x32-v3-4bpp.png",
+      "consumer": "OBJ 4bpp",
+      "size": [
+        32,
+        32
+      ],
+      "visibleColors": 14,
+      "sha256": "ba872347565c2cb10aed542959e767de172266bf8e5b9e282941a2f8176e1d60",
+      "note": "15-color sheet palette; binary source alpha"
+    },
+    {
+      "source": "assets/compass-medallion-24x24.png",
+      "prepared": "prepared/compass-medallion-24x24-v3-4bpp.png",
+      "consumer": "OBJ 4bpp",
+      "size": [
+        24,
+        24
+      ],
+      "visibleColors": 13,
+      "sha256": "cf825f836905a5899c7ad35cc91eae76f6d9c4184fe6ed1ca215a36d82316036",
+      "note": "15-color sheet palette; binary source alpha"
+    },
+    {
+      "source": "assets/energy-cell-idle-focus-32x24.png",
+      "prepared": "prepared/usina-energy-cell-v3-4bpp.png",
+      "consumer": "OBJ 4bpp",
+      "size": [
+        128,
+        64
+      ],
+      "visibleColors": 14,
+      "sha256": "73924f37e56fc3b7e955e4706a2e5bced530a4eeb439dd519bbadc7ca249bf13",
+      "note": "Two 64x64 frames; reward aligned to pedestal"
+    },
+    {
+      "source": "assets/hud-usina-exploration-skin-64x112.png",
+      "prepared": "prepared/hud-usina-exploration-v3-4bpp.png",
+      "consumer": "OBJ HUD icon 4bpp",
+      "size": [
+        64,
+        112
+      ],
+      "visibleColors": 10,
+      "sha256": "b7026521777d5d7b8c166248e1796f035ef3bc74282cfbc21b919aa35b25d53c",
+      "note": "Full panel at 176,0; dynamic text remains separate"
+    },
+    {
+      "source": "assets/hud-usina-combat-skin-64x112.png",
+      "prepared": "prepared/hud-usina-combat-v3-4bpp.png",
+      "consumer": "OBJ HUD icon 4bpp",
+      "size": [
+        64,
+        112
+      ],
+      "visibleColors": 11,
+      "sha256": "5392cb4b42aa1b3c0273343ebd71d91df4dbcb4a0d8dd8d2587876380dca5846",
+      "note": "Full panel at 176,0; dynamic text remains separate"
+    },
+    {
+      "source": "assets/hud-usina-exit-skin-64x112.png",
+      "prepared": "prepared/hud-usina-exit-v3-4bpp.png",
+      "consumer": "OBJ HUD icon 4bpp",
+      "size": [
+        64,
+        112
+      ],
+      "visibleColors": 12,
+      "sha256": "724d3ef4c8b7b8a1392269cb53592fba7b89242a3912629d0f1034adcd852e5e",
+      "note": "Full panel at 176,0; dynamic text remains separate"
+    }
+  ]
+}

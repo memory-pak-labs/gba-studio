@@ -1,0 +1,8 @@
+#define GBS_CUTSCENE_PROJECT_DATA_HEADER "cutscene_project_data.hpp"
+#define GBS_CUTSCENE_RUNTIME_ENTRY gbs_run_cutscene
+#define GBS_CUTSCENE_RUNTIME_ENTER gbs_enter_cutscene
+#define GBS_CUTSCENE_RUNTIME_UPDATE gbs_update_cutscene
+#define GBS_CUTSCENE_RUNTIME_RENDER gbs_render_cutscene
+#define GBS_CUTSCENE_RUNTIME_LEAVE gbs_leave_cutscene
+#define GBS_MULTI_RUNTIME 1
+#include "cutscene_runtime.inc"

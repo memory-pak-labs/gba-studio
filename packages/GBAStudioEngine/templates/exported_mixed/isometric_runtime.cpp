@@ -1,0 +1,8 @@
+#define GBS_ISOMETRIC_PROJECT_DATA_HEADER "isometric_project_data.hpp"
+#define GBS_ISOMETRIC_RUNTIME_ENTRY gbs_run_isometric
+#define GBS_ISOMETRIC_RUNTIME_ENTER gbs_enter_isometric
+#define GBS_ISOMETRIC_RUNTIME_UPDATE gbs_update_isometric
+#define GBS_ISOMETRIC_RUNTIME_RENDER gbs_render_isometric
+#define GBS_ISOMETRIC_RUNTIME_LEAVE gbs_leave_isometric
+#define GBS_MULTI_RUNTIME 1
+#include "isometric_runtime.inc"

@@ -1,0 +1,27 @@
+{
+  "status": "integrated-review",
+  "worldPixels": { "width": 480, "height": 320 },
+  "tileSizePixels": 8,
+  "viewportPixels": { "width": 240, "height": 160 },
+  "roadHalfWidthPixels": 18,
+  "startHeading": 4,
+  "cameraDeadZone": { "x": 56, "y": 40 },
+  "centerline": [
+    [180, 56], [280, 56], [325, 65], [365, 99], [414, 125],
+    [442, 153], [438, 190], [416, 222], [386, 241],
+    [300, 238], [205, 234], [110, 226], [60, 212],
+    [42, 184], [40, 115], [48, 80], [70, 58], [130, 55]
+  ],
+  "checkpoints": [
+    { "id": "ilha-curva-leste", "x": 439, "y": 169, "width": 48, "height": 72 },
+    { "id": "ilha-retorno-sul", "x": 237, "y": 235, "width": 80, "height": 48 },
+    { "id": "ilha-curva-oeste", "x": 42, "y": 150, "width": 48, "height": 72 },
+    { "id": "ilha-largada", "x": 210, "y": 56, "width": 28, "height": 40 }
+  ],
+  "actors": [
+    { "id": "racing-nara", "x": 181, "y": 53, "role": "player" },
+    { "id": "racing-rival", "x": 150, "y": 53, "role": "rival" },
+    { "id": "racing-rival-2", "x": 120, "y": 53, "role": "rival" }
+  ],
+  "notes": "Composição V2 aprovada em 2026-09-25; geometria e colisão integradas ao template canônico. O framebuffer otimizado permanece em revisão visual de detalhe."
+}

@@ -1,0 +1,110 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://gbastudio.local/schemas/public_schema_catalog.schema.json",
+  "title": "GBAStudio Engine public schema catalog",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "ok",
+    "version",
+    "kind",
+    "engine_pack",
+    "schema_count",
+    "schemas",
+    "missing_schemas",
+    "accepted_schema_arguments",
+    "auto_detection"
+  ],
+  "properties": {
+    "ok": {
+      "type": "boolean"
+    },
+    "version": {
+      "type": "string",
+      "minLength": 1
+    },
+    "kind": {
+      "const": "public_schema_catalog"
+    },
+    "engine_pack": {
+      "type": "string",
+      "minLength": 1
+    },
+    "schema_count": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "schemas": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/schemaEntry"
+      }
+    },
+    "missing_schemas": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "accepted_schema_arguments": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "auto_detection": {
+      "type": "boolean"
+    }
+  },
+  "$defs": {
+    "schemaEntry": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "schema_path",
+        "absolute_path",
+        "exists",
+        "size_bytes",
+        "sha256",
+        "validator"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "schema_path": {
+          "type": "string",
+          "minLength": 1
+        },
+        "absolute_path": {
+          "type": "string",
+          "minLength": 1
+        },
+        "exists": {
+          "type": "boolean"
+        },
+        "size_bytes": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "sha256": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "validator": {
+          "type": "boolean"
+        }
+      }
+    }
+  }
+}

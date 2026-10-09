@@ -1,0 +1,287 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://gbastudio.local/schemas/asset_pack.schema.json",
+  "title": "GBAStudio Engine asset pack input",
+  "type": "object",
+  "required": [
+    "assets"
+  ],
+  "properties": {
+    "stress_profile": {
+      "type": "string",
+      "minLength": 1
+    },
+    "resident_sets": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "groups", "max_resident_groups"],
+        "properties": {
+          "id": { "type": "string", "minLength": 1 },
+          "room": { "type": "string", "minLength": 1 },
+          "groups": {
+            "type": "array",
+            "minItems": 1,
+            "items": { "type": "string", "minLength": 1 },
+            "uniqueItems": true
+          },
+          "max_resident_groups": { "type": "integer", "minimum": 1 }
+        },
+        "additionalProperties": false
+      }
+    },
+    "assets": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "name"
+        ],
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1
+          },
+          "id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "bg",
+              "palette",
+              "obj",
+              "affine_bg",
+              "indexed_bg",
+              "paged_bg",
+              "bitmap3",
+              "bitmap4",
+              "bitmap5",
+              "audio",
+              "bank"
+            ]
+          },
+          "optional": {
+            "type": "boolean"
+          },
+          "png": {
+            "type": "string"
+          },
+          "audio_json": {
+            "type": "string"
+          },
+          "palette_slot": {
+            "type": "string",
+            "enum": [
+              "background",
+              "objects"
+            ]
+          },
+          "palette_values": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 16,
+            "items": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 32767
+            }
+          },
+          "header": {
+            "type": "string"
+          },
+          "symbol": {
+            "type": "string"
+          },
+          "background_bpp": {
+            "type": "integer",
+            "enum": [
+              4,
+              8
+            ]
+          },
+          "compression_policy": {
+            "oneOf": [
+              { "type": "string", "const": "auto" },
+              {
+                "type": "object",
+                "required": ["strategy", "tiles", "tilemap", "palette"],
+                "properties": {
+                  "strategy": { "const": "manual" },
+                  "tiles": { "type": "string", "enum": ["none", "rle16", "lz77", "huffman"] },
+                  "tilemap": { "type": "string", "enum": ["none", "rle16", "lz77", "huffman"] },
+                  "palette": { "type": "string", "enum": ["none", "rle16", "lz77", "huffman"] }
+                },
+                "additionalProperties": false
+              }
+            ],
+            "description": "Política de compressão declarada pelo manifesto de recursos da cena. auto é resolvido pelo assetc por componente."
+          },
+          "bank_group": {
+            "type": "string",
+            "minLength": 1
+          },
+          "bank_groups": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            },
+            "uniqueItems": true
+          },
+          "sprite_width": {
+            "type": "integer",
+            "minimum": 8,
+            "maximum": 128,
+            "multipleOf": 8
+          },
+          "sprite_height": {
+            "type": "integer",
+            "minimum": 8,
+            "maximum": 128,
+            "multipleOf": 8
+          },
+          "sprite_bpp": {
+            "type": "integer",
+            "enum": [
+              4,
+              8
+            ],
+            "description": "Profundidade de cor dos OBJ; 8bpp consome pares de character blocks e a paleta OBJ completa."
+          },
+          "stream_frames": {
+            "type": "boolean",
+            "description": "Mantem apenas o maior frame em OBJ VRAM e associa cada frame a um TileAsset residente temporario."
+          },
+          "resources": {
+            "type": "object"
+          },
+          "placement": {
+            "type": "object"
+          }
+        },
+        "allOf": [
+          {
+            "if": {
+              "properties": {
+                "kind": {
+                  "const": "affine_bg"
+                }
+              },
+              "required": [
+                "kind"
+              ]
+            },
+            "then": {
+              "properties": {
+                "background_bpp": {
+                  "const": 8
+                }
+              }
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "kind": {
+                  "enum": [
+                    "bg",
+                    "palette",
+                    "obj",
+                    "bitmap3",
+                    "bitmap4",
+                    "bitmap5",
+                    "audio",
+                    "bank"
+                  ]
+                }
+              },
+              "required": [
+                "kind"
+              ]
+            },
+            "then": {
+              "properties": {
+                "background_bpp": {
+                  "const": 4
+                }
+              }
+            }
+          },
+          {
+            "if": {
+              "not": {
+                "required": [
+                  "kind"
+                ]
+              }
+            },
+            "then": {
+              "properties": {
+                "background_bpp": {
+                  "const": 4
+                }
+              }
+            }
+          }
+        ],
+        "additionalProperties": true
+      }
+    },
+    "capability_assets": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["scene", "capability", "references"],
+        "properties": {
+          "scene": { "type": "string", "minLength": 1 },
+          "capability": {
+            "type": "string",
+            "enum": [
+              "tactical_surface",
+              "tactical_grid_overlay",
+              "tactical_hud",
+              "tactical_units",
+              "tactical_props",
+              "tactical_feedback",
+              "tactical_audio"
+            ]
+          },
+          "references": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "pattern": "^(?!/)(?![A-Za-z]:[\\\\/])(?!.*(?:^|/)\\.\\.(?:/|$)).+"
+            },
+            "uniqueItems": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "uniqueItems": true
+    },
+    "physical_budget": {
+      "type": "object",
+      "required": [
+        "schema",
+        "audio_bytes_by_item"
+      ],
+      "properties": {
+        "schema": {
+          "const": 1
+        },
+        "audio_bytes_by_item": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "integer",
+            "minimum": 0
+          }
+        }
+      },
+      "additionalProperties": true
+    }
+  },
+  "additionalProperties": true
+}

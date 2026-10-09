@@ -1,0 +1,56 @@
+{
+  "schema": 1,
+  "backend": "gbastudio_engine",
+  "kind": "isometric",
+  "template_dir": "../../templates/exported_isometric",
+  "entry": "main.cpp",
+  "project_data": "isometric_project_data.hpp",
+  "generated_assets": [],
+  "build": { "target": "assetc_isometric_tactical_export", "make_target": "all" },
+  "requires": {
+    "engine_pack": ">=1.95.0",
+    "features": ["isometric_runtime", "isometric_runtime.tactical_core"]
+  },
+  "isometric_project": {
+    "includes": ["../tilemap.hpp"],
+    "assets": {
+      "bg_palettes": ["tilemap_palette_asset"],
+      "tile_assets": ["tilemap_tile_asset"]
+    },
+    "initial_room": 0,
+    "backdrop_color": 123,
+    "grid": {
+      "tile_width_pixels": 32,
+      "tile_height_pixels": 16,
+      "origin": { "x": 120, "y": 24 }
+    },
+    "rooms": [
+      {
+        "name": "generated_iso_tactical_room",
+        "width_tiles": 5,
+        "height_tiles": 5,
+        "visual_tiles": [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
+        "collision_flags": [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+        "grid": {
+          "tile_width_pixels": 32,
+          "tile_height_pixels": 16,
+          "origin": { "x": 120, "y": 24 },
+          "gameplay_mode": "tactical"
+        },
+        "actors": [
+          { "tile": { "x": 1, "y": 2, "z": 0 }, "tile_index": 0, "palette": 0, "visible": true },
+          { "tile": { "x": 3, "y": 2, "z": 0 }, "tile_index": 0, "palette": 0, "visible": true }
+        ],
+        "tactical": {
+          "enabled": true,
+          "active_team": "player",
+          "active_unit_index": 0,
+          "units": [
+            { "actor_index": 0, "team": "player", "move_range": 3, "attack_range": 2, "max_hp": 5, "attack_power": 2 },
+            { "actor_index": 1, "team": "enemy", "move_range": 2, "attack_range": 2, "max_hp": 4, "attack_power": 1 }
+          ]
+        }
+      }
+    ]
+  }
+}

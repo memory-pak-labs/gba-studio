@@ -1,0 +1,173 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://gbastudio.local/schemas/readiness_report.schema.json",
+  "title": "GBAStudio Engine backend promotion readiness report",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "ok",
+    "version",
+    "engine_pack",
+    "kind",
+    "butano_replacement_readiness"
+  ],
+  "properties": {
+    "ok": {
+      "type": "boolean"
+    },
+    "version": {
+      "type": "string",
+      "minLength": 1
+    },
+    "engine_pack": {
+      "type": "string",
+      "minLength": 1
+    },
+    "kind": {
+      "const": "butano_replacement_readiness"
+    },
+    "butano_replacement_readiness": {
+      "$ref": "#/$defs/readiness"
+    }
+  },
+  "$defs": {
+    "readiness": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": [
+        "ok",
+        "ready_for_primary_backend",
+        "stage",
+        "backend_policy",
+        "manual_primary_gates",
+        "missing_manual_gates",
+        "next_actions",
+        "blockers"
+      ],
+      "properties": {
+        "ok": {
+          "type": "boolean"
+        },
+        "ready_for_primary_backend": {
+          "type": "boolean"
+        },
+        "stage": {
+          "type": "string",
+          "enum": [
+            "blocked",
+            "beta_candidate",
+            "primary_ready"
+          ]
+        },
+        "backend_policy": {
+          "const": "parallel_until_manual_promotion"
+        },
+        "manual_primary_gates": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/manual_gate"
+          }
+        },
+        "missing_manual_gates": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "uniqueItems": true
+        },
+        "next_actions": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/next_action"
+          }
+        },
+        "blockers": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/blocker"
+          }
+        }
+      }
+    },
+    "manual_gate": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": [
+        "id",
+        "ok",
+        "message"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "ok": {
+          "type": "boolean"
+        },
+        "message": {
+          "type": "string",
+          "minLength": 1
+        },
+        "source": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "checked_at": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      }
+    },
+    "next_action": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": [
+        "id",
+        "command",
+        "message"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "command": {
+          "type": "string",
+          "minLength": 1
+        },
+        "message": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "blocker": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": [
+        "id",
+        "message",
+        "missing"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "message": {
+          "type": "string",
+          "minLength": 1
+        },
+        "missing": {
+          "type": "array"
+        }
+      }
+    }
+  }
+}

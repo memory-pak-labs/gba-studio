@@ -1,0 +1,286 @@
+:root {
+  color-scheme: light;
+  --studio-color-bg-app-base: #eef2f7;
+  --studio-color-bg-app: var(--studio-color-bg-app-base);
+  --studio-color-bg-canvas-base: #f7f9fc;
+  --studio-color-bg-canvas: var(--studio-color-bg-canvas-base);
+  --studio-color-surface: #ffffff;
+  --studio-color-surface-muted: #f8fafc;
+  --studio-color-surface-raised: #ffffff;
+  --studio-color-border-base: #dfe4ea;
+  --studio-color-border: var(--studio-color-border-base);
+  --studio-color-border-strong-base: #ccd5df;
+  --studio-color-border-strong: var(--studio-color-border-strong-base);
+  --studio-color-text-primary-base: #252a31;
+  --studio-color-text-primary: var(--studio-color-text-primary-base);
+  --studio-color-text-secondary-base: #626b77;
+  --studio-color-text-secondary: var(--studio-color-text-secondary-base);
+  --studio-color-text-muted-base: #8a94a2;
+  --studio-color-text-muted: var(--studio-color-text-muted-base);
+  --studio-color-accent: #6d2bf1;
+  --studio-color-accent-hover: #5f22de;
+  --studio-color-accent-solid: var(--studio-color-accent);
+  --studio-color-accent-solid-hover: var(--studio-color-accent-hover);
+  --studio-color-on-accent: #ffffff;
+  --studio-color-accent-soft: #f1eaff;
+  --studio-color-accent-border: #cdb7ff;
+  --studio-color-ok: #22a06b;
+  --studio-color-ok-bg: #e8f8f0;
+  --studio-color-ok-border: #9ed9bc;
+  --studio-color-ok-text: #1a7a4f;
+  --studio-color-warning: #8a5f00;
+  --studio-color-warning-bg: #fff8e8;
+  --studio-color-warning-border: #ffd985;
+  --studio-color-warning-text: #8a5f00;
+  --studio-color-attention: #e6722d;
+  --studio-color-attention-bg: #fff0e8;
+  --studio-color-attention-border: #f2ae84;
+  --studio-color-attention-text: #8d3d0b;
+  --studio-color-danger: #d64555;
+  --studio-color-danger-solid: var(--studio-color-danger);
+  --studio-color-danger-solid-hover: #c13a48;
+  --studio-color-danger-bg: #fff1f1;
+  --studio-color-danger-border: #f5b8be;
+  --studio-color-danger-text: #b42333;
+  --studio-color-backdrop: rgba(15, 23, 42, 0.48);
+  --studio-color-surface-hover: #f3f6fa;
+  --studio-color-surface-selected: #f4f0ff;
+  --studio-color-input-bg: #ffffff;
+  --studio-color-grid-line: #e2e8f0;
+  --studio-button-bg: #eef2f6;
+  --studio-button-border: #dfe4ea;
+  --studio-button-text: #343941;
+  --studio-button-disabled-bg: #f3f5f8;
+  --studio-button-disabled-border: #e5e9ee;
+  --studio-button-disabled-text: #a6afba;
+  --studio-font-scale: 0.9;
+  --studio-font-size-2xs: calc(10px * var(--studio-font-scale));
+  --studio-font-size-xs: calc(11px * var(--studio-font-scale));
+  --studio-font-size-sm: calc(12px * var(--studio-font-scale));
+  --studio-font-size-md: calc(13px * var(--studio-font-scale));
+  --studio-font-size-lg: calc(15px * var(--studio-font-scale));
+  --studio-font-size-xl: calc(18px * var(--studio-font-scale));
+  --studio-font-size-display: calc(22px * var(--studio-font-scale));
+  --studio-font-weight-regular: 500;
+  --studio-font-weight-medium: 600;
+  --studio-font-weight-semibold: 700;
+  --studio-font-weight-bold: 760;
+  --studio-line-height-tight: 1.18;
+  --studio-line-height-compact: 1.3;
+  --studio-line-height-normal: 1.45;
+  --studio-line-height-control: 1.2;
+  --studio-space-1: 4px;
+  --studio-space-2: 6px;
+  --studio-space-3: 8px;
+  --studio-space-4: 12px;
+  --studio-space-5: 16px;
+  --studio-space-6: 20px;
+  --studio-space-7: 24px;
+  --studio-radius-control: 6px;
+  --studio-radius-panel: 8px;
+  --studio-radius-md: 8px;
+  --studio-radius-lg: 12px;
+  --studio-radius-pill: 999px;
+  --studio-surface-elevated: var(--studio-color-surface-raised);
+  --studio-border: var(--studio-color-border);
+  --studio-text-muted: var(--studio-color-text-muted);
+  --studio-danger: var(--studio-color-danger);
+  --studio-color-canvas-editor: #101418;
+  --studio-color-status-bar-bg: rgba(255, 255, 255, 0.88);
+  --studio-color-status-bar-border: var(--studio-color-border);
+  --studio-shadow-raised: 0 14px 32px rgba(31, 36, 44, 0.12);
+  --studio-shadow-soft: 0 8px 22px rgba(35, 42, 52, 0.08);
+  --studio-shadow-control: 0 1px 0 rgba(255, 255, 255, 0.78) inset, 0 6px 18px rgba(35, 42, 52, 0.06);
+  --studio-shadow-modal: 0 26px 80px rgba(15, 23, 42, 0.24), 0 10px 32px rgba(15, 23, 42, 0.14);
+  --studio-focus-ring: 0 0 0 3px rgba(109, 43, 241, 0.22);
+  --studio-motion-fast: 120ms ease;
+  --studio-motion-normal: 180ms ease;
+  font-family:
+    Inter, "Noto Sans", "Noto Sans Devanagari", "Noto Sans Arabic", "Noto Sans CJK SC",
+    "Noto Sans JP", "Noto Sans KR", ui-sans-serif, system-ui, -apple-system,
+    BlinkMacSystemFont, "Segoe UI", sans-serif;
+  font-size: calc(16px * var(--studio-font-scale));
+  background: var(--studio-color-bg-app);
+  color: var(--studio-color-text-primary);
+}
+
+[data-studio-font-size="compact"] {
+  --studio-font-scale: 0.9;
+}
+
+[data-studio-font-size="default"] {
+  --studio-font-scale: 1;
+}
+
+[data-studio-font-size="large"] {
+  --studio-font-scale: 1.15;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  accent-color: var(--studio-color-accent);
+  margin: 0;
+  min-width: 900px;
+  min-height: 700px;
+  background: var(--studio-color-bg-app);
+}
+
+:root[dir="rtl"] .welcome-shell,
+:root[dir="rtl"] .app-shell {
+  direction: rtl;
+}
+
+:root[dir="rtl"] .welcome-sidebar {
+  border-left: 1px solid #e1e6ed;
+  border-right: 0;
+}
+
+:root[dir="rtl"] .welcome-theme-toggle {
+  left: 18px;
+  right: auto;
+}
+
+:root[dir="rtl"] .project-action-menu {
+  left: 0;
+  right: auto;
+}
+
+:root[dir="rtl"] .project-action-menu button {
+  justify-items: end;
+  text-align: right;
+}
+
+:root[dir="rtl"] .project-menu-theme {
+  justify-items: end;
+  text-align: right;
+}
+
+button {
+  border: 1px solid var(--studio-button-border);
+  border-radius: var(--studio-radius-control);
+  background: var(--studio-button-bg);
+  color: var(--studio-button-text);
+  cursor: pointer;
+  font: inherit;
+  font-size: var(--studio-font-size-md);
+  font-weight: var(--studio-font-weight-medium);
+  line-height: var(--studio-line-height-control);
+  padding: 9px 12px;
+  transition:
+    background-color var(--studio-motion-fast),
+    border-color var(--studio-motion-fast),
+    box-shadow var(--studio-motion-fast),
+    color var(--studio-motion-fast),
+    opacity var(--studio-motion-fast),
+    transform var(--studio-motion-fast);
+}
+
+button:hover:not(:disabled) {
+  border-color: var(--studio-color-accent);
+  color: var(--studio-color-text-primary);
+}
+
+button:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible,
+summary:focus-visible {
+  box-shadow: var(--studio-focus-ring);
+  outline: none;
+}
+
+button:active:not(:disabled) {
+  transform: translateY(1px);
+}
+
+button:disabled {
+  background: var(--studio-button-disabled-bg);
+  border-color: var(--studio-button-disabled-border);
+  color: var(--studio-button-disabled-text);
+  cursor: not-allowed;
+  opacity: 0.72;
+}
+
+input,
+select,
+textarea {
+  transition:
+    background-color var(--studio-motion-fast),
+    border-color var(--studio-motion-fast),
+    box-shadow var(--studio-motion-fast);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --studio-motion-fast: 1ms linear;
+    --studio-motion-normal: 1ms linear;
+  }
+
+  *,
+  *::before,
+  *::after {
+    animation-duration: 1ms !important;
+    animation-iteration-count: 1 !important;
+    scroll-behavior: auto !important;
+    transition-duration: 1ms !important;
+  }
+}
+
+[data-studio-theme="dark"] {
+  color-scheme: dark;
+  --studio-color-bg-app-base: #171c26;
+  --studio-color-bg-canvas-base: #111720;
+  --studio-color-surface: #202733;
+  --studio-color-surface-muted: #1b222e;
+  --studio-color-surface-raised: #293345;
+  --studio-color-surface-hover: #323e52;
+  --studio-color-surface-selected: #34284d;
+  --studio-color-border-base: #3d4b61;
+  --studio-color-border-strong-base: #596b85;
+  --studio-color-text-primary-base: #eef3fb;
+  --studio-color-text-secondary-base: #bdc9db;
+  --studio-color-text-muted-base: #a5b3c8;
+  --studio-color-accent: #c3a6ff;
+  --studio-color-accent-hover: #d3bfff;
+  --studio-color-accent-solid: #7540dd;
+  --studio-color-accent-solid-hover: #6531c9;
+  --studio-color-accent-soft: #34284d;
+  --studio-color-accent-border: #8063b5;
+  --studio-color-ok: #3ecf8e;
+  --studio-color-ok-bg: #173c2f;
+  --studio-color-ok-border: #3f8b67;
+  --studio-color-ok-text: #6ee7a8;
+  --studio-color-warning: #e6b84d;
+  --studio-color-warning-bg: #3b311e;
+  --studio-color-warning-border: #8e7537;
+  --studio-color-warning-text: #f0c96a;
+  --studio-color-attention: #e6722d;
+  --studio-color-attention-bg: #41291f;
+  --studio-color-attention-border: #b86a3e;
+  --studio-color-attention-text: #ffc19f;
+  --studio-color-danger: #f07178;
+  --studio-color-danger-solid: #b93550;
+  --studio-color-danger-solid-hover: #a62a44;
+  --studio-color-danger-bg: #412530;
+  --studio-color-danger-border: #a64a61;
+  --studio-color-danger-text: #f5a0a5;
+  --studio-color-backdrop: rgba(0, 0, 0, 0.58);
+  --studio-color-input-bg: #151d29;
+  --studio-color-grid-line: #3d4b61;
+  --studio-shadow-raised: 0 14px 32px rgba(0, 0, 0, 0.42);
+  --studio-shadow-soft: 0 8px 22px rgba(0, 0, 0, 0.28);
+  --studio-shadow-control: 0 1px 0 rgba(255, 255, 255, 0.04) inset, 0 8px 20px rgba(0, 0, 0, 0.24);
+  --studio-shadow-modal: 0 28px 90px rgba(0, 0, 0, 0.58), 0 10px 36px rgba(0, 0, 0, 0.42);
+  --studio-focus-ring: 0 0 0 3px rgba(195, 166, 255, 0.5);
+  --studio-button-bg: #293345;
+  --studio-button-border: #596b85;
+  --studio-button-text: #eef3fb;
+  --studio-button-disabled-bg: #202733;
+  --studio-button-disabled-border: #3d4b61;
+  --studio-button-disabled-text: #8290a6;
+  --studio-color-status-bar-bg: rgba(23, 28, 38, 0.96);
+  --studio-color-canvas-editor: #101418;
+}

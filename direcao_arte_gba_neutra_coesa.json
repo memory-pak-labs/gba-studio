@@ -1,0 +1,577 @@
+{
+  "schema_version": "2.0",
+  "profile_id": "gba_neutral_cohesive_pixel_art",
+  "profile_name": "Direção de Arte GBA Neutra e Coesa",
+  "language": "pt-BR",
+  "purpose": "Sistema visual neutro e modular para gerar artes de diferentes gêneros de jogos, mantendo consistência de pixel art, proporções, cor, iluminação, materiais e legibilidade.",
+  "design_philosophy": {
+    "primary_goal": "Manter uma identidade visual reconhecível sem obrigar o projeto a adotar fantasia, ficção científica, medieval, moderno, terror, corrida, plataforma, RPG ou qualquer outro tema.",
+    "identity_source": [
+      "qualidade dos clusters de pixels",
+      "formas claras e levemente arredondadas",
+      "contornos cromáticos adaptativos",
+      "sombreamento com mudança de matiz",
+      "paletas controladas",
+      "hierarquia visual consistente",
+      "proporções estilizadas e legíveis",
+      "tratamento uniforme de materiais",
+      "animações expressivas e econômicas"
+    ],
+    "content_neutrality": [
+      "O tema narrativo não define o estilo-base.",
+      "O gênero do jogo altera câmera, escala e composição, mas não as regras fundamentais de renderização.",
+      "Elementos temáticos devem ser adicionados como conteúdo, e não como linguagem visual obrigatória.",
+      "Nenhum cenário, personagem ou objeto deve parecer automaticamente medieval, mágico, futurista ou infantil."
+    ]
+  },
+  "core_identity": {
+    "summary": "Pixel art 2D de alta legibilidade para estética GBA, com formas compactas, contornos coloridos, iluminação simplificada, paleta rica porém controlada e detalhes organizados em clusters intencionais.",
+    "fixed_traits": [
+      "pixels nítidos",
+      "silhuetas reconhecíveis",
+      "contornos cromáticos",
+      "luz e sombra agrupadas",
+      "mudança de matiz nas sombras",
+      "detalhes seletivos",
+      "contraste guiado pela jogabilidade",
+      "consistência entre personagens, objetos, cenários e interface"
+    ],
+    "variable_traits": [
+      "tema",
+      "época",
+      "gênero",
+      "câmera",
+      "nível de realismo",
+      "grau de fofura",
+      "intensidade da saturação",
+      "complexidade de cenário",
+      "proporção dos personagens",
+      "atmosfera emocional"
+    ],
+    "avoid_identity": [
+      "cópia direta de uma franquia específica",
+      "tema obrigatório de fantasia",
+      "tema obrigatório de ficção científica",
+      "aparência infantil obrigatória",
+      "fotorealismo",
+      "render 3D pré-renderizado",
+      "vetor liso",
+      "gradientes borrados",
+      "contorno preto uniforme",
+      "textura aleatória",
+      "redução automática de uma pintura digital para baixa resolução"
+    ]
+  },
+  "style_controls": {
+    "genre": {
+      "allowed_values": [
+        "plataforma",
+        "aventura",
+        "RPG",
+        "ação",
+        "puzzle",
+        "corrida",
+        "shoot_em_up",
+        "estratégia",
+        "visual_novel",
+        "apontar_e_clicar",
+        "simulação",
+        "terror",
+        "esporte",
+        "outro"
+      ],
+      "default": "outro",
+      "effect": "Altera composição, densidade de informação e prioridades de leitura, sem mudar o estilo-base."
+    },
+    "camera": {
+      "allowed_values": [
+        "lateral",
+        "top_down",
+        "top_down_tres_quartos",
+        "isometrica",
+        "pseudo_3d",
+        "primeira_pessoa_estilizada",
+        "tela_fixa",
+        "interface_narrativa"
+      ],
+      "default": "lateral",
+      "effect": "Define perspectiva, escala dos sprites, oclusão e construção dos tiles."
+    },
+    "tone": {
+      "allowed_values": [
+        "leve",
+        "aventuroso",
+        "dramatico",
+        "sombrio",
+        "misterioso",
+        "comico",
+        "melancolico",
+        "energico",
+        "sereno",
+        "neutro"
+      ],
+      "default": "neutro",
+      "effect": "Ajusta valores, saturação, temperatura de cor e contraste, sem alterar a gramática de pixels."
+    },
+    "shape_character": {
+      "allowed_values": [
+        "arredondado",
+        "equilibrado",
+        "angular"
+      ],
+      "default": "equilibrado",
+      "effect": "Controla a geometria das silhuetas sem vincular o resultado a um tema."
+    },
+    "detail_level": {
+      "allowed_values": [
+        "baixo",
+        "medio",
+        "alto"
+      ],
+      "default": "medio",
+      "effect": "Controla quantidade de textura e microdetalhes, preservando áreas de descanso visual."
+    },
+    "stylization": {
+      "allowed_values": [
+        "cartunesco_sutil",
+        "estilizado_equilibrado",
+        "semi_realista_pixelado"
+      ],
+      "default": "estilizado_equilibrado",
+      "effect": "Controla exagero de proporções e formas sem definir gênero narrativo."
+    }
+  },
+  "global_rendering_rules": {
+    "pixel_method": {
+      "method": "Pixel art manual ou gerada com acabamento equivalente a desenho manual.",
+      "cluster_rule": "Pixels devem formar grupos intencionais, evitando ruído de um pixel espalhado sem função.",
+      "edge_rule": "Bordas nítidas e escalonadas de forma consistente.",
+      "anti_aliasing": "Somente manual e seletivo.",
+      "dithering": "Opcional e restrito a materiais ou transições específicas.",
+      "scaling": "Somente escalas inteiras com nearest-neighbor."
+    },
+    "shape_language": {
+      "base": [
+        "silhuetas compactas",
+        "volumes simplificados",
+        "proporções fáceis de reconhecer",
+        "detalhes concentrados em áreas focais",
+        "equilíbrio entre curvas e ângulos"
+      ],
+      "neutrality_rule": "As formas não devem comunicar automaticamente um universo específico. A identidade temática deve vir de roupas, objetos, arquitetura e contexto."
+    },
+    "outline_system": {
+      "default": "Contornos coloridos e adaptativos.",
+      "preferred_dark_families": [
+        "azul profundo",
+        "roxo profundo",
+        "vinho",
+        "marrom profundo",
+        "verde petróleo",
+        "cinza cromático"
+      ],
+      "black_usage": "Preto puro somente em pequenos pontos de máximo contraste.",
+      "line_weight": "1 pixel como padrão; 2 pixels apenas em sprites maiores ou separações essenciais.",
+      "light_side_rule": "O contorno pode clarear ou desaparecer parcialmente no lado iluminado.",
+      "material_rule": "A cor do contorno deve responder à cor local do material."
+    },
+    "color_system": {
+      "palette_strategy": "Paleta modular e limitada por cena, personagem ou conjunto de materiais.",
+      "recommended_color_count": {
+        "small_sprite": "6 a 16 cores",
+        "medium_sprite": "12 a 28 cores",
+        "large_sprite_or_scene_element": "16 a 40 cores",
+        "scene": "Paleta compartilhada e controlada, sem limite rígido desde que exista unidade."
+      },
+      "saturation": "Variável conforme o tom do jogo, mantendo acentos mais fortes nos elementos importantes.",
+      "hue_shifting": {
+        "light": "Mover a luz para uma temperatura coerente com a fonte luminosa.",
+        "shadow": "Mover a sombra para uma família cromática complementar ou ambiental.",
+        "avoid": "Apenas multiplicar a cor por cinza ou preto."
+      },
+      "value_hierarchy": [
+        "personagem jogável e ameaças possuem maior separação de valor",
+        "objetos interativos possuem contraste ou acento identificável",
+        "fundos utilizam menor contraste local",
+        "efeitos temporários podem usar os valores mais extremos"
+      ],
+      "palette_roles": {
+        "outline_dark": [
+          "#1C2638",
+          "#29233F",
+          "#3C2936"
+        ],
+        "deep_shadow": [
+          "#30445A",
+          "#493D62",
+          "#5B403F"
+        ],
+        "neutral_midtones": [
+          "#667A7A",
+          "#7E806B",
+          "#8A6F68"
+        ],
+        "warm_accents": [
+          "#D96A4B",
+          "#E7A54A",
+          "#F0D36A"
+        ],
+        "cool_accents": [
+          "#3CA6A3",
+          "#4D84C4",
+          "#6D65B8"
+        ],
+        "light_values": [
+          "#C9DDC8",
+          "#D9D6B4",
+          "#D6E3E8"
+        ]
+      },
+      "palette_note": "As cores acima são referências de função, não uma paleta obrigatória."
+    },
+    "lighting": {
+      "default_model": "Uma fonte principal simplificada, reforçada por luz ambiente.",
+      "default_direction": "superior-esquerda, configurável por cena",
+      "shadow_style": "Massas sólidas, sem blur.",
+      "highlight_style": "Clusters pequenos e controlados.",
+      "ambient_integration": "Sombras e reflexos devem absorver cores do ambiente.",
+      "mood_adaptation": {
+        "leve": "valores claros, sombras curtas e saturação moderada",
+        "dramatico": "contraste maior e áreas de sombra mais amplas",
+        "sombrio": "paleta mais restrita, acentos seletivos e leitura preservada",
+        "neutro": "contraste médio e iluminação funcional"
+      }
+    },
+    "texture": {
+      "principle": "Textura serve para comunicar material e escala, nunca para preencher todo espaço.",
+      "methods": [
+        "clusters irregulares",
+        "quebras de borda",
+        "manchas de cor local",
+        "padrões direcionais",
+        "pequenas variações de valor",
+        "detalhes repetíveis com variações"
+      ],
+      "rest_areas": "Manter áreas simples próximas a rostos, sprites jogáveis, textos e objetos importantes."
+    }
+  },
+  "cohesion_system": {
+    "shared_rules": [
+      "mesma direção de luz dentro de uma cena",
+      "mesma lógica de contorno entre todos os assets",
+      "mesma família de sombras ambientais",
+      "mesma escala aparente de detalhe",
+      "mesma regra de perspectiva",
+      "mesmo nível de contraste para elementos da mesma categoria",
+      "reutilização estratégica de cores",
+      "tratamento consistente de materiais"
+    ],
+    "asset_categories": {
+      "player": "Maior clareza, contraste e animação.",
+      "enemy": "Silhueta distinta do jogador e leitura clara de ameaça.",
+      "npc": "Detalhe suficiente para personalidade, sem competir com o jogador.",
+      "interactive_object": "Acento visual identificável e feedback de estado.",
+      "background_prop": "Menor contraste e menor densidade de detalhe.",
+      "terrain": "Padrões repetíveis com variações discretas.",
+      "effect": "Pode romper temporariamente a paleta, mas deve manter pixels e timing coerentes.",
+      "ui": "Deve compartilhar contornos, cores e acabamento com o mundo do jogo."
+    },
+    "consistency_checks": [
+      "O asset parece pertencer ao mesmo jogo que os demais?",
+      "A densidade de pixels é compatível?",
+      "A direção de luz coincide?",
+      "Os materiais usam a mesma lógica de brilho e sombra?",
+      "O contraste corresponde à função do asset?",
+      "Os contornos usam espessura e cromatismo compatíveis?"
+    ]
+  },
+  "character_system": {
+    "proportion_modes": {
+      "compact": "Cabeça maior e corpo reduzido; adequado para sprites pequenos.",
+      "balanced": "Cabeça moderada e anatomia simplificada.",
+      "elongated": "Corpo mais alto e menos caricatural, mantendo leitura em pixel art."
+    },
+    "default": "balanced",
+    "rules": [
+      "silhueta reconhecível sem detalhes internos",
+      "um a três elementos visuais dominantes",
+      "rosto simplificado conforme o tamanho do sprite",
+      "mãos e pés desenhados para ação e leitura, não para anatomia precisa",
+      "roupas construídas por massas de cor antes de detalhes",
+      "acessórios devem reforçar função ou personalidade"
+    ],
+    "neutrality_rule": "Não aplicar automaticamente olhos grandes, capacetes, capas, orelhas, armaduras, roupas medievais, tecnologia ou elementos mágicos.",
+    "animation": {
+      "motion_language": "Poses claras, antecipação econômica e quadros-chave fortes.",
+      "idle": "Movimentos sutis ligados à personalidade ou função.",
+      "action": "Priorizar leitura da ação sobre realismo físico.",
+      "impact": "Usar deformação, smear ou pausa curta de modo seletivo.",
+      "frame_consistency": "Preservar volume, altura e ponto de apoio entre quadros."
+    }
+  },
+  "environment_system": {
+    "general_rules": [
+      "separar superfícies navegáveis de obstáculos",
+      "usar detalhes para comunicar material e não apenas decoração",
+      "reduzir contraste em planos distantes",
+      "evitar padrões repetitivos óbvios",
+      "criar variações modulares para tiles frequentes",
+      "preservar caminhos visuais e áreas de jogo"
+    ],
+    "material_language": {
+      "stone": "Planos quebrados, bordas irregulares e highlights curtos.",
+      "metal": "Contraste mais alto, reflexos direcionais e bordas limpas.",
+      "wood": "Padrões lineares, nós seletivos e variação quente.",
+      "fabric": "Sombras largas, poucas texturas e dobras simplificadas.",
+      "glass": "Reflexos fortes e áreas internas simplificadas.",
+      "water": "Faixas ou clusters horizontais, variação de ciano e reflexos.",
+      "foliage": "Massas sobrepostas com bordas irregulares e profundidade por valor.",
+      "soil": "Base simples com detalhes localizados.",
+      "plastic": "Superfícies limpas, highlights suaves em clusters.",
+      "energy_or_magic": "Núcleo claro, contorno cromático e animação pulsante; opcional conforme o tema."
+    },
+    "architecture_rule": "A arquitetura deve seguir a perspectiva e o tratamento de materiais do sistema, mas sua linguagem histórica ou tecnológica é definida pelo projeto."
+  },
+  "camera_modules": {
+    "side_view": {
+      "composition": "Leitura horizontal e espaço livre na direção do movimento.",
+      "terrain": "Topo das plataformas claramente separado das laterais.",
+      "background": "Camadas com contraste e detalhe progressivamente menores.",
+      "sprite_priority": "Personagens e perigos devem se separar do terreno."
+    },
+    "top_down": {
+      "composition": "Superfícies navegáveis limpas e obstáculos com silhueta superior clara.",
+      "occlusion": "Controlada por camadas e pontos de referência visíveis.",
+      "navigation": "Indicada por caminhos, bordas, repetição e contraste."
+    },
+    "top_down_three_quarter": {
+      "composition": "Frentes e topos visíveis, sem exigir isometria rígida.",
+      "verticality": "Altura comunicada por sobreposição, sombra e mudança de plano.",
+      "occlusion": "Objetos altos podem ocultar parcialmente personagens, com transparência opcional."
+    },
+    "isometric": {
+      "grid": "Usar ângulo e proporção consistentes em todos os tiles.",
+      "silhouette": "Elementos jogáveis devem permanecer reconhecíveis contra diagonais.",
+      "height": "Altura indicada por faces laterais e sombras coerentes."
+    },
+    "interface_narrative": {
+      "composition": "Retratos, caixas de diálogo e fundos devem compartilhar paleta e contornos.",
+      "portrait_rule": "Maior detalhe permitido, mantendo clusters e iluminação do restante do jogo."
+    }
+  },
+  "asset_guidelines": {
+    "sprites": {
+      "base_sizes": [
+        "8x8 para marcadores mínimos",
+        "16x16 para itens e unidades pequenas",
+        "24x24 ou 32x32 para personagens compactos",
+        "32x48, 48x48 ou 64x64 para personagens maiores",
+        "dimensões superiores para chefes, veículos e objetos grandes"
+      ],
+      "canvas_rule": "Preferir dimensões múltiplas de 8 quando houver benefício técnico.",
+      "silhouette_test": "O sprite deve ser reconhecível como massa sólida.",
+      "thumbnail_test": "O papel do asset deve ser compreensível na escala real do jogo."
+    },
+    "tiles": {
+      "technical_unit": "8x8",
+      "visual_modules": [
+        "16x16",
+        "32x32"
+      ],
+      "variation_rule": "Criar variações de borda, centro e detalhe para evitar repetição.",
+      "seam_rule": "Testar repetição horizontal, vertical e em blocos maiores."
+    },
+    "backgrounds": {
+      "layer_rule": "Separar fundo, plano intermediário e primeiro plano quando necessário.",
+      "detail_falloff": "Diminuir contraste, textura e contorno conforme a distância.",
+      "genre_neutrality": "O fundo deve refletir o tema escolhido sem alterar as regras de renderização."
+    },
+    "ui": {
+      "style": "Compacta, legível e derivada das mesmas formas e materiais do jogo.",
+      "text": "Fonte pixelada com contraste suficiente e espaçamento consistente.",
+      "icons": "Silhuetas simples e tratamento cromático igual ao dos sprites.",
+      "panels": "Podem ser neutros, tecnológicos, orgânicos, históricos ou abstratos conforme o projeto.",
+      "feedback": "Estados de foco, seleção, perigo e confirmação devem ser visualmente distintos."
+    }
+  },
+  "technical_constraints": {
+    "target_reference": "Game Boy Advance e sistemas com estética visual compatível.",
+    "native_resolution_reference": "240x160 pixels",
+    "tile_reference": "8x8 pixels",
+    "rendering": {
+      "filter": "nearest-neighbor",
+      "integer_scaling": true,
+      "subpixel_blur": false,
+      "smooth_gradients": false
+    },
+    "export": {
+      "preferred_formats": [
+        "PNG",
+        "PNG indexado",
+        "sprite sheet"
+      ],
+      "alpha": "Transparência binária como padrão para sprites.",
+      "palette_indexing": "Opcional conforme a engine e o pipeline.",
+      "naming": "Usar nomes previsíveis por categoria, estado, direção e quadro."
+    },
+    "hardware_note": "As limitações reais de paletas, sprites, backgrounds e modos gráficos devem ser definidas separadamente pelo pipeline técnico. Este arquivo controla a direção visual, não substitui as regras de implementação do hardware."
+  },
+  "prompt_system": {
+    "base_prompt_pt": "Crie uma arte em pixel art 2D de alta legibilidade com estética compatível com Game Boy Advance. Use pixels nítidos, clusters intencionais, silhuetas claras, contornos cromáticos adaptativos, sombras agrupadas com mudança de matiz e paleta controlada. Preserve áreas de descanso visual, diferencie elementos jogáveis por contraste e mantenha consistência de iluminação, materiais e escala. O tema, o gênero e a época devem seguir a descrição do projeto sem adicionar automaticamente fantasia, ficção científica, elementos medievais, aparência infantil ou qualquer universo específico.",
+    "variables": {
+      "subject": "{{personagem_objeto_cenario_interface}}",
+      "genre": "{{genero_do_jogo}}",
+      "theme": "{{tema_ou_ambientacao}}",
+      "camera": "{{tipo_de_camera}}",
+      "tone": "{{tom_emocional}}",
+      "shape_character": "{{arredondado_equilibrado_angular}}",
+      "detail_level": "{{baixo_medio_alto}}",
+      "palette_direction": "{{direcao_de_paleta}}",
+      "lighting": "{{direcao_e_tipo_de_luz}}",
+      "gameplay_function": "{{funcao_do_elemento}}"
+    },
+    "template_pt": "{{base_prompt_pt}} Assunto: {{subject}}. Gênero: {{genre}}. Tema: {{theme}}. Câmera: {{camera}}. Tom: {{tone}}. Linguagem de formas: {{shape_character}}. Nível de detalhe: {{detail_level}}. Direção de paleta: {{palette_direction}}. Iluminação: {{lighting}}. Função na jogabilidade: {{gameplay_function}}.",
+    "negative_prompt_pt": [
+      "cópia direta de personagem ou cenário existente",
+      "estilo obrigatório de fantasia",
+      "estilo obrigatório de ficção científica",
+      "aparência infantil automática",
+      "fotorealismo",
+      "render 3D",
+      "vetor",
+      "voxel",
+      "pixels borrados",
+      "interpolação bilinear",
+      "gradiente suave",
+      "anti-aliasing automático",
+      "contorno preto uniforme",
+      "ruído aleatório",
+      "detalhes sem hierarquia",
+      "iluminação incompatível entre assets",
+      "paleta sem controle",
+      "fundo competindo com o personagem"
+    ]
+  },
+  "genre_adaptation_rules": {
+    "principle": "Os módulos abaixo ajustam somente prioridades funcionais. Eles não impõem tema, paleta ou universo visual.",
+    "platformer": [
+      "reforçar leitura lateral",
+      "distinguir topo, lateral e fundo das plataformas",
+      "reservar espaço na direção do movimento",
+      "destacar perigos e superfícies interativas"
+    ],
+    "rpg_or_adventure": [
+      "priorizar navegação e identificação de personagens",
+      "separar elementos decorativos de interativos",
+      "usar landmarks visuais coerentes"
+    ],
+    "racing": [
+      "priorizar leitura de pista, obstáculos e velocidade",
+      "usar marcações claras de direção e profundidade",
+      "reduzir ruído próximo à trajetória"
+    ],
+    "shoot_em_up": [
+      "separar projéteis aliados e inimigos por forma e valor",
+      "manter fundo com contraste reduzido",
+      "reservar cores extremas para ameaças e efeitos"
+    ],
+    "visual_novel": [
+      "permitir retratos maiores e fundos mais detalhados",
+      "manter contornos, paleta e iluminação consistentes",
+      "priorizar legibilidade de texto e expressão facial"
+    ],
+    "horror": [
+      "reduzir saturação global sem perder separação funcional",
+      "usar acentos fortes de forma limitada",
+      "preservar leitura de ameaças e rotas"
+    ],
+    "puzzle": [
+      "usar categorias visuais inequívocas",
+      "diferenciar estados por forma, valor e animação",
+      "reduzir decoração que prejudique a compreensão"
+    ]
+  },
+  "quality_checklist": [
+    "O tema foi definido pelo projeto, e não imposto pelo estilo-base?",
+    "A arte mantém pixels nítidos e clusters intencionais?",
+    "As silhuetas permanecem claras na escala real?",
+    "Os contornos são cromáticos e adaptativos?",
+    "As sombras mudam de valor e tonalidade?",
+    "A direção de luz é consistente?",
+    "Os materiais recebem tratamentos previsíveis?",
+    "O contraste corresponde à função de jogabilidade?",
+    "O fundo possui menos prioridade visual que os elementos importantes?",
+    "A densidade de detalhes é consistente entre os assets?",
+    "A interface parece pertencer ao mesmo universo visual?",
+    "O resultado é reconhecível como parte do mesmo jogo sem depender de um tema específico?"
+  ],
+  "rejection_rules": [
+    "Rejeitar assets que introduzam fantasia ou ficção científica sem solicitação.",
+    "Rejeitar assets que copiem diretamente a identidade de jogos existentes.",
+    "Rejeitar pixel art borrada, suavizada ou redimensionada de forma fracionária.",
+    "Rejeitar excesso de preto puro nos contornos.",
+    "Rejeitar sombras feitas apenas com preto ou cinza.",
+    "Rejeitar contraste semelhante entre fundo e elementos jogáveis.",
+    "Rejeitar texturas uniformes sem áreas de descanso.",
+    "Rejeitar inconsistência de escala, perspectiva ou iluminação.",
+    "Rejeitar detalhes que prejudiquem a leitura na resolução real.",
+    "Rejeitar mudanças de linguagem visual entre personagens, cenários e interface."
+  ],
+  "example_configurations": [
+    {
+      "name": "plataforma_urbana",
+      "genre": "plataforma",
+      "theme": "cidade contemporânea",
+      "camera": "lateral",
+      "tone": "energico",
+      "shape_character": "equilibrado",
+      "detail_level": "medio"
+    },
+    {
+      "name": "aventura_historica",
+      "genre": "aventura",
+      "theme": "ambiente histórico realista estilizado",
+      "camera": "top_down_tres_quartos",
+      "tone": "dramatico",
+      "shape_character": "equilibrado",
+      "detail_level": "alto"
+    },
+    {
+      "name": "corrida_abstrata",
+      "genre": "corrida",
+      "theme": "circuitos geométricos abstratos",
+      "camera": "pseudo_3d",
+      "tone": "energico",
+      "shape_character": "angular",
+      "detail_level": "medio"
+    },
+    {
+      "name": "terror_domestico",
+      "genre": "terror",
+      "theme": "casa contemporânea",
+      "camera": "tela_fixa",
+      "tone": "sombrio",
+      "shape_character": "equilibrado",
+      "detail_level": "alto"
+    },
+    {
+      "name": "puzzle_minimalista",
+      "genre": "puzzle",
+      "theme": "formas e mecanismos abstratos",
+      "camera": "top_down",
+      "tone": "sereno",
+      "shape_character": "arredondado",
+      "detail_level": "baixo"
+    }
+  ],
+  "migration_notes": {
+    "previous_profile": "gba_cartoon_high_color",
+    "changes": [
+      "Removidas as variações temáticas obrigatórias de plataforma sci-fi e fantasia top-down.",
+      "Separado o estilo-base das escolhas de gênero, tema, câmera e atmosfera.",
+      "Adicionados controles modulares para adaptar o mesmo sistema visual a diferentes jogos.",
+      "Reduzida a obrigatoriedade de personagens chibi e formas excessivamente fofas.",
+      "Mantidos os elementos que criam coesão: pixels, clusters, contornos, cor, luz, materiais e hierarquia."
+    ]
+  }
+}

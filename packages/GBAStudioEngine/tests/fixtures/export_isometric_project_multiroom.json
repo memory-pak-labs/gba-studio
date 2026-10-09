@@ -1,0 +1,234 @@
+{
+  "schema": 1,
+  "backend": "gbastudio_engine",
+  "kind": "isometric",
+  "template_dir": "../../../templates/exported_isometric",
+  "entry": "main.cpp",
+  "project_data": "isometric_project_data.hpp",
+  "generated_assets": [],
+  "build": {
+    "target": "assetc_isometric_export",
+    "make_target": "all"
+  },
+  "requires": {
+    "engine_pack": ">=1.7.0",
+    "features": [
+      "isometric_runtime",
+      "engine_sdk.isometric_project_data_contract",
+      "isometric_runtime.room_warp"
+    ]
+  },
+  "isometric_project": {
+    "includes": [
+      "../tilemap.hpp"
+    ],
+    "assets": {
+      "bg_palettes": [
+        "tilemap_palette_asset"
+      ],
+      "tile_assets": [
+        "tilemap_tile_asset"
+      ]
+    },
+    "initial_room": 0,
+    "backdrop_color": 123,
+    "resource_banks": [
+      {
+        "kind": "bg_tiles",
+        "start": 0,
+        "count": 4,
+        "alignment": 1,
+        "name": "isometric_bg_tiles"
+      },
+      {
+        "kind": "bg_palette",
+        "start": 32,
+        "count": 16,
+        "alignment": 16,
+        "name": "isometric_bg_palette"
+      },
+      {
+        "kind": "oam_sprites",
+        "start": "auto",
+        "count": 8,
+        "alignment": 1,
+        "name": "isometric_oam"
+      }
+    ],
+    "grid": {
+      "tile_width_pixels": 32,
+      "tile_height_pixels": 16,
+      "origin": {
+        "x": 120,
+        "y": 24
+      }
+    },
+    "rooms": [
+      {
+        "name": "generated_iso_room",
+        "width_tiles": 3,
+        "height_tiles": 3,
+        "visual_tiles": [
+          1,
+          1,
+          1,
+          1,
+          2,
+          1,
+          1,
+          1,
+          1
+        ],
+        "collision_flags": [
+          1,
+          1,
+          1,
+          1,
+          0,
+          1,
+          1,
+          1,
+          1
+        ],
+        "camera": {
+          "position": {
+            "x": 0,
+            "y": 0
+          },
+          "bounds": {
+            "x": 0,
+            "y": 0,
+            "width": 96,
+            "height": 48
+          },
+          "bounds_enabled": true
+        },
+        "on_enter": [
+          {
+            "op": "set_variable",
+            "variable": 1,
+            "value": 4
+          }
+        ],
+        "actors": [
+          {
+            "tile": {
+              "x": 1,
+              "y": 1,
+              "z": 0
+            },
+            "screen_offset": {
+              "x": -8,
+              "y": -16
+            },
+            "tile_index": 0,
+            "palette": 0,
+            "visible": true,
+            "hflip": false,
+            "priority": 0
+          },
+          {
+            "tile": {
+              "x": 1,
+              "y": 0,
+              "z": 0
+            },
+            "screen_offset": {
+              "x": -8,
+              "y": -16
+            },
+            "tile_index": 0,
+            "palette": 0,
+            "visible": true,
+            "hflip": true,
+            "priority": 1,
+            "on_interact": [
+              {
+                "op": "show_dialogue",
+                "line": 0
+              },
+              {
+                "op": "warp",
+                "room": 1,
+                "x": 2,
+                "y": 2
+              }
+            ],
+            "on_start": [
+              {
+                "op": "set_actor_visible",
+                "actor": 1,
+                "visible": 1
+              }
+            ],
+            "on_update": [
+              {
+                "op": "set_camera_position",
+                "x": 0,
+                "y": 0
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "name": "generated_iso_warp_room",
+        "width_tiles": 3,
+        "height_tiles": 3,
+        "visual_tiles": [
+          1,
+          1,
+          1,
+          1,
+          3,
+          1,
+          1,
+          1,
+          1
+        ],
+        "collision_flags": [
+          1,
+          1,
+          1,
+          1,
+          0,
+          1,
+          1,
+          1,
+          1
+        ],
+        "on_enter": [
+          {
+            "op": "set_variable",
+            "variable": 6,
+            "value": 1
+          }
+        ],
+        "actors": [
+          {
+            "tile": {
+              "x": 2,
+              "y": 2,
+              "z": 0
+            },
+            "screen_offset": {
+              "x": -8,
+              "y": -16
+            },
+            "tile_index": 0,
+            "palette": 0,
+            "visible": true
+          }
+        ]
+      }
+    ],
+    "save": {
+      "enabled": true,
+      "signature": "GBIS",
+      "offset": 1024,
+      "slot_capacity": 1024,
+      "slot_count": 1,
+      "version": 1
+    }
+  }
+}

@@ -1,0 +1,7 @@
+#define GBS_SHMUP_RUNTIME_ENTRY gbs_run_shmup
+#define GBS_SHMUP_RUNTIME_ENTER gbs_enter_shmup
+#define GBS_SHMUP_RUNTIME_UPDATE gbs_update_shmup
+#define GBS_SHMUP_RUNTIME_RENDER gbs_render_shmup
+#define GBS_SHMUP_RUNTIME_LEAVE gbs_leave_shmup
+#define GBS_MULTI_RUNTIME 1
+#include "shmup_runtime.inc"

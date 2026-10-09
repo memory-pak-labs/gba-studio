@@ -1,0 +1,42 @@
+{
+  "schema": 1,
+  "backend": "gbastudio_engine",
+  "kind": "isometric",
+  "build": {
+    "target": "exported_isometric",
+    "make_target": "all"
+  },
+  "entry": "main.cpp",
+  "project_data": "isometric_project_data.hpp",
+  "generated_assets": [],
+  "requires": {
+    "engine_pack": ">=1.7.0",
+    "features": [
+      "isometric_runtime",
+      "engine_sdk.isometric_project_data_contract",
+      "isometric_runtime.iso_tilemap_collision",
+      "isometric_runtime.iso_diamond_picking",
+      "isometric_runtime.iso_greedy_path_step",
+      "isometric_runtime.iso_bfs_path_step",
+      "isometric_runtime.iso_astar_path_step",
+      "isometric_runtime.event_scripts",
+      "isometric_runtime.tile_event_scripts",
+      "isometric_runtime.tile_event_areas",
+      "isometric_runtime.cursor_selection",
+      "isometric_runtime.cursor_actor_interaction",
+      "isometric_runtime.actor_command_apply",
+      "isometric_runtime.room_cursor_start",
+      "isometric_runtime.tactical_core",
+      "isometric_runtime.room_warp",
+      "isometric_runtime.camera_zones",
+      "audio.runtime_bus_volume",
+      "audio.runtime_bus_fade",
+      "audio.runtime_bus_mute_all_profiles",
+      "audio.pcm_sfx_event_options",
+      "save.isometric_save_payload",
+      "save.isometric_autosave_on_progress",
+      "save.universal_runtime_envelope",
+      "save.export_project_config"
+    ]
+  }
+}

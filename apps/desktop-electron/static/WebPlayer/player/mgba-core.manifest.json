@@ -1,0 +1,15 @@
+{
+  "schema": 1,
+  "source": {
+    "repository": "https://github.com/mgba-emu/mgba.git",
+    "revision": "0.10.5",
+    "commit": "26b7884bc25a5933960f3cdcd98bac1ae14d42e2"
+  },
+  "wasm": {
+    "file": "mgba-core.wasm",
+    "sha256": "18cf327154ea7b343d32369924a831104ffacc79f647c67de32556e762059385"
+  },
+  "licenses": [
+    "../licenses/mGBA-MPL-2.0.txt"
+  ]
+}

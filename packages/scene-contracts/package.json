@@ -1,0 +1,16 @@
+{
+  "name": "@gbastudio/scene-contracts",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Canonical controlled entity contracts for GBA Studio scene types.",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/memory-pak-labs/gba-studio.git",
+    "directory": "packages/scene-contracts"
+  }
+}

@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>GBA Studio Player</title>
+  <style>
+    html, body, #runtime-game { width: 100%; height: 100%; margin: 0; overflow: hidden; background: #05060a; }
+    #runtime-game { display: grid; place-items: center; }
+    #runtime-game.ejs_parent { width: 100% !important; height: 100% !important; }
+    #runtime-game canvas, #runtime-game .ejs_canvas {
+      width: 240px;
+      height: 160px;
+      display: block;
+      image-rendering: crisp-edges;
+      image-rendering: pixelated;
+    }
+  </style>
+</head>
+<body>
+  <div id="runtime-game">Carregando GBA Studio Player…</div>
+  <script type="module">
+    const parameters = new URLSearchParams(window.location.search);
+    const romUrl = parameters.get("rom") || "";
+    const replayEnabled = parameters.get("replay") === "1";
+    const keyboardEnabled = parameters.get("keyboard") === "1";
+    const container = document.querySelector("#runtime-game");
+    const publishProfilerTelemetry = (stats) => {
+      window.gbaStudio?.publishRomPlayerTelemetry?.(stats);
+    };
+
+    if (!romUrl.startsWith("../roms/")) {
+      document.body.textContent = "ROM invalida para o GBA Studio Player.";
+    } else {
+      try {
+        const { startMGBAPlayer } = await import("./mgba-direct-player.mjs");
+        const replay = replayEnabled ? await fetch("./input-replay.json")
+          .then((response) => response.ok ? response.json() : null)
+          .catch(() => null) : null;
+        const keyboardBindings = keyboardEnabled ? await fetch("./input-config.json")
+          .then((response) => response.ok ? response.json() : null)
+          .catch(() => null) : null;
+        window.GBAStudioDirectPlayer = await startMGBAPlayer({
+          container,
+          romUrl,
+          storageKey: `gba-studio:${parameters.get("title") || "game"}:state`,
+          replay,
+          keyboardBindings,
+          onFrameStats: publishProfilerTelemetry
+        });
+      } catch (error) {
+        container.dataset.directError = error instanceof Error ? `${error.message}\n${error.stack || ""}` : String(error);
+        console.error("Core mGBA direto indisponivel.", error);
+        container.textContent = "Nao foi possivel iniciar o core mGBA-Web do GBA Studio Player.";
+      }
+    }
+  </script>
+</body>
+</html>

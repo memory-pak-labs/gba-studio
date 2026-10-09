@@ -1,0 +1,1192 @@
+{
+  "schemaVersion": 1,
+  "visualProfile": "neutral-purple",
+  "players": [
+    {
+      "family": "topdown",
+      "spriteSheet": "neutral-player-topdown.png",
+      "frameWidth": 32,
+      "frameHeight": 32,
+      "parts": [
+        {
+          "x": 0,
+          "y": 0,
+          "width": 32,
+          "height": 32
+        }
+      ],
+      "animations": [
+        {
+          "name": "idle_down",
+          "state": "idle",
+          "direction": "down",
+          "fps": 1,
+          "loops": true,
+          "sourceFrameIndexes": [
+            0
+          ]
+        },
+        {
+          "name": "walk_down",
+          "state": "walk",
+          "direction": "down",
+          "fps": 10,
+          "loops": true,
+          "sourceFrameIndexes": [
+            1,
+            2,
+            3,
+            4
+          ]
+        },
+        {
+          "name": "interact_down",
+          "state": "attack",
+          "direction": "down",
+          "fps": 8,
+          "loops": false,
+          "sourceFrameIndexes": [
+            5,
+            6
+          ]
+        },
+        {
+          "name": "idle_up",
+          "state": "idle",
+          "direction": "up",
+          "fps": 1,
+          "loops": true,
+          "sourceFrameIndexes": [
+            7
+          ]
+        },
+        {
+          "name": "walk_up",
+          "state": "walk",
+          "direction": "up",
+          "fps": 10,
+          "loops": true,
+          "sourceFrameIndexes": [
+            8,
+            9,
+            10,
+            11
+          ]
+        },
+        {
+          "name": "interact_up",
+          "state": "attack",
+          "direction": "up",
+          "fps": 8,
+          "loops": false,
+          "sourceFrameIndexes": [
+            12,
+            13
+          ]
+        },
+        {
+          "name": "idle_right",
+          "state": "idle",
+          "direction": "right",
+          "fps": 1,
+          "loops": true,
+          "sourceFrameIndexes": [
+            14
+          ]
+        },
+        {
+          "name": "walk_right",
+          "state": "walk",
+          "direction": "right",
+          "fps": 10,
+          "loops": true,
+          "sourceFrameIndexes": [
+            15,
+            16,
+            17,
+            18
+          ]
+        },
+        {
+          "name": "interact_right",
+          "state": "attack",
+          "direction": "right",
+          "fps": 8,
+          "loops": false,
+          "sourceFrameIndexes": [
+            19,
+            20
+          ]
+        },
+        {
+          "name": "idle_left",
+          "state": "idle",
+          "direction": "left",
+          "fps": 1,
+          "loops": true,
+          "sourceFrameIndexes": [
+            21
+          ]
+        },
+        {
+          "name": "walk_left",
+          "state": "walk",
+          "direction": "left",
+          "fps": 10,
+          "loops": true,
+          "sourceFrameIndexes": [
+            22,
+            23,
+            24,
+            25
+          ]
+        },
+        {
+          "name": "interact_left",
+          "state": "attack",
+          "direction": "left",
+          "fps": 8,
+          "loops": false,
+          "sourceFrameIndexes": [
+            26,
+            27
+          ]
+        }
+      ],
+      "sourceSha256": "b19bd08db1ea187699f7d720b9193911f52fb0fd5ff4d64401eb1ff067410167"
+    },
+    {
+      "family": "platformer",
+      "spriteSheet": "neutral-player-platformer.png",
+      "frameWidth": 64,
+      "frameHeight": 64,
+      "parts": [
+        {
+          "x": 0,
+          "y": 0,
+          "width": 64,
+          "height": 64
+        }
+      ],
+      "animations": [
+        {
+          "name": "idle_right",
+          "state": "idle",
+          "direction": "right",
+          "fps": 1,
+          "loops": true,
+          "sourceFrameIndexes": [
+            0
+          ]
+        },
+        {
+          "name": "walk_right",
+          "state": "walk",
+          "direction": "right",
+          "fps": 10,
+          "loops": true,
+          "sourceFrameIndexes": [
+            1,
+            2,
+            3,
+            4
+          ]
+        },
+        {
+          "name": "jump_right",
+          "state": "jump",
+          "direction": "right",
+          "fps": 10,
+          "loops": false,
+          "sourceFrameIndexes": [
+            5,
+            6
+          ]
+        },
+        {
+          "name": "fall_right",
+          "state": "fall",
+          "direction": "right",
+          "fps": 1,
+          "loops": true,
+          "sourceFrameIndexes": [
+            7
+          ]
+        },
+        {
+          "name": "attack_right",
+          "state": "attack",
+          "direction": "right",
+          "fps": 10,
+          "loops": false,
+          "sourceFrameIndexes": [
+            8,
+            9,
+            10
+          ]
+        },
+        {
+          "name": "hurt_right",
+          "state": "hurt",
+          "direction": "right",
+          "fps": 1,
+          "loops": false,
+          "sourceFrameIndexes": [
+            11
+          ]
+        }
+      ],
+      "sourceSha256": "60c1a6a750719b17fa7e977005ceedee99748d9a62a7b695c68c2ac99bff9692",
+      "correction": {
+        "date": "2026-10-08",
+        "sourcePreparedSha256": "a2c8cfc9d8e465b9c3329871992dd5d99e0995fb5ecb1d01e32c5665534c2fda",
+        "method": "integer horizontal translation of walking poses; fixed idle reference",
+        "frameOffsetX": {
+          "1": 3,
+          "2": 4,
+          "3": 6,
+          "4": -1
+        }
+      }
+    },
+    {
+      "family": "fighter",
+      "spriteSheet": "neutral-player-fighter.png",
+      "frameWidth": 64,
+      "frameHeight": 80,
+      "parts": [
+        {
+          "x": 0,
+          "y": 0,
+          "width": 64,
+          "height": 64
+        },
+        {
+          "x": 0,
+          "y": 64,
+          "width": 32,
+          "height": 16
+        },
+        {
+          "x": 32,
+          "y": 64,
+          "width": 32,
+          "height": 16
+        }
+      ],
+      "animations": [
+        {
+          "name": "idle_right",
+          "state": "idle",
+          "direction": "right",
+          "fps": 1,
+          "loops": true,
+          "sourceFrameIndexes": [
+            0
+          ]
+        },
+        {
+          "name": "walk_right",
+          "state": "walk",
+          "direction": "right",
+          "fps": 10,
+          "loops": true,
+          "sourceFrameIndexes": [
+            1,
+            2,
+            3,
+            4
+          ]
+        },
+        {
+          "name": "jump_right",
+          "state": "jump",
+          "direction": "right",
+          "fps": 10,
+          "loops": false,
+          "sourceFrameIndexes": [
+            5,
+            6
+          ]
+        },
+        {
+          "name": "fall_right",
+          "state": "fall",
+          "direction": "right",
+          "fps": 1,
+          "loops": true,
+          "sourceFrameIndexes": [
+            7
+          ]
+        },
+        {
+          "name": "attack_right",
+          "state": "attack",
+          "direction": "right",
+          "fps": 10,
+          "loops": false,
+          "sourceFrameIndexes": [
+            8,
+            9,
+            10
+          ]
+        },
+        {
+          "name": "hurt_right",
+          "state": "hurt",
+          "direction": "right",
+          "fps": 1,
+          "loops": false,
+          "sourceFrameIndexes": [
+            11
+          ]
+        }
+      ],
+      "sourceSha256": "3674f7fb1fb173a5c2f3eb895cd56e6d68251427cd2c938c8400fbd47a23d173",
+      "correction": {
+        "date": "2026-10-08",
+        "sourcePreparedSha256": "647335730481a367a8a514bb817a392c1b56dee432d28626ebeda056dbf53c5d",
+        "method": "integer horizontal translation of walking poses; fixed idle reference",
+        "frameOffsetX": {
+          "1": -2,
+          "2": -4,
+          "3": -6
+        }
+      }
+    },
+    {
+      "family": "isometric-adventure",
+      "spriteSheet": "neutral-player-isometric-adventure.png",
+      "frameWidth": 40,
+      "frameHeight": 48,
+      "parts": [
+        {
+          "x": 0,
+          "y": 0,
+          "width": 32,
+          "height": 32
+        },
+        {
+          "x": 0,
+          "y": 32,
+          "width": 32,
+          "height": 16
+        },
+        {
+          "x": 32,
+          "y": 0,
+          "width": 8,
+          "height": 32
+        },
+        {
+          "x": 32,
+          "y": 32,
+          "width": 8,
+          "height": 16
+        }
+      ],
+      "animations": [
+        {
+          "name": "idle_down-right",
+          "state": "idle",
+          "direction": "down-right",
+          "fps": 1,
+          "loops": true,
+          "sourceFrameIndexes": [
+            0
+          ]
+        },
+        {
+          "name": "walk_down-right",
+          "state": "walk",
+          "direction": "down-right",
+          "fps": 10,
+          "loops": true,
+          "sourceFrameIndexes": [
+            1,
+            2,
+            3,
+            4
+          ]
+        },
+        {
+          "name": "interact_down-right",
+          "state": "attack",
+          "direction": "down-right",
+          "fps": 8,
+          "loops": false,
+          "sourceFrameIndexes": [
+            5,
+            6
+          ]
+        },
+        {
+          "name": "hurt_down-right",
+          "state": "hurt",
+          "direction": "down-right",
+          "fps": 1,
+          "loops": false,
+          "sourceFrameIndexes": [
+            7
+          ]
+        },
+        {
+          "name": "idle_up-right",
+          "state": "idle",
+          "direction": "up-right",
+          "fps": 1,
+          "loops": true,
+          "sourceFrameIndexes": [
+            8
+          ]
+        },
+        {
+          "name": "walk_up-right",
+          "state": "walk",
+          "direction": "up-right",
+          "fps": 10,
+          "loops": true,
+          "sourceFrameIndexes": [
+            9,
+            10,
+            11,
+            12
+          ]
+        },
+        {
+          "name": "interact_up-right",
+          "state": "attack",
+          "direction": "up-right",
+          "fps": 8,
+          "loops": false,
+          "sourceFrameIndexes": [
+            13,
+            14
+          ]
+        },
+        {
+          "name": "hurt_up-right",
+          "state": "hurt",
+          "direction": "up-right",
+          "fps": 1,
+          "loops": false,
+          "sourceFrameIndexes": [
+            15
+          ]
+        },
+        {
+          "name": "idle_up-left",
+          "state": "idle",
+          "direction": "up-left",
+          "fps": 1,
+          "loops": true,
+          "sourceFrameIndexes": [
+            16
+          ]
+        },
+        {
+          "name": "walk_up-left",
+          "state": "walk",
+          "direction": "up-left",
+          "fps": 10,
+          "loops": true,
+          "sourceFrameIndexes": [
+            17,
+            18,
+            19,
+            20
+          ]
+        },
+        {
+          "name": "interact_up-left",
+          "state": "attack",
+          "direction": "up-left",
+          "fps": 8,
+          "loops": false,
+          "sourceFrameIndexes": [
+            21,
+            22
+          ]
+        },
+        {
+          "name": "hurt_up-left",
+          "state": "hurt",
+          "direction": "up-left",
+          "fps": 1,
+          "loops": false,
+          "sourceFrameIndexes": [
+            23
+          ]
+        },
+        {
+          "name": "idle_down-left",
+          "state": "idle",
+          "direction": "down-left",
+          "fps": 1,
+          "loops": true,
+          "sourceFrameIndexes": [
+            24
+          ]
+        },
+        {
+          "name": "walk_down-left",
+          "state": "walk",
+          "direction": "down-left",
+          "fps": 10,
+          "loops": true,
+          "sourceFrameIndexes": [
+            25,
+            26,
+            27,
+            28
+          ]
+        },
+        {
+          "name": "interact_down-left",
+          "state": "attack",
+          "direction": "down-left",
+          "fps": 8,
+          "loops": false,
+          "sourceFrameIndexes": [
+            29,
+            30
+          ]
+        },
+        {
+          "name": "hurt_down-left",
+          "state": "hurt",
+          "direction": "down-left",
+          "fps": 1,
+          "loops": false,
+          "sourceFrameIndexes": [
+            31
+          ]
+        }
+      ],
+      "sourceSha256": "565d011fd895a6893c88271caea109b9cb3e3c764a0f2ef08afe436ce4462b21",
+      "correction": {
+        "date": "2026-10-08",
+        "sourcePreparedSha256": "2f6745edbd1d1a5a0fe2fbf3942ba979fdc50137678b928219e145194df481cf",
+        "method": "integer horizontal translation of walking poses; fixed idle reference",
+        "frameOffsetX": {
+          "1": 1,
+          "3": 2,
+          "4": 2,
+          "9": -1,
+          "10": -1,
+          "11": 1,
+          "12": 2,
+          "17": 1,
+          "18": 2,
+          "19": 3,
+          "20": 5,
+          "26": 1,
+          "27": 3,
+          "28": 4
+        }
+      }
+    },
+    {
+      "family": "isometric-tactical",
+      "spriteSheet": "neutral-player-isometric-tactical.png",
+      "frameWidth": 32,
+      "frameHeight": 32,
+      "parts": [
+        {
+          "x": 0,
+          "y": 0,
+          "width": 32,
+          "height": 32
+        }
+      ],
+      "animations": [
+        {
+          "name": "idle_down-right",
+          "state": "idle",
+          "direction": "down-right",
+          "fps": 1,
+          "loops": true,
+          "sourceFrameIndexes": [
+            0
+          ]
+        },
+        {
+          "name": "walk_down-right",
+          "state": "walk",
+          "direction": "down-right",
+          "fps": 10,
+          "loops": true,
+          "sourceFrameIndexes": [
+            1,
+            2,
+            3,
+            4
+          ]
+        },
+        {
+          "name": "attack_down-right",
+          "state": "attack",
+          "direction": "down-right",
+          "fps": 8,
+          "loops": false,
+          "sourceFrameIndexes": [
+            5,
+            6
+          ]
+        },
+        {
+          "name": "hurt_down-right",
+          "state": "hurt",
+          "direction": "down-right",
+          "fps": 1,
+          "loops": false,
+          "sourceFrameIndexes": [
+            7
+          ]
+        },
+        {
+          "name": "idle_up-right",
+          "state": "idle",
+          "direction": "up-right",
+          "fps": 1,
+          "loops": true,
+          "sourceFrameIndexes": [
+            8
+          ]
+        },
+        {
+          "name": "walk_up-right",
+          "state": "walk",
+          "direction": "up-right",
+          "fps": 10,
+          "loops": true,
+          "sourceFrameIndexes": [
+            9,
+            10,
+            11,
+            12
+          ]
+        },
+        {
+          "name": "attack_up-right",
+          "state": "attack",
+          "direction": "up-right",
+          "fps": 8,
+          "loops": false,
+          "sourceFrameIndexes": [
+            13,
+            14
+          ]
+        },
+        {
+          "name": "hurt_up-right",
+          "state": "hurt",
+          "direction": "up-right",
+          "fps": 1,
+          "loops": false,
+          "sourceFrameIndexes": [
+            15
+          ]
+        },
+        {
+          "name": "idle_up-left",
+          "state": "idle",
+          "direction": "up-left",
+          "fps": 1,
+          "loops": true,
+          "sourceFrameIndexes": [
+            16
+          ]
+        },
+        {
+          "name": "walk_up-left",
+          "state": "walk",
+          "direction": "up-left",
+          "fps": 10,
+          "loops": true,
+          "sourceFrameIndexes": [
+            17,
+            18,
+            19,
+            20
+          ]
+        },
+        {
+          "name": "attack_up-left",
+          "state": "attack",
+          "direction": "up-left",
+          "fps": 8,
+          "loops": false,
+          "sourceFrameIndexes": [
+            21,
+            22
+          ]
+        },
+        {
+          "name": "hurt_up-left",
+          "state": "hurt",
+          "direction": "up-left",
+          "fps": 1,
+          "loops": false,
+          "sourceFrameIndexes": [
+            23
+          ]
+        },
+        {
+          "name": "idle_down-left",
+          "state": "idle",
+          "direction": "down-left",
+          "fps": 1,
+          "loops": true,
+          "sourceFrameIndexes": [
+            24
+          ]
+        },
+        {
+          "name": "walk_down-left",
+          "state": "walk",
+          "direction": "down-left",
+          "fps": 10,
+          "loops": true,
+          "sourceFrameIndexes": [
+            25,
+            26,
+            27,
+            28
+          ]
+        },
+        {
+          "name": "attack_down-left",
+          "state": "attack",
+          "direction": "down-left",
+          "fps": 8,
+          "loops": false,
+          "sourceFrameIndexes": [
+            29,
+            30
+          ]
+        },
+        {
+          "name": "hurt_down-left",
+          "state": "hurt",
+          "direction": "down-left",
+          "fps": 1,
+          "loops": false,
+          "sourceFrameIndexes": [
+            31
+          ]
+        }
+      ],
+      "sourceSha256": "7dcc987d9f34dfdd1faa99823b5d73196e8d9b44ad0c60532c2016d112e7c8c2"
+    },
+    {
+      "family": "shmup",
+      "spriteSheet": "neutral-player-shmup-horizontal.png",
+      "frameWidth": 32,
+      "frameHeight": 32,
+      "parts": [
+        {
+          "x": 0,
+          "y": 0,
+          "width": 32,
+          "height": 32
+        }
+      ],
+      "animations": [
+        {
+          "name": "idle",
+          "state": "idle",
+          "direction": "none",
+          "fps": 1,
+          "loops": false,
+          "sourceFrameIndexes": [
+            0
+          ]
+        },
+        {
+          "name": "fly_right",
+          "state": "walk",
+          "direction": "right",
+          "fps": 10,
+          "loops": true,
+          "sourceFrameIndexes": [
+            1,
+            2,
+            3
+          ]
+        },
+        {
+          "name": "bank_up",
+          "state": "walk",
+          "direction": "up",
+          "fps": 8,
+          "loops": true,
+          "sourceFrameIndexes": [
+            4,
+            5
+          ]
+        },
+        {
+          "name": "bank_down",
+          "state": "walk",
+          "direction": "down",
+          "fps": 8,
+          "loops": true,
+          "sourceFrameIndexes": [
+            6,
+            7
+          ]
+        },
+        {
+          "name": "shoot_right",
+          "state": "attack",
+          "direction": "right",
+          "fps": 12,
+          "loops": false,
+          "sourceFrameIndexes": [
+            8,
+            9
+          ]
+        },
+        {
+          "name": "hurt_right",
+          "state": "hurt",
+          "direction": "right",
+          "fps": 8,
+          "loops": false,
+          "sourceFrameIndexes": [
+            10,
+            11
+          ]
+        }
+      ],
+      "sourceSha256": "64d96d4e5bbf35adbc5d4e37f46b380432af8b4acb9671e19a642e258a6d9743",
+      "originX": -8,
+      "originY": -24,
+      "originSpace": "animator"
+    },
+    {
+      "family": "point-click",
+      "spriteSheet": "neutral-cursor-hand.png",
+      "frameWidth": 32,
+      "frameHeight": 32,
+      "parts": [
+        {
+          "x": 0,
+          "y": 0,
+          "width": 32,
+          "height": 32
+        }
+      ],
+      "animations": [
+        {
+          "name": "idle",
+          "state": "idle",
+          "direction": "none",
+          "fps": 1,
+          "loops": false,
+          "sourceFrameIndexes": [
+            0
+          ]
+        },
+        {
+          "name": "click",
+          "state": "attack",
+          "direction": "none",
+          "fps": 12,
+          "loops": false,
+          "sourceFrameIndexes": [
+            1,
+            2,
+            3,
+            4
+          ]
+        }
+      ],
+      "sourceSha256": "b3ac2d43993a39a949c4d19c5c4e7d86566b199398a3881d081e4eb88276ac93",
+      "originX": 2,
+      "originY": -17,
+      "originSpace": "animator"
+    },
+    {
+      "family": "racing-topdown",
+      "spriteSheet": "neutral-player-racing-topdown.png",
+      "frameWidth": 32,
+      "frameHeight": 32,
+      "originX": 8,
+      "originY": -8,
+      "originSpace": "animator",
+      "parts": [
+        {
+          "x": 0,
+          "y": 0,
+          "width": 32,
+          "height": 32
+        }
+      ],
+      "animations": [
+        {
+          "name": "idle_up",
+          "state": "idle",
+          "direction": "up",
+          "fps": 1,
+          "loops": true,
+          "sourceFrameIndexes": [
+            0
+          ]
+        },
+        {
+          "name": "drive_up",
+          "state": "walk",
+          "direction": "up",
+          "fps": 10,
+          "loops": true,
+          "sourceFrameIndexes": [
+            1,
+            2
+          ]
+        },
+        {
+          "name": "hurt_up",
+          "state": "hurt",
+          "direction": "up",
+          "fps": 8,
+          "loops": false,
+          "sourceFrameIndexes": [
+            3
+          ]
+        },
+        {
+          "name": "idle_right",
+          "state": "idle",
+          "direction": "right",
+          "fps": 1,
+          "loops": true,
+          "sourceFrameIndexes": [
+            4
+          ]
+        },
+        {
+          "name": "drive_right",
+          "state": "walk",
+          "direction": "right",
+          "fps": 10,
+          "loops": true,
+          "sourceFrameIndexes": [
+            5,
+            6
+          ]
+        },
+        {
+          "name": "hurt_right",
+          "state": "hurt",
+          "direction": "right",
+          "fps": 8,
+          "loops": false,
+          "sourceFrameIndexes": [
+            7
+          ]
+        },
+        {
+          "name": "idle_down",
+          "state": "idle",
+          "direction": "down",
+          "fps": 1,
+          "loops": true,
+          "sourceFrameIndexes": [
+            8
+          ]
+        },
+        {
+          "name": "drive_down",
+          "state": "walk",
+          "direction": "down",
+          "fps": 10,
+          "loops": true,
+          "sourceFrameIndexes": [
+            9,
+            10
+          ]
+        },
+        {
+          "name": "hurt_down",
+          "state": "hurt",
+          "direction": "down",
+          "fps": 8,
+          "loops": false,
+          "sourceFrameIndexes": [
+            11
+          ]
+        },
+        {
+          "name": "idle_left",
+          "state": "idle",
+          "direction": "left",
+          "fps": 1,
+          "loops": true,
+          "sourceFrameIndexes": [
+            12
+          ]
+        },
+        {
+          "name": "drive_left",
+          "state": "walk",
+          "direction": "left",
+          "fps": 10,
+          "loops": true,
+          "sourceFrameIndexes": [
+            13,
+            14
+          ]
+        },
+        {
+          "name": "hurt_left",
+          "state": "hurt",
+          "direction": "left",
+          "fps": 8,
+          "loops": false,
+          "sourceFrameIndexes": [
+            15
+          ]
+        }
+      ],
+      "sourceSha256": "9ca5c9e6d3e3289bb92fb77ef381125d1e45f33daeb0712507a838cdb0a03528"
+    },
+    {
+      "family": "racing-rear",
+      "spriteSheet": "neutral-player-racing-rear.png",
+      "frameWidth": 32,
+      "frameHeight": 32,
+      "originX": 8,
+      "originY": -8,
+      "originSpace": "animator",
+      "parts": [
+        {
+          "x": 0,
+          "y": 0,
+          "width": 32,
+          "height": 32
+        }
+      ],
+      "animations": [
+        {
+          "name": "idle",
+          "state": "idle",
+          "direction": "none",
+          "fps": 1,
+          "loops": true,
+          "sourceFrameIndexes": [
+            0
+          ]
+        },
+        {
+          "name": "drive",
+          "state": "walk",
+          "direction": "none",
+          "fps": 10,
+          "loops": true,
+          "sourceFrameIndexes": [
+            1,
+            2
+          ]
+        },
+        {
+          "name": "brake",
+          "state": "special",
+          "direction": "none",
+          "fps": 1,
+          "loops": true,
+          "sourceFrameIndexes": [
+            3
+          ]
+        },
+        {
+          "name": "steer_left",
+          "state": "walk",
+          "direction": "left",
+          "fps": 10,
+          "loops": true,
+          "sourceFrameIndexes": [
+            4,
+            5
+          ]
+        },
+        {
+          "name": "brake_left",
+          "state": "special",
+          "direction": "left",
+          "fps": 1,
+          "loops": true,
+          "sourceFrameIndexes": [
+            6
+          ]
+        },
+        {
+          "name": "steer_right",
+          "state": "walk",
+          "direction": "right",
+          "fps": 10,
+          "loops": true,
+          "sourceFrameIndexes": [
+            7,
+            8
+          ]
+        },
+        {
+          "name": "brake_right",
+          "state": "special",
+          "direction": "right",
+          "fps": 1,
+          "loops": true,
+          "sourceFrameIndexes": [
+            9
+          ]
+        },
+        {
+          "name": "hurt",
+          "state": "hurt",
+          "direction": "none",
+          "fps": 8,
+          "loops": false,
+          "sourceFrameIndexes": [
+            10,
+            11
+          ]
+        }
+      ],
+      "sourceSha256": "b1aa177315e1cd9aa02a4d21b73ed5bcc7ab96ebc6f81213361daa88f9f86865"
+    }
+  ],
+  "effects": [
+    {
+      "family": "shmup-explosion",
+      "spriteSheet": "neutral-shmup-explosion.png",
+      "frameWidth": 32,
+      "frameHeight": 32,
+      "parts": [
+        {
+          "x": 0,
+          "y": 0,
+          "width": 32,
+          "height": 32
+        }
+      ],
+      "animations": [
+        {
+          "name": "explosion",
+          "state": "attack",
+          "direction": "none",
+          "fps": 10,
+          "loops": false,
+          "sourceFrameIndexes": [
+            0,
+            1,
+            2,
+            3
+          ]
+        }
+      ],
+      "sourceSha256": "bcc9924ff886fa72afcfa66abbc7e6b54538af0c4c1f3f66af561cfcd5310309"
+    }
+  ]
+}

@@ -1,0 +1,68 @@
+SHELL := /bin/bash
+.DEFAULT_GOAL := all
+
+DEVKITPRO ?= /opt/devkitpro
+DEVKITARM ?= $(DEVKITPRO)/devkitARM
+ENGINE_PACK ?= $(CURDIR)/..
+PROJECT_DIR ?= $(CURDIR)
+TARGET ?= game
+BUILD_DIR ?= $(PROJECT_DIR)/build
+ROM_TITLE ?= GBS_GAME
+GAME_CODE ?= GBS0
+MAKER_CODE ?= 00
+ROM_VERSION ?= 00
+
+empty :=
+space := $(empty) $(empty)
+escape_spaces = $(subst $(space),\$(space),$1)
+
+PROJECT_DIR_ESC := $(call escape_spaces,$(PROJECT_DIR))
+BUILD_DIR_ESC := $(call escape_spaces,$(BUILD_DIR))
+ENGINE_PACK_ESC := $(call escape_spaces,$(ENGINE_PACK))
+
+ARM_CXX := $(DEVKITARM)/bin/arm-none-eabi-g++
+ARM_OBJCOPY := $(DEVKITARM)/bin/arm-none-eabi-objcopy
+GBAFIX := $(DEVKITPRO)/tools/bin/gbafix
+
+CXXFLAGS := -mthumb -mthumb-interwork -mcpu=arm7tdmi -mtune=arm7tdmi -Os -ffreestanding -fdata-sections -ffunction-sections -Wall -Wextra -std=c++17 -fno-exceptions -fno-rtti -fno-threadsafe-statics -I"$(ENGINE_PACK)/include"
+LDFLAGS := -mthumb -mthumb-interwork -mcpu=arm7tdmi -mtune=arm7tdmi -nostartfiles -Wl,--gc-sections -T "$(ENGINE_PACK)/templates/gba.ld"
+
+PROJECT_SOURCES ?= main.cpp
+SRC := $(addprefix $(PROJECT_DIR_ESC)/,$(PROJECT_SOURCES))
+OBJ := $(addprefix $(BUILD_DIR_ESC)/,$(PROJECT_SOURCES:.cpp=.o))
+ELF := $(BUILD_DIR_ESC)/$(TARGET).elf
+GBA := $(BUILD_DIR_ESC)/$(TARGET).gba
+MAP := $(BUILD_DIR_ESC)/$(TARGET).map
+DEP := $(OBJ:.o=.d)
+GBS_COMPILE_CONFIG ?=
+
+.PHONY: all objects clean check-toolchain
+
+all: $(GBA)
+
+objects: $(OBJ)
+
+check-toolchain:
+	@test -x "$(ARM_CXX)" || (echo "devkitARM nao encontrado em $(DEVKITARM)" >&2; exit 2)
+	@test -x "$(GBAFIX)" || (echo "gbafix nao encontrado em $(GBAFIX)" >&2; exit 2)
+	@test -f "$(ENGINE_PACK)/lib/libgbastudio_engine.a" || (echo "Engine lib nao encontrada em $(ENGINE_PACK)/lib" >&2; exit 2)
+
+define compile_source
+$(BUILD_DIR_ESC)/$(1:.cpp=.o): $(PROJECT_DIR_ESC)/$(1) $(GBS_COMPILE_CONFIG) | check-toolchain
+	@mkdir -p "$(BUILD_DIR)"
+	"$(ARM_CXX)" $(CXXFLAGS) -MD -MP -MF "$$(@:.o=.d)" -c "$$<" -o "$$@"
+endef
+$(foreach source,$(PROJECT_SOURCES),$(eval $(call compile_source,$(source))))
+
+$(ELF): $(OBJ) $(ENGINE_PACK_ESC)/lib/libgbastudio_engine.a $(ENGINE_PACK_ESC)/templates/gba.ld | check-toolchain
+	"$(ARM_CXX)" $(LDFLAGS) "-Wl,-Map,$(BUILD_DIR)/$(TARGET).map" $(foreach source,$(PROJECT_SOURCES),"$(BUILD_DIR)/$(source:.cpp=.o)") "$(ENGINE_PACK)/lib/libgbastudio_engine.a" -lgcc -o "$@"
+
+$(GBA): $(ELF)
+	"$(ARM_OBJCOPY)" -O binary "$<" "$@"
+	"$(GBAFIX)" "$@" -t"$(ROM_TITLE)" -c"$(GAME_CODE)" -m"$(MAKER_CODE)" -r"$(ROM_VERSION)" >/dev/null
+	@echo "ROM gerada: $@"
+
+clean:
+	rm -rf "$(BUILD_DIR)"
+
+-include $(DEP)

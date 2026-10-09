@@ -1,0 +1,36 @@
+{
+  "backend": "gbastudio_engine",
+  "kind": "world_map",
+  "runtime_profile": "world_map",
+  "runtime_adapter": {
+    "base_runtime": "world_map",
+    "adapter": "native",
+    "project_block": "world_map_project",
+    "native": true
+  },
+  "entry": "main.cpp",
+  "project_data": "world_map_project_data.hpp",
+  "generated_assets": [],
+  "build": {
+    "target": "exported_world_map",
+    "make_target": "all"
+  },
+  "requires": {
+    "engine_pack": ">=1.44.0",
+    "features": [
+      "world_map_runtime",
+      "engine_sdk.world_map_project_data_contract",
+      "asset-export-world-map-project-data",
+      "asset-export-runtime-profile-manifest",
+      "runtime_profiles.world_map_native_contract",
+      "world_map_conditional_nodes",
+      "world_map_locked_feedback",
+      "world_map_hidden_nodes",
+      "world_map_save_data",
+      "world_map_hud_node_status",
+      "save.export_project_config",
+      "dialogue.visual_box",
+      "events.interaction"
+    ]
+  }
+}

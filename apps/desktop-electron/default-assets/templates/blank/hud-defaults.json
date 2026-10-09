@@ -1,0 +1,91 @@
+{
+  "profile": "neutral-purple",
+  "approval": "User approved visual concept on 2026-10-06; native derivatives retain the approved design.",
+  "sourceSha256": "0bc55ec3c7291d732e0086e22541b9021019ef3fa849b74ee2656f6a80d5e92e",
+  "assets": [
+    {
+      "name": "neutral-hud-arrow-down.png",
+      "width": 8,
+      "height": 8,
+      "kind": "UI",
+      "sha256": "3fd4e134c49a48e2acd027d13461fbe37a9d94c10d0c9b7abd13c44fbce46ed8"
+    },
+    {
+      "name": "neutral-hud-arrow-right.png",
+      "width": 8,
+      "height": 8,
+      "kind": "UI",
+      "sha256": "89941d0ff4315086983fa821a3b974f488f90cc026c190ebd7ee00b1b9900378"
+    },
+    {
+      "name": "neutral-hud-bar-empty.png",
+      "width": 72,
+      "height": 8,
+      "kind": "UI",
+      "sha256": "ca49159b9ad3b0075d8b2cfc9539062bf65e639966ae144abe08117d7b067eb5"
+    },
+    {
+      "name": "neutral-hud-bar-full.png",
+      "width": 72,
+      "height": 8,
+      "kind": "UI",
+      "sha256": "055492650e3f64043669a120230cafe266470cd929e1efcc1c576f65d6a8b72b"
+    },
+    {
+      "name": "neutral-hud-bar-half.png",
+      "width": 72,
+      "height": 8,
+      "kind": "UI",
+      "sha256": "dfd08e13e81b6109603af1956f2f1af4a40d74b6c1682fdfc74d70c9bcecdfba"
+    },
+    {
+      "name": "neutral-hud-coin.png",
+      "width": 16,
+      "height": 16,
+      "kind": "UI",
+      "sha256": "b2f77181c9bae869ddcdf756c1e79c3a9f6a6fb62dd908b2ff325c367268b41c"
+    },
+    {
+      "name": "neutral-hud-diamond.png",
+      "width": 16,
+      "height": 16,
+      "kind": "UI",
+      "sha256": "fce02b055f0cb3d2dd0a85594df94ed1c80002e73c313630b8ca8080f79cd405"
+    },
+    {
+      "name": "neutral-hud-frame-counter.png",
+      "width": 64,
+      "height": 32,
+      "kind": "UI",
+      "sha256": "1f1a64cf7e97d4fc891aa4afac0a16db6ee82f92031ef07703d759f8bca66c07"
+    },
+    {
+      "name": "neutral-hud-frame-wide.png",
+      "width": 96,
+      "height": 32,
+      "kind": "UI",
+      "sha256": "9bf963e08bcbc710651d995dfd8e3c62c5629cde3c8111693a38c4f4a7ab6393"
+    },
+    {
+      "name": "neutral-hud-heart.png",
+      "width": 8,
+      "height": 8,
+      "kind": "UI",
+      "sha256": "7dc7f2a1e2bfec5c01dcdd70939fff339f291126459d0130b717c26f47b4f760"
+    },
+    {
+      "name": "neutral-hud-skin.png",
+      "width": 24,
+      "height": 24,
+      "kind": "UI",
+      "sha256": "514558252a1bbd12489d99f6f47524280e9291c2c86a86b46b948b9c3fa91990"
+    },
+    {
+      "name": "neutral-hud-spark.png",
+      "width": 16,
+      "height": 16,
+      "kind": "UI",
+      "sha256": "68f3dfb292cdaf65fdeffe956f275a92e88356a26d420143cb1790ff094f81d1"
+    }
+  ]
+}

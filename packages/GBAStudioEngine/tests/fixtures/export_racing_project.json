@@ -1,0 +1,70 @@
+{
+  "schema": 1,
+  "backend": "gbastudio_engine",
+  "kind": "racing",
+  "runtime_profile": "racing",
+  "template_dir": "../../templates/exported_racing",
+  "entry": "main.cpp",
+  "project_data": "racing_project_data.hpp",
+  "generated_assets": [],
+  "build": { "target": "racing_fixture", "make_target": "all" },
+  "requires": {
+    "engine_pack": ">=2.24.0",
+    "features": ["racing_runtime", "engine_sdk.racing_project_data_contract"]
+  },
+  "racing_project": {
+    "initial_room": 0,
+    "rooms": [{
+      "name": "coastal_track",
+      "width_tiles": 8,
+      "height_tiles": 12,
+      "collision_flags": [
+        1, 0, 0, 0, 0, 0, 0, 1,
+        1, 0, 0, 0, 0, 0, 0, 1,
+        1, 0, 0, 0, 0, 0, 0, 1,
+        1, 0, 0, 0, 0, 0, 0, 1,
+        1, 0, 0, 0, 0, 0, 0, 1,
+        1, 0, 0, 0, 0, 0, 0, 1,
+        1, 0, 0, 0, 0, 0, 0, 1,
+        1, 0, 0, 0, 0, 0, 0, 1,
+        1, 0, 0, 0, 0, 0, 0, 1,
+        1, 0, 0, 0, 0, 0, 0, 1,
+        1, 0, 0, 0, 0, 0, 0, 1,
+        1, 0, 0, 0, 0, 0, 0, 1
+      ],
+      "config": {
+        "max_speed_x256": 1536,
+        "acceleration_x256_per_second": 2560,
+        "brake_power_x256_per_second": 3584,
+        "steering_speed_x256": 640,
+        "presentation": "pseudo3d",
+        "laps_to_win": 2,
+        "checkpoints_per_lap": 3,
+        "pickups_per_lap": 2,
+        "rival_speed_x256_per_second": 896,
+        "road_curve": 14,
+        "show_minimap": true
+      },
+      "track_segments": [
+        { "length_pixels": 32, "curve": -12, "half_width": 28 },
+        { "length_pixels": 32, "curve": 18, "half_width": 36 },
+        { "length_pixels": 32, "curve": 0, "half_width": 32 }
+      ],
+      "topdown_track": {
+        "camera_dead_zone": { "x": 16, "y": 24 },
+        "start_heading": 4,
+        "path_points": [
+          { "x": 16, "y": 16 },
+          { "x": 48, "y": 16 },
+          { "x": 48, "y": 80 },
+          { "x": 16, "y": 80 }
+        ],
+        "checkpoints": [
+          { "id": "south", "x": 32, "y": 80, "width": 32, "height": 8 },
+          { "id": "north", "x": 32, "y": 24, "width": 32, "height": 8 }
+        ]
+      },
+      "player_start_pixels": { "x": 32, "y": 80 }
+    }]
+  }
+}

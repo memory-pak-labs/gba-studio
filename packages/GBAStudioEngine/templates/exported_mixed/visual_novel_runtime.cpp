@@ -1,0 +1,8 @@
+#define GBS_VISUAL_NOVEL_PROJECT_DATA_HEADER "visual_novel_project_data.hpp"
+#define GBS_VISUAL_NOVEL_RUNTIME_ENTRY gbs_run_visual_novel
+#define GBS_VISUAL_NOVEL_RUNTIME_ENTER gbs_enter_visual_novel
+#define GBS_VISUAL_NOVEL_RUNTIME_UPDATE gbs_update_visual_novel
+#define GBS_VISUAL_NOVEL_RUNTIME_RENDER gbs_render_visual_novel
+#define GBS_VISUAL_NOVEL_RUNTIME_LEAVE gbs_leave_visual_novel
+#define GBS_MULTI_RUNTIME 1
+#include "visual_novel_runtime.inc"

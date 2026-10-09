@@ -1,0 +1,124 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://gbastudio.local/schemas/promotion_summary.schema.json",
+  "title": "GBAStudio Engine backend promotion summary",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "ok",
+    "version",
+    "kind",
+    "stage",
+    "ready_for_primary_backend",
+    "backend_policy",
+    "missing_manual_gates",
+    "next_actions",
+    "public_schema_catalog_summary"
+  ],
+  "properties": {
+    "ok": {
+      "type": "boolean"
+    },
+    "version": {
+      "type": "string",
+      "minLength": 1
+    },
+    "kind": {
+      "const": "promotion_summary"
+    },
+    "stage": {
+      "type": "string",
+      "enum": [
+        "blocked",
+        "beta_candidate",
+        "primary_ready"
+      ]
+    },
+    "ready_for_primary_backend": {
+      "type": "boolean"
+    },
+    "backend_policy": {
+      "const": "parallel_until_manual_promotion"
+    },
+    "missing_manual_gates": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      },
+      "uniqueItems": true
+    },
+    "next_actions": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/nextAction"
+      }
+    },
+    "public_schema_catalog_summary": {
+      "$ref": "#/$defs/publicSchemaCatalogSummary"
+    }
+  },
+  "$defs": {
+    "nextAction": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": [
+        "id",
+        "command",
+        "message"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "command": {
+          "type": "string",
+          "minLength": 1
+        },
+        "message": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "publicSchemaCatalogSummary": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "ok",
+        "schema_count",
+        "missing_schemas",
+        "accepted_schema_arguments"
+      ],
+      "properties": {
+        "ok": {
+          "type": "boolean"
+        },
+        "schema_count": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "missing_schemas": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "uniqueItems": true
+        },
+        "accepted_schema_arguments": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "uniqueItems": true
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,167 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://gbastudio.local/schemas/promotion_bundle.schema.json",
+  "title": "GBAStudio Engine backend promotion bundle manifest",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "ok",
+    "version",
+    "kind",
+    "stage",
+    "ready_for_primary_backend",
+    "backend_policy",
+    "missing_manual_gates",
+    "files",
+    "file_integrity"
+  ],
+  "properties": {
+    "ok": {
+      "type": "boolean"
+    },
+    "version": {
+      "type": "string",
+      "minLength": 1
+    },
+    "kind": {
+      "const": "promotion_bundle"
+    },
+    "path": {
+      "type": "string",
+      "minLength": 1
+    },
+    "stage": {
+      "type": "string",
+      "enum": [
+        "blocked",
+        "beta_candidate",
+        "primary_ready"
+      ]
+    },
+    "ready_for_primary_backend": {
+      "type": "boolean"
+    },
+    "backend_policy": {
+      "const": "parallel_until_manual_promotion"
+    },
+    "missing_manual_gates": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      },
+      "uniqueItems": true
+    },
+    "files": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "promotion_bundle",
+        "readiness_decision",
+        "readiness_validation",
+        "readiness_evidence_template",
+        "public_schema_catalog",
+        "gbsdoctor_report",
+        "promotion_summary",
+        "promotion_summary_json"
+      ],
+      "properties": {
+        "promotion_bundle": {
+          "type": "string",
+          "minLength": 1
+        },
+        "readiness_decision": {
+          "type": "string",
+          "minLength": 1
+        },
+        "readiness_validation": {
+          "type": "string",
+          "minLength": 1
+        },
+        "readiness_evidence_template": {
+          "type": "string",
+          "minLength": 1
+        },
+        "readiness_evidence": {
+          "type": "string",
+          "minLength": 1
+        },
+        "public_schema_catalog": {
+          "type": "string",
+          "minLength": 1
+        },
+        "gbsdoctor_report": {
+          "type": "string",
+          "minLength": 1
+        },
+        "promotion_summary": {
+          "type": "string",
+          "minLength": 1
+        },
+        "promotion_summary_json": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "file_integrity": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "readiness_decision",
+        "readiness_validation",
+        "readiness_evidence_template",
+        "public_schema_catalog",
+        "gbsdoctor_report",
+        "promotion_summary",
+        "promotion_summary_json"
+      ],
+      "properties": {
+        "readiness_decision": {
+          "$ref": "#/$defs/fileIntegrity"
+        },
+        "readiness_validation": {
+          "$ref": "#/$defs/fileIntegrity"
+        },
+        "readiness_evidence_template": {
+          "$ref": "#/$defs/fileIntegrity"
+        },
+        "readiness_evidence": {
+          "$ref": "#/$defs/fileIntegrity"
+        },
+        "public_schema_catalog": {
+          "$ref": "#/$defs/fileIntegrity"
+        },
+        "gbsdoctor_report": {
+          "$ref": "#/$defs/fileIntegrity"
+        },
+        "promotion_summary": {
+          "$ref": "#/$defs/fileIntegrity"
+        },
+        "promotion_summary_json": {
+          "$ref": "#/$defs/fileIntegrity"
+        }
+      }
+    }
+  },
+  "$defs": {
+    "fileIntegrity": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "sha256",
+        "size_bytes"
+      ],
+      "properties": {
+        "sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "size_bytes": {
+          "type": "integer",
+          "minimum": 0
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,22 @@
+import assert from 'node:assert/strict';
+import {mkdtemp,writeFile,readFile} from 'node:fs/promises';
+import {tmpdir} from 'node:os';
+import {join,resolve} from 'node:path';
+import {fileURLToPath} from 'node:url';
+import {spawnSync} from 'node:child_process';
+const root=await mkdtemp(join(tmpdir(),'gba-release-triage-'));
+const cli=fileURLToPath(new URL('./triage-release.mjs',import.meta.url));
+const json=(file,data)=>writeFile(file,JSON.stringify(data));
+await json(join(root,'build.json'),{schema:1,command:'build',exitCode:1});
+await json(join(root,'manifest.json'),{schema:1,sources:[{kind:'command',path:'build.json',build:'test-build'}]});
+function run(args,status=0){const r=spawnSync(process.execPath,[cli,'--manifest',join(root,'manifest.json'),...args],{encoding:'utf8',timeout:10000,env:{...process.env,GBA_STUDIO_JEV_ENABLED:'0',TYPESAFE_API_KEY:''}});assert.equal(r.status,status,r.stderr);}
+run(['--out',join(root,'first'),'--jev']);
+const original=await readFile(join(root,'first/triage.json'),'utf8'),report=JSON.parse(original);
+assert.equal(report.items[0].suggestion,'bloqueia_lancamento');assert.equal(report.releaseApproval,false);assert.equal(report.apiCalls,0);
+const review=JSON.parse(await readFile(join(root,'first/review-template.json'),'utf8'));
+review.decisions=[{id:report.items[0].id,decision:'adiar',reason:'Teste de revisão humana; não remove bloqueio'}];await json(join(root,'review.json'),review);
+run(['--out',join(root,'reviewed'),'--review',join(root,'review.json')]);
+const reviewed=JSON.parse(await readFile(join(root,'reviewed/triage.json'),'utf8'));assert.equal(reviewed.items[0].objectiveBlocker,true);assert.equal(reviewed.items[0].finalDecision.decision,'adiar');
+run(['--out',join(root,'first')],1);assert.equal(await readFile(join(root,'first/triage.json'),'utf8'),original);
+await json(join(root,'build.json'),{schema:1,command:'build',exitCode:2});run(['--out',join(root,'stale'),'--review',join(root,'review.json')],1);
+console.log(JSON.stringify({pass:true,evidence:root}));

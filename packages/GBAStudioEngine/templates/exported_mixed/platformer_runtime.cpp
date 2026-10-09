@@ -1,0 +1,8 @@
+#define GBS_PLATFORMER_PROJECT_DATA_HEADER "platformer_project_data.hpp"
+#define GBS_PLATFORMER_RUNTIME_ENTRY gbs_run_platformer
+#define GBS_PLATFORMER_RUNTIME_ENTER gbs_enter_platformer
+#define GBS_PLATFORMER_RUNTIME_UPDATE gbs_update_platformer
+#define GBS_PLATFORMER_RUNTIME_RENDER gbs_render_platformer
+#define GBS_PLATFORMER_RUNTIME_LEAVE gbs_leave_platformer
+#define GBS_MULTI_RUNTIME 1
+#include "platformer_runtime.inc"

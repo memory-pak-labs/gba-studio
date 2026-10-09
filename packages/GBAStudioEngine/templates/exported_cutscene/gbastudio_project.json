@@ -1,0 +1,38 @@
+{
+  "schema": 1,
+  "backend": "gbastudio_engine",
+  "kind": "cutscene",
+  "runtime_profile": "cutscene",
+  "runtime_adapter": {
+    "base_runtime": "cutscene",
+    "adapter": "native",
+    "project_block": "cutscene_project",
+    "native": true
+  },
+  "entry": "main.cpp",
+  "project_data": "cutscene_project_data.hpp",
+  "generated_assets": [],
+  "build": {
+    "target": "exported_cutscene",
+    "make_target": "all"
+  },
+  "requires": {
+    "engine_pack": ">=1.59.0",
+    "features": [
+      "cutscene_runtime",
+      "engine_sdk.cutscene_project_data_contract",
+      "asset-export-cutscene-project-data",
+      "cutscene_branch_steps",
+      "cutscene_step_skip_control",
+      "cutscene_wait_for_dialogue",
+      "cutscene_save_data",
+      "cutscene_autosave_slot0",
+      "cutscene_hud_scene_step",
+      "save.export_project_config",
+      "asset-export-runtime-profile-manifest",
+      "runtime_profiles.cutscene_native_contract",
+      "dialogue.visual_box",
+      "events.progressive_event_runner"
+    ]
+  }
+}

@@ -1,0 +1,50 @@
+{
+  "schema": 1,
+  "backend": "gbastudio_engine",
+  "kind": "dungeon_crawler",
+  "runtime_profile": "dungeon_crawler",
+  "template_dir": "../../templates/exported_dungeon_crawler",
+  "entry": "main.cpp",
+  "project_data": "dungeon_crawler_project_data.hpp",
+  "generated_assets": [],
+  "build": {
+    "target": "dungeon_crawler_fixture",
+    "make_target": "all"
+  },
+  "requires": {
+    "engine_pack": ">=2.24.0",
+    "features": [
+      "dungeon_crawler_runtime",
+      "engine_sdk.dungeon_crawler_project_data_contract"
+    ]
+  },
+  "dungeon_crawler_project": {
+    "initial_room": 0,
+    "rooms": [
+      {
+        "name": "crypt",
+        "width_tiles": 5,
+        "height_tiles": 5,
+        "collision_flags": [
+          1, 1, 1, 1, 1,
+          1, 0, 0, 1, 1,
+          1, 0, 1, 0, 1,
+          1, 0, 0, 0, 1,
+          1, 1, 1, 1, 1
+        ],
+        "config": {
+          "step_duration_frames": 12,
+          "turn_duration_frames": 6,
+          "allow_backstep": false,
+          "view_distance": 7
+        },
+        "player_start": {
+          "x": 1,
+          "y": 1,
+          "direction": "east"
+        }
+      }
+    ],
+    "dialogue_lines": []
+  }
+}

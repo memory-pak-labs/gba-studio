@@ -1,0 +1,262 @@
+{
+  "name": "@gbastudio/desktop-electron",
+  "version": "0.1.0-beta.3",
+  "private": true,
+  "description": "Visual editor and native engine workflow for Game Boy Advance games.",
+  "author": "GBA Studio",
+  "homepage": "https://github.com/memory-pak-labs/gba-studio",
+  "type": "module",
+  "main": "dist/main/main.js",
+  "scripts": {
+    "dev": "electron-vite dev",
+    "dev:real-project": "GBA_STUDIO_OPEN_PROJECT=default-assets/templates/exemplo-gba/exemplo-gba.gba-project electron-vite dev",
+    "build": "npm run typecheck && electron-vite build",
+    "build:mgba-web": "node scripts/build-mgba-web-core.mjs",
+    "build:menu-flow-canary": "node scripts/build-menu-flow-canary.mjs",
+    "check:dev": "node scripts/electron-dev-workflow.mjs --profile quick",
+    "check:toolchain": "node scripts/check-gba-toolchain.mjs",
+    "icons": "node scripts/generate-icons.mjs",
+    "prepare:embedded-runtime": "node scripts/prepare-embedded-runtime.mjs",
+    "prepare:embedded-runtime:compact": "GBA_STUDIO_RUNTIME_PROFILE=compact node scripts/prepare-embedded-runtime.mjs",
+    "prepare:embedded-runtime:universal": "GBA_STUDIO_REQUIRE_UNIVERSAL_RUNTIME=1 node scripts/prepare-embedded-runtime.mjs",
+    "verify:macos-universal-runtime": "node scripts/verify-macos-universal-runtime.mjs",
+    "prepare:translation-models": "node scripts/prepare-translation-models.mjs",
+    "audit:i18n-coverage": "node scripts/report-i18n-coverage.mjs",
+    "audit:p0-sources": "node scripts/audit-p0-sources.mjs",
+    "audit:p0-sources:strict": "node scripts/audit-p0-sources.mjs --strict",
+    "package": "npm run icons && npm run prepare:translation-models && npm run build && npm run prepare:embedded-runtime && node scripts/prepare-package-output.mjs && electron-builder --dir && node scripts/sign-macos-app.mjs",
+    "package:mac:compact": "npm run icons && npm run prepare:translation-models && npm run build && npm run prepare:embedded-runtime:compact && node scripts/prepare-package-output.mjs && electron-builder --dir --arm64 && node scripts/sign-macos-app.mjs",
+    "package:mac:offline": "npm run icons && npm run prepare:translation-models && npm run build && npm run prepare:embedded-runtime && node scripts/prepare-package-output.mjs && electron-builder --dir && node scripts/sign-macos-app.mjs",
+    "dist": "npm run icons && npm run build && electron-builder",
+    "dist:linux": "npm run icons && npm run build && electron-builder --linux",
+    "package:mac:universal": "npm run icons && npm run prepare:translation-models && npm run build && npm run prepare:embedded-runtime:universal && npm run verify:macos-universal-runtime && node scripts/prepare-package-output.mjs && electron-builder --dir --universal && node scripts/sign-macos-app.mjs",
+    "dist:mac": "npm run icons && npm run prepare:translation-models && npm run build && npm run prepare:embedded-runtime:universal && npm run verify:macos-universal-runtime && electron-builder --mac --universal",
+    "dist:win": "npm run icons && npm run build && electron-builder --win",
+    "preview": "electron-vite preview",
+    "mcp": "electron . --mcp",
+    "smoke:mcp": "npm run build && node scripts/smoke-mcp-stdio.mjs",
+    "smoke:welcome": "npm run build && node scripts/smoke-electron-welcome.mjs",
+    "smoke:package": "npm run package && node scripts/smoke-macos-app-bundle.mjs && node scripts/smoke-electron-exemplo-template.mjs --packaged && node scripts/smoke-electron-welcome.mjs --packaged",
+    "smoke:ci-artifacts": "node scripts/validate-ci-artifacts.mjs",
+    "smoke:visual": "npm run smoke:visual:responsive",
+    "smoke:visual:responsive": "npm run build && node scripts/smoke-responsive-visual.mjs",
+    "smoke:engine-rom": "node scripts/smoke-engine-rom.mjs",
+    "smoke:play-window": "node scripts/smoke-play-window.mjs",
+    "smoke:author-stress-rom": "node scripts/smoke-author-stress-rom.mjs",
+    "smoke:events-runtime-export": "node scripts/smoke-events-runtime-export.mjs",
+    "smoke:sprites-runtime-export": "node scripts/smoke-sprites-runtime-export.mjs",
+    "smoke:audio-runtime-export": "node scripts/smoke-audio-runtime-export.mjs",
+    "smoke:rooms-runtime-export": "node scripts/smoke-rooms-runtime-export.mjs",
+    "materialize:technical-fixture": "node scripts/materialize-functional-p0-fixture.mjs",
+    "dev:technical-fixture": "GBA_STUDIO_OPEN_PROJECT=fixtures/electron-p0-playtest.gba-project electron-vite dev",
+    "smoke:technical-fixture": "node scripts/smoke-functional-p0.mjs",
+    "smoke:technical-fixture:e2e": "node scripts/smoke-functional-p0-e2e.mjs --allow-technical-fixture",
+    "smoke:technical-fixture:preview": "node scripts/smoke-preview-p0.mjs",
+    "smoke:technical-fixture:preview:visual": "node scripts/smoke-preview-p0-visual.mjs",
+    "smoke:technical-fixture:rom": "node scripts/smoke-engine-rom-p0.mjs",
+    "verify:technical-fixture:rom": "node scripts/verify-engine-rom-p0-playtest.mjs",
+    "materialize:technical-p0": "npm run materialize:technical-fixture",
+    "dev:technical-p0": "npm run dev:technical-fixture",
+    "smoke:technical-p0": "npm run smoke:technical-fixture",
+    "smoke:technical-p0:e2e": "npm run smoke:technical-fixture:e2e",
+    "smoke:technical-p0:preview": "npm run smoke:technical-fixture:preview",
+    "smoke:technical-p0:preview:visual": "npm run smoke:technical-fixture:preview:visual",
+    "smoke:technical-p0:rom": "npm run smoke:technical-fixture:rom",
+    "verify:technical-p0:rom": "npm run verify:technical-fixture:rom",
+    "smoke:exemplo-template": "npm run build && node scripts/smoke-electron-exemplo-template.mjs",
+    "smoke:structural-fixture": "npx tsx scripts/smoke-complete-project-structural-fixture.ts",
+    "materialize:structural-fixture": "npx tsx scripts/materialize-complete-project-structural-fixture.ts",
+    "smoke:exemplo-structural-fixture": "npm run smoke:structural-fixture",
+    "materialize:exemplo-structural-fixture": "npm run materialize:structural-fixture",
+    "smoke:template-hardware-soak": "npx tsx scripts/smoke-hardware-template.ts",
+    "smoke:template-hardware-soak:stress": "npx tsx scripts/smoke-hardware-template.ts --stress",
+    "smoke:template-hardware-soak:20m": "npm run build && npx tsx scripts/smoke-hardware-template.ts --soak-minutes=20",
+    "smoke:exemplo-scenes": "npm run build && node scripts/smoke-electron-exemplo-scenes.mjs",
+    "smoke:p0": "npm run audit:p0-sources:strict && npm run smoke:exemplo-template",
+    "smoke:p0:scenes": "npm run audit:p0-sources:strict && npm run smoke:exemplo-scenes",
+    "smoke:canonical-transition": "node scripts/smoke-canonical-transition.mjs",
+    "smoke:visual-transition": "node scripts/smoke-visual-transition.mjs",
+    "smoke:p0:transition": "npm run smoke:canonical-transition",
+    "smoke:isometric-editor": "npm run build && node scripts/smoke-isometric-editor.mjs",
+    "smoke:isometric-market-stability": "npm run build && node scripts/smoke-isometric-market-stability.mjs",
+    "smoke:exemplo-scene-user": "npm run build && node scripts/smoke-exemplo-scene-user.mjs",
+    "smoke:exemplo-scenes:soak": "npm run build && node scripts/smoke-electron-exemplo-scenes.mjs --soak-minutes=20",
+    "smoke:exemplo-scenes:isolated": "npm run build && node scripts/smoke-electron-exemplo-scenes-isolated.mjs",
+    "smoke:exemplo-interface-scenes:isolated": "npm run build && node scripts/smoke-electron-exemplo-scenes-isolated.mjs --interfaces",
+    "smoke:itch-export": "npm run build && node scripts/smoke-itch-export.mjs",
+    "smoke:projects": "node scripts/smoke-real-projects.mjs",
+    "review:visual": "node scripts/build-visual-review-board.mjs",
+    "report:scene-matrix": "node scripts/exemplo-gba-scene-matrix.mjs",
+    "audit:macos-pilot": "node scripts/audit-macos-pilot-readiness.mjs",
+    "audit:gb-studio-sprites": "node scripts/audit-gb-studio-sprites.mjs",
+    "audit:functional-parity": "node scripts/audit-functional-parity.mjs",
+    "audit:real-project": "node scripts/audit-real-project-readiness.mjs",
+    "audit:macos-signing": "node scripts/audit-macos-signing-readiness.mjs",
+    "audit:cross-platform": "node scripts/audit-cross-platform-package-config.mjs",
+    "gate:electron": "node scripts/electron-dev-workflow.mjs --profile readiness",
+    "gate:complete-project": "node scripts/electron-dev-workflow.mjs --profile complete-project",
+    "verify": "node scripts/electron-dev-workflow.mjs --profile verify",
+    "benchmark:incremental-cache": "node scripts/benchmark-incremental-cache.mjs",
+    "gate:audio-acoustic": "vitest run src/shared/completeProjectAudioAcoustic.test.ts",
+    "gate:electron:dry-run": "node scripts/electron-dev-workflow.mjs --profile readiness --dry-run",
+    "gate:macos-pilot": "node scripts/gate-macos-pilot.mjs",
+    "test:iteration": "vitest run src/shared/projectFile.test.ts src/shared/filesWorkspace.test.ts src/shared/eventsWorkspace.test.ts src/main/exportEngineProject.test.ts src/main/launchProject.test.ts src/main/gbStudioExampleImport.integration.test.ts src/shared/realProjectsSmoke.test.ts src/shared/canonicalProjectIntegrity.test.ts",
+    "test:example-acceptance": "vitest run src/main/gbStudioExampleContent.acceptance.test.ts scripts/exemplo-gba-campaign.test.mjs scripts/world-map-affine-acceptance.test.mjs",
+    "test:promotions": "vitest run scripts/*-promotion.test.mjs",
+    "test:all": "vitest run",
+    "check:iteration": "npm run typecheck && npm run test:iteration && npm run audit:p0-sources",
+    "test": "vitest run --exclude 'scripts/*-promotion.test.mjs' --exclude 'scripts/exemplo-gba-campaign.test.mjs' --exclude 'scripts/world-map-affine-acceptance.test.mjs' --exclude 'src/main/gbStudioExampleContent.acceptance.test.ts'",
+    "test:tools": "node scripts/test-tools.mjs",
+    "typecheck": "tsc --noEmit -p tsconfig.node.json && tsc --noEmit -p tsconfig.web.json",
+    "verify:mgba-web": "node scripts/verify-mgba-web-core.mjs",
+    "play:mgba-native": "node scripts/open-mgba-native.mjs",
+    "verify:mgba-av": "node scripts/verify-mgba-final.mjs"
+  },
+  "build": {
+    "afterPack": "./scripts/after-pack-macos.mjs",
+    "appId": "br.com.gbastudio.desktop",
+    "productName": "GBA Studio",
+    "executableName": "gba-studio",
+    "icon": "build/icon",
+    "directories": {
+      "buildResources": "build",
+      "output": "release"
+    },
+    "files": [
+      "dist/**",
+      "default-assets/**",
+      "package.json",
+      "!node_modules/**/{test,tests,__tests__,fixtures}/**",
+      "!node_modules/**/*.test.*"
+    ],
+    "extraResources": [
+      {
+        "from": "static/WebPlayer",
+        "to": "WebPlayer",
+        "filter": [
+          "**/*"
+        ]
+      }
+    ],
+    "fileAssociations": [
+      {
+        "ext": "gbastudio",
+        "name": "GBA Studio Legacy Project",
+        "description": "GBA Studio legacy project file",
+        "icon": "build/file-gbastudio",
+        "role": "Editor"
+      },
+      {
+        "ext": "gba-project",
+        "name": "GBA Studio Project",
+        "description": "GBA Studio project file",
+        "icon": "build/file-gbastudio",
+        "role": "Editor"
+      },
+      {
+        "ext": "gbsproj",
+        "name": "GB Studio Source Project",
+        "description": "GB Studio project imported into GBA Studio",
+        "icon": "build/file-gbastudio",
+        "role": "Editor"
+      }
+    ],
+    "mac": {
+      "bundleShortVersion": "0.1.0",
+      "bundleVersion": "3",
+      "category": "public.app-category.developer-tools",
+      "icon": "build/icon.icns",
+      "hardenedRuntime": true,
+      "entitlements": "build/entitlements.mac.plist",
+      "entitlementsInherit": "build/entitlements.mac.inherit.plist",
+      "extraResources": [
+        {
+          "from": "build/embedded-runtime",
+          "to": ".",
+          "filter": [
+            "**/*"
+          ]
+        }
+      ],
+      "target": [
+        "dmg",
+        "zip"
+      ]
+    },
+    "win": {
+      "icon": "build/icon.ico",
+      "target": [
+        "nsis",
+        "zip"
+      ]
+    },
+    "linux": {
+      "category": "Development",
+      "icon": "build/icon.png",
+      "maintainer": "GBA Studio Team",
+      "artifactName": "GBA-Studio-${version}-linux-${arch}.${ext}",
+      "target": [
+        "AppImage",
+        "deb",
+        "tar.gz"
+      ]
+    }
+  },
+  "dependencies": {
+    "@browsermt/bergamot-translator": "^0.4.9",
+    "@modelcontextprotocol/server": "^2.0.0",
+    "lucide-react": "^0.468.0",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "zod": "^4.4.3"
+  },
+  "devDependencies": {
+    "@electron/osx-sign": "^2.6.0",
+    "@testing-library/jest-dom": "^6.9.1",
+    "@testing-library/react": "^16.3.2",
+    "@testing-library/user-event": "^14.6.1",
+    "@types/node": "^22.10.2",
+    "@types/react": "^18.3.17",
+    "@types/react-dom": "^18.3.5",
+    "@vitejs/plugin-react": "^5.1.4",
+    "electron": "^43.7.9",
+    "electron-builder": "^26.17.0",
+    "electron-vite": "^5.0.0",
+    "happy-dom": "^20.10.6",
+    "typescript": "^5.7.2",
+    "vite": "^7.3.6",
+    "vitest": "^4.1.11"
+  },
+  "overrides": {
+    "minimatch@3.1.5": {
+      "brace-expansion": "1.1.21"
+    },
+    "minimatch@5.1.9": {
+      "brace-expansion": "2.1.7"
+    },
+    "minimatch@9.0.9": {
+      "brace-expansion": "2.1.7"
+    },
+    "minimatch@10.2.5": {
+      "brace-expansion": "5.0.12"
+    },
+    "fast-uri": "3.1.8",
+    "js-yaml": "4.3.2",
+    "nanoid": "3.3.18",
+    "postcss": "8.5.23",
+    "tar": "7.5.21",
+    "@electron/get": {
+      ".": "5.0.0",
+      "undici": "7.30.0"
+    },
+    "node-gyp": {
+      "undici": "6.29.0"
+    }
+  },
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/memory-pak-labs/gba-studio.git",
+    "directory": "apps/desktop-electron"
+  }
+}

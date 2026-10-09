@@ -1,0 +1,48 @@
+{
+  "id": "gbastudio/farol-data",
+  "type": "dataTablePack",
+  "version": "1.0.0",
+  "gbaStudioVersion": ">=0.1.0",
+  "name": "Dados de gameplay do Farol",
+  "author": "GBA Studio",
+  "description": "Tabelas canônicas usadas pelos eventos, pelo Preview e pela ROM do projeto Farol.",
+  "dataTables": [
+    {
+      "id": "guardiao_rele",
+      "label": "Atributos do Guardião do Relé",
+      "columns": [
+        {
+          "variable": "max_hp"
+        },
+        {
+          "variable": "attack"
+        },
+        {
+          "variable": "defense"
+        },
+        {
+          "variable": "speed"
+        },
+        {
+          "variable": "reward_gold"
+        },
+        {
+          "variable": "reward_experience"
+        }
+      ],
+      "rows": [
+        {
+          "label": "Autômato do relé",
+          "values": [
+            40,
+            7,
+            3,
+            5,
+            40,
+            25
+          ]
+        }
+      ]
+    }
+  ]
+}

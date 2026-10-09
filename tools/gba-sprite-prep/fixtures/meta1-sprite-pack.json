@@ -1,0 +1,40 @@
+{
+  "schemaVersion": 1,
+  "name": "meta1-npc",
+  "source": "../pilot/assets/tiny-dungeon-npc.png",
+  "profile": "topdown",
+  "animations": [
+    {
+      "name": "idle_down",
+      "state": "idle",
+      "direction": "down",
+      "fps": 8,
+      "loops": true,
+      "frames": [0]
+    },
+    {
+      "name": "walk_down",
+      "state": "walk",
+      "direction": "down",
+      "fps": 10,
+      "loops": true,
+      "frames": [0]
+    },
+    {
+      "name": "attack_down",
+      "state": "attack",
+      "direction": "down",
+      "fps": 12,
+      "loops": false,
+      "frames": [0]
+    },
+    {
+      "name": "hurt_down",
+      "state": "hurt",
+      "direction": "down",
+      "fps": 6,
+      "loops": false,
+      "frames": [0]
+    }
+  ]
+}

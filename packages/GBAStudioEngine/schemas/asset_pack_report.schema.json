@@ -1,0 +1,287 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://gbastudio.local/schemas/asset_pack_report.schema.json",
+  "title": "GBAStudio Engine asset pack report",
+  "type": "object",
+  "additionalProperties": true,
+  "required": [
+    "schema",
+    "kind",
+    "ok",
+    "stress_profile",
+    "asset_count",
+    "budgets",
+    "production_summary",
+    "production_profile",
+    "asset_reports",
+    "pool_reports",
+    "room_pressure_report",
+    "template_pressure_report",
+    "split_recommendations",
+    "compression_candidates",
+    "diagnostics",
+    "errors"
+  ],
+  "properties": {
+    "schema": {
+      "const": 11
+    },
+    "kind": {
+      "const": "GBAStudioAssetPackReport"
+    },
+    "ok": {
+      "type": "boolean"
+    },
+    "stress_profile": {
+      "type": "string",
+      "minLength": 1
+    },
+    "asset_count": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "budgets": {
+      "type": "object"
+    },
+    "production_summary": {
+      "type": "object",
+      "required": [
+        "ready_for_large_project",
+        "required_asset_count",
+        "optional_omitted_count",
+        "split_recommendation_count",
+        "compression_candidate_count",
+        "blocking_overflow_count"
+      ],
+      "properties": {
+        "ready_for_large_project": {
+          "type": "boolean"
+        },
+        "required_asset_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "optional_omitted_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "split_recommendation_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "compression_candidate_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "blocking_overflow_count": {
+          "type": "integer",
+          "minimum": 0
+        }
+      },
+      "additionalProperties": true
+    },
+    "production_profile": {
+      "type": "object",
+      "required": [
+        "id",
+        "schema",
+        "severity",
+        "ready_for_beta_export",
+        "ready_for_primary_backend",
+        "backend_policy",
+        "templates",
+        "template_limits",
+        "pressure_gates",
+        "ui_actions",
+        "ui_action_count",
+        "manual_validation_required"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "schema": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "severity": {
+          "enum": [
+            "ok",
+            "warning",
+            "error"
+          ]
+        },
+        "ready_for_beta_export": {
+          "type": "boolean"
+        },
+        "ready_for_primary_backend": {
+          "type": "boolean"
+        },
+        "backend_policy": {
+          "const": "parallel_until_manual_promotion"
+        },
+        "templates": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "template_limits": {
+          "type": "object"
+        },
+        "pressure_gates": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/pressureGate"
+          }
+        },
+        "ui_actions": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/uiAction"
+          }
+        },
+        "ui_action_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "manual_validation_required": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      },
+      "additionalProperties": true
+    },
+    "asset_reports": {
+      "type": "object"
+    },
+    "pool_reports": {
+      "type": "object"
+    },
+    "catalog_pressure_report": {
+      "type": "array"
+    },
+    "resident_sets": {
+      "type": "array"
+    },
+    "resident_pressure_report": {
+      "type": "array"
+    },
+    "room_pressure_report": {
+      "type": "array"
+    },
+    "template_pressure_report": {
+      "type": "array"
+    },
+    "split_recommendations": {
+      "type": "array"
+    },
+    "compression_candidates": {
+      "type": "array"
+    },
+    "physical_budget": {
+      "type": "object",
+      "required": [
+        "schema",
+        "audio_bytes_by_item"
+      ],
+      "properties": {
+        "schema": {
+          "const": 1
+        },
+        "audio_bytes_by_item": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "integer",
+            "minimum": 0
+          }
+        }
+      },
+      "additionalProperties": true
+    },
+    "diagnostics": {
+      "type": "array"
+    },
+    "errors": {
+      "type": "array"
+    }
+  },
+  "$defs": {
+    "pressureGate": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": [
+        "scope",
+        "name",
+        "template",
+        "severity",
+        "risk_score",
+        "pressure"
+      ],
+      "properties": {
+        "scope": {
+          "type": "string",
+          "minLength": 1
+        },
+        "name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "template": {
+          "type": "string",
+          "minLength": 1
+        },
+        "severity": {
+          "enum": [
+            "ok",
+            "warning",
+            "error"
+          ]
+        },
+        "risk_score": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "pressure": {
+          "type": "array"
+        }
+      }
+    },
+    "uiAction": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": [
+        "id",
+        "severity",
+        "scope",
+        "action"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "severity": {
+          "enum": [
+            "info",
+            "warning",
+            "error"
+          ]
+        },
+        "scope": {
+          "type": "string",
+          "minLength": 1
+        },
+        "action": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    }
+  }
+}

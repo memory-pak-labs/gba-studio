@@ -1,0 +1,25 @@
+import assert from 'node:assert/strict';
+import { spawnSync } from 'node:child_process';
+import { mkdtemp, readFile, writeFile, cp } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
+assert(process.argv[2]&&process.argv[3],'Informe ROM e plano JSON.');
+const rom=resolve(process.argv[2]),plan=resolve(process.argv[3]);
+const root=await mkdtemp(join(tmpdir(),'gba-gameplay-smoke-'));
+const cli=fileURLToPath(new URL('./explore-gameplay.mjs',import.meta.url));
+function run(args,expected=0){const result=spawnSync(process.execPath,[cli,'--rom',rom,...args],{encoding:'utf8',timeout:50000,env:{...process.env,GBA_STUDIO_JEV_ENABLED:'0',TYPESAFE_API_KEY:''}});assert.equal(result.status,expected,result.stdout+result.stderr);return result;}
+run(['--plan',plan,'--out',join(root,'first'),'--jev']);
+const first=JSON.parse(await readFile(join(root,'first/report.json'),'utf8'));
+assert.equal(first.reproduced,true);assert.equal(first.apiCalls,0);
+run(['--replay',join(root,'first'),'--out',join(root,'second')]);
+const second=JSON.parse(await readFile(join(root,'second/report.json'),'utf8'));
+assert.deepEqual(second.trace,first.trace);
+const reportBefore=await readFile(join(root,'first/report.json'),'utf8');
+run(['--plan',plan,'--out',join(root,'first')],1);
+assert.equal(await readFile(join(root,'first/report.json'),'utf8'),reportBefore);
+await cp(join(root,'first'),join(root,'tampered'),{recursive:true});
+const state=await readFile(join(root,'tampered/initial.state'));state[0]^=1;await writeFile(join(root,'tampered/initial.state'),state);
+run(['--replay',join(root,'tampered'),'--out',join(root,'rejected')],2);
+assert.equal(JSON.parse(await readFile(join(root,'rejected/failure.json'),'utf8')).code,'replay-initial-hash');
+console.log(JSON.stringify({pass:true,frames:first.inputs.length,findings:first.findings,evidence:root},null,2));

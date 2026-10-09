@@ -1,0 +1,358 @@
+.project-health-workspace {
+  background: transparent;
+  display: grid;
+  gap: var(--studio-space-4);
+  grid-column: 1 / -1;
+  min-height: calc(100vh - 112px);
+  min-width: 0;
+}
+
+.project-health-workspace.embedded {
+  min-height: auto;
+}
+
+.health-header {
+  align-items: center;
+  display: flex;
+  gap: var(--studio-space-4);
+  justify-content: space-between;
+  min-height: 38px;
+}
+
+.health-header h3,
+.health-header p {
+  margin: 0;
+}
+
+.health-header p {
+  color: var(--studio-color-text-secondary);
+  margin-top: var(--studio-space-1);
+}
+
+.project-health-status {
+  align-items: center;
+  border: 1px solid var(--studio-color-border);
+  border-radius: var(--studio-radius-pill);
+  display: inline-flex;
+  gap: var(--studio-space-2);
+  padding: var(--studio-space-2) var(--studio-space-3);
+}
+
+.project-health-status.ready {
+  background: var(--studio-color-ok-bg);
+  border-color: var(--studio-color-ok-border);
+  color: var(--studio-color-ok-text);
+}
+
+.project-health-status.warning {
+  background: var(--studio-color-warning-bg);
+  border-color: var(--studio-color-warning-border);
+  color: var(--studio-color-warning-text);
+}
+
+.project-health-status.blocked {
+  background: var(--studio-color-danger-bg);
+  border-color: var(--studio-color-danger-border);
+  color: var(--studio-color-danger-text);
+}
+
+.project-health-summary-grid {
+  display: grid;
+  gap: var(--studio-space-3);
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.project-health-summary-card {
+  background: var(--studio-color-surface);
+  border: 1px solid var(--studio-color-border);
+  border-radius: var(--studio-radius-panel);
+  display: grid;
+  gap: var(--studio-space-1);
+  min-height: 70px;
+  padding: var(--studio-space-3) var(--studio-space-4);
+}
+
+.project-health-summary-card span,
+.project-health-summary-card small {
+  color: var(--studio-color-text-secondary);
+}
+
+.project-health-summary-card strong {
+  color: var(--studio-color-text-primary);
+  line-height: 1;
+}
+
+.project-health-summary-card.ready {
+  background: var(--studio-color-ok-bg);
+  border-color: var(--studio-color-ok-border);
+}
+
+.project-health-summary-card.warning {
+  background: var(--studio-color-warning-bg);
+  border-color: var(--studio-color-warning-border);
+}
+
+.project-health-summary-card.error {
+  background: var(--studio-color-danger-bg);
+  border-color: var(--studio-color-danger-border);
+}
+
+.project-health-filter-bar {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--studio-space-2);
+}
+
+.project-health-filter-bar > span {
+  color: var(--studio-color-text-secondary);
+  margin-right: var(--studio-space-1);
+}
+
+.project-health-layout {
+  align-items: start;
+  display: grid;
+  gap: var(--studio-space-4);
+  grid-template-columns: minmax(280px, 0.85fr) minmax(0, 1.4fr);
+  min-width: 0;
+}
+
+.project-health-panel {
+  background: var(--studio-color-surface);
+  border: 1px solid var(--studio-color-border);
+  border-radius: var(--studio-radius-panel);
+  display: grid;
+  gap: var(--studio-space-3);
+  min-width: 0;
+  padding: var(--studio-space-4);
+}
+
+.project-health-panel-header {
+  align-items: start;
+  color: var(--studio-color-text-secondary);
+  display: flex;
+  gap: var(--studio-space-3);
+  justify-content: space-between;
+}
+
+.project-health-panel-header h4,
+.project-health-panel-header p {
+  margin: 0;
+}
+
+.project-health-panel-header h4 {
+  color: var(--studio-color-text-primary);
+}
+
+.project-health-panel-header p {
+  margin-top: var(--studio-space-1);
+}
+
+.project-health-diagnostic-list,
+.project-health-scene-list {
+  display: grid;
+  gap: var(--studio-space-2);
+  min-width: 0;
+}
+
+.project-health-diagnostic {
+  align-items: center;
+  background: var(--studio-color-surface-muted);
+  border: 1px solid var(--studio-color-border);
+  border-radius: var(--studio-radius-control);
+  color: var(--studio-color-text-primary);
+  display: flex;
+  gap: var(--studio-space-3);
+  min-width: 0;
+  padding: var(--studio-space-3);
+  text-align: left;
+  width: 100%;
+}
+
+.project-health-diagnostic:hover {
+  background: var(--studio-color-surface-hover);
+}
+
+.project-health-diagnostic-icon {
+  align-items: center;
+  display: inline-flex;
+  flex: 0 0 auto;
+}
+
+.project-health-diagnostic.error .project-health-diagnostic-icon { color: var(--studio-color-danger-text); }
+.project-health-diagnostic.warning .project-health-diagnostic-icon { color: var(--studio-color-warning-text); }
+.project-health-diagnostic.info .project-health-diagnostic-icon { color: var(--studio-color-accent); }
+
+.project-health-diagnostic-copy {
+  display: grid;
+  gap: var(--studio-space-1);
+  min-width: 0;
+}
+
+.project-health-diagnostic-copy strong {
+  overflow-wrap: anywhere;
+}
+
+.project-health-diagnostic-copy small {
+  color: var(--studio-color-text-secondary);
+  overflow-wrap: anywhere;
+}
+
+.project-health-empty {
+  color: var(--studio-color-text-secondary);
+  margin: 0;
+  padding: var(--studio-space-4) 0;
+}
+
+.project-health-scene-card {
+  background: var(--studio-color-surface-muted);
+  border: 1px solid var(--studio-color-border);
+  border-radius: var(--studio-radius-control);
+  min-width: 0;
+  overflow: hidden;
+  padding: 0;
+}
+
+.project-health-scene-summary {
+  align-items: center;
+  cursor: pointer;
+  display: flex;
+  gap: var(--studio-space-3);
+  justify-content: space-between;
+  min-width: 0;
+  padding: var(--studio-space-3);
+}
+
+.project-health-scene-summary::-webkit-details-marker {
+  color: var(--studio-color-text-secondary);
+}
+
+.project-health-scene-summary:hover {
+  background: var(--studio-color-surface-hover);
+}
+
+.project-health-scene-details-label {
+  color: var(--studio-color-accent);
+  flex: 0 0 auto;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.project-health-scene-details {
+  border-top: 1px solid var(--studio-color-border);
+  display: grid;
+  gap: var(--studio-space-3);
+  min-width: 0;
+  padding: var(--studio-space-3);
+}
+
+.project-health-scene-preflight {
+  min-width: 0;
+}
+
+.project-health-scene-preflight .scene-preflight-inspector {
+  margin: 0;
+}
+
+.project-health-scene-authoring-diagnostics {
+  display: grid;
+  gap: var(--studio-space-3);
+  min-width: 0;
+}
+
+.project-health-scene-authoring-diagnostics > .room-geometry-diagnostics,
+.project-health-scene-authoring-diagnostics > .room-visual-fidelity {
+  margin: 0;
+}
+
+.project-health-scene-heading {
+  align-items: start;
+  display: flex;
+  gap: var(--studio-space-3);
+  justify-content: space-between;
+  min-width: 0;
+}
+
+.project-health-scene-heading > div {
+  display: grid;
+  gap: var(--studio-space-1);
+  min-width: 0;
+}
+
+.project-health-scene-heading strong {
+  overflow-wrap: anywhere;
+}
+
+.project-health-scene-heading span,
+.project-health-scene-heading small {
+  color: var(--studio-color-text-secondary);
+  overflow-wrap: anywhere;
+}
+
+.project-health-preflight.ready {
+  color: var(--studio-color-ok-text);
+}
+
+.project-health-preflight.review {
+  color: var(--studio-color-warning-text);
+}
+
+.project-health-preflight.blocked {
+  color: var(--studio-color-error-text);
+}
+
+.project-health-scene-type {
+  background: var(--studio-color-accent-soft);
+  border: 1px solid var(--studio-color-accent-border);
+  border-radius: var(--studio-radius-pill);
+  color: var(--studio-color-accent);
+  flex: 0 0 auto;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  padding: var(--studio-space-1) var(--studio-space-2);
+}
+
+.project-health-tags,
+.project-health-budget {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--studio-space-2);
+}
+
+.project-health-tag,
+.project-health-budget span {
+  background: var(--studio-color-surface);
+  border: 1px solid var(--studio-color-border);
+  border-radius: var(--studio-radius-pill);
+  color: var(--studio-color-text-secondary);
+  padding: var(--studio-space-1) var(--studio-space-2);
+}
+
+.project-health-tag.active {
+  background: var(--studio-color-ok-bg);
+  border-color: var(--studio-color-ok-border);
+  color: var(--studio-color-ok-text);
+}
+
+.project-health-budget {
+  border-top: 1px solid var(--studio-color-border);
+  padding-top: var(--studio-space-2);
+}
+
+.project-health-budget span:first-child {
+  background: transparent;
+  border: 0;
+  color: var(--studio-color-text-primary);
+  padding-left: 0;
+}
+
+@media (max-width: 1180px) {
+  .project-health-summary-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .project-health-layout { grid-template-columns: 1fr; }
+}
+
+@media (max-width: 620px) {
+  .project-health-summary-grid { grid-template-columns: 1fr; }
+  .health-header { align-items: start; flex-direction: column; }
+  .project-health-scene-heading { flex-direction: column; }
+  .project-health-scene-type { justify-self: start; }
+}

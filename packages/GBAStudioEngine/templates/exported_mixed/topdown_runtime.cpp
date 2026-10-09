@@ -1,0 +1,8 @@
+#define GBS_TOPDOWN_PROJECT_DATA_HEADER "topdown_project_data.hpp"
+#define GBS_TOPDOWN_RUNTIME_ENTRY gbs_run_topdown
+#define GBS_TOPDOWN_RUNTIME_ENTER gbs_enter_topdown
+#define GBS_TOPDOWN_RUNTIME_UPDATE gbs_update_topdown
+#define GBS_TOPDOWN_RUNTIME_RENDER gbs_render_topdown
+#define GBS_TOPDOWN_RUNTIME_LEAVE gbs_leave_topdown
+#define GBS_MULTI_RUNTIME 1
+#include "topdown_runtime.inc"

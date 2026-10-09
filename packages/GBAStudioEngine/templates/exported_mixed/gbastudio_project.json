@@ -1,0 +1,54 @@
+{
+  "schema": 1,
+  "backend": "gbastudio_engine",
+  "kind": "mixed",
+  "runtime_profile": "mixed",
+  "build": {
+    "target": "exported_mixed",
+    "make_target": "all",
+    "sources": [
+      "main.cpp",
+      "topdown_runtime.cpp",
+      "platformer_runtime.cpp",
+      "isometric_runtime.cpp",
+      "shmup_runtime.cpp",
+      "point_click_runtime.cpp",
+      "dungeon_crawler_runtime.cpp",
+      "racing_runtime.cpp",
+      "cutscene_runtime.cpp",
+      "visual_novel_runtime.cpp",
+      "world_map_runtime.cpp",
+      "battle_rpg_runtime.cpp",
+      "luta_runtime.cpp"
+    ]
+  },
+  "entry": "main.cpp",
+  "project_data": "mixed_project_data.hpp",
+  "runtime_dispatch": {
+    "initial_runtime": "topdown",
+    "initial_room": 0,
+    "runtimes": ["topdown", "platformer", "isometric", "shmup", "point_click", "dungeon_crawler", "racing", "cutscene", "visual_novel", "world_map", "battle_rpg", "luta"],
+    "save": {
+      "enabled": true,
+      "autosave": true,
+      "signature": "GBUS",
+      "slot_capacity": 1024,
+      "slot_count": 3,
+      "offset": 0,
+      "version": 1
+    }
+  },
+  "requires": {
+    "engine_pack": ">=2.24.0",
+    "features": [
+      "runtime_dispatch.mixed",
+      "events.warp_runtime",
+      "isometric_runtime.tactical_core",
+      "save.universal_runtime_envelope",
+      "audio.runtime_bus_volume",
+      "audio.runtime_bus_fade",
+      "audio.runtime_bus_mute_all_profiles",
+      "audio.pcm_sfx_event_options"
+    ]
+  }
+}

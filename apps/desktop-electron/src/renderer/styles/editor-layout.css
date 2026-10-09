@@ -1,0 +1,236 @@
+/* Approved Editor layout. All dimensions describe UI chrome, not game geometry. */
+.work-area:has(.rooms-workspace),
+.rooms-workspace,
+.rooms-editor-layout {
+  min-width: 0;
+  max-width: 100%;
+}
+
+.rooms-editor-layout,
+.rooms-editor-layout:has(.workspace-explorer-rail:not(.is-collapsed)):has(.rooms-side-stack:not(.is-collapsed)) {
+  grid-template-columns: 220px minmax(0, 1fr) min(var(--rooms-inspector-width, 300px), 35vw);
+  min-height: 0;
+  height: 100%;
+  border-radius: 0;
+
+}
+.rooms-editor-layout .editor-project-tabs { gap: 2px; padding: 6px; }
+.rooms-editor-layout .editor-project-tabs button { min-width: 0; padding: 6px 7px; }
+.rooms-editor-layout .project-tree-toolbar { flex-wrap: wrap; gap: 5px; padding: 8px; }
+.rooms-editor-layout .editor-project-search-field { width: 100%; flex: 1 1 100%; min-width: 0; display: flex; align-items: center; gap: 6px; }
+.rooms-editor-layout .editor-project-search-field input { min-width: 0; width: 100%; }
+.rooms-editor-layout .editor-rail-actions { margin-left: auto; }
+.rooms-editor-layout .editor-tree-row { min-height: 28px; gap: 5px; padding-block: 4px; }
+.rooms-editor-layout .editor-tree-row strong {  line-height: 1.35; }
+.rooms-editor-layout .editor-tree-scene-branch > summary { grid-template-columns: 14px 17px minmax(0, 1fr); }
+.rooms-editor-layout .editor-tree-scene-branch > summary:has(input) { grid-template-columns: 14px 14px 17px minmax(0, 1fr); }
+.rooms-editor-layout .scene-tree-selection-checkbox { width: 13px; height: 13px; }
+.rooms-editor-layout .rooms-inspector-context { padding-block: 8px; }
+.rooms-editor-layout .rooms-inspector-header h4 {  line-height: 1.3; }
+.rooms-editor-layout .rooms-inspector-header p {  line-height: 1.4; }
+.rooms-editor-layout .rooms-inspector-header-badges em {  padding: 3px 6px; }
+.rooms-editor-layout .rooms-inspector-tabs { display: flex; flex-wrap: nowrap; min-height: 32px; gap: 4px; align-items: center; }
+.rooms-editor-layout .rooms-inspector-tabs > button { padding: 6px 9px; flex: 0 1 auto; min-height: 30px; }
+.rooms-editor-layout .rooms-inspector-tab-panel { min-width: 0; }
+.rooms-editor-layout .room-overview-scene-actions { display: flex; gap: 6px; margin-top: 10px; }
+.rooms-editor-layout .room-overview-scene-actions button { display: inline-flex; align-items: center; justify-content: center; gap: 5px; min-height: 30px; flex: 1; padding: 5px 8px; }
+.rooms-editor-layout .room-overview-scene-actions .primary-action { background: var(--studio-color-accent); color: var(--studio-color-accent-contrast, #fff); border-color: var(--studio-color-accent); }
+.rooms-editor-layout .room-inspector-scene-return { margin-top: 7px; padding: 4px 7px; min-height: 27px; }
+.rooms-editor-layout .room-scene-hud-summary { padding: 7px 0; gap: 8px; }
+.rooms-editor-layout .scene-inspector-essential-fields { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+.rooms-editor-layout .scene-inspector-essential-fields > label:last-child { grid-column: 1 / -1; }
+.rooms-editor-layout .scene-inspector-health-summary { padding: 6px; }
+.rooms-editor-layout .room-entities-header { flex-wrap: wrap; gap: 5px; }
+.rooms-editor-layout .room-entity-batch-actions { gap: 4px; }
+.rooms-editor-layout .room-selected-entity-inspector { gap: 10px; }
+.rooms-editor-layout .room-entity-step-segment,
+.rooms-editor-layout .room-entity-tool-segment { gap: 3px; }
+.rooms-editor-layout .rooms-canvas-stage { min-height: 0; min-width: 0; position: relative; container-type: inline-size; }
+.rooms-editor-layout .rooms-canvas-stage.has-scene-actions,
+.rooms-editor-layout .rooms-canvas-stage.has-scene-actions.has-focus-minimap { grid-template-columns: 56px minmax(0, 1fr); grid-template-rows: auto minmax(0, 1fr); }
+.rooms-editor-layout .rooms-canvas-stage.has-scene-actions .rooms-editor-secondary-toolbar.workspace-context-toolbar {
+  grid-column: 1 / -1; grid-row: 1; padding: 5px 30px 5px 8px; background: var(--studio-color-surface);
+  /* The explorer toggle extends into the canvas in both rail states. */
+  padding-inline-start: calc(var(--workspace-inspector-rail-toggle-width) + 8px);
+  display: grid; grid-template-rows: auto auto; gap: 0;
+  overflow: visible; position: relative; z-index: 55; min-width: 0;
+}
+.rooms-editor-layout .rooms-editor-secondary-toolbar-primary { height: 34px; flex: 1; overflow: visible; gap: 8px; min-width: 0; }
+.rooms-editor-layout .rooms-canvas-stage.has-scene-actions .rooms-editor-secondary-toolbar-tools {
+  grid-row: 2; height: auto; width: 100%; padding-block: 6px 2px; margin-top: 5px;
+  border-top: 1px solid var(--studio-color-border); overflow-x: auto; overflow-y: hidden;
+  flex-wrap: nowrap; scrollbar-width: thin;
+}
+.rooms-editor-layout .room-context-tool-label {
+  flex: 0 0 auto; padding: 5px 8px; border-radius: var(--studio-radius-control);
+  background: var(--studio-control-primary-bg); color: var(--studio-control-primary-text);
+}
+.rooms-editor-layout .hud-canvas-toolbar { gap: 6px; }
+.rooms-editor-layout .hud-canvas-toolbar button { display: inline-flex; align-items: center; gap: 6px; padding-inline: 8px; }
+.rooms-editor-layout .hud-canvas-toolbar button[aria-pressed="true"] {
+  background: var(--studio-color-accent-soft); color: var(--studio-color-accent); border-color: var(--studio-color-accent);
+}
+.hud-canvas-toolbar-divider { height: 22px; border-left: 1px solid var(--studio-color-border); margin-inline: 3px; }
+.rooms-editor-layout .rooms-editor-scene-actions { display: flex; align-items: center; min-width: 0; gap: 8px; flex: 1; }
+.rooms-editor-layout .rooms-canvas-stage.has-scene-actions .rooms-editor-scene-actions-title { display: block; min-width: 0; max-width: 130px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--studio-color-text-primary); }
+.rooms-editor-layout .rooms-editor-scene-actions-buttons { display: flex; align-items: center; gap: 6px; flex-wrap: nowrap; margin-left: auto; min-width: 0; }
+.rooms-editor-layout .room-test-start-control {  min-width: 0; }
+.rooms-editor-layout .room-test-start-control select { width: 180px; min-width: 0; max-width: 220px; border-radius: 5px; }
+.rooms-editor-layout .rooms-editor-scene-overview-button,
+.rooms-editor-layout .rooms-editor-test-scene-button { width: auto; min-width: 28px; padding-inline: 8px; flex: 0 0 auto; }
+.rooms-editor-layout .rooms-editor-scene-overview-button > span,
+.rooms-editor-layout .rooms-editor-test-scene-button > span { display: inline; }
+.rooms-editor-layout .rooms-editor-test-scene-button { background: var(--studio-color-accent); color: var(--studio-color-accent-contrast, #fff); border-color: var(--studio-color-accent); }
+.rooms-editor-layout .rooms-canvas-stage.has-scene-actions .room-editor-tool-rail.is-scene-focus {
+  position: relative; left: auto; top: auto; grid-column: 1; grid-row: 2;
+  width: 100%; height: 100%; padding: 8px 6px; min-height: 0;
+  border: 0; border-right: 1px solid var(--studio-color-border); border-radius: 0;
+  background: var(--studio-color-surface); box-shadow: none; z-index: 45;
+}
+.rooms-editor-layout .room-editor-tool-rail.is-scene-focus .room-editor-tool-rail-stack { gap: 4px; }
+.rooms-editor-layout .rooms-canvas-stage.has-scene-actions .rooms-canvas-viewport-host.is-focused-scene {
+  grid-column: 2; grid-row: 2; display: flex; min-height: 0; flex-direction: column; align-items: center; overflow: hidden;
+}
+.rooms-editor-layout .rooms-canvas-viewport-host.is-focused-scene .rooms-canvas-world-scroll {
+  flex: 0 0 auto; min-height: 0; max-height: none; max-width: 100%; border-radius: 0;
+  scrollbar-width: none;
+}
+.rooms-editor-layout .rooms-canvas-viewport-host.is-focused-scene > .room-scene-navigation { margin-top: auto; }
+.rooms-editor-layout .room-scene-navigation {
+  display: flex; align-items: center; flex: 0 0 38px; box-sizing: border-box;
+  min-height: 38px; width: 100%; gap: 8px; padding: 3px 8px; overflow: visible;
+  position: relative; z-index: 50; background: var(--studio-color-surface);
+}
+.rooms-editor-layout .room-scene-navigation-size {  color: var(--studio-color-text-secondary); white-space: nowrap; margin-right: auto; }
+.rooms-editor-layout .room-scene-navigation .room-canvas-layer-toolbar { display: flex; flex: 0 0 auto; width: auto; gap: 5px; overflow: visible; }
+.rooms-editor-layout .room-scene-navigation-zoom { gap: 3px; }
+.rooms-editor-layout .room-scene-navigation-zoom strong { min-width: 35px; }
+.rooms-editor-layout .room-scene-navigation button { min-height: 28px; height: 28px; }
+.rooms-editor-layout .room-canvas-minimap-toggle { width: auto; display: flex; align-items: center; gap: 5px; padding: 4px 7px; }
+.rooms-editor-layout .room-focus-minimap-dock { position: absolute; bottom: 50px; right: 12px; z-index: 40; padding: 0; border: 0; background: transparent; }
+.rooms-editor-layout .room-focus-minimap { width: 132px; padding: 2px; gap: 0; border: 1px solid var(--studio-color-border); box-shadow: var(--studio-shadow-sm); }
+.rooms-editor-layout .room-focus-minimap > strong { display: none; }
+.rooms-editor-layout .room-focus-minimap-preview,
+.rooms-editor-layout .room-focus-minimap-preview .room-stage-card-canvas,
+.rooms-editor-layout .room-focus-minimap > button { width: 128px; height: 64px; }
+.rooms-editor-layout .room-focus-minimap > button { inset: 2px; }
+.rooms-editor-layout .room-stage-card-preview-layer { position: absolute; inset: 0; margin: auto; transform: none; }
+.rooms-editor-layout .room-stage-card-footer { white-space: nowrap; overflow: hidden; gap: 4px; }
+.rooms-editor-layout .room-stage-card-dimensions { color: var(--studio-color-text-secondary); }
+.rooms-editor-layout .rooms-canvas-world-scroll.is-scene-map-overview { background-image: radial-gradient(var(--studio-color-border) 1px, transparent 1px); background-size: 20px 20px; }
+.rooms-editor-layout .room-editor-tool-rail.is-scene-map { padding-left: 12px; overflow: visible; }
+.rooms-editor-layout .room-editor-tool-group-add { display: flex; align-items: center; }
+.rooms-editor-layout .room-editor-tool-group-label { display: none; }
+.rooms-editor-layout .room-editor-tool-rail-add { background: var(--studio-color-accent); color: var(--studio-color-accent-contrast, #fff); border-color: var(--studio-color-accent); }
+.rooms-editor-layout .room-arrival-source-label { opacity: 0; transition: opacity 100ms; }
+.rooms-editor-layout .room-scene-event-marker:hover .room-arrival-source-label,
+.rooms-editor-layout .room-scene-event-marker:focus-within .room-arrival-source-label { opacity: 1; }
+.editor-popover { position: relative; flex: 0 0 auto; }
+.editor-popover > summary { list-style: none; display: flex; align-items: center; justify-content: center; gap: 5px; min-height: 28px; box-sizing: border-box; padding: 4px 8px; cursor: pointer; color: var(--studio-color-text-secondary); border: 1px solid var(--studio-color-border); border-radius: 5px; background: var(--studio-color-surface); white-space: nowrap; }
+.editor-popover > summary::-webkit-details-marker { display: none; }
+.editor-popover > summary:focus-visible { outline: 2px solid var(--studio-color-accent); outline-offset: 2px; }
+.editor-popover[open] > summary, .editor-popover.is-active > summary { color: var(--studio-color-accent); border-color: var(--studio-color-accent); }
+.editor-popover-content { position: absolute; top: calc(100% + 5px); right: 0; z-index: 100; padding: 6px; min-width: 180px; max-width: min(70vw, 520px); border: 1px solid var(--studio-color-border); border-radius: 7px; background: var(--studio-color-surface); color: var(--studio-color-text-primary); box-shadow: var(--studio-shadow-sm); }
+.rooms-inspector-more .editor-popover-content { display: grid; gap: 3px; }
+.rooms-inspector-more .editor-popover-content button { width: 100%; justify-content: flex-start; text-align: left; }
+.room-canvas-layers-popover .editor-popover-content { top: auto; bottom: calc(100% + 6px); left: 0; right: auto; min-width: 225px; }
+.room-canvas-layers-popover .room-canvas-layer-controls { display: grid; gap: 3px; }
+.room-canvas-layers-popover .room-canvas-layer-control { display: grid; grid-template-columns: 16px minmax(80px, 1fr) 28px 28px; gap: 6px; align-items: center; }
+.rooms-editor-layout .room-context-tools-popover .editor-popover-content { box-sizing: border-box; width: max-content; max-width: min(480px, calc(100cqw - 48px)); overflow: auto; }
+.rooms-editor-layout .room-context-tools-popover .room-paint-floating-toolbar { width: 100%; min-width: 0; max-width: 100%; }
+.rooms-editor-layout .room-context-tools-popover .room-paint-floating-toolbar-row,
+.rooms-editor-layout .room-context-tools-popover .room-collision-floating-toolbar,
+.rooms-editor-layout .room-context-tools-popover .hud-canvas-toolbar { display: flex; flex-wrap: wrap; max-width: 480px; height: auto; padding: 4px; }
+.rooms-editor-layout .room-context-tools-popover .room-paint-floating-toolbar-row { box-sizing: border-box; width: 100%; max-width: 100%; gap: 8px; }
+@media (max-width: 1200px) {
+  .rooms-editor-layout:has(.workspace-explorer-rail:not(.is-collapsed)):has(.rooms-side-stack:not(.is-collapsed)) { grid-template-columns: 190px minmax(0, 1fr) 270px; }
+  .rooms-editor-layout .rooms-editor-scene-actions-title { display: none !important; }
+  .rooms-editor-layout .room-test-start-control select { width: 130px; }
+  .rooms-editor-layout .rooms-editor-scene-overview-button > span,
+  .rooms-editor-layout .rooms-editor-test-scene-button > span,
+  .rooms-editor-layout .room-canvas-minimap-toggle > span,
+  .rooms-editor-layout .room-scene-navigation-size { display: none; }
+  .rooms-editor-layout .room-scene-navigation .room-canvas-layer-toolbar { margin-right: auto; }
+  .rooms-editor-layout .rooms-inspector-tabs > button { padding-inline: 6px; }
+  .rooms-editor-layout .editor-project-tabs button { padding-inline: 3px; }
+}
+
+/* Preserve collapse and inspector resize without forcing a wide center column. */
+.rooms-editor-layout:has(.workspace-explorer-rail.is-collapsed):has(.rooms-side-stack:not(.is-collapsed)) { grid-template-columns: var(--workspace-explorer-rail-collapsed-width) minmax(0, 1fr) min(var(--rooms-inspector-width, 300px), 35vw); }
+.rooms-editor-layout:has(.workspace-explorer-rail:not(.is-collapsed)):has(.rooms-side-stack.is-collapsed) { grid-template-columns: 220px minmax(0, 1fr) var(--workspace-editor-side-stack-collapsed-width); }
+.rooms-editor-layout:has(.workspace-explorer-rail.is-collapsed):has(.rooms-side-stack.is-collapsed) { grid-template-columns: var(--workspace-explorer-rail-collapsed-width) minmax(0, 1fr) var(--workspace-editor-side-stack-collapsed-width); }
+.rooms-editor-layout:has(.workspace-explorer-rail:not(.is-collapsed)) .rooms-editor-scene-overview-button,
+.rooms-editor-layout:has(.workspace-explorer-rail:not(.is-collapsed)) .rooms-editor-test-scene-button { width: auto; padding-inline: 8px; gap: 5px; }
+.rooms-editor-layout:has(.workspace-explorer-rail:not(.is-collapsed)) .rooms-editor-scene-overview-button > span,
+.rooms-editor-layout:has(.workspace-explorer-rail:not(.is-collapsed)) .rooms-editor-test-scene-button > span { display: inline; }
+@media (max-width: 1200px) {
+ .rooms-editor-layout:has(.workspace-explorer-rail:not(.is-collapsed)) .rooms-editor-scene-overview-button > span,
+ .rooms-editor-layout:has(.workspace-explorer-rail:not(.is-collapsed)) .rooms-editor-test-scene-button > span { display: none; }
+ .rooms-editor-layout:has(.workspace-explorer-rail:not(.is-collapsed)):has(.rooms-side-stack.is-collapsed) { grid-template-columns: 190px minmax(0, 1fr) var(--workspace-editor-side-stack-collapsed-width); }
+}
+
+.rooms-editor-layout .editor-project-search-field { border: 1px solid var(--studio-color-border); border-radius: 6px; background: var(--studio-color-surface); padding: 3px 7px; }
+.rooms-editor-layout .editor-project-search-field .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
+.rooms-editor-layout .editor-project-search-field input { border: 0; color: var(--studio-color-text-primary); background: transparent; padding: 4px 0; outline: none; }
+.rooms-editor-layout .editor-project-search-field:focus-within { outline: 2px solid var(--studio-color-accent); outline-offset: 1px; }
+.rooms-workspace .rooms-editor-layout .workspace-explorer-rail .editor-tree-scene-branch > summary.scene-tree-row { grid-template-columns: 14px 17px minmax(0, 1fr); }
+.rooms-workspace .rooms-editor-layout .workspace-explorer-rail .editor-tree-scene-branch > summary.scene-tree-row:has(input) { grid-template-columns: 14px 14px 17px minmax(0, 1fr); }
+.rooms-editor-layout .rooms-editor-secondary-toolbar-tools { width: auto; }
+.rooms-editor-layout .rooms-editor-scene-actions { padding: 0; border-right: 0; }
+.rooms-editor-layout .rooms-editor-scene-actions-title { text-transform: none; letter-spacing: normal; }
+.rooms-editor-layout .room-test-start-control { flex-shrink: 0; }
+.rooms-editor-layout .rooms-editor-scene-actions-buttons { flex: 0 0 auto; }
+@media (max-width: 1200px) {
+ .rooms-editor-layout .room-test-start-control > span { display: none; }
+}
+@media (min-width: 760px) and (max-width: 1180px) {
+ .work-area:has(.rooms-workspace), .rooms-workspace { height: 100%; min-height: 0; overflow: hidden; }
+ .rooms-editor-layout,
+ .rooms-editor-layout:has(.workspace-explorer-rail):has(.editor-side-stack) { grid-template-columns: 190px minmax(0, 1fr) 270px !important; grid-template-rows: minmax(0, 1fr) auto !important; height: 100%; overflow: hidden; }
+ .rooms-editor-layout > .workspace-explorer-rail { grid-column: 1 !important; grid-row: 1 / span 2 !important; max-height: none; overflow: visible; }
+ .rooms-editor-layout > .rooms-canvas-stage { grid-column: 2 !important; grid-row: 1 !important; min-height: 0; }
+ .rooms-editor-layout > .rooms-debugger { grid-column: 2 !important; grid-row: 2 !important; }
+ .rooms-editor-layout > .editor-side-stack.rooms-side-stack { grid-column: 3 !important; grid-row: 1 / span 2 !important; max-height: none; overflow: visible; }
+ .rooms-workspace .rooms-editor-layout > .workspace-explorer-rail .workspace-explorer-rail-toggle { left: auto !important; right: calc(var(--workspace-inspector-rail-toggle-width) * -1) !important; }
+ .rooms-workspace .rooms-editor-layout > .editor-side-stack.rooms-side-stack .editor-side-stack-toggle { left: calc(var(--workspace-inspector-rail-toggle-width) * -1) !important; right: auto !important; }
+ .rooms-editor-layout:has(.workspace-explorer-rail.is-collapsed):has(.rooms-side-stack:not(.is-collapsed)) { grid-template-columns: var(--workspace-explorer-rail-collapsed-width) minmax(0, 1fr) 270px !important; }
+ .rooms-editor-layout:has(.workspace-explorer-rail:not(.is-collapsed)):has(.rooms-side-stack.is-collapsed) { grid-template-columns: 190px minmax(0, 1fr) var(--workspace-editor-side-stack-collapsed-width) !important; }
+ .rooms-editor-layout:has(.workspace-explorer-rail.is-collapsed):has(.rooms-side-stack.is-collapsed) { grid-template-columns: var(--workspace-explorer-rail-collapsed-width) minmax(0, 1fr) var(--workspace-editor-side-stack-collapsed-width) !important; }
+ .rooms-editor-layout .room-test-start-control select { width: 110px; min-width: 0; }
+}
+
+/* The overview gives every scene the same readable card and metadata shell. */
+.rooms-editor-layout .room-stage-card-frame:not(.selected) .room-stage-card {
+ background: var(--studio-color-surface); border-color: var(--studio-color-border);
+ height: 100% !important; grid-template-rows: var(--room-map-card-header-height, 54px) minmax(0, 1fr) var(--room-map-card-footer-height, 36px);
+}
+.rooms-editor-layout .room-stage-card-frame:not(.selected) .room-stage-card-header { background: var(--studio-color-surface); border-bottom-color: var(--studio-color-border); }
+.rooms-editor-layout .room-stage-card-frame .room-stage-card-footer { display: flex; flex-wrap: nowrap; height: var(--room-map-card-footer-height, 36px); }
+.rooms-editor-layout .room-stage-card-frame:not(.selected) .room-stage-card-actions { display: flex; }
+.rooms-editor-layout .room-stage-card-frame:not(.selected) .room-stage-card-actions > button:not([aria-label^="Mais opções da cena"]) { display: none; }
+.rooms-editor-layout .rooms-inspector { max-height: none; }
+.rooms-editor-layout .rooms-inspector .room-selected-entity-inspector > .inspector-vector2 { box-sizing: border-box; width: 100%; min-width: 0; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; }
+.rooms-editor-layout .rooms-inspector .room-selected-entity-inspector > .inspector-vector2 > .inspector-field { grid-column: auto; display: flex; flex-direction: column; gap: 4px; width: 100%; }
+.rooms-editor-layout .rooms-inspector .room-selected-entity-inspector > .inspector-vector2 input { width: 100%; }
+.rooms-editor-layout .room-overview-scene-actions .primary-action,
+.rooms-editor-layout .rooms-editor-test-scene-button,
+.rooms-editor-layout .room-editor-tool-rail-add {
+ background: var(--studio-control-primary-bg); border-color: var(--studio-control-primary-border); color: var(--studio-control-primary-text);
+}
+
+.rooms-editor-layout .rooms-canvas-stage.has-scene-actions .rooms-editor-secondary-toolbar-primary { overflow: visible; height: 34px; }
+.rooms-editor-layout .rooms-inspector-context .rooms-inspector-tabs { overflow: visible; flex-wrap: nowrap; }
+.rooms-editor-layout .rooms-inspector .room-selected-entity-inspector > .inspector-vector2 .inspector-control-line { width: 100%; }
+
+/* Keep scene actions reachable when both rails leave a narrow canvas. */
+@container (max-width: 640px) {
+  .rooms-editor-layout .rooms-canvas-stage.has-scene-actions .rooms-editor-secondary-toolbar-primary {
+    overflow-x: auto;
+    scrollbar-width: thin;
+    height: auto;
+  }
+
+  .rooms-editor-layout .rooms-editor-scene-actions {
+    flex: 0 0 auto;
+  }
+}

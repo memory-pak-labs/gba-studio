@@ -1,0 +1,457 @@
+# Workflow canonico quando este pacote for publicado como espelho isolado.
+# Dentro do monorepo, a CI ativa fica em ../../../.github/workflows/ci.yml.
+name: Engine CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+    inputs:
+      manual_mgba_readiness_evidence_base64:
+        description: Base64-encoded manual_mgba_stress_smoke readiness_evidence JSON from a real mGBA review.
+        required: false
+        default: ""
+
+permissions:
+  contents: read
+
+jobs:
+  host-tests:
+    name: Host tests (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-latest, ubuntu-latest, windows-latest]
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Validate private maturation policy
+        shell: bash
+        env:
+          GBA_STUDIO_PRIVATE_MATURITY_ONLY: "1"
+          GITHUB_REPOSITORY_PRIVATE: ${{ github.event.repository.private }}
+        run: |
+          test "$GBA_STUDIO_PRIVATE_MATURITY_ONLY" = "1"
+          if [[ "$GITHUB_REPOSITORY_PRIVATE" != "true" ]]; then
+            echo "This workflow is private-maturation only. Keep the repository private until GBAStudioEngine is the proven primary backend." >&2
+            exit 1
+          fi
+
+      - name: Install Linux host dependencies
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends clang make python3 grep
+
+      - name: Install Windows host dependencies
+        if: runner.os == 'Windows'
+        uses: msys2/setup-msys2@v2
+        with:
+          msystem: UCRT64
+          update: true
+          install: >-
+            git
+            make
+            grep
+            python
+            mingw-w64-ucrt-x86_64-clang
+
+      - name: Run host tests
+        if: runner.os != 'Windows'
+        run: make host-test
+
+      - name: Run host tests
+        if: runner.os == 'Windows'
+        shell: msys2 {0}
+        run: |
+          chmod +x tools/assetc/assetc.py tools/gbsbuild/gbsbuild.py tools/gbsdoctor/gbsdoctor.py tests/host/*.py
+          make host-test
+
+  engine-pack-linux:
+    name: Engine Pack and Linux CI evidence
+    runs-on: ubuntu-latest
+    container:
+      image: devkitpro/devkitarm:20260610
+    env:
+      DEVKITPRO: /opt/devkitpro
+      DEVKITARM: /opt/devkitpro/devkitARM
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Validate private maturation policy
+        env:
+          GBA_STUDIO_PRIVATE_MATURITY_ONLY: "1"
+          GITHUB_REPOSITORY_PRIVATE: ${{ github.event.repository.private }}
+        run: |
+          test "$GBA_STUDIO_PRIVATE_MATURITY_ONLY" = "1"
+          if [ "$GITHUB_REPOSITORY_PRIVATE" != "true" ]; then
+            echo "This workflow is private-maturation only. Keep the repository private until GBAStudioEngine is the proven primary backend." >&2
+            exit 1
+          fi
+
+      - name: Install container host dependencies
+        run: |
+          apt-get update
+          apt-get install -y --no-install-recommends clang make python3 grep coreutils
+
+      - name: Verify Engine Pack
+        run: make verify-package
+
+      - name: Verify production smoke
+        run: make verify-production-smoke
+
+      - name: Verify local cross-platform probe
+        run: make verify-cross-platform-local
+
+      - name: Write Linux CI readiness evidence
+        run: |
+          mkdir -p build/ci
+          dist/GBAStudioEnginePack/tools/verify_cross_platform \
+            --engine-pack dist/GBAStudioEnginePack \
+            --project-dir build/verify-package/generated_project \
+            --output build/ci/cross-platform-linux-report.json \
+            --hardware-ci-pass \
+            --evidence-type cross_platform_ci \
+            --write-readiness-evidence build/ci/readiness_evidence_linux.json \
+            --evidence-source build/ci/cross-platform-linux-report.json \
+            --evidence-message "GitHub Actions Linux Engine Pack verifier passed in devkitpro/devkitarm:20260610."
+          tools/gbsdoctor/gbsdoctor.py \
+            --validate-public-schema readiness_evidence \
+            --schema-document build/ci/readiness_evidence_linux.json \
+            --json > build/ci/readiness_evidence_linux_validation.json
+
+      - name: Write promotion bundle with current CI evidence
+        run: |
+          tools/gbsdoctor/gbsdoctor.py \
+            --engine-pack dist/GBAStudioEnginePack \
+            --readiness-evidence build/ci/readiness_evidence_linux.json \
+            --write-promotion-bundle build/ci/promotion_bundle_linux_partial \
+            --json > build/ci/promotion_bundle_linux_partial_write.json
+          tools/gbsdoctor/gbsdoctor.py \
+            --validate-promotion-bundle build/ci/promotion_bundle_linux_partial \
+            --json > build/ci/promotion_bundle_linux_partial_validation.json
+
+      - name: Confirm Linux-only evidence cannot promote primary backend
+        run: |
+          if tools/gbsdoctor/gbsdoctor.py \
+            --engine-pack dist/GBAStudioEnginePack \
+            --readiness-evidence build/ci/readiness_evidence_linux.json \
+            --require-primary-ready \
+            --json > build/ci/primary-ready-linux-only.json; then
+            echo "Linux-only evidence unexpectedly promoted the backend." >&2
+            exit 1
+          fi
+          grep -q 'cross_platform_ci exige validated_platforms com macos, windows e linux' build/ci/primary-ready-linux-only.json
+
+      - name: Upload reusable Engine Pack CI base
+        uses: actions/upload-artifact@v4
+        with:
+          name: engine-pack-ci-base
+          path: |
+            dist/GBAStudioEnginePack/**
+            build/verify-package/generated_project/**
+          if-no-files-found: error
+          retention-days: 3
+
+      - name: Upload Engine Pack evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: engine-pack-linux-evidence
+          path: |
+            build/ci/*.json
+            build/ci/promotion_bundle_linux_partial/**
+            build/cross-platform-*.json
+            build/cross-platform-readiness-evidence*.json
+            build/production-smoke-*.json
+            dist/GBAStudioEnginePack/enginepack.json
+            dist/GBAStudioEnginePack/VERSION
+          if-no-files-found: error
+          retention-days: 3
+
+  cross-platform-ci-evidence:
+    name: Cross-platform CI evidence (${{ matrix.os }})
+    needs: [host-tests, engine-pack-linux]
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-latest, ubuntu-latest, windows-latest]
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Validate private maturation policy
+        shell: bash
+        env:
+          GBA_STUDIO_PRIVATE_MATURITY_ONLY: "1"
+          GITHUB_REPOSITORY_PRIVATE: ${{ github.event.repository.private }}
+        run: |
+          test "$GBA_STUDIO_PRIVATE_MATURITY_ONLY" = "1"
+          if [[ "$GITHUB_REPOSITORY_PRIVATE" != "true" ]]; then
+            echo "This workflow is private-maturation only. Keep the repository private until GBAStudioEngine is the proven primary backend." >&2
+            exit 1
+          fi
+
+      - name: Install Linux evidence dependencies
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends python3 grep coreutils
+
+      - name: Install Windows evidence dependencies
+        if: runner.os == 'Windows'
+        uses: msys2/setup-msys2@v2
+        with:
+          msystem: UCRT64
+          update: true
+          install: >-
+            git
+            grep
+            python
+            coreutils
+
+      - name: Download Engine Pack CI base
+        uses: actions/download-artifact@v4
+        with:
+          name: engine-pack-ci-base
+          path: .ci-base
+
+      - name: Write platform CI evidence
+        if: runner.os != 'Windows'
+        env:
+          RUNNER_OS_NAME: ${{ runner.os }}
+        run: |
+          chmod +x .ci-base/dist/GBAStudioEnginePack/tools/*
+          case "$RUNNER_OS_NAME" in
+            macOS) platform="macos" ;;
+            Linux) platform="linux" ;;
+            *) echo "Unsupported runner OS: $RUNNER_OS_NAME" >&2; exit 1 ;;
+          esac
+          mkdir -p build/ci-platform
+          .ci-base/dist/GBAStudioEnginePack/tools/verify_cross_platform \
+            --engine-pack .ci-base/dist/GBAStudioEnginePack \
+            --project-dir .ci-base/build/verify-package/generated_project \
+            --output "build/ci-platform/cross-platform-${platform}-report.json" \
+            --skip-toolchain \
+            --hardware-ci-pass \
+            --evidence-type cross_platform_ci \
+            --validated-platform "$platform" \
+            --write-readiness-evidence "build/ci-platform/readiness_evidence_${platform}.json" \
+            --evidence-source "build/ci-platform/cross-platform-${platform}-report.json" \
+            --evidence-message "GitHub Actions ${platform} host tests and Engine Pack dry-run verifier passed."
+          tools/gbsdoctor/gbsdoctor.py \
+            --validate-public-schema readiness_evidence \
+            --schema-document "build/ci-platform/readiness_evidence_${platform}.json" \
+            --json > "build/ci-platform/readiness_evidence_${platform}_validation.json"
+
+      - name: Write platform CI evidence
+        if: runner.os == 'Windows'
+        shell: msys2 {0}
+        env:
+          RUNNER_OS_NAME: ${{ runner.os }}
+        run: |
+          chmod +x .ci-base/dist/GBAStudioEnginePack/tools/*
+          case "$RUNNER_OS_NAME" in
+            Windows) platform="windows" ;;
+            *) echo "Unsupported runner OS: $RUNNER_OS_NAME" >&2; exit 1 ;;
+          esac
+          mkdir -p build/ci-platform
+          .ci-base/dist/GBAStudioEnginePack/tools/verify_cross_platform \
+            --engine-pack .ci-base/dist/GBAStudioEnginePack \
+            --project-dir .ci-base/build/verify-package/generated_project \
+            --output "build/ci-platform/cross-platform-${platform}-report.json" \
+            --skip-toolchain \
+            --hardware-ci-pass \
+            --evidence-type cross_platform_ci \
+            --validated-platform "$platform" \
+            --write-readiness-evidence "build/ci-platform/readiness_evidence_${platform}.json" \
+            --evidence-source "build/ci-platform/cross-platform-${platform}-report.json" \
+            --evidence-message "GitHub Actions ${platform} host tests and Engine Pack dry-run verifier passed."
+          tools/gbsdoctor/gbsdoctor.py \
+            --validate-public-schema readiness_evidence \
+            --schema-document "build/ci-platform/readiness_evidence_${platform}.json" \
+            --json > "build/ci-platform/readiness_evidence_${platform}_validation.json"
+
+      - name: Upload platform CI evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: engine-cross-platform-${{ runner.os }}-evidence
+          path: |
+            build/ci-platform/*.json
+          if-no-files-found: error
+          retention-days: 3
+
+  merge-cross-platform-evidence:
+    name: Merge cross-platform CI evidence
+    needs: cross-platform-ci-evidence
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Validate private maturation policy
+        env:
+          GBA_STUDIO_PRIVATE_MATURITY_ONLY: "1"
+          GITHUB_REPOSITORY_PRIVATE: ${{ github.event.repository.private }}
+        run: |
+          test "$GBA_STUDIO_PRIVATE_MATURITY_ONLY" = "1"
+          if [ "$GITHUB_REPOSITORY_PRIVATE" != "true" ]; then
+            echo "This workflow is private-maturation only. Keep the repository private until GBAStudioEngine is the proven primary backend." >&2
+            exit 1
+          fi
+
+      - name: Download Engine Pack CI base
+        uses: actions/download-artifact@v4
+        with:
+          name: engine-pack-ci-base
+          path: .ci-base
+
+      - name: Download platform CI evidence
+        uses: actions/download-artifact@v4
+        with:
+          pattern: engine-cross-platform-*-evidence
+          path: build/ci/inputs
+          merge-multiple: true
+
+      - name: Merge and validate cross-platform CI evidence
+        run: |
+          mkdir -p build/ci
+          mapfile -t evidence_inputs < <(find build/ci/inputs -name 'readiness_evidence_*.json' ! -name '*_validation.json' | sort)
+          if [ "${#evidence_inputs[@]}" -ne 3 ]; then
+            printf 'Expected 3 platform evidence files, found %s\n' "${#evidence_inputs[@]}" >&2
+            printf '%s\n' "${evidence_inputs[@]}" >&2
+            exit 1
+          fi
+          merge_args=()
+          for evidence in "${evidence_inputs[@]}"; do
+            merge_args+=(--readiness-evidence-input "$evidence")
+          done
+          tools/gbsdoctor/gbsdoctor.py \
+            --merge-readiness-evidence build/ci/readiness_evidence_cross_platform_merged.json \
+            "${merge_args[@]}" \
+            --json > build/ci/readiness_evidence_cross_platform_merge.json
+          tools/gbsdoctor/gbsdoctor.py \
+            --validate-public-schema readiness_evidence \
+            --schema-document build/ci/readiness_evidence_cross_platform_merged.json \
+            --json > build/ci/readiness_evidence_cross_platform_validation.json
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          evidence = json.loads(Path("build/ci/readiness_evidence_cross_platform_merged.json").read_text())
+          gate = evidence["hardware_or_ci_validation"]
+          assert gate["ok"] is True
+          assert gate["evidence_type"] == "cross_platform_ci"
+          assert set(gate["validated_platforms"]) == {"macos", "windows", "linux"}
+          assert evidence["manual_mgba_stress_smoke"]["ok"] is False
+          assert evidence["gba_studio_engine_primary_rollout"]["ok"] is False
+          PY
+          if tools/gbsdoctor/gbsdoctor.py \
+            --engine-pack .ci-base/dist/GBAStudioEnginePack \
+            --project-dir .ci-base/build/verify-package/generated_project \
+            --skip-toolchain \
+            --readiness-evidence build/ci/readiness_evidence_cross_platform_merged.json \
+            --require-primary-ready \
+            --json > build/ci/primary-ready-cross-platform-only.json; then
+            echo "Cross-platform CI evidence unexpectedly promoted the primary backend without manual mGBA and private engine-primary rollout gates." >&2
+            exit 1
+          fi
+          python3 - <<'PY'
+          import json
+          import sys
+          from pathlib import Path
+          report_path = Path("build/ci/primary-ready-cross-platform-only.json")
+          report = json.loads(report_path.read_text())
+          readiness = report.get("butano_replacement_readiness", {})
+          missing = set(readiness.get("missing_manual_gates") or [])
+          required_missing = {"manual_mgba_stress_smoke", "gba_studio_engine_primary_rollout"}
+          hardware_gate = next(
+              (gate for gate in readiness.get("manual_primary_gates", []) if gate.get("id") == "hardware_or_ci_validation"),
+              {},
+          )
+          if "hardware_or_ci_validation" in missing or not required_missing.issubset(missing):
+              print(report_path.read_text(), file=sys.stderr)
+              raise SystemExit("Cross-platform-only readiness report did not preserve the expected missing gates.")
+          if set(hardware_gate.get("validated_platforms") or []) != {"macos", "windows", "linux"}:
+              print(report_path.read_text(), file=sys.stderr)
+              raise SystemExit("Merged cross-platform CI evidence is still missing required platforms.")
+          PY
+          set +e
+          tools/gbsdoctor/gbsdoctor.py \
+            --engine-pack .ci-base/dist/GBAStudioEnginePack \
+            --project-dir .ci-base/build/verify-package/generated_project \
+            --skip-toolchain \
+            --readiness-evidence build/ci/readiness_evidence_cross_platform_merged.json \
+            --write-promotion-bundle build/ci/promotion_bundle_cross_platform_partial \
+            --json > build/ci/promotion_bundle_cross_platform_partial_write.json
+          promotion_bundle_write_status=$?
+          set -e
+          PROMOTION_BUNDLE_WRITE_STATUS="$promotion_bundle_write_status" python3 - <<'PY'
+          import json
+          import os
+          import sys
+          from pathlib import Path
+          status = int(os.environ["PROMOTION_BUNDLE_WRITE_STATUS"])
+          report_path = Path("build/ci/promotion_bundle_cross_platform_partial_write.json")
+          report = json.loads(report_path.read_text())
+          missing = set(report.get("missing_manual_gates") or [])
+          expected_missing = {"manual_mgba_stress_smoke", "gba_studio_engine_primary_rollout"}
+          if report.get("kind") != "promotion_bundle" or report.get("ok") is not True:
+              print(report_path.read_text(), file=sys.stderr)
+              raise SystemExit("Cross-platform partial promotion bundle write did not produce a valid bundle.")
+          if report.get("ready_for_primary_backend") is not False or not expected_missing.issubset(missing):
+              print(report_path.read_text(), file=sys.stderr)
+              raise SystemExit("Cross-platform partial promotion bundle lost the expected blocked readiness state.")
+          if status not in (0, 1, 3):
+              print(report_path.read_text(), file=sys.stderr)
+              raise SystemExit(f"Unexpected promotion bundle write exit status: {status}")
+          PY
+          tools/gbsdoctor/gbsdoctor.py \
+            --validate-promotion-bundle build/ci/promotion_bundle_cross_platform_partial \
+            --json > build/ci/promotion_bundle_cross_platform_partial_validation.json || {
+              cat build/ci/promotion_bundle_cross_platform_partial_validation.json >&2
+              exit 1
+            }
+
+      - name: Merge manual mGBA evidence for app handoff
+        env:
+          MANUAL_MGBA_READINESS_EVIDENCE_BASE64: ${{ github.event.inputs.manual_mgba_readiness_evidence_base64 || '' }}
+        run: |
+          scripts/write_engine_primary_handoff.py \
+            --cross-platform-evidence build/ci/readiness_evidence_cross_platform_merged.json \
+            --manual-mgba-evidence-base64 "$MANUAL_MGBA_READINESS_EVIDENCE_BASE64" \
+            --output-dir build/ci \
+            --gbsdoctor tools/gbsdoctor/gbsdoctor.py
+
+      - name: Upload merged cross-platform evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: engine-cross-platform-merged-evidence
+          path: |
+            build/ci/*.json
+            build/ci/promotion_bundle_cross_platform_partial/**
+          if-no-files-found: error
+          retention-days: 3
+
+      - name: Upload Engine primary readiness evidence handoff
+        uses: actions/upload-artifact@v4
+        with:
+          name: engine-primary-readiness-evidence-handoff
+          path: |
+            build/ci/readiness_evidence_mgba_manual.json
+            build/ci/readiness_evidence_mgba_manual_validation.json
+            build/ci/readiness_evidence_engine_primary.json
+            build/ci/readiness_evidence_engine_primary_merge.json
+            build/ci/readiness_evidence_engine_primary_validation.json
+            build/ci/readiness_evidence_engine_primary_base64.txt
+            build/ci/engine_primary_handoff_summary.json
+            build/ci/engine_primary_handoff_skipped.json
+          if-no-files-found: warn
+          retention-days: 3

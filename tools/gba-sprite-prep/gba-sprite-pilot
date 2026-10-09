@@ -1,0 +1,23 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+REPO_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
+
+if [ "$#" -lt 1 ]; then
+  echo "Uso: gba-sprite-pilot <pasta-saida> [--engine-pack <pasta>]" >&2
+  exit 2
+fi
+
+RUNNER_DIR="$(mktemp -d "${TMPDIR:-/tmp}/gba-sprite-pilot-runner.XXXXXX")"
+trap 'rm -rf "$RUNNER_DIR"' EXIT
+
+"$REPO_ROOT/apps/desktop-electron/node_modules/.bin/esbuild" \
+  "$SCRIPT_DIR/pilot-cli.ts" \
+  --bundle \
+  --platform=node \
+  --format=esm \
+  --outfile="$RUNNER_DIR/pilot-cli.mjs" \
+  --log-level=warning
+
+GBA_SPRITE_REPO_ROOT="$REPO_ROOT" node "$RUNNER_DIR/pilot-cli.mjs" "$@"

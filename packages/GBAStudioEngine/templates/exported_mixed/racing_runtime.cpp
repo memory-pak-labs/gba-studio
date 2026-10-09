@@ -1,0 +1,8 @@
+#define GBS_RACING_PROJECT_DATA_HEADER "racing_project_data.hpp"
+#define GBS_RACING_RUNTIME_ENTRY gbs_run_racing
+#define GBS_RACING_RUNTIME_ENTER gbs_enter_racing
+#define GBS_RACING_RUNTIME_UPDATE gbs_update_racing
+#define GBS_RACING_RUNTIME_RENDER gbs_render_racing
+#define GBS_RACING_RUNTIME_LEAVE gbs_leave_racing
+#define GBS_MULTI_RUNTIME 1
+#include "racing_runtime.inc"

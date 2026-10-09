@@ -1,0 +1,12 @@
+build/
+dist/
+*.gba
+!templates/Makefile.gba
+*.elf
+*.map
+*.o
+*.a
+.DS_Store
+
+.gitnexus
+graphify-out/

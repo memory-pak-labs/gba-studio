@@ -1,0 +1,492 @@
+/* Shared inspector readability rules.
+ * Important labels and descriptions must remain readable when a rail is narrow.
+ * Compact identifiers can still be shortened by their own control styles.
+ */
+
+/* Split workspaces keep the editor canvas fixed while side rails scroll internally. */
+.content:has(.files-workspace, .sprites-workspace, .dialogues-workspace, .audio-workspace, .colors-workspace),
+.work-area:has(.files-workspace, .sprites-workspace, .dialogues-workspace, .audio-workspace, .colors-workspace) {
+  min-height: 0;
+  overflow: hidden;
+}
+
+.work-area:has(.files-workspace, .sprites-workspace, .dialogues-workspace, .audio-workspace, .colors-workspace) {
+  height: 100%;
+}
+
+.inspector-readable {
+  box-sizing: border-box;
+  min-width: 0;
+}
+
+.inspector-readable > * {
+  max-width: 100%;
+  min-width: 0;
+}
+
+.inspector-readable :is(h1, h2, h3, h4, h5, h6, p, dt, dd, legend, summary, small),
+.inspector-readable label > span {
+  max-width: 100%;
+  min-width: 0;
+  overflow-wrap: anywhere;
+  white-space: normal;
+}
+
+.inspector-readable label > span {
+  overflow-wrap: normal;
+  word-break: normal;
+}
+
+.inspector-readable :is(h4, h5, h6, legend) {
+  color: var(--studio-color-text-primary);
+  line-height: var(--studio-line-height-tight);
+}
+
+.inspector-readable :is(h1, h2, h3, h4, h5, h6, p, dt, dd, legend, summary, small),
+.inspector-readable label > span {
+  overflow: visible;
+  text-overflow: clip;
+}
+
+.inspector-readable [role="tablist"] {
+  max-width: 100%;
+  min-width: 0;
+}
+
+.inspector-readable [role="tablist"] > button {
+  line-height: 1.2;
+  min-width: 0;
+  min-inline-size: max-content;
+  overflow-wrap: normal;
+  text-overflow: clip;
+  white-space: nowrap;
+}
+
+.inspector-readable .room-actor-battle-abilities label > span {
+  min-inline-size: max-content;
+  overflow-wrap: normal;
+  white-space: nowrap;
+}
+
+.inspector-readable :is(.inspector-actions, .audio-actions, .dialogues-editor-actions) {
+  flex-wrap: wrap;
+  min-width: 0;
+}
+
+/* Shared compact controls. The topbar keeps its own dimensions; only Inspector rails use this density. */
+.workspace-inspector-rail.inspector-readable,
+.editor-side-stack-inspector.inspector-readable,
+.settings-main-panel.inspector-readable {
+  --inspector-control-height: 28px;
+  --inspector-control-padding-x: 7px;
+  --inspector-section-gap: 7px;
+}
+
+.workspace-inspector-rail.inspector-readable :is(input:not([type="checkbox"]):not([type="radio"]), select, textarea),
+.editor-side-stack-inspector.inspector-readable :is(input:not([type="checkbox"]):not([type="radio"]), select, textarea),
+.settings-main-panel.inspector-readable :is(input:not([type="checkbox"]):not([type="radio"]), select, textarea) {
+  box-sizing: border-box;
+  min-height: var(--inspector-control-height);
+  padding: 5px var(--inspector-control-padding-x);
+}
+
+.workspace-inspector-rail.inspector-readable > .workspace-inspector-rail-body > :is(button, a),
+.workspace-inspector-rail.inspector-readable .inspector-action,
+.editor-side-stack-inspector.inspector-readable .inspector-action,
+.settings-main-panel.inspector-readable :is(button, a) {
+  min-height: var(--inspector-control-height);
+  padding: 5px 8px;
+}
+
+.inspector-field {
+  color: var(--studio-color-text-secondary);
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.inspector-field-label {
+  color: var(--studio-color-text-secondary);
+  line-height: 1.2;
+  overflow-wrap: normal;
+  word-break: normal;
+}
+
+.inspector-field-heading {
+  align-items: center;
+  display: flex;
+  gap: 8px;
+  justify-content: space-between;
+  min-width: 0;
+}
+
+.inspector-field-heading .inspector-field-label {
+  min-width: 0;
+}
+
+.inspector-control-line {
+  align-items: center;
+  display: flex;
+  gap: 5px;
+  min-width: 0;
+}
+
+.inspector-control-line input {
+  min-width: 0;
+  width: 100%;
+}
+
+.inspector-field-unit,
+.inspector-range-value {
+  color: var(--studio-color-text-muted);
+  white-space: nowrap;
+}
+
+.inspector-field-presets {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.inspector-field-presets button,
+.inspector-reset-button {
+  background: var(--studio-color-surface-muted);
+  border: 1px solid var(--studio-color-border);
+  border-radius: var(--studio-radius-control);
+  color: var(--studio-color-text-secondary);
+  cursor: pointer;
+  min-height: 22px;
+  padding: 2px 6px;
+}
+
+.inspector-field-presets button:hover:not(:disabled),
+.inspector-field-presets button[aria-pressed="true"],
+.inspector-reset-button:hover:not(:disabled) {
+  background: var(--studio-color-accent-soft);
+  border-color: var(--studio-color-accent-border);
+  color: var(--studio-color-accent);
+}
+
+.inspector-field-presets button:focus-visible,
+.inspector-reset-button:focus-visible {
+  box-shadow: var(--studio-focus-ring);
+  outline: none;
+}
+
+.inspector-reset-button {
+  flex: 0 0 auto;
+}
+
+.inspector-reset-button-block {
+  justify-self: start;
+}
+
+.inspector-field-description,
+.inspector-section-description {
+  color: var(--studio-color-text-muted);
+  line-height: 1.3;
+  margin: 0;
+}
+
+.inspector-range-field {
+  gap: 5px;
+}
+
+.inspector-range-heading {
+  align-items: baseline;
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.inspector-range-field > input[type="range"] {
+  accent-color: var(--studio-color-accent);
+  min-height: 18px;
+  padding: 0;
+  width: 100%;
+}
+
+.inspector-range-endpoints {
+  color: var(--studio-color-text-muted);
+  display: flex;
+  justify-content: space-between;
+  line-height: 1.2;
+  margin-top: -2px;
+}
+
+.inspector-range-exact-line {
+  justify-content: flex-end;
+}
+
+.inspector-range-exact-line input[type="number"] {
+  max-width: 78px;
+}
+
+.inspector-toggle-field {
+  align-items: center;
+  display: flex;
+  gap: 7px;
+  grid-template-columns: auto minmax(0, 1fr);
+}
+
+.inspector-toggle-field input {
+  accent-color: var(--studio-color-accent);
+  flex: 0 0 auto;
+}
+
+.inspector-toggle-field .inspector-field-label {
+  color: var(--studio-color-text-primary);
+}
+
+.inspector-vector2 {
+  border: 0;
+  display: grid;
+  gap: 6px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  margin: 0;
+  min-width: 0;
+  padding: 0;
+}
+
+.inspector-vector2 legend {
+  color: var(--studio-color-text-secondary);
+  grid-column: 1 / -1;
+  padding: 0;
+}
+
+.inspector-section {
+  border-top: 1px solid var(--studio-color-border);
+  display: grid;
+  gap: var(--inspector-section-gap, 7px);
+  min-width: 0;
+  padding-top: 7px;
+}
+
+.inspector-section > summary {
+  align-items: center;
+  color: var(--studio-color-text-secondary);
+  cursor: pointer;
+  display: flex;
+  gap: var(--studio-space-3, 8px);
+  justify-content: space-between;
+  list-style: none;
+  min-height: 30px;
+  padding: 4px 6px;
+  position: relative;
+  border-radius: var(--studio-radius-control, 6px);
+  text-transform: none;
+  transition: background-color 120ms ease, color 120ms ease;
+}
+
+.inspector-section > summary::-webkit-details-marker {
+  display: none;
+}
+
+.inspector-section > summary:hover {
+  background: var(--studio-color-accent-soft);
+  color: var(--studio-color-accent);
+}
+
+.inspector-section > summary:focus-visible {
+  box-shadow: var(--studio-focus-ring);
+  outline: none;
+}
+
+.inspector-section-summary-title {
+  min-width: 0;
+}
+
+.inspector-info-tip {
+  display: inline-flex;
+  flex: 0 0 auto;
+  line-height: 1;
+  position: relative;
+}
+
+.inspector-info-button {
+  align-items: center;
+  background: transparent;
+  border: 0;
+  border-radius: 999px;
+  color: var(--studio-color-text-muted);
+  cursor: help;
+  display: inline-flex;
+  height: 24px;
+  justify-content: center;
+  padding: 0;
+  width: 24px;
+}
+
+.inspector-info-button:hover,
+.inspector-info-button:focus-visible,
+.inspector-info-tip.is-pinned .inspector-info-button {
+  background: var(--studio-color-accent-soft);
+  color: var(--studio-color-accent);
+}
+
+.inspector-info-button:focus-visible {
+  box-shadow: var(--studio-focus-ring);
+  outline: none;
+}
+
+.inspector-info-popover {
+  background: var(--studio-color-text-primary);
+  border-radius: 8px;
+  box-shadow: 0 8px 24px #13213b3d;
+  color: var(--studio-color-surface);
+  line-height: 1.4;
+  max-width: min(260px, calc(100vw - 40px));
+  opacity: 0;
+  padding: 10px 12px;
+  pointer-events: none;
+  position: absolute;
+  right: 0;
+  text-align: left;
+  text-transform: none;
+  top: calc(100% + 4px);
+  visibility: hidden;
+  width: max-content;
+  white-space: normal;
+  z-index: 30;
+}
+
+.inspector-info-tip:hover .inspector-info-popover,
+.inspector-info-tip:focus-within .inspector-info-popover,
+.inspector-info-tip.is-pinned .inspector-info-popover {
+  opacity: 1;
+  pointer-events: auto;
+  visibility: visible;
+}
+
+.inspector-section-disclosure {
+  align-items: center;
+  color: var(--studio-color-accent);
+  display: inline-flex;
+  flex: 0 0 24px;
+  height: 24px;
+  justify-content: center;
+  margin-inline-start: auto;
+  width: 24px;
+}
+
+.inspector-section-content {
+  display: grid;
+  gap: var(--inspector-section-gap, 7px);
+  min-width: 0;
+}
+
+.inspector-action {
+  align-items: center;
+  display: inline-flex;
+  justify-content: center;
+}
+
+/* Settings uses a two-column form row; keep the shared numeric metadata in the value column. */
+.inspector-field.settings-edit-number {
+  align-items: center;
+  border-top: 1px solid #eef2f6;
+  display: grid;
+  gap: 8px;
+  grid-template-columns: minmax(150px, 0.35fr) minmax(0, 1fr);
+  min-height: 40px;
+  padding: 6px 0;
+}
+
+.inspector-field.settings-edit-number:first-child {
+  border-top: 0;
+}
+
+.settings-edit-number .inspector-field-heading {
+  grid-column: 1;
+  grid-row: 1;
+}
+
+.settings-edit-number .inspector-control-line,
+.settings-edit-number .inspector-field-presets,
+.settings-edit-number .inspector-field-description,
+.settings-edit-number .inspector-range-endpoints,
+.settings-edit-number > input[type="range"] {
+  grid-column: 2;
+}
+
+.settings-edit-number.inspector-range-field {
+  align-items: start;
+}
+
+.settings-edit-number.inspector-range-field > input[type="range"] {
+  grid-row: 2;
+}
+
+.settings-edit-number.inspector-range-field .inspector-range-endpoints {
+  grid-row: 3;
+}
+
+.settings-edit-number.inspector-range-field .inspector-range-exact-line {
+  grid-row: 4;
+}
+
+.settings-edit-number.inspector-range-field .inspector-field-presets {
+  grid-row: 5;
+}
+
+.settings-edit-number.inspector-range-field .inspector-field-description {
+  grid-row: 6;
+}
+
+/* Sprite geometry stays compact while retaining its visible range contract. */
+.sprite-sheet-size-bar .inspector-number-field {
+  display: grid;
+  gap: 2px;
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.sprite-sheet-size-bar .inspector-number-field .inspector-field-heading,
+.sprite-sheet-size-bar .inspector-number-field .inspector-control-line,
+.sprite-sheet-size-bar .inspector-number-field .inspector-field-description {
+  grid-column: 1;
+}
+
+.sprite-sheet-size-bar .inspector-number-field .inspector-field-description {
+  line-height: 1.15;
+}
+
+
+@media (max-width: 1120px) {
+  .workspace-inspector-rail.inspector-readable,
+  .editor-side-stack-inspector.inspector-readable,
+  .settings-main-panel.inspector-readable {
+    --inspector-control-height: 26px;
+  }
+}
+
+/* Inspector layout contract: preserve readable units before reducing density. */
+.inspector-readable :is(label, .inspector-field, fieldset) {
+  min-width: 0;
+}
+
+.inspector-readable [role="tablist"] {
+  overflow-x: auto;
+  scrollbar-width: thin;
+}
+
+.inspector-readable .rooms-inspector-tabs {
+  align-content: start;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  overflow-x: auto;
+}
+
+.inspector-readable .rooms-inspector-tabs > button {
+  flex: 0 0 auto;
+  min-inline-size: 0;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  width: auto;
+}
+
+.inspector-readable .sprites-inspector-tabs {
+  grid-template-columns: repeat(auto-fit, minmax(110px, 1fr));
+}

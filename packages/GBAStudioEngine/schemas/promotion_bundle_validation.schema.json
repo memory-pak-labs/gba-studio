@@ -1,0 +1,362 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://gbastudio.local/schemas/promotion_bundle_validation.schema.json",
+  "title": "GBAStudio Engine backend promotion bundle validation result",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "ok",
+    "version",
+    "kind",
+    "path",
+    "stage",
+    "ready_for_primary_backend",
+    "primary_ready_required",
+    "readiness_summary",
+    "public_schema_catalog_summary",
+    "promotion_summary_summary",
+    "files",
+    "errors"
+  ],
+  "properties": {
+    "ok": {
+      "type": "boolean"
+    },
+    "version": {
+      "type": "string",
+      "minLength": 1
+    },
+    "kind": {
+      "const": "promotion_bundle_validation"
+    },
+    "path": {
+      "type": "string",
+      "minLength": 1
+    },
+    "stage": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "enum": [
+        "blocked",
+        "beta_candidate",
+        "primary_ready",
+        null
+      ]
+    },
+    "ready_for_primary_backend": {
+      "type": [
+        "boolean",
+        "null"
+      ]
+    },
+    "primary_ready_required": {
+      "type": "boolean"
+    },
+    "readiness_summary": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/readinessSummary"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "public_schema_catalog_summary": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/publicSchemaCatalogSummary"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "promotion_summary_summary": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/promotionSummarySummary"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "files": {
+      "type": "object",
+      "additionalProperties": {
+        "$ref": "#/$defs/checkedFile"
+      }
+    },
+    "errors": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/validationError"
+      }
+    }
+  },
+  "$defs": {
+    "checkedFile": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "path",
+        "ok"
+      ],
+      "properties": {
+        "path": {
+          "type": "string",
+          "minLength": 1
+        },
+        "ok": {
+          "type": "boolean"
+        },
+        "sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "size_bytes": {
+          "type": "integer",
+          "minimum": 0
+        }
+      }
+    },
+    "validationError": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "path",
+        "message"
+      ],
+      "properties": {
+        "path": {
+          "type": "string",
+          "minLength": 1
+        },
+        "message": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "publicSchemaCatalogSummary": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "ok",
+        "schema_count",
+        "missing_schemas",
+        "accepted_schema_arguments"
+      ],
+      "properties": {
+        "ok": {
+          "type": "boolean"
+        },
+        "schema_count": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "missing_schemas": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "uniqueItems": true
+        },
+        "accepted_schema_arguments": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "uniqueItems": true
+        }
+      }
+    },
+    "readinessSummary": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "ok",
+        "stage",
+        "ready_for_primary_backend",
+        "backend_policy",
+        "manual_primary_gates",
+        "missing_manual_gates",
+        "next_actions",
+        "blockers"
+      ],
+      "properties": {
+        "ok": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "stage": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "enum": [
+            "blocked",
+            "beta_candidate",
+            "primary_ready",
+            null
+          ]
+        },
+        "ready_for_primary_backend": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "backend_policy": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "manual_primary_gates": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/manualGate"
+          }
+        },
+        "missing_manual_gates": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "next_actions": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/nextAction"
+          }
+        },
+        "blockers": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/blocker"
+          }
+        }
+      }
+    },
+    "promotionSummarySummary": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "ok",
+        "stage",
+        "ready_for_primary_backend",
+        "missing_manual_gates",
+        "public_schema_catalog_summary"
+      ],
+      "properties": {
+        "ok": {
+          "type": "boolean"
+        },
+        "stage": {
+          "type": "string",
+          "enum": [
+            "blocked",
+            "beta_candidate",
+            "primary_ready"
+          ]
+        },
+        "ready_for_primary_backend": {
+          "type": "boolean"
+        },
+        "missing_manual_gates": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "uniqueItems": true
+        },
+        "public_schema_catalog_summary": {
+          "$ref": "#/$defs/publicSchemaCatalogSummary"
+        }
+      }
+    },
+    "manualGate": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": [
+        "id",
+        "ok",
+        "message"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "ok": {
+          "type": "boolean"
+        },
+        "message": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "nextAction": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": [
+        "id",
+        "command",
+        "message"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "command": {
+          "type": "string",
+          "minLength": 1
+        },
+        "message": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "blocker": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": [
+        "id",
+        "message",
+        "missing"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "message": {
+          "type": "string",
+          "minLength": 1
+        },
+        "missing": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    }
+  }
+}

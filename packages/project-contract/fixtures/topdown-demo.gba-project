@@ -1,0 +1,443 @@
+{
+  "schemaVersion": 1,
+  "name": "Electron Topdown Demo",
+  "assets": [
+    {
+      "id": "asset-tiles",
+      "name": "tiles_overworld.png",
+      "kind": "Tileset",
+      "systemImage": "square.grid.3x3",
+      "metadata": {
+        "source": "Assets/tiles/tiles_overworld.png"
+      }
+    },
+    {
+      "id": "asset-player",
+      "name": "player_topdown_4dir.png",
+      "kind": "Sprite",
+      "systemImage": "person.crop.square",
+      "metadata": {
+        "source": "Assets/sprites/player_topdown_4dir.png"
+      }
+    },
+    {
+      "id": "asset-point-click-actor",
+      "name": "actor_point_click.png",
+      "kind": "Sprite",
+      "systemImage": "figure.stand",
+      "metadata": {
+        "source": "Assets/sprites/actor_point_click.png"
+      }
+    },
+    {
+      "id": "asset-point-click-cursor",
+      "name": "cursor_point_click.png",
+      "kind": "Sprite",
+      "systemImage": "cursorarrow.click",
+      "metadata": {
+        "source": "Assets/sprites/cursor_point_click.png"
+      }
+    },
+    {
+      "id": "asset-theme",
+      "name": "intro_theme.mod",
+      "kind": "Audio",
+      "systemImage": "music.note",
+      "metadata": {
+        "source": "Assets/music/intro_theme.mod"
+      }
+    },
+    {
+      "id": "asset-confirm",
+      "name": "confirm.wav",
+      "kind": "Audio",
+      "systemImage": "speaker.wave.2",
+      "metadata": {
+        "source": "Assets/sounds/confirm.wav"
+      }
+    }
+  ],
+  "assetGroups": [
+    {
+      "id": "group-art",
+      "name": "Arte",
+      "assetIDs": ["asset-tiles", "asset-player", "asset-point-click-actor", "asset-point-click-cursor"],
+      "children": [
+        {
+          "id": "group-audio",
+          "name": "Audio",
+          "assetIDs": ["asset-theme", "asset-confirm"],
+          "children": []
+        }
+      ]
+    }
+  ],
+  "scena": {
+    "id": "room-overworld",
+    "name": "overworld_start",
+    "width": 30,
+    "height": 20,
+    "music": "intro_theme.mod",
+    "cameraMode": "Follow Player",
+    "sceneType": "topdown",
+    "playerActorName": "Player",
+    "backgroundAssetName": "tiles_overworld.png",
+    "backgroundRenderMode": "tilemap",
+    "collisionTypes": ["solid", "free", "free", "solid"],
+    "referenceImages": [
+      {
+        "assetName": "tiles_overworld.png"
+      }
+    ],
+    "eventBindings": {
+      "onInit": "room_boot"
+    }
+  },
+  "scenas": [
+    {
+      "id": "room-overworld",
+      "name": "overworld_start",
+      "width": 30,
+      "height": 20,
+      "music": "intro_theme.mod",
+      "cameraMode": "Follow Player",
+      "sceneType": "topdown",
+      "playerActorName": "Player",
+      "backgroundAssetName": "tiles_overworld.png",
+      "backgroundRenderMode": "tilemap",
+      "collisionTypes": ["solid", "free", "free", "solid"],
+      "referenceImages": [
+        {
+          "assetName": "tiles_overworld.png"
+        }
+      ],
+      "eventBindings": {
+        "onInit": "room_boot"
+      }
+    },
+    {
+      "id": "room-shop",
+      "name": "shop",
+      "width": 30,
+      "height": 20,
+      "music": "",
+      "cameraMode": "Fixed",
+      "sceneType": "topdown",
+      "backgroundRenderMode": "tilemap",
+      "collisionTypes": [],
+      "referenceImages": []
+    }
+  ],
+  "actors": [
+    {
+      "id": "actor-player",
+      "name": "Player",
+      "roomName": "overworld_start",
+      "x": 15,
+      "y": 10,
+      "spriteSheet": "player_topdown_4dir.png",
+      "animationName": "idle_down",
+      "eventName": "player_start",
+      "eventBindings": {
+        "onInteract": "npc_shop"
+      }
+    }
+  ],
+  "triggers": [
+    {
+      "id": "trigger-door",
+      "name": "Shop Door",
+      "roomName": "overworld_start",
+      "x": 28,
+      "y": 10,
+      "width": 2,
+      "height": 2,
+      "eventName": "door_enter"
+    }
+  ],
+  "dialogues": [
+    {
+      "key": "intro_001",
+      "character": "Ana",
+      "portrait": "ana_portrait.png",
+      "text": "Ola, viajante!",
+      "choices": ["Vamos explorar", "Abrir inventario"]
+    },
+    {
+      "key": "npc_shop",
+      "character": "Mercador",
+      "portrait": "shopkeeper.png",
+      "text": "Tenho itens raros.",
+      "choices": ["Comprar", "Sair"]
+    }
+  ],
+  "animations": [
+    {
+      "id": "anim-idle",
+      "name": "idle_down",
+      "spriteSheet": "player_topdown_4dir.png",
+      "frameWidth": 16,
+      "frameHeight": 16,
+      "fps": 6,
+      "loops": true,
+      "frameCount": 2,
+      "state": "idle",
+      "direction": "down",
+      "colorMode": "4bpp"
+    },
+    {
+      "id": "anim-walk",
+      "name": "walk_down",
+      "spriteSheet": "player_topdown_4dir.png",
+      "frameWidth": 16,
+      "frameHeight": 16,
+      "fps": 10,
+      "loops": true,
+      "frameCount": 4,
+      "state": "walk",
+      "direction": "down",
+      "colorMode": "4bpp"
+    }
+  ],
+  "animationStates": [
+    {
+      "id": "state-idle",
+      "spriteSheet": "player_topdown_4dir.png",
+      "name": "idle",
+      "animationType": "fixed",
+      "mirrorLeftFromRight": true,
+      "animationIDs": ["anim-idle"]
+    }
+  ],
+  "spriteReferenceImages": [
+    {
+      "id": "ref-player",
+      "assetName": "player_reference.png",
+      "title": "Player reference",
+      "isVisible": true,
+      "opacity": 0.75,
+      "order": 1,
+      "generatedSpriteAssetName": "player_topdown_4dir.png",
+      "frameWidth": 16,
+      "frameHeight": 16,
+      "fps": 8,
+      "state": "idle",
+      "direction": "down"
+    }
+  ],
+  "activeSpriteReferenceImageID": "ref-player",
+  "audioItems": [
+    {
+      "id": "audio-theme",
+      "name": "intro_theme.mod",
+      "kind": "Musica",
+      "format": "MOD",
+      "assignedScene": "overworld_start",
+      "loops": true,
+      "bpm": 132,
+      "exportID": "intro_theme",
+      "volume": 80,
+      "patterns": [
+        {
+          "id": "pattern-intro",
+          "name": "intro",
+          "steps": 16,
+          "channels": [
+            {
+              "id": "ch-pulse",
+              "name": "Pulse 1",
+              "type": "pulse1",
+              "instrument": "Pulse Lead",
+              "volume": 12,
+              "dutyCycle": "50",
+              "notes": ["C4", "---", "E4", "---", "G4"],
+              "muted": false,
+              "solo": false
+            }
+          ]
+        }
+      ],
+      "patternOrder": ["pattern-intro"]
+    },
+    {
+      "id": "audio-confirm",
+      "name": "confirm.wav",
+      "kind": "SFX",
+      "format": "WAV",
+      "assignedScene": "Global",
+      "loops": false,
+      "bpm": 150,
+      "exportID": "confirm",
+      "volume": 90,
+      "channels": [
+        {
+          "id": "ch-noise",
+          "name": "Noise",
+          "type": "noise",
+          "instrument": "Noise Kit",
+          "volume": 13,
+          "dutyCycle": "Noise",
+          "notes": ["K", "---", "S"],
+          "muted": false,
+          "solo": false
+        }
+      ]
+    }
+  ],
+  "events": [
+    {
+      "id": "event-room",
+      "name": "room_boot",
+      "category": "Cena",
+      "detail": "Boot da sala",
+      "command": "play_music intro_theme.mod",
+      "steps": [
+        {
+          "id": "step-music",
+          "command": "play_music intro_theme.mod",
+          "note": "Tema"
+        },
+        {
+          "id": "step-dialogue",
+          "command": "show_dialogue intro_001",
+          "note": "Intro"
+        }
+      ]
+    },
+    {
+      "id": "event-player",
+      "name": "player_start",
+      "category": "Ator",
+      "detail": "Setup do player",
+      "command": "noop"
+    },
+    {
+      "id": "event-door",
+      "name": "door_enter",
+      "category": "Trigger",
+      "detail": "Entrar na loja",
+      "command": "change_scene shop"
+    },
+    {
+      "id": "event-shop",
+      "name": "npc_shop",
+      "category": "Dialogo",
+      "detail": "NPC mercador",
+      "command": "show_choice npc_shop",
+      "steps": [
+        {
+          "command": "show_choice npc_shop"
+        },
+        {
+          "command": "play_sfx confirm.wav"
+        }
+      ]
+    }
+  ],
+  "settings": {
+    "general": {
+      "gameTitle": "Electron Topdown Demo",
+      "author": "GBA Studio",
+      "version": "0.1.0",
+      "description": "Fixture de migracao Electron",
+      "startScene": "overworld_start",
+      "startSceneType": "topdown",
+      "startPlayer": "Player",
+      "defaultLanguage": "pt-BR",
+      "exportFolder": "build/electron-fixture"
+    },
+    "build": {
+      "romFileName": "electron_topdown_demo.gba",
+      "exportFormat": "gba_rom",
+      "engineBackend": "gbastudio_engine",
+      "enginePackPath": "/opt/GBAStudioEnginePack",
+      "toolchain": "devkitARM",
+      "butanoPath": "/opt/butano",
+      "compilerPath": "/opt/devkitARM",
+      "generateDebugFiles": true,
+      "openBuildLog": true,
+      "openFolderAfterExport": false,
+      "showMemoryUsageAfterBuild": true,
+      "runEmulatorAfterBuild": false
+    },
+    "sceneTypes": {
+      "defaultSceneType": "topdown",
+      "enabled": {
+        "topdown": true,
+        "platformer": true,
+        "isometric": false,
+        "pointAndClick": true,
+        "shmup": false
+      }
+    },
+    "preview": {
+      "defaultMode": "quick_preview",
+      "scale": 3,
+      "openInPopup": true,
+      "hotReload": true,
+      "showCollisions": true,
+      "showTriggers": true,
+      "showHitboxes": false,
+      "showGrid": false,
+      "showFps": true,
+      "showVariables": true,
+      "showEventLog": true,
+      "emulator": "mgba",
+      "emulatorPath": "/Applications/mGBA.app",
+      "runAfterBuild": false,
+      "muteRoomAudio": false
+    },
+    "audio": {
+      "defaultMusicFormat": "gba_studio_chiptune",
+      "audioEngine": "gbastudio_engine_audio",
+      "audioMode": "chiptune_pcm",
+      "sampleRate": 15768,
+      "masterVolume": 100,
+      "musicVolume": 80,
+      "sfxVolume": 90,
+      "enablePsgChannels": true,
+      "enableDirectSoundA": true,
+      "enableDirectSoundB": true,
+      "sfxPriority": "medium",
+      "stopMusicOnSceneChange": false,
+      "keepMusicBetweenScenes": true,
+      "sceneFadeDuration": 0.5
+    },
+    "save": {
+      "saveType": "sram",
+      "slots": 3,
+      "autoSave": true,
+      "manualSave": true,
+      "saveCurrentScene": true,
+      "savePlayerPosition": true,
+      "saveInventory": true,
+      "saveGlobalVariables": true,
+      "useChecksum": true,
+      "resetSaveInDebug": false
+    },
+    "debug": {
+      "showCpuUsage": true,
+      "showVramUsage": true,
+      "showOamUsage": true,
+      "showPaletteUsage": true,
+      "showRomUsage": true,
+      "showRamUsage": true,
+      "enableEventLogs": true,
+      "enableAudioLogs": false,
+      "enableCollisionLogs": false,
+      "exportReadableButanoProject": true,
+      "preserveTempFiles": false,
+      "developerMode": false
+    }
+  },
+  "editorState": {
+    "selectedWorkspace": "rooms",
+    "scenaConnections": [
+      {
+        "from": "overworld_start",
+        "to": "shop",
+        "eventName": "door_enter"
+      }
+    ]
+  }
+}

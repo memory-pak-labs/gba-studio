@@ -1,0 +1,88 @@
+{
+  "date": "2026-10-06",
+  "approval": "User: aprovado",
+  "palette": [
+    "#100018",
+    "#201030",
+    "#402058",
+    "#583878",
+    "#704888",
+    "#9068b0",
+    "#b890c8",
+    "#d0b8e0"
+  ],
+  "operation": "Native nearest-only reviews; measured alpha threshold; fixed eight-color purple palette, no rescale or reanchor",
+  "assets": [
+    {
+      "id": "dialogue-skin",
+      "input": "review/dialogue-skin-preserved.png",
+      "name": "neutral-dialogue-skin.png",
+      "width": 24,
+      "height": 24,
+      "sourceReviewSha256": "76a0ad9e7cef7169798a24aa4c668f5652d1b691a43c7db2e4fba9d2df0367ec",
+      "sha256": "962659218313d8cdf7cf6082b5eaf42621b4ef3ce2c857f480dccba6c0506002",
+      "alphaHistogram": {
+        "0": 16,
+        "3": 1,
+        "4": 3,
+        "253": 367,
+        "254": 186,
+        "255": 3
+      },
+      "alphaThreshold": 128,
+      "removedNonzeroPixels": 4,
+      "retainedPixels": 556
+    },
+    {
+      "id": "neutral-portrait",
+      "input": "review/neutral-portrait-preserved.png",
+      "name": "neutral-portrait.png",
+      "width": 64,
+      "height": 64,
+      "sourceReviewSha256": "fe54f5104e91ae642045437171f274ff8159ce055dd42ac000a51e5a4a3d1713",
+      "sha256": "6cb359dac88a53b9790d76c310b36b733aaa82c6f75c78de88adb5d630d19be3",
+      "alphaHistogram": {
+        "0": 2694,
+        "1": 8,
+        "3": 1,
+        "5": 1,
+        "34": 1,
+        "55": 1,
+        "109": 1,
+        "122": 1,
+        "126": 1,
+        "143": 1,
+        "159": 1,
+        "160": 1,
+        "164": 1,
+        "165": 1,
+        "173": 1,
+        "174": 1,
+        "241": 1,
+        "243": 1,
+        "245": 1,
+        "247": 2,
+        "248": 2,
+        "249": 3,
+        "250": 3,
+        "251": 5,
+        "252": 9,
+        "253": 291,
+        "254": 1060,
+        "255": 2
+      },
+      "alphaThreshold": 128,
+      "removedNonzeroPixels": 15,
+      "retainedPixels": 1387
+    },
+    {
+      "id": "dialogue-selector",
+      "name": "neutral-dialogue-selector.png",
+      "width": 8,
+      "height": 8,
+      "sha256": "89941d0ff4315086983fa821a3b974f488f90cc026c190ebd7ee00b1b9900378",
+      "sourceReviewSha256": "89941d0ff4315086983fa821a3b974f488f90cc026c190ebd7ee00b1b9900378",
+      "input": "Previously approved neutral-hud-arrow-right.png; byte-preserving copy for dialogue BG consumer"
+    }
+  ]
+}

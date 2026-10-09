@@ -1,0 +1,312 @@
+{
+  "schema": 1,
+  "backend": "gbastudio_engine",
+  "kind": "platformer",
+  "template_dir": "../../../templates/exported_platformer",
+  "entry": "main.cpp",
+  "project_data": "platformer_project_data.hpp",
+  "generated_assets": [],
+  "build": {
+    "target": "assetc_platformer_export",
+    "make_target": "all"
+  },
+  "requires": {
+    "engine_pack": ">=1.18.0",
+    "features": [
+      "platformer_runtime",
+      "engine_sdk.platformer_project_data_contract",
+      "platformer_runtime.room_warp",
+      "platformer_runtime.enemies",
+      "platformer_runtime.moving_platforms"
+    ]
+  },
+  "platformer_project": {
+    "includes": [
+      "../tilemap.hpp"
+    ],
+    "assets": {
+      "bg_palettes": [
+        "tilemap_palette_asset"
+      ],
+      "tile_assets": [
+        "tilemap_tile_asset"
+      ]
+    },
+    "initial_room": 0,
+    "backdrop_color": 99,
+    "resource_banks": [
+      {
+        "kind": "bg_tiles",
+        "start": 0,
+        "count": 4,
+        "alignment": 1,
+        "name": "platformer_bg_tiles"
+      },
+      {
+        "kind": "bg_palette",
+        "start": 32,
+        "count": 16,
+        "alignment": 16,
+        "name": "platformer_bg_palette"
+      },
+      {
+        "kind": "oam_sprites",
+        "start": "auto",
+        "count": 4,
+        "alignment": 1,
+        "name": "platformer_oam"
+      }
+    ],
+    "config": {
+      "gravity_x256": 56,
+      "jump_speed_x256": 1280,
+      "ladders_enabled": true
+    },
+    "rooms": [
+      {
+        "name": "generated_platformer_room",
+        "width_tiles": 4,
+        "height_tiles": 3,
+        "visual_tiles": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          2,
+          2,
+          2,
+          2
+        ],
+        "collision_flags": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          4,
+          0,
+          0,
+          1,
+          1,
+          1,
+          1
+        ],
+        "player_start": {
+          "x": 8,
+          "y": 8,
+          "width": 16,
+          "height": 16
+        },
+        "camera": {
+          "position": {
+            "x": 2,
+            "y": 4
+          },
+          "follow_player": true
+        },
+        "on_enter": [
+          {
+            "op": "set_variable",
+            "variable": 1,
+            "value": 7
+          }
+        ],
+        "on_update": [
+          {
+            "op": "show_dialogue_if",
+            "line": 0,
+            "variable": 1,
+            "value": 7
+          }
+        ],
+        "hazards": [
+          {
+            "area": {
+              "x": 16,
+              "y": 16,
+              "width": 8,
+              "height": 8
+            },
+            "damage": 2,
+            "respawn": true,
+            "on_hit": [
+              {
+                "op": "play_sfx",
+                "index": 0
+              },
+              {
+                "op": "warp",
+                "room": 1,
+                "x": 8,
+                "y": 8
+              }
+            ]
+          }
+        ],
+        "checkpoints": [
+          {
+            "area": {
+              "x": 8,
+              "y": 8,
+              "width": 16,
+              "height": 16
+            },
+            "respawn_position": {
+              "x": 8,
+              "y": 8
+            },
+            "id": 7,
+            "on_activate": [
+              {
+                "op": "set_variable",
+                "variable": 2,
+                "value": 3
+              }
+            ]
+          }
+        ],
+        "camera_zones": [
+          {
+            "area": {
+              "x": 0,
+              "y": 0,
+              "width": 32,
+              "height": 24
+            },
+            "bounds": {
+              "x": 0,
+              "y": 0,
+              "width": 64,
+              "height": 48
+            },
+            "offset": {
+              "x": 1,
+              "y": 2
+            },
+            "lock_x": false,
+            "lock_y": true,
+            "on_enter": [
+              {
+                "op": "set_camera_position",
+                "x": 1,
+                "y": 2
+              }
+            ]
+          }
+        ],
+        "enemies": [
+          {
+            "bounds": {
+              "x": 16,
+              "y": 8,
+              "width": 8,
+              "height": 8
+            },
+            "patrol_bounds": {
+              "x": 8,
+              "y": 8,
+              "width": 24,
+              "height": 8
+            },
+            "velocity_x256": {
+              "x": 256,
+              "y": 0
+            },
+            "damage": 1,
+            "active": true,
+            "facing_right": true
+          }
+        ],
+        "moving_platforms": [
+          {
+            "bounds": {
+              "x": 8,
+              "y": 16,
+              "width": 16,
+              "height": 8
+            },
+            "start": {
+              "x": 8,
+              "y": 16
+            },
+            "end": {
+              "x": 24,
+              "y": 16
+            },
+            "velocity_x256": {
+              "x": 256,
+              "y": 0
+            },
+            "active": true,
+            "forward": true
+          }
+        ]
+      },
+      {
+        "name": "generated_platformer_warp_room",
+        "width_tiles": 4,
+        "height_tiles": 3,
+        "visual_tiles": [
+          2,
+          2,
+          2,
+          2,
+          0,
+          0,
+          1,
+          0,
+          2,
+          2,
+          2,
+          2
+        ],
+        "collision_flags": [
+          1,
+          1,
+          1,
+          1,
+          0,
+          0,
+          4,
+          0,
+          1,
+          1,
+          1,
+          1
+        ],
+        "player_start": {
+          "x": 8,
+          "y": 8,
+          "width": 16,
+          "height": 16
+        },
+        "camera": {
+          "position": {
+            "x": 0,
+            "y": 0
+          },
+          "follow_player": true
+        },
+        "on_enter": [
+          {
+            "op": "set_variable",
+            "variable": 6,
+            "value": 1
+          }
+        ]
+      }
+    ],
+    "save": {
+      "enabled": true,
+      "signature": "GBPF",
+      "offset": 0,
+      "slot_capacity": 1024,
+      "slot_count": 1,
+      "version": 1
+    }
+  }
+}

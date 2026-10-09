@@ -1,0 +1,616 @@
+:root {
+  --studio-control-primary-bg: var(--studio-color-accent-solid);
+  --studio-control-primary-border: var(--studio-color-accent-solid);
+  --studio-control-primary-text: #ffffff;
+  --studio-control-secondary-bg: #f3f6fa;
+  --studio-control-secondary-border: #dce3eb;
+  --studio-control-secondary-text: var(--studio-color-text-primary);
+  --studio-control-hover-bg: #fbf9ff;
+  --studio-control-hover-border: var(--studio-color-accent-border);
+  --studio-filter-bg: #f6f8fb;
+  --studio-filter-border: #e0e7ef;
+  --studio-filter-text: var(--studio-color-text-secondary);
+  --studio-filter-selected-bg: var(--studio-color-accent-soft);
+  --studio-filter-selected-border: var(--studio-color-accent-border);
+  --studio-filter-selected-text: var(--studio-color-accent);
+  --studio-status-bg: var(--studio-color-surface);
+  --studio-status-border: #e1e7ef;
+  --studio-status-text: var(--studio-color-text-secondary);
+  --studio-token-bg: #edf2f7;
+  --studio-token-border: #dfe6ee;
+  --studio-token-text: #52606d;
+  --studio-readonly-bg: #f4f7fa;
+  --studio-readonly-border: #e2e8ef;
+  --studio-readonly-text: var(--studio-color-text-secondary);
+  --studio-disabled-bg: #f2f5f8;
+  --studio-disabled-border: #e4e9ef;
+  --studio-disabled-text: #9aa5b2;
+}
+
+.ui-button,
+:where(
+  .welcome-secondary,
+  .settings-header-actions > button,
+  .rooms-header-actions button,
+  .sprites-header-actions button,
+  .events-header-actions button,
+  .audio-header-actions button,
+  .dialogues-header button,
+  .room-actions button,
+  .sprite-actions button,
+  .audio-actions button,
+  .asset-actions button,
+  .event-actions button,
+  .dialogues-editor-actions button,
+  .project-action-menu button,
+  .event-command-menu-header button
+) {
+  background: var(--studio-control-secondary-bg);
+  border-color: var(--studio-control-secondary-border);
+  color: var(--studio-control-secondary-text);
+}
+
+.ui-button:hover:not(:disabled),
+:where(
+  .welcome-secondary,
+  .settings-header-actions > button,
+  .rooms-header-actions button,
+  .sprites-header-actions button,
+  .events-header-actions button,
+  .audio-header-actions button,
+  .dialogues-header button,
+  .room-actions button,
+  .sprite-actions button,
+  .audio-actions button,
+  .asset-actions button,
+  .event-actions button,
+  .dialogues-editor-actions button,
+  .project-action-menu button,
+  .event-command-menu-header button
+):hover:not(:disabled) {
+  background: var(--studio-control-hover-bg);
+  border-color: var(--studio-control-hover-border);
+  box-shadow: var(--studio-shadow-soft);
+  color: var(--studio-color-accent);
+}
+
+.ui-button:active:not(:disabled),
+:where(
+  .welcome-secondary,
+  .settings-header-actions > button,
+  .rooms-header-actions button,
+  .sprites-header-actions button,
+  .events-header-actions button,
+  .audio-header-actions button,
+  .dialogues-header button,
+  .room-actions button,
+  .sprite-actions button,
+  .audio-actions button,
+  .asset-actions button,
+  .event-actions button,
+  .dialogues-editor-actions button,
+  .project-action-menu button,
+  .event-command-menu-header button
+):active:not(:disabled) {
+  transform: translateY(1px);
+}
+
+:where(
+  .ui-button,
+  .welcome-secondary,
+  .settings-header-actions > button,
+  .rooms-header-actions button,
+  .sprites-header-actions button,
+  .events-header-actions button,
+  .audio-header-actions button,
+  .dialogues-header button,
+  .room-actions button,
+  .sprite-actions button,
+  .audio-actions button,
+  .asset-actions button,
+  .event-actions button,
+  .dialogues-editor-actions button,
+  .project-action-menu button,
+  .event-command-menu-header button
+):disabled {
+  background: var(--studio-disabled-bg);
+  border-color: var(--studio-disabled-border);
+  color: var(--studio-disabled-text);
+  opacity: 0.78;
+}
+
+:where(
+  .welcome-primary,
+  .welcome-play,
+  .topbar-actions .run-button,
+  .asset-primary-action,
+  .event-command-menu-section button.event-command-card:hover,
+  .event-command-menu-group button.event-command-card:hover
+) {
+  background: var(--studio-control-primary-bg);
+  border-color: var(--studio-control-primary-border);
+  color: var(--studio-control-primary-text);
+}
+
+:where(.welcome-primary, .welcome-play, .topbar-actions .run-button, .asset-primary-action):hover:not(:disabled) {
+  background: var(--studio-color-accent-solid-hover);
+  border-color: var(--studio-color-accent-hover);
+  color: #ffffff;
+  box-shadow: 0 12px 24px rgba(109, 43, 241, 0.24);
+}
+
+.ui-segmented,
+:where(
+  .workspace-list,
+  .event-filter-segment,
+  .event-command-menu-tabs,
+  .sprite-mode-segment,
+  .sprite-playback-strip,
+  .sprite-canvas-view-strip,
+  .audio-workspace-mode,
+  .audio-composer-tabs,
+  .files-segmented-control,
+  .room-tool-segment,
+  .room-edit-mode-segment,
+  .room-entity-tool-segment
+) {
+  background: var(--studio-filter-bg);
+  border: 1px solid var(--studio-filter-border);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
+}
+
+.ui-segmented button,
+:where(
+  .event-filter-segment,
+  .event-command-menu-tabs,
+  .sprite-mode-segment,
+  .sprite-playback-strip,
+  .sprite-canvas-view-strip,
+  .audio-workspace-mode,
+  .audio-composer-tabs,
+  .files-segmented-control,
+  .room-tool-segment,
+  .room-edit-mode-segment,
+  .room-entity-tool-segment
+) button {
+  color: var(--studio-filter-text);
+}
+
+.ui-segmented button.active,
+.ui-segmented button[aria-pressed="true"],
+:where(
+  .event-filter-segment,
+  .event-command-menu-tabs,
+  .sprite-mode-segment,
+  .audio-workspace-mode,
+  .audio-composer-tabs,
+  .files-segmented-control,
+  .room-tool-segment,
+  .room-edit-mode-segment,
+  .room-entity-tool-segment
+) button.active,
+:where(.files-segmented-control, .audio-composer-tabs) button[aria-pressed="true"] {
+  background: var(--studio-filter-selected-bg);
+  border-color: transparent;
+  color: var(--studio-filter-selected-text);
+  box-shadow: inset 0 0 0 1px var(--studio-filter-selected-border);
+}
+
+.event-filter-segment button.active,
+.event-command-menu-tabs button.active,
+.sprite-mode-segment button.active,
+.audio-workspace-mode button.active,
+.audio-composer-tabs button.active,
+.files-segmented-control button[aria-pressed="true"],
+.room-tool-segment button.active,
+.room-edit-mode-segment button.active,
+.room-entity-tool-segment button.active {
+  background: var(--studio-filter-selected-bg);
+  border-color: transparent;
+  color: var(--studio-filter-selected-text);
+  box-shadow: inset 0 0 0 1px var(--studio-filter-selected-border);
+}
+
+.sprite-playback-strip button.active,
+.sprite-canvas-view-strip button.active {
+  background: var(--studio-color-text-primary);
+  color: var(--studio-color-surface);
+}
+
+:where(.workspace.active, .topbar-actions .run-button) {
+  background: var(--studio-control-primary-bg);
+  border-color: var(--studio-control-primary-border);
+  color: #ffffff;
+}
+
+.ui-chip,
+:where(
+  .rooms-filter-chip-group button,
+  .files-filter-chip-group button,
+  .sprites-filter-chip-group button,
+  .events-filter-strip button,
+  .audio-filter-chip-group button,
+  .dialogues-filter-chip-group button
+) {
+  background: var(--studio-filter-bg);
+  border: 1px solid var(--studio-filter-border);
+  color: var(--studio-filter-text);
+  min-height: 30px;
+  transition:
+    background-color var(--studio-motion-fast),
+    border-color var(--studio-motion-fast),
+    box-shadow var(--studio-motion-fast),
+    color var(--studio-motion-fast),
+    opacity var(--studio-motion-fast),
+    transform var(--studio-motion-fast);
+}
+
+.ui-chip:hover:not(:disabled),
+:where(
+  .rooms-filter-chip-group button,
+  .files-filter-chip-group button,
+  .sprites-filter-chip-group button,
+  .events-filter-strip button,
+  .audio-filter-chip-group button,
+  .dialogues-filter-chip-group button
+):hover:not(:disabled) {
+  background: var(--studio-control-hover-bg);
+  border-color: var(--studio-control-hover-border);
+  color: var(--studio-color-accent);
+}
+
+.ui-chip:focus-visible {
+  box-shadow: var(--studio-focus-ring);
+  outline: none;
+}
+
+.ui-chip.active,
+:where(
+  .rooms-filter-chip-group button,
+  .files-filter-chip-group button,
+  .sprites-filter-chip-group button,
+  .events-filter-strip button,
+  .audio-filter-chip-group button,
+  .dialogues-filter-chip-group button
+).active {
+  background: var(--studio-filter-selected-bg);
+  border-color: var(--studio-filter-selected-border);
+  color: var(--studio-filter-selected-text);
+  box-shadow:
+    inset 0 0 0 1px rgba(109, 43, 241, 0.08),
+    0 6px 16px rgba(109, 43, 241, 0.08);
+}
+
+.rooms-filter-chip-group button.active,
+.files-filter-chip-group button.active,
+.sprites-filter-chip-group button.active,
+.events-filter-strip button.active,
+.audio-filter-chip-group button.active,
+.dialogues-filter-chip-group button.active {
+  background: var(--studio-filter-selected-bg);
+  border-color: var(--studio-filter-selected-border);
+  color: var(--studio-filter-selected-text);
+}
+
+:where(
+  .rooms-filter-chip-group button,
+  .files-filter-chip-group button,
+  .sprites-filter-chip-group button,
+  .events-filter-strip button,
+  .audio-filter-chip-group button,
+  .dialogues-filter-chip-group button
+):disabled {
+  background: var(--studio-disabled-bg);
+  border-color: var(--studio-disabled-border);
+  color: var(--studio-disabled-text);
+  opacity: 0.7;
+}
+
+.ui-badge,
+:where(
+  .settings-summary-strip span,
+  .files-summary-strip span,
+  .event-summary-strip span,
+  .sprite-summary-strip span,
+  .audio-summary-strip span,
+  .room-kind-strip span,
+  .event-node-badge,
+  .settings-section-badge,
+  .audio-validation-header span,
+  .sprite-active-sheet-chip
+) {
+  background: var(--studio-status-bg);
+  border: 1px solid var(--studio-status-border);
+  border-radius: var(--studio-radius-control);
+  color: var(--studio-status-text);
+  min-height: 24px;
+}
+
+:where(
+  .settings-summary-strip span,
+  .files-summary-strip span,
+  .event-summary-strip span,
+  .sprite-summary-strip span,
+  .audio-summary-strip span,
+  .room-kind-strip span
+) strong {
+  color: var(--studio-color-text-primary);
+}
+
+:where(.warning-chip, .danger-chip) {
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.54);
+}
+
+.warning-chip {
+  background: var(--studio-color-warning-bg);
+  border-color: var(--studio-color-warning-border);
+  color: var(--studio-color-warning-text);
+}
+
+.attention-chip {
+  background: var(--studio-color-attention-bg);
+  border-color: var(--studio-color-attention-border);
+  color: var(--studio-color-attention-text);
+}
+
+.danger-chip {
+  background: var(--studio-color-danger-bg);
+  border-color: var(--studio-color-danger-border);
+  color: var(--studio-color-danger-text);
+}
+
+.ok-chip {
+  background: var(--studio-color-ok-bg);
+  border-color: var(--studio-color-ok-border);
+  color: var(--studio-color-ok-text);
+}
+
+.ui-token,
+:where(
+  .event-command-menu-section button em,
+  .event-command-menu-group button em,
+  .event-command-palette button.event-command-card em,
+  .event-command-card-meta span,
+  .audio-validation-chips span,
+  .audio-step-badges span,
+  .sprite-composer-badges span,
+  .file-chip,
+  .audio-chip,
+  .sprite-chip
+) {
+  background: var(--studio-token-bg);
+  border: 1px solid var(--studio-token-border);
+  border-radius: var(--studio-radius-control);
+  color: var(--studio-token-text);
+  min-height: 22px;
+}
+
+.event-command-menu-section button em,
+.event-command-menu-group button em,
+.event-command-palette button.event-command-card em,
+.event-command-card-meta span,
+.audio-validation-chips span,
+.audio-step-badges span,
+.sprite-composer-badges span {
+  background: var(--studio-token-bg);
+  border: 1px solid var(--studio-token-border);
+  color: var(--studio-token-text);
+}
+
+.ui-field,
+:where(
+  .welcome-create input,
+  .settings-edit-row input,
+  .settings-edit-row select,
+  .room-inspector-panel input,
+  .room-inspector-panel select,
+  .event-command-field input,
+  .event-binding-field input,
+  .event-context-field input,
+  .files-workspace input,
+  .files-workspace select,
+  .sprites-workspace input,
+  .sprites-workspace select,
+  .audio-workspace input,
+  .audio-workspace select,
+  .dialogues-workspace input,
+  .dialogues-workspace select,
+  .dialogues-workspace textarea
+) {
+  background: var(--studio-color-input-bg);
+  border: 1px solid var(--studio-color-border);
+  color: var(--studio-color-text-primary);
+}
+
+:where(.settings-edit-row input[readonly], .welcome-create input[readonly], .dialogues-workspace input[readonly]) {
+  background: var(--studio-readonly-bg);
+  border-color: var(--studio-readonly-border);
+  color: var(--studio-readonly-text);
+}
+
+:where(
+  .settings-edit-row input,
+  .settings-edit-row select,
+  .welcome-create input,
+  .room-inspector-panel input,
+  .room-inspector-panel select,
+  .event-command-field input,
+  .event-binding-field input,
+  .event-context-field input,
+  .files-workspace input,
+  .files-workspace select,
+  .sprites-workspace input,
+  .sprites-workspace select,
+  .audio-workspace input,
+  .audio-workspace select,
+  .dialogues-workspace input,
+  .dialogues-workspace select,
+  .dialogues-workspace textarea
+):focus-visible {
+  border-color: var(--studio-color-accent);
+  box-shadow: var(--studio-focus-ring);
+}
+
+:where(
+  .welcome-recent,
+  .welcome-create,
+  .welcome-template-card,
+  .event-card,
+  .event-graph-node,
+  .event-command-card,
+  .sprite-sheet-card,
+  .audio-card,
+  .settings-intent-card,
+  .settings-section-card,
+  .settings-inspector-card,
+  .room-stage-card
+) {
+  transition:
+    background-color var(--studio-motion-fast),
+    border-color var(--studio-motion-fast),
+    box-shadow var(--studio-motion-fast),
+    color var(--studio-motion-fast),
+    transform var(--studio-motion-fast);
+}
+
+.event-command-menu-tabs button,
+.sprites-filter-chip-group button,
+.audio-summary-strip span,
+.settings-edit-row input[readonly] {
+  transition:
+    background-color var(--studio-motion-fast),
+    border-color var(--studio-motion-fast),
+    box-shadow var(--studio-motion-fast),
+    color var(--studio-motion-fast),
+    opacity var(--studio-motion-fast),
+    transform var(--studio-motion-fast);
+}
+
+:where(
+  .welcome-template-card,
+  .event-card,
+  .event-graph-node,
+  .event-command-card,
+  .sprite-sheet-card,
+  .audio-card,
+  .settings-intent-card,
+  .room-stage-card
+):hover {
+  border-color: var(--studio-control-hover-border);
+  box-shadow: var(--studio-shadow-soft);
+}
+
+:where(
+  .event-card:has(button[aria-pressed="true"]),
+  .sprite-sheet-card:has(.sprite-active-sheet-chip),
+  .audio-card:has(button[aria-pressed="true"]),
+  .settings-intent-card.applied,
+  .room-stage-card.selected,
+  .event-graph-node.selected
+) {
+  background: var(--studio-color-surface-selected);
+  border-color: var(--studio-color-accent);
+  box-shadow:
+    0 0 0 1px rgba(109, 43, 241, 0.14),
+    var(--studio-shadow-soft);
+}
+
+.project-action-menu {
+  padding: var(--studio-space-2);
+}
+
+.project-action-menu button + button {
+  border-top: 1px solid rgba(223, 228, 234, 0.66);
+}
+
+.project-action-menu button:nth-child(2),
+.project-action-menu button:nth-child(3) {
+  color: var(--studio-color-accent);
+}
+
+.event-command-menu {
+  box-shadow: var(--studio-shadow-raised);
+}
+
+.event-command-menu-section button.event-command-card:hover strong,
+.event-command-menu-group button.event-command-card:hover strong,
+.event-command-menu-section button.event-command-card:hover small,
+.event-command-menu-group button.event-command-card:hover small,
+.event-command-menu-section button.event-command-card:hover code,
+.event-command-menu-group button.event-command-card:hover code {
+  color: #ffffff;
+}
+
+.event-command-menu-section button.event-command-card:hover em,
+.event-command-menu-group button.event-command-card:hover em,
+.event-command-menu-section button.event-command-card:hover span,
+.event-command-menu-group button.event-command-card:hover span {
+  background: rgba(255, 255, 255, 0.18);
+  border-color: rgba(255, 255, 255, 0.24);
+  color: #ffffff;
+}
+
+.audio-composer-stage:has(.audio-empty-state),
+.audio-stage-empty,
+.audio-composer-empty {
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.78), rgba(247, 249, 252, 0.92)),
+    var(--studio-color-bg-canvas);
+}
+
+@media (max-width: 1180px) {
+  .workspace-list {
+    max-width: none;
+  }
+
+  :where(.events-layout, .sprites-layout, .audio-layout) {
+    grid-template-columns: minmax(220px, 280px) minmax(620px, 1fr) minmax(280px, 320px);
+  }
+
+  :where(.events-rail, .sprites-rail, .audio-rail, .settings-nav) {
+    overflow: auto;
+  }
+}
+
+@media (max-width: 980px) {
+  :where(.events-layout, .sprites-layout, .audio-layout) {
+    grid-template-columns: minmax(210px, 250px) minmax(560px, 1fr) minmax(260px, 300px);
+  }
+
+  :where(.events-header, .sprites-header, .audio-header, .settings-header) {
+    align-items: flex-start;
+    display: grid;
+    gap: var(--studio-space-3);
+    grid-template-columns: 1fr;
+  }
+
+  :where(.events-header-actions, .sprites-header-actions, .audio-header-actions, .settings-header-actions) {
+    justify-content: flex-start;
+  }
+}
+
+[data-studio-theme="dark"] {
+  --studio-control-secondary-bg: var(--studio-color-surface-raised);
+  --studio-control-secondary-border: var(--studio-color-border-strong);
+  --studio-control-secondary-text: var(--studio-color-text-primary);
+  --studio-control-hover-bg: var(--studio-color-surface-hover);
+  --studio-control-hover-border: var(--studio-color-accent-border);
+  --studio-filter-bg: var(--studio-color-surface-muted);
+  --studio-filter-border: var(--studio-color-border);
+  --studio-filter-text: var(--studio-color-text-secondary);
+  --studio-filter-selected-bg: var(--studio-color-accent-soft);
+  --studio-filter-selected-border: var(--studio-color-accent-border);
+  --studio-filter-selected-text: var(--studio-color-accent);
+  --studio-status-bg: var(--studio-color-surface-raised);
+  --studio-status-border: var(--studio-color-border);
+  --studio-status-text: var(--studio-color-text-secondary);
+  --studio-token-bg: var(--studio-color-surface-raised);
+  --studio-token-border: var(--studio-color-border-strong);
+  --studio-token-text: var(--studio-color-text-secondary);
+  --studio-readonly-bg: var(--studio-color-surface-muted);
+  --studio-readonly-border: var(--studio-color-border);
+  --studio-readonly-text: var(--studio-color-text-secondary);
+  --studio-disabled-bg: var(--studio-button-disabled-bg);
+  --studio-disabled-border: var(--studio-color-border);
+  --studio-disabled-text: var(--studio-button-disabled-text);
+}

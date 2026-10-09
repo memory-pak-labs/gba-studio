@@ -1,0 +1,97 @@
+{
+  "profile": "neutral-purple",
+  "approval": "User approved Luta and horizontal Shoot-up concepts on 2026-10-06.",
+  "assets": [
+    {
+      "name": "neutral-hud-fight-life-full.png",
+      "width": 96,
+      "height": 32,
+      "kind": "UI",
+      "sha256": "ccee10d4e9a31ede56d6f018db099eb3d2ad778ce405349d218e5a8b6e5d9c1a"
+    },
+    {
+      "name": "neutral-hud-fight-life-empty.png",
+      "width": 96,
+      "height": 32,
+      "kind": "UI",
+      "sha256": "43ce5faff303703c3caff4864d9d100b48d3921aa5c33e15e5b218cdd65f7c7d"
+    },
+    {
+      "name": "neutral-hud-fight-life-p2-full.png",
+      "width": 96,
+      "height": 32,
+      "kind": "UI",
+      "sha256": "f8f8433f3b6408042f83c0c8da2e66d527b13320b194ed7d618e7e121ca870cb"
+    },
+    {
+      "name": "neutral-hud-fight-life-p2-empty.png",
+      "width": 96,
+      "height": 32,
+      "kind": "UI",
+      "sha256": "958eb4949ae4e8fedec77a97a415ddd35c59377181ae96d3da8d21c0603ab344"
+    },
+    {
+      "name": "neutral-hud-fight-timer.png",
+      "width": 32,
+      "height": 32,
+      "kind": "UI",
+      "sha256": "302dac865751fcc557aeaa64a987bf6956fc238c84f70224312ec12801578277"
+    },
+    {
+      "name": "neutral-hud-fight-rounds-0.png",
+      "width": 32,
+      "height": 8,
+      "kind": "UI",
+      "sha256": "193f063375d2ab6ec8353ed8bde3e3581208d6b332fd25d93058eaa1336a0477"
+    },
+    {
+      "name": "neutral-hud-fight-rounds-1.png",
+      "width": 32,
+      "height": 8,
+      "kind": "UI",
+      "sha256": "667bb3f849e155c149cdf0c5a69f849bb72d08880ea8d7862f500c5a090090db"
+    },
+    {
+      "name": "neutral-hud-fight-rounds-2.png",
+      "width": 32,
+      "height": 8,
+      "kind": "UI",
+      "sha256": "dfaf01dc871ccab1a23a4bf4fcf8a1916377abe08a7debd67e085e4dcc5e8096"
+    },
+    {
+      "name": "neutral-hud-shmup-frame.png",
+      "width": 96,
+      "height": 32,
+      "kind": "UI",
+      "sha256": "4ba8749b4f8a6513916ab72780823a26ed82fa27ad5a635adacdca9a808c01b2"
+    },
+    {
+      "name": "neutral-hud-shmup-life-full.png",
+      "width": 96,
+      "height": 32,
+      "kind": "UI",
+      "sha256": "68f37f0dad0f8d8b3f18dca16e3250d7aa8cef801d01fb1590353a9a9ab99d7d"
+    },
+    {
+      "name": "neutral-hud-shmup-life-empty.png",
+      "width": 96,
+      "height": 32,
+      "kind": "UI",
+      "sha256": "87f6e6eddda477e2ab112466464b8dc04988a8432a0e4eac596b27621d337450"
+    },
+    {
+      "name": "neutral-hud-shmup-score.png",
+      "width": 80,
+      "height": 32,
+      "kind": "UI",
+      "sha256": "baf22e9ab7c5d42623878716a9c7378adaa150b806a72572f70fa069ea478fc6"
+    },
+    {
+      "name": "neutral-hud-shmup-ship.png",
+      "width": 16,
+      "height": 16,
+      "kind": "UI",
+      "sha256": "7ac8a96cd3741ff5be2ba4e9693da95ce9a4514f910dcff29f8369335a09f36d"
+    }
+  ]
+}

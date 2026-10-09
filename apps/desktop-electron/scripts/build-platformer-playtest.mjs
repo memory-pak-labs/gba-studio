@@ -1,0 +1,20 @@
+// Build the canonical project through the production export path, starting in Penedos.
+import fs from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { spawnSync } from 'node:child_process';
+import { build } from 'esbuild';
+import { resolveEnginePackRoot } from './resolve-engine-pack-root.mjs';
+const app = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
+const root = process.argv[2];
+if (!root) throw new Error('Provide a new output directory');
+const projectPath = path.join(app, 'default-assets/templates/exemplo-gba/exemplo-gba.gba-project');
+const enginePackPath = resolveEnginePackRoot(app);
+const bundle = await build({ stdin: { contents: 'export { prepareEngineProjectExport } from "./src/main/exportEngineProject.ts"; export { writeEngineSchemaExport } from "./src/main/engineProjectExport.ts";', resolveDir: app }, bundle: true, platform: 'node', format: 'esm', write: false });
+const { prepareEngineProjectExport, writeEngineSchemaExport } = await import('data:text/javascript;base64,' + Buffer.from(bundle.outputFiles[0].text).toString('base64'));
+const result = prepareEngineProjectExport(JSON.parse(fs.readFileSync(projectPath, 'utf8')), { enginePackPath, developmentStartScene: { name: 'penedos_vento' } });
+if (result.error) throw new Error(result.error);
+await writeEngineSchemaExport({ destination: path.resolve(root), prepared: result.generated, assetcPath: path.join(enginePackPath, 'tools/assetc'), projectPath, cacheEnabled: false });
+const built = spawnSync(path.join(enginePackPath, 'tools/gbsbuild'), ['--engine-pack', enginePackPath, '--project-dir', path.resolve(root), '--build-dir', path.resolve(root, 'build'), '--devkitpro', '/opt/devkitpro', '--devkitarm', '/opt/devkitpro/devkitARM'], { stdio: 'inherit' });
+if (built.status !== 0) process.exit(built.status ?? 1);
+console.log(path.resolve(root, 'build', result.generated.target + '.gba'));

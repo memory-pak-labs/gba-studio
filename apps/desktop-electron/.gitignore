@@ -1,0 +1,8 @@
+dist/
+node_modules/
+out/
+release/
+artifacts/
+build/embedded-runtime/
+build/embedded-sprite-prep/
+*.log

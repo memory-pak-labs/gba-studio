@@ -1,0 +1,7 @@
+#define GBS_POINT_CLICK_RUNTIME_ENTRY gbs_run_point_click
+#define GBS_POINT_CLICK_RUNTIME_ENTER gbs_enter_point_click
+#define GBS_POINT_CLICK_RUNTIME_UPDATE gbs_update_point_click
+#define GBS_POINT_CLICK_RUNTIME_RENDER gbs_render_point_click
+#define GBS_POINT_CLICK_RUNTIME_LEAVE gbs_leave_point_click
+#define GBS_MULTI_RUNTIME 1
+#include "point_click_runtime.inc"

@@ -1,0 +1,39 @@
+{
+  "schema": 1,
+  "backend": "gbastudio_engine",
+  "kind": "battle_rpg",
+  "runtime_profile": "battle_rpg",
+  "template_dir": "../../templates/exported_battle_rpg",
+  "entry": "main.cpp",
+  "project_data": "battle_rpg_project_data.hpp",
+  "generated_assets": [],
+  "build": { "target": "battle_rpg_fixture", "make_target": "all" },
+  "requires": { "engine_pack": ">=2.24.0", "features": ["battle_rpg_runtime", "engine_sdk.battle_rpg_project_data_contract"] },
+  "battle_rpg_project": {
+    "initial_encounter": 0,
+    "save": { "enabled": true, "autosave": true, "signature": "GBBR", "slot_capacity": 1024, "slot_count": 3, "offset": 0, "version": 1 },
+    "dialogue_lines": ["Battle start", "Victory"],
+    "encounters": [{
+      "name": "arena",
+      "config": { "max_party_size": 3, "max_enemies": 4, "turn_delay_frames": 12, "active_time_battle": false, "escape_enabled": true },
+      "party_count": 3,
+      "enemy_count": 4,
+      "party": [
+        { "name": "Hero", "unit": { "max_hp": 24, "attack": 7, "defense": 2, "speed": 5 }, "abilities": [{ "kind": "attack", "power": 0 }, { "kind": "magic", "power": 7 }, { "kind": "heal", "power": 6 }, { "kind": "defend", "power": 0 }] },
+        { "name": "Mage", "unit": { "max_hp": 18, "attack": 5, "defense": 1, "speed": 7 }, "abilities": [{ "kind": "attack", "power": 0 }] },
+        { "name": "Guard", "unit": { "max_hp": 30, "attack": 5, "defense": 5, "speed": 3 }, "abilities": [{ "kind": "attack", "power": 0 }] }
+      ],
+      "enemies": [
+        { "name": "Slime A", "unit": { "max_hp": 12, "attack": 4, "defense": 1, "speed": 3 }, "abilities": [{ "kind": "attack", "power": 0 }] },
+        { "name": "Slime B", "unit": { "max_hp": 12, "attack": 4, "defense": 1, "speed": 3 }, "abilities": [{ "kind": "attack", "power": 0 }] },
+        { "name": "Slime C", "unit": { "max_hp": 12, "attack": 4, "defense": 1, "speed": 3 }, "abilities": [{ "kind": "attack", "power": 0 }] },
+        { "name": "Slime D", "unit": { "max_hp": 12, "attack": 4, "defense": 1, "speed": 3 }, "abilities": [{ "kind": "attack", "power": 0 }] }
+      ],
+      "rewards": { "gold": 25, "experience": 10 },
+      "on_enter": [{ "op": "show_dialogue", "dialogue": 0 }],
+      "on_victory": [{ "op": "show_dialogue", "dialogue": 1 }, { "op": "warp_runtime", "runtime": "topdown", "room": 0, "x": 64, "y": 64 }],
+      "on_defeat": [{ "op": "set_variable", "variable": 1, "value": 1 }],
+      "on_escape": [{ "op": "set_variable", "variable": 2, "value": 1 }]
+    }]
+  }
+}

@@ -1,0 +1,184 @@
+.studio-overlay-backdrop {
+  align-items: flex-start;
+  background: rgba(20, 24, 32, 0.34);
+  display: flex;
+  inset: 0;
+  justify-content: center;
+  padding-top: min(16vh, 140px);
+  position: fixed;
+  z-index: 180;
+}
+
+.studio-command-palette {
+  background: var(--studio-color-surface-raised);
+  border: 1px solid var(--studio-color-border-strong);
+  border-radius: var(--studio-radius-panel);
+  box-shadow: var(--studio-shadow-raised);
+  display: grid;
+  gap: var(--studio-space-3);
+  max-height: min(620px, 72vh);
+  padding: var(--studio-space-3);
+  width: min(620px, calc(100vw - 32px));
+}
+
+.studio-command-palette > header {
+  align-items: center;
+  display: grid;
+  gap: var(--studio-space-2);
+  grid-template-columns: auto minmax(0, 1fr) auto auto;
+}
+
+.studio-command-palette kbd {
+  background: var(--studio-color-surface-muted);
+  border: 1px solid var(--studio-color-border);
+  border-radius: var(--studio-radius-control);
+  padding: 3px 7px;
+}
+
+.studio-command-search {
+  align-items: center;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  position: relative;
+}
+
+.studio-command-search > svg {
+  color: var(--studio-color-text-muted);
+  left: 11px;
+  position: absolute;
+}
+
+.studio-command-search input {
+  padding-left: 36px !important;
+  width: 100%;
+}
+
+.studio-command-results {
+  display: grid;
+  gap: 3px;
+  overflow-y: auto;
+}
+
+.studio-command-results > button {
+  align-items: start;
+  background: transparent;
+  border-color: transparent;
+  display: grid;
+  justify-items: start;
+  min-height: 44px;
+  padding: 8px 10px;
+  text-align: left;
+}
+
+.studio-command-results > button:hover,
+.studio-command-results > button:focus-visible {
+  background: var(--studio-color-surface-selected);
+  color: var(--studio-color-accent);
+}
+
+.studio-command-results small {
+  color: var(--studio-color-text-muted);
+}
+
+.project-problems-drawer {
+  background: var(--studio-color-surface-raised);
+  border-left: 1px solid var(--studio-color-border-strong);
+  bottom: 0;
+  box-shadow: var(--studio-shadow-raised);
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  position: fixed;
+  right: 0;
+  top: 52px;
+  width: min(430px, calc(100vw - 24px));
+  z-index: 150;
+}
+
+.project-problems-drawer > header {
+  align-items: start;
+  border-bottom: 1px solid var(--studio-color-border);
+  display: flex;
+  justify-content: space-between;
+  padding: var(--studio-space-4);
+}
+
+.project-problems-drawer > header > div {
+  display: grid;
+  gap: 4px;
+}
+
+.project-problems-drawer > header span {
+  color: var(--studio-color-text-muted);
+}
+
+.project-problems-list {
+  display: grid;
+  gap: var(--studio-space-4);
+  overflow-y: auto;
+  padding: var(--studio-space-4);
+}
+
+.project-problems-list section {
+  display: grid;
+  gap: 4px;
+}
+
+.project-problems-list h3 {
+  align-items: center;
+  display: flex;
+  justify-content: space-between;
+  margin: 0 0 4px;
+}
+
+.project-problems-list h3 span {
+  background: var(--studio-color-accent-soft);
+  border-radius: var(--studio-radius-pill);
+  color: var(--studio-color-accent);
+  padding: 2px 7px;
+}
+
+.project-problems-list section > button {
+  align-items: start;
+  background: var(--studio-color-surface);
+  border-color: var(--studio-color-border);
+  color: var(--studio-color-text-primary);
+  display: grid;
+  gap: var(--studio-space-2);
+  grid-template-columns: auto minmax(0, 1fr);
+  min-height: 42px;
+  padding: 8px 10px;
+  text-align: left;
+}
+
+.project-problems-list section > button.error > svg {
+  color: var(--studio-color-danger);
+}
+
+.project-problems-list section > button.warning > svg {
+  color: var(--studio-color-warning-text);
+}
+
+.workspace-navigation-trail {
+  align-items: center;
+  background: var(--studio-color-surface-raised);
+  border-bottom: 1px solid var(--studio-color-border);
+  display: flex;
+  gap: var(--studio-space-2);
+  min-height: 34px;
+  padding: 4px var(--studio-space-5);
+}
+
+.workspace-navigation-trail button {
+  align-items: center;
+  background: transparent;
+  border-color: transparent;
+  color: var(--studio-color-accent);
+  display: inline-flex;
+  gap: 5px;
+  padding: 4px 6px;
+}
+
+.workspace-navigation-trail > span,
+.workspace-navigation-trail > strong {
+  color: var(--studio-color-text-muted);
+}

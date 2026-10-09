@@ -1,0 +1,6 @@
+{
+  "schema": 1, "backend": "gbastudio_engine", "kind": "luta", "runtime_profile": "luta",
+  "entry": "main.cpp", "project_data": "luta_project_data.hpp", "generated_assets": [],
+  "build": { "target": "exported_luta", "make_target": "all" },
+  "requires": { "engine_pack": ">=2.24.0", "features": ["luta_runtime", "engine_sdk.luta_project_data_contract"] }
+}

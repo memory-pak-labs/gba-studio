@@ -1,0 +1,38 @@
+{
+  "schema": 1,
+  "backend": "gbastudio_engine",
+  "kind": "point_click",
+  "runtime_profile": "point_click",
+  "runtime_adapter": {
+    "base_runtime": "point_click",
+    "adapter": "native",
+    "project_block": "point_click_project",
+    "native": true
+  },
+  "build": {
+    "target": "exported_point_click",
+    "make_target": "all"
+  },
+  "entry": "main.cpp",
+  "project_data": "point_click_project_data.hpp",
+  "generated_assets": [],
+  "requires": {
+    "engine_pack": ">=1.45.0",
+    "features": [
+      "point_click_runtime",
+      "engine_sdk.point_click_project_data_contract",
+      "asset-export-point-click-project-data",
+      "point_click_inventory_items",
+      "point_click_hotspot_item_requirements",
+      "point_click_pending_scene_transition",
+      "point_click_save_data",
+      "point_click_autosave_slot0",
+      "point_click_hud_scene_item",
+      "save.export_project_config",
+      "asset-export-runtime-profile-manifest",
+      "runtime_profiles.point_click_native_contract",
+      "dialogue.visual_box",
+      "events.interaction"
+    ]
+  }
+}

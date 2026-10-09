@@ -1,0 +1,35 @@
+{
+  "schema": 1,
+  "backend": "gbastudio_engine",
+  "kind": "shmup",
+  "runtime_profile": "shmup",
+  "runtime_adapter": {
+    "base_runtime": "shmup",
+    "adapter": "native",
+    "project_block": "shmup_project",
+    "native": true
+  },
+  "entry": "main.cpp",
+  "project_data": "shmup_project_data.hpp",
+  "generated_assets": [],
+  "build": {
+    "target": "exported_shmup",
+    "make_target": "all"
+  },
+  "requires": {
+    "engine_pack": ">=1.43.0",
+    "features": [
+      "shmup_runtime",
+      "engine_sdk.shmup_project_data_contract",
+      "asset-export-shmup-project-data",
+      "shmup_save_data",
+      "shmup_autosave_slot0",
+      "shmup_hud_score_lives_high_score",
+      "save.export_project_config",
+      "asset-export-runtime-profile-manifest",
+      "runtime_profiles.shmup_native_contract",
+      "events.interaction",
+      "audio.direct_sound_pcm8"
+    ]
+  }
+}

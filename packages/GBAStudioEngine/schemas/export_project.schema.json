@@ -1,0 +1,4072 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://gbastudio.local/schemas/export_project.schema.json",
+  "title": "GBAStudio Engine export project input",
+  "type": "object",
+  "required": [
+    "schema",
+    "backend",
+    "kind",
+    "template_dir",
+    "entry",
+    "project_data",
+    "generated_assets",
+    "capability_manifest"
+  ],
+  "properties": {
+    "schema": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "backend": {
+      "const": "gbastudio_engine"
+    },
+    "kind": {
+      "type": "string",
+      "enum": [
+        "topdown",
+        "platformer",
+        "isometric",
+        "dungeon_crawler",
+        "dungeonCrawler",
+        "racing",
+        "battle_rpg",
+        "luta",
+        "mixed",
+        "point_click",
+        "pointAndClick",
+        "shmup",
+        "shoot_em_up",
+        "shootEmUp",
+        "visual_novel",
+        "visualNovel",
+        "menu",
+        "cutscene",
+        "world_map",
+        "worldMap"
+      ]
+    },
+    "runtime_profile": {
+      "oneOf": [
+        {
+          "type": "string",
+          "enum": [
+            "topdown",
+            "platformer",
+            "isometric",
+            "dungeon_crawler",
+            "dungeonCrawler",
+            "racing",
+            "battle_rpg",
+            "luta",
+            "mixed",
+            "point_click",
+            "pointAndClick",
+            "shmup",
+            "shoot_em_up",
+            "shootEmUp",
+            "visual_novel",
+            "visualNovel",
+            "menu",
+            "cutscene",
+            "world_map",
+            "worldMap"
+          ]
+        },
+        {
+          "type": "object",
+          "required": [
+            "kind"
+          ],
+          "properties": {
+            "kind": {
+              "type": "string",
+              "enum": [
+                "topdown",
+                "platformer",
+                "isometric",
+                "dungeon_crawler",
+                "dungeonCrawler",
+                "racing",
+                "battle_rpg",
+                "luta",
+                "mixed",
+                "point_click",
+                "pointAndClick",
+                "shmup",
+                "shoot_em_up",
+                "shootEmUp",
+                "visual_novel",
+                "visualNovel",
+                "menu",
+                "cutscene",
+                "world_map",
+                "worldMap"
+              ]
+            },
+            "base_runtime": {
+              "type": "string",
+              "enum": [
+                "topdown",
+                "platformer",
+                "isometric",
+                "dungeon_crawler",
+                "racing",
+                "battle_rpg",
+                "luta",
+                "point_click",
+                "visual_novel",
+                "menu",
+                "cutscene",
+                "world_map"
+              ]
+            }
+          },
+          "additionalProperties": true
+        }
+      ]
+    },
+    "capability_manifest": {
+      "type": "object",
+      "required": ["schema", "registry", "scenes"],
+      "properties": {
+        "schema": { "const": 1 },
+        "registry": { "const": "gba-studio-scene-capabilities" },
+        "scenes": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["name", "scene_type", "runtime_profile", "profile_budget", "capabilities", "issues"],
+            "properties": {
+              "name": { "type": "string", "minLength": 1 },
+              "scene_type": { "type": "string", "minLength": 1 },
+              "runtime_profile": { "type": "string", "minLength": 1 },
+              "profile_budget": {
+                "type": "object",
+                "required": [
+                  "bgTiles", "objTiles", "oam", "paletteColors", "vramBytes", "eventBytes",
+                  "audioBytes", "dmaBytes", "vblankTicks", "cpuWorkTicks"
+                ],
+                "properties": {
+                  "bgTiles": { "type": "integer", "minimum": 0 },
+                  "objTiles": { "type": "integer", "minimum": 0 },
+                  "oam": { "type": "integer", "minimum": 0 },
+                  "paletteColors": { "type": "integer", "minimum": 0 },
+                  "vramBytes": { "type": "integer", "minimum": 0 },
+                  "eventBytes": { "type": "integer", "minimum": 0 },
+                  "audioBytes": { "type": "integer", "minimum": 0 },
+                  "dmaBytes": { "type": "integer", "minimum": 0 },
+                  "vblankTicks": { "type": "integer", "minimum": 0 },
+                  "cpuWorkTicks": { "type": "integer", "minimum": 0 }
+                },
+                "additionalProperties": false
+              },
+              "capabilities": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "required": [
+                    "id", "label", "scene_profiles", "status", "assets", "editor_tools", "budget",
+                    "fallback", "verification", "settings", "engine_features"
+                  ],
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "enum": [
+                        "movement",
+                        "dialogue",
+                        "quests",
+                        "shop",
+                        "battle",
+                        "waves",
+                        "score",
+                        "inventory",
+                        "camera",
+                        "compass",
+                        "map",
+                        "affine_background",
+                        "affine_obj",
+                        "hblank_timeline",
+                        "animation_state_machine",
+                        "metatiles",
+                        "plugin_sdk",
+                        "link_multiplayer",
+                        "save_ui_profile",
+                        "tactical_surface",
+                        "tactical_grid_overlay",
+                        "tactical_hud",
+                        "tactical_units",
+                        "tactical_props",
+                        "tactical_feedback",
+                        "tactical_audio"
+                      ]
+                    },
+                    "label": { "type": "string", "minLength": 1 },
+                    "scene_profiles": {
+                      "type": "array",
+                      "items": { "type": "string", "minLength": 1 },
+                      "minItems": 1,
+                      "uniqueItems": true
+                    },
+                    "status": {
+                      "type": "object",
+                      "required": ["available", "enabled", "required", "verified"],
+                      "properties": {
+                        "available": { "type": "boolean" },
+                        "enabled": { "type": "boolean" },
+                        "required": { "type": "boolean" },
+                        "verified": { "type": "boolean" }
+                      },
+                      "additionalProperties": false
+                    },
+                    "assets": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "required": ["kind", "required", "reason"],
+                        "properties": {
+                          "kind": { "type": "string", "minLength": 1 },
+                          "required": { "type": "boolean" },
+                          "reason": { "type": "string", "minLength": 1 }
+                        },
+                        "additionalProperties": false
+                      }
+                    },
+                    "editor_tools": {
+                      "type": "array",
+                      "items": { "type": "string", "minLength": 1 },
+                      "uniqueItems": true
+                    },
+                    "budget": {
+                      "type": "object",
+                      "required": [
+                        "bgTiles", "objTiles", "oam", "paletteColors", "vramBytes", "eventBytes",
+                        "audioBytes", "dmaBytes", "vblankTicks", "cpuWorkTicks"
+                      ],
+                      "properties": {
+                        "bgTiles": { "type": "integer", "minimum": 0 },
+                        "objTiles": { "type": "integer", "minimum": 0 },
+                        "oam": { "type": "integer", "minimum": 0 },
+                        "paletteColors": { "type": "integer", "minimum": 0 },
+                        "vramBytes": { "type": "integer", "minimum": 0 },
+                        "eventBytes": { "type": "integer", "minimum": 0 },
+                        "audioBytes": { "type": "integer", "minimum": 0 },
+                        "dmaBytes": { "type": "integer", "minimum": 0 },
+                        "vblankTicks": { "type": "integer", "minimum": 0 },
+                        "cpuWorkTicks": { "type": "integer", "minimum": 0 }
+                      },
+                      "additionalProperties": false
+                    },
+                    "fallback": { "type": "string", "minLength": 1 },
+                    "verification": {
+                      "type": "object",
+                      "required": ["tests", "evidence"],
+                      "properties": {
+                        "tests": {
+                          "type": "array",
+                          "items": { "type": "string", "minLength": 1 },
+                          "minItems": 1,
+                          "uniqueItems": true
+                        },
+                        "evidence": {
+                          "type": "array",
+                          "items": { "type": "string", "minLength": 1 },
+                          "minItems": 1,
+                          "uniqueItems": true
+                        }
+                      },
+                      "additionalProperties": false
+                    },
+                    "settings": { "type": "object" },
+                    "engine_features": {
+                      "type": "array",
+                      "items": { "type": "string", "minLength": 1 },
+                      "uniqueItems": true
+                    }
+                  },
+                  "additionalProperties": false
+                }
+              },
+              "preflight": {
+                "$ref": "#/$defs/scene_preflight_report"
+              },
+              "issues": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "required": ["code", "message"],
+                  "properties": {
+                    "code": { "type": "string", "minLength": 1 },
+                    "module": { "type": "string", "minLength": 1 },
+                    "field": { "type": "string", "minLength": 1 },
+                    "message": { "type": "string", "minLength": 1 }
+                  },
+                  "additionalProperties": false
+                }
+              }
+            },
+            "additionalProperties": false
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    "structural_fixture": {
+      "$ref": "#/$defs/complete_structural_fixture"
+    },
+    "hardware_contract": {
+      "type": "object",
+      "required": [
+        "schema",
+        "viewport",
+        "tileSizePixels",
+        "videoMode",
+        "backgroundMapSizes",
+        "configuredBackgroundMapSize",
+        "obj",
+        "palette",
+        "scenes",
+        "assets",
+        "issues"
+      ],
+      "properties": {
+        "schema": { "const": 1 },
+        "viewport": { "type": "object", "required": ["widthPixels", "heightPixels", "widthTiles", "heightTiles"] },
+        "tileSizePixels": { "const": 8 },
+        "videoMode": { "type": "object", "required": ["id", "label"] },
+        "backgroundMapSizes": { "type": "array", "minItems": 4 },
+        "configuredBackgroundMapSize": { "type": "object", "required": ["id", "widthTiles", "heightTiles", "screenblocks"] },
+        "obj": { "type": "object", "required": ["maxEntries", "maxSingleDimensionPixels", "nativeDimensions", "tileSizePixels", "vramBytes"] },
+        "palette": { "type": "object", "required": ["background4bppColorsPerBank", "backgroundPaletteBanks", "object4bppColorsPerBank", "objectPaletteBanks", "transparentObjectIndex"] },
+        "scenes": { "type": "array" },
+        "assets": { "type": "array" },
+        "issues": { "type": "array" }
+      },
+      "additionalProperties": true
+    },
+    "scene_contracts": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/scene_contract"
+      },
+      "uniqueItems": true
+    },
+    "template_dir": {
+      "type": "string",
+      "minLength": 1
+    },
+    "entry": {
+      "type": "string",
+      "minLength": 1
+    },
+    "project_data": {
+      "type": "string",
+      "minLength": 1
+    },
+    "generated_assets": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      },
+      "uniqueItems": true
+    },
+    "export_warnings": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "export_notices": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "advanced_tools": {
+      "type": "object",
+      "required": [
+        "schema",
+        "replays",
+        "save_snapshots",
+        "state_machines",
+        "timelines",
+        "effects",
+        "particles",
+        "fonts",
+        "localization",
+        "gameplay_components"
+      ],
+      "properties": {
+        "schema": {
+          "const": 1
+        },
+        "replays": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["id", "seed", "initial_save_slot", "frame_count", "runs"],
+            "additionalProperties": true
+          }
+        },
+        "save_snapshots": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["id", "name", "slot", "variables", "inventory", "corruption"],
+            "additionalProperties": true
+          }
+        },
+        "state_machines": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["id", "initial_state", "state_count", "transition_count"],
+            "additionalProperties": true
+          }
+        },
+        "timelines": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["id", "duration_frames", "keyframe_count"],
+            "additionalProperties": true
+          }
+        },
+        "effects": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["id", "duration_frames", "keyframe_count"],
+            "additionalProperties": true
+          }
+        },
+        "particles": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["id", "preset", "max_particles", "max_per_scanline", "lifetime_frames"],
+            "additionalProperties": true
+          }
+        },
+        "fonts": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["id", "glyph_width", "glyph_height", "variable_width", "glyph_count"],
+            "additionalProperties": true
+          }
+        },
+        "localization": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["id", "source_locale", "target_locales", "entry_count"],
+            "additionalProperties": true
+          }
+        },
+        "gameplay_components": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "uniqueItems": true
+        }
+      },
+      "additionalProperties": false
+    },
+    "build": {
+      "type": "object",
+      "properties": {
+        "target": {
+          "type": "string",
+          "pattern": "^[A-Za-z_][A-Za-z0-9_-]*$"
+        },
+        "rom_title": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 12,
+          "pattern": "^[ -~]+$"
+        },
+        "game_code": {
+          "type": "string",
+          "pattern": "^[A-Z0-9]{4}$"
+        },
+        "maker_code": {
+          "type": "string",
+          "pattern": "^[A-Z0-9]{2}$"
+        },
+        "rom_version": {
+          "type": "string",
+          "pattern": "^[0-9A-F]{2}$"
+        },
+        "make_target": {
+          "type": "string",
+          "enum": ["all", "clean"]
+        },
+        "sources": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string",
+            "pattern": "^[A-Za-z_][A-Za-z0-9_-]*\\.cpp$"
+          },
+          "uniqueItems": true
+        }
+      },
+      "additionalProperties": true
+    },
+    "requires": {
+      "type": "object"
+    },
+    "asset_pack": {
+      "$ref": "asset_pack.schema.json"
+    },
+    "runtime_dispatch": {
+      "type": "object",
+      "required": ["initial_runtime", "initial_room", "runtimes"],
+      "properties": {
+        "initial_runtime": {
+          "type": "string",
+          "enum": ["topdown", "platformer", "isometric", "menu", "shmup", "point_click", "dungeon_crawler", "racing", "cutscene", "visual_novel", "world_map", "battle_rpg", "luta"]
+        },
+        "initial_room": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "runtimes": {
+          "type": "array",
+          "minItems": 2,
+          "items": {
+            "type": "string",
+            "enum": ["topdown", "platformer", "isometric", "menu", "shmup", "point_click", "dungeon_crawler", "racing", "cutscene", "visual_novel", "world_map", "battle_rpg", "luta"]
+          },
+          "uniqueItems": true
+        }
+      },
+      "additionalProperties": false
+    },
+    "topdown_project": {
+      "type": "object",
+      "required": [
+        "rooms"
+      ],
+      "properties": {
+        "initial_room": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "includes": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "uniqueItems": true
+        },
+        "assets": {
+          "$ref": "#/$defs/project_asset_refs"
+        },
+        "backdrop_color": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 65535
+        },
+        "dialogue_lines": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "inventory_enabled": {
+          "type": "boolean"
+        },
+        "quests_enabled": {
+          "type": "boolean"
+        },
+        "shop_enabled": {
+          "type": "boolean"
+        },
+        "quests": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["id"],
+            "properties": {
+              "id": { "type": "string" },
+              "state_variable": { "type": "integer", "minimum": 0, "maximum": 15 },
+              "active_value": { "type": "integer" },
+              "completed_value": { "type": "integer" },
+              "objective_item": { "type": "integer", "minimum": 0, "maximum": 15 },
+              "objective_quantity": { "type": "integer", "minimum": 1, "maximum": 999 },
+              "reward_item": { "type": "integer", "minimum": 0, "maximum": 15 },
+              "reward_quantity": { "type": "integer", "minimum": 1, "maximum": 999 }
+            },
+            "additionalProperties": false
+          }
+        },
+        "shop_items": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["label", "item", "currency_item", "price"],
+            "properties": {
+              "label": { "type": "string" },
+              "item": { "type": "integer", "minimum": 0, "maximum": 15 },
+              "currency_item": { "type": "integer", "minimum": 0, "maximum": 15 },
+              "price": { "type": "integer", "minimum": 1, "maximum": 999 },
+              "stock_variable": { "type": "integer", "minimum": -1, "maximum": 15 },
+              "stock": { "type": "integer", "minimum": 0, "maximum": 999 }
+            },
+            "additionalProperties": false
+          }
+        },
+        "camera": {
+          "type": "object"
+        },
+        "video": {
+          "$ref": "#/$defs/video_composition"
+        },
+        "player": {
+          "type": "object"
+        },
+        "actor_sprites": {
+          "type": "array",
+          "description": "Sprite sheets referenced by top-down SetSprite event commands, in event sprite-index order.",
+          "items": {
+            "type": "object",
+            "required": ["name", "metasprite"],
+            "properties": {
+              "name": { "type": "string", "minLength": 1 },
+              "metasprite": { "type": "object" },
+              "animation": {
+                "oneOf": [
+                  { "type": "string" },
+                  { "type": "object" }
+                ]
+              },
+              "animations": {
+                "type": "array",
+                "items": {
+                  "oneOf": [
+                    { "type": "string" },
+                    { "type": "object" }
+                  ]
+                }
+              }
+            },
+            "additionalProperties": true
+          }
+        },
+        "backgrounds": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "layer": {
+                "type": "string",
+                "enum": [
+                  "0",
+                  "1",
+                  "2",
+                  "3",
+                  "bg0",
+                  "bg1",
+                  "bg2",
+                  "bg3",
+                  "BG0",
+                  "BG1",
+                  "BG2",
+                  "BG3"
+                ]
+              },
+              "tilemap": {
+                "type": "string",
+                "minLength": 1
+              },
+              "tilemap_asset": {
+                "type": "string",
+                "minLength": 1
+              },
+              "compressed_tilemap": {
+                "type": "string",
+                "minLength": 1
+              },
+              "compressed_tilemap_asset": {
+                "type": "string",
+                "minLength": 1
+              },
+              "scroll": {
+                "type": "object"
+              },
+              "scroll_pixels": {
+                "type": "object"
+              },
+              "parallax": {
+                "type": "object"
+              },
+              "parallax_256": {
+                "type": "object"
+              }
+            },
+            "additionalProperties": true
+          }
+        },
+        "resource_banks": {
+          "oneOf": [
+            {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "required": [
+                  "kind",
+                  "count"
+                ],
+                "properties": {
+                  "kind": {
+                    "type": "string",
+                    "enum": [
+                      "bg_tiles",
+                      "background_tiles",
+                      "obj_tiles",
+                      "object_tiles",
+                      "sprite_tiles",
+                      "bg_palette",
+                      "bg_palette_colors",
+                      "obj_palette",
+                      "obj_palette_colors",
+                      "oam",
+                      "oam_sprites",
+                      "sprites"
+                    ]
+                  },
+                  "start": {
+                    "oneOf": [
+                      {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 65534
+                      },
+                      {
+                        "type": "string",
+                        "enum": [
+                          "auto",
+                          "automatic"
+                        ]
+                      }
+                    ]
+                  },
+                  "count": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 1024
+                  },
+                  "alignment": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 1024
+                  },
+                  "name": {
+                    "type": "string"
+                  }
+                },
+                "additionalProperties": true
+              }
+            },
+            {
+              "type": "string",
+              "enum": [
+                "asset_pack"
+              ]
+            }
+          ]
+        },
+        "resource_bank_groups": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": [
+              "name"
+            ],
+            "properties": {
+              "name": {
+                "type": "string",
+                "minLength": 1
+              },
+              "bank_indexes": {
+                "type": "array",
+                "items": {
+                  "type": "integer",
+                  "minimum": 0
+                }
+              },
+              "banks": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "required": [
+                    "kind",
+                    "count"
+                  ],
+                  "properties": {
+                    "kind": {
+                      "type": "string"
+                    },
+                    "start": {
+                      "oneOf": [
+                        {
+                          "type": "integer",
+                          "minimum": 0,
+                          "maximum": 65534
+                        },
+                        {
+                          "type": "string",
+                          "enum": [
+                            "auto",
+                            "automatic"
+                          ]
+                        }
+                      ]
+                    },
+                    "count": {
+                      "type": "integer",
+                      "minimum": 1,
+                      "maximum": 1024
+                    },
+                    "alignment": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 1024
+                    },
+                    "name": {
+                      "type": "string"
+                    }
+                  },
+                  "additionalProperties": true
+                }
+              }
+            },
+            "additionalProperties": true
+          }
+        },
+        "event_command": {
+          "type": "object",
+          "properties": {
+            "op": {
+              "type": "string",
+              "enum": [
+                "add_inventory_item",
+                "add_variable",
+                "add_var",
+                "add_variable_flags",
+                "advance_time",
+                "attach_adventure_callback",
+                "attach_button_event",
+                "attach_platform_callback",
+                "attach_timer_event",
+                "call_script",
+                "choice",
+                "clear_variable",
+                "clear_var",
+                "clear_variable_flags",
+                "close_dialogue",
+                "dialogue",
+                "divide_variable",
+                "end",
+                "fade_audio_volume",
+                "fade_in",
+                "fade_out",
+                "visual_effect",
+                "follow_camera",
+                "jump",
+                "jump_if_actor_at_position",
+                "jump_if_actor_direction",
+                "jump_if_actor_distance",
+                "jump_if_actor_relative",
+                "jump_if_button_pressed",
+                "jump_if_engine_field_equals",
+                "jump_if_engine_field_equals_variable",
+                "jump_if_inventory_at_least",
+                "jump_if_room_equals",
+                "jump_if_save_exists",
+                "if_rtc",
+                "read_rtc",
+                "jump_if_variable_equals",
+                "jump_if_variable_equals_variable",
+                "jump_if_variable_greater_than",
+                "jump_if_variable_less_than",
+                "jump_if_variable_not_equals",
+                "link_close",
+                "link_host",
+                "link_join",
+                "link_transfer",
+                "launch_projectile",
+                "launch_projectile_slot",
+                "draw_text",
+          "set_adventure_state",
+          "open_menu",
+          "open_shop",
+          "actor_effects",
+          "cancel_actor_movement",
+          "luta_start_match",
+                "luta_end_match",
+                "luta_set_super_gauge",
+                "luta_add_super_gauge",
+                "luta_set_guard_power",
+                "luta_set_ism_style",
+                "luta_trigger_super",
+                "luta_enable_alpha_counter",
+                "luta_set_round_timer",
+                "luta_set_rounds_to_win",
+                "load_game",
+                "lock_camera",
+                "lock_script",
+                "mod_variable",
+                "modify_stat",
+                "modify_wallet",
+                "move_actor",
+                "move_camera",
+                "multiply_variable",
+                "mute_audio_channel",
+                "open_code_lock",
+                "open_equip_menu",
+                "open_text_input",
+                "overlay_hide",
+                "overlay_line",
+                "overlay_move",
+                "overlay_show",
+                "pause_scene_type",
+                "player_bounce",
+                "play_music",
+                "play_pcm_sfx",
+                "play_sfx",
+                "projectile_load_slot",
+                "push_actor",
+                "push_actor_away_from_player",
+                "random_variable",
+                "rate_limit",
+                "remove_adventure_callback",
+                "remove_button_event",
+                "remove_inventory_item",
+                "remove_platform_callback",
+                "remove_save_game",
+                "remove_timer_event",
+                "replace_tile",
+                "replace_tile_sequence",
+                "reset_variables_false",
+                "restart_timer_event",
+                "resume_scene_type",
+                "run_audio_routine",
+                "save_game",
+                "scene_stack_clear",
+                "scene_stack_first",
+                "scene_stack_previous",
+                "scene_stack_push",
+                "set_actor_animation",
+                "set_actor_animation_frame",
+                "set_actor_animation_speed",
+                "set_actor_sprite",
+                "set_actor_active",
+                "set_actor_collision_box",
+                "set_actor_collision_enabled",
+                "set_actor_direction",
+                "set_actor_position",
+                "set_actor_speed",
+                "set_actor_visible",
+                "set_audio_volume",
+                "set_all_sprites_visible",
+                "set_background_palette",
+                "set_camera_bounds_x",
+                "set_camera_bounds_y",
+                "set_camera_position",
+                "set_camera_property",
+                "set_camera_shake",
+                "set_dialogue_frame",
+                "set_dialogue_language",
+                "set_dialogue_text_speed",
+                "set_engine_field",
+                "set_equipped_item",
+                "set_player_animation",
+                "set_player_movement_state",
+                "set_platformer_state",
+                "set_player_speed_profile",
+                "set_random_seed",
+                "seed_random",
+                "set_sprite_palette",
+                "set_stat",
+                "set_text_sfx",
+                "set_variable",
+                "set_var",
+                "set_variable_flags",
+                "sfx",
+                "show_actor_gesture",
+                "show_choice",
+                "show_dialogue",
+                "show_dialogue_if",
+                "show_hearts",
+                "show_number_hud",
+                "show_stat_bar",
+                "start_actor_update_script",
+                "start_game_clock",
+                "start_segment",
+                "stop_actor_update_script",
+                "stop_music",
+                "stop_segment",
+                "store_actor_direction",
+                "store_actor_position",
+                "store_engine_field",
+                "store_save_exists",
+                "unlock_script",
+                "wait",
+                "wait_actor_animation",
+                "wait_button_pressed",
+                "warp"
+              ]
+            }
+          },
+          "additionalProperties": true
+        },
+        "choice_groups": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": [
+              "choices"
+            ],
+            "properties": {
+              "line": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "line_index": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "variable": {
+                "type": "integer"
+              },
+              "variable_index": {
+                "type": "integer"
+              },
+              "choices": {
+                "type": "array",
+                "minItems": 1,
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "text": {
+                      "type": "string"
+                    },
+                    "value": {
+                      "type": "integer"
+                    },
+                    "script": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/properties/topdown_project/properties/event_command"
+                      }
+                    }
+                  },
+                  "additionalProperties": true
+                }
+              }
+            },
+            "additionalProperties": true
+          }
+        },
+        "dialogue_choices": {
+          "$ref": "#/properties/topdown_project/properties/choice_groups"
+        },
+        "save": {
+          "$ref": "#/$defs/save_config"
+        },
+        "rooms": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "required": [
+              "width_tiles",
+              "height_tiles",
+              "visual_tiles",
+              "collision_flags"
+            ],
+            "properties": {
+              "name": {
+                "type": "string"
+              },
+              "world_mode": {
+                "type": "string",
+                "enum": [
+                  "scrollable_tiled_world",
+                  "static_composition"
+                ]
+              },
+              "resource_bank_group": {
+                "type": "string"
+              },
+              "video": {
+                "$ref": "#/$defs/video_composition"
+              },
+              "bank_group": {
+                "type": "string"
+              },
+              "width_tiles": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 64
+              },
+              "height_tiles": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 64
+              },
+              "visual_tiles": {
+                "type": "array",
+                "items": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 255
+                }
+              },
+              "collision_flags": {
+                "type": "array",
+                "items": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 255
+                }
+              },
+              "collision_slopes": {
+                "type": "array",
+                "items": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 4
+                }
+              },
+              "metadata": {
+                "type": "object",
+                "properties": {
+                  "camera_mode": {
+                    "type": "string",
+                    "enum": [
+                      "project_default",
+                      "default",
+                      "follow",
+                      "fixed"
+                    ]
+                  },
+                  "camera_position": {
+                    "type": "object"
+                  },
+                  "player_start": {
+                    "type": "object"
+                  },
+                  "music_index": {
+                    "type": "integer",
+                    "minimum": 0
+                  },
+                  "stop_music": {
+                    "type": "boolean"
+                  },
+                  "backdrop_color": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 65535
+                  },
+                  "camera_bounds": {
+                    "type": "object"
+                  }
+                },
+                "additionalProperties": true
+              },
+              "on_enter": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/properties/topdown_project/properties/event_command"
+                }
+              },
+              "on_exit": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/properties/topdown_project/properties/event_command"
+                }
+              },
+              "on_interact": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/properties/topdown_project/properties/event_command"
+                }
+              },
+              "interactions": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "area": {
+                      "type": "object"
+                    },
+                    "script": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/properties/topdown_project/properties/event_command"
+                      }
+                    }
+                  },
+                  "additionalProperties": true
+                }
+              },
+              "npcs": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "name": {
+                      "type": "string"
+                    },
+                    "position": {
+                      "type": "object"
+                    },
+                    "size": {
+                      "type": "object"
+                    },
+                    "metasprite": {
+                      "type": "string"
+                    },
+                    "animation": {
+                      "type": "string"
+                    },
+                    "direction": {
+                      "type": "string"
+                    },
+                    "movement": {
+                      "type": "object"
+                    },
+                    "on_interact": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/properties/topdown_project/properties/event_command"
+                      }
+                    },
+                    "on_start": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/properties/topdown_project/properties/event_command"
+                      }
+                    },
+                    "on_update": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/properties/topdown_project/properties/event_command"
+                      }
+                    },
+                    "on_hit_player": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/properties/topdown_project/properties/event_command"
+                      }
+                    }
+                  },
+                  "additionalProperties": true
+                }
+              },
+              "triggers": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "area": {
+                      "type": "object"
+                    },
+                    "kind": {
+                      "type": "string",
+                      "enum": [
+                        "standard",
+                        "water",
+                        "damage"
+                      ]
+                    },
+                    "run_once": {
+                      "type": "boolean"
+                    },
+                    "cooldown_frames": {
+                      "type": "integer",
+                      "minimum": 0
+                    },
+                    "on_enter": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/properties/topdown_project/properties/event_command"
+                      }
+                    },
+                    "on_leave": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/properties/topdown_project/properties/event_command"
+                      }
+                    },
+                    "condition": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/properties/topdown_project/properties/event_command"
+                      }
+                    }
+                  },
+                  "additionalProperties": true
+                }
+              },
+              "portals": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "area": {
+                      "type": "object"
+                    },
+                    "target_room": {
+                      "type": "integer",
+                      "minimum": 0
+                    },
+                    "target_position": {
+                      "type": "object"
+                    },
+                    "target_direction": {
+                      "type": "string",
+                      "enum": [
+                        "up",
+                        "down",
+                        "left",
+                        "right"
+                      ]
+                    },
+                    "script": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/properties/topdown_project/properties/event_command"
+                      }
+                    }
+                  },
+                  "additionalProperties": true
+                }
+              },
+              "camera_zones": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/$defs/camera_zone"
+                }
+              }
+            },
+            "additionalProperties": true
+          }
+        }
+      },
+      "additionalProperties": true
+    },
+    "point_click_project": {
+      "type": "object",
+      "description": "Native point-and-click contract with scenes, hotspots, cursor data, inventory items, dialogue lines, scripts, backgrounds and resource bank groups.",
+      "required": [
+        "scenes"
+      ],
+      "properties": {
+        "initial_scene": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "cursor_start": {
+          "type": "object"
+        },
+        "cursor_start_pixels": {
+          "type": "object"
+        },
+        "cursor_speed": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "cursor_speed_pixels": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "cursor": {
+          "type": "object",
+          "required": ["metasprite"],
+          "properties": {
+            "metasprite": { "type": ["object", "string"] },
+            "animations": {
+              "type": "array",
+              "items": { "type": ["object", "string"] }
+            }
+          },
+          "additionalProperties": false
+        },
+        "dialogue_lines": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "inventory_items": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string"
+              },
+              "name": {
+                "type": "string"
+              },
+              "variable": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 15
+              },
+              "variable_index": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 15
+              },
+              "line": {
+                "type": "integer"
+              },
+              "dialogue_line": {
+                "type": "integer"
+              },
+              "dialogue_line_index": {
+                "type": "integer"
+              }
+            },
+            "additionalProperties": true
+          }
+        },
+        "items": {
+          "$ref": "#/properties/point_click_project/properties/inventory_items"
+        },
+        "backgrounds": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": true
+          }
+        },
+        "save": {
+          "$ref": "#/$defs/save_config"
+        },
+        "scenes": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "properties": {
+              "name": {
+                "type": "string"
+              },
+              "background": {
+                "type": "integer"
+              },
+              "background_index": {
+                "type": "integer"
+              },
+              "backgrounds": {
+                "type": "array",
+                "maxItems": 3,
+                "items": {
+                  "type": "integer",
+                  "minimum": -1
+                }
+              },
+              "props": {
+                "type": "array",
+                "maxItems": 6,
+                "items": {
+                  "type": "object",
+                  "required": ["name", "metasprite", "position"],
+                  "properties": {
+                    "id": {
+                      "type": "string"
+                    },
+                    "name": {
+                      "type": "string"
+                    },
+                    "metasprite": {
+                      "type": ["object", "string"]
+                    },
+                    "position": {
+                      "type": "object"
+                    },
+                    "position_pixels": {
+                      "type": "object"
+                    },
+                    "visible_variable": {
+                      "type": "integer",
+                      "minimum": -1,
+                      "maximum": 15
+                    },
+                    "visible_variable_index": {
+                      "type": "integer",
+                      "minimum": -1,
+                      "maximum": 15
+                    },
+                    "visible_value": {
+                      "type": "integer"
+                    },
+                    "visible_variable_value": {
+                      "type": "integer"
+                    },
+                    "animations": {
+                      "type": "array",
+                      "items": {"type": ["object", "string"]}
+                    }
+                  },
+                  "additionalProperties": false
+                }
+              },
+              "cursor_speed": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "on_enter": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/properties/topdown_project/properties/event_command"
+                }
+              },
+              "on_exit": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/properties/topdown_project/properties/event_command"
+                }
+              },
+              "hotspots": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "name": {
+                      "type": "string"
+                    },
+                    "area": {
+                      "type": "object"
+                    },
+                    "line": {
+                      "type": "integer"
+                    },
+                    "dialogue_line": {
+                      "type": "integer"
+                    },
+                    "target_scene": {
+                      "type": "integer"
+                    },
+                    "required_item": {
+                      "oneOf": [
+                        { "type": "integer" },
+                        { "type": "string" }
+                      ]
+                    },
+                    "give_item": {
+                      "oneOf": [
+                        { "type": "integer" },
+                        { "type": "string" }
+                      ]
+                    },
+                    "unavailable_line": {
+                      "type": "integer"
+                    },
+                    "on_click": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/properties/topdown_project/properties/event_command"
+                      }
+                    },
+                    "on_use_item": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/properties/topdown_project/properties/event_command"
+                      }
+                    }
+                  },
+                  "additionalProperties": true
+                }
+              }
+            },
+            "additionalProperties": true
+          }
+        }
+      },
+      "additionalProperties": true
+    },
+    "shmup_project": {
+      "type": "object",
+      "description": "Native shoot-em-up contract with player, projectile settings, waves, enemies, scripts, dialogue lines, save config, optional backgrounds and resource bank groups.",
+      "properties": {
+        "score_enabled": {
+          "type": "boolean",
+          "description": "Enables score accumulation and its HUD value."
+        },
+        "high_score_enabled": {
+          "type": "boolean",
+          "description": "Enables high-score persistence and its HUD value."
+        },
+        "initial_score": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 65535
+        },
+        "initial_lives": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9
+        },
+        "waves_enabled": {
+          "type": "boolean",
+          "description": "Enables wave progression and its HUD value."
+        },
+        "max_waves": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 64
+        },
+        "loop_waves": {
+          "type": "boolean",
+          "description": "Loops to the initial wave when the last wave has no next wave."
+        },
+        "save": {
+          "$ref": "#/$defs/save_config"
+        },
+        "backgrounds": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/shmup_background"
+          }
+        },
+        "background": {
+          "type": "integer",
+          "minimum": -1
+        }
+      },
+      "additionalProperties": true
+    },
+    "visual_novel_project": {
+      "type": "object",
+      "description": "Native Visual Novel contract with scenes, dialogue lines, conditional choice groups, choice scripts, choice scene targets, backgrounds and resource bank groups.",
+      "required": [
+        "scenes"
+      ],
+      "properties": {
+        "initial_scene": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "dialogue_lines": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "backgrounds": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": true
+          }
+        },
+        "save": {
+          "$ref": "#/$defs/save_config"
+        },
+        "choice_groups": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "line": {
+                "type": "integer"
+              },
+              "line_index": {
+                "type": "integer"
+              },
+              "variable": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 15
+              },
+              "variable_index": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 15
+              },
+              "choices": {
+                "type": "array",
+                "minItems": 1,
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "text": {
+                      "type": "string"
+                    },
+                    "value": {
+                      "type": "integer"
+                    },
+                    "next_scene": {
+                      "type": "integer"
+                    },
+                    "next_scene_index": {
+                      "type": "integer"
+                    },
+                    "target_scene": {
+                      "type": "integer"
+                    },
+                    "required_variable": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 15
+                    },
+                    "required_variable_index": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 15
+                    },
+                    "required_value": {
+                      "type": "integer"
+                    },
+                    "hide_when_unavailable": {
+                      "type": "boolean"
+                    },
+                    "on_select": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/properties/topdown_project/properties/event_command"
+                      }
+                    },
+                    "script": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/properties/topdown_project/properties/event_command"
+                      }
+                    }
+                  },
+                  "additionalProperties": true
+                }
+              }
+            },
+            "additionalProperties": true
+          }
+        },
+        "dialogue_choices": {
+          "$ref": "#/properties/visual_novel_project/properties/choice_groups"
+        },
+        "scenes": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "properties": {
+              "name": {
+                "type": "string"
+              },
+              "background": {
+                "type": "integer"
+              },
+              "background_index": {
+                "type": "integer"
+              },
+              "line": {
+                "type": "integer"
+              },
+              "dialogue_line": {
+                "type": "integer"
+              },
+              "dialogue_line_index": {
+                "type": "integer"
+              },
+              "choice_group": {
+                "type": "integer"
+              },
+              "choice_group_index": {
+                "type": "integer"
+              },
+              "next_scene": {
+                "type": "integer"
+              },
+              "next_scene_index": {
+                "type": "integer"
+              },
+              "auto_advance": {
+                "type": "boolean"
+              },
+              "on_enter": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/properties/topdown_project/properties/event_command"
+                }
+              },
+              "on_exit": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/properties/topdown_project/properties/event_command"
+                }
+              }
+            },
+            "additionalProperties": true
+          }
+        }
+      },
+      "additionalProperties": true
+    },
+    "menu_project": {
+      "type": "object",
+      "description": "Native Menu/UI contract with separate initial and in-game profiles, stack navigation, dynamic bindings, selectable items, conditional items, toggles/sliders by variable, dialogue lines, scripts, backgrounds, save config and resource bank groups.",
+      "properties": {
+        "initial_screen": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "start_menu_screen": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "start_menu_presentation": {
+          "type": "string",
+          "enum": ["scene", "hud", "both"]
+        },
+        "menu_profiles": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["id", "label", "entry_screen", "return_policy", "suspends_gameplay"],
+            "properties": {
+              "id": { "type": "string", "enum": ["initial", "in_game"] },
+              "label": { "type": "string", "minLength": 1 },
+              "entry_screen": { "type": "integer", "minimum": 0 },
+              "return_policy": { "type": "string", "enum": ["title", "resume"] },
+              "suspends_gameplay": { "type": "boolean" }
+            },
+            "additionalProperties": true
+          }
+        },
+        "screens": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "menu_profile": { "type": "string", "enum": ["initial", "in_game"] },
+              "presentation_mode": { "type": "string", "enum": ["scene", "hud", "both"] },
+              "hud_list_rows": { "type": "integer", "minimum": 0, "maximum": 6 },
+              "title_text_variable": { "type": "integer", "minimum": -1, "maximum": 7 },
+              "entry_policy": { "type": "string", "enum": ["title", "gameplay"] },
+              "return_policy": { "type": "string", "enum": ["title", "resume"] },
+              "suspends_gameplay": { "type": "boolean" },
+              "items": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "binding": { "$ref": "#/$defs/menu_item_binding" },
+                    "save_slot": { "type": "integer", "minimum": 0, "maximum": 7 },
+                    "value_labels": { "type": "array", "maxItems": 16, "items": { "type": "string" } }
+                  },
+                  "additionalProperties": true
+                }
+              },
+              "actors": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "name": { "type": "string", "minLength": 1 },
+                    "metasprite": { "type": ["object", "string"] },
+                    "position": { "type": "object" },
+                    "role": { "type": "string", "enum": ["decorative", "option", "cursor"] },
+                    "menu_item_index": { "type": "integer", "minimum": -1 },
+                    "selected_metasprite": { "type": ["object", "string"] },
+                    "visibility_variable": { "type": "integer", "minimum": -1, "maximum": 63 },
+                    "visibility_value": { "type": "integer", "minimum": 0 },
+                    "on_init": {
+                      "type": "array",
+                      "items": { "$ref": "#/properties/topdown_project/properties/event_command" }
+                    },
+                    "on_interact": {
+                      "type": "array",
+                      "items": { "$ref": "#/properties/topdown_project/properties/event_command" }
+                    },
+                    "on_update": {
+                      "type": "array",
+                      "items": { "$ref": "#/properties/topdown_project/properties/event_command" }
+                    }
+                  },
+                  "additionalProperties": true
+                }
+              }
+            },
+            "additionalProperties": true
+          }
+        },
+        "save": {
+          "$ref": "#/$defs/save_config"
+        }
+      },
+      "additionalProperties": true
+    },
+    "cutscene_project": {
+      "type": "object",
+      "description": "Native cutscene contract with scenes, timed timeline steps, conditional branches, skip control, dialogue wait, dialogue lines, scripts, optional backgrounds, save config and resource bank groups.",
+      "properties": {
+        "save": {
+          "$ref": "#/$defs/save_config"
+        },
+        "scenes": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "steps": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "actor_motions": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "required": ["actor_index", "from_position", "to_position", "duration_frames"],
+                        "properties": {
+                          "actor_index": { "type": "integer", "minimum": 0 },
+                          "from_position": {
+                            "type": "object",
+                            "required": ["x", "y"],
+                            "properties": {
+                              "x": { "type": "integer" },
+                              "y": { "type": "integer" }
+                            },
+                            "additionalProperties": false
+                          },
+                          "to_position": {
+                            "type": "object",
+                            "required": ["x", "y"],
+                            "properties": {
+                              "x": { "type": "integer" },
+                              "y": { "type": "integer" }
+                            },
+                            "additionalProperties": false
+                          },
+                          "duration_frames": { "type": "integer", "minimum": 1, "maximum": 65535 }
+                        },
+                        "additionalProperties": false
+                      }
+                    }
+                  },
+                  "additionalProperties": true
+                }
+              }
+            },
+            "additionalProperties": true
+          }
+        }
+      }
+    },
+    "world_map_project": {
+      "type": "object",
+      "description": "Native world map contract with map nodes, directional connections, conditional unlock variables, hidden/locked nodes, save config, scripts, dialogue lines, optional backgrounds and resource bank groups."
+    },
+    "platformer_project": {
+      "type": "object",
+      "required": [
+        "rooms"
+      ],
+      "properties": {
+        "initial_room": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "backdrop_color": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 65535
+        },
+        "config": {
+          "type": "object"
+        },
+        "player": {
+          "type": "object",
+          "required": [
+            "metasprite"
+          ],
+          "properties": {
+            "metasprite": {
+              "type": "object",
+              "required": [
+                "asset"
+              ],
+              "properties": {
+                "asset": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "index": {
+                  "type": "integer",
+                  "minimum": 0
+                }
+              },
+              "additionalProperties": false
+            },
+            "animation": {
+              "type": "object",
+              "required": [
+                "asset"
+              ],
+              "properties": {
+                "asset": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              },
+              "additionalProperties": false
+            },
+            "animations": {
+              "type": "object",
+              "properties": {
+                "idle": { "$ref": "#/$defs/platformer_player_animation" },
+                "walk": { "$ref": "#/$defs/platformer_player_animation" },
+                "jump": { "$ref": "#/$defs/platformer_player_animation" },
+                "fall": { "$ref": "#/$defs/platformer_player_animation" },
+                "climb": { "$ref": "#/$defs/platformer_player_animation" }
+              },
+              "additionalProperties": false
+            },
+            "on_start": {
+              "type": "array",
+              "items": { "$ref": "#/properties/topdown_project/properties/event_command" }
+            },
+            "on_update": {
+              "type": "array",
+              "items": { "$ref": "#/properties/topdown_project/properties/event_command" }
+            }
+          },
+          "additionalProperties": false
+        },
+        "player_start": {
+          "type": "object"
+        },
+        "camera": {
+          "type": "object"
+        },
+        "includes": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "uniqueItems": true
+        },
+        "assets": {
+          "$ref": "#/$defs/project_asset_refs"
+        },
+        "save": {
+          "$ref": "#/$defs/save_config"
+        },
+        "resource_banks": {
+          "$ref": "#/properties/topdown_project/properties/resource_banks"
+        },
+        "resource_bank_groups": {
+          "$ref": "#/properties/topdown_project/properties/resource_bank_groups"
+        },
+        "rooms": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "required": [
+              "width_tiles",
+              "height_tiles",
+              "visual_tiles",
+              "collision_flags"
+            ],
+            "properties": {
+              "name": {
+                "type": "string"
+              },
+              "resource_bank_group": {
+                "type": "string"
+              },
+              "video": {
+                "$ref": "#/$defs/video_composition"
+              },
+              "bank_group": {
+                "type": "string"
+              },
+              "width_tiles": {
+                "type": "integer",
+                "minimum": 1
+              },
+              "height_tiles": {
+                "type": "integer",
+                "minimum": 1
+              },
+              "visual_tiles": {
+                "type": "array",
+                "items": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 255
+                }
+              },
+              "tilemap_contract": {
+                "type": "object",
+                "required": [
+                  "collision_unit",
+                  "id",
+                  "logical_layers",
+                  "metatile_height",
+                  "metatile_width",
+                  "model",
+                  "tile_height",
+                  "tile_width"
+                ],
+                "properties": {
+                  "collision_unit": {
+                    "const": "metatile"
+                  },
+                  "id": {
+                    "const": "gba-regular-metatile-2x2-v1"
+                  },
+                  "logical_layers": {
+                    "type": "array",
+                    "minItems": 2,
+                    "maxItems": 2,
+                    "items": {
+                      "type": "object",
+                      "required": ["hardware_mapping", "id", "source"],
+                      "properties": {
+                        "hardware_mapping": {
+                          "type": "string",
+                          "enum": ["bg1", "bg2"]
+                        },
+                        "id": {
+                          "type": "string",
+                          "enum": ["base", "top"]
+                        },
+                        "source": {
+                          "type": "string",
+                          "enum": ["visual_tiles", "foreground_tiles"]
+                        }
+                      },
+                      "additionalProperties": false
+                    }
+                  },
+                  "metatile_height": {
+                    "const": 2
+                  },
+                  "metatile_width": {
+                    "const": 2
+                  },
+                  "model": {
+                    "const": "regular_tiled"
+                  },
+                  "tile_height": {
+                    "const": 8
+                  },
+                  "tile_width": {
+                    "const": 8
+                  }
+                },
+                "additionalProperties": false
+              },
+              "background_layers": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "required": [
+                    "layer",
+                    "tiles",
+                    "parallax"
+                  ],
+                  "properties": {
+                    "layer": {
+                      "type": "string",
+                      "enum": [
+                        "bg3",
+                        "bg2",
+                        "bg1"
+                      ]
+                    },
+                    "tiles": {
+                      "type": "array",
+                      "items": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 65535
+                      }
+                    },
+                    "tilemap": {
+                      "type": [
+                        "string",
+                        "object"
+                      ]
+                    },
+                    "tilemap_layout": {
+                      "type": "string",
+                      "enum": [
+                        "source_asset"
+                      ]
+                    },
+                    "parallax": {
+                      "type": "object",
+                      "required": [
+                        "x",
+                        "y"
+                      ],
+                      "properties": {
+                        "x": {
+                          "type": "integer",
+                          "minimum": 0,
+                          "maximum": 1024
+                        },
+                        "y": {
+                          "type": "integer",
+                          "minimum": 0,
+                          "maximum": 1024
+                        }
+                      },
+                      "additionalProperties": false
+                    }
+                  },
+                  "additionalProperties": false
+                }
+              },
+              "collision_flags": {
+                "type": "array",
+                "items": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 255
+                }
+              },
+              "collision_slopes": {
+                "type": "array",
+                "items": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 4
+                }
+              },
+              "player_start": {
+                "type": "object"
+              },
+              "player_collision_offset": {
+                "type": "object"
+              },
+              "camera": {
+                "type": "object"
+              },
+              "camera_start": {
+                "type": "object"
+              },
+              "config": {
+                "type": "object"
+              },
+              "on_enter": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/properties/topdown_project/properties/event_command"
+                }
+              },
+              "on_exit": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/properties/topdown_project/properties/event_command"
+                }
+              },
+              "on_update": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/properties/topdown_project/properties/event_command"
+                }
+              },
+              "npcs": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "name": { "type": "string" },
+                    "position": { "type": "object" },
+                    "size": { "type": "object" },
+                    "collision_offset": { "type": "object" },
+                    "metasprite": { "type": ["object", "string"] },
+                    "animation": { "type": ["object", "string"] },
+                    "animations": { "type": "object" },
+                    "facing": { "type": "string" },
+                    "animation_speed_percent": { "type": "integer", "minimum": 1 },
+                    "on_interact": {
+                      "type": "array",
+                      "items": { "$ref": "#/properties/topdown_project/properties/event_command" }
+                    },
+                    "on_start": {
+                      "type": "array",
+                      "items": { "$ref": "#/properties/topdown_project/properties/event_command" }
+                    },
+                    "on_update": {
+                      "type": "array",
+                      "items": { "$ref": "#/properties/topdown_project/properties/event_command" }
+                    }
+                  },
+                  "additionalProperties": true
+                }
+              },
+              "hazards": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "area": {
+                      "type": "object"
+                    },
+                    "damage": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 255
+                    },
+                    "respawn": {
+                      "type": "boolean"
+                    },
+                    "script": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/properties/topdown_project/properties/event_command"
+                      }
+                    },
+                    "on_hit": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/properties/topdown_project/properties/event_command"
+                      }
+                    }
+                  },
+                  "additionalProperties": true
+                }
+              },
+              "checkpoints": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "area": {
+                      "type": "object"
+                    },
+                    "respawn_position": {
+                      "type": "object"
+                    },
+                    "respawn_position_pixels": {
+                      "type": "object"
+                    },
+                    "id": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 65535
+                    },
+                    "script": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/properties/topdown_project/properties/event_command"
+                      }
+                    },
+                    "on_activate": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/properties/topdown_project/properties/event_command"
+                      }
+                    }
+                  },
+                  "additionalProperties": true
+                }
+              },
+              "camera_zones": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "area": {
+                      "type": "object"
+                    },
+                    "bounds": {
+                      "type": "object"
+                    },
+                    "bounds_pixels": {
+                      "type": "object"
+                    },
+                    "offset": {
+                      "type": "object"
+                    },
+                    "offset_pixels": {
+                      "type": "object"
+                    },
+                    "lock_x": {
+                      "type": "boolean"
+                    },
+                    "lock_y": {
+                      "type": "boolean"
+                    },
+                    "script": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/properties/topdown_project/properties/event_command"
+                      }
+                    },
+                    "on_enter": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/properties/topdown_project/properties/event_command"
+                      }
+                    }
+                  },
+                  "additionalProperties": true
+                }
+              }
+            },
+            "additionalProperties": true
+          }
+        }
+      },
+      "additionalProperties": true
+    },
+    "dungeon_crawler_project": {
+      "type": "object",
+      "required": ["rooms"],
+      "properties": {
+        "initial_room": { "type": "integer", "minimum": 0 },
+        "save": { "$ref": "#/$defs/save_config" },
+        "inventory_enabled": { "type": "boolean" },
+        "battle_enabled": { "type": "boolean" },
+        "compass_enabled": { "type": "boolean" },
+        "map_enabled": { "type": "boolean" },
+        "depth_sprites_enabled": { "type": "boolean" },
+        "inventory_items": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["label", "item", "initial_quantity", "heal_amount"],
+            "properties": {
+              "label": { "type": "string", "minLength": 1 },
+              "item": { "type": "integer", "minimum": 0, "maximum": 15 },
+              "initial_quantity": { "type": "integer", "minimum": 0, "maximum": 999 },
+              "heal_amount": { "type": "integer", "minimum": 0, "maximum": 99 }
+            },
+            "additionalProperties": false
+          }
+        },
+        "battle": {
+          "type": "object",
+          "required": ["enemy_name", "enemy_actor_index", "max_hp", "player_damage", "enemy_damage", "reward_item", "reward_quantity"],
+          "properties": {
+            "enemy_name": { "type": "string", "minLength": 1 },
+            "enemy_actor_index": { "type": "integer", "minimum": -1 },
+            "max_hp": { "type": "integer", "minimum": 1, "maximum": 99 },
+            "player_damage": { "type": "integer", "minimum": 1, "maximum": 99 },
+            "enemy_damage": { "type": "integer", "minimum": 1, "maximum": 99 },
+            "reward_item": { "type": "integer", "minimum": 0, "maximum": 15 },
+            "reward_quantity": { "type": "integer", "minimum": 0, "maximum": 999 }
+          },
+          "additionalProperties": false
+        },
+        "dialogue_lines": { "type": "array" },
+        "scripts": { "type": "array" },
+        "rooms": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "required": ["name", "width_tiles", "height_tiles", "collision_flags", "config", "player_start"],
+            "properties": {
+              "name": { "type": "string", "minLength": 1 },
+              "width_tiles": { "type": "integer", "minimum": 1, "maximum": 64 },
+              "height_tiles": { "type": "integer", "minimum": 1, "maximum": 64 },
+              "collision_flags": { "type": "array", "items": { "type": "integer", "minimum": 0, "maximum": 255 } },
+              "config": { "type": "object" },
+              "player_start": { "type": "object" },
+              "video": { "$ref": "#/$defs/video_composition" },
+              "battle_enabled": { "type": "boolean" },
+              "on_enter": { "type": "array", "items": { "$ref": "#/properties/topdown_project/properties/event_command" } },
+              "actors": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "required": ["name", "position", "metasprite"],
+                  "properties": {
+                    "name": { "type": "string", "minLength": 1 },
+                    "position": { "type": "object" },
+                    "metasprite": { "type": ["object", "string"] },
+                    "depth_metasprites": {
+                      "type": "object",
+                      "required": ["far", "mid", "near"],
+                      "properties": {
+                        "far": { "type": ["object", "string"] },
+                        "mid": { "type": ["object", "string"] },
+                        "near": { "type": ["object", "string"] }
+                      },
+                      "additionalProperties": false
+                    },
+                    "on_interact": {
+                      "type": "array",
+                      "items": { "$ref": "#/properties/topdown_project/properties/event_command" }
+                    }
+                  },
+                  "additionalProperties": true
+                }
+              }
+            },
+            "additionalProperties": true
+          }
+        }
+      },
+      "additionalProperties": true
+    },
+    "racing_project": {
+      "type": "object",
+      "required": ["rooms"],
+      "properties": {
+        "initial_room": { "type": "integer", "minimum": 0 },
+        "rooms": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "required": ["name", "width_tiles", "height_tiles", "collision_flags", "config", "player_start_pixels"],
+            "properties": {
+              "name": { "type": "string", "minLength": 1 },
+              "width_tiles": { "type": "integer", "minimum": 1, "maximum": 128 },
+              "height_tiles": { "type": "integer", "minimum": 2, "maximum": 128 },
+              "collision_flags": { "type": "array", "items": { "type": "integer", "minimum": 0, "maximum": 1 } },
+              "config": { "type": "object" },
+              "track_segments": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "required": ["length_pixels", "curve", "half_width"],
+                  "properties": {
+                    "length_pixels": { "type": "integer", "minimum": 1, "maximum": 4096 },
+                    "curve": { "type": "integer", "minimum": -64, "maximum": 128 },
+                    "half_width": { "type": "integer", "minimum": 1, "maximum": 128 }
+                  },
+                  "additionalProperties": false
+                }
+              },
+              "topdown_track": {
+                "type": "object",
+                "required": ["camera_dead_zone", "checkpoints"],
+                "properties": {
+                  "start_heading": { "type": "integer", "minimum": 0, "maximum": 15 },
+                  "finish_at_zero": { "type": "boolean" },
+                  "path_points": {
+                    "type": "array",
+                    "minItems": 2,
+                    "maxItems": 32,
+                    "items": {
+                      "type": "object",
+                      "required": ["x", "y"],
+                      "properties": {
+                        "x": { "type": "integer", "minimum": 0, "maximum": 4095 },
+                        "y": { "type": "integer", "minimum": 0, "maximum": 4095 }
+                      },
+                      "additionalProperties": false
+                    }
+                  },
+                  "camera_dead_zone": {
+                    "type": "object",
+                    "required": ["x", "y"],
+                    "properties": {
+                      "x": { "type": "integer", "minimum": 0, "maximum": 120 },
+                      "y": { "type": "integer", "minimum": 0, "maximum": 80 }
+                    },
+                    "additionalProperties": false
+                  },
+                  "checkpoints": {
+                    "type": "array",
+                    "minItems": 1,
+                    "maxItems": 16,
+                    "items": {
+                      "type": "object",
+                      "required": ["id", "x", "y", "width", "height"],
+                      "properties": {
+                        "id": { "type": "string", "minLength": 1 },
+                        "x": { "type": "integer", "minimum": 0, "maximum": 4095 },
+                        "y": { "type": "integer", "minimum": 0, "maximum": 4095 },
+                        "width": { "type": "integer", "minimum": 1, "maximum": 256 },
+                        "height": { "type": "integer", "minimum": 1, "maximum": 256 }
+                      },
+                      "additionalProperties": false
+                    }
+                  }
+                },
+                "additionalProperties": false
+              },
+              "perspective_camera": {"type": "object", "required": ["height", "distance", "focal_length"], "properties": {"height": {"type": "integer", "minimum": 16, "maximum": 96}, "distance": {"type": "integer", "minimum": 32, "maximum": 160}, "focal_length": {"type": "integer", "minimum": 48, "maximum": 160}}, "additionalProperties": false},
+              "floor_tilemap": {"type": "array", "minItems": 256, "maxItems": 16384, "items": {"type": "integer", "minimum": -1, "maximum": 16383}},
+              "player_start_pixels": { "type": "object" },
+              "video": { "$ref": "#/$defs/video_composition" }
+            },
+            "additionalProperties": true
+          }
+        }
+      },
+      "additionalProperties": true
+    },
+    "battle_rpg_project": {
+      "type": "object",
+      "required": ["encounters"],
+      "properties": {
+        "initial_encounter": { "type": "integer", "minimum": 0 },
+        "encounters": {
+          "type": "array", "minItems": 1,
+          "items": {
+            "type": "object",
+            "required": ["name", "config", "party_count", "enemy_count", "party", "enemy", "rewards"],
+            "additionalProperties": true
+          }
+        }
+      },
+      "additionalProperties": true
+    },
+    "isometric_project": {
+      "type": "object",
+      "required": [
+        "rooms"
+      ],
+      "properties": {
+        "initial_room": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "backdrop_color": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 65535
+        },
+        "grid": {
+          "$ref": "#/$defs/isometric_grid"
+        },
+        "camera": {
+          "type": "object"
+        },
+        "video": {
+          "$ref": "#/$defs/video_composition"
+        },
+        "includes": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "uniqueItems": true
+        },
+        "assets": {
+          "$ref": "#/$defs/project_asset_refs"
+        },
+        "save": {
+          "$ref": "#/$defs/save_config"
+        },
+        "resource_banks": {
+          "$ref": "#/properties/topdown_project/properties/resource_banks"
+        },
+        "resource_bank_groups": {
+          "$ref": "#/properties/topdown_project/properties/resource_bank_groups"
+        },
+        "rooms": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "required": [
+              "width_tiles",
+              "height_tiles",
+              "visual_tiles",
+              "collision_flags",
+              "actors"
+            ],
+            "properties": {
+              "name": {
+                "type": "string"
+              },
+              "resource_bank_group": {
+                "type": "string"
+              },
+              "video": {
+                "$ref": "#/$defs/video_composition"
+              },
+              "bank_group": {
+                "type": "string"
+              },
+              "width_tiles": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 64
+              },
+              "height_tiles": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 64
+              },
+              "visual_tiles": {
+                "type": "array",
+                "items": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 255
+                }
+              },
+              "collision_flags": {
+                "type": "array",
+                "items": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 255
+                }
+              },
+              "ramp_flags": {
+                "type": "array",
+                "items": {
+                  "type": "integer",
+                  "enum": [0, 2, 4]
+                }
+              },
+              "grid": {
+                "$ref": "#/$defs/isometric_grid"
+              },
+              "camera": {
+                "$ref": "#/$defs/isometric_camera"
+              },
+              "camera_start": {
+                "$ref": "#/$defs/isometric_camera"
+              },
+              "camera_zones": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/$defs/camera_zone"
+                }
+              },
+              "tileset": {
+                "type": "string",
+                "minLength": 1
+              },
+              "tileset_tile_width_pixels": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 256
+              },
+              "tileset_tile_height_pixels": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 256
+              },
+              "tileset_tile_offset_x_pixels": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "tileset_tile_offset_y_pixels": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "tileset_render_width_pixels": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 256
+              },
+              "tileset_render_offset_y_pixels": {
+                "type": "integer",
+                "minimum": -256,
+                "maximum": 256
+              },
+              "tileset_render_height_pixels": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 256
+              },
+              "on_enter": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/properties/topdown_project/properties/event_command"
+                }
+              },
+              "on_exit": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/properties/topdown_project/properties/event_command"
+                }
+              },
+              "on_update": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/properties/topdown_project/properties/event_command"
+                }
+              },
+              "actors": {
+                "type": "array",
+                "minItems": 1,
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "tile": {
+                      "type": "object"
+                    },
+                    "screen_offset": {
+                      "type": "object"
+                    },
+                    "screen_offset_pixels": {
+                      "type": "object"
+                    },
+                    "tile_index": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 65535
+                    },
+                    "palette": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 65535
+                    },
+                    "visible": {
+                      "type": "boolean"
+                    },
+                    "hflip": {
+                      "type": "boolean"
+                    },
+                    "priority": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 255
+                    },
+                    "script": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/properties/topdown_project/properties/event_command"
+                      }
+                    },
+                    "on_interact": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/properties/topdown_project/properties/event_command"
+                      }
+                    },
+                    "on_start": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/properties/topdown_project/properties/event_command"
+                      }
+                    },
+                    "on_update": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/properties/topdown_project/properties/event_command"
+                      }
+                    }
+                  },
+                  "additionalProperties": true
+                }
+              },
+              "tactical": {
+                "type": "object",
+                "required": ["enabled", "units"],
+                "properties": {
+                  "enabled": { "const": true },
+                  "active_team": { "enum": ["player", "enemy"] },
+                  "active_unit_index": { "type": "integer", "minimum": 0 },
+                  "units": {
+                    "type": "array",
+                    "minItems": 1,
+                    "items": {
+                      "type": "object",
+                      "required": ["actor_index", "team", "move_range", "attack_range", "max_hp", "attack_power"],
+                      "properties": {
+                        "actor_index": { "type": "integer", "minimum": 0 },
+                        "team": { "enum": ["player", "enemy"] },
+                        "move_range": { "type": "integer", "minimum": 1, "maximum": 15 },
+                        "attack_range": { "type": "integer", "minimum": 1, "maximum": 15 },
+                        "max_hp": { "type": "integer", "minimum": 1, "maximum": 255 },
+                        "attack_power": { "type": "integer", "minimum": 1, "maximum": 255 }
+                      },
+                      "additionalProperties": false
+                    }
+                  }
+                },
+                "additionalProperties": false
+              },
+              "tactical_presentation": {
+                "$ref": "#/$defs/isometric_tactical_presentation"
+              },
+              "initial_actors": {
+                "$ref": "#/properties/isometric_project/properties/rooms/items/properties/actors"
+              }
+            },
+            "additionalProperties": true
+          }
+        }
+      },
+      "additionalProperties": true
+    }
+  },
+  "$defs": {
+    "isometric_tactical_audio_ref": {
+      "oneOf": [
+        {
+          "type": "string",
+          "minLength": 1
+        },
+        {
+          "type": "object",
+          "required": ["asset", "index"],
+          "properties": {
+            "asset": { "type": "string", "minLength": 1 },
+            "index": { "type": "integer", "minimum": 0, "maximum": 255 }
+          },
+          "additionalProperties": false
+        }
+      ]
+    },
+    "complete_structural_fixture": {
+      "type": "object",
+      "required": [
+        "schema", "registry", "mode", "source", "production_ready", "status", "scene_count", "scenes"
+      ],
+      "properties": {
+        "schema": { "const": 1 },
+        "registry": { "const": "gba-studio-complete-structural-fixture" },
+        "mode": { "const": "structural" },
+        "source": { "const": "canonical-template" },
+        "production_ready": { "const": false },
+        "status": { "type": "string", "enum": ["complete", "review", "blocked"] },
+        "scene_count": { "type": "integer", "minimum": 0 },
+        "scenes": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": [
+              "name", "scene_type", "profile_id", "production_status", "structural_status", "production_ready",
+              "placeholder_roles", "resolved_layers", "resolved_assets", "verification", "issues"
+            ],
+            "properties": {
+              "name": { "type": "string", "minLength": 1 },
+              "scene_type": { "type": "string", "minLength": 1 },
+              "profile_id": { "type": "string", "minLength": 1 },
+              "production_status": { "type": "string", "enum": ["ready", "review", "blocked"] },
+              "structural_status": { "type": "string", "enum": ["complete", "review", "blocked"] },
+              "production_ready": { "const": false },
+              "placeholder_roles": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "enum": ["background", "player", "actors", "hud", "obstacles", "collision", "dialogue_font", "tileset", "music"]
+                },
+                "uniqueItems": true
+              },
+              "resolved_layers": {
+                "type": "array",
+                "items": { "type": "string", "minLength": 1 },
+                "uniqueItems": true
+              },
+              "resolved_assets": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "required": ["role", "reference", "kind", "source", "production_ready"],
+                  "properties": {
+                    "role": {
+                      "type": "string",
+                      "enum": ["background", "player", "actors", "hud", "obstacles", "collision", "dialogue_font", "tileset", "music"]
+                    },
+                    "reference": { "type": "string", "minLength": 1 },
+                    "kind": { "type": "string", "minLength": 1 },
+                    "source": { "type": "string", "enum": ["existing-project", "fixture-data"] },
+                    "production_ready": { "const": false }
+                  },
+                  "additionalProperties": false
+                }
+              },
+              "verification": {
+                "type": "object",
+                "required": ["tests", "evidence"],
+                "properties": {
+                  "tests": { "type": "array", "items": { "type": "string", "minLength": 1 }, "minItems": 1, "uniqueItems": true },
+                  "evidence": { "type": "array", "items": { "type": "string", "minLength": 1 }, "minItems": 1, "uniqueItems": true }
+                },
+                "additionalProperties": false
+              },
+              "issues": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "required": ["code", "severity", "message"],
+                  "properties": {
+                    "code": { "type": "string", "minLength": 1 },
+                    "severity": { "type": "string", "enum": ["info", "warning", "error"] },
+                    "message": { "type": "string", "minLength": 1 }
+                  },
+                  "additionalProperties": false
+                }
+              }
+            },
+            "additionalProperties": false
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    "shmup_background": {
+      "type": "object",
+      "required": ["name", "backdrop_color", "width_tiles", "height_tiles", "layers"],
+      "properties": {
+        "name": { "type": "string", "minLength": 1 },
+        "backdrop_color": { "type": "integer", "minimum": 0, "maximum": 32767 },
+        "width_tiles": { "type": "integer", "minimum": 1 },
+        "height_tiles": { "type": "integer", "minimum": 1 },
+        "layers": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["layer", "tilemap", "scroll"],
+            "properties": {
+              "layer": { "type": "string", "enum": ["bg1", "bg2", "bg3", "BG1", "BG2", "BG3"] },
+              "tilemap": { "type": "string", "minLength": 1 },
+              "scroll": {
+                "type": "object",
+                "required": ["x", "y"],
+                "properties": {
+                  "x": { "type": "integer" },
+                  "y": { "type": "integer" }
+                },
+                "additionalProperties": true
+              }
+            },
+            "additionalProperties": true
+          }
+        },
+        "video": { "$ref": "#/$defs/video_composition" },
+        "collision_flags": {
+          "type": "array",
+          "items": { "type": "integer", "minimum": 0, "maximum": 255 }
+        },
+        "collision_width_tiles": { "type": "integer", "minimum": 1 },
+        "collision_height_tiles": { "type": "integer", "minimum": 1 },
+        "world_width_pixels": { "type": "integer", "minimum": 1 },
+        "world_height_pixels": { "type": "integer", "minimum": 1 },
+        "affine_scroll_pixels_per_frame": {
+          "type": "object",
+          "required": ["x", "y"],
+          "properties": {
+            "x": { "type": "integer" },
+            "y": { "type": "integer" }
+          },
+          "additionalProperties": true
+        }
+      },
+      "additionalProperties": true
+    },
+    "scene_physical_budget": {
+      "type": "object",
+      "required": [
+        "bgTiles", "objTiles", "oam", "paletteColors", "vramBytes", "eventBytes",
+        "audioBytes", "dmaBytes", "vblankTicks", "cpuWorkTicks"
+      ],
+      "properties": {
+        "bgTiles": { "type": "integer", "minimum": 0 },
+        "objTiles": { "type": "integer", "minimum": 0 },
+        "oam": { "type": "integer", "minimum": 0 },
+        "paletteColors": { "type": "integer", "minimum": 0 },
+        "vramBytes": { "type": "integer", "minimum": 0 },
+        "eventBytes": { "type": "integer", "minimum": 0 },
+        "audioBytes": { "type": "integer", "minimum": 0 },
+        "dmaBytes": { "type": "integer", "minimum": 0 },
+        "vblankTicks": { "type": "integer", "minimum": 0 },
+        "cpuWorkTicks": { "type": "integer", "minimum": 0 }
+      },
+      "additionalProperties": false
+    },
+    "scene_preflight_report": {
+      "type": "object",
+      "required": [
+        "schema", "registry", "sceneName", "sceneType", "profileId", "profileLabel", "status",
+        "purpose", "perspective", "camera", "layers", "player", "actors", "hud", "obstacles",
+        "collision", "controls", "gameplay", "states", "events", "vfx", "audio", "assets",
+        "editorTools", "requiredEditorTools", "enabledCapabilities", "budget", "complexity", "fallback", "verification",
+        "checklist", "issues"
+      ],
+      "properties": {
+        "schema": { "const": 1 },
+        "registry": { "const": "gba-studio-scene-preflight" },
+        "sceneName": { "type": "string", "minLength": 1 },
+        "sceneType": { "type": "string", "minLength": 1 },
+        "profileId": {
+          "type": "string",
+          "enum": [
+            "topdown", "platformer", "isometric", "dungeonCrawler", "racing", "pointAndClick",
+            "shmup", "visualNovel", "menu", "cutscene", "worldMap", "battleRpg", "luta",
+            "puzzle", "bossBattle", "tacticalGrid", "hybrid", "custom"
+          ]
+        },
+        "profileLabel": { "type": "string", "minLength": 1 },
+        "status": { "type": "string", "enum": ["ready", "review", "blocked"] },
+        "fixture": {
+          "type": "object",
+          "required": ["registry", "mode", "productionReady"],
+          "properties": {
+            "registry": { "const": "gba-studio-complete-structural-fixture" },
+            "mode": { "const": "structural" },
+            "productionReady": { "const": false }
+          },
+          "additionalProperties": false
+        },
+        "purpose": { "type": "string", "minLength": 1 },
+        "perspective": { "type": "object", "required": ["projection", "orientation", "scroll", "viewport"], "additionalProperties": true },
+        "camera": { "type": "object", "required": ["mode", "followsPlayer", "boundsRequired", "zoomAuthoringIndependent"], "additionalProperties": true },
+        "layers": { "type": "array", "items": { "type": "object", "required": ["id", "role", "hardwareLayer", "required", "present"], "additionalProperties": true } },
+        "player": { "type": "object", "required": ["required", "present", "actorName"], "additionalProperties": true },
+        "actors": { "type": "object", "required": ["required", "count", "names"], "additionalProperties": true },
+        "hud": { "type": "object", "required": ["required", "present", "presetId"], "additionalProperties": true },
+        "obstacles": { "type": "object", "required": ["required", "count", "present"], "additionalProperties": true },
+        "collision": {
+          "type": "object",
+          "required": ["model", "source", "independentOfArt", "required", "declared", "actualCellCount", "coverage"],
+          "properties": {
+            "independentOfArt": { "const": true },
+            "actualCellCount": { "type": "integer", "minimum": 0 },
+            "coverage": { "type": "number", "minimum": 0, "maximum": 1 }
+          },
+          "additionalProperties": true
+        },
+        "controls": { "type": "array", "items": { "type": "object", "required": ["action", "input", "required"], "additionalProperties": true } },
+        "gameplay": { "type": "object", "required": ["objective", "loop", "success", "failure"], "additionalProperties": true },
+        "states": { "type": "array", "items": { "type": "string", "minLength": 1 } },
+        "events": { "type": "object", "required": ["expected", "declaredCount", "triggerCount"], "additionalProperties": true },
+        "vfx": { "type": "array", "items": { "type": "string", "minLength": 1 } },
+        "audio": { "type": "object", "required": ["music", "sfx", "channels", "cues", "musicReference", "sfxCount"], "additionalProperties": true },
+        "assets": { "type": "array", "items": { "type": "object", "required": ["id", "label", "kind", "required", "state", "present"], "additionalProperties": true } },
+        "editorTools": { "type": "array", "items": { "type": "string", "minLength": 1 } },
+        "requiredEditorTools": { "type": "array", "items": { "type": "string", "minLength": 1 } },
+        "enabledCapabilities": { "type": "array", "items": { "type": "string", "minLength": 1 }, "uniqueItems": true },
+        "budget": { "type": "object", "required": ["source", "safeLimit"], "properties": { "source": { "const": "profile" }, "safeLimit": { "$ref": "#/$defs/scene_physical_budget" } }, "additionalProperties": false },
+        "complexity": { "type": "string", "enum": ["low", "medium", "high"] },
+        "fallback": { "type": "string", "minLength": 1 },
+        "verification": { "type": "object", "required": ["tests", "evidence"], "additionalProperties": true },
+        "checklist": { "type": "array", "items": { "type": "object", "required": ["id", "label", "state", "detail"], "additionalProperties": true } },
+        "issues": { "type": "array", "items": { "type": "object", "required": ["code", "severity", "message"], "additionalProperties": true } }
+      },
+      "additionalProperties": true
+    },
+    "scene_composition_target_list": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "enum": ["BG0", "BG1", "BG2", "BG3", "OBJ", "BACKDROP"]
+      },
+      "uniqueItems": true
+    },
+    "scene_composition_window": {
+      "type": "object",
+      "required": [
+        "enabled", "left", "right", "top", "bottom", "insideTargets", "outsideTargets"
+      ],
+      "properties": {
+        "enabled": { "type": "boolean" },
+        "left": { "type": "integer", "minimum": 0, "maximum": 240 },
+        "right": { "type": "integer", "minimum": 0, "maximum": 240 },
+        "top": { "type": "integer", "minimum": 0, "maximum": 160 },
+        "bottom": { "type": "integer", "minimum": 0, "maximum": 160 },
+        "insideTargets": { "$ref": "#/$defs/scene_composition_target_list" },
+        "outsideTargets": { "$ref": "#/$defs/scene_composition_target_list" }
+      },
+      "additionalProperties": false
+    },
+    "scene_composition": {
+      "type": "object",
+      "required": [
+        "schema", "enabled", "mode", "display_mode", "default_tiled", "fallback",
+        "layers", "effects", "budget"
+      ],
+      "properties": {
+        "schema": { "const": 1 },
+        "enabled": { "type": "boolean" },
+        "mode": { "type": "string", "enum": ["tilemap", "affine", "bitmap3", "bitmap4", "bitmap5"] },
+        "display_mode": { "type": "integer", "minimum": 0, "maximum": 5 },
+        "default_tiled": { "type": "boolean" },
+        "fallback": { "type": "string", "enum": ["error", "tiled_default", "omit_decorative"] },
+        "layers": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": [
+              "id", "kind", "role", "layer", "asset", "priority", "parallax_x256",
+              "parallax_y256", "scroll_x", "scroll_y", "bitmap_page", "affine"
+            ],
+            "properties": {
+              "id": { "type": "string", "minLength": 1 },
+              "kind": { "type": "string", "enum": ["regular_bg", "affine_bg", "bitmap"] },
+              "role": { "type": "string", "enum": ["gameplay", "decorative"] },
+              "layer": { "type": "string", "enum": ["BG0", "BG1", "BG2", "BG3", "BITMAP"] },
+              "asset": { "type": ["string", "null"] },
+              "priority": { "type": "integer", "minimum": 0, "maximum": 3 },
+              "parallax_x256": { "type": "integer", "minimum": -1024, "maximum": 1024 },
+              "parallax_y256": { "type": "integer", "minimum": -1024, "maximum": 1024 },
+              "scroll_x": { "type": "integer", "minimum": -32768, "maximum": 32767 },
+              "scroll_y": { "type": "integer", "minimum": -32768, "maximum": 32767 },
+              "bitmap_page": { "type": "integer", "minimum": 0, "maximum": 1 },
+              "affine": {
+                "oneOf": [
+                  { "type": "null" },
+                  {
+                    "type": "object",
+                    "required": ["rotation_degrees", "scale_x", "scale_y", "pivot_x", "pivot_y", "wrap"],
+                    "properties": {
+                      "rotation_degrees": { "type": "number", "minimum": -360, "maximum": 360 },
+                      "scale_x": { "type": "number", "exclusiveMinimum": 0 },
+                      "scale_y": { "type": "number", "exclusiveMinimum": 0 },
+                      "pivot_x": { "type": "integer", "minimum": -32768, "maximum": 32767 },
+                      "pivot_y": { "type": "integer", "minimum": -32768, "maximum": 32767 },
+                      "wrap": { "type": "boolean" }
+                    },
+                    "additionalProperties": false
+                  }
+                ]
+              }
+            },
+            "additionalProperties": false
+          }
+        },
+        "effects": {
+          "type": "object",
+          "required": ["blend", "mosaic", "window0", "window1", "hblank"],
+          "properties": {
+            "blend": {
+              "type": "object",
+              "required": ["enabled", "mode", "first_targets", "second_targets", "eva", "evb", "intensity"],
+              "properties": {
+                "enabled": { "type": "boolean" },
+                "mode": { "type": "string", "enum": ["none", "alpha", "brighten", "darken"] },
+                "first_targets": { "$ref": "#/$defs/scene_composition_target_list" },
+                "second_targets": { "$ref": "#/$defs/scene_composition_target_list" },
+                "eva": { "type": "integer", "minimum": 0, "maximum": 16 },
+                "evb": { "type": "integer", "minimum": 0, "maximum": 16 },
+                "intensity": { "type": "integer", "minimum": 0, "maximum": 16 }
+              },
+              "additionalProperties": false
+            },
+            "mosaic": {
+              "type": "object",
+              "required": ["enabled", "bgX", "bgY", "objX", "objY"],
+              "properties": {
+                "enabled": { "type": "boolean" },
+                "bgX": { "type": "integer", "minimum": 0, "maximum": 15 },
+                "bgY": { "type": "integer", "minimum": 0, "maximum": 15 },
+                "objX": { "type": "integer", "minimum": 0, "maximum": 15 },
+                "objY": { "type": "integer", "minimum": 0, "maximum": 15 }
+              },
+              "additionalProperties": false
+            },
+            "window0": { "$ref": "#/$defs/scene_composition_window" },
+            "window1": { "$ref": "#/$defs/scene_composition_window" },
+            "hblank": {
+              "type": "object",
+              "required": ["enabled", "layer", "hdma", "scroll_offsets"],
+              "properties": {
+                "enabled": { "type": "boolean" },
+                "layer": { "type": "string", "enum": ["BG1", "BG2", "BG3"] },
+                "hdma": { "type": "boolean" },
+                "scroll_offsets": {
+                  "type": "array",
+                  "items": { "type": "integer", "minimum": -32768, "maximum": 32767 },
+                  "maxItems": 160
+                },
+                "timeline": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "required": ["frame", "scroll_offsets"],
+                    "properties": {
+                      "frame": { "type": "integer", "minimum": 0, "maximum": 65535 },
+                      "scroll_offsets": {
+                        "type": "array",
+                        "minItems": 160,
+                        "maxItems": 160,
+                        "items": { "type": "integer", "minimum": -32768, "maximum": 32767 }
+                      }
+                    },
+                    "additionalProperties": false
+                  }
+                }
+              },
+              "additionalProperties": false
+            }
+          },
+          "additionalProperties": false
+        },
+        "budget": { "$ref": "#/$defs/scene_physical_budget" }
+      },
+      "additionalProperties": false
+    },
+    "scene_resource_manifest": {
+      "type": "object",
+      "required": ["schema", "resources", "dependencies"],
+      "properties": {
+        "schema": { "const": 1 },
+        "dependencies": { "type": "array", "items": { "type": "string", "minLength": 1 }, "uniqueItems": true },
+        "resources": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": [
+              "id", "asset", "kind", "enabled", "required", "bpp", "palette", "compression", "tile_limit",
+              "resource_group", "prefetch", "cache", "eviction_priority", "dependencies", "fallback", "budget"
+            ],
+            "properties": {
+              "id": { "type": "string", "minLength": 1 },
+              "asset": { "type": "string", "minLength": 1 },
+              "kind": { "type": "string", "enum": ["regular_bg", "affine_bg", "bitmap3", "bitmap4", "bitmap5", "obj", "palette", "audio", "hblank_table"] },
+              "enabled": { "type": "boolean" },
+              "required": { "type": "boolean" },
+              "bpp": { "type": "integer", "enum": [4, 8, 15] },
+              "palette": {
+                "type": "object",
+                "required": ["id", "slot", "colors"],
+                "properties": {
+                  "id": { "type": "string" },
+                  "slot": { "type": "string", "enum": ["background", "objects", "none"] },
+                  "colors": { "type": "integer", "minimum": 0, "maximum": 256 }
+                },
+                "additionalProperties": false
+              },
+              "compression": {
+                "oneOf": [
+                  { "type": "string", "enum": ["auto", "none", "rle16", "lz77", "huffman"] },
+                  {
+                    "type": "object",
+                    "required": ["strategy", "tiles", "tilemap", "palette"],
+                    "properties": {
+                      "strategy": { "const": "manual" },
+                      "tiles": { "type": "string", "enum": ["none", "rle16", "lz77", "huffman"] },
+                      "tilemap": { "type": "string", "enum": ["none", "rle16", "lz77", "huffman"] },
+                      "palette": { "type": "string", "enum": ["none", "rle16", "lz77", "huffman"] }
+                    },
+                    "additionalProperties": false
+                  }
+                ]
+              },
+              "tile_limit": { "type": "integer", "minimum": 0, "maximum": 1024 },
+              "resource_group": { "type": "string", "minLength": 1 },
+              "prefetch": { "type": "string", "enum": ["none", "scene", "camera", "manual"] },
+              "cache": { "type": "string", "enum": ["resident", "evictable"] },
+              "eviction_priority": { "type": "integer", "minimum": 0, "maximum": 255 },
+              "dependencies": { "type": "array", "items": { "type": "string", "minLength": 1 }, "uniqueItems": true },
+              "fallback": {
+                "type": "object",
+                "required": ["mode"],
+                "properties": {
+                  "mode": { "type": "string", "enum": ["error", "omit_decorative", "tiled_default"] },
+                  "assetId": { "type": "string", "minLength": 1 }
+                },
+                "additionalProperties": false
+              },
+              "budget": { "$ref": "#/$defs/scene_physical_budget" }
+            },
+            "additionalProperties": false
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    "scene_metatile_authoring": {
+      "type": "object",
+      "required": [
+        "schema", "enabled", "contract", "fallback", "block_width", "block_height",
+        "logical_width", "logical_height", "library", "map", "physical", "export_cost"
+      ],
+      "properties": {
+        "schema": { "const": 1 },
+        "enabled": { "const": true },
+        "contract": { "const": "gba-authored-metatile-2x2-v1" },
+        "fallback": { "type": "string", "enum": ["error", "tiled_default"] },
+        "block_width": { "const": 2 },
+        "block_height": { "const": 2 },
+        "logical_width": { "type": "integer", "minimum": 1 },
+        "logical_height": { "type": "integer", "minimum": 1 },
+        "library": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "required": ["id", "label", "tiles", "semantic"],
+            "properties": {
+              "id": { "type": "string", "minLength": 1 },
+              "label": { "type": "string", "minLength": 1 },
+              "tiles": {
+                "type": "array",
+                "minItems": 4,
+                "maxItems": 4,
+                "items": { "type": "integer", "minimum": 0, "maximum": 1023 }
+              },
+              "semantic": {
+                "type": "object",
+                "required": ["collision", "terrain", "damage", "speed_percent", "animation", "on_enter_event", "step_sound", "tags"],
+                "properties": {
+                  "collision": { "type": "string", "minLength": 1 },
+                  "terrain": { "type": "string" },
+                  "damage": { "type": "integer", "minimum": 0, "maximum": 255 },
+                  "speed_percent": { "type": "integer", "minimum": 0, "maximum": 200 },
+                  "animation": { "type": "string" },
+                  "on_enter_event": { "type": "string" },
+                  "step_sound": { "type": "string" },
+                  "tags": { "type": "array", "items": { "type": "string" }, "uniqueItems": true }
+                },
+                "additionalProperties": false
+              }
+            },
+            "additionalProperties": false
+          }
+        },
+        "map": { "type": "array", "minItems": 1, "items": { "type": "integer", "minimum": 0 } },
+        "physical": {
+          "type": "object",
+          "required": ["width_tiles", "height_tiles", "visual_tiles", "collision_types"],
+          "properties": {
+            "width_tiles": { "type": "integer", "minimum": 1 },
+            "height_tiles": { "type": "integer", "minimum": 1 },
+            "visual_tiles": { "type": "array", "items": { "type": "integer", "minimum": 0, "maximum": 1023 } },
+            "collision_types": { "type": "array", "items": { "type": "string" } }
+          },
+          "additionalProperties": false
+        },
+        "export_cost": { "$ref": "#/$defs/scene_physical_budget" }
+      },
+      "additionalProperties": false
+    },
+    "scene_contract": {
+      "type": "object",
+      "required": ["name", "scene_type", "runtime_profile", "composition", "resources"],
+      "properties": {
+        "name": { "type": "string", "minLength": 1 },
+        "scene_type": { "type": "string", "minLength": 1 },
+        "runtime_profile": { "type": "string", "minLength": 1 },
+        "composition": { "$ref": "#/$defs/scene_composition" },
+        "resources": { "$ref": "#/$defs/scene_resource_manifest" },
+        "metatiles": { "$ref": "#/$defs/scene_metatile_authoring" }
+      },
+      "additionalProperties": false
+    },
+    "camera_zone": {
+      "type": "object",
+      "required": ["area", "bounds"],
+      "properties": {
+        "area": { "type": "object" },
+        "bounds": { "type": "object" },
+        "bounds_pixels": { "type": "object" },
+        "offset": { "type": "object" },
+        "offset_pixels": { "type": "object" },
+        "lock_x": { "type": "boolean" },
+        "lock_y": { "type": "boolean" }
+      },
+      "additionalProperties": true
+    },
+    "isometric_tactical_presentation": {
+      "type": "object",
+      "required": ["schema", "capabilities", "layers", "assets", "units", "props", "indices"],
+      "properties": {
+        "schema": { "const": 1 },
+        "capabilities": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "enum": [
+              "tactical_surface",
+              "tactical_grid_overlay",
+              "tactical_hud",
+              "tactical_units",
+              "tactical_props",
+              "tactical_feedback",
+              "tactical_audio"
+            ]
+          },
+          "uniqueItems": true
+        },
+        "layers": {
+          "type": "object",
+          "required": ["collision"],
+          "properties": {
+            "surface": { "const": "BG2" },
+            "grid": { "const": "BG1" },
+            "hud": { "const": "BG0" },
+            "objects": { "const": "OBJ" },
+            "collision": { "const": "scene_data" }
+          },
+          "additionalProperties": false
+        },
+        "assets": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["id", "reference", "consumer", "required"],
+            "properties": {
+              "id": { "type": "string", "minLength": 1 },
+              "reference": {
+                "type": "string",
+                "minLength": 1,
+                "pattern": "^(?!/)(?![A-Za-z]:[\\\\/])(?!.*(?:^|/)\\.\\.(?:/|$)).+"
+              },
+              "consumer": { "enum": ["bg", "obj", "ui", "audio"] },
+              "required": { "type": "boolean" },
+              "status": {
+                "enum": ["candidate", "palette-prepared", "pack-validated", "scene-verified", "approved", "attention", "impossible"]
+              }
+            },
+            "additionalProperties": false
+          },
+          "uniqueItems": true
+        },
+        "surface_asset": {
+          "type": "string",
+          "minLength": 1,
+          "pattern": "^(?!/)(?![A-Za-z]:[\\\\/])(?!.*(?:^|/)\\.\\.(?:/|$)).+"
+        },
+        "surface_pages": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "required": ["id", "asset", "bank_group", "world"],
+            "properties": {
+              "id": { "type": "string", "minLength": 1 },
+              "asset": { "type": "string", "minLength": 1 },
+              "bank_group": { "type": "string", "minLength": 1 },
+              "world": {
+                "type": "object",
+                "required": ["x", "y", "width", "height"],
+                "properties": {
+                  "x": { "type": "integer" },
+                  "y": { "type": "integer" },
+                  "width": { "type": "integer", "minimum": 1 },
+                  "height": { "type": "integer", "minimum": 1 }
+                },
+                "additionalProperties": false
+              }
+            },
+            "additionalProperties": false
+          }
+        },
+        "surface_residency": {
+          "type": "object",
+          "required": ["exclusive_bank_groups", "max_resident_groups", "prefetch_margin_pixels"],
+          "properties": {
+            "exclusive_bank_groups": {
+              "type": "array",
+              "minItems": 1,
+              "items": { "type": "string", "minLength": 1 },
+              "uniqueItems": true
+            },
+            "max_resident_groups": { "type": "integer", "minimum": 1 },
+            "prefetch_margin_pixels": { "type": "integer", "minimum": 0 }
+          },
+          "additionalProperties": false
+        },
+        "grid_asset": {
+          "type": "string",
+          "minLength": 1,
+          "pattern": "^(?!/)(?![A-Za-z]:[\\\\/])(?!.*(?:^|/)\\.\\.(?:/|$)).+"
+        },
+        "hud_layout": {
+          "type": "string",
+          "minLength": 1,
+          "pattern": "^(?!/)(?![A-Za-z]:[\\\\/])(?!.*(?:^|/)\\.\\.(?:/|$)).+"
+        },
+        "units": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["actor_id", "sheet"],
+            "properties": {
+              "actor_id": { "type": "string", "minLength": 1 },
+              "sheet": { "type": "string", "minLength": 1 },
+              "animations": {
+                "type": "object",
+                "properties": {
+                  "idle_down": { "type": "string", "minLength": 1 },
+                  "idle_up": { "type": "string", "minLength": 1 },
+                  "idle_left": { "type": "string", "minLength": 1 },
+                  "idle_right": { "type": "string", "minLength": 1 },
+                  "move_down": { "type": "string", "minLength": 1 },
+                  "move_up": { "type": "string", "minLength": 1 },
+                  "move_left": { "type": "string", "minLength": 1 },
+                  "move_right": { "type": "string", "minLength": 1 },
+                  "attack_down": { "type": "string", "minLength": 1 },
+                  "attack_up": { "type": "string", "minLength": 1 },
+                  "attack_left": { "type": "string", "minLength": 1 },
+                  "attack_right": { "type": "string", "minLength": 1 },
+                  "hurt_down": { "type": "string", "minLength": 1 },
+                  "hurt_up": { "type": "string", "minLength": 1 },
+                  "hurt_left": { "type": "string", "minLength": 1 },
+                  "hurt_right": { "type": "string", "minLength": 1 },
+                  "defeat_down": { "type": "string", "minLength": 1 },
+                  "defeat_up": { "type": "string", "minLength": 1 },
+                  "defeat_left": { "type": "string", "minLength": 1 },
+                  "defeat_right": { "type": "string", "minLength": 1 }
+                },
+                "additionalProperties": false
+              }
+            },
+            "additionalProperties": false
+          }
+        },
+        "props": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["id", "asset", "kind"],
+            "properties": {
+              "id": { "type": "string", "minLength": 1 },
+              "asset": { "type": "string", "minLength": 1 },
+              "kind": { "enum": ["objective", "cover", "elevation"] },
+              "tile": {
+                "type": "object",
+                "required": ["x", "y", "z"],
+                "properties": {
+                  "x": { "type": "integer" },
+                  "y": { "type": "integer" },
+                  "z": { "type": "integer" }
+                },
+                "additionalProperties": false
+              },
+              "animated": { "type": "boolean" }
+            },
+            "additionalProperties": false
+          }
+        },
+        "cursor_asset": { "type": "string", "minLength": 1 },
+        "range_asset": { "type": "string", "minLength": 1 },
+        "target_asset": { "type": "string", "minLength": 1 },
+        "emotes": {
+          "type": "object",
+          "required": ["asset", "index"],
+          "properties": {
+            "asset": { "type": "string", "minLength": 1 },
+            "index": { "type": "integer", "minimum": 0 }
+          },
+          "additionalProperties": false
+        },
+        "feedback": {
+          "type": "object",
+          "required": ["asset", "index"],
+          "properties": {
+            "asset": { "type": "string", "minLength": 1 },
+            "index": { "type": "integer", "minimum": 0 }
+          },
+          "additionalProperties": false
+        },
+        "audio": {
+          "type": "object",
+          "required": ["format", "music", "cues", "cue_indices"],
+          "properties": {
+            "format": { "const": "COMPOSED" },
+            "music": { "$ref": "#/$defs/isometric_tactical_audio_ref" },
+            "cues": {
+              "type": "object",
+              "required": ["cursor", "select", "cancel", "move", "attack", "hit", "turn", "victory", "defeat"],
+              "properties": {
+                "cursor": { "$ref": "#/$defs/isometric_tactical_audio_ref" },
+                "select": { "$ref": "#/$defs/isometric_tactical_audio_ref" },
+                "cancel": { "$ref": "#/$defs/isometric_tactical_audio_ref" },
+                "move": { "$ref": "#/$defs/isometric_tactical_audio_ref" },
+                "attack": { "$ref": "#/$defs/isometric_tactical_audio_ref" },
+                "hit": { "$ref": "#/$defs/isometric_tactical_audio_ref" },
+                "turn": { "$ref": "#/$defs/isometric_tactical_audio_ref" },
+                "victory": { "$ref": "#/$defs/isometric_tactical_audio_ref" },
+                "defeat": { "$ref": "#/$defs/isometric_tactical_audio_ref" }
+              },
+              "additionalProperties": false
+            },
+            "cue_indices": {
+              "type": "object",
+              "required": ["cursor", "select", "cancel", "move", "attack", "hit", "turn", "victory", "defeat"],
+              "properties": {
+                "cursor": { "type": "integer", "minimum": 0 },
+                "select": { "type": "integer", "minimum": 0 },
+                "cancel": { "type": "integer", "minimum": 0 },
+                "move": { "type": "integer", "minimum": 0 },
+                "attack": { "type": "integer", "minimum": 0 },
+                "hit": { "type": "integer", "minimum": 0 },
+                "turn": { "type": "integer", "minimum": 0 },
+                "victory": { "type": "integer", "minimum": 0 },
+                "defeat": { "type": "integer", "minimum": 0 }
+              },
+              "additionalProperties": false
+            }
+          },
+          "additionalProperties": false
+        },
+        "indices": {
+          "type": "object",
+          "required": ["props"],
+          "properties": {
+            "markers": {
+              "type": "object",
+              "required": ["cursor", "range", "target"],
+              "properties": {
+                "cursor": { "type": "integer", "minimum": 0 },
+                "range": { "type": "integer", "minimum": 0 },
+                "target": { "type": "integer", "minimum": 0 }
+              },
+              "additionalProperties": false
+            },
+            "props": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "required": ["id", "index"],
+                "properties": {
+                  "id": { "type": "string", "minLength": 1 },
+                  "index": { "type": "integer", "minimum": 0 }
+                },
+                "additionalProperties": false
+              },
+              "uniqueItems": true
+            },
+            "audio_cues": {
+              "type": "object",
+              "additionalProperties": { "type": "integer", "minimum": 0 }
+            }
+          },
+          "additionalProperties": false
+        }
+      },
+      "allOf": [
+        {
+          "if": { "properties": { "capabilities": { "contains": { "const": "tactical_surface" } } } },
+          "then": { "required": ["surface_asset"], "properties": { "layers": { "required": ["surface"] } } }
+        },
+        {
+          "if": { "properties": { "capabilities": { "contains": { "const": "tactical_grid_overlay" } } } },
+          "then": { "required": ["grid_asset"], "properties": { "layers": { "required": ["grid"] } } }
+        },
+        {
+          "if": { "properties": { "capabilities": { "contains": { "const": "tactical_hud" } } } },
+          "then": { "required": ["hud_layout"], "properties": { "layers": { "required": ["hud"] } } }
+        },
+        {
+          "if": { "properties": { "capabilities": { "contains": { "const": "tactical_units" } } } },
+          "then": {
+            "properties": {
+              "layers": { "required": ["objects"] },
+              "units": {
+                "minItems": 1,
+                "items": {
+                  "required": ["animations"],
+                  "properties": {
+                    "animations": {
+                      "required": [
+                        "idle_down", "idle_up", "idle_left", "idle_right",
+                        "move_down", "move_up", "move_left", "move_right",
+                        "attack_down", "attack_up", "attack_left", "attack_right",
+                        "hurt_down", "hurt_up", "hurt_left", "hurt_right",
+                        "defeat_down", "defeat_up", "defeat_left", "defeat_right"
+                      ],
+                      "minProperties": 20
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        {
+          "if": { "properties": { "capabilities": { "contains": { "const": "tactical_props" } } } },
+          "then": { "properties": { "props": { "minItems": 1 }, "layers": { "required": ["objects"] } } }
+        },
+        {
+          "if": { "properties": { "capabilities": { "contains": { "const": "tactical_feedback" } } } },
+          "then": {
+            "required": ["cursor_asset", "range_asset", "target_asset", "emotes", "feedback"],
+            "properties": {
+              "layers": { "required": ["objects"] },
+              "indices": { "required": ["markers"] }
+            }
+          }
+        },
+        {
+          "if": { "properties": { "capabilities": { "contains": { "const": "tactical_audio" } } } },
+          "then": { "required": ["audio"], "properties": { "indices": { "required": ["audio_cues"] } } }
+        }
+      ],
+      "additionalProperties": false
+    },
+    "isometric_camera": {
+      "type": "object",
+      "properties": {
+        "position": {
+          "type": "object"
+        },
+        "bounds": {
+          "type": "object"
+        },
+        "bounds_enabled": {
+          "type": "boolean"
+        },
+        "zoom_x256": {
+          "type": "integer",
+          "minimum": 128,
+          "maximum": 1024
+        },
+        "target_zoom_x256": {
+          "type": "integer",
+          "minimum": 128,
+          "maximum": 1024
+        },
+        "follow_enabled": {
+          "type": "boolean"
+        },
+        "smoothing_x256": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 256
+        },
+        "dead_zone": {
+          "type": "object"
+        },
+        "pan": {
+          "type": "object"
+        }
+      },
+      "additionalProperties": true
+    },
+    "isometric_grid": {
+      "type": "object",
+      "properties": {
+        "tile_width_pixels": {
+          "type": "integer",
+          "minimum": 2,
+          "maximum": 128,
+          "multipleOf": 2
+        },
+        "tile_height_pixels": {
+          "type": "integer",
+          "minimum": 2,
+          "maximum": 128,
+          "multipleOf": 2
+        },
+        "height_step_pixels": {
+          "type": "integer",
+          "minimum": 2,
+          "maximum": 128,
+          "multipleOf": 2
+        },
+        "origin": {
+          "type": "object",
+          "properties": {
+            "x": { "type": "integer", "minimum": -512, "maximum": 512 },
+            "y": { "type": "integer", "minimum": -512, "maximum": 512 }
+          },
+          "additionalProperties": false
+        },
+        "gameplay_mode": { "enum": ["adventure", "tactical"] },
+        "profile": { "const": "diamond-2to1" },
+        "projection": { "const": "diamond" },
+        "movement_model": { "enum": ["free", "tile"] },
+        "height_mode": { "const": "levels" }
+      },
+      "additionalProperties": true
+    },
+    "affine_video_composition": {
+      "type": "object",
+      "required": [
+        "asset",
+        "layer",
+        "wrap",
+        "pa",
+        "pb",
+        "pc",
+        "pd",
+        "reference_x_8",
+        "reference_y_8"
+      ],
+      "properties": {
+        "asset": { "type": ["string", "null"] },
+        "layer": { "enum": ["BG2", "BG3", "bg2", "bg3"] },
+        "wrap": { "type": "boolean" },
+        "pa": { "type": "integer", "minimum": -32768, "maximum": 32767 },
+        "pb": { "type": "integer", "minimum": -32768, "maximum": 32767 },
+        "pc": { "type": "integer", "minimum": -32768, "maximum": 32767 },
+        "pd": { "type": "integer", "minimum": -32768, "maximum": 32767 },
+        "reference_x_8": { "type": "integer", "minimum": -2147483648, "maximum": 2147483647 },
+        "reference_y_8": { "type": "integer", "minimum": -2147483648, "maximum": 2147483647 }
+      },
+      "additionalProperties": false
+    },
+    "video_composition": {
+      "type": "object",
+      "properties": {
+        "display_mode": { "type": "integer", "minimum": 0, "maximum": 5 },
+        "affine": {
+          "anyOf": [
+            { "$ref": "#/$defs/affine_video_composition" },
+            { "type": "null" }
+          ]
+        },
+        "bitmap": { "type": ["object", "null"] }
+      },
+      "additionalProperties": false
+    },
+    "platformer_player_animation": {
+      "type": "object",
+      "required": [
+        "asset",
+        "frame_indices"
+      ],
+      "properties": {
+        "asset": {
+          "type": "string",
+          "minLength": 1
+        },
+        "frame_indices": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 255
+          }
+        },
+        "durations": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 255
+          }
+        },
+        "frame_metasprites": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object"
+          }
+        },
+        "loop": {
+          "type": "boolean"
+        },
+        "loops": {
+          "type": "boolean"
+        }
+      },
+      "additionalProperties": false
+    },
+    "menu_item_binding": {
+      "type": "object",
+      "required": ["source", "index", "format"],
+      "properties": {
+        "source": { "type": "string", "enum": ["variable", "inventory", "stat", "equipped"] },
+        "index": { "type": "integer", "minimum": 0 },
+        "format": { "type": "string", "enum": ["number", "count", "percent", "on_off"] }
+      },
+      "additionalProperties": true
+    },
+    "save_config": {
+      "type": "object",
+      "properties": {
+        "save_type": {
+          "type": "string",
+          "enum": ["sram", "flash1m"]
+        },
+        "enabled": {
+          "type": "boolean"
+        },
+        "autosave": {
+          "type": "boolean"
+        },
+        "signature": {
+          "type": "string",
+          "minLength": 4,
+          "maxLength": 4
+        },
+        "offset": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 32767
+        },
+        "sram_offset": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 32767
+        },
+        "slot_capacity": {
+          "type": "integer",
+          "minimum": 17,
+          "maximum": 32768
+        },
+        "slot_capacity_bytes": {
+          "type": "integer",
+          "minimum": 17,
+          "maximum": 32768
+        },
+        "slot_count": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 255
+        },
+        "version": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 65535
+        }
+      },
+      "additionalProperties": true
+    },
+    "project_asset_refs": {
+      "type": "object",
+      "properties": {
+        "bg_palettes": {
+          "$ref": "#/$defs/symbol_list"
+        },
+        "obj_palettes": {
+          "$ref": "#/$defs/symbol_list"
+        },
+        "tile_assets": {
+          "$ref": "#/$defs/symbol_list"
+        },
+        "sfx_assets": {
+          "$ref": "#/$defs/symbol_list"
+        },
+        "music_assets": {
+          "$ref": "#/$defs/symbol_list"
+        },
+        "pcm_assets": {
+          "$ref": "#/$defs/symbol_list"
+        },
+        "tracker_assets": {
+          "$ref": "#/$defs/symbol_list"
+        }
+      },
+      "additionalProperties": true
+    },
+    "symbol_list": {
+      "type": "array",
+      "items": {
+        "oneOf": [
+          {
+            "type": "string",
+            "minLength": 1
+          },
+          {
+            "type": "object",
+            "properties": {
+              "asset": {
+                "type": "string",
+                "minLength": 1
+              },
+              "symbol": {
+                "type": "string",
+                "minLength": 1
+              }
+            },
+            "additionalProperties": true
+          }
+        ]
+      }
+    }
+  },
+  "additionalProperties": true
+}

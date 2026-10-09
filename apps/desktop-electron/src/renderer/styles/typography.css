@@ -1,0 +1,1497 @@
+/* Preserve authored canvas marker sizes and the existing typography cascade. */
+.room-focus-map-camera > span,
+.room-focus-preview-drag > span,
+.room-focus-preview-tabs > button {
+  font-size: 11px;
+}
+
+.room-focus-preview-drag > span {
+  font-weight: var(--studio-font-weight-medium);
+}
+
+.room-focus-preview-panel > small {
+  font-size: 10px;
+}
+
+.room-test-start-control,
+.room-test-start-control select,
+.room-test-start-marker,
+.room-game-start-label {
+  font-size: 11px;
+}
+
+.room-arrival-inspector p {
+  font-size: 12px;
+}
+
+.room-test-start-marker {
+  font-weight: 700;
+}
+
+.room-arrival-source-label {
+  font-size: 10px;
+  font-weight: 600;
+}
+
+.settings-translation-packs-heading strong,
+.settings-translation-pack-copy strong {
+  font-size: var(--studio-font-size-sm);
+}
+
+.settings-translation-packs-heading span:not(.settings-translation-packs-icon),
+.settings-translation-pack-copy span,
+.settings-translation-pack-copy small,
+.settings-translation-packs-note,
+.settings-translation-packs-message,
+.settings-translation-pack-actions button,
+.settings-translation-pack-status {
+  font-size: var(--studio-font-size-xs);
+}
+
+.settings-controls-note code {
+  font-family: var(--studio-font-mono);
+  font-size: 0.92em;
+}
+
+.settings-credits-content .welcome-credits-thanks dt,
+.settings-credits-content .welcome-credits-thanks dd {
+  font-size: var(--studio-font-size-xs);
+  line-height: var(--studio-line-height-compact);
+}
+
+.settings-credits-content .welcome-credits-thanks dt {
+  font-weight: var(--studio-font-weight-semibold);
+}
+
+.settings-credits-content .welcome-credits-thanks dd {
+  font-weight: var(--studio-font-weight-regular);
+}
+
+.studio-context-menu button {
+  font-size: var(--studio-font-size-md);
+}
+
+.room-geometry-diagnostics-header span,
+.room-geometry-diagnostic-card span,
+.room-geometry-diagnostics-header > strong,
+.room-geometry-diagnostic-warning {
+  font-size: var(--studio-font-size-xs);
+}
+
+.room-geometry-diagnostics-header h5 {
+  font-size: var(--studio-font-size-lg);
+}
+
+.room-geometry-diagnostics > p {
+  font-size: var(--studio-font-size-sm);
+}
+
+.room-geometry-diagnostic-card strong {
+  font-size: var(--studio-font-size-sm);
+}
+
+.room-geometry-diagnostic-card small {
+  font-size: var(--studio-font-size-2xs);
+}
+
+.scene-preflight-status,
+.scene-preflight-summary span,
+.scene-preflight-facts dt,
+.scene-preflight-panel-heading small,
+.scene-preflight-asset-list small,
+.scene-preflight-layer-list small,
+.scene-preflight-checklist-item small,
+.scene-preflight-issue small,
+.scene-preflight-physical small,
+.scene-preflight-physical-row.is-header {
+  font-size: var(--studio-font-size-xs);
+}
+
+.scene-preflight-status,
+.scene-preflight-checklist summary {
+  font-weight: var(--studio-font-weight-bold);
+}
+
+:where(.app-shell, .welcome-shell) {
+  font-size: var(--studio-font-size-md);
+  font-weight: var(--studio-font-weight-regular);
+  line-height: var(--studio-line-height-normal);
+  text-rendering: geometricPrecision;
+}
+
+/* Inspector typography uses the same scale as the rest of the application. */
+.settings-search input {
+  font: inherit;
+}
+
+.inspector-readable label > span {
+  color: var(--studio-color-text-secondary);
+  font-size: var(--studio-font-size-sm);
+  font-weight: var(--studio-font-weight-medium);
+  line-height: var(--studio-line-height-compact);
+}
+
+.inspector-readable h4 {
+  font-size: var(--studio-font-size-lg);
+  font-weight: var(--studio-font-weight-semibold);
+}
+
+.inspector-readable :is(h5, h6, legend) {
+  font-size: var(--studio-font-size-md);
+  font-weight: var(--studio-font-weight-semibold);
+}
+
+.inspector-readable .inspector-section > summary {
+  font-size: var(--studio-font-size-sm);
+  font-weight: var(--studio-font-weight-semibold);
+  line-height: var(--studio-line-height-compact);
+}
+
+.inspector-readable :is(p, small, .inspector-field-description, .inspector-section-description) {
+  font-size: var(--studio-font-size-sm);
+  font-weight: var(--studio-font-weight-regular);
+  line-height: var(--studio-line-height-normal);
+}
+
+.inspector-info-popover {
+  font-size: var(--studio-font-size-sm);
+  font-weight: var(--studio-font-weight-medium);
+}
+
+.room-stage-preview-loading,
+.room-connection-advanced-note,
+.room-scene-hud-summary > div span,
+.scene-dialogue-preview-caption {
+  font-size: var(--studio-font-size-sm);
+}
+
+.dialogue-appearance-group > summary {
+  font-weight: var(--studio-font-weight-medium);
+}
+
+.inspector-readable :is(input:not([type="checkbox"]):not([type="radio"]), select, textarea) {
+  font-size: var(--studio-font-size-md);
+  font-weight: var(--studio-font-weight-medium);
+  line-height: var(--studio-line-height-control);
+}
+
+.inspector-field-presets button,
+.inspector-reset-button {
+  font-size: var(--studio-font-size-2xs);
+  font-weight: var(--studio-font-weight-semibold);
+}
+
+.inspector-range-endpoints,
+.sprite-sheet-size-bar .inspector-number-field .inspector-field-unit,
+.sprite-sheet-size-bar .inspector-number-field .inspector-field-description {
+  font-size: var(--studio-font-size-2xs);
+}
+
+.rooms-editor-scene-actions-title {
+  font-size: var(--studio-font-size-2xs);
+  font-weight: var(--studio-font-weight-bold);
+}
+
+.room-stage-card-actions .room-stage-card-edit-button span {
+  font-size: var(--studio-font-size-2xs);
+  font-weight: 800;
+}
+
+:where(
+  .app-topbar,
+  .welcome-shell,
+  .files-workspace,
+  .rooms-workspace,
+  .sprites-workspace,
+  .events-workspace,
+  .dialogues-workspace,
+  .audio-workspace,
+  .settings-workspace,
+  .project-action-menu,
+  .preview-runtime
+) :where(button, input, select, textarea) {
+  font-size: var(--studio-font-size-md);
+  font-weight: var(--studio-font-weight-medium);
+  line-height: var(--studio-line-height-control);
+}
+
+:where(
+  .rooms-header h3,
+  .sprites-header h3,
+  .events-header h3,
+  .dialogues-header h3,
+  .audio-header h3,
+  .settings-header h3
+) {
+  font-size: var(--studio-font-size-lg);
+  font-weight: var(--studio-font-weight-bold);
+  line-height: var(--studio-line-height-tight);
+  margin-block: 0;
+}
+
+:where(
+  .rooms-header p,
+  .sprites-header p,
+  .events-header p,
+  .dialogues-header p,
+  .audio-header p,
+  .settings-header p,
+  .topbar-project,
+  .welcome-brand p,
+  .welcome-status,
+  .welcome-footer
+) {
+  font-size: var(--studio-font-size-sm);
+  font-weight: var(--studio-font-weight-regular);
+  line-height: var(--studio-line-height-compact);
+}
+
+.topbar-brand-logo {
+  display: block;
+  height: var(--studio-font-size-lg);
+  width: auto;
+}
+
+.workspace {
+  font-size: var(--studio-font-size-md);
+  font-weight: var(--studio-font-weight-semibold);
+  line-height: var(--studio-line-height-control);
+}
+
+:where(
+  .room-kind-strip span,
+  .settings-summary-strip span,
+  .files-summary-strip span,
+  .events-filter-strip button,
+  .rooms-filter-chip-group button,
+  .settings-header-actions > button,
+  .rooms-header-actions > button,
+  .sprites-header-actions > button,
+  .events-header-actions > button,
+  .audio-header-actions > button,
+  .dialogues-header-actions > button
+) {
+  font-size: var(--studio-font-size-md);
+  font-weight: var(--studio-font-weight-medium);
+  line-height: var(--studio-line-height-control);
+}
+
+:where(
+  .welcome-brand h1,
+  .welcome-main h2,
+  .welcome-create h2
+) {
+  font-size: var(--studio-font-size-display);
+  font-weight: var(--studio-font-weight-bold);
+  line-height: var(--studio-line-height-tight);
+}
+
+.welcome-learning-heading h2 {
+  font-size: var(--studio-font-size-lg);
+  font-weight: var(--studio-font-weight-bold);
+  line-height: var(--studio-line-height-tight);
+}
+
+.welcome-learning-steps strong {
+  font-size: var(--studio-font-size-sm);
+  font-weight: var(--studio-font-weight-semibold);
+  line-height: var(--studio-line-height-compact);
+}
+
+:where(.welcome-learning-steps span, .welcome-learning-advanced) {
+  font-size: var(--studio-font-size-xs);
+  font-weight: var(--studio-font-weight-regular);
+  line-height: var(--studio-line-height-compact);
+}
+
+:where(
+  .welcome-credits-card h3,
+  .welcome-credits-thanks dt
+) {
+  font-size: var(--studio-font-size-md);
+  font-weight: var(--studio-font-weight-semibold);
+  line-height: var(--studio-line-height-tight);
+}
+
+:where(
+  .welcome-credits-card p,
+  .welcome-credits-card dd,
+  .welcome-credits-creator span,
+  .welcome-credits-legal p
+) {
+  font-size: var(--studio-font-size-sm);
+  font-weight: var(--studio-font-weight-regular);
+  line-height: var(--studio-line-height-compact);
+}
+
+:where(
+  .welcome-create label,
+  .settings-edit-row span,
+  .settings-value-row strong,
+  .settings-nav-group h4,
+  .editor-tree-row small,
+  .room-inspector-panel label,
+  .audio-detail-label,
+  .sprite-detail-label
+) {
+  font-size: var(--studio-font-size-sm);
+  font-weight: var(--studio-font-weight-medium);
+  line-height: var(--studio-line-height-compact);
+}
+
+:where(
+  .welcome-template-card strong,
+  .welcome-recent strong,
+  .settings-nav-copy strong,
+  .settings-section-hero h4,
+  .settings-intent-card strong,
+  .editor-tree-row strong,
+  .editor-empty-row strong,
+  .room-stage-card-title,
+  .event-node-title,
+  .sprite-card-title,
+  .audio-library-item strong,
+  .dialogue-list-item strong
+) {
+  font-size: var(--studio-font-size-md);
+  font-weight: var(--studio-font-weight-semibold);
+  line-height: var(--studio-line-height-compact);
+}
+
+.rooms-workspace .editor-project-rail .editor-tree-row strong {
+  font-size: var(--studio-font-size-sm);
+  font-weight: var(--studio-font-weight-semibold);
+  line-height: var(--studio-line-height-control);
+}
+
+:where(
+  .scene-palette-family-card > strong,
+) {
+  font-size: var(--studio-font-size-sm);
+  font-weight: var(--studio-font-weight-bold);
+}
+
+:where(
+  .scene-palette-preview > span,
+) {
+  font-size: var(--studio-font-size-xs);
+  font-weight: var(--studio-font-weight-semibold);
+}
+
+:where(
+  .editor-rail-section-header h4,
+  .room-inspector-panel h4,
+  .room-tool-context-panel h4,
+  .settings-nav-copy span,
+  .settings-section-hero span,
+  .settings-intent-header span,
+  .settings-inspector-header h4,
+  .files-panel h4,
+  .sprites-panel h4,
+  .audio-panel h4,
+  .dialogues-panel h4
+) {
+  font-size: var(--studio-font-size-lg);
+  font-weight: var(--studio-font-weight-semibold);
+  line-height: var(--studio-line-height-tight);
+}
+
+:where(
+  .editor-tree-row small,
+  .room-stage-card-meta,
+  .room-stage-card-footer,
+  .rooms-debugger summary strong,
+  .rooms-debugger summary em,
+  .settings-edit-row small,
+  .settings-intent-card small,
+  .settings-inspector-card p,
+  .welcome-template-card small,
+  .welcome-recent small,
+  .welcome-create small
+) {
+  font-size: var(--studio-font-size-sm);
+  font-weight: var(--studio-font-weight-regular);
+  line-height: var(--studio-line-height-compact);
+}
+
+:where(
+  .event-runtime-visual-effect span,
+  .event-runtime-visual-effect code
+) {
+  font-size: var(--studio-font-size-sm);
+  font-weight: var(--studio-font-weight-regular);
+  line-height: var(--studio-line-height-compact);
+}
+
+:where(
+  .room-tool-context-panel span,
+  .room-inspector-panel span,
+  .settings-section-badge,
+  .settings-nav-group h4,
+  .event-node-badge,
+  .audio-chip,
+  .sprite-chip,
+  .sprites-inspector-tabs button,
+  .file-chip
+) {
+  font-size: var(--studio-font-size-xs);
+  font-weight: var(--studio-font-weight-semibold);
+  letter-spacing: 0;
+  line-height: var(--studio-line-height-control);
+}
+
+:where(
+  .scene-feature-modules-heading > strong,
+  .menu-title-flow-heading > span,
+  .scene-feature-module-toggle strong,
+  .scene-feature-module-toggle small,
+  .scene-feature-module-settings label span,
+  .scene-feature-modules-issues,
+  .scene-feature-modules-meta span,
+  .menu-title-flow-heading p,
+  .scene-feature-modules-meta strong,
+  .menu-title-flow li strong
+) {
+  font-size: var(--studio-font-size-xs);
+  line-height: var(--studio-line-height-compact);
+}
+
+.scene-preflight-runtime-panel h6 {
+  font-size: var(--studio-font-size-md);
+  font-weight: var(--studio-font-weight-semibold);
+  line-height: var(--studio-line-height-compact);
+}
+
+.scene-preflight-runtime-panel .scene-preflight-facts dt {
+  font-size: var(--studio-font-size-xs);
+  font-weight: var(--studio-font-weight-semibold);
+  line-height: var(--studio-line-height-compact);
+}
+
+.scene-preflight-runtime-panel .scene-preflight-facts dd {
+  color: var(--studio-color-text-primary);
+  font-size: var(--studio-font-size-sm);
+  font-weight: var(--studio-font-weight-regular);
+  line-height: var(--studio-line-height-normal);
+}
+
+:where(.menu-title-flow h6, .menu-text-input-editor h6) {
+  font-size: var(--studio-font-size-sm);
+  line-height: var(--studio-line-height-tight);
+}
+
+.menu-title-flow li span {
+  font-size: var(--studio-font-size-2xs);
+  line-height: var(--studio-line-height-compact);
+}
+
+:where(
+  .settings-edit-row input[type="text"],
+  .settings-edit-row input[type="number"],
+  .settings-edit-row select,
+  .welcome-create input,
+  .room-inspector-panel input,
+  .room-inspector-panel select,
+  .files-workspace input,
+  .sprites-workspace input,
+  .events-workspace input,
+  .audio-workspace input,
+  .dialogues-workspace input
+) {
+  font-size: var(--studio-font-size-md);
+  font-weight: var(--studio-font-weight-regular);
+  line-height: var(--studio-line-height-control);
+}
+
+.settings-nav-item {
+  font-size: var(--studio-font-size-md);
+  line-height: var(--studio-line-height-compact);
+}
+
+.settings-nav-copy span {
+  font-size: var(--studio-font-size-sm);
+  font-weight: var(--studio-font-weight-regular);
+}
+
+.settings-preset-toolbar strong {
+  font-size: var(--studio-font-size-md);
+}
+
+.settings-runtime-capabilities-header strong,
+.settings-runtime-capability-copy strong {
+  font-size: var(--studio-font-size-md);
+  font-weight: var(--studio-font-weight-semibold);
+}
+
+.settings-runtime-capabilities-header span,
+.settings-runtime-capabilities-note,
+.settings-runtime-capability-copy small {
+  font-size: var(--studio-font-size-sm);
+}
+
+.settings-runtime-capabilities-header b,
+.settings-runtime-capability-status {
+  font-size: var(--studio-font-size-xs);
+  font-weight: var(--studio-font-weight-bold);
+}
+
+.settings-runtime-capability-derived .settings-runtime-capability-status {
+  font-size: var(--studio-font-size-xs);
+  font-weight: var(--studio-font-weight-bold);
+}
+
+.settings-shortcut-intro strong,
+.settings-shortcut-copy label {
+  font-size: var(--studio-font-size-sm);
+  font-weight: var(--studio-font-weight-semibold);
+  line-height: var(--studio-line-height-compact);
+}
+
+.settings-shortcut-intro span,
+.settings-shortcut-copy small,
+.settings-shortcut-actions span {
+  font-size: var(--studio-font-size-sm);
+  font-weight: var(--studio-font-weight-regular);
+}
+
+.settings-shortcut-status {
+  font-size: var(--studio-font-size-sm);
+  font-weight: var(--studio-font-weight-semibold);
+  line-height: var(--studio-line-height-compact);
+}
+
+.settings-shortcut-edit input {
+  font-size: var(--studio-font-size-md);
+  font-weight: var(--studio-font-weight-semibold);
+  line-height: var(--studio-line-height-control);
+}
+
+.settings-shortcut-issue {
+  font-size: var(--studio-font-size-xs);
+  font-weight: var(--studio-font-weight-regular);
+  line-height: var(--studio-line-height-normal);
+}
+
+.settings-preset-toolbar span,
+.settings-preset-toolbar-actions button {
+  font-size: var(--studio-font-size-sm);
+}
+
+.settings-preset-toolbar-actions button {
+  font-weight: var(--studio-font-weight-bold);
+}
+
+.settings-header-actions > button.settings-primary-action {
+  font-weight: var(--studio-font-weight-semibold);
+}
+
+.settings-export-toolbar span,
+.settings-export-toolbar-status span {
+  font-size: var(--studio-font-size-sm);
+}
+
+.editor-rail-section-header h4 {
+  font-size: var(--studio-font-size-lg);
+}
+
+.room-stage-card-title {
+  font-size: var(--studio-font-size-lg);
+}
+
+.event-node-title {
+  font-size: var(--studio-font-size-md);
+}
+.audio-creation-assistant > button span,
+.audio-shortcuts,
+.audio-narrative-placement span,
+.settings-search label,
+.settings-search-results button span,
+.settings-section-hero .settings-section-status span,
+.settings-section-hero .settings-section-status strong {
+  font-size: var(--studio-font-size-xs);
+}
+
+.rooms-debugger-live small,
+.rooms-debugger-hardware-card span,
+.rooms-debugger-hardware-card small,
+.rooms-debugger-physical > header small,
+.rooms-debugger-physical > header span,
+.rooms-debugger-physical-note,
+.rooms-debugger-physical-row > span,
+.rooms-debugger-physical-row > strong,
+.rooms-debugger-physical-row > em,
+.world-map-node-preview > button span,
+.world-map-connections > span,
+.battle-authoring-summary span {
+  font-size: var(--studio-font-size-2xs);
+}
+
+.rooms-debugger-live strong,
+.rooms-debugger-hardware-card b,
+.rooms-debugger-physical > header strong {
+  font-size: var(--studio-font-size-sm);
+}
+
+.rooms-debugger-hardware-card > div:first-child strong,
+.rooms-debugger-hardware-card > div:first-child span,
+.rooms-debugger-physical > header span,
+.rooms-debugger-physical-row.is-header,
+.rooms-debugger-physical-row > em,
+.world-map-connections > span {
+  font-weight: var(--studio-font-weight-bold);
+}
+
+.scene-composition-heading small,
+.scene-resource-heading small,
+.scene-resource-empty,
+.scene-resource-export-summary,
+.scene-composition-valid,
+.scene-resource-valid {
+  font-size: var(--studio-font-size-xs);
+}
+
+.scene-composition-layer-card legend,
+.scene-composition-effect-card legend,
+.scene-composition-targets legend,
+.scene-resource-card legend,
+.scene-resource-subsection legend {
+  font-size: var(--studio-font-size-xs);
+  font-weight: var(--studio-font-weight-bold);
+}
+
+.audio-technical-panel > summary {
+  font-weight: var(--studio-font-weight-semibold);
+}
+
+.dialogue-choice-branches em,
+.dialogues-script-mode header span {
+  font-size: var(--studio-font-size-xs);
+}
+
+.dialogues-translation-table > header {
+  font-size: var(--studio-font-size-xs);
+  font-weight: var(--studio-font-weight-bold);
+}
+
+.event-natural-summary span,
+.event-runtime-result li,
+.event-graph-inline-parameters input,
+.event-graph-inline-parameters select,
+.event-graph-legend span {
+  font-size: var(--studio-font-size-xs);
+}
+
+.event-natural-summary span {
+  font-weight: var(--studio-font-weight-bold);
+}
+
+:where(
+  .event-structure-editor > header span,
+  .event-structure-step > button > span,
+  .event-structure-condition > section > header button,
+  .event-structure-rate-limit > section > header button,
+  .event-structure-branch > strong,
+  .event-structure-rate-limit strong,
+  .event-structure-add button,
+  .event-structure-branch > button,
+  .event-structure-diagnostics,
+  .event-structure-editor-hint,
+  .event-structure-actions button,
+  .room-event-bindings-header > span,
+  .room-event-binding-frequency,
+  .room-entity-group-events-inspector > ul label
+) {
+  font-size: var(--studio-font-size-xs);
+  font-weight: var(--studio-font-weight-regular);
+}
+
+:where(
+  .event-structure-step > button,
+  .room-entity-group-events-inspector header p,
+  .room-entity-group-events-inspector > ul > li > span,
+  .room-mixed-entity-events-inspector strong,
+  .room-mixed-entity-events-inspector p
+) {
+  font-size: var(--studio-font-size-sm);
+}
+
+.room-event-binding-head small {
+  font-size: var(--studio-font-size-xs);
+  font-weight: var(--studio-font-weight-regular);
+}
+
+.event-natural-summary p,
+.event-runtime-result p {
+  font-size: var(--studio-font-size-sm);
+}
+
+.events-view-tabs button {
+  font-size: var(--studio-font-size-sm);
+  font-weight: var(--studio-font-weight-bold);
+}
+
+.event-build-panel-header > div:first-child > span,
+.event-debug-panel header > span,
+.event-build-panel-empty span,
+.event-debug-result li span,
+.event-debug-result li em,
+.event-debug-result li code {
+  font-size: var(--studio-font-size-xs);
+}
+
+.event-build-panel-header > div:first-child > span,
+.event-debug-panel header > span,
+.event-build-panel-empty span {
+  font-weight: var(--studio-font-weight-bold);
+}
+
+.event-build-panel h4,
+.event-debug-panel h4 {
+  font-size: var(--studio-font-size-xl);
+}
+
+.event-build-panel p,
+.event-debug-panel p,
+.event-debug-result > strong {
+  font-size: var(--studio-font-size-md);
+}
+
+.event-inspector-advanced > p,
+.event-inspector-advanced summary {
+  font-size: var(--studio-font-size-sm);
+}
+
+.event-inspector-advanced summary {
+  font-weight: var(--studio-font-weight-bold);
+}
+
+.event-inspector-flow > .event-build-panel .event-build-actions button,
+.event-step-guided-parameters .event-command-parameter input,
+.event-step-guided-parameters .event-command-parameter select {
+  font-size: var(--studio-font-size-xs);
+}
+
+.event-inspector-flow > .event-build-panel .event-step-remove,
+.event-step-guided-parameters .event-command-parameter span {
+  font-size: var(--studio-font-size-2xs);
+}
+
+.room-focus-minimap > strong {
+  font-size: var(--studio-font-size-2xs);
+  font-weight: var(--studio-font-weight-bold);
+}
+
+.room-project-budget-header span,
+.room-project-budget-error,
+.room-project-budget-detail li strong,
+.room-project-budget footer span,
+.room-project-budget-header button {
+  font-size: var(--studio-font-size-xs);
+}
+
+.room-project-budget-header strong {
+  font-size: var(--studio-font-size-sm);
+}
+
+.room-project-budget-header button,
+.room-project-budget footer span {
+  font-weight: var(--studio-font-weight-semibold);
+}
+
+.files-filter-heading strong {
+  font-size: var(--studio-font-size-xs);
+  font-weight: var(--studio-font-weight-bold);
+}
+
+.room-project-budget-grid article strong,
+.room-project-budget-grid article span,
+.room-project-budget-grid article small,
+.room-project-budget-detail li span,
+.room-project-budget-header small,
+.room-project-budget-timestamp,
+.room-project-budget-detail p,
+.room-project-budget footer small {
+  font-size: var(--studio-font-size-2xs);
+}
+
+.room-project-budget-grid article b {
+  font-size: var(--studio-font-size-xs);
+}
+
+.dialogues-hud-budget-grid strong {
+  font-size: var(--studio-font-size-lg);
+}
+
+.room-paint-panel h4 {
+  font-size: var(--studio-font-size-md);
+  line-height: var(--studio-line-height-tight);
+}
+
+.room-paint-video-mode,
+.room-paint-control > span,
+.room-paint-tileset-header > span,
+.room-paint-free-selection,
+.room-paint-tileset-header button,
+.room-paint-tileset-header select {
+  font-size: var(--studio-font-size-xs);
+  line-height: var(--studio-line-height-compact);
+}
+
+.room-paint-free-selection strong,
+.room-paint-free-selection em {
+  font-size: var(--studio-font-size-sm);
+}
+.room-height-inspector > p {
+  font-size: var(--studio-font-size-sm);
+}
+
+.room-height-levels button span {
+  font-size: var(--studio-font-size-lg);
+  font-weight: var(--studio-font-weight-bold);
+}
+
+.room-height-levels button small,
+.room-stage-height-badge,
+.room-stage-ramp-badge {
+  font-size: var(--studio-font-size-2xs);
+}
+
+.room-height-summary div {
+  font-size: var(--studio-font-size-xs);
+}
+
+.room-height-summary dd,
+.room-stage-height-badge,
+.room-stage-ramp-badge {
+  font-weight: var(--studio-font-weight-bold);
+}
+.testing-diagnostics-drawer > header small {
+  font-size: var(--studio-font-size-sm);
+}
+
+.workspace-advanced-tools-header p,
+.workspace-advanced-tools-header > span {
+  font-size: var(--studio-font-size-xs);
+}
+
+.workspace-advanced-tools-header > span {
+  font-weight: var(--studio-font-weight-bold);
+}
+
+.room-collision-type-group > span {
+  font-weight: var(--studio-font-weight-bold);
+}
+
+.room-collision-placement-mode button small {
+  font-size: var(--studio-font-size-2xs);
+}
+
+.room-stage-asset-fallback strong {
+  font-size: var(--studio-font-size-sm);
+}
+
+.room-collision-type-group > span,
+.room-collision-type-grid button,
+.room-stage-asset-fallback span,
+.room-paint-tileset-preview.is-error span {
+  font-size: var(--studio-font-size-xs);
+}
+
+.room-collision-type-grid button.active {
+  font-weight: var(--studio-font-weight-bold);
+}
+
+.room-canvas-layer-toolbar-title {
+  font-size: var(--studio-font-size-2xs);
+  font-weight: var(--studio-font-weight-bold);
+}
+
+.room-canvas-layer-control button {
+  font-size: var(--studio-font-size-2xs);
+  font-weight: var(--studio-font-weight-semibold);
+}
+
+.room-canvas-layer-control button:last-child {
+  font-size: var(--studio-font-size-xs);
+}
+
+.room-hud-overlay-meta,
+.room-hud-overlay-status,
+.room-hud-overlay-component,
+.room-hud-overlay-standard {
+  font-size: var(--studio-font-size-2xs);
+  font-weight: var(--studio-font-weight-bold);
+}
+
+.room-hud-binding-heading span,
+.room-hud-binding-heading em,
+.room-hud-binding-inspector dt {
+  font-size: var(--studio-font-size-2xs);
+}
+
+.room-hud-binding-heading em,
+.room-hud-binding-inspector dd {
+  font-weight: var(--studio-font-weight-semibold);
+}
+
+.room-hud-binding-inspector p {
+  font-size: var(--studio-font-size-xs);
+}
+
+.credits-references-heading strong {
+  font-size: var(--studio-font-size-lg);
+}
+
+.credits-references-heading p,
+.credits-references-list p,
+.credits-references-legal {
+  font-size: var(--studio-font-size-sm);
+}
+
+.credits-references-list article strong {
+  font-size: var(--studio-font-size-sm);
+}
+
+.credits-references-list a {
+  font-size: var(--studio-font-size-xs);
+  font-weight: var(--studio-font-weight-bold);
+}
+
+.menu-text-input-keyboard-preview-row span,
+.menu-text-input-keyboard-preview-controls span,
+.menu-text-input-keyboard-preview-row button,
+.menu-text-input-keyboard-preview-controls button,
+.menu-text-input-preview-slots span,
+.menu-text-input-preview-status {
+  font-size: var(--studio-font-size-2xs);
+}
+
+.room-affine-preview-label {
+  font-size: var(--studio-font-size-2xs);
+  font-weight: var(--studio-font-weight-bold);
+}
+
+.affine-scene-inspector-pivot legend,
+.affine-scene-inspector-note {
+  font-size: var(--studio-font-size-xs);
+}
+
+.health-header h3 {
+  font-size: var(--studio-font-size-lg);
+}
+
+.health-header p,
+.project-health-status,
+.project-health-filter-bar > span {
+  font-size: var(--studio-font-size-sm);
+}
+
+.project-health-status,
+.project-health-filter-bar > span {
+  font-weight: var(--studio-font-weight-semibold);
+}
+
+.project-health-summary-card span,
+.project-health-summary-card small,
+.project-health-scene-heading span,
+.project-health-scene-heading small,
+.project-health-tag,
+.project-health-budget span,
+.project-health-panel-header p,
+.project-health-diagnostic-copy small,
+.project-health-scene-details-label {
+  font-size: var(--studio-font-size-xs);
+}
+
+.project-health-summary-card strong {
+  font-size: var(--studio-font-size-xl);
+}
+
+.project-health-panel-header h4,
+.project-health-scene-heading strong {
+  font-size: var(--studio-font-size-md);
+}
+
+.project-health-diagnostic-copy strong {
+  font-size: var(--studio-font-size-sm);
+}
+
+.project-health-scene-details-label {
+  font-weight: var(--studio-font-weight-bold);
+}
+
+.scene-inspector-health-heading strong {
+  font-size: var(--studio-font-size-xs);
+  font-weight: var(--studio-font-weight-bold);
+  letter-spacing: 0.04em;
+}
+
+.project-health-empty {
+  font-size: var(--studio-font-size-sm);
+}
+
+.project-health-budget b {
+  font-weight: var(--studio-font-weight-semibold);
+}
+
+.isometric-tactical-collections legend,
+.isometric-tactical-audio legend {
+  font-weight: var(--studio-font-weight-bold);
+}
+
+.isometric-tactical-animation-grid span {
+  font-size: var(--studio-font-size-2xs);
+  font-weight: var(--studio-font-weight-semibold);
+}
+
+.dialogue-preview-name-label {
+  font-size: var(--studio-font-size-xs);
+  font-weight: var(--studio-font-weight-bold);
+}
+
+.room-editor-tool-group-label {
+  font-size: var(--studio-font-size-2xs);
+  font-weight: var(--studio-font-weight-bold);
+}
+
+.room-preset-picker button span {
+  font-size: var(--studio-font-size-xs);
+}
+
+.room-preset-picker button small {
+  font-size: var(--studio-font-size-2xs);
+}
+
+.room-canvas-layer-toolbar-title {
+  font-size: var(--studio-font-size-2xs);
+  font-weight: var(--studio-font-weight-bold);
+}
+
+.settings-advanced-fields summary {
+  font-size: var(--studio-font-size-sm);
+  font-weight: var(--studio-font-weight-bold);
+}
+
+.settings-advanced-fields summary small,
+.settings-scene-advanced-fields > p {
+  font-size: var(--studio-font-size-xs);
+}
+
+.settings-advanced-fields summary small {
+  font-weight: var(--studio-font-weight-bold);
+}
+
+.rooms-canvas-stage[data-card-density="compact"] .room-stage-card-warning {
+  font-size: 0;
+}
+
+.event-slider-row summary { font-weight: var(--studio-font-weight-semibold, 700); }
+.event-slider-row summary small { font-weight: var(--studio-font-weight-regular, 400); }
+
+.room-native-event-block summary { font-weight: var(--studio-font-weight-semibold, 600); }
+
+.room-scene-navigation > summary,
+.room-scene-navigation-zoom strong {
+  font-size: var(--studio-font-size-xs);
+}
+
+.audio-groove-keys > span {
+  font-size: var(--studio-font-size-xs);
+  line-height: 1;
+}
+.audio-groove-song-title h3 {
+  font-size: var(--studio-font-size-xl);
+  font-weight: var(--studio-font-weight-bold);
+}
+
+.settings-plugins-copy p {
+  font-size: var(--studio-font-size-sm);
+}
+
+/* Files library layout typography. */
+.muted {
+  font-size: var(--studio-font-size-sm);
+}
+
+.files-navigation h3 {
+  font-size: var(--studio-font-size-lg);
+}
+
+.files-navigation nav button {
+  font-size: var(--studio-font-size-sm);
+}
+
+.files-navigation nav button small {
+  font-size: var(--studio-font-size-xs);
+}
+
+.files-repair-action {
+  font-size: var(--studio-font-size-xs);
+}
+
+.files-filter-heading h2 {
+  font-size: var(--studio-font-size-display);
+}
+
+.files-filter-heading-copy > span {
+  font-size: var(--studio-font-size-sm);
+}
+
+.files-search-field input {
+  font-size: var(--studio-font-size-sm);
+}
+
+.files-filter-chip-group button {
+  font-size: var(--studio-font-size-xs);
+  font-weight: var(--studio-font-weight-medium);
+}
+
+.files-selection-toggle {
+  font-size: var(--studio-font-size-xs);
+}
+
+.asset-kind-group header button {
+  font-size: var(--studio-font-size-sm);
+  font-weight: var(--studio-font-weight-semibold);
+}
+
+.asset-kind-group header small {
+  font-size: var(--studio-font-size-xs);
+}
+
+.asset-row-caption {
+  font-size: var(--studio-font-size-sm);
+}
+
+.asset-row-kind {
+  font-size: var(--studio-font-size-xs);
+  font-weight: var(--studio-font-weight-regular);
+}
+
+.files-batch-toolbar strong {
+  font-size: var(--studio-font-size-xs);
+}
+
+.files-batch-toolbar select, .files-batch-toolbar button {
+  font-size: var(--studio-font-size-xs);
+}
+
+.files-preview-header h3 {
+  font-size: var(--studio-font-size-xl);
+}
+
+.files-preview-header p {
+  font-size: var(--studio-font-size-xs);
+}
+
+.files-kind-badge {
+  font-size: var(--studio-font-size-2xs);
+}
+
+.files-preview-zoom button {
+  font-size: var(--studio-font-size-xs);
+}
+
+.files-preview-missing span {
+  font-size: var(--studio-font-size-xs);
+}
+
+.files-preview-meta {
+  font-size: var(--studio-font-size-xs);
+}
+
+.files-preview-actions button {
+  font-size: var(--studio-font-size-xs);
+}
+
+.files-pipeline-notice {
+  font-size: var(--studio-font-size-xs);
+}
+
+.files-pipeline-notice button {
+  font-size: inherit;
+}
+
+.files-details-usage h4 {
+  font-size: var(--studio-font-size-md);
+}
+
+.files-usage-links li {
+  font-size: var(--studio-font-size-xs);
+}
+
+.files-usage-links button {
+  font-size: var(--studio-font-size-xs);
+}
+
+.files-details-primary-action {
+  font-size: var(--studio-font-size-xs);
+}
+
+.files-technical-details > summary {
+  font-size: var(--studio-font-size-sm);
+}
+
+.files-preview-details dt {
+  font-size: var(--studio-font-size-2xs);
+}
+
+.files-preview-details dd {
+  font-size: var(--studio-font-size-xs);
+}
+
+.files-asset-pipeline-header strong {
+  font-size: var(--studio-font-size-sm);
+}
+
+.files-asset-pipeline-header p, .files-asset-pipeline-report {
+  font-size: var(--studio-font-size-2xs);
+}
+
+.files-asset-pipeline-header button {
+  font-size: var(--studio-font-size-xs);
+}
+
+.pipeline-stage {
+  font-size: var(--studio-font-size-xs);
+}
+
+.pipeline-stage-copy small {
+  font-size: var(--studio-font-size-2xs);
+}
+
+.pipeline-stage-status {
+  font-size: var(--studio-font-size-2xs);
+}
+
+@media (max-width: 1150px) {
+  .files-navigation nav button {
+    font-size: var(--studio-font-size-xs);
+  }
+}
+
+.dialogues-review-header h2 { font-size: var(--studio-font-size-display); font-weight: var(--studio-font-weight-bold); line-height: var(--studio-line-height-tight); }
+.dialogues-review-layout .dialogues-panel-title h3,
+.dialogues-text-panel h3, .dialogues-preview-title h3 { font-size: var(--studio-font-size-lg); font-weight: var(--studio-font-weight-bold); }
+.dialogues-text-panel .dialogues-script-text { font-size: var(--studio-font-size-display); line-height: 1.6; }
+.dialogues-row-copy small, .dialogues-library-status, .dialogues-preview-caption { font-size: var(--studio-font-size-xs); }
+.dialogues-row-copy strong { font-size: var(--studio-font-size-md); font-weight: var(--studio-font-weight-bold); }
+
+/* Settings workspaces share the Files library's typography scale. */
+:is(.settings-workspace-global, .settings-workspace-scene, .settings-workspace-export) .settings-nav-title strong {
+  font-size: var(--studio-font-size-lg);
+}
+
+:is(.settings-workspace-global, .settings-workspace-scene, .settings-workspace-export) .settings-search input,
+:is(.settings-workspace-global, .settings-workspace-scene, .settings-workspace-export) .settings-nav-copy strong {
+  font-size: var(--studio-font-size-sm);
+  font-weight: var(--studio-font-weight-medium);
+}
+
+:is(.settings-workspace-global, .settings-workspace-scene, .settings-workspace-export) .settings-nav-group h4 {
+  font-size: var(--studio-font-size-xs);
+}
+
+.settings-interface-heading h2,
+.scene-defaults-heading h2,
+.export-settings-header h2 {
+  font-size: var(--studio-font-size-display);
+  font-weight: var(--studio-font-weight-bold);
+  line-height: var(--studio-line-height-tight);
+}
+
+.settings-interface-copy h3,
+.scene-defaults-page h3,
+.export-settings-block h3 {
+  font-size: var(--studio-font-size-lg);
+  font-weight: var(--studio-font-weight-semibold);
+  line-height: var(--studio-line-height-tight);
+}
+
+.settings-interface-device,
+.scene-defaults-scope,
+.export-project-scope {
+  font-size: var(--studio-font-size-xs);
+  font-weight: var(--studio-font-weight-medium);
+}
+
+.settings-interface-header p,
+.settings-interface-copy p,
+.settings-interface-advanced summary small,
+.settings-interface-autosave,
+.scene-defaults-heading p,
+.scene-defaults-note,
+.scene-defaults-copy p,
+.scene-defaults-custom,
+.scene-defaults-advanced summary small,
+.export-settings-header p,
+.export-settings-block p,
+.export-rom-advanced summary small,
+.export-output-hint,
+.export-path-status {
+  font-size: var(--studio-font-size-sm);
+  font-weight: var(--studio-font-weight-regular);
+  line-height: var(--studio-line-height-normal);
+}
+
+.settings-interface-reset,
+.settings-interface-language select,
+.settings-interface-theme-choice,
+.settings-interface-segments label > span,
+.scene-defaults-reset,
+.scene-defaults-copy strong,
+.scene-defaults-segments button,
+.scene-defaults-page .settings-edit-row > span,
+.scene-defaults-page .settings-edit-number .inspector-field-label,
+.scene-defaults-controls label,
+.scene-defaults-page select,
+.scene-defaults-page input,
+.settings-workspace-export .export-project-fields .settings-edit-row > span,
+.settings-workspace-export .export-project-fields :is(input, select),
+.settings-workspace-export .export-project-fields .settings-path-control button,
+.export-settings-header > button,
+.export-rom-actions button {
+  font-size: var(--studio-font-size-md);
+}
+
+.settings-interface-theme-choice,
+.settings-interface-segments input:checked + span,
+.settings-interface-advanced summary strong,
+.scene-defaults-advanced summary strong,
+.export-rom-advanced summary strong {
+  font-weight: var(--studio-font-weight-semibold);
+}
+
+.settings-interface-advanced summary strong,
+.scene-defaults-advanced summary strong,
+.export-rom-advanced summary strong {
+  font-size: var(--studio-font-size-md);
+}
+
+/* Sprites uses the same compact type scale as the Files library. */
+.sprites-workspace .sprites-document-heading h2 { font-size: var(--studio-font-size-display); font-weight: var(--studio-font-weight-bold); line-height: 1.2; }
+.sprites-workspace .sprites-library-heading strong,
+.sprites-workspace .sprites-inspector-heading h3 { font-size: var(--studio-font-size-lg); font-weight: var(--studio-font-weight-bold); line-height: 1.3; }
+.sprites-workspace .sprite-library-sheet-copy strong,
+.sprites-workspace .sprite-animation-rail-row strong,
+.sprites-workspace .sprites-editor-row-label,
+.sprites-workspace .sprites-verify-button { font-size: var(--studio-font-size-sm); font-weight: var(--studio-font-weight-semibold); }
+.sprites-workspace .sprite-library-sheet-copy small,
+.sprites-workspace .sprite-animation-rail-row small,
+.sprites-workspace .sprites-document-heading p,
+.sprites-workspace .sprites-inspector-heading p,
+.sprites-workspace .sprite-library-title > span { font-size: var(--studio-font-size-xs); font-weight: var(--studio-font-weight-medium); line-height: 1.4; }
+.sprites-workspace .sprites-tool-strip,
+.sprites-workspace .sprites-tool-strip :is(button, select, span),
+.sprites-workspace .sprites-inspector-tabs button,
+.sprites-workspace .sprite-composer-frame-card-copy strong,
+.sprites-workspace .sprites-editor-bottom-toggle,
+.sprites-workspace .sprite-source-details summary,
+.sprites-workspace .sprite-inspector-advanced summary,
+.sprites-workspace .sprite-reference-panel summary { font-size: var(--studio-font-size-xs); }
+.sprites-workspace .sprite-animation-settings :is(label, .inspector-field-label, select, input, .inspector-toggle-label) { font-size: var(--studio-font-size-sm); }
+.sprites-workspace .sprite-canvas-view-strip .ui-chip span { font-size: var(--studio-font-size-2xs); }
+.sprites-workspace .sprite-inspector-geometry-shortcut,
+.sprites-workspace .sprite-inspector-advanced > summary,
+.sprites-workspace .sprite-reference-panel > summary { font-size: var(--studio-font-size-sm); font-weight: var(--studio-font-weight-medium); text-transform: none; letter-spacing: normal; }
+
+/* Compact Editor chrome uses the shared type scale. */
+/* Approved Editor layout. All dimensions describe UI chrome, not game geometry. */
+.rooms-editor-layout,
+.rooms-editor-layout:has(.workspace-explorer-rail:not(.is-collapsed)):has(.rooms-side-stack:not(.is-collapsed)) { font-size: var(--studio-font-size-sm); }
+.rooms-editor-layout .editor-project-tabs button { font-size: var(--studio-font-size-xs); }
+.rooms-editor-layout .editor-project-search-field input { font-size: var(--studio-font-size-sm); }
+.rooms-editor-layout .editor-tree-row strong { font-size: var(--studio-font-size-sm); }
+.rooms-editor-layout .editor-tree-row small { font-size: var(--studio-font-size-xs); }
+.rooms-editor-layout .rooms-inspector-header h4 { font-size: var(--studio-font-size-lg); }
+.rooms-editor-layout .rooms-inspector-header p { font-size: var(--studio-font-size-xs); }
+.rooms-editor-layout .rooms-inspector-header-badges em { font-size: var(--studio-font-size-xs); }
+.rooms-editor-layout .rooms-inspector-tabs > button { font-size: var(--studio-font-size-sm); }
+.rooms-editor-layout .room-inspector-scene-return { font-size: var(--studio-font-size-xs); }
+.rooms-editor-layout .room-scene-hud-summary strong,
+.rooms-editor-layout .room-scene-hud-summary span { font-size: var(--studio-font-size-sm); }
+.rooms-editor-layout .room-entities-header strong { font-size: var(--studio-font-size-sm); }
+.rooms-editor-layout .rooms-canvas-stage.has-scene-actions .rooms-editor-scene-actions-title { font-weight: var(--studio-font-weight-semibold); font-size: var(--studio-font-size-sm); }
+.rooms-editor-layout .room-test-start-control { font-size: var(--studio-font-size-xs); }
+.rooms-editor-layout .room-test-start-control select { font-size: var(--studio-font-size-xs); }
+.rooms-editor-layout .room-scene-navigation-size { font-size: var(--studio-font-size-xs); }
+.rooms-editor-layout .room-scene-navigation-zoom strong { font-size: var(--studio-font-size-xs); }
+.rooms-editor-layout .room-stage-card-footer { font-size: var(--studio-font-size-xs); }
+.editor-popover { font-size: var(--studio-font-size-sm); }
+
+/* Event authoring shares the compact typography scale of the workspaces. */
+.event-authoring-header strong {
+  font-size: var(--studio-font-size-lg);
+}
+
+.event-authoring-header small, .event-authoring-header > span {
+  font-size: var(--studio-font-size-xs);
+}
+
+.is-event-authoring .event-structure-step-content strong {
+  font-size: var(--studio-font-size-md);
+}
+
+.is-event-authoring .event-structure-step-meta {
+  font-size: var(--studio-font-size-xs);
+}
+
+.is-event-authoring .event-structure-branch > summary {
+  font-size: var(--studio-font-size-sm);
+}
+
+.is-event-authoring .event-structure-condition-content strong {
+  font-size: var(--studio-font-size-md);
+}
+
+.is-event-authoring .event-block-inspector-header strong {
+  font-size: var(--studio-font-size-md);
+}
+
+.event-library {
+  font-size: var(--studio-font-size-md);
+}
+
+.event-library button, .event-library input {
+  font-size: var(--studio-font-size-md);
+}
+
+.event-library-header strong {
+  font-size: var(--studio-font-size-lg);
+}
+
+.event-library-result strong {
+  font-size: var(--studio-font-size-md);
+}
+
+.event-library-result small {
+  font-size: var(--studio-font-size-xs);
+  font-weight: var(--studio-font-weight-regular);
+}
+
+.event-library-preview > header strong {
+  font-size: var(--studio-font-size-md);
+}
+
+.event-library-preview dt {
+  font-weight: var(--studio-font-weight-semibold);
+}
+
+.event-library-preview dd {
+  font-weight: var(--studio-font-weight-regular);
+  font-size: var(--studio-font-size-sm);
+}
+
+.event-library-footer > small span {
+  font-size: var(--studio-font-size-xs);
+}
+
+.event-library-group {
+  font-size: var(--studio-font-size-xs);
+  font-weight: var(--studio-font-weight-semibold);
+}
+
+.event-library-origin {
+  font-size: var(--studio-font-size-xs);
+  font-weight: var(--studio-font-weight-regular);
+}

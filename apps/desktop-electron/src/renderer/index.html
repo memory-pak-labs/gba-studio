@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>GBA Studio</title>
+    <script>
+      try {
+        const uiFontSize = localStorage.getItem("gba-studio:ui-font-size");
+        const validUiFontSize = uiFontSize === "default" || uiFontSize === "large" || uiFontSize === "compact"
+          ? uiFontSize
+          : "compact";
+        const uiFontScale = validUiFontSize === "large" ? "1.15" : validUiFontSize === "default" ? "1" : "0.9";
+        document.documentElement.setAttribute("data-studio-font-size", validUiFontSize);
+        document.documentElement.style.setProperty("--studio-font-scale", uiFontScale);
+        const uiAppearance = JSON.parse(localStorage.getItem("gba-studio:ui-appearance") || "null");
+        if (uiAppearance && typeof uiAppearance === "object") {
+          const clamp = (value, fallback) => {
+            const numeric = Number(value);
+            return Number.isFinite(numeric) ? Math.min(100, Math.max(0, numeric)) : fallback;
+          };
+          const appGray = clamp(uiAppearance.appBackgroundGray, 0);
+          const canvasGray = clamp(uiAppearance.canvasBackgroundGray, 0);
+          const textContrast = clamp(uiAppearance.textContrast, 50);
+          const brightness = clamp(uiAppearance.brightness, 50);
+          document.documentElement.style.setProperty("--studio-ui-app-gray", `${appGray}%`);
+          document.documentElement.style.setProperty("--studio-ui-canvas-gray", `${canvasGray}%`);
+          document.documentElement.style.setProperty("--studio-ui-brightness", String(0.85 + brightness * 0.003));
+          document.documentElement.setAttribute("data-studio-ui-text-contrast", textContrast < 34 ? "low" : textContrast > 66 ? "high" : "standard");
+          document.documentElement.setAttribute("data-studio-ui-contrast", uiAppearance.contrast === "high" ? "high" : "standard");
+        }
+        if (localStorage.getItem("gba-studio:theme") === "dark") {
+          document.documentElement.setAttribute("data-studio-theme", "dark");
+          document.documentElement.style.colorScheme = "dark";
+        }
+      } catch {}
+    </script>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="./main.tsx"></script>
+  </body>
+</html>

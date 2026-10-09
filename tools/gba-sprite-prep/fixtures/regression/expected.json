@@ -1,0 +1,39 @@
+{
+  "schemaVersion": 1,
+  "toolVersion": "0.1.0",
+  "case": {
+    "name": "ai-grid-alpha-palette-reuse",
+    "layout": "manual-grid",
+    "sourceSize": [36, 36],
+    "frameSize": [16, 16],
+    "frameCount": 4,
+    "maxVisibleColors": 15,
+    "requiredFiles": [
+      "sprite.png",
+      "sprite.animation.json",
+      "sprite.report.json",
+      "sprite.preview.png",
+      "inspector/numbered.png",
+      "inspector/hardware.png",
+      "inspector/onion-skin.png",
+      "inspector/before.png",
+      "inspector/after.png",
+      "inspector/comparison.png",
+      "inspector/preview.gif",
+      "inspector/idle.gif",
+      "inspector/walk.gif",
+      "inspector/attack.gif",
+      "inspector/hurt.gif",
+      "inspector/inspector.json",
+      "inspector/inspector.html"
+    ]
+  },
+  "freeCanvasSizes": [
+    [8, 8],
+    [16, 32],
+    [32, 32],
+    [64, 64],
+    [96, 64],
+    [128, 128]
+  ]
+}
