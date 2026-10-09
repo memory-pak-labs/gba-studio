@@ -90,7 +90,7 @@ jobs:
           location: C:\msys64
           msystem: UCRT64
           update: true
-          install: make curl gnupg
+          install: make curl wget gnupg
       - name: Install Windows devkitPro tools with signature verification
         if: matrix.platform == 'windows'
         shell: msys2 {0}
@@ -101,6 +101,9 @@ jobs:
             curl --fail --location "$keyring/$file" -o "/usr/share/pacman/keyrings/$file"
           done
           pacman-key --populate devkitpro
+          # Upstream recommends wget with the package-manager User-Agent for HTTP 403:
+          # https://github.com/devkitPro/pacman/issues/63#issuecomment-3800886278
+          sed -i '/^\[options\]/a XferCommand = /usr/bin/wget -U dkp-pacman --passive-ftp -c -O %o %u' /etc/pacman.conf
           cat >> /etc/pacman.conf <<'REPOS'
           [dkp-libs]
           Server = https://pkg.devkitpro.org/packages
