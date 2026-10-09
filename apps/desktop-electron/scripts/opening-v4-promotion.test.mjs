@@ -7,8 +7,8 @@ import { promoteApprovedOpeningV3 } from "./opening-v3-promotion.mjs";
 import { promoteApprovedOpeningV2 } from "./opening-v2-promotion.mjs";
 
 const projectURL = new URL("../default-assets/templates/exemplo-gba/exemplo-gba.gba-project", import.meta.url);
-const preparedURL = new URL("../../../tools/gba-sprite-prep/production/exemplo-gba-opening-v4-candidate/prepared/opening-v4-per-tile-14-banks.png", import.meta.url);
-const palettePlanURL = new URL("../../../tools/gba-sprite-prep/production/exemplo-gba-opening-v4-candidate/prepared/opening-v4-palette-reference-plan.json", import.meta.url);
+const preparedURL = new URL("../fixtures/asset-provenance/opening-v4-per-tile-14-banks.png", import.meta.url);
+const palettePlanURL = new URL("../fixtures/asset-provenance/opening-v4-palette-reference-plan.json", import.meta.url);
 const canonicalURL = new URL(`../default-assets/templates/exemplo-gba/Assets/backgrounds/${OPENING_V4_BACKGROUND.name}`, import.meta.url);
 
 describe("opening-v4 promotion", () => {

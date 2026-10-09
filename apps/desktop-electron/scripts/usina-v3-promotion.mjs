@@ -5,7 +5,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
-const packageRoot = path.resolve(here, "../../..", "tools/gba-sprite-prep/production/exemplo-gba-dungeon-crawler-v3-candidate");
+const packageRoot = path.resolve(here, "../fixtures/asset-provenance/usina");
 const preparedReportPath = path.resolve(here, "../fixtures/asset-provenance/usina/runtime-preparation.json");
 const preparedReport = JSON.parse(readFileSync(preparedReportPath, "utf8"));
 const PHASES = Object.freeze({

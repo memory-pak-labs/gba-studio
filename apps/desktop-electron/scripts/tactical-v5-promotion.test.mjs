@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { createHash } from 'node:crypto';
 import { describe, expect, it } from 'vitest';
-import { buildArenaV5 } from '../../../tools/gba-sprite-prep/production/isometric-arena-v5-quality-candidate/materialize-scene.mjs';
+import { buildArenaV5 } from '../fixtures/asset-provenance/tactical-v5/materialize-scene.mjs';
 import { promoteExemploGBAVerticeCampaign } from './vertice-showcase-project.mjs';
 import { buildEngineExportProjectContract } from '../src/main/exportEngineProject.ts';
 import { auditProjectSpriteFrames } from './lib/sprite-canvas-audit.mjs';
@@ -24,13 +24,13 @@ const footPlacement = project => animation(project).map(a => ({
 describe('approved Arena V5 reconstruction', () => {
   it('preserves the exact approved PNG files in the canonical template', () => {
     const assets = [
-      ['backgrounds','tactical-v5-surface.png','isometric-arena-v5-quality-candidate/prepared/background-13banks.png'],
-      ['ui','tactical-v5-hud.png','isometric-arena-v4-candidate/prepared/tactical-v4-hud.png'],
-      ...['nara','sentinel'].map(who => ['sprites',`tactical-${who}-v5.png`,`isometric-hurt-v2-candidate/project/Assets/sprites/tactical-${who}-v5.png`])
+      ['backgrounds','tactical-v5-surface.png','tactical-v5/prepared/background-13banks.png'],
+      ['ui','tactical-v5-hud.png','tactical-v5/hud/tactical-v5-hud.png'],
+      ...['nara','sentinel'].map(who => ['sprites',`tactical-${who}-v5.png`,`tactical-v5/hurt-v2/tactical-${who}-v5.png`])
     ];
     for (const [folder,name,path] of assets) {
       const bytes = readFileSync(new URL(`../default-assets/templates/exemplo-gba/Assets/${folder}/${name}`,import.meta.url));
-      const prepared = readFileSync(new URL(`../../../tools/gba-sprite-prep/production/${path}`,import.meta.url));
+      const prepared = readFileSync(new URL(`../fixtures/asset-provenance/${path}`,import.meta.url));
       const sha = createHash('sha256').update(bytes).digest('hex');
       expect(bytes.equals(prepared), name).toBe(true);
       expect(source.assets.find(a => a.name === name)?.metadata).toMatchObject({preparedSha256:sha,reviewStatus:'approved',visualStatus:'approved',technicalStatus:'scene-verified'});
@@ -40,7 +40,7 @@ describe('approved Arena V5 reconstruction', () => {
     const secondFrameColumns = [432, 1776, 1104, 2448]; // left, up, right, down in the approved V5 layout
     for (const who of ['nara', 'sentinel']) {
       const name = `tactical-${who}-v5.png`;
-      const previous = decodePngRgba(readFileSync(new URL(`../../../tools/gba-sprite-prep/production/isometric-arena-v5-quality-candidate/packed-final/${who}/${name}`, import.meta.url)));
+      const previous = decodePngRgba(readFileSync(new URL(`../fixtures/asset-provenance/tactical-v5/packed-final/${who}/${name}`, import.meta.url)));
       const current = decodePngRgba(readFileSync(new URL(`../default-assets/templates/exemplo-gba/Assets/sprites/${name}`, import.meta.url)));
       expect([current.width, current.height]).toEqual([previous.width, previous.height]);
       let outsideChanged = 0;
@@ -74,7 +74,7 @@ describe('approved Arena V5 reconstruction', () => {
       expect(approved[key], key).toEqual(source[key]);
     }
     expect(buildArenaV5(approved)).toEqual(approved);
-    const preparedPlan = JSON.parse(readFileSync(new URL('../../../tools/gba-sprite-prep/production/isometric-arena-v5-quality-candidate/review/background-palette.json', import.meta.url)));
+    const preparedPlan = JSON.parse(readFileSync(new URL('../fixtures/asset-provenance/tactical-v5/review/background-palette.json', import.meta.url)));
     expect(approved.assets.find(a => a.name === 'tactical-v5-surface.png').metadata.backgroundPaletteReferencePlan)
       .toEqual({banks: preparedPlan.banks, tile_palette_banks: preparedPlan.tile_palette_banks});
   });

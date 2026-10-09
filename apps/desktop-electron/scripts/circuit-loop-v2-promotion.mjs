@@ -15,7 +15,7 @@ export const CIRCUIT_LOOP_V2_BACKGROUND = Object.freeze({
 
 export async function syncApprovedCircuitLoopV2Asset(projectPath) {
   const preparedPath = fileURLToPath(new URL(
-    `../../../tools/gba-sprite-prep/production/play-background-fidelity-v1-approved/prepared/${CIRCUIT_LOOP_V2_BACKGROUND.name}`, import.meta.url
+    `../default-assets/templates/exemplo-gba/Assets/backgrounds/${CIRCUIT_LOOP_V2_BACKGROUND.name}`, import.meta.url
   ));
   const bytes = await readFile(preparedPath);
   const sha256 = createHash("sha256").update(bytes).digest("hex");

@@ -6,7 +6,7 @@ import { promoteExemploGBAVerticeCampaign } from "./vertice-showcase-project.mjs
 
 const projectURL = new URL("../default-assets/templates/exemplo-gba/exemplo-gba.gba-project", import.meta.url);
 const assetRootURL = new URL("../default-assets/templates/exemplo-gba/Assets/", import.meta.url);
-const diamondRootURL = new URL("../../../tools/gba-sprite-prep/production/exemplo-gba-tactical-diamond-v1-candidate/prepared/", import.meta.url);
+const diamondRootURL = new URL("../fixtures/asset-provenance/tactical-diamonds/", import.meta.url);
 const project = JSON.parse(readFileSync(projectURL, "utf8"));
 const sha256 = (bytes) => createHash("sha256").update(bytes).digest("hex");
 
