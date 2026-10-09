@@ -1558,7 +1558,7 @@ async function auditExportedAuthoredActors(exportPath, exported, project, room, 
         && intersectsInitialFramebuffer
       );
       if (framebufferRequired) {
-        const nativeActorObject = runtime === 'platformer'
+        const nativeActorObject = ['platformer', 'luta'].includes(runtime)
           ? nativeSinglePartSpriteObject(header, symbol, frameRuntimeState?.nativeVideo)
           : null;
         let compiledSource = scaleRgbaSpriteSheet(decodeExportedSpriteSheetRgba({
@@ -3522,6 +3522,12 @@ async function auditExportedLutaPlayers(exportPath, exported, frame, requireFram
     let framebufferPixels = { audited: false, ok: true };
     let resolvedTarget = target;
     if (framebufferRgba) {
+      // Fighters move before capture and may cross the viewport edge. Use
+      // their native tile/palette identity rather than an authored position
+      // or the anchor search, which requires a fully visible frame.
+      const nativeFighterObject = nativeSinglePartSpriteObject(
+        header, symbol, (exactOptions?.presentedRuntimeState ?? exactOptions?.runtimeState)?.nativeVideo
+      );
       const frameIndex = Math.max(0, Math.min(frameCount - 1, Number(fighter?.metasprite?.index ?? 0)));
       const candidateSourceXs = Array.from({ length: frameCount }, (_, index) => index * frameWidth);
       const detectedTargets = opaqueAnchorFramebufferTargets({
@@ -3539,9 +3545,11 @@ async function auditExportedLutaPlayers(exportPath, exported, frame, requireFram
         frameIndex,
         ...findBestOpaqueRgbaFramebufferFrame({
           allowedOcclusionRgb555: backgroundPalette,
-          candidateFlipsX: [false],
+          candidateFlipsX: nativeFighterObject ? [nativeFighterObject.flipX] : [false],
           candidateSourceXs,
-          candidateTargets: [target, ...detectedTargets],
+          candidateTargets: nativeFighterObject
+            ? [{ x: nativeFighterObject.x, y: nativeFighterObject.y }]
+            : [target, ...detectedTargets],
           framebuffer: framebufferRgba,
           framebufferHeight: SCREEN_HEIGHT,
           framebufferWidth: SCREEN_WIDTH,
