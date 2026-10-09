@@ -32,7 +32,7 @@ jobs:
           cache: npm
           cache-dependency-path: apps/desktop-electron/package-lock.json
       - run: npm ci
-      - run: npm test
+      - run: npm run test:all
       - run: npm run typecheck
       - run: npm run build
 

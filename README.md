@@ -41,7 +41,7 @@ Comece por uma Issue, faça um fork e envie um Pull Request pequeno com a
 explicação e as verificações executadas. Contribuições passam por revisão dos
 mantenedores. [Guia de contribuição](CONTRIBUTING.md).
 
-A CI básica proposta verifica testes, tipos e build do editor, além dos testes
+A CI verifica a suíte completa de testes, tipos e build do editor, além dos testes
 host do motor. O gate completo continua sendo uma verificação distinta de
 Editor, exportação e Play; CI, hardware físico e outros sistemas não devem ser
 inferidos a partir de uma compilação local.

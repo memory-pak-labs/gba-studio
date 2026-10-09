@@ -70,7 +70,7 @@ Preparação técnica não substitui revisão visual nem licença de redistribui
 
 ## CI e releases
 
-A CI proposta executa os testes do editor, tipos, build e testes host do motor
+A CI executa `npm run test:all`, tipos, build e testes host do motor
 no Linux. O gate completo local, outros sistemas, empacotamento e hardware
 possuem limites distintos de evidência.
 
