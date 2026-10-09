@@ -26,7 +26,7 @@ async function makeTemporaryDoctor(stdout: string, exitCode = 0): Promise<{ engi
   const doctorPath = path.join(toolsPath, process.platform === "win32" ? "gbsdoctor.cmd" : "gbsdoctor");
   const script =
     process.platform === "win32"
-      ? `@echo off\r\necho ${stdout.replace(/"/g, '\\"')}\r\nexit /b ${exitCode}\r\n`
+      ? `@echo off\r\necho ${stdout}\r\nexit /b ${exitCode}\r\n`
       : `#!/bin/sh\nprintf '%s\\n' '${stdout.replace(/'/g, "'\\''")}'\nexit ${exitCode}\n`;
   await writeFile(doctorPath, script, "utf8");
   if (process.platform !== "win32") {
@@ -45,7 +45,7 @@ async function makeTemporaryBuild(stdout: string, exitCode = 0): Promise<{ engin
   const buildPath = path.join(toolsPath, process.platform === "win32" ? "gbsbuild.cmd" : "gbsbuild");
   const script =
     process.platform === "win32"
-      ? `@echo off\r\necho ${stdout.replace(/"/g, '\\"')}\r\nexit /b ${exitCode}\r\n`
+      ? `@echo off\r\necho ${stdout}\r\nexit /b ${exitCode}\r\n`
       : `#!/bin/sh\nprintf '%s\\n' '${stdout.replace(/'/g, "'\\''")}'\nexit ${exitCode}\n`;
   await writeFile(buildPath, script, "utf8");
   if (process.platform !== "win32") {
@@ -65,7 +65,7 @@ async function makeSpacingSensitiveBuild(): Promise<{ enginePackPath: string; bu
     process.platform === "win32"
       ? [
           "@echo off",
-          "node %~dp0\\gbsbuild-spaces.js %*",
+          'node "%~dp0\\gbsbuild-spaces.js" %*',
           "exit /b %ERRORLEVEL%",
           ""
         ].join("\r\n")

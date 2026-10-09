@@ -12,17 +12,17 @@ async function fixture() {
   const root = await mkdtemp(path.join(os.tmpdir(), "gba-incremental-export-")); roots.push(root);
   const pack = path.join(root, "pack");
   const template = path.join(pack, "templates", "exported_topdown");
-  const tool = path.join(pack, "tools", "assetc");
+  const tool = path.join(pack, "tools", "assetc.py");
   await mkdir(template, { recursive: true }); await mkdir(path.dirname(tool), { recursive: true });
   await writeFile(path.join(template, "main.cpp"), "source");
-  await writeFile(tool, `#!/usr/bin/env node
-const fs = require('fs'), path = require('path');
-const output = process.argv[process.argv.indexOf('-o') + 1];
-const count = path.join(__dirname, 'calls');
-fs.writeFileSync(count, String(Number(fs.existsSync(count) ? fs.readFileSync(count) : 0) + 1));
-if (!fs.existsSync(path.join(output, 'asset_pack_report.json'))) fs.writeFileSync(path.join(output, 'data.hpp'), 'valid-header');
-fs.writeFileSync(path.join(output, 'main.cpp'), 'source');
-fs.writeFileSync(path.join(output, 'asset_pack_report.json'), JSON.stringify({rebuild_plan: {generate: 1}}));
+  await writeFile(tool, `import json,sys
+from pathlib import Path
+output = Path(sys.argv[sys.argv.index('-o') + 1])
+count = Path(__file__).parent / 'calls'
+count.write_text(str(int(count.read_text() if count.exists() else '0') + 1))
+if not (output / 'asset_pack_report.json').exists(): (output / 'data.hpp').write_text('valid-header')
+(output / 'main.cpp').write_text('source')
+(output / 'asset_pack_report.json').write_text(json.dumps({'rebuild_plan': {'generate': 1}}))
 `); await chmod(tool, 0o755);
   const projectPath = path.join(root, "game.gba-project"); await writeFile(projectPath, "{}");
   const options = {

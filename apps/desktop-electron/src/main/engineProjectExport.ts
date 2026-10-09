@@ -16,13 +16,13 @@ import {
 } from "./engineBuildCache.js";
 import { acquireBuildLock, copyTreeIfChanged, exportedFileHashes, writeFileIfChanged } from "./stableBuildFiles.js";
 import { touchDiskCacheEntry } from "./diskCacheRetention.js";
+import { resolveEngineToolInvocation as toolInvocation } from "./engineToolInvocation.js";
 
 const execFileAsync = promisify(execFile);
 // Cold exports of the complete showcase can exceed five minutes while assetc
 // quantizes the scene palettes. Keep a bound without terminating valid builds.
 const assetcTimeoutMs = 600_000;
 const assetcMaxBuffer = 8 * 1024 * 1024;
-const windowsShellScriptPattern = /\.(cmd|bat)$/i;
 
 export interface WriteEngineProjectExportOptions {
   destination: string;
@@ -49,18 +49,8 @@ export interface WriteEngineSchemaExportOptions {
   cacheEnabled?: boolean;
 }
 
-function toolInvocation(toolPath: string, args: string[]): { executable: string; args: string[] } {
-  if (process.platform === "win32" && windowsShellScriptPattern.test(toolPath)) {
-    return {
-      executable: process.env.ComSpec ?? "cmd.exe",
-      args: ["/d", "/s", "/c", toolPath, ...args]
-    };
-  }
-  return { executable: toolPath, args };
-}
-
-function execOptionsForTool(): ExecFileOptionsWithStringEncoding {
-  return { encoding: "utf8" };
+function execOptionsForTool(invocation: ReturnType<typeof toolInvocation>): ExecFileOptionsWithStringEncoding {
+  return { encoding: "utf8", windowsVerbatimArguments: invocation.windowsVerbatimArguments };
 }
 
 function safeDestinationPath(destination: string, relativePath: string): string {
@@ -357,7 +347,7 @@ async function writeLockedEngineSchemaExport(options: WriteEngineSchemaExportOpt
   ];
   const invocation = toolInvocation(options.assetcPath, assetcArgs);
   const { stderr } = await execFileAsync(invocation.executable, invocation.args, {
-    ...execOptionsForTool(),
+    ...execOptionsForTool(invocation),
     timeout: assetcTimeoutMs,
     maxBuffer: assetcMaxBuffer
   });

@@ -19,6 +19,7 @@ import type {
   EnginePackStatus
 } from "../shared/ipc.js";
 import { resolveEnginePackCandidatePaths } from "../shared/enginePackPaths.js";
+import { resolveEngineToolInvocation as toolInvocation } from "./engineToolInvocation.js";
 import { acquireBuildLock, copyTreeIfChanged, exportedFileHashes } from "./stableBuildFiles.js";
 import { pruneDiskCache, stagingCachePolicy, touchDiskCacheEntry, withDiskCacheLock } from "./diskCacheRetention.js";
 
@@ -27,12 +28,6 @@ const doctorTimeoutMs = 20_000;
 const gbsbuildTimeoutMs = 300_000;
 const doctorMaxBuffer = 8 * 1024 * 1024;
 const unsafeMakePathPattern = /\s/;
-const windowsShellScriptPattern = /\.(cmd|bat)$/i;
-
-interface ToolInvocation {
-  executable: string;
-  args: string[];
-}
 
 function gbsdoctorExecutableName(): string {
   return process.platform === "win32" ? "gbsdoctor.exe" : "gbsdoctor";
@@ -49,7 +44,9 @@ function assetcExecutableName(): string {
 function toolPath(candidatePath: string, executableName: string): string {
   const toolName = executableName.replace(/\.exe$/, "");
   const candidates = [
+    ...(process.platform !== "darwin" ? [path.join(candidatePath, "tools", `${toolName}.py`)] : []),
     path.join(candidatePath, "tools", executableName),
+    path.join(candidatePath, "tools", `${toolName}.py`),
     path.join(candidatePath, "tools", toolName),
     path.join(candidatePath, "tools", `${toolName}.exe`)
   ];
@@ -159,18 +156,8 @@ function booleanValue(value: unknown): boolean {
   return value === true;
 }
 
-function toolInvocation(toolPath: string, args: string[]): ToolInvocation {
-  if (process.platform === "win32" && windowsShellScriptPattern.test(toolPath)) {
-    return {
-      executable: process.env.ComSpec ?? "cmd.exe",
-      args: ["/d", "/s", "/c", toolPath, ...args]
-    };
-  }
-  return { executable: toolPath, args };
-}
-
-function execOptionsForTool(): ExecFileOptionsWithStringEncoding {
-  return { encoding: "utf8" };
+function execOptionsForTool(invocation: ReturnType<typeof toolInvocation>): ExecFileOptionsWithStringEncoding {
+  return { encoding: "utf8", windowsVerbatimArguments: invocation.windowsVerbatimArguments };
 }
 
 function checksSummary(value: unknown): { checksPassed: number; checksTotal: number } {
@@ -259,7 +246,7 @@ export async function runGbsdoctor(options: RunGbsdoctorOptions): Promise<Doctor
   try {
     const invocation = toolInvocation(options.gbsdoctorPath, args);
     const { stdout, stderr } = await execFileAsync(invocation.executable, invocation.args, {
-      ...execOptionsForTool(),
+      ...execOptionsForTool(invocation),
       timeout: doctorTimeoutMs,
       maxBuffer: doctorMaxBuffer
     });
@@ -503,7 +490,7 @@ export async function runGbsbuildDryRun(options: RunGbsbuildDryRunOptions): Prom
   try {
     const invocation = toolInvocation(options.gbsbuildPath, args);
     const { stdout, stderr } = await execFileAsync(invocation.executable, invocation.args, {
-      ...execOptionsForTool(),
+      ...execOptionsForTool(invocation),
       timeout: doctorTimeoutMs,
       maxBuffer: doctorMaxBuffer
     });
@@ -555,7 +542,7 @@ export async function runGbsbuild(options: RunGbsbuildOptions): Promise<EnginePa
   try {
     const invocation = toolInvocation(options.gbsbuildPath, args);
     const { stdout, stderr } = await execFileAsync(invocation.executable, invocation.args, {
-      ...execOptionsForTool(),
+      ...execOptionsForTool(invocation),
       timeout: gbsbuildTimeoutMs,
       maxBuffer: doctorMaxBuffer
     });
