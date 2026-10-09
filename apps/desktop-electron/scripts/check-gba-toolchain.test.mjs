@@ -10,7 +10,7 @@ import {
 
 const temporaryRoots = [];
 
-function createToolchainFixture(extension = "") {
+function createToolchainFixture(extension = process.platform === "win32" ? ".exe" : "") {
   const root = mkdtempSync(path.join(os.tmpdir(), "gbastudio-toolchain-test-"));
   temporaryRoots.push(root);
 
@@ -57,7 +57,7 @@ describe("check GBA toolchain", () => {
         DEVKITARM: fixture.devkitArm,
         PATH: fixture.hostBin
       },
-      platform: "darwin"
+      platform: process.platform
     });
 
     expect(report.ok).toBe(true);
@@ -66,12 +66,12 @@ describe("check GBA toolchain", () => {
       devkitArm: fixture.devkitArm
     });
     expect(report.tools).toMatchObject({
-      make: fixture.hostBin + "/make",
-      python3: fixture.hostBin + "/python3",
-      armGcc: fixture.armBin + "/arm-none-eabi-gcc",
-      armGxx: fixture.armBin + "/arm-none-eabi-g++",
-      armObjcopy: fixture.armBin + "/arm-none-eabi-objcopy",
-      gbafix: fixture.toolsBin + "/gbafix"
+      make: path.join(fixture.hostBin, "make" + (process.platform === "win32" ? ".exe" : "")),
+      python3: path.join(fixture.hostBin, "python3" + (process.platform === "win32" ? ".exe" : "")),
+      armGcc: path.join(fixture.armBin, "arm-none-eabi-gcc" + (process.platform === "win32" ? ".exe" : "")),
+      armGxx: path.join(fixture.armBin, "arm-none-eabi-g++" + (process.platform === "win32" ? ".exe" : "")),
+      armObjcopy: path.join(fixture.armBin, "arm-none-eabi-objcopy" + (process.platform === "win32" ? ".exe" : "")),
+      gbafix: path.join(fixture.toolsBin, "gbafix" + (process.platform === "win32" ? ".exe" : ""))
     });
     expect(report.missing).toEqual([]);
   });
@@ -82,7 +82,7 @@ describe("check GBA toolchain", () => {
       env: {
         PATH: [fixture.armBin, fixture.toolsBin, fixture.hostBin].join(path.delimiter)
       },
-      platform: "darwin"
+      platform: process.platform
     });
 
     expect(report.ok).toBe(true);
@@ -93,7 +93,7 @@ describe("check GBA toolchain", () => {
   it("reports missing tools without inventing a personal installation path", () => {
     const report = inspectGbaToolchain({
       env: { PATH: "" },
-      platform: "darwin",
+      platform: process.platform,
       standardRoots: [],
       hostRoots: []
     });
@@ -119,7 +119,7 @@ describe("check GBA toolchain", () => {
         DEVKITARM: fixture.devkitArm,
         PATH: fixture.hostBin
       },
-      platform: "darwin"
+      platform: process.platform
     });
     const resolved = resolveToolchainEnvironment(report, {
       PATH: "/usr/bin",
@@ -151,7 +151,7 @@ describe("check GBA toolchain", () => {
     });
 
     expect(report.ok).toBe(true);
-    expect(report.tools.armGxx).toBe(`${fixture.armBin}/arm-none-eabi-g++.exe`);
-    expect(report.tools.gbafix).toBe(`${fixture.toolsBin}/gbafix.exe`);
+    expect(report.tools.armGxx).toBe(path.join(fixture.armBin, "arm-none-eabi-g++.exe"));
+    expect(report.tools.gbafix).toBe(path.join(fixture.toolsBin, "gbafix.exe"));
   });
 });

@@ -1,3 +1,4 @@
+import path from "node:path";
 import { describe, expect, it } from "vitest";
 
 import {
@@ -204,7 +205,7 @@ function completeRoomsRuntimeExportEvidence() {
 function completeEngineRomEvidence() {
   return {
     ok: true,
-    sourceProjectPath: "default-assets/templates/exemplo-gba/exemplo-gba.gba-project",
+    sourceProjectPath: path.join("default-assets", "templates", "exemplo-gba", "exemplo-gba.gba-project"),
     target: "exemplo",
     romBuildVerified: true,
     exportPipeline: "schema-assetc-native",
@@ -263,7 +264,7 @@ describe("createRealProjectReadinessReport", () => {
       globalAcceptance: true
     });
     expect(report.canonicalP0ProjectPath).toContain(
-      "default-assets/templates/exemplo-gba/exemplo-gba.gba-project"
+      path.join("default-assets", "templates", "exemplo-gba", "exemplo-gba.gba-project")
     );
     expect(report.items.find((item) => item.area === "Rooms")?.status).toBe("funcional mas limitado");
   });

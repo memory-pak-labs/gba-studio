@@ -1,3 +1,4 @@
+import path from "node:path";
 import { describe, expect, it } from "vitest";
 
 import {
@@ -137,7 +138,7 @@ describe("createFunctionalParityReport", () => {
       globalAcceptance: true
     });
     expect(report.canonicalP0ProjectPath).toContain(
-      "default-assets/templates/exemplo-gba/exemplo-gba.gba-project"
+      path.join("default-assets", "templates", "exemplo-gba", "exemplo-gba.gba-project")
     );
     expect(rooms?.nextStep).not.toContain("Criar projeto P0");
     expect(rooms?.nextStep).toContain("projeto exemplo P0");

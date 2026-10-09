@@ -147,7 +147,7 @@ int main() {
     assert(s.menu_open && s.menu_index == 1); // Moving returns to actions, default Attack.
     tactical_state = s;
     const auto saved = capture_tactical_save(actors,2);
-    tactical_state = {};
+    tactical_state = IsoTacticalRuntimeState{};
     apply_tactical_save(saved,actors,2);
     assert(tactical_state.moved_this_turn && tactical_state.selected == s.selected && tactical_state.menu_open && tactical_state.menu_index == 1);
     auto legacy = saved;
@@ -194,7 +194,7 @@ int main() {
     uint8_t stair_flags[2] {}, stair_heights[2] {0,1}, stair_ramps[2] {0,2};
     gbs::IsoTileMap stairs {stair_flags,2,1,stair_heights,stair_ramps};
     actors[0].tile={0,0,0}; actors[1].tile={1,0,1};
-    s={}; s.enabled=true; s.active_unit_index=0;
+    s=IsoTacticalRuntimeState{}; s.enabled=true; s.active_unit_index=0;
     s.units[0]={true,0,0,2,1,5,5,2}; s.units[1]={true,1,1,2,1,2,2,1};
     cursor.tile=actors[0].tile;
     handle_iso_tactical_action(s,cursor,actors,nullptr,2,stairs,a,nullptr);
