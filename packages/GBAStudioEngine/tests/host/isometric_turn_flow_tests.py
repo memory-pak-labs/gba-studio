@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Compile the actual tactical controller with hardware audio stubbed out."""
 from pathlib import Path
+import os
 import subprocess
 import sys
 import tempfile
@@ -208,7 +209,7 @@ int main() {
 with tempfile.TemporaryDirectory(prefix='gba-iso-turns-') as tmp:
     cpp = Path(tmp) / 'turns.cpp'; exe = Path(tmp) / 'turns'
     cpp.write_text(code)
-    subprocess.run(['c++','-std=c++17','-O2','-ffunction-sections','-fdata-sections',
+    subprocess.run([os.environ.get('HOST_CXX', 'clang++'),'-std=c++17','-O2','-ffunction-sections','-fdata-sections',
                     '-I'+str(root/'engine/include'),str(cpp),
                     str(root/'engine/src/gbs_isometric.cpp'),
                     '-Wl,-dead_strip' if sys.platform == 'darwin' else '-Wl,--gc-sections','-o',str(exe)],check=True)
