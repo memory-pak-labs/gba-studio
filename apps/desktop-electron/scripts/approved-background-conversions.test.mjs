@@ -11,7 +11,7 @@ import { buildAssetcTilesetPackGeneration } from '../src/shared/engineProjectExp
 import { promoteExemploGBAVerticeCampaign } from './vertice-showcase-project.mjs';
 
 const templateURL = new URL('../default-assets/templates/exemplo-gba/exemplo-gba.gba-project', import.meta.url);
-const assetc = fileURLToPath(new URL('../../../packages/GBAStudioEngine/dist/GBAStudioEnginePack/tools/assetc', import.meta.url));
+const assetc = fileURLToPath(new URL('../../../packages/GBAStudioEngine/tools/assetc/assetc.py', import.meta.url));
 const approved = [
   ['mapa_rota', 'route-map-paged-v2.png', '6887d224a8490c8858fc5e66c779932ad8264f3a87535168e88c64755d88de0c'],
   ['armazem_das_mares', 'armazem-das-mares-gba.png', '808820ff31540bdf0f7f9da778610d76cfe119e195d6ae22e5ac12930594393d'],

@@ -1,5 +1,6 @@
 # Dependencies, caches and generated artifacts
 node_modules/
+.venv/
 .cache/
 .gba-cache/
 .pnpm-store/

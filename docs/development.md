@@ -5,6 +5,18 @@
 Use Node.js 22 (a versão principal está em `.nvmrc`). Os comandos npm são
 executados em `apps/desktop-electron`, pois a raiz não é um pacote npm.
 
+Os testes de conversão de PNG também precisam de Python 3 e Pillow. Na raiz,
+crie e ative um ambiente Python antes dos testes (macOS/Linux):
+
+```sh
+python3 -m venv .venv
+source .venv/bin/activate
+python -m pip install Pillow
+```
+
+Esses testes usam o `assetc.py` do código-fonte. As verificações que exigem
+um Engine Pack compilado são descritas abaixo.
+
 ```sh
 cd apps/desktop-electron
 npm ci
