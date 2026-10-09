@@ -15,7 +15,6 @@ int pcm_stops = 0;
 int pcm_stream_starts = 0;
 uint32_t last_pcm_sample_rate = 0;
 uint32_t last_pcm_sample_count = 0;
-int last_pcm_loop = 0;
 int last_pcm_first_sample = 0;
 int last_square_volume = -1;
 int last_noise_volume = -1;
@@ -41,7 +40,6 @@ void reset_hw_counts() {
     pcm_stream_starts = 0;
     last_pcm_sample_rate = 0;
     last_pcm_sample_count = 0;
-    last_pcm_loop = 0;
     last_pcm_first_sample = 0;
     last_square_volume = -1;
     last_noise_volume = -1;
@@ -109,12 +107,11 @@ extern "C" void gbs_hw_audio_set_psg_pan(int channel, int pan) {
     last_psg_pan = pan;
 }
 
-extern "C" void gbs_hw_audio_play_pcm8(const uint8_t* samples, uint32_t sample_count, uint32_t sample_rate_hz, int loop) {
+extern "C" void gbs_hw_audio_play_pcm8(const uint8_t* samples, uint32_t sample_count, uint32_t sample_rate_hz, int) {
     ++pcm_stream_starts;
     ++pcm_starts;
     last_pcm_sample_count = sample_count;
     last_pcm_sample_rate = sample_rate_hz;
-    last_pcm_loop = loop;
     last_pcm_first_sample = samples != nullptr && sample_count > 0 ? samples[0] : 0;
 }
 

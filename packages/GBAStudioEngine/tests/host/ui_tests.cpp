@@ -357,6 +357,8 @@ void test_menu_paginates_and_jumps_with_shoulders() {
 
     gbs::draw_menu(menu);
     assert(last_text_box_visible == 1);
+    assert(last_text_box_x == 2 && last_text_box_y == 5);
+    assert(last_text_box_width == 26 && last_text_box_height == 7);
     assert(std::strstr(last_text_box_text, "BAG v") != nullptr);
     assert(std::strstr(last_text_box_text, "ITEM 1") != nullptr);
     assert(std::strstr(last_text_box_text, "ITEM 5") == nullptr);
