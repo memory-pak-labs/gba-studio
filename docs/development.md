@@ -92,11 +92,18 @@ AppImage/DEB/TAR.GZ no Linux. Ele verifica os arquivos e executa smokes do edito
 empacotado e do projeto completo, incluindo exportação, ROM e abertura do Play.
 Os artefatos e evidências ficam disponíveis por um dia; não cria uma Release.
 
-Esses candidatos incluem o Engine Pack, mas precisam de **Python 3 com Pillow,
-devkitPro/devkitARM e GNU make/bash no computador do usuário** para compilar ROMs.
-Configure `DEVKITPRO`, `DEVKITARM` e `PATH` conforme a instalação oficial.
-`GBA_STUDIO_PYTHON` permite escolher o executável Python. O instalador Windows
-não possui assinatura digital; esta etapa é independente dos testes.
+Os candidatos Windows/Linux incluem **Python com Pillow, GNU Arm GCC, make e
+shell**. O aplicativo usa as cópias em seus recursos, sem instalar Python ou
+devkitPro no computador do usuário e sem download ao gerar ROMs. Versões e
+SHA256 ficam em `scripts/portable-runtime-sources.json` e no manifesto embutido
+`Runtime/runtime.json`; licenças originais são preservadas. O compilador xPack
+GNU Arm é uma ferramenta independente; o backend continua GBAStudioEngine.
+O instalador Windows não possui assinatura digital, etapa separada dos testes.
+
+O smoke da instalação remove `PATH`, Python e devkitPro externos do ambiente
+do aplicativo (`GBA_STUDIO_OFFLINE_SMOKE=1`) e exporta o exemplo completo. O
+preparo dos instaladores requer conexão apenas no build para baixar os arquivos
+fixados e conferir seus hashes; a geração de ROM pelo usuário funciona offline.
 
 Para reproduzir o empacotamento após compilar o Pack, em `apps/desktop-electron`:
 

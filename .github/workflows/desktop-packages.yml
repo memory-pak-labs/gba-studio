@@ -54,6 +54,7 @@ jobs:
     env:
       CSC_IDENTITY_AUTO_DISCOVERY: 'false'
       PYTHONUTF8: '1'
+      GBA_STUDIO_OFFLINE_SMOKE: '1'
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
@@ -76,13 +77,6 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends xvfb libgtk-3-0 libnss3 libasound2t64 libgbm1
-          docker run --rm -v "$RUNNER_TEMP:/stage" \
-            devkitpro/devkitarm@sha256:15b79ce75822c289538d8153da5fa7aafe5e6adc32ad8a575a197beca0f0761b \
-            bash -eu -c 'cp -a /opt/devkitpro /stage/devkitpro'
-          echo "DEVKITPRO=$RUNNER_TEMP/devkitpro" >> "$GITHUB_ENV"
-          echo "DEVKITARM=$RUNNER_TEMP/devkitpro/devkitARM" >> "$GITHUB_ENV"
-          echo "$RUNNER_TEMP/devkitpro/devkitARM/bin" >> "$GITHUB_PATH"
-          echo "$RUNNER_TEMP/devkitpro/tools/bin" >> "$GITHUB_PATH"
       - uses: msys2/setup-msys2@ec48f7c5447b3140e2b088413ae3a55687bccb6e # v2
         id: msys
         if: matrix.platform == 'windows'
@@ -90,32 +84,12 @@ jobs:
           location: C:\msys64
           msystem: UCRT64
           update: true
-          install: make curl wget gnupg
-      - name: Install Windows devkitPro tools with signature verification
+          install: make mingw-w64-ucrt-x86_64-gcc
+      - name: Native compiler for the bundled ROM header tool
         if: matrix.platform == 'windows'
-        shell: msys2 {0}
         run: |
-          set -eu
-          keyring=https://raw.githubusercontent.com/devkitPro/devkitpro-keyring/ed77f4db0fb9dbc7dcaa9aa3f5a4d981dac07832
-          for file in devkitpro.gpg devkitpro-trusted devkitpro-revoked; do
-            curl --fail --location "$keyring/$file" -o "/usr/share/pacman/keyrings/$file"
-          done
-          pacman-key --populate devkitpro
-          # Upstream recommends wget with the package-manager User-Agent for HTTP 403:
-          # https://github.com/devkitPro/pacman/issues/63#issuecomment-3800886278
-          sed -i '/^\[options\]/a XferCommand = /usr/bin/wget -U dkp-pacman --passive-ftp -c -O %o %u' /etc/pacman.conf
-          cat >> /etc/pacman.conf <<'REPOS'
-          [dkp-libs]
-          Server = https://pkg.devkitpro.org/packages
-          [dkp-windows]
-          Server = https://pkg.devkitpro.org/packages/windows/$arch
-          REPOS
-          pacman -Sy --needed --noconfirm devkitARM gba-tools
-          echo "DEVKITPRO=$(cygpath -m /opt/devkitpro)" >> "$GITHUB_ENV"
-          echo "DEVKITARM=$(cygpath -m /opt/devkitpro/devkitARM)" >> "$GITHUB_ENV"
-          cygpath -w /usr/bin >> "$GITHUB_PATH"
-          cygpath -w /opt/devkitpro/devkitARM/bin >> "$GITHUB_PATH"
-          cygpath -w /opt/devkitpro/tools/bin >> "$GITHUB_PATH"
+          echo 'C:\msys64\ucrt64\bin' >> $env:GITHUB_PATH
+          echo 'C:\msys64\usr\bin' >> $env:GITHUB_PATH
       - run: npm ci
       - name: Verify the WebPlayer core
         run: npm run verify:mgba-web
@@ -159,6 +133,7 @@ jobs:
           retention-days: 1
           if-no-files-found: ignore
       - name: Upload validated installer candidates
+        if: env.GBA_STUDIO_RUNTIME_SOURCES_READY == '1'
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: GBA-Studio-${{ matrix.platform }}-x64

@@ -19,6 +19,15 @@ export function createElectronSmokeEnv(overrides = {}) {
   for (const key of electronRunAsNodeKeys) {
     delete env[key];
   }
+  if (process.env.GBA_STUDIO_OFFLINE_SMOKE === "1") {
+    for (const key of Object.keys(env)) {
+      if (key.toLowerCase() === "path" || ["DEVKITPRO", "DEVKITARM", "GBA_STUDIO_PYTHON", "PYTHONHOME", "PYTHONPATH", "MAKE", "GBS_SHELL"].includes(key)) delete env[key];
+    }
+    env.PATH = "";
+    env.DEVKITPRO = "missing-external-toolchain";
+    env.DEVKITARM = "missing-external-toolchain";
+    env.GBA_STUDIO_PYTHON = "missing-external-python";
+  }
   return env;
 }
 

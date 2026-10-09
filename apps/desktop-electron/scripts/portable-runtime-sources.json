@@ -1,0 +1,54 @@
+{
+  "schemaVersion": 1,
+  "pythonVersion": "3.13.16",
+  "pillowVersion": "12.3.0",
+  "compilerVersion": "15.2.1-1.1",
+  "platforms": {
+    "win32": {
+      "python": {
+        "name": "cpython-3.13.16+20261009-x86_64-pc-windows-msvc-install_only_stripped.tar.gz",
+        "url": "https://github.com/astral-sh/python-build-standalone/releases/download/20261009/cpython-3.13.16%2B20261009-x86_64-pc-windows-msvc-install_only_stripped.tar.gz",
+        "sha256": "3a7adfb69e3ff02a41ed38ac637808532b438ab3c8619af46ca5dbec5c1f5190"
+      },
+      "compiler": {
+        "name": "xpack-arm-none-eabi-gcc-15.2.1-1.1-win32-x64.zip",
+        "url": "https://github.com/xpack-dev-tools/arm-none-eabi-gcc-xpack/releases/download/v15.2.1-1.1/xpack-arm-none-eabi-gcc-15.2.1-1.1-win32-x64.zip",
+        "sha256": "bae6a3d1667697ce750c3b13d6d26d80973ecedc2cc87bf04869e83447fd93ea"
+      },
+      "pillow": {
+        "name": "pillow-12.3.0-cp313-cp313-win_amd64.whl",
+        "url": "https://files.pythonhosted.org/packages/a6/9b/7a58e61d62be561da3a356fe2384d4059a6345fc130e23ef1c36a5b81d24/pillow-12.3.0-cp313-cp313-win_amd64.whl",
+        "sha256": "1cca606cd25738df4ed873d5ad46bbdb3d83b5cbca291f6b4ff13a4df6b0bbe8"
+      }
+    },
+    "linux": {
+      "python": {
+        "name": "cpython-3.13.16+20261009-x86_64-unknown-linux-gnu-install_only_stripped.tar.gz",
+        "url": "https://github.com/astral-sh/python-build-standalone/releases/download/20261009/cpython-3.13.16%2B20261009-x86_64-unknown-linux-gnu-install_only_stripped.tar.gz",
+        "sha256": "24801ea31c7d406d559a17e2226325c723d50c56900b9c0da7b62adaae2affc9"
+      },
+      "compiler": {
+        "name": "xpack-arm-none-eabi-gcc-15.2.1-1.1-linux-x64.tar.gz",
+        "url": "https://github.com/xpack-dev-tools/arm-none-eabi-gcc-xpack/releases/download/v15.2.1-1.1/xpack-arm-none-eabi-gcc-15.2.1-1.1-linux-x64.tar.gz",
+        "sha256": "da6a49ad4003944b823c6c93702a8787c922ab34bd7e918ec0eaf6933a9b1ff6"
+      },
+      "pillow": {
+        "name": "pillow-12.3.0-cp313-cp313-manylinux_2_27_x86_64.manylinux_2_28_x86_64.whl",
+        "url": "https://files.pythonhosted.org/packages/f7/62/de5bdd77d935331f4f802edc11e4d82950f642caad6cb2f949837b8560e2/pillow-12.3.0-cp313-cp313-manylinux_2_27_x86_64.manylinux_2_28_x86_64.whl",
+        "sha256": "0847a763afefb695bc912d7c131e7e0632d4edc1d8698f58ddabec8e46b8b6d3"
+      }
+    }
+  },
+  "gbafix": {
+    "source": {
+      "name": "gbafix.c",
+      "url": "https://raw.githubusercontent.com/devkitPro/gba-tools/054d507f90d32784274b6cf7e03f1c43d02d7a57/src/gbafix.c",
+      "sha256": "cba3496659a7658aa7e8182c112c2846397f67d298631381575047c4780ba92e"
+    },
+    "license": {
+      "name": "COPYING",
+      "url": "https://raw.githubusercontent.com/devkitPro/gba-tools/054d507f90d32784274b6cf7e03f1c43d02d7a57/COPYING",
+      "sha256": "8ceb4b9ee5adedde47b31e975c1d90c73ad27b6b165a1dcd80c7c545eb65b903"
+    }
+  }
+}
