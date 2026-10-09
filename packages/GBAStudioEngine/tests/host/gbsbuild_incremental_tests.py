@@ -61,7 +61,8 @@ else:
 
 class IncrementalBuildTests(unittest.TestCase):
     def test_bundled_shell_with_spaces_is_used_for_make_recipes(self):
-        shell = self.root / "GBA Studio shell"
+        shell = self.root / "GBA Studio shell" / "bash"
+        shell.parent.mkdir()
         marker = self.root / "shell-invoked"
         shell.write_text('#!/bin/sh\n: > "' + str(marker) + '"\nexec /bin/bash "$@"\n')
         shell.chmod(0o755)

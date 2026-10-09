@@ -136,6 +136,12 @@ def build_make_invocation(args):
     make_command.append(make_target)
 
     make_env = os.environ.copy()
+    if make_env.get("GBS_SHELL"):
+        # GNU Make 4.x splits a SHELL pathname containing spaces even when quoted.
+        # Resolve the basename through PATH, whose entries preserve spaces.
+        shell = Path(make_env["GBS_SHELL"])
+        make_env["GBS_SHELL"] = shell.name
+        make_env["PATH"] = str(shell.parent) + os.pathsep + make_env.get("PATH", "")
     make_env["PROJECT_DIR"] = project_dir.as_posix()
     make_env["ENGINE_PACK"] = engine_pack.as_posix()
     make_env["BUILD_DIR"] = build_dir.as_posix()
