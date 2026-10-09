@@ -60,6 +60,15 @@ else:
 '''
 
 class IncrementalBuildTests(unittest.TestCase):
+    def test_bundled_shell_with_spaces_is_used_for_make_recipes(self):
+        shell = self.root / "GBA Studio shell"
+        marker = self.root / "shell-invoked"
+        shell.write_text('#!/bin/sh\n: > "' + str(marker) + '"\nexec /bin/bash "$@"\n')
+        shell.chmod(0o755)
+        self.env["GBS_SHELL"] = str(shell)
+        self.run_build()
+        self.assertTrue(marker.exists(), "Make must use the bundled shell")
+
     def setUp(self):
         self.temp = tempfile.TemporaryDirectory(prefix="gba-incremental-make-")
         self.root = Path(self.temp.name)

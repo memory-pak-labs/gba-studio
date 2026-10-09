@@ -50,7 +50,7 @@ export interface WriteEngineSchemaExportOptions {
 }
 
 function execOptionsForTool(invocation: ReturnType<typeof toolInvocation>): ExecFileOptionsWithStringEncoding {
-  return { encoding: "utf8", windowsVerbatimArguments: invocation.windowsVerbatimArguments };
+  return { encoding: "utf8", windowsVerbatimArguments: invocation.windowsVerbatimArguments, env: invocation.env };
 }
 
 function safeDestinationPath(destination: string, relativePath: string): string {
