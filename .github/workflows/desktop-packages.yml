@@ -87,9 +87,12 @@ jobs:
           install: make mingw-w64-ucrt-x86_64-gcc
       - name: Native compiler for the bundled ROM header tool
         if: matrix.platform == 'windows'
+        env:
+          MSYS_ROOT: ${{ steps.msys.outputs.msys2-location }}
         run: |
-          echo 'C:\msys64\ucrt64\bin' >> $env:GITHUB_PATH
-          echo 'C:\msys64\usr\bin' >> $env:GITHUB_PATH
+          (Join-Path $env:MSYS_ROOT 'ucrt64\bin') >> $env:GITHUB_PATH
+          (Join-Path $env:MSYS_ROOT 'usr\bin') >> $env:GITHUB_PATH
+          "GBA_STUDIO_MSYS_SOURCE=$(Join-Path $env:MSYS_ROOT 'usr')" >> $env:GITHUB_ENV
       - run: npm ci
       - name: Verify the WebPlayer core
         run: npm run verify:mgba-web
