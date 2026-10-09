@@ -127,8 +127,8 @@ jobs:
           test -n "$deb"
           sudo apt-get install -y "$PWD/$deb"
           package=$(dpkg-deb -f "$deb" Package)
-          installed=$(dpkg -L "$package" | grep '/gba-studio$' | head -1)
-          test -x "$installed"
+          installed=$(dpkg -L "$package" | grep '^/opt/.*/gba-studio$' | head -1)
+          test -f "$installed" && test -x "$installed"
           export GBA_STUDIO_PACKAGED_APP_PATH="$installed"
           xvfb-run -a node scripts/smoke-electron-welcome.mjs --packaged
           xvfb-run -a node scripts/smoke-electron-exemplo-template.mjs --packaged
