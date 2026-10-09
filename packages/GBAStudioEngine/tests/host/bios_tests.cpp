@@ -89,7 +89,7 @@ void test_cpu_copy_and_fill() {
 }
 
 void test_lz77_wrapper_validates_header_and_decodes() {
-    const uint8_t compressed[] = {
+    alignas(4) const uint8_t compressed[] = {
         0x10, 0x05, 0x00, 0x00,
         0x00,
         'G', 'B', 'S', '!', '!',
@@ -118,7 +118,7 @@ void test_huffman_wrapper() {
         0xC0, 'A', 'B',
         0x00, 0x00, 0x00, 0x50,
     };
-    uint8_t destination[4] = {};
+    alignas(4) uint8_t destination[4] = {};
     assert(gbs::bios_huff_uncomp(compressed, sizeof(compressed), destination, sizeof(destination)));
     assert(destination[0] == 'A');
     assert(destination[1] == 'B');
@@ -131,7 +131,7 @@ void test_run_length_wrapper() {
         0x30, 0x06, 0x00, 0x00,
         0x83, 0x41,
     };
-    uint8_t destination[8] = {};
+    alignas(2) uint8_t destination[8] = {};
     assert(gbs::bios_rl_uncomp_wram(compressed, sizeof(compressed), destination, sizeof(destination)));
     for (size_t index = 0; index < 6; ++index) assert(destination[index] == 0x41);
     assert(destination[6] == 0);
@@ -150,7 +150,7 @@ void test_difference_wrappers() {
     assert(diff8_destination[2] == 18);
     assert(diff8_destination[3] == 20);
 
-    uint8_t diff8_vram_destination[4] = {};
+    alignas(2) uint8_t diff8_vram_destination[4] = {};
     assert(gbs::bios_diff8_uncomp_vram(diff8, sizeof(diff8), diff8_vram_destination, sizeof(diff8_vram_destination)));
     assert(diff8_vram_destination[0] == 10);
     assert(diff8_vram_destination[3] == 20);
