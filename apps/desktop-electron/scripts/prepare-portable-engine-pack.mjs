@@ -1,4 +1,4 @@
-import { chmod, copyFile, cp, mkdir, readFile, rm, stat, writeFile } from "node:fs/promises";
+import { chmod, copyFile, cp, mkdir, readFile, readdir, rm, stat, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -20,7 +20,9 @@ export async function preparePortableEnginePack(options = {}) {
   await cp(source, output, { recursive: true });
   for (const tool of ["assetc", "gbsdoctor", "gbsbuild"]) {
     await copyFile(path.join(output, "tools", tool), path.join(output, "tools", `${tool}.py`));
-    await chmod(path.join(output, "tools", tool), 0o755);
+  }
+  for (const tool of await readdir(path.join(output, "tools"), { withFileTypes: true })) {
+    if (tool.isFile()) await chmod(path.join(output, "tools", tool.name), 0o755);
   }
   await writeFile(path.join(output, "HOST_REQUIREMENTS.txt"), [
     `GBA Studio Engine Pack ${manifest.version}`,

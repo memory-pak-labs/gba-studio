@@ -1,4 +1,4 @@
-import { mkdtemp, mkdir, readFile, rm, writeFile } from "node:fs/promises";
+import { chmod, mkdtemp, mkdir, readFile, rm, stat, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { tmpdir } from "node:os";
 import { describe, expect, it } from "vitest";
@@ -18,10 +18,18 @@ describe("portable Engine Pack", () => {
       for (const tool of ["assetc", "gbsdoctor", "gbsbuild"]) {
         await writeFile(path.join(source, "tools", tool), `#!/usr/bin/env python3\nprint('${tool}')\n`);
       }
+      const auxiliary = path.join(source, "tools", "production_smoke");
+      await writeFile(auxiliary, "#!/usr/bin/env python3\nprint('smoke')\n");
+      await chmod(auxiliary, 0o644); // download-artifact does not retain POSIX modes.
       await preparePortableEnginePack({ source, output });
       expect(await readFile(path.join(output, "lib/libgbastudio_engine.a"))).toEqual(library);
       for (const tool of ["assetc", "gbsdoctor", "gbsbuild"]) {
         expect(await readFile(path.join(output, "tools", `${tool}.py`))).toEqual(await readFile(path.join(source, "tools", tool)));
+      }
+      expect(await readFile(path.join(output, "tools", "production_smoke"))).toEqual(await readFile(auxiliary));
+      if (process.platform !== "win32") {
+        expect((await stat(path.join(output, "tools", "production_smoke"))).mode & 0o111).toBe(0o111);
+        expect((await stat(auxiliary)).mode & 0o111).toBe(0);
       }
       expect(await readFile(path.join(output, "HOST_REQUIREMENTS.txt"), "utf8")).toContain("does not bundle");
     } finally { await rm(root, { recursive: true, force: true }); }
