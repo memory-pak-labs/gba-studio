@@ -13,9 +13,10 @@ describe("local MCP registration", () => {
     vi.mocked(inspectEnginePack).mockReturnValue({ selected: { path: "/repo/engine/pack" } } as ReturnType<typeof inspectEnginePack>);
     const resolved = createLocalMcpRegistrationInput(input);
     expect(inspectEnginePack).toHaveBeenCalledWith({ preferredPath: "GBAStudioEnginePack" });
-    expect(resolved.enginePackPath).toBe("/repo/engine/pack");
-    expect(JSON.parse(createMcpServerRegistration(resolved)).mcpServers["gba-studio"].args).toContain("/repo/engine/pack");
-    expect(createCodexMcpServerRegistration(resolved)).toContain('"--engine-pack", "/repo/engine/pack"');
+    const expectedPath = path.resolve("/repo/engine/pack");
+    expect(resolved.enginePackPath).toBe(expectedPath);
+    expect(JSON.parse(createMcpServerRegistration(resolved)).mcpServers["gba-studio"].args).toContain(expectedPath);
+    expect(createCodexMcpServerRegistration(resolved)).toContain('"--engine-pack", ' + JSON.stringify(expectedPath));
   });
   it("normalizes detected relative paths to avoid dependence on the MCP client's cwd", () => {
     vi.mocked(inspectEnginePack).mockReturnValue({ selected: { path: "engine/pack" } } as ReturnType<typeof inspectEnginePack>);

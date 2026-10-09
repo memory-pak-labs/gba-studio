@@ -1,0 +1,12 @@
+# Keep scripts and source contracts identical on Windows, Linux and macOS.
+* text=auto eol=lf
+*.png binary
+*.jpg binary
+*.ico binary
+*.icns binary
+*.wav binary
+*.mod binary
+*.it binary
+*.xm binary
+*.s3m binary
+*.wasm binary

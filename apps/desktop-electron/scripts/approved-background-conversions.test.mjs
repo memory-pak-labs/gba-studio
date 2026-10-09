@@ -12,6 +12,7 @@ import { promoteExemploGBAVerticeCampaign } from './vertice-showcase-project.mjs
 
 const templateURL = new URL('../default-assets/templates/exemplo-gba/exemplo-gba.gba-project', import.meta.url);
 const assetc = fileURLToPath(new URL('../../../packages/GBAStudioEngine/tools/assetc/assetc.py', import.meta.url));
+const python = process.env.GBA_STUDIO_PYTHON || (process.platform === 'win32' ? 'python' : 'python3');
 const approved = [
   ['mapa_rota', 'route-map-paged-v2.png', '6887d224a8490c8858fc5e66c779932ad8264f3a87535168e88c64755d88de0c'],
   ['armazem_das_mares', 'armazem-das-mares-gba.png', '808820ff31540bdf0f7f9da778610d76cfe119e195d6ae22e5ac12930594393d'],
@@ -53,10 +54,10 @@ describe('conversões de background aprovadas em 2026-10-02', () => {
         }
         const reportPath = join(root, 'tiles.json');
         if (scene === 'circuito_final') args.push('--optimize-background-tiles', '--background-tile-budget', '895', '--background-tile-report', reportPath);
-        execFileSync(assetc, args, { stdio: 'pipe' });
+        execFileSync(python, [assetc, ...args], { stdio: 'pipe' });
         const header = readFileSync(output, 'utf8');
         expect(auditRgbaAgainstExportedTilemap({ ...png, headerSource: header, symbol: packAsset.symbol })).toMatchObject({ ok: true, mismatchCount: 0 });
-        execFileSync(assetc, args, { stdio: 'pipe' });
+        execFileSync(python, [assetc, ...args], { stdio: 'pipe' });
         expect(readFileSync(output, 'utf8')).toBe(header);
         if (scene === 'circuito_final') expect(JSON.parse(readFileSync(reportPath, 'utf8'))).toMatchObject({ total_mapping_error: 0, tile_count_after: 894 });
       } finally {

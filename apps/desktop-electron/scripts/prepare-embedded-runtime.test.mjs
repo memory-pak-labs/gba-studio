@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import path from "node:path";
 
 import {
   devkitProToolsPath,
@@ -43,7 +44,7 @@ describe("prepare embedded runtime", () => {
   });
 
   it("derives devkitPro tools beside devkitARM", () => {
-    expect(devkitProToolsPath("/opt/devkitpro/devkitARM")).toBe("/opt/devkitpro/tools");
+    expect(devkitProToolsPath("/opt/devkitpro/devkitARM")).toBe(path.join("/opt/devkitpro", "tools"));
   });
 
   it("runs Engine Pack Python tools with the Python framework inside the app", () => {
