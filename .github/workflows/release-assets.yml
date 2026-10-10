@@ -1,0 +1,148 @@
+name: Assemble verified release assets
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Existing draft release tag'
+        required: true
+        type: string
+      package_run_id:
+        description: 'Successful Desktop packages run with tested Windows/Linux installers'
+        required: true
+        type: string
+      source_sha:
+        description: 'Full source commit shared by the draft and the packaging run'
+        required: true
+        type: string
+
+permissions:
+  contents: write
+  actions: read
+
+concurrency:
+  group: release-assets-${{ inputs.tag }}
+  cancel-in-progress: false
+
+jobs:
+  assets:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    steps:
+      - name: Verify, assemble and upload installers while preserving the draft
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ inputs.tag }}
+          PACKAGE_RUN_ID: ${{ inputs.package_run_id }}
+          SOURCE_SHA: ${{ inputs.source_sha }}
+        run: |
+          python3 - <<'PY'
+          import concurrent.futures, hashlib, json, os, re, subprocess
+          from pathlib import Path
+
+          repo = os.environ['GITHUB_REPOSITORY']
+          tag = os.environ['RELEASE_TAG']
+          run_id = os.environ['PACKAGE_RUN_ID']
+          sha = os.environ['SOURCE_SHA']
+          assert re.fullmatch(r'v[0-9][A-Za-z0-9._-]*', tag), 'Invalid release tag'
+          assert run_id.isdigit(), 'Invalid packaging run ID'
+          assert re.fullmatch(r'[0-9a-f]{40}', sha), 'Invalid source commit'
+
+          def gh(*args):
+              return subprocess.check_output(['gh', *args], text=True)
+
+          def release():
+              result = json.loads(gh('release', 'view', tag, '--repo', repo,
+                  '--json', 'assets,isDraft,tagName,targetCommitish'))
+              assert result['isDraft'], 'Only draft releases can be assembled'
+              assert result['tagName'] == tag and result['targetCommitish'] == sha
+              return result
+
+          release()
+          run = json.loads(gh('api', f'repos/{repo}/actions/runs/{run_id}'))
+          assert run['head_sha'] == sha and run['conclusion'] == 'success'
+          assert run['path'] == '.github/workflows/desktop-packages.yml'
+          stage = Path('release-staging')
+          stage.mkdir()
+          gh('release', 'download', tag, '--repo', repo, '--pattern', 'SHA256SUMS.txt', '--dir', str(stage))
+          checksums = {}
+          for line in (stage / 'SHA256SUMS.txt').read_text().splitlines():
+              digest, name = line.split('  ', 1)
+              assert re.fullmatch(r'[0-9a-f]{64}', digest) and Path(name).name == name
+              assert name not in checksums
+              checksums[name] = digest
+
+          def digest(path):
+              with path.open('rb') as stream:
+                  return hashlib.file_digest(stream, 'sha256').hexdigest()
+
+          def artifact(name):
+              gh('run', 'download', run_id, '--repo', repo, '--name', name, '--dir', str(stage / name))
+
+          with concurrent.futures.ThreadPoolExecutor(max_workers=2) as executor:
+              list(executor.map(artifact, ['GBA-Studio-windows-x64', 'GBA-Studio-linux-x64']))
+          installers = []
+          for folder in ['GBA-Studio-windows-x64', 'GBA-Studio-linux-x64']:
+              for path in (stage / folder).rglob('*'):
+                  if path.is_file():
+                      name = path.name.replace(' ', '.')
+                      assert name in checksums, f'Unexpected package file: {name}'
+                      assert digest(path) == checksums[name], f'Package hash mismatch: {name}'
+                      installers.append((path, name))
+          assert len(installers) == 5
+
+          gh('release', 'download', tag, '--repo', repo, '--pattern', 'UPLOAD_CHUNKS.json', '--dir', str(stage))
+          manifest = json.loads((stage / 'UPLOAD_CHUNKS.json').read_text())
+          assert manifest['tag'] == tag and manifest['sourceTagTarget'] == sha
+          assert len(manifest['files']) == 2
+          parts = [p for f in manifest['files'] for p in f['parts']]
+          assert len({p['name'] for p in parts}) == len(parts)
+          chunks = stage / 'chunks'
+          chunks.mkdir()
+
+          def chunk(part):
+              name = part['name']
+              assert re.fullmatch(r'upload-chunk-mac-(dmg|zip)-[0-9]{3}\.part', name)
+              gh('release', 'download', tag, '--repo', repo, '--pattern', name, '--dir', str(chunks))
+              path = chunks / name
+              assert path.stat().st_size == part['bytes'] and digest(path) == part['sha256']
+
+          with concurrent.futures.ThreadPoolExecutor(max_workers=8) as executor:
+              list(executor.map(chunk, parts))
+          for file in manifest['files']:
+              name = file['name']
+              assert Path(name).name == name and name in checksums
+              assert name.endswith(('-macOS-arm64.dmg', '-macOS-arm64.zip'))
+              assert file['sha256'] == checksums[name]
+              path = stage / name
+              with path.open('wb') as output:
+                  for part in file['parts']:
+                      with (chunks / part['name']).open('rb') as stream:
+                          while data := stream.read(1024 * 1024):
+                              output.write(data)
+              assert path.stat().st_size == file['bytes'] and digest(path) == checksums[name]
+              installers.append((path, name))
+          assert len({name for _, name in installers}) == 7
+          existing = {a['name']: a for a in release()['assets']}
+
+          def upload(item):
+              path, name = item
+              if name in existing:
+                  assert existing[name]['state'] == 'uploaded'
+                  assert existing[name]['digest'] == 'sha256:' + checksums[name]
+              else:
+                  gh('release', 'upload', tag, str(path), '--repo', repo)
+
+          with concurrent.futures.ThreadPoolExecutor(max_workers=4) as executor:
+              list(executor.map(upload, installers))
+          uploaded = {a['name']: a for a in release()['assets']}
+          for path, name in installers:
+              asset = uploaded[name]
+              assert asset['state'] == 'uploaded' and asset['size'] == path.stat().st_size
+              assert asset['digest'] == 'sha256:' + checksums[name], f'Uploaded hash mismatch: {name}'
+          for part in parts:
+              gh('release', 'delete-asset', tag, part['name'], '--repo', repo, '--yes')
+          gh('release', 'delete-asset', tag, 'UPLOAD_CHUNKS.json', '--repo', repo, '--yes')
+          release()
+          print('Seven installers verified and uploaded; temporary chunks removed; release remains a draft.')
+          PY
