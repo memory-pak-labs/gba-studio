@@ -1,5 +1,38 @@
 # Desenvolvimento
 
+## Repositório de referência e branches
+
+O desenvolvimento usa uma cópia local de
+[memory-pak-labs/gba-studio](https://github.com/memory-pak-labs/gba-studio).
+`develop` é a branch de integração. O repositório pessoal anterior é histórico;
+não é uma segunda origem de código a ser sincronizada a cada versão.
+
+Antes de começar uma funcionalidade ou correção, confira o estado local e
+atualize a base. O exemplo abaixo pressupõe um checkout limpo; preserve ou
+conclua alterações existentes antes de trocar de branch.
+
+```sh
+git status --short
+git switch develop
+git pull --ff-only origin develop
+git switch -c codex/nome-da-tarefa
+```
+
+Faça commits pequenos com Conventional Commits e valide o escopo antes de
+enviar a branch. Para colaboradores, use o fork e o fluxo de PR descritos em
+[CONTRIBUTING.md](../CONTRIBUTING.md). A integração em `develop` cabe aos
+mantenedores; não use force push nem substitua o histórico público pelo privado.
+
+Editar, testar e fazer commits locais não publica o código. `git push` envia os
+commits para o GitHub; em uma branch pública, eles podem ser consultados antes
+de uma nova beta. Não é necessário esperar uma versão completa para compartilhar
+uma alteração revisada. Publicar a Release e seus instaladores é uma etapa
+separada, depois das verificações de distribuição.
+
+Credenciais de assinatura e notarização, contexto privado, candidatos e caches
+permanecem locais. Um clone público novo pode seguir este guia sem os arquivos
+privados dos mantenedores.
+
 ## Editor
 
 Use Node.js 22 (a versão principal está em `.nvmrc`). Os comandos npm são

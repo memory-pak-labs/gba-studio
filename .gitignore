@@ -47,6 +47,7 @@ apps/desktop-electron/build/*
 *.mobileprovision
 .DS_Store
 .agent/
+.agents/
 .codex/
 .opencode/
 graphify-out/
