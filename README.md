@@ -8,6 +8,24 @@ O projeto pertence à [Memory Pak Labs](https://github.com/memory-pak-labs).
 mudar. A experiência lembra o GB Studio; o alvo é GBA e os limites do hardware
 fazem parte do desenvolvimento.
 
+## Baixar a beta
+
+Os instaladores da [beta.3](https://github.com/memory-pak-labs/gba-studio/releases/tag/v0.1.0-beta.3)
+incluem Python, compilador ARM e Engine Pack para gerar ROMs sem instalar
+Python ou devkitPro separadamente.
+
+| Sistema | Download recomendado |
+| --- | --- |
+| macOS 12+, Apple Silicon | [DMG assinado e notarizado](https://github.com/memory-pak-labs/gba-studio/releases/download/v0.1.0-beta.3/GBA-Studio-0.1.0-beta.3-macOS-arm64.dmg) |
+| Windows x64 | [Instalador EXE](https://github.com/memory-pak-labs/gba-studio/releases/download/v0.1.0-beta.3/GBA.Studio.Setup.0.1.0-beta.3.exe) |
+| Linux x86_64, testado no Ubuntu 24.04 | [Pacote DEB](https://github.com/memory-pak-labs/gba-studio/releases/download/v0.1.0-beta.3/GBA-Studio-0.1.0-beta.3-linux-amd64.deb) |
+
+A [página da Release](https://github.com/memory-pak-labs/gba-studio/releases/tag/v0.1.0-beta.3)
+também oferece ZIP, AppImage, TAR.GZ, checksums, licenças, acesso às fontes e
+instruções de instalação. O Windows ainda não tem assinatura Authenticode e
+pode exibir aviso do SmartScreen. Esta beta macOS é para Apple Silicon.
+Faça uma cópia dos seus projetos antes de testar.
+
 ## Estrutura
 
 | Diretório | Conteúdo |
