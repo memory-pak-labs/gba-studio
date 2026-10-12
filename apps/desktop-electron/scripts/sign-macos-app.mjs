@@ -1,15 +1,13 @@
 import { execFile } from "node:child_process";
 import { existsSync } from "node:fs";
 import { readFile } from "node:fs/promises";
-import { createRequire } from "node:module";
+import { sign } from "@electron/osx-sign";
 import { dirname, join, resolve } from "node:path";
 import { promisify } from "node:util";
 import { fileURLToPath } from "node:url";
 
 const execFileAsync = promisify(execFile);
 const appRoot = dirname(dirname(fileURLToPath(import.meta.url)));
-const require = createRequire(import.meta.url);
-const { signAsync } = require("@electron/osx-sign");
 const localEntitlementsPath = join(appRoot, "build/entitlements.mac.local.plist");
 
 export function localSigningOptions(filePath) {
@@ -19,6 +17,20 @@ export function localSigningOptions(filePath) {
     hardenedRuntime: true,
     timestamp: "none"
   };
+}
+
+export async function signMacosAppAdHoc(appPath) {
+  await sign({
+    app: appPath,
+    identity: "-",
+    identityValidation: false,
+    platform: "darwin",
+    preAutoEntitlements: false,
+    preEmbedProvisioningProfile: false,
+    strictVerify: true,
+    ignore: JSON.parse(await readFile(join(appRoot, "package.json"), "utf8")).build.mac.signIgnore,
+    optionsForFile: localSigningOptions
+  });
 }
 
 function packagedAppPath() {
@@ -56,17 +68,7 @@ async function main() {
     return;
   }
 
-  await signAsync({
-    app: appPath,
-    identity: "-",
-    identityValidation: false,
-    platform: "darwin",
-    preAutoEntitlements: false,
-    preEmbedProvisioningProfile: false,
-    strictVerify: true,
-    ignore: JSON.parse(await readFile(join(appRoot, "package.json"), "utf8")).build.mac.signIgnore,
-    optionsForFile: localSigningOptions
-  });
+  await signMacosAppAdHoc(appPath);
   await execFileAsync("codesign", ["--verify", "--deep", "--strict", "--verbose=2", appPath], {
     maxBuffer: 8 * 1024 * 1024
   });

@@ -70,8 +70,23 @@ jobs:
           path: packages/GBAStudioEngine/dist/GBAStudioEnginePack
       - run: npm ci
       - run: npm run verify:mgba-web
-      - name: Build and verify both bundled architectures
-        run: npm run package:mac:universal
+      - name: Test the installed signing API with a real Mach-O app
+        run: npx vitest run scripts/sign-macos-app.test.mjs
+      - name: Build the editor and resources
+        run: |
+          npm run icons
+          npm run prepare:translation-models
+          npm run build
+      - name: Prepare the pinned Universal offline runtime
+        run: npm run prepare:embedded-runtime:universal
+      - name: Verify both bundled architectures and identical ROMs
+        run: npm run verify:macos-universal-runtime
+      - name: Package the Universal app
+        run: |
+          node scripts/prepare-package-output.mjs
+          npx electron-builder --dir --universal
+      - name: Sign the CI candidate ad-hoc
+        run: node scripts/sign-macos-app.mjs
       - name: Check the ad-hoc signed Universal bundle
         run: node scripts/smoke-macos-app-bundle.mjs
       - name: Archive the exact candidate for native CPU tests
