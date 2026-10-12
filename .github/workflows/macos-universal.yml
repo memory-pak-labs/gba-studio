@@ -45,7 +45,7 @@ jobs:
   universal:
     name: Build Universal candidate on Apple Silicon
     needs: engine-pack
-    if: always() && (needs.engine-pack.result == 'success' || needs.engine-pack.result == 'skipped')
+    if: always() && !cancelled() && (needs.engine-pack.result == 'success' || needs.engine-pack.result == 'skipped')
     runs-on: macos-15
     timeout-minutes: 45
     defaults:
@@ -161,6 +161,7 @@ jobs:
   native:
     name: Native ${{ matrix.architecture }} editor, ROM and Play
     needs: universal
+    if: always() && !cancelled() && needs.universal.result == 'success'
     runs-on: ${{ matrix.runner }}
     timeout-minutes: 45
     strategy:
