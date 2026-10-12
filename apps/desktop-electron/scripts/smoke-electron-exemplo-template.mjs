@@ -220,6 +220,10 @@ async function waitForUniqueRom(engineExportRoot, cdp, timeoutMs = completeProje
     }
     if (romPaths.length === 1) return romPaths[0];
     rendered = await renderedText(cdp).catch(() => "");
+    const statusMessage = await evaluate(cdp, "document.querySelector('.studio-status-bar-message')?.textContent ?? ''").catch(() => "");
+    if (/^Command failed: .*\/(?:gbsdoctor|gbsbuild)\b/.test(statusMessage)) {
+      throw new Error(`O fluxo de ROM falhou: ${statusMessage}`);
+    }
     await wait(250);
   }
   throw new Error(
@@ -2293,6 +2297,12 @@ async function main() {
       await mkdir(evidenceRoot, { recursive: true });
       await captureScreenshot(cdp, join(evidenceRoot, "failure.png")).catch(() => {});
       await writeFile(join(evidenceRoot, "failure-text.txt"), await renderedText(cdp).catch(() => ""), "utf8");
+      const generatedFiles = existsSync(engineExportRoot) ? await listFilesRecursively(engineExportRoot) : [];
+      for (const manifest of generatedFiles.filter((file) => file.endsWith("/gbastudio_project.json") && !file.includes("/.gba-cache/"))) {
+        const diagnostic = await evaluate(cdp, `window.gbaStudio.runEnginePackDoctor({projectDir: ${JSON.stringify(dirname(manifest))}})`, true).catch((failure) => ({ error: String(failure) }));
+        await writeFile(join(evidenceRoot, "failure-doctor.json"), `${JSON.stringify(diagnostic, null, 2)}\n`, "utf8");
+        console.error("Engine Pack diagnostic:", JSON.stringify(diagnostic, null, 2));
+      }
       throw error;
     } finally {
       cdp.close();

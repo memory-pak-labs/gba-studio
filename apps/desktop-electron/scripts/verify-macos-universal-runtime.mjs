@@ -65,6 +65,7 @@ export async function verifyMacosUniversalRuntime() {
   const python = existsSync(portablePython) ? portablePython : path.join(runtimeRoot, "Runtime", "Python3.framework", "Versions", "Current", "bin", "python3");
   const compiler = path.join(runtimeRoot, "Toolchain", "devkitARM", "bin", "arm-none-eabi-g++");
   const gbsbuild = path.join(enginePack, "tools", "gbsbuild");
+  const gbsdoctor = path.join(enginePack, "tools", "gbsdoctor");
   const sourceFixture = path.join(enginePack, "templates", "exported_topdown");
   const temporaryRoot = await mkdtemp(path.join(os.tmpdir(), "gbastudio-universal-runtime-"));
   const projectDirectory = path.join(temporaryRoot, "project");
@@ -78,7 +79,8 @@ export async function verifyMacosUniversalRuntime() {
         architecture,
         python: await runArchitecture(architecture, python, ["-I", "-B", "-c", "import sys,platform,PIL; from PIL import Image; assert Image.new('RGB', (1,1)).getpixel((0,0)) == (0,0,0); print(sys.version); print(platform.machine()); print(PIL.__version__)"]),
         compiler: await runArchitecture(architecture, compiler, ["--version"]),
-        enginePack: await runArchitecture(architecture, gbsbuild, ["--version"])
+        enginePack: await runArchitecture(architecture, gbsbuild, ["--version"]),
+        doctor: JSON.parse(await runArchitecture(architecture, gbsdoctor, ["--engine-pack", enginePack, "--json"]))
       });
       builds.push(await buildFixtureForArchitecture({ architecture, enginePack, gbsbuild, projectDirectory }));
     }
