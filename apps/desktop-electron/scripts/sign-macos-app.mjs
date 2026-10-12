@@ -1,7 +1,8 @@
 import { execFile } from "node:child_process";
 import { existsSync } from "node:fs";
+import { readFile } from "node:fs/promises";
 import { createRequire } from "node:module";
-import { dirname, join } from "node:path";
+import { dirname, join, resolve } from "node:path";
 import { promisify } from "node:util";
 import { fileURLToPath } from "node:url";
 
@@ -10,6 +11,15 @@ const appRoot = dirname(dirname(fileURLToPath(import.meta.url)));
 const require = createRequire(import.meta.url);
 const { signAsync } = require("@electron/osx-sign");
 const localEntitlementsPath = join(appRoot, "build/entitlements.mac.local.plist");
+
+export function localSigningOptions(filePath) {
+  const isApp = filePath.endsWith(".app") || filePath.includes("/Contents/MacOS/");
+  return {
+    entitlements: isApp ? localEntitlementsPath : [],
+    hardenedRuntime: true,
+    timestamp: "none"
+  };
+}
 
 function packagedAppPath() {
   return [
@@ -54,11 +64,8 @@ async function main() {
     preAutoEntitlements: false,
     preEmbedProvisioningProfile: false,
     strictVerify: true,
-    optionsForFile: () => ({
-      entitlements: localEntitlementsPath,
-      hardenedRuntime: true,
-      timestamp: "none"
-    })
+    ignore: JSON.parse(await readFile(join(appRoot, "package.json"), "utf8")).build.mac.signIgnore,
+    optionsForFile: localSigningOptions
   });
   await execFileAsync("codesign", ["--verify", "--deep", "--strict", "--verbose=2", appPath], {
     maxBuffer: 8 * 1024 * 1024
@@ -68,7 +75,7 @@ async function main() {
   console.log(`[sign-macos-app] app: ${appPath}`);
 }
 
-main().catch((error) => {
+if (resolve(process.argv[1] ?? "") === fileURLToPath(import.meta.url)) main().catch((error) => {
   console.error("[sign-macos-app] failed");
   console.error(error);
   process.exit(1);

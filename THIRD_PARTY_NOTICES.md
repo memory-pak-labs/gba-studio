@@ -24,6 +24,15 @@ alterações em arquivos cobertos precisam preservar seus avisos e obrigações.
 
 ## Dependências instaladas
 
+O pacote macOS Universal inclui CPython/Pillow (PSF/MIT-CMU e avisos das
+bibliotecas incorporadas), xPack GNU Arm (GPL e exceções dos componentes) e
+GNU make 4.4.1 (GPL-3.0). São executáveis independentes usados para gerar ROMs;
+mantêm suas licenças e não recebem a MIT do editor. Versões, URLs e SHA256
+ficam em `apps/desktop-electron/scripts/portable-runtime-sources.json`.
+As receitas de montagem estão em `prepare-macos-support-runtime.mjs` e
+`prepare-macos-universal-toolchain.mjs`. O pacote preserva os avisos upstream,
+os links de acesso às fontes, a fonte/receita do gbafix e a fonte do GNU make.
+
 Dependências npm e Cargo são obtidas pelos lockfiles; não são vendorizadas neste
 repositório. Seus textos de licença acompanham os respectivos pacotes.
 Ao empacotar uma distribuição, confira os avisos do Electron, dos modelos de

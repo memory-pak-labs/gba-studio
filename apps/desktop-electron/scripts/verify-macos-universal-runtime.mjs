@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 import { createHash } from "node:crypto";
+import { existsSync } from "node:fs";
 import { execFile } from "node:child_process";
 import { cp, mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
@@ -49,7 +50,10 @@ export async function verifyMacosUniversalRuntime() {
     throw new Error("A verificacao Universal requer macOS, lipo, arch e Rosetta 2.");
   }
 
-  const architectureAudit = await auditUniversalMachOTree(runtimeRoot);
+  const architectureAudit = await auditUniversalMachOTree(runtimeRoot, { maximumMacosVersion: "12.0" });
+  if (architectureAudit.incompatibleMinimum.length > 0) {
+    throw new Error(`Runtime exige macOS superior a 12.0: ${architectureAudit.incompatibleMinimum.map((item) => item.relativePath).join(", ")}`);
+  }
   if (architectureAudit.invalid.length > 0) {
     throw new Error(
       `Runtime possui ${architectureAudit.invalid.length} Mach-O single-arch: ${architectureAudit.invalid.map((item) => item.relativePath).join(", ")}`
@@ -57,7 +61,8 @@ export async function verifyMacosUniversalRuntime() {
   }
 
   const enginePack = path.join(runtimeRoot, "EnginePack", "GBAStudioEnginePack");
-  const python = path.join(runtimeRoot, "Runtime", "Python3.framework", "Versions", "Current", "bin", "python3");
+  const portablePython = path.join(runtimeRoot, "Runtime/Python/bin/python3");
+  const python = existsSync(portablePython) ? portablePython : path.join(runtimeRoot, "Runtime", "Python3.framework", "Versions", "Current", "bin", "python3");
   const compiler = path.join(runtimeRoot, "Toolchain", "devkitARM", "bin", "arm-none-eabi-g++");
   const gbsbuild = path.join(enginePack, "tools", "gbsbuild");
   const sourceFixture = path.join(enginePack, "templates", "exported_topdown");
@@ -71,7 +76,7 @@ export async function verifyMacosUniversalRuntime() {
     for (const architecture of ["arm64", "x86_64"]) {
       probes.push({
         architecture,
-        python: await runArchitecture(architecture, python, ["--version"]),
+        python: await runArchitecture(architecture, python, ["-I", "-c", "import sys,platform,PIL; print(sys.version); print(platform.machine()); print(PIL.__version__)"]),
         compiler: await runArchitecture(architecture, compiler, ["--version"]),
         enginePack: await runArchitecture(architecture, gbsbuild, ["--version"])
       });
@@ -88,7 +93,9 @@ export async function verifyMacosUniversalRuntime() {
       runtimeRoot,
       architectureAudit: {
         machOBinaries: architectureAudit.total,
-        invalid: architectureAudit.invalid
+        invalid: architectureAudit.invalid,
+        maximumMacosVersion: "12.0",
+        incompatibleMinimum: architectureAudit.incompatibleMinimum
       },
       probes,
       builds,

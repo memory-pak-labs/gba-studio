@@ -5,7 +5,7 @@ import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { defaultWelcomeSavedProjectPath } from "./smoke-electron-welcome-paths.mjs";
-import { createElectronSmokeEnv, electronExecutablePath as resolveElectronExecutablePath } from "./lib/electron-smoke-helpers.mjs";
+import { createElectronSmokeEnv, electronLaunchCommand, electronExecutablePath as resolveElectronExecutablePath } from "./lib/electron-smoke-helpers.mjs";
 
 const appRoot = dirname(dirname(fileURLToPath(import.meta.url)));
 const outputDir = process.env.GBA_STUDIO_SMOKE_OUTPUT_DIR ?? join(appRoot, "artifacts/welcome/latest");
@@ -67,7 +67,9 @@ async function terminateChild(child) {
 }
 
 async function waitForTargets() {
-  const deadline = Date.now() + 15_000;
+  // The first translated Electron launch can exceed 15 seconds while Rosetta
+  // prepares its cache. Keep a bounded startup budget for the Intel smoke.
+  const deadline = Date.now() + (process.env.GBA_STUDIO_SMOKE_ARCH === "x86_64" ? 60_000 : 15_000);
   const url = `http://127.0.0.1:${port}/json/list`;
 
   while (Date.now() < deadline) {
@@ -281,7 +283,8 @@ async function main() {
   });
   delete childEnv.GBA_STUDIO_OPEN_PROJECT;
 
-  const child = spawn(electronPath, usePackagedApp ? [] : [appRoot], {
+  const launch = electronLaunchCommand(electronPath, usePackagedApp ? [] : [appRoot]);
+  const child = spawn(launch.executable, launch.args, {
     cwd: appRoot,
     env: childEnv,
     stdio: ["ignore", "pipe", "pipe"]

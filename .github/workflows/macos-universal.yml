@@ -1,0 +1,164 @@
+name: macOS Universal QA
+
+on:
+  push:
+    branches: [codex/macos-universal-installer]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: macos-universal-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  engine-pack:
+    name: Compile ARM Engine Pack
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - name: Build with the pinned devkitPro image
+        run: |
+          docker run --rm -v "$GITHUB_WORKSPACE:/work" \
+            -w /work/packages/GBAStudioEngine \
+            devkitpro/devkitarm@sha256:15b79ce75822c289538d8153da5fa7aafe5e6adc32ad8a575a197beca0f0761b \
+            bash -eu -c 'apt-get update && apt-get install -y --no-install-recommends clang python3-pil && make -j2 package'
+          sudo chown -R "$(id -u):$(id -g)" packages/GBAStudioEngine/dist
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: ARM-Engine-Pack-macos-universal
+          path: packages/GBAStudioEngine/dist/GBAStudioEnginePack/
+          if-no-files-found: error
+          retention-days: 1
+
+  universal:
+    name: Build Universal candidate on Apple Silicon
+    needs: engine-pack
+    runs-on: macos-15
+    timeout-minutes: 45
+    defaults:
+      run:
+        working-directory: apps/desktop-electron
+    env:
+      CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+      PYTHONDONTWRITEBYTECODE: '1'
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+          cache-dependency-path: apps/desktop-electron/package-lock.json
+      - name: Check build host and Rosetta
+        run: |
+          test "$(uname -m)" = arm64
+          if ! /usr/bin/arch -x86_64 /usr/bin/true; then
+            sudo /usr/sbin/softwareupdate --install-rosetta --agree-to-license
+          fi
+          /usr/bin/arch -x86_64 /usr/bin/true
+          sw_vers
+          xcodebuild -version
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: ARM-Engine-Pack-macos-universal
+          path: packages/GBAStudioEngine/dist/GBAStudioEnginePack
+      - run: npm ci
+      - run: npm run verify:mgba-web
+      - name: Build and verify both bundled architectures
+        run: npm run package:mac:universal
+      - name: Check the ad-hoc signed Universal bundle
+        run: node scripts/smoke-macos-app-bundle.mjs
+      - name: Archive the exact candidate for native CPU tests
+        run: |
+          tar -czf "$RUNNER_TEMP/macOS-universal-ci.tar.gz" -C release mac-universal
+          cd "$RUNNER_TEMP"
+          shasum -a 256 macOS-universal-ci.tar.gz > macOS-universal-ci.sha256
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: macOS-Universal-CI-candidate
+          path: |
+            ${{ runner.temp }}/macOS-universal-ci.tar.gz
+            ${{ runner.temp }}/macOS-universal-ci.sha256
+          compression-level: 0
+          retention-days: 1
+          if-no-files-found: error
+      - name: Upload build evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: macOS-Universal-build-evidence
+          path: |
+            apps/desktop-electron/artifacts/macos-universal/latest/
+            apps/desktop-electron/artifacts/macos-app/latest/
+          retention-days: 1
+          if-no-files-found: ignore
+
+  native:
+    name: Native ${{ matrix.architecture }} editor, ROM and Play
+    needs: universal
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - architecture: arm64
+            runner: macos-15
+          - architecture: x86_64
+            runner: macos-15-intel
+    defaults:
+      run:
+        working-directory: apps/desktop-electron
+    env:
+      GBA_STUDIO_SMOKE_ARCH: ${{ matrix.architecture }}
+      GBA_STUDIO_OFFLINE_SMOKE: '1'
+      PYTHONDONTWRITEBYTECODE: '1'
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+          cache-dependency-path: apps/desktop-electron/package-lock.json
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: macOS-Universal-CI-candidate
+          path: apps/desktop-electron/release
+      - name: Check native CPU and extract the unchanged candidate
+        run: |
+          test "$(uname -m)" = "$GBA_STUDIO_SMOKE_ARCH"
+          test "$(sysctl -in sysctl.proc_translated 2>/dev/null || true)" != 1
+          sw_vers
+          cd release
+          shasum -a 256 -c macOS-universal-ci.sha256
+          tar -xzf macOS-universal-ci.tar.gz
+          echo "GBA_STUDIO_PACKAGED_APP_PATH=$PWD/mac-universal/gba-studio.app" >> "$GITHUB_ENV"
+      - run: npm ci
+      - name: Verify the Universal bundle on the native host
+        run: node scripts/smoke-macos-app-bundle.mjs
+      - name: Create, save and reopen a complete project
+        run: node scripts/smoke-electron-welcome.mjs --packaged
+      - name: Verify workspaces, export, bundled compiler and ROM Play
+        run: node scripts/smoke-electron-exemplo-template.mjs --packaged
+      - name: Verify all 17 Play scenes, visual fidelity, cadence and audio
+        run: node scripts/smoke-electron-exemplo-scenes.mjs --packaged
+      - name: Upload native CPU evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: macOS-native-${{ matrix.architecture }}-evidence
+          path: |
+            apps/desktop-electron/artifacts/macos-app/latest/
+            apps/desktop-electron/artifacts/welcome/latest/
+            apps/desktop-electron/artifacts/exemplo-template/latest/
+            apps/desktop-electron/artifacts/exemplo-scene-playtest/latest/
+          retention-days: 1
+          if-no-files-found: ignore

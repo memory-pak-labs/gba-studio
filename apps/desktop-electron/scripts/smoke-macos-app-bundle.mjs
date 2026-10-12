@@ -169,8 +169,9 @@ async function main() {
     }
     nestedSignatures.push(signature);
   }
-  const architectureAudit = await auditUniversalMachOTree(appPath);
+  const architectureAudit = await auditUniversalMachOTree(appPath, appPath.includes("mac-universal") ? { maximumMacosVersion: "12.0" } : {});
   if (appPath.includes("mac-universal")) {
+    assert(architectureAudit.incompatibleMinimum.length === 0, "Universal bundle requires a macOS newer than 12.0.");
     assert(
       architectureAudit.invalid.length === 0,
       `Universal bundle contains single-arch Mach-O files: ${architectureAudit.invalid.map((item) => item.relativePath).join(", ")}.`
@@ -198,7 +199,8 @@ async function main() {
     nestedSignatures,
     architectureAudit: {
       machOBinaries: architectureAudit.total,
-      invalid: architectureAudit.invalid
+      invalid: architectureAudit.invalid,
+      incompatibleMinimum: architectureAudit.incompatibleMinimum
     }
   };
 

@@ -16,7 +16,7 @@ Python ou devkitPro separadamente.
 
 | Sistema | Download recomendado |
 | --- | --- |
-| macOS 12+, Apple Silicon | [DMG assinado e notarizado](https://github.com/memory-pak-labs/gba-studio/releases/download/v0.1.0-beta.3/GBA-Studio-0.1.0-beta.3-macOS-arm64.dmg) |
+| macOS 14+, Apple Silicon (geração de ROM com runtime embutido) | [DMG assinado e notarizado](https://github.com/memory-pak-labs/gba-studio/releases/download/v0.1.0-beta.3/GBA-Studio-0.1.0-beta.3-macOS-arm64.dmg) |
 | Windows x64 | [Instalador EXE](https://github.com/memory-pak-labs/gba-studio/releases/download/v0.1.0-beta.3/GBA.Studio.Setup.0.1.0-beta.3.exe) |
 | Linux x86_64, testado no Ubuntu 24.04 | [Pacote DEB](https://github.com/memory-pak-labs/gba-studio/releases/download/v0.1.0-beta.3/GBA-Studio-0.1.0-beta.3-linux-amd64.deb) |
 

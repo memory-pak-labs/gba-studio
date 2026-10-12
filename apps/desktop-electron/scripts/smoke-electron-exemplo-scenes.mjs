@@ -14,6 +14,7 @@ import {
   cdpSession,
   createElectronSmokeEnv,
   electronExecutablePath,
+  electronLaunchCommand,
   renderedText,
   terminateChild,
   wait
@@ -332,7 +333,7 @@ async function fetchTargets() {
   return Array.isArray(targets) ? targets : [];
 }
 
-async function waitForTargets(timeoutMs = 20_000) {
+async function waitForTargets(timeoutMs = process.env.GBA_STUDIO_SMOKE_ARCH === "x86_64" ? 60_000 : 20_000) {
   const deadline = Date.now() + timeoutMs;
   while (Date.now() < deadline) {
     try {
@@ -5470,7 +5471,8 @@ async function main() {
   });
   if (useExplicitProject) childEnv.GBA_STUDIO_OPEN_PROJECT = templatePath;
   else delete childEnv.GBA_STUDIO_OPEN_PROJECT;
-  const child = spawn(executable, usePackagedApp ? [] : [appRoot], {
+  const launch = electronLaunchCommand(executable, usePackagedApp ? [] : [appRoot]);
+  const child = spawn(launch.executable, launch.args, {
     cwd: appRoot,
     env: childEnv,
     stdio: ["ignore", "pipe", "pipe"]
