@@ -1,0 +1,58 @@
+name: macOS display diagnostic
+
+on:
+  push:
+    branches: [codex/macos-universal-installer]
+    paths:
+      - .github/workflows/macos-display-probe.yml
+      - apps/desktop-electron/scripts/smoke-electron-display-probe.cjs
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  display:
+    name: Native ${{ matrix.architecture }} display measurement
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - architecture: arm64
+            runner: macos-15
+          - architecture: x86_64
+            runner: macos-15-intel
+    defaults:
+      run:
+        working-directory: apps/desktop-electron
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+          cache-dependency-path: apps/desktop-electron/package-lock.json
+      - name: Check native architecture and host display
+        env:
+          EXPECTED_ARCHITECTURE: ${{ matrix.architecture }}
+        run: |
+          test "$(uname -m)" = "$EXPECTED_ARCHITECTURE"
+          test "$(sysctl -in sysctl.proc_translated 2>/dev/null || true)" != 1
+          mkdir -p artifacts/display-probe/latest
+          system_profiler -json SPDisplaysDataType > artifacts/display-probe/latest/system-displays.json
+          pmset -g custom > artifacts/display-probe/latest/power-settings.txt
+      - run: npm ci
+      - name: Measure unmodified requestAnimationFrame cadence
+        run: npx electron scripts/smoke-electron-display-probe.cjs
+      - name: Upload diagnostic evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: macOS-display-${{ matrix.architecture }}-evidence
+          path: apps/desktop-electron/artifacts/display-probe/latest/
+          retention-days: 1
+          if-no-files-found: ignore
