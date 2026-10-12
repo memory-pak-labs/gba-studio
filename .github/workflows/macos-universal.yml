@@ -35,10 +35,12 @@ jobs:
             devkitpro/devkitarm@sha256:15b79ce75822c289538d8153da5fa7aafe5e6adc32ad8a575a197beca0f0761b \
             bash -eu -c 'apt-get update && apt-get install -y --no-install-recommends clang python3-pil && make -j2 package'
           sudo chown -R "$(id -u):$(id -g)" packages/GBAStudioEngine/dist
+          tar -czf "$RUNNER_TEMP/ARM-Engine-Pack-macos-universal.tar.gz" \
+            -C packages/GBAStudioEngine/dist GBAStudioEnginePack
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: ARM-Engine-Pack-macos-universal
-          path: packages/GBAStudioEngine/dist/GBAStudioEnginePack/
+          path: ${{ runner.temp }}/ARM-Engine-Pack-macos-universal.tar.gz
           if-no-files-found: error
           retention-days: 1
 
@@ -77,7 +79,10 @@ jobs:
         if: inputs.candidate_run_id == ''
         with:
           name: ARM-Engine-Pack-macos-universal
-          path: packages/GBAStudioEngine/dist/GBAStudioEnginePack
+          path: packages/GBAStudioEngine/dist
+      - name: Extract Engine Pack with executable modes preserved
+        if: inputs.candidate_run_id == ''
+        run: tar -xzf ../../packages/GBAStudioEngine/dist/ARM-Engine-Pack-macos-universal.tar.gz -C ../../packages/GBAStudioEngine/dist
       - name: Verify the product source identity of a reused candidate
         if: inputs.candidate_run_id != ''
         env:
@@ -107,6 +112,16 @@ jobs:
           cd release
           shasum -a 256 -c macOS-universal-ci.sha256
           tar -xzf macOS-universal-ci.tar.gz
+      - name: Restore auxiliary script modes in older CI candidates
+        if: inputs.candidate_run_id != ''
+        run: |
+          # Older Engine Pack artifacts were transferred without a TAR archive.
+          # Restore exactly the executable scripts declared by the pack target.
+          tools=release/mac-universal/gba-studio.app/Contents/Resources/EnginePack/GBAStudioEnginePack/tools
+          for tool in smoke_mgba production_smoke stress_projects verify_cross_platform write_mgba_manual_handoff write_engine_primary_handoff; do
+            test -f "$tools/$tool"
+            chmod 755 "$tools/$tool"
+          done
       - run: npm ci
       - run: npm run verify:mgba-web
       - name: Test the installed signing API with a real Mach-O app
