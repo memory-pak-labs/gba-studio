@@ -159,6 +159,14 @@ e o candidato expiram em um dia. O workflow não cria Release nem publica
 instaladores; pode ser executado manualmente após integração e roda por push
 na branch inicial `codex/macos-universal-installer`.
 
+A CI verifica as ferramentas e a ROM também **depois da assinatura**, incluindo
+o carregamento das bibliotecas por Python/GCC. Para corrigir apenas a assinatura,
+o campo manual `candidate_run_id` permite reutilizar um candidato do próprio
+workflow ainda disponível. Antes de extraí-lo, a CI exige ancestralidade,
+origem no workflow esperado, fonte idêntica do editor/motor/runtime (somente o
+signer e seu teste podem diferir) e checksum do arquivo. Ela refaz a assinatura,
+as verificações do runtime e todos os smokes nativos.
+
 A CI executa `npm run test:all`, tipos e build no Linux e Windows, além dos
 testes host do motor nos dois sistemas. Confira o resultado da execução;
 ter um job configurado não significa que os testes passaram.

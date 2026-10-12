@@ -12,8 +12,11 @@ const localEntitlementsPath = join(appRoot, "build/entitlements.mac.local.plist"
 
 export function localSigningOptions(filePath) {
   const isApp = filePath.endsWith(".app") || filePath.includes("/Contents/MacOS/");
+  const isBundledTool = filePath.includes("/Contents/Resources/")
+    && /\/(?:bin|libexec)\//.test(filePath)
+    && !/\.(?:dylib|so|node)(?:\.\d+)*$/.test(filePath);
   return {
-    entitlements: isApp ? localEntitlementsPath : [],
+    entitlements: isApp ? localEntitlementsPath : isBundledTool ? ["com.apple.security.cs.disable-library-validation"] : [],
     hardenedRuntime: true,
     timestamp: "none"
   };
