@@ -164,7 +164,7 @@ o carregamento das bibliotecas por Python/GCC. Para corrigir apenas a assinatura
 o campo manual `candidate_run_id` permite reutilizar um candidato do próprio
 workflow ainda disponível. Antes de extraí-lo, a CI exige ancestralidade,
 origem no workflow esperado, fonte idêntica do editor/motor/runtime (somente o
-signer e seu teste podem diferir) e checksum do arquivo. Ela refaz a assinatura,
+signer, seu teste e o verificador podem diferir) e checksum do arquivo. Ela refaz a assinatura,
 as verificações do runtime e todos os smokes nativos.
 
 A CI executa `npm run test:all`, tipos e build no Linux e Windows, além dos

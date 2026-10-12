@@ -76,7 +76,7 @@ export async function verifyMacosUniversalRuntime() {
     for (const architecture of ["arm64", "x86_64"]) {
       probes.push({
         architecture,
-        python: await runArchitecture(architecture, python, ["-I", "-c", "import sys,platform,PIL; print(sys.version); print(platform.machine()); print(PIL.__version__)"]),
+        python: await runArchitecture(architecture, python, ["-I", "-B", "-c", "import sys,platform,PIL; from PIL import Image; assert Image.new('RGB', (1,1)).getpixel((0,0)) == (0,0,0); print(sys.version); print(platform.machine()); print(PIL.__version__)"]),
         compiler: await runArchitecture(architecture, compiler, ["--version"]),
         enginePack: await runArchitecture(architecture, gbsbuild, ["--version"])
       });
