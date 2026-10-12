@@ -6,6 +6,7 @@ on:
     paths:
       - .github/workflows/macos-display-probe.yml
       - apps/desktop-electron/scripts/smoke-electron-display-probe.cjs
+      - apps/desktop-electron/scripts/probe-macos-display-modes.swift
   workflow_dispatch:
 
 permissions:
@@ -45,6 +46,8 @@ jobs:
           mkdir -p artifacts/display-probe/latest
           system_profiler -json SPDisplaysDataType > artifacts/display-probe/latest/system-displays.json
           pmset -g custom > artifacts/display-probe/latest/power-settings.txt
+      - name: Inspect and select an advertised 60 Hz CI display mode
+        run: swift scripts/probe-macos-display-modes.swift --configure-ci-60hz > artifacts/display-probe/latest/display-modes.json
       - run: npm ci
       - name: Measure unmodified requestAnimationFrame cadence
         run: npx electron scripts/smoke-electron-display-probe.cjs
