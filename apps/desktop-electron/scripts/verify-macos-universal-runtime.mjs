@@ -118,6 +118,17 @@ if (path.resolve(process.argv[1] ?? "") === scriptPath) {
     console.log(`[macos-universal-runtime] evidence: ${evidencePath}`);
   }).catch((error) => {
     console.error("[macos-universal-runtime] failed");
+    if (typeof error?.stdout === "string") {
+      try {
+        const diagnostic = JSON.parse(error.stdout);
+        console.error("Failed doctor checks:", JSON.stringify({
+          ok: diagnostic.ok,
+          checks: diagnostic.checks?.filter((check) => !check.ok),
+          templates: diagnostic.diagnostics?.templates?.items?.filter((template) => !template.ok),
+          messages: diagnostic.diagnostics?.actionable_messages
+        }, null, 2));
+      } catch { /* Non-JSON tool output is included in the process error below. */ }
+    }
     console.error(error);
     process.exitCode = 1;
   });
