@@ -4,16 +4,24 @@ on:
   workflow_dispatch:
     inputs:
       tag:
-        description: 'Existing draft release tag'
+        description: 'Existing release tag; a draft is required for Desktop packages'
         required: true
         type: string
       package_run_id:
         description: 'Successful Desktop packages run with tested Windows/Linux installers'
-        required: true
+        required: false
         type: string
       source_sha:
-        description: 'Full source commit shared by the draft and the packaging run'
+        description: 'Full source commit of the original release tag'
         required: true
+        type: string
+      universal_staging_tag:
+        description: 'Optional private draft containing local notarized Universal archive chunks'
+        required: false
+        type: string
+      universal_manifest_sha256:
+        description: 'Required SHA256 of UPLOAD_UNIVERSAL.json when transferring Universal archives'
+        required: false
         type: string
 
 permissions:
@@ -35,6 +43,8 @@ jobs:
           RELEASE_TAG: ${{ inputs.tag }}
           PACKAGE_RUN_ID: ${{ inputs.package_run_id }}
           SOURCE_SHA: ${{ inputs.source_sha }}
+          UNIVERSAL_STAGING_TAG: ${{ inputs.universal_staging_tag }}
+          UNIVERSAL_MANIFEST_SHA256: ${{ inputs.universal_manifest_sha256 }}
         run: |
           python3 - <<'PY'
           import concurrent.futures, hashlib, json, os, re, subprocess
@@ -45,11 +55,114 @@ jobs:
           run_id = os.environ['PACKAGE_RUN_ID']
           sha = os.environ['SOURCE_SHA']
           assert re.fullmatch(r'v[0-9][A-Za-z0-9._-]*', tag), 'Invalid release tag'
-          assert run_id.isdigit(), 'Invalid packaging run ID'
           assert re.fullmatch(r'[0-9a-f]{40}', sha), 'Invalid source commit'
 
           def gh(*args):
               return subprocess.check_output(['gh', *args], text=True)
+
+          def digest(path):
+              with path.open('rb') as stream:
+                  return hashlib.file_digest(stream, 'sha256').hexdigest()
+
+          staging_tag = os.environ['UNIVERSAL_STAGING_TAG']
+          if staging_tag:
+              # Transfer exact local archives. This is not a build or QA approval.
+              assert re.fullmatch(r'upload-macos-universal-[A-Za-z0-9._-]+', staging_tag)
+              expected_manifest = os.environ['UNIVERSAL_MANIFEST_SHA256']
+              assert re.fullmatch(r'[0-9a-f]{64}', expected_manifest)
+
+              def get_release(release_tag):
+                  # Draft tags may not have a Git ref yet; gh resolves them by name.
+                  api_url = gh('release', 'view', release_tag, '--repo', repo,
+                               '--json', 'apiUrl', '--jq', '.apiUrl').strip()
+                  return json.loads(gh('api', api_url))
+
+              target = get_release(tag)
+              draft = get_release(staging_tag)
+              assert not target['draft'] and target['prerelease'], 'Target must be an existing public beta'
+              assert draft['draft'] and draft['id'] != target['id'], 'Chunks require a separate private draft'
+              tag_ref = json.loads(gh('api', f'repos/{repo}/git/ref/tags/{tag}'))
+              assert tag_ref['object']['type'] == 'commit' and tag_ref['object']['sha'] == sha
+              stage = Path('universal-transfer')
+              stage.mkdir()
+              gh('release', 'download', staging_tag, '--repo', repo,
+                 '--pattern', 'UPLOAD_UNIVERSAL.json', '--dir', str(stage))
+              manifest_file = stage / 'UPLOAD_UNIVERSAL.json'
+              assert digest(manifest_file) == expected_manifest, 'Manifest checksum mismatch'
+              manifest = json.loads(manifest_file.read_text())
+              assert manifest['targetReleaseId'] == target['id'] and manifest['tag'] == tag
+              assert manifest['stagingReleaseId'] == draft['id'] and manifest['sourceTagTarget'] == sha
+              assert len(manifest['files']) == 2
+              expected_names = {f'GBA-Studio-{tag[1:]}-macOS-universal.{ext}' for ext in ['dmg', 'zip']}
+              assert {f['name'] for f in manifest['files']} == expected_names
+              baseline = {a['name']: a for a in manifest['existingAssets']}
+              assert len(baseline) == len(manifest['existingAssets']) and baseline
+
+              def preserve_baseline(release):
+                  assets = {a['name']: a for a in release['assets']}
+                  for name, original in baseline.items():
+                      asset = assets[name]
+                      assert asset['id'] == original['id'] and asset['size'] == original['size']
+                      assert asset['state'] == 'uploaded' and asset['digest'] == original['digest']
+                  return assets
+
+              existing = preserve_baseline(target)
+              parts = [p for f in manifest['files'] for p in f['parts']]
+              assert len({p['name'] for p in parts}) == len(parts)
+              assert 1 <= len(parts) <= 100
+              draft_assets = {a['name']: a for a in draft['assets']}
+              for file in manifest['files']:
+                  assert re.fullmatch(r'[0-9a-f]{64}', file['sha256'])
+                  assert 0 < file['bytes'] < 2 * 1024**3
+                  assert sum(p['bytes'] for p in file['parts']) == file['bytes']
+                  ext = Path(file['name']).suffix[1:]
+                  for index, part in enumerate(file['parts']):
+                      assert part['name'] == f'upload-universal-{ext}-{index:03d}.part'
+                      assert re.fullmatch(r'[0-9a-f]{64}', part['sha256'])
+                      assert 0 < part['bytes'] <= 40 * 1024**2
+                      asset = draft_assets[part['name']]
+                      assert asset['state'] == 'uploaded' and asset['size'] == part['bytes']
+                      assert asset['digest'] == 'sha256:' + part['sha256']
+
+              chunks = stage / 'chunks'
+              chunks.mkdir()
+
+              def download_chunk(part):
+                  gh('release', 'download', staging_tag, '--repo', repo,
+                     '--pattern', part['name'], '--dir', str(chunks))
+                  path = chunks / part['name']
+                  assert path.stat().st_size == part['bytes'] and digest(path) == part['sha256']
+
+              with concurrent.futures.ThreadPoolExecutor(max_workers=8) as executor:
+                  list(executor.map(download_chunk, parts))
+              installers = []
+              for file in manifest['files']:
+                  path = stage / file['name']
+                  with path.open('wb') as output:
+                      for part in file['parts']:
+                          with (chunks / part['name']).open('rb') as stream:
+                              while data := stream.read(1024 * 1024):
+                                  output.write(data)
+                  assert path.stat().st_size == file['bytes'] and digest(path) == file['sha256']
+                  if file['name'] in existing:
+                      asset = existing[file['name']]
+                      assert asset['state'] == 'uploaded' and asset['size'] == file['bytes']
+                      assert asset['digest'] == 'sha256:' + file['sha256']
+                  else:
+                      installers.append(path)
+              preserve_baseline(get_release(tag))
+              with concurrent.futures.ThreadPoolExecutor(max_workers=2) as executor:
+                  list(executor.map(lambda path: gh('release', 'upload', tag, str(path), '--repo', repo), installers))
+              uploaded = preserve_baseline(get_release(tag))
+              for file in manifest['files']:
+                  asset = uploaded[file['name']]
+                  assert asset['state'] == 'uploaded' and asset['size'] == file['bytes']
+                  assert asset['digest'] == 'sha256:' + file['sha256']
+              assert get_release(staging_tag)['draft'], 'Staging must remain private'
+              print('Two exact Universal archives added; original assets/tag preserved. Staging remains private. No QA gates were approved by this transfer.')
+              raise SystemExit(0)
+
+          assert run_id.isdigit(), 'Invalid packaging run ID'
 
           def release():
               result = json.loads(gh('release', 'view', tag, '--repo', repo,
@@ -71,10 +184,6 @@ jobs:
               assert re.fullmatch(r'[0-9a-f]{64}', digest) and Path(name).name == name
               assert name not in checksums
               checksums[name] = digest
-
-          def digest(path):
-              with path.open('rb') as stream:
-                  return hashlib.file_digest(stream, 'sha256').hexdigest()
 
           def artifact(name):
               gh('run', 'download', run_id, '--repo', repo, '--name', name, '--dir', str(stage / name))
