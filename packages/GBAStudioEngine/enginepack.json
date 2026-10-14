@@ -944,6 +944,7 @@
     "topdown_runtime": [
       "advanced_tools_data",
       "camera_zones",
+      "paged_background",
       "native",
       "feature_modules",
       "inventory",

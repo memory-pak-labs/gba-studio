@@ -43,6 +43,42 @@ describe("tacticalMarkerIndices", () => {
 });
 
 describe("prepareEngineProjectExport", () => {
+  it("keeps an automatic portal when a paged room has a trigger without an enter event", () => {
+    const contract = buildEngineExportProjectContract(project({
+      assets: [{ id: "harbor", name: "harbor.png", kind: "Background", metadata: {
+        source: "Assets/backgrounds/harbor.png", kind: "paged_bg", colorMode: "8bpp-indexed", width: 240, height: 160
+      } }],
+      scenas: [{ name: "start", sceneType: "topdown", width: 30, height: 20, backgroundAssetName: "harbor.png" },
+        { name: "next", sceneType: "topdown", width: 30, height: 20 }],
+      triggers: [{ id: "spot", name: "spot", roomName: "start", x: 1, y: 1, width: 1, height: 1, eventBindings: {} }],
+      editorState: { scenaConnections: [{ from: "start", to: "next", exit: { x: 1, y: 1, width: 1, height: 1 },
+        entry: { x: 2, y: 2, width: 1, height: 1 } }] }
+    }));
+    expect(contract.topdown_project?.rooms[0]?.portals).toHaveLength(1);
+  });
+  it("exports unique SDK requirements for the mixed example validated by gbsdoctor", async () => {
+    const source = await readFile(path.join(process.cwd(), "default-assets/templates/exemplo-gba/exemplo-gba.gba-project"), "utf8");
+    const contract = buildEngineExportProjectContract(parseGBAProjectFile(source).data);
+    expect(contract.requires.features.length).toBe(new Set(contract.requires.features).size);
+  });
+  it("keeps a paged top-down atlas in ROM and binds a full source map to the room", () => {
+    const contract = buildEngineExportProjectContract(project({
+      assets: [{ id: "harbor", name: "harbor.png", kind: "Background", metadata: {
+        source: "Assets/backgrounds/harbor.png", kind: "paged_bg", colorMode: "8bpp-indexed", width: 1008, height: 688
+      } }],
+      scenas: [{ name: "start", sceneType: "topdown", width: 126, height: 86,
+        backgroundAssetName: "harbor.png", gbStudioUseBackgroundLayout: true }]
+    }));
+    expect(contract.topdown_project?.rooms[0]).toMatchObject({
+      width_tiles: 126, height_tiles: 86, background_bits_per_pixel: 8,
+      visual_tilemap: "harbor", visual_tilemap_layout: "source_asset", paged_source_tiles: "harbor"
+    });
+    expect(contract.topdown_project?.assets?.tile_assets).not.toContain("harbor");
+    expect(contract.topdown_project?.assets?.bg_palettes).toContain("harbor");
+    expect(contract.topdown_project?.backgrounds).toBeUndefined();
+    expect(contract.requires.features).toContain("topdown_runtime.paged_background");
+  });
+
   it("exports multiple tactical presets with separate residency groups without mutating authoring data", () => {
     let data = createBlankProjectData({ name: "Duas arenas", includeStarterContent: false });
     for (const id of ["arena-a", "arena-b"]) {

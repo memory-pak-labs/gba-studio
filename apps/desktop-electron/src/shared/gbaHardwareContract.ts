@@ -1,4 +1,4 @@
-import { hasPagedWorldMap } from './pagedWorldMap.js';
+import { hasPagedBackground } from './pagedWorldMap.js';
 import { gbaMetaspriteFramePartCount } from "./gbaMetaspriteLayout.js";
 import type { GBAProjectData } from "./projectFile.js";
 import {
@@ -464,7 +464,7 @@ export function buildGbaHardwareContract(data: GBAProjectData): GbaHardwareContr
     index,
     configuredMapSize,
     { id: videoModeDefinition.id, label: videoModeDefinition.label },
-    hasPagedWorldMap(data, scene)
+    hasPagedBackground(data, scene)
   ));
   const framesBySheet = new Map<string, {width: number; height: number}>();
   for (const animation of records(data.animations)) {

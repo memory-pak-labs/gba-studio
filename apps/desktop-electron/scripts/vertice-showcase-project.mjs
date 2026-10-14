@@ -29,9 +29,10 @@ import { refineRouteMap } from "./route-map-project.mjs";
 import { correctIsometricScenes } from "./isometric-scene-corrections.mjs";
 import { retireInitialMenuScene } from "./retire-initial-menu.mjs";
 import { applyExampleSceneTransitions } from "./exemplo-scene-transitions.mjs";
+import { promoteApprovedPortoLumenPaged } from "./porto-lumen-paged-promotion.mjs";
 const finalizeApprovedMenusAndRoute = project => {
   const finalized = promotePlatformerViewport(retireInitialMenuScene(promoteApprovedCouncilDialogueV5(promoteMarketAdventure(correctIsometricScenes(refineRouteMap(refineInGameMenus(project), {removeLab:true}))))));
-  return applyExampleSceneTransitions(promoteNeutralMenus({
+  return promoteApprovedPortoLumenPaged(applyExampleSceneTransitions(promoteNeutralMenus({
     ...finalized,
     editorState: {
       ...finalized.editorState,
@@ -41,7 +42,7 @@ const finalizeApprovedMenusAndRoute = project => {
     assets: finalized.assets.filter((asset) => CANONICAL_EXAMPLE_ASSET_NAMES.has(asset.name)),
     animations: finalized.animations.filter((animation) => CANONICAL_EXAMPLE_ASSET_NAMES.has(animation.spriteSheet)),
     animationStates: finalized.animationStates.filter((state) => CANONICAL_EXAMPLE_ASSET_NAMES.has(state.spriteSheet))
-  }));
+  })));
 };
 import { promoteApprovedCircuitLoopV2 } from "./circuit-loop-v2-promotion.mjs";
 import {

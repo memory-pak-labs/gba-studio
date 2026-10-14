@@ -204,19 +204,19 @@ describe("materialização canônica de Vértice", () => {
       }
     });
     expect(game).toMatchObject({
-      width: 60,
-      height: 40,
-      backgroundAssetName: "porto-lume-exterior-topdown-gba.png",
+      width: 126,
+      height: 86,
+      backgroundAssetName: "porto-lumen-continuous-paged.png",
       backgroundRenderMode: "tilemap",
       gbStudioUseBackgroundLayout: true,
       cameraMode: "follow_player",
-      cameraBounds: { x: 0, y: 0, width: 60, height: 40 },
+      cameraBounds: { x: 0, y: 0, width: 126, height: 86 },
       playerActorName: "Nara",
-      runtime: { type: "topdown", config: { presentation: "topdown", profile: "port-lumen-topdown-v1" } }
+      runtime: { type: "topdown", config: { presentation: "topdown", profile: "port-lumen-paged-topdown-v2" } }
     });
-    expect(game?.tilemap).toHaveLength(60 * 40);
-    expect(game?.collisionTypes).toHaveLength(60 * 40);
-    expect(game?.collisionTypes?.[21 * 60 + 30]).toBe("free");
+    expect(game?.tilemap).toHaveLength(126 * 86);
+    expect(game?.collisionTypes).toHaveLength(126 * 86);
+    expect(game?.collisionTypes?.[50 * 126 + 88]).toBe("free");
     expect(game?.collisionTypes?.[0]).toBe("solid");
     expect(project.actors.filter((actor) => actor.roomName === "porto_lumen")).toEqual(expect.arrayContaining([
       expect.objectContaining({ id: "port-nara", name: "Nara", spriteSheet: "player-pilot-32x32.png" }),
@@ -231,9 +231,9 @@ describe("materialização canônica de Vértice", () => {
       expect.objectContaining({
         id: "trigger-porto-exit",
         roomName: "porto_lumen",
-        x: 22,
-        y: 35,
-        width: 3,
+        x: 60,
+        y: 0,
+        width: 9,
         height: 3
       }),
       expect.objectContaining({
@@ -289,7 +289,7 @@ describe("materialização canônica de Vértice", () => {
       escolha_genero: { x: 900, y: 36 },
       nome_jogador: { x: 1476, y: 36 },
       prologo: { x: 1764, y: 36 },
-      porto_lumen: { x: 2052, y: 36 },
+      porto_lumen: { x: 2415, y: 36 },
       mapa_rota: { x: 36, y: 498 }
     });
 
@@ -1618,8 +1618,8 @@ describe("materialização canônica de Vértice", () => {
       expect(scene(name)?.collisionTypes.every((value) => value === "free")).toBe(true);
     }
 
-    expect(isFree("porto_lumen", 22, 35)).toBe(true);
-    expect(isFree("porto_lumen", 30, 35)).toBe(true);
+    expect(isFree("porto_lumen", 88, 50)).toBe(true);
+    expect(isFree("porto_lumen", 64, 2)).toBe(true);
     expect(isFree("farol_interior", 22, 24)).toBe(true);
     expect(isFree("farol_interior", 11, 9)).toBe(true);
     expect(isFree("farol_interior", 22, 14)).toBe(false);
@@ -2296,6 +2296,7 @@ describe("materialização canônica de Vértice", () => {
       "arena_arrancada",
     ];
 
+    allowedAssets.add("porto-lumen-continuous-paged.png");
     expect(new Set(project.assets.map((asset) => asset.name))).toEqual(allowedAssets);
     expect(project.audioItems).toHaveLength(29);
     expect(project.events.flatMap((event) => event.steps ?? []).some((step) => /play_(music|sfx) /.test(step.command))).toBe(true);
@@ -2425,7 +2426,7 @@ describe("materialização canônica de Vértice", () => {
     expect(() => buildEngineExportProjectContract(project)).not.toThrow();
   });
 
-  it("declara a otimização nativa de tiles dos backgrounds top-down aprovados", () => {
+  it("keeps static tile budgets and exports the approved Porto atlas through paging", () => {
     const project = verticeProject();
     const background = project.assets.find((asset) => asset.name === "porto-lume-exterior-topdown-gba.png");
     const interior360 = project.assets.find((asset) => asset.name === "farol-interior-topdown-360x240-gba.png");
@@ -2455,12 +2456,12 @@ describe("materialização canônica de Vértice", () => {
       backgroundTileOptimizer: { enabled: true, tileBudget: 895 },
       reviewStatus: "visual-approved"
     });
-    expect(packAsset).toMatchObject({
-      kind: "bg",
-      optimize_background_tiles: true,
-      background_tile_budget: 895,
-      background_palette_banks: 14
-    });
+    expect(packAsset).toBeUndefined(); // Preserved library source is no longer a resident room background.
+    const paged = exported.asset_pack?.assets.find(asset => asset.name === "porto_lumen_continuous_paged");
+    expect(paged).toMatchObject({ kind: "paged_bg", background_bpp: 8 });
+    expect(paged).not.toHaveProperty("optimize_background_tiles");
+    expect(exported.asset_pack?.assets.find(asset => asset.name === "farol_interior_topdown_360x240_gba"))
+      .toMatchObject({ kind: "bg", background_tile_budget: 895 });
   });
 
   it("fecha a cobertura do lote de clímax sem assets legados", () => {

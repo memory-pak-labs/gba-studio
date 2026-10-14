@@ -74,9 +74,10 @@ describe("auditoria do template Vértice", () => {
   it("detecta ator fora da área caminhável e gatilho fora dos limites da cena", () => {
     const broken = structuredClone(project);
     const portActor = broken.actors.find((actor) => actor.name === "Nara" && actor.roomName === "porto_lumen");
-    portActor.x = 58;
-    portActor.y = 38;
-    broken.triggers.find((trigger) => trigger.id === "trigger-porto-exit").x = 59;
+    portActor.x = 0;
+    portActor.y = 0;
+    const port = broken.scenas.find(scene => scene.name === "porto_lumen");
+    broken.triggers.find((trigger) => trigger.id === "trigger-porto-exit").x = port.width - 1;
 
     const audit = auditExemploTemplate(broken);
 

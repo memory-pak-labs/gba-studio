@@ -15,6 +15,14 @@ def load_gbsdoctor():
     return module
 
 
+def test_paged_background_is_an_explicit_8bpp_rom_source():
+    doctor = load_gbsdoctor()
+    payload = {"assets": [{"name": "harbor", "kind": "paged_bg", "png": "harbor.png", "background_bpp": 8}]}
+    assert doctor.validate_asset_pack_payload(payload) == []
+    payload["assets"][0]["background_bpp"] = 4
+    assert any(error["path"].endswith("background_bpp") for error in doctor.validate_asset_pack_payload(payload))
+
+
 def test_resource_pool_readiness_contract_is_actionable():
     gbsdoctor = load_gbsdoctor()
     manifest = {
@@ -1027,6 +1035,7 @@ def main():
     test_scene_preflight_fixture_context_is_explicit_and_non_production()
     test_structural_fixture_manifest_is_explicit_and_never_production()
     test_shmup_project_validates_affine_world_and_collision_planes()
+    test_paged_background_is_an_explicit_8bpp_rom_source()
     test_asset_pack_accepts_native_affine_bpp_and_rejects_it_for_regular_assets()
     test_asset_pack_public_schema_matches_native_affine_bpp_contract()
     test_exported_shmup_template_consumes_per_background_affine_and_collision_contract()

@@ -212,6 +212,8 @@ struct TopDownRoomData {
     EventScript on_hit_group1 = empty_event_script();
     EventScript on_hit_group2 = empty_event_script();
     EventScript on_hit_group3 = empty_event_script();
+    // Opt-in ROM atlas. Its map contains source indices, not hardware entries.
+    const TileAsset* paged_source_tiles = nullptr;
 };
 
 struct TopDownActorData {
@@ -1315,6 +1317,21 @@ constexpr ResourceBankGroup resource_bank_group_from_topdown_room(const TopDownP
     return resource_bank_group_from_topdown_project(project, resource_bank_group_name_for_topdown_room(room));
 }
 
+constexpr bool is_valid_topdown_paged_background(const TopDownRoomData& room) {
+    if (room.paged_source_tiles == nullptr) return true;
+    const auto* map = room.visual_tilemap;
+    const auto* palette = room.visual_palette;
+    const auto& atlas = *room.paged_source_tiles;
+    return room.uses_visual_tilemap && map != nullptr && map->entries != nullptr &&
+        map->width == room.width_tiles && map->height == room.height_tiles &&
+        map->compression == AssetCompression::None &&
+        room.visual_tile_asset == room.paged_source_tiles && atlas.data != nullptr &&
+        atlas.tile_count > 0 && !atlas.object_tiles && atlas.color_depth == ColorDepth::Bpp8 &&
+        atlas.compression == AssetCompression::None && atlas.destination_tile == 0 &&
+        palette != nullptr && palette->colors != nullptr && palette->color_count > 0 &&
+        palette->color_count <= 224 && palette->start_index == 0;
+}
+
 constexpr bool is_valid_topdown_project_data(const TopDownProjectData& project) {
     if (project.rooms == nullptr ||
         project.room_count == 0 ||
@@ -1326,6 +1343,9 @@ constexpr bool is_valid_topdown_project_data(const TopDownProjectData& project) 
     }
     if (project.background_count > 0 && project.backgrounds == nullptr) {
         return false;
+    }
+    for (size_t index = 0; index < project.room_count; ++index) {
+        if (!is_valid_topdown_paged_background(project.rooms[index])) return false;
     }
     for (size_t index = 0; index < project.background_count; ++index) {
         if (!is_valid_topdown_background_data(project.backgrounds[index])) {

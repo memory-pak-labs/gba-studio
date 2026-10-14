@@ -859,6 +859,11 @@
           "path": "Assets/sprites/penedos-v10-marco.png",
           "sha256": "79acb84fafe2434cd101a4bbe495175c040413780fbdc95089531996dc312006",
           "contract": "penedos-v13-user-approved-viewport-2026-10-01"
+        },
+        {
+          "path": "Assets/backgrounds/porto-lumen-continuous-paged.png",
+          "sha256": "73e35aa43ea1a4b6171d6087525d1c262f446a6dc53e2183d822224ddeec99b0",
+          "contract": "porto-lumen-paged-v16-user-approved-2026-10-14"
         }
       ],
       "retired": [

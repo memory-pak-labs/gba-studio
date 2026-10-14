@@ -456,7 +456,13 @@ $(HOST_BUILD)/animation_tests: tests/host/animation_tests.cpp engine/src/gbs_ani
 	$(HOST_CXX) $(HOST_CXXFLAGS) $^ -o $@
 
 .PHONY: animation-streaming-test
-host-test: animation-streaming-test
+host-test: animation-streaming-test paged-background-test
+
+.PHONY: paged-background-test
+paged-background-test:
+	@mkdir -p $(HOST_BUILD)
+	$(HOST_CXX) $(HOST_CXXFLAGS) -O2 tests/host/paged_background_tests.cpp -o $(HOST_BUILD)/paged_background_tests
+	$(HOST_BUILD)/paged_background_tests
 animation-streaming-test: $(HOST_BUILD)/animation_streaming_tests
 	$(HOST_BUILD)/animation_streaming_tests
 $(HOST_BUILD)/animation_streaming_tests: tests/host/animation_streaming_tests.cpp engine/src/gbs_animation.cpp engine/include/gbs/animation.hpp

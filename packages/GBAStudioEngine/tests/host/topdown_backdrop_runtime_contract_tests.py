@@ -27,6 +27,13 @@ def function_body(source: str, name: str) -> str:
 
 
 class TopdownBackdropRuntimeContractTests(unittest.TestCase):
+    def test_leaving_paging_restores_static_transparency_before_the_room_art(self):
+        body = function_body(self.source, "load_active_room_visual_tilemap")
+        clear = "gbs::load_tiles(gbs::TileAsset {transparent_bg_tile, 1, 0, false});"
+        self.assertIn("paged_background_active && room_data.paged_source_tiles == nullptr", body)
+        self.assertIn(clear, body)
+        self.assertLess(body.index(clear), body.index("gbs::load_tiles(*room_data.visual_tile_asset);"))
+
     @classmethod
     def setUpClass(cls) -> None:
         cls.source = TOPDOWN_RUNTIME.read_text(encoding="utf-8")
@@ -171,11 +178,11 @@ class TopdownBackdropRuntimeContractTests(unittest.TestCase):
             body,
         )
         self.assertIn(
-            "const int bg2_scroll_x = affine_room ? 0 : (active_room_data.uses_visual_tilemap ? render_camera.x : (render_camera.x & 7));",
+            "const int bg2_scroll_x = affine_room ? 0 : (paged_room ? background_camera.x % 256 : (active_room_data.uses_visual_tilemap ? render_camera.x : (render_camera.x & 7)));",
             body,
         )
         self.assertIn(
-            "const int bg2_scroll_y = affine_room ? 0 : (active_room_data.uses_visual_tilemap ? render_camera.y : (render_camera.y & 7));",
+            "const int bg2_scroll_y = affine_room ? 0 : (paged_room ? background_camera.y % 256 : (active_room_data.uses_visual_tilemap ? render_camera.y : (render_camera.y & 7)));",
             body,
         )
         self.assertIn(

@@ -10,6 +10,7 @@
 #include "gbs/interrupt.hpp"
 #include "gbs/link.hpp"
 #include "gbs/project.hpp"
+#include "gbs/paged_background.hpp"
 #include "gbs/render.hpp"
 #include "gbs/resource_manager.hpp"
 #include "gbs/runtime.hpp"
@@ -53,6 +54,9 @@ int current_room = 0;
 int configured_dialogue_ui_room = -1;
 bool configured_dialogue_ui_affine = false;
 uint16_t room_backdrop_color = 0;
+gbs::PagedBackgroundCache paged_background __attribute__((section(".ewram_bss")));
+bool paged_background_active = false;
+constexpr uint8_t transparent_bg_tile[32] = {};
 gbs::Room room = gbs::room_from_data(project.rooms[0]);
 gbs::Actor player = gbs::actor_from_data(project.player);
 gbs::EventPlayerRuntimeState player_event_runtime { true, 0, 0, 0 };
@@ -989,6 +993,12 @@ bool stream_resources_for_room(int room_index) {
 
 void load_active_room_visual_tilemap() {
     const gbs::TopDownRoomData& room_data = project.rooms[current_room];
+    if (paged_background_active && room_data.paged_source_tiles == nullptr) {
+        // Slot zero contains art while paging. Restore the static renderer's
+        // transparent tile before loading the next room's own tiles/map.
+        gbs::load_tiles(gbs::TileAsset {transparent_bg_tile, 1, 0, false});
+        paged_background_active = false;
+    }
     if (!room_data.uses_visual_tilemap ||
         room_data.visual_tilemap == nullptr ||
         room_data.visual_tile_asset == nullptr ||
@@ -996,6 +1006,13 @@ void load_active_room_visual_tilemap() {
         return;
     }
     gbs::load_palette(*room_data.visual_palette, false);
+    if (room_data.paged_source_tiles != nullptr) {
+        paged_background_active = true;
+        paged_background.window = {};
+        for (auto& entry : paged_background.map) entry = 0;
+        return; // The ROM atlas is never loaded through the resident tile path.
+    }
+    gbs::set_bg_screen_base(gbs::BackgroundLayer::BG2, 20);
     gbs::load_tiles(*room_data.visual_tile_asset);
     gbs::load_tilemap(gbs::BackgroundLayer::BG2, *room_data.visual_tilemap);
 }
@@ -1006,6 +1023,43 @@ void apply_active_room_video() {
         ? room_data.video
         : project.video;
     gbs::apply_video_composition(composition);
+    if (room_data.paged_source_tiles != nullptr) {
+        gbs::set_ui_character_base(1);
+        gbs::set_bg_character_base(gbs::BackgroundLayer::BG2, 0);
+        gbs::set_bg_screen_base(gbs::BackgroundLayer::BG2, 27);
+        gbs::set_bg_color_depth(gbs::BackgroundLayer::BG2, gbs::ColorDepth::Bpp8);
+        gbs::set_bg_enabled(gbs::BackgroundLayer::BG1, false);
+        gbs::set_bg_enabled(gbs::BackgroundLayer::BG3, false);
+    } else if (!composition.affine_enabled) {
+        gbs::set_ui_character_base(0);
+        gbs::set_bg_character_base(gbs::BackgroundLayer::BG2, 0);
+        gbs::set_bg_color_depth(gbs::BackgroundLayer::BG2, gbs::ColorDepth::Bpp4);
+        gbs::set_bg_screen_base(gbs::BackgroundLayer::BG2, 20);
+    }
+}
+
+gbs::Vec2i update_paged_room_background(gbs::Vec2i camera_position) {
+    const auto& data = project.rooms[current_room];
+    const auto& atlas = *data.paged_source_tiles;
+    const auto& map = *data.visual_tilemap;
+    const auto bounded = gbs::paged_background_camera(map, camera_position);
+    const int changed = gbs::stage_paged_background(paged_background, map, atlas, bounded);
+    if (changed > 128) {
+        gbs::load_bg_tiles_at_character_base(gbs::TileAsset {paged_background.tiles,
+            gbs::paged_background_slot_count, 0, false, gbs::ColorDepth::Bpp8}, 0);
+    } else {
+        // Coalesce adjacent dirty slots; never exhaust the bounded DMA queue
+        // with one transfer per tile on a diagonal step or camera jump.
+        for (int slot = 0; slot < gbs::paged_background_slot_count;) {
+            if (!paged_background.dirty[slot]) { ++slot; continue; }
+            const int first = slot;
+            while (slot < gbs::paged_background_slot_count && paged_background.dirty[slot]) ++slot;
+            gbs::load_bg_tiles_at_character_base(gbs::TileAsset {paged_background.tiles + first * 64,
+                static_cast<uint16_t>(slot - first), static_cast<uint16_t>(first), false, gbs::ColorDepth::Bpp8}, 0);
+        }
+    }
+    if (changed > 0) gbs::load_tilemap(gbs::BackgroundLayer::BG2, gbs::TileMapAsset {paged_background.map, 32, 32});
+    return bounded;
 }
 
 void configure_dialogue_ui_for_active_room(bool force = false) {
@@ -1679,7 +1733,12 @@ void sync_runtime_telemetry() {
     runtime_telemetry.trigger_leave_count = runtime_trigger_leave_count;
     runtime_telemetry.room_change_count = runtime_room_change_count;
     runtime_telemetry.blocked_direction_bits = runtime_blocked_direction_bits;
-    gbs::publish_runtime_physical_telemetry(resources, event_state);
+    auto physical = gbs::capture_runtime_physical_telemetry(resources, event_state);
+    if (project.rooms[current_room].paged_source_tiles != nullptr) {
+        physical.bg_tiles += sizeof(paged_background.tiles) / 32;
+        physical.vram_bytes += sizeof(paged_background.tiles) + sizeof(paged_background.map);
+    }
+    gbs::debug_set_runtime_physical_telemetry(physical);
 }
 
 bool queue_script(gbs::EventScript script, bool trigger_room_enter);
@@ -3388,8 +3447,10 @@ void render_topdown_runtime(const gbs::RuntimeFrameContext& context) {
         // A source visual tilemap is already resident as a full hardware map;
         // dynamic room tiles are staged into a 32x32 window and only need the
         // sub-tile scroll remainder.
-        const int bg2_scroll_x = affine_room ? 0 : (active_room_data.uses_visual_tilemap ? render_camera.x : (render_camera.x & 7));
-        const int bg2_scroll_y = affine_room ? 0 : (active_room_data.uses_visual_tilemap ? render_camera.y : (render_camera.y & 7));
+        const bool paged_room = active_room_data.paged_source_tiles != nullptr;
+        const gbs::Vec2i background_camera = paged_room ? update_paged_room_background(render_camera) : render_camera;
+        const int bg2_scroll_x = affine_room ? 0 : (paged_room ? background_camera.x % 256 : (active_room_data.uses_visual_tilemap ? render_camera.x : (render_camera.x & 7)));
+        const int bg2_scroll_y = affine_room ? 0 : (paged_room ? background_camera.y % 256 : (active_room_data.uses_visual_tilemap ? render_camera.y : (render_camera.y & 7)));
         gbs::set_bg_scroll(gbs::BackgroundLayer::BG1, render_camera.x & 7, render_camera.y & 7);
         gbs::set_bg_scroll(gbs::BackgroundLayer::BG2, bg2_scroll_x, bg2_scroll_y);
         gbs::set_bg_scroll(gbs::BackgroundLayer::BG0, 0, 0);

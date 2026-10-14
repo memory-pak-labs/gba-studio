@@ -7374,6 +7374,10 @@ def tilemap_values_from_asset_pack_entry(asset_report, base_dir, asset_id, descr
         raise SystemExit(f"{description} precisa do diretorio base para remapear visual_tilemap")
 
     args = header.get("assetc_args", [])
+    if "--paged-tilemap" in args:
+        width, height, _colors, indices = read_png(base_dir / source, max_colors=224)
+        _tiles, entries, _width, _height = build_indexed_background_tiles(width, height, indices, max_source_tiles=65535)
+        return entries
     background_bpp = assetc_arg_int(args, "--background-bpp", 4)
     width, height, colors, indices = read_png(base_dir / source, max_colors=256)
     if background_bpp != 4:
@@ -7419,6 +7423,36 @@ def source_asset_tilemap_for_dimensions(tilemap_values, asset_report, asset_id, 
         for y in range(target_height)
         for x in range(target_width)
     ]
+
+
+def validate_topdown_paged_background(room, width, height, room_index, asset_report, base_dir=None):
+    description = f"topdown_project.rooms[{room_index}]"
+    source = room.get("paged_source_tiles")
+    bpp = int(room.get("background_bits_per_pixel", 4))
+    if source is None:
+        if bpp != 4:
+            raise SystemExit(f"{description}: 8bpp requires explicit paged_source_tiles")
+        return
+    if not isinstance(source, str) or source != room.get("visual_tilemap"):
+        raise SystemExit(f"{description}: paged_source_tiles must match visual_tilemap")
+    if bpp != 8 or room.get("visual_tilemap_layout") != "source_asset":
+        raise SystemExit(f"{description}: paged background requires 8bpp and source_asset layout")
+    header = asset_pack_header_for_id(asset_report, source)
+    args = header.get("assetc_args", []) if header else []
+    if "--paged-tilemap" not in args:
+        raise SystemExit(f"{description}: source must be a paged_bg atlas")
+    if any(flag in args for flag in ("--lz77-tiles", "--huffman-tiles", "--lz77-tilemap", "--huffman-tilemap", "--rle-tilemap")):
+        raise SystemExit(f"{description}: paged source must remain directly addressable in ROM")
+    resources = header.get("resources", {})
+    if resources.get("tilemap_width") != width or resources.get("tilemap_height") != height:
+        raise SystemExit(f"{description}: paged map dimensions must match the room")
+    if any(value > 0 for value in room.get("foreground_tiles", [])):
+        raise SystemExit(f"{description}: paged BG cannot share its character block with foreground_tiles")
+    values = tilemap_values_from_asset_pack_entry(asset_report, base_dir, source, description)
+    count = resources.get("rom_source_bytes", 0) // 64
+    if not isinstance(values, list) or len(values) != width * height or count < 1 or any(not isinstance(v, int) or v < 0 or v >= count for v in values):
+        raise SystemExit(f"{description}: invalid paged ROM tile index")
+    return values
 
 
 def remap_topdown_visual_tiles_from_asset(room, visual, room_index, asset_report, base_dir):
@@ -13699,6 +13733,9 @@ def emit_topdown_project_data_header(topdown_project, asset_report=None, base_di
         height = int(room.get("height_tiles", 0))
         if not has_valid_streaming_room_dimensions(width, height):
             raise SystemExit(f"topdown_project.rooms[{room_index}] dimensoes invalidas")
+        paged_values = validate_topdown_paged_background(room, width, height, room_index, asset_report, base_dir)
+        if room.get("paged_source_tiles") is not None and (int(topdown_project.get("video", {}).get("display_mode", 0)) != 0 or int(room.get("video", {}).get("display_mode", 0)) != 0):
+            raise SystemExit("Paged topdown background requires Mode 0")
         tile_count = width * height
         prefix = pack_safe_identifier(room.get("name", f"room_{room_index}"))
         visual = int_list_from_json(
@@ -13707,7 +13744,7 @@ def emit_topdown_project_data_header(topdown_project, asset_report=None, base_di
             f"topdown_project.rooms[{room_index}].visual_tiles",
             maximum=0xFFFF,
         )
-        visual = remap_topdown_visual_tiles_from_asset(room, visual, room_index, asset_report, base_dir)
+        visual = paged_values if paged_values is not None else remap_topdown_visual_tiles_from_asset(room, visual, room_index, asset_report, base_dir)
         foreground_name = "nullptr"
         if "foreground_tiles" in room:
             foreground = int_list_from_json(
@@ -14102,11 +14139,6 @@ def emit_topdown_project_data_header(topdown_project, asset_report=None, base_di
             output.append("")
 
         room_metadata = emit_topdown_room_metadata(room, room_index)
-        background_bits_per_pixel = int(room.get("background_bits_per_pixel", 4))
-        if background_bits_per_pixel != 4:
-            raise SystemExit(
-                f"topdown_project.rooms[{room_index}].background_bits_per_pixel suporta somente 4"
-            )
         room_name_literal = cpp_string_literal(room.get("name", f"room_{room_index}"))
         room_bank_group = room.get("resource_bank_group", room.get("bank_group", None))
         if room_bank_group is not None and not isinstance(room_bank_group, str):
@@ -14179,7 +14211,8 @@ def emit_topdown_project_data_header(topdown_project, asset_report=None, base_di
             f"        {room_video_literal},\n"
             f"        {on_hit_group_scripts[0]},\n"
             f"        {on_hit_group_scripts[1]},\n"
-            f"        {on_hit_group_scripts[2]}\n"
+            f"        {on_hit_group_scripts[2]},\n"
+            f"        {visual_tiles_literal if room.get('paged_source_tiles') else 'nullptr'}\n"
             "    }"
         )
 

@@ -4,8 +4,8 @@
       "id": "port-nara",
       "name": "Nara",
       "roomName": "porto_lumen",
-      "x": 25,
-      "y": 18,
+      "x": 88,
+      "y": 50,
       "z": 0,
       "spriteSheet": "player-pilot-32x32.png",
       "animationName": "idle_down",
@@ -16,8 +16,8 @@
       "id": "port-mechanic",
       "name": "Mecânica de Lúmen",
       "roomName": "porto_lumen",
-      "x": 35,
-      "y": 21,
+      "x": 94,
+      "y": 47,
       "z": 0,
       "spriteSheet": "mechanic-pilot-32x32.png",
       "animationName": "idle_down",
@@ -59,8 +59,8 @@
       "id": "porto-lume-captain-pilot",
       "name": "Capitão · Porto de Lúmen",
       "roomName": "porto_lumen",
-      "x": 42,
-      "y": 12,
+      "x": 37,
+      "y": 66,
       "z": 0,
       "spriteSheet": "npc-captain-pilot-32x32.png",
       "animationName": "idle_down",
@@ -71,8 +71,8 @@
       "id": "porto-lume-traveler-pilot",
       "name": "Viajante · Porto de Lúmen",
       "roomName": "porto_lumen",
-      "x": 48,
-      "y": 9,
+      "x": 120,
+      "y": 38,
       "z": 0,
       "spriteSheet": "traveler-pilot-32x32.png",
       "animationName": "idle_down",
@@ -83,8 +83,8 @@
       "id": "porto-lume-cartographer-pilot",
       "name": "Cartógrafo · Porto de Lúmen",
       "roomName": "porto_lumen",
-      "x": 22,
-      "y": 21,
+      "x": 61,
+      "y": 62,
       "z": 0,
       "spriteSheet": "cartographer-pilot-32x32.png",
       "animationName": "idle_down",
@@ -95,8 +95,8 @@
       "id": "porto-lume-fisherchild-pilot",
       "name": "Pescador mirim · Porto de Lúmen",
       "roomName": "porto_lumen",
-      "x": 18,
-      "y": 25,
+      "x": 20,
+      "y": 65,
       "z": 0,
       "spriteSheet": "fisherchild-pilot-32x32.png",
       "animationName": "idle_down",
@@ -107,8 +107,8 @@
       "id": "porto-lume-lighthousekeeper-pilot",
       "name": "Guardião do farol",
       "roomName": "porto_lumen",
-      "x": 17,
-      "y": 13,
+      "x": 22,
+      "y": 15,
       "z": 0,
       "spriteSheet": "lighthousekeeper-pilot-32x32.png",
       "animationName": "idle_down",
@@ -64502,6 +64502,42 @@
       }
     },
     {
+      "id": "porto-lumen-continuous-paged-background",
+      "kind": "Background",
+      "name": "porto-lumen-continuous-paged.png",
+      "systemImage": "lighthouse",
+      "metadata": {
+        "source": "Assets/backgrounds/porto-lumen-continuous-paged.png",
+        "kind": "paged_bg",
+        "colorMode": "8bpp-indexed",
+        "backgroundBpp": 8,
+        "width": 1008,
+        "height": 688,
+        "tileCount": 10609,
+        "visibleColors": 199,
+        "sourceSha256": "62e28c4ef1c7e5477f40733f5594bf97d86e02219585da435505e4a42f1d3ca8",
+        "preparedSha256": "73e35aa43ea1a4b6171d6087525d1c262f446a6dc53e2183d822224ddeec99b0",
+        "generatedBy": "image_gen + assetc",
+        "provenance": "Mapa contínuo original aprovado; conversão de paleta com 199 cores aprovada em 2026-10-14; atlas paginado preserva os pixels RGB555 sem redução de tiles.",
+        "license": "Project-owned; generated from user-supplied visual direction",
+        "reviewStatus": "approved",
+        "assetcReviewed": true,
+        "profile": "topdown-paged",
+        "role": "port-lumen-continuous-topdown",
+        "sceneRoles": [
+          "port-lumen-continuous-topdown"
+        ],
+        "backgroundTileOptimizer": {
+          "enabled": false
+        },
+        "compressionPolicy": {
+          "tiles": "none",
+          "tilemap": "none",
+          "palette": "none"
+        }
+      }
+    },
+    {
       "id": "penedos-v7-player",
       "kind": "Sprite",
       "name": "penedos-v10-nara.png",
@@ -72037,8 +72073,8 @@
         "to": "farol_interior",
         "eventName": "porto_entrar_farol",
         "exit": {
-          "x": 9,
-          "y": 9,
+          "x": 16,
+          "y": 11,
           "width": 4,
           "height": 3
         },
@@ -72066,8 +72102,8 @@
           "height": 4
         },
         "entry": {
-          "x": 15,
-          "y": 14,
+          "x": 23,
+          "y": 20,
           "width": 1,
           "height": 1
         },
@@ -72089,8 +72125,8 @@
           "height": 5
         },
         "entry": {
-          "x": 30,
-          "y": 21,
+          "x": 88,
+          "y": 50,
           "width": 1,
           "height": 1
         },
@@ -72106,9 +72142,9 @@
         "to": "mapa_rota",
         "eventName": "porto_abrir_mapa",
         "exit": {
-          "x": 22,
-          "y": 35,
-          "width": 3,
+          "x": 60,
+          "y": 0,
+          "width": 9,
           "height": 3
         },
         "entry": {
@@ -72411,8 +72447,8 @@
           "height": 1
         },
         "entry": {
-          "x": 15,
-          "y": 14,
+          "x": 88,
+          "y": 50,
           "width": 1,
           "height": 1
         },
@@ -72627,8 +72663,8 @@
         "y": 36
       },
       "porto_lumen": {
-        "x": 36,
-        "y": 338
+        "x": 2415,
+        "y": 36
       },
       "mapa_rota": {
         "x": 564,
@@ -73403,7 +73439,7 @@
         },
         {
           "id": "event-lighthouse-exit-step-1",
-          "command": "change_scene porto_lumen 15 16 down",
+          "command": "change_scene porto_lumen 23 20 down",
           "isEnabled": true
         }
       ]
@@ -75155,7 +75191,7 @@
         },
         {
           "id": "route-v2-mapa_viajar_porto-1",
-          "command": "change_scene porto_lumen 15 14 down",
+          "command": "change_scene porto_lumen 88 50 down",
           "isEnabled": true
         }
       ]
@@ -76855,87 +76891,103 @@
       }
     },
     {
-      "backgroundAssetName": "porto-lume-exterior-topdown-gba.png",
+      "backgroundAssetName": "porto-lumen-continuous-paged.png",
       "backgroundRenderMode": "tilemap",
       "cameraBounds": {
         "x": 0,
         "y": 0,
-        "width": 60,
-        "height": 40
+        "width": 126,
+        "height": 86
       },
       "cameraMode": "follow_player",
       "cameraZoom": 100,
       "collisionTypes": {
         "encoding": "rle-v1",
-        "length": 2400,
+        "length": 10836,
         "runs": [
           [
             "solid",
-            485
+            60
           ],
           [
             "free",
-            16
+            10
           ],
           [
             "solid",
-            18
+            116
           ],
           [
             "free",
-            18
+            10
           ],
           [
             "solid",
+            116
+          ],
+          [
+            "free",
+            10
+          ],
+          [
+            "solid",
+            116
+          ],
+          [
+            "free",
+            10
+          ],
+          [
+            "solid",
+            116
+          ],
+          [
+            "free",
+            10
+          ],
+          [
+            "solid",
+            116
+          ],
+          [
+            "free",
+            10
+          ],
+          [
+            "solid",
+            116
+          ],
+          [
+            "free",
             8
           ],
           [
-            "free",
-            16
-          ],
-          [
             "solid",
-            18
+            118
           ],
           [
             "free",
-            18
-          ],
-          [
-            "solid",
             8
           ],
           [
-            "free",
-            52
+            "solid",
+            118
           ],
           [
-            "solid",
+            "free",
             8
           ],
           [
-            "free",
-            52
+            "solid",
+            118
           ],
           [
-            "solid",
+            "free",
             8
           ],
           [
-            "free",
-            52
-          ],
-          [
             "solid",
-            9
-          ],
-          [
-            "free",
-            34
-          ],
-          [
-            "solid",
-            13
+            74
           ],
           [
             "free",
@@ -76943,15 +76995,15 @@
           ],
           [
             "solid",
-            17
+            40
           ],
           [
             "free",
-            26
+            10
           ],
           [
             "solid",
-            13
+            72
           ],
           [
             "free",
@@ -76959,15 +77011,15 @@
           ],
           [
             "solid",
-            17
+            40
           ],
           [
             "free",
-            26
+            10
           ],
           [
             "solid",
-            13
+            72
           ],
           [
             "free",
@@ -76975,207 +77027,23 @@
           ],
           [
             "solid",
-            17
+            40
           ],
           [
             "free",
-            26
+            10
           ],
           [
             "solid",
-            13
-          ],
-          [
-            "free",
-            3
-          ],
-          [
-            "solid",
-            18
-          ],
-          [
-            "free",
-            26
-          ],
-          [
-            "solid",
-            13
-          ],
-          [
-            "free",
-            3
-          ],
-          [
-            "solid",
-            18
-          ],
-          [
-            "free",
-            26
-          ],
-          [
-            "solid",
-            13
-          ],
-          [
-            "free",
-            3
-          ],
-          [
-            "solid",
-            18
-          ],
-          [
-            "free",
-            26
-          ],
-          [
-            "solid",
-            13
-          ],
-          [
-            "free",
-            3
-          ],
-          [
-            "solid",
-            18
-          ],
-          [
-            "free",
-            26
-          ],
-          [
-            "solid",
-            6
-          ],
-          [
-            "free",
-            3
-          ],
-          [
-            "solid",
-            4
-          ],
-          [
-            "free",
-            3
-          ],
-          [
-            "solid",
-            18
-          ],
-          [
-            "free",
             42
           ],
           [
-            "solid",
-            12
-          ],
-          [
             "free",
-            48
+            6
           ],
           [
             "solid",
-            12
-          ],
-          [
-            "free",
-            48
-          ],
-          [
-            "solid",
-            12
-          ],
-          [
-            "free",
-            48
-          ],
-          [
-            "solid",
-            12
-          ],
-          [
-            "free",
-            48
-          ],
-          [
-            "solid",
-            12
-          ],
-          [
-            "free",
-            48
-          ],
-          [
-            "solid",
-            15
-          ],
-          [
-            "free",
-            45
-          ],
-          [
-            "solid",
-            12
-          ],
-          [
-            "free",
-            20
-          ],
-          [
-            "solid",
-            2
-          ],
-          [
-            "free",
-            1
-          ],
-          [
-            "solid",
-            2
-          ],
-          [
-            "free",
-            23
-          ],
-          [
-            "solid",
-            12
-          ],
-          [
-            "free",
-            20
-          ],
-          [
-            "solid",
-            1
-          ],
-          [
-            "free",
-            27
-          ],
-          [
-            "solid",
-            12
-          ],
-          [
-            "free",
-            19
-          ],
-          [
-            "solid",
-            1
-          ],
-          [
-            "free",
-            28
-          ],
-          [
-            "solid",
-            27
+            24
           ],
           [
             "free",
@@ -77183,7 +77051,7 @@
           ],
           [
             "solid",
-            1
+            40
           ],
           [
             "free",
@@ -77191,15 +77059,23 @@
           ],
           [
             "solid",
-            44
+            42
           ],
           [
             "free",
-            5
+            6
           ],
           [
             "solid",
-            1
+            22
+          ],
+          [
+            "free",
+            12
+          ],
+          [
+            "solid",
+            34
           ],
           [
             "free",
@@ -77207,39 +77083,87 @@
           ],
           [
             "solid",
-            44
+            40
           ],
           [
             "free",
-            5
+            10
           ],
           [
             "solid",
-            1
+            20
           ],
           [
             "free",
-            3
+            12
           ],
           [
             "solid",
-            1
+            34
           ],
           [
             "free",
-            5
+            10
           ],
           [
             "solid",
-            45
+            40
           ],
           [
             "free",
-            9
+            10
           ],
           [
             "solid",
-            1
+            20
+          ],
+          [
+            "free",
+            14
+          ],
+          [
+            "solid",
+            32
+          ],
+          [
+            "free",
+            10
+          ],
+          [
+            "solid",
+            40
+          ],
+          [
+            "free",
+            12
+          ],
+          [
+            "solid",
+            18
+          ],
+          [
+            "free",
+            14
+          ],
+          [
+            "solid",
+            32
+          ],
+          [
+            "free",
+            10
+          ],
+          [
+            "solid",
+            40
+          ],
+          [
+            "free",
+            12
+          ],
+          [
+            "solid",
+            26
           ],
           [
             "free",
@@ -77247,7 +77171,847 @@
           ],
           [
             "solid",
+            32
+          ],
+          [
+            "free",
+            8
+          ],
+          [
+            "solid",
             44
+          ],
+          [
+            "free",
+            10
+          ],
+          [
+            "solid",
+            26
+          ],
+          [
+            "free",
+            6
+          ],
+          [
+            "solid",
+            32
+          ],
+          [
+            "free",
+            8
+          ],
+          [
+            "solid",
+            44
+          ],
+          [
+            "free",
+            10
+          ],
+          [
+            "solid",
+            26
+          ],
+          [
+            "free",
+            6
+          ],
+          [
+            "solid",
+            32
+          ],
+          [
+            "free",
+            8
+          ],
+          [
+            "solid",
+            48
+          ],
+          [
+            "free",
+            6
+          ],
+          [
+            "solid",
+            26
+          ],
+          [
+            "free",
+            6
+          ],
+          [
+            "solid",
+            32
+          ],
+          [
+            "free",
+            8
+          ],
+          [
+            "solid",
+            48
+          ],
+          [
+            "free",
+            6
+          ],
+          [
+            "solid",
+            26
+          ],
+          [
+            "free",
+            6
+          ],
+          [
+            "solid",
+            30
+          ],
+          [
+            "free",
+            8
+          ],
+          [
+            "solid",
+            50
+          ],
+          [
+            "free",
+            6
+          ],
+          [
+            "solid",
+            26
+          ],
+          [
+            "free",
+            6
+          ],
+          [
+            "solid",
+            30
+          ],
+          [
+            "free",
+            8
+          ],
+          [
+            "solid",
+            50
+          ],
+          [
+            "free",
+            6
+          ],
+          [
+            "solid",
+            28
+          ],
+          [
+            "free",
+            4
+          ],
+          [
+            "solid",
+            30
+          ],
+          [
+            "free",
+            8
+          ],
+          [
+            "solid",
+            52
+          ],
+          [
+            "free",
+            6
+          ],
+          [
+            "solid",
+            26
+          ],
+          [
+            "free",
+            4
+          ],
+          [
+            "solid",
+            30
+          ],
+          [
+            "free",
+            8
+          ],
+          [
+            "solid",
+            52
+          ],
+          [
+            "free",
+            6
+          ],
+          [
+            "solid",
+            26
+          ],
+          [
+            "free",
+            4
+          ],
+          [
+            "solid",
+            30
+          ],
+          [
+            "free",
+            6
+          ],
+          [
+            "solid",
+            54
+          ],
+          [
+            "free",
+            6
+          ],
+          [
+            "solid",
+            26
+          ],
+          [
+            "free",
+            4
+          ],
+          [
+            "solid",
+            30
+          ],
+          [
+            "free",
+            6
+          ],
+          [
+            "solid",
+            54
+          ],
+          [
+            "free",
+            6
+          ],
+          [
+            "solid",
+            26
+          ],
+          [
+            "free",
+            4
+          ],
+          [
+            "solid",
+            28
+          ],
+          [
+            "free",
+            8
+          ],
+          [
+            "solid",
+            54
+          ],
+          [
+            "free",
+            6
+          ],
+          [
+            "solid",
+            26
+          ],
+          [
+            "free",
+            4
+          ],
+          [
+            "solid",
+            28
+          ],
+          [
+            "free",
+            8
+          ],
+          [
+            "solid",
+            54
+          ],
+          [
+            "free",
+            6
+          ],
+          [
+            "solid",
+            26
+          ],
+          [
+            "free",
+            6
+          ],
+          [
+            "solid",
+            26
+          ],
+          [
+            "free",
+            8
+          ],
+          [
+            "solid",
+            54
+          ],
+          [
+            "free",
+            6
+          ],
+          [
+            "solid",
+            26
+          ],
+          [
+            "free",
+            6
+          ],
+          [
+            "solid",
+            26
+          ],
+          [
+            "free",
+            8
+          ],
+          [
+            "solid",
+            54
+          ],
+          [
+            "free",
+            6
+          ],
+          [
+            "solid",
+            26
+          ],
+          [
+            "free",
+            6
+          ],
+          [
+            "solid",
+            26
+          ],
+          [
+            "free",
+            8
+          ],
+          [
+            "solid",
+            54
+          ],
+          [
+            "free",
+            6
+          ],
+          [
+            "solid",
+            26
+          ],
+          [
+            "free",
+            6
+          ],
+          [
+            "solid",
+            26
+          ],
+          [
+            "free",
+            8
+          ],
+          [
+            "solid",
+            54
+          ],
+          [
+            "free",
+            6
+          ],
+          [
+            "solid",
+            28
+          ],
+          [
+            "free",
+            6
+          ],
+          [
+            "solid",
+            24
+          ],
+          [
+            "free",
+            8
+          ],
+          [
+            "solid",
+            54
+          ],
+          [
+            "free",
+            6
+          ],
+          [
+            "solid",
+            28
+          ],
+          [
+            "free",
+            6
+          ],
+          [
+            "solid",
+            24
+          ],
+          [
+            "free",
+            8
+          ],
+          [
+            "solid",
+            54
+          ],
+          [
+            "free",
+            6
+          ],
+          [
+            "solid",
+            30
+          ],
+          [
+            "free",
+            8
+          ],
+          [
+            "solid",
+            20
+          ],
+          [
+            "free",
+            8
+          ],
+          [
+            "solid",
+            54
+          ],
+          [
+            "free",
+            6
+          ],
+          [
+            "solid",
+            30
+          ],
+          [
+            "free",
+            8
+          ],
+          [
+            "solid",
+            20
+          ],
+          [
+            "free",
+            8
+          ],
+          [
+            "solid",
+            54
+          ],
+          [
+            "free",
+            6
+          ],
+          [
+            "solid",
+            30
+          ],
+          [
+            "free",
+            12
+          ],
+          [
+            "solid",
+            16
+          ],
+          [
+            "free",
+            8
+          ],
+          [
+            "solid",
+            52
+          ],
+          [
+            "free",
+            8
+          ],
+          [
+            "solid",
+            30
+          ],
+          [
+            "free",
+            12
+          ],
+          [
+            "solid",
+            16
+          ],
+          [
+            "free",
+            8
+          ],
+          [
+            "solid",
+            52
+          ],
+          [
+            "free",
+            8
+          ],
+          [
+            "solid",
+            34
+          ],
+          [
+            "free",
+            12
+          ],
+          [
+            "solid",
+            12
+          ],
+          [
+            "free",
+            8
+          ],
+          [
+            "solid",
+            52
+          ],
+          [
+            "free",
+            8
+          ],
+          [
+            "solid",
+            34
+          ],
+          [
+            "free",
+            12
+          ],
+          [
+            "solid",
+            12
+          ],
+          [
+            "free",
+            8
+          ],
+          [
+            "solid",
+            52
+          ],
+          [
+            "free",
+            8
+          ],
+          [
+            "solid",
+            36
+          ],
+          [
+            "free",
+            12
+          ],
+          [
+            "solid",
+            10
+          ],
+          [
+            "free",
+            8
+          ],
+          [
+            "solid",
+            22
+          ],
+          [
+            "free",
+            6
+          ],
+          [
+            "solid",
+            24
+          ],
+          [
+            "free",
+            6
+          ],
+          [
+            "solid",
+            38
+          ],
+          [
+            "free",
+            12
+          ],
+          [
+            "solid",
+            10
+          ],
+          [
+            "free",
+            8
+          ],
+          [
+            "solid",
+            22
+          ],
+          [
+            "free",
+            6
+          ],
+          [
+            "solid",
+            24
+          ],
+          [
+            "free",
+            6
+          ],
+          [
+            "solid",
+            42
+          ],
+          [
+            "free",
+            12
+          ],
+          [
+            "solid",
+            4
+          ],
+          [
+            "free",
+            10
+          ],
+          [
+            "solid",
+            22
+          ],
+          [
+            "free",
+            6
+          ],
+          [
+            "solid",
+            24
+          ],
+          [
+            "free",
+            6
+          ],
+          [
+            "solid",
+            42
+          ],
+          [
+            "free",
+            12
+          ],
+          [
+            "solid",
+            4
+          ],
+          [
+            "free",
+            10
+          ],
+          [
+            "solid",
+            22
+          ],
+          [
+            "free",
+            6
+          ],
+          [
+            "solid",
+            24
+          ],
+          [
+            "free",
+            6
+          ],
+          [
+            "solid",
+            46
+          ],
+          [
+            "free",
+            22
+          ],
+          [
+            "solid",
+            8
+          ],
+          [
+            "free",
+            38
+          ],
+          [
+            "solid",
+            6
+          ],
+          [
+            "free",
+            6
+          ],
+          [
+            "solid",
+            46
+          ],
+          [
+            "free",
+            22
+          ],
+          [
+            "solid",
+            8
+          ],
+          [
+            "free",
+            38
+          ],
+          [
+            "solid",
+            6
+          ],
+          [
+            "free",
+            6
+          ],
+          [
+            "solid",
+            50
+          ],
+          [
+            "free",
+            18
+          ],
+          [
+            "solid",
+            8
+          ],
+          [
+            "free",
+            38
+          ],
+          [
+            "solid",
+            6
+          ],
+          [
+            "free",
+            6
+          ],
+          [
+            "solid",
+            50
+          ],
+          [
+            "free",
+            18
+          ],
+          [
+            "solid",
+            8
+          ],
+          [
+            "free",
+            38
+          ],
+          [
+            "solid",
+            6
+          ],
+          [
+            "free",
+            6
+          ],
+          [
+            "solid",
+            54
+          ],
+          [
+            "free",
+            14
+          ],
+          [
+            "solid",
+            20
+          ],
+          [
+            "free",
+            10
+          ],
+          [
+            "solid",
+            22
+          ],
+          [
+            "free",
+            6
+          ],
+          [
+            "solid",
+            54
+          ],
+          [
+            "free",
+            14
+          ],
+          [
+            "solid",
+            20
+          ],
+          [
+            "free",
+            10
+          ],
+          [
+            "solid",
+            22
+          ],
+          [
+            "free",
+            6
+          ],
+          [
+            "solid",
+            52
           ],
           [
             "free",
@@ -77255,7 +78019,23 @@
           ],
           [
             "solid",
-            44
+            22
+          ],
+          [
+            "free",
+            6
+          ],
+          [
+            "solid",
+            24
+          ],
+          [
+            "free",
+            6
+          ],
+          [
+            "solid",
+            52
           ],
           [
             "free",
@@ -77263,15 +78043,7 @@
           ],
           [
             "solid",
-            44
-          ],
-          [
-            "free",
-            9
-          ],
-          [
-            "solid",
-            1
+            22
           ],
           [
             "free",
@@ -77279,39 +78051,7 @@
           ],
           [
             "solid",
-            44
-          ],
-          [
-            "free",
-            1
-          ],
-          [
-            "solid",
-            1
-          ],
-          [
-            "free",
-            1
-          ],
-          [
-            "solid",
-            2
-          ],
-          [
-            "free",
-            1
-          ],
-          [
-            "solid",
-            2
-          ],
-          [
-            "free",
-            1
-          ],
-          [
-            "solid",
-            1
+            24
           ],
           [
             "free",
@@ -77319,81 +78059,353 @@
           ],
           [
             "solid",
-            82
+            50
+          ],
+          [
+            "free",
+            20
+          ],
+          [
+            "solid",
+            20
+          ],
+          [
+            "free",
+            6
+          ],
+          [
+            "solid",
+            22
+          ],
+          [
+            "free",
+            8
+          ],
+          [
+            "solid",
+            50
+          ],
+          [
+            "free",
+            20
+          ],
+          [
+            "solid",
+            20
+          ],
+          [
+            "free",
+            6
+          ],
+          [
+            "solid",
+            22
+          ],
+          [
+            "free",
+            8
+          ],
+          [
+            "solid",
+            50
+          ],
+          [
+            "free",
+            20
+          ],
+          [
+            "solid",
+            20
+          ],
+          [
+            "free",
+            6
+          ],
+          [
+            "solid",
+            22
+          ],
+          [
+            "free",
+            8
+          ],
+          [
+            "solid",
+            50
+          ],
+          [
+            "free",
+            20
+          ],
+          [
+            "solid",
+            20
+          ],
+          [
+            "free",
+            6
+          ],
+          [
+            "solid",
+            22
+          ],
+          [
+            "free",
+            8
+          ],
+          [
+            "solid",
+            48
+          ],
+          [
+            "free",
+            78
+          ],
+          [
+            "solid",
+            48
+          ],
+          [
+            "free",
+            78
+          ],
+          [
+            "solid",
+            18
+          ],
+          [
+            "free",
+            112
+          ],
+          [
+            "solid",
+            14
+          ],
+          [
+            "free",
+            112
+          ],
+          [
+            "solid",
+            14
+          ],
+          [
+            "free",
+            112
+          ],
+          [
+            "solid",
+            14
+          ],
+          [
+            "free",
+            112
+          ],
+          [
+            "solid",
+            14
+          ],
+          [
+            "free",
+            112
+          ],
+          [
+            "solid",
+            14
+          ],
+          [
+            "free",
+            112
+          ],
+          [
+            "solid",
+            14
+          ],
+          [
+            "free",
+            64
+          ],
+          [
+            "solid",
+            4
+          ],
+          [
+            "free",
+            8
+          ],
+          [
+            "solid",
+            18
+          ],
+          [
+            "free",
+            18
+          ],
+          [
+            "solid",
+            14
+          ],
+          [
+            "free",
+            64
+          ],
+          [
+            "solid",
+            4
+          ],
+          [
+            "free",
+            8
+          ],
+          [
+            "solid",
+            18
+          ],
+          [
+            "free",
+            18
+          ],
+          [
+            "solid",
+            14
+          ],
+          [
+            "free",
+            44
+          ],
+          [
+            "solid",
+            56
+          ],
+          [
+            "free",
+            12
+          ],
+          [
+            "solid",
+            14
+          ],
+          [
+            "free",
+            44
+          ],
+          [
+            "solid",
+            56
+          ],
+          [
+            "free",
+            12
+          ],
+          [
+            "solid",
+            52
+          ],
+          [
+            "free",
+            2
+          ],
+          [
+            "solid",
+            124
+          ],
+          [
+            "free",
+            2
+          ],
+          [
+            "solid",
+            1836
           ]
         ]
       },
       "collisions": {
         "encoding": "rle-v1",
-        "length": 2400,
+        "length": 10836,
         "runs": [
           [
             "solid",
-            485
+            60
           ],
           [
             "free",
-            16
+            10
           ],
           [
             "solid",
-            18
+            116
           ],
           [
             "free",
-            18
+            10
           ],
           [
             "solid",
+            116
+          ],
+          [
+            "free",
+            10
+          ],
+          [
+            "solid",
+            116
+          ],
+          [
+            "free",
+            10
+          ],
+          [
+            "solid",
+            116
+          ],
+          [
+            "free",
+            10
+          ],
+          [
+            "solid",
+            116
+          ],
+          [
+            "free",
+            10
+          ],
+          [
+            "solid",
+            116
+          ],
+          [
+            "free",
             8
           ],
           [
-            "free",
-            16
-          ],
-          [
             "solid",
-            18
+            118
           ],
           [
             "free",
-            18
-          ],
-          [
-            "solid",
             8
           ],
           [
-            "free",
-            52
+            "solid",
+            118
           ],
           [
-            "solid",
+            "free",
             8
           ],
           [
-            "free",
-            52
+            "solid",
+            118
           ],
           [
-            "solid",
+            "free",
             8
           ],
           [
-            "free",
-            52
-          ],
-          [
             "solid",
-            9
-          ],
-          [
-            "free",
-            34
-          ],
-          [
-            "solid",
-            13
+            74
           ],
           [
             "free",
@@ -77401,15 +78413,15 @@
           ],
           [
             "solid",
-            17
+            40
           ],
           [
             "free",
-            26
+            10
           ],
           [
             "solid",
-            13
+            72
           ],
           [
             "free",
@@ -77417,15 +78429,15 @@
           ],
           [
             "solid",
-            17
+            40
           ],
           [
             "free",
-            26
+            10
           ],
           [
             "solid",
-            13
+            72
           ],
           [
             "free",
@@ -77433,207 +78445,23 @@
           ],
           [
             "solid",
-            17
+            40
           ],
           [
             "free",
-            26
+            10
           ],
           [
             "solid",
-            13
-          ],
-          [
-            "free",
-            3
-          ],
-          [
-            "solid",
-            18
-          ],
-          [
-            "free",
-            26
-          ],
-          [
-            "solid",
-            13
-          ],
-          [
-            "free",
-            3
-          ],
-          [
-            "solid",
-            18
-          ],
-          [
-            "free",
-            26
-          ],
-          [
-            "solid",
-            13
-          ],
-          [
-            "free",
-            3
-          ],
-          [
-            "solid",
-            18
-          ],
-          [
-            "free",
-            26
-          ],
-          [
-            "solid",
-            13
-          ],
-          [
-            "free",
-            3
-          ],
-          [
-            "solid",
-            18
-          ],
-          [
-            "free",
-            26
-          ],
-          [
-            "solid",
-            6
-          ],
-          [
-            "free",
-            3
-          ],
-          [
-            "solid",
-            4
-          ],
-          [
-            "free",
-            3
-          ],
-          [
-            "solid",
-            18
-          ],
-          [
-            "free",
             42
           ],
           [
-            "solid",
-            12
-          ],
-          [
             "free",
-            48
+            6
           ],
           [
             "solid",
-            12
-          ],
-          [
-            "free",
-            48
-          ],
-          [
-            "solid",
-            12
-          ],
-          [
-            "free",
-            48
-          ],
-          [
-            "solid",
-            12
-          ],
-          [
-            "free",
-            48
-          ],
-          [
-            "solid",
-            12
-          ],
-          [
-            "free",
-            48
-          ],
-          [
-            "solid",
-            15
-          ],
-          [
-            "free",
-            45
-          ],
-          [
-            "solid",
-            12
-          ],
-          [
-            "free",
-            20
-          ],
-          [
-            "solid",
-            2
-          ],
-          [
-            "free",
-            1
-          ],
-          [
-            "solid",
-            2
-          ],
-          [
-            "free",
-            23
-          ],
-          [
-            "solid",
-            12
-          ],
-          [
-            "free",
-            20
-          ],
-          [
-            "solid",
-            1
-          ],
-          [
-            "free",
-            27
-          ],
-          [
-            "solid",
-            12
-          ],
-          [
-            "free",
-            19
-          ],
-          [
-            "solid",
-            1
-          ],
-          [
-            "free",
-            28
-          ],
-          [
-            "solid",
-            27
+            24
           ],
           [
             "free",
@@ -77641,7 +78469,7 @@
           ],
           [
             "solid",
-            1
+            40
           ],
           [
             "free",
@@ -77649,15 +78477,23 @@
           ],
           [
             "solid",
-            44
+            42
           ],
           [
             "free",
-            5
+            6
           ],
           [
             "solid",
-            1
+            22
+          ],
+          [
+            "free",
+            12
+          ],
+          [
+            "solid",
+            34
           ],
           [
             "free",
@@ -77665,39 +78501,87 @@
           ],
           [
             "solid",
-            44
+            40
           ],
           [
             "free",
-            5
+            10
           ],
           [
             "solid",
-            1
+            20
           ],
           [
             "free",
-            3
+            12
           ],
           [
             "solid",
-            1
+            34
           ],
           [
             "free",
-            5
+            10
           ],
           [
             "solid",
-            45
+            40
           ],
           [
             "free",
-            9
+            10
           ],
           [
             "solid",
-            1
+            20
+          ],
+          [
+            "free",
+            14
+          ],
+          [
+            "solid",
+            32
+          ],
+          [
+            "free",
+            10
+          ],
+          [
+            "solid",
+            40
+          ],
+          [
+            "free",
+            12
+          ],
+          [
+            "solid",
+            18
+          ],
+          [
+            "free",
+            14
+          ],
+          [
+            "solid",
+            32
+          ],
+          [
+            "free",
+            10
+          ],
+          [
+            "solid",
+            40
+          ],
+          [
+            "free",
+            12
+          ],
+          [
+            "solid",
+            26
           ],
           [
             "free",
@@ -77705,7 +78589,847 @@
           ],
           [
             "solid",
+            32
+          ],
+          [
+            "free",
+            8
+          ],
+          [
+            "solid",
             44
+          ],
+          [
+            "free",
+            10
+          ],
+          [
+            "solid",
+            26
+          ],
+          [
+            "free",
+            6
+          ],
+          [
+            "solid",
+            32
+          ],
+          [
+            "free",
+            8
+          ],
+          [
+            "solid",
+            44
+          ],
+          [
+            "free",
+            10
+          ],
+          [
+            "solid",
+            26
+          ],
+          [
+            "free",
+            6
+          ],
+          [
+            "solid",
+            32
+          ],
+          [
+            "free",
+            8
+          ],
+          [
+            "solid",
+            48
+          ],
+          [
+            "free",
+            6
+          ],
+          [
+            "solid",
+            26
+          ],
+          [
+            "free",
+            6
+          ],
+          [
+            "solid",
+            32
+          ],
+          [
+            "free",
+            8
+          ],
+          [
+            "solid",
+            48
+          ],
+          [
+            "free",
+            6
+          ],
+          [
+            "solid",
+            26
+          ],
+          [
+            "free",
+            6
+          ],
+          [
+            "solid",
+            30
+          ],
+          [
+            "free",
+            8
+          ],
+          [
+            "solid",
+            50
+          ],
+          [
+            "free",
+            6
+          ],
+          [
+            "solid",
+            26
+          ],
+          [
+            "free",
+            6
+          ],
+          [
+            "solid",
+            30
+          ],
+          [
+            "free",
+            8
+          ],
+          [
+            "solid",
+            50
+          ],
+          [
+            "free",
+            6
+          ],
+          [
+            "solid",
+            28
+          ],
+          [
+            "free",
+            4
+          ],
+          [
+            "solid",
+            30
+          ],
+          [
+            "free",
+            8
+          ],
+          [
+            "solid",
+            52
+          ],
+          [
+            "free",
+            6
+          ],
+          [
+            "solid",
+            26
+          ],
+          [
+            "free",
+            4
+          ],
+          [
+            "solid",
+            30
+          ],
+          [
+            "free",
+            8
+          ],
+          [
+            "solid",
+            52
+          ],
+          [
+            "free",
+            6
+          ],
+          [
+            "solid",
+            26
+          ],
+          [
+            "free",
+            4
+          ],
+          [
+            "solid",
+            30
+          ],
+          [
+            "free",
+            6
+          ],
+          [
+            "solid",
+            54
+          ],
+          [
+            "free",
+            6
+          ],
+          [
+            "solid",
+            26
+          ],
+          [
+            "free",
+            4
+          ],
+          [
+            "solid",
+            30
+          ],
+          [
+            "free",
+            6
+          ],
+          [
+            "solid",
+            54
+          ],
+          [
+            "free",
+            6
+          ],
+          [
+            "solid",
+            26
+          ],
+          [
+            "free",
+            4
+          ],
+          [
+            "solid",
+            28
+          ],
+          [
+            "free",
+            8
+          ],
+          [
+            "solid",
+            54
+          ],
+          [
+            "free",
+            6
+          ],
+          [
+            "solid",
+            26
+          ],
+          [
+            "free",
+            4
+          ],
+          [
+            "solid",
+            28
+          ],
+          [
+            "free",
+            8
+          ],
+          [
+            "solid",
+            54
+          ],
+          [
+            "free",
+            6
+          ],
+          [
+            "solid",
+            26
+          ],
+          [
+            "free",
+            6
+          ],
+          [
+            "solid",
+            26
+          ],
+          [
+            "free",
+            8
+          ],
+          [
+            "solid",
+            54
+          ],
+          [
+            "free",
+            6
+          ],
+          [
+            "solid",
+            26
+          ],
+          [
+            "free",
+            6
+          ],
+          [
+            "solid",
+            26
+          ],
+          [
+            "free",
+            8
+          ],
+          [
+            "solid",
+            54
+          ],
+          [
+            "free",
+            6
+          ],
+          [
+            "solid",
+            26
+          ],
+          [
+            "free",
+            6
+          ],
+          [
+            "solid",
+            26
+          ],
+          [
+            "free",
+            8
+          ],
+          [
+            "solid",
+            54
+          ],
+          [
+            "free",
+            6
+          ],
+          [
+            "solid",
+            26
+          ],
+          [
+            "free",
+            6
+          ],
+          [
+            "solid",
+            26
+          ],
+          [
+            "free",
+            8
+          ],
+          [
+            "solid",
+            54
+          ],
+          [
+            "free",
+            6
+          ],
+          [
+            "solid",
+            28
+          ],
+          [
+            "free",
+            6
+          ],
+          [
+            "solid",
+            24
+          ],
+          [
+            "free",
+            8
+          ],
+          [
+            "solid",
+            54
+          ],
+          [
+            "free",
+            6
+          ],
+          [
+            "solid",
+            28
+          ],
+          [
+            "free",
+            6
+          ],
+          [
+            "solid",
+            24
+          ],
+          [
+            "free",
+            8
+          ],
+          [
+            "solid",
+            54
+          ],
+          [
+            "free",
+            6
+          ],
+          [
+            "solid",
+            30
+          ],
+          [
+            "free",
+            8
+          ],
+          [
+            "solid",
+            20
+          ],
+          [
+            "free",
+            8
+          ],
+          [
+            "solid",
+            54
+          ],
+          [
+            "free",
+            6
+          ],
+          [
+            "solid",
+            30
+          ],
+          [
+            "free",
+            8
+          ],
+          [
+            "solid",
+            20
+          ],
+          [
+            "free",
+            8
+          ],
+          [
+            "solid",
+            54
+          ],
+          [
+            "free",
+            6
+          ],
+          [
+            "solid",
+            30
+          ],
+          [
+            "free",
+            12
+          ],
+          [
+            "solid",
+            16
+          ],
+          [
+            "free",
+            8
+          ],
+          [
+            "solid",
+            52
+          ],
+          [
+            "free",
+            8
+          ],
+          [
+            "solid",
+            30
+          ],
+          [
+            "free",
+            12
+          ],
+          [
+            "solid",
+            16
+          ],
+          [
+            "free",
+            8
+          ],
+          [
+            "solid",
+            52
+          ],
+          [
+            "free",
+            8
+          ],
+          [
+            "solid",
+            34
+          ],
+          [
+            "free",
+            12
+          ],
+          [
+            "solid",
+            12
+          ],
+          [
+            "free",
+            8
+          ],
+          [
+            "solid",
+            52
+          ],
+          [
+            "free",
+            8
+          ],
+          [
+            "solid",
+            34
+          ],
+          [
+            "free",
+            12
+          ],
+          [
+            "solid",
+            12
+          ],
+          [
+            "free",
+            8
+          ],
+          [
+            "solid",
+            52
+          ],
+          [
+            "free",
+            8
+          ],
+          [
+            "solid",
+            36
+          ],
+          [
+            "free",
+            12
+          ],
+          [
+            "solid",
+            10
+          ],
+          [
+            "free",
+            8
+          ],
+          [
+            "solid",
+            22
+          ],
+          [
+            "free",
+            6
+          ],
+          [
+            "solid",
+            24
+          ],
+          [
+            "free",
+            6
+          ],
+          [
+            "solid",
+            38
+          ],
+          [
+            "free",
+            12
+          ],
+          [
+            "solid",
+            10
+          ],
+          [
+            "free",
+            8
+          ],
+          [
+            "solid",
+            22
+          ],
+          [
+            "free",
+            6
+          ],
+          [
+            "solid",
+            24
+          ],
+          [
+            "free",
+            6
+          ],
+          [
+            "solid",
+            42
+          ],
+          [
+            "free",
+            12
+          ],
+          [
+            "solid",
+            4
+          ],
+          [
+            "free",
+            10
+          ],
+          [
+            "solid",
+            22
+          ],
+          [
+            "free",
+            6
+          ],
+          [
+            "solid",
+            24
+          ],
+          [
+            "free",
+            6
+          ],
+          [
+            "solid",
+            42
+          ],
+          [
+            "free",
+            12
+          ],
+          [
+            "solid",
+            4
+          ],
+          [
+            "free",
+            10
+          ],
+          [
+            "solid",
+            22
+          ],
+          [
+            "free",
+            6
+          ],
+          [
+            "solid",
+            24
+          ],
+          [
+            "free",
+            6
+          ],
+          [
+            "solid",
+            46
+          ],
+          [
+            "free",
+            22
+          ],
+          [
+            "solid",
+            8
+          ],
+          [
+            "free",
+            38
+          ],
+          [
+            "solid",
+            6
+          ],
+          [
+            "free",
+            6
+          ],
+          [
+            "solid",
+            46
+          ],
+          [
+            "free",
+            22
+          ],
+          [
+            "solid",
+            8
+          ],
+          [
+            "free",
+            38
+          ],
+          [
+            "solid",
+            6
+          ],
+          [
+            "free",
+            6
+          ],
+          [
+            "solid",
+            50
+          ],
+          [
+            "free",
+            18
+          ],
+          [
+            "solid",
+            8
+          ],
+          [
+            "free",
+            38
+          ],
+          [
+            "solid",
+            6
+          ],
+          [
+            "free",
+            6
+          ],
+          [
+            "solid",
+            50
+          ],
+          [
+            "free",
+            18
+          ],
+          [
+            "solid",
+            8
+          ],
+          [
+            "free",
+            38
+          ],
+          [
+            "solid",
+            6
+          ],
+          [
+            "free",
+            6
+          ],
+          [
+            "solid",
+            54
+          ],
+          [
+            "free",
+            14
+          ],
+          [
+            "solid",
+            20
+          ],
+          [
+            "free",
+            10
+          ],
+          [
+            "solid",
+            22
+          ],
+          [
+            "free",
+            6
+          ],
+          [
+            "solid",
+            54
+          ],
+          [
+            "free",
+            14
+          ],
+          [
+            "solid",
+            20
+          ],
+          [
+            "free",
+            10
+          ],
+          [
+            "solid",
+            22
+          ],
+          [
+            "free",
+            6
+          ],
+          [
+            "solid",
+            52
           ],
           [
             "free",
@@ -77713,7 +79437,23 @@
           ],
           [
             "solid",
-            44
+            22
+          ],
+          [
+            "free",
+            6
+          ],
+          [
+            "solid",
+            24
+          ],
+          [
+            "free",
+            6
+          ],
+          [
+            "solid",
+            52
           ],
           [
             "free",
@@ -77721,15 +79461,7 @@
           ],
           [
             "solid",
-            44
-          ],
-          [
-            "free",
-            9
-          ],
-          [
-            "solid",
-            1
+            22
           ],
           [
             "free",
@@ -77737,39 +79469,7 @@
           ],
           [
             "solid",
-            44
-          ],
-          [
-            "free",
-            1
-          ],
-          [
-            "solid",
-            1
-          ],
-          [
-            "free",
-            1
-          ],
-          [
-            "solid",
-            2
-          ],
-          [
-            "free",
-            1
-          ],
-          [
-            "solid",
-            2
-          ],
-          [
-            "free",
-            1
-          ],
-          [
-            "solid",
-            1
+            24
           ],
           [
             "free",
@@ -77777,7 +79477,263 @@
           ],
           [
             "solid",
-            82
+            50
+          ],
+          [
+            "free",
+            20
+          ],
+          [
+            "solid",
+            20
+          ],
+          [
+            "free",
+            6
+          ],
+          [
+            "solid",
+            22
+          ],
+          [
+            "free",
+            8
+          ],
+          [
+            "solid",
+            50
+          ],
+          [
+            "free",
+            20
+          ],
+          [
+            "solid",
+            20
+          ],
+          [
+            "free",
+            6
+          ],
+          [
+            "solid",
+            22
+          ],
+          [
+            "free",
+            8
+          ],
+          [
+            "solid",
+            50
+          ],
+          [
+            "free",
+            20
+          ],
+          [
+            "solid",
+            20
+          ],
+          [
+            "free",
+            6
+          ],
+          [
+            "solid",
+            22
+          ],
+          [
+            "free",
+            8
+          ],
+          [
+            "solid",
+            50
+          ],
+          [
+            "free",
+            20
+          ],
+          [
+            "solid",
+            20
+          ],
+          [
+            "free",
+            6
+          ],
+          [
+            "solid",
+            22
+          ],
+          [
+            "free",
+            8
+          ],
+          [
+            "solid",
+            48
+          ],
+          [
+            "free",
+            78
+          ],
+          [
+            "solid",
+            48
+          ],
+          [
+            "free",
+            78
+          ],
+          [
+            "solid",
+            18
+          ],
+          [
+            "free",
+            112
+          ],
+          [
+            "solid",
+            14
+          ],
+          [
+            "free",
+            112
+          ],
+          [
+            "solid",
+            14
+          ],
+          [
+            "free",
+            112
+          ],
+          [
+            "solid",
+            14
+          ],
+          [
+            "free",
+            112
+          ],
+          [
+            "solid",
+            14
+          ],
+          [
+            "free",
+            112
+          ],
+          [
+            "solid",
+            14
+          ],
+          [
+            "free",
+            112
+          ],
+          [
+            "solid",
+            14
+          ],
+          [
+            "free",
+            64
+          ],
+          [
+            "solid",
+            4
+          ],
+          [
+            "free",
+            8
+          ],
+          [
+            "solid",
+            18
+          ],
+          [
+            "free",
+            18
+          ],
+          [
+            "solid",
+            14
+          ],
+          [
+            "free",
+            64
+          ],
+          [
+            "solid",
+            4
+          ],
+          [
+            "free",
+            8
+          ],
+          [
+            "solid",
+            18
+          ],
+          [
+            "free",
+            18
+          ],
+          [
+            "solid",
+            14
+          ],
+          [
+            "free",
+            44
+          ],
+          [
+            "solid",
+            56
+          ],
+          [
+            "free",
+            12
+          ],
+          [
+            "solid",
+            14
+          ],
+          [
+            "free",
+            44
+          ],
+          [
+            "solid",
+            56
+          ],
+          [
+            "free",
+            12
+          ],
+          [
+            "solid",
+            52
+          ],
+          [
+            "free",
+            2
+          ],
+          [
+            "solid",
+            124
+          ],
+          [
+            "free",
+            2
+          ],
+          [
+            "solid",
+            1836
           ]
         ]
       },
@@ -77787,7 +79743,7 @@
       "gbStudioName": "03 · Porto da Enseada",
       "gbStudioSceneID": "94c18861-b352-4f49-a64d-52f2e3415077",
       "gbStudioUseBackgroundLayout": true,
-      "height": 40,
+      "height": 86,
       "id": "scene-porto_lumen",
       "music": "farol_enseada",
       "name": "porto_lumen",
@@ -77803,35 +79759,35 @@
       "sceneType": "topdown",
       "tilemap": {
         "encoding": "rle-v1",
-        "length": 2400,
+        "length": 10836,
         "runs": [
           [
             0,
-            2400
+            10836
           ]
         ]
       },
-      "width": 60,
+      "width": 126,
       "tileLayers": [
         {
           "mapping": "BG3",
           "tilemap": {
             "encoding": "rle-v1",
-            "length": 2400,
+            "length": 10836,
             "runs": [
               [
                 -1,
-                2400
+                10836
               ]
             ]
           },
           "tileSourceAssetNames": {
             "encoding": "rle-v1",
-            "length": 2400,
+            "length": 10836,
             "runs": [
               [
                 "",
-                2400
+                10836
               ]
             ]
           }
@@ -77840,101 +79796,21 @@
           "mapping": "BG2",
           "tilemap": {
             "encoding": "rle-v1",
-            "length": 2400,
+            "length": 10836,
             "runs": [
               [
-                -1,
-                979
-              ],
-              [
-                1,
-                1
-              ],
-              [
-                -1,
-                61
-              ],
-              [
-                1,
-                1
-              ],
-              [
-                -1,
-                117
-              ],
-              [
-                1,
-                1
-              ],
-              [
-                -1,
-                1192
-              ],
-              [
-                1,
-                1
-              ],
-              [
-                -1,
-                2
-              ],
-              [
-                1,
-                1
-              ],
-              [
-                -1,
-                44
+                0,
+                10836
               ]
             ]
           },
           "tileSourceAssetNames": {
             "encoding": "rle-v1",
-            "length": 2400,
+            "length": 10836,
             "runs": [
               [
                 "",
-                979
-              ],
-              [
-                "porto-lume-exterior-topdown-gba.png",
-                1
-              ],
-              [
-                "",
-                61
-              ],
-              [
-                "porto-lume-exterior-topdown-gba.png",
-                1
-              ],
-              [
-                "",
-                117
-              ],
-              [
-                "porto-lume-exterior-topdown-gba.png",
-                1
-              ],
-              [
-                "",
-                1192
-              ],
-              [
-                "porto-lume-exterior-topdown-gba.png",
-                1
-              ],
-              [
-                "",
-                2
-              ],
-              [
-                "porto-lume-exterior-topdown-gba.png",
-                1
-              ],
-              [
-                "",
-                44
+                10836
               ]
             ]
           }
@@ -77943,21 +79819,21 @@
           "mapping": "BG1",
           "tilemap": {
             "encoding": "rle-v1",
-            "length": 2400,
+            "length": 10836,
             "runs": [
               [
                 -1,
-                2400
+                10836
               ]
             ]
           },
           "tileSourceAssetNames": {
             "encoding": "rle-v1",
-            "length": 2400,
+            "length": 10836,
             "runs": [
               [
                 "",
-                2400
+                10836
               ]
             ]
           }
@@ -77966,21 +79842,21 @@
           "mapping": "BG0",
           "tilemap": {
             "encoding": "rle-v1",
-            "length": 2400,
+            "length": 10836,
             "runs": [
               [
                 -1,
-                2400
+                10836
               ]
             ]
           },
           "tileSourceAssetNames": {
             "encoding": "rle-v1",
-            "length": 2400,
+            "length": 10836,
             "runs": [
               [
                 "",
-                2400
+                10836
               ]
             ]
           }
@@ -77990,7 +79866,7 @@
         "type": "topdown",
         "config": {
           "presentation": "topdown",
-          "profile": "port-lumen-topdown-v1",
+          "profile": "port-lumen-paged-topdown-v2",
           "modules": [
             {
               "id": "movement",
@@ -93580,87 +95456,103 @@
       }
     },
     {
-      "backgroundAssetName": "porto-lume-exterior-topdown-gba.png",
+      "backgroundAssetName": "porto-lumen-continuous-paged.png",
       "backgroundRenderMode": "tilemap",
       "cameraBounds": {
         "x": 0,
         "y": 0,
-        "width": 60,
-        "height": 40
+        "width": 126,
+        "height": 86
       },
       "cameraMode": "follow_player",
       "cameraZoom": 100,
       "collisionTypes": {
         "encoding": "rle-v1",
-        "length": 2400,
+        "length": 10836,
         "runs": [
           [
             "solid",
-            485
+            60
           ],
           [
             "free",
-            16
+            10
           ],
           [
             "solid",
-            18
+            116
           ],
           [
             "free",
-            18
+            10
           ],
           [
             "solid",
+            116
+          ],
+          [
+            "free",
+            10
+          ],
+          [
+            "solid",
+            116
+          ],
+          [
+            "free",
+            10
+          ],
+          [
+            "solid",
+            116
+          ],
+          [
+            "free",
+            10
+          ],
+          [
+            "solid",
+            116
+          ],
+          [
+            "free",
+            10
+          ],
+          [
+            "solid",
+            116
+          ],
+          [
+            "free",
             8
           ],
           [
-            "free",
-            16
-          ],
-          [
             "solid",
-            18
+            118
           ],
           [
             "free",
-            18
-          ],
-          [
-            "solid",
             8
           ],
           [
-            "free",
-            52
+            "solid",
+            118
           ],
           [
-            "solid",
+            "free",
             8
           ],
           [
-            "free",
-            52
+            "solid",
+            118
           ],
           [
-            "solid",
+            "free",
             8
           ],
           [
-            "free",
-            52
-          ],
-          [
             "solid",
-            9
-          ],
-          [
-            "free",
-            34
-          ],
-          [
-            "solid",
-            13
+            74
           ],
           [
             "free",
@@ -93668,15 +95560,15 @@
           ],
           [
             "solid",
-            17
+            40
           ],
           [
             "free",
-            26
+            10
           ],
           [
             "solid",
-            13
+            72
           ],
           [
             "free",
@@ -93684,15 +95576,15 @@
           ],
           [
             "solid",
-            17
+            40
           ],
           [
             "free",
-            26
+            10
           ],
           [
             "solid",
-            13
+            72
           ],
           [
             "free",
@@ -93700,207 +95592,23 @@
           ],
           [
             "solid",
-            17
+            40
           ],
           [
             "free",
-            26
+            10
           ],
           [
             "solid",
-            13
-          ],
-          [
-            "free",
-            3
-          ],
-          [
-            "solid",
-            18
-          ],
-          [
-            "free",
-            26
-          ],
-          [
-            "solid",
-            13
-          ],
-          [
-            "free",
-            3
-          ],
-          [
-            "solid",
-            18
-          ],
-          [
-            "free",
-            26
-          ],
-          [
-            "solid",
-            13
-          ],
-          [
-            "free",
-            3
-          ],
-          [
-            "solid",
-            18
-          ],
-          [
-            "free",
-            26
-          ],
-          [
-            "solid",
-            13
-          ],
-          [
-            "free",
-            3
-          ],
-          [
-            "solid",
-            18
-          ],
-          [
-            "free",
-            26
-          ],
-          [
-            "solid",
-            6
-          ],
-          [
-            "free",
-            3
-          ],
-          [
-            "solid",
-            4
-          ],
-          [
-            "free",
-            3
-          ],
-          [
-            "solid",
-            18
-          ],
-          [
-            "free",
             42
           ],
           [
-            "solid",
-            12
-          ],
-          [
             "free",
-            48
+            6
           ],
           [
             "solid",
-            12
-          ],
-          [
-            "free",
-            48
-          ],
-          [
-            "solid",
-            12
-          ],
-          [
-            "free",
-            48
-          ],
-          [
-            "solid",
-            12
-          ],
-          [
-            "free",
-            48
-          ],
-          [
-            "solid",
-            12
-          ],
-          [
-            "free",
-            48
-          ],
-          [
-            "solid",
-            15
-          ],
-          [
-            "free",
-            45
-          ],
-          [
-            "solid",
-            12
-          ],
-          [
-            "free",
-            20
-          ],
-          [
-            "solid",
-            2
-          ],
-          [
-            "free",
-            1
-          ],
-          [
-            "solid",
-            2
-          ],
-          [
-            "free",
-            23
-          ],
-          [
-            "solid",
-            12
-          ],
-          [
-            "free",
-            20
-          ],
-          [
-            "solid",
-            1
-          ],
-          [
-            "free",
-            27
-          ],
-          [
-            "solid",
-            12
-          ],
-          [
-            "free",
-            19
-          ],
-          [
-            "solid",
-            1
-          ],
-          [
-            "free",
-            28
-          ],
-          [
-            "solid",
-            27
+            24
           ],
           [
             "free",
@@ -93908,7 +95616,7 @@
           ],
           [
             "solid",
-            1
+            40
           ],
           [
             "free",
@@ -93916,15 +95624,23 @@
           ],
           [
             "solid",
-            44
+            42
           ],
           [
             "free",
-            5
+            6
           ],
           [
             "solid",
-            1
+            22
+          ],
+          [
+            "free",
+            12
+          ],
+          [
+            "solid",
+            34
           ],
           [
             "free",
@@ -93932,39 +95648,87 @@
           ],
           [
             "solid",
-            44
+            40
           ],
           [
             "free",
-            5
+            10
           ],
           [
             "solid",
-            1
+            20
           ],
           [
             "free",
-            3
+            12
           ],
           [
             "solid",
-            1
+            34
           ],
           [
             "free",
-            5
+            10
           ],
           [
             "solid",
-            45
+            40
           ],
           [
             "free",
-            9
+            10
           ],
           [
             "solid",
-            1
+            20
+          ],
+          [
+            "free",
+            14
+          ],
+          [
+            "solid",
+            32
+          ],
+          [
+            "free",
+            10
+          ],
+          [
+            "solid",
+            40
+          ],
+          [
+            "free",
+            12
+          ],
+          [
+            "solid",
+            18
+          ],
+          [
+            "free",
+            14
+          ],
+          [
+            "solid",
+            32
+          ],
+          [
+            "free",
+            10
+          ],
+          [
+            "solid",
+            40
+          ],
+          [
+            "free",
+            12
+          ],
+          [
+            "solid",
+            26
           ],
           [
             "free",
@@ -93972,7 +95736,847 @@
           ],
           [
             "solid",
+            32
+          ],
+          [
+            "free",
+            8
+          ],
+          [
+            "solid",
             44
+          ],
+          [
+            "free",
+            10
+          ],
+          [
+            "solid",
+            26
+          ],
+          [
+            "free",
+            6
+          ],
+          [
+            "solid",
+            32
+          ],
+          [
+            "free",
+            8
+          ],
+          [
+            "solid",
+            44
+          ],
+          [
+            "free",
+            10
+          ],
+          [
+            "solid",
+            26
+          ],
+          [
+            "free",
+            6
+          ],
+          [
+            "solid",
+            32
+          ],
+          [
+            "free",
+            8
+          ],
+          [
+            "solid",
+            48
+          ],
+          [
+            "free",
+            6
+          ],
+          [
+            "solid",
+            26
+          ],
+          [
+            "free",
+            6
+          ],
+          [
+            "solid",
+            32
+          ],
+          [
+            "free",
+            8
+          ],
+          [
+            "solid",
+            48
+          ],
+          [
+            "free",
+            6
+          ],
+          [
+            "solid",
+            26
+          ],
+          [
+            "free",
+            6
+          ],
+          [
+            "solid",
+            30
+          ],
+          [
+            "free",
+            8
+          ],
+          [
+            "solid",
+            50
+          ],
+          [
+            "free",
+            6
+          ],
+          [
+            "solid",
+            26
+          ],
+          [
+            "free",
+            6
+          ],
+          [
+            "solid",
+            30
+          ],
+          [
+            "free",
+            8
+          ],
+          [
+            "solid",
+            50
+          ],
+          [
+            "free",
+            6
+          ],
+          [
+            "solid",
+            28
+          ],
+          [
+            "free",
+            4
+          ],
+          [
+            "solid",
+            30
+          ],
+          [
+            "free",
+            8
+          ],
+          [
+            "solid",
+            52
+          ],
+          [
+            "free",
+            6
+          ],
+          [
+            "solid",
+            26
+          ],
+          [
+            "free",
+            4
+          ],
+          [
+            "solid",
+            30
+          ],
+          [
+            "free",
+            8
+          ],
+          [
+            "solid",
+            52
+          ],
+          [
+            "free",
+            6
+          ],
+          [
+            "solid",
+            26
+          ],
+          [
+            "free",
+            4
+          ],
+          [
+            "solid",
+            30
+          ],
+          [
+            "free",
+            6
+          ],
+          [
+            "solid",
+            54
+          ],
+          [
+            "free",
+            6
+          ],
+          [
+            "solid",
+            26
+          ],
+          [
+            "free",
+            4
+          ],
+          [
+            "solid",
+            30
+          ],
+          [
+            "free",
+            6
+          ],
+          [
+            "solid",
+            54
+          ],
+          [
+            "free",
+            6
+          ],
+          [
+            "solid",
+            26
+          ],
+          [
+            "free",
+            4
+          ],
+          [
+            "solid",
+            28
+          ],
+          [
+            "free",
+            8
+          ],
+          [
+            "solid",
+            54
+          ],
+          [
+            "free",
+            6
+          ],
+          [
+            "solid",
+            26
+          ],
+          [
+            "free",
+            4
+          ],
+          [
+            "solid",
+            28
+          ],
+          [
+            "free",
+            8
+          ],
+          [
+            "solid",
+            54
+          ],
+          [
+            "free",
+            6
+          ],
+          [
+            "solid",
+            26
+          ],
+          [
+            "free",
+            6
+          ],
+          [
+            "solid",
+            26
+          ],
+          [
+            "free",
+            8
+          ],
+          [
+            "solid",
+            54
+          ],
+          [
+            "free",
+            6
+          ],
+          [
+            "solid",
+            26
+          ],
+          [
+            "free",
+            6
+          ],
+          [
+            "solid",
+            26
+          ],
+          [
+            "free",
+            8
+          ],
+          [
+            "solid",
+            54
+          ],
+          [
+            "free",
+            6
+          ],
+          [
+            "solid",
+            26
+          ],
+          [
+            "free",
+            6
+          ],
+          [
+            "solid",
+            26
+          ],
+          [
+            "free",
+            8
+          ],
+          [
+            "solid",
+            54
+          ],
+          [
+            "free",
+            6
+          ],
+          [
+            "solid",
+            26
+          ],
+          [
+            "free",
+            6
+          ],
+          [
+            "solid",
+            26
+          ],
+          [
+            "free",
+            8
+          ],
+          [
+            "solid",
+            54
+          ],
+          [
+            "free",
+            6
+          ],
+          [
+            "solid",
+            28
+          ],
+          [
+            "free",
+            6
+          ],
+          [
+            "solid",
+            24
+          ],
+          [
+            "free",
+            8
+          ],
+          [
+            "solid",
+            54
+          ],
+          [
+            "free",
+            6
+          ],
+          [
+            "solid",
+            28
+          ],
+          [
+            "free",
+            6
+          ],
+          [
+            "solid",
+            24
+          ],
+          [
+            "free",
+            8
+          ],
+          [
+            "solid",
+            54
+          ],
+          [
+            "free",
+            6
+          ],
+          [
+            "solid",
+            30
+          ],
+          [
+            "free",
+            8
+          ],
+          [
+            "solid",
+            20
+          ],
+          [
+            "free",
+            8
+          ],
+          [
+            "solid",
+            54
+          ],
+          [
+            "free",
+            6
+          ],
+          [
+            "solid",
+            30
+          ],
+          [
+            "free",
+            8
+          ],
+          [
+            "solid",
+            20
+          ],
+          [
+            "free",
+            8
+          ],
+          [
+            "solid",
+            54
+          ],
+          [
+            "free",
+            6
+          ],
+          [
+            "solid",
+            30
+          ],
+          [
+            "free",
+            12
+          ],
+          [
+            "solid",
+            16
+          ],
+          [
+            "free",
+            8
+          ],
+          [
+            "solid",
+            52
+          ],
+          [
+            "free",
+            8
+          ],
+          [
+            "solid",
+            30
+          ],
+          [
+            "free",
+            12
+          ],
+          [
+            "solid",
+            16
+          ],
+          [
+            "free",
+            8
+          ],
+          [
+            "solid",
+            52
+          ],
+          [
+            "free",
+            8
+          ],
+          [
+            "solid",
+            34
+          ],
+          [
+            "free",
+            12
+          ],
+          [
+            "solid",
+            12
+          ],
+          [
+            "free",
+            8
+          ],
+          [
+            "solid",
+            52
+          ],
+          [
+            "free",
+            8
+          ],
+          [
+            "solid",
+            34
+          ],
+          [
+            "free",
+            12
+          ],
+          [
+            "solid",
+            12
+          ],
+          [
+            "free",
+            8
+          ],
+          [
+            "solid",
+            52
+          ],
+          [
+            "free",
+            8
+          ],
+          [
+            "solid",
+            36
+          ],
+          [
+            "free",
+            12
+          ],
+          [
+            "solid",
+            10
+          ],
+          [
+            "free",
+            8
+          ],
+          [
+            "solid",
+            22
+          ],
+          [
+            "free",
+            6
+          ],
+          [
+            "solid",
+            24
+          ],
+          [
+            "free",
+            6
+          ],
+          [
+            "solid",
+            38
+          ],
+          [
+            "free",
+            12
+          ],
+          [
+            "solid",
+            10
+          ],
+          [
+            "free",
+            8
+          ],
+          [
+            "solid",
+            22
+          ],
+          [
+            "free",
+            6
+          ],
+          [
+            "solid",
+            24
+          ],
+          [
+            "free",
+            6
+          ],
+          [
+            "solid",
+            42
+          ],
+          [
+            "free",
+            12
+          ],
+          [
+            "solid",
+            4
+          ],
+          [
+            "free",
+            10
+          ],
+          [
+            "solid",
+            22
+          ],
+          [
+            "free",
+            6
+          ],
+          [
+            "solid",
+            24
+          ],
+          [
+            "free",
+            6
+          ],
+          [
+            "solid",
+            42
+          ],
+          [
+            "free",
+            12
+          ],
+          [
+            "solid",
+            4
+          ],
+          [
+            "free",
+            10
+          ],
+          [
+            "solid",
+            22
+          ],
+          [
+            "free",
+            6
+          ],
+          [
+            "solid",
+            24
+          ],
+          [
+            "free",
+            6
+          ],
+          [
+            "solid",
+            46
+          ],
+          [
+            "free",
+            22
+          ],
+          [
+            "solid",
+            8
+          ],
+          [
+            "free",
+            38
+          ],
+          [
+            "solid",
+            6
+          ],
+          [
+            "free",
+            6
+          ],
+          [
+            "solid",
+            46
+          ],
+          [
+            "free",
+            22
+          ],
+          [
+            "solid",
+            8
+          ],
+          [
+            "free",
+            38
+          ],
+          [
+            "solid",
+            6
+          ],
+          [
+            "free",
+            6
+          ],
+          [
+            "solid",
+            50
+          ],
+          [
+            "free",
+            18
+          ],
+          [
+            "solid",
+            8
+          ],
+          [
+            "free",
+            38
+          ],
+          [
+            "solid",
+            6
+          ],
+          [
+            "free",
+            6
+          ],
+          [
+            "solid",
+            50
+          ],
+          [
+            "free",
+            18
+          ],
+          [
+            "solid",
+            8
+          ],
+          [
+            "free",
+            38
+          ],
+          [
+            "solid",
+            6
+          ],
+          [
+            "free",
+            6
+          ],
+          [
+            "solid",
+            54
+          ],
+          [
+            "free",
+            14
+          ],
+          [
+            "solid",
+            20
+          ],
+          [
+            "free",
+            10
+          ],
+          [
+            "solid",
+            22
+          ],
+          [
+            "free",
+            6
+          ],
+          [
+            "solid",
+            54
+          ],
+          [
+            "free",
+            14
+          ],
+          [
+            "solid",
+            20
+          ],
+          [
+            "free",
+            10
+          ],
+          [
+            "solid",
+            22
+          ],
+          [
+            "free",
+            6
+          ],
+          [
+            "solid",
+            52
           ],
           [
             "free",
@@ -93980,7 +96584,23 @@
           ],
           [
             "solid",
-            44
+            22
+          ],
+          [
+            "free",
+            6
+          ],
+          [
+            "solid",
+            24
+          ],
+          [
+            "free",
+            6
+          ],
+          [
+            "solid",
+            52
           ],
           [
             "free",
@@ -93988,15 +96608,7 @@
           ],
           [
             "solid",
-            44
-          ],
-          [
-            "free",
-            9
-          ],
-          [
-            "solid",
-            1
+            22
           ],
           [
             "free",
@@ -94004,39 +96616,7 @@
           ],
           [
             "solid",
-            44
-          ],
-          [
-            "free",
-            1
-          ],
-          [
-            "solid",
-            1
-          ],
-          [
-            "free",
-            1
-          ],
-          [
-            "solid",
-            2
-          ],
-          [
-            "free",
-            1
-          ],
-          [
-            "solid",
-            2
-          ],
-          [
-            "free",
-            1
-          ],
-          [
-            "solid",
-            1
+            24
           ],
           [
             "free",
@@ -94044,81 +96624,353 @@
           ],
           [
             "solid",
-            82
+            50
+          ],
+          [
+            "free",
+            20
+          ],
+          [
+            "solid",
+            20
+          ],
+          [
+            "free",
+            6
+          ],
+          [
+            "solid",
+            22
+          ],
+          [
+            "free",
+            8
+          ],
+          [
+            "solid",
+            50
+          ],
+          [
+            "free",
+            20
+          ],
+          [
+            "solid",
+            20
+          ],
+          [
+            "free",
+            6
+          ],
+          [
+            "solid",
+            22
+          ],
+          [
+            "free",
+            8
+          ],
+          [
+            "solid",
+            50
+          ],
+          [
+            "free",
+            20
+          ],
+          [
+            "solid",
+            20
+          ],
+          [
+            "free",
+            6
+          ],
+          [
+            "solid",
+            22
+          ],
+          [
+            "free",
+            8
+          ],
+          [
+            "solid",
+            50
+          ],
+          [
+            "free",
+            20
+          ],
+          [
+            "solid",
+            20
+          ],
+          [
+            "free",
+            6
+          ],
+          [
+            "solid",
+            22
+          ],
+          [
+            "free",
+            8
+          ],
+          [
+            "solid",
+            48
+          ],
+          [
+            "free",
+            78
+          ],
+          [
+            "solid",
+            48
+          ],
+          [
+            "free",
+            78
+          ],
+          [
+            "solid",
+            18
+          ],
+          [
+            "free",
+            112
+          ],
+          [
+            "solid",
+            14
+          ],
+          [
+            "free",
+            112
+          ],
+          [
+            "solid",
+            14
+          ],
+          [
+            "free",
+            112
+          ],
+          [
+            "solid",
+            14
+          ],
+          [
+            "free",
+            112
+          ],
+          [
+            "solid",
+            14
+          ],
+          [
+            "free",
+            112
+          ],
+          [
+            "solid",
+            14
+          ],
+          [
+            "free",
+            112
+          ],
+          [
+            "solid",
+            14
+          ],
+          [
+            "free",
+            64
+          ],
+          [
+            "solid",
+            4
+          ],
+          [
+            "free",
+            8
+          ],
+          [
+            "solid",
+            18
+          ],
+          [
+            "free",
+            18
+          ],
+          [
+            "solid",
+            14
+          ],
+          [
+            "free",
+            64
+          ],
+          [
+            "solid",
+            4
+          ],
+          [
+            "free",
+            8
+          ],
+          [
+            "solid",
+            18
+          ],
+          [
+            "free",
+            18
+          ],
+          [
+            "solid",
+            14
+          ],
+          [
+            "free",
+            44
+          ],
+          [
+            "solid",
+            56
+          ],
+          [
+            "free",
+            12
+          ],
+          [
+            "solid",
+            14
+          ],
+          [
+            "free",
+            44
+          ],
+          [
+            "solid",
+            56
+          ],
+          [
+            "free",
+            12
+          ],
+          [
+            "solid",
+            52
+          ],
+          [
+            "free",
+            2
+          ],
+          [
+            "solid",
+            124
+          ],
+          [
+            "free",
+            2
+          ],
+          [
+            "solid",
+            1836
           ]
         ]
       },
       "collisions": {
         "encoding": "rle-v1",
-        "length": 2400,
+        "length": 10836,
         "runs": [
           [
             "solid",
-            485
+            60
           ],
           [
             "free",
-            16
+            10
           ],
           [
             "solid",
-            18
+            116
           ],
           [
             "free",
-            18
+            10
           ],
           [
             "solid",
+            116
+          ],
+          [
+            "free",
+            10
+          ],
+          [
+            "solid",
+            116
+          ],
+          [
+            "free",
+            10
+          ],
+          [
+            "solid",
+            116
+          ],
+          [
+            "free",
+            10
+          ],
+          [
+            "solid",
+            116
+          ],
+          [
+            "free",
+            10
+          ],
+          [
+            "solid",
+            116
+          ],
+          [
+            "free",
             8
           ],
           [
-            "free",
-            16
-          ],
-          [
             "solid",
-            18
+            118
           ],
           [
             "free",
-            18
-          ],
-          [
-            "solid",
             8
           ],
           [
-            "free",
-            52
+            "solid",
+            118
           ],
           [
-            "solid",
+            "free",
             8
           ],
           [
-            "free",
-            52
+            "solid",
+            118
           ],
           [
-            "solid",
+            "free",
             8
           ],
           [
-            "free",
-            52
-          ],
-          [
             "solid",
-            9
-          ],
-          [
-            "free",
-            34
-          ],
-          [
-            "solid",
-            13
+            74
           ],
           [
             "free",
@@ -94126,15 +96978,15 @@
           ],
           [
             "solid",
-            17
+            40
           ],
           [
             "free",
-            26
+            10
           ],
           [
             "solid",
-            13
+            72
           ],
           [
             "free",
@@ -94142,15 +96994,15 @@
           ],
           [
             "solid",
-            17
+            40
           ],
           [
             "free",
-            26
+            10
           ],
           [
             "solid",
-            13
+            72
           ],
           [
             "free",
@@ -94158,207 +97010,23 @@
           ],
           [
             "solid",
-            17
+            40
           ],
           [
             "free",
-            26
+            10
           ],
           [
             "solid",
-            13
-          ],
-          [
-            "free",
-            3
-          ],
-          [
-            "solid",
-            18
-          ],
-          [
-            "free",
-            26
-          ],
-          [
-            "solid",
-            13
-          ],
-          [
-            "free",
-            3
-          ],
-          [
-            "solid",
-            18
-          ],
-          [
-            "free",
-            26
-          ],
-          [
-            "solid",
-            13
-          ],
-          [
-            "free",
-            3
-          ],
-          [
-            "solid",
-            18
-          ],
-          [
-            "free",
-            26
-          ],
-          [
-            "solid",
-            13
-          ],
-          [
-            "free",
-            3
-          ],
-          [
-            "solid",
-            18
-          ],
-          [
-            "free",
-            26
-          ],
-          [
-            "solid",
-            6
-          ],
-          [
-            "free",
-            3
-          ],
-          [
-            "solid",
-            4
-          ],
-          [
-            "free",
-            3
-          ],
-          [
-            "solid",
-            18
-          ],
-          [
-            "free",
             42
           ],
           [
-            "solid",
-            12
-          ],
-          [
             "free",
-            48
+            6
           ],
           [
             "solid",
-            12
-          ],
-          [
-            "free",
-            48
-          ],
-          [
-            "solid",
-            12
-          ],
-          [
-            "free",
-            48
-          ],
-          [
-            "solid",
-            12
-          ],
-          [
-            "free",
-            48
-          ],
-          [
-            "solid",
-            12
-          ],
-          [
-            "free",
-            48
-          ],
-          [
-            "solid",
-            15
-          ],
-          [
-            "free",
-            45
-          ],
-          [
-            "solid",
-            12
-          ],
-          [
-            "free",
-            20
-          ],
-          [
-            "solid",
-            2
-          ],
-          [
-            "free",
-            1
-          ],
-          [
-            "solid",
-            2
-          ],
-          [
-            "free",
-            23
-          ],
-          [
-            "solid",
-            12
-          ],
-          [
-            "free",
-            20
-          ],
-          [
-            "solid",
-            1
-          ],
-          [
-            "free",
-            27
-          ],
-          [
-            "solid",
-            12
-          ],
-          [
-            "free",
-            19
-          ],
-          [
-            "solid",
-            1
-          ],
-          [
-            "free",
-            28
-          ],
-          [
-            "solid",
-            27
+            24
           ],
           [
             "free",
@@ -94366,7 +97034,7 @@
           ],
           [
             "solid",
-            1
+            40
           ],
           [
             "free",
@@ -94374,15 +97042,23 @@
           ],
           [
             "solid",
-            44
+            42
           ],
           [
             "free",
-            5
+            6
           ],
           [
             "solid",
-            1
+            22
+          ],
+          [
+            "free",
+            12
+          ],
+          [
+            "solid",
+            34
           ],
           [
             "free",
@@ -94390,39 +97066,87 @@
           ],
           [
             "solid",
-            44
+            40
           ],
           [
             "free",
-            5
+            10
           ],
           [
             "solid",
-            1
+            20
           ],
           [
             "free",
-            3
+            12
           ],
           [
             "solid",
-            1
+            34
           ],
           [
             "free",
-            5
+            10
           ],
           [
             "solid",
-            45
+            40
           ],
           [
             "free",
-            9
+            10
           ],
           [
             "solid",
-            1
+            20
+          ],
+          [
+            "free",
+            14
+          ],
+          [
+            "solid",
+            32
+          ],
+          [
+            "free",
+            10
+          ],
+          [
+            "solid",
+            40
+          ],
+          [
+            "free",
+            12
+          ],
+          [
+            "solid",
+            18
+          ],
+          [
+            "free",
+            14
+          ],
+          [
+            "solid",
+            32
+          ],
+          [
+            "free",
+            10
+          ],
+          [
+            "solid",
+            40
+          ],
+          [
+            "free",
+            12
+          ],
+          [
+            "solid",
+            26
           ],
           [
             "free",
@@ -94430,7 +97154,847 @@
           ],
           [
             "solid",
+            32
+          ],
+          [
+            "free",
+            8
+          ],
+          [
+            "solid",
             44
+          ],
+          [
+            "free",
+            10
+          ],
+          [
+            "solid",
+            26
+          ],
+          [
+            "free",
+            6
+          ],
+          [
+            "solid",
+            32
+          ],
+          [
+            "free",
+            8
+          ],
+          [
+            "solid",
+            44
+          ],
+          [
+            "free",
+            10
+          ],
+          [
+            "solid",
+            26
+          ],
+          [
+            "free",
+            6
+          ],
+          [
+            "solid",
+            32
+          ],
+          [
+            "free",
+            8
+          ],
+          [
+            "solid",
+            48
+          ],
+          [
+            "free",
+            6
+          ],
+          [
+            "solid",
+            26
+          ],
+          [
+            "free",
+            6
+          ],
+          [
+            "solid",
+            32
+          ],
+          [
+            "free",
+            8
+          ],
+          [
+            "solid",
+            48
+          ],
+          [
+            "free",
+            6
+          ],
+          [
+            "solid",
+            26
+          ],
+          [
+            "free",
+            6
+          ],
+          [
+            "solid",
+            30
+          ],
+          [
+            "free",
+            8
+          ],
+          [
+            "solid",
+            50
+          ],
+          [
+            "free",
+            6
+          ],
+          [
+            "solid",
+            26
+          ],
+          [
+            "free",
+            6
+          ],
+          [
+            "solid",
+            30
+          ],
+          [
+            "free",
+            8
+          ],
+          [
+            "solid",
+            50
+          ],
+          [
+            "free",
+            6
+          ],
+          [
+            "solid",
+            28
+          ],
+          [
+            "free",
+            4
+          ],
+          [
+            "solid",
+            30
+          ],
+          [
+            "free",
+            8
+          ],
+          [
+            "solid",
+            52
+          ],
+          [
+            "free",
+            6
+          ],
+          [
+            "solid",
+            26
+          ],
+          [
+            "free",
+            4
+          ],
+          [
+            "solid",
+            30
+          ],
+          [
+            "free",
+            8
+          ],
+          [
+            "solid",
+            52
+          ],
+          [
+            "free",
+            6
+          ],
+          [
+            "solid",
+            26
+          ],
+          [
+            "free",
+            4
+          ],
+          [
+            "solid",
+            30
+          ],
+          [
+            "free",
+            6
+          ],
+          [
+            "solid",
+            54
+          ],
+          [
+            "free",
+            6
+          ],
+          [
+            "solid",
+            26
+          ],
+          [
+            "free",
+            4
+          ],
+          [
+            "solid",
+            30
+          ],
+          [
+            "free",
+            6
+          ],
+          [
+            "solid",
+            54
+          ],
+          [
+            "free",
+            6
+          ],
+          [
+            "solid",
+            26
+          ],
+          [
+            "free",
+            4
+          ],
+          [
+            "solid",
+            28
+          ],
+          [
+            "free",
+            8
+          ],
+          [
+            "solid",
+            54
+          ],
+          [
+            "free",
+            6
+          ],
+          [
+            "solid",
+            26
+          ],
+          [
+            "free",
+            4
+          ],
+          [
+            "solid",
+            28
+          ],
+          [
+            "free",
+            8
+          ],
+          [
+            "solid",
+            54
+          ],
+          [
+            "free",
+            6
+          ],
+          [
+            "solid",
+            26
+          ],
+          [
+            "free",
+            6
+          ],
+          [
+            "solid",
+            26
+          ],
+          [
+            "free",
+            8
+          ],
+          [
+            "solid",
+            54
+          ],
+          [
+            "free",
+            6
+          ],
+          [
+            "solid",
+            26
+          ],
+          [
+            "free",
+            6
+          ],
+          [
+            "solid",
+            26
+          ],
+          [
+            "free",
+            8
+          ],
+          [
+            "solid",
+            54
+          ],
+          [
+            "free",
+            6
+          ],
+          [
+            "solid",
+            26
+          ],
+          [
+            "free",
+            6
+          ],
+          [
+            "solid",
+            26
+          ],
+          [
+            "free",
+            8
+          ],
+          [
+            "solid",
+            54
+          ],
+          [
+            "free",
+            6
+          ],
+          [
+            "solid",
+            26
+          ],
+          [
+            "free",
+            6
+          ],
+          [
+            "solid",
+            26
+          ],
+          [
+            "free",
+            8
+          ],
+          [
+            "solid",
+            54
+          ],
+          [
+            "free",
+            6
+          ],
+          [
+            "solid",
+            28
+          ],
+          [
+            "free",
+            6
+          ],
+          [
+            "solid",
+            24
+          ],
+          [
+            "free",
+            8
+          ],
+          [
+            "solid",
+            54
+          ],
+          [
+            "free",
+            6
+          ],
+          [
+            "solid",
+            28
+          ],
+          [
+            "free",
+            6
+          ],
+          [
+            "solid",
+            24
+          ],
+          [
+            "free",
+            8
+          ],
+          [
+            "solid",
+            54
+          ],
+          [
+            "free",
+            6
+          ],
+          [
+            "solid",
+            30
+          ],
+          [
+            "free",
+            8
+          ],
+          [
+            "solid",
+            20
+          ],
+          [
+            "free",
+            8
+          ],
+          [
+            "solid",
+            54
+          ],
+          [
+            "free",
+            6
+          ],
+          [
+            "solid",
+            30
+          ],
+          [
+            "free",
+            8
+          ],
+          [
+            "solid",
+            20
+          ],
+          [
+            "free",
+            8
+          ],
+          [
+            "solid",
+            54
+          ],
+          [
+            "free",
+            6
+          ],
+          [
+            "solid",
+            30
+          ],
+          [
+            "free",
+            12
+          ],
+          [
+            "solid",
+            16
+          ],
+          [
+            "free",
+            8
+          ],
+          [
+            "solid",
+            52
+          ],
+          [
+            "free",
+            8
+          ],
+          [
+            "solid",
+            30
+          ],
+          [
+            "free",
+            12
+          ],
+          [
+            "solid",
+            16
+          ],
+          [
+            "free",
+            8
+          ],
+          [
+            "solid",
+            52
+          ],
+          [
+            "free",
+            8
+          ],
+          [
+            "solid",
+            34
+          ],
+          [
+            "free",
+            12
+          ],
+          [
+            "solid",
+            12
+          ],
+          [
+            "free",
+            8
+          ],
+          [
+            "solid",
+            52
+          ],
+          [
+            "free",
+            8
+          ],
+          [
+            "solid",
+            34
+          ],
+          [
+            "free",
+            12
+          ],
+          [
+            "solid",
+            12
+          ],
+          [
+            "free",
+            8
+          ],
+          [
+            "solid",
+            52
+          ],
+          [
+            "free",
+            8
+          ],
+          [
+            "solid",
+            36
+          ],
+          [
+            "free",
+            12
+          ],
+          [
+            "solid",
+            10
+          ],
+          [
+            "free",
+            8
+          ],
+          [
+            "solid",
+            22
+          ],
+          [
+            "free",
+            6
+          ],
+          [
+            "solid",
+            24
+          ],
+          [
+            "free",
+            6
+          ],
+          [
+            "solid",
+            38
+          ],
+          [
+            "free",
+            12
+          ],
+          [
+            "solid",
+            10
+          ],
+          [
+            "free",
+            8
+          ],
+          [
+            "solid",
+            22
+          ],
+          [
+            "free",
+            6
+          ],
+          [
+            "solid",
+            24
+          ],
+          [
+            "free",
+            6
+          ],
+          [
+            "solid",
+            42
+          ],
+          [
+            "free",
+            12
+          ],
+          [
+            "solid",
+            4
+          ],
+          [
+            "free",
+            10
+          ],
+          [
+            "solid",
+            22
+          ],
+          [
+            "free",
+            6
+          ],
+          [
+            "solid",
+            24
+          ],
+          [
+            "free",
+            6
+          ],
+          [
+            "solid",
+            42
+          ],
+          [
+            "free",
+            12
+          ],
+          [
+            "solid",
+            4
+          ],
+          [
+            "free",
+            10
+          ],
+          [
+            "solid",
+            22
+          ],
+          [
+            "free",
+            6
+          ],
+          [
+            "solid",
+            24
+          ],
+          [
+            "free",
+            6
+          ],
+          [
+            "solid",
+            46
+          ],
+          [
+            "free",
+            22
+          ],
+          [
+            "solid",
+            8
+          ],
+          [
+            "free",
+            38
+          ],
+          [
+            "solid",
+            6
+          ],
+          [
+            "free",
+            6
+          ],
+          [
+            "solid",
+            46
+          ],
+          [
+            "free",
+            22
+          ],
+          [
+            "solid",
+            8
+          ],
+          [
+            "free",
+            38
+          ],
+          [
+            "solid",
+            6
+          ],
+          [
+            "free",
+            6
+          ],
+          [
+            "solid",
+            50
+          ],
+          [
+            "free",
+            18
+          ],
+          [
+            "solid",
+            8
+          ],
+          [
+            "free",
+            38
+          ],
+          [
+            "solid",
+            6
+          ],
+          [
+            "free",
+            6
+          ],
+          [
+            "solid",
+            50
+          ],
+          [
+            "free",
+            18
+          ],
+          [
+            "solid",
+            8
+          ],
+          [
+            "free",
+            38
+          ],
+          [
+            "solid",
+            6
+          ],
+          [
+            "free",
+            6
+          ],
+          [
+            "solid",
+            54
+          ],
+          [
+            "free",
+            14
+          ],
+          [
+            "solid",
+            20
+          ],
+          [
+            "free",
+            10
+          ],
+          [
+            "solid",
+            22
+          ],
+          [
+            "free",
+            6
+          ],
+          [
+            "solid",
+            54
+          ],
+          [
+            "free",
+            14
+          ],
+          [
+            "solid",
+            20
+          ],
+          [
+            "free",
+            10
+          ],
+          [
+            "solid",
+            22
+          ],
+          [
+            "free",
+            6
+          ],
+          [
+            "solid",
+            52
           ],
           [
             "free",
@@ -94438,7 +98002,23 @@
           ],
           [
             "solid",
-            44
+            22
+          ],
+          [
+            "free",
+            6
+          ],
+          [
+            "solid",
+            24
+          ],
+          [
+            "free",
+            6
+          ],
+          [
+            "solid",
+            52
           ],
           [
             "free",
@@ -94446,15 +98026,7 @@
           ],
           [
             "solid",
-            44
-          ],
-          [
-            "free",
-            9
-          ],
-          [
-            "solid",
-            1
+            22
           ],
           [
             "free",
@@ -94462,39 +98034,7 @@
           ],
           [
             "solid",
-            44
-          ],
-          [
-            "free",
-            1
-          ],
-          [
-            "solid",
-            1
-          ],
-          [
-            "free",
-            1
-          ],
-          [
-            "solid",
-            2
-          ],
-          [
-            "free",
-            1
-          ],
-          [
-            "solid",
-            2
-          ],
-          [
-            "free",
-            1
-          ],
-          [
-            "solid",
-            1
+            24
           ],
           [
             "free",
@@ -94502,7 +98042,263 @@
           ],
           [
             "solid",
-            82
+            50
+          ],
+          [
+            "free",
+            20
+          ],
+          [
+            "solid",
+            20
+          ],
+          [
+            "free",
+            6
+          ],
+          [
+            "solid",
+            22
+          ],
+          [
+            "free",
+            8
+          ],
+          [
+            "solid",
+            50
+          ],
+          [
+            "free",
+            20
+          ],
+          [
+            "solid",
+            20
+          ],
+          [
+            "free",
+            6
+          ],
+          [
+            "solid",
+            22
+          ],
+          [
+            "free",
+            8
+          ],
+          [
+            "solid",
+            50
+          ],
+          [
+            "free",
+            20
+          ],
+          [
+            "solid",
+            20
+          ],
+          [
+            "free",
+            6
+          ],
+          [
+            "solid",
+            22
+          ],
+          [
+            "free",
+            8
+          ],
+          [
+            "solid",
+            50
+          ],
+          [
+            "free",
+            20
+          ],
+          [
+            "solid",
+            20
+          ],
+          [
+            "free",
+            6
+          ],
+          [
+            "solid",
+            22
+          ],
+          [
+            "free",
+            8
+          ],
+          [
+            "solid",
+            48
+          ],
+          [
+            "free",
+            78
+          ],
+          [
+            "solid",
+            48
+          ],
+          [
+            "free",
+            78
+          ],
+          [
+            "solid",
+            18
+          ],
+          [
+            "free",
+            112
+          ],
+          [
+            "solid",
+            14
+          ],
+          [
+            "free",
+            112
+          ],
+          [
+            "solid",
+            14
+          ],
+          [
+            "free",
+            112
+          ],
+          [
+            "solid",
+            14
+          ],
+          [
+            "free",
+            112
+          ],
+          [
+            "solid",
+            14
+          ],
+          [
+            "free",
+            112
+          ],
+          [
+            "solid",
+            14
+          ],
+          [
+            "free",
+            112
+          ],
+          [
+            "solid",
+            14
+          ],
+          [
+            "free",
+            64
+          ],
+          [
+            "solid",
+            4
+          ],
+          [
+            "free",
+            8
+          ],
+          [
+            "solid",
+            18
+          ],
+          [
+            "free",
+            18
+          ],
+          [
+            "solid",
+            14
+          ],
+          [
+            "free",
+            64
+          ],
+          [
+            "solid",
+            4
+          ],
+          [
+            "free",
+            8
+          ],
+          [
+            "solid",
+            18
+          ],
+          [
+            "free",
+            18
+          ],
+          [
+            "solid",
+            14
+          ],
+          [
+            "free",
+            44
+          ],
+          [
+            "solid",
+            56
+          ],
+          [
+            "free",
+            12
+          ],
+          [
+            "solid",
+            14
+          ],
+          [
+            "free",
+            44
+          ],
+          [
+            "solid",
+            56
+          ],
+          [
+            "free",
+            12
+          ],
+          [
+            "solid",
+            52
+          ],
+          [
+            "free",
+            2
+          ],
+          [
+            "solid",
+            124
+          ],
+          [
+            "free",
+            2
+          ],
+          [
+            "solid",
+            1836
           ]
         ]
       },
@@ -94512,7 +98308,7 @@
       "gbStudioName": "03 · Porto da Enseada",
       "gbStudioSceneID": "94c18861-b352-4f49-a64d-52f2e3415077",
       "gbStudioUseBackgroundLayout": true,
-      "height": 40,
+      "height": 86,
       "id": "scene-porto_lumen",
       "music": "farol_enseada",
       "name": "porto_lumen",
@@ -94528,35 +98324,35 @@
       "sceneType": "topdown",
       "tilemap": {
         "encoding": "rle-v1",
-        "length": 2400,
+        "length": 10836,
         "runs": [
           [
             0,
-            2400
+            10836
           ]
         ]
       },
-      "width": 60,
+      "width": 126,
       "tileLayers": [
         {
           "mapping": "BG3",
           "tilemap": {
             "encoding": "rle-v1",
-            "length": 2400,
+            "length": 10836,
             "runs": [
               [
                 -1,
-                2400
+                10836
               ]
             ]
           },
           "tileSourceAssetNames": {
             "encoding": "rle-v1",
-            "length": 2400,
+            "length": 10836,
             "runs": [
               [
                 "",
-                2400
+                10836
               ]
             ]
           }
@@ -94565,101 +98361,21 @@
           "mapping": "BG2",
           "tilemap": {
             "encoding": "rle-v1",
-            "length": 2400,
+            "length": 10836,
             "runs": [
               [
-                -1,
-                979
-              ],
-              [
-                1,
-                1
-              ],
-              [
-                -1,
-                61
-              ],
-              [
-                1,
-                1
-              ],
-              [
-                -1,
-                117
-              ],
-              [
-                1,
-                1
-              ],
-              [
-                -1,
-                1192
-              ],
-              [
-                1,
-                1
-              ],
-              [
-                -1,
-                2
-              ],
-              [
-                1,
-                1
-              ],
-              [
-                -1,
-                44
+                0,
+                10836
               ]
             ]
           },
           "tileSourceAssetNames": {
             "encoding": "rle-v1",
-            "length": 2400,
+            "length": 10836,
             "runs": [
               [
                 "",
-                979
-              ],
-              [
-                "porto-lume-exterior-topdown-gba.png",
-                1
-              ],
-              [
-                "",
-                61
-              ],
-              [
-                "porto-lume-exterior-topdown-gba.png",
-                1
-              ],
-              [
-                "",
-                117
-              ],
-              [
-                "porto-lume-exterior-topdown-gba.png",
-                1
-              ],
-              [
-                "",
-                1192
-              ],
-              [
-                "porto-lume-exterior-topdown-gba.png",
-                1
-              ],
-              [
-                "",
-                2
-              ],
-              [
-                "porto-lume-exterior-topdown-gba.png",
-                1
-              ],
-              [
-                "",
-                44
+                10836
               ]
             ]
           }
@@ -94668,21 +98384,21 @@
           "mapping": "BG1",
           "tilemap": {
             "encoding": "rle-v1",
-            "length": 2400,
+            "length": 10836,
             "runs": [
               [
                 -1,
-                2400
+                10836
               ]
             ]
           },
           "tileSourceAssetNames": {
             "encoding": "rle-v1",
-            "length": 2400,
+            "length": 10836,
             "runs": [
               [
                 "",
-                2400
+                10836
               ]
             ]
           }
@@ -94691,21 +98407,21 @@
           "mapping": "BG0",
           "tilemap": {
             "encoding": "rle-v1",
-            "length": 2400,
+            "length": 10836,
             "runs": [
               [
                 -1,
-                2400
+                10836
               ]
             ]
           },
           "tileSourceAssetNames": {
             "encoding": "rle-v1",
-            "length": 2400,
+            "length": 10836,
             "runs": [
               [
                 "",
-                2400
+                10836
               ]
             ]
           }
@@ -94715,7 +98431,7 @@
         "type": "topdown",
         "config": {
           "presentation": "topdown",
-          "profile": "port-lumen-topdown-v1",
+          "profile": "port-lumen-paged-topdown-v2",
           "modules": [
             {
               "id": "movement",
@@ -112639,9 +116355,9 @@
       "id": "trigger-porto-exit",
       "name": "Saída para a rota dos faróis",
       "roomName": "porto_lumen",
-      "x": 22,
-      "y": 35,
-      "width": 3,
+      "x": 60,
+      "y": 0,
+      "width": 9,
       "height": 3,
       "eventBindings": {
         "onEnter": "porto_abrir_mapa"
@@ -112651,8 +116367,8 @@
       "id": "trigger-porto-lighthouse",
       "name": "Entrada do farol",
       "roomName": "porto_lumen",
-      "x": 9,
-      "y": 9,
+      "x": 16,
+      "y": 11,
       "width": 4,
       "height": 3,
       "eventBindings": {
@@ -112857,8 +116573,8 @@
         {
           "value": 0,
           "scene": "porto_lumen",
-          "x": 20,
-          "y": 15,
+          "x": 88,
+          "y": 50,
           "direction": "down",
           "fadeFrames": 0
         },
@@ -112873,8 +116589,8 @@
       ],
       "fallback": {
         "scene": "porto_lumen",
-        "x": 20,
-        "y": 15,
+        "x": 88,
+        "y": 50,
         "direction": "down",
         "fadeFrames": 0
       }

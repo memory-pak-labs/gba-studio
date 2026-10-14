@@ -1094,7 +1094,26 @@
               "visual_tiles",
               "collision_flags"
             ],
+            "allOf": [{
+              "if": { "required": ["paged_source_tiles"] },
+              "then": {
+                "required": ["visual_tilemap", "visual_tilemap_layout", "background_bits_per_pixel"],
+                "properties": {
+                  "background_bits_per_pixel": { "const": 8 },
+                  "visual_tilemap_layout": { "const": "source_asset" }
+                }
+              },
+              "else": { "properties": {
+                "background_bits_per_pixel": { "const": 4 },
+                "width_tiles": { "maximum": 64 },
+                "height_tiles": { "maximum": 64 }
+              } }
+            }],
             "properties": {
+              "paged_source_tiles": { "type": "string", "minLength": 1 },
+              "visual_tilemap": { "type": "string", "minLength": 1 },
+              "visual_tilemap_layout": { "enum": ["source_asset"] },
+              "background_bits_per_pixel": { "enum": [4, 8] },
               "name": {
                 "type": "string"
               },
@@ -1117,19 +1136,19 @@
               "width_tiles": {
                 "type": "integer",
                 "minimum": 1,
-                "maximum": 64
+                "maximum": 65535
               },
               "height_tiles": {
                 "type": "integer",
                 "minimum": 1,
-                "maximum": 64
+                "maximum": 65535
               },
               "visual_tiles": {
                 "type": "array",
                 "items": {
                   "type": "integer",
                   "minimum": 0,
-                  "maximum": 255
+                  "maximum": 65535
                 }
               },
               "collision_flags": {

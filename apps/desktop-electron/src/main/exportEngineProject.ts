@@ -359,6 +359,7 @@ export interface EngineExportTopdownRoom {
   foreground_tiles?: number[];
   visual_tilemap?: string;
   visual_tilemap_layout?: "source_asset";
+  paged_source_tiles?: string;
   collision_flags: number[];
   collision_slopes: number[];
   collision_types: string[];
@@ -5717,9 +5718,10 @@ function buildTopdownProjectAssetSection(
   backgroundAssetNames?: string[]
 ): Pick<EngineExportTopdownProject, "assets" | "backgrounds" | "resource_banks"> {
   const regularTilesets = regularTilesetAssetNames(tilesetPack);
+  const pagedNames = new Set(tilesetPack?.packAssets.filter(asset => asset.kind === "paged_bg").map(asset => asset.name) ?? []);
   const backgroundTilesets = backgroundAssetNames === undefined
-    ? regularTilesets
-    : Array.from(new Set(backgroundAssetNames)).filter((assetName) => regularTilesets.includes(assetName));
+    ? regularTilesets.filter(name => !pagedNames.has(name))
+    : Array.from(new Set(backgroundAssetNames)).filter((assetName) => regularTilesets.includes(assetName) && !pagedNames.has(assetName));
   const bgPalettes = regularTilesets;
   const objPalettes = Array.from(new Set([
     ...(spritePack?.assetNames ?? []),
@@ -5727,7 +5729,7 @@ function buildTopdownProjectAssetSection(
     ...(emotePack?.assetNames ?? [])
   ]));
   const tileAssets = Array.from(new Set([
-    ...regularTilesets,
+    ...regularTilesets.filter(name => !pagedNames.has(name)),
     ...(spritePack?.assetNames ?? []),
     ...(portraitPack?.assetNames ?? []),
     ...(emotePack?.assetNames ?? [])
@@ -5848,6 +5850,14 @@ function buildTopdownRooms(
     if (tilesetAsset) {
       roomData.visual_tilemap = tilesetAsset.name;
       roomData.background_bits_per_pixel = tilesetAsset.background_bpp;
+      if (tilesetPack?.packAssets.some(asset => asset.name === tilesetAsset.name && asset.kind === "paged_bg")) {
+        if (roomData.foreground_tiles?.some(tile => tile > 0)) {
+          throw new Error(`Top-down scene ${roomData.name}: paged BG requires an exclusive BG character block.`);
+        }
+        roomData.paged_source_tiles = tilesetAsset.name;
+        roomData.visual_tilemap_layout = "source_asset";
+        delete roomData.foreground_tiles;
+      }
       if (room.gbStudioUseBackgroundLayout === true) {
         roomData.visual_tilemap_layout = "source_asset";
       }
@@ -5905,6 +5915,18 @@ function buildTopdownRooms(
         const legacyEntry = defaultRoomConnectionEntryArea(targetWidth, targetHeight);
         const exitArea = connectionAreaField(connection, "exit", legacyExit);
         const entryArea = connectionAreaField(connection, "entry", legacyEntry);
+        if (roomData.paged_source_tiles && projectArray(data, "triggers").some(trigger => {
+          const eventName = nullableStringField(connection, "eventName");
+          if (!eventName) return false;
+          if (entitySceneName(trigger, "trigger") !== roomData.name ||
+            resolveTriggerEnterEventName(trigger) !== eventName) return false;
+          const bounds = entityBounds(trigger, "trigger", exitArea);
+          return bounds.x === exitArea.x && bounds.y === exitArea.y && bounds.width === exitArea.width && bounds.height === exitArea.height;
+        })) {
+          // The authored enter trigger already owns this connection event.
+          // A second, continuously checked portal would reopen gated dialogue.
+          return [];
+        }
         const targetCollisionTypes = paddedCollisionTypes(targetRoom.collisionTypes, targetWidth * targetHeight);
         const arrival = roomConnectionArrival(entryArea, targetWidth, targetHeight, targetCollisionTypes);
         const connectionScript = scriptForEventName(data, nullableStringField(connection, "eventName"), events, rooms, dialogues, audioItems, audioPack);
@@ -10495,6 +10517,10 @@ export function buildEngineExportProjectContract(
   }
   features.push("hardware.gba_native_contract");
   features.push("events.native_authoring_v2");
+  if (exportRoomsForKind(data, "topdown").some(room => {
+    const name = roomBackgroundAssetName(room);
+    return tilesetPack?.packAssets.some(asset => asset.name === tilesetPack.assetsBySheet[name]?.name && asset.kind === "paged_bg");
+  })) features.push("topdown_runtime.paged_background");
   if (advancedTools.compiled.hasResources) {
     features.push("advanced_tools_data");
   }
@@ -10590,7 +10616,7 @@ export function buildEngineExportProjectContract(
     },
     requires: {
       engine_pack: `>=${enginePackVersion}`,
-      features
+      features: Array.from(new Set(features))
     },
     ...(isMixedRuntime
       ? {
