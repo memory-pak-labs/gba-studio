@@ -20,6 +20,12 @@ import type { WindowDocumentState } from "../shared/windowDocumentState.js";
 const api: GBAStudioDesktopAPI = {
   setAppLocale: (locale: string) => ipcRenderer.invoke(ipcChannels.setAppLocale, locale),
   platform: process.platform,
+  getWindowFullscreen: () => ipcRenderer.invoke(ipcChannels.getWindowFullscreen),
+  onWindowFullscreenChange: (listener: (fullscreen: boolean) => void) => {
+    const subscription = (_event: IpcRendererEvent, fullscreen: boolean) => listener(fullscreen);
+    ipcRenderer.on(ipcChannels.windowFullscreenChanged, subscription);
+    return () => ipcRenderer.removeListener(ipcChannels.windowFullscreenChanged, subscription);
+  },
   onAppCommand: (listener: (command: AppCommand) => void) => {
     const subscription = (_event: IpcRendererEvent, command: AppCommand) => listener(command);
     ipcRenderer.on(ipcChannels.appCommand, subscription);

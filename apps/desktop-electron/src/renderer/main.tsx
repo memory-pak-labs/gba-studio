@@ -247,6 +247,7 @@ import {
   X
 } from "lucide-react";
 import { studioWordmarkURL } from "./brandingAssets";
+import { useWindowFullscreen } from "./useWindowFullscreen";
 import { AudioWorkspace } from "./audioWorkspace";
 import { WorkspaceAdvancedTools } from "./contextualAdvancedTools";
 import { DialoguesWorkspace } from "./dialoguesWorkspace";
@@ -337,6 +338,7 @@ const projectActionIcons: Record<ProjectActionID, React.ReactElement> = {
 type ToolbarMenuActionID = "save" | "open" | "commands" | "focus" | "diagnostics";
 
 function App(): React.ReactElement {
+  const windowFullscreen = useWindowFullscreen();
   const ui = useStudioUiText();
   const { t } = useStudioI18n();
   const [session, setSession] = useState<ProjectSession | null>(null);
@@ -3129,7 +3131,7 @@ function App(): React.ReactElement {
 
   return (
     <main className={`app-shell${focusMode ? " focus-mode" : ""}`}>
-      <header className={`app-topbar${window.gbaStudio.platform === "darwin" ? " native-macos-titlebar" : ""}`}>
+      <header className={`app-topbar${window.gbaStudio.platform === "darwin" ? " native-macos-titlebar" : ""}${windowFullscreen ? " is-fullscreen" : ""}`}>
         <div className="topbar-brand">
           <img alt={ui("GBA Studio")} className="topbar-brand-logo" src={studioWordmarkURL} />
         </div>

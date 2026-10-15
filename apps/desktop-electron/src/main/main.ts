@@ -193,6 +193,13 @@ function createWindow(): BrowserWindow {
   });
   windowCloseGuards.set(window, closeGuard);
 
+  window.on("enter-full-screen", () => {
+    window.webContents.send(ipcChannels.windowFullscreenChanged, true);
+  });
+  window.on("leave-full-screen", () => {
+    window.webContents.send(ipcChannels.windowFullscreenChanged, false);
+  });
+
   loadRendererSurface(window);
 
   window.webContents.once("did-finish-load", () => {
@@ -204,6 +211,10 @@ function createWindow(): BrowserWindow {
 
   return window;
 }
+
+ipcMain.handle(ipcChannels.getWindowFullscreen, (event) =>
+  BrowserWindow.fromWebContents(event.sender)?.isFullScreen() ?? false
+);
 
 ipcMain.handle(ipcChannels.confirmWindowClose, (event, confirmed = true) => {
   const window = BrowserWindow.fromWebContents(event.sender);

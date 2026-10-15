@@ -501,6 +501,14 @@
   -webkit-app-region: drag;
 }
 
+.app-topbar.native-macos-titlebar.is-fullscreen {
+  padding-left: var(--studio-space-5);
+}
+
+.app-topbar.native-macos-titlebar.is-fullscreen .topbar-brand-logo {
+  height: calc(var(--studio-font-size-lg) * 1.1);
+}
+
 .app-topbar.native-macos-titlebar :is(button, a, input, select, textarea, [role="button"], .project-action-menu) {
   -webkit-app-region: no-drag;
 }

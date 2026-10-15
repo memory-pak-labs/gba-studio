@@ -489,6 +489,8 @@ export interface DownloadTranslationPackResult {
 export interface GBAStudioDesktopAPI {
   setAppLocale?(locale: string): Promise<void>;
   platform: NodeJS.Platform;
+  getWindowFullscreen(): Promise<boolean>;
+  onWindowFullscreenChange(listener: (fullscreen: boolean) => void): () => void;
   onAppCommand(listener: (command: AppCommand) => void): () => void;
   onExternalProjectOpen(listener: (result: OpenProjectResult) => void): () => void;
   onExternalAssetChange(listener: (event: ExternalAssetChangeEvent) => void): () => void;
@@ -537,6 +539,8 @@ export const ipcChannels = {
   appCommand: "app:command",
   confirmWindowClose: "window:confirm-close",
   setWindowDocumentState: "window:set-document-state",
+  getWindowFullscreen: "window:get-fullscreen",
+  windowFullscreenChanged: "window:fullscreen-changed",
   externalProjectOpen: "project:external-open",
   externalAssetChange: "assets:external-change",
   getLaunchProject: "project:get-launch",
