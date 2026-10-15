@@ -1,5 +1,9 @@
 import { readStoredLocale } from "./i18n";
 import { uiText as ui, useStudioUiText } from "./studioUiText";
+import { SceneDiagramCard } from "./SceneDiagramCard";
+import { sceneDiagramPositions, SCENE_DIAGRAM_CARD_SIZE } from "./sceneMapDiagram";
+import { readSceneMapViewMode, writeSceneMapViewMode, type SceneMapViewMode } from "./sceneMapViewPreferences";
+import "./styles/scene-map-diagram.css";
 import { RacingCircuitCamera } from "./RacingCircuitCamera";
 import { RacingSceneInspector } from "./RacingSceneInspector";
 import { LogicNavigator, LogicValueInspector, type LogicSelection } from "./LogicNavigator";
@@ -23,6 +27,7 @@ import {
   Diamond,
   Folder,
   GitFork,
+  Network,
   Grid3X3,
   FolderPlus,
   ListOrdered,
@@ -7079,6 +7084,11 @@ export function RoomsWorkspace({
   const [selectedCameraZoneID, setSelectedCameraZoneID] = useState<string | null>(null);
   const [selectedConnectionZoneSide, setSelectedConnectionZoneSide] = useState<"exit" | "entry">("exit");
   const [selectedSceneMapRoomName, setSelectedSceneMapRoomName] = useState<string | null>(null);
+  const [overviewView, setOverviewView] = useState<{ path?: string; mode: SceneMapViewMode } | null>(null);
+  const overviewMode = overviewView && overviewView.path === projectPath ? overviewView.mode : readSceneMapViewMode(projectPath);
+  const [diagramNavigation, setDiagramNavigation] = useState<{ path?: string; zoom: number; positions: Record<string, SceneMapPosition> } | null>(null);
+  const diagramZoom = diagramNavigation && diagramNavigation.path === projectPath ? diagramNavigation.zoom : 1;
+  const diagramOverrides = useMemo(() => diagramNavigation && diagramNavigation.path === projectPath ? diagramNavigation.positions : {}, [diagramNavigation, projectPath]);
   const [selectedCanvasCell, setSelectedCanvasCell] = useState<SelectedRoomCellState | null>(null);
   const canvasStageRef = useRef<HTMLElement | null>(null);
   const canvasScrollRef = useRef<HTMLDivElement | null>(null);
@@ -7202,8 +7212,35 @@ export function RoomsWorkspace({
   const focusedEditorRoom = focusedSceneEditorRoomID
     ? presentation?.rooms.find((room) => room.id === focusedSceneEditorRoomID) ?? null
     : null;
+  const isSceneDiagram = !focusedEditorRoom && overviewMode === "diagram";
+  const roomEventSceneLinks = useMemo(() => projectData ? deriveRoomEventSceneLinks(projectData) : [], [projectData]);
+  const diagramPositions = useMemo(() => isSceneDiagram ? {
+    ...sceneDiagramPositions(presentation?.rooms ?? [], [...(presentation?.connections ?? []), ...roomEventSceneLinks]),
+    ...diagramOverrides
+  } : {}, [isSceneDiagram, presentation?.rooms, presentation?.connections, roomEventSceneLinks, diagramOverrides]);
+  const diagramSummaries = useMemo(() => {
+    const counts = new Map<string, { actors: number; triggers: number }>();
+    if (isSceneDiagram) for (const entity of presentation?.entities ?? []) {
+      const count = counts.get(entity.roomName) ?? { actors: 0, triggers: 0 };
+      if (entity.kind === "actor" && !entity.isPlayer) count.actors++;
+      if (entity.kind === "trigger") count.triggers++;
+      counts.set(entity.roomName, count);
+    }
+    return counts;
+  }, [isSceneDiagram, presentation?.entities]);
   const currentCanvasZoom = focusedEditorRoom ? focusViewMode === "viewport" ? 1 : focusSceneZoom
-    : clampSceneMapZoom(sceneMapZoom ?? presentation?.sceneMapZoom ?? 1);
+    : isSceneDiagram ? diagramZoom : clampSceneMapZoom(sceneMapZoom ?? presentation?.sceneMapZoom ?? 1);
+
+  function updateOverviewZoom(zoom: number): void {
+    if (isSceneDiagram) setDiagramNavigation({ path: projectPath, zoom, positions: diagramOverrides });
+    else onUpdateSceneMapZoom(zoom);
+  }
+
+  useLayoutEffect(() => {
+    if (!canvasScrollRef.current) return;
+    canvasScrollRef.current.scrollLeft = 0;
+    canvasScrollRef.current.scrollTop = 0;
+  }, [overviewMode, projectPath]);
   canvasWheelHandlerRef.current = zoomRoomsCanvas;
 
   useEffect(() => {
@@ -7217,7 +7254,7 @@ export function RoomsWorkspace({
   useEffect(() => {
     canvasPointerRef.current = null;
     pendingCanvasZoomRef.current = null;
-  }, [projectPath, focusedSceneEditorRoomID, focusViewMode]);
+  }, [projectPath, focusedSceneEditorRoomID, focusViewMode, overviewMode]);
 
   useLayoutEffect(() => {
     const scroll = canvasScrollRef.current;
@@ -7408,11 +7445,11 @@ export function RoomsWorkspace({
     const frameID = window.requestAnimationFrame(() => {
       const scroll = canvasScrollRef.current;
       if (!scroll) return;
-      const zoom = clampSceneMapZoom(sceneMapZoom ?? presentation.sceneMapZoom);
+      const zoom = currentCanvasZoom;
       const index = presentation.rooms.findIndex((candidate) => candidate.id === room.id);
-      const position = presentation.sceneMapPositions[room.name]
+      const position = (isSceneDiagram ? diagramPositions[room.name] : presentation.sceneMapPositions[room.name])
         ?? defaultSceneMapPosition(index, presentation.rooms);
-      const cardSize = displayedSceneMapCardSize(room, zoom);
+      const cardSize = isSceneDiagram ? { width: SCENE_DIAGRAM_CARD_SIZE.width * zoom, height: SCENE_DIAGRAM_CARD_SIZE.height * zoom } : displayedSceneMapCardSize(room, zoom);
       const padding = 48;
       const cardPosition = displayedSceneMapPosition(position, zoom);
       const cardLeft = cardPosition.x;
@@ -7990,13 +8027,13 @@ export function RoomsWorkspace({
     const projectRoomIndex = presentation.rooms.findIndex((candidate) => candidate.id === room.id);
     const storedPosition = focusSceneRoom
       ? { x: 72, y: 72 }
-      : presentation.sceneMapPositions[room.name] ?? defaultSceneMapPosition(projectRoomIndex, presentation.rooms);
+      : (isSceneDiagram ? diagramPositions[room.name] : presentation.sceneMapPositions[room.name]) ?? defaultSceneMapPosition(projectRoomIndex, presentation.rooms);
     const connectorPosition = sceneMapDragPreview?.roomName === room.name
       ? sceneMapDragPreview.position
       : storedPosition;
-    const contentSize = sceneMapContentSize(room);
-    const displayedCard = displayedSceneMapCardSize(room, canvasZoom);
-    const displayedContent = displayedSceneMapContentSize(room, canvasZoom);
+    const contentSize = isSceneDiagram ? SCENE_DIAGRAM_CARD_SIZE : sceneMapContentSize(room);
+    const displayedCard = isSceneDiagram ? { width: SCENE_DIAGRAM_CARD_SIZE.width * canvasZoom, height: SCENE_DIAGRAM_CARD_SIZE.height * canvasZoom } : displayedSceneMapCardSize(room, canvasZoom);
+    const displayedContent = isSceneDiagram ? displayedCard : displayedSceneMapContentSize(room, canvasZoom);
     const cardSize: RoomStageCardSize = {
       canvasDisplayHeight: displayedContent.height,
       canvasHeight: contentSize.height,
@@ -8040,7 +8077,7 @@ export function RoomsWorkspace({
     const scroll = canvasScrollRef.current;
     if (!scroll) {
       if (focusSceneRoom) setFocusSceneZoom(nextZoom);
-      else onUpdateSceneMapZoom(nextZoom);
+      else updateOverviewZoom(nextZoom);
       return;
     }
 
@@ -8055,7 +8092,7 @@ export function RoomsWorkspace({
       scrollTop: Math.round(worldY * nextZoom - anchor.y)
     };
     if (focusSceneRoom) setFocusSceneZoom(nextZoom);
-    else onUpdateSceneMapZoom(nextZoom);
+    else updateOverviewZoom(nextZoom);
   }
 
   function setCanvasZoomByStep(delta: number): void {
@@ -8082,16 +8119,16 @@ export function RoomsWorkspace({
     const nextViewport = fitSceneMapViewToCards({
       cards: visibleSceneMapCards.map((item) => ({
         position: item.connectorPosition,
-        size: sceneMapCardSize(item.room)
+        size: isSceneDiagram ? SCENE_DIAGRAM_CARD_SIZE : sceneMapCardSize(item.room)
       })),
-      maxZoom: SCENE_MAP_MAX_ZOOM,
+      maxZoom: isSceneDiagram ? 1 : SCENE_MAP_MAX_ZOOM,
       minZoom: SCENE_MAP_MIN_ZOOM,
       padding: 48,
       viewportHeight: scroll.clientHeight,
       viewportWidth: scroll.clientWidth
     });
     if (focusSceneRoom) setFocusSceneZoom(nextViewport.zoom);
-    else onUpdateSceneMapZoom(nextViewport.zoom);
+    else updateOverviewZoom(nextViewport.zoom);
     window.requestAnimationFrame(() => {
       scroll.scrollLeft = nextViewport.scrollLeft;
       scroll.scrollTop = nextViewport.scrollTop;
@@ -8894,7 +8931,8 @@ export function RoomsWorkspace({
     sceneMapCardDrag.current = null;
     setSceneMapDragPreview(null);
     setSelectedSceneMapRoomName(drag.roomName);
-    onUpdateSceneMapPosition(drag.roomName, nextPosition);
+    if (isSceneDiagram) setDiagramNavigation({ path: projectPath, zoom: diagramZoom, positions: { ...diagramOverrides, [drag.roomName]: nextPosition } });
+    else onUpdateSceneMapPosition(drag.roomName, nextPosition);
   }
 
   function startSceneMapCardDrag(room: RoomsWorkspaceRoom, event: React.PointerEvent<HTMLElement>): void {
@@ -8908,7 +8946,7 @@ export function RoomsWorkspace({
       // Synthetic pointer events in smoke tests may not register an active pointer.
     }
     sceneMapCardDrag.current?.cleanup?.();
-    const startPosition = resolvedPresentation.sceneMapPositions[room.name]
+    const startPosition = (isSceneDiagram ? diagramPositions[room.name] : resolvedPresentation.sceneMapPositions[room.name])
       ?? defaultSceneMapPosition(resolvedPresentation.rooms.findIndex((candidate) => candidate.id === room.id), resolvedPresentation.rooms);
     const pointerID = event.pointerId;
     const frame = sceneMapCardFrameRefs.current[room.name];
@@ -8980,7 +9018,6 @@ export function RoomsWorkspace({
     }
   });
   const explicitSceneLinkPairs = new Set(presentation.connections.map((connection) => `${connection.from}\u0000${connection.to}`));
-  const roomEventSceneLinks = projectData ? deriveRoomEventSceneLinks(projectData) : [];
   const incomingArrivals = roomEventSceneLinks.filter(link => link.to === focusSceneRoom?.name && link.x !== null && link.y !== null);
   const selectedArrival = incomingArrivals.find(link => link.id === selectedArrivalID);
   const testArrival = incomingArrivals.find(link => link.id === testArrivalID);
@@ -9023,7 +9060,7 @@ export function RoomsWorkspace({
     ?? activeRoom?.name
     ?? null;
   const roomCardConnectors = sceneMapConnections.filter((connection) => (
-    sceneMapSelectionName !== null
+    isSceneDiagram || sceneMapSelectionName !== null
       && (connection.from === sceneMapSelectionName || connection.to === sceneMapSelectionName)
   )).flatMap((connection) => {
     const from = roomCardByName.get(connection.from);
@@ -9051,7 +9088,7 @@ export function RoomsWorkspace({
       label: connection.label,
       labelX: (x1 + x2) / 2,
       labelY: (y1 + y2) / 2 - 8,
-      showLabel: connection.showLabel,
+      showLabel: !isSceneDiagram && connection.showLabel,
       to: connection.to,
       eventLink: connection.eventLink
     }];
@@ -9693,14 +9730,36 @@ export function RoomsWorkspace({
                       </div>
                     ) : null}
                   </div>
+                  {focusSceneRoom ? <RoomEditorCanvasControls
+                    canvasLayerLocks={canvasLayerLocks} canvasLayerVisibility={canvasLayerVisibility}
+                    room={focusSceneRoom} setCanvasLayerLock={setCanvasLayerLock}
+                    setCanvasLayerVisibility={setCanvasLayerVisibility}
+                  /> : null}
 
                   {!focusSceneRoom ? (
                   <div className="room-editor-tool-rail-zoom rooms-canvas-zoom" role="group" aria-label={ui("Zoom do canvas")}>
-                  {!focusSceneRoom && onOrganizeSceneMap ? (
+                  <button
+                    type="button"
+                    aria-label={ui("Alternar visualização em organograma")}
+                    aria-pressed={isSceneDiagram}
+                    title={isSceneDiagram ? ui("Voltar aos cards com imagens") : ui("Cards uniformes sem prévias de imagem")}
+                    onClick={() => {
+                      const mode = overviewMode === "diagram" ? "preview" : "diagram";
+                      setOverviewView({ path: projectPath, mode });
+                      writeSceneMapViewMode(projectPath, mode);
+                    }}
+                  >
+                    <Network aria-hidden="true" size={15} strokeWidth={2.3} />
+                    <span>{ui("Organograma")}</span>
+                  </button>
+                  {!focusSceneRoom && (onOrganizeSceneMap || isSceneDiagram) ? (
                     <button
                       aria-label={ui("Organizar cards das cenas")}
-                      onClick={onOrganizeSceneMap}
-                      title={ui("Organizar cards por ordem e tamanho")}
+                      onClick={() => {
+                        if (isSceneDiagram) setDiagramNavigation({ path: projectPath, zoom: diagramZoom, positions: {} });
+                        else onOrganizeSceneMap?.();
+                      }}
+                      title={isSceneDiagram ? ui("Organizar cards por conexões") : ui("Organizar cards por ordem e tamanho")}
                       type="button"
                     >
                       <ListOrdered aria-hidden="true" size={14} strokeWidth={2.3} />
@@ -9834,6 +9893,7 @@ export function RoomsWorkspace({
                   isCanvasPanning ? "panning" : "",
                   focusSceneRoom ? "is-focused-scene-viewport" : "",
                   !focusSceneRoom ? "is-scene-map-overview" : "",
+                  isSceneDiagram ? "is-scene-diagram" : "",
                   focusViewportGeometry?.hasOverflow && !focusSceneUsesPseudo3dCamera ? "has-overflow" : ""
                 ].filter(Boolean).join(" ")}
                 onPointerDown={startRoomsCanvasPan}
@@ -9857,6 +9917,7 @@ export function RoomsWorkspace({
                   <div
                     className={`rooms-canvas-world${focusSceneRoom ? " is-focused-scene" : ""}`}
                     data-scene-map-selection={!focusSceneRoom ? (sceneMapSelectionName ?? "") : undefined}
+                    data-scene-map-view={!focusSceneRoom ? overviewMode : undefined}
                     ref={canvasWorldRef}
                     style={{
                       height: `${canvasWorldHeight}px`,
@@ -9903,7 +9964,8 @@ export function RoomsWorkspace({
                               className={[
                                 "room-card-connector-path",
                                 connector.connectionIndex !== null && selectedConnectionIndex === connector.connectionIndex ? "selected" : "",
-                                connector.connectionIndex === null ? "derived" : ""
+                                connector.connectionIndex === null ? "derived" : "",
+                                isSceneDiagram && (connector.from === sceneMapSelectionName || connector.to === sceneMapSelectionName) ? "is-connected-to-selection" : ""
                               ].filter(Boolean).join(" ")}
                               data-connector-from={connector.from}
                               data-connector-to={connector.to}
@@ -9938,12 +10000,13 @@ export function RoomsWorkspace({
                       </svg>
                     ) : null}
                     {visibleSceneMapCards.map(({ cardSize, position, room, z }) => {
-                      const roomEntities = presentation.entities.filter((entity) => entity.roomName === room.name);
+                      const roomEntities = isSceneDiagram ? [] : presentation.entities.filter((entity) => entity.roomName === room.name);
                       const displayedPosition = displayedSceneMapPosition(position, canvasZoom);
                       return (
                         <div
                           className={[
                             "room-stage-card-frame",
+                            isSceneDiagram ? "scene-diagram-frame" : "",
                             selectedSceneMapRoomName === room.name || room.isActive ? "selected" : ""
                           ].filter(Boolean).join(" ")}
                           key={room.id}
@@ -9962,10 +10025,20 @@ export function RoomsWorkspace({
                           style={{
                             left: `${displayedPosition.x}px`,
                             top: `${displayedPosition.y}px`,
+                            ...(isSceneDiagram ? { width: cardSize.width, height: cardSize.height } : {}),
                             zIndex: z
                           }}
                         >
-                          <RoomSceneMapInactivePreview
+                          {isSceneDiagram ? <SceneDiagramCard
+                            name={sceneDisplayName(room.name)}
+                            typeLabel={sceneTypeLabel(room.sceneType)}
+                            summary={`${roomEntityCountLabel("actor", diagramSummaries.get(room.name)?.actors ?? 0)} · ${roomEntityCountLabel("trigger", diagramSummaries.get(room.name)?.triggers ?? 0)}`}
+                            isStart={room.isStart} isActive={room.isActive} zoom={canvasZoom}
+                            runDisabled={runRoomDisabled}
+                            onOpen={() => enterSceneFocus(room)}
+                            onRun={() => onRunRoom(room.id, room.name)}
+                            onContextMenu={event => openRoomContextMenu(event, room)}
+                          /> : <RoomSceneMapInactivePreview
                             cardSize={cardSize}
                             assetRefreshToken={assetRefreshToken}
                             connectionZones={deriveRoomConnectionAreasForRoom(room.name, presentation.connections)}
@@ -9979,7 +10052,7 @@ export function RoomsWorkspace({
                             projectData={projectData}
                             projectPath={projectPath}
                             room={room}
-                          />
+                          />}
                         </div>
                       );
                     })}
@@ -10029,15 +10102,8 @@ export function RoomsWorkspace({
                 </div>
               ) : null}
               {focusSceneRoom ? (
-                <div className="room-scene-navigation" aria-label={ui("Camadas e navegação")}>
+                <div className="room-scene-navigation" aria-label={ui("Navegação da cena")}>
                   <span className="room-scene-navigation-size">{roomSceneResolutionLabel(focusSceneRoom)} {ui(" px · ")}{focusSceneRoom.width} × {focusSceneRoom.height} {focusSceneRoom.sceneType === "isometric" ? ui("células") : ui("tiles")}</span>
-                    <RoomEditorCanvasControls
-                      canvasLayerLocks={canvasLayerLocks} canvasLayerVisibility={canvasLayerVisibility}
-                      minimapAvailable={focusMinimapAvailable} minimapVisible={focusMinimapVisible}
-                      hideMinimapToggle
-                      room={focusSceneRoom} setCanvasLayerLock={setCanvasLayerLock}
-                      setCanvasLayerVisibility={setCanvasLayerVisibility} setMinimapVisible={setFocusMinimapVisible}
-                    />
                   <div className="room-scene-navigation-zoom rooms-canvas-zoom" role="group" aria-label={ui("Zoom do canvas")}>
                   {focusViewMode === "viewport" ? <span className="room-focus-display-scale">240 × 160 · {Math.round((focusViewportGeometry?.scale ?? 1) * 100)}%</span> : <>
                   {!focusSceneRoom && onOrganizeSceneMap ? (

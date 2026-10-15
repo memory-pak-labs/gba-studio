@@ -1,5 +1,19 @@
 /** Application copy only. Tuple order: pt-BR, en-US, es-ES. Keep project data out of this catalog. */
 export const studioUiMessages: Record<string, readonly [string, string, string]> = {
+  "Organograma": ["Organograma", "Flowchart", "Organigrama"],
+  "Voltar aos cards com imagens": ["Voltar aos cards com imagens", "Return to image cards", "Volver a las tarjetas con imágenes"],
+  "Organizar cards por conexões": ["Organizar cards por conexões", "Arrange cards by connections", "Organizar tarjetas por conexiones"],
+  "Alternar visualização em organograma": ["Alternar visualização em organograma", "Toggle flowchart view", "Alternar vista de organigrama"],
+  "Cards uniformes sem prévias de imagem": ["Cards uniformes sem prévias de imagem", "Uniform cards without image previews", "Tarjetas uniformes sin vistas previas de imágenes"],
+  "Card da cena {0} · organograma": ["Card da cena {0} · organograma", "Scene card {0} · flowchart", "Tarjeta de escena {0} · organigrama"],
+  "Fechar painel de camadas": ["Fechar painel de camadas", "Close layers panel", "Cerrar panel de capas"],
+  "Navegação da cena": ["Navegação da cena", "Scene navigation", "Navegación de la escena"],
+  "Ocultar camada {0}": ["Ocultar camada {0}", "Hide {0} layer", "Ocultar capa {0}"],
+  "Mostrar camada {0}": ["Mostrar camada {0}", "Show {0} layer", "Mostrar capa {0}"],
+  "Bloquear camada {0}": ["Bloquear camada {0}", "Lock {0} layer", "Bloquear capa {0}"],
+  "Desbloquear camada {0}": ["Desbloquear camada {0}", "Unlock {0} layer", "Desbloquear capa {0}"],
+  "Ocultar overlay {0}": ["Ocultar overlay {0}", "Hide {0} overlay", "Ocultar superposición {0}"],
+  "Mostrar overlay {0}": ["Mostrar overlay {0}", "Show {0} overlay", "Mostrar superposición {0}"],
   "- `{0}` - placeholder importado do GB Studio.": [
     "- `{0}` - placeholder importado do GB Studio.",
     "- \"{0} - placeholder imported from GB Studio.",

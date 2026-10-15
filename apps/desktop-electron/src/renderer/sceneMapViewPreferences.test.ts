@@ -1,9 +1,25 @@
 /** @vitest-environment happy-dom */
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { readSceneMapViewZoom, writeSceneMapViewZoom } from "./sceneMapViewPreferences.js";
+import { readSceneMapViewZoom, writeSceneMapViewZoom, readSceneMapViewMode, writeSceneMapViewMode } from "./sceneMapViewPreferences.js";
 
 describe("scene map navigation preferences", () => {
   afterEach(() => { window.localStorage.clear(); vi.restoreAllMocks(); });
+
+  it("remembers the overview mode per project and defaults to previews", () => {
+    expect(readSceneMapViewMode("/one")).toBe("preview");
+    writeSceneMapViewMode("/one", "diagram");
+    expect(readSceneMapViewMode("/one")).toBe("diagram");
+    expect(readSceneMapViewMode("/two")).toBe("preview");
+    writeSceneMapViewMode("/one", "preview");
+    expect(readSceneMapViewMode("/one")).toBe("preview");
+  });
+
+  it("keeps the overview usable when device preferences are unavailable", () => {
+    vi.spyOn(window.localStorage, "setItem").mockImplementation(() => { throw new Error("full"); });
+    expect(() => writeSceneMapViewMode("/one", "diagram")).not.toThrow();
+    vi.spyOn(window.localStorage, "getItem").mockImplementation(() => { throw new Error("blocked"); });
+    expect(readSceneMapViewMode("/one")).toBe("preview");
+  });
 
   it("reads the project's initial zoom until a device preference exists", () => {
     expect(readSceneMapViewZoom("/games/one.gba-project", 0.75)).toBe(0.75);

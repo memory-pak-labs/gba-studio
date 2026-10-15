@@ -97,7 +97,64 @@ async function openSceneInspector(user: ReturnType<typeof userEvent.setup>): Pro
   await user.click(tab ?? screen.getByRole("button", { name: "Propriedades da cena" }));
 }
 
+async function openCanvasLayers(user: ReturnType<typeof userEvent.setup>): Promise<void> {
+  const trigger = screen.getByRole("button", { name: "Camadas" });
+  if (trigger.getAttribute("aria-expanded") !== "true") await user.click(trigger);
+}
+
 describe("RoomsWorkspace React smoke", () => {
+  it("switches to uniform image-free diagram cards without changing authored positions", async () => {
+    const user = userEvent.setup();
+    let project = createBlankProjectData({ name: "Scene diagram" });
+    project = createRoomInProject(project, { id: "large-room", name: "large", height: 86, width: 126, sceneType: "topdown" });
+    project = createRoomInProject(project, { id: "end-room", name: "end", height: 20, width: 30, sceneType: "cutscene" });
+    const rooms = deriveRoomsWorkspacePresentation(project).rooms;
+    project.editorState = { ...(project.editorState as Record<string, unknown>), scenaConnections: [
+      { from: rooms[0].name, to: "large", eventName: "first" },
+      { from: "large", to: "end", eventName: "second" }
+    ] };
+    const source = JSON.stringify(project);
+    const onOrganizeSceneMap = vi.fn();
+    const handlers = roomsWorkspaceHandlers({ onOrganizeSceneMap });
+    const { container } = render(<RoomsWorkspace projectData={project} presentation={deriveRoomsWorkspacePresentation(project)} {...handlers} />);
+    const originalPositions = Array.from(container.querySelectorAll<HTMLElement>(".room-stage-card-frame"), card => [card.style.left, card.style.top]);
+    const toggle = screen.getByRole("button", { name: "Alternar visualização em organograma" });
+    await user.click(toggle);
+    expect(toggle).toHaveAttribute("aria-pressed", "true");
+    const world = container.querySelector(".rooms-canvas-world")!;
+    expect(world).toHaveAttribute("data-scene-map-view", "diagram");
+    expect(world.querySelectorAll("img, canvas")).toHaveLength(0);
+    const cards = world.querySelectorAll<HTMLElement>(".scene-diagram-card");
+    expect(cards).toHaveLength(rooms.length);
+    expect(new Set(Array.from(cards, card => `${card.style.width}:${card.style.height}`)).size).toBe(1);
+    expect(world.querySelectorAll(".room-card-connector-path")).toHaveLength(2);
+    await user.click(screen.getByRole("button", { name: "Executar somente a cena large" }));
+    expect(handlers.onRunRoom).toHaveBeenCalledWith("large-room", "large");
+    await user.click(screen.getByRole("button", { name: "Organizar cards das cenas" }));
+    expect(onOrganizeSceneMap).not.toHaveBeenCalled();
+    const frame = cards[0].parentElement!;
+    fireEvent.pointerDown(cards[0].querySelector("strong")!, { button: 0, pointerId: 7, clientX: 50, clientY: 50 });
+    fireEvent.pointerMove(window, { pointerId: 7, clientX: 150, clientY: 100 });
+    await waitFor(() => expect(frame.style.transform).toContain("translate3d"));
+    fireEvent.pointerUp(window, { pointerId: 7 });
+    expect(handlers.onUpdateSceneMapPosition).not.toHaveBeenCalled();
+    await user.click(toggle);
+    expect(container.querySelector(".scene-diagram-card")).toBeNull();
+    expect(Array.from(container.querySelectorAll<HTMLElement>(".room-stage-card-frame"), card => [card.style.left, card.style.top])).toEqual(originalPositions);
+    expect(JSON.stringify(project)).toBe(source);
+  });
+
+  it("opens a diagram scene with the keyboard and restores the mode when returning", async () => {
+    const user = userEvent.setup();
+    const project = createBlankProjectData({ name: "Diagram keyboard" });
+    const { container } = render(<RoomsWorkspace projectData={project} presentation={deriveRoomsWorkspacePresentation(project)} {...roomsWorkspaceHandlers()} />);
+    await user.click(screen.getByRole("button", { name: "Alternar visualização em organograma" }));
+    fireEvent.keyDown(container.querySelector(".scene-diagram-card")!, { key: "Enter" });
+    expect(container.querySelector(".room-focused-scene-editor-frame")).not.toBeNull();
+    await user.click(screen.getByRole("button", { name: "Voltar à visão geral" }));
+    expect(screen.getByRole("button", { name: "Alternar visualização em organograma" })).toHaveAttribute("aria-pressed", "true");
+  });
+
   afterEach(() => {
     cleanup();
     window.localStorage.clear();
@@ -730,10 +787,12 @@ describe("RoomsWorkspace React smoke", () => {
     expect(container.querySelector(".room-focused-scene-editor-frame .room-stage-card-actions")).toBeNull();
     expect(canvas).toHaveClass("is-grid-visible");
 
+    await openCanvasLayers(user);
     const gridVisibilityToggle = screen.getByRole("button", { name: "Ocultar camada Grade" });
     expect(gridVisibilityToggle).toBeInTheDocument();
     expect(gridVisibilityToggle).not.toHaveTextContent("Grade");
     expect(gridVisibilityToggle.querySelector("svg")).not.toBeNull();
+    await openCanvasLayers(user);
     expect(screen.getByRole("button", { name: "Bloquear camada Grade" })).not.toHaveTextContent("Grade");
   });
 
@@ -770,9 +829,11 @@ describe("RoomsWorkspace React smoke", () => {
     expect(hudOverlay.querySelector('[data-hud-component-id="hud-frame"]')).not.toBeNull();
     expect(hudOverlay.querySelector('[data-hud-component-id="hud-status"]')).not.toBeNull();
 
+    await openCanvasLayers(user);
     await user.click(screen.getByRole("button", { name: "Ocultar camada HUD" }));
     expect(screen.queryByRole("img", { name: "Preview da HUD HUD Dungeon · origem Sala" })).not.toBeInTheDocument();
 
+    await openCanvasLayers(user);
     await user.click(screen.getByRole("button", { name: "Mostrar camada HUD" }));
     expect(screen.getByRole("img", { name: "Preview da HUD HUD Dungeon · origem Sala" })).toBeInTheDocument();
   });
@@ -804,6 +865,7 @@ describe("RoomsWorkspace React smoke", () => {
     expect(hudOverlay.querySelector("img")).toHaveAttribute("src", expect.stringContaining("fight-hud.png"));
     expect(screen.queryByRole("img", { name: /^Preview da HUD .*origem/ })).not.toBeInTheDocument();
 
+    await openCanvasLayers(user);
     await user.click(screen.getByRole("button", { name: "Ocultar camada HUD" }));
     expect(screen.queryByRole("img", { name: "Prévia da HUD de luta fight-hud.png" })).not.toBeInTheDocument();
   });
@@ -873,6 +935,7 @@ describe("RoomsWorkspace React smoke", () => {
     });
 
     expect(hudScenes.map((scene) => scene.name)).toEqual([
+      "porto_lumen",
       "mapa_rota",
       "mercado_suspenso",
       "usina_submersa",
@@ -969,12 +1032,16 @@ describe("RoomsWorkspace React smoke", () => {
     await focusActiveScene(user);
 
     expect(screen.queryByRole("img", { name: "Prévia visual do menu Salvar" })).not.toBeInTheDocument();
+    await openCanvasLayers(user);
     expect(screen.getByRole("button", { name: "Mostrar camada Guias da composição" })).toBeInTheDocument();
+    await openCanvasLayers(user);
     expect(screen.getByRole("button", { name: "Ocultar camada HUD" })).toBeInTheDocument();
     expect(screen.queryByRole("img", { name: /Preview da HUD/ })).not.toBeInTheDocument();
 
+    await openCanvasLayers(user);
     await user.click(screen.getByRole("button", { name: "Mostrar camada Guias da composição" }));
     expect(screen.getByRole("img", { name: "Prévia visual do menu Salvar" })).toBeInTheDocument();
+    await openCanvasLayers(user);
     await user.click(screen.getByRole("button", { name: "Ocultar camada Guias da composição" }));
     expect(screen.queryByRole("img", { name: "Prévia visual do menu Salvar" })).not.toBeInTheDocument();
 
@@ -2107,6 +2174,7 @@ describe("RoomsWorkspace React smoke", () => {
 
     render(<RoomsWorkspace presentation={deriveRoomsWorkspacePresentation(project)} projectData={project} {...handlers} />);
     await focusScene(user, "gender-select");
+    await openCanvasLayers(user);
     await user.click(screen.getByRole("button", { name: "Mostrar camada Guias da composição" }));
     const genderPreview = screen.getByRole("img", { name: "Prévia visual da escolha de gênero" });
     expect(genderPreview).toBeInTheDocument();
@@ -2136,6 +2204,7 @@ describe("RoomsWorkspace React smoke", () => {
     cleanup();
     render(<RoomsWorkspace presentation={deriveRoomsWorkspacePresentation(project)} projectData={project} {...handlers} />);
     await focusScene(user, "gender-select");
+    await openCanvasLayers(user);
     await user.click(screen.getByRole("button", { name: "Mostrar camada Guias da composição" }));
     const namePreview = screen.getByRole("img", { name: "Prévia visual da entrada do nome" });
     expect(namePreview).toHaveAttribute("data-menu-preview-cursor-index", "0");
@@ -2591,8 +2660,10 @@ describe("RoomsWorkspace React smoke", () => {
     expect(canvas?.querySelector(".room-stage-cell.has-isometric-foreground")).toBeNull();
     expect(canvas?.querySelector(".room-stage-cell-tile")).toBeNull();
     expect(canvas?.querySelector(".room-stage-cell .tile-overlay-collision")).not.toBeNull();
+    await openCanvasLayers(user);
     await user.click(screen.getByRole("button", { name: "Ocultar camada Colisão" }));
     expect(canvas?.querySelector(".room-stage-cell .tile-overlay-collision")).toBeNull();
+    await openCanvasLayers(user);
     await user.click(screen.getByRole("button", { name: "Mostrar camada Colisão" }));
     expect(canvas?.querySelector(".room-stage-cell .tile-overlay-collision")).not.toBeNull();
     await user.click(container.querySelector<HTMLButtonElement>(
@@ -2775,8 +2846,10 @@ describe("RoomsWorkspace React smoke", () => {
     expect(geometryOverlay?.querySelector(".room-stage-isometric-grid-world-bounds")).not.toBeNull();
     expect(geometryOverlay?.querySelector(".room-stage-isometric-grid-camera-bounds")).not.toBeNull();
     expect(geometryOverlay?.querySelector(".room-stage-isometric-grid-grid-bounds")).not.toBeNull();
+    await openCanvasLayers(user);
     await user.click(screen.getByRole("button", { name: "Ocultar overlay Câmera" }));
     expect(geometryOverlay?.querySelector(".room-stage-isometric-grid-camera-bounds")).toBeNull();
+    await openCanvasLayers(user);
     await user.click(screen.getByRole("button", { name: "Mostrar overlay Câmera" }));
     expect(geometryOverlay?.querySelector(".room-stage-isometric-grid-camera-bounds")).not.toBeNull();
   });
@@ -2800,9 +2873,11 @@ describe("RoomsWorkspace React smoke", () => {
     const canvas = container.querySelector<HTMLElement>(".room-focused-scene-editor-frame .room-stage-card-canvas");
     expect(canvas).toHaveClass("is-grid-visible");
 
+    await openCanvasLayers(user);
     await user.click(screen.getByRole("button", { name: "Ocultar camada Grade" }));
     expect(canvas).not.toHaveClass("is-grid-visible");
 
+    await openCanvasLayers(user);
     await user.click(screen.getByRole("button", { name: "Bloquear camada Colisão" }));
     await user.click(screen.getByRole("button", { name: "Colisão - Sólidos" }));
     const collisionCell = canvas?.querySelector<HTMLButtonElement>(".room-stage-cell");
@@ -2811,6 +2886,7 @@ describe("RoomsWorkspace React smoke", () => {
     fireEvent.pointerUp(collisionCell!, { button: 0, buttons: 0, pointerId: 51 });
 
     expect(handlers.onSetCollisionType).not.toHaveBeenCalled();
+    await openCanvasLayers(user);
     await user.click(screen.getByRole("button", { name: "Desbloquear camada Colisão" }));
     fireEvent.pointerDown(collisionCell!, { button: 0, buttons: 1, pointerId: 52 });
     expect(handlers.onSetCollisionType).toHaveBeenCalledWith(initialRoom.id, 0, "solid", expect.any(String));
@@ -2908,6 +2984,7 @@ describe("RoomsWorkspace React smoke", () => {
     fireEvent.pointerUp(firstCell, { button: 0, buttons: 0, pointerId: 61 });
     expect(screen.getAllByText("Player").length).toBeGreaterThan(0);
 
+    await openCanvasLayers(user);
     await user.click(screen.getByRole("button", { name: "Bloquear camada Atores" }));
     fireEvent.keyDown(window, { key: "Delete" });
 
@@ -3788,15 +3865,16 @@ describe("RoomsWorkspace React smoke", () => {
     expect(paintMode).toHaveValue("fill");
     expect(topToolbar?.querySelector(".room-canvas-layer-toolbar")).toBeNull();
     const dock = container.querySelector(".room-scene-navigation");
-    expect(dock?.querySelector(".room-canvas-layer-toolbar")).toBeInTheDocument();
-    expect(dock).toHaveAttribute("aria-label", "Camadas e navegação");
-    const layers = dock!.querySelector("details")!;
-    expect(layers).not.toHaveAttribute("open");
-    await user.click(within(dock as HTMLElement).getByText("Camadas"));
-    expect(layers).toHaveAttribute("open");
+    expect(dock?.querySelector(".room-canvas-layer-toolbar")).toBeNull();
+    expect(dock).toHaveAttribute("aria-label", "Navegação da cena");
+    const layers = within(focusToolRail as HTMLElement).getByRole("button", { name: "Camadas" });
+    expect(layers).toHaveAttribute("aria-expanded", "false");
+    await user.click(layers);
+    expect(screen.getByRole("region", { name: "Camadas" })).toBeInTheDocument();
+    expect(paintButton).toHaveAttribute("aria-pressed", "true");
     await user.keyboard("{Escape}");
-    expect(layers).not.toHaveAttribute("open");
-    expect(layers.querySelector("summary")).toHaveFocus();
+    expect(layers).toHaveAttribute("aria-expanded", "false");
+    expect(layers).toHaveFocus();
 
     await user.click(within(focusToolRail as HTMLElement).getByRole("button", { name: /^HUD -/ }));
     const hudToolbar = screen.getByRole("toolbar", { name: "Ferramentas da HUD" });

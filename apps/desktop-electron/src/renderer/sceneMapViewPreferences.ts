@@ -1,5 +1,18 @@
 import { clampSceneMapZoom } from "../shared/sceneMapLayout.js";
 
+export type SceneMapViewMode = "preview" | "diagram";
+
+export function readSceneMapViewMode(projectPath: string | undefined): SceneMapViewMode {
+  try {
+    return projectPath && window.localStorage.getItem(`gba-studio:scene-map-view-mode:${projectPath}`) === "diagram" ? "diagram" : "preview";
+  } catch { return "preview"; }
+}
+
+export function writeSceneMapViewMode(projectPath: string | undefined, mode: SceneMapViewMode): void {
+  if (!projectPath) return;
+  try { window.localStorage.setItem(`gba-studio:scene-map-view-mode:${projectPath}`, mode); } catch { /* Navigation remains available. */ }
+}
+
 function preferenceKey(projectPath: string): string {
   return `gba-studio:scene-map-view-zoom:${projectPath}`;
 }

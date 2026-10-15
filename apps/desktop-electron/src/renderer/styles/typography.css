@@ -252,6 +252,12 @@
   width: auto;
 }
 
+.scene-diagram-card { font-size: var(--studio-font-size-sm); }
+.scene-diagram-card-heading strong { font-size: var(--studio-font-size-lg); }
+.scene-diagram-card-type { font-size: var(--studio-font-size-sm); }
+.scene-diagram-card-type em, .scene-diagram-card-bottom > span { font-size: var(--studio-font-size-xs); }
+.scene-diagram-card-type em { font-style: normal; }
+
 .workspace {
   font-size: var(--studio-font-size-md);
   font-weight: var(--studio-font-weight-semibold);
