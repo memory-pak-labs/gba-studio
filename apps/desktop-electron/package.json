@@ -22,6 +22,7 @@
     "verify:macos-universal-runtime": "node scripts/verify-macos-universal-runtime.mjs",
     "prepare:translation-models": "node scripts/prepare-translation-models.mjs",
     "audit:i18n-coverage": "node scripts/report-i18n-coverage.mjs",
+    "audit:i18n-ui": "node scripts/audit-ui-copy.mjs",
     "audit:p0-sources": "node scripts/audit-p0-sources.mjs",
     "audit:p0-sources:strict": "node scripts/audit-p0-sources.mjs --strict",
     "package": "npm run icons && npm run prepare:translation-models && npm run build && npm run prepare:embedded-runtime && node scripts/prepare-package-output.mjs && electron-builder --dir && node scripts/sign-macos-app.mjs",

@@ -1,3 +1,5 @@
+import { readStoredLocale } from "./i18n";
+import { uiText as ui, useStudioUiText } from "./studioUiText";
 import type { SceneActionHandler, SceneActionAuditEntry } from "../shared/sceneActionRouting.js";
 import { SceneAnalysisPanel } from "./SceneAnalysisPanel.js";
 import { CheckCircle2, CircleAlert, Info, Layers3, ShieldCheck, TriangleAlert } from "lucide-react";
@@ -57,9 +59,9 @@ function preflightStatusLabel(status: ScenePreflightStatus): string {
 
 function budgetItems(scene: ProjectHealthReport["scenes"][number]): Array<[string, string]> {
   return [
-    ["BG tiles", scene.budget.bgTiles.toLocaleString("pt-BR")],
-    ["OBJ tiles", scene.budget.objTiles.toLocaleString("pt-BR")],
-    ["OAM", scene.budget.oam.toLocaleString("pt-BR")],
+    ["BG tiles", scene.budget.bgTiles.toLocaleString(readStoredLocale())],
+    ["OBJ tiles", scene.budget.objTiles.toLocaleString(readStoredLocale())],
+    ["OAM", scene.budget.oam.toLocaleString(readStoredLocale())],
     ["VRAM", `${Math.round(scene.budget.vramBytes / 1024)} KB`],
     ["Eventos", `${Math.round(scene.budget.eventBytes / 1024)} KB`]
   ];
@@ -83,6 +85,7 @@ export function ProjectHealthWorkspace({
   onSceneAction,
   sceneActionHistory = []
 }: ProjectHealthWorkspaceProps): React.ReactElement {
+  const ui = useStudioUiText();
   const [filter, setFilter] = useState<ProjectHealthFilter>("all");
 
   const diagnostics = useMemo(() => {
@@ -93,14 +96,14 @@ export function ProjectHealthWorkspace({
   if (!report) {
     return (
       <section
-        aria-label={embedded ? "Saúde e preflight de exportação" : "Workspace Saúde"}
+        aria-label={embedded ? ui("Saúde e preflight de exportação") : ui("Workspace Saúde")}
         className={embedded ? "project-health-workspace embedded" : "project-health-workspace"}
       >
         <WorkspaceEmptyState
-          description="Abra ou crie um projeto para calcular contrato, capacidades, HUDs e orçamento."
-          hint="O relatório usa os mesmos dados consumidos pelo Editor, Play e exportação."
+          description={ui("Abra ou crie um projeto para calcular contrato, capacidades, HUDs e orçamento.")}
+          hint={ui("O relatório usa os mesmos dados consumidos pelo Editor, Play e exportação.")}
           icon={ShieldCheck}
-          title="Saúde indisponível"
+          title={ui("Saúde indisponível")}
         />
       </section>
     );
@@ -108,23 +111,23 @@ export function ProjectHealthWorkspace({
 
   return (
     <section
-      aria-label={embedded ? "Saúde e preflight de exportação" : "Workspace Saúde"}
+      aria-label={embedded ? ui("Saúde e preflight de exportação") : ui("Workspace Saúde")}
       className={embedded ? "project-health-workspace embedded" : "project-health-workspace"}
       data-project-health-status={report.status}
     >
-      <h3 className="studio-visually-hidden">{embedded ? "Saúde do projeto · Preflight" : "Saúde do projeto"}</h3>
+      <h3 className="studio-visually-hidden">{embedded ? ui("Saúde do projeto · Preflight") : ui("Saúde do projeto")}</h3>
 
       {sceneActionHistory.length > 0 ? <details className="scene-preflight-panel">
-        <summary>Ações de revisão nesta sessão · {sceneActionHistory.length}</summary>
-        <ul>{sceneActionHistory.map((entry, index) => <li key={index}>{entry.message} · {entry.status === 'opened' ? 'Navegação solicitada' : entry.status === 'rejected' ? 'Não executada' : 'Falhou'}</li>)}</ul>
-        <small>Últimas 20 ações. Histórico local, descartado ao trocar ou fechar o projeto.</small>
+        <summary>{ui("Ações de revisão nesta sessão · ")}{sceneActionHistory.length}</summary>
+        <ul>{sceneActionHistory.map((entry, index) => <li key={index}>{ui(entry.message)} · {entry.status === 'opened' ? ui("Navegação solicitada") : entry.status === 'rejected' ? ui("Não executada") : ui("Falhou")}</li>)}</ul>
+        <small>{ui("Últimas 20 ações. Histórico local, descartado ao trocar ou fechar o projeto.")}</small>
       </details> : null}
-      <div aria-label="Resumo da saúde do projeto" className="project-health-summary-grid">
+      <div aria-label={ui("Resumo da saúde do projeto")} className="project-health-summary-grid">
         <article className={`project-health-summary-card ${report.status}`}>
-          <span>Status</span>
+          <span>{ui("Status")}</span>
           <strong>
             <span
-              aria-label={`Status do projeto: ${statusLabel(report.status)}`}
+              aria-label={ui("Status do projeto: {0}", { 0: statusLabel(report.status) })}
               className={`project-health-status ${report.status}`}
               data-project-health-status={report.status}
               data-testid="project-health-status"
@@ -134,51 +137,51 @@ export function ProjectHealthWorkspace({
             </span>
           </strong>
           <small>
-            <span>{report.exportReady ? "Exportação liberada" : "Exportação bloqueada"}</span>
+            <span>{report.exportReady ? ui("Exportação liberada") : ui("Exportação bloqueada")}</span>
             <span>{healthStatusReviewDetail(report)}</span>
           </small>
         </article>
         <article className="project-health-summary-card">
-          <span>Cenas</span>
+          <span>{ui("Cenas")}</span>
           <strong>{report.scenes.length}</strong>
-          <small>perfis de capacidade</small>
+          <small>{ui("perfis de capacidade")}</small>
         </article>
         <article className="project-health-summary-card error">
-          <span>Bloqueios</span>
+          <span>{ui("Bloqueios")}</span>
           <strong>{report.counts.error}</strong>
-          <small>erros de contrato ou exportação</small>
+          <small>{ui("erros de contrato ou exportação")}</small>
         </article>
         <article className="project-health-summary-card warning">
-          <span>Avisos</span>
-          <strong>{report.counts.warning}</strong>
-          <small>itens que pedem revisão</small>
+          <span>{ui("Avisos")}</span>
+          <strong>{ui(report.counts.warning)}</strong>
+          <small>{ui("itens que pedem revisão")}</small>
         </article>
       </div>
 
-      <div className="project-health-filter-bar" role="toolbar" aria-label="Filtrar saúde do projeto">
-        <span>Exibir</span>
-        <StudioChip active={filter === "all"} onClick={() => setFilter("all")}>Tudo</StudioChip>
-        <StudioChip active={filter === "error"} onClick={() => setFilter("error")}>Bloqueios</StudioChip>
-        <StudioChip active={filter === "warning"} onClick={() => setFilter("warning")}>Avisos</StudioChip>
-        <StudioChip active={filter === "info"} onClick={() => setFilter("info")}>Informações</StudioChip>
+      <div className="project-health-filter-bar" role="toolbar" aria-label={ui("Filtrar saúde do projeto")}>
+        <span>{ui("Exibir")}</span>
+        <StudioChip active={filter === "all"} onClick={() => setFilter("all")}>{ui("Tudo")}</StudioChip>
+        <StudioChip active={filter === "error"} onClick={() => setFilter("error")}>{ui("Bloqueios")}</StudioChip>
+        <StudioChip active={filter === "warning"} onClick={() => setFilter("warning")}>{ui("Avisos")}</StudioChip>
+        <StudioChip active={filter === "info"} onClick={() => setFilter("info")}>{ui("Informações")}</StudioChip>
       </div>
 
       <div className="project-health-layout">
         <section aria-labelledby="project-health-diagnostics-title" className="project-health-panel">
           <header className="project-health-panel-header">
             <div>
-              <h4 id="project-health-diagnostics-title">Diagnósticos</h4>
-              <p>{diagnostics.length} item(ns) neste filtro</p>
+              <h4 id="project-health-diagnostics-title">{ui("Diagnósticos")}</h4>
+              <p>{diagnostics.length} {ui(" item(ns) neste filtro")}</p>
             </div>
             <Info aria-hidden="true" size={16} />
           </header>
           {diagnostics.length === 0 ? (
-            <p className="project-health-empty" role="status">Nenhum item neste filtro.</p>
+            <p className="project-health-empty" role="status">{ui("Nenhum item neste filtro.")}</p>
           ) : (
             <div className="project-health-diagnostic-list">
               {diagnostics.map((diagnostic) => (
                 <button
-                  aria-label={`Abrir ${diagnostic.message}`}
+                  aria-label={ui("Abrir {0}", { 0: ui(diagnostic.message) })}
                   className={diagnosticClassName(diagnostic.severity)}
                   key={diagnostic.id}
                   onClick={() => onOpenDiagnostic?.(diagnostic)}
@@ -186,7 +189,7 @@ export function ProjectHealthWorkspace({
                 >
                   <span className="project-health-diagnostic-icon">{diagnosticIcon(diagnostic.severity)}</span>
                   <span className="project-health-diagnostic-copy">
-                    <strong>{diagnostic.message}</strong>
+                    <strong>{ui(diagnostic.message)}</strong>
                     <small>
                       {[diagnostic.workspace, diagnostic.sceneName ?? diagnostic.targetName].filter(Boolean).join(" · ")}
                     </small>
@@ -200,8 +203,8 @@ export function ProjectHealthWorkspace({
         <section aria-labelledby="project-health-scenes-title" className="project-health-panel project-health-scenes-panel">
           <header className="project-health-panel-header">
             <div>
-              <h4 id="project-health-scenes-title">Capacidades por cena</h4>
-              <p>Perfil que Editor, Play e exportação devem respeitar.</p>
+              <h4 id="project-health-scenes-title">{ui("Capacidades por cena")}</h4>
+              <p>{ui("Perfil que Editor, Play e exportação devem respeitar.")}</p>
             </div>
             <Layers3 aria-hidden="true" size={16} />
           </header>
@@ -220,32 +223,32 @@ export function ProjectHealthWorkspace({
                       <div>
                         <strong>{sceneLabel}</strong>
                         <span>{scene.sceneLabel}</span>
-                        <small>Preview: {scene.previewMode}</small>
+                        <small>{ui("Preview: ")}{scene.previewMode}</small>
                         <small className={scene.preflight ? `project-health-preflight ${scene.preflight.status}` : "project-health-preflight unavailable"}>
-                          Preflight: {scene.preflight ? preflightStatusLabel(scene.preflight.status) : "não calculado"}
+                          {ui("Preflight: ")}{scene.preflight ? preflightStatusLabel(scene.preflight.status) : ui("não calculado")}
                         </small>
                       </div>
                       <span className="project-health-scene-type">{scene.sceneType}</span>
                     </div>
-                    <span className="project-health-scene-details-label">Ver detalhes</span>
+                    <span className="project-health-scene-details-label">{ui("Ver detalhes")}</span>
                   </summary>
                   <div className="project-health-scene-details">
                     {projectData ? <SceneAnalysisPanel data={projectData} projectPath={projectPath} sceneName={scene.sceneName} onOpenAction={onSceneAction} /> : null}
-                    <div className="project-health-tags" aria-label={`Módulos ativos de ${sceneLabel}`}>
+                    <div className="project-health-tags" aria-label={ui("Módulos ativos de {0}", { 0: sceneLabel })}>
                       {scene.enabledModules.length > 0 ? scene.enabledModules.map((module) => (
                         <span className="project-health-tag active" key={module}>{module}</span>
-                      )) : <span className="project-health-tag">sem módulos</span>}
+                      )) : <span className="project-health-tag">{ui("sem módulos")}</span>}
                     </div>
-                    <div className="project-health-budget" aria-label={`Orçamento de ${sceneLabel}`}>
-                      <span><b>Budget</b></span>
-                      {budgetItems(scene).map(([label, value]) => <span key={label}><b>{label}</b> {value}</span>)}
+                    <div className="project-health-budget" aria-label={ui("Orçamento de {0}", { 0: sceneLabel })}>
+                      <span><b>{ui("Budget")}</b></span>
+                      {budgetItems(scene).map(([label, value]) => <span key={label}><b>{ui(label)}</b> {value}</span>)}
                     </div>
                     {scene.preflight ? (
                       <div className="project-health-scene-preflight">
                         <ScenePreflightInspector physical={physical} report={scene.preflight} />
                       </div>
                     ) : (
-                      <p className="project-health-empty">O preflight desta cena ainda não foi calculado.</p>
+                      <p className="project-health-empty">{ui("O preflight desta cena ainda não foi calculado.")}</p>
                     )}
                     {room ? (
                       <div className="project-health-scene-authoring-diagnostics">

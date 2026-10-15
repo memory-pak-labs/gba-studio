@@ -10258,8 +10258,8 @@ body.room-scene-map-card-dragging .room-stage-card-frame.is-dragging {
   outline: none;
 }
 
-.rooms-workspace .workspace-explorer-rail .scene-tree-group-actions button[aria-label^="Remover"]:hover,
-.rooms-workspace .workspace-explorer-rail .scene-tree-group-actions button[aria-label^="Remover"]:focus-visible {
+.rooms-workspace .workspace-explorer-rail .scene-tree-group-actions .scene-tree-group-remove:hover,
+.rooms-workspace .workspace-explorer-rail .scene-tree-group-actions .scene-tree-group-remove:focus-visible {
   background: rgba(208, 65, 87, 0.12);
   color: var(--studio-color-danger, #c0394f);
 }

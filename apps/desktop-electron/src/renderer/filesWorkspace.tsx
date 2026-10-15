@@ -1,3 +1,5 @@
+import { readStoredLocale } from "./i18n";
+import { uiText as ui, useStudioUiText } from "./studioUiText";
 import { AlertTriangle, Boxes, Check, CheckCircle2, ChevronDown, FileImage, Grid3X3, Image, MessageSquare, MoreHorizontal, Package, Search, UserRound, Folder, FolderOpen, List, LayoutGrid, Replace, ExternalLink, Type } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import {
@@ -70,6 +72,7 @@ export function FilesWorkspace({
   onReplaceAsset,
   onOpenAssetWorkspace
 }: FilesWorkspaceProps): React.ReactElement {
+  const ui = useStudioUiText();
   const { t } = useStudioI18n();
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedKind, setSelectedKind] = useState("");
@@ -315,10 +318,10 @@ export function FilesWorkspace({
           </div>
 
           {selectedIDs.length > 0 ? (
-            <div className="files-batch-toolbar" aria-label="Ações para seleção de arquivos">
-              <strong>{selectedIDs.length} {selectedIDs.length === 1 ? "selecionado" : "selecionados"}</strong>
+            <div className="files-batch-toolbar" aria-label={ui("Ações para seleção de arquivos")}>
+              <strong>{selectedIDs.length} {selectedIDs.length === 1 ? ui("selecionado") : ui("selecionados")}</strong>
               <select
-                aria-label="Mover seleção para grupo"
+                aria-label={ui("Mover seleção para grupo")}
                 className="files-batch-select"
                 defaultValue=""
                 onChange={(event) => {
@@ -328,12 +331,12 @@ export function FilesWorkspace({
                   event.currentTarget.value = "";
                 }}
               >
-                <option value="">Mover para…</option>
-                <option value="__ungrouped__">Sem grupo</option>
+                <option value="">{ui("Mover para…")}</option>
+                <option value="__ungrouped__">{ui("Sem grupo")}</option>
                 {presentation.groups.map((group) => <option key={group.id} value={group.id}>{group.name}</option>)}
               </select>
               <select
-                aria-label="Converter tipo da seleção"
+                aria-label={ui("Converter tipo da seleção")}
                 className="files-batch-select"
                 defaultValue=""
                 onChange={(event) => {
@@ -343,14 +346,14 @@ export function FilesWorkspace({
                   event.currentTarget.value = "";
                 }}
               >
-                <option value="">Converter para…</option>
+                <option value="">{ui("Converter para…")}</option>
                 {["Sprite", "Tileset", "Background", "UI", "Emote", "Audio", "Fonte", "Arquivo"].map((kind) => (
                   <option key={kind} value={kind}>{kind}</option>
                 ))}
               </select>
-              <button aria-label="Renomear seleção" onClick={() => onBatchRenameAssets(selectedIDs)} type="button">Renomear</button>
-              <button aria-label="Remover seleção" className="files-batch-remove" onClick={() => onBatchRemoveAssets(selectedIDs)} type="button">Remover</button>
-              <button aria-label="Limpar seleção" onClick={() => setSelectedAssetIDs(new Set())} type="button">Limpar</button>
+              <button aria-label={ui("Renomear seleção")} onClick={() => onBatchRenameAssets(selectedIDs)} type="button">{ui("Renomear")}</button>
+              <button aria-label={ui("Remover seleção")} className="files-batch-remove" onClick={() => onBatchRemoveAssets(selectedIDs)} type="button">{ui("Remover")}</button>
+              <button aria-label={ui("Limpar seleção")} onClick={() => setSelectedAssetIDs(new Set())} type="button">{ui("Limpar")}</button>
             </div>
           ) : null}
 
@@ -372,12 +375,12 @@ export function FilesWorkspace({
                     >
                       <ChevronDown aria-hidden="true" className="asset-group-chevron" size={12} />
                       {group.icon}
-                      <span>{group.label}</span>
+                      <span>{ui(group.label)}</span>
                     </button>
                     <small>{group.assets.length}</small>
                   </header> : null}
                   {!selectedKind && !selectedFolder && collapsedGroupIDs.has(group.id) ? null : group.assets.length === 0 ? (
-                    <p className="asset-empty-row">{group.emptyLabel}</p>
+                    <p className="asset-empty-row">{ui(group.emptyLabel)}</p>
                   ) : (
                     <div className="asset-kind-group-list">
                       {group.assets.map((asset) => {
@@ -455,7 +458,7 @@ export function FilesWorkspace({
                 {activeFileInfo ? <span>{t("files.detail.formatSize", { format: activeFileInfo.format, size: activeFileInfo.byteSize === undefined ? t("files.detail.missing") : formatFileBytes(activeFileInfo.byteSize) })}</span> : null}
               </div>
               <div className="files-preview-actions" aria-label={t("files.inspector.aria")}>
-                <button aria-label={`${t("files.actions.replace")} de ${activeAsset.name}`} type="button" onClick={() => onReplaceAsset(activeAsset.id, activeAsset.name)}><Replace aria-hidden="true" size={15} />{t("files.actions.replace")}</button>
+                <button aria-label={ui("{0} de {1}", { 0: t("files.actions.replace"), 1: activeAsset.name })} type="button" onClick={() => onReplaceAsset(activeAsset.id, activeAsset.name)}><Replace aria-hidden="true" size={15} />{t("files.actions.replace")}</button>
                 <button aria-label={t("files.actions.more", { name: activeAsset.name })} aria-haspopup="menu"
                   aria-expanded={commandMenu?.state.label === activeAsset.name}
                   onClick={event => openCommandMenu(event, activeAsset.name, [
@@ -473,7 +476,7 @@ export function FilesWorkspace({
                     {activeAsset.usageLinks.map((link, index) => (
                       <li key={`${link.workspace}-${link.targetID}-${link.usageKind}-${index}`}>
                         {primaryActionIcon(link.workspace)}
-                        <span title={link.label}>{link.label}</span>
+                        <span title={ui(link.label)}>{ui(link.label)}</span>
                         <button type="button" aria-label={`${t("files.actions.openInWorkspace", { workspace: t(workspaceLabelKey(link.workspace)) })}: ${link.label}`}
                           onClick={() => openAssetWorkspace(activeAsset, link)}>
                           {t(link.workspace === "Editor" ? "files.actions.openScene" : "files.actions.openWorkspace")}<ExternalLink aria-hidden="true" size={12} />
@@ -496,7 +499,7 @@ export function FilesWorkspace({
                     <div><dt>{t("files.detail.gbaBudgetLabel")}</dt><dd>{t("files.detail.gbaBudget", { bytes: formatFileBytes(activeFileInfo.estimatedGbaBytes), percent: formatBudgetPercent(activeFileInfo.gbaBudgetPercent), colorMode: activeAsset.colorMode ?? "4bpp" })}</dd></div>
                   ) : null}
                   <div><dt>{t("files.group.field")}</dt><dd>{activeAsset.groupNames.length ? activeAsset.groupNames.join(" / ") : t("files.noGroup")}</dd></div>
-                  {activeUsageSummary.length ? <div><dt>{t("files.inspector.usageSummary")}</dt><dd>{activeUsageSummary.map(item => <p key={item.label}>{item.label}</p>)}</dd></div> : null}
+                  {activeUsageSummary.length ? <div><dt>{t("files.inspector.usageSummary")}</dt><dd>{activeUsageSummary.map(item => <p key={item.label}>{ui(item.label)}</p>)}</dd></div> : null}
                 </dl>
                 <AssetPipelineStatus asset={activeAsset} fileInfo={activeFileInfo} onRevealReport={onRevealAsset} t={t} />
                 {advancedTools ? <div className="files-details-advanced-tools">{advancedTools}</div> : null}
@@ -532,6 +535,7 @@ function assetIconForKind(kind: string): React.ReactElement {
 function AssetPipelineNotice({ fileInfo, failed, onDetails, t }: {
   fileInfo: InspectAssetFileResult | null; failed: boolean; onDetails(): void; t: FilesTranslate;
 }): React.ReactElement {
+  const ui = useStudioUiText();
   const prepared = fileInfo?.pipeline?.preparedStatus;
   const exported = fileInfo?.pipeline?.exportedStatus;
   const complete = fileInfo?.exists && prepared === "complete" && exported === "complete";
@@ -541,7 +545,7 @@ function AssetPipelineNotice({ fileInfo, failed, onDetails, t }: {
     : complete ? t("files.pipeline.exported.registered") : t("files.pipeline.status.pending");
   return <div className={`files-pipeline-notice ${warning ? "attention" : complete ? "complete" : "pending"}`}>
     {complete ? <CheckCircle2 aria-hidden="true" size={16} /> : <AlertTriangle aria-hidden="true" size={16} />}
-    <span>{label}</span><button onClick={onDetails} type="button">{t("files.detail.view")}</button>
+    <span>{ui(label)}</span><button onClick={onDetails} type="button">{t("files.detail.view")}</button>
   </div>;
 }
 
@@ -560,6 +564,7 @@ interface AssetGridThumbnailProps {
 }
 
 function AssetGridThumbnail({ asset, assetRefreshToken, projectPath }: AssetGridThumbnailProps): React.ReactElement {
+  const ui = useStudioUiText();
   const previewURL = assetPreviewURL(asset, projectPath, assetRefreshToken);
   const [dimensions, setDimensions] = useState<{ width: number; height: number } | null>(null);
   const { t } = useStudioI18n();
@@ -584,7 +589,7 @@ function AssetGridThumbnail({ asset, assetRefreshToken, projectPath }: AssetGrid
       ) : null}
     </span>
     <span className="asset-row-caption">{assetDisplayName(asset.name)}</span>
-    <small className="asset-row-kind">{dimensions ? `${dimensions.width} × ${dimensions.height} px` : categoryLabel(asset.kind, t)}</small>
+    <small className="asset-row-kind">{dimensions ? ui("{0} × {1} px", { 0: dimensions.width, 1: dimensions.height }) : categoryLabel(asset.kind, t)}</small>
     </>
   );
 }
@@ -602,6 +607,7 @@ interface AssetPipelineStatusProps {
 }
 
 function AssetPipelineStatus({ asset, fileInfo, onRevealReport, t }: AssetPipelineStatusProps): React.ReactElement {
+  const ui = useStudioUiText();
   const sourceStatus: AssetPipelineStageStatus = fileInfo?.exists ? "complete" : "pending";
   const preparedStatus = fileInfo?.pipeline?.preparedStatus ?? "pending";
   const exportedStatus = fileInfo?.pipeline?.exportedStatus ?? "pending";
@@ -649,7 +655,7 @@ function AssetPipelineStatus({ asset, fileInfo, onRevealReport, t }: AssetPipeli
             </span>
             <span className="pipeline-stage-copy">
               <strong>{t(`files.pipeline.stage.${stage.id}` as StudioTranslationKey)}</strong>
-              <small>{stage.detail}</small>
+              <small>{ui(stage.detail)}</small>
             </span>
             <span className="pipeline-stage-status">
               {t(`files.pipeline.status.${stage.status}` as StudioTranslationKey)}
@@ -788,7 +794,7 @@ function formatFileBytes(bytes: number): string {
 }
 
 function formatBudgetPercent(percent: number): string {
-  return `${percent.toLocaleString("pt-BR", { maximumFractionDigits: 1 })}%`;
+  return `${percent.toLocaleString(readStoredLocale(), { maximumFractionDigits: 1 })}%`;
 }
 
 function translatedCountLabel(

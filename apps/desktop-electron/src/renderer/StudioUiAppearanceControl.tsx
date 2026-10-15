@@ -1,3 +1,4 @@
+import { uiText as ui, useStudioUiText } from "./studioUiText";
 import { useEffect, useState } from "react";
 
 import { InspectorRange } from "./InspectorControls";
@@ -18,10 +19,11 @@ interface AppearanceRangeProps {
 }
 
 function AppearanceRange({ label, description, value, onChange }: AppearanceRangeProps): React.ReactElement {
+  const ui = useStudioUiText();
   return <InspectorRange
     ariaLabel={label}
     className="settings-ui-appearance-range"
-    description={description}
+    description={ui(description)}
     label={label}
     max={100}
     min={0}
@@ -33,6 +35,7 @@ function AppearanceRange({ label, description, value, onChange }: AppearanceRang
 }
 
 export function StudioUiAppearanceControl(): React.ReactElement {
+  const ui = useStudioUiText();
   const [appearance, setAppearance] = useState<StudioUiAppearance>(() => readStudioUiAppearance());
 
   useEffect(() => {
@@ -54,40 +57,40 @@ export function StudioUiAppearanceControl(): React.ReactElement {
     <section className="settings-ui-appearance-control" aria-labelledby="settings-ui-appearance-title">
       <header className="settings-ui-appearance-header">
         <div>
-          <strong id="settings-ui-appearance-title">Aparência da interface</strong>
-          <span>Refine a leitura do editor neste dispositivo.</span>
+          <strong id="settings-ui-appearance-title">{ui("Aparência da interface")}</strong>
+          <span>{ui("Refine a leitura do editor neste dispositivo.")}</span>
         </div>
-        <button onClick={resetAppearance} type="button">Restaurar</button>
+        <button onClick={resetAppearance} type="button">{ui("Restaurar")}</button>
       </header>
       <div className="settings-ui-appearance-ranges">
         <AppearanceRange
-          description="Neutraliza o fundo externo do editor."
-          label="Nível de cinza do plano de fundo"
+          description={ui("Neutraliza o fundo externo do editor.")}
+          label={ui("Nível de cinza do plano de fundo")}
           onChange={(value) => updateAppearance({ appBackgroundGray: value })}
           value={appearance.appBackgroundGray}
         />
         <AppearanceRange
-          description="Neutraliza o fundo das áreas de trabalho e pranchetas."
-          label="Nível de cinza do fundo da prancheta"
+          description={ui("Neutraliza o fundo das áreas de trabalho e pranchetas.")}
+          label={ui("Nível de cinza do fundo da prancheta")}
           onChange={(value) => updateAppearance({ canvasBackgroundGray: value })}
           value={appearance.canvasBackgroundGray}
         />
         <AppearanceRange
-          description="Aumenta ou reduz a definição das informações textuais."
-          label="Contraste de texto"
+          description={ui("Aumenta ou reduz a definição das informações textuais.")}
+          label={ui("Contraste de texto")}
           onChange={(value) => updateAppearance({ textContrast: value })}
           value={appearance.textContrast}
         />
         <AppearanceRange
-          description="Ajusta a luminosidade geral da janela do editor."
-          label="Brilho da interface"
+          description={ui("Ajusta a luminosidade geral da janela do editor.")}
+          label={ui("Brilho da interface")}
           onChange={(value) => updateAppearance({ brightness: value })}
           value={appearance.brightness}
         />
       </div>
       <fieldset className="settings-ui-contrast-control">
-        <legend>Contraste da UI</legend>
-        <div aria-label="Contraste da UI" role="radiogroup">
+        <legend>{ui("Contraste da UI")}</legend>
+        <div aria-label={ui("Contraste da UI")} role="radiogroup">
           {(["standard", "high"] as StudioUiContrast[]).map((value) => (
             <label key={value}>
               <input
@@ -97,7 +100,7 @@ export function StudioUiAppearanceControl(): React.ReactElement {
                 type="radio"
                 value={value}
               />
-              <span>{value === "standard" ? "Padrão" : "Alto"}</span>
+              <span>{value === "standard" ? ui("Padrão") : ui("Alto")}</span>
             </label>
           ))}
         </div>

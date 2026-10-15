@@ -1,7 +1,9 @@
 import { app, BrowserWindow, Menu, type MenuItemConstructorOptions } from "electron";
 import { ipcChannels, type AppCommand } from "../shared/ipc.js";
+import { translateStudioMessage } from "../shared/studioUiMessages.js";
 
 interface AppMenuOptions {
+  locale?: string;
   appName?: string;
   isMac?: boolean;
   sendCommand(command: AppCommand): void;
@@ -123,14 +125,19 @@ export function createAppMenuTemplate(options: AppMenuOptions): MenuItemConstruc
     ]
   });
 
-  return template;
+  const localize = (items: MenuItemConstructorOptions[]): MenuItemConstructorOptions[] => items.map(item => ({
+    ...item,
+    ...(item.label && item.label !== options.appName ? { label: translateStudioMessage(options.locale ?? "pt-BR", item.label) } : {}),
+    ...(Array.isArray(item.submenu) ? { submenu: localize(item.submenu) } : {})
+  }));
+  return localize(template);
 }
 
-export function installAppMenu(): void {
+export function installAppMenu(locale = "pt-BR"): void {
   const sendCommand = (command: AppCommand): void => {
     const target = BrowserWindow.getFocusedWindow() ?? BrowserWindow.getAllWindows()[0];
     target?.webContents.send(ipcChannels.appCommand, command);
   };
 
-  Menu.setApplicationMenu(Menu.buildFromTemplate(createAppMenuTemplate({ sendCommand })));
+  Menu.setApplicationMenu(Menu.buildFromTemplate(createAppMenuTemplate({ sendCommand, locale })));
 }

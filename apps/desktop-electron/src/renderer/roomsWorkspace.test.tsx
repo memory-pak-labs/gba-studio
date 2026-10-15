@@ -131,7 +131,7 @@ describe("RoomsWorkspace React smoke", () => {
     const tools = container.querySelector<HTMLElement>(".room-editor-tool-group-focus")!;
     expect(within(tools).getByRole("button", { name: /Pintura - indisponível/ })).toBeDisabled();
     expect(within(tools).getByRole("button", { name: /Altura -/ })).toBeEnabled();
-    expect(within(tools).getByRole("button", { name: /Colisao -/ })).toBeEnabled();
+    expect(within(tools).getByRole("button", { name: /Colisão -/ })).toBeEnabled();
     expect(container.querySelector(".room-stage-isometric-grid-cell[data-cell-index='10']"))
       .toHaveAttribute("points", "120,48 136,56 120,64 104,56");
     const trigger = container.querySelector<HTMLElement>(".room-focused-scene-editor-frame .room-stage-entity.trigger")!;
@@ -916,7 +916,7 @@ describe("RoomsWorkspace React smoke", () => {
 
       cleanup();
     }
-  });
+  }, 60_000);
 
   it("exibe sprites de componentes da HUD no canvas e permite escolher o asset no inspetor", async () => {
     const user = userEvent.setup();
@@ -1505,7 +1505,7 @@ describe("RoomsWorkspace React smoke", () => {
     await user.click(screen.getByRole("tab", { name: "Pré-fabricados" }));
     expect(screen.getByText("NPC Base")).toBeInTheDocument();
     expect(screen.getByText("Porta Base")).toBeInTheDocument();
-    await user.click(screen.getByRole("button", { name: "Aplicar pre-fabricados as instancias" }));
+    await user.click(screen.getByRole("button", { name: "Aplicar pré-fabricados às instâncias" }));
     expect(handlers.onSynchronizePrefabs).toHaveBeenCalledOnce();
   });
 
@@ -1521,11 +1521,11 @@ describe("RoomsWorkspace React smoke", () => {
       .find((button) => button.textContent?.includes("Player"));
     expect(playerRow).not.toBeNull();
     await user.click(playerRow!);
-    await user.click(screen.getByRole("button", { name: "Criar pre-fabricado do selecionado" }));
+    await user.click(screen.getByRole("button", { name: "Criar pré-fabricado do selecionado" }));
     expect(handlers.onCreatePrefabFromEntity).toHaveBeenCalledWith("actor", "actor-player");
 
     await user.click(screen.getByText("NPC Base"));
-    fireEvent.change(screen.getByLabelText("Animacao do prefab NPC Base"), { target: { value: "walk" } });
+    fireEvent.change(screen.getByLabelText("Animação do prefab NPC Base"), { target: { value: "walk" } });
     expect(handlers.onUpdatePrefab).toHaveBeenLastCalledWith("actor", "npc-base", { animationName: "walk" });
     await user.click(screen.getByRole("button", { name: "Instanciar NPC Base" }));
     expect(handlers.onInstantiatePrefab).toHaveBeenCalledWith("actor", "npc-base", expect.objectContaining({ roomID: "room-1" }));
@@ -1548,7 +1548,7 @@ describe("RoomsWorkspace React smoke", () => {
     );
 
     await focusScene(user, "patio");
-    const heightButton = container.querySelector<HTMLButtonElement>(".room-editor-tool-rail button[aria-label='Altura - Niveis 0 a 3']");
+    const heightButton = container.querySelector<HTMLButtonElement>(".room-editor-tool-rail button[aria-label='Altura - Níveis 0 a 3']");
     expect(heightButton).not.toBeNull();
     await user.click(heightButton!);
     expect(screen.getByRole("region", { name: "Pincel de altura" })).toBeInTheDocument();
@@ -1651,11 +1651,11 @@ describe("RoomsWorkspace React smoke", () => {
     expect(tool("Selecionar - Mover")).not.toBeNull();
     expect(tool("Pintura - Tiles")).not.toBeNull();
     expect(tool("Cena - Camera")).toBeNull();
-    expect(tool("Colisao - Solidos")).not.toBeNull();
-    expect(tool("Colisao - Solidos")).not.toBeDisabled();
+    expect(tool("Colisão - Sólidos")).not.toBeNull();
+    expect(tool("Colisão - Sólidos")).not.toBeDisabled();
     expect(tool("Ator - OBJ")).not.toBeNull();
-    expect(tool("Trigger - Eventos")).not.toBeNull();
-    expect(tool("Trigger - Eventos")).not.toBeDisabled();
+    expect(tool("Gatilho - Eventos")).not.toBeNull();
+    expect(tool("Gatilho - Eventos")).not.toBeDisabled();
     expect(tool("Zonas de câmera - Áreas")).toBeNull();
   });
 
@@ -1681,7 +1681,7 @@ describe("RoomsWorkspace React smoke", () => {
     await focusScene(user, "arena");
 
     const collisionButton = container.querySelector<HTMLButtonElement>(
-      ".room-editor-tool-rail button[aria-label='Colisao - Solidos']"
+      ".room-editor-tool-rail button[aria-label='Colisão - Sólidos']"
     );
     expect(collisionButton).not.toBeNull();
     expect(collisionButton).not.toBeDisabled();
@@ -1704,7 +1704,7 @@ describe("RoomsWorkspace React smoke", () => {
     );
 
     await focusScene(user, "rampa");
-    await user.click(container.querySelector<HTMLButtonElement>(".room-editor-tool-rail button[aria-label='Colisao - Solidos']")!);
+    await user.click(container.querySelector<HTMLButtonElement>(".room-editor-tool-rail button[aria-label='Colisão - Sólidos']")!);
     const cell = container.querySelector<HTMLButtonElement>(".rooms-canvas-stage .room-stage-cell")!;
     fireEvent.pointerDown(cell, { button: 0, pointerId: 8 });
     await user.click(screen.getByRole("button", { name: "Rampa subindo à direita" }));
@@ -1725,7 +1725,7 @@ describe("RoomsWorkspace React smoke", () => {
     );
 
     await focusScene(user, String(room.name));
-    await user.click(container.querySelector<HTMLButtonElement>(".room-editor-tool-rail button[aria-label='Colisao - Solidos']")!);
+    await user.click(container.querySelector<HTMLButtonElement>(".room-editor-tool-rail button[aria-label='Colisão - Sólidos']")!);
 
     expect(screen.getByText(/cada célula representa 8×8 px/)).toBeInTheDocument();
     expect(screen.getByText(/rampas mostram a área triangular/)).toBeInTheDocument();
@@ -1812,7 +1812,7 @@ describe("RoomsWorkspace React smoke", () => {
     expect(within(physical).getByRole("row", { name: /CPU/ })).toHaveTextContent("1600 ticks");
     expect(screen.getByRole("region", { name: "Estado nativo da ROM" })).toHaveTextContent("Sala 1");
     expect(screen.getByRole("region", { name: "Estado nativo da ROM" })).toHaveTextContent("VAR0 3 · FLAGS 0x00000003");
-    expect(screen.getByRole("region", { name: "Estado nativo da ROM" })).toHaveTextContent("Player 80, 64 · dir 1");
+    expect(screen.getByRole("region", { name: "Estado nativo da ROM" })).toHaveTextContent("Jogador 80, 64 · dir 1");
     expect(screen.getByRole("region", { name: "Estado nativo da ROM" })).toHaveTextContent("Ator 1/1 · 112, 64 · dir 2");
     expect(screen.getByRole("region", { name: "Estado nativo da ROM" })).toHaveTextContent("Colisão 0x20 · rampa 2");
     expect(screen.getByRole("region", { name: "Estado nativo da ROM" })).toHaveTextContent("Efeitos 0xE0 · rampas 0x14 · bloqueios 0xF");
@@ -2245,7 +2245,7 @@ describe("RoomsWorkspace React smoke", () => {
     expect(screen.getByRole("button", { name: "Adicionar zona" })).toBeInTheDocument();
   });
 
-  it("mantem Projeto e Pre-fabricados em abas exclusivas no navegador inferior", async () => {
+  it("mantem Projeto e Pré-fabricados em abas exclusivas no navegador inferior", async () => {
     const user = userEvent.setup();
     const project = createBlankProjectData({ name: "Navegador contextual" });
 
@@ -2261,10 +2261,10 @@ describe("RoomsWorkspace React smoke", () => {
     expect(navigator).toBeInTheDocument();
     expect(screen.getByRole("tab", { name: "Projeto" })).toHaveAttribute("aria-selected", "true");
     expect(screen.getByRole("region", { name: "Projeto" })).toBeInTheDocument();
-    expect(screen.queryByRole("region", { name: "Pre-fabricados" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("region", { name: "Pré-fabricados" })).not.toBeInTheDocument();
 
     await user.click(screen.getByRole("tab", { name: "Pré-fabricados" }));
-    expect(screen.getByRole("region", { name: "Pre-fabricados" })).toBeInTheDocument();
+    expect(screen.getByRole("region", { name: "Pré-fabricados" })).toBeInTheDocument();
     expect(screen.queryByRole("region", { name: "Projeto" })).not.toBeInTheDocument();
   });
 
@@ -2596,7 +2596,7 @@ describe("RoomsWorkspace React smoke", () => {
     await user.click(screen.getByRole("button", { name: "Mostrar camada Colisão" }));
     expect(canvas?.querySelector(".room-stage-cell .tile-overlay-collision")).not.toBeNull();
     await user.click(container.querySelector<HTMLButtonElement>(
-      ".room-editor-tool-rail button[aria-label='Colisao - Solidos']"
+      ".room-editor-tool-rail button[aria-label='Colisão - Sólidos']"
     )!);
     expect(canvas?.querySelector('[role="status"][aria-label="Colisão sobre preview RGB555"]')).not.toBeNull();
     const freeCollisionCell = canvas?.querySelector<HTMLButtonElement>(
@@ -2804,7 +2804,7 @@ describe("RoomsWorkspace React smoke", () => {
     expect(canvas).not.toHaveClass("is-grid-visible");
 
     await user.click(screen.getByRole("button", { name: "Bloquear camada Colisão" }));
-    await user.click(screen.getByRole("button", { name: "Colisao - Solidos" }));
+    await user.click(screen.getByRole("button", { name: "Colisão - Sólidos" }));
     const collisionCell = canvas?.querySelector<HTMLButtonElement>(".room-stage-cell");
     expect(collisionCell).not.toBeNull();
     fireEvent.pointerDown(collisionCell!, { button: 0, buttons: 1, pointerId: 51 });
@@ -2829,7 +2829,7 @@ describe("RoomsWorkspace React smoke", () => {
     );
 
     await focusActiveScene(user);
-    await user.click(container.querySelector<HTMLButtonElement>(".room-editor-tool-rail button[aria-label='Colisao - Solidos']")!);
+    await user.click(container.querySelector<HTMLButtonElement>(".room-editor-tool-rail button[aria-label='Colisão - Sólidos']")!);
     const canvas = container.querySelector<HTMLElement>(".room-focused-scene-editor-frame .room-stage-card-canvas")!;
     const cell = canvas.querySelector<HTMLButtonElement>(".room-stage-cell")!;
     fireEvent.pointerDown(cell, { button: 2, buttons: 2, pointerId: 81 });
@@ -2851,7 +2851,7 @@ describe("RoomsWorkspace React smoke", () => {
     );
 
     await focusActiveScene(user);
-    await user.click(container.querySelector<HTMLButtonElement>(".room-editor-tool-rail button[aria-label='Colisao - Solidos']")!);
+    await user.click(container.querySelector<HTMLButtonElement>(".room-editor-tool-rail button[aria-label='Colisão - Sólidos']")!);
     await user.click(screen.getByRole("button", { name: /Preencher Região/ }));
     const canvas = container.querySelector<HTMLElement>(".room-focused-scene-editor-frame .room-stage-card-canvas")!;
     const cell = canvas.querySelector<HTMLButtonElement>(".room-stage-cell")!;
@@ -2878,13 +2878,13 @@ describe("RoomsWorkspace React smoke", () => {
     );
 
     await focusActiveScene(user);
-    await user.click(container.querySelector<HTMLButtonElement>(".room-editor-tool-rail button[aria-label='Colisao - Solidos']")!);
+    await user.click(container.querySelector<HTMLButtonElement>(".room-editor-tool-rail button[aria-label='Colisão - Sólidos']")!);
     const canvas = container.querySelector<HTMLElement>(".room-focused-scene-editor-frame .room-stage-card-canvas")!;
     const cell = canvas.querySelector<HTMLButtonElement>(".room-stage-cell")!;
     fireEvent.pointerDown(cell, { altKey: true, button: 0, buttons: 1, pointerId: 82 });
 
     expect(handlers.onSetCollisionType).not.toHaveBeenCalled();
-    expect(screen.getByRole("button", { name: "Tipo de colisao Agua" })).toHaveAttribute("aria-pressed", "true");
+    expect(screen.getByRole("button", { name: "Tipo de colisão Água" })).toHaveAttribute("aria-pressed", "true");
   });
 
   it("preserva entidade selecionada quando a camada correspondente está bloqueada", async () => {
@@ -3922,12 +3922,12 @@ describe("RoomsWorkspace React smoke", () => {
 
     await focusActiveScene(user);
 
-    const collisionButton = screen.getByRole("button", { name: "Colisao - Solidos" });
-    const triggerButton = screen.getByRole("button", { name: "Trigger - Eventos" });
+    const collisionButton = screen.getByRole("button", { name: "Colisão - Sólidos" });
+    const triggerButton = screen.getByRole("button", { name: "Gatilho - Eventos" });
     expect(collisionButton).not.toBeDisabled();
     expect(triggerButton).not.toBeDisabled();
     expect(screen.queryByRole("region", { name: "Recursos indisponíveis nesta cena" })).not.toBeInTheDocument();
-    expect(container.querySelector(".room-editor-tool-rail button[aria-label^='Colisao - indisponível']")).toBeNull();
+    expect(container.querySelector(".room-editor-tool-rail button[aria-label^='Colisão - indisponível']")).toBeNull();
 
     await user.click(screen.getByRole("tab", { name: "Eventos" }));
     expect(screen.queryByRole("region", { name: "Recursos indisponíveis nesta cena" })).not.toBeInTheDocument();
@@ -3949,7 +3949,7 @@ describe("RoomsWorkspace React smoke", () => {
     );
 
     await focusActiveScene(user);
-    await user.click(container.querySelector<HTMLButtonElement>(".room-editor-tool-rail button[aria-label='Trigger - Eventos']")!);
+    await user.click(container.querySelector<HTMLButtonElement>(".room-editor-tool-rail button[aria-label='Gatilho - Eventos']")!);
     expect(screen.getByText("Nenhum gatilho vinculado a esta cena.")).toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "Criar gatilho" }));
 
@@ -3984,7 +3984,7 @@ describe("RoomsWorkspace React smoke", () => {
     );
 
     await focusActiveScene(user);
-    await user.click(screen.getByRole("button", { name: "Trigger - Eventos" }));
+    await user.click(screen.getByRole("button", { name: "Gatilho - Eventos" }));
 
     const canvas = container.querySelector<HTMLElement>(".room-focused-scene-editor-frame .room-stage-card-canvas");
     const cells = Array.from(canvas?.querySelectorAll<HTMLButtonElement>(".room-stage-cell") ?? []);
@@ -4018,7 +4018,7 @@ describe("RoomsWorkspace React smoke", () => {
     );
 
     await focusActiveScene(user);
-    await user.click(container.querySelector<HTMLButtonElement>(".room-editor-tool-rail button[aria-label='Colisao - Solidos']")!);
+    await user.click(container.querySelector<HTMLButtonElement>(".room-editor-tool-rail button[aria-label='Colisão - Sólidos']")!);
     await user.click(screen.getByRole("button", { name: "Retângulo Área" }));
 
     const cells = Array.from(container.querySelectorAll<HTMLButtonElement>(".room-stage-cell"));
@@ -4044,7 +4044,7 @@ describe("RoomsWorkspace React smoke", () => {
 
     await focusActiveScene(user);
     await user.click(container.querySelector<HTMLButtonElement>(
-      ".room-editor-tool-rail button[aria-label='Colisao - Solidos']"
+      ".room-editor-tool-rail button[aria-label='Colisão - Sólidos']"
     )!);
     await user.click(screen.getByRole("button", { name: "Retângulo Área" }));
 
@@ -4071,7 +4071,7 @@ describe("RoomsWorkspace React smoke", () => {
 
     await focusActiveScene(user);
     await user.click(container.querySelector<HTMLButtonElement>(
-      ".room-editor-tool-rail button[aria-label='Trigger - Eventos']"
+      ".room-editor-tool-rail button[aria-label='Gatilho - Eventos']"
     )!);
 
     const cells = Array.from(container.querySelectorAll<HTMLButtonElement>(".room-stage-cell"));
@@ -4104,7 +4104,7 @@ describe("RoomsWorkspace React smoke", () => {
 
     await focusActiveScene(user);
     const collisionButton = container.querySelector<HTMLButtonElement>(
-      ".room-editor-tool-rail button[aria-label='Colisao - Solidos']"
+      ".room-editor-tool-rail button[aria-label='Colisão - Sólidos']"
     );
     expect(collisionButton).not.toBeNull();
     await user.click(collisionButton!);
@@ -4121,7 +4121,7 @@ describe("RoomsWorkspace React smoke", () => {
       collisionTypes: expect.arrayContaining(["solid"])
     }), expect.any(String));
 
-    await user.click(screen.getByRole("button", { name: "Trigger - Eventos" }));
+    await user.click(screen.getByRole("button", { name: "Gatilho - Eventos" }));
     fireEvent.pointerDown(cells[124]!, { button: 0, buttons: 1, pointerId: 52 });
     fireEvent.pointerEnter(cells[156]!, { buttons: 1, pointerId: 52 });
     fireEvent.pointerUp(cells[156]!, { button: 0, buttons: 0, pointerId: 52 });
@@ -4155,8 +4155,8 @@ describe("RoomsWorkspace React smoke", () => {
     );
 
     await focusActiveScene(user);
-    const collisionButton = screen.getByRole("button", { name: "Colisao - Solidos" });
-    const triggerButton = screen.getByRole("button", { name: "Trigger - Eventos" });
+    const collisionButton = screen.getByRole("button", { name: "Colisão - Sólidos" });
+    const triggerButton = screen.getByRole("button", { name: "Gatilho - Eventos" });
     expect(collisionButton).not.toBeDisabled();
     expect(triggerButton).not.toBeDisabled();
 

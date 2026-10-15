@@ -1,3 +1,4 @@
+import { uiText as ui, useStudioUiText } from "./studioUiText";
 import { useMemo, type ReactElement } from "react";
 
 import {
@@ -54,6 +55,7 @@ export function ShmupSceneCompositionInspector({
   roomHeight,
   roomWidth
 }: ShmupSceneCompositionInspectorProps): ReactElement {
+  const ui = useStudioUiText();
   const resolution = useMemo(
     () => resolveShmupSceneComposition({
       composition,
@@ -66,53 +68,53 @@ export function ShmupSceneCompositionInspector({
   return (
     <InspectorSection
       className="shmup-scene-composition-inspector room-detail-editor-span-2"
-      description="A composição SHMUP mantém HUD, atores, obstáculos/colisão e fundo em contratos separados. Affine só entra quando a capability estiver habilitada explicitamente."
-      title="Composição SHMUP"
+      description={ui("A composição SHMUP mantém HUD, atores, obstáculos/colisão e fundo em contratos separados. Affine só entra quando a capability estiver habilitada explicitamente.")}
+      title={ui("Composição SHMUP")}
     >
       <div className="shmup-scene-composition-heading">
         <div>
-          <strong>Perfil horizontal · Mode 1</strong>
+          <strong>{ui("Perfil horizontal · Mode 1")}</strong>
           <small>{contractStatus(resolution)}</small>
         </div>
         <span className={resolution.issues.length > 0 ? "is-warning" : "is-valid"} role="status">
-          {resolution.issues.length > 0 ? `${resolution.issues.length} incompatibilidade(s)` : "Contrato compatível"}
+          {resolution.issues.length > 0 ? ui("{0} incompatibilidade(s)", { 0: resolution.issues.length }) : ui("Contrato compatível")}
         </span>
       </div>
 
-      <div className="shmup-scene-composition-planes" aria-label="Planos da cena SHMUP">
+      <div className="shmup-scene-composition-planes" aria-label={ui("Planos da cena SHMUP")}>
         {planeDetail(resolution.config).map((plane) => (
           <article className="shmup-scene-composition-plane" data-plane-id={plane.id} key={plane.id}>
-            <strong>{plane.title}</strong>
-            <span>{plane.detail}</span>
+            <strong>{ui(plane.title)}</strong>
+            <span>{ui(plane.detail)}</span>
           </article>
         ))}
       </div>
 
-      <dl className="shmup-scene-composition-metrics" aria-label="Dimensões físicas do SHMUP">
+      <dl className="shmup-scene-composition-metrics" aria-label={ui("Dimensões físicas do SHMUP")}>
         <div>
-          <dt>Viewport</dt>
-          <dd>{resolution.config.viewport.widthPixels}×{resolution.config.viewport.heightPixels}px</dd>
+          <dt>{ui("Viewport")}</dt>
+          <dd>{resolution.config.viewport.widthPixels}×{resolution.config.viewport.heightPixels}{ui("px")}</dd>
         </div>
         <div>
-          <dt>Mundo lógico</dt>
-          <dd>{resolution.config.world.widthPixels}×{resolution.config.world.heightPixels}px · {resolution.config.world.widthTiles}×{resolution.config.world.heightTiles} tiles</dd>
+          <dt>{ui("Mundo lógico")}</dt>
+          <dd>{resolution.config.world.widthPixels}×{resolution.config.world.heightPixels}{ui("px · ")}{resolution.config.world.widthTiles}×{resolution.config.world.heightTiles} {ui(" tiles")}</dd>
         </div>
         <div>
-          <dt>Mapa Affine físico</dt>
-          <dd>{resolution.config.world.affineMapWidthTiles}×{resolution.config.world.affineMapHeightTiles} tiles · {affine ? `${affine.bpp} bpp` : "não carregado"}</dd>
+          <dt>{ui("Mapa Affine físico")}</dt>
+          <dd>{resolution.config.world.affineMapWidthTiles}×{resolution.config.world.affineMapHeightTiles} {ui(" tiles · ")}{affine ? ui("{0} bpp", { 0: affine.bpp }) : ui("não carregado")}</dd>
         </div>
         <div>
-          <dt>Asset Affine</dt>
-          <dd>{affine?.assetId ?? "nenhum · fallback tiled"}</dd>
+          <dt>{ui("Asset Affine")}</dt>
+          <dd>{affine?.assetId ?? ui("nenhum · fallback tiled")}</dd>
         </div>
       </dl>
 
       {resolution.issues.length > 0 ? (
         <ul className="shmup-scene-composition-issues" role="status">
-          {resolution.issues.map((issue) => <li key={`${issue.code}-${issue.field}`}>{issue.message}</li>)}
+          {resolution.issues.map((issue) => <li key={`${issue.code}-${issue.field}`}>{ui(issue.message)}</li>)}
         </ul>
       ) : (
-        <p className="shmup-scene-composition-valid" role="status">HUD, atores, colisão e fundo serão exportados em planos independentes.</p>
+        <p className="shmup-scene-composition-valid" role="status">{ui("HUD, atores, colisão e fundo serão exportados em planos independentes.")}</p>
       )}
     </InspectorSection>
   );

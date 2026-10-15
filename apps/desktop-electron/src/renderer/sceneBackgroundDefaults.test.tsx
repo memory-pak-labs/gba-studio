@@ -23,9 +23,9 @@ describe("scene background defaults", () => {
     expect(onUpdateSetting).toHaveBeenLastCalledWith("sceneTypes", "defaultBackgrounds.topdown", "");
     fireEvent.change(select, { target: { value: "neutral-background-custom.png" } });
     expect(onUpdateSetting).toHaveBeenLastCalledWith("sceneTypes", "defaultBackgrounds.topdown", "neutral-background-custom.png");
-    fireEvent.click(screen.getByRole("button", { name: "Isométrico seção de ajustes" }));
+    fireEvent.click(screen.getByRole("button", { name: "Seção de ajustes: Isométrico" }));
     expect(screen.getByRole("combobox", { name: "Background padrão · Isométrico tático" })).toHaveValue("neutral-background-isometric-tactical.png");
-    fireEvent.click(screen.getByRole("button", { name: "Corrida seção de ajustes" }));
+    fireEvent.click(screen.getByRole("button", { name: "Seção de ajustes: Corrida" }));
     expect(screen.getByRole("combobox", { name: "Background padrão · Corrida em perspectiva" })).toHaveValue("neutral-background-racing-rear.png");
   });
 });

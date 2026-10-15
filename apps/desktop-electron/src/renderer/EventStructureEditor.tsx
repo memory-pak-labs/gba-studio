@@ -1,3 +1,4 @@
+import { uiText as ui, useStudioUiText } from "./studioUiText";
 import type { ReactNode } from "react";
 import { useState } from "react";
 
@@ -100,6 +101,7 @@ function EventStructureDropSlot({
   onOpenCommandMenu,
   target
 }: EventStructureDropSlotProps): React.ReactElement {
+  const ui = useStudioUiText();
   const [isDropActive, setIsDropActive] = useState(false);
   const canDrop = Boolean(onDropBlock);
 
@@ -116,7 +118,7 @@ function EventStructureDropSlot({
 
   return (
     <button
-      aria-label={label}
+      aria-label={ui(label)}
       className={isDropActive ? "is-drop-target" : ""}
       onClick={() => onOpenCommandMenu(target)}
       onDragEnter={canDrop ? () => setIsDropActive(true) : undefined}
@@ -150,6 +152,7 @@ function EventStructureSequenceView({
   stepPresentations,
   target
 }: EventStructureSequenceViewProps): React.ReactElement {
+  const ui = useStudioUiText();
   return (
     <ol className="event-structure-sequence">
       {sequence.children.map((node) => (
@@ -173,7 +176,7 @@ function EventStructureSequenceView({
       <li className="event-structure-add">
         <EventStructureDropSlot
           buttonLabel="Adicionar evento"
-          label={target.kind === "root" ? "Adicionar evento ao fluxo principal" : `Adicionar evento em ${target.kind === "trueBranch" ? "Se sim" : "Se não"}`}
+          label={target.kind === "root" ? ui("Adicionar evento ao fluxo principal") : ui("Adicionar evento em {0}", { 0: target.kind === "trueBranch" ? "Se sim" : "Se não" })}
           onDropBlock={onDropBlock}
           onOpenCommandMenu={onOpenCommandMenu}
           target={target}
@@ -212,6 +215,7 @@ function EventStructureNodeView({
   selectionMode: boolean;
   stepPresentations: ReadonlyMap<number, EventStructureStepPresentation>;
 }): React.ReactElement {
+  const ui = useStudioUiText();
   if (node.kind === "step") {
     const presentation = stepPresentations.get(node.index);
     const category = presentation
@@ -225,7 +229,7 @@ function EventStructureNodeView({
       <li className={["event-structure-step", `tone-${presentation?.tone ?? "neutral"}`, selectionMode ? "is-selecting" : "", node.step.isEnabled ? "" : "is-disabled"].filter(Boolean).join(" ")}>
         {selectionMode ? (
           <input
-            aria-label={`Selecionar passo ${node.index + 1}`}
+            aria-label={ui("Selecionar passo {0}", { 0: node.index + 1 })}
             checked={selectedStepIndexes.has(node.index)}
             onChange={() => onToggleStepSelection?.(node.index)}
             type="checkbox"
@@ -233,7 +237,7 @@ function EventStructureNodeView({
         ) : null}
         <div className="event-structure-step-card">
           <button
-            aria-label={`Passo ${node.index + 1}: ${presentation?.label ?? node.step.command}`}
+            aria-label={ui("Passo {0}: {1}", { 0: node.index + 1, 1: presentation ? ui(presentation.label) : node.step.command })}
             className="event-structure-step-main"
             onClick={() => onSelectStep(node.index)}
             aria-pressed={isSelected}
@@ -244,13 +248,13 @@ function EventStructureNodeView({
             <span className="event-structure-step-content">
               {presentation ? (
                 <>
-                  <strong>{presentation.label}</strong>
+                  <strong>{ui(presentation.label)}</strong>
                   {category ? <small>{category}</small> : null}
                   {presentation.badge || parameters.length ? (
                     <span className="event-structure-step-meta">
                       {presentation.badge && presentation.badge !== "OK ROM" ? <em>{presentation.badge}</em> : null}
                       {summaryParameters.slice(0, 3).map((parameter) => (
-                        <span key={`${node.index}-${parameter.id}`}>{parameter.label}: {parameter.value || "-"}</span>
+                        <span key={`${node.index}-${parameter.id}`}>{ui(parameter.label)}: {parameter.value || "-"}</span>
                       ))}
                       {summaryParameters.length > 3 ? <span>+{summaryParameters.length - 3}</span> : null}
                     </span>
@@ -264,7 +268,7 @@ function EventStructureNodeView({
             <div
               role="region"
               className="event-structure-inline-editor"
-              aria-label={`Parâmetros do evento ${node.index + 1}`}
+              aria-label={ui("Parâmetros do evento {0}", { 0: node.index + 1 })}
             >
               <div className="event-structure-inline-fields">
                 {inlineParameters.map((parameter) => {
@@ -272,21 +276,21 @@ function EventStructureNodeView({
                   const hasCurrentOption = options.includes(parameter.value);
                   return (
                     <label key={`${node.index}-${parameter.id}`}>
-                      <span>{parameter.label}</span>
+                      <span>{ui(parameter.label)}</span>
                       {options.length && !options.some(option => option.startsWith("const(")) ? (
                         <select
-                          aria-label={`${parameter.label} do evento ${node.index + 1}`}
+                          aria-label={ui("{0} do evento {1}", { 0: ui(parameter.label), 1: node.index + 1 })}
                           onChange={(event) => onUpdateStepParameter?.(node.index, parameter.id, event.currentTarget.value)}
                           onClick={(event) => event.stopPropagation()}
                           value={parameter.value}
                         >
-                          {hasCurrentOption ? null : <option value={parameter.value}>{parameter.value || "Valor atual"}</option>}
+                          {hasCurrentOption ? null : <option value={parameter.value}>{parameter.value || ui("Valor atual")}</option>}
                           {options.map((option) => <option key={`${node.index}-${parameter.id}-${option}`} value={option}>{option}</option>)}
                         </select>
                       ) : (
                         <><input
                           list={options.length ? `constant-inline-${node.index}-${parameter.id}` : undefined}
-                          aria-label={`${parameter.label} do evento ${node.index + 1}`}
+                          aria-label={ui("{0} do evento {1}", { 0: ui(parameter.label), 1: node.index + 1 })}
                           inputMode={parameter.inputMode ?? "text"}
                           onChange={(event) => onUpdateStepParameter?.(node.index, parameter.id, event.currentTarget.value)}
                           onClick={(event) => event.stopPropagation()}
@@ -302,16 +306,16 @@ function EventStructureNodeView({
                 {onToggleStep ? (
                   <label>
                     <input
-                      aria-label={`Executar evento ${node.index + 1}`}
+                      aria-label={ui("Executar evento {0}", { 0: node.index + 1 })}
                       checked={node.step.isEnabled}
                       onChange={(event) => onToggleStep(node.index, event.currentTarget.checked)}
                       type="checkbox"
                     />
-                    <span>Executar</span>
+                    <span>{ui("Executar")}</span>
                   </label>
                 ) : null}
                 {onRemoveStep ? (
-                  <button onClick={() => onRemoveStep(node.index)} type="button">Remover</button>
+                  <button onClick={() => onRemoveStep(node.index)} type="button">{ui("Remover")}</button>
                 ) : null}
               </div>
             </div>
@@ -324,12 +328,11 @@ function EventStructureNodeView({
   if (node.kind === "rateLimit") {
     return (
       <li className="event-structure-rate-limit">
-        <section aria-label={`Camada a cada ${node.frames} quadros`}>
+        <section aria-label={ui("Camada a cada {0} quadros", { 0: node.frames })}>
           <header>
-            <strong>A cada {node.frames} quadros</strong>
-            <button aria-label={`Editar frequência do passo ${node.index + 1}`} onClick={() => onSelectStep(node.index)} type="button">
-              Editar
-            </button>
+            <strong>{ui("A cada ")}{node.frames} {ui(" quadros")}</strong>
+            <button aria-label={ui("Editar frequência do passo {0}", { 0: node.index + 1 })} onClick={() => onSelectStep(node.index)} type="button">
+              {ui("Editar")}</button>
           </header>
           {activeStepIndex === node.index && renderStepEditor ? renderStepEditor(node.index) : null}
           <EventStructureSequenceView
@@ -361,21 +364,21 @@ function EventStructureNodeView({
     : null;
   return (
     <li className={["event-structure-condition", `tone-${conditionPresentation?.tone ?? "control"}`].join(" ")}>
-      <section aria-label={`Condição do passo ${node.index + 1}`}>
+      <section aria-label={ui("Condição do passo {0}", { 0: node.index + 1 })}>
         <header>
-          <strong>Se</strong>
-          <button aria-label={`Editar condição do passo ${node.index + 1}`} aria-pressed={activeStepIndex === node.index} onClick={() => onSelectStep(node.index)} type="button">
+          <strong>{ui("Se")}</strong>
+          <button aria-label={ui("Editar condição do passo {0}", { 0: node.index + 1 })} aria-pressed={activeStepIndex === node.index} onClick={() => onSelectStep(node.index)} type="button">
             {conditionPresentation ? (
               <span className="event-structure-condition-content">
-                <strong>{conditionPresentation.label}</strong>
+                <strong>{ui(conditionPresentation.label)}</strong>
                 {conditionCategory ? <small>{conditionCategory}</small> : null}
               </span>
             ) : <code>{node.command}</code>}
           </button>
         </header>
         {activeStepIndex === node.index && renderStepEditor ? renderStepEditor(node.index) : null}
-        <details open role="region" aria-label={`Se sim do passo ${node.index + 1}`} className="event-structure-branch event-structure-branch-true">
-          <summary>Se sim</summary>
+        <details open role="region" aria-label={ui("Se sim do passo {0}", { 0: node.index + 1 })} className="event-structure-branch event-structure-branch-true">
+          <summary>{ui("Se sim")}</summary>
           <EventStructureSequenceView
             onDropBlock={onDropBlock}
             onOpenCommandMenu={onOpenCommandMenu}
@@ -393,8 +396,8 @@ function EventStructureNodeView({
             target={trueTarget}
           />
         </details>
-        <details open role="region" aria-label={`Se não do passo ${node.index + 1}`} className="event-structure-branch event-structure-branch-false">
-          <summary>Se não</summary>
+        <details open role="region" aria-label={ui("Se não do passo {0}", { 0: node.index + 1 })} className="event-structure-branch event-structure-branch-false">
+          <summary>{ui("Se não")}</summary>
           {node.falseBranch ? (
             <EventStructureSequenceView
                 onDropBlock={onDropBlock}
@@ -415,7 +418,7 @@ function EventStructureNodeView({
           ) : (
             <EventStructureDropSlot
               buttonLabel="Adicionar caminho não"
-              label="Adicionar evento em Se não"
+              label={ui("Adicionar evento em Se não")}
               onDropBlock={onDropBlock}
               onOpenCommandMenu={onOpenCommandMenu}
               target={falseTarget}
@@ -443,12 +446,13 @@ export function EventStructureEditor({
   stepPresentations = new Map<number, EventStructureStepPresentation>(),
   steps
 }: EventStructureEditorProps): React.ReactElement {
+  const ui = useStudioUiText();
   const structure = deriveEventStructure(steps);
   return (
-    <section aria-label={`Estrutura do script ${eventName}`} className="event-structure-editor">
+    <section aria-label={ui("Estrutura do script {0}", { 0: eventName })} className="event-structure-editor">
       <header>
-        <strong>Eventos do script</strong>
-        <span>Arraste eventos para montar a sequência do comportamento.</span>
+        <strong>{ui("Eventos do script")}</strong>
+        <span>{ui("Arraste eventos para montar a sequência do comportamento.")}</span>
       </header>
       <EventStructureSequenceView
         onDropBlock={onDropBlock}
@@ -467,8 +471,8 @@ export function EventStructureEditor({
         target={{ kind: "root" }}
       />
       {structure.diagnostics.length ? (
-        <ul aria-label="Diagnósticos da estrutura" className="event-structure-diagnostics">
-          {structure.diagnostics.map((diagnostic) => <li key={`${diagnostic.index}-${diagnostic.message}`}>Passo {diagnostic.index + 1}: {diagnostic.message}</li>)}
+        <ul aria-label={ui("Diagnósticos da estrutura")} className="event-structure-diagnostics">
+          {structure.diagnostics.map((diagnostic) => <li key={`${diagnostic.index}-${diagnostic.message}`}>{ui("Passo ")}{diagnostic.index + 1}: {ui(diagnostic.message)}</li>)}
         </ul>
       ) : null}
     </section>

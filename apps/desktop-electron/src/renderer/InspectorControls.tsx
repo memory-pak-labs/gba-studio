@@ -1,5 +1,7 @@
+import { uiText as ui, useStudioUiText } from "./studioUiText";
 import { useEffect, useId, useRef, useState, type ReactNode } from "react";
 import { ChevronDown, ChevronRight, Info } from "lucide-react";
+import { readStoredLocale } from "./i18n";
 
 export interface InspectorSelectOption {
   label: string;
@@ -38,7 +40,7 @@ function clampInspectorValue(value: number, min?: number, max?: number): number 
 
 function formatInspectorValue(value: number): string {
   if (Number.isInteger(value)) return String(value);
-  return String(Number(value.toFixed(4))).replace(".", ",");
+  return value.toLocaleString(readStoredLocale(), { useGrouping: false, maximumFractionDigits: 4 });
 }
 
 function formatInspectorValueWithUnit(value: number, unit?: string): string {
@@ -47,10 +49,10 @@ function formatInspectorValueWithUnit(value: number, unit?: string): string {
 
 function inspectorConstraintText(min?: number, max?: number, step?: number): string | null {
   const bounds = [
-    min === undefined ? null : `Mín. ${formatInspectorValue(min)}`,
-    max === undefined ? null : `Máx. ${formatInspectorValue(max)}`
+    min === undefined ? null : ui("Mín. {0}", { 0: formatInspectorValue(min) }),
+    max === undefined ? null : ui("Máx. {0}", { 0: formatInspectorValue(max) })
   ].filter((value): value is string => value !== null);
-  if (step !== undefined && step !== 1) bounds.push(`Passo ${formatInspectorValue(step)}`);
+  if (step !== undefined && step !== 1) bounds.push(ui("Passo {0}", { 0: formatInspectorValue(step) }));
   return bounds.length > 0 ? bounds.join(" · ") : null;
 }
 
@@ -67,9 +69,10 @@ function InspectorPresets({
   presets: InspectorValuePreset[];
   value: number;
 }): React.ReactElement | null {
+  const ui = useStudioUiText();
   if (presets.length === 0) return null;
   return (
-    <div className="inspector-field-presets" aria-label={`Valores sugeridos para ${label}`}>
+    <div className="inspector-field-presets" aria-label={ui("Valores sugeridos para {0}", { 0: ui(label) })}>
       {presets.map((preset) => (
         <button
           aria-pressed={preset.value === value}
@@ -78,7 +81,7 @@ function InspectorPresets({
           onClick={() => onChange(preset.value)}
           type="button"
         >
-          {preset.label}
+          {ui(preset.label)}
         </button>
       ))}
     </div>
@@ -100,33 +103,33 @@ export function InspectorNumber({
   unit,
   value
 }: InspectorNumberProps): React.ReactElement {
+  const ui = useStudioUiText();
   const inputID = useId();
   const descriptionID = useId();
   const normalizedValue = clampInspectorValue(value, min, max);
   const constraintText = inspectorConstraintText(min, max, step);
-  const helpText = [constraintText, description].filter(Boolean).join(" · ");
+  const helpText = [constraintText, ui(description)].filter(Boolean).join(" · ");
   const hasOutOfRangeValue = Number.isFinite(value) && ((min !== undefined && value < min) || (max !== undefined && value > max));
   const applyValue = (nextValue: number): void => onChange(clampInspectorValue(nextValue, min, max));
   return (
     <label className={className ? `inspector-field inspector-number-field ${className}` : "inspector-field inspector-number-field"}>
       <span className="inspector-field-heading">
-        <span className="inspector-field-label">{label}</span>
+        <span className="inspector-field-label">{ui(label)}</span>
         {defaultValue !== undefined && normalizedValue !== defaultValue ? (
           <button
-            aria-label={`Restaurar padrão de ${label}`}
+            aria-label={ui("Restaurar padrão de {0}", { 0: ui(label) })}
             className="inspector-reset-button"
             disabled={disabled}
             onClick={() => onChange(clampInspectorValue(defaultValue, min, max))}
-            title={`Restaurar padrão de ${label}`}
+            title={ui("Restaurar padrão de {0}", { 0: ui(label) })}
             type="button"
           >
-            Padrão
-          </button>
+            {ui("Padrão")}</button>
         ) : null}
       </span>
       <span className="inspector-control-line">
         <input
-          aria-label={ariaLabel ?? label}
+          aria-label={ui(ariaLabel ?? label)}
           aria-describedby={helpText ? descriptionID : undefined}
           aria-invalid={hasOutOfRangeValue || undefined}
           disabled={disabled}
@@ -175,6 +178,7 @@ export function InspectorRange({
   unit,
   value
 }: InspectorRangeProps): React.ReactElement {
+  const ui = useStudioUiText();
   const rangeID = useId();
   const exactID = useId();
   const descriptionID = useId();
@@ -183,16 +187,16 @@ export function InspectorRange({
   }
 
   const normalizedValue = clampInspectorValue(value, min, max);
-  const helpText = [step === 1 ? null : `Passo ${formatInspectorValue(step)}`, description].filter(Boolean).join(" · ");
+  const helpText = [step === 1 ? null : ui("Passo {0}", { 0: formatInspectorValue(step) }), ui(description)].filter(Boolean).join(" · ");
   const applyValue = (nextValue: number): void => onChange(clampInspectorValue(nextValue, min, max));
   return (
     <div className={className ? `inspector-field inspector-range-field ${className}` : "inspector-field inspector-range-field"}>
       <div className="inspector-range-heading">
-        <span className="inspector-field-label">{label}</span>
+        <span className="inspector-field-label">{ui(label)}</span>
         <span className="inspector-range-value">{formatInspectorValueWithUnit(normalizedValue, unit)}</span>
       </div>
       <input
-        aria-label={ariaLabel ?? label}
+        aria-label={ui(ariaLabel ?? label)}
         aria-describedby={helpText ? descriptionID : undefined}
         disabled={disabled}
         max={max}
@@ -214,7 +218,7 @@ export function InspectorRange({
         <span className="inspector-control-line inspector-range-exact-line">
           <input
             aria-describedby={helpText ? descriptionID : undefined}
-            aria-label={exactAriaLabel ?? `${ariaLabel ?? label} valor exato`}
+            aria-label={exactAriaLabel ? ui(exactAriaLabel) : ui("{0} valor exato", { 0: ui(ariaLabel ?? label) })}
             disabled={disabled}
             id={exactID}
             max={max}
@@ -237,17 +241,16 @@ export function InspectorRange({
       {presets ? <InspectorPresets disabled={disabled} label={label} onChange={applyValue} presets={presets} value={normalizedValue} /> : null}
       {defaultValue !== undefined && normalizedValue !== defaultValue ? (
         <button
-          aria-label={`Restaurar padrão de ${label}`}
+          aria-label={ui("Restaurar padrão de {0}", { 0: ui(label) })}
           className="inspector-reset-button inspector-reset-button-block"
           disabled={disabled}
           onClick={() => applyValue(defaultValue)}
-          title={`Restaurar padrão de ${label}`}
+          title={ui("Restaurar padrão de {0}", { 0: ui(label) })}
           type="button"
         >
-          Restaurar padrão
-        </button>
+          {ui("Restaurar padrão")}</button>
       ) : null}
-      {helpText ? <small className="inspector-field-description" id={descriptionID}>{helpText}</small> : null}
+      {helpText ? <small className="inspector-field-description" id={descriptionID}>{ui(helpText)}</small> : null}
     </div>
   );
 }
@@ -270,18 +273,19 @@ export function InspectorSelect({
   options,
   value
 }: InspectorSelectProps): React.ReactElement {
+  const ui = useStudioUiText();
   return (
     <label className={className ? `inspector-field inspector-select-field ${className}` : "inspector-field inspector-select-field"}>
-      <span className="inspector-field-label">{label}</span>
+      <span className="inspector-field-label">{ui(label)}</span>
       <select
-        aria-label={ariaLabel ?? label}
+        aria-label={ui(ariaLabel ?? label)}
         disabled={disabled}
         onChange={(event) => onChange(event.currentTarget.value)}
         value={value}
       >
-        {options.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
+        {options.map((option) => <option key={option.value} value={option.value}>{ui(option.label)}</option>)}
       </select>
-      {description ? <small className="inspector-field-description">{description}</small> : null}
+      {description ? <small className="inspector-field-description">{ui(description)}</small> : null}
     </label>
   );
 }
@@ -293,11 +297,12 @@ export interface InspectorToggleProps extends InspectorFieldProps {
 }
 
 export function InspectorToggle({ checked, className, description, disabled, label, onChange }: InspectorToggleProps): React.ReactElement {
+  const ui = useStudioUiText();
   return (
     <label className={className ? `inspector-field inspector-toggle-field ${className}` : "inspector-field inspector-toggle-field"}>
       <input checked={checked} disabled={disabled} onChange={(event) => onChange(event.currentTarget.checked)} type="checkbox" />
-      <span className="inspector-field-label">{label}</span>
-      {description ? <small className="inspector-field-description">{description}</small> : null}
+      <span className="inspector-field-label">{ui(label)}</span>
+      {description ? <small className="inspector-field-description">{ui(description)}</small> : null}
     </label>
   );
 }
@@ -310,9 +315,10 @@ export interface InspectorVector2Props {
 }
 
 export function InspectorVector2({ legend = "Posição", labels = ["X", "Y"], onChange, values }: InspectorVector2Props): React.ReactElement {
+  const ui = useStudioUiText();
   return (
     <fieldset className="inspector-vector2">
-      <legend>{legend}</legend>
+      <legend>{ui(legend)}</legend>
       <InspectorNumber label={labels[0]} onChange={(value) => onChange("x", value)} value={values.x} />
       <InspectorNumber label={labels[1]} onChange={(value) => onChange("y", value)} value={values.y} />
     </fieldset>
@@ -322,6 +328,7 @@ export function InspectorVector2({ legend = "Posição", labels = ["X", "Y"], on
 const INSPECTOR_SECTION_STORAGE_PREFIX = "gba-studio:inspector-section:";
 
 export function InspectorInfoTip({ label, children }: { label: string; children: ReactNode }): React.ReactElement {
+  const ui = useStudioUiText();
   const descriptionID = useId();
   const [pinned, setPinned] = useState(false);
   const tipRef = useRef<HTMLSpanElement>(null);
@@ -338,7 +345,7 @@ export function InspectorInfoTip({ label, children }: { label: string; children:
   return (
     <span className={pinned ? "inspector-info-tip is-pinned" : "inspector-info-tip"} ref={tipRef}>
       <button
-        aria-label={`Informações sobre ${label}`}
+        aria-label={ui("Informações sobre {0}", { 0: ui(label) })}
         aria-describedby={descriptionID}
         aria-expanded={pinned}
         className="inspector-info-button"
@@ -401,10 +408,11 @@ export function InspectorSection({
   role?: "group" | "region";
   title: string;
 }): React.ReactElement {
+  const ui = useStudioUiText();
   const [isOpen, setIsOpen] = useState(() => readInspectorSectionOpen(persistKey, defaultOpen));
   return (
     <details
-      aria-label={ariaLabel}
+      aria-label={ui(ariaLabel)}
       className={className ? `inspector-section ${className}` : "inspector-section"}
       onToggle={(event) => {
         const open = event.currentTarget.open;
@@ -419,8 +427,8 @@ export function InspectorSection({
           event.preventDefault();
         }
       }}>
-        <span className="inspector-section-summary-title">{title}</span>
-        {description ? <InspectorInfoTip label={title}>{description}</InspectorInfoTip> : null}
+        <span className="inspector-section-summary-title">{ui(title)}</span>
+        {description ? <InspectorInfoTip label={title}>{ui(description)}</InspectorInfoTip> : null}
         <span
           aria-hidden="true"
           className="inspector-section-disclosure"
@@ -448,8 +456,9 @@ export function InspectorAction({
   onClick?: () => void;
   title?: string;
 }): React.ReactElement {
+  const ui = useStudioUiText();
   return (
-    <button className={className ? `inspector-action ${className}` : "inspector-action"} disabled={disabled} onClick={onClick} title={title} type="button">
+    <button className={className ? `inspector-action ${className}` : "inspector-action"} disabled={disabled} onClick={onClick} title={ui(title)} type="button">
       {children}
     </button>
   );

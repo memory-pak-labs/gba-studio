@@ -18,19 +18,28 @@
   </style>
 </head>
 <body>
-  <div id="runtime-game">Carregando GBA Studio Player…</div>
+  <div id="runtime-game" role="status"></div>
   <script type="module">
     const parameters = new URLSearchParams(window.location.search);
+    const locale = parameters.get("locale") || "pt-BR";
+    const language = locale.startsWith("es") ? "es-ES" : locale.startsWith("en") ? "en-US" : "pt-BR";
+    document.documentElement.lang = language;
+    const messages = {
+      "pt-BR": ["Carregando GBA Studio Player…", "ROM inválida para o GBA Studio Player.", "Não foi possível iniciar o core mGBA-Web do GBA Studio Player."],
+      "en-US": ["Loading GBA Studio Player…", "Invalid ROM for GBA Studio Player.", "Could not start the mGBA-Web core in GBA Studio Player."],
+      "es-ES": ["Cargando GBA Studio Player…", "ROM no válida para GBA Studio Player.", "No se pudo iniciar el núcleo mGBA-Web de GBA Studio Player."]
+    }[language];
     const romUrl = parameters.get("rom") || "";
     const replayEnabled = parameters.get("replay") === "1";
     const keyboardEnabled = parameters.get("keyboard") === "1";
     const container = document.querySelector("#runtime-game");
+    container.textContent = messages[0];
     const publishProfilerTelemetry = (stats) => {
       window.gbaStudio?.publishRomPlayerTelemetry?.(stats);
     };
 
     if (!romUrl.startsWith("../roms/")) {
-      document.body.textContent = "ROM invalida para o GBA Studio Player.";
+      document.body.textContent = messages[1];
     } else {
       try {
         const { startMGBAPlayer } = await import("./mgba-direct-player.mjs");
@@ -51,7 +60,7 @@
       } catch (error) {
         container.dataset.directError = error instanceof Error ? `${error.message}\n${error.stack || ""}` : String(error);
         console.error("Core mGBA direto indisponivel.", error);
-        container.textContent = "Nao foi possivel iniciar o core mGBA-Web do GBA Studio Player.";
+        container.textContent = messages[2];
       }
     }
   </script>

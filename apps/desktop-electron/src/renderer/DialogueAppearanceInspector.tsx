@@ -1,3 +1,4 @@
+import { uiText as ui, useStudioUiText } from "./studioUiText";
 import { InterfaceThemeInspector } from "./InterfaceThemeInspector";
 import type { InterfaceThemeChange } from "../shared/interfaceThemes";
 import { useMemo } from "react";
@@ -37,6 +38,7 @@ export function DialogueAppearanceInspector({ projectData, projectPath, roomId, 
   onUpdateDialoguesUi(fields: UpdateDialoguesUiFields): void;
   onImportAssets?(): void | Promise<void>;
 }): React.ReactElement {
+  const ui = useStudioUiText();
   const { t } = useStudioI18n();
   const resolvedPresentation = useMemo(() => deriveDialoguesWorkspacePresentation(projectData), [projectData]);
   const fontCatalog = resolvedPresentation.fontCatalog ?? deriveFontCatalog(projectData);
@@ -45,10 +47,10 @@ export function DialogueAppearanceInspector({ projectData, projectPath, roomId, 
   const dialogueInterfaceStatus = characterSoundMissing ? t("dialogues.status.reviewAsset") : resolvedPresentation.fontPanel.status;
   const settings = resolveDialogueUiSettings((projectData.settings as Record<string, any>)?.uiDialogs);
   const boxSize = { width: settings.boxWidth, height: settings.boxHeight };
-  return <div className="dialogue-appearance-inspector" aria-label="Aparência dos diálogos do projeto">
+  return <div className="dialogue-appearance-inspector" aria-label={ui("Aparência dos diálogos do projeto")}>
     {roomId && onUpdateInterfaceTheme ? <InterfaceThemeInspector projectData={projectData} projectPath={projectPath} roomId={roomId} focus="dialogue" onChange={onUpdateInterfaceTheme} /> : null}
-    <div className="hud-scope-notice"><span className="dialogue-appearance-scope-title"><strong>Aparência dos diálogos · Projeto</strong><InspectorInfoTip label="Aparência dos diálogos">Estes ajustes alteram o padrão compartilhado dos diálogos. Retrato, texto e sons da fala selecionada ficam em Fala.</InspectorInfoTip></span></div>
-              <details className="dialogue-appearance-group"><summary>Texto e som</summary>
+    <div className="hud-scope-notice"><span className="dialogue-appearance-scope-title"><strong>{ui("Aparência dos diálogos · Projeto")}</strong><InspectorInfoTip label={ui("Aparência dos diálogos")}>{ui("Estes ajustes alteram o padrão compartilhado dos diálogos. Retrato, texto e sons da fala selecionada ficam em Fala.")}</InspectorInfoTip></span></div>
+              <details className="dialogue-appearance-group"><summary>{ui("Texto e som")}</summary>
                 <div className="dialogues-card-title">
                   <h4>{t("dialogues.font.game")}</h4>
                   <span>{dialogueInterfaceStatus}</span>
@@ -81,7 +83,7 @@ export function DialogueAppearanceInspector({ projectData, projectPath, roomId, 
                     ) : null}
                   </div>
                   {fontCatalog.activeFont?.warnings.length ? (
-                    <p className="dialogues-hud-warning">{fontCatalog.activeFont.warnings.join(" ")}</p>
+                    <p className="dialogues-hud-warning">{fontCatalog.activeFont.warnings.map(warning => ui(warning)).join(" ")}</p>
                   ) : null}
                   <label>
                     <span>{t("dialogues.font.speed")}</span>
@@ -119,7 +121,7 @@ export function DialogueAppearanceInspector({ projectData, projectPath, roomId, 
                 </div>
               </details>
 
-              <details className="dialogue-appearance-group" open><summary>Caixa e seletor</summary>
+              <details className="dialogue-appearance-group" open><summary>{ui("Caixa e seletor")}</summary>
                 <div className="dialogues-card-title">
                   <h4>{t("dialogues.box.title")}</h4>
                   <span>{t("dialogues.box.badge")}</span>
@@ -186,7 +188,7 @@ export function DialogueAppearanceInspector({ projectData, projectPath, roomId, 
                 </div>
               </details>
 
-              <details className="dialogue-appearance-group"><summary>Retrato, nome e escolhas</summary>
+              <details className="dialogue-appearance-group"><summary>{ui("Retrato, nome e escolhas")}</summary>
                 <div className="dialogues-card-title">
                   <h4>{t("dialogues.chrome.title")}</h4>
                   <span>{t("dialogues.chrome.badge")}</span>

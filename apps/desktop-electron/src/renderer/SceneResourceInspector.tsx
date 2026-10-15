@@ -1,3 +1,4 @@
+import { uiText as ui, useStudioUiText } from "./studioUiText";
 import type { ReactElement } from "react";
 
 import {
@@ -169,6 +170,7 @@ function budgetWithChange(resource: SceneResourceDescriptor, key: keyof ScenePhy
 }
 
 export function SceneResourceInspector({ assetOptions, onChange, value }: SceneResourceInspectorProps): ReactElement {
+  const ui = useStudioUiText();
   const normalized = normalizeSceneResourceManifest(value);
   const issues = sceneResourceManifestIssues(normalized);
   const update = (changes: Partial<SceneResourceManifest>): void => {
@@ -183,19 +185,19 @@ export function SceneResourceInspector({ assetOptions, onChange, value }: SceneR
     <InspectorSection
       className="scene-resource-inspector room-detail-editor-span-2"
       defaultOpen={normalized.resources.length > 0}
-      description="Cada entrada liga um asset a tipo, BPP, paleta, compressão, cache, prefetch, dependências e orçamento. O manifesto vazio não habilita recursos por inferência."
-      title="Recursos tipados da cena"
+      description={ui("Cada entrada liga um asset a tipo, BPP, paleta, compressão, cache, prefetch, dependências e orçamento. O manifesto vazio não habilita recursos por inferência.")}
+      title={ui("Recursos tipados da cena")}
     >
       <div className="scene-resource-heading">
         <div>
-          <strong>{normalized.resources.length} recurso(s) declarado(s)</strong>
-          <small>Somente entradas enabled=true entram no export.</small>
+          <strong>{normalized.resources.length} {ui(" recurso(s) declarado(s)")}</strong>
+          <small>{ui("Somente entradas enabled=true entram no export.")}</small>
         </div>
-        <InspectorAction onClick={addResource}>Adicionar recurso</InspectorAction>
+        <InspectorAction onClick={addResource}>{ui("Adicionar recurso")}</InspectorAction>
       </div>
 
       {normalized.resources.length === 0 ? (
-        <p className="scene-resource-empty" role="status">Nenhum recurso opt-in. A cena usa apenas os assets do fluxo padrão.</p>
+        <p className="scene-resource-empty" role="status">{ui("Nenhum recurso opt-in. A cena usa apenas os assets do fluxo padrão.")}</p>
       ) : null}
 
       {normalized.resources.map((resource) => {
@@ -223,83 +225,83 @@ export function SceneResourceInspector({ assetOptions, onChange, value }: SceneR
         });
         return (
           <fieldset className={`scene-resource-card${resource.enabled ? " is-enabled" : ""}`} key={resource.id}>
-            <legend>{resource.id || "Recurso sem ID"}</legend>
+            <legend>{resource.id || ui("Recurso sem ID")}</legend>
             <div className="scene-resource-card-heading">
-              <InspectorToggle checked={resource.enabled} label="Recurso ativo" onChange={(enabled) => patch({ enabled })} />
-              <InspectorToggle checked={resource.required} label="Obrigatório" onChange={(required) => patch({ required })} />
-              <InspectorAction onClick={() => update({ resources: normalized.resources.filter((entry) => entry.id !== resource.id) })}>Remover</InspectorAction>
+              <InspectorToggle checked={resource.enabled} label={ui("Recurso ativo")} onChange={(enabled) => patch({ enabled })} />
+              <InspectorToggle checked={resource.required} label={ui("Obrigatório")} onChange={(required) => patch({ required })} />
+              <InspectorAction onClick={() => update({ resources: normalized.resources.filter((entry) => entry.id !== resource.id) })}>{ui("Remover")}</InspectorAction>
             </div>
             <div className="scene-resource-fields">
               <label>
-                <span>ID do recurso</span>
+                <span>{ui("ID do recurso")}</span>
                 <input
-                  aria-label={`ID do recurso ${resource.id}`}
+                  aria-label={ui("ID do recurso {0}", { 0: resource.id })}
                   onChange={(event) => patch({ id: event.currentTarget.value })}
                   value={resource.id}
                 />
               </label>
               <InspectorSelect
-                ariaLabel={`Asset do recurso ${resource.id}`}
+                ariaLabel={ui("Asset do recurso {0}", { 0: resource.id })}
                 disabled={resourceAssets.length === 0}
-                label="Asset"
+                label={ui("Asset")}
                 onChange={(assetId) => patch({ assetId })}
                 options={resourceAssets.length > 0 ? [{ label: "Selecionar asset", value: "" }, ...resourceAssets] : [{ label: "Nenhum asset disponível", value: "" }]}
                 value={resource.assetId}
               />
-              <InspectorSelect ariaLabel={`Tipo do recurso ${resource.id}`} label="Tipo" onChange={(kind) => changeKind(kind as SceneResourceKind)} options={RESOURCE_KIND_OPTIONS} value={resource.kind} />
-              <InspectorSelect ariaLabel={`BPP do recurso ${resource.id}`} label="BPP" onChange={(bpp) => patch({ bpp: Number(bpp) as SceneResourceBpp })} options={BPP_OPTIONS.filter(option => sceneResourceSupportedBpp(resource.kind).includes(Number(option.value) as SceneResourceBpp))} value={String(resource.bpp)} />
-              {resource.kind === "obj" ? <p className="scene-resource-compression-note">O formato da imagem é definido no workspace Sprites. Este BPP declara o formato esperado pela cena.</p> : null}
-              <InspectorSelect ariaLabel={`Modo de compressão do recurso ${resource.id}`} label="Modo de compressão" onChange={(strategy) => setCompressionMode(strategy as "auto" | "manual")} options={[{ label: "Automático", value: "auto" }, { label: "Manual", value: "manual" }]} value={compression.strategy} />
+              <InspectorSelect ariaLabel={ui("Tipo do recurso {0}", { 0: resource.id })} label={ui("Tipo")} onChange={(kind) => changeKind(kind as SceneResourceKind)} options={RESOURCE_KIND_OPTIONS} value={resource.kind} />
+              <InspectorSelect ariaLabel={ui("BPP do recurso {0}", { 0: resource.id })} label={ui("BPP")} onChange={(bpp) => patch({ bpp: Number(bpp) as SceneResourceBpp })} options={BPP_OPTIONS.filter(option => sceneResourceSupportedBpp(resource.kind).includes(Number(option.value) as SceneResourceBpp))} value={String(resource.bpp)} />
+              {resource.kind === "obj" ? <p className="scene-resource-compression-note">{ui("O formato da imagem é definido no workspace Sprites. Este BPP declara o formato esperado pela cena.")}</p> : null}
+              <InspectorSelect ariaLabel={ui("Modo de compressão do recurso {0}", { 0: resource.id })} label={ui("Modo de compressão")} onChange={(strategy) => setCompressionMode(strategy as "auto" | "manual")} options={[{ label: "Automático", value: "auto" }, { label: "Manual", value: "manual" }]} value={compression.strategy} />
               {compression.strategy === "auto" ? (
-                <p className="scene-resource-compression-note">O exportador compara as opções compatíveis e escolhe a menor saída por componente.</p>
+                <p className="scene-resource-compression-note">{ui("O exportador compara as opções compatíveis e escolhe a menor saída por componente.")}</p>
               ) : (
                 <>
-                  <InspectorSelect ariaLabel={`Compressão dos tiles do recurso ${resource.id}`} label="Tiles" onChange={(selected) => setCompressionComponent("tiles", selected)} options={compressionOptionsFor(resource.kind, "tiles")} value={compression.tiles} />
-                  <InspectorSelect ariaLabel={`Compressão do tilemap do recurso ${resource.id}`} label="Tilemap" onChange={(selected) => setCompressionComponent("tilemap", selected)} options={compressionOptionsFor(resource.kind, "tilemap")} value={compression.tilemap} />
-                  <InspectorSelect ariaLabel={`Compressão da paleta do recurso ${resource.id}`} label="Paleta" onChange={(selected) => setCompressionComponent("palette", selected)} options={compressionOptionsFor(resource.kind, "palette")} value={compression.palette} />
+                  <InspectorSelect ariaLabel={ui("Compressão dos tiles do recurso {0}", { 0: resource.id })} label={ui("Tiles")} onChange={(selected) => setCompressionComponent("tiles", selected)} options={compressionOptionsFor(resource.kind, "tiles")} value={compression.tiles} />
+                  <InspectorSelect ariaLabel={ui("Compressão do tilemap do recurso {0}", { 0: resource.id })} label={ui("Tilemap")} onChange={(selected) => setCompressionComponent("tilemap", selected)} options={compressionOptionsFor(resource.kind, "tilemap")} value={compression.tilemap} />
+                  <InspectorSelect ariaLabel={ui("Compressão da paleta do recurso {0}", { 0: resource.id })} label={ui("Paleta")} onChange={(selected) => setCompressionComponent("palette", selected)} options={compressionOptionsFor(resource.kind, "palette")} value={compression.palette} />
                 </>
               )}
-              <InspectorNumber label="Limite de tiles" max={1024} min={0} onChange={(tileLimit) => patch({ tileLimit })} value={resource.tileLimit} />
+              <InspectorNumber label={ui("Limite de tiles")} max={1024} min={0} onChange={(tileLimit) => patch({ tileLimit })} value={resource.tileLimit} />
               <label>
-                <span>Grupo de recurso</span>
-                <input aria-label={`Grupo do recurso ${resource.id}`} onChange={(event) => patch({ resourceGroup: event.currentTarget.value })} value={resource.resourceGroup} />
+                <span>{ui("Grupo de recurso")}</span>
+                <input aria-label={ui("Grupo do recurso {0}", { 0: resource.id })} onChange={(event) => patch({ resourceGroup: event.currentTarget.value })} value={resource.resourceGroup} />
               </label>
-              <InspectorSelect ariaLabel={`Prefetch do recurso ${resource.id}`} label="Prefetch" onChange={(prefetch) => patch({ prefetch: prefetch as SceneResourcePrefetch })} options={[{ label: "Nenhum", value: "none" }, { label: "Ao entrar na cena", value: "scene" }, { label: "Pela câmera", value: "camera" }, { label: "Manual", value: "manual" }]} value={resource.prefetch} />
-              <InspectorSelect ariaLabel={`Cache do recurso ${resource.id}`} label="Cache" onChange={(cache) => patch({ cache: cache as SceneResourceCachePolicy })} options={[{ label: "Residente", value: "resident" }, { label: "Evictable", value: "evictable" }]} value={resource.cache} />
-              <InspectorNumber label="Prioridade de eviction" max={255} min={0} onChange={(evictionPriority) => patch({ evictionPriority })} value={resource.evictionPriority} />
+              <InspectorSelect ariaLabel={ui("Prefetch do recurso {0}", { 0: resource.id })} label={ui("Prefetch")} onChange={(prefetch) => patch({ prefetch: prefetch as SceneResourcePrefetch })} options={[{ label: "Nenhum", value: "none" }, { label: "Ao entrar na cena", value: "scene" }, { label: "Pela câmera", value: "camera" }, { label: "Manual", value: "manual" }]} value={resource.prefetch} />
+              <InspectorSelect ariaLabel={ui("Cache do recurso {0}", { 0: resource.id })} label={ui("Cache")} onChange={(cache) => patch({ cache: cache as SceneResourceCachePolicy })} options={[{ label: "Residente", value: "resident" }, { label: "Evictable", value: "evictable" }]} value={resource.cache} />
+              <InspectorNumber label={ui("Prioridade de eviction")} max={255} min={0} onChange={(evictionPriority) => patch({ evictionPriority })} value={resource.evictionPriority} />
             </div>
 
             <fieldset className="scene-resource-subsection">
-              <legend>Paleta</legend>
+              <legend>{ui("Paleta")}</legend>
               <div className="scene-resource-fields">
                 <label>
-                  <span>ID da paleta</span>
-                  <input aria-label={`Paleta do recurso ${resource.id}`} onChange={(event) => patch({ palette: { ...resource.palette, id: event.currentTarget.value } })} value={resource.palette.id} />
+                  <span>{ui("ID da paleta")}</span>
+                  <input aria-label={ui("Paleta do recurso {0}", { 0: resource.id })} onChange={(event) => patch({ palette: { ...resource.palette, id: event.currentTarget.value } })} value={resource.palette.id} />
                 </label>
-                <InspectorSelect ariaLabel={`Slot de paleta do recurso ${resource.id}`} label="Slot" onChange={(slot) => patch({ palette: { ...resource.palette, slot: slot as SceneResourcePaletteSlot } })} options={[{ label: "Background", value: "background" }, { label: "Objects", value: "objects" }, { label: "Sem paleta", value: "none" }]} value={resource.palette.slot} />
-                <InspectorNumber label="Cores" max={256} min={0} onChange={(colors) => patch({ palette: { ...resource.palette, colors } })} value={resource.palette.colors} />
+                <InspectorSelect ariaLabel={ui("Slot de paleta do recurso {0}", { 0: resource.id })} label={ui("Slot")} onChange={(slot) => patch({ palette: { ...resource.palette, slot: slot as SceneResourcePaletteSlot } })} options={[{ label: "Background", value: "background" }, { label: "Objects", value: "objects" }, { label: "Sem paleta", value: "none" }]} value={resource.palette.slot} />
+                <InspectorNumber label={ui("Cores")} max={256} min={0} onChange={(colors) => patch({ palette: { ...resource.palette, colors } })} value={resource.palette.colors} />
               </div>
             </fieldset>
 
             <fieldset className="scene-resource-subsection">
-              <legend>Fallback e dependências</legend>
+              <legend>{ui("Fallback e dependências")}</legend>
               <div className="scene-resource-fields">
-                <InspectorSelect ariaLabel={`Fallback do recurso ${resource.id}`} label="Fallback" onChange={(mode) => patch({ fallback: { ...resource.fallback, mode: mode as SceneResourceFallbackMode } })} options={[{ label: "Erro", value: "error" }, { label: "Omitir decorativo", value: "omit_decorative" }, { label: "Voltar para tiled", value: "tiled_default" }]} value={resource.fallback.mode} />
+                <InspectorSelect ariaLabel={ui("Fallback do recurso {0}", { 0: resource.id })} label={ui("Fallback")} onChange={(mode) => patch({ fallback: { ...resource.fallback, mode: mode as SceneResourceFallbackMode } })} options={[{ label: "Erro", value: "error" }, { label: "Omitir decorativo", value: "omit_decorative" }, { label: "Voltar para tiled", value: "tiled_default" }]} value={resource.fallback.mode} />
                 {resource.fallback.mode !== "error" ? (
                   <label>
-                    <span>Asset de fallback</span>
-                    <input aria-label={`Asset de fallback do recurso ${resource.id}`} onChange={(event) => patch({ fallback: { ...resource.fallback, assetId: event.currentTarget.value } })} value={resource.fallback.assetId ?? ""} />
+                    <span>{ui("Asset de fallback")}</span>
+                    <input aria-label={ui("Asset de fallback do recurso {0}", { 0: resource.id })} onChange={(event) => patch({ fallback: { ...resource.fallback, assetId: event.currentTarget.value } })} value={resource.fallback.assetId ?? ""} />
                   </label>
                 ) : null}
               </div>
               <label className="scene-resource-textarea-field">
-                <span>Dependências · IDs separados por vírgula</span>
-                <textarea aria-label={`Dependências do recurso ${resource.id}`} onChange={(event) => patch({ dependencies: event.currentTarget.value.split(",").map((entry) => entry.trim()).filter(Boolean) })} rows={2} value={resource.dependencies.join(", ")} />
+                <span>{ui("Dependências · IDs separados por vírgula")}</span>
+                <textarea aria-label={ui("Dependências do recurso {0}", { 0: resource.id })} onChange={(event) => patch({ dependencies: event.currentTarget.value.split(",").map((entry) => entry.trim()).filter(Boolean) })} rows={2} value={resource.dependencies.join(", ")} />
               </label>
             </fieldset>
 
             <fieldset className="scene-resource-subsection">
-              <legend>Orçamento físico declarado</legend>
+              <legend>{ui("Orçamento físico declarado")}</legend>
               <div className="scene-resource-budget-grid">
                 {BUDGET_FIELDS.map(({ key, label, unit }) => (
                   <InspectorNumber key={key} label={label} min={0} onChange={(nextValue) => patch({ budget: budgetWithChange(resource, key, nextValue) })} unit={unit} value={resource.budget[key]} />
@@ -312,14 +314,13 @@ export function SceneResourceInspector({ assetOptions, onChange, value }: SceneR
 
       {issues.length > 0 ? (
         <ul className="scene-resource-issues" role="status">
-          {issues.slice(0, 8).map((entry, index) => <li key={`${entry.code}-${entry.resourceId ?? "manifest"}-${index}`}>{entry.message}</li>)}
+          {issues.slice(0, 8).map((entry, index) => <li key={`${entry.code}-${entry.resourceId ?? "manifest"}-${index}`}>{ui(entry.message)}</li>)}
         </ul>
       ) : (
-        <p className="scene-resource-valid" role="status">Manifesto de recursos compatível com o contrato do exportador.</p>
+        <p className="scene-resource-valid" role="status">{ui("Manifesto de recursos compatível com o contrato do exportador.")}</p>
       )}
-      <output className="scene-resource-export-summary" aria-label="Recursos exportados">
-        {exportSceneResourceManifest(normalized).resources.length} recurso(s) serão exportado(s).
-      </output>
+      <output className="scene-resource-export-summary" aria-label={ui("Recursos exportados")}>
+        {exportSceneResourceManifest(normalized).resources.length} {ui(" recurso(s) serão exportado(s).")}</output>
     </InspectorSection>
   );
 }

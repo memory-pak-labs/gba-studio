@@ -1,3 +1,4 @@
+import { uiText as ui, useStudioUiText } from "./studioUiText";
 import { CheckCircle2, CircleAlert, TriangleAlert, ArrowUpRight } from "lucide-react";
 import type { ScenePreflightReport } from "../shared/scenePreflight.js";
 import { InspectorInfoTip } from "./InspectorControls";
@@ -20,6 +21,7 @@ function statusIcon(status: ScenePreflightReport["status"]): React.ReactElement 
 }
 
 export function SceneInspectorHealthSummary({ report, onOpenHealth }: SceneInspectorHealthSummaryProps): React.ReactElement {
+  const ui = useStudioUiText();
   const pendingCount = report.issues.filter((issue) => issue.severity !== "info").length;
   const status = statusLabel(report.status);
   const detail = report.status === "blocked"
@@ -30,7 +32,7 @@ export function SceneInspectorHealthSummary({ report, onOpenHealth }: SceneInspe
 
   return (
     <section
-      aria-label="Saúde da cena"
+      aria-label={ui("Saúde da cena")}
       className="room-detail-section room-detail-editor-span-2 scene-inspector-health-summary"
       data-preflight-status={report.status}
       role="region"
@@ -41,18 +43,18 @@ export function SceneInspectorHealthSummary({ report, onOpenHealth }: SceneInspe
             {statusIcon(report.status)}
           </span>
           <div>
-            <h5>Saúde da cena</h5>
-            <strong>{status}{pendingCount > 0 ? ` · ${pendingCount}` : ""}</strong>
+            <h5>{ui("Saúde da cena")}</h5>
+            <strong>{ui(status)}{pendingCount > 0 ? ` · ${pendingCount}` : ""}</strong>
           </div>
-          <InspectorInfoTip label="Saúde da cena">{detail}</InspectorInfoTip>
+          <InspectorInfoTip label={ui("Saúde da cena")}>{ui(detail)}</InspectorInfoTip>
         </div>
       </div>
       {onOpenHealth ? (
         <button
-          aria-label="Abrir Saúde do projeto"
+          aria-label={ui("Abrir Saúde do projeto")}
           className="scene-inspector-health-action"
           onClick={onOpenHealth}
-          title="Abrir Saúde do projeto"
+          title={ui("Abrir Saúde do projeto")}
           type="button"
         >
           <ArrowUpRight aria-hidden="true" size={14} />

@@ -859,7 +859,7 @@ async function editSpriteInWorkspace(cdp, framesBefore) {
     await wait(100);
   }
   if (frameCount !== framesBefore + 1) throw new Error(`Adicionar quadro não atualizou a timeline: antes=${framesBefore} depois=${frameCount}`);
-  await clickButtonByAriaLabel(cdp, "Ultimo frame");
+  await clickButtonByAriaLabel(cdp, "Último frame");
   await clickButtonByAriaLabel(cdp, "Pintar");
   await wait(100);
   const canvas = await evaluate(cdp, `
@@ -966,7 +966,7 @@ async function inspectFilesWorkspacePipeline(cdp) {
 }
 
 async function validateSettingsPaths(cdp) {
-  await clickButtonByAriaLabel(cdp, "Compilação seção de ajustes");
+  await clickButtonByAriaLabel(cdp, "Seção de ajustes: Compilação");
   await clickButtonByText(cdp, "Verificar caminhos");
   const result = await evaluate(cdp, `
     new Promise((resolve) => {
@@ -1633,7 +1633,7 @@ async function main() {
       const tileCellLabel = await firstRoomCanvasTileCell(cdp, editedSceneName);
       await dispatchPointerPressOnRoomCell(cdp, editedSceneName, tileCellLabel);
       uiP0Checked.push("workspace-rooms", "workspace-rooms-tile-paint");
-      await clickButtonInSelectorByAriaLabel(cdp, ".room-editor-tool-rail", "Colisao - Solidos");
+      await clickButtonInSelectorByAriaLabel(cdp, ".room-editor-tool-rail", "Colisão - Sólidos");
       const collisionCellLabel = await firstRoomCanvasCellWithoutCollision(cdp, editedSceneName);
       const editedCollisionIndex = Number(collisionCellLabel.match(/(\d+)$/)?.[1] ?? 0) - 1;
       if (editedCollisionIndex < 0) {
@@ -1657,7 +1657,7 @@ async function main() {
       `);
       if (!actorNudged) throw new Error("O atalho de movimento do ator não pôde ser disparado.");
       await assertWorkspace(cdp, "Editor", []);
-      await clickButtonInSelectorByAriaLabel(cdp, ".room-editor-tool-rail", "Trigger - Eventos");
+      await clickButtonInSelectorByAriaLabel(cdp, ".room-editor-tool-rail", "Gatilho - Eventos");
       await selectRoomEntityRow(cdp, editedTriggerName);
       await waitForText(
         cdp,
@@ -1808,7 +1808,7 @@ async function main() {
         throw new Error(`O Engine Pack detectado não foi explicado na validação: ${JSON.stringify(settingsValidation)}`);
       }
       uiP0Checked.push("settings-path-validation");
-      await clickButtonByAriaLabel(cdp, "Projeto e ROM seção de ajustes");
+      await clickButtonByAriaLabel(cdp, "Seção de ajustes: Projeto e ROM");
       await waitForText(cdp, (text) => text.includes("Informações do jogo"), "retorno às informações do jogo");
       await fillInputNearLabel(cdp, "Título", editedGameTitle);
       await waitForText(
@@ -1986,7 +1986,7 @@ async function main() {
       }
       await clickButtonByAriaLabel(cdp, "Fechar central de pendências");
       await focusSceneInEditor(cdp, editedSceneName);
-      await clickButtonInSelectorByAriaLabel(cdp, ".room-editor-tool-rail", "Colisao - Solidos");
+      await clickButtonInSelectorByAriaLabel(cdp, ".room-editor-tool-rail", "Colisão - Sólidos");
       await clickButtonInSelectorByAriaLabel(cdp, ".rooms-editor-secondary-toolbar", "Voltar à visão geral");
       await waitForText(cdp, (text) => !text.includes("Voltar à visão geral"), "retorno à visão geral para validar previews");
       const backgroundLayoutRendering = await inspectBackgroundLayoutRendering(cdp, initial.project);
@@ -2034,7 +2034,7 @@ async function main() {
       }
       await assertWorkspace(cdp, "Editor", ["penedos_vento"]);
       await focusSceneInEditor(cdp, editedSceneName);
-      await clickButtonInSelectorByAriaLabel(cdp, ".room-editor-tool-rail", "Colisao - Solidos");
+      await clickButtonInSelectorByAriaLabel(cdp, ".room-editor-tool-rail", "Colisão - Sólidos");
       const editorScrollChrome = await inspectEditorScrollChrome(cdp);
       await clickButtonInSelectorByAriaLabel(cdp, ".room-editor-tool-rail", "Selecionar - Mover");
       await waitForSelectionScenePreview(cdp, editedSceneName);

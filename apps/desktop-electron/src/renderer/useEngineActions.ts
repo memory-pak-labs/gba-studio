@@ -1,3 +1,4 @@
+import { uiText as ui } from "./studioUiText";
 import { useEffect, useRef, useState } from "react";
 import type {
   DevelopmentSceneLaunch,
@@ -132,7 +133,7 @@ export function useEngineActions({ contractDiagnosticsOK, projectHealthExportRea
     const currentSession = sessionRef.current;
     const projectDir = hasCurrentEngineExport ? lastEngineExportPath : null;
     if (!projectDir || !currentSession) {
-      setStatus("Exporte o projeto atual antes de rodar gbsbuild dry-run.");
+      setStatus(ui("Exporte o projeto atual antes de rodar gbsbuild dry-run."));
       return;
     }
 
@@ -175,7 +176,7 @@ export function useEngineActions({ contractDiagnosticsOK, projectHealthExportRea
     const currentSession = sessionRef.current;
     const resolvedProjectDir = projectDir ?? (hasCurrentEngineExport ? lastEngineExportPath : null);
     if (!resolvedProjectDir) {
-      setStatus("Exporte, salve ou abra um projeto antes de gerar a ROM.");
+      setStatus(ui("Exporte, salve ou abra um projeto antes de gerar a ROM."));
       return;
     }
 
@@ -218,7 +219,7 @@ export function useEngineActions({ contractDiagnosticsOK, projectHealthExportRea
       });
       if (result.canceled) {
         if (options?.interactive !== false) {
-          setStatus("Exportacao Engine Pack cancelada.");
+          setStatus(ui("Exportacao Engine Pack cancelada."));
         }
         return null;
       }
@@ -266,7 +267,7 @@ export function useEngineActions({ contractDiagnosticsOK, projectHealthExportRea
     if (!currentSession?.path) return null;
 
     const destinationRoot = resolveRomExportRoot(currentSession.path, currentSession.project.data);
-    setStatus(`Exportando projeto para ${destinationRoot}...`);
+    setStatus(ui("Exportando projeto para {0}...", { 0: destinationRoot }));
     const exported = await exportEngineProject({
       destinationRoot,
       developmentStartScene,
@@ -287,7 +288,7 @@ export function useEngineActions({ contractDiagnosticsOK, projectHealthExportRea
       return null;
     }
 
-    setStatus("Compilando ROM...");
+    setStatus(ui("Compilando ROM..."));
     const result = await window.gbaStudio.runEnginePackBuild(
       exportPath,
       projectEnginePackPath(),
@@ -358,11 +359,11 @@ export function useEngineActions({ contractDiagnosticsOK, projectHealthExportRea
       if (!built) return;
       if (sessionRef.current?.path !== currentSession.path
         || JSON.stringify(sessionRef.current?.project.data) !== sourceSnapshot) {
-        setStatus("O projeto mudou durante o build. Execute Play novamente para usar a versão atual.");
+        setStatus(ui("O projeto mudou durante o build. Execute Play novamente para usar a versão atual."));
         return;
       }
 
-      setStatus("Abrindo ROM no Play Window...");
+      setStatus(ui("Abrindo ROM no Play Window..."));
       const launch = await window.gbaStudio.openRomPlayerWindow({
         romPath: built.romPath,
         title: currentSession?.project.summary.name ?? "GBA Studio",
@@ -391,7 +392,7 @@ export function useEngineActions({ contractDiagnosticsOK, projectHealthExportRea
     try {
       const result = await window.gbaStudio.exportWebProject({ project: currentSession.project, projectPath: currentSession.path });
       if (result.canceled) {
-        setStatus("Exportacao Web / itch.io cancelada.");
+        setStatus(ui("Exportacao Web / itch.io cancelada."));
         return;
       }
       if (result.error || !result.destination) {

@@ -1,3 +1,4 @@
+import { uiText as ui, useStudioUiText } from "./studioUiText";
 import { Copy, Eye, Frame, Grid3X3, Image, Magnet, MousePointer2, RectangleHorizontal, Trash2, Type, type LucideIcon } from "lucide-react";
 import { useEffect } from "react";
 import type { HudComponentKind, HudPresetPresentation, UpdateHudPresetFields } from "../shared/hudPresets";
@@ -19,6 +20,7 @@ export interface HudCanvasToolbarProps {
   onToggleGrid?(): void;
 }
 export function HudCanvasToolbar(props: HudCanvasToolbarProps): React.ReactElement {
+  const ui = useStudioUiText();
   const { preset, canEdit, selectedComponentID, onSelectComponent, onUpdateHudPreset } = props;
   const selected = preset?.components.find(item => item.id === selectedComponentID);
   const remove = () => {
@@ -44,25 +46,25 @@ export function HudCanvasToolbar(props: HudCanvasToolbarProps): React.ReactEleme
     onSelectComponent(id);
     props.onViewMode("edit");
   };
-  return <div className="hud-canvas-toolbar" role="toolbar" aria-label="Ferramentas da HUD">
-    <button type="button" aria-pressed={props.viewMode === "edit"} onClick={() => props.onViewMode("edit")}><MousePointer2 aria-hidden="true" size={16}/><span>Selecionar</span></button>
+  return <div className="hud-canvas-toolbar" role="toolbar" aria-label={ui("Ferramentas da HUD")}>
+    <button type="button" aria-pressed={props.viewMode === "edit"} onClick={() => props.onViewMode("edit")}><MousePointer2 aria-hidden="true" size={16}/><span>{ui("Selecionar")}</span></button>
     {hudToolKinds.map(kind => {
       const Icon = hudToolIcons[kind];
-      return <button type="button" key={kind} aria-label={`+ ${hudKindLabels[kind]}`} title={`Adicionar ${hudKindLabels[kind].toLocaleLowerCase()}`} disabled={!canEdit || !preset || preset.components.length >= 64} onClick={() => add(kind)}><Icon aria-hidden="true" size={16}/><span>{hudKindLabels[kind]}</span></button>;
+      return <button type="button" key={kind} aria-label={`+ ${ui(hudKindLabels[kind])}`} title={ui("Adicionar {0}", { 0: ui(hudKindLabels[kind]).toLocaleLowerCase() })} disabled={!canEdit || !preset || preset.components.length >= 64} onClick={() => add(kind)}><Icon aria-hidden="true" size={16}/><span>{ui(hudKindLabels[kind])}</span></button>;
     })}
     <span className="hud-canvas-toolbar-divider" aria-hidden="true"/>
-    {props.onToggleGrid ? <button type="button" aria-pressed={props.gridVisible} onClick={props.onToggleGrid}><Grid3X3 aria-hidden="true" size={16}/><span>Grade</span></button> : null}
-    <button type="button" title="Alinhar o elemento selecionado à grade de 8×8 px" disabled={!canEdit || !selected || !preset || props.viewMode !== "edit"} onClick={() => {
+    {props.onToggleGrid ? <button type="button" aria-pressed={props.gridVisible} onClick={props.onToggleGrid}><Grid3X3 aria-hidden="true" size={16}/><span>{ui("Grade")}</span></button> : null}
+    <button type="button" title={ui("Alinhar o elemento selecionado à grade de 8×8 px")} disabled={!canEdit || !selected || !preset || props.viewMode !== "edit"} onClick={() => {
       if (!preset || !selected) return;
       onUpdateHudPreset?.(preset.id, { components: preset.components.map(component => component.id === selected.id ? updateHudComponentGeometry(component, {}) : component) });
-    }}><Magnet aria-hidden="true" size={16}/><span>Encaixar</span></button>
-    <button type="button" aria-label="Duplicar elemento" title="Duplicar elemento" disabled={!canEdit || !selected || !preset || preset.components.length >= 64 || props.viewMode !== "edit"} onClick={() => {
+    }}><Magnet aria-hidden="true" size={16}/><span>{ui("Encaixar")}</span></button>
+    <button type="button" aria-label={ui("Duplicar elemento")} title={ui("Duplicar elemento")} disabled={!canEdit || !selected || !preset || preset.components.length >= 64 || props.viewMode !== "edit"} onClick={() => {
       if (!preset || !selected) return;
       const id = `${selected.id}-copy-${crypto.randomUUID()}`;
       onUpdateHudPreset?.(preset.id, { components: [...preset.components, { ...selected, id, label: `${selected.label} cópia` }] });
       onSelectComponent(id);
     }}><Copy aria-hidden="true" size={15}/></button>
-    <button type="button" className="danger" aria-label="Remover elemento" disabled={!canEdit || !selected || props.viewMode !== "edit"} title="Excluir elemento (Delete ou Backspace)" onClick={remove}><Trash2 aria-hidden="true" size={15}/></button>
-    <button type="button" aria-label="Prévia sem guias" title="Prévia sem guias" aria-pressed={props.viewMode === "preview"} onClick={() => props.onViewMode("preview")}><Eye aria-hidden="true" size={16}/><span>Prévia</span></button>
+    <button type="button" className="danger" aria-label={ui("Remover elemento")} disabled={!canEdit || !selected || props.viewMode !== "edit"} title={ui("Excluir elemento (Delete ou Backspace)")} onClick={remove}><Trash2 aria-hidden="true" size={15}/></button>
+    <button type="button" aria-label={ui("Prévia sem guias")} title={ui("Prévia sem guias")} aria-pressed={props.viewMode === "preview"} onClick={() => props.onViewMode("preview")}><Eye aria-hidden="true" size={16}/><span>{ui("Prévia")}</span></button>
   </div>;
 }

@@ -1,8 +1,10 @@
+import { uiText as ui, useStudioUiText } from "./studioUiText";
 import { Cpu, Heart, Sparkles, UserRound } from "lucide-react";
 
 import { useStudioI18n } from "./i18n";
 
 export function CreditsContent({ className = "welcome-credits-content" }: { className?: string }): React.ReactElement {
+  const ui = useStudioUiText();
   const { t } = useStudioI18n();
 
   return (
@@ -14,7 +16,7 @@ export function CreditsContent({ className = "welcome-credits-content" }: { clas
 
       <article className="welcome-credits-card welcome-credits-creator">
         <h3><UserRound aria-hidden="true" size={16} />{t("credits.creatorTitle")}</h3>
-        <strong>Matheus Melo</strong>
+        <strong>{ui("Matheus Melo")}</strong>
         <span>{t("credits.creatorRole")}</span>
       </article>
 
@@ -22,23 +24,23 @@ export function CreditsContent({ className = "welcome-credits-content" }: { clas
         <h3><Heart aria-hidden="true" size={16} />{t("credits.thanksTitle")}</h3>
         <dl>
           <div>
-            <dt>GB Studio</dt>
+            <dt>{ui("GB Studio")}</dt>
             <dd>{t("credits.gbStudio")}</dd>
           </div>
           <div>
-            <dt>Butano</dt>
+            <dt>{ui("Butano")}</dt>
             <dd>{t("credits.butano")}</dd>
           </div>
           <div>
-            <dt>Tonc</dt>
+            <dt>{ui("Tonc")}</dt>
             <dd>{t("credits.tonc")}</dd>
           </div>
           <div>
-            <dt>devkitPro / devkitARM</dt>
+            <dt>{ui("devkitPro / devkitARM")}</dt>
             <dd>{t("credits.devkit")}</dd>
           </div>
           <div>
-            <dt>mGBA</dt>
+            <dt>{ui("mGBA")}</dt>
             <dd>{t("credits.mgba")}</dd>
           </div>
         </dl>

@@ -1,3 +1,4 @@
+import { uiText as ui, useStudioUiText } from "./studioUiText";
 import { useRef, useState, type ReactNode } from "react";
 
 import {
@@ -22,6 +23,7 @@ export function SpritesEditorCenter({
   bottomPane,
   canvasPane
 }: SpritesEditorCenterProps): React.ReactElement {
+  const ui = useStudioUiText();
   const [bottomHeight, setBottomHeight] = useState(() => readSpriteEditorBottomHeight());
   const centerRef = useRef<HTMLDivElement>(null);
   const resizeDrag = useRef<ResizeDragState | null>(null);
@@ -74,7 +76,7 @@ export function SpritesEditorCenter({
         {canvasPane}
       </div>
       <div
-        aria-label="Altura da folha de sprites e quadros"
+        aria-label={ui("Altura da folha de sprites e quadros")}
         aria-orientation="horizontal"
         aria-valuemax={420}
         aria-valuemin={36}
@@ -93,7 +95,7 @@ export function SpritesEditorCenter({
         onPointerUp={endResize}
         role="separator"
         tabIndex={0}
-        title="Ajustar altura do painel de tiles e frames"
+        title={ui("Ajustar altura do painel de tiles e frames")}
       />
       <section
         className={isBottomCollapsed ? "sprites-editor-bottom-pane is-collapsed" : "sprites-editor-bottom-pane"}
@@ -105,8 +107,8 @@ export function SpritesEditorCenter({
           onClick={toggleBottomPane}
           type="button"
         >
-          <span>Folha · Quadros</span>
-          <span>{isBottomCollapsed ? "Expandir" : "Recolher"}</span>
+          <span>{ui("Folha · Quadros")}</span>
+          <span>{isBottomCollapsed ? ui("Expandir") : ui("Recolher")}</span>
         </button>
         {isBottomCollapsed ? null : bottomPane}
       </section>

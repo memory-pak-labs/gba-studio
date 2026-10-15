@@ -18,6 +18,7 @@ import type { RomPlayerFrameStats, RomPlayerTelemetryEvent } from "../shared/har
 import type { WindowDocumentState } from "../shared/windowDocumentState.js";
 
 const api: GBAStudioDesktopAPI = {
+  setAppLocale: (locale: string) => ipcRenderer.invoke(ipcChannels.setAppLocale, locale),
   platform: process.platform,
   onAppCommand: (listener: (command: AppCommand) => void) => {
     const subscription = (_event: IpcRendererEvent, command: AppCommand) => listener(command);

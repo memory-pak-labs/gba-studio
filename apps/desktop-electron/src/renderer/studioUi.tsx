@@ -1,3 +1,4 @@
+import { uiText as ui, useStudioUiText } from "./studioUiText";
 import type { LucideIcon } from "lucide-react";
 import { AlertCircle, Check, ChevronDown, FolderOpen, Loader2, Search } from "lucide-react";
 import React from "react";
@@ -48,6 +49,7 @@ export function StudioButton({
   type = "button",
   ...props
 }: StudioButtonProps): React.ReactElement {
+  const ui = useStudioUiText();
   return (
     <button
       className={[buttonClassNames[variant], className].filter(Boolean).join(" ")}
@@ -67,6 +69,7 @@ export function StudioChip({
   type = "button",
   ...props
 }: StudioChipProps): React.ReactElement {
+  const ui = useStudioUiText();
   return (
     <button
       className={["ui-chip", active ? "active" : "", className].filter(Boolean).join(" ")}
@@ -120,6 +123,7 @@ export function ProjectReferencePicker({
   searchPlaceholder,
   actions = []
 }: ProjectReferencePickerProps): React.ReactElement {
+  const ui = useStudioUiText();
   const [isOpen, setIsOpen] = React.useState(false);
   const [query, setQuery] = React.useState("");
   const rootRef = React.useRef<HTMLDivElement>(null);
@@ -184,7 +188,7 @@ export function ProjectReferencePicker({
           aria-expanded={isOpen}
           aria-haspopup="listbox"
           aria-invalid={isInvalid}
-          aria-label={ariaLabel}
+          aria-label={ui(ariaLabel)}
           className="project-reference-picker-value"
           disabled={disabled}
           onClick={() => setIsOpen((current) => !current)}
@@ -201,17 +205,17 @@ export function ProjectReferencePicker({
         <ChevronDown aria-hidden="true" size={14} />
       </div>
 
-      {isInvalid ? <small className="project-reference-picker-warning" role="alert">{invalidLabel}: {value}</small> : null}
+      {isInvalid ? <small className="project-reference-picker-warning" role="alert">{ui(invalidLabel)}: {value}</small> : null}
 
       {isOpen ? (
         <div className="project-reference-picker-popover">
           <label className="project-reference-picker-search">
             <Search aria-hidden="true" size={14} />
             <input
-              aria-label={`Buscar ${ariaLabel}`}
+              aria-label={ui("Buscar {0}", { 0: ui(ariaLabel) })}
               autoFocus
               onChange={(event) => setQuery(event.currentTarget.value)}
-              placeholder={searchPlaceholder ?? `Buscar ${ariaLabel.toLocaleLowerCase("pt-BR")}`}
+              placeholder={searchPlaceholder ?? ui("Buscar {0}", { 0: ariaLabel.toLocaleLowerCase("pt-BR") })}
               type="search"
               value={query}
             />
@@ -225,7 +229,7 @@ export function ProjectReferencePicker({
                 role="option"
                 type="button"
               >
-                <span>{emptyLabel}</span>
+                <span>{ui(emptyLabel)}</span>
                 {value.length === 0 ? <Check aria-hidden="true" size={14} /> : null}
               </button>
             ) : null}
@@ -240,18 +244,18 @@ export function ProjectReferencePicker({
               >
                 <span>
                   <strong>{option.label}</strong>
-                  {option.detail ? <small>{option.detail}</small> : null}
+                  {option.detail ? <small>{ui(option.detail)}</small> : null}
                 </span>
                 {option.value === value ? <Check aria-hidden="true" size={14} /> : null}
               </button>
             ))}
-            {visibleOptions.length === 0 ? <p>Nenhuma referência encontrada.</p> : null}
+            {visibleOptions.length === 0 ? <p>{ui("Nenhuma referência encontrada.")}</p> : null}
           </div>
           {actions.length > 0 ? (
             <div className="project-reference-picker-actions">
               {actions.map((action) => (
                 <button key={action.label} onClick={() => void runAction(action)} type="button">
-                  {action.label}
+                  {ui(action.label)}
                 </button>
               ))}
             </div>
@@ -272,6 +276,7 @@ export function WorkspaceContextToolbar({
   role = "toolbar",
   ...props
 }: WorkspaceContextToolbarProps): React.ReactElement {
+  const ui = useStudioUiText();
   return (
     <div
       className={["workspace-context-toolbar", className].filter(Boolean).join(" ")}
@@ -298,11 +303,12 @@ export function StudioField({
   children,
   className
 }: StudioFieldProps): React.ReactElement {
+  const ui = useStudioUiText();
   return (
     <label className={["studio-field ui-field", className].filter(Boolean).join(" ")} htmlFor={htmlFor}>
-      <span>{label}</span>
+      <span>{ui(label)}</span>
       {children}
-      {hint ? <small className="studio-field-hint">{hint}</small> : null}
+      {hint ? <small className="studio-field-hint">{ui(hint)}</small> : null}
     </label>
   );
 }
@@ -322,6 +328,7 @@ export function WorkspaceHeader({
   actions,
   meta
 }: WorkspaceHeaderProps): React.ReactElement {
+  const ui = useStudioUiText();
   const hasActions = Boolean(actions || meta);
 
   return (
@@ -347,6 +354,7 @@ export function WorkspaceEmptyState({
   kind = "empty",
   icon
 }: WorkspaceEmptyStateProps): React.ReactElement {
+  const ui = useStudioUiText();
   const Icon = icon ?? defaultIcons[kind];
 
   return (
@@ -361,8 +369,8 @@ export function WorkspaceEmptyState({
       </div>
       <div className="workspace-empty-copy">
         <h3>{title}</h3>
-        <p>{description}</p>
-        {hint ? <small className="workspace-empty-hint">{hint}</small> : null}
+        <p>{ui(description)}</p>
+        {hint ? <small className="workspace-empty-hint">{ui(hint)}</small> : null}
       </div>
     </div>
   );
@@ -379,6 +387,7 @@ export function StudioStatusBar({
   workspace,
   isBusy = false
 }: StudioStatusBarProps): React.ReactElement {
+  const ui = useStudioUiText();
   const { t } = useStudioI18n();
   const workspaceLabel = workspace ? t(workspaceLabelKey(workspace)) : null;
 
@@ -390,7 +399,7 @@ export function StudioStatusBar({
         ) : (
           <span aria-hidden="true" className="studio-status-bar-dot" />
         )}
-        <span className="studio-status-bar-message">{message}</span>
+        <span className="studio-status-bar-message">{ui(message)}</span>
       </div>
       {workspaceLabel ? (
         <span className="studio-status-bar-workspace" aria-label={t("workspace.activeAria", { workspace: workspaceLabel })}>

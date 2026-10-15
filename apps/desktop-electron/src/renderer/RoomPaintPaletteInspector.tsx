@@ -1,3 +1,4 @@
+import { uiText as ui, useStudioUiText } from "./studioUiText";
 import { useEffect, useRef, useState, type PointerEvent } from "react";
 import { ZoomIn, ZoomOut } from "lucide-react";
 import { InspectorInfoTip } from "./InspectorControls";
@@ -68,6 +69,7 @@ export function RoomPaintPaletteInspector({
   videoModeId,
   videoModeLabel
 }: RoomPaintPaletteInspectorProps): React.ReactElement {
+  const ui = useStudioUiText();
   const backgroundURL = resolveAssetURLWithBundledDefault(
     projectPath,
     room.backgroundSource,
@@ -188,51 +190,50 @@ export function RoomPaintPaletteInspector({
   }
 
   return (
-    <section className="room-paint-inspector" aria-label="Inspector Pintura">
+    <section className="room-paint-inspector" aria-label={ui("Inspector Pintura")}>
       <div className="room-paint-panel">
         <div className="room-paint-panel-heading">
-          <h4>Paleta</h4>
+          <h4>{ui("Paleta")}</h4>
           <p className="room-paint-video-mode">{presentation.videoModeLabel}</p>
         </div>
       </div>
 
       {room.tilemapContract ? (
-        <div aria-label="Contrato modular do tilemap" className="room-paint-metatile-contract">
-          <strong>Metatile {room.tilemapContract.metatileWidth * room.backgroundTileWidth}×{room.tilemapContract.metatileHeight * room.backgroundTileHeight}</strong>
-          <InspectorInfoTip label="Metatile">Base BG2 · Topo BG1 · colisão alinhada em metatile</InspectorInfoTip>
+        <div aria-label={ui("Contrato modular do tilemap")} className="room-paint-metatile-contract">
+          <strong>{ui("Metatile ")}{room.tilemapContract.metatileWidth * room.backgroundTileWidth}×{room.tilemapContract.metatileHeight * room.backgroundTileHeight}</strong>
+          <InspectorInfoTip label={ui("Metatile")}>{ui("Base BG2 · Topo BG1 · colisão alinhada em metatile")}</InspectorInfoTip>
         </div>
       ) : null}
 
-      <div className="room-paint-free-selection" aria-label="Pincel por seleção livre">
+      <div className="room-paint-free-selection" aria-label={ui("Pincel por seleção livre")}>
         <span className="room-paint-selection-title">
-          <strong>Seleção livre</strong>
-          <InspectorInfoTip label="Seleção livre">Arraste sobre o tileset para montar o pincel.</InspectorInfoTip>
+          <strong>{ui("Seleção livre")}</strong>
+          <InspectorInfoTip label={ui("Seleção livre")}>{ui("Arraste sobre o tileset para montar o pincel.")}</InspectorInfoTip>
         </span>
         <em>{selectedTileStamp.width}×{selectedTileStamp.height}</em>
       </div>
 
       <div className="room-paint-tileset-header">
-        <span>Tileset</span>
+        <span>{ui("Tileset")}</span>
         <select
           onChange={(event) => onUpdateRoomFields(room.id, { backgroundAssetName: event.currentTarget.value })}
           value={room.background ?? ""}
         >
-          <option value="">Sem tileset</option>
+          <option value="">{ui("Sem tileset")}</option>
           {backgroundOptions.map((option) => (
-            <option key={option.value} value={option.value}>{option.label}</option>
+            <option key={option.value} value={option.value}>{ui(option.label)}</option>
           ))}
         </select>
-        <button aria-label="Importar tileset PNG" onClick={() => void onImportTileset(room.id)} type="button">
+        <button aria-label={ui("Importar tileset PNG")} onClick={() => void onImportTileset(room.id)} type="button">
           +
         </button>
-        <button aria-label="Importar mapa Tiled" onClick={() => void onImportTiledMap(room.id)} type="button">
-          Tiled
-        </button>
+        <button aria-label={ui("Importar mapa Tiled")} onClick={() => void onImportTiledMap(room.id)} type="button">
+          {ui("Tiled")}</button>
       </div>
 
-      <div className="room-paint-tileset-zoom" role="group" aria-label="Zoom do tileset">
+      <div className="room-paint-tileset-zoom" role="group" aria-label={ui("Zoom do tileset")}>
         <button
-          aria-label="Reduzir zoom do tileset"
+          aria-label={ui("Reduzir zoom do tileset")}
           onClick={() => setTilesetZoom((current) => Math.max(0.5, Number((current - 0.25).toFixed(2))))}
           type="button"
         >
@@ -240,7 +241,7 @@ export function RoomPaintPaletteInspector({
         </button>
         <strong>{Math.round(tilesetZoom * 100)}%</strong>
         <button
-          aria-label="Aumentar zoom do tileset"
+          aria-label={ui("Aumentar zoom do tileset")}
           onClick={() => setTilesetZoom((current) => Math.min(4, Number((current + 0.25).toFixed(2))))}
           type="button"
         >
@@ -258,7 +259,7 @@ export function RoomPaintPaletteInspector({
             }}
           >
             <img
-              alt={`Tileset ${presentation.backgroundName}`}
+              alt={ui("Tileset {0}", { 0: presentation.backgroundName })}
               crossOrigin={isDesktopAssetURL(backgroundURL) ? "anonymous" : undefined}
               onError={() => {
                 setTilesetSize(null);
@@ -296,18 +297,18 @@ export function RoomPaintPaletteInspector({
           </div>
         ) : tilesetPreviewError || (hasSelectedTileset && !backgroundURL) ? (
           <p role="status">
-            <strong>Não foi possível carregar o tileset.</strong>
-            <span>Verifique o asset em Arquivos ou importe um PNG novamente.</span>
+            <strong>{ui("Não foi possível carregar o tileset.")}</strong>
+            <span>{ui("Verifique o asset em Arquivos ou importe um PNG novamente.")}</span>
           </p>
         ) : (
-          <p role="status">Selecione um tileset para abrir a paleta.</p>
+          <p role="status">{ui("Selecione um tileset para abrir a paleta.")}</p>
         )}
         <em>{presentation.tileCountLabel}</em>
       </div>
 
       <p className="room-paint-floating-meta">
-        {presentation.activeTileLabel} · Pincel {selectedTileStamp.width}×{selectedTileStamp.height}
-        {selectedCellIndex === null ? "" : ` · Celula ${selectedCellIndex + 1}`}
+        {presentation.activeTileLabel} {ui(" · Pincel ")}{selectedTileStamp.width}×{selectedTileStamp.height}
+        {selectedCellIndex === null ? "" : ui(" · Celula {0}", { 0: selectedCellIndex + 1 })}
       </p>
     </section>
   );

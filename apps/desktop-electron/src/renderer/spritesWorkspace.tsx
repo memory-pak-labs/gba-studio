@@ -1,3 +1,5 @@
+import { readStoredLocale } from "./i18n";
+import { uiText as ui, useStudioUiText } from "./studioUiText";
 import { useEffect, useMemo, useRef, useState, type CSSProperties, type Dispatch, type KeyboardEvent, type MouseEvent, type PointerEvent, type SetStateAction } from "react";
 
 import { ArrowDown, ArrowLeft, ArrowRight, ArrowUp, Crosshair, Eraser, Grid3X3, Layers, MousePointer2, Pause, Play, Plus, Scan, Search, SkipBack, SkipForward, Stamp, ChevronLeft, ChevronRight, ShieldCheck } from "lucide-react";
@@ -117,6 +119,7 @@ function spriteSheetLabel(name: string): string {
 function SpriteLibraryThumbnail({ sheet, animation, projectPath }: {
   sheet: SpritesWorkspaceSheet; animation?: SpritesWorkspaceAnimation; projectPath?: string;
 }): React.ReactElement {
+  const ui = useStudioUiText();
   const [size, setSize] = useState<{ width: number; height: number } | null>(null);
   const sourceURL = resolveSpriteAssetURL(projectPath, sheet.source, sheet.bundledDefaultAsset);
   const frame = animation?.metaspriteFrames[0];
@@ -410,19 +413,18 @@ function spriteSheetPreview(
         compactPalette ? "palette-mode" : "",
         paletteSourceKind === "reference" ? "palette-reference-mode" : ""
       ].filter(Boolean).join(" ")}
-      aria-label={`Preview visual de ${sheet.name}`}
+      aria-label={ui("Preview visual de {0}", { 0: sheet.name })}
     >
       {compactPalette ? (
-        <div className="sprite-sheet-palette-toolbar" aria-label="Paleta de pintura">
-          <div className="sprite-sheet-source-toggle" role="group" aria-label="Fonte da paleta">
+        <div className="sprite-sheet-palette-toolbar" aria-label={ui("Paleta de pintura")}>
+          <div className="sprite-sheet-source-toggle" role="group" aria-label={ui("Fonte da paleta")}>
             <button
               aria-pressed={paletteSourceKind === "sheet"}
               className={paletteSourceKind === "sheet" ? "active" : ""}
               onClick={() => onPaletteSourceKindChange?.("sheet")}
               type="button"
             >
-              Sheet
-            </button>
+              {ui("Sheet")}</button>
             <button
               aria-pressed={paletteSourceKind === "reference"}
               className={paletteSourceKind === "reference" ? "active" : ""}
@@ -430,23 +432,22 @@ function spriteSheetPreview(
               onClick={() => onPaletteSourceKindChange?.("reference")}
               type="button"
             >
-              Referência
-            </button>
+              {ui("Referência")}</button>
           </div>
           {paletteSourceKind === "reference" && paletteReferences.length > 1 ? (
             <select
-              aria-label="Referência ativa"
+              aria-label={ui("Referência ativa")}
               onChange={(event) => onPaletteReferenceIdChange?.(event.currentTarget.value)}
               value={paletteReferenceId ?? paletteReferences[0]?.id ?? ""}
             >
               {paletteReferences.map((reference) => (
-                <option key={reference.id} value={reference.id}>{reference.title}</option>
+                <option key={reference.id} value={reference.id}>{ui(reference.title)}</option>
               ))}
             </select>
           ) : null}
-          <span className="sprite-sheet-palette-brush">{paintTileMetrics?.brushLabel ?? "Selecione um recorte"}</span>
+          <span className="sprite-sheet-palette-brush">{paintTileMetrics?.brushLabel ?? ui("Selecione um recorte")}</span>
           {previewAnimation && paintBrush ? (
-            <div className="sprite-sheet-brush-size-controls" aria-label="Tamanho do brush">
+            <div className="sprite-sheet-brush-size-controls" aria-label={ui("Tamanho do brush")}>
               <button onClick={() => adjustBrushSize(-8, 0)} type="button">W-</button>
               <button onClick={() => adjustBrushSize(8, 0)} type="button">W+</button>
               <button onClick={() => adjustBrushSize(0, -8)} type="button">H-</button>
@@ -457,23 +458,23 @@ function spriteSheetPreview(
       ) : (
         <div className="sprite-sheet-preview-header">
           <div className="sprite-sheet-preview-title">
-            <strong>Tiles</strong>
-            <span>{paintTileMetrics ? `${paintTileMetrics.tileCount.toLocaleString("pt-BR")} Tiles` : "Aguardando imagem"}</span>
+            <strong>{ui("Tiles")}</strong>
+            <span>{paintTileMetrics ? ui("{0} Tiles", { 0: paintTileMetrics.tileCount.toLocaleString(readStoredLocale()) }) : ui("Aguardando imagem")}</span>
           </div>
-          <span>{paintTileMetrics?.brushLabel ?? "Brush aguardando frame"}</span>
+          <span>{paintTileMetrics?.brushLabel ?? ui("Brush aguardando frame")}</span>
         </div>
       )}
       {compactPalette ? null : (
         <div className="sprite-sheet-context-row">
-          <span>Ativa</span>
-          <strong>{previewAnimation?.name ?? "Sem animação"}</strong>
-          <span>Referência</span>
+          <span>{ui("Ativa")}</span>
+          <strong>{previewAnimation?.name ?? ui("Sem animação")}</strong>
+          <span>{ui("Referência")}</span>
           <strong>{sheet.name}</strong>
         </div>
       )}
       {previewAnimation && !compactPalette ? (
-        <div className="sprite-sheet-size-bar" aria-label="Tamanho do frame ativo">
-          <div className="sprite-sheet-size-presets" role="group" aria-label="Presets de frame">
+        <div className="sprite-sheet-size-bar" aria-label={ui("Tamanho do frame ativo")}>
+          <div className="sprite-sheet-size-presets" role="group" aria-label={ui("Presets de frame")}>
             {frameSizePresets.map((preset) => (
               <button
                 aria-pressed={previewAnimation.frameWidth === preset.width && previewAnimation.frameHeight === preset.height}
@@ -489,12 +490,11 @@ function spriteSheetPreview(
               </button>
             ))}
             <span aria-pressed={isCustomFrameSize} className={isCustomFrameSize ? "active" : ""} role="status">
-              Livre
-            </span>
+              {ui("Livre")}</span>
           </div>
           <InspectorNumber
             className="sprite-sheet-frame-size-field"
-            description="Largura do recorte."
+            description={ui("Largura do recorte.")}
             label="W"
             max={imageSize?.width}
             min={1}
@@ -504,7 +504,7 @@ function spriteSheetPreview(
           />
           <InspectorNumber
             className="sprite-sheet-frame-size-field"
-            description="Altura do recorte."
+            description={ui("Altura do recorte.")}
             label="H"
             max={imageSize?.height}
             min={1}
@@ -515,30 +515,28 @@ function spriteSheetPreview(
         </div>
       ) : null}
       {previewAnimation && canPickTileSlice && activeSpriteMode !== "paint" ? (
-        <div className="sprite-sheet-interaction-toggle" role="group" aria-label="Interacao do sprite sheet">
+        <div className="sprite-sheet-interaction-toggle" role="group" aria-label={ui("Interacao do sprite sheet")}>
           <button
             aria-pressed={interactionMode === "frames"}
             className={interactionMode === "frames" ? "active" : ""}
             onClick={() => setInteractionMode("frames")}
             type="button"
           >
-            Frames
-          </button>
+            {ui("Frames")}</button>
           <button
             aria-pressed={interactionMode === "slice"}
             className={interactionMode === "slice" ? "active" : ""}
             onClick={() => setInteractionMode("slice")}
             type="button"
           >
-            Recorte
-          </button>
+            {ui("Recorte")}</button>
         </div>
       ) : null}
       {sourceURL ? (
         <div className="sprite-sheet-image-stage">
           <div className="sprite-sheet-image-stack">
             <img
-              alt={`Sprite sheet ${sheet.name}`}
+              alt={ui("Sprite sheet {0}", { 0: sheet.name })}
               crossOrigin={isDesktopAssetURL(sourceURL) ? "anonymous" : undefined}
               onLoad={(event) => {
                 const nextSize = {
@@ -570,7 +568,7 @@ function spriteSheetPreview(
               const isDeclaredFrame = region.frameIndex < previewAnimation.frameCount;
               return (
                 <button
-                  aria-label={`Definir frames ate ${region.frameIndex + 1}`}
+                  aria-label={ui("Definir frames ate {0}", { 0: region.frameIndex + 1 })}
                   className={isDeclaredFrame ? "sprite-frame-grid-region declared" : "sprite-frame-grid-region"}
                   key={`${sheet.name}-grid-frame-${region.frameIndex}`}
                   onClick={() => onUpdateAnimationFields(previewAnimation.id, { frameCount: region.frameIndex + 1 })}
@@ -587,8 +585,8 @@ function spriteSheetPreview(
             {isSliceMode && activeSliceTarget ? (
               <button
                 aria-label={activeMetaspriteTile
-                  ? `Escolher recorte do tile ${activeMetaspriteTile.tileIndex + 1}`
-                  : "Escolher recorte do brush de pintura"}
+                  ? ui("Escolher recorte do tile {0}", { 0: activeMetaspriteTile.tileIndex + 1 })
+                  : ui("Escolher recorte do brush de pintura")}
                 className="sprite-sheet-slice-picker"
                 onPointerCancel={endSliceDrag}
                 onPointerDown={beginSliceDrag}
@@ -598,7 +596,7 @@ function spriteSheetPreview(
               >
                 {sliceMarkerStyle ? (
                   <span className="sprite-sheet-slice-marker" style={sliceMarkerStyle}>
-                    {activeMetaspriteTile ? activeMetaspriteTile.tileIndex + 1 : "Brush"}
+                    {activeMetaspriteTile ? activeMetaspriteTile.tileIndex + 1 : ui("Brush")}
                   </span>
                 ) : null}
               </button>
@@ -607,14 +605,14 @@ function spriteSheetPreview(
         </div>
       ) : (
         <div className="sprite-sheet-preview-empty">
-          <span>{sheet.hasAsset ? "Sem source" : "Asset ausente"}</span>
+          <span>{sheet.hasAsset ? ui("Sem source") : ui("Asset ausente")}</span>
         </div>
       )}
       {paintTileMetrics && activeSliceTarget && !compactPalette ? (
-        <div className="sprite-sheet-brush-readout" aria-label="Brush atual de pintura">
-          <span>Brush</span>
+        <div className="sprite-sheet-brush-readout" aria-label={ui("Brush atual de pintura")}>
+          <span>{ui("Brush")}</span>
           <strong>{paintTileMetrics.brushLabel}</strong>
-          <small>{activeMetaspriteTile ? `Tile ${activeMetaspriteTile.tileIndex + 1}` : "Pronto para pintar primeiro tile"}</small>
+          <small>{activeMetaspriteTile ? ui("Tile {0}", { 0: activeMetaspriteTile.tileIndex + 1 }) : ui("Pronto para pintar primeiro tile")}</small>
         </div>
       ) : null}
     </div>
@@ -635,7 +633,7 @@ function stateDirectionPreviewGrid(
   if (previews.length === 0) return null;
 
   return (
-    <div className="sprite-state-direction-preview-grid" aria-label="Previews por estado e direcao">
+    <div className="sprite-state-direction-preview-grid" aria-label={ui("Previews por estado e direcao")}>
       {previews.map((preview) => {
         const regions = sourceURL && imageSize
           ? deriveSpriteStateDirectionPreviewRegions({
@@ -658,7 +656,7 @@ function stateDirectionPreviewGrid(
                 const isAnimatedFrame = region.frameIndex === deriveSpriteAnimatedPreviewFrameIndex({ elapsedMs: animationElapsedMs, preview });
                 return (
                   <button
-                    aria-label={`Selecionar ${preview.state} ${preview.direction}, frame ${region.frameIndex + 1}`}
+                    aria-label={ui("Selecionar {0} {1}, frame {2}", { 0: preview.state, 1: preview.direction, 2: region.frameIndex + 1 })}
                     className={[
                       "sprite-state-direction-thumbnail",
                       isActiveFrame ? "active" : "",
@@ -693,7 +691,7 @@ function stateDirectionPreviewGrid(
             >
               <span>{preview.state}</span>
               <strong>{preview.direction}</strong>
-              <small>{preview.frameCount}f · {preview.fps}fps · {preview.frameSize}</small>
+              <small>{preview.frameCount}f · {preview.fps}{ui("fps · ")}{preview.frameSize}</small>
             </button>
           </div>
         );
@@ -745,6 +743,7 @@ function metaspriteReferenceFrameStyle(
 function SpriteFrameThumbnail({ frame, sourceURL, imageSize }: {
   frame: SpriteMetaspriteFramePresentation; sourceURL: string | null; imageSize: { width: number; height: number } | null;
 }): React.ReactElement {
+  const ui = useStudioUiText();
   return <span aria-hidden="true" className="sprite-composer-frame-thumbnail" style={{ aspectRatio: `${frame.width} / ${frame.height}` }}>
     {sourceURL && imageSize ? frame.tiles.map((tile) => <span key={tile.tileIndex} className="sprite-frame-thumbnail-tile" style={{
       left: `${(spriteCanvasDefaultOriginX(frame.width) + tile.x) / frame.width * 100}%`,
@@ -1001,10 +1000,10 @@ function metaspriteCanvas(
       ) : null}
       <button
         aria-label={activeSpriteMode === "paint"
-          ? `Pintar tile no frame ${frameIndex + 1}`
+          ? ui("Pintar tile no frame {0}", { 0: frameIndex + 1 })
           : activeSpriteMode === "erase"
-            ? `Apagar tile no frame ${frameIndex + 1}`
-            : `Reposicionar tile ${selectedTile.tileIndex + 1} no frame ${frameIndex + 1}`}
+            ? ui("Apagar tile no frame {0}", { 0: frameIndex + 1 })
+            : ui("Reposicionar tile {0} no frame {1}", { 0: selectedTile.tileIndex + 1, 1: frameIndex + 1 })}
         className="sprite-metasprite-canvas-hit-area"
         onPointerCancel={endTilePointerInteraction}
         onPointerDown={beginTilePointerInteraction}
@@ -1033,8 +1032,7 @@ function metaspriteCanvas(
       ) : null}
       {frame.tileCount === 0 && activeSpriteMode === "paint" ? (
         <span aria-hidden="true" className="sprite-metasprite-empty-hint">
-          Clique para pintar
-        </span>
+          {ui("Clique para pintar")}</span>
       ) : null}
       {frame.tiles.map((tile) => {
         const screenX = spriteCanvasDefaultOriginX(frame.width) + tile.x;
@@ -1113,6 +1111,7 @@ function SpriteComposerPanel({
   onStageResize?: (size: { width: number; height: number }) => void;
   layout?: "viewport" | "panel";
 }): React.ReactElement {
+  const ui = useStudioUiText();
   const stageRef = useRef<HTMLDivElement>(null);
   const [stageSize, setStageSize] = useState<{ width: number; height: number } | null>(null);
   const selectedTileIndex = activeFrame
@@ -1163,20 +1162,20 @@ function SpriteComposerPanel({
         "sprite-composer-panel",
         layout === "viewport" ? "is-viewport" : ""
       ].filter(Boolean).join(" ")}
-      aria-label="Canvas de montagem de sprites"
+      aria-label={ui("Canvas de montagem de sprites")}
     >
       {layout === "panel" ? (
         <header className="sprite-composer-header">
           <div>
-            <strong>Canvas de montagem</strong>
+            <strong>{ui("Canvas de montagem")}</strong>
             <span>
-              {animation ? `${animation.name} - ${animation.frameSize}` : "Selecione uma animação"}
+              {animation ? `${animation.name} - ${animation.frameSize}` : ui("Selecione uma animação")}
             </span>
           </div>
-          <div className="sprite-composer-badges" aria-label="Resumo do frame ativo">
-            <span>{activeFrame ? `Frame ${selectedMetaspriteFrameIndex + 1}` : "Sem frame"}</span>
-            <span>{activeFrame ? `${activeFrame.tileCount} tile(s)` : "0 tile"}</span>
-            <span>{activeSpriteMode === "paint" ? "Pintura ativa" : "Montagem"}</span>
+          <div className="sprite-composer-badges" aria-label={ui("Resumo do frame ativo")}>
+            <span>{activeFrame ? ui("Frame {0}", { 0: selectedMetaspriteFrameIndex + 1 }) : ui("Sem frame")}</span>
+            <span>{activeFrame ? ui("{0} tile(s)", { 0: activeFrame.tileCount }) : ui("0 tile")}</span>
+            <span>{activeSpriteMode === "paint" ? ui("Pintura ativa") : ui("Montagem")}</span>
           </div>
         </header>
       ) : null}
@@ -1201,11 +1200,11 @@ function SpriteComposerPanel({
           )
         ) : (
           <div className="sprite-composer-empty">
-            <strong>{animation ? "Nenhum frame ativo" : "Selecione uma animação"}</strong>
+            <strong>{animation ? ui("Nenhum frame ativo") : ui("Selecione uma animação")}</strong>
             <span>
               {animation
-                ? "Escolha um frame na faixa abaixo para montar o sprite."
-                : "Selecione um ator e uma animação na biblioteca lateral."}
+                ? ui("Escolha um frame na faixa abaixo para montar o sprite.")
+                : ui("Selecione um ator e uma animação na biblioteca lateral.")}
             </span>
           </div>
         )}
@@ -1247,6 +1246,7 @@ function SpriteFrameTileStrip({
   sourceURL: string | null;
   imageSize: { width: number; height: number } | null;
 }): React.ReactElement {
+  const ui = useStudioUiText();
   const selectedTileIndex = activeFrame
     ? Math.min(selectedMetaspriteTileIndex, Math.max(0, activeFrame.tileCount - 1))
     : 0;
@@ -1326,9 +1326,9 @@ function SpriteFrameTileStrip({
   }
 
   return (
-    <div className="sprites-editor-timeline" aria-label="Timeline de frames e tiles">
+    <div className="sprites-editor-timeline" aria-label={ui("Timeline de frames e tiles")}>
       <div className="sprites-editor-timeline-row">
-        <div className="sprite-composer-frame-strip" role="group" aria-label="Frames da animação">
+        <div className="sprite-composer-frame-strip" role="group" aria-label={ui("Frames da animação")}>
           {animation?.metaspriteFrames.map((frame) => (
             <button
               aria-pressed={frame.frameIndex === selectedMetaspriteFrameIndex}
@@ -1348,15 +1348,15 @@ function SpriteFrameTileStrip({
             >
               <SpriteFrameThumbnail frame={frame} sourceURL={sourceURL} imageSize={imageSize} />
               <span className="sprite-composer-frame-card-copy">
-                <strong>Quadro {frame.frameIndex + 1}</strong>
-                <small>{frame.tileCount} {frame.tileCount === 1 ? "tile" : "tiles"}</small>
+                <strong>{ui("Quadro ")}{frame.frameIndex + 1}</strong>
+                <small>{frame.tileCount} {frame.tileCount === 1 ? ui("tile") : ui("tiles")}</small>
               </span>
             </button>
           ))}
         </div>
         <div className="sprite-composer-actions">
           <button
-            aria-label="Adicionar quadro"
+            aria-label={ui("Adicionar quadro")}
             disabled={!animation}
             onClick={addFrame}
             type="button"
@@ -1364,7 +1364,7 @@ function SpriteFrameTileStrip({
             +
           </button>
           <button
-            aria-label="Remover ultimo quadro"
+            aria-label={ui("Remover ultimo quadro")}
             disabled={!animation || animation.frameCount <= 1}
             onClick={removeFrame}
             type="button"
@@ -1374,7 +1374,7 @@ function SpriteFrameTileStrip({
         </div>
       </div>
       <div className="sprites-editor-timeline-row">
-        <div className="sprite-composer-tile-strip" role="group" aria-label="Tiles do frame ativo">
+        <div className="sprite-composer-tile-strip" role="group" aria-label={ui("Tiles do frame ativo")}>
           {activeFrame?.tiles.map((tile) => (
             <button
               aria-pressed={tile.tileIndex === selectedTile?.tileIndex}
@@ -1389,14 +1389,14 @@ function SpriteFrameTileStrip({
               ))}
               type="button"
             >
-              Tile {tile.tileIndex + 1}
+              {ui("Tile ")}{tile.tileIndex + 1}
               <small>{tile.x},{tile.y}</small>
             </button>
           ))}
         </div>
         <div className="sprite-composer-actions">
-          <button disabled={!canEdit} onClick={addTile} type="button">+ Tile</button>
-          <button disabled={!activeFrame || activeFrame.tileCount === 0} onClick={removeTile} type="button">− Tile</button>
+          <button disabled={!canEdit} onClick={addTile} type="button">{ui("+ Tile")}</button>
+          <button disabled={!activeFrame || activeFrame.tileCount === 0} onClick={removeTile} type="button">{ui("− Tile")}</button>
         </div>
       </div>
     </div>
@@ -1413,34 +1413,34 @@ function formatVramBytes(bytes: number): string {
 function spriteVramBudgetPanel(animation: SpritesWorkspaceAnimation): React.ReactElement {
   const analysis = animation.vramAnalysis;
   return (
-    <section aria-label="Orçamento GBA da animação" className="sprite-gba-budget-panel">
+    <section aria-label={ui("Orçamento GBA da animação")} className="sprite-gba-budget-panel">
       <div className="sprite-gba-budget-header">
-        <h4>Orçamento GBA</h4>
-        <span>{animation.colorMode} OBJ</span>
+        <h4>{ui("Orçamento GBA")}</h4>
+        <span>{animation.colorMode} {ui(" OBJ")}</span>
       </div>
       <dl className="sprite-gba-budget-metrics">
-        <div><dt>Tiles por frame</dt><dd>{analysis.tilesWide} x {analysis.tilesHigh} ({analysis.tilesPerFrame})</dd></div>
-        <div><dt>Frames únicos</dt><dd>{analysis.uniqueFrameCount} / {analysis.frameCount}</dd></div>
-        <div><dt>Tiles da animação</dt><dd>{formatVramBytes(analysis.totalTileBytes)}</dd></div>
-        <div><dt>VRAM residente estimada</dt><dd>{formatVramBytes(analysis.residentTileBytes)}</dd></div>
-        <div><dt>VRAM única</dt><dd>{formatVramBytes(analysis.uniqueTileBytes)}</dd></div>
-        <div><dt>OBJ por frame</dt><dd>{analysis.nativeObjDimension ?? `Metasprite · ${analysis.oamEntriesPerFrame} OBJs`}</dd></div>
-        <div><dt>Grade</dt><dd>{analysis.tileAligned ? "8×8 alinhado" : "Revisar: não alinhado"}</dd></div>
+        <div><dt>{ui("Tiles por frame")}</dt><dd>{analysis.tilesWide} x {analysis.tilesHigh} ({analysis.tilesPerFrame})</dd></div>
+        <div><dt>{ui("Frames únicos")}</dt><dd>{analysis.uniqueFrameCount} / {analysis.frameCount}</dd></div>
+        <div><dt>{ui("Tiles da animação")}</dt><dd>{formatVramBytes(analysis.totalTileBytes)}</dd></div>
+        <div><dt>{ui("VRAM residente estimada")}</dt><dd>{formatVramBytes(analysis.residentTileBytes)}</dd></div>
+        <div><dt>{ui("VRAM única")}</dt><dd>{formatVramBytes(analysis.uniqueTileBytes)}</dd></div>
+        <div><dt>{ui("OBJ por frame")}</dt><dd>{analysis.nativeObjDimension ?? ui("Metasprite · {0} OBJs", { 0: analysis.oamEntriesPerFrame })}</dd></div>
+        <div><dt>{ui("Grade")}</dt><dd>{analysis.tileAligned ? ui("8×8 alinhado") : ui("Revisar: não alinhado")}</dd></div>
         {analysis.repeatedFrameSavingsBytes > 0 ? (
-          <div><dt>Economia repetida</dt><dd>{formatVramBytes(analysis.repeatedFrameSavingsBytes)}</dd></div>
+          <div><dt>{ui("Economia repetida")}</dt><dd>{formatVramBytes(analysis.repeatedFrameSavingsBytes)}</dd></div>
         ) : null}
       </dl>
       {analysis.warnings.length > 0 ? (
         <ul className="sprite-gba-budget-warnings">
-          {analysis.warnings.map((warning) => <li key={warning}>{warning}</li>)}
+          {analysis.warnings.map((warning) => <li key={warning}>{ui(warning)}</li>)}
         </ul>
       ) : (
-        <p className="muted">Sem avisos de hardware para esta animação.</p>
+        <p className="muted">{ui("Sem avisos de hardware para esta animação.")}</p>
       )}
       {analysis.recommendations.length > 0 ? (
         <ul className="sprite-gba-budget-recommendations">
           {analysis.recommendations.map((recommendation) => (
-            <li key={recommendation}>{spriteVramRecommendationLabels[recommendation]}</li>
+            <li key={recommendation}>{ui(spriteVramRecommendationLabels[recommendation])}</li>
           ))}
         </ul>
       ) : null}
@@ -1451,6 +1451,7 @@ function spriteVramBudgetPanel(animation: SpritesWorkspaceAnimation): React.Reac
 function SpriteTileNumberField({ label, value, min, step, onCommit }: {
   label: string; value: number; min?: number; step: number; onCommit: (value: number) => void;
 }): React.ReactElement {
+  const ui = useStudioUiText();
   const [draft, setDraft] = useState(String(value));
   useEffect(() => setDraft(String(value)), [value]);
   const commit = (): void => {
@@ -1460,7 +1461,7 @@ function SpriteTileNumberField({ label, value, min, step, onCommit }: {
       setDraft(String(Math.floor(next)));
     } else setDraft(String(value));
   };
-  return <label><span>{label}</span><input aria-label={label} inputMode="numeric" role="spinbutton" aria-valuemin={min} aria-valuenow={draft.trim() && Number.isFinite(Number(draft)) ? Number(draft) : undefined} type="text" value={draft}
+  return <label><span>{ui(label)}</span><input aria-label={ui(label)} inputMode="numeric" role="spinbutton" aria-valuemin={min} aria-valuenow={draft.trim() && Number.isFinite(Number(draft)) ? Number(draft) : undefined} type="text" value={draft}
     onChange={event => setDraft(event.currentTarget.value)} onBlur={commit}
     onKeyDown={event => {
       if (event.key === "ArrowUp" || event.key === "ArrowDown") { event.preventDefault(); const next = Number(draft || value) + (event.key === "ArrowUp" ? step : -step); setDraft(String(min === undefined ? next : Math.max(min, next))); }
@@ -1497,7 +1498,7 @@ function spriteMetricGroup(
 ): React.ReactElement {
   return (
     <div className={`sprite-metric-group${layout === "quad" ? " is-quad" : ""}`}>
-      <span className="sprite-metric-group-label">{label}</span>
+      <span className="sprite-metric-group-label">{ui(label)}</span>
       <div className="sprite-metric-row">
         {fields.map((field) => spriteMetricField(field.prefix, field.prefix, field.value, field.onChange, field.min ?? 0, field.max))}
       </div>
@@ -1560,16 +1561,16 @@ function animationEditor(
   };
 
   return (
-    <div className="sprite-animation-editor sprite-animation-editor-compact" aria-label={`Editar ${animation.name}`}>
+    <div className="sprite-animation-editor sprite-animation-editor-compact" aria-label={ui("Editar {0}", { 0: animation.name })}>
       {activeTab === "animation" ? (
-        <section className="sprite-animation-settings" aria-label="Configurações de animação">
-        <InspectorRange label="Velocidade" ariaLabel="FPS" unit="FPS" max={60} min={1} onChange={(value) => onUpdateAnimationFields(animation.id, { fps: value })} value={animation.fps} />
-        <InspectorToggle checked={animation.loops} label="Repetir" onChange={(checked) => onUpdateAnimationFields(animation.id, { loops: checked })} />
-        <InspectorToggle checked={animation.pingPong} label="Ping-pong" onChange={(checked) => onUpdateAnimationFields(animation.id, { pingPong: checked })} />
+        <section className="sprite-animation-settings" aria-label={ui("Configurações de animação")}>
+        <InspectorRange label={ui("Velocidade")} ariaLabel={ui("FPS")} unit="FPS" max={60} min={1} onChange={(value) => onUpdateAnimationFields(animation.id, { fps: value })} value={animation.fps} />
+        <InspectorToggle checked={animation.loops} label={ui("Repetir")} onChange={(checked) => onUpdateAnimationFields(animation.id, { loops: checked })} />
+        <InspectorToggle checked={animation.pingPong} label={ui("Ping-pong")} onChange={(checked) => onUpdateAnimationFields(animation.id, { pingPong: checked })} />
         {animationState ? (
           <div className="sprite-animation-type-settings">
             <InspectorSelect
-              label="Tipo de animação"
+              label={ui("Tipo de animação")}
               onChange={(value) => onUpdateAnimationState(animationState.id, {
                 animationType: value as SpriteStateContract["animationType"]
               })}
@@ -1588,19 +1589,19 @@ function animationEditor(
             />
             <InspectorToggle
               checked={animationState.mirrorLeftFromRight}
-              label="Espelhar esquerda a partir da direita"
+              label={ui("Espelhar esquerda a partir da direita")}
               onChange={(checked) => onUpdateAnimationState(animationState.id, { mirrorLeftFromRight: checked })}
             />
           </div>
         ) : null}
-        <InspectorSection title="Folha de origem" defaultOpen={false} className="sprite-source-details">
+        <InspectorSection title={ui("Folha de origem")} defaultOpen={false} className="sprite-source-details">
         <div className="sprite-inspector-grid-2 sprite-animation-source-row">
           <div className="sprite-reference-field">
-            <span>Sheet</span>
+            <span>{ui("Sheet")}</span>
             <ProjectReferencePicker
               actions={[{ label: "Importar sprite sheet", run: onImportSpriteSheets }]}
-              ariaLabel="Sheet"
-              invalidLabel="Sprite sheet não encontrado"
+              ariaLabel={ui("Sheet")}
+              invalidLabel={ui("Sprite sheet não encontrado")}
               onChange={(spriteSheet) => onUpdateAnimationFields(animation.id, { spriteSheet })}
               options={spriteSheetOptions.map((sheet) => ({
                 value: sheet.name,
@@ -1611,18 +1612,18 @@ function animationEditor(
             />
           </div>
           <InspectorSelect
-            ariaLabel="Formato de cores da folha"
-            label="Cores da folha"
+            ariaLabel={ui("Formato de cores da folha")}
+            label={ui("Cores da folha")}
             onChange={(colorMode) => onUpdateAnimationFields(animation.id, { colorMode })}
             options={[{ label: "4bpp · padrão", value: "4bpp" }, { label: "8bpp · avançado", value: "8bpp" }]}
             value={animation.colorMode}
           />
         </div>
-        <p className="muted">Aplica-se a todas as animações da folha e preserva a imagem original. 4bpp usa até 15 cores visíveis. 8bpp dobra o espaço dos tiles e compartilha até 194 cores visíveis com os sprites da cena, conforme o orçamento. Os bancos do texto e dos elementos internos do motor ficam reservados.</p>
-        <div className="sprite-state-direction-panel sprite-state-direction-panel-compact" aria-label="Estado e direção da animação">
+        <p className="muted">{ui("Aplica-se a todas as animações da folha e preserva a imagem original. 4bpp usa até 15 cores visíveis. 8bpp dobra o espaço dos tiles e compartilha até 194 cores visíveis com os sprites da cena, conforme o orçamento. Os bancos do texto e dos elementos internos do motor ficam reservados.")}</p>
+        <div className="sprite-state-direction-panel sprite-state-direction-panel-compact" aria-label={ui("Estado e direção da animação")}>
           <div>
-            <span>Estado</span>
-            <div className="sprite-option-segment" role="group" aria-label="Estados">
+            <span>{ui("Estado")}</span>
+            <div className="sprite-option-segment" role="group" aria-label={ui("Estados")}>
               {stateDirectionOptions.states.map((state) => (
                 <button
                   aria-pressed={animation.state === state}
@@ -1637,8 +1638,8 @@ function animationEditor(
             </div>
           </div>
           <div>
-            <span>Direção</span>
-            <div className="sprite-option-segment" role="group" aria-label="Direções">
+            <span>{ui("Direção")}</span>
+            <div className="sprite-option-segment" role="group" aria-label={ui("Direções")}>
               {stateDirectionOptions.directions.map((direction) => (
                 <button
                   aria-pressed={animation.direction === direction}
@@ -1653,24 +1654,24 @@ function animationEditor(
             </div>
           </div>
         </div>
-          <InspectorNumber label="Quadros" min={1} onChange={(value) => onUpdateAnimationFields(animation.id, { frameCount: value })} value={animation.frameCount} />
+          <InspectorNumber label={ui("Quadros")} min={1} onChange={(value) => onUpdateAnimationFields(animation.id, { frameCount: value })} value={animation.frameCount} />
         </InspectorSection>
         </section>
       ) : null}
 
       {activeTab === "frame" ? activeMetaspriteFrame ? (
-        <section className="sprite-inspector-section sprite-inspector-frame-section" aria-label="Tile selecionado">
-          <h5 className="sprite-inspector-section-title">Tile selecionado</h5>
-          <p className="sprite-inspector-section-description">Ajustes aplicados ao tile selecionado no frame ativo.</p>
-          <div className="sprite-inspector-icon-bar" aria-label="Transformar tile selecionado">
-            <button disabled={activeTileIndexes.length === 0} onClick={() => onMoveMetaspriteTiles(animation.id, { frameIndex: activeMetaspriteFrameIndex, tileIndexes: activeTileIndexes, deltaX: -1, deltaY: 0 })} title="Mover esquerda" type="button">←</button>
-            <button disabled={activeTileIndexes.length === 0} onClick={() => onMoveMetaspriteTiles(animation.id, { frameIndex: activeMetaspriteFrameIndex, tileIndexes: activeTileIndexes, deltaX: 1, deltaY: 0 })} title="Mover direita" type="button">→</button>
-            <button disabled={activeTileIndexes.length === 0} onClick={() => onMoveMetaspriteTiles(animation.id, { frameIndex: activeMetaspriteFrameIndex, tileIndexes: activeTileIndexes, deltaX: 0, deltaY: 1 })} title="Mover cima" type="button">↑</button>
-            <button disabled={activeTileIndexes.length === 0} onClick={() => onMoveMetaspriteTiles(animation.id, { frameIndex: activeMetaspriteFrameIndex, tileIndexes: activeTileIndexes, deltaX: 0, deltaY: -1 })} title="Mover baixo" type="button">↓</button>
-            <button disabled={activeTileIndexes.length === 0} onClick={() => onToggleMetaspriteTilesFlip(animation.id, { frameIndex: activeMetaspriteFrameIndex, tileIndexes: activeTileIndexes, horizontal: true })} title="Flip horizontal" type="button">FX</button>
-            <button disabled={activeTileIndexes.length === 0} onClick={() => onToggleMetaspriteTilesFlip(animation.id, { frameIndex: activeMetaspriteFrameIndex, tileIndexes: activeTileIndexes, horizontal: false })} title="Flip vertical" type="button">FY</button>
-            <button disabled={activeTileIndexes.length === 0} onClick={() => onReorderMetaspriteTiles(animation.id, { frameIndex: activeMetaspriteFrameIndex, tileIndexes: activeTileIndexes, placement: "front" })} title="Trazer para frente" type="button">Frente</button>
-            <button disabled={activeTileIndexes.length === 0} onClick={() => onReorderMetaspriteTiles(animation.id, { frameIndex: activeMetaspriteFrameIndex, tileIndexes: activeTileIndexes, placement: "back" })} title="Enviar para trás" type="button">Trás</button>
+        <section className="sprite-inspector-section sprite-inspector-frame-section" aria-label={ui("Tile selecionado")}>
+          <h5 className="sprite-inspector-section-title">{ui("Tile selecionado")}</h5>
+          <p className="sprite-inspector-section-description">{ui("Ajustes aplicados ao tile selecionado no frame ativo.")}</p>
+          <div className="sprite-inspector-icon-bar" aria-label={ui("Transformar tile selecionado")}>
+            <button disabled={activeTileIndexes.length === 0} onClick={() => onMoveMetaspriteTiles(animation.id, { frameIndex: activeMetaspriteFrameIndex, tileIndexes: activeTileIndexes, deltaX: -1, deltaY: 0 })} title={ui("Mover esquerda")} type="button">←</button>
+            <button disabled={activeTileIndexes.length === 0} onClick={() => onMoveMetaspriteTiles(animation.id, { frameIndex: activeMetaspriteFrameIndex, tileIndexes: activeTileIndexes, deltaX: 1, deltaY: 0 })} title={ui("Mover direita")} type="button">→</button>
+            <button disabled={activeTileIndexes.length === 0} onClick={() => onMoveMetaspriteTiles(animation.id, { frameIndex: activeMetaspriteFrameIndex, tileIndexes: activeTileIndexes, deltaX: 0, deltaY: 1 })} title={ui("Mover cima")} type="button">↑</button>
+            <button disabled={activeTileIndexes.length === 0} onClick={() => onMoveMetaspriteTiles(animation.id, { frameIndex: activeMetaspriteFrameIndex, tileIndexes: activeTileIndexes, deltaX: 0, deltaY: -1 })} title={ui("Mover baixo")} type="button">↓</button>
+            <button disabled={activeTileIndexes.length === 0} onClick={() => onToggleMetaspriteTilesFlip(animation.id, { frameIndex: activeMetaspriteFrameIndex, tileIndexes: activeTileIndexes, horizontal: true })} title={ui("Flip horizontal")} type="button">{ui("FX")}</button>
+            <button disabled={activeTileIndexes.length === 0} onClick={() => onToggleMetaspriteTilesFlip(animation.id, { frameIndex: activeMetaspriteFrameIndex, tileIndexes: activeTileIndexes, horizontal: false })} title={ui("Flip vertical")} type="button">{ui("FY")}</button>
+            <button disabled={activeTileIndexes.length === 0} onClick={() => onReorderMetaspriteTiles(animation.id, { frameIndex: activeMetaspriteFrameIndex, tileIndexes: activeTileIndexes, placement: "front" })} title={ui("Trazer para frente")} type="button">{ui("Frente")}</button>
+            <button disabled={activeTileIndexes.length === 0} onClick={() => onReorderMetaspriteTiles(animation.id, { frameIndex: activeMetaspriteFrameIndex, tileIndexes: activeTileIndexes, placement: "back" })} title={ui("Enviar para trás")} type="button">{ui("Trás")}</button>
             <button
               disabled={activeTileIndexes.length === 0}
               onClick={() => {
@@ -1680,14 +1681,13 @@ function animationEditor(
                 setSelectedMetaspriteTileIndex(nextTileIndex);
                 setSelectedMetaspriteTileIndexes(activeMetaspriteFrame.tileCount > activeTileIndexes.length ? [nextTileIndex] : []);
               }}
-              title="Remover tiles selecionados"
+              title={ui("Remover tiles selecionados")}
               type="button"
             >
-              Rem
-            </button>
+              {ui("Rem")}</button>
           </div>
           {activeMetaspriteTile ? (
-            <div className="sprite-metasprite-tile-editor sprite-inspector-grid-2" aria-label="Editar tile do metasprite">
+            <div className="sprite-metasprite-tile-editor sprite-inspector-grid-2" aria-label={ui("Editar tile do metasprite")}>
               {([
                 ["X", "x", activeMetaspriteTile.x],
                 ["Y", "y", activeMetaspriteTile.y],
@@ -1704,11 +1704,11 @@ function animationEditor(
                 />
               ))}
               <div className="sprite-reference-field">
-                <span>Source</span>
+                <span>{ui("Source")}</span>
                 <ProjectReferencePicker
                   actions={[{ label: "Importar sprite sheet", run: onImportSpriteSheets }]}
-                  ariaLabel="Source"
-                  invalidLabel="Sprite sheet não encontrado"
+                  ariaLabel={ui("Source")}
+                  invalidLabel={ui("Sprite sheet não encontrado")}
                   onChange={(sourceSheet) => updateActiveMetaspriteTile({ sourceSheet })}
                   options={spriteSheetOptions.map((sheet) => ({
                     value: sheet.name,
@@ -1719,17 +1719,17 @@ function animationEditor(
                 />
               </div>
               <label>
-                <span>Obj pal</span>
+                <span>{ui("Obj pal")}</span>
                 <select
                   onChange={(event) => updateActiveMetaspriteTile({ objPalette: event.currentTarget.value })}
                   value={activeMetaspriteTile.objPalette}
                 >
-                  <option value="OBP0">OBP0</option>
-                  <option value="OBP1">OBP1</option>
+                  <option value="OBP0">{ui("OBP0")}</option>
+                  <option value="OBP1">{ui("OBP1")}</option>
                 </select>
               </label>
               <label className="sprite-tile-toggle">
-                <span>Flip X</span>
+                <span>{ui("Flip X")}</span>
                 <input
                   checked={activeMetaspriteTile.flipX}
                   onChange={(event) => updateActiveMetaspriteTile({ flipX: event.currentTarget.checked })}
@@ -1737,7 +1737,7 @@ function animationEditor(
                 />
               </label>
               <label className="sprite-tile-toggle">
-                <span>Flip Y</span>
+                <span>{ui("Flip Y")}</span>
                 <input
                   checked={activeMetaspriteTile.flipY}
                   onChange={(event) => updateActiveMetaspriteTile({ flipY: event.currentTarget.checked })}
@@ -1745,7 +1745,7 @@ function animationEditor(
                 />
               </label>
               <label className="sprite-tile-toggle">
-                <span>Prioridade</span>
+                <span>{ui("Prioridade")}</span>
                 <input
                   checked={activeMetaspriteTile.priority}
                   onChange={(event) => updateActiveMetaspriteTile({ priority: event.currentTarget.checked })}
@@ -1754,15 +1754,15 @@ function animationEditor(
               </label>
             </div>
           ) : (
-            <p className="muted">Selecione um tile no canvas para editar.</p>
+            <p className="muted">{ui("Selecione um tile no canvas para editar.")}</p>
           )}
         </section>
-      ) : <p className="muted">Selecione um frame para editar seus tiles.</p> : null}
+      ) : <p className="muted">{ui("Selecione um frame para editar seus tiles.")}</p> : null}
 
       {activeTab === "geometry" ? (
-        <section className="sprite-inspector-section sprite-inspector-geometry-section" aria-label="Frame e colisão">
-          <h5 className="sprite-inspector-section-title">Frame e colisão</h5>
-          <p className="sprite-inspector-section-description">Dimensões do frame, origem do frame ativo e caixa de colisão do sprite.</p>
+        <section className="sprite-inspector-section sprite-inspector-geometry-section" aria-label={ui("Frame e colisão")}>
+          <h5 className="sprite-inspector-section-title">{ui("Frame e colisão")}</h5>
+          <p className="sprite-inspector-section-description">{ui("Dimensões do frame, origem do frame ativo e caixa de colisão do sprite.")}</p>
           <div className="sprite-inspector-geometry-grid">
             {spriteMetricGroup("Tamanho do frame", [
               {
@@ -1779,7 +1779,7 @@ function animationEditor(
               }
             ])}
             <InspectorVector2
-              legend="Origem do frame ativo"
+              legend={ui("Origem do frame ativo")}
               onChange={(axis, value) => syncFrameOrigin(axis === "x" ? value : activeFrameOrigin.x, axis === "y" ? value : activeFrameOrigin.y)}
               values={activeFrameOrigin}
             />
@@ -1814,9 +1814,8 @@ function animationEditor(
           ], "quad")}
           <div className="sprite-inspector-actions-row sprite-inspector-actions-row-compact">
             <InspectorAction disabled={!activeMetaspriteFrame || activeMetaspriteFrame.tileCount === 0} onClick={() => onFitAnimationHitbox(animation.id, activeMetaspriteFrameIndex)}>
-              Ajustar hitbox
-            </InspectorAction>
-            <InspectorAction onClick={() => onCopyAnimationGeometry(animation.id)}>Copiar geometria</InspectorAction>
+              {ui("Ajustar hitbox")}</InspectorAction>
+            <InspectorAction onClick={() => onCopyAnimationGeometry(animation.id)}>{ui("Copiar geometria")}</InspectorAction>
           </div>
         </section>
       ) : null}
@@ -1852,6 +1851,7 @@ export function SpritesWorkspace({
   onDuplicateSpriteSheet,
   onRemoveSpriteSheet
 }: SpritesWorkspaceProps): React.ReactElement {
+  const ui = useStudioUiText();
   const [sheetImageSizes, setSheetImageSizes] = useState<Record<string, { width: number; height: number }>>({});
   const [selectedAnimationID, setSelectedAnimationID] = useState<string | null>(null);
   const [selectedSheetName, setSelectedSheetName] = useState<string | null>(null);
@@ -2078,8 +2078,8 @@ export function SpritesWorkspace({
   if (!presentation) {
     return (
       <WorkspaceEmptyState
-        title="Sprites"
-        description="Abra um projeto para visualizar sprite sheets, animações e imagens de referência."
+        title={ui("Sprites")}
+        description={ui("Abra um projeto para visualizar sprite sheets, animações e imagens de referência.")}
       />
     );
   }
@@ -2099,7 +2099,7 @@ export function SpritesWorkspace({
     groups.set(key, rows);
     return groups;
   }, new Map<string, SpritesWorkspaceAnimation[]>())).map(([id, animations]) => ({
-    id, label: spriteStateLabel(animations[0].state ?? animations[0].name), animations
+    id, label: animations[0].state && Object.hasOwn(spriteStateLabels, animations[0].state) ? ui(spriteStateLabel(animations[0].state)) : spriteStateLabel(animations[0].state ?? animations[0].name), animations
   }));
   const activePreviewAnimation = activeSelection && activeSelection.sheet.name === activeSheet?.name
     ? activeSelection.animation
@@ -2202,7 +2202,7 @@ export function SpritesWorkspace({
   }
 
   return (
-    <section className="sprites-workspace" aria-label="Workspace Sprites">
+    <section className="sprites-workspace" aria-label={ui("Workspace Sprites")}>
       {contextMenu ? (
         <StudioContextMenu
           actions={contextMenu.kind === "sheet" ? [
@@ -2218,10 +2218,10 @@ export function SpritesWorkspace({
           state={contextMenu}
         />
       ) : null}
-      <h3 className="studio-visually-hidden">Sprites</h3>
+      <h3 className="studio-visually-hidden">{ui("Sprites")}</h3>
 
       {validationOpen ? (
-        <div className="sprites-validation-panel" aria-label="Diagnostico de sprites">
+        <div className="sprites-validation-panel" aria-label={ui("Diagnostico de sprites")}>
           {validationIssues.map((issue) => (
             <button
               className={issue.severity === "error" ? "danger-chip" : issue.severity === "warning" ? "warning-chip" : ""}
@@ -2235,36 +2235,36 @@ export function SpritesWorkspace({
               }}
               type="button"
             >
-              {issue.message}
+              {ui(issue.message)}
             </button>
           ))}
         </div>
       ) : null}
 
       {activeSelection ? null : (
-        <div className="sprites-summary-strip" aria-label="Resumo de sprites">
+        <div className="sprites-summary-strip" aria-label={ui("Resumo de sprites")}>
           {summaryCards.map((card) => (
             <div className={`sprites-summary-card ${card.tone}`} key={card.id}>
               <strong>{card.value}</strong>
-              <span>{card.label}</span>
+              <span>{ui(card.label)}</span>
             </div>
           ))}
         </div>
       )}
 
       <div className="sprites-layout">
-        <aside className="sprites-rail" aria-label="Biblioteca de sprites">
+        <aside className="sprites-rail" aria-label={ui("Biblioteca de sprites")}>
           <div className="sprite-library-title sprites-library-heading">
-            <strong>Sprites</strong><span>{presentation.spriteSheets.length}</span>
-            <button aria-label="Adicionar ator por PNG" className="sprite-library-add-button" onClick={() => void onImportSpriteSheets()} title="Importar sprite por PNG" type="button"><Plus size={16} /></button>
+            <strong>{ui("Sprites")}</strong><span>{presentation.spriteSheets.length}</span>
+            <button aria-label={ui("Adicionar ator por PNG")} className="sprite-library-add-button" onClick={() => void onImportSpriteSheets()} title={ui("Importar sprite por PNG")} type="button"><Plus size={16} /></button>
           </div>
-          <div className="sprites-filter-bar" aria-label="Filtros de sprites">
+          <div className="sprites-filter-bar" aria-label={ui("Filtros de sprites")}>
             <label>
               <Search aria-hidden="true" size={15} />
               <input
                 onChange={(event) => setSearchQuery(event.currentTarget.value)}
-                aria-label="Buscar sprite"
-                placeholder="Buscar sprite..."
+                aria-label={ui("Buscar sprite")}
+                placeholder={ui("Buscar sprite...")}
                 type="search"
                 value={searchQuery}
               />
@@ -2272,11 +2272,11 @@ export function SpritesWorkspace({
           </div>
 
           <div className="sprite-library-group">
-            <div className="sprite-sheet-list" role="list" aria-label="Sprite sheets do projeto">
+            <div className="sprite-sheet-list" role="list" aria-label={ui("Sprite sheets do projeto")}>
               {presentation.spriteSheets.length === 0 ? (
-                <p className="muted">Nenhum sprite sheet encontrado no projeto aberto.</p>
+                <p className="muted">{ui("Nenhum sprite sheet encontrado no projeto aberto.")}</p>
               ) : visibleSpriteSheets.length === 0 ? (
-                <p className="muted">Nenhum sprite sheet corresponde aos filtros atuais.</p>
+                <p className="muted">{ui("Nenhum sprite sheet corresponde aos filtros atuais.")}</p>
               ) : (
                 visibleSpriteSheets.map((sheet) => {
                   const isActiveSheet = sheet.name === activeSheet?.name;
@@ -2296,7 +2296,7 @@ export function SpritesWorkspace({
                       type="button"
                     >
                       <SpriteLibraryThumbnail sheet={sheet} animation={presentation.animationsBySheet[sheet.name]?.[0]} projectPath={projectPath} />
-                      <span className="sprite-library-sheet-copy"><strong>{spriteSheetLabel(sheet.name)}</strong><small>{sheet.hasAsset ? sheet.name : "Asset ausente"}</small></span>
+                      <span className="sprite-library-sheet-copy"><strong>{spriteSheetLabel(sheet.name)}</strong><small>{sheet.hasAsset ? sheet.name : ui("Asset ausente")}</small></span>
                     </button>
                   );
                 })
@@ -2304,31 +2304,31 @@ export function SpritesWorkspace({
             </div>
           </div>
 
-          <div className="sprite-library-group sprite-animation-library" aria-label="Animações do ator selecionado">
+          <div className="sprite-library-group sprite-animation-library" aria-label={ui("Animações do ator selecionado")}>
             <div className="sprite-library-title">
-              <strong>Animações</strong>
+              <strong>{ui("Animações")}</strong>
               <span>{animationGroups.length}</span>
               <button
-                aria-label="Adicionar pacote de animação"
+                aria-label={ui("Adicionar pacote de animação")}
                 className="sprite-library-package-button"
                 disabled={!activeSheet}
                 onClick={() => activeSheet && onCreateAnimation(activeSheet.name)}
-                title="Cria uma nova animação no ator selecionado"
+                title={ui("Cria uma nova animação no ator selecionado")}
                 type="button"
               >
                 <Plus size={16} />
               </button>
             </div>
-            {animationGroups.length === 0 ? <p className="muted">Nenhuma animação para o sprite selecionado.</p> : (
+            {animationGroups.length === 0 ? <p className="muted">{ui("Nenhuma animação para o sprite selecionado.")}</p> : (
               <div className="sprite-animation-list">
                 {animationGroups.map((group) => {
                   const selected = group.id === activeGroup?.id;
                   const animation = group.animations.find((row) => row.direction === activePreviewAnimation?.direction) ?? group.animations[0];
                   const directionCount = new Set(group.animations.map((row) => row.direction).filter(Boolean)).size;
-                  return <button key={group.id} aria-label={`Selecionar animação ${group.label}`} aria-pressed={selected}
+                  return <button key={group.id} aria-label={ui("Selecionar animação {0}", { 0: group.label })} aria-pressed={selected}
                     className={selected ? "sprite-animation-rail-row active" : "sprite-animation-rail-row"}
                     onClick={() => selectAnimationGroup(group.id)} onContextMenu={(event) => openAnimationContextMenu(event, animation)} type="button">
-                    <Play aria-hidden="true" size={14} /><span><strong>{group.label}</strong><small>{directionCount > 1 ? `${directionCount} direções` : `${animation.frameCount} quadro(s)`}</small></span>
+                    <Play aria-hidden="true" size={14} /><span><strong>{group.label}</strong><small>{directionCount > 1 ? ui("{0} direções", { 0: directionCount }) : ui("{0} quadro(s)", { 0: animation.frameCount })}</small></span>
                   </button>;
                 })}
               </div>
@@ -2338,12 +2338,12 @@ export function SpritesWorkspace({
 
         <section
           className={activeSpriteMode === "paint" ? "sprites-canvas-stage paint-mode" : "sprites-canvas-stage"}
-          aria-label="Canvas de sprites"
+          aria-label={ui("Canvas de sprites")}
         >
-          <header className="sprites-document-heading"><h2>{activeSheet ? spriteSheetLabel(activeSheet.name) : "Sprites"}</h2><p>{activeSheet?.name ?? "Selecione um sprite"}{activePreviewAnimation ? ` · ${activePreviewAnimation.frameWidth} × ${activePreviewAnimation.frameHeight} px` : ""}</p></header>
+          <header className="sprites-document-heading"><h2>{activeSheet ? spriteSheetLabel(activeSheet.name) : ui("Sprites")}</h2><p>{activeSheet?.name ?? ui("Selecione um sprite")}{activePreviewAnimation ? ui(" · {0} × {1} px", { 0: activePreviewAnimation.frameWidth, 1: activePreviewAnimation.frameHeight }) : ""}</p></header>
           <WorkspaceContextToolbar
             className="sprites-tool-strip is-compact"
-            aria-label="Ferramentas do animador"
+            aria-label={ui("Ferramentas do animador")}
             onFocus={(event) => {
               const toolbar = event.currentTarget;
               const control = event.target;
@@ -2356,21 +2356,21 @@ export function SpritesWorkspace({
               });
             }}
           >
-            <div className="sprite-direction-navigation" role="group" aria-label="Direção ativa">
+            <div className="sprite-direction-navigation" role="group" aria-label={ui("Direção ativa")}>
               {[...(activeGroup?.animations ?? [])].sort((left, right) => {
                 const order = ["up", "down", "left", "right"];
                 return order.indexOf(left.direction ?? "none") - order.indexOf(right.direction ?? "none");
               }).map((animation) => {
                 const direction = animation.direction ?? "none";
                 const label = spriteDirectionLabels[direction] ?? direction;
-                return <button key={animation.id} aria-label={`Direção ${label}`} title={label} aria-pressed={animation.id === activePreviewAnimation?.id} className={animation.id === activePreviewAnimation?.id ? "active" : ""} onClick={() => selectAnimation(animation.id)} type="button">
+                return <button key={animation.id} aria-label={ui("Direção {0}", { 0: ui(label) })} title={label} aria-pressed={animation.id === activePreviewAnimation?.id} className={animation.id === activePreviewAnimation?.id ? "active" : ""} onClick={() => selectAnimation(animation.id)} type="button">
                   {direction === "up" ? <ArrowUp size={16} /> : direction === "down" ? <ArrowDown size={16} /> : direction === "left" ? <ArrowLeft size={16} /> : direction === "right" ? <ArrowRight size={16} /> : label}
                 </button>;
               })}
             </div>
-            <div className="sprite-playback-strip is-compact" aria-label="Playback">
+            <div className="sprite-playback-strip is-compact" aria-label={ui("Playback")}>
               <button
-                aria-label="Primeiro frame"
+                aria-label={ui("Primeiro frame")}
                 disabled={activePlaybackFrameCount <= 0}
                 onClick={() => selectSpritePlaybackFrame(0)}
                 type="button"
@@ -2378,7 +2378,7 @@ export function SpritesWorkspace({
                 <SkipBack size={16} />
               </button>
               <button
-                aria-label="Frame anterior"
+                aria-label={ui("Frame anterior")}
                 disabled={activePlaybackFrameCount <= 1}
                 onClick={() => stepSpritePlaybackFrame(-1)}
                 type="button"
@@ -2386,7 +2386,7 @@ export function SpritesWorkspace({
                 <ChevronLeft size={16} />
               </button>
               <button
-                aria-label={isSpritePlaybackRunning ? "Pausar animação" : "Reproduzir animação"}
+                aria-label={isSpritePlaybackRunning ? ui("Pausar animação") : ui("Reproduzir animação")}
                 aria-pressed={isSpritePlaybackRunning}
                 className={isSpritePlaybackRunning ? "active" : ""}
                 disabled={activePlaybackFrameCount <= 1}
@@ -2396,7 +2396,7 @@ export function SpritesWorkspace({
                 {isSpritePlaybackRunning ? <Pause size={16} /> : <Play size={16} />}
               </button>
               <button
-                aria-label="Proximo frame"
+                aria-label={ui("Proximo frame")}
                 disabled={activePlaybackFrameCount <= 1}
                 onClick={() => stepSpritePlaybackFrame(1)}
                 type="button"
@@ -2404,7 +2404,7 @@ export function SpritesWorkspace({
                 <ChevronRight size={16} />
               </button>
               <button
-                aria-label="Ultimo frame"
+                aria-label={ui("Ultimo frame")}
                 disabled={activePlaybackFrameCount <= 0}
                 onClick={() => selectSpritePlaybackFrame(Math.max(0, activePlaybackFrameCount - 1))}
                 type="button"
@@ -2414,9 +2414,9 @@ export function SpritesWorkspace({
               <span className="sprite-playback-counter">{activePlaybackFrameIndex + 1} / {activePlaybackFrameCount || 1}</span>
             </div>
             <span aria-hidden="true" className="sprites-tool-divider" />
-            <div className="sprite-canvas-view-strip is-compact" aria-label="Visualizacao do canvas">
+            <div className="sprite-canvas-view-strip is-compact" aria-label={ui("Visualizacao do canvas")}>
               <button
-                aria-label="Reduzir zoom do canvas de sprite"
+                aria-label={ui("Reduzir zoom do canvas de sprite")}
                 disabled={spriteCanvasZoom <= 2}
                 onClick={() => setSpriteCanvasZoom((current) => Math.max(2, current - 2))}
                 type="button"
@@ -2425,7 +2425,7 @@ export function SpritesWorkspace({
               </button>
               <span>{spriteCanvasZoom}x</span>
               <button
-                aria-label="Aumentar zoom do canvas de sprite"
+                aria-label={ui("Aumentar zoom do canvas de sprite")}
                 disabled={spriteCanvasZoom >= 32}
                 onClick={() => setSpriteCanvasZoom((current) => Math.min(32, current + 2))}
                 type="button"
@@ -2433,7 +2433,7 @@ export function SpritesWorkspace({
                 +
               </button>
               <button
-                aria-label="Ajustar zoom do canvas ao espaco disponivel"
+                aria-label={ui("Ajustar zoom do canvas ao espaco disponivel")}
                 disabled={!activePreviewMetaspriteFrame || !composerStageSize}
                 onClick={() => {
                   if (!activePreviewMetaspriteFrame || !composerStageSize) return;
@@ -2448,19 +2448,18 @@ export function SpritesWorkspace({
                 }}
                 type="button"
               >
-                Ajustar
-              </button>
-              <StudioChip active={showSpriteGrid} onClick={() => setShowSpriteGrid((current) => !current)} aria-label="Grid" title="Grid">
-                <Grid3X3 aria-hidden="true" size={15} /><span>Grid</span>
+                {ui("Ajustar")}</button>
+              <StudioChip active={showSpriteGrid} onClick={() => setShowSpriteGrid((current) => !current)} aria-label={ui("Grid")} title={ui("Grid")}>
+                <Grid3X3 aria-hidden="true" size={15} /><span>{ui("Grid")}</span>
               </StudioChip>
-              <StudioChip active={showSpriteOrigin} onClick={() => setShowSpriteOrigin((current) => !current)} aria-label="Origem" title="Origem">
-                <Crosshair aria-hidden="true" size={15} /><span>Origem</span>
+              <StudioChip active={showSpriteOrigin} onClick={() => setShowSpriteOrigin((current) => !current)} aria-label={ui("Origem")} title={ui("Origem")}>
+                <Crosshair aria-hidden="true" size={15} /><span>{ui("Origem")}</span>
               </StudioChip>
-              <StudioChip active={showSpriteHitbox} onClick={() => setShowSpriteHitbox((current) => !current)} aria-label="Hitbox" title="Hitbox">
-                <Scan aria-hidden="true" size={15} /><span>Hitbox</span>
+              <StudioChip active={showSpriteHitbox} onClick={() => setShowSpriteHitbox((current) => !current)} aria-label={ui("Hitbox")} title={ui("Hitbox")}>
+                <Scan aria-hidden="true" size={15} /><span>{ui("Hitbox")}</span>
               </StudioChip>
-              <StudioChip active={showSpriteOnionSkin} onClick={() => setShowSpriteOnionSkin((current) => !current)} aria-label="Onion skin" title="Onion skin">
-                <Layers aria-hidden="true" size={15} /><span>On</span>
+              <StudioChip active={showSpriteOnionSkin} onClick={() => setShowSpriteOnionSkin((current) => !current)} aria-label={ui("Onion skin")} title={ui("Onion skin")}>
+                <Layers aria-hidden="true" size={15} /><span>{ui("On")}</span>
               </StudioChip>
             </div>
           </WorkspaceContextToolbar>
@@ -2468,8 +2467,8 @@ export function SpritesWorkspace({
             <SpritesEditorCenter
               bottomPane={(
                 <div className="sprites-editor-bottom-content">
-                  <section className="sprites-editor-tiles-row" aria-label="Paleta de tiles">
-                    <div className="sprites-editor-row-label">{paletteSourceKind === "reference" ? "Referência visual" : "Folha de sprites"}</div>
+                  <section className="sprites-editor-tiles-row" aria-label={ui("Paleta de tiles")}>
+                    <div className="sprites-editor-row-label">{paletteSourceKind === "reference" ? ui("Referência visual") : ui("Folha de sprites")}</div>
                     {spriteSheetPreview(
                       activeSheet,
                       activePreviewAnimation,
@@ -2496,8 +2495,8 @@ export function SpritesWorkspace({
                       paletteImageKey
                     )}
                   </section>
-                  <section className="sprites-editor-frames-row" aria-label="Quadros da animação">
-                    <div className="sprites-editor-row-label">Quadros{activeGroup ? ` · ${activeGroup.label}` : ""}</div>
+                  <section className="sprites-editor-frames-row" aria-label={ui("Quadros da animação")}>
+                    <div className="sprites-editor-row-label">{ui("Quadros")}{activeGroup ? ` · ${activeGroup.label}` : ""}</div>
                     <SpriteFrameTileStrip
                       activeBrush={activePaintBrush}
                       activeFrame={activePreviewMetaspriteFrame}
@@ -2520,11 +2519,11 @@ export function SpritesWorkspace({
               )}
               canvasPane={(
                 <div className="sprites-canvas-surface">
-            <div className="sprite-mode-segment" role="group" aria-label="Modo de edicao de sprite">
+            <div className="sprite-mode-segment" role="group" aria-label={ui("Modo de edicao de sprite")}>
               {spriteAnimatorModes.map((mode) => (
                 <StudioChip
                   active={mode.id === activeSpriteMode}
-                  aria-label={mode.label}
+                  aria-label={ui(mode.label)}
                   key={mode.id}
                   onClick={() => {
                     setActiveSpriteMode(mode.id);
@@ -2534,7 +2533,7 @@ export function SpritesWorkspace({
                       setActiveInspectorTab("frame");
                     }
                   }}
-                  title={mode.title}
+                  title={ui(mode.title)}
                 >
                   {mode.id === "select" ? <MousePointer2 size={17} /> : mode.id === "paint" ? <Stamp size={17} /> : mode.id === "erase" ? <Eraser size={17} /> : <Scan size={17} />}
                 </StudioChip>
@@ -2564,19 +2563,19 @@ export function SpritesWorkspace({
               )}
             />
           ) : (
-            <p className="muted">Selecione ou crie um sprite sheet para abrir o animador.</p>
+            <p className="muted">{ui("Selecione ou crie um sprite sheet para abrir o animador.")}</p>
           )}
         </section>
 
         <WorkspaceInspectorRail
-          ariaLabel="Inspector de sprite"
+          ariaLabel={ui("Inspector de sprite")}
           className="sprites-inspector"
           workspaceId="sprites"
         >
           {activeSelection ? (
             <>
-              <header className="sprites-inspector-heading"><h3>Animação</h3><p>{activeGroup?.label ?? activeSelection.animation.name} · {spriteDirectionLabels[activeSelection.animation.direction ?? "none"] ?? activeSelection.animation.direction}</p></header>
-              <div aria-label="Seções do inspetor de sprite" className="sprites-inspector-tabs" role="tablist">
+              <header className="sprites-inspector-heading"><h3>{ui("Animação")}</h3><p>{activeGroup?.label ?? activeSelection.animation.name} · {spriteDirectionLabels[activeSelection.animation.direction ?? "none"] ?? activeSelection.animation.direction}</p></header>
+              <div aria-label={ui("Seções do inspetor de sprite")} className="sprites-inspector-tabs" role="tablist">
                 {spriteInspectorTabs.map((tab) => (
                   <button
                     aria-controls={`sprites-inspector-panel-${tab.id}`}
@@ -2588,7 +2587,7 @@ export function SpritesWorkspace({
                     role="tab"
                     type="button"
                   >
-                    {tab.label}
+                    {ui(tab.label)}
                   </button>
                 ))}
               </div>
@@ -2623,21 +2622,20 @@ export function SpritesWorkspace({
                 )}
                 {activeInspectorTab === "animation" ? (
                   <>
-                    <button className="sprite-inspector-geometry-shortcut" onClick={() => setActiveInspectorTab("geometry")} type="button">Origem e colisão <ChevronRight size={15} /></button>
+                    <button className="sprite-inspector-geometry-shortcut" onClick={() => setActiveInspectorTab("geometry")} type="button">{ui("Origem e colisão ")}<ChevronRight size={15} /></button>
                     <details className="sprite-inspector-advanced">
-                      <summary>Dados GBA e ações</summary>
+                      <summary>{ui("Dados GBA e ações")}</summary>
                       {spriteVramBudgetPanel(activeSelection.animation)}
                       <div className="sprite-animation-actions inspector-actions">
-                        <button type="button" onClick={() => onRenameAnimation(activeSelection.animation.id, activeSelection.animation.name)}>Renomear</button>
-                        <button type="button" onClick={() => onDuplicateAnimation(activeSelection.animation.id, activeSelection.animation.name)}>Duplicar</button>
+                        <button type="button" onClick={() => onRenameAnimation(activeSelection.animation.id, activeSelection.animation.name)}>{ui("Renomear")}</button>
+                        <button type="button" onClick={() => onDuplicateAnimation(activeSelection.animation.id, activeSelection.animation.name)}>{ui("Duplicar")}</button>
                         <button className="danger-button" type="button" onClick={() => onRemoveAnimation(activeSelection.animation.id, activeSelection.animation.name)}>
-                          Remover
-                        </button>
+                          {ui("Remover")}</button>
                       </div>
                     </details>
                     {(presentation.stateDirectionPreviewsBySheet[activeSelection.sheet.name] ?? []).length > 0 ? (
                       <details className="sprite-inspector-advanced sprite-state-direction-preview-section">
-                        <summary>Estados e direções</summary>
+                        <summary>{ui("Estados e direções")}</summary>
                         {stateDirectionPreviewGrid(
                           presentation.stateDirectionPreviewsBySheet[activeSelection.sheet.name] ?? [],
                           activeAnimationID,
@@ -2656,28 +2654,27 @@ export function SpritesWorkspace({
               </div>
             </>
           ) : (
-            <p className="muted">Selecione uma animação para editar.</p>
+            <p className="muted">{ui("Selecione uma animação para editar.")}</p>
           )}
 
-          <details className="sprite-reference-panel" aria-label="Imagens de referência de sprite">
-            <summary>Referências</summary>
+          <details className="sprite-reference-panel" aria-label={ui("Imagens de referência de sprite")}>
+            <summary>{ui("Referências")}</summary>
             {presentation.references.length === 0 ? (
-              <p className="muted">Nenhuma referência visual cadastrada.</p>
+              <p className="muted">{ui("Nenhuma referência visual cadastrada.")}</p>
             ) : (
               presentation.references.map((reference) => (
                 <div className={reference.isActive ? "sprite-reference-row active" : "sprite-reference-row"} key={reference.id}>
                   <div>
-                    <span>{reference.title}</span>
-                    <small>{reference.generatedSpriteAssetName ?? reference.assetName ?? "Sem sprite gerado"}</small>
+                    <span>{ui(reference.title)}</span>
+                    <small>{reference.generatedSpriteAssetName ?? reference.assetName ?? ui("Sem sprite gerado")}</small>
                   </div>
                   <div className="sprite-reference-actions">
-                    <strong>{reference.isVisible ? `${Math.round(reference.opacity * 100)}%` : "oculta"}</strong>
+                    <strong>{reference.isVisible ? `${Math.round(reference.opacity * 100)}%` : ui("oculta")}</strong>
                     <button
                       onClick={() => onGenerateSpriteFromReference(reference.id, reference.title, reference.assetName, reference.generatedSpriteAssetName)}
                       type="button"
                     >
-                      Gerar
-                    </button>
+                      {ui("Gerar")}</button>
                   </div>
                 </div>
               ))
@@ -2689,8 +2686,7 @@ export function SpritesWorkspace({
               onClick={() => setValidationOpen((current) => !current)}
               type="button"
             >
-              <ShieldCheck size={16} /> Verificar sprite
-              {validationIssues.filter((issue) => issue.severity !== "info").length > 0
+              <ShieldCheck size={16} /> {ui(" Verificar sprite")}{validationIssues.filter((issue) => issue.severity !== "info").length > 0
                 ? ` (${validationIssues.filter((issue) => issue.severity !== "info").length})`
                 : ""}
             </button>

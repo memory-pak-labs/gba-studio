@@ -52,9 +52,9 @@ describe("EventsWorkspace React smoke", () => {
 
     expect(screen.getByRole("region", { name: "Workspace Eventos" })).toBeInTheDocument();
     expect(screen.getByText("Editor de Eventos")).toBeInTheDocument();
-    expect(screen.getByLabelText("Variaveis do projeto")).toBeInTheDocument();
+    expect(screen.getByLabelText("Variáveis do projeto")).toBeInTheDocument();
     expect(screen.getByText("score")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Nova variavel" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Nova variável" })).toBeInTheDocument();
 
     await user.click(screen.getByRole("button", { name: "Adicionar evento" }));
 

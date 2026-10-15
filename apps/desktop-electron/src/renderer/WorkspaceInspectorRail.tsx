@@ -1,3 +1,4 @@
+import { uiText as ui, useStudioUiText } from "./studioUiText";
 import { useState } from "react";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 
@@ -26,9 +27,10 @@ export function WorkspaceInspectorRail({
   expandLabel = "Expandir inspetor",
   workspaceId
 }: WorkspaceInspectorRailProps): React.ReactElement {
+  const ui = useStudioUiText();
   const [collapsed, setCollapsed] = useState(() => collapsible && readInspectorRailCollapsed(workspaceId));
   const isCollapsed = collapsible && collapsed;
-  const toggleLabel = isCollapsed ? expandLabel : collapseLabel;
+  const toggleLabel = ui(isCollapsed ? expandLabel : collapseLabel);
 
   function toggleCollapsed(): void {
     setCollapsed((current) => {
@@ -40,7 +42,7 @@ export function WorkspaceInspectorRail({
 
   return (
     <aside
-      aria-label={ariaLabel}
+      aria-label={ui(ariaLabel)}
       className={[
         "workspace-inspector-rail",
         "inspector-readable",
@@ -65,7 +67,7 @@ export function WorkspaceInspectorRail({
         </button>
       ) : null}
       <div
-        aria-label={`${ariaLabel} conteúdo rolável`}
+        aria-label={ui("{0} conteúdo rolável", { 0: ui(ariaLabel) })}
         className="workspace-inspector-rail-body"
         data-scroll-owner="inspector"
         tabIndex={0}

@@ -1,3 +1,4 @@
+import { uiText as ui, useStudioUiText } from "./studioUiText";
 import { EventEditingContext } from "./EventEditingContext";
 import { EventBlockLibrary } from "./EventBlockLibrary";
 import { runtimeEventStates } from "../shared/sceneEventStates";
@@ -189,20 +190,20 @@ function commandCardPreview(
   options?: { compact?: boolean }
 ): React.ReactElement {
   if (options?.compact) {
-    return <strong>{suggestion.label}</strong>;
+    return <strong>{ui(suggestion.label)}</strong>;
   }
 
   return (
     <>
       <div className="event-command-card-main">
-        <strong>{suggestion.label}</strong>
+        <strong>{ui(suggestion.label)}</strong>
         <small>{suggestion.section ? `${suggestion.category} / ${suggestion.section}` : suggestion.category}</small>
       </div>
       <div className="event-command-card-meta">
         {suggestion.badge ? <em>{suggestion.badge}</em> : null}
         {suggestion.parameters.slice(0, 3).map((parameter) => (
           <span key={`${suggestion.id}-${parameter.id}`}>
-            {parameter.label}: {parameter.value || "-"}
+            {ui(parameter.label)}: {parameter.value || "-"}
           </span>
         ))}
         {suggestion.parameters.length > 3 ? <span>+{suggestion.parameters.length - 3}</span> : null}
@@ -239,8 +240,9 @@ function CommandSuggestionAccordion({
   onToggleCategory,
   onChooseSuggestion
 }: CommandSuggestionAccordionProps): React.ReactElement {
+  const ui = useStudioUiText();
   if (!groups.length) {
-    return <p className="muted">Nenhum evento corresponde à busca.</p>;
+    return <p className="muted">{ui("Nenhum evento corresponde à busca.")}</p>;
   }
 
   return (
@@ -274,7 +276,7 @@ function CommandSuggestionAccordion({
                       event.dataTransfer.setData("text/plain", suggestion.command);
                       event.dataTransfer.effectAllowed = "copy";
                     } : undefined}
-                    title={suggestion.label}
+                    title={ui(suggestion.label)}
                     type="button"
                   >
                     {commandCardPreview(suggestion, { compact: true })}
@@ -293,10 +295,10 @@ function commandParameterInput(
   parameter: EventsWorkspaceCommandParameter,
   onChange: (value: string) => void
 ): React.ReactElement {
-  const commonLabel = `${parameter.label} do evento`;
+  const commonLabel = ui("{0} do evento", { 0: ui(parameter.label) });
   if (parameter.kind === "value" && parameter.options.some(option => option.startsWith("const("))) {
     const listID = `constant-values-${parameter.id}`;
-    return <label className="event-command-parameter"><span>{parameter.label}</span>
+    return <label className="event-command-parameter"><span>{ui(parameter.label)}</span>
       <input aria-label={commonLabel} type="text" list={listID} value={parameter.value} onChange={event => onChange(event.currentTarget.value)}/>
       <datalist id={listID}>{parameter.options.map(option => <option key={option} value={option}/>)}</datalist>
     </label>;
@@ -305,9 +307,9 @@ function commandParameterInput(
     const hasCurrentOption = parameter.options.includes(parameter.value);
     return (
       <label className={parameter.isKnownValue ? "event-command-parameter" : "event-command-parameter warning"}>
-        <span>{parameter.label}</span>
+        <span>{ui(parameter.label)}</span>
         <select aria-label={commonLabel} onChange={(event) => onChange(event.currentTarget.value)} value={parameter.value}>
-          {hasCurrentOption ? null : <option value={parameter.value}>{parameter.value || "Valor atual"}</option>}
+          {hasCurrentOption ? null : <option value={parameter.value}>{parameter.value || ui("Valor atual")}</option>}
           {parameter.options.map((option) => (
             <option key={`${parameter.id}-${option}`} value={option}>{parameter.label === "Direção" ? ({ up: "Cima", down: "Baixo", left: "Esquerda", right: "Direita" } as Record<string,string>)[option] ?? option : option}</option>
           ))}
@@ -318,7 +320,7 @@ function commandParameterInput(
 
   return (
     <label className="event-command-parameter">
-      <span>{parameter.label}</span>
+      <span>{ui(parameter.label)}</span>
       <input
         aria-label={commonLabel}
         onChange={(event) => onChange(event.currentTarget.value)}
@@ -367,16 +369,17 @@ function SceneRouteTableEditor({
   variables: ProjectVariableEntry[];
   onUpdate?: (tableID: string, patch: SceneRouteTablePatch) => void;
 }): React.ReactElement {
+  const ui = useStudioUiText();
   const sceneNames = Array.from(new Set([...sceneNamesForRouteEditor(projectData), ...table.routes.map((route) => route.scene), table.fallback?.scene ?? ""].filter(Boolean)));
   const variableNames = Array.from(new Set([...variables.filter((entry) => entry.valueType !== "text").map((entry) => entry.name), table.variable].filter(Boolean)));
   const updateRoutes = (routes: SceneRouteCase[]) => onUpdate?.(table.id, { routes });
   const updateRoute = (routeIndex: number, patch: Partial<SceneRouteCase>) => updateRoutes(table.routes.map((route, index) => index === routeIndex ? { ...route, ...patch } : route));
 
   return (
-    <section className="event-scene-route-editor" aria-label={`Tabela de rotas ${table.name}`}>
+    <section className="event-scene-route-editor" aria-label={ui("Tabela de rotas {0}", { 0: table.name })}>
       <div className="event-scene-route-editor-header">
         <div>
-          <span>Rotas da cena</span>
+          <span>{ui("Rotas da cena")}</span>
           <strong>{table.name}</strong>
         </div>
         <button
@@ -395,19 +398,18 @@ function SceneRouteTableEditor({
           }}
           disabled={!onUpdate || sceneNames.length === 0}
         >
-          Adicionar rota
-        </button>
+          {ui("Adicionar rota")}</button>
       </div>
       <label className="event-context-field">
-        <span>Variável de decisão</span>
+        <span>{ui("Variável de decisão")}</span>
         <select
-          aria-label={`Variável da tabela ${table.name}`}
+          aria-label={ui("Variável da tabela {0}", { 0: table.name })}
           disabled={!onUpdate}
           onChange={(event) => onUpdate?.(table.id, { variable: event.currentTarget.value })}
           value={table.variable}
         >
           {variableNames.map((name) => <option key={name} value={name}>{name}</option>)}
-          {!variableNames.includes(table.variable) ? <option value={table.variable}>{table.variable || "Escolher variável"}</option> : null}
+          {!variableNames.includes(table.variable) ? <option value={table.variable}>{table.variable || ui("Escolher variável")}</option> : null}
         </select>
       </label>
       {table.routes.length ? table.routes.map((route, routeIndex) => (
@@ -416,19 +418,19 @@ function SceneRouteTableEditor({
             const sceneSize = sceneSizeForRouteEditor(projectData, route.scene);
             return (
               <>
-          <strong>Valor {route.value}</strong>
-          <label><span>Cena</span><select disabled={!onUpdate} onChange={(event) => updateRoute(routeIndex, { scene: event.currentTarget.value })} value={route.scene}>{sceneNames.map((name) => <option key={name} value={name}>{sceneDisplayName(name)}</option>)}</select></label>
+          <strong>{ui("Valor ")}{route.value}</strong>
+          <label><span>{ui("Cena")}</span><select disabled={!onUpdate} onChange={(event) => updateRoute(routeIndex, { scene: event.currentTarget.value })} value={route.scene}>{sceneNames.map((name) => <option key={name} value={name}>{sceneDisplayName(name)}</option>)}</select></label>
           <InspectorNumber disabled={!onUpdate} label="X" max={sceneSize ? sceneSize.width - 1 : undefined} min={0} onChange={(value) => updateRoute(routeIndex, { x: value })} unit="tile" value={route.x} />
           <InspectorNumber disabled={!onUpdate} label="Y" max={sceneSize ? sceneSize.height - 1 : undefined} min={0} onChange={(value) => updateRoute(routeIndex, { y: value })} unit="tile" value={route.y} />
-          <label><span>Direção</span><select disabled={!onUpdate} onChange={(event) => updateRoute(routeIndex, { direction: event.currentTarget.value as SceneRouteCase["direction"] })} value={route.direction}>{SCENE_ROUTE_DIRECTIONS.map((direction) => <option key={direction} value={direction}>{direction}</option>)}</select></label>
-          <InspectorNumber disabled={!onUpdate} label="Fade" max={3600} min={0} onChange={(value) => updateRoute(routeIndex, { fadeFrames: value })} unit="frames" value={route.fadeFrames} />
-          <button type="button" disabled={!onUpdate} onClick={() => updateRoutes(table.routes.filter((_item, index) => index !== routeIndex))}>Remover</button>
+          <label><span>{ui("Direção")}</span><select disabled={!onUpdate} onChange={(event) => updateRoute(routeIndex, { direction: event.currentTarget.value as SceneRouteCase["direction"] })} value={route.direction}>{SCENE_ROUTE_DIRECTIONS.map((direction) => <option key={direction} value={direction}>{direction}</option>)}</select></label>
+          <InspectorNumber disabled={!onUpdate} label={ui("Fade")} max={3600} min={0} onChange={(value) => updateRoute(routeIndex, { fadeFrames: value })} unit="frames" value={route.fadeFrames} />
+          <button type="button" disabled={!onUpdate} onClick={() => updateRoutes(table.routes.filter((_item, index) => index !== routeIndex))}>{ui("Remover")}</button>
               </>
             );
           })()}
         </div>
-      )) : <p className="muted">Nenhuma rota configurada. Adicione pelo menos uma para exportar.</p>}
-      {table.fallback ? <small className="event-scene-route-fallback">Fallback: {sceneDisplayName(table.fallback.scene)} · ({table.fallback.x}, {table.fallback.y}) · {table.fallback.direction}</small> : <small className="event-scene-route-fallback">Sem fallback: valores sem correspondência encerram o evento.</small>}
+      )) : <p className="muted">{ui("Nenhuma rota configurada. Adicione pelo menos uma para exportar.")}</p>}
+      {table.fallback ? <small className="event-scene-route-fallback">{ui("Fallback: ")}{sceneDisplayName(table.fallback.scene)} · ({table.fallback.x}, {table.fallback.y}) · {table.fallback.direction}</small> : <small className="event-scene-route-fallback">{ui("Sem fallback: valores sem correspondência encerram o evento.")}</small>}
     </section>
   );
 }
@@ -439,23 +441,24 @@ function MenuSliderEditor({ sceneName, screenID, projectData, onUpdate }: {
   projectData: GBAProjectData;
   onUpdate?: EventsWorkspaceProps["onUpdateMenuSliderItem"];
 }): React.ReactElement {
+  const ui = useStudioUiText();
   const screen = findMenuSliderScreen(projectData, sceneName, screenID);
-  if (!screen) return <p className="event-step-issues">Slider {screenID || "-"} não encontrado na cena {sceneName}.</p>;
+  if (!screen) return <p className="event-step-issues">{ui("Slider ")}{screenID || "-"} {ui(" não encontrado na cena ")}{sceneName}.</p>;
   const images = menuSliderSpriteOptions(projectData, sceneName, screenID);
   const scenes = Array.isArray(projectData.scenas) ? projectData.scenas.map((scene) => scene.name).filter((name): name is string => typeof name === "string") : [];
   const events = Array.isArray(projectData.events) ? projectData.events.map((event) => event.name).filter((name): name is string => typeof name === "string") : [];
   return (
-    <section className="event-scene-route-editor" aria-label={`Slider ${screenID}`}>
-      <div className="event-scene-route-editor-header"><div><span>Slider · ←/→ navega · A confirma · B volta</span><strong>{screen.items.length} opções em {screenID}</strong></div></div>
+    <section className="event-scene-route-editor" aria-label={ui("Slider {0}", { 0: screenID })}>
+      <div className="event-scene-route-editor-header"><div><span>{ui("Slider · ←/→ navega · A confirma · B volta")}</span><strong>{screen.items.length} {ui(" opções em ")}{screenID}</strong></div></div>
       {screen.items.map((item, index) => (
         <details className="event-slider-row" key={item.id}>
-          <summary>{index + 1}. {item.label} <small>→ {sceneDisplayName(item.targetScreenID)}</small></summary>
+          <summary>{index + 1}. {ui(item.label)} <small>→ {sceneDisplayName(item.targetScreenID)}</small></summary>
           <div className="event-slider-fields">
-          <label><span>Texto</span><input aria-label={`Texto de ${item.id}`} value={item.label} disabled={!onUpdate} onChange={(event) => onUpdate?.(sceneName, screenID, item.id, { label: event.currentTarget.value })} /></label>
-          <label><span>Imagem</span><select aria-label={`Imagem de ${item.id}`} value={menuSliderSprite(projectData, sceneName, item.id)} disabled={!onUpdate} onChange={(event) => onUpdate?.(sceneName, screenID, item.id, { spriteSheet: event.currentTarget.value })}>{images.map((image) => <option key={image} value={image}>{image}</option>)}</select></label>
-          <label><span>Cena ao confirmar</span><select aria-label={`Cena de ${item.id}`} value={item.targetScreenID} disabled={!onUpdate} onChange={(event) => onUpdate?.(sceneName, screenID, item.id, { targetScreenID: event.currentTarget.value })}>{scenes.map((name) => <option key={name} value={name}>{sceneDisplayName(name)}</option>)}</select></label>
-          <label><span>Evento antes da ação</span><select aria-label={`Evento de ${item.id}`} value={item.eventName} disabled={!onUpdate} onChange={(event) => onUpdate?.(sceneName, screenID, item.id, { eventName: event.currentTarget.value })}><option value="">Nenhum</option>{events.map((name) => <option key={name} value={name}>{name}</option>)}</select></label>
-          {item.targetItemID ? <label><span>Foco na cena</span><input aria-label={`Foco de ${item.id}`} value={item.targetItemID} disabled={!onUpdate} onChange={(event) => onUpdate?.(sceneName, screenID, item.id, { targetItemID: event.currentTarget.value })} /></label> : null}
+          <label><span>{ui("Texto")}</span><input aria-label={ui("Texto de {0}", { 0: item.id })} value={item.label} disabled={!onUpdate} onChange={(event) => onUpdate?.(sceneName, screenID, item.id, { label: event.currentTarget.value })} /></label>
+          <label><span>{ui("Imagem")}</span><select aria-label={ui("Imagem de {0}", { 0: item.id })} value={menuSliderSprite(projectData, sceneName, item.id)} disabled={!onUpdate} onChange={(event) => onUpdate?.(sceneName, screenID, item.id, { spriteSheet: event.currentTarget.value })}>{images.map((image) => <option key={image} value={image}>{image}</option>)}</select></label>
+          <label><span>{ui("Cena ao confirmar")}</span><select aria-label={ui("Cena de {0}", { 0: item.id })} value={item.targetScreenID} disabled={!onUpdate} onChange={(event) => onUpdate?.(sceneName, screenID, item.id, { targetScreenID: event.currentTarget.value })}>{scenes.map((name) => <option key={name} value={name}>{sceneDisplayName(name)}</option>)}</select></label>
+          <label><span>{ui("Evento antes da ação")}</span><select aria-label={ui("Evento de {0}", { 0: item.id })} value={item.eventName} disabled={!onUpdate} onChange={(event) => onUpdate?.(sceneName, screenID, item.id, { eventName: event.currentTarget.value })}><option value="">{ui("Nenhum")}</option>{events.map((name) => <option key={name} value={name}>{name}</option>)}</select></label>
+          {item.targetItemID ? <label><span>{ui("Foco na cena")}</span><input aria-label={ui("Foco de {0}", { 0: item.id })} value={item.targetItemID} disabled={!onUpdate} onChange={(event) => onUpdate?.(sceneName, screenID, item.id, { targetItemID: event.currentTarget.value })} /></label> : null}
           </div>
         </details>
       ))}
@@ -490,6 +493,7 @@ export interface EventCommandMenuProps {
 }
 
 export function EventCommandMenu(props: EventCommandMenuProps): React.ReactElement {
+  const ui = useStudioUiText();
   return <EventBlockLibrary {...props} />;
 }
 
@@ -510,6 +514,7 @@ function EventCommandPalette({
   onClose?(): void;
   title?: string;
 }): React.ReactElement {
+  const ui = useStudioUiText();
   const groupedSuggestions = commandSuggestionsByCategory(suggestions);
   const [expandedCategories, setExpandedCategories] = useState<ReadonlySet<string>>(() => new Set());
 
@@ -526,15 +531,15 @@ function EventCommandPalette({
   };
 
   const palette = (
-    <div aria-label={`Paleta de eventos de ${event.name}`} className="event-command-palette" role="region">
+    <div aria-label={ui("Paleta de eventos de {0}", { 0: event.name })} className="event-command-palette" role="region">
       <div className="event-command-palette-header">
         <div>
           <strong>{title}</strong>
-          {floating ? <small>Arraste um evento para o ponto desejado do fluxo.</small> : null}
+          {floating ? <small>{ui("Arraste um evento para o ponto desejado do fluxo.")}</small> : null}
         </div>
         <div className="event-command-palette-header-actions">
-          <span>{suggestions.length} opções</span>
-          {onClose ? <button aria-label="Fechar biblioteca de eventos" onClick={onClose} type="button">×</button> : null}
+          <span>{suggestions.length} {ui(" opções")}</span>
+          {onClose ? <button aria-label={ui("Fechar biblioteca de eventos")} onClick={onClose} type="button">×</button> : null}
         </div>
       </div>
       <CommandSuggestionAccordion
@@ -549,7 +554,7 @@ function EventCommandPalette({
 
   if (floating && typeof document !== "undefined") {
     return createPortal(
-      <div className="event-command-palette-floating" role="dialog" aria-label={`Biblioteca de eventos de ${event.name}`}>
+      <div className="event-command-palette-floating" role="dialog" aria-label={ui("Biblioteca de eventos de {0}", { 0: event.name })}>
         {palette}
       </div>,
       document.body
@@ -572,45 +577,45 @@ function eventEditor(
     props.onUpdateEventFields(event.id, { procedure });
   };
   return (
-    <div className="event-editor" aria-label={`Editar ${event.name}`}>
+    <div className="event-editor" aria-label={ui("Editar {0}", { 0: event.name })}>
       {showAdvancedFields ? (
         <>
       <label>
-        <span>Tipo</span>
+        <span>{ui("Tipo")}</span>
         <select
-          aria-label={`Tipo de ${event.name}`}
+          aria-label={ui("Tipo de {0}", { 0: event.name })}
           onChange={(inputEvent) => props.onUpdateEventFields(event.id, {
             eventKind: inputEvent.currentTarget.value === "procedure" ? "procedure" : "event"
           })}
           value={event.eventKind}
         >
-          <option value="event">Evento</option>
-          <option value="procedure">Rotina reutilizável</option>
+          <option value="event">{ui("Evento")}</option>
+          <option value="procedure">{ui("Rotina reutilizável")}</option>
         </select>
       </label>
       {event.eventKind === "procedure" ? (
-        <section className="event-procedure-editor" aria-label={`Procedure ${event.name}`}>
+        <section className="event-procedure-editor" aria-label={ui("Procedure {0}", { 0: event.name })}>
           <div className="event-procedure-heading">
             <div>
-              <strong>Entradas e memória local</strong>
-              <small>Use $nome nos valores dos eventos. As chamadas são expandidas igualmente no preview e na ROM.</small>
+              <strong>{ui("Entradas e memória local")}</strong>
+              <small>{ui("Use $nome nos valores dos eventos. As chamadas são expandidas igualmente no preview e na ROM.")}</small>
             </div>
           </div>
           <div className="event-procedure-list">
             <div className="event-procedure-list-heading">
-              <span>Parâmetros</span>
+              <span>{ui("Parâmetros")}</span>
               <button
                 onClick={() => updateProcedure({
                   ...event.procedure,
                   parameters: [...event.procedure.parameters, { name: `param${event.procedure.parameters.length + 1}`, type: "number", defaultValue: "0" }]
                 })}
                 type="button"
-              >Adicionar</button>
+              >{ui("Adicionar")}</button>
             </div>
             {event.procedure.parameters.map((parameter, parameterIndex) => (
               <div className="event-procedure-row" key={`parameter-${parameterIndex}`}>
                 <input
-                  aria-label={`Nome do parâmetro ${parameterIndex + 1}`}
+                  aria-label={ui("Nome do parâmetro {0}", { 0: parameterIndex + 1 })}
                   onChange={(inputEvent) => updateProcedure({
                     ...event.procedure,
                     parameters: event.procedure.parameters.map((item, index) => index === parameterIndex ? { ...item, name: inputEvent.currentTarget.value } : item)
@@ -618,7 +623,7 @@ function eventEditor(
                   value={parameter.name}
                 />
                 <select
-                  aria-label={`Tipo do parâmetro ${parameter.name}`}
+                  aria-label={ui("Tipo do parâmetro {0}", { 0: parameter.name })}
                   onChange={(inputEvent) => updateProcedure({
                     ...event.procedure,
                     parameters: event.procedure.parameters.map((item, index) => index === parameterIndex ? {
@@ -628,12 +633,12 @@ function eventEditor(
                   })}
                   value={parameter.type}
                 >
-                  <option value="number">Número</option>
-                  <option value="boolean">Booleano</option>
-                  <option value="variable">Variável por referência</option>
+                  <option value="number">{ui("Número")}</option>
+                  <option value="boolean">{ui("Booleano")}</option>
+                  <option value="variable">{ui("Variável por referência")}</option>
                 </select>
                 <input
-                  aria-label={`Valor padrão de ${parameter.name}`}
+                  aria-label={ui("Valor padrão de {0}", { 0: parameter.name })}
                   onChange={(inputEvent) => updateProcedure({
                     ...event.procedure,
                     parameters: event.procedure.parameters.map((item, index) => index === parameterIndex ? { ...item, defaultValue: inputEvent.currentTarget.value } : item)
@@ -641,7 +646,7 @@ function eventEditor(
                   value={parameter.defaultValue ?? ""}
                 />
                 <button
-                  aria-label={`Remover parâmetro ${parameter.name}`}
+                  aria-label={ui("Remover parâmetro {0}", { 0: parameter.name })}
                   onClick={() => updateProcedure({
                     ...event.procedure,
                     parameters: event.procedure.parameters.filter((_item, index) => index !== parameterIndex)
@@ -653,19 +658,19 @@ function eventEditor(
           </div>
           <div className="event-procedure-list">
             <div className="event-procedure-list-heading">
-              <span>Variáveis locais</span>
+              <span>{ui("Variáveis locais")}</span>
               <button
                 onClick={() => updateProcedure({
                   ...event.procedure,
                   locals: [...event.procedure.locals, { name: `local${event.procedure.locals.length + 1}`, type: "number", initialValue: "0" }]
                 })}
                 type="button"
-              >Adicionar</button>
+              >{ui("Adicionar")}</button>
             </div>
             {event.procedure.locals.map((local, localIndex) => (
               <div className="event-procedure-row" key={`local-${localIndex}`}>
                 <input
-                  aria-label={`Nome da variável local ${localIndex + 1}`}
+                  aria-label={ui("Nome da variável local {0}", { 0: localIndex + 1 })}
                   onChange={(inputEvent) => updateProcedure({
                     ...event.procedure,
                     locals: event.procedure.locals.map((item, index) => index === localIndex ? { ...item, name: inputEvent.currentTarget.value } : item)
@@ -673,7 +678,7 @@ function eventEditor(
                   value={local.name}
                 />
                 <select
-                  aria-label={`Tipo da variável local ${local.name}`}
+                  aria-label={ui("Tipo da variável local {0}", { 0: local.name })}
                   onChange={(inputEvent) => updateProcedure({
                     ...event.procedure,
                     locals: event.procedure.locals.map((item, index) => index === localIndex ? {
@@ -683,11 +688,11 @@ function eventEditor(
                   })}
                   value={local.type}
                 >
-                  <option value="number">Número</option>
-                  <option value="boolean">Booleano</option>
+                  <option value="number">{ui("Número")}</option>
+                  <option value="boolean">{ui("Booleano")}</option>
                 </select>
                 <input
-                  aria-label={`Valor inicial de ${local.name}`}
+                  aria-label={ui("Valor inicial de {0}", { 0: local.name })}
                   onChange={(inputEvent) => updateProcedure({
                     ...event.procedure,
                     locals: event.procedure.locals.map((item, index) => index === localIndex ? { ...item, initialValue: inputEvent.currentTarget.value } : item)
@@ -695,7 +700,7 @@ function eventEditor(
                   value={local.initialValue}
                 />
                 <button
-                  aria-label={`Remover variável local ${local.name}`}
+                  aria-label={ui("Remover variável local {0}", { 0: local.name })}
                   onClick={() => updateProcedure({
                     ...event.procedure,
                     locals: event.procedure.locals.filter((_item, index) => index !== localIndex)
@@ -708,7 +713,7 @@ function eventEditor(
         </section>
       ) : null}
       <label>
-        <span>Categoria</span>
+        <span>{ui("Categoria")}</span>
         <input
           onChange={(inputEvent) => props.onUpdateEventFields(event.id, { category: inputEvent.currentTarget.value })}
           type="text"
@@ -716,7 +721,7 @@ function eventEditor(
         />
       </label>
       <label>
-        <span>Detalhe</span>
+        <span>{ui("Detalhe")}</span>
         <input
           onChange={(inputEvent) => props.onUpdateEventFields(event.id, { detail: inputEvent.currentTarget.value })}
           type="text"
@@ -724,7 +729,7 @@ function eventEditor(
         />
       </label>
       {mode !== "properties" ? <label className="event-command-field">
-        <span>Comando</span>
+        <span>{ui("Comando")}</span>
         <input
           onChange={(inputEvent) => props.onUpdateEventFields(event.id, { command: inputEvent.currentTarget.value })}
           type="text"
@@ -732,7 +737,7 @@ function eventEditor(
         />
       </label> : null}
       <label className="event-binding-field">
-        <span>Vinculo rapido</span>
+        <span>{ui("Vinculo rapido")}</span>
         <select
           onChange={(inputEvent) => {
             const target = props.presentation?.bindingTargets.find((item) => item.id === inputEvent.currentTarget.value);
@@ -747,16 +752,16 @@ function eventEditor(
           }}
           value=""
         >
-          <option value="">Vincular a room/ator/trigger</option>
+          <option value="">{ui("Vincular a room/ator/trigger")}</option>
           {props.presentation?.bindingTargets.map((target) => (
             <option key={`${event.id}-${target.id}`} value={target.id}>
-              {target.currentEventName ? `${target.label} (${target.currentEventName})` : target.label}
+              {target.currentEventName ? `${target.label} (${target.currentEventName})` : ui(target.label)}
             </option>
           ))}
         </select>
       </label>
       {activeBindings.length ? (
-        <div className="event-active-bindings" aria-label={`Vinculos ativos de ${event.name}`}>
+        <div className="event-active-bindings" aria-label={ui("Vinculos ativos de {0}", { 0: event.name })}>
           {activeBindings.map((target) => (
             <button
               key={`${event.id}-${target.id}`}
@@ -765,10 +770,10 @@ function eventEditor(
                 targetName: target.targetName,
                 bindingKey: target.bindingKey
               })}
-              aria-label={`Remover vínculo com ${target.label}`} title={`Remover vínculo com ${target.label}`}
+              aria-label={ui("Remover vínculo com {0}", { 0: ui(target.label) })} title={ui("Remover vínculo com {0}", { 0: ui(target.label) })}
               type="button"
             >
-              Remover vínculo: {target.label}
+              {ui("Remover vínculo: ")}{ui(target.label)}
             </button>
           ))}
         </div>
@@ -782,8 +787,8 @@ function eventEditor(
       ) : null}
       {mode !== "properties" ? <div className="event-step-editor">
         <div className="event-step-editor-header">
-          <strong>Eventos</strong>
-          <button type="button" onClick={() => props.onOpenCommandMenu(event.id, null)}>Adicionar</button>
+          <strong>{ui("Eventos")}</strong>
+          <button type="button" onClick={() => props.onOpenCommandMenu(event.id, null)}>{ui("Adicionar")}</button>
         </div>
         {event.steps.length ? (
           event.steps.map((step) => (
@@ -803,7 +808,7 @@ function eventEditor(
                 {step.index + 1}
               </button>
               <input
-                aria-label={`Ativar evento ${step.index + 1}`}
+                aria-label={ui("Ativar evento {0}", { 0: step.index + 1 })}
                 checked={step.isEnabled}
                 onChange={(inputEvent) => {
                   onSelectStep(step.index);
@@ -813,7 +818,7 @@ function eventEditor(
               />
               <div className="event-step-main">
                 <button
-                  aria-label={`Abrir escolha de evento ${step.index + 1}`}
+                  aria-label={ui("Abrir escolha de evento {0}", { 0: step.index + 1 })}
                   className="event-step-command"
                   onClick={() => {
                     onSelectStep(step.index);
@@ -826,17 +831,17 @@ function eventEditor(
                   <small>{eventStepLabelCategory(step)}</small>
                 </button>
                 {step.commandParameters.length ? (
-                  <div className="event-step-parameter-summary" aria-label={`Parâmetros do evento ${step.index + 1}`}>
+                  <div className="event-step-parameter-summary" aria-label={ui("Parâmetros do evento {0}", { 0: step.index + 1 })}>
                     {step.commandParameters.slice(0, 4).map((parameter) => (
                       <span key={`${event.id}-${step.index}-${parameter.id}`}>{`${inlineCommandParameterLabel(parameter)}: ${parameter.value || "-"}`}</span>
                     ))}
                     {step.commandParameters.length > 4 ? (
-                      <span>+{step.commandParameters.length - 4} parâmetro(s)</span>
+                      <span>+{step.commandParameters.length - 4} {ui(" parâmetro(s)")}</span>
                     ) : null}
                   </div>
                 ) : null}
                 {mode === "guided" && step.commandParameters.length ? (
-                  <div className="event-step-guided-parameters" aria-label={`Editar parâmetros do evento ${step.index + 1}`}>
+                  <div className="event-step-guided-parameters" aria-label={ui("Editar parâmetros do evento {0}", { 0: step.index + 1 })}>
                     {step.commandParameters.map((parameter) => (
                       <Fragment key={`${event.id}-${step.index}-${parameter.id}`}>
                         {commandParameterInput(parameter, (value) => {
@@ -876,10 +881,9 @@ function eventEditor(
                 type="button"
                 onClick={() => props.onRemoveEventStep(event.id, step.index, event.name)}
               >
-                Remover
-              </button>
+                {ui("Remover")}</button>
               {step.missingReferences.length ? (
-                <div className="event-step-issues" aria-label={`Pendências do evento ${step.index + 1}`}>
+                <div className="event-step-issues" aria-label={ui("Pendências do evento {0}", { 0: step.index + 1 })}>
                   {step.missingReferences.map((reference) => (
                     <span key={`${event.id}-${step.index}-${reference}`}>{reference}</span>
                   ))}
@@ -889,8 +893,8 @@ function eventEditor(
           ))
         ) : (
           <div className="event-step-empty-state">
-            <p>Nenhum evento neste evento ainda.</p>
-            <p>Clique em <strong>Adicionar evento</strong> para começar a montar a lógica.</p>
+            <p>{ui("Nenhum evento neste evento ainda.")}</p>
+            <p>{ui("Clique em ")}<strong>{ui("Adicionar evento")}</strong> {ui(" para começar a montar a lógica.")}</p>
           </div>
         )}
       </div> : null}
@@ -907,6 +911,7 @@ function EventBlockInspector({
   editorProps: EventEditorProps;
   selectedStepIndex: number;
 }): React.ReactElement | null {
+  const ui = useStudioUiText();
   const selectedStep = event.steps.find((step) => step.index === selectedStepIndex);
   if (!selectedStep) return null;
 
@@ -915,10 +920,10 @@ function EventBlockInspector({
     : selectedStep.commandCategory;
 
   return (
-    <section className={`event-block-inspector tone-${eventBlockToneForCategory(selectedStep.commandCategory)}`} aria-label={`Editar evento ${selectedStep.index + 1}`}>
+    <section className={`event-block-inspector tone-${eventBlockToneForCategory(selectedStep.commandCategory)}`} aria-label={ui("Editar evento {0}", { 0: selectedStep.index + 1 })}>
       <header className="event-block-inspector-header">
         <div>
-          <span>Evento {selectedStep.index + 1}</span>
+          <span>{ui("Evento ")}{selectedStep.index + 1}</span>
           <strong>{selectedStep.commandLabel}</strong>
           <small>{category}</small>
         </div>
@@ -926,7 +931,7 @@ function EventBlockInspector({
       </header>
       {selectedStep.commandAvailability ? <>
         <p className="event-authoring-warning" role="status">{selectedStep.commandAvailability}</p>
-        <button type="button" onClick={() => editorProps.onOpenCommandMenu(event.id, selectedStep.index)}>Escolher outro evento</button>
+        <button type="button" onClick={() => editorProps.onOpenCommandMenu(event.id, selectedStep.index)}>{ui("Escolher outro evento")}</button>
       </> : null}
       {selectedStep.commandVerb !== "slider" ? <label className="event-block-inspector-toggle">
         <input
@@ -936,10 +941,10 @@ function EventBlockInspector({
           })}
           type="checkbox"
         />
-        <span>Executar este evento</span>
+        <span>{ui("Executar este evento")}</span>
       </label> : null}
       {selectedStep.commandAvailability ? null : selectedStep.commandParameters.length ? (
-        <div className="event-block-inspector-parameters" aria-label={`Parâmetros do evento ${selectedStep.index + 1}`}>
+        <div className="event-block-inspector-parameters" aria-label={ui("Parâmetros do evento {0}", { 0: selectedStep.index + 1 })}>
           {selectedStep.commandParameters.map((parameter) => (
             <Fragment key={`${event.id}-${selectedStep.index}-${parameter.id}`}>
               {commandParameterInput(parameter, (value) => editorProps.onUpdateEventStep(event.id, selectedStep.index, {
@@ -949,7 +954,7 @@ function EventBlockInspector({
           ))}
         </div>
       ) : (
-        <p className="event-block-inspector-empty">Este evento não tem parâmetros editáveis.</p>
+        <p className="event-block-inspector-empty">{ui("Este evento não tem parâmetros editáveis.")}</p>
       )}
       {selectedStep.commandVerb === "change_scene_by_variable" ? (
         (() => {
@@ -968,18 +973,17 @@ function EventBlockInspector({
       {selectedStep.commandVerb === "slider" ? (
         <MenuSliderEditor sceneName={sliderSceneName(editorProps.projectData, event.id)} screenID={selectedStep.command.trim().split(/\s+/)[1] ?? ""} projectData={editorProps.projectData} onUpdate={editorProps.onUpdateMenuSliderItem} />
       ) : null}
-      <details className="event-block-technical"><summary>Opções técnicas</summary>
-        <label><span>Comando</span><input aria-label={`Comando do evento ${selectedStep.index + 1}`} value={selectedStep.command} onChange={e => editorProps.onUpdateEventStep(event.id, selectedStep.index, { command: e.currentTarget.value })}/></label>
-        {!selectedStep.commandAvailability ? <button type="button" onClick={() => editorProps.onOpenCommandMenu(event.id, selectedStep.index)}>Trocar evento</button> : null}
+      <details className="event-block-technical"><summary>{ui("Opções técnicas")}</summary>
+        <label><span>{ui("Comando")}</span><input aria-label={ui("Comando do evento {0}", { 0: selectedStep.index + 1 })} value={selectedStep.command} onChange={e => editorProps.onUpdateEventStep(event.id, selectedStep.index, { command: e.currentTarget.value })}/></label>
+        {!selectedStep.commandAvailability ? <button type="button" onClick={() => editorProps.onOpenCommandMenu(event.id, selectedStep.index)}>{ui("Trocar evento")}</button> : null}
       </details>
-      {!selectedStep.commandVerb.startsWith("if_") && !["has_item", "rate_limit"].includes(selectedStep.commandVerb) ? <button type="button" onClick={() => editorProps.onAddEventStep(event.id, event.name, selectedStep.command)}>Duplicar evento ao final</button> : null}
+      {!selectedStep.commandVerb.startsWith("if_") && !["has_item", "rate_limit"].includes(selectedStep.commandVerb) ? <button type="button" onClick={() => editorProps.onAddEventStep(event.id, event.name, selectedStep.command)}>{ui("Duplicar evento ao final")}</button> : null}
       <button
         className="danger-button"
         onClick={() => editorProps.onRemoveEventStep(event.id, selectedStep.index, event.name)}
         type="button"
       >
-        Remover evento
-      </button>
+        {ui("Remover evento")}</button>
     </section>
   );
 }
@@ -1035,6 +1039,7 @@ export function EventInspectorPanel({
   onRemoveEvent,
   onRelayoutEventsGraph
 }: EventInspectorPanelProps): React.ReactElement {
+  const ui = useStudioUiText();
   const [selectedStepIndex, setSelectedStepIndex] = useState<number | null>(null);
   const [commandMenuOpen, setCommandMenuOpen] = useState(false);
   const [commandMenuQuery, setCommandMenuQuery] = useState("");
@@ -1170,24 +1175,24 @@ export function EventInspectorPanel({
 
   if (!event) {
     return (
-      <section aria-label="Editor de evento" className="event-inspector-flow event-inspector-flow-empty">
-        <p>Esse evento não existe mais nesta cena.</p>
+      <section aria-label={ui("Editor de evento")} className="event-inspector-flow event-inspector-flow-empty">
+        <p>{ui("Esse evento não existe mais nesta cena.")}</p>
       </section>
     );
   }
 
-  const blockInspector = selectedStepIndex !== null ? <EventBlockInspector event={event} editorProps={editorProps} selectedStepIndex={selectedStepIndex}/> : <p className="event-selected-empty">Selecione um evento para editar seus parâmetros.</p>;
+  const blockInspector = selectedStepIndex !== null ? <EventBlockInspector event={event} editorProps={editorProps} selectedStepIndex={selectedStepIndex}/> : <p className="event-selected-empty">{ui("Selecione um evento para editar seus parâmetros.")}</p>;
   const content = (
-    <section aria-label={`Editor de ${event.name}`} className={`event-inspector-flow is-event-authoring${expandedHost ? " is-expanded" : ""}${expandedHost === document.body ? " is-standalone" : ""}`}>
+    <section aria-label={ui("Editor de {0}", { 0: event.name })} className={`event-inspector-flow is-event-authoring${expandedHost ? " is-expanded" : ""}${expandedHost === document.body ? " is-standalone" : ""}`}>
       {expandedHost || !context?.onChangeExpandedHost ? <header className="event-authoring-header">
-        {expandedHost ? <button type="button" onClick={() => changeExpanded(false)}><ArrowLeft size={15}/>Voltar à cena</button> : null}
+        {expandedHost ? <button type="button" onClick={() => changeExpanded(false)}><ArrowLeft size={15}/>{ui("Voltar à cena")}</button> : null}
         <div>
-          {context?.name ? <small>{context.name} / Eventos</small> : null}<strong>{triggerLabel}</strong><small>{event.name}</small>
+          {context?.name ? <small>{context.name} {ui(" / Eventos")}</small> : null}<strong>{triggerLabel}</strong><small>{event.name}</small>
         </div>
-        <span className={event.missingReferences.length ? "event-authoring-warning" : "muted"}>{event.missingReferences.length ? `${event.missingReferences.length} pendências` : "Sem pendências de referências"}</span>
-        {!expandedHost ? <button ref={expandButtonRef} type="button" onClick={() => changeExpanded(true)} aria-label="Expandir eventos"><Maximize2 size={15}/>Expandir</button> : null}
-      </header> : event.missingReferences.length ? <p className="event-authoring-warning" role="status">{event.missingReferences.length} pendências de referências</p> : null}
-      {expandedHost && context ? <div className="event-authoring-states" role="tablist" aria-label="Estados de evento expandido">{context.states.map(state => <button key={state.key} type="button" role="tab" aria-selected={context.activeKey === state.key} onClick={() => context.onSelectState(state.key)}>{state.label}</button>)}</div> : null}
+        <span className={event.missingReferences.length ? "event-authoring-warning" : "muted"}>{event.missingReferences.length ? ui("{0} pendências", { 0: event.missingReferences.length }) : ui("Sem pendências de referências")}</span>
+        {!expandedHost ? <button ref={expandButtonRef} type="button" onClick={() => changeExpanded(true)} aria-label={ui("Expandir eventos")}><Maximize2 size={15}/>{ui("Expandir")}</button> : null}
+      </header> : event.missingReferences.length ? <p className="event-authoring-warning" role="status">{event.missingReferences.length} {ui(" pendências de referências")}</p> : null}
+      {expandedHost && context ? <div className="event-authoring-states" role="tablist" aria-label={ui("Estados de evento expandido")}>{context.states.map(state => <button key={state.key} type="button" role="tab" aria-selected={context.activeKey === state.key} onClick={() => context.onSelectState(state.key)}>{ui(state.label)}</button>)}</div> : null}
       <div className="event-authoring-layout"><div className="event-authoring-flow" ref={flowRef}>
       <EventBuildPanel
         unifiedEditing
@@ -1206,16 +1211,16 @@ export function EventInspectorPanel({
         selectedStepIndex={selectedStepIndex}
       />
       <details className="event-properties" open={simulationOpen} onToggle={e => setSimulationOpen(e.currentTarget.open)}>
-        <summary>Simular script</summary>
+        <summary>{ui("Simular script")}</summary>
         {simulationOpen ? <EventSimulationPanel key={event.id} event={event} projectData={projectData}/> : null}
       </details>
       <details className="event-properties" onToggle={e => setPropertiesOpen(e.currentTarget.open)}>
-        <summary>Propriedades do script</summary>
-        <small className="muted">Fluxo: {event.name}</small>
-        <div className="event-properties-actions"><button type="button" onClick={() => onRenameEvent(event.id, event.name)}>Renomear</button><button type="button" onClick={() => onDuplicateEvent(event.id,event.name)}>Duplicar script</button><button type="button" onClick={() => onExportEvent(event.id,event.name)}>Exportar script</button></div>
+        <summary>{ui("Propriedades do script")}</summary>
+        <small className="muted">{ui("Fluxo: ")}{event.name}</small>
+        <div className="event-properties-actions"><button type="button" onClick={() => onRenameEvent(event.id, event.name)}>{ui("Renomear")}</button><button type="button" onClick={() => onDuplicateEvent(event.id,event.name)}>{ui("Duplicar script")}</button><button type="button" onClick={() => onExportEvent(event.id,event.name)}>{ui("Exportar script")}</button></div>
         {propertiesOpen ? eventEditor(event, editorProps, selectedStepIndex, setSelectedStepIndex, "properties") : null}
       </details>
-      </div>{expandedHost ? <aside className="event-authoring-parameters" aria-label="Parâmetros do evento selecionado">{blockInspector}</aside> : null}</div>
+      </div>{expandedHost ? <aside className="event-authoring-parameters" aria-label={ui("Parâmetros do evento selecionado")}>{blockInspector}</aside> : null}</div>
       {commandMenuOpen ? (
         <EventCommandMenu
           allowRecipes={commandMenuStepIndex === null}
@@ -1270,6 +1275,7 @@ function EventBuildPanel({
   onOpenRecipeMenu,
   onSelectStep
 }: EventBuildPanelProps): React.ReactElement {
+  const ui = useStudioUiText();
   const [stepSelectionMode, setStepSelectionMode] = useState(false);
   const [selectedStructureStepIndexes, setSelectedStructureStepIndexes] = useState<Set<number>>(new Set());
   const [paletteOpen, setPaletteOpen] = useState(false);
@@ -1291,12 +1297,12 @@ function EventBuildPanel({
 
   if (!event) {
     return (
-      <section aria-label="Montar script" className="event-build-panel event-build-panel-empty">
+      <section aria-label={ui("Montar script")} className="event-build-panel event-build-panel-empty">
         <div>
-          <span>Comece por aqui</span>
-          <h4>Crie um script para montar a lógica</h4>
-          <p>Depois escolha uma modelo de script ou adicione eventos um por um.</p>
-          <button onClick={onCreateEvent} type="button">Novo script</button>
+          <span>{ui("Comece por aqui")}</span>
+          <h4>{ui("Crie um script para montar a lógica")}</h4>
+          <p>{ui("Depois escolha uma modelo de script ou adicione eventos um por um.")}</p>
+          <button onClick={onCreateEvent} type="button">{ui("Novo script")}</button>
         </div>
       </section>
     );
@@ -1344,46 +1350,44 @@ function EventBuildPanel({
   };
 
   return (
-    <section aria-label={`Montar script ${event.name}`} className="event-build-panel">
+    <section aria-label={ui("Montar script {0}", { 0: event.name })} className="event-build-panel">
       <header className="event-build-panel-header">
         {!floatingPalette ? (
           <div>
-            <span>Você está montando</span>
+            <span>{ui("Você está montando")}</span>
             <h4>{event.name}</h4>
             <p>{describeEventFlow(event)}</p>
           </div>
         ) : null}
         <div className="event-build-actions">
-          <button onClick={() => onOpenRecipeMenu(event.id)} type="button">Começar com modelo de script</button>
-          <button className="primary-button" onClick={() => onOpenCommandMenu(event.id)} type="button">Adicionar evento</button>
+          <button onClick={() => onOpenRecipeMenu(event.id)} type="button">{ui("Começar com modelo de script")}</button>
+          <button className="primary-button" onClick={() => onOpenCommandMenu(event.id)} type="button">{ui("Adicionar evento")}</button>
           {!unifiedEditing && floatingPalette && onChoosePaletteSuggestion && paletteSuggestions.length ? (
             <button
               aria-expanded={paletteOpen}
-              aria-label="Abrir biblioteca de eventos"
+              aria-label={ui("Abrir biblioteca de eventos")}
               className={paletteOpen ? "active" : ""}
               onClick={() => unifiedEditing ? onOpenCommandMenu(event.id) : setPaletteOpen((current) => !current)}
               type="button"
             >
-              Biblioteca de eventos
-            </button>
+              {ui("Biblioteca de eventos")}</button>
           ) : null}
         </div>
       </header>
-      <div className="event-structure-actions" role="toolbar" aria-label="Ações de passos">
+      <div className="event-structure-actions" role="toolbar" aria-label={ui("Ações de passos")}>
         <button
           aria-pressed={stepSelectionMode}
           onClick={() => setStepSelectionMode((current) => !current)}
           type="button"
         >
-          Selecionar passos
-        </button>
+          {ui("Selecionar passos")}</button>
         {stepSelectionMode && selectedStepCount > 0 ? (
           <>
             <button
               onClick={() => selectedStepIndexes.forEach((stepIndex) => editorProps.onUpdateEventStep(event.id, stepIndex, { isEnabled: false }))}
               type="button"
             >
-              Desativar {selectedStepLabel}
+              {ui("Desativar ")}{selectedStepLabel}
             </button>
             <button
               onClick={() => selectedStepIndexes.forEach((stepIndex) => {
@@ -1392,13 +1396,13 @@ function EventBuildPanel({
               })}
               type="button"
             >
-              Duplicar {selectedStepLabel}
+              {ui("Duplicar ")}{selectedStepLabel}
             </button>
             <button
               onClick={() => editorProps.onAddEventStep(event.id, event.name, `comment passos ${selectedStepIndexes.map((index) => index + 1).join(", ")}`)}
               type="button"
             >
-              Comentar {selectedStepLabel}
+              {ui("Comentar ")}{selectedStepLabel}
             </button>
           </>
         ) : null}
@@ -1427,7 +1431,7 @@ function EventBuildPanel({
           onChooseSuggestion={onChoosePaletteSuggestion}
           onClose={floatingPalette ? () => setPaletteOpen(false) : undefined}
           suggestions={paletteSuggestions}
-          title="Biblioteca de eventos"
+          title={ui("Biblioteca de eventos")}
         />
       ) : null}
       {!unifiedEditing && selectedStepIndex !== null && !selectedStepIsInline ? (
@@ -1438,7 +1442,7 @@ function EventBuildPanel({
         />
       ) : null}
       {onInsertEventSteps ? null : (
-        <p className="event-structure-editor-hint">Os novos eventos são adicionados ao fim do fluxo.</p>
+        <p className="event-structure-editor-hint">{ui("Os novos eventos são adicionados ao fim do fluxo.")}</p>
       )}
     </section>
   );
@@ -1468,6 +1472,7 @@ function nativeModalStatus(result: PreviewRuntimeState): string {
 }
 
 function EventRuntimeStatus({ result }: { result: PreviewRuntimeState }): React.ReactElement {
+  const ui = useStudioUiText();
   const title = result.debugger.paused ? "Depuração pausada"
     : result.nativeEvents.modal ? "Aguardando resposta"
     : result.scriptWaitFrames > 0 ? "Aguardando evento"
@@ -1476,12 +1481,12 @@ function EventRuntimeStatus({ result }: { result: PreviewRuntimeState }): React.
     <strong>{title}</strong>
     {result.debugger.pauseReason ? <p>{result.debugger.pauseReason}</p> : null}
     {result.nativeEvents.modal ? <p role="status">{nativeModalStatus(result)}</p> : null}
-    {result.hud.gameClock ? <p>Relógio: {String(Math.floor(result.hud.gameClock.currentMinute / 60)).padStart(2, "0")}:{String(result.hud.gameClock.currentMinute % 60).padStart(2, "0")}</p> : null}
-    {result.lutaCombat ? <p>Luta: HP {result.lutaCombat.fighters[0].hp}/{result.lutaCombat.fighters[1].hp}; Super {result.lutaCombat.fighters[0].superGauge}/{result.lutaCombat.fighters[1].superGauge}; {Math.ceil(result.lutaCombat.roundTimerFrames / 60)} s.</p> : null}
-    {Object.keys(result.nativeEvents.threads).length ? <p>Scripts paralelos ativos: {Object.keys(result.nativeEvents.threads).join(", ")}.</p> : null}
-    {result.scriptWaitFrames > 0 ? <p>Espera: {result.scriptWaitFrames} quadros restantes.</p> : null}
+    {result.hud.gameClock ? <p>{ui("Relógio: ")}{String(Math.floor(result.hud.gameClock.currentMinute / 60)).padStart(2, "0")}:{String(result.hud.gameClock.currentMinute % 60).padStart(2, "0")}</p> : null}
+    {result.lutaCombat ? <p>{ui("Luta: HP ")}{result.lutaCombat.fighters[0].hp}/{result.lutaCombat.fighters[1].hp}{ui("; Super ")}{result.lutaCombat.fighters[0].superGauge}/{result.lutaCombat.fighters[1].superGauge}; {Math.ceil(result.lutaCombat.roundTimerFrames / 60)} s.</p> : null}
+    {Object.keys(result.nativeEvents.threads).length ? <p>{ui("Scripts paralelos ativos: ")}{Object.keys(result.nativeEvents.threads).join(", ")}.</p> : null}
+    {result.scriptWaitFrames > 0 ? <p>{ui("Espera: ")}{result.scriptWaitFrames} {ui(" quadros restantes.")}</p> : null}
     {result.eventLog.filter(item => item.result === "unsupported").map((item, index) => (
-      <p key={`unsupported-${index}`} role="status">{item.detail}</p>
+      <p key={`unsupported-${index}`} role="status">{ui(item.detail)}</p>
     ))}
   </>;
 }
@@ -1503,8 +1508,9 @@ function useEventRuntimeClock(result: PreviewRuntimeState | null, setResult: Rea
 }
 
 function EventNativeResponseControls({ result, setResult }: { result: PreviewRuntimeState; setResult: React.Dispatch<React.SetStateAction<PreviewRuntimeState | null>> }): React.ReactElement | null {
+  const ui = useStudioUiText();
   if (!result.nativeEvents.modal) return null;
-  return <div className="event-debug-actions" role="group" aria-label="Responder à interação">
+  return <div className="event-debug-actions" role="group" aria-label={ui("Responder à interação")}>
     {(["up", "down", "left", "right", "action", "back"] as const).map((action, index) => <button type="button" key={action} disabled={result.debugger.paused}
       onClick={() => setResult(current => current ? dispatchPreviewRuntimeAction(current, action) : current)}>
       {["Selecionar opção anterior", "Selecionar próxima opção", "Cursor à esquerda", "Cursor à direita", "Confirmar", "Voltar ou cancelar"][index]}
@@ -1513,6 +1519,7 @@ function EventNativeResponseControls({ result, setResult }: { result: PreviewRun
 }
 
 function EventSimulationPanel({ event, projectData }: { event: EventsWorkspaceEvent; projectData: GBAProjectData }): React.ReactElement {
+  const ui = useStudioUiText();
   const initial = useMemo(() => {
     const record = Array.isArray(projectData.events) ? projectData.events.find(record => record?.id === event.id || record?.name === event.name) : null;
     const room = typeof record?.sceneName === "string" ? record.sceneName : null;
@@ -1522,70 +1529,68 @@ function EventSimulationPanel({ event, projectData }: { event: EventsWorkspaceEv
   const [result, setResult] = useState<PreviewRuntimeState | null>(null);
   useEventRuntimeClock(result, setResult);
   useEffect(() => { setResult(null); setRoomName(initial.currentRoom?.name ?? ""); }, [initial]);
-  return <section className="event-debug-panel" aria-label={`Simulação de ${event.name}`}>
-    <p>Simula as variáveis e o fluxo deste evento no editor.</p>
-    <label>Cena da simulação
-      <select aria-label="Cena da simulação" value={roomName} onChange={e => { setRoomName(e.currentTarget.value); setResult(null); }}>
+  return <section className="event-debug-panel" aria-label={ui("Simulação de {0}", { 0: event.name })}>
+    <p>{ui("Simula as variáveis e o fluxo deste evento no editor.")}</p>
+    <label>{ui("Cena da simulação")}<select aria-label={ui("Cena da simulação")} value={roomName} onChange={e => { setRoomName(e.currentTarget.value); setResult(null); }}>
         {initial.rooms.map(room => <option key={room.id} value={room.name}>{room.name}</option>)}
       </select>
     </label>
     <div className="event-debug-actions"><button type="button" disabled={!initial.ready} onClick={() => {
       const base = bootPreviewRuntimeAtRoom(projectData, roomName, { skipBootEvents: true });
       setResult(runPreviewRuntimeEvent(base, event.name));
-    }}>Executar simulação</button></div>
-    {result ? <section className="event-debug-result" aria-label={`Resultado da simulação de ${event.name}`}>
+    }}>{ui("Executar simulação")}</button></div>
+    {result ? <section className="event-debug-result" aria-label={ui("Resultado da simulação de {0}", { 0: event.name })}>
       <EventRuntimeStatus result={result}/>
       <EventNativeResponseControls result={result} setResult={setResult}/>
       <div className="event-debug-actions">
-        <button type="button" disabled={result.debugger.paused} onClick={() => setResult(current => current ? dispatchPreviewRuntimeAction(current, "action") : current)}>Interagir</button>
-        <button type="button" disabled={result.debugger.paused} onClick={() => setResult(current => current ? tickPreviewRuntime(current, 1000 / 60) : current)}>Avançar um quadro</button>
+        <button type="button" disabled={result.debugger.paused} onClick={() => setResult(current => current ? dispatchPreviewRuntimeAction(current, "action") : current)}>{ui("Interagir")}</button>
+        <button type="button" disabled={result.debugger.paused} onClick={() => setResult(current => current ? tickPreviewRuntime(current, 1000 / 60) : current)}>{ui("Avançar um quadro")}</button>
       </div>
       {result.currentRoom?.sceneType === "topdown" && result.player ? <>
-        <div className="event-debug-actions" role="group" aria-label="Mover jogador na simulação">
+        <div className="event-debug-actions" role="group" aria-label={ui("Mover jogador na simulação")}>
           {(["up", "left", "down", "right"] as const).map((direction, index) => <button key={direction} type="button"
             disabled={result.debugger.paused || result.scriptWaitFrames > 0 || result.scriptQueue.length > 0 || result.scriptContinuations.length > 0}
             onClick={() => setResult(current => current ? dispatchPreviewRuntimeAction(current, direction) : current)}>
             {["Mover para cima", "Mover à esquerda", "Mover para baixo", "Mover à direita"][index]}
           </button>)}
         </div>
-        <p>Cena: {result.currentRoom.name}. Posição: {result.player.x}, {result.player.y} tiles.</p>
+        <p>{ui("Cena: ")}{result.currentRoom.name}{ui(". Posição: ")}{result.player.x}, {result.player.y} {ui(" tiles.")}</p>
       </> : null}
-      {result.platformerPhysics ? <p>Estado da Plataforma: {result.platformerState}. Posição: {result.platformerPhysics.x.toFixed(2)}, {result.platformerPhysics.y.toFixed(2)} px.</p> : null}
+      {result.platformerPhysics ? <p>{ui("Estado da Plataforma: ")}{result.platformerState}{ui(". Posição: ")}{result.platformerPhysics.x.toFixed(2)}, {result.platformerPhysics.y.toFixed(2)} {ui(" px.")}</p> : null}
       <div className="event-runtime-variables">
         {Object.entries(result.variables).map(([name, value]) => <code key={name}>{name} = {String(value)}</code>)}
       </div>
-      {result.activeMusic ? <p>Rotina de música: {result.activeMusic}</p> : null}
+      {result.activeMusic ? <p>{ui("Rotina de música: ")}{result.activeMusic}</p> : null}
     </section> : null}
   </section>;
 }
 
 function EventDebugPanel({ event, result, onRun }: EventDebugPanelProps): React.ReactElement {
+  const ui = useStudioUiText();
   if (!event) {
     return (
-      <section aria-label="Depurar evento" className="event-debug-panel">
-        <h4>Escolha um evento para testar</h4>
-        <p>Selecione um evento no Mapa ou crie um novo na visão Montar.</p>
+      <section aria-label={ui("Depurar evento")} className="event-debug-panel">
+        <h4>{ui("Escolha um evento para testar")}</h4>
+        <p>{ui("Selecione um evento no Mapa ou crie um novo na visão Montar.")}</p>
       </section>
     );
   }
 
   return (
-    <section aria-label={`Depurar evento ${event.name}`} className="event-debug-panel">
+    <section aria-label={ui("Depurar evento {0}", { 0: event.name })} className="event-debug-panel">
       <header>
-        <span>Teste a lógica</span>
+        <span>{ui("Teste a lógica")}</span>
         <h4>{event.name}</h4>
         <p>{describeEventFlow(event)}</p>
       </header>
       <div className="event-debug-actions">
-        <button aria-label={`Executar evento ${event.name}`} onClick={() => onRun(false)} type="button">
-          Executar evento
-        </button>
-        <button aria-label={`Depurar evento ${event.name}`} onClick={() => onRun(true)} type="button">
-          Depurar evento
-        </button>
+        <button aria-label={ui("Executar evento {0}", { 0: event.name })} onClick={() => onRun(false)} type="button">
+          {ui("Executar evento")}</button>
+        <button aria-label={ui("Depurar evento {0}", { 0: event.name })} onClick={() => onRun(true)} type="button">
+          {ui("Depurar evento")}</button>
       </div>
       {result ? (
-        <section className="event-debug-result" aria-label={`Resultado de ${event.name}`}>
+        <section className="event-debug-result" aria-label={ui("Resultado de {0}", { 0: event.name })}>
           <EventRuntimeStatus result={result}/>
           {result.executionTrace.length ? (
             <ol>
@@ -1597,9 +1602,9 @@ function EventDebugPanel({ event, result, onRun }: EventDebugPanelProps): React.
                 </li>
               ))}
             </ol>
-          ) : <p>Nenhum evento foi executado.</p>}
+          ) : <p>{ui("Nenhum evento foi executado.")}</p>}
         </section>
-      ) : <p className="event-debug-empty">Execute o evento para acompanhar o resultado.</p>}
+      ) : <p className="event-debug-empty">{ui("Execute o evento para acompanhar o resultado.")}</p>}
     </section>
   );
 }
@@ -1719,6 +1724,7 @@ function EventBindingPicker({
   onQueryChange,
   onSelect
 }: EventBindingPickerProps): React.ReactElement {
+  const ui = useStudioUiText();
   const normalizedQuery = query.trim().toLowerCase();
   const visibleEvents = normalizedQuery
     ? events.filter((event) => (
@@ -1730,31 +1736,31 @@ function EventBindingPicker({
   return (
     <div className="event-binding-picker-backdrop" onClick={onClose} role="presentation">
       <section
-        aria-label={`Escolher evento para ${picker.label}`}
+        aria-label={ui("Escolher evento para {0}", { 0: ui(picker.label) })}
         className="event-binding-picker"
         onClick={(event) => event.stopPropagation()}
         role="dialog"
       >
         <header className="event-binding-picker-header">
           <div>
-            <h4>{picker.label}</h4>
+            <h4>{ui(picker.label)}</h4>
             <p>{picker.targetName}</p>
           </div>
-          <button onClick={onClose} type="button">Fechar</button>
+          <button onClick={onClose} type="button">{ui("Fechar")}</button>
         </header>
         <label className="event-binding-picker-search">
-          <span>Buscar evento</span>
+          <span>{ui("Buscar evento")}</span>
           <input
             autoFocus
             onChange={(event) => onQueryChange(event.currentTarget.value)}
-            placeholder="Nome ou categoria"
+            placeholder={ui("Nome ou categoria")}
             type="search"
             value={query}
           />
         </label>
         <div className="event-binding-picker-list" role="list">
           {visibleEvents.length === 0 ? (
-            <p className="muted">Nenhum evento encontrado.</p>
+            <p className="muted">{ui("Nenhum evento encontrado.")}</p>
           ) : (
             visibleEvents.map((event) => (
               <button
@@ -1822,6 +1828,7 @@ function EventGraphCanvas({
   onOpenCommandMenu,
   onOpenCommandMenuForBindingSlot
 }: EventGraphCanvasProps): React.ReactElement {
+  const ui = useStudioUiText();
   const [dragState, setDragState] = useState<EventGraphDragState | null>(null);
   const [dragPreviewPosition, setDragPreviewPosition] = useState<UpdateEventGraphNodePosition | null>(null);
   const [zoom, setZoom] = useState(1);
@@ -2094,15 +2101,15 @@ function EventGraphCanvas({
       onWheel={handleWheel}
       ref={viewportRef}
     >
-      <div className="event-graph-zoom" role="group" aria-label="Zoom do canvas de eventos">
-        <button aria-label="Ajustar canvas aos cards visiveis" onClick={fitViewToNodes} title="Ajustar" type="button">
+      <div className="event-graph-zoom" role="group" aria-label={ui("Zoom do canvas de eventos")}>
+        <button aria-label={ui("Ajustar canvas aos cards visiveis")} onClick={fitViewToNodes} title={ui("Ajustar")} type="button">
           <ScanSearch aria-hidden="true" size={14} strokeWidth={2.3} />
         </button>
-        <button aria-label="Reduzir zoom do canvas de eventos" onClick={() => setZoomByStep(-0.1)} type="button">
+        <button aria-label={ui("Reduzir zoom do canvas de eventos")} onClick={() => setZoomByStep(-0.1)} type="button">
           <ZoomOut aria-hidden="true" size={14} strokeWidth={2.3} />
         </button>
         <strong>{Math.round(zoom * 100)}%</strong>
-        <button aria-label="Aumentar zoom do canvas de eventos" onClick={() => setZoomByStep(0.1)} type="button">
+        <button aria-label={ui("Aumentar zoom do canvas de eventos")} onClick={() => setZoomByStep(0.1)} type="button">
           <ZoomIn aria-hidden="true" size={14} strokeWidth={2.3} />
         </button>
       </div>
@@ -2144,7 +2151,7 @@ function EventGraphCanvas({
           const bend = Math.max(68, Math.abs(targetX - sourceX) * 0.42);
           return (
             <path
-              aria-label={`Selecionar chamada ${edge.flowLabel} de ${edge.sourceEventName} para ${edge.targetEventName}`}
+              aria-label={ui("Selecionar chamada {0} de {1} para {2}", { 0: edge.flowLabel, 1: edge.sourceEventName, 2: edge.targetEventName })}
               className={[
                 edge.flowKind,
                 edge.isMissingTarget ? "missing" : "",
@@ -2180,7 +2187,7 @@ function EventGraphCanvas({
           const bend = Math.max(58, Math.abs(targetX - sourceX) * 0.34);
           return (
             <path
-              aria-label={`Selecionar vinculo ${edge.sourceLabel} ${edge.bindingKey} para ${edge.targetEventName}`}
+              aria-label={ui("Selecionar vinculo {0} {1} para {2}", { 0: edge.sourceLabel, 1: edge.bindingKey, 2: edge.targetEventName })}
               className="binding-edge"
               d={`M ${sourceX} ${sourceY} C ${sourceX + bend} ${sourceY}, ${targetX - bend} ${targetY}, ${targetX} ${targetY}`}
               key={edge.id}
@@ -2239,7 +2246,7 @@ function EventGraphCanvas({
               top: (source.displayY + target.displayY + graphNodeHeightFor(source)) / 2 + 13
             }}
           >
-            {edge.label}
+            {ui(edge.label)}
           </span>
         );
       })}
@@ -2283,7 +2290,7 @@ function EventGraphCanvas({
             <span className="event-graph-node-port in" aria-hidden="true" />
             {node.nodeKind === "event" ? (
               <button
-                aria-label={`Criar conexao saindo de ${node.eventName}`}
+                aria-label={ui("Criar conexao saindo de {0}", { 0: node.eventName })}
                 className="event-graph-node-port out"
                 onClick={(event) => {
                   event.stopPropagation();
@@ -2305,9 +2312,9 @@ function EventGraphCanvas({
               <em>{pendingLabel}</em>
             </span>
             {node.nodeKind === "event" ? (
-              <span className="event-graph-node-flow" aria-label={`Fluxo: ${node.flowLabels.join(", ")}`}>
+              <span className="event-graph-node-flow" aria-label={ui("Fluxo: {0}", { 0: node.flowLabels.join(", ") })}>
                 {node.flowLabels.slice(0, 3).map((label) => (
-                  <small key={`${node.id}-${label}`}>{label}</small>
+                  <small key={`${node.id}-${label}`}>{ui(label)}</small>
                 ))}
               </span>
             ) : null}
@@ -2326,16 +2333,16 @@ function EventGraphCanvas({
                     <Fragment key={`${node.id}-${slot.bindingKey}`}>
                       {sectionHeader}
                       <div className="event-graph-binding-row">
-                        <span className="event-graph-binding-label">{slot.label}</span>
+                        <span className="event-graph-binding-label">{ui(slot.label)}</span>
                         <span className={[
                           "event-graph-binding-value",
                           slot.isPending ? "pending" : "",
                           slot.isMissing ? "missing" : ""
                         ].filter(Boolean).join(" ")}>
-                          {slot.eventName ?? "Sem evento"}
+                          {slot.eventName ?? ui("Sem evento")}
                         </span>
                         <button
-                          aria-label={`Adicionar evento em ${slot.label}`}
+                          aria-label={ui("Adicionar evento em {0}", { 0: ui(slot.label) })}
                           className="event-graph-binding-add"
                           onClick={(event) => {
                             event.stopPropagation();
@@ -2347,7 +2354,7 @@ function EventGraphCanvas({
                           <Plus aria-hidden="true" size={12} strokeWidth={2.4} />
                         </button>
                         <button
-                          aria-label={boundEvent ? `Abrir script ${slot.eventName}` : `Criar script para ${slot.label}`}
+                          aria-label={boundEvent ? ui("Abrir script {0}", { 0: slot.eventName }) : ui("Criar script para {0}", { 0: ui(slot.label) })}
                           className={[
                             "event-graph-binding-open",
                             slot.isPending ? "pending" : "linked"
@@ -2381,11 +2388,11 @@ function EventGraphCanvas({
                         onPointerDown={(event) => event.stopPropagation()}
                         type="button"
                       >
-                        <small>{step.index === 0 ? "Ao iniciar" : `Comando ${step.index + 1}`}</small>
+                        <small>{step.index === 0 ? ui("Ao iniciar") : ui("Comando {0}", { 0: step.index + 1 })}</small>
                         <strong className={step.command === "noop" ? "empty-command" : ""}>
-                          {step.command === "noop" ? "Sem operação" : step.commandLabel}
+                          {step.command === "noop" ? ui("Sem operação") : step.commandLabel}
                         </strong>
-                        {step.flow.kind !== "linear" ? <em>{step.flow.label}</em> : null}
+                        {step.flow.kind !== "linear" ? <em>{ui(step.flow.label)}</em> : null}
                       </button>
                       {isSelectedStep && step.commandParameters.length ? (
                         <span className="event-graph-inline-parameters" onClick={(event) => event.stopPropagation()}>
@@ -2394,7 +2401,7 @@ function EventGraphCanvas({
                               <small>{inlineCommandParameterLabel(parameter)}</small>
                               {parameter.options.length && parameter.kind !== "value" ? (
                                 <select
-                                    aria-label={`${inlineCommandParameterLabel(parameter)} do evento no card`}
+                                    aria-label={ui("{0} do evento no card", { 0: inlineCommandParameterLabel(parameter) })}
                                   onChange={(event) => onUpdateEventStep(node.id, step.index, {
                                     command: commandWithParameterValue(step.command, parameter, event.currentTarget.value)
                                   })}
@@ -2406,7 +2413,7 @@ function EventGraphCanvas({
                                 </select>
                               ) : (
                                 <input
-                                  aria-label={`${inlineCommandParameterLabel(parameter)} do evento no card`}
+                                  aria-label={ui("{0} do evento no card", { 0: inlineCommandParameterLabel(parameter) })}
                                   onChange={(event) => onUpdateEventStep(node.id, step.index, {
                                     command: commandWithParameterValue(step.command, parameter, event.currentTarget.value)
                                   })}
@@ -2423,9 +2430,9 @@ function EventGraphCanvas({
                 })
               ) : (
                 <span>
-                  <small>Fluxo</small>
+                  <small>{ui("Fluxo")}</small>
                   <strong className={(eventDetails?.primaryCommand ?? "noop") === "noop" ? "empty-command" : ""}>
-                    {(eventDetails?.primaryCommand ?? "noop") === "noop" ? "Sem operação" : eventDetails?.primaryCommand}
+                    {(eventDetails?.primaryCommand ?? "noop") === "noop" ? ui("Sem operação") : eventDetails?.primaryCommand}
                   </strong>
                 </span>
               )}
@@ -2433,14 +2440,14 @@ function EventGraphCanvas({
             <span className="event-graph-node-footer">
               <small>
                 {node.nodeKind === "context"
-                  ? `${node.boundEventNames.length} vinculo${node.boundEventNames.length === 1 ? "" : "s"}`
-                  : eventDetails ? `${eventDetails.enabledStepCount}/${eventDetails.stepCount} eventos` : "0 eventos"}
+                  ? ui("{0} vinculo{1}", { 0: node.boundEventNames.length, 1: node.boundEventNames.length === 1 ? "" : "s" })
+                  : eventDetails ? ui("{0}/{1} eventos", { 0: eventDetails.enabledStepCount, 1: eventDetails.stepCount }) : ui("0 eventos")}
                 {hiddenStepCount > 0 ? ` +${hiddenStepCount}` : ""}
               </small>
-              <small>{node.incomingEdgeCount} in / {node.outgoingEdgeCount} out</small>
+              <small>{node.incomingEdgeCount} {ui(" in / ")}{node.outgoingEdgeCount} {ui(" out")}</small>
               {node.nodeKind === "event" ? (
                 <button
-                  aria-label={`Adicionar evento em ${node.eventName}`}
+                  aria-label={ui("Adicionar evento em {0}", { 0: node.eventName })}
                   className="event-graph-node-add-block"
                   onClick={(event) => {
                     event.stopPropagation();
@@ -2458,10 +2465,10 @@ function EventGraphCanvas({
           })}
         </div>
       </div>
-      <nav aria-label="Minimapa de eventos" className="event-graph-minimap">
+      <nav aria-label={ui("Minimapa de eventos")} className="event-graph-minimap">
         {displayNodes.map((node) => (
           <button
-            aria-label={`Localizar ${node.eventName}`}
+            aria-label={ui("Localizar {0}", { 0: node.eventName })}
             className={`${node.nodeKind}${node.id === selectedNodeID ? " selected" : ""}`}
             key={`minimap-${node.id}`}
             onClick={() => locateNode(node)}
@@ -2523,6 +2530,7 @@ export function EventsWorkspace({
   onRemoveEvent,
   onRelayoutEventsGraph
 }: EventsWorkspaceProps): React.ReactElement {
+  const ui = useStudioUiText();
   const [activeView, setActiveView] = useState<EventWorkspaceView>("build");
   const [inspectorSelection, setInspectorSelection] = useState<EventInspectorSelection | null>(null);
   const [pendingConnectionSourceID, setPendingConnectionSourceID] = useState<string | null>(null);
@@ -2641,8 +2649,8 @@ export function EventsWorkspace({
   if (!presentation) {
     return (
       <WorkspaceEmptyState
-        title="Editor de Eventos"
-        description="Abra um projeto para visualizar scripts, eventos e vínculos do editor visual."
+        title={ui("Editor de Eventos")}
+        description={ui("Abra um projeto para visualizar scripts, eventos e vínculos do editor visual.")}
       />
     );
   }
@@ -2799,12 +2807,12 @@ export function EventsWorkspace({
   };
 
   return (
-    <section className="events-workspace" aria-label="Workspace Eventos">
-      <h3 className="studio-visually-hidden">Editor de Eventos</h3>
+    <section className="events-workspace" aria-label={ui("Workspace Eventos")}>
+      <h3 className="studio-visually-hidden">{ui("Editor de Eventos")}</h3>
 
       <div className="events-layout">
-        <section className="events-canvas-stage" aria-label="Área de trabalho de eventos">
-          <div aria-label="Visão do editor de eventos" className="events-view-tabs" role="tablist">
+        <section className="events-canvas-stage" aria-label={ui("Área de trabalho de eventos")}>
+          <div aria-label={ui("Visão do editor de eventos")} className="events-view-tabs" role="tablist">
             <button
               aria-controls="events-build-view"
               aria-selected={activeView === "build"}
@@ -2812,8 +2820,7 @@ export function EventsWorkspace({
               role="tab"
               type="button"
             >
-              Montar
-            </button>
+              {ui("Montar")}</button>
             <button
               aria-controls="events-map-view"
               aria-selected={activeView === "map"}
@@ -2821,8 +2828,7 @@ export function EventsWorkspace({
               role="tab"
               type="button"
             >
-              Mapa
-            </button>
+              {ui("Mapa")}</button>
             <button
               aria-controls="events-debug-view"
               aria-selected={activeView === "debug"}
@@ -2830,8 +2836,7 @@ export function EventsWorkspace({
               role="tab"
               type="button"
             >
-              Depurar
-            </button>
+              {ui("Depurar")}</button>
           </div>
           {activeView === "build" ? (
             <div id="events-build-view" role="tabpanel">
@@ -2853,30 +2858,28 @@ export function EventsWorkspace({
             </div>
           ) : (
             <div id="events-map-view" role="tabpanel">
-          <WorkspaceContextToolbar className="events-tool-strip" aria-label="Ferramentas do editor de eventos">
-            <button type="button" onClick={onCreateEvent}>Novo script</button>
+          <WorkspaceContextToolbar className="events-tool-strip" aria-label={ui("Ferramentas do editor de eventos")}>
+            <button type="button" onClick={onCreateEvent}>{ui("Novo script")}</button>
             <button
               disabled={!selectedEvent}
               onClick={() => selectedEvent && openCommandMenuForEvent(selectedEvent.id)}
               type="button"
             >
-              Adicionar evento
-            </button>
+              {ui("Adicionar evento")}</button>
             <button
               disabled={!selectedEvent}
               onClick={() => selectedEvent && openRecipeMenuForEvent(selectedEvent.id)}
               type="button"
             >
-              Modelos de script
-            </button>
+              {ui("Modelos de script")}</button>
             <label className="events-scene-filter">
-              <span>Cena</span>
+              <span>{ui("Cena")}</span>
               <select
-                aria-label="Filtrar canvas por cena"
+                aria-label={ui("Filtrar canvas por cena")}
                 onChange={(event) => setActiveSceneName(event.currentTarget.value)}
                 value={activeSceneName}
               >
-                <option value="">Todas</option>
+                <option value="">{ui("Todas")}</option>
                 {presentation.sceneNames.map((sceneName) => (
                   <option key={`scene-filter-${sceneName}`} value={sceneName}>{sceneDisplayName(sceneName)}</option>
                 ))}
@@ -2884,9 +2887,9 @@ export function EventsWorkspace({
             </label>
             {selectedEvent && bindableTargets.length ? (
               <label className="events-bind-topbar">
-                <span>Usar em</span>
+                <span>{ui("Usar em")}</span>
                 <select
-                  aria-label={`Vincular ${selectedEvent.name} a um alvo do projeto`}
+                  aria-label={ui("Vincular {0} a um alvo do projeto", { 0: selectedEvent.name })}
                   defaultValue=""
                   onChange={(inputEvent) => {
                     const targetID = inputEvent.currentTarget.value;
@@ -2900,9 +2903,9 @@ export function EventsWorkspace({
                     });
                   }}
                 >
-                  <option value="">Escolher alvo</option>
+                  <option value="">{ui("Escolher alvo")}</option>
                   {bindableTargets.map((target) => (
-                    <option key={target.id} value={target.id}>{target.label}</option>
+                    <option key={target.id} value={target.id}>{ui(target.label)}</option>
                   ))}
                 </select>
               </label>
@@ -2913,8 +2916,7 @@ export function EventsWorkspace({
               onClick={() => setValidationOpen((current) => !current)}
               type="button"
             >
-              Validar
-              {validationIssues.length > 0 ? ` (${validationIssues.length})` : ""}
+              {ui("Validar")}{validationIssues.length > 0 ? ` (${validationIssues.length})` : ""}
             </button>
             <button
               onClick={() => {
@@ -2923,18 +2925,17 @@ export function EventsWorkspace({
               }}
               type="button"
             >
-              Organizar canvas
-            </button>
-            <div className="event-filter-segment" role="group" aria-label="Filtros rapidos de eventos">
-              <StudioChip active={filterStatus === ""} onClick={() => setFilterStatus("")}>Tudo</StudioChip>
-              <StudioChip active={filterStatus === "unlinked"} onClick={() => setFilterStatus("unlinked")}>Pendencias</StudioChip>
-              <StudioChip active={filterStatus === "warnings"} onClick={() => setFilterStatus("warnings")}>Problemas</StudioChip>
-              <StudioChip active={Boolean(selectedGraphNode)} disabled={!selectedGraphNode}>Selecionado</StudioChip>
+              {ui("Organizar canvas")}</button>
+            <div className="event-filter-segment" role="group" aria-label={ui("Filtros rapidos de eventos")}>
+              <StudioChip active={filterStatus === ""} onClick={() => setFilterStatus("")}>{ui("Tudo")}</StudioChip>
+              <StudioChip active={filterStatus === "unlinked"} onClick={() => setFilterStatus("unlinked")}>{ui("Pendencias")}</StudioChip>
+              <StudioChip active={filterStatus === "warnings"} onClick={() => setFilterStatus("warnings")}>{ui("Problemas")}</StudioChip>
+              <StudioChip active={Boolean(selectedGraphNode)} disabled={!selectedGraphNode}>{ui("Selecionado")}</StudioChip>
             </div>
-            <span>{activeGraph.graphNodes.length} cards{activeSceneName ? ` · ${activeSceneName}` : ""}</span>
+            <span>{activeGraph.graphNodes.length} {ui(" cards")}{activeSceneName ? ` · ${activeSceneName}` : ""}</span>
           </WorkspaceContextToolbar>
           {validationOpen ? (
-            <div className="events-validation-panel" aria-label="Diagnostico do grafo de eventos">
+            <div className="events-validation-panel" aria-label={ui("Diagnostico do grafo de eventos")}>
               {validationIssues.length ? validationIssues.map((issue) => (
                 <button
                   className={issue.severity === "error" ? "danger-chip" : "warning-chip"}
@@ -2944,36 +2945,34 @@ export function EventsWorkspace({
                   }}
                   type="button"
                 >
-                  {issue.message}
+                  {ui(issue.message)}
                 </button>
               )) : (
-                <p className="muted">Nenhum problema encontrado no grafo de eventos.</p>
+                <p className="muted">{ui("Nenhum problema encontrado no grafo de eventos.")}</p>
               )}
             </div>
           ) : null}
 
           <div className="event-graph-panel">
             <div className="event-graph-panel-header">
-              <h4>Canvas visual</h4>
-              <div className="event-graph-legend" aria-label="Legenda do canvas de eventos">
-                <span className="context">Contexto</span>
-                <span className="event">Evento</span>
-                <span className="call">Chamada</span>
+              <h4>{ui("Canvas visual")}</h4>
+              <div className="event-graph-legend" aria-label={ui("Legenda do canvas de eventos")}>
+                <span className="context">{ui("Contexto")}</span>
+                <span className="event">{ui("Evento")}</span>
+                <span className="call">{ui("Chamada")}</span>
               </div>
               <div className="event-graph-count">
-                Chamadas
-                <strong>{presentation.summary.graphEdgeCount}</strong>
+                {ui("Chamadas")}<strong>{presentation.summary.graphEdgeCount}</strong>
               </div>
             </div>
             {pendingConnectionSourceID ? (
               <div className="event-graph-connect">
                 <span>
-                  Conectando a partir de{" "}
-                  <strong>{eventsByID.get(pendingConnectionSourceID)?.name ?? "evento"}</strong>
+                  {ui("Conectando a partir de")}{" "}
+                  <strong>{eventsByID.get(pendingConnectionSourceID)?.name ?? ui("evento")}</strong>
                 </span>
                 <button onClick={() => setPendingConnectionSourceID(null)} type="button">
-                  Cancelar
-                </button>
+                  {ui("Cancelar")}</button>
               </div>
             ) : null}
             {activeGraph.graphNodes.length > 0 ? (
@@ -3002,7 +3001,7 @@ export function EventsWorkspace({
                 onOpenCommandMenuForBindingSlot={openCommandMenuForBindingSlot}
               />
             ) : (
-              <p className="muted">Nenhum card de evento para exibir.</p>
+              <p className="muted">{ui("Nenhum card de evento para exibir.")}</p>
             )}
           </div>
             </div>
@@ -3010,18 +3009,18 @@ export function EventsWorkspace({
         </section>
 
         <WorkspaceInspectorRail
-          ariaLabel="Inspector de eventos"
+          ariaLabel={ui("Inspector de eventos")}
           className="event-side-stack"
           workspaceId="events"
         >
           {inspectorSelection?.kind === "context" && selectedContextNode ? (
-            <div className="event-inspector-panel event-context-panel" aria-label={`Inspector de ${selectedContextNode.eventName}`}>
+            <div className="event-inspector-panel event-context-panel" aria-label={ui("Inspector de {0}", { 0: selectedContextNode.eventName })}>
               <div className="event-inspector-header">
                 <div>
                   <h4>{selectedContextNode.eventName}</h4>
-                  <p>{selectedContextNode.boundEventNames.length} vinculo{selectedContextNode.boundEventNames.length === 1 ? "" : "s"} de evento</p>
+                  <p>{selectedContextNode.boundEventNames.length} {ui(" vinculo")}{selectedContextNode.boundEventNames.length === 1 ? "" : "s"} {ui(" de evento")}</p>
                 </div>
-                <span>{selectedContextNode.missingReferenceCount > 0 ? "Pendente" : selectedContextNode.boundEventNames.length ? "Vinculada" : "Sem evento"}</span>
+                <span>{selectedContextNode.missingReferenceCount > 0 ? ui("Pendente") : selectedContextNode.boundEventNames.length ? ui("Vinculada") : ui("Sem evento")}</span>
               </div>
               {(() => {
                 let lastSection: string | null = null;
@@ -3038,9 +3037,9 @@ export function EventsWorkspace({
                     <Fragment key={`${selectedContextNode.id}-${field.bindingKey}`}>
                       {sectionHeader}
                       <label className="event-context-field">
-                        <span>{field.label}</span>
+                        <span>{ui(field.label)}</span>
                         <select
-                          aria-label={`${field.label} de ${selectedContextNode.eventName}`}
+                          aria-label={ui("{0} de {1}", { 0: ui(field.label), 1: selectedContextNode.eventName })}
                           onChange={(inputEvent) => {
                             const eventID = inputEvent.currentTarget.value;
                             const eventToBind = allEvents.find((event) => event.id === eventID);
@@ -3053,7 +3052,7 @@ export function EventsWorkspace({
                           }}
                           value={boundEdge?.targetEventID ?? ""}
                         >
-                          <option value="">Escolher evento</option>
+                          <option value="">{ui("Escolher evento")}</option>
                           {allEvents.map((event) => (
                             <option key={`${selectedContextNode.id}-${field.bindingKey}-${event.id}`} value={event.id}>
                               {event.name}
@@ -3070,17 +3069,17 @@ export function EventsWorkspace({
                 <strong>{selectedContextNode.targetName ?? selectedContextNode.eventName}</strong>
                 {selectedContextNode.sceneName ? (
                   <>
-                    <span>Cena</span>
+                    <span>{ui("Cena")}</span>
                     <strong>{sceneDisplayName(selectedContextNode.sceneName)}</strong>
                   </>
                 ) : null}
-                <span>Saidas</span>
+                <span>{ui("Saidas")}</span>
                 <strong>{selectedContextNode.outgoingEdgeCount}</strong>
-                <span>Pendencias</span>
+                <span>{ui("Pendencias")}</span>
                 <strong>{selectedContextNode.missingReferenceCount}</strong>
               </div>
               {selectedContextBindingEdges.length ? (
-                <div className="event-active-bindings" aria-label={`Vinculos ativos de ${selectedContextNode.eventName}`}>
+                <div className="event-active-bindings" aria-label={ui("Vinculos ativos de {0}", { 0: selectedContextNode.eventName })}>
                   {selectedContextBindingEdges.map((edge) => (
                     <button
                       className={edge.isMissingTarget ? "warning" : ""}
@@ -3090,7 +3089,7 @@ export function EventsWorkspace({
                         targetName: edge.targetName,
                         bindingKey: edge.bindingKey
                       })}
-                      title={`Remover ${edge.bindingKey}`}
+                      title={ui("Remover {0}", { 0: edge.bindingKey })}
                       type="button"
                     >
                       {`${edge.bindingKey} -> ${edge.targetEventName}${edge.isMissingTarget ? " (pendente)" : ""}`}
@@ -3098,22 +3097,22 @@ export function EventsWorkspace({
                   ))}
                 </div>
               ) : (
-                <p className="muted">Nenhum evento vinculado a este contexto.</p>
+                <p className="muted">{ui("Nenhum evento vinculado a este contexto.")}</p>
               )}
             </div>
           ) : inspectorSelection?.kind === "edge" && selectedEdge ? (
-            <div className="event-inspector-panel event-context-panel" aria-label={`Inspector da chamada ${selectedEdge.sourceEventName}`}>
+            <div className="event-inspector-panel event-context-panel" aria-label={ui("Inspector da chamada {0}", { 0: selectedEdge.sourceEventName })}>
               <div className="event-inspector-header">
                 <div>
-                  <h4>Conexao</h4>
+                  <h4>{ui("Conexao")}</h4>
                   <p>{selectedEdge.sourceEventName} - {selectedEdge.commandVerb}</p>
                 </div>
-                <span>{selectedEdge.isMissingTarget ? "Pendente" : "OK"}</span>
+                <span>{selectedEdge.isMissingTarget ? ui("Pendente") : ui("OK")}</span>
               </div>
               <label className="event-context-field">
-                <span>Destino</span>
+                <span>{ui("Destino")}</span>
                 <select
-                  aria-label={`Destino de ${selectedEdge.sourceEventName} ${selectedEdge.commandVerb}`}
+                  aria-label={ui("Destino de {0} {1}", { 0: selectedEdge.sourceEventName, 1: selectedEdge.commandVerb })}
                   onChange={(inputEvent) => {
                     const targetEventName = inputEvent.currentTarget.value;
                     onRetargetEventGraphEdge({
@@ -3139,25 +3138,25 @@ export function EventsWorkspace({
                 </select>
               </label>
               <div className="event-context-summary">
-                <span>Origem</span>
+                <span>{ui("Origem")}</span>
                 <strong>{selectedEdge.sourceEventName}</strong>
-                <span>Fluxo</span>
+                <span>{ui("Fluxo")}</span>
                 <strong>{selectedEdge.flowLabel}</strong>
-                <span>Comando</span>
+                <span>{ui("Comando")}</span>
                 <strong>{selectedEdge.stepIndex + 1}</strong>
-                <span>Destino</span>
+                <span>{ui("Destino")}</span>
                 <strong>{selectedEdge.targetEventName}</strong>
                 {selectedEdge.guardCommand ? (
                   <>
-                    <span>Guarda</span>
-                    <strong>{`Comando ${(selectedEdge.guardStepIndex ?? 0) + 1}: ${selectedEdge.guardCommand}`}</strong>
+                    <span>{ui("Guarda")}</span>
+                    <strong>{ui("Comando {0}: {1}", { 0: (selectedEdge.guardStepIndex ?? 0) + 1, 1: selectedEdge.guardCommand })}</strong>
                   </>
                 ) : null}
-                <span>Detalhe</span>
+                <span>{ui("Detalhe")}</span>
                 <strong>{selectedEdge.flowDetail}</strong>
               </div>
               <div className="event-actions inspector-actions">
-                <button type="button" onClick={() => selectEvent(selectedEdge.sourceEventID)}>Abrir evento</button>
+                <button type="button" onClick={() => selectEvent(selectedEdge.sourceEventID)}>{ui("Abrir evento")}</button>
                 <button
                   className="danger-button"
                   onClick={() => {
@@ -3169,15 +3168,14 @@ export function EventsWorkspace({
                   }}
                   type="button"
                 >
-                  Remover conexao
-                </button>
+                  {ui("Remover conexao")}</button>
               </div>
             </div>
           ) : inspectorSelection?.kind === "step" && selectedStepEvent && selectedStep ? (
-            <div className="event-inspector-panel event-context-panel" aria-label={`Inspetor do evento ${selectedStep.index + 1}`}>
+            <div className="event-inspector-panel event-context-panel" aria-label={ui("Inspetor do evento {0}", { 0: selectedStep.index + 1 })}>
               <div className="event-inspector-header">
                 <div>
-                  <h4>Evento {selectedStep.index + 1}</h4>
+                  <h4>{ui("Evento ")}{selectedStep.index + 1}</h4>
                   <p>{selectedStepEvent.name}</p>
                 </div>
                 <span>{selectedStep.commandBadge}</span>
@@ -3191,48 +3189,48 @@ export function EventsWorkspace({
                       : selectedStep.commandCategory} · {selectedStep.commandVerb}
                   </small>
                 </div>
-                <em>{selectedStep.isEnabled ? "Ativo" : "Inativo"}</em>
+                <em>{selectedStep.isEnabled ? ui("Ativo") : ui("Inativo")}</em>
               </div>
               <div className="event-command-template-card">
-                <span>Modelo</span>
+                <span>{ui("Modelo")}</span>
                 <code>{selectedStep.commandTemplate ?? selectedStep.commandVerb}</code>
                 <small>{selectedStep.commandRuntimeStatus === "ok-rom"
-                  ? "Executa na ROM."
+                  ? ui("Executa na ROM.")
                   : selectedStep.commandRuntimeStatus === "preview-p0"
-                    ? "Disponível apenas como evento de organização no editor."
+                    ? ui("Disponível apenas como evento de organização no editor.")
                     : selectedStep.commandRuntimeStatus === "preview-runtime"
-                      ? "Reconhecido pelo editor, mas ainda nao compila para a ROM."
-                      : "Ainda sem runtime Electron."}</small>
+                      ? ui("Reconhecido pelo editor, mas ainda nao compila para a ROM.")
+                      : ui("Ainda sem runtime Electron.")}</small>
               </div>
               <div className={`event-flow-card ${selectedStep.flow.kind}`}>
-                <span>Fluxo</span>
-                <strong>{selectedStep.flow.label}</strong>
-                <small>{selectedStep.flow.detail}</small>
+                <span>{ui("Fluxo")}</span>
+                <strong>{ui(selectedStep.flow.label)}</strong>
+                <small>{ui(selectedStep.flow.detail)}</small>
                 {selectedStep.flow.dependsOnStepIndex !== null ? (
-                  <em>Depende do evento {selectedStep.flow.dependsOnStepIndex + 1}</em>
+                  <em>{ui("Depende do evento ")}{selectedStep.flow.dependsOnStepIndex + 1}</em>
                 ) : selectedStep.flow.controlsNextStep ? (
-                  <em>Controla o próximo evento</em>
+                  <em>{ui("Controla o próximo evento")}</em>
                 ) : selectedStep.flow.targetEventName ? (
-                  <em>Alvo: {selectedStep.flow.targetEventName}</em>
+                  <em>{ui("Alvo: ")}{selectedStep.flow.targetEventName}</em>
                 ) : null}
               </div>
               {selectedStep.commandParameters.length ? (
-                <div className="event-command-parameters" aria-label={`Parâmetros do evento ${selectedStep.index + 1}`}>
+                <div className="event-command-parameters" aria-label={ui("Parâmetros do evento {0}", { 0: selectedStep.index + 1 })}>
                   {selectedStep.commandParameters.map((parameter) => (
                     <div className="event-command-parameter-row" key={`${selectedStepEvent.id}-${selectedStep.index}-${parameter.id}`}>
                       {commandParameterInput(parameter, (value) => onUpdateEventStep(selectedStepEvent.id, selectedStep.index, {
                         command: commandWithParameterValue(selectedStep.command, parameter, value)
                       }))}
                       {!parameter.isKnownValue && parameter.options.length ? (
-                        <small>Valor fora dos recursos atuais.</small>
+                        <small>{ui("Valor fora dos recursos atuais.")}</small>
                       ) : null}
                     </div>
                   ))}
                 </div>
               ) : (
                 <div className="event-command-parameters empty">
-                  <span>Parametros</span>
-                  <p className="muted">Este evento não tem argumentos editáveis.</p>
+                  <span>{ui("Parametros")}</span>
+                  <p className="muted">{ui("Este evento não tem argumentos editáveis.")}</p>
                 </div>
               )}
               {selectedStep.commandVerb === "change_scene_by_variable" ? (
@@ -3248,8 +3246,8 @@ export function EventsWorkspace({
                     />
                   ) : (
                     <div className="event-scene-route-editor missing">
-                      <strong>Tabela de rotas não encontrada</strong>
-                      <span>{routeTableID || "Escolha uma tabela no parâmetro acima."}</span>
+                      <strong>{ui("Tabela de rotas não encontrada")}</strong>
+                      <span>{routeTableID || ui("Escolha uma tabela no parâmetro acima.")}</span>
                     </div>
                   );
                 })()
@@ -3265,10 +3263,10 @@ export function EventsWorkspace({
                   })}
                   type="checkbox"
                 />
-                <span>Executar este evento</span>
+                <span>{ui("Executar este evento")}</span>
               </label> : null}
               <label className="event-context-field">
-                <span>Evento</span>
+                <span>{ui("Evento")}</span>
                 <button
                   className="event-step-command"
                   onClick={() => openCommandMenuForEvent(selectedStepEvent.id, selectedStep.index)}
@@ -3280,7 +3278,7 @@ export function EventsWorkspace({
                 </button>
               </label>
               <label className="event-context-field">
-                <span>Comando (texto)</span>
+                <span>{ui("Comando (texto)")}</span>
                 <input
                   onChange={(inputEvent) => onUpdateEventStep(selectedStepEvent.id, selectedStep.index, {
                     command: inputEvent.currentTarget.value
@@ -3291,7 +3289,7 @@ export function EventsWorkspace({
               </label>
               {selectedStep.paletteSuggestions.length ? (
                 <div className="event-step-suggestions">
-                  <span>Sugestões da paleta</span>
+                  <span>{ui("Sugestões da paleta")}</span>
                   {selectedStep.paletteSuggestions.map((suggestion) => (
                     <button
                       aria-pressed={suggestion.command === selectedStep.command}
@@ -3300,7 +3298,7 @@ export function EventsWorkspace({
                       type="button"
                     >
                       <div>
-                        <strong>{suggestion.label}</strong>
+                        <strong>{ui(suggestion.label)}</strong>
                         <small>{suggestion.command}</small>
                       </div>
                       {suggestion.badge ? <em>{suggestion.badge}</em> : null}
@@ -3309,8 +3307,8 @@ export function EventsWorkspace({
                 </div>
               ) : (
                 <div className="event-step-suggestions empty">
-                  <span>Sugestões da paleta</span>
-                  <p className="muted">Comando custom sem sugestoes relacionadas.</p>
+                  <span>{ui("Sugestões da paleta")}</span>
+                  <p className="muted">{ui("Comando custom sem sugestoes relacionadas.")}</p>
                 </div>
               )}
               {selectedStepPendingMessages.length ? (
@@ -3321,7 +3319,7 @@ export function EventsWorkspace({
                 </div>
               ) : null}
               <div className="event-actions inspector-actions">
-                <button type="button" onClick={() => selectEvent(selectedStepEvent.id)}>Abrir evento</button>
+                <button type="button" onClick={() => selectEvent(selectedStepEvent.id)}>{ui("Abrir evento")}</button>
                 <button
                   className="danger-button"
                   onClick={() => {
@@ -3330,49 +3328,47 @@ export function EventsWorkspace({
                   }}
                   type="button"
                 >
-                  Remover evento
-                </button>
+                  {ui("Remover evento")}</button>
               </div>
             </div>
           ) : selectedEvent ? (
-            <div className="event-inspector-panel" aria-label={`Inspector de ${selectedEvent.name}`}>
+            <div className="event-inspector-panel" aria-label={ui("Inspector de {0}", { 0: selectedEvent.name })}>
               <div className="event-inspector-header">
                 <div>
                   <h4>{selectedEvent.name}</h4>
-                  <p>{selectedEvent.category} - {selectedEvent.enabledStepCount}/{selectedEvent.stepCount} eventos ativos</p>
+                  <p>{selectedEvent.category} - {selectedEvent.enabledStepCount}/{selectedEvent.stepCount} {ui(" eventos ativos")}</p>
                 </div>
-                <span>{selectedEvent.isUnlinked ? "Solto" : `${selectedEvent.referenceCount} uso${selectedEvent.referenceCount === 1 ? "" : "s"}`}</span>
+                <span>{selectedEvent.isUnlinked ? ui("Solto") : ui("{0} uso{1}", { 0: selectedEvent.referenceCount, 1: selectedEvent.referenceCount === 1 ? "" : "s" })}</span>
               </div>
               {activeView !== "build" ? (
-                <section className="event-natural-summary" aria-label={`Resumo de ${selectedEvent.name}`}>
-                  <span>Em linguagem natural</span>
+                <section className="event-natural-summary" aria-label={ui("Resumo de {0}", { 0: selectedEvent.name })}>
+                  <span>{ui("Em linguagem natural")}</span>
                   <p>{describeEventFlow(selectedEvent)}</p>
                 </section>
               ) : null}
               <div className="event-actions inspector-actions">
-                <button type="button" onClick={() => executeFromSelectedEvent(false)}>Executar daqui</button>
-                <button type="button" onClick={() => executeFromSelectedEvent(true)}>Depurar daqui</button>
-                <button type="button" onClick={() => onRenameEvent(selectedEvent.id, selectedEvent.name)}>Renomear</button>
-                <button type="button" onClick={() => onDuplicateEvent(selectedEvent.id, selectedEvent.name)}>Duplicar</button>
-                <button type="button" onClick={() => onExportEvent(selectedEvent.id, selectedEvent.name)}>Exportar</button>
+                <button type="button" onClick={() => executeFromSelectedEvent(false)}>{ui("Executar daqui")}</button>
+                <button type="button" onClick={() => executeFromSelectedEvent(true)}>{ui("Depurar daqui")}</button>
+                <button type="button" onClick={() => onRenameEvent(selectedEvent.id, selectedEvent.name)}>{ui("Renomear")}</button>
+                <button type="button" onClick={() => onDuplicateEvent(selectedEvent.id, selectedEvent.name)}>{ui("Duplicar")}</button>
+                <button type="button" onClick={() => onExportEvent(selectedEvent.id, selectedEvent.name)}>{ui("Exportar")}</button>
                 <button className="danger-button" type="button" onClick={() => onRemoveEvent(selectedEvent.id, selectedEvent.name)}>
-                  Remover
-                </button>
+                  {ui("Remover")}</button>
               </div>
               {eventRuntimeResult ? (
-                <section className="event-runtime-result" aria-label={`Resultado de ${selectedEvent.name}`}>
+                <section className="event-runtime-result" aria-label={ui("Resultado de {0}", { 0: selectedEvent.name })}>
                   <EventRuntimeStatus result={eventRuntimeResult}/>
                   <EventNativeResponseControls result={eventRuntimeResult} setResult={setEventRuntimeResult}/>
                   {eventDebuggerPresentation?.callStack.length ? (
                     <div className="event-runtime-debug-grid">
                       <section>
-                        <span>Pilha de chamadas</span>
+                        <span>{ui("Pilha de chamadas")}</span>
                         {eventDebuggerPresentation.callStack.map((entry, index) => (
                           <code key={`${entry}-${index}`}>{index + 1}. {entry}</code>
                         ))}
                       </section>
                       <section>
-                        <span>Watches</span>
+                        <span>{ui("Watches")}</span>
                         {eventDebuggerPresentation.watchValues.map((watch) => (
                           <code key={watch.expression}>{watch.expression} = {watch.value}</code>
                         ))}
@@ -3384,34 +3380,33 @@ export function EventsWorkspace({
                       className={`event-runtime-visual-effect is-${eventRuntimeResult.visualEffect.effect}`}
                       data-effect={eventRuntimeResult.visualEffect.effect}
                     >
-                      <span>Efeito visual</span>
+                      <span>{ui("Efeito visual")}</span>
                       <strong>{eventRuntimeResult.visualEffect.effect}</strong>
                       <code>
-                        {eventRuntimeResult.visualEffect.layer} · {eventRuntimeResult.visualEffect.durationFrames} frames · {eventRuntimeResult.visualEffect.intensity}%
+                        {eventRuntimeResult.visualEffect.layer} · {eventRuntimeResult.visualEffect.durationFrames} {" frames · "}{eventRuntimeResult.visualEffect.intensity}%
                       </code>
                     </div>
                   ) : null}
                   {eventRuntimeResult.sceneTransition ? (
                     <div
-                      aria-label={`Transição de cena para ${eventRuntimeResult.sceneTransition.targetRoomName}`}
+                      aria-label={ui("Transição de cena para {0}", { 0: eventRuntimeResult.sceneTransition.targetRoomName })}
                       className={`event-runtime-scene-transition is-${eventRuntimeResult.sceneTransition.style}`}
                       data-effect={eventRuntimeResult.sceneTransition.style}
                       role="region"
                     >
                       <div className="event-runtime-scene-transition-heading">
-                        <span>Transição de cena</span>
+                        <span>{ui("Transição de cena")}</span>
                         <strong>{sceneTransitionDisplayName(eventRuntimeResult.sceneTransition.style)}</strong>
                       </div>
                       <div aria-hidden="true" className="event-runtime-scene-transition-track">
                         <span style={{ width: `${Math.round(eventRuntimeResult.sceneTransition.progress * 100)}%` }} />
                       </div>
                       <code>
-                        {eventRuntimeResult.sceneTransition.sourceRoomName ?? "Cena atual"}
+                        {eventRuntimeResult.sceneTransition.sourceRoomName ?? ui("Cena atual")}
                         {" → "}
                         {eventRuntimeResult.sceneTransition.targetRoomName}
                         {" · revelando · "}
-                        {eventRuntimeResult.sceneTransition.elapsedFrames}/{eventRuntimeResult.sceneTransition.durationFrames} frames
-                      </code>
+                        {eventRuntimeResult.sceneTransition.elapsedFrames}/{eventRuntimeResult.sceneTransition.durationFrames} {" frames"}</code>
                     </div>
                   ) : null}
                   {eventRuntimeResult.executionTrace.length ? (
@@ -3428,15 +3423,15 @@ export function EventsWorkspace({
                   <div className="event-runtime-variables">
                     {Object.entries(eventRuntimeResult.variables).length ? Object.entries(eventRuntimeResult.variables).map(([name, value]) => (
                       <code key={name}>{name} = {String(value)}</code>
-                    )) : <span>Nenhuma variável alterada.</span>}
+                    )) : <span>{ui("Nenhuma variável alterada.")}</span>}
                   </div>
                 </section>
               ) : null}
               {bindableTargets.length ? (
                 <label className="event-context-field">
-                  <span>Usar em</span>
+                  <span>{ui("Usar em")}</span>
                   <select
-                    aria-label={`Vincular ${selectedEvent.name} a um alvo do projeto`}
+                    aria-label={ui("Vincular {0} a um alvo do projeto", { 0: selectedEvent.name })}
                     defaultValue=""
                     onChange={(inputEvent) => {
                       const targetID = inputEvent.currentTarget.value;
@@ -3450,18 +3445,18 @@ export function EventsWorkspace({
                       });
                     }}
                   >
-                    <option value="">Escolher room, ator ou trigger</option>
+                    <option value="">{ui("Escolher room, ator ou trigger")}</option>
                     {bindableTargets.map((target) => (
-                      <option key={target.id} value={target.id}>{target.label}</option>
+                      <option key={target.id} value={target.id}>{ui(target.label)}</option>
                     ))}
                   </select>
                 </label>
               ) : null}
               {selectedGraphNode ? (
                 <div className={`event-flow-card ${selectedGraphNode.flowRole}`}>
-                  <span>Papel no fluxo</span>
+                  <span>{ui("Papel no fluxo")}</span>
                   <strong>{selectedGraphNode.flowLabels.join(" · ")}</strong>
-                  <small>{selectedGraphNode.incomingEdgeCount} entrada(s) e {selectedGraphNode.outgoingEdgeCount} saida(s)</small>
+                  <small>{selectedGraphNode.incomingEdgeCount} {ui(" entrada(s) e ")}{selectedGraphNode.outgoingEdgeCount} {ui(" saida(s)")}</small>
                   {selectedGraphNode.incomingFlowKinds.length || selectedGraphNode.outgoingFlowKinds.length ? (
                     <em>
                       {[
@@ -3480,11 +3475,11 @@ export function EventsWorkspace({
               ) : null}
             </div>
           ) : (
-            <p className="muted">Selecione um evento para editar.</p>
+            <p className="muted">{ui("Selecione um evento para editar.")}</p>
           )}
 
           <div className="event-category-panel">
-            <h4>Categorias</h4>
+            <h4>{ui("Categorias")}</h4>
             {presentation.summary.categories.map((category) => (
               <div className="event-category-row" key={category.category}>
                 <span>{category.category}</span>
@@ -3495,10 +3490,10 @@ export function EventsWorkspace({
 
           <div className="event-graph-details-panel">
             {selectedGraphNode?.nodeKind === "event" ? (
-              <div className="event-graph-node-panel" aria-label={`Conexoes visuais de ${selectedGraphNode.eventName}`}>
+              <div className="event-graph-node-panel" aria-label={ui("Conexoes visuais de {0}", { 0: selectedGraphNode.eventName })}>
                 <div>
                   <strong>{selectedGraphNode.eventName}</strong>
-                  <span>{visualConnectTargets.length} destinos livres</span>
+                  <span>{visualConnectTargets.length} {ui(" destinos livres")}</span>
                 </div>
                 {visualConnectTargets.length ? (
                   <div className="event-graph-targets">
@@ -3506,7 +3501,7 @@ export function EventsWorkspace({
                       <button
                         key={`${selectedGraphNode.id}-${target.eventID}`}
                         onClick={() => completeConnection(selectedGraphNode.id, target.eventName)}
-                        title={`Criar chamada para ${target.eventName}`}
+                        title={ui("Criar chamada para {0}", { 0: target.eventName })}
                         type="button"
                       >
                         {target.eventName}
@@ -3514,7 +3509,7 @@ export function EventsWorkspace({
                     ))}
                   </div>
                 ) : (
-                  <p className="muted">Todos os eventos disponiveis ja estao conectados.</p>
+                  <p className="muted">{ui("Todos os eventos disponiveis ja estao conectados.")}</p>
                 )}
                 {selectedGraphEdges.length ? (
                   <div className="event-graph-selected-edges">
@@ -3522,7 +3517,7 @@ export function EventsWorkspace({
                       <button
                         key={`${selectedGraphNode.id}-${edge.id}`}
                         onClick={() => selectEdge(edge.id)}
-                        title={`Selecionar chamada para ${edge.targetEventName}`}
+                        title={ui("Selecionar chamada para {0}", { 0: edge.targetEventName })}
                         type="button"
                       >
                         {`${edge.flowLabel} -> ${edge.targetEventName}`}
@@ -3532,38 +3527,37 @@ export function EventsWorkspace({
                 ) : null}
               </div>
             ) : null}
-            <div className="event-variables-panel" aria-label="Variaveis do projeto">
+            <div className="event-variables-panel" aria-label={ui("Variaveis do projeto")}>
               <div className="event-inspector-header">
                 <div>
-                  <h4>Variaveis</h4>
-                  <p>{variables.length} no projeto</p>
+                  <h4>{ui("Variaveis")}</h4>
+                  <p>{variables.length} {ui(" no projeto")}</p>
                 </div>
                 {onCreateVariable ? (
                   <div className="event-actions inspector-actions">
-                    <button type="button" onClick={() => onCreateVariable("variable")}>Nova variavel</button>
-                    <button type="button" onClick={() => onCreateVariable("variable", "text")}>Nova variavel textual</button>
-                    <button type="button" onClick={() => onCreateVariable("constant")}>Nova constante</button>
+                    <button type="button" onClick={() => onCreateVariable("variable")}>{ui("Nova variavel")}</button>
+                    <button type="button" onClick={() => onCreateVariable("variable", "text")}>{ui("Nova variavel textual")}</button>
+                    <button type="button" onClick={() => onCreateVariable("constant")}>{ui("Nova constante")}</button>
                   </div>
                 ) : null}
               </div>
               {variables.length === 0 ? (
-                <p className="muted">Nenhuma variavel ou constante cadastrada.</p>
+                <p className="muted">{ui("Nenhuma variavel ou constante cadastrada.")}</p>
               ) : (
                 <ul className="event-variables-list">
                   {variables.map((entry) => (
                     <li key={`${entry.kind}-${entry.name}`}>
                       <span>{entry.name}</span>
-                      <em>{entry.kind === "constant" ? "constante" : "variavel"}</em>
-                      {entry.valueType === "text" ? <small>texto · até {entry.maxLength ?? 16} caracteres</small> : <small>número</small>}
+                      <em>{entry.kind === "constant" ? ui("constante") : ui("variavel")}</em>
+                      {entry.valueType === "text" ? <small>{ui("texto · até ")}{entry.maxLength ?? 16} {ui(" caracteres")}</small> : <small>{ui("número")}</small>}
                       {onRemoveVariable ? (
                         <button
-                          aria-label={`Remover ${entry.kind === "constant" ? "constante" : "variavel"} ${entry.name}`}
+                          aria-label={ui("Remover {0} {1}", { 0: entry.kind === "constant" ? "constante" : "variavel", 1: entry.name })}
                           className="danger-button"
                           onClick={() => onRemoveVariable(entry.name, entry.kind)}
                           type="button"
                         >
-                          Remover
-                        </button>
+                          {ui("Remover")}</button>
                       ) : null}
                     </li>
                   ))}
@@ -3571,7 +3565,7 @@ export function EventsWorkspace({
               )}
             </div>
             {activeGraph.graphEdges.length === 0 ? (
-              <p className="muted">Nenhuma chamada entre eventos.</p>
+              <p className="muted">{ui("Nenhuma chamada entre eventos.")}</p>
             ) : (
               presentation.graphEdges.slice(0, 8).map((edge) => {
                 const targetOptions = eventGraphNodes.some((node) => node.eventName === edge.targetEventName)
@@ -3593,7 +3587,7 @@ export function EventsWorkspace({
                     <span>{edge.sourceEventName}</span>
                     <code>{edge.flowLabel}</code>
                     <select
-                      aria-label={`Destino de ${edge.sourceEventName} ${edge.commandVerb}`}
+                      aria-label={ui("Destino de {0} {1}", { 0: edge.sourceEventName, 1: edge.commandVerb })}
                       onChange={(inputEvent) => {
                         inputEvent.stopPropagation();
                         onRetargetEventGraphEdge({
@@ -3625,11 +3619,10 @@ export function EventsWorkspace({
                         });
                         setInspectorSelection({ kind: "event", eventID: edge.sourceEventID });
                       }}
-                      title={`Remover chamada ${edge.sourceEventName} -> ${edge.targetEventName}`}
+                      title={ui("Remover chamada {0} -> {1}", { 0: edge.sourceEventName, 1: edge.targetEventName })}
                       type="button"
                     >
-                      Remover
-                    </button>
+                      {ui("Remover")}</button>
                   </div>
                 );
               })

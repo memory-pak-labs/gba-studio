@@ -1,3 +1,4 @@
+import { uiText as ui, useStudioUiText } from "./studioUiText";
 import {
   ArrowDown,
   ArrowLeft,
@@ -68,16 +69,17 @@ function CollisionToolButton({
   setSelectedCollisionType: (collisionType: RoomCollisionType) => void;
   tool: CollisionTool;
 }): React.ReactElement {
+  const ui = useStudioUiText();
   const ToolIcon = tool.Icon;
   const isActive = selectedCollisionType === tool.type;
 
   return (
     <button
-      aria-label={`Tipo de colisao ${tool.label}`}
+      aria-label={ui("Tipo de colisao {0}", { 0: ui(tool.label) })}
       aria-pressed={isActive}
       className={["room-collision-floating-tool", tool.tone, isActive ? "active" : ""].filter(Boolean).join(" ")}
       onClick={() => setSelectedCollisionType(tool.type)}
-      title={tool.label}
+      title={ui(tool.label)}
       type="button"
     >
       <ToolIcon aria-hidden="true" size={18} strokeWidth={2.5} />
@@ -96,6 +98,7 @@ export function RoomCollisionFloatingToolbar({
   setCollisionHoverPreviewEnabled,
   setSelectedCollisionType
 }: RoomCollisionFloatingToolbarProps): React.ReactElement {
+  const ui = useStudioUiText();
   const activeLabel = roomCollisionTypeLabel(selectedCollisionType);
   const allowed = new Set<RoomCollisionType>(allowedCollisionTypes ?? [...basics, ...directional, ...special, ...ramps].map((tool) => tool.type));
 
@@ -105,11 +108,11 @@ export function RoomCollisionFloatingToolbar({
         "room-collision-floating-toolbar",
         layout === "docked" ? "is-docked" : ""
       ].filter(Boolean).join(" ")}
-      aria-label="Barra de colisao"
+      aria-label={ui("Barra de colisao")}
     >
       <div className={["room-collision-floating-active", selectedCollisionType].join(" ")}>
-        <span>{activeLabel}</span>
-        <strong>{selectedCellIndex === null ? "Sem celula" : `Celula ${selectedCellIndex + 1}`}</strong>
+        <span>{ui(activeLabel)}</span>
+        <strong>{selectedCellIndex === null ? ui("Sem celula") : ui("Celula {0}", { 0: selectedCellIndex + 1 })}</strong>
       </div>
 
       <div className="room-collision-floating-group">
@@ -156,21 +159,21 @@ export function RoomCollisionFloatingToolbar({
         ))}
       </div>
 
-      <label className="room-collision-floating-toggle" title="Preview no hover">
+      <label className="room-collision-floating-toggle" title={ui("Preview no hover")}>
         <input
           checked={collisionHoverPreviewEnabled}
           onChange={(event) => setCollisionHoverPreviewEnabled(event.currentTarget.checked)}
           type="checkbox"
         />
-        <span>Hover</span>
+        <span>{ui("Hover")}</span>
       </label>
 
       {layout === "floating" ? <div className="room-collision-floating-actions">
-        <button onClick={onSetBorderCollision} title="Aplicar borda solida" type="button">
-          <span>Borda</span>
+        <button onClick={onSetBorderCollision} title={ui("Aplicar borda solida")} type="button">
+          <span>{ui("Borda")}</span>
         </button>
-        <button onClick={onClearCollision} title="Limpar colisao" type="button">
-          <span>Limpar</span>
+        <button onClick={onClearCollision} title={ui("Limpar colisao")} type="button">
+          <span>{ui("Limpar")}</span>
         </button>
       </div> : null}
     </div>

@@ -58,46 +58,46 @@ describe("Ajustes operational scope", () => {
     const user = userEvent.setup();
     const view = (up: string) => <StudioI18nProvider><SettingsWorkspace presentation={deriveSettingsWorkspacePresentation({ settings: { controls: { up } } })} {...handlers} projectPath="/projects/demo.gba-project" /></StudioI18nProvider>;
     const { rerender } = render(view("w"));
-    await user.click(screen.getByRole("button", { name: "Controles seção de ajustes" }));
+    await user.click(screen.getByRole("button", { name: "Seção de ajustes: Controles" }));
     await user.type(screen.getByRole("searchbox", { name: "Buscar ajustes" }), "teclado");
     rerender(view("i"));
     expect(screen.getByRole("searchbox", { name: "Buscar ajustes" })).toHaveValue("teclado");
-    expect(screen.getByRole("button", { name: "Controles seção de ajustes" })).toHaveAttribute("aria-pressed", "true");
+    expect(screen.getByRole("button", { name: "Seção de ajustes: Controles" })).toHaveAttribute("aria-pressed", "true");
     expect(within(screen.getByRole("region", { name: "Editar Controles" })).queryByLabelText("Preset")).not.toBeInTheDocument();
     expect(screen.getByText("Só Play")).toBeInTheDocument();
   });
 
   it("keeps local translation preferences reachable without an open project", async () => {
     render(<StudioI18nProvider><SettingsWorkspace presentation={null} {...handlers} /></StudioI18nProvider>);
-    await userEvent.click(screen.getByRole("button", { name: "Tradução offline seção de ajustes" }));
+    await userEvent.click(screen.getByRole("button", { name: "Seção de ajustes: Tradução offline" }));
     expect(screen.getByRole("region", { name: "Pacotes de tradução offline" })).toBeInTheDocument();
     expect(screen.queryByRole("region", { name: "Editar Interface" })).not.toBeInTheDocument();
   });
 
   it("replaces the inactive plugin development block with the real catalog entry", async () => {
     render(<StudioI18nProvider><SettingsWorkspace presentation={deriveSettingsWorkspacePresentation({ settings: {} })} {...handlers} advancedTools={<div>Hot reload sem consumidor</div>} onOpenPluginCatalog={vi.fn()} /></StudioI18nProvider>);
-    await userEvent.click(screen.getByRole("button", { name: "Plugins seção de ajustes" }));
+    await userEvent.click(screen.getByRole("button", { name: "Seção de ajustes: Plugins" }));
     expect(screen.queryByText("Hot reload sem consumidor")).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Abrir catálogo de plugins" })).toBeDisabled();
   });
 
   it("keeps the chosen section when scrolling its content to the bottom", async () => {
     const { container } = render(<StudioI18nProvider><SettingsWorkspace presentation={deriveSettingsWorkspacePresentation({ settings: {} })} {...handlers} projectPath="/projects/demo.gba-project" onOpenPluginCatalog={vi.fn()} /></StudioI18nProvider>);
-    await userEvent.click(screen.getByRole("button", { name: "MCP local seção de ajustes" }));
+    await userEvent.click(screen.getByRole("button", { name: "Seção de ajustes: MCP local" }));
     const panel = container.querySelector<HTMLElement>(".settings-main-panel")!;
     Object.defineProperties(panel, {
       scrollHeight: { value: 2000 }, clientHeight: { value: 900 }, scrollTop: { value: 1100 }
     });
     fireEvent.scroll(panel);
-    expect(screen.getByRole("button", { name: "Plugins seção de ajustes" })).toHaveAttribute("aria-pressed", "false");
-    expect(screen.getByRole("button", { name: "MCP local seção de ajustes" })).toHaveAttribute("aria-pressed", "true");
+    expect(screen.getByRole("button", { name: "Seção de ajustes: Plugins" })).toHaveAttribute("aria-pressed", "false");
+    expect(screen.getByRole("button", { name: "Seção de ajustes: MCP local" })).toHaveAttribute("aria-pressed", "true");
     expect(screen.queryByRole("region", { name: "Editar Interface" })).not.toBeInTheDocument();
   });
 
   it("bases MCP budget information on the generated configuration", async () => {
     const registration = JSON.stringify({ mcpServers: { "gba-studio": { args: ["--mcp", "--project", "/projects/demo.gba-project"] } } });
     render(<StudioI18nProvider><SettingsWorkspace presentation={deriveSettingsWorkspacePresentation({ settings: {} })} {...handlers} projectPath="/projects/demo.gba-project" enginePackPath="GBAStudioEnginePack" getMcpServerRegistration={vi.fn().mockResolvedValue(registration)} getCodexMcpServerRegistration={vi.fn().mockResolvedValue("config")} /></StudioI18nProvider>);
-    await userEvent.click(screen.getByRole("button", { name: "MCP local seção de ajustes" }));
+    await userEvent.click(screen.getByRole("button", { name: "Seção de ajustes: MCP local" }));
     await screen.findByDisplayValue(registration);
     expect(screen.getByText("Requer Engine Pack")).toBeInTheDocument();
     expect(screen.queryByText("Disponível com Engine Pack")).not.toBeInTheDocument();

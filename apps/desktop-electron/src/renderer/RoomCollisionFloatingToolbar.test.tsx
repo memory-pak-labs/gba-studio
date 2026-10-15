@@ -18,9 +18,9 @@ describe("RoomCollisionFloatingToolbar", () => {
       setSelectedCollisionType={vi.fn()}
     />);
 
-    expect(screen.getByRole("button", { name: "Tipo de colisao Rampa subindo à direita" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Tipo de colisao Rampa subindo à esquerda" })).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "Tipo de colisao Agua" })).not.toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "Tipo de colisao Evento" })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Tipo de colisão Rampa subindo à direita" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Tipo de colisão Rampa subindo à esquerda" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Tipo de colisão Água" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Tipo de colisão Evento" })).not.toBeInTheDocument();
   });
 });

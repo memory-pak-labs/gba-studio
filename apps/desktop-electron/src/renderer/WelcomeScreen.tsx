@@ -1,3 +1,4 @@
+import { uiText as ui, useStudioUiText } from "./studioUiText";
 import React, { useEffect, useRef, useState } from "react";
 import type { RecentProjectEntry } from "../shared/ipc";
 import { projectTemplateDefinitions, type ProjectTemplateID } from "../shared/projectTemplates";
@@ -28,6 +29,7 @@ export function WelcomeScreen({
   onOpenProject,
   onOpenRecentProject
 }: WelcomeScreenProps): React.ReactElement {
+  const ui = useStudioUiText();
   const { t } = useStudioI18n();
   const defaultProjectName = t("welcome.defaultProjectName");
   const [projectName, setProjectName] = useState(defaultProjectName);
@@ -85,7 +87,7 @@ export function WelcomeScreen({
     <main className={`welcome-shell${window.gbaStudio.platform === "darwin" ? " native-macos-titlebar" : ""}`}>
       <StudioThemeToggle className="welcome-theme-toggle icon-button" />
       <aside className="welcome-sidebar">
-        <section className="welcome-brand" aria-label="GBA Studio">
+        <section className="welcome-brand" aria-label={ui("GBA Studio")}>
           <svg aria-hidden="true" className="welcome-logo-image" viewBox="0 0 1024 1024">
             <defs>
               <clipPath id="welcome-logo-silhouette">
@@ -94,7 +96,7 @@ export function WelcomeScreen({
             </defs>
             <image clipPath="url(#welcome-logo-silhouette)" height="1024" href={welcomeIconURL} width="1024" />
           </svg>
-          <h1>GBA Studio</h1>
+          <h1>{ui("GBA Studio")}</h1>
           <p>{t("welcome.ideTagline")}</p>
         </section>
 
@@ -146,7 +148,7 @@ export function WelcomeScreen({
         <button className="welcome-secondary" type="button" onClick={() => setCreditsOpen(true)}>{t("welcome.credits")}</button>
         <p className="welcome-status-bar" role="status" aria-live="polite">
           <span aria-hidden="true" className="welcome-status-bar-dot" />
-          {status}
+          {ui(status)}
         </p>
       </aside>
 

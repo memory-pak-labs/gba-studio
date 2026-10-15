@@ -105,7 +105,7 @@ describe("Exemplo template full-project smoke contract", () => {
     expect(source).not.toContain('assertWorkspace(cdp, "Dialogos"');
     expect(source).not.toContain('assertWorkspace(cdp, "Audio"');
     expect(source).toContain('text.includes("Informações do jogo")');
-    expect(source).toContain('clickButtonByAriaLabel(cdp, "Compilação seção de ajustes")');
+    expect(source).toContain('clickButtonByAriaLabel(cdp, "Seção de ajustes: Compilação")');
     expect(source).toContain('fillInputNearLabel(cdp, "Título"');
     expect(source).not.toContain('fillInputNearLabel(cdp, "Titulo"');
   });

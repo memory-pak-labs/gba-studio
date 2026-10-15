@@ -10,14 +10,14 @@ describe("WorkspaceInspectorRail", () => {
   it("renders a keyboard-reachable scroll owner for inspector content", () => {
     render(
       <WorkspaceInspectorRail
-        ariaLabel="Inspector de sprite"
+        ariaLabel="Inspetor de sprite"
         workspaceId="sprites-scroll-test"
       >
         <div>Conteúdo longo</div>
       </WorkspaceInspectorRail>
     );
 
-    const body = screen.getByLabelText("Inspector de sprite conteúdo rolável");
+    const body = screen.getByLabelText("Inspetor de sprite conteúdo rolável");
     expect(body).toHaveClass("workspace-inspector-rail-body");
     expect(body).toHaveAttribute("data-scroll-owner", "inspector");
     expect(body).toHaveAttribute("tabindex", "0");
@@ -26,14 +26,14 @@ describe("WorkspaceInspectorRail", () => {
   it("keeps the collapse action independent from the scroll owner", () => {
     render(
       <WorkspaceInspectorRail
-        ariaLabel="Inspector de sprite"
+        ariaLabel="Inspetor de sprite"
         workspaceId="sprites-scroll-toggle-test"
       >
         <div>Conteúdo longo</div>
       </WorkspaceInspectorRail>
     );
 
-    const rail = screen.getByLabelText("Inspector de sprite");
+    const rail = screen.getByLabelText("Inspetor de sprite");
     fireEvent.click(screen.getByRole("button", { name: "Recolher inspetor" }));
 
     expect(rail).toHaveClass("is-collapsed");

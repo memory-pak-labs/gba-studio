@@ -1,3 +1,4 @@
+import { uiText as ui, useStudioUiText } from "./studioUiText";
 import { useRef, useState, type ReactNode } from "react";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 
@@ -51,6 +52,7 @@ export function EditorSideStack({
   projectPane,
   workspaceId
 }: EditorSideStackProps): React.ReactElement {
+  const ui = useStudioUiText();
   const [collapsed, setCollapsed] = useState(() => readEditorSideStackCollapsed(workspaceId));
   const [splitRatio, setSplitRatio] = useState(() => readEditorSideStackSplit(workspaceId));
   const stackRef = useRef<HTMLElement | null>(null);
@@ -171,7 +173,7 @@ export function EditorSideStack({
 
   return (
     <aside
-      aria-label={ariaLabel}
+      aria-label={ui(ariaLabel)}
       className={[
         "editor-side-stack",
         collapsed ? "is-collapsed" : "",
@@ -183,7 +185,7 @@ export function EditorSideStack({
     >
       {horizontalResize ? (
         <div
-          aria-label="Largura do inspetor"
+          aria-label={ui("Largura do inspetor")}
           aria-orientation="vertical"
           aria-valuemax={horizontalResize.max ?? 760}
           aria-valuemin={horizontalResize.min ?? 320}
@@ -196,15 +198,15 @@ export function EditorSideStack({
           onPointerUp={endHorizontalResize}
           role="separator"
           tabIndex={0}
-          title="Ajustar largura do inspetor"
+          title={ui("Ajustar largura do inspetor")}
         />
       ) : null}
       <button
         aria-expanded={!collapsed}
-        aria-label={collapsed ? "Expandir painel lateral" : "Recolher painel lateral"}
+        aria-label={collapsed ? ui("Expandir painel lateral") : ui("Recolher painel lateral")}
         className="editor-side-stack-toggle"
         onClick={toggleCollapsed}
-        title={collapsed ? "Expandir painel lateral" : "Recolher painel lateral"}
+        title={collapsed ? ui("Expandir painel lateral") : ui("Recolher painel lateral")}
         type="button"
       >
         {collapsed ? (
@@ -216,7 +218,7 @@ export function EditorSideStack({
       <div className="editor-side-stack-body">
         {collapseInspectorPane ? null : (
           <section
-            aria-label="Inspector"
+            aria-label={ui("Inspector")}
             className="editor-side-stack-pane editor-side-stack-inspector rooms-inspector inspector-readable"
             style={{ flexGrow: hideProjectPane ? 1 : splitRatio }}
           >
@@ -236,10 +238,10 @@ export function EditorSideStack({
               onPointerMove={continueResize}
               onPointerUp={endResize}
               role="separator"
-              title="Ajustar altura do inspector"
+              title={ui("Ajustar altura do inspector")}
             />
             <section
-              aria-label="Navegador do projeto"
+              aria-label={ui("Navegador do projeto")}
               className="editor-side-stack-pane editor-side-stack-project editor-project-rail"
               style={{ flexGrow: navigatorRatio }}
             >
@@ -249,7 +251,7 @@ export function EditorSideStack({
         )}
         {collapseInspectorPane ? (
           <section
-            aria-label="Navegador do projeto"
+            aria-label={ui("Navegador do projeto")}
             className="editor-side-stack-pane editor-side-stack-project editor-project-rail"
             style={{ flexGrow: 1 }}
           >

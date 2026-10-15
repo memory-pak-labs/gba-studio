@@ -1,3 +1,4 @@
+import { uiText as ui, useStudioUiText } from "./studioUiText";
 import { X } from "lucide-react";
 import React, { createContext, useCallback, useContext, useEffect, useRef, useState } from "react";
 
@@ -49,6 +50,7 @@ function StudioDialogSurface({
   state: DialogState;
   onClose: () => void;
 }): React.ReactElement {
+  const ui = useStudioUiText();
   const [promptValue, setPromptValue] = useState(state.kind === "prompt" ? state.defaultValue : "");
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -117,16 +119,16 @@ function StudioDialogSurface({
         <header className="modal-card-header studio-dialog-header">
           <div>
             <h2 id="studio-dialog-title">{title}</h2>
-            <p>{state.message}</p>
+            <p>{ui(state.message)}</p>
           </div>
-          <StudioButton aria-label="Fechar" className="ghost-button" onClick={handleCancel} type="button" variant="ghost">
+          <StudioButton aria-label={ui("Fechar")} className="ghost-button" onClick={handleCancel} type="button" variant="ghost">
             <X aria-hidden="true" size={16} strokeWidth={2.2} />
           </StudioButton>
         </header>
 
         {state.kind === "prompt" ? (
           <label className="studio-field ui-field">
-            <span>{state.options.label ?? "Valor"}</span>
+            <span>{state.options.label ?? ui("Valor")}</span>
             <input
               ref={inputRef}
               placeholder={state.options.placeholder}
@@ -145,8 +147,8 @@ function StudioDialogSurface({
         <div className="studio-dialog-actions">
           <StudioButton onClick={handleCancel} type="button" variant="secondary">
             {state.kind === "confirm"
-              ? state.options.cancelLabel ?? "Cancelar"
-              : state.options.cancelLabel ?? "Cancelar"}
+              ? state.options.cancelLabel ?? ui("Cancelar")
+              : state.options.cancelLabel ?? ui("Cancelar")}
           </StudioButton>
           <StudioButton
             disabled={state.kind === "prompt" && !promptValue.trim()}
@@ -155,8 +157,8 @@ function StudioDialogSurface({
             variant={state.kind === "confirm" && state.options.variant === "danger" ? "danger" : "primary"}
           >
             {state.kind === "confirm"
-              ? state.options.confirmLabel ?? "Confirmar"
-              : state.options.confirmLabel ?? "OK"}
+              ? state.options.confirmLabel ?? ui("Confirmar")
+              : state.options.confirmLabel ?? ui("OK")}
           </StudioButton>
         </div>
       </section>
@@ -165,6 +167,7 @@ function StudioDialogSurface({
 }
 
 export function StudioDialogProvider({ children }: { children: React.ReactNode }): React.ReactElement {
+  const ui = useStudioUiText();
   const [dialogState, setDialogState] = useState<DialogState | null>(null);
   const queueRef = useRef<DialogState[]>([]);
 

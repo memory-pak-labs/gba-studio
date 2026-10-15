@@ -1,3 +1,4 @@
+import { uiText as ui, useStudioUiText } from "./studioUiText";
 import { ChevronDown, ChevronUp, GripHorizontal, X } from "lucide-react";
 import { useLayoutEffect, useRef, useState, type ReactNode } from "react";
 
@@ -7,6 +8,7 @@ export function FocusScenePreviewPanel({ preview, minimap, onClose }: {
   minimap: ReactNode;
   onClose(): void;
 }): React.ReactElement {
+  const ui = useStudioUiText();
   const panelRef = useRef<HTMLElement>(null);
   const drag = useRef<{ pointerID: number; x: number; y: number; left: number; top: number } | null>(null);
   const [position, setPosition] = useState<{ left: number; top: number } | null>(null);
@@ -28,10 +30,10 @@ export function FocusScenePreviewPanel({ preview, minimap, onClose }: {
     return () => observer?.disconnect();
   }, [collapsed, activeTab, Boolean(position)]);
 
-  return <aside aria-label="Prévia e minimapa da cena" className={`room-focus-preview-panel${collapsed ? " is-collapsed" : ""}`}
+  return <aside aria-label={ui("Prévia e minimapa da cena")} className={`room-focus-preview-panel${collapsed ? " is-collapsed" : ""}`}
     ref={panelRef} style={position ? { left: position.left, top: position.top, right: "auto", bottom: "auto" } : undefined}>
     <header>
-      <button aria-label="Mover painel de prévia" className="room-focus-preview-drag" type="button"
+      <button aria-label={ui("Mover painel de prévia")} className="room-focus-preview-drag" type="button"
         onKeyDown={event => {
           const direction = { ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, -1], ArrowDown: [0, 1] }[event.key];
           const panel = panelRef.current, host = panel?.parentElement;
@@ -68,8 +70,8 @@ export function FocusScenePreviewPanel({ preview, minimap, onClose }: {
           drag.current = null;
           if (event.currentTarget.hasPointerCapture(event.pointerId)) event.currentTarget.releasePointerCapture(event.pointerId);
         }} onPointerCancel={() => { drag.current = null; }}
-        title="Arraste ou use as setas para mover o painel"><GripHorizontal aria-hidden="true" size={14} /><span>{collapsed ? "Prévia GBA" : null}</span></button>
-      {!collapsed ? <div className="room-focus-preview-tabs" role="tablist" aria-label="Conteúdo do painel de prévia"
+        title={ui("Arraste ou use as setas para mover o painel")}><GripHorizontal aria-hidden="true" size={14} /><span>{collapsed ? ui("Prévia GBA") : null}</span></button>
+      {!collapsed ? <div className="room-focus-preview-tabs" role="tablist" aria-label={ui("Conteúdo do painel de prévia")}
         onKeyDown={event => {
           if (!minimap || !["ArrowLeft", "ArrowRight", "Home", "End"].includes(event.key)) return;
           event.preventDefault(); event.stopPropagation();
@@ -77,18 +79,18 @@ export function FocusScenePreviewPanel({ preview, minimap, onClose }: {
           setTab(next);
           event.currentTarget.querySelectorAll<HTMLButtonElement>('button')[next === "gba" ? 0 : 1]?.focus();
         }}>
-        <button role="tab" aria-controls="focus-scene-preview-content" tabIndex={activeTab === "gba" ? 0 : -1} aria-selected={activeTab === "gba"} onClick={() => setTab("gba")} type="button">Prévia GBA</button>
-        {minimap ? <button role="tab" aria-controls="focus-scene-preview-content" tabIndex={activeTab === "map" ? 0 : -1} aria-selected={activeTab === "map"} onClick={() => setTab("map")} type="button">Minimapa</button> : null}
+        <button role="tab" aria-controls="focus-scene-preview-content" tabIndex={activeTab === "gba" ? 0 : -1} aria-selected={activeTab === "gba"} onClick={() => setTab("gba")} type="button">{ui("Prévia GBA")}</button>
+        {minimap ? <button role="tab" aria-controls="focus-scene-preview-content" tabIndex={activeTab === "map" ? 0 : -1} aria-selected={activeTab === "map"} onClick={() => setTab("map")} type="button">{ui("Minimapa")}</button> : null}
       </div> : null}
-      <button aria-label={collapsed ? "Expandir painel de prévia" : "Recolher painel de prévia"} aria-expanded={!collapsed}
+      <button aria-label={collapsed ? ui("Expandir painel de prévia") : ui("Recolher painel de prévia")} aria-expanded={!collapsed}
         onClick={() => setCollapsed(!collapsed)} type="button">{collapsed ? <ChevronUp size={14} /> : <ChevronDown size={14} />}</button>
-      <button aria-label="Fechar painel de prévia" onClick={onClose} type="button"><X size={14} /></button>
+      <button aria-label={ui("Fechar painel de prévia")} onClick={onClose} type="button"><X size={14} /></button>
     </header>
     {!collapsed ? <>
-      <div id="focus-scene-preview-content" role="tabpanel" aria-label={activeTab === "gba" ? "Prévia GBA em tamanho real" : "Minimapa"}>
+      <div id="focus-scene-preview-content" role="tabpanel" aria-label={activeTab === "gba" ? ui("Prévia GBA em tamanho real") : ui("Minimapa")}>
         {activeTab === "gba" ? preview : minimap}
       </div>
-      {activeTab === "gba" ? <small>240 × 160 px · 1× · prévia do editor</small> : null}
+      {activeTab === "gba" ? <small>{ui("240 × 160 px · 1× · prévia do editor")}</small> : null}
     </> : null}
   </aside>;
 }

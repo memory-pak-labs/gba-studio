@@ -1,3 +1,4 @@
+import { uiText as ui, useStudioUiText } from "./studioUiText";
 import { useEffect, useMemo, useState } from "react";
 import { AlertTriangle, ArrowLeft, Command, Search, X } from "lucide-react";
 
@@ -23,6 +24,7 @@ function normalizedSearch(value: string, locale: string): string {
 }
 
 export function StudioCommandPalette({ actions, isOpen, onClose }: StudioCommandPaletteProps): React.ReactElement | null {
+  const ui = useStudioUiText();
   const { locale, t } = useStudioI18n();
   const [query, setQuery] = useState("");
   useEffect(() => {
@@ -31,13 +33,14 @@ export function StudioCommandPalette({ actions, isOpen, onClose }: StudioCommand
 
   const visibleActions = useMemo(() => {
     const normalizedQuery = normalizedSearch(query, locale);
-    if (!normalizedQuery) return actions;
-    return actions.filter((action) => normalizedSearch([
+    const localizedActions = actions.map(action => ({ ...action, label: ui(action.label), detail: ui(action.detail), keywords: action.keywords?.map(keyword => ui(keyword)) }));
+    if (!normalizedQuery) return localizedActions;
+    return localizedActions.filter((action) => normalizedSearch([
       action.label,
       action.detail ?? "",
       ...(action.keywords ?? [])
     ].join(" "), locale).includes(normalizedQuery));
-  }, [actions, locale, query]);
+  }, [actions, locale, query, ui]);
 
   if (!isOpen) return null;
 
@@ -70,9 +73,9 @@ export function StudioCommandPalette({ actions, isOpen, onClose }: StudioCommand
         </label>
         <div className="studio-command-results">
           {visibleActions.map((action) => (
-            <button aria-label={action.label} key={action.id} onClick={() => void execute(action)} type="button">
-              <span>{action.label}</span>
-              {action.detail ? <small>{action.detail}</small> : null}
+            <button aria-label={ui(action.label)} key={action.id} onClick={() => void execute(action)} type="button">
+              <span>{ui(action.label)}</span>
+              {action.detail ? <small>{ui(action.detail)}</small> : null}
             </button>
           ))}
           {visibleActions.length === 0 ? <p>{t("shell.noCommandFound")}</p> : null}
@@ -92,6 +95,7 @@ interface ProjectProblemsDrawerProps {
 const problemWorkspaceOrder: ProjectProblemWorkspace[] = ["Arquivos", "Editor", "Sprites", "Dialogos", "Audio", "Exportar", "Ajustes"];
 
 export function ProjectProblemsDrawer({ isOpen, onClose, onOpenProblem, problems }: ProjectProblemsDrawerProps): React.ReactElement | null {
+  const ui = useStudioUiText();
   const { t } = useStudioI18n();
   if (!isOpen) return null;
   const errorCount = problems.filter((problem) => problem.severity === "error").length;
@@ -121,7 +125,7 @@ export function ProjectProblemsDrawer({ isOpen, onClose, onOpenProblem, problems
                   type="button"
                 >
                   <AlertTriangle aria-hidden="true" size={15} />
-                  <span>{problem.message}</span>
+                  <span>{ui(problem.message)}</span>
                 </button>
               ))}
             </section>
@@ -140,6 +144,7 @@ interface WorkspaceNavigationTrailProps {
 }
 
 export function WorkspaceNavigationTrail({ currentLabel, onReturn, sourceLabel }: WorkspaceNavigationTrailProps): React.ReactElement {
+  const ui = useStudioUiText();
   const { t } = useStudioI18n();
 
   return (

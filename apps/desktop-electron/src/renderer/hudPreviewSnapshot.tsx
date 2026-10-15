@@ -1,4 +1,5 @@
 import { useEffect, useRef } from "react";
+import { useStudioUiText } from "./studioUiText";
 import type { HudComponent, HudPresetPresentation } from "../shared/hudPresets";
 import { dialogueFontSourceRect, renderSkin } from "./dialoguePreviewSnapshot";
 import { dialogueFontRows, normalizeDialogueText } from "../shared/dialogueFont";
@@ -173,6 +174,7 @@ export function HudPreviewSnapshot({
   className,
   transparentBackground = false
 }: HudPreviewSnapshotProps): React.ReactElement {
+  const ui = useStudioUiText();
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
   useEffect(() => {
@@ -242,7 +244,7 @@ export function HudPreviewSnapshot({
 
   return (
     <canvas
-      aria-label="Preview renderizado da HUD"
+      aria-label={ui("Preview renderizado da HUD")}
       className={className}
       data-hud-preview-renderer="native-contract"
       height={HUD_VIEWPORT_HEIGHT}

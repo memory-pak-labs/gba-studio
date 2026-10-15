@@ -483,6 +483,7 @@ export interface DownloadTranslationPackResult {
 }
 
 export interface GBAStudioDesktopAPI {
+  setAppLocale?(locale: string): Promise<void>;
   platform: NodeJS.Platform;
   onAppCommand(listener: (command: AppCommand) => void): () => void;
   onExternalProjectOpen(listener: (result: OpenProjectResult) => void): () => void;
@@ -528,6 +529,7 @@ export interface GBAStudioDesktopAPI {
 }
 
 export const ipcChannels = {
+  setAppLocale: "app:set-locale",
   appCommand: "app:command",
   confirmWindowClose: "window:confirm-close",
   setWindowDocumentState: "window:set-document-state",

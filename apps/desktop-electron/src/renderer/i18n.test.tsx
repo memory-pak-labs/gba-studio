@@ -4,6 +4,7 @@ import { afterEach, describe, expect, it } from "vitest";
 
 import {
   defaultLocale,
+  explicitStudioTranslationKeys,
   getStudioTranslation,
   isSupportedLocale,
   localeOptions,
@@ -35,6 +36,16 @@ afterEach(() => {
 });
 
 describe("renderer i18n", () => {
+  it("covers the three primary catalogs explicitly without relying on fallback", () => {
+    const source = [...studioTranslationKeys].sort();
+    for (const locale of ["pt-BR", "en-US", "es-ES"] as const) {
+      expect(explicitStudioTranslationKeys(locale).sort(), locale).toEqual(source);
+      for (const key of studioTranslationKeys) {
+        expect(placeholders(getStudioTranslation(locale, key)), `${locale}:${key}`)
+          .toEqual(placeholders(getStudioTranslation("pt-BR", key)));
+      }
+    }
+  });
   it("matches the complete site language catalog", () => {
     expect(localeOptions.map((option) => option.locale)).toEqual([
       "pt-BR",

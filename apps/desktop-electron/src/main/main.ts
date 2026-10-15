@@ -1,3 +1,5 @@
+import type { OpenDialogOptions, SaveDialogOptions } from "electron";
+import { isAppLocale, localizeNativeDialog } from "./nativeUiLocale.js";
 import { createSceneAnalysisService, JevDecisionProvider } from "./sceneAnalysisService.js";
 import { randomUUID } from "node:crypto";
 import { writeFile } from "node:fs/promises";
@@ -81,6 +83,19 @@ import type { WindowDocumentState } from "../shared/windowDocumentState.js";
 
 configureSmokeDevToolsPort();
 registerTranslationModelProtocolScheme();
+
+let appLocale = "pt-BR";
+function showLocalizedOpenDialog(options: OpenDialogOptions) {
+  return dialog.showOpenDialog(localizeNativeDialog({ buttonLabel: "Abrir", ...options }, appLocale));
+}
+function showLocalizedSaveDialog(options: SaveDialogOptions) {
+  return dialog.showSaveDialog(localizeNativeDialog({ buttonLabel: "Salvar", ...options }, appLocale));
+}
+ipcMain.handle(ipcChannels.setAppLocale, (_event, locale: unknown) => {
+  if (!isAppLocale(locale)) throw new Error("Unsupported application locale.");
+  appLocale = locale;
+  installAppMenu(locale);
+});
 
 const mcpServerMode = process.argv.includes("--mcp");
 
@@ -230,7 +245,7 @@ ipcMain.handle(ipcChannels.openProjectAtPath, async (_event, projectPath: string
 });
 
 ipcMain.handle(ipcChannels.openProject, async () => {
-  const result = await dialog.showOpenDialog(projectOpenDialogOptions());
+  const result = await showLocalizedOpenDialog(projectOpenDialogOptions());
 
   if (result.canceled || result.filePaths.length === 0) {
     return { canceled: true };
@@ -246,7 +261,7 @@ ipcMain.handle(ipcChannels.saveProject, async (_event, request: SaveProjectReque
     request.path ??
     resolveSmokeProjectSavePath() ??
     (
-      await dialog.showSaveDialog(projectSaveDialogOptions(request.project.summary.name))
+      await showLocalizedSaveDialog(projectSaveDialogOptions(request.project.summary.name))
     ).filePath;
 
   if (!selectedDestination) {
@@ -284,7 +299,7 @@ ipcMain.handle(ipcChannels.exportDialogue, async (_event, request: ExportDialogu
   }
 
   const destination = (
-    await dialog.showSaveDialog({
+    await showLocalizedSaveDialog({
       title: "Exportar dialogo",
       defaultPath: prepared.fileName,
       filters: [{ name: "GBA Studio Dialogue", extensions: ["json"] }]
@@ -314,7 +329,7 @@ ipcMain.handle(ipcChannels.exportAudio, async (_event, request: ExportAudioReque
   }
 
   const destination = (
-    await dialog.showSaveDialog({
+    await showLocalizedSaveDialog({
       title: "Exportar audio",
       defaultPath: prepared.fileName,
       filters: [{ name: "GBA Studio Audio", extensions: ["json"] }]
@@ -344,7 +359,7 @@ ipcMain.handle(ipcChannels.exportEvent, async (_event, request: ExportEventReque
   }
 
   const destination = (
-    await dialog.showSaveDialog({
+    await showLocalizedSaveDialog({
       title: "Exportar evento",
       defaultPath: prepared.fileName,
       filters: [{ name: "GBA Studio Event", extensions: ["json"] }]
@@ -454,6 +469,7 @@ ipcMain.handle(ipcChannels.launchRomInEmulator, (_event, request: LaunchRomInEmu
 ipcMain.handle(ipcChannels.openRomPlayerWindow, async (event, request: OpenRomPlayerWindowRequest) => {
   const parent = BrowserWindow.fromWebContents(event.sender);
   return openRomPlayerWindow({
+    locale: appLocale,
     romPath: request.romPath,
     title: request.title,
     replay: request.replay,
@@ -477,7 +493,7 @@ ipcMain.handle(ipcChannels.selectPath, async (_event, request: SelectPathRequest
       ? ["openFile", "openDirectory", "createDirectory"]
       : ["openFile"];
 
-  const result = await dialog.showOpenDialog({
+  const result = await showLocalizedOpenDialog({
     title: request.title,
     defaultPath: request.defaultPath,
     properties: properties as Array<"openDirectory" | "openFile" | "createDirectory">,
@@ -560,7 +576,7 @@ ipcMain.handle(ipcChannels.importAssets, async (_event, request: ImportAssetsReq
   const animationScope = request.scope === "animation";
   const tilesetScope = request.scope === "tileset";
   const spriteScope = request.scope === "sprite";
-  const result = await dialog.showOpenDialog({
+  const result = await showLocalizedOpenDialog({
     title: animationScope ? "Importar animação GIF" : audioScope ? "Importar audio MOD/WAV" : tilesetScope ? "Importar tileset PNG" : spriteScope ? "Importar sprite PNG" : "Importar assets",
     properties: request.replaceRelativePath ? ["openFile"] : ["openFile", "multiSelections"],
     filters: animationScope
@@ -627,7 +643,7 @@ ipcMain.handle(ipcChannels.importTiledMap, async (_event, request: ImportTiledMa
     return { canceled: false, error: "Salve o projeto antes de importar mapa Tiled." };
   }
 
-  const result = await dialog.showOpenDialog({
+  const result = await showLocalizedOpenDialog({
     title: "Importar mapa Tiled",
     properties: ["openFile"],
     filters: [
@@ -789,7 +805,7 @@ ipcMain.handle(ipcChannels.exportEngineProject, async (_event, request: ExportEn
     ? { canceled: false, filePaths: [smokeExportRoot] }
     : configuredExportRoot
       ? { canceled: false, filePaths: [configuredExportRoot] }
-    : await dialog.showOpenDialog({
+    : await showLocalizedOpenDialog({
         title: "Escolher pasta para exportar Engine Pack",
         properties: ["openDirectory", "createDirectory"]
       });
@@ -834,7 +850,7 @@ ipcMain.handle(ipcChannels.exportWebProject, async (_event, request: ExportWebPr
   const smokeExportRoot = resolveSmokeWebExportRoot();
   const result = smokeExportRoot
     ? { canceled: false, filePaths: [smokeExportRoot] }
-    : await dialog.showOpenDialog({
+    : await showLocalizedOpenDialog({
         title: "Escolher pasta para exportar Web / itch.io",
         properties: ["openDirectory", "createDirectory"]
       });

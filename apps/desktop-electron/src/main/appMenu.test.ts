@@ -20,8 +20,8 @@ describe("app menu template", () => {
       "Abrir recentes",
       "Salvar",
       "Salvar como...",
-      "Export Engine",
-      "Play Window",
+      "Exportar Engine Pack",
+      "Executar ROM",
       "Exportar ROM .gba",
       "Sair"
     ]);
@@ -30,12 +30,12 @@ describe("app menu template", () => {
     expect(submenu.find((item) => item.label === "Abrir projeto...")?.accelerator).toBe("CmdOrCtrl+O");
     expect(submenu.find((item) => item.label === "Salvar")?.accelerator).toBe("CmdOrCtrl+S");
     expect(submenu.find((item) => item.label === "Salvar como...")?.accelerator).toBe("Shift+CmdOrCtrl+S");
-    expect(submenu.find((item) => item.label === "Play Window")?.accelerator).toBe("CmdOrCtrl+B");
+    expect(submenu.find((item) => item.label === "Executar ROM")?.accelerator).toBe("CmdOrCtrl+B");
     expect(submenu.find((item) => item.label === "Exportar ROM .gba")?.accelerator).toBe("Shift+CmdOrCtrl+B");
     expect(submenu.find((item) => item.label === "Preview rapido")).toBeUndefined();
 
-    submenu.find((item) => item.label === "Export Engine")?.click?.();
-    submenu.find((item) => item.label === "Play Window")?.click?.();
+    submenu.find((item) => item.label === "Exportar Engine Pack")?.click?.();
+    submenu.find((item) => item.label === "Executar ROM")?.click?.();
     submenu.find((item) => item.label === "Exportar ROM .gba")?.click?.();
 
     expect(sendCommand).toHaveBeenCalledWith("engine:export");

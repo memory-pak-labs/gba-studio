@@ -23,6 +23,7 @@ export interface ResolveWebPlayerRootOptions {
 }
 
 export interface RomPlayerServerOptions {
+  locale?: string;
   romPath: string;
   title: string;
   webPlayerRoot: string;
@@ -36,6 +37,7 @@ export interface RomPlayerServer {
 }
 
 export interface OpenRomPlayerWindowRequest {
+  locale?: string;
   romPath: string;
   title?: string;
   replay?: InputReplay;
@@ -136,13 +138,14 @@ function safePlayerAssetPath(webPlayerRoot: string, requestPath: string): string
     : null;
 }
 
-function runtimePlayerPath(options: Pick<RomPlayerServerOptions, "romPath" | "title" | "inputReplay" | "keyboardBindings">): string {
+function runtimePlayerPath(options: Pick<RomPlayerServerOptions, "romPath" | "title" | "inputReplay" | "keyboardBindings" | "locale">): string {
   const query = new URLSearchParams({
     rom: `../roms/${path.basename(options.romPath)}`,
     title: options.title
   });
   if (options.inputReplay) query.set("replay", "1");
   if (options.keyboardBindings) query.set("keyboard", "1");
+  if (options.locale) query.set("locale", options.locale);
   return `/player/runtime.html?${query.toString()}`;
 }
 
@@ -433,6 +436,7 @@ export async function openRomPlayerWindow(options: OpenRomPlayerWindowOptions): 
       return { ok: false, error: "ROM invalida para abrir no Play Window." };
     }
     const server = await createRomPlayerServer({
+      locale: options.locale,
       romPath,
       title,
       webPlayerRoot,
