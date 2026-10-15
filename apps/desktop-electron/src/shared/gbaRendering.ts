@@ -9,6 +9,7 @@ import {
 import {
   readSceneTileLayersFromRoom,
   sceneTileLayerEmptyTile,
+  type SceneTileLayer,
   type SceneTileLayerMapping
 } from "./sceneTileLayers.js";
 
@@ -297,13 +298,11 @@ export function gbaTopdownTilePointToPixels(point: { x: number; y: number }): { 
 }
 
 function layerAssetNameForCell(
-  room: Record<string, unknown>,
+  layer: SceneTileLayer | undefined,
   mapping: SceneTileLayerMapping,
   cellIndex: number,
   fallbackAssetName: string | null
 ): string | null {
-  const layers = readSceneTileLayersFromRoom(room);
-  const layer = layers.find((candidate) => candidate.mapping === mapping);
   const perCellAsset = layer?.tileSourceAssetNames[cellIndex]?.trim();
   if (perCellAsset) return perCellAsset;
   if (mapping === "BG2") return fallbackAssetName;
@@ -375,7 +374,7 @@ export function resolveGbaRoomBackgroundLayer(
       ? width * height
       : tileCells.filter((value) => value > 0).length;
   const primaryAssetName = paintedIndices
-    .map((index) => layerAssetNameForCell(room, mapping, index, fallbackAssetName))
+    .map((index) => layerAssetNameForCell(authoredLayer, mapping, index, fallbackAssetName))
     .find((assetName): assetName is string => Boolean(assetName))
     ?? (mapping === "BG2" ? fallbackAssetName : null);
   const asset = assetByName(data, primaryAssetName);
