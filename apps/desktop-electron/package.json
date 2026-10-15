@@ -1,6 +1,6 @@
 {
   "name": "@gbastudio/desktop-electron",
-  "version": "0.1.0-beta.3",
+  "version": "0.1.0-beta.4",
   "private": true,
   "description": "Visual editor and native engine workflow for Game Boy Advance games.",
   "author": "GBA Studio",
@@ -167,7 +167,7 @@
       "artifactName": "GBA-Studio-${version}-macOS-${arch}.${ext}",
       "signIgnore": ["\\.(?:pyc|pyo|a|o|whl|lz|gz|zip|asar|png|icns|ico|wasm|pak|dat|bin)$"],
       "bundleShortVersion": "0.1.0",
-      "bundleVersion": "3",
+      "bundleVersion": "4",
       "category": "public.app-category.developer-tools",
       "icon": "build/icon.icns",
       "hardenedRuntime": true,

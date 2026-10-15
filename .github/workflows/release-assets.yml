@@ -112,7 +112,7 @@ jobs:
           for file in manifest['files']:
               name = file['name']
               assert Path(name).name == name and name in checksums
-              assert name.endswith(('-macOS-arm64.dmg', '-macOS-arm64.zip'))
+              assert name.endswith(('-macOS-arm64.dmg', '-macOS-arm64.zip', '-macOS-universal.dmg', '-macOS-universal.zip'))
               assert file['sha256'] == checksums[name]
               path = stage / name
               with path.open('wb') as output:
