@@ -478,6 +478,7 @@ describe("campanha canônica O Último Farol", () => {
       "call_event aplicar_perfil_jogador",
       "if_variable z_feature_quest_state 0",
       "set_variable z_feature_quest_state 1",
+      "set_variable porto_player_health 3",
       "add_item currency_gold 3",
       "set_variable z_feature_shop_stock 0",
       "condition_end"
@@ -645,14 +646,14 @@ describe("campanha canônica O Último Farol", () => {
 
   it("usa o sprite aprovado de Porto Lumen para o player nos dois perfis", () => {
     const project = campaignProject();
-    const approvedPlayer = project.assets.find((asset) => asset.name === "player-pilot-32x32.png");
+    const approvedPlayer = project.assets.find((asset) => asset.name === "porto-nara-animations48.png");
     const playerAnimations = project.animations.filter((animation) => (
-      animation.spriteSheet === "player-pilot-32x32.png"
+      animation.spriteSheet === "porto-nara-animations48.png"
     ));
 
     expect(approvedPlayer?.metadata).toMatchObject({
       frameWidth: 32,
-      frameHeight: 32,
+      frameHeight: 48,
       reviewStatus: "approved"
     });
     expect(playerAnimations).toHaveLength(8);
@@ -661,7 +662,7 @@ describe("campanha canônica O Último Farol", () => {
       "call_event aplicar_perfil_jogador_base"
     ]);
     expect(commands(project, "aplicar_perfil_jogador_base")).toEqual([
-      "change_player_sprite player-pilot-32x32.png",
+      "change_player_sprite porto-nara-animations48.png",
       "set_actor_animation Player idle_down",
     ]);
 
@@ -671,7 +672,7 @@ describe("campanha canônica O Último Farol", () => {
     runtime = { ...bootPreviewRuntimeAtRoom(project, "porto_lumen"), variables: runtime.variables };
     runtime = runPreviewRuntimeEvent(runtime, "aplicar_perfil_jogador");
     expect(runtime.player).toMatchObject({
-      spriteSheet: "player-pilot-32x32.png",
+      spriteSheet: "porto-nara-animations48.png",
       animationName: "idle_down"
     });
     expect(runtime.variables.var_character_gender).toBe(1);
@@ -681,7 +682,7 @@ describe("campanha canônica O Último Farol", () => {
     runtime = { ...bootPreviewRuntimeAtRoom(project, "porto_lumen"), variables: runtime.variables };
     runtime = runPreviewRuntimeEvent(runtime, "aplicar_perfil_jogador");
     expect(runtime.player).toMatchObject({
-      spriteSheet: "player-pilot-32x32.png",
+      spriteSheet: "porto-nara-animations48.png",
       animationName: "idle_down"
     });
     expect(runtime.variables.var_character_gender).toBe(0);
@@ -722,7 +723,8 @@ describe("campanha canônica O Último Farol", () => {
       "var_audio_enabled",
       "var_audio_initialized",
       "var_rtc_hour",
-      "var_rtc_minute"
+      "var_rtc_minute",
+      "porto_player_health"
     ]));
     expect(VERTICE_PROGRESS_KEYS).toHaveLength(15);
   });

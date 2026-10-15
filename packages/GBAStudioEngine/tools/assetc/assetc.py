@@ -15005,6 +15005,20 @@ def hud_layouts_from_json(value, description):
             normalized["kind"] = kind
             normalized["visible"] = visible
             binding = component.get("value_binding")
+            project_binding = "value_variable" in component or "inventory_item" in component
+            if "text_advance" in component:
+                if component["text_advance"] not in (6, 8) or isinstance(component["text_advance"], bool) or kind != "text":
+                    raise SystemExit(f"{component_description}.text_advance precisa ser 6 ou 8 em um texto")
+                normalized["text_advance"] = component["text_advance"]
+            if "foreground_image" in component:
+                if not isinstance(component["foreground_image"], bool) or kind != "bar":
+                    raise SystemExit(f"{component_description}.foreground_image precisa ser booleano em uma barra")
+                normalized["foreground_image"] = component["foreground_image"]
+            if sum(key in component for key in ("value_variable", "inventory_item", "value_binding")) > 1:
+                raise SystemExit(f"{component_description}: selecione uma unica fonte de valor")
+            for key, limit in (("value_variable", 63), ("inventory_item", 15), ("value_maximum", 0xFFFFFFFF)):
+                if key in component:
+                    normalized[key] = require_int(component[key], f"{component_description}.{key}", 1 if key == "value_maximum" else 0, limit)
             bindings = ("p1-health","p2-health","round-time","p1-rounds","p2-rounds","score","lives")
             if binding is not None:
                 if binding not in bindings: raise SystemExit(f"{component_description}.value_binding invalido")
@@ -15015,7 +15029,7 @@ def hud_layouts_from_json(value, description):
             normalized["state_assets"] = states
             if "gauge" in component:
                 gauge=component["gauge"]
-                if kind!="bar" or binding is None or not isinstance(gauge,dict): raise SystemExit(f"{component_description}.gauge invalido")
+                if kind!="bar" or (binding is None and not project_binding) or not isinstance(gauge,dict): raise SystemExit(f"{component_description}.gauge invalido")
                 if not isinstance(gauge.get("empty_asset"),str) or not gauge["empty_asset"]: raise SystemExit(f"{component_description}.gauge.empty_asset invalido")
                 for key in ("x","y","width","height"):
                     if isinstance(gauge.get(key),bool) or not isinstance(gauge.get(key),int) or gauge[key] < (1 if key in ("width","height") else 0):
@@ -15337,7 +15351,7 @@ def emit_shared_dialogue_ui_assets_header(box_skin, hud_skin, selector, font, di
                     f"{cpp_string_literal(component['label'])}, {cpp_string_literal(component['text'])}, "
                     f"{cpp_string_literal(component['asset'])}, {component['x']}, {component['y']}, "
                     f"{component['width']}, {component['height']}, {component['z_index']}, "
-                    f"{'true' if component['visible'] else 'false'}, {metasprite_expression}, {behavior_expressions[component_index]}, {binding}, {gauge_expression}, {state_expression} }},"
+                    f"{'true' if component['visible'] else 'false'}, {metasprite_expression}, {behavior_expressions[component_index]}, {binding}, {gauge_expression}, {state_expression}, {component.get('value_variable', -1)}, {component.get('inventory_item', -1)}, {component.get('value_maximum', 100)}, {component.get('text_advance', 8)}, {'true' if component.get('foreground_image') else 'false'} }},"
                 )
             output.append("};")
         else:

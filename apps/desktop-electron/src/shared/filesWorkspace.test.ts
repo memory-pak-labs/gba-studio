@@ -399,6 +399,7 @@ describe("Files workspace presentation", () => {
         { id: "selector", name: "dialogue-selector.png", kind: "UI" },
         { id: "font", name: "dialogue-font.png", kind: "FONT" },
         { id: "icon", name: "hud-icon.png", kind: "UI" },
+        { id: "empty", name: "hud-empty.png", kind: "UI" },
         { id: "unused", name: "unused.png", kind: "UI" }
       ],
       settings: {
@@ -408,7 +409,7 @@ describe("Files workspace presentation", () => {
           backgroundImage: "dialogue-box.png",
           selectorImage: "dialogue-selector.png",
           font: "dialogue-font.png",
-          components: [{ id: "portrait-frame", label: "Moldura", asset: "hud-icon.png" }]
+          components: [{ id: "portrait-frame", label: "Moldura", asset: "hud-icon.png", gauge: { emptyAsset: "hud-empty.png" } }]
         }]
       }
     });
@@ -418,6 +419,7 @@ describe("Files workspace presentation", () => {
       ["dialogue-selector.png", true, "hud-preset-selector"],
       ["dialogue-font.png", true, "hud-preset-font"],
       ["hud-icon.png", true, "hud-preset-component"],
+      ["hud-empty.png", true, "hud-preset-component"],
       ["unused.png", false, undefined]
     ]);
   });

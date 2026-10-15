@@ -16,6 +16,8 @@ import {
   auditExemploSessionSoak,
   auditExemploInterfaceScenePlaytest,
   auditExemploVisualQualityGate,
+  resolveTopdownActorFramebufferTarget,
+  resolveTopdownActorFramebufferTargets,
   auditIntegerFramebufferDisplay,
   consolidateExemploScenePlaytestRuns,
   editorProjectReadyForScenePlaytest,
@@ -126,6 +128,52 @@ function healthyInterfaceResult(scene, index = 0) {
     }
   };
 }
+
+describe("GBA BG and OBJ palette capacity", () => {
+  it("anchors the authored Porto actors to the following camera and their exported multipart offsets", () => {
+    const parts = [{x:-8,y:-40,width:32,height:32},{x:-8,y:-8,width:32,height:16}];
+    const entity = {position:{x:704,y:400},size:{x:16,y:16},animations:[{frame_metasprites:[{parts}]}]};
+    const exported = {topdown_project:{player:entity,camera:{follow_player:true},rooms:[{name:"porto_lumen",width_tiles:126,height_tiles:86,npcs:[{...entity,name:"Mecânica",position:{x:752,y:376}}]}]}};
+    const room = {name:"porto_lumen",playerActorName:"Nara"};
+    const state = {player:{x:704,y:400}};
+    expect(resolveTopdownActorFramebufferTarget(room,{name:"Nara"},state,exported)).toEqual({x:104,y:32});
+    expect(resolveTopdownActorFramebufferTarget(room,{name:"Mecânica"},state,exported)).toEqual({x:152,y:8});
+    expect(resolveTopdownActorFramebufferTarget(room,{name:"Nara"},{player:{x:0,y:0}},exported)).toEqual({x:-8,y:-40});
+  });
+  it("uses the current native position of a moving first NPC rather than its spawn", () => {
+    const parts = [{x:-8,y:-40,width:32,height:32},{x:-8,y:-8,width:32,height:16}];
+    const player = {size:{x:16,y:16}};
+    const npc = {name:"Mecânica",position:{x:752,y:376},movement:{kind:"wander_box"},animations:[{frame_metasprites:[{parts}]}]};
+    const exported = {topdown_project:{player,camera:{follow_player:true},rooms:[{name:"porto_lumen",width_tiles:126,height_tiles:86,npcs:[npc]}]}};
+    const state = {player:{x:704,y:400},firstActor:{x:784,y:392}};
+    expect(resolveTopdownActorFramebufferTarget({name:"porto_lumen",playerActorName:"Nara"},{name:"Mecânica"},state,exported)).toEqual({x:184,y:24});
+  });
+  it("admits only current or immediately previous native positions in the same room", () => {
+    const parts=[{x:-8,y:-40,width:32,height:32}];
+    const npc={name:"Mecânica",movement:{kind:"wander_box"},animations:[{frame_metasprites:[{parts}]}]};
+    const exported={topdown_project:{player:{size:{x:16,y:16}},camera:{follow_player:true},rooms:[{name:"porto_lumen",width_tiles:126,height_tiles:86,npcs:[npc]}]}};
+    const room={name:"porto_lumen",playerActorName:"Nara"}, actor={name:"Mecânica"};
+    const current={frame:18,currentRoom:0,player:{x:704,y:400},firstActor:{x:748,y:392}};
+    const previous={...current,frame:17,firstActor:{x:747,y:392}};
+    expect(resolveTopdownActorFramebufferTargets(room,actor,current,exported,previous)).toEqual([{x:148,y:24},{x:147,y:24}]);
+    expect(resolveTopdownActorFramebufferTargets(room,actor,current,exported,{...previous,frame:10})).toEqual([{x:148,y:24}]);
+    expect(resolveTopdownActorFramebufferTargets(room,actor,current,exported,{...previous,currentRoom:1})).toEqual([{x:148,y:24}]);
+    expect(()=>resolveTopdownActorFramebufferTarget(room,actor,{...current,firstActor:null},exported)).toThrow(/Telemetria/);
+  });
+  it("accepts separate BG/OBJ palettes while rejecting overflow and unknown colors", () => {
+    const results = exemploScenePlaytestPlan(project).map(healthyVisualResult);
+    const porto = results.find(result => result.name === "porto_lumen");
+    porto.frame.uniqueColorCount = 281;
+    expect(auditExemploVisualQualityGate(project,results).ok).toBe(true);
+    porto.frame.uniqueColorCount = 513;
+    expect(auditExemploVisualQualityGate(project,results).ok).toBe(false);
+    porto.frame.uniqueColorCount = 281; porto.paletteFidelity.ok = false;
+    expect(auditExemploVisualQualityGate(project,results).ok).toBe(false);
+  });
+  it("requires authored actor fidelity for the Porto player instead of the retired default sheet", () => {
+    expect(EXEMPLO_EXPLICIT_ACTOR_BINDING_SCENES).toContain("porto_lumen");
+  });
+});
 
 describe("contrato de playtest de Vértice", () => {
   it("resolve todos os assets declarados pela animação de background da cena", () => {

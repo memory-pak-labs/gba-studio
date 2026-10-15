@@ -864,6 +864,81 @@
           "path": "Assets/backgrounds/porto-lumen-continuous-paged.png",
           "sha256": "73e35aa43ea1a4b6171d6087525d1c262f446a6dc53e2183d822224ddeec99b0",
           "contract": "porto-lumen-paged-v16-user-approved-2026-10-14"
+        },
+        {
+          "path": "Assets/sprites/porto-nara-body48.png",
+          "sha256": "b71cf900974e9fb79a8920c5aeec3de4cb635f3d559d5b02a3ddfcbec8b48667",
+          "contract": "porto-lumen-body48-hud-b-user-approved-2026-10-14"
+        },
+        {
+          "path": "Assets/sprites/porto-mechanic-body48.png",
+          "sha256": "88a9a1045a5bafc4bbaf4e74c9e0aedf49ce445352aa26814073bc7f9632ad36",
+          "contract": "porto-lumen-body48-hud-b-user-approved-2026-10-14"
+        },
+        {
+          "path": "Assets/ui/porto-hud-b-life-frame.png",
+          "sha256": "3e7a24cbdf2e539a3ac7de0125ef18cd6910983f0335d5c47577dcc904a94f3e",
+          "contract": "porto-lumen-body48-hud-b-user-approved-2026-10-14"
+        },
+        {
+          "path": "Assets/ui/porto-hud-b-coin-frame.png",
+          "sha256": "2b2947b21a11422229109e0a2c5c055fb682783941e4b5346ad5986a997eeee4",
+          "contract": "porto-lumen-body48-hud-b-user-approved-2026-10-14"
+        },
+        {
+          "path": "Assets/ui/porto-hud-b-hearts-full.png",
+          "sha256": "7db3ff9bf202cdd9c8576aaaeadaefc9928efcda8eca64d99092c046f41a8003",
+          "contract": "porto-lumen-body48-hud-b-user-approved-2026-10-14"
+        },
+        {
+          "path": "Assets/ui/porto-hud-b-hearts-empty.png",
+          "sha256": "6ce7450df1d605785f7533da4a462dc07abbf96208dc61974030fa7819cf55d9",
+          "contract": "porto-lumen-body48-hud-b-user-approved-2026-10-14"
+        },
+        {
+          "path": "Assets/ui/porto-hud-b-coin.png",
+          "sha256": "9e86144ac315d750d7eeda310ae242284a582760d808451469a7719d01df2f22",
+          "contract": "porto-lumen-body48-hud-b-user-approved-2026-10-14"
+        },
+        {
+          "path": "Assets/fonts/porto-hud-b-font.png",
+          "sha256": "10ff87e8cf04a5a6b36039ed3f696e3584f37ef914135f3d8d96589f88e43aae",
+          "contract": "porto-lumen-body48-hud-b-user-approved-2026-10-14"
+        },
+        {
+          "path": "Assets/sprites/porto-nara-animations48.png",
+          "sha256": "bf4e524c34d0ed6d4b0bf442e2b307f0d364a4b96acab0f89eca2a2bceeebc8f",
+          "contract": "porto-lumen-animations48-user-approved-2026-10-14"
+        },
+        {
+          "path": "Assets/sprites/porto-mechanic-animations48.png",
+          "sha256": "892d69b9ca1b3277686f6639775a0373b047e905e9c38de2fb484b8c910f33af",
+          "contract": "porto-lumen-animations48-user-approved-2026-10-14"
+        },
+        {
+          "path": "Assets/sprites/porto-captain-body48.png",
+          "sha256": "1a2853d760d3dd58cf6a1ed6e33b98bbe2206f3a7191f266eefdc02185cd4fa4",
+          "contract": "porto-lumen-npcs48-v21-user-approved-2026-10-15"
+        },
+        {
+          "path": "Assets/sprites/porto-traveler-body48.png",
+          "sha256": "09a4f22020fab1ba6057ffce0b176f99467cdfe45e147189448a359b6a28f65a",
+          "contract": "porto-lumen-npcs48-v21-user-approved-2026-10-15"
+        },
+        {
+          "path": "Assets/sprites/porto-cartographer-body48.png",
+          "sha256": "e8fe9bf9e11bf1b966141a50ddfb367d161243cbe4def50d5907f3a2b40185c1",
+          "contract": "porto-lumen-npcs48-v21-user-approved-2026-10-15"
+        },
+        {
+          "path": "Assets/sprites/porto-fisherchild-body48.png",
+          "sha256": "98e73e8a8192294add702d3e15da4138e2a70cfbdc2fbd271eb999f3e357c46b",
+          "contract": "porto-lumen-npcs48-v21-user-approved-2026-10-15"
+        },
+        {
+          "path": "Assets/sprites/porto-lighthousekeeper-body48.png",
+          "sha256": "b956f0d7369d10bccc3ea603c7a34dfd9af7c8c9760e84e2dfcadf11e7ebf963",
+          "contract": "porto-lumen-npcs48-v21-user-approved-2026-10-15"
         }
       ],
       "retired": [

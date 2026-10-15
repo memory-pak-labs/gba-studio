@@ -4189,7 +4189,7 @@ def assert_topdown_template_switches_directional_animations(repo_root):
         "constexpr size_t topdown_directional_animation_count = 8;",
         "topdown_idle_directional_animation_count",
         "topdown_has_idle_directional_animations",
-        "bool topdown_direction_uses_horizontal_flip(uint8_t direction)",
+        "bool topdown_direction_uses_horizontal_flip(uint8_t direction, size_t animation_count)",
         "refresh_player_directional_animation(player_wants_to_move);",
         "refresh_npc_directional_animation(index, npc_moved);",
         "set_actor_metasprite(",

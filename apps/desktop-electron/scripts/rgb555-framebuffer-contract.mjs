@@ -206,7 +206,8 @@ function parseExportedMetaSpriteParts(headerSource, symbol, frameCount) {
     if (!match) return null;
     const parts = [...match[1].matchAll(/\{([^{}]+)\}/g)].map((partMatch) => {
       const fields = partMatch[1].split(",").map((field) => field.trim());
-      if (fields.length !== 8) return null;
+      if (fields.length !== 8 && fields.length !== 9) return null;
+      if (fields.length === 9 && !/^gbs::ColorDepth::Bpp[48]$/.test(fields[8])) return null;
       const numericFields = [0, 1, 2, 3, 6, 7].map((index) => Number.parseInt(fields[index], 0));
       if (numericFields.some((value) => !Number.isInteger(value))) return null;
       if (!["true", "false"].includes(fields[4]) || !["true", "false"].includes(fields[5])) return null;
@@ -370,7 +371,7 @@ export function decodeExportedSpriteSheetRgba(options) {
       for (const part of deduplicatedFrameParts[frameIndex]) {
         for (let localY = 0; localY < part.height; localY += 1) {
           for (let localX = 0; localX < part.width; localX += 1) {
-            const tileIndex = part.tileIndex - packed.destinationTile
+            const tileIndex = (part.tileIndex - packed.destinationTile) / (packed.bitsPerPixel === 8 ? 2 : 1)
               + Math.floor(localY / 8) * (part.width / 8)
               + Math.floor(localX / 8);
             if (tileIndex < 0 || tileIndex >= framePacked.tileCount) {
@@ -1112,7 +1113,7 @@ function parseExportedSpriteFrameParts(headerSource, symbol, frameIndex) {
   const match = headerSource.match(pattern);
   if (!match) throw new Error(`Partes do frame ${frameIndex} nao encontradas para ${symbol}.`);
   const parts = [...match[1].matchAll(
-    /\{\s*(-?\d+)\s*,\s*(-?\d+)\s*,\s*(\d+)\s*,\s*(\d+)\s*,\s*(true|false)\s*,\s*(true|false)\s*,\s*(\d+)\s*,\s*(\d+)\s*\}/g
+    /\{\s*(-?\d+)\s*,\s*(-?\d+)\s*,\s*(\d+)\s*,\s*(\d+)\s*,\s*(true|false)\s*,\s*(true|false)\s*,\s*(\d+)\s*,\s*(\d+)(?:\s*,\s*gbs::ColorDepth::Bpp[48])?\s*\}/g
   )].map((entry) => ({
     height: Number(entry[8]),
     hflip: entry[5] === "true",
@@ -1164,6 +1165,8 @@ export function auditRgbaAgainstExportedSpriteFrame(options) {
     ? parseExportedNumericArray(headerSource, symbol, frameTileSuffix, "uint8_t")
     : parseExportedNumericArray(headerSource, symbol, "tiles", "uint8_t");
   const destinationTile = parseExportedSpriteDestinationTile(headerSource, symbol, frameIndex);
+  const { bitsPerPixel } = parseExportedBackgroundTileAsset(headerSource, symbol);
+  const bytesPerTile = bitsPerPixel === 8 ? 64 : 32;
   const parts = parseExportedSpriteFrameParts(headerSource, symbol, frameIndex);
   const exportedIndexes = new Uint8Array(frameWidth * frameHeight);
   let clippedPixelCount = 0;
@@ -1171,7 +1174,7 @@ export function auditRgbaAgainstExportedSpriteFrame(options) {
     if (part.width <= 0 || part.height <= 0 || part.width % 8 !== 0 || part.height % 8 !== 0) {
       throw new Error(`Parte OBJ ${part.width}x${part.height} invalida em ${symbol}.`);
     }
-    const baseTile = part.tileIndex - destinationTile;
+    const baseTileOffset = (part.tileIndex - destinationTile) * 32;
     for (let partY = 0; partY < part.height; partY += 1) {
       for (let partX = 0; partX < part.width; partX += 1) {
         const destinationX = part.x + partX;
@@ -1182,17 +1185,16 @@ export function auditRgbaAgainstExportedSpriteFrame(options) {
         }
         const sampleX = part.hflip ? part.width - 1 - partX : partX;
         const sampleY = part.vflip ? part.height - 1 - partY : partY;
-        const tileIndex = baseTile
-          + (Math.floor(sampleY / 8) * (part.width / 8))
+        const tileIndex = (Math.floor(sampleY / 8) * (part.width / 8))
           + Math.floor(sampleX / 8);
-        const tileOffset = tileIndex * 32;
-        if (tileIndex < 0 || tileOffset + 31 >= tileBytes.length) {
+        const tileOffset = baseTileOffset + tileIndex * bytesPerTile;
+        if (tileOffset < 0 || tileOffset + bytesPerTile > tileBytes.length) {
           throw new Error(`Parte OBJ de ${symbol} referencia tile invalido ${tileIndex + destinationTile}.`);
         }
         const tileX = sampleX % 8;
         const tileY = sampleY % 8;
-        const packed = tileBytes[tileOffset + (tileY * 4) + Math.floor(tileX / 2)];
-        exportedIndexes[(destinationY * frameWidth) + destinationX] = tileX % 2 === 0
+        const packed = tileBytes[tileOffset + (bitsPerPixel === 8 ? tileY * 8 + tileX : tileY * 4 + Math.floor(tileX / 2))];
+        exportedIndexes[(destinationY * frameWidth) + destinationX] = bitsPerPixel === 8 ? packed : tileX % 2 === 0
           ? packed & 0x0F
           : (packed >> 4) & 0x0F;
       }
@@ -1738,4 +1740,32 @@ export function auditRgb555FramebufferPalette(options) {
     ok: actualRatio >= minimumPixelRatio,
     unexpectedColors
   };
+}
+
+// Compare reviewed export colors exactly; never grant a blanket color tolerance.
+export function approvedObjectPaletteSourceRgba(source, metadata) {
+  if (metadata?.colorMode !== "8bpp" || metadata?.runtimePaletteReviewStatus !== "approved") return source;
+  const values = metadata.objectPaletteValues;
+  if (!Array.isArray(values) || values.length < 2 || values.length > 256
+    || values.some(value => !Number.isInteger(value) || value < 0 || value > 0x7FFF)) {
+    throw new Error("Paleta OBJ aprovada precisa conter 2 a 256 valores RGB555 validos.");
+  }
+  const pixels = new Uint8Array(source.pixels);
+  const cache = new Map();
+  for (let i = 0; i < pixels.length; i += 4) {
+    if (pixels[i + 3] === 0) continue;
+    const color = rgb888ToRgb555(pixels[i], pixels[i + 1], pixels[i + 2]);
+    let nearest = cache.get(color);
+    if (nearest === undefined) {
+      let distance = Infinity;
+      for (const candidate of values.slice(1)) {
+        // assetc selects export colors with the same 2:4:1 channel weights.
+        const error = [[0, 2], [5, 4], [10, 1]].reduce((sum, [shift, weight]) => sum + weight * (((color >> shift) & 31) - ((candidate >> shift) & 31)) ** 2, 0);
+        if (error < distance) { distance = error; nearest = candidate; }
+      }
+      cache.set(color, nearest);
+    }
+    pixels.set(decodeRgb555(nearest), i);
+  }
+  return {...source, pixels};
 }

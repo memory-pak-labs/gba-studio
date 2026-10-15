@@ -468,7 +468,28 @@ void test_hud_gauge_updates_only_when_value_or_layout_changes() {
     assert(hud_tile_upload_calls == 4);
 }
 
+void test_hud_project_values_refresh_and_clear_on_scene_change() {
+    gbs::HudLayoutComponent component {"coins","text","Moedas","000","",204,9,24,8,2,true};
+    component.inventory_item = 0;
+    gbs::HudLayout layout {"wallet","advanced",&component,1};
+    gbs::configure_hud_layouts(&layout,1); assert(gbs::configure_hud_layout("wallet"));
+    gbs::HudState hud {}; gbs::init_hud(hud); gbs::set_hud_text(hud,"","");
+    gbs::EventState events {}; events.inventory[0]=8;
+    gbs::update_hud_behavior(events,true); gbs::draw_hud(hud);
+    assert(std::strcmp(last_hud_layout_text,"008")==0);
+    events.inventory[0]=7;
+    gbs::update_hud_behavior(events,true); gbs::draw_hud(hud);
+    assert(std::strcmp(last_hud_layout_text,"007")==0);
+    component.inventory_item=-1; component.value_variable=2;
+    events.variables[2]=-9;
+    gbs::update_hud_behavior(events,true); gbs::draw_hud(hud);
+    assert(std::strcmp(last_hud_layout_text,"000")==0);
+    assert(gbs::configure_hud_layout("wallet"));
+    gbs::draw_hud(hud); assert(!last_hud_layout_component_visible);
+}
+
 int main() {
+    test_hud_project_values_refresh_and_clear_on_scene_change();
     test_hud_gauge_updates_only_when_value_or_layout_changes();
     test_named_hud_values_survive_reordering_and_round_images();
     test_hud_behavior_drives_text_and_visibility_without_remapping_slots();

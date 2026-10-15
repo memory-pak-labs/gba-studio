@@ -495,6 +495,12 @@ function collectSettingsUsages(data: GBAProjectData, usages: AssetUsageMap): voi
         targetName: presetName,
         usageKind: "hud-preset-component"
       });
+      const stateAssets = [...(Array.isArray(component.stateAssets) ? component.stateAssets : []),
+        ...(isRecord(component.gauge) ? [component.gauge.emptyAsset] : [])];
+      for (const stateAsset of stateAssets) addUsage(usages, nullableString(stateAsset), {
+        label: `HUD ${presetName}: ${componentName} (estado)`, workspace: "Editor", targetID,
+        targetName: presetName, usageKind: "hud-preset-component"
+      });
     }
   }
 

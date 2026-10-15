@@ -1,0 +1,157 @@
+{
+  "schemaVersion": 1,
+  "userApproval": [
+    "atores no tamanho de 48",
+    "aprovado proposta B",
+    "Agora vamos integrar os atores de 48 px e a HUD B já aprovados em Porto Lumen"
+  ],
+  "sourceActorSha256": "a82940f60091d335b7d390590d4ce6694d1b8115073978dc8408c234d2adf4bf",
+  "sourceHudSha256": "27c21470e74b12bb9fbc02f44991e844be7cb70895f7df5e0d5e05508dfe64b7",
+  "scale": 0.064343163538874,
+  "alphaThreshold": 224,
+  "alphaEvidence": "source alpha clusters near 253; low-alpha glow excluded; exact body crop removes zero visible pixels",
+  "actorCanvas": [
+    32,
+    48
+  ],
+  "actorAnchor": "body centered, foot bottom; collision 16×16 at (0,-8)",
+  "poses": "one approved front pose per actor; no fabricated directions",
+  "hudLayout": {
+    "id": "hud-porto-lumen-b",
+    "name": "Porto Lumen · HUD B",
+    "description": "Molduras aprovadas; vida em variável e moedas no inventário real.",
+    "backgroundImage": "",
+    "selectorImage": "",
+    "font": "porto-hud-b-font.png",
+    "position": "Superior",
+    "width": 240,
+    "height": 24,
+    "mode": "advanced",
+    "components": [
+      {
+        "id": "life-frame",
+        "kind": "frame",
+        "label": "life-frame",
+        "text": "",
+        "asset": "porto-hud-b-life-frame.png",
+        "x": 4,
+        "y": 4,
+        "width": 60,
+        "height": 18,
+        "zIndex": 0,
+        "visible": true,
+        "pixelPosition": true
+      },
+      {
+        "id": "money-frame",
+        "kind": "frame",
+        "label": "money-frame",
+        "text": "",
+        "asset": "porto-hud-b-coin-frame.png",
+        "x": 180,
+        "y": 4,
+        "width": 56,
+        "height": 18,
+        "zIndex": 0,
+        "visible": true,
+        "pixelPosition": true
+      },
+      {
+        "id": "hearts",
+        "kind": "bar",
+        "label": "hearts",
+        "text": "",
+        "asset": "porto-hud-b-hearts-full.png",
+        "x": 13,
+        "y": 8,
+        "width": 64,
+        "height": 16,
+        "zIndex": 1,
+        "visible": true,
+        "pixelPosition": true,
+        "valueVariable": "porto_player_health",
+        "valueMaximum": 3,
+        "foregroundImage": true,
+        "gauge": {
+          "emptyAsset": "porto-hud-b-hearts-empty.png",
+          "x": 0,
+          "y": 0,
+          "width": 48,
+          "height": 16
+        }
+      },
+      {
+        "id": "coin",
+        "kind": "icon",
+        "label": "coin",
+        "text": "",
+        "asset": "porto-hud-b-coin.png",
+        "x": 189,
+        "y": 8,
+        "width": 10,
+        "height": 10,
+        "zIndex": 1,
+        "visible": true,
+        "pixelPosition": true
+      },
+      {
+        "id": "coins",
+        "kind": "text",
+        "label": "coins",
+        "text": "000",
+        "asset": "",
+        "x": 204,
+        "y": 9,
+        "width": 18,
+        "height": 8,
+        "zIndex": 2,
+        "visible": true,
+        "pixelPosition": true,
+        "inventoryItem": 0,
+        "textAdvance": 6
+      }
+    ]
+  },
+  "assets": [
+    {
+      "path": "Assets/sprites/porto-nara-body48.png",
+      "sha256": "b71cf900974e9fb79a8920c5aeec3de4cb635f3d559d5b02a3ddfcbec8b48667",
+      "contract": "porto-lumen-body48-hud-b-user-approved-2026-10-14"
+    },
+    {
+      "path": "Assets/sprites/porto-mechanic-body48.png",
+      "sha256": "88a9a1045a5bafc4bbaf4e74c9e0aedf49ce445352aa26814073bc7f9632ad36",
+      "contract": "porto-lumen-body48-hud-b-user-approved-2026-10-14"
+    },
+    {
+      "path": "Assets/ui/porto-hud-b-life-frame.png",
+      "sha256": "3e7a24cbdf2e539a3ac7de0125ef18cd6910983f0335d5c47577dcc904a94f3e",
+      "contract": "porto-lumen-body48-hud-b-user-approved-2026-10-14"
+    },
+    {
+      "path": "Assets/ui/porto-hud-b-coin-frame.png",
+      "sha256": "2b2947b21a11422229109e0a2c5c055fb682783941e4b5346ad5986a997eeee4",
+      "contract": "porto-lumen-body48-hud-b-user-approved-2026-10-14"
+    },
+    {
+      "path": "Assets/ui/porto-hud-b-hearts-full.png",
+      "sha256": "7db3ff9bf202cdd9c8576aaaeadaefc9928efcda8eca64d99092c046f41a8003",
+      "contract": "porto-lumen-body48-hud-b-user-approved-2026-10-14"
+    },
+    {
+      "path": "Assets/ui/porto-hud-b-hearts-empty.png",
+      "sha256": "6ce7450df1d605785f7533da4a462dc07abbf96208dc61974030fa7819cf55d9",
+      "contract": "porto-lumen-body48-hud-b-user-approved-2026-10-14"
+    },
+    {
+      "path": "Assets/ui/porto-hud-b-coin.png",
+      "sha256": "9e86144ac315d750d7eeda310ae242284a582760d808451469a7719d01df2f22",
+      "contract": "porto-lumen-body48-hud-b-user-approved-2026-10-14"
+    },
+    {
+      "path": "Assets/fonts/porto-hud-b-font.png",
+      "sha256": "10ff87e8cf04a5a6b36039ed3f696e3584f37ef914135f3d8d96589f88e43aae",
+      "contract": "porto-lumen-body48-hud-b-user-approved-2026-10-14"
+    }
+  ]
+}

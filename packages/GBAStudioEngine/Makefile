@@ -149,6 +149,7 @@ topdown-backdrop-runtime-test:
 
 topdown-hud-runtime-test:
 	python3 tests/host/topdown_hud_runtime_tests.py
+	python3 tests/host/topdown_actor_pose_tests.py
 
 platformer-runtime-wait-test: check-toolchain
 	python3 tests/host/platformer_runtime_wait_tests.py
@@ -1966,6 +1967,12 @@ luta-authored-hud-test:
 
 .PHONY: hud-racing-test
 host-test: hud-racing-test
+host-test: hud-compact-text-test
+hud-compact-text-test: $(HOST_BUILD)/hud_compact_text_tests
+	$(HOST_BUILD)/hud_compact_text_tests
+$(HOST_BUILD)/hud_compact_text_tests: tests/host/hud_compact_text_tests.cpp engine/include/gbs/hud_compact_text.h
+	@mkdir -p $(HOST_BUILD)
+	$(HOST_CXX) $(HOST_CXXFLAGS) $< -o $@
 hud-racing-test: $(HOST_BUILD)/hud_racing_tests
 	$(HOST_BUILD)/hud_racing_tests
 	python3 tests/host/hud_racing_render_tests.py

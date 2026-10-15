@@ -825,6 +825,7 @@ export async function startMGBAPlayer({ container, romUrl, storageKey, onFrameSt
     let frameHandle = 0;
     cleanup.push(() => cancelAnimationFrame(frameHandle));
     let presentedRuntimeState = null;
+    let previousPresentedRuntimeState = null;
     let accumulatorMs = GBA_FRAME_DURATION_MS;
     let lastAnimationFrameAt = performance.now();
     let sampleDroppedFrames = 0;
@@ -849,6 +850,7 @@ export async function startMGBAPlayer({ container, romUrl, storageKey, onFrameSt
       for (let frame = 0; frame < plan.framesToRun; frame += 1) {
         module._gba_set_keys(inputMasks[frame]);
         const emulationStartedAt = performance.now();
+        previousPresentedRuntimeState = presentedRuntimeState;
         module._gba_run_frame();
         presentedRuntimeState = readRuntimeTelemetry(module);
         queueNativeAudio();
@@ -944,7 +946,7 @@ export async function startMGBAPlayer({ container, romUrl, storageKey, onFrameSt
         manualKeys: keyboardInput.sample(0),
         replayActive: Boolean(replayDriver && !replayDriver.complete)
       }),
-      inspectPresentedRuntime: () => Object.freeze({ state: presentedRuntimeState }),
+      inspectPresentedRuntime: () => Object.freeze({ state: presentedRuntimeState, previousState: previousPresentedRuntimeState }),
       inspectFrame: () => Object.freeze({
         ...analyzeRgbaFrame(image.data, WIDTH, HEIGHT),
         framebufferBytes: module._gba_framebuffer_size(),

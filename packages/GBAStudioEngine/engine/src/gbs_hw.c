@@ -1,6 +1,7 @@
 #include "gbs_hw.h"
 #include "gbs_room_tilemap.h"
 #include "gbs/text.h"
+#include "gbs/hud_compact_text.h"
 
 #define REG16(address) (*(volatile uint16_t*)(address))
 #define REG32(address) (*(volatile uint32_t*)(address))
@@ -71,6 +72,7 @@ static uint8_t shadow_oam_dirty_first;
 static uint8_t shadow_oam_dirty_last;
 static uint32_t oam_overflow_count;
 static uint8_t hud_icon_obj_count;
+static uint8_t hud_compact_obj_count;
 static int hud_icon_obj_write;
 static uint16_t shadow_bg_tilemaps[4][32 * 32] __attribute__((section(".ewram_bss")));
 static uint8_t shadow_bg_tilemap_pending_mask;
@@ -1321,7 +1323,7 @@ static int gbs_hw_hud_icon_slot(int ordinal) {
 static int gbs_hw_hud_icon_owns_slot(int index) {
     if (hud_icon_obj_write || index < HUD_ICON_OBJ_OAM_BASE - HUD_ICON_OBJ_OAM_COUNT + 8 || index >= HUD_ICON_OBJ_OAM_BASE + 8) return 0;
     const int ordinal = ((HUD_ICON_OBJ_OAM_BASE + 7 - index) / 8) * 8 + index % 8;
-    return ordinal < hud_icon_obj_count;
+    return ordinal < hud_icon_obj_count || ordinal >= HUD_ICON_OBJ_OAM_COUNT - hud_compact_obj_count;
 }
 
 void gbs_hw_hide_sprites(int first, int count) {
@@ -1341,6 +1343,7 @@ void gbs_hw_hide_sprites(int first, int count) {
 
 void gbs_hw_hide_all_sprites(void) {
     hud_icon_obj_count = 0;
+    hud_compact_obj_count = 0;
     gbs_hw_hide_sprites(0, 128);
 }
 
@@ -1948,13 +1951,16 @@ static void gbs_hw_clear_text_overlay_slots(int first, int count) {
 
 static void gbs_hw_clear_hud_icon_slots(void) {
     const int previous_count = hud_icon_obj_count;
+    const int previous_compact_count = hud_compact_obj_count;
     hud_icon_obj_count = 0;
+    hud_compact_obj_count = 0;
     for (int index = 0; index < previous_count; ++index) {
         gbs_hw_set_sprite(
             gbs_hw_hud_icon_slot(index),
             0, 160, 0, DIALOGUE_PALETTE, 0, 0, 0, 0, 0, 0, 0, 0
         );
     }
+    for (int index=0; index<previous_compact_count; ++index) gbs_hw_hide_sprites(gbs_hw_hud_icon_slot(HUD_ICON_OBJ_OAM_COUNT-1-index),1);
 }
 
 static uint16_t gbs_hw_hud_icon_shape(int width, int height) {
@@ -1985,7 +1991,7 @@ static int gbs_hw_draw_hud_icon(const void* raw_metasprite, int x, int y, int vi
         return 0;
     }
 
-    if (hud_icon_obj_count + metasprite->part_count > HUD_ICON_OBJ_OAM_COUNT) return 0;
+    if (hud_icon_obj_count + hud_compact_obj_count + metasprite->part_count > HUD_ICON_OBJ_OAM_COUNT) return 0;
     for (uint8_t part_index = 0; part_index < metasprite->part_count; ++part_index) {
         const struct gbs_hw_metasprite_part* part = &metasprite->parts[part_index];
         const uint16_t shape = gbs_hw_hud_icon_shape(part->width, part->height);
@@ -2504,6 +2510,45 @@ static void gbs_hw_remember_hud_layout_rect(int x, int y, int width, int height)
     ++hud_layout_current_count;
 }
 
+static int gbs_hw_allocate_hud_compact_slot(void) {
+    if (hud_icon_obj_count+hud_compact_obj_count>=HUD_ICON_OBJ_OAM_COUNT) return -1;
+    return gbs_hw_hud_icon_slot(HUD_ICON_OBJ_OAM_COUNT-1-hud_compact_obj_count++);
+}
+
+static void gbs_hw_draw_hud_compact_text(int x, int y, int width, const char* text, int visible) {
+    if (!visible || text == 0) return;
+    MEM_PALETTE[256 + HUD_PALETTE_BASE + DIALOGUE_COLOR_TEXT] = MEM_PALETTE[HUD_PALETTE_BASE + DIALOGUE_COLOR_TEXT];
+    unsigned column=0;
+    const unsigned columns=(unsigned)width/6;
+    while (*text && column<columns && hud_pixel_text_obj_count<DYNAMIC_TEXT_OBJ_OAM_COUNT) {
+        const unsigned tile=DYNAMIC_TEXT_OBJ_TILE_BASE+hud_pixel_text_obj_count*4;
+        if (tile+4>1024) return;
+        const int slot=gbs_hw_allocate_hud_compact_slot();
+        if (slot<0) return;
+        uint8_t glyphs[160]={0}, pixels[128]; unsigned count=0;
+        while (*text && count<5 && column+count<columns) {
+            const unsigned glyph=gbs_text_glyph_index(gbs_text_next_codepoint(&text));
+            for (unsigned row=0; row<8; ++row) for (unsigned half=0; half<2; ++half) {
+                const uint8_t* source=configured_dialogue_font_tiles ? configured_dialogue_font_tiles+glyph*32+row*4+half*2 : 0;
+                const uint16_t value=source ? (uint16_t)(source[0]|(source[1]<<8)) :
+                    pack_font_pixels(gbs_font_rows[glyph][row],half*4,0,DIALOGUE_COLOR_TEXT);
+                glyphs[count*32+row*4+half*2]=value&255;
+                glyphs[count*32+row*4+half*2+1]=value>>8;
+            }
+            ++count;
+        }
+        gbs_compose_compact_hud_text(glyphs,count,pixels);
+        volatile uint16_t* target=MEM_OBJ_TILES+tile*16u;
+        for (unsigned i=0; i<64; ++i) target[i]=pixels[i*2]|(pixels[i*2+1]<<8);
+        for (unsigned i=0; i<4; ++i) hud_pixel_text_glyphs[tile-DYNAMIC_TEXT_OBJ_TILE_BASE+i]=0xFFFFu;
+        ++hud_pixel_text_obj_count;
+        hud_icon_obj_write=1;
+        gbs_hw_set_sprite(slot,x+column*6,y,tile,HUD_PALETTE,0,0,1,0,0,0,1,1);
+        hud_icon_obj_write=0;
+        column+=count;
+    }
+}
+
 void gbs_hw_draw_hud_layout_component(
     int kind,
     int x,
@@ -2526,6 +2571,11 @@ void gbs_hw_draw_hud_layout_component(
     if (box_y + box_h > 32) box_h = 32 - box_y;
     if (box_w <= 0 || box_h <= 0) return;
 
+    if (kind == GBS_HW_HUD_COMPONENT_COMPACT_TEXT) {
+        gbs_hw_draw_hud_compact_text(x,y,width,text,visible);
+        return;
+    }
+
     if (kind == GBS_HW_HUD_COMPONENT_FRAME) {
         /* A full-panel metasprite sits behind BG0 text; ordinary icons stay
          * in front. Both use the existing reserved HUD OAM slots. */
@@ -2534,8 +2584,8 @@ void gbs_hw_draw_hud_layout_component(
         if (visible) gbs_hw_remember_hud_layout_rect(box_x, box_y, box_w, box_h);
         return;
     }
-    if (kind == GBS_HW_HUD_COMPONENT_BAR) {
-        if (metasprite != 0 && gbs_hw_draw_hud_icon(metasprite, x, y, visible, 1)) {
+    if (kind == GBS_HW_HUD_COMPONENT_BAR || kind == GBS_HW_HUD_COMPONENT_FOREGROUND_BAR) {
+        if (metasprite != 0 && gbs_hw_draw_hud_icon(metasprite, x, y, visible, kind == GBS_HW_HUD_COMPONENT_FOREGROUND_BAR ? 0 : 1)) {
             /* A BG frame's opaque center otherwise masks the image gauge.
              * Release just the gauge cells; later text still draws above OBJ. */
             if (visible) gbs_hw_draw_hud_surface(box_x, box_y, box_w, box_h, 0, 0);

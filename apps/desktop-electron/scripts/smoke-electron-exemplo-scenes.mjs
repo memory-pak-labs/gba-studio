@@ -42,6 +42,8 @@ import {
   exemploScenePlaytestPlan,
   parseExemploSceneSoakMinutes,
   resolveExemploSmokeFaceButton,
+  resolveTopdownActorFramebufferTarget,
+  resolveTopdownActorFramebufferTargets,
   selectExemploScenePlaytestPlan,
   selectExemploScenePlaytestProjectPath,
   steadyFrameSamples
@@ -53,6 +55,7 @@ import { renderPngContactSheet } from "./lib/png-contact-sheet.mjs";
 import { resolveLutaFighterFramebufferMasks } from "./luta-framebuffer-contract.mjs";
 import { auditTemporalVisualStability } from "./visual-frame-stability.mjs";
 import {
+  approvedObjectPaletteSourceRgba,
   auditAlphaBlendedRgbaAgainstFramebuffer,
   auditOpaqueRgbaAgainstFramebufferRegion,
   auditRgbaAgainstFramebufferWithMasks,
@@ -123,6 +126,7 @@ const evidencePath = requestedEvidencePath
 const canonicalP0Source = resolveCanonicalP0Source(appRoot);
 const defaultTemplatePath = canonicalP0Source.projectPath;
 const authoredActorFramebufferScenes = new Set([
+  "porto_lumen",
   "usina_submersa",
   "arena_tatica"
 ]);
@@ -548,7 +552,8 @@ async function waitForPlayerEvidence(cdp, captureFramebuffer = false) {
           // sampled from the same render pass; otherwise a transient previous
           // OBJ frame can make an exact sprite audit fail intermittently.
           requestAnimationFrame(() => {
-            const presentedAfterPaint = player?.inspectPresentedRuntime?.()?.state ?? null;
+            const presentedSnapshot = player?.inspectPresentedRuntime?.();
+            const presentedAfterPaint = presentedSnapshot?.state ?? null;
             const runtimeAfterPaint = player?.inspectRuntime?.()?.state ?? null;
             const frameAfterPaint = player?.inspectFrame?.() ?? frame;
             let framebufferRgbaBase64 = null;
@@ -585,6 +590,7 @@ async function waitForPlayerEvidence(cdp, captureFramebuffer = false) {
               framebufferRgbaBase64,
               nativeStateBase64,
               presentedRuntimeState: presentedAfterPaint,
+              previousPresentedRuntimeState: presentedSnapshot?.previousState ?? null,
               runtimeState: runtimeAfterPaint
             });
           });
@@ -1300,6 +1306,7 @@ function exportedIntegerConstant(headerSource, symbol, suffix) {
 }
 
 function authoredActorFramebufferTarget(room, runtime, actor, frameWidth, frameHeight, runtimeState, exportedProject) {
+  if (runtime === "topdown") return resolveTopdownActorFramebufferTarget(room,actor,runtimeState,exportedProject);
   const x = Number(actor?.x) * 8;
   const y = Number(actor?.y) * 8;
   if (!Number.isFinite(x) || !Number.isFinite(y)) return null;
@@ -1433,6 +1440,24 @@ function temporalActorRegionsForScene({ project, exportedProject, room, runtime,
   return regions;
 }
 
+async function topdownHudOcclusionPixels(exportPath, exported, sceneName) {
+  const ui = exported?.topdown_project?.dialogue_ui;
+  const id = ui?.hud_scene_bindings?.find(binding=>binding.scene_name===sceneName)?.preset_id;
+  const layout = ui?.hud_layouts?.find(candidate=>candidate.id===id);
+  const layers = [];
+  for (const component of layout?.components ?? []) {
+    if (!component.visible || !component.asset || !['frame','icon'].includes(component.kind)) continue;
+    const header = await readFile(join(dirname(exportPath),`${component.asset}.hpp`),'utf8');
+    const source = decodeExportedSpriteSheetRgba({headerSource:header,symbol:component.asset,
+      frameCount:1,frameWidth:exportedIntegerConstant(header,component.asset,'sprite_width'),
+      frameHeight:exportedIntegerConstant(header,component.asset,'sprite_height')});
+    layers.push({source,x:component.x,y:component.y});
+  }
+  // Only an exact declared overlay pixel can cover the actor. HUD bounds alone
+  // would also hide corrupted actor pixels under transparent padding.
+  return framebufferOcclusionPixels(layers);
+}
+
 async function auditExportedAuthoredActors(exportPath, exported, project, room, frame, exactOptions = null) {
   const actors = (Array.isArray(project?.actors) ? project.actors : [])
     .filter((actor) => actor?.roomName === room?.name);
@@ -1442,6 +1467,7 @@ async function auditExportedAuthoredActors(exportPath, exported, project, room, 
   const runtime = exactOptions?.runtime ?? room?.sceneType ?? null;
   const frameRuntimeState = exactOptions?.presentedRuntimeState ?? exactOptions?.runtimeState;
   const framebufferRuntimeSupport = new Set([
+    "topdown",
     "battleRpg",
     "dungeonCrawler",
     "isometric",
@@ -1479,6 +1505,7 @@ async function auditExportedAuthoredActors(exportPath, exported, project, room, 
     : [];
   const allowedNativeOcclusionPixels = runtime === 'isometric'
     ? await isometricNativeOcclusionPixels(exportPath, exactOptions?.exportedProject ?? exported, room.name, frameRuntimeState)
+    : runtime === 'topdown' ? await topdownHudOcclusionPixels(exportPath,exported,room.name)
     : new Set();
   const audits = await Promise.all(actors.map(async (actor) => {
     const sourceAssetName = typeof actor?.spriteSheet === "string" ? actor.spriteSheet : null;
@@ -1505,6 +1532,9 @@ async function auditExportedAuthoredActors(exportPath, exported, project, room, 
         readFile(sourcePath)
       ]);
       const source = decodePngRgba(sourceBytes);
+      const metadata = project.assets?.find(asset => asset.name === sourceAssetName)?.metadata;
+      const approvedRuntimeSource = approvedObjectPaletteSourceRgba(source, metadata);
+      const approvedPaletteRemap = approvedRuntimeSource !== source;
       const frameWidth = exportedIntegerConstant(header, symbol, "sprite_width")
         ?? spriteFrameDimensions(sourceAssetName, actor, project?.animations)?.width
         ?? source.width;
@@ -1516,6 +1546,7 @@ async function auditExportedAuthoredActors(exportPath, exported, project, room, 
       const sheetWidth = exportedIntegerConstant(header, symbol, "width") ?? source.width;
       const sheetHeight = exportedIntegerConstant(header, symbol, "height") ?? source.height;
       const objectPaletteOverride = exportedObjectPaletteOverride(exactOptions?.exportedProject ?? exported, symbol);
+      const allowPaletteRemap = objectPaletteOverride !== null && parseExportedBackgroundTileAsset(header,symbol).bitsPerPixel !== 8;
       const sourceFrames = Array.from({ length: frameCount }, (_, frameIndex) => {
         const origin = spriteSheetFrameOrigin(source, frameIndex, frameWidth, frameHeight);
         return auditRgbaAgainstExportedSpriteFrame({
@@ -1523,13 +1554,13 @@ async function auditExportedAuthoredActors(exportPath, exported, project, room, 
           frameIndex,
           frameWidth,
           headerSource: header,
-          pixels: source.pixels,
+          pixels: approvedRuntimeSource.pixels,
           sheetWidth: source.width,
           symbol,
           sourceX: origin.sourceX,
           sourceY: origin.sourceY,
           transparentPaletteIndex: 0,
-          allowPaletteRemap: objectPaletteOverride !== null
+          allowPaletteRemap
         });
       });
       const palette = parseExportedRgb555Palette(header, symbol);
@@ -1595,8 +1626,10 @@ async function auditExportedAuthoredActors(exportPath, exported, project, room, 
           ...findBestOpaqueRgbaFramebufferFrame({
             candidateFlipsX: nativeActorObject ? [nativeActorObject.flipX] : [false],
             candidateSourceXs,
-            candidateTargets: nativeActorObject ? [{x:nativeActorObject.x,y:nativeActorObject.y}]
-              : runtime === 'racing' && authoredTarget ? [authoredTarget] : authoredTarget ? [authoredTarget, ...detectedTargets] : detectedTargets,
+            candidateTargets: runtime === 'topdown'
+              ? resolveTopdownActorFramebufferTargets(room,actor,frameRuntimeState,exactOptions?.exportedProject,exactOptions?.previousPresentedRuntimeState)
+              : nativeActorObject ? [{x:nativeActorObject.x,y:nativeActorObject.y}]
+              : ['racing','topdown'].includes(runtime) && authoredTarget ? [authoredTarget] : authoredTarget ? [authoredTarget, ...detectedTargets] : detectedTargets,
             framebuffer: framebufferRgba,
             framebufferHeight: SCREEN_HEIGHT,
             framebufferWidth: SCREEN_WIDTH,
@@ -1642,7 +1675,7 @@ async function auditExportedAuthoredActors(exportPath, exported, project, room, 
         renderedFrameHeight: frameHeight * spriteScale,
         renderedFrameWidth: frameWidth * spriteScale,
         palette,
-        paletteRemapped: objectPaletteOverride !== null,
+        paletteRemapped: allowPaletteRemap || approvedPaletteRemap,
         sourceFrames,
         sourcePath,
         spriteScale,
@@ -5852,6 +5885,7 @@ async function main() {
             framebufferRgbaBase64: playerEvidence.framebufferRgbaBase64,
             exportedProject: exported.project,
             presentedRuntimeState: playerEvidence.presentedRuntimeState,
+            previousPresentedRuntimeState: playerEvidence.previousPresentedRuntimeState,
             runtime: scene.runtime,
             runtimeState: playerEvidence.runtimeState
           }

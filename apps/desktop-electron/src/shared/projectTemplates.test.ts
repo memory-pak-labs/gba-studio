@@ -564,7 +564,17 @@ describe("projectTemplates", () => {
       .map((asset) => asset.name)
       .sort();
 
-    expect(approved8bppAssets).toEqual([]);
+    expect(approved8bppAssets).toEqual([
+      "porto-captain-body48.png",
+      "porto-cartographer-body48.png",
+      "porto-fisherchild-body48.png",
+      "porto-lighthousekeeper-body48.png",
+      "porto-mechanic-animations48.png",
+      "porto-mechanic-body48.png",
+      "porto-nara-animations48.png",
+      "porto-nara-body48.png",
+      "porto-traveler-body48.png"
+    ]);
     expect(assets.filter((asset) => (
       (asset.metadata as Record<string, unknown> | undefined)?.visualProfile === "cohesive-lighthouse-adventure-v2"
     ))).toEqual([]);
@@ -592,7 +602,7 @@ describe("projectTemplates", () => {
     expect(pagedAssets[0]?.metadata).toMatchObject({colorMode:"8bpp-indexed", backgroundPaletteBankBudget:14});
     expect(pagedAssets.slice(1).every((asset) => (asset.metadata as Record<string, unknown>)?.colorMode === "8bpp-indexed")).toBe(true);
     expect(assets.filter((asset) => (
-      !affineAssets.includes(asset) && !indexedIsometricAssets.includes(asset) && !pagedAssets.includes(asset)
+      !affineAssets.includes(asset) && !indexedIsometricAssets.includes(asset) && !pagedAssets.includes(asset) && !approved8bppAssets.includes(asset.name)
     )).every((asset) => (
       ((asset.metadata as Record<string, unknown> | undefined)?.colorMode === undefined
         || (asset.metadata as Record<string, unknown> | undefined)?.colorMode === "4bpp")

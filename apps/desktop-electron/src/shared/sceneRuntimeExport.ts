@@ -689,6 +689,11 @@ export interface EngineDialogueUiConfig {
       z_index: number;
       visible: boolean;
       value_binding?: string;
+      value_variable?: number;
+      inventory_item?: number;
+      value_maximum?: number;
+      text_advance?: number;
+      foreground_image?: boolean;
       state_assets?: string[];
       gauge?: {empty_asset:string;x:number;y:number;width:number;height:number;reverse:boolean};
       behavior?: {

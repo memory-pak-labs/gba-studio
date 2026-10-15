@@ -18,6 +18,7 @@ def function(name):
     return source[start:end]
 structs = '\n'.join(re.findall(r'struct gbs_hw_metasprite(?:_part)? \{.*?\n\};', source, re.S))
 globals = '\n'.join(re.findall(r'static (?:uint8_t|int) hud_icon_obj_(?:count|write)[^;]*;', source))
+globals += '\n'.join(re.findall(r'static uint8_t hud_compact_obj_count[^;]*;', source))
 constants = ', '.join(re.findall(r'HUD_ICON_OBJ_OAM_(?:BASE|COUNT) = \d+', source))
 code = '#include <stdint.h>\n#include <assert.h>\n#include <string.h>\n' + structs + '\n' + globals
 code += '\nenum { ' + constants + ', DIALOGUE_PALETTE = 15 };\n'
@@ -31,6 +32,7 @@ code += '\n'.join(function(name) for name in (
     'gbs_hw_hide_all_sprites','gbs_hw_set_sprite','gbs_hw_set_sprite_color_depth',
     'gbs_hw_set_sprite_affine','gbs_hw_clear_hud_icon_slots',
     'gbs_hw_hud_icon_shape','gbs_hw_hud_icon_size','gbs_hw_draw_hud_icon'))
+code += '\n'+function('gbs_hw_allocate_hud_compact_slot')
 code += r'''
 int main() {
     struct gbs_hw_metasprite_part a = {0}, b = {0};
@@ -41,6 +43,10 @@ int main() {
     assert(gbs_hw_draw_hud_icon(&first,8,8,1,1));
     assert(gbs_hw_draw_hud_icon(&second,16,8,1,0));
     assert((shadow_oam[88*4+2]&1023)==11 && (shadow_oam[89*4+2]&1023)==22);
+    int foreground=gbs_hw_allocate_hud_compact_slot();
+    assert(foreground<88 && gbs_hw_hud_icon_owns_slot(foreground));
+    gbs_hw_hide_sprites(foreground,1); // World rendering must preserve the reserved text slot.
+    hud_compact_obj_count=0;
     for(int n=2;n<32;n++) assert(gbs_hw_draw_hud_icon(&second,16,8,1,0));
     assert(!gbs_hw_draw_hud_icon(&first,8,8,1,1));
     assert((shadow_oam[88*4+2]&1023)==11);

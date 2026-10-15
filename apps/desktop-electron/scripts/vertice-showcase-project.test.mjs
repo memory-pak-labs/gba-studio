@@ -219,13 +219,13 @@ describe("materialização canônica de Vértice", () => {
     expect(game?.collisionTypes?.[50 * 126 + 88]).toBe("free");
     expect(game?.collisionTypes?.[0]).toBe("solid");
     expect(project.actors.filter((actor) => actor.roomName === "porto_lumen")).toEqual(expect.arrayContaining([
-      expect.objectContaining({ id: "port-nara", name: "Nara", spriteSheet: "player-pilot-32x32.png" }),
-      expect.objectContaining({ id: "port-mechanic", name: "Mecânica de Lúmen", spriteSheet: "mechanic-pilot-32x32.png", eventBindings: { onInteract: "porto_recuperar_estrutura" } }),
-      expect.objectContaining({ id: "porto-lume-captain-pilot", spriteSheet: "npc-captain-pilot-32x32.png" }),
-      expect.objectContaining({ id: "porto-lume-traveler-pilot", spriteSheet: "traveler-pilot-32x32.png" }),
-      expect.objectContaining({ id: "porto-lume-cartographer-pilot", spriteSheet: "cartographer-pilot-32x32.png" }),
-      expect.objectContaining({ id: "porto-lume-fisherchild-pilot", spriteSheet: "fisherchild-pilot-32x32.png" }),
-      expect.objectContaining({ id: "porto-lume-lighthousekeeper-pilot", spriteSheet: "lighthousekeeper-pilot-32x32.png" })
+      expect.objectContaining({ id: "port-nara", name: "Nara", spriteSheet: "porto-nara-animations48.png" }),
+      expect.objectContaining({ id: "port-mechanic", name: "Mecânica de Lúmen", spriteSheet: "porto-mechanic-animations48.png", eventBindings: { onInteract: "porto_recuperar_estrutura" } }),
+      expect.objectContaining({ id: "porto-lume-captain-pilot", spriteSheet: "porto-captain-body48.png" }),
+      expect.objectContaining({ id: "porto-lume-traveler-pilot", spriteSheet: "porto-traveler-body48.png" }),
+      expect.objectContaining({ id: "porto-lume-cartographer-pilot", spriteSheet: "porto-cartographer-body48.png" }),
+      expect.objectContaining({ id: "porto-lume-fisherchild-pilot", spriteSheet: "porto-fisherchild-body48.png" }),
+      expect.objectContaining({ id: "porto-lume-lighthousekeeper-pilot", spriteSheet: "porto-lighthousekeeper-body48.png" })
     ]));
     expect(project.triggers).toEqual(expect.arrayContaining([
       expect.objectContaining({
@@ -2297,6 +2297,8 @@ describe("materialização canônica de Vértice", () => {
     ];
 
     allowedAssets.add("porto-lumen-continuous-paged.png");
+    for (const role of ["captain", "traveler", "cartographer", "fisherchild", "lighthousekeeper"]) allowedAssets.add(`porto-${role}-body48.png`);
+    for (const name of ["porto-nara-body48.png", "porto-mechanic-body48.png", "porto-hud-b-life-frame.png", "porto-hud-b-coin-frame.png", "porto-hud-b-hearts-full.png", "porto-hud-b-hearts-empty.png", "porto-hud-b-coin.png", "porto-hud-b-font.png", "porto-nara-animations48.png", "porto-mechanic-animations48.png"]) allowedAssets.add(name);
     expect(new Set(project.assets.map((asset) => asset.name))).toEqual(allowedAssets);
     expect(project.audioItems).toHaveLength(29);
     expect(project.events.flatMap((event) => event.steps ?? []).some((step) => /play_(music|sfx) /.test(step.command))).toBe(true);

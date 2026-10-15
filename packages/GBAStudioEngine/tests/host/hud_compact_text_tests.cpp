@@ -1,0 +1,17 @@
+#include <cassert>
+#include <cstring>
+#include "gbs/hud_compact_text.h"
+int main() {
+    uint8_t glyphs[3][32] {}; uint8_t output[128];
+    // Glyphs have an independent 5x7 footprint, six pixels between origins.
+    for (unsigned g=0; g<3; ++g) for (unsigned y=0; y<7; ++y)
+        for (unsigned x=0; x<5; ++x) glyphs[g][y*4+x/2] |= (g+1) << ((x&1)*4);
+    gbs_compose_compact_hud_text(&glyphs[0][0],3,output);
+    for (unsigned y=0; y<8; ++y) for (unsigned x=0; x<32; ++x) {
+        const unsigned offset=(x/8)*32+y*4+(x%8)/2;
+        const unsigned pixel=(output[offset]>>((x&1)*4))&15;
+        assert(pixel == (y<7 && x<18 && x%6<5 ? 4u : 0u));
+    }
+    gbs_compose_compact_hud_text(&glyphs[0][0],0,output);
+    for (auto pixel:output) assert(pixel==0);
+}

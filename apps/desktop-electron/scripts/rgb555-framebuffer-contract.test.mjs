@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  approvedObjectPaletteSourceRgba,
   auditAlphaBlendedRgbaAgainstFramebuffer,
   auditRgbaAgainstFramebufferWithMasks,
   auditOpaqueRgbaAgainstFramebufferRegion,
@@ -33,6 +34,26 @@ import {
 import { findBestRgbaFramebufferCropWithMasks } from "./rgb555-framebuffer-contract.mjs";
 
 describe("RGB555 framebuffer contract", () => {
+  it("reconstructs 8bpp composite OBJ parts using 32-byte hardware tile addresses", () => {
+    const palette = Array(256).fill(0); palette[17] = 31; palette[201] = 31744;
+    const headerSource = `
+      constexpr int hero_tile_count = 2;
+      constexpr uint16_t hero_palette[256] = {${palette}};
+      constexpr uint8_t hero_tiles[2][64] = {${Array(64).fill(201)},${Array(64).fill(17)}};
+      const gbs::TileAsset hero_tile_asset = {reinterpret_cast<const uint8_t*>(hero_tiles),hero_tile_count,512,true,gbs::ColorDepth::Bpp8};
+      constexpr gbs::MetaSpritePart hero_frame_0_parts[2] = {
+        {0,0,514,0,false,false,8,8,gbs::ColorDepth::Bpp8},
+        {0,8,512,0,false,false,8,8,gbs::ColorDepth::Bpp8}
+      };`;
+    const pixels = Uint8Array.from([...Array(64).fill([255,0,0,255]), ...Array(64).fill([0,0,255,255])].flat());
+    const options = {headerSource,symbol:"hero",frameCount:1,frameWidth:8,frameHeight:16};
+    expect(decodeExportedSpriteSheetRgba(options).pixels).toEqual(pixels);
+    expect(auditRgbaAgainstExportedSpriteFrame({...options,pixels,sheetWidth:8})).toMatchObject({ok:true,partCount:2,colorMismatchCount:0});
+    pixels[0] = 0;
+    expect(auditRgbaAgainstExportedSpriteFrame({...options,pixels,sheetWidth:8})).toMatchObject({ok:false,colorMismatchCount:1});
+    pixels[3] = 0;
+    expect(auditRgbaAgainstExportedSpriteFrame({...options,pixels,sheetWidth:8})).toMatchObject({ok:false,alphaMismatchCount:1});
+  });
   it("exclui somente as partes do metasprite Point & Click na posição exportada", () => {
     const scene = { props: [{
       position: { x: 40, y: 88 }, animation: "idle_down",
@@ -1380,5 +1401,31 @@ describe("RGB555 framebuffer contract", () => {
       actualCount: 38_000,
       unexpectedColors: [{ count: 400, rgb: [250, 230, 190] }]
     });
+  });
+});
+
+
+describe("approved 8bpp export palette reference", () => {
+  const source = () => ({width: 8, height: 8, pixels: Uint8Array.from(Array(64).fill([248, 8, 0, 255]).flat())});
+  const metadata = {colorMode: "8bpp", runtimePaletteReviewStatus: "approved", objectPaletteValues: [0, 31]};
+  it("applies only the approved palette without mutating source pixels or alpha", () => {
+    const input = source(); input.pixels[3] = 0;
+    const before = new Uint8Array(input.pixels);
+    const expected = approvedObjectPaletteSourceRgba(input, metadata);
+    expect([...expected.pixels.slice(4, 8)]).toEqual([255, 0, 0, 255]);
+    expect(expected.pixels[3]).toBe(0);
+    expect(input.pixels).toEqual(before);
+    expect(approvedObjectPaletteSourceRgba(input, {...metadata, runtimePaletteReviewStatus: "pending"})).toBe(input);
+  });
+  it("still rejects compiled colors outside the exact approved reference", () => {
+    const expected = approvedObjectPaletteSourceRgba(source(), metadata);
+    const header = color => `constexpr int hero_tile_count = 1;
+      constexpr uint16_t hero_palette[2] = {0,${color}};
+      constexpr uint8_t hero_tiles[1][64] = {${Array(64).fill(1)}};
+      const gbs::TileAsset hero_tile_asset = {reinterpret_cast<const uint8_t*>(hero_tiles),hero_tile_count,0,true,gbs::ColorDepth::Bpp8};
+      constexpr gbs::MetaSpritePart hero_frame_0_parts[1] = {{0,0,0,0,false,false,8,8,gbs::ColorDepth::Bpp8}};`;
+    const options = {symbol:"hero",frameIndex:0,frameWidth:8,frameHeight:8,sheetWidth:8,pixels:expected.pixels,allowPaletteRemap:false};
+    expect(auditRgbaAgainstExportedSpriteFrame({...options,headerSource:header(31)}).ok).toBe(true);
+    expect(auditRgbaAgainstExportedSpriteFrame({...options,headerSource:header(31744)})).toMatchObject({ok:false,colorMismatchCount:64});
   });
 });

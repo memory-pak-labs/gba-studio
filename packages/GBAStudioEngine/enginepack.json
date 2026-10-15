@@ -955,6 +955,9 @@
     "dialogue_emote_assets": true,
     "dialogue_box_skin": true,
     "hud_box_skin": true,
+    "hud_project_value_bindings": true,
+    "hud_compact_text": true,
+    "hud_foreground_images": true,
     "dialogue_font": true,
     "dialogue_choice_selector": true,
     "platformer_runtime": [

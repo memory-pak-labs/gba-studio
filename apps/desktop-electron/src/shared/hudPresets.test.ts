@@ -15,6 +15,20 @@ import {
 } from "./hudPresets.js";
 
 describe("hudPresets", () => {
+  it("preserves pixel-authored image frames and icons at the approved HUD dimensions", () => {
+    const project = createBlankProjectData({ name: "Image HUD" });
+    project.settings = { ...(project.settings as Record<string, unknown>), hudPresets: [{
+      ...DEFAULT_HUD_PRESET, id: "image-hud", mode: "advanced", components: [
+        { id: "life", kind: "frame", asset: "life.png", x: 4, y: 4, width: 60, height: 18, pixelPosition: true },
+        { id: "heart", kind: "bar", asset: "heart.png", x: 13, y: 8, width: 10, height: 10, pixelPosition: true, valueVariable: "player_health", valueMaximum: 3, foregroundImage: true },
+        { id: "legacy", kind: "frame", asset: "life.png", x: 4, y: 4, width: 60, height: 18 }
+      ]
+    }] };
+    const components = deriveHudPresetsWorkspacePresentation(project).presets.find(p => p.id === "image-hud")!.components;
+    expect(components[0]).toMatchObject({ x: 4, y: 4, width: 60, height: 18, pixelPosition: true });
+    expect(components[1]).toMatchObject({ x: 13, y: 8, width: 10, height: 10, pixelPosition: true, valueVariable: "player_health", valueMaximum: 3, foregroundImage: true });
+    expect(components[2]).toMatchObject({ x: 8, y: 8, width: 64, height: 16 });
+  });
   it("preserves opted-in text pixel positions without changing legacy grid snapping", () => {
     const project = createBlankProjectData({ name: "Pixel HUD" });
     project.settings = {...(project.settings as Record<string, unknown>), hudPresets: [{ ...DEFAULT_HUD_PRESET, id: "pixel-hud", mode: "advanced", components: [

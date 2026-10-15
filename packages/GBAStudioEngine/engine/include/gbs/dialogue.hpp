@@ -99,6 +99,11 @@ struct HudLayoutComponent {
     HudValueSource value_source = HudValueSource::None;
     HudGauge gauge {};
     const MetaSprite* state_assets[2] = {nullptr,nullptr};
+    int16_t value_variable = -1;
+    int16_t inventory_item = -1;
+    uint32_t value_maximum = 100;
+    uint8_t text_advance = 8;
+    bool foreground_image = false;
 };
 
 struct HudLayout {

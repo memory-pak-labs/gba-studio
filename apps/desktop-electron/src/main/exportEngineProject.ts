@@ -402,10 +402,11 @@ export interface EngineExportTopdownRoom {
     collision_mask?: number;
     push_priority?: number;
     pushable?: boolean;
+    movement?: { kind: "wander_box"; bounds: { x: number; y: number; width: number; height: number }; step_interval_frames?: number };
     affine_obj?: EngineExportAffineObj;
     metasprite?: { asset: string; index: number };
     animation?: string | { asset: string };
-    animations?: Array<{ name: string; asset: string; frame_indices: number[] }>;
+    animations?: AssetcSpriteAnimationExportEntry[];
     on_start?: EngineExportProjectEventCommand[];
     on_interact?: EngineExportProjectEventCommand[];
     on_update?: EngineExportProjectEventCommand[];
@@ -5780,6 +5781,26 @@ function roomBackgroundAssetNameUncached(room: Record<string, unknown>): string 
   return normalizeGBASceneDocument(room).background.assetName ?? "";
 }
 
+function topdownNpcMovementForExport(actor: Record<string, unknown>): NonNullable<EngineExportTopdownRoom["npcs"]>[number]["movement"] {
+  const movement = actor.topdownMovement;
+  if (movement === undefined) return undefined;
+  if (!isRecord(movement) || movement.kind !== "wander_box" || !isRecord(movement.bounds)) {
+    throw new Error("Actor topdownMovement requer wander_box com bounds em tiles.");
+  }
+  const bounds = movement.bounds;
+  if (!["x", "y", "width", "height"].every(key => Number.isInteger(bounds[key]))
+    || Number(bounds.x) < 0 || Number(bounds.y) < 0 || Number(bounds.width) <= 0 || Number(bounds.height) <= 0) {
+    throw new Error("Actor topdownMovement.bounds requer origem não negativa e dimensões inteiras positivas.");
+  }
+  const interval = movement.stepIntervalFrames;
+  if (interval !== undefined && (!Number.isInteger(interval) || Number(interval) < 1 || Number(interval) > 255)) {
+    throw new Error("Actor topdownMovement.stepIntervalFrames requer um inteiro de 1 a 255.");
+  }
+  return { kind: "wander_box", ...(interval === undefined ? {} : { step_interval_frames: Number(interval) }), bounds: gbaTopdownAreaToPixels({
+    x: Number(bounds.x), y: Number(bounds.y), width: Number(bounds.width), height: Number(bounds.height)
+  }) };
+}
+
 function buildTopdownRooms(
   data: GBAProjectData,
   spritePack: AssetcSpritePackGeneration | null,
@@ -6019,6 +6040,7 @@ function buildTopdownRooms(
         const spriteExport = buildActorEngineSpriteExport(data, actor, spritePack);
         const collisionGeometry = actorCollisionGeometry(data, actor, actorSizePx);
         const position = entityPosition(actor, "actor", { x: 8, y: 8 });
+        const movement = topdownNpcMovementForExport(actor);
         return {
           name: stringField(actor, "name", "NPC"),
           position: gbaTopdownTilePointToPixels({
@@ -6034,6 +6056,7 @@ function buildTopdownRooms(
           collision_mask: Math.max(0, Math.min(0xFFFF, integerField(actor, "collisionMask", 0xFFFF))),
           push_priority: Math.max(0, Math.min(255, integerField(actor, "pushPriority", 0))),
           pushable: actor.pushable === true,
+          ...(movement ? { movement } : {}),
           ...(roomAffineObjForExport(room) ? { affine_obj: roomAffineObjForExport(room) } : {}),
           ...(spriteExport ? {
             metasprite: spriteExport.metasprite,
@@ -10223,6 +10246,11 @@ function buildEngineDialogueUiConfigForExportUncached(data: GBAProjectData): Eng
         label: component.label,
         text: component.runtimeText ? "" : component.text,
         ...(component.valueBinding ? {value_binding:component.valueBinding} : {}),
+        ...(component.valueVariable ? {value_variable:hudVariableIndex(component.valueVariable)} : {}),
+        ...(component.inventoryItem !== undefined ? {inventory_item:component.inventoryItem} : {}),
+        ...(component.valueMaximum !== undefined ? {value_maximum:component.valueMaximum} : {}),
+        ...(component.textAdvance ? {text_advance:component.textAdvance} : {}),
+        ...(component.foregroundImage ? {foreground_image:true} : {}),
         ...(component.stateAssets ? {state_assets:component.stateAssets.map(normalizeHudComponentAsset)} : {}),
         ...(component.gauge ? {gauge:{empty_asset:normalizeHudComponentAsset(component.gauge.emptyAsset),x:component.gauge.x,y:component.gauge.y,width:component.gauge.width,height:component.gauge.height,reverse:component.gauge.reverse === true}} : {}),
         asset: normalizeHudComponentAsset(component.asset),
@@ -10527,6 +10555,14 @@ function buildEngineExportProjectContractUncached(
   if (buildEngineDialogueUiConfigForExport(data).font_image) {
     features.push("dialogue_font");
   }
+  const hudLayouts = buildEngineDialogueUiConfigForExport(data).hud_layouts ?? [];
+  if (hudLayouts.some(layout => layout.components.some(component => component.value_variable !== undefined || component.inventory_item !== undefined))) {
+    features.push("hud_project_value_bindings");
+  }
+  if (hudLayouts.some(layout => layout.components.some(component => component.text_advance === 6))) {
+    features.push("hud_compact_text");
+  }
+  if (hudLayouts.some(layout => layout.components.some(component => component.foreground_image))) features.push("hud_foreground_images");
   if (buildEngineDialogueUiConfigForExport(data).selector_skin) {
     features.push("dialogue_choice_selector");
   }

@@ -20,6 +20,42 @@ const EXEMPLO_PLAYER_RUNTIMES = new Set([
   "luta"
 ]);
 
+export function resolveTopdownActorFramebufferTarget(room, actor, state, exported) {
+  const project = exported?.topdown_project;
+  const runtimeRoom = project?.rooms?.find(candidate => candidate.name === room?.name);
+  const isPlayer = actor?.name === room?.playerActorName;
+  const entity = isPlayer ? project?.player : runtimeRoom?.npcs?.find(candidate => candidate.name === actor?.name);
+  const movingNpc = !isPlayer && entity?.movement?.kind && entity.movement.kind !== "none";
+  const npcIndex = runtimeRoom?.npcs?.indexOf(entity);
+  const position = isPlayer ? state?.player : movingNpc && npcIndex === 0 ? state?.firstActor : movingNpc ? null : entity?.position;
+  if (movingNpc && (!Number.isFinite(position?.x) || !Number.isFinite(position?.y))) {
+    throw new Error(`Telemetria de posição ausente para NPC em movimento: ${actor?.name}.`);
+  }
+  const parts = entity?.animations?.[0]?.frame_metasprites?.[0]?.parts;
+  if (!runtimeRoom || !parts?.length || !Number.isFinite(position?.x) || !Number.isFinite(position?.y)) return null;
+  const size = project.player?.size ?? {x:16,y:16};
+  const camera = project.camera ?? {};
+  const follow = camera.follow_player === true;
+  const cameraX = follow ? Math.max(0,Math.min(runtimeRoom.width_tiles*8-240,state.player.x+size.x/2-120)) : Number(camera.position?.x ?? 0);
+  const cameraY = follow ? Math.max(0,Math.min(runtimeRoom.height_tiles*8-160,state.player.y+size.y/2-80)) : Number(camera.position?.y ?? 0);
+  return {x:position.x-cameraX+Math.min(...parts.map(part=>part.x)),y:position.y-cameraY+Math.min(...parts.map(part=>part.y))};
+}
+
+export function resolveTopdownActorFramebufferTargets(room, actor, state, exported, previousState) {
+  const current = resolveTopdownActorFramebufferTarget(room, actor, state, exported);
+  if (!current) return [];
+  const candidates = [current];
+  // Native scanout can finish before the next CPU telemetry publish. Only
+  // the immediately adjacent snapshot in the same room is admissible.
+  if (previousState && previousState.currentRoom === state?.currentRoom
+    && Number.isInteger(previousState.frame) && Number.isInteger(state?.frame)
+    && previousState.frame <= state.frame && previousState.frame >= state.frame - 1) {
+    const previous = resolveTopdownActorFramebufferTarget(room, actor, previousState, exported);
+    if (previous && (previous.x !== current.x || previous.y !== current.y)) candidates.push(previous);
+  }
+  return candidates;
+}
+
 export function resolveExemploSmokeFaceButton(controls, action) {
   if (action !== "a" && action !== "b") {
     throw new Error(`Botão de ação não suportado no smoke: ${String(action)}.`);
@@ -252,11 +288,12 @@ export const EXEMPLO_PLAYER_FRAMEBUFFER_SCENES = Object.freeze([
   "circuito_final"
 ]);
 
-// Penedos liga o player ao mesmo asset autorado da Nara; a arena tática
+// Porto e Penedos ligam o player ao mesmo asset autorado da Nara; a arena tática
 // também usa atores explícitos. Nenhuma deve auditar o player padrão.
 export const EXEMPLO_EXPLICIT_ACTOR_BINDING_SCENES = Object.freeze([
   "arena_tatica",
-  "penedos_vento"
+  "penedos_vento",
+  "porto_lumen"
 ]);
 
 export const EXEMPLO_EXACT_PLAYER_FRAMEBUFFER_SCENES = Object.freeze([
@@ -631,7 +668,9 @@ export function auditExemploVisualQualityGate(project, results) {
       geometry: result?.backgroundFidelity?.checks?.dimensions === true
         && result?.displayFidelity?.ok === true
         && Number(result?.frame?.pixelCount) === GBA_FRAMEBUFFER_WIDTH * GBA_FRAMEBUFFER_HEIGHT,
-      colorCount: backgroundless || (uniqueColorCount >= minimumColors && uniqueColorCount <= 256),
+      // GBA palette RAM has separate 256-entry BG and OBJ regions (Tonc video).
+      // Exported palette membership is checked independently below.
+      colorCount: backgroundless || (uniqueColorCount >= minimumColors && uniqueColorCount <= 512),
       contrast: backgroundless || contrastSpan >= 0.3 || playerContrastCompensation,
       paletteCoherence: backgroundless
         || (result?.paletteFidelity?.ok === true

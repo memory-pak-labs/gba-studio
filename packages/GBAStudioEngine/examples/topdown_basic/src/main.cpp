@@ -385,10 +385,13 @@ int default_save_menu_index() {
     return requested >= 0 && static_cast<size_t>(requested) < active_save_slot_count ? requested : 0;
 }
 
-bool topdown_direction_uses_horizontal_flip(uint8_t direction) {
-    return direction == static_cast<uint8_t>(gbs::TopDownActorDirection::Left) ||
-        direction == static_cast<uint8_t>(gbs::TopDownActorDirection::DownLeft) ||
-        direction == static_cast<uint8_t>(gbs::TopDownActorDirection::UpLeft);
+bool topdown_direction_uses_horizontal_flip(uint8_t direction, size_t animation_count) {
+    // The selected directional metasprite already contains its orientation,
+    // including mirrorLeftFromRight resolved by the exporter. Flipping here
+    // would reverse authored left artwork or undo that exported mirror.
+    (void)direction;
+    (void)animation_count;
+    return false;
 }
 
 void set_actor_metasprite(
@@ -436,7 +439,7 @@ void set_actor_metasprite(
             hflip ? !part.hflip : part.hflip,
             part.vflip,
             true,
-            0,
+            2,
             gbs::SpriteRenderMode::Normal,
             gbs::visual_effect_sprite_mosaic_enabled(visual_effects),
             part.width,
@@ -1631,6 +1634,14 @@ void refresh_npc_directional_animation(size_t index, bool moving) {
         ? actor_sprite->animation_count
         : room_data.npcs[index].animation_count;
     if (!topdown_has_idle_directional_animations(animation_count)) return;
+
+    const auto& npc = room_data.npcs[index];
+    const auto& runtime = npc_runtimes[index];
+    // Waiting for a discrete movement tick is still part of the current walk
+    // cycle. Selecting idle here would restart a slow patrol every other frame.
+    if (!moving && runtime.movement_frame_counter != 0 && !runtime.movement_cancelled
+        && runtime.active && runtime.visible
+        && gbs::actor_runtime_movement_speed_x100(npc, runtime) > 0) return;
 
     npc_runtimes[index].animation_index = topdown_directional_animation_index(
         animation_count,
@@ -3068,8 +3079,8 @@ int initialize_topdown_runtime() {
         gbastudio_project::dialogue_emote_assets,
         gbastudio_project::dialogue_emote_asset_count
     );
-    configure_dialogue_ui_for_active_room(true);
     gbs::configure_dialogue_font(gbastudio_project::dialogue_font);
+    configure_dialogue_ui_for_active_room(true);
     gbs::init_hud(hud);
     gbs::init_overlay(overlay);
     gbs::init_menu(pause_menu);
@@ -3521,6 +3532,7 @@ void render_topdown_runtime(const gbs::RuntimeFrameContext& context) {
                         continue;
                     }
                     const gbs::MetaSprite* player_metasprite = player_runtime_metasprite();
+                    const auto* player_sprite = selected_player_sprite_data();
                     set_actor_metasprite(
                         first_oam_index,
                         *player_metasprite,
@@ -3529,7 +3541,8 @@ void render_topdown_runtime(const gbs::RuntimeFrameContext& context) {
                             player.position_pixels.y - render_camera.y
                         },
                         player.size_pixels,
-                        topdown_direction_uses_horizontal_flip(player.direction),
+                        topdown_direction_uses_horizontal_flip(player.direction,
+                            player_sprite ? player_sprite->animation_count : project.player.animation_count),
                         project.player.affine_obj.enabled ? &project.player.affine_obj : nullptr
                     );
                     continue;
@@ -3548,6 +3561,7 @@ void render_topdown_runtime(const gbs::RuntimeFrameContext& context) {
                     npc_metasprite = npc_runtimes[index].metasprite;
                 }
                 if (npc_metasprite != nullptr) {
+                    const auto* npc_sprite = gbs::topdown_actor_sprite_for_index(project,npc_runtimes[index].sprite_index);
                     set_actor_metasprite(
                         first_oam_index,
                         *npc_metasprite,
@@ -3556,7 +3570,8 @@ void render_topdown_runtime(const gbs::RuntimeFrameContext& context) {
                             npc_runtimes[index].actor.position_pixels.y - render_camera.y
                         },
                         npc_runtimes[index].actor.size_pixels,
-                        topdown_direction_uses_horizontal_flip(npc_runtimes[index].actor.direction),
+                        topdown_direction_uses_horizontal_flip(npc_runtimes[index].actor.direction,
+                            npc_sprite ? npc_sprite->animation_count : project.rooms[current_room].npcs[index].animation_count),
                         npc_runtimes[index].affine_obj.enabled ? &npc_runtimes[index].affine_obj : nullptr
                     );
                 }

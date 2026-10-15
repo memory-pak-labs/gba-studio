@@ -31,21 +31,21 @@ function clamp(value: number, minimum: number, maximum: number): number {
 
 type FontAtlas = HTMLCanvasElement | HTMLImageElement | null;
 /** The native HUD places one glyph per tile, wrapping at the component bounds. */
-export function drawHudText(context: CanvasRenderingContext2D, text: string, x: number, y: number, width: number, height: number, font: FontAtlas = null, ink = "#f0e0b8"): void {
-  const columns = Math.floor(width / 8), rows = Math.floor(height / 8);
+export function drawHudText(context: CanvasRenderingContext2D, text: string, x: number, y: number, width: number, height: number, font: FontAtlas = null, ink = "#f0e0b8", advance: 6 | 8 = 8): void {
+  const columns = Math.floor(width / advance), rows = Math.floor(height / 8), glyphWidth = advance === 6 ? 5 : 8;
   let column = 0, line = 0;
   context.fillStyle = ink;
   for (const character of normalizeDialogueText(text)) {
     if (character === "\n") { line++; column = 0; continue; }
     if (column >= columns) { line++; column = 0; }
     if (columns < 1 || line >= rows) break;
-    const px = x + column * 8, py = y + line * 8;
+    const px = x + column * advance, py = y + line * 8;
     if (font) {
       const source = dialogueFontSourceRect(character);
-      context.drawImage(font, source.x, source.y, 8, 8, px, py, 8, 8);
+      context.drawImage(font, source.x, source.y, glyphWidth, 8, px, py, glyphWidth, 8);
     } else {
       dialogueFontRows(character).forEach((row, dy) => {
-        for (let dx = 0; dx < 8; dx++) if (row & (1 << (7 - dx))) context.fillRect(px + dx, py + dy, 1, 1);
+        for (let dx = 0; dx < glyphWidth; dx++) if (row & (1 << (7 - dx))) context.fillRect(px + dx, py + dy, 1, 1);
       });
     }
     column++;
@@ -102,7 +102,7 @@ function drawFallbackComponent(
   if (component.kind === "frame") return;
 
   const label = component.text || component.label || (component.kind === "icon" ? "*" : actionLabel);
-  drawHudText(context, label, x, y, width, height, font, ink);
+  drawHudText(context, label, x, y, width, height, font, ink, component.textAdvance);
 }
 
 export function drawHudComponent(
@@ -120,11 +120,12 @@ export function drawHudComponent(
 
   if (image && component.kind === "frame" && image.naturalWidth === 24 && image.naturalHeight === 24)
     renderSkin(context, image, { x, y, width, height });
+  else if (image && component.pixelPosition) context.drawImage(image,0,0,Math.min(width,image.naturalWidth),Math.min(height,image.naturalHeight),x,y,Math.min(width,image.naturalWidth),Math.min(height,image.naturalHeight));
   else if (image) drawCover(context, image, x, y, width, height);
   else drawFallbackComponent(context, component, actionLabel, font, ink);
 
   if (component.kind === "text" && image && (component.text || component.label)) {
-    drawHudText(context, component.text || component.label, x, y, width, height, font, ink);
+    drawHudText(context, component.text || component.label, x, y, width, height, font, ink, component.textAdvance);
   }
 }
 

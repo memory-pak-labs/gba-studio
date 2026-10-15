@@ -20,6 +20,8 @@ struct HudGaugeCache {
 };
 HudGaugeCache hud_gauge_cache[2] {};
 char hud_value_text[64][9] GBS_UI_EWRAM {};
+uint32_t hud_project_values[64] GBS_UI_EWRAM {};
+bool hud_project_values_ready = false;
 
 bool string_equals(const char* left, const char* right) {
     if (left == nullptr || right == nullptr) {
@@ -231,7 +233,13 @@ void update_hud_behavior(EventState& state, bool visible) {
     for (size_t index=0; index<selected_hud_layout->component_count && index<64; ++index) {
         const auto& component=selected_hud_layout->components[index];
         update_hud_element(component.behavior,hud_element_memory[index],state,visible && component.visible,state.input_pressed);
+        const int value = component.value_variable >= 0 && component.value_variable < static_cast<int>(event_variable_count)
+            ? state.variables[component.value_variable]
+            : component.inventory_item >= 0 && component.inventory_item < static_cast<int>(max_event_inventory_items)
+                ? state.inventory[component.inventory_item] : 0;
+        hud_project_values[index] = value > 0 ? static_cast<uint32_t>(value) : 0;
     }
+    hud_project_values_ready = true;
 }
 
 void draw_hud(const HudState& state) {
@@ -263,14 +271,15 @@ void draw_hud(const HudState& state) {
             const char* text = status == HudElementState::Selected && component.behavior.selected.text ? component.behavior.selected.text :
                 status == HudElementState::Disabled && component.behavior.disabled.text ? component.behavior.disabled.text : component.text;
             const int value_index = static_cast<int>(component.value_source);
-            const bool bound = value_index >= 0 && static_cast<size_t>(value_index) < hud_value_source_count;
-            const bool available = !bound || (state.value_sources & (1u << value_index));
+            const bool project_bound = component.value_variable >= 0 || component.inventory_item >= 0;
+            const bool bound = project_bound || (value_index >= 0 && static_cast<size_t>(value_index) < hud_value_source_count);
+            const bool available = project_bound ? hud_project_values_ready : !bound || (state.value_sources & (1u << value_index));
             const MetaSprite* image = component.metasprite;
             if (bound && available) {
-                const uint32_t value = state.values[value_index];
+                const uint32_t value = project_bound ? hud_project_values[order[order_index]] : state.values[value_index];
                 if (kind == GBS_HW_HUD_COMPONENT_TEXT) {
                     char* digits = hud_value_text[order[order_index]];
-                    const size_t columns = static_cast<size_t>((component.width + 7) / 8);
+                    const size_t columns = static_cast<size_t>((component.width + component.text_advance - 1) / component.text_advance);
                     size_t length = 0;
                     if (component.text) while (component.text[length] && length < 8) ++length;
                     if (length == 0 || length > columns) length = columns < 8 ? columns : 8;
@@ -285,7 +294,7 @@ void draw_hud(const HudState& state) {
                     state.visible && status != HudElementState::Hidden) {
                     const size_t buffer = gauge_buffer++;
                     auto& cache = hud_gauge_cache[buffer];
-                    const uint32_t maximum = state.maximums[value_index];
+                    const uint32_t maximum = project_bound ? component.value_maximum : state.maximums[value_index];
                     if ((cache.component != &component || cache.value != value || cache.maximum != maximum) &&
                         compose_hud_gauge(*image,component.gauge,value,maximum,hud_gauge_buffers[buffer],1536)) {
                         gbs_hw_load_obj_tiles(hud_gauge_buffers[buffer],component.gauge.full->destination_tile,component.gauge.full->tile_count);
@@ -310,7 +319,8 @@ void draw_hud(const HudState& state) {
                 }
             }
             gbs_hw_draw_hud_layout_component(
-                kind,
+                kind == GBS_HW_HUD_COMPONENT_TEXT && component.text_advance == 6 ? GBS_HW_HUD_COMPONENT_COMPACT_TEXT :
+                    kind == GBS_HW_HUD_COMPONENT_BAR && component.foreground_image ? GBS_HW_HUD_COMPONENT_FOREGROUND_BAR : kind,
                 component.x,
                 component.y,
                 component.width,
@@ -339,6 +349,7 @@ void configure_hud_layouts(const HudLayout* layouts, size_t count) {
 }
 
 bool configure_hud_layout(const char* layout_id) {
+    hud_project_values_ready = false;
     // Scene setup may have reloaded the full image into the same VRAM slot.
     for (auto& cache : hud_gauge_cache) cache = HudGaugeCache {};
     if (layout_id == nullptr) {
