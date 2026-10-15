@@ -25,6 +25,31 @@ function projectSession(enginePackPath: string): ProjectSession {
 }
 
 describe("useEngineActions", () => {
+  it("opens a verified cached Play ROM without doctor or compilation and keeps warnings", async () => {
+    inspectEnginePack.mockResolvedValue({ platform: "darwin", candidates: [], selected: {
+      label: "Engine Pack", path: "/packs/EnginePack", exists: true, hasAssetc: true, hasGbsbuild: true, hasGbsdoctor: true,
+      assetcPath: "/pack/assetc", gbsbuildPath: "/pack/gbsbuild"
+    } });
+    window.gbaStudio.exportEngineProject = vi.fn().mockResolvedValue({ canceled: false, destination: "/tmp/export",
+      romPath: "/tmp/verified.gba", warnings: ["asset warning"],
+      playBuildResult: { ran: true, exitCode: 0, summary: { romPath: "/tmp/verified.gba", romBytes: 4096 } },
+      playDoctorResult: { ran: true, exitCode: 0 } });
+    window.gbaStudio.runEnginePackDoctor = vi.fn(); window.gbaStudio.runEnginePackBuild = vi.fn();
+    window.gbaStudio.openRomPlayerWindow = vi.fn().mockResolvedValue({ ok: true });
+    const publishStatus = vi.fn();
+    const { result } = renderHook(() => useEngineActions({ contractDiagnosticsOK: true,
+      session: projectSession("/packs/EnginePack"), setStatus: vi.fn(), publishStatus }));
+    await waitFor(() => expect(result.current.playProjectDisabled).toBe(false));
+    vi.mocked(window.gbaStudio.runEnginePackDoctor).mockClear();
+    await act(() => result.current.playProject({ roomName: "porto_lumen" }));
+    expect(window.gbaStudio.exportEngineProject).toHaveBeenCalledWith(expect.objectContaining({ reusePlayRom: true }));
+    expect(window.gbaStudio.runEnginePackDoctor).not.toHaveBeenCalled();
+    expect(window.gbaStudio.runEnginePackBuild).not.toHaveBeenCalled();
+    expect(window.gbaStudio.openRomPlayerWindow).toHaveBeenCalledWith(expect.objectContaining({ romPath: "/tmp/verified.gba" }));
+    expect(result.current.buildResult?.summary?.romBytes).toBe(4096);
+    expect(result.current.doctorResult?.exitCode).toBe(0);
+    expect(publishStatus).toHaveBeenLastCalledWith(expect.stringContaining("asset warning"), "success");
+  });
   it("requires an export before dry-run instead of passing the editable project folder", async () => {
     const runEnginePackBuildDryRun = vi.fn();
     const setStatus = vi.fn();

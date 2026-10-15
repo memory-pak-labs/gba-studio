@@ -13,6 +13,7 @@ import { openRomPlayerWindow } from "./romPlayerWindow.js";
 import { installAppMenu } from "./appMenu.js";
 import { writeEngineSchemaExport } from "./engineProjectExport.js";
 import { projectPersistentBuildCacheEnabled } from "./engineBuildCache.js";
+import { PlayRomCache, type PlayRomInputs } from "./playRomCache.js";
 import { writeProjectMemoryReport } from "./projectMemoryReport.js";
 import { writeRomOccupancyArtifact } from "./romOccupancyArtifact.js";
 import { readProjectEnginePackPath } from "../shared/engineRomPipeline.js";
@@ -693,7 +694,13 @@ ipcMain.handle(ipcChannels.generateSpriteReferenceAsset, async (_event, request:
 });
 
 ipcMain.handle(ipcChannels.inspectEnginePack, (_event, preferredPath?: string) => inspectEnginePack({ preferredPath }));
-ipcMain.handle(ipcChannels.runEnginePackDoctor, (_event, options) => runSelectedEnginePackDoctor(options));
+const playRomCache = new PlayRomCache();
+ipcMain.handle(ipcChannels.runEnginePackDoctor, async (_event, options) => {
+  const selectedPath = inspectEnginePack({ preferredPath: options?.enginePackPath }).selected?.path;
+  const result = await runSelectedEnginePackDoctor(options);
+  playRomCache.doctorCompleted(options?.projectDir, result, selectedPath);
+  return result;
+});
 ipcMain.handle(ipcChannels.runEnginePackBuildDryRun, (_event, projectDir: string, enginePackPath?: string) =>
   runSelectedEnginePackBuildDryRun(projectDir, enginePackPath)
 );
@@ -703,6 +710,7 @@ ipcMain.handle(ipcChannels.runEnginePackBuild, async (
   enginePackPath?: string,
   projectPath?: string
 ) => {
+  const selectedPath = inspectEnginePack({ preferredPath: enginePackPath }).selected?.path;
   const built = await runSelectedEnginePackBuild(projectDir, enginePackPath);
   const romPath = built.error ? null : built.summary?.romPath;
   const occupancy = romPath
@@ -718,7 +726,7 @@ ipcMain.handle(ipcChannels.runEnginePackBuild, async (
       })
     : null;
   const published = await publishEnginePackRomToProjectRoot(built, projectPath);
-  return published.summary
+  const result = published.summary
     ? {
       ...published,
       summary: {
@@ -734,6 +742,9 @@ ipcMain.handle(ipcChannels.runEnginePackBuild, async (
       }
     }
     : published;
+  const changedInputs = await playRomCache.buildCompleted(projectDir, result, selectedPath);
+  if (changedInputs) return { ran: true, exitCode: null, error: changedInputs };
+  return result;
 });
 // Opt-in, user-owned credential, main process only. No key is persisted or bridged.
 const analyzeScene = createSceneAnalysisService({
@@ -785,6 +796,18 @@ ipcMain.handle(ipcChannels.exportEngineProject, async (_event, request: ExportEn
     };
   }
 
+  const playInputs: PlayRomInputs | null = request.reusePlayRom && request.projectPath ? {
+    projectPath: request.projectPath,
+    data: request.project.data,
+    enginePack: selectedEnginePack,
+    developmentStartScene: request.developmentStartScene,
+    bundledAssetRoots: [join(app.getAppPath(), "default-assets/templates"), join(process.resourcesPath, "default-assets/templates")]
+  } : null;
+  if (playInputs) {
+    const cached = await playRomCache.reuse(playInputs);
+    if (cached) return cached;
+  }
+
   const pluginRegistry = request.projectPath
     ? await loadProjectPlugins(request.projectPath)
     : undefined;
@@ -816,6 +839,10 @@ ipcMain.handle(ipcChannels.exportEngineProject, async (_event, request: ExportEn
 
   const destination = join(result.filePaths[0], generated.target);
   try {
+    const candidate = playInputs ? await playRomCache.begin(playInputs, [
+      ...generated.assets.map(asset => asset.source),
+      ...(generated.audioPack?.sourceCopies.map(asset => asset.source) ?? [])
+    ]) : null;
     const written = await writeEngineSchemaExport({
       destination,
       prepared: generated,
@@ -823,13 +850,15 @@ ipcMain.handle(ipcChannels.exportEngineProject, async (_event, request: ExportEn
       projectPath: request.projectPath,
       cacheEnabled: projectPersistentBuildCacheEnabled(request.project.data)
     });
-    return {
+    const exported = {
       canceled: false,
       destination: written.destination,
       files: written.files,
       warnings: written.warnings,
       target: generated.target
     };
+    playRomCache.exported(destination, candidate, exported);
+    return exported;
   } catch (error) {
     return {
       canceled: false,

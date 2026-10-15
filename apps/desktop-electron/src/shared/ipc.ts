@@ -331,6 +331,7 @@ export interface ExportEngineProjectRequest {
   projectPath?: string;
   destinationRoot?: string;
   developmentStartScene?: DevelopmentSceneLaunch;
+  reusePlayRom?: boolean;
 }
 
 export interface DevelopmentSceneLaunch {
@@ -357,6 +358,9 @@ export interface ExportEngineProjectResult {
   files?: string[];
   warnings?: string[];
   target?: string;
+  romPath?: string;
+  playBuildResult?: EnginePackBuildResult;
+  playDoctorResult?: EnginePackDoctorResult;
   error?: string;
 }
 

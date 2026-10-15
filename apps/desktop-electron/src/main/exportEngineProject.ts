@@ -1,3 +1,4 @@
+import { memoizeEngineExport, withEngineExportContext } from "../shared/engineExportContext.js";
 import { audioContractIssues } from "../shared/audioContract.js";
 import { isLutaEventVerb, parseLutaEventCommand } from "../shared/lutaEventCommands.js";
 import { eventCommandIntegrationIssue, eventCommandSupport } from "../shared/eventCommandSupport.js";
@@ -2713,6 +2714,10 @@ function gbaRomHeaderBuild(data: GBAProjectData): Pick<EngineExportProjectContra
 }
 
 function projectRooms(data: GBAProjectData): Record<string, unknown>[] {
+  return memoizeEngineExport(data, "main.projectRooms", () => projectRoomsUncached(data));
+}
+
+function projectRoomsUncached(data: GBAProjectData): Record<string, unknown>[] {
   const rooms = projectArray(data, "scenas");
   if (rooms.length > 0) return rooms;
   const persistedRooms = projectArray(data, "rooms");
@@ -2879,6 +2884,10 @@ function entityBounds(
 }
 
 function roomSceneType(room: Record<string, unknown>): string {
+  return memoizeEngineExport(room, "main.roomSceneType", () => roomSceneTypeUncached(room));
+}
+
+function roomSceneTypeUncached(room: Record<string, unknown>): string {
   return normalizeSceneTypeId(normalizeGBASceneDocument(room).sceneType, "topdown");
 }
 
@@ -5764,6 +5773,10 @@ function buildTopdownProjectAssetSection(
 }
 
 function roomBackgroundAssetName(room: Record<string, unknown>): string {
+  return memoizeEngineExport(room, "main.roomBackgroundAssetName", () => roomBackgroundAssetNameUncached(room));
+}
+
+function roomBackgroundAssetNameUncached(room: Record<string, unknown>): string {
   return normalizeGBASceneDocument(room).background.assetName ?? "";
 }
 
@@ -10092,6 +10105,10 @@ function resolveDialogueFontAsset(
 }
 
 function buildEngineDialogueUiConfigForExport(data: GBAProjectData): EngineDialogueUiConfig {
+  return memoizeEngineExport(data, "main.buildEngineDialogueUiConfigForExport", () => buildEngineDialogueUiConfigForExportUncached(data));
+}
+
+function buildEngineDialogueUiConfigForExportUncached(data: GBAProjectData): EngineDialogueUiConfig {
   const hudPresentation = deriveHudPresetsWorkspacePresentation(data);
   const hudIconSpritePack = buildAssetcSpritePackGeneration(data);
   const activeHud = hudPresentation.activePreset;
@@ -10231,6 +10248,13 @@ function buildEngineDialogueUiConfigForExport(data: GBAProjectData): EngineDialo
 export function buildEngineExportProjectContract(
   data: GBAProjectData,
   options: BuildEngineExportProjectContractOptions = {}
+): EngineExportProjectContract {
+  return withEngineExportContext(() => buildEngineExportProjectContractUncached(data, options));
+}
+
+function buildEngineExportProjectContractUncached(
+  data: GBAProjectData,
+  options: BuildEngineExportProjectContractOptions
 ): EngineExportProjectContract {
   if (options.developmentStartScene) {
     const { developmentStartScene, ...regularOptions } = options;
@@ -10680,6 +10704,13 @@ export function buildEngineExportProjectContract(
 export function prepareEngineProjectExport(
   data: GBAProjectData,
   options: BuildEngineExportProjectContractOptions = {}
+): PreparedEngineProjectExport {
+  return withEngineExportContext(() => prepareEngineProjectExportUncached(data, options));
+}
+
+function prepareEngineProjectExportUncached(
+  data: GBAProjectData,
+  options: BuildEngineExportProjectContractOptions
 ): PreparedEngineProjectExport {
   try {
     data = projectWithIndependentTacticalResidency(expandProjectTilemaps(data));

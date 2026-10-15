@@ -1,3 +1,4 @@
+import { memoizeEngineExport } from "./engineExportContext.js";
 import { spriteColorModeForSheet } from "./spriteColorDepth.js";
 import { decomposeGbaMetaspriteFrame } from "./gbaMetaspriteLayout.js";
 import { resolveAudioInstrumentComposition } from "./audioInstruments.js";
@@ -92,6 +93,10 @@ function projectArray(data: GBAProjectData, key: string): Record<string, unknown
 }
 
 function projectRooms(data: GBAProjectData): Record<string, unknown>[] {
+  return memoizeEngineExport(data, "shared.projectRooms", () => projectRoomsUncached(data));
+}
+
+function projectRoomsUncached(data: GBAProjectData): Record<string, unknown>[] {
   const scenas = projectArray(data, "scenas");
   if (scenas.length > 0) return scenas;
 
@@ -130,6 +135,10 @@ export function engineEventBackgroundGroupName(room: Record<string, unknown>, in
 }
 
 function eventBackgroundAssetNames(data: GBAProjectData): string[] {
+  return memoizeEngineExport(data, "shared.eventBackgroundAssetNames", () => eventBackgroundAssetNamesUncached(data));
+}
+
+function eventBackgroundAssetNamesUncached(data: GBAProjectData): string[] {
   return [...new Set(projectArray(data, "events").flatMap(event => {
     const steps = Array.isArray(event.steps) ? recordArray(event, "steps") : [event];
     return steps.filter(step => step.isEnabled !== false).flatMap(step => {
@@ -282,6 +291,10 @@ export function engineUsedHudPresetIDs(data: GBAProjectData): Set<string> {
 }
 
 function hudSceneGroupsByIcon(data: GBAProjectData): ReadonlyMap<string, readonly string[]> {
+  return memoizeEngineExport(data, "shared.hudSceneGroupsByIcon", () => hudSceneGroupsByIconUncached(data));
+}
+
+function hudSceneGroupsByIconUncached(data: GBAProjectData): ReadonlyMap<string, readonly string[]> {
   const projectSettings = settings(data);
   const presets = recordArray(projectSettings ?? {}, "hudPresets");
   const groupsByIcon = new Map<string, string[]>();
@@ -3509,6 +3522,10 @@ export interface AssetcPaletteFamilyPackGeneration {
 }
 
 export function buildAssetcPaletteFamilyPackGeneration(data: GBAProjectData): AssetcPaletteFamilyPackGeneration | null {
+  return memoizeEngineExport(data, "shared.buildAssetcPaletteFamilyPackGeneration", () => buildAssetcPaletteFamilyPackGenerationUncached(data));
+}
+
+function buildAssetcPaletteFamilyPackGenerationUncached(data: GBAProjectData): AssetcPaletteFamilyPackGeneration | null {
   const families = exportPaletteFamilies(data);
   if (families.length === 0) return null;
 
@@ -3546,6 +3563,10 @@ export function buildAssetcPaletteFamilyPackGeneration(data: GBAProjectData): As
 }
 
 export function buildAssetcAudioPackGeneration(data: GBAProjectData): AssetcAudioPackGeneration | null {
+  return memoizeEngineExport(data, "shared.buildAssetcAudioPackGeneration", () => buildAssetcAudioPackGenerationUncached(data));
+}
+
+function buildAssetcAudioPackGenerationUncached(data: GBAProjectData): AssetcAudioPackGeneration | null {
   const tracker: AssetcAudioJsonDocument["tracker"] = [];
   const pcm: AssetcAudioJsonDocument["pcm"] = [];
   const sfx: AssetcAudioJsonDocument["sfx"] = [];
@@ -4471,6 +4492,10 @@ export function buildLutaActorEngineSpriteExport(
 }
 
 export function buildAssetcSpritePackGeneration(data: GBAProjectData): AssetcSpritePackGeneration | null {
+  return memoizeEngineExport(data, "shared.buildAssetcSpritePackGeneration", () => buildAssetcSpritePackGenerationUncached(data));
+}
+
+function buildAssetcSpritePackGenerationUncached(data: GBAProjectData): AssetcSpritePackGeneration | null {
   const hudGroups = hudSceneGroupsByIcon(data);
   const spriteSheets = uniqueSpriteSheetsFromActors(data, hudGroups);
   if (spriteSheets.length === 0) return null;
@@ -5080,6 +5105,10 @@ function uniqueTilesetsForPack(data: GBAProjectData): string[] {
 }
 
 export function buildAssetcTilesetPackGeneration(data: GBAProjectData): AssetcTilesetPackGeneration | null {
+  return memoizeEngineExport(data, "shared.buildAssetcTilesetPackGeneration", () => buildAssetcTilesetPackGenerationUncached(data));
+}
+
+function buildAssetcTilesetPackGenerationUncached(data: GBAProjectData): AssetcTilesetPackGeneration | null {
   const tilesetNames = uniqueTilesetsForPack(data);
   if (tilesetNames.length === 0) return null;
 

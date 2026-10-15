@@ -25,6 +25,7 @@ export type StatusTone = "info" | "success" | "error";
 interface EngineExportOutcome {
   destination: string;
   warnings: string[];
+  romPath?: string;
 }
 
 interface RomBuildOutcome {
@@ -203,6 +204,7 @@ export function useEngineActions({ contractDiagnosticsOK, projectHealthExportRea
     interactive?: boolean;
     projectData?: ProjectSession["project"]["data"];
     skipPostExportChecks?: boolean;
+    reusePlayRom?: boolean;
   }): Promise<EngineExportOutcome | null> {
     const currentSession = sessionRef.current;
     if (!currentSession) return null;
@@ -215,7 +217,8 @@ export function useEngineActions({ contractDiagnosticsOK, projectHealthExportRea
           : currentSession.project,
         projectPath: currentSession.path,
         destinationRoot: options?.destinationRoot,
-        developmentStartScene: options?.developmentStartScene
+        developmentStartScene: options?.developmentStartScene,
+        ...(options?.reusePlayRom ? { reusePlayRom: true } : {})
       });
       if (result.canceled) {
         if (options?.interactive !== false) {
@@ -227,6 +230,8 @@ export function useEngineActions({ contractDiagnosticsOK, projectHealthExportRea
         setStatus(result.error ?? "Falha ao exportar projeto Engine Pack.");
         return null;
       }
+      if (result.playBuildResult) setBuildResult(result.playBuildResult);
+      if (result.playDoctorResult) setDoctorResult(result.playDoctorResult);
 
       setLastEngineExportPath(result.destination);
       setLastEngineExportSource({ path: currentSession.path, data: options?.projectData ?? currentSession.project.data });
@@ -253,7 +258,7 @@ export function useEngineActions({ contractDiagnosticsOK, projectHealthExportRea
           }
         }
       }
-      return { destination: result.destination, warnings };
+      return { destination: result.destination, warnings, romPath: result.romPath };
     } finally {
       setExportRunning(false);
     }
@@ -261,11 +266,13 @@ export function useEngineActions({ contractDiagnosticsOK, projectHealthExportRea
 
   async function buildProjectRomArtifact(
     projectData?: ProjectSession["project"]["data"],
-    developmentStartScene?: DevelopmentSceneLaunch
+    developmentStartScene?: DevelopmentSceneLaunch,
+    reusePlayRom = false
   ): Promise<RomBuildOutcome | null> {
     const currentSession = sessionRef.current;
     if (!currentSession?.path) return null;
 
+    const enginePackPath = readProjectEnginePackPath(projectData ?? currentSession.project.data);
     const destinationRoot = resolveRomExportRoot(currentSession.path, currentSession.project.data);
     setStatus(ui("Exportando projeto para {0}...", { 0: destinationRoot }));
     const exported = await exportEngineProject({
@@ -273,14 +280,16 @@ export function useEngineActions({ contractDiagnosticsOK, projectHealthExportRea
       developmentStartScene,
       interactive: false,
       projectData,
+      reusePlayRom,
       skipPostExportChecks: true
     });
     if (!exported) return null;
+    if (exported.romPath) return { romPath: exported.romPath, warnings: exported.warnings };
     const exportPath = exported.destination;
 
     const doctor = await window.gbaStudio.runEnginePackDoctor({
       projectDir: exportPath,
-      enginePackPath: projectEnginePackPath()
+      enginePackPath
     });
     setDoctorResult(doctor);
     if (doctor.error || (doctor.exitCode !== null && doctor.exitCode !== 0)) {
@@ -291,7 +300,7 @@ export function useEngineActions({ contractDiagnosticsOK, projectHealthExportRea
     setStatus(ui("Compilando ROM..."));
     const result = await window.gbaStudio.runEnginePackBuild(
       exportPath,
-      projectEnginePackPath(),
+      enginePackPath,
       currentSession.path
     );
     setBuildResult(result);
@@ -354,7 +363,8 @@ export function useEngineActions({ contractDiagnosticsOK, projectHealthExportRea
         : undefined;
       const built = await buildProjectRomArtifact(
         JSON.parse(sourceSnapshot),
-        developmentStartScene
+        developmentStartScene,
+        true
       );
       if (!built) return;
       if (sessionRef.current?.path !== currentSession.path
