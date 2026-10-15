@@ -143,17 +143,40 @@ export async function mergeUniversalMachOTrees({ arm64Root, x86_64Root, destinat
   return relativePaths;
 }
 
-export async function auditUniversalMachOTree(root) {
+export function parseMinimumMacosVersions(output) {
+  return [...new Set([
+    ...String(output).matchAll(/\bminos\s+(\d+(?:\.\d+)+)/g),
+    ...String(output).matchAll(/cmd LC_VERSION_MIN_MACOSX\s+cmdsize \d+\s+version (\d+(?:\.\d+)+)/g)
+  ].map((match) => match[1]))];
+}
+
+export function macosVersionExceeds(version, maximum) {
+  const actual = version.split(".").map(Number), allowed = maximum.split(".").map(Number);
+  for (let index = 0; index < Math.max(actual.length, allowed.length); index += 1) {
+    if ((actual[index] ?? 0) !== (allowed[index] ?? 0)) return (actual[index] ?? 0) > (allowed[index] ?? 0);
+  }
+  return false;
+}
+
+export async function auditUniversalMachOTree(root, options = {}) {
   const paths = await collectMachORelativePaths(root);
   const binaries = [];
   for (const relativePath of paths) {
     const architectures = await architecturesForMachO(path.join(root, relativePath));
-    binaries.push({ relativePath, architectures, universal: hasUniversalMacArchitectures(architectures) });
+    let minimumMacosVersions = [];
+    if (options.maximumMacosVersion) {
+      // otool interprets a trailing "(GPU)" as an archive member, including
+      // Electron helper executable names. vtool reads the literal file path.
+      const { stdout } = await execFileAsync("xcrun", ["vtool", "-show-build", path.join(root, relativePath)], { maxBuffer: 8 * 1024 * 1024 });
+      minimumMacosVersions = parseMinimumMacosVersions(stdout);
+    }
+    binaries.push({ relativePath, architectures, universal: hasUniversalMacArchitectures(architectures), minimumMacosVersions });
   }
   return {
     root,
     binaries,
     total: binaries.length,
-    invalid: binaries.filter((item) => !item.universal)
+    invalid: binaries.filter((item) => !item.universal),
+    incompatibleMinimum: binaries.filter((item) => item.minimumMacosVersions.some((version) => macosVersionExceeds(version, options.maximumMacosVersion)))
   };
 }

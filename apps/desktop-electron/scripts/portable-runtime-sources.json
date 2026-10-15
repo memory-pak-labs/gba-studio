@@ -3,6 +3,45 @@
   "pythonVersion": "3.13.16",
   "pillowVersion": "12.3.0",
   "compilerVersion": "15.2.1-1.1",
+  "macosCompilers": {
+    "arm64": {
+      "name": "xpack-arm-none-eabi-gcc-15.2.1-1.1-darwin-arm64.tar.gz",
+      "url": "https://github.com/xpack-dev-tools/arm-none-eabi-gcc-xpack/releases/download/v15.2.1-1.1/xpack-arm-none-eabi-gcc-15.2.1-1.1-darwin-arm64.tar.gz",
+      "sha256": "574082d35e49a2bcbdc355836b2a3ae5e5bb3b9456c9f5e37177db2ab4aad870"
+    },
+    "x86_64": {
+      "name": "xpack-arm-none-eabi-gcc-15.2.1-1.1-darwin-x64.tar.gz",
+      "url": "https://github.com/xpack-dev-tools/arm-none-eabi-gcc-xpack/releases/download/v15.2.1-1.1/xpack-arm-none-eabi-gcc-15.2.1-1.1-darwin-x64.tar.gz",
+      "sha256": "5be906a5194c3173e145a58048e5607ffff947773237802b93e55e23c415f1b6"
+    }
+  },
+  "macosRuntime": {
+    "python_arm64": {
+      "name": "cpython-3.13.16+20261009-aarch64-apple-darwin-install_only_stripped.tar.gz",
+      "url": "https://github.com/astral-sh/python-build-standalone/releases/download/20261009/cpython-3.13.16%2B20261009-aarch64-apple-darwin-install_only_stripped.tar.gz",
+      "sha256": "11785155d0f70e634178219c20925d8f20be00a3da4684fc4f5019dd15602ef7"
+    },
+    "python_x86_64": {
+      "name": "cpython-3.13.16+20261009-x86_64-apple-darwin-install_only_stripped.tar.gz",
+      "url": "https://github.com/astral-sh/python-build-standalone/releases/download/20261009/cpython-3.13.16%2B20261009-x86_64-apple-darwin-install_only_stripped.tar.gz",
+      "sha256": "bd085c51e960f00ee33b630e2b13ac90fe90cdc3da25a0f0bc0719b1294920bf"
+    },
+    "pillow_arm64": {
+      "name": "pillow-12.3.0-cp313-cp313-macosx_11_0_arm64.whl",
+      "url": "https://files.pythonhosted.org/packages/10/76/8803c13605b763d33d156c4678fc77f8443389c0c51c8aef707bb02015f4/pillow-12.3.0-cp313-cp313-macosx_11_0_arm64.whl",
+      "sha256": "d69141514cc30b774ceea5e3ed3a6635c8d8a96edf664689b890f4089111fb35"
+    },
+    "pillow_x86_64": {
+      "name": "pillow-12.3.0-cp313-cp313-macosx_10_13_x86_64.whl",
+      "url": "https://files.pythonhosted.org/packages/42/92/2fc3ffad878ae8dd5469ec1bc8eb83b71f48e13efdf68f02709003982a32/pillow-12.3.0-cp313-cp313-macosx_10_13_x86_64.whl",
+      "sha256": "7a743ff716f746fc19a9557f60dab1600d4613255f8a7aeb3cdde4db7eb15a66"
+    },
+    "make": {
+      "name": "make-4.4.1.tar.lz",
+      "url": "https://ftp.gnu.org/gnu/make/make-4.4.1.tar.lz",
+      "sha256": "8814ba072182b605d156d7589c19a43b89fc58ea479b9355146160946f8cf6e9"
+    }
+  },
   "platforms": {
     "win32": {
       "python": {

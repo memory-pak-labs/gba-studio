@@ -35,6 +35,15 @@ function firstExistingPath(paths) {
   return paths.find((item) => existsSync(item)) ?? paths[0];
 }
 
+export function electronLaunchCommand(executable, args = [], options = {}) {
+  const architecture = options.architecture ?? process.env.GBA_STUDIO_SMOKE_ARCH?.trim();
+  const platform = options.platform ?? process.platform;
+  if (!architecture) return { executable, args };
+  if (platform !== "darwin") throw new Error("A selecao de arquitetura do smoke requer macOS.");
+  if (!["arm64", "x86_64"].includes(architecture)) throw new Error(`Arquitetura do smoke invalida: ${architecture}`);
+  return { executable: "/usr/bin/arch", args: [`-${architecture}`, executable, ...args] };
+}
+
 export function packagedDarwinElectronExecutableCandidates(appRoot) {
   return [
     posix.join(appRoot, "release/mac-universal/gba-studio.app/Contents/MacOS/gba-studio"),

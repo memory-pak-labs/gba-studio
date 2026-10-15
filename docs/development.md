@@ -62,6 +62,40 @@ npm run dev
 O npm instala as dependências declaradas e o Electron. Nenhuma senha Apple é
 necessária para desenvolver, testar ou compilar o editor.
 
+## Instalador macOS Universal
+
+Em um Mac Apple Silicon com Rosetta 2, Xcode e Node.js 22, depois de compilar
+o Engine Pack:
+
+```sh
+cd apps/desktop-electron
+npm run package:mac:universal  # aplicativo para validação
+npm run dist:mac              # DMG e ZIP, Intel + Apple Silicon
+```
+
+O preparo Universal baixa as toolchains oficiais xPack GNU Arm para arm64 e
+x86_64, verifica os SHA256 fixados em `scripts/portable-runtime-sources.json`
+e combina os executáveis com `lipo`. O compilador é uma ferramenta independente;
+o backend continua GBAStudioEngine. A receita e as fontes do gbafix ficam no
+pacote, junto aos avisos e às licenças originais do compilador.
+
+Python/Pillow são baixados de distribuições com versão e SHA256 fixados.
+GNU make é compilado para as duas arquiteturas com alvo macOS 12; sua fonte
+e receita ficam no pacote. O runtime não usa cópias de ferramentas do sistema
+que exijam um macOS mais recente. `verify:macos-universal-runtime` rejeita
+binários incompletos ou com mínimo superior a macOS 12 e
+gera a mesma ROM de teste nas duas arquiteturas. No Apple Silicon, o teste
+Intel requer Rosetta 2. Para usar toolchains externas, defina o par
+`GBA_STUDIO_DEVKITPRO_ARM64_SOURCE` e `GBA_STUDIO_DEVKITPRO_X86_64_SOURCE`.
+
+Os smokes do aplicativo empacotado aceitam `GBA_STUDIO_SMOKE_ARCH=arm64` ou
+`GBA_STUDIO_SMOKE_ARCH=x86_64` para forçar a arquitetura testada.
+
+O pacote permite gerar ROMs sem instalar Python ou devkitPro no computador do
+usuário. A assinatura Developer ID, notarização, tickets e Gatekeeper devem
+ser verificados no DMG/ZIP final. O teste Intel por Rosetta deve ser registrado
+separadamente de uma execução em um Mac Intel físico.
+
 ## Motor
 
 Os testes host precisam de C++17, make e Python 3. São independentes de ROM e de

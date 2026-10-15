@@ -14,6 +14,7 @@ import {
   cdpSession,
   createElectronSmokeEnv,
   electronExecutablePath,
+  electronLaunchCommand,
   renderedText,
   terminateChild,
   wait
@@ -5470,7 +5471,8 @@ async function main() {
   });
   if (useExplicitProject) childEnv.GBA_STUDIO_OPEN_PROJECT = templatePath;
   else delete childEnv.GBA_STUDIO_OPEN_PROJECT;
-  const child = spawn(executable, usePackagedApp ? [] : [appRoot], {
+  const launch = electronLaunchCommand(executable, usePackagedApp ? [] : [appRoot]);
+  const child = spawn(launch.executable, launch.args, {
     cwd: appRoot,
     env: childEnv,
     stdio: ["ignore", "pipe", "pipe"]

@@ -6,8 +6,18 @@ import {
   cdpSession,
   copySmokeProject,
   createElectronSmokeEnv,
+  electronLaunchCommand,
   packagedDarwinElectronExecutableCandidates
 } from "./electron-smoke-helpers.mjs";
+
+it("forces the requested macOS architecture instead of silently testing the host slice twice", () => {
+  expect(electronLaunchCommand("/app/Contents/MacOS/gba-studio", [], { platform: "darwin", architecture: "x86_64" })).toEqual({
+    executable: "/usr/bin/arch", args: ["-x86_64", "/app/Contents/MacOS/gba-studio"]
+  });
+  expect(electronLaunchCommand("/app", ["project"], { platform: "darwin", architecture: "arm64" }).args).toEqual(["-arm64", "/app", "project"]);
+  expect(() => electronLaunchCommand("/app", [], { platform: "darwin", architecture: "invalid" })).toThrow(/arquitetura/i);
+  expect(() => electronLaunchCommand("/app", [], { platform: "linux", architecture: "x86_64" })).toThrow(/macOS/);
+});
 
 it("copies authored project files without copying generated builds and caches", async () => {
   const temporary = await mkdtemp(join(tmpdir(), "gba-smoke-copy-test-"));

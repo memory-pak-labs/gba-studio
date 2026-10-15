@@ -31,7 +31,7 @@
     "dist": "npm run icons && npm run build && electron-builder",
     "dist:linux": "npm run icons && npm run build && node scripts/prepare-portable-engine-pack.mjs && node scripts/prepare-portable-runtime.mjs && electron-builder --linux --x64 --publish never",
     "package:mac:universal": "npm run icons && npm run prepare:translation-models && npm run build && npm run prepare:embedded-runtime:universal && npm run verify:macos-universal-runtime && node scripts/prepare-package-output.mjs && electron-builder --dir --universal && node scripts/sign-macos-app.mjs",
-    "dist:mac": "npm run icons && npm run prepare:translation-models && npm run build && npm run prepare:embedded-runtime:universal && npm run verify:macos-universal-runtime && electron-builder --mac --universal",
+    "dist:mac": "npm run icons && npm run prepare:translation-models && npm run build && npm run prepare:embedded-runtime:universal && npm run verify:macos-universal-runtime && electron-builder --mac --universal --publish never",
     "dist:win": "npm run icons && npm run build && node scripts/prepare-portable-engine-pack.mjs && node scripts/prepare-portable-runtime.mjs && electron-builder --win --x64 --publish never",
     "preview": "electron-vite preview",
     "mcp": "electron . --mcp",
@@ -163,6 +163,9 @@
       }
     ],
     "mac": {
+      "minimumSystemVersion": "12.0",
+      "artifactName": "GBA-Studio-${version}-macOS-${arch}.${ext}",
+      "signIgnore": ["\\.(?:pyc|pyo|a|o|whl|lz|gz|zip|asar|png|icns|ico|wasm|pak|dat|bin)$"],
       "bundleShortVersion": "0.1.0",
       "bundleVersion": "3",
       "category": "public.app-category.developer-tools",
