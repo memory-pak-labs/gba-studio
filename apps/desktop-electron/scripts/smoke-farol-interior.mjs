@@ -93,4 +93,3 @@ try{
  fs.writeFileSync(path.join(out,'farol-verification.json'),JSON.stringify(report,null,2));core._gba_destroy();
 }
 console.log(JSON.stringify({ok:report.ok,states:report.states.length,pixels:report.states.length*38400,directions:report.directions.length,collisions:report.collisions.length,dialogues:report.dialogues.length,transitions:report.transitions.length}));
-

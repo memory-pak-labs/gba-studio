@@ -72,4 +72,3 @@ try{
  report.audio.rms=Math.sqrt(report.audio.sum/report.audio.count);assert.ok(report.audio.rms>0.001&&report.audio.peak<1,'mixed gameplay audio is present and not clipped');report.ok=true;
 } finally {fs.writeFileSync(path.join(out,'verification.json'),JSON.stringify(report,null,2));m._gba_destroy();}
 console.log('Tempestade native smoke PASS');
-

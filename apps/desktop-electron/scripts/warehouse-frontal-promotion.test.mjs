@@ -66,4 +66,3 @@ it('exports the approved hand anchored at its fingertip only in Warehouse',()=>{
  ]);
  expect(scenes.find(s=>s.name==='observatorio_do_farol').cursor.metasprite.asset).toBe('point_click_cursor');
 });
-

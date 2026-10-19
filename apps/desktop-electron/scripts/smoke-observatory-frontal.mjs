@@ -77,4 +77,3 @@ try{
  fs.writeFileSync(path.join(out,'observatory-verification.json'),JSON.stringify(report,null,2));core._gba_destroy();
 }
 console.log(JSON.stringify({ok:report.ok,states:report.states.length,pixels:report.states.length*38400,directions:report.directions.length,dialogues:report.dialogues.length,exit:report.exit?.marketReached}));
-

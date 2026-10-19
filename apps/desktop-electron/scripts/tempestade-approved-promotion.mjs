@@ -36,4 +36,3 @@ export function promoteApprovedTempestade(source){
  for(const g of p.assetGroups??[])if(Array.isArray(g.assetIDs))g.assetIDs=g.assetIDs.filter(id=>!removed.has(id));
  return p;
 }
-
