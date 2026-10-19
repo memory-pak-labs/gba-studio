@@ -1784,7 +1784,7 @@ function openPreviewTextInput(
       variableName,
       value,
       maxLength: effectiveMaxLength,
-      cursorIndex: Math.min(value.length, effectiveMaxLength - 1),
+      cursorIndex: Math.min(value.length, layout === "grid" ? effectiveMaxLength : effectiveMaxLength - 1),
       keyboardIndex: 0,
       lowercase: false,
       layout
@@ -1806,11 +1806,12 @@ function updatePreviewTextInput(state: PreviewRuntimeState, action: PreviewRunti
 
     const keyboardIndex = state.textInput.keyboardIndex;
     if (keyboardIndex >= 0 && keyboardIndex < 26) {
+      if (state.textInput.cursorIndex >= state.textInput.maxLength) return state;
       const character = MENU_TEXT_INPUT_ALPHABET[keyboardIndex] ?? "";
       const nextCharacter = state.textInput.lowercase ? character.toLowerCase() : character;
       const padded = state.textInput.value.padEnd(state.textInput.maxLength, " ").split("");
       padded[state.textInput.cursorIndex] = nextCharacter;
-      const nextCursorIndex = Math.min(state.textInput.maxLength - 1, state.textInput.cursorIndex + 1);
+      const nextCursorIndex = state.textInput.cursorIndex + 1;
       return withPreviewTextInputValue({
         ...state,
         textInput: { ...state.textInput, cursorIndex: nextCursorIndex }

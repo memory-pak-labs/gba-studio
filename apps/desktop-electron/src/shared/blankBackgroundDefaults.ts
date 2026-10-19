@@ -3,6 +3,7 @@ import type { GBAProjectData } from "./projectFile.js";
 import { normalizeSceneTypeId } from "./sceneTypes.js";
 import { defaultSceneTileLayers } from "./sceneTileLayers.js";
 import { normalizeIsometricSceneConfig } from "./sceneTypeProfiles.js";
+import { blankDungeonMaterialContent, BLANK_DUNGEON_MATERIALS } from "./blankDungeonDefaults.js";
 
 export const BLANK_BACKGROUND_DEFAULTS_PROFILE = "neutral-orange";
 
@@ -35,7 +36,7 @@ export function defaultBackgroundActorPosition(data: GBAProjectData, room: Recor
   };
 }
 
-/** New scenes use the source layout. Existing scenes are never migrated by changing defaults. */
+/** Preserve the source image inside editable larger maps; logical grids load their view separately. */
 export function applyDefaultRoomBackground(data: GBAProjectData, room: Record<string, unknown>): void {
   const background = defaultBackgroundForRoom(data, room);
   room.backgroundAssetName = background;
@@ -45,12 +46,16 @@ export function applyDefaultRoomBackground(data: GBAProjectData, room: Record<st
   }
   room.backgroundRenderMode = "tilemap";
   room.gbStudioUseBackgroundLayout = true;
+  if (["topdown", "platformer"].includes(String(room.sceneType))) room.tilemapIndexBase = 1;
   const width = Number(room.width) || 30;
   const height = Number(room.height) || 20;
   const asset = (data.assets as Record<string, unknown>[] | undefined)?.find(item => item.name === background);
   const metadata = asset?.metadata as { width?: number; height?: number } | undefined;
   const sourceWidth = Math.ceil((metadata?.width ?? 240) / 8);
   const sourceHeight = Math.ceil((metadata?.height ?? 160) / 8);
+  if (["topdown", "platformer"].includes(String(room.sceneType)) && (width !== sourceWidth || height !== sourceHeight)) {
+    room.gbStudioUseBackgroundLayout = false;
+  }
   room.tilemap = Array.from({ length: width * height }, (_, index) => {
     const x = index % width;
     const y = Math.floor(index / width);
@@ -74,7 +79,7 @@ export function blankBackgroundContent(): {
   defaultBackgrounds: Record<string, string>;
 } {
   return {
-    assets: catalog.backgrounds.map(background => ({
+    assets: [...catalog.backgrounds.map(background => ({
       id: `asset-neutral-background-${background.family}`, name: background.file, kind: "Background", systemImage: "photo",
       metadata: {
         source: `Assets/backgrounds/${background.file}`,
@@ -82,11 +87,12 @@ export function blankBackgroundContent(): {
         width: background.width, height: background.height, tileWidth: 8, tileHeight: 8,
         visualProfile: BLANK_BACKGROUND_DEFAULTS_PROFILE, colorMode: "4bpp", backgroundPaletteBankBudget: 14,
         backgroundPaletteReferencePlan: background.palettePlan,
+        ...(background.key === "dungeonCrawler" ? { dungeonMaterialAssets: BLANK_DUNGEON_MATERIALS.slice() } : {}),
         provenance: "Original OpenAI Imagegen artwork visually approved by the user.",
         license: "Project-owned", sourceSha256: background.sourceSha256,
         backgroundTileOptimizer: { enabled: true, tileBudget: 640 }
       }
-    })),
+    })), ...blankDungeonMaterialContent()],
     defaultBackgrounds: Object.fromEntries(catalog.backgrounds.map(background => [background.key, background.file]))
   };
 }

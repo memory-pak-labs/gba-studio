@@ -742,6 +742,12 @@ function updateAudioReferences(data: GBAProjectData, oldName: string, nextName: 
     replace(room, "music");
     const runtime = isRecord(room.runtime) ? room.runtime : null;
     const config = runtime && isRecord(runtime.config) ? runtime.config : null;
+    if (config && isRecord(config.actionSounds)) for (const cue of Object.keys(config.actionSounds)) replace(config.actionSounds, cue);
+    const rpg = config && isRecord(config.presentation) ? config.presentation : null;
+    if(rpg){
+      replace(rpg,"victoryMusic");
+      if(isRecord(rpg.actionSounds))for(const cue of Object.keys(rpg.actionSounds))replace(rpg.actionSounds,cue);
+    }
     const presentation = config && isRecord(config.tacticalPresentation) ? config.tacticalPresentation : null;
     const audio = presentation && isRecord(presentation.audio) ? presentation.audio : null;
     if (audio) {
@@ -812,6 +818,29 @@ function dialogueUsageLabels(data: GBAProjectData, audioName: string): string[] 
       usages.push(`Dialogo: ${dialogueLabel} (confirmacao)`);
     }
     return usages;
+  });
+}
+
+function lutaUsageLabels(data: GBAProjectData, audioName: string): string[] {
+  return projectArray(data, "scenas").flatMap(scene => {
+    const runtime = isRecord(scene.runtime) ? scene.runtime : null;
+    const config = runtime && isRecord(runtime.config) ? runtime.config : null;
+    return config && isRecord(config.actionSounds) ? Object.entries(config.actionSounds)
+      .filter(([, reference]) => reference === audioName)
+      .map(([cue]) => `Cena: ${stringField(scene.name, "Cena sem nome")} (luta ${cue})`) : [];
+  });
+}
+
+function battleRpgUsageLabels(data: GBAProjectData, audioName: string): string[] {
+  return projectArray(data,"scenas").flatMap(scene=>{
+    const runtime=isRecord(scene.runtime)?scene.runtime:null;
+    const config=runtime&&isRecord(runtime.config)?runtime.config:null;
+    const p=config&&isRecord(config.presentation)?config.presentation:null;
+    if(!p)return [];
+    const label=stringField(scene.name,"Cena sem nome"),labels:string[]=[];
+    if(p.victoryMusic===audioName)labels.push(`Cena: ${label} (RPG vitória)`);
+    if(isRecord(p.actionSounds))for(const [cue,ref]of Object.entries(p.actionSounds))if(ref===audioName)labels.push(`Cena: ${label} (RPG ${cue})`);
+    return labels;
   });
 }
 
@@ -1120,8 +1149,8 @@ function makeWarnings(item: {
     warnings.push("Áudio sem uso em cenas ou eventos.");
   }
   warnings.push(...formatWarnings(item.kind, item.format, item.hasComposedContent));
-  if (item.bpm !== null && (item.bpm < 40 || item.bpm > 240)) {
-    warnings.push("BPM fora da faixa 40-240.");
+  if (item.bpm !== null && (item.bpm < 40 || item.bpm > (item.kind === "SFX" ? 360 : 240))) {
+    warnings.push(`BPM fora da faixa 40-${item.kind === "SFX" ? 360 : 240}.`);
   }
   for (const slot of item.patternSequence.filter((slot) => slot.isMissing)) {
     warnings.push(`Sequencia referencia padrao ausente no slot ${slot.index + 1}: ${slot.patternID}.`);
@@ -2203,7 +2232,7 @@ export function normalizeAudioInProject(
   const bpm = integerField(audio.bpm);
   const volume = integerField(audio.volume);
   const loopStart = integerField(audio.loopStart);
-  if (bpm !== null) audio.bpm = clampedInteger(bpm, 40, 240);
+  if (bpm !== null) audio.bpm = clampedInteger(bpm, 40, String(audio.kind).toLowerCase() === "sfx" ? 360 : 240);
   if (volume !== null) audio.volume = clampedInteger(volume, 0, 100);
   audio.loopStart = clampedInteger(loopStart ?? 0, 0, 63);
   next.audioItems = audioItems;
@@ -2240,7 +2269,7 @@ export function deriveAudioWorkspacePresentation(data: GBAProjectData): AudioWor
         ...roomUsageLabels(data, name),
         ...eventUsageLabels(data, name, kind),
         ...dialogueUsageLabels(data, name),
-        ...tacticalUsageLabels(data, name)
+        ...tacticalUsageLabels(data, name), ...lutaUsageLabels(data, name), ...battleRpgUsageLabels(data,name)
       ];
       const bpm = integerField(audio.bpm);
       const normalizedBPM = bpm && bpm > 0 ? bpm : null;

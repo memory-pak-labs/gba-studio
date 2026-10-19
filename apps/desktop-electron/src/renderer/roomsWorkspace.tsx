@@ -1,8 +1,11 @@
+import { DungeonScenePreview } from "./DungeonScenePreview";
+import { ActorRuntimeResourcesInspector, SceneRuntimeResourcesInspector } from "./SceneRuntimeResourcesInspector";
+import { DungeonSceneEditor } from "./DungeonSceneEditor";
 import { readStoredLocale } from "./i18n";
 import { uiText as ui, useStudioUiText } from "./studioUiText";
 import { SceneDiagramCard } from "./SceneDiagramCard";
 import { sceneDiagramPositions, SCENE_DIAGRAM_CARD_SIZE } from "./sceneMapDiagram";
-import { readSceneMapViewMode, writeSceneMapViewMode, type SceneMapViewMode } from "./sceneMapViewPreferences";
+import { readSceneDiagramPositions, writeSceneDiagramPositions, readSceneMapViewMode, writeSceneMapViewMode, type SceneMapViewMode } from "./sceneMapViewPreferences";
 import "./styles/scene-map-diagram.css";
 import { RacingCircuitCamera } from "./RacingCircuitCamera";
 import { RacingSceneInspector } from "./RacingSceneInspector";
@@ -41,6 +44,7 @@ import {
   Play,
   Plus,
   RefreshCw,
+  Search,
   Shield,
   SquarePlus,
   ScanSearch,
@@ -75,12 +79,13 @@ import type { GBAProjectData } from "../shared/projectFile";
 import { playerArrivalPreview } from "../shared/playerArrivalPreview";
 import { SCENE_TRANSITION_STYLES, type SceneTransitionStyle } from "../shared/sceneTransition";
 import { sceneDisplayName } from "../shared/sceneDisplayName";
-import { deriveHudPresetsWorkspacePresentation, hudPresetBindingSourceLabel, resolveExplicitHudPresetBinding, type HudComponent, type HudPresetBinding, type UpdateHudPresetFields } from "../shared/hudPresets";
+import { deriveHudPresetsWorkspacePresentation, hudPresetBindingSourceLabel, resolveExplicitHudPresetBinding, type HudComponent, type HudPresetPresentation, type HudPresetBinding, type UpdateHudPresetFields } from "../shared/hudPresets";
 import { deriveDialogueCharacterProfiles, deriveDialoguesWorkspacePresentation, deriveDialoguesForScene, type UpdateDialogueFields, type UpdateDialoguesUiFields } from "../shared/dialoguesWorkspace";
 import {
   projectActorPrefabs,
   projectTriggerPrefabs,
   type ProjectPrefabKind,
+  type ProjectPrefabRecord,
   type ProjectPrefabPlacement
 } from "../shared/projectPrefabs";
 import type { HardwareProfilerMetric, HardwareProfilerPresentation } from "../shared/hardwareProfiler";
@@ -121,6 +126,7 @@ import {
   sceneMapCardChromeSize,
   sceneMapCardSize,
   sceneMapContentSize,
+  sceneMapInitialViewportOrigin,
   sceneMapTileGridBackgroundStyle,
   type SceneMapPosition
 } from "../shared/sceneMapLayout";
@@ -184,7 +190,7 @@ import {
 } from "../shared/roomEditorShortcuts";
 import { resolveDungeonCrawlerFeatureRuntime } from "../shared/sceneFeatureModules";
 import { buildScenePreflightReport } from "../shared/scenePreflight";
-import { normalizeDungeonCrawlerSceneConfig, normalizeIsometricSceneConfig, normalizeRacingSceneConfig, normalizeSceneRuntime, normalizeShmupSceneConfig, resolveSceneRuntime, sceneTypeProfile, type DungeonCrawlerSceneConfig, type IsometricSceneConfig, type RacingSceneConfig, type SceneFeatureRuntimeConfig } from "../shared/sceneTypeProfiles";
+import { normalizeBattleRpgSceneConfig, normalizeDungeonCrawlerSceneConfig, normalizeIsometricSceneConfig, normalizeRacingSceneConfig, normalizeSceneRuntime, normalizeShmupSceneConfig, resolveSceneRuntime, sceneTypeProfile, type DungeonCrawlerSceneConfig, type IsometricSceneConfig, type RacingSceneConfig, type SceneFeatureRuntimeConfig } from "../shared/sceneTypeProfiles";
 import {
   affineMatrixForScenePresentation,
   normalizeAffineScenePresentation,
@@ -599,6 +605,7 @@ function RoomHardwareDebugger({ presentation }: { presentation: HardwareProfiler
 }
 
 function formatProjectBudgetValue(metric: ProjectBudgetMetric): string {
+  if (metric.pending) return `— / ${metric.capacity}`;
   if (metric.unit === "bytes") {
     return `${formatHardwareProfilerBytes(metric.used)} / ${formatHardwareProfilerBytes(metric.capacity)}`;
   }
@@ -609,6 +616,7 @@ function formatProjectBudgetValue(metric: ProjectBudgetMetric): string {
 function projectBudgetStatusLabel(presentation: ProjectBudgetPresentation): string {
   if (!presentation.projectReady || presentation.tone === "error") return "Limite excedido";
   if (presentation.tone === "warning") return "Atenção necessária";
+  if (presentation.sceneMetrics.some(metric => metric.pending)) return "Pendente";
   return "Dentro dos limites";
 }
 
@@ -635,7 +643,7 @@ function RoomProjectBudgetPanel({
       <header className="room-project-budget-header">
         <div>
           <span>{presentation.source === "compiler" ? ui("Relatório do compilador") : ui("Estimativa ao vivo")}</span>
-          <strong>{projectBudgetStatusLabel(presentation)}</strong>
+          <strong>{ui(projectBudgetStatusLabel(presentation))}</strong>
           <small>
             {presentation.source === "compiler"
               ? ui("Cena {0} · pressão máxima {1}%", { 0: sceneLabel, 1: presentation.maxScenePressure })
@@ -660,12 +668,12 @@ function RoomProjectBudgetPanel({
       <div aria-label={ui("Pressão de recursos da cena")} className="room-project-budget-grid">
         {presentation.sceneMetrics.map((metric) => (
           <article aria-label={ui("Pressão {0}", { 0: ui(metric.label) })} className={metric.tone} key={metric.id}>
-            <div><strong>{ui(metric.label)}</strong><span>{metric.percent}%</span></div>
+            <div><strong>{ui(metric.label)}</strong><span>{metric.pending ? ui("Pendente") : `${metric.percent}%`}</span></div>
             <b>{formatProjectBudgetValue(metric)}</b>
             <div aria-hidden="true" className="room-project-budget-meter">
-              <span style={{ width: `${Math.min(100, metric.percent)}%` }} />
+              <span style={{ width: `${metric.pending ? 0 : Math.min(100, metric.percent)}%` }} />
             </div>
-            <small>{metric.remaining} {ui(" restante(s)")}</small>
+            <small>{metric.pending ? ui("Disponível depois da análise do compilador.") : <>{metric.remaining} {ui(" restante(s)")}</>}</small>
           </article>
         ))}
       </div>
@@ -688,11 +696,11 @@ function RoomProjectBudgetPanel({
 
       <section aria-label={ui("Carga DMA por troca de banco")} className="room-project-budget-detail">
         <h5>{ui("Carga DMA estimada")}</h5>
-        <p>
+        {presentation.dma.pending ? <p>{ui("Disponível depois da análise do compilador.")}</p> : <><p>
           <strong>{formatHardwareProfilerBytes(presentation.dma.estimatedBytes)} / {formatHardwareProfilerBytes(presentation.dma.budgetBytes)}</strong>
           {ui(" · {0}% · {1} upload(s)", { 0: presentation.dma.percent, 1: presentation.dma.uploadCount })}
         </p>
-        <p>{presentation.dma.action}</p>
+        <p>{presentation.dma.action}</p></>}
         <small>{ui("Orçamento editorial de prefetch; não representa um limite físico isolado do DMA do GBA.")}</small>
       </section>
 
@@ -792,6 +800,7 @@ function roomToolUnavailableReason(
   room: RoomsWorkspaceRoom,
   availableTools: readonly string[]
 ): string | null {
+  if (room.sceneType === "dungeonCrawler" && ["paint", "height", "camera", "warp"].includes(mode)) return ui("Dungeon usa células lógicas e câmera em primeira pessoa. Edite paredes, marcadores e início no labirinto.");
   if (mode === "warp" || mode === "hud") return null;
   const isometricConfig = roomIsometricConfig(room);
   if (mode === "paint" && (isometricConfig?.pagedSurface || isometricConfig?.worldMode === "static_composition")) {
@@ -999,10 +1008,11 @@ function roomIsometricConfig(room: RoomsWorkspaceRoom): IsometricSceneConfig | u
 
 function roomRuntimeHudAsset(room: RoomsWorkspaceRoom | null): string | undefined {
   if (!room) return undefined;
-  if (room.runtime?.type === "luta") {
+  if (room.runtime?.type === "luta" || room.runtime?.type === "battleRpg") {
     const asset = (room.runtime.config as Record<string, unknown> | undefined)?.hudAssetName;
     return typeof asset === "string" ? asset : undefined;
   }
+  if(room.runtime?.type === "dungeonCrawler")return normalizeDungeonCrawlerSceneConfig(room.runtime.config).presentation?.hudAssetName;
   const config = roomIsometricConfig(room);
   return config?.tacticalCapabilities?.some(capability => capability.id === "tactical_hud" && capability.enabled)
     ? config.tacticalPresentation?.hudLayout : undefined;
@@ -1055,6 +1065,7 @@ function roomTileCenterStyle(room: RoomsWorkspaceRoom, x: number, y: number): CS
 }
 
 function roomSceneResolutionLabel(room: RoomsWorkspaceRoom): string {
+  if(room.sceneType === "dungeonCrawler")return "240 × 160";
   if (room.sceneType !== "isometric") return room.gbaResolution;
   const size = roomIsometricSurfaceSize(room) ?? deriveIsometricWorldSize({
     atlasTileHeight: room.backgroundAtlasTileHeight,
@@ -1224,6 +1235,7 @@ interface RoomHudOverlayProps {
   selectedComponentID?: string | null;
   viewportAnchored?: boolean;
   viewportScale: number;
+  dungeonDirection?: number;
 }
 
 export function RoomHudOverlay({
@@ -1241,7 +1253,8 @@ export function RoomHudOverlay({
   room,
   selectedComponentID,
   viewportAnchored = false,
-  viewportScale
+  viewportScale,
+  dungeonDirection
 }: RoomHudOverlayProps): React.ReactElement {
   const ui = useStudioUiText();
   const [draft, setDraft] = useState<HudComponent | null>(null);
@@ -1293,6 +1306,14 @@ export function RoomHudOverlay({
   };
   const scale = Number.isFinite(viewportScale) && viewportScale > 0 ? viewportScale : 1;
   const assetURL = (assetName: string): string | null => resolveProjectAssetURL(projectData, projectPath, assetName);
+  const battlePresentation = room?.runtime?.type === "battleRpg"
+    ? normalizeBattleRpgSceneConfig(room.runtime.config).presentation : undefined;
+  // The editor freezes the command menu at its initial state. These two icons
+  // are owned by the combat runtime, which controls their visibility in Play.
+  const battleSnapshotPreset = battlePresentation ? { ...preset, components: preset.components.map(component =>
+    component.asset && [battlePresentation.cursorAssetName, battlePresentation.disabledEscapeAssetName].includes(component.asset)
+      ? { ...component, visible: true } : component) } : preset;
+  const snapshotPreset = dungeonDirection === undefined ? battleSnapshotPreset : { ...battleSnapshotPreset, components: battleSnapshotPreset.components.map(component => component.id === "dungeon-direction" ? { ...component, text: "NLSO"[dungeonDirection & 3] } : component) };
   const presetBackgroundURL = assetURL(preset.backgroundImage);
   const componentAssetURL = (component: HudComponent): string | null => (
     assetURL(component.asset) ?? (component.kind === "frame" ? presetBackgroundURL : null)
@@ -1331,7 +1352,7 @@ export function RoomHudOverlay({
         backgroundAssetURL={presetBackgroundURL}
         fontAssetURL={assetURL(preset.font || (projectData ? resolveSceneDialogueUiSettings(projectData, room?.id).font : ""))}
         className="room-hud-overlay-rendered"
-        preset={preset}
+        preset={snapshotPreset}
         resolveComponentAssetURL={componentAssetURL}
         transparentBackground
       />
@@ -2306,6 +2327,21 @@ export function RoomVisualFidelityPanel({
   );
 }
 
+function SceneDimensionInput({ value, min, onChange }: { value: number; min: number; onChange: (value: number) => void }): React.ReactElement {
+  const [draft, setDraft] = useState(String(value));
+  useEffect(() => setDraft(String(value)), [value]);
+  return <input min={min} type="number" value={draft}
+    onChange={event => setDraft(event.currentTarget.value)}
+    onBlur={() => {
+      const next = draft.trim() ? Number(draft) : NaN;
+      if (Number.isInteger(next) && next >= min) {
+        if (next !== value) onChange(next);
+        setDraft(String(next));
+      } else setDraft(String(value));
+    }}
+    onKeyDown={event => { if (event.key === "Enter") event.currentTarget.blur(); }} />;
+}
+
 function roomHeightInspector(
   room: RoomsWorkspaceRoom,
   selectedCellIndex: number | null,
@@ -2537,6 +2573,14 @@ function roomDetailsEditor(
         onPrepare={track=>onUpdateRoomFields(room.id,{...(normalizeRacingSceneConfig(resolvedRuntime.config).presentation==="pseudo3d"?{width:64,height:64}:{}),
           runtime:{type:"racing",config:{...runtime.config,topdownTrack:track}}})}
       /> : null}
+      {projectData ? <SceneRuntimeResourcesInspector sceneType={room.sceneType} roomName={room.name}
+        background={room.background ?? ""} config={resolvedRuntime.config} data={projectData}
+        onChange={config => onUpdateRoomFields(room.id, {
+          runtime: normalizeSceneRuntime(room.sceneType, { type: room.sceneType, config }),
+          ...(room.sceneType === "isometric" && config.pagedSurface?.backgroundAsset ? {
+            backgroundAssetName: config.pagedSurface.backgroundAsset, cameraMode: "follow_player"
+          } : {})
+        })} /> : null}
       <InspectorSection
         ariaLabel={ui("Essencial da cena")}
         className="room-detail-editor-span-2 scene-inspector-group scene-inspector-essential"
@@ -2565,26 +2609,20 @@ function roomDetailsEditor(
         {scenePreflight ? <SceneInspectorHealthSummary onOpenHealth={onOpenProjectHealth} report={scenePreflight} /> : null}
         <div className="scene-inspector-essential-fields">
           <label>
-            <span>{room.sceneType === "isometric" ? ui("Largura (células)") : ui("Largura (tiles)")}</span>
-            <input
-              min={room.sceneType === "isometric" ? 1 : 30}
-              onChange={(event) => {
-                const nextValue = event.currentTarget.valueAsNumber;
-                if (Number.isFinite(nextValue)) onUpdateRoomFields(room.id, { width: nextValue });
-              }}
-              type="number"
+            <span>{["isometric", "dungeonCrawler"].includes(room.sceneType) ? ui("Largura (células)") : ui("Largura (tiles)")}</span>
+            <SceneDimensionInput
+              key={`${room.id}-width`}
+              min={["isometric", "dungeonCrawler"].includes(room.sceneType) ? 1 : 30}
+              onChange={width => onUpdateRoomFields(room.id, { width })}
               value={room.width}
             />
           </label>
           <label>
-            <span>{room.sceneType === "isometric" ? ui("Altura (células)") : ui("Altura (tiles)")}</span>
-            <input
-              min={room.sceneType === "isometric" ? 1 : 20}
-              onChange={(event) => {
-                const nextValue = event.currentTarget.valueAsNumber;
-                if (Number.isFinite(nextValue)) onUpdateRoomFields(room.id, { height: nextValue });
-              }}
-              type="number"
+            <span>{["isometric", "dungeonCrawler"].includes(room.sceneType) ? ui("Altura (células)") : ui("Altura (tiles)")}</span>
+            <SceneDimensionInput
+              key={`${room.id}-height`}
+              min={["isometric", "dungeonCrawler"].includes(room.sceneType) ? 1 : 20}
+              onChange={height => onUpdateRoomFields(room.id, { height })}
               value={room.height}
             />
           </label>
@@ -3635,7 +3673,7 @@ function RoomEntitiesEditor({
                   <small>{ui("A montagem visual e a seleção do menu continuam vinculadas ao item lógico; a lógica deste ator é configurada na aba Eventos.")}</small>
                 </section>
               ) : null}
-              {isGeneralTab && selectedEntity.kind === "actor" && selectedEntity.battle && !isMenuVisualActor ? (
+              {isGeneralTab && selectedEntity.kind === "actor" && selectedEntity.battle && room.sceneType !== "luta" && !isMenuVisualActor ? (
                 <InspectorSection
                   ariaLabel={ui("Batalha RPG")}
                   className="room-actor-battle-section"
@@ -3692,6 +3730,10 @@ function RoomEntitiesEditor({
                   </p>
                   </div>
                 </InspectorSection>
+              ) : null}
+              {isGeneralTab && selectedEntity.kind === "actor" && !isMenuVisualActor && projectData ? (
+                <ActorRuntimeResourcesInspector sceneType={room.sceneType} actorID={selectedEntity.id} data={projectData}
+                  onChange={fields => onUpdateRoomEntity("actor", selectedEntity.id, fields)} />
               ) : null}
               {isGeneralTab && selectedEntity.kind === "actor" && !isMenuVisualActor ? (
                 <InspectorSection
@@ -4431,6 +4473,7 @@ interface RoomSceneMapInactivePreviewProps {
   cardSize: RoomStageCardSize;
   entities: RoomsWorkspaceEntity[];
   showCardChrome?: boolean;
+  useViewportPreview?: boolean;
   isActiveRoom?: boolean;
   projectData?: GBAProjectData | null;
   projectPath?: string;
@@ -4471,7 +4514,8 @@ function paintRoomTilemapPreview(
   tileset: HTMLImageElement,
   outputSize: { height: number; width: number },
   previewFit: { height: number; width: number },
-  palette: readonly number[] = []
+  palette: readonly number[] = [],
+  viewportOrigin?: { left: number; top: number }
 ): void {
   const tileWidth = room.backgroundTileWidth;
   const tileHeight = room.backgroundTileHeight;
@@ -4500,7 +4544,8 @@ function paintRoomTilemapPreview(
   offscreenContext.clearRect(0, 0, previewFit.width, previewFit.height);
   offscreenContext.imageSmoothingEnabled = false;
   if (room.gbStudioUseBackgroundLayout) {
-    offscreenContext.drawImage(tileset, 0, 0, previewFit.width, previewFit.height);
+    if (viewportOrigin) offscreenContext.drawImage(tileset, -viewportOrigin.left, -viewportOrigin.top);
+    else offscreenContext.drawImage(tileset, 0, 0, previewFit.width, previewFit.height);
     canvas.width = outputSize.width;
     canvas.height = outputSize.height;
     const context = canvas.getContext("2d");
@@ -4520,8 +4565,8 @@ function paintRoomTilemapPreview(
       width: room.width
     }))
     : [{ mapping: "BG2" as const, tilemap: room.tileCells }];
-  const previewScaleX = previewFit.width / pixelWidth;
-  const previewScaleY = previewFit.height / pixelHeight;
+  const previewScaleX = viewportOrigin ? 1 : previewFit.width / pixelWidth;
+  const previewScaleY = viewportOrigin ? 1 : previewFit.height / pixelHeight;
   for (const previewLayer of previewLayers) {
     for (let index = 0; index < previewLayer.tilemap.length; index += 1) {
       const tileID = previewLayer.tilemap[index] ?? 0;
@@ -4547,10 +4592,13 @@ function paintRoomTilemapPreview(
       const y = isometricPoint
         ? isometricPoint.y + (room.backgroundAtlasRenderOffsetY ?? 0)
         : cartY * tileHeight;
+      const drawX = x - (viewportOrigin?.left ?? 0);
+      const drawY = y - (viewportOrigin?.top ?? 0);
+      if (viewportOrigin && (drawX + atlasTileWidth <= 0 || drawY + atlasTileHeight <= 0 || drawX >= 240 || drawY >= 160)) continue;
       offscreenContext.drawImage(
         tileset,
         region.x, region.y, region.width, region.height,
-        x * previewScaleX, y * previewScaleY, atlasTileWidth * previewScaleX, atlasTileHeight * previewScaleY
+        drawX * previewScaleX, drawY * previewScaleY, atlasTileWidth * previewScaleX, atlasTileHeight * previewScaleY
       );
     }
   }
@@ -4587,11 +4635,56 @@ function refreshedPreviewAssetURL(url: string | null, revision: number): string 
   return url && revision ? `${url}${url.includes("?") ? "&" : "?"}assetRevision=${revision}` : url;
 }
 
+function roomCardViewportOrigin(room: RoomsWorkspaceRoom, entities: RoomsWorkspaceEntity[], world: { width: number; height: number }): { left: number; top: number } {
+  if (room.sceneType !== "isometric") return sceneMapInitialViewportOrigin(room, entities.find(entity => entity.isPlayer));
+  const config = roomIsometricConfig(room)!;
+  const player = entities.find(entity => entity.isPlayer || entity.name === room.playerActorName);
+  const camera = player ? deriveIsometricCameraPositionForPlayer({ config, player, zones: room.cameraZones ?? [] }) : null;
+  if (camera) {
+    const offset = isometricProjectionCanvasOffset(room.height, config, roomIsometricSurfaceSize(room));
+    return { left: Math.max(0, Math.min(world.width - 240, camera.cameraX - offset.x)),
+      top: Math.max(0, Math.min(world.height - 160, camera.cameraY - offset.y)) };
+  }
+  // Match the focused editor's fallback: center the authored actor bounds.
+  const bounds = entities.filter(entity => entity.kind === "actor").map(entity => {
+    const style = roomEntityStyle(room, entity, null, {});
+    const left = parseFloat(String(style.left)) / 100 * world.width;
+    const top = parseFloat(String(style.top)) / 100 * world.height;
+    return { left, top, right: left + parseFloat(String(style.width)) / 100 * world.width,
+      bottom: top + parseFloat(String(style.height)) / 100 * world.height };
+  });
+  const centerX = bounds.length ? (Math.min(...bounds.map(b => b.left)) + Math.max(...bounds.map(b => b.right))) / 2 : world.width / 2;
+  const centerY = bounds.length ? (Math.min(...bounds.map(b => b.top)) + Math.max(...bounds.map(b => b.bottom))) / 2 : world.height / 2;
+  return { left: Math.max(0, Math.min(world.width - 240, Math.round(centerX - 120))),
+    top: Math.max(0, Math.min(world.height - 160, Math.round(centerY - 80))) };
+}
+
+function RoomTacticalInitialHud({ room, projectData, projectPath }: { room: RoomsWorkspaceRoom; projectData?: GBAProjectData | null; projectPath?: string }): React.ReactElement | null {
+  const config = roomIsometricConfig(room);
+  const art = config?.tacticalCapabilities?.some(capability => capability.id === "tactical_hud" && capability.enabled)
+    ? config.tacticalPresentation?.compactHud : null;
+  if (!art) return null;
+  const locale = readStoredLocale();
+  const phase = config?.tactical?.activeTeam === "enemy" ? locale === "en-US" ? "ENEMY" : locale === "es-ES" ? "ENEMIGO" : "INIMIGO"
+    : locale === "en-US" ? "PLAYER" : locale === "es-ES" ? "TU TURNO" : "SUA VEZ";
+  // Match the runtime's initial turn badge. Unit and action panels are contextual.
+  const preset: HudPresetPresentation = { id: "tactical-initial", name: "Tactical", description: "", backgroundImage: "", selectorImage: "",
+    font: art.font, position: "Superior", width: 240, height: 160, mode: "advanced", builtIn: false, ready: true, warning: null,
+    components: [
+      { id: "turn", kind: "frame", label: "", text: "", asset: art.turnPanel, x: 0, y: 0, width: 96, height: 32, zIndex: 0, visible: true },
+      { id: "phase", kind: "text", label: "", text: phase, textAdvance: 7, asset: "", x: 29, y: 12, width: 56, height: 8, zIndex: 1, visible: true }
+    ] };
+  return <HudPreviewSnapshot preset={preset} className="room-stage-card-tactical-hud" actionLabel=""
+    fontAssetURL={resolveProjectAssetURL(projectData, projectPath, art.font)} transparentBackground
+    resolveComponentAssetURL={component => resolveProjectAssetURL(projectData, projectPath, component.asset)} />;
+}
+
 function RoomSceneMapInactivePreview({
   room,
   cardSize,
   entities,
   showCardChrome = true,
+  useViewportPreview = true,
   isActiveRoom = false,
   projectData,
   projectPath,
@@ -4605,6 +4698,25 @@ function RoomSceneMapInactivePreview({
 }: RoomSceneMapInactivePreviewProps): React.ReactElement {
   const ui = useStudioUiText();
   const roomLabel = sceneDisplayName(room.name);
+  const isViewportPreview = useViewportPreview;
+  const isPerspectiveViewport = isViewportPreview && isPseudo3dRacingRoom(room);
+  const menu = room.sceneType === "menu" ? normalizeMenuSceneConfig(room.runtime?.config) : null;
+  const runtimeHudAsset = roomRuntimeHudAsset(room);
+  const runtimeHudURL = isViewportPreview && projectData && room.sceneType !== "dungeonCrawler" && runtimeHudAsset
+    ? resolveProjectAssetURL(projectData, projectPath, runtimeHudAsset) : null;
+  const viewportHud = isViewportPreview && projectData && (!runtimeHudAsset || ["battleRpg", "dungeonCrawler"].includes(room.sceneType))
+    && (!menu || (menu.hudMode !== "none" && menu.screenType === "menu"))
+    ? resolveExplicitHudPresetBinding(projectData, { roomID: room.id, roomPresetId: room.hudPresetId, scenePresetId: menu?.hudPresetId }) : null;
+  const visibleEntities = entities.filter(entity => {
+    if (!isViewportPreview) return true;
+    if (entity.kind !== "actor" || (menu && viewportHud)) return false;
+    if (!menu || !projectData) return true;
+    const actor = Array.isArray(projectData.actors) ? projectData.actors.find(actor => actor.id === entity.id) : null;
+    if (actor?.menuActorSelectedOnly && actor.menuItemID !== menu.items[0]?.id) return false;
+    if (!actor?.menuVisibilityVariable) return true;
+    const variable = Array.isArray(projectData.variables) ? projectData.variables.find(variable => variable.name === actor.menuVisibilityVariable) : null;
+    return Number(variable?.initialValue ?? 0) === Number(actor.menuVisibilityValue ?? 0);
+  });
   const sceneComposition = sceneCompositionForRoomPreview(room);
   const affinePresentation = sceneCompositionToAffinePresentation(sceneComposition);
   const backgroundURL = refreshedPreviewAssetURL(resolveRoomBackgroundURL(projectPath, room), assetRefreshToken);
@@ -4641,15 +4753,18 @@ function RoomSceneMapInactivePreview({
         height: room.height * room.backgroundTileHeight,
         width: room.width * room.backgroundTileWidth
       };
+  const viewportOrigin = roomCardViewportOrigin(room, entities, tilemapPixelSize);
   const previewOutputSize = {
     height: cardSize.canvasDisplayHeight,
     width: cardSize.width
   };
   const preserveIsometricCardAspect = !hasTacticalSurfacePreview;
-  const displayScale = Math.min(previewOutputSize.width / tilemapPixelSize.width, previewOutputSize.height / tilemapPixelSize.height);
+  const displayScale = isViewportPreview ? previewOutputSize.width / 240
+    : Math.min(previewOutputSize.width / tilemapPixelSize.width, previewOutputSize.height / tilemapPixelSize.height);
   const previewLayerSize = { width: tilemapPixelSize.width * displayScale, height: tilemapPixelSize.height * displayScale };
   // Keep the composition bitmap independent of zoom; CSS scales it with the card.
-  const previewFit = integerNearestNeighborPreviewFit(tilemapPixelSize, SCENE_MAP_PREVIEW_MAX_SIZE);
+  const previewFit = isViewportPreview ? { width: 240, height: 160 }
+    : integerNearestNeighborPreviewFit(tilemapPixelSize, SCENE_MAP_PREVIEW_MAX_SIZE);
   const cardPreviewMode = hasTacticalSurfacePreview
     ? "tactical-surface"
     : room.sceneType === "isometric"
@@ -4704,7 +4819,7 @@ function RoomSceneMapInactivePreview({
     if (isDesktopAssetURL(backgroundURL)) tileset.crossOrigin = "anonymous";
     tileset.onload = () => {
       if (cancelled) return;
-      paintRoomTilemapPreview(canvas, roomPaintRef.current, tileset, previewFit, previewFit, roomPaintRef.current.backgroundPalette ?? []);
+      paintRoomTilemapPreview(canvas, roomPaintRef.current, tileset, previewFit, previewFit, roomPaintRef.current.backgroundPalette ?? [], isViewportPreview ? viewportOrigin : undefined);
     };
     tileset.src = backgroundURL;
 
@@ -4712,7 +4827,7 @@ function RoomSceneMapInactivePreview({
       cancelled = true;
     };
   }, [backgroundURL, backgroundLayerURLs.map(layer => layer.url).join("|"), previewFit.height, previewFit.width,
-    room.backgroundPalette?.join(",") ?? "", tilemapSignature, useLayeredBackgroundLayout]);
+    room.backgroundPalette?.join(",") ?? "", tilemapSignature, useLayeredBackgroundLayout, isViewportPreview, viewportOrigin.left, viewportOrigin.top]);
 
   function openSceneEditor(event: React.SyntheticEvent<HTMLElement>): void {
     if (!onFocusScene) return;
@@ -4731,7 +4846,7 @@ function RoomSceneMapInactivePreview({
 
   return (
     <article
-      className={`room-stage-card${isActiveRoom ? " is-active-room" : ""}${showCardChrome ? "" : " is-chrome-hidden"}`}
+      className={`room-stage-card${isViewportPreview ? " is-viewport-card" : ""}${isActiveRoom ? " is-active-room" : ""}${showCardChrome ? "" : " is-chrome-hidden"}`}
       aria-label={ui("Card da cena {0} · visão geral somente leitura", { 0: roomLabel })}
       data-scene-map-preview="true"
       data-scene-map-mode="overview"
@@ -4753,7 +4868,7 @@ function RoomSceneMapInactivePreview({
               className="room-stage-card-drag room-stage-card-title-drag"
               title={ui("Mover card da cena")}
             >
-              <strong>{roomLabel}</strong>
+              <strong title={roomLabel}>{roomLabel}</strong>
               {room.isStart ? <em>{ui("Início do jogo")}</em> : null}
             </span>
           </div>
@@ -4831,13 +4946,19 @@ function RoomSceneMapInactivePreview({
           height: `${cardSize.canvasDisplayHeight}px`
         }}
       >
-        <div
+        {isPerspectiveViewport ? <RacingPseudo3dCameraPreview room={room} entities={entities} projectPath={projectPath} />
+        : room.sceneType === "dungeonCrawler" ? <div className="dungeon-card-camera"><div style={{ transform: `scale(${cardSize.width / 240})`, transformOrigin: "top left" }}><DungeonScenePreview room={room} entities={entities} projectData={projectData} projectPath={projectPath} assetRefreshToken={assetRefreshToken} hud={projectData ? (() => { const binding = resolveExplicitHudPresetBinding(projectData, { roomID: room.id, roomPresetId: room.hudPresetId }); return binding ? <RoomHudOverlay binding={binding} entities={entities} projectData={projectData} projectPath={projectPath} room={room} viewportScale={1} guides={false} /> : null; })() : null} /></div></div> : <div
           className="room-stage-card-preview-layer"
-          data-card-preview-mode={cardPreviewMode}
+          data-card-preview-mode={isViewportPreview && room.sceneType === "racing" ? "racing-viewport" : cardPreviewMode}
+          data-card-preview-framing={isViewportPreview ? "viewport" : "map"}
+          data-camera-x={isViewportPreview ? viewportOrigin.left : undefined}
+          data-camera-y={isViewportPreview ? viewportOrigin.top : undefined}
           data-card-preview-projection={preserveIsometricCardAspect ? room.sceneType === "isometric" ? "isometric-contain" : "contain" : "fill"}
           style={{
             height: `${previewLayerSize.height}px`,
-            width: `${previewLayerSize.width}px`
+            width: `${previewLayerSize.width}px`,
+            ...(isViewportPreview ? { inset: "auto", margin: 0, left: -viewportOrigin.left * displayScale,
+              top: -viewportOrigin.top * displayScale, transform: "none" } : {})
           }}
         >
           {hasTacticalSurfacePreview ? (
@@ -4871,8 +4992,11 @@ function RoomSceneMapInactivePreview({
             <canvas
               aria-hidden="true"
               className="room-stage-card-preview-canvas"
+              width={isViewportPreview ? 240 : undefined}
+              height={isViewportPreview ? 160 : undefined}
               ref={canvasRef}
-              style={{ height: `${previewLayerSize.height}px`, width: `${previewLayerSize.width}px` }}
+              style={isViewportPreview ? { position: "absolute", left: viewportOrigin.left * displayScale, top: viewportOrigin.top * displayScale, height: 160 * displayScale, width: 240 * displayScale }
+                : { height: `${previewLayerSize.height}px`, width: `${previewLayerSize.width}px` }}
             />
           )}
           <IsometricPagedForeground room={room} projectData={projectData} projectPath={projectPath} assetRefreshToken={assetRefreshToken} />
@@ -4891,7 +5015,7 @@ function RoomSceneMapInactivePreview({
               />
             ) : null;
           })}
-          {connectionZones.map((zone) => (
+          {(isViewportPreview ? [] : connectionZones).map((zone) => (
             <span
               aria-hidden="true"
               className={[
@@ -4906,7 +5030,7 @@ function RoomSceneMapInactivePreview({
               }}
             />
           ))}
-          {entities.map((entity) => {
+          {visibleEntities.map((entity) => {
             const width = Math.max(1, entity.width);
             const height = Math.max(1, entity.height);
             const sourceSpriteURL = entity.kind === "actor"
@@ -4931,14 +5055,25 @@ function RoomSceneMapInactivePreview({
               </span>
             );
           })}
-        </div>
+        </div>}
+        {runtimeHudURL ? <img className="room-stage-card-runtime-hud" src={refreshedPreviewAssetURL(runtimeHudURL, assetRefreshToken)!} alt="" /> : null}
+        {isViewportPreview && room.sceneType === "isometric" ? <div className="room-stage-card-viewport-hud" style={{ transform: `scale(${displayScale})` }}>
+          <RoomTacticalInitialHud room={room} projectData={projectData} projectPath={projectPath} />
+        </div> : null}
+        {viewportHud && room.sceneType !== "dungeonCrawler" ? <div className="room-stage-card-viewport-hud" style={{ transform: `scale(${displayScale})` }}>
+          <RoomHudOverlay binding={viewportHud} entities={entities} projectData={projectData} projectPath={projectPath}
+            room={room} viewportScale={1} guides={false} />
+        </div> : null}
       </div>
       {showCardChrome ? <div className="room-stage-card-footer">
-        <span className="room-stage-card-dimensions">{roomSceneResolutionLabel(room)} {ui(" px")}</span>
-        <span>{roomEntityCountLabel("actor", entities.filter((entity) => entity.kind === "actor" && !entity.isPlayer).length)}</span>
-        {entities.some((entity) => entity.isPlayer) ? <span className="player-present">{ui("Player visível")}</span> : null}
-        <span>{roomEntityCountLabel("trigger", entities.filter((entity) => entity.kind === "trigger").length)}</span>
-        {isActiveRoom ? <span className="active">{ui("Ativa")}</span> : null}
+        <span className="room-stage-card-dimensions" title={`${roomSceneResolutionLabel(room)} px`}>{roomSceneResolutionLabel(room).replace(/\s*[x×]\s*/g, " × ")} px</span>
+        <span className="room-stage-card-count" aria-label={roomEntityCountLabel("actor", entities.filter(entity => entity.kind === "actor" && !entity.isPlayer).length)} title={roomEntityCountLabel("actor", entities.filter(entity => entity.kind === "actor" && !entity.isPlayer).length)}>
+          <UsersRound aria-hidden="true" size={12} />{entities.filter(entity => entity.kind === "actor" && !entity.isPlayer).length}
+        </span>
+        <span className="room-stage-card-count" aria-label={roomEntityCountLabel("trigger", entities.filter(entity => entity.kind === "trigger").length)} title={roomEntityCountLabel("trigger", entities.filter(entity => entity.kind === "trigger").length)}>
+          <Diamond aria-hidden="true" size={11} />{entities.filter(entity => entity.kind === "trigger").length}
+        </span>
+        {entities.some(entity => entity.isPlayer) ? <span className="player-present room-stage-card-player" title={ui("Player visível")} aria-label={ui("Player visível")}><UserRound aria-hidden="true" size={12} /></span> : null}
       </div> : null}
     </article>
   );
@@ -4968,7 +5103,7 @@ function RacingPseudo3dCameraPreview({
   room: RoomsWorkspaceRoom;
   entities: RoomsWorkspaceEntity[];
   projectPath?: string;
-  onOpenTechnicalMap(): void;
+  onOpenTechnicalMap?(): void;
 }): React.ReactElement | null {
   const ui = useStudioUiText();
   const config = racingPseudo3dConfigForRoom(room);
@@ -5040,7 +5175,7 @@ function RacingPseudo3dCameraPreview({
           style={backgroundStyle(preview.minimapURL)}
         />
       ) : null}
-      {preview.technicalMapAvailable ? (
+      {preview.technicalMapAvailable && onOpenTechnicalMap ? (
         <button
           aria-label={ui("Abrir mapa técnico da cena {0}", { 0: roomLabel })}
           className="racing-pseudo3d-technical-map-toggle"
@@ -5106,6 +5241,7 @@ function RoomFocusMinimap({
           projectPath={projectPath}
           room={room}
           showCardChrome={false}
+          useViewportPreview={false}
         />
       </div>
       <button
@@ -6971,6 +7107,11 @@ function RoomTilemapEditor({
   );
 }
 
+function PrefabAuthoringNote({ prefab }: { prefab: ProjectPrefabRecord }): React.ReactElement | null {
+  const note = prefab.authoring as { sourceScene?: string; description?: string } | undefined;
+  return note?.description ? <p><small>{note.sourceScene}: {note.description}</small></p> : null;
+}
+
 export function RoomsWorkspace({
   logicEvents, onCreateLogicVariable, onUpdateLogicValue, onRemoveLogicValue,
   projectData,
@@ -7088,7 +7229,7 @@ export function RoomsWorkspace({
   const overviewMode = overviewView && overviewView.path === projectPath ? overviewView.mode : readSceneMapViewMode(projectPath);
   const [diagramNavigation, setDiagramNavigation] = useState<{ path?: string; zoom: number; positions: Record<string, SceneMapPosition> } | null>(null);
   const diagramZoom = diagramNavigation && diagramNavigation.path === projectPath ? diagramNavigation.zoom : 1;
-  const diagramOverrides = useMemo(() => diagramNavigation && diagramNavigation.path === projectPath ? diagramNavigation.positions : {}, [diagramNavigation, projectPath]);
+  const diagramOverrides = useMemo(() => diagramNavigation && diagramNavigation.path === projectPath ? diagramNavigation.positions : readSceneDiagramPositions(projectPath), [diagramNavigation, projectPath]);
   const [selectedCanvasCell, setSelectedCanvasCell] = useState<SelectedRoomCellState | null>(null);
   const canvasStageRef = useRef<HTMLElement | null>(null);
   const canvasScrollRef = useRef<HTMLDivElement | null>(null);
@@ -7132,6 +7273,7 @@ export function RoomsWorkspace({
     () => new Set(presentation?.rooms.filter((room) => room.isActive).map((room) => room.id) ?? [])
   );
   const [navigatorTab, setNavigatorTab] = useState<"project" | "prefabs" | "logic">("project");
+  const [prefabQuery, setPrefabQuery] = useState("");
   const [selectedArrivalID, setSelectedArrivalID] = useState<string | null>(null);
   const [testArrivalID, setTestArrivalID] = useState<string>("");
   useEffect(() => { setSelectedArrivalID(null); setTestArrivalID(""); }, [focusedSceneEditorRoomID]);
@@ -7234,6 +7376,11 @@ export function RoomsWorkspace({
   function updateOverviewZoom(zoom: number): void {
     if (isSceneDiagram) setDiagramNavigation({ path: projectPath, zoom, positions: diagramOverrides });
     else onUpdateSceneMapZoom(zoom);
+  }
+
+  function updateDiagramPositions(positions: Record<string, SceneMapPosition>): void {
+    setDiagramNavigation({ path: projectPath, zoom: diagramZoom, positions });
+    writeSceneDiagramPositions(projectPath, positions);
   }
 
   useLayoutEffect(() => {
@@ -7572,11 +7719,7 @@ export function RoomsWorkspace({
       if (focusSceneRoom.sceneType !== "isometric") {
         const scale = focusViewportScaleRef.current;
         const player = presentation?.entities.find(entity => entity.roomName === focusSceneRoom.name && entity.isPlayer);
-        const center = focusSceneRoom.cameraMode === "follow_player" && player
-          ? { left: player.x * 8 - 120, top: player.y * 8 - 80 }
-          : focusSceneRoom.cameraMode === "fixed_position" || focusSceneRoom.cameraMode === "manual"
-            ? { left: focusSceneRoom.cameraBounds.x * 8, top: focusSceneRoom.cameraBounds.y * 8 }
-            : { left: (focusSceneRoom.width * 8 - 240) / 2, top: (focusSceneRoom.height * 8 - 160) / 2 };
+        const center = sceneMapInitialViewportOrigin(focusSceneRoom, player);
         scroll.scrollLeft = Math.max(0, center.left * scale);
         scroll.scrollTop = Math.max(0, center.top * scale);
         return;
@@ -7766,7 +7909,7 @@ export function RoomsWorkspace({
         : inspectorContext.kind === "connection"
           ? inspectorContext.connection.eventName ?? ui("Conexão entre cenas")
           : inspectorRoom
-            ? ui("Cena · {0} · {1}", { 0: ui(sceneTypeLabel(inspectorRoom.sceneType, roomIsometricConfig(inspectorRoom)?.gameplayMode)), 1: inspectorRoom.sceneType === "isometric" ? ui("{0}×{1} células · {2}×{3} px/célula", { 0: inspectorRoom.width, 1: inspectorRoom.height, 2: roomIsometricConfig(inspectorRoom)?.tileWidth, 3: roomIsometricConfig(inspectorRoom)?.tileHeight }) : inspectorRoom.gbaResolution })
+            ? ui("Cena · {0} · {1}", { 0: ui(sceneTypeLabel(inspectorRoom.sceneType, roomIsometricConfig(inspectorRoom)?.gameplayMode)), 1: inspectorRoom.sceneType === "dungeonCrawler" ? ui("{0}×{1} células · câmera 240×160", { 0: inspectorRoom.width, 1: inspectorRoom.height }) : inspectorRoom.sceneType === "isometric" ? ui("{0}×{1} células · {2}×{3} px/célula", { 0: inspectorRoom.width, 1: inspectorRoom.height, 2: roomIsometricConfig(inspectorRoom)?.tileWidth, 3: roomIsometricConfig(inspectorRoom)?.tileHeight }) : inspectorRoom.gbaResolution })
             : "";
   const inspectorRoleBadge = !inspectorHasEntityGroup && !inspectorHasMixedEntityGroup && inspectorContext.kind === "entity"
     && inspectorContext.entity.kind === "actor"
@@ -7919,6 +8062,8 @@ export function RoomsWorkspace({
   const actorPrefabCount = actorPrefabs.length;
   const triggerPrefabCount = triggerPrefabs.length;
   const prefabCount = actorPrefabCount + triggerPrefabCount;
+  const normalizePrefabSearch = (value: string): string => value.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+  const matchesPrefab = (prefab: ProjectPrefabRecord): boolean => normalizePrefabSearch(`${prefab.name} ${JSON.stringify(prefab.authoring ?? {})}`).includes(normalizePrefabSearch(prefabQuery.trim()));
   const selectedPrefabSource = presentation.entities.find((entity) => selectedEntityKeys.includes(entityKey(entity))) ?? null;
   const prefabPlacement: ProjectPrefabPlacement | null = activeRoom ? {
     roomID: activeRoom.id,
@@ -7962,7 +8107,7 @@ export function RoomsWorkspace({
   const focusSceneLutaHudAssetURL = projectData && projectPath && typeof focusSceneLutaHudAssetName === "string"
     ? resolveProjectAssetURL(projectData, projectPath, focusSceneLutaHudAssetName)
     : null;
-  const focusSceneHudBinding = !focusSceneLutaHudAssetName && projectData && focusSceneRoom && focusSceneMenuConfig?.hudMode !== "none" && (
+  const focusSceneHudBinding = (!focusSceneLutaHudAssetName || ["battleRpg","dungeonCrawler"].includes(focusSceneRoom?.sceneType ?? "")) && projectData && focusSceneRoom && focusSceneMenuConfig?.hudMode !== "none" && (
     focusSceneRoom.sceneType !== "menu" || focusSceneMenuConfig?.screenType === "menu"
   ) ? resolveExplicitHudPresetBinding(projectData, {
     roomID: focusSceneRoom.id,
@@ -7975,7 +8120,7 @@ export function RoomsWorkspace({
     hudMode: hudSelectedScreen.hudMode ?? (hudSelectedScreen.hudPresetId ? undefined : focusSceneMenuConfig?.hudMode),
     hudPresetId: hudSelectedScreen.hudPresetId ?? focusSceneMenuConfig?.hudPresetId
   } : focusSceneMenuConfig;
-  const hudUnavailableReason = focusSceneLutaHudAssetName ? `Esta cena usa uma HUD ${focusSceneRoom?.sceneType === "isometric" ? "tática" : "de luta"} por imagem. A prévia aparece sobre a cena; a imagem e os recursos são configurados na aba Cena.`
+  const hudUnavailableReason = focusSceneLutaHudAssetName && !["battleRpg","dungeonCrawler"].includes(focusSceneRoom?.sceneType ?? "") ? `Esta cena usa uma HUD ${focusSceneRoom?.sceneType === "isometric" ? "tática" : "de luta"} por imagem. A prévia aparece sobre a cena; a imagem e os recursos são configurados na aba Cena.`
     : focusSceneRoom?.sceneType === "menu" && hudSelectedMenu?.screenType !== "menu" ? "Telas de logo e título usam atores e fundo. Escolha uma tela de menu para editar sua HUD." : undefined;
   const hudAppliedBinding = projectData && focusSceneRoom && !hudUnavailableReason && hudSelectedMenu?.hudMode !== "none"
     ? resolveExplicitHudPresetBinding(projectData, { roomID: focusSceneRoom.id, scenePresetId: hudSelectedMenu?.hudPresetId, roomPresetId: focusSceneRoom.hudPresetId }) : null;
@@ -8919,6 +9064,11 @@ export function RoomsWorkspace({
     const drag = sceneMapCardDrag.current;
     if (!drag || drag.pointerID !== pointerID) return;
 
+    // Pointer-up can arrive before the scheduled preview frame. Commit the
+    // pending coordinates rather than saving the previous preview position.
+    if (sceneMapCardDragFrameRequest !== null) {
+      updateSceneMapCardDrag(sceneMapCardDragPendingPointer.x, sceneMapCardDragPendingPointer.y);
+    }
     const nextPosition = drag.previewPosition;
     sceneMapCardDragActiveRef.current = false;
     document.body.classList.remove("room-scene-map-card-dragging");
@@ -8931,7 +9081,7 @@ export function RoomsWorkspace({
     sceneMapCardDrag.current = null;
     setSceneMapDragPreview(null);
     setSelectedSceneMapRoomName(drag.roomName);
-    if (isSceneDiagram) setDiagramNavigation({ path: projectPath, zoom: diagramZoom, positions: { ...diagramOverrides, [drag.roomName]: nextPosition } });
+    if (isSceneDiagram) updateDiagramPositions({ ...diagramOverrides, [drag.roomName]: nextPosition });
     else onUpdateSceneMapPosition(drag.roomName, nextPosition);
   }
 
@@ -9404,6 +9554,10 @@ export function RoomsWorkspace({
           ) : null}
           {navigatorTab === "prefabs" ? (
           <section className="editor-rail-section prefabs-section" aria-label={ui("Pre-fabricados")}>
+            <label className="editor-project-search-field">
+              <Search aria-hidden="true" size={16} />
+              <input type="search" aria-label={ui("Buscar")} placeholder={ui("Buscar")} value={prefabQuery} onChange={event => setPrefabQuery(event.currentTarget.value)} />
+            </label>
             <div className="editor-rail-section-header">
               <h4>{ui("Pre-fabricados")}</h4>
               <button
@@ -9445,7 +9599,7 @@ export function RoomsWorkspace({
               </button>
               {railExpanded.prefabsLibrary ? (
                 <div className="editor-tree-children">
-                  {actorPrefabs.map((prefab) => (
+                  {actorPrefabs.filter(matchesPrefab).map((prefab) => (
                     <details className="editor-prefab-editor" data-prefab-kind="actor" key={`actor-prefab:${prefab.id}`}>
                       <summary className="editor-tree-row nested leaf">
                         <ChevronRight aria-hidden="true" className="editor-tree-chevron" size={17} strokeWidth={2.2} />
@@ -9453,6 +9607,7 @@ export function RoomsWorkspace({
                         <span><strong>{prefab.name}</strong><small>{ui("Ator · ")}{prefab.id}</small></span>
                       </summary>
                       <div className="editor-prefab-fields">
+                        <PrefabAuthoringNote prefab={prefab} />
                         <label>
                           <span>{ui("Nome")}</span>
                           <input
@@ -9497,7 +9652,7 @@ export function RoomsWorkspace({
                       </div>
                     </details>
                   ))}
-                  {triggerPrefabs.map((prefab) => (
+                  {triggerPrefabs.filter(matchesPrefab).map((prefab) => (
                     <details className="editor-prefab-editor" data-prefab-kind="trigger" key={`trigger-prefab:${prefab.id}`}>
                       <summary className="editor-tree-row nested leaf">
                         <ChevronRight aria-hidden="true" className="editor-tree-chevron" size={17} strokeWidth={2.2} />
@@ -9505,6 +9660,7 @@ export function RoomsWorkspace({
                         <span><strong>{prefab.name}</strong><small>{ui("Trigger · ")}{prefab.id}</small></span>
                       </summary>
                       <div className="editor-prefab-fields">
+                        <PrefabAuthoringNote prefab={prefab} />
                         <label>
                           <span>{ui("Nome")}</span>
                           <input
@@ -9538,7 +9694,7 @@ export function RoomsWorkspace({
                           <input
                             aria-label={ui("Evento enter do prefab {0}", { 0: prefab.name })}
                             onChange={(event) => onUpdatePrefab?.("trigger", prefab.id, { onEnterEventName: event.currentTarget.value })}
-                            value={String(prefab.onEnterEventName ?? "")}
+                            value={String((prefab.eventBindings as Record<string, unknown> | undefined)?.onEnter ?? prefab.onEnterEventName ?? "")}
                           />
                         </label>
                         <label>
@@ -9546,7 +9702,7 @@ export function RoomsWorkspace({
                           <input
                             aria-label={ui("Evento leave do prefab {0}", { 0: prefab.name })}
                             onChange={(event) => onUpdatePrefab?.("trigger", prefab.id, { onLeaveEventName: event.currentTarget.value })}
-                            value={String(prefab.onLeaveEventName ?? "")}
+                            value={String((prefab.eventBindings as Record<string, unknown> | undefined)?.onLeave ?? prefab.onLeaveEventName ?? "")}
                           />
                         </label>
                         <button
@@ -9756,7 +9912,7 @@ export function RoomsWorkspace({
                     <button
                       aria-label={ui("Organizar cards das cenas")}
                       onClick={() => {
-                        if (isSceneDiagram) setDiagramNavigation({ path: projectPath, zoom: diagramZoom, positions: {} });
+                        if (isSceneDiagram) updateDiagramPositions({});
                         else onOrganizeSceneMap?.();
                       }}
                       title={isSceneDiagram ? ui("Organizar cards por conexões") : ui("Organizar cards por ordem e tamanho")}
@@ -9882,6 +10038,28 @@ export function RoomsWorkspace({
                 ref={focusViewportHostRef}
                 role={focusSceneRoom ? "region" : undefined}
               >
+              {focusSceneRoom?.sceneType === "dungeonCrawler" ? <DungeonSceneEditor key={focusSceneRoom.id}
+                room={focusSceneRoom} entities={presentation.entities.filter(e => e.roomName === focusSceneRoom.name)}
+                projectData={projectData} projectPath={projectPath} assetRefreshToken={assetRefreshToken}
+                viewMode={focusViewMode} previewVisible={focusMinimapVisible} onClosePreview={() => setFocusMinimapVisible(false)}
+                placementMode={collisionPlacementMode} mode={selectedToolPanelMode} tool={selectedTool} collision={selectedCollisionType}
+                actorsLocked={canvasLayerLocks.actors} triggersLocked={canvasLayerLocks.triggers}
+                showBounds={canvasLayerVisibility.hitboxes} showBackground={canvasLayerVisibility.background} showGrid={canvasLayerVisibility.grid} showActors={canvasLayerVisibility.actors} showTriggers={canvasLayerVisibility.triggers} showHud={canvasLayerVisibility.hud}
+                locked={selectedToolPanelMode === "collision" ? canvasLayerLocks.collision : selectedToolPanelMode === "trigger" ? canvasLayerLocks.triggers : selectedToolPanelMode === "actor" ? canvasLayerLocks.actors : false}
+                selected={selectedEntityKeys} onSelect={selectRoomEntityKeys} onCell={selectCanvasCell}
+                onRectangle={applyCollisionRectangleForRoom} onCollision={onSetCollisionType} onFill={onApplyCollisionFill} onUpdate={onUpdateRoomFields}
+                onBeginHistoryGroup={onBeginHistoryGroup} onEndHistoryGroup={onEndHistoryGroup}
+                onEntity={onUpdateRoomEntity} onCreateActor={onCreateActor} onCreateTrigger={onCreateTrigger}
+                renderHud={(camera, displayScale, readOnly) => {
+                  const binding = selectedToolPanelMode === "hud" ? focusSceneHudAuthoringBinding : focusSceneHudBinding;
+                  return canvasLayerVisibility.hud && binding ? <RoomHudOverlay binding={binding}
+                    entities={presentation.entities.filter(e => e.roomName === focusSceneRoom.name)}
+                    projectData={projectData} projectPath={projectPath} room={focusSceneRoom}
+                    viewportScale={displayScale} viewportAnchored dungeonDirection={camera.direction} guides={!readOnly && selectedToolPanelMode === "hud" && hudViewMode === "edit"}
+                    editable={!readOnly && selectedToolPanelMode === "hud" && hudViewMode === "edit"} canEdit={canEditHudCanvas}
+                    onUpdateHudPreset={onUpdateHudPreset} selectedComponentID={selectedHudComponentID}
+                    onSelectComponent={setSelectedHudComponentID} /> : null;
+                }} /> : <>
               {focusSceneRoom?.sceneType === "isometric" || focusSceneRoom?.sceneType === "dungeonCrawler" ? (
                 <span aria-hidden="true" className="room-isometric-viewport-label">
                   {focusSceneRoom.sceneType === "dungeonCrawler" ? ui("Viewport Play · 240×160 · primeira pessoa") : focusSceneZoom === 1 ? ui("Viewport Play · 240×160") : ui("Revisão da cena · {0}%", { 0: Math.round(focusSceneZoom * 100) })}
@@ -10090,8 +10268,8 @@ export function RoomsWorkspace({
               /> : null}
               {canvasLayerVisibility.hud && focusSceneLutaHudAssetURL && typeof focusSceneLutaHudAssetName === "string" ? (
                 <div
-                  aria-label={ui("Prévia da HUD {0} {1}", { 0: focusSceneRoom?.sceneType === "isometric" ? "tática" : "de luta", 1: focusSceneLutaHudAssetName })}
-                  className="room-hud-overlay is-viewport-anchored room-runtime-hud-overlay"
+                  aria-label={ui("Prévia da HUD {0} {1}", { 0: focusSceneRoom?.sceneType === "isometric" ? "tática" : focusSceneRoom?.sceneType === "battleRpg" ? "RPG" : focusSceneRoom?.sceneType === "dungeonCrawler" ? "do labirinto" : "de luta", 1: focusSceneLutaHudAssetName })}
+                  className={`room-hud-overlay is-viewport-anchored room-runtime-hud-overlay${["battleRpg","dungeonCrawler"].includes(focusSceneRoom?.sceneType ?? "") ? " room-runtime-hud-background" : ""}`}
                   role="img"
                   style={{
                     height: `${160 * (focusViewportGeometry?.scale ?? 1)}px`,
@@ -10156,6 +10334,7 @@ export function RoomsWorkspace({
                   projectData={projectData} projectPath={projectPath} room={focusSceneRoom}
                   viewport={focusMinimapViewport} worldHeight={canvasWorldHeight} worldWidth={canvasWorldWidth}
                 /></div> : null} /> : null}
+              </>}
               </div>
             </>
           ) : (
@@ -10334,7 +10513,7 @@ export function RoomsWorkspace({
                 <>
                   {activeInspectorTab === "scene" ? <>
                   <section className="hud-authoring-section room-scene-hud-summary" aria-label={ui("Resumo da HUD da cena")}>
-                    <div><strong>{ui("HUD da cena")}</strong><span>{roomRuntimeHudAsset(inspectorRoom) ? ui("HUD {0} · {1}", { 0: inspectorRoom.sceneType === "isometric" ? "tática" : "de luta", 1: roomRuntimeHudAsset(inspectorRoom) }) : inspectorHudBinding?.preset.name ?? ui("Sem HUD")}</span></div>
+                    <div><strong>{ui("HUD da cena")}</strong><span>{roomRuntimeHudAsset(inspectorRoom) ? ui("HUD {0} · {1}", { 0: inspectorRoom.sceneType === "isometric" ? "tática" : inspectorRoom.sceneType === "battleRpg" ? "RPG" : inspectorRoom.sceneType === "dungeonCrawler" ? "do labirinto" : "de luta", 1: roomRuntimeHudAsset(inspectorRoom) }) : inspectorHudBinding?.preset.name ?? ui("Sem HUD")}</span></div>
                     <button type="button" onClick={() => { enterSceneFocus(inspectorRoom); setEditorToolPanelMode("hud"); setCanvasLayerVisibilityState(current => ({ ...current, hud: true })); }}>{ui("Editar HUD")}</button>
                   </section>
                   {inspectorRoom.warnings.length ? (

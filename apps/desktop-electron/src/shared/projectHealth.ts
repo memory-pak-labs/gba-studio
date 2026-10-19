@@ -218,6 +218,20 @@ function addSceneDiagnostics(
   }
 
   const budget = deriveProjectBudgetPresentation(data, sceneName, assetPackReport);
+  if (budget.sceneMetrics.some(metric => metric.pending)) {
+    addDiagnostic(diagnostics, {
+      id: `scene-${sceneIndex}-asset-budget-pending`,
+      code: "asset.budget.pending",
+      severity: "info",
+      scope: "asset",
+      workspace: "Arquivos",
+      sceneName,
+      targetName: sceneName,
+      message: "A contagem de tiles únicos do piso affine depende da análise do compilador.",
+      detail: "As posições do mapa não representam a quantidade de padrões residentes em VRAM.",
+      fixAction: "open_files"
+    });
+  }
   if (budget.tone === "error" || !budget.projectReady) {
     const compilerConfirmed = budget.source === "compiler";
     addDiagnostic(diagnostics, {

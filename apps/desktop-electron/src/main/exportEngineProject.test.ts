@@ -89,22 +89,16 @@ describe("prepareEngineProjectExport", () => {
     const prepared = prepareEngineProjectExport(data);
     expect(prepared.error).toBeUndefined();
     const contract = prepared.generated!.contract;
-    const sets = contract.asset_pack!.resident_sets!;
-    expect(sets).toHaveLength(2);
-    expect(new Set(sets.flatMap(set => set.groups)).size).toBe(sets.reduce((sum, set) => sum + set.groups.length, 0));
-    for (const room of contract.isometric_project!.rooms) {
-      const set = sets.find(set => set.room === room.name)!;
-      expect(room.tactical_presentation!.surface_pages!.map(page => page.bank_group)).toEqual(set.groups);
-      expect(room.tactical_presentation!.surface_residency!.exclusive_bank_groups).toEqual(set.groups);
-      for (const group of set.groups) {
-        expect(contract.asset_pack!.assets.some(asset => {
-          const banks = asset as typeof asset & { bank_groups?: string[]; bank_group?: string };
-          return banks.bank_groups?.includes(group) || banks.bank_group === group;
-        })).toBe(true);
-      }
+    const rooms=contract.isometric_project!.rooms;
+    expect(rooms).toHaveLength(2);
+    for (const room of rooms) {
+      expect(room.paged_surface).toMatchObject({width:768,height:512});
+      expect(room.tactical_presentation!.surface_pages).toBeUndefined();
+      const group=`scene_${room.name.replaceAll("-","_")}`;
+      expect(contract.asset_pack!.assets.some(asset=>(asset as typeof asset & {bank_groups?:string[]}).bank_groups?.includes(group))).toBe(true);
     }
     expect(JSON.stringify(data)).toBe(before);
-    expect(buildEngineExportProjectContract(data).asset_pack!.resident_sets).toEqual(sets);
+    expect(buildEngineExportProjectContract(data).asset_pack).toEqual(contract.asset_pack);
   });
   it("emite o contrato físico GBA junto do export e bloqueia OBJ incompatível", () => {
     const contract = buildEngineExportProjectContract(project({
@@ -544,7 +538,7 @@ describe("prepareEngineProjectExport", () => {
     expect(template).toMatch(/void draw_view\(\)[\s\S]*?fixed UI layer used by the approved HUD[\s\S]*?fill_rect\(0, 0, 30, 20, 0\);[\s\S]*?set_bg_enabled\(gbs::BackgroundLayer::BG0, true\);/);
     expect(template).toMatch(/void draw_view\(\)[\s\S]*?cached_view_room == current_room_index[\s\S]*?cached_view_position\.x == runtime_state\.position\.x[\s\S]*?return;[\s\S]*?cached_view_room = current_room_index;/);
     expect(template).toMatch(/void apply_room_visuals\(\)[\s\S]*?invalidate_dungeon_view_cache\(\);/);
-    expect(template).toMatch(/draw_actors\(\);[\s\S]*?set_bg_priority\(gbs::BackgroundLayer::BG0, 0\);[\s\S]*?gbs::draw_hud\(hud\);[\s\S]*?gbs::draw_dialogue\(dialogue\);/);
+    expect(template).toMatch(/draw_actors\(\);[\s\S]*?set_bg_priority\(gbs::BackgroundLayer::BG0, 0\);[\s\S]*?gbs::draw_hud\(hud\);[\s\S]*?gbs::draw_dialogue\(dungeon_dialogue\);/);
     expect(template).not.toMatch(/if \(room\.background_index >= 0[\s\S]*?set_bg_enabled\(gbs::BackgroundLayer::BG0, false\)/);
   });
 

@@ -117,6 +117,7 @@ export interface MenuEmbeddedScreenConfig {
   hudListRows?: number;
   hudTextColor?: number;
   hudTransparentText?: boolean;
+  hudFeedbackInDetails?: boolean;
   titleTextVariableName?: string;
   backgroundAnimation?: MenuBackgroundAnimationConfig;
   titleFadeFrames: number;
@@ -144,6 +145,7 @@ export interface MenuSceneConfig {
   hudListRows?: number;
   hudTextColor?: number;
   hudTransparentText?: boolean;
+  hudFeedbackInDetails?: boolean;
   titleTextVariableName?: string;
   backgroundAnimation?: MenuBackgroundAnimationConfig;
   titleFadeFrames: number;
@@ -486,6 +488,7 @@ function normalizeEmbeddedScreens(value: unknown, parentProfile: MenuSceneProfil
       titleOverlayAssetName: stringValue(source.titleOverlayAssetName),
       ...(hudMode ? { hudMode } : {}),
       ...(source.hudTransparentText === true ? {hudTransparentText:true} : {}),
+      ...(source.hudFeedbackInDetails === true ? {hudFeedbackInDetails:true} : {}),
       ...(Number.isInteger(source.hudTextColor) ? { hudTextColor: integer(source.hudTextColor, 32767, 0, 32767) } : {}),
       ...(Number(source.hudListRows) > 0 ? { hudListRows: integer(source.hudListRows, 4, 1, 6) } : {}),
       ...(stringValue(source.titleTextVariableName) ? { titleTextVariableName: stringValue(source.titleTextVariableName) } : {}),
@@ -584,6 +587,7 @@ export function normalizeMenuSceneConfig(value: unknown): MenuSceneConfig {
     titleOverlayAssetName: stringValue(source.titleOverlayAssetName),
     ...(hudMode ? { hudMode } : {}),
       ...(source.hudTransparentText === true ? {hudTransparentText:true} : {}),
+      ...(source.hudFeedbackInDetails === true ? {hudFeedbackInDetails:true} : {}),
       ...(Number.isInteger(source.hudTextColor) ? { hudTextColor: integer(source.hudTextColor, 32767, 0, 32767) } : {}),
       ...(Number(source.hudListRows) > 0 ? { hudListRows: integer(source.hudListRows, 4, 1, 6) } : {}),
       ...(stringValue(source.titleTextVariableName) ? { titleTextVariableName: stringValue(source.titleTextVariableName) } : {}),

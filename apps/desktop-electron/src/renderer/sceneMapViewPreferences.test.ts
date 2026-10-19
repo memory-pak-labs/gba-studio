@@ -1,9 +1,34 @@
 /** @vitest-environment happy-dom */
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { readSceneMapViewZoom, writeSceneMapViewZoom, readSceneMapViewMode, writeSceneMapViewMode } from "./sceneMapViewPreferences.js";
+import { readSceneMapViewZoom, writeSceneMapViewZoom, readSceneMapViewMode, writeSceneMapViewMode, readSceneDiagramPositions, writeSceneDiagramPositions } from "./sceneMapViewPreferences.js";
 
 describe("scene map navigation preferences", () => {
   afterEach(() => { window.localStorage.clear(); vi.restoreAllMocks(); });
+
+  it("restores diagram card positions independently for each saved project", () => {
+    writeSceneDiagramPositions("/one.gba-project", { porto: { x: 321, y: 456 } });
+    expect(readSceneDiagramPositions("/one.gba-project")).toEqual({ porto: { x: 321, y: 456 } });
+    expect(readSceneDiagramPositions("/two.gba-project")).toEqual({});
+    writeSceneDiagramPositions("/one.gba-project", {});
+    expect(readSceneDiagramPositions("/one.gba-project")).toEqual({});
+  });
+
+  it("rejects malformed diagram coordinates without blocking project opening", () => {
+    const key="gba-studio:scene-diagram-positions:/one";
+    window.localStorage.setItem(key,'{"valid":{"x":10.4,"y":-2},"bad":{"x":"40","y":2},"": {"x":1,"y":2}}');
+    expect(readSceneDiagramPositions("/one")).toEqual({valid:{x:10,y:0}});
+    window.localStorage.setItem(key,'broken');
+    expect(readSceneDiagramPositions("/one")).toEqual({});
+  });
+
+  it("keeps diagram navigation usable when no saved path or device storage exists", () => {
+    writeSceneDiagramPositions(undefined,{porto:{x:1,y:2}});
+    expect(readSceneDiagramPositions(undefined)).toEqual({});
+    vi.spyOn(window.localStorage,"setItem").mockImplementation(()=>{throw new Error("full");});
+    expect(()=>writeSceneDiagramPositions("/one",{porto:{x:1,y:2}})).not.toThrow();
+    vi.spyOn(window.localStorage,"getItem").mockImplementation(()=>{throw new Error("blocked");});
+    expect(readSceneDiagramPositions("/one")).toEqual({});
+  });
 
   it("remembers the overview mode per project and defaults to previews", () => {
     expect(readSceneMapViewMode("/one")).toBe("preview");

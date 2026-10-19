@@ -7,12 +7,13 @@ import { buildAssetcSpritePackGeneration } from "./engineProjectExport.js";
 const data = parseGBAProjectFile(readFileSync(new URL("../../default-assets/templates/exemplo-gba/exemplo-gba.gba-project", import.meta.url), "utf8")).data;
 
 describe("approved Porto Lumen actor and HUD integration", () => {
-  it("keeps one approved front pose, body48, 8bpp color and independent foot collision", () => {
-    for (const name of ["porto-nara-body48.png", "porto-mechanic-body48.png"]) {
+  it("keeps the active 48px four-direction sheets and independent foot collision", () => {
+    for (const name of ["porto-nara-animations48.png", "porto-mechanic-animations48.png"]) {
       const source = (data.assets as any[]).find(asset => asset.name === name);
-      expect(source.metadata).toMatchObject({ frameWidth: 32, frameHeight: 48, colorMode: "8bpp", reusableLibraryAsset: true });
+      expect(source.metadata).toMatchObject({ frameWidth: 32, frameHeight: 48, colorMode: "8bpp", reviewStatus: "approved" });
       const animations = (data.animations as any[]).filter((animation: any) => animation.spriteSheet === name);
-      expect(animations).toHaveLength(1);
+      expect(animations).toHaveLength(8);
+      expect(animations.filter(a => a.name.startsWith("walk_")).every(a => a.frameCount === 4)).toBe(true);
       expect(animations[0]).toMatchObject({ frameCount: 1, hitboxWidth: 16, hitboxHeight: 16, originX: 0, originY: 0 });
     }
     expect((data.actors as any[]).find(actor => actor.id === "port-nara").spriteSheet).toBe("porto-nara-animations48.png");

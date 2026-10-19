@@ -1501,3 +1501,22 @@
   font-size: var(--studio-font-size-xs);
   font-weight: var(--studio-font-weight-regular);
 }
+
+/* Dungeon authoring controls share application typography; GBA pixels stay in the camera. */
+.dungeon-camera-error,
+.dungeon-scene-editor header label,
+.dungeon-scene-editor p,
+.dungeon-camera-controls button,
+.dungeon-entity-list button {
+  font-size: var(--studio-font-size-sm);
+}
+.dungeon-grid button {
+  font-size: var(--studio-font-size-lg);
+  font-weight: var(--studio-font-weight-semibold);
+}
+
+.rooms-editor-layout .is-viewport-card .room-stage-card-dimensions,
+.rooms-editor-layout .is-viewport-card .room-stage-card-count,
+.rooms-editor-layout .is-viewport-card .room-stage-card-player {
+  font-size: var(--studio-font-size-2xs);
+}

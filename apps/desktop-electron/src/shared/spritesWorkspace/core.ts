@@ -2512,7 +2512,7 @@ export function deriveSpritesWorkspaceValidationIssues(
     if (animations.length === 0) {
       issues.push({
         id: `no-animations-${sheet.name}`,
-        severity: "warning",
+        severity: "info",
         message: `${sheet.name} nao possui animacoes.`,
         spriteSheet: sheet.name
       });

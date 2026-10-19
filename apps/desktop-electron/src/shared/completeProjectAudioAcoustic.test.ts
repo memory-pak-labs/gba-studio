@@ -73,6 +73,16 @@ describe("gate acústico do projeto completo", () => {
         })
         : []),
       ...scenes.flatMap((scene) => {
+        const p = ((scene.runtime as any)?.config as any)?.presentation;
+        return p ? [p.victoryMusic,...Object.values(p.actionSounds??{})].filter((n):n is string=>typeof n==='string'&&n.length>0) : [];
+      }),
+      ...scenes.flatMap((scene) => {
+        const runtime = scene.runtime as Record<string, unknown> | undefined;
+        const config = runtime?.config as Record<string, unknown> | undefined;
+        return Object.values((config?.actionSounds as Record<string, unknown> | undefined) ?? {})
+          .filter((name): name is string => typeof name === "string" && name.length > 0);
+      }),
+      ...scenes.flatMap((scene) => {
         const runtime = scene.runtime as Record<string, unknown> | undefined;
         const config = runtime?.config as Record<string, unknown> | undefined;
         const presentation = config?.tacticalPresentation as Record<string, unknown> | undefined;

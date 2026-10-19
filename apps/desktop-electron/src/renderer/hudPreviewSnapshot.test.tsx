@@ -10,10 +10,10 @@ describe('HUD rendering matches the tile frame contract', () => {
     drawHudComponent(ctx,{...component,x:4,y:4,width:60,height:18,pixelPosition:true},image,'');
     expect(ctx.drawImage).toHaveBeenCalledWith(image,0,0,60,18,4,4,60,18);
   });
-  it('uses a six-pixel advance for the approved five-pixel numeric glyphs', () => {
+  it('keeps the six-pixel numeric advance while preserving complete custom font cells', () => {
     const ctx=context(), atlas={} as HTMLCanvasElement;
     drawHudComponent(ctx,{...component,kind:'text',text:'008',x:204,y:9,width:18,height:8,textAdvance:6},undefined,'',atlas);
-    expect(vi.mocked(ctx.drawImage).mock.calls.map(call=>call.slice(5))).toEqual([[204,9,5,8],[210,9,5,8],[216,9,5,8]]);
+    expect(vi.mocked(ctx.drawImage).mock.calls.map(call=>call.slice(5))).toEqual([[204,9,8,8],[210,9,8,8],[216,9,8,8]]);
   });
   it('preserves an authored purple bar image without an orange overlay', () => {
     const ctx=context();const image={naturalWidth:72,naturalHeight:8} as HTMLImageElement;

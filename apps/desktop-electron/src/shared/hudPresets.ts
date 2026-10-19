@@ -5,11 +5,11 @@ import { applyInterfaceThemeToHudPreset } from "./interfaceThemes.js";
 export type HudPresetPosition = "Superior" | "Inferior";
 export type HudPresetMode = "standard" | "advanced";
 export type HudComponentKind = "frame" | "text" | "bar" | "icon";
-export const HUD_VALUE_BINDINGS = ["p1-health", "p2-health", "round-time", "p1-rounds", "p2-rounds", "score", "lives"] as const;
+export const HUD_VALUE_BINDINGS = ["p1-health", "p2-health", "round-time", "p1-rounds", "p2-rounds", "score", "lives", "p1-super", "p2-super", "wave"] as const;
 export type HudValueBinding = typeof HUD_VALUE_BINDINGS[number];
 export const HUD_VALUE_BINDING_LABELS: Record<HudValueBinding, string> = {
   "p1-health":"Vida P1", "p2-health":"Vida P2", "round-time":"Tempo do round",
-  "p1-rounds":"Rounds P1", "p2-rounds":"Rounds P2", score:"Pontuação", lives:"Vidas"
+  "p1-rounds":"Rounds P1", "p2-rounds":"Rounds P2", score:"Pontuação", lives:"Vidas", "p1-super":"Especial P1", "p2-super":"Especial P2", wave:"Onda"
 };
 export type HudCornerAnchor = "freeform" | "top-left" | "top-right" | "bottom-left" | "bottom-right";
 
@@ -30,7 +30,7 @@ export interface HudComponent {
   valueVariable?: string;
   inventoryItem?: number;
   valueMaximum?: number;
-  textAdvance?: 6 | 8;
+  textAdvance?: 6 | 7 | 8;
   foregroundImage?: boolean;
   stateAssets?: string[];
   gauge?: { emptyAsset: string; x: number; y: number; width: number; height: number; reverse?: boolean };
@@ -264,7 +264,7 @@ function normalizeHudComponent(value: unknown, index: number): HudComponent | nu
     ...(typeof value.valueVariable === "string" && value.valueVariable.trim() ? { valueVariable: value.valueVariable.trim() } : {}),
     ...(Number.isInteger(value.inventoryItem) && Number(value.inventoryItem) >= 0 && Number(value.inventoryItem) < 16 ? { inventoryItem: Number(value.inventoryItem) } : {}),
     ...(typeof value.valueMaximum === "number" && value.valueMaximum > 0 ? { valueMaximum: Math.trunc(value.valueMaximum) } : {}),
-    ...(value.textAdvance === 6 ? { textAdvance: 6 as const } : {}),
+    ...(value.textAdvance === 6 || value.textAdvance === 7 ? { textAdvance: value.textAdvance } : {}),
     ...(value.foregroundImage === true && componentKind(value.kind) === "bar" ? { foregroundImage: true } : {}),
     ...(Array.isArray(value.stateAssets) ? {stateAssets:value.stateAssets.filter((v): v is string => typeof v === "string").slice(0,2)} : {}),
     ...(isRecord(value.gauge) ? {gauge: {

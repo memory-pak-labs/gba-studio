@@ -507,6 +507,36 @@ describe("Preview Runtime", () => {
     expect(saved.saveSlots[0]?.variables).toMatchObject({ "player.name": "AB", "player.gender": 1 });
   });
 
+  it("preserva a última letra no limite do nome e apaga essa letra antes da anterior", () => {
+    const runtime = createPreviewRuntime({
+      scenas: [{
+        id: "name-room", name: "name_room", sceneType: "menu", width: 30, height: 20,
+        runtime: { type: "menu", config: {
+          screenType: "menu", role: "name_input",
+          textInput: { variableName: "player.name", maxLength: 8, keyboard: { layout: "grid" } },
+          items: [{ id: "name", label: "Nome", action: "select", eventName: "open-name" }]
+        } }
+      }],
+      events: [{ name: "open-name", steps: [{ command: "open_text_input player.name 8 latin_upper" }] }],
+      settings: { general: { startScene: "name_room" } }
+    });
+    let state = dispatchPreviewRuntimeAction(runtime, "action");
+    for (const letter of "MARIANNA") {
+      state = dispatchPreviewRuntimeAction({ ...state, textInput: {
+        ...state.textInput, keyboardIndex: letter.charCodeAt(0) - 65
+      } }, "action");
+    }
+    expect(state.textInput).toMatchObject({ value: "MARIANNA", cursorIndex: 8 });
+    state = dispatchPreviewRuntimeAction({ ...state, textInput: { ...state.textInput, keyboardIndex: 1 } }, "action");
+    expect(state.variables["player.name"]).toBe("MARIANNA");
+    state = dispatchPreviewRuntimeAction({ ...state, textInput: { ...state.textInput, keyboardIndex: 26 } }, "action");
+    expect(state.textInput).toMatchObject({ value: "MARIANN", cursorIndex: 7 });
+    state = dispatchPreviewRuntimeAction({ ...state, textInput: { ...state.textInput, keyboardIndex: 0 } }, "action");
+    state = dispatchPreviewRuntimeAction(state, "back");
+    state = dispatchPreviewRuntimeAction(state, "action");
+    expect(state.textInput).toMatchObject({ active: true, value: "MARIANNA", cursorIndex: 8 });
+  });
+
   it("mantém o controle de maiúsculas desabilitado quando o contrato não permite minúsculas", () => {
     const runtime = createPreviewRuntime({
       scenas: [{

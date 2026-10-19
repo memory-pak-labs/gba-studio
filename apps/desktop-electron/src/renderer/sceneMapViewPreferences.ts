@@ -1,6 +1,27 @@
-import { clampSceneMapZoom } from "../shared/sceneMapLayout.js";
+import { clampSceneMapZoom, type SceneMapPosition } from "../shared/sceneMapLayout.js";
 
 export type SceneMapViewMode = "preview" | "diagram";
+
+export function readSceneDiagramPositions(projectPath: string | undefined): Record<string, SceneMapPosition> {
+  if (!projectPath) return {};
+  try {
+    const value: unknown = JSON.parse(window.localStorage.getItem(`gba-studio:scene-diagram-positions:${projectPath}`) ?? "{}");
+    if (!value || typeof value !== "object" || Array.isArray(value)) return {};
+    return Object.fromEntries(Object.entries(value).flatMap(([name, position]) => {
+      if (!name.trim() || !position || typeof position !== "object" || Array.isArray(position)) return [];
+      const { x, y } = position as Record<string, unknown>;
+      if (typeof x !== "number" || typeof y !== "number" || !Number.isFinite(x) || !Number.isFinite(y)) return [];
+      return [[name, { x: Math.max(0, Math.round(x)), y: Math.max(0, Math.round(y)) }]];
+    }));
+  } catch { return {}; }
+}
+
+export function writeSceneDiagramPositions(projectPath: string | undefined, positions: Record<string, SceneMapPosition>): void {
+  if (!projectPath) return;
+  try {
+    window.localStorage.setItem(`gba-studio:scene-diagram-positions:${projectPath}`, JSON.stringify(positions));
+  } catch { /* The current in-memory layout remains usable when storage is unavailable. */ }
+}
 
 export function readSceneMapViewMode(projectPath: string | undefined): SceneMapViewMode {
   try {

@@ -35,7 +35,9 @@ describe("approved orange backgrounds in blank scenes",()=>{
   const p=buildProjectFromTemplate("blank",{name:"Orange"});
   expect(rooms(p)[0]).toMatchObject({backgroundAssetName:image("topdown"),gbStudioUseBackgroundLayout:true});
   const backgrounds=assets(p).filter(a=>a.kind==="Background");
-  expect(backgrounds).toHaveLength(16);
+  expect(backgrounds.filter(a=>!a.metadata.dungeonMaterial)).toHaveLength(16);
+  expect(backgrounds.filter(a=>a.metadata.dungeonMaterial)).toHaveLength(4);
+  expect(backgrounds.filter(a=>a.metadata.dungeonMaterial).every(a=>a.metadata.width===64&&a.metadata.height===64)).toBe(true);
   expect(backgrounds.every(a=>a.metadata.bundledDefaultAsset.startsWith("template:blank/Assets/backgrounds/"))).toBe(true);
   expect(p.settings).toMatchObject({sceneTypes:{backgroundDefaultsProfile:"neutral-orange",defaultBackgrounds:{topdown:image("topdown"),racingPerspective:image("racing-rear")}}});
  });

@@ -92,11 +92,19 @@ describe.skipIf(!process.env.GBA_USER_ASSETS_QA_OUTPUT)("blank user asset native
       }
       evidence.push({ family: player.family, sheet: name, width, height, colors, frames, palette, opaque, colorMode, sourceSha256: createHash("sha256").update(image).digest("hex") });
     }
-    // Two independent actors deliberately use different frames from the same
-    // streamed sheet. Comparing only against any source frame would miss aliasing.
+    // Two stationary actors deliberately use different idle frames from the
+    // same streamed sheet. A walking clip returns to idle while an NPC is still.
+    const topdownAnimations = data.animations as Record<string, any>[];
+    const npcIdle = { ...structuredClone(topdownAnimations.find(a => a.spriteSheet === "QA own topdown.png" && a.name === "idle_down")!),
+      id: "qa-independent-idle", name: "npc_idle_down", frames: [structuredClone(topdownAnimations.find(a => a.spriteSheet === "QA own topdown.png" && a.name === "walk_down")!.frames[0])] };
+    data.animations = [...topdownAnimations, npcIdle];
+    data.animationStates = [...data.animationStates as unknown[], {
+      ...structuredClone((data.animationStates as Record<string, any>[]).find(s => s.spriteSheet === "QA own topdown.png")!),
+      id: "qa-independent-state", name: "Independent NPC", animationType: "fixed",
+      spriteSheet: "QA own topdown.png", animationIDs: [npcIdle.id] }];
     data = createActorInProject(data, {
       id: "qa-independent-npc", name: "IndependentNPC", roomID: String((data.rooms as Record<string, any>[])[0]!.id),
-      x: 5, y: 10, spriteSheet: "QA own topdown.png", animationName: "walk_down"
+      x: 5, y: 10, spriteSheet: "QA own topdown.png", animationName: "npc_idle_down", animationStateID: "qa-independent-state"
     });
     if (process.env.GBA_USER_ASSETS_QA_PROPS) data = createActorInProject(data, {
       id: "qa-animated-prop", name: "AnimatedProp", roomID: "pointAndClick",

@@ -6,7 +6,7 @@ export const BLANK_PLAYER_DEFAULTS_PROFILE = "neutral-purple";
 
 const families: Record<string, string> = {
   topdown: "topdown", platformer: "platformer", luta: "fighter", shmup: "shmup", pointAndClick: "point-click",
-  racing: "racing-topdown", racingPerspective: "racing-rear",
+  racing: "racing-topdown", racingPerspective: "racing-rear", dungeonCrawler: "dungeon",
   isometric: "isometric-adventure", isometricAdventure: "isometric-adventure", isometricTactical: "isometric-tactical"
 };
 
@@ -76,7 +76,7 @@ export function blankPlayerContent(): {
     animationStates.push({
       id: `state-neutral-${family}`, name: family, spriteSheet,
       animationType: family === "point-click" ? "cursor" : family === "platformer" ? "platform_player"
-        : ["fighter", "shmup", "shmup-explosion", "racing-rear"].includes(family) ? "fixed" : "four_direction_movement",
+        : ["fighter", "shmup", "shmup-explosion", "racing-rear", "dungeon"].includes(family) ? "fixed" : "four_direction_movement",
       mirrorLeftFromRight: family === "platformer" || family === "fighter",
       animationIDs: playerAnimations.map(animation => animation.id)
     });

@@ -1,4 +1,5 @@
 import { memoizeEngineExport, withEngineExportContext } from "../shared/engineExportContext.js";
+import { dungeonGeometryKey, dungeonPlayerActor } from "../shared/dungeonSceneView.js";
 import { audioContractIssues } from "../shared/audioContract.js";
 import { isLutaEventVerb, parseLutaEventCommand } from "../shared/lutaEventCommands.js";
 import { eventCommandIntegrationIssue, eventCommandSupport } from "../shared/eventCommandSupport.js";
@@ -19,6 +20,7 @@ import {
 import {
   buildActorEngineSpriteExport,
   buildLutaActorEngineSpriteExport,
+  buildBattleRpgActorEngineSpriteExport,
   buildAssetcAudioPackGeneration,
   buildAssetcPaletteFamilyPackGeneration,
   buildAssetcSpritePackGeneration,
@@ -359,7 +361,7 @@ export interface EngineExportTopdownRoom {
   visual_tiles: number[];
   foreground_tiles?: number[];
   visual_tilemap?: string;
-  visual_tilemap_layout?: "source_asset";
+  visual_tilemap_layout?: "source_asset" | "editor_tiles";
   paged_source_tiles?: string;
   collision_flags: number[];
   collision_slopes: number[];
@@ -530,12 +532,12 @@ export interface EngineExportPlatformerRoom {
   height_tiles: number;
   visual_tiles: number[];
   visual_tilemap?: string;
-  visual_tilemap_layout?: "source_asset";
+  visual_tilemap_layout?: "source_asset" | "editor_tiles";
   background_layers?: Array<{
     layer: "bg3" | "bg2" | "bg1";
     tiles: number[];
     tilemap?: string;
-    tilemap_layout?: "source_asset";
+    tilemap_layout?: "source_asset" | "editor_tiles";
     parallax: { x: number; y: number };
   }>;
   collision_flags: number[];
@@ -609,7 +611,7 @@ export interface EngineExportPlatformerProject {
     metasprite: { asset: string; index: number };
     animation?: { asset: string };
     animations?: Partial<Record<
-      "idle" | "walk" | "jump" | "fall" | "climb" | "wall_slide" | "dash" | "glide",
+      "idle" | "walk" | "jump" | "fall" | "climb" | "wall_slide" | "dash" | "glide" | "attack" | "hurt" | "land",
       Omit<AssetcSpriteAnimationExportEntry, "name">
     >>;
     on_start?: EngineExportProjectEventCommand[];
@@ -633,7 +635,7 @@ export interface EngineExportPlatformerProject {
   scripts: EngineExportProjectScript[];
 }
 
-type PlatformerPlayerAnimationState = "idle" | "walk" | "jump" | "fall" | "climb" | "wall_slide" | "dash" | "glide";
+type PlatformerPlayerAnimationState = "idle" | "walk" | "jump" | "fall" | "climb" | "wall_slide" | "dash" | "glide" | "attack" | "hurt" | "land";
 
 function platformerPlayerAnimationState(name: string): PlatformerPlayerAnimationState | null {
   const tokens = name.toLowerCase().split(/[^a-z0-9]+/).filter(Boolean);
@@ -645,6 +647,9 @@ function platformerPlayerAnimationState(name: string): PlatformerPlayerAnimation
   if (tokens.includes("wall") && tokens.some((token) => token === "slide" || token === "sliding")) return "wall_slide";
   if (tokens.some((token) => token === "dash" || token === "dashing")) return "dash";
   if (tokens.some((token) => token === "glide" || token === "gliding")) return "glide";
+  if (tokens.includes("attack")) return "attack";
+  if (tokens.includes("hurt")) return "hurt";
+  if (tokens.includes("land")) return "land";
   return null;
 }
 
@@ -829,7 +834,8 @@ function tacticalPresentationReferences(
   if (enabled.has("tactical_surface")) references.push(...(presentation.surfacePages ?? []).map((page) => page.asset));
   if (enabled.has("tactical_grid_overlay") && presentation.gridAsset) references.push(presentation.gridAsset);
   if (enabled.has("tactical_hud") && presentation.hudLayout) references.push(presentation.hudLayout);
-  if (enabled.has("tactical_units")) references.push(...presentation.units.map((unit) => unit.sheet));
+  if (enabled.has("tactical_units")) references.push(...presentation.units.flatMap((unit) => [unit.sheet,...(unit.portrait?[unit.portrait]:[])]));
+  if(enabled.has("tactical_hud") && presentation.compactHud) references.push(...Object.values(presentation.compactHud));
   if (enabled.has("tactical_props")) references.push(...presentation.props.map((prop) => prop.asset));
   if (enabled.has("tactical_feedback")) {
     references.push(...[
@@ -948,6 +954,8 @@ function buildIsometricTacticalPresentation(
     ? presentation.units.map((unit) => ({
       actor_id: unit.actorId,
       sheet: canonicalAsset(unit.sheet, "obj"),
+      ...(unit.portrait ? {portrait:canonicalAsset(unit.portrait,"obj")} : {}),
+      ...(unit.label ? {label:unit.label} : {}),
       ...(unit.animations ? { animations: unit.animations } : {})
     }))
     : [];
@@ -992,6 +1000,7 @@ function buildIsometricTacticalPresentation(
     ...(enabled.has("tactical_hud") && presentation.hudLayout
       ? { hud_layout: canonicalAsset(presentation.hudLayout, "ui") }
       : {}),
+    ...(enabled.has("tactical_hud") && presentation.compactHud ? {compact_hud:Object.fromEntries(Object.entries(presentation.compactHud).map(([key,name])=>[key,canonicalAsset(name,"obj")])) as Record<string,string>} : {}),
     units,
     props,
     ...(enabled.has("tactical_feedback") && presentation.cursorAsset && presentation.rangeAsset && presentation.targetAsset
@@ -1146,9 +1155,12 @@ export interface EngineExportIsometricTacticalPresentation {
   };
   grid_asset?: string;
   hud_layout?: string;
+  compact_hud?: Record<string,string>;
   units: Array<{
     actor_id: string;
     sheet: string;
+    portrait?: string;
+    label?: string;
     animations?: NonNullable<IsoTacticalUnitPresentation["animations"]>;
   }>;
   props: Array<{
@@ -1232,7 +1244,7 @@ export interface EngineExportIsometricRoom {
     bg0: number[];
   };
   authored_background?: string;
-  paged_surface?: { background: string; foreground: string; width: number; height: number };
+  paged_surface?: { background: string; foreground?: string; width: number; height: number };
   tileset?: string;
   tileset_tile_width_pixels?: number;
   tileset_tile_height_pixels?: number;
@@ -1278,6 +1290,13 @@ export interface EngineExportIsometricProject {
 }
 
 export interface EngineExportDungeonCrawlerRoom {
+  player_view?: {
+    metasprite: { asset: string; index: number };
+    animation?: Omit<AssetcSpriteAnimationExportEntry,"name">;
+    position_pixels: { x: number; y: number };
+  };
+  presentation?: { hud_background: number; action_sounds: Record<string,number>; player_label?: string;
+    view_recipe?: {width:number;height:number;cells:boolean[];materials?:string[];material_assets?:string[];door:{x:number;y:number}} };
   name: string;
   resource_bank_group?: string;
   width_tiles: number;
@@ -1306,6 +1325,8 @@ export interface EngineExportDungeonCrawlerRoom {
     name: string;
     position: { x: number; y: number };
     metasprite: { asset: string; index: number };
+    depth_frames?: Record<string, Omit<AssetcSpriteAnimationExportEntry,"name">>;
+    cell?: boolean;
     depth_metasprites?: {
       far: { asset: string; index: number };
       mid: { asset: string; index: number };
@@ -1317,6 +1338,7 @@ export interface EngineExportDungeonCrawlerRoom {
 }
 
 export interface EngineExportDungeonCrawlerProject {
+  view_cache?: {tiles:string; maps:string; palettes:string; index:Array<{view:string;mapOffset:number;paletteOffset:number;paletteColors:number}>};
   initial_room: number;
   resource_banks?: "asset_pack";
   save?: {
@@ -1333,7 +1355,7 @@ export interface EngineExportDungeonCrawlerProject {
   scripts: EngineExportProjectScript[];
   assets?: EngineExportTopdownProject["assets"];
   backgrounds?: Array<{
-    layer: "bg2";
+    layer: "bg2" | "bg1";
     tilemap: string;
     backdrop_color?: number;
     backdrop_from_tilemap_palette?: boolean;
@@ -1371,6 +1393,7 @@ export interface EngineExportRacingPlayer {
 }
 
 export interface EngineExportRacingRoom {
+  action_sounds?: Partial<Record<"accelerate" | "brake" | "collision" | "checkpoint", number>>;
   player?: EngineExportRacingPlayer;
   name: string;
   resource_bank_group?: string;
@@ -1453,6 +1476,16 @@ export interface EngineExportRacingProject {
 }
 
 export interface EngineExportBattleRpgEncounter {
+  presentation?: {
+    cursor?: {asset:string;index:number};
+    victory_label?: string;
+    hud_background: number;
+    action_sounds: Partial<Record<string,number>>;
+    victory_tracker: number;
+    outcome_hold_frames: number;
+    effects: Record<string, Omit<AssetcSpriteAnimationExportEntry,"name">>;
+    disabled_escape?: {asset:string;index:number};
+  };
   name: string;
   background?: number;
   resource_bank_group?: string;
@@ -1483,6 +1516,9 @@ export interface EngineExportBattleRpgEncounter {
 }
 
 export interface EngineExportBattleRpgParticipant {
+  animation_set?: AssetcActorSpriteExportFields["battle_rpg_animation_set"];
+  position?: {x:number;y:number};
+  hud_label?: string;
   name: string;
   unit: { max_hp: number; attack: number; defense: number; speed: number };
   abilities: Array<{ kind: "attack" | "magic" | "heal" | "defend"; power: number }>;
@@ -1500,7 +1536,7 @@ export interface EngineExportBattleRpgProject {
   assets?: EngineExportTopdownProject["assets"] & { sprite_assets?: string[] };
   resource_banks?: "asset_pack";
   backgrounds?: Array<{
-    layer: "bg2";
+    layer: "bg1" | "bg2";
     tilemap: string;
     backdrop_color?: number;
     backdrop_from_tilemap_palette?: boolean;
@@ -1516,6 +1552,7 @@ export interface EngineExportLutaFighter {
 }
 
 export interface EngineExportLutaStage {
+  action_sounds?: Partial<Record<"hit" | "guard" | "special" | "miss", number>>;
   name: string;
   background?: number;
   resource_bank_group?: string;
@@ -1596,6 +1633,7 @@ export interface EngineExportPointClickScene {
   cursor_speed?: number;
   hotspots?: EngineExportPointClickHotspot[];
   props?: EngineExportPointClickProp[];
+  cursor?: EngineExportPointClickProject["cursor"];
 }
 
 export interface EngineExportPointClickProject {
@@ -1644,6 +1682,7 @@ export interface EngineExportShmupEnemy {
   on_destroy?: EngineExportProjectEventCommand[];
   on_hit_player?: EngineExportProjectEventCommand[];
   metasprite?: { asset: string; index: number };
+  animation?: Omit<AssetcSpriteAnimationExportEntry, "name">;
 }
 
 export interface EngineExportShmupWave {
@@ -1656,6 +1695,7 @@ export interface EngineExportShmupWave {
   enemies: EngineExportShmupEnemy[];
   on_start?: EngineExportProjectEventCommand[];
   on_clear?: EngineExportProjectEventCommand[];
+  on_defeat?: EngineExportProjectEventCommand[];
 }
 
 export interface EngineExportShmupProject {
@@ -1711,6 +1751,7 @@ export interface EngineExportShmupProject {
     speed: number;
     fire_cooldown: number;
     projectile_offset: { x: number; y: number };
+    on_fire?: EngineExportProjectEventCommand[];
     metasprite?: { asset: string; index: number };
     animations?: Partial<Record<"idle" | "fly" | "bank_up" | "bank_down" | "shoot" | "hurt" | "explosion", Omit<AssetcSpriteAnimationExportEntry, "name">>>;
   };
@@ -1721,6 +1762,7 @@ export interface EngineExportShmupProject {
     metasprite?: { asset: string; index: number };
   };
   enemy_projectile?: {
+    on_hit_player?: EngineExportProjectEventCommand[];
     size: { x: number; y: number };
     velocity: { x: number; y: number };
     max_active: number;
@@ -1856,6 +1898,7 @@ export interface EngineExportMenuScreen {
   hud_list_rows?: number;
   hud_text_color?: number;
   hud_transparent_text?: boolean;
+  hud_feedback_in_details?: boolean;
   title_text_variable?: number;
   background?: number;
   background_animation?: {
@@ -1960,12 +2003,14 @@ export interface EngineExportCutsceneStep {
     to_position: { x: number; y: number };
     duration_frames: number;
   }>;
+  actor_frames?: Array<{ actor_index: number; frame_index: number }>;
 }
 
 export interface EngineExportCutsceneActor {
   name: string;
   position: { x: number; y: number };
   metasprite: { asset: string; index: number };
+  animation?: { asset: string };
 }
 
 export interface EngineExportCutsceneScene {
@@ -2035,6 +2080,7 @@ export interface EngineExportWorldMapProject {
   on_start?: EngineExportProjectEventCommand[];
   journey_frames?: number;
   cursor_affine?: boolean;
+  hud_labels?: { available: string; journey: string; locked: string };
   embedded_nodes?: boolean;
   save?: {
     enabled: boolean;
@@ -3474,7 +3520,9 @@ function npcActorsForRoom(
   return projectArray(data, "actors").filter((actor) => {
     const name = stringField(actor, "name", "");
     const roomNameValue = entitySceneName(actor, "actor");
-    return name !== playerName && (!roomNameValue || roomNameValue === roomDataName);
+    return name !== playerName
+      && !(roomSceneType(room)==="dungeonCrawler" && child(actor,"dungeonViewAnchor"))
+      && (!roomNameValue || roomNameValue === roomDataName);
   });
 }
 
@@ -5894,6 +5942,8 @@ function buildTopdownRooms(
       }
       if (room.gbStudioUseBackgroundLayout === true) {
         roomData.visual_tilemap_layout = "source_asset";
+      } else if (room.tilemapIndexBase === 1) {
+        roomData.visual_tilemap_layout = "editor_tiles";
       }
     }
 
@@ -6418,6 +6468,8 @@ function buildPlatformerRooms(
       roomData.visual_tilemap = tilesetAsset.name;
       if (room.gbStudioUseBackgroundLayout === true) {
         roomData.visual_tilemap_layout = "source_asset";
+      } else if (room.tilemapIndexBase === 1) {
+        roomData.visual_tilemap_layout = "editor_tiles";
       }
     }
     if (tileLayers.length > 0) {
@@ -6430,7 +6482,7 @@ function buildPlatformerRooms(
         const sourceNames = Array.isArray(layer.tileSourceAssetNames)
           ? layer.tileSourceAssetNames.filter((value): value is string => typeof value === "string" && value.trim().length > 0)
           : [];
-        const sourceName = sourceNames[0] ?? (mapping === "BG2" && room.gbStudioUseBackgroundLayout === true
+        const sourceName = sourceNames[0] ?? (mapping === "BG2" && (room.gbStudioUseBackgroundLayout === true || room.tilemapIndexBase === 1)
           ? visualTilemapAssetName : "");
         const layerAsset = sourceName && tilesetPack ? tilesetPack.assetsBySheet[sourceName] : null;
         const hasPaintedTiles = Array.isArray(layer.tilemap) && layer.tilemap.some((value) => (
@@ -6442,6 +6494,7 @@ function buildPlatformerRooms(
           tiles: paddedNumberArray(layer.tilemap, tileCount),
           ...(layerAsset ? { tilemap: layerAsset.name } : {}),
           ...(layerAsset && room.gbStudioUseBackgroundLayout === true ? { tilemap_layout: "source_asset" as const } : {}),
+          ...(layerAsset && room.gbStudioUseBackgroundLayout !== true && room.tilemapIndexBase === 1 ? { tilemap_layout: "editor_tiles" as const } : {}),
           parallax: mapping === "BG3" && parallaxMode === "bg3"
             ? {
                 x: Math.max(0, Math.min(1024, integerField(roomParallax, "speedX", 256))),
@@ -6809,7 +6862,9 @@ function buildIsometricRooms(
       height_tiles: height,
       visual_tiles: compiledTiles.visualTiles,
       collision_flags: paddedCollisionFlagsFromTypes(collisionTypes, tileCount),
-      ramp_flags: collisionSlopesFromTypes(collisionTypes),
+      ramp_flags: Array.isArray(room.rampFlags) && room.rampFlags.length===tileCount
+        ? room.rampFlags.map((flag:unknown)=>typeof flag==='number'&&Number.isInteger(flag)&&flag>=0&&flag<=30?flag:0)
+        : collisionSlopesFromTypes(collisionTypes),
       height_levels: compiledTiles.heightLevels,
       video: buildRoomVideoComposition(data, room, tilesetPack)
     };
@@ -6882,16 +6937,24 @@ function buildIsometricRooms(
       const surface = grid.pagedSurface;
       const background = tilesetPack?.assetsBySheet[surface.backgroundAsset];
       const foreground = tilesetPack?.assetsBySheet[surface.foregroundAsset];
-      if (!background || !foreground || background.kind !== "paged_bg" || foreground.kind !== "paged_bg") {
-        throw new Error(`Isometric scene ${roomData.name}: paged surface requires two paged_bg assets.`);
+      if (!background || background.kind !== "paged_bg" || (surface.foregroundAsset && (!foreground || foreground.kind !== "paged_bg"))) {
+        throw new Error(`Isometric scene ${roomData.name}: paged surface requires paged_bg sources.`);
       }
-      if (grid.worldMode !== "scrollable_tiled_world" || grid.gameplayMode !== "adventure" || grid.presentationZoom !== 100) {
-        throw new Error(`Isometric scene ${roomData.name}: paged surface requires adventure, scrolling and 100% runtime scale.`);
+      if (grid.worldMode !== "scrollable_tiled_world" || grid.presentationZoom !== 100) {
+        throw new Error(`Isometric scene ${roomData.name}: paged surface requires scrolling and 100% runtime scale.`);
       }
-      roomData.paged_surface = { background: background.name, foreground: foreground.name, width: surface.width, height: surface.height };
+      roomData.paged_surface = { background: background.name, ...(foreground ? {foreground:foreground.name} : {}), width: surface.width, height: surface.height };
       delete roomData.tileset;
+      if(roomData.tactical_presentation) delete roomData.tactical_presentation.surface_asset;
       delete roomData.tileset_render_offset_y_pixels;
       roomData.camera = { ...roomData.camera!, bounds: {x: 0, y: 0, width: surface.width, height: surface.height}, position: {x: 0, y: 0} };
+      if(grid.gameplayMode==="tactical") {
+        const actor=isometricActorsForRoom(data,room,index)[0];
+        const x=integerField(actor,"x",0),y=integerField(actor,"y",0),z=integerField(actor,"z",0);
+        roomData.camera.position={x:Math.max(0,Math.min(surface.width-240,grid.originX+(x-y)*grid.tileWidth/2-120)),
+          y:Math.max(0,Math.min(surface.height-160,grid.originY+(x+y)*grid.tileHeight/2+grid.tileHeight/2-z*grid.heightStep-80))};
+        roomData.camera.dead_zone={x:120,y:80,width:0,height:0};
+      }
     }
     if (
       authoredBackgroundAsset &&
@@ -6969,6 +7032,11 @@ function buildIsometricRooms(
               grid?.tileHeight
             )
           : { x: 0, y: 0 };
+        const pivot = child(child(projectArray(data,"assets").find(a=>a.name===actor.spriteSheet),"metadata"),"pivot");
+        if(pivot && typeof pivot.x === "number" && typeof pivot.y === "number") {
+          screenOffset.x = -Math.round(pivot.x);
+          screenOffset.y = Math.round((grid?.tileHeight ?? 0) / 2) - Math.round(pivot.y);
+        }
         return {
           tile: {
             x: actorX,
@@ -7177,8 +7245,8 @@ function dungeonCrawlerSafePlayerStart(
 function advancedRuntimeBackgrounds(
   rooms: Record<string, unknown>[],
   tilesetPack: AssetcTilesetPackGeneration | null
-): { backgrounds: NonNullable<EngineExportDungeonCrawlerProject["backgrounds"]>; indexByRoomName: Map<string, number> } {
-  const backgrounds: NonNullable<EngineExportDungeonCrawlerProject["backgrounds"]> = [];
+): { backgrounds: Array<{layer:"bg2";tilemap:string;backdrop_from_tilemap_palette?:boolean;backdrop_color?:number}>; indexByRoomName: Map<string, number> } {
+  const backgrounds: Array<{layer:"bg2";tilemap:string;backdrop_from_tilemap_palette?:boolean;backdrop_color?:number}> = [];
   const indexByRoomName = new Map<string, number>();
   rooms.forEach((room, index) => {
     const backgroundName = roomBackgroundAssetName(room);
@@ -7385,10 +7453,41 @@ function buildDungeonCrawlerRooms(
       : [];
     const onEnterScript = mergeRoomOnEnterScript(index === startIndex ? dialogueBoot : [], [...(onEnter ?? []), ...startMenuBinding]);
     const currentRoomName = roomName(room, index);
+    let playerView: EngineExportDungeonCrawlerRoom["player_view"];
+    if (config?.presentation?.playerView?.enabled) {
+      const actor = dungeonPlayerActor(data, room);
+      if (actor) {
+        const sprite = buildActorEngineSpriteExport(data,actor,spritePack,{preserveAuthoredAnimations:true});
+        if (!sprite) throw new Error("Dungeon: o ator do jogador em primeira pessoa precisa de um sprite exportável.");
+        const selected = sprite.animations?.find(clip=>clip.name===actor.animationName) ?? sprite.animations?.[0];
+        const animation = selected ? (({name:_name,...clip})=>clip)(selected) : undefined;
+        const anchor=child(actor,"dungeonViewAnchor") ?? {};
+        playerView={metasprite:sprite.metasprite,...(animation?{animation}:{}),
+          position_pixels:{x:Math.max(-128,Math.min(368,integerField(anchor,"x",200))),y:Math.max(-128,Math.min(288,integerField(anchor,"y",120)))}};
+      }
+    }
     const actors = npcActorsForRoom(data, room, index).flatMap((actor) => {
-      const sprite = buildActorEngineSpriteExport(data, actor, spritePack);
+      const sprite = buildActorEngineSpriteExport(data, actor, spritePack, {preserveAuthoredAnimations:Boolean(config?.presentation)});
       if (!sprite) return [];
       const depthMetasprites = buildDungeonCrawlerDepthSpriteExports(data, actor, spritePack);
+      const sheets=child(actor,"dungeonDepthSheets");
+      let depthFrames=sheets && Object.values(sheets).some(Boolean) ? Object.fromEntries(["near","mid","far"].map(depth=>{
+        const clipName=nullableStringField(actor,"dungeonDepthAnimationName") || "poses";
+        const fields=buildActorEngineSpriteExport(data,{...actor,animationStateID:"",spriteSheet:sheets[depth]||actor.spriteSheet,animationName:clipName},spritePack,{preserveAuthoredAnimations:true});
+        const clip=fields?.animations?.find(a=>a.name===clipName) ?? fields?.animations?.[0];
+        if(!clip)throw new Error(`Dungeon depth animation missing: ${String(sheets[depth])}`);
+        const {name:_name,...entry}=clip;return [depth,entry];
+      })) : undefined;
+      if(!depthFrames && !depthMetasprites && config?.presentation){
+        const clip=sprite.animations?.find(a=>a.name===actor.animationName) ?? sprite.animations?.[0];
+        if(clip){
+          // A normal NPC keeps its authored origin and native size at every depth.
+          // Explicit depth sheets remain the opt-in contract for pose animations.
+          const {name:_name,...entry}=clip;
+          const frame={...entry,frame_indices:entry.frame_indices.slice(0,1),durations:entry.durations?.slice(0,1),frame_metasprites:entry.frame_metasprites?.slice(0,1),loops:false};
+          depthFrames={near:frame,mid:frame,far:frame};
+        }
+      }
       const onInteract = scriptForEventName(data, resolveActorInteractEventName(actor), events, rooms, dialogues, audioItems, audioPack, pluginRegistry);
       const position = entityPosition(actor, "actor");
       return [{
@@ -7396,6 +7495,7 @@ function buildDungeonCrawlerRooms(
         position,
         metasprite: sprite.metasprite,
         ...(depthMetasprites ? { depth_metasprites: depthMetasprites } : {}),
+        ...(depthFrames ? {depth_frames:depthFrames,cell:actor.dungeonCell===true} : {}),
         ...(onInteract && onInteract.length > 0 ? { on_interact: onInteract } : {})
       }];
     });
@@ -7412,6 +7512,7 @@ function buildDungeonCrawlerRooms(
     );
     return {
       name: currentRoomName,
+      ...(playerView ? {player_view:playerView} : {}),
       resource_bank_group: engineSceneResourceBankGroupName(room, index),
       width_tiles: width,
       height_tiles: height,
@@ -7427,6 +7528,12 @@ function buildDungeonCrawlerRooms(
         y: playerStart.y,
         direction: dungeonDirection(config?.playerStart?.direction ?? playerActor?.direction)
       },
+      ...(config?.presentation ? {presentation:{hud_background:-1,
+        player_label: config.presentation.playerLabel || nullableStringField(child(child(data,"settings"),"general"),"startPlayer")
+          || nullableStringField(projectArray(projectArray(child(data,"settings") ?? {},"hudPresets").find(p=>p.id===room.hudPresetId) ?? {},"components").find(c=>c.kind==="text"),"text") || "Player",
+        action_sounds:Object.fromEntries(Object.entries(config.presentation.actionSounds).map(([cue,name])=>{
+        const audio=resolveAudioPlayback(audioItems,audioPack,name);if(audio?.op!=="play_sfx")throw new Error(`Dungeon cue must reference PSG SFX: ${name}`);return [cue,audio.index];
+      }))}} : {}),
       battle_enabled: roomFeatureRuntime.battleEnabled,
       video: buildRoomVideoComposition(data, room, tilesetPack),
       ...(backgroundIndexByRoomName.has(currentRoomName) ? { background: backgroundIndexByRoomName.get(currentRoomName) } : {}),
@@ -7447,11 +7554,59 @@ function buildDungeonCrawlerProject(
   const audioPack = buildAssetcAudioPackGeneration(data);
   const spritePack = buildAssetcSpritePackGeneration(data);
   const tilesetPack = buildAssetcTilesetPackGeneration(data);
-  const visual = advancedRuntimeBackgrounds(rooms, tilesetPack);
+  const baseVisual = advancedRuntimeBackgrounds(rooms.filter(room => {
+    const presentation = dungeonCrawlerSceneConfigFromRuntime(room.runtime, data.settings)?.presentation;
+    const metadata = child(projectArray(data,"assets").find(a=>a.name===roomBackgroundAssetName(room)),"metadata");
+    return !presentation || Boolean(metadata?.dungeonViewCache);
+  }), tilesetPack);
+  const visual:{backgrounds:NonNullable<EngineExportDungeonCrawlerProject["backgrounds"]>;indexByRoomName:Map<string,number>} = baseVisual;
   const events = projectArray(data, "events");
   const scripts = buildTopdownScripts(data, events, rooms, dialogues, audioItems, audioPack, pluginRegistry, true, "dungeon_crawler");
   const startMenuScriptIndex = scripts.findIndex((entry) => entry.name === "__gbastudio_start_menu__");
   const dungeonRooms = buildDungeonCrawlerRooms(data, spritePack, tilesetPack, visual.indexByRoomName, pluginRegistry, startMenuScriptIndex);
+  const cacheRoom=rooms.find(r=>child(projectArray(data,"assets").find(a=>a.name===roomBackgroundAssetName(r)),"metadata")?.dungeonViewCache);
+  const sourceCache=cacheRoom ? child(child(projectArray(data,"assets").find(a=>a.name===roomBackgroundAssetName(cacheRoom)),"metadata"),"dungeonViewCache") : undefined;
+  const copies=exportableAssets(data);
+  const cachePath=(key:string)=>{const name=sourceCache?.[key];const copy=copies.find(a=>a.name===name);if(!copy)throw new Error(`Dungeon cache resource missing: ${String(name)}`);return copy.output;};
+  const viewCache=sourceCache ? {tiles:cachePath("tilesAsset"),maps:cachePath("mapsAsset"),palettes:cachePath("palettesAsset"),index:sourceCache.index as NonNullable<EngineExportDungeonCrawlerProject["view_cache"]>["index"]} : undefined;
+  for(let i=0;i<rooms.length;i++){
+    const presentation=dungeonCrawlerSceneConfigFromRuntime(rooms[i].runtime,data.settings)?.presentation;
+    if(!presentation)continue;
+    const roomAsset = projectArray(data,"assets").find(a=>a.name===roomBackgroundAssetName(rooms[i]));
+    const roomSource = child(child(roomAsset,"metadata"),"dungeonViewCache");
+    const available=new Set(viewCache?.index.map(v=>v.view));
+    const room=dungeonRooms[i];
+    const grid={width:room.width_tiles,height:room.height_tiles,cells:room.collision_flags.map(flag=>flag!==0)};
+    const authoring=child(roomSource,"authoring");
+    const customMaterials = presentation.materialAssets?.some(Boolean) === true;
+    const customDoor = presentation.door !== undefined && JSON.stringify(presentation.door) !== JSON.stringify(authoring?.door);
+    const sharesProjectCache = roomSource && sourceCache && ["tilesAsset","mapsAsset","palettesAsset","index"].every(key=>JSON.stringify(roomSource[key])===JSON.stringify(sourceCache[key]));
+    const rebuild = !sharesProjectCache || customMaterials || customDoor || dungeonGeometryKey(grid)!==authoring?.geometry;
+    if(rebuild){
+      if(grid.width>64||grid.height>64||grid.cells.filter(cell=>!cell).length>256)throw new Error("Dungeon: a reconstrução aceita até 64×64 células e 256 células livres por cena.");
+      if (grid.cells.every(Boolean)) throw new Error("Dungeon: adicione pelo menos uma célula livre para a câmera.");
+      let material_assets: string[] | undefined;
+      if (customMaterials) {
+        if (presentation.materialAssets?.length !== 8 || presentation.materialAssets.some(name=>!name)) throw new Error("Dungeon: selecione os oito materiais de 64×64 pixels ou use os materiais procedurais.");
+        material_assets = presentation.materialAssets.map(name=>{
+          const source=copies.find(a=>a.name===name); if(!source)throw new Error(`Dungeon: material ausente: ${name}`);
+          return source.output;
+        });
+      }
+      const materials = !customMaterials && Array.isArray(authoring?.materials) ? authoring.materials as string[] : undefined;
+      if (materials && (materials.length!==8 || materials.some(value=>typeof value!=="string"||value.length!==10924))) throw new Error("Dungeon: materiais de origem inválidos.");
+      const door=presentation.door ?? child(authoring,"door");
+      room.presentation!.view_recipe={...grid,...(material_assets?{material_assets}:materials?{materials}:{}),door:{x:integerField(door??{},"x",-1),y:integerField(door??{},"y",-1)}};
+      if (!roomSource) delete room.background;
+    }
+    for(let y=0;!rebuild&&y<room.height_tiles;y++)for(let x=0;x<room.width_tiles;x++)if(room.collision_flags[y*room.width_tiles+x]===0)for(let direction=0;direction<4;direction++){
+      if(!available.has(`${x}-${y}-${direction}`))throw new Error(`Dungeon view cache missing camera for ${room.name}: ${x},${y},${direction}`);
+    }
+    if (!presentation.hudAssetName) continue;
+    const asset=tilesetPack?.assetsBySheet[presentation.hudAssetName];if(!asset)throw new Error("Dungeon HUD background missing");
+    let n=visual.backgrounds.findIndex(b=>b.tilemap===asset.name);if(n<0){n=visual.backgrounds.length;visual.backgrounds.push({layer:"bg1",tilemap:asset.name,backdrop_from_tilemap_palette:true});}
+    dungeonRooms[i].presentation!.hud_background=n;
+  }
   const initialRoom = rooms[startRoomIndex(data, rooms)] ?? rooms[0] ?? {};
   const dungeonModules = rooms.flatMap((room) => {
     const modules = child(child(room, "runtime"), "config")?.modules;
@@ -7467,6 +7622,7 @@ function buildDungeonCrawlerProject(
   const dungeonSpriteAssets = Array.from(new Set(dungeonRooms.flatMap((room) =>
     room.actors?.flatMap((actor) => [
       actor.metasprite.asset,
+      ...Object.values(actor.depth_frames??{}).map(a=>a.asset),
       ...(actor.depth_metasprites ? Object.values(actor.depth_metasprites).map((metasprite) => metasprite.asset) : [])
     ]) ?? []
   )));
@@ -7483,6 +7639,7 @@ function buildDungeonCrawlerProject(
     dialogue_lines: buildDialogueLines(data, dialogues, audioItems, audioPack),
     dialogue_ui: buildEngineDialogueUiConfigForExport(data),
     scripts,
+    ...(viewCache ? {view_cache:viewCache} : {}),
     inventory_enabled: featureRuntime.inventoryEnabled,
     battle_enabled: featureRuntime.battleEnabled,
     compass_enabled: featureRuntime.compassEnabled,
@@ -7543,6 +7700,11 @@ function buildRacingRooms(
       if((config.pseudo3dVisuals?.horizonY??48)+camera.height*camera.focalLength/camera.distance>152)
         throw new Error("Câmera da corrida: aumente a distância ou reduza a altura/perspectiva para manter o carro dentro da tela.");
     }
+    const actionSounds = Object.fromEntries(Object.entries(config?.actionSounds ?? {}).map(([cue,name]) => {
+      const resolved=resolveAudioPlayback(audioItems,audioPack,name);
+      if(resolved?.op !== "play_sfx") throw new Error(`Corrida actionSounds.${cue} requer SFX PSG compilado: ${name}`);
+      return [cue,resolved.index];
+    }));
     const player = playerPositionForRoom(data, room, index);
     const currentRoomName = roomName(room, index);
     const eventBindings = child(room, "eventBindings");
@@ -7582,6 +7744,7 @@ function buildRacingRooms(
     ].some((asset) => asset.bank_groups.includes(resourceBankGroup));
     return {
       name: currentRoomName,
+      ...(Object.keys(actionSounds).length ? {action_sounds:actionSounds} : {}),
       ...(hasResourceBankGroup ? { resource_bank_group: resourceBankGroup } : {}),
       width_tiles: width,
       height_tiles: height,
@@ -7765,10 +7928,17 @@ function buildBattleRpgProject(
   const spritePack = buildAssetcSpritePackGeneration(data);
   const tilesetPack = buildAssetcTilesetPackGeneration(data);
   const visual = advancedRuntimeBackgrounds(rooms, tilesetPack);
+  const backgrounds: NonNullable<EngineExportBattleRpgProject["backgrounds"]> = [...visual.backgrounds];
+  const hudIndices = new Map<string,number>();
+  rooms.forEach(room=>{
+    const name=nullableStringField(child(child(room,"runtime"),"config"),"hudAssetName");
+    const asset=name && tilesetPack?.assetsBySheet[name];
+    if(asset){hudIndices.set(roomName(room,0),backgrounds.length); backgrounds.push({layer:"bg1",tilemap:asset.name});}
+  });
   const events = projectArray(data, "events");
   const participantSpriteAssets = new Set<string>();
   const assetSection = advancedRuntimeAssetSection(
-    visual.backgrounds.map((background) => background.tilemap),
+    backgrounds.map((background) => background.tilemap),
     spritePack?.assetNames ?? [],
     audioPack
   );
@@ -7799,7 +7969,7 @@ function buildBattleRpgProject(
           ? battle.abilities.filter((ability): ability is "attack" | "magic" | "heal" | "defend" => ability === "attack" || ability === "magic" || ability === "heal" || ability === "defend")
           : [];
         const uniqueKinds = Array.from(new Set(abilityKinds.length > 0 ? abilityKinds : ["attack" as const])).slice(0, 4);
-        const sprite = buildActorEngineSpriteExport(data, actor, spritePack);
+        const sprite = buildBattleRpgActorEngineSpriteExport(data, actor, spritePack);
         if (sprite) participantSpriteAssets.add(sprite.metasprite.asset);
         return [{
           side,
@@ -7811,7 +7981,10 @@ function buildBattleRpgProject(
               power: kind === "magic" ? attack : kind === "heal" ? Math.max(1, Math.floor(maxHp / 4)) : 0
             })),
             ...(spriteScale > 1 ? { sprite_scale: spriteScale } : {}),
-            ...(sprite ? { metasprite: sprite.metasprite } : {})
+            ...(sprite ? { metasprite: sprite.metasprite } : {}),
+            ...(sprite?.battle_rpg_animation_set ? {animation_set:sprite.battle_rpg_animation_set} : {}),
+            ...(battle.useAuthoredPosition === true ? {position:{x:integerField(actor,"x",0)*8,y:integerField(actor,"y",0)*8}} : {}),
+            ...(nullableStringField(battle,"hudLabel") ? {hud_label:nullableStringField(battle,"hudLabel")} : {})
           }
         }];
       });
@@ -7842,7 +8015,32 @@ function buildBattleRpgProject(
         unit: { max_hp: 12, attack: 4, defense: 1, speed: 3 },
         abilities: [{ kind: "attack" as const, power: 0 }]
       }));
+      let presentation: EngineExportBattleRpgEncounter["presentation"];
+      if(config?.presentation){
+        const authored=config.presentation, hudBackground=hudIndices.get(encounterName);
+        if(config.hudAssetName && hudBackground===undefined) throw new Error("Battle RPG presentation requer hudAssetName valido");
+        const action_sounds=Object.fromEntries(Object.entries(authored.actionSounds).map(([cue,name])=>{
+          const audio=resolveAudioPlayback(audioItems,audioPack,name);
+          if(audio?.op!=="play_sfx") throw new Error(`Battle RPG actionSounds.${cue} requer SFX PSG: ${name}`);
+          return [cue,audio.index];
+        }));
+        const victory=resolveAudioPlayback(audioItems,audioPack,authored.victoryMusic);
+        if(authored.victoryMusic && victory?.op!=="run_audio_routine") throw new Error("Battle RPG victoryMusic requer musica tracker compilada");
+        const effectsActor=projectArray(data,"actors").find(a=>a.id===authored.effectsActorId && entitySceneName(a,"actor")===encounterName);
+        const effectsSprite=effectsActor && buildActorEngineSpriteExport(data,effectsActor,spritePack,{preserveAuthoredAnimations:true});
+        const effects=Object.fromEntries((effectsSprite?.animations??[]).map(({name,...clip})=>[name,clip]));
+        if(authored.effectsActorId && !effectsSprite)throw new Error("Battle RPG effectsActorId requer um ator de efeitos da cena");
+        const disabled=spritePack?.assetsBySheet[authored.disabledEscapeAssetName];
+        if(authored.disabledEscapeAssetName && !disabled) throw new Error("Battle RPG disabledEscapeAssetName ausente");
+        if(effectsSprite) participantSpriteAssets.add(effectsSprite.metasprite.asset);
+        if(disabled) participantSpriteAssets.add(disabled.name);
+        const cursor=spritePack?.assetsBySheet[authored.cursorAssetName??""];
+        if(authored.cursorAssetName&&!cursor)throw new Error("Battle RPG cursorAssetName ausente");
+        if(cursor)participantSpriteAssets.add(cursor.name);
+        presentation={...(cursor?{cursor:{asset:cursor.name,index:0}}:{}),victory_label:authored.victoryLabel,hud_background:hudBackground??-1,action_sounds,victory_tracker:victory?.op==="run_audio_routine"?victory.index:-1,outcome_hold_frames:authored.outcomeHoldFrames,effects,...(disabled?{disabled_escape:{asset:disabled.name,index:0}}:{})};
+      }
       return {
+        ...(presentation ? {presentation} : {}),
         name: encounterName,
         ...(visual.indexByRoomName.has(encounterName) ? { background: visual.indexByRoomName.get(encounterName) } : {}),
         resource_bank_group: engineSceneResourceBankGroupName(room, index),
@@ -7879,7 +8077,7 @@ function buildBattleRpgProject(
         ...(participantSpriteAssets.size > 0 ? { sprite_assets: Array.from(participantSpriteAssets) } : {})
       }
     } : {}),
-    ...(visual.backgrounds.length > 0 ? { backgrounds: visual.backgrounds } : {})
+    ...(backgrounds.length > 0 ? { backgrounds } : {})
   };
 }
 
@@ -7933,6 +8131,11 @@ function buildLutaProject(
       const onEnter = hook("onInit");
       const onVictory = hook("onVictory");
       const onDefeat = hook("onDefeat");
+      const actionSounds = Object.fromEntries(Object.entries(config?.actionSounds ?? {}).map(([cue, name]) => {
+        const resolved = resolveAudioPlayback(audioItems, audioPack, name);
+        if (resolved?.op !== "play_sfx") throw new Error(`Luta actionSounds.${cue} requer SFX PSG compilado: ${name}`);
+        return [cue, resolved.index];
+      }));
       const participants = projectArray(data, "actors").flatMap((actor): Array<{ side: "player1" | "player2"; fighter: EngineExportLutaFighter }> => {
         if (entitySceneName(actor, "actor") !== stageName) return [];
         const battle = child(actor, "battle");
@@ -7974,6 +8177,7 @@ function buildLutaProject(
       }];
       return {
         name: stageName,
+        ...(Object.keys(actionSounds).length ? { action_sounds: actionSounds } : {}),
         ...(visual.indexByRoomName.has(stageName) ? { background: visual.indexByRoomName.get(stageName) } : {}),
         resource_bank_group: engineSceneResourceBankGroupName(room, index),
         ...(onEnter && onEnter.length > 0 ? { on_enter: onEnter } : {}),
@@ -8025,6 +8229,7 @@ interface PointClickSceneVisualExport {
   background?: number;
   backgrounds?: number[];
   props?: EngineExportPointClickProp[];
+  cursor?: EngineExportPointClickProject["cursor"];
   spriteAssetNames: string[];
 }
 
@@ -8088,6 +8293,14 @@ function buildPointClickVisualExport(
         })()),
       spriteAssetNames: []
     };
+    const playerName = configuredPlayerActorName(data, room);
+    const cursorActor = projectArray(data, "actors").find(actor =>
+      actorMatchesPlayerName(actor, playerName) && entitySceneName(actor, "actor") === sceneName);
+    const cursorSprite = cursorActor ? buildActorEngineSpriteExport(data, cursorActor, spritePack, { directionAdapter: "cursor" }) : null;
+    if (cursorSprite) {
+      visual.cursor = { metasprite: cursorSprite.metasprite, ...(cursorSprite.animations ? { animations: cursorSprite.animations } : {}) };
+      visual.spriteAssetNames.push(cursorSprite.metasprite.asset);
+    }
     const props = npcActorsForRoom(data, room, roomIndex).flatMap((actor) => {
       const sprite = buildActorEngineSpriteExport(data, actor, spritePack);
       if (!sprite) return [];
@@ -8145,6 +8358,7 @@ function buildPointClickScenes(
       ...(visual?.backgrounds ? { backgrounds: visual.backgrounds } : { background: visual?.background ?? -1 }),
       resource_bank_group: engineSceneResourceBankGroupName(room, index),
       ...(pointClickConfig ? { cursor_speed: Math.max(1, Math.round(pointClickConfig.cursorSpeed)) } : {}),
+      ...(visual?.cursor ? { cursor: visual.cursor } : {}),
       ...(visual?.props && visual.props.length > 0 ? { props: visual.props } : {})
     };
     const onEnterScript = mergeRoomOnEnterScript(roomDialogueBoot, onEnter);
@@ -8341,7 +8555,7 @@ function buildShmupProject(
     ? buildActorEngineSpriteExport(data, playerActor, spritePack, { preserveAuthoredAnimations: true })
     : spriteExportForSheet(nullableStringField(shmupSettings, "playerSprite"), "idle");
   const playerAnimations: NonNullable<EngineExportShmupProject["player"]["animations"]> = {};
-  const animationKeys: Record<string, keyof typeof playerAnimations> = { idle: "idle", idle_right: "idle", fly_right: "fly", walk_right: "fly", walk: "fly",
+  const animationKeys: Record<string, keyof typeof playerAnimations> = { fly: "fly", shoot: "shoot", idle: "idle", idle_right: "idle", fly_right: "fly", walk_right: "fly", walk: "fly",
       bank_up: "bank_up", walk_up: "bank_up", bank_down: "bank_down", walk_down: "bank_down",
       shoot_right: "shoot", attack_right: "shoot", attack: "shoot", hurt_right: "hurt", hurt: "hurt"
   };
@@ -8497,10 +8711,13 @@ function buildShmupProject(
     const roomEnemies = npcActorsForRoom(data, room, index)
       .filter((actor) => integerField(actor, "waveIndex", 0) === waveIndex)
       .map((actor, actorIndex) => {
-      const spriteExport = buildActorEngineSpriteExport(data, actor, spritePack);
+      const spriteExport = buildActorEngineSpriteExport(data, actor, spritePack, { preserveAuthoredAnimations: true });
+      const enemyConfig = child(actor, "shmup") ?? {};
+      const animated = spriteExport?.animations?.find(clip => clip.name === nullableStringField(actor, "animationName")) ?? spriteExport?.animations?.[0];
+      const { name: _clipName, ...enemyAnimation } = animated ?? {};
       const actorName = stringField(actor, "name", `enemy_${actorIndex + 1}`);
       const actorEventBindings = child(actor, "eventBindings");
-      const projectileLaunch = enemyProjectileLaunchByActor.get(actorName);
+      const projectileLaunch = enemyProjectileLaunchByActor.get(actorName) ?? enemyProjectileLaunchByActor.get(stringField(actor, "id", ""));
       const onSpawn = scriptForEventName(
         data,
         nullableStringField(actorEventBindings, "onInit"),
@@ -8538,19 +8755,20 @@ function buildShmupProject(
           x: position.x,
           y: position.y
         }),
-        size: { x: 16, y: 16 },
-        velocity: { x: -enemySpeed, y: 0 },
-        movement: "linear",
-        health: 1,
+        size: { x: integerField(enemyConfig, "width", 16), y: integerField(enemyConfig, "height", 16) },
+        velocity: { x: integerField(enemyConfig, "velocityX", -enemySpeed), y: integerField(enemyConfig, "velocityY", 0) },
+        movement: stringField(enemyConfig, "movement", "linear"),
+        health: Math.max(1, Math.min(255, integerField(enemyConfig, "health", 1))),
         score: featureRuntime.pointsPerEnemy,
-        fire_interval: projectileLaunch ? 24 : 0,
+        fire_interval: projectileLaunch ? Math.max(1, Math.min(255, integerField(enemyConfig, "fireInterval", 24))) : 0,
         ...(projectileLaunch ? {
           projectile_offset: { x: projectileLaunch.direction === "left" ? -4 : 16, y: 8 }
         } : {}),
         ...(onSpawn && onSpawn.length > 0 ? { on_spawn: onSpawn } : {}),
         ...(onHitPlayer && onHitPlayer.length > 0 ? { on_hit_player: onHitPlayer } : {}),
         ...(onDestroy && onDestroy.length > 0 ? { on_destroy: onDestroy } : {}),
-        ...(spriteExport ? { metasprite: spriteExport.metasprite } : {})
+        ...(spriteExport ? { metasprite: spriteExport.metasprite } : {}),
+        ...(animated ? { animation: enemyAnimation as Omit<AssetcSpriteAnimationExportEntry, "name"> } : {})
       };
     });
     const wave: EngineExportShmupWave = {
@@ -8564,6 +8782,7 @@ function buildShmupProject(
         player_speed: Math.max(1, Math.round(wavePlan.playerSpeed ?? shmupConfig?.playerSpeed ?? playerSpeed)),
         fire_cooldown: Math.max(1, Math.round(wavePlan.fireCooldown ?? shmupConfig?.fireCooldown ?? fireRate))
       } : {}),
+      on_defeat: scriptForEventName(data, nullableStringField(eventBindings, "onDefeat"), events, rooms, dialogues, audioItems, audioPack, pluginRegistry),
       enemies: roomEnemies.length > 0 ? roomEnemies : [{
         name: "scout",
         position: { x: 184, y: 48 },
@@ -8625,19 +8844,21 @@ function buildShmupProject(
       size: { x: 32, y: 32 },
       speed: Math.max(1, Math.round(playerSpeed)),
       fire_cooldown: Math.max(1, Math.round(fireRate)),
-      projectile_offset: { x: 24, y: 12 },
+      projectile_offset: { x: integerField(child(shmupSettings, "projectileOffset"), "x", 24), y: integerField(child(shmupSettings, "projectileOffset"), "y", 12) },
+      ...(playerActor ? { on_fire: scriptForEventName(data, nullableStringField(child(playerActor, "eventBindings"), "onInteract"), events, rooms, dialogues, audioItems, audioPack) } : {}),
       ...(playerSprite ? { metasprite: playerSprite.metasprite } : {}),
       ...(Object.keys(playerAnimations).length > 0 ? { animations: playerAnimations } : {})
     },
     projectile: {
-      size: projectileSprite ? { x: 16, y: 8 } : { x: 4, y: 8 },
+      size: projectileSprite ? { x: Math.max(1, integerField(child(shmupSettings, "projectileSize"), "x", 16)), y: Math.max(1, integerField(child(shmupSettings, "projectileSize"), "y", 8)) } : { x: 4, y: 8 },
       velocity: playerProjectileLaunch ? shmupProjectileVelocity(playerProjectileLaunch) : { x: 4, y: 0 },
       max_active: 6,
       ...(projectileSprite ? { metasprite: projectileSprite.metasprite } : {})
     },
     ...(firstEnemyProjectileLaunch ? {
       enemy_projectile: {
-        size: enemyProjectileSprite ? { x: 16, y: 8 } : { x: 4, y: 8 },
+        ...(playerActor ? { on_hit_player: scriptForEventName(data, nullableStringField(child(playerActor, "eventBindings"), "onHit1"), events, rooms, dialogues, audioItems, audioPack) } : {}),
+        size: enemyProjectileSprite ? { x: Math.max(1, integerField(child(shmupSettings, "projectileSize"), "x", 16)), y: Math.max(1, integerField(child(shmupSettings, "projectileSize"), "y", 8)) } : { x: 4, y: 8 },
         velocity: shmupProjectileVelocity(firstEnemyProjectileLaunch),
         max_active: 8,
         ...(enemyProjectileSprite ? { metasprite: enemyProjectileSprite.metasprite } : {})
@@ -9286,6 +9507,7 @@ function buildMenuScreens(
       if (menuConfig.hudListRows) screen.hud_list_rows = menuConfig.hudListRows;
       if (menuConfig.hudTextColor !== undefined) screen.hud_text_color = menuConfig.hudTextColor;
       if (menuConfig.hudTransparentText) screen.hud_transparent_text = true;
+      if (menuConfig.hudFeedbackInDetails) screen.hud_feedback_in_details = true;
       if (menuConfig.titleTextVariableName) screen.title_text_variable = eventValueRegistries.textVariableIndex(menuConfig.titleTextVariableName);
       if (menuConfig.backgroundAnimation && tilesetPack) {
         const frameIndexes = menuConfig.backgroundAnimation.frameAssetNames
@@ -9580,11 +9802,13 @@ function buildCutsceneScenes(
       audioItems,
       audioPack
     ) ?? [];
+    const exportedActorIndexes = new Map<number, number>();
     const actors = projectArray(data, "actors")
       .filter((actor) => entitySceneName(actor, "actor") === roomName(room, index))
-      .flatMap((actor): EngineExportCutsceneActor[] => {
+      .flatMap((actor, actorIndex): EngineExportCutsceneActor[] => {
         const spriteExport = buildActorEngineSpriteExport(data, actor, spritePack);
         if (!spriteExport) return [];
+        exportedActorIndexes.set(actorIndex, exportedActorIndexes.size);
         const position = entityPosition(actor, "actor");
         return [{
           name: stringField(actor, "name", "Actor"),
@@ -9592,7 +9816,9 @@ function buildCutsceneScenes(
             x: position.x,
             y: position.y
           }),
-          metasprite: spriteExport.metasprite
+          metasprite: spriteExport.metasprite,
+          ...(sceneConfig?.steps?.some(step => step.actorFrames?.some(frame => frame.actorIndex === actorIndex))
+            ? { animation: { asset: spriteExport.metasprite.asset } } : {})
         }];
       });
 
@@ -9643,6 +9869,15 @@ function buildCutsceneScenes(
             to_position: motion.toPosition,
             duration_frames: motion.durationFrames
           }))
+        } : {}),
+        ...(step.actorFrames && step.actorFrames.length > 0 ? {
+          actor_frames: step.actorFrames.map(frame => {
+            const actorIndex = exportedActorIndexes.get(frame.actorIndex);
+            if (actorIndex === undefined || frame.frameIndex < 0) {
+              throw new Error(`Cutscene ${roomName(room, index)}: pose referencia ator ou quadro inválido.`);
+            }
+            return { actor_index: actorIndex, frame_index: frame.frameIndex };
+          })
         } : {})
       };
     });
@@ -9930,6 +10165,7 @@ function buildWorldMapProject(
   if (assetSection?.tile_assets) assetSection.tile_assets = assetSection.tile_assets.filter(name => !pagedNames.has(name));
   const scene = rooms[0];
   const onEnter = scriptForEventName(data, nullableStringField(child(scene, "eventBindings"), "onInit"), events, rooms, dialogues, audioItems, audioPack);
+  const sceneConfig = worldMapSceneConfigFromRuntime(child(scene, "runtime"), child(data, "settings"));
   const startScreen = startMenuScreenIndex(data);
   return {
     initial_node: startRoomIndex(data, rooms),
@@ -9941,8 +10177,9 @@ function buildWorldMapProject(
       { op: "warp_runtime", runtime: "menu", room: startScreen, x: 0, y: 0 }
     ] : [],
     journey_frames: 120,
-    cursor_affine: Boolean(cursorEntry) && worldMapSceneConfigFromRuntime(child(scene, "runtime"), child(data, "settings"))?.cursorAffine === true,
-    embedded_nodes: rooms.length === 1 && (worldMapSceneConfigFromRuntime(child(scene, "runtime"), child(data, "settings"))?.nodes?.length ?? 0) > 0,
+    ...(sceneConfig?.hudLabels ? {hud_labels:sceneConfig.hudLabels} : {}),
+    cursor_affine: Boolean(cursorEntry) && sceneConfig?.cursorAffine === true,
+    embedded_nodes: rooms.length === 1 && (sceneConfig?.nodes?.length ?? 0) > 0,
     save: buildProjectSaveConfig(data),
     nodes,
     dialogue_lines: buildDialogueLines(data, dialogues, audioItems, audioPack),
@@ -10163,6 +10400,7 @@ function buildEngineDialogueUiConfigForExportUncached(data: GBAProjectData): Eng
       ...(presetUi.hud_image ? { hud_image: presetUi.hud_image } : {}),
       ...(presetUi.hud_skin ? { hud_skin: presetUi.hud_skin } : {}),
       ...resolveDialogueFontAsset(data, preset.font),
+      ...(child(projectArray(data,"assets").find(a=>a.name===preset.font),"metadata")?.preserveOpaqueColors === true ? {font_preserve_opaque_colors:true} : {}),
       hud_position: preset.position,
       hud_width: preset.width,
       hud_height: preset.height
@@ -10201,6 +10439,10 @@ function buildEngineDialogueUiConfigForExportUncached(data: GBAProjectData): Eng
     addSceneSkin(sceneName, room, { roomPresetId: room.hudPresetId });
     if (sceneType !== "menu") {
       addHudSceneBinding(sceneName, { roomPresetId: room.hudPresetId });
+    }
+    if (sceneType === "shmup") {
+      const config = shmupSceneConfigFromRuntime(room.runtime, data.settings);
+      for (const wave of config?.wavePlan ?? []) addHudSceneBinding(wave.name, { roomPresetId: room.hudPresetId });
     }
     if (sceneType === "worldMap") {
       const worldMapConfig = worldMapSceneConfigFromRuntime(child(room, "runtime"), projectSettings);
@@ -10555,10 +10797,16 @@ function buildEngineExportProjectContractUncached(
   if (buildEngineDialogueUiConfigForExport(data).font_image) {
     features.push("dialogue_font");
   }
+  for(const room of projectArray(data,"rooms")) {
+    const config=child(child(room,"runtime"),"config");
+    if(config?.gameplayMode==="tactical" && config.pagedSurface)features.push("isometric_runtime.paged_tactical_surface");
+    if(child(config,"tacticalPresentation")?.compactHud)features.push("isometric_runtime.compact_hud","hud_spaced_text");
+  }
   const hudLayouts = buildEngineDialogueUiConfigForExport(data).hud_layouts ?? [];
   if (hudLayouts.some(layout => layout.components.some(component => component.value_variable !== undefined || component.inventory_item !== undefined))) {
     features.push("hud_project_value_bindings");
   }
+  if (hudLayouts.some(layout => layout.components.some(component => component.text_advance === 7))) features.push("hud_spaced_text");
   if (hudLayouts.some(layout => layout.components.some(component => component.text_advance === 6))) {
     features.push("hud_compact_text");
   }
@@ -10623,9 +10871,14 @@ function buildEngineExportProjectContractUncached(
   const startRoom = rooms[startGlobalRoomIndex] ?? rooms[0] ?? {};
   const initialRuntime = resolveSceneRuntimeExport(roomSceneType(startRoom)).kind as MixedRuntimeKind;
   const initialRuntimeRooms = isMixedRuntime ? exportRoomsForKind(data, initialRuntime) : rooms;
-  const initialRoom = isMixedRuntime
+  const initialRuntimeRoomIndex = isMixedRuntime
     ? Math.max(0, roomIndexByName(initialRuntimeRooms, roomName(startRoom, startGlobalRoomIndex)))
     : startRoomIndex(data, initialRuntimeRooms);
+  // Embedded menu screens expand a logical scene into multiple native indices.
+  // Match buildMenuScreens so dispatch and the launched adapter describe one scene.
+  const initialRoom = isMixedRuntime && initialRuntime === "menu"
+    ? Math.max(0, menuScreenSources(initialRuntimeRooms).findIndex(source => source.roomIndex === initialRuntimeRoomIndex))
+    : initialRuntimeRoomIndex;
   const mixedSources = [
     "main.cpp",
     ...mixedRuntimeKinds.map((runtime) => `${runtime}_runtime.cpp`)

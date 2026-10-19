@@ -6,7 +6,7 @@ export interface LutaCombatFighter {
 }
 export interface LutaCombatConfig {
   maxSuperGauge?: number; roundsToWin?: number; roundTime?: number;
-  alphaCounterEnabled?: boolean; guardPowerRecovery?: number; superGaugeGainOnReceive?: number;
+  alphaCounterEnabled?: boolean; guardPowerRecovery?: number; superGaugeGainOnReceive?: number; superGaugeGainOnHit?: number;
   defaultStyle?: string;
 }
 export interface LutaCombatState {
@@ -14,7 +14,7 @@ export interface LutaCombatState {
   wins: [number, number]; round: number; roundsToWin: number;
   roundTimerFrames: number; roundTimeFrames: number;
   roundState: "active" | "player1" | "player2" | "draw";
-  maxSuperGauge: number; guardPowerRecovery: number; hitGaugeGain: number;
+  maxSuperGauge: number; guardPowerRecovery: number; hitGaugeGain: number; receiveGaugeGain: number;
 }
 const bound = (value: number, max: number) => Math.max(0, Math.min(max, Math.trunc(value)));
 export function createLutaCombatState(config: LutaCombatConfig = {}, fighters: Array<{ maxHp?: number; guardPower?: number }> = []): LutaCombatState {
@@ -29,7 +29,8 @@ export function createLutaCombatState(config: LutaCombatConfig = {}, fighters: A
     roundsToWin: config.roundsToWin ?? 2, roundState: "active",
     roundTimerFrames: (config.roundTime ?? 99) * 60, roundTimeFrames: (config.roundTime ?? 99) * 60,
     maxSuperGauge: config.maxSuperGauge ?? 100, guardPowerRecovery: config.guardPowerRecovery ?? 2,
-    hitGaugeGain: config.superGaugeGainOnReceive ?? 4
+    hitGaugeGain: config.superGaugeGainOnHit ?? 8,
+    receiveGaugeGain: config.superGaugeGainOnReceive ?? 4
   };
 }
 function copy(state: LutaCombatState): LutaCombatState {
@@ -53,7 +54,9 @@ export function applyLutaCombatEvent(state: LutaCombatState, command: LutaEventC
     case "luta_set_rounds_to_win": next.roundsToWin = command.value; break;
     case "luta_trigger_super":
       if (next.roundState === "active" && fighter.superGauge >= next.maxSuperGauge) {
-        next.fighters[side === 0 ? 1 : 0].hp = bound(next.fighters[side === 0 ? 1 : 0].hp - (command.value === 1 ? 40 : 25), 9999);
+        const opponent = next.fighters[side === 0 ? 1 : 0];
+        opponent.hp = bound(opponent.hp - (command.value === 1 ? 40 : 25), 9999);
+        opponent.superGauge = bound(opponent.superGauge + next.receiveGaugeGain, next.maxSuperGauge);
         fighter.superGauge = bound(next.hitGaugeGain, next.maxSuperGauge);
       }
       break;

@@ -102,15 +102,15 @@ describe("gbaHardwareContract", () => {
     ]));
   });
 
-  it("keeps non-native but tile-aligned actor frames as metasprite warnings", () => {
+  it("keeps non-native but tile-aligned actor frames as metasprite information", () => {
     const contract = buildGbaHardwareContract({
       animations: [{ name: "idle", frameWidth: 24, frameHeight: 24, colorMode: "4bpp" }],
       assets: [{ name: "hero.png", kind: "Sprite", metadata: { width: 24, height: 24, colorMode: "4bpp" } }]
     });
 
     expect(contract.issues).toEqual(expect.arrayContaining([
-      expect.objectContaining({ code: "SPRITE_ASSET_REQUIRES_METASPRITE", severity: "warning" }),
-      expect.objectContaining({ code: "SPRITE_FRAME_REQUIRES_METASPRITE", severity: "warning" })
+      expect.objectContaining({ code: "SPRITE_ASSET_REQUIRES_METASPRITE", severity: "info" }),
+      expect.objectContaining({ code: "SPRITE_FRAME_REQUIRES_METASPRITE", severity: "info" })
     ]));
     expect(auditGbaHardwareBlockingErrors({
       animations: [{ name: "idle", frameWidth: 24, frameHeight: 24, colorMode: "4bpp" }]
@@ -146,7 +146,7 @@ describe("gbaHardwareContract", () => {
     });
 
     expect(contract.issues).toEqual(expect.arrayContaining([
-      expect.objectContaining({ code: "SPRITE_METASPRITE_PART_REQUIRES_DECOMPOSITION", severity: "warning" })
+      expect.objectContaining({ code: "SPRITE_METASPRITE_PART_REQUIRES_DECOMPOSITION", severity: "info" })
     ]));
     expect(auditGbaHardwareBlockingErrors({
       animations: [{

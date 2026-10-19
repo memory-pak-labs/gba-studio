@@ -1019,6 +1019,29 @@ describe("Audio workspace presentation", () => {
     ]);
   });
 
+  it("tracks and renames the native fight action cues in both scene collections", () => {
+    const scene = {name:"arena", runtime:{type:"luta", config:{actionSounds:{hit:"impact",miss:"whiff"}}}};
+    const project = {
+      rooms:[structuredClone(scene)], scenas:[structuredClone(scene)],
+      audioItems:[{id:"impact",name:"impact",kind:"SFX",format:"COMPOSED",exportID:"impact"}]
+    };
+    expect(deriveAudioWorkspacePresentation(project).items[0].usageLabels).toContain("Cena: arena (luta hit)");
+    const renamed = renameAudioItemInProject(project,"impact","impact_new");
+    for(const key of ["rooms","scenas"] as const) expect(renamed[key]).toEqual([
+      {...scene,runtime:{type:"luta",config:{actionSounds:{hit:"impact_new",miss:"whiff"}}}}
+    ]);
+  });
+
+  it("tracks and renames RPG action sounds and the victory fanfare in both scene collections", () => {
+    const scene={name:"relay",runtime:{type:"battleRpg",config:{presentation:{actionSounds:{attack:"cue"},victoryMusic:"cue"}}}};
+    const p={rooms:[structuredClone(scene)],scenas:[structuredClone(scene)],audioItems:[{id:"cue",name:"cue",kind:"SFX",format:"COMPOSED",exportID:"cue"}]};
+    const usage=deriveAudioWorkspacePresentation(p).items[0].usageLabels;
+    expect(usage).toContain("Cena: relay (RPG attack)");
+    expect(usage).toContain("Cena: relay (RPG vitória)");
+    const renamed=renameAudioItemInProject(p,"cue","new_cue");
+    for(const key of ["rooms","scenas"] as const)expect((renamed[key] as any)[0].runtime.config.presentation).toEqual({actionSounds:{attack:"new_cue"},victoryMusic:"new_cue"});
+  });
+
   it("duplicates an audio item with a new id, name and export id", () => {
     const project = {
       audioItems: [

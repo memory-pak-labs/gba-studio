@@ -26,7 +26,7 @@ function numericTileValues(tilemap: unknown): number[] {
     .map(Math.floor);
 }
 
-function auditTileValues(roomLabel: string, tilemap: unknown, warnings: Set<string>): void {
+function auditTileValues(roomLabel: string, tilemap: unknown, warnings: Set<string>, sourceCellCount?: number): void {
   const values = numericTileValues(tilemap);
   if (values.length === 0) return;
 
@@ -39,7 +39,9 @@ function auditTileValues(roomLabel: string, tilemap: unknown, warnings: Set<stri
   if (positive.length === 0) return;
 
   const maxTileId = Math.max(...positive);
-  if (maxTileId > tilemapGbaMaxTileIndex) {
+  if (sourceCellCount !== undefined) {
+    if (maxTileId > sourceCellCount) warnings.add(`Piso afim referencia celula fora da imagem fonte (${roomLabel}: max=${maxTileId}, cells=${sourceCellCount})`);
+  } else if (maxTileId > tilemapGbaMaxTileIndex) {
     warnings.add(`${tilemapAuditWarningLabels.tileIndexAboveHardwareLimit} (${roomLabel}: max=${maxTileId})`);
   }
 }
@@ -49,7 +51,16 @@ export function auditProjectTilemapWarnings(data: GBAProjectData): string[] {
 
   projectArray(data, "scenas").forEach((room, index) => {
     const label = roomName(room, index);
-    auditTileValues(label, room.tilemap, warnings);
+    const runtime=room.runtime as Record<string,unknown> | undefined;
+    const config=runtime?.config as Record<string,unknown> | undefined;
+    const visuals=config?.pseudo3dVisuals as Record<string,unknown> | undefined;
+    const source=runtime?.type === "racing" && config?.presentation === "pseudo3d" && config?.topdownTrack
+      ? projectArray(data,"assets").find(a=>a.name===visuals?.floorTilemapId || a.id===visuals?.floorTilemapId) : undefined;
+    const metadata=source?.metadata as Record<string,unknown> | undefined;
+    const sourceCells=metadata && Number(metadata.width)>0 && Number(metadata.height)>0
+      ? Math.floor(Number(metadata.width)/8)*Math.floor(Number(metadata.height)/8) : undefined;
+    // Affine editor IDs address source PNG cells (1-based), before assetc deduplication.
+    auditTileValues(label, room.tilemap, warnings,sourceCells);
 
     const layers = room.layers;
     if (!Array.isArray(layers)) return;

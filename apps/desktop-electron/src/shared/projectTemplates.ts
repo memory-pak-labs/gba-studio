@@ -2,6 +2,7 @@ import { parseGBAProjectFile, type GBAProjectData } from "./projectFile.js";
 import { expandProjectTilemaps } from "./projectResourceFormat.js";
 import { createBlankProjectData } from "./newProject.js";
 import { blankPlayerContent, BLANK_PLAYER_DEFAULTS_PROFILE } from "./blankPlayerDefaults.js";
+import { blankDungeonNpcContent } from "./blankDungeonDefaults.js";
 import { blankHudContent } from "./blankHudDefaults.js";
 import { blankDialogueContent, BLANK_DIALOGUE_SKIN, BLANK_DIALOGUE_PORTRAIT } from "./blankDialogueDefaults.js";
 import { blankSceneHudContent } from "./blankSceneHudDefaults.js";
@@ -76,16 +77,21 @@ export function buildProjectFromTemplate(
   if (templateID === "blank") {
     const project = createBlankProjectData({ name: options.name, includeStarterContent: false });
     const content = blankPlayerContent();
+    const dungeonNpcs = blankDungeonNpcContent();
     const hud = blankHudContent();
     const sceneHuds = blankSceneHudContent();
     hud.assets.push(...sceneHuds.assets);
     const dialogueAssets = blankDialogueContent();
     const backgrounds = blankBackgroundContent();
-    project.assets = [...content.assets, ...hud.assets, ...dialogueAssets, ...backgrounds.assets];
-    project.animations = content.animations;
-    project.animationStates = content.animationStates;
+    project.assets = [...content.assets, ...dungeonNpcs.assets, ...hud.assets, ...dialogueAssets, ...backgrounds.assets].map(asset => ({
+      ...asset,
+      metadata: { ...(asset.metadata as Record<string, unknown>), reusableLibraryAsset: true }
+    }));
+    project.animations = [...content.animations, ...dungeonNpcs.animations];
+    project.animationStates = [...content.animationStates, ...dungeonNpcs.animationStates];
     project.assetGroups = [
       { id: "asset-group-neutral-players", name: "Players padrão", assetIDs: content.assets.map(asset => asset.id), children: [] },
+      { id: "asset-group-neutral-dungeon-npcs", name: "NPCs Dungeon", assetIDs: dungeonNpcs.assets.map(asset => asset.id), children: [] },
       { id: "asset-group-neutral-hud", name: "HUD padrão", assetIDs: hud.assets.map(asset => asset.id), children: [] },
       { id: "asset-group-neutral-dialogue", name: "Diálogo padrão", assetIDs: dialogueAssets.map(asset => asset.id), children: [] },
       { id: "asset-group-neutral-backgrounds", name: "Backgrounds padrão", assetIDs: backgrounds.assets.map(asset => asset.id), children: [] }
@@ -109,6 +115,7 @@ export function buildProjectFromTemplate(
     settings.sceneTypes.playerDefaultsProfile = BLANK_PLAYER_DEFAULTS_PROFILE;
     settings.sceneTypes.backgroundDefaultsProfile = BLANK_BACKGROUND_DEFAULTS_PROFILE;
     settings.sceneTypes.defaultBackgrounds = backgrounds.defaultBackgrounds;
+    settings.backgrounds.defaultMapSize = "";
     applyDefaultRoomBackground(project, room);
     project.scena = structuredClone(room);
     (project.settings as Record<string, unknown>).hudPresets = [hud.preset,...sceneHuds.presets];

@@ -100,6 +100,9 @@ export function resolveEventBindingCapabilities(input: EventBindingCapabilityInp
     );
   }
   if (runtime === "battlerpg") lifecycle.push({ bindingKey: "onEscape", label: "Ao fugir", section: null, requiresFrequency: false });
-  if (runtime === "shmup") lifecycle.push({ bindingKey: "onClear", label: "Ao concluir ondas", section: null, requiresFrequency: false });
+  if (runtime === "shmup") lifecycle.push(
+    { bindingKey: "onClear", label: "Ao concluir ondas", section: null, requiresFrequency: false },
+    { bindingKey: "onDefeat", label: "Ao perder", section: null, requiresFrequency: false }
+  );
   return lifecycle;
 }

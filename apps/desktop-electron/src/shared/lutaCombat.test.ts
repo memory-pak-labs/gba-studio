@@ -20,7 +20,8 @@ describe("Luta event simulation", () => {
     state = applyLutaCombatEvent(state, parseLutaEventCommand("luta_set_super_gauge player1 100"), 0);
     state = applyLutaCombatEvent(state, parseLutaEventCommand("luta_trigger_super player1 ultra"), 0);
     expect(state.fighters[1].hp).toBe(60);
-    expect(state.fighters[0].superGauge).toBe(4);
+    expect(state.fighters[0].superGauge).toBe(8);
+    expect(state.fighters[1].superGauge).toBe(4);
   });
   it("advances the authored timer and ends the match at the authored win count", () => {
     let state = createLutaCombatState({ roundsToWin: 2, roundTime: 30 });

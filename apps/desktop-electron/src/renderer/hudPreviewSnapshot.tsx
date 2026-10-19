@@ -31,8 +31,8 @@ function clamp(value: number, minimum: number, maximum: number): number {
 
 type FontAtlas = HTMLCanvasElement | HTMLImageElement | null;
 /** The native HUD places one glyph per tile, wrapping at the component bounds. */
-export function drawHudText(context: CanvasRenderingContext2D, text: string, x: number, y: number, width: number, height: number, font: FontAtlas = null, ink = "#f0e0b8", advance: 6 | 8 = 8): void {
-  const columns = Math.floor(width / advance), rows = Math.floor(height / 8), glyphWidth = advance === 6 ? 5 : 8;
+export function drawHudText(context: CanvasRenderingContext2D, text: string, x: number, y: number, width: number, height: number, font: FontAtlas = null, ink = "#f0e0b8", advance: 6 | 7 | 8 = 8): void {
+  const columns = Math.floor(width / advance), rows = Math.floor(height / 8), glyphWidth = font ? 8 : advance === 6 ? 5 : 8;
   let column = 0, line = 0;
   context.fillStyle = ink;
   for (const character of normalizeDialogueText(text)) {

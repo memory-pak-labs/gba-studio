@@ -33,7 +33,8 @@ describe("approved players in blank projects", () => {
     ["luta", "neutral-player-fighter.png", 64, 80, 1],
     ["isometricAdventure", "neutral-player-isometric-adventure.png", 40, 48, 1],
     ["isometricTactical", "neutral-player-isometric-tactical.png", 32, 32, 2],
-    ["shmup", "neutral-player-shmup-horizontal.png", 32, 32, 1]
+    ["shmup", "neutral-player-shmup-horizontal.png", 32, 32, 1],
+    ["dungeonCrawler", "neutral-player-dungeon-hand.png", 64, 64, 1]
   ])("creates %s with its approved player and complete animation bindings", (sceneType, spriteSheet, width, height, actorCount) => {
     const base = buildProjectFromTemplate("blank", { name: "Cenas" });
     const next = createRoomInProject(base, {
@@ -138,7 +139,7 @@ describe("approved players in blank projects", () => {
     expect(records(next, "animationStates").some(state => state.id === player.animationStateID)).toBe(true);
     const switched = updateRoomFieldsInProject(next, sceneType, { sceneType: "topdown" });
     expect(records(switched, "actors").find(actor => actor.id === player.id)?.spriteSheet).toBe("neutral-player-topdown.png");
-    expect(records(base, "assets").filter(asset => String((asset.metadata as Record<string,unknown>)?.source).startsWith("Assets/sprites/"))).toHaveLength(10);
+    expect(records(base, "assets").filter(asset => String((asset.metadata as Record<string,unknown>)?.source).startsWith("Assets/sprites/"))).toHaveLength(14);
   });
 
   it("uses the approved hand as the blank point-and-click player, with a fixed pointer and complete click", () => {
@@ -200,7 +201,7 @@ describe("approved players in blank projects", () => {
     expect(project.events).toEqual([]);
   });
 
-  it.each(["cutscene", "menu", "visualNovel", "battleRpg", "dungeonCrawler", "worldMap"])("does not add an unnecessary player to %s", sceneType => {
+  it.each(["cutscene", "menu", "visualNovel", "battleRpg", "worldMap"])("does not add an unnecessary player to %s", sceneType => {
     const next = createRoomInProject(buildProjectFromTemplate("blank", { name: "Sem player" }), {
       id: sceneType, name: sceneType, width: 30, height: 20, sceneType
     });

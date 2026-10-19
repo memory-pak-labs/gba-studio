@@ -14,36 +14,56 @@ import {
   sceneMapCardChromeSize,
   sceneMapCardSize,
   sceneMapContentSize,
+  sceneMapInitialViewportOrigin,
   sceneMapTileGridBackgroundStyle
 } from "./sceneMapLayout.js";
 
 describe("scene map layout", () => {
+  it.each(["topdown", "pseudo3d"])("shows a viewport card for %s racing without shrinking the technical map", (presentation) => {
+    const room = { sceneType: "racing", width: 64, height: 64, runtime: { type: "racing", config: { presentation } } };
+    expect(sceneMapContentSize(room)).toEqual({ width: 512, height: 512 });
+    expect(sceneMapCardSize(room)).toEqual({ width: 240, height: 250 });
+    expect(displayedSceneMapContentSize(room, 2)).toEqual({ width: 480, height: 320 });
+  });
+
+  it("frames the starting player and clamps the viewport to the full track", () => {
+    const room = { width: 64, height: 64, cameraMode: "follow_player", cameraBounds: { x: 0, y: 0 } };
+    expect(sceneMapInitialViewportOrigin(room, { x: 32, y: 9 })).toEqual({ left: 136, top: 0 });
+    expect(sceneMapInitialViewportOrigin(room, { x: 63, y: 63 })).toEqual({ left: 272, top: 352 });
+    expect(sceneMapInitialViewportOrigin({ ...room, cameraMode: "fixed_position", cameraBounds: { x: 10, y: 20 } })).toEqual({ left: 80, top: 160 });
+    expect(sceneMapInitialViewportOrigin({ ...room, cameraMode: "fixed_center" })).toEqual({ left: 136, top: 176 });
+    expect(sceneMapInitialViewportOrigin({ ...room, width: 20, height: 10 })).toEqual({ left: 0, top: 0 });
+  });
+  it("keeps the first-person camera independent of dungeon maze dimensions", () => {
+    expect(sceneMapContentSize({sceneType:"dungeonCrawler",width:11,height:11})).toEqual({width:240,height:160});
+    expect(sceneMapCardSize({sceneType:"dungeonCrawler",width:40,height:30})).toEqual({width:240,height:250});
+  });
   it("keeps a static isometric background at its authored pixel size", () => {
     expect(sceneMapCardSize({ width: 30, height: 20, sceneType: "isometric",
       gbStudioUseBackgroundLayout: true, backgroundPixelWidth: 240, backgroundPixelHeight: 160,
       runtime: { type: "isometric", config: { worldMode: "static_composition" } }
     })).toEqual({ width: 240, height: 250 });
   });
-  it("represents the full scene and its relative size in overview cards", () => {
-    expect(sceneMapCardSize({ width: 120, height: 20 })).toEqual({ width: 960, height: 250 });
-    expect(displayedSceneMapContentSize({ width: 60, height: 40 }, 1)).toEqual({ width: 480, height: 320 });
+  it("keeps full map dimensions while cards use a uniform viewport", () => {
+    expect(sceneMapCardSize({ width: 120, height: 20 })).toEqual({ width: 240, height: 250 });
+    expect(displayedSceneMapContentSize({ width: 60, height: 40 }, 1)).toEqual({ width: 240, height: 160 });
     expect(sceneMapContentSize({ width: 60, height: 40 })).toEqual({ width: 480, height: 320 });
   });
 
-  it("bounds huge maps without changing the scene or its aspect ratio", () => {
+  it("keeps huge map dimensions independent of the card viewport", () => {
     const room = { width: 600, height: 100 };
-    expect(sceneMapCardSize(room)).toEqual({ width: 960, height: 250 });
+    expect(sceneMapCardSize(room)).toEqual({ width: 240, height: 250 });
     expect(sceneMapContentSize(room)).toEqual({ width: 4800, height: 800 });
-    expect(displayedSceneMapContentSize(room, 1.25)).toEqual({ width: 1200, height: 200 });
+    expect(displayedSceneMapContentSize(room, 1.25)).toEqual({ width: 300, height: 200 });
   });
 
-  it("uses the authored isometric surface instead of the logical tile grid", () => {
+  it("uses the same viewport card for an authored isometric surface", () => {
     expect(sceneMapCardSize({
       width: 25, height: 25, sceneType: "isometric",
       runtime: { type: "isometric", config: { pagedSurface: {
         backgroundAsset: "market.png", foregroundAsset: "market-front.png", width: 512, height: 344
       } } }
-    })).toEqual({ width: 512, height: 434 });
+    })).toEqual({ width: 240, height: 250 });
   });
   it("scales scene content by GBA screen units", () => {
     expect(sceneMapContentSize({ width: 30, height: 20 })).toEqual({ width: 240, height: 160 });
@@ -103,8 +123,8 @@ describe("scene map layout", () => {
   it("scales card chrome with the map and removes the footer at mini density", () => {
     expect(displayedSceneMapContentSize({ width: 30, height: 20 }, 3.5)).toEqual({ width: 840, height: 560 });
     expect(displayedSceneMapCardSize({ width: 30, height: 20 }, 3.5)).toEqual({ width: 840, height: 650 });
-    expect(sceneMapCardChromeSize(0.5)).toEqual({ footerHeight: 0, headerHeight: 36.86 });
-    expect(displayedSceneMapCardSize({ width: 30, height: 20 }, 0.5)).toEqual({ width: 120, height: 116.86 });
+    expect(sceneMapCardChromeSize(0.5)).toEqual({ footerHeight: 0, headerHeight: 34 });
+    expect(displayedSceneMapCardSize({ width: 30, height: 20 }, 0.5)).toEqual({ width: 120, height: 114 });
     expect(displayedSceneMapPosition({ x: 36, y: 48 }, 3)).toEqual({ x: 108, y: 144 });
   });
 
@@ -119,7 +139,15 @@ describe("scene map layout", () => {
     expect(defaultSceneMapPosition(0, rooms)).toEqual({ x: 36, y: 36 });
     expect(defaultSceneMapPosition(1, rooms)).toEqual({ x: 324, y: 36 });
     expect(defaultSceneMapPosition(2, rooms)).toEqual({ x: 612, y: 36 });
-    expect(defaultSceneMapPosition(3, rooms)).toEqual({ x: 1140, y: 36 });
+    expect(defaultSceneMapPosition(3, rooms)).toEqual({ x: 900, y: 36 });
+  });
+
+  it.each([0.25, 0.5, 0.51, 0.61, 0.75, 1, 2, 4])("keeps organized viewport rows apart at zoom %s", zoom => {
+    const rooms = Array.from({ length: 8 }, (_, index) => ({ name: `room-${index}`, width: 120, height: 80 }));
+    const positions = organizedSceneMapPositions(rooms);
+    const first = displayedSceneMapPosition(positions["room-0"]!, zoom);
+    const below = displayedSceneMapPosition(positions["room-4"]!, zoom);
+    expect(first.y + displayedSceneMapCardSize(rooms[0]!, zoom).height).toBeLessThan(below.y);
   });
 
   it("organizes cards by order and reserves the full height of each row", () => {
@@ -132,9 +160,9 @@ describe("scene map layout", () => {
     ])).toEqual({
       logo: { x: 36, y: 36 },
       wide: { x: 324, y: 36 },
-      menu: { x: 852, y: 36 },
-      next: { x: 1140, y: 36 },
-      after: { x: 36, y: 498 }
+      menu: { x: 612, y: 36 },
+      next: { x: 900, y: 36 },
+      after: { x: 36, y: 338 }
     });
   });
 

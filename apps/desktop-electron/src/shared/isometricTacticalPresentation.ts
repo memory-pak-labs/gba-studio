@@ -84,6 +84,8 @@ export interface IsoTacticalAssetBinding {
 export interface IsoTacticalUnitPresentation {
   actorId: string;
   sheet: string;
+  portrait?: string;
+  label?: string;
   animations?: Partial<Record<IsoTacticalAnimationBinding, string>>;
 }
 
@@ -113,7 +115,12 @@ export interface IsoTacticalSurfaceResidency {
   prefetchMarginPixels: number;
 }
 
+export interface IsoTacticalCompactHud {
+  turnPanel: string; unitPanel: string; actionsPanel: string; selection: string; healthFull: string; healthEmpty: string; font: string;
+}
+
 export interface IsoTacticalPresentationConfig {
+  compactHud?: IsoTacticalCompactHud;
   schema?: 1;
   assets?: IsoTacticalAssetBinding[];
   surfaceAsset?: string;
@@ -380,6 +387,8 @@ export function normalizeIsometricTacticalPresentation(value: unknown): IsoTacti
     ? value.units.filter(isRecord).map((unit) => ({
       actorId: stringValue(unit.actorId) ?? "",
       sheet: stringValue(unit.sheet) ?? "",
+      ...(stringValue(unit.portrait) ? {portrait:stringValue(unit.portrait)} : {}),
+      ...(stringValue(unit.label) ? {label:stringValue(unit.label)} : {}),
       ...(normalizeAnimations(unit.animations) ? { animations: normalizeAnimations(unit.animations) } : {})
     }))
     : [];
@@ -457,6 +466,7 @@ export function normalizeIsometricTacticalPresentation(value: unknown): IsoTacti
     ...(surfaceResidency ? { surfaceResidency } : {}),
     ...(stringValue(value.gridAsset) ? { gridAsset: stringValue(value.gridAsset) } : {}),
     ...(stringValue(value.hudLayout) ? { hudLayout: stringValue(value.hudLayout) } : {}),
+    ...(isRecord(value.compactHud) ? {compactHud:Object.fromEntries(["turnPanel","unitPanel","actionsPanel","selection","healthFull","healthEmpty","font"].map(key=>[key,stringValue((value.compactHud as Record<string,unknown>)[key])??""])) as unknown as IsoTacticalCompactHud}:{}),
     ...(stringValue(value.cursorAsset) ? { cursorAsset: stringValue(value.cursorAsset) } : {}),
     ...(stringValue(value.rangeAsset) ? { rangeAsset: stringValue(value.rangeAsset) } : {}),
     ...(stringValue(value.targetAsset) ? { targetAsset: stringValue(value.targetAsset) } : {}),
@@ -625,7 +635,10 @@ export function validateIsometricTacticalPresentation(
     }
   }
   if (enabled.has("tactical_grid_overlay") && !presentation.gridAsset) issues.push(missingBinding("tactical_grid_overlay", "tactical_grid_overlay exige gridAsset."));
-  if (enabled.has("tactical_hud") && !presentation.hudLayout) issues.push(missingBinding("tactical_hud", "tactical_hud exige hudLayout."));
+  if (enabled.has("tactical_hud") && !presentation.hudLayout && !presentation.compactHud) issues.push(missingBinding("tactical_hud", "tactical_hud exige hudLayout."));
+  if(enabled.has("tactical_hud") && presentation.compactHud && Object.values(presentation.compactHud).some(value=>!value)) {
+    issues.push(missingBinding("tactical_hud","compactHud exige todos os painéis, cursor, barra e fonte.","compactHud"));
+  }
   if (enabled.has("tactical_units")) {
     const invalidUnit = presentation.units.length === 0 || presentation.units.some((unit) => !unit.actorId || !unit.sheet);
     const missingAnimation = presentation.units.some((unit) => (

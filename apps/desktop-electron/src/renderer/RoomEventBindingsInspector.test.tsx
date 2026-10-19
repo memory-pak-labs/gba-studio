@@ -32,6 +32,21 @@ function selectState(label: string): void {
 describe("RoomEventBindingsInspector", () => {
   afterEach(cleanup);
 
+  it("exposes the scene authoring guide without adding artificial timeline steps", () => {
+    render(<RoomEventBindingsInspector
+      contextKind="room"
+      entity={{ id: "opening", name: "Opening", authoringNotes: "Edite os quadros na sequência nativa.", eventBindings: {} }}
+      eventOptions={[]}
+      onChangeBinding={vi.fn()}
+      onCreateEvent={vi.fn()}
+      sceneType="cutscene"
+    />);
+    const note = screen.getByText("Edite os quadros na sequência nativa.");
+    expect(note.closest("details")).not.toHaveAttribute("open");
+    expect(note.closest("details")?.querySelector("summary")).toHaveTextContent("Detalhe");
+    expect(screen.getByText("Este estado ainda não tem eventos.")).toBeInTheDocument();
+  });
+
   it("shows room states from the export-backed runtime contract without decorative branches", () => {
     render(
       <RoomEventBindingsInspector

@@ -1079,7 +1079,7 @@ describe("Engine project export writer", () => {
     expect(contract).toContain('"on_click"');
     expect(contract).toContain('"cursor_speed": 4');
     expect(header).toContain('gbs::PointClickSceneData { "office"');
-    expect(header).toContain('"scene_office", 4, nullptr, 0, nullptr, 0 }');
+    expect(header).toContain('"scene_office", 4, nullptr, 0, nullptr, 0, nullptr, nullptr, nullptr, nullptr }');
 
     const build = await runGbsbuild({
       enginePackPath: localEnginePackPath,

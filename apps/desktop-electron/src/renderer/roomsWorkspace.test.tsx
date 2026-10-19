@@ -103,6 +103,30 @@ async function openCanvasLayers(user: ReturnType<typeof userEvent.setup>): Promi
 }
 
 describe("RoomsWorkspace React smoke", () => {
+  it("lets authors type scene dimensions before applying the minimum", async () => {
+    const user = userEvent.setup();
+    const project = buildProjectFromTemplate("blank", { name: "Dimension entry" });
+    const handlers = roomsWorkspaceHandlers();
+    render(<RoomsWorkspace projectData={project} presentation={deriveRoomsWorkspacePresentation(project)} {...handlers} />);
+    const width = screen.getByLabelText("Largura (tiles)");
+    await user.clear(width);
+    await user.type(width, "60");
+    expect(handlers.onUpdateRoomFields).not.toHaveBeenCalled();
+    await user.tab();
+    expect(handlers.onUpdateRoomFields).toHaveBeenLastCalledWith("room-1", { width: 60 });
+    expect(handlers.onUpdateRoomFields).not.toHaveBeenCalledWith("room-1", { width: 6 });
+  });
+
+  it("offers logical cell dimensions for Dungeon Crawler authoring", () => {
+    const project = buildProjectFromTemplate("blank", { name: "Dungeon grid" });
+    const room = (project.rooms as Record<string, unknown>[])[0]!;
+    room.sceneType = "dungeonCrawler";
+    room.runtime = { type: "dungeonCrawler", config: {} };
+    render(<RoomsWorkspace projectData={project} presentation={deriveRoomsWorkspacePresentation(project)} {...roomsWorkspaceHandlers()} />);
+    expect(screen.getByLabelText("Largura (células)")).toHaveAttribute("min", "1");
+    expect(screen.getByLabelText("Altura (células)")).toHaveAttribute("min", "1");
+  });
+
   it("switches to uniform image-free diagram cards without changing authored positions", async () => {
     const user = userEvent.setup();
     let project = createBlankProjectData({ name: "Scene diagram" });
@@ -142,6 +166,50 @@ describe("RoomsWorkspace React smoke", () => {
     expect(container.querySelector(".scene-diagram-card")).toBeNull();
     expect(Array.from(container.querySelectorAll<HTMLElement>(".room-stage-card-frame"), card => [card.style.left, card.style.top])).toEqual(originalPositions);
     expect(JSON.stringify(project)).toBe(source);
+  });
+
+  it("restores moved diagram cards after reopening the workspace and persists Organizar", async () => {
+    const user=userEvent.setup();
+    const project=createBlankProjectData({name:"Persistent diagram"});
+    const source=JSON.stringify(project), projectPath="/games/diagram.gba-project";
+    const handlers=roomsWorkspaceHandlers({onOrganizeSceneMap:vi.fn()});
+    const props={projectData:project,projectPath,presentation:deriveRoomsWorkspacePresentation(project),...handlers};
+    let view=render(<RoomsWorkspace {...props}/>);
+    await user.click(screen.getByRole("button",{name:"Alternar visualização em organograma"}));
+    let card=view.container.querySelector<HTMLElement>(".scene-diagram-card")!;
+    const initial=[card.parentElement!.style.left,card.parentElement!.style.top];
+    fireEvent.pointerDown(card.querySelector("strong")!,{button:0,pointerId:7,clientX:50,clientY:50});
+    fireEvent.pointerMove(window,{pointerId:7,clientX:150,clientY:100});
+    await waitFor(()=>expect(card.parentElement!.style.transform).toContain("translate3d"));
+    fireEvent.pointerUp(window,{pointerId:7});
+    const moved=[card.parentElement!.style.left,card.parentElement!.style.top];
+    expect(moved).not.toEqual(initial);
+    view.unmount();
+    view=render(<RoomsWorkspace {...props}/>);
+    card=view.container.querySelector<HTMLElement>(".scene-diagram-card")!;
+    expect([card.parentElement!.style.left,card.parentElement!.style.top]).toEqual(moved);
+    await user.click(screen.getByRole("button",{name:"Organizar cards das cenas"}));
+    view.unmount();
+    view=render(<RoomsWorkspace {...props}/>);
+    card=view.container.querySelector<HTMLElement>(".scene-diagram-card")!;
+    expect([card.parentElement!.style.left,card.parentElement!.style.top]).toEqual(initial);
+    expect(handlers.onUpdateSceneMapPosition).not.toHaveBeenCalled();
+    expect(JSON.stringify(project)).toBe(source);
+  });
+
+  it("commits the final card position even when released before the next animation frame", () => {
+    const callbacks:FrameRequestCallback[]=[];
+    vi.spyOn(window,"requestAnimationFrame").mockImplementation(callback=>{callbacks.push(callback);return callbacks.length;});
+    vi.spyOn(window,"cancelAnimationFrame").mockImplementation(()=>{});
+    const project=createBlankProjectData({name:"Fast card drag"});
+    const handlers=roomsWorkspaceHandlers();
+    const {container}=render(<RoomsWorkspace projectData={project} presentation={deriveRoomsWorkspacePresentation(project)} {...handlers}/>);
+    const frame=container.querySelector<HTMLElement>(".room-stage-card-frame")!;
+    const x=Number.parseFloat(frame.style.left), y=Number.parseFloat(frame.style.top);
+    fireEvent.pointerDown(frame,{button:0,pointerId:11,clientX:20,clientY:20});
+    fireEvent.pointerMove(window,{pointerId:11,clientX:120,clientY:80});
+    fireEvent.pointerUp(window,{pointerId:11});
+    expect(handlers.onUpdateSceneMapPosition).toHaveBeenCalledWith(deriveRoomsWorkspacePresentation(project).rooms[0]!.name,{x:x+100,y:y+60});
   });
 
   it("opens a diagram scene with the keyboard and restores the mode when returning", async () => {
@@ -838,6 +906,20 @@ describe("RoomsWorkspace React smoke", () => {
     expect(screen.getByRole("img", { name: "Preview da HUD HUD Dungeon · origem Sala" })).toBeInTheDocument();
   });
 
+  it("combina as molduras de batalha RPG com os componentes dinâmicos editáveis", async () => {
+    const user=userEvent.setup(),project=createBlankProjectData({name:"HUD RPG"});
+    const room=(project.scenas as Array<Record<string,unknown>>)[0]!;
+    room.sceneType="battleRpg";room.runtime={type:"battleRpg",config:{hudAssetName:"battle-hud.png"}};room.hudPresetId="battle-hud";
+    project.assets=[...(Array.isArray(project.assets)?project.assets:[]),{id:"battle-hud",kind:"Background",name:"battle-hud.png",metadata:{source:"Assets/backgrounds/battle-hud.png"}}];
+    (project.settings as any).hudPresets=[{id:"battle-hud",name:"Status RPG",mode:"advanced",width:240,height:160,components:[{id:"battle-party-name",kind:"text",text:"NARA",runtimeText:true,x:12,y:4,width:64,height:8,visible:true}]}];
+    render(<RoomsWorkspace presentation={deriveRoomsWorkspacePresentation(project)} projectData={project} projectPath="/tmp/hud-rpg.gba-project" {...roomsWorkspaceHandlers()}/>);
+    await focusActiveScene(user);
+    const image=screen.getByRole("img",{name:"Prévia da HUD RPG battle-hud.png"});
+    expect(image).toHaveClass("room-runtime-hud-background");
+    expect(image.querySelector("img")).toHaveAttribute("src",expect.stringContaining("battle-hud.png"));
+    expect(screen.getByRole("img",{name:/Preview da HUD Status RPG/})).toBeInTheDocument();
+  });
+
   it("materializa a HUD de imagem da cena de luta no viewport sem preset", async () => {
     const user = userEvent.setup();
     const project = createBlankProjectData({ name: "HUD de luta" });
@@ -907,7 +989,7 @@ describe("RoomsWorkspace React smoke", () => {
 
       const hudOverlay = screen.getByRole("img", { name: "Preview da HUD HUD Todos os perfis · origem Sala" });
       expect(hudOverlay).toHaveClass("is-viewport-anchored");
-      expect(hudOverlay.parentElement).toHaveClass("rooms-canvas-viewport-host");
+      expect(hudOverlay.parentElement).toHaveClass(sceneType === "dungeonCrawler" ? "dungeon-camera" : "rooms-canvas-viewport-host");
 
       await user.click(screen.getByRole("button", { name: "HUD - 240×160" }));
       await user.click(screen.getByRole("button", { name: "Editar Status" }));
@@ -937,12 +1019,14 @@ describe("RoomsWorkspace React smoke", () => {
     expect(hudScenes.map((scene) => scene.name)).toEqual([
       "porto_lumen",
       "mapa_rota",
+      "penedos_vento",
       "mercado_suspenso",
       "usina_submersa",
       "usina_combate",
       "usina_saida",
       "tempestade",
       "guardiao_rele",
+      "arena_arrancada",
       "circuito_final",
       "carregar_jogo",
       "configuracoes",
@@ -951,7 +1035,9 @@ describe("RoomsWorkspace React smoke", () => {
       "inventario",
       "mapa_menu",
       "salvar",
-      "menu_start"
+      "menu_start",
+      "farol_interior",
+      "circuito_perspectiva"
     ]);
 
     for (const scene of hudScenes) {
@@ -968,7 +1054,7 @@ describe("RoomsWorkspace React smoke", () => {
 
       const hudOverlay = screen.getByRole("img", { name: /^Preview da HUD / });
       expect(hudOverlay).toHaveClass("is-viewport-anchored");
-      expect(hudOverlay.parentElement).toHaveClass("rooms-canvas-viewport-host");
+      expect(hudOverlay.parentElement).toHaveClass(scene.sceneType === "dungeonCrawler" ? "dungeon-camera" : "rooms-canvas-viewport-host");
       expect(hudOverlay.querySelector('canvas[data-hud-preview-renderer="native-contract"]')).toBeInTheDocument();
 
       await user.click(screen.getByRole("button", { name: "HUD - 240×160" }));
@@ -979,7 +1065,7 @@ describe("RoomsWorkspace React smoke", () => {
 
       cleanup();
     }
-  }, 60_000);
+  }, 90_000);
 
   it("exibe sprites de componentes da HUD no canvas e permite escolher o asset no inspetor", async () => {
     const user = userEvent.setup();
@@ -1495,6 +1581,82 @@ describe("RoomsWorkspace React smoke", () => {
     expect(screen.getByRole("button", { name: "Ocultar painel de prévia" })).toHaveAttribute("aria-pressed", "true");
   });
 
+  it("padroniza todos os cards do exemplo com câmera inicial, dimensões reais e HUD", () => {
+    const project = buildProjectFromTemplate("exemplo-gba", { name: "Cards uniformes" });
+    project.editorState = { ...(project.editorState as Record<string, unknown>), sceneMapZoom: 1 };
+    const presentation = deriveRoomsWorkspacePresentation(project);
+    const { container } = render(<RoomsWorkspace presentation={presentation} projectData={project} {...roomsWorkspaceHandlers()} />);
+    const cards = container.querySelectorAll<HTMLElement>('[data-scene-map-preview="true"]');
+    expect(cards).toHaveLength(presentation.rooms.length);
+    for (const card of cards) {
+      expect(card).toHaveClass("is-viewport-card");
+      expect(card).toHaveStyle({ width: "240px", height: "234px" });
+      expect(card.querySelector(".room-stage-card-canvas")).toHaveStyle({ height: "160px" });
+      expect(card.querySelectorAll(".room-stage-entity.trigger, .room-connection-zone")).toHaveLength(0);
+    }
+    const port = screen.getByLabelText("Card da cena porto_lumen · visão geral somente leitura");
+    expect(port.querySelector('[data-card-preview-framing="viewport"]')).toHaveAttribute("data-camera-x", "584");
+    expect(port.querySelector('[data-card-preview-framing="viewport"]')).toHaveAttribute("data-camera-y", "320");
+    expect(port.querySelector("canvas")).toHaveAttribute("width", "240");
+    expect(port.querySelector("canvas")).toHaveAttribute("height", "160");
+    expect(port.querySelector(".room-stage-card-dimensions")).toHaveTextContent("1008 × 688 px");
+    expect(port.querySelector('[data-hud-preset-id="hud-porto-lumen-b"]')).toBeInTheDocument();
+    expect(screen.getByLabelText("Card da cena usina_combate · visão geral somente leitura").querySelector(".dungeon-camera")).toBeInTheDocument();
+    expect(screen.getByLabelText("Card da cena circuito_perspectiva · visão geral somente leitura").querySelector(".racing-pseudo3d-camera-preview")).toBeInTheDocument();
+    expect(screen.getByLabelText("Card da cena arena_tatica · visão geral somente leitura").querySelector(".room-stage-card-tactical-hud")).toBeInTheDocument();
+  });
+
+  it("usa os limites da câmera isométrica no card e preserva a superfície inteira", () => {
+    const project = createBlankProjectData({ name: "Iso camera card" });
+    const room = (project.scenas as Array<Record<string, unknown>>)[0]!;
+    room.sceneType = "isometric";
+    room.width = 40; room.height = 40;
+    room.runtime = { type: "isometric", config: { tileWidth: 32, tileHeight: 16, originX: 0, originY: 0,
+      pagedSurface: { backgroundAsset: "map.png", foregroundAsset: "front.png", width: 800, height: 640 } } };
+    const presentation = deriveRoomsWorkspacePresentation(project);
+    const scene = presentation.rooms[0]!;
+    const player = presentation.entities.find(entity => entity.kind === "actor")!;
+    scene.playerActorName = player.name;
+    scene.cameraZones = [{ id: "locked", name: "Locked camera", area: { x: 0, y: 0, width: 40, height: 40 }, bounds: { x: 80, y: 120, width: 240, height: 160 },
+      offset: { x: 0, y: 0 }, lockX: true, lockY: true }];
+    const { container } = render(<RoomsWorkspace presentation={presentation} projectData={project} {...roomsWorkspaceHandlers()} />);
+    const layer = container.querySelector('[data-card-preview-framing="viewport"]');
+    expect(layer).toHaveAttribute("data-camera-x", "80");
+    expect(layer).toHaveAttribute("data-camera-y", "120");
+    expect(layer).toHaveStyle({ width: "800px", height: "640px", left: "-80px", top: "-120px" });
+  });
+
+  it.each(["topdown", "pseudo3d"])("mostra o viewport no card de corrida %s e mantém a pista inteira no editor", async (presentationMode) => {
+    const user = userEvent.setup();
+    const project = createRoomInProject(createBlankProjectData({ name: "Racing cards" }), {
+      anchorRoomID: "room-1", height: 64, id: "room-racing", name: "circuit", sceneType: "racing", width: 64
+    });
+    const racingRoom = (project.scenas as Array<Record<string, unknown>>).find(scene => scene.id === "room-racing")!;
+    racingRoom.runtime = { type: "racing", config: { presentation: presentationMode,
+      pseudo3dVisuals: { floorTilemapId: "floor.png", horizonY: 48 } } };
+    const { container } = render(<RoomsWorkspace presentation={deriveRoomsWorkspacePresentation(project)}
+      projectData={project} {...roomsWorkspaceHandlers()} />);
+    const card = screen.getByLabelText("Card da cena circuit · visão geral somente leitura");
+    const canvas = card.querySelector(".room-stage-card-canvas")!;
+    expect(canvas).toHaveStyle({ height: "160px" });
+    expect(card).toHaveStyle({ width: "240px" });
+    if (presentationMode === "pseudo3d") {
+      expect(within(card).getByRole("region", { name: "Câmera pseudo-3D da cena circuit" })).toBeInTheDocument();
+      expect(within(card).queryByRole("button", { name: "Abrir mapa técnico da cena circuit" })).not.toBeInTheDocument();
+    } else {
+      expect(canvas.querySelector('[data-card-preview-mode="racing-viewport"]')).toBeInTheDocument();
+    }
+    await user.click(screen.getByRole("button", { name: "Editar cena circuit" }));
+    await user.click(screen.getByRole("button", { name: "Mapa" }));
+    expect(container.querySelector(".room-focused-scene-editor-frame [role=grid]")).toBeInTheDocument();
+    expect(container.querySelectorAll(".room-focused-scene-editor-frame [role=gridcell]")).toHaveLength(64 * 64);
+    if (presentationMode === "topdown") {
+      await user.click(screen.getByRole("tab", { name: "Minimapa" }));
+      const minimap = screen.getByRole("complementary", { name: "Minimapa da cena circuit" });
+      expect(minimap.querySelector('[data-card-preview-mode="racing-viewport"]')).toBeNull();
+    }
+  });
+
   it("prioriza a câmera 240x160 e o minimapa de jogo para a corrida pseudo-3D em foco", async () => {
     const user = userEvent.setup();
     const project = setActiveRoomInProject(createRoomInProject(createBlankProjectData({ name: "Foco P3D" }), {
@@ -1574,6 +1736,22 @@ describe("RoomsWorkspace React smoke", () => {
     expect(screen.getByText("Porta Base")).toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "Aplicar pré-fabricados às instâncias" }));
     expect(handlers.onSynchronizePrefabs).toHaveBeenCalledOnce();
+  });
+
+  it("filtra a biblioteca por cena de origem e mostra como reutilizar o modelo", async () => {
+    const user = userEvent.setup();
+    const project = createBlankProjectData({ name: "Prefab guide" });
+    project.actorPrefabs = [
+      { id: "mechanic", name: "Mecânica", authoring: { sourceScene: "porto_lumen", description: "Conversa compartilhada de campanha." } },
+      { id: "sentinel", name: "Sentinela", authoring: { sourceScene: "usina_combate", description: "Combate nativo." } }
+    ];
+    render(<RoomsWorkspace presentation={deriveRoomsWorkspacePresentation(project)} projectData={project} {...roomsWorkspaceHandlers()} />);
+    await user.click(screen.getByRole("tab", { name: "Pré-fabricados" }));
+    fireEvent.change(screen.getByRole("searchbox", { name: "Buscar" }), { target: { value: "porto_lumen" } });
+    expect(screen.getByText("Mecânica")).toBeInTheDocument();
+    expect(screen.queryByText("Sentinela")).not.toBeInTheDocument();
+    await user.click(screen.getByText("Mecânica"));
+    expect(screen.getByText(/Conversa compartilhada de campanha/)).toBeVisible();
   });
 
   it("cria, edita e instancia prefabs pela biblioteca", async () => {
@@ -3923,7 +4101,7 @@ describe("RoomsWorkspace React smoke", () => {
     const compactMarkerWidth = Number.parseFloat(compactMarker.getAttribute("markerWidth") ?? "");
 
     expect(compactStage.dataset.cardDensity).toBe("compact");
-    expect(Number.parseFloat(compactCard.style.height)).toBe(231.71);
+    expect(Number.parseFloat(compactCard.style.height)).toBe(234);
     expect(compactMarker.getAttribute("markerUnits")).toBe("userSpaceOnUse");
     expect(compactActionSize).toBeLessThanOrEqual(21);
     expect(compactStroke).toBeGreaterThan(0);
@@ -4181,6 +4359,8 @@ describe("RoomsWorkspace React smoke", () => {
     );
 
     await focusActiveScene(user);
+    expect(screen.queryByRole("grid")).not.toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Mapa" }));
     const collisionButton = container.querySelector<HTMLButtonElement>(
       ".room-editor-tool-rail button[aria-label='Colisão - Sólidos']"
     );
@@ -4189,7 +4369,7 @@ describe("RoomsWorkspace React smoke", () => {
     await user.click(screen.getByRole("button", { name: "Retângulo Área" }));
 
     const cells = Array.from(container.querySelectorAll<HTMLButtonElement>(
-      ".room-focused-scene-editor-frame .room-stage-cell"
+      ".dungeon-grid [role='gridcell']"
     ));
     fireEvent.pointerDown(cells[1]!, { button: 0, buttons: 1, pointerId: 51 });
     fireEvent.pointerEnter(cells[32]!, { buttons: 1, pointerId: 51 });

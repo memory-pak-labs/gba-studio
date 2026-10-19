@@ -402,6 +402,10 @@ export function RoomEventBindingsInspector({
 
   return (
     <div className="room-event-bindings-inspector" aria-label={`${ui(isPlayer ? "Configuração do Player" : contextTitle(contextKind))} ${String(target.name ?? "")}`}>
+      {contextKind === "room" && typeof target.authoringNotes === "string" ? <details className="room-native-event-block">
+        <summary>{ui("Detalhe")}</summary>
+        <p>{target.authoringNotes}</p>
+      </details> : null}
       <div className="room-event-state-toolbar">
         <label className="room-event-state-picker">
           <span>{ui("Quando")}</span>

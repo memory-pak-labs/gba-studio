@@ -184,6 +184,15 @@ export interface DungeonCrawlerPlayerStart {
 }
 
 export interface DungeonCrawlerSceneConfig extends SceneFeatureRuntimeConfig {
+  presentation?: {
+    hudAssetName: string;
+    actionSounds: Record<string,string>;
+    /** Eight optional 64x64 source images, independent of an example view cache. */
+    materialAssets?: string[];
+    door?: { x: number; y: number };
+    playerLabel?: string;
+    playerView?: { enabled: boolean };
+  };
   stepDurationMs: number;
   turnDurationMs: number;
   allowBackstep: boolean;
@@ -211,6 +220,7 @@ export interface RacingSceneConfig extends SceneFeatureRuntimeConfig {
   trackSegments?: RacingTrackSegmentConfig[];
   topdownTrack?: RacingTopdownTrackConfig;
   pseudo3dVisuals?: RacingPseudo3DVisuals;
+  actionSounds?: Partial<Record<"accelerate" | "brake" | "collision" | "checkpoint", string>>;
   perspectiveCamera?: RacingPerspectiveCamera;
 }
 
@@ -297,6 +307,16 @@ export interface BattleRpgPokemon {
 }
 
 export interface BattleRpgSceneConfig extends SceneFeatureRuntimeConfig {
+  hudAssetName?: string;
+  presentation?: {
+    victoryLabel?: string;
+    cursorAssetName?: string;
+    effectsActorId: string;
+    disabledEscapeAssetName: string;
+    victoryMusic: string;
+    outcomeHoldFrames: number;
+    actionSounds: Partial<Record<"cursor" | "confirm" | "attack" | "magic" | "hurt" | "defend" | "defeat", string>>;
+  };
   maxPartySize: number;
   maxEnemies: number;
   turnDelayFrames: number;
@@ -363,7 +383,9 @@ export interface LutaCharacter {
   description: string;
 }
 
+export type LutaActionSound = "hit" | "guard" | "special" | "miss";
 export interface LutaSceneConfig extends SceneFeatureRuntimeConfig {
+  actionSounds?: Partial<Record<LutaActionSound, string>>;
   roundTime: number;
   roundsToWin: number;
   maxSuperGauge: number;
@@ -387,6 +409,7 @@ export interface LutaSceneConfig extends SceneFeatureRuntimeConfig {
 
 export interface WorldMapSceneConfig extends SceneFeatureRuntimeConfig {
   cursorAffine?: boolean;
+  hudLabels?: { available: string; journey: string; locked: string };
   navigable: boolean;
   unlocked: boolean;
   hideWhenLocked: boolean;
@@ -424,6 +447,11 @@ export interface CutsceneActorMotionConfig {
   toPosition: { x: number; y: number };
   durationFrames: number;
 }
+export interface CutsceneActorFrameConfig {
+  actorIndex: number;
+  /** Absolute frame in the actor's source sheet, held for the whole step. */
+  frameIndex: number;
+}
 export interface CutsceneStepConfig {
   id: string;
   dialogueKey: string;
@@ -440,6 +468,7 @@ export interface CutsceneStepConfig {
   branchTargetSceneIndex: number;
   branchTargetStepIndex: number;
   actorMotions?: CutsceneActorMotionConfig[];
+  actorFrames?: CutsceneActorFrameConfig[];
 }
 export interface CutsceneSceneConfig extends SceneFeatureRuntimeConfig {
   stepDurationFrames: number;
@@ -818,6 +847,14 @@ export function normalizeDungeonCrawlerSceneConfig(value: unknown): DungeonCrawl
     : undefined;
   return {
     ...normalizeSceneFeatureConfig("dungeonCrawler", config),
+    ...(isRecord(config.presentation) ? { presentation: {
+      hudAssetName: typeof config.presentation.hudAssetName === "string" ? config.presentation.hudAssetName : "",
+      actionSounds: Object.fromEntries(Object.entries(isRecord(config.presentation.actionSounds) ? config.presentation.actionSounds : {}).filter((e): e is [string,string] => typeof e[1] === "string" && e[1].trim().length > 0)),
+      ...(Array.isArray(config.presentation.materialAssets) ? { materialAssets: config.presentation.materialAssets.slice(0,8).map(v => typeof v === "string" ? v : "") } : {}),
+      ...(isRecord(config.presentation.door) ? { door: { x: Math.round(finiteNumber(config.presentation.door.x,-1,-1,63)), y: Math.round(finiteNumber(config.presentation.door.y,-1,-1,63)) } } : {}),
+      ...(typeof config.presentation.playerLabel === "string" ? { playerLabel: config.presentation.playerLabel.slice(0,16) } : {}),
+      ...(isRecord(config.presentation.playerView) ? { playerView: { enabled: config.presentation.playerView.enabled === true } } : {})
+    } } : {}),
     stepDurationMs: Math.round(finiteNumber(config.stepDurationMs, DEFAULT_DUNGEON_CRAWLER_SCENE_CONFIG.stepDurationMs, 40, 1000)),
     turnDurationMs: Math.round(finiteNumber(config.turnDurationMs, DEFAULT_DUNGEON_CRAWLER_SCENE_CONFIG.turnDurationMs, 40, 1000)),
     allowBackstep: typeof config.allowBackstep === "boolean" ? config.allowBackstep : DEFAULT_DUNGEON_CRAWLER_SCENE_CONFIG.allowBackstep,
@@ -899,7 +936,7 @@ export function normalizeRacingSceneConfig(value: unknown): RacingSceneConfig {
     checkpointsPerLap: Math.round(finiteNumber(config.checkpointsPerLap, DEFAULT_RACING_SCENE_CONFIG.checkpointsPerLap, 1, 16)),
     pickupsPerLap: Math.round(finiteNumber(config.pickupsPerLap, DEFAULT_RACING_SCENE_CONFIG.pickupsPerLap, 0, 16)),
     rivalSpeed: finiteNumber(config.rivalSpeed, DEFAULT_RACING_SCENE_CONFIG.rivalSpeed, 0.125,
-      config.presentation === "pseudo3d" ? 16 : 127),
+      config.presentation === "pseudo3d" && !topdownTrack ? 16 : 127),
     roadCurve: Math.round(finiteNumber(config.roadCurve, DEFAULT_RACING_SCENE_CONFIG.roadCurve, 0, 64)),
     showMinimap: typeof config.showMinimap === "boolean"
       ? config.showMinimap
@@ -907,7 +944,12 @@ export function normalizeRacingSceneConfig(value: unknown): RacingSceneConfig {
     ...(trackSegments && trackSegments.length > 0 ? { trackSegments } : {}),
     ...(topdownTrack ? { topdownTrack } : {}),
     ...(pseudo3dVisuals ? { pseudo3dVisuals } : {}),
-    ...(perspectiveCamera ? { perspectiveCamera } : {})
+    ...(perspectiveCamera ? { perspectiveCamera } : {}),
+    ...(isRecord(config.actionSounds) ? {actionSounds:Object.fromEntries(
+      ["accelerate","brake","collision","checkpoint"].flatMap(cue=> {
+        const value=(config.actionSounds as Record<string,unknown>)[cue];
+        return typeof value === "string" && value.trim() ? [[cue,value.trim()]] : [];
+      }))} : {})
   };
 }
 
@@ -915,6 +957,19 @@ export function normalizeBattleRpgSceneConfig(value: unknown): BattleRpgSceneCon
   const config = isRecord(value) ? value : {};
   return {
     ...normalizeSceneFeatureConfig("battleRpg", config),
+    ...(typeof config.hudAssetName === "string" && config.hudAssetName.trim() ? {hudAssetName:config.hudAssetName.trim()} : {}),
+    ...(isRecord(config.presentation) ? {presentation: {
+      cursorAssetName: String(config.presentation.cursorAssetName ?? ""),
+      victoryLabel: String(config.presentation.victoryLabel ?? "VITORIA").slice(0,16),
+      effectsActorId: String(config.presentation.effectsActorId ?? ""),
+      disabledEscapeAssetName: String(config.presentation.disabledEscapeAssetName ?? ""),
+      victoryMusic: String(config.presentation.victoryMusic ?? ""),
+      outcomeHoldFrames: Math.round(finiteNumber(config.presentation.outcomeHoldFrames,120,1,600)),
+      actionSounds: Object.fromEntries((["cursor", "confirm", "attack", "magic", "hurt", "defend", "defeat"] as const).flatMap(key => {
+        const name = isRecord(config.presentation) && isRecord(config.presentation.actionSounds) ? config.presentation.actionSounds[key] : undefined;
+        return typeof name === "string" && name.trim() ? [[key,name.trim()]] : [];
+      }))
+    }} : {}),
     maxPartySize: Math.round(finiteNumber(config.maxPartySize, DEFAULT_BATTLE_RPG_SCENE_CONFIG.maxPartySize, 1, 6)),
     maxEnemies: Math.round(finiteNumber(config.maxEnemies, DEFAULT_BATTLE_RPG_SCENE_CONFIG.maxEnemies, 1, 6)),
     turnDelayFrames: frameCount(config.turnDelayFrames, DEFAULT_BATTLE_RPG_SCENE_CONFIG.turnDelayFrames),
@@ -937,6 +992,12 @@ export function normalizeLutaSceneConfig(value: unknown): LutaSceneConfig {
   const config = isRecord(value) ? value : {};
   return {
     ...normalizeSceneFeatureConfig("luta", config),
+    ...(isRecord(config.actionSounds) ? { actionSounds: Object.fromEntries(
+      (["hit", "guard", "special", "miss"] as const).flatMap(key => {
+        const name = (config.actionSounds as Record<string, unknown>)[key];
+        return typeof name === "string" && name.trim() ? [[key, name.trim()]] : [];
+      })
+    ) } : {}),
     roundTime: Math.round(finiteNumber(config.roundTime, DEFAULT_LUTA_SCENE_CONFIG.roundTime, 30, 300)),
     roundsToWin: Math.round(finiteNumber(config.roundsToWin, DEFAULT_LUTA_SCENE_CONFIG.roundsToWin, 1, 5)),
     maxSuperGauge: Math.round(finiteNumber(config.maxSuperGauge, DEFAULT_LUTA_SCENE_CONFIG.maxSuperGauge, 50, 300)),
@@ -966,6 +1027,11 @@ export function normalizeWorldMapSceneConfig(value: unknown): WorldMapSceneConfi
   const normalized: WorldMapSceneConfig = {
     ...normalizeSceneFeatureConfig("worldMap", config),
     ...(typeof config.cursorAffine === "boolean" ? {cursorAffine:config.cursorAffine} : {}),
+    ...(isRecord(config.hudLabels) ? {hudLabels: {
+      available: typeof config.hudLabels.available === "string" ? config.hudLabels.available.slice(0, 64) : "A VIAJAR",
+      journey: typeof config.hudLabels.journey === "string" ? config.hudLabels.journey.slice(0, 64) : "EM VOO",
+      locked: typeof config.hudLabels.locked === "string" ? config.hudLabels.locked.slice(0, 64) : "BLOQUEADO"
+    }} : {}),
     navigable: typeof config.navigable === "boolean" ? config.navigable : DEFAULT_WORLD_MAP_SCENE_CONFIG.navigable,
     unlocked: typeof config.unlocked === "boolean" ? config.unlocked : DEFAULT_WORLD_MAP_SCENE_CONFIG.unlocked,
     hideWhenLocked: typeof config.hideWhenLocked === "boolean" ? config.hideWhenLocked : DEFAULT_WORLD_MAP_SCENE_CONFIG.hideWhenLocked,
@@ -1052,6 +1118,15 @@ export function normalizeCutsceneSceneConfig(value: unknown): CutsceneSceneConfi
               }];
             })
           : undefined;
+        const actorFrames = Array.isArray(source.actorFrames)
+          ? source.actorFrames.map((frame): CutsceneActorFrameConfig => {
+              const entry = isRecord(frame) ? frame : {};
+              return {
+                actorIndex: Math.round(finiteNumber(entry.actorIndex, -1, -1, 255)),
+                frameIndex: Math.round(finiteNumber(entry.frameIndex, -1, -1, 255))
+              };
+            })
+          : undefined;
         return {
           id: text("id", `step-${index + 1}`) || `step-${index + 1}`,
           dialogueKey: text("dialogueKey"),
@@ -1067,7 +1142,8 @@ export function normalizeCutsceneSceneConfig(value: unknown): CutsceneSceneConfi
           branchValue: Math.round(finiteNumber(source.branchValue, 0, -32768, 32767)),
           branchTargetSceneIndex: Math.round(finiteNumber(source.branchTargetSceneIndex, -1, -1, 255)),
           branchTargetStepIndex: Math.round(finiteNumber(source.branchTargetStepIndex, -1, -1, 255)),
-          ...(actorMotions && actorMotions.length > 0 ? { actorMotions } : {})
+          ...(actorMotions && actorMotions.length > 0 ? { actorMotions } : {}),
+          ...(actorFrames && actorFrames.length > 0 ? { actorFrames } : {})
         };
       })
     : undefined;
@@ -1143,6 +1219,7 @@ function normalizeDungeonCrawlerSceneOverrides(value: unknown): Partial<DungeonC
   const normalized = normalizeDungeonCrawlerSceneConfig(value);
   return {
     ...normalizeSceneFeatureConfig("dungeonCrawler", value),
+    ...(normalized.presentation ? {presentation:normalized.presentation} : {}),
     ...(Object.hasOwn(value, "stepDurationMs") ? { stepDurationMs: normalized.stepDurationMs } : {}),
     ...(Object.hasOwn(value, "turnDurationMs") ? { turnDurationMs: normalized.turnDurationMs } : {}),
     ...(Object.hasOwn(value, "allowBackstep") ? { allowBackstep: normalized.allowBackstep } : {}),
@@ -1156,6 +1233,7 @@ function normalizeRacingSceneOverrides(value: unknown): Partial<RacingSceneConfi
   const normalized = normalizeRacingSceneConfig(value);
   return {
     ...normalizeSceneFeatureConfig("racing", value),
+    ...(Object.hasOwn(value, "actionSounds") ? {actionSounds:normalized.actionSounds} : {}),
     ...(Object.hasOwn(value, "maxSpeed") ? { maxSpeed: normalized.maxSpeed } : {}),
     ...(Object.hasOwn(value, "acceleration") ? { acceleration: normalized.acceleration } : {}),
     ...(Object.hasOwn(value, "brakePower") ? { brakePower: normalized.brakePower } : {}),
@@ -1185,6 +1263,8 @@ function normalizeBattleRpgSceneOverrides(value: unknown): Partial<BattleRpgScen
   if (!isRecord(value)) return {};
   const normalized = normalizeBattleRpgSceneConfig(value);
   return {
+    ...(Object.hasOwn(value,"hudAssetName") ? {hudAssetName:normalized.hudAssetName} : {}),
+    ...(Object.hasOwn(value,"presentation") ? {presentation:normalized.presentation} : {}),
     ...normalizeSceneFeatureConfig("battleRpg", value),
     ...(Object.hasOwn(value, "maxPartySize") ? { maxPartySize: normalized.maxPartySize } : {}),
     ...(Object.hasOwn(value, "maxEnemies") ? { maxEnemies: normalized.maxEnemies } : {}),
@@ -1209,6 +1289,7 @@ function normalizeLutaSceneOverrides(value: unknown): Partial<LutaSceneConfig> {
   const normalized = normalizeLutaSceneConfig(value);
   return {
     ...normalizeSceneFeatureConfig("luta", value),
+    ...(Object.hasOwn(value, "actionSounds") ? { actionSounds: normalized.actionSounds } : {}),
     ...(Object.hasOwn(value, "roundTime") ? { roundTime: normalized.roundTime } : {}),
     ...(Object.hasOwn(value, "roundsToWin") ? { roundsToWin: normalized.roundsToWin } : {}),
     ...(Object.hasOwn(value, "maxSuperGauge") ? { maxSuperGauge: normalized.maxSuperGauge } : {}),
@@ -1237,6 +1318,7 @@ function normalizeWorldMapSceneOverrides(value: unknown): Partial<WorldMapSceneC
   return {
     ...normalizeSceneFeatureConfig("worldMap", value),
     ...(Object.hasOwn(value, "cursorAffine") ? {cursorAffine:normalized.cursorAffine} : {}),
+    ...(normalized.hudLabels ? {hudLabels:normalized.hudLabels} : {}),
     ...(Object.hasOwn(value, "navigable") ? { navigable: normalized.navigable } : {}),
     ...(Object.hasOwn(value, "unlocked") ? { unlocked: normalized.unlocked } : {}),
     ...(Object.hasOwn(value, "hideWhenLocked") ? { hideWhenLocked: normalized.hideWhenLocked } : {}),

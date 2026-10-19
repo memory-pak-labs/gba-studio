@@ -17,7 +17,8 @@ describe('player arrival preview', () => {
   it('retains a single front reference when no directional poses are bound', () => {
     const p=project();
     const actor=(p.actors as Record<string,unknown>[]).find(a=>a.id==='port-nara')!;
-    actor.spriteSheet='porto-nara-body48.png'; delete actor.animationStateID;
+    delete actor.animationStateID;
+    p.animations=(p.animations as Record<string,unknown>[]).filter(a=>a.spriteSheet!==actor.spriteSheet||a.name==='idle_down');
     for(const direction of ['up','down','left','right']) {
       const preview=playerArrivalPreview(p,'porto_lumen','Nara',direction);
       expect(preview?.sprite.animationName).toBe('idle_down');
@@ -38,8 +39,8 @@ describe('player arrival preview', () => {
   });
   it('mirrors the right frame when no left frame is authored', () => {
     const p = project();
-    p.animations = (p.animations as Record<string, unknown>[]).filter(a => a.spriteSheet !== 'player-pilot-32x32.png' || a.name !== 'idle_left');
-    (p.animationStates as Record<string, unknown>[]).find(s => s.id === 'nara-topdown-state')!.mirrorLeftFromRight = true;
+    p.animations = (p.animations as Record<string, unknown>[]).filter(a => a.spriteSheet !== 'porto-nara-animations48.png' || a.name !== 'idle_left');
+    (p.animationStates as Record<string, unknown>[]).find(s => s.id === 'porto-nara-animations48-state')!.mirrorLeftFromRight = true;
     const preview = playerArrivalPreview(p, 'farol_interior', 'Nara · Farol', 'left');
     expect(preview?.sprite.animationName).toBe('idle_right');
     expect(preview?.flipX).toBe(true);
@@ -47,9 +48,9 @@ describe('player arrival preview', () => {
   it('uses idle rather than attack or special poses for battle and fighting arrivals', () => {
     const p = project();
     const battle = playerArrivalPreview(p, 'guardiao_rele', 'Nara · Mecânica', 'left');
-    expect(battle?.sprite.animationName).toBe('battle_party_mechanic_idle_v2');
+    expect(battle?.sprite.animationName).toBe('idle');
     const fighter = playerArrivalPreview(p, 'arena_arrancada', 'Nara · Arena', 'up');
-    expect(fighter?.sprite.animationName).toBe('idle');
+    expect(fighter?.sprite.animationName).toBe('arena_nara_idle');
     expect(fighter?.sprite.animationName).not.toBe('attack');
     expect(fighter?.sprite.animationName).not.toBe('jump');
   });
@@ -61,9 +62,9 @@ describe('player arrival preview', () => {
       ['penedos_vento', 'Nara · Penedos', 'right', 'idle_right'],
       ['armazem_das_mares', 'Cursor do Armazém', 'down', 'idle'],
       ['observatorio_do_farol', 'Cursor do Observatório', 'left', 'idle'],
-      ['tempestade', 'Aeronave de Nara', 'left', 'fly'],
-      ['guardiao_rele', 'Nara · Mecânica', 'down', 'battle_party_mechanic_idle_v2'],
-      ['arena_arrancada', 'Nara · Arena', 'right', 'idle']
+      ['tempestade', 'Aeronave de Nara', 'left', 'fly_right'],
+      ['guardiao_rele', 'Nara · Mecânica', 'down', 'idle'],
+      ['arena_arrancada', 'Nara · Arena', 'right', 'arena_nara_idle']
     ] as const;
 
     for (const [roomName, playerName, direction, expectedAnimation] of arrivals) {
@@ -75,7 +76,8 @@ describe('player arrival preview', () => {
   it('does not present a wrong-facing or attack pose when the selected direction has no idle frame', () => {
     const p = project();
     expect(playerArrivalPreview(p, 'arena_arrancada', 'Rival · Arena', 'right')).toBeNull();
-    p.animations = (p.animations as Record<string, unknown>[]).filter(a => a.spriteSheet !== 'nara-fighter.png' || a.state !== 'idle');
+    const sheet = (p.actors as Record<string, unknown>[]).find(a => a.id === 'nara-fighter')?.spriteSheet;
+    p.animations = (p.animations as Record<string, unknown>[]).filter(a => a.spriteSheet !== sheet || a.state !== 'idle');
     expect(playerArrivalPreview(p, 'arena_arrancada', 'Nara · Arena', 'left')).toBeNull();
   });
 });

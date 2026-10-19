@@ -59,6 +59,11 @@ export function runtimeEventStates(entity: unknown): RuntimeEventState[] {
       const actions: NativeEventAction[] = [];
       if (step.backgroundAssetName) actions.push({ title: "Exibir fundo", fields: [field(step, "backgroundAssetName", "Imagem")] });
       if (step.dialogueKey) actions.push({ title: "Exibir diálogo", fields: [field(step, "dialogueKey", "Fala"), field(step, "waitForDialogue", "Aguardar diálogo", false)] });
+      for (const [frameIndex, frame] of list(step.actorFrames).entries()) {
+        actions.push({ title: `Pose do ator ${Number(frame.actorIndex ?? 0) + 1}`, fields: [
+          { ...field(frame, "frameIndex", "Quadro da spritesheet", 0), key: `actorFrames/${frameIndex}/frameIndex` }
+        ] });
+      }
       for (const [motionIndex, motion] of list(step.actorMotions).entries()) {
         actions.push({ title: `Mover ator ${Number(motion.actorIndex ?? 0) + 1}`, fields: [
           { ...field(motion, "durationFrames", "Duração (quadros)", 1), key: `actorMotions/${motionIndex}/durationFrames` },

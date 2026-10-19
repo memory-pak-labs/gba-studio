@@ -2092,10 +2092,12 @@ describe("Engine project export", () => {
           special: "special",
           guard: "guard",
           hurt: "hurt",
+          walk: "walk",
+          jump: "jump",
           fallback: "static_metasprite"
         }
       }],
-      animations: ["idle", "attack", "special", "guard", "hurt"].map((name, index) => ({
+      animations: ["idle", "attack", "special", "guard", "hurt", "walk", "jump"].map((name, index) => ({
         id: `anim-${name}`,
         name,
         spriteSheet: "fighter.png",
@@ -2120,7 +2122,9 @@ describe("Engine project export", () => {
       attack: { asset: "fighter", frame_indices: [0, 1], loops: false },
       special: { asset: "fighter", frame_indices: [0, 1], loops: false },
       guard: { asset: "fighter", frame_indices: [0] },
-      hurt: { asset: "fighter", frame_indices: [0] }
+      hurt: { asset: "fighter", frame_indices: [0] },
+      walk: { asset: "fighter", frame_indices: [0] },
+      jump: { asset: "fighter", frame_indices: [0] }
     });
 
     const fallbackFields = buildLutaActorEngineSpriteExport(

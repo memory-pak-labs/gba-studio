@@ -158,6 +158,7 @@ interface AssetcSceneBankFields {
 }
 
 interface AssetcTilesetPlacement {
+  bg_palette_colors?: {start:number};
   bg_tiles: { start: number };
 }
 
@@ -471,8 +472,8 @@ function sceneBankFieldsForAsset(
       const runtimeConfig = nullableStringField(runtime, "type") === "menu"
         ? child(runtime, "config")
         : undefined;
-      const lutaHudName = nullableStringField(runtime, "type") === "luta"
-        ? nullableStringField(child(runtime, "config"), "hudAssetName")
+      const lutaHudName = ["luta", "battleRpg", "dungeonCrawler"].includes(nullableStringField(runtime, "type"))
+        ? (nullableStringField(child(runtime, "config"), "hudAssetName") || nullableStringField(child(child(runtime,"config"),"presentation"),"hudAssetName"))
         : "";
       const menuOverlayNames = runtimeConfig
         ? [
@@ -530,7 +531,7 @@ function sceneBankFieldsForAsset(
       ...rooms.map((room) => nullableStringField(room, "playerActorName")).filter(Boolean)
     ]);
     projectArray(data, "actors").forEach((actor) => {
-      if (nullableStringField(actor, "spriteSheet") !== assetName) return;
+      if (nullableStringField(actor, "spriteSheet") !== assetName && !Object.values(child(actor,"dungeonDepthSheets")??{}).includes(assetName)) return;
       const actorName = nullableStringField(actor, "name");
       const actorRoom = nullableStringField(actor, "roomName");
       const configuredPlayerEntries = roomEntries.filter((entry, index) => (
@@ -571,7 +572,7 @@ function sceneBankFieldsForAsset(
         .filter((entry) => entry === actorRoomEntry)
         .forEach((entry) => groups.add(entry.group));
     });
-    if (["playerSprite", "projectileSprite", "enemyProjectileSprite", "enemySprite"].some((key) => (
+    if (["playerSprite", "playerExplosionSprite", "projectileSprite", "enemyProjectileSprite", "enemySprite"].some((key) => (
       nullableStringField(shmup, key) === assetName
     ))) {
       rooms.forEach((room, index) => {
@@ -593,6 +594,14 @@ function sceneBankFieldsForAsset(
     tacticalPageGroups.shared.forEach((group) => groups.add(group));
   } else {
     tacticalSurfacePageBankGroupsForAsset(data, assetName).objects.forEach((group) => groups.add(group));
+    rooms.forEach((room,index)=>{
+      const config=child(child(room,"runtime"),"config"),presentation=child(config,"tacticalPresentation");
+      if(!presentation)return;
+      const refs=[...recordArray(presentation,"units").flatMap(unit=>[nullableStringField(unit,"sheet"),nullableStringField(unit,"portrait")]),
+        ...recordArray(presentation,"assets").filter(asset=>asset.consumer==="obj").flatMap(asset=>[nullableStringField(asset,"path"),nullableStringField(asset,"id")]),
+        ...Object.values(child(presentation,"compactHud")??{})];
+      if(refs.some(ref=>typeof ref==="string" && ref.split("#",1)[0]===assetName))groups.add(engineSceneResourceBankGroupName(room,index));
+    });
   }
 
   // Replacements use independent residency groups; never reserve all BGs at once.
@@ -1048,12 +1057,12 @@ export function deriveAudioEngineExportDiagnostics(audioItems: Record<string, un
       });
     }
 
-    if (bpm > 0 && (bpm < 40 || bpm > 240)) {
+    if (bpm > 0 && (bpm < 40 || bpm > (kind === "SFX" ? 360 : 240))) {
       diagnostics.push({
         audioID,
         audioName,
         level: "warning",
-        message: `BPM ${bpm} fora da faixa 40-240 recomendada pela engine subset.`
+        message: `BPM ${bpm} fora da faixa 40-${kind === "SFX" ? 360 : 240} recomendada pela engine subset.`
       });
     }
 
@@ -3422,8 +3431,8 @@ function roomReferencesTileset(room: Record<string, unknown>, assetName: string)
 function roomReferencesPaletteAsset(room: Record<string, unknown>, assetName: string): boolean {
   if (roomReferencesTileset(room, assetName)) return true;
   const runtime = child(room, "runtime");
-  return nullableStringField(runtime, "type") === "luta"
-    && nullableStringField(child(runtime, "config"), "hudAssetName") === assetName;
+  return ["luta", "battleRpg", "dungeonCrawler"].includes(nullableStringField(runtime, "type"))
+    && (nullableStringField(child(runtime, "config"), "hudAssetName") || nullableStringField(child(child(runtime,"config"),"presentation"),"hudAssetName")) === assetName;
 }
 
 export function backgroundPaletteBankPolicyForAsset(
@@ -3713,7 +3722,7 @@ export interface AssetcSpriteAnimationExportEntry {
   frame_metasprites?: AssetcFrameMetaspriteExport[];
 }
 
-export type AssetcLutaAnimationState = "idle" | "attack" | "special" | "guard" | "hurt";
+export type AssetcLutaAnimationState = "idle" | "attack" | "special" | "guard" | "hurt" | "walk" | "jump";
 
 export type AssetcLutaAnimationExport = Omit<AssetcSpriteAnimationExportEntry, "name">;
 
@@ -3724,6 +3733,8 @@ export interface AssetcLutaAnimationSetExport {
   special?: AssetcLutaAnimationExport;
   guard?: AssetcLutaAnimationExport;
   hurt?: AssetcLutaAnimationExport;
+  walk?: AssetcLutaAnimationExport;
+  jump?: AssetcLutaAnimationExport;
 }
 
 export interface AssetcMetaspritePartExport {
@@ -3747,6 +3758,7 @@ export interface AssetcActorSpriteExportFields {
   animation: string | { asset: string };
   animations?: AssetcSpriteAnimationExportEntry[];
   luta_animation_set?: AssetcLutaAnimationSetExport;
+  battle_rpg_animation_set?: Partial<Record<BattleRpgAnimationState, AssetcLutaAnimationExport>>;
   emit_animation_fallback: false;
 }
 
@@ -3795,6 +3807,7 @@ function uniqueSpriteSheetsFromActors(data: GBAProjectData, hudGroups: ReadonlyM
   projectArray(data, "actors").forEach((actor) => {
     const spriteSheet = nullableStringField(actor, "spriteSheet");
     if (spriteSheet) sheets.add(spriteSheet);
+    Object.values(child(actor,"dungeonDepthSheets")??{}).forEach(value=>{if(typeof value==="string")sheets.add(value);});
   });
   projectArray(data, "events").forEach((event) => {
     const steps = Array.isArray(event.steps) ? event.steps.filter(isRecord) : [];
@@ -4429,7 +4442,9 @@ export function buildActorEngineSpriteExport(
   return fields;
 }
 
-const LUTA_ANIMATION_STATES: AssetcLutaAnimationState[] = ["idle", "attack", "special", "guard", "hurt"];
+export type BattleRpgAnimationState = "idle" | "attack" | "magic" | "heal" | "defend" | "hurt" | "defeat" | "victory" | "reactivate";
+
+const LUTA_ANIMATION_STATES: AssetcLutaAnimationState[] = ["idle", "attack", "special", "guard", "hurt", "walk", "jump"];
 
 /**
  * Builds the explicit animation map used only by the native Luta runtime.
@@ -4489,6 +4504,55 @@ export function buildLutaActorEngineSpriteExport(
   });
 
   return { ...base, luta_animation_set: animationSet };
+}
+
+export function buildBattleRpgActorEngineSpriteExport(
+  data: GBAProjectData,
+  actor: Record<string, unknown>,
+  spritePack: AssetcSpritePackGeneration | null
+): AssetcActorSpriteExportFields | null {
+  const base = buildActorEngineSpriteExport(data, actor, spritePack);
+  if (!base) return null;
+
+  const rawConfig = actor.battleAnimations;
+  if (rawConfig === undefined) return base;
+  if (!isRecord(rawConfig)) {
+    throw new Error("Actor battleAnimations precisa ser um objeto quando configurado.");
+  }
+
+  const spriteSheet = nullableStringField(actor, "spriteSheet");
+  const animations = animationsForSpriteSheet(data, spriteSheet);
+  const { spriteWidth, spriteHeight } = resolveSpriteSheetDimensions(data, spriteSheet);
+  const packAsset = base.metasprite.asset;
+  const animationSet: Partial<Record<BattleRpgAnimationState, AssetcLutaAnimationExport>> = {};
+
+  (["idle", "attack", "magic", "heal", "defend", "hurt", "defeat", "victory", "reactivate"] as BattleRpgAnimationState[]).forEach((state) => {
+    const sourceName = rawConfig[state];
+    if (sourceName === undefined || sourceName === null || sourceName === "") return;
+    if (typeof sourceName !== "string" || sourceName.trim().length === 0) {
+      throw new Error(`Actor battleAnimations.${state} precisa ser o nome ou id de uma animacao.`);
+    }
+    const sourceIndex = animations.findIndex((animation, index) => (
+      animationMatchesActorExport(animation, index, spriteSheet, sourceName.trim())
+    ));
+    if (sourceIndex < 0) {
+      throw new Error(`Actor battleAnimations.${state} referencia uma animacao ausente: ${sourceName}.`);
+    }
+    const sourceAnimation = animations[sourceIndex];
+    const { name: _name, ...entry } = buildSpriteAnimationExportEntry(
+      data,
+      spriteSheet,
+      spriteWidth,
+      spriteHeight,
+      packAsset,
+      sourceAnimation,
+      sourceIndex,
+      state
+    );
+    animationSet[state] = entry;
+  });
+
+  return { ...base, battle_rpg_animation_set: animationSet };
 }
 
 export function buildAssetcSpritePackGeneration(data: GBAProjectData): AssetcSpritePackGeneration | null {
@@ -5049,9 +5113,9 @@ function uniqueTilesetsFromRooms(data: GBAProjectData): string[] {
         if (backgroundAssetName) tilesets.add(backgroundAssetName);
       });
     }
-    if (nullableStringField(runtime, "type") === "luta") {
+    if (["luta", "battleRpg", "dungeonCrawler"].includes(nullableStringField(runtime, "type"))) {
       const config = child(runtime, "config");
-      const hudAssetName = nullableStringField(config, "hudAssetName");
+      const hudAssetName = nullableStringField(config, "hudAssetName") || nullableStringField(child(config,"presentation"),"hudAssetName");
       if (hudAssetName) tilesets.add(hudAssetName);
     }
     if (nullableStringField(runtime, "type") === "isometric") {
@@ -5113,6 +5177,10 @@ function buildAssetcTilesetPackGenerationUncached(data: GBAProjectData): AssetcT
   if (tilesetNames.length === 0) return null;
 
   const affineFloorAssets = racingPseudo3dFloorAssetNames(data);
+  const pagedSurfaceAssets = new Set(projectArray(data,"rooms").flatMap(room => {
+    const surface=child(child(child(room,"runtime"),"config"),"pagedSurface");
+    return surface ? [nullableStringField(surface,"backgroundAsset"),nullableStringField(surface,"foregroundAsset")].filter(Boolean) : [];
+  }));
 
   const packAssets: AssetcTilesetPackAsset[] = [];
   const assetsBySheet: Record<string, AssetcTilesetPackAsset> = {};
@@ -5128,7 +5196,7 @@ function buildAssetcTilesetPackGenerationUncached(data: GBAProjectData): AssetcT
     const isAffineAsset = affineFloorAssets.has(tilesetName)
       || metadataKind === "affine_bg"
       || assetKind === "affine_bg";
-    const isPagedBackground = metadataKind === "paged_bg" || assetKind === "paged_bg";
+    const isPagedBackground = pagedSurfaceAssets.has(tilesetName) || metadataKind === "paged_bg" || assetKind === "paged_bg";
     const isIndexedIsometricSource = isPagedBackground || metadataKind === "indexed_bg"
       || assetKind === "indexed_bg";
     const colorMode = nullableStringField(asset, "colorMode") || nullableStringField(metadata, "colorMode");
@@ -5138,7 +5206,7 @@ function buildAssetcTilesetPackGenerationUncached(data: GBAProjectData): AssetcT
       : isIndexedIsometricSource
         ? ["8bpp-indexed"]
         : ["4bpp"];
-    if (normalizedColorMode && !validColorModes.includes(normalizedColorMode)) {
+    if (normalizedColorMode && !validColorModes.includes(normalizedColorMode) && !(pagedSurfaceAssets.has(tilesetName) && normalizedColorMode === "4bpp")) {
       const expectedColorMode = isAffineAsset
         ? "4bpp or 8bpp-affine"
         : isIndexedIsometricSource
@@ -5198,6 +5266,7 @@ function buildAssetcTilesetPackGenerationUncached(data: GBAProjectData): AssetcT
         background_palette_reference_colors: paletteFamily.background.map(rgb555ToRgb888)
       } : {}),
       ...(pointClickPlacement ? { placement: pointClickPlacement } : {}),
+      ...(Number.isInteger(metadata?.backgroundTileStart) ? {placement:{bg_tiles:{start:Number(metadata!.backgroundTileStart)},...(Number.isInteger(metadata?.backgroundPaletteStart)?{bg_palette_colors:{start:Number(metadata!.backgroundPaletteStart)}}:{})}} : {}),
       png: output,
       header: `${assetId}.hpp`,
       symbol: assetId,
