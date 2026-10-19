@@ -7,9 +7,9 @@ import { promoteApprovedOpeningV3 } from "./opening-v3-promotion.mjs";
 import { promoteApprovedOpeningV2 } from "./opening-v2-promotion.mjs";
 
 const projectURL = new URL("../default-assets/templates/exemplo-gba/exemplo-gba.gba-project", import.meta.url);
+const retired = JSON.parse(readFileSync(new URL("../fixtures/asset-provenance/example-library-cleanup.json", import.meta.url))).retiredAssets;
 const preparedURL = new URL("../fixtures/asset-provenance/opening-v4-per-tile-14-banks.png", import.meta.url);
 const palettePlanURL = new URL("../fixtures/asset-provenance/opening-v4-palette-reference-plan.json", import.meta.url);
-const canonicalURL = new URL(`../default-assets/templates/exemplo-gba/Assets/backgrounds/${OPENING_V4_BACKGROUND.name}`, import.meta.url);
 
 describe("opening-v4 promotion", () => {
   it("troca somente o fundo aprovado e mantém quadros, atores e eventos", () => {
@@ -34,7 +34,7 @@ describe("opening-v4 promotion", () => {
     expect(promoted.events).toEqual(source.events);
     expect(promoted.rooms.filter((room) => room.name !== "abertura"))
       .toEqual(source.rooms.filter((room) => room.name !== "abertura"));
-    expect(promoted.assets).toHaveLength(canonical.assets.length);
+    expect(promoted.assets).toHaveLength(source.assets.length);
     expect(promoted.assets.some((item) => item.id === "opening-v2-background")).toBe(false);
     expect(promoted.assets.some((item) => item.id === "opening-v3-background")).toBe(false);
     expect(asset?.metadata).toMatchObject({
@@ -53,10 +53,11 @@ describe("opening-v4 promotion", () => {
     expect(asset.metadata.backgroundPaletteReferencePlan.banks).toHaveLength(14);
     expect(asset.metadata.backgroundPaletteReferencePlan.tile_palette_banks).toHaveLength(600);
     expect(asset.metadata.backgroundPaletteReferencePlan).toEqual(JSON.parse(readFileSync(palettePlanURL, "utf8")));
-    expect(canonical.assets.find((item) => item.id === "opening-v4-background")).toEqual(asset);
+    // The retirement record preserves the original approval without a live library entry.
+    expect(canonical.assets.some((item) => item.id === "opening-v4-background")).toBe(false);
     expect(createHash("sha256").update(readFileSync(preparedURL)).digest("hex"))
       .toBe(OPENING_V4_BACKGROUND.sha256);
-    expect(createHash("sha256").update(readFileSync(canonicalURL)).digest("hex"))
+    expect(retired.find(asset => asset.name === OPENING_V4_BACKGROUND.name)?.sha256)
       .toBe(OPENING_V4_BACKGROUND.sha256);
     expect(promoteApprovedOpeningV4(promoted)).toEqual(promoted);
   });

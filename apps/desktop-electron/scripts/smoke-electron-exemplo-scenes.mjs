@@ -1,3 +1,4 @@
+import { platformerCameraPosition, composePlatformerViewport } from './platformer-viewport-contract.mjs';
 import { execFile, spawn } from "node:child_process";
 import { createHash } from "node:crypto";
 import { existsSync, readFileSync } from "node:fs";
@@ -7,7 +8,7 @@ import { basename, dirname, extname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { promisify } from "node:util";
 import { auditNativeIsometricComposition, decodeNativeIsometricPagedComposition } from './native-isometric-composition-contract.mjs';
-import { decodeMGBAHardwareVideoState, exportedHudFramebufferMasks, framebufferOcclusionPixels, nativeSinglePartSpriteObject, transformRacingSpriteSheetRgba } from './native-scene-framebuffer-contract.mjs';
+import { decodeMGBAHardwareVideoState, exportedHudFramebufferMasks, framebufferOcclusionPixels, nativeSinglePartSpriteObject, pointClickCursorFramebufferMask, resolveWorldMapNativeFramebufferMasks, transformRacingSpriteSheetRgba } from './native-scene-framebuffer-contract.mjs';
 import { auditStreamedObjResidency } from "./streamed-obj-residency.mjs";
 
 import {
@@ -43,6 +44,7 @@ import {
   parseExemploSceneSoakMinutes,
   resolveExemploSmokeFaceButton,
   resolveTopdownActorFramebufferTarget,
+  resolveTopdownCameraPosition,
   resolveTopdownActorFramebufferTargets,
   selectExemploScenePlaytestPlan,
   selectExemploScenePlaytestProjectPath,
@@ -52,7 +54,7 @@ import {
   decodePngRgba
 } from "./lib/png-icons.mjs";
 import { renderPngContactSheet } from "./lib/png-contact-sheet.mjs";
-import { resolveLutaFighterFramebufferMasks } from "./luta-framebuffer-contract.mjs";
+import { resolveLutaNativeFramebufferMasks } from "./luta-framebuffer-contract.mjs";
 import { auditTemporalVisualStability } from "./visual-frame-stability.mjs";
 import {
   approvedObjectPaletteSourceRgba,
@@ -127,6 +129,7 @@ const canonicalP0Source = resolveCanonicalP0Source(appRoot);
 const defaultTemplatePath = canonicalP0Source.projectPath;
 const authoredActorFramebufferScenes = new Set([
   "porto_lumen",
+  "farol_interior",
   "usina_submersa",
   "arena_tatica"
 ]);
@@ -223,6 +226,7 @@ function currentTemplateRuntimeSpriteSpec(assetName) {
   const frameHeight = Number(metadata.frameHeight) || image.height;
   const frameCount = Number(metadata.frameCount) || Math.floor(image.width / frameWidth) * Math.floor(image.height / frameHeight);
   return Object.freeze({
+    colorMode: metadata.colorMode ?? "4bpp",
     allowPaletteRemap: metadata.assetcStatus === "pending" || metadata.assetcReviewed !== true,
     assetName,
     frameCount,
@@ -239,7 +243,7 @@ function currentTemplateRuntimeSpriteSpec(assetName) {
 }
 
 const runtimePlayerSpecs = Object.freeze({
-  platformer: currentTemplateRuntimeSpriteSpec("penedos-v10-nara.png"),
+  platformer: currentTemplateRuntimeSpriteSpec("penedos-approved-nara.png"),
   pointAndClick: Object.freeze({
     assetName: "point-click-cursor.png",
     frameCount: 2,
@@ -256,56 +260,10 @@ const runtimePlayerSpecs = Object.freeze({
     tileCount: 8,
     transparentPaletteIndex: 0
   }),
-  shmup: Object.freeze({
-    assetName: "tempestade-v3-player.png",
-    frameCount: 1,
-    frameHeight: 64,
-    frameWidth: 64,
-    palette: Object.freeze([
-      0x0000, 8489, 6417, 6519, 19057, 23387, 18036, 3136,
-      7363, 13702, 21204, 23318, 14794, 17997, 17048, 18235
-    ]),
-    sheetHeight: 64,
-    sheetWidth: 64,
-    sha256: "3eb41a92131ae9e71c384aea57457e6222ce298b64dc040549d5edb901802f8a",
-    symbol: "tempestade_v3_player",
-    tileCount: 64,
-    // OBJ transparency is encoded by palette index 0. The RGB value stored
-    // in that slot may be non-zero when the exporter remaps the object
-    // palette, so the audit must not infer transparency from the color value.
-    transparentPaletteIndex: 0
-  }),
+  shmup: currentTemplateRuntimeSpriteSpec("tempestade-approved-player.png"),
   isometric: currentTemplateRuntimeSpriteSpec("tactical-nara-v5.png"),
-  racing: Object.freeze({
-    assetName: "nara-racer.png",
-    frameCount: 3,
-    frameHeight: 32,
-    frameWidth: 32,
-    palette: Object.freeze([
-      0, 6339, 17113, 4193, 17009, 15849, 5428, 7575,
-      13701, 21307, 9513, 20107, 9477, 22365, 21202, 9618
-    ]),
-    sheetHeight: 32,
-    sheetWidth: 96,
-    sha256: "d933dc6a743c06312ea3c343079080430272e43ff0fe1bed0a5d5cc016446185",
-    symbol: "nara_racer",
-    tileCount: 48
-  }),
-  battleRpg: Object.freeze({
-    assetName: "battle-rpg-scene-party-mechanic-alpha128-v2.png",
-    frameCount: 6,
-    frameHeight: 64,
-    frameWidth: 64,
-    palette: Object.freeze([
-      0x0000, 0x1482, 0x18c6, 0x18ec, 0x1d4f, 0x4250, 0x2528, 0x2dd1,
-      0x31aa, 0x52f5, 0x42b9, 0x575d, 0x29f8, 0x1975, 0x325d, 0x42de
-    ]),
-    sheetHeight: 64,
-    sheetWidth: 384,
-    sha256: "7cfffa6566c2a2b3790891c8b9d3ce9a189da204174fd00f620610e44caf0c10",
-    symbol: "battle_rpg_scene_party_mechanic_alpha128_v2",
-    tileCount: 320
-  })
+  racing: currentTemplateRuntimeSpriteSpec("racing-approved-overhead-nara.png"),
+  battleRpg: currentTemplateRuntimeSpriteSpec("relay-approved-nara.png")
 });
 
 const topdownPlayerSpec = Object.freeze({
@@ -1313,7 +1271,8 @@ function authoredActorFramebufferTarget(room, runtime, actor, frameWidth, frameH
   if (runtime === "pointAndClick" && actor?.name === room?.playerActorName
     && Number.isFinite(Number(runtimeState?.player?.x))
     && Number.isFinite(Number(runtimeState?.player?.y))) {
-    return { x: Number(runtimeState.player.x), y: Number(runtimeState.player.y) - 8 };
+    const cursor = pointClickCursorFramebufferMask(runtimeState);
+    return {x:cursor.x,y:cursor.y};
   }
   if (runtime === "platformer") {
     return { x: x - frameWidth / 2, y: y - frameHeight + 8 };
@@ -1380,9 +1339,13 @@ function authoredActorFramebufferTarget(room, runtime, actor, frameWidth, frameH
     };
   }
   if (runtime === "battleRpg") {
-    return actor?.battle?.side === "enemy"
-      ? { x: 176, y: 24 }
-      : { x: 48, y: 32 };
+    const encounter=exportedProject?.battle_rpg_project?.encounters?.find(e=>e.name===room?.name);
+    const participant=(actor?.battle?.side==="enemy"?encounter?.enemies:encounter?.party)?.find(p=>p.name===actor?.name);
+    if(participant?.position){
+      const part=participant.animation_set?.idle?.frame_metasprites?.[0]?.parts?.[0];
+      return {x:participant.position.x+(part?.x??0),y:participant.position.y+(part?.y??0)};
+    }
+    return actor?.battle?.side === "enemy" ? { x: 176, y: 24 } : { x: 48, y: 32 };
   }
   if (runtime === "shmup") {
     return { x, y };
@@ -1568,7 +1531,10 @@ async function auditExportedAuthoredActors(exportPath, exported, project, room, 
         ? Math.max(1, Math.min(2, Number(actor?.battle?.spriteScale) || 1))
         : 1;
       let framebufferPixels = { audited: false, ok: true };
-      const visibleInInitialFrame = typeof actor?.visibleVariable !== "string";
+      const inactiveActionEffect = runtime === "battleRpg"
+        && room?.runtime?.config?.presentation?.effectsActorId === actor?.id
+        && !nativeSinglePartSpriteObject(header,symbol,frameRuntimeState?.nativeVideo);
+      const visibleInInitialFrame = typeof actor?.visibleVariable !== "string" && !inactiveActionEffect;
       const authoredTarget = authoredActorFramebufferTarget(
         room,
         runtime,
@@ -1590,7 +1556,7 @@ async function auditExportedAuthoredActors(exportPath, exported, project, room, 
         && intersectsInitialFramebuffer
       );
       if (framebufferRequired) {
-        const nativeActorObject = ['platformer', 'luta'].includes(runtime)
+        const nativeActorObject = ['platformer', 'luta', 'battleRpg'].includes(runtime)
           ? nativeSinglePartSpriteObject(header, symbol, frameRuntimeState?.nativeVideo)
           : null;
         let compiledSource = scaleRgbaSpriteSheet(decodeExportedSpriteSheetRgba({
@@ -1662,7 +1628,7 @@ async function auditExportedAuthoredActors(exportPath, exported, project, room, 
           audited: framebufferRequired,
           ok: !framebufferRequired || framebufferPixels.ok,
           required: framebufferRequired,
-          reason: !visibleInInitialFrame
+          reason: inactiveActionEffect ? "efeito-de-acao-inativo-no-frame-inicial" : !visibleInInitialFrame
             ? "ator-condicional-ausente-no-frame-inicial"
             : !intersectsInitialFramebuffer
               ? "ator-fora-do-framebuffer-inicial"
@@ -1844,30 +1810,20 @@ function exactBackgroundFramebufferMasks(
   const masks = runtime === "platformer"
     ? []
     : [{ height: 8, width: 240, x: 0, y: 0 }];
+  if (runtime === "worldMap" && runtimeState?.nativeVideo) {
+    // Use the actual vehicle, markers and HUD bounds, including the affine
+    // double-size display area, rather than assuming a 32px player frame.
+    return [...masks,...resolveWorldMapNativeFramebufferMasks(runtimeState.nativeVideo)];
+  }
+  if (runtime === "topdown" && runtimeState?.nativeVideo) {
+    // These are actual OAM rectangles, including the separately audited actors
+    // and HUD. Background comparisons keep the native scrolling coordinates.
+    return [...masks,...runtimeState.nativeVideo.objects.map(({x,y,width,height})=>({x,y,width,height}))];
+  }
   if (runtime === "luta") {
-    // The luta runtime composes its fixed HUD on BG0 and its fighters on OAM.
-    // Exclude those native surfaces while proving that the authored stage is
-    // still exact in the framebuffer.
-    const lutaHudMasks = [
-      // The approved 240x160 HUD has opaque top and bottom panels plus a
-      // centered round/timer medallion. Keep the mask aligned to the native
-      // asset bounds so the stage comparison does not treat HUD pixels as
-      // background regressions.
-      { height: 32, width: 240, x: 0, y: 0 },
-      { height: 32, width: 240, x: 0, y: 128 },
-      { height: 32, width: 32, x: 104, y: 0 }
-    ];
-    masks.push(...lutaHudMasks);
-    // Os alvos vêm da mesma auditoria de pixels que prova cada lutador. Isso
-    // acompanha anchors/metasprites diferentes sem mascarar uma área fixa do
-    // cenário maior que os OBJ efetivamente desenhados.
-    masks.push(...resolveLutaFighterFramebufferMasks({
-      fighters: lutaFighters,
-      sourceX,
-      sourceY
-    }));
-    masks.push({ height: 72, width: 176, x: 64, y: 72 });
-    return masks;
+    // Modular frames, round markers and glyphs are OBJ alongside the fighters.
+    // Their real OAM replaces the former fixed HUD and broad floor masks.
+    return [...masks,...resolveLutaNativeFramebufferMasks(runtimeState?.nativeVideo)];
   }
   if (runtime === "racing") {
     // The racing runtime keeps its status bar on BG0 for the full race. The
@@ -1913,6 +1869,9 @@ function exactBackgroundFramebufferMasks(
     // uma divergência que não é perda da arte de fundo.
     masks.push({ height: 32, width: 240, x: 0, y: 0 });
   }
+  if (runtime === "platformer" && runtimeState?.nativeVideo) {
+    return runtimeState.nativeVideo.objects.map(({x,y,width,height})=>({x,y,width,height}));
+  }
   if (runtime === "platformer" && room?.name === "penedos_vento") {
     // O preset aprovado usa duas molduras superiores para vida e itens. Elas
     // são UI deliberada e não pertencem ao background composto da plataforma.
@@ -1927,10 +1886,8 @@ function exactBackgroundFramebufferMasks(
   }
   if (runtime === "pointAndClick" && runtimeRoom) {
     masks.push(...resolvePointClickPropFramebufferMasks(runtimeRoom));
-    // Props use exported metasprite offsets, rather than the editor canvas.
-    // The pointer is audited separately and occupies its native 16px frame.
-    masks.push({ height: 16, width: 16,
-      x: Number(runtimeState?.player?.x), y: Number(runtimeState?.player?.y) - 8 });
+    // The cursor is audited separately; mask only its real native OAM rectangle.
+    masks.push(pointClickCursorFramebufferMask(runtimeState));
     return masks;
   }
   if (runtime === "worldMap" && runtimeRoom) {
@@ -2158,42 +2115,6 @@ async function racingNativeOcclusionPixels(exportPath, exported, roomName, runti
   return framebufferOcclusionPixels(layers);
 }
 
-function platformerCameraPosition(exportedRoom, runtimeState) {
-  const roomWidthPixels = Number(exportedRoom?.width_tiles ?? 0) * 8;
-  const roomHeightPixels = Number(exportedRoom?.height_tiles ?? 0) * 8;
-  const playerWidth = Number(exportedRoom?.player_start?.width ?? 16);
-  const playerHeight = Number(exportedRoom?.player_start?.height ?? 16);
-  const initialPosition = exportedRoom?.camera?.position ?? { x: 0, y: 0 };
-  const config = exportedRoom?.config ?? {};
-  const followDirections = Number(config.camera_follow_directions ?? 15);
-  const deadZoneX = Number(config.camera_deadzone_x_pixels ?? 0);
-  const cameraLockEdge = Number(config.camera_lock_edge ?? 0);
-  let cameraX = Number(initialPosition.x ?? 0);
-  let cameraY = Number(initialPosition.y ?? 0);
-  if (exportedRoom?.camera?.follow_player === true) {
-    const centerX = Number(runtimeState?.player?.x ?? 0) + Math.floor(playerWidth / 2);
-    const centerY = Number(runtimeState?.player?.y ?? 0) + Math.floor(playerHeight / 2);
-    if ((followDirections & 0x01) !== 0 || (followDirections & 0x02) !== 0) {
-      const viewportCenterX = cameraX + (SCREEN_WIDTH / 2);
-      if (deadZoneX <= 0) {
-        cameraX = centerX - (SCREEN_WIDTH / 2);
-      } else if ((followDirections & 0x01) !== 0 && centerX > viewportCenterX + deadZoneX) {
-        cameraX += centerX - (viewportCenterX + deadZoneX);
-      } else if ((followDirections & 0x02) !== 0 && centerX < viewportCenterX - deadZoneX) {
-        cameraX -= (viewportCenterX - deadZoneX) - centerX;
-      }
-    }
-    if ((followDirections & 0x04) !== 0 || (followDirections & 0x08) !== 0) {
-      cameraY = centerY - (SCREEN_HEIGHT / 2);
-    }
-    if (cameraLockEdge === 1) cameraX = 0;
-    else if (cameraLockEdge === 2) cameraX = roomWidthPixels - SCREEN_WIDTH;
-  }
-  return {
-    x: Math.max(0, Math.min(cameraX, Math.max(0, roomWidthPixels - SCREEN_WIDTH))),
-    y: Math.max(0, Math.min(cameraY, Math.max(0, roomHeightPixels - SCREEN_HEIGHT)))
-  };
-}
 
 function auditIsometricRoomFramebuffer(source, room, runtimeState, framebufferRgbaBase64, options = null) {
   const sourceTileDestination = Number(options?.sourceTileDestination ?? 0);
@@ -2401,6 +2322,8 @@ async function auditLayeredPlatformerFramebuffer(exportPath, project, room, exac
   const sourceY = exactOptions.runtime === "platformer"
     ? camera.y
     : Number(exactOptions.sourceY ?? camera.y ?? 0);
+  const viewportLayers = compiledLayers.map((image,index)=>({...image,parallax:exportedLayers.find(layer=>layer.layer===layerChecks[index].mapping)?.parallax}));
+  const composedViewport = composePlatformerViewport(viewportLayers,camera);
   const framebufferPixels = {
     audited: true,
     ...auditRgbaAgainstFramebufferWithMasks({
@@ -2409,7 +2332,7 @@ async function auditLayeredPlatformerFramebuffer(exportPath, project, room, exac
       framebuffer,
       framebufferHeight: 160,
       framebufferWidth: 240,
-      height,
+      height: 160,
       masks: exactBackgroundFramebufferMasks(
         room,
         exactOptions.actors,
@@ -2420,10 +2343,10 @@ async function auditLayeredPlatformerFramebuffer(exportPath, project, room, exac
         exportedRoom,
         exactOptions.animations
       ),
-      sourcePixels: compiledPreview.pixels,
-      sourceX,
-      sourceY,
-      width
+      sourcePixels: composedViewport.pixels,
+      sourceX: 0,
+      sourceY: 0,
+      width: 240
     })
   };
   return {
@@ -2939,6 +2862,7 @@ async function auditExportedSceneBackgroundAsset(exportPath, project, room, fram
     : null;
   const backgroundSourceX = Number(
     authoredIsometricScroll?.x
+      ?? (exactOptions?.runtime === 'topdown' ? resolveTopdownCameraPosition(room,frameRuntimeState,exactOptions.exportedProject)?.x : null)
       ?? worldMapViewport?.x
       ?? platformerViewport?.x
       ?? exactOptions?.sourceX
@@ -2946,6 +2870,7 @@ async function auditExportedSceneBackgroundAsset(exportPath, project, room, fram
   );
   const backgroundSourceY = Number(
     authoredIsometricScroll?.y
+      ?? (exactOptions?.runtime === 'topdown' ? resolveTopdownCameraPosition(room,frameRuntimeState,exactOptions.exportedProject)?.y : null)
       ?? worldMapViewport?.y
       ?? platformerViewport?.y
       ?? exactOptions?.sourceY
@@ -3027,7 +2952,9 @@ async function auditExportedSceneBackgroundAsset(exportPath, project, room, fram
       ? palette.length <= 256
       : palette.length <= 256 && palette.length % 16 === 0),
     png,
-    sourcePixels: nativeComposition?.audited ? nativeComposition.ok : exactOptions?.framebufferRgbaBase64 ? sourcePixelsWithNativeReduction.ok : true,
+    sourcePixels: nativeComposition?.audited ? nativeComposition.ok
+      : exactOptions?.framebufferRgbaBase64 || sourceAsset?.metadata?.kind === "affine_bg"
+        ? sourcePixelsWithNativeReduction.ok : true,
     tilemap: framebuffer.exportCoverage.tilemapEntryCount === (
       usesSourceAssetLayout ? (sourceWidth / 8) * (sourceHeight / 8) : Number(room.width) * Number(room.height)
     ) && framebuffer.exportCoverage.pixelCount === sourceWidth * sourceHeight
@@ -3385,7 +3312,7 @@ function exportedRuntimePlayerAsset(exported, runtime) {
   if (runtime === "pointAndClick") return exported?.point_click_project?.cursor?.metasprite?.asset ?? null;
   if (runtime === "shmup") return exported?.shmup_project?.player?.metasprite?.asset ?? null;
   if (runtime === "isometric") return exported?.isometric_project?.rooms?.[0]?.actors?.[0]?.metasprite?.asset ?? null;
-  if (runtime === "racing") return exported?.racing_project?.player?.idle_metasprite?.asset ?? null;
+  if (runtime === "racing") { const p=exported?.racing_project; return (p?.rooms?.[p?.initial_room ?? 0]?.player ?? p?.player)?.idle_metasprite?.asset ?? null; }
   if (runtime === "battleRpg") {
     const battle = exported?.battle_rpg_project;
     return battle?.encounters?.[battle?.initial_encounter ?? 0]?.party?.[0]?.metasprite?.asset ?? null;
@@ -3456,14 +3383,14 @@ async function auditExportedLutaPlayers(exportPath, exported, frame, requireFram
   const initialStage = Number(lutaProject?.initial_stage ?? 0);
   const stage = lutaProject?.stages?.[initialStage];
   const nativePositions = Object.freeze({
-    player1: { x: 80, y: 80 },
-    player2: { x: 200, y: 80 }
+    player1: { x: stage?.config?.player1_start_x, y: 80 },
+    player2: { x: stage?.config?.player2_start_x, y: 80 }
   });
-  const expectedSourceSha256 = Object.freeze({
-    nara_fighter: "9cb22e4861725b9a6e74274c7c5756360b2d0204d2696724159b3e99bfe44bf5",
-    nara_penedos_platformer_64x64: "6f0b745ae3525aea518577033ac96566a4e654cbd722c4bf74310d173472a477",
-    rival_fighter: "fcd446b1fb7c7bcba6549d545c62859e88fe91a292704af230993bf66cc43376"
-  });
+  const approval=JSON.parse(readFileSync(new URL('../fixtures/asset-provenance/arena-approved-manifest.json',import.meta.url),'utf8'));
+  const approvedSources=Object.fromEntries(approval.actors.map(actor=>{
+    const asset=approval.assets.find(asset=>asset.name===actor.spriteSheet);
+    return [actor.battle.side,{symbol:exportedAssetSymbol(asset.name),sha256:asset.sha256}];
+  }));
   const project = exactOptions?.project;
   const projectAssets = Array.isArray(project?.assets) ? project.assets : [];
   const players = ["player1", "player2"].map((side) => ({
@@ -3604,17 +3531,17 @@ async function auditExportedLutaPlayers(exportPath, exported, frame, requireFram
       }
     }
     const checks = {
-      binding: symbol === (side === "player1" ? "nara_fighter" : "rival_fighter"),
+      binding: symbol === approvedSources[side].symbol,
       framebuffer: !requireFramebuffer || framebufferAudit.ok,
       framebufferPixels: !framebufferRgba || framebufferPixels.ok,
       frameCount: header.includes(`constexpr int ${symbol}_frame_count = ${frameCount};`),
       frameSize: header.includes(`constexpr int ${symbol}_sprite_width = ${frameWidth};`)
         && header.includes(`constexpr int ${symbol}_sprite_height = ${frameHeight};`),
       metasprites: header.includes(`constexpr gbs::MetaSprite ${symbol}_metasprites[${frameCount}]`),
-      palette: palette.length === 16 && palette[0] === 0,
+      palette: palette.length === 208 && palette[0] === 0,
       sheetSize: header.includes(`constexpr int ${symbol}_width = ${source.width};`)
         && header.includes(`constexpr int ${symbol}_height = ${source.height};`),
-      sourceSha256: sourceSha256 === expectedSourceSha256[symbol],
+      sourceSha256: sourceSha256 === approvedSources[side].sha256,
       sourcePixels: source.width % frameWidth === 0
         && source.height === frameHeight
         && sourceFrames.every((sourceFrame) => sourceFrame.ok),
@@ -3690,7 +3617,10 @@ async function auditExportedRuntimePlayer(exportPath, exported, runtime, frame, 
     };
   }
   const selectedSymbol = exportedRuntimePlayerAsset(exported, runtime);
-  const spec = runtimePlayerSpecs[runtime];
+  const spec = runtime === "pointAndClick" && selectedSymbol?.startsWith("white_hand_cursor_32x32")
+    ? currentTemplateRuntimeSpriteSpec("white-hand-cursor-32x32.png")
+    : runtime === "racing" && selectedSymbol?.startsWith("racing_approved_rear_nara")
+      ? currentTemplateRuntimeSpriteSpec("racing-approved-rear-nara.png") : runtimePlayerSpecs[runtime];
   if (!spec) return { audited: false, ok: false, runtime };
   const frameRuntimeState = exactOptions?.presentedRuntimeState ?? exactOptions?.runtimeState;
   const playerSymbol = selectedSymbol ?? spec.symbol;
@@ -3790,6 +3720,10 @@ async function auditExportedRuntimePlayer(exportPath, exported, runtime, frame, 
           camera
         );
       }
+      if (runtime === "shmup") {
+        const object = nativeSinglePartSpriteObject(header, playerSymbol, frameRuntimeState?.nativeVideo);
+        if (object) target = { x: object.x, y: object.y };
+      }
       if (runtime === "racing") {
         const camera = racingCameraPosition(racingRoom, frameRuntimeState);
         target = {
@@ -3798,7 +3732,8 @@ async function auditExportedRuntimePlayer(exportPath, exported, runtime, frame, 
         };
       }
       if (runtime === "battleRpg") {
-        target = { x: 48, y: 32 };
+        const object=nativeSinglePartSpriteObject(header,playerSymbol,frameRuntimeState?.nativeVideo);
+        target=object?{x:object.x,y:object.y}:{x:48,y:32};
       }
       const candidateSourceXs = Array.from({ length: spec.frameCount }, (_, index) => index * renderedFrameWidth);
       const detectedTargets = opaqueAnchorFramebufferTargets({
@@ -3846,7 +3781,10 @@ async function auditExportedRuntimePlayer(exportPath, exported, runtime, frame, 
     framebuffer: !requireFramebuffer || framebuffer.ok,
     framebufferPixels: !exactOptions || framebufferPixels.ok,
     metasprites: header.includes(`constexpr gbs::MetaSprite ${playerSymbol}_metasprites[${spec.frameCount}]`),
-    palette: objectPaletteOverride
+    palette: spec.colorMode === "8bpp"
+      ? palette.length > sourceRgb555Colors.size && palette.length <= 256
+        && [...sourceRgb555Colors].every(value=>palette.includes(value))
+      : objectPaletteOverride
       ? palette.length === 16
         && palette.every((value, index) => value === (objectPaletteOverride[index] ?? 0))
       : Array.isArray(spec.palette)
@@ -4171,15 +4109,20 @@ async function runShmupWavesExercise(cdp, sceneName, faceButtons) {
     throw new Error(`A primeira wave SHMUP não removeu um inimigo: ${JSON.stringify(afterFirstWaveTop)}.`);
   }
 
-  await movePlayerToY(84);
+  await movePlayerToY(100);
   const afterSecondEnemy = await fireUntilCountOrRuntimeTransition(initialEnemyCount - 2, runtimeKindByName.shmup);
   if (
     Number(afterSecondEnemy?.runtimeKind) === runtimeKindByName.shmup &&
+    Number(afterSecondEnemy?.currentRoom) === 0 &&
     Number(afterSecondEnemy?.actorCount) !== initialEnemyCount - 2
   ) {
     throw new Error(`A primeira wave SHMUP não removeu o segundo inimigo: ${JSON.stringify(afterSecondEnemy)}.`);
   }
 
+  const bossWave = await waitForRuntimeScene(cdp, "shmup", 1, 2, 10_000);
+  if (!bossWave?.ok) throw new Error("A Tempestade não iniciou a onda do farol.");
+  await movePlayerToY(64);
+  await fireUntilActorCount(0);
   const transition = await waitForRuntimeScene(cdp, "battleRpg", 0, 2, 10_000);
   const afterTransition = transition?.runtimeState ?? null;
   if (
@@ -4460,6 +4403,33 @@ async function runFeatureModulesInputExercise(cdp, sceneName, startMenuScreenInd
       throw new Error(`SHMUP não manteve a primeira wave após o disparo: antes=${JSON.stringify(initial)} depois=${JSON.stringify(afterFire)}.`);
     }
     return { ok: true, scene: sceneName, initial, afterFire, waveIndex: Number(afterFire?.currentRoom) };
+  }
+
+  // Approved first-person presentation: logical maze and camera are separate;
+  // the long route and cross-scene campaign are covered by smoke-dungeon-approved.
+  if (["usina_submersa","usina_combate","usina_saida"].includes(sceneName) && JSON.parse(await readFile(templatePath,"utf8")).rooms?.find(r=>r.name===sceneName)?.dungeonVisualRevision) {
+    const right = {code:"ArrowRight",key:"ArrowRight",windowsVirtualKeyCode:39};
+    const settle=async(frames=40)=>{const start=Number((await readRuntimeState())?.frame??0);for(let n=0;n<140;n++){const state=await readRuntimeState();if(Number(state?.frame)>=start+frames)return state;await wait(50);}throw Error("Dungeon frame deadline");};
+    const action=async()=>{await pressPlayerButton(cdp,a.code,a.key,a.windowsVirtualKeyCode,80);await settle(40);return readRuntimeState();};
+    await settle(30);await action();await action();
+    const initial=await readRuntimeState(),index=["usina_submersa","usina_combate","usina_saida"].indexOf(sceneName);
+    const spawn=[[1,9],[9,3],[5,5]][index];
+    if(Number(initial?.runtimeKind)!==6||Number(initial?.currentRoom)!==index||initial.player.x!==spawn[0]||initial.player.y!==spawn[1])throw Error(`Dungeon approved spawn: ${JSON.stringify(initial)}`);
+    const screenshot=await capturePlayerScreenshot(cdp,sceneName+"_approved");
+    if(index===0){
+      await pressPlayerButton(cdp,start.code,start.key,start.windowsVirtualKeyCode,80);await settle(8);const mapScreenshot=await capturePlayerScreenshot(cdp,sceneName+"_map");
+      await pressPlayerButton(cdp,b.code,b.key,b.windowsVirtualKeyCode,80);await settle(8);
+      const dirs=[];for(let n=0;n<4;n++){await pressPlayerButton(cdp,right.code,right.key,right.windowsVirtualKeyCode,80);await settle(14);dirs.push((await readRuntimeState()).player.direction);}
+      if(new Set(dirs).size!==4)throw Error("Dungeon camera must turn in all four directions");return {ok:true,scene:sceneName,initial,screenshot,mapScreenshot,directions:dirs};
+    }
+    if(index===1){
+      let battle=await readRuntimeState();for(let n=0;n<5&&battle.collision.currentFlags===0;n++)battle=await action();
+      if(battle.collision.currentFlags!==3)throw Error("Dungeon battle did not start");
+      const firstAttack=await action();if(firstAttack.collision.currentFlags!==2||firstAttack.collision.currentSlope!==2)throw Error("Dungeon attack must change both HP values");
+      await action();const victory=await action();if(victory.roomChangeCount!==1)throw Error("Dungeon victory did not open passage");return {ok:true,scene:sceneName,initial,screenshot,firstAttack,victory};
+    }
+    let collected=await readRuntimeState();for(let n=0;n<5&&collected.variables[2]!==1;n++)collected=await action();
+    if(collected.variables[2]!==1||collected.firstActor.visible)throw Error("Dungeon collection must persist the cell and hide its actor");return {ok:true,scene:sceneName,initial,screenshot,collected};
   }
 
   if (sceneName === "usina_submersa") {
@@ -5577,6 +5547,26 @@ async function main() {
       const affineShowcaseScene = scene.name === "affine_lab";
       const exactBackgroundFramebuffer = EXEMPLO_EXACT_BACKGROUND_FRAMEBUFFER_SCENES.includes(scene.name)
         || affineShowcaseScene;
+      if (scene.name === 'farol_interior') {
+        // The intro box legitimately covers the lower part of48pxNara. Audit
+        // the unobstructed room after advancing it through the authored A input.
+        await waitForPlayerEvidence(playerCdp);
+        await wait(750);
+        for (let page=0;page<5;page++) {
+          await pressPlayerButton(playerCdp,faceButtons.a.code,faceButtons.a.key,faceButtons.a.windowsVirtualKeyCode,120);
+          await wait(200);
+        }
+      }
+      if(scene.name==='arena_tatica') {
+        // The authored introduction has three pages in the default PT locale.
+        // Advance through real A input before comparing both unobstructed actors.
+        await waitForPlayerEvidence(playerCdp);
+        await wait(750);
+        for(let page=0;page<3;page++) {
+          await pressPlayerButton(playerCdp,faceButtons.a.code,faceButtons.a.key,faceButtons.a.windowsVirtualKeyCode,120);
+          await wait(200);
+        }
+      }
       const playerEvidence = await waitForPlayerEvidence(
         playerCdp,
         exactPlayerFramebuffer || exactBackgroundFramebuffer || authoredActorFramebufferScenes.has(scene.name)
@@ -6001,8 +5991,14 @@ async function main() {
           throw new Error(`A seleção feminina nao persistiu a variável de gênero: ${JSON.stringify(selectedGender)}.`);
         }
         const genderScreen = menuScreens[genderRoom];
-        if (genderScreen.items.length !== 2 || genderScreen.actors.filter(actor => actor.role === "cursor").length !== 1) {
-          throw new Error("Escolha de gênero exige duas opções e uma única moldura cursor.");
+        const genderCursors = genderScreen.actors.filter(actor => actor.role === "cursor");
+        const genderCursorOffsets = [[-12, -16], [68, -16], [-12, 88], [68, 88]];
+        if (genderScreen.items.length !== 2 || genderCursors.length !== 4
+          || genderCursors.some((actor, index) => actor.cursor_follows_option !== true
+            || actor.cursor_for_menu !== "escolha_genero"
+            || actor.cursor_offset_pixels?.x !== genderCursorOffsets[index][0]
+            || actor.cursor_offset_pixels?.y !== genderCursorOffsets[index][1])) {
+          throw new Error("Escolha de gênero exige duas opções e os quatro cantos aprovados seguindo a seleção.");
         }
         const nameRoom = menuScreens.findIndex((screen) => screen.name === "nome_jogador");
         const genderToName = template.editorState?.scenaConnections?.find(connection =>
@@ -6138,6 +6134,7 @@ async function main() {
           loadWithoutSaveState,
           optionsToGender: genderEvidence,
           selectedGender,
+          genderCursorOffsets,
           genderToName: nameEvidence,
           nameInput: nameInputScreenshotPath,
           saveData,

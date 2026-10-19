@@ -74,7 +74,8 @@ export const EXEMPLO_SCENE_BATCHES = Object.freeze([
       "tempestade",
       "guardiao_rele",
       "arena_arrancada",
-      "circuito_final"
+      "circuito_final",
+      "circuito_perspectiva"
     ]),
     focus: "visual novel, SHMUP, batalha RPG, luta e racing"
   }),

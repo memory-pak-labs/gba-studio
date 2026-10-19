@@ -9,7 +9,8 @@ import {
   dispatchPreviewRuntimeAction,
   previewRuntimeStartMenuItems,
   rebootPreviewRuntimePreservingSaves,
-  runPreviewRuntimeEvent
+  runPreviewRuntimeEvent,
+  tickPreviewRuntime
 } from "../src/shared/previewRuntime.js";
 import {
   VERTICE_CAMPAIGN_SCENES,
@@ -47,7 +48,7 @@ describe("campanha canônica O Último Farol", () => {
       startScene: "logo",
       startSceneType: "cutscene"
     });
-    expect(project.scenas).toHaveLength(VERTICE_CAMPAIGN_SCENES.length + VERTICE_SUPPORT_SCENES.length - 1);
+    expect(project.scenas).toHaveLength(VERTICE_CAMPAIGN_SCENES.length + VERTICE_SUPPORT_SCENES.length);
     expect(project.scenas.some((scene) => scene.sceneType === "custom")).toBe(false);
 
     for (const [chapter, definition] of VERTICE_CAMPAIGN_SCENES.entries()) {
@@ -110,7 +111,7 @@ describe("campanha canônica O Último Farol", () => {
     expect(flow.unreachableScenes).toEqual([]);
     expect(flow.invalidTransitions).toEqual([]);
     expect(flow.deadEnds).toEqual([]);
-    expect(flow.reachableScenes).toHaveLength(VERTICE_CAMPAIGN_SCENES.length + VERTICE_SUPPORT_SCENES.length - 1);
+    expect(flow.reachableScenes).toHaveLength(VERTICE_CAMPAIGN_SCENES.length + VERTICE_SUPPORT_SCENES.length);
     const sortTransitions = (transitions) => [...transitions].sort((left, right) => (
       left.from.localeCompare(right.from) || left.to.localeCompare(right.to)
     ));
@@ -130,7 +131,9 @@ describe("campanha canônica O Último Farol", () => {
         .filter(({ name }) => name !== "titulo" && name !== "mapa_rota")
         .map(({ name, nextScene }) => ({ from: name, to: nextScene })),
       ...["porto_lumen","penedos_vento","armazem_das_mares","observatorio_do_farol","mercado_suspenso","usina_submersa","conselho_guardia","circuito_final"].map(to => ({from:"mapa_rota",to})),
-      { from: "mercado_suspenso", to: "arena_tatica" }
+      { from: "mercado_suspenso", to: "arena_tatica" },
+      {from:"circuito_final",to:"circuito_perspectiva"},
+      {from:"circuito_perspectiva",to:"circuito_final"}
     ]));
     expect(project.events.every((event) => (
       project.scenas.some((scene) => scene.name === event.roomName)
@@ -139,7 +142,7 @@ describe("campanha canônica O Último Farol", () => {
     for (const scene of VERTICE_CAMPAIGN_SCENES) {
       const pointClickExit = ["armazem_das_mares", "observatorio_do_farol"].includes(scene.name);
       const expectedTransition = scene.transitionEvent === "mapa_viajar_penedos"
-        ? "change_scene penedos_vento 6 11 right"
+        ? "change_scene penedos_vento 11 32 right"
         : pointClickExit
           ? "advance_campaign"
         : scene.completionVariable
@@ -202,9 +205,9 @@ describe("campanha canônica O Último Farol", () => {
     const project = campaignProject();
     const items = project.scenas.find(scene => scene.name === "menu_start").runtime.config.items;
     expect(items.map(item => item.id)).toEqual(["missions", "inventory", "map", "save", "settings", "back"]);
-    expect(items.map(item => item.clickBox.y)).toEqual([40,56,72,88,104,120]);
+    expect(items.map(item => item.clickBox.y)).toEqual([30,44,58,73,87,101]);
     const actors = project.actors.filter(actor => actor.roomName === "menu_start");
-    expect(actors).toHaveLength(9);
+    expect(actors).toHaveLength(8);
     expect(actors.filter(actor => actor.menuActorRole === "option").map(actor => actor.menuItemID))
       .toEqual(items.map(item => item.id));
     expect(actors.filter(actor => actor.menuActorRole === "decorative").map(actor => ({
@@ -214,8 +217,7 @@ describe("campanha canônica O Último Farol", () => {
       { variable: "var_character_gender", value: 0 },
       { variable: "var_character_gender", value: 1 }
     ]);
-    expect(actors.filter(actor => actor.menuActorRole === "cursor"))
-      .toEqual([expect.objectContaining({ cursorForMenu: "menu_start", menuCursorFollowsOption: true })]);
+    expect(actors.filter(actor => actor.menuActorRole === "option").every(actor => actor.menuActorSelectedOnly)).toBe(true);
   });
 
   it("mantém a confirmação de Novo Jogo explícita no título", () => {
@@ -334,37 +336,40 @@ describe("campanha canônica O Último Farol", () => {
     const project = campaignProject();
 
     expect(commands(project, "usina_ao_entrar")).toEqual([
+      "play_music dungeon_tide",
       "call_event aplicar_perfil_jogador",
       "show_dialogue usina_objetivo",
       "if_variable var_usina_combat_cleared 1",
-      "change_scene usina_saida 17 5 up",
+      "change_scene usina_saida 5 5 down",
       "condition_end"
     ]);
     expect(commands(project, "usina_abrir_combate")).toEqual([
       "if_variable var_usina_combat_cleared 0",
-      "change_scene usina_combate 14 6 up",
+      "change_scene usina_combate 9 3 up",
       "else",
-      "change_scene usina_saida 17 5 up",
+      "change_scene usina_saida 5 5 down",
       "condition_end"
     ]);
     expect(commands(project, "usina_combate_ao_entrar")).toEqual([
+      "play_music dungeon_patrol",
       "call_event aplicar_perfil_jogador",
       "show_dialogue usina_combate_objetivo",
       "if_variable var_usina_combat_cleared 1",
-      "change_scene usina_saida 17 5 up",
+      "change_scene usina_saida 5 5 down",
       "condition_end"
     ]);
     expect(commands(project, "usina_vencer_combate")).toEqual([
-      "play_sfx farol_sfx_impacto",
+      "play_sfx dungeon_porta",
       "if_variable var_usina_combat_cleared 0",
       "set_variable var_usina_combat_cleared 1",
       "save_game 0",
-      "change_scene usina_saida 17 5 up",
+      "change_scene usina_saida 5 5 down",
       "else",
-      "change_scene usina_saida 17 5 up",
+      "change_scene usina_saida 5 5 down",
       "condition_end"
     ]);
     expect(commands(project, "usina_saida_ao_entrar")).toEqual([
+      "play_music dungeon_tide",
       "call_event aplicar_perfil_jogador",
       "show_dialogue usina_saida_objetivo",
       "if_variable var_energy_cell 1",
@@ -372,7 +377,7 @@ describe("campanha canônica O Último Farol", () => {
       "condition_end"
     ]);
     expect(commands(project, "usina_coletar_celula")).toEqual([
-      "play_sfx farol_sfx_item",
+      "play_sfx dungeon_celula",
       "if_variable var_energy_cell 0",
       "set_variable var_energy_cell 1",
       "add_item usina_cell 1",
@@ -384,7 +389,7 @@ describe("campanha canônica O Último Farol", () => {
       "condition_end"
     ]);
     expect(commands(project, "usina_encontrar_guardia")).toEqual([
-      "play_sfx farol_sfx_porta",
+      "play_sfx dungeon_porta",
       "if_variable var_energy_cell 1",
       "advance_campaign",
       "else",
@@ -403,41 +408,42 @@ describe("campanha canônica O Último Farol", () => {
     const exit = project.triggers.find((trigger) => trigger.id === "trigger-usina-exit");
 
     expect(room).toMatchObject({
-      width: 30,
-      height: 20,
+      width: 11,
+      height: 11,
       cameraMode: "fixed_center",
       cameraZoom: 100,
       playerActorName: "",
-      backgroundAssetName: "usina-exploration-background-v3-4bpp.png",
-      runtime: { config: { playerStart: { x: 14, y: 6, direction: "up" } } },
+      backgroundAssetName: "dungeon-approved-exploracao-background.png",
+      runtime: { config: { playerStart: { x: 1, y: 9, direction: "up" } } },
       hudPresetId: "hud-usina-exploration-v3"
     });
     expect(combatRoom).toMatchObject({
       sceneType: "dungeonCrawler",
       runtime: {
         type: "dungeonCrawler",
-        config: { profile: "usina-submersa-combat-v3", playerStart: { x: 14, y: 6, direction: "up" } }
+        config: { profile: "usina-submersa-combat-v3", playerStart: { x: 9, y: 3, direction: "up" } }
       },
       hudPresetId: "hud-usina-combat-v3",
-      backgroundAssetName: "usina-combat-background-v3-4bpp.png"
+      backgroundAssetName: "dungeon-approved-combate-background.png"
     });
     expect(exitRoom).toMatchObject({
       sceneType: "dungeonCrawler",
       runtime: {
         type: "dungeonCrawler",
-        config: { profile: "usina-submersa-exit-v3", playerStart: { x: 17, y: 5, direction: "up" } }
+        config: { profile: "usina-submersa-exit-v3", playerStart: { x: 5, y: 5, direction: "down" } }
       },
       hudPresetId: "hud-usina-exit-v3",
-      backgroundAssetName: "usina-exit-background-v3-4bpp.png"
+      backgroundAssetName: "dungeon-approved-saida-background.png"
     });
-    expect(room.collisionTypes[15 * room.width + 15]).toBe("free");
-    expect(room.collisionTypes[4 * room.width + 15]).toBe("free");
+    expect(room.collisionTypes.filter(c=>c==="free")).toHaveLength(51);
+    expect(room.collisionTypes[9 * room.width + 1]).toBe("free");
+    expect(room.collisionTypes[1 * room.width + 9]).toBe("free");
     expect(explorationActors).toEqual([]);
     expect(combatActors).toEqual(expect.arrayContaining([
-      expect.objectContaining({ id: "usina-sentinel-v2", x: 14, y: 5, width: 1, height: 1 })
+      expect.objectContaining({ id: "usina-sentinel-v2", x: 9, y: 2, width: 1, height: 1 })
     ]));
     expect(exitActors).toEqual(expect.arrayContaining([
-      expect.objectContaining({ id: "usina-energy-cell-v2", x: 17, y: 4 })
+      expect.objectContaining({ id: "usina-energy-cell-v2", x: 5, y: 6 })
     ]));
     expect(combatDoor).toMatchObject({
       roomName: "usina_submersa",
@@ -451,10 +457,10 @@ describe("campanha canônica O Último Farol", () => {
     });
     expect(exit).toMatchObject({
       roomName: "usina_saida",
-      x: 14,
-      y: 3,
-      width: 3,
-      height: 3,
+      x: 9,
+      y: 1,
+      width: 1,
+      height: 1,
       eventName: "usina_encontrar_guardia",
       eventBindings: { onEnter: "usina_encontrar_guardia" }
     });
@@ -538,8 +544,8 @@ describe("campanha canônica O Último Farol", () => {
       initial_score: 0,
       initial_lives: 3,
       waves_enabled: true,
-      max_waves: 1,
-      loop_waves: true
+      max_waves: 2,
+      loop_waves: false
     });
     expect(exported.dungeon_crawler_project).toMatchObject({
       inventory_enabled: true,
@@ -593,6 +599,7 @@ describe("campanha canônica O Último Farol", () => {
     runtime = runPreviewRuntimeEvent(runtime, "guardiao_vitoria");
     runtime = runPreviewRuntimeEvent(runtime, "arena_vencer_rival");
     runtime = runPreviewRuntimeEvent(runtime, "circuito_concluir");
+    for(let i=0;i<20;i++)runtime=tickPreviewRuntime(runtime,100);
 
     expect(runtime.currentRoom?.name).toBe("titulo");
     expect(runtime.variables).toMatchObject({
@@ -621,8 +628,8 @@ describe("campanha canônica O Último Farol", () => {
     expect(loaded.currentRoom?.name).toBe("circuito_final");
     expect(loaded.variables).toMatchObject({ var_campaign_finished: 1 });
     expect(loaded.player).toMatchObject({
-      spriteSheet: "nara-racer.png",
-      animationName: "racing"
+      spriteSheet: "racing-approved-overhead-nara.png",
+      animationName: "idle_up"
     });
   });
 
@@ -639,8 +646,8 @@ describe("campanha canônica O Último Farol", () => {
 
     expect(runtime.currentRoom?.name).toBe("missoes");
     expect(previewRuntimeStartMenuItems(runtime)).toEqual(expect.arrayContaining([
-      expect.objectContaining({ id: "next", label: "Objetivo", enabled: true }),
-      { id: "back", label: "Voltar", enabled: true }
+      expect.objectContaining({ id: "next", label: "OBJETIVO", enabled: true }),
+      { id: "back", label: "VOLTAR", enabled: true }
     ]));
   });
 
@@ -724,7 +731,8 @@ describe("campanha canônica O Último Farol", () => {
       "var_audio_initialized",
       "var_rtc_hour",
       "var_rtc_minute",
-      "porto_player_health"
+      "porto_player_health", "var_penedos_farol", "penedos_player_health", "penedos_tokens",
+      "penedos_defeated_crab", "penedos_defeated_moth", "penedos_defeated_crab_east", "penedos_defeated_moth_east"
     ]));
     expect(VERTICE_PROGRESS_KEYS).toHaveLength(15);
   });

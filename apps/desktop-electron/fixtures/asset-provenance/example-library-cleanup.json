@@ -1,0 +1,876 @@
+{
+  "approval": {
+    "approved": true,
+    "date": "2026-10-17",
+    "scope": "Remove example library files not used by the current scenes or their dependencies. Preserve shared blank-project defaults."
+  },
+  "before": {
+    "assets": 269,
+    "animations": 389,
+    "states": 147
+  },
+  "after": {
+    "assets": 149,
+    "animations": 213,
+    "states": 60
+  },
+  "retiredAssets": [
+    {
+      "id": "porto-lume-captain-pilot-32x32",
+      "name": "npc-captain-pilot-32x32.png",
+      "source": "Assets/sprites/npc-captain-pilot-32x32.png",
+      "bytes": 8797,
+      "sha256": "44ba073d05e121562f64fdb4505ef33df9a827201a4e6587d8158fe4404e4acf"
+    },
+    {
+      "id": "porto-lume-traveler-pilot-32x32",
+      "name": "traveler-pilot-32x32.png",
+      "source": "Assets/sprites/traveler-pilot-32x32.png",
+      "bytes": 8423,
+      "sha256": "4beb55d8269e894805d768eeb567b09cde2813ff0dba1f5c83506bd63dc767b0"
+    },
+    {
+      "id": "porto-lume-mechanic-pilot-32x32",
+      "name": "mechanic-pilot-32x32.png",
+      "source": "Assets/sprites/mechanic-pilot-32x32.png",
+      "bytes": 9309,
+      "sha256": "446a12d681ea866d309a03a778d0df89540b5884c948adb409046591b5f3dc97"
+    },
+    {
+      "id": "porto-lume-cartographer-pilot-32x32",
+      "name": "cartographer-pilot-32x32.png",
+      "source": "Assets/sprites/cartographer-pilot-32x32.png",
+      "bytes": 9195,
+      "sha256": "9ead522ec3998b5abeb4b582bbc104acd0155dcaa958e508d46457466fbeb467"
+    },
+    {
+      "id": "porto-lume-fisherchild-pilot-32x32",
+      "name": "fisherchild-pilot-32x32.png",
+      "source": "Assets/sprites/fisherchild-pilot-32x32.png",
+      "bytes": 8936,
+      "sha256": "94cf165566205a54cae5e9b5d73164b5102f1668c8cecaa02d77487286f1eae6"
+    },
+    {
+      "id": "porto-lume-lighthousekeeper-pilot-32x32",
+      "name": "lighthousekeeper-pilot-32x32.png",
+      "source": "Assets/sprites/lighthousekeeper-pilot-32x32.png",
+      "bytes": 9443,
+      "sha256": "eccfecbe2f82352050cfeca6b5ac119b1e5e110842aad31e08648c462fa8e091"
+    },
+    {
+      "id": "observatorio_do_farol-background",
+      "name": "observatorio-do-farol-gba.png",
+      "source": "Assets/backgrounds/observatorio-do-farol-gba.png",
+      "bytes": 16707,
+      "sha256": "5322e4cd1be4c19dbd2cfff13ce1c0d16b5f0947b9cf1ba4b76650afed07285f"
+    },
+    {
+      "id": "point-click-point-click-lia-scroll",
+      "name": "point-click-lia-scroll.png",
+      "source": "Assets/sprites/point-click-lia-scroll.png",
+      "bytes": 2079,
+      "sha256": "5fd4d8fea4d5ecb1553502165f50a22b1207843bcbcb8c6f29483a3d59be2ee0"
+    },
+    {
+      "id": "point-click-point-click-dock-mechanic",
+      "name": "point-click-dock-mechanic.png",
+      "source": "Assets/sprites/point-click-dock-mechanic.png",
+      "bytes": 2080,
+      "sha256": "92affc7975e87a8392a85e50349eb4676bb84a92e4441ccc92775c88936df5f9"
+    },
+    {
+      "id": "initial-menu-background-v3",
+      "name": "menu-inicial-v3-gba.png",
+      "source": "Assets/backgrounds/menu-inicial-v3-gba.png",
+      "bytes": 4930,
+      "sha256": "2ec9ad340c314a4bbaa5d98b440c2851f1f1294a2ae90d471d121e27b79e65ae"
+    },
+    {
+      "id": "name-input-background-v1",
+      "name": "name-input-bg-gba.png",
+      "source": "Assets/backgrounds/name-input-bg-gba.png",
+      "bytes": 4930,
+      "sha256": "2ec9ad340c314a4bbaa5d98b440c2851f1f1294a2ae90d471d121e27b79e65ae"
+    },
+    {
+      "id": "gender-selection-background-v1",
+      "name": "gender-selection-gba.png",
+      "source": "Assets/backgrounds/gender-selection-gba.png",
+      "bytes": 4930,
+      "sha256": "2ec9ad340c314a4bbaa5d98b440c2851f1f1294a2ae90d471d121e27b79e65ae"
+    },
+    {
+      "id": "prologue-frame-1-background",
+      "name": "prologue-frame-1-gba.png",
+      "source": "Assets/backgrounds/prologue-frame-1-gba.png",
+      "bytes": 12717,
+      "sha256": "7aec4f90fbe86db3bfb1dd3e8bc5a5ca2baab2eefcaf5cb31702972cd4af43c1"
+    },
+    {
+      "id": "prologue-frame-2-background",
+      "name": "prologue-frame-2-gba.png",
+      "source": "Assets/backgrounds/prologue-frame-2-gba.png",
+      "bytes": 18560,
+      "sha256": "9c05137e9de5b68a6417e6b40087e638c728c9b2cd25fec984e305c3e7a60d63"
+    },
+    {
+      "id": "prologue-frame-3-background",
+      "name": "prologue-frame-3-gba.png",
+      "source": "Assets/backgrounds/prologue-frame-3-gba.png",
+      "bytes": 13525,
+      "sha256": "321ce43c5687e83f89c81c5416363f6c8cab7c5c780c25877c88d46b5e4c2b7a"
+    },
+    {
+      "id": "menu-cursor",
+      "name": "menu-inicial-cursor.png",
+      "source": "Assets/sprites/menu-inicial-cursor.png",
+      "bytes": 202,
+      "sha256": "7154abfe23d6af52fcef4391885daa24964980299fe1014dfc5273f948033989"
+    },
+    {
+      "id": "menu-gender-title",
+      "name": "menu-gender-title.png",
+      "source": "Assets/sprites/menu-gender-title.png",
+      "bytes": 3001,
+      "sha256": "b6f3d8db7a2aaa8fdd23c028165f92be42b77c23e154b5f12b483323571c2464"
+    },
+    {
+      "id": "menu-player-name-title",
+      "name": "menu-player-name-title.png",
+      "source": "Assets/sprites/menu-player-name-title.png",
+      "bytes": 2480,
+      "sha256": "bc71560a40d275a1cbeb9c9ed2455e72e53a2048d1972c754360d6527d47dae9"
+    },
+    {
+      "id": "menu-entry-cursor",
+      "name": "menu-entry-cursor.png",
+      "source": "Assets/sprites/menu-entry-cursor.png",
+      "bytes": 132,
+      "sha256": "1f8cd9be0c1058654dab5593cc0d47bb8ce0cf98eda912916ac02740b59cf7d4"
+    },
+    {
+      "id": "menu-map-detail-current",
+      "name": "mapa-detail-current.png",
+      "source": "Assets/sprites/mapa-detail-current.png",
+      "bytes": 674,
+      "sha256": "20bd3f0bb7f347127a7de03f1346d34f53600ac2d5f3ca2d0783a8ad1431626d"
+    },
+    {
+      "id": "menu-map-detail-penedos",
+      "name": "mapa-detail-penedos.png",
+      "source": "Assets/sprites/mapa-detail-penedos.png",
+      "bytes": 675,
+      "sha256": "efa4dc01ca817952a853507d7e6b3798a85419aa938f3bd869e312d30982ba3a"
+    },
+    {
+      "id": "menu-male",
+      "name": "menu-male.png",
+      "source": "Assets/sprites/menu-male.png",
+      "bytes": 2085,
+      "sha256": "a25aa122a1bf956b6c3472fb08439eae7af7fba658007262a94e0731daeabcab"
+    },
+    {
+      "id": "menu-female",
+      "name": "menu-female.png",
+      "source": "Assets/sprites/menu-female.png",
+      "bytes": 1942,
+      "sha256": "b8c188370eca3fbd41fcd1c91b535ffa49b30a8097f8c9a469f2bd84b65424ab"
+    },
+    {
+      "id": "menu-confirm",
+      "name": "menu-confirm.png",
+      "source": "Assets/sprites/menu-confirm.png",
+      "bytes": 2271,
+      "sha256": "217fe91c68ba1e5fcf37903e31d5c1754cc3f44753e91d77967d0454dfbd1e48"
+    },
+    {
+      "id": "menu-entry-back",
+      "name": "menu-entry-back.png",
+      "source": "Assets/sprites/menu-entry-back.png",
+      "bytes": 1805,
+      "sha256": "af6fe496e5766e443041c58ed45f47063f4e03357b525a5b3ed41c793eee5704"
+    },
+    {
+      "id": "menu-project",
+      "name": "menu-project.png",
+      "source": "Assets/sprites/menu-project.png",
+      "bytes": 282,
+      "sha256": "46655f39e43049ba9a25f8a8e34e48c0bae2a58fc2630c2e12c00a3d86d9c075"
+    },
+    {
+      "id": "menu-engine",
+      "name": "menu-engine.png",
+      "source": "Assets/sprites/menu-engine.png",
+      "bytes": 224,
+      "sha256": "a4a572c0c51852c8820954b77a1850fd959b6b3dd638cecb8fbe4bd1ed21d64c"
+    },
+    {
+      "id": "gender-player-male-32x64",
+      "name": "gender-player-male-32x64.png",
+      "source": "Assets/sprites/gender-player-male-32x64.png",
+      "bytes": 3244,
+      "sha256": "09d0f98b003dd9ed40b0af1ae200f7cff7baf95c3b918764f0de6804e082069c"
+    },
+    {
+      "id": "gender-player-female-32x64",
+      "name": "gender-player-female-32x64.png",
+      "source": "Assets/sprites/gender-player-female-32x64.png",
+      "bytes": 3474,
+      "sha256": "505fe2fd1fc40e290d9cf3747d69a6b947c5d378360082518597cfe2bfd75bd5"
+    },
+    {
+      "id": "mechanic",
+      "name": "mechanic.png",
+      "source": "Assets/sprites/mechanic.png",
+      "bytes": 2874,
+      "sha256": "6fbef7e6ad04f65298c93b387d7e171410524858319e7c3cee3bf3010c347cae"
+    },
+    {
+      "id": "porto-lume-exterior-topdown-background",
+      "name": "porto-lume-exterior-topdown-gba.png",
+      "source": "Assets/backgrounds/porto-lume-exterior-topdown-gba.png",
+      "bytes": 71214,
+      "sha256": "02193f95986e003ee017fb9e7e28d719fbe0318557ce326873e74556b8f700c6"
+    },
+    {
+      "id": "farol-interior-topdown-360x240-background",
+      "name": "farol-interior-topdown-360x240-gba.png",
+      "source": "Assets/backgrounds/farol-interior-topdown-360x240-gba.png",
+      "bytes": 52214,
+      "sha256": "e8944a17ea51d4c2ca65432331a3cb36545fa7a2d4aefbd9b24d01f077924181"
+    },
+    {
+      "id": "arena-background",
+      "name": "arena-gba.png",
+      "source": "Assets/backgrounds/arena-gba.png",
+      "bytes": 16893,
+      "sha256": "16df2d3c529bdff6f9342aa2a71be958fe68fd0b80c5e1c05d2b916e5fb3129b"
+    },
+    {
+      "id": "fight-hud",
+      "name": "fight-hud-v2-arena-bank-05.png",
+      "source": "Assets/backgrounds/fight-hud-v2-arena-bank-05.png",
+      "bytes": 1613,
+      "sha256": "dfda50c3c913a8e4e987cd971e82f34e749e3e416a8f87fc176c7ded783e3642"
+    },
+    {
+      "id": "opening-v4-background",
+      "name": "opening-v4-per-tile-14-banks.png",
+      "source": "Assets/backgrounds/opening-v4-per-tile-14-banks.png",
+      "bytes": 21748,
+      "sha256": "071905536628830df779a17d758eb4c9373baf14076612927680cb5f03d5ee74"
+    },
+    {
+      "id": "opening-v3-guardia-idle",
+      "name": "opening-v3-guardia-idle-48x64.png",
+      "source": "Assets/sprites/opening-v3-guardia-idle-48x64.png",
+      "bytes": 1443,
+      "sha256": "af2c80534f985b4a171294a41b6a6e716be0ff14b2aa2954be35a2d94c2ae380"
+    },
+    {
+      "id": "opening-v3-guardia-turn",
+      "name": "opening-v3-guardia-turn-48x64.png",
+      "source": "Assets/sprites/opening-v3-guardia-turn-48x64.png",
+      "bytes": 1458,
+      "sha256": "13efa145c3c95504b59a82cc2eb436ce751c471ffd2efcef1a15a93022a1c60d"
+    },
+    {
+      "id": "opening-v3-guardia-signal",
+      "name": "opening-v3-guardia-signal-48x64.png",
+      "source": "Assets/sprites/opening-v3-guardia-signal-48x64.png",
+      "bytes": 1712,
+      "sha256": "8738d0df9bb0942a19103fceb028329684a922a49634c4515adb18881c447ca1"
+    },
+    {
+      "id": "opening-v3-menino",
+      "name": "opening-v3-menino-24x32.png",
+      "source": "Assets/sprites/opening-v3-menino-24x32.png",
+      "bytes": 630,
+      "sha256": "13fab53838304ce82b4632161f227cc7b9a973077ec6727458ad9ba2c0a388dc"
+    },
+    {
+      "id": "opening-v3-gaivota",
+      "name": "opening-v3-gaivota-24x16.png",
+      "source": "Assets/sprites/opening-v3-gaivota-24x16.png",
+      "bytes": 326,
+      "sha256": "b4346c395cfaa50e479d4782e69c7232f079e4e5d27b322262c22b2898235e0c"
+    },
+    {
+      "id": "tactical-cursor-diamond-v1",
+      "name": "tactical-cursor-diamond-32x16-v1.png",
+      "source": "Assets/sprites/tactical-cursor-diamond-32x16-v1.png",
+      "bytes": 537,
+      "sha256": "823a618bb9aff43fea787d681f4bba03f65bfee8dd13c33e916e5b89268af809"
+    },
+    {
+      "id": "tactical-range-diamond-v1",
+      "name": "tactical-range-diamond-32x16-v1.png",
+      "source": "Assets/sprites/tactical-range-diamond-32x16-v1.png",
+      "bytes": 552,
+      "sha256": "0ddafc12ba15fd63a9e05339b8640c64ecf5e9e90156015e2820a61cd034eff6"
+    },
+    {
+      "id": "tactical-target-diamond-v1",
+      "name": "tactical-target-diamond-32x16-v1.png",
+      "source": "Assets/sprites/tactical-target-diamond-32x16-v1.png",
+      "bytes": 555,
+      "sha256": "4318099a7566f2f55756d4754cef4c36564a25742851b290e02e13705fa67110"
+    },
+    {
+      "id": "tactical-v5-hud",
+      "name": "tactical-v5-hud.png",
+      "source": "Assets/ui/tactical-v5-hud.png",
+      "bytes": 417,
+      "sha256": "930ae3c711646aae75460b3e291902cb17e6076715cf9c29fb9b146dd0ddd8df"
+    },
+    {
+      "id": "tactical-sentinel-v5",
+      "name": "tactical-sentinel-v5.png",
+      "source": "Assets/sprites/tactical-sentinel-v5.png",
+      "bytes": 17229,
+      "sha256": "a2b38a3671857e7650cb3b51f034a85c6656ff0f83baff91de307b26e2668c25"
+    },
+    {
+      "id": "gender-selection-approved-v2",
+      "name": "gender-selection-approved-v2-gba.png",
+      "source": "Assets/backgrounds/gender-selection-approved-v2-gba.png",
+      "bytes": 20397,
+      "sha256": "134e057318411dd6c72d46267347e229bf5fed0a19d5f78269bed7a0ac4823dd"
+    },
+    {
+      "id": "asset-gender-portrait-male-gba.png",
+      "name": "gender-portrait-male-gba.png",
+      "source": "Assets/sprites/gender-portrait-male-gba.png",
+      "bytes": 3137,
+      "sha256": "e9cb5a541db113f879056a86563e3b79eebbe7361f143d54ccb7f3932b15038b"
+    },
+    {
+      "id": "asset-gender-portrait-female-gba.png",
+      "name": "gender-portrait-female-gba.png",
+      "source": "Assets/sprites/gender-portrait-female-gba.png",
+      "bytes": 3415,
+      "sha256": "cebbf3f3fde313dfb881a207f1ce8597ea6a259fbebd905fd0be0ac2613339bb"
+    },
+    {
+      "id": "asset-gender-gold-frame-male-gba.png",
+      "name": "gender-gold-frame-male-gba.png",
+      "source": "Assets/sprites/gender-gold-frame-male-gba.png",
+      "bytes": 1008,
+      "sha256": "a5c9b8d558437d5ea269e75f8b2b58dbf154dbd45c13ec5105ce80aaf2b8a8fb"
+    },
+    {
+      "id": "name-input-approved-v2",
+      "name": "name-input-approved-v2-gba.png",
+      "source": "Assets/backgrounds/name-input-approved-v2-gba.png",
+      "bytes": 17012,
+      "sha256": "84c409dac0b80b0bffc1190808ac0fd1e79a4d3e9cb4b53bfdee29d97ccc3f9b"
+    },
+    {
+      "id": "asset-name-portrait-male-gba",
+      "name": "name-portrait-male-gba.png",
+      "source": "Assets/sprites/name-portrait-male-gba.png",
+      "bytes": 480,
+      "sha256": "a5fa43fe490dff2fb7d5ed06a30cee6a110cd17667a796e379defd7e626b34b6"
+    },
+    {
+      "id": "asset-name-portrait-female-gba",
+      "name": "name-portrait-female-gba.png",
+      "source": "Assets/sprites/name-portrait-female-gba.png",
+      "bytes": 498,
+      "sha256": "f1f51e78b7ec4da03c77349ed7b1089705a669a260f58601bee5c84978f1f093"
+    },
+    {
+      "id": "neutral-item-estrutura",
+      "name": "neutral-item-estrutura-gba.png",
+      "source": "Assets/sprites/neutral-item-estrutura-gba.png",
+      "bytes": 582,
+      "sha256": "ccfbf9230a08841698b5a3608675872d5b59d0ecfc23f648da0be56d2463f55d"
+    },
+    {
+      "id": "neutral-item-aderencia",
+      "name": "neutral-item-aderencia-gba.png",
+      "source": "Assets/sprites/neutral-item-aderencia-gba.png",
+      "bytes": 514,
+      "sha256": "aa6514abf8d7a2239870f2caa8c72175682760c6acb69857fa84b6276fbf7a27"
+    },
+    {
+      "id": "neutral-item-celula",
+      "name": "neutral-item-celula-gba.png",
+      "source": "Assets/sprites/neutral-item-celula-gba.png",
+      "bytes": 381,
+      "sha256": "88c5ad781d6aff88a8a6f883c4c3be022152de42197b5fce7ae529e25f68d08b"
+    },
+    {
+      "id": "neutral-item-blindagem",
+      "name": "neutral-item-blindagem-gba.png",
+      "source": "Assets/sprites/neutral-item-blindagem-gba.png",
+      "bytes": 574,
+      "sha256": "0ee2a4b14238d2566a8d4019479b9957c8771d7549c18ef5f7ed676a48285610"
+    },
+    {
+      "id": "neutral-item-impulso",
+      "name": "neutral-item-impulso-gba.png",
+      "source": "Assets/sprites/neutral-item-impulso-gba.png",
+      "bytes": 407,
+      "sha256": "ae6fd1e67872f16b3c7eb54f2b987d6fff08db052a1ed65489aee9ee7a8642e5"
+    },
+    {
+      "id": "neutral-marker-porto",
+      "name": "neutral-marker-porto-gba.png",
+      "source": "Assets/sprites/neutral-marker-porto-gba.png",
+      "bytes": 512,
+      "sha256": "c6e5c9e92ccd3295257e3c160311ee45f316f56f7586cbf85ecff3ff663a30bb"
+    },
+    {
+      "id": "neutral-marker-penedos",
+      "name": "neutral-marker-penedos-gba.png",
+      "source": "Assets/sprites/neutral-marker-penedos-gba.png",
+      "bytes": 501,
+      "sha256": "c2c16ccce4f198b4953761eb542021fad769492acd943380dea4b12d430695c6"
+    },
+    {
+      "id": "neutral-marker-armazem",
+      "name": "neutral-marker-armazem-gba.png",
+      "source": "Assets/sprites/neutral-marker-armazem-gba.png",
+      "bytes": 420,
+      "sha256": "c7da7f29902cb939232767c6c69aee74b57fff4a1c6b52f9c479b6787dea3575"
+    },
+    {
+      "id": "neutral-marker-observatorio",
+      "name": "neutral-marker-observatorio-gba.png",
+      "source": "Assets/sprites/neutral-marker-observatorio-gba.png",
+      "bytes": 429,
+      "sha256": "599ebc461b671bf62f1b62072deb780cbbc14a859247f08feebb3c9b8b398fb9"
+    },
+    {
+      "id": "neutral-marker-mercado",
+      "name": "neutral-marker-mercado-gba.png",
+      "source": "Assets/sprites/neutral-marker-mercado-gba.png",
+      "bytes": 442,
+      "sha256": "c5e8cf3d3837c45547bac79f6d86f51cc93f59fe8748050be17e124ef58c92db"
+    },
+    {
+      "id": "neutral-marker-usina",
+      "name": "neutral-marker-usina-gba.png",
+      "source": "Assets/sprites/neutral-marker-usina-gba.png",
+      "bytes": 616,
+      "sha256": "dd0d11125de40621fcdae2b11e74af295b39e1c36f5ec774553384483fa74913"
+    },
+    {
+      "id": "neutral-marker-conselho",
+      "name": "neutral-marker-conselho-gba.png",
+      "source": "Assets/sprites/neutral-marker-conselho-gba.png",
+      "bytes": 391,
+      "sha256": "24c3748048611d5e283ef8260f4c87ebc5541bae1750270f8563e5a44b68469b"
+    },
+    {
+      "id": "neutral-marker-circuito",
+      "name": "neutral-marker-circuito-gba.png",
+      "source": "Assets/sprites/neutral-marker-circuito-gba.png",
+      "bytes": 268,
+      "sha256": "32b0176e3666fa0b3a9aac7defade792afc00f3351a333dcdd69a33d13116b65"
+    },
+    {
+      "id": "neutral-compact-mission",
+      "name": "neutral-compact-mission-gba.png",
+      "source": "Assets/sprites/neutral-compact-mission-gba.png",
+      "bytes": 244,
+      "sha256": "e8151c6348530de7fec5cc448ac46528856d05dc87cd97a3e10b9a5686e5e5eb"
+    },
+    {
+      "id": "neutral-compact-bag",
+      "name": "neutral-compact-bag-gba.png",
+      "source": "Assets/sprites/neutral-compact-bag-gba.png",
+      "bytes": 187,
+      "sha256": "580c6b2539f4a385f4ec1281a20f833d8e039b3b0d559d4df0885f17fb0915a2"
+    },
+    {
+      "id": "neutral-compact-map",
+      "name": "neutral-compact-map-gba.png",
+      "source": "Assets/sprites/neutral-compact-map-gba.png",
+      "bytes": 244,
+      "sha256": "7cc05fb14a694468bf3e0eb08189580a96f4192d404c1e289c6d55c5bf58887a"
+    },
+    {
+      "id": "neutral-compact-save",
+      "name": "neutral-compact-save-gba.png",
+      "source": "Assets/sprites/neutral-compact-save-gba.png",
+      "bytes": 265,
+      "sha256": "0976bf2cd92508df71cccfd3e10436eb5baf1c7c2e4eb9225d9a2e5dd85984aa"
+    },
+    {
+      "id": "neutral-compact-gear",
+      "name": "neutral-compact-gear-gba.png",
+      "source": "Assets/sprites/neutral-compact-gear-gba.png",
+      "bytes": 313,
+      "sha256": "0ac2896ea98204165b2cde4627d29ccd8a829b4a58d3d8af1986ed56f082ac98"
+    },
+    {
+      "id": "neutral-compact-return",
+      "name": "neutral-compact-return-gba.png",
+      "source": "Assets/sprites/neutral-compact-return-gba.png",
+      "bytes": 239,
+      "sha256": "737dec4a99704b70dd910f0d48f306b085056795251b3a34541a220227d234e7"
+    },
+    {
+      "id": "neutral-portrait-male",
+      "name": "neutral-portrait-male-gba.png",
+      "source": "Assets/sprites/neutral-portrait-male-gba.png",
+      "bytes": 1235,
+      "sha256": "96545e4ca69055100a71509192ed3fccf1ea291807deebda74c22f96a5fd35f1"
+    },
+    {
+      "id": "neutral-portrait-female",
+      "name": "neutral-portrait-female-gba.png",
+      "source": "Assets/sprites/neutral-portrait-female-gba.png",
+      "bytes": 1349,
+      "sha256": "655e9be913a75595680af3db7a0b5b18475d0e19b1bde887e9cb8bed8072a644"
+    },
+    {
+      "id": "neutral-portrait-small-male",
+      "name": "neutral-portrait-small-male-gba.png",
+      "source": "Assets/sprites/neutral-portrait-small-male-gba.png",
+      "bytes": 488,
+      "sha256": "4f03b7673f8d36802e65efd72f55519997aaa3167943ea8ea6f4fe6a655ea8f4"
+    },
+    {
+      "id": "neutral-portrait-small-female",
+      "name": "neutral-portrait-small-female-gba.png",
+      "source": "Assets/sprites/neutral-portrait-small-female-gba.png",
+      "bytes": 557,
+      "sha256": "bbeca8ace597071991cab492387c2d1af545dd69741a059f1ac37fa046927f70"
+    },
+    {
+      "id": "neutral-detail-item-estrutura",
+      "name": "neutral-detail-item-estrutura-gba.png",
+      "source": "Assets/sprites/neutral-detail-item-estrutura-gba.png",
+      "bytes": 952,
+      "sha256": "0c22de9562e3e79cbc5e89848c447bd8ea4c13e87ad1c29765188bc9321d2985"
+    },
+    {
+      "id": "neutral-detail-item-aderencia",
+      "name": "neutral-detail-item-aderencia-gba.png",
+      "source": "Assets/sprites/neutral-detail-item-aderencia-gba.png",
+      "bytes": 766,
+      "sha256": "647c097076819b4f8e1987618b1b2f970ae0d0840c277bbc572dda21cbda14aa"
+    },
+    {
+      "id": "neutral-detail-item-celula",
+      "name": "neutral-detail-item-celula-gba.png",
+      "source": "Assets/sprites/neutral-detail-item-celula-gba.png",
+      "bytes": 825,
+      "sha256": "6d584b36cd121c80f57133807c7bfab5d6e0c174ed7ceee5fb78aa5e991864ca"
+    },
+    {
+      "id": "neutral-detail-item-blindagem",
+      "name": "neutral-detail-item-blindagem-gba.png",
+      "source": "Assets/sprites/neutral-detail-item-blindagem-gba.png",
+      "bytes": 1084,
+      "sha256": "d15c79175803808ce15bdc9e1cb1ded6e21b86c3567f418262771d4822a78df6"
+    },
+    {
+      "id": "neutral-detail-item-impulso",
+      "name": "neutral-detail-item-impulso-gba.png",
+      "source": "Assets/sprites/neutral-detail-item-impulso-gba.png",
+      "bytes": 657,
+      "sha256": "a7e532260b3b3f6c223182d0b686d1cb0f4949750f323ed7a3272ced790f36a1"
+    },
+    {
+      "id": "neutral-compact-item-estrutura",
+      "name": "neutral-compact-item-estrutura-gba.png",
+      "source": "Assets/sprites/neutral-compact-item-estrutura-gba.png",
+      "bytes": 234,
+      "sha256": "089a971b8f3842f5de589add78d65b91519404f2d4212809e5300ce1aeb59eb2"
+    },
+    {
+      "id": "neutral-compact-item-aderencia",
+      "name": "neutral-compact-item-aderencia-gba.png",
+      "source": "Assets/sprites/neutral-compact-item-aderencia-gba.png",
+      "bytes": 256,
+      "sha256": "042d700b2b2100187fe7f5a56bed76686f7891c1f702950750cb7ad5a10d19e9"
+    },
+    {
+      "id": "neutral-compact-item-celula",
+      "name": "neutral-compact-item-celula-gba.png",
+      "source": "Assets/sprites/neutral-compact-item-celula-gba.png",
+      "bytes": 202,
+      "sha256": "8f88a1c18923f1bda945909ffddbd7ed3ebc704967d4e2495af4efd09215d35c"
+    },
+    {
+      "id": "neutral-compact-item-blindagem",
+      "name": "neutral-compact-item-blindagem-gba.png",
+      "source": "Assets/sprites/neutral-compact-item-blindagem-gba.png",
+      "bytes": 309,
+      "sha256": "1a7b6deb568483189d74f42d2d8de61a5ee7c9053a24fc829db0e5c50539fc5c"
+    },
+    {
+      "id": "neutral-compact-item-impulso",
+      "name": "neutral-compact-item-impulso-gba.png",
+      "source": "Assets/sprites/neutral-compact-item-impulso-gba.png",
+      "bytes": 213,
+      "sha256": "154203abb988e4ba0def8666ccd9b5062ad7e0d2c63d1c31ffc3683db5b941d3"
+    },
+    {
+      "id": "neutral-arrow-right",
+      "name": "neutral-arrow-right-gba.png",
+      "source": "Assets/sprites/neutral-arrow-right-gba.png",
+      "bytes": 290,
+      "sha256": "4667f4778683f7ccf27a0f3294f3459d5138b7e0ceec9f308506820d801d061d"
+    },
+    {
+      "id": "neutral-compact-marker-porto",
+      "name": "neutral-compact-marker-porto-gba.png",
+      "source": "Assets/sprites/neutral-compact-marker-porto-gba.png",
+      "bytes": 192,
+      "sha256": "6aad5bebf8db272b86ce9732b36dfefcd058880f548d84f314a593e417376296"
+    },
+    {
+      "id": "neutral-compact-marker-penedos",
+      "name": "neutral-compact-marker-penedos-gba.png",
+      "source": "Assets/sprites/neutral-compact-marker-penedos-gba.png",
+      "bytes": 231,
+      "sha256": "352f8892b2027da3f8fcd0d9a2c9b46fd2bb246e2efd1d79dc5c8f736960c1ca"
+    },
+    {
+      "id": "neutral-compact-marker-armazem",
+      "name": "neutral-compact-marker-armazem-gba.png",
+      "source": "Assets/sprites/neutral-compact-marker-armazem-gba.png",
+      "bytes": 172,
+      "sha256": "181383b476cc5f4167278a169aca5b2f1b57904c16222f1f96b124ea8a929477"
+    },
+    {
+      "id": "neutral-compact-marker-observatorio",
+      "name": "neutral-compact-marker-observatorio-gba.png",
+      "source": "Assets/sprites/neutral-compact-marker-observatorio-gba.png",
+      "bytes": 242,
+      "sha256": "aa0c04ca3ed9b2deb176f210d1250decdc48e1350e41e1ff1bcd32affc269488"
+    },
+    {
+      "id": "neutral-compact-marker-mercado",
+      "name": "neutral-compact-marker-mercado-gba.png",
+      "source": "Assets/sprites/neutral-compact-marker-mercado-gba.png",
+      "bytes": 190,
+      "sha256": "74f975b6aad1ddf0e2031554b72b5858cbd57eec8340b4aa9077d5fdf0b63fa9"
+    },
+    {
+      "id": "neutral-compact-marker-usina",
+      "name": "neutral-compact-marker-usina-gba.png",
+      "source": "Assets/sprites/neutral-compact-marker-usina-gba.png",
+      "bytes": 248,
+      "sha256": "84ce9392a1697da21f518f958c80f9c781ccf1dcaec67a4d1677cd5847f3bf27"
+    },
+    {
+      "id": "neutral-compact-marker-conselho",
+      "name": "neutral-compact-marker-conselho-gba.png",
+      "source": "Assets/sprites/neutral-compact-marker-conselho-gba.png",
+      "bytes": 212,
+      "sha256": "2ecab6fc9d165eb10067ecf1f249022eb7963fd51872719e0819fcbd11977f81"
+    },
+    {
+      "id": "neutral-compact-marker-circuito",
+      "name": "neutral-compact-marker-circuito-gba.png",
+      "source": "Assets/sprites/neutral-compact-marker-circuito-gba.png",
+      "bytes": 197,
+      "sha256": "217d475f12599411bebbe9d873cb634a8e939bfd3e2b4f7bfe3a6438830d32a5"
+    },
+    {
+      "id": "neutral-selection-frame",
+      "name": "neutral-selection-frame-gba.png",
+      "source": "Assets/sprites/neutral-selection-frame-gba.png",
+      "bytes": 282,
+      "sha256": "9d62148cfa4b1f68361a488ee79265a199e41fb967f6281f4ace91cf0fcf0d1e"
+    },
+    {
+      "id": "neutral-mission",
+      "name": "neutral-mission-gba.png",
+      "source": "Assets/sprites/neutral-mission-gba.png",
+      "bytes": 301,
+      "sha256": "656e8391b820db7983137759af117c77e769960ec9f2e65ae9b0de25f59cbdc7"
+    },
+    {
+      "id": "neutral-bag",
+      "name": "neutral-bag-gba.png",
+      "source": "Assets/sprites/neutral-bag-gba.png",
+      "bytes": 251,
+      "sha256": "2d92ea94208dd4ad17c85b50ea4518a87fd09f4af128957c54028592c4359b17"
+    },
+    {
+      "id": "neutral-map",
+      "name": "neutral-map-gba.png",
+      "source": "Assets/sprites/neutral-map-gba.png",
+      "bytes": 282,
+      "sha256": "dd25709daa499a02a5af2405b1826919028f94cbd8f4a7c22a37b784b629dd11"
+    },
+    {
+      "id": "neutral-save",
+      "name": "neutral-save-gba.png",
+      "source": "Assets/sprites/neutral-save-gba.png",
+      "bytes": 330,
+      "sha256": "5403a1d383108dbdbdbe3d2eb1520bfa8b8b7578b23539b1d08c7727d7277b07"
+    },
+    {
+      "id": "neutral-gear",
+      "name": "neutral-gear-gba.png",
+      "source": "Assets/sprites/neutral-gear-gba.png",
+      "bytes": 374,
+      "sha256": "21b55b968992371de80f63e7be4954c40d2f4267dd72fdfe241b02cc1e491cbc"
+    },
+    {
+      "id": "neutral-return",
+      "name": "neutral-return-gba.png",
+      "source": "Assets/sprites/neutral-return-gba.png",
+      "bytes": 289,
+      "sha256": "4de73f92c36896e0939b008c7237a69dec9d32008810b445fd0065936ccbe5f7"
+    },
+    {
+      "id": "neutral-font",
+      "name": "neutral-menu-font-gba.png",
+      "source": "Assets/fonts/neutral-menu-font-gba.png",
+      "bytes": 2313,
+      "sha256": "ad8c4991158a27af14e8ae5ca27e35f9d91a7683d6b3fd19680e9b96e4927147"
+    },
+    {
+      "id": "neutral-background-carregar_jogo",
+      "name": "neutral-carregar_jogo-gba.png",
+      "source": "Assets/backgrounds/neutral-carregar_jogo-gba.png",
+      "bytes": 1806,
+      "sha256": "691b0924601d69040d11df706357dfb9dc1fe628fd85f1f0a0b237bc66fc3d27"
+    },
+    {
+      "id": "neutral-background-configuracoes",
+      "name": "neutral-configuracoes-gba.png",
+      "source": "Assets/backgrounds/neutral-configuracoes-gba.png",
+      "bytes": 1761,
+      "sha256": "b951169d26b248b39c34f8548df29a263ce46aba80b274f0bf0aea4f9a560a96"
+    },
+    {
+      "id": "neutral-background-creditos",
+      "name": "neutral-creditos-gba.png",
+      "source": "Assets/backgrounds/neutral-creditos-gba.png",
+      "bytes": 1651,
+      "sha256": "cf413e4fddc45fbf966c9ef1ff8c317629a1983a65e73f9081ef233defbba579"
+    },
+    {
+      "id": "neutral-background-missoes",
+      "name": "neutral-missoes-gba.png",
+      "source": "Assets/backgrounds/neutral-missoes-gba.png",
+      "bytes": 1942,
+      "sha256": "6f742a6feb23fade9b75fc9973e15cfbf758a0bd982ef136dc4262e895faa5cb"
+    },
+    {
+      "id": "neutral-background-inventario",
+      "name": "neutral-inventario-gba.png",
+      "source": "Assets/backgrounds/neutral-inventario-gba.png",
+      "bytes": 2128,
+      "sha256": "839cd62bc53e9096569cc1996ad14de621032da44d22b5d0eb5d864d3088c0e9"
+    },
+    {
+      "id": "neutral-background-mapa_menu",
+      "name": "neutral-mapa_menu-gba.png",
+      "source": "Assets/backgrounds/neutral-mapa_menu-gba.png",
+      "bytes": 2061,
+      "sha256": "403b41481224382e3831eaf5e23e9e436e6fea961f60085bdc59da5605c0b0d1"
+    },
+    {
+      "id": "neutral-background-salvar",
+      "name": "neutral-salvar-gba.png",
+      "source": "Assets/backgrounds/neutral-salvar-gba.png",
+      "bytes": 1684,
+      "sha256": "80db4de3ccbeb3488c4124e16d640400db3931d080f7f8d617380958b9dd12a6"
+    },
+    {
+      "id": "neutral-background-menu_start",
+      "name": "neutral-menu_start-gba.png",
+      "source": "Assets/backgrounds/neutral-menu_start-gba.png",
+      "bytes": 2062,
+      "sha256": "ed17cf76292484b53bde883a1c5270b3f5453fbf8b08443117495def5887e7e5"
+    },
+    {
+      "id": "porto-approved-nara",
+      "name": "porto-nara-body48.png",
+      "source": "Assets/sprites/porto-nara-body48.png",
+      "bytes": 1332,
+      "sha256": "b71cf900974e9fb79a8920c5aeec3de4cb635f3d559d5b02a3ddfcbec8b48667"
+    },
+    {
+      "id": "porto-approved-mechanic",
+      "name": "porto-mechanic-body48.png",
+      "source": "Assets/sprites/porto-mechanic-body48.png",
+      "bytes": 1324,
+      "sha256": "88a9a1045a5bafc4bbaf4e74c9e0aedf49ce445352aa26814073bc7f9632ad36"
+    },
+    {
+      "id": "approved-arena-nara-64x64",
+      "name": "arena-nara-64x64.png",
+      "source": "Assets/sprites/arena-nara-64x64.png",
+      "bytes": 41712,
+      "sha256": "a0de211b68bc82d54b10b3e70b4c9e20f6f60357abe404c093d344731bcba845",
+      "originalPixels": {
+        "width": 1024,
+        "height": 64,
+        "sha256": "b77995edd65548328ac07e9dad738de91974959532a48c904bcacd6458a201dc"
+      }
+    },
+    {
+      "id": "approved-arena-rival-64x64",
+      "name": "arena-rival-64x64.png",
+      "source": "Assets/sprites/arena-rival-64x64.png",
+      "bytes": 40263,
+      "sha256": "dbe322201e9938d3749184dad6652c7773114b8b0e4af1cdd9a4856a89939a5d",
+      "originalPixels": {
+        "width": 1024,
+        "height": 64,
+        "sha256": "2450f702a59598bec12f85c11efbefe4d0f48a41193a39509b48ba3927f2b01a"
+      }
+    },
+    {
+      "id": "porto-lume-player-pilot-32x32",
+      "name": "player-pilot-32x32.png",
+      "source": "Assets/sprites/player-pilot-32x32.png",
+      "bytes": 15744,
+      "sha256": "4089313016c9bc9674ec2ce6857efd4b3a6ab4c14fde5fa03c613aa611fc1472"
+    },
+    {
+      "id": "point-click-point-click-cursor",
+      "name": "point-click-cursor.png",
+      "source": "Assets/sprites/point-click-cursor.png",
+      "bytes": 606,
+      "sha256": "2128a2c31ae447549b1aa295215cfcfad4233e3af89c1ad91e478d98dfcac1f8"
+    },
+    {
+      "id": "point-click-point-click-keeper-lantern",
+      "name": "point-click-keeper-lantern.png",
+      "source": "Assets/sprites/point-click-keeper-lantern.png",
+      "bytes": 1923,
+      "sha256": "1f329d1a7e6ac111a171e186ebf813105eac8100bc062e370729bde93a357232"
+    },
+    {
+      "id": "nara-topdown",
+      "name": "nara-topdown.png",
+      "source": "Assets/sprites/nara-topdown.png",
+      "bytes": 17397,
+      "sha256": "d60684b930e4b210e1c6a07962e4ca2993b0c7ea8bd2f3fd1a83f6faf4c7875c"
+    },
+    {
+      "id": "tactical-v5-surface",
+      "name": "tactical-v5-surface.png",
+      "source": "Assets/backgrounds/tactical-v5-surface.png",
+      "bytes": 19372,
+      "sha256": "df1a3c5538911918664da5cc510c78329ab64752b01c81e6b5ae9b70d236589b"
+    },
+    {
+      "id": "armazem_das_mares-background",
+      "name": "armazem-das-mares-gba.png",
+      "source": "Assets/backgrounds/armazem-das-mares-gba.png",
+      "bytes": 16412,
+      "sha256": "808820ff31540bdf0f7f9da778610d76cfe119e195d6ae22e5ac12930594393d"
+    }
+  ],
+  "sharedDefaults": [
+    "Assets/sprites/player-pilot-32x32.png",
+    "Assets/sprites/point-click-cursor.png",
+    "Assets/sprites/point-click-keeper-lantern.png",
+    "Assets/sprites/nara-topdown.png",
+    "Assets/backgrounds/tactical-v5-surface.png"
+  ]
+}

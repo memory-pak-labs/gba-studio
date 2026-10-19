@@ -485,11 +485,11 @@ export const VERTICE_SCENE_PACKAGES = Object.freeze({
     interactionRoles: Object.freeze(["checkpoint", "collectible", "wind-audio"])
   }),
   armazem_das_mares: Object.freeze({
-    assetRoles: Object.freeze(["point-click-background", "point-click-cursor", "point-click-actor"]),
+    assetRoles: Object.freeze(["point-click-background", "point-click-cursor"]),
     interactionRoles: Object.freeze(["chart-hotspot", "chest-hotspot", "exit-hotspot", "point-click-dialogue"])
   }),
   observatorio_do_farol: Object.freeze({
-    assetRoles: Object.freeze(["point-click-background", "point-click-cursor", "point-click-actor"]),
+    assetRoles: Object.freeze(["point-click-background", "point-click-cursor"]),
     interactionRoles: Object.freeze(["telescope-hotspot", "chart-hotspot", "exit-hotspot", "point-click-dialogue"])
   }),
   mercado_suspenso: Object.freeze({

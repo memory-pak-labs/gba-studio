@@ -20,6 +20,15 @@ function audit(headerSource = header(), options = {}) {
 }
 
 describe("streamed OBJ residency", () => {
+  it("accepts 8bpp uploads and enforces their shared depth and hardware range", () => {
+    const source=header().replaceAll("32, true", "32, true, gbs::ColorDepth::Bpp8");
+    expect(audit(source)).toMatchObject({ok:true,residentTileCount:16,destinationTile:32});
+    expect(audit(source.replace("hero_frame_1_tiles), 16, 32, true, gbs::ColorDepth::Bpp8",
+      "hero_frame_1_tiles), 16, 32, true, gbs::ColorDepth::Bpp4")).ok).toBe(false);
+    expect(audit(source.replaceAll("32, true", "33, true")).ok).toBe(false);
+    expect(audit(source.replaceAll("32, true", "1000, true")).ok).toBe(false);
+  });
+
   it("checks one resident frame and both distinct frame uploads", () => {
     expect(audit()).toMatchObject({ ok: true, residentTileCount: 16, destinationTile: 32 });
   });

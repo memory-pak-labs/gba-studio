@@ -75,6 +75,10 @@ describe("promoção aprovada da Usina v3", () => {
 
   it("exporta a moldura da HUD como OBJ e mantém as três associações de cena", () => {
     const project = promoteApprovedUsinaV3(JSON.parse(readFileSync(templateURL, "utf8")));
+    // Exercise the legacy static-view consumer without the later optional camera cache.
+    for(const key of ["rooms","scenas"])for(const room of project[key]??[])if(room.name.startsWith("usina_"))delete room.runtime.config.presentation;
+    for(const actor of project.actors??[])if(actor.roomName?.startsWith("usina_")){delete actor.dungeonDepthSheets;delete actor.dungeonCell;}
+
     expect(deriveProjectHealthReport(project).exportReady).toBe(true);
     const contract = buildEngineExportProjectContract(project);
     const ui = contract.dungeon_crawler_project.dialogue_ui;

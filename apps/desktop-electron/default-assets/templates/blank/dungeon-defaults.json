@@ -1,0 +1,117 @@
+{
+  "profile": "neutral-orange",
+  "approval": "User approved prepared v2 on 2026-10-19",
+  "sourceSha256": "0d0540970d5641cd130e56b07b610b44bf25700915383ba6ccdf3dfd01d1d7a4",
+  "materials": [
+    {
+      "name": "neutral-dungeon-wall.png",
+      "file": "Assets/backgrounds/neutral-dungeon-wall.png",
+      "width": 64,
+      "height": 64,
+      "sha256": "1a78a6ac54a6b3f2e25081418cf11ca6bff9f5ad9b9edd6433c3c0d65054c84e",
+      "candidateSha256": "df5cf08f6fec8c6622b0f26d35d053bc1222cc716cc6425f6d0135dbe308b47a"
+    },
+    {
+      "name": "neutral-dungeon-floor.png",
+      "file": "Assets/backgrounds/neutral-dungeon-floor.png",
+      "width": 64,
+      "height": 64,
+      "sha256": "0249106877bf03aac3484607b05e879e55a0199f0ff8c2d53dfe840d5cd65215",
+      "candidateSha256": "d1ccb014d792ebf6a10c13d7412b2fc5533d847f99a54521c426bb819f181c57"
+    },
+    {
+      "name": "neutral-dungeon-ceiling.png",
+      "file": "Assets/backgrounds/neutral-dungeon-ceiling.png",
+      "width": 64,
+      "height": 64,
+      "sha256": "2f85db22a127175e86c7896d6097be17e42475e6f985c43d317c4b4c2d99168b",
+      "candidateSha256": "b1b6679f2a62f4125e0ba9da92e24663dc33d6eacee61d30cf39ed8cb150cf5d"
+    },
+    {
+      "name": "neutral-dungeon-door.png",
+      "file": "Assets/backgrounds/neutral-dungeon-door.png",
+      "width": 64,
+      "height": 64,
+      "sha256": "0a0ef29f8bd587946dadf66949d51d2e8ff666390b3ac0cbc4e3fa05edcdc1b8",
+      "candidateSha256": "15108aef91d8df646ae8b17be70160b13c6fd95662760832dafb42869bb4a382"
+    }
+  ],
+  "materialAssets": [
+    "neutral-dungeon-wall.png",
+    "neutral-dungeon-wall.png",
+    "neutral-dungeon-wall.png",
+    "neutral-dungeon-wall.png",
+    "neutral-dungeon-floor.png",
+    "neutral-dungeon-ceiling.png",
+    "neutral-dungeon-door.png",
+    "neutral-dungeon-floor.png"
+  ],
+  "initialLayout": {
+    "width": 11,
+    "height": 11,
+    "rows": [
+      "###########",
+      "#...#.....#",
+      "#.#.#.###.#",
+      "#.#...#...#",
+      "#.###.#.#.#",
+      "#.....#.#.#",
+      "###.###.#.#",
+      "#...#...#.#",
+      "#.###.###.#",
+      "#.........#",
+      "###########"
+    ],
+    "playerStart": {
+      "x": 5,
+      "y": 9,
+      "direction": "up"
+    },
+    "door": {
+      "x": 5,
+      "y": 6
+    },
+    "approvedRecipeSha256": "933ca7f13a3648ec7fd251bb332bae5ea4c1971e355f3cbb335cd940ca26667b"
+  },
+  "npc": {
+    "profile": "neutral-purple",
+    "approval": "User approved the prepared frontal guard, its near/mid/far scales and native Editor/ROM review on 2026-10-19",
+    "license": "Project-owned",
+    "sourceSha256": "9b1d62926f4eedf0571003236b65bd4787e6c6954f2b76d48013fb551787eda9",
+    "depths": [
+      {
+        "depth": "near",
+        "name": "neutral-dungeon-guard-near.png",
+        "file": "Assets/sprites/neutral-dungeon-guard-near.png",
+        "width": 64,
+        "height": 128,
+        "footPivotX": 32,
+        "footPivotY": 128,
+        "sha256": "d772c9edf933b0b40a5ae6c8b5970ab596391ce4ea9215c8530b0df33d4140f4",
+        "nativeObjects": 2
+      },
+      {
+        "depth": "mid",
+        "name": "neutral-dungeon-guard-mid.png",
+        "file": "Assets/sprites/neutral-dungeon-guard-mid.png",
+        "width": 32,
+        "height": 64,
+        "footPivotX": 16,
+        "footPivotY": 64,
+        "sha256": "1bb55f8b5dd79df94f1adeab2a0ca4985a9aa655502411a7c0a0f2e36241ddc4",
+        "nativeObjects": 1
+      },
+      {
+        "depth": "far",
+        "name": "neutral-dungeon-guard-far.png",
+        "file": "Assets/sprites/neutral-dungeon-guard-far.png",
+        "width": 16,
+        "height": 32,
+        "footPivotX": 8,
+        "footPivotY": 32,
+        "sha256": "113fde0dab245d47a191e4f3ff0b0a14eafa7feb0e7ba94f0d5a05ad1c5c84df",
+        "nativeObjects": 1
+      }
+    ]
+  }
+}

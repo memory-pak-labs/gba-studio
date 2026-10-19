@@ -1,3 +1,12 @@
+import { materializeExampleAuthoring } from "./example-authoring-library.mjs";
+import { pruneObsoleteExampleScripts } from './prune-obsolete-example-scripts.mjs';
+import { promoteApprovedStartupFade } from './startup-fade-promotion.mjs';
+import { promoteApprovedDungeon } from './dungeon-approved-promotion.mjs';
+import { promoteApprovedRelay } from "./relay-approved-promotion.mjs";
+import { promoteApprovedTempestade } from "./tempestade-approved-promotion.mjs";
+import { promoteApprovedRacing } from "./racing-approved-promotion.mjs";
+import { pruneUnusedExampleAssets } from './lib/example-asset-usage.mjs';
+import { promoteApprovedTacticalArena } from './tactical-arena-promotion.mjs';
 import { readFile, writeFile } from "node:fs/promises";
 import { readFileSync } from "node:fs";
 import { promoteApprovedCharacterSelection } from "./exemplo-character-selection.mjs";
@@ -23,16 +32,25 @@ import { promotePlatformerViewport } from "./promote-platformer-viewport.mjs";
 import { promoteApprovedOpeningV2 } from "./opening-v2-promotion.mjs";
 import { promoteApprovedOpeningV3 } from "./opening-v3-promotion.mjs";
 import { promoteApprovedOpeningV4 } from "./opening-v4-promotion.mjs";
+import { promoteApprovedCleanPrologue } from "./prologue-clean-promotion.mjs";
+import { promoteApprovedLoadCredits } from "./load-credits-book-promotion.mjs";
+import { promoteApprovedFrontalObservatory } from "./observatory-frontal-promotion.mjs";
+import { promoteApprovedFarolInterior } from "./farol-interior-promotion.mjs";
+import { promoteApprovedArena } from "./arena-approved-promotion.mjs";
+import { promoteApprovedFrontalWarehouse } from "./warehouse-frontal-promotion.mjs";
 import { promoteNeutralMenus } from "./neutral-menus-promotion.mjs";
+import { promoteApprovedBookMenus } from "./book-menus-promotion.mjs";
+import { promoteApprovedTravelerEntry } from "./traveler-entry-promotion.mjs";
 import { refineInGameMenus } from "./in-game-menu-project.mjs";
 import { refineRouteMap } from "./route-map-project.mjs";
 import { correctIsometricScenes } from "./isometric-scene-corrections.mjs";
 import { retireInitialMenuScene } from "./retire-initial-menu.mjs";
 import { applyExampleSceneTransitions } from "./exemplo-scene-transitions.mjs";
 import { promoteApprovedPortoLumenPaged } from "./porto-lumen-paged-promotion.mjs";
+import { promoteApprovedPlatformer } from "./platformer-approved-promotion.mjs";
 const finalizeApprovedMenusAndRoute = project => {
   const finalized = promotePlatformerViewport(retireInitialMenuScene(promoteApprovedCouncilDialogueV5(promoteMarketAdventure(correctIsometricScenes(refineRouteMap(refineInGameMenus(project), {removeLab:true}))))));
-  return promoteApprovedPortoLumenPaged(applyExampleSceneTransitions(promoteNeutralMenus({
+  return promoteApprovedBookMenus(promoteApprovedPortoLumenPaged(applyExampleSceneTransitions(promoteNeutralMenus({
     ...finalized,
     editorState: {
       ...finalized.editorState,
@@ -42,7 +60,7 @@ const finalizeApprovedMenusAndRoute = project => {
     assets: finalized.assets.filter((asset) => CANONICAL_EXAMPLE_ASSET_NAMES.has(asset.name)),
     animations: finalized.animations.filter((animation) => CANONICAL_EXAMPLE_ASSET_NAMES.has(animation.spriteSheet)),
     animationStates: finalized.animationStates.filter((state) => CANONICAL_EXAMPLE_ASSET_NAMES.has(state.spriteSheet))
-  })));
+  }))));
 };
 import { promoteApprovedCircuitLoopV2 } from "./circuit-loop-v2-promotion.mjs";
 import {
@@ -8288,6 +8306,15 @@ export function projectAssetCoverage(project) {
       assetRoles.set(role, entries);
     }
   }
+  // Coverage follows current scene assets; retired authoring versions do not
+  // need to remain in the library merely to satisfy historical role labels.
+  for (const [role, file] of [
+    ['initial-menu-bg', 'title-porto-lumen-240x160-4bpp.png'],
+    ['port-tiles', 'porto-lumen-continuous-paged.png'],
+    ['nara-topdown', 'porto-nara-animations48.png'],
+    ['mechanic', 'porto-mechanic-animations48.png'],
+    ...[1, 2, 3].map(i => [`prologue-frame-${i}`, `prologue-clean-frame-${i}-240x160-4bpp.png`])
+  ]) if (assets.some(asset => asset.name === file)) assetRoles.set(role, [file]);
   return {
     scenes: VERTICE_CAMPAIGN_SCENES.map(({ name }) => {
       const definition = VERTICE_SCENE_PACKAGES[name];
@@ -8362,37 +8389,8 @@ function verticeCanvasPositions(scenes, mainPositions = {}) {
   const positions = {};
   const gap = 48;
   const verticalGap = 52;
-  const roomSize = (scene) => {
-    const isometricMinimum = scene?.sceneType === "isometric";
-    const minimumWidth = isometricMinimum ? 30 : 1;
-    const minimumHeight = isometricMinimum ? 20 : 1;
-    let width = Math.max(minimumWidth, Number(scene?.width) || 1) * 8;
-    let height = Math.max(minimumHeight, Number(scene?.height) || 1) * 8;
-    if (isometricMinimum) {
-      const config = scene.runtime?.config ?? {};
-      const bounds = (config.tacticalPresentation?.surfacePages ?? []).reduce((size, page) => ({
-        minX: Math.min(size.minX, page.world.x),
-        minY: Math.min(size.minY, page.world.y),
-        maxX: Math.max(size.maxX, page.world.x + page.world.width),
-        maxY: Math.max(size.maxY, page.world.y + page.world.height)
-      }), { minX: 0, minY: 0, maxX: 0, maxY: 0 });
-      const surface = config.pagedSurface ?? (bounds.maxX > bounds.minX && bounds.maxY > bounds.minY
-        ? { width: bounds.maxX - bounds.minX, height: bounds.maxY - bounds.minY }
-        : null);
-      const tileWidth = Number(config.tileWidth) || 32;
-      const tileHeight = tileWidth / 2;
-      const span = Math.max(1, Number(scene.width) || 1) + Math.max(1, Number(scene.height) || 1);
-      width = surface?.width ?? span * tileWidth / 2;
-      height = surface?.height ?? span * tileHeight / 2
-        + Math.max(0, (Number(scene.backgroundAtlasTileHeight) || tileHeight) - tileHeight);
-    }
-    // Match sceneMapPreviewContentSize: bound huge maps and preserve aspect ratio.
-    const scale = Math.min(960 / Math.max(1, width), 640 / Math.max(1, height), Math.max(1, 240 / Math.max(1, width)));
-    return {
-      width: width * scale,
-      height: height * scale + 54 + 36
-    };
-  };
+  // Match the uniform 240x160 viewport and 54px/36px card chrome in sceneMapLayout.
+  const roomSize = () => ({ width: 240, height: 250 });
   let mainX = 36;
   let mainRowHeight = 0;
   for (const name of mainFlow) {
@@ -8765,10 +8763,35 @@ export function isVerticeShowcaseProject(data) {
     && sceneNames[0] === "logo"
     && requiredCampaignNames.every((name) => sceneNames.includes(name))
     && new Set(sceneNames).size === sceneNames.length
-    && sceneNames.every((name) => expectedSceneNameSet.has(name) || legacySupportSceneNames.has(name) || name === "oficina");
+    && sceneNames.every((name) => expectedSceneNameSet.has(name) || legacySupportSceneNames.has(name) || name === "oficina" || name === "circuito_perspectiva");
 }
 
-export function promoteExemploGBAVerticeCampaign(data) {
+// Regenerating campaign logic must retain the approved illustrated opening,
+// including its source-sheet poses, rather than reinstalling the older actors.
+function preserveApprovedMenuScene(source, promoted, sceneName, backgroundName) {
+  const scene = source.scenas?.find(room => room.name === sceneName);
+  if (scene?.backgroundAssetName !== backgroundName) return promoted;
+  const actors = source.actors.filter(actor => actor.roomName === sceneName);
+  const sheets = new Set(actors.map(actor => actor.spriteSheet));
+  const assets = source.assets.filter(asset => asset.name === scene.backgroundAssetName || sheets.has(asset.name)
+    || asset.metadata?.supersededBy === backgroundName);
+  const ids = new Set(assets.map(asset => asset.id));
+  return {
+    ...promoted,
+    rooms: promoted.rooms.map(room => room.name === sceneName ? structuredClone(scene) : room),
+    scenas: promoted.scenas.map(room => room.name === sceneName ? structuredClone(scene) : room),
+    actors: [...promoted.actors.filter(actor => actor.roomName !== sceneName), ...structuredClone(actors)],
+    assets: [...promoted.assets.filter(asset => !ids.has(asset.id)), ...structuredClone(assets)],
+    animations: [...promoted.animations.filter(animation => !sheets.has(animation.spriteSheet)),
+      ...structuredClone(source.animations.filter(animation => sheets.has(animation.spriteSheet)))],
+    animationStates: [...promoted.animationStates.filter(state => !sheets.has(state.spriteSheet)),
+      ...structuredClone(source.animationStates.filter(state => sheets.has(state.spriteSheet)))],
+    events: [...promoted.events.filter(event => event.roomName !== sceneName),
+      ...structuredClone(source.events.filter(event => event.roomName === sceneName))]
+  };
+}
+
+function buildExemploGBAVerticeCampaign(data) {
   if (isVerticeShowcaseProject(data)) {
     const existing = structuredClone(data);
     const existingScenes = Array.isArray(existing.scenas) ? existing.scenas : [];
@@ -8852,7 +8875,9 @@ export function promoteExemploGBAVerticeCampaign(data) {
     promoted = promoteApprovedOpeningV3(promoted);
     promoted = promoteApprovedOpeningV4(promoted);
     promoted = promoteApprovedCircuitLoopV2(promoted);
-    return promoteApprovedCharacterSelection(finalizeApprovedMenusAndRoute(promoted));
+    const withOpening = preserveApprovedMenuScene(data, promoteApprovedTravelerEntry(promoteApprovedCharacterSelection(finalizeApprovedMenusAndRoute(promoted))),
+      "abertura", "opening-medium-shot-240x160.png");
+    return pruneObsoleteExampleScripts(pruneUnusedExampleAssets(promoteApprovedStartupFade(promoteApprovedDungeon(promoteApprovedRelay(promoteApprovedTempestade(promoteApprovedRacing(promoteApprovedPlatformer(promoteApprovedTacticalArena(promoteApprovedArena(promoteApprovedFarolInterior(promoteApprovedFrontalObservatory(promoteApprovedFrontalWarehouse(promoteApprovedLoadCredits(promoteApprovedCleanPrologue(preserveApprovedMenuScene(data, withOpening, "titulo", "title-porto-lumen-240x160-4bpp.png"))))))))))))))));
   }
   const farolProject = promoteExemploGBAFarolCampaign(data);
   const sourceScenes = new Map(farolProject.scenas.map((scene) => [scene.name, scene]));
@@ -8979,7 +9004,11 @@ export function promoteExemploGBAVerticeCampaign(data) {
   promoted = promoteApprovedOpeningV3(promoted);
   promoted = promoteApprovedOpeningV4(promoted);
   promoted = promoteApprovedCircuitLoopV2(promoted);
-  return fitProjectSpriteFrames(promoteApprovedCharacterSelection(finalizeApprovedMenusAndRoute(promoted)));
+  return pruneObsoleteExampleScripts(pruneUnusedExampleAssets(promoteApprovedStartupFade(promoteApprovedDungeon(promoteApprovedRelay(promoteApprovedTempestade(promoteApprovedRacing(promoteApprovedPlatformer(promoteApprovedTacticalArena(promoteApprovedArena(promoteApprovedFarolInterior(promoteApprovedFrontalObservatory(promoteApprovedFrontalWarehouse(promoteApprovedLoadCredits(promoteApprovedCleanPrologue(fitProjectSpriteFrames(promoteApprovedTravelerEntry(promoteApprovedCharacterSelection(finalizeApprovedMenusAndRoute(promoted)))))))))))))))))));
+}
+
+export function promoteExemploGBAVerticeCampaign(data) {
+  return materializeExampleAuthoring(buildExemploGBAVerticeCampaign(data));
 }
 
 const invokedPath = process.argv[1] ? fileURLToPath(import.meta.url) === process.argv[1] : false;

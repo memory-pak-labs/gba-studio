@@ -28,6 +28,17 @@ describe("auditoria do template Vértice", () => {
     });
   });
 
+  it("valida o corpo acima da âncora e rejeita um ator enterrado ou uma saída toda sólida na plataforma", () => {
+    expect(auditExemploTemplate(project).geometry.issues.filter(i => i.includes("penedos_vento"))).toEqual([]);
+    const broken=structuredClone(project);
+    broken.actors.find(a=>a.id==="penedos-player").y+=1;
+    const exit=broken.triggers.find(t=>t.id==="trigger-penedos-grip-module");
+    exit.y=32;exit.height=2;
+    const issues=auditExemploTemplate(broken).geometry.issues;
+    expect(issues).toContain("Cena penedos_vento: ator jogador Nara · Penedos começa em célula bloqueada.");
+    expect(issues).toContain("Cena penedos_vento: área do gatilho trigger-penedos-grip-module atravessa célula bloqueada.");
+  });
+
   it("aceita o formato persistido que mantém collisionTypes sem o alias collisions", () => {
     const persisted = structuredClone(project);
     persisted.scenas = persisted.scenas.map((scene) => {
@@ -46,12 +57,12 @@ describe("auditoria do template Vértice", () => {
 
   it("aceita a posição fracionária do cursor no mapa e rejeita coordenadas fora da cena", () => {
     const currentIssues = auditExemploTemplate(project).geometry.issues;
-    expect(currentIssues.some((issue) => issue.includes("ator Aeronave de viagem está fora dos limites"))).toBe(false);
+    expect(currentIssues.some((issue) => issue.includes("ator Dirigível Lumen está fora dos limites"))).toBe(false);
 
     const broken = structuredClone(project);
     broken.actors.find((actor) => actor.id === "map-cursor").x = 60.5;
     expect(auditExemploTemplate(broken).geometry.issues).toContain(
-      "Cena mapa_rota: ator Aeronave de viagem está fora dos limites."
+      "Cena mapa_rota: ator Dirigível Lumen está fora dos limites."
     );
   });
 

@@ -13,21 +13,21 @@ describe("aceite da tecnologia Affine na aeronave do mapa de rotas", () => {
     const project = JSON.parse(readFileSync(templateURL, "utf8"));
     const route = project.scenas.find((scene) => scene.name === "mapa_rota");
     const cursor = project.actors.find((actor) => actor.id === "map-cursor");
-    const aircraft = project.assets.find((asset) => asset.name === "route-airship-v2.png");
+    const aircraft = project.assets.find((asset) => asset.name === "route-dirigible-lumen-64.png");
 
     expect(route).toMatchObject({
-      backgroundAssetName: "route-map-paged-v2.png",
+      backgroundAssetName: "route-lumen-paged.png",
       runtime: { type: "worldMap", config: { cursorAffine: true } }
     });
     expect(cursor).toMatchObject({
       roomName: "mapa_rota",
       worldMapRole: "cursor",
-      spriteSheet: "route-airship-v2.png"
+      spriteSheet: "route-dirigible-lumen-64.png"
     });
     expect(aircraft?.metadata).toMatchObject({
       role: "route-airship",
-      width: 32,
-      height: 32,
+      width: 64,
+      height: 64,
       reviewStatus: "approved"
     });
 
@@ -35,7 +35,7 @@ describe("aceite da tecnologia Affine na aeronave do mapa de rotas", () => {
     expect(exported.world_map_project).toMatchObject({
       scene_name: "mapa_rota",
       cursor_affine: true,
-      cursor: { metasprite: { asset: "route_airship_v2", index: 0 } }
+      cursor: { metasprite: { asset: "route_dirigible_lumen_64", index: 0 } }
     });
   });
 });

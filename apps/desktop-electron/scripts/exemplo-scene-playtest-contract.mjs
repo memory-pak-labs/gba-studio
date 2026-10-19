@@ -8,7 +8,7 @@ const DEFAULT_THRESHOLDS = Object.freeze({
 
 const GBA_FRAMEBUFFER_WIDTH = 240;
 const GBA_FRAMEBUFFER_HEIGHT = 160;
-const EXEMPLO_SCENE_COUNT = 17;
+const EXEMPLO_SCENE_COUNT = 18;
 const EXEMPLO_PLAYER_RUNTIMES = new Set([
   "topdown",
   "platformer",
@@ -19,6 +19,18 @@ const EXEMPLO_PLAYER_RUNTIMES = new Set([
   "battleRpg",
   "luta"
 ]);
+
+export function resolveTopdownCameraPosition(room, state, exported) {
+  const project = exported?.topdown_project;
+  const runtimeRoom = project?.rooms?.find(candidate => candidate.name === room?.name);
+  if (!runtimeRoom || !Number.isFinite(state?.player?.x) || !Number.isFinite(state?.player?.y)) return null;
+  const size = project.player?.size ?? {x:16,y:16};
+  const camera = project.camera ?? {};
+  return camera.follow_player === true ? {
+    x: Math.max(0,Math.min(runtimeRoom.width_tiles*8-240,state.player.x+size.x/2-120)),
+    y: Math.max(0,Math.min(runtimeRoom.height_tiles*8-160,state.player.y+size.y/2-80))
+  } : {x:Number(camera.position?.x ?? 0),y:Number(camera.position?.y ?? 0)};
+}
 
 export function resolveTopdownActorFramebufferTarget(room, actor, state, exported) {
   const project = exported?.topdown_project;
@@ -33,12 +45,9 @@ export function resolveTopdownActorFramebufferTarget(room, actor, state, exporte
   }
   const parts = entity?.animations?.[0]?.frame_metasprites?.[0]?.parts;
   if (!runtimeRoom || !parts?.length || !Number.isFinite(position?.x) || !Number.isFinite(position?.y)) return null;
-  const size = project.player?.size ?? {x:16,y:16};
-  const camera = project.camera ?? {};
-  const follow = camera.follow_player === true;
-  const cameraX = follow ? Math.max(0,Math.min(runtimeRoom.width_tiles*8-240,state.player.x+size.x/2-120)) : Number(camera.position?.x ?? 0);
-  const cameraY = follow ? Math.max(0,Math.min(runtimeRoom.height_tiles*8-160,state.player.y+size.y/2-80)) : Number(camera.position?.y ?? 0);
-  return {x:position.x-cameraX+Math.min(...parts.map(part=>part.x)),y:position.y-cameraY+Math.min(...parts.map(part=>part.y))};
+  const camera = resolveTopdownCameraPosition(room,state,exported);
+  if (!camera) return null;
+  return {x:position.x-camera.x+Math.min(...parts.map(part=>part.x)),y:position.y-camera.y+Math.min(...parts.map(part=>part.y))};
 }
 
 export function resolveTopdownActorFramebufferTargets(room, actor, state, exported, previousState) {
@@ -273,7 +282,9 @@ export const EXEMPLO_NON_SILENT_AUDIO_SCENES = Object.freeze([
   "observatorio_do_farol",
   "tempestade",
   "guardiao_rele",
-  "arena_arrancada"
+  "arena_arrancada",
+  "circuito_final",
+  "circuito_perspectiva"
 ]);
 
 export const EXEMPLO_PLAYER_FRAMEBUFFER_SCENES = Object.freeze([
@@ -285,15 +296,17 @@ export const EXEMPLO_PLAYER_FRAMEBUFFER_SCENES = Object.freeze([
   "tempestade",
   "guardiao_rele",
   "arena_arrancada",
-  "circuito_final"
+  "circuito_final",
+  "circuito_perspectiva"
 ]);
 
-// Porto e Penedos ligam o player ao mesmo asset autorado da Nara; a arena tática
+// Porto, Farol e Penedos ligam o player ao asset autorado da Nara; a arena tática
 // também usa atores explícitos. Nenhuma deve auditar o player padrão.
 export const EXEMPLO_EXPLICIT_ACTOR_BINDING_SCENES = Object.freeze([
   "arena_tatica",
   "penedos_vento",
-  "porto_lumen"
+  "porto_lumen",
+  "farol_interior"
 ]);
 
 export const EXEMPLO_EXACT_PLAYER_FRAMEBUFFER_SCENES = Object.freeze([
@@ -304,7 +317,8 @@ export const EXEMPLO_EXACT_PLAYER_FRAMEBUFFER_SCENES = Object.freeze([
   "tempestade",
   "guardiao_rele",
   "arena_arrancada",
-  "circuito_final"
+  "circuito_final",
+  "circuito_perspectiva"
 ]);
 
 // A aeronave da rota e um cursor de viagem, sem player livre.
@@ -316,6 +330,7 @@ export const EXEMPLO_EXACT_BACKGROUND_FRAMEBUFFER_SCENES = Object.freeze([
   // o quadro nativo quando a cena chega ao Play/mGBA.
   "titulo",
   "prologo",
+  "farol_interior",
   "abertura",
   "conselho_guardia",
   "mapa_rota",
@@ -330,6 +345,9 @@ export function exemploScenePlaytestPlan(project) {
   const scenes = Array.isArray(project?.scenas) ? project.scenas : [];
   return scenes
     .filter((scene) => Boolean(scene?.campaign) || (
+      scene?.name === "circuito_perspectiva"
+      && scene?.racingVisualRevision === "racing-two-views-approved-2026-10-18"
+    ) || (
       scene?.sceneType === "isometric"
       && scene?.runtime?.config?.gameplayMode === "tactical"
 
@@ -373,7 +391,7 @@ export function selectExemploScenePlaytestPlan(project, sceneName) {
         : "topdown"
     }));
   const topdownInteriorPlan = (Array.isArray(project?.scenas) ? project.scenas : [])
-    .filter((scene) => scene?.name === sceneName && scene?.runtime?.config?.profile === "lighthouse-interior")
+    .filter((scene) => scene?.name === sceneName && ["lighthouse-interior", "farol-interior-scale-v2-approved"].includes(scene?.runtime?.config?.profile))
     .map((scene, index) => ({
       id: typeof scene?.id === "string" ? scene.id : null,
       index,

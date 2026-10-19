@@ -28,7 +28,8 @@ export const EXEMPLO_GB_STUDIO_SCENE_TYPES = Object.freeze({
   salvar: "menu",
   menu_start: "menu",
   arena_tatica: "isometric",
-  farol_interior: "topdown"
+  farol_interior: "topdown",
+  circuito_perspectiva: "racing"
 });
 
 const LEGACY_DIALOGUE_ASSET_NAMES = new Set([

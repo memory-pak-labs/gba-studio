@@ -1,4 +1,5 @@
 /** Approved travel map. Changes only its authored scene, assets and connections. */
+import {promoteApprovedWorldMapLumen} from './world-map-lumen-promotion.mjs';
 export const ROUTE_DESTINATIONS = [
   ['porto','Porto Lumen',79,224,'porto_lumen',-1,15,14],
   ['penedos','Penedos do Vento',123,115,'penedos_vento',-1,4,10],
@@ -64,5 +65,5 @@ export function refineRouteMap(source,{removeLab=false}={}) {
   }
   if (p.scena?.name === 'mapa_rota') p.scena = transform(p.scena);
   if (removeLab && p.scena?.name === 'affine_lab') p.scena = structuredClone(p.scenas.find(r => r.name === 'mapa_rota'));
-  return p;
+  return promoteApprovedWorldMapLumen(p);
 }

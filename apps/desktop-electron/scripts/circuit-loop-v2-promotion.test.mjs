@@ -16,6 +16,11 @@ const templateURL = new URL("../default-assets/templates/exemplo-gba/exemplo-gba
 describe("Circuito Final V2 aprovado", () => {
   it("conecta o circuito completo sem alterar as outras cenas", () => {
     const before = JSON.parse(readFileSync(templateURL, "utf8"));
+    // Reconstruct the historical fixture explicitly; the live example now has a larger approved circuit.
+    for(const rows of [before.rooms,before.scenas]){const r=rows.find(r=>r.name==='circuito_final');delete r.racingVisualRevision;r.width=60;r.height=40;}
+    before.assets.push({id:'racing-topdown-background',name:CIRCUIT_LOOP_V2_BACKGROUND.name,kind:'Background',metadata:{}});
+    for(const id of ['racing-nara','racing-rival','racing-rival-2'])before.actors.push({id,roomName:'circuito_final',x:0,y:0});
+    before.events.push({id:'legacy-defeat',name:'circuito_reiniciar',steps:[{command:'change_scene circuito_final 0 0 right'}]});
     const after = promoteApprovedCircuitLoopV2(before);
     const scene = after.rooms.find((room) => room.name === "circuito_final");
     expect(after.scenas).toHaveLength(before.scenas.length);

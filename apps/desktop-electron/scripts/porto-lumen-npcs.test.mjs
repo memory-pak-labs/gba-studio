@@ -50,7 +50,7 @@ describe('NPCs aprovados de Porto Lumen', () => {
         expect(animation.frames[0].tiles.map(t => [t.sliceX, t.sliceY, t.tileWidth, t.tileHeight])).toEqual([[index * 32, 0, 32, 32], [index * 32, 32, 32, 16]]);
       }
     }
-    expect(data.actors.find(a => a.id === 'farol-keeper').spriteSheet).toBe('lighthousekeeper-pilot-32x32.png');
+    expect(data.actors.find(a => a.id === 'farol-keeper').spriteSheet).toBe('porto-lighthousekeeper-body48.png');
   });
 
   it('restaura os vínculos aprovados na regeneração sem alterar posições, eventos ou a superfície', () => {

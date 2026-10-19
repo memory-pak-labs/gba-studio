@@ -1,0 +1,110 @@
+{
+  "schemaVersion": 1,
+  "scene": "farol_interior",
+  "approval": {
+    "approved": true,
+    "visual": true,
+    "palette": true,
+    "date": "2026-10-17",
+    "record": "aprovado pode integrar ao projeto — candidate gallery8802 with prepared palette, actors48px and revised fixture scale"
+  },
+  "origin": "Original OpenAI built-in Imagegen artwork under user direction; approved project-owned PortoLumen scale and camera references. No third-party pixels.",
+  "license": "Project-owned AI-generated artwork",
+  "asset": {
+    "id": "farol-interior-approved-paged-background",
+    "file": "farol-interior-approved-paged-384x256.png",
+    "source": "Assets/backgrounds/farol-interior-approved-paged-384x256.png",
+    "sha256": "0c6fef6a0a62a7a940d72cc4e7207f5ae6aadea3a06780f41c5632393c0fe9fb",
+    "sourceSha256": "f61246e8c51e3b76d32e4a04ba996a4731c7c7288adb152a3e53c1c2afb87820",
+    "sourceDimensions": [
+      1536,
+      1024
+    ],
+    "logicalDimensions": [
+      384,
+      256
+    ],
+    "visibleColors": 216,
+    "uniqueTiles": 1508,
+    "preparation": "Nearest384x256 source-preserving review; RGB555216color palette without dithering. Palette and composition visually approved. Paged8bpp with no tile merging.",
+    "retainedAsset": "farol-interior-topdown-360x240-gba.png"
+  },
+  "layout": {
+    "width": 48,
+    "height": 32,
+    "playerStart": {
+      "x": 23,
+      "y": 27
+    },
+    "keeperPosition": {
+      "x": 17,
+      "y": 14
+    },
+    "solidRects": [
+      [
+        19,
+        7,
+        10,
+        6
+      ],
+      [
+        3,
+        10,
+        7,
+        11
+      ],
+      [
+        5,
+        20,
+        3,
+        3
+      ],
+      [
+        5,
+        5,
+        5,
+        4
+      ],
+      [
+        40,
+        6,
+        4,
+        4
+      ],
+      [
+        40,
+        10,
+        5,
+        11
+      ]
+    ],
+    "stairEllipsePixels": {
+      "x": 266,
+      "y": 166,
+      "radiusX": 35,
+      "radiusY": 33
+    },
+    "lensTrigger": {
+      "x": 21,
+      "y": 13,
+      "width": 6,
+      "height": 2
+    },
+    "exitTrigger": {
+      "x": 22,
+      "y": 30,
+      "width": 4,
+      "height": 2
+    }
+  },
+  "preservedActors": {
+    "player": "porto-nara-animations48.png",
+    "keeper": "porto-lighthousekeeper-body48.png",
+    "frame": [
+      32,
+      48
+    ],
+    "hudPresetId": "hud-porto-lumen-b"
+  },
+  "scope": "Only Farol room presentation, collisions, actor bindings, inbound location and editor connection rectangles. Existing dialogue, exit destination, music and campaign logic preserved."
+}

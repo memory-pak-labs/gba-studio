@@ -170,10 +170,9 @@ describe("exemplo scenes smoke wiring", () => {
       /if \(runtime === "racing"\) \{[\s\S]*?const camera = racingCameraPosition\(racingRoom, frameRuntimeState\);[\s\S]*?x: nativeRacingPlayer\?\.x \?\? Number\(player\.x\) - camera\.x,[\s\S]*?y: nativeRacingPlayer\?\.y \?\? Number\(player\.y\) - camera\.y/
     );
     expect(playerAuditBody).toContain('matrix:nativeRacingPlayer.matrix');
-    expect(source).toContain('sha256: "d933dc6a743c06312ea3c343079080430272e43ff0fe1bed0a5d5cc016446185"');
-    expect(source).toMatch(
-      /racing: Object\.freeze\(\{[\s\S]*?frameCount: 3,[\s\S]*?sheetWidth: 96,[\s\S]*?tileCount: 48/
-    );
+    expect(source).toContain('racing: currentTemplateRuntimeSpriteSpec("racing-approved-overhead-nara.png")');
+    expect(source).toContain('currentTemplateRuntimeSpriteSpec("racing-approved-rear-nara.png")');
+    expect(source).toContain('p?.rooms?.[p?.initial_room ?? 0]?.player');
     expect(source).toContain('const exactBackgroundCamera = scene.runtime === "racing"');
     expect(source).toContain("sourceX: exactBackgroundCamera.x");
     expect(source).toContain("sourceY: exactBackgroundCamera.y");
@@ -297,7 +296,7 @@ describe("exemplo scenes smoke wiring", () => {
       'sha256: "2128a2c31ae447549b1aa295215cfcfad4233e3af89c1ad91e478d98dfcac1f8"'
     );
     expect(source).toContain(
-      'const spec = runtimePlayerSpecs[runtime];'
+      'currentTemplateRuntimeSpriteSpec("white-hand-cursor-32x32.png")'
     );
     expect(source).toContain(
       'if (runtime === "pointAndClick") return exported?.point_click_project?.cursor?.metasprite?.asset ?? null;'
@@ -308,20 +307,17 @@ describe("exemplo scenes smoke wiring", () => {
     expect(source).not.toContain('assetName: "oficina-cursor.png"');
   });
 
-  it("tracks the current six-frame battle player sheet promoted for the Relay Guardian", async () => {
+  it("audita Nara aprovada no RPG sem exigir os efeitos transitórios durante o idle", async () => {
     const source = await readFile(
       new URL("./smoke-electron-exemplo-scenes.mjs", import.meta.url),
       "utf8"
     );
-    expect(source).toContain(
-      'sha256: "7cfffa6566c2a2b3790891c8b9d3ce9a189da204174fd00f620610e44caf0c10"'
-    );
-    expect(source).toMatch(
-      /battleRpg: Object\.freeze\(\{[\s\S]*?frameCount: 6,[\s\S]*?frameWidth: 64,[\s\S]*?sheetWidth: 384,[\s\S]*?tileCount: 320/
-    );
-    expect(source).toContain(
-      "0x0000, 0x1482, 0x18c6, 0x18ec, 0x1d4f, 0x4250, 0x2528, 0x2dd1,\n      0x31aa, 0x52f5, 0x42b9, 0x575d, 0x29f8, 0x1975, 0x325d, 0x42de"
-    );
+    expect(source).toContain('battleRpg: currentTemplateRuntimeSpriteSpec("relay-approved-nara.png")');
+    expect(source).toContain('sha256: createHash("sha256").update(bytes).digest("hex")');
+    expect(source).toContain('streamFrames: metadata.streamFrames === true');
+    expect(source).toContain("inactiveActionEffect");
+    expect(source).toContain("effectsActorId");
+    expect(source).toContain("sourceFrames.every((frame) => frame.ok)");
   });
 
   it("audita os dois lutadores nativos da cena luta e separa HUD de OAM", async () => {
@@ -331,26 +327,21 @@ describe("exemplo scenes smoke wiring", () => {
     );
     expect(source).toContain("async function auditExportedLutaPlayers");
     expect(source).toMatch(/runtime === "luta"[\s\S]*?auditExportedLutaPlayers\([\s\S]*?\)/);
-    expect(source).toContain("const lutaHudMasks = [");
-    expect(source).toContain("player1: { x: 80, y: 80 }");
-    expect(source).toContain("player2: { x: 200, y: 80 }");
-    expect(source).toContain('side === "player1" ? "nara_fighter" : "rival_fighter"');
+    expect(source).toContain("resolveLutaNativeFramebufferMasks(runtimeState?.nativeVideo)");
+    expect(source).not.toContain("const lutaHudMasks = [");
+    expect(source).toContain("player1: { x: stage?.config?.player1_start_x, y: 80 }");
+    expect(source).toContain("player2: { x: stage?.config?.player2_start_x, y: 80 }");
+    expect(source).toContain("symbol === approvedSources[side].symbol");
+    expect(source).toContain("sourceSha256 === approvedSources[side].sha256");
+    expect(source).toContain("palette.length === 208 && palette[0] === 0");
   });
 
-  it("tracks the approved Tempestade v3 shmup player sheet promoted for the Storm", async () => {
-    const source = await readFile(
-      new URL("./smoke-electron-exemplo-scenes.mjs", import.meta.url),
-      "utf8"
-    );
-    expect(source).toContain(
-      'sha256: "3eb41a92131ae9e71c384aea57457e6222ce298b64dc040549d5edb901802f8a"'
-    );
-    expect(source).toMatch(
-      /shmup: Object\.freeze\(\{[\s\S]*?assetName: "tempestade-v3-player\.png",[\s\S]*?frameCount: 1,[\s\S]*?frameHeight: 64,[\s\S]*?frameWidth: 64,[\s\S]*?sheetWidth: 64,[\s\S]*?tileCount: 64/
-    );
-    expect(source).toContain(
-      "0x0000, 8489, 6417, 6519, 19057, 23387, 18036, 3136"
-    );
+  it("tracks the approved streamed Tempestade sheet from the canonical metadata", async () => {
+    const source=await readFile(new URL('./smoke-electron-exemplo-scenes.mjs',import.meta.url),'utf8');
+    expect(source).toContain('shmup: currentTemplateRuntimeSpriteSpec("tempestade-approved-player.png")');
+    expect(source).toContain('nativeSinglePartSpriteObject(header, playerSymbol, frameRuntimeState?.nativeVideo)');
+    const p=JSON.parse(await readFile(new URL('../default-assets/templates/exemplo-gba/exemplo-gba.gba-project',import.meta.url),'utf8'));
+    expect(p.assets.find(a=>a.name==='tempestade-approved-player.png').metadata).toMatchObject({frameCount:12,frameWidth:64,frameHeight:64,colorMode:'8bpp',streamFrames:true});
   });
 
   it("liga o botao B ao freio aereo do runtime shmup", async () => {

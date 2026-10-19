@@ -61,7 +61,7 @@ describe("promoção do Dungeon Crawler v1 de Vértice", () => {
     }
   });
 
-  it("mantém as três fases atuais da Usina com os assets V3 materializados", () => {
+  it("mantém as três fases da Usina com a apresentação Porto Lumen aprovada", () => {
     const project = promoteExemploGBAVerticeCampaign(JSON.parse(readFileSync(templateProjectPath, "utf8")));
     const exploration = project.scenas.find((scene) => scene.name === "usina_submersa");
     const combat = project.scenas.find((scene) => scene.name === "usina_combate");
@@ -69,19 +69,19 @@ describe("promoção do Dungeon Crawler v1 de Vértice", () => {
     const sentinel = project.actors.find((actor) => actor.name === "Sentinela da Usina");
 
     expect(exploration).toMatchObject({
-      backgroundAssetName: "usina-exploration-background-v3-4bpp.png",
+      backgroundAssetName: "dungeon-approved-exploracao-background.png",
       runtime: { type: "dungeonCrawler" }
     });
-    expect(combat?.backgroundAssetName).toBe("usina-combat-background-v3-4bpp.png");
-    expect(exit?.backgroundAssetName).toBe("usina-exit-background-v3-4bpp.png");
+    expect(combat?.backgroundAssetName).toBe("dungeon-approved-combate-background.png");
+    expect(exit?.backgroundAssetName).toBe("dungeon-approved-saida-background.png");
     expect(sentinel).toEqual(expect.objectContaining({
       roomName: "usina_combate",
-      spriteSheet: "sentinel-depth-far-mid-near-192x64-v3-4bpp.png"
+      spriteSheet: "dungeon-approved-sentinel-near.png"
     }));
-    expect(project.assets.find((asset) => asset.name === "sentinel-depth-far-mid-near-192x64-v3-4bpp.png"))
+    expect(project.assets.find((asset) => asset.name === "dungeon-approved-sentinel-near.png"))
       .toEqual(expect.objectContaining({
-        name: "sentinel-depth-far-mid-near-192x64-v3-4bpp.png",
-        metadata: expect.objectContaining({ generatedBy: "usina-v3-promotion" })
+        name: "dungeon-approved-sentinel-near.png",
+        metadata: expect.objectContaining({ approved: true, reviewStatus: "approved" })
     }));
   });
 });

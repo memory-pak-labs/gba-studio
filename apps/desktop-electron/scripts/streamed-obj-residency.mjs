@@ -3,10 +3,11 @@ function tileAsset(header, name) {
     "gbs::TileAsset\\s+" + name + "\\s*=\\s*\\{([^}]+)\\}\\s*;"
   ))?.[1];
   const match = body?.match(
-    /^\s*reinterpret_cast<const\s+uint8_t\s*\*>\s*\((\w+)\)\s*,\s*(\w+)\s*,\s*(0x[0-9a-f]+|\d+)\s*,\s*true\s*$/i
+    /^\s*reinterpret_cast<const\s+uint8_t\s*\*>\s*\((\w+)\)\s*,\s*(\w+)\s*,\s*(0x[0-9a-f]+|\d+)\s*,\s*true(?:\s*,\s*gbs::ColorDepth::Bpp(4|8))?\s*$/i
   );
   return match ? {
-    data: match[1], count: match[2], destination: Number.parseInt(match[3], 0)
+    data: match[1], count: match[2], destination: Number.parseInt(match[3], 0),
+    bitsPerPixel: Number(match[4] ?? 4)
   } : null;
 }
 
@@ -42,10 +43,13 @@ export function auditStreamedObjResidency({
     contract,
     residentTileCount: count === residentTileCount,
     residentAsset: base?.data === symbol + "_tiles"
-      && base.count === symbol + "_tile_count",
+      && base.count === symbol + "_tile_count"
+      && base.destination + residentTileCount * (base.bitsPerPixel === 8 ? 2 : 1) <= 1024
+      && (base.bitsPerPixel !== 8 || base.destination % 2 === 0),
     frameUploads: uploads.every((upload, index) =>
       upload?.data === symbol + "_frame_" + index + "_tiles"
       && Number(upload.count) === residentTileCount
+      && upload.bitsPerPixel === base?.bitsPerPixel
       && upload.destination === base?.destination),
     animationBindings: Number(animation?.[1]) === frameCount
       && bindings.length === frameCount

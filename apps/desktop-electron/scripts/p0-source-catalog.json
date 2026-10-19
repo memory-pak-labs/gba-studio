@@ -161,31 +161,6 @@
           "contract": "racing-v2-user-approved-visual"
         },
         {
-          "path": "Assets/backgrounds/porto-lume-shmup-wide-v3-local-banks.png",
-          "sha256": "6e5825ee65d8781b0a6ee5854585c88f7a44d67264b6d78610e0d341b032e82a",
-          "contract": "tempestade-v3-user-approved-visual"
-        },
-        {
-          "path": "Assets/sprites/tempestade-v3-boss-lighthouse.png",
-          "sha256": "1b6c5dae96e02b844ce99ed943153faec785a95331975e3abd8007926714aa90",
-          "contract": "other-scene-actors-v1-user-approved-2026-10-01"
-        },
-        {
-          "path": "Assets/sprites/tempestade-v3-drone-horizontal.png",
-          "sha256": "4159bf7a1515acf622602db5c00e40874b353006eb45aa3076781f5d203dec13",
-          "contract": "tempestade-v3-user-approved-visual"
-        },
-        {
-          "path": "Assets/sprites/tempestade-v3-drone-vertical.png",
-          "sha256": "33aa60167e8c32313525e0538ae569d760a9d47d12a38489656b0e32423ce511",
-          "contract": "tempestade-v3-user-approved-visual"
-        },
-        {
-          "path": "Assets/sprites/tempestade-v3-player.png",
-          "sha256": "3eb41a92131ae9e71c384aea57457e6222ce298b64dc040549d5edb901802f8a",
-          "contract": "tempestade-v3-user-approved-visual"
-        },
-        {
           "path": "Assets/ui/frame-acao-v2.png",
           "sha256": "63cb4aa77e41e4878272c5cfd7ae1c06e71e4edf37fcb4bbb8dad65c477de635",
           "contract": "hud-frame-v2-user-approved-visual"
@@ -939,6 +914,1082 @@
           "path": "Assets/sprites/porto-lighthousekeeper-body48.png",
           "sha256": "b956f0d7369d10bccc3ea603c7a34dfd9af7c8c9760e84e2dfcadf11e7ebf963",
           "contract": "porto-lumen-npcs48-v21-user-approved-2026-10-15"
+        },
+        {
+          "path": "Assets/backgrounds/title-porto-lumen-240x160-4bpp.png",
+          "sha256": "ace39e438172a2fa8c1abcdc8075f1d5c999f5b9ea7960f2372129c720cbf9f5",
+          "contract": "title-porto-lumen-240x160-14-banks-user-approved-2026-10-16"
+        },
+        {
+          "path": "Assets/backgrounds/opening-medium-shot-240x160.png",
+          "sha256": "c135edb87bb52260c612cbbc31ff26ec9d06f1f642b9a75b3a5854432824a90f",
+          "contract": "opening-medium-shot-local-animation-user-approved-2026-10-16"
+        },
+        {
+          "path": "Assets/sprites/opening-local-animation-128x96.png",
+          "sha256": "c01251e956ca362cc8c4e9e050ebbb0c82b3a4435378934eb52fed7dc33a86e4",
+          "contract": "opening-medium-shot-local-animation-user-approved-2026-10-16"
+        },
+        {
+          "path": "Assets/illustrations/opening/scenery.png",
+          "sha256": "b2449a16f02c136610bde9d580084b4e81040204284964693104e097487f1c32",
+          "contract": "opening-medium-shot-local-animation-user-approved-2026-10-16"
+        },
+        {
+          "path": "Assets/illustrations/opening/nara.png",
+          "sha256": "05899083ee9e493dfd970f703d2f9fb52b55f2ee8ff68da2c277f874a945622d",
+          "contract": "opening-medium-shot-local-animation-user-approved-2026-10-16"
+        },
+        {
+          "path": "Assets/illustrations/opening/mechanic.png",
+          "sha256": "1e0b88a006ce9540d3c1ea4df9a5621e84d745135f5e38cb5d926ddfe3c1462d",
+          "contract": "opening-medium-shot-local-animation-user-approved-2026-10-16"
+        },
+        {
+          "path": "Assets/illustrations/opening/layers.json",
+          "sha256": "96f49d9c52860777b242cab2352c45e21ebbca96f999ae4653731b227ff8b701",
+          "contract": "opening-source-provenance-2026-10-16"
+        },
+        {
+          "path": "Assets/illustrations/opening/SOURCES.md",
+          "sha256": "5ac9c1feb496fa6d712680c007a9d9edb12d03979866e6f0944e5cd15fa3435b",
+          "contract": "opening-source-provenance-2026-10-16"
+        },
+        {
+          "path": "Assets/backgrounds/book-menu_start-bg-240x160.png",
+          "sha256": "bb6a163563c09037c24b366eb83b2dddd117a73e981839fbcffc2c3786184993",
+          "contract": "book-menus-v5-toolcase-v3-user-approved-2026-10-16"
+        },
+        {
+          "path": "Assets/backgrounds/book-missoes-bg-240x160.png",
+          "sha256": "e0dd75a7ccb6a21dbedb833c7b2cd0e62ad4903446e13a2f221e23841e25aa2e",
+          "contract": "book-menus-v5-toolcase-v3-user-approved-2026-10-16"
+        },
+        {
+          "path": "Assets/backgrounds/book-mapa_menu-bg-240x160.png",
+          "sha256": "69eace42803afdce271ce2908ee228653b84f7d1a751807ef07a339cad3ebaa5",
+          "contract": "book-menus-v5-toolcase-v3-user-approved-2026-10-16"
+        },
+        {
+          "path": "Assets/backgrounds/book-salvar-bg-240x160.png",
+          "sha256": "15f86386e4231d46f3f104af1d16f87eaf3d0d8e33913476fa64e68fa3bf18a5",
+          "contract": "book-menus-v5-toolcase-v3-user-approved-2026-10-16"
+        },
+        {
+          "path": "Assets/backgrounds/book-configuracoes-bg-240x160.png",
+          "sha256": "81c4e8bb4e08c94020cc4e188afcd06e174b287fda916aa5e39fb01e0a2eea84",
+          "contract": "book-menus-v5-toolcase-v3-user-approved-2026-10-16"
+        },
+        {
+          "path": "Assets/sprites/book-cursor-approved-8x8.png",
+          "sha256": "4dbeabbb353282be052bdc6e28c417a6005c160d96f0c9802ff652f079c7ce69",
+          "contract": "book-menus-v5-toolcase-v3-user-approved-2026-10-16"
+        },
+        {
+          "path": "Assets/sprites/book-pages-32x8.png",
+          "sha256": "6c7e2744fec40c1597a6975d3c1cf1d0ba0782256762cc56dc9c9431a404540b",
+          "contract": "book-menus-v5-toolcase-v3-user-approved-2026-10-16"
+        },
+        {
+          "path": "Assets/backgrounds/toolcase-toolcase-bg-240x160.png",
+          "sha256": "3bbcd5e850ee762d6964a9461972c20c83ba1b0b2c22c0bd4adc1be12320bd18",
+          "contract": "book-menus-v5-toolcase-v3-user-approved-2026-10-16"
+        },
+        {
+          "path": "Assets/sprites/toolcase-item-frame-40x48.png",
+          "sha256": "122bb0de86b9c4ed74cd2f956eeb0cc6b86646e9576c58f3df7fa94c8d8bbd3f",
+          "contract": "book-menus-v5-toolcase-v3-user-approved-2026-10-16"
+        },
+        {
+          "path": "Assets/sprites/toolcase-item-grip-40x48.png",
+          "sha256": "4c07afe50f4d90ec1a88f3f3c744d8a5da996d2d61ef4e43a62bd43507295ee3",
+          "contract": "book-menus-v5-toolcase-v3-user-approved-2026-10-16"
+        },
+        {
+          "path": "Assets/sprites/toolcase-item-cell-40x48.png",
+          "sha256": "615d3a34c6e8824338c44039d93a060f2d05b86e0685845efc35043d28502535",
+          "contract": "book-menus-v5-toolcase-v3-user-approved-2026-10-16"
+        },
+        {
+          "path": "Assets/sprites/toolcase-item-shield-40x48.png",
+          "sha256": "d2194b94f6626d23b226270cd8b4f41a3e4c4f0fa7d64f28b0b6a147451ed799",
+          "contract": "book-menus-v5-toolcase-v3-user-approved-2026-10-16"
+        },
+        {
+          "path": "Assets/sprites/toolcase-item-boost-40x48.png",
+          "sha256": "c672b5c17d6a8a32293b8d4f7e1efeab8d646c547e82816c7709cb9b6397fd08",
+          "contract": "book-menus-v5-toolcase-v3-user-approved-2026-10-16"
+        },
+        {
+          "path": "Assets/sprites/toolcase-selection-40x48.png",
+          "sha256": "ce9ee66de19bc98f7ec0604671cc00b244bb89c6635c00a1a6ae73f1358f64b6",
+          "contract": "book-menus-v5-toolcase-v3-user-approved-2026-10-16"
+        },
+        {
+          "path": "Assets/sprites/toolcase-commands-128x8.png",
+          "sha256": "3a87909d0f000c1a5e9eea931d3874fab1f7e6e3ea5b45c3c201757d8d0220d1",
+          "contract": "book-menus-v5-toolcase-v3-user-approved-2026-10-16"
+        },
+        {
+          "path": "Assets/sprites/book-nara-approved-32x48.png",
+          "sha256": "b71cf900974e9fb79a8920c5aeec3de4cb635f3d559d5b02a3ddfcbec8b48667",
+          "contract": "book-menus-v5-toolcase-v3-user-approved-2026-10-16"
+        },
+        {
+          "path": "Assets/sprites/book-player-female-approved-48x48.png",
+          "sha256": "505fe2fd1fc40e290d9cf3747d69a6b947c5d378360082518597cfe2bfd75bd5",
+          "contract": "book-menus-v5-toolcase-v3-user-approved-2026-10-16"
+        },
+        {
+          "path": "Assets/backgrounds/traveler-gender-bg-240x160.png",
+          "sha256": "6985148e18aace99f9e41c6eaabac13e83778660abc5f72017450060d7431ead",
+          "contract": "traveler-entry-v2-user-approved-2026-10-16"
+        },
+        {
+          "path": "Assets/backgrounds/traveler-name-bg-240x160.png",
+          "sha256": "3dac9ea3e129eacf29e3404433446281d8785006aa2bf55eb3e2710d82ee557e",
+          "contract": "traveler-entry-v2-user-approved-2026-10-16"
+        },
+        {
+          "path": "Assets/sprites/traveler-gender-portraits-64x64.png",
+          "sha256": "dc81a34054c744d75ef0bad4137684958c67a25eac7dc2d07531f875ad18ea39",
+          "contract": "traveler-entry-v2-user-approved-2026-10-16"
+        },
+        {
+          "path": "Assets/sprites/traveler-name-portraits-48x48.png",
+          "sha256": "13a3c6d0666bb27bb0c121c46e9c18eef9415b43431f1767161f7569cc652bd3",
+          "contract": "traveler-entry-v2-user-approved-2026-10-16"
+        },
+        {
+          "path": "Assets/sprites/traveler-focus-corners-8x8.png",
+          "sha256": "a9dc3395af1fabe02c04c2934b2cdd5816d05f59a1e92bdfde770d82f1b6693a",
+          "contract": "traveler-entry-v2-user-approved-2026-10-16"
+        },
+        {
+          "path": "Assets/sprites/traveler-gender-labels-48x8.png",
+          "sha256": "1ceed5722fa9a5f934deb8d76b294a74822a16c98c55c8c31378fd5abc60f50c",
+          "contract": "traveler-entry-v2-user-approved-2026-10-16"
+        },
+        {
+          "path": "Assets/backgrounds/prologue-clean-frame-1-240x160-4bpp.png",
+          "sha256": "8c8a6fcb0147867ce2da42348409593271b74be178e598a6076c46cdb98bd909",
+          "contract": "prologue-clean-v3-user-approved-2026-10-16"
+        },
+        {
+          "path": "Assets/backgrounds/prologue-clean-frame-2-240x160-4bpp.png",
+          "sha256": "c1997430bccddae9a4ac31250db99f4fbafa48d28259ff1ca12d3e913c6588ff",
+          "contract": "prologue-clean-v3-user-approved-2026-10-16"
+        },
+        {
+          "path": "Assets/backgrounds/prologue-clean-frame-3-240x160-4bpp.png",
+          "sha256": "1de7b32bb0c9304923b55522bf562b73d168bc47714b914128fb5fc304591be4",
+          "contract": "prologue-clean-v3-user-approved-2026-10-16"
+        },
+        {
+          "path": "Assets/backgrounds/book-carregar_jogo-bg-240x160.png",
+          "sha256": "624d32bf4ef421e33895e607a991c00b48e6c40a87c6b24788adfab76b891af2",
+          "contract": "load-credits-book-v1-user-approved-2026-10-16"
+        },
+        {
+          "path": "Assets/backgrounds/book-creditos-bg-240x160.png",
+          "sha256": "abc3ab5b1e5700c908be6f5d5f53261d442b7b822e1560a2ad78f3a1ffc029c0",
+          "contract": "load-credits-book-v1-user-approved-2026-10-16"
+        },
+        {
+          "path": "Assets/backgrounds/warehouse-frontal-bg-240x160.png",
+          "sha256": "bfb134fe3b40160458ab46ad2bfa5771e4b840bf6731478588956bc174ac64cb",
+          "contract": "warehouse-frontal-v1-user-approved-2026-10-17"
+        },
+        {
+          "path": "Assets/sprites/white-hand-cursor-32x32.png",
+          "sha256": "5b5738fca8229a5b9f4ca5093d7f3437846d8a788e4119d54890075ecd99e8b2",
+          "contract": "warehouse-white-hand-user-approved-2026-10-17"
+        },
+        {
+          "path": "Assets/backgrounds/observatory-frontal-bg-240x160.png",
+          "sha256": "b303744ffb0e30b1f3323740a1f1d6033a69f2d629f158540fcbf66e947aa9d3",
+          "contract": "observatory-frontal-v1-user-approved-2026-10-17"
+        },
+        {
+          "path": "Assets/backgrounds/farol-interior-approved-paged-384x256.png",
+          "sha256": "0c6fef6a0a62a7a940d72cc4e7207f5ae6aadea3a06780f41c5632393c0fe9fb",
+          "contract": "farol-interior-scale-v2-approved-2026-10-17"
+        },
+        {
+          "path": "Assets/backgrounds/arena-coastal-240x160.png",
+          "sha256": "6e5880ebcb91c2ca6930fe74628a1764b6c82ae886511f8e80a86310da98e77c",
+          "contract": "arena-v2-user-approved-2026-10-17"
+        },
+        {
+          "path": "Assets/sprites/arena-nara-64x64.png",
+          "sha256": "a0de211b68bc82d54b10b3e70b4c9e20f6f60357abe404c093d344731bcba845",
+          "contract": "arena-v2-user-approved-2026-10-17"
+        },
+        {
+          "path": "Assets/sprites/arena-rival-64x64.png",
+          "sha256": "dbe322201e9938d3749184dad6652c7773114b8b0e4af1cdd9a4856a89939a5d",
+          "contract": "arena-v2-user-approved-2026-10-17"
+        },
+        {
+          "path": "Assets/sprites/arena-life-full.png",
+          "sha256": "054e764f21509d78e3e3bad0bf0f79f05b85b7d61eff17bff9715c5074f03797",
+          "contract": "arena-v2-user-approved-2026-10-17"
+        },
+        {
+          "path": "Assets/sprites/arena-life-empty.png",
+          "sha256": "1e53246efa04bd1e16508780a97f38dc8f75114707ff3a8b8764d8d81a9f3a39",
+          "contract": "arena-v2-user-approved-2026-10-17"
+        },
+        {
+          "path": "Assets/sprites/arena-ui-left.png",
+          "sha256": "1b6ec116615e067d046ee3b9c6bf80f768720c95833d2f8df10eeeed69dd8c9d",
+          "contract": "arena-v2-user-approved-2026-10-17"
+        },
+        {
+          "path": "Assets/sprites/arena-ui-right.png",
+          "sha256": "aa7eb08cf44baf43259e04b7dc08bf051b55291fd541677d3fa761c49c199c9a",
+          "contract": "arena-v2-user-approved-2026-10-17"
+        },
+        {
+          "path": "Assets/sprites/arena-ui-timer.png",
+          "sha256": "abc008ad32f05dbe993a7dd7df282c7bcf63159581f7d8efc0dddb707ef7aa93",
+          "contract": "arena-v2-user-approved-2026-10-17"
+        },
+        {
+          "path": "Assets/sprites/arena-ui-super-left.png",
+          "sha256": "adbfe4e5b1ed00bc693d3e15f1acef6cd818724e38d997c7575b9f47892ccc66",
+          "contract": "arena-v2-user-approved-2026-10-17"
+        },
+        {
+          "path": "Assets/sprites/arena-ui-super-right.png",
+          "sha256": "253eb392131839987e5e46c58749e753894359157b80483cad8feec1fd857637",
+          "contract": "arena-v2-user-approved-2026-10-17"
+        },
+        {
+          "path": "Assets/sprites/arena-rounds-0.png",
+          "sha256": "ffedd12901aa11bcf95d2df99fb7d50d0a889ab5fd85fdc367cb33449c9741f9",
+          "contract": "arena-v2-user-approved-2026-10-17"
+        },
+        {
+          "path": "Assets/sprites/arena-rounds-1.png",
+          "sha256": "5e1aac45c0c846e138c7c9c397c716dceeac9ad45eda8643fde65c22fae10d42",
+          "contract": "arena-v2-user-approved-2026-10-17"
+        },
+        {
+          "path": "Assets/sprites/arena-rounds-2.png",
+          "sha256": "b9c39e2ac70acc71042c5f6a880c83951b53a261f6bd82b03854a3833ca3970b",
+          "contract": "arena-v2-user-approved-2026-10-17"
+        },
+        {
+          "path": "Assets/sprites/arena-life-p2-full.png",
+          "sha256": "054e764f21509d78e3e3bad0bf0f79f05b85b7d61eff17bff9715c5074f03797",
+          "contract": "arena-v2-user-approved-2026-10-17"
+        },
+        {
+          "path": "Assets/sprites/arena-life-p2-empty.png",
+          "sha256": "1e53246efa04bd1e16508780a97f38dc8f75114707ff3a8b8764d8d81a9f3a39",
+          "contract": "arena-v2-user-approved-2026-10-17"
+        },
+        {
+          "path": "Assets/sprites/arena-nara-complete-64x64.png",
+          "sha256": "24e15544097a7a43ff50cab2860fa130c2a29990492dd6f9c96665567f5dd816",
+          "status": "approved",
+          "reason": "Arena: montagem exata das poses aprovadas e preenchimento dinâmico do gauge autorizado em 2026-10-17."
+        },
+        {
+          "path": "Assets/sprites/arena-rival-complete-64x64.png",
+          "sha256": "70abeff2fcab8b3a398d18e5ca213a4239f1014053a17e0c62ebd98806ab02cd",
+          "status": "approved",
+          "reason": "Arena: montagem exata das poses aprovadas e preenchimento dinâmico do gauge autorizado em 2026-10-17."
+        },
+        {
+          "path": "Assets/sprites/arena-super-p1-full.png",
+          "sha256": "054e764f21509d78e3e3bad0bf0f79f05b85b7d61eff17bff9715c5074f03797",
+          "status": "approved",
+          "reason": "Arena: preenchimento dinâmico autorizado do gauge com cores aprovadas."
+        },
+        {
+          "path": "Assets/sprites/arena-super-p1-empty.png",
+          "sha256": "1e53246efa04bd1e16508780a97f38dc8f75114707ff3a8b8764d8d81a9f3a39",
+          "status": "approved",
+          "reason": "Arena: preenchimento dinâmico autorizado do gauge com cores aprovadas."
+        },
+        {
+          "path": "Assets/sprites/arena-super-p2-full.png",
+          "sha256": "054e764f21509d78e3e3bad0bf0f79f05b85b7d61eff17bff9715c5074f03797",
+          "status": "approved",
+          "reason": "Arena: preenchimento dinâmico autorizado do gauge com cores aprovadas."
+        },
+        {
+          "path": "Assets/sprites/arena-super-p2-empty.png",
+          "sha256": "1e53246efa04bd1e16508780a97f38dc8f75114707ff3a8b8764d8d81a9f3a39",
+          "status": "approved",
+          "reason": "Arena: preenchimento dinâmico autorizado do gauge com cores aprovadas."
+        },
+        {
+          "path": "Assets/backgrounds/tactical-arena-large-768x512.png",
+          "sha256": "c4ee93e693427deb445644a7bde853b1f4f98f3db30f596874fb8c844cac3d00",
+          "contract": "tactical-arena-large-compact-approved-2026-10-17"
+        },
+        {
+          "path": "Assets/backgrounds/tactical-arena-large-foreground.png",
+          "sha256": "0971c107b41797db7679721027a8d56f3de3de81fae3590b43fe05b470764abb",
+          "contract": "tactical-arena-large-compact-approved-2026-10-17"
+        },
+        {
+          "path": "Assets/sprites/tactical-compact-turnPanel.png",
+          "sha256": "162f76b355985f6a8fe8deb0edb75e9281aeb589521af9a549711ab6dcdce4ef",
+          "contract": "tactical-arena-large-compact-approved-2026-10-17"
+        },
+        {
+          "path": "Assets/sprites/tactical-compact-unitPanel.png",
+          "sha256": "3f5db67761f36077a6a913a8a8624dffaee16d12833f5455c4c3c80f9fe8e118",
+          "contract": "tactical-arena-large-compact-approved-2026-10-17"
+        },
+        {
+          "path": "Assets/sprites/tactical-compact-actionsPanel.png",
+          "sha256": "c3e421d6c8de8b7f530cb0dab8bc6a6e76d59ab4ab5e5d7e9c47d1aacd4acb2a",
+          "contract": "tactical-arena-large-compact-approved-2026-10-17"
+        },
+        {
+          "path": "Assets/sprites/tactical-approved-nara-64x64.png",
+          "sha256": "ba517f69bfdb8462ad33309d6a0f1cbba185bff5704241ad375469e788dae041",
+          "contract": "tactical-arena-large-compact-approved-2026-10-17"
+        },
+        {
+          "path": "Assets/sprites/tactical-compact-nara-portrait.png",
+          "sha256": "99cc4e5b57cb32f0b3fc3292e749478480fbf13fab70ce9ba2a6902d02f93716",
+          "contract": "tactical-arena-large-compact-approved-2026-10-17"
+        },
+        {
+          "path": "Assets/sprites/tactical-approved-sentinel-64x64.png",
+          "sha256": "a74e6c9c332870d83b8f1ccb8572886ce414ab51cb47737764d3cb45f7853ce7",
+          "contract": "tactical-arena-large-compact-approved-2026-10-17"
+        },
+        {
+          "path": "Assets/sprites/tactical-compact-sentinel-portrait.png",
+          "sha256": "2415c7b1779d86047b19061079407457563fd3d63ea3673a760fd0852a9a2db7",
+          "contract": "tactical-arena-large-compact-approved-2026-10-17"
+        },
+        {
+          "path": "Assets/sprites/tactical-compact-healthFull.png",
+          "sha256": "a16ee710799a3a69dd3bbf5d4185387a0f23ad5138c2e4fa7b86b16bdf39b5d8",
+          "contract": "tactical-arena-large-compact-approved-2026-10-17"
+        },
+        {
+          "path": "Assets/sprites/tactical-compact-healthEmpty.png",
+          "sha256": "e5b6b83d667aeddad0334e9675e755eb0c7b26f0a0f33c1c8738dcf583706955",
+          "contract": "tactical-arena-large-compact-approved-2026-10-17"
+        },
+        {
+          "path": "Assets/sprites/tactical-compact-selection.png",
+          "sha256": "5617bcd16aad5f4a8368a7d4f0cb5300933aefdb84d7f1477548b6f27cbc3415",
+          "contract": "tactical-arena-large-compact-approved-2026-10-17"
+        },
+        {
+          "path": "Assets/sprites/tactical-compact-font-8x8.png",
+          "sha256": "e80ffc3730979c909d2646ccbd029de3d110a3215b39c657b24b1a2b8e6b17a4",
+          "contract": "tactical-arena-large-compact-approved-2026-10-17"
+        },
+        {
+          "path": "Assets/sprites/tactical-cursor-48x24.png",
+          "sha256": "41d304c4f9a1f74948e4a29010e47b526117a11ecd153d5bea48c13fbc892cc2",
+          "contract": "tactical-arena-large-compact-approved-2026-10-17"
+        },
+        {
+          "path": "Assets/sprites/tactical-range-48x24.png",
+          "sha256": "41d304c4f9a1f74948e4a29010e47b526117a11ecd153d5bea48c13fbc892cc2",
+          "contract": "tactical-arena-large-compact-approved-2026-10-17"
+        },
+        {
+          "path": "Assets/sprites/tactical-target-48x24.png",
+          "sha256": "41d304c4f9a1f74948e4a29010e47b526117a11ecd153d5bea48c13fbc892cc2",
+          "contract": "tactical-arena-large-compact-approved-2026-10-17"
+        },
+        {
+          "path": "Assets/backgrounds/penedos-approved-sky.png",
+          "sha256": "762c7cd2ea8612f78ae287030a6cbebb042238e29bab34f86aa192eaad3f3129",
+          "contract": "platformer-approved-wide-v2-user-approved-2026-10-17"
+        },
+        {
+          "path": "Assets/backgrounds/penedos-approved-terrain.png",
+          "sha256": "c171fdc91dccd8384f00f09dbd418172c3595f09e5faec85f0d976beb1fab6c2",
+          "contract": "platformer-approved-wide-v2-user-approved-2026-10-17"
+        },
+        {
+          "path": "Assets/sprites/penedos-approved-nara.png",
+          "sha256": "4c78f52a90972ae5a2cd497f66dd6c89387f5e4dacb7c86bf5ab06e4a883f6e9",
+          "contract": "platformer-approved-wide-v2-user-approved-2026-10-17"
+        },
+        {
+          "path": "Assets/sprites/penedos-approved-worker.png",
+          "sha256": "eed836923733f11e07f9df8933669a5cd4ce748ddbb4ea7c02f3ac729234ab19",
+          "contract": "platformer-approved-wide-v2-user-approved-2026-10-17"
+        },
+        {
+          "path": "Assets/sprites/penedos-approved-crab.png",
+          "sha256": "5eb864b3d6727e3c880a5dae9c24846427aeee9c2fba362767a54df6bd9ec2f1",
+          "contract": "platformer-approved-wide-v2-user-approved-2026-10-17"
+        },
+        {
+          "path": "Assets/sprites/penedos-approved-moth.png",
+          "sha256": "eb95a2ac7cbdf7eb3f55b5ec0e1af32300c2d046a3a84d7864d3373f159d9d83",
+          "contract": "platformer-approved-wide-v2-user-approved-2026-10-17"
+        },
+        {
+          "path": "Assets/sprites/penedos-approved-checkpoint.png",
+          "sha256": "ad300e5ba4bb0c5cb31719e39966584bc7da4736c1e4b211fefa8d37e9a56683",
+          "contract": "platformer-approved-wide-v2-user-approved-2026-10-17"
+        },
+        {
+          "path": "Assets/sprites/penedos-approved-crab-east.png",
+          "sha256": "5eb864b3d6727e3c880a5dae9c24846427aeee9c2fba362767a54df6bd9ec2f1",
+          "contract": "platformer-approved-wide-v2-user-approved-2026-10-17"
+        },
+        {
+          "path": "Assets/sprites/penedos-approved-moth-east.png",
+          "sha256": "eb95a2ac7cbdf7eb3f55b5ec0e1af32300c2d046a3a84d7864d3373f159d9d83",
+          "contract": "platformer-approved-wide-v2-user-approved-2026-10-17"
+        },
+        {
+          "path": "Assets/backgrounds/racing-approved-topdown.png",
+          "sha256": "e1de92b280ebb5210e3a786ab98dc83c8bcb8ccbb053586d654db608148fced6",
+          "contract": "racing-two-views-approved-2026-10-18"
+        },
+        {
+          "path": "Assets/backgrounds/racing-approved-floor.png",
+          "sha256": "20f49597a0766d6b343f8ce4cef1b4cd800200748dec891ff54613185af8e930",
+          "contract": "racing-two-views-approved-2026-10-18"
+        },
+        {
+          "path": "Assets/backgrounds/racing-approved-panorama.png",
+          "sha256": "1123d7cc773e487b68d28c228acc45b2879deee0ebfdbcad0abe950e599ae09a",
+          "contract": "racing-two-views-approved-2026-10-18"
+        },
+        {
+          "path": "Assets/sprites/racing-approved-overhead-nara.png",
+          "sha256": "380728d5df11d72da31115d7714f4899e6a41351623275f36403623c1665e95d",
+          "contract": "racing-two-views-approved-2026-10-18"
+        },
+        {
+          "path": "Assets/sprites/racing-approved-overhead-rival.png",
+          "sha256": "3aa1968c5df6b7aff77b998ab1db4d13e4f48d25beeb694b85c2614c27565e5c",
+          "contract": "racing-two-views-approved-2026-10-18"
+        },
+        {
+          "path": "Assets/sprites/racing-approved-rear-nara.png",
+          "sha256": "ec8410727c5a8b8777d24734f618b31801f75e24a1134f89000077531cb57950",
+          "contract": "racing-two-views-approved-2026-10-18"
+        },
+        {
+          "path": "Assets/sprites/racing-approved-rear-rival.png",
+          "sha256": "88064a2bbacbd1e7542bfd0efebed4bafd6173cdf12a05d2218ebf3d878f2813",
+          "contract": "racing-two-views-approved-2026-10-18"
+        },
+        {
+          "path": "Assets/ui/racing-approved-hud-panel.png",
+          "sha256": "0fb9aec5719e4f13fc906c47863fa0c9aa7f3eda782bccd94e22a0f82fd68bc8",
+          "contract": "racing-two-views-approved-2026-10-18"
+        },
+        {
+          "path": "Assets/backgrounds/tempestade-approved-background.png",
+          "sha256": "f6c48ad5c3b57d33e82e36f365ed1e6890c0a734dd47f5c23ffeff5216458acb",
+          "contract": "tempestade-porto-voo-livre-2026-10-18"
+        },
+        {
+          "path": "Assets/sprites/tempestade-approved-player.png",
+          "sha256": "50e3e2bc0171b10fcc87a8df2284b07558584826e24b9b2f98b9f2578868a193",
+          "contract": "tempestade-porto-voo-livre-2026-10-18"
+        },
+        {
+          "path": "Assets/sprites/tempestade-approved-explosion.png",
+          "sha256": "985fc72c65385054d242f9daed560fd9b17a258608d8a73981430bbd08357111",
+          "contract": "tempestade-porto-voo-livre-2026-10-18"
+        },
+        {
+          "path": "Assets/sprites/tempestade-approved-drone-a.png",
+          "sha256": "88af237e56976b0cd0d679d4c55cc755b81624aab91a8b60a5888bb76c8c2a2b",
+          "contract": "tempestade-porto-voo-livre-2026-10-18"
+        },
+        {
+          "path": "Assets/sprites/tempestade-approved-drone-b.png",
+          "sha256": "833658d6a6e8f71aa66a516d42755003d1257d5236e4fc83eb7f4506b523f67d",
+          "contract": "tempestade-porto-voo-livre-2026-10-18"
+        },
+        {
+          "path": "Assets/sprites/tempestade-approved-boss.png",
+          "sha256": "e9c34f908bb804b0e2df678edd574a87be96b697f7e02fcd7e7be88c309c4954",
+          "contract": "tempestade-porto-voo-livre-2026-10-18"
+        },
+        {
+          "path": "Assets/sprites/tempestade-approved-shot.png",
+          "sha256": "2bdab70b14373242a80b6cee45cf2987f182ceb14a32e3380490a0f66baf59c3",
+          "contract": "tempestade-porto-voo-livre-2026-10-18"
+        },
+        {
+          "path": "Assets/sprites/tempestade-approved-bolt.png",
+          "sha256": "3110b1b8ccf6e50318dc24bbbe4ff3f9d46848661ebac0ca03206baa520b06a9",
+          "contract": "tempestade-porto-voo-livre-2026-10-18"
+        },
+        {
+          "path": "Assets/ui/tempestade-approved-plane.png",
+          "sha256": "988b991b83404235db409a938514329e0808253da935f186e542feebf0e2cae0",
+          "contract": "tempestade-porto-voo-livre-2026-10-18"
+        },
+        {
+          "path": "Assets/ui/tempestade-approved-flag.png",
+          "sha256": "b7e53cf3d9ab245552a9835389593673c36759127991ff0b4039aa0844d076c4",
+          "contract": "tempestade-porto-voo-livre-2026-10-18"
+        },
+        {
+          "path": "Assets/sprites/tempestade-approved-font.png",
+          "sha256": "f2cfb36d6788fe02972500811e5155576b3e8e9dde8eb9aed2e08d10a336ff23",
+          "contract": "tempestade-porto-voo-livre-2026-10-18"
+        },
+        {
+          "path": "Assets/sprites/storm-shot.png",
+          "sha256": "76b648e4f5109fc62b644d404e7cdf9620391ace67b54cf16d6ac4cfe3a9d900",
+          "contract": "previously-approved-tempestade-preserved-source"
+        },
+        {
+          "path": "Assets/sprites/storm-bolt.png",
+          "sha256": "b266f238b498cdf40d615eff711eaa28c3b2569f327b212aa2ea66a173f09b46",
+          "contract": "previously-approved-tempestade-preserved-source"
+        },
+        {
+          "path": "Assets/backgrounds/porto-lume-shmup-wide-v3-local-banks.png",
+          "sha256": "6e5825ee65d8781b0a6ee5854585c88f7a44d67264b6d78610e0d341b032e82a",
+          "contract": "previously-approved-tempestade-preserved-source"
+        },
+        {
+          "path": "Assets/sprites/tempestade-v3-player.png",
+          "sha256": "3eb41a92131ae9e71c384aea57457e6222ce298b64dc040549d5edb901802f8a",
+          "contract": "previously-approved-tempestade-preserved-source"
+        },
+        {
+          "path": "Assets/sprites/tempestade-v3-drone-horizontal.png",
+          "sha256": "4159bf7a1515acf622602db5c00e40874b353006eb45aa3076781f5d203dec13",
+          "contract": "previously-approved-tempestade-preserved-source"
+        },
+        {
+          "path": "Assets/sprites/tempestade-v3-drone-vertical.png",
+          "sha256": "33aa60167e8c32313525e0538ae569d760a9d47d12a38489656b0e32423ce511",
+          "contract": "previously-approved-tempestade-preserved-source"
+        },
+        {
+          "path": "Assets/sprites/tempestade-v3-boss-lighthouse.png",
+          "sha256": "1b6c5dae96e02b844ce99ed943153faec785a95331975e3abd8007926714aa90",
+          "contract": "previously-approved-tempestade-preserved-source"
+        },
+        {
+          "path": "Assets/backgrounds/relay-approved-background.png",
+          "sha256": "4e104d8b2dd49b614a7a36a511b3030beeba3218d606a69fec6701a3b30d6da8",
+          "contract": "relay-porto-approved-2026-10-18"
+        },
+        {
+          "path": "Assets/backgrounds/relay-approved-hud-frames.png",
+          "sha256": "98757d7f954c44fb90ef61becafad2ca385f14b40ede5bdc9a3d1a55ae12d327",
+          "contract": "relay-porto-approved-2026-10-18"
+        },
+        {
+          "path": "Assets/sprites/relay-approved-nara.png",
+          "sha256": "f741d934e75e5c8e1539c15d4353483dad4dcc7c92422c035a66c542dfa30767",
+          "contract": "relay-porto-approved-2026-10-18"
+        },
+        {
+          "path": "Assets/sprites/relay-approved-guardian.png",
+          "sha256": "2ce8a03f18e99fdb42e22d019b9b4c35f6711cfc619407dc693e07f2f13b817b",
+          "contract": "relay-porto-approved-2026-10-18"
+        },
+        {
+          "path": "Assets/sprites/relay-approved-effects.png",
+          "sha256": "1b7776e1721042d01868e138c80e40b1b609ba0eef8e0c6d1e8a87cbcd64485f",
+          "contract": "relay-porto-approved-2026-10-18"
+        },
+        {
+          "path": "Assets/ui/relay-approved-shadow-party.png",
+          "sha256": "85155b25b13667112e336c22036b52481a55cc40574f4736158b88b22c863b97",
+          "contract": "relay-porto-approved-2026-10-18"
+        },
+        {
+          "path": "Assets/ui/relay-approved-shadow-enemy.png",
+          "sha256": "ef315e1cb69ee55c8caef71653d8b968efda1c80f6e738e340343e200cc62248",
+          "contract": "relay-porto-approved-2026-10-18"
+        },
+        {
+          "path": "Assets/ui/relay-approved-hp-party.png",
+          "sha256": "d44b19b6cefbfd047271d1e79df0d45f5453075ddfe147e328d29dbb452686be",
+          "contract": "relay-porto-approved-2026-10-18"
+        },
+        {
+          "path": "Assets/ui/relay-approved-hp-enemy.png",
+          "sha256": "d44b19b6cefbfd047271d1e79df0d45f5453075ddfe147e328d29dbb452686be",
+          "contract": "relay-porto-approved-2026-10-18"
+        },
+        {
+          "path": "Assets/ui/relay-approved-hp-empty.png",
+          "sha256": "5f3bf0160e266f9fd1d560220c7f3f3ee04cd1b2acee3e1411e67324f7668089",
+          "contract": "relay-porto-approved-2026-10-18"
+        },
+        {
+          "path": "Assets/ui/relay-approved-disabled-escape.png",
+          "sha256": "7b3ac7febcc9d89ab0b76045e76bb98ef14ae7928ce0a7f9d87c53a81a24e8b3",
+          "contract": "relay-porto-approved-2026-10-18"
+        },
+        {
+          "path": "Assets/fonts/relay-approved-font.png",
+          "sha256": "10ff87e8cf04a5a6b36039ed3f696e3584f37ef914135f3d8d96589f88e43aae",
+          "contract": "relay-porto-approved-2026-10-18"
+        },
+        {
+          "path": "Assets/ui/relay-approved-cursor.png",
+          "sha256": "02480406497ac728553d80d193f27a8d90dbab9077c83e55e393fac7978d1e43",
+          "contract": "relay-porto-approved-2026-10-18"
+        },
+        {
+          "path": "Assets/backgrounds/battle-rpg-usina-nearest-review.png",
+          "sha256": "cb7027e8fd4dbd0c15638c2d00e9a06ebd0c4b56beb2ed20ab4e6f0cf2e5d53e",
+          "contract": "previously-approved-relay-source-preserved-2026-10-18"
+        },
+        {
+          "path": "Assets/sprites/battle-rpg-scene-party-mechanic-alpha128-v2.png",
+          "sha256": "7cfffa6566c2a2b3790891c8b9d3ce9a189da204174fd00f620610e44caf0c10",
+          "contract": "previously-approved-relay-source-preserved-2026-10-18"
+        },
+        {
+          "path": "Assets/sprites/battle-rpg-scene-enemy-large-robot-alpha128-v2.png",
+          "sha256": "fab7f224493e066a0ed2a5cc7a42c27a09df918b249810801b4d4be3e278f91c",
+          "contract": "previously-approved-relay-source-preserved-2026-10-18"
+        },
+        {
+          "path": "Assets/backgrounds/dungeon-approved-exploracao-background.png",
+          "sha256": "90b2876c55423aa009156c5cf0a936355660f74250dad94656059afe739c5432",
+          "contract": "dungeon-porto-approved-2026-10-18"
+        },
+        {
+          "path": "Assets/backgrounds/dungeon-approved-combate-background.png",
+          "sha256": "e2848b87a2e4bff6a82c1c0bbc22d67934cfc59451b129da29d06b0e601d3525",
+          "contract": "dungeon-porto-approved-2026-10-18"
+        },
+        {
+          "path": "Assets/backgrounds/dungeon-approved-saida-background.png",
+          "sha256": "bcae07fc3e6d40a278dc0a83728c5b5172b7a9b0b78b2601ed9fc276efd480c9",
+          "contract": "dungeon-porto-approved-2026-10-18"
+        },
+        {
+          "path": "Assets/dungeon/dungeon-approved-tiles.4bpp",
+          "sha256": "ed87ca166d66b0ac2bca3fe9b6afa38c753c2191a6e092cc4f33d4e91196bca5",
+          "contract": "dungeon-porto-approved-2026-10-18"
+        },
+        {
+          "path": "Assets/dungeon/dungeon-approved-views.bin",
+          "sha256": "cb490b95dc192a476b7dd10ec2657af90ca77675ed08ae4201a0910b01086017",
+          "contract": "dungeon-porto-approved-2026-10-18"
+        },
+        {
+          "path": "Assets/dungeon/dungeon-approved-palettes.rgb555",
+          "sha256": "e0a77c145af565987e6b4a422ee6e7610851d033dc2536d1673369479684387d",
+          "contract": "dungeon-porto-approved-2026-10-18"
+        },
+        {
+          "path": "Assets/sprites/dungeon-approved-sentinel-near.png",
+          "sha256": "d2f5fd32efb4270b2561d33f3bb7ee8d817083e592fee6dbd8e5bd677896fb6b",
+          "contract": "dungeon-porto-approved-2026-10-18"
+        },
+        {
+          "path": "Assets/sprites/dungeon-approved-sentinel-mid.png",
+          "sha256": "9b9c40d7123efc99befff815d2b14a717256bf3fc008a55db43ebc13f5c54954",
+          "contract": "dungeon-porto-approved-2026-10-18"
+        },
+        {
+          "path": "Assets/sprites/dungeon-approved-sentinel-far.png",
+          "sha256": "e18d469714943c03052abcb23f6c5bf71625f59fec6ed1f790a21ddf7299f656",
+          "contract": "dungeon-porto-approved-2026-10-18"
+        },
+        {
+          "path": "Assets/sprites/dungeon-approved-cell-near.png",
+          "sha256": "766fdbbcf9a85f6fecde3dc6abc0300c0a365447e2163f72346a9d894d0a446d",
+          "contract": "dungeon-porto-approved-2026-10-18"
+        },
+        {
+          "path": "Assets/sprites/dungeon-approved-cell-mid.png",
+          "sha256": "3cd352fe430a3875620a09f309516a6422c3e204f8ab1ace049586d48ff89758",
+          "contract": "dungeon-porto-approved-2026-10-18"
+        },
+        {
+          "path": "Assets/sprites/dungeon-approved-cell-far.png",
+          "sha256": "bebc784d6b0069103982e11fd2802f6533cdab68cf71d1579493a1e99e86f16a",
+          "contract": "dungeon-porto-approved-2026-10-18"
+        },
+        {
+          "path": "Assets/backgrounds/dungeon-approved-hud.png",
+          "sha256": "2dbbc4ee7c167770140e66b5e3016a4d353501cd09bc9bf1034e059281823d4a",
+          "contract": "dungeon-porto-approved-2026-10-18"
+        },
+        {
+          "path": "Assets/fonts/dungeon-approved-font.png",
+          "sha256": "e80ffc3730979c909d2646ccbd029de3d110a3215b39c657b24b1a2b8e6b17a4",
+          "contract": "dungeon-porto-approved-2026-10-18"
+        },
+        {
+          "path": "Assets/sprites/dungeon-approved-portrait.png",
+          "sha256": "4691efe18e255772f5a1f919fe35e4beefbad36441c987d44ae23b666b890aad",
+          "contract": "dungeon-porto-approved-2026-10-18"
+        },
+        {
+          "path": "Assets/sprites/dungeon-approved-cell-icon.png",
+          "sha256": "bcd5fd0c516ebd242db99c3afbe97d1935651cb6f0dfd3fa98a41f7e109d196c",
+          "contract": "dungeon-porto-approved-2026-10-18"
+        },
+        {
+          "path": "Assets/sprites/dungeon-approved-hearts-0.png",
+          "sha256": "314e28ce4129b4eedd1b7724ae85a0ba35ed7b8b79ed122639dfaf8d915d185d",
+          "contract": "dungeon-porto-approved-2026-10-18"
+        },
+        {
+          "path": "Assets/sprites/dungeon-approved-hearts-1.png",
+          "sha256": "843ede26faf8b1ad37203b95c24a867d069ac941462d68b95c365cdb4df1a246",
+          "contract": "dungeon-porto-approved-2026-10-18"
+        },
+        {
+          "path": "Assets/sprites/dungeon-approved-hearts-2.png",
+          "sha256": "ff333654f4da59b44d43046c2628a9313578e9cd85b1b20c174b0c644e3f4bae",
+          "contract": "dungeon-porto-approved-2026-10-18"
+        },
+        {
+          "path": "Assets/sprites/dungeon-approved-hearts-3.png",
+          "sha256": "108f0bc9556ae0cdffd488e9c952549bf12a503ea010ef14348c5e06b5dbb63d",
+          "contract": "dungeon-porto-approved-2026-10-18"
+        },
+        {
+          "path": "Assets/sprites/dungeon-approved-panel.png",
+          "sha256": "ecffdfcafe3c754311583f1b38fdac921ac45f7a0976b4c00cc9ac75daad0bc6",
+          "contract": "dungeon-porto-approved-2026-10-18"
+        },
+        {
+          "path": "Assets/sprites/dungeon-approved-gauge-full.png",
+          "sha256": "b8d947502e60cf82a7576b49f62165183206dd66e1188fb4b6aa1fa7c93111a6",
+          "contract": "dungeon-porto-approved-2026-10-18"
+        },
+        {
+          "path": "Assets/sprites/dungeon-approved-gauge-empty.png",
+          "sha256": "5b9fe6eeeb3f5b1209e7546b2d35f2fa78dc9e77cec73993f28f102c44a8f0fe",
+          "contract": "dungeon-porto-approved-2026-10-18"
+        },
+        {
+          "path": "Assets/backgrounds/startup-fade-a-00-gba.png",
+          "sha256": "539a0e2c7915bfe6d08c101ed96d3921ca90ed987ae6c6301943c3ac439ba87a",
+          "contract": "startup-fade-a-user-approved-2026-10-19"
+        },
+        {
+          "path": "Assets/backgrounds/startup-fade-a-01-gba.png",
+          "sha256": "e9b96e6ccba7dbff9f3b80b9321b3c2d28a13dc94f4de1ccaef4803393aea33a",
+          "contract": "startup-fade-a-user-approved-2026-10-19"
+        },
+        {
+          "path": "Assets/backgrounds/startup-fade-a-02-gba.png",
+          "sha256": "fac949bc538b6ab2d3e03caed28552d5393d560813f231d1ce98406838ce84de",
+          "contract": "startup-fade-a-user-approved-2026-10-19"
+        },
+        {
+          "path": "Assets/backgrounds/startup-fade-a-03-gba.png",
+          "sha256": "665ee435b0073b945851b296465e093c434292b80d65679b88c29b9123116395",
+          "contract": "startup-fade-a-user-approved-2026-10-19"
+        },
+        {
+          "path": "Assets/backgrounds/startup-fade-a-04-gba.png",
+          "sha256": "d2660e4105cff61e04f60045520c65234d184295a0a61106a76b7d1d175dcfcb",
+          "contract": "startup-fade-a-user-approved-2026-10-19"
+        },
+        {
+          "path": "Assets/backgrounds/startup-fade-a-05-gba.png",
+          "sha256": "a3e218718cf18f263051e64f3878b2553b7c2c491ebeb907d679bc6b7aa7feb8",
+          "contract": "startup-fade-a-user-approved-2026-10-19"
+        },
+        {
+          "path": "Assets/backgrounds/startup-fade-a-06-gba.png",
+          "sha256": "50f40e83d0e65997db64b45f0de85540ac08ddc4a7230213c50194149289512b",
+          "contract": "startup-fade-a-user-approved-2026-10-19"
+        },
+        {
+          "path": "Assets/backgrounds/startup-fade-a-07-gba.png",
+          "sha256": "b7b065fdf419ea34bc050818ba6259a882e24125467320cf875eb897668132d7",
+          "contract": "startup-fade-a-user-approved-2026-10-19"
+        },
+        {
+          "path": "Assets/backgrounds/startup-fade-a-08-gba.png",
+          "sha256": "bff36ef657d95b0b20546bf78e65f2c2deb1f14974fbd179f1365d0fd2a8b817",
+          "contract": "startup-fade-a-user-approved-2026-10-19"
+        },
+        {
+          "path": "Assets/backgrounds/startup-fade-a-09-gba.png",
+          "sha256": "0a4af75316c593ced4d7462993caf4e42fd8a4cbcc6b467c325864f194ba7fc8",
+          "contract": "startup-fade-a-user-approved-2026-10-19"
+        },
+        {
+          "path": "Assets/backgrounds/startup-fade-a-10-gba.png",
+          "sha256": "bd5e82559a5437205548a413ddd9739f3eb709880537df06bada0ae7770d10d2",
+          "contract": "startup-fade-a-user-approved-2026-10-19"
+        },
+        {
+          "path": "Assets/backgrounds/startup-fade-a-11-gba.png",
+          "sha256": "ba80b55ff7ea4d769f7733afcce43ba255683c49b5662f409491734a7caf3cd9",
+          "contract": "startup-fade-a-user-approved-2026-10-19"
+        },
+        {
+          "path": "Assets/backgrounds/startup-fade-a-12-gba.png",
+          "sha256": "e90fa2b2c5e6ee745fbd0c906e22fe739134b3b8f8fc4f788647001598dd321f",
+          "contract": "startup-fade-a-user-approved-2026-10-19"
+        },
+        {
+          "path": "Assets/backgrounds/startup-fade-a-13-gba.png",
+          "sha256": "5d54883d44760f9e8c6a32c7e4513646ddf2ace5c81784444c0c6b4e84c2a35a",
+          "contract": "startup-fade-a-user-approved-2026-10-19"
+        },
+        {
+          "path": "Assets/backgrounds/startup-fade-a-14-gba.png",
+          "sha256": "41688bc765a55c64795564e8b496bb2cd508268fc52c2582fc36241f6cadbd16",
+          "contract": "startup-fade-a-user-approved-2026-10-19"
+        },
+        {
+          "path": "Assets/backgrounds/startup-fade-a-15-gba.png",
+          "sha256": "743a6e59c1b965cce3ab04ada01483a3a9150031c307a1153e8d1acfe2316462",
+          "contract": "startup-fade-a-user-approved-2026-10-19"
+        },
+        {
+          "path": "Assets/backgrounds/startup-fade-a-16-gba.png",
+          "sha256": "2a6702ae2b20189cd33d234ab4ed868e1605e4b352daad10b5f17dc460ae21ea",
+          "contract": "startup-fade-a-user-approved-2026-10-19"
+        },
+        {
+          "path": "Assets/backgrounds/startup-fade-a-17-gba.png",
+          "sha256": "e0523ee9e9c59bf2c30ec2721db1430af04f0525c822428e3abf93e955d46bd3",
+          "contract": "startup-fade-a-user-approved-2026-10-19"
+        },
+        {
+          "path": "Assets/backgrounds/startup-fade-a-18-gba.png",
+          "sha256": "c71bf6d8bffb0a29b7367904d2f3f15a3902d567a0df0ad8825b0b9f7bec0a1e",
+          "contract": "startup-fade-a-user-approved-2026-10-19"
+        },
+        {
+          "path": "Assets/backgrounds/startup-fade-a-19-gba.png",
+          "sha256": "7d254213b863fbd757fa0f708b182a4ac9a222120c91f9f41d0cb7fd851be229",
+          "contract": "startup-fade-a-user-approved-2026-10-19"
+        },
+        {
+          "path": "Assets/backgrounds/startup-fade-a-20-gba.png",
+          "sha256": "ed2e7cc3684a46e1f6f646b04ce8499d5b538d5934a6c2a719941542fb9445ff",
+          "contract": "startup-fade-a-user-approved-2026-10-19"
+        },
+        {
+          "path": "Assets/backgrounds/startup-fade-a-21-gba.png",
+          "sha256": "59a48058ae0de7725207d0b2a5d836bc5c6b97d304996c381cfe49c65c10e913",
+          "contract": "startup-fade-a-user-approved-2026-10-19"
+        },
+        {
+          "path": "Assets/backgrounds/startup-fade-a-22-gba.png",
+          "sha256": "740b328a2178a62b5c16ccc14f9bc4cf6ee92c2f8c94324335d2f32f84e643a2",
+          "contract": "startup-fade-a-user-approved-2026-10-19"
+        },
+        {
+          "path": "Assets/backgrounds/startup-fade-a-23-gba.png",
+          "sha256": "a787c3db55d8926ee8861d09f08500b1b7cc9a2307ebc012c239f8f0f1311bde",
+          "contract": "startup-fade-a-user-approved-2026-10-19"
+        },
+        {
+          "path": "Assets/backgrounds/startup-fade-a-24-gba.png",
+          "sha256": "05b80ee12b86e5380592320b3973b8e1e80a41bcb901155e86232bd7e0c7fa91",
+          "contract": "startup-fade-a-user-approved-2026-10-19"
+        },
+        {
+          "path": "Assets/backgrounds/startup-fade-a-25-gba.png",
+          "sha256": "c84763fafe0c75f95911cb5607b5e927eb55fb6fb5dc16718d82303224c91ae8",
+          "contract": "startup-fade-a-user-approved-2026-10-19"
+        },
+        {
+          "path": "Assets/backgrounds/startup-fade-a-26-gba.png",
+          "sha256": "1734475acf879934be97834928d026f7e496021fe33c5208f35b5ff8469f0bd9",
+          "contract": "startup-fade-a-user-approved-2026-10-19"
+        },
+        {
+          "path": "Assets/backgrounds/startup-fade-a-27-gba.png",
+          "sha256": "fc71753e91e817f46e37ce535a3e5e79ffe3277489d03872d583af37b5369b0b",
+          "contract": "startup-fade-a-user-approved-2026-10-19"
+        },
+        {
+          "path": "Assets/backgrounds/startup-fade-a-28-gba.png",
+          "sha256": "ff07c6dac911cb7504b24d2d4bae1d0812ee45e7a8fd820a1befe414e3f68d2b",
+          "contract": "startup-fade-a-user-approved-2026-10-19"
+        },
+        {
+          "path": "Assets/backgrounds/startup-fade-a-29-gba.png",
+          "sha256": "c020633f90f002bf9996e52c7c38c3fba3d5364e12a344d8d9c80c1fdf407c4a",
+          "contract": "startup-fade-a-user-approved-2026-10-19"
+        },
+        {
+          "path": "Assets/backgrounds/startup-fade-a-30-gba.png",
+          "sha256": "fe6f04e64925d739548ae659344ca1e02e0cbf3066045440126feced87419b03",
+          "contract": "startup-fade-a-user-approved-2026-10-19"
+        },
+        {
+          "path": "Assets/backgrounds/startup-fade-a-31-gba.png",
+          "sha256": "9a9bf9d2bfef10a2ecd7adef28b9452f479a9ef41b0466c3a6e3fa60e4c827d3",
+          "contract": "startup-fade-a-user-approved-2026-10-19"
+        },
+        {
+          "path": "Assets/backgrounds/startup-fade-a-32-gba.png",
+          "sha256": "5a4d55b961e7cf026600f8e3ed53725b8ad364d2bb32cdc7186de821120f06bc",
+          "contract": "startup-fade-a-user-approved-2026-10-19"
+        },
+        {
+          "path": "Assets/backgrounds/startup-fade-a-33-gba.png",
+          "sha256": "24051bbff9d3b1bdca7a833bf34c554800cde0733b3cf79904436b5c6d579c45",
+          "contract": "startup-fade-a-user-approved-2026-10-19"
+        },
+        {
+          "path": "Assets/backgrounds/startup-fade-a-34-gba.png",
+          "sha256": "5902593b3aeb953bd26603f0921a7ee5e1ac4fb8e377612e296fb93b3503820a",
+          "contract": "startup-fade-a-user-approved-2026-10-19"
+        },
+        {
+          "path": "Assets/backgrounds/startup-fade-a-35-gba.png",
+          "sha256": "aaef32efa5fcd611066cf1eda47410a9d964f56a5f64f30b0ebd6dc7e30ae07c",
+          "contract": "startup-fade-a-user-approved-2026-10-19"
+        },
+        {
+          "path": "Assets/backgrounds/startup-fade-a-36-gba.png",
+          "sha256": "c2a465eb89d0caf69dbbf91fa69567d08cf30193d3fb14ce4fa0e9a3579c5cf9",
+          "contract": "startup-fade-a-user-approved-2026-10-19"
+        },
+        {
+          "path": "Assets/backgrounds/startup-fade-a-37-gba.png",
+          "sha256": "bdf6db2e6b88f5fd082d9bbdb5ca498d0e344e70f0d3db469ea852557c168262",
+          "contract": "startup-fade-a-user-approved-2026-10-19"
+        },
+        {
+          "path": "Assets/backgrounds/startup-fade-a-38-gba.png",
+          "sha256": "65a2f20e137b45d284cc732ffb2be84dd0849615aaac0e85291485668788c823",
+          "contract": "startup-fade-a-user-approved-2026-10-19"
+        },
+        {
+          "path": "Assets/backgrounds/startup-fade-a-39-gba.png",
+          "sha256": "5541ece7ca5429986b704a0b5b2cda56c48536b447b7e06545bdcfadb46b335c",
+          "contract": "startup-fade-a-user-approved-2026-10-19"
+        },
+        {
+          "path": "Assets/backgrounds/startup-fade-a-40-gba.png",
+          "sha256": "5b1d1e75f5d2f00ba68e1bf600bf7b3b5e88e6ce03befb0666060fa061ccf8c7",
+          "contract": "startup-fade-a-user-approved-2026-10-19"
+        },
+        {
+          "path": "Assets/backgrounds/startup-fade-a-41-gba.png",
+          "sha256": "6ec60585c9f7b34c8f1d084e59bc18d56b7e4fc90fb34a3522d16b27512698c1",
+          "contract": "startup-fade-a-user-approved-2026-10-19"
+        },
+        {
+          "path": "Assets/backgrounds/startup-fade-a-42-gba.png",
+          "sha256": "a31c274191e9fb3407db9949014e771a60580333b63903ea74dc697a428cb2fb",
+          "contract": "startup-fade-a-user-approved-2026-10-19"
+        },
+        {
+          "path": "Assets/backgrounds/startup-fade-a-43-gba.png",
+          "sha256": "0df7d6238191168debdadb97bfce346ad99987f564a346ca92289b1a7747a9e3",
+          "contract": "startup-fade-a-user-approved-2026-10-19"
+        },
+        {
+          "path": "Assets/backgrounds/startup-fade-a-44-gba.png",
+          "sha256": "d782404a202a291a095f9220ffcbe79d10733bba85f8cf9aa81a3c19a690f6bf",
+          "contract": "startup-fade-a-user-approved-2026-10-19"
+        },
+        {
+          "path": "Assets/backgrounds/startup-fade-a-45-gba.png",
+          "sha256": "defb45e1c77f9fe3232959873b06fec395bf620a1375df02314501b0afe26f5d",
+          "contract": "startup-fade-a-user-approved-2026-10-19"
+        },
+        {
+          "path": "Assets/backgrounds/startup-fade-a-46-gba.png",
+          "sha256": "133d65cbfbfd3620e295a6e56fcb4f63309e919129ba720876c33adbd97cf805",
+          "contract": "startup-fade-a-user-approved-2026-10-19"
+        },
+        {
+          "path": "Assets/backgrounds/startup-fade-a-47-gba.png",
+          "sha256": "b9700a315e2a813f8768138e5fd61384a896f846d06490e833ad3eb7e4986e64",
+          "contract": "startup-fade-a-user-approved-2026-10-19"
+        },
+        {
+          "path": "Assets/backgrounds/startup-fade-a-48-gba.png",
+          "sha256": "9a76a84e60b7e34c1a229434c0a1159c7b98e709ee18cef3fea4af8ce1f5a460",
+          "contract": "startup-fade-a-user-approved-2026-10-19"
+        },
+        {
+          "path": "Assets/backgrounds/startup-fade-a-49-gba.png",
+          "sha256": "c286217c9f7733e4925150f5c1e50795f86046b82a0d72a4816abb5885dee9da",
+          "contract": "startup-fade-a-user-approved-2026-10-19"
+        },
+        {
+          "path": "Assets/backgrounds/startup-fade-a-50-gba.png",
+          "sha256": "d035b7c074c0146445c5fb053df23fe544933048870ebe89286fe3975d5f6a0a",
+          "contract": "startup-fade-a-user-approved-2026-10-19"
+        },
+        {
+          "path": "Assets/backgrounds/startup-fade-a-51-gba.png",
+          "sha256": "89ff45227ee92a27d8cbd32f51673ecea8385bd38aae4c4eee7d99df2cbb9904",
+          "contract": "startup-fade-a-user-approved-2026-10-19"
+        },
+        {
+          "path": "Assets/backgrounds/startup-fade-a-52-gba.png",
+          "sha256": "8a951b9ff172ed83358685e05409b543e330384454aae4ea59bb2dbdbbe80030",
+          "contract": "startup-fade-a-user-approved-2026-10-19"
+        },
+        {
+          "path": "Assets/backgrounds/gba-studio-startup-canvas-frame-00-gba.png",
+          "sha256": "0559f053fa098f9e4596470a70ff618e96166f46cbeb42cbdd0cc173c9c67089",
+          "contract": "startup-fade-a-preserved-originals-2026-10-19"
+        },
+        {
+          "path": "Assets/backgrounds/gba-studio-startup-canvas-frame-01-gba.png",
+          "sha256": "91fa6104418006de5517a8d3e7eb3f990ede959b6b99f5f47f4ac8d1c7f146bb",
+          "contract": "startup-fade-a-preserved-originals-2026-10-19"
+        },
+        {
+          "path": "Assets/backgrounds/gba-studio-startup-canvas-frame-02-gba.png",
+          "sha256": "0fc7b5333b83335a966d8ca3c68feb73b5a7c506a374624ffac634ef293cb09f",
+          "contract": "startup-fade-a-preserved-originals-2026-10-19"
+        },
+        {
+          "path": "Assets/backgrounds/gba-studio-startup-canvas-frame-03-gba.png",
+          "sha256": "0f09cac899b5faf27ac9ffa8b5adfc15138154e325eca7ea19852b89356bef13",
+          "contract": "startup-fade-a-preserved-originals-2026-10-19"
+        },
+        {
+          "path": "Assets/backgrounds/route-lumen-paged.png",
+          "sha256": "54b45b3d6d7f5111ab96c29624d51990f6ece4f4a8a4bc7dae9f2cd2783937c4",
+          "contract": "world-map-lumen-user-approved-2026-10-19"
+        },
+        {
+          "path": "Assets/sprites/route-dirigible-lumen-64.png",
+          "sha256": "9ea0da26b97f5cdaedf580bfde27b3f65f9955e98fda8f899b4336d1a13171c2",
+          "contract": "world-map-lumen-user-approved-2026-10-19"
+        },
+        {
+          "path": "Assets/fonts/route-lumen-hud-font.png",
+          "sha256": "39a033cc111aefebb5b38798385aec191657aa5f8219cc7db8e262ba094d4a68",
+          "contract": "world-map-lumen-user-approved-2026-10-19"
+        },
+        {
+          "path": "Assets/ui/route-lumen-hud-card-0.png",
+          "sha256": "517e503651771f3e8c6e4a78860560fffc84c2cf9d0032dc1ac715ff4e5e71be",
+          "contract": "world-map-lumen-user-approved-2026-10-19"
+        },
+        {
+          "path": "Assets/ui/route-lumen-hud-card-1.png",
+          "sha256": "5c259cf83ab3923d0f43722d0d3e73be8dfaac02135c2a106d3dbdf345084081",
+          "contract": "world-map-lumen-user-approved-2026-10-19"
+        },
+        {
+          "path": "Assets/ui/route-lumen-hud-card-2.png",
+          "sha256": "d473f331ca22dc4ee47648f6a5ae915f0308a63eb44074b9e4f61833c11e4ea4",
+          "contract": "world-map-lumen-user-approved-2026-10-19"
         }
       ],
       "retired": [

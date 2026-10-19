@@ -2,6 +2,7 @@ import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { decodePngRgba } from "./lib/png-icons.mjs";
 import { describe, expect, it } from "vitest";
+import { startupFadeManifest } from './startup-fade-promotion.mjs';
 
 import { buildEngineExportProjectContract } from "../src/main/exportEngineProject.js";
 import { analyzeConditionalSceneFlow } from "../src/shared/conditionalFlowAnalyzer.js";
@@ -29,6 +30,8 @@ const templateURL = new URL(
   import.meta.url
 );
 
+const retiredAssets = JSON.parse(readFileSync(new URL("../fixtures/asset-provenance/example-library-cleanup.json", import.meta.url))).retiredAssets;
+
 function canonicalProject() {
   return expandProjectTilemaps(parseGBAProjectFile(readFileSync(templateURL, "utf8")).data);
 }
@@ -40,7 +43,8 @@ function verticeProject() {
 function canonicalVerticeSceneCount() {
   const sceneNames = [
     ...VERTICE_CAMPAIGN_SCENES.map((scene) => scene.name),
-    ...VERTICE_SUPPORT_SCENES.map((scene) => scene.name)
+    ...VERTICE_SUPPORT_SCENES.map((scene) => scene.name),
+    "circuito_perspectiva"
   ].filter((name) => name !== "menu_inicial");
   return new Set(sceneNames).size;
 }
@@ -106,49 +110,34 @@ describe("materialização canônica de Vértice", () => {
     }
   });
 
-  it("preserva movimento e espelhamento do sprite autorado de Nara no Porto", () => {
-    const saved = JSON.parse(readFileSync(templateURL, "utf8"));
-    for (const project of [saved, verticeProject()]) {
-      for (const sheet of ["nara-topdown.png"]) {
-        const frameWidth = 32;
-        const frameHeight = 64;
-        const sheetWidth = 288;
-        const animations = project.animations.filter((animation) => animation.spriteSheet === sheet);
+  it("preserva as quatro direções das sheets de 48px ativas do Porto", () => {
+    for (const project of [canonicalProject(), verticeProject()]) {
+      for (const sheet of ['porto-nara-animations48.png', 'porto-mechanic-animations48.png']) {
+        const animations = project.animations.filter(a => a.spriteSheet === sheet);
         expect(animations).toHaveLength(8);
-        for (const direction of ["down", "up", "left", "right"]) {
-          const idle = animations.find((animation) => animation.name === `idle_${direction}`);
-          const walk = animations.find((animation) => animation.name === `walk_${direction}`);
-          expect(idle).toMatchObject({ frameWidth, frameHeight, frameCount: 1 });
-          expect(walk).toMatchObject({ frameWidth, frameHeight, frameCount: 2, hitboxWidth: 16, hitboxHeight: 16 });
-          expect(new Set(walk.frames.map((frame) => frame.tiles[0].sliceX)).size).toBe(2);
-          for (const animation of [idle, walk]) for (const frame of animation.frames) {
-            expect(frame).toMatchObject({ width: frameWidth, height: frameHeight, originY: 0 });
-            // Fitting the editor canvas shifts the tile and origin together.
-            // The exported position and the full 32px composition stay intact.
-            expect(frame.tiles[0].x - frame.originX).toBe(0);
-            expect(frameWidth / 2 - 8 + frame.tiles[0].x).toBeGreaterThanOrEqual(0);
-            expect(frameWidth / 2 - 8 + frame.tiles[0].x + frame.tiles[0].tileWidth).toBeLessThanOrEqual(frameWidth);
-            expect(frame.tiles[0]).toMatchObject({ tileWidth: frameWidth, tileHeight: frameHeight, flipX: direction === "left" });
-            expect(frame.tiles[0].sliceX).toBeLessThan(sheetWidth);
-          }
+        for (const direction of ['down', 'up', 'left', 'right']) {
+          expect(animations.find(a => a.name === `idle_${direction}`)).toMatchObject({frameWidth:32,frameHeight:48,frameCount:1});
+          const walk = animations.find(a => a.name === `walk_${direction}`);
+          expect(walk).toMatchObject({frameWidth:32,frameHeight:48,frameCount:4,hitboxWidth:16,hitboxHeight:16});
+          expect(new Set(walk.frames.map(f => f.sourceFrameIndex)).size).toBe(4);
         }
-        expect(animations.find((animation) => animation.name === "walk_left").frames.map((frame) => frame.tiles[0].sliceX))
-          .toEqual(animations.find((animation) => animation.name === "walk_right").frames.map((frame) => frame.tiles[0].sliceX));
       }
     }
   });
+
   it("mantém seis cenas de menu in-game com HUD própria e retorno lógico", () => {
     const project = verticeProject();
     const names = ["menu_start", "missoes", "inventario", "mapa_menu", "salvar", "configuracoes"];
     for (const name of names) {
       const scene = project.scenas.find(scene => scene.name === name);
-      expect(scene.runtime.config).toMatchObject({ presentationMode: "hud", hudPresetId: `hud-neutral-${name}` });
+      expect(scene.runtime.config).toMatchObject({ presentationMode: "hud", hudPresetId: `hud-book-${name}` });
       expect(scene.runtime.config.hudListRows ?? 0).toBe({menu_start:6,missoes:4,inventario:0,mapa_menu:0,salvar:4,configuracoes:5}[name]);
       expect(scene.runtime.config.items).toEqual(expect.arrayContaining([expect.objectContaining({ id: "back", action: "pop_screen" })]));
       const hud = project.settings.hudPresets.find(hud => hud.id === scene.hudPresetId);
       expect(hud).toMatchObject({ backgroundImage: "", width: 240, height: 160 });
       expect(hud.components.filter(c => c.kind === "text")).toHaveLength(8);
-      expect(hud.components.filter(c => c.kind === "text").every(c => c.visible === true)).toBe(true);
+      expect(hud.components.filter(c => c.runtimeText).length).toBeLessThanOrEqual(7);
+      expect(hud.components.every(c => c.visible)).toBe(true);
     }
     expect(project.scenas.some(scene => scene.name === "perfil_equipe")).toBe(false);
   });
@@ -175,7 +164,7 @@ describe("materialização canônica de Vértice", () => {
         role: "title",
         menuProfile: "initial",
         backgroundAnimation: {
-          frameAssetNames: ["title-day-centered-240x160-4bpp.png"],
+          frameAssetNames: ["title-porto-lumen-240x160-4bpp.png"],
           frameDuration: 1,
           loop: false
         },
@@ -245,32 +234,31 @@ describe("materialização canônica de Vértice", () => {
     ]));
     const lighthouse = project.scenas.find((scene) => scene.name === "farol_interior");
     expect(lighthouse).toMatchObject({
-      width: 45,
-      height: 30,
+      width: 48,
+      height: 32,
       sceneType: "topdown",
-      backgroundAssetName: "farol-interior-topdown-360x240-gba.png",
-      tilesetAssetName: "farol-interior-topdown-360x240-gba.png",
+      backgroundAssetName: "farol-interior-approved-paged-384x256.png",
       backgroundRenderMode: "tilemap",
       cameraMode: "follow_player",
       playerActorName: "Nara · Farol",
-      runtime: { type: "topdown", config: { presentation: "topdown", profile: "lighthouse-interior" } }
+      runtime: { type: "topdown", config: { presentation: "topdown", profile: "farol-interior-scale-v2-approved" } }
     });
     expect(project.actors.filter((actor) => actor.roomName === "farol_interior")).toEqual(expect.arrayContaining([
-      expect.objectContaining({ id: "farol-nara", name: "Nara · Farol", x: 22, y: 24, spriteSheet: "player-pilot-32x32.png" }),
-      expect.objectContaining({ id: "farol-keeper", name: "Guardião do farol", x: 11, y: 9, spriteSheet: "lighthousekeeper-pilot-32x32.png", eventName: "farol_falar_guardiao" })
+      expect.objectContaining({ id: "farol-nara", name: "Nara · Farol", x: 23, y: 27, spriteSheet: "porto-nara-animations48.png" }),
+      expect.objectContaining({ id: "farol-keeper", name: "Guardião do farol", x: 17, y: 14, spriteSheet: "porto-lighthousekeeper-body48.png", eventName: "farol_falar_guardiao" })
     ]));
     expect(project.triggers).toEqual(expect.arrayContaining([
-      expect.objectContaining({ id: "trigger-lighthouse-lens", roomName: "farol_interior", x: 19, y: 8, width: 7, height: 3, eventName: "farol_examinar_lente" }),
-      expect.objectContaining({ id: "trigger-lighthouse-exit", roomName: "farol_interior", x: 20, y: 26, width: 5, height: 4, eventName: "farol_sair_porto" })
+      expect.objectContaining({ id: "trigger-lighthouse-lens", roomName: "farol_interior", x: 21, y: 13, width: 6, height: 2, eventName: "farol_examinar_lente" }),
+      expect.objectContaining({ id: "trigger-lighthouse-exit", roomName: "farol_interior", x: 22, y: 30, width: 4, height: 2, eventName: "farol_sair_porto" })
     ]));
     const prologue = project.scenas.find((scene) => scene.name === "prologo");
     expect(prologue?.runtime).toMatchObject({
       type: "cutscene",
       config: {
         steps: [
-          expect.objectContaining({ id: "prologo-frame-1", dialogueKey: "prologo_frame_1", backgroundAssetName: "prologue-frame-1-gba.png" }),
-          expect.objectContaining({ id: "prologo-frame-2", dialogueKey: "prologo_frame_2", backgroundAssetName: "prologue-frame-2-gba.png" }),
-          expect.objectContaining({ id: "prologo-frame-3", dialogueKey: "prologo_frame_3", backgroundAssetName: "prologue-frame-3-gba.png" }),
+          expect.objectContaining({ id: "prologo-frame-1", dialogueKey: "prologo_frame_1", backgroundAssetName: "prologue-clean-frame-1-240x160-4bpp.png" }),
+          expect.objectContaining({ id: "prologo-frame-2", dialogueKey: "prologo_frame_2", backgroundAssetName: "prologue-clean-frame-2-240x160-4bpp.png" }),
+          expect.objectContaining({ id: "prologo-frame-3", dialogueKey: "prologo_frame_3", backgroundAssetName: "prologue-clean-frame-3-240x160-4bpp.png" }),
           expect.objectContaining({ id: "prologo-complete", dialogueKey: "", eventName: "prologo_partir" })
         ]
       }
@@ -290,7 +278,7 @@ describe("materialização canônica de Vértice", () => {
       nome_jogador: { x: 1476, y: 36 },
       prologo: { x: 1764, y: 36 },
       porto_lumen: { x: 2415, y: 36 },
-      mapa_rota: { x: 36, y: 498 }
+      mapa_rota: { x: 36, y: 338 }
     });
 
     const positionedRooms = project.scenas.map((scene) => ({
@@ -310,7 +298,7 @@ describe("materialização canônica de Vértice", () => {
     }
   });
 
-  it("reserva a superfície final dos cards após promover o Mercado", () => {
+  it("reserva o viewport uniforme dos cards após promover o Mercado", () => {
     const source = canonicalProject();
     const sourceMarket = source.scenas.find((scene) => scene.name === "mercado_suspenso");
     sourceMarket.runtime.config.pagedSurface.width = 240;
@@ -321,7 +309,7 @@ describe("materialização canônica de Vértice", () => {
     const positions = project.editorState.sceneMapPositions;
     const marketSize = sceneMapCardSize(market);
 
-    expect(marketSize).toEqual({ width: 512, height: 434 });
+    expect(marketSize).toEqual({ width: 240, height: 250 });
     expect(positions.usina_submersa.x - positions.mercado_suspenso.x)
       .toBe(marketSize.width + 48);
     expect(positions.conselho_guardia.y - positions.mercado_suspenso.y)
@@ -372,16 +360,16 @@ describe("materialização canônica de Vértice", () => {
     expect(project.scenas.slice(0, 6).map((scene) => scene.name)).toEqual([
       "logo", "abertura", "titulo", "prologo", "porto_lumen", "mapa_rota"
     ]);
-    expect(project.scenas).toHaveLength(30);
+    expect(project.scenas).toHaveLength(31);
     expect(project.scenas.some((scene) => scene.name === "menu_inicial")).toBe(false);
     expect(project.scenas).toHaveLength(canonicalVerticeSceneCount());
     expect(project.scenas.some((scene) => scene.sceneType === "custom")).toBe(false);
     expect(project.scenas.find((scene) => scene.name === "arena_arrancada"))
       .toMatchObject({
         sceneType: "luta",
-        backgroundAssetName: "arena-gba.png",
+        backgroundAssetName: "arena-coastal-240x160.png",
         tileLayers: [],
-        runtime: { type: "luta", config: { hudAssetName: "fight-hud-v2-arena-bank-05.png" } }
+        runtime: { type: "luta", config: { hudPresetId: "hud-arena-approved" } }
       });
     expect(project.settings.general).toMatchObject({
       gameTitle: "O Último Farol",
@@ -397,31 +385,35 @@ describe("materialização canônica de Vértice", () => {
     expect(arenaActors).toEqual(expect.arrayContaining([
       expect.objectContaining({
         id: "nara-fighter",
-        spriteSheet: "nara-fighter.png",
-        animationName: "idle",
-        animationStateID: "nara-fighter-state",
+        spriteSheet: "arena-nara-complete-64x64.png",
+        animationName: "arena_nara_idle",
+        animationStateID: "arena-nara-approved-state",
         lutaAnimations: {
           fallback: "idle_animation",
-          idle: "idle",
-          attack: "attack",
-          special: "jump",
-          guard: "walk",
-          hurt: "hurt"
+          idle: "arena_nara_idle",
+          attack: "arena_nara_attack",
+          special: "arena_nara_special",
+          guard: "arena_nara_guard",
+          hurt: "arena_nara_hurt",
+          walk: "arena_nara_walk",
+          jump: "arena_nara_jump"
         },
         battle: expect.objectContaining({ side: "player1", maxHp: 100 })
       }),
       expect.objectContaining({
         id: "rival-fighter",
-        spriteSheet: "rival-fighter.png",
-        animationName: "arena_rival_idle_left",
-        animationStateID: "rival-fighter-state",
+        spriteSheet: "arena-rival-complete-64x64.png",
+        animationName: "arena_rival_idle",
+        animationStateID: "arena-rival-approved-state",
         lutaAnimations: {
           fallback: "idle_animation",
-          idle: "arena_rival_idle_left",
-          attack: "arena_rival_attack_left",
-          special: "arena_rival_special_left",
-          guard: "arena_rival_guard_left",
-          hurt: "arena_rival_hurt_left"
+          idle: "arena_rival_idle",
+          attack: "arena_rival_attack",
+          special: "arena_rival_special",
+          guard: "arena_rival_guard",
+          hurt: "arena_rival_hurt",
+          walk: "arena_rival_walk",
+          jump: "arena_rival_jump"
         },
         battle: expect.objectContaining({ side: "player2", maxHp: 96 })
       })
@@ -515,35 +507,13 @@ describe("materialização canônica de Vértice", () => {
     });
   });
 
-  it("declara a perda de quantização observada da Arena sem mascarar o framebuffer", () => {
+  it("usa a arena aprovada com orçamento explícito e nenhuma perda adicional de pixels", () => {
     const project = verticeProject();
-    const background = project.assets.find((asset) => asset.id === "arena-background");
-
-    expect(background?.metadata).toMatchObject({
-      generatedBy: "exemplo-gba-luta-cais-v2",
-      backgroundPaletteBankBudget: 16,
-      paletteBankCount: 16,
-      backgroundTileOptimizer: {
-        enabled: true,
-        tileBudget: 1024,
-        maxSourcePixelErrorRatio: 0.498671875,
-        maxFramebufferMismatchRatio: 0
-      },
-      backgroundPaletteReferencePlan: {
-        schema_version: 1,
-        width: 240,
-        height: 160,
-        bank_count: 16,
-        banks: expect.any(Array),
-        tile_palette_banks: expect.any(Array)
-      },
-      assetcStatus: "attention",
-      assetcReviewed: true,
-      reviewStatus: "attention",
-      approved: false
-    });
-    expect(background?.metadata?.backgroundPaletteReferencePlan?.banks).toHaveLength(16);
-    expect(background?.metadata?.backgroundPaletteReferencePlan?.tile_palette_banks).toHaveLength(600);
+    expect(project.assets.some(a => a.name === 'arena-gba.png')).toBe(false);
+    const background = project.assets.find(a => a.name === 'arena-coastal-240x160.png');
+    expect(background.metadata).toMatchObject({colorMode:'4bpp',width:240,height:160,backgroundPaletteBankBudget:12,
+      backgroundTileOptimizer:{enabled:true,tileBudget:600,maxSourcePixelErrorRatio:0,maxFramebufferMismatchRatio:0},reviewStatus:'approved'});
+    expect(createHash('sha256').update(readFileSync(new URL(background.metadata.source,templateURL))).digest('hex')).toBe(background.metadata.preparedSha256);
   });
 
   it("mantém o player v2 em 64x64, sem cortar as poses da luta", () => {
@@ -600,29 +570,23 @@ describe("materialização canônica de Vértice", () => {
       runtime: {
         type: "cutscene",
         config: {
-          stepDurationFrames: 120,
+          stepDurationFrames: 216,
           autoAdvance: true,
-          steps: [
-            expect.objectContaining({ id: "startup-logo-frame-00", durationFrames: 18, backgroundAssetName: "gba-studio-startup-canvas-frame-00-gba.png" }),
-            expect.objectContaining({ id: "startup-logo-frame-01", durationFrames: 12, backgroundAssetName: "gba-studio-startup-canvas-frame-01-gba.png" }),
-            expect.objectContaining({ id: "startup-logo-frame-02", durationFrames: 12, backgroundAssetName: "gba-studio-startup-canvas-frame-02-gba.png" }),
-            expect.objectContaining({ id: "startup-logo-frame-03", durationFrames: 18, backgroundAssetName: "gba-studio-startup-canvas-frame-03-gba.png" }),
-            expect.objectContaining({ id: "startup-logo-hold", durationFrames: 60, targetSceneIndex: 1 })
-          ]
+          steps: startupFadeManifest.timeline.map((step, index) => expect.objectContaining({
+            id: step.id, durationFrames: step.durationFrames, backgroundAssetName: step.file,
+            targetSceneIndex: index === startupFadeManifest.timeline.length - 1 ? 1 : -1,
+            onSkipEventName: 'logo_concluir'
+          }))
         }
       }
     });
     expect(abertura).toMatchObject({
-      sceneType: "cutscene",
-      backgroundAssetName: "opening-v4-per-tile-14-banks.png",
-      runtime: { type: "cutscene", config: { stepDurationFrames: 120, autoAdvance: true, steps: [
-        expect.objectContaining({ id: "opening-v3-01-vigia-na-praia", durationFrames: 120, skippable: true }),
-        expect.objectContaining({ id: "opening-v3-02-vigia-de-costas", durationFrames: 90, skippable: true }),
-        expect.objectContaining({ id: "opening-v3-03-sinal-ao-farol", durationFrames: 120, eventName: "abertura_sinal" }),
-        expect.objectContaining({ id: "opening-v3-04-menino-na-praia", durationFrames: 150, skippable: true }),
-        expect.objectContaining({ id: "opening-v3-complete", eventName: "abertura_concluir", skippable: false })
-      ] } }
+      sceneType: "cutscene", backgroundAssetName: "opening-medium-shot-240x160.png",
+      runtime: { type: "cutscene", config: { stepDurationFrames: 120, autoAdvance: true } }
     });
+    expect(abertura.runtime.config.steps).toHaveLength(18);
+    expect(abertura.runtime.config.steps.reduce((sum, step) => sum + step.durationFrames, 0)).toBe(480);
+    expect(abertura.runtime.config.steps.at(-1)).toMatchObject({ eventName: "abertura_concluir", skippable: false });
     expect(title?.runtime).toMatchObject({
       type: "menu",
       config: {
@@ -642,15 +606,16 @@ describe("materialização canônica de Vértice", () => {
     const project = verticeProject();
     const logo = project.scenas.find((scene) => scene.name === "logo");
     const title = project.scenas.find((scene) => scene.name === "titulo");
-    const logoAsset = project.assets.find((asset) => asset.name === "gba-studio-startup-canvas-frame-00-gba.png");
-    const titleAsset = project.assets.find((asset) => asset.name === "title-day-centered-240x160-4bpp.png");
+    const posterAsset = startupFadeManifest.assets.find(asset => asset.file === startupFadeManifest.posterAsset);
+    const logoAsset = project.assets.find((asset) => asset.name === posterAsset.file);
+    const titleAsset = project.assets.find((asset) => asset.name === "title-porto-lumen-240x160-4bpp.png");
 
     expect(logo).toMatchObject({
-      backgroundAssetName: "gba-studio-startup-canvas-frame-00-gba.png",
+      backgroundAssetName: posterAsset.file,
       backgroundRenderMode: "tilemap"
     });
     expect(title).toMatchObject({
-      backgroundAssetName: "title-day-centered-240x160-4bpp.png"
+      backgroundAssetName: "title-porto-lumen-240x160-4bpp.png"
     });
     expect(titleAsset).toMatchObject({
       metadata: {
@@ -661,16 +626,16 @@ describe("materialização canônica de Vértice", () => {
     });
     expect(logoAsset).toMatchObject({
       kind: "Background",
-      name: "gba-studio-startup-canvas-frame-00-gba.png",
+      name: posterAsset.file,
       metadata: {
-        source: "Assets/backgrounds/gba-studio-startup-canvas-frame-00-gba.png",
+        source: posterAsset.source,
         role: "startup-logo-bg",
         sceneRoles: expect.arrayContaining(["startup-logo-bg", "logo-bg"]),
         colorMode: "4bpp",
         width: 240,
         height: 160,
-        assetcStatus: "safe",
-        generatedBy: "exemplo-gba-startup-logo-v3",
+        backgroundPaletteBankBudget: 1,
+        generatedBy: "approved-startup-fade-a",
         provenance: expect.stringContaining("canvas"),
         reviewStatus: "approved"
       }
@@ -680,12 +645,12 @@ describe("materialização canônica de Vértice", () => {
   it("preserva a composição V2 aprovada e o carrossel de opções no título", () => {
     const saved = JSON.parse(readFileSync(templateURL, "utf8"));
     for (const project of [saved, promoteExemploGBAVerticeCampaign(saved)]) {
-      expect(project.scenas).toHaveLength(30);
+      expect(project.scenas).toHaveLength(31);
       const title = project.scenas.find((scene) => scene.name === "titulo");
       const titleOptions = title.runtime.config.screens.find((screen) => screen.id === "title_options");
-      expect(title.backgroundAssetName).toBe("title-day-centered-240x160-4bpp.png");
-      expect(title.runtime.config.backgroundAnimation.frameAssetNames).toEqual(["title-day-centered-240x160-4bpp.png"]);
-      expect(title.runtime.config.screens[0].backgroundAnimation.frameAssetNames).toEqual(["title-day-centered-240x160-4bpp.png"]);
+      expect(title.backgroundAssetName).toBe("title-porto-lumen-240x160-4bpp.png");
+      expect(title.runtime.config.backgroundAnimation.frameAssetNames).toEqual(["title-porto-lumen-240x160-4bpp.png"]);
+      expect(title.runtime.config.screens[0].backgroundAnimation.frameAssetNames).toEqual(["title-porto-lumen-240x160-4bpp.png"]);
       expect(title.runtime.config.screens[0].items[0]).toMatchObject({ eventName: "titulo_abrir_menu", targetScreenID: "title_options" });
       expect(titleOptions).toMatchObject({ carousel: true, items: [
         expect.objectContaining({ id: "new-game" }),
@@ -699,7 +664,7 @@ describe("materialização canônica de Vértice", () => {
         expect.objectContaining({ id: "title-logo-v2", x: 7, y: 0, spriteSheet: "title-logo-actor-128x88.png", animationStateID: "title-logo-actor-128x88-state" }),
         expect.objectContaining({ id: "title-press-start", x: 10, y: 13, spriteSheet: "press-start-actor-88x32.png", animationStateID: "press-start-actor-state", inputBinding: "Start", eventBindings: { onInteract: "titulo_abrir_menu" } })
       ]));
-      expect(project.assets.find((asset) => asset.name === "title-day-centered-240x160-4bpp.png")?.metadata).toMatchObject({ reviewStatus: "approved", candidateStatus: "canonical-integrated", assetcStatus: "attention", backgroundPaletteBankBudget: 14 });
+      expect(project.assets.find((asset) => asset.name === "title-porto-lumen-240x160-4bpp.png")?.metadata).toMatchObject({ reviewStatus: "approved", candidateStatus: "canonical-integrated", assetcStatus: "attention", backgroundPaletteBankBudget: 14 });
       expect(project.assets.find((asset) => asset.name === "title-logo-actor-128x88.png")?.metadata).toMatchObject({ reviewStatus: "approved", candidateStatus: "canonical-integrated", technicalStatus: "attention" });
       expect(project.assets.find((asset) => asset.name === "press-start-actor-88x32.png")?.metadata).toMatchObject({ reviewStatus: "approved", candidateStatus: "canonical-integrated" });
       expect(project.animations.find((animation) => animation.id === "title-logo-actor-128x88-animation")).toMatchObject({ frameWidth: 128, frameHeight: 88, frames: [{ tiles: expect.arrayContaining([expect.objectContaining({ tileWidth: 64, tileHeight: 64 })]) }] });
@@ -708,7 +673,7 @@ describe("materialização canônica de Vértice", () => {
       expect(project.animationStates.some((state) => state.id === "press-start-actor-state")).toBe(true);
     }
     for (const [path, sha256] of [
-      ["Assets/backgrounds/title-day-centered-240x160-4bpp.png", "34de4e4b73def5a18a7e55d6fac176ca2b6fd99e2d39231935a2bcd075f6daf9"],
+      ["Assets/backgrounds/title-porto-lumen-240x160-4bpp.png", "ace39e438172a2fa8c1abcdc8075f1d5c999f5b9ea7960f2372129c720cbf9f5"],
       ["Assets/sprites/title-logo-actor-128x88.png", "f2fa056433d6b43629edb8ef65a9d1fb0ced41b391030a84bdf96931f021c3e0"],
       ["Assets/sprites/press-start-actor-88x32.png", "b3c0d69aa24afe1b4d4bde7aca15ba10a8f7fb03b94150271b34dffecdd2669c"]
     ]) {
@@ -717,19 +682,16 @@ describe("materialização canônica de Vértice", () => {
   });
 
   it("preserva os 14 bancos preparados do Título sem quantizar o PNG novamente", () => {
-    const report = JSON.parse(readFileSync(new URL(
-      "../fixtures/asset-provenance/title-background-14banks.report.json",
-      import.meta.url
-    ), "utf8"));
+    const report = canonicalProject().assets.find(asset => asset.name === "title-porto-lumen-240x160-4bpp.png").metadata.backgroundPaletteReferencePlan;
     const plan = { banks: report.banks, tile_palette_banks: report.tile_palette_banks };
     const source = decodePngRgba(readFileSync(new URL(
-      "Assets/backgrounds/title-day-centered-240x160-4bpp.png", templateURL
+      "Assets/backgrounds/title-porto-lumen-240x160-4bpp.png", templateURL
     )));
     expect(plan.banks).toHaveLength(14);
     expect(plan.tile_palette_banks).toHaveLength(600);
     for (const project of [canonicalProject(), verticeProject()]) {
       const exported = buildAssetcTilesetPackGeneration(project)
-        ?.assetsBySheet?.["title-day-centered-240x160-4bpp.png"];
+        ?.assetsBySheet?.["title-porto-lumen-240x160-4bpp.png"];
       expect(exported?.background_palette_reference_plan).toEqual(plan);
     }
     for (let y = 0; y < source.height; y += 1) {
@@ -744,74 +706,25 @@ describe("materialização canônica de Vértice", () => {
     }
   });
 
-  it("separa a arte da Abertura da paisagem do Menu Título", () => {
+  it("separa o quadro em plano médio da paisagem do Menu Título", () => {
     const project = verticeProject();
-    const abertura = project.scenas.find((scene) => scene.name === "abertura");
-    const title = project.scenas.find((scene) => scene.name === "titulo");
-    const openingAsset = project.assets.find((asset) => asset.name === "opening-v4-per-tile-14-banks.png");
-    const titlePack = buildAssetcTilesetPackGeneration(project);
-    const titleBackground = titlePack?.assetsBySheet?.["title-day-centered-240x160-4bpp.png"];
-
-    expect(abertura).toMatchObject({
-      backgroundAssetName: "opening-v4-per-tile-14-banks.png",
-      backgroundRenderMode: "tilemap"
+    const opening = project.scenas.find(scene => scene.name === "abertura");
+    expect(opening).toMatchObject({ backgroundAssetName: "opening-medium-shot-240x160.png", backgroundRenderMode: "tilemap" });
+    expect(project.assets.find(asset => asset.name === opening.backgroundAssetName)).toMatchObject({
+      kind: "Background", metadata: { reviewStatus: "approved", colorMode: "4bpp", backgroundPaletteBankBudget: 14 }
     });
-    expect(title).toMatchObject({
-      backgroundAssetName: "title-day-centered-240x160-4bpp.png"
-    });
-    expect(openingAsset).toMatchObject({
-      kind: "Background",
-      name: "opening-v4-per-tile-14-banks.png",
-      metadata: {
-        source: "Assets/backgrounds/opening-v4-per-tile-14-banks.png",
-        generatedBy: "opening-v4-per-tile-14-banks",
-        role: "opening-bg",
-        sceneRoles: ["opening-bg"],
-        profile: "menu",
-        colorMode: "4bpp",
-        backgroundPaletteBankBudget: 14,
-        reviewStatus: "approved",
-        backgroundPaletteReferencePlan: {
-          banks: expect.any(Array),
-          tile_palette_banks: expect.any(Array)
-        }
-      }
-    });
-    expect(titleBackground).toMatchObject({
-      kind: "bg",
-      background_palette_banks: 14
-    });
+    expect(project.scenas.find(scene => scene.name === "titulo").backgroundAssetName).toBe("title-porto-lumen-240x160-4bpp.png");
   });
 
-  it("usa os cinco atores aprovados da sequência V3", () => {
+  it("usa as dez poses locais de Nara e da mecânica sem os sprites substituídos", () => {
     const project = verticeProject();
-    const openingActors = project.actors.filter((actor) => actor.roomName === "abertura");
-    expect(openingActors.map((actor) => actor.id)).toEqual([
-      "opening-v3-actor-guardia-idle",
-      "opening-v3-actor-guardia-turn",
-      "opening-v3-actor-guardia-signal",
-      "opening-v3-actor-menino",
-      "opening-v3-actor-gaivota"
+    expect(project.actors.filter(actor => actor.roomName === "abertura")).toEqual([
+      expect.objectContaining({ id: "opening-approved-local-animation-actor", x: 8, y: 7, spriteSheet: "opening-local-animation-128x96.png" })
     ]);
-    expect(openingActors.every((actor) => actor.x === 29 && actor.y === 19)).toBe(true);
-    expect(project.assets.find((asset) => asset.name === "opening-v3-guardia-idle-48x64.png"))
-      .toMatchObject({ kind: "Sprite", metadata: { role: "opening-actor", colorMode: "4bpp" } });
-    expect(project.animations.find((animation) => animation.id === "opening-v3-animation-guardia-idle"))
-      .toMatchObject({ frameWidth: 48, frameHeight: 64, frameCount: 1 });
-    expect(project.animationStates.find((state) => state.id === "opening-v3-state-guardia-idle"))
-      .toMatchObject({ animationIDs: ["opening-v3-animation-guardia-idle"] });
-    expect(project.actors.filter((actor) => actor.roomName === "titulo").map((actor) => actor.id))
-      .toEqual([
-        "title-logo-v2",
-        "title-press-start",
-        "title-carousel-new-game",
-        "title-carousel-load-game",
-        "title-carousel-language",
-        "title-carousel-settings",
-        "title-carousel-credits"
-      ]);
-    expect(project.scenas.find((scene) => scene.name === "logo")?.actors ?? []).toHaveLength(0);
-    expect(project.scenas.find((scene) => scene.name === "titulo")?.playerActorName).toBe("");
+    expect(project.assets.find(asset => asset.name === "opening-local-animation-128x96.png").metadata)
+      .toMatchObject({ colorMode: "8bpp", streamFrames: true, frameCount: 10, hardwareObjectsPerFrame: 4 });
+    expect(project.assets.some(asset => asset.name === "opening-v3-guardia-idle-48x64.png")).toBe(false);
+    expect(project.actors.filter(actor => actor.roomName === "titulo")).toHaveLength(7);
   });
 
   it("remove os atores de setas azuis substituídos pelo bloco Slider", () => {
@@ -825,7 +738,7 @@ describe("materialização canônica de Vértice", () => {
     const title = project.scenas.find((scene) => scene.name === "titulo");
 
     expect(project.scenas.some((scene) => scene.name === "menu_inicial")).toBe(false);
-    expect(title).toMatchObject({ backgroundAssetName: "title-day-centered-240x160-4bpp.png" });
+    expect(title).toMatchObject({ backgroundAssetName: "title-porto-lumen-240x160-4bpp.png" });
   });
 
   it("exporta a Logo como primeira tela nativa e aponta para a Abertura", () => {
@@ -845,18 +758,15 @@ describe("materialização canônica de Vértice", () => {
       name: "logo",
       background: expect.any(Number),
       next_scene: aberturaIndex,
-      steps: [
-        expect.objectContaining({ duration_frames: 18, auto_advance: true, skippable: true, target_scene: -1 }),
-        expect.objectContaining({ duration_frames: 12, auto_advance: true, skippable: true, target_scene: -1 }),
-        expect.objectContaining({ duration_frames: 12, auto_advance: true, skippable: true, target_scene: -1 }),
-        expect.objectContaining({ duration_frames: 18, auto_advance: true, skippable: true, target_scene: -1 }),
-        expect.objectContaining({ duration_frames: 60, auto_advance: true, skippable: true, target_scene: aberturaIndex })
-      ]
+      steps: startupFadeManifest.timeline.map((step,index)=>expect.objectContaining({
+        duration_frames:step.durationFrames,auto_advance:true,skippable:true,
+        target_scene:index===startupFadeManifest.timeline.length-1?aberturaIndex:-1
+      }))
     });
     expect(logoBackground).toMatchObject({
-      name: "gba_studio_startup_canvas_frame_00_gba",
+      name: startupFadeManifest.posterAsset.replace('.png','').replaceAll('-','_'),
       layer: "bg1",
-      tilemap: "gba_studio_startup_canvas_frame_00_gba"
+      tilemap: startupFadeManifest.posterAsset.replace('.png','').replaceAll('-','_')
     });
   });
 
@@ -867,50 +777,20 @@ describe("materialização canônica de Vértice", () => {
     const abertura = scenes[aberturaIndex];
     const aberturaBackground = exported.cutscene_project?.backgrounds?.[abertura?.background ?? -1];
 
-    expect(abertura).toMatchObject({
-      name: "abertura",
-      background: expect.any(Number),
-      steps: [
-        expect.objectContaining({
-          duration_frames: 120,
-          auto_advance: true,
-          skippable: true,
-          actor_motions: expect.arrayContaining([{
-            actor_index: 0,
-            from_position: { x: 240, y: 160 },
-            to_position: { x: 142, y: 81 },
-            duration_frames: 1
-          }])
-        }),
-        expect.objectContaining({ duration_frames: 90, skippable: true }),
-        expect.objectContaining({ duration_frames: 120, script: [{ op: "play_sfx", index: 7 }] }),
-        expect.objectContaining({ duration_frames: 150, skippable: true }),
-        expect.objectContaining({ script: expect.any(Array), skippable: false })
-      ]
-    });
-    expect(aberturaBackground).toMatchObject({
-      name: "opening_v4_per_tile_14_banks",
-      layer: "bg1",
-      tilemap: "opening_v4_per_tile_14_banks"
-    });
+    expect(abertura).toMatchObject({ name: "abertura", background: expect.any(Number) });
+    expect(abertura.steps).toHaveLength(18);
+    expect(abertura.steps[0]).toMatchObject({ duration_frames: 60, auto_advance: true, skippable: true, actor_frames: [{ actor_index: 0, frame_index: 0 }] });
+    expect(abertura.steps.reduce((sum, step) => sum + step.duration_frames, 0)).toBe(480);
+    expect(abertura.steps.at(-1)).toMatchObject({ script: expect.any(Array), skippable: false });
+    expect(aberturaBackground).toMatchObject({ name: "opening_medium_shot_240x160", layer: "bg1", tilemap: "opening_medium_shot_240x160" });
   });
 
-  it("exporta o ator da Abertura como metasprite nativo da cutscene", () => {
+  it("exporta as poses da Abertura como metasprite OBJ com streaming", () => {
     const exported = buildEngineExportProjectContract(verticeProject());
-    const abertura = exported.cutscene_project?.scenes.find((scene) => scene.name === "abertura");
-
-    expect(abertura?.actors).toHaveLength(5);
-    expect(abertura?.actors).toEqual(expect.arrayContaining([
-      expect.objectContaining({ name: "Guardiã · Abertura · Quadro 1", metasprite: { asset: "opening_v3_guardia_idle_48x64", index: 0 } }),
-      expect.objectContaining({ name: "Guardiã · Abertura · Quadro 2", metasprite: { asset: "opening_v3_guardia_turn_48x64", index: 0 } }),
-      expect.objectContaining({ name: "Guardiã · Abertura · Quadro 3", metasprite: { asset: "opening_v3_guardia_signal_48x64", index: 0 } }),
-      expect.objectContaining({ name: "Menino · Abertura · Quadro 4", metasprite: { asset: "opening_v3_menino_24x32", index: 0 } }),
-      expect.objectContaining({ name: "Gaivota · Abertura · Quadro 4", metasprite: { asset: "opening_v3_gaivota_24x16", index: 0 } })
-    ]));
-    expect(exported.cutscene_project?.assets).toMatchObject({
-      obj_palettes: expect.arrayContaining(["opening_v3_guardia_idle_48x64", "opening_v3_guardia_turn_48x64", "opening_v3_guardia_signal_48x64", "opening_v3_menino_24x32", "opening_v3_gaivota_24x16"]),
-      tile_assets: expect.arrayContaining(["opening_v3_guardia_idle_48x64", "opening_v3_guardia_turn_48x64", "opening_v3_guardia_signal_48x64", "opening_v3_menino_24x32", "opening_v3_gaivota_24x16"])
-    });
+    const opening = exported.cutscene_project.scenes.find(scene => scene.name === "abertura");
+    expect(opening.actors).toEqual([expect.objectContaining({ metasprite: { asset: "opening_local_animation_128x96", index: 0 }, animation: { asset: "opening_local_animation_128x96" } })]);
+    expect(exported.cutscene_project.assets).toMatchObject({ obj_palettes: expect.arrayContaining(["opening_local_animation_128x96"]), tile_assets: expect.arrayContaining(["opening_local_animation_128x96"]) });
+    expect(exported.asset_pack.assets.find(asset => asset.name === "opening_local_animation_128x96")).toMatchObject({ stream_frames: true, sprite_bpp: 8 });
   });
 
   it("exporta o fundo aprovado do título para as telas do carrossel", () => {
@@ -922,9 +802,9 @@ describe("materialização canônica de Vértice", () => {
     expect(title?.background).toEqual(expect.any(Number));
     expect(options?.background).toBe(title?.background);
     expect(background).toMatchObject({
-      name: "title_day_centered_240x160_4bpp",
+      name: "title_porto_lumen_240x160_4bpp",
       layer: "bg1",
-      tilemap: "title_day_centered_240x160_4bpp"
+      tilemap: "title_porto_lumen_240x160_4bpp"
     });
   });
 
@@ -945,14 +825,15 @@ describe("materialização canônica de Vértice", () => {
     ]));
   });
 
-  it("mantém os atores dos Créditos no perfil neutro aprovado", () => {
+  it("mantém os cursores dos Créditos no livro aprovado, ligados à seleção", () => {
     const project = verticeProject();
     const initialMenuPageNames = new Set(["creditos"]);
     const initialMenuPageActors = project.actors.filter((actor) => initialMenuPageNames.has(actor.roomName));
 
     expect(initialMenuPageActors).not.toHaveLength(0);
     expect(initialMenuPageActors.every((actor) => (
-      actor.spriteSheet.startsWith("neutral-")
+      actor.spriteSheet === "book-cursor-approved-8x8.png"
+      && actor.menuActorSelectedOnly === true
       && actor.menuEntryAnimation === undefined
     ))).toBe(true);
   });
@@ -971,9 +852,9 @@ describe("materialização canônica de Vértice", () => {
 
     expect(linkedScenes.every(Boolean)).toBe(true);
     expect(linkedScenes.map((scene) => scene?.backgroundAssetName)).toEqual([
-      "gender-selection-approved-v2-gba.png", "name-input-approved-v2-gba.png",
-      "neutral-carregar_jogo-gba.png", "neutral-salvar-gba.png", "neutral-menu_start-gba.png",
-      "neutral-configuracoes-gba.png", "neutral-creditos-gba.png"
+      "traveler-gender-bg-240x160.png", "traveler-name-bg-240x160.png",
+      "book-carregar_jogo-bg-240x160.png", "book-salvar-bg-240x160.png", "book-menu_start-bg-240x160.png",
+      "book-configuracoes-bg-240x160.png", "book-creditos-bg-240x160.png"
     ]);
     expect(project.actors.filter((actor) => [
       "escolha_genero",
@@ -987,11 +868,11 @@ describe("materialização canônica de Vértice", () => {
         .filter((actor) => actor.roomName === "escolha_genero")
         .map((actor) => [actor.name, { x: actor.x, y: actor.y }])
     );
-    expect(project.actors.find(actor => actor.name === "Moldura de seleção").menuPositionPixels).toEqual({x: 58, y: 47});
+    expect(project.actors.find(actor => actor.name === "Moldura de seleção").menuPositionPixels).toEqual({x: 24, y: 32});
     expect(genderActorPositions).toEqual(expect.objectContaining({
-      "gender-portrait-male-gba": { x: 7, y: 6 },
-      "gender-portrait-female-gba": { x: 15, y: 6 },
-      "Moldura de seleção": { x: 7, y: 5 }
+      "gender-portrait-male-gba": { x: 4, y: 6 },
+      "gender-portrait-female-gba": { x: 17, y: 6 },
+      "Moldura de seleção": { x: 3, y: 4 }
     }));
   });
 
@@ -1078,7 +959,7 @@ describe("materialização canônica de Vértice", () => {
     expect(commands).toContain("if_variable var_frame 1");
     expect(commands.filter(command => command === "condition_end")).toHaveLength(12);
     expect(commands.some(command => /set_variable|save_game|change_scene|push_screen|pop_screen/.test(command))).toBe(false);
-    expect(project.actors.filter(actor => actor.roomName === "missoes")).toHaveLength(13);
+    expect(project.actors.filter(actor => actor.roomName === "missoes")).toHaveLength(12);
   });
 
 
@@ -1111,7 +992,7 @@ describe("materialização canônica de Vértice", () => {
 
   it("mantém no catálogo o mapa de viagem aprovado no lugar do Mapa Híbrido", () => {
     const project = verticeProject();
-    const background = project.assets.find((asset) => asset.name === "route-map-paged-v2.png");
+    const background = project.assets.find((asset) => asset.name === "route-lumen-paged.png");
 
     expect(background?.metadata).toMatchObject({
       kind: "paged_bg",
@@ -1128,7 +1009,7 @@ describe("materialização canônica de Vértice", () => {
     const start = project.scenas.find(scene => scene.name === "menu_start");
     expect(start.runtime.config.titleTextVariableName).toBe("var_character_name");
     const portraits = project.actors.filter(actor => actor.roomName === "menu_start" && actor.menuVisibilityVariable === "var_character_gender");
-    expect(portraits.map(actor => actor.spriteSheet)).toEqual(["neutral-portrait-male-gba.png", "neutral-portrait-female-gba.png"]);
+    expect(portraits.map(actor => actor.spriteSheet)).toEqual(["book-nara-approved-32x48.png", "book-player-female-approved-48x48.png"]);
     expect(portraits.map(actor => actor.menuVisibilityValue)).toEqual([0, 1]);
     expect(portraits.every(actor => actor.menuVisibilityVariable === "var_character_gender")).toBe(true);
   });
@@ -1141,11 +1022,11 @@ describe("materialização canônica de Vértice", () => {
     expect(playerName?.text_input).toEqual(expect.objectContaining({
       variable_index: expect.any(Number),
       max_length: 8,
-      x: 13,
-      y: 6,
+      x: 15,
+      y: 5,
       width: 8,
       keyboard_layout: "grid",
-      keyboard_x: 7,
+      keyboard_x: 11,
       keyboard_y: 8,
       keyboard_width: 16,
       keyboard_height: 10,
@@ -1159,7 +1040,7 @@ describe("materialização canônica de Vértice", () => {
     ]);
   });
 
-  it("mantém os textos de gênero no background e o nome livre para o input runtime", () => {
+  it("mantém títulos no background, rótulos separados e o nome livre para o input runtime", () => {
     const project = verticeProject();
     const gender = project.actors.find((actor) => actor.id === "menu-escolha-genero-title");
     const name = project.actors.find((actor) => actor.id === "menu-nome-jogador-title");
@@ -1168,14 +1049,14 @@ describe("materialização canônica de Vértice", () => {
     expect(gender).toBeUndefined();
     expect(name).toBeUndefined();
     expect(project.actors.filter((actor) => actor.roomName === "nome_jogador")).toHaveLength(2);
-    expect(playerName?.runtime?.config?.textInput).toMatchObject({ x: 13, y: 6, width: 8 });
+    expect(playerName?.runtime?.config?.textInput).toMatchObject({ x: 15, y: 5, width: 8 });
   });
 
   it("mantém cada tela ligada limitada aos próprios atores e ao BG compartilhado", () => {
     const project = verticeProject();
     const exported = buildEngineExportProjectContract(project);
     const expectedActors = {
-      escolha_genero: ["gender-portrait-male-gba", "gender-portrait-female-gba", "Moldura de seleção"],
+      escolha_genero: ["gender-portrait-male-gba", "gender-portrait-female-gba", "Moldura de seleção", "Canto de seleção 2", "Canto de seleção 3", "Canto de seleção 4", "Homem · rótulo", "Mulher · rótulo"],
       nome_jogador: ["name-portrait-male-gba", "name-portrait-female-gba"],
       carregar_jogo: [],
       menu_start: ["Jogador - male", "Jogador - female"],
@@ -1195,18 +1076,23 @@ describe("materialização canônica de Vértice", () => {
       const actorAssets = screenActors
         ?.filter((actor) => actor.name !== "VOLTAR")
         .map((actor) => actor.metasprite.asset);
-      if (neutral) expect(screenActors.filter(actor => actor.role === "cursor")).toHaveLength(1);
-      else expect(new Set(actorAssets)).toHaveLength(names.length - (names.includes("VOLTAR") ? 1 : 0));
+      if (["menu_start", "missoes", "configuracoes", "carregar_jogo", "creditos"].includes(screenName)) {
+        const selected = screenActors.filter(actor => actor.selected_only);
+        expect(new Set(selected.map(actor => actor.menu_item_index)).size).toBe(screen.items.length);
+      } else if (neutral) expect(screenActors.filter(actor => actor.role === "cursor")).toHaveLength(1);
+      else expect(new Set(actorAssets)).toEqual(new Set(screenName === "escolha_genero"
+        ? ["traveler_gender_portraits_64x64", "traveler_focus_corners_8x8", "traveler_gender_labels_48x8"]
+        : ["traveler_name_portraits_48x48"]));
     }
 
     const gender = exported.menu_project?.screens.find((screen) => screen.name === "escolha_genero");
     expect(gender?.actors).toEqual(expect.arrayContaining([
-      expect.objectContaining({ name: "gender-portrait-male-gba", role: "option", metasprite: { asset: "gender_portrait_male_gba", index: 0 } }),
-      expect.objectContaining({ name: "gender-portrait-female-gba", role: "option", metasprite: { asset: "gender_portrait_female_gba", index: 0 } })
+      expect.objectContaining({ name: "gender-portrait-male-gba", role: "option", metasprite: { asset: "traveler_gender_portraits_64x64", index: 0 } }),
+      expect.objectContaining({ name: "gender-portrait-female-gba", role: "option", metasprite: { asset: "traveler_gender_portraits_64x64", index: 1 } })
     ]));
 
     expect(exported.menu_project?.screens.find((screen) => screen.name === "menu_start")?.items)
-      .toEqual(expect.arrayContaining([expect.objectContaining({ label: "Retomar", action: "pop_screen" })]));
+      .toEqual(expect.arrayContaining([expect.objectContaining({ label: "RETOMAR", action: "pop_screen" })]));
   });
 
   it("mantém os recortes antigos do logotipo fora do pacote runtime", () => {
@@ -1235,7 +1121,7 @@ describe("materialização canônica de Vértice", () => {
     const settings = project.scenas.find((scene) => scene.name === "configuracoes");
     const startMenu = project.scenas.find((scene) => scene.name === "menu_start");
     const settingsItems = settings?.runtime?.config?.items ?? [];
-    const settingsHud = project.settings.hudPresets.find((preset) => preset.id === "hud-neutral-configuracoes");
+    const settingsHud = project.settings.hudPresets.find((preset) => preset.id === "hud-book-configuracoes");
 
     expect(project.scenas).not.toEqual(expect.arrayContaining([
       expect.objectContaining({ name: "idioma" }),
@@ -1243,14 +1129,14 @@ describe("materialização canônica de Vértice", () => {
       expect.objectContaining({ name: "configuracoes_controles" })
     ]));
     expect(settings).toMatchObject({
-      backgroundAssetName: "neutral-configuracoes-gba.png",
-      hudPresetId: "hud-neutral-configuracoes",
+      backgroundAssetName: "book-configuracoes-bg-240x160.png",
+      hudPresetId: "hud-book-configuracoes",
       runtime: {
         type: "menu",
         config: {
           role: "settings",
           presentationMode: "hud",
-          hudPresetId: "hud-neutral-configuracoes"
+          hudPresetId: "hud-book-configuracoes"
         }
       }
     });
@@ -1260,7 +1146,7 @@ describe("materialização canônica de Vértice", () => {
       expect.objectContaining({ id: "audio-sfx", variableIndex: 20, action: "adjust_variable", audioChannel: "sfx" }),
       expect.objectContaining({ id: "audio-enabled", variableIndex: 21, action: "toggle_variable", audioChannel: "all" }),
       expect.objectContaining({ id: "language", variableIndex: 15, action: "adjust_variable" }),
-      expect.objectContaining({ id: "controls", label: "Controles" }),
+      expect.objectContaining({ id: "controls", label: "CONTROLES" }),
       expect.objectContaining({ id: "rtc", eventName: "configuracoes_rtc", binding: expect.objectContaining({ index: 23 }) }),
       expect.objectContaining({ id: "back", action: "pop_screen" })
     ]));
@@ -1271,13 +1157,12 @@ describe("materialização canônica de Vértice", () => {
       height: 160,
       mode: "advanced",
       components: expect.arrayContaining([
-        expect.objectContaining({ id: "configuracoes-row-0", kind: "text", x:56, y:44, height:8 }),
-        expect.objectContaining({ kind: "text", text: "D MOVER A OK B VOLTAR", label: "D MOVER A OK B VOLTAR" })
+        expect.objectContaining({ id: "book-configuracoes-slot-1", kind: "text", x:39, y:36, height:8, runtimeText:true })
       ])
     });
     expect(settingsHud.components.some(component => component.id === "configuracoes-title")).toBe(false);
-    expect(project.assets.find(asset => asset.name === settings.backgroundAssetName)?.metadata.generatedBy).toBe("approved-neutral-menus-v3");
-    expect(project.actors.filter((actor) => actor.roomName === "configuracoes")).toHaveLength(9);
+    expect(project.assets.find(asset => asset.name === settings.backgroundAssetName)?.metadata.generatedBy).toBe("approved-book-menus-v5-toolcase-v3");
+    expect(project.actors.filter((actor) => actor.roomName === "configuracoes")).toHaveLength(16);
     expect(project.events.find((event) => event.name === "configuracoes_ao_entrar")?.steps).toEqual(expect.arrayContaining([
       expect.objectContaining({ command: "read_rtc hour var_rtc_hour" }),
       expect.objectContaining({ command: "read_rtc minute var_rtc_minute" })
@@ -1324,7 +1209,7 @@ describe("materialização canônica de Vértice", () => {
       retained: true
     });
     expect(scenes.has("affine_lab")).toBe(false);
-    expect(scenes.get("mapa_rota").runtime.config.profile).toBe("route-map-affine-v2-approved");
+    expect(scenes.get("mapa_rota").runtime.config.profile).toBe("route-lumen-dirigible-approved");
     expect(verticeShowcaseSceneClassification(scenes.get("configuracoes"))).toEqual({
       id: "o-ultimo-farol",
       lane: "support",
@@ -1350,26 +1235,26 @@ describe("materialização canônica de Vértice", () => {
     expect(tacticalActors).toEqual(expect.arrayContaining([
       expect.objectContaining({
         id: "tactical-nara",
-        spriteSheet: "tactical-nara-v5.png",
-        animationStateID: "tactical-nara-v5-state"
+        spriteSheet: "tactical-approved-nara-64x64.png",
+        animationStateID: "tactical-approved-nara-state"
       }),
       expect.objectContaining({
         id: "tactical-sentinel",
-        spriteSheet: "tactical-sentinel-v5.png",
-        animationStateID: "tactical-sentinel-v5-state"
+        spriteSheet: "tactical-approved-sentinel-64x64.png",
+        animationStateID: "tactical-approved-sentinel-state"
       })
     ]));
-    expect(project.animations.filter((animation) => animation.spriteSheet === "tactical-nara-v5.png")).toHaveLength(20);
+    expect(project.animations.filter((animation) => animation.spriteSheet === "tactical-approved-nara-64x64.png")).toHaveLength(24);
     expect(project.animationStates).toEqual(expect.arrayContaining([
-      expect.objectContaining({ spriteSheet: "tactical-nara-v5.png" }),
-      expect.objectContaining({ spriteSheet: "tactical-sentinel-v5.png" })
+      expect.objectContaining({ spriteSheet: "tactical-approved-nara-64x64.png" }),
+      expect.objectContaining({ spriteSheet: "tactical-approved-sentinel-64x64.png" })
     ]));
     expect(project.assets.map((asset) => asset.name)).toEqual(expect.arrayContaining([
-      "tactical-v5-surface.png",
-      "tactical-v5-hud.png",
-      "tactical-nara-v5.png",
-      "tactical-sentinel-v5.png",
-      "tactical-cursor-diamond-32x16-v1.png"
+      "tactical-arena-large-768x512.png",
+      "tactical-compact-turnPanel.png",
+      "tactical-approved-nara-64x64.png",
+      "tactical-approved-sentinel-64x64.png",
+      "tactical-cursor-48x24.png"
     ]));
     expect(project.animations.some((animation) => animation.spriteSheet === "tactical-nara-v3.png")).toBe(false);
     expect(project.animationStates.some((state) => ["tactical-nara-v3.png", "tactical-sentinel-v3.png"].includes(state.spriteSheet))).toBe(false);
@@ -1380,7 +1265,7 @@ describe("materialização canônica de Vértice", () => {
     const credits = project.scenas.find((scene) => scene.name === "creditos");
 
     expect(credits).toMatchObject({
-      backgroundAssetName: "neutral-creditos-gba.png",
+      backgroundAssetName: "book-creditos-bg-240x160.png",
       backgroundRenderMode: "tilemap",
       runtime: {
         type: "menu",
@@ -1403,7 +1288,7 @@ describe("materialização canônica de Vértice", () => {
     ]));
     const creditsActors = project.actors.filter((actor) => actor.roomName === "creditos");
     expect(creditsActors.map((actor) => actor.spriteSheet)).toEqual([
-      "neutral-compact-mission-gba.png", "neutral-compact-gear-gba.png", "neutral-arrow-right-gba.png"
+      "book-cursor-approved-8x8.png", "book-cursor-approved-8x8.png"
     ]);
     expect(creditsActors.every((actor) => actor.x >= 0 && actor.y >= 0 && actor.x * 8 < 240 && actor.y * 8 < 160)).toBe(true);
   });
@@ -1412,7 +1297,7 @@ describe("materialização canônica de Vértice", () => {
     const project = verticeProject();
     for (const [name, prefix, requiresSave] of [["salvar", "menu_salvar", false], ["carregar_jogo", "carregar_jogo", true]]) {
       const scene = project.scenas.find(scene => scene.name === name);
-      expect(scene.backgroundAssetName).toBe(`neutral-${name}-gba.png`);
+      expect(scene.backgroundAssetName).toBe(name === "salvar" ? "book-salvar-bg-240x160.png" : "book-carregar_jogo-bg-240x160.png");
       expect(scene.runtime.config.items.filter(item => Number.isInteger(item.saveSlot)).map(item => item.saveSlot)).toEqual([0, 1, 2]);
       for (let slot = 0; slot < 3; slot++) {
         const item = scene.runtime.config.items[slot];
@@ -1421,7 +1306,7 @@ describe("materialização canônica de Vértice", () => {
         const commands = project.events.find(event => event.name === `${prefix}_slot_${slot + 1}`).steps.map(step => step.command);
         expect(commands).toEqual(requiresSave ? [`if_save_game ${slot}`, `load_game ${slot}`, "condition_end"] : [`save_game ${slot}`]);
       }
-      expect(project.actors.filter(actor => actor.roomName === name)).toHaveLength(5);
+      expect(project.actors.filter(actor => actor.roomName === name)).toHaveLength(4);
     }
     expect(project.settings.save).toMatchObject({ autoSave: true, manualSave: true, slots: 3 });
   });
@@ -1432,7 +1317,7 @@ describe("materialização canônica de Vértice", () => {
     const startMenu = project.scenas.find(scene => scene.name === "menu_start");
     expect(project.scenas).toHaveLength(canonicalVerticeSceneCount());
     expect(startMenu.runtime.config.items.map(item => item.id)).toEqual(["missions", "inventory", "map", "save", "settings", "back"]);
-    expect(startMenu.runtime.config.items.at(-1)).toMatchObject({ label: "Retomar", action: "pop_screen" });
+    expect(startMenu.runtime.config.items.at(-1)).toMatchObject({ label: "RETOMAR", action: "pop_screen" });
     expect(startMenu.eventBindings).toMatchObject({ onInit: "menu_start_ao_entrar" });
   });
 
@@ -1441,12 +1326,12 @@ describe("materialização canônica de Vértice", () => {
     const project = verticeProject();
     const scene = project.scenas.find(scene => scene.name === "mapa_rota");
     const exported = buildEngineExportProjectContract(project);
-    expect(scene).toMatchObject({width:60,height:40,backgroundAssetName:"route-map-paged-v2.png",hudPresetId:"hud-route-travel"});
-    expect(project.assets.find(asset => asset.id === "route-map-paged-v2")?.metadata)
+    expect(scene).toMatchObject({width:60,height:40,backgroundAssetName:"route-lumen-paged.png",hudPresetId:"hud-route-travel"});
+    expect(project.assets.find(asset => asset.id === "world-map-lumen-background")?.metadata)
       .toMatchObject({kind:"paged_bg",colorMode:"8bpp-indexed",backgroundPaletteBankBudget:14,reviewStatus:"approved"});
-    expect(exported.asset_pack.assets.find(asset => asset.name === "route_map_paged_v2")).toMatchObject({kind:"paged_bg"});
+    expect(exported.asset_pack.assets.find(asset => asset.name === "route_lumen_paged")).toMatchObject({kind:"paged_bg"});
     expect(project.actors.filter(actor => actor.roomName === "mapa_rota")).toEqual([
-      expect.objectContaining({id:"map-cursor",worldMapRole:"cursor",spriteSheet:"route-airship-v2.png"})
+      expect.objectContaining({id:"map-cursor",worldMapRole:"cursor",spriteSheet:"route-dirigible-lumen-64.png"})
     ]);
   });
 
@@ -1454,97 +1339,27 @@ describe("materialização canônica de Vértice", () => {
     const exported = buildEngineExportProjectContract(verticeProject());
     const map = exported.world_map_project;
     expect(map).toMatchObject({scene_name:"mapa_rota",embedded_nodes:true,cursor_affine:true,journey_frames:120,
-      cursor:{metasprite:{asset:"route_airship_v2",index:0}}});
-    expect(map.backgrounds[0]).toMatchObject({tilemap:"route_map_paged_v2",source_tiles:"route_map_paged_v2"});
-    expect(map.assets.tile_assets).not.toContain("route_map_paged_v2");
-    expect(map.assets.bg_palettes).toContain("route_map_paged_v2");
+      cursor:{metasprite:{asset:"route_dirigible_lumen_64",index:0}}});
+    expect(map.backgrounds[0]).toMatchObject({tilemap:"route_lumen_paged",source_tiles:"route_lumen_paged"});
+    expect(map.assets.tile_assets).not.toContain("route_lumen_paged");
+    expect(map.assets.bg_palettes).toContain("route_lumen_paged");
     expect(map.nodes.map(node => node.name)).toEqual(["porto","penedos","armazem","observatorio","mercado","usina","conselho","circuito"]);
-    expect(map.nodes[6]).toMatchObject({position:{x:424,y:74},label:"Conselho Guardia",required_variable:2});
+    expect(map.nodes[6]).toMatchObject({position:{x:453,y:62},label:"Conselho Guardia",required_variable:2});
     expect(map.on_start).toEqual(expect.arrayContaining([expect.objectContaining({op:"scene_stack_push",runtime:"world_map"})]));
     expect(map.dialogue_ui.hud_scene_bindings).toEqual(expect.arrayContaining([{scene_name:"mapa_rota",preset_id:"hud-route-travel"}]));
   });
 
   it("materializa os três fundos e os atores aprovados da Usina", () => {
     const project = verticeProject();
-    const backgrounds = ["exploration", "combat", "exit"].map((stage) =>
-      project.assets.find((asset) => asset.id === `usina-${stage}-background-v3-4bpp`));
-    const sentinel = project.assets.find((asset) => asset.id === "sentinel-depth-far-mid-near-192x64-v3-4bpp");
-    const energyCell = project.assets.find((asset) => asset.id === "usina-energy-cell-v3-4bpp");
-    const scene = project.scenas.find((candidate) => candidate.name === "usina_submersa");
-    const combatScene = project.scenas.find((candidate) => candidate.name === "usina_combate");
-    const exitScene = project.scenas.find((candidate) => candidate.name === "usina_saida");
-    const explorationActors = project.actors.filter((actor) => actor.roomName === "usina_submersa");
-    const combatActors = project.actors.filter((actor) => actor.roomName === "usina_combate");
-    const exitActors = project.actors.filter((actor) => actor.roomName === "usina_saida");
-
-    for (const [index, stage] of ["exploration", "combat", "exit"].entries()) {
-      expect(backgrounds[index]).toMatchObject({
-        name: `usina-${stage}-background-v3-4bpp.png`,
-        metadata: {
-          role: "dungeon-viewport", colorMode: "4bpp",
-          generatedBy: "usina-v3-promotion", reviewStatus: "approved-composition"
-        }
-      });
+    const manifest=JSON.parse(readFileSync(new URL('../fixtures/asset-provenance/dungeon-approved-manifest.json',import.meta.url)));
+    for(const [i,name]of ['usina_submersa','usina_combate','usina_saida'].entries()){
+      const room=project.rooms.find(r=>r.name===name);
+      expect(room).toMatchObject({width:11,height:11,backgroundAssetName:manifest.scenes.scenes[i].background,runtime:{type:'dungeonCrawler'}});
+      expect(project.assets.find(a=>a.name===room.backgroundAssetName)?.metadata).toMatchObject({approved:true,colorMode:'4bpp',runtimeDependencies:expect.arrayContaining([manifest.cache.tilesAsset,manifest.cache.mapsAsset,manifest.cache.palettesAsset])});
     }
-    expect(sentinel).toMatchObject({
-      name: "sentinel-depth-far-mid-near-192x64-v3-4bpp.png",
-      metadata: {
-        role: "dungeon-depth-actor",
-        colorMode: "4bpp",
-        reviewStatus: "approved-composition"
-      }
-    });
-    expect(energyCell).toMatchObject({
-      name: "usina-energy-cell-v3-4bpp.png",
-      metadata: {
-        role: "dungeon-reward",
-        colorMode: "4bpp",
-        reviewStatus: "approved-composition"
-      }
-    });
-    expect(scene).toMatchObject({
-      width: 30,
-      height: 20,
-      backgroundAssetName: "usina-exploration-background-v3-4bpp.png",
-      playerActorName: "",
-      runtime: { type: "dungeonCrawler" }
-    });
-    expect(explorationActors).toEqual([]);
-    expect(combatScene).toMatchObject({
-      name: "usina_combate",
-      runtime: { type: "dungeonCrawler" },
-      backgroundAssetName: "usina-combat-background-v3-4bpp.png"
-    });
-    expect(combatActors).toEqual([
-      expect.objectContaining({
-        id: "usina-sentinel-v2",
-        name: "Sentinela da Usina",
-        spriteSheet: "sentinel-depth-far-mid-near-192x64-v3-4bpp.png",
-        animationName: "sentinel_far",
-        animationStateID: "usina-sentinel-v3-state"
-      }),
-    ]);
-    expect(exitScene).toMatchObject({
-      name: "usina_saida",
-      runtime: { type: "dungeonCrawler" },
-      backgroundAssetName: "usina-exit-background-v3-4bpp.png"
-    });
-    expect(exitActors).toEqual([
-      expect.objectContaining({
-        id: "usina-energy-cell-v2",
-        name: "Célula de energia",
-        spriteSheet: "usina-energy-cell-v3-4bpp.png",
-        animationName: "energy_cell_idle",
-        animationStateID: "usina-energy-cell-v3-state",
-        eventName: "usina_coletar_celula"
-      })
-    ]);
-    expect([...explorationActors, ...combatActors, ...exitActors].map((actor) => actor.spriteSheet)).not.toEqual(expect.arrayContaining([
-      "nara-dungeon.png",
-      "dungeon-sentinel-v1.png",
-      "energy-cell.png",
-      "plant-sentinel.png",
-    ]));
+    expect(project.actors.filter(a=>a.roomName==='usina_submersa')).toEqual([]);
+    expect(project.actors.find(a=>a.id==='usina-sentinel-v2')).toMatchObject({x:9,y:2,spriteSheet:manifest.sentinel.near,animationName:'poses',dungeonDepthSheets:manifest.sentinel});
+    expect(project.actors.find(a=>a.id==='usina-energy-cell-v2')).toMatchObject({x:5,y:6,spriteSheet:manifest.cell.near,animationName:'poses',eventName:'usina_coletar_celula'});
   });
 
   it("mantém o BG3 antigo dos Penedos fora do conjunto canônico", () => {
@@ -1565,12 +1380,9 @@ describe("materialização canônica de Vértice", () => {
     const project = verticeProject();
     expect(project.scenas.find((scene) => scene.name === "oficina")).toBeUndefined();
     expect(project.assets.map((asset) => asset.name)).toEqual(expect.arrayContaining([
-      "armazem-das-mares-gba.png",
-      "observatorio-do-farol-gba.png",
-      "point-click-cursor.png",
-      "point-click-lia-scroll.png",
-      "point-click-dock-mechanic.png",
-      "point-click-keeper-lantern.png"
+      "warehouse-frontal-bg-240x160.png",
+      "observatory-frontal-bg-240x160.png",
+      "white-hand-cursor-32x32.png"
     ]));
     for (const scene of [
       project.scenas.find((candidate) => candidate.name === "armazem_das_mares"),
@@ -1584,7 +1396,7 @@ describe("materialização canônica de Vértice", () => {
         gbStudioUseBackgroundLayout: true,
         showcase: { lane: "campaign", access: "campaign" }
       });
-      expect(project.actors.filter((actor) => actor.roomName === scene.name)).toHaveLength(4);
+      expect(project.actors.filter((actor) => actor.roomName === scene.name)).toHaveLength(1);
       expect(project.triggers.filter((trigger) => trigger.roomName === scene.name)).toHaveLength(3);
     }
   });
@@ -1620,45 +1432,46 @@ describe("materialização canônica de Vértice", () => {
 
     expect(isFree("porto_lumen", 88, 50)).toBe(true);
     expect(isFree("porto_lumen", 64, 2)).toBe(true);
-    expect(isFree("farol_interior", 22, 24)).toBe(true);
-    expect(isFree("farol_interior", 11, 9)).toBe(true);
-    expect(isFree("farol_interior", 22, 14)).toBe(false);
+    expect(isFree("farol_interior", 23, 27)).toBe(true);
+    expect(isFree("farol_interior", 17, 14)).toBe(true);
+    expect(isFree("farol_interior", 24, 10)).toBe(false);
     expect(isFree("circuito_final", 22, 6)).toBe(true);
     expect(isFree("circuito_final", 30, 20)).toBe(false);
   });
 
-  it("materializa a composição aprovada dos Penedos no viewport em duas camadas", () => {
+  it("materializa a composição ampliada aprovada dos Penedos em duas camadas", () => {
     const project = verticeProject();
     const scene = project.scenas.find(scene => scene.name === "penedos_vento");
-    expect(scene).toMatchObject({width:30,height:20,cameraMode:"fixed_center",
-      backgroundAssetName:"penedos-v13-terreno-240x160.png",
+    expect(scene).toMatchObject({width:120,height:40,cameraMode:"follow_player",
+      backgroundAssetName:"penedos-approved-terrain.png",
       tileLayers:[expect.objectContaining({mapping:"BG3"}),expect.objectContaining({mapping:"BG2"})]});
-    expect(scene).not.toHaveProperty("hudPresetId");
+    expect(scene.hudPresetId).toBe("hud-penedos-approved");
     const cells = scene.collisionTypes;
-    expect(cells).toHaveLength(600);
-    expect(cells[12*30+2]).toBe("solid");
-    expect(cells[19*30+14]).toBe("damage");
-    expect(cells[7*30+13]).toBe("down");
-    expect(project.actors.filter(a => a.roomName === "penedos_vento")).toHaveLength(5);
+    expect(cells).toHaveLength(4800);
+    expect(cells[32*120+2]).toBe("solid");
+    expect(cells[39*120+25]).toBe("damage");
+    expect(cells[26*120+17]).toBe("down");
+    expect(project.actors.filter(a => a.roomName === "penedos_vento")).toHaveLength(7);
   });
 
   it("exporta o contrato compacto aprovado dos Penedos com BG3 e BG2", () => {
     const project = verticeProject();
     const exported = buildEngineExportProjectContract(project);
     const room = exported.platformer_project.rooms.find(r => r.name === "penedos_vento");
-    expect(room).toMatchObject({width_tiles:30,height_tiles:20,
-      visual_tilemap:"penedos_v13_terreno_240x160",visual_tilemap_layout:"source_asset",
+    expect(room).toMatchObject({width_tiles:120,height_tiles:40,
+      visual_tilemap:"penedos_approved_terrain",visual_tilemap_layout:"source_asset",
       collision_types:expect.arrayContaining(["solid","down","damage"]),
-      background_layers:[expect.objectContaining({layer:"bg3",tilemap:"penedos_v13_fundo_240x160"}),
-        expect.objectContaining({layer:"bg2",tilemap:"penedos_v13_terreno_240x160"})]});
+      background_layers:[expect.objectContaining({layer:"bg3",tilemap:"penedos_approved_sky"}),
+        expect.objectContaining({layer:"bg2",tilemap:"penedos_approved_terrain"})]});
     expect(project.actors).toEqual(expect.arrayContaining([expect.objectContaining({
-      id:"penedos-player",x:6,y:11,spriteSheet:"penedos-v10-nara.png",gbStudioPlayerRuntime:"PLATFORM"})]));
+      id:"penedos-player",x:11,y:32,spriteSheet:"penedos-approved-nara.png",gbStudioPlayerRuntime:"PLATFORM"})]));
     expect(project.sceneRouteTables.find(t => t.id === "map-routes").routes).toEqual(expect.arrayContaining([
-      expect.objectContaining({scene:"penedos_vento",x:6,y:11})]));
-    expect(exported.platformer_project.dialogue_ui.hud_scene_bindings.some(b => b.scene_name === "penedos_vento")).toBe(false);
-    for (const name of ["penedos_v13_fundo_240x160", "penedos_v13_terreno_240x160"]) {
-      expect(exported.asset_pack.assets).toEqual(expect.arrayContaining([expect.objectContaining({
-        id:name,background_tile_budget:895,background_palette_banks:14})]));
+      expect.objectContaining({scene:"penedos_vento",x:11,y:32})]));
+    expect(exported.platformer_project.dialogue_ui.hud_scene_bindings.some(b => b.scene_name === "penedos_vento")).toBe(true);
+    for (const name of ["penedos_approved_sky", "penedos_approved_terrain"]) {
+      const asset = exported.asset_pack.assets.find(a => a.id === name);
+      expect(asset).toMatchObject({id:name,background_palette_banks:14});
+      expect(asset.background_tile_budget).toBeUndefined();
     }
   });
 
@@ -1703,12 +1516,12 @@ describe("materialização canônica de Vértice", () => {
 
   it("materializa o pacote aprovado da batalha do Guardião do Relé", () => {
     const project = verticeProject();
-    const background = project.assets.find((asset) => asset.id === "relay-background");
+    const background = project.assets.find((asset) => asset.id === "relay-approved-background");
     const scene = project.scenas.find((candidate) => candidate.name === "guardiao_rele");
 
     expect(background).toMatchObject({
       kind: "Background",
-      name: "battle-rpg-usina-nearest-review.png",
+      name: "relay-approved-background.png",
       metadata: {
         role: "relay-arena",
         profile: "battleRpg",
@@ -1718,31 +1531,31 @@ describe("materialização canônica de Vértice", () => {
     expect(scene).toMatchObject({
       width: 30,
       height: 20,
-      backgroundAssetName: "battle-rpg-usina-nearest-review.png",
+      backgroundAssetName: "relay-approved-background.png",
       sceneType: "battleRpg",
       runtime: { type: "battleRpg" }
     });
     expect(project.actors.filter((actor) => actor.roomName === "guardiao_rele")).toEqual(expect.arrayContaining([
       expect.objectContaining({
         id: "nara-guardian",
-        spriteSheet: "battle-rpg-scene-party-mechanic-alpha128-v2.png",
-        animationStateID: "nara-battle-state",
+        spriteSheet: "relay-approved-nara.png",
+        animationStateID: "relay-approved-nara-state",
         battle: expect.objectContaining({ side: "party" })
       }),
       expect.objectContaining({
         id: "relay-guardian",
-        spriteSheet: "battle-rpg-scene-enemy-large-robot-alpha128-v2.png",
-        animationStateID: "relay-guardian-state",
+        spriteSheet: "relay-approved-guardian.png",
+        animationStateID: "relay-approved-guardian-state",
         battle: expect.objectContaining({ side: "enemy" })
       })
     ]));
     expect(project.animations.map((animation) => animation.spriteSheet)).toEqual(expect.arrayContaining([
-      "battle-rpg-scene-party-mechanic-alpha128-v2.png",
-      "battle-rpg-scene-enemy-large-robot-alpha128-v2.png"
+      "relay-approved-nara.png",
+      "relay-approved-guardian.png"
     ]));
     expect(project.assets.map((asset) => asset.name)).toEqual(expect.arrayContaining([
-      "battle-rpg-scene-party-mechanic-alpha128-v2.png",
-      "battle-rpg-scene-enemy-large-robot-alpha128-v2.png"
+      "relay-approved-nara.png",
+      "relay-approved-guardian.png"
     ]));
     expect(project.assets.some((asset) => asset.name === "battle-ui.png")).toBe(false);
     expect(projectAssetCoverage(project).scenes.find((entry) => entry.scene === "guardiao_rele")).toMatchObject({
@@ -1758,11 +1571,11 @@ describe("materialização canônica de Vértice", () => {
     expect(project.events.every((event) => project.scenas.some((scene) => scene.name === event.roomName))).toBe(true);
     expect(project.events.map((event) => event.name)).toEqual(expect.arrayContaining([
       "titulo_abrir_menu",
-      "missoes_detalhar_ativa",
       "missoes_detalhar_proximo",
       "arena_vencer_rival",
       "circuito_concluir"
     ]));
+    expect(project.events.map(event => event.name)).not.toContain("missoes_detalhar_ativa");
     expect(project.triggers).toEqual(expect.arrayContaining([
       expect.objectContaining({ roomName: "porto_lumen", eventName: "porto_abrir_mapa" }),
       expect.objectContaining({ roomName: "armazem_das_mares", eventName: "armazem_das_mares_carta", eventBindings: { onInteract: "armazem_das_mares_carta" } }),
@@ -1807,6 +1620,7 @@ describe("materialização canônica de Vértice", () => {
       for (const [key, value] of Object.entries(data)) {
         if (!["assets", "animations", "animationStates"].includes(key)) collectReferences(value);
       }
+      for(const asset of data.assets)if(directReferences.has(asset.name))collectReferences(asset.metadata?.runtimeDependencies);
       expect(data.assets.filter((asset) =>
         !directReferences.has(asset.name) && !directReferences.has(asset.id) &&
         !asset.metadata?.reusableLibraryAsset &&
@@ -1870,24 +1684,20 @@ describe("materialização canônica de Vértice", () => {
       "racing"
     ]));
     expect(exported.luta_project?.stages).toHaveLength(1);
-    expect(exported.luta_project?.hud).toMatchObject({
-      layer: "bg0",
-      tilemap: "fight_hud_v2_arena_bank_05",
-      backdrop_from_tilemap_palette: true
-    });
+    expect(exported.luta_project?.hud).toBeUndefined();
+    expect(exported.luta_project?.dialogue_ui.hud_scene_bindings).toContainEqual({scene_name:"arena_arrancada",preset_id:"hud-arena-approved"});
     expect(exported.luta_project?.assets?.tile_assets).toEqual(expect.arrayContaining([
-      "arena_gba",
-      "fight_hud_v2_arena_bank_05"
+      "arena_coastal_240x160"
     ]));
     const startMenuScreenIndex = exported.menu_project?.start_menu_screen ?? -1;
     expect(startMenuScreenIndex).toBeGreaterThanOrEqual(0);
     const startMenuScreen = exported.menu_project?.screens[startMenuScreenIndex];
     expect(startMenuScreen?.items).toEqual(expect.arrayContaining([
-      expect.objectContaining({ label: "Missoes" }),
-      expect.objectContaining({ label: "Mapa" }),
-      expect.objectContaining({ label: "Salvar" }),
-      expect.objectContaining({ label: "Configuracoes" }),
-      expect.objectContaining({ label: "Retomar" })
+      expect.objectContaining({ label: "MISSÕES" }),
+      expect.objectContaining({ label: "MAPA" }),
+      expect.objectContaining({ label: "SALVAR" }),
+      expect.objectContaining({ label: "AJUSTES" }),
+      expect.objectContaining({ label: "RETOMAR" })
     ]));
     expect(exported.topdown_project?.scripts).toEqual(expect.arrayContaining([
       expect.objectContaining({
@@ -1918,10 +1728,10 @@ describe("materialização canônica de Vértice", () => {
         config: expect.objectContaining({
           presentation: "topdown",
           laps_to_win: 3,
-          checkpoints_per_lap: 3,
-          pickups_per_lap: 2,
+          checkpoints_per_lap: 4,
+          pickups_per_lap: 0,
           rival_speed_x256_per_second: 26880,
-          road_curve: 14,
+          road_curve: 0,
           show_minimap: false
         })
       })
@@ -1940,22 +1750,22 @@ describe("materialização canônica de Vértice", () => {
       action: "push_screen",
       target_screen: settingsScreen
     });
-    expect(item("menu_start", "Configuracoes")).toMatchObject({
+    expect(item("menu_start", "AJUSTES")).toMatchObject({
       action: "push_screen",
       target_screen: settingsScreen
     });
-    expect(item("configuracoes", "Idioma")).toMatchObject({
+    expect(item("configuracoes", "IDIOMA")).toMatchObject({
       action: "adjust_variable",
       adjust_variable: 15,
       min: 0,
       max: 2,
       step: 1
     });
-    expect(item("configuracoes", "Voltar")).toMatchObject({ action: "pop_screen" });
+    expect(item("configuracoes", "VOLTAR")).toMatchObject({ action: "pop_screen" });
     expect(exported.menu_project?.screens[settingsScreen]).toMatchObject({
       presentation_mode: "hud"
     });
-    expect(exported.menu_project?.screens[settingsScreen]?.actors ?? []).toHaveLength(9);
+    expect(exported.menu_project?.screens[settingsScreen]?.actors ?? []).toHaveLength(16);
     expect(exported.menu_project?.screens.some((candidate) => [
       "idioma",
       "configuracoes_audio",
@@ -1963,73 +1773,21 @@ describe("materialização canônica de Vértice", () => {
     ].includes(candidate.name))).toBe(false);
   });
 
-  it("materializa o circuito fechado V2 e mantém o pseudo-3D arquivado", () => {
-    const project = verticeProject();
-    const circuit = project.scenas.find((scene) => scene.name === "circuito_final");
-    const exported = buildEngineExportProjectContract(project);
-
-    expect(project.assets.map((asset) => asset.name)).toEqual(expect.arrayContaining([
-      "circuit-final-loop-v2-runtime.png",
-      "nara-racer.png",
-      "rival-racer.png"
-    ]));
-    expect(circuit).toMatchObject({
-      backgroundAssetName: "circuit-final-loop-v2-runtime.png",
-      collisionTypes: expect.objectContaining({ encoding: "rle-v1", length: 2400 }),
-      runtime: {
-        type: "racing",
-        config: {
-          presentation: "topdown",
-          topdownTrack: {
-            cameraDeadZoneX: 56,
-            cameraDeadZoneY: 40,
-            startHeading: 4,
-            pathPoints: expect.arrayContaining([{ x: 180, y: 56 }, { x: 442, y: 153 }]),
-            checkpoints: [
-              { id: "ilha-curva-leste", x: 439, y: 169, width: 48, height: 72 },
-              { id: "ilha-retorno-sul", x: 237, y: 235, width: 80, height: 48 },
-              { id: "ilha-curva-oeste", x: 42, y: 150, width: 48, height: 72 },
-              { id: "ilha-largada", x: 210, y: 56, width: 28, height: 40 }
-            ]
-          }
-        }
-      }
-    });
-    expect(project.actors.filter((actor) => actor.roomName === "circuito_final")).toEqual(expect.arrayContaining([
-      expect.objectContaining({ id: "racing-nara", name: "Carro de Nara", x: 22, y: 6, spriteSheet: "nara-racer.png" }),
-      expect.objectContaining({ id: "racing-rival", name: "Rival de Nara", x: 18, y: 6, spriteSheet: "rival-racer.png" }),
-      expect.objectContaining({ id: "racing-rival-2", name: "Rival da Ilha", x: 15, y: 6, spriteSheet: "rival-racer.png" })
-    ]));
-    expect(circuit.hudPresetId).toBe("hud-corrida-topdown");
-    expect(circuit.runtime.config.trackSegments.reduce((total, segment) => total + segment.lengthPixels, 0)).toBe(320);
-    expect(project.settings.hudPresets).toEqual(expect.arrayContaining([
-      expect.objectContaining({ id: "hud-corrida-topdown", width: 240, height: 160 })
-    ]));
-    for (const source of [project, JSON.parse(readFileSync(templateURL, "utf8"))]) {
-      const raceHud = source.settings.hudPresets.find((preset) => preset.id === "hud-corrida-topdown");
-      expect(raceHud.components.filter((component) => component.kind === "text").map((component) => component.text))
-        .toEqual(["", "", ""]);
+  it("materializa as duas corridas aprovadas, com mapas completos e animações próprias",()=>{
+    const p=verticeProject(), c=buildEngineExportProjectContract(p).racing_project;
+    expect(c.rooms.map(r=>r.name)).toEqual(['circuito_final','circuito_perspectiva']);
+    const m=JSON.parse(readFileSync(new URL('../fixtures/asset-provenance/racing-approved-manifest.json',import.meta.url),'utf8'));
+    for(const name of m.scenes.map(s=>s.name)){
+      const room=p.scenas.find(r=>r.name===name);
+      expect([room.width,room.height]).toEqual([64,64]);
+      expect(room.hudPresetId).toBe('hud-porto-corrida');
+      expect(room.runtime.config.topdownTrack.checkpoints).toHaveLength(4);
+      expect(p.actors.filter(a=>a.roomName===name)).toHaveLength(3);
     }
-    expect(project.assets).toEqual(expect.arrayContaining([
-      expect.objectContaining({
-        name: "circuit-final-loop-v2-runtime.png",
-        metadata: expect.objectContaining({ reviewStatus: "approved", candidateStatus: "canonical-integrated", visualStatus: "approved", assetcStatus: "attention", width: 480, height: 320, optimizedTileCount: 894, backgroundPaletteBankBudget: 14 })
-      }),
-      expect.objectContaining({
-        name: "nara-racer.png",
-        metadata: expect.objectContaining({ maxVisibleColors: 15, reviewStatus: "approved", candidateStatus: "canonical-integrated", visualStatus: "approved" })
-      })
-    ]));
-    expect(project.events.find((event) => event.name === "circuito_reiniciar")?.steps).toEqual(expect.arrayContaining([
-      expect.objectContaining({ command: "change_scene circuito_final 22 6 right" })
-    ]));
-    for (const source of [project, JSON.parse(readFileSync(templateURL, "utf8"))]) {
-      expect(source.events.find((event) => event.name === "circuito_ao_entrar")?.steps).toEqual(expect.arrayContaining([
-        expect.objectContaining({ command: "play_music farol_corrida_final" }),
-        expect.objectContaining({ command: "play_sfx farol_sfx_motor" })
-      ]));
-    }
-    expect(exported.racing_project?.pseudo3d_visuals).toBeUndefined();
+    expect(c.rooms[1].floor_tilemap).toHaveLength(4096);
+    expect(c.rooms[1].player.animations.brake_left).toBeDefined();
+    expect(c.pseudo3d_visuals).toHaveLength(1);
+    for(const a of m.assets)expect(p.assets.find(x=>x.name===a.name).metadata.preparedSha256).toBe(a.metadata.preparedSha256);
   });
 
   it("preserva apenas os atores da onda atual e remove os atores legados", () => {
@@ -2049,65 +1807,18 @@ describe("materialização canônica de Vértice", () => {
       ]);
   });
 
-  it("materializa o elenco top-down do Porto e suas animações 4 BPP", () => {
-    const project = verticeProject();
-    const portActors = project.actors.filter((actor) => actor.roomName === "porto_lumen");
-    const portAnimations = project.animations.filter((animation) => ["nara-topdown.png", "mechanic.png"].includes(animation.spriteSheet));
-
-    expect(portActors).toHaveLength(7);
-    expect(portAnimations).toEqual(expect.arrayContaining([
-      expect.objectContaining({ id: "nara-topdown-walk-down", frameWidth: 32, frameHeight: 64, frameCount: 2, hitboxX: 0, hitboxY: -8, hitboxWidth: 16, hitboxHeight: 16, colorMode: "4bpp" }),
-      expect.objectContaining({ id: "mechanic-work-down", frameWidth: 16, frameHeight: 32, frameCount: 1, hitboxWidth: 16, hitboxHeight: 16, colorMode: "4bpp" })
-    ]));
-    expect(project.animationStates).toEqual(expect.arrayContaining([
-      expect.objectContaining({ id: "nara-topdown-state", animationType: "four_direction_movement", mirrorLeftFromRight: true })
-    ]));
-    expect(project.assets).toEqual(expect.arrayContaining([
-      expect.objectContaining({
-        name: "nara-topdown.png",
-        metadata: expect.objectContaining({ frameWidth: 32, frameHeight: 64, frameCount: 9, logicalSourceFrameCount: 6, visibleColors: 14, colorMode: "4bpp", reviewStatus: "approved" })
-      })
-    ]));
-    expect(Object.fromEntries(
-      project.animations
-        .filter((animation) => animation.spriteSheet === "nara-topdown.png")
-        .map((animation) => [
-          animation.name,
-          animation.frames.map((frame) => ({
-            sourceFrameIndex: frame.sourceFrameIndex,
-            sliceX: frame.tiles[0].sliceX
-          }))
-        ])
-    )).toEqual({
-      idle_down: [{ sourceFrameIndex: 0, sliceX: 0 }],
-      idle_up: [{ sourceFrameIndex: 2, sliceX: 32 }],
-      idle_right: [{ sourceFrameIndex: 1, sliceX: 64 }],
-      idle_left: [{ sourceFrameIndex: 1, sliceX: 64 }],
-      walk_down: [
-        { sourceFrameIndex: 0, sliceX: 96 },
-        { sourceFrameIndex: 3, sliceX: 128 }
-      ],
-      walk_up: [
-        { sourceFrameIndex: 2, sliceX: 160 },
-        { sourceFrameIndex: 4, sliceX: 192 }
-      ],
-      walk_right: [
-        { sourceFrameIndex: 1, sliceX: 224 },
-        { sourceFrameIndex: 5, sliceX: 256 }
-      ],
-      walk_left: [
-        { sourceFrameIndex: 1, sliceX: 224 },
-        { sourceFrameIndex: 5, sliceX: 256 }
-      ]
-    });
-    expect(project.assets.find((asset) => asset.name === "port-skiff.png")).toBeUndefined();
-    expect(project.assets.find((asset) => asset.name === "port-cargo.png")).toBeUndefined();
-    expect(project.assets.map((asset) => asset.name)).toEqual(expect.arrayContaining([
-      "porto-lume-exterior-topdown-gba.png",
-      "farol-interior-topdown-360x240-gba.png",
-      "nara-topdown.png",
-      "mechanic.png"
-    ]));
+  it("materializa o elenco atual do Porto sem as animações das versões aposentadas", () => {
+    const project = verticeProject(), actors = project.actors.filter(a => a.roomName === 'porto_lumen');
+    expect(actors).toHaveLength(7);
+    for(const actor of actors) {
+      expect(project.assets.some(a => a.name === actor.spriteSheet)).toBe(true);
+      expect(project.animationStates.some(state => state.id === actor.animationStateID && state.spriteSheet === actor.spriteSheet)).toBe(true);
+      expect(project.animations.some(a => a.spriteSheet === actor.spriteSheet)).toBe(true);
+    }
+    for(const name of ['nara-topdown.png','mechanic.png','porto-nara-body48.png','porto-mechanic-body48.png']) {
+      expect(project.assets.some(a => a.name === name)).toBe(false);
+      expect(project.animations.some(a => a.spriteSheet === name)).toBe(false);
+    }
   });
 
   it("promove o BG v4 e remove o lote legado do Porto quando a promoção é chamada", () => {
@@ -2160,6 +1871,8 @@ describe("materialização canônica de Vértice", () => {
     const project = verticeProject();
     const neutralManifest = JSON.parse(readFileSync(new URL("../fixtures/asset-provenance/neutral-menu-v1-manifest.json", import.meta.url), "utf8"));
     const allowedAssets = new Set([
+      ...startupFadeManifest.assets.map(asset => asset.file),
+      ...JSON.parse(readFileSync(new URL("../fixtures/asset-provenance/dungeon-approved-manifest.json",import.meta.url))).assets.map(a=>a.name),
       ...Object.values(neutralManifest.backgrounds).map(asset=>asset.file),
       ...Object.values(neutralManifest.sprites).map(asset=>asset.file),
       "neutral-menu-font-gba.png",
@@ -2170,7 +1883,7 @@ describe("materialização canônica de Vértice", () => {
       "name-input-approved-v2-gba.png",
       "name-portrait-male-gba.png",
       "name-portrait-female-gba.png",
-      "title-day-centered-240x160-4bpp.png",
+      "title-porto-lumen-240x160-4bpp.png",
       "press-start-actor-88x32.png",
       "tactical-cursor-diamond-32x16-v1.png",
       "tactical-range-diamond-32x16-v1.png",
@@ -2190,7 +1903,7 @@ describe("materialização canônica de Vértice", () => {
       "title-logo-actor-128x88.png",
       "menu-entry-back.png",
       "circuit-final-loop-v2-runtime.png",
-      "usina-exploration-background-v3-4bpp.png",
+      "dungeon-approved-exploracao-background.png",
       "hud-usina-exploration-v3-4bpp.png",
       "usina-combat-background-v3-4bpp.png",
       "hud-usina-combat-v3-4bpp.png",
@@ -2204,8 +1917,8 @@ describe("materialização canônica de Vértice", () => {
       "opening-v3-guardia-signal-48x64.png",
       "opening-v3-menino-24x32.png",
       "opening-v3-gaivota-24x16.png",
-      "route-map-paged-v2.png",
-      "route-airship-v2.png",
+      "route-lumen-paged.png",
+      "route-dirigible-lumen-64.png",
       "market-adventure-merchant.png",
       "market-adventure-guard.png",
       "mercado-adventure-surface.png",
@@ -2259,19 +1972,17 @@ describe("materialização canônica de Vértice", () => {
       "fisherchild-pilot-32x32.png",
       "lighthousekeeper-pilot-32x32.png",
       "mechanic.png",
-      "penedos-v13-fundo-240x160.png",
-      "penedos-v13-terreno-240x160.png",
-      "penedos-v10-nara.png",
-      "penedos-v10-caranguejo.png",
-      "penedos-v10-mariposa.png",
-      "penedos-v10-trabalhador.png",
-      "penedos-v10-marco.png",
-      "armazem-das-mares-gba.png",
-      "observatorio-do-farol-gba.png",
-      "point-click-cursor.png",
-      "point-click-lia-scroll.png",
-      "point-click-dock-mechanic.png",
-      "point-click-keeper-lantern.png",
+      "penedos-approved-sky.png",
+      "penedos-approved-terrain.png",
+      "penedos-approved-nara.png",
+      "penedos-approved-crab.png",
+      "penedos-approved-moth.png",
+      "penedos-approved-worker.png",
+      "penedos-approved-checkpoint.png",
+      "penedos-approved-crab-east.png", "penedos-approved-moth-east.png",
+      "warehouse-frontal-bg-240x160.png",
+      "observatory-frontal-bg-240x160.png",
+      "white-hand-cursor-32x32.png",
       "usina-sentinel-v2.png",
       "usina-energy-cell-v2.png",
       "nara-portrait.png",
@@ -2296,16 +2007,53 @@ describe("materialização canônica de Vértice", () => {
       "arena_arrancada",
     ];
 
+    const bookManifest = JSON.parse(readFileSync(new URL("../fixtures/asset-provenance/book-menu-manifest.json", import.meta.url)));
+    for (const entry of Object.values(bookManifest.assets)) allowedAssets.add(entry.file);
+    const travelerManifest = JSON.parse(readFileSync(new URL("../fixtures/asset-provenance/traveler-entry-manifest.json", import.meta.url)));
+    for (const entry of Object.values(travelerManifest.assets)) allowedAssets.add(entry.file);
+    const prologueManifest = JSON.parse(readFileSync(new URL("../fixtures/asset-provenance/prologue-clean-manifest.json", import.meta.url)));
+    for (const entry of prologueManifest.assets) allowedAssets.add(entry.file);
+    const loadCreditsManifest = JSON.parse(readFileSync(new URL("../fixtures/asset-provenance/load-credits-book-manifest.json", import.meta.url)));
+    for (const entry of loadCreditsManifest.assets) allowedAssets.add(entry.file);
+    const warehouseManifest = JSON.parse(readFileSync(new URL("../fixtures/asset-provenance/warehouse-frontal-manifest.json", import.meta.url)));
+    allowedAssets.add(warehouseManifest.asset.file);
+    const observatoryManifest = JSON.parse(readFileSync(new URL('../fixtures/asset-provenance/observatory-frontal-manifest.json', import.meta.url)));
+    allowedAssets.add(observatoryManifest.asset.file);
+    const farolManifest = JSON.parse(readFileSync(new URL('../fixtures/asset-provenance/farol-interior-manifest.json', import.meta.url)));
+    allowedAssets.add(farolManifest.asset.file);
+    const arenaManifest = JSON.parse(readFileSync(new URL('../fixtures/asset-provenance/arena-approved-manifest.json', import.meta.url)));
+    for (const entry of arenaManifest.assets) allowedAssets.add(entry.name);
+    const tacticalManifest=JSON.parse(readFileSync(new URL("../fixtures/asset-provenance/tactical-arena-manifest.json",import.meta.url)));
+    for(const asset of tacticalManifest.assets)allowedAssets.add(asset.name);
+    allowedAssets.add("white-hand-cursor-32x32.png");
+    allowedAssets.add("opening-medium-shot-240x160.png");
+    allowedAssets.add("opening-local-animation-128x96.png");
     allowedAssets.add("porto-lumen-continuous-paged.png");
     for (const role of ["captain", "traveler", "cartographer", "fisherchild", "lighthousekeeper"]) allowedAssets.add(`porto-${role}-body48.png`);
     for (const name of ["porto-nara-body48.png", "porto-mechanic-body48.png", "porto-hud-b-life-frame.png", "porto-hud-b-coin-frame.png", "porto-hud-b-hearts-full.png", "porto-hud-b-hearts-empty.png", "porto-hud-b-coin.png", "porto-hud-b-font.png", "porto-nara-animations48.png", "porto-mechanic-animations48.png"]) allowedAssets.add(name);
+    for (const asset of retiredAssets) allowedAssets.delete(asset.name);
+    const racingManifest=JSON.parse(readFileSync(new URL('../fixtures/asset-provenance/racing-approved-manifest.json',import.meta.url),'utf8'));
+    for(const name of racingManifest.replacedAssetNames)allowedAssets.delete(name);
+    for(const asset of racingManifest.assets)allowedAssets.add(asset.name);
+    const stormManifest=JSON.parse(readFileSync(new URL('../fixtures/asset-provenance/tempestade-approved-manifest.json',import.meta.url)));
+    for(const name of stormManifest.replacedAssetNames)allowedAssets.delete(name);
+    for(const asset of stormManifest.assets)allowedAssets.add(asset.name);
+    const relayManifest=JSON.parse(readFileSync(new URL('../fixtures/asset-provenance/relay-approved-manifest.json',import.meta.url)));
+    for(const name of relayManifest.replacedAssetNames)allowedAssets.delete(name);
+    for(const asset of relayManifest.assets)allowedAssets.add(asset.name);
+    for(const original of startupFadeManifest.retainedOriginals)allowedAssets.delete(original.source.split('/').at(-1));
+    const dungeonManifest=JSON.parse(readFileSync(new URL('../fixtures/asset-provenance/dungeon-approved-manifest.json',import.meta.url)));
+    for(const name of [...dungeonManifest.replacedAssetNames,...dungeonManifest.unusedPreparedAssetNames])allowedAssets.delete(name);
+    const routeManifest=JSON.parse(readFileSync(new URL('../fixtures/asset-provenance/world-map-lumen-manifest.json',import.meta.url)));
+    for(const asset of Object.values(routeManifest.assets))allowedAssets.add(asset.name);
     expect(new Set(project.assets.map((asset) => asset.name))).toEqual(allowedAssets);
-    expect(project.audioItems).toHaveLength(29);
+    expect(project.audioItems).toHaveLength(69);
+    expect(project.audioItems.find(a=>a.name==='mapa_mar_aberto')).toMatchObject({bpm:84,format:'COMPOSED',loops:true});
     expect(project.events.flatMap((event) => event.steps ?? []).some((step) => /play_(music|sfx) /.test(step.command))).toBe(true);
     expect(project.scenas.filter((scene) => pendingSceneNames.includes(scene.name)))
       .toEqual(expect.arrayContaining([
-        expect.objectContaining({ name: "usina_submersa", backgroundAssetName: "usina-exploration-background-v3-4bpp.png" }),
-        expect.objectContaining({ name: "arena_arrancada", backgroundAssetName: "arena-gba.png" }),
+        expect.objectContaining({ name: "usina_submersa", backgroundAssetName: "dungeon-approved-exploracao-background.png" }),
+        expect.objectContaining({ name: "arena_arrancada", backgroundAssetName: "arena-coastal-240x160.png" }),
       ]));
     expect(project.actors.every((actor) => [
       "titulo",
@@ -2336,7 +2084,8 @@ describe("materialização canônica de Vértice", () => {
       "usina_saida",
       "conselho_guardia",
       "circuito_final",
-      "arena_tatica"
+      "arena_tatica",
+      "circuito_perspectiva"
     ].includes(actor.roomName))).toBe(true);
   });
 
@@ -2407,7 +2156,7 @@ describe("materialização canônica de Vértice", () => {
       "show_dialogue mercado_guarda"
     ]);
     expect(eventCommands("mercado_entrar_arena")).toEqual([
-      "change_scene arena_tatica 1 4 right"
+      "change_scene arena_tatica 5 9 down"
     ]);
     expect(eventCommands("arena_tatica_ao_entrar")).toEqual([
       "remove_button r",
@@ -2435,35 +2184,15 @@ describe("materialização canônica de Vértice", () => {
     const exported = buildEngineExportProjectContract(project);
     const packAsset = exported.asset_pack?.assets.find((asset) => asset.png?.endsWith("porto_lume_exterior_topdown_gba.png"));
 
-    expect(background?.metadata).toMatchObject({
-      width: 480,
-      height: 320,
-      tileCount: 2400,
-      generatedBy: "gba-studio-topdown-reset-v1.3O15O9",
-      sourcePipeline: "candidate-provided-480x320-assetc-per-tile",
-      sourceSha256: "f5351fa509bf07f23a1f35954d7776e8e3a5b2dea66ce0e615d187e217095697",
-      preparedSha256: "02193f95986e003ee017fb9e7e28d719fbe0318557ce326873e74556b8f700c6",
-      backgroundPaletteBankBudget: 14,
-      backgroundTileOptimizer: { enabled: true, tileBudget: 895 }
-    });
-    expect(interior360?.metadata).toMatchObject({
-      width: 360,
-      height: 240,
-      tileCount: 1350,
-      generatedBy: "farol-interior-topdown-360x240-candidate",
-      sourcePipeline: "nearest-cover-1448x1086-to-360x240-assetc-4bpp",
-      sourceSha256: "d9b90beb68df29417b101151250e287c170e7eaa24536f0f9ad0a5bcef44b9da",
-      preparedSha256: "e8944a17ea51d4c2ca65432331a3cb36545fa7a2d4aefbd9b24d01f077924181",
-      backgroundPaletteBankBudget: 14,
-      backgroundTileOptimizer: { enabled: true, tileBudget: 895 },
-      reviewStatus: "visual-approved"
-    });
+    expect(background).toBeUndefined();
+    expect(interior360).toBeUndefined();
     expect(packAsset).toBeUndefined(); // Preserved library source is no longer a resident room background.
     const paged = exported.asset_pack?.assets.find(asset => asset.name === "porto_lumen_continuous_paged");
     expect(paged).toMatchObject({ kind: "paged_bg", background_bpp: 8 });
     expect(paged).not.toHaveProperty("optimize_background_tiles");
-    expect(exported.asset_pack?.assets.find(asset => asset.name === "farol_interior_topdown_360x240_gba"))
-      .toMatchObject({ kind: "bg", background_tile_budget: 895 });
+    expect(exported.asset_pack?.assets.find(asset => asset.name === "farol_interior_topdown_360x240_gba")).toBeUndefined();
+    expect(exported.asset_pack?.assets.find(asset => asset.name === "farol_interior_approved_paged_384x256"))
+      .toMatchObject({ kind: "paged_bg", background_bpp: 8 });
   });
 
   it("fecha a cobertura do lote de clímax sem assets legados", () => {
@@ -2481,100 +2210,42 @@ describe("materialização canônica de Vértice", () => {
     expect(climaxBatch.flatMap((scene) => scene.legacyDemoAssets)).toEqual([]);
   });
 
-  it("materializa a composição aprovada v3 da Tempestade no contrato shmup", () => {
-    const project = verticeProject();
-    const stormRoom = project.rooms.find((room) => room.name === "tempestade");
-    const stormBackground = project.assets.find((asset) => asset.id === "tempestade-v3-regular-background");
-
-    expect(stormRoom).toMatchObject({
-      width: 90,
-      height: 20,
-      backgroundAssetName: "porto-lume-shmup-wide-v3.png",
-      parallax: { mode: "disabled", speedX: 256, speedY: 256 },
-      runtime: {
-        type: "shmup",
-        config: {
-          capabilities: [],
-          composition: { enabled: true, mode: "tilemap" },
-          resources: { resources: [{ kind: "regular_bg", assetId: "porto-lume-shmup-wide-v3.png" }] }
-        }
-      }
-    });
-    expect(stormBackground).toMatchObject({
-      name: "porto-lume-shmup-wide-v3.png",
-      metadata: {
-        generatedBy: "tempestade-shmup-integration-candidate-v2-quality",
-        role: "shmup-background-regular",
-        colorMode: "4bpp",
-        width: 720,
-        height: 160,
-        tileWidth: 8,
-        tileHeight: 8,
-        preparedSha256: "6e5825ee65d8781b0a6ee5854585c88f7a44d67264b6d78610e0d341b032e82a",
-        reviewStatus: "approved",
-        approved: true
-      }
-    });
-    expect(buildAssetcTilesetPackGeneration(project)?.assetsBySheet["porto-lume-shmup-wide-v3.png"])
-      .toMatchObject({ kind: "bg", background_bpp: 4, optimize_background_tiles: true, background_tile_budget: 895 });
-
-    expect(project.actors.filter((actor) => actor.roomName === "tempestade")).toEqual(expect.arrayContaining([
-      expect.objectContaining({ id: "tempestade-v3-player", x: 11, y: 8, spriteSheet: "tempestade-v3-player.png" }),
-      expect.objectContaining({ id: "tempestade-v3-drone-horizontal", x: 46, y: 5, spriteSheet: "tempestade-v3-drone-horizontal.png" }),
-      expect.objectContaining({ id: "tempestade-v3-drone-vertical", x: 64, y: 13, spriteSheet: "tempestade-v3-drone-vertical.png" }),
-      expect.objectContaining({ id: "tempestade-v3-boss-lighthouse", x: 79, y: 11, spriteSheet: "tempestade-v3-boss-lighthouse.png" })
-    ]));
+  it("materializa a Tempestade aprovada sem redução adicional da arte", () => {
+    const project=verticeProject(),room=project.rooms.find(r=>r.name==='tempestade');
+    expect(room).toMatchObject({width:96,height:20,backgroundAssetName:'tempestade-approved-background.png',hudPresetId:'hud-tempestade-voo-livre'});
+    const bg=buildAssetcTilesetPackGeneration(project).assetsBySheet[room.backgroundAssetName];
+    expect(bg).toMatchObject({kind:'bg',background_bpp:4,background_palette_banks:14});
+    expect(bg.background_palette_reference_plan.banks).toHaveLength(14);
+    expect(bg.optimize_background_tiles).toBeUndefined();
+    expect(project.actors.filter(a=>a.roomName==='tempestade')).toHaveLength(4);
   });
 
-  it("conclui a Tempestade somente depois de limpar a onda", () => {
-    const project = verticeProject();
-    const stormRoom = project.rooms.find((room) => room.name === "tempestade");
-    const stormDrones = project.actors.filter((actor) => (
-      actor.roomName === "tempestade" && actor.name === "Drone"
-    ));
-
-    expect(stormRoom?.eventBindings).toMatchObject({
-      onInit: "tempestade_ao_entrar",
-      onClear: "tempestade_concluir"
-    });
-    expect(stormDrones).toHaveLength(2);
-    expect(stormDrones.every((drone) => drone.eventName === "tempestade_drone_disparar")).toBe(true);
-    expect(stormDrones.every((drone) => drone.eventBindings?.onInteract === "tempestade_drone_disparar")).toBe(true);
+  it("conclui a Tempestade somente depois das duas ondas", () => {
+    const project=verticeProject(),room=project.rooms.find(r=>r.name==='tempestade');
+    expect(room.eventBindings).toMatchObject({onInit:'tempestade_ao_entrar',onClear:'tempestade_concluir'});
+    expect(room.runtime.config.wavePlan).toHaveLength(2);
+    const drones=project.actors.filter(a=>a.roomName==='tempestade'&&a.waveIndex===0&&!a.id.endsWith('-player'));
+    expect(drones).toHaveLength(2);
+    expect(drones.every(a=>a.eventBindings.onInteract==='tempestade_dano'&&a.eventBindings.onHit1==='tempestade_destruir')).toBe(true);
   });
 
-  it("mantém o background compartilhado do menu inicial em 4 bpp", () => {
+  it("mantém o título aprovado em 4bpp sem o background antigo do menu inicial", () => {
     const project = verticeProject();
-    const title = project.assets.find((asset) => asset.id === "initial-menu-background-v3");
-
-    expect(title).toMatchObject({
-      name: "menu-inicial-v3-gba.png",
-      metadata: {
-        generatedBy: "exemplo-gba-menu-inicial-v3-reset-candidate",
-        role: "initial-menu-bg",
-        colorMode: "4bpp",
-        visualProfile: "gba_neutral_cohesive_pixel_art",
-        backgroundPaletteBankBudget: 16,
-        reviewStatus: "approved"
-      }
-    });
+    expect(project.assets.some(a => a.name === 'menu-inicial-v3-gba.png')).toBe(false);
+    expect(project.assets.find(a => a.name === 'title-porto-lumen-240x160-4bpp.png')?.metadata)
+      .toMatchObject({colorMode:'4bpp',width:240,height:160,backgroundPaletteBankBudget:14,reviewStatus:'approved'});
   });
 
-  it("mantém os três quadros novos do storyboard do Prólogo em 4 bpp", () => {
+  it("mantém somente o storyboard limpo aprovado do Prólogo", () => {
     const project = verticeProject();
-    expect(project.assets.filter((asset) => asset.name.startsWith("prologue-frame-"))).toHaveLength(3);
-    expect(project.assets.find((asset) => asset.name === "prologue-gba.png")).toBeUndefined();
-    expect(project.assets.filter((asset) => asset.name.startsWith("prologue-frame-")))
-      .toEqual(expect.arrayContaining([
-        expect.objectContaining({ name: "prologue-frame-1-gba.png", metadata: expect.objectContaining({ colorMode: "4bpp", generatedBy: "exemplo-gba-prologo-storyboard-v3", backgroundPaletteBankBudget: 14, paletteBankCount: 14, backgroundTileOptimizer: { enabled: true, tileBudget: 1024, maxSourcePixelErrorRatio: 0.48010416666666667 }, width: 240, height: 160, tileCount: 600, reviewStatus: "approved" }) }),
-        expect.objectContaining({ name: "prologue-frame-2-gba.png", metadata: expect.objectContaining({ colorMode: "4bpp", generatedBy: "exemplo-gba-prologo-storyboard-v3", backgroundPaletteBankBudget: 14, paletteBankCount: 14, backgroundTileOptimizer: { enabled: true, tileBudget: 1024, maxSourcePixelErrorRatio: 0.3729166666666667 }, width: 240, height: 160, tileCount: 600, reviewStatus: "approved" }) }),
-        expect.objectContaining({ name: "prologue-frame-3-gba.png", metadata: expect.objectContaining({ colorMode: "4bpp", generatedBy: "exemplo-gba-prologo-storyboard-v3", backgroundPaletteBankBudget: 14, paletteBankCount: 14, backgroundTileOptimizer: { enabled: true, tileBudget: 1024, maxSourcePixelErrorRatio: 0.38859375 }, width: 240, height: 160, tileCount: 600, reviewStatus: "approved" }) })
-      ]));
+    expect(project.assets.some(asset => asset.name.startsWith('prologue-frame-'))).toBe(false);
+    expect(project.assets.filter(asset => asset.name.startsWith('prologue-clean-frame-'))).toHaveLength(3);
 
     expect(project.scenas.find((scene) => scene.name === "prologo")?.runtime.config.steps)
       .toEqual([
-        expect.objectContaining({ dialogueKey: "prologo_frame_1", backgroundAssetName: "prologue-frame-1-gba.png" }),
-        expect.objectContaining({ dialogueKey: "prologo_frame_2", backgroundAssetName: "prologue-frame-2-gba.png" }),
-        expect.objectContaining({ dialogueKey: "prologo_frame_3", backgroundAssetName: "prologue-frame-3-gba.png" }),
+        expect.objectContaining({ dialogueKey: "prologo_frame_1", backgroundAssetName: "prologue-clean-frame-1-240x160-4bpp.png" }),
+        expect.objectContaining({ dialogueKey: "prologo_frame_2", backgroundAssetName: "prologue-clean-frame-2-240x160-4bpp.png" }),
+        expect.objectContaining({ dialogueKey: "prologo_frame_3", backgroundAssetName: "prologue-clean-frame-3-240x160-4bpp.png" }),
         expect.objectContaining({ dialogueKey: "", eventName: "prologo_partir" })
       ]);
   });

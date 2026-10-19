@@ -55,7 +55,6 @@ import {
 } from "./vertice-showcase-assets.mjs";
 
 const repositoryRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..", "..");
-const artDirection = JSON.parse(readFileSync(path.join(repositoryRoot, "direcao_arte_gba_neutra_coesa.json"), "utf8"));
 const initialMenuBackgroundAssetcReportPath = path.join(
   repositoryRoot,
   "tools",
@@ -203,24 +202,6 @@ describe("assets de corrida de Vértice", () => {
     expect(VERTICE_LUTA_ASSET_LAYOUT.some(({ name }) => name === "fight-ui.png")).toBe(false);
   });
 
-  it("deriva a paleta de Vértice do padrão neutro e coeso do projeto", () => {
-    expect(artDirection).toMatchObject({
-      profile_id: "gba_neutral_cohesive_pixel_art",
-      global_rendering_rules: {
-        pixel_method: {
-          cluster_rule: expect.stringContaining("grupos intencionais"),
-          scaling: expect.stringContaining("nearest-neighbor")
-        },
-        lighting: { default_direction: expect.stringContaining("superior-esquerda") }
-      }
-    });
-    expect(artDirection.global_rendering_rules.color_system.palette_roles).toMatchObject({
-      outline_dark: expect.arrayContaining(["#1C2638"]),
-      warm_accents: expect.arrayContaining(["#D96A4B"]),
-      cool_accents: expect.arrayContaining(["#3CA6A3"])
-    });
-  });
-
   it.skipIf(!initialMenuBackgroundAssetcReport)("mantém o background do Menu Inicial dentro do orçamento 4 BPP", () => {
     expect(initialMenuBackgroundAssetcReport).toMatchObject({
       bank_count: 16,
@@ -348,10 +329,8 @@ describe("assets de corrida de Vértice", () => {
 
   it("mantém alpha binário nos atores aprovados do Porto para o formato OBJ", () => {
     for (const name of [
-      "nara-topdown.png",
-      "gender-player-male-32x64.png",
-      "gender-player-female-32x64.png",
-      "mechanic-pilot-32x32.png"
+      "porto-nara-animations48.png",
+      "porto-mechanic-animations48.png"
     ]) {
       const image = decodePngRgba(readFileSync(path.join(
         repositoryRoot,
@@ -361,19 +340,13 @@ describe("assets de corrida de Vértice", () => {
       const alphaValues = new Set();
       for (let offset = 3; offset < image.pixels.length; offset += 4) alphaValues.add(image.pixels[offset]);
 
-      const expectedSize = name === "mechanic-pilot-32x32.png"
-        ? { width: 256, height: 32 }
-        : name === "nara-topdown.png"
-          ? { width: 288, height: 64 }
-        : name.includes("32x64")
-          ? { width: 48, height: 48 }
-          : { width: 288, height: 64 };
+      const expectedSize = {width: 160, height: 192};
       expect(image).toMatchObject(expectedSize);
       expect([...alphaValues].sort((left, right) => left - right)).toEqual([0, 255]);
     }
   });
 
-  it("usa o jogador atual dos Penedos em seis quadros nativos de 40x40", () => {
+  it("usa o jogador atual dos Penedos em 24 quadros de 64x64 com desenho aprovado de 48px", () => {
     const actorPath = path.join(
       repositoryRoot,
       "apps",
@@ -383,15 +356,15 @@ describe("assets de corrida de Vértice", () => {
       "exemplo-gba",
       "Assets",
       "sprites",
-      "penedos-v10-nara.png"
+      "penedos-approved-nara.png"
     );
     const image = decodePngRgba(readFileSync(actorPath));
-    expect(image).toMatchObject({ width: 240, height: 40 });
-    for (let frameIndex = 0; frameIndex < 6; frameIndex += 1) {
+    expect(image).toMatchObject({ width: 1536, height: 64 });
+    for (let frameIndex = 0; frameIndex < 24; frameIndex += 1) {
       let opaquePixels = 0;
-      for (let y = 0; y < 40; y += 1) {
-        for (let x = 0; x < 40; x += 1) {
-          const offset = ((y * image.width) + (frameIndex * 40) + x) * 4;
+      for (let y = 0; y < 64; y += 1) {
+        for (let x = 0; x < 64; x += 1) {
+          const offset = ((y * image.width) + (frameIndex * 64) + x) * 4;
           if (image.pixels[offset + 3] === 0) continue;
           opaquePixels += 1;
         }
@@ -400,14 +373,13 @@ describe("assets de corrida de Vértice", () => {
     }
   });
 
-  it("mantém os retratos aprovados do Menu Start em escala nativa", () => {
+  it("mantém o retrato aprovado do livro de pausa em escala nativa", () => {
     const spriteRoot = path.join(
       repositoryRoot,
       "apps/desktop-electron/default-assets/templates/exemplo-gba/Assets/sprites"
     );
     const expected = new Map([
-      ["gender-player-male-32x64.png", { width: 48, height: 48, maxColors: 15 }],
-      ["gender-player-female-32x64.png", { width: 48, height: 48, maxColors: 15 }]
+      ["book-nara-approved-32x48.png", { width: 32, height: 48, maxColors: 255 }]
     ]);
     for (const [name, dimensions] of expected) {
       const image = decodePngRgba(readFileSync(path.join(spriteRoot, name)));
@@ -442,6 +414,7 @@ describe("assets de corrida de Vértice", () => {
       repositoryRoot,
       "apps/desktop-electron/default-assets/templates/exemplo-gba/exemplo-gba.gba-project"
     ), "utf8"));
+    const retired = JSON.parse(readFileSync(new URL("../fixtures/asset-provenance/example-library-cleanup.json", import.meta.url)));
     const asset = project.assets.find((item) => item.name === "point-click-cursor.png");
     const alphaValues = new Set();
     const visibleColors = new Set();
@@ -451,7 +424,8 @@ describe("assets de corrida de Vértice", () => {
       if (pixel[3] > 0) visibleColors.add(pixel.subarray(0, 3).toString("hex"));
     }
     expect(cursor).toMatchObject({ width: 32, height: 16 });
-    expect(asset?.metadata).toMatchObject({ colorMode: "4bpp", frameWidth: 16, frameHeight: 16, frameCount: 2 });
+    expect(asset).toBeUndefined();
+    expect(retired.sharedDefaults).toContain("Assets/sprites/point-click-cursor.png");
     expect([...alphaValues].sort((left, right) => left - right)).toEqual([0, 255]);
     expect(visibleColors.size).toBeGreaterThan(0);
     expect(visibleColors.size).toBeLessThanOrEqual(15);

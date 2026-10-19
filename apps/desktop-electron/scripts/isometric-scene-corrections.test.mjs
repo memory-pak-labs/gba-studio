@@ -6,7 +6,7 @@ const source = JSON.parse(readFileSync(new URL("../default-assets/templates/exem
 const fixed = correctIsometricScenes(source);
 const commands = name => fixed.events.find(event => event.name === name).steps.map(step => step.command);
 describe("isometric scene integration", () => {
-  it("não deixa células caminháveis fora do enquadramento fixo da Arena", () => {
+  it("mantém as células caminháveis dentro do mapa amplo da Arena", () => {
     const arena = fixed.rooms.find(room => room.name === 'arena_tatica');
     const cells = Array.isArray(arena.collisions) ? arena.collisions : arena.collisions.runs.flatMap(([value,count])=>Array(count).fill(value));
     const {originX,originY,tileWidth,tileHeight,heightStep} = arena.runtime.config;
@@ -15,9 +15,9 @@ describe("isometric scene integration", () => {
       const px=originX+(x-y)*tileWidth/2;
       const py=originY+(x+y)*tileHeight/2-arena.heightLevels[i]*heightStep;
       expect(px-tileWidth/2).toBeGreaterThanOrEqual(0);
-      expect(px+tileWidth/2).toBeLessThanOrEqual(240);
+      expect(px+tileWidth/2).toBeLessThanOrEqual(arena.cameraBounds.width);
       expect(py).toBeGreaterThanOrEqual(0);
-      expect(py+tileHeight).toBeLessThanOrEqual(160);
+      expect(py+tileHeight).toBeLessThanOrEqual(arena.cameraBounds.height);
     }
   });
   it("exporta portas físicas, mantendo as conexões de conversa fora dos gatilhos", () => {

@@ -17,6 +17,7 @@ import {
   auditExemploInterfaceScenePlaytest,
   auditExemploVisualQualityGate,
   resolveTopdownActorFramebufferTarget,
+  resolveTopdownCameraPosition,
   resolveTopdownActorFramebufferTargets,
   auditIntegerFramebufferDisplay,
   consolidateExemploScenePlaytestRuns,
@@ -50,11 +51,11 @@ describe("música das oito cenas canônicas", () => {
   it("cobra PCM não silencioso no Play dessas cenas", () => {
     expect(EXEMPLO_NON_SILENT_AUDIO_SCENES).toEqual([
       "porto_lumen", "farol_interior", "penedos_vento", "armazem_das_mares",
-      "observatorio_do_farol", "tempestade", "guardiao_rele", "arena_arrancada"
+      "observatorio_do_farol", "tempestade", "guardiao_rele", "arena_arrancada", "circuito_final", "circuito_perspectiva"
     ]);
   });
   it("inicia a faixa declarada por cada cena no evento onInit", () => {
-    const names = ["porto_lumen", "farol_interior", "penedos_vento", "armazem_das_mares", "observatorio_do_farol", "tempestade", "guardiao_rele", "arena_arrancada"];
+    const names = ["porto_lumen", "farol_interior", "penedos_vento", "armazem_das_mares", "observatorio_do_farol", "tempestade", "guardiao_rele", "arena_arrancada", "circuito_final", "circuito_perspectiva"];
     for (const name of names) {
       const scene = project.scenas.find((entry) => entry.name === name);
       const onInit = project.events.find((event) => event.name === scene?.eventBindings?.onInit);
@@ -170,12 +171,21 @@ describe("GBA BG and OBJ palette capacity", () => {
     porto.frame.uniqueColorCount = 281; porto.paletteFidelity.ok = false;
     expect(auditExemploVisualQualityGate(project,results).ok).toBe(false);
   });
-  it("requires authored actor fidelity for the Porto player instead of the retired default sheet", () => {
+  it("requires authored actor fidelity for Porto and Farol instead of the retired default sheet", () => {
     expect(EXEMPLO_EXPLICIT_ACTOR_BINDING_SCENES).toContain("porto_lumen");
+    expect(EXEMPLO_EXPLICIT_ACTOR_BINDING_SCENES).toContain("farol_interior");
+    expect(EXEMPLO_EXACT_BACKGROUND_FRAMEBUFFER_SCENES).toContain("farol_interior");
   });
 });
 
 describe("contrato de playtest de Vértice", () => {
+  it("uses the same bounded Farol camera for background and actor pixel audits", () => {
+    const room={name:'farol_interior'};
+    const exported={topdown_project:{player:{size:{x:16,y:16}},camera:{follow_player:true},rooms:[{name:room.name,width_tiles:48,height_tiles:32}]}};
+    expect(resolveTopdownCameraPosition(room,{player:{x:184,y:216}},exported)).toEqual({x:72,y:96});
+    expect(resolveTopdownCameraPosition(room,{player:{x:0,y:0}},exported)).toEqual({x:0,y:0});
+    expect(resolveTopdownCameraPosition(room,{player:{x:376,y:248}},exported)).toEqual({x:144,y:96});
+  });
   it("resolve todos os assets declarados pela animação de background da cena", () => {
     expect(exemploSceneBackgroundAnimationAssetNames({
       id: "titulo",
@@ -215,17 +225,17 @@ describe("contrato de playtest de Vértice", () => {
     const plan = exemploScenePlaytestPlan(project);
     const results = plan.map(healthyVisualResult);
 
-    expect(plan).toHaveLength(17);
+    expect(plan).toHaveLength(18);
     expect(plan.map((scene) => scene.name)).toEqual([
       "titulo", "prologo", "porto_lumen", "mapa_rota",
       "penedos_vento", "armazem_das_mares", "observatorio_do_farol", "mercado_suspenso", "usina_submersa",
       "usina_combate", "usina_saida",
       "conselho_guardia", "tempestade", "guardiao_rele", "arena_arrancada",
-      "circuito_final", "arena_tatica"
+      "circuito_final", "arena_tatica", "circuito_perspectiva"
     ]);
     expect(auditExemploVisualQualityGate(project, results)).toMatchObject({
       ok: true,
-      counts: { expected: 17, passed: 17, failed: 0 }
+      counts: { expected: 18, passed: 18, failed: 0 }
     });
   });
 
@@ -390,13 +400,13 @@ describe("contrato de playtest de Vértice", () => {
       audioSamples: [{ audioUnderrunCount: 0 }],
       saveLoad: { attempted: true, saveSucceeded: true, loadSucceeded: true, stateChanged: true, restored: true },
       sceneSamples
-    })).toMatchObject({ ok: true, scenes: { count: 17, complete: true } });
+    })).toMatchObject({ ok: true, scenes: { count: 18, complete: true } });
     expect(parseExemploSceneSoakMinutes(["--soak-minutes=20"])).toBe(20);
   });
 
   it("resolve assets do template pelo metadado atual", () => {
-    expect(exemploProjectAssetSource(project, "menu-inicial-v3-gba.png"))
-      .toBe("Assets/backgrounds/menu-inicial-v3-gba.png");
+    expect(exemploProjectAssetSource(project, "title-porto-lumen-240x160-4bpp.png"))
+      .toBe("Assets/backgrounds/title-porto-lumen-240x160-4bpp.png");
     expect(() => exemploProjectAssetSource(project, "ausente.png")).toThrow("ausente.png");
   });
 });

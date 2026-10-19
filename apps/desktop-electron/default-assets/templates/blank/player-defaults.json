@@ -1155,6 +1155,34 @@
         }
       ],
       "sourceSha256": "b1aa177315e1cd9aa02a4d21b73ed5bcc7ab96ebc6f81213361daa88f9f86865"
+    },
+    {
+      "family": "dungeon",
+      "spriteSheet": "neutral-player-dungeon-hand.png",
+      "frameWidth": 64,
+      "frameHeight": 64,
+      "parts": [
+        {
+          "x": 0,
+          "y": 0,
+          "width": 64,
+          "height": 64
+        }
+      ],
+      "animations": [
+        {
+          "name": "idle",
+          "state": "idle",
+          "direction": "none",
+          "fps": 1,
+          "loops": true,
+          "sourceFrameIndexes": [
+            0
+          ]
+        }
+      ],
+      "sourceSha256": "11625ff421b214af00c9e7c4ec0e82756adf690779cfc17447ca2429e2795572",
+      "preparedSha256": "104e63a99974e19e2a9046350ce3f6a953ec4ab5c1746fc281a7fc69357ba4b2"
     }
   ],
   "effects": [

@@ -52,7 +52,7 @@ describe("título com opções em carrossel", () => {
     const project = promoteExemploGBAVerticeCampaign(template);
     const title = project.scenas.find((scene) => scene.name === "titulo");
 
-    expect(project.scenas).toHaveLength(30);
+    expect(project.scenas).toHaveLength(31);
     expect(project.scenas.some((scene) => scene.name === "menu_inicial")).toBe(false);
     expect(title.runtime.config.screens.map((screen) => screen.id)).toEqual(["title", "title_options"]);
     expect(project.actors.filter((actor) => actor.roomName === "titulo")).toHaveLength(7);
@@ -82,7 +82,14 @@ describe("título com opções em carrossel", () => {
     expect(gender?.items[0]).toMatchObject({ target_screen: 3, on_select: expect.arrayContaining([{op: "set_variable", variable: 17, value: 0}]) });
     expect(gender?.items[1]).toMatchObject({ target_screen: 3, on_select: expect.arrayContaining([{op: "set_variable", variable: 17, value: 1}]) });
     expect(gender?.actors?.filter(actor => actor.role === "cursor")).toEqual([
-      expect.objectContaining({name: "Moldura de seleção", cursor_follows_option: true, cursor_offset_pixels: {x: 0, y: -1}})
+      ...[
+        ["Moldura de seleção", -12, -16],
+        ["Canto de seleção 2", 68, -16],
+        ["Canto de seleção 3", -12, 88],
+        ["Canto de seleção 4", 68, 88]
+      ].map(([name, x, y]) => expect.objectContaining({
+        name, cursor_follows_option: true, cursor_offset_pixels: {x, y}
+      }))
     ]);
   });
 });

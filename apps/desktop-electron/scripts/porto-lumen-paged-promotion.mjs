@@ -86,8 +86,9 @@ export function promoteApprovedPortoLumenPaged(project) {
     else result.animationStates[index] = structuredClone(source);
   }
   if (hud) {
-    result.settings.hudPresets = result.settings.hudPresets.filter(preset => preset.id !== hud.id);
-    result.settings.hudPresets.push(structuredClone(hud));
+    const index = result.settings.hudPresets.findIndex(preset => preset.id === hud.id);
+    if (index < 0) result.settings.hudPresets.push(structuredClone(hud));
+    else result.settings.hudPresets[index] = structuredClone(hud);
   }
   for (const source of canonical.variables.filter(variable => variable.name === "porto_player_health")) {
     if (!result.variables.some(variable => variable.name === source.name)) result.variables.push(structuredClone(source));

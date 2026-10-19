@@ -11,7 +11,8 @@ function isolated(project) {
   p.rooms = p.rooms.filter(s => s.name === sceneName);
   p.scena = p.scenas[0];
   p.actors = p.actors.filter(a => a.roomName === sceneName);
-  p.events = p.events.filter(e => e.name.startsWith('penedos_teste_'));
+  // Keep global callees; only remove other rooms and their bindings.
+  p.events = p.events.filter(e => !e.roomName || e.roomName === sceneName);
   p.triggers = [];
   p.sceneRouteTables = [];
   p.editorState = {};
@@ -25,22 +26,24 @@ describe('Penedos: eventos dos atores', () => {
   it('liga o vão central ao retorno condicionado pelo farol', () => {
     const next = configurePlatformerEvents(source());
     const falls = next.triggers.filter(t => t.id.startsWith('trigger-penedos-fall-'));
-    expect(falls.map(t => [t.x, t.y, t.width, t.height])).toEqual([[12,18,8,2]]);
+    expect(falls.map(t => [t.x, t.y, t.width, t.height])).toEqual([[24,36,8,4],[52,36,8,4],[76,36,12,4]]);
     for (const t of falls) {
       const e = next.events.find(e => e.name === t.eventBindings.onEnter);
       expect(e.steps.map(s => s.command)).toEqual([
-        'group Queda - Retornar ao farol', 'if_variable var_penedos_farol 1',
-        'set_actor_position player 10 6', 'else', 'set_actor_position player 6 11', 'condition_end'
+        'play_sfx penedos_impacto_candidato','add_variable penedos_player_health -1',
+        'if_variable penedos_player_health 0','set_variable penedos_player_health 3','condition_end',
+        'set_platformer_state knockback','if_variable var_penedos_farol 1',
+        'set_actor_position player 63 28', 'else', 'set_actor_position player 11 32', 'condition_end'
       ]);
     }
   });
-  it('mantém a saída de campanha na margem do viewport', () => {
+  it('mantém a saída de campanha na margem do mapa ampliado', () => {
     const p = source();
     const exit = p.editorState.scenaConnections.find(c => c.from === sceneName);
     exit.exit = { x: 76, y: 9, width: 3, height: 8 };
     const next = configurePlatformerEvents(p);
     expect(next.editorState.scenaConnections.find(c => c.from === sceneName).exit)
-      .toEqual({ x: 28, y: 10, width: 2, height: 2 });
+      .toEqual({ x: 116, y: 28, width: 4, height: 4 });
   });
   it('monta timelines agrupadas, patrulhas e interações sem alterar outras cenas ou assets', () => {
     const p = source(), next = configurePlatformerEvents(p);
@@ -52,7 +55,7 @@ describe('Penedos: eventos dos atores', () => {
       expect(a.collisionGroup).toBe(1);
       expect(a.eventBindings.onUpdate).toBeTruthy();
       const event = next.events.find(e => e.name === a.eventBindings.onUpdate);
-      expect(event.steps[0].command).toMatch(/^group /);
+      expect(event.steps[0].command).toMatch(/^if_variable penedos_defeated_/);
       expect(event.steps.some(s => s.command.startsWith('wait '))).toBe(true);
     }
     for (const kind of ['npc', 'checkpoint']) {
@@ -70,20 +73,20 @@ describe('Penedos: eventos dos atores', () => {
     ] }];
     const out = buildEngineExportProjectContract(p).platformer_project;
     expect(out.scripts.find(s => s.name === 'subtile').script).toEqual([
-      { op: 'move_actor', actor: 0, x: 1, y: 0 },
-      { op: 'move_actor', actor: 0, x: -1, y: 0 },
-      { op: 'move_actor', actor: 1, x: 0, y: 2 }
+      { op: 'move_actor', actor: 1, x: 1, y: 0 },
+      { op: 'move_actor', actor: 1, x: -1, y: 0 },
+      { op: 'move_actor', actor: 2, x: 0, y: 2 }
     ]);
   });
   it('liga scripts de início, atualização e interação no contrato nativo', () => {
-    const p = isolated(configurePlatformerEvents(source()));
+    const p = configurePlatformerEvents(source());
     const out = buildEngineExportProjectContract(p).platformer_project;
-    const npcs = out.rooms[0].npcs;
-    expect(npcs[0].on_update?.length).toBeGreaterThan(0);
-    expect(npcs[0].on_start?.some(c => c.op === 'set_actor_animation')).toBe(true);
-    for (const npc of npcs.slice(0, 2)) {
-      expect(npc.animations.find(a => a.name === 'patrol_right')?.frame_indices).toEqual([0]);
+    const npcs = out.rooms.find(r => r.name === sceneName).npcs;
+    expect(npcs[1].on_update?.length).toBeGreaterThan(0);
+    expect(npcs[1].on_start?.some(c => c.op === 'set_actor_animation')).toBe(true);
+    for (const npc of npcs.slice(1, 3)) {
+      expect(npc.animations.find(a => a.name === 'idle_right')?.frame_indices.length).toBeGreaterThan(1);
     }
-    expect(npcs[2].on_interact?.some(c => c.op === 'show_dialogue')).toBe(true);
+    expect(npcs[0].on_interact?.some(c => c.op === 'show_dialogue')).toBe(true);
   });
 });

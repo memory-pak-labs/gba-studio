@@ -34,6 +34,30 @@ import {
 import { findBestRgbaFramebufferCropWithMasks } from "./rgb555-framebuffer-contract.mjs";
 
 describe("RGB555 framebuffer contract", () => {
+  it("decodes affine byte maps and catches source pixel loss without text-map assumptions", () => {
+    const palette = Array(224).fill(0); palette[1] = 31; palette[201] = 31744;
+    const headerSource = `
+      constexpr int floor_tile_count = 2;
+      constexpr uint16_t floor_palette[224] = {${palette}};
+      constexpr uint8_t floor_tiles[2][64] = {${Array(64).fill(1)},${Array(64).fill(201)}};
+      constexpr uint8_t floor_tilemap_entries[2] = {1,0};
+      const gbs::AffineTileAsset floor_tile_asset = {reinterpret_cast<const uint8_t*>(floor_tiles),floor_tile_count,0};
+    `;
+    const image = decodeExportedTilemapRgba({headerSource,symbol:"floor",width:16,height:8});
+    expect(image).toMatchObject({bitsPerPixel:8,tileCount:2,tilemapEntryCount:2});
+    expect([...image.pixels.slice(0,4)]).toEqual([0,0,255,255]);
+    expect([...image.pixels.slice(32,36)]).toEqual([255,0,0,255]);
+    const options = {headerSource,symbol:"floor",width:16,height:8,pixels:image.pixels};
+    expect(auditRgbaAgainstExportedTilemap(options)).toMatchObject({ok:true,mismatchCount:0});
+    image.pixels[0] = 255;
+    expect(auditRgbaAgainstExportedTilemap(options)).toMatchObject({ok:false,mismatchCount:1});
+    expect(exportedTilemapRgb555Coverage(headerSource,"floor",1)).toMatchObject({
+      bitsPerPixel:8,pixelCount:128,tilemapEntryCount:2
+    });
+    expect(()=>decodeExportedTilemapRgba({...options,headerSource:headerSource.replace("{1,0}","{2,0}")}))
+      .toThrow(/tile invalido/);
+  });
+
   it("reconstructs 8bpp composite OBJ parts using 32-byte hardware tile addresses", () => {
     const palette = Array(256).fill(0); palette[17] = 31; palette[201] = 31744;
     const headerSource = `
@@ -378,6 +402,16 @@ describe("RGB555 framebuffer contract", () => {
       position: { x: 55, y: 135 },
       zoomX256: 282
     });
+  });
+
+  it("uses the selected diamond center for the paged tactical camera oracle", () => {
+    const room={width_tiles:16,height_levels:Array(256).fill(0),paged_surface:{width:768,height:512},
+      grid:{origin:{x:384,y:68},tile_width_pixels:48,tile_height_pixels:24,height_step_pixels:8,gameplay_mode:"tactical"},
+      camera:{position:{x:168,y:168},bounds:{x:0,y:0,width:768,height:512},follow_enabled:true,
+        dead_zone:{x:120,y:80,width:0,height:0},smoothing_x256:256}};
+    const state={frame:100,player:{x:5,y:9},flagBits:(1<<16)|(5<<23)|(9<<27)};
+    expect(resolveIsometricCameraPosition(room,state).position).toEqual({x:168,y:168});
+    expect(resolveIsometricCameraPosition(room,{...state,flagBits:(1<<16)|(15<<23)}).position).toEqual({x:528,y:180});
   });
 
   it("clamps the authored isometric BG2 scroll to the compiled background bounds", () => {

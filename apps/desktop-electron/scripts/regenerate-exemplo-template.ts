@@ -1,3 +1,4 @@
+import { pruneObsoleteExampleScripts } from "./prune-obsolete-example-scripts.mjs";
 import { readFile, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -213,6 +214,7 @@ try {
     uiDialogs!.boxImage = "";
   }
 
+  promoted.data = pruneObsoleteExampleScripts(promoted.data);
   const presentation = deriveEventsWorkspacePresentation(promoted.data);
   const audio = deriveAudioWorkspacePresentation(promoted.data);
   const audioPack = buildAssetcAudioPackGeneration(promoted.data);

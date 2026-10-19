@@ -120,8 +120,13 @@ export function parseNativeRgb15Palette(source, symbol) {
   });
 }
 
+function hasExportedAffineTileAsset(headerSource, symbol) {
+  return new RegExp(`gbs::AffineTileAsset\\s+${escapedRegExp(symbol)}_tile_asset\\s*=`).test(headerSource);
+}
+
 export function parseExportedTilemapEntries(headerSource, symbol) {
-  return parseExportedNumericArray(headerSource, symbol, "tilemap_entries", "uint16_t");
+  return parseExportedNumericArray(headerSource, symbol, "tilemap_entries",
+    hasExportedAffineTileAsset(headerSource,symbol) ? "uint8_t" : "uint16_t");
 }
 
 function parseExportedNumericArray(headerSource, symbol, suffix, type) {
@@ -144,6 +149,11 @@ export function parseExportedBackgroundTileAsset(headerSource, symbol) {
   );
   if (!tileAssetMatch) throw new Error(`TileAsset de fundo exportado nao encontrado para ${symbol}.`);
   const assetBody = tileAssetMatch[1];
+  if (hasExportedAffineTileAsset(headerSource,symbol)) {
+    const affineDestination = assetBody.match(new RegExp(`${escapedRegExp(symbol)}_tile_count\\s*,\\s*(0x[0-9a-f]+|\\d+)\\s*$`,"i"));
+    if (!affineDestination) throw new Error(`AffineTileAsset invalido para ${symbol}.`);
+    return {bitsPerPixel:8,destinationTile:Number.parseInt(affineDestination[1],0)};
+  }
   const destinationMatch = assetBody.match(
     new RegExp(
       `${escapedRegExp(symbol)}_tile_count\\s*,\\s*(0x[0-9a-f]+|\\d+)\\s*,\\s*(?:true|false)(?:\\s*,\\s*(?:gbs::ColorDepth::Bpp)?(4|8))?`,
@@ -240,7 +250,7 @@ export function decodeExportedTilemapRgba(options) {
   const palette = parseExportedRgb555Palette(headerSource, symbol);
   const paletteAsset = parseExportedPaletteAssetMetadata(headerSource, symbol);
   const tileBytes = parseExportedNumericArray(headerSource, symbol, "tiles", "uint8_t");
-  const tilemapEntries = parseExportedNumericArray(headerSource, symbol, "tilemap_entries", "uint16_t");
+  const tilemapEntries = parseExportedTilemapEntries(headerSource, symbol);
   const { bitsPerPixel, destinationTile } = parseExportedBackgroundTileAsset(headerSource, symbol);
   const bytesPerTile = bitsPerPixel === 8 ? 64 : 32;
   const widthTiles = width / 8;
@@ -417,7 +427,7 @@ export function dominantExportedTilemapRgb555(headerSource, symbol) {
   const palette = parseExportedRgb555Palette(headerSource, symbol);
   const paletteAsset = parseExportedPaletteAssetMetadata(headerSource, symbol);
   const tileBytes = parseExportedNumericArray(headerSource, symbol, "tiles", "uint8_t");
-  const tilemapEntries = parseExportedNumericArray(headerSource, symbol, "tilemap_entries", "uint16_t");
+  const tilemapEntries = parseExportedTilemapEntries(headerSource, symbol);
   const { bitsPerPixel, destinationTile } = parseExportedBackgroundTileAsset(headerSource, symbol);
   const bytesPerTile = bitsPerPixel === 8 ? 64 : 32;
   if (tileBytes.length === 0 || tileBytes.length % bytesPerTile !== 0) {
@@ -580,12 +590,16 @@ export function resolveIsometricCameraPosition(room, runtimeState) {
   const player = runtimeState?.player;
   if (!cameraInput?.position || !cameraInput?.bounds || !grid?.origin
     || !Number.isFinite(player?.x) || !Number.isFinite(player?.y)) return null;
-  const playerIndex = Number(player.y) * Number(room?.width_tiles ?? 0) + Number(player.x);
+  const pagedTactical=Boolean(room.paged_surface && grid.gameplay_mode==="tactical");
+  const bits=Number(runtimeState?.flagBits)>>>0;
+  const focusTile=pagedTactical && (bits&(1<<16)) ? {x:(bits>>>23)&15,y:(bits>>>27)&15} : player;
+  const playerIndex = Number(focusTile.y) * Number(room?.width_tiles ?? 0) + Number(focusTile.x);
   const elevation = Number(room?.height_levels?.[playerIndex] ?? 0);
   const focus = {
-    x: Number(grid.origin.x) + (Number(player.x) - Number(player.y)) * Number(grid.tile_width_pixels) / 2,
-    y: Number(grid.origin.y) + (Number(player.x) + Number(player.y)) * Number(grid.tile_height_pixels) / 2
+    x: Number(grid.origin.x) + (Number(focusTile.x) - Number(focusTile.y)) * Number(grid.tile_width_pixels) / 2,
+    y: Number(grid.origin.y) + (Number(focusTile.x) + Number(focusTile.y)) * Number(grid.tile_height_pixels) / 2
       - elevation * Number(grid.height_step_pixels ?? 0)
+      + (pagedTactical ? Number(grid.tile_height_pixels)/2 : 0)
   };
   const bounds = {
     x: Number(cameraInput.bounds.x),
@@ -974,7 +988,7 @@ export function auditRgbaAgainstExportedTilemap(options) {
   const paletteAsset = parseExportedPaletteAssetMetadata(headerSource, symbol);
   const referencePaletteColors = normalizeReferencePaletteColors(options?.referencePaletteColors);
   const tileBytes = parseExportedNumericArray(headerSource, symbol, "tiles", "uint8_t");
-  const tilemapEntries = parseExportedNumericArray(headerSource, symbol, "tilemap_entries", "uint16_t");
+  const tilemapEntries = parseExportedTilemapEntries(headerSource, symbol);
   const { bitsPerPixel, destinationTile } = parseExportedBackgroundTileAsset(headerSource, symbol);
   const bytesPerTile = bitsPerPixel === 8 ? 64 : 32;
   const widthTiles = width / 8;

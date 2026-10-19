@@ -1,0 +1,102 @@
+{
+  "version": 1,
+  "source": {
+    "generator": "OpenAI Imagegen",
+    "file": "exec-9e707f7e-777b-4ff0-ac89-1c18451d966c.png",
+    "sha256": "9b1d62926f4eedf0571003236b65bd4787e6c6954f2b76d48013fb551787eda9",
+    "license": "Project-owned"
+  },
+  "approval": "User approved the prepared frontal guard, its near/mid/far scales and native Editor/ROM review on 2026-10-19",
+  "preparation": {
+    "alphaRule": "Measured source alpha; 128 mask retains source silhouette; generated source never overwritten",
+    "transparentCrop": [
+      32,
+      0,
+      96,
+      128
+    ],
+    "cropVisiblePixelsLost": 0,
+    "depths": [
+      {
+        "name": "near",
+        "width": 64,
+        "height": 128,
+        "file": "guard-near-64x128.png",
+        "footPivotX": 32,
+        "footPivotY": 128,
+        "visiblePixels": 2881,
+        "colors": 15,
+        "sha256": "d772c9edf933b0b40a5ae6c8b5970ab596391ce4ea9215c8530b0df33d4140f4",
+        "maxNativeObjects": 2
+      },
+      {
+        "name": "mid",
+        "width": 32,
+        "height": 64,
+        "file": "guard-mid-32x64.png",
+        "footPivotX": 16,
+        "footPivotY": 64,
+        "visiblePixels": 720,
+        "colors": 15,
+        "sha256": "1bb55f8b5dd79df94f1adeab2a0ca4985a9aa655502411a7c0a0f2e36241ddc4",
+        "maxNativeObjects": 1
+      },
+      {
+        "name": "far",
+        "width": 16,
+        "height": 32,
+        "file": "guard-far-16x32.png",
+        "footPivotX": 8,
+        "footPivotY": 32,
+        "visiblePixels": 180,
+        "colors": 15,
+        "sha256": "113fde0dab245d47a191e4f3ff0b0a14eafa7feb0e7ba94f0d5a05ad1c5c84df",
+        "maxNativeObjects": 1
+      }
+    ],
+    "sourceSilhouette": {
+      "changedPixels": 0,
+      "translation": [
+        7,
+        23
+      ],
+      "sourceMaskPixels": 2881,
+      "preparedMaskPixels": 2881
+    }
+  },
+  "assets": [
+    {
+      "depth": "near",
+      "name": "neutral-dungeon-guard-near.png",
+      "file": "Assets/sprites/neutral-dungeon-guard-near.png",
+      "width": 64,
+      "height": 128,
+      "footPivotX": 32,
+      "footPivotY": 128,
+      "sha256": "d772c9edf933b0b40a5ae6c8b5970ab596391ce4ea9215c8530b0df33d4140f4",
+      "nativeObjects": 2
+    },
+    {
+      "depth": "mid",
+      "name": "neutral-dungeon-guard-mid.png",
+      "file": "Assets/sprites/neutral-dungeon-guard-mid.png",
+      "width": 32,
+      "height": 64,
+      "footPivotX": 16,
+      "footPivotY": 64,
+      "sha256": "1bb55f8b5dd79df94f1adeab2a0ca4985a9aa655502411a7c0a0f2e36241ddc4",
+      "nativeObjects": 1
+    },
+    {
+      "depth": "far",
+      "name": "neutral-dungeon-guard-far.png",
+      "file": "Assets/sprites/neutral-dungeon-guard-far.png",
+      "width": 16,
+      "height": 32,
+      "footPivotX": 8,
+      "footPivotY": 32,
+      "sha256": "113fde0dab245d47a191e4f3ff0b0a14eafa7feb0e7ba94f0d5a05ad1c5c84df",
+      "nativeObjects": 1
+    }
+  ]
+}

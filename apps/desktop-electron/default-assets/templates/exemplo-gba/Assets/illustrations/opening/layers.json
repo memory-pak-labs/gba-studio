@@ -1,0 +1,137 @@
+{
+  "schemaVersion": 1,
+  "license": "Project-owned; AI-generated under user direction",
+  "canvas": {
+    "width": 240,
+    "height": 160
+  },
+  "layers": [
+    "scenery.png",
+    "nara.png",
+    "mechanic.png"
+  ],
+  "runtime": {
+    "staticComposition": "../../backgrounds/opening-medium-shot-240x160.png",
+    "localAnimation": "../../sprites/opening-local-animation-128x96.png",
+    "patchPosition": {
+      "x": 64,
+      "y": 56
+    },
+    "frameWidth": 128,
+    "frameHeight": 96,
+    "streamFrames": true,
+    "durationFrames": 480,
+    "fps": 60,
+    "steps": [
+      {
+        "from": 0,
+        "to": 60,
+        "pose": 0,
+        "label": "Encontro"
+      },
+      {
+        "from": 60,
+        "to": 66,
+        "pose": 1,
+        "label": "Nara pisca"
+      },
+      {
+        "from": 66,
+        "to": 100,
+        "pose": 0,
+        "label": "Encontro"
+      },
+      {
+        "from": 100,
+        "to": 106,
+        "pose": 2,
+        "label": "Mecânica pisca"
+      },
+      {
+        "from": 106,
+        "to": 132,
+        "pose": 0,
+        "label": "Atenção à peça"
+      },
+      {
+        "from": 132,
+        "to": 140,
+        "pose": 3,
+        "label": "Apresentação · intermediário"
+      },
+      {
+        "from": 140,
+        "to": 178,
+        "pose": 4,
+        "label": "A mecânica mostra a peça"
+      },
+      {
+        "from": 178,
+        "to": 204,
+        "pose": 5,
+        "label": "Nara reage"
+      },
+      {
+        "from": 204,
+        "to": 216,
+        "pose": 6,
+        "label": "Mecânica fala"
+      },
+      {
+        "from": 216,
+        "to": 232,
+        "pose": 5,
+        "label": "Pausa na fala"
+      },
+      {
+        "from": 232,
+        "to": 244,
+        "pose": 6,
+        "label": "Mecânica fala"
+      },
+      {
+        "from": 244,
+        "to": 260,
+        "pose": 5,
+        "label": "Pausa na fala"
+      },
+      {
+        "from": 260,
+        "to": 266,
+        "pose": 7,
+        "label": "Mecânica pisca"
+      },
+      {
+        "from": 266,
+        "to": 320,
+        "pose": 5,
+        "label": "Confirmação"
+      },
+      {
+        "from": 320,
+        "to": 328,
+        "pose": 8,
+        "label": "Retorno do gesto"
+      },
+      {
+        "from": 328,
+        "to": 400,
+        "pose": 9,
+        "label": "Resposta de Nara"
+      },
+      {
+        "from": 400,
+        "to": 480,
+        "pose": 0,
+        "label": "Retorno ao quadro aprovado"
+      }
+    ]
+  },
+  "sha256": {
+    "Assets/backgrounds/opening-medium-shot-240x160.png": "c135edb87bb52260c612cbbc31ff26ec9d06f1f642b9a75b3a5854432824a90f",
+    "Assets/sprites/opening-local-animation-128x96.png": "c01251e956ca362cc8c4e9e050ebbb0c82b3a4435378934eb52fed7dc33a86e4",
+    "Assets/illustrations/opening/scenery.png": "b2449a16f02c136610bde9d580084b4e81040204284964693104e097487f1c32",
+    "Assets/illustrations/opening/nara.png": "05899083ee9e493dfd970f703d2f9fb52b55f2ee8ff68da2c277f874a945622d",
+    "Assets/illustrations/opening/mechanic.png": "1e0b88a006ce9540d3c1ea4df9a5621e84d745135f5e38cb5d926ddfe3c1462d"
+  }
+}

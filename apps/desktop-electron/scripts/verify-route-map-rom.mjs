@@ -5,6 +5,7 @@ import createMGBA from '../static/WebPlayer/player/mgba-core.mjs';
 import {readRuntimeTelemetry, copyModuleSavedata} from '../static/WebPlayer/player/mgba-direct-player.mjs';
 import {encodePngRgba} from './lib/png-icons.mjs';
 import {ROUTE_DESTINATIONS} from './route-map-project.mjs';
+import {LUMEN_ROUTE_POSITIONS} from './world-map-lumen-promotion.mjs';
 
 const [romPath, dir, mode = 'campaign'] = process.argv.slice(2);
 if (!dir) throw new Error('Uso: node verify-route-map-rom.mjs <rom> <evidence-dir> [campaign|unlocked]');
@@ -43,9 +44,9 @@ function pathTo(target) {
   while(queue.length) {
     const [from, keys]=queue.shift(); if(from===target) return keys;
     for(const [key,dx,dy] of [[16,1,0],[32,-1,0],[64,0,-1],[128,0,1]]) {
-      const [, ,x,y]=ROUTE_DESTINATIONS[from];
+      const [x,y]=LUMEN_ROUTE_POSITIONS[from];
       let next=-1, best=Infinity;
-      ROUTE_DESTINATIONS.forEach(([, ,nx,ny],index)=>{
+      LUMEN_ROUTE_POSITIONS.forEach(([nx,ny],index)=>{
         const ax=nx-x, ay=ny-y;
         if(index===from || (dx && ax*dx<=0) || (dy && ay*dy<=0)) return;
         const score=dx ? Math.abs(ax)+Math.abs(ay)*2 : Math.abs(ay)+Math.abs(ax)*2;

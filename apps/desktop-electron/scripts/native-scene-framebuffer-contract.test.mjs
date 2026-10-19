@@ -1,6 +1,39 @@
 import { expect, it } from 'vitest';
-import { decodeMGBAHardwareVideoState, exportedHudFramebufferMasks, framebufferOcclusionPixels, nativeSinglePartSpriteObject, transformRacingSpriteSheetRgba } from './native-scene-framebuffer-contract.mjs';
-import { auditOpaqueRgbaAgainstFramebufferRegion, findBestOpaqueRgbaFramebufferFrame } from './rgb555-framebuffer-contract.mjs';
+import { decodeMGBAHardwareVideoState, exportedHudFramebufferMasks, framebufferOcclusionPixels, nativeSinglePartSpriteObject, pointClickCursorFramebufferMask, resolveWorldMapNativeFramebufferMasks, transformRacingSpriteSheetRgba } from './native-scene-framebuffer-contract.mjs';
+import { auditOpaqueRgbaAgainstFramebufferRegion, auditRgbaAgainstFramebufferWithMasks, findBestOpaqueRgbaFramebufferFrame } from './rgb555-framebuffer-contract.mjs';
+
+it('masks the real double-size affine airship and still rejects background corruption outside its OAM', () => {
+  const bytes=new Uint8Array(0x1000),view=new DataView(bytes.buffer);
+  view.setUint32(0,0x01000007,true);
+  for(let i=0;i<128;i++)view.setUint16(0xc00+i*8,0x200,true);
+  view.setUint16(0xc00,0x300|12,true);view.setUint16(0xc02,0xc000|10,true);
+  const nativeVideo=decodeMGBAHardwareVideoState(bytes);
+  expect(nativeVideo.objects[0]).toMatchObject({width:64,height:64,affine:true,doubleSize:true});
+  const masks=resolveWorldMapNativeFramebufferMasks(nativeVideo);
+  expect(masks).toEqual([{x:10,y:12,width:128,height:128}]);
+  const source=new Uint8Array(160*160*4);
+  for(let i=3;i<source.length;i+=4)source[i]=255;
+  const framebuffer=new Uint8Array(source);
+  framebuffer.set([248,248,248,255],(40*160+120)*4);
+  const options={sourcePixels:source,width:160,height:160,framebuffer,framebufferWidth:160,framebufferHeight:160,masks};
+  expect(auditRgbaAgainstFramebufferWithMasks(options)).toMatchObject({ok:true,mismatchCount:0});
+  framebuffer.set([248,0,0,255],(100*160+145)*4);
+  expect(auditRgbaAgainstFramebufferWithMasks(options)).toMatchObject({ok:false,mismatchCount:1});
+  expect(()=>resolveWorldMapNativeFramebufferMasks(null)).toThrow(/OAM unavailable/);
+});
+
+it('masks the real hand OBJ and still rejects background corruption outside it', () => {
+  const mask=pointClickCursorFramebufferMask({nativeVideo:{objects:[{index:0,x:3,y:2,width:32,height:32}]}});
+  const source=new Uint8Array(40*40*4);
+  for(let i=3;i<source.length;i+=4)source[i]=255;
+  const framebuffer=new Uint8Array(source);
+  framebuffer.set([248,248,248,255],(30*40+30)*4); // Hand pixel beyond the old 16px mask.
+  const options={sourcePixels:source,width:40,height:40,framebuffer,framebufferWidth:40,framebufferHeight:40,masks:[mask]};
+  expect(auditRgbaAgainstFramebufferWithMasks(options)).toMatchObject({ok:true,mismatchCount:0});
+  framebuffer.set([248,0,0,255],(35*40+35)*4);
+  expect(auditRgbaAgainstFramebufferWithMasks(options)).toMatchObject({ok:false,mismatchCount:1});
+  expect(()=>pointClickCursorFramebufferMask({})).toThrow(/OAM unavailable/);
+});
 
 it('accepts an occluding pixel only at its declared coordinate and color', () => {
   const source = {width:2,height:1,pixels:Uint8Array.from([255,0,0,255,255,0,0,255])};
@@ -18,6 +51,7 @@ it('uses the exported HUD component bounds and skips hidden components', () => {
     {"hidden","frame","","","",0,40,240,80,1,false,nullptr}
   }; constexpr gbs::HudLayout layouts[] = {{"race-hud","advanced",race_components,2}};`;
   expect(exportedHudFramebufferMasks(header,'race-hud')).toEqual([{x:8,y:8,width:72,height:24}]);
+  expect(exportedHudFramebufferMasks(header.replace('race_components,2}', 'race_components,2,&flight_font[0][0],26591,5217}'),'race-hud')).toEqual([{x:8,y:8,width:72,height:24}]);
   expect(exportedHudFramebufferMasks(header,'missing')).toEqual([]);
 });
 
