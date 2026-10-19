@@ -39,6 +39,12 @@ struct WorldMapNodeData {
     const char* label = nullptr;
 };
 
+struct WorldMapHudLabels {
+    const char* available = "A VIAJAR";
+    const char* journey = "EM VOO";
+    const char* locked = "BLOQUEADO";
+};
+
 struct WorldMapProjectData {
     const PaletteAsset* bg_palettes;
     size_t bg_palette_count;
@@ -77,6 +83,7 @@ struct WorldMapProjectData {
     int journey_frames = 120;
     bool cursor_affine = false;
     bool embedded_nodes = false;
+    WorldMapHudLabels hud_labels {};
 };
 
 struct WorldMapRuntimeState {
@@ -91,6 +98,10 @@ enum class WorldMapNodeStatus : uint8_t {
     Locked,
     Available,
 };
+
+constexpr const char* world_map_hud_status_text(const WorldMapProjectData& project, WorldMapNodeStatus status, bool traveling) {
+    return traveling ? project.hud_labels.journey : status == WorldMapNodeStatus::Available ? project.hud_labels.available : project.hud_labels.locked;
+}
 
 struct WorldMapSaveData {
     uint16_t node_index;

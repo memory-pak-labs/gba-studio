@@ -30,6 +30,22 @@ class PointClickAnimationExportTests(unittest.TestCase):
         with self.assertRaises(SystemExit):
             assetc.emit_point_click_project_data_header(self.project(True), self.report())
 
+    def test_emits_independent_scene_cursor_and_preserves_project_default(self):
+        project = self.project()
+        project['scenes'] = [{'name': 'warehouse', 'cursor': project['cursor']}, {'name': 'observatory'}]
+        header = assetc.emit_point_click_project_data_header(project, self.report())
+        warehouse = next(line for line in header.splitlines() if 'gbs::PointClickSceneData { "warehouse"' in line)
+        self.assertIn('&hand_metasprites[0]', warehouse)
+        self.assertIn('&point_click_scene_0_cursor_idle_animation', header)
+        self.assertIn('&point_click_scene_0_cursor_click_animation', header)
+        self.assertIn('&point_click_cursor_click_animation,', header)
+
+    def test_rejects_looping_click_in_scene_cursor(self):
+        project = self.project(True)
+        project['scenes'][0]['cursor'] = project.pop('cursor')
+        with self.assertRaises(SystemExit):
+            assetc.emit_point_click_project_data_header(project, self.report())
+
 
 if __name__ == '__main__':
     unittest.main()

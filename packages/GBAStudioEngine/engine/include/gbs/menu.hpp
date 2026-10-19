@@ -344,7 +344,21 @@ struct MenuScreenData {
     bool carousel = false;
     uint16_t hud_text_color = 0x7FFF;
     bool hud_transparent_text = false;
+    bool hud_feedback_in_details = false;
 };
+
+enum class MenuSaveFeedback : uint8_t { None, Confirm, Saved, Failed };
+
+// Three short lines keep contextual save feedback inside authored detail fields.
+constexpr const char* menu_hud_save_feedback_line(MenuSaveFeedback state, size_t line) {
+    if (line >= 3) return nullptr;
+    switch (state) {
+        case MenuSaveFeedback::Confirm: return line == 0 ? "REGRAVAR?" : line == 1 ? "A SIM" : "B NÃO";
+        case MenuSaveFeedback::Saved: return line == 0 ? "JOGO" : line == 1 ? "SALVO" : nullptr;
+        case MenuSaveFeedback::Failed: return line == 0 ? "FALHA AO" : line == 1 ? "SALVAR" : nullptr;
+        default: return nullptr;
+    }
+}
 
 constexpr bool menu_screen_can_be_empty(const MenuScreenData& screen) {
     return screen.screen_type == MenuScreenType::Logo;

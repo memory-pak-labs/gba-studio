@@ -645,6 +645,22 @@ int main() {
         self.assertIsNotNone(value)
         self.assertEqual((int(value.group(1), 16) >> 21) & 3, 2)
 
+    def test_vblank_rearms_the_last_complete_affine_table_even_when_render_misses_a_frame(self):
+        irq = function_body(self.source, "gbs_hw_irq_dispatch")
+        code = """#include <stdint.h>
+#include <assert.h>
+uint16_t REG_IF=1,REG_IE=1,BIOS_IRQ_FLAGS=0;int keypad_irq_pending,arms;
+static int affine_hblank_enabled=1;
+static void rearm_active_affine_hblank(void){++arms;}
+void commit_pcm_stream_block(void){} void gbs_audio_vblank_update(void){} void gbs_dispatch_hardware_interrupts(uint16_t flags){}
+void dispatch(void) {"""+irq+"""}
+int main(void){dispatch();dispatch();assert(arms==2);REG_IF=0;dispatch();assert(arms==2);}
+"""
+        with tempfile.TemporaryDirectory() as directory:
+            source=Path(directory)/"irq.c";source.write_text(code);binary=Path(directory)/"irq"
+            subprocess.run(["cc",str(source),"-o",str(binary)],check=True)
+            subprocess.run([str(binary)],check=True)
+
     def test_hblank_dma_uses_repeat_and_hblank_start_timing(self) -> None:
         start_body = function_body(self.source, "gbs_hw_hdma_start")
         stop_body = function_body(self.source, "gbs_hw_hdma_stop")
@@ -666,8 +682,10 @@ int main() {
         self.assertIn("affine_hblank_active_buffer^1u", affine_body)
         self.assertIn("pending_hblank_scroll_dirty=1", affine_body)
         self.assertIn("if(pending_hblank_scroll_dirty) affine_hblank_active_buffer ^= 1u", commit_body)
-        self.assertIn("DMA_REPEAT|DMA_START_HBLANK|DMA_32BIT|DMA_ENABLE", commit_body)
-        self.assertIn("4u|0x00600000u", commit_body)
+        active_body=function_body(self.source,"rearm_active_affine_hblank")
+        self.assertIn("rearm_active_affine_hblank();",commit_body)
+        self.assertIn("DMA_REPEAT|DMA_START_HBLANK|DMA_32BIT|DMA_ENABLE", active_body)
+        self.assertIn("4u|0x00600000u", active_body)
 
     def test_immediate_dma_disables_previous_transfer_before_reprogramming(self) -> None:
         body = function_body(self.source, "gbs_hw_dma_copy")

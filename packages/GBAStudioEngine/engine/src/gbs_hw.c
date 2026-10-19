@@ -112,6 +112,7 @@ static uint8_t pcm_stereo_stream;
 static uint8_t pcm_timer_running;
 static uint8_t pcm_stop_after_pending;
 static void commit_pcm_stream_block(void);
+static void rearm_active_affine_hblank(void);
 // Hardware-only host links may omit the mixer; the engine supplies this hook.
 void __attribute__((weak)) gbs_audio_vblank_update(void) {}
 
@@ -256,6 +257,7 @@ void gbs_hw_irq_dispatch(void) {
         keypad_irq_pending = 1;
     }
     if ((pending & 1u) != 0) {
+        if (affine_hblank_enabled) rearm_active_affine_hblank();
         commit_pcm_stream_block();
         gbs_audio_vblank_update();
     }
@@ -389,13 +391,10 @@ static void commit_shadow_bg_controls(void) {
     shadow_bg_depth_mask = 0;
 }
 
-static void commit_hblank_bg_scroll(void) {
-    if (!affine_hblank_enabled && !pending_hblank_scroll_enabled && !pending_hblank_scroll_dirty) {
-        return;
-    }
+/* IRQ-safe rearm of the active table only. The producer writes the other
+ * buffer and publishes it in commit_hblank_bg_scroll at its own frame boundary. */
+static void rearm_active_affine_hblank(void) {
     gbs_hw_hdma_stop(0);
-    if(affine_hblank_enabled) {
-        if(pending_hblank_scroll_dirty) affine_hblank_active_buffer ^= 1u;
         const uint32_t* words=affine_hblank_words[affine_hblank_active_buffer];
         volatile uint32_t* registers=(volatile uint32_t*)(0x04000020u+(affine_hblank_layer-2u)*16u);
         for(unsigned i=0;i<4;++i)registers[i]=words[i];
@@ -405,6 +404,16 @@ static void commit_hblank_bg_scroll(void) {
         /* Four words per HBlank, destination increment/reload, source increment. */
         dma[2]=4u|0x00600000u|DMA_REPEAT|DMA_START_HBLANK|DMA_32BIT|DMA_ENABLE;
         hblank_dma_active_mask=(uint8_t)(hblank_dma_active_mask|1u);
+}
+
+static void commit_hblank_bg_scroll(void) {
+    if (!affine_hblank_enabled && !pending_hblank_scroll_enabled && !pending_hblank_scroll_dirty) {
+        return;
+    }
+    gbs_hw_hdma_stop(0);
+    if(affine_hblank_enabled) {
+        if(pending_hblank_scroll_dirty) affine_hblank_active_buffer ^= 1u;
+        rearm_active_affine_hblank();
     } else if (pending_hblank_scroll_enabled && pending_hblank_scroll_offsets != 0) {
         volatile void* destination = (volatile void*)(0x04000010u + (uint32_t)pending_hblank_scroll_layer * 4u);
         gbs_hw_hdma_start(0, pending_hblank_scroll_offsets, destination, 1, 0);
@@ -662,6 +671,7 @@ struct gbs_hw_metasprite_part {
     uint8_t vflip;
     uint8_t width;
     uint8_t height;
+    uint8_t color_depth;
 };
 
 struct gbs_hw_metasprite {
@@ -2017,6 +2027,8 @@ static int gbs_hw_draw_hud_icon(const void* raw_metasprite, int x, int y, int vi
             gbs_hw_hud_icon_size(part->width, part->height)
         );
     }
+    for(uint8_t p=0;p<metasprite->part_count;++p)
+        gbs_hw_set_sprite_color_depth(gbs_hw_hud_icon_slot(hud_icon_obj_count+p),metasprite->parts[p].color_depth==8);
     hud_icon_obj_write = 0;
     hud_icon_obj_count += metasprite->part_count;
     return 1;
@@ -2419,13 +2431,22 @@ void gbs_hw_begin_hud_layout(int visible) {
 /* Four glyph tiles form one 32x8 OBJ. Only sub-tile text uses this path;
  * aligned HUD text retains BG0 and consumes no dynamic text OAM entries.
  * The existing private tile arena (900..1023) holds 31 such groups. */
+static const uint8_t* configured_hud_font_tiles;
+static int configured_hud_text_color=-1;
+static int configured_hud_shadow_color=-1;
+static const uint8_t* cached_hud_pixel_font;
+void gbs_hw_set_hud_font_shadow(int color) { configured_hud_shadow_color=color; }
+
 static void gbs_hw_draw_hud_pixel_text(int x, int y, int width, int height, const char* text, int visible) {
     if (!visible || text == 0) return;
     const int columns = width / 8;
     const int lines = height / 8;
     if (columns <= 0 || lines <= 0) return;
     MEM_PALETTE[256 + HUD_PALETTE_BASE + DIALOGUE_COLOR_TEXT] =
-        MEM_PALETTE[HUD_PALETTE_BASE + DIALOGUE_COLOR_TEXT];
+        configured_hud_text_color >= 0 ? (uint16_t)configured_hud_text_color : MEM_PALETTE[HUD_PALETTE_BASE + DIALOGUE_COLOR_TEXT];
+    if(configured_hud_shadow_color>=0)MEM_PALETTE[256+HUD_PALETTE_BASE+5]=(uint16_t)configured_hud_shadow_color;
+    const uint8_t* font_tiles=configured_hud_font_tiles?configured_hud_font_tiles:configured_dialogue_font_tiles;
+    if(cached_hud_pixel_font!=font_tiles){for(unsigned i=0;i<1024-DYNAMIC_TEXT_OBJ_TILE_BASE;++i)hud_pixel_text_glyphs[i]=0xffff;cached_hud_pixel_font=font_tiles;}
     int column = 0, line = 0;
     const char* cursor = text;
     while (*cursor != '\0' && line < lines) {
@@ -2436,7 +2457,7 @@ static void gbs_hw_draw_hud_pixel_text(int x, int y, int width, int height, cons
         const unsigned tile = DYNAMIC_TEXT_OBJ_TILE_BASE + hud_pixel_text_obj_count * 4;
         const int group_column = column;
         for (unsigned cell = 0; cell < 4; ++cell) {
-            unsigned glyph = 0;
+            unsigned glyph = 0xfffe;
             if (*cursor != '\0' && *cursor != '\n' && column < columns) {
                 glyph = gbs_text_glyph_index(gbs_text_next_codepoint(&cursor));
                 ++column;
@@ -2448,9 +2469,10 @@ static void gbs_hw_draw_hud_pixel_text(int x, int y, int width, int height, cons
                 for (unsigned row = 0; row < 8; ++row) {
                     for (unsigned half = 0; half < 2; ++half) {
                         uint16_t pixels;
-                        if (configured_dialogue_font_tiles != 0) {
-                            const uint8_t* source = configured_dialogue_font_tiles + glyph * 32 + row * 4 + half * 2;
-                            pixels = (source[0] & 15 ? 4u : 0u) | (source[0] & 240 ? 64u : 0u) |
+                        if(glyph==0xfffe){pixels=0;}
+                        else if (font_tiles != 0) {
+                            const uint8_t* source = font_tiles + glyph * 32 + row * 4 + half * 2;
+                            pixels = configured_hud_font_tiles ? (uint16_t)(source[0] | (source[1]<<8)) : (source[0] & 15 ? 4u : 0u) | (source[0] & 240 ? 64u : 0u) |
                                 (source[1] & 15 ? 1024u : 0u) | (source[1] & 240 ? 16384u : 0u);
                         } else {
                             pixels = pack_font_pixels(gbs_font_rows[glyph][row], half * 4, 0, DIALOGUE_COLOR_TEXT);
@@ -2517,7 +2539,9 @@ static int gbs_hw_allocate_hud_compact_slot(void) {
 
 static void gbs_hw_draw_hud_compact_text(int x, int y, int width, const char* text, int visible) {
     if (!visible || text == 0) return;
-    MEM_PALETTE[256 + HUD_PALETTE_BASE + DIALOGUE_COLOR_TEXT] = MEM_PALETTE[HUD_PALETTE_BASE + DIALOGUE_COLOR_TEXT];
+    MEM_PALETTE[256 + HUD_PALETTE_BASE + DIALOGUE_COLOR_TEXT] = configured_hud_text_color >= 0
+        ? (uint16_t)configured_hud_text_color : MEM_PALETTE[HUD_PALETTE_BASE + DIALOGUE_COLOR_TEXT];
+    const uint8_t* font_tiles = configured_hud_font_tiles ? configured_hud_font_tiles : configured_dialogue_font_tiles;
     unsigned column=0;
     const unsigned columns=(unsigned)width/6;
     while (*text && column<columns && hud_pixel_text_obj_count<DYNAMIC_TEXT_OBJ_OAM_COUNT) {
@@ -2529,7 +2553,7 @@ static void gbs_hw_draw_hud_compact_text(int x, int y, int width, const char* te
         while (*text && count<5 && column+count<columns) {
             const unsigned glyph=gbs_text_glyph_index(gbs_text_next_codepoint(&text));
             for (unsigned row=0; row<8; ++row) for (unsigned half=0; half<2; ++half) {
-                const uint8_t* source=configured_dialogue_font_tiles ? configured_dialogue_font_tiles+glyph*32+row*4+half*2 : 0;
+                const uint8_t* source=font_tiles ? font_tiles+glyph*32+row*4+half*2 : 0;
                 const uint16_t value=source ? (uint16_t)(source[0]|(source[1]<<8)) :
                     pack_font_pixels(gbs_font_rows[glyph][row],half*4,0,DIALOGUE_COLOR_TEXT);
                 glyphs[count*32+row*4+half*2]=value&255;
@@ -2537,7 +2561,8 @@ static void gbs_hw_draw_hud_compact_text(int x, int y, int width, const char* te
             }
             ++count;
         }
-        gbs_compose_compact_hud_text(glyphs,count,pixels);
+        if (configured_hud_font_tiles) gbs_compose_spaced_hud_text(glyphs,count,6,pixels);
+        else gbs_compose_compact_hud_text(glyphs,count,pixels);
         volatile uint16_t* target=MEM_OBJ_TILES+tile*16u;
         for (unsigned i=0; i<64; ++i) target[i]=pixels[i*2]|(pixels[i*2+1]<<8);
         for (unsigned i=0; i<4; ++i) hud_pixel_text_glyphs[tile-DYNAMIC_TEXT_OBJ_TILE_BASE+i]=0xFFFFu;
@@ -2546,6 +2571,42 @@ static void gbs_hw_draw_hud_compact_text(int x, int y, int width, const char* te
         gbs_hw_set_sprite(slot,x+column*6,y,tile,HUD_PALETTE,0,0,1,0,0,0,1,1);
         hud_icon_obj_write=0;
         column+=count;
+    }
+}
+static const uint8_t* hud_spaced_fonts[31] __attribute__((section(".ewram_bss")));
+void gbs_hw_set_hud_font(const uint8_t* tiles,int color) { configured_hud_font_tiles=tiles; configured_hud_text_color=color; }
+
+static void gbs_hw_draw_hud_spaced_text(int x,int y,int width,const char* text,int visible) {
+    if(!visible || !text)return;
+    MEM_PALETTE[256+HUD_PALETTE_BASE+DIALOGUE_COLOR_TEXT]=configured_hud_text_color>=0
+        ? (uint16_t)configured_hud_text_color : MEM_PALETTE[HUD_PALETTE_BASE+DIALOGUE_COLOR_TEXT];
+    const uint8_t* font_tiles=configured_hud_font_tiles?configured_hud_font_tiles:configured_dialogue_font_tiles;
+    const unsigned columns=(unsigned)width/7;
+    unsigned column=0;
+    while(*text && column<columns && hud_pixel_text_obj_count<31){
+        const unsigned group=hud_pixel_text_obj_count,tile=DYNAMIC_TEXT_OBJ_TILE_BASE+group*4;
+        const int slot=gbs_hw_allocate_hud_compact_slot();if(slot<0)return;
+        unsigned count=0;uint16_t ids[4]={0xfffe,0xfffe,0xfffe,0xfffe};
+        while(*text && count<4 && column+count<columns)ids[count++]=(uint16_t)gbs_text_glyph_index(gbs_text_next_codepoint(&text));
+        int cached=hud_spaced_fonts[group]==font_tiles;
+        for(unsigned i=0;i<4;++i)if(hud_pixel_text_glyphs[group*4+i]!=(uint16_t)(ids[i]|0x8000u))cached=0;
+        if(!cached){
+            uint8_t glyphs[128]={0},pixels[128];
+            for(unsigned g=0;g<count;++g)for(unsigned row=0;row<8;++row)for(unsigned half=0;half<2;++half){
+                const uint8_t* source=font_tiles?font_tiles+ids[g]*32+row*4+half*2:0;
+                const uint16_t value=source?(uint16_t)(source[0]|(source[1]<<8)):
+                    pack_font_pixels(gbs_font_rows[ids[g]][row],half*4,0,DIALOGUE_COLOR_TEXT);
+                glyphs[g*32+row*4+half*2]=value&255;glyphs[g*32+row*4+half*2+1]=value>>8;
+            }
+            gbs_compose_spaced_hud_text(glyphs,count,7,pixels);
+            volatile uint16_t* target=MEM_OBJ_TILES+tile*16u;
+            for(unsigned i=0;i<64;++i)target[i]=pixels[i*2]|(pixels[i*2+1]<<8);
+            for(unsigned i=0;i<4;++i)hud_pixel_text_glyphs[group*4+i]=(uint16_t)(ids[i]|0x8000u);
+            hud_spaced_fonts[group]=font_tiles;
+        }
+        ++hud_pixel_text_obj_count;hud_icon_obj_write=1;
+        gbs_hw_set_sprite(slot,x+column*7,y,tile,HUD_PALETTE,0,0,1,0,0,0,1,1);
+        hud_icon_obj_write=0;column+=count;
     }
 }
 
@@ -2571,6 +2632,9 @@ void gbs_hw_draw_hud_layout_component(
     if (box_y + box_h > 32) box_h = 32 - box_y;
     if (box_w <= 0 || box_h <= 0) return;
 
+    if (kind == GBS_HW_HUD_COMPONENT_SPACED_TEXT) {
+        gbs_hw_draw_hud_spaced_text(x,y,width,text,visible);return;
+    }
     if (kind == GBS_HW_HUD_COMPONENT_COMPACT_TEXT) {
         gbs_hw_draw_hud_compact_text(x,y,width,text,visible);
         return;

@@ -124,10 +124,16 @@ void wait_vblank() {calls.push_back("wait");}
 void render_ui_assets() {calls.push_back("restore");}
 void draw_dialogue(const DialogueState&) {calls.push_back("dialogue");}
 void draw_hud(const HudState&) {calls.push_back("hud");}
+struct PaletteAsset {};
+void load_palette(const PaletteAsset&,bool){calls.push_back("palette");}
 }
 gbs::DialogueState dialogue {false}, battle_prompt_dialogue {}, battle_menu_dialogue {};
 gbs::HudState battle_hud;
 bool battle_ui_restore_pending = true;
+struct { struct Encounter {struct Presentation {const gbs::PaletteAsset* hud_palette=nullptr;} *presentation=nullptr;} encounters[1];} project;
+int encounter_index=0;
+bool custom_ui=false;
+bool authored_battle_ui(){return custom_ui;}
 void draw_battle() {calls.push_back("actors");}
 void update_battle_hud() {}
 void ensure_battle_prompt_visible() {}
@@ -144,7 +150,8 @@ int main() {
         if (call == "restore") {assert(upload_completed);restored = true;}
     }
     assert(restored);
-    for (bool visible : {false,true}) {
+    for (bool custom : {false,true}) for (bool visible : {false,true}) {
+        custom_ui=custom;
         calls.clear(); dialogue.visible = visible;
         render_battle_rpg_runtime({});
         assert(calls.back() == "wait");

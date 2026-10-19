@@ -2,6 +2,7 @@
 
 #include <cassert>
 #include <cstdlib>
+#include <initializer_list>
 
 namespace {
 
@@ -65,6 +66,7 @@ void test_player_movement_jump_and_guard() {
     const uint16_t hp_before_range_test = state.p2_hp;
     gbs::luta_p1_attack(state, stage, gbs::LutaAttackStrength::Light, gbs::LutaAttackType::Punch);
     assert(state.p2_hp == hp_before_range_test);
+    for (int frame = 0; frame < 8; ++frame) gbs::tick_luta(state, stage);
 
     while (state.p1_x + 48 < state.p2_x) {
         gbs::luta_p1_move(state, stage, 1);
@@ -237,7 +239,7 @@ void test_authored_luta_events() {
     apply(gbs::LutaEventAction::SetSuperGauge, 0, 100);
     const auto hp_before = runtime.p2_hp;
     apply(gbs::LutaEventAction::TriggerSuper, 0, 1);
-    assert(runtime.p2_hp < hp_before && runtime.p1_super_gauge == stages[1].superGaugeGainOnReceive);
+    assert(runtime.p2_hp < hp_before && runtime.p1_super_gauge == stages[1].superGaugeGainOnHit);
     apply(gbs::LutaEventAction::SetRoundsToWin, 3);
     apply(gbs::LutaEventAction::SetRoundTimer, 600);
     assert(runtime.rounds_to_win == 3 && runtime.round_timer == 600);
@@ -253,7 +255,89 @@ void test_authored_luta_events() {
     assert(gbs::make_luta_runtime_state(authored_stage).p1_hp == 123);
 }
 
+void test_locomotion_and_action_feedback() {
+    gbs::LutaCharacter fighters[2]{};
+    for (auto& fighter : fighters) {
+        fighter.maxHp = 100; fighter.guardPower = 48; fighter.walkSpeed = 12;
+    }
+    const auto stage = make_stage(fighters);
+    auto runtime = gbs::make_luta_runtime_state(stage);
+    gbs::LutaVisualStateData visual{};
+    gbs::init_luta_visual_state(visual);
+    gbs::sync_luta_visual_state(visual, runtime, true, nullptr);
+    gbs::luta_p1_move(runtime, stage, 1);
+    gbs::sync_luta_visual_state(visual, runtime, true, nullptr);
+    assert(visual.state == gbs::LutaVisualState::Walk);
+    gbs::sync_luta_visual_state(visual, runtime, true, nullptr);
+    assert(visual.state == gbs::LutaVisualState::Idle);
+    gbs::luta_p1_jump(runtime, stage);
+    gbs::sync_luta_visual_state(visual, runtime, true, nullptr);
+    assert(visual.state == gbs::LutaVisualState::Jump);
+    runtime.p1_hitstun = 2;
+    gbs::sync_luta_visual_state(visual, runtime, true, nullptr);
+    assert(visual.state == gbs::LutaVisualState::Hurt);
+    runtime.p1_hitstun = 0;
+    gbs::set_luta_visual_state(visual, nullptr, gbs::LutaVisualState::Attack);
+    gbs::sync_luta_visual_state(visual, runtime, true, nullptr);
+    assert(visual.state == gbs::LutaVisualState::Attack);
+
+    // A whiff is an accepted action with recovery; rejected inputs are silent.
+    gbs::luta_p1_attack(runtime, stage, gbs::LutaAttackStrength::Light, gbs::LutaAttackType::Punch);
+    assert(gbs::consume_luta_action_feedback(runtime, true) == gbs::LutaActionFeedback::Miss);
+    assert(runtime.p1_attack_cooldown == 8);
+    gbs::luta_p1_attack(runtime, stage, gbs::LutaAttackStrength::Light, gbs::LutaAttackType::Punch);
+    assert(gbs::consume_luta_action_feedback(runtime, true) == gbs::LutaActionFeedback::None);
+    runtime.p1_attack_cooldown = 0; runtime.p2_x = runtime.p1_x + 24;
+    gbs::luta_p1_attack(runtime, stage, gbs::LutaAttackStrength::Light, gbs::LutaAttackType::Punch);
+    assert(gbs::consume_luta_action_feedback(runtime, true) == gbs::LutaActionFeedback::Hit);
+    assert(runtime.p1_super_gauge == 8 && runtime.p2_super_gauge == 4);
+    runtime.p1_attack_cooldown = runtime.p2_hitstun = 0;
+    gbs::luta_p2_set_guard(runtime, true);
+    gbs::luta_p1_attack(runtime, stage, gbs::LutaAttackStrength::Light, gbs::LutaAttackType::Kick);
+    assert(gbs::consume_luta_action_feedback(runtime, true) == gbs::LutaActionFeedback::Guard);
+    runtime.p1_super_gauge = 100;
+    gbs::luta_p1_super(runtime);
+    assert(gbs::consume_luta_action_feedback(runtime, true) == gbs::LutaActionFeedback::Special);
+    assert(gbs::consume_luta_action_feedback(runtime, true) == gbs::LutaActionFeedback::None);
+}
+
+void test_jump_phases_and_walk_do_not_restart() {
+    const gbs::MetaSpritePart part {0,0,0,0,false,false,8,8};
+    const gbs::SpriteAnimationFrame frames[] = {
+        {{&part,1},2}, {{&part,1},2}, {{&part,1},2}, {{&part,1},2}
+    };
+    const gbs::SpriteAnimation walk {frames,4,true}, jump {frames,4,false};
+    const gbs::LutaAnimationSet animations {&walk,nullptr,nullptr,nullptr,nullptr,&walk,&jump};
+    const gbs::SpriteAnimation short_jump {frames,2,false};
+    const gbs::LutaAnimationSet short_set {nullptr,nullptr,nullptr,nullptr,nullptr,nullptr,&short_jump};
+    gbs::LutaVisualStateData short_visual{};gbs::init_luta_visual_state(short_visual);
+    gbs::set_luta_visual_state(short_visual,&short_set,gbs::LutaVisualState::Jump);
+    gbs::tick_luta_visual_state(short_visual,&short_set);gbs::tick_luta_visual_state(short_visual,&short_set);
+    assert(short_visual.animator.frame_index==1);
+    for (const bool p1 : {true,false}) {
+        gbs::LutaRuntimeState runtime{};
+        gbs::LutaVisualStateData visual{};gbs::init_luta_visual_state(visual);
+        gbs::sync_luta_visual_state(visual,runtime,p1,&animations);
+        auto& x=p1?runtime.p1_x:runtime.p2_x;
+        for (int n=0;n<3;++n) {++x;gbs::sync_luta_visual_state(visual,runtime,p1,&animations);gbs::tick_luta_visual_state(visual,&animations);}
+        assert(visual.state==gbs::LutaVisualState::Walk && visual.animator.frame_index==1);
+        auto& airborne=p1?runtime.p1_airborne:runtime.p2_airborne;
+        auto& velocity=p1?runtime.p1_vertical_velocity:runtime.p2_vertical_velocity;
+        airborne=true;velocity=-6;gbs::sync_luta_visual_state(visual,runtime,p1,&animations);
+        assert(visual.state==gbs::LutaVisualState::Jump && visual.animator.frame_index==0);
+        velocity=-2;gbs::sync_luta_visual_state(visual,runtime,p1,&animations);assert(visual.animator.frame_index==1);
+        velocity=1;gbs::sync_luta_visual_state(visual,runtime,p1,&animations);assert(visual.animator.frame_index==2);
+        for(int n=0;n<30;++n)gbs::tick_luta_visual_state(visual,&animations);
+        assert(visual.animator.frame_index==2);
+        airborne=false;gbs::sync_luta_visual_state(visual,runtime,p1,&animations);assert(visual.animator.frame_index==3);
+        for(int n=0;n<4;++n)gbs::tick_luta_visual_state(visual,&animations);
+        gbs::sync_luta_visual_state(visual,runtime,p1,&animations);assert(visual.state==gbs::LutaVisualState::Idle);
+    }
+}
+
 int main() {
+    test_locomotion_and_action_feedback();
+    test_jump_phases_and_walk_do_not_restart();
     test_authored_luta_events();
     test_player_movement_jump_and_guard();
     test_round_progression();

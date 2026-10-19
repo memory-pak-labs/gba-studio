@@ -100,6 +100,7 @@ bool tick_racing_vehicle(RacingRuntimeState& state, const RacingRoomData& room, 
     if (racing_result(state) != RacingRaceResult::InProgress) {
         return true;
     }
+    if (state.elapsed_frames != 0xffffffffu) ++state.elapsed_frames;
     if (input.use_item && state.boost_charges > 0 && state.boost_frames == 0) {
         --state.boost_charges;
         state.boost_frames = 45;

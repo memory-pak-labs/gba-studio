@@ -2,6 +2,7 @@
 #include "gbs/audio.hpp"
 #include "gbs/cutscene.hpp"
 #include "gbs/dialogue.hpp"
+#include "gbs/dma.hpp"
 #include "gbs/event.hpp"
 #include "gbs/input.hpp"
 #include "gbs/render.hpp"
@@ -53,6 +54,17 @@ gbs::HudState hud;
 gbs::EngineResourceManager resource_manager __attribute__((section(".ewram_bss")));
 uint32_t cutscene_save_sequence = 0;
 int cutscene_initialization_result = -1;
+constexpr size_t max_cutscene_animated_actors = 128;
+const gbs::TileAsset* loaded_actor_frames[max_cutscene_animated_actors] = {};
+int applied_background_index = -1;
+bool entry_frame_pending = true;
+int resident_background_scene = -1;
+int resident_background_group = -1;
+
+void invalidate_visual_upload_cache() {
+    applied_background_index = -1;
+    for (auto& frame : loaded_actor_frames) frame = nullptr;
+}
 
 // A full-screen BG and five independently paletted actors need 17 banks.
 constexpr size_t max_resource_bank_reservations = 24;
@@ -164,7 +176,12 @@ void stream_current_step_resource_group() {
     const char* group_name = step != nullptr
         ? gbs::cutscene_step_resource_bank_group_name(*scene, *step)
         : scene->resource_bank_group_name;
-    int group_index = gbs::find_cutscene_resource_bank_group_index(project, group_name);
+    if (resident_background_scene != cutscene_state.scene_index) {
+        resident_background_scene = cutscene_state.scene_index;
+        resident_background_group = gbs::cutscene_resident_background_group_index(project, *scene);
+    }
+    int group_index = resident_background_group >= 0 ? resident_background_group
+        : gbs::find_cutscene_resource_bank_group_index(project, group_name);
     if (group_index < 0 && group_name != scene->resource_bank_group_name) {
         group_index = gbs::find_cutscene_resource_bank_group_index(project, scene->resource_bank_group_name);
     }
@@ -179,6 +196,10 @@ void stream_current_step_resource_group() {
     if (group.bank_count == 0) {
         return;
     }
+    if (resident_background_group >= 0 && active_resource_bank_group.success &&
+        active_resource_bank_group.group_name == group.name) {
+        return;
+    }
 
     const gbs::ResourceStreamResult stream_result = gbs::stream_resource_bank_group_with_uploads(
         resource_manager,
@@ -189,7 +210,13 @@ void stream_current_step_resource_group() {
         project.resource_bank_upload_source_count
     );
     if (stream_result.success && stream_result.uploaded_count > 0) {
-        gbs::wait_vblank();
+        invalidate_visual_upload_cache();
+        if (resident_background_group < 0) {
+            gbs::wait_vblank();
+        }
+        // Resident image-only timelines publish palette, tiles and map
+        // together at the frame boundary. Other scenes keep their existing
+        // resource upload boundary before preparing actors and dialogue.
     }
 }
 
@@ -198,20 +225,33 @@ void apply_background(const gbs::CutsceneSceneData& scene, int background_index 
     if (!gbs::is_valid_cutscene_background_index(project, resolved_background_index) || resolved_background_index < 0) {
         return;
     }
+    if (applied_background_index == resolved_background_index) return;
+    const bool reuse_background_plane = resident_background_group >= 0 && applied_background_index >= 0 &&
+        project.backgrounds[applied_background_index].layer == project.backgrounds[resolved_background_index].layer;
+    applied_background_index = resolved_background_index;
 
     const gbs::CutsceneBackgroundData& background = project.backgrounds[resolved_background_index];
     gbs::set_backdrop_color(background.backdrop_color);
     // Keep the authored world behind a clean, transparent HUD/dialogue plane.
-    for (int y = 0; y < 32; ++y) {
-        for (int x = 0; x < 32; ++x) {
-            gbs::set_bg_tile(gbs::BackgroundLayer::BG0, x, y, 32, 32, 0);
+    if (!reuse_background_plane) {
+        if (resident_background_group >= 0) {
+            static const uint16_t transparent_hud_map[32 * 32] = {};
+            // The image-only timeline can clear its unchanged HUD in bulk.
+            gbs::load_tilemap(gbs::BackgroundLayer::BG0,
+                gbs::TileMapAsset { transparent_hud_map, 32, 32 });
+        } else {
+            for (int y = 0; y < 32; ++y) {
+                for (int x = 0; x < 32; ++x) {
+                    gbs::set_bg_tile(gbs::BackgroundLayer::BG0, x, y, 32, 32, 0);
+                }
+            }
         }
-    }
-    gbs::set_bg_priority(gbs::BackgroundLayer::BG0, 0);
-    gbs::set_bg_priority(background.layer, 2);
-    for (int layer = 1; layer < 4; ++layer) {
-        const auto candidate = static_cast<gbs::BackgroundLayer>(layer);
-        gbs::set_bg_enabled(candidate, candidate == background.layer);
+        gbs::set_bg_priority(gbs::BackgroundLayer::BG0, 0);
+        gbs::set_bg_priority(background.layer, 2);
+        for (int layer = 1; layer < 4; ++layer) {
+            const auto candidate = static_cast<gbs::BackgroundLayer>(layer);
+            gbs::set_bg_enabled(candidate, candidate == background.layer);
+        }
     }
     if (resolved_background_index < static_cast<int>(project.bg_palette_count)) {
         gbs::load_palette(project.bg_palettes[resolved_background_index], false);
@@ -244,18 +284,28 @@ void draw_scene_actors() {
     int sprite_index = 0;
     for (size_t actor_index = 0; actor_index < scene->actor_count; ++actor_index) {
         const gbs::CutsceneActorData& actor = scene->actors[actor_index];
-        if (actor.metasprite == nullptr || !gbs::is_valid_metasprite(*actor.metasprite)) {
+        const gbs::CutsceneStepData* step = gbs::cutscene_step_for(*scene, cutscene_state.step_index);
+        const auto* frame = step != nullptr ? gbs::cutscene_actor_frame_for(*scene, *step, actor_index) : nullptr;
+        const auto* metasprite = step != nullptr
+            ? gbs::cutscene_actor_metasprite_for(*scene, *step, actor_index) : actor.metasprite;
+        if (metasprite == nullptr || !gbs::is_valid_metasprite(*metasprite)) {
             continue;
         }
-        if (sprite_index + actor.metasprite->part_count > max_oam_sprites) {
+        if (sprite_index + metasprite->part_count > max_oam_sprites) {
             break;
         }
-        const gbs::CutsceneStepData* step = gbs::cutscene_step_for(*scene, cutscene_state.step_index);
+        if (frame != nullptr && frame->streamed_tile_asset != nullptr) {
+            if (actor_index >= max_cutscene_animated_actors) continue;
+            if (loaded_actor_frames[actor_index] != frame->streamed_tile_asset) {
+                if (!gbs::load_tiles(*frame->streamed_tile_asset)) continue;
+                loaded_actor_frames[actor_index] = frame->streamed_tile_asset;
+            }
+        }
         const gbs::Vec2i position = step != nullptr
             ? gbs::cutscene_actor_position_at(*scene, *step, actor_index, cutscene_state.frame_counter)
             : actor.position_pixels;
-        gbs::set_metasprite(sprite_index, *actor.metasprite, position);
-        sprite_index += actor.metasprite->part_count;
+        gbs::set_metasprite(sprite_index, *metasprite, position);
+        sprite_index += metasprite->part_count;
     }
 }
 
@@ -305,7 +355,7 @@ void consume_event_state() {
                 ready = gbs::stream_resource_bank_group_with_uploads(resource_manager, active_resource_bank_group,
                     scratch_resource_bank_group, group, project.resource_bank_upload_sources, project.resource_bank_upload_source_count).success;
             }
-            if (ready) { gbs::wait_vblank(); apply_background(*scene, index); }
+            if (ready) { invalidate_visual_upload_cache(); gbs::wait_vblank(); apply_background(*scene, index); }
         }
     }
 
@@ -395,6 +445,7 @@ void show_current_step(bool reset_counter, bool run_script, bool prepare_visual)
     if (step == nullptr) {
         return;
     }
+    gbastudio_dialogue_ui::configure_for_scene(scene->name);
     if (reset_counter) {
         cutscene_state.frame_counter = 0;
     }
@@ -489,6 +540,8 @@ void start_scene(int scene_index) {
     cutscene_state.scene_index = scene_index;
     cutscene_state.step_index = 0;
     cutscene_state.frame_counter = 0;
+    entry_frame_pending = true;
+    gbastudio_dialogue_ui::configure_for_scene(scene->name);
     stream_current_step_resource_group();
     apply_current_step_background();
     gbs::run_event_script(event_state, scene->on_enter);
@@ -586,14 +639,18 @@ void update_cutscene(gbs::InputState input) {
         return;
     }
 
+    const bool publish_entry_frame = entry_frame_pending;
+    gbs::update_dialogue(dialogue);
     if (step->wait_for_dialogue && dialogue.visible) {
-        if (input.was_pressed(gbs::ButtonA) || input.was_pressed(gbs::ButtonB) || input.was_pressed(gbs::ButtonStart)) {
-            gbs::hide_dialogue(dialogue);
-        }
+        gbs::advance_dialogue(dialogue, input);
         return;
     }
 
     if (input.was_pressed(gbs::ButtonA)) {
+        if (dialogue.visible) {
+            gbs::advance_dialogue(dialogue, input);
+            if (dialogue.visible) return;
+        }
         advance_step();
         return;
     }
@@ -606,6 +663,9 @@ void update_cutscene(gbs::InputState input) {
         return;
     }
     if (step->auto_advance && step->duration_frames > 0) {
+        // Publish frame zero before ticking the initial step. Later steps
+        // already render frame zero in the update that advances into them.
+        if (publish_entry_frame) return;
         ++cutscene_state.frame_counter;
         if ((cutscene_state.frame_counter % 30) == 0) {
             refresh_hud();
@@ -620,12 +680,20 @@ void update_cutscene(gbs::InputState input) {
 } // namespace
 
 int initialize_cutscene_runtime() {
+    invalidate_visual_upload_cache();
+    entry_frame_pending = true;
     gbs::init();
     gbs::init_dialogue(dialogue);
     gbs::init_hud(hud);
     gbs::init_event_state(event_state);
     gbs::init_resource_manager(resource_manager);
     gbs::set_backdrop_color(gbs::rgb15(2, 1, 6));
+    // Reset the scene binding before any entry script or first dialogue page.
+    gbastudio_dialogue_ui::configure_for_scene(nullptr, true);
+    gbs::configure_dialogue_portraits(
+        gbastudio_cutscene_project::dialogue_portrait_assets,
+        gbastudio_cutscene_project::dialogue_portrait_asset_count
+    );
 
     if (!gbs::is_valid_cutscene_project_data(project)) {
         gbs::set_backdrop_color(gbs::rgb15(31, 0, 0));
@@ -669,13 +737,6 @@ int initialize_cutscene_runtime() {
         start_scene(project.initial_scene);
     }
 #endif
-    gbastudio_dialogue_ui::configure();
-    gbastudio_dialogue_ui::configure_for_scene(gbs::cutscene_scene_name(project, cutscene_state.scene_index));
-    gbs::configure_dialogue_portraits(
-        gbastudio_cutscene_project::dialogue_portrait_assets,
-        gbastudio_cutscene_project::dialogue_portrait_asset_count
-    );
-
     return 0;
 }
 
@@ -714,6 +775,15 @@ void render_cutscene_runtime(const gbs::RuntimeFrameContext& context) {
          * after it so the HUD cleanup cannot hide the active portrait. */
         draw_dialogue_portrait();
         gbs::wait_vblank();
+        // Illustrated poses may use four native objects (128x96 at 8bpp).
+        // Finish their 12 KiB upload in this VBlank, before the next visible
+        // scanline, instead of displaying the first 8 KiB with the old tail.
+        gbs::dma_flush_vblank_queue_budget(gbs::DmaChannel::Channel3, 4096u);
+        // Start the authored clock only after all entry graphics are visible.
+        // A scene can need several upload frames before its first complete pose.
+        if (entry_frame_pending && gbs::dma_vblank_queue_count() == 0) {
+            entry_frame_pending = false;
+        }
 }
 
 void leave_cutscene_runtime() {

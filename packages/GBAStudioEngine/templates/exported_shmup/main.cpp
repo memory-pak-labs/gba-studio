@@ -59,6 +59,7 @@ gbs::RoomTilemapCache background_layer_cache[4] {};
 gbs::ShmupPlayerAnimator player_animator;
 const gbs::TileAsset* player_streamed_tile_asset_loaded = nullptr;
 bool player_fired_this_frame = false;
+bool defeat_consumed = false;
 bool player_damaged_this_frame = false;
 gbs::EventPlayerRuntimeState player_event_runtime { true, 0, 0, 3 };
 volatile gbs::RuntimeTelemetryBlock& runtime_telemetry = gbs::runtime_telemetry_block();
@@ -99,6 +100,7 @@ struct RuntimeEnemy {
     bool destroying = false;
     gbs::EventRunner destroy_runner {};
     uint16_t destroy_wait_frames = 0;
+    const gbs::TileAsset* streamed_tile_asset_loaded = nullptr;
 };
 
 struct RuntimeActorGesture {
@@ -169,6 +171,7 @@ gbs::EventScript checkpoint_script_for(int room, int index) {
     if (index == 1) return wave->on_clear;
     if (index == 2) return project.player.on_fire;
     if (index == 3) return project.enemy_projectile.on_hit_player;
+    if (index == 4) return wave->on_defeat;
     if (index >= 100 && index < 100 + static_cast<int>(wave->enemy_count)) return wave->enemies[index - 100].on_spawn;
     if (index >= 1000 && static_cast<size_t>(index - 1000) < project.script_count) return project.scripts[index - 1000];
     for (size_t enemy = 0; enemy < wave->enemy_count; ++enemy)
@@ -178,11 +181,11 @@ gbs::EventScript checkpoint_script_for(int room, int index) {
 int current_checkpoint_script_index() {
     if (!gbs::has_event_script(shmup_event_runner.script)) return -1;
     const auto* wave = gbs::shmup_wave_for(project, shmup_state.wave_index);
-    for (size_t candidate = 0; candidate < 4 + wave->enemy_count * 2 + project.script_count; ++candidate) {
-        const int index = candidate < 4 ? static_cast<int>(candidate)
-            : candidate < 4 + wave->enemy_count ? 100 + static_cast<int>(candidate - 4)
-            : candidate < 4 + wave->enemy_count * 2 ? 200 + static_cast<int>(candidate - 4 - wave->enemy_count)
-            : 1000 + static_cast<int>(candidate - 4 - wave->enemy_count * 2);
+    for (size_t candidate = 0; candidate < 5 + wave->enemy_count * 2 + project.script_count; ++candidate) {
+        const int index = candidate < 5 ? static_cast<int>(candidate)
+            : candidate < 5 + wave->enemy_count ? 100 + static_cast<int>(candidate - 5)
+            : candidate < 5 + wave->enemy_count * 2 ? 200 + static_cast<int>(candidate - 5 - wave->enemy_count)
+            : 1000 + static_cast<int>(candidate - 5 - wave->enemy_count * 2);
         const auto script = checkpoint_script_for(shmup_state.wave_index, index);
         if (script.commands == shmup_event_runner.script.commands && script.command_count == shmup_event_runner.script.command_count) return index;
     }
@@ -461,6 +464,7 @@ void refresh_hud() {
     gbs::set_hud_text_slots(hud, text_slots, 3);
     gbs::set_hud_value(hud,gbs::HudValueSource::Score,project.score_enabled ? shmup_state.score : 0);
     gbs::set_hud_value(hud,gbs::HudValueSource::Lives,shmup_state.lives,project.initial_lives);
+    gbs::set_hud_value(hud,gbs::HudValueSource::Wave,project.waves_enabled ? shmup_state.wave_index + 1 : 0);
 }
 
 void load_assets() {
@@ -935,6 +939,7 @@ void persist_shmup_runtime_state() {
 }
 
 void clear_runtime_objects() {
+    defeat_consumed = false;
     gbs::init_shmup_player_animator(player_animator);
     player_streamed_tile_asset_loaded = nullptr;
     for (size_t index = 0; index < max_runtime_enemies; ++index) {
@@ -1048,6 +1053,7 @@ bool restore_shmup_checkpoint(int slot) {
     if (!gbs::restore_checkpoint_events(saved_events, event_state) ||
         !gbs::restore_suspended_common_state(data, event_state)) return false;
     shmup_state = snapshot.state;
+    defeat_consumed = snapshot.script.script_index == 4;
     player_event_runtime = snapshot.player;
     shmup_event_runner = restored_runner;
     checkpoint_resume_script_index = snapshot.script.script_index;
@@ -1546,6 +1552,11 @@ void update_shmup(gbs::InputState input, bool allow_default_fire) {
         { shmup_state.player_position_pixels.x - previous_position.x,
           shmup_state.player_position_pixels.y - previous_position.y },
         player_fired_this_frame, player_damaged_this_frame, shmup_state.lives > 0);
+    if (shmup_state.lives == 0 && !defeat_consumed && !player_animator.animator.playing) {
+        defeat_consumed = true;
+        if (wave != nullptr) run_shmup_event_script(wave->on_defeat);
+        consume_event_state();
+    }
     maybe_advance_wave();
     ++shmup_state.frame_counter;
     if ((shmup_state.frame_counter % 60) == 0) {
@@ -1590,7 +1601,7 @@ void draw_scene() {
     if (wave != nullptr) {
         const size_t enemy_count = wave->enemy_count;
         for (size_t index = 0; index < enemy_count && sprite_index < 40; ++index) {
-            const RuntimeEnemy& runtime_enemy = runtime_enemies[index];
+            RuntimeEnemy& runtime_enemy = runtime_enemies[index];
             if (!runtime_enemy.active) {
                 continue;
             }
@@ -1600,7 +1611,13 @@ void draw_scene() {
                 screen_position.y + enemy.size_pixels.y <= 0 || screen_position.y >= screen_height) {
                 continue;
             }
-            const gbs::MetaSprite* enemy_metasprite = actor_sprite_for_index(runtime_enemy.sprite_index, enemy.metasprite);
+            const auto* frame = enemy.animation == nullptr ? nullptr : gbs::shmup_animation_frame_at(*enemy.animation, shmup_state.frame_counter);
+            if (frame != nullptr && runtime_enemy.sprite_index < 0 && frame->streamed_tile_asset != nullptr &&
+                frame->streamed_tile_asset != runtime_enemy.streamed_tile_asset_loaded && gbs::load_tiles(*frame->streamed_tile_asset)) {
+                runtime_enemy.streamed_tile_asset_loaded = frame->streamed_tile_asset;
+            }
+            const gbs::MetaSprite* enemy_metasprite = actor_sprite_for_index(runtime_enemy.sprite_index,
+                frame == nullptr ? enemy.metasprite : &frame->metasprite);
             if (enemy_metasprite != nullptr && gbs::is_valid_metasprite(*enemy_metasprite)) {
                 gbs::set_metasprite(sprite_index, *enemy_metasprite, screen_position);
                 sprite_index += enemy_metasprite->part_count;

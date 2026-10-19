@@ -13,12 +13,12 @@ const gbs::HudLayout* configured_hud_layouts = nullptr;
 size_t configured_hud_layout_count = 0;
 const gbs::HudLayout* selected_hud_layout = nullptr;
 gbs::HudElementMemory hud_element_memory[64] {};
-uint8_t hud_gauge_buffers[2][1536] GBS_UI_EWRAM {};
+uint8_t hud_gauge_buffers[4][1536] GBS_UI_EWRAM {};
 struct HudGaugeCache {
     const gbs::HudLayoutComponent* component = nullptr;
     uint32_t value = 0, maximum = 0;
 };
-HudGaugeCache hud_gauge_cache[2] {};
+HudGaugeCache hud_gauge_cache[4] {};
 char hud_value_text[64][9] GBS_UI_EWRAM {};
 uint32_t hud_project_values[64] GBS_UI_EWRAM {};
 bool hud_project_values_ready = false;
@@ -260,6 +260,8 @@ void draw_hud(const HudState& state) {
         }
 
         gbs_hw_begin_hud_layout(state.visible ? 1 : 0);
+        gbs_hw_set_hud_font(selected_hud_layout->font_tiles,selected_hud_layout->font_color);
+        gbs_hw_set_hud_font_shadow(selected_hud_layout->font_shadow_color);
         int text_slot = 0;
         int text_oam_offset = 0;
         size_t gauge_buffer = 0;
@@ -290,7 +292,7 @@ void draw_hud(const HudState& state) {
                 } else if (kind == GBS_HW_HUD_COMPONENT_ICON && value > 0) {
                     image = component.state_assets[value > 1 ? 1 : 0];
                     if (!image) image = component.metasprite;
-                } else if (kind == GBS_HW_HUD_COMPONENT_BAR && image && gauge_buffer < 2 &&
+                } else if (kind == GBS_HW_HUD_COMPONENT_BAR && image && gauge_buffer < 4 &&
                     state.visible && status != HudElementState::Hidden) {
                     const size_t buffer = gauge_buffer++;
                     auto& cache = hud_gauge_cache[buffer];
@@ -319,6 +321,7 @@ void draw_hud(const HudState& state) {
                 }
             }
             gbs_hw_draw_hud_layout_component(
+                kind == GBS_HW_HUD_COMPONENT_TEXT && component.text_advance == 7 ? GBS_HW_HUD_COMPONENT_SPACED_TEXT :
                 kind == GBS_HW_HUD_COMPONENT_TEXT && component.text_advance == 6 ? GBS_HW_HUD_COMPONENT_COMPACT_TEXT :
                     kind == GBS_HW_HUD_COMPONENT_BAR && component.foreground_image ? GBS_HW_HUD_COMPONENT_FOREGROUND_BAR : kind,
                 component.x,
@@ -334,6 +337,7 @@ void draw_hud(const HudState& state) {
                 text_oam_offset += (component.width + 7) / 8;
             }
         }
+        gbs_hw_set_hud_font(nullptr,-1);
         gbs_hw_end_hud_layout();
         return;
     }

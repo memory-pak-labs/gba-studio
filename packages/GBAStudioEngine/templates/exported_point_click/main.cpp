@@ -288,7 +288,7 @@ void refresh_hud() {
 }
 
 void load_cursor_assets() {
-    if (project.cursor_metasprite != nullptr) {
+    if (gbs::point_click_cursor_metasprite(project, current_scene_index) != nullptr) {
         if (project.resource_bank_group_count == 0) {
             for (size_t index = 0; index < project.obj_palette_count; ++index) {
                 gbs::load_palette(project.obj_palettes[index], true);
@@ -323,7 +323,8 @@ void stream_scene_resource_group(const gbs::PointClickSceneData& scene) {
 }
 
 void draw_cursor() {
-    if (project.cursor_metasprite != nullptr) {
+    const auto* scene_cursor = gbs::point_click_cursor_metasprite(project, current_scene_index);
+    if (scene_cursor != nullptr) {
         if (cursor_animator.animation != nullptr && cursor_animator.animation->frames != nullptr) {
             const auto& frame = cursor_animator.animation->frames[cursor_animator.frame_index];
             if (frame.streamed_tile_asset != nullptr && frame.streamed_tile_asset != cursor_streamed_tile_asset_loaded) {
@@ -332,7 +333,7 @@ void draw_cursor() {
         }
         const gbs::MetaSprite* cursor_metasprite = gbs::current_metasprite(cursor_animator);
         if (cursor_metasprite == nullptr) {
-            cursor_metasprite = project.cursor_metasprite;
+            cursor_metasprite = scene_cursor;
         }
         gbs::set_metasprite(0, *cursor_metasprite, cursor.position_pixels);
         return;
@@ -582,6 +583,9 @@ void start_scene(int scene_index) {
         return;
     }
     current_scene_index = scene_index;
+    gbs::init_sprite_animator(cursor_animator);
+    cursor_streamed_tile_asset_loaded = nullptr;
+    gbs::update_point_click_cursor_animator(cursor_animator, project, false, false, current_scene_index);
     event_state.current_room = current_scene_index;
     event_state.player_x = cursor.position_pixels.x;
     event_state.player_y = cursor.position_pixels.y;
@@ -826,7 +830,7 @@ gbs::RuntimeAdapterFrameResult update_point_click_runtime(const gbs::RuntimeFram
     const gbs::PointClickSceneData* cursor_scene = gbs::point_click_scene_for(project, current_scene_index);
     const bool cursor_hovering = cursor_scene != nullptr &&
         gbs::point_click_hotspot_at(*cursor_scene, cursor.position_pixels) != nullptr;
-    gbs::update_point_click_cursor_animator(cursor_animator, project, cursor_hovering, cursor_clicked);
+    gbs::update_point_click_cursor_animator(cursor_animator, project, cursor_hovering, cursor_clicked, current_scene_index);
 
 #ifdef GBS_MULTI_RUNTIME
     if (gbs::runtime_transition_pending()) {

@@ -308,6 +308,67 @@ void draw_iso_tactical_hud_status(const IsoTacticalRuntimeState& state) {
     }
 }
 
+// Compact HUD: fixed viewport composition, real selected-unit HP and contextual actions.
+// The shared image/text compositor owns the reserved HUD slots and releases them each frame.
+void draw_iso_tactical_compact_hud(const IsoTacticalRuntimeState& state,
+    const gbs::IsoTacticalPresentationData& presentation,const gbs::IsoCursorState& cursor,
+    const gbs::IsoActor* actors,size_t actor_count) {
+    const auto& art=*presentation.compact_hud;
+    static gbs::HudLayoutComponent c[13] __attribute__((section(".ewram_bss")));
+    static gbs::HudLayout layout {"iso-tactical-compact","advanced",c,13};
+    layout.font_tiles=art.font->tiles;layout.font_color=art.font_color;
+    if(gbs::active_hud_layout()!=&layout){
+        gbs::configure_hud_layouts(&layout,1);
+        gbs::configure_hud_layout(layout.id);
+    }
+    auto component=[&](int i,const char* kind,int x,int y,int w,int h,const char* text,
+        const gbs::MetaSprite* image,bool visible){
+        c[i]={};c[i].id="tactical";c[i].kind=kind;c[i].x=x;c[i].y=y;c[i].width=w;c[i].height=h;
+        c[i].visible=visible;c[i].text=text;c[i].metasprite=image;c[i].text_advance=7;
+    };
+    const gbs::IsoTacticalUnitPresentationData* hovered=nullptr;
+    const IsoTacticalRuntimeUnit* stats=nullptr;
+    for(size_t i=0;i<presentation.unit_count;++i){
+        const auto& unit=presentation.units[i];
+        if(unit.actor_index>=actor_count)continue;
+        const auto& a=actors[unit.actor_index];
+        if(a.tile.x!=cursor.tile.x || a.tile.y!=cursor.tile.y)continue;
+        for(size_t j=0;j<max_actor_count;++j)if(state.units[j].configured&&state.units[j].actor_index==unit.actor_index){
+            hovered=&unit;stats=&state.units[j];break;
+        }
+    }
+    const bool show_unit=hovered && stats;
+    const bool show_menu=state.menu_open && state.active_team==0 && !state.moving && state.outcome==0;
+    const uint8_t locale=gbs::active_dialogue_locale_id();
+    const char* phase=iso_tactical_phase_label(state,locale);
+    // All localized feedback fits the same 8-glyph badge.
+    if(locale==2 && state.outcome==0 && state.active_team==0 && !state.moving && !state.moved_this_turn)phase="PLAYER";
+    if(state.message_frames>0)phase=state.message==1?(locale==2?"NO FOE":"SEM ALVO"):
+        state.message==2?(locale==2?"MOVED":"JA MOVEU"):(locale==2?"INVALID":"INVALIDO");
+    if(locale==3 && state.message_frames>0)phase=state.message==1?"SIN ALVO":state.message==2?"YA MOVIO":"INVALIDO";
+    static char hp[]="0/0";
+    hp[0]=show_unit?static_cast<char>('0'+gbs::clamp_int(stats->hp,0,9)):'0';
+    hp[2]=show_unit?static_cast<char>('0'+gbs::clamp_int(stats->max_hp,0,9)):'0';
+    component(0,"frame",0,0,96,32,nullptr,art.turn_panel,true);
+    component(1,"frame",4,122,128,32,nullptr,art.unit_panel,show_unit);
+    component(2,"frame",172,104,64,48,nullptr,art.actions_panel,show_menu);
+    component(3,"text",29,12,56,8,phase,nullptr,true);
+    component(4,"icon",11,126,32,32,nullptr,hovered?hovered->portrait:nullptr,show_unit);
+    component(5,"text",42,129,77,8,hovered?hovered->label:" ",nullptr,show_unit);
+    component(6,"text",42,140,14,8,"HP",nullptr,show_unit);
+    component(7,"bar",57,141,64,8,nullptr,art.health,show_unit);
+    c[7].value_source=gbs::HudValueSource::P1Health;c[7].gauge={art.health_full,art.health_empty,1,1,36,3,false};c[7].foreground_image=true;
+    component(8,"text",99,140,21,8,hp,nullptr,show_unit);
+    component(9,"text",180,114,56,8,locale==2?"MOVE":"MOVER",nullptr,show_menu);
+    component(10,"text",180,126,56,8,locale==2?"ATTACK":"ATACAR",nullptr,show_menu);
+    component(11,"text",180,138,56,8,locale==2?"WAIT":"ESPERAR",nullptr,show_menu);
+    component(12,"icon",173,114+state.menu_index*12,8,8,nullptr,art.selection,show_menu);
+    gbs::HudState view {};view.visible=true;
+    if(show_unit)gbs::set_hud_value(view,gbs::HudValueSource::P1Health,stats->hp,stats->max_hp);
+    gbs::draw_hud(view);
+
+}
+
 enum IsoTacticalFeedbackKind : uint8_t {
     IsoTacticalFeedbackNone = 0,
     IsoTacticalFeedbackMove = 1,
@@ -2723,13 +2784,20 @@ gbs::RuntimeAdapterFrameResult update_isometric_runtime(const gbs::RuntimeFrameC
         const gbs::Vec2i player_world_focus = actor_count > 0
             ? gbs::iso_actor_world_position_pixels(actors[0], room_data->grid)
             : gbs::Vec2i {};
+        // Paged tactical maps follow the selected diamond center, matching actor feet.
+        const bool paged_tactical_camera = tactical_state.enabled && room_data->baked_composition != nullptr &&
+            room_data->baked_composition->paged_foreground_first_tile != 0;
+        gbs::Vec2i selected_world_focus = gbs::iso_tile_to_screen(
+            gbs::iso_selected_tile(cursor, actors[0]), room_data->grid
+        );
+        selected_world_focus.y += room_data->grid.tile_height_pixels / 2;
         iso_camera_zone_active = gbs::apply_iso_camera_zones(
             camera,
             gbs::iso_selected_tile(cursor, actors[0]),
             room_data->grid,
             room_data->camera_zones,
             room_data->camera_zone_count,
-            continuous_camera ? &player_world_focus : nullptr
+            paged_tactical_camera ? &selected_world_focus : (continuous_camera ? &player_world_focus : nullptr)
         );
         apply_iso_event_camera(camera, event_state);
         if (tactical_state.enabled && room_data->tactical_presentation != nullptr) {
@@ -2872,7 +2940,7 @@ void render_isometric_runtime(const gbs::RuntimeFrameContext& context) {
         const bool tactical_presentation_active = tactical_state.enabled && tactical_presentation != nullptr;
         // The dynamic surface uses CBB2. Keep all maps above its last tile;
         // authored/tactical paths retain the shared engine's default layout.
-        const bool dynamic_surface = !authored_background && !tactical_presentation_active;
+        const bool dynamic_surface = !authored_background && (!tactical_presentation_active || room_data->baked_composition != nullptr);
         const bool baked_surface = dynamic_surface && room_data->baked_composition != nullptr;
         const bool paged_surface = baked_surface && room_data->baked_composition->paged_foreground_first_tile != 0;
         const bool indexed_surface = dynamic_surface && !baked_surface && uses_indexed_surface(*room_data);
@@ -2989,7 +3057,7 @@ void render_isometric_runtime(const gbs::RuntimeFrameContext& context) {
                 }
             }
         }
-        const bool rendered_iso_surface = !tactical_presentation_active && iso_surface_valid;
+        const bool rendered_iso_surface = (!tactical_presentation_active || baked_surface) && iso_surface_valid;
         const int surface_scroll_x = rendered_iso_surface
             ? camera.position_pixels.x - iso_surface_camera.position_pixels.x
             : 0;
@@ -2999,7 +3067,7 @@ void render_isometric_runtime(const gbs::RuntimeFrameContext& context) {
         int authored_background_scroll_x = 0;
         int authored_background_scroll_y = 0;
         gbs::set_bg_priority(gbs::BackgroundLayer::BG0, 0);
-        if (tactical_presentation_active) {
+        if (tactical_presentation_active && !baked_surface) {
             if (!tactical_presentation_maps_loaded) {
                 if (tactical_presentation->surface_page_count > 0) {
                     const size_t initial_page = tactical_surface_requested_page_index != gbs::iso_tactical_surface_page_none
@@ -3192,8 +3260,8 @@ void render_isometric_runtime(const gbs::RuntimeFrameContext& context) {
             gbs::set_bg_enabled(gbs::BackgroundLayer::BG3, true);
             gbs::set_bg_character_base(gbs::BackgroundLayer::BG2, 0);
             gbs::set_bg_character_base(gbs::BackgroundLayer::BG3, 0);
-            gbs::set_bg_priority(gbs::BackgroundLayer::BG2, 2);
-            gbs::set_bg_priority(gbs::BackgroundLayer::BG3, 0);
+            gbs::set_bg_priority(gbs::BackgroundLayer::BG2, tactical_presentation_active ? 3 : 2);
+            gbs::set_bg_priority(gbs::BackgroundLayer::BG3, tactical_presentation_active ? 2 : 0);
             if (paged_surface) {
                 iso_surface_valid = render_paged_isometric_viewport(baked, x, y);
             } else if (!iso_surface_map_loaded || x / 8 != (iso_surface_camera.position_pixels.x - baked.origin.x) / 8 ||
@@ -3424,7 +3492,8 @@ void render_isometric_runtime(const gbs::RuntimeFrameContext& context) {
             gbastudio_dialogue_ui::has_hud_scene_binding(project.rooms[current_room].name)) {
             gbs::set_bg_priority(gbs::BackgroundLayer::BG0, 0);
             for (size_t index = 0; index < draw_count; ++index) {
-                if (draw_items[index].priority == 0) draw_items[index].priority = 1;
+                if (tactical_presentation_active && tactical_presentation->compact_hud) draw_items[index].priority = 3;
+                else if (draw_items[index].priority == 0) draw_items[index].priority = 1;
             }
         }
         gbs::sort_iso_draw_list(draw_items, draw_count);
@@ -3441,7 +3510,9 @@ void render_isometric_runtime(const gbs::RuntimeFrameContext& context) {
         }
         gbs::draw_dialogue(dialogue);
         gbs::draw_event_clock(event_state);
-        if (tactical_presentation_active && tactical_presentation->hud != nullptr && !dialogue.visible) {
+        if(tactical_presentation_active && tactical_presentation->compact_hud && !dialogue.visible) {
+            draw_iso_tactical_compact_hud(tactical_state,*tactical_presentation,cursor,actors,actor_count);
+        } else if (tactical_presentation_active && tactical_presentation->hud != nullptr && !dialogue.visible) {
             // Hiding a dialogue clears its rectangle on BG0. Restore the
             // authored panel afterwards so the lower status keeps its backing.
             gbs::load_tilemap(gbs::BackgroundLayer::BG0, *tactical_presentation->hud);

@@ -58,6 +58,10 @@ int main() {
         gbs_hw_hide_sprites(n,1);
         assert(memcmp(previous,shadow_oam+n*4,sizeof(previous))==0);
     }
+    // UI portraits keep their eight-bit palette and hardware color-depth flag.
+    gbs_hw_clear_hud_icon_slots(); a.color_depth=8;
+    assert(gbs_hw_draw_hud_icon(&first,8,8,1,0));
+    assert(shadow_oam[88*4] & 0x2000);
     // An unreserved world slot remains usable.
     gbs_hw_set_sprite(63,0,0,99,1,0,0,1,0,0,0,0,0);
     assert((shadow_oam[63*4+2]&1023)==99);

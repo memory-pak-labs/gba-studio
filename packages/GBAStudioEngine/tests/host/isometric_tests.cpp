@@ -1400,6 +1400,16 @@ void test_iso_tactical_audio_cues_have_stable_native_indices() {
 
 } // namespace
 
+void test_tactical_stairs_support_negative_axes_without_crossing_other_edges() {
+    uint8_t flags[9]={},heights[9]={0,2,0,0,1,0,0,0,0},ramps[9]={0,8,0,0,8,0,0,0,0};
+    gbs::IsoTileMap map{flags,3,3,heights,ramps}; gbs::IsoActor a{};a.tile={1,2,0};a.visible=true;
+    assert(gbs::move_iso_actor_by_delta(map,a,{0,-1}));assert(a.tile.z==1);
+    assert(gbs::move_iso_actor_by_delta(map,a,{0,-1}));assert(a.tile.z==2);
+    assert(gbs::move_iso_actor_by_delta(map,a,{0,1}));assert(a.tile.z==1);
+    assert(!gbs::move_iso_actor_by_delta(map,a,{1,0})); // A stair is not a free side exit.
+    assert(gbs::move_iso_actor_by_delta(map,a,{0,1}));assert(a.tile.z==0);
+}
+
 int main() {
     {
         // Enemy navigation must use the traversable route, not slide towards
@@ -1525,6 +1535,7 @@ int main() {
     test_render_iso_room_surface_scales_tiles_with_camera_zoom();
     test_render_iso_room_surface_decodes_real_32x16_4bpp_diamond();
     test_render_iso_room_surface_uses_visual_32x32_atlas_slots();
+    test_tactical_stairs_support_negative_axes_without_crossing_other_edges();
     test_sort_iso_draw_list_assigns_front_items_to_lower_oam_indices();
     test_iso_surface_tile_cache_only_reports_changed_hardware_tiles();
     test_iso_actor_uses_one_level_height_map_as_a_ramp();

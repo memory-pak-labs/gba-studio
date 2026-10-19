@@ -8,8 +8,8 @@ source = (root / 'engine/src/gbs_hw.c').read_text()
 start = source.index('void gbs_hw_draw_hud_layout_component(')
 helper = source[start:source.index('\nvoid gbs_hw_end_hud_layout(', start)]
 code = '''#include <assert.h>
-enum { GBS_HW_HUD_COMPONENT_FRAME, GBS_HW_HUD_COMPONENT_BAR, GBS_HW_HUD_COMPONENT_ICON, GBS_HW_HUD_COMPONENT_TEXT, GBS_HW_HUD_COMPONENT_COMPACT_TEXT, GBS_HW_HUD_COMPONENT_FOREGROUND_BAR };
-int clears, fills, icons, text_calls, compact_calls, image_priority;
+enum { GBS_HW_HUD_COMPONENT_FRAME, GBS_HW_HUD_COMPONENT_BAR, GBS_HW_HUD_COMPONENT_ICON, GBS_HW_HUD_COMPONENT_TEXT, GBS_HW_HUD_COMPONENT_COMPACT_TEXT, GBS_HW_HUD_COMPONENT_FOREGROUND_BAR, GBS_HW_HUD_COMPONENT_SPACED_TEXT };
+int clears, fills, icons, text_calls, compact_calls, spaced_calls, image_priority;
 int gbs_hw_draw_hud_icon(const void* image,int x,int y,int visible,int behind) {
     assert(image); image_priority=behind; ++icons; return 1;
 }
@@ -20,6 +20,7 @@ void gbs_hw_remember_hud_layout_rect(int x,int y,int w,int h) {}
 void gbs_hw_draw_hud_pixel_text(int x,int y,int w,int h,const char* text,int visible) { ++text_calls; }
 void gbs_hw_draw_hud_text_at(int x,int y,int w,int h,const char* text,int visible) { ++text_calls; }
 void gbs_hw_draw_hud_compact_text(int x,int y,int w,const char* text,int visible) { assert(x==204 && y==9 && w==18); ++compact_calls; }
+void gbs_hw_draw_hud_spaced_text(int x,int y,int w,const char* text,int visible) { assert(x==180 && y==138 && w==56); ++spaced_calls; }
 ''' + helper + '''
 int main() {
     gbs_hw_draw_hud_layout_component(GBS_HW_HUD_COMPONENT_FRAME,8,80,104,32,"",0,0,1);
@@ -37,6 +38,8 @@ int main() {
     assert(image_priority==0 && clears==2);
     gbs_hw_draw_hud_layout_component(GBS_HW_HUD_COMPONENT_COMPACT_TEXT,204,9,18,8,"008",0,0,1);
     assert(compact_calls==1 && text_calls==1);
+    gbs_hw_draw_hud_layout_component(GBS_HW_HUD_COMPONENT_SPACED_TEXT,180,138,56,8,"ESPERAR",0,0,1);
+    assert(spaced_calls==1);
 }
 '''
 with tempfile.TemporaryDirectory() as directory:

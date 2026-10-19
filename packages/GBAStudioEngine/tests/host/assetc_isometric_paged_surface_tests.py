@@ -38,6 +38,13 @@ class IsometricPagedSurfaceTests(unittest.TestCase):
         with self.assertRaisesRegex(SystemExit, 'palette'):
             assetc.compose_isometric_paged_surface(self.source(1515,list(range(224))),self.source(66,[0,300]))
 
+    def test_foreground_reuses_background_colors_without_reducing_the_approved_palette(self):
+        back=self.source(1515,list(range(223)))
+        front=self.source(66,[0,150,222])
+        out=assetc.compose_isometric_paged_surface(back,front)
+        self.assertEqual(len(out['palette']),224)
+        self.assertEqual(out['palette'][out['tiles'][1516][0]],150)
+
     def test_rejects_mismatched_dimensions_and_invalid_rom_indices(self):
         back, front = self.source(1515,[0,1]),self.source(66,[0,2])
         front['width']=32

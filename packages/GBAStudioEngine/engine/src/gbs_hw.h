@@ -15,6 +15,7 @@ enum {
     GBS_HW_HUD_COMPONENT_BAR = 2,
     GBS_HW_HUD_COMPONENT_ICON = 3,
     GBS_HW_HUD_COMPONENT_COMPACT_TEXT = 4,
+    GBS_HW_HUD_COMPONENT_SPACED_TEXT = 6,
     GBS_HW_HUD_COMPONENT_FOREGROUND_BAR = 5
 };
 
@@ -67,6 +68,8 @@ void gbs_hw_configure_hud_box_skin(const uint8_t* tiles, const uint16_t* palette
 void gbs_hw_configure_hud_box(int x, int y, int width, int height);
 void gbs_hw_invalidate_hud_layout(void);
 void gbs_hw_begin_hud_layout(int visible);
+void gbs_hw_set_hud_font(const uint8_t* tiles, int color);
+void gbs_hw_set_hud_font_shadow(int color);
 void gbs_hw_draw_hud_layout_component(int kind, int x, int y, int width, int height, const char* text, int text_slot, const void* metasprite, int visible);
 void gbs_hw_end_hud_layout(void);
 void gbs_hw_configure_dialogue_font(const uint8_t* tiles);

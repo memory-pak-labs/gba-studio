@@ -4,6 +4,24 @@ import unittest
 spec=importlib.util.spec_from_file_location('racing_assetc',Path(__file__).resolve().parents[2]/'tools/assetc/assetc.py')
 assetc=importlib.util.module_from_spec(spec);spec.loader.exec_module(assetc)
 class RacingAuthoringExportTests(unittest.TestCase):
+    def test_action_sounds_are_optional_validated_sfx_indices(self):
+        room = {'name':'race','width_tiles':8,'height_tiles':8,'collision_flags':[0]*64}
+        project = {'rooms':[room], 'assets':{'sfx_assets':['motor','brake','hit','gate']}}
+        room['action_sounds'] = {'accelerate':0,'brake':1,'collision':2,'checkpoint':3}
+        self.assertIn('gbs::RacingActionSounds { 0, 1, 2, 3 }',assetc.emit_racing_project_data_header(project))
+        for sounds in ({'accelerate':4}, {'collision':-1}, {'unknown':0}):
+            room['action_sounds'] = sounds
+            with self.assertRaises(SystemExit): assetc.emit_racing_project_data_header(project)
+        del room['action_sounds']
+        self.assertIn('gbs::RacingActionSounds { -1, -1, -1, -1 }',assetc.emit_racing_project_data_header(project))
+    def test_seven_pixel_text_exports_without_losing_approved_glyph_width(self):
+        layouts=[{'id':'racing','mode':'advanced','components':[{'id':'time','kind':'text','text':'','asset':'','x':180,'y':7,'width':49,'height':8,'z_index':1,'visible':True,'text_advance':7}]}]
+        self.assertEqual(assetc.hud_layouts_from_json(layouts,'hud')[0]['components'][0]['text_advance'],7)
+    def test_racing_emits_authored_button_script_table(self):
+        room={'name':'race','width_tiles':8,'height_tiles':8,'collision_flags':[0]*64}
+        header=assetc.emit_racing_project_data_header({'rooms':[room],'scripts':[{'name':'switch','script':[{'op':'wait','frames':3}]}]})
+        self.assertIn('constexpr gbs::EventScript racing_project_scripts[]',header)
+        self.assertIn('racing_project_script_0',header)
     def test_streamed_vehicle_clips(self):
         report={'export_plan':{'headers':[{'id':'car','symbol':'car','kind':'obj_sprite','assetc_args':['--stream-frames']}]}}
         output=[]

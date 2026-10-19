@@ -24,6 +24,8 @@ const SpriteAnimation* luta_animation_for(const LutaAnimationSet* animation_set,
         case LutaVisualState::Special: return animation_set->special;
         case LutaVisualState::Guard: return animation_set->guard;
         case LutaVisualState::Hurt: return animation_set->hurt;
+        case LutaVisualState::Walk: return animation_set->walk;
+        case LutaVisualState::Jump: return animation_set->jump;
     }
     return nullptr;
 }
@@ -37,6 +39,9 @@ void init_luta_visual_state(LutaVisualStateData& state) {
     state.state = LutaVisualState::Idle;
     init_sprite_animator(state.animator);
     state.fallback = LutaVisualFallback::None;
+    state.previous_x = 0;
+    state.position_initialized = false;
+    state.landing_frames = 0;
 }
 
 void set_luta_visual_state(
@@ -45,6 +50,7 @@ void set_luta_visual_state(
     LutaVisualState visual_state
 ) {
     state.state = visual_state;
+    state.landing_frames = 0;
     init_sprite_animator(state.animator);
 
     const SpriteAnimation* animation = luta_animation_for(animation_set, visual_state);
@@ -67,6 +73,12 @@ void set_luta_visual_state(
 }
 
 void tick_luta_visual_state(LutaVisualStateData& state, const LutaAnimationSet* animation_set) {
+    // Jump poses follow physics, so the airborne pose cannot become a landing pose midair.
+    if (state.state == LutaVisualState::Jump && state.fallback == LutaVisualFallback::None &&
+        state.animator.animation != nullptr && state.animator.animation->frame_count >= 4) {
+        if (state.landing_frames > 0) --state.landing_frames;
+        return;
+    }
     const bool transient_action = state.state == LutaVisualState::Attack || state.state == LutaVisualState::Special;
     if (state.animator.animation == nullptr) {
         if (transient_action) set_luta_visual_state(state, animation_set, LutaVisualState::Idle);
@@ -88,6 +100,10 @@ void sync_luta_visual_state(
 ) {
     const uint16_t hitstun = player_one ? runtime_state.p1_hitstun : runtime_state.p2_hitstun;
     const bool guarding = player_one ? runtime_state.p1_guarding : runtime_state.p2_guarding;
+    const int16_t x = player_one ? runtime_state.p1_x : runtime_state.p2_x;
+    const bool moved = state.position_initialized && x != state.previous_x;
+    state.previous_x = x;
+    state.position_initialized = true;
     if (hitstun > 0) {
         if (state.state != LutaVisualState::Hurt) {
             set_luta_visual_state(state, animation_set, LutaVisualState::Hurt);
@@ -100,9 +116,33 @@ void sync_luta_visual_state(
         }
         return;
     }
-    if (state.state == LutaVisualState::Hurt || state.state == LutaVisualState::Guard) {
-        set_luta_visual_state(state, animation_set, LutaVisualState::Idle);
+    if (state.state == LutaVisualState::Attack || state.state == LutaVisualState::Special) return;
+    const bool airborne = player_one ? runtime_state.p1_airborne : runtime_state.p2_airborne;
+    if (airborne) {
+        if (state.state != LutaVisualState::Jump) set_luta_visual_state(state, animation_set, LutaVisualState::Jump);
+        if (state.fallback == LutaVisualFallback::None && state.animator.animation->frame_count >= 4) {
+            const int16_t velocity = player_one ? runtime_state.p1_vertical_velocity : runtime_state.p2_vertical_velocity;
+            set_sprite_animation_frame(state.animator, velocity < -4 ? 0 : velocity < 0 ? 1 : 2);
+        }
+        return;
     }
+    if (state.state == LutaVisualState::Jump && state.fallback == LutaVisualFallback::None &&
+        state.animator.animation->frame_count >= 4) {
+        if (state.animator.frame_index != 3) {
+            set_sprite_animation_frame(state.animator, 3);
+            state.landing_frames = 4;
+        }
+        if (state.landing_frames > 0) return;
+    }
+    const auto next = moved ? LutaVisualState::Walk : LutaVisualState::Idle;
+    if (state.state != next) set_luta_visual_state(state, animation_set, next);
+}
+
+LutaActionFeedback consume_luta_action_feedback(LutaRuntimeState& state, bool player_one) {
+    auto& feedback = player_one ? state.p1_action_feedback : state.p2_action_feedback;
+    const auto result = feedback;
+    feedback = LutaActionFeedback::None;
+    return result;
 }
 
 static const LutaCharacter* fighter_for(const LutaStageData* stage, bool player_one) {
@@ -143,6 +183,7 @@ static void reset_round(LutaRuntimeState& state, const LutaStageData& stage) {
     state.p2_vertical_velocity = 0;
     state.p1_attack_cooldown = 0;
     state.p2_attack_cooldown = 0;
+    state.p1_action_feedback = state.p2_action_feedback = LutaActionFeedback::None;
 }
 
 LutaRuntimeState make_luta_runtime_state(const LutaStageData& stage) {
@@ -244,10 +285,10 @@ static void apply_damage(
         state.p1_hitstun = hitstun_frames;
         if (strength >= LutaAttackStrength::Medium) state.p1_combo_count++;
         else state.p1_combo_count = 0;
-        const uint16_t receive_gain = stage != nullptr ? stage->superGaugeGainOnReceive : 8;
-        state.p2_super_gauge = saturating_add(state.p2_super_gauge, receive_gain, state.super_gauge_max);
+        const uint16_t hit_gain = stage != nullptr ? stage->superGaugeGainOnHit : 8;
+        state.p2_super_gauge = saturating_add(state.p2_super_gauge, hit_gain, state.super_gauge_max);
         if (stage != nullptr) {
-            state.p1_super_gauge = saturating_add(state.p1_super_gauge, stage->superGaugeGainOnHit, state.super_gauge_max);
+            state.p1_super_gauge = saturating_add(state.p1_super_gauge, stage->superGaugeGainOnReceive, state.super_gauge_max);
         }
     } else {
         if (state.p2_hp > damage) state.p2_hp -= damage;
@@ -255,10 +296,10 @@ static void apply_damage(
         state.p2_hitstun = hitstun_frames;
         if (strength >= LutaAttackStrength::Medium) state.p2_combo_count++;
         else state.p2_combo_count = 0;
-        const uint16_t receive_gain = stage != nullptr ? stage->superGaugeGainOnReceive : 8;
-        state.p1_super_gauge = saturating_add(state.p1_super_gauge, receive_gain, state.super_gauge_max);
+        const uint16_t hit_gain = stage != nullptr ? stage->superGaugeGainOnHit : 8;
+        state.p1_super_gauge = saturating_add(state.p1_super_gauge, hit_gain, state.super_gauge_max);
         if (stage != nullptr) {
-            state.p2_super_gauge = saturating_add(state.p2_super_gauge, stage->superGaugeGainOnHit, state.super_gauge_max);
+            state.p2_super_gauge = saturating_add(state.p2_super_gauge, stage->superGaugeGainOnReceive, state.super_gauge_max);
         }
     }
 }
@@ -381,14 +422,18 @@ static void attack_luta(
     const int16_t reach = stage != nullptr
         ? static_cast<int16_t>((attacker != nullptr ? attacker->throwRange : 16) + 32)
         : 32767;
+    if (player_one) state.p1_attack_cooldown = recovery;
+    else state.p2_attack_cooldown = recovery;
+    auto& feedback = player_one ? state.p1_action_feedback : state.p2_action_feedback;
+    feedback = LutaActionFeedback::Miss;
     if (distance > reach) return;
+    feedback = (player_one ? state.p2_guarding : state.p1_guarding)
+        ? LutaActionFeedback::Guard : LutaActionFeedback::Hit;
 
     if (attacker != nullptr && defender != nullptr) {
         damage = static_cast<int16_t>(damage + attacker->attack / 4 - defender->defense / 6);
         if (damage < 1) damage = 1;
     }
-    if (player_one) state.p1_attack_cooldown = recovery;
-    else state.p2_attack_cooldown = recovery;
     apply_damage(state, stage, !player_one, damage, stun, hitstun, strength);
 }
 
@@ -460,6 +505,7 @@ void luta_p1_super(LutaRuntimeState& state) {
     if (state.p1_super_gauge < state.super_gauge_max) return;
 
     state.p1_super_gauge = 0;
+    state.p1_action_feedback = LutaActionFeedback::Special;
     apply_damage(state, nullptr, false, 25, 30, 40, LutaAttackStrength::Heavy);
 }
 
@@ -468,6 +514,7 @@ void luta_p2_super(LutaRuntimeState& state) {
     if (state.p2_super_gauge < state.super_gauge_max) return;
 
     state.p2_super_gauge = 0;
+    state.p2_action_feedback = LutaActionFeedback::Special;
     apply_damage(state, nullptr, true, 25, 30, 40, LutaAttackStrength::Heavy);
 }
 
@@ -479,6 +526,7 @@ void luta_p1_alpha_counter(LutaRuntimeState& state) {
 
     state.p1_super_gauge -= state.super_gauge_max / 2;
     state.p1_hitstun = 0;
+    state.p1_action_feedback = LutaActionFeedback::Special;
     apply_damage(state, nullptr, false, 8, 16, 18, LutaAttackStrength::Medium);
 }
 
@@ -490,6 +538,7 @@ void luta_p2_alpha_counter(LutaRuntimeState& state) {
 
     state.p2_super_gauge -= state.super_gauge_max / 2;
     state.p2_hitstun = 0;
+    state.p2_action_feedback = LutaActionFeedback::Special;
     apply_damage(state, nullptr, true, 8, 16, 18, LutaAttackStrength::Medium);
 }
 

@@ -40,6 +40,9 @@ extern "C" void gbs_hw_draw_hud_bar(const char*, const char*, int) {
 
 extern "C" void gbs_hw_load_obj_tiles(const uint8_t*, uint32_t, uint32_t) { ++hud_tile_upload_calls; }
 
+extern "C" void gbs_hw_set_hud_font(const uint8_t*,int) {}
+extern "C" void gbs_hw_set_hud_font_shadow(int) {}
+
 extern "C" void gbs_hw_begin_hud_layout(int visible) {
     ++hud_layout_begin_calls;
     last_hud_layout_visible = visible;
@@ -488,7 +491,35 @@ void test_hud_project_values_refresh_and_clear_on_scene_change() {
     gbs::draw_hud(hud); assert(!last_hud_layout_component_visible);
 }
 
+void test_four_independent_fight_gauges() {
+    uint8_t full_pixels[32], empty_pixels[32];
+    std::memset(full_pixels, 0x77, 32); std::memset(empty_pixels, 0x11, 32);
+    gbs::TileAsset full[] = {{full_pixels,1,20,true},{full_pixels,1,21,true},
+                            {full_pixels,1,22,true},{full_pixels,1,23,true}};
+    const gbs::TileAsset empty {empty_pixels,1,24,true};
+    gbs::MetaSpritePart parts[4]{}; gbs::MetaSprite sprites[4]{};
+    gbs::HudLayoutComponent components[4]{};
+    const gbs::HudValueSource sources[] = {gbs::HudValueSource::P1Health, gbs::HudValueSource::P2Health,
+        gbs::HudValueSource::P1Super, gbs::HudValueSource::P2Super};
+    for (int n=0;n<4;++n) {
+        parts[n] = {0,0,static_cast<uint16_t>(20+n),0,false,false,8,8};
+        sprites[n] = {&parts[n],1};
+        components[n] = {"gauge","bar","","","",n*8,0,8,8,0,true,&sprites[n]};
+        components[n].value_source = sources[n];
+        components[n].gauge = {&full[n],&empty,0,0,8,8,false};
+    }
+    const gbs::HudLayout layout {"four","advanced",components,4};
+    gbs::configure_hud_layouts(&layout,1); assert(gbs::configure_hud_layout("four"));
+    gbs::HudState hud{};gbs::init_hud(hud);gbs::set_hud_text(hud,"","");
+    for (int n=0;n<4;++n) gbs::set_hud_value(hud,sources[n],25*n,100);
+    hud_tile_upload_calls=0; gbs::draw_hud(hud); assert(hud_tile_upload_calls==4);
+    gbs::draw_hud(hud); assert(hud_tile_upload_calls==4);
+    gbs::set_hud_value(hud,gbs::HudValueSource::P1Super,100,100);
+    gbs::draw_hud(hud); assert(hud_tile_upload_calls==5);
+}
+
 int main() {
+    test_four_independent_fight_gauges();
     test_hud_project_values_refresh_and_clear_on_scene_change();
     test_hud_gauge_updates_only_when_value_or_layout_changes();
     test_named_hud_values_survive_reordering_and_round_images();

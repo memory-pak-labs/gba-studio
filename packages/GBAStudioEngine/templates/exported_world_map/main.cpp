@@ -209,7 +209,7 @@ void refresh_hud() {
     hud_left_buffer[0] = '\0';
     append_text(left, left_end, node != nullptr ? (node->label != nullptr ? node->label : node->name) : "MAPA");
     const auto status = gbs::world_map_node_status(project,world_map_state.node_index,event_state);
-    const char* texts[] = {hud_left_buffer, journey.active ? "EM VOO" : status == gbs::WorldMapNodeStatus::Available ? "A VIAJAR" : "BLOQUEADO", "D DESTINO  B PORTO", "START PAUSA"};
+    const char* texts[] = {hud_left_buffer, gbs::world_map_hud_status_text(project,status,journey.active), "D DESTINO  B PORTO", "START PAUSA"};
     gbs::set_hud_text_slots(hud,texts,4);
 }
 

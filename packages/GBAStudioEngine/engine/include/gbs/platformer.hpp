@@ -40,6 +40,14 @@ struct PlatformerPlayerAnimationSet {
     const SpriteAnimation* wall_slide = nullptr;
     const SpriteAnimation* dash = nullptr;
     const SpriteAnimation* glide = nullptr;
+    const SpriteAnimation* attack = nullptr;
+    const SpriteAnimation* hurt = nullptr;
+    const SpriteAnimation* land = nullptr;
+};
+
+struct PlatformerPlayerPresentation {
+    const SpriteAnimation* one_shot = nullptr;
+    uint16_t frames_remaining = 0;
 };
 
 enum class PlatformerEnemyContactResult : uint8_t {
@@ -808,6 +816,15 @@ bool platformer_actor_on_ground(const TileMap& map, const PlatformerActor& actor
 bool platformer_slope_floor_y_at(const TileMap& map, int pixel_x, int tile_y, int* floor_y);
 bool snap_platformer_actor_to_slope_floor(const TileMap& map, PlatformerActor& actor, int max_snap_pixels = 4);
 PlatformerActorAnimationState platformer_actor_animation_state(const PlatformerActor& actor, int run_threshold_x256 = 0x0080);
+int platformer_callback_state_for_actor(const PlatformerActor& actor);
+const SpriteAnimation* update_platformer_player_presentation(
+    PlatformerPlayerPresentation& state,
+    const PlatformerPlayerAnimationSet& animations,
+    const PlatformerActor& actor,
+    InputState input,
+    bool landed,
+    bool hurt
+);
 const SpriteAnimation* platformer_player_animation_for_state(
     const PlatformerPlayerAnimationSet& animations,
     PlatformerActorAnimationState state

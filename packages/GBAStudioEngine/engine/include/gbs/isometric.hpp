@@ -152,6 +152,8 @@ enum IsoRampFlags : uint8_t {
     IsoRampNone = 0,
     IsoRampUpRight = 1 << 1,
     IsoRampUpLeft = 1 << 2,
+    IsoRampDownLeft = 1 << 3,
+    IsoRampDownRight = 1 << 4,
 };
 
 enum class IsoWorldMode : uint8_t {
@@ -219,6 +221,8 @@ constexpr uint16_t iso_tactical_capability_bit(IsoTacticalCapability capability)
 struct IsoTacticalUnitPresentationData {
     size_t actor_index;
     const IsoActorAnimationSet* animations;
+    const MetaSprite* portrait = nullptr;
+    const char* label = nullptr;
 };
 
 struct IsoTacticalPropData {
@@ -267,6 +271,13 @@ constexpr Vec2i iso_tactical_surface_page_scroll(
     };
 }
 
+struct IsoTacticalCompactHud {
+    const MetaSprite *turn_panel, *unit_panel, *actions_panel, *selection, *health;
+    const TileAsset *health_full, *health_empty;
+    const DialogueFont* font;
+    uint16_t font_color;
+};
+
 struct IsoTacticalPresentationData {
     uint16_t capability_mask;
     const TileMapAsset* surface;
@@ -288,6 +299,7 @@ struct IsoTacticalPresentationData {
     const TrackerAsset* music;
     const SfxAsset* audio_cues;
     size_t audio_cue_count;
+    const IsoTacticalCompactHud* compact_hud = nullptr;
 };
 
 constexpr bool iso_tactical_capability_enabled(

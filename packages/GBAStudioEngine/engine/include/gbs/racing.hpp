@@ -93,6 +93,13 @@ struct RacingTopdownTrackData {
 
 struct RacingPlayerVisual;
 
+struct RacingActionSounds {
+    int16_t accelerate = -1;
+    int16_t brake = -1;
+    int16_t collision = -1;
+    int16_t checkpoint = -1;
+};
+
 struct RacingRoomData {
     const char* name;
     const uint8_t* collision_flags;
@@ -118,6 +125,7 @@ struct RacingRoomData {
     const AffineTileMapAsset* circuit_floor = nullptr;
     int circuit_empty_tile = -1;
     const RacingPlayerVisual* player_visual = nullptr;
+    RacingActionSounds action_sounds {};
 };
 
 struct RacingVehicleDirectionAnimations {
@@ -175,6 +183,8 @@ struct RacingProjectData {
     RacingVehicleAnimationSet player_animations {};
     const ResourceBankUploadSource* resource_bank_upload_sources = nullptr;
     size_t resource_bank_upload_source_count = 0;
+    const EventScript* scripts = nullptr;
+    size_t script_count = 0;
 };
 
 struct RacingInput {
@@ -205,6 +215,7 @@ struct RacingRuntimeState {
     uint16_t heading_x256 = 0;
     uint8_t collision_frames = 0;
     int8_t last_checkpoint = -1;
+    uint32_t elapsed_frames = 0;
 };
 
 enum class RacingRaceResult : uint8_t {
@@ -263,10 +274,29 @@ constexpr bool racing_uses_circuit_track(const RacingRoomData& room) {
     return room.topdown_track != nullptr && room.topdown_track->checkpoint_count > 0;
 }
 
+// The affine source map occupies low VRAM. Keep the panorama after it and
+// below the fixed UI tiles (0x7000), independently of the floor's charblock 2.
+constexpr unsigned racing_panorama_base_tile(const RacingPseudo3DVisualData& visual) {
+    const unsigned bytes=visual.floor_tilemap ? visual.floor_tilemap->width*visual.floor_tilemap->height : 0;
+    const unsigned tile_bytes=visual.panorama_tiles && visual.panorama_tiles->color_depth==ColorDepth::Bpp8 ? 64 : 32;
+    return (bytes+tile_bytes-1)/tile_bytes;
+}
+constexpr uint16_t racing_panorama_map_entry(uint16_t entry,const RacingPseudo3DVisualData& visual) {
+    return static_cast<uint16_t>((entry&0xfc00u)|((entry&1023u)+racing_panorama_base_tile(visual)-visual.panorama_tiles->destination_tile));
+}
+constexpr bool is_valid_racing_panorama(const RacingPseudo3DVisualData& visual) {
+    if(!visual.panorama_tiles)return false;
+    const auto& tiles=*visual.panorama_tiles;
+    const unsigned limit=tiles.color_depth==ColorDepth::Bpp8 ? 448 : 896;
+    return tiles.data && !tiles.object_tiles && tiles.compression==AssetCompression::None &&
+        is_valid_color_depth(tiles.color_depth) && tiles.tile_count>0 &&
+        racing_panorama_base_tile(visual)+tiles.tile_count<=limit;
+}
+
 constexpr bool is_valid_racing_pseudo3d_visual_data(const RacingPseudo3DVisualData& visual) {
     return visual.horizon_y > 0 && visual.horizon_y < 160 &&
         ((visual.panorama_tiles == nullptr && visual.panorama_tilemap == nullptr && visual.panorama_palette == nullptr) ||
-         (visual.panorama_tiles != nullptr && is_valid_tile_asset(*visual.panorama_tiles) &&
+         (visual.panorama_tiles != nullptr && is_valid_racing_panorama(visual) &&
           visual.panorama_tilemap != nullptr && is_valid_tilemap_asset(*visual.panorama_tilemap) &&
           visual.panorama_palette != nullptr && is_valid_palette_asset(*visual.panorama_palette))) &&
         visual.floor_tiles != nullptr && is_valid_affine_tile_asset(*visual.floor_tiles) &&
@@ -973,8 +1003,9 @@ inline bool apply_racing_save_data(
     // Legacy states ended after steering_frames and rounded to four bytes.
     constexpr size_t legacy_size = (offsetof(RacingRuntimeState, heading_x256) + 3u) & ~3u;
     const bool legacy = save_data.payload_size == legacy_size;
+    const bool untimed = save_data.payload_size == offsetof(RacingRuntimeState, elapsed_frames);
     if (!read_universal_save_payload(save_data, UniversalSaveRuntime::Racing, &payload,
-            legacy ? legacy_size : sizeof(payload))) return false;
+            legacy ? legacy_size : untimed ? offsetof(RacingRuntimeState, elapsed_frames) : sizeof(payload))) return false;
     if(legacy) {
         payload.runtime_state.heading_x256 = payload.runtime_state.heading * 256;
         payload.runtime_state.collision_frames = 0;

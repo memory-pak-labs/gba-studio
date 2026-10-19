@@ -1786,10 +1786,10 @@ def assert_mixed_runtime_dispatch_export(repo_root, build_dir):
     assert "gbs::draw_hud(hud)" in dungeon_runtime
     assert "gbs::init_hud(hud)" in dungeon_runtime
     hud_render_index = dungeon_runtime.find("gbs::draw_hud(hud);")
-    hidden_dialogue_index = dungeon_runtime.find("if (!dialogue.visible) gbs::draw_dialogue(dialogue);")
+    hidden_dialogue_index = dungeon_runtime.find("if (!dungeon_dialogue.visible) gbs::draw_dialogue(dungeon_dialogue);")
     hidden_map_index = dungeon_runtime.find("if (!map_dialogue.visible) gbs::draw_dialogue(map_dialogue);")
     hidden_interaction_index = dungeon_runtime.find("if (!interaction_dialogue.visible) gbs::draw_dialogue(interaction_dialogue);")
-    visible_dialogue_index = dungeon_runtime.find("if (dialogue.visible) gbs::draw_dialogue(dialogue);")
+    visible_dialogue_index = dungeon_runtime.find("if (dungeon_dialogue.visible) gbs::draw_dialogue(dungeon_dialogue);")
     visible_map_index = dungeon_runtime.find("if (map_dialogue.visible) gbs::draw_dialogue(map_dialogue);")
     visible_interaction_index = dungeon_runtime.find("if (interaction_dialogue.visible) gbs::draw_dialogue(interaction_dialogue);")
     assert -1 not in (hidden_dialogue_index, hidden_map_index, hidden_interaction_index, hud_render_index,
@@ -1802,9 +1802,9 @@ def assert_mixed_runtime_dispatch_export(repo_root, build_dir):
     battle_update_index = dungeon_runtime.find("bool update_dungeon_interaction(", battle_start_index)
     assert battle_start_index >= 0 and battle_update_index > battle_start_index
     battle_start_runtime = dungeon_runtime[battle_start_index:battle_update_index]
-    assert "gbs::hide_dialogue(dialogue);" in battle_start_runtime
+    assert "gbs::hide_dialogue(dungeon_dialogue);" in battle_start_runtime
     assert "runtime_script_controls_dialogue = false;" in battle_start_runtime
-    assert "gbs::set_dialogue_frame(dialogue, gbs::dialogue_frame_default);" in dungeon_runtime
+    assert "gbs::set_dialogue_frame(dungeon_dialogue, gbs::dialogue_frame_default);" in dungeon_runtime
     assert "gbs::update_runtime_trigger" in dungeon_runtime
     assert "const bool assets_are_streamed = project.resource_bank_group_count > 0;" in dungeon_runtime
     assert "stream_resources_for_room" in dungeon_runtime
@@ -1856,7 +1856,7 @@ def assert_mixed_runtime_dispatch_export(repo_root, build_dir):
     assert 'gbs::EngineResourceManager resource_manager __attribute__((section(".ewram_bss")));' in cutscene_runtime
     assert "gbs::cutscene_step_background_index(*scene, *step)" in cutscene_runtime
     assert "apply_current_step_background();" in cutscene_runtime
-    assert "if (input.was_pressed(gbs::ButtonA)) {\n        advance_step();" in cutscene_runtime
+    assert "if (input.was_pressed(gbs::ButtonA)) {\n        if (dialogue.visible) {\n            gbs::advance_dialogue(dialogue, input);\n            if (dialogue.visible) return;\n        }\n        advance_step();" in cutscene_runtime
     assert "if (input.was_pressed(gbs::ButtonB)) {\n        skip_step();" in cutscene_runtime
     assert "if (input.was_pressed(gbs::ButtonStart)) {\n        skip_step();" in cutscene_runtime
     assert "gbs::RuntimeKind::Cutscene" in mixed_runtime
@@ -3114,7 +3114,7 @@ def assert_platformer_custom_player_metasprite_export(repo_root, build_dir):
     assert "project.player_animations" in template
     assert "project.player_on_start" in template
     assert "project.player_on_update" in template
-    assert "platformer_player_animation_for_state" in template
+    assert "update_platformer_player_presentation" in template
     assert "current_metasprite" in template
     assert "gbs::set_metasprite" in template
     assert "input.was_pressed(gbs::ButtonStart)" in template
@@ -4409,7 +4409,7 @@ def assert_point_click_profile_output(repo_root, output_dir):
     assert "constexpr gbs::PointClickInventoryItemData point_click_inventory_items" in header
     assert "point_click_scene_0_hotspot_1_on_use_item" in header
     assert 'gbs::PointClickSceneData { "room", -1, point_click_scene_0_hotspots, 2' in header
-    assert 'nullptr, 4, nullptr, 0, nullptr, 0 },' in header
+    assert 'nullptr, 4, nullptr, 0, nullptr, 0, nullptr, nullptr, nullptr, nullptr },' in header
     assert "scene->cursor_speed_pixels > 0" in main_cpp
     assert "gbs::EventOp::ShowDialogue" in header
     assert "gbs::EventOp::SetVariable" in header
@@ -5444,6 +5444,8 @@ def assert_luta_native_export(repo_root, build_dir):
                         "special": {"asset": "arena_fighter", "frame_indices": [1, 0], "durations": [4, 4], "loops": False},
                         "guard": {"asset": "arena_fighter", "frame_indices": [0], "durations": [6]},
                         "hurt": {"asset": "arena_fighter", "frame_indices": [1], "durations": [6]},
+                        "walk": {"asset": "arena_fighter", "frame_indices": [0, 1], "durations": [6, 6]},
+                        "jump": {"asset": "arena_fighter", "frame_indices": [1, 0], "durations": [3, 3], "loops": False},
                     },
                 }],
                 "player2": [{
@@ -5457,6 +5459,8 @@ def assert_luta_native_export(repo_root, build_dir):
                         "special": {"asset": "arena_fighter", "frame_indices": [1, 0], "durations": [4, 4], "loops": False},
                         "guard": {"asset": "arena_fighter", "frame_indices": [0], "durations": [6]},
                         "hurt": {"asset": "arena_fighter", "frame_indices": [1], "durations": [6]},
+                        "walk": {"asset": "arena_fighter", "frame_indices": [0, 1], "durations": [6, 6]},
+                        "jump": {"asset": "arena_fighter", "frame_indices": [1, 0], "durations": [3, 3], "loops": False},
                     },
                 }],
                 "on_victory": [{"op": "show_dialogue", "dialogue": 1}],
@@ -5475,6 +5479,8 @@ def assert_luta_native_export(repo_root, build_dir):
     assert "gbs::LutaAnimationSet luta_stage_0_player2_0_animation_set" in header
     assert "luta_stage_0_player1_0_attack_animation" in header
     assert "luta_stage_0_player2_0_hurt_animation" in header
+    assert "&luta_stage_0_player1_0_walk_animation," in header
+    assert "&luta_stage_0_player2_0_jump_animation," in header
     compile_generated_header(
         repo_root,
         output_dir,
@@ -5518,7 +5524,7 @@ def assert_luta_template_consumes_animation_states(repo_root):
         "gbs::tick_luta_visual_state(",
         "gbs::LutaVisualState::Attack",
         "gbs::LutaVisualState::Special",
-        "gbs::LutaVisualState::Guard",
+        "gbs::consume_luta_action_feedback(state, player_one)",
     ]:
         assert snippet in template
 

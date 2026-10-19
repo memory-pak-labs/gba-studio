@@ -81,6 +81,10 @@ void test_optional_clips_and_invalid_contract() {
 }
 
 int main() {
+    assert(gbs::shmup_animation_frame_at(fly, 0) == &frames[0]);
+    assert(gbs::shmup_animation_frame_at(fly, 2) == &frames[1]);
+    assert(gbs::shmup_animation_frame_at(fly, 6) == &frames[0]);
+    assert(gbs::shmup_animation_frame_at(explosion, 90) == &frames[2]);
     test_movement_and_idle();
     test_one_shots_finish_and_damage_wins();
     test_optional_clips_and_invalid_contract();

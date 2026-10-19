@@ -4,6 +4,7 @@
 #include <stdint.h>
 
 #include "gbs/audio.hpp"
+#include "gbs/animation.hpp"
 #include "gbs/assets.hpp"
 #include "gbs/dialogue.hpp"
 #include "gbs/event.hpp"
@@ -37,6 +38,30 @@ struct BattleRpgAbilityData {
     int power;
 };
 
+struct BattleRpgAnimationSet {
+    const SpriteAnimation* idle = nullptr;
+    const SpriteAnimation* attack = nullptr;
+    const SpriteAnimation* magic = nullptr;
+    const SpriteAnimation* heal = nullptr;
+    const SpriteAnimation* defend = nullptr;
+    const SpriteAnimation* hurt = nullptr;
+    const SpriteAnimation* defeat = nullptr;
+    const SpriteAnimation* victory = nullptr;
+    const SpriteAnimation* reactivate = nullptr;
+};
+
+struct BattleRpgPresentationData {
+    int hud_background_index = -1;
+    int action_sounds[7] = {-1,-1,-1,-1,-1,-1,-1}; // cursor, confirm, attack, magic, hurt, defend, defeat
+    int victory_tracker = -1;
+    int outcome_hold_frames = 120;
+    const SpriteAnimation* effects[4] = {}; // hit, energy, shield, electric
+    const MetaSprite* disabled_escape = nullptr;
+    const char* victory_label = "VITORIA";
+    const PaletteAsset* hud_palette = nullptr;
+    const MetaSprite* cursor = nullptr;
+};
+
 struct BattleRpgParticipantData {
     const char* name;
     BattleRpgUnitData unit;
@@ -44,6 +69,10 @@ struct BattleRpgParticipantData {
     int ability_count;
     const MetaSprite* metasprite = nullptr;
     uint8_t sprite_scale = 1;
+    const BattleRpgAnimationSet* animation_set = nullptr;
+    bool use_authored_position = false;
+    Vec2i position {};
+    const char* hud_label = nullptr;
 };
 
 struct BattleRpgBackgroundData {
@@ -72,6 +101,7 @@ struct BattleRpgEncounterData {
     EventScript on_escape = empty_event_script();
     int background_index = -1;
     const char* resource_bank_group_name = nullptr;
+    const BattleRpgPresentationData* presentation = nullptr;
 };
 
 struct BattleRpgProjectData {

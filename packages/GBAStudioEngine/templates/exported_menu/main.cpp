@@ -61,6 +61,7 @@ gbs::EngineResourceManager resource_manager __attribute__((section(".ewram_bss")
 int temporary_message_frames = 0;
 int save_feedback_frames = 0;
 const char* save_feedback = nullptr;
+gbs::MenuSaveFeedback save_feedback_state = gbs::MenuSaveFeedback::None;
 int overwrite_confirmation_slot = -1;
 int menu_event_wait_frames = 0;
 bool menu_script_controls_dialogue = false;
@@ -279,9 +280,8 @@ void select_menu_text_input_character() {
     menu_text_input.value[menu_text_input.cursor_index] = static_cast<char>(
         (menu_text_input.lowercase ? 'a' : 'A') + menu_text_input.keyboard_index
     );
-    if (menu_text_input.cursor_index + 1 < menu_text_input.max_length) {
-        ++menu_text_input.cursor_index;
-    }
+    // The full-name sentinel keeps the last letter visible and lets DEL remove it.
+    ++menu_text_input.cursor_index;
 }
 
 void backspace_menu_text_input_character() {
@@ -367,7 +367,7 @@ char* append_menu_item_details(
                 cursor = append_char(cursor, end, '%');
                 break;
             case gbs::MenuItemBindingFormat::OnOff:
-                cursor = append_text(cursor, end, value != 0 ? "OK" : "NAO");
+                cursor = append_text(cursor, end, value != 0 ? "OK" : "NÃO");
                 break;
             case gbs::MenuItemBindingFormat::Number:
             default:
@@ -424,7 +424,11 @@ void format_hud_menu_item_label(const gbs::MenuItemData& item, int item_index, s
     if (!menu_screen_uses_actor_options(gbs::menu_screen_for(project, menu_state.screen_index))) {
         cursor = append_text(cursor, end, item_index == menu_state.selected_item_index ? "! " : "  ");
     }
-    if (item.audio_channel >= 0 && item.action == gbs::MenuItemAction::AdjustVariable) {
+    const auto* screen = gbs::menu_screen_for(project, menu_state.screen_index);
+    if (screen != nullptr && screen->hud_transparent_text) {
+        cursor = append_text(cursor, end, item.label);
+        cursor = append_menu_item_details(cursor, end, item);
+    } else if (item.audio_channel >= 0 && item.action == gbs::MenuItemAction::AdjustVariable) {
         const char* audio_label = item.audio_channel == 4
             ? "Geral"
             : (item.audio_channel == 1 || item.audio_channel == 3 ? "Efeitos" : "Musica");
@@ -787,6 +791,15 @@ void refresh_hud() {
             for (size_t i = rows + 2; i < 8; ++i) {
                 map_hud_text_slots[i] = selected && i - rows - 2 < 3 ? selected->detail_lines[i - rows - 2] : nullptr;
             }
+            if (screen->hud_feedback_in_details) {
+                for (size_t i = rows + 1; i < 8; ++i) {
+                    const size_t line = i - rows - 1;
+                    const char* line_text = save_feedback_frames > 0
+                        ? gbs::menu_hud_save_feedback_line(save_feedback_state, line)
+                        : selected && line < 3 ? selected->detail_lines[line] : nullptr;
+                    map_hud_text_slots[i] = line_text && *line_text ? line_text : " ";
+                }
+            }
             gbs::set_hud_text_slots(hud, map_hud_text_slots, 8);
             return;
         }
@@ -801,7 +814,9 @@ void refresh_hud() {
         for (size_t i = 0; i < 3; ++i) map_hud_text_slots[i + 3] = selected_item ? selected_item->detail_lines[i] : nullptr;
         char* progress = append_menu_item_details(hud_right_buffer, hud_right_buffer + sizeof(hud_right_buffer) - 1, selected_item ? *selected_item : screen->items[0]);
         *progress = '\0';
-        map_hud_text_slots[6] = hud_right_buffer;
+        const char* status = hud_right_buffer;
+        while (*status == ' ') ++status;
+        map_hud_text_slots[6] = status;
         map_hud_text_slots[7] = "D MOVER A OK B VOLTAR";
         gbs::set_hud_text_slots(hud, map_hud_text_slots, 8);
         return;
@@ -1004,7 +1019,7 @@ void draw_screen_actors() {
                 screen_elapsed_frames
             );
         }
-        if (actor.flip_horizontal) {
+        if (actor.flip_horizontal || dialogue.visible) {
             int left = 240;
             int right = 0;
             for (uint8_t part_index = 0; part_index < metasprite->part_count; ++part_index) {
@@ -1015,14 +1030,14 @@ void draw_screen_actors() {
             for (uint8_t part_index = 0; part_index < metasprite->part_count; ++part_index) {
                 const gbs::MetaSpritePart& part = metasprite->parts[part_index];
                 gbs::Sprite sprite {
-                    position.x + left + right - part.x - part.width,
+                    position.x + (actor.flip_horizontal ? left + right - part.x - part.width : part.x),
                     position.y + part.y,
                     part.tile_index,
                     part.palette,
-                    !part.hflip,
+                    actor.flip_horizontal ? !part.hflip : part.hflip,
                     part.vflip,
                     true,
-                    0,
+                    dialogue.visible ? 1 : 0,
                     gbs::SpriteRenderMode::Normal,
                     false,
                     part.width,
@@ -1463,6 +1478,7 @@ void consume_menu_save_request() {
         const bool saved = event_state.scene_stack_count > 0 && service != nullptr &&
             gbs::write_suspended_runtime_save(*service, slot_index, event_state) == gbs::SaveStatus::Ok;
         save_feedback = saved ? "JOGO SALVO" : "FALHA AO SALVAR";
+        save_feedback_state = saved ? gbs::MenuSaveFeedback::Saved : gbs::MenuSaveFeedback::Failed;
         save_feedback_frames = 180;
     } else if (request == 2) {
         request_mixed_runtime_save_restore(slot_index);
@@ -1867,6 +1883,7 @@ gbs::RuntimeAdapterFrameResult update_menu_runtime(const gbs::RuntimeFrameContex
             && overwrite_confirmation_slot != item->save_slot) {
             overwrite_confirmation_slot = item->save_slot;
             save_feedback = "A SUBSTITUIR  B CANCELAR";
+            save_feedback_state = gbs::MenuSaveFeedback::Confirm;
             save_feedback_frames = 3600;
         } else {
             overwrite_confirmation_slot = -1;
@@ -1902,12 +1919,13 @@ void render_menu_runtime(const gbs::RuntimeFrameContext& context) {
         gbs::draw_menu(menu_ui);
     }
     gbs::update_dialogue(dialogue);
-    gbs_hw_set_bg_font_transparent(screen != nullptr && screen->hud_transparent_text);
+    gbs_hw_set_bg_font_transparent(screen != nullptr && screen->hud_transparent_text && !dialogue.visible);
     /* Invisible dialogue still clears its previous box. When an advanced HUD
      * is active, perform that cleanup first so it cannot erase HUD rows that
      * occupy the same lower BG0 tiles. */
     if (gbs::active_hud_layout() != nullptr) {
         if (!dialogue.visible) gbs::draw_dialogue(dialogue);
+        if (dialogue.visible) gbs::hide_hud(hud);
         gbs::draw_hud(hud);
         if (dialogue.visible) gbs::draw_dialogue(dialogue);
     } else {

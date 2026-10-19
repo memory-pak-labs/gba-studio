@@ -414,7 +414,9 @@ bool move_iso_actor_by_delta(const IsoTileMap& map, IsoActor& actor, Vec2i delta
             const int transition_sign = height_delta > 0 ? 1 : -1;
             const bool uses_up_right = (ramp & IsoRampUpRight) != 0 && delta_tile.x == transition_sign && delta_tile.y == 0;
             const bool uses_up_left = (ramp & IsoRampUpLeft) != 0 && delta_tile.y == transition_sign && delta_tile.x == 0;
-            if (!uses_up_right && !uses_up_left) {
+            const bool uses_down_left=(ramp & IsoRampDownLeft)!=0 && delta_tile.y == -transition_sign && delta_tile.x==0;
+            const bool uses_down_right=(ramp & IsoRampDownRight)!=0 && delta_tile.x == -transition_sign && delta_tile.y==0;
+            if (!uses_up_right && !uses_up_left && !uses_down_left && !uses_down_right) {
                 return false;
             }
         }

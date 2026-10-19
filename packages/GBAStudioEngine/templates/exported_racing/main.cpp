@@ -8,6 +8,7 @@
 #include "gbs/runtime_telemetry.hpp"
 #include "gbs/ui.hpp"
 #include "gbs/hud_racing.hpp"
+#include "gbs/racing_feedback.hpp"
 #include <cstring>
 #include "gbs/visual_effects.hpp"
 #ifndef GBS_RACING_PROJECT_DATA_HEADER
@@ -43,6 +44,8 @@ namespace {
 const gbs::RacingProjectData& project = gbastudio_racing_project::project;
 int current_room_index = 0;
 gbs::RacingRuntimeState runtime_state {};
+gbs::RacingInput previous_racing_controls {};
+uint16_t relocated_panorama_map[64*64] {};
 gbs::SpriteAnimatorState vehicle_animator {};
 const gbs::TileAsset* vehicle_loaded_frame = nullptr;
 gbs::DialogueState dialogue __attribute__((section(".ewram_bss")));
@@ -194,17 +197,29 @@ void apply_room_visuals() {
             gbs::set_bg_enabled(gbs::BackgroundLayer::BG2, false);
             return;
         }
+        gbs::set_ui_character_base(2);
         if (visual->panorama_palette) gbs::load_palette(*visual->panorama_palette, false);
         gbs::load_palette(*visual->floor_palette, false);
         if (visual->minimap_palette) gbs::load_palette(*visual->minimap_palette, false);
-        if (visual->panorama_tiles) gbs::load_tiles(*visual->panorama_tiles);
+        if (visual->panorama_tiles) {
+            auto tiles=*visual->panorama_tiles;
+            tiles.destination_tile=gbs::racing_panorama_base_tile(*visual);
+            gbs::load_bg_tiles_at_character_base(tiles,0);
+            gbs::set_bg_character_base(gbs::BackgroundLayer::BG1,0);
+            gbs::set_bg_color_depth(gbs::BackgroundLayer::BG1,tiles.color_depth);
+        }
         if (visual->minimap_tiles) gbs::load_tiles(*visual->minimap_tiles);
         gbs::load_affine_tiles(gbs::BackgroundLayer::BG2, *visual->floor_tiles);
         if(room.circuit_empty_tile>=0) {
             static constexpr uint8_t empty_tile[64]={};
             gbs::load_affine_tiles(gbs::BackgroundLayer::BG2,gbs::AffineTileAsset{empty_tile,1,static_cast<uint16_t>(room.circuit_empty_tile)});
         }
-        if (visual->panorama_tilemap) gbs::load_tilemap(gbs::BackgroundLayer::BG1, *visual->panorama_tilemap);
+        if (visual->panorama_tilemap) {
+            auto map=*visual->panorama_tilemap;
+            for(unsigned i=0;i<map.width*map.height;++i) relocated_panorama_map[i]=gbs::racing_panorama_map_entry(map.entries[i],*visual);
+            map.entries=relocated_panorama_map;
+            gbs::load_tilemap(gbs::BackgroundLayer::BG1,map);
+        }
         if (visual->minimap_tilemap) gbs::load_tilemap(gbs::BackgroundLayer::BG0, *visual->minimap_tilemap);
         gbs::load_affine_tilemap(gbs::BackgroundLayer::BG2, room.circuit_floor ? *room.circuit_floor : *visual->floor_tilemap);
         gbs::set_bg_priority(gbs::BackgroundLayer::BG0, 0);
@@ -216,7 +231,7 @@ void apply_room_visuals() {
         gbs::set_bg_enabled(gbs::BackgroundLayer::BG3, false);
         gbs::set_window0(gbs::WindowConfig {
             gbs::WindowRect { 0, 240, visual->horizon_y, 160 },
-            static_cast<uint16_t>(gbs::RenderLayerBG0 | gbs::RenderLayerBG1 | gbs::RenderLayerBG2 | gbs::RenderLayerOBJ | gbs::RenderLayerBackdrop),
+            static_cast<uint16_t>(gbs::RenderLayerBG0 | gbs::RenderLayerBG2 | gbs::RenderLayerOBJ | gbs::RenderLayerBackdrop),
             static_cast<uint16_t>(gbs::RenderLayerBG0 | gbs::RenderLayerBG1 | gbs::RenderLayerOBJ | gbs::RenderLayerBackdrop),
             true
         });
@@ -523,7 +538,11 @@ bool update_runtime_event_script(const gbs::InputState& input) {
         return true;
     }
     if (!gbs::event_runner_is_active(runtime_event_runner)) {
-        return false;
+        if (!gbs::update_button_event_bindings(event_state)) return false;
+        const int script_index=event_state.last_script;
+        event_state.last_script=-1;
+        if (script_index<0 || static_cast<size_t>(script_index)>=project.script_count) return false;
+        start_runtime_event_script(project.scripts[script_index]);
     }
     gbs::update_event_runner(runtime_event_runner, event_state);
     consume_event_state();
@@ -580,6 +599,11 @@ void draw_pseudo3d_hud(const gbs::RacingRoomData& room) {
 void draw_pseudo3d_track(const gbs::RacingRoomData& room) {
     const gbs::RacingPseudo3DVisualData* visual = pseudo3d_visual(room);
     if (visual == nullptr) return;
+    // Transition effects release WIN0 when they finish; restore the runtime's horizon clip.
+    gbs::set_window0(gbs::WindowConfig {
+        {0,240,visual->horizon_y,160},
+        static_cast<uint16_t>(gbs::RenderLayerBG0|gbs::RenderLayerBG2|gbs::RenderLayerOBJ|gbs::RenderLayerBackdrop),
+        static_cast<uint16_t>(gbs::RenderLayerBG0|gbs::RenderLayerBG1|gbs::RenderLayerOBJ|gbs::RenderLayerBackdrop),true});
     if(gbs::racing_uses_circuit_track(room)) {
         // Height, focal length and horizon are room constants. Keep their
         // divisions out of the frame loop on the ARM7TDMI.
@@ -650,6 +674,15 @@ void draw_racing_hud(const gbs::RacingRoomData& room) {
     const unsigned int lap = runtime_state.lap_count >= laps ? laps : runtime_state.lap_count + 1;
     const unsigned int position = gbs::racing_position_for_hud(runtime_state, room);
     const auto* layout = gbs::active_hud_layout();
+    if (layout && std::strcmp(layout->id, "hud-porto-corrida") == 0) {
+        const auto porto = gbs::porto_racing_hud_text(lap, laps, position,
+            static_cast<unsigned int>(room.actor_count + 1),
+            static_cast<unsigned int>(runtime_state.speed_x256 * 40 / 256), runtime_state.elapsed_frames);
+        const char* slots[] = { porto.position, porto.lap, porto.time, porto.speed };
+        gbs::set_hud_text_slots(racing_hud, slots, 4);
+        gbs::draw_hud(racing_hud);
+        return;
+    }
     if (layout && std::strcmp(layout->id, "hud-neutral-corrida") == 0) {
         const auto compact = gbs::compact_racing_hud_text(lap, laps, position,
             static_cast<unsigned int>(room.actor_count + 1), speed);
@@ -916,6 +949,7 @@ gbs::RacingInput racing_input(const gbs::InputState& input) {
 int initialize_racing_runtime() {
     gbs::init();
     gbs::init_dialogue(dialogue);
+    previous_racing_controls = {};
     gbs::init_hud(racing_hud);
     gbs::init_sprite_animator(vehicle_animator);
     vehicle_loaded_frame=nullptr;
@@ -976,6 +1010,9 @@ int initialize_racing_runtime() {
         while (true) gbs::wait_vblank();
     }
     apply_room_visuals();
+    const auto& room = project.rooms[current_room_index];
+    gbs::update_racing_vehicle_animator(vehicle_animator,current_vehicle_clips(),0,{},false,
+        gbs::racing_uses_pseudo3d(room) ? 0 : runtime_state.heading);
     gbastudio_dialogue_ui::configure();
     gbastudio_dialogue_ui::configure_for_scene(project.rooms[current_room_index].name);
     if (!restored) {
@@ -1008,12 +1045,22 @@ gbs::RuntimeAdapterFrameResult update_racing_runtime(const gbs::RuntimeFrameCont
     );
     racing_controls_active = controls.accelerate || controls.brake || controls.steering != 0 || controls.use_item;
     if (!script_active) {
+        const auto before = runtime_state;
         gbs::tick_racing_vehicle(runtime_state, project.rooms[current_room_index], controls);
+        if(gbs::racing_result(before)==gbs::RacingRaceResult::InProgress) {
+            const auto timing=gbs::frame_timing();
+            const uint32_t extra=gbs::racing_clock_frame_span(timing.cpu_work_ticks,timing.vblank_wait_ticks)-1u;
+            runtime_state.elapsed_frames=extra>0xffffffffu-runtime_state.elapsed_frames?0xffffffffu:runtime_state.elapsed_frames+extra;
+        }
+        const int sound = gbs::racing_action_sound(before, runtime_state, controls, previous_racing_controls,
+            project.rooms[current_room_index].action_sounds);
+        if (sound >= 0 && static_cast<size_t>(sound) < project.sfx_asset_count) gbs::play_sfx(project.sfx_assets[sound]);
         const auto& room = project.rooms[current_room_index];
         gbs::update_racing_vehicle_animator(vehicle_animator,current_vehicle_clips(),runtime_state.speed_x256,controls,runtime_state.collision_frames>0,
             gbs::racing_uses_pseudo3d(room) ? 0 : runtime_state.heading);
         dispatch_race_result();
     }
+    previous_racing_controls = controls;
     runtime_telemetry.seen_tile_effects = 120;
     update_camera();
     runtime_telemetry.seen_tile_effects = 130;

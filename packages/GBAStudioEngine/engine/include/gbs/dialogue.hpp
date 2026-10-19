@@ -77,8 +77,8 @@ struct HudBoxConfig {
     uint8_t height;
 };
 
-enum class HudValueSource : int8_t { None = -1, P1Health, P2Health, RoundTime, P1Rounds, P2Rounds, Score, Lives };
-constexpr size_t hud_value_source_count = 7;
+enum class HudValueSource : int8_t { None = -1, P1Health, P2Health, RoundTime, P1Rounds, P2Rounds, Score, Lives, P1Super, P2Super, Wave };
+constexpr size_t hud_value_source_count = 10;
 
 /** Author-authored HUD composition exported for the native runtime. Positions
  * and dimensions are expressed in viewport pixels and snapped to 8px tiles. */
@@ -111,6 +111,9 @@ struct HudLayout {
     const char* mode;
     const HudLayoutComponent* components;
     size_t component_count;
+    const uint8_t* font_tiles = nullptr;
+    int32_t font_color = -1;
+    int32_t font_shadow_color = -1;
 };
 
 constexpr HudBoxConfig default_hud_box_config() {

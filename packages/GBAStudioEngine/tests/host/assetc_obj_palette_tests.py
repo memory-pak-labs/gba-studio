@@ -89,6 +89,39 @@ def test_shared_palette_overflow_blocks_without_quantizing():
             raise AssertionError("palette overflow was accepted")
 
 
+def test_scoped_four_bpp_banks_do_not_consume_disjoint_scene_masters():
+    c = load_assetc_module()
+    with tempfile.TemporaryDirectory() as tmp:
+        root = Path(tmp)
+        entries = []
+        for scene in range(4):
+            name = f"hero{scene}"
+            colors = [(0, 0, 0)] + [(i % 32 * 8, (i // 32 + scene * 6) * 8, 64) for i in range(1, 161)]
+            write_indexed_png(root / (name + ".png"), 16, 16, colors, [1 + i % 160 for i in range(256)])
+            entries.append(asset(name, 8, name))
+            icon = f"icon{scene}"
+            icon_colors = [(0, 0, 0)] + [(i * 8, scene * 32, 240) for i in range(1, 16)]
+            write_indexed_png(root / (icon + ".png"), 8, 8, icon_colors, [1 + i % 15 for i in range(64)])
+            entries.append(asset(icon, 4, name))
+        # Each scene uses 160 hero colors plus one local 4bpp bank, which fits.
+        # Reserving all four unrelated banks in every master falsely overflows.
+        report = c.emit_pack_report({"assets": entries}, root)
+        assert report["ok"], report["errors"]
+        allocations = {a["id"]: a for a in report["allocations"]}
+        for source in entries:
+            resolved = c.pack_asset_with_allocations(source, allocations[source["id"]])
+            _, _, colors, indices, transparent = c.read_png(root / source["png"], max_colors=None, include_transparency=True)
+            target, remapped = c.prepare_obj_asset_pixels(colors, indices, transparent, resolved)
+            assert [c.rgb15(target[i]) for i in remapped] == [c.rgb15(colors[i]) for i in indices]
+            if source["sprite_bpp"] == 4:
+                plan = allocations[source["id"]]["object_palette_plan"]
+                assert plan["groups"] == [source["bank_group"]]
+                assert plan["palette_bank"] == 0, "disjoint palettes may reuse the same physical bank"
+                master = allocations[source["bank_group"]]["object_palette_plan"]["values"]
+                start = plan["palette_bank"] * 16
+                assert master[start:start + 16] == plan["values"]
+
+
 def test_mixed_palette_rejects_conflicting_fixed_placements():
     c = load_assetc_module()
     with tempfile.TemporaryDirectory() as tmp:
@@ -165,6 +198,7 @@ def test_palette_families_remain_compile_time_tables():
 if __name__ == "__main__":
     test_mixed_palette_is_exact_shared_even_and_preserves_text()
     test_disjoint_scenes_do_not_spend_each_others_palette()
+    test_scoped_four_bpp_banks_do_not_consume_disjoint_scene_masters()
     test_shared_palette_overflow_blocks_without_quantizing()
     test_mixed_palette_rejects_conflicting_fixed_placements()
     test_four_bpp_icons_share_a_bank_when_their_color_union_fits()

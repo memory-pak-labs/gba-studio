@@ -109,6 +109,8 @@ gbs::EventState platformer_event_state __attribute__((section(".ewram_bss")));
 int platformer_event_wait_frames = 0;
 gbs::DialogueState dialogue __attribute__((section(".ewram_bss")));
 gbs::HudState hud;
+gbs::PlatformerPlayerPresentation player_presentation {};
+bool player_hurt_presentation_requested = false;
 gbs::LinkSession link_session;
 
 bool open_link(gbs::LinkRole role, uint16_t timeout_frames) {
@@ -812,8 +814,10 @@ void consume_platformer_actor_commands(
     player.facing = player_event_runtime.direction == 2
         ? gbs::PlatformerFacing::Left
         : gbs::PlatformerFacing::Right;
-    event_state.player_x = player.bounds_pixels.x;
-    event_state.player_y = player.bounds_pixels.y;
+    // Event conditions compare authored actor anchors, including NPC foot positions.
+    // The collision rectangle is offset from that anchor and must stay internal to physics.
+    event_state.player_x = player_event_runtime.x;
+    event_state.player_y = player_event_runtime.y;
     event_state.player_direction = player_event_runtime.direction;
     gbs::consume_actor_event_commands(platformer_npc_runtimes, platformer_npc_count, event_state);
     for (size_t index = 0; index < platformer_npc_count; ++index) {
@@ -902,6 +906,7 @@ bool consume_platformer_state_request(
     if (next_state < 0 || next_state > 9) {
         return false;
     }
+    if (next_state == 6) player_hurt_presentation_requested = true;
 
     transition_platformer_callback_state(event_state, active_state, next_state);
     player_event_active = next_state != 7;
@@ -1403,6 +1408,8 @@ int initialize_platformer_runtime() {
         0
     );
     active_platformer_state = player.on_ground ? 1 : 0;
+    player_presentation = {};
+    player_hurt_presentation_requested = false;
     camera = room_data->camera_start;
     gbs::init_dialogue(dialogue);
     gbs::init_menu(pause_menu);
@@ -1591,6 +1598,7 @@ gbs::RuntimeAdapterFrameResult update_platformer_runtime(const gbs::RuntimeFrame
             gbs::update_platformer_enemy_patrol(active_enemies[index], room.collision);
         }
         const bool was_on_ground = player.on_ground;
+        const uint8_t previous_air_jumps = player.air_jumps_used;
         const gbs::Rect player_bounds_before_update = player.bounds_pixels;
         const gbs::Vec2i player_remainder_before_update = player.movement_remainder_x256;
         const gbs::InputState player_input = player_event_active && !dialogue.visible
@@ -1627,17 +1635,24 @@ gbs::RuntimeAdapterFrameResult update_platformer_runtime(const gbs::RuntimeFrame
                 gbs::platformer_moving_platform_event_script_for(*room_data, landed_platform_index)
             );
         }
-        if (!was_on_ground && player.on_ground) {
-            transition_platformer_callback_state(event_state, active_platformer_state, 1);
-        } else if (was_on_ground && !player.on_ground) {
-            transition_platformer_callback_state(event_state, active_platformer_state, 0);
+        if (player_event_active) {
+            const int next_state = gbs::platformer_callback_state_for_actor(player);
+            // A second accepted jump starts another sound even while already ascending.
+            if (next_state == 2 && active_platformer_state == 2 && player.air_jumps_used != previous_air_jumps) {
+                run_platform_callback(event_state, platform_callback_jump_start);
+            }
+            transition_platformer_callback_state(event_state, active_platformer_state, next_state);
         }
-        const gbs::PlatformerActorAnimationState player_animation_state = gbs::platformer_actor_animation_state(player);
-        const bool player_animation_should_advance = player_animation_state != gbs::PlatformerActorAnimationState::Idle;
-        const gbs::SpriteAnimation* player_animation = gbs::platformer_player_animation_for_state(
+        const gbs::SpriteAnimation* player_animation = gbs::update_platformer_player_presentation(
+            player_presentation,
             project.player_animations,
-            player_animation_state
+            player,
+            player_input,
+            !was_on_ground && player.on_ground,
+            player_hurt_presentation_requested
         );
+        player_hurt_presentation_requested = false;
+        const bool player_animation_should_advance = player_animation != nullptr && player_animation->frame_count > 1;
         if (player_animation != player_animator.animation) {
             if (player_animation != nullptr) {
                 if (player_animation_should_advance) {
@@ -1757,6 +1772,8 @@ gbs::RuntimeAdapterFrameResult update_platformer_runtime(const gbs::RuntimeFrame
         if (room_changed) {
             player_event_active = true;
             active_platformer_state = player.on_ground ? 1 : 0;
+            player_presentation = gbs::PlatformerPlayerPresentation {};
+            player_hurt_presentation_requested = false;
             ++runtime_room_change_count;
             runtime_blocked_direction_bits = 0;
             if (room_data->trigger_count > max_room_triggers || room_data->npc_count > max_room_npcs) {

@@ -3,6 +3,20 @@
 #include "gbs/racing_camera.hpp"
 
 int main() {
+    static constexpr uint8_t panorama_pixels[64] {};
+    static constexpr uint16_t panorama_entries[32*8] {}, colors[224] {};
+    static constexpr uint8_t floor_pixels[64] {}, floor_entries[64*64] {};
+    const gbs::TileAsset panorama {panorama_pixels,233,0,false,gbs::ColorDepth::Bpp8};
+    const gbs::TileMapAsset panorama_map {panorama_entries,32,8};
+    const gbs::AffineTileAsset floor {floor_pixels,236,0};
+    const gbs::AffineTileMapAsset floor_map {floor_entries,64,64};
+    const gbs::PaletteAsset palette {colors,224,0};
+    const gbs::RacingPseudo3DVisualData visual {48,&panorama,&panorama_map,&palette,&floor,&floor_map,&palette};
+    assert(gbs::is_valid_racing_pseudo3d_visual_data(visual));
+    assert(gbs::racing_panorama_base_tile(visual)==64);
+    const auto relocated=gbs::racing_panorama_map_entry(17,visual);
+    assert(relocated==81);
+    assert(gbs::racing_panorama_map_entry(0x4011,visual)==0x4051);
     constexpr gbs::RacingCameraConfig camera {};
     const gbs::Vec2i player { 256 * 256, 256 * 256 };
     auto north = gbs::racing_camera_pose(player, 0, camera);

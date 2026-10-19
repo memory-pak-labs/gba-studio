@@ -36,6 +36,11 @@ struct CutsceneActorMotionData {
     uint16_t duration_frames;
 };
 
+struct CutsceneActorFrameData {
+    int actor_index;
+    int frame_index;
+};
+
 struct CutsceneStepData {
     int line_index;
     uint16_t duration_frames;
@@ -50,12 +55,16 @@ struct CutsceneStepData {
     const char* resource_bank_group_name = nullptr;
     const CutsceneActorMotionData* actor_motions = nullptr;
     size_t actor_motion_count = 0;
+    const CutsceneActorFrameData* actor_frames = nullptr;
+    size_t actor_frame_count = 0;
 };
 
 struct CutsceneActorData {
     const char* name;
     const MetaSprite* metasprite;
     Vec2i position_pixels;
+    const SpriteAnimation* animation = nullptr;
+    uint8_t initial_frame_index = 0;
 };
 
 struct CutsceneSceneData {
@@ -188,7 +197,39 @@ constexpr bool is_valid_cutscene_step(const CutsceneProjectData& project, const 
 constexpr bool is_valid_cutscene_actor(const CutsceneActorData& actor) {
     return actor.name != nullptr &&
         actor.metasprite != nullptr &&
-        is_valid_metasprite(*actor.metasprite);
+        is_valid_metasprite(*actor.metasprite) &&
+        (actor.animation == nullptr || (is_valid_sprite_animation(*actor.animation) &&
+            actor.initial_frame_index < actor.animation->frame_count));
+}
+
+constexpr bool is_valid_cutscene_actor_frame(const CutsceneSceneData& scene, const CutsceneActorFrameData& frame) {
+    if (scene.actors == nullptr || frame.actor_index < 0 ||
+        static_cast<size_t>(frame.actor_index) >= scene.actor_count || frame.frame_index < 0) return false;
+    const SpriteAnimation* animation = scene.actors[frame.actor_index].animation;
+    return animation != nullptr && is_valid_sprite_animation(*animation) && frame.frame_index < animation->frame_count;
+}
+
+constexpr const SpriteAnimationFrame* cutscene_actor_frame_for(
+    const CutsceneSceneData& scene, const CutsceneStepData& step, size_t actor_index
+) {
+    if (scene.actors == nullptr || actor_index >= scene.actor_count) return nullptr;
+    for (size_t index = 0; index < step.actor_frame_count; ++index) {
+        const auto& frame = step.actor_frames[index];
+        if (frame.actor_index == static_cast<int>(actor_index) && is_valid_cutscene_actor_frame(scene, frame)) {
+            return &scene.actors[actor_index].animation->frames[frame.frame_index];
+        }
+    }
+    const auto& actor = scene.actors[actor_index];
+    return actor.animation != nullptr && actor.initial_frame_index < actor.animation->frame_count
+        ? &actor.animation->frames[actor.initial_frame_index] : nullptr;
+}
+
+constexpr const MetaSprite* cutscene_actor_metasprite_for(
+    const CutsceneSceneData& scene, const CutsceneStepData& step, size_t actor_index
+) {
+    if (scene.actors == nullptr || actor_index >= scene.actor_count) return nullptr;
+    const auto* frame = cutscene_actor_frame_for(scene, step, actor_index);
+    return frame != nullptr ? &frame->metasprite : scene.actors[actor_index].metasprite;
 }
 
 constexpr bool is_valid_cutscene_actor_motion(
@@ -432,6 +473,54 @@ constexpr int find_cutscene_scene_resource_bank_group_index(
     return find_cutscene_resource_bank_group_index(project, scene.resource_bank_group_name);
 }
 
+// Image-only timelines can keep one physical reservation for all their frames.
+// Accept only an existing group whose ranges cover every required BG range;
+// actor, dialogue and scripted scenes retain per-step resource streaming.
+inline int cutscene_resident_background_group_index(
+    const CutsceneProjectData& project, const CutsceneSceneData& scene
+) {
+    if (scene.actor_count != 0 || scene.steps == nullptr || scene.step_count < 2 ||
+        scene.on_enter.command_count != 0 || project.resource_bank_groups == nullptr) return -1;
+    int candidate = -1;
+    size_t candidate_size = 0;
+    for (size_t index = 0; index < scene.step_count; ++index) {
+        const auto& step = scene.steps[index];
+        if (step.line_index >= 0 || step.script.command_count != 0 ||
+            step.actor_motion_count != 0 || step.actor_frame_count != 0) return -1;
+        const int group_index = find_cutscene_resource_bank_group_index(project,
+            cutscene_step_resource_bank_group_name(scene, step));
+        if (group_index < 0) return -1;
+        const auto& group = project.resource_bank_groups[group_index];
+        if (group.banks == nullptr || group.bank_count == 0) return -1;
+        size_t size = 0;
+        for (size_t bank = 0; bank < group.bank_count; ++bank) {
+            const auto& range = group.banks[bank];
+            if (range.kind != ResourcePoolKind::BgTiles && range.kind != ResourcePoolKind::BgPalette) return -1;
+            size += range.count;
+        }
+        if (candidate < 0 || size > candidate_size) { candidate = group_index; candidate_size = size; }
+    }
+    const auto& resident = project.resource_bank_groups[candidate];
+    for (size_t index = 0; index < scene.step_count; ++index) {
+        const int group_index = find_cutscene_resource_bank_group_index(project,
+            cutscene_step_resource_bank_group_name(scene, scene.steps[index]));
+        const auto& group = project.resource_bank_groups[group_index];
+        for (size_t bank = 0; bank < group.bank_count; ++bank) {
+            const auto& range = group.banks[bank];
+            bool covered = false;
+            for (size_t envelope = 0; envelope < resident.bank_count; ++envelope) {
+                const auto& available = resident.banks[envelope];
+                if (available.kind == range.kind && available.start <= range.start &&
+                    static_cast<size_t>(available.start) + available.count >= static_cast<size_t>(range.start) + range.count) {
+                    covered = true; break;
+                }
+            }
+            if (!covered) return -1;
+        }
+    }
+    return candidate;
+}
+
 constexpr ResourceBankGroup resource_bank_group_from_cutscene_scene(
     const CutsceneProjectData& project,
     const CutsceneSceneData& scene
@@ -478,12 +567,19 @@ constexpr bool is_valid_cutscene_project_data(const CutsceneProjectData& project
         for (size_t step_index = 0; step_index < scene.step_count; ++step_index) {
             const CutsceneStepData& step = scene.steps[step_index];
             if (!is_valid_cutscene_step(project, step) ||
-                (step.actor_motion_count > 0 && step.actor_motions == nullptr)) {
+                (step.actor_motion_count > 0 && step.actor_motions == nullptr) ||
+                (step.actor_frame_count > 0 && step.actor_frames == nullptr)) {
                 return false;
             }
             for (size_t motion_index = 0; motion_index < step.actor_motion_count; ++motion_index) {
                 if (!is_valid_cutscene_actor_motion(scene, step.actor_motions[motion_index])) {
                     return false;
+                }
+            }
+            for (size_t frame_index = 0; frame_index < step.actor_frame_count; ++frame_index) {
+                if (!is_valid_cutscene_actor_frame(scene, step.actor_frames[frame_index])) return false;
+                for (size_t prior = 0; prior < frame_index; ++prior) {
+                    if (step.actor_frames[prior].actor_index == step.actor_frames[frame_index].actor_index) return false;
                 }
             }
         }

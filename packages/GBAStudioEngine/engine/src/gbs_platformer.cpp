@@ -387,6 +387,45 @@ const SpriteAnimation* platformer_player_animation_for_state(
     return selected != nullptr ? selected : animations.idle;
 }
 
+int platformer_callback_state_for_actor(const PlatformerActor& actor) {
+    switch (platformer_actor_animation_state(actor)) {
+    case PlatformerActorAnimationState::Jump: return 2;
+    case PlatformerActorAnimationState::Fall: return 0;
+    case PlatformerActorAnimationState::Dash: return 3;
+    case PlatformerActorAnimationState::Climb: return 4;
+    case PlatformerActorAnimationState::WallSlide: return 5;
+    case PlatformerActorAnimationState::Glide: return 9;
+    default: return 1; // Walking and idle both remain on the ground.
+    }
+}
+
+const SpriteAnimation* update_platformer_player_presentation(
+    PlatformerPlayerPresentation& state,
+    const PlatformerPlayerAnimationSet& animations,
+    const PlatformerActor& actor,
+    InputState input,
+    bool landed,
+    bool hurt
+) {
+    const SpriteAnimation* requested = hurt ? animations.hurt
+        : state.frames_remaining == 0 && input.was_pressed(ButtonL) && !actor.dashing ? animations.attack
+        : state.frames_remaining == 0 && landed ? animations.land : nullptr;
+    if (requested != nullptr && requested->frames != nullptr && requested->frame_count > 0) {
+        state.one_shot = requested;
+        state.frames_remaining = 0;
+        for (uint8_t i = 0; i < requested->frame_count; ++i) {
+            state.frames_remaining += requested->frames[i].duration_frames > 0
+                ? requested->frames[i].duration_frames : 1;
+        }
+    }
+    if (state.frames_remaining > 0 && state.one_shot != nullptr) {
+        --state.frames_remaining;
+        return state.one_shot;
+    }
+    state.one_shot = nullptr;
+    return platformer_player_animation_for_state(animations, platformer_actor_animation_state(actor));
+}
+
 void update_platformer_actor(const TileMap& map, PlatformerActor& actor, InputState input, const PlatformerConfig& config) {
     const bool touched_wall_last_frame = actor.hit_wall && !actor.on_ground;
     actor.hit_ceiling = false;

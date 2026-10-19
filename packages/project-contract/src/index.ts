@@ -1106,7 +1106,7 @@ export function validateAudioSchemaCoverage(data: GBAProjectData): GBAProjectAud
       invalidFields.push("kind");
     }
 
-    if (audio.bpm !== undefined && (!Number.isFinite(audio.bpm) || typeof audio.bpm !== "number" || audio.bpm < 40 || audio.bpm > 240)) {
+    if (audio.bpm !== undefined && (!Number.isFinite(audio.bpm) || typeof audio.bpm !== "number" || audio.bpm < 40 || audio.bpm > (String(kind).toLowerCase() === "sfx" ? 360 : 240))) {
       invalidFields.push("bpm");
     }
 

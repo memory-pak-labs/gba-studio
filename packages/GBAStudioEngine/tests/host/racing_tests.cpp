@@ -133,6 +133,17 @@ int main() {
     static_assert(gbs::find_racing_resource_bank_group_index(project, "track_group") == 0);
     static_assert(gbs::resource_bank_group_from_racing_room(project, room).bank_count == 1);
     gbs::RacingRuntimeState state = gbs::make_racing_runtime_state(room);
+    assert(state.elapsed_frames == 0);
+    auto timed = state;
+    gbs::tick_racing_vehicle(timed, room, {});
+    assert(timed.elapsed_frames == 1);
+    timed.elapsed_frames = 0xffffffffu;
+    gbs::tick_racing_vehicle(timed, room, {});
+    assert(timed.elapsed_frames == 0xffffffffu);
+    timed.race_result = static_cast<uint8_t>(gbs::RacingRaceResult::Victory);
+    timed.elapsed_frames = 72;
+    gbs::tick_racing_vehicle(timed, room, {});
+    assert(timed.elapsed_frames == 72);
     assert(state.position_x256 == 32 * 256);
     assert(state.position_y256 == 72 * 256);
 
@@ -166,6 +177,7 @@ int main() {
     state.speed_x256 = 640;
     state.distance_x256 = 4096;
     state.lap_count = 2;
+    state.elapsed_frames = 3612;
     gbs::UniversalSaveData save_data {};
     assert(gbs::capture_racing_save_data(save_data, 0, state, event_state, 3600));
 
@@ -186,6 +198,13 @@ int main() {
     assert(restored_state.speed_x256 == state.speed_x256);
     assert(restored_state.distance_x256 == state.distance_x256);
     assert(restored_state.lap_count == state.lap_count);
+    assert(restored_state.elapsed_frames == 3612);
+    auto untimed_save=save_data;
+    untimed_save.payload_size=offsetof(gbs::RacingRuntimeState,elapsed_frames);
+    assert(gbs::apply_racing_save_data(project,untimed_save,restored_room,restored_state,restored_event_state));
+    assert(restored_state.elapsed_frames == 0);
+    untimed_save.payload_size=43;
+    assert(!gbs::apply_racing_save_data(project,untimed_save,restored_room,restored_state,restored_event_state));
     assert(restored_event_state.variables[3] == 77);
     assert(restored_event_state.inventory[2] == 5);
 

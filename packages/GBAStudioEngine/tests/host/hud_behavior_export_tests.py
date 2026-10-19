@@ -52,9 +52,9 @@ class HudBehaviorExport(unittest.TestCase):
  def test_invalid_variable_is_rejected(self):
   component=self.component();component['behavior']['states']['selected']['variable']=64
   with self.assertRaises(SystemExit): assetc.hud_layouts_from_json([dict(id='hud',mode='advanced',components=[component])],'hud')
- def test_more_than_two_dynamic_gauges_are_rejected(self):
+ def test_more_than_four_dynamic_gauges_are_rejected(self):
   components=[]
-  for index in range(3):
+  for index in range(5):
    component=self.component();component.update(id='bar'+str(index),kind='bar',asset='full',value_binding='lives',gauge=dict(empty_asset='empty',x=0,y=0,width=64,height=8))
    components.append(component)
   with self.assertRaises(SystemExit): assetc.hud_layouts_from_json([dict(id='hud',mode='advanced',components=components)],'hud')

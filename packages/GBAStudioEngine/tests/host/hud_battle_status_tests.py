@@ -20,11 +20,13 @@ struct HudLayout { const char* id; const HudLayoutComponent* components = nullpt
 const HudLayout* current = nullptr;
 const HudLayout* active_hud_layout() { return current; }
 struct Unit { int max_hp; };
-struct Participant { const char* name; Unit unit; };
-struct BattleRpgEncounterData { int party_count, enemy_count; Participant party[4], enemies[4]; };
+struct Participant { const char* name; Unit unit; const char* hud_label=nullptr; };
+struct BattleRpgEncounterData { int party_count, enemy_count; Participant party[4], enemies[4]; struct {bool escape_enabled=false;} config; struct Presentation {const char* victory_label="VITORIA";} *presentation=nullptr; };
+enum class BattleRpgOutcome {InProgress,Victory,Defeat};
 struct HudState { const char* text_slots[8]; size_t text_slot_count; uint32_t hp[2], maximum[2]; };
 struct DialogueLine { const char* text; };
-struct DialogueState {};
+struct DialogueChoice {const char* text;int value;};
+struct DialogueState {bool visible=false; const DialogueChoice* choices=nullptr; size_t choice_count=0; int selected_choice=0;};
 constexpr int dialogue_frame_battle_prompt = 3;
 void show_dialogue(DialogueState&, const DialogueLine*, int, int) {}
 void set_dialogue_frame(DialogueState&, int frame) { assert(frame==3); }
@@ -37,12 +39,21 @@ void set_hud_value(HudState& hud, HudValueSource source, uint32_t value, uint32_
 }
 struct { gbs::BattleRpgEncounterData encounters[1]; } project;
 int encounter_index = 0;
-struct { int party_hp[4], enemy_hp[4], selected_party, selected_enemy; } state;
+struct { int party_hp[4], enemy_hp[4], selected_party, selected_enemy; int reward_gold=40,reward_experience=25; bool enemy_turn_pending=false; gbs::BattleRpgOutcome outcome=gbs::BattleRpgOutcome::InProgress; } state;
 gbs::HudState battle_hud {};
 char battle_party_hud_text[48], battle_enemy_hud_text[48], battle_enemy_hp_hud_text[16], battle_party_hp_hud_text[16];
 char battle_prompt_text[96];
 gbs::DialogueState battle_prompt_dialogue;
 gbs::DialogueLine battle_prompt_line { battle_prompt_text };
+bool custom_ui=false;
+bool authored_battle_ui(){return custom_ui;}
+enum class BattleMenuPage {Root,Notice,Party,Targets};
+BattleMenuPage battle_menu_page=BattleMenuPage::Root;
+bool battle_menu_wait_for_enemy_turn=false;
+int battle_menu_parent_choice=0;
+gbs::DialogueState battle_menu_dialogue;
+gbs::DialogueChoice battle_root_choices[]={{"ATACAR",0},{"EQUIPE",1},{"ITENS",2},{"FUGIR",3}};
+char authored_prompt[64],authored_commands[64],authored_cursor[16];
 ''' + helper + prompt + '''
 int main() {
     auto& encounter = project.encounters[0]; encounter.party_count = encounter.enemy_count = 2;
@@ -69,6 +80,14 @@ int main() {
     show_battle_prompt(); assert(std::strcmp(battle_prompt_line.text,"O QUE FARA\\nMATEUS?")==0);
     state.selected_party=state.selected_enemy=-1; update_battle_hud();
     assert(std::strcmp(battle_hud.text_slots[0],"NARA") == 0);
+    custom_ui=true; encounter.party[0].hud_label="HEROINA";update_battle_hud();
+    assert(battle_hud.text_slot_count==6);
+    assert(std::strcmp(battle_hud.text_slots[0],"HEROINA")==0);
+    assert(std::strcmp(battle_hud.text_slots[4],"O QUE FARA\\n\\nHEROINA?")==0);
+    assert(std::strcmp(battle_hud.text_slots[5],"ATACAR\\nEQUIPE\\nITENS\\n")==0);
+    battle_menu_dialogue.visible=true;battle_menu_dialogue.selected_choice=2;update_battle_hud();
+    assert(battle_hud.text_slot_count==6);
+    custom_ui=false;encounter.party[0].hud_label=nullptr;
     gbs::current=nullptr; update_battle_hud();
     assert(battle_hud.text_slot_count==3);
     assert(std::strcmp(battle_hud.text_slots[0],"NARA 6/24")==0);

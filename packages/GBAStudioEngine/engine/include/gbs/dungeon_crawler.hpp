@@ -4,6 +4,7 @@
 #include <stdint.h>
 
 #include "gbs/dialogue.hpp"
+#include "gbs/dungeon_presentation.hpp"
 #include "gbs/event.hpp"
 #include "gbs/assets.hpp"
 #include "gbs/audio.hpp"
@@ -53,6 +54,7 @@ struct DungeonCrawlerActorData {
     const MetaSprite* metasprite;
     EventScript on_interact = empty_event_script();
     const DungeonCrawlerDepthSprites* depth_sprites = nullptr;
+    const DungeonActorFrames* frames = nullptr;
 };
 
 struct DungeonCrawlerRoomData {
@@ -72,6 +74,8 @@ struct DungeonCrawlerRoomData {
     const char* resource_bank_group_name = nullptr;
     bool battle_enabled = false;
     VideoComposition video = default_video_composition();
+    const DungeonPresentation* presentation = nullptr;
+    const DungeonCrawlerPlayerView* player_view = nullptr;
 };
 
 struct DungeonCrawlerInventoryItemData {

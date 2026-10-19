@@ -1385,6 +1385,32 @@
       },
       "additionalProperties": true
     },
+    "luta_project": {
+      "type": "object",
+      "properties": {
+        "stages": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "action_sounds": {
+                "description": "Indices dos SFX PSG do projeto; pistas ausentes permanecem silenciosas.",
+                "type": "object",
+                "properties": {
+                  "hit": { "type": "integer", "minimum": 0 },
+                  "guard": { "type": "integer", "minimum": 0 },
+                  "special": { "type": "integer", "minimum": 0 },
+                  "miss": { "type": "integer", "minimum": 0 }
+                },
+                "additionalProperties": false
+              }
+            },
+            "additionalProperties": true
+          }
+        }
+      },
+      "additionalProperties": true
+    },
     "point_click_project": {
       "type": "object",
       "description": "Native point-and-click contract with scenes, hotspots, cursor data, inventory items, dialogue lines, scripts, backgrounds and resource bank groups.",
@@ -1548,6 +1574,7 @@
                 "type": "integer",
                 "minimum": 0
               },
+              "cursor": { "$ref": "#/properties/point_click_project/properties/cursor" },
               "on_enter": {
                 "type": "array",
                 "items": {
@@ -1874,6 +1901,7 @@
               "menu_profile": { "type": "string", "enum": ["initial", "in_game"] },
               "presentation_mode": { "type": "string", "enum": ["scene", "hud", "both"] },
               "hud_list_rows": { "type": "integer", "minimum": 0, "maximum": 6 },
+              "hud_feedback_in_details": { "type": "boolean" },
               "title_text_variable": { "type": "integer", "minimum": -1, "maximum": 7 },
               "entry_policy": { "type": "string", "enum": ["title", "gameplay"] },
               "return_policy": { "type": "string", "enum": ["title", "resume"] },
@@ -1972,6 +2000,18 @@
                             "additionalProperties": false
                           },
                           "duration_frames": { "type": "integer", "minimum": 1, "maximum": 65535 }
+                        },
+                        "additionalProperties": false
+                      }
+                    },
+                    "actor_frames": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "required": ["actor_index", "frame_index"],
+                        "properties": {
+                          "actor_index": { "type": "integer", "minimum": 0 },
+                          "frame_index": { "type": "integer", "minimum": 0, "maximum": 255 }
                         },
                         "additionalProperties": false
                       }
@@ -2504,6 +2544,17 @@
               "collision_flags": { "type": "array", "items": { "type": "integer", "minimum": 0, "maximum": 255 } },
               "config": { "type": "object" },
               "player_start": { "type": "object" },
+              "player_view": {
+                "type": "object", "required": ["metasprite", "position_pixels"],
+                "properties": {
+                  "metasprite": {"type": ["object", "string"]},
+                  "animation": {"type": "object"},
+                  "position_pixels": {"type": "object", "required": ["x", "y"], "properties": {
+                    "x": {"type": "integer", "minimum": -128, "maximum": 368},
+                    "y": {"type": "integer", "minimum": -128, "maximum": 288}
+                  }, "additionalProperties": false}
+                }, "additionalProperties": false
+              },
               "video": { "$ref": "#/$defs/video_composition" },
               "battle_enabled": { "type": "boolean" },
               "on_enter": { "type": "array", "items": { "$ref": "#/properties/topdown_project/properties/event_command" } },
@@ -2557,6 +2608,7 @@
               "width_tiles": { "type": "integer", "minimum": 1, "maximum": 128 },
               "height_tiles": { "type": "integer", "minimum": 2, "maximum": 128 },
               "collision_flags": { "type": "array", "items": { "type": "integer", "minimum": 0, "maximum": 1 } },
+              "action_sounds": {"type":"object","properties":{"accelerate":{"type":"integer","minimum":0,"maximum":32767},"brake":{"type":"integer","minimum":0,"maximum":32767},"collision":{"type":"integer","minimum":0,"maximum":32767},"checkpoint":{"type":"integer","minimum":0,"maximum":32767}},"additionalProperties":false},
               "config": { "type": "object" },
               "track_segments": {
                 "type": "array",
@@ -3588,6 +3640,8 @@
           "minLength": 1,
           "pattern": "^(?!/)(?![A-Za-z]:[\\\\/])(?!.*(?:^|/)\\.\\.(?:/|$)).+"
         },
+        "compact_hud": {"type":"object","required":["turnPanel","unitPanel","actionsPanel","selection","healthFull","healthEmpty","font"],"properties":{
+          "turnPanel":{"type":"string","minLength":1},"unitPanel":{"type":"string","minLength":1},"actionsPanel":{"type":"string","minLength":1},"selection":{"type":"string","minLength":1},"healthFull":{"type":"string","minLength":1},"healthEmpty":{"type":"string","minLength":1},"font":{"type":"string","minLength":1}},"additionalProperties":false},
         "hud_layout": {
           "type": "string",
           "minLength": 1,
@@ -3601,6 +3655,8 @@
             "properties": {
               "actor_id": { "type": "string", "minLength": 1 },
               "sheet": { "type": "string", "minLength": 1 },
+              "portrait": {"type":"string","minLength":1},
+              "label": {"type":"string","minLength":1},
               "animations": {
                 "type": "object",
                 "properties": {
