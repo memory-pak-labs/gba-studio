@@ -15,3 +15,30 @@ A HUD foi separada por recortes exatos em selo de turno, ficha e ações. Retrat
 Consumidores: BG/foreground paginados8bpp; atores e retratos OBJ8bpp; painéis, fonte, marcadores e barra OBJ4bpp. Compartilhamento de paleta é calculado no pack completo, respeitando os bancos internos de UI. Música e nove cues existentes permanecem intactos. As artes antigas continuam na biblioteca.
 
 A projeção do runtime usa o topo do losango: origem Y68 mais meia altura12 conserva o centro Y80 aprovado. O pivot real32,62 gera offset de desenho−32,−50. Marcadores receberam somente translação de2px dentro do canvas transparente, alinhando o centro ao chão, sem modificar pixels opacos.
+
+
+## Piso modular aprovado em 20/10/2026
+
+O usuário aprovou a comparação do piso em grade48×24 e autorizou a integração
+com “aprovado pode implementar”. O BG ativo conserva768×512 e a origem384,68.
+A revisão reaproveita material original gerado pelo ImageGen
+`exec-1657d840-2d71-4d44-b8e4-b9bb7c366de2.png`: seis regiões de textura são
+amostradas dentro de losangos projetados analiticamente. As juntas ficam na
+mesma grade do editor e do runtime. A imagem gerada inteira não foi promovida.
+
+O BG preparado aprovado tem SHA-256
+`c4ba0bcd0f84fdb41e6191136ea77348624d0e9b17a6b00a1dacc236c2000000`.
+A revisão anterior, preservada no histórico Git, tem SHA-256
+`c4ee93e693427deb445644a7bde853b1f4f98f3db30f596874fb8c844cac3d00`.
+Apenas93.277 pixels nas superfícies de piso mudaram. Oceano, arquitetura,
+vegetação, props e escadas fora dessas máscaras conservaram os mesmos pixels.
+O foreground inteiro permanece com os bytes e a máscara aprovados anteriormente.
+Atores, retratos, HUD, músicas e sons não receberam alteração.
+
+As cores novas são escolhidas exclusivamente na paleta do BG aprovado:
+213 cores nativas e213 em RGB555, usando o truncamento `canal >> 3` do pack.
+Não houve aumento de resolução, suavização ou
+nova quantização da imagem completa. Os módulos reduzem a quantidade de tiles
+8×8 distintos da fonte; a validação de residência depende da exportação paginada.
+As colisões, alturas e rampas do manifesto foram remapeadas aos espaços de piso
+e aos dois percursos de escada, sem alterar as regras de combate.

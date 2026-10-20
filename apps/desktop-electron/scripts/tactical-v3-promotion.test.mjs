@@ -35,7 +35,8 @@ describe("tactical provenance: archived V5 and current large Arena", () => {
     expect(room.runtime.config.tacticalPresentation.assets.filter(a=>a.consumer!=="audio")).toHaveLength(16);
     expect(expandedCollisions(room)[4*16+3]).toBe("free");
     expect(room.rampFlags[4*16+3]).toBe(8);
-    expect(room.heightLevels[4*16+3]).toBe(2);
+    expect(room.heightLevels[4*16+3]).toBe(1);
+    expect(room.heightLevels[3*16+3]).toBe(2);
     for(const [who,x] of [["nara",5],["sentinel",8]]) {
       expect(project.actors.find(a=>a.id===`tactical-${who}`)).toMatchObject({x,y:9,z:0,spriteSheet:`tactical-approved-${who}-64x64.png`});
       expect(project.animations.filter(a=>a.spriteSheet===`tactical-approved-${who}-64x64.png`)).toHaveLength(24);

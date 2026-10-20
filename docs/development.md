@@ -230,6 +230,14 @@ estão registrados em `fixtures/asset-provenance/tactical-arena-manifest.json`.
 A origem Y68 representa o topo do losango; somar12px mantém os pés no centro
 Y80 da composição aprovada. Atores64×64 usam pivot32,62 e offset−32,−50.
 
+A revisão do piso de20/10/2026 usa juntas alinhadas aos módulos48×24 e
+conserva os pixels aprovados fora das superfícies de piso. O manifesto também
+materializa os dois percursos de escada: o esquerdo varia Y com rampas
+`IsoRampDownLeft`; o direito varia X com `IsoRampDownRight`. Colisões e níveis
+são dados editáveis da cena, preservados ao reconstruir o exemplo. A validação
+estreita de bytes, geometria e conectividade está em
+`scripts/tactical-arena-grid.test.mjs`.
+
 A HUD contextual mostra a unidade sob o seletor, HP real e três ações. O avanço
 7px da fonte preserva suas seis colunas de tinta. BG/foreground compartilham
 paleta, sem reduzir tiles; o viewport carrega somente a janela necessária.

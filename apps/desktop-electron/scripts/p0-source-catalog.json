@@ -1228,8 +1228,8 @@
         },
         {
           "path": "Assets/backgrounds/tactical-arena-large-768x512.png",
-          "sha256": "c4ee93e693427deb445644a7bde853b1f4f98f3db30f596874fb8c844cac3d00",
-          "contract": "tactical-arena-large-compact-approved-2026-10-17"
+          "sha256": "c4ba0bcd0f84fdb41e6191136ea77348624d0e9b17a6b00a1dacc236c2000000",
+          "contract": "tactical-arena-grid-approved-2026-10-20"
         },
         {
           "path": "Assets/backgrounds/tactical-arena-large-foreground.png",

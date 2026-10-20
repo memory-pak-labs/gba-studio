@@ -17,6 +17,7 @@ const module = new WebAssembly.Module(wasm), rom = fs.readFileSync(romPath);
 const assets = app + '/default-assets/templates/exemplo-gba/Assets/';
 const font = decodePngRgba(fs.readFileSync(assets + 'sprites/tactical-compact-font-8x8.png'));
 const room = JSON.parse(fs.readFileSync(app + '/default-assets/templates/exemplo-gba/exemplo-gba.gba-project')).rooms.find(r => r.name === 'arena_tatica');
+const background = decodePngRgba(fs.readFileSync(assets + 'backgrounds/' + room.backgroundAssetName));
 const core = await createMGBA({ print: () => { }, printErr: () => { }, instantiateWasm(imports, receive) { let i = new WebAssembly.Instance(module, imports); receive(i); return i.exports; } });
 let initialized = false;
 function reset() { if (initialized)
@@ -32,6 +33,22 @@ const checks = [];
 function check(name, fn) { fn(); checks.push(name); }
 function pixels() { const p = core._gba_framebuffer(); return core.HEAPU8.slice(p, p + 153600); }
 const rgb = (p, i) => (p[i] >> 3) | ((p[i + 1] >> 3) << 5) | ((p[i + 2] >> 3) << 10);
+const backgroundChecks = [];
+function verifyBackground(shotData, label) {
+    const [x, y] = shotData.state.cursor, config = room.runtime.config;
+    const z = room.heightLevels[y * room.width + x];
+    const cameraX = Math.max(0, Math.min(background.width - 240, config.originX + (x - y) * config.tileWidth / 2 - 120));
+    const cameraY = Math.max(0, Math.min(background.height - 160, config.originY + (x + y + 1) * config.tileHeight / 2 - z * config.heightStep - 80));
+    const frame = pixels();
+    let compared = 0;
+    for (let yy = 0; yy < 160; yy++) for (let xx = 0; xx < 240; xx++) {
+        if (shotData.native.objects.some(o => xx >= o.x && xx < o.x + o.width && yy >= o.y && yy < o.y + o.height)) continue;
+        assert.equal(rgb(frame, (yy * 240 + xx) * 4), rgb(background.pixels, ((cameraY + yy) * background.width + cameraX + xx) * 4), `${label}: BG pixel ${xx},${yy}`);
+        compared++;
+    }
+    assert.ok(compared > 2000, `${label}: insufficient unobstructed BG pixels`);
+    backgroundChecks.push({ label, cameraX, cameraY, compared });
+}
 function text(expected, x, y) { const p = pixels(); let count = 0; for (let i = 0; i < expected.length; i++) {
     const code = expected.charCodeAt(i) - 32;
     for (let yy = 0; yy < 8; yy++)
@@ -52,6 +69,7 @@ function go(x, y) { for (let i = 0; i < 40; i++) {
 } throw Error('Cursor failed to reach ' + [x, y]); }
 reset();
 const initial = shot('initial');
+check('initial BG preserves approved source pixels', () => verifyBackground(initial, 'initial'));
 check('initial HUD, exact font and 5/5 health', () => { assert.deepEqual(state().cursor, [5, 9]); text('SUA VEZ', 29, 12); text('5/5', 99, 140); });
 check('selector centered at actor feet', () => { const n = initial.native.objects.find(o => o.width === 64 && o.height === 64 && o.tile === 0); const marker = initial.native.objects.find(o => o.width === 64 && o.height === 32 && o.priority === 3); assert.ok(n && marker); assert.equal(marker.y + 16, n.y + 62); });
 tap(1);
@@ -86,16 +104,27 @@ for (const [x, y] of [[0, 15], [15, 0], [0, 0], [15, 15], [5, 9]]) {
     run(25);
     const shotData = shot(`camera-${x}-${y}`), z = room.heightLevels[y * 16 + x], cx = Math.max(0, Math.min(528, 384 + (x - y) * 24 - 120)), cy = Math.max(0, Math.min(352, 80 + (x + y) * 12 - z * 8 - 80));
     check('camera follows selector ' + x + ',' + y, () => { assert.equal(shotData.native.bg[2].x, cx % 256); assert.equal(shotData.native.bg[2].y, cy % 256); assert.deepEqual(point(), [5, 9]); });
+    check('camera BG preserves source ' + x + ',' + y, () => verifyBackground(shotData, `camera-${x}-${y}`));
     cameras.push({ x, y, camera: { x: cx, y: cy } });
 }
 reset();
 tap(1);
 tap(1);
-go(4, 10);
+go(4, 9);
+tap(1);
+run(30);
+tap(4);
+run(160);
+assert.deepEqual(point(), [4, 9]);
+assert.equal(room.collisionTypes[10 * room.width + 3], 'solid');
+assert.ok(Math.abs(3 - 4) + Math.abs(10 - 9) <= room.runtime.config.tactical.units[0].moveRange);
+tap(1);
+tap(1);
+go(3, 10);
 tap(1);
 run(30);
 shot('blocked-prop');
-check('solid prop blocks movement', () => { assert.deepEqual(point(), [5, 9]); assert.equal(state().turn, 1); });
+check('solid prop blocks an in-range movement', () => { assert.deepEqual(point(), [4, 9]); assert.equal(state().turn, 3); });
 reset();
 tap(1);
 tap(1);
@@ -167,7 +196,7 @@ tap(2);
 run(100);
 shot('resume');
 check('resume retains tactical state', () => { assert.equal(state().runtimeKind, 2); assert.deepEqual(point(), [beforePause.player.x, beforePause.player.y]); assert.equal(state().turn, beforePause.turn); });
-const final = { ok: true, romSha256: createHash('sha256').update(rom).digest('hex'), checks, cameras, method: 'Real GBA inputs in mGBA WASM; no runtime memory or save modification', limits: ['No physical GBA evidence'], initial: initial.state };
+const final = { ok: true, romSha256: createHash('sha256').update(rom).digest('hex'), checks, cameras, backgroundChecks, method: 'Real GBA inputs in mGBA WASM; no runtime memory or save modification', limits: ['No physical GBA evidence'], initial: initial.state };
 fs.writeFileSync(path.join(output, 'verification.json'), JSON.stringify(final, null, 2) + '\n');
 console.log(JSON.stringify({ ok: true, checks: checks.length }));
 core._gba_destroy();
