@@ -17,6 +17,8 @@ ARM_OBJCOPY := $(DEVKITARM)/bin/arm-none-eabi-objcopy
 GBAFIX := $(TOOLS_BIN)/gbafix
 
 HOST_CXX ?= clang++
+# The incremental-build fixtures are executable POSIX scripts, not Windows binaries.
+HOST_POSIX_FIXTURE_PYTHON ?= python3
 
 ENGINE_INCLUDES := -Iengine/include -Iengine/src
 GBA_ARCH := -mthumb -mthumb-interwork -mcpu=arm7tdmi -mtune=arm7tdmi
@@ -927,7 +929,7 @@ assetc-test:
 	python3 tests/host/assetc_obj_palette_tests.py
 
 gbsbuild-host-test:
-	python3 tests/host/gbsbuild_incremental_tests.py
+	$(HOST_POSIX_FIXTURE_PYTHON) tests/host/gbsbuild_incremental_tests.py
 	grep -q 'MAP := $$(BUILD_DIR_ESC)/$$(TARGET).map' templates/Makefile.gba
 	grep -q -- '-Wl,-Map,$$(BUILD_DIR)/$$(TARGET).map' templates/Makefile.gba
 	@mkdir -p $(HOST_BUILD)/gbsbuild/pack/templates $(HOST_BUILD)/gbsbuild/pack/lib "$(HOST_BUILD)/gbsbuild/project with space" "$(HOST_BUILD)/gbsbuild/output dir"

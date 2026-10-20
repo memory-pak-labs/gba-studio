@@ -66,7 +66,7 @@ class ColorLookupTests(unittest.TestCase):
     def test_generated_text_preserves_timestamp_and_rewrites_changed_bytes(self):
         assetc = load_assetc()
         with tempfile.TemporaryDirectory() as root:
-            target = Path(root)/"data.hpp"; target.write_text("same\n")
+            target = Path(root)/"data.hpp"; target.write_bytes(b"same\n")
             os.utime(target, (1000, 1000))
             assetc.write_text_if_changed(target, "same\n", encoding="utf-8")
             self.assertEqual(target.stat().st_mtime, 1000)

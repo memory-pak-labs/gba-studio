@@ -29,6 +29,8 @@ code = r'''
 // Keep the full translation unit linkable on hosts whose linker retains drawing code.
 extern "C" {
 void gbs_hw_configure_dialogue_box_skin(const uint8_t*, const uint16_t*) {}
+void gbs_hw_configure_hud_box_skin(const uint8_t*, const uint16_t*) {}
+void gbs_hw_configure_hud_box(int, int, int, int) {}
 void gbs_hw_configure_dialogue_font(const uint8_t*) {}
 void gbs_hw_configure_dialogue_choice_selector(const uint8_t*) {}
 void gbs_hw_draw_text_box(int, int, int, int, const char*, int) {}
