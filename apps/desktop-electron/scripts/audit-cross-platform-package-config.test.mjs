@@ -33,6 +33,13 @@ describe("audit-cross-platform-package-config", () => {
     expect(report.items.find(item => item.id === "macos-universal").state).toBe("blocked");
   });
 
+  it("rejects an unsigned DMG container independently of app signing", () => {
+    const input = options();
+    input.packageJson.build.dmg.sign = false;
+    const report = createCrossPlatformPackageConfigReport(input);
+    expect(report.items.find(item => item.id === "macos-dmg-signing").state).toBe("blocked");
+  });
+
   it("rejects packaging before the strict audit", () => {
     const input = options();
     input.desktopWorkflowText = input.desktopWorkflowText.replace("npm run audit:cross-platform -- --strict", "echo audit omitted");

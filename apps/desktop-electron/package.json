@@ -189,6 +189,9 @@
         "zip"
       ]
     },
+    "dmg": {
+      "sign": true
+    },
     "win": {
       "extraResources": [
         {

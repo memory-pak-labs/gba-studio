@@ -157,6 +157,14 @@ export function createCrossPlatformPackageConfigReport({ packageJson, workflowTe
       "Ajustar build.mac em package.json."
     ),
     check(
+      "macos-dmg-signing",
+      "Assinatura do instalador DMG",
+      build.dmg?.sign === true,
+      "O contêiner DMG exige assinatura própria antes da notarização.",
+      "O DMG nao exige assinatura, mesmo que o aplicativo esteja assinado.",
+      "Definir build.dmg.sign=true e validar o Gatekeeper no DMG final."
+    ),
+    check(
       "macos-universal",
       "Distribuicao macOS Universal",
       /prepare:embedded-runtime:universal/.test(macDistributionScript) &&
