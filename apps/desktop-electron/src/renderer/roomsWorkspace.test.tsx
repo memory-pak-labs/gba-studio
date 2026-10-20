@@ -1,5 +1,6 @@
 /** @vitest-environment happy-dom */
-import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { Profiler } from "react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
@@ -3347,6 +3348,41 @@ describe("RoomsWorkspace React smoke", () => {
     expect(screen.queryByRole("region", { name: `Editor da cena ${room.name}` })).not.toBeInTheDocument();
   });
 
+  it.each(["actor", "trigger"] as const)("move a prévia de %s sem reconciliar a grade e cancela com Escape", async (kind) => {
+    const user = userEvent.setup();
+    const project = createBlankProjectData({ name: "Arraste responsivo" });
+    const room = deriveRoomsWorkspacePresentation(project).rooms[0]!;
+    const entity = { id: "drag-preview", name: "Drag", roomName: room.name, x: 1, y: 1, width: 1, height: 1 };
+    if (kind === "actor") project.actors = [entity];
+    else project.triggers = [entity];
+    const handlers = roomsWorkspaceHandlers();
+    const commits = vi.fn();
+    const { container } = render(<Profiler id="scene" onRender={commits}>
+      <RoomsWorkspace presentation={deriveRoomsWorkspacePresentation(project)} projectData={project} {...handlers} />
+    </Profiler>);
+    await focusActiveScene(user);
+    const canvas = container.querySelector<HTMLElement>(".room-focused-scene-editor-frame .room-stage-card-canvas")!;
+    Object.defineProperty(canvas, "getBoundingClientRect", { configurable: true,
+      value: () => ({ left: 0, top: 0, width: room.width * 10, height: room.height * 10 }) });
+    const cells = canvas.querySelectorAll<HTMLButtonElement>(".room-stage-cell");
+    const overlay = canvas.querySelector<HTMLElement>(`.room-stage-entity.${kind}`)!;
+    const originalStyle = overlay.getAttribute("style");
+    fireEvent.pointerDown(cells[1 + room.width]!, { button: 0, buttons: 1, pointerId: 71, clientX: 15, clientY: 15 });
+    const initialCommits = commits.mock.calls.length;
+    for (let step = 2; step <= 4; step++) {
+      await act(async () => {
+        fireEvent.pointerMove(canvas, { buttons: 1, pointerId: 71, clientX: step * 10 + 5, clientY: 25 });
+        await new Promise(resolve => requestAnimationFrame(resolve));
+      });
+      expect(overlay.getAttribute("style")).not.toBe(originalStyle);
+    }
+    expect(commits.mock.calls.length - initialCommits).toBe(0);
+    expect(handlers.onPlaceRoomEntity).not.toHaveBeenCalled();
+    fireEvent.keyDown(window, { key: "Escape" });
+    expect(overlay.getAttribute("style")).toBe(originalStyle);
+    expect(handlers.onPlaceRoomEntity).not.toHaveBeenCalled();
+  });
+
   it("mantém a prévia do ator durante o arraste e persiste apenas ao soltar", async () => {
     const user = userEvent.setup();
     const project = createBlankProjectData({ name: "Arraste de ator" });
@@ -3388,6 +3424,39 @@ describe("RoomsWorkspace React smoke", () => {
       { roomID: room.id, x: 3, y: 2 },
       expect.any(String)
     );
+  });
+
+  it("restaura a prévia ao perder a captura e mantém a última posição de um arraste rápido", async () => {
+    const user = userEvent.setup();
+    const project = createBlankProjectData({ name: "Captura do arraste" });
+    const room = deriveRoomsWorkspacePresentation(project).rooms[0]!;
+    project.triggers = [{ id: "area", name: "Area", roomName: room.name, x: 1, y: 1, width: 2, height: 2 }];
+    const handlers = roomsWorkspaceHandlers();
+    const { container } = render(<RoomsWorkspace presentation={deriveRoomsWorkspacePresentation(project)} projectData={project} {...handlers} />);
+    await focusActiveScene(user);
+    const canvas = container.querySelector<HTMLElement>(".room-focused-scene-editor-frame .room-stage-card-canvas")!;
+    Object.defineProperty(canvas, "getBoundingClientRect", { configurable: true,
+      value: () => ({ left: 0, top: 0, width: room.width * 10, height: room.height * 10 }) });
+    const cells = canvas.querySelectorAll<HTMLButtonElement>(".room-stage-cell");
+    const start = cells[1 + room.width]!;
+    const overlay = canvas.querySelector<HTMLElement>(".room-stage-entity.trigger")!;
+    const original = overlay.getAttribute("style");
+    fireEvent.pointerDown(start, { button: 0, buttons: 1, pointerId: 82, clientX: 15, clientY: 15 });
+    fireEvent.pointerMove(canvas, { buttons: 1, pointerId: 82, clientX: 35, clientY: 25 });
+    await waitFor(() => expect(overlay.getAttribute("style")).not.toBe(original));
+    fireEvent.lostPointerCapture(start, { pointerId: 82 });
+    expect(overlay.getAttribute("style")).toBe(original);
+    fireEvent.pointerUp(canvas, { button: 0, pointerId: 82, clientX: 35, clientY: 25 });
+    expect(handlers.onPlaceRoomEntity).not.toHaveBeenCalled();
+
+    fireEvent.pointerDown(start, { button: 0, buttons: 1, pointerId: 83, clientX: 15, clientY: 15 });
+    fireEvent.pointerMove(canvas, { buttons: 1, pointerId: 83, clientX: 35, clientY: 25 });
+    // Release before the preview's animation frame, at the map edge.
+    fireEvent.pointerUp(canvas, { button: 0, pointerId: 83, clientX: room.width * 10 - 5, clientY: room.height * 10 - 5 });
+    expect(handlers.onPlaceRoomEntity).toHaveBeenCalledTimes(1);
+    expect(handlers.onPlaceRoomEntity).toHaveBeenCalledWith("trigger", "area", {
+      roomID: room.id, x: room.width - 2, y: room.height - 2
+    }, expect.any(String));
   });
 
   it("stacks authored BG3, BG2 and BG1 full-scene images in GBA draw order", async () => {

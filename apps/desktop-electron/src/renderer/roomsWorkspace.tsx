@@ -1,4 +1,5 @@
 import { DungeonScenePreview } from "./DungeonScenePreview";
+import { createRoomEntityDragPreview } from "./roomEntityDragPreview";
 import { ActorRuntimeResourcesInspector, SceneRuntimeResourcesInspector } from "./SceneRuntimeResourcesInspector";
 import { DungeonSceneEditor } from "./DungeonSceneEditor";
 import { readStoredLocale } from "./i18n";
@@ -319,6 +320,7 @@ interface RoomEntityPointerDrag {
   startClientY: number;
   previewX: number;
   previewY: number;
+  visual: ReturnType<typeof createRoomEntityDragPreview> | null;
 }
 
 function invokeHistoryAware<Result>(
@@ -5534,7 +5536,6 @@ function RoomTilemapEditor({
   const [connectionZonePlacementEnd, setConnectionZonePlacementEnd] = useState<number | null>(null);
   const [cameraZonePlacementStart, setCameraZonePlacementStart] = useState<number | null>(null);
   const [cameraZonePlacementEnd, setCameraZonePlacementEnd] = useState<number | null>(null);
-  const [entityDragPreview, setEntityDragPreview] = useState<{ entityKey: string; x: number; y: number } | null>(null);
   const collisionPaintTypeRef = useRef<RoomCollisionType | null>(null);
   const entityPointerDrag = useRef<RoomEntityPointerDrag | null>(null);
   const pendingEmptySceneSelection = useRef<{ pointerID: number; startCellIndex: number; moved: boolean } | null>(null);
@@ -5547,14 +5548,7 @@ function RoomTilemapEditor({
   const arrivalPreviewReplacesPlayer = isFocusedSceneEditor
     && activeArrivalPreviewLinkID !== null
     && eventLinks.some((link) => link.id === activeArrivalPreviewLinkID);
-  const canvasRenderEntities = canvasEntities.map((entity) => {
-    if (entityDragPreview?.entityKey !== entityKey(entity)) return entity;
-    return { ...entity, x: entityDragPreview.x, y: entityDragPreview.y,
-      ...(room.sceneType === "isometric" && entity.kind === "actor" ? {
-        z: room.heightLevels?.[entityDragPreview.y * room.width + entityDragPreview.x] ?? 0
-      } : {})
-    };
-  });
+  const canvasRenderEntities = canvasEntities;
   const menuConfig = room.runtime?.type === "menu" ? normalizeMenuSceneConfig(room.runtime.config) : null;
   const menuScreens = menuConfig?.screens ?? [];
   const menuPreviewScreen = menuScreens.find((screen) => screen.id === menuPreviewScreenID) ?? menuScreens[0];
@@ -5858,21 +5852,43 @@ function RoomTilemapEditor({
       const current = entityPointerDrag.current;
       if (!current || current !== drag) return;
       current.frameRequest = null;
-      setEntityDragPreview({
-        entityKey: current.entityKey,
-        x: current.previewX,
-        y: current.previewY
-      });
+      paintEntityDragPreview();
     });
   }
+
+  function paintEntityDragPreview(): void {
+    const drag = entityPointerDrag.current;
+    const entity = drag && canvasEntities.find(candidate => entityKey(candidate) === drag.entityKey);
+    if (!drag || !entity) return;
+    const canvas = drag.captureTarget.closest<HTMLElement>(".room-stage-card-canvas");
+    if (!canvas) return;
+    drag.visual ??= createRoomEntityDragPreview(canvas, drag.entityKey,
+      deriveRoomSelectedEntityCells(room, canvasDisplayEntities.filter(candidate => entityKey(candidate) !== drag.entityKey), selectedEntityKeys));
+    const preview = { ...entity, x: drag.previewX, y: drag.previewY,
+      ...(room.sceneType === "isometric" && entity.kind === "actor" ? {
+        z: room.heightLevels?.[drag.previewY * room.width + drag.previewX] ?? 0
+      } : {}) };
+    drag.visual.paint(roomEntityStyle(room, preview, null, spriteImageSizes), roomEntityHitboxStyle(room, preview),
+      roomEntitySelectionFootprint(preview, room.sceneType), room.width, room.height);
+  }
+
+  // Loading a sprite or changing another control can render during a gesture.
+  useLayoutEffect(() => { if (entityPointerDrag.current?.visual) paintEntityDragPreview(); });
+  useEffect(() => () => {
+    const drag = entityPointerDrag.current;
+    if (drag?.frameRequest !== null && drag?.frameRequest !== undefined) cancelAnimationFrame(drag.frameRequest);
+    drag?.visual?.restore();
+  }, []);
 
   function previewEntityDragAtTile(tile: { x: number; y: number }): void {
     const drag = entityPointerDrag.current;
     if (!drag) return;
     const entity = canvasEntities.find((candidate) => entityKey(candidate) === drag.entityKey);
     if (!entity) return;
-    const nextX = Math.floor(entity.x + tile.x - drag.offsetX - roomEntitySelectionFootprint(entity, room.sceneType).x);
-    const nextY = Math.floor(entity.y + tile.y - drag.offsetY - roomEntitySelectionFootprint(entity, room.sceneType).y);
+    const maxX = Math.max(0, room.width - (entity.kind === "trigger" ? entity.width : 1));
+    const maxY = Math.max(0, room.height - (entity.kind === "trigger" ? entity.height : 1));
+    const nextX = Math.max(0, Math.min(maxX, Math.floor(entity.x + tile.x - drag.offsetX - roomEntitySelectionFootprint(entity, room.sceneType).x)));
+    const nextY = Math.max(0, Math.min(maxY, Math.floor(entity.y + tile.y - drag.offsetY - roomEntitySelectionFootprint(entity, room.sceneType).y)));
     if (nextX === drag.previewX && nextY === drag.previewY) return;
     drag.previewX = nextX;
     drag.previewY = nextY;
@@ -6018,6 +6034,7 @@ function RoomTilemapEditor({
     if (drag && drag.frameRequest !== null) {
       cancelAnimationFrame(drag.frameRequest);
     }
+    drag?.visual?.restore();
     if (drag && commit && (drag.previewX !== drag.originX || drag.previewY !== drag.originY)) {
       const layer = drag.kind === "actor" ? "actors" : "triggers";
       if (!canvasLayerLocks[layer]) {
@@ -6028,11 +6045,10 @@ function RoomTilemapEditor({
         }], canvasHistoryGroupID.current ?? undefined);
       }
     }
+    entityPointerDrag.current = null;
     if (drag?.captureTarget.hasPointerCapture(drag.pointerID)) {
       drag.captureTarget.releasePointerCapture(drag.pointerID);
     }
-    entityPointerDrag.current = null;
-    setEntityDragPreview(null);
     if (pendingSelection) {
       setSelectedEntityKeys(pendingSelection);
     }
@@ -6176,7 +6192,8 @@ function RoomTilemapEditor({
         startClientX: event.clientX,
         startClientY: event.clientY,
         previewX: contextualEntity.x,
-        previewY: contextualEntity.y
+        previewY: contextualEntity.y,
+        visual: null
       };
       pendingEntitySelection.current = null;
       setSelectedEntityKeys(deriveRoomEntitySelection({
@@ -6642,6 +6659,11 @@ function RoomTilemapEditor({
           resetCameraZonePlacement();
           endCanvasHistoryGroup();
         }}
+        onLostPointerCapture={(event) => {
+          if (entityPointerDrag.current?.pointerID !== event.pointerId) return;
+          finishEntityPointerInteraction(false);
+          endCanvasHistoryGroup();
+        }}
         onContextMenu={(event) => {
           if (selectedEditMode === "collision") event.preventDefault();
         }}
@@ -6998,6 +7020,7 @@ function RoomTilemapEditor({
                   aria-hidden="true"
                   className={`room-stage-entity-hitbox${room.sceneType === "isometric" ? " isometric" : ""}`}
                   data-entity-overlay="hitbox"
+                  data-room-entity-key={entityKey(entity)}
                   key={`${entityKey(entity)}-hitbox-overlay`}
                   style={roomEntityHitboxStyle(room, { ...entity, width, height })}
                 />
@@ -7012,6 +7035,7 @@ function RoomTilemapEditor({
                   affineObj ? "has-affine-obj" : ""
                 ].filter(Boolean).join(" ")}
                 data-affine-obj={affineObj ? "true" : undefined}
+                data-room-entity-key={entityKey(entity)}
                 data-affine-obj-double-size={affineObj?.doubleSize ? "true" : undefined}
                 data-affine-obj-matrix={affineObj ? String(affineObj.matrixIndex) : undefined}
                 data-sprite-frame-height={entity.kind === "actor" && entity.spriteFrame ? String(entity.spriteFrame.frameHeight) : undefined}
