@@ -21,6 +21,7 @@ const outputDir = process.env.GBA_STUDIO_ISOMETRIC_EDITOR_OUTPUT
   : join(appRoot, "artifacts/visual-isometric/latest");
 const port = Number(process.env.GBA_STUDIO_ISOMETRIC_EDITOR_CDP_PORT ?? 9362);
 const arenaOnly = process.argv.includes("--arena-only");
+const hitTargetsOnly = process.argv.includes("--hit-targets-only");
 
 function sceneDisplayName(value) {
   const name = String(value ?? "").trim();
@@ -501,6 +502,32 @@ async function run() {
       await waitForRenderedText(cdp, (text) => text.includes("Ferramentas do Editor") && text.includes("mercado_suspenso"), "Editor workspace");
       const initialEvidence = await cdp.send('Page.captureScreenshot', {format:'png'});
       await writeFile(join(outputDir, 'initial-editor.png'), Buffer.from(initialEvidence.data, 'base64'));
+      if (hitTargetsOnly) {
+        const checked = [];
+        for (const sceneName of ["mercado_suspenso", "arena_tatica"]) {
+          await evaluate(cdp, `document.querySelector('[aria-label="Voltar à visão geral"]')?.click()`);
+          await focusScene(cdp, sceneName);
+          await wait(350);
+          const hits = await evaluate(cdp, `(() => {
+            const canvas = document.querySelector('.room-focused-scene-editor-frame .room-stage-card-canvas.isometric');
+            const elevation = cell => Number([...cell.classList].find(name => name.startsWith('has-isometric-height-'))?.split('-').at(-1) ?? 0);
+            return [...(canvas?.querySelectorAll('.room-stage-cell') ?? [])].flatMap(cell => {
+              const r = cell.getBoundingClientRect();
+              const target = document.elementFromPoint(r.x + r.width / 2, r.y + r.height / 2)?.closest('.room-stage-cell');
+              // Raised terrain can legitimately cover a lower diamond.
+              if (target && target !== cell && elevation(target) > elevation(cell)) return [];
+              return target?.closest('.room-stage-card-canvas') === canvas
+                ? [{ expected: cell.getAttribute('aria-label'), actual: target.getAttribute('aria-label'), matches: target === cell }] : [];
+            });
+          })()`);
+          const entry = { sceneName, checked: hits?.length ?? 0, mismatches: (hits ?? []).filter(hit => !hit.matches) };
+          checked.push(entry);
+          await writeFile(join(outputDir, "cell-hit-targets.json"), JSON.stringify(checked, null, 2));
+          if (!entry.checked || entry.mismatches.length) throw new Error(`Áreas de clique isométricas incorretas: ${JSON.stringify(entry)}`);
+        }
+        console.log(JSON.stringify({ ok: true, checked }));
+        return;
+      }
       const overview = await inspectOverviewCard(cdp, "mercado_suspenso", marketAspectRatio, marketRoom?.runtime?.config?.pagedSurface ? 1 + Number(Boolean(marketRoom.runtime.config.pagedSurface.foregroundAsset)) : 0);
       await wait(350);
       const overviewScreenshot = await cdp.send("Page.captureScreenshot", {

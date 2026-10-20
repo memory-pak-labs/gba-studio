@@ -2966,6 +2966,8 @@ body.room-scene-map-card-dragging .room-stage-card-frame.is-dragging {
 .room-stage-card-canvas.isometric .room-stage-cell {
   background-color: transparent;
   overflow: visible;
+  /* The atlas can extend beyond the cell; only its diamond receives input. */
+  pointer-events: none;
   position: absolute;
 }
 
@@ -2976,7 +2978,7 @@ body.room-scene-map-card-dragging .room-stage-card-frame.is-dragging {
   content: "";
   height: 100%;
   left: 0;
-  pointer-events: none;
+  pointer-events: auto;
   position: absolute;
   top: 0;
   width: 100%;
