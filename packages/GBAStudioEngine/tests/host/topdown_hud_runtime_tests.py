@@ -45,6 +45,8 @@ void gbs_hw_draw_hud_bar(const char*, const char*, int) {}
 void gbs_hw_draw_overlay_rect(int, int, int, int, int) {}
 void gbs_hw_draw_text_box(int, int, int, int, const char*, int) {}
 void gbs_hw_load_obj_tiles(const uint8_t*, uint32_t, uint32_t) {}
+void gbs_hw_set_hud_font(const uint8_t*, int) {}
+void gbs_hw_set_hud_font_shadow(int) {}
 }
 struct Room { const char* name; };
 const Room rooms[] = {{"blank"}, {"authored"}, {"no-hud"}, {nullptr}};

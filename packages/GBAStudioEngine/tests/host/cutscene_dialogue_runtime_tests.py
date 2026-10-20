@@ -26,6 +26,13 @@ code = r'''
 #include <initializer_list>
 #include "gbs/cutscene.hpp"
 #include "gbs/dialogue.hpp"
+// Keep the full translation unit linkable on hosts whose linker retains drawing code.
+extern "C" {
+void gbs_hw_configure_dialogue_box_skin(const uint8_t*, const uint16_t*) {}
+void gbs_hw_configure_dialogue_font(const uint8_t*) {}
+void gbs_hw_configure_dialogue_choice_selector(const uint8_t*) {}
+void gbs_hw_draw_text_box(int, int, int, int, const char*, int) {}
+}
 gbs::DialogueState dialogue {};
 gbs::EventState event_state {};
 gbs::CutsceneRuntimeState cutscene_state {};

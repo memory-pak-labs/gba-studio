@@ -82,7 +82,7 @@ jobs:
           install: >-
             make
             grep
-            python
+            mingw-w64-ucrt-x86_64-python-pillow
             mingw-w64-ucrt-x86_64-clang
       - name: Test engine on Windows
         shell: msys2 {0}
