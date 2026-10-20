@@ -29,6 +29,10 @@ def collect_runtime(runtime):
             if not selected or source.suffix.lower() in forbidden or name.startswith(".env"):
                 continue
             if source.is_symlink():
+                # Distribution documentation can link to an optional package
+                # absent from the runtime. Never follow it outside the bundle.
+                if name.lower().startswith(("readme", "changelog", "news")):
+                    continue
                 raise ValueError(f"Refusing a symbolic link in runtime source/notices: {relative}")
             entries[f"bundled/{relative.as_posix()}"] = source.read_bytes()
     if not any("licenses/" in name.lower() for name in entries):

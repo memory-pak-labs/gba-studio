@@ -1,6 +1,6 @@
 import { it, expect } from "vitest";
 import { execFileSync } from "node:child_process";
-import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from "node:fs";
+import { mkdtempSync, mkdirSync, writeFileSync, rmSync, symlinkSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -42,6 +42,14 @@ with zipfile.ZipFile(${JSON.stringify(output)}) as z:
         assert 'gba-studio/LICENSE' in t.getnames()
         assert not any('.env' in n or '.agent/' in n for n in t.getnames())
 `], { stdio: "pipe" });
+    if (process.platform !== "win32") {
+      const docs = path.join(runtime, "Runtime/Licenses/bash"); mkdirSync(docs, { recursive: true });
+      symlinkSync("../bash-completion/README.md.gz", path.join(docs, "README.md.bash_completion.gz"));
+      execFileSync(python, args, { stdio: "pipe" });
+      symlinkSync(path.join(root, "outside-COPYING"), path.join(docs, "COPYING"));
+      expect(() => execFileSync(python, args, { stdio: "pipe" })).toThrow();
+      rmSync(path.join(docs, "COPYING"));
+    }
     put(repo, "LICENSE", "modified");
     expect(() => execFileSync(python, args, { stdio: "pipe" })).toThrow();
     expect(() => execFileSync(python, [...args, "--allow-generated-icons"], { stdio: "pipe" })).toThrow();
