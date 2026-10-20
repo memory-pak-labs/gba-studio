@@ -91,8 +91,13 @@ describe('example library cleanup', () => {
     const dungeon=JSON.parse(readFileSync(new URL('../fixtures/asset-provenance/dungeon-approved-manifest.json',import.meta.url)));
     const startup=JSON.parse(readFileSync(new URL('../fixtures/asset-provenance/startup-fade-a-manifest.json',import.meta.url)));
     const worldMap = JSON.parse(readFileSync(new URL('../fixtures/asset-provenance/world-map-lumen-manifest.json', import.meta.url)));
+    const market = JSON.parse(readFileSync(new URL('../fixtures/asset-provenance/market-approved-manifest.json', import.meta.url)));
     const replacedWorldMapSources = ['Assets/backgrounds/route-map-paged-v2.png', 'Assets/sprites/route-airship-v2.png'];
-    expect(source.assets).toHaveLength(record.after.assets - dungeon.replacedAssetNames.length + dungeon.assets.length - dungeon.unusedPreparedAssetNames.length - platformer.replacedAssetNames.length + platformer.assets.length - racing.replacedAssetNames.length + racing.assets.length - storm.replacedAssetNames.length + storm.assets.length - relay.replacedAssetNames.length + relay.assets.length - startup.retainedOriginals.length + startup.assets.length - replacedWorldMapSources.length + Object.keys(worldMap.assets).length);
+    expect(source.assets).toHaveLength(record.after.assets - dungeon.replacedAssetNames.length + dungeon.assets.length - dungeon.unusedPreparedAssetNames.length - platformer.replacedAssetNames.length + platformer.assets.length - racing.replacedAssetNames.length + racing.assets.length - storm.replacedAssetNames.length + storm.assets.length - relay.replacedAssetNames.length + relay.assets.length - startup.retainedOriginals.length + startup.assets.length - replacedWorldMapSources.length + Object.keys(worldMap.assets).length - market.replacedAssetNames.length + market.assets.length);
+    for (const original of market.retainedOriginals) {
+      expect(source.assets.some(asset => asset.name === original.source.split('/').at(-1))).toBe(false);
+      expect(existsSync(new URL(original.source, root))).toBe(true);
+    }
     for (const previousSource of replacedWorldMapSources) {
       expect(source.assets.some(asset => asset.name === previousSource.split('/').at(-1))).toBe(false);
       expect(existsSync(new URL(previousSource, root))).toBe(true);

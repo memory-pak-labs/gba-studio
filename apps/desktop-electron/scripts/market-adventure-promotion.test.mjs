@@ -22,7 +22,7 @@ describe('approved Mercado adventure',()=>{
   const market=next.rooms.find(r=>r.name==='mercado_suspenso');
   expect(market.runtime.config).toMatchObject({gameplayMode:'adventure',movement:'free',worldMode:'scrollable_tiled_world'});
   expect(market.collisions).toBeUndefined();
-  expect(next.editorState.scenaConnections.find(c=>c.eventName==='mercado_abrir_usina').exit).toEqual({x:27,y:12,width:1,height:1});
+  expect(next.editorState.scenaConnections.find(c=>c.eventName==='mercado_abrir_usina').exit).toEqual({x:25,y:3,width:1,height:1});
   expect(next.animationStates.find(s=>s.id==='market-adventure-player-state').animationIDs.every(id=>!/attack|hurt|defeat/.test(id))).toBe(true);
  });
 });

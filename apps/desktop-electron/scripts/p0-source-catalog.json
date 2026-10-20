@@ -1990,6 +1990,31 @@
           "path": "Assets/ui/route-lumen-hud-card-2.png",
           "sha256": "d473f331ca22dc4ee47648f6a5ae915f0308a63eb44074b9e4f61833c11e4ea4",
           "contract": "world-map-lumen-user-approved-2026-10-19"
+        },
+        {
+          "path": "Assets/backgrounds/market-approved-surface-768x512.png",
+          "sha256": "339bbea84785992feb68b0102dac46e88d3621c5893b129f0eefebab1b6b676b",
+          "contract": "mercado-suspenso-v2-user-approved-2026-10-20-compatible-palette"
+        },
+        {
+          "path": "Assets/backgrounds/market-approved-foreground-768x512.png",
+          "sha256": "4201d75817e6845538e796f1d03c441776562b1c8eeb868127a75b95fa12c307",
+          "contract": "mercado-suspenso-v2-user-approved-2026-10-20-compatible-palette"
+        },
+        {
+          "path": "Assets/sprites/market-approved-actors-64x64.png",
+          "sha256": "4a9bb556cf2413304c7a6928a94620bfbf7c34031b6c00b4f6ec870a79482215",
+          "contract": "mercado-suspenso-v2-user-approved-2026-10-20-compatible-palette"
+        },
+        {
+          "path": "Assets/sprites/market-approved-delivery-icon.png",
+          "sha256": "84b942d456ae7608e8cc751f29b5d9107470ec738f46a6ca2cc675bfdd509a4f",
+          "contract": "mercado-suspenso-v2-user-approved-2026-10-20-compatible-palette"
+        },
+        {
+          "path": "Assets/sprites/dialogue-sigil.png",
+          "sha256": "b0c3a75b5da13acd702fcc573b9c70af589336667744024974fb97f215fdfdc7",
+          "contract": "conselho-guardia-portraits-v4-approved-source-retained-after-market-v2"
         }
       ],
       "retired": [

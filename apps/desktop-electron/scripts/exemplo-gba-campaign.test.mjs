@@ -303,10 +303,11 @@ describe("campanha canônica O Último Farol", () => {
     const project = campaignProject();
 
     expect(commands(project, "mercado_ao_entrar")).toEqual([
+      "if_variable porto_player_health 0", "set_variable porto_player_health 3", "condition_end",
       "play_music farol_falesias",
       "set_camera_property pan_y 0", "remove_button l", "remove_button r",
-      "if_variable var_market_shortcut 1", "set_actor_position market-guard-v1 25 12",
-      "else", "set_actor_position market-guard-v1 26 12", "condition_end"
+      "if_variable var_market_shortcut 1", "set_actor_position market-guard-v1 23 3",
+      "else", "set_actor_position market-guard-v1 24 3", "condition_end"
     ]);
     expect(commands(project, "mercado_falar_mercador")).toEqual([
       "show_dialogue mercado_objetivo",
@@ -315,7 +316,7 @@ describe("campanha canônica O Último Farol", () => {
     expect(commands(project, "mercado_abrir_atalho")).toEqual([
       "if_variable var_market_shortcut 0",
       "set_variable var_market_shortcut 1",
-      "set_actor_position market-guard-v1 25 12",
+      "set_actor_position market-guard-v1 23 3",
       "play_sfx farol_sfx_dialogo",
       "save_game 0",
       "show_dialogue mercado_ponte_organizada",

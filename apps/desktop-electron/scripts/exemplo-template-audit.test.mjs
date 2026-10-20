@@ -71,9 +71,9 @@ describe("auditoria do template Vértice", () => {
     expect(currentIssues.some((issue) => issue.startsWith("Cena mercado_suspenso: background"))).toBe(false);
 
     const broken = structuredClone(project);
-    broken.assets.find((asset) => asset.name === "mercado-adventure-foreground.png").metadata.height = 336;
+    broken.assets.find((asset) => asset.name === "market-approved-foreground-768x512.png").metadata.height = 504;
     expect(auditExemploTemplate(broken).geometry.issues).toContain(
-      "Cena mercado_suspenso: foreground 512x336 não cobre a superfície paginada 512x344."
+      "Cena mercado_suspenso: foreground 768x504 não cobre a superfície paginada 768x512."
     );
   });
 

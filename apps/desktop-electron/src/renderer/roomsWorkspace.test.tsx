@@ -1086,10 +1086,10 @@ describe("RoomsWorkspace React smoke", () => {
 
     const hudOverlay = screen.getByLabelText(/^Preview da HUD /);
     expect(hudOverlay.querySelector('canvas[data-hud-preview-renderer="native-contract"]')).toBeInTheDocument();
-    await user.click(screen.getByRole("button", { name: "Editar Sinal" }));
+    await user.click(screen.getAllByRole("button", { name: "Editar Entrega" })[0]!);
 
-    expect(screen.getByRole("combobox", { name: "Sprite do ícone" })).toHaveValue("dialogue-sigil.png");
-    expect(screen.getByRole("heading", { name: "Sinal" })).toBeInTheDocument();
+    expect(screen.getByRole("combobox", { name: "Sprite do ícone" })).toHaveValue("market-approved-delivery-icon.png");
+    expect(screen.getByRole("heading", { name: "Entrega" })).toBeInTheDocument();
   });
 
   it("separa os guias de composição do controle da HUD e respeita Sem HUD", async () => {

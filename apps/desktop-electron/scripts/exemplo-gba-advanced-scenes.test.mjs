@@ -93,24 +93,24 @@ describe("cenas avançadas do template Exemplo GBA", () => {
 
     expect(market).toMatchObject({
       sceneType: "isometric",
-      width: 36,
-      height: 36,
-      backgroundAssetName: "mercado-adventure-surface.png",
+      width: 52,
+      height: 52,
+      backgroundAssetName: "market-approved-surface-768x512.png",
       playerActorName: "Aventureiro · Mercado",
       cameraMode: "follow_player",
       runtime: { type: "isometric", config: {
-        profile: "market-suspenso-isometric-world-v1",
+        profile: "market-suspenso-approved-adventure-v2",
         movement: "free",
         worldMode: "scrollable_tiled_world",
         gameplayMode: "adventure",
-        pagedSurface: { backgroundAsset: "mercado-adventure-surface.png", foregroundAsset: "mercado-adventure-foreground.png" }
+        pagedSurface: { backgroundAsset: "market-approved-surface-768x512.png", foregroundAsset: "market-approved-foreground-768x512.png" }
       } }
     });
     expect(project.actors.filter((actor) => actor.roomName === "mercado_suspenso").map(({ name, spriteSheet }) => [name, spriteSheet]))
       .toEqual([
-        ["Aventureiro · Mercado", "tactical-nara-v5.png"],
-        ["Mercador suspenso", "market-adventure-merchant.png"],
-        ["Guarda do mercado", "market-adventure-guard.png"]
+        ["Aventureiro · Mercado", "market-approved-actors-64x64.png"],
+        ["Mercador suspenso", "market-approved-actors-64x64.png"],
+        ["Guarda do mercado", "market-approved-actors-64x64.png"]
       ]);
   });
 

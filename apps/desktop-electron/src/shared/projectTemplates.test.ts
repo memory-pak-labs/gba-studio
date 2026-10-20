@@ -300,7 +300,7 @@ describe("projectTemplates", () => {
     const room = deriveRoomsWorkspacePresentation(project).rooms.find((candidate) => candidate.name === "mercado_suspenso");
 
     expect(room).toMatchObject({
-      background: "mercado-adventure-surface.png",
+      background: "market-approved-surface-768x512.png",
       backgroundTileWidth: 8,
       backgroundTileHeight: 8
     });
@@ -318,15 +318,16 @@ describe("projectTemplates", () => {
       expect.objectContaining({ id: "hud-default", mode: "standard" }),
       expect.objectContaining({
         id: "hud-mercado-avancada",
-        name: "HUD Mercado",
+        name: "Mercado Suspenso · Entrega",
         mode: "advanced",
         width: 240,
         height: 24,
         components: expect.arrayContaining([
-          expect.objectContaining({ kind: "frame", x: 0, y: 0, width: 240, height: 24 }),
-          expect.objectContaining({ kind: "icon", asset: "dialogue-sigil.png", x: 8, y: 8, width: 16, height: 16 }),
-          expect.objectContaining({ kind: "text", text: "NARA", x: 32, y: 8 }),
-          expect.objectContaining({ kind: "text", text: "A INTERAGIR", x: 136, y: 8, width: 88 })
+          expect.objectContaining({ kind: "frame", x: 4, y: 4, width: 60, height: 18 }),
+          expect.objectContaining({ kind: "icon", asset: "market-approved-delivery-icon.png", x: 187, y: 9, width: 10, height: 9 }),
+          expect.objectContaining({ kind: "bar", valueVariable: "porto_player_health", valueMaximum: 3 }),
+          expect.objectContaining({ kind: "text", valueVariable: "var_market_shortcut", x: 205, y: 9, width: 6 }),
+          expect.objectContaining({ kind: "text", text: "/1", x: 211, y: 9, width: 12 })
         ])
       })
     ]));
@@ -418,9 +419,9 @@ describe("projectTemplates", () => {
     const assets = new Set((project.assets as Array<Record<string, unknown>>).map((asset) => String(asset.name)));
 
     expect(actors.filter((actor) => String(actor.roomName) === "mercado_suspenso")).toEqual(expect.arrayContaining([
-      expect.objectContaining({ name: "Aventureiro · Mercado", spriteSheet: "tactical-nara-v5.png", animationStateID: "market-adventure-player-state" }),
-      expect.objectContaining({ name: "Mercador suspenso", spriteSheet: "market-adventure-merchant.png", animationStateID: "market-adventure-merchant-state" }),
-      expect.objectContaining({ name: "Guarda do mercado", spriteSheet: "market-adventure-guard.png", animationStateID: "market-adventure-guard-state" })
+      expect.objectContaining({ name: "Aventureiro · Mercado", spriteSheet: "market-approved-actors-64x64.png", animationStateID: "market-adventure-player-state" }),
+      expect.objectContaining({ name: "Mercador suspenso", spriteSheet: "market-approved-actors-64x64.png", animationStateID: "market-adventure-merchant-state" }),
+      expect.objectContaining({ name: "Guarda do mercado", spriteSheet: "market-approved-actors-64x64.png", animationStateID: "market-adventure-guard-state" })
     ]));
     expect(actors.filter((actor) => String(actor.roomName) === "usina_submersa")).toEqual([]);
     expect(actors.filter((actor) => String(actor.roomName) === "usina_combate")).toEqual(expect.arrayContaining([
@@ -429,11 +430,9 @@ describe("projectTemplates", () => {
     expect(actors.filter((actor) => String(actor.roomName) === "usina_saida")).toEqual(expect.arrayContaining([
       expect.objectContaining({ name: "Célula de energia", spriteSheet: "dungeon-approved-cell-near.png" })
     ]));
-    expect(assets.has("tactical-nara-v5.png")).toBe(true);
-    expect(assets.has("market-adventure-merchant.png")).toBe(true);
-    expect(assets.has("market-adventure-guard.png")).toBe(true);
-    expect(assets.has("mercado-adventure-surface.png")).toBe(true);
-    expect(assets.has("mercado-adventure-foreground.png")).toBe(true);
+    expect(assets.has("market-approved-actors-64x64.png")).toBe(true);
+    expect(assets.has("market-approved-surface-768x512.png")).toBe(true);
+    expect(assets.has("market-approved-foreground-768x512.png")).toBe(true);
     expect(assets.has("dungeon-approved-sentinel-near.png")).toBe(true);
   });
 
@@ -578,6 +577,7 @@ describe("projectTemplates", () => {
       "dungeon-approved-sentinel-far.png",
       "dungeon-approved-sentinel-mid.png",
       "dungeon-approved-sentinel-near.png",
+      "market-approved-actors-64x64.png",
       "opening-local-animation-128x96.png",
       "penedos-approved-checkpoint.png",
       "penedos-approved-crab-east.png",
@@ -641,8 +641,8 @@ describe("projectTemplates", () => {
     const pagedAssets = assets.filter(asset => (asset.metadata as Record<string, unknown> | undefined)?.kind === "paged_bg");
     expect(pagedAssets.map(asset => asset.name)).toEqual(expect.arrayContaining([
       "route-lumen-paged.png",
-      "mercado-adventure-surface.png",
-      "mercado-adventure-foreground.png"
+      "market-approved-surface-768x512.png",
+      "market-approved-foreground-768x512.png"
     ]));
     expect(pagedAssets.find(asset => asset.name === "route-lumen-paged.png")?.metadata).toMatchObject({colorMode:"8bpp-indexed", backgroundPaletteBankBudget:14});
     expect(pagedAssets.every((asset) => (asset.metadata as Record<string, unknown>)?.colorMode === "8bpp-indexed")).toBe(true);

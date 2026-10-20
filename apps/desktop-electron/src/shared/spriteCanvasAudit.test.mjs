@@ -7,10 +7,10 @@ import { deriveProjectHealthReport } from "./projectHealth.js";
 const canonical = JSON.parse(readFileSync(new URL("../../default-assets/templates/exemplo-gba/exemplo-gba.gba-project", import.meta.url), "utf8"));
 
 describe("canonical sprite canvas audit", () => {
-  it("contains all 119 active sheets and 497 frames without cropping or missing compositions", () => {
+  it("contains all 117 active sheets and 506 frames without cropping or missing compositions", () => {
     const rows = auditProjectSpriteFrames(canonical);
-    expect(rows).toHaveLength(119);
-    expect(rows.reduce((n, r) => n + r.frames, 0)).toBe(497);
+    expect(rows).toHaveLength(117);
+    expect(rows.reduce((n, r) => n + r.frames, 0)).toBe(506);
     expect(rows.filter(r => r.clippedFrames || r.missingFrames)).toEqual([]);
     expect(fitProjectSpriteFrames(canonical)).toEqual(canonical);
   });

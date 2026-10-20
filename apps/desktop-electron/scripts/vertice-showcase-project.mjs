@@ -8313,6 +8313,7 @@ export function projectAssetCoverage(project) {
     ['port-tiles', 'porto-lumen-continuous-paged.png'],
     ['nara-topdown', 'porto-nara-animations48.png'],
     ['mechanic', 'porto-mechanic-animations48.png'],
+    ['dialogue-ui', 'gba-dialogue-font-v3.png'],
     ...[1, 2, 3].map(i => [`prologue-frame-${i}`, `prologue-clean-frame-${i}-240x160-4bpp.png`])
   ]) if (assets.some(asset => asset.name === file)) assetRoles.set(role, [file]);
   return {

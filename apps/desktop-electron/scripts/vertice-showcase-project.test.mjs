@@ -89,10 +89,10 @@ describe("materialização canônica de Vértice", () => {
       const exported = buildEngineExportProjectContract(project);
       const room = exported.isometric_project.rooms.find(room => room.name === "mercado_suspenso");
       expect(room.tile_events).toEqual(expect.arrayContaining([
-        expect.objectContaining({ area: { x: 27, y: 12, width: 1, height: 1, z: 3 } })
+        expect.objectContaining({ area: { x: 25, y: 3, width: 1, height: 1, z: 3 } })
       ]));
-      expect(room.height_levels[12 * 36 + 27]).toBe(3);
-      expect(room.collision_flags[12 * 36 + 27]).toBe(0);
+      expect(room.height_levels[3 * 52 + 25]).toBe(3);
+      expect(room.collision_flags[3 * 52 + 25]).toBe(0);
     }
   });
 
@@ -1898,7 +1898,6 @@ describe("materialização canônica de Vértice", () => {
       "frame-menus-v2.png",
       "tactical-v5-surface.png",
       "tactical-v5-hud.png",
-      "tactical-nara-v5.png",
       "tactical-sentinel-v5.png",
       "title-logo-actor-128x88.png",
       "menu-entry-back.png",
@@ -1919,10 +1918,9 @@ describe("materialização canônica de Vértice", () => {
       "opening-v3-gaivota-24x16.png",
       "route-lumen-paged.png",
       "route-dirigible-lumen-64.png",
-      "market-adventure-merchant.png",
-      "market-adventure-guard.png",
-      "mercado-adventure-surface.png",
-      "mercado-adventure-foreground.png",
+      "market-approved-actors-64x64.png",
+      "market-approved-surface-768x512.png",
+      "market-approved-foreground-768x512.png",
       "council-v5-background.png",
       "council-v5-nara.png",
       "council-v5-guardian.png",
@@ -1986,7 +1984,6 @@ describe("materialização canônica de Vértice", () => {
       "usina-sentinel-v2.png",
       "usina-energy-cell-v2.png",
       "nara-portrait.png",
-      "dialogue-sigil.png",
       "battle-rpg-scene-party-mechanic-alpha128-v2.png",
       "battle-rpg-usina-nearest-review.png",
       "battle-rpg-scene-enemy-large-robot-alpha128-v2.png",
@@ -2046,6 +2043,7 @@ describe("materialização canônica de Vértice", () => {
     for(const name of [...dungeonManifest.replacedAssetNames,...dungeonManifest.unusedPreparedAssetNames])allowedAssets.delete(name);
     const routeManifest=JSON.parse(readFileSync(new URL('../fixtures/asset-provenance/world-map-lumen-manifest.json',import.meta.url)));
     for(const asset of Object.values(routeManifest.assets))allowedAssets.add(asset.name);
+    for (const a of JSON.parse(readFileSync(new URL('../fixtures/asset-provenance/market-approved-manifest.json',import.meta.url))).assets) allowedAssets.add(a.name);
     expect(new Set(project.assets.map((asset) => asset.name))).toEqual(allowedAssets);
     expect(project.audioItems).toHaveLength(69);
     expect(project.audioItems.find(a=>a.name==='mapa_mar_aberto')).toMatchObject({bpm:84,format:'COMPOSED',loops:true});
@@ -2110,37 +2108,37 @@ describe("materialização canônica de Vértice", () => {
   it("preserva a exploração do Mercado com superfície contínua e corrimãos separados", () => {
     const project = verticeProject();
     const market = project.scenas.find(scene => scene.name === "mercado_suspenso");
-    expect(market).toMatchObject({ width: 36, height: 36,
-      backgroundAssetName: "mercado-adventure-surface.png", gbStudioUseBackgroundLayout: true,
+    expect(market).toMatchObject({ width: 52, height: 52,
+      backgroundAssetName: "market-approved-surface-768x512.png", gbStudioUseBackgroundLayout: true,
       cameraMode: "follow_player", runtime: { type: "isometric", config: {
-        tileWidth: 24, tileHeight: 12, heightStep: 16, movement: "free",
+        tileWidth: 24, tileHeight: 12, heightStep: 12, movement: "free",
         worldMode: "scrollable_tiled_world", gameplayMode: "adventure",
-        pagedSurface: { backgroundAsset: "mercado-adventure-surface.png",
-          foregroundAsset: "mercado-adventure-foreground.png", width: 512, height: 344 }
+        pagedSurface: { backgroundAsset: "market-approved-surface-768x512.png",
+          foregroundAsset: "market-approved-foreground-768x512.png", width: 768, height: 512 }
       }} });
     expect(market.tileLayers).toEqual([]);
-    expect(market.tilemap).toHaveLength(36 * 36);
-    expect(market.collisionTypes[13 * 36 + 21]).toBe("slope_up_right");
-    expect(market.heightLevels[13 * 36 + 21]).toBe(1);
-    expect(market.heightLevels[13 * 36 + 22]).toBe(2);
-    expect(market.heightLevels[13 * 36 + 23]).toBe(3);
+    expect(market.tilemap).toHaveLength(52 * 52);
+    expect(market.collisionTypes[9 * 52 + 21]).toBe("slope_up_left");
+    expect(market.heightLevels[9 * 52 + 21]).toBe(1);
+    expect(market.heightLevels[8 * 52 + 21]).toBe(2);
+    expect(market.heightLevels[7 * 52 + 21]).toBe(3);
     expect(project.actors.filter(a => a.roomName === "mercado_suspenso")).toEqual(expect.arrayContaining([
-      expect.objectContaining({id: "market-nara", x: 16, y: 20, spriteSheet: "tactical-nara-v5.png"}),
-      expect.objectContaining({id: "market-trader-v2", x: 15, y: 16, spriteSheet: "market-adventure-merchant.png", eventBindings: {onInteract: "mercado_falar_mercador"}}),
-      expect.objectContaining({id: "market-guard-v1", x: 26, y: 12, z: 3, spriteSheet: "market-adventure-guard.png"})
+      expect.objectContaining({id: "market-nara", x: 20, y: 22, spriteSheet: "market-approved-actors-64x64.png"}),
+      expect.objectContaining({id: "market-trader-v2", x: 18, y: 18, spriteSheet: "market-approved-actors-64x64.png", eventBindings: {onInteract: "mercado_falar_mercador"}}),
+      expect.objectContaining({id: "market-guard-v1", x: 24, y: 3, z: 3, spriteSheet: "market-approved-actors-64x64.png"})
     ]));
     const room = buildEngineExportProjectContract(project).isometric_project.rooms.find(r => r.name === "mercado_suspenso");
-    expect(room.paged_surface).toEqual({background: "mercado_adventure_surface", foreground: "mercado_adventure_foreground", width: 512, height: 344});
+    expect(room.paged_surface).toEqual({background: "market_approved_surface_768x512", foreground: "market_approved_foreground_768x512", width: 768, height: 512});
     expect(room).not.toHaveProperty("tileset");
     expect(room).not.toHaveProperty("authored_background");
     expect(room).not.toHaveProperty("tactical");
-    expect(room.camera).toMatchObject({follow_enabled: true, bounds: {x: 0, y: 0, width: 512, height: 344}});
+    expect(room.camera).toMatchObject({follow_enabled: true, bounds: {x: 0, y: 0, width: 768, height: 512}});
     expect(room.tile_events).toEqual(expect.arrayContaining([
-      expect.objectContaining({area: {x: 28, y: 22, width: 1, height: 1, z: 0}, on_interact: expect.any(Array)}),
-      expect.objectContaining({area: {x: 27, y: 12, width: 1, height: 1, z: 3}, on_interact: expect.any(Array)})
+      expect.objectContaining({area: {x: 41, y: 24, width: 1, height: 1, z: 0}, on_interact: expect.any(Array)}),
+      expect.objectContaining({area: {x: 25, y: 3, width: 1, height: 1, z: 3}, on_interact: expect.any(Array)})
     ]));
     const pack = buildAssetcTilesetPackGeneration(project).assetsBySheet;
-    expect(pack["mercado-adventure-foreground.png"]).toMatchObject({kind: "paged_bg", paged_palette_owner: "mercado_adventure_surface", bank_groups: ["scene_mercado_suspenso"]});
+    expect(pack["market-approved-foreground-768x512.png"]).toMatchObject({kind: "paged_bg", paged_palette_owner: "market_approved_surface_768x512", bank_groups: ["scene_mercado_suspenso"]});
   });
 
   it("mantém o diálogo do guarda e o atalho de treino tático consistentes", () => {
@@ -2165,13 +2163,13 @@ describe("materialização canônica de Vértice", () => {
     ]);
     expect(eventCommands("arena_tatica_sair")).toEqual([
       "remove_button l",
-      "change_scene mercado_suspenso 25 13 down"
+      "change_scene mercado_suspenso 24 5 down"
     ]);
     expect(project.editorState.scenaConnections).toContainEqual(expect.objectContaining({
       from: "arena_tatica",
       to: "mercado_suspenso",
       eventName: "arena_tatica_sair",
-      entry: { x: 25, y: 13, width: 1, height: 1 }
+      entry: { x: 24, y: 5, width: 1, height: 1 }
     }));
     expect(validateGBAProjectMigrationContract(project)).toEqual([]);
     expect(() => buildEngineExportProjectContract(project)).not.toThrow();

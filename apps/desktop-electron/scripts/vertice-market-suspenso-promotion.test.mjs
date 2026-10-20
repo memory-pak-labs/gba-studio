@@ -41,9 +41,9 @@ describe("promoção do background novo do Mercado Suspenso", () => {
       .sort((left, right) => left.id.localeCompare(right.id));
 
     expect(marketActors).toEqual([
-      { id: "market-guard-v1", spriteSheet: "market-adventure-guard.png", animationStateID: "market-adventure-guard-state" },
-      { id: "market-nara", spriteSheet: "tactical-nara-v5.png", animationStateID: "market-adventure-player-state" },
-      { id: "market-trader-v2", spriteSheet: "market-adventure-merchant.png", animationStateID: "market-adventure-merchant-state" }
+      { id: "market-guard-v1", spriteSheet: "market-approved-actors-64x64.png", animationStateID: "market-adventure-guard-state" },
+      { id: "market-nara", spriteSheet: "market-approved-actors-64x64.png", animationStateID: "market-adventure-player-state" },
+      { id: "market-trader-v2", spriteSheet: "market-approved-actors-64x64.png", animationStateID: "market-adventure-merchant-state" }
     ]);
     expect(project.assets.map((asset) => asset.name).sort()).toEqual(original.assets.map((asset) => asset.name).sort());
     expect(project.assets.some((asset) => [
@@ -65,25 +65,25 @@ describe("promoção do background novo do Mercado Suspenso", () => {
     expect(project.assets.map((asset) => asset.name).sort()).toEqual(original.assets.map((asset) => asset.name).sort());
     expect(project.assets.find((candidate) => candidate.name === "market-gba.png")).toBeUndefined();
     expect(market).toMatchObject({
-      width: 36, height: 36,
-      backgroundAssetName: "mercado-adventure-surface.png",
-      tilesetAssetName: "mercado-adventure-surface.png",
+      width: 52, height: 52,
+      backgroundAssetName: "market-approved-surface-768x512.png",
+      tilesetAssetName: "market-approved-surface-768x512.png",
       gbStudioUseBackgroundLayout: true,
       playerActorName: "Aventureiro · Mercado",
       tileLayers: [],
       runtime: { type: "isometric", config: {
-        tileWidth: 24, tileHeight: 12, heightStep: 16,
+        tileWidth: 24, tileHeight: 12, heightStep: 12,
         gameplayMode: "adventure", movement: "free", worldMode: "scrollable_tiled_world",
-        pagedSurface: { backgroundAsset: "mercado-adventure-surface.png", foregroundAsset: "mercado-adventure-foreground.png", width: 512, height: 344 }
+        pagedSurface: { backgroundAsset: "market-approved-surface-768x512.png", foregroundAsset: "market-approved-foreground-768x512.png", width: 768, height: 512 }
       } }
     });
     expect(market.heightLevels).toHaveLength(market.width * market.height);
     expect(project.actors.filter((actor) => actor.roomName === "mercado_suspenso")).toEqual(expect.arrayContaining([
-      expect.objectContaining({ spriteSheet: "tactical-nara-v5.png", animationStateID: "market-adventure-player-state" }),
-      expect.objectContaining({ spriteSheet: "market-adventure-merchant.png", animationStateID: "market-adventure-merchant-state" }),
-      expect.objectContaining({ spriteSheet: "market-adventure-guard.png", animationStateID: "market-adventure-guard-state" })
+      expect.objectContaining({ spriteSheet: "market-approved-actors-64x64.png", animationStateID: "market-adventure-player-state" }),
+      expect.objectContaining({ spriteSheet: "market-approved-actors-64x64.png", animationStateID: "market-adventure-merchant-state" }),
+      expect.objectContaining({ spriteSheet: "market-approved-actors-64x64.png", animationStateID: "market-adventure-guard-state" })
     ]));
-    for (const name of ["mercado-adventure-surface.png", "mercado-adventure-foreground.png", "market-adventure-merchant.png", "market-adventure-guard.png"]) {
+    for (const name of ["market-approved-surface-768x512.png", "market-approved-foreground-768x512.png", "market-approved-actors-64x64.png", "market-approved-delivery-icon.png"]) {
       expect(project.assets.find((asset) => asset.name === name)?.metadata?.reviewStatus).toBe("approved");
     }
   });
@@ -97,7 +97,7 @@ describe("promoção do background novo do Mercado Suspenso", () => {
     const root = await mkdtemp(path.join(os.tmpdir(), "retired-market-assets-"));
     const templateProjectPath = path.join(root, "template", "exemplo.gba-project");
     const fixtureProjectPath = path.join(root, "fixture", "exemplo.gba-project");
-    const currentProject = { assets: [{ name: "mercado-adventure-surface.png", metadata: { source: "Assets/backgrounds/mercado-adventure-surface.png" } }] };
+    const currentProject = { assets: [{ name: "market-approved-surface-768x512.png", metadata: { source: "Assets/backgrounds/market-approved-surface-768x512.png" } }] };
     await Promise.all([
       mkdir(path.dirname(templateProjectPath), { recursive: true }),
       mkdir(path.dirname(fixtureProjectPath), { recursive: true })

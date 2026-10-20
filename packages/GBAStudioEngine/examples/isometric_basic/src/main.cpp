@@ -2389,6 +2389,19 @@ bool apply_iso_event_room_change(
 } // namespace
 
 int initialize_isometric_runtime() {
+    // A runtime handoff (including another isometric room or a pause menu)
+    // can replace VRAM while these C++ residency flags survive. Reload both
+    // layers and the paged window before trusting the cached tile footprint.
+    iso_surface_room = nullptr;
+    iso_surface_valid = false;
+    iso_surface_map_loaded = false;
+    iso_foreground_valid = false;
+    iso_foreground_map_loaded = false;
+    iso_foreground_incremental_cache_ready = false;
+    iso_foreground_unique_tile_count = 0;
+    iso_foreground_uploaded_unique_tile_count = 0;
+    authored_background_map_loaded = false;
+    iso_paged_window = {};
     gbs::init();
     gbs::reset_runtime_telemetry();
     runtime_room_change_count = 0;
@@ -2886,6 +2899,10 @@ bool render_indexed_viewport(const gbs::IsometricRoomData& room, const gbs::IsoC
 }
 
 bool render_paged_isometric_viewport(const gbs::IsoBakedComposition& surface, int x, int y) {
+    // A fast follow-camera jump can queue more dirty tiles than one VBlank
+    // uploads. Those transfers still reference our mutable ring buffers: drain
+    // them before recycling slots, even after the first viewport was loaded.
+    while (gbs::dma_vblank_queue_count() != 0) gbs::wait_vblank();
     const bool initial_upload = !iso_paged_window.initialized;
     // The room-entry/load path resets this window. While its tile footprint
     // remains resident, pixel scrolling needs no dirty-slot scan or upload.

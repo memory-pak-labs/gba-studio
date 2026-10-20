@@ -647,7 +647,7 @@ export interface RoomPreset {
 }
 
 export const ROOM_PRESETS: RoomPreset[] = [
-  { id: "isometricAdventure", label: "Isométrica · Aventura", description: "Exploração livre com composição, rampas e sprites aprovados do Mercado.", width: 36, height: 36, sceneType: "isometricAdventure", cameraMode: "follow_player", borderCollision: false },
+  { id: "isometricAdventure", label: "Isométrica · Aventura", description: "Exploração livre com composição, rampas e sprites aprovados do Mercado.", width: 52, height: 52, sceneType: "isometricAdventure", cameraMode: "follow_player", borderCollision: false },
   { id: "isometricTactical", label: "Isométrica · Batalha tática RPG", description: "Arena por turnos com uma unidade aliada e uma inimiga.", width: 6, height: 6, sceneType: "isometricTactical", cameraMode: "fixed_center", borderCollision: false },
   { id: "interior", label: "Interior", description: "Cena compacta com bordas sólidas.", width: 30, height: 20, sceneType: "topdown", cameraMode: "fixed_center", borderCollision: true },
   { id: "exterior", label: "Exterior", description: "Área ampla com câmera seguindo o jogador.", width: 30, height: 20, sceneType: "topdown", cameraMode: "follow_player", borderCollision: false },
@@ -3804,7 +3804,7 @@ function applyApprovedIsometricPreset(data: GBAProjectData, room: Record<string,
   // Reuse approved pixels together with their authored geometry. Story events
   // and campaign state belong to the example, rather than the new scene.
   for (const key of ["width", "height", "backgroundAssetName", "tilesetAssetName", "gbStudioUseBackgroundLayout",
-    "backgroundRenderMode", "cameraMode", "cameraZoom", "cameraBounds", "parallax", "tilemap", "tileLayers",
+    "backgroundRenderMode", "cameraMode", "cameraZoom", "cameraBounds", "cameraZones", "parallax", "tilemap", "tileLayers",
     "heightLevels", "collisionTypes", "rampFlags", "runtime", "paletteFamilyID", "paletteBankPolicy"]) {
     if (source[key] !== undefined) room[key] = cloneProjectData(source[key]);
   }

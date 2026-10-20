@@ -464,7 +464,7 @@ describe("Rooms workspace presentation", () => {
   it("creates distinct room presets and initializes isometric rooms with the bundled tilemap", () => {
     const base = createBlankProjectData({ name: "Presets de room" });
     const expected = {
-      isometricAdventure: {width: 36, height: 36, sceneType: "isometric", cameraMode: "follow_player"},
+      isometricAdventure: {width: 52, height: 52, sceneType: "isometric", cameraMode: "follow_player"},
       isometricTactical: {width: 16, height: 16, sceneType: "isometric", cameraMode: "follow_player"},
       interior: { width: 30, height: 20, sceneType: "topdown", cameraMode: "fixed_center" },
       exterior: { width: 30, height: 20, sceneType: "topdown", cameraMode: "follow_player" },
@@ -4902,8 +4902,9 @@ describe("Isometric authoring modes and actor support", () => {
         sceneType: "isometric", presetID});
       const scene = (next.scenas as Record<string, any>[]).at(-1)!;
       expect(scene.sceneType).toBe("isometric");
-      expect(scene.width).toBe(presetID === "isometricAdventure" ? 36 : 16);
-      expect(scene.height).toBe(presetID === "isometricAdventure" ? 36 : 16);
+      expect(scene.width).toBe(presetID === "isometricAdventure" ? 52 : 16);
+      expect(scene.height).toBe(presetID === "isometricAdventure" ? 52 : 16);
+      if (presetID === "isometricAdventure") expect(scene.cameraZones[0].bounds).toEqual({x: 0, y: 0, width: 768, height: 512});
       expect(scene.runtime.config.gameplayMode).toBe(presetID === "isometricAdventure" ? "adventure" : "tactical");
       const actors = (next.actors as Record<string, unknown>[]).filter(actor => actor.roomName === presetID);
       expect(actors).toHaveLength(presetID === "isometricAdventure" ? 1 : 2);

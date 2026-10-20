@@ -261,7 +261,7 @@ const runtimePlayerSpecs = Object.freeze({
     transparentPaletteIndex: 0
   }),
   shmup: currentTemplateRuntimeSpriteSpec("tempestade-approved-player.png"),
-  isometric: currentTemplateRuntimeSpriteSpec("tactical-nara-v5.png"),
+  isometric: currentTemplateRuntimeSpriteSpec("market-approved-actors-64x64.png"),
   racing: currentTemplateRuntimeSpriteSpec("racing-approved-overhead-nara.png"),
   battleRpg: currentTemplateRuntimeSpriteSpec("relay-approved-nara.png")
 });
@@ -571,6 +571,38 @@ async function waitForPlayerEvidence(cdp, captureFramebuffer = false) {
     delete evidence.nativeStateBase64;
   }
   return evidence;
+}
+
+async function waitForIsometricCameraRest(cdp, initialEvidence) {
+  // Follow-camera easing continues after the first meaningful boot frame.
+  // A native savestate can also lead the presented canvas by one update.
+  // Compare exact pixels only after both scroll and player OAM have stopped;
+  // keep all pixel/palette/actor checks unchanged.
+  const deadline = Date.now() + 15_000;
+  const samples = [];
+  let evidence = initialEvidence;
+  let previousSignature = null;
+  let previousFrame = -1;
+  let stableSamples = 0;
+  while (Date.now() < deadline) {
+    const state = evidence.presentedRuntimeState;
+    const video = state?.nativeVideo;
+    const player = video?.objects?.find(object => object.index === 0);
+    const scroll = video?.bg?.[2];
+    const signature = JSON.stringify([state?.currentRoom, scroll?.x, scroll?.y, player?.x, player?.y]);
+    const fullyVisible = player && player.x >= 0 && player.y >= 0
+      && player.x + player.width <= 240 && player.y + player.height <= 160;
+    if (scroll && fullyVisible && Number(state?.frame) > previousFrame) {
+      stableSamples = signature === previousSignature ? stableSamples + 1 : 0;
+      previousSignature = signature;
+      previousFrame = Number(state.frame);
+      samples.push({frame: state.frame, scroll, player: {x: player.x, y: player.y}});
+      if (stableSamples >= 3) return {...evidence, cameraRest: {stableSamples, samples}};
+    } else stableSamples = 0;
+    await wait(100);
+    evidence = await waitForPlayerEvidence(cdp, true);
+  }
+  throw new Error(`A câmera isométrica não estabilizou com o jogador visível: ${JSON.stringify(samples)}.`);
 }
 
 async function samplePlayerVisualStability(cdp, sampleCount = 36, actorRegions = []) {
@@ -5567,10 +5599,13 @@ async function main() {
           await wait(200);
         }
       }
-      const playerEvidence = await waitForPlayerEvidence(
+      let playerEvidence = await waitForPlayerEvidence(
         playerCdp,
         exactPlayerFramebuffer || exactBackgroundFramebuffer || authoredActorFramebufferScenes.has(scene.name)
       );
+      if (scene.runtime === "isometric" && templateRoomForScene(template, scene.name)?.runtime?.config?.pagedSurface) {
+        playerEvidence = await waitForIsometricCameraRest(playerCdp, playerEvidence);
+      }
       if (!playerEvidence?.ok) throw new Error(`${scene.name} nao produziu frame/audio/runtime: ${JSON.stringify(playerEvidence)}.`);
       traceSceneSmoke(scene.name, "evidence-ready");
       const exported = await latestExportContract(engineExportRoot);

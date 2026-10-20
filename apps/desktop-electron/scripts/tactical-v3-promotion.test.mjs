@@ -17,8 +17,9 @@ function expandedCollisions(room) {
 }
 
 describe("tactical provenance: archived V5 and current large Arena", () => {
-  it("mantém a sheet V5 ainda usada pelo Mercado e retira as versões substituídas da Arena", () => {
-    expect(project.assets.find(a => a.name === 'tactical-nara-v5.png')?.metadata.reviewStatus).toBe('approved');
+  it("usa a sheet aprovada do Mercado e retira as versões substituídas da Arena", () => {
+    expect(project.assets.find(a => a.name === 'market-approved-actors-64x64.png')?.metadata.reviewStatus).toBe('approved');
+    expect(project.assets.some(a => a.name === 'tactical-nara-v5.png')).toBe(false);
     for (const name of ['tactical-v5-surface.png', 'tactical-v5-hud.png', 'tactical-sentinel-v5.png']) {
       expect(project.assets.some(a => a.name === name)).toBe(false);
       expect(retired.some(a => a.name === name)).toBe(true);
@@ -65,7 +66,7 @@ describe("tactical provenance: archived V5 and current large Arena", () => {
     expect(rebuilt.actors.filter((actor) => actor.roomName === "arena_tatica"))
       .toEqual(project.actors.filter((actor) => actor.roomName === "arena_tatica"));
     expect(rebuilt.animations.filter((animation) => animation.spriteSheet === "tactical-nara-v5.png"))
-      .toHaveLength(20);
+      .toHaveLength(0);
     expect(rebuilt.animationStates.some((state) => state.id === "tactical-sentinel-v5-state"))
       .toBe(false);
     expect(() => buildEngineExportProjectContract(rebuilt)).not.toThrow();

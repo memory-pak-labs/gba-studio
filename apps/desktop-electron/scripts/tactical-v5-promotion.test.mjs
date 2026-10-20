@@ -8,6 +8,7 @@ import { auditProjectSpriteFrames } from './lib/sprite-canvas-audit.mjs';
 import { decodePngRgba } from './lib/png-icons.mjs';
 
 const retired = JSON.parse(readFileSync(new URL("../fixtures/asset-provenance/example-library-cleanup.json", import.meta.url))).retiredAssets;
+const retained = JSON.parse(readFileSync(new URL('../fixtures/asset-provenance/market-approved-manifest.json', import.meta.url))).retainedOriginals;
 const source = JSON.parse(readFileSync(new URL('../default-assets/templates/exemplo-gba/exemplo-gba.gba-project', import.meta.url)));
 const approved = buildArenaV5(source);
 // Keep the legacy compiler regression independent of the current promoted Arena.
@@ -46,7 +47,7 @@ describe('approved Arena V5 reconstruction', () => {
       const sha = createHash('sha256').update(bytes).digest('hex');
       expect(bytes.equals(prepared), name).toBe(true);
       if(active) expect(active.metadata).toMatchObject({preparedSha256:sha,reviewStatus:'approved',visualStatus:'approved',technicalStatus:'scene-verified'});
-      else expect(retired.find(a => a.name === name)?.sha256).toBe(sha);
+      else expect(retired.find(a => a.name === name)?.sha256 ?? retained.find(a => a.source.endsWith('/'+name))?.sha256).toBe(sha);
     }
   });
   it('limits the approved hurt revision to the second frame in each direction', () => {
@@ -103,13 +104,13 @@ describe('approved Arena V5 reconstruction', () => {
     expect(footPlacement(rebuilt)).toEqual(footPlacement(source));
     const canvasAudit = auditProjectSpriteFrames(rebuilt)
       .filter(row => /tactical-(nara|sentinel)-v5\.png/.test(row.sheet));
-    expect(canvasAudit).toHaveLength(1);
+    expect(canvasAudit).toHaveLength(0);
     for (const row of canvasAudit) {
       expect(row.frames).toBeGreaterThan(0);
       expect(row.missingFrames).toBe(0);
       expect(row.clippedFrames).toBe(0);
     }
-    expect(rebuilt.assets.filter(a => a.metadata?.generatedBy === 'isometric-arena-v5')).toHaveLength(1);
+    expect(rebuilt.assets.filter(a => a.metadata?.generatedBy === 'isometric-arena-v5')).toHaveLength(0);
     expect(rebuilt.assets.some(a => a.name === 'tactical-v5-surface.png')).toBe(false);
     expect(after.runtime.config).toMatchObject({originX:384,originY:68,tileWidth:48,tileHeight:24,heightStep:8});
     expect(after).toEqual(rebuilt.scenas.find(r => r.name === 'arena_tatica'));

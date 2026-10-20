@@ -668,3 +668,30 @@ Sequência nativa: 0 quadros.
 | Player · Nara | example-actor-racing-approved-rear-nara | Apresentação ou controle nativo |
 | Rival · Coral | example-actor-racing-approved-rear-rival | Apresentação ou controle nativo |
 | Rival · Ilha | example-actor-racing-approved-rear-rival-2 | Apresentação ou controle nativo |
+
+### Mercado Suspenso: apresentação aprovada de 20/10/2026
+
+A aventura usa um fundo contínuo de 768 × 512, câmera seguindo Nara e uma grade
+lógica de 52 × 52. A chegada fica na ilha sudoeste; as pontes ligam a praça e a
+ilha de carga. Registre a entrega com A para atualizar `var_market_shortcut`,
+salvar o checkpoint e liberar a saída da Usina no terraço. A escada sobe três
+níveis. O guarda mantém o acesso com R à Arena Tática e L retorna ao Mercado.
+
+Os três atores usam o banco aprovado de 64 × 64 com pivô nos pés (32,62).
+Nara tem repouso e caminhada nas quatro direções; mercador e guarda alternam as
+poses ambientes aprovadas. A HUD B mostra a vida e a entrega real `0/1` → `1/1`.
+A música das falésias e o som de confirmação foram mantidos. A autoria de
+colisões, alturas, atores, gatilhos e prefabs permanece disponível no editor.
+
+Para validar o consumidor completo, exporte o exemplo com início de teste no
+Mercado e execute, em `apps/desktop-electron`:
+
+```sh
+node scripts/build-racing-playtest.mjs /caminho/mercado-export mercado_suspenso
+node scripts/smoke-market-approved.mjs /caminho/mercado-export/build/exemplo.gba /caminho/mercado-export /caminho/evidencias
+```
+
+O smoke usa botões, compara os pixels dos atores e do BG, percorre as pontes e
+escadas, testa diálogos, entrega, saída e retorno da Arena, e confirma a chegada
+à Usina. Não escreve saves do usuário. A evidência em mGBA não substitui teste
+em GBA físico. Fonte e aprovação: `fixtures/asset-provenance/market-approved-sources.md`.

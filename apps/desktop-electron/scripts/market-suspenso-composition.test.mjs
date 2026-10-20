@@ -15,13 +15,13 @@ describe('Market modular composition', () => {
       project.rooms.find((room) => room.name === 'mercado_suspenso')
     );
     const scene = project.scenas.find((room) => room.name === 'mercado_suspenso');
-    expect(scene).toMatchObject({ width: 36, height: 36, backgroundAssetName: MARKET_SURFACE, tilesetAssetName: MARKET_SURFACE,
-      runtime: { config: { gameplayMode: 'adventure', movement: 'free', pagedSurface: { backgroundAsset: MARKET_SURFACE, foregroundAsset: MARKET_FRONT, width: 512, height: 344 } } } });
+    expect(scene).toMatchObject({ width: 52, height: 52, backgroundAssetName: MARKET_SURFACE, tilesetAssetName: MARKET_SURFACE,
+      runtime: { config: { gameplayMode: 'adventure', movement: 'free', pagedSurface: { backgroundAsset: MARKET_SURFACE, foregroundAsset: MARKET_FRONT, width: 768, height: 512 } } } });
     expect(scene.tileLayers).toEqual([]);
-    expect(scene.collisionTypes).toHaveLength(36 * 36);
+    expect(scene.collisionTypes).toHaveLength(52 * 52);
     expect(JSON.parse(source).scenas.find((room) => room.name === 'mercado_suspenso')).not.toHaveProperty('collisions');
-    expect(project.triggers.find((trigger) => trigger.id === 'trigger-market-bridge')).toMatchObject({ x: 28, y: 22 });
-    expect(project.triggers.find((trigger) => trigger.id === 'trigger-market-exit')).toMatchObject({ x: 27, y: 12 });
+    expect(project.triggers.find((trigger) => trigger.id === 'trigger-market-bridge')).toMatchObject({ x: 41, y: 24 });
+    expect(project.triggers.find((trigger) => trigger.id === 'trigger-market-exit')).toMatchObject({ x: 25, y: 3 });
   });
   it('keeps the approved surface and trader landmark aligned in the canonical project', () => {
     const project = JSON.parse(readFileSync(new URL('../default-assets/templates/exemplo-gba/exemplo-gba.gba-project', import.meta.url), 'utf8'));
@@ -31,7 +31,7 @@ describe('Market modular composition', () => {
     expect([trader.x, trader.y]).toEqual(MARKET_POINTS.merchant);
     expect(trader.eventBindings.onInteract).toBe('mercado_falar_mercador');
     expect(surface.metadata.reviewStatus).toBe('approved');
-    expect(createHash('sha256').update(png).digest('hex')).toBe('cb4944b1b5f9d0837908711db5c743b5a23ff5c6ca9e505c5114d495b8808255');
+    expect(createHash('sha256').update(png).digest('hex')).toBe('339bbea84785992feb68b0102dac46e88d3621c5893b129f0eefebab1b6b676b');
   });
   it('keeps the complete project export contract valid', () => {
     const project = JSON.parse(readFileSync(new URL('../default-assets/templates/exemplo-gba/exemplo-gba.gba-project', import.meta.url), 'utf8'));

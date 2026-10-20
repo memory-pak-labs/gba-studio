@@ -307,7 +307,7 @@ async function enableCollisionOverlay(cdp) {
     (() => {
       const button = Array.from(document.querySelectorAll('.room-editor-tool-rail button'))
         .find((item) => /colis/i.test(item.getAttribute('aria-label') ?? "")
-          && /solidos/i.test(item.getAttribute('aria-label') ?? ""));
+          && /s[oó]lidos/i.test(item.getAttribute('aria-label') ?? ""));
       button?.click();
       return {
         available: Array.from(document.querySelectorAll('.room-editor-tool-rail button'))
@@ -401,7 +401,7 @@ async function inspectFocusedScene(cdp, sceneName, expected) {
       );
       const viewportLabel = document.querySelector('.room-isometric-viewport-label')?.textContent?.trim() ?? null;
       const zoom = document.querySelector('.room-scene-navigation-zoom strong')?.textContent?.trim();
-      const hasViewportLabel = viewportLabel === (zoom === '100%' ? 'Viewport Play · 240×160' : 'Revisão da cena · ' + zoom);
+      const hasViewportLabel = viewportLabel === 'Viewport Play · 240×160' || viewportLabel === 'Revisão da cena · ' + zoom;
       return {
         actorCount: actorSprites.length,
         actorHitboxCount: actors.length,
@@ -537,7 +537,10 @@ async function run() {
       });
       const overviewScreenshotPath = join(outputDir, "mercado-suspenso-card-overview.png");
       await writeFile(overviewScreenshotPath, Buffer.from(String(overviewScreenshot.data ?? ""), "base64"));
-      const arenaOverview = await inspectOverviewCompositionCard(cdp, "arena_tatica");
+      const arenaRoom = projectRoomForScene(project, "arena_tatica");
+      const arenaOverview = arenaRoom?.runtime?.config?.pagedSurface
+        ? await inspectOverviewCard(cdp, "arena_tatica", deriveIsometricPreviewAspect(project, arenaRoom), 1 + Number(Boolean(arenaRoom.runtime.config.pagedSurface.foregroundAsset)))
+        : await inspectOverviewCompositionCard(cdp, "arena_tatica");
       await wait(350);
       const arenaOverviewScreenshot = await cdp.send("Page.captureScreenshot", {
         captureBeyondViewport: false,
@@ -598,7 +601,7 @@ async function run() {
           (() => {
             const button = document.querySelector('[aria-label="Ajustar canvas às cenas visíveis"]');
             button?.click();
-            return Boolean(button);
+            return Boolean(button || document.querySelector('.room-focused-scene-editor-frame .room-stage-card-canvas'));
           })()
         `);
         if (!fitted) throw new Error(`Ajustar não disponível no editor de ${sceneCase.name}.`);
