@@ -38,14 +38,25 @@ def collect_runtime(runtime):
     return entries
 
 
-def build(repo, runtime, output, platform):
-    if git(repo, "status", "--porcelain", "--untracked-files=no").strip():
-        raise ValueError("Commit tracked release changes before exporting corresponding source")
+def build(repo, runtime, output, platform, allow_generated_icons=False):
+    changed = set(filter(None, git(repo, "diff", "HEAD", "--name-only", "-z").decode().split("\0")))
+    generated_icons = {f"apps/desktop-electron/build/{name}.{extension}"
+                       for name in ("icon", "file-gbastudio") for extension in ("png", "ico", "icns")}
+    unexpected = changed - (generated_icons if allow_generated_icons else set())
+    if unexpected:
+        raise ValueError("Commit tracked release changes before exporting corresponding source: " + ", ".join(sorted(unexpected)))
     commit = git(repo, "rev-parse", "HEAD").decode().strip()
     package_path = "apps/desktop-electron/package.json"
     package = json.loads(git(repo, "show", f"HEAD:{package_path}"))
     version = package["version"]
     entries = collect_runtime(runtime)
+    # icons regenerates tracked build outputs differently on native hosts. Keep the
+    # exact packaged bytes alongside the committed source icon and build recipe.
+    for relative in sorted(changed):
+        icon = repo / relative
+        if icon.is_symlink() or not icon.is_file():
+            raise ValueError(f"Invalid generated icon: {relative}")
+        entries[f"generated/{relative}"] = icon.read_bytes()
     for relative in ["LICENSE", "THIRD_PARTY_NOTICES.md", package_path,
                      "apps/desktop-electron/package-lock.json",
                      "apps/desktop-electron/scripts/portable-runtime-sources.json"]:
@@ -63,6 +74,7 @@ def build(repo, runtime, output, platform):
         "Independent tools retain their original licenses; the editor MIT license does not replace those licenses.\n"
         "MANIFEST.json hashes every other ZIP entry. This supplement contains no signing credentials or installed executables.\n").encode()
     manifest = {"schemaVersion": 1, "version": version, "commit": commit, "platform": platform,
+                "generatedIconOverrides": sorted(changed),
                 "entries": [{"path": name, "bytes": len(data), "sha256": hashlib.sha256(data).hexdigest()}
                             for name, data in sorted(entries.items())]}
     entries["MANIFEST.json"] = (json.dumps(manifest, indent=2) + "\n").encode()
@@ -83,5 +95,6 @@ if __name__ == "__main__":
     parser.add_argument("--runtime", type=Path, required=True)
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--platform", choices=["macos-universal", "windows-x64", "linux-x64"], required=True)
+    parser.add_argument("--allow-generated-icons", action="store_true", help="Retain the six known icon build outputs if regenerated")
     args = parser.parse_args()
-    build(args.repo.resolve(), args.runtime.resolve(), args.output.resolve(), args.platform)
+    build(args.repo.resolve(), args.runtime.resolve(), args.output.resolve(), args.platform, args.allow_generated_icons)

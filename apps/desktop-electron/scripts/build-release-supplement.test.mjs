@@ -18,6 +18,7 @@ it("exports committed source, original notices and hashes while excluding privat
     put(repo, "apps/desktop-electron/package.json", '{"version":"0.1.0-rc.1"}');
     put(repo, "apps/desktop-electron/package-lock.json", "{}");
     put(repo, "apps/desktop-electron/scripts/portable-runtime-sources.json", "{}");
+    put(repo, "apps/desktop-electron/build/icon.png", "original icon");
     git("init"); git("add", "."); git("-c", "user.name=Test", "-c", "user.email=test@example.invalid", "commit", "-m", "test");
     put(repo, ".env", "private"); put(repo, ".agent/STATE.md", "private");
     put(runtime, "Toolchain/licenses/GPL.txt", "Original GPL");
@@ -43,8 +44,18 @@ with zipfile.ZipFile(${JSON.stringify(output)}) as z:
 `], { stdio: "pipe" });
     put(repo, "LICENSE", "modified");
     expect(() => execFileSync(python, args, { stdio: "pipe" })).toThrow();
+    expect(() => execFileSync(python, [...args, "--allow-generated-icons"], { stdio: "pipe" })).toThrow();
     git("add", "LICENSE"); git("-c", "user.name=Test", "-c", "user.email=test@example.invalid", "commit", "-m", "test");
-    rmSync(path.join(runtime, "Toolchain/licenses"), { recursive: true });
+    put(repo, "apps/desktop-electron/build/icon.png", "native generated icon");
     expect(() => execFileSync(python, args, { stdio: "pipe" })).toThrow();
+    execFileSync(python, [...args, "--allow-generated-icons"], { stdio: "pipe" });
+    execFileSync(python, ["-I", "-c", `
+import json,zipfile
+with zipfile.ZipFile(${JSON.stringify(output)}) as z:
+    assert z.read('generated/apps/desktop-electron/build/icon.png') == b'native generated icon'
+    assert json.loads(z.read('MANIFEST.json'))['generatedIconOverrides'] == ['apps/desktop-electron/build/icon.png']
+`], { stdio: "pipe" });
+    rmSync(path.join(runtime, "Toolchain/licenses"), { recursive: true });
+    expect(() => execFileSync(python, [...args, "--allow-generated-icons"], { stdio: "pipe" })).toThrow();
   } finally { rmSync(root, { recursive: true, force: true }); }
 });

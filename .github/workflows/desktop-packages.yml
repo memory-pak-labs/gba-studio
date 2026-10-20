@@ -129,7 +129,7 @@ jobs:
       - name: Check installer files
         run: npm run smoke:ci-artifacts -- --platform ${{ matrix.platform }}
       - name: Export exact source and bundled license supplement
-        run: python scripts/build-release-supplement.py --runtime build/embedded-runtime --platform ${{ matrix.platform }}-x64 --output release/GBA-Studio-${{ matrix.platform }}-x64-licenses-and-sources.zip
+        run: python scripts/build-release-supplement.py --runtime build/embedded-runtime --platform ${{ matrix.platform }}-x64 --output release/GBA-Studio-${{ matrix.platform }}-x64-licenses-and-sources.zip --allow-generated-icons
       - name: Smoke Linux packaged editor and complete project
         if: matrix.platform == 'linux'
         run: |
