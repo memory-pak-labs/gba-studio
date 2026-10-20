@@ -3,6 +3,7 @@ import json
 import importlib.util
 import struct
 import subprocess
+import sys
 import tempfile
 import zlib
 from pathlib import Path
@@ -37,7 +38,7 @@ def run_assetc_pack(payload):
         report_path = tmp_path / "report.json"
         pack_path.write_text(json.dumps(payload), encoding="utf-8")
         result = subprocess.run(
-            [str(ASSETC), str(pack_path), "-o", str(report_path), "--pack-json"],
+            [sys.executable, str(ASSETC), str(pack_path), "-o", str(report_path), "--pack-json"],
             cwd=REPO,
             text=True,
             stdout=subprocess.PIPE,
@@ -55,7 +56,7 @@ def run_assetc_export(payload, header_name):
         output_path = tmp_path / "output"
         project_path.write_text(json.dumps(payload), encoding="utf-8")
         result = subprocess.run(
-            [str(ASSETC), str(project_path), "-o", str(output_path), "--export-project-json"],
+            [sys.executable, str(ASSETC), str(project_path), "-o", str(output_path), "--export-project-json"],
             cwd=REPO,
             text=True,
             stdout=subprocess.PIPE,
@@ -73,7 +74,7 @@ def run_assetc_audio(payload):
         output_path = tmp_path / "audio.hpp"
         input_path.write_text(json.dumps(payload), encoding="utf-8")
         result = subprocess.run(
-            [str(ASSETC), str(input_path), "-o", str(output_path), "-n", "audio", "--audio-json"],
+            [sys.executable, str(ASSETC), str(input_path), "-o", str(output_path), "-n", "audio", "--audio-json"],
             cwd=REPO,
             text=True,
             stdout=subprocess.PIPE,
