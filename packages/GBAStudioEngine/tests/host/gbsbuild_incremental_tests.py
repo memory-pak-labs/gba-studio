@@ -58,6 +58,9 @@ elif name=='arm-none-eabi-objcopy':
 else:
  rom=Path(args[0]);rom.write_bytes(rom.read_bytes()+('|'.join(args[1:])).encode())
 '''
+# The fixture must use the same POSIX interpreter as the build harness, even
+# when the Windows runner also exposes a native Python/Pillow earlier in PATH.
+FAKE = FAKE.replace("#!/usr/bin/env python3", "#!" + sys.executable, 1)
 
 class IncrementalBuildTests(unittest.TestCase):
     def test_bundled_shell_with_spaces_is_used_for_make_recipes(self):

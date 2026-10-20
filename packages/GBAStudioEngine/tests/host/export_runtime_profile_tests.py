@@ -1011,6 +1011,7 @@ def world_map_project():
 def run_assetc(repo_root, manifest_path, output_dir, capture_output=False):
     subprocess.run(
         [
+            sys.executable,
             str(repo_root / "tools" / "assetc" / "assetc.py"),
             str(manifest_path),
             "-o",
@@ -1169,6 +1170,7 @@ def assert_scene_banks_reuse_vram_ranges(repo_root, build_dir):
         ]
     }, indent=2) + "\n", encoding="utf-8")
     subprocess.run([
+        sys.executable,
         str(repo_root / "tools" / "assetc" / "assetc.py"),
         str(pack_path),
         "-o",
@@ -5501,6 +5503,7 @@ def assert_luta_native_export(repo_root, build_dir):
     invalid_manifest_path.write_text(json.dumps(invalid_manifest, indent=2) + "\n", encoding="utf-8")
     invalid_result = subprocess.run(
         [
+            sys.executable,
             str(repo_root / "tools" / "assetc" / "assetc.py"),
             str(invalid_manifest_path),
             "-o",
