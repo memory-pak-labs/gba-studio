@@ -33,6 +33,17 @@ export function desktopAssetURL(filePath: string): string {
   return `${desktopAssetProtocol}://asset?path=${encodeURIComponent(normalized)}`;
 }
 
+/** Fetch uses the scoped protocol; file URL pathnames are not native Windows paths. */
+export function assetFetchURL(value: string): string {
+  if (!value.startsWith("file:")) return value;
+  const url = new URL(value);
+  const pathname = decodeURIComponent(url.pathname);
+  const filePath = url.hostname
+    ? `//${url.hostname}${pathname}`
+    : pathname.replace(/^\/([A-Za-z]:\/)/, "$1");
+  return desktopAssetURL(filePath);
+}
+
 export function parseDesktopAssetURL(value: string): string | null {
   try {
     const url = new URL(value);

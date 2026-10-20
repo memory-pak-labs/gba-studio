@@ -2,7 +2,7 @@ import { uiText as ui, useStudioUiText } from "./studioUiText";
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import type { GBAProjectData } from "../shared/projectFile";
 import type { RoomsWorkspaceRoom, RoomsWorkspaceEntity } from "../shared/roomsWorkspace/core";
-import { resolveAssetURL, desktopAssetURL, isDesktopAssetURL } from "../shared/spriteAssetURL";
+import { resolveAssetURL, assetFetchURL, isDesktopAssetURL } from "../shared/spriteAssetURL";
 import { decodeDungeonView, dungeonActorVisual, dungeonGeometryKey, dungeonPlayerActor, dungeonPlayerVisual, projectDungeonActor, renderDungeonWorld, type DungeonCamera, type DungeonTexture } from "../shared/dungeonSceneView";
 import "./styles/dungeon-scene.css";
 
@@ -62,7 +62,7 @@ export function DungeonScenePreview({ room, entities, projectData, projectPath, 
     const resolved = dungeonAssetURL(projectData, projectPath, name);
     if (!resolved) throw Error(ui("Origem das vistas Dungeon indisponível"));
     // Fetch cannot read file: in Electron; the scoped protocol checks the open project root.
-    const url = resolved.startsWith("file:") ? desktopAssetURL(decodeURIComponent(new URL(resolved).pathname)) : resolved;
+    const url = assetFetchURL(resolved);
     return `${url}${url.includes("?") ? "&" : "?"}v=${assetRefreshToken}`;
   };
   useEffect(() => {

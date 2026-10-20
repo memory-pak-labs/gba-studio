@@ -5,6 +5,7 @@ import {buildProjectFromTemplate} from "../shared/projectTemplates";
 import {createRoomInProject} from "../shared/roomsWorkspace";
 import type {RoomsWorkspaceRoom,RoomsWorkspaceEntity} from "../shared/roomsWorkspace";
 import {DungeonScenePreview} from "./DungeonScenePreview";
+import * as assetURLs from "../shared/spriteAssetURL";
 
 afterEach(()=>{cleanup();vi.restoreAllMocks();vi.unstubAllGlobals();});
 it("never renders the disabled first-person hand as a world NPC when looking back",()=>{
@@ -19,7 +20,7 @@ it("never renders the disabled first-person hand as a world NPC when looking bac
   expect(container.querySelector("[data-dungeon-actor]")).toBeNull();
   expect(container.querySelector("[data-dungeon-player]")).toBeNull();
 });
-it.each([true,false])("loads local Dungeon images with CORS before reading canvas pixels (generated=%s)",async generated=>{
+it.each([[true,false],[false,false],[true,true],[false,true]])("loads local Dungeon images with CORS before reading canvas pixels (generated=%s, Windows=%s)",async (generated,windows)=>{
   const loaded:{src:string;crossOrigin:string}[]=[];
   class LocalImage {
     naturalWidth=64;naturalHeight=64;crossOrigin="";
@@ -27,6 +28,7 @@ it.each([true,false])("loads local Dungeon images with CORS before reading canva
     set src(src:string){loaded.push({src,crossOrigin:this.crossOrigin});queueMicrotask(()=>this.onload?.());}
   }
   vi.stubGlobal("Image",LocalImage);
+  if(windows)vi.spyOn(assetURLs,"resolveAssetURL").mockReturnValue("file:///C%3A/Meu%20jogo/Assets/material.png");
   vi.stubGlobal("ImageData",class {constructor(public data:Uint8ClampedArray,public width:number,public height:number){}});
   const put=vi.fn();
   vi.spyOn(HTMLCanvasElement.prototype,"getContext").mockReturnValue({
@@ -42,4 +44,5 @@ it.each([true,false])("loads local Dungeon images with CORS before reading canva
   expect(loaded).toHaveLength(generated?8:1);
   expect(loaded.map(image=>image.crossOrigin)).toEqual(Array(generated?8:1).fill("anonymous"));
   expect(loaded.every(image=>image.src.startsWith("gba-asset:"))).toBe(true);
+  if(windows)expect(assetURLs.parseDesktopAssetURL(loaded[0].src)).toBe("C:/Meu jogo/Assets/material.png");
 });
