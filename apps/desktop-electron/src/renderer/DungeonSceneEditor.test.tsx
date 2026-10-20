@@ -47,4 +47,16 @@ describe("Dungeon follows the scene editor view contract",()=>{
     p.onCollision.mockClear();v.rerender(<DungeonSceneEditor {...p} viewMode="map" mode="collision" locked/>);
     fireEvent.click(screen.getByRole("gridcell",{name:"Célula 2, 1 · passagem"}));expect(p.onCollision).not.toHaveBeenCalled();
   });
+  it("selects a newly drawn trigger so the next map click can move it",()=>{
+    const p=props(),onCreateTrigger=vi.fn(()=>"new-area");
+    const room={...p.room,collisionCells:Array(9).fill(false)};
+    render(<DungeonSceneEditor {...p} room={room} viewMode="map" mode="trigger" onCreateTrigger={onCreateTrigger}/>);
+    const start=screen.getByRole("gridcell",{name:"Célula 0, 0 · passagem"});
+    const end=screen.getByRole("gridcell",{name:"Célula 1, 0 · passagem"});
+    fireEvent.pointerDown(start,{button:0,buttons:1});
+    fireEvent.pointerEnter(end,{buttons:1});
+    fireEvent.pointerUp(window,{button:0,buttons:0});
+    expect(onCreateTrigger).toHaveBeenCalledWith({roomID:"dungeon",x:0,y:0,width:2,height:1},expect.any(String));
+    expect(p.onSelect).toHaveBeenCalledWith(["trigger:new-area"]);
+  });
 });
