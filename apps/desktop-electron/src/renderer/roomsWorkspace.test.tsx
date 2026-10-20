@@ -3640,7 +3640,7 @@ describe("RoomsWorkspace React smoke", () => {
     });
   });
 
-  it("apoia os atores no centro do losango e respeita a altura como a ROM", async () => {
+  it("apoia o pivô dos atores no centro do losango e respeita a altura como a ROM", async () => {
     const user = userEvent.setup();
     const project = createBlankProjectData({ name: "Arena elevada" });
     const room = (project.scenas as Array<Record<string, unknown>>)[0]!;
@@ -3653,7 +3653,7 @@ describe("RoomsWorkspace React smoke", () => {
     });
     project.assets = [
       {id: "floor", kind: "Background", name: "floor.png", metadata: {source: "Assets/backgrounds/floor.png", width: 240, height: 160}},
-      {id: "unit", kind: "Sprite", name: "unit.png", metadata: {source: "Assets/sprites/unit.png"}}
+      {id: "unit", kind: "Sprite", name: "unit.png", metadata: {source: "Assets/sprites/unit.png", pivot: {x: 20, y: 38}}}
     ];
     project.animations = [{
       id: "unit-idle", name: "idle", spriteSheet: "unit.png", frameWidth: 48, frameHeight: 40,
@@ -3669,11 +3669,18 @@ describe("RoomsWorkspace React smoke", () => {
     await focusActiveScene(user);
     const stage = container.querySelector('.room-focused-scene-editor-frame')!;
     const [lower, upper] = Array.from(stage.querySelectorAll<HTMLElement>('.room-stage-entity.actor'));
-    // Engine positions: top = originY + (x+y)*8 - z*8 + 8 - frameHeight.
-    expect(parseFloat(lower.style.top)).toBeCloseTo(30);
-    expect(parseFloat(upper.style.top)).toBeCloseTo(25);
-    expect(parseFloat(lower.style.left)).toBeCloseTo(20);
-    expect(parseFloat(upper.style.left)).toBeCloseTo(60);
+    // Match the export's metadata pivot, including transparent frame margins.
+    // Foot positions are (72,88) and (168,80); the frame is 48×40.
+    expect(parseFloat(lower.style.top)).toBeCloseTo(50 / 160 * 100);
+    expect(parseFloat(upper.style.top)).toBeCloseTo(42 / 160 * 100);
+    expect(parseFloat(lower.style.left)).toBeCloseTo(52 / 240 * 100);
+    expect(parseFloat(upper.style.left)).toBeCloseTo(148 / 240 * 100);
+    const cell = stage.querySelectorAll<HTMLElement>(".room-stage-cell")[4 * 6 + 1]!;
+    fireEvent.pointerDown(cell, { button: 0, buttons: 1, pointerId: 101 });
+    fireEvent.pointerUp(cell, { button: 0, pointerId: 101 });
+    expect(stage.querySelectorAll(".room-stage-isometric-grid-cell.is-entity-selected")).toHaveLength(1);
+    expect(stage.querySelector(".room-stage-isometric-grid-cell.is-entity-selected"))
+      .toHaveAttribute("data-cell-index", "25");
   });
 
   it("renderiza o frame logico completo de um ator isometrico formado por quatro tiles", async () => {

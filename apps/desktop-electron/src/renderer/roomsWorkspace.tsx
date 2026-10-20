@@ -1742,6 +1742,12 @@ function roomEntityStyle(
   const isometricFrameHeight = frame
     ? (frame.frameHeight / Math.max(1, isometricWorldSize?.height ?? (isometricTileHeight / 2) * isometricSpan)) * 100
     : isometricTile?.heightPercent ?? 0;
+  const isometricPivotX = frame && entity.spritePivot
+    ? entity.spritePivot.x / Math.max(1, isometricWorldSize?.width ?? 1) * 100
+    : isometricFrameWidth / 2;
+  const isometricPivotY = frame && entity.spritePivot
+    ? entity.spritePivot.y / Math.max(1, isometricWorldSize?.height ?? 1) * 100
+    : isometricFrameHeight;
   const isometricElevation = entity.z ?? room.heightLevels?.[Math.floor(entity.y) * room.width + Math.floor(entity.x)] ?? 0;
   // The engine anchors sprites at the diamond center, after applying elevation.
   const isometricFeet = isometricTile
@@ -1752,8 +1758,8 @@ function roomEntityStyle(
     backgroundImage: spriteURL ? `url("${spriteURL}")` : undefined,
     clipPath: isometricArea?.clipPath,
     height: isometricArea ? `${isometricArea.heightPercent}%` : isometricTile ? `${isometricFrameHeight}%` : position.height,
-    left: isometricArea ? `${isometricArea.leftPercent}%` : isometricTile ? `${isometricTile.leftPercent + (isometricTile.widthPercent - isometricFrameWidth) / 2}%` : position.left,
-    top: isometricArea ? `${isometricArea.topPercent}%` : isometricTile ? `${isometricFeet - isometricFrameHeight}%` : position.top,
+    left: isometricArea ? `${isometricArea.leftPercent}%` : isometricTile ? `${isometricTile.leftPercent + isometricTile.widthPercent / 2 - isometricPivotX}%` : position.left,
+    top: isometricArea ? `${isometricArea.topPercent}%` : isometricTile ? `${isometricFeet - isometricPivotY}%` : position.top,
     transform: affineObj ? `rotate(${affineObj.rotationDegrees}deg) scale(${affineObj.scaleX}, ${affineObj.scaleY})` : undefined,
     transformOrigin: affineObj ? "center center" : undefined,
     width: isometricArea ? `${isometricArea.widthPercent}%` : isometricTile ? `${isometricFrameWidth}%` : position.width,
@@ -1818,6 +1824,7 @@ interface IsometricGridOverlayProps {
   roomHeight: number;
   roomWidth: number;
   selectedCellIndex?: number | null;
+  selectedEntityCells?: readonly boolean[];
   surfaceSize: IsometricWorldSize;
   showCameraBounds?: boolean;
   showGridCells?: boolean;
@@ -1834,6 +1841,7 @@ function IsometricGridOverlay({
   roomHeight,
   roomWidth,
   selectedCellIndex = null,
+  selectedEntityCells,
   surfaceSize,
   showCameraBounds = false,
   showGridCells = true,
@@ -1895,7 +1903,8 @@ function IsometricGridOverlay({
               className={[
                 "room-stage-isometric-grid-cell",
                 cell.index === hoverCellIndex ? "is-hovered" : "",
-                cell.index === selectedCellIndex ? "is-selected" : ""
+                cell.index === selectedCellIndex ? "is-selected" : "",
+                selectedEntityCells?.[cell.index] ? "is-entity-selected" : ""
               ].filter(Boolean).join(" ")}
               data-cell-index={cell.index}
               key={`isometric-grid-cell-${cell.index}`}
@@ -6744,6 +6753,7 @@ function RoomTilemapEditor({
             roomHeight={room.height}
             roomWidth={room.width}
             selectedCellIndex={selectedCanvasCellIndex}
+            selectedEntityCells={selectedEntityCells}
             surfaceSize={isometricGridSurfaceSize}
             showCameraBounds={isFocusedSceneEditor && canvasLayerVisibility.cameraBounds}
             showGridCells={showGrid && canvasLayerVisibility.grid}

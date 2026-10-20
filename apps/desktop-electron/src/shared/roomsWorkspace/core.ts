@@ -539,6 +539,8 @@ export interface RoomsWorkspaceEntity {
   spriteSource?: string | null;
   spriteBundledDefaultAsset?: string | null;
   spriteFrame?: RoomsWorkspaceSpriteFrame | null;
+  /** Source-frame pivot used by the isometric export, independent of padding. */
+  spritePivot?: { x: number; y: number };
   animationName?: string | null;
   animationStateID?: string | null;
   z?: number;
@@ -2897,6 +2899,12 @@ function entityPresentation(
   const spriteMetadataForSheet = spriteSheet ? spriteMetadata.get(spriteSheet) : undefined;
   const spriteSource = spriteSheet ? nullableString(spriteMetadataForSheet?.source) : null;
   const spriteBundledDefaultAsset = spriteSheet ? nullableString(spriteMetadataForSheet?.bundledDefaultAsset) : null;
+  const pivot = spriteMetadataForSheet?.pivot;
+  const spritePivot = kind === "actor" && isRecord(pivot)
+    && typeof pivot.x === "number" && Number.isFinite(pivot.x)
+    && typeof pivot.y === "number" && Number.isFinite(pivot.y)
+    ? { x: Math.round(pivot.x), y: Math.round(pivot.y) }
+    : null;
   const animationName = entityDocument.animationName;
   const animationStateID = entityDocument.animationStateID;
   const isPlayer = kind === "actor" && rooms.some((room) => (
@@ -2940,6 +2948,7 @@ function entityPresentation(
     spriteSource,
     spriteBundledDefaultAsset,
     spriteFrame,
+    ...(spritePivot ? { spritePivot } : {}),
     animationName,
     ...(kind === "actor" && typeof entity.z === "number" && Number.isFinite(entity.z)
       ? { z: Math.floor(entity.z) }

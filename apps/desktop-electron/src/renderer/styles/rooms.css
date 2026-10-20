@@ -3014,6 +3014,12 @@ body.room-scene-map-card-dragging .room-stage-card-frame.is-dragging {
   z-index: 1000;
 }
 
+/* A composed floor has no tall tile artwork above it. Keep its grid on the
+   ground, below actors and foreground, so lines do not cut through bodies. */
+.room-stage-card-canvas.isometric.has-background-layout .room-stage-isometric-grid {
+  z-index: 8;
+}
+
 .room-stage-isometric-grid-cell {
   fill: transparent;
   shape-rendering: crispEdges;
@@ -3033,7 +3039,8 @@ body.room-scene-map-card-dragging .room-stage-card-frame.is-dragging {
   stroke-width: 2;
 }
 
-.room-stage-isometric-grid-cell.is-selected {
+.room-stage-isometric-grid-cell.is-selected,
+.room-stage-isometric-grid-cell.is-entity-selected {
   fill: rgba(255, 209, 102, 0.16);
   stroke: #ffd166;
   stroke-width: 2;
@@ -3268,6 +3275,21 @@ body.room-scene-map-card-dragging .room-stage-card-frame.is-dragging {
 
 .room-stage-entity.selected {
   box-shadow: 0 0 0 2px #ffd166;
+}
+
+/* Borders shrink the background painting area and distort the source frame.
+   The selected logical diamond marks occupancy; only selection shows frame bounds. */
+.room-stage-card-canvas.isometric .room-stage-entity.actor.has-sprite {
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+  min-height: 0;
+  min-width: 0;
+}
+
+.room-stage-card-canvas.isometric .room-stage-entity.actor.has-sprite.selected {
+  outline: 1px dashed #6d2bf1;
+  outline-offset: 1px;
 }
 
 .room-stage-entity-label {
