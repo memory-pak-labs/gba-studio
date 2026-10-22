@@ -81,11 +81,12 @@ import {
   type ValidateSettingsPathsRequest
 } from "../shared/ipc.js";
 import type { WindowDocumentState } from "../shared/windowDocumentState.js";
+import { DEFAULT_APP_LOCALE } from "../shared/appLocale.js";
 
 configureSmokeDevToolsPort();
 registerTranslationModelProtocolScheme();
 
-let appLocale = "pt-BR";
+let appLocale: string = DEFAULT_APP_LOCALE;
 function showLocalizedOpenDialog(options: OpenDialogOptions) {
   return dialog.showOpenDialog(localizeNativeDialog({ buttonLabel: "Abrir", ...options }, appLocale));
 }

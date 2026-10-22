@@ -5525,6 +5525,16 @@ async function main() {
     await mainCdp.ready;
     traceSceneSmoke("main-ready");
     if (!useExplicitProject) {
+      await waitForText(mainCdp, (text) => text.includes("Exemplo GBA Completo") || text.includes("Exemplo GBA Complete"), "Welcome com template Exemplo");
+      // This route asserts Portuguese editor labels. Select that locale through
+      // the Welcome control in the disposable smoke profile, including first run.
+      await evaluate(mainCdp, `(() => {
+        const language = document.querySelector('select[aria-label="App language"]');
+        if (language) {
+          language.value = "pt-BR";
+          language.dispatchEvent(new Event("change", { bubbles: true }));
+        }
+      })()`);
       await waitForText(mainCdp, (text) => text.includes("Exemplo GBA Completo"), "Welcome com template Exemplo");
       await clickButtonByText(mainCdp, "Exemplo GBA Completo");
     }

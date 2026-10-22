@@ -14,6 +14,7 @@ const entry = { id: "acme/demo", type: "recipePack", gbaStudioVersion: ">=0.1.0"
 
 beforeEach(() => {
   window.localStorage.clear(); vi.resetAllMocks();
+  window.localStorage.setItem("gbaStudio.locale", "pt-BR");
   Object.defineProperty(window, "gbaStudio", { configurable: true, value: { fetchPluginRepository, installPluginFromCatalog } });
   fetchPluginRepository.mockResolvedValue({ ok: true, repository: { name: "Community GBA", plugins: [] } });
 });

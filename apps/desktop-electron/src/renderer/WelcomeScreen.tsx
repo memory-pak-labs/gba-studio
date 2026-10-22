@@ -100,7 +100,7 @@ export function WelcomeScreen({
           <p>{t("welcome.ideTagline")}</p>
         </section>
 
-        <StudioLanguageSwitcher className="welcome-language" />
+        <StudioLanguageSwitcher className="welcome-language" showLabel />
 
         <button
           aria-label={recentProject ? `${t("welcome.continue")} ${recentProject.name}` : t("welcome.openRecentProject")}

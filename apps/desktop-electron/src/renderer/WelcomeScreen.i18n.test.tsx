@@ -11,9 +11,26 @@ describe("WelcomeScreen i18n", () => {
 
   beforeEach(() => {
     window.localStorage.clear();
+    window.localStorage.setItem("gbaStudio.locale", "pt-BR");
     window.gbaStudio = {
       getRecentProjects: vi.fn(async () => [])
     } as unknown as typeof window.gbaStudio;
+  });
+
+  it("starts in English with a visible Language label and preserves the next choice on remount", async () => {
+    window.localStorage.removeItem("gbaStudio.locale");
+    const user = userEvent.setup();
+    const welcome = <StudioI18nProvider><WelcomeScreen status="Ready." onCreateProject={vi.fn()} onOpenProject={vi.fn()} onOpenRecentProject={vi.fn()} /></StudioI18nProvider>;
+    const { unmount } = render(welcome);
+    expect(screen.getByLabelText("App language")).toHaveValue("en-US");
+    expect(screen.getByText("Language", { selector: ".studio-language-label" })).toBeVisible();
+    await user.selectOptions(screen.getByLabelText("App language"), "pt-BR");
+    expect(screen.getByText("Idioma", { selector: ".studio-language-label" })).toBeVisible();
+    expect(window.localStorage.getItem("gbaStudio.locale")).toBe("pt-BR");
+    unmount();
+    render(welcome);
+    expect(screen.getByLabelText("Idioma do app")).toHaveValue("pt-BR");
+    expect(screen.getByRole("heading", { name: "Criar projeto" })).toBeVisible();
   });
 
   it("switches the welcome UI between English and Latin American Spanish", async () => {

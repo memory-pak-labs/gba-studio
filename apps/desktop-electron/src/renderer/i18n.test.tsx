@@ -81,18 +81,23 @@ describe("renderer i18n", () => {
     ]);
   });
 
-  it("falls back to Portuguese BR for unsupported locales", () => {
-    expect(defaultLocale).toBe("pt-BR");
+  it("uses English for a fresh install and unsupported locales", () => {
+    window.localStorage.removeItem("gbaStudio.locale");
+    expect(readStoredLocale()).toBe("en-US");
+    expect(defaultLocale).toBe("en-US");
     expect(isSupportedLocale("fr-FR")).toBe(true);
     expect(resolveLocale("fr-FR")).toBe("fr-FR");
     expect(resolveLocale("es-ES")).toBe("es-ES");
     expect(resolveLocale("es-419")).toBe("es-ES");
-    expect(resolveLocale("xx-XX")).toBe("pt-BR");
+    expect(resolveLocale("xx-XX")).toBe("en-US");
     expect(resolveLocale("en-US")).toBe("en-US");
   });
 
   it("persists only supported locales", () => {
     window.localStorage.clear();
+
+    writeStoredLocale("pt-BR");
+    expect(readStoredLocale()).toBe("pt-BR");
 
     writeStoredLocale("es-ES");
     expect(readStoredLocale()).toBe("es-ES");

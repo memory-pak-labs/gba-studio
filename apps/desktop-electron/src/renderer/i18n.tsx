@@ -1,4 +1,6 @@
 import React, { createContext, useContext, useEffect, useMemo, useState } from "react";
+import { ChevronDown } from "lucide-react";
+import { DEFAULT_APP_LOCALE } from "../shared/appLocale";
 import {
   additionalLocaleDialoguesTranslations,
   additionalLocaleFilesTranslations,
@@ -32,7 +34,7 @@ export type StudioLocaleOption = {
 
 const storageKey = "gbaStudio.locale";
 
-export const defaultLocale: StudioLocale = "pt-BR";
+export const defaultLocale: StudioLocale = DEFAULT_APP_LOCALE;
 
 export const localeOptions: StudioLocaleOption[] = [
   { flagLabel: "PT", label: "Português (Brasil)", locale: "pt-BR", shortLabel: "PT" },
@@ -3014,15 +3016,19 @@ export function useStudioLocale(): StudioLocale {
 
 type StudioLanguageSwitcherProps = {
   className?: string;
+  showLabel?: boolean;
 };
 
-export function StudioLanguageSwitcher({ className }: StudioLanguageSwitcherProps): React.ReactElement {
+export function StudioLanguageSwitcher({ className, showLabel = false }: StudioLanguageSwitcherProps): React.ReactElement {
   const { locale, localeOption, setLocale, t } = useStudioI18n();
 
   return (
     <label className={["studio-language-switcher", className].filter(Boolean).join(" ")} title={t("language.title")}>
-      <span aria-hidden="true" className="studio-language-flag">{localeOption.flagLabel}</span>
+      {showLabel ? <span className="studio-language-label">{t("language.title")}</span> : (
+        <span aria-hidden="true" className="studio-language-flag">{localeOption.flagLabel}</span>
+      )}
       <strong>{localeOption.shortLabel}</strong>
+      {showLabel ? <ChevronDown aria-hidden="true" className="studio-language-chevron" /> : null}
       <select
         aria-label={t("language.ariaLabel")}
         dir={locale === "ar-SA" ? "rtl" : "ltr"}

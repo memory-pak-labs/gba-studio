@@ -11,7 +11,7 @@ function menuItemLabels(section: { submenu?: unknown }): string[] {
 describe("app menu template", () => {
   it("exposes project commands with desktop accelerators", () => {
     const sendCommand = vi.fn();
-    const template = createAppMenuTemplate({ isMac: false, sendCommand });
+    const template = createAppMenuTemplate({ isMac: false, locale: "pt-BR", sendCommand });
     const fileMenu = template.find((item) => item.label === "Arquivo");
 
     expect(fileMenu).toBeDefined();
@@ -44,7 +44,7 @@ describe("app menu template", () => {
   });
 
   it("keeps the macOS app menu before the File menu", () => {
-    const template = createAppMenuTemplate({ appName: "GBA Studio", isMac: true, sendCommand: vi.fn() });
+    const template = createAppMenuTemplate({ appName: "GBA Studio", isMac: true, locale: "pt-BR", sendCommand: vi.fn() });
     const labels = template.map((item) => item.label);
 
     expect(template[0].label).toBe("GBA Studio");
@@ -54,7 +54,7 @@ describe("app menu template", () => {
 
   it("routes undo and redo through renderer app commands", () => {
     const sendCommand = vi.fn();
-    const template = createAppMenuTemplate({ isMac: false, sendCommand });
+    const template = createAppMenuTemplate({ isMac: false, locale: "pt-BR", sendCommand });
     const editMenu = template.find((item) => item.label === "Editar");
     const submenu = editMenu!.submenu as Array<{ label: string; accelerator?: string; click?: () => void }>;
 

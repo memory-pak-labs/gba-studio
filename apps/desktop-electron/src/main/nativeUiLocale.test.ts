@@ -4,6 +4,11 @@ import { createAppMenuTemplate } from "./appMenu.js";
 import { isAppLocale, localizeNativeDialog } from "./nativeUiLocale.js";
 
 describe("native UI locale", () => {
+  it("starts the native menu in English before a renderer preference is supplied", () => {
+    const menu = createAppMenuTemplate({ isMac: false, sendCommand: vi.fn() });
+    expect(menu.some(item => item.label === "File")).toBe(true);
+    expect(menu.some(item => item.label === "Arquivo")).toBe(false);
+  });
   it.each([
     ["pt-BR", "Arquivo", "Salvar", "Executar ROM"],
     ["en-US", "File", "Save", "Run ROM"],
