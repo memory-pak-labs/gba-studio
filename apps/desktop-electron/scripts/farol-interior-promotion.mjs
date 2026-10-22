@@ -33,7 +33,7 @@ export function promoteApprovedFarolInterior(source) {
  const update=r=>{
   if(r.name!==name)return r;
   const result={...r,width,height,backgroundAssetName:entry.file,backgroundRenderMode:'tilemap',gbStudioUseBackgroundLayout:true,
-   cameraMode:'follow_player',cameraZoom:100,cameraBounds:{x:0,y:0,width,height},hudPresetId:manifest.preservedActors.hudPresetId,
+   cameraMode:'follow_player',cameraZoom:100,cameraBounds:{x:0,y:0,width,height},hudPresetId:r.hudPresetId==='hud-farol-trial'?r.hudPresetId:manifest.preservedActors.hudPresetId,
    tilemap:Array(width*height).fill(0),collisions:[...collision],collisionTypes:[...collision],tileLayers:[],heightLevels:Array(width*height).fill(0),
    runtime:{...r.runtime,type:'topdown',config:{...r.runtime?.config,presentation:'topdown',profile:'farol-interior-scale-v2-approved'}}};
   delete result.tilesetAssetName;return result;

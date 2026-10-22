@@ -900,6 +900,34 @@ void test_engine_field_commands_store_and_gate_runtime_state() {
     assert(state.player_x == 9);
 }
 
+void test_equipment_and_timer_fields_follow_native_state() {
+    gbs::EventState state {};
+    gbs::init_event_state(state);
+    const gbs::EventCommand empty[] = {{gbs::EventOp::StoreEngineField, 6, 0, 0}};
+    gbs::run_event_script(state, empty, 1);
+    assert(state.variables[0] == -1);
+    for (int slot = 0; slot < 8; ++slot) {
+        const gbs::EventCommand equip[] = {
+            {gbs::EventOp::SetEquippedItem, static_cast<int16_t>(slot), static_cast<int16_t>(slot + 2), 0},
+            {gbs::EventOp::StoreEngineField, static_cast<int16_t>(6 + slot), static_cast<int16_t>(slot), 0}
+        };
+        gbs::run_event_script(state, equip, 2);
+        assert(state.variables[slot] == slot + 2);
+    }
+    const gbs::EventCommand clear[] = {{gbs::EventOp::SetEquippedItem, 0, -1, 0}, {gbs::EventOp::StoreEngineField, 6, 0, 0}};
+    gbs::run_event_script(state, clear, 2);
+    assert(state.variables[0] == -1);
+    const gbs::EventCommand timers[] = {
+        {gbs::EventOp::AttachTimerEvent, 60, 4, 0},
+        {gbs::EventOp::StoreEngineField, 14, 8, 0},
+        {gbs::EventOp::RemoveTimerEvent, 4, 0, 0},
+        {gbs::EventOp::StoreEngineField, 14, 9, 0}
+    };
+    gbs::run_event_script(state, timers, 4);
+    assert(state.variables[8] == 1);
+    assert(state.variables[9] == 0);
+}
+
 void test_store_actor_state_commands_copy_actor_state_to_variables() {
     gbs::EventState state {};
     gbs::init_event_state(state);
@@ -1963,6 +1991,7 @@ int main() {
     test_variable_to_variable_jump_gates_next_command();
     test_room_conditional_jump_gates_next_command();
     test_engine_field_commands_store_and_gate_runtime_state();
+    test_equipment_and_timer_fields_follow_native_state();
     test_store_actor_state_commands_copy_actor_state_to_variables();
     test_button_pressed_jump_gates_next_command();
     test_wait_button_pressed_pauses_runner_until_matching_input();

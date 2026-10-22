@@ -39,8 +39,12 @@ describe('example authoring library',()=>{
   const next=materializeExampleAuthoring(source());
   for(const id of ['captain','traveler','cartographer','fisherchild','lighthousekeeper']){
    const actor=next.actors.find(a=>a.id===`porto-lume-${id}-pilot`),event=next.events.find(e=>e.name===actor.eventBindings.onInteract);
-   expect(event.steps).toEqual([expect.objectContaining({command:expect.stringMatching(/^show_dialogue /)})]);
-   const dialogue=next.dialogues.find(d=>d.key===event.steps[0].command.split(' ')[1]);
+   if(id==='cartographer')expect(event.steps).toEqual(expect.arrayContaining([expect.objectContaining({command:'show_choice signal_travel'})]));
+   else if(['captain','traveler'].includes(id))expect(event.steps).toEqual(expect.arrayContaining([expect.objectContaining({command:`choice_event showcase_${id==='captain'?'captain':'trader'}_menu 2 showcase_${id}_talk`})]));
+   const conversation=next.events.find(e=>e.name===`showcase_base_${id==='fisherchild'?'fisher':id}`)??event;
+   const original=conversation.steps.find(s=>s.command===`show_dialogue porto-${id}-conversa`);
+   expect(original).toBeDefined();
+   const dialogue=next.dialogues.find(d=>d.key===original.command.split(' ')[1]);
    expect(dialogue).toBeDefined();
    for(const locale of ['pt-BR','en','es'])expect(dialogue.translations[locale]?.length).toBeGreaterThan(20);
   }

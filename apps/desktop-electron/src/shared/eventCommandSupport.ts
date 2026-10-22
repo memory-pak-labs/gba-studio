@@ -57,7 +57,7 @@ const platformCallbacks = new Set([
   "knockbackstart", "knockback_start", "knockbackend", "knockback_end", "blankstart", "blank_start", "blankend", "blank_end",
   "runstart", "run_start", "runend", "run_end", "floatstart", "float_start", "floatend", "float_end"
 ]);
-export const nativeEngineReadFields = new Set(["current_scene_index", "current_room", "scene", "room", "camera_x", "camera_y", "player_x", "player_y", "plat_blank_grav", "platformer_blank_gravity"]);
+export const nativeEngineReadFields = new Set(["current_scene_index", "current_room", "scene", "room", "camera_x", "camera_y", "player_x", "player_y", "plat_blank_grav", "platformer_blank_gravity", ...Array.from({ length: 8 }, (_, slot) => `equipped_item_${slot}`), "timer_count"]);
 export const nativePlatformStates = new Set(["fall", "ground", "jump", "dash", "ladder", "wall", "knockback", "blank", "run", "float"]);
 
 /** Validate the newly integrated paths; existing native commands retain their own validators. */

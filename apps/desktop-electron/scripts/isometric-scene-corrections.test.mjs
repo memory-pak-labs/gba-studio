@@ -4,7 +4,7 @@ import { correctIsometricScenes } from "./isometric-scene-corrections.mjs";
 import { buildEngineExportProjectContract } from "../src/main/exportEngineProject.ts";
 const source = JSON.parse(readFileSync(new URL("../default-assets/templates/exemplo-gba/exemplo-gba.gba-project",import.meta.url)));
 const fixed = correctIsometricScenes(source);
-const commands = name => fixed.events.find(event => event.name === name).steps.map(step => step.command);
+const commands = name => fixed.events.find(event => event.name === name).steps.flatMap(step => step.command.startsWith("call_procedure ") ? commands(step.command.split(" ")[1]) : [step.command]);
 describe("isometric scene integration", () => {
   it("mantém as células caminháveis dentro do mapa amplo da Arena", () => {
     const arena = fixed.rooms.find(room => room.name === 'arena_tatica');

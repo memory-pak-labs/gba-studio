@@ -630,6 +630,21 @@ bool pause_menu_has_shop_items() {
     return project.shop_enabled && project.shop_item_count > 0;
 }
 
+const char* configured_inventory_item_label(size_t item) {
+    for (size_t index = 0; index < project.shop_item_count; ++index) {
+        if (project.shop_items[index].item == static_cast<int>(item)) return project.shop_items[index].label;
+        if (project.shop_items[index].currency_item == static_cast<int>(item)) return "MOEDAS";
+    }
+    return nullptr;
+}
+
+void append_inventory_item_label(char*& out, char* end, int item) {
+    if (item < 0) { append_text(out, end, "VAZIO"); return; }
+    const char* label = configured_inventory_item_label(static_cast<size_t>(item));
+    if (label) append_text(out, end, label);
+    else { append_text(out, end, "ITEM "); append_number(out, end, item + 1); }
+}
+
 void refresh_pause_inventory_items() {
     size_t item_count = 0;
     for (size_t index = 0; index < pause_menu_inventory_capacity; ++index) {
@@ -638,8 +653,7 @@ void refresh_pause_inventory_items() {
         }
         char* out = inventory_item_labels[item_count];
         char* end = out + sizeof(inventory_item_labels[item_count]) - 1;
-        append_text(out, end, "ITEM ");
-        append_number(out, end, static_cast<int>(index + 1));
+        append_inventory_item_label(out, end, static_cast<int>(index));
         append_text(out, end, " x");
         append_number(out, end, event_state.inventory[index]);
         *out = '\0';
@@ -2495,7 +2509,7 @@ void refresh_event_interaction_menu() {
         for(int i=0;i<event_interaction.slots;++i) {
             char* out=event_interaction_labels[i];char* end=out+31;
             append_text(out,end,"SLOT ");append_number(out,end,i+1);
-            append_text(out,end," / ");append_number(out,end,event_state.equipped_items[i]+1);*out='\0';
+            append_text(out,end," / ");append_inventory_item_label(out,end,event_state.equipped_items[i]);*out='\0';
             event_interaction_items[count++]={event_interaction_labels[i],i,true};
         }
     } else {
@@ -2503,7 +2517,7 @@ void refresh_event_interaction_menu() {
         for(size_t i=0;i<gbs::max_event_inventory_items;++i) {
             if(event_state.inventory[i]<=0) continue;
             char* out=event_interaction_labels[count];char* end=out+31;
-            append_text(out,end,"ITEM ");append_number(out,end,static_cast<int>(i+1));
+            append_inventory_item_label(out,end,static_cast<int>(i));
             append_text(out,end," x");append_number(out,end,event_state.inventory[i]);*out='\0';
             event_interaction_items[count]={event_interaction_labels[count],static_cast<int>(i),true};++count;
         }

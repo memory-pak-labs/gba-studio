@@ -153334,28 +153334,31 @@
       "character": "Guardiã",
       "choiceTranslations": {
         "pt-BR": [
-          "Aceitar a aliança"
+          "Proteger a costa",
+          "Explorar novas rotas"
         ],
         "es": [
-          "Aceptar la alianza"
+          "Proteger la costa",
+          "Explorar nuevas rutas"
         ]
       },
       "choices": [
-        "Accept the alliance"
+        "Protect the coast",
+        "Explore new routes"
       ],
       "confirmSound": "farol_sfx_dialogo",
       "emote": "",
       "key": "conselho",
       "portrait": "council-v5-guardian.png",
       "portraitSlot": "right",
-      "text": "The route demands courage and precision. Do you accept the pact?",
+      "text": "Which pact shall we make?",
       "textSound": "farol_sfx_texto",
       "translations": {
-        "pt-BR": "A rota exige coragem e precisão. Você aceita o pacto?",
-        "es": "La ruta exige valor y precisión. ¿Aceptas el pacto?"
+        "pt-BR": "Qual será o nosso pacto?",
+        "es": "¿Cuál será nuestro pacto?"
       },
       "translationStatus": {
-        "pt-BR": "approved",
+        "pt-BR": "draft-ai",
         "es": "draft-ai"
       }
     },
@@ -154372,6 +154375,912 @@
         "es": "El interior del faro está al norte. Allí puedes examinar la lente y el mecanismo.",
         "pt-BR": "O interior do farol fica ao norte. Lá você pode examinar a lente e o mecanismo."
       }
+    },
+    {
+      "key": "signal_request",
+      "character": "Nara",
+      "portrait": "",
+      "emote": "",
+      "text": "The lost signal: find the chart and relay in the Warehouse. Speak to the cartographer. During the trip, hold R and press A on a door to return to Port.",
+      "textSound": "farol_sfx_texto",
+      "confirmSound": "farol_sfx_dialogo",
+      "choices": [],
+      "translations": {
+        "pt-BR": "O sinal perdido: busque a carta e a peça no Armazém. Fale com o cartógrafo. Durante a viagem, R + A na porta volta ao Porto.",
+        "es": "La señal perdida: busca la carta y la pieza en el Almacén. Habla con el cartógrafo. Durante el viaje, R + A en la puerta vuelve al Puerto."
+      },
+      "choiceTranslations": {
+        "pt-BR": [],
+        "es": []
+      },
+      "translationStatus": {
+        "pt-BR": "draft-ai",
+        "es": "draft-ai"
+      }
+    },
+    {
+      "key": "signal_progress",
+      "character": "Nara",
+      "portrait": "",
+      "emote": "",
+      "text": "The lost signal: check OBJECTIVE in the journal. The chart and relay are in the Warehouse; the final clue is in the Observatory.",
+      "textSound": "farol_sfx_texto",
+      "confirmSound": "farol_sfx_dialogo",
+      "choices": [],
+      "translations": {
+        "pt-BR": "O sinal perdido: consulte OBJETIVO no diário. A carta e a peça estão no Armazém; a pista final está no Observatório.",
+        "es": "La señal perdida: consulta OBJETIVO en el diario. La carta y la pieza están en el Almacén; la pista final está en el Observatorio."
+      },
+      "choiceTranslations": {
+        "pt-BR": [],
+        "es": []
+      },
+      "translationStatus": {
+        "pt-BR": "draft-ai",
+        "es": "draft-ai"
+      }
+    },
+    {
+      "key": "signal_chest_locked",
+      "character": "Nara",
+      "portrait": "",
+      "emote": "",
+      "text": "The chest has a nautical latch. Examine the chart on the table first.",
+      "textSound": "farol_sfx_texto",
+      "confirmSound": "farol_sfx_dialogo",
+      "choices": [],
+      "translations": {
+        "pt-BR": "O baú tem uma trava náutica. Examine primeiro a carta sobre a mesa.",
+        "es": "El cofre tiene un cierre náutico. Examina primero la carta de la mesa."
+      },
+      "choiceTranslations": {
+        "pt-BR": [],
+        "es": []
+      },
+      "translationStatus": {
+        "pt-BR": "draft-ai",
+        "es": "draft-ai"
+      }
+    },
+    {
+      "key": "signal_chart",
+      "character": "Nara",
+      "portrait": "",
+      "emote": "",
+      "text": "Chart collected: read the signals EAST to WEST. The telescope and tide table reveal the three numbers.",
+      "textSound": "farol_sfx_texto",
+      "confirmSound": "farol_sfx_dialogo",
+      "choices": [],
+      "translations": {
+        "pt-BR": "Carta recolhida: leia os sinais de LESTE para OESTE. O telescópio e a mesa da maré revelam os três números.",
+        "es": "Carta recogida: lee las señales de ESTE a OESTE. El telescopio y la mesa de mareas revelan los tres números."
+      },
+      "choiceTranslations": {
+        "pt-BR": [],
+        "es": []
+      },
+      "translationStatus": {
+        "pt-BR": "draft-ai",
+        "es": "draft-ai"
+      }
+    },
+    {
+      "key": "signal_chart_again",
+      "character": "Nara",
+      "portrait": "",
+      "emote": "",
+      "text": "You already have the chart. Read it EAST to WEST.",
+      "textSound": "farol_sfx_texto",
+      "confirmSound": "farol_sfx_dialogo",
+      "choices": [],
+      "translations": {
+        "pt-BR": "A carta já está com você. A leitura segue de LESTE para OESTE.",
+        "es": "Ya tienes la carta. La lectura va de ESTE a OESTE."
+      },
+      "choiceTranslations": {
+        "pt-BR": [],
+        "es": []
+      },
+      "translationStatus": {
+        "pt-BR": "draft-ai",
+        "es": "draft-ai"
+      }
+    },
+    {
+      "key": "signal_relay",
+      "character": "Nara",
+      "portrait": "",
+      "emote": "",
+      "text": "Relay collected. Take it to the lighthouse after decoding the signals in the Observatory.",
+      "textSound": "farol_sfx_texto",
+      "confirmSound": "farol_sfx_dialogo",
+      "choices": [],
+      "translations": {
+        "pt-BR": "Peça de relé recolhida. Leve-a ao farol depois de decifrar os sinais no Observatório.",
+        "es": "Pieza de relé recogida. Llévala al faro después de descifrar las señales en el Observatorio."
+      },
+      "choiceTranslations": {
+        "pt-BR": [],
+        "es": []
+      },
+      "translationStatus": {
+        "pt-BR": "draft-ai",
+        "es": "draft-ai"
+      }
+    },
+    {
+      "key": "signal_chest_empty",
+      "character": "Nara",
+      "portrait": "",
+      "emote": "",
+      "text": "You already collected the relay. The chest is empty.",
+      "textSound": "farol_sfx_texto",
+      "confirmSound": "farol_sfx_dialogo",
+      "choices": [],
+      "translations": {
+        "pt-BR": "A peça já foi recolhida. Não há outra no baú.",
+        "es": "Ya recogiste la pieza. El cofre está vacío."
+      },
+      "choiceTranslations": {
+        "pt-BR": [],
+        "es": []
+      },
+      "translationStatus": {
+        "pt-BR": "draft-ai",
+        "es": "draft-ai"
+      }
+    },
+    {
+      "key": "signal_stars",
+      "character": "Nara",
+      "portrait": "",
+      "emote": "",
+      "text": "Through the telescope: three signals EAST, one CENTER and four WEST. Check their order on the tide table.",
+      "textSound": "farol_sfx_texto",
+      "confirmSound": "farol_sfx_dialogo",
+      "choices": [],
+      "translations": {
+        "pt-BR": "Pelo telescópio: três sinais a LESTE, um ao CENTRO e quatro a OESTE. Confira a ordem na mesa da maré.",
+        "es": "Por el telescopio: tres señales al ESTE, una al CENTRO y cuatro al OESTE. Comprueba el orden en la mesa de mareas."
+      },
+      "choiceTranslations": {
+        "pt-BR": [],
+        "es": []
+      },
+      "translationStatus": {
+        "pt-BR": "draft-ai",
+        "es": "draft-ai"
+      }
+    },
+    {
+      "key": "signal_need_observation",
+      "character": "Nara",
+      "portrait": "",
+      "emote": "",
+      "text": "The table shows the chart order, but the signals are missing. Examine the telescope and return here.",
+      "textSound": "farol_sfx_texto",
+      "confirmSound": "farol_sfx_dialogo",
+      "choices": [],
+      "translations": {
+        "pt-BR": "A mesa mostra a ordem da carta, mas faltam os sinais. Examine o telescópio e volte aqui.",
+        "es": "La mesa muestra el orden de la carta, pero faltan las señales. Examina el telescopio y vuelve."
+      },
+      "choiceTranslations": {
+        "pt-BR": [],
+        "es": []
+      },
+      "translationStatus": {
+        "pt-BR": "draft-ai",
+        "es": "draft-ai"
+      }
+    },
+    {
+      "key": "signal_code",
+      "character": "Nara",
+      "portrait": "",
+      "emote": "",
+      "text": "EAST, CENTER, WEST: 3, 1, 4. The code is 314. Return through the door and speak to the keeper beside the lighthouse lens.",
+      "textSound": "farol_sfx_texto",
+      "confirmSound": "farol_sfx_dialogo",
+      "choices": [],
+      "translations": {
+        "pt-BR": "LESTE, CENTRO, OESTE: 3, 1, 4. A combinação é 314. Volte pela porta e fale com o guardião junto à lente do farol.",
+        "es": "ESTE, CENTRO, OESTE: 3, 1, 4. La combinación es 314. Vuelve por la puerta y habla con el guardián junto a la lente del faro."
+      },
+      "choiceTranslations": {
+        "pt-BR": [],
+        "es": []
+      },
+      "translationStatus": {
+        "pt-BR": "draft-ai",
+        "es": "draft-ai"
+      }
+    },
+    {
+      "key": "signal_need_parts",
+      "character": "Nara",
+      "portrait": "",
+      "emote": "",
+      "text": "The panel needs the Warehouse chart and relay. The cartographer can take you back.",
+      "textSound": "farol_sfx_texto",
+      "confirmSound": "farol_sfx_dialogo",
+      "choices": [],
+      "translations": {
+        "pt-BR": "O painel precisa da carta e da peça do Armazém. O cartógrafo pode levar você de volta.",
+        "es": "El panel necesita la carta y la pieza del Almacén. El cartógrafo puede llevarte de vuelta."
+      },
+      "choiceTranslations": {
+        "pt-BR": [],
+        "es": []
+      },
+      "translationStatus": {
+        "pt-BR": "draft-ai",
+        "es": "draft-ai"
+      }
+    },
+    {
+      "key": "signal_need_code",
+      "character": "Nara",
+      "portrait": "",
+      "emote": "",
+      "text": "The relay fits, but you still need the code. Examine the telescope and tide table in the Observatory.",
+      "textSound": "farol_sfx_texto",
+      "confirmSound": "farol_sfx_dialogo",
+      "choices": [],
+      "translations": {
+        "pt-BR": "A peça serve, mas falta a combinação. Examine o telescópio e a mesa da maré no Observatório.",
+        "es": "La pieza encaja, pero falta la combinación. Examina el telescopio y la mesa de mareas del Observatorio."
+      },
+      "choiceTranslations": {
+        "pt-BR": [],
+        "es": []
+      },
+      "translationStatus": {
+        "pt-BR": "draft-ai",
+        "es": "draft-ai"
+      }
+    },
+    {
+      "key": "signal_lock_help",
+      "character": "Nara",
+      "portrait": "",
+      "emote": "",
+      "text": "Lighthouse panel: left/right selects a digit; up/down changes it. A confirms; B cancels.",
+      "textSound": "farol_sfx_texto",
+      "confirmSound": "farol_sfx_dialogo",
+      "choices": [],
+      "translations": {
+        "pt-BR": "Painel do farol: esquerda/direita escolhe o dígito; cima/baixo altera. A confirma; B cancela.",
+        "es": "Panel del faro: izquierda/derecha elige el dígito; arriba/abajo lo cambia. A confirma; B cancela."
+      },
+      "choiceTranslations": {
+        "pt-BR": [],
+        "es": []
+      },
+      "translationStatus": {
+        "pt-BR": "draft-ai",
+        "es": "draft-ai"
+      }
+    },
+    {
+      "key": "signal_wrong_code",
+      "character": "Nara",
+      "portrait": "",
+      "emote": "",
+      "text": "Incorrect code. The clue is 314. Try again without losing the relay.",
+      "textSound": "farol_sfx_texto",
+      "confirmSound": "farol_sfx_dialogo",
+      "choices": [],
+      "translations": {
+        "pt-BR": "A combinação não confere. A pista é 314. Você pode tentar novamente sem perder a peça.",
+        "es": "La combinación no coincide. La pista es 314. Puedes intentarlo de nuevo sin perder la pieza."
+      },
+      "choiceTranslations": {
+        "pt-BR": [],
+        "es": []
+      },
+      "translationStatus": {
+        "pt-BR": "draft-ai",
+        "es": "draft-ai"
+      }
+    },
+    {
+      "key": "signal_cancelled",
+      "character": "Nara",
+      "portrait": "",
+      "emote": "",
+      "text": "Panel closed. You still have the relay.",
+      "textSound": "farol_sfx_texto",
+      "confirmSound": "farol_sfx_dialogo",
+      "choices": [],
+      "translations": {
+        "pt-BR": "Painel fechado. A peça continua com você.",
+        "es": "Panel cerrado. La pieza sigue contigo."
+      },
+      "choiceTranslations": {
+        "pt-BR": [],
+        "es": []
+      },
+      "translationStatus": {
+        "pt-BR": "draft-ai",
+        "es": "draft-ai"
+      }
+    },
+    {
+      "key": "signal_repaired",
+      "character": "Nara",
+      "portrait": "",
+      "emote": "",
+      "text": "The signal is back! The relay is installed. Return to the mechanic in the Port to finish the mission.",
+      "textSound": "farol_sfx_texto",
+      "confirmSound": "farol_sfx_dialogo",
+      "choices": [],
+      "translations": {
+        "pt-BR": "O sinal voltou! A peça foi instalada. Volte à mecânica no Porto para concluir a missão.",
+        "es": "¡La señal volvió! La pieza está instalada. Vuelve con la mecánica del Puerto para completar la misión."
+      },
+      "choiceTranslations": {
+        "pt-BR": [],
+        "es": []
+      },
+      "translationStatus": {
+        "pt-BR": "draft-ai",
+        "es": "draft-ai"
+      }
+    },
+    {
+      "key": "signal_reward",
+      "character": "Nara",
+      "portrait": "",
+      "emote": "",
+      "text": "Mission complete: The lost signal. The mechanic thanks you and gives you 2 coins. Progress saved.",
+      "textSound": "farol_sfx_texto",
+      "confirmSound": "farol_sfx_dialogo",
+      "choices": [],
+      "translations": {
+        "pt-BR": "Missão concluída: O sinal perdido. A mecânica agradece e entrega 2 moedas. Progresso salvo.",
+        "es": "Misión completada: La señal perdida. La mecánica te agradece y entrega 2 monedas. Progreso guardado."
+      },
+      "choiceTranslations": {
+        "pt-BR": [],
+        "es": []
+      },
+      "translationStatus": {
+        "pt-BR": "draft-ai",
+        "es": "draft-ai"
+      }
+    },
+    {
+      "key": "signal_done",
+      "character": "Nara",
+      "portrait": "",
+      "emote": "",
+      "text": "The lost signal: mission complete and reward collected. The lighthouse is operating.",
+      "textSound": "farol_sfx_texto",
+      "confirmSound": "farol_sfx_dialogo",
+      "choices": [],
+      "translations": {
+        "pt-BR": "O sinal perdido: missão concluída e recompensa recebida. O farol segue operando.",
+        "es": "La señal perdida: misión completada y recompensa recibida. El faro sigue funcionando."
+      },
+      "choiceTranslations": {
+        "pt-BR": [],
+        "es": []
+      },
+      "translationStatus": {
+        "pt-BR": "draft-ai",
+        "es": "draft-ai"
+      }
+    },
+    {
+      "key": "signal_available",
+      "character": "Nara",
+      "portrait": "",
+      "emote": "",
+      "text": "The lost signal: speak to the mechanic on the eastern dock in Lumen Port.",
+      "textSound": "farol_sfx_texto",
+      "confirmSound": "farol_sfx_dialogo",
+      "choices": [],
+      "translations": {
+        "pt-BR": "O sinal perdido: fale com a mecânica no cais leste do Porto de Lúmen.",
+        "es": "La señal perdida: habla con la mecánica del muelle este del Puerto de Lumen."
+      },
+      "choiceTranslations": {
+        "pt-BR": [],
+        "es": []
+      },
+      "translationStatus": {
+        "pt-BR": "draft-ai",
+        "es": "draft-ai"
+      }
+    },
+    {
+      "key": "signal_travel",
+      "character": "Nara",
+      "portrait": "",
+      "emote": "",
+      "text": "The lost signal: where shall we go?",
+      "textSound": "farol_sfx_texto",
+      "confirmSound": "farol_sfx_dialogo",
+      "choices": [
+        "Warehouse",
+        "Observatory",
+        "Lighthouse"
+      ],
+      "translations": {
+        "pt-BR": "O sinal perdido: para onde vamos?",
+        "es": "La señal perdida: ¿adónde vamos?"
+      },
+      "choiceTranslations": {
+        "pt-BR": [
+          "Armazém",
+          "Observatório",
+          "Farol"
+        ],
+        "es": [
+          "Almacén",
+          "Observatorio",
+          "Faro"
+        ]
+      },
+      "translationStatus": {
+        "pt-BR": "draft-ai",
+        "es": "draft-ai"
+      }
+    },
+    {
+      "key": "signal_find_relay",
+      "character": "Nara",
+      "portrait": "",
+      "emote": "",
+      "text": "The lost signal: you have the chart. Examine the Warehouse chest to collect the relay.",
+      "textSound": "farol_sfx_texto",
+      "confirmSound": "farol_sfx_dialogo",
+      "choices": [],
+      "translations": {
+        "pt-BR": "O sinal perdido: a carta já está com você. Examine o baú do Armazém para recolher a peça.",
+        "es": "La señal perdida: ya tienes la carta. Examina el cofre del Almacén para recoger la pieza."
+      },
+      "choiceTranslations": {
+        "pt-BR": [],
+        "es": []
+      },
+      "translationStatus": {
+        "pt-BR": "draft-ai",
+        "es": "draft-ai"
+      }
+    },
+    {
+      "key": "showcase_captain_menu",
+      "character": "",
+      "portrait": "",
+      "emote": "",
+      "text": "What comes next?",
+      "translations": {
+        "pt-BR": "Qual é o próximo passo?",
+        "es": "¿Cuál es el siguiente paso?"
+      },
+      "choices": [
+        "Visit the Council",
+        "Coast report",
+        "Talk"
+      ],
+      "choiceTranslations": {
+        "pt-BR": [
+          "Visitar o Conselho",
+          "Estado da costa",
+          "Conversar"
+        ],
+        "es": [
+          "Visitar el Consejo",
+          "Estado de la costa",
+          "Conversar"
+        ]
+      },
+      "translationStatus": {
+        "pt-BR": "draft-ai",
+        "es": "draft-ai"
+      },
+      "textSound": "farol_sfx_texto",
+      "confirmSound": "farol_sfx_dialogo"
+    },
+    {
+      "key": "showcase_trader_menu",
+      "character": "",
+      "portrait": "",
+      "emote": "",
+      "text": "Trader: what do you need?",
+      "translations": {
+        "pt-BR": "Viajante: o que deseja?",
+        "es": "Viajero: ¿qué deseas?"
+      },
+      "choices": [
+        "Buy tool",
+        "Equipment",
+        "Talk"
+      ],
+      "choiceTranslations": {
+        "pt-BR": [
+          "Comprar ferramenta",
+          "Equipamento",
+          "Conversar"
+        ],
+        "es": [
+          "Comprar herramienta",
+          "Equipo",
+          "Conversar"
+        ]
+      },
+      "translationStatus": {
+        "pt-BR": "draft-ai",
+        "es": "draft-ai"
+      },
+      "textSound": "farol_sfx_texto",
+      "confirmSound": "farol_sfx_dialogo"
+    },
+    {
+      "key": "showcase_equipment_help",
+      "character": "",
+      "portrait": "",
+      "emote": "",
+      "text": "Choose the tool in the first slot. Carrying it is different from equipping it. B goes back.",
+      "translations": {
+        "pt-BR": "Escolha a ferramenta no primeiro slot. Ter o item na mochila é diferente de usá-lo. B retorna ao menu anterior.",
+        "es": "Elige la herramienta en el primer espacio. Llevarla no es lo mismo que equiparla. B vuelve."
+      },
+      "choices": [],
+      "choiceTranslations": {
+        "pt-BR": [],
+        "es": []
+      },
+      "translationStatus": {
+        "pt-BR": "draft-ai",
+        "es": "draft-ai"
+      },
+      "textSound": "farol_sfx_texto",
+      "confirmSound": "farol_sfx_dialogo"
+    },
+    {
+      "key": "showcase_keeper_menu",
+      "character": "",
+      "portrait": "",
+      "emote": "",
+      "text": "Calibrate the lighthouse?",
+      "translations": {
+        "pt-BR": "Calibrar o farol?",
+        "es": "¿Calibramos el faro?"
+      },
+      "choices": [
+        "Start calibration",
+        "Equipment",
+        "Talk"
+      ],
+      "choiceTranslations": {
+        "pt-BR": [
+          "Iniciar calibração",
+          "Equipamento",
+          "Conversar"
+        ],
+        "es": [
+          "Iniciar calibración",
+          "Equipo",
+          "Conversar"
+        ]
+      },
+      "translationStatus": {
+        "pt-BR": "draft-ai",
+        "es": "draft-ai"
+      },
+      "textSound": "farol_sfx_texto",
+      "confirmSound": "farol_sfx_dialogo"
+    },
+    {
+      "key": "showcase_need_signal",
+      "character": "",
+      "portrait": "",
+      "emote": "",
+      "text": "Finish The lost signal and collect the mechanic reward first.",
+      "translations": {
+        "pt-BR": "Primeiro conclua O sinal perdido e receba a recompensa da mecânica.",
+        "es": "Primero completa La señal perdida y recoge la recompensa."
+      },
+      "choices": [],
+      "choiceTranslations": {
+        "pt-BR": [],
+        "es": []
+      },
+      "translationStatus": {
+        "pt-BR": "draft-ai",
+        "es": "draft-ai"
+      },
+      "textSound": "farol_sfx_texto",
+      "confirmSound": "farol_sfx_dialogo"
+    },
+    {
+      "key": "showcase_need_tool",
+      "character": "",
+      "portrait": "",
+      "emote": "",
+      "text": "Equip the Port trader tool in the first slot. Carrying it in the bag does not activate the calibrator.",
+      "translations": {
+        "pt-BR": "Equipe a ferramenta do viajante do Porto no primeiro slot. Só carregá-la na mochila não aciona o calibrador.",
+        "es": "Equipa la herramienta del viajero del Puerto en el primer espacio. Llevarla en la mochila no activa el calibrador."
+      },
+      "choices": [],
+      "choiceTranslations": {
+        "pt-BR": [],
+        "es": []
+      },
+      "translationStatus": {
+        "pt-BR": "draft-ai",
+        "es": "draft-ai"
+      },
+      "textSound": "farol_sfx_texto",
+      "confirmSound": "farol_sfx_dialogo"
+    },
+    {
+      "key": "showcase_trial_help",
+      "character": "",
+      "portrait": "",
+      "emote": "",
+      "text": "After closing this text, reach the lower door before time runs out. The center number shows remaining charge. You can retry.",
+      "translations": {
+        "pt-BR": "Ao fechar esta fala, corra até a porta inferior antes do tempo acabar. O número central mostra a carga restante. Errar permite tentar outra vez.",
+        "es": "Al cerrar este texto, llega a la puerta inferior antes de que termine el tiempo. El número central indica la carga restante. Puedes reintentar."
+      },
+      "choices": [],
+      "choiceTranslations": {
+        "pt-BR": [],
+        "es": []
+      },
+      "translationStatus": {
+        "pt-BR": "draft-ai",
+        "es": "draft-ai"
+      },
+      "textSound": "farol_sfx_texto",
+      "confirmSound": "farol_sfx_dialogo"
+    },
+    {
+      "key": "showcase_trial_failed",
+      "character": "",
+      "portrait": "",
+      "emote": "",
+      "text": "The test signal faded. Your tool stays equipped. Return to the keeper to retry.",
+      "translations": {
+        "pt-BR": "O sinal de teste apagou. Sua ferramenta continua equipada. Volte ao guardião para tentar novamente.",
+        "es": "La señal de prueba se apagó. La herramienta sigue equipada. Vuelve al guardián para reintentar."
+      },
+      "choices": [],
+      "choiceTranslations": {
+        "pt-BR": [],
+        "es": []
+      },
+      "translationStatus": {
+        "pt-BR": "draft-ai",
+        "es": "draft-ai"
+      },
+      "textSound": "farol_sfx_texto",
+      "confirmSound": "farol_sfx_dialogo"
+    },
+    {
+      "key": "showcase_trial_success",
+      "character": "",
+      "portrait": "",
+      "emote": "",
+      "text": "Circuit calibrated! One coin for the first calibration. Your result and equipment are saved.",
+      "translations": {
+        "pt-BR": "Circuito calibrado! Você recebe uma moeda pela primeira calibração. O resultado e os equipamentos foram salvos.",
+        "es": "¡Circuito calibrado! Una moneda por la primera calibración. El resultado y el equipo están guardados."
+      },
+      "choices": [],
+      "choiceTranslations": {
+        "pt-BR": [],
+        "es": []
+      },
+      "translationStatus": {
+        "pt-BR": "draft-ai",
+        "es": "draft-ai"
+      },
+      "textSound": "farol_sfx_texto",
+      "confirmSound": "farol_sfx_dialogo"
+    },
+    {
+      "key": "showcase_trial_done",
+      "character": "",
+      "portrait": "",
+      "emote": "",
+      "text": "The emergency circuit is calibrated. Its reward can only be collected once.",
+      "translations": {
+        "pt-BR": "O circuito de emergência já foi calibrado. A recompensa só pode ser recebida uma vez.",
+        "es": "El circuito de emergencia ya está calibrado. Su recompensa solo se recibe una vez."
+      },
+      "choices": [],
+      "choiceTranslations": {
+        "pt-BR": [],
+        "es": []
+      },
+      "translationStatus": {
+        "pt-BR": "draft-ai",
+        "es": "draft-ai"
+      },
+      "textSound": "farol_sfx_texto",
+      "confirmSound": "farol_sfx_dialogo"
+    },
+    {
+      "key": "showcase_trial_active",
+      "character": "",
+      "portrait": "",
+      "emote": "",
+      "text": "The circuit is active. Carry the signal to the lower door before time runs out.",
+      "translations": {
+        "pt-BR": "O circuito está ativo. Leve o sinal até a porta inferior antes que o tempo acabe.",
+        "es": "El circuito está activo. Lleva la señal a la puerta inferior a tiempo."
+      },
+      "choices": [],
+      "choiceTranslations": {
+        "pt-BR": [],
+        "es": []
+      },
+      "translationStatus": {
+        "pt-BR": "draft-ai",
+        "es": "draft-ai"
+      },
+      "textSound": "farol_sfx_texto",
+      "confirmSound": "farol_sfx_dialogo"
+    },
+    {
+      "key": "showcase_community",
+      "character": "",
+      "portrait": "",
+      "emote": "",
+      "text": "Your choice protects coastal shelters. The Guardian sent two repair coins; the Port remembers the pact.",
+      "translations": {
+        "pt-BR": "Sua escolha protege os abrigos da costa. A Guardiã enviou duas moedas para ajudar nos reparos; o Porto se lembra do acordo.",
+        "es": "Tu elección protege los refugios costeros. La Guardiana envió dos monedas; el Puerto recuerda el acuerdo."
+      },
+      "choices": [],
+      "choiceTranslations": {
+        "pt-BR": [],
+        "es": []
+      },
+      "translationStatus": {
+        "pt-BR": "draft-ai",
+        "es": "draft-ai"
+      },
+      "textSound": "farol_sfx_texto",
+      "confirmSound": "farol_sfx_dialogo"
+    },
+    {
+      "key": "showcase_exploration",
+      "character": "",
+      "portrait": "",
+      "emote": "",
+      "text": "Your choice opens new routes. The Guardian compass extends the calibration window to 18 charge units.",
+      "translations": {
+        "pt-BR": "Sua escolha abriu novas rotas. A bússola da Guardiã amplia a janela de calibração para 18 unidades de carga.",
+        "es": "Tu elección abre nuevas rutas. La brújula de la Guardiana amplía la calibración a 18 unidades de carga."
+      },
+      "choices": [],
+      "choiceTranslations": {
+        "pt-BR": [],
+        "es": []
+      },
+      "translationStatus": {
+        "pt-BR": "draft-ai",
+        "es": "draft-ai"
+      },
+      "textSound": "farol_sfx_texto",
+      "confirmSound": "farol_sfx_dialogo"
+    },
+    {
+      "key": "showcase_undecided",
+      "character": "",
+      "portrait": "",
+      "emote": "",
+      "text": "The Guardian awaits your choice: shelters or new routes. The captain can take you to the Council after the signal is restored.",
+      "translations": {
+        "pt-BR": "A Guardiã espera sua decisão: apoiar os abrigos ou explorar novas rotas. O capitão pode levar você ao Conselho após restaurar o sinal.",
+        "es": "La Guardiana espera tu decisión: refugios o nuevas rutas. El capitán te lleva al Consejo tras restaurar la señal."
+      },
+      "choices": [],
+      "choiceTranslations": {
+        "pt-BR": [],
+        "es": []
+      },
+      "translationStatus": {
+        "pt-BR": "draft-ai",
+        "es": "draft-ai"
+      },
+      "textSound": "farol_sfx_texto",
+      "confirmSound": "farol_sfx_dialogo"
+    },
+    {
+      "key": "showcase_mechanic_tool",
+      "character": "",
+      "portrait": "",
+      "emote": "",
+      "text": "You have the trader tool. Equip it before asking the keeper to calibrate the lighthouse circuit.",
+      "translations": {
+        "pt-BR": "Você trouxe a ferramenta do viajante. Equipe-a antes de pedir ao guardião para calibrar o circuito do Farol.",
+        "es": "Tienes la herramienta del viajero. Equípala antes de pedir la calibración al guardián."
+      },
+      "choices": [],
+      "choiceTranslations": {
+        "pt-BR": [],
+        "es": []
+      },
+      "translationStatus": {
+        "pt-BR": "draft-ai",
+        "es": "draft-ai"
+      },
+      "textSound": "farol_sfx_texto",
+      "confirmSound": "farol_sfx_dialogo"
+    },
+    {
+      "key": "showcase_fisher_success",
+      "character": "",
+      "portrait": "",
+      "emote": "",
+      "text": "I saw the lighthouse test! Now the coast has an emergency signal too.",
+      "translations": {
+        "pt-BR": "Eu vi o teste do farol! Agora a costa tem também um sinal de emergência.",
+        "es": "¡Vi la prueba del faro! Ahora la costa tiene una señal de emergencia."
+      },
+      "choices": [],
+      "choiceTranslations": {
+        "pt-BR": [],
+        "es": []
+      },
+      "translationStatus": {
+        "pt-BR": "draft-ai",
+        "es": "draft-ai"
+      },
+      "textSound": "farol_sfx_texto",
+      "confirmSound": "farol_sfx_dialogo"
+    },
+    {
+      "key": "showcase_epilogue_community",
+      "character": "",
+      "portrait": "",
+      "emote": "",
+      "text": "With the beacons lit, coastal shelters welcome travelers again. The protection pact you chose helps the coast thrive.",
+      "translations": {
+        "pt-BR": "Com os faróis acesos, os abrigos voltaram a receber viajantes. A costa prospera pelo pacto de proteção que você escolheu.",
+        "es": "Con los faros encendidos, los refugios reciben viajeros. El pacto de protección que elegiste hace prosperar la costa."
+      },
+      "choices": [],
+      "choiceTranslations": {
+        "pt-BR": [],
+        "es": []
+      },
+      "translationStatus": {
+        "pt-BR": "draft-ai",
+        "es": "draft-ai"
+      },
+      "textSound": "farol_sfx_texto",
+      "confirmSound": "farol_sfx_dialogo"
+    },
+    {
+      "key": "showcase_epilogue_exploration",
+      "character": "",
+      "portrait": "",
+      "emote": "",
+      "text": "With the beacons lit, the compass points beyond the storm. Your exploration pact opens a new journey.",
+      "translations": {
+        "pt-BR": "Com os faróis acesos, a bússola aponta além da tempestade. O pacto de exploração que você escolheu abre uma nova jornada.",
+        "es": "Con los faros encendidos, la brújula señala más allá de la tormenta. Tu pacto de exploración abre otra aventura."
+      },
+      "choices": [],
+      "choiceTranslations": {
+        "pt-BR": [],
+        "es": []
+      },
+      "translationStatus": {
+        "pt-BR": "draft-ai",
+        "es": "draft-ai"
+      },
+      "textSound": "farol_sfx_texto",
+      "confirmSound": "farol_sfx_dialogo"
     }
   ],
   "editorState": {
@@ -155539,6 +156448,106 @@
           "id": "event-menu-initial-new-step-16",
           "command": "set_variable var_campaign_finished 0",
           "isEnabled": true
+        },
+        {
+          "id": "signal-new-game-reset-0",
+          "command": "set_variable var_signal_stage 0",
+          "isEnabled": true
+        },
+        {
+          "id": "signal-new-game-reset-1",
+          "command": "set_variable var_signal_chart 0",
+          "isEnabled": true
+        },
+        {
+          "id": "signal-new-game-reset-2",
+          "command": "set_variable var_signal_part 0",
+          "isEnabled": true
+        },
+        {
+          "id": "signal-new-game-reset-3",
+          "command": "set_variable var_signal_observation 0",
+          "isEnabled": true
+        },
+        {
+          "id": "signal-new-game-reset-4",
+          "command": "set_variable var_signal_code 0",
+          "isEnabled": true
+        },
+        {
+          "id": "signal-new-game-reset-5",
+          "command": "set_variable var_signal_lock 0",
+          "isEnabled": true
+        },
+        {
+          "id": "signal-new-game-reset-6",
+          "command": "set_variable var_signal_trip 0",
+          "isEnabled": true
+        },
+        {
+          "id": "signal-new-game-reset-7",
+          "command": "add_item zz_signal_chart -99",
+          "isEnabled": true
+        },
+        {
+          "id": "signal-new-game-reset-8",
+          "command": "add_item zz_signal_relay -99",
+          "isEnabled": true
+        },
+        {
+          "id": "showcase-new-game-0",
+          "command": "set_equipped_item 0 none",
+          "isEnabled": true
+        },
+        {
+          "id": "showcase-new-game-1",
+          "command": "set_variable var_council_path 0",
+          "isEnabled": true
+        },
+        {
+          "id": "showcase-new-game-2",
+          "command": "set_variable var_council_visit 0",
+          "isEnabled": true
+        },
+        {
+          "id": "showcase-new-game-3",
+          "command": "set_variable var_tool_stock 0",
+          "isEnabled": true
+        },
+        {
+          "id": "showcase-new-game-4",
+          "command": "set_variable var_trial_active 0",
+          "isEnabled": true
+        },
+        {
+          "id": "showcase-new-game-5",
+          "command": "set_variable var_trial_charge 0",
+          "isEnabled": true
+        },
+        {
+          "id": "showcase-new-game-6",
+          "command": "set_variable var_trial_result 0",
+          "isEnabled": true
+        },
+        {
+          "id": "showcase-new-game-7",
+          "command": "set_variable var_trial_attempts 0",
+          "isEnabled": true
+        },
+        {
+          "id": "showcase-new-game-8",
+          "command": "set_variable var_trial_reward 0",
+          "isEnabled": true
+        },
+        {
+          "id": "showcase-new-game-9",
+          "command": "add_item zzz_lumen_tool -99",
+          "isEnabled": true
+        },
+        {
+          "id": "showcase-new-game-10",
+          "command": "add_item zzz_guardian_compass -99",
+          "isEnabled": true
         }
       ]
     },
@@ -155749,47 +156758,67 @@
       "id": "event-port-enter",
       "name": "porto_ao_entrar",
       "roomName": "porto_lumen",
-      "category": "Cena",
-      "detail": "Autoria: porto_ao_entrar. Sequência editável com 8 passos. Os eventos chamados permanecem acessíveis na timeline. Vínculos: rooms.4 (onInit).",
+      "category": "Exemplo · Sistemas conectados",
+      "detail": "Exemplo de sistemas conectados: estado persistente, requisitos e efeitos separados do cenário.",
       "command": "noop",
       "steps": [
         {
-          "id": "event-port-enter-music",
-          "command": "play_music farol_enseada",
+          "id": "porto_ao_entrar-1",
+          "command": "call_procedure showcase_base_port_enter",
           "isEnabled": true
         },
         {
-          "id": "event-port-enter-step-1",
-          "command": "call_event aplicar_perfil_jogador",
+          "id": "porto_ao_entrar-2",
+          "command": "if_variable var_council_visit 1",
           "isEnabled": true
         },
         {
-          "id": "event-port-enter-step-2",
-          "command": "if_variable z_feature_quest_state 0",
+          "id": "porto_ao_entrar-3",
+          "command": "set_variable var_council_visit 0",
           "isEnabled": true
         },
         {
-          "id": "event-port-enter-step-3",
-          "command": "set_variable z_feature_quest_state 1",
+          "id": "porto_ao_entrar-4",
+          "command": "save_game 0",
           "isEnabled": true
         },
         {
-          "id": "porto-health-initial-state",
-          "command": "set_variable porto_player_health 3",
+          "id": "porto_ao_entrar-5",
+          "command": "condition_end",
           "isEnabled": true
         },
         {
-          "id": "event-port-enter-step-4",
-          "command": "add_item currency_gold 3",
+          "id": "porto_ao_entrar-6",
+          "command": "if_variable var_council_path 1",
           "isEnabled": true
         },
         {
-          "id": "event-port-enter-step-5",
-          "command": "set_variable z_feature_shop_stock 0",
+          "id": "porto_ao_entrar-7",
+          "command": "set_actor_animation port-mechanic idle_left",
           "isEnabled": true
         },
         {
-          "id": "event-port-enter-step-6",
+          "id": "porto_ao_entrar-8",
+          "command": "else",
+          "isEnabled": true
+        },
+        {
+          "id": "porto_ao_entrar-9",
+          "command": "if_variable var_council_path 2",
+          "isEnabled": true
+        },
+        {
+          "id": "porto_ao_entrar-10",
+          "command": "set_actor_animation port-mechanic idle_right",
+          "isEnabled": true
+        },
+        {
+          "id": "porto_ao_entrar-11",
+          "command": "condition_end",
+          "isEnabled": true
+        },
+        {
+          "id": "porto_ao_entrar-12",
           "command": "condition_end",
           "isEnabled": true
         }
@@ -155799,23 +156828,28 @@
       "id": "event-port-frame",
       "name": "porto_recuperar_estrutura",
       "roomName": "porto_lumen",
-      "category": "Ator",
-      "detail": "Autoria: porto_recuperar_estrutura. Sequência editável com 3 passos. Os eventos chamados permanecem acessíveis na timeline. Vínculos: actors.1 (scriptName), actors.1 (onInteract).",
+      "category": "Exemplo · Sistemas conectados",
+      "detail": "Exemplo de sistemas conectados: estado persistente, requisitos e efeitos separados do cenário.",
       "command": "noop",
       "steps": [
         {
-          "id": "event-port-frame-step-1",
-          "command": "set_variable var_frame 1",
+          "id": "porto_recuperar_estrutura-1",
+          "command": "call_procedure showcase_base_mechanic",
           "isEnabled": true
         },
         {
-          "id": "event-port-frame-step-2",
-          "command": "add_item quest_fragment 1",
+          "id": "porto_recuperar_estrutura-2",
+          "command": "has_item zzz_lumen_tool 1",
           "isEnabled": true
         },
         {
-          "id": "event-port-frame-step-3",
-          "command": "save_game 0",
+          "id": "porto_recuperar_estrutura-3",
+          "command": "show_dialogue showcase_mechanic_tool",
+          "isEnabled": true
+        },
+        {
+          "id": "porto_recuperar_estrutura-4",
+          "command": "condition_end",
           "isEnabled": true
         }
       ]
@@ -155879,33 +156913,18 @@
       "id": "event-lighthouse-enter",
       "name": "farol_interior_ao_entrar",
       "roomName": "farol_interior",
-      "category": "Cena",
-      "detail": "Autoria: farol_interior_ao_entrar. Sequência editável com 5 passos. Os eventos chamados permanecem acessíveis na timeline. Vínculos: rooms.29 (onInit).",
+      "category": "Exemplo · Sistemas conectados",
+      "detail": "Exemplo de sistemas conectados: estado persistente, requisitos e efeitos separados do cenário.",
       "command": "noop",
       "steps": [
         {
-          "id": "event-lighthouse-enter-music",
-          "command": "play_music farol_memorias",
+          "id": "farol_interior_ao_entrar-1",
+          "command": "call_procedure showcase_trial_watchdog",
           "isEnabled": true
         },
         {
-          "id": "farol-preserve-player-art",
-          "command": "change_player_sprite porto-nara-animations48.png",
-          "isEnabled": true
-        },
-        {
-          "id": "farol-preserve-player-pose",
-          "command": "set_actor_animation Player idle_up",
-          "isEnabled": true
-        },
-        {
-          "id": "event-lighthouse-enter-audio",
-          "command": "play_sfx farol_sfx_porta",
-          "isEnabled": true
-        },
-        {
-          "id": "event-lighthouse-enter-step-1",
-          "command": "show_dialogue farol_interior_objetivo",
+          "id": "farol_interior_ao_entrar-2",
+          "command": "call_procedure showcase_base_farol_enter",
           "isEnabled": true
         }
       ]
@@ -155914,13 +156933,48 @@
       "id": "event-lighthouse-keeper",
       "name": "farol_falar_guardiao",
       "roomName": "farol_interior",
-      "category": "Ator",
-      "detail": "Autoria: farol_falar_guardiao. Sequência editável com 1 passos. Os eventos chamados permanecem acessíveis na timeline. Vínculos: actors.10 (scriptName), actors.10 (onInteract).",
+      "category": "Exemplo · Sistemas conectados",
+      "detail": "Exemplo de sistemas conectados: estado persistente, requisitos e efeitos separados do cenário.",
       "command": "noop",
       "steps": [
         {
-          "id": "event-lighthouse-keeper-step-1",
-          "command": "show_dialogue farol_guardiao",
+          "id": "farol_falar_guardiao-1",
+          "command": "if_variable var_signal_stage 3",
+          "isEnabled": true
+        },
+        {
+          "id": "farol_falar_guardiao-2",
+          "command": "choice_event showcase_keeper_menu 0 showcase_begin_trial",
+          "isEnabled": true
+        },
+        {
+          "id": "farol_falar_guardiao-3",
+          "command": "choice_event showcase_keeper_menu 1 showcase_open_equipment",
+          "isEnabled": true
+        },
+        {
+          "id": "farol_falar_guardiao-4",
+          "command": "choice_event showcase_keeper_menu 2 showcase_keeper_talk",
+          "isEnabled": true
+        },
+        {
+          "id": "farol_falar_guardiao-5",
+          "command": "show_choice showcase_keeper_menu",
+          "isEnabled": true
+        },
+        {
+          "id": "farol_falar_guardiao-6",
+          "command": "else",
+          "isEnabled": true
+        },
+        {
+          "id": "farol_falar_guardiao-7",
+          "command": "call_procedure showcase_base_keeper",
+          "isEnabled": true
+        },
+        {
+          "id": "farol_falar_guardiao-8",
+          "command": "condition_end",
           "isEnabled": true
         }
       ]
@@ -155929,18 +156983,188 @@
       "id": "event-lighthouse-lens",
       "name": "farol_examinar_lente",
       "roomName": "farol_interior",
-      "category": "Hotspot",
-      "detail": "Autoria: farol_examinar_lente. Sequência editável com 2 passos. Os eventos chamados permanecem acessíveis na timeline. Vínculos: triggers.2 (onInteract), triggers.2 (onEnter).",
+      "category": "O sinal perdido",
+      "detail": "Missão opcional: condições e recompensas persistentes, sem modificar as camadas visuais aprovadas.",
       "command": "noop",
       "steps": [
         {
-          "id": "event-lighthouse-lens-audio",
+          "id": "farol_examinar_lente-step-1",
+          "command": "if_variable var_signal_stage 1",
+          "isEnabled": true
+        },
+        {
+          "id": "farol_examinar_lente-step-2",
+          "command": "has_item zz_signal_chart 1",
+          "isEnabled": true
+        },
+        {
+          "id": "farol_examinar_lente-step-3",
+          "command": "has_item zz_signal_relay 1",
+          "isEnabled": true
+        },
+        {
+          "id": "farol_examinar_lente-step-4",
+          "command": "if_variable var_signal_code 1",
+          "isEnabled": true
+        },
+        {
+          "id": "farol_examinar_lente-step-5",
+          "command": "show_dialogue signal_lock_help",
+          "isEnabled": true
+        },
+        {
+          "id": "farol_examinar_lente-step-6",
+          "command": "open_code_lock var_signal_lock 3 314",
+          "isEnabled": true
+        },
+        {
+          "id": "farol_examinar_lente-step-7",
+          "command": "if_variable var_signal_lock 1",
+          "isEnabled": true
+        },
+        {
+          "id": "farol_examinar_lente-step-8",
+          "command": "call_event signal_finish_repair",
+          "isEnabled": true
+        },
+        {
+          "id": "farol_examinar_lente-step-9",
+          "command": "else",
+          "isEnabled": true
+        },
+        {
+          "id": "farol_examinar_lente-step-10",
+          "command": "if_variable var_signal_lock 0",
+          "isEnabled": true
+        },
+        {
+          "id": "farol_examinar_lente-step-11",
+          "command": "show_dialogue signal_wrong_code",
+          "isEnabled": true
+        },
+        {
+          "id": "farol_examinar_lente-step-12",
+          "command": "else",
+          "isEnabled": true
+        },
+        {
+          "id": "farol_examinar_lente-step-13",
+          "command": "show_dialogue signal_cancelled",
+          "isEnabled": true
+        },
+        {
+          "id": "farol_examinar_lente-step-14",
+          "command": "condition_end",
+          "isEnabled": true
+        },
+        {
+          "id": "farol_examinar_lente-step-15",
+          "command": "condition_end",
+          "isEnabled": true
+        },
+        {
+          "id": "farol_examinar_lente-step-16",
+          "command": "else",
+          "isEnabled": true
+        },
+        {
+          "id": "farol_examinar_lente-step-17",
+          "command": "show_dialogue signal_need_code",
+          "isEnabled": true
+        },
+        {
+          "id": "farol_examinar_lente-step-18",
+          "command": "condition_end",
+          "isEnabled": true
+        },
+        {
+          "id": "farol_examinar_lente-step-19",
+          "command": "else",
+          "isEnabled": true
+        },
+        {
+          "id": "farol_examinar_lente-step-20",
+          "command": "show_dialogue signal_need_parts",
+          "isEnabled": true
+        },
+        {
+          "id": "farol_examinar_lente-step-21",
+          "command": "condition_end",
+          "isEnabled": true
+        },
+        {
+          "id": "farol_examinar_lente-step-22",
+          "command": "else",
+          "isEnabled": true
+        },
+        {
+          "id": "farol_examinar_lente-step-23",
+          "command": "show_dialogue signal_need_parts",
+          "isEnabled": true
+        },
+        {
+          "id": "farol_examinar_lente-step-24",
+          "command": "condition_end",
+          "isEnabled": true
+        },
+        {
+          "id": "farol_examinar_lente-step-25",
+          "command": "else",
+          "isEnabled": true
+        },
+        {
+          "id": "farol_examinar_lente-step-26",
+          "command": "if_variable var_signal_stage 2",
+          "isEnabled": true
+        },
+        {
+          "id": "farol_examinar_lente-step-27",
+          "command": "show_dialogue signal_repaired",
+          "isEnabled": true
+        },
+        {
+          "id": "farol_examinar_lente-step-28",
+          "command": "else",
+          "isEnabled": true
+        },
+        {
+          "id": "farol_examinar_lente-step-29",
+          "command": "if_variable var_signal_stage 3",
+          "isEnabled": true
+        },
+        {
+          "id": "farol_examinar_lente-step-30",
+          "command": "show_dialogue signal_done",
+          "isEnabled": true
+        },
+        {
+          "id": "farol_examinar_lente-step-31",
+          "command": "else",
+          "isEnabled": true
+        },
+        {
+          "id": "farol_examinar_lente-step-32",
           "command": "play_sfx farol_sfx_sinal",
           "isEnabled": true
         },
         {
-          "id": "event-lighthouse-lens-step-1",
+          "id": "farol_examinar_lente-step-33",
           "command": "show_dialogue farol_lente",
+          "isEnabled": true
+        },
+        {
+          "id": "farol_examinar_lente-step-34",
+          "command": "condition_end",
+          "isEnabled": true
+        },
+        {
+          "id": "farol_examinar_lente-step-35",
+          "command": "condition_end",
+          "isEnabled": true
+        },
+        {
+          "id": "farol_examinar_lente-step-36",
+          "command": "condition_end",
           "isEnabled": true
         }
       ]
@@ -155949,18 +157173,28 @@
       "id": "event-lighthouse-exit",
       "name": "farol_sair_porto",
       "roomName": "farol_interior",
-      "category": "Hotspot",
-      "detail": "Autoria: farol_sair_porto. Sequência editável com 2 passos. Os eventos chamados permanecem acessíveis na timeline. Vínculos: triggers.3 (onEnter).",
+      "category": "Exemplo · Sistemas conectados",
+      "detail": "Exemplo de sistemas conectados: estado persistente, requisitos e efeitos separados do cenário.",
       "command": "noop",
       "steps": [
         {
-          "id": "event-lighthouse-exit-audio",
-          "command": "play_sfx farol_sfx_porta",
+          "id": "farol_sair_porto-1",
+          "command": "if_variable var_trial_active 1",
           "isEnabled": true
         },
         {
-          "id": "event-lighthouse-exit-step-1",
-          "command": "change_scene porto_lumen 23 20 down",
+          "id": "farol_sair_porto-2",
+          "command": "call_procedure showcase_finish_trial",
+          "isEnabled": true
+        },
+        {
+          "id": "farol_sair_porto-3",
+          "command": "condition_end",
+          "isEnabled": true
+        },
+        {
+          "id": "farol_sair_porto-4",
+          "command": "call_procedure showcase_base_exit",
           "isEnabled": true
         }
       ]
@@ -155969,17 +157203,17 @@
       "id": "event-warehouse-enter",
       "name": "armazem_das_mares_ao_entrar",
       "roomName": "armazem_das_mares",
-      "category": "Cena",
-      "detail": "Autoria: armazem_das_mares_ao_entrar. Sequência editável com 2 passos. Os eventos chamados permanecem acessíveis na timeline. Vínculos: rooms.7 (onInit).",
+      "category": "O sinal perdido",
+      "detail": "Missão opcional: condições e recompensas persistentes, sem modificar as camadas visuais aprovadas.",
       "command": "noop",
       "steps": [
         {
-          "id": "event-warehouse-enter-music",
+          "id": "armazem_das_mares_ao_entrar-step-1",
           "command": "play_music farol_enseada",
           "isEnabled": true
         },
         {
-          "id": "event-warehouse-enter-save",
+          "id": "armazem_das_mares_ao_entrar-step-2",
           "command": "save_game 0",
           "isEnabled": true
         }
@@ -155989,17 +157223,17 @@
       "id": "event-observatory-enter",
       "name": "observatorio_do_farol_ao_entrar",
       "roomName": "observatorio_do_farol",
-      "category": "Cena",
-      "detail": "Autoria: observatorio_do_farol_ao_entrar. Sequência editável com 2 passos. Os eventos chamados permanecem acessíveis na timeline. Vínculos: rooms.8 (onInit).",
+      "category": "O sinal perdido",
+      "detail": "Missão opcional: condições e recompensas persistentes, sem modificar as camadas visuais aprovadas.",
       "command": "noop",
       "steps": [
         {
-          "id": "event-observatory-enter-music",
+          "id": "observatorio_do_farol_ao_entrar-step-1",
           "command": "play_music farol_memorias",
           "isEnabled": true
         },
         {
-          "id": "event-observatory-enter-save",
+          "id": "observatorio_do_farol_ao_entrar-step-2",
           "command": "save_game 0",
           "isEnabled": true
         }
@@ -156381,18 +157615,48 @@
       "id": "event-council-enter",
       "name": "conselho_ao_entrar",
       "roomName": "conselho_guardia",
-      "category": "Cena",
-      "detail": "Autoria: conselho_ao_entrar. Sequência editável com 2 passos. Os eventos chamados permanecem acessíveis na timeline. Vínculos: rooms.13 (onInit).",
+      "category": "Exemplo · Sistemas conectados",
+      "detail": "Exemplo de sistemas conectados: estado persistente, requisitos e efeitos separados do cenário.",
       "command": "noop",
       "steps": [
         {
-          "id": "event-council-enter-step-1",
+          "id": "conselho_ao_entrar-1",
           "command": "choice_event conselho 0 conselho_confirmar_alianca",
           "isEnabled": true
         },
         {
-          "id": "council-v5-enter-nara",
+          "id": "conselho_ao_entrar-2",
+          "command": "choice_event conselho 1 conselho_escolher_exploracao",
+          "isEnabled": true
+        },
+        {
+          "id": "conselho_ao_entrar-3",
+          "command": "if_variable var_council_path 0",
+          "isEnabled": true
+        },
+        {
+          "id": "conselho_ao_entrar-4",
           "command": "show_dialogue conselho_nara",
+          "isEnabled": true
+        },
+        {
+          "id": "conselho_ao_entrar-5",
+          "command": "else",
+          "isEnabled": true
+        },
+        {
+          "id": "conselho_ao_entrar-6",
+          "command": "call_procedure showcase_coast_report",
+          "isEnabled": true
+        },
+        {
+          "id": "conselho_ao_entrar-7",
+          "command": "call_procedure showcase_leave_council",
+          "isEnabled": true
+        },
+        {
+          "id": "conselho_ao_entrar-8",
+          "command": "condition_end",
           "isEnabled": true
         }
       ]
@@ -156401,23 +157665,33 @@
       "id": "event-council-choice",
       "name": "conselho_confirmar_alianca",
       "roomName": "conselho_guardia",
-      "category": "Cena",
-      "detail": "Autoria: conselho_confirmar_alianca. Sequência editável com 3 passos. Os eventos chamados permanecem acessíveis na timeline.",
+      "category": "Exemplo · Sistemas conectados",
+      "detail": "Exemplo de sistemas conectados: estado persistente, requisitos e efeitos separados do cenário.",
       "command": "noop",
       "steps": [
         {
-          "id": "event-council-choice-step-1",
-          "command": "set_variable var_guardian_bond 1",
+          "id": "conselho_confirmar_alianca-1",
+          "command": "if_variable var_council_path 0",
           "isEnabled": true
         },
         {
-          "id": "event-council-choice-step-2",
-          "command": "save_game 0",
+          "id": "conselho_confirmar_alianca-2",
+          "command": "set_variable var_council_path 1",
           "isEnabled": true
         },
         {
-          "id": "event-council-choice-step-3",
-          "command": "advance_campaign",
+          "id": "conselho_confirmar_alianca-3",
+          "command": "add_item currency_gold 2",
+          "isEnabled": true
+        },
+        {
+          "id": "conselho_confirmar_alianca-4",
+          "command": "condition_end",
+          "isEnabled": true
+        },
+        {
+          "id": "conselho_confirmar_alianca-5",
+          "command": "call_procedure showcase_leave_council",
           "isEnabled": true
         }
       ]
@@ -156646,42 +157920,47 @@
       "id": "event-circuit-finish",
       "name": "circuito_concluir",
       "roomName": "circuito_final",
-      "category": "Cena",
-      "detail": "Autoria: circuito_concluir. Sequência editável com 7 passos. Os eventos chamados permanecem acessíveis na timeline. Vínculos: rooms.17 (onVictory).",
+      "category": "Exemplo · Sistemas conectados",
+      "detail": "Exemplo de sistemas conectados: estado persistente, requisitos e efeitos separados do cenário.",
       "command": "noop",
       "steps": [
         {
-          "id": "racing-finish-jingle",
+          "id": "circuito_concluir-1",
           "command": "play_sfx corrida_chegada",
           "isEnabled": true
         },
         {
-          "id": "racing-finish-wait",
+          "id": "circuito_concluir-2",
           "command": "wait 90",
           "isEnabled": true
         },
         {
-          "id": "event-circuit-finish-audio",
+          "id": "circuito_concluir-3",
           "command": "play_sfx farol_sfx_vitoria",
           "isEnabled": true
         },
         {
-          "id": "event-circuit-finish-step-1",
+          "id": "circuito_concluir-4",
           "command": "set_variable var_campaign_finished 1",
           "isEnabled": true
         },
         {
-          "id": "event-circuit-finish-step-2",
+          "id": "circuito_concluir-5",
           "command": "save_game 0",
           "isEnabled": true
         },
         {
-          "id": "event-circuit-finish-step-3",
+          "id": "circuito_concluir-6",
+          "command": "call_procedure showcase_council_epilogue",
+          "isEnabled": true
+        },
+        {
+          "id": "circuito_concluir-7",
           "command": "show_dialogue epilogo",
           "isEnabled": true
         },
         {
-          "id": "event-circuit-finish-step-4",
+          "id": "circuito_concluir-8",
           "command": "advance_campaign",
           "isEnabled": true
         }
@@ -156754,10 +158033,21 @@
       "id": "event-menu_start-enter",
       "name": "menu_start_ao_entrar",
       "roomName": "menu_start",
-      "category": "Cena",
-      "detail": "Autoria: menu_start_ao_entrar. Entrada sem comandos customizados. Em Eventos, selecione uma opção da tela para editar sua ação e o script ligado. Abrir tela, voltar, seleção e ajustes de valores são ações nativas; não precisam de comandos duplicados em Ao iniciar. Vínculos: rooms.27 (onInit).",
+      "category": "Exemplo · Sistemas conectados",
+      "detail": "Abrir Start interrompe o teste antes de salvar; cronômetros transitórios não são persistidos.",
       "command": "noop",
-      "steps": []
+      "steps": [
+        {
+          "id": "menu_start_ao_entrar-1",
+          "command": "call_procedure showcase_interrupt_trial",
+          "isEnabled": true
+        },
+        {
+          "id": "menu_start_ao_entrar-2",
+          "command": "call_procedure showcase_base_start_enter",
+          "isEnabled": true
+        }
+      ]
     },
     {
       "id": "event-settings-enter",
@@ -156883,13 +158173,68 @@
       "id": "armazem_das_mares_carta-event",
       "name": "armazem_das_mares_carta",
       "roomName": "armazem_das_mares",
-      "category": "Hotspot",
-      "detail": "Cena point-and-click promovida do pacote fornecido pelo usuário",
+      "category": "O sinal perdido",
+      "detail": "Missão opcional: condições e recompensas persistentes, sem modificar as camadas visuais aprovadas.",
       "command": "noop",
       "steps": [
         {
           "id": "armazem_das_mares_carta-step-1",
+          "command": "if_variable var_signal_stage 1",
+          "isEnabled": true
+        },
+        {
+          "id": "armazem_das_mares_carta-step-2",
+          "command": "if_variable var_signal_chart 0",
+          "isEnabled": true
+        },
+        {
+          "id": "armazem_das_mares_carta-step-3",
+          "command": "add_item zz_signal_chart 1",
+          "isEnabled": true
+        },
+        {
+          "id": "armazem_das_mares_carta-step-4",
+          "command": "set_variable var_signal_chart 1",
+          "isEnabled": true
+        },
+        {
+          "id": "armazem_das_mares_carta-step-5",
+          "command": "save_game 0",
+          "isEnabled": true
+        },
+        {
+          "id": "armazem_das_mares_carta-step-6",
+          "command": "show_dialogue signal_chart",
+          "isEnabled": true
+        },
+        {
+          "id": "armazem_das_mares_carta-step-7",
+          "command": "else",
+          "isEnabled": true
+        },
+        {
+          "id": "armazem_das_mares_carta-step-8",
+          "command": "show_dialogue signal_chart_again",
+          "isEnabled": true
+        },
+        {
+          "id": "armazem_das_mares_carta-step-9",
+          "command": "condition_end",
+          "isEnabled": true
+        },
+        {
+          "id": "armazem_das_mares_carta-step-10",
+          "command": "else",
+          "isEnabled": true
+        },
+        {
+          "id": "armazem_das_mares_carta-step-11",
           "command": "show_dialogue armazem_das_mares_carta",
+          "isEnabled": true
+        },
+        {
+          "id": "armazem_das_mares_carta-step-12",
+          "command": "condition_end",
           "isEnabled": true
         }
       ]
@@ -156898,13 +158243,88 @@
       "id": "armazem_das_mares_bau-event",
       "name": "armazem_das_mares_bau",
       "roomName": "armazem_das_mares",
-      "category": "Hotspot",
-      "detail": "Cena point-and-click promovida do pacote fornecido pelo usuário",
+      "category": "O sinal perdido",
+      "detail": "Missão opcional: condições e recompensas persistentes, sem modificar as camadas visuais aprovadas.",
       "command": "noop",
       "steps": [
         {
           "id": "armazem_das_mares_bau-step-1",
+          "command": "if_variable var_signal_stage 1",
+          "isEnabled": true
+        },
+        {
+          "id": "armazem_das_mares_bau-step-2",
+          "command": "has_item zz_signal_chart 1",
+          "isEnabled": true
+        },
+        {
+          "id": "armazem_das_mares_bau-step-3",
+          "command": "if_variable var_signal_part 0",
+          "isEnabled": true
+        },
+        {
+          "id": "armazem_das_mares_bau-step-4",
+          "command": "add_item zz_signal_relay 1",
+          "isEnabled": true
+        },
+        {
+          "id": "armazem_das_mares_bau-step-5",
+          "command": "set_variable var_signal_part 1",
+          "isEnabled": true
+        },
+        {
+          "id": "armazem_das_mares_bau-step-6",
+          "command": "save_game 0",
+          "isEnabled": true
+        },
+        {
+          "id": "armazem_das_mares_bau-step-7",
+          "command": "show_dialogue signal_relay",
+          "isEnabled": true
+        },
+        {
+          "id": "armazem_das_mares_bau-step-8",
+          "command": "else",
+          "isEnabled": true
+        },
+        {
+          "id": "armazem_das_mares_bau-step-9",
+          "command": "show_dialogue signal_chest_empty",
+          "isEnabled": true
+        },
+        {
+          "id": "armazem_das_mares_bau-step-10",
+          "command": "condition_end",
+          "isEnabled": true
+        },
+        {
+          "id": "armazem_das_mares_bau-step-11",
+          "command": "else",
+          "isEnabled": true
+        },
+        {
+          "id": "armazem_das_mares_bau-step-12",
+          "command": "show_dialogue signal_chest_locked",
+          "isEnabled": true
+        },
+        {
+          "id": "armazem_das_mares_bau-step-13",
+          "command": "condition_end",
+          "isEnabled": true
+        },
+        {
+          "id": "armazem_das_mares_bau-step-14",
+          "command": "else",
+          "isEnabled": true
+        },
+        {
+          "id": "armazem_das_mares_bau-step-15",
           "command": "show_dialogue armazem_das_mares_bau",
+          "isEnabled": true
+        },
+        {
+          "id": "armazem_das_mares_bau-step-16",
+          "command": "condition_end",
           "isEnabled": true
         }
       ]
@@ -156913,13 +158333,58 @@
       "id": "armazem_das_mares_saida-event",
       "name": "armazem_das_mares_saida",
       "roomName": "armazem_das_mares",
-      "category": "Cena",
-      "detail": "Saída da cena point-and-click promovida à campanha canônica",
+      "category": "O sinal perdido",
+      "detail": "Missão opcional: condições e recompensas persistentes, sem modificar as camadas visuais aprovadas.",
       "command": "noop",
       "steps": [
         {
           "id": "armazem_das_mares_saida-step-1",
+          "command": "if_variable var_signal_trip 1",
+          "isEnabled": true
+        },
+        {
+          "id": "armazem_das_mares_saida-step-2",
+          "command": "if_button r",
+          "isEnabled": true
+        },
+        {
+          "id": "armazem_das_mares_saida-step-3",
+          "command": "set_variable var_signal_trip 0",
+          "isEnabled": true
+        },
+        {
+          "id": "armazem_das_mares_saida-step-4",
+          "command": "change_scene porto_lumen 88 50 down",
+          "isEnabled": true
+        },
+        {
+          "id": "armazem_das_mares_saida-step-5",
+          "command": "else",
+          "isEnabled": true
+        },
+        {
+          "id": "armazem_das_mares_saida-step-6",
+          "command": "change_scene observatorio_do_farol 15 16 down",
+          "isEnabled": true
+        },
+        {
+          "id": "armazem_das_mares_saida-step-7",
+          "command": "condition_end",
+          "isEnabled": true
+        },
+        {
+          "id": "armazem_das_mares_saida-step-8",
+          "command": "else",
+          "isEnabled": true
+        },
+        {
+          "id": "armazem_das_mares_saida-step-9",
           "command": "advance_campaign",
+          "isEnabled": true
+        },
+        {
+          "id": "armazem_das_mares_saida-step-10",
+          "command": "condition_end",
           "isEnabled": true
         }
       ]
@@ -156928,13 +158393,43 @@
       "id": "observatorio_do_farol_telescopio-event",
       "name": "observatorio_do_farol_telescopio",
       "roomName": "observatorio_do_farol",
-      "category": "Hotspot",
-      "detail": "Cena point-and-click promovida do pacote fornecido pelo usuário",
+      "category": "O sinal perdido",
+      "detail": "Missão opcional: condições e recompensas persistentes, sem modificar as camadas visuais aprovadas.",
       "command": "noop",
       "steps": [
         {
           "id": "observatorio_do_farol_telescopio-step-1",
+          "command": "if_variable var_signal_stage 1",
+          "isEnabled": true
+        },
+        {
+          "id": "observatorio_do_farol_telescopio-step-2",
+          "command": "set_variable var_signal_observation 1",
+          "isEnabled": true
+        },
+        {
+          "id": "observatorio_do_farol_telescopio-step-3",
+          "command": "save_game 0",
+          "isEnabled": true
+        },
+        {
+          "id": "observatorio_do_farol_telescopio-step-4",
+          "command": "show_dialogue signal_stars",
+          "isEnabled": true
+        },
+        {
+          "id": "observatorio_do_farol_telescopio-step-5",
+          "command": "else",
+          "isEnabled": true
+        },
+        {
+          "id": "observatorio_do_farol_telescopio-step-6",
           "command": "show_dialogue observatorio_do_farol_telescopio",
+          "isEnabled": true
+        },
+        {
+          "id": "observatorio_do_farol_telescopio-step-7",
+          "command": "condition_end",
           "isEnabled": true
         }
       ]
@@ -156943,13 +158438,83 @@
       "id": "observatorio_do_farol_mapa-event",
       "name": "observatorio_do_farol_mapa",
       "roomName": "observatorio_do_farol",
-      "category": "Hotspot",
-      "detail": "Cena point-and-click promovida do pacote fornecido pelo usuário",
+      "category": "O sinal perdido",
+      "detail": "Missão opcional: condições e recompensas persistentes, sem modificar as camadas visuais aprovadas.",
       "command": "noop",
       "steps": [
         {
           "id": "observatorio_do_farol_mapa-step-1",
+          "command": "if_variable var_signal_stage 1",
+          "isEnabled": true
+        },
+        {
+          "id": "observatorio_do_farol_mapa-step-2",
+          "command": "has_item zz_signal_chart 1",
+          "isEnabled": true
+        },
+        {
+          "id": "observatorio_do_farol_mapa-step-3",
+          "command": "if_variable var_signal_observation 1",
+          "isEnabled": true
+        },
+        {
+          "id": "observatorio_do_farol_mapa-step-4",
+          "command": "set_variable var_signal_code 1",
+          "isEnabled": true
+        },
+        {
+          "id": "observatorio_do_farol_mapa-step-5",
+          "command": "save_game 0",
+          "isEnabled": true
+        },
+        {
+          "id": "observatorio_do_farol_mapa-step-6",
+          "command": "show_dialogue signal_code",
+          "isEnabled": true
+        },
+        {
+          "id": "observatorio_do_farol_mapa-step-7",
+          "command": "else",
+          "isEnabled": true
+        },
+        {
+          "id": "observatorio_do_farol_mapa-step-8",
+          "command": "show_dialogue signal_need_observation",
+          "isEnabled": true
+        },
+        {
+          "id": "observatorio_do_farol_mapa-step-9",
+          "command": "condition_end",
+          "isEnabled": true
+        },
+        {
+          "id": "observatorio_do_farol_mapa-step-10",
+          "command": "else",
+          "isEnabled": true
+        },
+        {
+          "id": "observatorio_do_farol_mapa-step-11",
+          "command": "show_dialogue signal_need_parts",
+          "isEnabled": true
+        },
+        {
+          "id": "observatorio_do_farol_mapa-step-12",
+          "command": "condition_end",
+          "isEnabled": true
+        },
+        {
+          "id": "observatorio_do_farol_mapa-step-13",
+          "command": "else",
+          "isEnabled": true
+        },
+        {
+          "id": "observatorio_do_farol_mapa-step-14",
           "command": "show_dialogue observatorio_do_farol_mapa",
+          "isEnabled": true
+        },
+        {
+          "id": "observatorio_do_farol_mapa-step-15",
+          "command": "condition_end",
           "isEnabled": true
         }
       ]
@@ -156958,13 +158523,58 @@
       "id": "observatorio_do_farol_saida-event",
       "name": "observatorio_do_farol_saida",
       "roomName": "observatorio_do_farol",
-      "category": "Cena",
-      "detail": "Saída da cena point-and-click promovida à campanha canônica",
+      "category": "O sinal perdido",
+      "detail": "Missão opcional: condições e recompensas persistentes, sem modificar as camadas visuais aprovadas.",
       "command": "noop",
       "steps": [
         {
           "id": "observatorio_do_farol_saida-step-1",
+          "command": "if_variable var_signal_trip 1",
+          "isEnabled": true
+        },
+        {
+          "id": "observatorio_do_farol_saida-step-2",
+          "command": "set_variable var_signal_trip 0",
+          "isEnabled": true
+        },
+        {
+          "id": "observatorio_do_farol_saida-step-3",
+          "command": "if_button r",
+          "isEnabled": true
+        },
+        {
+          "id": "observatorio_do_farol_saida-step-4",
+          "command": "change_scene porto_lumen 88 50 down",
+          "isEnabled": true
+        },
+        {
+          "id": "observatorio_do_farol_saida-step-5",
+          "command": "else",
+          "isEnabled": true
+        },
+        {
+          "id": "observatorio_do_farol_saida-step-6",
+          "command": "change_scene farol_interior 23 27 up",
+          "isEnabled": true
+        },
+        {
+          "id": "observatorio_do_farol_saida-step-7",
+          "command": "condition_end",
+          "isEnabled": true
+        },
+        {
+          "id": "observatorio_do_farol_saida-step-8",
+          "command": "else",
+          "isEnabled": true
+        },
+        {
+          "id": "observatorio_do_farol_saida-step-9",
           "command": "advance_campaign",
+          "isEnabled": true
+        },
+        {
+          "id": "observatorio_do_farol_saida-step-10",
+          "command": "condition_end",
           "isEnabled": true
         }
       ]
@@ -156973,253 +158583,18 @@
       "id": "ingame-missoes_detalhar_proximo",
       "name": "missoes_detalhar_proximo",
       "roomName": "missoes",
-      "category": "Menu",
-      "detail": "Consulta dos dados reais da campanha.",
+      "category": "O sinal perdido",
+      "detail": "Missão opcional: condições e recompensas persistentes, sem modificar as camadas visuais aprovadas.",
       "command": "noop",
       "steps": [
         {
-          "id": "ingame-missoes_detalhar_proximo-0",
-          "command": "if_variable var_campaign_finished 1",
+          "id": "missoes_detalhar_proximo-step-1",
+          "command": "call_procedure signal_mission_status",
           "isEnabled": true
         },
         {
-          "id": "ingame-missoes_detalhar_proximo-1",
-          "command": "show_dialogue ingame-next-0",
-          "isEnabled": true
-        },
-        {
-          "id": "ingame-missoes_detalhar_proximo-2",
-          "command": "else",
-          "isEnabled": true
-        },
-        {
-          "id": "ingame-missoes_detalhar_proximo-3",
-          "command": "if_variable var_boost 1",
-          "isEnabled": true
-        },
-        {
-          "id": "ingame-missoes_detalhar_proximo-4",
-          "command": "show_dialogue ingame-next-1",
-          "isEnabled": true
-        },
-        {
-          "id": "ingame-missoes_detalhar_proximo-5",
-          "command": "else",
-          "isEnabled": true
-        },
-        {
-          "id": "ingame-missoes_detalhar_proximo-6",
-          "command": "if_variable var_relay_cleared 1",
-          "isEnabled": true
-        },
-        {
-          "id": "ingame-missoes_detalhar_proximo-7",
-          "command": "show_dialogue ingame-next-2",
-          "isEnabled": true
-        },
-        {
-          "id": "ingame-missoes_detalhar_proximo-8",
-          "command": "else",
-          "isEnabled": true
-        },
-        {
-          "id": "ingame-missoes_detalhar_proximo-9",
-          "command": "if_variable var_shield 1",
-          "isEnabled": true
-        },
-        {
-          "id": "ingame-missoes_detalhar_proximo-10",
-          "command": "show_dialogue ingame-next-3",
-          "isEnabled": true
-        },
-        {
-          "id": "ingame-missoes_detalhar_proximo-11",
-          "command": "else",
-          "isEnabled": true
-        },
-        {
-          "id": "ingame-missoes_detalhar_proximo-12",
-          "command": "if_variable var_guardian_bond 1",
-          "isEnabled": true
-        },
-        {
-          "id": "ingame-missoes_detalhar_proximo-13",
-          "command": "show_dialogue ingame-next-4",
-          "isEnabled": true
-        },
-        {
-          "id": "ingame-missoes_detalhar_proximo-14",
-          "command": "else",
-          "isEnabled": true
-        },
-        {
-          "id": "ingame-missoes_detalhar_proximo-15",
-          "command": "if_variable var_energy_cell 1",
-          "isEnabled": true
-        },
-        {
-          "id": "ingame-missoes_detalhar_proximo-16",
-          "command": "show_dialogue ingame-next-5",
-          "isEnabled": true
-        },
-        {
-          "id": "ingame-missoes_detalhar_proximo-17",
-          "command": "else",
-          "isEnabled": true
-        },
-        {
-          "id": "ingame-missoes_detalhar_proximo-18",
-          "command": "if_variable var_usina_combat_cleared 1",
-          "isEnabled": true
-        },
-        {
-          "id": "ingame-missoes_detalhar_proximo-19",
-          "command": "show_dialogue ingame-next-6",
-          "isEnabled": true
-        },
-        {
-          "id": "ingame-missoes_detalhar_proximo-20",
-          "command": "else",
-          "isEnabled": true
-        },
-        {
-          "id": "ingame-missoes_detalhar_proximo-21",
-          "command": "if_variable var_market_shortcut 1",
-          "isEnabled": true
-        },
-        {
-          "id": "ingame-missoes_detalhar_proximo-22",
-          "command": "show_dialogue ingame-next-7",
-          "isEnabled": true
-        },
-        {
-          "id": "ingame-missoes_detalhar_proximo-23",
-          "command": "else",
-          "isEnabled": true
-        },
-        {
-          "id": "ingame-missoes_detalhar_proximo-24",
-          "command": "if_variable var_observatory_read 1",
-          "isEnabled": true
-        },
-        {
-          "id": "ingame-missoes_detalhar_proximo-25",
-          "command": "show_dialogue ingame-next-8",
-          "isEnabled": true
-        },
-        {
-          "id": "ingame-missoes_detalhar_proximo-26",
-          "command": "else",
-          "isEnabled": true
-        },
-        {
-          "id": "ingame-missoes_detalhar_proximo-27",
-          "command": "if_variable var_warehouse_inspected 1",
-          "isEnabled": true
-        },
-        {
-          "id": "ingame-missoes_detalhar_proximo-28",
-          "command": "show_dialogue ingame-next-9",
-          "isEnabled": true
-        },
-        {
-          "id": "ingame-missoes_detalhar_proximo-29",
-          "command": "else",
-          "isEnabled": true
-        },
-        {
-          "id": "ingame-missoes_detalhar_proximo-30",
-          "command": "if_variable var_grip 1",
-          "isEnabled": true
-        },
-        {
-          "id": "ingame-missoes_detalhar_proximo-31",
-          "command": "show_dialogue ingame-next-10",
-          "isEnabled": true
-        },
-        {
-          "id": "ingame-missoes_detalhar_proximo-32",
-          "command": "else",
-          "isEnabled": true
-        },
-        {
-          "id": "ingame-missoes_detalhar_proximo-33",
-          "command": "if_variable var_frame 1",
-          "isEnabled": true
-        },
-        {
-          "id": "ingame-missoes_detalhar_proximo-34",
-          "command": "show_dialogue ingame-next-11",
-          "isEnabled": true
-        },
-        {
-          "id": "ingame-missoes_detalhar_proximo-35",
-          "command": "else",
-          "isEnabled": true
-        },
-        {
-          "id": "ingame-missoes_detalhar_proximo-36",
-          "command": "show_dialogue ingame-next-start",
-          "isEnabled": true
-        },
-        {
-          "id": "ingame-missoes_detalhar_proximo-37",
-          "command": "condition_end",
-          "isEnabled": true
-        },
-        {
-          "id": "ingame-missoes_detalhar_proximo-38",
-          "command": "condition_end",
-          "isEnabled": true
-        },
-        {
-          "id": "ingame-missoes_detalhar_proximo-39",
-          "command": "condition_end",
-          "isEnabled": true
-        },
-        {
-          "id": "ingame-missoes_detalhar_proximo-40",
-          "command": "condition_end",
-          "isEnabled": true
-        },
-        {
-          "id": "ingame-missoes_detalhar_proximo-41",
-          "command": "condition_end",
-          "isEnabled": true
-        },
-        {
-          "id": "ingame-missoes_detalhar_proximo-42",
-          "command": "condition_end",
-          "isEnabled": true
-        },
-        {
-          "id": "ingame-missoes_detalhar_proximo-43",
-          "command": "condition_end",
-          "isEnabled": true
-        },
-        {
-          "id": "ingame-missoes_detalhar_proximo-44",
-          "command": "condition_end",
-          "isEnabled": true
-        },
-        {
-          "id": "ingame-missoes_detalhar_proximo-45",
-          "command": "condition_end",
-          "isEnabled": true
-        },
-        {
-          "id": "ingame-missoes_detalhar_proximo-46",
-          "command": "condition_end",
-          "isEnabled": true
-        },
-        {
-          "id": "ingame-missoes_detalhar_proximo-47",
-          "command": "condition_end",
-          "isEnabled": true
-        },
-        {
-          "id": "ingame-missoes_detalhar_proximo-48",
-          "command": "condition_end",
+          "id": "missoes_detalhar_proximo-step-2",
+          "command": "call_procedure signal_campaign_objective",
           "isEnabled": true
         }
       ]
@@ -157973,18 +159348,28 @@
       "id": "iso-v4-mercado_falar_guarda",
       "name": "mercado_falar_guarda",
       "roomName": "mercado_suspenso",
-      "category": "Cena",
-      "detail": "Percurso isométrico e treino tático.",
+      "category": "Exemplo · Sistemas conectados",
+      "detail": "Exemplo de sistemas conectados: estado persistente, requisitos e efeitos separados do cenário.",
       "command": "noop",
       "steps": [
         {
-          "id": "iso-v4-mercado_falar_guarda-0",
-          "command": "attach_button r mercado_entrar_arena true",
+          "id": "mercado_falar_guarda-1",
+          "command": "call_procedure showcase_base_market_guard",
           "isEnabled": true
         },
         {
-          "id": "iso-v4-mercado_falar_guarda-1",
-          "command": "show_dialogue mercado_guarda",
+          "id": "mercado_falar_guarda-2",
+          "command": "if_variable_greater_than var_council_path 0",
+          "isEnabled": true
+        },
+        {
+          "id": "mercado_falar_guarda-3",
+          "command": "call_procedure showcase_coast_report",
+          "isEnabled": true
+        },
+        {
+          "id": "mercado_falar_guarda-4",
+          "command": "condition_end",
           "isEnabled": true
         }
       ]
@@ -158368,13 +159753,48 @@
       "id": "event-porto_conversar_captain",
       "name": "porto_conversar_captain",
       "roomName": "porto_lumen",
-      "category": "Ator",
-      "detail": "Conversa de orientação de Capitão; não altera a progressão.",
+      "category": "Exemplo · Sistemas conectados",
+      "detail": "Exemplo de sistemas conectados: estado persistente, requisitos e efeitos separados do cenário.",
       "command": "noop",
       "steps": [
         {
-          "id": "porto_conversar_captain-fala",
-          "command": "show_dialogue porto-captain-conversa",
+          "id": "porto_conversar_captain-1",
+          "command": "if_variable var_signal_stage 3",
+          "isEnabled": true
+        },
+        {
+          "id": "porto_conversar_captain-2",
+          "command": "choice_event showcase_captain_menu 0 showcase_visit_council",
+          "isEnabled": true
+        },
+        {
+          "id": "porto_conversar_captain-3",
+          "command": "choice_event showcase_captain_menu 1 showcase_coast_report_event",
+          "isEnabled": true
+        },
+        {
+          "id": "porto_conversar_captain-4",
+          "command": "choice_event showcase_captain_menu 2 showcase_captain_talk",
+          "isEnabled": true
+        },
+        {
+          "id": "porto_conversar_captain-5",
+          "command": "show_choice showcase_captain_menu",
+          "isEnabled": true
+        },
+        {
+          "id": "porto_conversar_captain-6",
+          "command": "else",
+          "isEnabled": true
+        },
+        {
+          "id": "porto_conversar_captain-7",
+          "command": "call_procedure showcase_base_captain",
+          "isEnabled": true
+        },
+        {
+          "id": "porto_conversar_captain-8",
+          "command": "condition_end",
           "isEnabled": true
         }
       ]
@@ -158383,13 +159803,28 @@
       "id": "event-porto_conversar_traveler",
       "name": "porto_conversar_traveler",
       "roomName": "porto_lumen",
-      "category": "Ator",
-      "detail": "Conversa de orientação de Viajante; não altera a progressão.",
+      "category": "Exemplo · Sistemas conectados",
+      "detail": "Exemplo de sistemas conectados: estado persistente, requisitos e efeitos separados do cenário.",
       "command": "noop",
       "steps": [
         {
-          "id": "porto_conversar_traveler-fala",
-          "command": "show_dialogue porto-traveler-conversa",
+          "id": "porto_conversar_traveler-1",
+          "command": "choice_event showcase_trader_menu 0 showcase_open_shop",
+          "isEnabled": true
+        },
+        {
+          "id": "porto_conversar_traveler-2",
+          "command": "choice_event showcase_trader_menu 1 showcase_open_equipment",
+          "isEnabled": true
+        },
+        {
+          "id": "porto_conversar_traveler-3",
+          "command": "choice_event showcase_trader_menu 2 showcase_traveler_talk",
+          "isEnabled": true
+        },
+        {
+          "id": "porto_conversar_traveler-4",
+          "command": "show_choice showcase_trader_menu",
           "isEnabled": true
         }
       ]
@@ -158398,13 +159833,48 @@
       "id": "event-porto_conversar_cartographer",
       "name": "porto_conversar_cartographer",
       "roomName": "porto_lumen",
-      "category": "Ator",
-      "detail": "Conversa de orientação de Cartógrafo; não altera a progressão.",
+      "category": "O sinal perdido",
+      "detail": "Missão opcional: condições e recompensas persistentes, sem modificar as camadas visuais aprovadas.",
       "command": "noop",
       "steps": [
         {
-          "id": "porto_conversar_cartographer-fala",
+          "id": "porto_conversar_cartographer-step-1",
+          "command": "if_variable var_signal_stage 1",
+          "isEnabled": true
+        },
+        {
+          "id": "porto_conversar_cartographer-step-2",
+          "command": "choice_event signal_travel 0 signal_go_warehouse",
+          "isEnabled": true
+        },
+        {
+          "id": "porto_conversar_cartographer-step-3",
+          "command": "choice_event signal_travel 1 signal_go_observatory",
+          "isEnabled": true
+        },
+        {
+          "id": "porto_conversar_cartographer-step-4",
+          "command": "choice_event signal_travel 2 signal_return_lighthouse",
+          "isEnabled": true
+        },
+        {
+          "id": "porto_conversar_cartographer-step-5",
+          "command": "show_choice signal_travel",
+          "isEnabled": true
+        },
+        {
+          "id": "porto_conversar_cartographer-step-6",
+          "command": "else",
+          "isEnabled": true
+        },
+        {
+          "id": "porto_conversar_cartographer-step-7",
           "command": "show_dialogue porto-cartographer-conversa",
+          "isEnabled": true
+        },
+        {
+          "id": "porto_conversar_cartographer-step-8",
+          "command": "condition_end",
           "isEnabled": true
         }
       ]
@@ -158413,13 +159883,33 @@
       "id": "event-porto_conversar_fisherchild",
       "name": "porto_conversar_fisherchild",
       "roomName": "porto_lumen",
-      "category": "Ator",
-      "detail": "Conversa de orientação de Pescador mirim; não altera a progressão.",
+      "category": "Exemplo · Sistemas conectados",
+      "detail": "Exemplo de sistemas conectados: estado persistente, requisitos e efeitos separados do cenário.",
       "command": "noop",
       "steps": [
         {
-          "id": "porto_conversar_fisherchild-fala",
-          "command": "show_dialogue porto-fisherchild-conversa",
+          "id": "porto_conversar_fisherchild-1",
+          "command": "if_variable var_trial_result 1",
+          "isEnabled": true
+        },
+        {
+          "id": "porto_conversar_fisherchild-2",
+          "command": "show_dialogue showcase_fisher_success",
+          "isEnabled": true
+        },
+        {
+          "id": "porto_conversar_fisherchild-3",
+          "command": "else",
+          "isEnabled": true
+        },
+        {
+          "id": "porto_conversar_fisherchild-4",
+          "command": "call_procedure showcase_base_fisher",
+          "isEnabled": true
+        },
+        {
+          "id": "porto_conversar_fisherchild-5",
+          "command": "condition_end",
           "isEnabled": true
         }
       ]
@@ -159963,6 +161453,1900 @@
         }
       ],
       "detail": "Autoria: penedos_retornar_armazem. Sequência editável com 4 passos. Os eventos chamados permanecem acessíveis na timeline."
+    },
+    {
+      "id": "event-signal_go_warehouse",
+      "name": "signal_go_warehouse",
+      "roomName": "porto_lumen",
+      "category": "O sinal perdido",
+      "command": "noop",
+      "detail": "Missão opcional: condições e recompensas persistentes, sem modificar as camadas visuais aprovadas.",
+      "steps": [
+        {
+          "id": "signal_go_warehouse-step-1",
+          "command": "set_variable var_signal_trip 1",
+          "isEnabled": true
+        },
+        {
+          "id": "signal_go_warehouse-step-2",
+          "command": "change_scene armazem_das_mares 15 16 down",
+          "isEnabled": true
+        }
+      ]
+    },
+    {
+      "id": "event-signal_go_observatory",
+      "name": "signal_go_observatory",
+      "roomName": "armazem_das_mares",
+      "category": "O sinal perdido",
+      "command": "noop",
+      "detail": "Missão opcional: condições e recompensas persistentes, sem modificar as camadas visuais aprovadas.",
+      "steps": [
+        {
+          "id": "signal_go_observatory-step-1",
+          "command": "set_variable var_signal_trip 1",
+          "isEnabled": true
+        },
+        {
+          "id": "signal_go_observatory-step-2",
+          "command": "change_scene observatorio_do_farol 15 16 down",
+          "isEnabled": true
+        }
+      ]
+    },
+    {
+      "id": "event-signal_return_port",
+      "name": "signal_return_port",
+      "roomName": "observatorio_do_farol",
+      "category": "O sinal perdido",
+      "command": "noop",
+      "detail": "Missão opcional: condições e recompensas persistentes, sem modificar as camadas visuais aprovadas.",
+      "steps": [
+        {
+          "id": "signal_return_port-step-1",
+          "command": "set_variable var_signal_trip 0",
+          "isEnabled": true
+        },
+        {
+          "id": "signal_return_port-step-2",
+          "command": "remove_button r",
+          "isEnabled": true
+        },
+        {
+          "id": "signal_return_port-step-3",
+          "command": "change_scene porto_lumen 88 50 down",
+          "isEnabled": true
+        }
+      ]
+    },
+    {
+      "id": "event-signal_return_lighthouse",
+      "name": "signal_return_lighthouse",
+      "roomName": "observatorio_do_farol",
+      "category": "O sinal perdido",
+      "command": "noop",
+      "detail": "Missão opcional: condições e recompensas persistentes, sem modificar as camadas visuais aprovadas.",
+      "steps": [
+        {
+          "id": "signal_return_lighthouse-step-1",
+          "command": "set_variable var_signal_trip 0",
+          "isEnabled": true
+        },
+        {
+          "id": "signal_return_lighthouse-step-2",
+          "command": "remove_button r",
+          "isEnabled": true
+        },
+        {
+          "id": "signal_return_lighthouse-step-3",
+          "command": "change_scene farol_interior 23 27 up",
+          "isEnabled": true
+        }
+      ]
+    },
+    {
+      "id": "event-signal_finish_repair",
+      "name": "signal_finish_repair",
+      "roomName": "farol_interior",
+      "category": "O sinal perdido",
+      "command": "noop",
+      "detail": "Missão opcional: condições e recompensas persistentes, sem modificar as camadas visuais aprovadas.",
+      "steps": [
+        {
+          "id": "signal_finish_repair-step-1",
+          "command": "if_variable var_signal_stage 1",
+          "isEnabled": true
+        },
+        {
+          "id": "signal_finish_repair-step-2",
+          "command": "has_item zz_signal_chart 1",
+          "isEnabled": true
+        },
+        {
+          "id": "signal_finish_repair-step-3",
+          "command": "has_item zz_signal_relay 1",
+          "isEnabled": true
+        },
+        {
+          "id": "signal_finish_repair-step-4",
+          "command": "if_variable var_signal_code 1",
+          "isEnabled": true
+        },
+        {
+          "id": "signal_finish_repair-step-5",
+          "command": "if_variable var_signal_lock 1",
+          "isEnabled": true
+        },
+        {
+          "id": "signal_finish_repair-step-6",
+          "command": "add_item zz_signal_relay -1",
+          "isEnabled": true
+        },
+        {
+          "id": "signal_finish_repair-step-7",
+          "command": "set_variable var_signal_part 0",
+          "isEnabled": true
+        },
+        {
+          "id": "signal_finish_repair-step-8",
+          "command": "set_variable var_signal_stage 2",
+          "isEnabled": true
+        },
+        {
+          "id": "signal_finish_repair-step-9",
+          "command": "set_variable var_signal_trip 0",
+          "isEnabled": true
+        },
+        {
+          "id": "signal_finish_repair-step-10",
+          "command": "call_event timeline_signal_repair",
+          "isEnabled": true
+        },
+        {
+          "id": "signal_finish_repair-step-11",
+          "command": "condition_end",
+          "isEnabled": true
+        },
+        {
+          "id": "signal_finish_repair-step-12",
+          "command": "condition_end",
+          "isEnabled": true
+        },
+        {
+          "id": "signal_finish_repair-step-13",
+          "command": "condition_end",
+          "isEnabled": true
+        },
+        {
+          "id": "signal_finish_repair-step-14",
+          "command": "condition_end",
+          "isEnabled": true
+        },
+        {
+          "id": "signal_finish_repair-step-15",
+          "command": "condition_end",
+          "isEnabled": true
+        }
+      ]
+    },
+    {
+      "id": "event-signal_claim_reward",
+      "name": "signal_claim_reward",
+      "roomName": "porto_lumen",
+      "category": "O sinal perdido",
+      "command": "noop",
+      "detail": "Missão opcional: condições e recompensas persistentes, sem modificar as camadas visuais aprovadas.",
+      "steps": [
+        {
+          "id": "signal_claim_reward-step-1",
+          "command": "if_variable var_signal_stage 2",
+          "isEnabled": true
+        },
+        {
+          "id": "signal_claim_reward-step-2",
+          "command": "add_item currency_gold 2",
+          "isEnabled": true
+        },
+        {
+          "id": "signal_claim_reward-step-3",
+          "command": "set_variable var_signal_stage 3",
+          "isEnabled": true
+        },
+        {
+          "id": "signal_claim_reward-step-4",
+          "command": "save_game 0",
+          "isEnabled": true
+        },
+        {
+          "id": "signal_claim_reward-step-5",
+          "command": "show_dialogue signal_reward",
+          "isEnabled": true
+        },
+        {
+          "id": "signal_claim_reward-step-6",
+          "command": "else",
+          "isEnabled": true
+        },
+        {
+          "id": "signal_claim_reward-step-7",
+          "command": "call_procedure signal_mission_status",
+          "isEnabled": true
+        },
+        {
+          "id": "signal_claim_reward-step-8",
+          "command": "condition_end",
+          "isEnabled": true
+        }
+      ]
+    },
+    {
+      "id": "event-signal_mission_status",
+      "name": "signal_mission_status",
+      "roomName": "missoes",
+      "category": "O sinal perdido",
+      "command": "noop",
+      "detail": "Missão opcional: condições e recompensas persistentes, sem modificar as camadas visuais aprovadas.",
+      "steps": [
+        {
+          "id": "signal_mission_status-step-1",
+          "command": "if_variable var_signal_stage 0",
+          "isEnabled": true
+        },
+        {
+          "id": "signal_mission_status-step-2",
+          "command": "show_dialogue signal_available",
+          "isEnabled": true
+        },
+        {
+          "id": "signal_mission_status-step-3",
+          "command": "else",
+          "isEnabled": true
+        },
+        {
+          "id": "signal_mission_status-step-4",
+          "command": "if_variable var_signal_stage 1",
+          "isEnabled": true
+        },
+        {
+          "id": "signal_mission_status-step-5",
+          "command": "if_variable var_signal_chart 0",
+          "isEnabled": true
+        },
+        {
+          "id": "signal_mission_status-step-6",
+          "command": "show_dialogue signal_progress",
+          "isEnabled": true
+        },
+        {
+          "id": "signal_mission_status-step-7",
+          "command": "else",
+          "isEnabled": true
+        },
+        {
+          "id": "signal_mission_status-step-8",
+          "command": "if_variable var_signal_part 0",
+          "isEnabled": true
+        },
+        {
+          "id": "signal_mission_status-step-9",
+          "command": "show_dialogue signal_find_relay",
+          "isEnabled": true
+        },
+        {
+          "id": "signal_mission_status-step-10",
+          "command": "else",
+          "isEnabled": true
+        },
+        {
+          "id": "signal_mission_status-step-11",
+          "command": "if_variable var_signal_code 0",
+          "isEnabled": true
+        },
+        {
+          "id": "signal_mission_status-step-12",
+          "command": "show_dialogue signal_need_code",
+          "isEnabled": true
+        },
+        {
+          "id": "signal_mission_status-step-13",
+          "command": "else",
+          "isEnabled": true
+        },
+        {
+          "id": "signal_mission_status-step-14",
+          "command": "show_dialogue signal_code",
+          "isEnabled": true
+        },
+        {
+          "id": "signal_mission_status-step-15",
+          "command": "condition_end",
+          "isEnabled": true
+        },
+        {
+          "id": "signal_mission_status-step-16",
+          "command": "condition_end",
+          "isEnabled": true
+        },
+        {
+          "id": "signal_mission_status-step-17",
+          "command": "condition_end",
+          "isEnabled": true
+        },
+        {
+          "id": "signal_mission_status-step-18",
+          "command": "else",
+          "isEnabled": true
+        },
+        {
+          "id": "signal_mission_status-step-19",
+          "command": "if_variable var_signal_stage 2",
+          "isEnabled": true
+        },
+        {
+          "id": "signal_mission_status-step-20",
+          "command": "show_dialogue signal_repaired",
+          "isEnabled": true
+        },
+        {
+          "id": "signal_mission_status-step-21",
+          "command": "else",
+          "isEnabled": true
+        },
+        {
+          "id": "signal_mission_status-step-22",
+          "command": "show_dialogue signal_done",
+          "isEnabled": true
+        },
+        {
+          "id": "signal_mission_status-step-23",
+          "command": "condition_end",
+          "isEnabled": true
+        },
+        {
+          "id": "signal_mission_status-step-24",
+          "command": "condition_end",
+          "isEnabled": true
+        },
+        {
+          "id": "signal_mission_status-step-25",
+          "command": "condition_end",
+          "isEnabled": true
+        }
+      ],
+      "eventKind": "procedure",
+      "procedure": {
+        "parameters": [],
+        "locals": []
+      }
+    },
+    {
+      "id": "event-signal_campaign_objective",
+      "name": "signal_campaign_objective",
+      "roomName": "missoes",
+      "category": "O sinal perdido",
+      "command": "noop",
+      "detail": "Objetivo original da campanha, preservado como procedimento compartilhado.",
+      "steps": [
+        {
+          "id": "signal_campaign_objective-step-1",
+          "command": "if_variable var_campaign_finished 1",
+          "isEnabled": true
+        },
+        {
+          "id": "signal_campaign_objective-step-2",
+          "command": "show_dialogue ingame-next-0",
+          "isEnabled": true
+        },
+        {
+          "id": "signal_campaign_objective-step-3",
+          "command": "else",
+          "isEnabled": true
+        },
+        {
+          "id": "signal_campaign_objective-step-4",
+          "command": "if_variable var_boost 1",
+          "isEnabled": true
+        },
+        {
+          "id": "signal_campaign_objective-step-5",
+          "command": "show_dialogue ingame-next-1",
+          "isEnabled": true
+        },
+        {
+          "id": "signal_campaign_objective-step-6",
+          "command": "else",
+          "isEnabled": true
+        },
+        {
+          "id": "signal_campaign_objective-step-7",
+          "command": "if_variable var_relay_cleared 1",
+          "isEnabled": true
+        },
+        {
+          "id": "signal_campaign_objective-step-8",
+          "command": "show_dialogue ingame-next-2",
+          "isEnabled": true
+        },
+        {
+          "id": "signal_campaign_objective-step-9",
+          "command": "else",
+          "isEnabled": true
+        },
+        {
+          "id": "signal_campaign_objective-step-10",
+          "command": "if_variable var_shield 1",
+          "isEnabled": true
+        },
+        {
+          "id": "signal_campaign_objective-step-11",
+          "command": "show_dialogue ingame-next-3",
+          "isEnabled": true
+        },
+        {
+          "id": "signal_campaign_objective-step-12",
+          "command": "else",
+          "isEnabled": true
+        },
+        {
+          "id": "signal_campaign_objective-step-13",
+          "command": "if_variable var_guardian_bond 1",
+          "isEnabled": true
+        },
+        {
+          "id": "signal_campaign_objective-step-14",
+          "command": "show_dialogue ingame-next-4",
+          "isEnabled": true
+        },
+        {
+          "id": "signal_campaign_objective-step-15",
+          "command": "else",
+          "isEnabled": true
+        },
+        {
+          "id": "signal_campaign_objective-step-16",
+          "command": "if_variable var_energy_cell 1",
+          "isEnabled": true
+        },
+        {
+          "id": "signal_campaign_objective-step-17",
+          "command": "show_dialogue ingame-next-5",
+          "isEnabled": true
+        },
+        {
+          "id": "signal_campaign_objective-step-18",
+          "command": "else",
+          "isEnabled": true
+        },
+        {
+          "id": "signal_campaign_objective-step-19",
+          "command": "if_variable var_usina_combat_cleared 1",
+          "isEnabled": true
+        },
+        {
+          "id": "signal_campaign_objective-step-20",
+          "command": "show_dialogue ingame-next-6",
+          "isEnabled": true
+        },
+        {
+          "id": "signal_campaign_objective-step-21",
+          "command": "else",
+          "isEnabled": true
+        },
+        {
+          "id": "signal_campaign_objective-step-22",
+          "command": "if_variable var_market_shortcut 1",
+          "isEnabled": true
+        },
+        {
+          "id": "signal_campaign_objective-step-23",
+          "command": "show_dialogue ingame-next-7",
+          "isEnabled": true
+        },
+        {
+          "id": "signal_campaign_objective-step-24",
+          "command": "else",
+          "isEnabled": true
+        },
+        {
+          "id": "signal_campaign_objective-step-25",
+          "command": "if_variable var_observatory_read 1",
+          "isEnabled": true
+        },
+        {
+          "id": "signal_campaign_objective-step-26",
+          "command": "show_dialogue ingame-next-8",
+          "isEnabled": true
+        },
+        {
+          "id": "signal_campaign_objective-step-27",
+          "command": "else",
+          "isEnabled": true
+        },
+        {
+          "id": "signal_campaign_objective-step-28",
+          "command": "if_variable var_warehouse_inspected 1",
+          "isEnabled": true
+        },
+        {
+          "id": "signal_campaign_objective-step-29",
+          "command": "show_dialogue ingame-next-9",
+          "isEnabled": true
+        },
+        {
+          "id": "signal_campaign_objective-step-30",
+          "command": "else",
+          "isEnabled": true
+        },
+        {
+          "id": "signal_campaign_objective-step-31",
+          "command": "if_variable var_grip 1",
+          "isEnabled": true
+        },
+        {
+          "id": "signal_campaign_objective-step-32",
+          "command": "show_dialogue ingame-next-10",
+          "isEnabled": true
+        },
+        {
+          "id": "signal_campaign_objective-step-33",
+          "command": "else",
+          "isEnabled": true
+        },
+        {
+          "id": "signal_campaign_objective-step-34",
+          "command": "if_variable var_frame 1",
+          "isEnabled": true
+        },
+        {
+          "id": "signal_campaign_objective-step-35",
+          "command": "show_dialogue ingame-next-11",
+          "isEnabled": true
+        },
+        {
+          "id": "signal_campaign_objective-step-36",
+          "command": "else",
+          "isEnabled": true
+        },
+        {
+          "id": "signal_campaign_objective-step-37",
+          "command": "show_dialogue ingame-next-start",
+          "isEnabled": true
+        },
+        {
+          "id": "signal_campaign_objective-step-38",
+          "command": "condition_end",
+          "isEnabled": true
+        },
+        {
+          "id": "signal_campaign_objective-step-39",
+          "command": "condition_end",
+          "isEnabled": true
+        },
+        {
+          "id": "signal_campaign_objective-step-40",
+          "command": "condition_end",
+          "isEnabled": true
+        },
+        {
+          "id": "signal_campaign_objective-step-41",
+          "command": "condition_end",
+          "isEnabled": true
+        },
+        {
+          "id": "signal_campaign_objective-step-42",
+          "command": "condition_end",
+          "isEnabled": true
+        },
+        {
+          "id": "signal_campaign_objective-step-43",
+          "command": "condition_end",
+          "isEnabled": true
+        },
+        {
+          "id": "signal_campaign_objective-step-44",
+          "command": "condition_end",
+          "isEnabled": true
+        },
+        {
+          "id": "signal_campaign_objective-step-45",
+          "command": "condition_end",
+          "isEnabled": true
+        },
+        {
+          "id": "signal_campaign_objective-step-46",
+          "command": "condition_end",
+          "isEnabled": true
+        },
+        {
+          "id": "signal_campaign_objective-step-47",
+          "command": "condition_end",
+          "isEnabled": true
+        },
+        {
+          "id": "signal_campaign_objective-step-48",
+          "command": "condition_end",
+          "isEnabled": true
+        },
+        {
+          "id": "signal_campaign_objective-step-49",
+          "command": "condition_end",
+          "isEnabled": true
+        }
+      ],
+      "eventKind": "procedure",
+      "procedure": {
+        "parameters": [],
+        "locals": []
+      }
+    },
+    {
+      "id": "event-timeline_signal_repair",
+      "name": "timeline_signal_repair",
+      "roomName": "farol_interior",
+      "category": "O sinal perdido",
+      "command": "noop",
+      "detail": "Timeline editável em Ferramentas avançadas; câmera e áudio, sem rasterizar atores ou HUD no background.",
+      "steps": [
+        {
+          "id": "timeline_signal_repair-step-1",
+          "command": "pause_scene_type topdown",
+          "isEnabled": true
+        },
+        {
+          "id": "timeline_signal_repair-step-2",
+          "command": "camera_set_position 64 0",
+          "isEnabled": true
+        },
+        {
+          "id": "timeline_signal_repair-step-3",
+          "command": "play_music farol_tema_principal",
+          "isEnabled": true
+        },
+        {
+          "id": "timeline_signal_repair-step-4",
+          "command": "wait 30",
+          "isEnabled": true
+        },
+        {
+          "id": "timeline_signal_repair-step-5",
+          "command": "play_sfx farol_sfx_sinal",
+          "isEnabled": true
+        },
+        {
+          "id": "timeline_signal_repair-step-6",
+          "command": "wait 60",
+          "isEnabled": true
+        },
+        {
+          "id": "timeline_signal_repair-step-7",
+          "command": "play_sfx farol_sfx_confirmar",
+          "isEnabled": true
+        },
+        {
+          "id": "timeline_signal_repair-step-8",
+          "command": "wait 30",
+          "isEnabled": true
+        },
+        {
+          "id": "timeline_signal_repair-step-9",
+          "command": "camera_follow_player",
+          "isEnabled": true
+        },
+        {
+          "id": "timeline_signal_repair-step-10",
+          "command": "resume_scene_type topdown",
+          "isEnabled": true
+        },
+        {
+          "id": "timeline_signal_repair-step-11",
+          "command": "save_game 0",
+          "isEnabled": true
+        },
+        {
+          "id": "timeline_signal_repair-step-12",
+          "command": "show_dialogue signal_repaired",
+          "isEnabled": true
+        }
+      ]
+    },
+    {
+      "id": "event-showcase_base_captain",
+      "name": "showcase_base_captain",
+      "roomName": "porto_lumen",
+      "category": "Exemplo · Sistemas conectados",
+      "detail": "Comportamento anterior preservado como procedimento compartilhado.",
+      "command": "noop",
+      "steps": [
+        {
+          "id": "porto_conversar_captain-fala",
+          "command": "show_dialogue porto-captain-conversa",
+          "isEnabled": true
+        }
+      ],
+      "eventKind": "procedure",
+      "procedure": {
+        "parameters": [],
+        "locals": []
+      }
+    },
+    {
+      "id": "event-showcase_base_traveler",
+      "name": "showcase_base_traveler",
+      "roomName": "porto_lumen",
+      "category": "Exemplo · Sistemas conectados",
+      "detail": "Comportamento anterior preservado como procedimento compartilhado.",
+      "command": "noop",
+      "steps": [
+        {
+          "id": "porto_conversar_traveler-fala",
+          "command": "show_dialogue porto-traveler-conversa",
+          "isEnabled": true
+        }
+      ],
+      "eventKind": "procedure",
+      "procedure": {
+        "parameters": [],
+        "locals": []
+      }
+    },
+    {
+      "id": "event-showcase_base_mechanic",
+      "name": "showcase_base_mechanic",
+      "roomName": "porto_lumen",
+      "category": "Exemplo · Sistemas conectados",
+      "detail": "Comportamento anterior preservado como procedimento compartilhado.",
+      "command": "noop",
+      "steps": [
+        {
+          "id": "porto_recuperar_estrutura-step-1",
+          "command": "if_variable var_frame 0",
+          "isEnabled": true
+        },
+        {
+          "id": "porto_recuperar_estrutura-step-2",
+          "command": "set_variable var_frame 1",
+          "isEnabled": true
+        },
+        {
+          "id": "porto_recuperar_estrutura-step-3",
+          "command": "add_item quest_fragment 1",
+          "isEnabled": true
+        },
+        {
+          "id": "porto_recuperar_estrutura-step-4",
+          "command": "condition_end",
+          "isEnabled": true
+        },
+        {
+          "id": "porto_recuperar_estrutura-step-5",
+          "command": "if_variable var_signal_stage 0",
+          "isEnabled": true
+        },
+        {
+          "id": "porto_recuperar_estrutura-step-6",
+          "command": "set_variable var_signal_stage 1",
+          "isEnabled": true
+        },
+        {
+          "id": "porto_recuperar_estrutura-step-7",
+          "command": "save_game 0",
+          "isEnabled": true
+        },
+        {
+          "id": "porto_recuperar_estrutura-step-8",
+          "command": "show_dialogue signal_request",
+          "isEnabled": true
+        },
+        {
+          "id": "porto_recuperar_estrutura-step-9",
+          "command": "else",
+          "isEnabled": true
+        },
+        {
+          "id": "porto_recuperar_estrutura-step-10",
+          "command": "if_variable var_signal_stage 2",
+          "isEnabled": true
+        },
+        {
+          "id": "porto_recuperar_estrutura-step-11",
+          "command": "call_event signal_claim_reward",
+          "isEnabled": true
+        },
+        {
+          "id": "porto_recuperar_estrutura-step-12",
+          "command": "else",
+          "isEnabled": true
+        },
+        {
+          "id": "porto_recuperar_estrutura-step-13",
+          "command": "call_procedure signal_mission_status",
+          "isEnabled": true
+        },
+        {
+          "id": "porto_recuperar_estrutura-step-14",
+          "command": "condition_end",
+          "isEnabled": true
+        },
+        {
+          "id": "porto_recuperar_estrutura-step-15",
+          "command": "condition_end",
+          "isEnabled": true
+        }
+      ],
+      "eventKind": "procedure",
+      "procedure": {
+        "parameters": [],
+        "locals": []
+      }
+    },
+    {
+      "id": "event-showcase_base_fisher",
+      "name": "showcase_base_fisher",
+      "roomName": "porto_lumen",
+      "category": "Exemplo · Sistemas conectados",
+      "detail": "Comportamento anterior preservado como procedimento compartilhado.",
+      "command": "noop",
+      "steps": [
+        {
+          "id": "porto_conversar_fisherchild-fala",
+          "command": "show_dialogue porto-fisherchild-conversa",
+          "isEnabled": true
+        }
+      ],
+      "eventKind": "procedure",
+      "procedure": {
+        "parameters": [],
+        "locals": []
+      }
+    },
+    {
+      "id": "event-showcase_base_keeper",
+      "name": "showcase_base_keeper",
+      "roomName": "farol_interior",
+      "category": "Exemplo · Sistemas conectados",
+      "detail": "Comportamento anterior preservado como procedimento compartilhado.",
+      "command": "noop",
+      "steps": [
+        {
+          "id": "farol_falar_guardiao-step-1",
+          "command": "if_variable var_signal_stage 0",
+          "isEnabled": true
+        },
+        {
+          "id": "farol_falar_guardiao-step-2",
+          "command": "show_dialogue farol_guardiao",
+          "isEnabled": true
+        },
+        {
+          "id": "farol_falar_guardiao-step-3",
+          "command": "else",
+          "isEnabled": true
+        },
+        {
+          "id": "farol_falar_guardiao-step-4",
+          "command": "call_event farol_examinar_lente",
+          "isEnabled": true
+        },
+        {
+          "id": "farol_falar_guardiao-step-5",
+          "command": "condition_end",
+          "isEnabled": true
+        }
+      ],
+      "eventKind": "procedure",
+      "procedure": {
+        "parameters": [],
+        "locals": []
+      }
+    },
+    {
+      "id": "event-showcase_base_exit",
+      "name": "showcase_base_exit",
+      "roomName": "farol_interior",
+      "category": "Exemplo · Sistemas conectados",
+      "detail": "Comportamento anterior preservado como procedimento compartilhado.",
+      "command": "noop",
+      "steps": [
+        {
+          "id": "event-lighthouse-exit-audio",
+          "command": "play_sfx farol_sfx_porta",
+          "isEnabled": true
+        },
+        {
+          "id": "event-lighthouse-exit-step-1",
+          "command": "change_scene porto_lumen 23 20 down",
+          "isEnabled": true
+        }
+      ],
+      "eventKind": "procedure",
+      "procedure": {
+        "parameters": [],
+        "locals": []
+      }
+    },
+    {
+      "id": "event-showcase_base_port_enter",
+      "name": "showcase_base_port_enter",
+      "roomName": "porto_lumen",
+      "category": "Exemplo · Sistemas conectados",
+      "detail": "Comportamento anterior preservado como procedimento compartilhado.",
+      "command": "noop",
+      "steps": [
+        {
+          "id": "event-port-enter-music",
+          "command": "play_music farol_enseada",
+          "isEnabled": true
+        },
+        {
+          "id": "event-port-enter-step-1",
+          "command": "call_event aplicar_perfil_jogador",
+          "isEnabled": true
+        },
+        {
+          "id": "event-port-enter-step-2",
+          "command": "if_variable z_feature_quest_state 0",
+          "isEnabled": true
+        },
+        {
+          "id": "event-port-enter-step-3",
+          "command": "set_variable z_feature_quest_state 1",
+          "isEnabled": true
+        },
+        {
+          "id": "porto-health-initial-state",
+          "command": "set_variable porto_player_health 3",
+          "isEnabled": true
+        },
+        {
+          "id": "event-port-enter-step-4",
+          "command": "add_item currency_gold 3",
+          "isEnabled": true
+        },
+        {
+          "id": "event-port-enter-step-5",
+          "command": "set_variable z_feature_shop_stock 0",
+          "isEnabled": true
+        },
+        {
+          "id": "event-port-enter-step-6",
+          "command": "condition_end",
+          "isEnabled": true
+        }
+      ],
+      "eventKind": "procedure",
+      "procedure": {
+        "parameters": [],
+        "locals": []
+      }
+    },
+    {
+      "id": "event-showcase_base_farol_enter",
+      "name": "showcase_base_farol_enter",
+      "roomName": "farol_interior",
+      "category": "Exemplo · Sistemas conectados",
+      "detail": "Comportamento anterior preservado como procedimento compartilhado.",
+      "command": "noop",
+      "steps": [
+        {
+          "id": "event-lighthouse-enter-music",
+          "command": "play_music farol_memorias",
+          "isEnabled": true
+        },
+        {
+          "id": "farol-preserve-player-art",
+          "command": "change_player_sprite porto-nara-animations48.png",
+          "isEnabled": true
+        },
+        {
+          "id": "farol-preserve-player-pose",
+          "command": "set_actor_animation Player idle_up",
+          "isEnabled": true
+        },
+        {
+          "id": "event-lighthouse-enter-audio",
+          "command": "play_sfx farol_sfx_porta",
+          "isEnabled": true
+        },
+        {
+          "id": "event-lighthouse-enter-step-1",
+          "command": "show_dialogue farol_interior_objetivo",
+          "isEnabled": true
+        }
+      ],
+      "eventKind": "procedure",
+      "procedure": {
+        "parameters": [],
+        "locals": []
+      }
+    },
+    {
+      "id": "event-showcase_base_start_enter",
+      "name": "showcase_base_start_enter",
+      "roomName": "menu_start",
+      "category": "Exemplo · Sistemas conectados",
+      "detail": "Comportamento anterior preservado como procedimento compartilhado.",
+      "command": "noop",
+      "steps": [],
+      "eventKind": "procedure",
+      "procedure": {
+        "parameters": [],
+        "locals": []
+      }
+    },
+    {
+      "id": "event-showcase_base_market_guard",
+      "name": "showcase_base_market_guard",
+      "roomName": "mercado_suspenso",
+      "category": "Exemplo · Sistemas conectados",
+      "detail": "Comportamento anterior preservado como procedimento compartilhado.",
+      "command": "noop",
+      "steps": [
+        {
+          "id": "iso-v4-mercado_falar_guarda-0",
+          "command": "attach_button r mercado_entrar_arena true",
+          "isEnabled": true
+        },
+        {
+          "id": "iso-v4-mercado_falar_guarda-1",
+          "command": "show_dialogue mercado_guarda",
+          "isEnabled": true
+        }
+      ],
+      "eventKind": "procedure",
+      "procedure": {
+        "parameters": [],
+        "locals": []
+      }
+    },
+    {
+      "id": "event-showcase_base_ending",
+      "name": "showcase_base_ending",
+      "roomName": "circuito_final",
+      "category": "Exemplo · Sistemas conectados",
+      "detail": "Comportamento anterior preservado como procedimento compartilhado.",
+      "command": "noop",
+      "steps": [
+        {
+          "id": "racing-finish-jingle",
+          "command": "play_sfx corrida_chegada",
+          "isEnabled": true
+        },
+        {
+          "id": "racing-finish-wait",
+          "command": "wait 90",
+          "isEnabled": true
+        },
+        {
+          "id": "event-circuit-finish-audio",
+          "command": "play_sfx farol_sfx_vitoria",
+          "isEnabled": true
+        },
+        {
+          "id": "event-circuit-finish-step-1",
+          "command": "set_variable var_campaign_finished 1",
+          "isEnabled": true
+        },
+        {
+          "id": "event-circuit-finish-step-2",
+          "command": "save_game 0",
+          "isEnabled": true
+        },
+        {
+          "id": "event-circuit-finish-step-3",
+          "command": "show_dialogue epilogo",
+          "isEnabled": true
+        },
+        {
+          "id": "event-circuit-finish-step-4",
+          "command": "advance_campaign",
+          "isEnabled": true
+        }
+      ],
+      "eventKind": "procedure",
+      "procedure": {
+        "parameters": [],
+        "locals": []
+      }
+    },
+    {
+      "id": "event-showcase_coast_report",
+      "name": "showcase_coast_report",
+      "roomName": "porto_lumen",
+      "category": "Exemplo · Sistemas conectados",
+      "detail": "Exemplo de sistemas conectados: estado persistente, requisitos e efeitos separados do cenário.",
+      "command": "noop",
+      "steps": [
+        {
+          "id": "showcase_coast_report-1",
+          "command": "if_variable var_council_path 1",
+          "isEnabled": true
+        },
+        {
+          "id": "showcase_coast_report-2",
+          "command": "show_dialogue showcase_community",
+          "isEnabled": true
+        },
+        {
+          "id": "showcase_coast_report-3",
+          "command": "else",
+          "isEnabled": true
+        },
+        {
+          "id": "showcase_coast_report-4",
+          "command": "if_variable var_council_path 2",
+          "isEnabled": true
+        },
+        {
+          "id": "showcase_coast_report-5",
+          "command": "show_dialogue showcase_exploration",
+          "isEnabled": true
+        },
+        {
+          "id": "showcase_coast_report-6",
+          "command": "else",
+          "isEnabled": true
+        },
+        {
+          "id": "showcase_coast_report-7",
+          "command": "show_dialogue showcase_undecided",
+          "isEnabled": true
+        },
+        {
+          "id": "showcase_coast_report-8",
+          "command": "condition_end",
+          "isEnabled": true
+        },
+        {
+          "id": "showcase_coast_report-9",
+          "command": "condition_end",
+          "isEnabled": true
+        }
+      ],
+      "eventKind": "procedure",
+      "procedure": {
+        "parameters": [],
+        "locals": []
+      }
+    },
+    {
+      "id": "event-showcase_coast_report_event",
+      "name": "showcase_coast_report_event",
+      "roomName": "porto_lumen",
+      "category": "Exemplo · Sistemas conectados",
+      "detail": "Exemplo de sistemas conectados: estado persistente, requisitos e efeitos separados do cenário.",
+      "command": "noop",
+      "steps": [
+        {
+          "id": "showcase_coast_report_event-1",
+          "command": "call_procedure showcase_coast_report",
+          "isEnabled": true
+        }
+      ]
+    },
+    {
+      "id": "event-showcase_captain_talk",
+      "name": "showcase_captain_talk",
+      "roomName": "porto_lumen",
+      "category": "Exemplo · Sistemas conectados",
+      "detail": "Exemplo de sistemas conectados: estado persistente, requisitos e efeitos separados do cenário.",
+      "command": "noop",
+      "steps": [
+        {
+          "id": "showcase_captain_talk-1",
+          "command": "call_procedure showcase_base_captain",
+          "isEnabled": true
+        }
+      ]
+    },
+    {
+      "id": "event-showcase_visit_council",
+      "name": "showcase_visit_council",
+      "roomName": "porto_lumen",
+      "category": "Exemplo · Sistemas conectados",
+      "detail": "Exemplo de sistemas conectados: estado persistente, requisitos e efeitos separados do cenário.",
+      "command": "noop",
+      "steps": [
+        {
+          "id": "showcase_visit_council-1",
+          "command": "set_variable var_council_visit 1",
+          "isEnabled": true
+        },
+        {
+          "id": "showcase_visit_council-2",
+          "command": "change_scene conselho_guardia 0 0 down",
+          "isEnabled": true
+        }
+      ]
+    },
+    {
+      "id": "event-showcase_leave_council",
+      "name": "showcase_leave_council",
+      "roomName": "conselho_guardia",
+      "category": "Exemplo · Sistemas conectados",
+      "detail": "Exemplo de sistemas conectados: estado persistente, requisitos e efeitos separados do cenário.",
+      "command": "noop",
+      "steps": [
+        {
+          "id": "showcase_leave_council-1",
+          "command": "if_variable var_council_visit 1",
+          "isEnabled": true
+        },
+        {
+          "id": "showcase_leave_council-2",
+          "command": "change_scene porto_lumen 37 68 up",
+          "isEnabled": true
+        },
+        {
+          "id": "showcase_leave_council-3",
+          "command": "else",
+          "isEnabled": true
+        },
+        {
+          "id": "showcase_leave_council-4",
+          "command": "set_variable var_guardian_bond 1",
+          "isEnabled": true
+        },
+        {
+          "id": "showcase_leave_council-5",
+          "command": "save_game 0",
+          "isEnabled": true
+        },
+        {
+          "id": "showcase_leave_council-6",
+          "command": "advance_campaign",
+          "isEnabled": true
+        },
+        {
+          "id": "showcase_leave_council-7",
+          "command": "condition_end",
+          "isEnabled": true
+        }
+      ],
+      "eventKind": "procedure",
+      "procedure": {
+        "parameters": [],
+        "locals": []
+      }
+    },
+    {
+      "id": "event-conselho_escolher_exploracao",
+      "name": "conselho_escolher_exploracao",
+      "roomName": "conselho_guardia",
+      "category": "Exemplo · Sistemas conectados",
+      "detail": "Exemplo de sistemas conectados: estado persistente, requisitos e efeitos separados do cenário.",
+      "command": "noop",
+      "steps": [
+        {
+          "id": "conselho_escolher_exploracao-1",
+          "command": "if_variable var_council_path 0",
+          "isEnabled": true
+        },
+        {
+          "id": "conselho_escolher_exploracao-2",
+          "command": "set_variable var_council_path 2",
+          "isEnabled": true
+        },
+        {
+          "id": "conselho_escolher_exploracao-3",
+          "command": "add_item zzz_guardian_compass 1",
+          "isEnabled": true
+        },
+        {
+          "id": "conselho_escolher_exploracao-4",
+          "command": "condition_end",
+          "isEnabled": true
+        },
+        {
+          "id": "conselho_escolher_exploracao-5",
+          "command": "call_procedure showcase_leave_council",
+          "isEnabled": true
+        }
+      ]
+    },
+    {
+      "id": "event-showcase_traveler_talk",
+      "name": "showcase_traveler_talk",
+      "roomName": "porto_lumen",
+      "category": "Exemplo · Sistemas conectados",
+      "detail": "Exemplo de sistemas conectados: estado persistente, requisitos e efeitos separados do cenário.",
+      "command": "noop",
+      "steps": [
+        {
+          "id": "showcase_traveler_talk-1",
+          "command": "call_procedure showcase_base_traveler",
+          "isEnabled": true
+        }
+      ]
+    },
+    {
+      "id": "event-showcase_open_shop",
+      "name": "showcase_open_shop",
+      "roomName": "porto_lumen",
+      "category": "Exemplo · Sistemas conectados",
+      "detail": "Exemplo de sistemas conectados: estado persistente, requisitos e efeitos separados do cenário.",
+      "command": "noop",
+      "steps": [
+        {
+          "id": "showcase_open_shop-1",
+          "command": "open_shop porto-lume-traveler-pilot",
+          "isEnabled": true
+        },
+        {
+          "id": "showcase_open_shop-2",
+          "command": "save_game 0",
+          "isEnabled": true
+        }
+      ]
+    },
+    {
+      "id": "event-showcase_open_equipment",
+      "name": "showcase_open_equipment",
+      "roomName": "porto_lumen",
+      "category": "Exemplo · Sistemas conectados",
+      "detail": "Exemplo de sistemas conectados: estado persistente, requisitos e efeitos separados do cenário.",
+      "command": "noop",
+      "steps": [
+        {
+          "id": "showcase_open_equipment-1",
+          "command": "show_dialogue showcase_equipment_help",
+          "isEnabled": true
+        },
+        {
+          "id": "showcase_open_equipment-2",
+          "command": "open_equip_menu 1 true",
+          "isEnabled": true
+        },
+        {
+          "id": "showcase_open_equipment-3",
+          "command": "save_game 0",
+          "isEnabled": true
+        }
+      ]
+    },
+    {
+      "id": "event-showcase_council_epilogue",
+      "name": "showcase_council_epilogue",
+      "roomName": "circuito_final",
+      "category": "Exemplo · Sistemas conectados",
+      "detail": "Exemplo de sistemas conectados: estado persistente, requisitos e efeitos separados do cenário.",
+      "command": "noop",
+      "steps": [
+        {
+          "id": "showcase_council_epilogue-1",
+          "command": "if_variable var_council_path 1",
+          "isEnabled": true
+        },
+        {
+          "id": "showcase_council_epilogue-2",
+          "command": "show_dialogue showcase_epilogue_community",
+          "isEnabled": true
+        },
+        {
+          "id": "showcase_council_epilogue-3",
+          "command": "else",
+          "isEnabled": true
+        },
+        {
+          "id": "showcase_council_epilogue-4",
+          "command": "if_variable var_council_path 2",
+          "isEnabled": true
+        },
+        {
+          "id": "showcase_council_epilogue-5",
+          "command": "show_dialogue showcase_epilogue_exploration",
+          "isEnabled": true
+        },
+        {
+          "id": "showcase_council_epilogue-6",
+          "command": "condition_end",
+          "isEnabled": true
+        },
+        {
+          "id": "showcase_council_epilogue-7",
+          "command": "condition_end",
+          "isEnabled": true
+        }
+      ],
+      "eventKind": "procedure",
+      "procedure": {
+        "parameters": [],
+        "locals": []
+      }
+    },
+    {
+      "id": "event-showcase_keeper_talk",
+      "name": "showcase_keeper_talk",
+      "roomName": "farol_interior",
+      "category": "Exemplo · Sistemas conectados",
+      "detail": "Exemplo de sistemas conectados: estado persistente, requisitos e efeitos separados do cenário.",
+      "command": "noop",
+      "steps": [
+        {
+          "id": "showcase_keeper_talk-1",
+          "command": "call_procedure showcase_coast_report",
+          "isEnabled": true
+        }
+      ]
+    },
+    {
+      "id": "event-showcase_begin_trial",
+      "name": "showcase_begin_trial",
+      "roomName": "farol_interior",
+      "category": "Exemplo · Sistemas conectados",
+      "detail": "Exemplo de sistemas conectados: estado persistente, requisitos e efeitos separados do cenário.",
+      "command": "noop",
+      "steps": [
+        {
+          "id": "showcase_begin_trial-1",
+          "command": "if_variable var_signal_stage 3",
+          "isEnabled": true
+        },
+        {
+          "id": "showcase_begin_trial-2",
+          "command": "if_variable var_trial_result 1",
+          "isEnabled": true
+        },
+        {
+          "id": "showcase_begin_trial-3",
+          "command": "show_dialogue showcase_trial_done",
+          "isEnabled": true
+        },
+        {
+          "id": "showcase_begin_trial-4",
+          "command": "else",
+          "isEnabled": true
+        },
+        {
+          "id": "showcase_begin_trial-5",
+          "command": "if_variable var_trial_active 1",
+          "isEnabled": true
+        },
+        {
+          "id": "showcase_begin_trial-6",
+          "command": "show_dialogue showcase_trial_active",
+          "isEnabled": true
+        },
+        {
+          "id": "showcase_begin_trial-7",
+          "command": "else",
+          "isEnabled": true
+        },
+        {
+          "id": "showcase_begin_trial-8",
+          "command": "if_engine_field equipped_item_0 6",
+          "isEnabled": true
+        },
+        {
+          "id": "showcase_begin_trial-9",
+          "command": "has_item zzz_lumen_tool 1",
+          "isEnabled": true
+        },
+        {
+          "id": "showcase_begin_trial-10",
+          "command": "show_dialogue showcase_trial_help",
+          "isEnabled": true
+        },
+        {
+          "id": "showcase_begin_trial-11",
+          "command": "set_variable var_trial_charge 12",
+          "isEnabled": true
+        },
+        {
+          "id": "showcase_begin_trial-12",
+          "command": "has_item zzz_guardian_compass 1",
+          "isEnabled": true
+        },
+        {
+          "id": "showcase_begin_trial-13",
+          "command": "set_variable var_trial_charge 18",
+          "isEnabled": true
+        },
+        {
+          "id": "showcase_begin_trial-14",
+          "command": "condition_end",
+          "isEnabled": true
+        },
+        {
+          "id": "showcase_begin_trial-15",
+          "command": "set_variable var_trial_result 0",
+          "isEnabled": true
+        },
+        {
+          "id": "showcase_begin_trial-16",
+          "command": "set_variable var_trial_active 1",
+          "isEnabled": true
+        },
+        {
+          "id": "showcase_begin_trial-17",
+          "command": "add_variable var_trial_attempts 1",
+          "isEnabled": true
+        },
+        {
+          "id": "showcase_begin_trial-18",
+          "command": "timer_attach 60 showcase_trial_tick",
+          "isEnabled": true
+        },
+        {
+          "id": "showcase_begin_trial-19",
+          "command": "start_segment 7 showcase_trial_pulse",
+          "isEnabled": true
+        },
+        {
+          "id": "showcase_begin_trial-20",
+          "command": "else",
+          "isEnabled": true
+        },
+        {
+          "id": "showcase_begin_trial-21",
+          "command": "show_dialogue showcase_need_tool",
+          "isEnabled": true
+        },
+        {
+          "id": "showcase_begin_trial-22",
+          "command": "condition_end",
+          "isEnabled": true
+        },
+        {
+          "id": "showcase_begin_trial-23",
+          "command": "else",
+          "isEnabled": true
+        },
+        {
+          "id": "showcase_begin_trial-24",
+          "command": "show_dialogue showcase_need_tool",
+          "isEnabled": true
+        },
+        {
+          "id": "showcase_begin_trial-25",
+          "command": "condition_end",
+          "isEnabled": true
+        },
+        {
+          "id": "showcase_begin_trial-26",
+          "command": "condition_end",
+          "isEnabled": true
+        },
+        {
+          "id": "showcase_begin_trial-27",
+          "command": "condition_end",
+          "isEnabled": true
+        },
+        {
+          "id": "showcase_begin_trial-28",
+          "command": "else",
+          "isEnabled": true
+        },
+        {
+          "id": "showcase_begin_trial-29",
+          "command": "show_dialogue showcase_need_signal",
+          "isEnabled": true
+        },
+        {
+          "id": "showcase_begin_trial-30",
+          "command": "condition_end",
+          "isEnabled": true
+        }
+      ]
+    },
+    {
+      "id": "event-showcase_trial_pulse",
+      "name": "showcase_trial_pulse",
+      "roomName": "farol_interior",
+      "category": "Exemplo · Sistemas conectados",
+      "detail": "Exemplo de sistemas conectados: estado persistente, requisitos e efeitos separados do cenário.",
+      "command": "noop",
+      "steps": [
+        {
+          "id": "showcase_trial_pulse-1",
+          "command": "actor_effects farol-keeper flash 16 50",
+          "isEnabled": true
+        },
+        {
+          "id": "showcase_trial_pulse-2",
+          "command": "play_sfx farol_sfx_sinal",
+          "isEnabled": true
+        },
+        {
+          "id": "showcase_trial_pulse-3",
+          "command": "wait 60",
+          "isEnabled": true
+        },
+        {
+          "id": "showcase_trial_pulse-4",
+          "command": "actor_effects farol-keeper flash 16 50",
+          "isEnabled": true
+        },
+        {
+          "id": "showcase_trial_pulse-5",
+          "command": "wait 60",
+          "isEnabled": true
+        },
+        {
+          "id": "showcase_trial_pulse-6",
+          "command": "play_sfx farol_sfx_sinal",
+          "isEnabled": true
+        }
+      ]
+    },
+    {
+      "id": "event-showcase_trial_tick",
+      "name": "showcase_trial_tick",
+      "roomName": "farol_interior",
+      "category": "Exemplo · Sistemas conectados",
+      "detail": "Exemplo de sistemas conectados: estado persistente, requisitos e efeitos separados do cenário.",
+      "command": "noop",
+      "steps": [
+        {
+          "id": "showcase_trial_tick-1",
+          "command": "if_variable var_trial_active 1",
+          "isEnabled": true
+        },
+        {
+          "id": "showcase_trial_tick-2",
+          "command": "add_variable var_trial_charge -1",
+          "isEnabled": true
+        },
+        {
+          "id": "showcase_trial_tick-3",
+          "command": "if_variable var_trial_charge 3",
+          "isEnabled": true
+        },
+        {
+          "id": "showcase_trial_tick-4",
+          "command": "play_sfx farol_sfx_sinal",
+          "isEnabled": true
+        },
+        {
+          "id": "showcase_trial_tick-5",
+          "command": "condition_end",
+          "isEnabled": true
+        },
+        {
+          "id": "showcase_trial_tick-6",
+          "command": "if_variable_less_than var_trial_charge 1",
+          "isEnabled": true
+        },
+        {
+          "id": "showcase_trial_tick-7",
+          "command": "call_procedure showcase_trial_timeout",
+          "isEnabled": true
+        },
+        {
+          "id": "showcase_trial_tick-8",
+          "command": "condition_end",
+          "isEnabled": true
+        },
+        {
+          "id": "showcase_trial_tick-9",
+          "command": "else",
+          "isEnabled": true
+        },
+        {
+          "id": "showcase_trial_tick-10",
+          "command": "timer_remove showcase_trial_tick",
+          "isEnabled": true
+        },
+        {
+          "id": "showcase_trial_tick-11",
+          "command": "condition_end",
+          "isEnabled": true
+        }
+      ]
+    },
+    {
+      "id": "event-showcase_trial_timeout",
+      "name": "showcase_trial_timeout",
+      "roomName": "farol_interior",
+      "category": "Exemplo · Sistemas conectados",
+      "detail": "Exemplo de sistemas conectados: estado persistente, requisitos e efeitos separados do cenário.",
+      "command": "noop",
+      "steps": [
+        {
+          "id": "showcase_trial_timeout-1",
+          "command": "timer_remove showcase_trial_tick",
+          "isEnabled": true
+        },
+        {
+          "id": "showcase_trial_timeout-2",
+          "command": "stop_segment 7",
+          "isEnabled": true
+        },
+        {
+          "id": "showcase_trial_timeout-3",
+          "command": "set_variable var_trial_active 0",
+          "isEnabled": true
+        },
+        {
+          "id": "showcase_trial_timeout-4",
+          "command": "set_variable var_trial_charge 0",
+          "isEnabled": true
+        },
+        {
+          "id": "showcase_trial_timeout-5",
+          "command": "set_variable var_trial_result -1",
+          "isEnabled": true
+        },
+        {
+          "id": "showcase_trial_timeout-6",
+          "command": "play_sfx farol_sfx_sinal",
+          "isEnabled": true
+        },
+        {
+          "id": "showcase_trial_timeout-7",
+          "command": "show_dialogue showcase_trial_failed",
+          "isEnabled": true
+        }
+      ],
+      "eventKind": "procedure",
+      "procedure": {
+        "parameters": [],
+        "locals": []
+      }
+    },
+    {
+      "id": "event-showcase_finish_trial",
+      "name": "showcase_finish_trial",
+      "roomName": "farol_interior",
+      "category": "Exemplo · Sistemas conectados",
+      "detail": "Exemplo de sistemas conectados: estado persistente, requisitos e efeitos separados do cenário.",
+      "command": "noop",
+      "steps": [
+        {
+          "id": "showcase_finish_trial-1",
+          "command": "if_variable var_trial_active 1",
+          "isEnabled": true
+        },
+        {
+          "id": "showcase_finish_trial-2",
+          "command": "timer_remove showcase_trial_tick",
+          "isEnabled": true
+        },
+        {
+          "id": "showcase_finish_trial-3",
+          "command": "stop_segment 7",
+          "isEnabled": true
+        },
+        {
+          "id": "showcase_finish_trial-4",
+          "command": "set_variable var_trial_active 0",
+          "isEnabled": true
+        },
+        {
+          "id": "showcase_finish_trial-5",
+          "command": "set_variable var_trial_charge 0",
+          "isEnabled": true
+        },
+        {
+          "id": "showcase_finish_trial-6",
+          "command": "set_variable var_trial_result 1",
+          "isEnabled": true
+        },
+        {
+          "id": "showcase_finish_trial-7",
+          "command": "if_variable var_trial_reward 0",
+          "isEnabled": true
+        },
+        {
+          "id": "showcase_finish_trial-8",
+          "command": "set_variable var_trial_reward 1",
+          "isEnabled": true
+        },
+        {
+          "id": "showcase_finish_trial-9",
+          "command": "add_item currency_gold 1",
+          "isEnabled": true
+        },
+        {
+          "id": "showcase_finish_trial-10",
+          "command": "condition_end",
+          "isEnabled": true
+        },
+        {
+          "id": "showcase_finish_trial-11",
+          "command": "play_sfx farol_sfx_confirmar",
+          "isEnabled": true
+        },
+        {
+          "id": "showcase_finish_trial-12",
+          "command": "save_game 0",
+          "isEnabled": true
+        },
+        {
+          "id": "showcase_finish_trial-13",
+          "command": "show_dialogue showcase_trial_success",
+          "isEnabled": true
+        },
+        {
+          "id": "showcase_finish_trial-14",
+          "command": "condition_end",
+          "isEnabled": true
+        }
+      ],
+      "eventKind": "procedure",
+      "procedure": {
+        "parameters": [],
+        "locals": []
+      }
+    },
+    {
+      "id": "event-showcase_interrupt_trial",
+      "name": "showcase_interrupt_trial",
+      "roomName": "farol_interior",
+      "category": "Exemplo · Sistemas conectados",
+      "detail": "Exemplo de sistemas conectados: estado persistente, requisitos e efeitos separados do cenário.",
+      "command": "noop",
+      "steps": [
+        {
+          "id": "showcase_interrupt_trial-1",
+          "command": "if_variable var_trial_active 1",
+          "isEnabled": true
+        },
+        {
+          "id": "showcase_interrupt_trial-2",
+          "command": "set_variable var_trial_active 0",
+          "isEnabled": true
+        },
+        {
+          "id": "showcase_interrupt_trial-3",
+          "command": "set_variable var_trial_charge 0",
+          "isEnabled": true
+        },
+        {
+          "id": "showcase_interrupt_trial-4",
+          "command": "set_variable var_trial_result -2",
+          "isEnabled": true
+        },
+        {
+          "id": "showcase_interrupt_trial-5",
+          "command": "condition_end",
+          "isEnabled": true
+        }
+      ],
+      "eventKind": "procedure",
+      "procedure": {
+        "parameters": [],
+        "locals": []
+      }
+    },
+    {
+      "id": "event-showcase_trial_watchdog",
+      "name": "showcase_trial_watchdog",
+      "roomName": "farol_interior",
+      "category": "Exemplo · Sistemas conectados",
+      "detail": "Carregar sem timer interrompe a tentativa, preserva os equipamentos e permite reiniciar.",
+      "command": "noop",
+      "steps": [
+        {
+          "id": "showcase_trial_watchdog-1",
+          "command": "if_variable var_trial_active 1",
+          "isEnabled": true
+        },
+        {
+          "id": "showcase_trial_watchdog-2",
+          "command": "if_engine_field timer_count 0",
+          "isEnabled": true
+        },
+        {
+          "id": "showcase_trial_watchdog-3",
+          "command": "call_procedure showcase_interrupt_trial",
+          "isEnabled": true
+        },
+        {
+          "id": "showcase_trial_watchdog-4",
+          "command": "condition_end",
+          "isEnabled": true
+        },
+        {
+          "id": "showcase_trial_watchdog-5",
+          "command": "condition_end",
+          "isEnabled": true
+        }
+      ],
+      "eventKind": "procedure",
+      "procedure": {
+        "parameters": [],
+        "locals": []
+      }
     }
   ],
   "gbStudioImport": {
@@ -164266,11 +167650,11 @@
               "id": "shop",
               "enabled": true,
               "settings": {
-                "label": "KIT REPARO",
-                "item": 3,
+                "label": "FERRAMENTA",
+                "item": 6,
                 "currencyItem": 0,
-                "price": 1,
-                "stockVariable": 18,
+                "price": 4,
+                "stockVariable": 42,
                 "stock": 1
               }
             },
@@ -207886,7 +211270,41 @@
         "type": "topdown",
         "config": {
           "presentation": "topdown",
-          "profile": "farol-interior-scale-v2-approved"
+          "profile": "farol-interior-scale-v2-approved",
+          "modules": [
+            {
+              "id": "movement",
+              "enabled": true,
+              "settings": {}
+            },
+            {
+              "id": "dialogue",
+              "enabled": true,
+              "settings": {}
+            },
+            {
+              "id": "inventory",
+              "enabled": true,
+              "settings": {}
+            },
+            {
+              "id": "shop",
+              "enabled": true,
+              "settings": {
+                "label": "FERRAMENTA",
+                "item": 6,
+                "currencyItem": 0,
+                "price": 4,
+                "stockVariable": 42,
+                "stock": 1
+              }
+            },
+            {
+              "id": "camera",
+              "enabled": true,
+              "settings": {}
+            }
+          ]
         }
       },
       "tileLayers": [],
@@ -209444,7 +212862,7 @@
         "success": "Entender o estado da lente e voltar para Porto de Lúmen.",
         "failureRecovery": "A sala permanece aberta e o retorno pelo portal inferior continua disponível."
       },
-      "hudPresetId": "hud-porto-lumen-b",
+      "hudPresetId": "hud-farol-trial",
       "authoringNotes": "O runtime move o player e segue a câmera. Selecione um NPC ou gatilho e abra Eventos para estudar a conversa, coleta ou troca de cena."
     },
     {
@@ -230284,11 +233702,11 @@
               "id": "shop",
               "enabled": true,
               "settings": {
-                "label": "KIT REPARO",
-                "item": 3,
+                "label": "FERRAMENTA",
+                "item": 6,
                 "currencyItem": 0,
-                "price": 1,
-                "stockVariable": 18,
+                "price": 4,
+                "stockVariable": 42,
                 "stock": 1
               }
             },
@@ -273904,7 +277322,41 @@
         "type": "topdown",
         "config": {
           "presentation": "topdown",
-          "profile": "farol-interior-scale-v2-approved"
+          "profile": "farol-interior-scale-v2-approved",
+          "modules": [
+            {
+              "id": "movement",
+              "enabled": true,
+              "settings": {}
+            },
+            {
+              "id": "dialogue",
+              "enabled": true,
+              "settings": {}
+            },
+            {
+              "id": "inventory",
+              "enabled": true,
+              "settings": {}
+            },
+            {
+              "id": "shop",
+              "enabled": true,
+              "settings": {
+                "label": "FERRAMENTA",
+                "item": 6,
+                "currencyItem": 0,
+                "price": 4,
+                "stockVariable": 42,
+                "stock": 1
+              }
+            },
+            {
+              "id": "camera",
+              "enabled": true,
+              "settings": {}
+            }
+          ]
         }
       },
       "tileLayers": [],
@@ -275462,7 +278914,7 @@
         "success": "Entender o estado da lente e voltar para Porto de Lúmen.",
         "failureRecovery": "A sala permanece aberta e o retorno pelo portal inferior continua disponível."
       },
-      "hudPresetId": "hud-porto-lumen-b",
+      "hudPresetId": "hud-farol-trial",
       "authoringNotes": "O runtime move o player e segue a câmera. Selecione um NPC ou gatilho e abra Eventos para estudar a conversa, coleta ou troca de cena."
     },
     {
@@ -295731,7 +299183,16 @@
             "height": 16,
             "zIndex": 0,
             "visible": true,
-            "pixelPosition": true
+            "pixelPosition": true,
+            "behavior": {
+              "states": {
+                "hidden": {
+                  "variable": "var_campaign_finished",
+                  "value": 1
+                }
+              },
+              "events": []
+            }
           },
           {
             "id": "race-text-3",
@@ -295747,7 +299208,16 @@
             "zIndex": 1,
             "visible": true,
             "pixelPosition": true,
-            "textAdvance": 7
+            "textAdvance": 7,
+            "behavior": {
+              "states": {
+                "hidden": {
+                  "variable": "var_campaign_finished",
+                  "value": 1
+                }
+              },
+              "events": []
+            }
           }
         ]
       },
@@ -296063,6 +299533,150 @@
             "width": 12,
             "height": 8,
             "textAdvance": 6
+          }
+        ]
+      },
+      {
+        "id": "hud-farol-trial",
+        "name": "Farol · Calibração contextual",
+        "description": "HUD aprovada com cronômetro independente, visível somente durante o teste.",
+        "backgroundImage": "",
+        "selectorImage": "",
+        "font": "porto-hud-b-font.png",
+        "position": "Superior",
+        "width": 240,
+        "height": 24,
+        "mode": "advanced",
+        "components": [
+          {
+            "id": "life-frame",
+            "kind": "frame",
+            "label": "life-frame",
+            "text": "",
+            "asset": "porto-hud-b-life-frame.png",
+            "x": 4,
+            "y": 4,
+            "width": 60,
+            "height": 18,
+            "zIndex": 0,
+            "visible": true,
+            "pixelPosition": true
+          },
+          {
+            "id": "money-frame",
+            "kind": "frame",
+            "label": "money-frame",
+            "text": "",
+            "asset": "porto-hud-b-coin-frame.png",
+            "x": 180,
+            "y": 4,
+            "width": 56,
+            "height": 18,
+            "zIndex": 0,
+            "visible": true,
+            "pixelPosition": true
+          },
+          {
+            "id": "hearts",
+            "kind": "bar",
+            "label": "hearts",
+            "text": "",
+            "asset": "porto-hud-b-hearts-full.png",
+            "x": 13,
+            "y": 8,
+            "width": 64,
+            "height": 16,
+            "zIndex": 1,
+            "visible": true,
+            "pixelPosition": true,
+            "valueVariable": "porto_player_health",
+            "valueMaximum": 3,
+            "foregroundImage": true,
+            "gauge": {
+              "emptyAsset": "porto-hud-b-hearts-empty.png",
+              "x": 0,
+              "y": 0,
+              "width": 48,
+              "height": 16
+            }
+          },
+          {
+            "id": "coin",
+            "kind": "icon",
+            "label": "coin",
+            "text": "",
+            "asset": "porto-hud-b-coin.png",
+            "x": 189,
+            "y": 8,
+            "width": 10,
+            "height": 10,
+            "zIndex": 1,
+            "visible": true,
+            "pixelPosition": true
+          },
+          {
+            "id": "coins",
+            "kind": "text",
+            "label": "coins",
+            "text": "000",
+            "asset": "",
+            "x": 204,
+            "y": 9,
+            "width": 18,
+            "height": 8,
+            "zIndex": 2,
+            "visible": true,
+            "pixelPosition": true,
+            "inventoryItem": 0,
+            "textAdvance": 6
+          },
+          {
+            "id": "trial-frame",
+            "kind": "frame",
+            "label": "Tempo do teste",
+            "text": "",
+            "asset": "porto-hud-b-coin-frame.png",
+            "x": 92,
+            "y": 4,
+            "width": 56,
+            "height": 18,
+            "zIndex": 0,
+            "visible": true,
+            "pixelPosition": true,
+            "behavior": {
+              "states": {
+                "hidden": {
+                  "variable": "var_trial_active",
+                  "value": 0
+                }
+              },
+              "events": []
+            }
+          },
+          {
+            "id": "trial-charge",
+            "kind": "text",
+            "label": "Carga restante",
+            "text": "000",
+            "asset": "",
+            "x": 111,
+            "y": 9,
+            "width": 18,
+            "height": 8,
+            "zIndex": 2,
+            "visible": true,
+            "pixelPosition": true,
+            "valueVariable": "var_trial_charge",
+            "textAdvance": 6,
+            "behavior": {
+              "states": {
+                "hidden": {
+                  "variable": "var_trial_active",
+                  "value": 0
+                }
+              },
+              "events": []
+            }
           }
         ]
       }
@@ -296703,6 +300317,96 @@
       "name": "penedos_defeated_moth_east",
       "displayName": "penedos_defeated_moth_east",
       "initialValue": 0
+    },
+    {
+      "id": "variable-var_signal_stage",
+      "name": "var_signal_stage",
+      "displayName": "O sinal perdido · stage",
+      "initialValue": 0
+    },
+    {
+      "id": "variable-var_signal_chart",
+      "name": "var_signal_chart",
+      "displayName": "O sinal perdido · chart",
+      "initialValue": 0
+    },
+    {
+      "id": "variable-var_signal_part",
+      "name": "var_signal_part",
+      "displayName": "O sinal perdido · part",
+      "initialValue": 0
+    },
+    {
+      "id": "variable-var_signal_observation",
+      "name": "var_signal_observation",
+      "displayName": "O sinal perdido · observation",
+      "initialValue": 0
+    },
+    {
+      "id": "variable-var_signal_code",
+      "name": "var_signal_code",
+      "displayName": "O sinal perdido · code",
+      "initialValue": 0
+    },
+    {
+      "id": "variable-var_signal_lock",
+      "name": "var_signal_lock",
+      "displayName": "O sinal perdido · lock",
+      "initialValue": 0
+    },
+    {
+      "id": "variable-var_signal_trip",
+      "name": "var_signal_trip",
+      "displayName": "O sinal perdido · trip",
+      "initialValue": 0
+    },
+    {
+      "id": "variable-var_council_path",
+      "name": "var_council_path",
+      "displayName": "Sistemas conectados · council_path",
+      "initialValue": 0
+    },
+    {
+      "id": "variable-var_council_visit",
+      "name": "var_council_visit",
+      "displayName": "Sistemas conectados · council_visit",
+      "initialValue": 0
+    },
+    {
+      "id": "variable-var_tool_stock",
+      "name": "var_tool_stock",
+      "displayName": "Sistemas conectados · tool_stock",
+      "initialValue": 0
+    },
+    {
+      "id": "variable-var_trial_active",
+      "name": "var_trial_active",
+      "displayName": "Sistemas conectados · trial_active",
+      "initialValue": 0
+    },
+    {
+      "id": "variable-var_trial_charge",
+      "name": "var_trial_charge",
+      "displayName": "Sistemas conectados · trial_charge",
+      "initialValue": 0
+    },
+    {
+      "id": "variable-var_trial_result",
+      "name": "var_trial_result",
+      "displayName": "Sistemas conectados · trial_result",
+      "initialValue": 0
+    },
+    {
+      "id": "variable-var_trial_attempts",
+      "name": "var_trial_attempts",
+      "displayName": "Sistemas conectados · trial_attempts",
+      "initialValue": 0
+    },
+    {
+      "id": "variable-var_trial_reward",
+      "name": "var_trial_reward",
+      "displayName": "Sistemas conectados · trial_reward",
+      "initialValue": 0
     }
   ],
   "localization": {
@@ -297060,6 +300764,54 @@
               {
                 "frame": 0,
                 "command": "camera_move 0 0"
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "id": "signal_repair",
+        "name": "O sinal perdido · Reativação do farol",
+        "durationFrames": 120,
+        "tracks": [
+          {
+            "kind": "events",
+            "keyframes": [
+              {
+                "frame": 0,
+                "command": "pause_scene_type topdown"
+              },
+              {
+                "frame": 0,
+                "command": "camera_set_position 64 0"
+              },
+              {
+                "frame": 0,
+                "command": "play_music farol_tema_principal"
+              },
+              {
+                "frame": 30,
+                "command": "play_sfx farol_sfx_sinal"
+              },
+              {
+                "frame": 90,
+                "command": "play_sfx farol_sfx_confirmar"
+              },
+              {
+                "frame": 120,
+                "command": "camera_follow_player"
+              },
+              {
+                "frame": 120,
+                "command": "resume_scene_type topdown"
+              },
+              {
+                "frame": 120,
+                "command": "save_game 0"
+              },
+              {
+                "frame": 120,
+                "command": "show_dialogue signal_repaired"
               }
             ]
           }

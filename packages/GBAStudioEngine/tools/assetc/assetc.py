@@ -9177,6 +9177,8 @@ def event_engine_field(command, keys=("field", "engine_field"), default=0):
             "player_y": 4,
             "plat_blank_grav": 5,
             "platformer_blank_gravity": 5,
+            **{f"equipped_item_{slot}": 6 + slot for slot in range(8)},
+            "timer_count": 14,
         },
         default,
     )

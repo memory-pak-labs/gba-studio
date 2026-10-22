@@ -40,7 +40,7 @@ export function promoteApprovedPortoLumenPaged(project) {
     if (source) for (const key of ["x", "y", "width", "height"]) trigger[key] = source[key];
   }
   for (const event of result.events ?? []) for (const step of event.steps ?? []) {
-    if (step.command?.startsWith("change_scene porto_lumen ")) step.command = `change_scene porto_lumen ${event.name === "farol_sair_porto" ? "23 20" : "88 50"} down`;
+    if (event.name !== "showcase_leave_council" && step.command?.startsWith("change_scene porto_lumen ")) step.command = `change_scene porto_lumen ${["farol_sair_porto", "showcase_base_exit"].includes(event.name) ? "23 20" : "88 50"} down`;
   }
   for (const table of result.sceneRouteTables ?? []) {
     for (const route of [...(table.routes ?? []), table.fallback].filter(Boolean)) {
@@ -97,15 +97,15 @@ export function promoteApprovedPortoLumenPaged(project) {
   if (profile && companionAssets.length) for (const step of profile.steps) {
     if (step.command.startsWith("change_player_sprite ")) step.command = `change_player_sprite ${positions.get("port-nara").spriteSheet}`;
   }
-  const enter = result.events.find(event => event.name === "porto_ao_entrar");
+  const enter = result.events.find(event => event.name === "showcase_base_port_enter") ?? result.events.find(event => event.name === "porto_ao_entrar");
   if (enter && companionAssets.length && !enter.steps.some(step => step.id === "porto-health-initial-state")) {
     enter.steps.splice(enter.steps.findIndex(step => step.command === "set_variable z_feature_quest_state 1")+1,0,
-      structuredClone(canonical.events.find(event => event.name === enter.name).steps.find(step => step.id === "porto-health-initial-state")));
+      structuredClone(canonical.events.flatMap(event => event.steps ?? []).find(step => step.id === "porto-health-initial-state")));
   }
-  const farol = result.events.find(event => event.name === "farol_interior_ao_entrar");
+  const farol = result.events.find(event => event.name === "showcase_base_farol_enter") ?? result.events.find(event => event.name === "farol_interior_ao_entrar");
   if (farol && companionAssets.length && !farol.steps.some(step => step.id === "farol-preserve-player-art")) {
     farol.steps.splice(farol.steps.findIndex(step => step.command.startsWith("play_music "))+1,0,
-      ...structuredClone(canonical.events.find(event => event.name === farol.name).steps.filter(step => step.id.startsWith("farol-preserve-player-"))));
+      ...structuredClone(canonical.events.flatMap(event => event.steps ?? []).filter(step => step.id.startsWith("farol-preserve-player-"))));
   }
   return result;
 }

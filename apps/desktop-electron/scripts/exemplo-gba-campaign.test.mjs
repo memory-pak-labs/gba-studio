@@ -19,20 +19,24 @@ import {
   VERTICE_START_SCENE
 } from "./vertice-showcase-contract.mjs";
 import { promoteExemploGBAVerticeCampaign } from "./vertice-showcase-project.mjs";
+import { SHOWCASE_VARIABLES } from './showcase-systems.mjs';
+import { LOST_SIGNAL_VARIABLES } from './lost-signal-mission.mjs';
 
 const templateURL = new URL(
   "../default-assets/templates/exemplo-gba/exemplo-gba.gba-project",
   import.meta.url
 );
 
+let materializedCampaign;
 function campaignProject() {
-  return promoteExemploGBAVerticeCampaign(JSON.parse(readFileSync(templateURL, "utf8")));
+  materializedCampaign ??= promoteExemploGBAVerticeCampaign(JSON.parse(readFileSync(templateURL, "utf8")));
+  return structuredClone(materializedCampaign);
 }
 
 function commands(project, eventName) {
   return project.events
     .find((event) => event.name === eventName)
-    ?.steps.map((step) => step.command) ?? [];
+    ?.steps.flatMap((step) => step.command.startsWith("call_procedure ") ? commands(project, step.command.split(" ")[1]) : [step.command]) ?? [];
 }
 
 describe("campanha canônica O Último Farol", () => {
@@ -289,14 +293,13 @@ describe("campanha canônica O Último Farol", () => {
     const project = campaignProject();
 
     expect(commands(project, "penedos_retornar_armazem")).toContain("advance_campaign");
-    expect(commands(project, "armazem_das_mares_carta")).toEqual([
-      "show_dialogue armazem_das_mares_carta"
-    ]);
-    expect(commands(project, "armazem_das_mares_saida")).toEqual(["advance_campaign"]);
-    expect(commands(project, "observatorio_do_farol_telescopio")).toEqual([
-      "show_dialogue observatorio_do_farol_telescopio"
-    ]);
-    expect(commands(project, "observatorio_do_farol_saida")).toEqual(["advance_campaign"]);
+    expect(commands(project, "armazem_das_mares_carta")).toContain("show_dialogue armazem_das_mares_carta");
+    expect(commands(project, "observatorio_do_farol_telescopio")).toContain("show_dialogue observatorio_do_farol_telescopio");
+    for (const name of ['armazem_das_mares_saida', 'observatorio_do_farol_saida']) {
+      const steps = commands(project, name);
+      expect(steps[0]).toBe('if_variable var_signal_trip 1');
+      expect(steps.slice(-3)).toEqual(['else', 'advance_campaign', 'condition_end']);
+    }
   });
 
   it("monta o fluxo jogável do Mercado Suspenso antes de liberar a usina", () => {
@@ -481,7 +484,7 @@ describe("campanha canônica O Último Farol", () => {
       expect.objectContaining({ id: "quests", enabled: true }),
       expect.objectContaining({ id: "shop", enabled: true })
     ]));
-    expect(commands(project, "porto_ao_entrar")).toEqual([
+    expect(commands(project, "porto_ao_entrar")).toEqual(expect.arrayContaining([
       "call_event aplicar_perfil_jogador",
       "if_variable z_feature_quest_state 0",
       "set_variable z_feature_quest_state 1",
@@ -489,7 +492,7 @@ describe("campanha canônica O Último Farol", () => {
       "add_item currency_gold 3",
       "set_variable z_feature_shop_stock 0",
       "condition_end"
-    ]);
+    ]));
     expect(commands(project, "porto_recuperar_estrutura")).toEqual(expect.arrayContaining([
       "add_item quest_fragment 1"
     ]));
@@ -534,7 +537,7 @@ describe("campanha canônica O Último Farol", () => {
       quests_enabled: true,
       shop_enabled: true,
       quests: [{ state_variable: 17, objective_item: 2, reward_item: 1 }],
-      shop_items: [{ item: 3, currency_item: 0, price: 1, stock_variable: 18, stock: 1 }]
+      shop_items: [{ label: "FERRAMENTA", item: 6, currency_item: 0, price: 4, stock_variable: project.variables.findIndex(v => v.name === "var_tool_stock"), stock: 1 }]
     });
     expect(exported.topdown_project.rooms[0].on_enter).toEqual(expect.arrayContaining([
       expect.objectContaining({ op: "attach_button_event", button: "start" })
@@ -733,7 +736,8 @@ describe("campanha canônica O Último Farol", () => {
       "var_rtc_hour",
       "var_rtc_minute",
       "porto_player_health", "var_penedos_farol", "penedos_player_health", "penedos_tokens",
-      "penedos_defeated_crab", "penedos_defeated_moth", "penedos_defeated_crab_east", "penedos_defeated_moth_east"
+      "penedos_defeated_crab", "penedos_defeated_moth", "penedos_defeated_crab_east", "penedos_defeated_moth_east",
+      ...LOST_SIGNAL_VARIABLES, ...SHOWCASE_VARIABLES
     ]));
     expect(VERTICE_PROGRESS_KEYS).toHaveLength(15);
   });

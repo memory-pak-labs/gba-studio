@@ -59,7 +59,8 @@ describe("música das oito cenas canônicas", () => {
     for (const name of names) {
       const scene = project.scenas.find((entry) => entry.name === name);
       const onInit = project.events.find((event) => event.name === scene?.eventBindings?.onInit);
-      expect(onInit?.steps?.[0]?.command, name).toBe(`play_music ${scene?.music}`);
+      const commands=event=>(event?.steps??[]).flatMap(s=>s.command.startsWith("call_procedure ")?commands(project.events.find(e=>e.name===s.command.split(" ")[1])):[s.command]);
+      expect(commands(onInit).find(c=>c.startsWith("play_music ")), name).toBe(`play_music ${scene?.music}`);
     }
   });
 });

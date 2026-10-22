@@ -36,8 +36,10 @@ function canonicalProject() {
   return expandProjectTilemaps(parseGBAProjectFile(readFileSync(templateURL, "utf8")).data);
 }
 
+let materializedVertice;
 function verticeProject() {
-  return promoteExemploGBAVerticeCampaign(canonicalProject());
+  materializedVertice ??= promoteExemploGBAVerticeCampaign(canonicalProject());
+  return structuredClone(materializedVertice);
 }
 
 function canonicalVerticeSceneCount() {
@@ -954,7 +956,8 @@ describe("materialização canônica de Vértice", () => {
     const project = verticeProject();
     const scene = project.scenas.find(scene => scene.name === "missoes");
     expect(scene.runtime.config.items.map(item => item.binding?.index).filter(Number.isInteger)).toEqual([1, 2, 8, 14]);
-    const commands = project.events.find(event => event.name === "missoes_detalhar_proximo").steps.map(step => step.command);
+    expect(project.events.find(event => event.name === 'missoes_detalhar_proximo').steps.map(step => step.command)).toEqual(['call_procedure signal_mission_status', 'call_procedure signal_campaign_objective']);
+    const commands = project.events.find(event => event.name === "signal_campaign_objective").steps.map(step => step.command);
     expect(commands[0]).toBe("if_variable var_campaign_finished 1");
     expect(commands).toContain("if_variable var_frame 1");
     expect(commands.filter(command => command === "condition_end")).toHaveLength(12);
@@ -2150,7 +2153,8 @@ describe("materialização canônica de Vértice", () => {
 
     expect(project.actors.find((actor) => actor.id === "market-guard-v1")?.eventBindings)
       .toEqual({ onInteract: "mercado_falar_guarda" });
-    expect(eventCommands("mercado_falar_guarda")).toEqual([
+    expect(eventCommands("mercado_falar_guarda")).toEqual(["call_procedure showcase_base_market_guard", "if_variable_greater_than var_council_path 0", "call_procedure showcase_coast_report", "condition_end"]);
+    expect(eventCommands("showcase_base_market_guard")).toEqual([
       "attach_button r mercado_entrar_arena true",
       "show_dialogue mercado_guarda"
     ]);

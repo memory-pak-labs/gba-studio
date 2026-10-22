@@ -1,4 +1,6 @@
 import { materializeExampleAuthoring } from "./example-authoring-library.mjs";
+import { promoteLostSignalMission } from './lost-signal-mission.mjs';
+import { promoteShowcaseSystems } from './showcase-systems.mjs';
 import { pruneObsoleteExampleScripts } from './prune-obsolete-example-scripts.mjs';
 import { promoteApprovedStartupFade } from './startup-fade-promotion.mjs';
 import { promoteApprovedDungeon } from './dungeon-approved-promotion.mjs';
@@ -9009,7 +9011,7 @@ function buildExemploGBAVerticeCampaign(data) {
 }
 
 export function promoteExemploGBAVerticeCampaign(data) {
-  return materializeExampleAuthoring(buildExemploGBAVerticeCampaign(data));
+  return promoteShowcaseSystems(promoteLostSignalMission(materializeExampleAuthoring(buildExemploGBAVerticeCampaign(data))));
 }
 
 const invokedPath = process.argv[1] ? fileURLToPath(import.meta.url) === process.argv[1] : false;

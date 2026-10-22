@@ -398,6 +398,48 @@ Instaladores oficiais são publicados por mantenedores após validação própri
 Assinatura e notarização usam credenciais privadas fora do repositório; PRs de
 contribuidores não precisam dessas credenciais.
 
+## Missão opcional — O sinal perdido
+
+A mecânica do cais leste inicia a missão ao entregar a estrutura. O cartógrafo
+oferece viagens ao Armazém e ao Observatório. No Armazém, examine a carta antes
+do baú; no Observatório, examine o telescópio e depois a mesa da maré. A leitura
+de leste para oeste revela **314**. A porta do Observatório permite voltar ao
+Farol. Durante a viagem, segure R e pressione A na porta para voltar ao Porto a partir dos dois interiores; as
+saídas normais da campanha continuam disponíveis fora da viagem da missão.
+
+No Farol, converse com o guardião junto à lente: esquerda/direita seleciona o dígito,
+cima/baixo altera, A confirma e B cancela. Combinações incorretas e cancelamento
+preservam a peça. O acerto instala o relé e executa a timeline `signal_repair`,
+com câmera, áudio e pausa temporária do movimento. Volte à mecânica para receber
+duas moedas uma única vez. O diário, em **Missões → OBJETIVO**, informa o estado
+da missão antes do objetivo da campanha.
+
+Carta, peça, pista e conclusão usam variáveis e inventário persistidos no save
+universal. Coletas e etapas relevantes salvam no slot automático 0; o menu
+Salvar mantém os três slots manuais. Novo jogo reinicia apenas os dados da missão
+e os campos já reiniciados pela campanha. A promoção idempotente em
+`scripts/lost-signal-mission.mjs` é reaplicada ao regenerar o exemplo.
+
+Nenhuma imagem é recomposta: backgrounds, atores/cursor e HUD continuam nos
+recursos aprovados e nas respectivas camadas. Os testes da missão verificam
+essas invariantes, ordem das pistas, consumo da peça, recompensa única e exportação:
+
+```sh
+npx vitest run scripts/lost-signal-mission.test.mjs
+node scripts/build-racing-playtest.mjs /caminho/sinal-export titulo
+node scripts/smoke-lost-signal-mission.mjs /caminho/sinal-export/build/exemplo.gba /caminho/sinal-export /caminho/sinal-rom
+node scripts/smoke-lost-signal-play.mjs /caminho/sinal-play
+```
+
+Os dois smokes percorrem a missão por controles nativos, reiniciam o core,
+carregam o save parcial pelo menu, voltam ao Porto pela porta com R+A,
+retomam a missão, rejeitam/cancelam o cadeado, concluem o reparo e verificam a
+recompensa única antes e depois de salvar/carregar manualmente no slot 2.
+O Play usa uma instância descartável do Electron e um relógio de teste para
+entradas determinísticas; isso valida fluxo e pixels renderizados, sem medir
+desempenho em tempo real. Snapshots do emulador são apenas diagnósticos de leitura;
+o progresso é restaurado pelo carregamento da SRAM no jogo.
+
 ## Armazém das Marés frontal
 
 O cursor aprovado `white-hand-cursor-32x32.png` usa a ponta do dedo como ponto

@@ -3894,7 +3894,7 @@ function buildEventValueRegistries(
         }
       } else if (EVENT_ITEM_KEY_VERBS.has(verb) && parts[1]) {
         itemKeys.add(parts[1]);
-      } else if (verb === "set_equipped_item" && parts[2]) {
+      } else if (verb === "set_equipped_item" && parts[2] && parts[2] !== "none") {
         itemKeys.add(parts[2]);
       }
     }
@@ -4668,7 +4668,7 @@ function compileEventStep(
     case "modify_wallet":
       return [{ op: "modify_wallet", variable: registries.variableIndex(operand), amount: integerPart(parts[2], 0), max: integerPart(parts[3], 0) }];
     case "set_equipped_item":
-      return [{ op: "set_equipped_item", slot: integerPart(operand, 0), item: registries.itemIndex(parts[2] ?? "") }];
+      return [{ op: "set_equipped_item", slot: integerPart(operand, 0), item: parts[2] === "none" ? -1 : registries.itemIndex(parts[2] ?? "") }];
     case "fade_in":
     case "fade_out":
       return [{ op: verb, frames: Math.max(0, Math.min(600, integerPart(operand, 30))) }];
@@ -5522,8 +5522,12 @@ function scriptForEventName(
   pluginRegistry: ProjectPluginRegistry = emptyProjectPluginRegistry()
 ): EngineExportProjectEventCommand[] | undefined {
   if (!eventName) return undefined;
-  const event = eventByName(events, eventName);
-  return event ? compileEvent(data, event, rooms, dialogues, audioItems, audioPack, events, pluginRegistry) : undefined;
+  const expansion = memoizeEngineExport(events, "bound-event-procedures", () => expandEventProcedures(events));
+  if (expansion.issues.length > 0) {
+    throw new Error(`Procedures invalidas: ${expansion.issues.join(" | ")}`);
+  }
+  const event = eventByName(expansion.events, eventName);
+  return event ? compileEvent(data, event, rooms, dialogues, audioItems, audioPack, expansion.events, pluginRegistry) : undefined;
 }
 
 function drawTextLiteralLines(data: GBAProjectData): string[] {
@@ -5665,9 +5669,12 @@ function dialogueChoices(dialogue: Record<string, unknown>): string[] {
   return Array.isArray(dialogue.choices) ? dialogue.choices.filter((choice): choice is string => typeof choice === "string") : [];
 }
 
-function choiceEventBindings(events: Record<string, unknown>[]): Map<string, Map<number, string>> {
+function choiceEventBindings(events: Record<string, unknown>[], rooms: Record<string, unknown>[]): Map<string, Map<number, string>> {
   const bindings = new Map<string, Map<number, string>>();
-  for (const event of events) {
+  const roomNames = new Set(rooms.map((room, index) => roomName(room, index)));
+  for (const [index, event] of events.entries()) {
+    const owner = normalizeGBAEventDocument(event, index).sceneName;
+    if (owner && !roomNames.has(owner)) continue;
     for (const step of eventSteps(event)) {
       const parts = commandParts(stringField(step, "command", "noop"));
       if ((parts[0] ?? "") !== "choice_event") continue;
@@ -5691,7 +5698,7 @@ function buildTopdownChoiceGroups(
   audioItems: Record<string, unknown>[],
   audioPack: AssetcAudioPackGeneration | null
 ): EngineExportTopdownChoiceGroup[] {
-  const bindings = choiceEventBindings(events);
+  const bindings = choiceEventBindings(events, rooms);
   const localization = deriveProjectLocalization(data);
   return dialogues.flatMap((dialogue, dialogueIndex) => {
     const choices = dialogueChoices(dialogue);
@@ -8916,7 +8923,7 @@ function buildVisualNovelChoiceGroups(
   audioItems: Record<string, unknown>[],
   audioPack: AssetcAudioPackGeneration | null
 ): EngineExportVisualNovelChoiceGroup[] {
-  const bindings = choiceEventBindings(events);
+  const bindings = choiceEventBindings(events, rooms);
   const localization = deriveProjectLocalization(data);
   return dialogues.flatMap((dialogue, dialogueIndex) => {
     const choices = dialogueChoices(dialogue);
@@ -9196,7 +9203,7 @@ function buildMenuScreens(
   const startRoom = startRoomIndex(data, rooms);
   const initialScreen = Math.max(0, sources.findIndex((source) => source.roomIndex === startRoom));
   const dialogueBoot = dialogueUiBootCommands(data, audioItems, audioPack);
-  const bindings = choiceEventBindings(events);
+  const bindings = choiceEventBindings(events, rooms);
   const titleLine = menuTitleLineIndex(dialogues);
   const itemsDialogueIndex = menuItemsDialogueIndex(dialogues);
   const itemsDialogue = itemsDialogueIndex >= 0 ? dialogues[itemsDialogueIndex] : undefined;

@@ -31,6 +31,23 @@ export function createElectronSmokeEnv(overrides = {}) {
   return env;
 }
 
+/** Set the language fixture only in a disposable smoke profile. */
+export async function prepareElectronSmokeLocale(cdp, locale = "pt-BR") {
+  await cdp.send("Runtime.evaluate", {
+    expression: `(() => {
+      const locale = ${JSON.stringify(locale)};
+      const language = document.querySelector('select[aria-label="App language"]');
+      if (language) {
+        language.value = locale;
+        language.dispatchEvent(new Event("change", { bubbles: true }));
+      } else if (localStorage.getItem("gbaStudio.locale") !== locale) {
+        localStorage.setItem("gbaStudio.locale", locale);
+        location.reload();
+      }
+    })()`
+  });
+}
+
 function firstExistingPath(paths) {
   return paths.find((item) => existsSync(item)) ?? paths[0];
 }

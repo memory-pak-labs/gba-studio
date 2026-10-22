@@ -25,11 +25,14 @@ it('compiles every approved background pixel without tile merging or additional 
 
 it('exports the approved paged Farol, existing48pxactors and HUD B without the old sprite override',()=>{
  const p=canonical(),room=p.rooms.find(r=>r.name===scene);
- expect(room).toMatchObject({width:48,height:32,backgroundAssetName:file,hudPresetId:'hud-porto-lumen-b'});
+ expect(room).toMatchObject({width:48,height:32,backgroundAssetName:file,hudPresetId:'hud-farol-trial'});
  expect(p.scenas.find(r=>r.name===scene)).toEqual(room);
+ const base=p.settings.hudPresets.find(h=>h.id==='hud-porto-lumen-b'),hud=p.settings.hudPresets.find(h=>h.id===room.hudPresetId);
+ expect(hud.components.slice(0,base.components.length)).toEqual(base.components);
+ expect(hud.components.slice(base.components.length).every(c=>c.behavior.states.hidden.variable==='var_trial_active')).toBe(true);
  expect(p.actors.find(a=>a.id==='farol-nara')).toMatchObject({x:23,y:27,spriteSheet:'porto-nara-animations48.png',animationStateID:'porto-nara-animations48-state'});
  expect(p.actors.find(a=>a.id==='farol-keeper')).toMatchObject({x:17,y:14,spriteSheet:'porto-lighthousekeeper-body48.png',animationStateID:'porto-approved-lighthousekeeper-body48-state'});
- expect(p.events.find(e=>e.name==='farol_interior_ao_entrar').steps.map(s=>s.command)).toContain('change_player_sprite porto-nara-animations48.png');
+ expect(p.events.find(e=>e.name==='showcase_base_farol_enter').steps.map(s=>s.command)).toContain('change_player_sprite porto-nara-animations48.png');
  expect(p.events.find(e=>e.name==='porto_entrar_farol').steps.map(s=>s.command)).toContain('change_scene farol_interior 23 27 up');
  const c=buildEngineExportProjectContract(p),exported=c.topdown_project.rooms.find(r=>r.name===scene);
  expect(exported).toMatchObject({width_tiles:48,height_tiles:32,paged_source_tiles:'farol_interior_approved_paged_384x256'});

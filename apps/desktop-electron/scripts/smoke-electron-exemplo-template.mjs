@@ -11,6 +11,7 @@ import {
   createElectronSmokeEnv,
   electronExecutablePath,
   electronLaunchCommand,
+  prepareElectronSmokeLocale,
   renderedText,
   terminateChild,
   wait
@@ -1592,6 +1593,7 @@ async function main() {
     await cdp.ready;
 
     try {
+      await prepareElectronSmokeLocale(cdp);
       await waitForText(
         cdp,
         (text) => text.includes("Templates") && text.includes("Exemplo GBA Completo"),

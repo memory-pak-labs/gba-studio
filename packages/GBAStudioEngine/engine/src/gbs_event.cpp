@@ -327,6 +327,12 @@ int random_range(EventState& state, int minimum, int maximum) {
 }
 
 int engine_field_value(const EventState& state, int field) {
+    if (field >= 6 && field < 6 + static_cast<int>(max_event_equipment_slots)) {
+        return state.equipped_items[field - 6];
+    }
+    if (field == 14) {
+        return static_cast<int>(state.timer_binding_count);
+    }
     switch (field) {
     case 0:
         return state.current_room;

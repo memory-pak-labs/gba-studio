@@ -520,6 +520,7 @@ export interface PreviewNativeModal {
 export interface PreviewNativeThread { frame: PreviewRuntimeScriptFrame; wait: number; continuations: PreviewRuntimeScriptFrame[]; }
 export interface PreviewNativeEvents {
  modal: PreviewNativeModal | null;
+ timers: Record<string, { frames: number; remaining: number; pending: boolean }>;
  threads: Record<string,PreviewNativeThread>;
  executingSegment: string | null;
  actorStates: Record<string,string>;
@@ -531,9 +532,9 @@ export interface PreviewNativeEvents {
  adventure: {state:string,frames:number};
 }
 function initialNativeEvents(): PreviewNativeEvents {
- return {modal:null,threads:{},executingSegment:null,actorStates:{},actorEffects:{},cancelledMovement:{},projectileSlots:{},projectiles:[],texts:[],adventure:{state:"ground",frames:0}};
+ return {modal:null,timers:{},threads:{},executingSegment:null,actorStates:{},actorEffects:{},cancelledMovement:{},projectileSlots:{},projectiles:[],texts:[],adventure:{state:"ground",frames:0}};
 }
-const integratedNativeSimulationVerbs=new Set(["open_menu","open_shop","open_code_lock","open_equip_menu","draw_text","start_segment","stop_segment","set_adventure_state","push_actor","cancel_actor_movement","set_actor_animation_state","actor_effects","projectile_load_slot","launch_projectile_slot"]);
+const integratedNativeSimulationVerbs=new Set(["open_menu","open_shop","open_code_lock","open_equip_menu","draw_text","start_segment","stop_segment","timer_attach","timer_restart","timer_remove","set_adventure_state","push_actor","cancel_actor_movement","set_actor_animation_state","actor_effects","projectile_load_slot","launch_projectile_slot"]);
 
 export interface PreviewRuntimeScriptFrame {
   callStack: string[];
@@ -1276,9 +1277,7 @@ function topdownFeatureRuntimeForState(state: PreviewRuntimeState): TopdownFeatu
   return resolveTopdownFeatureRuntime((config as Record<string, unknown>).modules);
 }
 
-function topdownInventoryKey(state: PreviewRuntimeState, item: number): string {
-  // Authored shop commands use the ROM registry, including named inventory items.
-  if (state.nativeEvents.modal?.kind !== "shop") return String(item);
+function eventInventoryKeys(state: PreviewRuntimeState): string[] {
   const keys = new Set<string>();
   const expanded = expandEventProcedures(projectArray(state.project, "events"));
   for (const event of expanded.events) {
@@ -1286,10 +1285,16 @@ function topdownInventoryKey(state: PreviewRuntimeState, item: number): string {
     for (const step of steps) {
       const parts = commandTokens(resolveProjectConstantCommand(state.project, stringField(step.command, "")));
       const key = parts[0] === "set_equipped_item" ? parts[2] : ["add_item", "has_item"].includes(parts[0] ?? "") ? parts[1] : null;
-      if (key) keys.add(key);
+      if (key && key !== "none") keys.add(key);
     }
   }
-  return [...keys].sort()[item] ?? String(item);
+  return [...keys].sort();
+}
+
+function topdownInventoryKey(state: PreviewRuntimeState, item: number): string {
+  // Authored shop commands use the ROM registry, including named inventory items.
+  if (state.nativeEvents.modal?.kind !== "shop") return String(item);
+  return eventInventoryKeys(state)[item] ?? String(item);
 }
 
 function topdownInventoryCount(state: PreviewRuntimeState, item: number): number {
@@ -3112,6 +3117,12 @@ function scalarEquals(left: PreviewRuntimeScalar | undefined, right: PreviewRunt
 }
 
 function engineFieldValue(state: PreviewRuntimeState, field: string): PreviewRuntimeScalar {
+  const equipment = /^equipped_item_([0-7])$/.exec(field);
+  if (equipment) {
+    const item = state.equippedItems[equipment[1]!];
+    return item ? eventInventoryKeys(state).indexOf(item) : -1;
+  }
+  if (field === "timer_count") return Object.keys(state.nativeEvents.timers).length;
   if (["current_scene_index", "current_room", "scene", "room"].includes(field)) {
     const rooms = state.rooms.filter(room => room.sceneType === state.currentRoom?.sceneType);
     return Math.max(0, rooms.findIndex(room => room.id === state.currentRoom?.id));
@@ -3819,6 +3830,11 @@ function handleHudInventoryCommand(state: PreviewRuntimeState, parts: string[]):
     const slot = parts[1] ?? "";
     const item = parts[2] ?? "";
     if (!slot || !item) return state;
+    if (item === "none") {
+      const equippedItems = { ...state.equippedItems };
+      delete equippedItems[slot];
+      return { ...state, equippedItems };
+    }
     return { ...state, equippedItems: { ...state.equippedItems, [slot]: item } };
   }
   return null;
@@ -4308,6 +4324,14 @@ function runScriptFrameCommands(state: PreviewRuntimeState, frame: PreviewRuntim
 
     if (isPluginPreviewVerb(currentState.pluginRegistry, rawCommand.trim().split(/\s+/).filter(Boolean)[0] ?? "") && command === rawCommand) {
       currentState = appendRecognizedScript(currentState, resolvedEventName, rawCommand, verb, operand);
+      break doCommand;
+    }
+
+    const skippedParent = conditionalScopes.at(-1);
+    if (skippedParent && skippedParent.mode !== "then" && previewConditionCommandVerbs.has(verb)
+      && structuredConditionBoundary(commands, commandIndex).endIndex !== null) {
+      conditionalScopes = [...conditionalScopes, { mode: "skip_to_end" }];
+      currentState = appendLog(currentState, resolvedEventName, command, "skipped", "Condição dentro de um ramo ignorado.");
       break doCommand;
     }
 
@@ -4826,6 +4850,9 @@ function applyIntegratedNativeSimulation(state:PreviewRuntimeState,parts:string[
  const [verb,target,arg,extra]=parts;
  let native={...state.nativeEvents};
  if(verb==="start_segment") native.threads={...native.threads,[target!]:{frame:nativeThreadFrame(state,arg!),wait:0,continuations:[]}};
+ else if(verb==="timer_attach") native.timers={...native.timers,[arg!]:{frames:Math.max(1,Number(target)),remaining:Math.max(1,Number(target)),pending:false}};
+ else if(verb==="timer_restart") {if(native.timers[target!])native.timers={...native.timers,[target!]:{...native.timers[target!]!,remaining:native.timers[target!]!.frames,pending:false}};}
+ else if(verb==="timer_remove") {native.timers={...native.timers};delete native.timers[target!];}
  else if(verb==="stop_segment") {native.threads={...native.threads};delete native.threads[target!];}
  else if(verb==="set_adventure_state") native.adventure={state:target!,frames:["dash","knockback","push"].includes(target!) ? (target==="push" ? 8 : 12) : 0};
  else if(verb==="draw_text") {
@@ -4914,6 +4941,17 @@ function dispatchIntegratedNativeModal(state:PreviewRuntimeState,action:PreviewR
 }
 function tickIntegratedNativeSimulation(state:PreviewRuntimeState,frames:number):PreviewRuntimeState {
  for(let frame=0;frame<frames;++frame) {
+  for (const name of Object.keys(state.nativeEvents.timers)) {
+   const timer = state.nativeEvents.timers[name]; if (!timer) continue;
+   const due = timer.remaining <= 1;
+   const next = { ...timer, remaining: due ? timer.frames : timer.remaining - 1, pending: timer.pending || due };
+   state = { ...state, nativeEvents: { ...state.nativeEvents, timers: { ...state.nativeEvents.timers, [name]: next } } };
+   if (next.pending && !state.activeDialogue && !state.startMenu.visible && !state.nativeEvents.modal) {
+    state = { ...state, nativeEvents: { ...state.nativeEvents, timers: { ...state.nativeEvents.timers, [name]: { ...next, pending: false } } } };
+    state = runPreviewRuntimeEvent(state, name);
+    break;
+   }
+  }
   if(!state.nativeEvents.modal?.pause && !state.activeDialogue && !state.startMenu.visible) {
    for(const slot of Object.keys(state.nativeEvents.threads)) {
     const thread=state.nativeEvents.threads[slot];if(!thread) continue;

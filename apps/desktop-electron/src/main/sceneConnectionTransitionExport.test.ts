@@ -27,8 +27,9 @@ describe("scene connection transitions on event-driven navigation", () => {
   ])("honors %s → %s in the %s event script", (from, to, kind) => {
     const { data, connection } = fixture(from, to);
     const commands = script(data, kind, connection.eventName);
-    const warp = commands.findIndex(c => c.op === "warp" || c.op === "warp_runtime");
     const cover = commands.findIndex(c => c.op === "visual_effect" && c.phase === "cover");
+    // Optional routes can warp elsewhere before the configured connection branch.
+    const warp = commands.findIndex((c, index) => index > cover && (c.op === "warp" || c.op === "warp_runtime"));
     expect(cover).toBeGreaterThanOrEqual(0);
     expect(cover + 1).toBeLessThan(warp);
     expect(commands.slice(cover, cover + 2)).toEqual([
