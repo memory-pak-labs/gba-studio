@@ -25,6 +25,26 @@ function projectSession(enginePackPath: string): ProjectSession {
 }
 
 describe("useEngineActions", () => {
+  it.each([
+    ["Engine Pack", "exportEngineProject", "Exportando projeto Engine Pack..."],
+    ["Web", "exportWebProject", "Exportando pacote Web / itch.io..."]
+  ] as const)("mostra o início da exportação %s enquanto aguarda o IPC e encerra ao cancelar", async (_label, method, message) => {
+    let finish!: (value: { canceled: true }) => void;
+    const pending = new Promise<{ canceled: true }>(resolve => { finish = resolve; });
+    const setStatus = vi.fn();
+    window.gbaStudio[method] = vi.fn().mockReturnValue(pending);
+    const { result } = renderHook(() => useEngineActions({
+      contractDiagnosticsOK: true, session: projectSession("/packs/EnginePack"), setStatus
+    }));
+    let exporting!: Promise<unknown>;
+    act(() => { exporting = result.current[method](); });
+    expect(setStatus).toHaveBeenLastCalledWith(message);
+    expect(result.current.exportRunning).toBe(true);
+    await act(async () => { finish({ canceled: true }); await exporting; });
+    expect(result.current.exportRunning).toBe(false);
+    expect(setStatus).toHaveBeenLastCalledWith(expect.stringContaining("cancelada"));
+  });
+
   it("opens a verified cached Play ROM without doctor or compilation and keeps warnings", async () => {
     inspectEnginePack.mockResolvedValue({ platform: "darwin", candidates: [], selected: {
       label: "Engine Pack", path: "/packs/EnginePack", exists: true, hasAssetc: true, hasGbsbuild: true, hasGbsdoctor: true,

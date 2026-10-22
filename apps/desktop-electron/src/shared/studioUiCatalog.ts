@@ -9167,6 +9167,16 @@ export const studioUiMessages: Record<string, readonly [string, string, string]>
     "Exporting design to {0}...",
     "Exportar el diseño a {0}..."
   ],
+  "Exportando projeto Engine Pack...": [
+    "Exportando projeto Engine Pack...",
+    "Exporting Engine Pack project...",
+    "Exportando proyecto Engine Pack..."
+  ],
+  "Exportando pacote Web / itch.io...": [
+    "Exportando pacote Web / itch.io...",
+    "Exporting Web / itch.io package...",
+    "Exportando paquete Web / itch.io..."
+  ],
   "Exportar": [
     "Exportar",
     "Export",

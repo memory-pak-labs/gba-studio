@@ -182,6 +182,7 @@ export function useEngineActions({ contractDiagnosticsOK, projectHealthExportRea
     }
 
     setBuildRunning(true);
+    setStatus(ui("Compilando ROM..."));
     try {
       const result = await window.gbaStudio.runEnginePackBuild(
         resolvedProjectDir,
@@ -210,6 +211,7 @@ export function useEngineActions({ contractDiagnosticsOK, projectHealthExportRea
     if (!currentSession) return null;
 
     setExportRunning(true);
+    if (options?.interactive !== false) setStatus(ui("Exportando projeto Engine Pack..."));
     try {
       const result = await window.gbaStudio.exportEngineProject({
         project: options?.projectData
@@ -399,6 +401,7 @@ export function useEngineActions({ contractDiagnosticsOK, projectHealthExportRea
     if (!currentSession) return;
 
     setExportRunning(true);
+    setStatus(ui("Exportando pacote Web / itch.io..."));
     try {
       const result = await window.gbaStudio.exportWebProject({ project: currentSession.project, projectPath: currentSession.path });
       if (result.canceled) {
