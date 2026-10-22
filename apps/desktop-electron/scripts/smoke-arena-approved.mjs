@@ -211,7 +211,11 @@ try{
  core._gba_destroy();boot();run(6000);capture('defeat-dialogue',{audit:false});
  assert.equal(state().firstActor.x,0,'CPU must complete the match');
  for(let n=0;n<14;n++){run(1,1);run(30);if(state().firstActor.x===100)break;}
- assert.equal(state().runtimeKind,12);assert.equal(state().firstActor.x,100,'defeat must restart the match');run(90);capture('rematch');report.actions.push('defeat-dialogue-and-rematch');
+ // Health can reset one frame before the new runtime publishes its telemetry.
+ for(let frame=0;frame<300&&state().runtimeKind===-1;frame++)run(1);
+ assert.equal(state().runtimeKind,12);assert.equal(state().firstActor.x,100,'defeat must restart the match');run(90);
+ // Wait two VBlank boundaries for queued HUD uploads before comparing pixels.
+ run(2);capture('rematch');report.actions.push('defeat-dialogue-and-rematch');
  report.ok=true;
 }catch(error){report.error=String(error);report.failureState=state();fs.writeFileSync(path.join(out,'failure.png'),encodePngRgba({width:240,height:160,pixels:pixels()}));throw error;}
 finally{fs.writeFileSync(path.join(out,'arena-verification.json'),JSON.stringify(report,null,2));core._gba_destroy();}

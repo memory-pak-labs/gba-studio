@@ -16,7 +16,7 @@ const contract=JSON.parse(fs.readFileSync(path.join(exportDir,'export_project.js
 const root=new URL('../default-assets/templates/exemplo-gba/',import.meta.url);
 const image=(folder,key)=>decodePngRgba(fs.readFileSync(new URL('Assets/'+folder+'/relay-approved-'+key+'.png',root)));
 const images={bg:image('backgrounds','background'),hud:image('backgrounds','hud-frames'),nara:image('sprites','nara'),guardian:image('sprites','guardian'),effects:image('sprites','effects'),disabled:image('ui','disabled-escape'),cursor:image('ui','cursor'),font:decodePngRgba(fs.readFileSync(new URL('Assets/fonts/porto-hud-b-font.png',root)))};
-const nm=spawnSync('/opt/devkitpro/devkitARM/bin/arm-none-eabi-nm',['-S','-C',romPath.replace(/\.gba$/,'.elf')],{encoding:'utf8'});assert.equal(nm.status,0);
+const nm=spawnSync('/opt/devkitpro/devkitARM/bin/arm-none-eabi-nm',['-S','-C',romPath.replace(/\.gba$/,'.elf')],{encoding:'utf8',maxBuffer:8*1024*1024});assert.equal(nm.status,0);
 const symbols=nm.stdout.split('\n').map(l=>{const x=l.match(/^([\da-f]+) ([\da-f]+) \w (.*)$/);return x?{address:parseInt(x[1],16),size:parseInt(x[2],16),name:x[3]}:null;}).filter(Boolean);
 const symbol=name=>{const s=symbols.find(s=>s.name.endsWith('::'+name));assert.ok(s,'ELF symbol '+name);return s.address;};
 const a=symbols.find(s=>s.name.endsWith('::state')&&s.size===112)?.address;assert.ok(a,'BattleRpgRuntimeState unchanged checkpoint size');

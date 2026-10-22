@@ -11,7 +11,7 @@ import { decodeMGBAHardwareVideoState } from './native-scene-framebuffer-contrac
 const app = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const romPath = path.resolve(process.argv[2]), out = path.resolve(process.argv[3]);
 fs.mkdirSync(out, { recursive: true });
-const nm = spawnSync('/opt/devkitpro/devkitARM/bin/arm-none-eabi-nm', ['-S', '-C', romPath.replace(/\.gba$/, '.elf')], { encoding: 'utf8' });
+const nm = spawnSync('/opt/devkitpro/devkitARM/bin/arm-none-eabi-nm', ['-S', '-C', romPath.replace(/\.gba$/, '.elf')], { encoding: 'utf8', maxBuffer: 8 * 1024 * 1024 });
 assert.equal(nm.status, 0);
 const symbols = nm.stdout.split('\n').map(l => { const m = l.match(/^([\da-f]+) ([\da-f]+) (\w) (.*)$/); return m ? { address: parseInt(m[1], 16), size: parseInt(m[2], 16), name: m[4] } : null; }).filter(Boolean);
 const nativeState = symbols.find(s => /::runtime_state$/.test(s.name) && s.size === 48);

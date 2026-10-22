@@ -17,7 +17,7 @@ const project=JSON.parse(fs.readFileSync(new URL('exemplo-gba.gba-project',root)
 const art=key=>decodePngRgba(fs.readFileSync(new URL('Assets/'+(key==='background'?'backgrounds/':key==='plane'||key==='flag'?'ui/':'sprites/')+'tempestade-approved-'+key+'.png',root)));
 const images=Object.fromEntries(['background','player','drone-a','drone-b','boss','explosion','plane','flag','font'].map(k=>[k,art(k)]));
 const rom=fs.readFileSync(romPath),wasm=new WebAssembly.Module(fs.readFileSync(new URL('../static/WebPlayer/player/mgba-core.wasm',import.meta.url)));
-const nm=spawnSync('/opt/devkitpro/devkitARM/bin/arm-none-eabi-nm',['-S','-C',romPath.replace(/\.gba$/,'.elf')],{encoding:'utf8'});assert.equal(nm.status,0);
+const nm=spawnSync('/opt/devkitpro/devkitARM/bin/arm-none-eabi-nm',['-S','-C',romPath.replace(/\.gba$/,'.elf')],{encoding:'utf8',maxBuffer:8*1024*1024});assert.equal(nm.status,0);
 const symbols=nm.stdout.split('\n').map(l=>{const x=l.match(/^([\da-f]+) ([\da-f]+) \w (.*)$/);return x?{address:parseInt(x[1],16),size:parseInt(x[2],16),name:x[3]}:null;}).filter(Boolean);
 const native=symbols.find(s=>s.name.endsWith('::shmup_state')),animator=symbols.find(s=>s.name.endsWith('::player_animator')&&s.size===16);
 assert.ok(native&&animator,'matching SHMUP ELF');
