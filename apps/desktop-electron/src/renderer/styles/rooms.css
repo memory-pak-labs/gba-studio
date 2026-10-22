@@ -1185,10 +1185,7 @@
   background: var(--studio-color-surface);
   border-top: 1px solid #dfe4ea;
   color: var(--studio-color-text-primary);
-  position: fixed;
-  bottom: 0;
-  left: 0;
-  width: 100%;
+  position: relative;
   z-index: 10;
   min-width: 0;
 }
@@ -9000,6 +8997,8 @@ body.room-scene-map-card-dragging .room-stage-card-frame.is-dragging {
   height: 100%;
   min-height: 0;
   overflow: hidden;
+  grid-template-rows: minmax(0, 1fr) auto;
+  gap: 0;
 }
 
 .rooms-editor-layout {

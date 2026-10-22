@@ -10376,8 +10376,6 @@ export function RoomsWorkspace({
           )}
         </section>
 
-        {hardwareProfiler ? <RoomHardwareDebugger presentation={hardwareProfiler} /> : null}
-
         <EditorSideStack
           ariaLabel={ui("Painel lateral do Editor")}
           className="rooms-side-stack"
@@ -10634,6 +10632,7 @@ export function RoomsWorkspace({
           )}
         />
       </div>
+      {hardwareProfiler ? <RoomHardwareDebugger presentation={hardwareProfiler} /> : null}
     </section>
   );
 }

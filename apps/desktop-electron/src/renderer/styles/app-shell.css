@@ -286,6 +286,7 @@
 }
 
 .focus-mode .rooms-side-stack,
+.focus-mode .rooms-workspace > .rooms-debugger,
 .focus-mode .rooms-editor-layout > :not(.rooms-canvas-stage),
 .focus-mode .room-editor-tool-rail {
   display: none;
