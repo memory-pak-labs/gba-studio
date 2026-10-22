@@ -1,3 +1,4 @@
+#define GBS_DIALOGUE_UI_RUNTIME_KIND 10
 #include "gbs/engine.hpp"
 #include <string.h>
 #include "gbs/audio.hpp"

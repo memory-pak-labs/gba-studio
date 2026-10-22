@@ -1,3 +1,4 @@
+#define GBS_DIALOGUE_UI_RUNTIME_KIND 7
 #include "gbs/engine.hpp"
 #include "gbs/input.hpp"
 #include "gbs/racing.hpp"

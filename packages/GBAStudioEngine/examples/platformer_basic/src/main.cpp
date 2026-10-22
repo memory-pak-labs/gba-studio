@@ -1,3 +1,4 @@
+#define GBS_DIALOGUE_UI_RUNTIME_KIND 1
 #include "gbs/engine.hpp"
 #include "gbs/event_ui.hpp"
 #include "gbs/animation.hpp"

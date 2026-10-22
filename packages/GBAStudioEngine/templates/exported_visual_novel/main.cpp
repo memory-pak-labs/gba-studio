@@ -1,3 +1,4 @@
+#define GBS_DIALOGUE_UI_RUNTIME_KIND 9
 #include "gbs/engine.hpp"
 #include "gbs/audio.hpp"
 #include "gbs/dialogue.hpp"
@@ -769,10 +770,12 @@ void render_visual_novel_runtime(const gbs::RuntimeFrameContext& context) {
          * cannot leak a HUD from the previous scene. */
         gbs::hide_hud(hud);
         gbs::draw_hud(hud);
-        gbs::draw_dialogue(dialogue);
         /* Advanced HUD text uses OAM 96-127. Draw fixed dialogue portraits
-         * after it so the HUD cleanup cannot hide the active portrait. */
+         * after it so the HUD cleanup cannot hide the active portrait.
+         * The optional dialogue frame also owns OBJ slots and follows the
+         * portrait pass, which clears scene OBJ before drawing the face. */
         draw_dialogue_portrait();
+        gbs::draw_dialogue(dialogue);
         gbs::runtime_telemetry_block().current_room = current_scene_index;
         for (size_t index = 0; index < gbs::runtime_telemetry_variable_count; ++index)
             gbs::runtime_telemetry_block().variables[index] = event_state.variables[index];

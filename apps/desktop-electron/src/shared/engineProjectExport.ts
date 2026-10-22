@@ -4690,6 +4690,7 @@ export interface AssetcPortraitPackAsset extends AssetcSceneBankFields {
   png: string;
   sprite_width: number;
   sprite_height: number;
+  sprite_bpp?: 8;
   header: string;
   symbol: string;
   portraitName: string;
@@ -4746,6 +4747,7 @@ export function buildAssetcPortraitPackGeneration(
       png: output,
       sprite_width: spriteWidth,
       sprite_height: spriteHeight,
+      ...(spriteColorModeForSheet(data, portraitName) === "8bpp" ? { sprite_bpp: 8 as const } : {}),
       header: `${assetId}.hpp`,
       symbol: assetId,
       portraitName,

@@ -309,6 +309,17 @@ void configure_dialogue_ui(const DialogueUiConfig& config) {
     active_dialogue_ui.name_label_above = config.name_label_above;
     active_dialogue_ui.box_width_tiles = box_width_tiles;
     active_dialogue_ui.box_height_tiles = box_height_tiles;
+    active_dialogue_ui.portrait_tab = config.portrait_tab;
+    if (config.portrait_tab) {
+        active_dialogue_ui.frame_index = 0;
+        active_dialogue_ui.wrap_columns = 26;
+        active_dialogue_ui.wrap_lines = 3;
+        active_dialogue_ui.box_width_tiles = 28;
+        active_dialogue_ui.box_height_tiles = 5;
+        active_dialogue_ui.fixed_portrait_slots = true;
+        active_dialogue_ui.name_label_above = true;
+    }
+    gbs_hw_draw_portrait_tab(nullptr, nullptr, 0, 0, 0);
 }
 
 const DialogueUiConfig& active_dialogue_ui_config() {
@@ -405,6 +416,10 @@ Vec2i dialogue_portrait_position_pixels(const DialogueState& state) {
     if (state.portrait_slot != nullptr && state.portrait_slot[0] != '\0') {
         portrait_on_right = string_equals(state.portrait_slot, "right")
             || string_equals(state.portrait_slot, "direita");
+    }
+    if (active_dialogue_ui.portrait_tab) {
+        return Vec2i { (portrait_on_right ? 180 : 12) + (48 - dimensions.width) / 2,
+            60 + (48 - dimensions.height) / 2 };
     }
     if (active_dialogue_ui.fixed_portrait_slots) {
         const DialogueBoxLayout slot = dialogue_portrait_slot_layout_for_frame(
@@ -822,6 +837,16 @@ size_t format_dialogue_display_text(const DialogueState& state, char* out, size_
 }
 
 void draw_dialogue(const DialogueState& state) {
+    if (active_dialogue_ui.portrait_tab) {
+        char display_buffer[dialogue_page_buffer_capacity];
+        format_dialogue_display_text(state, display_buffer, sizeof(display_buffer));
+        const bool right = state.portrait_slot != nullptr && state.portrait_slot[0] != '\0'
+            ? string_equals(state.portrait_slot, "right") || string_equals(state.portrait_slot, "direita")
+            : active_dialogue_ui.portrait_on_right;
+        gbs_hw_draw_portrait_tab(active_dialogue_ui.show_character_name ? state.speaker : nullptr,
+            display_buffer, state.visible, dialogue_should_show_portrait(state), right);
+        return;
+    }
     const DialogueBoxLayout layout = dialogue_box_layout_for_frame(state.frame_index);
     const DialoguePortraitDimensions dimensions = dialogue_portrait_dimensions(state);
     bool portrait_on_right = active_dialogue_ui.portrait_on_right;

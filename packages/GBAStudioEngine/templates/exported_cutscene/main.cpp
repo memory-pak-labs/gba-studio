@@ -1,3 +1,4 @@
+#define GBS_DIALOGUE_UI_RUNTIME_KIND 8
 #include "gbs/engine.hpp"
 #include "gbs/audio.hpp"
 #include "gbs/cutscene.hpp"

@@ -1809,7 +1809,7 @@ async function main() {
       await assertWorkspace(cdp, "Arquivos", [
         "title-porto-lumen-240x160-4bpp.png",
         "prologue-clean-frame-1-240x160-4bpp.png",
-        "council-v5-background.png",
+        "council-v13-background.png",
         "market-approved-surface-768x512.png",
         "porto-nara-animations48.png",
         "dialogue-selector-gba-v4.png",

@@ -1,3 +1,4 @@
+#define GBS_DIALOGUE_UI_RUNTIME_KIND 6
 #include "gbs/dungeon_crawler.hpp"
 #include "gbs/engine.hpp"
 #include "gbs/input.hpp"

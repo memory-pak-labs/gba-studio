@@ -20,7 +20,7 @@ const approved = [
   ['mapa_rota', lumen.assets.background.name, lumen.assets.background.metadata.preparedSha256, lumen.assets.background.metadata.visualApproval],
   ['armazem_das_mares', warehouse.asset.file, warehouse.asset.sha256, {date:'2026-10-17',contract:'warehouse-frontal-v1-approved'}],
   ['observatorio_do_farol', observatory.asset.file, observatory.asset.sha256, {date:'2026-10-17',contract:'observatory-frontal-v1-approved'}],
-  ['conselho_guardia', 'council-v5-background.png', '98a6ccb4597f25f2156e30fed19ce7f9e9f88a5403ea5b46f1cefb1281c1cdff'],
+  ['conselho_guardia', 'council-v13-background.png', '5d8ab383b0166bca73fe664dfeea3977fed3a6d7643ddbb224bc9145a8408965', { date:'2026-10-22', contract:'council-porto-lumen-v13', record:'V1.3 approved for integration; native conversion presented before commit' }],
   ['circuito_final', 'racing-approved-topdown.png', 'e1de92b280ebb5210e3a786ab98dc83c8bcb8ccbb053586d654db608148fced6', {date:'2026-10-18',contract:'racing-two-views-approved-2026-10-18'}]
 ];
 

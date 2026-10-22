@@ -1,3 +1,4 @@
+#define GBS_DIALOGUE_UI_RUNTIME_KIND 3
 #include <algorithm>
 extern "C" void gbs_hw_set_bg_font_transparent(int enabled);
 #include "gbs/engine.hpp"

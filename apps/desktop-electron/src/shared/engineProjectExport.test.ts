@@ -1675,6 +1675,14 @@ describe("Engine project export", () => {
     ]);
   });
 
+  it("preserves the declared 8bpp color contract of a dialogue-only portrait", () => {
+    const pack = buildAssetcPortraitPackGeneration({
+      assets: [{ name: "portrait.png", kind: "Sprite", metadata: { source: "Assets/portrait.png", colorMode: "8bpp", width: 48, height: 48, frameWidth: 48, frameHeight: 48 } }],
+      dialogues: [{ key: "speech", portrait: "portrait.png" }]
+    }, null);
+    expect(pack?.assetsByPortraitName["portrait.png"]).toMatchObject({ sprite_bpp: 8, sprite_width: 48, sprite_height: 48 });
+  });
+
   it("preserves a 48x48 dialogue portrait frame without requiring a world actor", () => {
     const data = exportableProject({
       assets: [{ id: "guardian", name: "guardian.png", kind: "Sprite", metadata: { source: "Assets/sprites/guardian.png" } }],

@@ -1,3 +1,4 @@
+#define GBS_DIALOGUE_UI_RUNTIME_KIND 12
 #include "gbs/engine.hpp"
 #include "gbs/audio.hpp"
 #include "gbs/dialogue.hpp"

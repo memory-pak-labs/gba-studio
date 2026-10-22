@@ -1,3 +1,4 @@
+#define GBS_DIALOGUE_UI_RUNTIME_KIND 11
 #include "gbs/engine.hpp"
 #include "gbs/battle_rpg_presentation.hpp"
 #include "gbs/audio.hpp"

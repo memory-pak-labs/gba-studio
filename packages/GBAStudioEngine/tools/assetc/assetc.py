@@ -15190,7 +15190,13 @@ def scene_interface_skins_from_json(items, base_dir, description):
             raise SystemExit(f"{label}.scene_name precisa ser string nao vazia")
         if any(existing["scene_name"] == item["scene_name"] for existing in result):
             raise SystemExit(f"{label}.scene_name duplicado: {item['scene_name']}")
-        skins = {"scene_name": item["scene_name"]}
+        presentation = item.get("presentation", "standard")
+        if presentation not in ("standard", "portrait_tab"):
+            raise SystemExit(f"{label}.presentation precisa ser standard ou portrait_tab")
+        runtime_kind = item.get("runtime_kind", 9)
+        if isinstance(runtime_kind, bool) or not isinstance(runtime_kind, int) or not 0 <= runtime_kind <= 12:
+            raise SystemExit(f"{label}.runtime_kind precisa estar entre 0 e 12")
+        skins = {"scene_name": item["scene_name"], "portrait_tab": presentation == "portrait_tab", "runtime_kind": runtime_kind}
         for key in ("box_skin", "hud_skin"):
             if key in item:
                 if not isinstance(item[key], str) or not item[key].strip():
@@ -15389,8 +15395,25 @@ def shared_dialogue_ui_assets_from_project(project_data, base_dir):
     return box_skin, hud_skin, selector, font, dialogue_ui_from_json(selected_ui, f"{selected_key}.dialogue_ui"), hud_box_config_from_json(selected_ui), hud_presets, hud_scene_bindings, hud_layouts, active_hud_layout_id, scene_interface_skins_from_json(selected_ui.get("scene_skins", []), base_dir, "dialogue_ui.scene_skins")
 
 
+def validate_portrait_tab_resources(scene_skins, asset_report):
+    for entry in scene_skins:
+        if not entry.get("portrait_tab"):
+            continue
+        group = pack_safe_identifier("scene_" + entry["scene_name"])
+        for asset in (asset_report or {}).get("allocations", []):
+            groups = asset.get("bank_groups", [asset.get("bank_group", "global")])
+            if "global" not in groups and group not in groups:
+                continue
+            tiles = asset.get("allocations", {}).get("obj_tiles", {})
+            start, count = tiles.get("start", 0), tiles.get("count", 0)
+            if count and start < 896 and start + count > 512:
+                raise SystemExit(f"portrait_tab em {entry['scene_name']}: OBJ {asset.get('id')} ocupa tiles reservados 512..895; reduza os OBJ residentes ou use a apresentacao standard")
+
+
 def emit_shared_dialogue_ui_assets_header(box_skin, hud_skin, selector, font, dialogue_ui_config, hud_config, hud_presets=None, hud_scene_bindings=None, hud_layouts=None, active_hud_layout_id=None, asset_report=None, scene_skins=None):
     scene_skins = scene_skins or []
+    validate_portrait_tab_resources(scene_skins, asset_report)
+    portrait_tab_mask = sum(1 << kind for kind in set(entry["runtime_kind"] for entry in scene_skins if entry.get("portrait_tab")))
     hud_presets = hud_presets or []
     hud_scene_bindings = hud_scene_bindings or []
     hud_layouts = hud_layouts or []
@@ -15400,6 +15423,7 @@ def emit_shared_dialogue_ui_assets_header(box_skin, hud_skin, selector, font, di
         "#include <cstddef>",
         '#include "gbs/dialogue.hpp"',
         '#include "gbs/render.hpp"',
+        '#include "gbs/portrait_tab.h"',
     ]
     hud_icon_headers = []
     for layout in hud_layouts:
@@ -15564,12 +15588,12 @@ def emit_shared_dialogue_ui_assets_header(box_skin, hud_skin, selector, font, di
         return skin_symbols[key]
     scene_entries = []
     for entry in scene_skins:
-        scene_entries.append((entry["scene_name"], scene_skin_symbol(entry.get("box_skin")), scene_skin_symbol(entry.get("hud_skin"))))
-    output.append("struct SceneSkin { const char* scene_name; const gbs::DialogueBoxSkin* box; const gbs::DialogueBoxSkin* hud; };")
+        scene_entries.append((entry["scene_name"], scene_skin_symbol(entry.get("box_skin")), scene_skin_symbol(entry.get("hud_skin")), entry.get("portrait_tab", False)))
+    output.append("struct SceneSkin { const char* scene_name; const gbs::DialogueBoxSkin* box; const gbs::DialogueBoxSkin* hud; bool portrait_tab; };")
     if scene_entries:
         output.append("constexpr SceneSkin scene_skins[] = {")
-        for name, box, hud in scene_entries:
-            output.append(f"    {{ {cpp_string_literal(name)}, {box}, {hud} }},")
+        for name, box, hud, portrait_tab in scene_entries:
+            output.append(f"    {{ {cpp_string_literal(name)}, {box}, {hud}, {str(portrait_tab).lower()} }},")
         output.append("};")
     else:
         output.append("constexpr const SceneSkin* scene_skins = nullptr;")
@@ -15582,6 +15606,20 @@ def emit_shared_dialogue_ui_assets_header(box_skin, hud_skin, selector, font, di
         "}",
         "",
     ])
+    if portrait_tab_mask:
+        output.extend([
+            "#ifndef GBS_DIALOGUE_UI_RUNTIME_KIND",
+            "#define GBS_DIALOGUE_UI_RUNTIME_KIND 31",
+            "#endif",
+            f"constexpr bool portrait_tab_enabled = ({portrait_tab_mask}u & (1u << GBS_DIALOGUE_UI_RUNTIME_KIND)) != 0;",
+            "#if defined(__arm__)",
+            '#define GBS_DIALOGUE_UI_WORKSPACE __attribute__((section(".ewram_bss")))',
+            "#else",
+            "#define GBS_DIALOGUE_UI_WORKSPACE",
+            "#endif",
+            'alignas(4) static uint8_t portrait_tab_workspace[portrait_tab_enabled ? sizeof(GbsPortraitTabWorkspace) : 1] GBS_DIALOGUE_UI_WORKSPACE;',
+            "",
+        ])
     output.append("static inline void load_hud_layout_images(const char* preset_id) {")
     output.append("    if (preset_id == nullptr) return;")
     for layout in hud_layouts:
@@ -15619,6 +15657,7 @@ def emit_shared_dialogue_ui_assets_header(box_skin, hud_skin, selector, font, di
         "}",
         "",
         "static inline void configure() {",
+        *(["    gbs_portrait_tab_set_workspace(portrait_tab_enabled ? portrait_tab_workspace : nullptr, sizeof(portrait_tab_workspace));"] if portrait_tab_mask else []),
         "    gbs::configure_dialogue_ui(dialogue_ui);",
         "    gbs::configure_dialogue_box_skin(dialogue_box_skin);",
         "    gbs::configure_hud_box_skin(hud_box_skin);",
@@ -15650,6 +15689,9 @@ def emit_shared_dialogue_ui_assets_header(box_skin, hud_skin, selector, font, di
         "    for (std::size_t index = 0; index < scene_skin_count; ++index) {",
         "        const auto& skin = scene_skins[index];",
         "        if (!scene_name_equals(skin.scene_name, scene_name)) continue;",
+        "        auto scene_dialogue_ui = dialogue_ui;",
+        "        scene_dialogue_ui.portrait_tab = skin.portrait_tab;",
+        "        gbs::configure_dialogue_ui(scene_dialogue_ui);",
         "        if (skin.box != nullptr) gbs::configure_dialogue_box_skin(skin.box);",
         "        if (skin.hud != nullptr) gbs::configure_hud_box_skin(skin.hud);",
         "        break;",

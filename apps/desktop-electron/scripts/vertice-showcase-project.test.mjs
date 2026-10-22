@@ -1478,7 +1478,7 @@ describe("materialização canônica de Vértice", () => {
     }
   });
 
-  it("materializa o Conselho V5 com retratos apenas no diálogo", () => {
+  it("materializa o Conselho V1.3 com retratos apenas no diálogo", () => {
     const project = verticeProject();
     const scene = project.scenas.find((candidate) => candidate.name === "conselho_guardia");
     const actors = project.actors.filter((actor) => actor.roomName === "conselho_guardia");
@@ -1487,22 +1487,24 @@ describe("materialização canônica de Vértice", () => {
     expect(scene).toMatchObject({
       width: 30,
       height: 20,
-      backgroundAssetName: "council-v5-background.png",
+      backgroundAssetName: "council-v13-background.png",
+      dialoguePresentation: "portrait_tab",
+      interfaceThemeId: "council-v13",
       runtime: { type: "visualNovel", config: { dialogueKey: "conselho" } },
       playerActorName: ""
     });
     expect(councilDialogue).toMatchObject({
       character: "Guardiã",
-      portrait: "council-v5-guardian.png",
+      portrait: "council-v13-guardian.png",
       portraitSlot: "right"
     });
     expect(naraDialogue).toMatchObject({
       character: "Nara",
-      portrait: "council-v5-nara.png",
+      portrait: "council-v13-nara.png",
       portraitSlot: "left"
     });
     expect(actors).toEqual([]);
-    for (const name of ["council-v5-nara.png", "council-v5-guardian.png"]) {
+    for (const name of ["council-v13-nara.png", "council-v13-guardian.png"]) {
       expect(project.assets.find((asset) => asset.name === name)).toMatchObject({
         kind: "Sprite",
         metadata: { width: 48, height: 48, frameWidth: 48, frameHeight: 48, reviewStatus: "approved" }
@@ -1511,7 +1513,7 @@ describe("materialização canônica de Vértice", () => {
         frameWidth: 48, frameHeight: 48, frameCount: 1
       });
     }
-    expect(project.assets.find((asset) => asset.name === "council-v5-background.png")).toMatchObject({
+    expect(project.assets.find((asset) => asset.name === "council-v13-background.png")).toMatchObject({
       kind: "Background",
       metadata: { width: 240, height: 160, reviewStatus: "approved" }
     });
@@ -1924,9 +1926,10 @@ describe("materialização canônica de Vértice", () => {
       "market-approved-actors-64x64.png",
       "market-approved-surface-768x512.png",
       "market-approved-foreground-768x512.png",
-      "council-v5-background.png",
-      "council-v5-nara.png",
-      "council-v5-guardian.png",
+      "council-v13-background.png",
+      "council-v13-nara.png",
+      "council-v13-guardian.png",
+      "frame-council-v13.png",
       "dialogue-selector-gba-v4.png",
       "gba-dialogue-font-v3.png",
       "gba-studio-startup-canvas-frame-00-gba.png",

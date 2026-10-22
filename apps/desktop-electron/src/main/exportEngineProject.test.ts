@@ -43,6 +43,17 @@ describe("tacticalMarkerIndices", () => {
 });
 
 describe("prepareEngineProjectExport", () => {
+  it("exports an opt-in portrait tab independently of themes and requires its Engine capability", () => {
+    const contract = buildEngineExportProjectContract(project({ scenas: [
+      { name: "start", width: 30, height: 20, dialoguePresentation: "portrait_tab" },
+      { name: "other", width: 30, height: 20 }
+    ] }));
+    expect(contract.topdown_project?.dialogue_ui?.scene_skins).toEqual([{ scene_name: "start", presentation: "portrait_tab", runtime_kind: 0 }]);
+    expect(contract.requires.features).toContain("dialogue_portrait_tab");
+    const standard = buildEngineExportProjectContract(project({}));
+    expect(standard.requires.features).not.toContain("dialogue_portrait_tab");
+  });
+
   it("keeps an automatic portal when a paged room has a trigger without an enter event", () => {
     const contract = buildEngineExportProjectContract(project({
       assets: [{ id: "harbor", name: "harbor.png", kind: "Background", metadata: {
@@ -556,7 +567,7 @@ describe("prepareEngineProjectExport", () => {
       /gbs::draw_hud\(hud\);[\s\S]*?gbs::draw_dialogue\(dialogue\);[\s\S]*?draw_dialogue_portrait\(\);/
     );
     expect(visualNovelTemplate).toMatch(
-      /gbs::draw_hud\(hud\);[\s\S]*?gbs::draw_dialogue\(dialogue\);[\s\S]*?draw_dialogue_portrait\(\);/
+      /gbs::draw_hud\(hud\);[\s\S]*?draw_dialogue_portrait\(\);[\s\S]*?gbs::draw_dialogue\(dialogue\);/
     );
   });
 

@@ -22,3 +22,5 @@ int gbs_hw_get_vcount(void) { return 0; }
 
 extern "C" void __attribute__((weak)) gbs_hw_start_hblank_affine(int,const uint32_t*) {}
 extern "C" uint32_t* __attribute__((weak)) gbs_hw_hblank_affine_buffer() { static uint32_t words[644];return words; }
+
+extern "C" void __attribute__((weak)) gbs_hw_draw_portrait_tab(const char*,const char*,int,int,int) {}

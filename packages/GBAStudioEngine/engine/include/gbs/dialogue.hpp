@@ -46,6 +46,8 @@ struct DialogueUiConfig {
     /** Dialogue box dimensions in 8px tiles; one tile remains as bottom margin. */
     int box_width_tiles = dialogue_box_width_tiles_default;
     int box_height_tiles = dialogue_box_height_tiles_default;
+    /** Opt-in 224x40 lower panel with a 48px portrait and integrated 16px name tab. */
+    bool portrait_tab = false;
 };
 
 struct DialoguePortraitEntry {

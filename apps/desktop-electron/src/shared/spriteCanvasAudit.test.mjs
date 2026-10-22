@@ -31,7 +31,7 @@ describe("canonical sprite canvas audit", () => {
 
   it("keeps the export identical when materializing a 48px implicit portrait", () => {
     const before = structuredClone(canonical);
-    const animation = before.animations.find(a => a.spriteSheet === "council-v5-nara.png");
+    const animation = before.animations.find(a => a.spriteSheet === "council-v13-nara.png");
     delete animation.frames;
     const after = fitProjectSpriteFrames(before);
     const actor = { id: "audit", spriteSheet: animation.spriteSheet };

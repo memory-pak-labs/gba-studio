@@ -10,6 +10,9 @@ it("browses scopes without mutation and sends a scoped skin edit with only compa
   ], settings: { interfaceThemes: { themes: [{ id: "sea", name: "Mar", boxImage: "skin.png", hudImage: "skin.png" }], defaultThemeId: "sea" } } };
   const change = vi.fn();
   render(<InterfaceThemeInspector projectData={data} roomId="port" focus="dialogue" onChange={change}/>);
+  fireEvent.change(screen.getByLabelText("Apresentação nesta cena"), { target: { value: "portrait_tab" } });
+  expect(change).toHaveBeenCalledWith({ roomId: "port", presentation: "portrait_tab" });
+  change.mockClear();
   fireEvent.change(screen.getByLabelText("Aplicar aparência em"), { target: { value: "type" } });
   expect(change).not.toHaveBeenCalled();
   expect(screen.getByText(/Porto, Caverna/)).toBeInTheDocument();

@@ -3,6 +3,8 @@
 #include "gbs/dialogue.hpp"
 #include "gbs/runtime_checkpoint.hpp"
 
+extern "C" void gbs_hw_draw_portrait_tab(const char*, const char*, int, int, int) {}
+
 extern "C" void gbs_hw_draw_dialogue_box(const char*, int) {
 }
 
@@ -991,7 +993,36 @@ void test_checkpoint_restores_dialogue_page_and_reveal_progress() {
     assert(!gbs::restore_checkpoint_dialogue(invalid, loaded, lines, 1));
 }
 
+void test_portrait_tab_preserves_text_rows_and_uses_approved_portrait_insets() {
+    auto config = gbs::default_dialogue_ui_config();
+    config.portrait_tab = true;
+    gbs::configure_dialogue_ui(config);
+    assert(gbs::active_dialogue_ui_config().fixed_portrait_slots);
+    assert(gbs::active_dialogue_ui_config().name_label_above);
+    assert(gbs::active_dialogue_ui_config().box_height_tiles == 5);
+    const gbs::MetaSpritePart parts[] = {{0, 0, 0, 0, false, false, 32, 32}, {32, 0, 16, 0, false, false, 16, 32}, {0, 32, 24, 0, false, false, 32, 16}, {32, 32, 32, 0, false, false, 16, 16}};
+    const gbs::MetaSprite sprite { parts, 4 };
+    const gbs::DialoguePortraitEntry entries[] = {{"portrait", &sprite}};
+    gbs::configure_dialogue_portraits(entries, 1);
+    const gbs::DialogueLine lines[] = {{"Restauramos os sinais da costa. Como atravessamos a tempestade?", "Nara", "portrait"}};
+    gbs::DialogueState state {};
+    gbs::show_dialogue(state, lines, 1, 0);
+    const auto left = gbs::dialogue_portrait_position_pixels(state);
+    assert(left.x == 12 && left.y == 60);
+    state.portrait_slot = "right";
+    const auto right = gbs::dialogue_portrait_position_pixels(state);
+    assert(right.x == 180 && right.y == 60);
+    char text[1024];
+    gbs::format_dialogue_display_text(state, text, sizeof(text));
+    assert(std::strstr(text, "Nara") == nullptr);
+    assert(!state.has_next_page);
+    gbs::configure_dialogue_ui(gbs::default_dialogue_ui_config());
+    assert(!gbs::active_dialogue_ui_config().portrait_tab);
+    gbs::configure_dialogue_portraits(nullptr, 0);
+}
+
 int main() {
+    test_portrait_tab_preserves_text_rows_and_uses_approved_portrait_insets();
     test_checkpoint_restores_dialogue_page_and_reveal_progress();
     test_show_dialogue_selects_line();
     test_show_dialogue_preserves_speaker_and_portrait();

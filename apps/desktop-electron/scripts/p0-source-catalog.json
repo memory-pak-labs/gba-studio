@@ -2035,6 +2035,26 @@
           "path": "Assets/ui/penedos-v2-hearts-empty.png",
           "sha256": "2a13f314bec8a727df2b2a29c65d2e7b480674742ca8026c2efa1ee9f11715a2",
           "contract": "penedos-v2-faithful-user-approved-2026-10-22"
+        },
+        {
+          "path": "Assets/backgrounds/council-v13-background.png",
+          "sha256": "5d8ab383b0166bca73fe664dfeea3977fed3a6d7643ddbb224bc9145a8408965",
+          "contract": "council-porto-lumen-v13-user-approved-2026-10-22"
+        },
+        {
+          "path": "Assets/sprites/council-v13-nara.png",
+          "sha256": "02ea2d55eb72d5fe279320aa3192287ff20bec5065928b4fe67f336ccf460a8c",
+          "contract": "council-porto-lumen-v13-user-approved-2026-10-22"
+        },
+        {
+          "path": "Assets/sprites/council-v13-guardian.png",
+          "sha256": "5743afce4ee6eb8d0c0595e2238b0dbd4a72abf91e0c94f48c686e6b3f7b9156",
+          "contract": "council-porto-lumen-v13-user-approved-2026-10-22"
+        },
+        {
+          "path": "Assets/ui/frame-council-v13.png",
+          "sha256": "a0672836f50ae4c1a1a1bf80ed83616c6bbfe4bbf5efb62ae941025646adb843",
+          "contract": "council-porto-lumen-v13-user-approved-2026-10-22"
         }
       ],
       "retired": [

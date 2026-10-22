@@ -1,0 +1,219 @@
+{
+  "schema": 1,
+  "approval": {
+    "approved": true,
+    "visual": true,
+    "date": "2026-10-22",
+    "record": "Gostei da V1.3, pode implementar no Conselho como opção do sistema de diálogo.",
+    "scope": "Approved art and layout; native GBA conversion presented before commit."
+  },
+  "license": "Project-owned; original artwork generated with OpenAI ImageGen",
+  "separation": {
+    "background": "world BG tilemap",
+    "portraits": "independent transparent OBJ sheets",
+    "interface": "native joined frame + font + palette skin; no baked speech or names"
+  },
+  "sourceBackgroundSha256": "be49b985a63159e6ccac47b2b8d9c51807c65511f42d0b7b137c1cc53c79870c",
+  "reviewBackgroundSha256": "866f2d7f47c675b1b9a4c7d3b0e7064de45db29feb0b75ed32c2da5cdd51a7a2",
+  "runtimeBackgroundSha256": "5d8ab383b0166bca73fe664dfeea3977fed3a6d7643ddbb224bc9145a8408965",
+  "preparation": {
+    "backgroundBanks": 14,
+    "backgroundColors": 182,
+    "backgroundStrategy": "constrained",
+    "objectColorsShared": 91,
+    "portraits": [
+      {
+        "name": "nara",
+        "alphaThreshold": 128,
+        "sourceAlphaHistogram": {
+          "0": 1103,
+          "252": 37,
+          "253": 1035,
+          "237": 1,
+          "251": 16,
+          "5": 3,
+          "255": 25,
+          "150": 1,
+          "33": 2,
+          "248": 2,
+          "65": 1,
+          "76": 1,
+          "72": 1,
+          "77": 1,
+          "82": 1,
+          "250": 7,
+          "1": 5,
+          "2": 3,
+          "254": 38,
+          "247": 2,
+          "249": 2,
+          "86": 1,
+          "21": 1,
+          "240": 1,
+          "243": 1,
+          "213": 1,
+          "235": 1,
+          "244": 2,
+          "3": 2,
+          "7": 1,
+          "15": 1,
+          "68": 1,
+          "209": 1,
+          "214": 1,
+          "8": 1,
+          "101": 1
+        },
+        "visibleColors": 69,
+        "sourceVisiblePixels": 1201,
+        "runtimeVisiblePixels": 1174,
+        "sourceHash": "1a9cae5a1aa64ce9cc937003be6262f0ea0c5f05c280f42637e4f43237414edb",
+        "reviewHash": "e452c21a06385691f754868494547895462af47f33c1b32bd012ba31ed3f445c",
+        "runtimeHash": "02ea2d55eb72d5fe279320aa3192287ff20bec5065928b4fe67f336ccf460a8c"
+      },
+      {
+        "name": "guardian",
+        "alphaThreshold": 128,
+        "sourceAlphaHistogram": {
+          "1": 3,
+          "0": 1011,
+          "253": 1061,
+          "254": 171,
+          "15": 1,
+          "250": 4,
+          "251": 6,
+          "252": 15,
+          "255": 2,
+          "186": 1,
+          "199": 1,
+          "244": 1,
+          "8": 2,
+          "249": 2,
+          "28": 1,
+          "6": 1,
+          "146": 1,
+          "7": 2,
+          "4": 1,
+          "2": 2,
+          "10": 2,
+          "20": 1,
+          "21": 1,
+          "22": 2,
+          "25": 2,
+          "23": 1,
+          "33": 1,
+          "31": 1,
+          "24": 2,
+          "16": 1,
+          "26": 1
+        },
+        "visibleColors": 66,
+        "sourceVisiblePixels": 1293,
+        "runtimeVisiblePixels": 1265,
+        "sourceHash": "592d17ba22f4acb5ccfc2df3e045c9094063b1a67b85122d547774c99865dfb5",
+        "reviewHash": "49d8824fff66597972709f0f625ded1285fc6acaa6db52b3a60ad84812ec160c",
+        "runtimeHash": "5743afce4ee6eb8d0c0595e2238b0dbd4a72abf91e0c94f48c686e6b3f7b9156"
+      }
+    ]
+  },
+  "ui": {
+    "body": [
+      8,
+      112,
+      224,
+      40
+    ],
+    "portraitLeft": [
+      12,
+      60,
+      48,
+      48
+    ],
+    "portraitRight": [
+      180,
+      60,
+      48,
+      48
+    ],
+    "nameTabHeight": 16,
+    "colors": {
+      "outline": [
+        7,
+        29,
+        39
+      ],
+      "rim": [
+        202,
+        187,
+        137
+      ],
+      "inner": [
+        30,
+        91,
+        104
+      ],
+      "fill": [
+        15,
+        48,
+        62
+      ],
+      "header": [
+        20,
+        62,
+        75
+      ],
+      "text": [
+        244,
+        237,
+        211
+      ],
+      "name": [
+        239,
+        203,
+        127
+      ],
+      "selection": [
+        29,
+        70,
+        80
+      ]
+    }
+  },
+  "assets": [
+    {
+      "source": "Assets/backgrounds/council-v13-background.png",
+      "sha256": "5d8ab383b0166bca73fe664dfeea3977fed3a6d7643ddbb224bc9145a8408965",
+      "name": "council-v13-background.png"
+    },
+    {
+      "source": "Assets/sprites/council-v13-nara.png",
+      "sha256": "02ea2d55eb72d5fe279320aa3192287ff20bec5065928b4fe67f336ccf460a8c",
+      "name": "council-v13-nara.png"
+    },
+    {
+      "source": "Assets/sprites/council-v13-guardian.png",
+      "sha256": "5743afce4ee6eb8d0c0595e2238b0dbd4a72abf91e0c94f48c686e6b3f7b9156",
+      "name": "council-v13-guardian.png"
+    },
+    {
+      "source": "Assets/ui/frame-council-v13.png",
+      "sha256": "a0672836f50ae4c1a1a1bf80ed83616c6bbfe4bbf5efb62ae941025646adb843",
+      "name": "frame-council-v13.png"
+    }
+  ],
+  "replacedAssetNames": [
+    "council-v5-background.png",
+    "council-v5-guardian.png",
+    "council-v5-nara.png"
+  ],
+  "retainedOriginals": [
+    {
+      "source": "Assets/sprites/council-v5-guardian.png"
+    },
+    {
+      "source": "Assets/sprites/council-v5-nara.png"
+    },
+    {
+      "source": "Assets/backgrounds/council-v5-background.png"
+    }
+  ]
+}

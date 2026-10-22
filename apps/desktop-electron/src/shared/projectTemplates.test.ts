@@ -290,7 +290,7 @@ describe("projectTemplates", () => {
     });
     expect(dialogues.find((dialogue) => dialogue.key === "conselho")).toMatchObject({
       character: "Guardiã",
-      portrait: "council-v5-guardian.png",
+      portrait: "council-v13-guardian.png",
       portraitSlot: "right"
     });
   });
@@ -569,6 +569,8 @@ describe("projectTemplates", () => {
       "arena-nara-complete-64x64.png",
       "arena-rival-complete-64x64.png",
       "book-nara-approved-32x48.png",
+      "council-v13-guardian.png",
+      "council-v13-nara.png",
       "dungeon-approved-cell-far.png",
       "dungeon-approved-cell-icon.png",
       "dungeon-approved-cell-mid.png",

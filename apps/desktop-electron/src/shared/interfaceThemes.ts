@@ -1,12 +1,12 @@
 import type { GBAProjectData } from "./projectFile.js";
 import type { HudPresetPresentation } from "./hudPresets.js";
-import { resolveDialogueUiSettings } from "./sceneRuntimeExport.js";
+import { resolveDialogueUiSettings, type DialoguePresentation } from "./sceneRuntimeExport.js";
 
 export interface InterfaceTheme { id: string; name: string; hudImage: string; boxImage: string }
 export type InterfaceThemeScope = "scene" | "type" | "project";
 export interface InterfaceThemeBindingChange { scope: InterfaceThemeScope; roomId?: string; themeId: string }
 export interface InterfaceThemeSkinChange { scope: InterfaceThemeScope; roomId?: string; field: "hudImage" | "boxImage"; image: string }
-export type InterfaceThemeChange = InterfaceThemeBindingChange | InterfaceThemeSkinChange;
+export type InterfaceThemeChange = InterfaceThemeBindingChange | InterfaceThemeSkinChange | { roomId: string; presentation: DialoguePresentation };
 const record = (v: unknown): Record<string, unknown> => v && typeof v === "object" && !Array.isArray(v) ? v as Record<string, unknown> : {};
 const string = (v: unknown): string => typeof v === "string" ? v.trim() : "";
 export function interfaceThemeRooms(data: GBAProjectData): Record<string, unknown>[] {
@@ -44,8 +44,9 @@ export function applyInterfaceThemeToHudPreset(data: GBAProjectData, roomId: str
 }
 export function resolveSceneDialogueUiSettings(data: GBAProjectData, roomId?: string) {
   const ui = record(record(data.settings).uiDialogs);
-  const boxImage = resolveInterfaceTheme(data, roomId).theme?.boxImage;
-  return resolveDialogueUiSettings({ ...ui, ...(boxImage ? { boxImage } : {}) });
+  const { theme, room } = resolveInterfaceTheme(data, roomId);
+  const boxImage = theme?.boxImage;
+  return resolveDialogueUiSettings({ ...ui, presentation: room?.dialoguePresentation ?? "standard", ...(boxImage ? { boxImage } : {}) });
 }
 export function updateInterfaceThemeBinding(data: GBAProjectData, change: InterfaceThemeBindingChange): GBAProjectData {
   const id = change.themeId.trim();
@@ -99,5 +100,19 @@ export function updateInterfaceThemeSkin(data: GBAProjectData, change: Interface
   return updateInterfaceThemeBinding(next, { scope: change.scope, roomId: change.roomId, themeId: id });
 }
 export function updateInterfaceThemeInProject(data: GBAProjectData, change: InterfaceThemeChange): GBAProjectData {
+  if ("presentation" in change) {
+    if (!interfaceThemeRooms(data).some(room => room.id === change.roomId || room.name === change.roomId)) return data;
+    const next = structuredClone(data);
+    for (const collection of [next.scenas, next.rooms, [next.scena]]) {
+      if (!Array.isArray(collection)) continue;
+      for (const value of collection) {
+        const room = record(value);
+        if (room.id !== change.roomId && room.name !== change.roomId) continue;
+        if (change.presentation === "portrait_tab") room.dialoguePresentation = change.presentation;
+        else delete room.dialoguePresentation;
+      }
+    }
+    return next;
+  }
   return "field" in change ? updateInterfaceThemeSkin(data, change) : updateInterfaceThemeBinding(data, change);
 }

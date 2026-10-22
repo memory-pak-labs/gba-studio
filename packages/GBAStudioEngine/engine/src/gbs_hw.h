@@ -55,6 +55,7 @@ void gbs_hw_draw_room_to_bg(int layer, const uint8_t* tiles, int width, int heig
 void gbs_hw_draw_room16_to_bg(int layer, const uint16_t* tiles, int width, int height, int camera_x, int camera_y);
 void gbs_hw_draw_dialogue_box(const char* text, int visible);
 void gbs_hw_draw_text_box(int x, int y, int width, int height, const char* text, int visible);
+void gbs_hw_draw_portrait_tab(const char* speaker, const char* text, int visible, int portrait, int right);
 void gbs_hw_draw_text_at(int x, int y, int width, const char* text);
 void gbs_hw_draw_text_overlay(int x, int y, int width, const char* text, int visible);
 void gbs_hw_draw_text_overlay_slot(int x, int y, int width, const char* text, int oam_offset, int visible);

@@ -2,6 +2,7 @@
 #include "gbs_room_tilemap.h"
 #include "gbs/text.h"
 #include "gbs/hud_compact_text.h"
+#include "gbs/portrait_tab.h"
 
 #define REG16(address) (*(volatile uint16_t*)(address))
 #define REG32(address) (*(volatile uint32_t*)(address))
@@ -631,6 +632,7 @@ static int dialogue_box_skin_active = 0;
 static int hud_box_skin_active = 0;
 static int dialogue_choice_selector_active = 0;
 static const uint8_t* configured_dialogue_font_tiles = 0;
+static const uint16_t* configured_dialogue_skin_palette = 0;
 static int bg_font_transparent = 0;
 static int hud_box_x = 0;
 static int hud_box_y = 0;
@@ -680,6 +682,7 @@ struct gbs_hw_metasprite {
 };
 
 void gbs_hw_configure_dialogue_box_skin(const uint8_t* tiles, const uint16_t* palette) {
+    configured_dialogue_skin_palette = palette;
     if (tiles == 0 || palette == 0) {
         dialogue_box_skin_active = 0;
         return;
@@ -689,6 +692,11 @@ void gbs_hw_configure_dialogue_box_skin(const uint8_t* tiles, const uint16_t* pa
     gbs_hw_load_obj_palette(palette, DIALOGUE_PALETTE_BASE, 16);
     gbs_hw_flush_vram_writes();
     dialogue_box_skin_active = 1;
+}
+
+void gbs_hw_draw_portrait_tab(const char* speaker, const char* text, int visible, int portrait, int right) {
+    gbs_portrait_tab_draw(speaker, text, visible, portrait, right,
+        configured_dialogue_font_tiles, configured_dialogue_skin_palette);
 }
 
 void gbs_hw_configure_hud_box_skin(const uint8_t* tiles, const uint16_t* palette) {
