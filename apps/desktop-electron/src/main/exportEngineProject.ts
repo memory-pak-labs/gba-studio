@@ -8980,7 +8980,12 @@ function buildVisualNovelScenes(
       audioPack
     );
     const roomDialogueBoot = index === startIndex ? dialogueBoot : [];
-    const onEnterScript = mergeRoomOnEnterScript(roomDialogueBoot, onEnter);
+    const music = resolveAudioPlayback(audioItems, audioPack, stringField(room, "music", ""));
+    const sceneBoot: EngineExportProjectEventCommand[] = [
+      ...roomDialogueBoot,
+      ...(music ? [{ op: music.op, index: music.index }] : [])
+    ];
+    const onEnterScript = mergeRoomOnEnterScript(sceneBoot, onEnter);
 
     let line = -1;
     let choiceGroup = -1;

@@ -274,6 +274,18 @@ void draw_dialogue_portrait() {
 }
 
 void consume_event_state() {
+    if (event_state.dialogue_text_speed_changed) {
+        gbs::set_dialogue_text_speed(dialogue, event_state.dialogue_text_speed_frames);
+        event_state.dialogue_text_speed_changed = false;
+    }
+    if (event_state.dialogue_text_sfx_changed) {
+        gbs::set_dialogue_text_sfx(dialogue, event_state.dialogue_text_sfx_index);
+        event_state.dialogue_text_sfx_changed = false;
+    }
+    if (event_state.dialogue_frame_changed) {
+        gbs::set_dialogue_frame(dialogue, event_state.dialogue_frame_index);
+        event_state.dialogue_frame_changed = false;
+    }
     gbs::consume_scene_transition_visual_effect_event(event_state);
     gbs::consume_event_palette_changes(
         event_state,
@@ -662,6 +674,8 @@ int initialize_visual_novel_runtime() {
     gbs::set_bg_enabled(gbs::BackgroundLayer::BG2, false);
     gbs::set_bg_enabled(gbs::BackgroundLayer::BG3, false);
     gbs::init_dialogue(dialogue);
+    // Match the editor Normal default; authored boot commands may override it.
+    gbs::set_dialogue_text_speed(dialogue, 2);
     gbs::init_event_state(event_state);
     gbs::init_hud(hud);
     gbs::init_resource_manager(resource_manager);
@@ -738,7 +752,15 @@ gbs::RuntimeAdapterFrameResult update_visual_novel_runtime(const gbs::RuntimeFra
 #endif
         if (dialogue.visible) {
             bool was_choice_mode = dialogue.choice_mode;
+            const int confirm_sfx = dialogue.confirm_sfx_index;
+            const int confirm_pcm = dialogue.confirm_pcm_index;
             gbs::advance_dialogue(dialogue, input);
+            if (!dialogue.visible) {
+                if (confirm_sfx >= 0 && static_cast<size_t>(confirm_sfx) < project.sfx_asset_count)
+                    gbs::play_sfx(project.sfx_assets[confirm_sfx]);
+                else if (confirm_pcm >= 0 && static_cast<size_t>(confirm_pcm) < project.pcm_asset_count)
+                    gbs::play_pcm_sfx(project.pcm_assets[confirm_pcm]);
+            }
             finish_scene_choice_if_needed(was_choice_mode);
             show_scene_content_if_ready();
             if (!dialogue.visible) {
@@ -765,6 +787,11 @@ gbs::RuntimeAdapterFrameResult update_visual_novel_runtime(const gbs::RuntimeFra
 
 void render_visual_novel_runtime(const gbs::RuntimeFrameContext& context) {
     (void)context;
+        gbs::update_dialogue(dialogue);
+        if (dialogue.revealed_char_this_frame && dialogue.text_sfx_index >= 0 &&
+            static_cast<size_t>(dialogue.text_sfx_index) < project.sfx_asset_count) {
+            gbs::play_sfx(project.sfx_assets[dialogue.text_sfx_index]);
+        }
         /* The scene title/history bar is runtime diagnostics, not authored
          * scene content. Keep the UI layer clear so a mixed-runtime handoff
          * cannot leak a HUD from the previous scene. */

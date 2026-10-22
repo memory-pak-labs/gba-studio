@@ -17,10 +17,15 @@ struct DrawCall {
     int visible;
 };
 
-DrawCall draw_calls[4] = {};
+DrawCall draw_calls[16] = {};
 int draw_call_count = 0;
+bool painted_dialogue_tiles[32 * 32] = {};
 
 extern "C" void gbs_hw_draw_text_box(int x, int y, int width, int height, const char* text, int visible) {
+    for (int row = y; row < y + height && row < 32; ++row)
+        for (int column = x; column < x + width && column < 32; ++column)
+            if (row >= 0 && column >= 0)
+                painted_dialogue_tiles[row * 32 + column] = visible != 0;
     if (draw_call_count >= static_cast<int>(sizeof(draw_calls) / sizeof(draw_calls[0]))) return;
     DrawCall& call = draw_calls[draw_call_count++];
     call.x = x;
@@ -861,10 +866,13 @@ void test_dialogue_fixed_frame_fits_portrait_and_name() {
     state.portrait_slot = "right";
     reset_draw_calls();
     gbs::draw_dialogue(state);
-    assert(draw_calls[1].x == 25 && draw_calls[1].y == 10);
+    const int current_draw = draw_call_count - 4;
+    assert(current_draw == 3);
+    assert(draw_calls[1].visible == 0 && draw_calls[1].x == 1 && draw_calls[1].y == 10);
+    assert(draw_calls[current_draw + 1].x == 25 && draw_calls[current_draw + 1].y == 10);
     const gbs::Vec2i right = gbs::dialogue_portrait_position_pixels(state);
     assert(right.x == 200 && right.y == 80);
-    assert(draw_calls[2].x + draw_calls[2].width == draw_calls[1].x);
+    assert(draw_calls[current_draw + 2].x + draw_calls[current_draw + 2].width == draw_calls[current_draw + 1].x);
     const gbs::DialogueBoxLayout portrait48 = gbs::dialogue_portrait_slot_layout_for_frame(0, true, 48, 48);
     const gbs::DialogueBoxLayout guardian48 = gbs::dialogue_name_label_layout_for_frame(0, 9, true, true, true, 48, 48);
     assert(portrait48.w == 6 && portrait48.h == 6);
@@ -1021,7 +1029,35 @@ void test_portrait_tab_preserves_text_rows_and_uses_approved_portrait_insets() {
     gbs::configure_dialogue_portraits(nullptr, 0);
 }
 
+void test_dialogue_frame_transitions_erase_previous_owned_regions() {
+    gbs::configure_dialogue_ui(gbs::DialogueUiConfig { 0, 28, 3, true, true, false, true, true });
+    std::memset(painted_dialogue_tiles, 0, sizeof(painted_dialogue_tiles));
+    const gbs::DialogueLine lines[] = {{ "Text", "QA", "guide.png", "qa" }};
+    gbs::DialogueState state;
+    gbs::init_dialogue(state);
+    assert(gbs::show_dialogue(state, lines, 1, 0));
+    gbs::draw_dialogue(state);
+    assert(painted_dialogue_tiles[18 * 32 + 28]);
+    painted_dialogue_tiles[19 * 32 + 29] = true; // An unrelated HUD tile.
+    gbs::set_dialogue_frame(state, gbs::dialogue_frame_top);
+    gbs::draw_dialogue(state);
+    assert(!painted_dialogue_tiles[18 * 32 + 28]);
+    assert(painted_dialogue_tiles[0 * 32 + 28]);
+    gbs::set_dialogue_frame(state, gbs::dialogue_frame_center);
+    gbs::draw_dialogue(state);
+    assert(!painted_dialogue_tiles[0 * 32 + 28]);
+    state.portrait_slot = "right";
+    gbs::draw_dialogue(state);
+    assert(!painted_dialogue_tiles[0 * 32 + 1]);
+    gbs::hide_dialogue(state);
+    gbs::draw_dialogue(state);
+    for (int index = 0; index < 32 * 32; ++index)
+        assert(painted_dialogue_tiles[index] == (index == 19 * 32 + 29));
+    gbs::configure_dialogue_ui(gbs::default_dialogue_ui_config());
+}
+
 int main() {
+    test_dialogue_frame_transitions_erase_previous_owned_regions();
     test_portrait_tab_preserves_text_rows_and_uses_approved_portrait_insets();
     test_checkpoint_restores_dialogue_page_and_reveal_progress();
     test_show_dialogue_selects_line();

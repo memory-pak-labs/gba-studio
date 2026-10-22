@@ -211,5 +211,45 @@ int main() {
         run_cpp(code)
 
 
+    def test_visual_novel_reveals_text_and_plays_only_valid_character_cues(self):
+        source = (ROOT / 'templates/exported_visual_novel/main.cpp').read_text()
+        code = r'''
+#include <cassert>
+#include <cstddef>
+namespace gbs {
+struct RuntimeFrameContext {};
+struct SfxAsset { int id; };
+struct DialogueState { bool visible, revealed_char_this_frame; int text_sfx_index; };
+int updates=0, cues=0;
+void update_dialogue(DialogueState& d) { ++updates; d.revealed_char_this_frame=d.visible; }
+void play_sfx(const SfxAsset&) { ++cues; }
+void hide_hud(int&) {} void draw_hud(int&) {} void draw_dialogue(const DialogueState&) {}
+constexpr int runtime_telemetry_variable_count=16;
+struct Telemetry { int current_room; int variables[16]; } telemetry;
+Telemetry& runtime_telemetry_block() { return telemetry; }
+template<class A,class B> void publish_runtime_physical_telemetry(A&,B&) {}
+void wait_vblank() {}
+}
+int hud=0,resource_manager=0,current_scene_index=0;
+struct { int variables[16]; } event_state {};
+gbs::DialogueState dialogue {};
+gbs::SfxAsset assets[] {{1}};
+struct { const gbs::SfxAsset* sfx_assets; size_t sfx_asset_count; } project {assets,1};
+void draw_dialogue_portrait() {}
+'''
+        code += function(source, 'void render_visual_novel_runtime(')
+        code += r'''
+int main() {
+    for (bool visible : {false,true}) for (int index : {-1,0,1}) {
+        dialogue={visible,false,index};gbs::updates=gbs::cues=0;
+        render_visual_novel_runtime({});
+        assert(gbs::updates==1);
+        assert(gbs::cues==(visible && index==0 ? 1 : 0));
+    }
+}
+'''
+        run_cpp('#include <initializer_list>\n'+code)
+
+
 if __name__ == '__main__':
     unittest.main()

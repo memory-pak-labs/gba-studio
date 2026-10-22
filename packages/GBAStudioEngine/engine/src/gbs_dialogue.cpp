@@ -36,6 +36,30 @@ bool string_equals(const char* left, const char* right) {
 char choice_page_buffer[dialogue_page_buffer_capacity];
 constexpr int dialogue_box_text_columns = 26;
 
+DialogueBoxLayout drawn_dialogue_regions[3] = {};
+size_t drawn_dialogue_region_count = 0;
+
+void clear_drawn_dialogue_regions() {
+    for (size_t index = 0; index < drawn_dialogue_region_count; ++index) {
+        const DialogueBoxLayout& region = drawn_dialogue_regions[index];
+        gbs_hw_draw_text_box(region.x, region.y, region.w, region.h, nullptr, 0);
+    }
+    drawn_dialogue_region_count = 0;
+}
+
+void replace_drawn_dialogue_regions(const DialogueBoxLayout* regions, size_t count) {
+    bool changed = count != drawn_dialogue_region_count;
+    for (size_t index = 0; index < count && !changed; ++index) {
+        const DialogueBoxLayout& old = drawn_dialogue_regions[index];
+        const DialogueBoxLayout& next = regions[index];
+        changed = old.x != next.x || old.y != next.y || old.w != next.w || old.h != next.h;
+    }
+    if (!changed) return;
+    clear_drawn_dialogue_regions();
+    for (size_t index = 0; index < count; ++index) drawn_dialogue_regions[index] = regions[index];
+    drawn_dialogue_region_count = count;
+}
+
 struct DialoguePortraitDimensions {
     int width;
     int height;
@@ -276,6 +300,7 @@ void rebuild_choice_page(DialogueState& state) {
 } // namespace
 
 void configure_dialogue_ui(const DialogueUiConfig& config) {
+    clear_drawn_dialogue_regions();
     const int frame_index = config.frame_index < 0 ? 0 : config.frame_index;
     int wrap_columns = config.wrap_columns;
     int wrap_lines = config.wrap_lines;
@@ -838,6 +863,7 @@ size_t format_dialogue_display_text(const DialogueState& state, char* out, size_
 
 void draw_dialogue(const DialogueState& state) {
     if (active_dialogue_ui.portrait_tab) {
+        clear_drawn_dialogue_regions();
         char display_buffer[dialogue_page_buffer_capacity];
         format_dialogue_display_text(state, display_buffer, sizeof(display_buffer));
         const bool right = state.portrait_slot != nullptr && state.portrait_slot[0] != '\0'
@@ -854,6 +880,24 @@ void draw_dialogue(const DialogueState& state) {
         portrait_on_right = string_equals(state.portrait_slot, "right")
             || string_equals(state.portrait_slot, "direita");
     }
+    // Track only the regions owned by dialogue. Changing frame, portrait or
+    // speaker must erase the previous geometry without clearing unrelated HUD.
+    DialogueBoxLayout regions[3];
+    size_t region_count = 0;
+    const bool portrait_visible = dialogue_should_show_portrait(state);
+    if (state.visible) regions[region_count++] = layout;
+    if (active_dialogue_ui.fixed_portrait_slots && portrait_visible) {
+        regions[region_count++] = dialogue_portrait_slot_layout_for_frame(
+            state.frame_index, portrait_on_right, dimensions.width, dimensions.height);
+    }
+    if (active_dialogue_ui.name_label_above && active_dialogue_ui.show_character_name &&
+        state.visible && state.speaker != nullptr && state.speaker[0] != '\0') {
+        regions[region_count++] = dialogue_name_label_layout_for_frame(
+            state.frame_index, dialogue_name_label_width(state.speaker, layout),
+            active_dialogue_ui.fixed_portrait_slots, portrait_on_right, portrait_visible,
+            dimensions.width, dimensions.height);
+    }
+    replace_drawn_dialogue_regions(regions, region_count);
     DialogueBoxLayout label_clear_layout = dialogue_name_label_layout_for_frame(
         state.frame_index,
         layout.w,
@@ -873,7 +917,6 @@ void draw_dialogue(const DialogueState& state) {
         nullptr,
         0
     );
-    const bool portrait_visible = dialogue_should_show_portrait(state);
     if (active_dialogue_ui.fixed_portrait_slots && portrait_visible) {
         const DialogueBoxLayout portrait_box = dialogue_portrait_slot_layout_for_frame(
             state.frame_index, portrait_on_right, dimensions.width, dimensions.height);

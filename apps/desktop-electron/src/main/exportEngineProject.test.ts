@@ -4521,6 +4521,24 @@ describe("prepareEngineProjectExport", () => {
     ]);
   });
 
+  it("starts the music selected on every visual-novel scene before its dialogue", () => {
+    const contract = buildEngineExportProjectContract(project({
+      scenas: [
+        { name: "chapter", sceneType: "visualNovel", width: 16, height: 16, music: "council_theme", eventBindings: { onInit: "speak" } },
+        { name: "chapter_two", sceneType: "visualNovel", width: 16, height: 16, music: "council_theme" }
+      ],
+      audioItems: [{ id: "theme", name: "council_theme", exportID: "council_theme", kind: "Musica", format: "MOD", loops: true,
+        patterns: [{ id: "main", name: "Main", steps: 4, channels: [{ id: "pulse", name: "Pulse", type: "pulse1", notes: ["C4", "", "E4", ""] }] }], patternOrder: ["main"] }],
+      dialogues: [{ key: "intro", text: "Hello" }],
+      events: [{ id: "event-speak", name: "speak", category: "Cena", steps: [{ command: "show_dialogue intro" }] }],
+      settings: { ...(project({}).settings as Record<string, unknown>), general: { gameTitle: "Council", startScene: "chapter", startSceneType: "visualNovel", exportFolder: "build" } }
+    }));
+    for (const scene of contract.visual_novel_project!.scenes) {
+      expect(scene.on_enter?.[0]).toEqual({ op: "run_audio_routine", index: 0 });
+    }
+    expect(contract.visual_novel_project!.scenes[0].on_enter).toContainEqual({ op: "show_dialogue", dialogue: 0 });
+  });
+
   it("exports visual-novel rooms through the native visual_novel project contract", () => {
     const contract = buildEngineExportProjectContract(project({
       scenas: [
