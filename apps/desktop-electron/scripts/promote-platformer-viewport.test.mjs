@@ -24,7 +24,7 @@ describe('approved wide platformer composition', () => {
     }
     for (const s of p.events.flatMap(e => e.steps ?? [])) {
       if (s.command?.startsWith('change_scene penedos_vento '))
-        expect(s.command).toBe('change_scene penedos_vento 11 32 right');
+        expect(s.command).toBe('change_scene penedos_vento 8 34 right');
     }
   });
 });

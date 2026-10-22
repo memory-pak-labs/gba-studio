@@ -1448,9 +1448,9 @@ describe("materialização canônica de Vértice", () => {
     expect(scene.hudPresetId).toBe("hud-penedos-approved");
     const cells = scene.collisionTypes;
     expect(cells).toHaveLength(4800);
-    expect(cells[32*120+2]).toBe("solid");
-    expect(cells[39*120+25]).toBe("damage");
-    expect(cells[26*120+17]).toBe("down");
+    expect(cells[34*120+2]).toBe("solid");
+    expect(cells[39*120+16]).toBe("damage");
+    expect(cells[30*120+27]).toBe("down");
     expect(project.actors.filter(a => a.roomName === "penedos_vento")).toHaveLength(7);
   });
 
@@ -1464,9 +1464,9 @@ describe("materialização canônica de Vértice", () => {
       background_layers:[expect.objectContaining({layer:"bg3",tilemap:"penedos_approved_sky"}),
         expect.objectContaining({layer:"bg2",tilemap:"penedos_approved_terrain"})]});
     expect(project.actors).toEqual(expect.arrayContaining([expect.objectContaining({
-      id:"penedos-player",x:11,y:32,spriteSheet:"penedos-approved-nara.png",gbStudioPlayerRuntime:"PLATFORM"})]));
+      id:"penedos-player",x:8,y:34,spriteSheet:"penedos-approved-nara.png",gbStudioPlayerRuntime:"PLATFORM"})]));
     expect(project.sceneRouteTables.find(t => t.id === "map-routes").routes).toEqual(expect.arrayContaining([
-      expect.objectContaining({scene:"penedos_vento",x:11,y:32})]));
+      expect.objectContaining({scene:"penedos_vento",x:8,y:34})]));
     expect(exported.platformer_project.dialogue_ui.hud_scene_bindings.some(b => b.scene_name === "penedos_vento")).toBe(true);
     for (const name of ["penedos_approved_sky", "penedos_approved_terrain"]) {
       const asset = exported.asset_pack.assets.find(a => a.id === name);
@@ -2044,6 +2044,7 @@ describe("materialização canônica de Vértice", () => {
     const routeManifest=JSON.parse(readFileSync(new URL('../fixtures/asset-provenance/world-map-lumen-manifest.json',import.meta.url)));
     for(const asset of Object.values(routeManifest.assets))allowedAssets.add(asset.name);
     for (const a of JSON.parse(readFileSync(new URL('../fixtures/asset-provenance/market-approved-manifest.json',import.meta.url))).assets) allowedAssets.add(a.name);
+    for (const a of JSON.parse(readFileSync(new URL('../fixtures/asset-provenance/platformer-approved-manifest.json',import.meta.url))).assets) allowedAssets.add(a.name);
     expect(new Set(project.assets.map((asset) => asset.name))).toEqual(allowedAssets);
     expect(project.audioItems).toHaveLength(69);
     expect(project.audioItems.find(a=>a.name==='mapa_mar_aberto')).toMatchObject({bpm:84,format:'COMPOSED',loops:true});

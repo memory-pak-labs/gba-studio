@@ -1308,48 +1308,48 @@
         },
         {
           "path": "Assets/backgrounds/penedos-approved-sky.png",
-          "sha256": "762c7cd2ea8612f78ae287030a6cbebb042238e29bab34f86aa192eaad3f3129",
-          "contract": "platformer-approved-wide-v2-user-approved-2026-10-17"
+          "sha256": "2cfaff6b8eda5e6d75e8ae2e010f6ade0fbd19ff4f528a9aa5a4fb367508b2e1",
+          "contract": "penedos-v2-faithful-user-approved-2026-10-22"
         },
         {
           "path": "Assets/backgrounds/penedos-approved-terrain.png",
-          "sha256": "c171fdc91dccd8384f00f09dbd418172c3595f09e5faec85f0d976beb1fab6c2",
-          "contract": "platformer-approved-wide-v2-user-approved-2026-10-17"
+          "sha256": "e452f855b3ee9f0fc8860d002a2e8684e69943393b718253f3b9ba4ce11148d3",
+          "contract": "penedos-v2-faithful-user-approved-2026-10-22"
         },
         {
           "path": "Assets/sprites/penedos-approved-nara.png",
-          "sha256": "4c78f52a90972ae5a2cd497f66dd6c89387f5e4dacb7c86bf5ab06e4a883f6e9",
-          "contract": "platformer-approved-wide-v2-user-approved-2026-10-17"
+          "sha256": "8a655e430276d905ca4e4d382124356a05d0906cb7d39f188a7d249fa6180d61",
+          "contract": "penedos-v2-faithful-user-approved-2026-10-22"
         },
         {
           "path": "Assets/sprites/penedos-approved-worker.png",
-          "sha256": "eed836923733f11e07f9df8933669a5cd4ce748ddbb4ea7c02f3ac729234ab19",
-          "contract": "platformer-approved-wide-v2-user-approved-2026-10-17"
+          "sha256": "cc241243d3566e33854b4b4188ba13e7f2498ea5db823c186e38b0667245a522",
+          "contract": "penedos-v2-faithful-user-approved-2026-10-22"
         },
         {
           "path": "Assets/sprites/penedos-approved-crab.png",
-          "sha256": "5eb864b3d6727e3c880a5dae9c24846427aeee9c2fba362767a54df6bd9ec2f1",
-          "contract": "platformer-approved-wide-v2-user-approved-2026-10-17"
+          "sha256": "e6102076b74878f2ef66eb1e317ff1e40016eb06cd6b51c14ef0d742a28e3f50",
+          "contract": "penedos-v2-faithful-user-approved-2026-10-22"
         },
         {
           "path": "Assets/sprites/penedos-approved-moth.png",
-          "sha256": "eb95a2ac7cbdf7eb3f55b5ec0e1af32300c2d046a3a84d7864d3373f159d9d83",
-          "contract": "platformer-approved-wide-v2-user-approved-2026-10-17"
+          "sha256": "922adb61ca793fa86ff680b30bb391b13f6b1de5a8fe0013aa9d9f0eee59427e",
+          "contract": "penedos-v2-faithful-user-approved-2026-10-22"
         },
         {
           "path": "Assets/sprites/penedos-approved-checkpoint.png",
-          "sha256": "ad300e5ba4bb0c5cb31719e39966584bc7da4736c1e4b211fefa8d37e9a56683",
-          "contract": "platformer-approved-wide-v2-user-approved-2026-10-17"
+          "sha256": "8ef633bfe2558178d33d5803c5c6d103c16ee2fbb25f256edbe5243d08fcb68a",
+          "contract": "penedos-v2-faithful-user-approved-2026-10-22"
         },
         {
           "path": "Assets/sprites/penedos-approved-crab-east.png",
-          "sha256": "5eb864b3d6727e3c880a5dae9c24846427aeee9c2fba362767a54df6bd9ec2f1",
-          "contract": "platformer-approved-wide-v2-user-approved-2026-10-17"
+          "sha256": "e6102076b74878f2ef66eb1e317ff1e40016eb06cd6b51c14ef0d742a28e3f50",
+          "contract": "penedos-v2-faithful-user-approved-2026-10-22"
         },
         {
           "path": "Assets/sprites/penedos-approved-moth-east.png",
-          "sha256": "eb95a2ac7cbdf7eb3f55b5ec0e1af32300c2d046a3a84d7864d3373f159d9d83",
-          "contract": "platformer-approved-wide-v2-user-approved-2026-10-17"
+          "sha256": "922adb61ca793fa86ff680b30bb391b13f6b1de5a8fe0013aa9d9f0eee59427e",
+          "contract": "penedos-v2-faithful-user-approved-2026-10-22"
         },
         {
           "path": "Assets/backgrounds/racing-approved-topdown.png",
@@ -2015,6 +2015,26 @@
           "path": "Assets/sprites/dialogue-sigil.png",
           "sha256": "b0c3a75b5da13acd702fcc573b9c70af589336667744024974fb97f215fdfdc7",
           "contract": "conselho-guardia-portraits-v4-approved-source-retained-after-market-v2"
+        },
+        {
+          "path": "Assets/ui/penedos-v2-life-frame.png",
+          "sha256": "4881f4a78cf949e8fef94fadff4df2f27348687429093cc4f5e575e46fde69d6",
+          "contract": "penedos-v2-faithful-user-approved-2026-10-22"
+        },
+        {
+          "path": "Assets/ui/penedos-v2-token-frame.png",
+          "sha256": "01faf47628f2e081a18f4618f748f17d56a1f36c0c5adc1e821050572905dc64",
+          "contract": "penedos-v2-faithful-user-approved-2026-10-22"
+        },
+        {
+          "path": "Assets/ui/penedos-v2-hearts-full.png",
+          "sha256": "ee3d4a0698c12048ea8ecd844018beec15c983955cc70611a767c6254499b34e",
+          "contract": "penedos-v2-faithful-user-approved-2026-10-22"
+        },
+        {
+          "path": "Assets/ui/penedos-v2-hearts-empty.png",
+          "sha256": "2a13f314bec8a727df2b2a29c65d2e7b480674742ca8026c2efa1ee9f11715a2",
+          "contract": "penedos-v2-faithful-user-approved-2026-10-22"
         }
       ],
       "retired": [

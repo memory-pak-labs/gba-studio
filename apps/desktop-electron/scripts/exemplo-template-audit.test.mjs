@@ -33,7 +33,7 @@ describe("auditoria do template Vértice", () => {
     const broken=structuredClone(project);
     broken.actors.find(a=>a.id==="penedos-player").y+=1;
     const exit=broken.triggers.find(t=>t.id==="trigger-penedos-grip-module");
-    exit.y=32;exit.height=2;
+    exit.x=113;exit.y=35;exit.width=2;exit.height=2;
     const issues=auditExemploTemplate(broken).geometry.issues;
     expect(issues).toContain("Cena penedos_vento: ator jogador Nara · Penedos começa em célula bloqueada.");
     expect(issues).toContain("Cena penedos_vento: área do gatilho trigger-penedos-grip-module atravessa célula bloqueada.");

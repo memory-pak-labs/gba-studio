@@ -26,7 +26,7 @@ describe('approved wide Penedos integration', () => {
         expect([r.width, r.height, r.cameraMode, r.cameraZoom]).toEqual([120, 40, 'follow_player', 100]);
         expect(r.cameraBounds).toEqual({ x: 0, y: 0, width: 120, height: 40 });
         expect(r.collisionTypes).toHaveLength(4800);
-        expect(r.runtime.config.cameraFollow).toBe(15);
+        expect(r.runtime.config.cameraFollow).toBe(3);
         expect(r.tileLayers.map(l => l.mapping)).toEqual(['BG3', 'BG2']);
         expect(r.hudPresetId).toBe(manifest.hud.id);
         const c = buildEngineExportProjectContract(p), room = c.platformer_project.rooms.find(r => r.name === manifest.scene);
@@ -52,6 +52,6 @@ describe('approved wide Penedos integration', () => {
         for (const e of p.events)
             for (const s of e.steps ?? [])
                 if (s.command.startsWith('change_scene penedos_vento '))
-                    expect(s.command).toBe('change_scene penedos_vento 11 32 right');
+                    expect(s.command).toBe('change_scene penedos_vento 8 34 right');
     });
 });

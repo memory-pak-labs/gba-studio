@@ -12,7 +12,7 @@ import { decodeMGBAHardwareVideoState } from './native-scene-framebuffer-contrac
 const app = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const romPath = path.resolve(process.argv[2]), output = path.resolve(process.argv[3]);
 fs.mkdirSync(output, { recursive: true });
-const symbols = spawnSync('/opt/devkitpro/devkitARM/bin/arm-none-eabi-nm', ['-S', '-C', romPath.replace(/\.gba$/, '.elf')], { encoding: 'utf8' }).stdout.split('\n').map(l => { const m = l.match(/^([\da-f]+) ([\da-f]+) (\w) (.*)$/); return m ? { address: parseInt(m[1], 16), size: parseInt(m[2], 16), type: m[3], name: m[4] } : null; }).filter(Boolean);
+const symbols = spawnSync('/opt/devkitpro/devkitARM/bin/arm-none-eabi-nm', ['-S', '-C', romPath.replace(/\.gba$/, '.elf')], { encoding: 'utf8', maxBuffer: 8 * 1024 * 1024 }).stdout.split('\n').map(l => { const m = l.match(/^([\da-f]+) ([\da-f]+) (\w) (.*)$/); return m ? { address: parseInt(m[1], 16), size: parseInt(m[2], 16), type: m[3], name: m[4] } : null; }).filter(Boolean);
 const sym = n => symbols.find(s => s.name.endsWith('::' + n));
 const presentation = sym('player_presentation');
 assert.ok(presentation, 'matching ELF is required');
@@ -28,6 +28,7 @@ const dialogueSymbols = [...new Set(symbols.filter(s => s.name.endsWith('::dialo
 const activeDialogue = () => dialogueSymbols.filter(a => (rd16(a) & 255) === 1 && rd32(a + 1028) >= 0 && rd32(a + 1028) < 20 && rd32(a + 8) >= 0x08000000 && rd32(a + 8) < 0x0a000000);
 const samples = [], trace = [], checks = [], fidelity = [];
 let checkpointBattery = null;
+let renderedState = null;
 const manifest = JSON.parse(fs.readFileSync(app + '/fixtures/asset-provenance/platformer-approved-manifest.json'));
 const image = n => decodePngRgba(fs.readFileSync(app + '/default-assets/templates/exemplo-gba/Assets/' + n));
 const art = { nara: image('sprites/penedos-approved-nara.png'), terrain: image('backgrounds/penedos-approved-terrain.png'), sky: image('backgrounds/penedos-approved-sky.png') };
@@ -35,8 +36,12 @@ const rgb = (p, o) => (p[o] >> 3) | ((p[o + 1] >> 3) << 5) | ((p[o + 2] >> 3) <<
 function check(name, fn) { fn(); checks.push(name); }
 function verifyPixels(sample) {
     const screen = m.HEAPU8.slice(m._gba_framebuffer(), m._gba_framebuffer() + 153600), o = sample.native.objects.find(o => o.index === 0);
-    const clip = manifest.animations.find(a => a.state === sample.state.animation && a.spriteSheet === 'penedos-approved-nara.png');
-    const frame = clip.frames[sample.state.animationFrame].sourceFrameIndex;
+    // mGBA returns at the next frame boundary: RAM may already describe the
+    // next animation pose. Compare pixels to the state that produced this frame.
+    const visibleState = sample.renderedState;
+    assert.ok(visibleState, 'rendered frame state is required');
+    const clip = manifest.animations.find(a => a.state === visibleState.animation && a.spriteSheet === 'penedos-approved-nara.png');
+    const frame = clip.frames[visibleState.animationFrame].sourceFrameIndex;
     let actorPixels = 0, bgPixels = 0;
     for (let y = 0; y < o.height; y++)
         for (let x = 0; x < o.width; x++) {
@@ -50,7 +55,7 @@ function verifyPixels(sample) {
         for (let x = 0; x < 240; x++) {
             if (sample.native.objects.some(o => x >= o.x && x < o.x + o.width && y >= o.y && y < o.y + o.height))
                 continue;
-            const world = ((sample.state.camera.y + y) * 960 + sample.state.camera.x + x) * 4;
+            const world = ((visibleState.camera.y + y) * 960 + visibleState.camera.x + x) * 4;
             const source = art.terrain.pixels[world + 3] ? art.terrain : art.sky, at = source === art.terrain ? world : (y * 240 + x) * 4;
             assert.equal(rgb(screen, (y * 240 + x) * 4), rgb(source.pixels, at), 'native composed background pixel');
             bgPixels++;
@@ -62,6 +67,8 @@ let started = false;
 function run(n, k = 0, track = false) {
     m._gba_set_keys(k);
     for (let i = 0; i < n; i++) {
+        if (i === n - 1)
+            renderedState = state();
         m._gba_run_frame();
         if (track)
             trace.push(state());
@@ -90,7 +97,7 @@ function shot(name) {
     m._gba_save_state(b, n);
     const native = decodeMGBAHardwareVideoState(m.HEAPU8.slice(b, b + n));
     m._free(b);
-    const s = { name, state: state(), native };
+    const s = { name, state: state(), renderedState, native };
     samples.push(s);
     console.log(name, JSON.stringify({ player: s.state.player, room: s.state.currentRoom, runtime: s.state.runtimeKind, animation: s.state.animation, frame: s.state.animationFrame, camera: s.state.camera, bg: native.bg[2], vars: s.state.variables.slice(27, 33) }));
     return s;
@@ -101,10 +108,15 @@ try {
     verifyPixels(initial);
     const sequence = JSON.parse(process.env.GBA_PLATFORMER_SEQUENCE ?? fs.readFileSync(new URL('./platformer-approved-playtest-route.json', import.meta.url), 'utf8'));
     for (const [label, key, frames] of sequence) {
-        if (label === 'attack-east') {
+        if (label === 'restart-route') {
+            // The bridge pixel case and the campaign traversal start in fresh cores.
+            reset();
+        }
+        else if (label === 'attack-east') {
             for (let i = 0; i < 100; i++) {
                 const s = state(), dx = s.npcs[4].x - (s.player.x + 8);
-                if (Math.abs(dx) <= 28) {
+                const dy = s.npcs[4].y - (s.player.y + rd32(actor.address + 12));
+                if (Math.abs(dx) + Math.abs(dy) <= 29) {
                     run(1, dx >= 0 ? 16 : 32, true);
                     run(2, 512, true);
                     run(38, 0, true);
@@ -121,6 +133,12 @@ try {
             }
             assert.equal(activeDialogue().length, 0, 'dialogue closes');
         }
+        else if (label === 'ladder-top') {
+            // Wait below the patrol, then climb while the crab is far enough away.
+            for (let i = 0; i < 240 && state().npcs[1].x > 196; i++) run(1, 0, true);
+            assert.ok(state().npcs[1].x <= 196, 'a safe opening in the crab patrol');
+            run(frames, key, true);
+        }
         else
             run(frames, key, true);
         if (label) {
@@ -133,16 +151,26 @@ try {
     }
     if (!process.env.GBA_PLATFORMER_SEQUENCE) {
         const sample = name => samples.find(s => s.name === name).state;
-        check('original art matches native framebuffer without scale or recoloring', () => assert.equal(fidelity.length, 4));
+        check('prepared BG and actor pixels match the native framebuffer', () => assert.equal(fidelity.length, 4));
         check('camera follows past three viewports and remains within the approved world', () => {
             const states = trace.filter(s => s.runtimeKind === 1);
             assert.ok(states.some(s => s.camera.x === 720));
             assert.ok(states.every(s => s.camera.x >= 0 && s.camera.x <= 720 && s.camera.y >= 0 && s.camera.y <= 160));
         });
+        check('the full player collider walks across the next rope bridge and onto its right cliff', () => {
+            assert.ok(sample('cross-east').player.x >= 416);
+            assert.equal(sample('cross-east').player.y, 248);
+            assert.equal(sample('cross-east').variables[27], 3);
+        });
+        check('the bridge also returns to the left cliff without an invisible wall', () => {
+            assert.ok(sample('bridge-return').player.x <= 80);
+            assert.equal(sample('bridge-return').player.y, 248);
+        });
         check('climb and descent use the approved animation and real collision ladder', () => {
             assert.equal(sample('climb-mid').animation, 'climb');
-            assert.ok(sample('climb-mid').player.y < 150);
-            assert.ok(sample('descend-mid').player.y > 190);
+            assert.equal(sample('descend-mid').animation, 'climb');
+            assert.ok(sample('descend-mid').player.y - sample('climb-mid').player.y >= 12);
+            assert.ok(sample('bottom').player.y > sample('descend-mid').player.y);
         });
         check('checkpoint awards one token and writes a valid battery record', () => {
             assert.equal(sample('beacon').variables[28], 1);
@@ -161,7 +189,7 @@ try {
         reset(checkpointBattery);
         const reloaded = shot('battery-reload');
         check('fresh core restores saved position and checkpoint variables', () => {
-            assert.deepEqual(reloaded.state.player, { x: 529, y: 200, direction: 3 });
+            assert.deepEqual(reloaded.state.player, sample('beacon').player);
             assert.equal(reloaded.state.variables[28], 1);
         });
         run(8, 8);
@@ -173,22 +201,23 @@ try {
         shot('resume');
         check('return retains checkpoint and phase', () => assert.equal(state().runtimeKind, 1));
         reset(checkpointBattery);
-        let previousSaved = state().player.x, savedReturn = false;
-        for (let i = 0; i < 220; i++) {
-            run(1, 32, true);
-            const x = state().player.x;
-            if (x - previousSaved > 80) {
+        run(25, 32, true);
+        run(30, 0, true);
+        run(2, 129, true);
+        let savedReturn = false;
+        for (let i = 0; i < 120; i++) {
+            run(1, 0, true);
+            if (state().variables[27] === 2) {
                 savedReturn = true;
                 break;
             }
-            previousSaved = x;
         }
         run(45, 0, true);
         const damaged = shot('checkpoint-damage-return');
         check('damage returns to the active checkpoint with its token preserved', () => {
             assert.ok(savedReturn);
-            assert.equal(damaged.state.player.x, 496);
-            assert.equal(damaged.state.player.y, 200);
+            assert.equal(damaged.state.player.x, manifest.respawn.x * 8 - 8);
+            assert.equal(damaged.state.player.y, manifest.respawn.y * 8 - 24);
             assert.equal(damaged.state.variables[27], 2);
             assert.equal(damaged.state.variables[28], 1);
         });
@@ -203,26 +232,36 @@ try {
         run(50);
         check('B activates dash animation', () => assert.ok(trace.slice(-100).some(s => s.animation === 'dash')));
         reset();
-        let previous = state().player.x, returned = false;
-        for (let i = 0; i < 220; i++) {
-            run(1, 16, true);
-            const x = state().player.x;
-            if (previous - x > 80) {
+        run(22, 16, true);
+        run(30, 0, true);
+        run(2, 129, true); // Down+A drops through the rope bridge, away from actors.
+        let returned = false;
+        for (let i = 0; i < 120; i++) {
+            run(1, 0, true);
+            if (state().variables[27] === 2) {
                 returned = true;
                 break;
             }
-            previous = x;
         }
         run(45, 0, true);
         const fall = shot('unactivated-fall');
         check('unactivated fall restores spawn, decrements health and shows hurt animation', () => {
             assert.ok(returned);
-            assert.equal(fall.state.player.x, 80);
+            assert.equal(fall.state.player.x, manifest.entry.x * 8 - 8);
+            assert.equal(fall.state.player.y, manifest.entry.y * 8 - 24);
             assert.equal(fall.state.variables[27], 2);
             assert.ok(trace.some(s => s.animation === 'hurt'));
         });
-        const count = m._gba_audio_sample_count(), pcm = new Int16Array(m.HEAPU8.buffer, m._gba_audio_samples(), count * 2);
-        check('native PSG music produces audible samples', () => assert.ok(pcm.some(v => Math.abs(v) > 100)));
+        // A single terminal frame may be a rest or have no fresh audio block.
+        // Listen to a bounded two-second window without triggering another SFX.
+        let audible = false;
+        for (let frame = 0; frame < 120 && !audible; frame++) {
+            run(1);
+            const count = m._gba_audio_sample_count();
+            const pcm = new Int16Array(m.HEAPU8.buffer, m._gba_audio_samples(), count * 2);
+            audible = pcm.some(value => Math.abs(value) > 100);
+        }
+        check('native PSG music produces audible samples', () => assert.ok(audible));
     }
     check('scene allocations respect GBA BG, OBJ, palette and OAM limits', () => {
         const measured = samples.filter(s => s.state.runtimeKind === 1 && s.state.hardware);

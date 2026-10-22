@@ -483,3 +483,27 @@ reiniciar após a derrota. Confere em RGB555 os atores, rotores, BG, ícones e
 números reais da HUD, incluindo a sombra da fonte. Compara PCM com e sem
 disparo sobre a música; saves e instâncias de QA ficam separados das partidas.
 Os resultados no emulador não substituem uma validação em GBA físico.
+
+## Penedos do Vento · direção costeira V2
+
+A plataforma conserva o mundo de 960 × 320 e a câmera de 240 × 160. A paisagem fica em
+BG3, o terreno em BG2, os sete atores em OBJ e a HUD em peças OBJ independentes.
+A abertura e as colisões seguem a composição V2: ponte contínua, penedos orgânicos,
+escada e checkpoint. A câmera mantém y=160; entrada e retorno por dano acompanham
+o novo layout. As habilidades, o áudio e a progressão de campanha permanecem. A origem,
+aprovação e transformações estão em
+`fixtures/asset-provenance/platformer-approved-sources.md` no aplicativo.
+
+Em `apps/desktop-electron`, exporte e confira os pixels e o percurso real:
+
+```sh
+node scripts/build-platformer-playtest.mjs /caminho/penedos-export
+node scripts/smoke-platformer-approved.mjs /caminho/penedos-export/build/exemplo.gba /caminho/penedos-evidencias
+node scripts/verify-platformer-v2-hud.mjs /caminho/penedos-evidencias /caminho/penedos-export
+npm run smoke:exemplo-scenes -- --scene=penedos_vento
+```
+
+O verificador de HUD compara molduras, ícones, corações e glifos em cinco
+estados de vida/fichas com o framebuffer real. Use a interface em português
+na instância isolada de QA do Play. A validação física do GBA
+continua separada.

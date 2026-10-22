@@ -26,14 +26,14 @@ describe('Penedos: eventos dos atores', () => {
   it('liga o vão central ao retorno condicionado pelo farol', () => {
     const next = configurePlatformerEvents(source());
     const falls = next.triggers.filter(t => t.id.startsWith('trigger-penedos-fall-'));
-    expect(falls.map(t => [t.x, t.y, t.width, t.height])).toEqual([[24,36,8,4],[52,36,8,4],[76,36,12,4]]);
+    expect(falls.map(t => [t.x, t.y, t.width, t.height])).toEqual([[12,38,9,2],[42,38,9,2],[72,38,9,2],[102,38,9,2]]);
     for (const t of falls) {
       const e = next.events.find(e => e.name === t.eventBindings.onEnter);
       expect(e.steps.map(s => s.command)).toEqual([
         'play_sfx penedos_impacto_candidato','add_variable penedos_player_health -1',
         'if_variable penedos_player_health 0','set_variable penedos_player_health 3','condition_end',
         'set_platformer_state knockback','if_variable var_penedos_farol 1',
-        'set_actor_position player 63 28', 'else', 'set_actor_position player 11 32', 'condition_end'
+        'set_actor_position player 21 34', 'else', 'set_actor_position player 8 34', 'condition_end'
       ]);
     }
   });
@@ -43,7 +43,7 @@ describe('Penedos: eventos dos atores', () => {
     exit.exit = { x: 76, y: 9, width: 3, height: 8 };
     const next = configurePlatformerEvents(p);
     expect(next.editorState.scenaConnections.find(c => c.from === sceneName).exit)
-      .toEqual({ x: 116, y: 28, width: 4, height: 4 });
+      .toEqual({ x: 116, y: 33, width: 4, height: 4 });
   });
   it('monta timelines agrupadas, patrulhas e interações sem alterar outras cenas ou assets', () => {
     const p = source(), next = configurePlatformerEvents(p);

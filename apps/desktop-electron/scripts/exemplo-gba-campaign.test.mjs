@@ -142,7 +142,7 @@ describe("campanha canônica O Último Farol", () => {
     for (const scene of VERTICE_CAMPAIGN_SCENES) {
       const pointClickExit = ["armazem_das_mares", "observatorio_do_farol"].includes(scene.name);
       const expectedTransition = scene.transitionEvent === "mapa_viajar_penedos"
-        ? "change_scene penedos_vento 11 32 right"
+        ? "change_scene penedos_vento 8 34 right"
         : pointClickExit
           ? "advance_campaign"
         : scene.completionVariable

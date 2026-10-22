@@ -20,13 +20,14 @@ export function promoteApprovedPlatformer(source) {
     const update = r => r.name !== name ? r : { ...r, width: 120, height: 40, backgroundAssetName: 'penedos-approved-terrain.png',
         runtimeBaseBackgroundAssetName: 'penedos-approved-terrain.png', runtimeCompositeBackgroundAssetName: 'penedos-approved-terrain.png', backgroundRenderMode: 'tilemap', gbStudioUseBackgroundLayout: true,
         cameraMode: 'follow_player', cameraBounds: { x: 0, y: 0, width: 120, height: 40 }, cameraZoom: 100,
-        cameraZones: [{ id: 'penedos-follow-framing', name: 'Enquadramento da fase', area: { x: 0, y: 0, width: 960, height: 320 }, bounds: { x: 0, y: 0, width: 960, height: 320 }, offset: { x: 0, y: -16 }, lockX: false, lockY: false }],
+        cameraPosition: structuredClone(m.cameraPosition),
+        cameraZones: [structuredClone(m.cameraZone)],
         tilemap: Array(4800).fill(0), collisionTypes: [...m.collisionTypes], collisions: [...m.collisionTypes],
         tileLayers: [['BG3', 'penedos-approved-sky.png'], ['BG2', 'penedos-approved-terrain.png']].map(([mapping, asset]) => ({ mapping, tilemap: Array(4800).fill(0), tileSourceAssetNames: Array(4800).fill(asset) })),
         parallax: { mode: 'bg3', speedX: 0, speedY: 0, offsetX: 0, offsetY: 0 }, hudPresetId: m.hud.id, music: m.audioItems[0].id,
-        runtime: { ...r.runtime, type: 'platformer', config: { ...r.runtime.config, cameraFollow: 15, cameraDeadzoneX: 24, profile: m.revision } },
+        runtime: { ...r.runtime, type: 'platformer', config: { ...r.runtime.config, cameraFollow: 3, cameraDeadzoneX: 24, profile: m.revision } },
         eventBindings: { ...r.eventBindings, onInit: 'penedos_ao_entrar', onHitGroup1: 'penedos_teste_contato_inimigo' },
-        referenceImages: [], platformerVisualRevision: m.revision, visualPromotionStatus: 'canonical-integrated' };
+        referenceImages: [], platformerVisualRevision: m.visualRevision ?? m.revision, visualPromotionStatus: 'canonical-integrated' };
     for (const key of ['rooms', 'scenas', 'scenes'])
         if (Array.isArray(p[key]))
             p[key] = p[key].map(update);
@@ -40,7 +41,7 @@ export function promoteApprovedPlatformer(source) {
         `attach_platform_callback jumpStart ${jump}`, `attach_platform_callback groundStart ${ground}`, `attach_platform_callback dashStart ${dash}`, 'attach_button L penedos_player_attack false'];
     add('penedos_ao_entrar', enter);
     const health = ['add_variable penedos_player_health -1', 'if_variable penedos_player_health 0', 'set_variable penedos_player_health 3', 'condition_end'];
-    const respawn = ['play_sfx penedos_impacto_candidato', ...health, 'set_platformer_state knockback', 'if_variable var_penedos_farol 1', 'set_actor_position player 63 28', 'else', 'set_actor_position player 11 32', 'condition_end'];
+    const respawn = ['play_sfx penedos_impacto_candidato', ...health, 'set_platformer_state knockback', 'if_variable var_penedos_farol 1', `set_actor_position player ${m.respawn.x} ${m.respawn.y}`, 'else', `set_actor_position player ${m.entry.x} ${m.entry.y}`, 'condition_end'];
     add('penedos_teste_queda', respawn);
     add('penedos_teste_contato_inimigo', ['rate_limit 45 30', ...respawn, 'rate_limit_end']);
     const attack = ['play_sfx penedos_impulso_candidato'];
@@ -77,11 +78,11 @@ export function promoteApprovedPlatformer(source) {
             d.translationStatus = { ...d.translationStatus, 'pt-BR': 'approved' };
         }
     p.triggers = [...p.triggers.filter(t => t.roomName !== name), { id: 'trigger-penedos-grip-module', name: 'Módulo de aderência · saída', roomName: name, ...m.exit, eventBindings: { onEnter: 'penedos_recolher_aderencia' } },
-        ...[[24, 8], [52, 8], [76, 12]].map(([x, width], i) => ({ id: `trigger-penedos-fall-${i + 1}`, name: `Queda no vão ${i + 1}`, roomName: name, x, y: 36, width, height: 4, eventBindings: { onEnter: 'penedos_teste_queda' } }))];
+        ...m.fallZones.map((area, i) => ({ id: `trigger-penedos-fall-${i + 1}`, name: `Queda no vão ${i + 1}`, roomName: name, ...area, eventBindings: { onEnter: 'penedos_teste_queda' } }))];
     for (const e of p.events)
         for (const s of e.steps ?? [])
             if (/^change_scene penedos_vento(?:\s|$)/.test(s.command ?? ''))
-                s.command = 'change_scene penedos_vento 11 32 right';
+                s.command = `change_scene penedos_vento ${m.entry.x} ${m.entry.y} ${m.entry.direction}`;
     for (const table of p.sceneRouteTables ?? [])
         for (const route of [...(table.routes ?? []), table.fallback].filter(Boolean))
             if (route.scene === name)

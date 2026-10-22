@@ -391,7 +391,7 @@ describe("projectTemplates", () => {
     ]));
   });
 
-  it("integra a HUD B dinâmica na fase ampliada de plataforma", () => {
+  it("integra a HUD costeira V2 dinâmica na fase ampliada de plataforma", () => {
     const project = buildProjectFromTemplate("exemplo-gba", { name: "HUD Plataforma" });
     const scenes = project.scenas as Array<Record<string, unknown>>;
     const settings = project.settings as Record<string, unknown>;
@@ -405,8 +405,8 @@ describe("projectTemplates", () => {
     expect(platformerHud).toMatchObject({ mode: "advanced" });
     expect(components).toHaveLength(5);
     expect(components).toEqual(expect.arrayContaining([
-      expect.objectContaining({ id: "life-frame", width: 60 }),
-      expect.objectContaining({ id: "money-frame", width: 56 }),
+      expect.objectContaining({ id: "life-frame", asset: "penedos-v2-life-frame.png", x: 16, y: 6, width: 40, height: 16 }),
+      expect.objectContaining({ id: "money-frame", asset: "penedos-v2-token-frame.png", x: 184, y: 6, width: 40, height: 16 }),
       expect.objectContaining({ id: "hearts", valueVariable: "penedos_player_health" }),
       expect.objectContaining({ id: "coins", valueVariable: "penedos_tokens" })
     ]));
