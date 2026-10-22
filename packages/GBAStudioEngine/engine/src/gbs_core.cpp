@@ -250,6 +250,9 @@ void begin_runtime_handoff() {
 
 void begin_render_publication_transaction() {
     render_publication_transaction = true;
+    // The old tilemap still references VRAM being replaced by staged DMA.
+    // Hiding register publication alone cannot preserve that old image.
+    gbs_hw_set_render_handoff_fallback();
     gbs_hw_set_render_publication_blocked(1);
 }
 

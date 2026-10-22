@@ -109,6 +109,53 @@ int main() {
                                'engine/src/deferred_work.cpp', 'engine/src/gbs_engine_global.cpp',
                                'tests/host/hw_stubs.cpp'])
 
+    def test_menu_ui_restore_is_hidden_until_its_own_uploads_complete(self):
+        source = (ROOT / 'templates/exported_menu/main.cpp').read_text()
+        render = function(source, 'void render_menu_runtime(')
+        restore = function(render, 'if (menu_ui_assets_restore_pending &&')
+        code = '''
+#include <cassert>
+#include <cstddef>
+bool blocked = false;
+int restores = 0, transactions = 0;
+namespace gbs {
+enum class MenuScreenType {Logo, Title, Menu};
+struct MenuScreenData {MenuScreenType screen_type;};
+struct PaletteAsset {};
+bool render_publication_transaction_active() {return blocked;}
+void begin_render_publication_transaction() {blocked = true; ++transactions;}
+void render_ui_assets() {assert(blocked); ++restores;}
+int active_dialogue_box_skin() {return 0;}
+int active_hud_box_skin() {return 0;}
+void configure_dialogue_box_skin(int) {assert(blocked);}
+void configure_hud_box_skin(int) {assert(blocked);}
+const MenuScreenData* menu_screen_for(int, int) {
+    static MenuScreenData screen {MenuScreenType::Menu}; return &screen;
+}
+const char* menu_screen_name(int, int) {return "missoes";}
+void load_palette(const PaletteAsset&, bool) {assert(blocked);}
+}
+namespace gbastudio_dialogue_ui {void configure_for_scene(const char*) {assert(blocked);}}
+struct {int screen_index = 0;} menu_state;
+struct {int bg_palette_count = 0; gbs::PaletteAsset bg_palettes[1]; operator int() const {return 0;}} project;
+int active_background_index = -1;
+bool menu_ui_assets_restore_pending = true;
+bool menu_screen_uses_ui(const gbs::MenuScreenData*) {return true;}
+void restore_menu() {
+'''
+        code += restore + '''
+}
+int main() {
+    // Background DMA just drained. Restoring font/skin queues another upload.
+    restore_menu();
+    assert(restores == 1 && transactions == 1 && blocked);
+    assert(!menu_ui_assets_restore_pending);
+    restore_menu();
+    assert(restores == 1 && transactions == 1);
+}
+'''
+        run_cpp(code)
+
     def test_battle_ui_is_staged_before_final_vblank_and_restore_happens_once(self):
         source = (ROOT / 'templates/exported_battle_rpg/main.cpp').read_text()
         code = '''

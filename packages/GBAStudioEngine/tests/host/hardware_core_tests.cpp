@@ -411,9 +411,13 @@ void test_render_publication_transaction_waits_for_dma_queue() {
     gbs::dma_reset_vblank_queue();
     hardware_publication_blocked = 0;
     hardware_vblank_publication_blocked = -1;
+    hardware_handoff_fallback_calls = 0;
     assert(gbs::dma_enqueue_vblank16(&source, &destination, 1));
 
     gbs::begin_render_publication_transaction();
+    // Deferring shadow registers alone still exposes the old screen to VRAM
+    // uploads. Hide it before the first resource is replaced.
+    assert(hardware_handoff_fallback_calls == 1);
     assert(gbs::render_publication_transaction_active());
     gbs::wait_vblank();
 

@@ -1284,8 +1284,8 @@ void start_screen(int screen_index, bool reset_selection = true, int target_item
     stream_screen_resource_group(*screen);
     load_screen_actor_resources(*screen);
     // Reapply the native dialogue/HUD tiles and palettes after the staged
-    // screen resources finish uploading. The publication transaction keeps
-    // the previous frame visible until that point.
+    // screen resources finish uploading. Hide the display while shared VRAM
+    // is replaced; the previous tilemap cannot safely remain visible.
     menu_ui_assets_restore_pending = true;
     if (screen->screen_type != gbs::MenuScreenType::Logo &&
         screen->screen_type != gbs::MenuScreenType::Title) {
@@ -1943,6 +1943,9 @@ void render_menu_runtime(const gbs::RuntimeFrameContext& context) {
     publish_menu_screen_telemetry();
     gbs::wait_vblank();
     if (menu_ui_assets_restore_pending && !gbs::render_publication_transaction_active()) {
+        // Font/skin restoration queues more VRAM uploads after the screen
+        // bank drained. Keep those hidden until their own VBlank completes.
+        gbs::begin_render_publication_transaction();
         gbs::render_ui_assets();
         // Generic UI restoration resets palette entries. Reapply the scene's
         // approved skins even when configure_for_scene's cache is unchanged.
