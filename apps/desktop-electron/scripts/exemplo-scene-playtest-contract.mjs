@@ -480,13 +480,24 @@ export function exemploSceneScreenshotPath(evidencePath, sceneName) {
 }
 
 export function selectSceneCadenceWindow(samples, scope) {
+  const hasProducerMarker = scope?.notBeforeUnixMs !== undefined;
+  if (hasProducerMarker) {
+    if (!Number.isFinite(scope.notBeforeUnixMs) || scope.notBeforeUnixMs < 0
+        || !Number.isInteger(scope.initialFrame) || scope.initialFrame < 0) {
+      throw new Error("Marcador de cadencia invalido.");
+    }
+    if (!Array.isArray(samples) || samples.some(sample => !Number.isFinite(sample?.sampledAtUnixMs))) {
+      throw new Error("Janela de cadencia sem relogio de origem.");
+    }
+    samples = samples.filter(sample => sample.sampledAtUnixMs >= scope.notBeforeUnixMs);
+  }
   if (!Array.isArray(samples) || samples.length < 4) {
     throw new Error("Janela de cadencia incompleta: esperadas quatro amostras da cena.");
   }
   // Keep the first complete window, including slow samples. Later menu/reset
   // telemetry must never replace the selected scene's playback measurements.
   const selected = samples.slice(0, 4);
-  let previousFrame = -1;
+  let previousFrame = hasProducerMarker ? scope.initialFrame : -1;
   for (const sample of selected) {
     const state = sample?.runtimeState;
     if (!state || state.runtimeKind !== scope.runtimeKind || state.currentRoom !== scope.currentRoom

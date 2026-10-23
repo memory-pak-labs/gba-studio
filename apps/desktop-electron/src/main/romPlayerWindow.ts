@@ -331,6 +331,8 @@ function normalizeRuntimeState(value: unknown): RomPlayerRuntimeState | null {
 export function normalizeRomPlayerFrameStats(value: unknown): RomPlayerFrameStats | null {
   if (!value || typeof value !== "object") return null;
   const candidate = value as Partial<RomPlayerFrameStats>;
+  if (candidate.sampledAtUnixMs !== undefined && (typeof candidate.sampledAtUnixMs !== "number"
+      || !Number.isFinite(candidate.sampledAtUnixMs) || candidate.sampledAtUnixMs < 0)) return null;
   const numbers = [
     candidate.cpuPercent,
     candidate.droppedFrameRatio,
@@ -348,6 +350,7 @@ export function normalizeRomPlayerFrameStats(value: unknown): RomPlayerFrameStat
   const hardware = normalizeHardwareTelemetry(candidate.hardware);
   if (candidate.hardware != null && !hardware) return null;
   return {
+    ...(candidate.sampledAtUnixMs !== undefined ? { sampledAtUnixMs: candidate.sampledAtUnixMs } : {}),
     cpuPercent: candidate.cpuPercent!,
     droppedFrameRatio: candidate.droppedFrameRatio!,
     droppedFrames: candidate.droppedFrames!,

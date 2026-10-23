@@ -26,6 +26,15 @@ afterEach(async () => {
 });
 
 describe("romPlayerWindow", () => {
+  it("preserves the producer clock across telemetry IPC and rejects invalid timestamps", () => {
+    const stats = { cpuPercent: 8, droppedFrameRatio: 0, droppedFrames: 0, emulationFps: 60,
+      emulationMs: 1.2, fps: 60, frameMs: 16.67, presentationFps: 60, romBytes: 85000 };
+    expect(normalizeRomPlayerFrameStats({ ...stats, sampledAtUnixMs: 1792798000123.5 }))
+      .toMatchObject({ sampledAtUnixMs: 1792798000123.5 });
+    for (const sampledAtUnixMs of [-1, NaN, Infinity, "1792798000123"]) {
+      expect(normalizeRomPlayerFrameStats({ ...stats, sampledAtUnixMs })).toBeNull();
+    }
+  });
   it("preserves validated native Luta runtime state in Play telemetry", () => {
     const runtimeState = {
       schema: 2,

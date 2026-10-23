@@ -95,6 +95,7 @@ export interface RomPlayerRuntimeState {
 export type RomPlayerHardwareTelemetry = Partial<Record<ScenePhysicalMetricID, number>>;
 
 export interface RomPlayerFrameStats {
+  sampledAtUnixMs?: number;
   cpuPercent: number;
   droppedFrameRatio: number;
   droppedFrames: number;

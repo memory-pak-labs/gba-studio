@@ -420,6 +420,29 @@ describe("janela de cadência da cena selecionada", () => {
     presentationFps: i === 1 ? 40 : 60, emulationFps: 60, droppedFrameRatio: 0,
     runtimeState: { runtimeKind: 8, currentRoom: 2, frame: 20 + i * 30 }
   }));
+  it("descarta somente a telemetria produzida antes do marcador, mesmo se o IPC atrasar", () => {
+    const current = samples().map((sample, index) => ({ ...sample, sampledAtUnixMs: 1000 + index * 500 }));
+    const delayedBoot = { sampledAtUnixMs: 500, presentationFps: 27.4,
+      runtimeState: { runtimeKind: -1, currentRoom: -1, frame: 0 } };
+    const selected = selectSceneCadenceWindow([delayedBoot, ...current], {
+      ...scope, notBeforeUnixMs: 1000, initialFrame: 9
+    });
+    expect(selected).toEqual(current.slice(0, 4));
+    expect(selected[1].presentationFps).toBe(40);
+  });
+  it("rejeita um reinício posterior ao marcador, inclusive na primeira amostra", () => {
+    const current = samples().map((sample, index) => ({ ...sample, sampledAtUnixMs: 1000 + index * 500 }));
+    current[0].runtimeState.frame = 0;
+    expect(() => selectSceneCadenceWindow(current, { ...scope, notBeforeUnixMs: 1000, initialFrame: 9 }))
+      .toThrow(/cadencia|cadência/i);
+  });
+  it("exige quatro amostras com o relógio de origem quando há marcador temporal", () => {
+    expect(() => selectSceneCadenceWindow(samples(), { ...scope, notBeforeUnixMs: 1000, initialFrame: 9 }))
+      .toThrow(/cadencia|cadência/i);
+    const current = samples().map((sample, index) => ({ ...sample, sampledAtUnixMs: 500 + index * 100 }));
+    expect(() => selectSceneCadenceWindow(current, { ...scope, notBeforeUnixMs: 1000, initialFrame: 9 }))
+      .toThrow(/cadencia|cadência/i);
+  });
   it("mantém as primeiras quatro amostras, incluindo uma queda, sem escolher as melhores", () => {
     const input = samples();
     expect(selectSceneCadenceWindow(input, scope)).toEqual(input.slice(0, 4));

@@ -779,6 +779,7 @@ export async function startMGBAPlayer({ container, romUrl, storageKey, onFrameSt
     if (loaded !== 1) throw new Error("A ROM foi rejeitada pelo core mGBA.");
     prepareRuntimeInspection(module);
     onFrameStats?.({
+      sampledAtUnixMs: performance.timeOrigin + performance.now(),
       cpuPercent: 0,
       droppedFrameRatio: 0,
       droppedFrames: 0,
@@ -996,6 +997,7 @@ export async function startMGBAPlayer({ container, romUrl, storageKey, onFrameSt
         });
         const nativeTelemetry = readRuntimeTelemetry(module);
         onFrameStats?.({
+          sampledAtUnixMs: performance.timeOrigin + now,
           ...cadence,
           romBytes: rom.length,
           runtimeState: nativeTelemetry,

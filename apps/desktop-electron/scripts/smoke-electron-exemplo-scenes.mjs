@@ -548,6 +548,7 @@ async function waitForPlayerEvidence(cdp, captureFramebuffer = false) {
               frame: frameAfterPaint,
               framebufferRgbaBase64,
               nativeStateBase64,
+              observedAtUnixMs: performance.timeOrigin + performance.now(),
               presentedRuntimeState: presentedAfterPaint,
               previousPresentedRuntimeState: presentedSnapshot?.previousState ?? null,
               runtimeState: runtimeAfterPaint
@@ -926,20 +927,29 @@ async function waitForPerformance(mainCdp, knownWindowIDs, scope = null) {
   const value = await evaluate(mainCdp, `
     new Promise((resolve) => {
       const known = new Set(${JSON.stringify([...knownWindowIDs])});
+      const notBefore = ${JSON.stringify(scope?.notBeforeUnixMs ?? null)};
+      const inWindow = (event) => notBefore === null || (
+        Number.isFinite(event.stats?.sampledAtUnixMs) && event.stats.sampledAtUnixMs >= notBefore
+      );
       const started = Date.now();
       const check = () => {
         const events = (window.__gbaStudioScenePlaytestTelemetry ?? []).slice(${JSON.stringify(scope?.afterIndex ?? 0)});
         const candidate = [...events].reverse().find((event) => (
           event.state === "running" &&
           !known.has(event.windowID) &&
+          inWindow(event) &&
           Number(event.stats?.presentationFps) > 0
         ));
         const samples = candidate
-          ? events.filter((event) => event.windowID === candidate.windowID && Number(event.stats?.presentationFps) > 0).map((event) => event.stats)
+          ? events.filter((event) => event.windowID === candidate.windowID && inWindow(event) && Number(event.stats?.presentationFps) > 0).map((event) => event.stats)
           : [];
         const timedOut = Date.now() - started > 15_000;
         if (candidate && (samples.length >= 4 || (timedOut && samples.length >= 3))) {
-          resolve({ ok: true, samples, windowID: candidate.windowID });
+          const excludedBeforeScope = notBefore === null ? [] : events
+            .filter(event => event.windowID === candidate.windowID && Number(event.stats?.presentationFps) > 0
+              && Number.isFinite(event.stats?.sampledAtUnixMs) && event.stats.sampledAtUnixMs < notBefore)
+            .map(event => event.stats);
+          resolve({ ok: true, samples, windowID: candidate.windowID, excludedBeforeScope });
           return;
         }
         if (timedOut) {
@@ -968,7 +978,7 @@ async function waitForPerformance(mainCdp, knownWindowIDs, scope = null) {
     emulationFps: Math.round(average(samples, "emulationFps") * 100) / 100,
     emulationMs: Math.round(average(samples, "emulationMs") * 100) / 100,
     presentationFps: Math.round(average(samples, "presentationFps") * 100) / 100,
-    ...(scope ? { scope, observedSamples } : {}),
+    ...(scope ? { scope, observedSamples, excludedBeforeScope: value.excludedBeforeScope } : {}),
     samples,
     windowID: value.windowID
   };
@@ -5626,9 +5636,6 @@ async function main() {
       const captureInitialFramebuffer = exactPlayerFramebuffer || exactBackgroundFramebuffer
         || authoredActorFramebufferScenes.has(scene.name);
       let playerEvidence = await waitForPlayerEvidence(playerCdp);
-      if (scene.runtime === "isometric" && templateRoomForScene(template, scene.name)?.runtime?.config?.pagedSurface) {
-        playerEvidence = await waitForIsometricCameraRest(playerCdp, playerEvidence);
-      }
       if (!playerEvidence?.ok) throw new Error(`${scene.name} nao produziu frame/audio/runtime: ${JSON.stringify(playerEvidence)}.`);
       traceSceneSmoke(scene.name, "evidence-ready");
       const exported = await latestExportContract(engineExportRoot);
@@ -5655,7 +5662,10 @@ async function main() {
       // audits and input exercises deliberately perform expensive inspection,
       // enter menus and reset/load the ROM; those are separate assertions.
       const cadenceScope = {
-        afterIndex: await evaluate(mainCdp, "(window.__gbaStudioScenePlaytestTelemetry ?? []).length"),
+        // Renderer IPC can arrive after observation even though it was produced
+        // during boot. Use the Player's clock, not Main's delivery-array index.
+        notBeforeUnixMs: playerEvidence.observedAtUnixMs,
+        initialFrame: Number(observedRuntimeState.frame),
         runtimeKind: runtimeKindByName[expectedRuntimeName],
         currentRoom: Number(launchContract.currentRoom)
       };
@@ -5665,6 +5675,9 @@ async function main() {
       const playbackAudio = await evaluate(playerCdp, "window.GBAStudioDirectPlayer.inspectAudio()");
       if (captureInitialFramebuffer) {
         playerEvidence = await waitForPlayerEvidence(playerCdp, true);
+      }
+      if (scene.runtime === "isometric" && templateRoomForScene(template, scene.name)?.runtime?.config?.pagedSurface) {
+        playerEvidence = await waitForIsometricCameraRest(playerCdp, playerEvidence);
       }
       playerEvidence = { ...playerEvidence, audio: playbackAudio };
       let isometricCadence = null;

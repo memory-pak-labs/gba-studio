@@ -45,6 +45,24 @@ beforeEach(async () => {
   expect(sources.length).toBeGreaterThan(0);
 });
 
+describe("Play telemetry producer clock", () => {
+  it("stamps the actual sample before asynchronous delivery, without advancing a preparation frame", async () => {
+    player.destroy();
+    now = 100;
+    const stats = vi.fn();
+    player = await startMGBAPlayer({ container, romUrl: "test.gba", storageKey: "clock-test", onFrameStats: stats });
+    expect(stats).toHaveBeenCalledTimes(1);
+    expect(stats.mock.calls[0][0]).toMatchObject({ presentationFps: 0, sampledAtUnixMs: performance.timeOrigin + 100 });
+    now = 634;
+    render(now);
+    expect(stats).toHaveBeenCalledTimes(2);
+    const produced = stats.mock.calls[1][0];
+    expect(produced.sampledAtUnixMs).toBe(performance.timeOrigin + 634);
+    now = 9000;
+    expect(produced.sampledAtUnixMs).toBe(performance.timeOrigin + 634);
+  });
+});
+
 describe("Play system keyboard shortcuts", () => {
   beforeEach(async () => {
     player.destroy();

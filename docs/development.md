@@ -138,6 +138,11 @@ acontecem depois dessa leitura: são auditorias que bloqueiam o renderer e não
 podem interferir na medição de reprodução contínua. Se a identidade ou a
 sequência de frames for rejeitada, o smoke preserva as amostras brutas e o
 escopo em `cadence-rejected-<windowID>.json` antes de fechar o Player.
+O início da janela usa o relógio do Player (`performance.timeOrigin` somado a
+`performance.now()`), preservado pelo IPC. Amostras produzidas antes desse
+marcador não entram na janela, mesmo quando chegam atrasadas ao editor. Um
+contador abaixo do frame observado, ou um reinício dentro da janela, reprova
+o teste; amostras lentas posteriores ao marcador continuam na medição.
 
 ## Motor
 
