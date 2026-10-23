@@ -1,7 +1,7 @@
 {
   "schema": 1,
   "name": "GBAStudioEnginePack",
-  "version": "2.26.0",
+  "version": "2.27.0",
   "version_file": "VERSION",
   "tools": {
     "assetc": "tools/assetc",

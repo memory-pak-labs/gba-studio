@@ -2329,7 +2329,7 @@ export interface PreparedEngineProjectExport {
   error?: string;
 }
 
-const defaultEnginePackVersion = "2.26.0";
+const defaultEnginePackVersion = "2.27.0";
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return Boolean(value) && typeof value === "object" && !Array.isArray(value);
