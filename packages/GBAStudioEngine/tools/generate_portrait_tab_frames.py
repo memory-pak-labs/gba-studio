@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Bake the approved joined UI outline into palette-role tiles, without text
+"""Bake closed portrait, speaker and dialogue outlines into palette-role tiles, without text
 or portraits. Byte RLE keeps the ROM small and avoids a per-pixel distance
 transform on the ARM7 when the speaker changes. No image dependency required.
 """
@@ -12,33 +12,37 @@ def frame(mode, letters):
     portrait, right = mode != 0, mode == 2
     width = letters * 8 + 16
     tab_x = (168 - width if right else 56) if portrait else 0
-    regions = [(0, 56, 224, 40)]
+    regions = [(0, 56, 224, 40, False)]
     if portrait:
-        regions.append((168 if right else 0, 0, 56, 60))
+        regions.append((168 if right else 0, 0, 56, 56, False))
     if letters:
-        regions.append((tab_x - (4 if portrait and not right else 0), 40, width + (4 if portrait else 0), 20))
+        regions.append((tab_x, 40, width, 16, True))
     field = bytearray(WIDTH * HEIGHT)
-    for x, y, w, h in regions:
+    for x, y, w, h, header in regions:
+        region = bytearray(w * h)
         for yy in range(h):
             for xx in range(w):
-                if min(xx + yy, w - 1 - xx + yy, xx + h - 1 - yy, w + h - 2 - xx - yy) >= 3 and y + yy < HEIGHT:
-                    field[(y + yy) * WIDTH + x + xx] = 4
+                if min(xx + yy, w - 1 - xx + yy, xx + h - 1 - yy, w + h - 2 - xx - yy) >= 3:
+                    region[yy * w + xx] = 4
 
-    def at(x, y):
-        return field[y * WIDTH + x] if 0 <= x < WIDTH and 0 <= y < HEIGHT else 0
+        def at(xx, yy):
+            return region[yy * w + xx] if 0 <= xx < w and 0 <= yy < h else 0
 
-    for y in range(HEIGHT):
-        for x in range(WIDTH):
-            if at(x, y):
-                field[y * WIDTH + x] = min(at(x, y), at(x - 1, y) + 1, at(x, y - 1) + 1)
-    for y in reversed(range(HEIGHT)):
-        for x in reversed(range(WIDTH)):
-            if at(x, y):
-                field[y * WIDTH + x] = min(at(x, y), at(x + 1, y) + 1, at(x, y + 1) + 1)
-    if letters:
-        for y in range(43, 56):
-            for x in range(tab_x + 3, tab_x + width - 3):
-                field[y * WIDTH + x] = 5
+        # Outline each region before composition so adjacent boxes keep their
+        # own bottom/top and left/right edges instead of becoming one union.
+        for yy in range(h):
+            for xx in range(w):
+                if at(xx, yy):
+                    region[yy * w + xx] = min(at(xx, yy), at(xx - 1, yy) + 1, at(xx, yy - 1) + 1)
+        for yy in reversed(range(h)):
+            for xx in reversed(range(w)):
+                if at(xx, yy):
+                    region[yy * w + xx] = min(at(xx, yy), at(xx + 1, yy) + 1, at(xx, yy + 1) + 1)
+        for yy in range(h):
+            for xx in range(w):
+                role = at(xx, yy)
+                if role and 0 <= x + xx < WIDTH and 0 <= y + yy < HEIGHT:
+                    field[(y + yy) * WIDTH + x + xx] = 5 if header and role == 4 else role
     tiles = bytearray(384 * 32)
     for y in range(HEIGHT):
         for x in range(WIDTH):

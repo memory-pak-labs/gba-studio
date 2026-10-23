@@ -211,6 +211,57 @@ int main() {
         run_cpp(code)
 
 
+    def test_visual_novel_cancelled_choice_stays_interactive_without_effects(self):
+        source = (ROOT / 'templates/exported_visual_novel/main.cpp').read_text()
+        code = r'''
+#include <cassert>
+#include "gbs/visual_novel.hpp"
+gbs::VisualNovelProjectData project {};
+gbs::DialogueState dialogue {};
+gbs::EventState event_state {};
+int current_scene_index=0, reopened=0, effects=0, saves=0;
+bool pending_scene_advance=false;
+int pending_next_scene_index=-1;
+size_t runtime_choice_count=2;
+int runtime_choice_source_indices[] {0,1};
+bool show_choice_group(const gbs::VisualNovelChoiceGroupData&) {
+    ++reopened; dialogue.visible=true; dialogue.choice_mode=true; return true;
+}
+void run_visual_novel_event_script(gbs::EventScript) {++effects;}
+void consume_event_state() {}
+void refresh_hud() {}
+void persist_visual_novel_runtime_state() {++saves;}
+'''
+        code += function(source, 'void finish_scene_choice_if_needed(')
+        code += r'''
+int main() {
+    const gbs::DialogueChoice choices[] {{"Protect",1,0},{"Explore",2,1}};
+    const gbs::VisualNovelChoiceOptionData options[] {
+        {-1,1,false,1,{}}, {-1,1,false,1,{}}
+    };
+    const gbs::VisualNovelChoiceGroupData group {0,choices,2,0,options};
+    const gbs::VisualNovelSceneData scenes[] {
+        {"council",-1,-1,0,-1,{},{},false,nullptr},
+        {"exit",-1,-1,-1,-1,{},{},false,nullptr}
+    };
+    project.scenes=scenes;project.scene_count=2;
+    project.choice_groups=&group;project.choice_group_count=1;
+    event_state.variables[0]=77;
+    dialogue.visible=false;dialogue.last_choice_index=-1;
+    dialogue.last_choice_script=-1;dialogue.last_choice_value=-1;
+    finish_scene_choice_if_needed(true);
+    assert(dialogue.visible && dialogue.choice_mode);
+    assert(reopened==1 && event_state.variables[0]==77);
+    assert(!pending_scene_advance && effects==0 && saves==0);
+    dialogue.visible=false;dialogue.last_choice_index=1;
+    dialogue.last_choice_script=1;dialogue.last_choice_value=2;
+    finish_scene_choice_if_needed(true);
+    assert(event_state.variables[0]==2 && effects==1 && saves==1);
+    assert(pending_scene_advance && pending_next_scene_index==1);
+}
+'''
+        run_cpp(code)
+
     def test_visual_novel_reveals_text_and_plays_only_valid_character_cues(self):
         source = (ROOT / 'templates/exported_visual_novel/main.cpp').read_text()
         code = r'''

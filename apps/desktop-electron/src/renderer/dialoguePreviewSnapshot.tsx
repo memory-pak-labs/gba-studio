@@ -309,8 +309,6 @@ function renderDialogueSnapshot(
       return rgb[0] | (rgb[1] << 5) | (rgb[2] << 10);
     };
     if (name) {
-      context.fillStyle = colors[5];
-      context.fillRect(layout.nameLabel.x + 3, layout.nameLabel.y + 3, layout.nameLabel.width - 6, 13);
       drawTextLines(context, prepareInterfaceFontPreview(images.font, null, tint(7)), [speaker], {
         x: layout.nameLabel.x + 8, y: layout.nameLabel.y + 4, width: layout.nameLabel.width - 16, height: 8
       }, null, colors[7]);

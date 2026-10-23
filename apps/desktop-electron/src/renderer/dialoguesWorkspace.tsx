@@ -229,9 +229,11 @@ export function DialoguesWorkspace({
   const defaultPortraitSlot = presentation?.chromePanel.portraitPosition === "Direita"
     ? "Direita"
     : "Esquerda";
-  const previewPortraitSlot = preview?.portraitSlot === "Direita" || preview?.portraitSlot === "Esquerda"
-    ? preview.portraitSlot
-    : defaultPortraitSlot;
+  const previewPortraitSlot = preview?.portraitSlot === "right" || preview?.portraitSlot === "Direita"
+    ? "Direita"
+    : preview?.portraitSlot === "left" || preview?.portraitSlot === "Esquerda"
+      ? "Esquerda"
+      : defaultPortraitSlot;
   const defaultDialogueSettings = useMemo<DialogueUiSettingsContract>(() => ({
     boxImage: presentation?.boxPanel.boxImage ?? "ui/dialogue_box.png",
     selectorImage: presentation?.boxPanel.selectorImage ?? "ui/dialogue_cursor.png",

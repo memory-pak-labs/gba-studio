@@ -1,6 +1,6 @@
 import type { DialoguePreviewLayout } from "./sceneRuntimeExport.js";
 
-/** Palette roles and joined outline shared by the editor snapshot and native preset. */
+/** Palette roles and closed outlines shared by the editor snapshot and native preset. */
 export const portraitTabColors = ["#00000000", "#001820", "#c8b888", "#185868", "#083038", "#103848", "#f0e8d0", "#e8c878", "#184050"];
 
 export function portraitTabPalette(pixels?: Uint8ClampedArray): string[] {
@@ -24,17 +24,25 @@ export function portraitTabPalette(pixels?: Uint8ClampedArray): string[] {
 
 export function portraitTabFramePixels(layout: DialoguePreviewLayout, portrait: boolean, name: boolean, colors = portraitTabColors): Uint8ClampedArray {
   const { box, portraitSlot: pod, nameLabel: tab } = layout;
-  const regions = [box];
-  if (portrait) regions.push({ ...pod, height: pod.height + 4 });
-  if (name) regions.push({ ...tab, x: tab.x - (portrait && !layout.portraitOnRight ? 4 : 0), width: tab.width + (portrait ? 4 : 0), height: tab.height + 4 });
+  const regions = [{ ...box, header: false }];
+  if (portrait) regions.push({ ...pod, header: false });
+  if (name) regions.push({ ...tab, header: true });
   const field = new Uint8Array(240 * 160);
-  for (const b of regions) for (let y = b.y; y < b.y + b.height; y++) for (let x = b.x; x < b.x + b.width; x++) {
-    const xx = x - b.x, yy = y - b.y;
-    if (Math.min(xx + yy, b.width - 1 - xx + yy, xx + b.height - 1 - yy, b.width + b.height - 2 - xx - yy) >= 3) field[y * 240 + x] = 4;
+  for (const b of regions) {
+    const region = new Uint8Array(b.width * b.height);
+    for (let y = 0; y < b.height; y++) for (let x = 0; x < b.width; x++) {
+      if (Math.min(x + y, b.width - 1 - x + y, x + b.height - 1 - y, b.width + b.height - 2 - x - y) >= 3) region[y * b.width + x] = 4;
+    }
+    const at = (x: number, y: number): number => x < 0 || x >= b.width || y < 0 || y >= b.height ? 0 : region[y * b.width + x];
+    for (let y = 0; y < b.height; y++) for (let x = 0; x < b.width; x++) if (at(x, y)) region[y * b.width + x] = Math.min(at(x, y), at(x - 1, y) + 1, at(x, y - 1) + 1);
+    for (let y = b.height - 1; y >= 0; y--) for (let x = b.width - 1; x >= 0; x--) if (at(x, y)) region[y * b.width + x] = Math.min(at(x, y), at(x + 1, y) + 1, at(x, y + 1) + 1);
+    for (let y = 0; y < b.height; y++) for (let x = 0; x < b.width; x++) {
+      const role = at(x, y);
+      if (role && b.x + x >= 0 && b.x + x < 240 && b.y + y >= 0 && b.y + y < 160) {
+        field[(b.y + y) * 240 + b.x + x] = b.header && role === 4 ? 5 : role;
+      }
+    }
   }
-  const at = (x: number, y: number): number => x < 0 || x >= 240 || y < 0 || y >= 160 ? 0 : field[y * 240 + x];
-  for (let y = 0; y < 160; y++) for (let x = 0; x < 240; x++) if (at(x, y)) field[y * 240 + x] = Math.min(at(x, y), at(x - 1, y) + 1, at(x, y - 1) + 1);
-  for (let y = 159; y >= 0; y--) for (let x = 239; x >= 0; x--) if (at(x, y)) field[y * 240 + x] = Math.min(at(x, y), at(x + 1, y) + 1, at(x, y + 1) + 1);
   const output = new Uint8ClampedArray(240 * 160 * 4);
   field.forEach((role, i) => { if (role) output.set([...colors[role].slice(1).match(/../g)!.map(c => parseInt(c, 16)), 255], i * 4); });
   return output;

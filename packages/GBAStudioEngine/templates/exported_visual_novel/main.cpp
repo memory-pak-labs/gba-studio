@@ -589,6 +589,12 @@ void finish_scene_choice_if_needed(bool was_choice_mode) {
     if (group == nullptr) {
         return;
     }
+    if (dialogue.last_choice_index < 0) {
+        // Cancelling a scene choice must not consume its result or strand the
+        // scene without content. Keep the mandatory decision available.
+        show_choice_group(*group);
+        return;
+    }
     if (gbs::is_valid_event_variable(group->variable_index)) {
         event_state.variables[group->variable_index] = dialogue.last_choice_value;
     }

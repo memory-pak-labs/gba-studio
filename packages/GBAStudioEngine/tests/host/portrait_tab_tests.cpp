@@ -35,8 +35,17 @@ int main() {
     assert(pixel(8,56)==0 && pixel(11,56)==1 && pixel(12,60)==4);
     assert(pixel(26,128)==4 && pixel(16,148)==4);
     assert(pixel(100,90)==0 && pixel(72,99)==5);
+    // Portrait, speaker and text body each retain a complete closed border.
+    assert(pixel(24,111)==1 && pixel(24,110)==2);
+    assert(pixel(63,104)==1 && pixel(64,104)==1);
+    assert(pixel(80,96)==1 && pixel(80,111)==1);
+    assert(pixel(24,112)==1 && pixel(80,112)==1);
     gbs_portrait_tab_draw("Guardiã","Qual será o nosso pacto?\n! Proteger a costa\n- Explorar novas rotas",1,1,1,nullptr,nullptr);
     assert(uploads==2 && pixel(12,60)==0 && pixel(180,60)==4);
+    assert(pixel(200,111)==1 && pixel(200,110)==2);
+    assert(pixel(175,104)==1 && pixel(176,104)==1);
+    assert(pixel(152,96)==1 && pixel(152,111)==1);
+    assert(pixel(200,112)==1 && pixel(152,112)==1);
     assert(pixel(26,128)==8 && pixel(26,136)==4);
     gbs_portrait_tab_draw("Guardiã","Qual será o nosso pacto?\n- Proteger a costa\n! Explorar novas rotas",1,1,1,nullptr,nullptr);
     assert(uploads==3 && pixel(26,128)==4 && pixel(26,136)==8);

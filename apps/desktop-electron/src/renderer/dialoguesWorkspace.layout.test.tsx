@@ -33,6 +33,15 @@ describe("dialogue review pagination", () => {
  });
 });
 describe("approved dialogue workspace", () => {
+ it.each([["right", "Direita"], ["left", "Esquerda"]])("honors the authored %s portrait slot in the rendered preview", (portraitSlot, expected) => {
+  const data = { ...project,
+   settings: { uiDialogs: { ...project.settings.uiDialogs, portraitPosition: portraitSlot === "left" ? "Direita" : "Esquerda" } },
+   assets: [...project.assets, { name: "face.png", metadata: { source: "Assets/sprites/face.png" } }],
+   dialogues: project.dialogues.map(dialogue => ({ ...dialogue, portrait: "face.png", portraitSlot }))
+  };
+  const { container } = show(data);
+  expect(container.querySelector('.dialogue-preview-snapshot')).toHaveAttribute('data-dialogue-preview-portrait-slot', expected);
+ });
  it("shows a scene group, actual cutscene background, pages and a single edit action", () => {
   const { container, actions } = show();
   expect(screen.getByRole("heading", { name: "Porto" })).toBeInTheDocument();

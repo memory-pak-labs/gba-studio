@@ -2053,6 +2053,6 @@ portrait-tab-test: $(HOST_BUILD)/portrait_tab_tests
 	$(HOST_BUILD)/portrait_tab_tests
 	python3 tests/host/interface_theme_tests.py
 
-$(HOST_BUILD)/portrait_tab_tests: tests/host/portrait_tab_tests.cpp engine/src/gbs_portrait_tab.c engine/src/gbs_text.c
+$(HOST_BUILD)/portrait_tab_tests: tests/host/portrait_tab_tests.cpp engine/src/gbs_portrait_tab.c engine/src/gbs_text.c engine/include/gbs/portrait_tab_frame_data.h
 	@mkdir -p $(@D)
-	$(HOST_CXX) $(HOST_CXXFLAGS) -Iengine/src -x c++ $^ -o $@
+	$(HOST_CXX) $(HOST_CXXFLAGS) -Iengine/src -x c++ $(filter %.cpp %.c,$^) -o $@
