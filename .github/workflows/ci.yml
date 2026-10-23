@@ -88,3 +88,45 @@ jobs:
       - name: Test engine on Windows
         shell: msys2 {0}
         run: make -k -C packages/GBAStudioEngine host-test HOST_POSIX_FIXTURE_PYTHON=/usr/bin/python3
+
+  rom-regressions:
+    name: ARM ROM regressions (mGBA)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+          cache-dependency-path: apps/desktop-electron/package-lock.json
+      - run: npm ci
+        working-directory: apps/desktop-electron
+      - name: Compile ARM and replay native regressions
+        run: |
+          mkdir -p "$RUNNER_TEMP/rom-regressions"
+          docker run --rm -v "$GITHUB_WORKSPACE:/work" \
+            -v "$RUNNER_TEMP/rom-regressions:/qa" \
+            -v "$(dirname "$(command -v node)"):/node/bin:ro" \
+            -w /work/packages/GBAStudioEngine \
+            devkitpro/devkitarm@sha256:15b79ce75822c289538d8153da5fa7aafe5e6adc32ad8a575a197beca0f0761b \
+            bash -eu -c '
+              export PATH=/node/bin:$PATH
+              apt-get update && apt-get install -y --no-install-recommends clang python3-pil
+              make -j2 package
+              cd /work/apps/desktop-electron
+              node scripts/smoke-replace-tile.mjs /work/packages/GBAStudioEngine/dist/GBAStudioEnginePack /qa/replace-tile
+              node scripts/smoke-event-replay.mjs /work/packages/GBAStudioEngine/dist/GBAStudioEnginePack /qa/event-replay
+              node scripts/smoke-hardware-diagnostic.mjs /work/packages/GBAStudioEngine/dist/GBAStudioEnginePack /qa/hardware-diagnostic
+              node scripts/smoke-map-states.mjs /work/packages/GBAStudioEngine/dist/GBAStudioEnginePack /qa/map-states
+              node scripts/smoke-visibility-graphics.mjs /work/packages/GBAStudioEngine/dist/GBAStudioEnginePack /qa/graphics
+            '
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        if: always()
+        with:
+          name: ARM-ROM-regressions
+          path: ${{ runner.temp }}/rom-regressions
+          if-no-files-found: error
+          retention-days: 7

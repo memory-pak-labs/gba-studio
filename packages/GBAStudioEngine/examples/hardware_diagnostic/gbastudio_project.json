@@ -1,0 +1,6 @@
+{
+  "schema": 1,
+  "backend": "gbastudio_engine",
+  "kind": "diagnostic",
+  "build": { "target": "hardware_diagnostic", "sources": ["main.cpp"], "rom_title": "GBS DIAG", "game_code": "GBSD", "maker_code": "00", "rom_version": "00" }
+}
