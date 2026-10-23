@@ -133,6 +133,11 @@ As quatro amostras ficam na evidência; todas devem pertencer ao runtime e à ce
 selecionados, com frames avançando. Uma queda não é substituída por amostras
 posteriores de outro menu ou de uma ROM reiniciada. O contador de underruns é
 lido novamente ao final dessa janela, sem zerar seu histórico.
+A captura de framebuffer e a serialização do estado nativo pelo CDP também
+acontecem depois dessa leitura: são auditorias que bloqueiam o renderer e não
+podem interferir na medição de reprodução contínua. Se a identidade ou a
+sequência de frames for rejeitada, o smoke preserva as amostras brutas e o
+escopo em `cadence-rejected-<windowID>.json` antes de fechar o Player.
 
 ## Motor
 

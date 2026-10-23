@@ -952,7 +952,15 @@ async function waitForPerformance(mainCdp, knownWindowIDs, scope = null) {
     })
   `, true);
   if (!value?.ok) throw new Error(`Telemetria de cadencia insuficiente: ${JSON.stringify(value)}.`);
-  const observedSamples = scope ? selectSceneCadenceWindow(value.samples, scope) : value.samples;
+  let observedSamples;
+  try {
+    observedSamples = scope ? selectSceneCadenceWindow(value.samples, scope) : value.samples;
+  } catch (error) {
+    // Preserve the actual rejected sequence before the smoke closes its Player.
+    await writeFile(join(evidenceRoot, `cadence-rejected-${value.windowID}.json`),
+      JSON.stringify({ scope, ...value }, null, 2));
+    throw error;
+  }
   const samples = steadyFrameSamples(observedSamples);
   return {
     droppedFrameRatio: Math.round(average(samples, "droppedFrameRatio") * 10_000) / 10_000,
@@ -5612,10 +5620,12 @@ async function main() {
           await wait(200);
         }
       }
-      let playerEvidence = await waitForPlayerEvidence(
-        playerCdp,
-        exactPlayerFramebuffer || exactBackgroundFramebuffer || authoredActorFramebufferScenes.has(scene.name)
-      );
+      // Observe readiness without serializing a framebuffer/save state. CDP
+      // serialization and native-state inspection block the Player renderer,
+      // so they belong after the uninterrupted playback measurement.
+      const captureInitialFramebuffer = exactPlayerFramebuffer || exactBackgroundFramebuffer
+        || authoredActorFramebufferScenes.has(scene.name);
+      let playerEvidence = await waitForPlayerEvidence(playerCdp);
       if (scene.runtime === "isometric" && templateRoomForScene(template, scene.name)?.runtime?.config?.pagedSurface) {
         playerEvidence = await waitForIsometricCameraRest(playerCdp, playerEvidence);
       }
@@ -5652,7 +5662,11 @@ async function main() {
       const performance = await waitForPerformance(mainCdp, knownWindowIDs, cadenceScope);
       traceSceneSmoke(scene.name, "performance-ready");
       knownWindowIDs.add(performance.windowID);
-      playerEvidence = { ...playerEvidence, audio: await evaluate(playerCdp, "window.GBAStudioDirectPlayer.inspectAudio()") };
+      const playbackAudio = await evaluate(playerCdp, "window.GBAStudioDirectPlayer.inspectAudio()");
+      if (captureInitialFramebuffer) {
+        playerEvidence = await waitForPlayerEvidence(playerCdp, true);
+      }
+      playerEvidence = { ...playerEvidence, audio: playbackAudio };
       let isometricCadence = null;
       if (scene.name === "mercado_suspenso") {
         const roms = activeBuildRomPaths(await filesNamed(dirname(exported.path), "exemplo.gba"));
