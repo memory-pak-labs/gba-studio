@@ -422,6 +422,11 @@ function readProfilerTelemetry(module, address, runtime) {
     const offset = address + 256 + index * 4;
     return (module._gba_audio_register(offset) | (module._gba_audio_register(offset + 2) << 16)) >>> 0;
   };
+  return decodeProfilerTelemetry(readWord, runtime);
+}
+
+function decodeProfilerTelemetry(readWord, runtime) {
+  if (runtime.schema !== 4) return null;
   if (readWord(0) !== 0x47535046 || readWord(1) !== 1 || readWord(2) !== 16 ||
       readWord(3) !== runtime.frame || readWord(4) !== 262144) return null;
   const valid = readWord(5);
@@ -437,6 +442,10 @@ function readProfilerTelemetry(module, address, runtime) {
 export function readEventTraceTelemetry(module, address) {
   if (typeof module._gba_audio_register !== "function") return null;
   const word = index => { const offset = address + 320 + index * 4; return (module._gba_audio_register(offset) | module._gba_audio_register(offset + 2) << 16) >>> 0; };
+  return decodeEventTraceTelemetry(word);
+}
+
+function decodeEventTraceTelemetry(word) {
   if (word(0) !== 0x47534554 || word(1) !== 1 || word(2) !== 20) return null;
   const sequence = word(3), entries = [];
   for (let i = Math.max(0, sequence - 4); i < sequence; ++i) {
@@ -447,6 +456,20 @@ export function readEventTraceTelemetry(module, address) {
 }
 
 export function readRuntimeTelemetry(module) {
+  if (typeof module._gba_runtime_telemetry_snapshot === "function") {
+    const pointer = module._gba_runtime_telemetry_snapshot();
+    const heap = module.HEAPU8;
+    // The bridge owns a contiguous 100-word snapshot, including both extensions.
+    if (!Number.isInteger(pointer) || pointer <= 0 || pointer % 4 !== 0 ||
+        !heap || pointer + 400 > heap.byteLength) return null;
+    const words = new Uint32Array(heap.buffer, heap.byteOffset + pointer, 100);
+    const decoded = decodeRuntimeTelemetryWords(words);
+    if (!decoded) return null;
+    return Object.freeze({ ...decoded,
+      subsystems: decodeProfilerTelemetry(index => words[64 + index], decoded),
+      eventTrace: decoded.schema === 4 ? decodeEventTraceTelemetry(index => words[80 + index]) : null
+    });
+  }
   const hasNativeBridge = typeof module._gba_find_runtime_telemetry === "function" &&
     typeof module._gba_runtime_telemetry_word === "function";
   if (hasNativeBridge) {
@@ -761,10 +784,8 @@ export async function startMGBAPlayer({ container, romUrl, storageKey, onFrameSt
       if (audioContext.state !== "running") await audioContext.resume();
       if (!active) return false;
       canvas.dataset.audio = audioContext.state;
-      nextAudioTime = planPcmBufferSchedule({
-        currentTime: audioContext.currentTime,
-        nextAudioTime
-      }).nextAudioTime;
+      // Only queueNativeAudio advances the playback clock. Resuming before the
+      // first PCM block must not create a gap, or hide one on a later key press.
       return audioContext.state === "running";
     };
     const queueNativeAudio = () => {
@@ -779,10 +800,6 @@ export async function startMGBAPlayer({ container, romUrl, storageKey, onFrameSt
       emittedNonSilentSamples += analysis.nonSilentSampleCount;
       emittedAudioPeak = Math.max(emittedAudioPeak, analysis.peak);
       if (!audioContext || audioContext.state !== "running" || !audioDestination) return;
-      const schedule = planPcmBufferSchedule({ currentTime: audioContext.currentTime, nextAudioTime });
-      nextAudioTime = schedule.nextAudioTime;
-      if (schedule.resynchronized) audioResynchronizationCount += 1;
-      if (schedule.underrun) audioUnderrunCount += 1;
       const buffer = audioContext.createBuffer(2, frameCount, audioSampleRate);
       const left = buffer.getChannelData(0);
       const right = buffer.getChannelData(1);
@@ -797,6 +814,12 @@ export async function startMGBAPlayer({ container, romUrl, storageKey, onFrameSt
         queuedAudioSources.delete(source);
         source.disconnect();
       };
+      // Buffer creation and conversion can be expensive on the first call.
+      // Sample the audio clock only once the source is actually ready to start.
+      const schedule = planPcmBufferSchedule({ currentTime: audioContext.currentTime, nextAudioTime });
+      nextAudioTime = schedule.nextAudioTime;
+      if (schedule.resynchronized) audioResynchronizationCount += 1;
+      if (schedule.underrun) audioUnderrunCount += 1;
       source.start(nextAudioTime);
       queuedAudioSources.add(source);
       nextAudioTime += frameCount / audioSampleRate;

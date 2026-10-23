@@ -98,6 +98,21 @@ final. O teste Intel por Rosetta é registrado separadamente de um Mac Intel
 físico. Utilitários Universal antigos permanecem disponíveis para reproduzir
 builds históricos; a distribuição atual usa instaladores separados.
 
+No macOS, a detecção `app.runningUnderARM64Translation` aplica uma política de
+compilação aos renderers x64 executados pelo Rosetta: JavaScript usa Sparkplug
+sem mudanças posteriores de tier, e WebAssembly é compilado antecipadamente no
+tier otimizado. Isso evita a tradução repetida de código JIT durante o Play.
+Apple Silicon nativo, Mac Intel nativo, Windows e Linux mantêm a configuração
+padrão do Electron. Mudanças na versão do Electron exigem revalidar essa política.
+
+O bridge mGBA copia gameplay, profiler e rastro de eventos em um snapshot de
+100 palavras, reduzindo a coleta a uma chamada JavaScript/Wasm por frame. O
+buffer pertence ao host e não ocupa a RAM emulada do GBA. A regressão
+`scripts/mgba-native-telemetry.test.mjs` executa ROMs ARM autorais no core
+compilado e compara o resultado com a leitura por palavras, incluindo o limite
+da EWRAM. O relógio PCM começa no primeiro bloco disponível; retomar áudio por
+uma tecla não altera o relógio nem encobre um underrun real.
+
 ## Motor
 
 Os testes host precisam de C++17, make e Python 3. São independentes de ROM e de

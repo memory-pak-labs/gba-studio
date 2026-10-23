@@ -13,9 +13,10 @@ const repositoryRoot = path.resolve(appRoot, "..", "..");
 const revision = "0.10.5";
 const sourceRepository = "https://github.com/mgba-emu/mgba.git";
 const sourceRoot = process.env.GBA_STUDIO_MGBA_SOURCE ?? path.join(repositoryRoot, ".cache", "mgba", revision);
-const buildRoot = path.join(repositoryRoot, ".cache", "mgba-build", revision);
-const playerRoot = path.join(appRoot, "static", "WebPlayer", "player");
-const licensesRoot = path.join(appRoot, "static", "WebPlayer", "licenses");
+const buildRoot = process.env.GBA_STUDIO_MGBA_BUILD_ROOT ?? path.join(repositoryRoot, ".cache", "mgba-build", revision);
+const webPlayerRoot = process.env.GBA_STUDIO_MGBA_OUTPUT_ROOT ?? path.join(appRoot, "static", "WebPlayer");
+const playerRoot = path.join(webPlayerRoot, "player");
+const licensesRoot = path.join(webPlayerRoot, "licenses");
 const wrapperPath = path.join(appRoot, "third_party", "mgba-web", "mgba_web.c");
 
 function run(command, args, options = {}) {
@@ -77,7 +78,7 @@ async function main() {
     "-s", "FILESYSTEM=0",
     "--no-entry",
     "-s", "EXPORTED_RUNTIME_METHODS=['HEAPU8']",
-    "-s", "EXPORTED_FUNCTIONS=['_malloc','_free','_gba_init','_gba_load_rom','_gba_last_stage','_gba_run_frame','_gba_audio_samples','_gba_audio_sample_count','_gba_audio_sample_rate','_gba_audio_register','_gba_set_keys','_gba_reset','_gba_find_runtime_telemetry','_gba_runtime_telemetry_word','_gba_framebuffer','_gba_framebuffer_size','_gba_state_size','_gba_save_state','_gba_load_state','_gba_savedata_size','_gba_savedata_copy','_gba_savedata_restore','_gba_destroy']",
+    "-s", "EXPORTED_FUNCTIONS=['_malloc','_free','_gba_init','_gba_load_rom','_gba_last_stage','_gba_run_frame','_gba_audio_samples','_gba_audio_sample_count','_gba_audio_sample_rate','_gba_audio_register','_gba_set_keys','_gba_reset','_gba_find_runtime_telemetry','_gba_runtime_telemetry_word','_gba_runtime_telemetry_snapshot','_gba_framebuffer','_gba_framebuffer_size','_gba_state_size','_gba_save_state','_gba_load_state','_gba_savedata_size','_gba_savedata_copy','_gba_savedata_restore','_gba_destroy']",
     "-o", modulePath
   ]);
 
@@ -93,7 +94,7 @@ async function main() {
     licenses: ["../licenses/mGBA-MPL-2.0.txt"]
   }, null, 2)}\n`, "utf8");
 
-  const verification = await inspectMGBAWebCore(path.join(appRoot, "static", "WebPlayer"));
+  const verification = await inspectMGBAWebCore(webPlayerRoot);
   if (!verification.ok) throw new Error(`Core gerado invalido:\n- ${verification.failures.join("\n- ")}`);
   console.log(`Core mGBA Web gerado: ${wasmPath}`);
 }

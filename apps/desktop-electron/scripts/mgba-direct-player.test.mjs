@@ -576,3 +576,48 @@ it("decodes only the bounded native event trace extension and preserves wait con
   words[0] = 0;
   expect(readEventTraceTelemetry(module, 0)).toBeNull();
 });
+
+describe("bulk native telemetry snapshot", () => {
+  function fixture() {
+    const HEAPU8 = new Uint8Array(1024);
+    const words = new Uint32Array(HEAPU8.buffer, 128, 100);
+    words.set([0x47535452, 4, 64, 42]);
+    words[5] = 123;
+    words[22] = 704;
+    words[23] = 400;
+    words[62] = 3;
+    words.set([0x47535046, 1, 16, 42, 262144, 31, 10, 20, 30, 40, 50, 11, 22, 33, 44, 55], 64);
+    words.set([0x47534554, 1, 20, 1, 0x08000100, 42, 7 | (3 << 16), 4 | (12 << 16)], 80);
+    const forbidden = vi.fn(() => { throw new Error("per-word bridge calls exceed the frame budget"); });
+    const module = { HEAPU8, _gba_runtime_telemetry_snapshot: vi.fn(() => 128),
+      _gba_find_runtime_telemetry: forbidden, _gba_runtime_telemetry_word: forbidden, _gba_audio_register: forbidden };
+    return { module, words, forbidden };
+  }
+
+  it("reads gameplay, profiler and event trace in one bridge call and owns its decoded values", () => {
+    const { module, words, forbidden } = fixture();
+    const state = readRuntimeTelemetry(module);
+    expect(state).toMatchObject({ frame: 42, player: { x: 704, y: 400 }, audio: { pcmUnderrunCount: 3 },
+      subsystems: { frameTicks: { scripts: 10, render: 30 } },
+      eventTrace: { entries: [{ commandAddress: 0x08000100, frame: 42, step: 7, room: 4, waitFrames: 12 }] } });
+    words.fill(0);
+    expect(state.frame).toBe(42);
+    expect(state.player.x).toBe(704);
+    expect(state.variables[0]).toBe(123);
+    expect(module._gba_runtime_telemetry_snapshot).toHaveBeenCalledTimes(1);
+    expect(forbidden).not.toHaveBeenCalled();
+  });
+
+  it.each([0, 129, 900])("rejects an unavailable or invalid snapshot pointer: %s", pointer => {
+    const { module, forbidden } = fixture();
+    module._gba_runtime_telemetry_snapshot.mockReturnValue(pointer);
+    expect(readRuntimeTelemetry(module)).toBeNull();
+    expect(forbidden).not.toHaveBeenCalled();
+  });
+
+  it("rejects stale profiler data without discarding gameplay telemetry", () => {
+    const { module, words } = fixture();
+    words[67] = 41;
+    expect(readRuntimeTelemetry(module)).toMatchObject({ frame: 42, subsystems: null });
+  });
+});

@@ -82,7 +82,9 @@ import {
 } from "../shared/ipc.js";
 import type { WindowDocumentState } from "../shared/windowDocumentState.js";
 import { DEFAULT_APP_LOCALE } from "../shared/appLocale.js";
+import { configureTranslatedRuntime } from "./translatedRuntime.js";
 
+configureTranslatedRuntime(app);
 configureSmokeDevToolsPort();
 registerTranslationModelProtocolScheme();
 

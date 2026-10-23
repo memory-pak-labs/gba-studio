@@ -103,6 +103,40 @@ afterEach(() => {
 });
 
 describe("Play queued audio lifecycle", () => {
+  it("starts the playback clock when the first PCM block is available", async () => {
+    player.destroy();
+    sources = [];
+    player = await startMGBAPlayer({ container, romUrl: "test.gba", storageKey: "audio-test" });
+    player.canvas.dispatchEvent(new PointerEvent("pointerdown"));
+    now += 1000; // A cold core can take time before it produces its first block.
+    render(now);
+    expect(player.inspectAudio().audioUnderrunCount).toBe(0);
+    expect(sources[0].start.mock.calls[0][0]).toBeCloseTo(audio.currentTime + 0.08, 5);
+  });
+
+  it("still counts a real playback gap when the user presses another game key", () => {
+    now += 1000;
+    window.dispatchEvent(new KeyboardEvent("keydown", { code: "KeyX" }));
+    render(now);
+    expect(player.inspectAudio().audioUnderrunCount).toBe(1);
+  });
+
+  it("schedules the first block after cold WebAudio buffer allocation", async () => {
+    player.destroy();
+    sources = [];
+    player = await startMGBAPlayer({ container, romUrl: "test.gba", storageKey: "audio-test" });
+    player.canvas.dispatchEvent(new PointerEvent("pointerdown"));
+    const createBuffer = audio.createBuffer.bind(audio);
+    vi.spyOn(audio, "createBuffer").mockImplementationOnce((...args) => {
+      now += 250;
+      return createBuffer(...args);
+    });
+    now += 17;
+    render(now);
+    expect(sources[0].start.mock.calls[0][0]).toBeCloseTo(audio.currentTime + 0.08, 5);
+    expect(player.inspectAudio().audioUnderrunCount).toBe(0);
+  });
+
   it("reports the pending audio duration", () => {
     expect(player.inspectAudio().queuedAudioSeconds).toBeGreaterThan(0);
     expect(player.inspectAudio().queuedAudioSeconds).toBeLessThan(0.15);

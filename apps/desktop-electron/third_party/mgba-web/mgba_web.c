@@ -19,6 +19,9 @@ static int rom_loaded = 0;
 static int config_initialized = 0;
 static int last_stage = 0;
 static uint32_t runtime_telemetry_address = 0;
+// Host-side bridge memory only; this does not consume emulated GBA RAM.
+enum { RUNTIME_SNAPSHOT_WORD_COUNT = 100 };
+static uint32_t runtime_snapshot[RUNTIME_SNAPSHOT_WORD_COUNT];
 enum { AUDIO_SAMPLE_RATE = 32768, AUDIO_SAMPLE_CAPACITY = 2048 };
 static int16_t audio_buffer[AUDIO_SAMPLE_CAPACITY * 2];
 static size_t audio_sample_count = 0;
@@ -266,6 +269,20 @@ EMSCRIPTEN_KEEPALIVE uint32_t gba_runtime_telemetry_word(uint32_t index) {
 		return 0;
 	}
 	return core->busRead32(core, address + (index * sizeof(uint32_t)));
+}
+
+EMSCRIPTEN_KEEPALIVE uintptr_t gba_runtime_telemetry_snapshot(void) {
+	const uint32_t address = (uint32_t) gba_find_runtime_telemetry();
+	if (address == 0) return 0;
+	const uint32_t word_count = core->busRead32(core, address + (2 * sizeof(uint32_t)));
+	const uint32_t snapshot_words = word_count == RUNTIME_TELEMETRY_WORD_COUNT &&
+		address + sizeof(runtime_snapshot) <= GBA_EWRAM_END
+		? RUNTIME_SNAPSHOT_WORD_COUNT : word_count;
+	memset(runtime_snapshot, 0, sizeof(runtime_snapshot));
+	for (uint32_t index = 0; index < snapshot_words; ++index) {
+		runtime_snapshot[index] = core->busRead32(core, address + (index * sizeof(uint32_t)));
+	}
+	return (uintptr_t) runtime_snapshot;
 }
 
 EMSCRIPTEN_KEEPALIVE uintptr_t gba_framebuffer(void) {
