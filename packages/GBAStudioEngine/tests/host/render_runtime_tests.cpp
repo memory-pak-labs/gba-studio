@@ -4,6 +4,7 @@
 #include "gbs/event.hpp"
 #include "gbs/interrupt.hpp"
 #include "gbs/render.hpp"
+#include "gbs/tile_edits.hpp"
 
 namespace {
 
@@ -76,6 +77,8 @@ int sprite_color_depth_calls = 0;
 int last_sprite_color_depth = -1;
 uint8_t last_bg_tile_byte = 0;
 uint16_t last_tilemap_entry = 0;
+uint16_t captured_tilemaps[4][1024] {};
+int tilemap_upload_calls = 0;
 uint16_t last_palette_colors[16] = {};
 uint16_t display_page_calls = 0;
 int hblank_scroll_calls = 0;
@@ -725,8 +728,11 @@ void gbs_hw_set_sprite_color_depth(int, int eight_bpp) {
     ++sprite_color_depth_calls;
     last_sprite_color_depth = eight_bpp;
 }
-void gbs_hw_load_bg_tilemap(int, const uint16_t* entries, uint32_t, uint32_t, uint32_t) {
+void gbs_hw_load_bg_tilemap(int layer, const uint16_t* entries, uint32_t width, uint32_t height, uint32_t) {
     last_tilemap_entry = entries[0];
+    ++tilemap_upload_calls;
+    const uint32_t count = width * height < 1024 ? width * height : 1024;
+    for (uint32_t i = 0; i < count; ++i) captured_tilemaps[layer][i] = entries[i];
 }
 void gbs_hw_set_bg_tilemap_entry(int, uint32_t, uint32_t, uint32_t, uint32_t, uint16_t) {}
 void gbs_hw_load_affine_bg_tiles(const uint8_t*, uint32_t, uint32_t) {
@@ -899,7 +905,32 @@ static void test_room_tilemap_rows_preserve_edges_and_full_entries() {
     for (const auto tile : output) assert(tile == 0);
 }
 
+static void test_room_edits_stage_independent_layers_and_refresh_without_camera_motion() {
+    const uint16_t floor[] {0x1801, 0x2C02, 3, 4, 5, 6, 7, 8};
+    const uint16_t foreground[] {0, 9, 0, 0, 0, 0, 0, 0};
+    gbs::RoomTileEdits edits {};
+    gbs::RoomTilemapCache floor_cache {}, foreground_cache {};
+    assert(gbs::set_room_tile_edit(edits, 2, 1, 0, 4, 2, 99, 0));
+    assert(gbs::set_room_tile_edit(edits, 1, 0, 0, 4, 2, 77));
+    gbs::draw_room_to_bg_cached(gbs::BackgroundLayer::BG2, floor, 4, 2, 0, 0, floor_cache, edits);
+    gbs::draw_room_to_bg_cached(gbs::BackgroundLayer::BG1, foreground, 4, 2, 0, 0, foreground_cache, edits);
+    // A later decompression reuses the scratch; staged layers retain their copies.
+    const gbs::Rle16Run runs[] {{123, 4}};
+    assert(gbs::load_tilemap(gbs::BackgroundLayer::BG3, gbs::Rle16TileMapAsset {{runs, 1, 4}, 2, 2}));
+    assert(captured_tilemaps[2][0] == 0x1801 && captured_tilemaps[2][1] == 99);
+    assert(captured_tilemaps[1][0] == 77 && captured_tilemaps[1][1] == 9);
+    const int uploads = tilemap_upload_calls;
+    gbs::draw_room_to_bg_cached(gbs::BackgroundLayer::BG2, floor, 4, 2, 0, 0, floor_cache, edits);
+    assert(tilemap_upload_calls == uploads);
+    assert(gbs::set_room_tile_edit(edits, 2, 1, 0, 4, 2, 100));
+    gbs::draw_room_to_bg_cached(gbs::BackgroundLayer::BG2, floor, 4, 2, 0, 0, floor_cache, edits);
+    assert(tilemap_upload_calls == uploads + 1 && captured_tilemaps[2][1] == 100);
+    gbs::draw_room_to_bg_cached(gbs::BackgroundLayer::BG2, floor, 4, 2, 8, 0, floor_cache, edits);
+    assert(captured_tilemaps[2][0] == 100 && captured_tilemaps[2][1] == 3);
+}
+
 int main() {
+    test_room_edits_stage_independent_layers_and_refresh_without_camera_motion();
     test_room_tilemap_rows_preserve_edges_and_full_entries();
     test_room_tilemap_cache_preserves_scroll_and_invalidates_sources();
     test_based_bg_upload_respects_tilemap_and_obj_memory();

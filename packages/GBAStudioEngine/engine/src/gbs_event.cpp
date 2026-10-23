@@ -1,3 +1,5 @@
+extern "C" __attribute__((weak)) void gbs_debug_record_event(const void*, unsigned, unsigned, unsigned, int, int) {}
+#include "gbs/profiler.hpp"
 #include "gbs/event.hpp"
 #include "gbs/runtime.hpp"
 #include "gbs/assets.hpp"
@@ -18,6 +20,7 @@ struct RuntimeTransitionState {
     bool pending;
     int cover_wait_frames;
     RuntimeTransitionMode mode;
+    gbs::SceneEntryReason entry_reason;
     gbs::RuntimeKind target;
     int room;
     int player_x;
@@ -59,6 +62,7 @@ void request_runtime_transition(
     }
     runtime_transition.pending = true;
     runtime_transition.mode = RuntimeTransitionMode::Warp;
+    runtime_transition.entry_reason = SceneEntryReason::Return;
     runtime_transition.target = static_cast<gbs::RuntimeKind>(runtime_value);
     runtime_transition.room = room;
     runtime_transition.player_x = player_x;
@@ -234,6 +238,7 @@ void restore_scene_stack_entry(EventState& state, const EventSceneStackEntry& en
     if (entry.runtime != current_runtime) {
         const int packed_target = (static_cast<int>(entry.runtime) << 12) | (entry.room & 0x0FFF);
         request_runtime_transition(state, packed_target, entry.player_x, entry.player_y);
+        runtime_transition.entry_reason = SceneEntryReason::Resume;
     }
 }
 
@@ -414,7 +419,8 @@ void push_tile_command(
     int packed_location,
     int tile,
     int count,
-    int tile_asset = -1
+    int tile_asset = -1,
+    int options = 0
 ) {
     if (state.tile_command_count >= gbs::max_event_tile_commands) {
         return;
@@ -422,11 +428,12 @@ void push_tile_command(
 
     state.tile_commands[state.tile_command_count] = gbs::EventTileCommand {
         (packed_location >> 12) & 0x3,
-        packed_location & 0x3F,
-        (packed_location >> 6) & 0x3F,
+        (packed_location & 0x3F) | (((options >> 9) & 7) << 6),
+        ((packed_location >> 6) & 0x3F) | (((options >> 12) & 7) << 6),
         tile,
         clamp_int(count, 1, 64),
-        tile_asset
+        tile_asset,
+        (options & 0x1FF) - 1
     };
     ++state.tile_command_count;
 }
@@ -1056,7 +1063,7 @@ EventStepResult execute_event_command(
         state.camera_bounds_max_y = command.b;
         break;
     case EventOp::ReplaceTile:
-        push_tile_command(state, command.a, command.b, command.c);
+        push_tile_command(state, command.a, command.b, command.c, -1, command.d);
         break;
     case EventOp::ReplaceTileSequence: {
         const int variable = command.c & 0xFF;
@@ -1071,7 +1078,7 @@ EventStepResult execute_event_command(
         if (tile < base_tile || tile >= base_tile + frame_count) {
             tile = base_tile;
         }
-        push_tile_command(state, command.a, tile, 1, tile_asset);
+        push_tile_command(state, command.a, tile, 1, tile_asset, command.d);
         state.variables[variable] = tile + 1;
         if (state.variables[variable] >= base_tile + frame_count) {
             state.variables[variable] = base_tile;
@@ -1273,6 +1280,10 @@ EventStepResult execute_event_command(
         state.fade_changed = true;
         state.fade_direction = -1;
         state.fade_frames = clamp_int(command.a, 1, 600);
+        break;
+    case EventOp::Visibility:
+        push_actor_command(state, (command.d & 128) != 0 ? EventActorOp::VisibilityReveal : EventActorOp::VisibilityLantern,
+            command.a, static_cast<uint16_t>(command.b), clamp_int(command.c, 0, 3600), clamp_int(command.d & 127, 0, 100));
         break;
     case EventOp::VisualEffect:
         if (runtime_transition.pending &&
@@ -1544,6 +1555,7 @@ bool runtime_transition_route(RuntimeTransitionRoute& route) {
     }
     route.runtime = runtime_transition.target;
     route.local_index = runtime_transition.room;
+    route.entry_reason = runtime_transition.entry_reason;
     return true;
 }
 
@@ -1557,6 +1569,7 @@ bool request_runtime_save_restore(RuntimeKind runtime, int slot_index) {
     runtime_transition.pending = true;
     runtime_transition.cover_wait_frames = 0;
     runtime_transition.mode = RuntimeTransitionMode::SaveRestore;
+    runtime_transition.entry_reason = SceneEntryReason::Load;
     runtime_transition.target = runtime;
     runtime_transition.room = 0;
     runtime_transition.player_x = 0;
@@ -1995,9 +2008,16 @@ void run_event_script(EventState& state, EventScript script) {
 }
 
 void run_event_script(EventState& state, const EventCommand* commands, size_t count) {
+    run_event_script_consuming(state, EventScript { commands, count }, nullptr);
+}
+
+void run_event_script_consuming(EventState& state, EventScript script, EventCommandConsumer consumer, void* context) {
+    const EventCommand* commands = script.commands;
+    const size_t count = script.command_count;
     if (commands == nullptr || count == 0) {
         return;
     }
+    const SubsystemProfilerScope profiler_scope(ProfilerSubsystem::Scripts);
 
     size_t index = 0;
     size_t steps = 0;
@@ -2005,7 +2025,10 @@ void run_event_script(EventState& state, const EventCommand* commands, size_t co
     while (index < count && steps < max_steps) {
         ++steps;
         const EventCommand& command = commands[index];
+        const size_t source_index = index;
         EventStepResult result = execute_event_command(state, command, index, count, false);
+        gbs_debug_record_event(&command, source_index, static_cast<unsigned>(command.op), static_cast<unsigned>(result), state.current_room, state.wait_frames);
+        if (consumer) consumer(state, context);
         if (result == EventStepResult::Stop) {
             return;
         }
@@ -2041,6 +2064,7 @@ bool update_event_runner(EventRunner& runner, EventState& state) {
         runner.active = false;
         return false;
     }
+    const SubsystemProfilerScope profiler_scope(ProfilerSubsystem::Scripts);
 
     size_t steps = 0;
     const size_t max_steps = runner.step_budget > 0 ? runner.step_budget : runner.script.command_count * 8 + 8;
@@ -2048,7 +2072,9 @@ bool update_event_runner(EventRunner& runner, EventState& state) {
         ++steps;
         size_t index = runner.command_index;
         const EventCommand& command = runner.script.commands[index];
+        const size_t source_index = index;
         EventStepResult result = execute_event_command(state, command, index, runner.script.command_count, true);
+        gbs_debug_record_event(&command, source_index, static_cast<unsigned>(command.op), static_cast<unsigned>(result), state.current_room, state.wait_frames);
         runner.command_index = index;
         if (result == EventStepResult::Pause) {
             return true;

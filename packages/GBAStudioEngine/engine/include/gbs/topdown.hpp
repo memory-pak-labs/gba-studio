@@ -4,6 +4,7 @@
 #include <stdint.h>
 #include "gbs/input.hpp"
 #include "gbs/types.hpp"
+#include "gbs/tile_edits.hpp"
 
 namespace gbs {
 
@@ -32,6 +33,7 @@ struct TileMap {
     int width;
     int height;
     const TileSlope* slopes = nullptr;
+    const RoomTileEdits* edits = nullptr;
 };
 
 struct Portal {

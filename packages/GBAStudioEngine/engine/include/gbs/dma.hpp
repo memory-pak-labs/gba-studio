@@ -31,6 +31,17 @@ struct HBlankDmaTransfer {
     DmaWidth width;
 };
 
+// FIFO completion fence. Reset cancels old fences; resetting statistics does not.
+struct DmaFence { uint32_t epoch; uint32_t sequence; };
+enum class DmaFenceStatus : uint8_t { Pending, Complete, Canceled };
+DmaFence dma_vblank_fence();
+DmaFenceStatus dma_fence_status(DmaFence fence);
+bool dma_source_pending(const void* source, size_t bytes);
+// Loading barrier for mutable decode buffers; waits only while their bytes are borrowed.
+bool dma_wait_for_source(const void* source, size_t bytes);
+bool dma_destination_pending(const volatile void* destination, size_t bytes);
+bool dma_wait_for_destination(const volatile void* destination, size_t bytes);
+
 struct DmaQueueStats {
     size_t queued;
     uint32_t submitted;

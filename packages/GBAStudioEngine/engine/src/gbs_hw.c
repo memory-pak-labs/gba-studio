@@ -246,12 +246,15 @@ static uint16_t interrupt_mask_for_source(int source) {
     }
 }
 
+extern void gbs_profiler_record_irq(uint32_t ticks) __attribute__((weak));
+
 void gbs_hw_irq_dispatch(void) {
     uint16_t pending = (uint16_t)(REG_IF & REG_IE);
     if (pending == 0) {
         return;
     }
 
+    const uint32_t profiler_start = gbs_hw_frame_counter_ticks();
     REG_IF = pending;
     BIOS_IRQ_FLAGS = (uint16_t)(BIOS_IRQ_FLAGS | pending);
     if ((pending & (1u << 12)) != 0) {
@@ -263,6 +266,7 @@ void gbs_hw_irq_dispatch(void) {
         gbs_audio_vblank_update();
     }
     gbs_dispatch_hardware_interrupts(pending);
+    if (gbs_profiler_record_irq) gbs_profiler_record_irq(gbs_hw_frame_counter_ticks() - profiler_start);
 }
 
 static volatile uint16_t* bg_control_register(int layer) {
@@ -1797,8 +1801,9 @@ void gbs_hw_set_window0(uint16_t left, uint16_t right, uint16_t top, uint16_t bo
     REG_WIN0H = (uint16_t)(((left & 0xFFu) << 8) | (right & 0xFFu));
     REG_WIN0V = (uint16_t)(((top & 0xFFu) << 8) | (bottom & 0xFFu));
     REG_WININ = (uint16_t)((REG_WININ & 0xFF00u) | (inside_mask & 0x3Fu));
-    REG_WINOUT = (uint16_t)((REG_WINOUT & 0xFFC0u) | (outside_mask & 0x3Fu));
+
     if (enabled) {
+        REG_WINOUT = (uint16_t)((REG_WINOUT & 0xFFC0u) | (outside_mask & 0x3Fu));
         REG_DISPCNT = (uint16_t)(REG_DISPCNT | (1u << 13));
     } else {
         REG_DISPCNT = (uint16_t)(REG_DISPCNT & ~(1u << 13));
@@ -1809,8 +1814,9 @@ void gbs_hw_set_window1(uint16_t left, uint16_t right, uint16_t top, uint16_t bo
     REG_WIN1H = (uint16_t)(((left & 0xFFu) << 8) | (right & 0xFFu));
     REG_WIN1V = (uint16_t)(((top & 0xFFu) << 8) | (bottom & 0xFFu));
     REG_WININ = (uint16_t)((REG_WININ & 0x00FFu) | ((inside_mask & 0x3Fu) << 8));
-    REG_WINOUT = (uint16_t)((REG_WINOUT & 0xFFC0u) | (outside_mask & 0x3Fu));
+
     if (enabled) {
+        REG_WINOUT = (uint16_t)((REG_WINOUT & 0xFFC0u) | (outside_mask & 0x3Fu));
         REG_DISPCNT = (uint16_t)(REG_DISPCNT | (1u << 14));
     } else {
         REG_DISPCNT = (uint16_t)(REG_DISPCNT & ~(1u << 14));

@@ -1,15 +1,19 @@
+import { createHash } from "node:crypto";
 import { createReadStream } from "node:fs";
-import { stat } from "node:fs/promises";
+import { readFile, stat } from "node:fs/promises";
 import { createServer, type Server, type ServerResponse } from "node:http";
 import path from "node:path";
 import type { BrowserWindow as ElectronBrowserWindow, BrowserWindowConstructorOptions } from "electron";
 import { preloadScriptPath } from "./mainPaths.js";
+import { profilerSubsystems } from "../shared/hardwareProfiler.js";
 import type {
   RomPlayerFrameStats,
+  RomPlayerEventTrace,
   RomPlayerHardwareTelemetry,
   RomPlayerAudioTelemetry,
   RomPlayerRuntimeEntityState,
   RomPlayerRuntimeState,
+  RomPlayerSubsystemTelemetry,
   RomPlayerTelemetryEvent
 } from "../shared/hardwareProfiler.js";
 import type { InputReplay } from "../shared/inputReplay.js";
@@ -210,6 +214,35 @@ function normalizeAudioTelemetry(value: unknown): RomPlayerAudioTelemetry | null
   };
 }
 
+function normalizeSubsystemTelemetry(value: unknown): RomPlayerSubsystemTelemetry | null {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return null;
+  const candidate = value as Partial<RomPlayerSubsystemTelemetry>;
+  if (candidate.ticksPerSecond !== 262144 || !candidate.frameTicks || !candidate.scenePeakTicks ||
+      typeof candidate.frameTicks !== "object" || typeof candidate.scenePeakTicks !== "object" ||
+      Array.isArray(candidate.frameTicks) || Array.isArray(candidate.scenePeakTicks)) return null;
+  const frameTicks: RomPlayerSubsystemTelemetry["frameTicks"] = {};
+  const scenePeakTicks: RomPlayerSubsystemTelemetry["scenePeakTicks"] = {};
+  for (const label of profilerSubsystems) {
+    const frame = candidate.frameTicks[label], peak = candidate.scenePeakTicks[label];
+    if (frame === undefined && peak === undefined) continue;
+    if (!nonnegativeInteger(frame) || !nonnegativeInteger(peak) || frame > 0xFFFFFFFF || peak > 0xFFFFFFFF) return null;
+    frameTicks[label] = frame;
+    scenePeakTicks[label] = peak;
+  }
+  return { ticksPerSecond: 262144, frameTicks, scenePeakTicks };
+}
+
+function normalizeEventTrace(value: unknown): RomPlayerEventTrace | null {
+  if (!value || typeof value !== "object") return null;
+  const candidate = value as RomPlayerEventTrace;
+  if (!nonnegativeInteger(candidate.sequence) || !Array.isArray(candidate.entries) || candidate.entries.length > 4) return null;
+  const entries = candidate.entries.map(entry => {
+    if (!entry || ![entry.commandAddress, entry.frame, entry.step, entry.op, entry.status, entry.waitFrames].every(nonnegativeInteger) || !Number.isInteger(entry.room)) return null;
+    return { commandAddress: entry.commandAddress, frame: entry.frame, step: entry.step, op: entry.op, status: entry.status, room: entry.room, waitFrames: entry.waitFrames };
+  });
+  return entries.every(entry => entry !== null) ? { sequence: candidate.sequence, entries } : null;
+}
+
 function normalizeRuntimeState(value: unknown): RomPlayerRuntimeState | null {
   if (!value || typeof value !== "object") return null;
   const candidate = value as Partial<RomPlayerRuntimeState>;
@@ -251,6 +284,8 @@ function normalizeRuntimeState(value: unknown): RomPlayerRuntimeState | null {
   ) return null;
   const audio = normalizeAudioTelemetry(candidate.audio);
   if (candidate.audio != null && !audio) return null;
+  const subsystems = normalizeSubsystemTelemetry(candidate.subsystems);
+  if (candidate.subsystems != null && !subsystems) return null;
   return {
     schema,
     frame: candidate.frame,
@@ -287,7 +322,9 @@ function normalizeRuntimeState(value: unknown): RomPlayerRuntimeState | null {
       pressed: input!.pressed,
       released: input!.released
     },
-    ...(schema === 4 ? { audio } : {})
+    ...(schema === 4 ? { audio } : {}),
+    ...(subsystems ? { subsystems } : {}),
+    ...(candidate.eventTrace ? { eventTrace: normalizeEventTrace(candidate.eventTrace) } : {})
   };
 }
 
@@ -435,6 +472,20 @@ export async function openRomPlayerWindow(options: OpenRomPlayerWindowOptions): 
     if (!romInfo.isFile()) {
       return { ok: false, error: "ROM invalida para abrir no Play Window." };
     }
+    const sourceByAddress = new Map<number, { eventID: string; stepID: string }>();
+    try {
+      let contents: string;
+      try { contents = await readFile(`${romPath}.events.json`, "utf8"); }
+      catch (error) {
+        if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
+        contents = await readFile(path.join(path.dirname(romPath), "event_source_map.json"), "utf8");
+      }
+      const map = JSON.parse(contents);
+      const hash = createHash("sha256").update(await readFile(romPath)).digest("hex");
+      if (map.schema === 1 && map.romSha256 === hash && Array.isArray(map.entries)) for (const entry of map.entries) {
+        if (Number.isInteger(entry.address) && typeof entry.eventID === "string" && typeof entry.stepID === "string") sourceByAddress.set(entry.address, { eventID: entry.eventID, stepID: entry.stepID });
+      }
+    } catch { /* External ROMs may have no source map. */ }
     const server = await createRomPlayerServer({
       locale: options.locale,
       romPath,
@@ -455,6 +506,8 @@ export async function openRomPlayerWindow(options: OpenRomPlayerWindowOptions): 
       if (channel !== ipcChannels.romPlayerTelemetry) return;
       const stats = normalizeRomPlayerFrameStats(args[0]);
       if (!stats) return;
+      const trace = stats.runtimeState?.eventTrace;
+      if (trace) trace.entries = trace.entries.map(entry => ({ ...entry, ...sourceByAddress.get(entry.commandAddress) }));
       options.onTelemetry?.({ state: "running", windowID: window.id, stats });
     });
 

@@ -174,7 +174,31 @@ struct RuntimeTelemetryLegacyBlock {
 
 static_assert(sizeof(RuntimeTelemetryLegacyBlock) == 50 * sizeof(uint32_t), "legacy runtime telemetry layout must remain stable");
 
+// Four most recent event steps; 80 bytes, fixed storage, no heap or labels in RAM.
+struct RuntimeEventTraceEntry { uint32_t command_address; uint32_t frame; uint32_t step_op_status; uint32_t room_wait; };
+struct RuntimeEventTraceBlock {
+    uint32_t magic; uint32_t schema; uint32_t word_count; uint32_t sequence;
+    RuntimeEventTraceEntry entries[4];
+};
+static_assert(sizeof(RuntimeEventTraceBlock) == 80, "event trace RAM budget");
+volatile RuntimeEventTraceBlock& runtime_event_trace_block();
+void debug_set_event_trace_enabled(bool enabled);
+
 void debug_reset();
+// Optional extension immediately after the stable 64-word telemetry block.
+// Order: scripts, audio, render, streaming, interrupts. Inclusive timer ticks.
+struct RuntimeProfilerTelemetryBlock {
+    uint32_t magic;
+    uint32_t schema;
+    uint32_t word_count;
+    uint32_t frame;
+    uint32_t ticks_per_second;
+    uint32_t valid_bits;
+    uint32_t frame_ticks[5];
+    uint32_t scene_peak_ticks[5];
+};
+static_assert(sizeof(RuntimeProfilerTelemetryBlock) == 16 * sizeof(uint32_t), "profiler telemetry layout must remain stable");
+volatile RuntimeProfilerTelemetryBlock& runtime_profiler_telemetry_block();
 volatile RuntimeTelemetryBlock& runtime_telemetry_block();
 volatile RuntimeTelemetryLegacyBlock& runtime_telemetry_legacy_block();
 void debug_set_runtime_kind(int32_t runtime_kind);

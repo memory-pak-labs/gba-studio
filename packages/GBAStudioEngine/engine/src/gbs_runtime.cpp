@@ -1,3 +1,4 @@
+#include "gbs/profiler.hpp"
 #include "gbs/runtime.hpp"
 
 namespace gbs {
@@ -109,6 +110,7 @@ RuntimeAdapterFrameResult run_runtime_adapter_frame(
     if (result != RuntimeAdapterFrameResult::Error &&
         adapter.render != nullptr &&
         (context.frame_state == nullptr || context.frame_state->render_enabled)) {
+        const SubsystemProfilerScope scope(ProfilerSubsystem::Render);
         adapter.render(context);
     }
     return result;
@@ -210,6 +212,7 @@ int run_project_runtime(ProjectRuntime& runtime) {
         ++active_frame_context.transition_count;
         active_frame_context.active_runtime = runtime.active_runtime;
         active_frame_context.active_scene = runtime.active_scene;
+        active_frame_context.entry_reason = route.entry_reason;
         if (runtime.hooks.on_transition != nullptr) {
             runtime.hooks.on_transition();
         }

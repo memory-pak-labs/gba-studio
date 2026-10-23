@@ -1,3 +1,4 @@
+#include "gbs/profiler.hpp"
 #define GBS_DIALOGUE_UI_RUNTIME_KIND 11
 #include "gbs/engine.hpp"
 #include "gbs/battle_rpg_presentation.hpp"
@@ -1351,6 +1352,7 @@ gbs::RuntimeAdapterFrameResult update_battle_rpg_runtime(const gbs::RuntimeFrame
 }
 
 void render_battle_rpg_runtime(const gbs::RuntimeFrameContext& context) {
+    const gbs::SubsystemProfilerScope profiler_scope(gbs::ProfilerSubsystem::Render);
     (void)context;
     draw_battle();
     update_battle_hud();

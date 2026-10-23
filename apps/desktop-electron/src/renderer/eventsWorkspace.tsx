@@ -1,3 +1,4 @@
+import { eventExecutionContract } from "../shared/eventExecutionContract";
 import { uiText as ui, useStudioUiText } from "./studioUiText";
 import { EventEditingContext } from "./EventEditingContext";
 import { EventBlockLibrary } from "./EventBlockLibrary";
@@ -973,6 +974,11 @@ function EventBlockInspector({
       {selectedStep.commandVerb === "slider" ? (
         <MenuSliderEditor sceneName={sliderSceneName(editorProps.projectData, event.id)} screenID={selectedStep.command.trim().split(/\s+/)[1] ?? ""} projectData={editorProps.projectData} onUpdate={editorProps.onUpdateMenuSliderItem} />
       ) : null}
+      <details className="event-block-technical"><summary>{ui("Contrato de execução")}</summary>
+        <p>{ui("Origem")}: {event.id} / {selectedStep.index + 1}</p>
+        <p>{ui("Espera")}: {eventExecutionContract(selectedStep.commandVerb).timing}</p>
+        <p>{ui("Recursos")}: {eventExecutionContract(selectedStep.commandVerb).resources.join(", ") || "—"}</p>
+      </details>
       <details className="event-block-technical"><summary>{ui("Opções técnicas")}</summary>
         <label><span>{ui("Comando")}</span><input aria-label={ui("Comando do evento {0}", { 0: selectedStep.index + 1 })} value={selectedStep.command} onChange={e => editorProps.onUpdateEventStep(event.id, selectedStep.index, { command: e.currentTarget.value })}/></label>
         {!selectedStep.commandAvailability ? <button type="button" onClick={() => editorProps.onOpenCommandMenu(event.id, selectedStep.index)}>{ui("Trocar evento")}</button> : null}
@@ -1493,7 +1499,7 @@ function EventRuntimeStatus({ result }: { result: PreviewRuntimeState }): React.
 
 function useEventRuntimeClock(result: PreviewRuntimeState | null, setResult: React.Dispatch<React.SetStateAction<PreviewRuntimeState | null>>): void {
   const advancing = Boolean(result && !result.debugger.paused && (
-    result.sceneTransition || result.visualEffect || result.scriptWaitFrames > 0
+    result.sceneTransition || result.visualEffect || result.visibility || result.scriptWaitFrames > 0
     || result.scriptContinuations.length || result.scriptQueue.length
     || result.lutaCombat?.roundState === "active" || (result.hud.gameClock?.frames ?? 0) > 0 || Object.keys(result.nativeEvents.threads).length
     || Object.keys(result.nativeEvents.actorEffects).length || result.nativeEvents.projectiles.length || result.nativeEvents.adventure.frames > 0
@@ -3375,6 +3381,10 @@ export function EventsWorkspace({
                       </section>
                     </div>
                   ) : null}
+                  {eventRuntimeResult.visibility ? <div className="event-runtime-visual-effect" data-effect={eventRuntimeResult.visibility.effect} role="status">
+                    <strong>{eventRuntimeResult.visibility.effect === "lantern" ? ui("Lanterna") : ui("Revelação")}</strong>
+                    <span>{eventRuntimeResult.visibility.actor} · {eventRuntimeResult.visibility.width} × {eventRuntimeResult.visibility.height} px · {eventRuntimeResult.visibility.intensity}% · {eventRuntimeResult.visibility.remainingFrames} {ui("quadros restantes")}</span>
+                  </div> : null}
                   {eventRuntimeResult.visualEffect ? (
                     <div
                       className={`event-runtime-visual-effect is-${eventRuntimeResult.visualEffect.effect}`}

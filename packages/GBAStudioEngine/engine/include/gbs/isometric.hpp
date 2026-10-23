@@ -955,6 +955,8 @@ constexpr void apply_iso_actor_event_command(
     case EventActorOp::SetCollisionBox:
         break;
     case EventActorOp::SetSprite:
+    case EventActorOp::VisibilityLantern:
+    case EventActorOp::VisibilityReveal:
     case EventActorOp::PushFacing:
     case EventActorOp::Push:
     case EventActorOp::CancelMovement: // Export currently restricts cancellation to topdown.

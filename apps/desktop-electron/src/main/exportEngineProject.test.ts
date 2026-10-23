@@ -33,6 +33,24 @@ function project(overrides: GBAProjectData): GBAProjectData {
   };
 }
 
+it("exporta ReplaceTile com colisão explícita e preserva a omissão", () => {
+  const contract = buildEngineExportProjectContract(project({events: [{
+    id: "tile-edit", name: "tile_edit", category: "Cena", roomName: "start", steps: [
+      {command: "replace_tile 125 85 17 bg2 free"},
+      {command: "replace_tile_sequence 4 6 18 3 bg2 solid"},
+      {command: "replace_tile 4 6 17 bg2 keep"}
+    ]
+  }]}));
+  expect(contract.topdown_project?.scripts).toEqual(expect.arrayContaining([{
+    name: "tile_edit", script: [
+      {op: "replace_tile", x: 125, y: 85, tile: 17, layer: "bg2", count: 1, collision_flags: 0},
+      {op: "replace_tile", x: 4, y: 6, tile: 18, layer: "bg2", count: 3, collision_flags: 1},
+      {op: "replace_tile", x: 4, y: 6, tile: 17, layer: "bg2", count: 1}
+    ]
+  }]));
+  expect(() => buildEngineExportProjectContract(project({events: [{name: "bad", category: "Cena", command: "replace_tile 1 1 2 bg1 free"}]}))).toThrow(/BG2/);
+});
+
 describe("tacticalMarkerIndices", () => {
   it("uses each asset's own frame zero when the cursor, range and target use separate sheets", () => {
     expect(tacticalMarkerIndices("cursor", "range", "target")).toEqual({ cursor: 0, range: 0, target: 0 });

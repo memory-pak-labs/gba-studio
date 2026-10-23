@@ -1297,6 +1297,7 @@ describe("Rooms workspace presentation", () => {
         music: null,
         hudPresetId: null,
         eventBindings: {},
+        mapStates: [],
       cameraMode: "fixed_center",
       cameraZoom: 100,
       cameraBounds: { x: 0, y: 0, width: 1, height: 1 },

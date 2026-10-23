@@ -315,6 +315,7 @@ struct PlatformerRoomData {
     EventScript on_hit_group1 = empty_event_script();
     EventScript on_hit_group2 = empty_event_script();
     EventScript on_hit_group3 = empty_event_script();
+    EventScript on_restore = empty_event_script();
 };
 
 struct PlatformerProjectData {
@@ -517,6 +518,8 @@ constexpr void apply_platformer_npc_event_command(
         runtime.actor.size_pixels = Vec2i { command.c, command.d };
         break;
     case EventActorOp::SetSprite:
+    case EventActorOp::VisibilityLantern:
+    case EventActorOp::VisibilityReveal:
     case EventActorOp::PushFacing:
     case EventActorOp::Push:
     case EventActorOp::CancelMovement: // Export currently restricts cancellation to topdown.

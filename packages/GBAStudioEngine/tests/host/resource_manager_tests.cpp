@@ -2405,7 +2405,21 @@ void test_resource_leases_release_banks_and_groups_automatically() {
 
 } // namespace
 
+static void test_releasing_a_bank_waits_until_its_destination_is_no_longer_borrowed() {
+    gbs::EngineResourceManager manager {}; gbs::init_resource_manager(manager);
+    gbs::dma_reset_vblank_queue();
+    const gbs::ResourceBank bank { gbs::ResourcePoolKind::BgTiles, 0, 4, 1, "borrowed" };
+    auto reservation = gbs::reserve_resource_bank(manager, bank);
+    uint16_t data[64] {};
+    assert(gbs::enqueue_resource_bank_upload_vblank(reservation, data));
+    const auto fence = gbs::dma_vblank_fence();
+    assert(gbs::release_resource_bank(manager, reservation));
+    assert(gbs::dma_fence_status(fence) == gbs::DmaFenceStatus::Complete);
+    assert(manager.bg_tiles.used_count == 0);
+}
+
 int main() {
+    test_releasing_a_bank_waits_until_its_destination_is_no_longer_borrowed();
     test_compact_pool_storage_and_word_boundaries();
     test_fixed_range_reservation();
     test_overflow_fails_safely();

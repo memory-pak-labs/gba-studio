@@ -22,7 +22,7 @@ def function(source, marker):
 def run_cpp(code, sources=()):
     with tempfile.TemporaryDirectory(prefix='gba-frame-boundary-') as directory:
         temp = Path(directory)
-        (temp / 'test.cpp').write_text(code)
+        (temp / 'test.cpp').write_text('#include "gbs/profiler.hpp"\n' + code)
         executable = temp / 'test'
         subprocess.run(['c++', '-std=c++17', '-O2', '-ffunction-sections', '-fdata-sections',
                         '-I' + str(ROOT / 'engine/include'), '-I' + str(ROOT / 'engine/src'),
@@ -33,6 +33,81 @@ def run_cpp(code, sources=()):
 
 
 class RuntimeFrameBoundaryTests(unittest.TestCase):
+    def test_platformer_button_script_waits_between_cover_and_reveal(self):
+        source = (ROOT / 'examples/platformer_basic/src/main.cpp').read_text()
+        code = '''
+#include <cassert>
+#include "gbs/event.hpp"
+namespace gbs {
+struct PlatformerActor {};
+struct PlatformerRoomData { int config; };
+struct VisualEffectsController { int phase = 0; };
+void consume_visual_effect_event(EventState& state, VisualEffectsController& effect) {
+    if (!state.visual_effect_changed) return;
+    effect.phase = state.visual_effect_phase;
+    state.visual_effect_changed = false;
+}
+template<class T> bool is_valid_platformer_project_script_index(const T& p, int i) {
+    return i >= 0 && static_cast<size_t>(i) < p.script_count;
+}
+}
+gbs::EventState event_state {};
+gbs::EventRunner platformer_event_runner {};
+gbs::EventScriptQueue platformer_event_queue {};
+int platformer_event_wait_frames = 0;
+gbs::VisualEffectsController visual_effects;
+struct { bool visible; } dialogue {false};
+struct { const gbs::EventScript* scripts; size_t script_count; } project {};
+void consume_event_state(gbs::EventState& state) {
+    platformer_event_wait_frames += state.wait_frames; state.wait_frames = 0;
+}
+void consume_platformer_actor_commands(gbs::EventState&,gbs::PlatformerActor&,const gbs::PlatformerRoomData&,bool&) {}
+void consume_platformer_state_request(gbs::EventState&,gbs::PlatformerActor&,int,bool&,int&) {}
+'''
+        code += function(source, 'void queue_platformer_script(')
+        code += function(source, 'bool run_button_event_binding(')
+        code += function(source, 'void update_platformer_event_script(')
+        code += '''
+int main() {
+    gbs::init_event_state(event_state);
+    gbs::init_event_runner(platformer_event_runner);
+    gbs::init_event_script_queue(platformer_event_queue);
+    const gbs::EventCommand commands[] = {
+        {gbs::EventOp::VisualEffect,9,4,100,1},
+        {gbs::EventOp::SetVariable,0,1,0}, {gbs::EventOp::Wait,8,0,0},
+        {gbs::EventOp::VisualEffect,9,4,100,2},
+        {gbs::EventOp::SetVariable,0,2,0}, {gbs::EventOp::Warp,1,24,32}
+    };
+    const gbs::EventScript scripts[] = {{commands,6}};
+    project = {scripts,1};
+    const gbs::EventCommand binding[] = {{gbs::EventOp::AttachButtonEvent,1,0,1}};
+    gbs::run_event_script(event_state,{binding,1});
+    gbs::set_event_input_state(event_state,1,1,0);
+    assert(run_button_event_binding());
+    assert(event_state.variables[0] == 0 && event_state.current_room == 0);
+    gbs::PlatformerActor player; gbs::PlatformerRoomData room{};
+    bool active=true; int active_state=0;
+    update_platformer_event_script(event_state,player,room,active,active_state);
+    assert(event_state.variables[0] == 1 && platformer_event_wait_frames == 8);
+    assert(visual_effects.phase == 1);
+    for (int frame=0; frame<8; ++frame) {
+        gbs::tick_event_frame_counter(event_state);
+        update_platformer_event_script(event_state,player,room,active,active_state);
+        assert(event_state.variables[0] == 1 && event_state.current_room == 0);
+        assert(visual_effects.phase == 1);
+    }
+    update_platformer_event_script(event_state,player,room,active,active_state);
+    assert(event_state.variables[0] == 2 && event_state.current_room == 1);
+    assert(visual_effects.phase == 2);
+    assert(event_state.player_x == 24 && event_state.player_y == 32);
+}
+'''
+        run_cpp(code, ['engine/src/gbs_event.cpp', 'engine/src/gbs_dialogue_locale.cpp',
+                      'engine/src/gbs_runtime.cpp', 'engine/src/gbs_rtc.cpp',
+                      'engine/src/gbs_link.cpp', 'engine/src/rumble.cpp',
+                      'engine/src/deferred_work.cpp', 'engine/src/gbs_engine_global.cpp',
+                      'tests/host/hw_stubs.cpp'])
+
     def test_platformer_initial_and_room_entry_wait_before_warp_and_player_start(self):
         source = (ROOT / 'examples/platformer_basic/src/main.cpp').read_text()
         entries = re.findall(r'(?:[^\n]*gbs::stop_event_runner\(platformer_event_runner\);\s*gbs::clear_event_script_queue\(platformer_event_queue\);\s*platformer_event_wait_frames = 0;\s*)?[^\n]*\((?:event_state, )?room_data->on_enter\);\s*queue_platformer_player_start_script\(\);', source)
@@ -45,7 +120,9 @@ class RuntimeFrameBoundaryTests(unittest.TestCase):
 namespace gbs {
 struct PlatformerActor {};
 struct PlatformerRoomData { int config; EventScript on_enter; };
+void consume_visual_effect_event(EventState&, int&) {}
 }
+int visual_effects = 0;
 gbs::EventState event_state {};
 gbs::EventRunner platformer_event_runner {};
 gbs::EventScriptQueue platformer_event_queue {};

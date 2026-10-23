@@ -1,3 +1,4 @@
+#include "gbs/profiler.hpp"
 #define GBS_DIALOGUE_UI_RUNTIME_KIND 4
 #include "gbs/engine.hpp"
 #include "gbs/audio.hpp"
@@ -1819,6 +1820,7 @@ gbs::RuntimeAdapterFrameResult update_shmup_runtime(const gbs::RuntimeFrameConte
 }
 
 void render_shmup_runtime(const gbs::RuntimeFrameContext& context) {
+    const gbs::SubsystemProfilerScope profiler_scope(gbs::ProfilerSubsystem::Render);
     (void)context;
     stream_background();
     refresh_affine_background();

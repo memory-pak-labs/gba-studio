@@ -1,3 +1,4 @@
+#include "gbs/profiler.hpp"
 #define GBS_DIALOGUE_UI_RUNTIME_KIND 3
 #include <algorithm>
 extern "C" void gbs_hw_set_bg_font_transparent(int enabled);
@@ -1908,6 +1909,7 @@ gbs::RuntimeAdapterFrameResult update_menu_runtime(const gbs::RuntimeFrameContex
 }
 
 void render_menu_runtime(const gbs::RuntimeFrameContext& context) {
+    const gbs::SubsystemProfilerScope profiler_scope(gbs::ProfilerSubsystem::Render);
     (void)context;
     const gbs::MenuScreenData* screen = gbs::menu_screen_for(project, menu_state.screen_index);
     if (!menu_script_controls_dialogue) {

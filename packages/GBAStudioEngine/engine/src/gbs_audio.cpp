@@ -1,3 +1,4 @@
+#include "gbs/profiler.hpp"
 #include "gbs/audio.hpp"
 #include "gbs_hw.h"
 
@@ -946,11 +947,17 @@ void audio_init() {
 }
 
 void audio_vblank_update() {
+#if defined(__arm__) || defined(__thumb__) || defined(GBS_ENABLE_PROFILER_SCOPES)
+    const uint32_t profiler_start = gbs_hw_frame_counter_ticks();
+#endif
     update_audio_volume_fades();
     update_sfx();
     update_music();
     update_tracker();
     update_pcm_mixer();
+#if defined(__arm__) || defined(__thumb__) || defined(GBS_ENABLE_PROFILER_SCOPES)
+    subsystem_profiler_record_audio(gbs_hw_frame_counter_ticks() - profiler_start);
+#endif
 }
 
 void audio_update() {

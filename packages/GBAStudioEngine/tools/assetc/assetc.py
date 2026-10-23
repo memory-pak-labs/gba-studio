@@ -8746,6 +8746,7 @@ def event_op_from_json(value):
         "projectile_load_slot": "ProjectileLoadSlot",
         "cancel_actor_movement": "CancelActorMovement",
         "actor_effects": "ActorEffects",
+        "visibility": "Visibility",
         "open_menu": "OpenMenu",
         "open_shop": "OpenShop",
         "set_adventure_state": "SetAdventureState",
@@ -9156,10 +9157,23 @@ def event_layer_index(command, keys=("layer", "background"), default=0):
 
 
 def event_tile_location(command):
-    x = max(0, min(63, event_int(command, ["x", "tile_x"], 0)))
-    y = max(0, min(63, event_int(command, ["y", "tile_y"], 0)))
+    x = event_int(command, ["x", "tile_x"], 0)
+    y = event_int(command, ["y", "tile_y"], 0)
+    if not 0 <= x <= 511 or not 0 <= y <= 511:
+        raise SystemExit("ReplaceTile coordinates must be between 0 and 511")
     layer = max(0, min(3, event_layer_index(command)))
-    return (layer << 12) | (y << 6) | x
+    return (layer << 12) | ((y & 63) << 6) | (x & 63)
+
+
+def event_tile_options(command):
+    x = event_int(command, ["x", "tile_x"], 0)
+    y = event_int(command, ["y", "tile_y"], 0)
+    collision = event_int(command, ["collision_flags"], -1)
+    if not -1 <= collision <= 255:
+        raise SystemExit("ReplaceTile collision_flags must be between 0 and 255")
+    if collision >= 0 and event_layer_index(command) not in (0, 2):
+        raise SystemExit("ReplaceTile collision is only supported on the scene floor (BG2)")
+    return (collision + 1) | ((x >> 6) << 9) | ((y >> 6) << 12)
 
 
 def event_engine_field(command, keys=("field", "engine_field"), default=0):
@@ -9567,6 +9581,23 @@ def event_command_from_json(command, description, animation_lookup=None):
         elif verb == "luta_set_rounds_to_win":
             target, value = max(1, min(255, event_int(command, ["count"], 2))), 0
         return (op, actions.index(verb), target, value)
+    if op == "Visibility":
+        effect = command.get("effect")
+        if effect == "clear":
+            return (op, -1, 0, 0, 0)
+        if effect not in ("lantern", "reveal"):
+            raise SystemExit("Visibility effect must be lantern, reveal or clear")
+        actor = event_int(command, ["actor"], -1)
+        width = event_int(command, ["width"], 80)
+        height = event_int(command, ["height"], 64)
+        intensity = event_int(command, ["intensity"], 75)
+        frames = event_int(command, ["frames"], 180)
+        if not (-1 <= actor < 96 and 8 <= width <= 240 and 8 <= height <= 160 and 0 <= intensity <= 100 and 1 <= frames <= 3600):
+            raise SystemExit("Visibility actor, area, intensity or duration out of range")
+        area = (width << 8) | height
+        if area > 32767:
+            area -= 65536
+        return (op, actor, area, frames, intensity | (128 if effect == "reveal" else 0))
     if op == "ActorEffects":
         return (op, event_int(command, ["actor"], -1), event_int(command, ["index"], 0), event_int(command, ["frames"], 30), event_int(command, ["intensity"], 50))
     if op == "CancelActorMovement":
@@ -9868,12 +9899,14 @@ def event_command_from_json(command, description, animation_lookup=None):
             0,
         )
     if op == "ReplaceTile":
-        return (
+        result = (
             op,
             event_tile_location(command),
             event_int(command, ["tile", "tile_id", "value"], 0),
             max(1, min(64, event_int(command, ["count", "length"], 1))),
         )
+        options = event_tile_options(command)
+        return result + (options,) if options else result
     if op == "ReplaceTileSequence":
         variable = max(0, min(15, event_int(command, ["variable", "var"], 0)))
         frames = max(1, min(255, event_int(command, ["frames", "count", "length"], 1)))
@@ -9882,12 +9915,9 @@ def event_command_from_json(command, description, animation_lookup=None):
         packed_tile = tile
         if tile_asset >= 0:
             packed_tile |= (max(0, min(30, tile_asset)) + 1) << 10
-        return (
-            op,
-            event_tile_location(command),
-            packed_tile,
-            (frames << 8) | variable,
-        )
+        result = (op, event_tile_location(command), packed_tile, (frames << 8) | variable)
+        options = event_tile_options(command)
+        return result + (options,) if options else result
     if op == "OverlayLine":
         return (op, event_int(command, ["line", "y", "height"], 0), 0, 0)
     if op == "OverlayShow":
@@ -10144,6 +10174,9 @@ def emit_event_script(output, name, commands, description, animation_lookup=None
     if parsed[-1][0] != "End":
         parsed.append(("End", 0, 0, 0))
 
+    for index, command in enumerate(commands):
+        if isinstance(command, dict) and isinstance(command.get("source"), dict):
+            output.append("// @gbs-event-source " + json.dumps({"symbol": name + "_commands", "index": index, "eventID": str(command["source"].get("eventID", "")), "stepID": str(command["source"].get("stepID", ""))}, ensure_ascii=True))
     output.append(f"constexpr gbs::EventCommand {name}_commands[] = {{")
     for command in parsed:
         op, a, b, c = command[:4]
@@ -13916,6 +13949,12 @@ def emit_topdown_project_data_header(topdown_project, asset_report=None, base_di
             f"topdown_project.rooms[{room_index}].on_enter",
             animation_lookup=player_animation_lookup,
         )
+        on_restore_script = emit_event_script(
+            output,
+            f"{prefix}_on_restore",
+            room.get("on_restore"),
+            f"topdown_project.rooms[{room_index}].on_restore",
+        )
         on_exit_script = emit_event_script(
             output,
             f"{prefix}_on_exit",
@@ -14331,7 +14370,8 @@ def emit_topdown_project_data_header(topdown_project, asset_report=None, base_di
             f"        {on_hit_group_scripts[0]},\n"
             f"        {on_hit_group_scripts[1]},\n"
             f"        {on_hit_group_scripts[2]},\n"
-            f"        {visual_tiles_literal if room.get('paged_source_tiles') else 'nullptr'}\n"
+            f"        {visual_tiles_literal if room.get('paged_source_tiles') else 'nullptr'},\n"
+            f"        {on_restore_script}\n"
             "    }"
         )
 
@@ -15992,6 +16032,12 @@ def emit_platformer_project_data_header(platformer_project, asset_report=None, b
             room.get("on_enter"),
             f"platformer_project.rooms[{room_index}].on_enter",
         )
+        on_restore_script = emit_event_script(
+            output,
+            f"{prefix}_on_restore",
+            room.get("on_restore"),
+            f"platformer_project.rooms[{room_index}].on_restore",
+        )
         on_exit_script = emit_event_script(
             output,
             f"{prefix}_on_exit",
@@ -16468,7 +16514,8 @@ def emit_platformer_project_data_header(platformer_project, asset_report=None, b
             f"        {room_video_literal},\n"
             f"        {on_hit_group_scripts[0]},\n"
             f"        {on_hit_group_scripts[1]},\n"
-            f"        {on_hit_group_scripts[2]}\n"
+            f"        {on_hit_group_scripts[2]},\n"
+            f"        {on_restore_script}\n"
             "    }"
         )
 

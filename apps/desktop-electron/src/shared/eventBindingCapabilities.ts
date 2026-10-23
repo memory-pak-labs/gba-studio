@@ -86,6 +86,7 @@ export function resolveEventBindingCapabilities(input: EventBindingCapabilityInp
   }
 
   const lifecycle = [standardRoomCapabilities[0]!];
+  if (["topdown", "platformer"].includes(runtime)) lifecycle.push({ bindingKey: "onRestore", label: "Ao restaurar", section: null, requiresFrequency: false });
   if (["topdown", "platformer", "isometric"].includes(runtime)) {
     lifecycle.push(standardRoomCapabilities[1]!);
     lifecycle.push({ bindingKey: "onExit", label: "Ao sair", section: null, requiresFrequency: false });

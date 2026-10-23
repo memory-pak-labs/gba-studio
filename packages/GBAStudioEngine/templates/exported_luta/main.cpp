@@ -1,3 +1,4 @@
+#include "gbs/profiler.hpp"
 #define GBS_DIALOGUE_UI_RUNTIME_KIND 12
 #include "gbs/engine.hpp"
 #include "gbs/audio.hpp"
@@ -902,6 +903,7 @@ gbs::RuntimeAdapterFrameResult update_luta_runtime(const gbs::RuntimeFrameContex
 }
 
 void render_luta_runtime(const gbs::RuntimeFrameContext& context) {
+    const gbs::SubsystemProfilerScope profiler_scope(gbs::ProfilerSubsystem::Render);
     (void)context;
     draw_luta();
     sync_runtime_telemetry();

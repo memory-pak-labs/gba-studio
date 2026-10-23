@@ -38,6 +38,28 @@ def function_body(source: str, name: str) -> str:
 
 
 class HardwareSourceContractTests(unittest.TestCase):
+    def test_audio_profiler_measures_the_vblank_mixer_work(self):
+        body = function_body(AUDIO_SOURCE.read_text(), "audio_vblank_update")
+        code = '''
+#include <cassert>
+#include <cstdint>
+uint32_t ticks=100, measured=0;
+uint32_t gbs_hw_frame_counter_ticks() { return ticks; }
+void subsystem_profiler_record_audio(uint32_t elapsed) { measured += elapsed; }
+void update_audio_volume_fades() { ticks+=1; }
+void update_sfx() { ticks+=2; }
+void update_music() { ticks+=3; }
+void update_tracker() { ticks+=4; }
+void update_pcm_mixer() { ticks+=5; }
+void audio_vblank_update() BODY
+int main() { audio_vblank_update(); assert(measured==15); }
+'''.replace("BODY", body)
+        with tempfile.TemporaryDirectory(prefix="gba-audio-profiler-") as directory:
+            source=Path(directory)/"test.cpp";binary=Path(directory)/"test"
+            source.write_text(code)
+            subprocess.run(["c++","-std=c++17","-DGBS_ENABLE_PROFILER_SCOPES",str(source),"-o",str(binary)],check=True)
+            subprocess.run([str(binary)],check=True)
+
     @classmethod
     def setUpClass(cls) -> None:
         cls.source = HARDWARE_SOURCE.read_text(encoding="utf-8")
@@ -645,16 +667,32 @@ int main() {
         self.assertIsNotNone(value)
         self.assertEqual((int(value.group(1), 16) >> 21) & 3, 2)
 
+    def test_disabling_one_window_preserves_the_other_window_outside_mask(self):
+        parameters = "uint16_t left,uint16_t right,uint16_t top,uint16_t bottom,uint16_t inside_mask,uint16_t outside_mask,int enabled"
+        code = "#include <stdint.h>\n#include <assert.h>\nuint16_t REG_WIN0H,REG_WIN0V,REG_WIN1H,REG_WIN1V,REG_WININ,REG_WINOUT,REG_DISPCNT;\n"
+        for window in (0, 1):
+            code += "void window" + str(window) + "(" + parameters + "){" + function_body(self.source, "gbs_hw_set_window" + str(window)) + "}\n"
+        code += "int main(void){window0(0,120,0,160,63,0,1);window1(0,240,0,160,63,63,0);assert((REG_WINOUT&63)==0);window1(0,120,0,160,31,4,1);window0(0,240,0,160,63,63,0);assert((REG_WINOUT&63)==4);}"
+        with tempfile.TemporaryDirectory() as directory:
+            source = Path(directory)/"windows.c"; source.write_text(code)
+            binary = Path(directory)/"windows"
+            subprocess.run(["cc",str(source),"-o",str(binary)],check=True)
+            subprocess.run([str(binary)],check=True)
+
     def test_vblank_rearms_the_last_complete_affine_table_even_when_render_misses_a_frame(self):
         irq = function_body(self.source, "gbs_hw_irq_dispatch")
         code = """#include <stdint.h>
 #include <assert.h>
 uint16_t REG_IF=1,REG_IE=1,BIOS_IRQ_FLAGS=0;int keypad_irq_pending,arms;
 static int affine_hblank_enabled=1;
+static uint32_t ticks,irq_ticks;
+uint32_t gbs_hw_frame_counter_ticks(void){return ticks++;}
+void record_irq(uint32_t elapsed){irq_ticks+=elapsed;}
+void (*gbs_profiler_record_irq)(uint32_t)=record_irq;
 static void rearm_active_affine_hblank(void){++arms;}
 void commit_pcm_stream_block(void){} void gbs_audio_vblank_update(void){} void gbs_dispatch_hardware_interrupts(uint16_t flags){}
 void dispatch(void) {"""+irq+"""}
-int main(void){dispatch();dispatch();assert(arms==2);REG_IF=0;dispatch();assert(arms==2);}
+int main(void){dispatch();dispatch();assert(arms==2);assert(irq_ticks==2);REG_IF=0;dispatch();assert(arms==2);assert(irq_ticks==2);}
 """
         with tempfile.TemporaryDirectory() as directory:
             source=Path(directory)/"irq.c";source.write_text(code);binary=Path(directory)/"irq"

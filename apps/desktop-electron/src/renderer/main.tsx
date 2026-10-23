@@ -122,6 +122,8 @@ import {
   createProjectPrefabFromEntity,
   instantiateProjectPrefab,
   synchronizeProjectPrefabInstances,
+  setProjectPrefabOverrides,
+  clearProjectPrefabOverrides,
   updateProjectPrefab,
   type ProjectPrefabKind,
   type ProjectPrefabPlacement
@@ -435,6 +437,16 @@ function App(): React.ReactElement {
     void loadLaunchProject();
   }, []);
 
+  function openSourceEvent(eventName: string, sourceRoomName?: string): void {
+    const requestID = ++focusedEventRequestSequence.current;
+    if (sourceRoomName) setFocusedAssetRequest({
+      assetID: sourceRoomName, assetName: sourceRoomName, kind: "Room",
+      label: `Cena · ${sourceRoomName}`, requestID, targetName: sourceRoomName, workspace: "Editor"
+    });
+    setFocusedEventRequest({ eventName, requestID });
+    openEventsInspector(eventName);
+  }
+
   function openEventsInspector(eventName?: string): void {
     setPendingFocusInspectorTab("events");
     requestAnimationFrame(() => {
@@ -703,7 +715,8 @@ function App(): React.ReactElement {
       dma: physicalMetric("dmaBytes"),
       vram: physicalMetric("vramBytes"),
       oam: physicalMetric("oam"),
-      scanline: runtime.timing.renderSkipCount
+      scanline: runtime.timing.renderSkipCount,
+      subsystems: runtime.subsystems?.scenePeakTicks
     }));
   }, [hardwareProfiler, romPlayerTelemetry]);
   useEffect(() => {
@@ -1630,10 +1643,14 @@ function App(): React.ReactElement {
 
   function updateRoomFields(roomID: string, fields: UpdateRoomFields, historyGroupID?: string): void {
     if (!session) return;
-    const nextData = updateRoomFieldsInProject(session.project.data, roomID, fields);
-    if (nextData !== session.project.data) {
-      updateProjectData(nextData, { historyGroupID });
-      setStatus(ui("Cena atualizada."));
+    try {
+      const nextData = updateRoomFieldsInProject(session.project.data, roomID, fields);
+      if (nextData !== session.project.data) {
+        updateProjectData(nextData, { historyGroupID });
+        setStatus(ui("Cena atualizada."));
+      }
+    } catch (error) {
+      setStatus(error instanceof Error ? ui(error.message) : ui("Não foi possível atualizar a cena."));
     }
   }
 
@@ -1790,7 +1807,9 @@ function App(): React.ReactElement {
 
   function updateRoomEntity(kind: RoomsWorkspaceEntityKind, entityID: string, fields: UpdateRoomEntityFields, historyGroupID?: string): void {
     if (!session) return;
-    const nextData = updateRoomEntityInProject(session.project.data, kind, entityID, fields);
+    const updated = updateRoomEntityInProject(session.project.data, kind, entityID, fields);
+    const entity = (updated[kind === "actor" ? "actors" : "triggers"] as Record<string, unknown>[]).find(item => item.id === entityID);
+    const nextData = entity?.prefabID ? setProjectPrefabOverrides(updated, kind, entityID, Object.fromEntries(Object.keys(fields).map(key => [key, entity[key]]))) : updated;
     if (nextData !== session.project.data) {
       updateProjectData(nextData, { historyGroupID });
       setStatus(kind === "actor" ? "Ator da cena atualizado." : "Trigger da cena atualizado.");
@@ -1813,7 +1832,9 @@ function App(): React.ReactElement {
 
   function instantiatePrefab(kind: ProjectPrefabKind, prefabID: string, placement: ProjectPrefabPlacement): void {
     if (!session) return;
-    const result = instantiateProjectPrefab(session.project.data, kind, prefabID, placement);
+    let result: ReturnType<typeof instantiateProjectPrefab>;
+    try { result = instantiateProjectPrefab(session.project.data, kind, prefabID, placement); }
+    catch (error) { setStatus(error instanceof Error ? error.message : String(error)); return; }
     if (!result.entityID) return;
     updateProjectData(result.data);
     setStatus(kind === "actor" ? "Instancia de ator criada na cena." : "Instancia de trigger criada na cena.");
@@ -3414,6 +3435,8 @@ function App(): React.ReactElement {
               onCreatePrefabFromEntity={createPrefabFromEntity}
               onInstantiatePrefab={instantiatePrefab}
               onUpdatePrefab={updatePrefab}
+              onApplyInteractiveObjects={data => updateProjectData(data)}
+              onResetPrefabOverrides={(kind, entityID) => updateProjectData(clearProjectPrefabOverrides(session.project.data, kind, entityID))}
               onPlaceRoomEntity={placeRoomEntity}
               onCreateTrigger={createTrigger}
               onCreateActor={createActor}
@@ -3449,25 +3472,7 @@ function App(): React.ReactElement {
               onImportAssets={importAssets}
               onAnalyzeProjectBudget={() => void analyzeProjectBudget()}
               onOpenProjectHealth={openProjectHealth}
-              onOpenEvent={(eventName, sourceRoomName) => {
-                const requestID = ++focusedEventRequestSequence.current;
-                if (sourceRoomName) {
-                  setFocusedAssetRequest({
-                    assetID: sourceRoomName,
-                    assetName: sourceRoomName,
-                    kind: "Room",
-                    label: `Cena · ${sourceRoomName}`,
-                    requestID,
-                    targetName: sourceRoomName,
-                    workspace: "Editor"
-                  });
-                }
-                setFocusedEventRequest({
-                  eventName,
-                  requestID
-                });
-                openEventsInspector(eventName);
-              }}
+              onOpenEvent={openSourceEvent}
               onUpdateEventStep={updateEventStep}
               onOpenDialoguesWorkspace={(dialogueKey) => {
                 if (dialogueKey) {
@@ -3686,6 +3691,8 @@ function App(): React.ReactElement {
         problems={projectProblems}
       />
       <TestingDiagnosticsDrawer
+        buildResult={buildResult}
+        doctorSummary={doctorResult?.summary}
         inputRecording={inputRecording}
         inputReplay={inputReplaySession}
         isOpen={testingDiagnosticsOpen}
@@ -3700,6 +3707,12 @@ function App(): React.ReactElement {
         projectData={session.project.data}
         memoryReport={buildResult?.summary?.memoryReport}
         romOccupancy={buildResult?.summary?.romOccupancy}
+        eventTrace={romPlayerTelemetry?.state === "running" ? romPlayerTelemetry.stats?.runtimeState?.eventTrace : null}
+        onOpenEvent={eventID => {
+          const event = (session.project.data.events as Record<string, unknown>[]).find(item => item.id === eventID || item.name === eventID);
+          setTestingDiagnosticsOpen(false);
+          openSourceEvent(String(event?.name ?? eventID), typeof event?.roomName === "string" ? event.roomName : typeof event?.sceneName === "string" ? event.sceneName : undefined);
+        }}
         runtimeAudio={romPlayerTelemetry?.state === "running" ? romPlayerTelemetry.stats?.runtimeState?.audio : null}
       />
       <StudioStatusBar message={status} workspace={selectedWorkspace} isBusy={statusBusy} />

@@ -427,6 +427,22 @@ describe("Events workspace presentation", () => {
     );
   });
 
+  it("recognizes the player alias in visibility preset actor fields", () => {
+    const presentation = deriveEventsWorkspacePresentation({
+      actors: [{ name: "Player" }, { name: "Guide" }],
+      events: [{ id: "visibility", name: "visibility", category: "Cena", steps: [
+        { command: "lantern player 80 64 75 240" },
+        { command: "reveal_area player 24 24 100 120" }
+      ] }]
+    });
+    const event = presentation.groups.flatMap(group => group.events).find(item => item.id === "visibility")!;
+    for (const step of event.steps) {
+      expect(step.commandParameters[0]).toMatchObject({
+        value: "player", options: ["player", "Player", "Guide"], isKnownValue: true
+      });
+    }
+  });
+
   it("derives command cards and editable parameters for the ROM-ready registry", () => {
     const presentation = deriveEventsWorkspacePresentation({
       scenas: [{ name: "overworld" }, { name: "shop" }],
@@ -1486,8 +1502,8 @@ describe("Events workspace presentation", () => {
     const roomNode = presentation.graphNodes.find((node) => node.targetName === "room_1");
     const battleNode = presentation.graphNodes.find((node) => node.targetName === "arena");
     const playerNode = presentation.graphNodes.find((node) => node.targetName === "Player");
-    expect(roomNode?.contextBindingSlots.map((slot) => slot.bindingKey)).toEqual(["onInit", "onHitPlayer", "onExit", "onInteract"]);
-    expect(roomNode?.pendingBindingCount).toBe(5);
+    expect(roomNode?.contextBindingSlots.map((slot) => slot.bindingKey)).toEqual(["onInit", "onRestore", "onHitPlayer", "onExit", "onInteract"]);
+    expect(roomNode?.pendingBindingCount).toBe(6);
     expect(battleNode?.contextBindingSlots.map((slot) => slot.bindingKey)).toEqual(["onInit", "onVictory", "onDefeat", "onEscape"]);
     expect(battleNode?.contextBindingSlots.some((slot) => slot.bindingKey === "onHitPlayer")).toBe(false);
     expect(battleNode?.pendingBindingCount).toBe(4);
@@ -1751,8 +1767,8 @@ describe("Events workspace presentation", () => {
         bindingKeys: ["onInit", "onExit"],
         boundEventNames: ["room_boot", "missing_event"],
         missingReferenceCount: 1,
-        pendingBindingCount: 4,
-        flowLabels: ["Cena", "4 pendentes"]
+        pendingBindingCount: 5,
+        flowLabels: ["Cena", "5 pendentes"]
       }),
       expect.objectContaining({
         id: "context-room-shop",
@@ -1765,8 +1781,8 @@ describe("Events workspace presentation", () => {
         bindingKeys: [],
         boundEventNames: [],
         missingReferenceCount: 0,
-        pendingBindingCount: 6,
-        flowLabels: ["Cena", "6 pendentes"]
+        pendingBindingCount: 7,
+        flowLabels: ["Cena", "7 pendentes"]
       }),
       expect.objectContaining({
         id: "event-room",

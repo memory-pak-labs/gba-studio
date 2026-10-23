@@ -1,3 +1,4 @@
+#include "gbs/profiler.hpp"
 #define GBS_DIALOGUE_UI_RUNTIME_KIND 2
 #include "gbs/engine.hpp"
 #include "gbs/event_ui.hpp"
@@ -2952,6 +2953,7 @@ bool render_paged_isometric_viewport(const gbs::IsoBakedComposition& surface, in
 }
 
 void render_isometric_runtime(const gbs::RuntimeFrameContext& context) {
+    const gbs::SubsystemProfilerScope profiler_scope(gbs::ProfilerSubsystem::Render);
     (void)context;
         const bool authored_background = gbs::uses_authored_isometric_background(*room_data);
         const gbs::IsoTacticalPresentationData* tactical_presentation = room_data->tactical_presentation;

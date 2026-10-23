@@ -1,3 +1,4 @@
+#include "gbs/profiler.hpp"
 #define GBS_DIALOGUE_UI_RUNTIME_KIND 6
 #include "gbs/dungeon_crawler.hpp"
 #include "gbs/engine.hpp"
@@ -1445,6 +1446,7 @@ void draw_presented_dungeon_map() {
 }
 
 void render_dungeon_crawler_runtime(const gbs::RuntimeFrameContext& context) {
+    const gbs::SubsystemProfilerScope profiler_scope(gbs::ProfilerSubsystem::Render);
     (void)context;
     if(dungeon_presentation() && dungeon_presentation()->hud_palette)gbs::load_palette(*dungeon_presentation()->hud_palette,false);
     draw_view();

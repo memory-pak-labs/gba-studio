@@ -1,3 +1,4 @@
+extern "C" void gbs_debug_record_event(const void*, unsigned, unsigned, unsigned, int, int);
 #include <cassert>
 #include <cstring>
 #include "gbs/debug.hpp"
@@ -109,6 +110,10 @@ void test_runtime_telemetry_block_is_shared_and_reset_to_schema_four() {
     volatile gbs::RuntimeTelemetryBlock& first = gbs::runtime_telemetry_block();
     assert(first.magic == gbs::runtime_telemetry_magic);
     assert(first.schema == 4);
+    volatile auto& profiler = gbs::runtime_profiler_telemetry_block();
+    assert(reinterpret_cast<uintptr_t>(&profiler) == reinterpret_cast<uintptr_t>(&first) + 256);
+    assert(profiler.magic == 0x47535046u && profiler.schema == 1 && profiler.word_count == 16);
+    assert(profiler.ticks_per_second == 262144 && profiler.valid_bits == 0);
     assert(first.word_count == 64);
     assert(first.current_room == -1);
     assert(gbs::debug_runtime_kind() == 1);
@@ -182,7 +187,23 @@ extern "C" void gbs_hw_draw_text_box(int, int, int, int, const char* text, int v
     last_draw_visible = visible;
 }
 
+static void test_event_trace_is_bounded_and_can_be_disabled() {
+    auto& trace = gbs::runtime_event_trace_block(); trace.sequence = 0;
+    gbs::debug_set_event_trace_enabled(true);
+    for (unsigned i = 0; i < 9; ++i) gbs_debug_record_event(reinterpret_cast<void*>(0x08000000u + i * 10), i, 3, 2, 4, 12);
+    assert(trace.sequence == 9);
+    assert(trace.entries[0].command_address == 0x08000050u);
+    assert((trace.entries[0].step_op_status & 65535) == 8);
+    assert(trace.entries[0].room_wait == (12u << 16 | 4));
+    assert(trace.magic == 0x47534554u && trace.word_count == 20);
+    gbs::debug_set_event_trace_enabled(false);
+    gbs_debug_record_event(nullptr, 0, 0, 0, 0, 0);
+    assert(trace.sequence == 9);
+    gbs::debug_set_event_trace_enabled(true);
+}
+
 int main() {
+    test_event_trace_is_bounded_and_can_be_disabled();
     test_debug_assertion_records_first_order_state();
     test_debug_frame_budget_tracks_peak_and_over_budget();
     test_debug_counters_track_values_and_peaks();

@@ -1,3 +1,6 @@
+import { InteractiveObjectsInspector } from "./InteractiveObjectsInspector";
+import { prefabUpdateImpact } from "../shared/projectPrefabs";
+import { MapStatesInspector } from "./MapStatesInspector";
 import { DungeonScenePreview } from "./DungeonScenePreview";
 import { createRoomEntityDragPreview } from "./roomEntityDragPreview";
 import { ActorRuntimeResourcesInspector, SceneRuntimeResourcesInspector } from "./SceneRuntimeResourcesInspector";
@@ -428,6 +431,8 @@ interface RoomsWorkspaceProps {
   onSynchronizePrefabs?(): void;
   onCreatePrefabFromEntity?(kind: ProjectPrefabKind, entityID: string): void;
   onInstantiatePrefab?(kind: ProjectPrefabKind, prefabID: string, placement: ProjectPrefabPlacement): void;
+  onResetPrefabOverrides?(kind: ProjectPrefabKind, entityID: string): void;
+  onApplyInteractiveObjects?(data: GBAProjectData): void;
   onUpdatePrefab?(kind: ProjectPrefabKind, prefabID: string, fields: Record<string, unknown>): void;
 }
 
@@ -2576,6 +2581,9 @@ function roomDetailsEditor(
   return (
     <div className="room-detail-editor" aria-label={ui("Editar {0}", { 0: roomLabel })}>
       {activeTab === "scene" ? <>
+      {["topdown", "platformer"].includes(room.sceneType) ? <MapStatesInspector value={room.mapStates ?? []}
+        width={room.width} height={room.height} sceneName={room.name}
+        onChange={mapStates => onUpdateRoomFields(room.id, { mapStates })} /> : null}
       {resolvedRuntime.type === "racing" ? <RacingSceneInspector
         config={normalizeRacingSceneConfig(resolvedRuntime.config)} width={room.width} height={room.height}
         background={room.background??""} assets={backgroundOptions}
@@ -7141,6 +7149,19 @@ function RoomTilemapEditor({
   );
 }
 
+function PrefabInstanceImpact({ data, kind, prefab, onReset }: { data: GBAProjectData; kind: ProjectPrefabKind; prefab: ProjectPrefabRecord; onReset?: (kind: ProjectPrefabKind, id: string) => void }): React.ReactElement {
+  const ui = useStudioUiText();
+  const fields = Object.keys(prefab).filter(key => !["id", "name", "authoring"].includes(key));
+  const impact = prefabUpdateImpact(data, kind, prefab.id, fields);
+  return <details><summary>{ui("Herança das instâncias")} · {impact.length}</summary>
+    {impact.map(instance => <div key={instance.id}>
+      <strong>{instance.id}</strong><p>{ui("Herdados: {0}", { 0: instance.inherited.join(", ") || "—" })}</p>
+      <p>{ui("Personalizados: {0}", { 0: instance.overridden.join(", ") || "—" })}</p>
+      {instance.overridden.length && onReset ? <button type="button" onClick={() => onReset(kind, instance.id)}>{ui("Restaurar herança")}</button> : null}
+    </div>)}
+  </details>;
+}
+
 function PrefabAuthoringNote({ prefab }: { prefab: ProjectPrefabRecord }): React.ReactElement | null {
   const note = prefab.authoring as { sourceScene?: string; description?: string } | undefined;
   return note?.description ? <p><small>{note.sourceScene}: {note.description}</small></p> : null;
@@ -7223,7 +7244,9 @@ export function RoomsWorkspace({
   onSynchronizePrefabs,
   onCreatePrefabFromEntity,
   onInstantiatePrefab,
-  onUpdatePrefab
+  onUpdatePrefab,
+  onApplyInteractiveObjects,
+  onResetPrefabOverrides
 }: RoomsWorkspaceProps): React.ReactElement {
   const ui = useStudioUiText();
   const [selectedTileID, setSelectedTileID] = useState(1);
@@ -9588,6 +9611,7 @@ export function RoomsWorkspace({
           ) : null}
           {navigatorTab === "prefabs" ? (
           <section className="editor-rail-section prefabs-section" aria-label={ui("Pre-fabricados")}>
+            {projectData && onApplyInteractiveObjects ? <InteractiveObjectsInspector data={projectData} onApply={onApplyInteractiveObjects} /> : null}
             <label className="editor-project-search-field">
               <Search aria-hidden="true" size={16} />
               <input type="search" aria-label={ui("Buscar")} placeholder={ui("Buscar")} value={prefabQuery} onChange={event => setPrefabQuery(event.currentTarget.value)} />
@@ -9642,6 +9666,7 @@ export function RoomsWorkspace({
                       </summary>
                       <div className="editor-prefab-fields">
                         <PrefabAuthoringNote prefab={prefab} />
+                        <PrefabInstanceImpact data={projectData!} kind="actor" prefab={prefab} onReset={onResetPrefabOverrides} />
                         <label>
                           <span>{ui("Nome")}</span>
                           <input
@@ -9695,6 +9720,7 @@ export function RoomsWorkspace({
                       </summary>
                       <div className="editor-prefab-fields">
                         <PrefabAuthoringNote prefab={prefab} />
+                        <PrefabInstanceImpact data={projectData!} kind="trigger" prefab={prefab} onReset={onResetPrefabOverrides} />
                         <label>
                           <span>{ui("Nome")}</span>
                           <input

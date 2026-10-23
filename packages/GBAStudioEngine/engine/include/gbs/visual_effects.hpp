@@ -26,6 +26,29 @@ struct VisualEffectsController {
     bool active;
 };
 
+struct VisibilityEffectController {
+    int16_t actor;
+    uint16_t width;
+    uint16_t height;
+    uint16_t duration_frames;
+    uint16_t remaining_frames;
+    uint16_t elapsed_frames;
+    uint8_t intensity;
+    bool reveal;
+    bool active;
+};
+
+enum class VisibilityRenderStatus : uint8_t { Inactive, Visible, TransitionOwnsResources, EffectOwnsResources };
+// WIN1 + brightness are exclusive with transitions and window/blend effects.
+VisibilityRenderStatus visibility_render_status(const VisualEffectsController& other, bool transition_active = false);
+const VisibilityEffectController& visibility_effect();
+void start_visibility_effect(int actor, int width, int height, int intensity, int frames, bool reveal);
+void stop_visibility_effect();
+void consume_visibility_event_commands(const EventState& state);
+// Fade/mask transitions own the shared hardware effects while active.
+void render_visibility_effects(Vec2i center_screen, const VisualEffectsController& other, bool transition_active = false);
+void tick_visibility_effects();
+
 void init_visual_effects(VisualEffectsController& controller);
 void reset_visual_effect_rendering();
 void stop_visual_effect(VisualEffectsController& controller);

@@ -1,3 +1,4 @@
+import { captureBuildEnvironment } from "./buildEnvironment.js";
 import { existsSync } from "node:fs";
 import { createHash } from "node:crypto";
 import { execFile, type ExecFileOptionsWithStringEncoding } from "node:child_process";
@@ -535,6 +536,12 @@ export async function runGbsbuildDryRun(options: RunGbsbuildDryRunOptions): Prom
 }
 
 export async function runGbsbuild(options: RunGbsbuildOptions): Promise<EnginePackBuildResult> {
+  const environment = await captureBuildEnvironment(options).catch(() => undefined);
+  const result = await executeGbsbuild(options);
+  return { ...result, ...(environment ? { environment } : {}) };
+}
+
+async function executeGbsbuild(options: RunGbsbuildOptions): Promise<EnginePackBuildResult> {
   let prepared: PreparedGbsbuildRun;
   try { prepared = await prepareGbsbuildRun(options); } catch (error) {
     return { ran: false, exitCode: null, error: error instanceof Error ? error.message : String(error) };
@@ -654,6 +661,7 @@ export async function runSelectedEnginePackBuild(projectDir: string, enginePackP
   const status = inspectEnginePack({ preferredPath: enginePackPath });
   if (!status.selected?.gbsbuildPath) {
     return {
+      environment: await captureBuildEnvironment({ projectDir, enginePackPath }).catch(() => undefined),
       ran: false,
       exitCode: null,
       error: enginePackMissingMessage(enginePackPath, "gbsbuild")

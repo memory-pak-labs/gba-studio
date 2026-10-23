@@ -880,6 +880,7 @@
                 "fade_in",
                 "fade_out",
                 "visual_effect",
+                "visibility",
                 "follow_camera",
                 "jump",
                 "jump_if_actor_at_position",
@@ -1202,6 +1203,12 @@
                   }
                 },
                 "additionalProperties": true
+              },
+              "on_restore": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/properties/topdown_project/properties/event_command"
+                }
               },
               "on_enter": {
                 "type": "array",
@@ -2325,6 +2332,12 @@
               },
               "config": {
                 "type": "object"
+              },
+              "on_restore": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/properties/topdown_project/properties/event_command"
+                }
               },
               "on_enter": {
                 "type": "array",

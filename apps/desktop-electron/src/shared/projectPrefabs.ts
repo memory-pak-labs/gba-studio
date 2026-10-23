@@ -1,3 +1,4 @@
+import { configureInteractiveObject, type InteractiveObjectParameters } from "./interactiveObjects.js";
 import type { GBAProjectData } from "./projectFile.js";
 
 export interface ProjectPrefabRecord extends Record<string, unknown> {
@@ -13,7 +14,7 @@ export interface ProjectPrefabPlacement {
   y: number;
 }
 
-const instanceFields = new Set(["id", "name", "roomID", "roomId", "roomName", "x", "y", "z", "prefabID", "prefabEventCopies", "authoring"]);
+const instanceFields = new Set(["id", "name", "roomID", "roomId", "roomName", "x", "y", "z", "prefabID", "prefabEventCopies", "prefabOverrides", "authoring"]);
 
 function slug(value: string): string {
   return value.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase()
@@ -81,7 +82,7 @@ function synchronizeInstances(instances: unknown, prefabs: ProjectPrefabRecord[]
       inherited.eventBindings = mappedBindings(inherited.eventBindings, mapping);
       for (const key of ["eventName", "scriptName"]) if (typeof inherited[key] === "string") inherited[key] = mapping[inherited[key] as string] ?? inherited[key];
     }
-    return { ...instance, ...inherited };
+    return { ...instance, ...inherited, ...(instance.prefabOverrides && typeof instance.prefabOverrides === "object" ? inheritedFields(instance.prefabOverrides as Record<string, unknown>) : {}) };
   });
 }
 
@@ -172,7 +173,11 @@ export function instantiateProjectPrefab(
     prefabID
   };
   const next = { ...data, [instanceKey]: [...instances, entity] };
-  if (kind === "actor") copyActorScripts(next, entity, prefab, String(room?.name ?? ""));
+  if (kind === "actor" && !prefab.interactiveObject) copyActorScripts(next, entity, prefab, String(room?.name ?? ""));
+  if (kind === "actor" && prefab.interactiveObject && typeof prefab.interactiveObject === "object") {
+    const parameters = prefab.interactiveObject as InteractiveObjectParameters;
+    return { data: configureInteractiveObject(next, entityID, { ...parameters, variable: `${parameters.variable}.${entityID}` }).data, entityID };
+  }
   return { data: next, entityID };
 }
 
@@ -221,4 +226,44 @@ function copyActorScripts(data: GBAProjectData, entity: Record<string, unknown>,
   entity.prefabEventCopies = mapping;
   entity.eventBindings = mappedBindings(entity.eventBindings, mapping);
   for (const key of ["eventName", "scriptName"]) if (typeof entity[key] === "string") entity[key] = mapping[entity[key] as string] ?? entity[key];
+}
+
+/** Instance edits opt out of inheritance explicitly; placement never becomes an override. */
+export function setProjectPrefabOverrides(data: GBAProjectData, kind: ProjectPrefabKind, entityID: string, fields: Record<string, unknown>): GBAProjectData {
+  const key = kind === "actor" ? "actors" : "triggers";
+  const overrides = inheritedFields(fields);
+  if (!Object.keys(overrides).length) return data;
+  return { ...data, [key]: records(data[key]).map(entity => entity.id === entityID && entity.prefabID
+    ? { ...entity, ...overrides, prefabOverrides: { ...(entity.prefabOverrides as Record<string, unknown> ?? {}), ...overrides } } : entity) };
+}
+export function prefabUpdateImpact(data: GBAProjectData, kind: ProjectPrefabKind, prefabID: string, fields: string[]) {
+  return records(data[kind === "actor" ? "actors" : "triggers"]).filter(entity => entity.prefabID === prefabID).map(entity => ({
+    id: String(entity.id), inherited: fields.filter(field => !Object.hasOwn(entity.prefabOverrides as object ?? {}, field)),
+    overridden: fields.filter(field => Object.hasOwn(entity.prefabOverrides as object ?? {}, field))
+  }));
+}
+
+export function clearProjectPrefabOverrides(data: GBAProjectData, kind: ProjectPrefabKind, entityID: string): GBAProjectData {
+  const key = kind === "actor" ? "actors" : "triggers";
+  const source = records(data[key]).find(entity => entity.id === entityID);
+  const prefabs = kind === "actor" ? projectActorPrefabs(data) : projectTriggerPrefabs(data);
+  const prefab = prefabs.find(item => item.id === source?.prefabID);
+  const next = synchronizeProjectPrefabInstances({ ...structuredClone(data), [key]: records(data[key]).map(entity => {
+    if (entity.id !== entityID) return entity;
+    const inherited = { ...entity };
+    for (const field of Object.keys(entity.prefabOverrides as Record<string, unknown> ?? {})) delete inherited[field];
+    return { ...inherited, prefabOverrides: {} };
+  }) });
+  if (kind === "actor" && source?.interactiveObject) {
+    if (prefab?.interactiveObject) return configureInteractiveObject(next, entityID, {
+      ...prefab.interactiveObject as InteractiveObjectParameters,
+      variable: (source.interactiveObject as InteractiveObjectParameters).variable
+    }).data;
+    const restoreName = `object-${entityID.replace(/[^\w.-]/g, "_")}-restore`;
+    // Remove only calls owned by the generated lifecycle wrappers. Keep event
+    // definitions intact, since the author may reference them elsewhere.
+    next.events = records(next.events).map(event => String(event.name).startsWith("objects-")
+      ? { ...event, steps: records(event.steps).filter(step => step.command !== `call_event ${restoreName}`) } : event);
+  }
+  return next;
 }

@@ -5,6 +5,8 @@ namespace {
 int16_t hblank_scroll_offsets[160] {};
 gbs::VisualEffectsController scene_transition_effects {};
 bool scene_transition_effects_initialized = false;
+gbs::VisibilityEffectController visibility_controller {};
+bool visibility_rendered = false;
 
 int clamp_value(int value, int minimum, int maximum) {
     if (value < minimum) return minimum;
@@ -113,6 +115,79 @@ VisualEffectsController& scene_transition_controller() {
 }
 
 } // namespace
+
+const VisibilityEffectController& visibility_effect() { return visibility_controller; }
+
+void stop_visibility_effect() {
+    disable_window1();
+    if (visibility_rendered) disable_blending();
+    visibility_controller = {};
+    visibility_rendered = false;
+}
+
+void start_visibility_effect(int actor, int width, int height, int intensity, int frames, bool reveal) {
+    stop_visibility_effect();
+    if (frames <= 0 || actor < -1 || actor >= static_cast<int>(max_event_actor_state_slots)) return;
+    visibility_controller.actor = static_cast<int16_t>(actor);
+    visibility_controller.width = static_cast<uint16_t>(clamp_value(width, 8, 240));
+    visibility_controller.height = static_cast<uint16_t>(clamp_value(height, 8, 160));
+    visibility_controller.intensity = static_cast<uint8_t>(clamp_value(intensity, 0, 100));
+    visibility_controller.duration_frames = static_cast<uint16_t>(clamp_value(frames, 1, 3600));
+    visibility_controller.remaining_frames = visibility_controller.duration_frames;
+    visibility_controller.reveal = reveal;
+    visibility_controller.active = true;
+}
+
+void consume_visibility_event_commands(const EventState& state) {
+    for (size_t i = 0; i < state.actor_command_count; ++i) {
+        const EventActorCommand& command = state.actor_commands[i];
+        if (command.op != EventActorOp::VisibilityLantern && command.op != EventActorOp::VisibilityReveal) continue;
+        start_visibility_effect(command.actor_index, (command.a >> 8) & 255, command.a & 255,
+            command.c, command.b, command.op == EventActorOp::VisibilityReveal);
+    }
+}
+
+VisibilityRenderStatus visibility_render_status(const VisualEffectsController& other, bool transition_active) {
+    if (!visibility_controller.active) return VisibilityRenderStatus::Inactive;
+    if (transition_active || (scene_transition_effects_initialized && scene_transition_effects.active)) return VisibilityRenderStatus::TransitionOwnsResources;
+    const bool shared_effect = other.active && (other.kind == VisualEffectKind::Fade ||
+        other.kind == VisualEffectKind::ColorFade || other.kind == VisualEffectKind::PaletteFlash ||
+        other.kind == VisualEffectKind::Mask || other.kind == VisualEffectKind::Letterbox ||
+        other.kind == VisualEffectKind::Push || other.kind == VisualEffectKind::Pull);
+    return shared_effect ? VisibilityRenderStatus::EffectOwnsResources : VisibilityRenderStatus::Visible;
+}
+
+void render_visibility_effects(Vec2i center_screen, const VisualEffectsController& other, bool transition_active) {
+    const VisibilityEffectController& effect = visibility_controller;
+    const VisibilityRenderStatus status = visibility_render_status(other, transition_active);
+    if (status == VisibilityRenderStatus::Inactive) return;
+    if (status != VisibilityRenderStatus::Visible) {
+        disable_window1();
+        visibility_rendered = false;
+        return;
+    }
+    int width = effect.width, height = effect.height;
+    if (effect.reveal) {
+        width += ((480 - width) * effect.elapsed_frames) / effect.duration_frames;
+        height += ((320 - height) * effect.elapsed_frames) / effect.duration_frames;
+    }
+    const int left = clamp_value(center_screen.x - width / 2, 0, 240);
+    const int right = clamp_value(center_screen.x - width / 2 + width, 0, 240);
+    const int top = clamp_value(center_screen.y - height / 2, 0, 160);
+    const int bottom = clamp_value(center_screen.y - height / 2 + height, 0, 160);
+    const bool visible = left < right && top < bottom;
+    const WindowRect rect = visible ? WindowRect { static_cast<uint8_t>(left), static_cast<uint8_t>(right),
+        static_cast<uint8_t>(top), static_cast<uint8_t>(bottom) } : WindowRect { 0, 1, 0, 1 };
+    set_window1(WindowConfig { rect, static_cast<uint16_t>(visible ? 0x1F : 0x3F), 0x3F, true });
+    set_blending(BlendConfig { 0x3F, 0, BlendMode::Darken, 0, 0, static_cast<uint8_t>((effect.intensity * 16) / 100) });
+    visibility_rendered = true;
+}
+
+void tick_visibility_effects() {
+    if (!visibility_controller.active) return;
+    ++visibility_controller.elapsed_frames;
+    if (--visibility_controller.remaining_frames == 0) stop_visibility_effect();
+}
 
 void init_visual_effects(VisualEffectsController& controller) {
     controller.kind = VisualEffectKind::Clear;
@@ -232,6 +307,7 @@ bool consume_scene_transition_visual_effect_event(EventState& event_state) {
 }
 
 void reset_scene_transition_visual_effects() {
+    stop_visibility_effect();
     VisualEffectsController& controller = scene_transition_controller();
     stop_visual_effect(controller);
 }
@@ -242,6 +318,7 @@ void render_scene_transition_visual_effects() {
 }
 
 void tick_scene_transition_visual_effects() {
+    tick_visibility_effects();
     if (!scene_transition_effects_initialized) return;
     tick_visual_effects(scene_transition_effects);
 }
@@ -277,7 +354,7 @@ void render_visual_effects(const VisualEffectsController& controller) {
             BlendMode::Darken,
             0,
             0,
-            static_cast<uint8_t>((amount * 16) / Fixed::scale)
+            static_cast<uint8_t>((static_cast<int>(controller.intensity) * amount * 16) / (100 * Fixed::scale))
         });
         break;
     }
@@ -329,7 +406,12 @@ void render_visual_effects(const VisualEffectsController& controller) {
     case VisualEffectKind::Mask: {
         const int distance = transition_distance(controller);
         const int width = controller.transition_phase && controller.cover ? 240 - distance : distance;
-        const int visible_width = width > 0 ? width : 1;
+        if (width <= 0) {
+            // A closed mask hides every pixel, including the former 1px seam.
+            set_window0(WindowConfig { WindowRect { 0, 240, 0, 160 }, 0, 0, true });
+            break;
+        }
+        const int visible_width = width;
         const uint8_t left = controller.direction == TransitionDirection::Left
             ? 0
             : static_cast<uint8_t>(240 - visible_width);

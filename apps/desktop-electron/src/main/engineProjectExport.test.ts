@@ -192,8 +192,8 @@ async function assertNativeVisualExportArtifacts(destination: string, expectedTa
 
   const mainCpp = await readFile(path.join(destination, "main.cpp"), "utf8");
   expect(mainCpp).toContain("load_project_assets()");
-  expect(mainCpp).toContain("gbs::draw_room_to_bg(gbs::BackgroundLayer::BG2");
-  expect(mainCpp).toContain("gbs::draw_room_to_bg(gbs::BackgroundLayer::BG1");
+  expect(mainCpp).toContain("gbs::draw_room_to_bg_cached(gbs::BackgroundLayer::BG2");
+  expect(mainCpp).toContain("gbs::draw_room_to_bg_cached(gbs::BackgroundLayer::BG1");
   expect(mainCpp).toContain("set_actor_metasprite(");
   expect(mainCpp).not.toContain("struct RuntimeWitnessState");
   expect(mainCpp).not.toContain("tile_runtime_player");

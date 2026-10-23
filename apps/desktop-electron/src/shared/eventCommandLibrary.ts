@@ -596,12 +596,44 @@ const historicalEventCommandDefinitions: EventCommandDefinition[] = [
     "commandTemplate": "resume_scene_type topdown"
   },
   {
+    "id": "scene.lantern",
+    "title": "Lanterna (área retangular)",
+    "category": "Cena",
+    "section": "Visibilidade",
+    "isFavorite": false,
+    "commandTemplate": "lantern {actor} 80 64 75 180"
+  },
+  {
+    "id": "scene.reveal_area",
+    "title": "Revelar área ao redor do ator",
+    "category": "Cena",
+    "section": "Visibilidade",
+    "isFavorite": false,
+    "commandTemplate": "reveal_area {actor} 24 24 100 60"
+  },
+  {
+    "id": "scene.clear_visibility",
+    "title": "Restaurar visibilidade",
+    "category": "Cena",
+    "section": "Visibilidade",
+    "isFavorite": false,
+    "commandTemplate": "clear_visibility"
+  },
+  {
+    "id": "scene.set_map_state",
+    "title": "Aplicar estado de mapa",
+    "category": "Cena",
+    "section": "Tiles",
+    "isFavorite": false,
+    "commandTemplate": "set_map_state door open"
+  },
+  {
     "id": "scene.replace_tile",
     "title": "Substituir tile na posicao",
     "category": "Cena",
     "section": "Tiles",
     "isFavorite": false,
-    "commandTemplate": "replace_tile 0 0 0 bg0"
+    "commandTemplate": "replace_tile 0 0 0 bg2 keep"
   },
   {
     "id": "scene.replace_tile_sequence",
@@ -609,7 +641,7 @@ const historicalEventCommandDefinitions: EventCommandDefinition[] = [
     "category": "Cena",
     "section": "Tiles",
     "isFavorite": false,
-    "commandTemplate": "replace_tile_sequence 0 0 0 1 bg0"
+    "commandTemplate": "replace_tile_sequence 0 0 0 1 bg2 keep"
   },
   {
     "id": "colors.restore",

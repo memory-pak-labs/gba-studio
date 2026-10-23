@@ -163,8 +163,8 @@ class TopdownBackdropRuntimeContractTests(unittest.TestCase):
     def test_static_visual_tilemap_is_not_overwritten_by_authored_room_tiles(self) -> None:
         body = function_body(self.source, "render_topdown_runtime")
 
-        guard = "if (!active_room_data.uses_visual_tilemap && !affine_room) {"
-        background_draw = "gbs::draw_room_to_bg(gbs::BackgroundLayer::BG2, active_room_visual_tiles()"
+        guard = "if ((!active_room_data.uses_visual_tilemap || room_tile_edits.count > 0) && !affine_room && active_room_data.paged_source_tiles == nullptr) {"
+        background_draw = "gbs::draw_room_to_bg_cached(gbs::BackgroundLayer::BG2, active_room_visual_tiles()"
 
         self.assertIn(guard, body)
         self.assertIn(background_draw, body)
@@ -178,11 +178,11 @@ class TopdownBackdropRuntimeContractTests(unittest.TestCase):
             body,
         )
         self.assertIn(
-            "const int bg2_scroll_x = affine_room ? 0 : (paged_room ? background_camera.x % 256 : (active_room_data.uses_visual_tilemap ? render_camera.x : (render_camera.x & 7)));",
+            "const int bg2_scroll_x = affine_room ? 0 : (paged_room ? background_camera.x % 256 : (active_room_data.uses_visual_tilemap && room_tile_edits.count == 0 ? render_camera.x : (render_camera.x & 7)));",
             body,
         )
         self.assertIn(
-            "const int bg2_scroll_y = affine_room ? 0 : (paged_room ? background_camera.y % 256 : (active_room_data.uses_visual_tilemap ? render_camera.y : (render_camera.y & 7)));",
+            "const int bg2_scroll_y = affine_room ? 0 : (paged_room ? background_camera.y % 256 : (active_room_data.uses_visual_tilemap && room_tile_edits.count == 0 ? render_camera.y : (render_camera.y & 7)));",
             body,
         )
         self.assertIn(
@@ -197,8 +197,8 @@ class TopdownBackdropRuntimeContractTests(unittest.TestCase):
             "gbs::set_bg_enabled(gbs::BackgroundLayer::BG1, !active_room_data.uses_visual_tilemap && !affine_room);",
             body,
         )
-        foreground_draw = "gbs::draw_room_to_bg(gbs::BackgroundLayer::BG1, project.rooms[current_room].foreground_tiles"
-        guard = "if (!active_room_data.uses_visual_tilemap && !affine_room) {"
+        foreground_draw = "gbs::draw_room_to_bg_cached(gbs::BackgroundLayer::BG1, project.rooms[current_room].foreground_tiles"
+        guard = "if ((!active_room_data.uses_visual_tilemap || room_tile_edits.count > 0) && !affine_room && active_room_data.paged_source_tiles == nullptr) {"
         self.assertIn(foreground_draw, body)
         self.assertGreater(body.index(foreground_draw), body.index(guard))
 

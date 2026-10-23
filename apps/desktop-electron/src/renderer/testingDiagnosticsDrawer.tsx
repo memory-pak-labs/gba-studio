@@ -1,3 +1,6 @@
+import type { RomPlayerEventTrace } from "../shared/hardwareProfiler";
+import { BuildDiagnosticReportPanel } from "./BuildDiagnosticReportPanel";
+import type { EnginePackBuildResult, EnginePackDoctorSummary } from "../shared/ipc";
 import { readStoredLocale } from "./i18n";
 import { uiText as ui, useStudioUiText } from "./studioUiText";
 import { Activity, CheckCircle2, GitBranch, Plus, Wrench, X } from "lucide-react";
@@ -21,6 +24,8 @@ import { AdvancedToolEditors } from "./advancedToolEditors";
 import { advancedToolsForSurface } from "./advancedToolsPlacement";
 
 interface TestingDiagnosticsDrawerProps {
+  buildResult?: EnginePackBuildResult | null;
+  doctorSummary?: EnginePackDoctorSummary | null;
   inputRecording?: boolean;
   inputReplay?: InputReplay | null;
   isOpen: boolean;
@@ -35,6 +40,8 @@ interface TestingDiagnosticsDrawerProps {
   profilerSession?: HardwareProfilerSession | null;
   projectData: GBAProjectData;
   romOccupancy?: RomOccupancyReport | null;
+  eventTrace?: RomPlayerEventTrace | null;
+  onOpenEvent?(eventID: string): void;
   runtimeAudio?: RomPlayerAudioTelemetry | null;
 }
 
@@ -64,6 +71,8 @@ function DiagnosticToolCard({
 }
 
 export function TestingDiagnosticsDrawer({
+  buildResult,
+  doctorSummary,
   inputRecording = false,
   inputReplay,
   isOpen,
@@ -78,7 +87,9 @@ export function TestingDiagnosticsDrawer({
   profilerSession,
   projectData,
   romOccupancy,
-  runtimeAudio
+  runtimeAudio,
+  eventTrace,
+  onOpenEvent
 }: TestingDiagnosticsDrawerProps): React.ReactElement | null {
   const ui = useStudioUiText();
   if (!isOpen) return null;
@@ -106,6 +117,15 @@ export function TestingDiagnosticsDrawer({
           <X aria-hidden="true" />
         </button>
       </header>
+      <section className="testing-diagnostics-section" aria-label={ui("Rastro de eventos da ROM")}>
+        <h3>{ui("Rastro de eventos da ROM")}</h3>
+        <label><input type="checkbox" checked={projectData.eventDiagnostics === true} onChange={e => onChangeProjectData({ ...projectData, eventDiagnostics: e.target.checked })} />{ui("Incluir origem dos eventos no próximo build")}</label>
+        {eventTrace?.entries.map((entry, index) => <p key={`${eventTrace.sequence}-${index}`}>
+          {entry.eventID ? <button type="button" onClick={() => onOpenEvent?.(entry.eventID!)}>{entry.eventID} / {entry.stepID}</button> : <code>0x{entry.commandAddress.toString(16)}</code>}
+          {` · frame ${entry.frame} · op ${entry.op} · ${entry.status === 2 ? "pause" : entry.status === 1 ? "stop" : "continue"} · wait ${entry.waitFrames}`}
+        </p>)}
+      </section>
+
 
       <div className="testing-diagnostics-content">
         <div className="advanced-tools-grid">
@@ -145,6 +165,8 @@ export function TestingDiagnosticsDrawer({
             : <p>{ui("Todas as cenas são alcançáveis pelo fluxo atual.")}</p>}
         </section>
 
+        <BuildDiagnosticReportPanel result={buildResult} doctor={doctorSummary} />
+
         <section className="advanced-flow-report" aria-label={ui("Sessões do perfil de hardware")}>
           <h3>{ui("Sessões do perfil de hardware")}</h3>
           <p>{profilerHistory.length} {ui(" execução(ões) concluída(s) · ")}{profilerSession?.frames.length ?? 0} {ui(" frames na sessão atual.")}</p>
@@ -153,6 +175,7 @@ export function TestingDiagnosticsDrawer({
               {ui("Comparação mais recente: CPU ")}<strong>{lastComparison.deltas.cpu >= 0 ? "+" : ""}{lastComparison.deltas.cpu.toFixed(1)}</strong> {ui(" · DMA ")}<strong>{lastComparison.deltas.dma >= 0 ? "+" : ""}{lastComparison.deltas.dma.toFixed(0)}</strong> {ui(" · VRAM ")}<strong>{lastComparison.deltas.vram >= 0 ? "+" : ""}{lastComparison.deltas.vram.toFixed(0)}</strong> {ui(" · OAM ")}<strong>{lastComparison.deltas.oam >= 0 ? "+" : ""}{lastComparison.deltas.oam.toFixed(0)}</strong>
             </p>
           ) : <p>{ui("Conclua duas sessões de Play para comparar os frames de pico.")}</p>}
+          <p>{ui("Subsistemas: tempos inclusivos em µs. Escopos sobrepostos não devem ser somados. Picos nativos reiniciam ao entrar em outra cena.")}</p>
           {profiledScenes.map((scene) => (
             <article className="hardware-profiler-scene-peak" key={`${scene.runtime}:${scene.roomIndex}`}>
               <strong>{sceneDisplayName(scene.sceneName)}</strong>
@@ -161,6 +184,11 @@ export function TestingDiagnosticsDrawer({
               </small>
               <span>
                 {ui("CPU ")}{scene.peaks.cpu.value.toLocaleString(readStoredLocale(), { maximumFractionDigits: 1 })}{ui("% · VRAM ")}{scene.peaks.vram.value.toLocaleString(readStoredLocale())} {ui(" B · OAM ")}{scene.peaks.oam.value.toLocaleString(readStoredLocale())} {ui(" · DMA ")}{scene.peaks.dma.value.toLocaleString(readStoredLocale())} {ui(" ticks")}</span>
+              {scene.subsystems ? (
+                <span aria-label={ui("Picos por subsistema")}>
+                  {Object.entries(scene.subsystems).map(([label, peak]) => `${label}: ${((peak?.value ?? 0) * 1_000_000 / 262144).toLocaleString(readStoredLocale(), { maximumFractionDigits: 1 })} µs`).join(" · ")}
+                </span>
+              ) : <small>{ui("Execute uma ROM com o profiler para medir os subsistemas.")}</small>}
             </article>
           ))}
         </section>
@@ -178,8 +206,29 @@ export function TestingDiagnosticsDrawer({
           {memoryReport ? (
             <>
               <p>
-                {ui("Arquivo: ")}<strong>{memoryReport.rom.fileBytes.toLocaleString(readStoredLocale())} {ui(" bytes")}</strong> {ui(" · EWRAM: ")}<strong>{memoryReport.ram.ewram.usedBytes.toLocaleString(readStoredLocale())} / {memoryReport.ram.ewram.capacityBytes.toLocaleString(readStoredLocale())}</strong> {ui(" · IWRAM: ")}<strong>{memoryReport.ram.iwram.usedBytes.toLocaleString(readStoredLocale())} / {memoryReport.ram.iwram.capacityBytes.toLocaleString(readStoredLocale())}</strong>
+                {ui("Arquivo: ")}<strong>{memoryReport.rom.fileBytes.toLocaleString(readStoredLocale())} {ui(" bytes")}</strong>
               </p>
+              <div className="rom-occupancy-map" aria-label={ui("RAM: uso e margem estática")}>
+                {(["ewram", "iwram"] as const).map((region) => {
+                  const usage = memoryReport.ram[region];
+                  const number = (value: number) => value.toLocaleString(readStoredLocale());
+                  return <article key={region} aria-label={region.toUpperCase()}>
+                    <div>
+                      <strong>{region.toUpperCase()}</strong>
+                      <span>{number(usage.usedBytes)} / {number(usage.capacityBytes)} {ui(" bytes")}</span>
+                    </div>
+                    <meter aria-label={ui("Ocupação de {0}", { 0: region.toUpperCase() })} max={usage.capacityBytes}
+                      high={usage.capacityBytes * 0.9} optimum={0} value={Math.min(usage.usedBytes, usage.capacityBytes)} />
+                    <small>{ui("Dados vinculados: {0} bytes · Alinhamento e lacunas: {1} bytes", { 0: number(usage.linkedBytes), 1: number(usage.paddingBytes) })}</small>
+                    <small>{ui("Reservas: {0} bytes · Margem estática: {1} bytes", { 0: number(usage.reservedBytes), 1: number(usage.remainingBytes) })}</small>
+                    {region === "iwram" ? <small>{ui("Pilhas reservadas — sistema: {0}, IRQ: {1}, supervisor: {2} bytes", {
+                      0: number(memoryReport.ram.iwram.stacks.systemBytes), 1: number(memoryReport.ram.iwram.stacks.irqBytes), 2: number(memoryReport.ram.iwram.stacks.supervisorBytes)
+                    })}</small> : null}
+                    <small>{number(usage.percent)}% · {ui(usage.severity === "error" ? "Limite de RAM excedido" : usage.severity === "warning" ? "Margem de RAM reduzida" : "RAM dentro do limite")}</small>
+                  </article>;
+                })}
+              </div>
+              <p>{ui("A margem estática desconta as reservas do linker. O uso das pilhas em execução não é medido.")}</p>
               <div className="rom-occupancy-map">
                 {Object.entries(memoryReport.resources).map(([id, usage]) => (
                   <article key={id}>
@@ -202,7 +251,7 @@ export function TestingDiagnosticsDrawer({
           {romOccupancy ? (
             <>
               <p>
-                {ui("ROM: ")}<strong>{romOccupancy.romBytes.toLocaleString(readStoredLocale())} {ui(" bytes")}</strong> {ui(" · RAM: ")}<strong>{romOccupancy.ramBytes.toLocaleString(readStoredLocale())} {ui(" bytes")}</strong> {ui(" · removidos pelo linker: ")}<strong>{romOccupancy.discardedBytes.toLocaleString(readStoredLocale())} {ui(" bytes")}</strong>
+                {ui("ROM: ")}<strong>{romOccupancy.romBytes.toLocaleString(readStoredLocale())} {ui(" bytes")}</strong> {ui("· RAM vinculada (endereços únicos):")} <strong>{romOccupancy.ramBytes.toLocaleString(readStoredLocale())} {ui(" bytes")}</strong> {ui(" · removidos pelo linker: ")}<strong>{romOccupancy.discardedBytes.toLocaleString(readStoredLocale())} {ui(" bytes")}</strong>
               </p>
               <div className="rom-occupancy-map">
                 {romOccupancy.categories.map((category) => (

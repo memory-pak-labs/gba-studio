@@ -345,7 +345,7 @@ export const eventCommandRecipeLibrary: EventCommandRecipeDefinition[] = [
     "category": "Cena",
     "steps": [
       {
-        "commandTemplate": "replace_tile 4 6 17 bg2",
+        "commandTemplate": "replace_tile 4 6 17 bg2 solid",
         "category": "Cena",
         "detail": "Porta por tile swap"
       },
@@ -360,7 +360,7 @@ export const eventCommandRecipeLibrary: EventCommandRecipeDefinition[] = [
         "detail": ""
       },
       {
-        "commandTemplate": "replace_tile_sequence 4 6 18 3 bg2",
+        "commandTemplate": "replace_tile_sequence 4 6 18 3 bg2 free",
         "category": "Cena",
         "detail": ""
       }

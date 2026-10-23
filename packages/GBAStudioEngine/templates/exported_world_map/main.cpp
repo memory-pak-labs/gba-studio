@@ -1,3 +1,4 @@
+#include "gbs/profiler.hpp"
 #define GBS_DIALOGUE_UI_RUNTIME_KIND 10
 #include "gbs/engine.hpp"
 #include <string.h>
@@ -595,6 +596,7 @@ gbs::RuntimeAdapterFrameResult update_world_map_runtime(const gbs::RuntimeFrameC
 }
 
 void render_world_map_runtime(const gbs::RuntimeFrameContext& context) {
+    const gbs::SubsystemProfilerScope profiler_scope(gbs::ProfilerSubsystem::Render);
     (void)context;
         gbs::set_event_player_actor_state(event_state,journey.position.x,journey.position.y,0,1);
         auto& telemetry=gbs::runtime_telemetry_block();

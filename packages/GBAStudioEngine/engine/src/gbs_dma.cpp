@@ -5,11 +5,19 @@
 extern "C" __attribute__((weak)) void gbs_hw_hdma_start(int, const void*, volatile void*, uint32_t, int) {
 }
 
+extern "C" __attribute__((weak)) void gbs_hw_wait_vblank() {}
+
 extern "C" __attribute__((weak)) void gbs_hw_hdma_stop(int) {
 }
 #endif
 
 namespace gbs {
+
+#if !defined(__arm__) && !defined(__thumb__)
+__attribute__((weak)) void begin_render_publication_transaction() {}
+#else
+void begin_render_publication_transaction();
+#endif
 
 namespace {
 
@@ -25,6 +33,9 @@ uint32_t vblank_queue_flushed_bytes = 0;
 uint32_t vblank_queue_dropped_bytes = 0;
 size_t vblank_queue_peak_bytes = 0;
 uint8_t active_hblank_dma_mask = 0;
+uint32_t fence_epoch = 0;
+uint32_t fence_submitted = 0;
+uint32_t fence_completed = 0;
 
 size_t dma_transfer_bytes(const gbs::DmaTransfer& transfer) {
     return transfer.units * static_cast<size_t>(transfer.width);
@@ -96,6 +107,8 @@ void dma_stop_hblank(DmaChannel channel) {
 }
 
 void dma_reset_vblank_queue() {
+    ++fence_epoch;
+    fence_submitted = fence_completed = 0;
     for (size_t index = 0; index < dma_vblank_queue_capacity; ++index) {
         vblank_queue[index] = DmaTransfer {};
     }
@@ -136,6 +149,7 @@ bool dma_enqueue_vblank(const DmaTransfer& transfer) {
     vblank_queue[vblank_queue_count] = transfer;
     ++vblank_queue_count;
     ++vblank_queue_submitted;
+    ++fence_submitted;
     vblank_queue_bytes += bytes;
     vblank_queue_submitted_bytes += static_cast<uint32_t>(bytes);
     if (vblank_queue_count > vblank_queue_peak) {
@@ -143,6 +157,55 @@ bool dma_enqueue_vblank(const DmaTransfer& transfer) {
     }
     if (vblank_queue_bytes > vblank_queue_peak_bytes) {
         vblank_queue_peak_bytes = vblank_queue_bytes;
+    }
+    return true;
+}
+
+DmaFence dma_vblank_fence() { return { fence_epoch, fence_submitted }; }
+
+DmaFenceStatus dma_fence_status(DmaFence fence) {
+    if (fence.epoch != fence_epoch) return DmaFenceStatus::Canceled;
+    // At most 32 outstanding transfers, so modular comparison survives wrap.
+    return static_cast<int32_t>(fence_completed - fence.sequence) >= 0
+        ? DmaFenceStatus::Complete : DmaFenceStatus::Pending;
+}
+
+bool dma_source_pending(const void* source, size_t bytes) {
+    const uintptr_t first = reinterpret_cast<uintptr_t>(source);
+    if (!source || !bytes) return false;
+    for (size_t i = 0; i < vblank_queue_count; ++i) {
+        const uintptr_t pending = reinterpret_cast<uintptr_t>(vblank_queue[i].source);
+        const size_t count = dma_transfer_bytes(vblank_queue[i]);
+        if (pending >= first ? pending - first < bytes : first - pending < count) return true;
+    }
+    return false;
+}
+
+bool dma_destination_pending(const volatile void* destination, size_t bytes) {
+    const uintptr_t first = reinterpret_cast<uintptr_t>(destination);
+    if (!destination || !bytes) return false;
+    for (size_t i = 0; i < vblank_queue_count; ++i) {
+        const uintptr_t pending = reinterpret_cast<uintptr_t>(vblank_queue[i].destination);
+        const size_t count = dma_transfer_bytes(vblank_queue[i]);
+        if (pending >= first ? pending - first < bytes : first - pending < count) return true;
+    }
+    return false;
+}
+
+bool dma_wait_for_destination(const volatile void* destination, size_t bytes) {
+    while (dma_destination_pending(destination, bytes)) {
+        begin_render_publication_transaction();
+        gbs_hw_wait_vblank();
+        if (!dma_flush_vblank_queue_budget(DmaChannel::Channel3, dma_default_vblank_budget_bytes)) return false;
+    }
+    return true;
+}
+
+bool dma_wait_for_source(const void* source, size_t bytes) {
+    while (dma_source_pending(source, bytes)) {
+        begin_render_publication_transaction();
+        gbs_hw_wait_vblank();
+        if (!dma_flush_vblank_queue_budget(DmaChannel::Channel3, dma_default_vblank_budget_bytes)) return false;
     }
     return true;
 }
@@ -214,6 +277,7 @@ size_t dma_flush_vblank_queue_budget(DmaChannel channel, size_t max_bytes) {
             vblank_queue[index - 1] = vblank_queue[index];
         }
         --vblank_queue_count;
+        ++fence_completed;
         vblank_queue[vblank_queue_count] = DmaTransfer {};
     }
     vblank_queue_flushed += static_cast<uint32_t>(flushed);

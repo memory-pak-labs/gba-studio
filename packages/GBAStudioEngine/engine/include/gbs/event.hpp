@@ -175,7 +175,8 @@ enum class EventOp : uint8_t {
     OpenMenu = 159,
     OpenShop = 160,
     SetAdventureState = 161,
-    DrawText = 162
+    DrawText = 162,
+    Visibility = 163
 };
 
 enum class VisualEffectKind : uint8_t {
@@ -242,6 +243,8 @@ struct EventCommand {
     int16_t d = 0;
 };
 
+static_assert(sizeof(EventCommand) == 10, "source maps use the fixed native command stride");
+
 struct EventScript {
     const EventCommand* commands;
     size_t command_count;
@@ -269,7 +272,9 @@ enum class EventActorOp : uint8_t {
     SetSprite = 12,
     Push = 13,
     CancelMovement = 14,
-    PushFacing = 15
+    PushFacing = 15,
+    VisibilityLantern = 16,
+    VisibilityReveal = 17
 };
 
 struct EventActorCommand {
@@ -291,6 +296,7 @@ struct EventTileCommand {
     int tile;
     int count;
     int tile_asset;
+    int collision_flags = -1;
 };
 
 constexpr size_t max_event_actor_commands = 8;
@@ -682,6 +688,8 @@ int event_actor_effect_offset_x(const EventState& state, int actor_index);
 bool update_button_event_bindings(EventState& state);
 bool button_event_binding_overrides_default(const EventState& state, uint16_t buttons);
 bool update_timer_event_bindings(EventState& state);
+using EventCommandConsumer = void (*)(EventState& state, void* context);
+void run_event_script_consuming(EventState& state, EventScript script, EventCommandConsumer consumer, void* context = nullptr);
 void run_event_script(EventState& state, EventScript script);
 void run_event_script(EventState& state, const EventCommand* commands, size_t count);
 void clear_event_actor_commands(EventState& state);

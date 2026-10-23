@@ -1,3 +1,4 @@
+#include "gbs/profiler.hpp"
 #define GBS_DIALOGUE_UI_RUNTIME_KIND 5
 #include "gbs/engine.hpp"
 #include "gbs/animation.hpp"
@@ -843,6 +844,7 @@ gbs::RuntimeAdapterFrameResult update_point_click_runtime(const gbs::RuntimeFram
 }
 
 void render_point_click_runtime(const gbs::RuntimeFrameContext& context) {
+    const gbs::SubsystemProfilerScope profiler_scope(gbs::ProfilerSubsystem::Render);
     (void)context;
     gbs::hide_all_sprites();
     const gbs::PointClickSceneData* scene = gbs::point_click_scene_for(project, current_scene_index);

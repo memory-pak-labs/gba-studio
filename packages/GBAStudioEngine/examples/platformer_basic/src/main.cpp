@@ -1,3 +1,4 @@
+#include "gbs/profiler.hpp"
 #define GBS_DIALOGUE_UI_RUNTIME_KIND 1
 #include "gbs/engine.hpp"
 #include "gbs/event_ui.hpp"
@@ -154,6 +155,7 @@ const gbs::TileAsset* player_streamed_tile_asset_loaded = nullptr;
 const gbs::TileAsset* npc_streamed_tile_assets_loaded[max_room_npcs] = {};
 gbs::PlatformerRuntimeState runtime_state {};
 int current_room = 0;
+gbs::RoomTileEdits room_tile_edits __attribute__((section(".ewram_bss")));
 int active_platformer_state = 0;
 gbs::Camera camera {};
 bool previous_camera_zone_active = false;
@@ -739,10 +741,26 @@ bool run_button_event_binding() {
     event_state.last_script = -1;
     event_state.last_button_binding_overrides_default = false;
     if (gbs::is_valid_platformer_project_script_index(project, script_index)) {
-        gbs::run_event_script(event_state, project.scripts[script_index]);
-        consume_event_state(event_state);
+        queue_platformer_script(project.scripts[script_index]);
     }
     return overrides_default;
+}
+
+void consume_platformer_tile_commands(gbs::EventState& event_state, const gbs::PlatformerRoomData& room_data) {
+    for (size_t i = 0; i < event_state.tile_command_count; ++i) {
+        const auto& command = event_state.tile_commands[i];
+        const int layer = command.layer == 0 ? 2 : command.layer;
+        for (int offset = 0; offset < command.count; ++offset) {
+            const int x = command.x + offset, y = command.y;
+            if (x < 0 || y < 0 || x >= room_data.width_tiles || y >= room_data.height_tiles) continue;
+            auto resolved = command;
+            resolved.tile += offset;
+            const uint16_t tile = gbs::resolve_event_tile(resolved, project.tile_assets, project.tile_asset_count);
+            gbs::debug_assert(gbs::set_room_tile_edit(room_tile_edits, layer, x, y,
+                room_data.width_tiles, room_data.height_tiles, tile, command.collision_flags), "room tile edit cap", 32);
+        }
+    }
+    gbs::clear_event_tile_commands(event_state);
 }
 
 void consume_platformer_actor_commands(
@@ -751,7 +769,9 @@ void consume_platformer_actor_commands(
     const gbs::PlatformerRoomData& room_data,
     bool& player_event_active
 ) {
-    const gbs::TileMap collision = gbs::platformer_collision_map_from_room(room_data);
+    gbs::consume_visibility_event_commands(event_state);
+    consume_platformer_tile_commands(event_state, room_data);
+    const gbs::TileMap collision = room.collision;
     for (size_t command_index = 0; command_index < event_state.actor_command_count; ++command_index) {
         const gbs::EventActorCommand& command = event_state.actor_commands[command_index];
         if (command.op != gbs::EventActorOp::Push ||
@@ -978,6 +998,9 @@ void update_platformer_event_script(
     }
     gbs::update_event_runner(platformer_event_runner, event_state);
     consume_event_state(event_state);
+    // Script waits skip the physics branch that consumes effects later in update.
+    // Publish each effect before the runner advances to its next phase.
+    gbs::consume_visual_effect_event(event_state, visual_effects);
     consume_platformer_actor_commands(event_state, player, room_data, player_event_active);
     consume_platformer_state_request(
         event_state,
@@ -1187,12 +1210,24 @@ bool restore_platformer_runtime_state(
     room_data = &project.rooms[current_room];
     apply_active_room_video(project, current_room);
     room = gbs::platformer_room_from_data(*room_data);
+    gbs::stop_visibility_effect();
+    room_tile_edits = {};
+    room.collision.edits = &room_tile_edits;
+    for (auto& cache : room_layer_cache) cache = {};
     load_platformer_room_runtime_objects(*room_data);
     player.collision_offset_pixels = room_data->player_collision_offset_pixels;
     player.bounds_pixels.width = room_data->player_start.width;
     player.bounds_pixels.height = room_data->player_start.height;
     gbs::SaveInfo info = gbs::inspect_save_slot(gbastudio_platformer_project::save_bank, static_cast<size_t>(slot_index));
     platformer_save_sequence = info.sequence;
+    gbs::clear_event_tile_commands(event_state);
+    struct RestoreContext { gbs::PlatformerActor* player; const gbs::PlatformerRoomData* room; } restore_context { &player, room_data };
+    gbs::run_event_script_consuming(event_state, room_data->on_restore, +[](gbs::EventState& state, void* opaque) {
+        const auto& context = *static_cast<RestoreContext*>(opaque);
+        consume_platformer_actor_commands(state, *context.player, *context.room, player_event_active);
+        gbs::clear_event_actor_commands(state);
+        gbs::clear_event_tile_commands(state);
+    }, &restore_context);
     return true;
 }
 
@@ -1229,6 +1264,10 @@ bool apply_event_room_change(
     room_data = &project_data.rooms[current_room];
     apply_active_room_video(project_data, current_room);
     room = gbs::platformer_room_from_data(*room_data);
+    gbs::stop_visibility_effect();
+    room_tile_edits = {};
+    room.collision.edits = &room_tile_edits;
+    for (auto& cache : room_layer_cache) cache = {};
     load_platformer_room_runtime_objects(*room_data);
     player = gbs::platformer_actor_from_rect(
         room_data->player_start,
@@ -1282,7 +1321,7 @@ void draw_platformer_room_layers(
         room.height_tiles,
         bg3_camera_x,
         bg3_camera_y,
-        room_layer_cache[3]
+        room_layer_cache[3], room_tile_edits
     );
     gbs::set_bg_scroll(
         gbs::BackgroundLayer::BG3,
@@ -1309,7 +1348,7 @@ void draw_platformer_room_layers(
         room.height_tiles,
         camera.position_pixels.x,
         camera.position_pixels.y,
-        room_layer_cache[2]
+        room_layer_cache[2], room_tile_edits
     );
     gbs::set_bg_scroll(
         gbs::BackgroundLayer::BG2,
@@ -1328,7 +1367,7 @@ void draw_platformer_room_layers(
         room.height_tiles,
         camera.position_pixels.x,
         camera.position_pixels.y,
-        room_layer_cache[1]
+        room_layer_cache[1], room_tile_edits
     );
     gbs::set_bg_scroll(
         gbs::BackgroundLayer::BG1,
@@ -1391,6 +1430,10 @@ int initialize_platformer_runtime() {
         return -1;
     }
     room = gbs::platformer_room_from_data(*room_data);
+    gbs::stop_visibility_effect();
+    room_tile_edits = {};
+    room.collision.edits = &room_tile_edits;
+    for (auto& cache : room_layer_cache) cache = {};
     load_platformer_room_runtime_objects(*room_data);
     player = gbs::platformer_actor_from_rect(
         room_data->player_start,
@@ -1816,9 +1859,21 @@ gbs::RuntimeAdapterFrameResult update_platformer_runtime(const gbs::RuntimeFrame
         }
         }
         gbs::update_dialogue(dialogue);
-        if (event_state.save_request == 1) {
+        if (event_state.save_request != 0) {
+            const int request = event_state.save_request;
             const int slot = event_state.save_request_slot;
-            persist_platformer_runtime_state(current_room, player, runtime_state, camera, event_state, slot);
+            if (request == 1) {
+                persist_platformer_runtime_state(current_room, player, runtime_state, camera, event_state, slot);
+            } else if (request == 2 && slot >= 0 && restore_platformer_runtime_state(
+                current_room, room_data, room, player, runtime_state, camera, event_state, slot)) {
+                gbs::stop_event_runner(platformer_event_runner);
+                gbs::clear_event_script_queue(platformer_event_queue);
+                platformer_event_wait_frames = 0;
+                gbs::hide_dialogue(dialogue);
+            } else if (request == 3 && gbastudio_platformer_project::save_enabled && slot >= 0 &&
+                static_cast<size_t>(slot) < gbastudio_platformer_project::save_bank.slot_count) {
+                gbs::clear_save_slot(gbastudio_platformer_project::save_bank, static_cast<size_t>(slot));
+            }
             if (slot >= 0 && static_cast<size_t>(slot) < gbastudio_platformer_project::save_bank.slot_count &&
                 static_cast<size_t>(slot) < gbs::max_event_save_slots) {
                 event_state.save_slot_exists[slot] = gbs::inspect_save_slot(
@@ -1838,9 +1893,23 @@ gbs::RuntimeAdapterFrameResult update_platformer_runtime(const gbs::RuntimeFrame
 }
 
 void render_platformer_runtime(const gbs::RuntimeFrameContext& context) {
+    const gbs::SubsystemProfilerScope profiler_scope(gbs::ProfilerSubsystem::Render);
     (void)context;
         draw_platformer_room_layers(*room_data, camera, visual_effects);
         gbs::render_visual_effects(visual_effects);
+        if (gbs::visibility_effect().active) {
+            const int target = gbs::visibility_effect().actor;
+            gbs::Vec2i center { player.bounds_pixels.x + player.bounds_pixels.width / 2,
+                player.bounds_pixels.y + player.bounds_pixels.height / 2 };
+            if (target >= 0 && static_cast<size_t>(target) >= platformer_npc_count) gbs::stop_visibility_effect();
+            else {
+                if (target >= 0) {
+                    const auto& actor = platformer_npc_runtimes[target].actor;
+                    center = { actor.position_pixels.x + actor.size_pixels.x / 2, actor.position_pixels.y + actor.size_pixels.y / 2 };
+                }
+                gbs::render_visibility_effects({ center.x - camera.position_pixels.x, center.y - camera.position_pixels.y }, visual_effects);
+            }
+        }
         gbs::hide_all_sprites();
         int next_world_sprite_index = 1;
         const gbs::MetaSprite* player_metasprite = gbs::current_metasprite(player_animator);

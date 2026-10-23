@@ -1,3 +1,6 @@
+import { parseEventInstruction, eventWaitFrames } from "../shared/eventExecutionContract.js";
+import { parseVisibilityPreset } from "../shared/visibilityPresets.js";
+import { roomMapStates, resolveMapState, type MapStateVariant } from "../shared/mapStates.js";
 import { memoizeEngineExport, withEngineExportContext } from "../shared/engineExportContext.js";
 import { dungeonGeometryKey, dungeonPlayerActor } from "../shared/dungeonSceneView.js";
 import { audioContractIssues } from "../shared/audioContract.js";
@@ -79,6 +82,7 @@ import {
   type RoomConnectionArea
 } from "../shared/roomsWorkspace.js";
 import { normalizeSceneTypeId } from "../shared/sceneTypes.js";
+import { tileReplacementCollisionFields } from "../shared/tileReplacement.js";
 import {
   resolveDungeonCrawlerFeatureRuntime,
   resolveSceneCapabilityManifest,
@@ -227,6 +231,7 @@ import {
 
 export interface EngineExportProjectEventCommand {
   op: string;
+  source?: { eventID: string; stepID: string };
   minutes?: number;
   minutes_per_tick?: number;
   frames_per_tick?: number;
@@ -353,6 +358,7 @@ export interface EngineExportCameraZone {
 }
 
 export interface EngineExportTopdownRoom {
+  on_restore?: EngineExportProjectEventCommand[];
   name: string;
   scene_type: string;
   runtime_profile: string;
@@ -527,6 +533,7 @@ export interface EngineExportAffineObj {
 }
 
 export interface EngineExportPlatformerRoom {
+  on_restore?: EngineExportProjectEventCommand[];
   name: string;
   width_tiles: number;
   height_tiles: number;
@@ -3665,11 +3672,12 @@ function paddedCollisionFlagsFromTypes(types: RoomCollisionType[], count: number
 function eventSteps(event: Record<string, unknown>): Record<string, unknown>[] {
   return normalizeGBAEventDocument(event).steps
     .filter((step) => step.isEnabled)
-    .map((step) => ({ command: step.command, isEnabled: step.isEnabled }));
+    .map((step) => ({ id: step.id, sourceEventID: (Array.isArray(event.steps) ? event.steps as Record<string, unknown>[] : []).find(raw => raw.id === step.id)?.sourceEventID ?? event.id ?? event.name, command: step.command, isEnabled: step.isEnabled }));
 }
 
 function commandParts(command: string): string[] {
-  return command.split(/\s+/).filter(Boolean);
+  const instruction = parseEventInstruction(command, undefined, false);
+  return [instruction.verb, ...instruction.operands];
 }
 
 const ACTOR_COMMAND_VERBS = new Set([
@@ -4143,9 +4151,27 @@ function sceneRouteVariableKeys(data: GBAProjectData): string[] {
 }
 
 function projectVariableKeys(data: GBAProjectData): string[] {
-  return projectArray(data, "variables")
+  return [...projectArray(data, "variables")
     .map((variable) => stringField(variable, "name", "").trim())
-    .filter(Boolean);
+    .filter(Boolean), ...projectRooms(data).flatMap(room => roomMapStates(room).map(state => state.variable))];
+}
+
+function mapVariantCommands(variant: MapStateVariant): EngineExportProjectEventCommand[] {
+  return variant.tiles.map(tile => ({ op: "replace_tile", x: tile.x, y: tile.y,
+    tile: tile.tile, count: tile.count, layer: tile.layer, ...tileReplacementCollisionFields(tile.collision, tile.layer) }));
+}
+
+function mapStateRestoreCommands(data: GBAProjectData, room: Record<string, unknown>): EngineExportProjectEventCommand[] {
+  const definitions = roomMapStates(room);
+  if (!definitions.length) return [];
+  const registries = buildEventValueRegistries(projectArray(data, "events"), emptyProjectPluginRegistry(), [], [], sceneRouteVariableKeys(data), projectVariableKeys(data));
+  return definitions.flatMap(state => state.variants.flatMap(variant => {
+    const edits = mapVariantCommands(variant);
+    return [
+      { op: "jump_if_variable_equals" as const, variable: registries.variableIndex(state.variable), value: variant.value, offset: 2 },
+      { op: "jump" as const, offset: edits.length + 1 }, ...edits
+    ];
+  }));
 }
 
 function sceneRouteTransitionCommands(
@@ -4672,6 +4698,12 @@ function compileEventStep(
     case "fade_in":
     case "fade_out":
       return [{ op: verb, frames: Math.max(0, Math.min(600, integerPart(operand, 30))) }];
+    case "lantern":
+    case "reveal_area":
+    case "clear_visibility": {
+      const preset = parseVisibilityPreset(parts);
+      return [{ op: "visibility", ...preset, actor: eventActorIndex(data, rooms, preset.actor) }];
+    }
     case "visual_effect": {
       const effect = operand.trim().toLowerCase();
       const layer = (parts[2] ?? "all").trim().toLowerCase();
@@ -4903,7 +4935,7 @@ function compileEventStep(
         max: integerPart(parts[3], integerPart(parts[2], 0))
       }];
     case "wait":
-      return [{ op: "wait", frames: Math.max(0, Math.min(600, integerPart(operand, 0))) }];
+      return [{ op: "wait", frames: eventWaitFrames(parseEventInstruction(rawCommand, undefined, false)) }];
     case "stop_music":
       return [{ op: "stop_music" }];
     case "close_dialogue":
@@ -4970,6 +5002,16 @@ function compileEventStep(
         x: integerPart(parts[2], 200),
         digits: integerPart(parts[4], 3)
       }];
+    case "set_map_state": {
+      const { room, state, variant } = resolveMapState(projectRooms(data), operand, parts[2] ?? "");
+      const assignment: EngineExportProjectEventCommand = { op: "set_variable", variable: registries.variableIndex(state.variable), value: variant.value };
+      const roomIndex = rooms.findIndex(candidate => candidate.name === room.name);
+      if (roomIndex < 0) return [assignment];
+      const edits = mapVariantCommands(variant);
+      return [{ op: "wait", frames: 1 }, assignment,
+        { op: "jump_if_room_equals", room: roomIndex, offset: 2 },
+        { op: "jump", offset: edits.length + 1 }, ...edits, { op: "wait", frames: 1 }];
+    }
     case "replace_tile":
       return [{
         op: "replace_tile",
@@ -4977,6 +5019,7 @@ function compileEventStep(
         y: integerPart(parts[2], 0),
         tile: integerPart(parts[3], 0),
         layer: parts[4] ?? "bg0",
+        ...tileReplacementCollisionFields(parts[5], parts[4] ?? "bg0"),
         count: 1
       }];
     case "replace_tile_sequence":
@@ -4986,7 +5029,8 @@ function compileEventStep(
         y: integerPart(parts[2], 0),
         tile: integerPart(parts[3], 0),
         count: Math.max(1, Math.min(64, integerPart(parts[4], 1))),
-        layer: parts[5] ?? "bg0"
+        layer: parts[5] ?? "bg0",
+        ...tileReplacementCollisionFields(parts[6], parts[5] ?? "bg0")
       }];
     case "replace_tile_animation":
       {
@@ -5251,6 +5295,9 @@ function compileEvent(
   const commands: EngineExportProjectEventCommand[] = [];
 
   for (let index = 0; index < steps.length; index += 1) {
+    const firstCommand = commands.length;
+    const source = { eventID: String(steps[index].sourceEventID ?? event.id ?? event.name ?? ""), stepID: String(steps[index].id ?? index) };
+    try {
     const parts = commandParts(resolveProjectConstantCommand(data, stringField(steps[index], "command", "noop")));
     if (parts[0] === "loop_begin") {
       const loopID = parts[1] ?? "";
@@ -5414,6 +5461,9 @@ function compileEvent(
     }
 
     commands.push(...compileEventStep(data, steps[index], rooms, dialogues, audioItems, audioPack, events, registries, resolvedCampaignRoom));
+    } finally {
+      if (data.eventDiagnostics === true) for (let ci = firstCommand; ci < commands.length; ++ci) commands[ci].source ??= source;
+    }
   }
 
   return commands;
@@ -5467,6 +5517,28 @@ function resolveActorOnUpdateEventName(actor: Record<string, unknown>): string {
   const eventBindings = child(actor, "eventBindings");
   return nullableStringField(eventBindings, "onUpdate")
     || nullableStringField(actor, "onUpdateEventName");
+}
+
+/** Restoration is synchronous: inline calls so several restored objects cannot overwrite last_script. */
+function compileRestoreEvent(data: GBAProjectData, name: string, rooms: Record<string, unknown>[], dialogues: Record<string, unknown>[], audioItems: Record<string, unknown>[], audioPack: AssetcAudioPackGeneration | null, events: Record<string, unknown>[]): EngineExportProjectEventCommand[] {
+  const expand = (eventName: string, stack: string[]): Record<string, unknown>[] => {
+    if (!eventName) return [];
+    if (stack.includes(eventName)) throw new Error(`Restauração recursiva: ${[...stack, eventName].join(" → ")}`);
+    const event = eventByName(events, eventName);
+    if (!event) throw new Error(`Evento de restauração inexistente: ${eventName}`);
+    return eventSteps(event).flatMap(step => {
+      const instruction = parseEventInstruction(String(step.command));
+      if (instruction.verb === "call_event" || instruction.verb === "call_procedure") return expand(instruction.operands[0] ?? "", [...stack, eventName]);
+      if (["wait", "idle", "wait_button", "wait_actor_animation", "show_dialogue", "show_choice",
+        "open_text_input", "open_code_lock", "open_shop", "open_equip_menu", "open_menu",
+        "load_game", "change_scene", "change_scene_by_variable", "advance_campaign",
+        "scene_stack_previous", "scene_stack_first"].includes(instruction.verb)) {
+        throw new Error(`Restauração não pode aguardar ou trocar cena: ${instruction.verb}`);
+      }
+      return [step];
+    });
+  };
+  return compileEvent(data, { id: name, name, steps: expand(name, []) }, rooms, dialogues, audioItems, audioPack, events);
 }
 
 function mergeRoomOnEnterScript(
@@ -5958,7 +6030,11 @@ function buildTopdownRooms(
     const startMenuBinding = startMenuScriptIndex >= 0
       ? [{ op: "attach_button_event" as const, button: "start", index: startMenuScriptIndex, override: true }]
       : [];
-    const onEnterScript = mergeRoomOnEnterScript(roomDialogueBoot, [...(onEnter ?? []), ...startMenuBinding]);
+    const mapRestore = mapStateRestoreCommands(data, room);
+    const restore = [...mapRestore, ...compileRestoreEvent(data, nullableStringField(eventBindings, "onRestore"), rooms, dialogues, audioItems, audioPack, events)];
+    if (restore.length) roomData.on_restore = restore;
+    const boot = mapRestore.length ? [...mapRestore, { op: "wait" as const, frames: 1 }, ...roomDialogueBoot] : roomDialogueBoot;
+    const onEnterScript = mergeRoomOnEnterScript(boot, [...(onEnter ?? []), ...startMenuBinding]);
     if (onEnterScript) {
       roomData.on_enter = onEnterScript;
     }
@@ -6517,7 +6593,11 @@ function buildPlatformerRooms(
     const startMenuBinding = startMenuScriptIndex >= 0
       ? [{ op: "attach_button_event" as const, button: "start", index: startMenuScriptIndex, override: true }]
       : [];
-    const onEnterScript = mergeRoomOnEnterScript(roomDialogueBoot, [...(onEnter ?? []), ...startMenuBinding]);
+    const mapRestore = mapStateRestoreCommands(data, room);
+    const restore = [...mapRestore, ...compileRestoreEvent(data, nullableStringField(eventBindings, "onRestore"), rooms, dialogues, audioItems, audioPack, events)];
+    if (restore.length) roomData.on_restore = restore;
+    const boot = mapRestore.length ? [...mapRestore, { op: "wait" as const, frames: 1 }, ...roomDialogueBoot] : roomDialogueBoot;
+    const onEnterScript = mergeRoomOnEnterScript(boot, [...(onEnter ?? []), ...startMenuBinding]);
     if (onEnterScript) {
       roomData.on_enter = onEnterScript;
     }

@@ -1,8 +1,17 @@
+#include "gbs/dma.hpp"
 #include "gbs/render.hpp"
 #include "gbs/bios.hpp"
 #include "gbs/event.hpp"
 #include "gbs/interrupt.hpp"
 #include "gbs_hw.h"
+#include "gbs_room_tilemap.h"
+#include "gbs/tile_edits.hpp"
+
+#if !defined(__arm__) && !defined(__thumb__)
+// Pure render host fixtures omit the DMA transport. Full queue tests link the
+// strong implementation, which replaces this no-queue host stub.
+namespace gbs { __attribute__((weak)) bool dma_wait_for_source(const void*, size_t) { return true; } }
+#endif
 
 namespace gbs {
 
@@ -109,6 +118,7 @@ bool load_palette(const Lz77PaletteAsset& asset, bool object_palette) {
     if (!is_valid_lz77_palette_asset(asset)) {
         return false;
     }
+    if (!dma_wait_for_source(palette_decode_buffer, sizeof(palette_decode_buffer))) return false;
     if (!decode_lz77_runtime(asset.data, lz77_palette_decode_buffer, max_lz77_palette_bytes)) {
         return false;
     }
@@ -131,6 +141,7 @@ bool load_palette(const HuffmanPaletteAsset& asset, bool object_palette) {
     if (!is_valid_huffman_palette_asset(asset)) {
         return false;
     }
+    if (!dma_wait_for_source(palette_decode_buffer, sizeof(palette_decode_buffer))) return false;
     if (!decode_huffman_runtime(asset.data, huffman_palette_decode_buffer, max_huffman_palette_bytes)) {
         return false;
     }
@@ -246,6 +257,7 @@ bool load_tiles(const Lz77TileAsset& asset) {
     if (!is_valid_lz77_tile_asset(asset)) {
         return false;
     }
+    if (!dma_wait_for_source(lz77_tile_decode_buffer, sizeof(lz77_tile_decode_buffer))) return false;
     if (!decode_lz77_runtime(asset.data, lz77_tile_decode_buffer, max_lz77_tile_asset_bytes)) {
         return false;
     }
@@ -266,6 +278,7 @@ bool load_tiles(const HuffmanTileAsset& asset) {
     if (!is_valid_huffman_tile_asset(asset)) {
         return false;
     }
+    if (!dma_wait_for_source(huffman_tile_decode_buffer, sizeof(huffman_tile_decode_buffer))) return false;
     if (!decode_huffman_runtime(asset.data, huffman_tile_decode_buffer, max_huffman_tile_asset_bytes)) {
         return false;
     }
@@ -360,6 +373,7 @@ bool load_tilemap(BackgroundLayer layer, const Rle16TileMapAsset& asset) {
     if (!is_valid_background_layer(layer) || !is_valid_rle16_tilemap_asset(asset) || !is_valid_background_map_size(size)) {
         return false;
     }
+    if (!dma_wait_for_source(tilemap_decode_buffer, sizeof(tilemap_decode_buffer))) return false;
     if (!decode_rle16(asset.data, tilemap_decode_buffer, max_rle16_tilemap_entries)) {
         return false;
     }
@@ -373,6 +387,7 @@ bool load_tilemap(BackgroundLayer layer, const Lz77TileMapAsset& asset) {
     if (!is_valid_background_layer(layer) || !is_valid_lz77_tilemap_asset(asset) || !is_valid_background_map_size(size)) {
         return false;
     }
+    if (!dma_wait_for_source(tilemap_decode_buffer, sizeof(tilemap_decode_buffer))) return false;
     if (!decode_lz77_runtime(asset.data, lz77_tilemap_decode_buffer, max_lz77_tilemap_bytes)) {
         return false;
     }
@@ -393,6 +408,7 @@ bool load_tilemap(BackgroundLayer layer, const HuffmanTileMapAsset& asset) {
     if (!is_valid_background_layer(layer) || !is_valid_huffman_tilemap_asset(asset) || !is_valid_background_map_size(size)) {
         return false;
     }
+    if (!dma_wait_for_source(tilemap_decode_buffer, sizeof(tilemap_decode_buffer))) return false;
     if (!decode_huffman_runtime(asset.data, huffman_tilemap_decode_buffer, max_lz77_tilemap_bytes)) {
         return false;
     }
@@ -737,6 +753,31 @@ void draw_room_to_bg_cached(BackgroundLayer layer, const uint16_t* tiles, int wi
         cache.layer == layer && cache.tile_x == tile_x && cache.tile_y == tile_y) return;
     draw_room_to_bg(layer, tiles, width, height, camera_x, camera_y);
     cache = RoomTilemapCache { tiles, width, height, tile_x, tile_y, layer, true };
+}
+
+void draw_room_to_bg_cached(BackgroundLayer layer, const uint16_t* tiles, int width, int height,
+    int camera_x, int camera_y, RoomTilemapCache& cache, const RoomTileEdits& edits) {
+    if (!is_valid_background_layer(layer)) return;
+    const int tile_x = camera_x / 8, tile_y = camera_y / 8;
+    if (cache.valid && cache.tiles == tiles && cache.width == width && cache.height == height &&
+        cache.layer == layer && cache.tile_x == tile_x && cache.tile_y == tile_y &&
+        cache.edits_revision == edits.revision) return;
+    // load_tilemap stages this 32x32 window and its size at the frame boundary.
+    // It must not write edits directly into VRAM before the pending map commits.
+    // The upload copies into the per-layer shadow immediately, so reuse the
+    // existing decode scratch instead of reserving another 2 KiB of EWRAM.
+    static_assert(max_rle16_tilemap_entries >= 1024, "room staging scratch");
+    auto& window = tilemap_decode_buffer;
+    gbs_stage_room_tilemap16(window, tiles, width, height, camera_x, camera_y);
+    for (size_t i = 0; i < edits.count; ++i) {
+        const auto& edit = edits.entries[i];
+        if ((edit.key >> 28) != static_cast<uint32_t>(layer)) continue;
+        const int x = static_cast<int>(edit.key & 0x3FFF) - tile_x;
+        const int y = static_cast<int>((edit.key >> 14) & 0x3FFF) - tile_y;
+        if (x >= 0 && y >= 0 && x < 32 && y < 32) window[y * 32 + x] = edit.tile;
+    }
+    load_tilemap(layer, TileMapAsset {window, 32, 32});
+    cache = RoomTilemapCache {tiles, width, height, tile_x, tile_y, layer, true, edits.revision};
 }
 
 void draw_text_at(int x, int y, int width, const char* text) { gbs_hw_draw_text_at(x,y,width,text); }

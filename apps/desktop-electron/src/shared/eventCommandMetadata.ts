@@ -1,5 +1,12 @@
+import { TILE_REPLACEMENT_COLLISIONS } from "./tileReplacement.js";
+
 /** Authoring metadata only. Never rewrites a command or its serialized arguments. */
 const parameterLabels: Record<string, string[]> = {
+  lantern: ["Ator", "Largura (pixels, 8–240)", "Altura (pixels, 8–160)", "Escuridão (0–100%)", "Duração (quadros, 1–3600)"],
+  reveal_area: ["Ator", "Largura inicial (pixels, 8–240)", "Altura inicial (pixels, 8–160)", "Escuridão (0–100%)", "Duração (quadros, 1–3600)"],
+  set_map_state: ["Estado de mapa (ID)", "Variante (ID)"],
+  replace_tile: ["X (tiles)", "Y (tiles)", "Tile", "Camada", "Colisão"],
+  replace_tile_sequence: ["X (tiles)", "Y (tiles)", "Tile", "Quantidade", "Camada", "Colisão"],
   draw_text: ["X (tiles)", "Y (tiles)", "Destino", "Texto"],
   start_segment: ["Segmento (0–31)", "Script"], stop_segment: ["Segmento (0–31)"],
   set_adventure_state: ["Estado"], push_actor: ["Ator", "Continuar até colisão"],
@@ -46,6 +53,12 @@ const parameterLabels: Record<string, string[]> = {
 };
 
 const descriptions: Record<string, string> = {
+  lantern: "Área retangular iluminada que acompanha o ator. Escurece o exterior durante a duração escolhida. Fades e máscaras têm prioridade enquanto ativos.",
+  reveal_area: "Expande a área retangular ao redor do ator até revelar a tela. Largura e altura definem a abertura inicial; ao terminar, remove o escurecimento.",
+  clear_visibility: "Remove a lanterna ou a revelação e restaura a visibilidade da cena.",
+  set_map_state: "Aplica uma variante nomeada com tiles, colisão e variável persistente. Configure os estados na cena. O estado é restaurado ao voltar à cena ou carregar o save.",
+  replace_tile: "Troca um tile da cena. BG0 é o alias do piso BG2. Colisão keep preserva o terreno; free libera a passagem. Alterações valem durante a visita à cena.",
+  replace_tile_sequence: "Troca tiles consecutivos na mesma linha. A colisão opcional aplica-se ao piso BG2; keep preserva a colisão existente.",
   draw_text: "Desenha uma linha sem caixa de diálogo. background usa coordenadas da cena na grade de tiles; overlay usa coordenadas fixas da tela.",
   start_segment: "Executa outro script em paralelo, com esperas independentes, e guarda seu identificador 0–31.",
   stop_segment: "Interrompe o script paralelo do segmento, incluindo as chamadas iniciadas por ele.",
@@ -110,6 +123,7 @@ export function eventCommandParameterLabel(verb: string, tokenIndex: number, fal
 }
 
 export function eventCommandParameterChoices(verb: string, tokenIndex: number): string[] | null {
+  if ((verb === "replace_tile" && tokenIndex === 5) || (verb === "replace_tile_sequence" && tokenIndex === 6)) return TILE_REPLACEMENT_COLLISIONS;
   if(verb==="set_adventure_state" && tokenIndex===1) return ["ground","dash","knockback","blank","run","push"];
   if(verb==="actor_effects" && tokenIndex===2) return ["flash","shake"];
   if((verb==="push_actor" && tokenIndex===2) || (verb==="open_equip_menu" && tokenIndex===2)) return ["true","false"];

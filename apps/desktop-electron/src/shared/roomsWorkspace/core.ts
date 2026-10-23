@@ -1,3 +1,4 @@
+import { roomMapStates, type MapStateDefinition } from "../mapStates.js";
 import type { GBAProjectData } from "../projectFile.js";
 import { applyDefaultRoomBackground, defaultBackgroundActorPosition, defaultBackgroundForRoom } from "../blankBackgroundDefaults.js";
 import { createBlankProjectData } from "../newProject.js";
@@ -145,6 +146,7 @@ export interface RoomBackgroundFidelity {
 }
 
 export interface RoomsWorkspaceRoom {
+  mapStates?: MapStateDefinition[];
   id: string;
   name: string;
   displayName?: string;
@@ -700,6 +702,7 @@ export interface UpdateRoomConnectionFields {
 }
 
 export interface UpdateRoomFields {
+  mapStates?: MapStateDefinition[];
   width?: number;
   height?: number;
   collisionTypes?: RoomCollisionType[];
@@ -3187,6 +3190,7 @@ function renameActiveRoom(data: GBAProjectData, roomIDToRename: string, oldName:
 }
 
 function applyRoomFields(room: Record<string, unknown>, fields: UpdateRoomFields, neutralPlayers = false): void {
+  if (fields.mapStates !== undefined) room.mapStates = fields.mapStates;
   const oldWidth = positiveInteger(room.width, 30);
   const oldHeight = positiveInteger(room.height, 20);
 
@@ -3239,6 +3243,10 @@ function applyRoomFields(room: Record<string, unknown>, fields: UpdateRoomFields
     const mode = isometricGameplayModeForSceneTypeChoice(fields.sceneType);
     if (mode) room.runtime = isometricRuntimeForMode(mode, room.runtime);
   }
+
+  // Validate against the requested dimensions/type before publishing the clone.
+  // Existing definitions must survive a scene edit without losing their cells.
+  if (room.mapStates !== undefined) room.mapStates = roomMapStates(room);
 
   if (fields.runtime !== undefined) {
     room.runtime = normalizeSceneRuntime(stringField(room.sceneType, "topdown"), fields.runtime);
@@ -5422,6 +5430,7 @@ export function deriveRoomsWorkspacePresentation(data: GBAProjectData): RoomsWor
       collisionCount: collisionCount(sceneProjection, width, height),
       collisionCells: collisionCells(sceneProjection, width, height),
       collisionTypes: collisionTypes(sceneProjection, width, height),
+      mapStates: roomMapStates(room),
       eventBindings: sceneDocument.eventBindings,
       heightLevels,
       foregroundTileCount,

@@ -8,11 +8,18 @@ gbs::DebugFrameStats frame_stats {};
 gbs::DebugCounter counters[gbs::debug_counter_count] {};
 char overlay_buffer[26 * 7 + 1] {};
 int32_t active_runtime_kind = -1;
+bool event_trace_enabled = true;
+struct SharedRuntimeTelemetry {
+    gbs::RuntimeTelemetryBlock base;
+    gbs::RuntimeProfilerTelemetryBlock profiler;
+    gbs::RuntimeEventTraceBlock events;
+};
+static_assert(offsetof(SharedRuntimeTelemetry, profiler) == 256, "profiler extension must follow base telemetry");
 #if defined(__arm__) || defined(__thumb__)
-volatile gbs::RuntimeTelemetryBlock shared_runtime_telemetry __attribute__((section(".ewram_bss"), used));
+volatile SharedRuntimeTelemetry shared_runtime_telemetry __attribute__((section(".ewram_bss"), used));
 volatile gbs::RuntimeTelemetryLegacyBlock shared_runtime_telemetry_legacy __attribute__((section(".ewram_bss"), used));
 #else
-volatile gbs::RuntimeTelemetryBlock shared_runtime_telemetry {};
+volatile SharedRuntimeTelemetry shared_runtime_telemetry {};
 volatile gbs::RuntimeTelemetryLegacyBlock shared_runtime_telemetry_legacy {};
 #endif
 
@@ -80,7 +87,11 @@ void append_counter_line(char*& out, char* end, const gbs::DebugCounter& counter
 namespace gbs {
 
 volatile RuntimeTelemetryBlock& runtime_telemetry_block() {
-    return shared_runtime_telemetry;
+    return shared_runtime_telemetry.base;
+}
+
+volatile RuntimeProfilerTelemetryBlock& runtime_profiler_telemetry_block() {
+    return shared_runtime_telemetry.profiler;
 }
 
 volatile RuntimeTelemetryLegacyBlock& runtime_telemetry_legacy_block() {
@@ -110,6 +121,14 @@ void reset_runtime_telemetry() {
     telemetry.first_actor_direction = -1;
     telemetry.last_music = -1;
     telemetry.last_sfx = -1;
+    volatile RuntimeProfilerTelemetryBlock& profiler = runtime_profiler_telemetry_block();
+    volatile uint32_t* profiler_words = reinterpret_cast<volatile uint32_t*>(&profiler);
+    for (size_t i = 0; i < sizeof(profiler) / sizeof(uint32_t); ++i) profiler_words[i] = 0;
+    profiler.magic = 0x47535046u;
+    profiler.schema = 1;
+    profiler.word_count = sizeof(profiler) / sizeof(uint32_t);
+    profiler.ticks_per_second = 262144;
+
 
     volatile RuntimeTelemetryLegacyBlock& legacy = runtime_telemetry_legacy_block();
     uint32_t* legacy_words = const_cast<uint32_t*>(reinterpret_cast<const volatile uint32_t*>(&legacy));
@@ -166,6 +185,9 @@ void debug_set_runtime_physical_telemetry(const RuntimePhysicalTelemetry& sample
     telemetry.physical_audio_bytes = sample.audio_bytes;
     telemetry.physical_dma_bytes = sample.dma_bytes;
 }
+
+volatile RuntimeEventTraceBlock& runtime_event_trace_block() { return shared_runtime_telemetry.events; }
+void debug_set_event_trace_enabled(bool enabled) { event_trace_enabled = enabled; }
 
 void debug_reset() {
     assertion_state = DebugAssertion {};
@@ -300,3 +322,16 @@ void draw_debug_overlay(bool visible) {
 }
 
 } // namespace gbs
+
+extern "C" void gbs_debug_record_event(const void* command, uint32_t index, uint32_t op, uint32_t status, int room, int wait) {
+    if (!event_trace_enabled) return;
+    auto& trace = gbs::runtime_event_trace_block();
+    trace.magic = 0x47534554u; trace.schema = 1; trace.word_count = 20;
+    const uint32_t sequence = trace.sequence;
+    auto& entry = trace.entries[sequence % 4];
+    entry.command_address = static_cast<uint32_t>(reinterpret_cast<uintptr_t>(command));
+    entry.frame = gbs::runtime_telemetry_block().frame;
+    entry.step_op_status = (index & 0xFFFF) | ((op & 255) << 16) | ((status & 255) << 24);
+    entry.room_wait = static_cast<uint16_t>(room) | (static_cast<uint32_t>(static_cast<uint16_t>(wait)) << 16);
+    trace.sequence = sequence + 1; // publish after the record is complete
+}

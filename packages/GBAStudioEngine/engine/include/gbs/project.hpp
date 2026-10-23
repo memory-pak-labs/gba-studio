@@ -214,6 +214,7 @@ struct TopDownRoomData {
     EventScript on_hit_group3 = empty_event_script();
     // Opt-in ROM atlas. Its map contains source indices, not hardware entries.
     const TileAsset* paged_source_tiles = nullptr;
+    EventScript on_restore = empty_event_script();
 };
 
 struct TopDownActorData {
@@ -927,6 +928,8 @@ constexpr void apply_actor_event_command(
         runtime.movement_step_accumulator = 0;
         runtime.movement_frame_counter = 0;
         break;
+    case EventActorOp::VisibilityLantern:
+    case EventActorOp::VisibilityReveal:
     case EventActorOp::PushFacing:
     case EventActorOp::Push:
         break;

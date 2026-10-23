@@ -1,3 +1,4 @@
+#include "gbs/profiler.hpp"
 #define GBS_DIALOGUE_UI_RUNTIME_KIND 0
 #include "gbs/animation.hpp"
 #include "gbs/audio.hpp"
@@ -52,6 +53,7 @@ namespace {
 const gbs::TopDownProjectData& project = gbastudio_project::project;
 
 int current_room = 0;
+bool restored_room_events_pending = false;
 int configured_dialogue_ui_room = -1;
 bool configured_dialogue_ui_affine = false;
 uint16_t room_backdrop_color = 0;
@@ -129,7 +131,6 @@ constexpr size_t max_runtime_projectiles = 8;
 constexpr uint16_t projectile_oam_start = npc_oam_start + max_visible_npc_slots * oam_sprites_per_actor;
 constexpr size_t max_trigger_slots = 8;
 constexpr size_t max_tile_effect_slots = 8;
-constexpr size_t max_mutable_room_tiles = 64 * 64;
 constexpr int adventure_callback_on_interact = 0;
 constexpr int adventure_callback_on_room_enter = 1;
 constexpr int adventure_callback_on_room_exit = 2;
@@ -181,8 +182,8 @@ bool npc_touching_player[max_npc_slots] __attribute__((section(".ewram_bss")));
 bool npc_defeat_pending_despawn[max_npc_slots] __attribute__((section(".ewram_bss")));
 gbs::TopDownTriggerState trigger_states[max_trigger_slots];
 gbs::TopDownTriggerState tile_effect_states[max_tile_effect_slots];
-uint16_t mutable_room_visual_tiles[max_mutable_room_tiles] __attribute__((section(".ewram_bss")));
-bool mutable_room_visual_tiles_ready = false;
+gbs::RoomTileEdits room_tile_edits __attribute__((section(".ewram_bss")));
+gbs::RoomTilemapCache room_layer_cache[4];
 gbs::InputState current_input { 0, 0, 0 };
 bool player_moved_this_frame = false;
 int topdown_initialization_result = 0;
@@ -1061,7 +1062,7 @@ gbs::Vec2i update_paged_room_background(gbs::Vec2i camera_position) {
     const auto& atlas = *data.paged_source_tiles;
     const auto& map = *data.visual_tilemap;
     const auto bounded = gbs::paged_background_camera(map, camera_position);
-    const int changed = gbs::stage_paged_background(paged_background, map, atlas, bounded);
+    const int changed = gbs::stage_paged_background(paged_background, map, atlas, bounded, &room_tile_edits);
     if (changed > 128) {
         gbs::load_bg_tiles_at_character_base(gbs::TileAsset {paged_background.tiles,
             gbs::paged_background_slot_count, 0, false, gbs::ColorDepth::Bpp8}, 0);
@@ -1214,81 +1215,45 @@ void load_project_assets() {
     apply_active_room_video();
 }
 
-size_t active_room_tile_count() {
-    const gbs::TopDownRoomData& room_data = project.rooms[current_room];
-    if (room_data.width_tiles <= 0 || room_data.height_tiles <= 0) {
-        return 0;
-    }
-    const size_t count = static_cast<size_t>(room_data.width_tiles) *
-        static_cast<size_t>(room_data.height_tiles);
-    return count < max_mutable_room_tiles ? count : max_mutable_room_tiles;
-}
-
 void reset_active_room_visual_tiles() {
-    const gbs::TopDownRoomData& room_data = project.rooms[current_room];
-    const size_t count = active_room_tile_count();
-    for (size_t index = 0; index < count; ++index) {
-        mutable_room_visual_tiles[index] = room_data.visual_tiles[index];
-    }
-    for (size_t index = count; index < max_mutable_room_tiles; ++index) {
-        mutable_room_visual_tiles[index] = 0;
-    }
-    mutable_room_visual_tiles_ready = true;
+    gbs::stop_visibility_effect();
+    room_tile_edits = {};
+    for (auto& cache : room_layer_cache) cache = {};
+    room.collision.edits = &room_tile_edits;
 }
 
 const uint16_t* active_room_visual_tiles() {
-    if (!mutable_room_visual_tiles_ready) {
-        reset_active_room_visual_tiles();
-    }
-    return mutable_room_visual_tiles;
-}
-
-bool background_dimensions_for_layer(int layer, int& width, int& height) {
-    for (size_t index = 0; index < project.background_count; ++index) {
-        const gbs::TopDownBackgroundData& background = project.backgrounds[index];
-        if (static_cast<int>(background.layer) != layer) {
-            continue;
-        }
-        if (background.compressed_tilemap != nullptr) {
-            width = background.compressed_tilemap->width;
-            height = background.compressed_tilemap->height;
-        } else {
-            width = background.tilemap.width;
-            height = background.tilemap.height;
-        }
-        return width > 0 && height > 0;
-    }
-    return false;
+    return project.rooms[current_room].visual_tiles;
 }
 
 bool apply_tile_command(const gbs::EventTileCommand& command) {
+    const auto& data = project.rooms[current_room];
+    // BG0 is the original event alias for the scene floor, rendered on BG2.
+    const int layer = command.layer == 0 ? 2 : command.layer;
     for (int offset = 0; offset < command.count; ++offset) {
-        const int x = command.x + offset;
-        const int y = command.y;
-        gbs::EventTileCommand resolved_command = command;
-        resolved_command.tile += offset;
-        const uint16_t tile = gbs::resolve_event_tile(
-            resolved_command,
-            project.tile_assets,
-            project.tile_asset_count
-        );
-        if (command.layer == 0) {
-            const gbs::TopDownRoomData& room_data = project.rooms[current_room];
-            if (x < 0 || y < 0 || x >= room_data.width_tiles || y >= room_data.height_tiles) {
-                continue;
-            }
-            active_room_visual_tiles();
-            const size_t tile_index = static_cast<size_t>(y * room_data.width_tiles + x);
-            if (tile_index < max_mutable_room_tiles) {
-                mutable_room_visual_tiles[tile_index] = tile;
+        const int x = command.x + offset, y = command.y;
+        if (x < 0 || y < 0 || x >= data.width_tiles || y >= data.height_tiles) continue;
+        auto resolved = command;
+        resolved.tile += offset;
+        const uint16_t tile = gbs::resolve_event_tile(resolved, project.tile_assets, project.tile_asset_count);
+        // BG3 remains a project background, outside the room floor/foreground.
+        if (layer == 3) {
+            for (size_t i = 0; i < project.background_count; ++i) {
+                const auto& background = project.backgrounds[i];
+                if (background.layer != gbs::BackgroundLayer::BG3) continue;
+                const int width = background.compressed_tilemap != nullptr
+                    ? background.compressed_tilemap->width : background.tilemap.width;
+                const int height = background.compressed_tilemap != nullptr
+                    ? background.compressed_tilemap->height : background.tilemap.height;
+                gbs::set_bg_tile(gbs::BackgroundLayer::BG3, x, y, width, height, tile);
+                break;
             }
             continue;
         }
-
-        int width = 0;
-        int height = 0;
-        if (background_dimensions_for_layer(command.layer, width, height)) {
-            gbs::set_bg_tile(static_cast<gbs::BackgroundLayer>(command.layer), x, y, width, height, tile);
+        if (!gbs::set_room_tile_edit(room_tile_edits, layer, x, y,
+            data.width_tiles, data.height_tiles, tile, command.collision_flags)) {
+            gbs::debug_assert(false, "room tile edit cap", 32);
+            return false;
         }
     }
     return true;
@@ -1325,6 +1290,7 @@ void consume_push_actor_commands() {
 }
 
 void consume_player_event_commands() {
+    gbs::consume_visibility_event_commands(event_state);
     const int previous_sprite_index = player_event_runtime.sprite_index;
     player_event_runtime.x = player.position_pixels.x;
     player_event_runtime.y = player.position_pixels.y;
@@ -1524,6 +1490,16 @@ void init_npc_runtime() {
         if (index < gbs::max_event_actor_state_slots) {
             event_state.actor_update_script_enabled[index] = gbs::has_event_script(room_data.npcs[index].on_update);
         }
+    }
+    if (restored_room_events_pending) {
+        restored_room_events_pending = false;
+        gbs::run_event_script_consuming(event_state, room_data.on_restore, +[](gbs::EventState& state, void*) {
+            consume_player_event_commands();
+            gbs::consume_actor_event_commands(npc_runtimes, current_npc_count(), state);
+            gbs::clear_event_actor_commands(state);
+            consume_tile_commands();
+            gbs::clear_event_tile_commands(state);
+        });
     }
 }
 
@@ -2310,6 +2286,9 @@ bool restore_runtime_state(int slot_index) {
     event_interaction = {};
     gbs::hide_menu(event_interaction_menu);
     init_runtime_projectiles();
+    event_state.current_room = current_room;
+    gbs::clear_event_tile_commands(event_state);
+    restored_room_events_pending = true;
     refresh_hud();
     return true;
 }
@@ -3025,6 +3004,7 @@ int initialize_topdown_runtime() {
         return -1;
     }
     room = gbs::room_from_data(project.rooms[current_room]);
+    reset_active_room_visual_tiles();
     player = gbs::actor_from_data(project.player);
     if (runtime_entry) {
         player.position_pixels = gbs::Vec2i { entry_x, entry_y };
@@ -3431,6 +3411,7 @@ gbs::RuntimeAdapterFrameResult update_topdown_runtime(const gbs::RuntimeFrameCon
 }
 
 void render_topdown_runtime(const gbs::RuntimeFrameContext& context) {
+    const gbs::SubsystemProfilerScope profiler_scope(gbs::ProfilerSubsystem::Render);
     (void)context;
         gbs::consume_visual_effect_event(event_state, visual_effects);
         gbs::set_backdrop_color(backdrop_color_for_player_effects());
@@ -3464,9 +3445,9 @@ void render_topdown_runtime(const gbs::RuntimeFrameContext& context) {
         }
         const bool affine_room = active_room_data.video.affine_enabled || project.video.affine_enabled;
         if (!gbs::is_bitmap_display_mode(project.video.display_mode)) {
-            if (!active_room_data.uses_visual_tilemap && !affine_room) {
-                gbs::draw_room_to_bg(gbs::BackgroundLayer::BG2, active_room_visual_tiles(), room.width_tiles, room.height_tiles, render_camera.x, render_camera.y);
-                gbs::draw_room_to_bg(gbs::BackgroundLayer::BG1, project.rooms[current_room].foreground_tiles, room.width_tiles, room.height_tiles, render_camera.x, render_camera.y);
+            if ((!active_room_data.uses_visual_tilemap || room_tile_edits.count > 0) && !affine_room && active_room_data.paged_source_tiles == nullptr) {
+                gbs::draw_room_to_bg_cached(gbs::BackgroundLayer::BG2, active_room_visual_tiles(), room.width_tiles, room.height_tiles, render_camera.x, render_camera.y, room_layer_cache[2], room_tile_edits);
+                gbs::draw_room_to_bg_cached(gbs::BackgroundLayer::BG1, project.rooms[current_room].foreground_tiles, room.width_tiles, room.height_tiles, render_camera.x, render_camera.y, room_layer_cache[1], room_tile_edits);
             }
         }
         gbs::set_bg_enabled(gbs::BackgroundLayer::BG1, !active_room_data.uses_visual_tilemap && !affine_room);
@@ -3475,8 +3456,8 @@ void render_topdown_runtime(const gbs::RuntimeFrameContext& context) {
         // sub-tile scroll remainder.
         const bool paged_room = active_room_data.paged_source_tiles != nullptr;
         const gbs::Vec2i background_camera = paged_room ? update_paged_room_background(render_camera) : render_camera;
-        const int bg2_scroll_x = affine_room ? 0 : (paged_room ? background_camera.x % 256 : (active_room_data.uses_visual_tilemap ? render_camera.x : (render_camera.x & 7)));
-        const int bg2_scroll_y = affine_room ? 0 : (paged_room ? background_camera.y % 256 : (active_room_data.uses_visual_tilemap ? render_camera.y : (render_camera.y & 7)));
+        const int bg2_scroll_x = affine_room ? 0 : (paged_room ? background_camera.x % 256 : (active_room_data.uses_visual_tilemap && room_tile_edits.count == 0 ? render_camera.x : (render_camera.x & 7)));
+        const int bg2_scroll_y = affine_room ? 0 : (paged_room ? background_camera.y % 256 : (active_room_data.uses_visual_tilemap && room_tile_edits.count == 0 ? render_camera.y : (render_camera.y & 7)));
         gbs::set_bg_scroll(gbs::BackgroundLayer::BG1, render_camera.x & 7, render_camera.y & 7);
         gbs::set_bg_scroll(gbs::BackgroundLayer::BG2, bg2_scroll_x, bg2_scroll_y);
         gbs::set_bg_scroll(gbs::BackgroundLayer::BG0, 0, 0);
@@ -3494,6 +3475,15 @@ void render_topdown_runtime(const gbs::RuntimeFrameContext& context) {
             gbs::set_bg_scroll(gbs::BackgroundLayer::BG3, visual_scroll.x, visual_scroll.y);
         }
         gbs::render_visual_effects(visual_effects);
+        if (gbs::visibility_effect().active) {
+            const int target = gbs::visibility_effect().actor;
+            const gbs::Actor* actor = target < 0 ? &player :
+                (static_cast<size_t>(target) < current_npc_count() ? &npc_runtimes[target].actor : nullptr);
+            if (actor == nullptr) gbs::stop_visibility_effect();
+            else gbs::render_visibility_effects({ actor->position_pixels.x + actor->size_pixels.x / 2 - render_camera.x,
+                actor->position_pixels.y + actor->size_pixels.y / 2 - render_camera.y }, visual_effects,
+                screen_fade_active || (screen_fade_direction > 0 && screen_fade_frames_remaining == 0));
+        }
         const bool show_debug_overlay = current_input.is_held(gbs::ButtonSelect);
         if (!show_debug_overlay) {
             gbs::draw_debug_overlay(false);

@@ -413,11 +413,45 @@ export function readRuntimeTelemetryFromHeap(module) {
   );
 }
 
+const PROFILER_SUBSYSTEMS = ["scripts", "audio", "render", "streaming", "interrupts"];
+
+function readProfilerTelemetry(module, address, runtime) {
+  if (runtime.schema !== 4 || address < 0x02000000 || address + 320 > 0x02040000 ||
+      typeof module._gba_audio_register !== "function") return null;
+  const readWord = (index) => {
+    const offset = address + 256 + index * 4;
+    return (module._gba_audio_register(offset) | (module._gba_audio_register(offset + 2) << 16)) >>> 0;
+  };
+  if (readWord(0) !== 0x47535046 || readWord(1) !== 1 || readWord(2) !== 16 ||
+      readWord(3) !== runtime.frame || readWord(4) !== 262144) return null;
+  const valid = readWord(5);
+  const frameTicks = {}, scenePeakTicks = {};
+  PROFILER_SUBSYSTEMS.forEach((label, index) => {
+    if ((valid & (1 << index)) === 0) return;
+    frameTicks[label] = readWord(6 + index);
+    scenePeakTicks[label] = readWord(11 + index);
+  });
+  return Object.freeze({ ticksPerSecond: 262144, frameTicks: Object.freeze(frameTicks), scenePeakTicks: Object.freeze(scenePeakTicks) });
+}
+
+export function readEventTraceTelemetry(module, address) {
+  if (typeof module._gba_audio_register !== "function") return null;
+  const word = index => { const offset = address + 320 + index * 4; return (module._gba_audio_register(offset) | module._gba_audio_register(offset + 2) << 16) >>> 0; };
+  if (word(0) !== 0x47534554 || word(1) !== 1 || word(2) !== 20) return null;
+  const sequence = word(3), entries = [];
+  for (let i = Math.max(0, sequence - 4); i < sequence; ++i) {
+    const start = 4 + (i % 4) * 4, packed = word(start + 2), context = word(start + 3);
+    entries.push({ commandAddress: word(start), frame: word(start + 1), step: packed & 65535, op: (packed >>> 16) & 255, status: packed >>> 24, room: (context << 16) >> 16, waitFrames: context >>> 16 });
+  }
+  return Object.freeze({ sequence, entries });
+}
+
 export function readRuntimeTelemetry(module) {
   const hasNativeBridge = typeof module._gba_find_runtime_telemetry === "function" &&
     typeof module._gba_runtime_telemetry_word === "function";
   if (hasNativeBridge) {
-    if (module._gba_find_runtime_telemetry() !== 0) {
+    const address = module._gba_find_runtime_telemetry() >>> 0;
+    if (address !== 0) {
       const wordCount = module._gba_runtime_telemetry_word(2) >>> 0;
       if (wordCount === RUNTIME_TELEMETRY_LEGACY_WORD_COUNT || wordCount === RUNTIME_TELEMETRY_PREVIOUS_WORD_COUNT || wordCount === RUNTIME_TELEMETRY_WORD_COUNT) {
         const words = Uint32Array.from(
@@ -425,7 +459,7 @@ export function readRuntimeTelemetry(module) {
           (_, index) => module._gba_runtime_telemetry_word(index) >>> 0
         );
         const decoded = decodeRuntimeTelemetryWords(words);
-        if (decoded) return decoded;
+        if (decoded) return Object.freeze({ ...decoded, subsystems: readProfilerTelemetry(module, address, decoded), eventTrace: readEventTraceTelemetry(module, address) });
       }
     }
     return null;

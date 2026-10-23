@@ -526,9 +526,13 @@ struct RoomTilemapCache {
     int width = 0, height = 0, tile_x = 0, tile_y = 0;
     BackgroundLayer layer = BackgroundLayer::BG0;
     bool valid = false;
+    uint32_t edits_revision = 0;
 };
+struct RoomTileEdits;
 void draw_room_to_bg_cached(BackgroundLayer layer, const uint16_t* tiles, int width, int height,
     int camera_x, int camera_y, RoomTilemapCache& cache);
+void draw_room_to_bg_cached(BackgroundLayer layer, const uint16_t* tiles, int width, int height,
+    int camera_x, int camera_y, RoomTilemapCache& cache, const RoomTileEdits& edits);
 void draw_text_at(int x, int y, int width, const char* text);
 void draw_text_overlay(int x, int y, int width, const char* text, bool visible = true);
 void draw_text_overlay_slot(int x, int y, int width, const char* text, int oam_offset, bool visible = true);

@@ -132,6 +132,7 @@ describe("romPlayerWindow", () => {
       runtimeState: {
         ...runtimeState,
         schema: 4,
+        subsystems: { ticksPerSecond: 262144, frameTicks: { scripts: 12, audio: 7 }, scenePeakTicks: { scripts: 50, audio: 18 } },
         audio: {
           pcmSourceBytes: 600,
           mixerBufferBytes: 4096,
@@ -143,6 +144,7 @@ describe("romPlayerWindow", () => {
     })).toEqual(expect.objectContaining({
       runtimeState: expect.objectContaining({
         schema: 4,
+        subsystems: { ticksPerSecond: 262144, frameTicks: { scripts: 12, audio: 7 }, scenePeakTicks: { scripts: 50, audio: 18 } },
         audio: {
           pcmSourceBytes: 600,
           mixerBufferBytes: 4096,
@@ -152,6 +154,15 @@ describe("romPlayerWindow", () => {
         }
       })
     }));
+    for (const subsystems of [
+      { ticksPerSecond: 0, frameTicks: {}, scenePeakTicks: {} },
+      { ticksPerSecond: 262144, frameTicks: { audio: -1 }, scenePeakTicks: { audio: 2 } },
+      { ticksPerSecond: 262144, frameTicks: { scripts: 1 }, scenePeakTicks: {} }
+    ]) {
+      expect(normalizeRomPlayerFrameStats({ cpuPercent: 8, emulationMs: 1.2, fps: 60, frameMs: 16.67, romBytes: 85000,
+        runtimeState: { ...runtimeState, schema: 4, subsystems }
+      })).toBeNull();
+    }
   });
 
   it("abre o Play em uma janela normal sem fullscreen", () => {

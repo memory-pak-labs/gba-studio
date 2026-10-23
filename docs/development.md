@@ -116,6 +116,119 @@ O editor permite selecionar o Engine Pack nas configurações. Para o layout
 deste monorepo, a saída é `packages/GBAStudioEngine/dist/GBAStudioEnginePack`.
 Não copie caminhos absolutos de outro computador.
 
+## Substituição de tiles em Aventura e Plataforma
+
+`replace_tile X Y TILE bg2 COLISAO` altera um tile de 8×8 do piso.
+`replace_tile_sequence X Y TILE QUANTIDADE bg2 COLISAO` altera uma sequência
+horizontal, limitada à linha atual. `COLISAO` é opcional: `keep` preserva a
+colisão atual; `free`, `solid`, `up`, `down`, `left`, `right`, `water`, `damage`
+e `ladder` definem explicitamente o novo terreno. Uma colisão explícita também
+remove a rampa anterior. BG0 é o alias histórico do piso BG2 nos eventos;
+colisão explícita só se aplica ao piso. As outras camadas alteram apenas o visual.
+
+As alterações são locais à visita à cena, com até 256 células modificadas e
+coordenadas de 0 a 511. Entrar novamente na cena ou carregar um save restaura
+o mapa original; reaplique o estado desejado no evento de entrada a partir das
+variáveis salvas. Mapas paginados conservam o atlas na ROM e atualizam somente
+os tiles visíveis afetados. Os projetos e PNGs originais permanecem intactos.
+
+Para reproduzir a regressão com cores procedurais, gerar ROMs pelo Pack e
+conferir pixels, colisão e retorno da câmera no mGBA Web, execute no aplicativo:
+
+```sh
+node scripts/smoke-replace-tile.mjs /caminho/GBAStudioEnginePack /caminho/evidencias
+```
+
+O smoke cobre mapas por tiles, residentes, paginados, coordenadas acima de 63,
+Plataforma e preservação da colisão quando o argumento é omitido. A validação
+de um GBA físico continua separada.
+
+## Estados de mapa e visibilidade
+
+Em cenas Topdown e Plataforma, o inspetor **Estados de mapa** agrupa tiles do
+piso BG2, colisões explícitas e uma variável salva. Cada estado possui de 2 a
+8 variantes; uma delas usa valor 0. As variantes cobrem as mesmas células,
+sem sobreposição com outros estados. O limite conjunto da cena é de 8
+operações e 256 células. IDs de estado usados por comandos devem ser únicos
+no projeto. As definições são salvas no `.gba-project`.
+
+```text
+set_map_state porta open
+lantern player 80 64 75 240
+reveal_area Guide 24 24 100 120
+clear_visibility
+```
+
+`set_map_state` troca a variável, o visual e a colisão. A entrada na cena e o
+carregamento de save reaplicam a variante salva sem repetir os eventos de
+inicialização do usuário. Um valor sem variante mantém o mapa original na
+entrada. Antes de reduzir a cena ou mudar para outro runtime, remova definições
+que ficariam inválidas.
+
+Os presets de visibilidade usam uma área retangular que acompanha o centro do
+jogador (`player`) ou do ator indicado, considerando a câmera. Largura e altura
+aceitam 8–240 e 8–160 pixels; escuridão, 0–100%; duração, 1–3600 quadros. A
+revelação expande a área inicial durante esse tempo. Fade e transições têm
+prioridade sobre a lanterna. A troca de cena e o fim da duração limpam o efeito.
+
+As regressões abaixo exportam comandos reais do editor, compilam fixtures
+procedurais com o Pack e executam a ROM no mGBA Web:
+
+```sh
+node scripts/smoke-map-states.mjs /caminho/GBAStudioEnginePack /caminho/evidencias-estados
+node scripts/smoke-visibility-graphics.mjs /caminho/GBAStudioEnginePack /caminho/evidencias-graficas
+```
+
+Os casos cobrem Topdown residente, paginado e Plataforma. O primeiro confere
+save, reboot, colisão e retorno à cena. O segundo confere pixels, câmera, atores,
+expiração, máscara completa, fade parcial, modos de sprites em movimento e
+troca de cena. Os assets procedurais pertencem somente às fixtures de teste.
+
+## Diagnóstico de execução e compilação
+
+No Depurador, o profiler recebe medidas nativas de scripts, áudio, renderização,
+streaming e interrupções, com picos por cena. O contador usa 262144 ticks por
+segundo; a UI apresenta microssegundos. Escopos podem se sobrepor, portanto
+seus valores não devem ser somados. Subsistemas sem amostra ficam fora dos
+picos exibidos. A extensão de telemetria preserva o bloco principal existente.
+O áudio mede o mixer de VBlank; seu tempo também está contido no total de
+interrupções. A coleta na IRQ usa contadores separados, sem alterar o registro
+de escopos.
+Os cinco subsistemas usam um estado fixo de até 128 bytes; o registro opcional
+de 16 labels da API `ProfilerScope` permanece separado para não ocupar a IWRAM
+de toda ROM exportada.
+
+Após uma compilação ou Play, **Relatório compartilhável de build** permite
+revisar e copiar JSON com versões do editor, Pack e compilador, configuração,
+resultado e causa provável. O relatório usa uma lista explícita de campos e
+exclui caminhos, comandos e logs brutos. A causa provável depende da evidência
+disponível; versões não obtidas permanecem nulas.
+
+## Margem estática de RAM
+
+O relatório pós-link `memory_report.json` usa o schema 2. Ele separa bytes
+vinculados (união dos endereços, contando overlays uma vez), alinhamento e
+lacunas, reservas e margem estática. O fim de EWRAM vem de `__ewram_bss_end`;
+em IWRAM, a margem é o intervalo entre `__bss_end` e `__stack_bottom`. As
+reservas de sistema, IRQ, supervisor e o slot final da IRQ permanecem ocupadas.
+Mapas sem os símbolos obrigatórios não produzem uma estimativa de margem.
+O relatório sinaliza uso a partir de 90% e estouro acima da capacidade.
+
+Essa margem permite avaliar novas alocações estáticas; ela não mede quanto
+das pilhas foi consumido em execução. O painel **Testes e diagnóstico** mostra
+essas parcelas após compilar ou executar a ROM.
+
+Os pools de recursos mantêm 1024 posições por meio de mapas de bits de 128
+bytes. Snapshots continuam sendo cópias independentes e preservam rollback,
+alinhamento e contagem. Os buffers de retomada de save ficam na EWRAM comum,
+fora do overlay reutilizado entre runtimes; a capacidade de save não muda.
+Para verificar a seção e os tamanhos reais do objeto ARM, execute no motor:
+
+```sh
+make runtime-save-memory-test
+make resource-manager-stack-test
+```
+
 ## Verificação completa
 
 O projeto canônico é
@@ -549,3 +662,53 @@ O verificador de HUD compara molduras, ícones, corações e glifos em cinco
 estados de vida/fichas com o framebuffer real. Use a interface em português
 na instância isolada de QA do Play. A validação física do GBA
 continua separada.
+
+### Contratos, restauração e regressões de ROM
+
+`eventExecutionContract.ts` centraliza a interpretação inicial, duração de espera
+em frames (0–32767), recursos declarados e planos de entrada/restauração. Comandos
+com semântica específica de cena continuam explicitamente `runtime-defined`.
+O Preview executa `attach_button`/`remove_button` e condições `if_button` no
+contexto do botão. O evento de cena `onRestore` existe para Topdown e Platformer;
+é síncrono, expande chamadas e rejeita esperas/trocas de cena. Estados de mapa
+são reaplicados antes dele. Inicialização de missão legada permanece explícita
+na política de carregamento; objetos novos usam `restore-only`.
+
+O painel de prefabs cria objetos interativos usando eventos existentes e mostra
+as instâncias afetadas. Edições de instância registram `prefabOverrides`, que
+prevalecem durante sincronização. Plataforma ativada move o ator por evento;
+transporte automático do jogador não é uma capacidade adicionada por esse preset.
+
+Em Testes e diagnóstico, habilite a origem dos eventos antes de compilar. O build
+escreve `event_source_map.json` com endereços nativos, IDs dos passos e hash da
+ROM. Ao copiar a ROM para a raiz do projeto, preserva o mapa em
+`<nome>.gba.events.json`. O Play só associa o mapa à ROM com hash correspondente. O rastro circular
+nativo armazena quatro passos (80 bytes em EWRAM); `debug_set_event_trace_enabled`
+permite suspender a coleta. A UI permite abrir o evento correspondente.
+
+A fila DMA expõe fences Pending/Complete/Canceled. Buffers mutáveis de decode e
+reservas de destino esperam o último upload antes de reutilizar memória. Essas
+barreiras de carregamento podem aguardar vários VBlanks; a publicação de render
+continua sob o protocolo existente do motor. `visibility_render_status` informa
+quando transições ou efeitos concorrentes suspendem a visibilidade.
+
+O launcher separa entradas C/C++/headers de logs e relatórios. Declare dados
+binários e outros arquivos autorais em `build.inputs`, com caminhos relativos.
+Dependências do compilador continuam verificadas por conteúdo. Cada build gera
+`build_decisions.json`, indicando entradas alteradas, fontes recompiladas e
+reutilização direta ou de variante.
+
+Execute em `apps/desktop-electron`:
+
+```sh
+node scripts/smoke-event-replay.mjs ../../packages/GBAStudioEngine/dist/GBAStudioEnginePack /caminho/qa-replay
+node scripts/smoke-map-states.mjs ../../packages/GBAStudioEngine/dist/GBAStudioEnginePack /caminho/qa-map
+node scripts/smoke-visibility-graphics.mjs ../../packages/GBAStudioEngine/dist/GBAStudioEnginePack /caminho/qa-graphics
+node scripts/smoke-hardware-diagnostic.mjs ../../packages/GBAStudioEngine/dist/GBAStudioEnginePack /caminho/qa-hardware
+```
+
+A CI normal executa essa seleção de ROMs ARM no mGBA, além dos testes host e do
+editor. O replay compara checkpoints estáveis após cada sequência de entrada;
+não certifica equivalência de cada frame de todos os comandos/runtimes. O gate
+canônico completo continua obrigatório. O [roteiro físico de versão](hardware-release-validation.md)
+registra a fronteira que o emulador não cobre.

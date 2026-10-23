@@ -191,6 +191,7 @@ void test_project_runtime_dispatches_adapters_and_transition() {
     gbs::runtime_frame_tick(11, frame_state);
     assert(state.service_frame_calls == 2);
     assert(state.last_frame.active_runtime == gbs::RuntimeKind::Platformer);
+    assert(state.last_frame.entry_reason == gbs::SceneEntryReason::Return);
     assert(state.last_frame.active_scene == 1);
     assert(state.last_frame.frame_state != nullptr);
 }

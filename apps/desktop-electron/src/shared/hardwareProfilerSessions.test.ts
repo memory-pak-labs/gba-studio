@@ -54,3 +54,14 @@ describe("hardware profiler sessions", () => {
     });
   });
 });
+
+
+it("keeps native subsystem peaks per scene with the measured frame", () => {
+  let session = createHardwareProfilerSession("subsystems");
+  const frame = { frame: 5, roomIndex: 0, sceneName: "Door", runtime: "topdown", cpu: 2, dma: 0, vram: 0, oam: 1, scanline: 0 };
+  session = appendHardwareProfilerFrame(session, { ...frame, subsystems: { scripts: 20, render: 50 } });
+  session = appendHardwareProfilerFrame(session, { ...frame, frame: 6, roomIndex: 1, subsystems: { scripts: 3, render: 7 } });
+  session = appendHardwareProfilerFrame(session, { ...frame, frame: 7, subsystems: { scripts: 10, render: 55 } });
+  expect(session.scenePeaks[0].subsystems).toEqual({ scripts: { frame: 5, value: 20 }, render: { frame: 7, value: 55 } });
+  expect(session.scenePeaks[1].subsystems?.scripts).toEqual({ frame: 6, value: 3 });
+});

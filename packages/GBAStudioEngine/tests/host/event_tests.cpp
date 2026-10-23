@@ -1832,6 +1832,9 @@ void test_runtime_save_restore_transition_preserves_target_and_slot() {
     assert(gbs::request_runtime_save_restore(gbs::RuntimeKind::Platformer, 2));
     assert(gbs::runtime_transition_pending());
     assert(gbs::runtime_transition_target() == gbs::RuntimeKind::Platformer);
+    gbs::RuntimeTransitionRoute route {};
+    assert(gbs::runtime_transition_route(route));
+    assert(route.entry_reason == gbs::SceneEntryReason::Load);
 
     gbs::EventState state {};
     gbs::init_event_state(state);
@@ -1953,7 +1956,39 @@ void test_adventure_movement_consumes_state() {
  assert(gbs::adventure_event_input(state,{gbs::ButtonRight,0,0},0).held==0);
 }
 
+void test_tile_replacement_extended_coordinates_and_collision() {
+    gbs::EventState state {};
+    gbs::init_event_state(state);
+    const gbs::EventCommand commands[] = {
+        {gbs::EventOp::ReplaceTile, (2 << 12) | (21 << 6) | 61, 7, 1, 4609},
+        {gbs::EventOp::ReplaceTileSequence, (2 << 12) | (21 << 6) | 61, 3, (2 << 8) | 1, 4609}
+    };
+    gbs::run_event_script(state, commands, 2);
+    assert(state.tile_command_count == 2);
+    for (size_t i = 0; i < 2; ++i) {
+        assert(state.tile_commands[i].x == 125 && state.tile_commands[i].y == 85);
+        assert(state.tile_commands[i].layer == 2 && state.tile_commands[i].collision_flags == 0);
+    }
+}
+
+static unsigned restored_actor_commands = 0;
+static void consume_restored_commands(gbs::EventState& state, void*) {
+    restored_actor_commands += static_cast<unsigned>(state.actor_command_count);
+    gbs::clear_event_actor_commands(state);
+}
+static void test_restore_consumer_does_not_drop_commands_beyond_the_queue_capacity() {
+    gbs::EventState state {}; gbs::init_event_state(state);
+    gbs::EventCommand commands[24];
+    for (auto& command : commands) command = { gbs::EventOp::SetActorVisible, 0, 0, 0 };
+    restored_actor_commands = 0;
+    gbs::run_event_script_consuming(state, { commands, 24 }, consume_restored_commands);
+    assert(restored_actor_commands == 24);
+    assert(state.actor_command_count == 0);
+}
+
 int main() {
+    test_restore_consumer_does_not_drop_commands_beyond_the_queue_capacity();
+    test_tile_replacement_extended_coordinates_and_collision();
  test_adventure_movement_consumes_state();
  test_parallel_scripts_wait_and_cancel();
  test_interactive_lock_and_equipment();

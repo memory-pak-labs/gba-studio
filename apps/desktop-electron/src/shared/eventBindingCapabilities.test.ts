@@ -54,7 +54,7 @@ describe("resolveEventBindingCapabilities", () => {
 
   it("resolve os estados de sala pelo contrato do runtime", () => {
     expect(resolveEventBindingCapabilities({ targetKind: "room", sceneType: "topdown" })
-      .map((slot) => slot.bindingKey)).toEqual(["onInit", "onHitPlayer", "onExit", "onInteract"]);
+      .map((slot) => slot.bindingKey)).toEqual(["onInit", "onRestore", "onHitPlayer", "onExit", "onInteract"]);
     expect(resolveEventBindingCapabilities({ targetKind: "room", sceneType: "topdown" })
       .find((slot) => slot.bindingKey === "onHitPlayer")?.groupedBindingKeys?.map((group) => group.bindingKey))
       .toEqual(["onHitGroup1", "onHitGroup2", "onHitGroup3"]);

@@ -27,9 +27,9 @@ describe("reviewed event block catalog", () => {
   });
   it("retains all historical definitions with every GBA integration resolved", () => {
     const matrix=buildEventCommandSupportMatrix();
-    expect(matrix).toHaveLength(200);
+    expect(matrix).toHaveLength(204);
     expect(matrix.filter(d=>d.status === "pending")).toEqual([]);
-    expect(matrix.filter(d=>d.status === "native")).toHaveLength(190);
+    expect(matrix.filter(d=>d.status === "native")).toHaveLength(194);
     expect(matrix.filter(d=>d.status === "not-applicable")).toHaveLength(2);
   });
   it("explains an old menu block using its product name and actual integration boundary, preserving saved commands", () => {

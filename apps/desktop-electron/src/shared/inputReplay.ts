@@ -5,6 +5,9 @@ export interface InputReplayFrame {
 
 export interface InputReplayCheckpoint {
   room?: string;
+  position?: { x: number; y: number };
+  collision?: { cell: number; type: string };
+  event?: { id: string; step: number; waiting: string };
   variables?: Record<string, boolean | number | string>;
   inventory?: Record<string, number>;
 }
@@ -86,6 +89,9 @@ export function normalizeInputReplay(value: unknown): InputReplay | null {
     if (Number.isNaN(frameIndex) || frameIndex < 0) continue;
     if (!isObject(checkpoint)) continue;
     checkpoints[frameIndex] = {
+      ...(isObject(checkpoint.position) && isNumber(checkpoint.position.x) && isNumber(checkpoint.position.y) ? { position: { x: checkpoint.position.x, y: checkpoint.position.y } } : {}),
+      ...(isObject(checkpoint.collision) && isNumber(checkpoint.collision.cell) && typeof checkpoint.collision.type === "string" ? { collision: { cell: checkpoint.collision.cell, type: checkpoint.collision.type } } : {}),
+      ...(isObject(checkpoint.event) && typeof checkpoint.event.id === "string" && isNumber(checkpoint.event.step) && typeof checkpoint.event.waiting === "string" ? { event: { id: checkpoint.event.id, step: checkpoint.event.step, waiting: checkpoint.event.waiting } } : {}),
       room: typeof checkpoint.room === "string" ? checkpoint.room : undefined,
       variables: isObject(checkpoint.variables) ? { ...checkpoint.variables as Record<string, unknown> } as Record<string, boolean | number | string> : undefined,
       inventory: isObject(checkpoint.inventory) ? { ...checkpoint.inventory as Record<string, unknown> } as Record<string, number> : undefined
@@ -209,7 +215,7 @@ export function verifyInputReplayCheckpoint(
   const expected = replay.checkpoints[frameIndex];
   if (!expected) return { ok: false, differences: [`Checkpoint ausente no frame ${frameIndex}.`] };
   const differences: string[] = [];
-  if (expected.room !== actual.room) differences.push(`room: esperado ${expected.room ?? "-"}, recebido ${actual.room ?? "-"}`);
+  if (expected.room !== undefined && expected.room !== actual.room) differences.push(`room: esperado ${expected.room ?? "-"}, recebido ${actual.room ?? "-"}`);
   for (const category of ["variables", "inventory"] as const) {
     const expectedValues = expected[category] ?? {};
     const actualValues = actual[category] ?? {};
@@ -217,6 +223,14 @@ export function verifyInputReplayCheckpoint(
       if (expectedValues[key] !== actualValues[key]) {
         differences.push(`${category}.${key}: esperado ${String(expectedValues[key])}, recebido ${String(actualValues[key])}`);
       }
+    }
+  }
+  for (const category of ["position", "collision", "event"] as const) {
+    const wanted = expected[category];
+    if (!wanted) continue;
+    for (const [key, value] of Object.entries(wanted)) {
+      const received = (actual[category] as unknown as Record<string, unknown> | undefined)?.[key];
+      if (received !== value) differences.push(`${category}.${key}: esperado ${String(value)}, recebido ${String(received)}`);
     }
   }
   return { ok: differences.length === 0, differences };

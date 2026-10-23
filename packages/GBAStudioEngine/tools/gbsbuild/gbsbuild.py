@@ -212,12 +212,78 @@ def dependencies(depfile):
         return []
 
 
+def project_input_files(project):
+    # Compiler depfiles additionally validate dependencies outside the project.
+    manifest = load_project_manifest(project)
+    declared = manifest.get("build", {}).get("inputs", [])
+    if not isinstance(declared, list):
+        raise SystemExit("build.inputs deve ser uma lista de caminhos relativos.")
+    paths = {p for p in project.rglob("*") if p.is_file()
+             and not any(part in ("build", ".gba-cache", ".git", "node_modules") for part in p.relative_to(project).parts)
+             and p.suffix.lower() in (".cpp", ".c", ".s", ".h", ".hpp", ".inc")}
+    paths.add(project / "gbastudio_project.json")
+    for name in declared:
+        if not isinstance(name, str) or Path(name).is_absolute() or ".." in Path(name).parts:
+            raise SystemExit("build.inputs requer caminhos relativos dentro do projeto.")
+        path = project / name
+        if not path.is_file() or not path.resolve().is_relative_to(project.resolve()):
+            raise SystemExit(f"Entrada de build ausente ou fora do projeto: {name}")
+        paths.add(path)
+    return {str(p.relative_to(project)): digest_file(p) for p in sorted(paths) if p.is_file()}
+
+
+def write_event_sources(env, build):
+    project = Path(env["PROJECT_DIR"])
+    entries = []
+    for header in sorted(project.glob("*.hpp")):
+        text = header.read_text(errors="replace")
+        namespace = re.search(r"namespace ([A-Za-z_][A-Za-z_0-9]*)\s*\{", text)
+        for line in text.splitlines():
+            if line.startswith("// @gbs-event-source "):
+                entry = json.loads(line.split("// @gbs-event-source ", 1)[1])
+                entry["symbol"] = ((namespace.group(1) + "::") if namespace else "") + entry["symbol"]
+                entries.append(entry)
+    resolved = []
+    if entries:
+        nm = Path(env["DEVKITARM"]) / "bin/arm-none-eabi-nm"
+        if not nm.is_file():
+            nm = nm.with_suffix(".exe")
+        symbols = subprocess.run([str(nm), "-S", "-C", str(build / (env["TARGET"] + ".elf"))], capture_output=True, text=True, check=True)
+        addresses = {}
+        for line in symbols.stdout.splitlines():
+            match = re.match(r"^([0-9a-fA-F]+) [0-9a-fA-F]+ [A-Za-z] (.+)$", line)
+            if match:
+                addresses[match.group(2)] = int(match.group(1), 16)
+        for entry in entries:
+            address = addresses.get(entry["symbol"])
+            if address is not None:  # Linker-discarded scripts have no native PC.
+                resolved.append({**entry, "address": address + entry["index"] * 10})
+    (build / "event_source_map.json").write_text(json.dumps({"schema": 1, "romSha256": digest_file(build / (env["TARGET"] + ".gba")), "entries": resolved}, indent=2))
+
+
+def write_build_decisions(build, result, before, previous, compiled=None):
+    old = previous.get("inputs", {})
+    changed = []
+    for category, value in before.items():
+        if isinstance(value, dict):
+            prior = old.get(category, {})
+            for key in sorted(set(value) | set(prior)):
+                if value.get(key) != prior.get(key):
+                    changed.append(category + ":" + key)
+        elif value != old.get(category):
+            changed.append(category)
+    build.mkdir(parents=True, exist_ok=True)
+    (build / "build_decisions.json").write_text(json.dumps({
+        "schema": 1, "result": result, "changedInputs": changed,
+        "compiledSources": compiled or [], "inputManifest": before["project"]}, indent=2))
+
+
 def input_state(env, tools):
     pack = Path(env["ENGINE_PACK"])
     build = Path(env["BUILD_DIR"])
     project = Path(env["PROJECT_DIR"])
     lock = build.parent / ("." + build.name + ".gbsbuild-lock")
-    project_files = digest_tree(project)
+    project_files = project_input_files(project)
     # A custom build directory inside the project must never hash its own outputs.
     project_files = {k: v for k, v in project_files.items()
                      if build not in (project / k).parents and lock not in (project / k).parents}
@@ -389,26 +455,33 @@ def locked_build(command, env, build, clean, cache_enabled):
             and previous.get("inputs") == before and previous.get("artifacts") == artifact_hashes
             and previous.get("dependencies") == dependency_hashes
             and all(artifact_hashes.values()) and all(dependency_hashes.values())):
+        write_event_sources(env, build)
+        write_build_decisions(build, "reused", before, previous)
         print(f"ROM reutilizada (conteudo e dependencias verificados): {build / output_names[1]}")
         return 0
 
-    compile_config = {"tools": tools, "makefile": before["makefile"], "launcher": before["launcher"],
+    authored_inputs = load_project_manifest(Path(env["PROJECT_DIR"])).get("build", {}).get("inputs", [])
+    compile_config = {"authored_inputs": {name: before["project"].get(name) for name in authored_inputs}, "tools": tools, "makefile": before["makefile"], "launcher": before["launcher"],
                       "headers_environment": {k: env.get(k, "") for k in (
                           "CXXFLAGS", "CPPFLAGS", "CPATH", "CPLUS_INCLUDE_PATH", "C_INCLUDE_PATH")}}
     if (cache_enabled and not clean and command[-1] == "all"
             and previous.get("inputs") and previous["inputs"] != before):
         restored = restore_variant(env, before, compile_config, artifacts, objects, output_names)
         if restored is not None:
+            write_event_sources(env, build)
+            write_build_decisions(build, "variant-reused", before, previous)
             return restored
     completion.unlink(missing_ok=True)
     config_bytes = json.dumps(compile_config, sort_keys=True).encode()
     previous_config = previous.get("compile_config")
+    compiled = []
     for obj in objects:
         deps = dependencies(obj.with_suffix(".d"))
         if (clean or previous_config != compile_config or not deps
                 or previous.get("artifacts", {}).get(obj.name) != digest_file(obj)
                 or previous.get("artifacts", {}).get(obj.with_suffix(".d").name) != digest_file(obj.with_suffix(".d"))
                 or any(previous.get("dependencies", {}).get(str(d)) != digest_file(d) for d in deps)):
+            compiled.append(obj.with_suffix(".cpp").name)
             obj.unlink(missing_ok=True)
     # Every miss relinks cheaply. A failed build must not expose the old ROM.
     for name in output_names:
@@ -445,6 +518,8 @@ def locked_build(command, env, build, clean, cache_enabled):
             pending.write_text(json.dumps(record, sort_keys=True))
             pending.replace(completion)
             store_variant(env, record, artifacts)
+    write_event_sources(env, build)
+    write_build_decisions(build, "rebuilt", before, previous, compiled)
     return 0
 
 

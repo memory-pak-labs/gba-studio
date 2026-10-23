@@ -8,6 +8,7 @@ start = source.index('void render_racing_runtime(')
 render = source[start:source.index('\nvoid leave_racing_runtime()', start)]
 code = '''#include <cassert>
 #include "gbs/racing.hpp"
+#include "gbs/profiler.hpp"
 #include "gbs/dialogue.hpp"
 namespace gbs { struct RuntimeFrameContext {}; void draw_dialogue(const DialogueState&) {} void wait_vblank() {} }
 gbs::DialogueState dialogue {}; gbs::RacingRoomData rooms[1] {}; gbs::RacingProjectData project {};

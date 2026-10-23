@@ -1,3 +1,4 @@
+import { parseVisibilityPreset, visibilityPresetVerbs } from "./visibilityPresets.js";
 import { nativeEventCommandExportHandling, type NativeEventCommandExportHandling } from "./eventCommandRegistry.js";
 import { eventCommandCatalog } from "./eventCommandLibrary.js";
 import { eventCommandReview } from "./eventCommandReview.js";
@@ -10,6 +11,11 @@ const excluded: Record<string, string> = {
 };
 
 const scoped: Record<string, string[]> = {
+  ...Object.fromEntries(visibilityPresetVerbs.map(verb => [verb, ["topdown", "platformer"]])),
+  set_map_state: ["topdown", "platformer"],
+  replace_tile: ["topdown", "platformer"],
+  replace_tile_sequence: ["topdown", "platformer"],
+  replace_tile_animation: ["topdown", "platformer"],
   draw_text:["topdown"],
   start_segment:["topdown"], stop_segment:["topdown"], set_adventure_state:["topdown"], push_actor:["topdown"],
   open_menu: ["topdown"], open_shop: ["topdown"], open_equip_menu: ["topdown"], open_code_lock: ["topdown"],
@@ -69,6 +75,9 @@ export function eventCommandIntegrationIssue(command: string, runtime?: string):
   const transitionEffect = verb === "visual_effect" && ["cover", "reveal"].includes(parts[5] ?? "");
   if (runtime && support.runtimes && !support.runtimes.includes(runtime) && !transitionEffect) {
     return `Comando ${verb} não possui consumidor em ${runtime}; use ${support.runtimes.join(" ou ")}.`;
+  }
+  if (visibilityPresetVerbs.includes(verb)) {
+    try { parseVisibilityPreset(parts); } catch (error) { return error instanceof Error ? error.message : "Preset de visibilidade inválido."; }
   }
   if (isLutaEventVerb(verb)) {
     try { parseLutaEventCommand(command); } catch (error) { return error instanceof Error ? error.message : "Evento de Luta inválido."; }

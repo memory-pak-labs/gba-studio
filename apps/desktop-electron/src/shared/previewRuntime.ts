@@ -1,3 +1,6 @@
+import { parseEventInstruction, sceneEntryPlan, eventWaitFrames, type SceneEntryReason } from "./eventExecutionContract.js";
+import { parseVisibilityPreset, visibilityPresetVerbs, type VisibilityPreset } from "./visibilityPresets.js";
+import { roomMapStates, resolveMapState, mapStateTileCommands } from "./mapStates.js";
 import { resolveProjectConstantCommand } from "./projectConstants.js";
 import { resolveSceneDialogueUiSettings } from "./interfaceThemes.js";
 import { eventCommandRuntimeVerbs } from "./eventCommandLibrary.js";
@@ -48,7 +51,8 @@ import {
 } from "./projectLocalization.js";
 import { projectIsometricCoordinate } from "./isometricProjection.js";
 import { deriveIsometricCameraPositionForPlayer } from "./isometricCamera.js";
-import { blockedCollisionCellsFromRoom } from "./roomCollisionTypes.js";
+import { blockedCollisionCellsFromRoom, isBlockedCollisionTypeForScene } from "./roomCollisionTypes.js";
+import { tileReplacementCollision, tileReplacementCollisionFields } from "./tileReplacement.js";
 import {
   battleRpgSceneConfigFromRuntime,
   dungeonCrawlerSceneConfigFromRuntime,
@@ -519,6 +523,8 @@ export interface PreviewNativeModal {
 }
 export interface PreviewNativeThread { frame: PreviewRuntimeScriptFrame; wait: number; continuations: PreviewRuntimeScriptFrame[]; }
 export interface PreviewNativeEvents {
+ buttons: Record<string, { event: string; override: boolean }>;
+ pressedButtons: string[];
  modal: PreviewNativeModal | null;
  timers: Record<string, { frames: number; remaining: number; pending: boolean }>;
  threads: Record<string,PreviewNativeThread>;
@@ -532,9 +538,9 @@ export interface PreviewNativeEvents {
  adventure: {state:string,frames:number};
 }
 function initialNativeEvents(): PreviewNativeEvents {
- return {modal:null,timers:{},threads:{},executingSegment:null,actorStates:{},actorEffects:{},cancelledMovement:{},projectileSlots:{},projectiles:[],texts:[],adventure:{state:"ground",frames:0}};
+ return {buttons:{},pressedButtons:[],modal:null,timers:{},threads:{},executingSegment:null,actorStates:{},actorEffects:{},cancelledMovement:{},projectileSlots:{},projectiles:[],texts:[],adventure:{state:"ground",frames:0}};
 }
-const integratedNativeSimulationVerbs=new Set(["open_menu","open_shop","open_code_lock","open_equip_menu","draw_text","start_segment","stop_segment","timer_attach","timer_restart","timer_remove","set_adventure_state","push_actor","cancel_actor_movement","set_actor_animation_state","actor_effects","projectile_load_slot","launch_projectile_slot"]);
+const integratedNativeSimulationVerbs=new Set(["attach_button","remove_button","open_menu","open_shop","open_code_lock","open_equip_menu","draw_text","start_segment","stop_segment","timer_attach","timer_restart","timer_remove","set_adventure_state","push_actor","cancel_actor_movement","set_actor_animation_state","actor_effects","projectile_load_slot","launch_projectile_slot"]);
 
 export interface PreviewRuntimeScriptFrame {
   callStack: string[];
@@ -607,6 +613,11 @@ export interface PreviewRuntimeAudioMixState {
   muted: Record<PreviewRuntimeAudioBus, boolean>;
   fades: Record<PreviewRuntimeAudioBus, PreviewRuntimeAudioFadeState | null>;
   lastPcmSfx: { volume: number; priority: number } | null;
+}
+
+export interface PreviewRuntimeVisibilityState extends VisibilityPreset {
+  remainingFrames: number;
+  elapsedMs: number;
 }
 
 export interface PreviewRuntimeVisualEffectState {
@@ -706,6 +717,7 @@ function previewRuntimeRtcFieldValue(state: PreviewRuntimeState, field: string):
 export const PREVIEW_ACTOR_UPDATE_INTERVAL_MS = 1000 / 60;
 
 export interface PreviewRuntimeState {
+  sceneLifecycle?: ReturnType<typeof sceneEntryPlan>;
   ready: boolean;
   error: string | null;
   rooms: PreviewRuntimeRoom[];
@@ -740,6 +752,7 @@ export interface PreviewRuntimeState {
   platformerInputRequests: { jump: boolean; dash: boolean };
   activeCameraZoneID: string | null;
   visualEffect: PreviewRuntimeVisualEffectState | null;
+  visibility?: PreviewRuntimeVisibilityState | null;
   choiceEvents: PreviewRuntimeChoiceEvent[];
   eventLog: PreviewRuntimeEventLogItem[];
   equippedItems: Record<string, string>;
@@ -2919,8 +2932,27 @@ export function stepPreviewDebuggerScript(state: PreviewRuntimeState): PreviewRu
   }, frame);
 }
 
-function setCurrentRoom(state: PreviewRuntimeState, room: PreviewRuntimeRoom, triggerRoomEnter = true): PreviewRuntimeState {
+function applyMapStateTiles(state: PreviewRuntimeState): PreviewRuntimeState {
+  const room = roomRecordByRuntimeRoom(state.project, state.currentRoom);
+  if (!room) return state;
+  let next = state;
+  for (const definition of roomMapStates(room)) {
+    const value = Number(next.variables[definition.variable] ?? 0);
+    const variant = definition.variants.find(item => item.value === value);
+    if (!variant) continue;
+    for (const command of mapStateTileCommands(variant)) next = handleActorCommand(next, commandTokens(command)) ?? next;
+  }
+  return next;
+}
+
+function setCurrentRoom(state: PreviewRuntimeState, room: PreviewRuntimeRoom, triggerRoomEnter = true, reason: SceneEntryReason = state.currentRoom ? "return" : "first-entry"): PreviewRuntimeState {
   const previousRoom = state.currentRoom;
+  const source = roomRecordByRuntimeRoom(state.project, room);
+  if (source) {
+    // Room-local tile edits expire on entry/load, before saved map states reapply.
+    room = toRuntimeRoom(state.project, source, projectRooms(state.project).indexOf(source));
+    state = { ...state, rooms: state.rooms.map(item => item.id === room.id ? room : item) };
+  }
   state={...state,nativeEvents:{...initialNativeEvents(),projectileSlots:state.nativeEvents.projectileSlots}};
   const roomActors = actorsForRoom(state.project, room);
   const destinationPlayerName = roomRecordByRuntimeRoom(state.project, room)?.playerActorName;
@@ -2938,6 +2970,8 @@ function setCurrentRoom(state: PreviewRuntimeState, room: PreviewRuntimeRoom, tr
   const entered = applyPointClickCursorAnimation(updateDebug({
     ...state,
     currentRoom: room,
+    sceneLifecycle: sceneEntryPlan(reason, { hasMapStates: source ? roomMapStates(source).length > 0 : false, restoreOnly: source?.restorePolicy === "restore-only" }),
+    visibility: null,
     dialogueUi: dialogueUiSettings(state.project, room.id),
     camera: roomUsesPagedTacticalSurfaceInPreview(room) ? initialRuntimeCameraStateForRoom(room) : state.camera,
     runtimeProfile: runtimeProfileForRoom(room),
@@ -2969,7 +3003,7 @@ function setCurrentRoom(state: PreviewRuntimeState, room: PreviewRuntimeRoom, tr
     battleTurnIndex: 0,
     battleEscaped: false
   }));
-  const transitioned = applySceneConnectionTransition(entered, previousRoom, room);
+  const transitioned = applySceneConnectionTransition(applyMapStateTiles(entered), previousRoom, room);
   return triggerRoomEnter && previousRoom?.id !== room.id && room.sceneType === "topdown"
     ? queuePreviewCallback(transitioned, transitioned.adventureCallbacks[1] ?? roomBootEventName(transitioned),
         !transitioned.adventureCallbacks[1]) : transitioned;
@@ -3079,7 +3113,8 @@ function skipPreviewLogo(state: PreviewRuntimeState): PreviewRuntimeState {
 }
 
 function commandTokens(command: string): string[] {
-  return command.split(/\s+/).filter(Boolean);
+  const instruction = parseEventInstruction(command, undefined, false);
+  return [instruction.verb, ...instruction.operands];
 }
 
 function numberToken(value: string | undefined, fallback = 0): number {
@@ -3386,7 +3421,7 @@ function runtimeScriptLog(
 function evaluateConditionCommand(state: PreviewRuntimeState, parts: string[]): boolean | null {
   const verb = parts[0] ?? "noop";
   const key = parts[1] ?? "";
-  if (verb === "if_variable") return scalarEquals(state.variables[key], scalarToken(parts[2]));
+  if (verb === "if_variable") return scalarEquals(state.variables[key] ?? 0, scalarToken(parts[2]));
   if (verb === "if_variable_variable") return scalarEquals(state.variables[key], state.variables[parts[2] ?? ""]);
   if (verb === "if_variable_greater_than") return variableNumber(state, key) > numberToken(parts[2], 0);
   if (verb === "if_variable_less_than") return variableNumber(state, key) < numberToken(parts[2], 0);
@@ -3423,7 +3458,7 @@ function evaluateConditionCommand(state: PreviewRuntimeState, parts: string[]): 
     const slot = Math.max(0, Math.min(255, numberToken(parts[1], 0)));
     return previewRuntimeSaveSlotAvailable(state, slot) && state.saveSlots[slot] !== undefined;
   }
-  if (verb === "if_button") return false;
+  if (verb === "if_button") return state.nativeEvents.pressedButtons.includes(key.toLowerCase());
   return null;
 }
 
@@ -3644,21 +3679,44 @@ function handleActorCommand(state: PreviewRuntimeState, parts: string[]): Previe
   if (verb === "wait_actor_animation") {
     return state;
   }
+  if (verb === "set_map_state") {
+    const { room, state: mapState, variant } = resolveMapState(projectRooms(state.project), parts[1] ?? "", parts[2] ?? "");
+    const next = { ...state, variables: { ...state.variables, [mapState.variable]: variant.value } };
+    return room.name === state.currentRoom?.name ? applyMapStateTiles(next) : next;
+  }
   if (verb === "replace_tile" || verb === "replace_tile_sequence") {
     const room = state.currentRoom;
     if (!room) return state;
     const x = numberToken(parts[1], 0);
     const y = numberToken(parts[2], 0);
     const startTile = numberToken(parts[3], 0);
-    const count = verb === "replace_tile_sequence" ? Math.max(1, numberToken(parts[4], 1)) : 1;
-    const tileCells = [...room.tileCells];
+    const count = verb === "replace_tile_sequence" ? Math.max(1, Math.min(64, numberToken(parts[4], 1))) : 1;
+    const layerToken = parts[verb === "replace_tile_sequence" ? 5 : 4] ?? "bg0";
+    const layer = layerToken === "bg0" ? "BG2" : layerToken.toUpperCase() as "BG1" | "BG2" | "BG3";
+    if (!["BG1", "BG2", "BG3"].includes(layer)) return state;
+    const collisionToken = parts[verb === "replace_tile_sequence" ? 6 : 5];
+    tileReplacementCollisionFields(collisionToken, layer.toLowerCase());
+    const collision = tileReplacementCollision(collisionToken);
+    const renderLayer = room.renderLayers.backgrounds[layer];
+    const tileCells = [...renderLayer.tileCells];
+    const collisionCells = [...room.collisionCells];
+    const collisionTypes = [...room.collisionTypes];
     for (let tileOffset = 0; tileOffset < count; tileOffset += 1) {
+      if (x + tileOffset < 0 || x + tileOffset >= room.width || y < 0 || y >= room.height) continue;
       const cellIndex = y * room.width + (x + tileOffset);
       if (cellIndex >= 0 && cellIndex < tileCells.length) {
         tileCells[cellIndex] = startTile + tileOffset;
+        if (layer === "BG2" && collision !== undefined) {
+          collisionTypes[cellIndex] = collision;
+          collisionCells[cellIndex] = isBlockedCollisionTypeForScene(collision, room.sceneType);
+        }
       }
     }
-    const nextRoom = { ...room, tileCells };
+    const nextLayer = {...renderLayer, tileCells};
+    const renderLayers = {...room.renderLayers, backgrounds: {...room.renderLayers.backgrounds, [layer]: nextLayer}};
+    const nextRoom = { ...room, tileCells: layer === "BG2" ? tileCells : room.tileCells,
+      bg2: layer === "BG2" ? {...room.bg2, tileCells} : room.bg2,
+      renderLayers, collisionCells, collisionTypes };
     return {
       ...state,
       currentRoom: nextRoom,
@@ -3767,6 +3825,12 @@ function handleCameraCommand(state: PreviewRuntimeState, parts: string[]): Previ
 }
 
 function handleVisualEffectCommand(state: PreviewRuntimeState, parts: string[]): PreviewRuntimeState | null {
+  if (visibilityPresetVerbs.includes(parts[0] ?? "")) {
+    const preset = parseVisibilityPreset(parts);
+    if (preset.effect === "clear") return { ...state, visibility: null };
+    if (!actorByName(state, preset.actor)) throw new Error(`Ator de visibilidade inexistente: ${preset.actor}`);
+    return { ...state, visibility: { ...preset, remainingFrames: preset.frames, elapsedMs: 0 } };
+  }
   if ((parts[0] ?? "noop") !== "visual_effect") return null;
   const effect = (parts[1] ?? "clear").trim().toLowerCase();
   if (effect === "clear") return { ...state, visualEffect: null };
@@ -4046,8 +4110,10 @@ function appendRecognizedScript(
     if (!savedRoom || runtimeProfileForRoom(savedRoom).sceneType !== snapshot.runtime) {
       return updateDebug(appendLog(state, eventName, command, "skipped", `Save slot ${slot} possui runtime ou room invalido.`));
     }
-    const restoredRoomState = setCurrentRoom(state, savedRoom);
-    return updateDebug(appendLog({
+    const savedSource = roomRecordByRuntimeRoom(state.project, savedRoom);
+    const plan = sceneEntryPlan("load", { hasMapStates: savedSource ? roomMapStates(savedSource).length > 0 : false, restoreOnly: savedSource?.restorePolicy === "restore-only" });
+    const restoredRoomState = setCurrentRoom({ ...state, variables: { ...snapshot.variables } }, savedRoom, plan.runInit, "load");
+    const restored = updateDebug(appendLog({
       ...restoredRoomState,
       player: restoredRoomState.player && snapshot.player
         ? { ...restoredRoomState.player, x: snapshot.player.x, y: snapshot.player.y }
@@ -4061,6 +4127,8 @@ function appendRecognizedScript(
       equippedItems: { ...snapshot.equippedItems },
       dialogueLocale: snapshot.dialogueLocale ?? state.dialogueLocale
     }, eventName, command, "script", `slot=${slot}`));
+    const restoreEvent = (savedSource?.eventBindings as Record<string, unknown> | undefined)?.onRestore;
+    return typeof restoreEvent === "string" && restoreEvent ? runPreviewRuntimeEvent(restored, restoreEvent) : restored;
   }
 
   if (verb === "remove_save_game") {
@@ -4116,6 +4184,15 @@ function appendRecognizedScript(
       return runtimeScriptLog(state, eventName, command, `idioma-invalido:${operand}`);
     }
     return runtimeScriptLog({ ...state, dialogueLocale: locale }, eventName, command, locale);
+  }
+
+  if (visibilityPresetVerbs.includes(verb) || verb === "set_map_state") {
+    try {
+      const next = verb === "set_map_state" ? handleActorCommand(state, parts) : handleVisualEffectCommand(state, parts);
+      return runtimeScriptLog(next ?? state, eventName, command, operand || verb);
+    } catch (error) {
+      return updateDebug(appendLog(state, eventName, command, "skipped", error instanceof Error ? error.message : String(error)));
+    }
   }
 
   const handledState = handleVariableCommand(state, parts) ??
@@ -4483,7 +4560,7 @@ function runScriptFrameCommands(state: PreviewRuntimeState, frame: PreviewRuntim
     }
 
     if (verb === "idle" || verb === "wait") {
-      const frames = Math.max(0, Math.min(32767, numberToken(parts[0], 0)));
+      const frames = eventWaitFrames(parseEventInstruction(command, undefined, false));
       currentState = runtimeScriptLog(currentState, resolvedEventName, command, `${frames} quadros`);
       if (frames > 0) {
         return updateDebug({
@@ -4849,7 +4926,9 @@ function nativeThreadFrame(state:PreviewRuntimeState,eventName:string):PreviewRu
 function applyIntegratedNativeSimulation(state:PreviewRuntimeState,parts:string[]):PreviewRuntimeState {
  const [verb,target,arg,extra]=parts;
  let native={...state.nativeEvents};
- if(verb==="start_segment") native.threads={...native.threads,[target!]:{frame:nativeThreadFrame(state,arg!),wait:0,continuations:[]}};
+ if(verb==="attach_button") native.buttons={...native.buttons,[target!.toLowerCase()]:{event:arg!,override:extra==="true"}};
+ else if(verb==="remove_button") {native.buttons={...native.buttons};delete native.buttons[target!.toLowerCase()];}
+ else if(verb==="start_segment") native.threads={...native.threads,[target!]:{frame:nativeThreadFrame(state,arg!),wait:0,continuations:[]}};
  else if(verb==="timer_attach") native.timers={...native.timers,[arg!]:{frames:Math.max(1,Number(target)),remaining:Math.max(1,Number(target)),pending:false}};
  else if(verb==="timer_restart") {if(native.timers[target!])native.timers={...native.timers,[target!]:{...native.timers[target!]!,remaining:native.timers[target!]!.frames,pending:false}};}
  else if(verb==="timer_remove") {native.timers={...native.timers};delete native.timers[target!];}
@@ -6010,6 +6089,7 @@ export function bootPreviewRuntimeAtRoom(
     platformerInputRequests: { jump: false, dash: false },
     activeCameraZoneID: null,
     visualEffect: null,
+    visibility: null,
     choiceEvents: [],
     eventLog: [],
     equippedItems: {},
@@ -6053,8 +6133,9 @@ export function bootPreviewRuntimeAtRoom(
     platformerPlayerActive: true
   });
 
-  const booted = options.skipBootEvents ? applyPointClickCursorAnimation(baseState)
-    : runEvent(applyPointClickCursorAnimation(baseState), roomBootEventName(baseState));
+  const mapStateBoot = applyMapStateTiles(baseState);
+  const booted = options.skipBootEvents ? applyPointClickCursorAnimation(mapStateBoot)
+    : runEvent(applyPointClickCursorAnimation(mapStateBoot), roomBootEventName(mapStateBoot));
   const initialScreen = embeddedMenuScreenForConfig(
     sceneMenuConfigForRoom(booted.currentRoom),
     booted.sceneMenu.screenID
@@ -6377,6 +6458,17 @@ export function tickPreviewRuntime(
   heldMovement: PreviewRuntimeAction | null = null,
   heldActions: PreviewRuntimeAction[] = []
 ): PreviewRuntimeState {
+  const next = tickPreviewRuntimeFrame(state, deltaMs, heldMovement, heldActions);
+  if (!next.nativeEvents.pressedButtons.length || next.previewFrame === state.previewFrame) return next;
+  return { ...next, nativeEvents: { ...next.nativeEvents, pressedButtons: [] } };
+}
+
+function tickPreviewRuntimeFrame(
+  state: PreviewRuntimeState,
+  deltaMs: number,
+  heldMovement: PreviewRuntimeAction | null = null,
+  heldActions: PreviewRuntimeAction[] = []
+): PreviewRuntimeState {
   if (isPreviewDebuggerBlocking(state)) {
     return updateDebug(state);
   }
@@ -6420,6 +6512,14 @@ export function tickPreviewRuntime(
 
   let nextState = state;
   let nextVisualEffect = state.visualEffect;
+  let nextVisibility = state.visibility;
+  if (state.visibility && deltaMs > 0) {
+    const elapsed = state.visibility.elapsedMs + deltaMs;
+    const frames = Math.floor(elapsed * 60 / 1000);
+    const remainingFrames = Math.max(0, state.visibility.remainingFrames - frames);
+    nextVisibility = remainingFrames === 0 ? null : { ...state.visibility,
+      remainingFrames, elapsedMs: elapsed - frames * 1000 / 60 };
+  }
 
   if (nextVisualEffect && deltaMs > 0) {
     const frameDurationMs = 1000 / 60;
@@ -6506,6 +6606,8 @@ export function tickPreviewRuntime(
   } else if (state.movementElapsedMs !== 0) {
     nextState = { ...state, movementElapsedMs: 0 };
   }
+
+  if (nextState.visibility !== nextVisibility) nextState = { ...nextState, visibility: nextVisibility };
 
   if (nextState.visualEffect !== nextVisualEffect) {
     nextState = { ...nextState, visualEffect: nextVisualEffect };
@@ -7468,7 +7570,7 @@ function selectSceneMenuItem(state: PreviewRuntimeState): PreviewRuntimeState {
         const restored = setCurrentRoom({
           ...state,
           sceneMenu: { ...state.sceneMenu, stack: state.sceneMenu.stack.slice(0, -1) }
-        }, previous);
+        }, previous, false, "resume");
         return previousEntry.screenID
           ? setCurrentMenuScreen(restored, previousEntry.screenID)
           : runActiveMenuScreenEnter(restored);
@@ -7544,6 +7646,13 @@ export function dispatchPreviewRuntimeAction(
 
   if (state.textInput.active && !state.activeDialogue) {
     return updatePreviewTextInput(state, action);
+  }
+
+  const button = action === "action" ? "a" : action === "back" ? "b" : action;
+  const attached = state.nativeEvents.buttons[button];
+  if (attached && !state.activeDialogue && !state.textInput.active && !state.startMenu.visible) {
+    state = runPreviewRuntimeEvent({ ...state, nativeEvents: { ...state.nativeEvents, pressedButtons: [button] } }, attached.event);
+    if (attached.override) return state;
   }
 
   if (action === "start" && !(state.sceneMenu.visible && !state.activeDialogue)) {
@@ -7626,7 +7735,7 @@ export function dispatchPreviewRuntimeAction(
         const restored = setCurrentRoom({
           ...state,
           sceneMenu: { ...state.sceneMenu, stack: state.sceneMenu.stack.slice(0, -1) }
-        }, previous);
+        }, previous, false, "resume");
         return previousEntry?.screenID
           ? setCurrentMenuScreen(restored, previousEntry.screenID)
           : runActiveMenuScreenEnter(restored);
@@ -7759,5 +7868,5 @@ export function dispatchPreviewRuntimeAction(
     return updateDebug(state);
   }
 
-  return tryMovePreviewPlayer(state, action);
+  return isPreviewMovementAction(action) ? tryMovePreviewPlayer(state, action) : updateDebug(state);
 }

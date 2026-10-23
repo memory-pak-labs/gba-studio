@@ -16,6 +16,7 @@ import {
   planEmulationFrames,
   planPcmBufferSchedule,
   readRuntimeTelemetry,
+  readEventTraceTelemetry,
   readRuntimeTelemetryFromHeap,
   restoreModuleSavedata
 } from "../static/WebPlayer/player/mgba-direct-player.mjs";
@@ -539,4 +540,39 @@ describe("mGBA direct player framebuffer", () => {
       analyzeRgbaFrame(second, 4, 4).signature
     );
   });
+});
+
+
+describe("native subsystem profiler extension", () => {
+  it("reads measured ticks without changing the existing mGBA telemetry bridge", () => {
+    const words = new Uint32Array(64);
+    words.set([0x47535452, 4, 64, 42]);
+    const extension = new Uint32Array([0x47535046, 1, 16, 42, 262144, 31, 10, 20, 30, 40, 50, 11, 22, 33, 44, 55]);
+    const module = {
+      _gba_find_runtime_telemetry: () => 0x02001000,
+      _gba_runtime_telemetry_word: (index) => words[index],
+      _gba_audio_register: (address) => {
+        const offset = address - 0x02001100;
+        return extension[offset >>> 2] >>> ((offset & 2) * 8) & 0xffff;
+      }
+    };
+    expect(readRuntimeTelemetry(module).subsystems).toEqual({
+      ticksPerSecond: 262144,
+      frameTicks: { scripts: 10, audio: 20, render: 30, streaming: 40, interrupts: 50 },
+      scenePeakTicks: { scripts: 11, audio: 22, render: 33, streaming: 44, interrupts: 55 }
+    });
+    extension[3] = 41;
+    expect(readRuntimeTelemetry(module).subsystems).toBeNull();
+    extension[0] = 0;
+    expect(readRuntimeTelemetry(module).subsystems).toBeNull();
+  });
+});
+
+it("decodes only the bounded native event trace extension and preserves wait context", () => {
+  const words = [0x47534554, 1, 20, 5, ...Array(16).fill(0)];
+  words[4] = 0x08000100; words[5] = 90; words[6] = 7 | (3 << 16) | (2 << 24); words[7] = 4 | (12 << 16);
+  const module = { _gba_audio_register(address) { const offset = address - 320; const word = words[Math.floor(offset / 4)] ?? 0; return (offset % 4 === 0 ? word : word >>> 16) & 65535; } };
+  expect(readEventTraceTelemetry(module, 0).entries.at(-1)).toMatchObject({ commandAddress: 0x08000100, frame: 90, step: 7, op: 3, status: 2, room: 4, waitFrames: 12 });
+  words[0] = 0;
+  expect(readEventTraceTelemetry(module, 0)).toBeNull();
 });

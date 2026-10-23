@@ -1,3 +1,4 @@
+#include "gbs/profiler.hpp"
 #define GBS_DIALOGUE_UI_RUNTIME_KIND 8
 #include "gbs/engine.hpp"
 #include "gbs/audio.hpp"
@@ -766,6 +767,7 @@ gbs::RuntimeAdapterFrameResult update_cutscene_runtime(const gbs::RuntimeFrameCo
 }
 
 void render_cutscene_runtime(const gbs::RuntimeFrameContext& context) {
+    const gbs::SubsystemProfilerScope profiler_scope(gbs::ProfilerSubsystem::Render);
     (void)context;
         publish_runtime_telemetry();
         refresh_hud();

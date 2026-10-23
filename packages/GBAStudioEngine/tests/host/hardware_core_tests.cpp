@@ -936,7 +936,29 @@ void test_global_input_repeat_fires_after_initial_delay() {
 
 } // namespace
 
+static void test_dma_fences_hold_sources_until_the_last_partial_transfer() {
+    gbs::dma_reset_vblank_queue();
+    uint16_t source[12] {}, destination[12] {};
+    assert(gbs::dma_enqueue_vblank16(source, destination, 12));
+    const auto fence = gbs::dma_vblank_fence();
+    assert(gbs::dma_fence_status(fence) == gbs::DmaFenceStatus::Pending);
+    assert(gbs::dma_source_pending(source, sizeof(source)));
+    gbs::dma_flush_vblank_queue_budget(gbs::DmaChannel::Channel3, 8);
+    assert(gbs::dma_fence_status(fence) == gbs::DmaFenceStatus::Pending);
+    assert(gbs::dma_source_pending(source, sizeof(source)));
+    gbs::dma_reset_vblank_queue_stats();
+    assert(gbs::dma_fence_status(fence) == gbs::DmaFenceStatus::Pending);
+    gbs::dma_flush_vblank_queue();
+    assert(gbs::dma_fence_status(fence) == gbs::DmaFenceStatus::Complete);
+    assert(!gbs::dma_source_pending(source, sizeof(source)));
+    assert(gbs::dma_enqueue_vblank16(source, destination, 12));
+    const auto canceled = gbs::dma_vblank_fence();
+    gbs::dma_reset_vblank_queue();
+    assert(gbs::dma_fence_status(canceled) == gbs::DmaFenceStatus::Canceled);
+}
+
 int main() {
+    test_dma_fences_hold_sources_until_the_last_partial_transfer();
     test_dma_validation();
     test_unaligned_affine_map_upload_preserves_byte_pairs_and_budget();
     test_hblank_dma_lifecycle_is_explicit();

@@ -112,6 +112,25 @@ class IncrementalBuildTests(unittest.TestCase):
         return [c for c in calls if "-c" in c["args"]]
     def change_same_mtime(self, file, contents):
         old=file.stat();file.write_text(contents);os.utime(file,ns=(old.st_atime_ns,old.st_mtime_ns))
+    def test_reports_and_logs_are_not_build_inputs(self):
+        self.run_build()
+        (self.project/"build.log").write_text("diagnostic output")
+        (self.project/"memory_report.json").write_text("{}")
+        self.assertEqual(self.run_build(), [])
+        self.assertEqual(self.log.read_text(), "", "reports must not cause relinking")
+        report=json.loads((self.project/"build/build_decisions.json").read_text())
+        self.assertEqual(report["result"], "reused")
+
+    def test_explicit_inputs_invalidate_on_binary_data_change(self):
+        (self.project/"palette.bin").write_bytes(b"one")
+        self.manifest["build"]["inputs"]=["palette.bin"]
+        self.save();self.run_build()
+        (self.project/"palette.bin").write_bytes(b"two")
+        self.assertEqual(len(self.run_build()), 2, "binary includes must not remain embedded in stale objects")
+        self.assertNotEqual(self.log.read_text(), "")
+        report=json.loads((self.project/"build/build_decisions.json").read_text())
+        self.assertIn("project:palette.bin", report["changedInputs"])
+
     def test_identical_play_runs_no_compiler_and_matches_clean_rom(self):
         self.assertEqual(len(self.run_build()),2)
         rom=self.project/"build/game.gba";sha=hashlib.sha256(rom.read_bytes()).hexdigest()

@@ -317,6 +317,7 @@ export interface EnginePackBuildSummary {
 }
 
 export interface EnginePackBuildResult {
+  environment?: import("./buildDiagnosticReport.js").BuildEnvironmentSnapshot;
   ran: boolean;
   exitCode: number | null;
   command?: string;

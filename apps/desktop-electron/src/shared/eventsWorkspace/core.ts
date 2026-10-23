@@ -834,8 +834,11 @@ function commandParametersForCommand(
     const id = occurrence === 0 ? baseID : `${baseID}${occurrence + 1}`;
     const value = parts[tokenIndex] ?? "";
     const defaultValue = placeholder ? "" : templatePart ?? "";
+    const resourceOptions = kind === "actor" && (parts[0] === "lantern" || parts[0] === "reveal_area")
+      ? [...new Set(["player", ...options.actor])]
+      : commandParameterOptions(kind, options);
     const parameterOptions = eventCommandParameterChoices(parts[0] ?? "", tokenIndex) ?? (constantOperandIndices(parts[0] ?? "").includes(tokenIndex)
-      ? options.constant ?? [] : commandParameterOptions(kind, options));
+      ? options.constant ?? [] : resourceOptions);
     return {
       id,
       label: eventCommandParameterLabel(parts[0] ?? "", tokenIndex, commandParameterLabel(kind, tokenIndex, placeholder)),

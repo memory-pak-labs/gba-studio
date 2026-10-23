@@ -1,3 +1,4 @@
+#include "gbs/profiler.hpp"
 #define GBS_DIALOGUE_UI_RUNTIME_KIND 9
 #include "gbs/engine.hpp"
 #include "gbs/audio.hpp"
@@ -792,6 +793,7 @@ gbs::RuntimeAdapterFrameResult update_visual_novel_runtime(const gbs::RuntimeFra
 }
 
 void render_visual_novel_runtime(const gbs::RuntimeFrameContext& context) {
+    const gbs::SubsystemProfilerScope profiler_scope(gbs::ProfilerSubsystem::Render);
     (void)context;
         gbs::update_dialogue(dialogue);
         if (dialogue.revealed_char_this_frame && dialogue.text_sfx_index >= 0 &&
