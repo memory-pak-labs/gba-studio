@@ -44,7 +44,9 @@ jobs:
           python-version: '3.11'
       - run: python -m pip install Pillow
       - run: npm ci
-      - run: npm run test:all
+      - run: npm run test:all -- --exclude src/shared/projectOpenPerf.test.ts
+      # Measure the existing performance budget without competing test workers.
+      - run: npm run test:perf:project-open
       - run: npm run typecheck
       - run: npm run build
 

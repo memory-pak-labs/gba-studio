@@ -5,7 +5,7 @@ import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { defaultWelcomeSavedProjectPath } from "./smoke-electron-welcome-paths.mjs";
-import { createElectronSmokeEnv, electronLaunchCommand, electronExecutablePath as resolveElectronExecutablePath } from "./lib/electron-smoke-helpers.mjs";
+import { createElectronSmokeEnv, electronLaunchCommand, electronExecutablePath as resolveElectronExecutablePath, prepareElectronSmokeLocale } from "./lib/electron-smoke-helpers.mjs";
 
 const appRoot = dirname(dirname(fileURLToPath(import.meta.url)));
 const canonicalExample = JSON.parse(await readFile(join(appRoot, "default-assets/templates/exemplo-gba/exemplo-gba.gba-project"), "utf8"));
@@ -307,6 +307,13 @@ async function main() {
       await cdp.ready;
 
       try {
+        // Fresh profiles now start in English. Verify that behavior, then select
+        // Portuguese explicitly for the authored example and editor assertions.
+        const firstRunText = await waitForRenderedText(cdp,
+          text => text.includes("Create project") && text.includes("Language"), "fresh English welcome");
+        assertContains(firstRunText, "Visual IDE for Game Boy Advance");
+        await captureScreenshot(cdp, join(outputDir, "00-welcome-en-US.png"));
+        await prepareElectronSmokeLocale(cdp);
         const welcomeText = await waitForRenderedText(
           cdp,
           (nextText) => nextText.includes("GBA Studio") && nextText.includes("Templates") && nextText.includes("Exemplo GBA Completo") && nextText.includes("Projeto em branco"),
@@ -356,6 +363,8 @@ async function main() {
         welcomeScreenshotPath,
         savedProjectPath,
         checked: [
+          "fresh-welcome-en-US",
+          "explicit-language-switch-pt-BR",
           "welcome-screen",
           "example-project",
           "example-project-auto-save",

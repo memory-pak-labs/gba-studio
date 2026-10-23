@@ -111,7 +111,8 @@
     "typecheck": "tsc --noEmit -p tsconfig.node.json && tsc --noEmit -p tsconfig.web.json",
     "verify:mgba-web": "node scripts/verify-mgba-web-core.mjs",
     "play:mgba-native": "node scripts/open-mgba-native.mjs",
-    "verify:mgba-av": "node scripts/verify-mgba-final.mjs"
+    "verify:mgba-av": "node scripts/verify-mgba-final.mjs",
+    "test:perf:project-open": "vitest run src/shared/projectOpenPerf.test.ts --maxWorkers=1 --no-file-parallelism"
   },
   "build": {
     "afterPack": "./scripts/after-pack-macos.mjs",
