@@ -479,6 +479,28 @@ export function exemploSceneScreenshotPath(evidencePath, sceneName) {
   return join(dirname(evidencePath), "scenes", `${sceneName}.png`);
 }
 
+export function selectSceneCadenceWindow(samples, scope) {
+  if (!Array.isArray(samples) || samples.length < 4) {
+    throw new Error("Janela de cadencia incompleta: esperadas quatro amostras da cena.");
+  }
+  // Keep the first complete window, including slow samples. Later menu/reset
+  // telemetry must never replace the selected scene's playback measurements.
+  const selected = samples.slice(0, 4);
+  let previousFrame = -1;
+  for (const sample of selected) {
+    const state = sample?.runtimeState;
+    if (!state || state.runtimeKind !== scope.runtimeKind || state.currentRoom !== scope.currentRoom
+        || !Number.isInteger(state.frame) || state.frame < 0 || state.frame < previousFrame) {
+      throw new Error("Janela de cadencia mistura runtimes, cenas ou um reinicio da ROM.");
+    }
+    previousFrame = state.frame;
+  }
+  if (selected.at(-1).runtimeState.frame <= selected[0].runtimeState.frame) {
+    throw new Error("Janela de cadencia sem avanco de frames do jogo.");
+  }
+  return selected;
+}
+
 export function steadyFrameSamples(samples, sampleCount = 3) {
   if (!Array.isArray(samples) || samples.length < sampleCount) return [];
   return samples.slice(-sampleCount);

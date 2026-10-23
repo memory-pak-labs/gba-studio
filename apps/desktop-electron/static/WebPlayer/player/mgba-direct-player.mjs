@@ -455,6 +455,37 @@ function decodeEventTraceTelemetry(word) {
   return Object.freeze({ sequence, entries });
 }
 
+function decodeRuntimeDiagnostics(words) {
+  const decoded = decodeRuntimeTelemetryWords(words);
+  if (!decoded) return null;
+  return Object.freeze({ ...decoded,
+    subsystems: decodeProfilerTelemetry(index => words[64 + index], decoded),
+    eventTrace: decoded.schema === 4 ? decodeEventTraceTelemetry(index => words[80 + index]) : null
+  });
+}
+
+export function prepareRuntimeInspection(module) {
+  // Prepare host-only decoders before cadence/audio clocks start. These words
+  // never enter emulator memory and no emulated frame or save operation runs.
+  const words = new Uint32Array(100);
+  words.set([RUNTIME_TELEMETRY_MAGIC, RUNTIME_TELEMETRY_SCHEMA, RUNTIME_TELEMETRY_WORD_COUNT, 42]);
+  words.set([0x47535046, 1, 16, 42, 262144, 31, 10, 20, 30, 40, 50, 11, 22, 33, 44, 55], 64);
+  words.set([0x47534554, 1, 20, 4], 80);
+  for (let index = 0; index < 4; ++index) {
+    words.set([0x08000100 + index * 4, 42, index | (3 << 16), 4 | (12 << 16)], 84 + index * 4);
+  }
+  for (let iteration = 0; iteration < 3; ++iteration) {
+    words[50] = 0;
+    decodeRuntimeDiagnostics(words);
+    words[50] = 0x3ff;
+    decodeRuntimeDiagnostics(words);
+    analyzePcmSamples(new Int16Array([0, 8, 9, -32768, 32767]));
+  }
+  if (typeof module._gba_analyze_rgba === "function") {
+    analyzeModuleRgbaFrame(module, new Uint8Array([0, 0, 0, 255, 4, 4, 4, 255, 5, 0, 0, 255, 0, 5, 0, 255]), 2, 2);
+  }
+}
+
 export function readRuntimeTelemetry(module) {
   if (typeof module._gba_runtime_telemetry_snapshot === "function") {
     const pointer = module._gba_runtime_telemetry_snapshot();
@@ -463,12 +494,7 @@ export function readRuntimeTelemetry(module) {
     if (!Number.isInteger(pointer) || pointer <= 0 || pointer % 4 !== 0 ||
         !heap || pointer + 400 > heap.byteLength) return null;
     const words = new Uint32Array(heap.buffer, heap.byteOffset + pointer, 100);
-    const decoded = decodeRuntimeTelemetryWords(words);
-    if (!decoded) return null;
-    return Object.freeze({ ...decoded,
-      subsystems: decodeProfilerTelemetry(index => words[64 + index], decoded),
-      eventTrace: decoded.schema === 4 ? decodeEventTraceTelemetry(index => words[80 + index]) : null
-    });
+    return decodeRuntimeDiagnostics(words);
   }
   const hasNativeBridge = typeof module._gba_find_runtime_telemetry === "function" &&
     typeof module._gba_runtime_telemetry_word === "function";
@@ -534,6 +560,38 @@ export function analyzeRgbaFrame(bytes, width = WIDTH, height = HEIGHT) {
     dominantColorRatio,
     signature: (signatureHash >>> 0).toString(16).padStart(8, "0")
   });
+}
+
+export function analyzeModuleRgbaFrame(module, bytes, width = WIDTH, height = HEIGHT) {
+  if (typeof module._gba_analyze_rgba !== "function") return analyzeRgbaFrame(bytes, width, height);
+  const pixelCount = width * height;
+  if (!Number.isSafeInteger(pixelCount) || pixelCount <= 0 || pixelCount > WIDTH * HEIGHT
+      || !bytes || bytes.length < pixelCount * 4) throw new Error("Framebuffer RGBA invalido para analise visual.");
+  const pointer = module._malloc(pixelCount * 4);
+  if (!pointer) throw new Error("Memoria insuficiente para analise do framebuffer.");
+  try {
+    module.HEAPU8.set(bytes.subarray(0, pixelCount * 4), pointer);
+    const result = module._gba_analyze_rgba(pointer, pixelCount) >>> 0;
+    const heap = module.HEAPU8;
+    if (!result || result % 4 || result + 32 > heap.byteLength) throw new Error("Resultado invalido da analise nativa.");
+    const header = new Uint32Array(heap.buffer, heap.byteOffset + result, 8);
+    const [magic, version, pixels, nonBlackPixelCount, dominant, signature, uniqueColorCount] = header;
+    if (magic !== 0x47465241 || version !== 1 || pixels !== pixelCount || nonBlackPixelCount > pixels
+        || dominant > pixels || !uniqueColorCount || uniqueColorCount > pixels
+        || result + 32 + uniqueColorCount * 8 > heap.byteLength) throw new Error("Resultado invalido da analise nativa.");
+    const counts = new Uint32Array(heap.buffer, heap.byteOffset + result + 32, uniqueColorCount * 2);
+    const colorHistogram = [];
+    for (let index = 0; index < uniqueColorCount; ++index) {
+      const color = counts[index * 2];
+      colorHistogram.push({ count: counts[index * 2 + 1], rgb: [(color >> 16) & 255, (color >> 8) & 255, color & 255] });
+    }
+    const nonBlackRatio = nonBlackPixelCount / pixelCount;
+    const dominantColorRatio = dominant / pixelCount;
+    return Object.freeze({ colorHistogram,
+      meaningful: nonBlackRatio >= 0.01 && uniqueColorCount >= 3 && dominantColorRatio < 0.995,
+      pixelCount, nonBlackPixelCount, nonBlackRatio, uniqueColorCount, dominantColorRatio,
+      signature: signature.toString(16).padStart(8, "0") });
+  } finally { module._free(pointer); }
 }
 
 export function analyzePcmSamples(samples) {
@@ -649,6 +707,7 @@ export function restoreModuleSavedata(module, savedata) {
 }
 
 function bytesToBase64(bytes) {
+  if (typeof bytes.toBase64 === "function") return bytes.toBase64();
   let text = "";
   for (let offset = 0; offset < bytes.length; offset += 0x8000) {
     text += String.fromCharCode(...bytes.subarray(offset, offset + 0x8000));
@@ -657,6 +716,7 @@ function bytesToBase64(bytes) {
 }
 
 function base64ToBytes(value) {
+  if (typeof Uint8Array.fromBase64 === "function") return Uint8Array.fromBase64(value);
   const text = atob(value);
   return Uint8Array.from(text, (character) => character.charCodeAt(0));
 }
@@ -717,6 +777,7 @@ export async function startMGBAPlayer({ container, romUrl, storageKey, onFrameSt
       module._free(romPointer);
     }
     if (loaded !== 1) throw new Error("A ROM foi rejeitada pelo core mGBA.");
+    prepareRuntimeInspection(module);
     onFrameStats?.({
       cpuPercent: 0,
       droppedFrameRatio: 0,
@@ -1005,7 +1066,7 @@ export async function startMGBAPlayer({ container, romUrl, storageKey, onFrameSt
       }),
       inspectPresentedRuntime: () => Object.freeze({ state: presentedRuntimeState, previousState: previousPresentedRuntimeState }),
       inspectFrame: () => Object.freeze({
-        ...analyzeRgbaFrame(image.data, WIDTH, HEIGHT),
+        ...analyzeModuleRgbaFrame(module, image.data, WIDTH, HEIGHT),
         framebufferBytes: module._gba_framebuffer_size(),
         expectedRgbaBytes: FRAME_BYTES
       }),

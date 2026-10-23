@@ -672,3 +672,14 @@ describe("exemplo scenes smoke wiring", () => {
     expect(exerciseBody).toContain("bridgeProbe: bridgeDialogue.probe");
   });
 });
+
+
+it("mede a cena selecionada antes da auditoria de pixels, menus e reinícios", async () => {
+  const source = await readFile(new URL("./smoke-electron-exemplo-scenes.mjs", import.meta.url), "utf8");
+  const main = source.slice(source.indexOf("for (const [planIndex, scene] of plan.entries())"));
+  const measurement = main.indexOf("const performance = await waitForPerformance");
+  expect(measurement).toBeGreaterThan(0);
+  expect(measurement).toBeLessThan(main.indexOf("const visualStabilitySamples = await samplePlayerVisualStability"));
+  expect(main.slice(0, measurement)).toContain("cadenceScope");
+  expect(source).toContain("selectSceneCadenceWindow(value.samples, scope)");
+});

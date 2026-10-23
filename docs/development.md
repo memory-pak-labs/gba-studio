@@ -113,6 +113,27 @@ compilado e compara o resultado com a leitura por palavras, incluindo o limite
 da EWRAM. O relógio PCM começa no primeiro bloco disponível; retomar áudio por
 uma tecla não altera o relógio nem encobre um underrun real.
 
+A inspeção visual calcula o histograma RGB888 completo e a assinatura FNV no
+bridge nativo, mantendo a mesma ordenação e os mesmos critérios do cálculo JS.
+`scripts/mgba-native-frame-analysis.test.mjs` compara todos os campos no core
+compilado, inclusive para pixels RGBA arbitrários e limites da memória Wasm.
+As tabelas e o buffer temporário usam cerca de 1 MiB no host, sem reservar RAM
+do GBA. Snapshots preferem os codecs Base64 nativos de `Uint8Array` quando
+disponíveis; o formato salvo e o fallback de navegador permanecem os mesmos.
+Os decodificadores de diagnóstico são preparados antes dos relógios de cadência e
+áudio, para evitar compilação tardia sob Rosetta. A preparação usa dados locais
+do host: não avança frames, não escreve na memória do GBA nem publica telemetria
+sintética. A regressão de ciclo de vida confirma início sem frames executados,
+sem estados salvos e sem dados de preparação nos callbacks do Player.
+
+O smoke de cenas mede uma janela fixa de quatro amostras depois de confirmar a
+cena em execução e antes das auditorias de pixels, menus e save/load. As três
+últimas compõem a cadência, com os mesmos limites de 55 FPS e 10% de descarte.
+As quatro amostras ficam na evidência; todas devem pertencer ao runtime e à cena
+selecionados, com frames avançando. Uma queda não é substituída por amostras
+posteriores de outro menu ou de uma ROM reiniciada. O contador de underruns é
+lido novamente ao final dessa janela, sem zerar seu histórico.
+
 ## Motor
 
 Os testes host precisam de C++17, make e Python 3. São independentes de ROM e de

@@ -31,7 +31,8 @@ import {
   parseExemploSceneSoakMinutes,
   resolveExemploSmokeFaceButton,
   reusableExemploScenePlaytestRuns,
-  selectExemploScenePlaytestPlan
+  selectExemploScenePlaytestPlan,
+  selectSceneCadenceWindow
 } from "./exemplo-scene-playtest-contract.mjs";
 
 const appRoot = dirname(dirname(fileURLToPath(import.meta.url)));
@@ -409,5 +410,45 @@ describe("contrato de playtest de Vértice", () => {
     expect(exemploProjectAssetSource(project, "title-porto-lumen-240x160-4bpp.png"))
       .toBe("Assets/backgrounds/title-porto-lumen-240x160-4bpp.png");
     expect(() => exemploProjectAssetSource(project, "ausente.png")).toThrow("ausente.png");
+  });
+});
+
+
+describe("janela de cadência da cena selecionada", () => {
+  const scope = { runtimeKind: 8, currentRoom: 2 };
+  const samples = () => Array.from({ length: 6 }, (_, i) => ({
+    presentationFps: i === 1 ? 40 : 60, emulationFps: 60, droppedFrameRatio: 0,
+    runtimeState: { runtimeKind: 8, currentRoom: 2, frame: 20 + i * 30 }
+  }));
+  it("mantém as primeiras quatro amostras, incluindo uma queda, sem escolher as melhores", () => {
+    const input = samples();
+    expect(selectSceneCadenceWindow(input, scope)).toEqual(input.slice(0, 4));
+    expect(selectSceneCadenceWindow(input, scope)[1].presentationFps).toBe(40);
+  });
+  it.each([
+    ["menu", { runtimeKind: 3 }],
+    ["outra cena", { currentRoom: 11 }],
+    ["reinício", { frame: 1 }],
+    ["telemetria ausente", null]
+  ])("rejeita amostras misturadas com %s", (_label, state) => {
+    const input = samples();
+    input[2].runtimeState = state === null ? null : { ...input[2].runtimeState, ...state };
+    expect(() => selectSceneCadenceWindow(input, scope)).toThrow(/cadencia|cadência/i);
+  });
+  it("não mistura um menu posterior à janela de medição", () => {
+    const input = samples();
+    input[4].runtimeState = { runtimeKind: 3, currentRoom: 11, frame: 0 };
+    expect(selectSceneCadenceWindow(input, scope)).toEqual(input.slice(0, 4));
+  });
+  it("rejeita um contador inicial inválido", () => {
+    const input = samples();
+    input[0].runtimeState.frame = -1;
+    expect(() => selectSceneCadenceWindow(input, scope)).toThrow(/cadencia|cadência/i);
+  });
+  it("exige a janela completa e frames que continuam avançando", () => {
+    expect(() => selectSceneCadenceWindow(samples().slice(0, 3), scope)).toThrow(/cadencia|cadência/i);
+    const input = samples();
+    input.forEach(s => { s.runtimeState.frame = 20; });
+    expect(() => selectSceneCadenceWindow(input, scope)).toThrow(/cadencia|cadência/i);
   });
 });

@@ -78,7 +78,7 @@ async function main() {
     "-s", "FILESYSTEM=0",
     "--no-entry",
     "-s", "EXPORTED_RUNTIME_METHODS=['HEAPU8']",
-    "-s", "EXPORTED_FUNCTIONS=['_malloc','_free','_gba_init','_gba_load_rom','_gba_last_stage','_gba_run_frame','_gba_audio_samples','_gba_audio_sample_count','_gba_audio_sample_rate','_gba_audio_register','_gba_set_keys','_gba_reset','_gba_find_runtime_telemetry','_gba_runtime_telemetry_word','_gba_runtime_telemetry_snapshot','_gba_framebuffer','_gba_framebuffer_size','_gba_state_size','_gba_save_state','_gba_load_state','_gba_savedata_size','_gba_savedata_copy','_gba_savedata_restore','_gba_destroy']",
+    "-s", "EXPORTED_FUNCTIONS=['_malloc','_free','_gba_init','_gba_load_rom','_gba_last_stage','_gba_run_frame','_gba_audio_samples','_gba_audio_sample_count','_gba_audio_sample_rate','_gba_audio_register','_gba_set_keys','_gba_reset','_gba_find_runtime_telemetry','_gba_runtime_telemetry_word','_gba_runtime_telemetry_snapshot','_gba_framebuffer','_gba_framebuffer_size','_gba_analyze_rgba','_gba_state_size','_gba_save_state','_gba_load_state','_gba_savedata_size','_gba_savedata_copy','_gba_savedata_restore','_gba_destroy']",
     "-o", modulePath
   ]);
 

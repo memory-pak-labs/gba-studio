@@ -38,6 +38,7 @@ beforeEach(() => {
     _free: vi.fn(),
     _gba_load_rom: vi.fn(() => 1),
     _gba_destroy: vi.fn(),
+    _gba_run_frame: vi.fn(),
     _gba_state_size: vi.fn(() => 8),
     _gba_save_state: vi.fn(() => 1),
     _gba_load_state: vi.fn(() => 1)
@@ -52,6 +53,21 @@ afterEach(() => {
 const start = () => startMGBAPlayer({ container, romUrl: "test.gba", storageKey: "test-state" });
 
 describe("Play resource ownership", () => {
+  it("starts at frame zero without publishing preparation data or persisting state", async () => {
+    const stats = vi.fn();
+    const player = await startMGBAPlayer({ container, romUrl: "test.gba", storageKey: "test-state", onFrameStats: stats });
+    try {
+      expect(harness.core._gba_run_frame).not.toHaveBeenCalled();
+      expect(harness.core._gba_save_state).not.toHaveBeenCalled();
+      expect(harness.core._gba_load_state).not.toHaveBeenCalled();
+      expect(player.inspectRuntime().state).toBeNull();
+      expect(player.inspectPresentedRuntime()).toEqual({ state: null, previousState: null });
+      expect(stats).toHaveBeenCalledTimes(1);
+      expect(stats.mock.calls[0][0]).not.toHaveProperty("state");
+      expect(localStorage.getItem("test-state")).toBeNull();
+    } finally { player.destroy(); }
+  });
+
   it("removes keyboard listeners across repeated starts and destroys", async () => {
     const add = vi.spyOn(window, "addEventListener");
     const remove = vi.spyOn(window, "removeEventListener");

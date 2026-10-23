@@ -7,7 +7,7 @@
   },
   "wasm": {
     "file": "mgba-core.wasm",
-    "sha256": "96375c5cec5e68e45a487429b78c531bae959aa4fa8d15a85fa132e06df80448"
+    "sha256": "d641f0a2bfa66dbaef5818e418f2cccbd00710214337fc259a08ebc66deeeed1"
   },
   "licenses": [
     "../licenses/mGBA-MPL-2.0.txt"

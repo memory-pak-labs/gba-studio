@@ -1,7 +1,8 @@
 import { beforeAll, describe, expect, it } from "vitest";
 import { readFile } from "node:fs/promises";
 import createMGBA from "../static/WebPlayer/player/mgba-core.mjs";
-import { readRuntimeTelemetry } from "../static/WebPlayer/player/mgba-direct-player.mjs";
+import * as inspection from "../static/WebPlayer/player/mgba-direct-player.mjs";
+const { readRuntimeTelemetry } = inspection;
 
 // Authored ARM fixture: copy 100 words into EWRAM, then loop. It exercises the
 // actual mGBA bus and bridge without relying on an emulator-memory mock.
@@ -81,6 +82,30 @@ describe("compiled mGBA telemetry snapshot", () => {
       }
       // Reading a snapshot must not advance the game or alter its diagnostic data.
       expect(readRuntimeTelemetry(core)).toEqual(state);
+    } finally { core._gba_destroy(); }
+  });
+
+  it("prepares inspection without advancing or changing the loaded game", async () => {
+    const words = Uint32Array.from({ length: 100 }, (_, index) => index + 100);
+    words.set([0x47535452, 4, 64, 42]);
+    words.set([0x47535046, 1, 16, 42, 262144, 31, 10, 20, 30, 40, 50, 11, 22, 33, 44, 55], 64);
+    words.set([0x47534554, 1, 20, 1, 0x08000100, 42, 7 | (3 << 16), 4 | (12 << 16)], 80);
+    const core = await boot(0x02000100, words);
+    try {
+      const before = readRuntimeTelemetry(core);
+      const realRunFrame = core._gba_run_frame;
+      core._gba_run_frame = () => { throw new Error("inspection must not run the game"); };
+      try {
+        expect(typeof inspection.prepareRuntimeInspection).toBe("function");
+        expect(inspection.prepareRuntimeInspection(core)).toBeUndefined();
+        expect(inspection.prepareRuntimeInspection(core)).toBeUndefined();
+        expect(readRuntimeTelemetry(core)).toEqual(before);
+        for (let i = 0; i < 100; ++i) {
+          const address = 0x02000100 + i * 4;
+          const word = (core._gba_audio_register(address) | core._gba_audio_register(address + 2) << 16) >>> 0;
+          expect(word).toBe(words[i]);
+        }
+      } finally { core._gba_run_frame = realRunFrame; }
     } finally { core._gba_destroy(); }
   });
 

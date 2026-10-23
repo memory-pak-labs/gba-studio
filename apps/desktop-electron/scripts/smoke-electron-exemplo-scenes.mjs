@@ -48,7 +48,8 @@ import {
   resolveTopdownActorFramebufferTargets,
   selectExemploScenePlaytestPlan,
   selectExemploScenePlaytestProjectPath,
-  steadyFrameSamples
+  steadyFrameSamples,
+  selectSceneCadenceWindow
 } from "./exemplo-scene-playtest-contract.mjs";
 import {
   decodePngRgba
@@ -921,13 +922,13 @@ function average(samples, key) {
   return samples.reduce((total, sample) => total + Number(sample[key] ?? 0), 0) / samples.length;
 }
 
-async function waitForPerformance(mainCdp, knownWindowIDs) {
+async function waitForPerformance(mainCdp, knownWindowIDs, scope = null) {
   const value = await evaluate(mainCdp, `
     new Promise((resolve) => {
       const known = new Set(${JSON.stringify([...knownWindowIDs])});
       const started = Date.now();
       const check = () => {
-        const events = window.__gbaStudioScenePlaytestTelemetry ?? [];
+        const events = (window.__gbaStudioScenePlaytestTelemetry ?? []).slice(${JSON.stringify(scope?.afterIndex ?? 0)});
         const candidate = [...events].reverse().find((event) => (
           event.state === "running" &&
           !known.has(event.windowID) &&
@@ -951,13 +952,15 @@ async function waitForPerformance(mainCdp, knownWindowIDs) {
     })
   `, true);
   if (!value?.ok) throw new Error(`Telemetria de cadencia insuficiente: ${JSON.stringify(value)}.`);
-  const samples = steadyFrameSamples(value.samples);
+  const observedSamples = scope ? selectSceneCadenceWindow(value.samples, scope) : value.samples;
+  const samples = steadyFrameSamples(observedSamples);
   return {
     droppedFrameRatio: Math.round(average(samples, "droppedFrameRatio") * 10_000) / 10_000,
     droppedFrames: Math.round(average(samples, "droppedFrames")),
     emulationFps: Math.round(average(samples, "emulationFps") * 100) / 100,
     emulationMs: Math.round(average(samples, "emulationMs") * 100) / 100,
     presentationFps: Math.round(average(samples, "presentationFps") * 100) / 100,
+    ...(scope ? { scope, observedSamples } : {}),
     samples,
     windowID: value.windowID
   };
@@ -5638,6 +5641,18 @@ async function main() {
           }
         })}`);
       }
+      // Measure this scene while it is running normally. The later pixel
+      // audits and input exercises deliberately perform expensive inspection,
+      // enter menus and reset/load the ROM; those are separate assertions.
+      const cadenceScope = {
+        afterIndex: await evaluate(mainCdp, "(window.__gbaStudioScenePlaytestTelemetry ?? []).length"),
+        runtimeKind: runtimeKindByName[expectedRuntimeName],
+        currentRoom: Number(launchContract.currentRoom)
+      };
+      const performance = await waitForPerformance(mainCdp, knownWindowIDs, cadenceScope);
+      traceSceneSmoke(scene.name, "performance-ready");
+      knownWindowIDs.add(performance.windowID);
+      playerEvidence = { ...playerEvidence, audio: await evaluate(playerCdp, "window.GBAStudioDirectPlayer.inspectAudio()") };
       let isometricCadence = null;
       if (scene.name === "mercado_suspenso") {
         const roms = activeBuildRomPaths(await filesNamed(dirname(exported.path), "exemplo.gba"));
@@ -6187,9 +6202,6 @@ async function main() {
           optionsToPrologue: transitionEvidence
         };
       }
-      const performance = await waitForPerformance(mainCdp, knownWindowIDs);
-      traceSceneSmoke(scene.name, "performance-ready");
-      knownWindowIDs.add(performance.windowID);
       const romBytes = Number(performance.samples.at(-1)?.romBytes ?? 0);
       results.push({
         ...scene,

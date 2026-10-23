@@ -1,6 +1,7 @@
 // GBA Studio's minimal browser-facing adapter for the official mGBA libmgba API.
 // The mGBA source itself is fetched at the pinned revision by build-mgba-web-core.mjs.
 #include <emscripten/emscripten.h>
+#include <emscripten/heap.h>
 #include <mgba/core/core.h>
 #include <mgba/core/blip_buf.h>
 #include <mgba/gba/core.h>
@@ -287,6 +288,55 @@ EMSCRIPTEN_KEEPALIVE uintptr_t gba_runtime_telemetry_snapshot(void) {
 
 EMSCRIPTEN_KEEPALIVE uintptr_t gba_framebuffer(void) {
 	return (uintptr_t) video_buffer;
+}
+
+// Debug inspection uses host Wasm storage, never emulated GBA RAM. Keep the
+// complete RGB888 histogram and FNV signature; only move the pixel loop out of JS.
+enum { FRAME_PIXEL_CAPACITY = 240 * 160, FRAME_COLOR_BUCKETS = 65536 };
+struct FrameColorCount { uint32_t color, count; };
+static struct FrameColorCount frame_color_buckets[FRAME_COLOR_BUCKETS];
+static struct {
+	uint32_t magic, version, pixels, non_black, dominant, signature, colors, reserved;
+	struct FrameColorCount histogram[FRAME_PIXEL_CAPACITY];
+} frame_analysis;
+
+static int compare_frame_colors(const void* left, const void* right) {
+	const struct FrameColorCount* a = left;
+	const struct FrameColorCount* b = right;
+	if (a->count != b->count) return a->count > b->count ? -1 : 1;
+	return a->color < b->color ? -1 : a->color > b->color;
+}
+
+EMSCRIPTEN_KEEPALIVE uintptr_t gba_analyze_rgba(uintptr_t source, uint32_t pixels) {
+	const size_t heap_size = emscripten_get_heap_size();
+	if (!source || !pixels || pixels > FRAME_PIXEL_CAPACITY || source >= heap_size ||
+		(size_t) pixels * 4 > heap_size - source) return 0;
+	const uint8_t* rgba = (const uint8_t*) source;
+	memset(frame_color_buckets, 0, sizeof(frame_color_buckets));
+	frame_analysis.magic = 0x47465241;
+	frame_analysis.version = 1;
+	frame_analysis.pixels = pixels;
+	frame_analysis.non_black = frame_analysis.dominant = frame_analysis.colors = 0;
+	uint32_t signature = 0x811c9dc5;
+	for (uint32_t pixel = 0; pixel < pixels; ++pixel) {
+		const uint8_t* rgb = rgba + pixel * 4;
+		if (rgb[0] > 4 || rgb[1] > 4 || rgb[2] > 4) ++frame_analysis.non_black;
+		const uint32_t color = ((uint32_t) rgb[0] << 16) | ((uint32_t) rgb[1] << 8) | rgb[2];
+		for (unsigned channel = 0; channel < 3; ++channel) signature = (signature ^ rgb[channel]) * 0x01000193;
+		unsigned bucket = (color * 2654435761u) >> 16;
+		while (frame_color_buckets[bucket].count && frame_color_buckets[bucket].color != color)
+			bucket = (bucket + 1) & (FRAME_COLOR_BUCKETS - 1);
+		struct FrameColorCount* entry = &frame_color_buckets[bucket];
+		if (!entry->count) entry->color = color;
+		if (++entry->count > frame_analysis.dominant) frame_analysis.dominant = entry->count;
+	}
+	for (unsigned bucket = 0; bucket < FRAME_COLOR_BUCKETS; ++bucket) {
+		if (frame_color_buckets[bucket].count)
+			frame_analysis.histogram[frame_analysis.colors++] = frame_color_buckets[bucket];
+	}
+	frame_analysis.signature = signature;
+	qsort(frame_analysis.histogram, frame_analysis.colors, sizeof(struct FrameColorCount), compare_frame_colors);
+	return (uintptr_t) &frame_analysis;
 }
 
 EMSCRIPTEN_KEEPALIVE size_t gba_framebuffer_size(void) {
