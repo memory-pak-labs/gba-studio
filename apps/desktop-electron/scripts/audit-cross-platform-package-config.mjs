@@ -71,7 +71,9 @@ export function createCrossPlatformPackageConfigReport({ packageJson, workflowTe
   const packageIndex = desktopJob.indexOf("npm run ${{ matrix.script }}");
   const macTargets = targetsOf(build.mac);
   const macDistributionScript = packageJson.scripts?.["dist:mac"] ?? "";
-  const macUniversalPackageScript = packageJson.scripts?.["package:mac:universal"] ?? "";
+  const macArchitectureScripts = ["arm64", "x64"].every(architecture =>
+    packageJson.scripts?.[`dist:mac:${architecture}`] === `node scripts/package-macos.mjs --arch ${architecture}` &&
+    packageJson.scripts?.[`package:mac:${architecture}`] === `node scripts/package-macos.mjs --arch ${architecture} --dir`);
   const winTargets = targetsOf(build.win);
   const linuxTargets = targetsOf(build.linux);
   const associationExts = new Set(
@@ -165,17 +167,13 @@ export function createCrossPlatformPackageConfigReport({ packageJson, workflowTe
       "Definir build.dmg.sign=true e validar o Gatekeeper no DMG final."
     ),
     check(
-      "macos-universal",
-      "Distribuicao macOS Universal",
-      /prepare:embedded-runtime:universal/.test(macDistributionScript) &&
-        /verify:macos-universal-runtime/.test(macDistributionScript) &&
-        /electron-builder --mac --universal/.test(macDistributionScript) &&
-        /electron-builder --dir --universal/.test(macUniversalPackageScript) &&
-        /GBA_STUDIO_REQUIRE_UNIVERSAL_RUNTIME=1/.test(packageJson.scripts?.["prepare:embedded-runtime:universal"] ?? "") &&
-        fileExists("scripts/verify-macos-universal-runtime.mjs"),
-      "Scripts locais de distribuicao e pacote Universal exigem preparo e verificacao do runtime arm64/x86_64.",
-      "O pacote macOS ainda nao exige Electron, Engine Pack e toolchain Universal.",
-      "Usar --universal, exigir o runtime Universal e verificar as duas arquiteturas antes de empacotar."
+      "macos-architectures",
+      "Instaladores macOS separados",
+      macDistributionScript === "node scripts/package-macos.mjs --arch all" && macArchitectureScripts &&
+        fileExists("scripts/package-macos.mjs") && fileExists("scripts/verify-macos-universal-runtime.mjs"),
+      "Apple Silicon (arm64) e Intel (x64) possuem pacotes, runtimes e verificações separados.",
+      "O fluxo macOS não exige os dois instaladores por arquitetura.",
+      "Manter dist:mac:arm64/dist:mac:x64 e validar o runtime correspondente antes de empacotar."
     ),
     check(
       "windows-targets",
@@ -249,12 +247,12 @@ export function createCrossPlatformPackageConfigReport({ packageJson, workflowTe
     check(
       "local-package-canonical",
       "Pacote local canonico Electron",
-      /electron-builder --mac --universal --publish never/.test(macDistributionScript) &&
+      macDistributionScript === "node scripts/package-macos.mjs --arch all" && macArchitectureScripts &&
         !/script\/package_app\.sh|GBA_STUDIO_PREBUILT_BINARY/.test(macDistributionScript) &&
         fileExists("scripts/smoke-macos-app-bundle.mjs"),
       "dist:mac usa o empacotador Electron canonico e impede publicacao automatica; smoke local do bundle disponivel.",
-      "O pacote local macOS nao usa o fluxo Electron Universal esperado.",
-      "Manter dist:mac com --universal --publish never e validar o bundle final localmente."
+      "O pacote local macOS nao usa o fluxo Electron por arquitetura esperado.",
+      "Manter o empacotamento arm64/x64 com --publish never e validar cada bundle final localmente."
     )
   ];
 
@@ -306,7 +304,7 @@ function renderMarkdown(report) {
     "",
     "## Limite da evidencia",
     "",
-    "- Para validacao final, executar Desktop packages para Windows/Linux no commit da release e testar o pacote macOS Universal localmente. Configuracao aprovada nao comprova execucao desses testes."
+    "- Para validacao final, executar Desktop packages para Windows/Linux no commit da release e testar os pacotes macOS arm64 e x64 localmente. Configuracao aprovada nao comprova execucao desses testes."
   );
 
   return `${lines.join("\n")}\n`;

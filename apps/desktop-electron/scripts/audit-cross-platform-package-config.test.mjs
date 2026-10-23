@@ -26,11 +26,11 @@ describe("audit-cross-platform-package-config", () => {
     expect(report.items.find(item => item.id === "ci-artifact-validation").state).toBe("blocked");
   });
 
-  it("rejects a macOS distribution that loses Universal verification", () => {
+  it("rejects a macOS distribution that omits the Intel installer", () => {
     const input = options();
-    input.packageJson.scripts["dist:mac"] = "electron-builder --mac --arm64";
+    delete input.packageJson.scripts["dist:mac:x64"];
     const report = createCrossPlatformPackageConfigReport(input);
-    expect(report.items.find(item => item.id === "macos-universal").state).toBe("blocked");
+    expect(report.items.find(item => item.id === "macos-architectures").state).toBe("blocked");
   });
 
   it("rejects an unsigned DMG container independently of app signing", () => {

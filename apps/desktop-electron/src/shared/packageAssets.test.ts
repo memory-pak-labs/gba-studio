@@ -38,9 +38,11 @@ describe("Electron package assets", () => {
     expect(packageJson.scripts["prepare:embedded-runtime:compact"]).toContain("GBA_STUDIO_RUNTIME_PROFILE=compact");
     expect(packageJson.scripts["package:mac:compact"]).toContain("prepare:embedded-runtime:compact");
     expect(packageJson.scripts["package:mac:offline"]).toContain("prepare:embedded-runtime");
-    for (const scriptName of ["package", "dist:mac"]) {
-      expect(packageJson.scripts[scriptName]).toContain("npm run prepare:embedded-runtime");
-    }
+    expect(packageJson.scripts.package).toContain("npm run prepare:embedded-runtime");
+    expect(packageJson.scripts["dist:mac"]).toBe("node scripts/package-macos.mjs --arch all");
+    const macPackager = await readFile(new URL("../../scripts/package-macos.mjs", import.meta.url), "utf8");
+    expect(macPackager).toContain("scripts/prepare-embedded-runtime.mjs");
+    expect(macPackager).toContain("scripts/verify-macos-universal-runtime.mjs");
     expect(packageJson.build.mac.extraResources).toContainEqual(
       expect.objectContaining({ from: "build/embedded-runtime", to: "." })
     );

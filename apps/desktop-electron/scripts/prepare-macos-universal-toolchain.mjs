@@ -5,6 +5,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { verifiedDownload } from "./prepare-portable-runtime.mjs";
+import { macosMachOArchitecture } from "./macos-universal-runtime.mjs";
 
 const appRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 
@@ -20,19 +21,20 @@ export async function resolveUniversalToolchainSources(environment = process.env
   return { arm64Root, x86_64Root };
 }
 
-export async function prepareMacosUniversalToolchain() {
+export async function prepareMacosUniversalToolchain(options = {}) {
   if (process.platform !== "darwin") throw new Error("Prepare a toolchain Universal no macOS.");
   const lock = JSON.parse(await readFile(path.join(appRoot, "scripts/portable-runtime-sources.json"), "utf8"));
   const cache = path.join(appRoot, "build/runtime-downloads");
-  const stage = path.join(appRoot, "build/macos-toolchain-sources");
+  const architectures = options.architecture ? [macosMachOArchitecture(options.architecture)] : ["arm64", "x86_64"];
+  const stage = path.join(appRoot, "build/macos-toolchain-sources", options.architecture ?? "universal");
   const archives = {};
-  for (const [architecture, source] of Object.entries(lock.macosCompilers)) {
-    archives[architecture] = await verifiedDownload(source, cache);
+  for (const architecture of architectures) {
+    archives[architecture] = await verifiedDownload(lock.macosCompilers[architecture], cache);
   }
   const gbafixSource = await verifiedDownload(lock.gbafix.source, cache);
   const gbafixLicense = await verifiedDownload(lock.gbafix.license, cache);
   await rm(stage, { recursive: true, force: true });
-  for (const architecture of ["arm64", "x86_64"]) {
+  for (const architecture of architectures) {
     const root = path.join(stage, architecture);
     const compiler = path.join(root, "devkitARM");
     const tools = path.join(root, "tools/bin");

@@ -5,11 +5,12 @@ import { fileURLToPath } from "node:url";
 
 import {
   auditUniversalMachOTree,
+  macosMachOArchitecture,
   mergeUniversalBinary,
   mergeUniversalMachOTrees,
   normalizeInfoPlistsToXml
 } from "./macos-universal-runtime.mjs";
-import { resolveUniversalToolchainSources } from "./prepare-macos-universal-toolchain.mjs";
+import { prepareMacosUniversalToolchain, resolveUniversalToolchainSources } from "./prepare-macos-universal-toolchain.mjs";
 import { prepareMacosSupportRuntime } from "./prepare-macos-support-runtime.mjs";
 
 const scriptPath = fileURLToPath(import.meta.url);
@@ -124,6 +125,14 @@ export function universalRuntimeRequested(environment = process.env) {
   return environment.GBA_STUDIO_REQUIRE_UNIVERSAL_RUNTIME === "1";
 }
 
+export function embeddedRuntimeArchitecture(environment = process.env) {
+  const architecture = environment.GBA_STUDIO_MAC_ARCH?.trim();
+  if (!architecture) return undefined;
+  macosMachOArchitecture(architecture);
+  if (universalRuntimeRequested(environment)) throw new Error("Selecione um runtime por arquitetura ou Universal, nunca ambos.");
+  return architecture;
+}
+
 export function preserveToolchainSymlinks(source) {
   const absolutePathDefinition = "def absolute_path(value):\n    return Path(value).expanduser().resolve()\n";
   if (!source.includes(absolutePathDefinition)) {
@@ -148,6 +157,18 @@ async function resolveSources(profile) {
     return { enginePack, universal: false };
   }
   const requireUniversal = universalRuntimeRequested();
+  const architecture = embeddedRuntimeArchitecture();
+  if (architecture) {
+    if (!existsSync(enginePack)) throw new Error("GBAStudioEnginePack ausente.");
+    const toolchains = await prepareMacosUniversalToolchain({ architecture });
+    const support = await prepareMacosSupportRuntime({ architecture });
+    const toolchainRoot = architecture === "arm64" ? toolchains.arm64Root : toolchains.x86_64Root;
+    return {
+      enginePack, architecture, universal: false,
+      pythonFramework: support.pythonRoot, pythonLayout: "Python", pythonRelativePath: "Runtime/Python/bin/python3",
+      devkitArm: path.join(toolchainRoot, "devkitARM"), devkitProTools: path.join(toolchainRoot, "tools"), make: support.make
+    };
+  }
   const universalSources = requireUniversal ? await resolveUniversalToolchainSources() : null;
   const supportRuntime = requireUniversal && !process.env.GBA_STUDIO_PYTHON_FRAMEWORK_SOURCE
     ? await prepareMacosSupportRuntime() : null;
@@ -296,7 +317,7 @@ exec "$RUNTIME_DIR/${sources.pythonRelativePath.replace(/^Runtime\//, "")}" "$@"
     `Engine Pack: ${sources.enginePack}`,
     `Python: ${requirements.bundledPython ? sources.pythonFramework : "external (python3 or GBA_STUDIO_PYTHON)"}`,
     `Toolchain: ${requirements.bundledToolchain ? sources.devkitArm : "external (DEVKITPRO/DEVKITARM)"}`,
-    `Architecture: ${sources.universal ? "Universal (arm64 + x86_64)" : process.arch}`,
+    `Architecture: ${sources.universal ? "Universal (arm64 + x86_64)" : sources.architecture ?? process.arch}`,
     `Universal toolchain binaries: ${mergedToolchainBinaries.length}`,
     `Info.plist XML normalizados: ${normalizedInfoPlists.length}`,
     requirements.bundledToolchain
@@ -305,13 +326,14 @@ exec "$RUNTIME_DIR/${sources.pythonRelativePath.replace(/^Runtime\//, "")}" "$@"
     ""
   ].join("\n"), "utf8");
 
-  const architectureAudit = await auditUniversalMachOTree(outputRoot, sources.universal ? { maximumMacosVersion: "12.0" } : {});
-  if (sources.universal && architectureAudit.incompatibleMinimum.length > 0) {
+  const architectureAudit = await auditUniversalMachOTree(outputRoot, sources.universal || sources.architecture
+    ? { maximumMacosVersion: "12.0", architecture: sources.architecture } : {});
+  if ((sources.universal || sources.architecture) && architectureAudit.incompatibleMinimum.length > 0) {
     throw new Error(`Runtime exige macOS superior a 12.0: ${architectureAudit.incompatibleMinimum.map((item) => item.relativePath).join(", ")}`);
   }
-  if (sources.universal && architectureAudit.invalid.length > 0) {
+  if ((sources.universal || sources.architecture) && architectureAudit.invalid.length > 0) {
     throw new Error(
-      `Runtime embarcado ainda contem Mach-O single-arch: ${architectureAudit.invalid.map((item) => item.relativePath).join(", ")}`
+      `Runtime embarcado contem Mach-O incompatível com ${sources.architecture ?? "Universal"}: ${architectureAudit.invalid.map((item) => item.relativePath).join(", ")}`
     );
   }
 

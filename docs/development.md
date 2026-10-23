@@ -62,39 +62,41 @@ npm run dev
 O npm instala as dependências declaradas e o Electron. Nenhuma senha Apple é
 necessária para desenvolver, testar ou compilar o editor.
 
-## Instalador macOS Universal
+## Instaladores macOS por arquitetura
 
 Em um Mac Apple Silicon com Rosetta 2, Xcode e Node.js 22, depois de compilar
 o Engine Pack:
 
 ```sh
 cd apps/desktop-electron
-npm run package:mac:universal  # aplicativo para validação
-npm run dist:mac              # DMG e ZIP, Intel + Apple Silicon
+npm run package:mac:arm64  # aplicativo Apple Silicon para validação
+npm run package:mac:x64    # aplicativo Intel para validação via Rosetta
+npm run dist:mac:arm64     # DMG e ZIP Apple Silicon
+npm run dist:mac:x64       # DMG e ZIP Intel
+npm run dist:mac           # os dois conjuntos separados, sem publicação
 ```
 
-O preparo Universal baixa as toolchains oficiais xPack GNU Arm para arm64 e
-x86_64, verifica os SHA256 fixados em `scripts/portable-runtime-sources.json`
-e combina os executáveis com `lipo`. O compilador é uma ferramenta independente;
-o backend continua GBAStudioEngine. A receita e as fontes do gbafix ficam no
-pacote, junto aos avisos e às licenças originais do compilador.
+Cada instalador contém Electron, Python/Pillow, GNU make, gbafix e compilador
+GNU Arm da mesma arquitetura. As fontes portáveis têm versões e SHA256 fixados
+em `scripts/portable-runtime-sources.json`; não são usadas ferramentas do sistema
+do usuário. O backend continua GBAStudioEngine. Receitas, fontes do make/gbafix
+e licenças originais acompanham o runtime.
 
-Python/Pillow são baixados de distribuições com versão e SHA256 fixados.
-GNU make é compilado para as duas arquiteturas com alvo macOS 12; sua fonte
-e receita ficam no pacote. O runtime não usa cópias de ferramentas do sistema
-que exijam um macOS mais recente. `verify:macos-universal-runtime` rejeita
-binários incompletos ou com mínimo superior a macOS 12 e
-gera a mesma ROM de teste nas duas arquiteturas. No Apple Silicon, o teste
-Intel requer Rosetta 2. Para usar toolchains externas, defina o par
-`GBA_STUDIO_DEVKITPRO_ARM64_SOURCE` e `GBA_STUDIO_DEVKITPRO_X86_64_SOURCE`.
+O preparo rejeita Mach-O de outra arquitetura, binários Universal ou mínimo
+superior a macOS 12. Antes de empacotar, importa Pillow, verifica o Engine Pack
+e gera uma ROM com a toolchain embarcada. As evidências ficam em
+`artifacts/macos-runtime/arm64` e `artifacts/macos-runtime/x64`.
 
-Os smokes do aplicativo empacotado aceitam `GBA_STUDIO_SMOKE_ARCH=arm64` ou
-`GBA_STUDIO_SMOKE_ARCH=x86_64` para forçar a arquitetura testada.
+Os smokes do aplicativo empacotado aceitam `GBA_STUDIO_PACKAGED_APP_PATH` e
+`GBA_STUDIO_SMOKE_ARCH=arm64` ou `x86_64`. Informe também
+`GBA_STUDIO_MAC_ARCH=arm64` ou `x64` no smoke do bundle para verificar todos
+os Mach-O, inclusive as ferramentas embarcadas.
 
-O pacote permite gerar ROMs sem instalar Python ou devkitPro no computador do
-usuário. A assinatura Developer ID, notarização, tickets e Gatekeeper devem
-ser verificados no DMG/ZIP final. O teste Intel por Rosetta deve ser registrado
-separadamente de uma execução em um Mac Intel físico.
+O pacote gera ROMs sem Python ou devkitPro externos. Assinatura Developer ID,
+notarização, tickets e Gatekeeper precisam ser verificados em cada DMG/ZIP
+final. O teste Intel por Rosetta é registrado separadamente de um Mac Intel
+físico. Utilitários Universal antigos permanecem disponíveis para reproduzir
+builds históricos; a distribuição atual usa instaladores separados.
 
 ## Motor
 

@@ -15,6 +15,16 @@ export function hasUniversalMacArchitectures(architectures) {
   return values.has("arm64") && values.has("x86_64");
 }
 
+export function macosMachOArchitecture(architecture) {
+  if (architecture === "arm64") return "arm64";
+  if (architecture === "x64") return "x86_64";
+  throw new Error(`Arquitetura macOS desconhecida: ${architecture}`);
+}
+
+export function hasExactMacArchitecture(architectures, architecture) {
+  return architectures.length === 1 && architectures[0] === macosMachOArchitecture(architecture);
+}
+
 export function matchingMachORelativePaths(arm64Paths, x86_64Paths) {
   const arm64 = [...new Set(arm64Paths)].sort();
   const x86_64 = [...new Set(x86_64Paths)].sort();
@@ -176,7 +186,8 @@ export async function auditUniversalMachOTree(root, options = {}) {
     root,
     binaries,
     total: binaries.length,
-    invalid: binaries.filter((item) => !item.universal),
+    invalid: binaries.filter((item) => options.architecture
+      ? !hasExactMacArchitecture(item.architectures, options.architecture) : !item.universal),
     incompatibleMinimum: binaries.filter((item) => item.minimumMacosVersions.some((version) => macosVersionExceeds(version, options.maximumMacosVersion)))
   };
 }
