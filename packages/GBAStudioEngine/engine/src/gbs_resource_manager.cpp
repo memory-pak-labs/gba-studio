@@ -14,9 +14,7 @@ ResourceBankCacheEntry cached_reserve_cache_snapshot[max_resource_bank_cache_ent
 EngineResourceSnapshot cached_reserve_manager_snapshot GBS_RESOURCE_EWRAM;
 
 void capture_resource_pool_snapshot_into(const StaticResourcePool& pool, ResourcePoolSnapshot& snapshot) {
-    for (size_t index = 0; index < 1024; ++index) {
-        snapshot.used[index] = pool.used[index];
-    }
+    snapshot.used = pool.used;
     snapshot.capacity = pool.capacity;
     snapshot.valid = pool.capacity <= 1024;
 }
@@ -159,9 +157,7 @@ void init_resource_pool(StaticResourcePool& pool, uint16_t capacity) {
 }
 
 void reset_resource_pool(StaticResourcePool& pool) {
-    for (size_t index = 0; index < 1024; ++index) {
-        pool.used[index] = false;
-    }
+    pool.used = {};
     pool.used_count = 0;
 }
 

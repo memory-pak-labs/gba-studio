@@ -160,6 +160,12 @@ platformer-runtime-wait-test: check-toolchain
 resource-manager-stack-test: check-toolchain
 	DEVKITARM="$(DEVKITARM)" python3 tests/host/resource_manager_stack_tests.py
 
+.PHONY: runtime-save-memory-test
+runtime-save-memory-test: check-toolchain
+	DEVKITARM="$(DEVKITARM)" python3 tests/host/runtime_save_memory_tests.py
+
+test: runtime-save-memory-test
+
 topdown_basic.gba: check-toolchain $(EXAMPLE_GBA)
 
 platformer_basic.gba: check-toolchain $(PLATFORMER_GBA)

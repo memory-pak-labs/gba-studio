@@ -17,6 +17,9 @@ export interface ProjectMemoryReportPool {
 
 export interface ProjectMemoryReportBytePool {
   usedBytes: number;
+  linkedBytes: number;
+  paddingBytes: number;
+  reservedBytes: number;
   capacityBytes: number;
   remainingBytes: number;
   percent: number;
@@ -24,7 +27,7 @@ export interface ProjectMemoryReportBytePool {
 }
 
 export interface ProjectMemoryReport {
-  schema: 1;
+  schema: 2;
   generatedAt: string;
   rom: {
     fileBytes: number;
@@ -37,7 +40,9 @@ export interface ProjectMemoryReport {
   };
   ram: {
     ewram: ProjectMemoryReportBytePool;
-    iwram: ProjectMemoryReportBytePool;
+    iwram: ProjectMemoryReportBytePool & {
+      stacks: { systemBytes: number; irqBytes: number; supervisorBytes: number };
+    };
     linkedBytes: number;
   };
   resources: Record<string, ProjectMemoryReportPool>;

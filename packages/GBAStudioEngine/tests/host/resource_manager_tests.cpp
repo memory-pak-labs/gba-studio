@@ -1,4 +1,5 @@
 #include <cassert>
+#include <initializer_list>
 #include "gbs/resource_manager.hpp"
 
 extern "C" void gbs_hw_dma_copy(int, const void*, volatile void*, uint32_t, int) {
@@ -11,6 +12,28 @@ extern "C" void gbs_hw_hdma_stop(int) {
 }
 
 namespace {
+
+void test_compact_pool_storage_and_word_boundaries() {
+    assert(sizeof(gbs::StaticResourcePool) <= 136);
+    assert(sizeof(gbs::ResourcePoolSnapshot) <= 136);
+    assert(sizeof(gbs::EngineResourceManager) <= 680);
+    for (const uint16_t capacity : { uint16_t(33), uint16_t(65), uint16_t(1023), uint16_t(1024) }) {
+        gbs::StaticResourcePool pool;
+        gbs::init_resource_pool(pool, capacity);
+        assert(gbs::reserve_resource_range(pool, 31, 2).success);
+        assert(!gbs::reserve_resource_range(pool, 32, 1).success);
+        const auto snapshot = gbs::capture_resource_pool_snapshot(pool);
+        assert(gbs::release_resource_range(pool, { 31, 2, true }));
+        assert(gbs::reserve_resource_range(pool, capacity - 1, 1).success);
+        assert(gbs::restore_resource_pool_snapshot(pool, snapshot));
+        assert(gbs::resource_pool_used_count(pool) == 2);
+        assert(pool.used[31] && pool.used[32] && !pool.used[30]);
+        if (capacity > 33) assert(gbs::reserve_resource_range(pool, capacity - 1, 1).success);
+        gbs::init_resource_pool(pool, 16);
+        assert(gbs::reserve_resource_range(pool, 0, 16).success);
+        assert(gbs::resource_pool_used_count(pool) == 16);
+    }
+}
 
 void test_fixed_range_reservation() {
     gbs::StaticResourcePool pool;
@@ -2383,6 +2406,7 @@ void test_resource_leases_release_banks_and_groups_automatically() {
 } // namespace
 
 int main() {
+    test_compact_pool_storage_and_word_boundaries();
     test_fixed_range_reservation();
     test_overflow_fails_safely();
     test_next_range_respects_alignment();
