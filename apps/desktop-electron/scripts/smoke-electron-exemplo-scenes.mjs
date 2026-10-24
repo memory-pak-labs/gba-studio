@@ -91,6 +91,7 @@ import {
 import { classifyP0ProjectPath, resolveCanonicalP0Source } from "./p0-source-catalog.mjs";
 import { activeBuildRomPaths } from "./exemplo-template-smoke-contract.mjs";
 import { defaultWelcomeSavedProjectPath } from "./smoke-electron-welcome-paths.mjs";
+import { readPlayerPlaybackReadiness } from "./player-playback-readiness.mjs";
 
 const appRoot = dirname(dirname(fileURLToPath(import.meta.url)));
 const canonicalTemplatePath = join(appRoot, "default-assets", "templates", "exemplo-gba", "exemplo-gba.gba-project");
@@ -484,6 +485,25 @@ async function waitForRunSceneEnabled(cdp, sceneName) {
     await wait(200);
   }
   throw new Error(`O editor nao reabilitou ${ariaLabel}: ${JSON.stringify(lastState)}.`);
+}
+
+async function waitForPlayerPlaybackReady(cdp) {
+  return evaluate(cdp, `new Promise(resolve => {
+    const read = ${readPlayerPlaybackReadiness.toString()};
+    const started = performance.now();
+    const check = () => {
+      const sample = read(window.GBAStudioDirectPlayer, performance.timeOrigin + performance.now());
+      if (sample.ok) {
+        requestAnimationFrame(() => {
+          const presented = read(window.GBAStudioDirectPlayer, performance.timeOrigin + performance.now());
+          if (presented.ok) resolve(presented);
+          else setTimeout(check, 100);
+        });
+      } else if (performance.now() - started > 15000) resolve(sample);
+      else setTimeout(check, 100);
+    };
+    check();
+  })`, true);
 }
 
 async function waitForPlayerEvidence(cdp, captureFramebuffer = false) {
@@ -5638,7 +5658,7 @@ async function main() {
       if (scene.name === 'farol_interior') {
         // The intro box legitimately covers the lower part of48pxNara. Audit
         // the unobstructed room after advancing it through the authored A input.
-        await waitForPlayerEvidence(playerCdp);
+        await waitForPlayerPlaybackReady(playerCdp);
         await wait(750);
         for (let page=0;page<5;page++) {
           await pressPlayerButton(playerCdp,faceButtons.a.code,faceButtons.a.key,faceButtons.a.windowsVirtualKeyCode,120);
@@ -5648,7 +5668,7 @@ async function main() {
       if(scene.name==='arena_tatica') {
         // The authored introduction has three pages in the default PT locale.
         // Advance through real A input before comparing both unobstructed actors.
-        await waitForPlayerEvidence(playerCdp);
+        await waitForPlayerPlaybackReady(playerCdp);
         await wait(750);
         for(let page=0;page<3;page++) {
           await pressPlayerButton(playerCdp,faceButtons.a.code,faceButtons.a.key,faceButtons.a.windowsVirtualKeyCode,120);
@@ -5660,7 +5680,7 @@ async function main() {
       // so they belong after the uninterrupted playback measurement.
       const captureInitialFramebuffer = exactPlayerFramebuffer || exactBackgroundFramebuffer
         || authoredActorFramebufferScenes.has(scene.name);
-      let playerEvidence = await waitForPlayerEvidence(playerCdp);
+      let playerEvidence = await waitForPlayerPlaybackReady(playerCdp);
       if (!playerEvidence?.ok) throw new Error(`${scene.name} nao produziu frame/audio/runtime: ${JSON.stringify(playerEvidence)}.`);
       traceSceneSmoke(scene.name, "evidence-ready");
       const exported = await latestExportContract(engineExportRoot);
@@ -5698,9 +5718,8 @@ async function main() {
       traceSceneSmoke(scene.name, "performance-ready");
       knownWindowIDs.add(performance.windowID);
       const playbackAudio = await evaluate(playerCdp, "window.GBAStudioDirectPlayer.inspectAudio()");
-      if (captureInitialFramebuffer) {
-        playerEvidence = await waitForPlayerEvidence(playerCdp, true);
-      }
+      // Every visual proof remains required, after the uninterrupted window.
+      playerEvidence = await waitForPlayerEvidence(playerCdp, captureInitialFramebuffer);
       if (scene.runtime === "isometric" && templateRoomForScene(template, scene.name)?.runtime?.config?.pagedSurface) {
         playerEvidence = await waitForIsometricCameraRest(playerCdp, playerEvidence);
       }
