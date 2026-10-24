@@ -37,7 +37,7 @@ export async function prepareElectronSmokeLocale(cdp, locale = "pt-BR") {
   let requested = false;
   const evaluate = async (expression) => {
     const response = await cdp.send("Runtime.evaluate", { expression, returnByValue: true });
-    if (response.exceptionDetails) throw new Error(response.exceptionDetails.text ?? "Locale evaluation failed");
+    if (response.exceptionDetails) throw new Error(response.exceptionDetails.exception?.description ?? response.exceptionDetails.text ?? "Locale evaluation failed");
     return response.result?.value;
   };
   while (Date.now() < deadline) {
@@ -45,9 +45,9 @@ export async function prepareElectronSmokeLocale(cdp, locale = "pt-BR") {
       // CDP can connect before React mounts. Reloading then races the provider's
       // initial locale read; wait for its own rendered acknowledgement first.
       const state = await evaluate(`({
-        mounted: Boolean(document.documentElement.dataset.studioLocale),
-        locale: document.documentElement.dataset.studioLocale,
-        lang: document.documentElement.lang
+        mounted: Boolean(document.documentElement?.dataset.studioLocale),
+        locale: document.documentElement?.dataset.studioLocale,
+        lang: document.documentElement?.lang
       })`);
       if (state?.mounted && state.locale === locale && state.lang === locale) return;
       if (state?.mounted && !requested) {

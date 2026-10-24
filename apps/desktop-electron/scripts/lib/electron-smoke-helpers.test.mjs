@@ -99,6 +99,21 @@ describe("prepareElectronSmokeLocale", () => {
     await pending;
   });
 
+  it("waits across the initial empty document before the first HTML element exists", async () => {
+    vi.useFakeTimers();
+    const { context, cdp } = renderer();
+    const element = context.document.documentElement;
+    context.document.documentElement = null;
+    const pending = prepareElectronSmokeLocale(cdp);
+    const checked = expect(pending).resolves.toBeUndefined();
+    await vi.advanceTimersByTimeAsync(100);
+    context.document.documentElement = element;
+    element.dataset.studioLocale = "en-US";
+    element.lang = "en-US";
+    await vi.advanceTimersByTimeAsync(400);
+    await checked;
+  });
+
   it("fails rather than accepting a provider that never applies the selected language", async () => {
     vi.useFakeTimers();
     const { cdp } = renderer();
