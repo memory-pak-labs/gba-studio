@@ -2,12 +2,14 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { mkdir, mkdtemp, readFile, readdir, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { runInNewContext } from "node:vm";
 import {
   cdpSession,
   copySmokeProject,
   createElectronSmokeEnv,
   electronLaunchCommand,
-  packagedDarwinElectronExecutableCandidates
+  packagedDarwinElectronExecutableCandidates,
+  prepareElectronSmokeLocale
 } from "./electron-smoke-helpers.mjs";
 
 it("forces the requested macOS architecture instead of silently testing the host slice twice", () => {
@@ -41,8 +43,74 @@ it("copies authored project files without copying generated builds and caches", 
 });
 
 afterEach(() => {
+  vi.useRealTimers();
   vi.unstubAllGlobals();
   vi.unstubAllEnvs();
+});
+
+describe("prepareElectronSmokeLocale", () => {
+  function renderer({ mounted = false, switcher = true, stored = "en-US" } = {}) {
+    const context = {
+      document: { documentElement: { dataset: mounted ? { studioLocale: "en-US" } : {}, lang: mounted ? "en-US" : "" } },
+      localStorage: { getItem: vi.fn(() => stored), setItem: vi.fn((_key, value) => { stored = value; }) },
+      location: { reload: vi.fn() },
+      Event: class { constructor(type) { this.type = type; } }
+    };
+    const select = { value: "en-US", dispatchEvent: vi.fn(() => {
+      context.localStorage.setItem("gbaStudio.locale", select.value);
+      setTimeout(() => {
+        context.document.documentElement.dataset.studioLocale = select.value;
+        context.document.documentElement.lang = select.value;
+      }, 200);
+    }) };
+    context.document.querySelector = () => switcher && context.document.documentElement.dataset.studioLocale ? select : null;
+    const cdp = { send: vi.fn(async (_method, { expression }) => ({ result: { value: runInNewContext(expression, context) } })) };
+    return { context, cdp };
+  }
+
+  it("waits for the actual provider before changing locale and for its rendered acknowledgement", async () => {
+    vi.useFakeTimers();
+    const { context, cdp } = renderer();
+    let settled = false;
+    const pending = prepareElectronSmokeLocale(cdp).then(() => { settled = true; });
+    await vi.advanceTimersByTimeAsync(100);
+    expect(settled).toBe(false);
+    expect(context.localStorage.setItem).not.toHaveBeenCalled();
+    expect(context.location.reload).not.toHaveBeenCalled();
+    context.document.documentElement.dataset.studioLocale = "en-US";
+    context.document.documentElement.lang = "en-US";
+    await vi.advanceTimersByTimeAsync(100);
+    expect(settled).toBe(false);
+    await vi.advanceTimersByTimeAsync(300);
+    await pending;
+    expect(context.document.documentElement.lang).toBe("pt-BR");
+    expect(context.location.reload).not.toHaveBeenCalled();
+  });
+
+  it("reloads a mounted editor without a switcher only once and waits for the new provider", async () => {
+    vi.useFakeTimers();
+    const { context, cdp } = renderer({ mounted: true, switcher: false });
+    const pending = prepareElectronSmokeLocale(cdp);
+    await vi.advanceTimersByTimeAsync(200);
+    expect(context.location.reload).toHaveBeenCalledTimes(1);
+    context.document.documentElement.dataset.studioLocale = "pt-BR";
+    context.document.documentElement.lang = "pt-BR";
+    await vi.advanceTimersByTimeAsync(100);
+    await pending;
+  });
+
+  it("fails rather than accepting a provider that never applies the selected language", async () => {
+    vi.useFakeTimers();
+    const { cdp } = renderer();
+    const pending = expect(prepareElectronSmokeLocale(cdp)).rejects.toThrow(/idioma.*pt-BR/i);
+    await vi.runAllTimersAsync();
+    await pending;
+  });
+
+  it("propagates renderer evaluation exceptions", async () => {
+    const cdp = { send: vi.fn(async () => ({ exceptionDetails: { text: "Locale script failed" } })) };
+    await expect(prepareElectronSmokeLocale(cdp)).rejects.toThrow("Locale script failed");
+  });
 });
 
 describe("cdpSession", () => {

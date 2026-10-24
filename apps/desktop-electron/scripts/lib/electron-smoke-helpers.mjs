@@ -33,19 +33,43 @@ export function createElectronSmokeEnv(overrides = {}) {
 
 /** Set the language fixture only in a disposable smoke profile. */
 export async function prepareElectronSmokeLocale(cdp, locale = "pt-BR") {
-  await cdp.send("Runtime.evaluate", {
-    expression: `(() => {
-      const locale = ${JSON.stringify(locale)};
-      const language = document.querySelector('select[aria-label="App language"]');
-      if (language) {
-        language.value = locale;
-        language.dispatchEvent(new Event("change", { bubbles: true }));
-      } else if (localStorage.getItem("gbaStudio.locale") !== locale) {
-        localStorage.setItem("gbaStudio.locale", locale);
-        location.reload();
+  const deadline = Date.now() + 15_000;
+  let requested = false;
+  const evaluate = async (expression) => {
+    const response = await cdp.send("Runtime.evaluate", { expression, returnByValue: true });
+    if (response.exceptionDetails) throw new Error(response.exceptionDetails.text ?? "Locale evaluation failed");
+    return response.result?.value;
+  };
+  while (Date.now() < deadline) {
+    try {
+      // CDP can connect before React mounts. Reloading then races the provider's
+      // initial locale read; wait for its own rendered acknowledgement first.
+      const state = await evaluate(`({
+        mounted: Boolean(document.documentElement.dataset.studioLocale),
+        locale: document.documentElement.dataset.studioLocale,
+        lang: document.documentElement.lang
+      })`);
+      if (state?.mounted && state.locale === locale && state.lang === locale) return;
+      if (state?.mounted && !requested) {
+        requested = true;
+        await evaluate(`(() => {
+          const locale = ${JSON.stringify(locale)};
+          const language = document.querySelector('.studio-language-switcher select');
+          if (language) {
+            language.value = locale;
+            language.dispatchEvent(new Event("change", { bubbles: true }));
+          } else {
+            localStorage.setItem("gbaStudio.locale", locale);
+            location.reload();
+          }
+        })()`);
       }
-    })()`
-  });
+    } catch (error) {
+      if (!/Execution context was destroyed|Cannot find context with specified id/.test(String(error))) throw error;
+    }
+    await wait(100);
+  }
+  throw new Error(`Estado não alcançado: idioma renderizado ${locale}.`);
 }
 
 function firstExistingPath(paths) {
