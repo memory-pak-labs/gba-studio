@@ -55,7 +55,7 @@ import {
   decodePngRgba
 } from "./lib/png-icons.mjs";
 import { renderPngContactSheet } from "./lib/png-contact-sheet.mjs";
-import { resolveLutaNativeFramebufferMasks } from "./luta-framebuffer-contract.mjs";
+import { resolveLutaNativeFramebufferMasks, resolveLutaFighterOcclusionPixels } from "./luta-framebuffer-contract.mjs";
 import { auditTemporalVisualStability } from "./visual-frame-stability.mjs";
 import {
   approvedObjectPaletteSourceRgba,
@@ -1626,6 +1626,10 @@ async function auditExportedAuthoredActors(exportPath, exported, project, room, 
         const allowedRacingOcclusionPixels = nativeRacingObject
           ? await racingNativeOcclusionPixels(exportPath,exactOptions?.exportedProject ?? exported,room.name,frameRuntimeState,nativeRacingObject.index)
           : new Set();
+        const allowedLutaOcclusionPixels = runtime === 'luta' && nativeActorObject
+          ? await lutaNativeOcclusionPixels(exportPath, exactOptions?.exportedProject ?? exported,
+            frameRuntimeState, framebufferRgba, nativeActorObject.index)
+          : new Set();
         const renderedFrameWidth = frameWidth * spriteScale;
         const renderedFrameHeight = frameHeight * spriteScale;
         const candidateSourceXs = Array.from({ length: frameCount }, (_, index) => index * renderedFrameWidth);
@@ -1658,7 +1662,8 @@ async function auditExportedAuthoredActors(exportPath, exported, project, room, 
             // an actor in the isometric depth order. Other OBJ layers remain
             // visible mismatches instead of being silently accepted.
             allowedOcclusionRgb555: allowedTacticalOcclusionRgb555,
-            allowedOcclusionPixels: runtime === 'racing' ? allowedRacingOcclusionPixels : allowedNativeOcclusionPixels,
+            allowedOcclusionPixels: runtime === 'luta' ? allowedLutaOcclusionPixels
+              : runtime === 'racing' ? allowedRacingOcclusionPixels : allowedNativeOcclusionPixels,
             sourcePixels: compiledSource.pixels,
             sourceSheetWidth: compiledSource.width
           })
@@ -3431,6 +3436,23 @@ function opaqueAnchorFramebufferTargets({
   return [...targets.values()];
 }
 
+async function lutaNativeOcclusionPixels(exportPath, exported, runtimeState, framebuffer, targetObjectIndex) {
+  const project=exported.luta_project, stage=project?.stages?.[project.initial_stage ?? 0], fighters=[];
+  for(const side of ['player1','player2']) {
+    const symbol=stage?.[side]?.[0]?.metasprite?.asset;
+    if(!symbol) continue;
+    const header=await readFile(join(dirname(exportPath),`${symbol}.hpp`),'utf8');
+    const object=nativeSinglePartSpriteObject(header,symbol,runtimeState?.nativeVideo);
+    if(!object || object.index>=targetObjectIndex) continue;
+    const frameWidth=exportedIntegerConstant(header,symbol,'sprite_width');
+    const frameHeight=exportedIntegerConstant(header,symbol,'sprite_height');
+    const frameCount=exportedIntegerConstant(header,symbol,'frame_count');
+    const source=decodeExportedSpriteSheetRgba({headerSource:header,symbol,frameWidth,frameHeight,frameCount});
+    fighters.push({object,source,frameWidth,frameHeight,frameCount});
+  }
+  return resolveLutaFighterOcclusionPixels({fighters,targetObjectIndex,framebuffer});
+}
+
 async function auditExportedLutaPlayers(exportPath, exported, frame, requireFramebuffer, exactOptions = null) {
   const lutaProject = exported?.luta_project;
   const initialStage = Number(lutaProject?.initial_stage ?? 0);
@@ -3558,7 +3580,10 @@ async function auditExportedLutaPlayers(exportPath, exported, frame, requireFram
         audited: true,
         frameIndex,
         ...findBestOpaqueRgbaFramebufferFrame({
-          allowedOcclusionRgb555: backgroundPalette,
+          allowedOcclusionPixels: nativeFighterObject
+            ? await lutaNativeOcclusionPixels(exportPath, exported,
+              exactOptions?.presentedRuntimeState ?? exactOptions?.runtimeState, framebufferRgba, nativeFighterObject.index)
+            : new Set(),
           candidateFlipsX: nativeFighterObject ? [nativeFighterObject.flipX] : [false],
           candidateSourceXs,
           candidateTargets: nativeFighterObject
