@@ -2024,6 +2024,8 @@ describe("materialização canônica de Vértice", () => {
     allowedAssets.add(observatoryManifest.asset.file);
     const farolManifest = JSON.parse(readFileSync(new URL('../fixtures/asset-provenance/farol-interior-manifest.json', import.meta.url)));
     allowedAssets.add(farolManifest.asset.file);
+    const farolRelayManifest = JSON.parse(readFileSync(new URL('../fixtures/asset-provenance/farol-relay-v2.json', import.meta.url)));
+    allowedAssets.add(farolRelayManifest.sheet);
     const arenaManifest = JSON.parse(readFileSync(new URL('../fixtures/asset-provenance/arena-approved-manifest.json', import.meta.url)));
     for (const entry of arenaManifest.assets) allowedAssets.add(entry.name);
     const tacticalManifest=JSON.parse(readFileSync(new URL("../fixtures/asset-provenance/tactical-arena-manifest.json",import.meta.url)));

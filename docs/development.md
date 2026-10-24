@@ -760,3 +760,46 @@ editor. O replay compara checkpoints estáveis após cada sequência de entrada;
 não certifica equivalência de cada frame de todos os comandos/runtimes. O gate
 canônico completo continua obrigatório. O [roteiro físico de versão](hardware-release-validation.md)
 registra a fronteira que o emulador não cobre.
+
+## Farol · relé persistente
+
+O relé auxiliar da V2 aprovada ocupa a área livre à direita da lente do Farol.
+É um ator independente de 48 × 48 pixels, com os estados avariado, instalação
+e funcionando. A interação reutiliza os requisitos, a peça de inventário e a
+fechadura de código da missão “O sinal perdido”. O reparo toca os efeitos
+existentes e salva no slot 0; não cria outra recompensa.
+
+`var_farol_relay` acompanha a apresentação: 0 avariado, 1 instalação e
+2 funcionando. Ao entrar ou restaurar a sala, o progresso da missão determina
+o estado estável. O `onRestore` mantém o watchdog da calibração. O novo jogo
+reinicia o relé. A passarela foi retirada: mapa, colisão, escada, fundo aprovado,
+personagens existentes e HUD permanecem preservados em suas camadas.
+
+`scripts/farol-relay.mjs` aplica a promoção de forma idempotente. A origem,
+aprovação da V2 e preparação do sprite estão em
+`fixtures/asset-provenance/farol-relay-v2.json`. O atlas de três estados usa
+15 cores visíveis, alpha binário e quatro objetos por frame. Na ROM, o ator
+reutiliza a paleta OBJ de 8 bpp já aprovada dos NPCs; isso evita reservar outro
+banco e mantém as cores dos personagens e da interface. O resultado final,
+incluindo a conversão de cores, foi aprovado no Play e na ROM em 24/10/2026.
+
+Execute em `apps/desktop-electron`, usando diretórios externos para os artefatos:
+
+```sh
+node scripts/build-racing-playtest.mjs /caminho/farol-export titulo
+node scripts/smoke-lost-signal-mission.mjs /caminho/farol-export/build/exemplo.gba /caminho/farol-export /caminho/farol-rom --relay
+node scripts/smoke-lost-signal-play.mjs /caminho/farol-play --relay
+node scripts/verify-farol-relay-pixels.mjs /caminho/farol-rom
+node scripts/verify-farol-relay-pixels.mjs /caminho/farol-play
+```
+
+O percurso usa entradas de controle para completar a missão, cancelar a
+fechadura, errar e acertar o código, observar os três estados e revisitar o relé.
+Salva antes e depois do reparo, reinicia, carrega e verifica a peça real e o
+progresso; também troca e restaura os três idiomas. Diagnósticos são somente
+leitura e os saves vêm do próprio jogo. O Play usa relógio de teste para
+sincronizar as entradas; esse smoke não mede desempenho em tempo real.
+O verificador compara o framebuffer com o fundo aprovado e com os pixels do
+relé na paleta compilada, incluindo a região da escada. Play e ROM direta usam
+o núcleo mGBA, mas exercitam caminhos de integração distintos. O teste em GBA
+físico permanece uma verificação separada.

@@ -94,7 +94,11 @@ describe('example library cleanup', () => {
     const market = JSON.parse(readFileSync(new URL('../fixtures/asset-provenance/market-approved-manifest.json', import.meta.url)));
     const council = JSON.parse(readFileSync(new URL('../fixtures/asset-provenance/council-v13-approved-manifest.json', import.meta.url)));
     const replacedWorldMapSources = ['Assets/backgrounds/route-map-paged-v2.png', 'Assets/sprites/route-airship-v2.png'];
-    expect(source.assets).toHaveLength(record.after.assets - dungeon.replacedAssetNames.length + dungeon.assets.length - dungeon.unusedPreparedAssetNames.length - platformer.replacedAssetNames.length + platformer.assets.length - racing.replacedAssetNames.length + racing.assets.length - storm.replacedAssetNames.length + storm.assets.length - relay.replacedAssetNames.length + relay.assets.length - startup.retainedOriginals.length + startup.assets.length - replacedWorldMapSources.length + Object.keys(worldMap.assets).length - market.replacedAssetNames.length + market.assets.length - council.replacedAssetNames.length + council.assets.length);
+    const farolRelay = JSON.parse(readFileSync(new URL('../fixtures/asset-provenance/farol-relay-v2.json', import.meta.url)));
+    expect(farolRelay.approval.approved).toBe(true);
+    expect(source.assets.some(asset => asset.name === farolRelay.sheet)).toBe(true);
+    // The relay adds one approved actor without retiring an existing source.
+    expect(source.assets).toHaveLength(record.after.assets - dungeon.replacedAssetNames.length + dungeon.assets.length - dungeon.unusedPreparedAssetNames.length - platformer.replacedAssetNames.length + platformer.assets.length - racing.replacedAssetNames.length + racing.assets.length - storm.replacedAssetNames.length + storm.assets.length - relay.replacedAssetNames.length + relay.assets.length - startup.retainedOriginals.length + startup.assets.length - replacedWorldMapSources.length + Object.keys(worldMap.assets).length - market.replacedAssetNames.length + market.assets.length - council.replacedAssetNames.length + council.assets.length + 1);
     for (const original of market.retainedOriginals) {
       expect(source.assets.some(asset => asset.name === original.source.split('/').at(-1))).toBe(false);
       expect(existsSync(new URL(original.source, root))).toBe(true);

@@ -177,7 +177,8 @@ export async function playLostSignalMission(driver, project, exported, options =
   await hotspot('Telescópio'); assert.equal(await value('observation'), 1); await driver.capture('telescope-clue'); await close();
   await hotspot('Mesa da Maré'); assert.equal(await value('code'), 1); await driver.capture('code-314'); await close();
   await hotspot('Saída do Observatório'); await chooseFirstDestination(0, 1); await expect(0, 1, 'lighthouse-arrival'); await close();
-  await walkTo(17, 16); await driver.run(1, 64); await driver.run(8, 0);
+  if(options.approachRepair)await options.approachRepair(controls);
+  else {await walkTo(17, 16); await driver.run(1, 64); await driver.run(8, 0);}
   // Advance only the help text: the next interaction is the native numeric modal.
   await driver.capture('lens-approach'); await openCodeLock(); await driver.capture('code-lock');
   await tap(1, 90); assert.equal(await value('lock'), 0); assert.equal(await value('stage'), 1); assert.equal(await value('part'), 1);
@@ -187,9 +188,10 @@ export async function playLostSignalMission(driver, project, exported, options =
   await openCodeLock();
   assert.ok(await driver.modal());
   for (const digit of [3,1,4]) { for (let n = 0; n < digit; n++) await tap(64, 8); if (digit !== 4) await tap(16, 8); }
-  await tap(1, 65); await driver.capture('repair-cinematic'); await driver.run(250, 0);
+  await tap(1, 65); await driver.capture('repair-cinematic'); await options.duringRepair?.(controls); await driver.run(250, 0);
   assert.equal(await value('stage'), 2); assert.equal(await value('part'), 0); await driver.capture('lighthouse-repaired'); await close();
   assert.equal(await driver.item('zz_signal_relay'),0,'Repair consumes the actual inventory piece');
+  await options.afterRepair?.(controls);
   await walkTo(23, 27); await driver.run(90, 128); await driver.run(120, 0); await expect(0, 0, 'return-to-port');
   await mechanic(); await driver.capture('mission-reward'); assert.equal(await value('stage'), 3); await close();
   const complete = await driver.state(), currencyBeforeRepeat = await driver.currency();

@@ -21,6 +21,7 @@ import {
 import { promoteExemploGBAVerticeCampaign } from "./vertice-showcase-project.mjs";
 import { SHOWCASE_VARIABLES } from './showcase-systems.mjs';
 import { LOST_SIGNAL_VARIABLES } from './lost-signal-mission.mjs';
+import { FAROL_RELAY } from './farol-relay.mjs';
 
 const templateURL = new URL(
   "../default-assets/templates/exemplo-gba/exemplo-gba.gba-project",
@@ -737,7 +738,7 @@ describe("campanha canônica O Último Farol", () => {
       "var_rtc_minute",
       "porto_player_health", "var_penedos_farol", "penedos_player_health", "penedos_tokens",
       "penedos_defeated_crab", "penedos_defeated_moth", "penedos_defeated_crab_east", "penedos_defeated_moth_east",
-      ...LOST_SIGNAL_VARIABLES, ...SHOWCASE_VARIABLES
+      ...LOST_SIGNAL_VARIABLES, ...SHOWCASE_VARIABLES, FAROL_RELAY.variable
     ]));
     expect(VERTICE_PROGRESS_KEYS).toHaveLength(15);
   });

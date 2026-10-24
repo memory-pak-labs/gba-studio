@@ -2153,6 +2153,20 @@
         "onUpdate": "penedos_moth-east_patrulhar"
       },
       "collisionGroup": 1
+    },
+    {
+      "id": "farol-relay",
+      "name": "Rele auxiliar do Farol",
+      "roomName": "farol_interior",
+      "x": 33,
+      "y": 13,
+      "z": 0,
+      "spriteSheet": "farol-relay-v2.png",
+      "animationName": "faulty",
+      "animationStateID": "farol-relay-faulty-state",
+      "eventBindings": {
+        "onInteract": "farol_relay_interact"
+      }
     }
   ],
   "animationStates": [
@@ -2982,6 +2996,36 @@
       "mirrorLeftFromRight": false,
       "animationIDs": [
         "market-approved-guard-guard_idle"
+      ]
+    },
+    {
+      "id": "farol-relay-faulty-state",
+      "name": "faulty",
+      "spriteSheet": "farol-relay-v2.png",
+      "animationType": "fixed",
+      "mirrorLeftFromRight": false,
+      "animationIDs": [
+        "farol-relay-faulty"
+      ]
+    },
+    {
+      "id": "farol-relay-installing-state",
+      "name": "installing",
+      "spriteSheet": "farol-relay-v2.png",
+      "animationType": "fixed",
+      "mirrorLeftFromRight": false,
+      "animationIDs": [
+        "farol-relay-installing"
+      ]
+    },
+    {
+      "id": "farol-relay-working-state",
+      "name": "working",
+      "spriteSheet": "farol-relay-v2.png",
+      "animationType": "fixed",
+      "mirrorLeftFromRight": false,
+      "animationIDs": [
+        "farol-relay-working"
       ]
     }
   ],
@@ -21776,6 +21820,267 @@
           ]
         }
       ]
+    },
+    {
+      "colorMode": "8bpp",
+      "direction": "none",
+      "fps": 1,
+      "frameCount": 1,
+      "frameHeight": 48,
+      "frameWidth": 48,
+      "frames": [
+        {
+          "frameIndex": 0,
+          "height": 48,
+          "originX": 0,
+          "originY": 0,
+          "sourceFrameIndex": 0,
+          "tiles": [
+            {
+              "flipX": false,
+              "flipY": false,
+              "objPalette": "OBP0",
+              "paletteIndex": 0,
+              "priority": false,
+              "sliceX": 0,
+              "sliceY": 0,
+              "sourceSheet": "farol-relay-v2.png",
+              "tileHeight": 32,
+              "tileWidth": 32,
+              "x": -16,
+              "y": 16
+            },
+            {
+              "flipX": false,
+              "flipY": false,
+              "objPalette": "OBP0",
+              "paletteIndex": 0,
+              "priority": false,
+              "sliceX": 0,
+              "sliceY": 32,
+              "sourceSheet": "farol-relay-v2.png",
+              "tileHeight": 16,
+              "tileWidth": 32,
+              "x": -16,
+              "y": 0
+            },
+            {
+              "flipX": false,
+              "flipY": false,
+              "objPalette": "OBP0",
+              "paletteIndex": 0,
+              "priority": false,
+              "sliceX": 32,
+              "sliceY": 0,
+              "sourceSheet": "farol-relay-v2.png",
+              "tileHeight": 32,
+              "tileWidth": 16,
+              "x": 16,
+              "y": 16
+            },
+            {
+              "flipX": false,
+              "flipY": false,
+              "objPalette": "OBP0",
+              "paletteIndex": 0,
+              "priority": false,
+              "sliceX": 32,
+              "sliceY": 32,
+              "sourceSheet": "farol-relay-v2.png",
+              "tileHeight": 16,
+              "tileWidth": 16,
+              "x": 16,
+              "y": 0
+            }
+          ],
+          "width": 48
+        }
+      ],
+      "id": "farol-relay-faulty",
+      "loops": true,
+      "name": "faulty",
+      "spriteSheet": "farol-relay-v2.png",
+      "state": "hurt",
+      "originX": 0,
+      "originY": 0,
+      "hitboxX": -4,
+      "hitboxY": -6,
+      "hitboxWidth": 24,
+      "hitboxHeight": 12
+    },
+    {
+      "colorMode": "8bpp",
+      "direction": "none",
+      "fps": 1,
+      "frameCount": 1,
+      "frameHeight": 48,
+      "frameWidth": 48,
+      "frames": [
+        {
+          "frameIndex": 0,
+          "height": 48,
+          "originX": 0,
+          "originY": 0,
+          "sourceFrameIndex": 1,
+          "tiles": [
+            {
+              "flipX": false,
+              "flipY": false,
+              "objPalette": "OBP0",
+              "paletteIndex": 0,
+              "priority": false,
+              "sliceX": 48,
+              "sliceY": 0,
+              "sourceSheet": "farol-relay-v2.png",
+              "tileHeight": 32,
+              "tileWidth": 32,
+              "x": -16,
+              "y": 16
+            },
+            {
+              "flipX": false,
+              "flipY": false,
+              "objPalette": "OBP0",
+              "paletteIndex": 0,
+              "priority": false,
+              "sliceX": 48,
+              "sliceY": 32,
+              "sourceSheet": "farol-relay-v2.png",
+              "tileHeight": 16,
+              "tileWidth": 32,
+              "x": -16,
+              "y": 0
+            },
+            {
+              "flipX": false,
+              "flipY": false,
+              "objPalette": "OBP0",
+              "paletteIndex": 0,
+              "priority": false,
+              "sliceX": 80,
+              "sliceY": 0,
+              "sourceSheet": "farol-relay-v2.png",
+              "tileHeight": 32,
+              "tileWidth": 16,
+              "x": 16,
+              "y": 16
+            },
+            {
+              "flipX": false,
+              "flipY": false,
+              "objPalette": "OBP0",
+              "paletteIndex": 0,
+              "priority": false,
+              "sliceX": 80,
+              "sliceY": 32,
+              "sourceSheet": "farol-relay-v2.png",
+              "tileHeight": 16,
+              "tileWidth": 16,
+              "x": 16,
+              "y": 0
+            }
+          ],
+          "width": 48
+        }
+      ],
+      "id": "farol-relay-installing",
+      "loops": false,
+      "name": "installing",
+      "spriteSheet": "farol-relay-v2.png",
+      "state": "attack",
+      "originX": 0,
+      "originY": 0,
+      "hitboxX": -4,
+      "hitboxY": -6,
+      "hitboxWidth": 24,
+      "hitboxHeight": 12
+    },
+    {
+      "colorMode": "8bpp",
+      "direction": "none",
+      "fps": 1,
+      "frameCount": 1,
+      "frameHeight": 48,
+      "frameWidth": 48,
+      "frames": [
+        {
+          "frameIndex": 0,
+          "height": 48,
+          "originX": 0,
+          "originY": 0,
+          "sourceFrameIndex": 2,
+          "tiles": [
+            {
+              "flipX": false,
+              "flipY": false,
+              "objPalette": "OBP0",
+              "paletteIndex": 0,
+              "priority": false,
+              "sliceX": 96,
+              "sliceY": 0,
+              "sourceSheet": "farol-relay-v2.png",
+              "tileHeight": 32,
+              "tileWidth": 32,
+              "x": -16,
+              "y": 16
+            },
+            {
+              "flipX": false,
+              "flipY": false,
+              "objPalette": "OBP0",
+              "paletteIndex": 0,
+              "priority": false,
+              "sliceX": 96,
+              "sliceY": 32,
+              "sourceSheet": "farol-relay-v2.png",
+              "tileHeight": 16,
+              "tileWidth": 32,
+              "x": -16,
+              "y": 0
+            },
+            {
+              "flipX": false,
+              "flipY": false,
+              "objPalette": "OBP0",
+              "paletteIndex": 0,
+              "priority": false,
+              "sliceX": 128,
+              "sliceY": 0,
+              "sourceSheet": "farol-relay-v2.png",
+              "tileHeight": 32,
+              "tileWidth": 16,
+              "x": 16,
+              "y": 16
+            },
+            {
+              "flipX": false,
+              "flipY": false,
+              "objPalette": "OBP0",
+              "paletteIndex": 0,
+              "priority": false,
+              "sliceX": 128,
+              "sliceY": 32,
+              "sourceSheet": "farol-relay-v2.png",
+              "tileHeight": 16,
+              "tileWidth": 16,
+              "x": 16,
+              "y": 0
+            }
+          ],
+          "width": 48
+        }
+      ],
+      "id": "farol-relay-working",
+      "loops": true,
+      "name": "working",
+      "spriteSheet": "farol-relay-v2.png",
+      "state": "idle",
+      "originX": 0,
+      "originY": 0,
+      "hitboxX": -4,
+      "hitboxY": -6,
+      "hitboxWidth": 24,
+      "hitboxHeight": 12
     }
   ],
   "assetGroups": [],
@@ -144389,6 +144694,206 @@
         "sourcePipeline": "Procedural UI from approved V1.3; no scene or portrait pixels",
         "visualStatus": "approved"
       }
+    },
+    {
+      "id": "farol-relay-v2",
+      "name": "farol-relay-v2.png",
+      "kind": "Sprite",
+      "metadata": {
+        "source": "Assets/sprites/farol-relay-v2.png",
+        "width": 144,
+        "height": 48,
+        "frameWidth": 48,
+        "frameHeight": 48,
+        "frameCount": 3,
+        "colorMode": "8bpp",
+        "objectPaletteValues": [
+          0,
+          2048,
+          13572,
+          13605,
+          12516,
+          9346,
+          2718,
+          5322,
+          4669,
+          8660,
+          1363,
+          18104,
+          22332,
+          26526,
+          11998,
+          22367,
+          5391,
+          4366,
+          3174,
+          6375,
+          5457,
+          13982,
+          12891,
+          18174,
+          6547,
+          9690,
+          6551,
+          2619,
+          2685,
+          19196,
+          5185,
+          9478,
+          11590,
+          11591,
+          4466,
+          4266,
+          7706,
+          8893,
+          16094,
+          13947,
+          15037,
+          19230,
+          4302,
+          4311,
+          10674,
+          4301,
+          5220,
+          3320,
+          5432,
+          6589,
+          21343,
+          17150,
+          18070,
+          9446,
+          7469,
+          10541,
+          13709,
+          9516,
+          17932,
+          3072,
+          22398,
+          7500,
+          7363,
+          5354,
+          10639,
+          18138,
+          18173,
+          4343,
+          3279,
+          10846,
+          3513,
+          14014,
+          5487,
+          3678,
+          8352,
+          8386,
+          19043,
+          17985,
+          25503,
+          2719,
+          26558,
+          11071,
+          4564,
+          3708,
+          13839,
+          24444,
+          17986,
+          6272,
+          6495,
+          24447,
+          6344,
+          22366,
+          6462,
+          6429,
+          6362,
+          5216,
+          23454,
+          6878,
+          20447,
+          3742,
+          4605,
+          11038,
+          21407,
+          11488,
+          2049,
+          4269,
+          6208,
+          13508,
+          19019,
+          2782,
+          7707,
+          4268,
+          18945,
+          2051,
+          19262,
+          24478,
+          8797,
+          7402,
+          2154,
+          11934,
+          15102,
+          12484,
+          19937,
+          4235,
+          440,
+          14688,
+          18912,
+          6519,
+          17147,
+          4370,
+          5460,
+          20351,
+          20319,
+          26591,
+          7542,
+          25535,
+          26559,
+          9720,
+          13911,
+          8385,
+          8390,
+          3476,
+          6518,
+          2052,
+          2118,
+          4234,
+          539,
+          605,
+          407,
+          6550,
+          21273,
+          20285,
+          15991,
+          18137,
+          30687,
+          4166,
+          4201,
+          9585,
+          7572,
+          31673,
+          28605,
+          11868,
+          15036,
+          0,
+          18757,
+          3074,
+          7534,
+          10499,
+          14726,
+          5434,
+          6242,
+          3073,
+          4336,
+          13539,
+          3144,
+          4863
+        ],
+        "streamFrames": true,
+        "sourceSha256": "355fca439e6d4720093a2770f8eafcc93edeac025c4c20eeb817d80ba57ae5cd",
+        "preparedSha256": "80ac915233dcd96cb84f98f455974d9570c3097449b288f7c399ea5a0caf20bd",
+        "license": "Project-owned AI-generated artwork",
+        "generatedBy": "approved-farol-relay-v2",
+        "reviewStatus": "approved",
+        "runtimePaletteReviewStatus": "approved",
+        "provenance": "fixtures/asset-provenance/farol-relay-v2.json"
+      }
     }
   ],
   "audioItems": [
@@ -155255,6 +155760,30 @@
       },
       "textSound": "farol_sfx_texto",
       "confirmSound": "farol_sfx_dialogo"
+    },
+    {
+      "key": "farol_relay_faulty",
+      "character": "Mecanismo",
+      "portrait": "",
+      "text": "The auxiliary relay is broken. The mechanic on the eastern dock can help.",
+      "translations": {
+        "en": "The auxiliary relay is broken. The mechanic on the eastern dock can help.",
+        "pt-BR": "O relé auxiliar está avariado. A mecânica no cais leste pode ajudar.",
+        "es": "El relé auxiliar está averiado. La mecánica del muelle este puede ayudar."
+      },
+      "choices": [],
+      "choiceTranslations": {
+        "en": [],
+        "pt-BR": [],
+        "es": []
+      },
+      "translationStatus": {
+        "en": "draft-ai",
+        "pt-BR": "draft-ai",
+        "es": "draft-ai"
+      },
+      "textSound": "farol_sfx_texto",
+      "confirmSound": "farol_sfx_dialogo"
     }
   ],
   "editorState": {
@@ -156522,6 +157051,11 @@
           "id": "showcase-new-game-10",
           "command": "add_item zzz_guardian_compass -99",
           "isEnabled": true
+        },
+        {
+          "id": "new-game-farol-relay",
+          "command": "set_variable var_farol_relay 0",
+          "isEnabled": true
         }
       ]
     },
@@ -156891,6 +157425,11 @@
       "detail": "Exemplo de sistemas conectados: estado persistente, requisitos e efeitos separados do cenário.",
       "command": "noop",
       "steps": [
+        {
+          "id": "farol-relay-entry-sync",
+          "command": "call_procedure farol_relay_sync",
+          "isEnabled": true
+        },
         {
           "id": "farol_interior_ao_entrar-1",
           "command": "call_procedure showcase_trial_watchdog",
@@ -162062,62 +162601,82 @@
       "detail": "Timeline editável em Ferramentas avançadas; câmera e áudio, sem rasterizar atores ou HUD no background.",
       "steps": [
         {
-          "id": "timeline_signal_repair-step-1",
+          "id": "signal-repair-relay-0",
           "command": "pause_scene_type topdown",
           "isEnabled": true
         },
         {
-          "id": "timeline_signal_repair-step-2",
+          "id": "signal-repair-relay-1",
           "command": "camera_set_position 64 0",
           "isEnabled": true
         },
         {
-          "id": "timeline_signal_repair-step-3",
+          "id": "signal-repair-relay-2",
+          "command": "set_variable var_farol_relay 1",
+          "isEnabled": true
+        },
+        {
+          "id": "signal-repair-relay-3",
+          "command": "set_actor_animation_state farol-relay farol-relay-installing-state",
+          "isEnabled": true
+        },
+        {
+          "id": "signal-repair-relay-4",
           "command": "play_music farol_tema_principal",
           "isEnabled": true
         },
         {
-          "id": "timeline_signal_repair-step-4",
+          "id": "signal-repair-relay-5",
           "command": "wait 30",
           "isEnabled": true
         },
         {
-          "id": "timeline_signal_repair-step-5",
+          "id": "signal-repair-relay-6",
           "command": "play_sfx farol_sfx_sinal",
           "isEnabled": true
         },
         {
-          "id": "timeline_signal_repair-step-6",
+          "id": "signal-repair-relay-7",
           "command": "wait 60",
           "isEnabled": true
         },
         {
-          "id": "timeline_signal_repair-step-7",
+          "id": "signal-repair-relay-8",
+          "command": "set_variable var_farol_relay 2",
+          "isEnabled": true
+        },
+        {
+          "id": "signal-repair-relay-9",
+          "command": "set_actor_animation_state farol-relay farol-relay-working-state",
+          "isEnabled": true
+        },
+        {
+          "id": "signal-repair-relay-10",
           "command": "play_sfx farol_sfx_confirmar",
           "isEnabled": true
         },
         {
-          "id": "timeline_signal_repair-step-8",
+          "id": "signal-repair-relay-11",
           "command": "wait 30",
           "isEnabled": true
         },
         {
-          "id": "timeline_signal_repair-step-9",
+          "id": "signal-repair-relay-12",
           "command": "camera_follow_player",
           "isEnabled": true
         },
         {
-          "id": "timeline_signal_repair-step-10",
+          "id": "signal-repair-relay-13",
           "command": "resume_scene_type topdown",
           "isEnabled": true
         },
         {
-          "id": "timeline_signal_repair-step-11",
+          "id": "signal-repair-relay-14",
           "command": "save_game 0",
           "isEnabled": true
         },
         {
-          "id": "timeline_signal_repair-step-12",
+          "id": "signal-repair-relay-15",
           "command": "show_dialogue signal_repaired",
           "isEnabled": true
         }
@@ -163321,6 +163880,113 @@
         "parameters": [],
         "locals": []
       }
+    },
+    {
+      "id": "event-farol_relay_sync",
+      "name": "farol_relay_sync",
+      "roomName": "farol_interior",
+      "category": "O sinal perdido",
+      "command": "noop",
+      "eventKind": "procedure",
+      "procedure": {
+        "parameters": [],
+        "locals": []
+      },
+      "steps": [
+        {
+          "id": "farol_relay_sync-0",
+          "command": "if_variable_less_than var_signal_stage 2",
+          "isEnabled": true
+        },
+        {
+          "id": "farol_relay_sync-1",
+          "command": "set_variable var_farol_relay 0",
+          "isEnabled": true
+        },
+        {
+          "id": "farol_relay_sync-2",
+          "command": "set_actor_animation_state farol-relay farol-relay-faulty-state",
+          "isEnabled": true
+        },
+        {
+          "id": "farol_relay_sync-3",
+          "command": "else",
+          "isEnabled": true
+        },
+        {
+          "id": "farol_relay_sync-4",
+          "command": "set_variable var_farol_relay 2",
+          "isEnabled": true
+        },
+        {
+          "id": "farol_relay_sync-5",
+          "command": "set_actor_animation_state farol-relay farol-relay-working-state",
+          "isEnabled": true
+        },
+        {
+          "id": "farol_relay_sync-6",
+          "command": "condition_end",
+          "isEnabled": true
+        }
+      ]
+    },
+    {
+      "id": "event-farol_relay_restore",
+      "name": "farol_relay_restore",
+      "roomName": "farol_interior",
+      "category": "O sinal perdido",
+      "command": "noop",
+      "steps": [
+        {
+          "id": "farol_relay_restore-0",
+          "command": "call_procedure showcase_trial_watchdog",
+          "isEnabled": true
+        },
+        {
+          "id": "farol_relay_restore-1",
+          "command": "call_procedure farol_relay_sync",
+          "isEnabled": true
+        }
+      ]
+    },
+    {
+      "id": "event-farol_relay_interact",
+      "name": "farol_relay_interact",
+      "roomName": "farol_interior",
+      "category": "O sinal perdido",
+      "command": "noop",
+      "steps": [
+        {
+          "id": "farol_relay_interact-0",
+          "command": "call_procedure farol_relay_sync",
+          "isEnabled": true
+        },
+        {
+          "id": "farol_relay_interact-1",
+          "command": "if_variable var_signal_stage 0",
+          "isEnabled": true
+        },
+        {
+          "id": "farol_relay_interact-2",
+          "command": "show_dialogue farol_relay_faulty",
+          "isEnabled": true
+        },
+        {
+          "id": "farol_relay_interact-3",
+          "command": "else",
+          "isEnabled": true
+        },
+        {
+          "id": "farol_relay_interact-4",
+          "command": "call_event farol_examinar_lente",
+          "isEnabled": true
+        },
+        {
+          "id": "farol_relay_interact-5",
+          "command": "condition_end",
+          "isEnabled": true
+        }
+      ]
     }
   ],
   "gbStudioImport": {
@@ -209684,7 +210350,8 @@
         "solid"
       ],
       "eventBindings": {
-        "onInit": "farol_interior_ao_entrar"
+        "onInit": "farol_interior_ao_entrar",
+        "onRestore": "farol_relay_restore"
       },
       "gbStudioName": "02 · A Jornada do Farol",
       "gbStudioSceneID": "4912bee2-387a-472f-ae4f-6679b6149517",
@@ -275738,7 +276405,8 @@
         "solid"
       ],
       "eventBindings": {
-        "onInit": "farol_interior_ao_entrar"
+        "onInit": "farol_interior_ao_entrar",
+        "onRestore": "farol_relay_restore"
       },
       "gbStudioName": "02 · A Jornada do Farol",
       "gbStudioSceneID": "4912bee2-387a-472f-ae4f-6679b6149517",
@@ -300391,6 +301059,12 @@
       "name": "var_trial_reward",
       "displayName": "Sistemas conectados · trial_reward",
       "initialValue": 0
+    },
+    {
+      "id": "variable-farol-relay",
+      "name": "var_farol_relay",
+      "displayName": "Rele do Farol",
+      "initialValue": 0
     }
   ],
   "localization": {
@@ -300771,11 +301445,27 @@
               },
               {
                 "frame": 0,
+                "command": "set_variable var_farol_relay 1"
+              },
+              {
+                "frame": 0,
+                "command": "set_actor_animation_state farol-relay farol-relay-installing-state"
+              },
+              {
+                "frame": 0,
                 "command": "play_music farol_tema_principal"
               },
               {
                 "frame": 30,
                 "command": "play_sfx farol_sfx_sinal"
+              },
+              {
+                "frame": 90,
+                "command": "set_variable var_farol_relay 2"
+              },
+              {
+                "frame": 90,
+                "command": "set_actor_animation_state farol-relay farol-relay-working-state"
               },
               {
                 "frame": 90,

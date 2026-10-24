@@ -9,6 +9,7 @@ import { encodePngRgba } from './lib/png-icons.mjs';
 import { nativeLayoutSource, parseNativeLayouts, readNativeUI, runtimeNativeSymbols, nativeEventStatesByRuntime } from './lib/native-ui-diagnostics.mjs';
 import { playShowcaseEnding } from './lib/showcase-ending-playthrough.mjs';
 import { playShowcaseSystems } from './lib/showcase-systems-playthrough.mjs';
+import { playFarolRelay } from './lib/farol-relay-playthrough.mjs';
 import { playLostSignalMission, lostSignalInventoryIndices } from './lib/lost-signal-playthrough.mjs';
 
 const [romFile, exportDir, output] = process.argv.slice(2);
@@ -72,7 +73,10 @@ const driver = {
   reboot() { const saved = copyModuleSavedata(core); report.inputs.push({ reset: true }); boot(saved); },
   capture(label) {
     const p = core._gba_framebuffer();
-    fs.writeFileSync(path.join(output, label + '.png'), encodePngRgba({ width: 240, height: 160, pixels: core.HEAPU8.slice(p, p + 153600) }));
+    const pixels = core.HEAPU8.slice(p, p + 153600);
+    // mGBA's fourth byte stores internal flags. Match the production canvas.
+    for (let offset = 3; offset < pixels.length; offset += 4) pixels[offset] = 255;
+    fs.writeFileSync(path.join(output, label + '.png'), encodePngRgba({ width: 240, height: 160, pixels }));
     const nativePlayer=symbols.find(s=>s.name.endsWith('::player')&&s.size===36);
     if(label==='failure'&&nativePlayer)console.log('native-player',Array.from({length:9},(_,i)=>read32(nativePlayer.address+i*4)));
     report.captures.push({ label, frame: report.totalFrames, inputCount: report.inputs.length, ui:driver.ui(), state: driver.state(), dialogue: driver.dialogue(), modal: driver.modal() });
@@ -107,7 +111,7 @@ try {
     driver.capture('return-after-load');report.passed=true;
   } else if (process.argv.includes('--diagnostics-only')) { driver.run(180,0); driver.capture('title'); report.passed=true; }
   else if(process.argv.some(a=>a.startsWith('--ending=')))Object.assign(report,await playShowcaseEnding(driver,project,JSON.parse(fs.readFileSync(new URL('../fixtures/asset-provenance/racing-approved-manifest.json',import.meta.url))),Number(process.argv.find(a=>a.startsWith('--ending=')).split('=')[1])));
-  else Object.assign(report, await (process.argv.includes('--showcase')?playShowcaseSystems:playLostSignalMission)(driver, project, exported));
+  else Object.assign(report, await (process.argv.includes('--relay')?playFarolRelay:process.argv.includes('--showcase')?playShowcaseSystems:playLostSignalMission)(driver, project, exported));
 }
-catch (error) { report.error = String(error); driver.capture('failure'); throw error; }
+catch (error) { report.error = String(error); driver.capture('failure'); driver.checkpoint('failure'); throw error; }
 finally { fs.writeFileSync(path.join(output, 'report.json'), JSON.stringify(report, null, 2)); core._gba_destroy(); }

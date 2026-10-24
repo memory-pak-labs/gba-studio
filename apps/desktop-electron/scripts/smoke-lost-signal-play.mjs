@@ -9,6 +9,7 @@ import { resolveExemploSmokeFaceButton } from './exemplo-scene-playtest-contract
 import { playShowcaseEnding } from './lib/showcase-ending-playthrough.mjs';
 import { readNativeUI, runtimeNativeSymbols } from './lib/native-ui-diagnostics.mjs';
 import { playShowcaseSystems } from './lib/showcase-systems-playthrough.mjs';
+import { playFarolRelay } from './lib/farol-relay-playthrough.mjs';
 import { playLostSignalMission, lostSignalInventoryIndices } from './lib/lost-signal-playthrough.mjs';
 
 const app = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -127,7 +128,7 @@ try {
     assert.equal(nativeRun.status,0,nativeRun.stdout+nativeRun.stderr);
     const trace=JSON.parse(fs.readFileSync(path.join(traceDir,'report.json')));assert.equal(trace.romSha256,report.romSha256);
     await driver.reboot();Object.assign(report,await playShowcaseEnding(driver,project,JSON.parse(fs.readFileSync(path.join(app,'fixtures/asset-provenance/racing-approved-manifest.json'))),endingPath),{nativeReport:path.join(traceDir,'report.json')});
-  }else Object.assign(report,await (process.argv.includes('--showcase')?playShowcaseSystems:playLostSignalMission)(driver,project,exported));
+  }else Object.assign(report,await (process.argv.includes('--relay')?playFarolRelay:process.argv.includes('--showcase')?playShowcaseSystems:playLostSignalMission)(driver,project,exported));
   report.audio=await evaluate(player,'window.GBAStudioDirectPlayer.inspectAudio()');
 } catch(error) {report.error=String(error);throw error;}
 finally {

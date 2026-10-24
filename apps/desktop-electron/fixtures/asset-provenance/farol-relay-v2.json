@@ -1,0 +1,313 @@
+{
+  "schemaVersion": 1,
+  "scene": "farol_interior",
+  "actor": "farol-relay",
+  "variable": "var_farol_relay",
+  "sheet": "farol-relay-v2.png",
+  "sourceSha256": "355fca439e6d4720093a2770f8eafcc93edeac025c4c20eeb817d80ba57ae5cd",
+  "sha256": "80ac915233dcd96cb84f98f455974d9570c3097449b288f7c399ea5a0caf20bd",
+  "license": "Project-owned AI-generated artwork",
+  "approval": {
+    "approved": true,
+    "date": "2026-10-24",
+    "variant": "V2",
+    "source": "User approved V2 and authorized implementation before commit",
+    "runtimeApproved": true,
+    "runtimeApprovalDate": "2026-10-24"
+  },
+  "layout": {
+    "frameWidth": 48,
+    "frameHeight": 48,
+    "visualPosition": [
+      248,
+      64
+    ],
+    "actorPosition": [
+      33,
+      13
+    ],
+    "footCollision": [
+      -4,
+      -6,
+      24,
+      12
+    ]
+  },
+  "preparation": {
+    "consumer": "OBJ 8bpp, reusing the approved 176-entry NPC palette",
+    "tool": "gba-sprite-prep stage-candidate and pack",
+    "visibleColors": 15,
+    "alphaThreshold": 128,
+    "sourceAlphaMode": 253,
+    "filter": "nearest",
+    "resize": false,
+    "frameOffsetsPreserved": true,
+    "objectsPerFrame": 4,
+    "sourceColors": 15,
+    "runtimePaletteSource": "porto-lighthousekeeper-body48.png",
+    "runtimePaletteReview": "approved-user-Play-ROM-review"
+  },
+  "animations": [
+    {
+      "colorMode": "8bpp",
+      "direction": "none",
+      "fps": 1,
+      "frameCount": 1,
+      "frameHeight": 48,
+      "frameWidth": 48,
+      "frames": [
+        {
+          "frameIndex": 0,
+          "height": 48,
+          "originX": 0,
+          "originY": 0,
+          "sourceFrameIndex": 0,
+          "tiles": [
+            {
+              "flipX": false,
+              "flipY": false,
+              "objPalette": "OBP0",
+              "paletteIndex": 0,
+              "priority": false,
+              "sliceX": 0,
+              "sliceY": 0,
+              "sourceSheet": "farol-relay-v2.png",
+              "tileHeight": 32,
+              "tileWidth": 32,
+              "x": -16,
+              "y": 16
+            },
+            {
+              "flipX": false,
+              "flipY": false,
+              "objPalette": "OBP0",
+              "paletteIndex": 0,
+              "priority": false,
+              "sliceX": 0,
+              "sliceY": 32,
+              "sourceSheet": "farol-relay-v2.png",
+              "tileHeight": 16,
+              "tileWidth": 32,
+              "x": -16,
+              "y": 0
+            },
+            {
+              "flipX": false,
+              "flipY": false,
+              "objPalette": "OBP0",
+              "paletteIndex": 0,
+              "priority": false,
+              "sliceX": 32,
+              "sliceY": 0,
+              "sourceSheet": "farol-relay-v2.png",
+              "tileHeight": 32,
+              "tileWidth": 16,
+              "x": 16,
+              "y": 16
+            },
+            {
+              "flipX": false,
+              "flipY": false,
+              "objPalette": "OBP0",
+              "paletteIndex": 0,
+              "priority": false,
+              "sliceX": 32,
+              "sliceY": 32,
+              "sourceSheet": "farol-relay-v2.png",
+              "tileHeight": 16,
+              "tileWidth": 16,
+              "x": 16,
+              "y": 0
+            }
+          ],
+          "width": 48
+        }
+      ],
+      "id": "farol-relay-faulty",
+      "loops": true,
+      "name": "faulty",
+      "spriteSheet": "farol-relay-v2.png",
+      "state": "hurt",
+      "originX": 0,
+      "originY": 0,
+      "hitboxX": -4,
+      "hitboxY": -6,
+      "hitboxWidth": 24,
+      "hitboxHeight": 12
+    },
+    {
+      "colorMode": "8bpp",
+      "direction": "none",
+      "fps": 1,
+      "frameCount": 1,
+      "frameHeight": 48,
+      "frameWidth": 48,
+      "frames": [
+        {
+          "frameIndex": 0,
+          "height": 48,
+          "originX": 0,
+          "originY": 0,
+          "sourceFrameIndex": 1,
+          "tiles": [
+            {
+              "flipX": false,
+              "flipY": false,
+              "objPalette": "OBP0",
+              "paletteIndex": 0,
+              "priority": false,
+              "sliceX": 48,
+              "sliceY": 0,
+              "sourceSheet": "farol-relay-v2.png",
+              "tileHeight": 32,
+              "tileWidth": 32,
+              "x": -16,
+              "y": 16
+            },
+            {
+              "flipX": false,
+              "flipY": false,
+              "objPalette": "OBP0",
+              "paletteIndex": 0,
+              "priority": false,
+              "sliceX": 48,
+              "sliceY": 32,
+              "sourceSheet": "farol-relay-v2.png",
+              "tileHeight": 16,
+              "tileWidth": 32,
+              "x": -16,
+              "y": 0
+            },
+            {
+              "flipX": false,
+              "flipY": false,
+              "objPalette": "OBP0",
+              "paletteIndex": 0,
+              "priority": false,
+              "sliceX": 80,
+              "sliceY": 0,
+              "sourceSheet": "farol-relay-v2.png",
+              "tileHeight": 32,
+              "tileWidth": 16,
+              "x": 16,
+              "y": 16
+            },
+            {
+              "flipX": false,
+              "flipY": false,
+              "objPalette": "OBP0",
+              "paletteIndex": 0,
+              "priority": false,
+              "sliceX": 80,
+              "sliceY": 32,
+              "sourceSheet": "farol-relay-v2.png",
+              "tileHeight": 16,
+              "tileWidth": 16,
+              "x": 16,
+              "y": 0
+            }
+          ],
+          "width": 48
+        }
+      ],
+      "id": "farol-relay-installing",
+      "loops": false,
+      "name": "installing",
+      "spriteSheet": "farol-relay-v2.png",
+      "state": "attack",
+      "originX": 0,
+      "originY": 0,
+      "hitboxX": -4,
+      "hitboxY": -6,
+      "hitboxWidth": 24,
+      "hitboxHeight": 12
+    },
+    {
+      "colorMode": "8bpp",
+      "direction": "none",
+      "fps": 1,
+      "frameCount": 1,
+      "frameHeight": 48,
+      "frameWidth": 48,
+      "frames": [
+        {
+          "frameIndex": 0,
+          "height": 48,
+          "originX": 0,
+          "originY": 0,
+          "sourceFrameIndex": 2,
+          "tiles": [
+            {
+              "flipX": false,
+              "flipY": false,
+              "objPalette": "OBP0",
+              "paletteIndex": 0,
+              "priority": false,
+              "sliceX": 96,
+              "sliceY": 0,
+              "sourceSheet": "farol-relay-v2.png",
+              "tileHeight": 32,
+              "tileWidth": 32,
+              "x": -16,
+              "y": 16
+            },
+            {
+              "flipX": false,
+              "flipY": false,
+              "objPalette": "OBP0",
+              "paletteIndex": 0,
+              "priority": false,
+              "sliceX": 96,
+              "sliceY": 32,
+              "sourceSheet": "farol-relay-v2.png",
+              "tileHeight": 16,
+              "tileWidth": 32,
+              "x": -16,
+              "y": 0
+            },
+            {
+              "flipX": false,
+              "flipY": false,
+              "objPalette": "OBP0",
+              "paletteIndex": 0,
+              "priority": false,
+              "sliceX": 128,
+              "sliceY": 0,
+              "sourceSheet": "farol-relay-v2.png",
+              "tileHeight": 32,
+              "tileWidth": 16,
+              "x": 16,
+              "y": 16
+            },
+            {
+              "flipX": false,
+              "flipY": false,
+              "objPalette": "OBP0",
+              "paletteIndex": 0,
+              "priority": false,
+              "sliceX": 128,
+              "sliceY": 32,
+              "sourceSheet": "farol-relay-v2.png",
+              "tileHeight": 16,
+              "tileWidth": 16,
+              "x": 16,
+              "y": 0
+            }
+          ],
+          "width": 48
+        }
+      ],
+      "id": "farol-relay-working",
+      "loops": true,
+      "name": "working",
+      "spriteSheet": "farol-relay-v2.png",
+      "state": "idle",
+      "originX": 0,
+      "originY": 0,
+      "hitboxX": -4,
+      "hitboxY": -6,
+      "hitboxWidth": 24,
+      "hitboxHeight": 12
+    }
+  ]
+}

@@ -25,7 +25,7 @@ export async function playShowcaseSystems(driver, project, exported) {
     await controls.walkTo(a.x,a.y+2);await driver.run(1,64);await driver.run(6,0);await controls.tap(1,70);
   }
   async function trader(choice) {await actor('porto-lume-traveler-pilot');await choose('showcase_trader_menu',choice);}
-  async function keeper(choice) {await controls.walkTo(17,16);await driver.run(1,64);await driver.run(6,0);await controls.tap(1,70);await choose('showcase_keeper_menu',choice);}
+  async function keeper(choice) {await controls.walkTo(17,16);await driver.run(4,64);await driver.run(6,0);await controls.tap(1,70);await choose('showcase_keeper_menu',choice);}
   async function openFarol() {
     await controls.walkTo(17,16);await driver.run(90,64);await driver.run(8,0);await controls.tap(1,150);
     await controls.expect(0,1,'showcase-farol-entry');await controls.close();

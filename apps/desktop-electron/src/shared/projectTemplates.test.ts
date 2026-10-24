@@ -579,6 +579,7 @@ describe("projectTemplates", () => {
       "dungeon-approved-sentinel-far.png",
       "dungeon-approved-sentinel-mid.png",
       "dungeon-approved-sentinel-near.png",
+      "farol-relay-v2.png",
       "market-approved-actors-64x64.png",
       "opening-local-animation-128x96.png",
       "penedos-approved-checkpoint.png",

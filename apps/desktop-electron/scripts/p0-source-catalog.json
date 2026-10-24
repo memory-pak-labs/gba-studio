@@ -2055,6 +2055,12 @@
           "path": "Assets/ui/frame-council-v13.png",
           "sha256": "a0672836f50ae4c1a1a1bf80ed83616c6bbfe4bbf5efb62ae941025646adb843",
           "contract": "council-porto-lumen-v13-user-approved-2026-10-22"
+        },
+        {
+          "path": "Assets/sprites/farol-relay-v2.png",
+          "sha256": "80ac915233dcd96cb84f98f455974d9570c3097449b288f7c399ea5a0caf20bd",
+          "contract": "farol-relay-v2-approved",
+          "provenance": "fixtures/asset-provenance/farol-relay-v2.json"
         }
       ],
       "retired": [
