@@ -59,6 +59,12 @@ npm run build
 npm run dev
 ```
 
+A suíte Vitest executa os testes funcionais no projeto `unit` e, ao terminar,
+mede a abertura do projeto em `project-open-perf`, com um único worker. Essa
+ordem preserva o orçamento de 750 ms sem disputar CPU com os demais testes.
+Para executar apenas essa medição, use `npm run test:perf:project-open`.
+Evite executar builds ou outras verificações pesadas ao mesmo tempo que ela.
+
 O npm instala as dependências declaradas e o Electron. Nenhuma senha Apple é
 necessária para desenvolver, testar ou compilar o editor.
 

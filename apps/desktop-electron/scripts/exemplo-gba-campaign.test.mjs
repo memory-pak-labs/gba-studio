@@ -72,14 +72,16 @@ describe("campanha canônica O Último Farol", () => {
     }
   });
 
-  it("exporta a habilidade especial de Nara como magic para permitir vencer o Guardião", () => {
-    for (const project of [JSON.parse(readFileSync(templateURL, "utf8")), campaignProject()]) {
-      const exported = buildEngineExportProjectContract(project);
-      const encounter = exported.battle_rpg_project.encounters[0];
-      expect(encounter.party[0].abilities).toEqual([
-        { kind: "attack", power: 0 }, { kind: "magic", power: 12 }
-      ]);
-    }
+  // Each complete export has its own correctness check and the default timeout.
+  it.each([
+    ["canônico", () => JSON.parse(readFileSync(templateURL, "utf8"))],
+    ["reconstruído", campaignProject]
+  ])("exporta a habilidade especial de Nara como magic para permitir vencer o Guardião (%s)", (_name, projectFactory) => {
+    const exported = buildEngineExportProjectContract(projectFactory());
+    const encounter = exported.battle_rpg_project.encounters[0];
+    expect(encounter.party[0].abilities).toEqual([
+      { kind: "attack", power: 0 }, { kind: "magic", power: 12 }
+    ]);
   });
 
   it("salva a célula da Usina somente depois de esconder o item coletado", () => {

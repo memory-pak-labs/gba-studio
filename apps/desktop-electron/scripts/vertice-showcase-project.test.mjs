@@ -75,15 +75,16 @@ describe("materialização canônica de Vértice", () => {
     expect(promoted.scenas.every((scene) => !scene.backgroundAssetName || declaredAssetNames.has(scene.backgroundAssetName))).toBe(true);
   });
 
-  it("enquadra o mercador inteiro ao iniciar o Mercado sem mudar o zoom ou o seguimento", () => {
-    for (const project of [JSON.parse(readFileSync(templateURL, "utf8")), verticeProject()]) {
-      const room = buildEngineExportProjectContract(project).isometric_project.rooms
-        .find((candidate) => candidate.name === "mercado_suspenso");
-      expect(room.camera).toMatchObject({ follow_enabled: true, zoom_x256: 256 });
-      expect(room.on_enter).toEqual(expect.arrayContaining([
-        { op: "set_camera_property", field: "pan_y", value: 0 }
-      ]));
-    }
+  it.each([
+    ["canônico", () => JSON.parse(readFileSync(templateURL, "utf8"))],
+    ["reconstruído", verticeProject]
+  ])("enquadra o mercador inteiro ao iniciar o Mercado sem mudar o zoom ou o seguimento (%s)", (_name, projectFactory) => {
+    const room = buildEngineExportProjectContract(projectFactory()).isometric_project.rooms
+      .find((candidate) => candidate.name === "mercado_suspenso");
+    expect(room.camera).toMatchObject({ follow_enabled: true, zoom_x256: 256 });
+    expect(room.on_enter).toEqual(expect.arrayContaining([
+      { op: "set_camera_property", field: "pan_y", value: 0 }
+    ]));
   });
 
   it("exports the market exit on the walkable upper deck height", () => {
