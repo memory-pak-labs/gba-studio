@@ -8,6 +8,27 @@
 
 namespace {
 
+void test_walk_animation_path_handles_fractional_steps_walls_and_sliding() {
+    uint8_t flags[4 * 4] = {};
+    const gbs::TileMap map { flags, 4, 4 };
+    const gbs::Actor player { { 8, 8 }, { 8, 8 }, 0 };
+    const gbs::InputState diagonal { gbs::ButtonRight | gbs::ButtonDown, 0, 0 };
+    assert(gbs::player_has_walk_path(map, player, diagonal, nullptr, 0));
+    flags[1 * 4 + 2] = gbs::TileSolid;
+    assert(gbs::player_has_walk_path(map, player, diagonal, nullptr, 0));
+    auto four_way = player;
+    four_way.allow_diagonal = false;
+    four_way.direction = 3;
+    assert(!gbs::player_has_walk_path(map, four_way, diagonal, nullptr, 0));
+    flags[2 * 4 + 1] = gbs::TileSolid;
+    assert(!gbs::player_has_walk_path(map, player, diagonal, nullptr, 0));
+    flags[1 * 4 + 2] = flags[2 * 4 + 1] = gbs::TileEmpty;
+    const gbs::Actor blockers[] = { { { 16, 8 }, { 8, 8 }, 0 }, { { 8, 16 }, { 8, 8 }, 0 } };
+    assert(gbs::player_has_walk_path(map, player, diagonal, blockers, 1));
+    assert(!gbs::player_has_walk_path(map, player, diagonal, blockers, 2));
+    assert(!gbs::player_has_walk_path(map, player, { gbs::ButtonRight | gbs::ButtonLeft, 0, 0 }, nullptr, 0));
+}
+
 void player_input_step(const gbs::TileMap& map, gbs::Actor& player, uint16_t held, bool push) {
     const gbs::InputState input { held, held, 0 };
     // Exercise both paths, including the push path with an actual blocker list.
@@ -1352,6 +1373,7 @@ void test_topdown_quest_and_shop_modules_mutate_event_state_safely() {
 } // namespace
 
 int main() {
+    test_walk_animation_path_handles_fractional_steps_walls_and_sliding();
     test_player_eight_way_speed_is_uniform();
     test_player_diagonal_keeps_compatible_facing();
     test_player_diagonal_slides_along_wall_without_crossing_it();

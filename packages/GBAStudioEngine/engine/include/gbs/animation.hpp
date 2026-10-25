@@ -16,10 +16,15 @@ struct SpriteAnimatorState {
 void init_sprite_animator(SpriteAnimatorState& state);
 bool select_sprite_animation(SpriteAnimatorState& state, const SpriteAnimation& animation);
 bool play_sprite_animation(SpriteAnimatorState& state, const SpriteAnimation& animation);
+// Keep the walk phase across compatible looping directional clips.
+bool continue_sprite_animation(SpriteAnimatorState& state, const SpriteAnimation& animation);
 bool set_sprite_animation_frame(SpriteAnimatorState& state, int frame_index);
 void stop_sprite_animation(SpriteAnimatorState& state);
 void update_sprite_animator(SpriteAnimatorState& state);
 void update_sprite_animator_scaled(SpriteAnimatorState& state, int speed_percent);
+// One authored animation tick per travelled pixel, scaled by the caller.
+// Zero travel does not advance; diagonal travel uses a fixed-point length.
+void update_sprite_animator_travel(SpriteAnimatorState& state, Vec2i actual_travel, int speed_percent);
 const MetaSprite* current_metasprite(const SpriteAnimatorState& state);
 
 // Call in the render phase. Reset loaded_asset after scene/video/resource uploads.

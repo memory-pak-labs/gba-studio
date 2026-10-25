@@ -19,7 +19,7 @@
   "sourceSheets": [
     {
       "name": "porto-nara-animations48.png",
-      "sha256": "bf4e524c34d0ed6d4b0bf442e2b307f0d364a4b96acab0f89eca2a2bceeebc8f",
+      "sha256": "a23482d9ed3a48b73d388ea6e624ca8df4f1af591b8b77df5d0335eaf31a2aa7",
       "sourceSha256": "abedf06e42e615f1560aa60a295540372c73907aa6c6b0241dbcb63076b0a9d8",
       "approvedFrontReference": "porto-nara-body48.png",
       "palette": [
@@ -370,5 +370,76 @@
       "height": 4
     },
     "stepIntervalFrames": 2
+  },
+  "naraWalkRevision": {
+    "revision": "v3-lateral-v2-front-back",
+    "userApproval": "Gostei da V3. Pode integrar as laterais com frente e costas da V2, ajustar a paleta e a cadência e validar no Play e na ROM, 4 quadros incluindo salvar e carregar.",
+    "previousPreparedSha256": "bf4e524c34d0ed6d4b0bf442e2b307f0d364a4b96acab0f89eca2a2bceeebc8f",
+    "lateralGeneratedSourceSha256": "8c67718946b0935d649c15e091cf567cd047ea2e4887b072ea8bfe2ee2bd92a7",
+    "preparedSha256": "a23482d9ed3a48b73d388ea6e624ca8df4f1af591b8b77df5d0335eaf31a2aa7",
+    "sourceRegions": [
+      [
+        238,
+        669,
+        216,
+        324
+      ],
+      [
+        467,
+        669,
+        216,
+        324
+      ],
+      [
+        696,
+        669,
+        216,
+        324
+      ],
+      [
+        925,
+        669,
+        216,
+        324
+      ],
+      [
+        238,
+        996,
+        216,
+        324
+      ],
+      [
+        467,
+        996,
+        216,
+        324
+      ],
+      [
+        696,
+        996,
+        216,
+        324
+      ],
+      [
+        925,
+        996,
+        216,
+        324
+      ]
+    ],
+    "preparation": "Nearest-neighbor staging at shared scale32/216; original upper32x32 plus lateral lower32x16; palette remap restricted to original approved OBJ colors; binary alpha128 after histogram review",
+    "colorMode": "8bpp",
+    "declaredPaletteEntries": 163,
+    "paletteChanged": false,
+    "rgbRmse": 6.974110078147164,
+    "walkFrames": 4,
+    "fps": 15,
+    "stridePixels": 16,
+    "groundAnchorUnchanged": true,
+    "idlePixelsUnchanged": true,
+    "frontBack": "V2 composed frame references baked without palette changes",
+    "lateralUpper": "Original walk frames unchanged",
+    "hardwareObjectsPerFrame": 2,
+    "streamFrames": true
   }
 }

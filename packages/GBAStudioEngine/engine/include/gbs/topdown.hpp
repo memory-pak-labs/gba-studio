@@ -148,6 +148,7 @@ constexpr bool actor_collision_groups_overlap(const Actor& mover, const Actor& b
         (blocker.collision_mask & mover_group) != 0;
 }
 bool rect_hits_any_blocking_actor(Rect rect, const Actor& mover, const Actor* actors, size_t actor_count);
+bool player_has_walk_path(const TileMap& map, const Actor& player, InputState input, const Actor* actors, size_t actor_count);
 uint8_t tile_flags_at(const TileMap& map, int tile_x, int tile_y);
 TileSlope tile_slope_at(const TileMap& map, int tile_x, int tile_y);
 uint8_t tile_flags_in_rect(const TileMap& map, Rect rect);

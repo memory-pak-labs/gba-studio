@@ -7,6 +7,12 @@ import { buildAssetcSpritePackGeneration } from "./engineProjectExport.js";
 const data = parseGBAProjectFile(readFileSync(new URL("../../default-assets/templates/exemplo-gba/exemplo-gba.gba-project", import.meta.url), "utf8")).data;
 
 describe("approved Porto Lumen actor and HUD integration", () => {
+  it("exports four walk phases with a four-pixel cadence for Nara", () => {
+    const actor = buildEngineExportProjectContract(data).topdown_project!.actor_sprites!.find((a: any) => a.name === 'porto-nara-animations48.png')!;
+    const walks = actor.animations!.filter(a => a.frame_indices.length === 4);
+    expect(walks).toHaveLength(4);
+    for (const walk of walks) expect(walk.durations).toEqual([4, 4, 4, 4]);
+  });
   it("keeps the active 48px four-direction sheets and independent foot collision", () => {
     for (const name of ["porto-nara-animations48.png", "porto-mechanic-animations48.png"]) {
       const source = (data.assets as any[]).find(asset => asset.name === name);

@@ -186,6 +186,8 @@ gbs::RoomTileEdits room_tile_edits __attribute__((section(".ewram_bss")));
 gbs::RoomTilemapCache room_layer_cache[4];
 gbs::InputState current_input { 0, 0, 0 };
 bool player_moved_this_frame = false;
+gbs::Vec2i player_animation_travelled_pixels { 0, 0 };
+bool player_walk_clip_active = false;
 int topdown_initialization_result = 0;
 
 volatile gbs::RuntimeTelemetryBlock& runtime_telemetry = gbs::runtime_telemetry_block();
@@ -1539,7 +1541,8 @@ void refresh_npc_runtime_animation(size_t index, bool playing) {
     }
 }
 
-void refresh_player_runtime_animation(int animation_index) {
+void refresh_player_runtime_animation(int animation_index, bool continue_walk = false) {
+    if (!continue_walk) player_walk_clip_active = false;
     const gbs::TopDownActorSpriteData* actor_sprite = selected_player_sprite_data();
     const gbs::SpriteAnimation* next_animation = actor_sprite != nullptr
         ? gbs::topdown_actor_animation_for_index(*actor_sprite, animation_index)
@@ -1548,8 +1551,8 @@ void refresh_player_runtime_animation(int animation_index) {
         return;
     }
 
-    gbs::init_sprite_animator(player_animator);
-    gbs::play_sprite_animation(player_animator, *next_animation);
+    if (continue_walk) gbs::continue_sprite_animation(player_animator, *next_animation);
+    else gbs::play_sprite_animation(player_animator, *next_animation);
 }
 
 void refresh_player_directional_animation(bool moving) {
@@ -1560,7 +1563,8 @@ void refresh_player_directional_animation(bool moving) {
     if (!topdown_has_idle_directional_animations(animation_count)) {
         return;
     }
-    refresh_player_runtime_animation(topdown_directional_animation_index(animation_count, player.direction, moving));
+    refresh_player_runtime_animation(topdown_directional_animation_index(animation_count, player.direction, moving), moving && player_walk_clip_active);
+    player_walk_clip_active = moving;
 }
 
 const gbs::TopDownActorSpriteData* selected_player_sprite_data() {
@@ -1598,6 +1602,7 @@ bool load_streamed_animation_frame_tiles(
 
 void apply_player_sprite_variant() {
     gbs::init_sprite_animator(player_animator);
+    player_walk_clip_active = false;
     player_streamed_tile_asset_loaded = nullptr;
     const gbs::TopDownActorSpriteData* actor_sprite = selected_player_sprite_data();
     const gbs::SpriteAnimation* initial_animation = actor_sprite != nullptr
@@ -3049,6 +3054,7 @@ int initialize_topdown_runtime() {
         gbs::play_music(project.music_assets[0]);
     }
     gbs::init_sprite_animator(player_animator);
+    player_walk_clip_active = false;
     if (project.player.animation != nullptr) {
         gbs::play_sprite_animation(player_animator, *project.player.animation);
     }
@@ -3114,6 +3120,7 @@ gbs::RuntimeAdapterFrameResult update_topdown_runtime(const gbs::RuntimeFrameCon
         gbs::debug_begin_frame(gbs::frame_count());
         debug_work_units = 0;
         player_moved_this_frame = false;
+        player_animation_travelled_pixels = gbs::Vec2i { 0, 0 };
         current_input = gbs::begin_frame().input;
         const gbs::InputState input = current_input;
 #ifdef GBS_MULTI_RUNTIME
@@ -3282,6 +3289,10 @@ gbs::RuntimeAdapterFrameResult update_topdown_runtime(const gbs::RuntimeFrameCon
                 }
                 player_moved_this_frame = player.position_pixels.x != player_position_before_update.x ||
                     player.position_pixels.y != player_position_before_update.y;
+                player_animation_travelled_pixels = gbs::Vec2i {
+                    player.position_pixels.x - player_position_before_update.x,
+                    player.position_pixels.y - player_position_before_update.y
+                };
                 if (player.speed_pixels > 0 && !player_moved_this_frame && player_wants_to_move) {
                     gbs::Rect attempted_rect = gbs::actor_rect(player);
                     if (player_input.is_held(gbs::ButtonRight)) ++attempted_rect.x;
@@ -3299,7 +3310,8 @@ gbs::RuntimeAdapterFrameResult update_topdown_runtime(const gbs::RuntimeFrameCon
                         runtime_blocked_direction_bits |= runtime_input_direction_bits(player_input);
                     runtime_telemetry.seen_slope_bits |= runtime_slope_bits_in_rect(room.collision, attempted_rect);
                 }
-                refresh_player_directional_animation(player_wants_to_move);
+                refresh_player_directional_animation(player_wants_to_move && (player_moved_this_frame ||
+                    gbs::player_has_walk_path(room.collision, player, player_input, player_blockers, player_blocker_count)));
             }
 
             const gbs::TopDownRoomData& ai_room = project.rooms[current_room];
@@ -3609,7 +3621,8 @@ void render_topdown_runtime(const gbs::RuntimeFrameContext& context) {
         }
 
         if (player_moved_this_frame) {
-            gbs::update_sprite_animator_scaled(player_animator, project.player.animation_speed_percent);
+            gbs::update_sprite_animator_travel(player_animator, player_animation_travelled_pixels, project.player.animation_speed_percent);
+            player_animation_travelled_pixels = gbs::Vec2i { 0, 0 };
         }
         for (size_t index = 0; index < npc_count; ++index) {
             if (npc_runtimes[index].active || npc_defeat_pending_despawn[index]) {

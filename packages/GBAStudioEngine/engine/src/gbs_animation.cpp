@@ -90,6 +90,25 @@ bool set_sprite_animation_frame(SpriteAnimatorState& state, int frame_index) {
     return true;
 }
 
+bool continue_sprite_animation(SpriteAnimatorState& state, const SpriteAnimation& animation) {
+    const SpriteAnimatorState previous = state;
+    const bool compatible = previous.playing && previous.animation != nullptr &&
+        previous.animation->loop && animation.loop &&
+        previous.animation->frame_count == animation.frame_count &&
+        previous.frame_index < animation.frame_count;
+    if (!play_sprite_animation(state, animation)) return false;
+    if (compatible) {
+        const uint32_t old_duration = previous.animation->frames[previous.frame_index].duration_frames;
+        const uint32_t duration = animation.frames[previous.frame_index].duration_frames;
+        const uint32_t elapsed = (old_duration - previous.frames_remaining) * 100 + previous.frame_progress_x100;
+        const uint32_t mapped = elapsed * duration / old_duration;
+        state.frame_index = previous.frame_index;
+        state.frames_remaining = static_cast<uint8_t>(duration - mapped / 100);
+        state.frame_progress_x100 = static_cast<uint16_t>(mapped % 100);
+    }
+    return true;
+}
+
 void stop_sprite_animation(SpriteAnimatorState& state) {
     state.playing = false;
 }
@@ -114,6 +133,22 @@ void update_sprite_animator_scaled(SpriteAnimatorState& state, int speed_percent
         state.frame_progress_x100 = static_cast<uint16_t>(state.frame_progress_x100 - 100);
         advance_sprite_animator_one_tick(state);
     }
+}
+
+void update_sprite_animator_travel(SpriteAnimatorState& state, Vec2i actual_travel, int speed_percent) {
+    if (!state.playing || state.animation == nullptr || (actual_travel.x == 0 && actual_travel.y == 0)) return;
+    const uint32_t dx = static_cast<uint32_t>(actual_travel.x < 0 ? -int64_t(actual_travel.x) : actual_travel.x);
+    const uint32_t dy = static_cast<uint32_t>(actual_travel.y < 0 ? -int64_t(actual_travel.y) : actual_travel.y);
+    // 141/100 approximates sqrt(2) without floating point on the GBA.
+    const uint64_t distance = dx > dy ? uint64_t(dx) * 100 + uint64_t(dy) * 41
+                                     : uint64_t(dy) * 100 + uint64_t(dx) * 41;
+    const uint32_t bounded_distance = static_cast<uint32_t>(distance > 65535 ? 65535 : distance);
+    uint32_t progress = state.frame_progress_x100 + bounded_distance * clamp_animation_speed_percent(speed_percent) / 100;
+    while (progress >= 100 && state.playing) {
+        progress -= 100;
+        advance_sprite_animator_one_tick(state);
+    }
+    state.frame_progress_x100 = static_cast<uint16_t>(state.playing ? progress : 0);
 }
 
 const MetaSprite* current_metasprite(const SpriteAnimatorState& state) {

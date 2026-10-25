@@ -786,6 +786,25 @@ PortalHit check_portal_hits(const Room& room, const Actor& player, int current_r
     };
 }
 
+bool player_has_walk_path(const TileMap& map, const Actor& player, InputState input, const Actor* actors, size_t actor_count) {
+    int dx = int(input.is_held(ButtonRight)) - int(input.is_held(ButtonLeft));
+    int dy = int(input.is_held(ButtonDown)) - int(input.is_held(ButtonUp));
+    if (!player.allow_diagonal && dx && dy) {
+        if (player.direction == (dx < 0 ? 2 : 3)) dy = 0;
+        else dx = 0;
+    }
+    const Vec2i candidates[] = { { dx, 0 }, { 0, dy } };
+    for (const Vec2i delta : candidates) {
+        if (delta.x == 0 && delta.y == 0) continue;
+        Rect candidate = actor_rect(player, player.position_pixels);
+        candidate.x += delta.x;
+        candidate.y += delta.y;
+        if (!rect_hits_blocking_tile(map, candidate, delta) &&
+            !rect_hits_any_blocking_actor(candidate, player, actors, actor_count)) return true;
+    }
+    return false;
+}
+
 WarpResult check_portals(const Room& room, const Actor& player, int current_room_index) {
     return check_portal_hits(room, player, current_room_index).warp;
 }

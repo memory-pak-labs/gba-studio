@@ -475,9 +475,9 @@ tween-test: $(HOST_BUILD)/tween_tests
 math-test: $(HOST_BUILD)/math_tests
 	$(HOST_BUILD)/math_tests
 
-$(HOST_BUILD)/animation_tests: tests/host/animation_tests.cpp engine/src/gbs_animation.cpp
+$(HOST_BUILD)/animation_tests: tests/host/animation_tests.cpp engine/src/gbs_animation.cpp engine/include/gbs/animation.hpp
 	@mkdir -p $(@D)
-	$(HOST_CXX) $(HOST_CXXFLAGS) $^ -o $@
+	$(HOST_CXX) $(HOST_CXXFLAGS) $(filter %.cpp,$^) -o $@
 
 .PHONY: animation-streaming-test
 host-test: animation-streaming-test paged-background-test
