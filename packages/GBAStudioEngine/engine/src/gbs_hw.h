@@ -132,6 +132,8 @@ void gbs_hw_dma_copy(int channel, const void* source, volatile void* destination
 void gbs_hw_hdma_start(int channel, const void* source, volatile void* destination, uint32_t units, int word_sized);
 void gbs_hw_hdma_stop(int channel);
 void gbs_hw_start_hblank_bg_scroll(int layer, const int16_t* offsets);
+void gbs_hw_start_hblank_window1(const uint16_t* bounds);
+void gbs_hw_disable_hblank_window1(void);
 void gbs_hw_disable_hblank_effects(void);
 void gbs_hw_start_hblank_affine(int layer, const uint32_t* words);
 uint32_t* gbs_hw_hblank_affine_buffer(void);

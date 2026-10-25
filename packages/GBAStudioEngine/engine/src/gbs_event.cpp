@@ -1283,7 +1283,7 @@ EventStepResult execute_event_command(
         break;
     case EventOp::Visibility:
         push_actor_command(state, (command.d & 128) != 0 ? EventActorOp::VisibilityReveal : EventActorOp::VisibilityLantern,
-            command.a, static_cast<uint16_t>(command.b), clamp_int(command.c, 0, 3600), clamp_int(command.d & 127, 0, 100));
+            command.a, static_cast<uint16_t>(command.b), clamp_int(command.c, 0, 3600), clamp_int(command.d & 127, 0, 100) | (command.d & 256));
         break;
     case EventOp::VisualEffect:
         if (runtime_transition.pending &&

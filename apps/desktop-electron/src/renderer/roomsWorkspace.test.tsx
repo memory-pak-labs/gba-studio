@@ -1038,7 +1038,8 @@ describe("RoomsWorkspace React smoke", () => {
       "salvar",
       "menu_start",
       "farol_interior",
-      "circuito_perspectiva"
+      "circuito_perspectiva",
+      "galeria_das_mares"
     ]);
 
     for (const scene of hudScenes) {

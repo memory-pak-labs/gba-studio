@@ -101,6 +101,11 @@ static uint32_t affine_hblank_words[2][161 * 4] __attribute__((section(".ewram_b
 static uint8_t affine_hblank_active_buffer;
 static uint8_t affine_hblank_enabled;
 static uint8_t affine_hblank_layer;
+static uint16_t window1_hblank_rows[2][161] __attribute__((section(".ewram_bss"), aligned(4)));
+static uint8_t window1_hblank_active_buffer;
+static uint8_t window1_hblank_active;
+static uint8_t pending_window1_hblank_enabled;
+static uint8_t pending_window1_hblank_dirty;
 
 static volatile uint8_t hblank_dma_active_mask;
 static volatile uint8_t keypad_irq_pending;
@@ -114,6 +119,7 @@ static uint8_t pcm_timer_running;
 static uint8_t pcm_stop_after_pending;
 static void commit_pcm_stream_block(void);
 static void rearm_active_affine_hblank(void);
+static void rearm_active_window1_hblank(void);
 // Hardware-only host links may omit the mixer; the engine supplies this hook.
 void __attribute__((weak)) gbs_audio_vblank_update(void) {}
 
@@ -261,7 +267,8 @@ void gbs_hw_irq_dispatch(void) {
         keypad_irq_pending = 1;
     }
     if ((pending & 1u) != 0) {
-        if (affine_hblank_enabled) rearm_active_affine_hblank();
+        if (window1_hblank_active) rearm_active_window1_hblank();
+        else if (affine_hblank_enabled) rearm_active_affine_hblank();
         commit_pcm_stream_block();
         gbs_audio_vblank_update();
     }
@@ -413,10 +420,17 @@ static void rearm_active_affine_hblank(void) {
 
 static void commit_hblank_bg_scroll(void) {
     if (!affine_hblank_enabled && !pending_hblank_scroll_enabled && !pending_hblank_scroll_dirty) {
-        return;
+        if (!window1_hblank_active && !pending_window1_hblank_dirty) return;
     }
     gbs_hw_hdma_stop(0);
-    if(affine_hblank_enabled) {
+    if (pending_window1_hblank_dirty) {
+        window1_hblank_active = pending_window1_hblank_enabled;
+        if (window1_hblank_active) window1_hblank_active_buffer ^= 1u;
+        pending_window1_hblank_dirty = 0;
+    }
+    if (window1_hblank_active) {
+        rearm_active_window1_hblank();
+    } else if(affine_hblank_enabled) {
         if(pending_hblank_scroll_dirty) affine_hblank_active_buffer ^= 1u;
         rearm_active_affine_hblank();
     } else if (pending_hblank_scroll_enabled && pending_hblank_scroll_offsets != 0) {
@@ -424,6 +438,13 @@ static void commit_hblank_bg_scroll(void) {
         gbs_hw_hdma_start(0, pending_hblank_scroll_offsets, destination, 1, 0);
     }
     pending_hblank_scroll_dirty = 0;
+}
+
+static void rearm_active_window1_hblank(void) {
+    const uint16_t* rows = window1_hblank_rows[window1_hblank_active_buffer];
+    gbs_hw_hdma_stop(0);
+    REG_WIN1H = rows[0];
+    gbs_hw_hdma_start(0, rows + 1, (volatile void*)&REG_WIN1H, 1, 0);
 }
 
 static void stage_room_tilemap8(int layer, const uint8_t* tiles, int width, int height, int camera_x, int camera_y) {
@@ -986,6 +1007,10 @@ void gbs_hw_init(void) {
     commit_shadow_bg_scroll();
     affine_hblank_enabled=0;
     affine_hblank_active_buffer=0;
+    window1_hblank_active_buffer=0;
+    window1_hblank_active=0;
+    pending_window1_hblank_enabled=0;
+    pending_window1_hblank_dirty=0;
     pending_hblank_scroll_offsets = 0;
     pending_hblank_scroll_layer = 0;
     pending_hblank_scroll_enabled = 0;
@@ -3085,6 +3110,7 @@ void gbs_hw_start_hblank_affine(int layer,const uint32_t* words) {
     if(words!=pending) for(unsigned i=0;i<161u*4u;++i)pending[i]=words[i];
     affine_hblank_layer=(uint8_t)layer;
     affine_hblank_enabled=1;
+    gbs_hw_disable_hblank_window1();
     pending_hblank_scroll_enabled=0;
     pending_hblank_scroll_dirty=1;
 }
@@ -3094,6 +3120,7 @@ void gbs_hw_start_hblank_bg_scroll(int layer, const int16_t* offsets) {
         return;
     }
     affine_hblank_enabled=0;
+    gbs_hw_disable_hblank_window1();
     pending_hblank_scroll_layer = layer;
     pending_hblank_scroll_offsets = offsets;
     pending_hblank_scroll_enabled = 1;
@@ -3101,9 +3128,28 @@ void gbs_hw_start_hblank_bg_scroll(int layer, const int16_t* offsets) {
 }
 
 void gbs_hw_disable_hblank_effects(void) {
+    gbs_hw_disable_hblank_window1();
     affine_hblank_enabled=0;
     pending_hblank_scroll_enabled = 0;
     pending_hblank_scroll_dirty = 1;
+}
+
+void gbs_hw_start_hblank_window1(const uint16_t* bounds) {
+    if (bounds == 0) return;
+    uint16_t* pending = window1_hblank_rows[window1_hblank_active_buffer ^ 1u];
+    for (unsigned i = 0; i < 161; ++i) pending[i] = bounds[i];
+    pending_window1_hblank_enabled = 1;
+    pending_window1_hblank_dirty = 1;
+    affine_hblank_enabled = 0;
+    pending_hblank_scroll_enabled = 0;
+    pending_hblank_scroll_dirty = 1;
+}
+
+void gbs_hw_disable_hblank_window1(void) {
+    if (window1_hblank_active || pending_window1_hblank_enabled) {
+        pending_window1_hblank_enabled = 0;
+        pending_window1_hblank_dirty = 1;
+    }
 }
 
 int gbs_hw_get_vcount(void) {

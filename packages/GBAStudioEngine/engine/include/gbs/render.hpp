@@ -96,6 +96,11 @@ struct WindowConfig {
     bool enabled;
 };
 
+// One packed WIN1H value per display line plus the final HBlank sentinel.
+// Shares DMA0 with affine and scrolling raster effects.
+bool set_hblank_window1(const uint16_t* bounds, size_t count);
+void disable_hblank_window1();
+
 struct Sprite {
     int x;
     int y;

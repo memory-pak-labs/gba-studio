@@ -1,3 +1,4 @@
+import {preserveApprovedGallery} from './gallery-approved-project.mjs';
 import { materializeExampleAuthoring } from "./example-authoring-library.mjs";
 import { promoteApprovedCouncilV13 } from "./council-v13-promotion.mjs";
 import { promoteLostSignalMission } from './lost-signal-mission.mjs';
@@ -8768,7 +8769,7 @@ export function isVerticeShowcaseProject(data) {
     && sceneNames[0] === "logo"
     && requiredCampaignNames.every((name) => sceneNames.includes(name))
     && new Set(sceneNames).size === sceneNames.length
-    && sceneNames.every((name) => expectedSceneNameSet.has(name) || legacySupportSceneNames.has(name) || name === "oficina" || name === "circuito_perspectiva");
+    && sceneNames.every((name) => expectedSceneNameSet.has(name) || legacySupportSceneNames.has(name) || name === "oficina" || name === "circuito_perspectiva" || name === "galeria_das_mares");
 }
 
 // Regenerating campaign logic must retain the approved illustrated opening,
@@ -9013,7 +9014,7 @@ function buildExemploGBAVerticeCampaign(data) {
 }
 
 export function promoteExemploGBAVerticeCampaign(data) {
-  return promoteFarolRelay(pruneUnusedExampleAssets(promoteApprovedCouncilV13(promoteShowcaseSystems(promoteLostSignalMission(materializeExampleAuthoring(buildExemploGBAVerticeCampaign(data)))))));
+  return preserveApprovedGallery(data, promoteFarolRelay(pruneUnusedExampleAssets(promoteApprovedCouncilV13(promoteShowcaseSystems(promoteLostSignalMission(materializeExampleAuthoring(buildExemploGBAVerticeCampaign(data))))))));
 }
 
 const invokedPath = process.argv[1] ? fileURLToPath(import.meta.url) === process.argv[1] : false;

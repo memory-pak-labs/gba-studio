@@ -1,0 +1,152 @@
+{
+  "schemaVersion": 1,
+  "approval": {
+    "approved": true,
+    "date": "2026-10-24",
+    "variant": "Galeria V2.1",
+    "source": "User explicitly approved the visual/runtime review and authorized integration into the canonical example",
+    "runtimeReviewApproved": true
+  },
+  "scenes": [
+    "galeria_das_mares"
+  ],
+  "preservation": {
+    "existingAssetFiles": "preserved byte-for-byte",
+    "campaignOrder": "unchanged"
+  },
+  "assets": [
+    {
+      "id": "gallery-props",
+      "name": "gallery-props.png",
+      "reviewName": "gallery-props-review.png",
+      "path": "Assets/sprites/gallery-props.png",
+      "sha256": "a9c62a15e143f78805d667f7c4432e5e757bd168e817cf3dce3226c197722bac",
+      "width": 128,
+      "height": 32,
+      "consumer": "OBJ",
+      "license": "Project-owned AI-generated artwork",
+      "origin": "Original AI-generated artwork prepared without changing the approved pixels",
+      "sources": [
+        {
+          "origin": "AI-generated original interactive props",
+          "sha256": "61c6ca7b35e73ef59a5155292b667736a6213774f5a9c0c7a23d5cd29acdb165",
+          "width": 2172,
+          "height": 724
+        }
+      ],
+      "preparation": {
+        "filter": "nearest",
+        "approvedPngCopiedExactly": true,
+        "binaryAlpha": true,
+        "palette": "approved scene palette",
+        "frameWidth": 32,
+        "frameHeight": 32,
+        "frameCount": 4
+      }
+    },
+    {
+      "id": "gallery-tides",
+      "name": "gallery-tides.png",
+      "reviewName": "gallery-tides-clean-review.png",
+      "path": "Assets/backgrounds/gallery-tides.png",
+      "sha256": "5e22120456aa99e79e2d5604541bdbefdf734f861da9c7d10a20b5ce2483df6c",
+      "width": 384,
+      "height": 256,
+      "consumer": "BG",
+      "license": "Project-owned AI-generated artwork",
+      "origin": "Original AI-generated artwork prepared without changing the approved pixels",
+      "sources": [
+        {
+          "origin": "AI-generated original archive background",
+          "sha256": "0ab89b7640a1db381117b4537165f439a0922e66d87b5da05b9cb22b526c6ce8",
+          "width": 1536,
+          "height": 1024
+        },
+        {
+          "origin": "AI-generated edit: remove gate from doorway",
+          "sha256": "ad54c7190813c07d6ce5078a0778f24636cdd2efb91149b920e825e0bf29421a",
+          "width": 1536,
+          "height": 1024
+        }
+      ],
+      "preparation": {
+        "filter": "nearest",
+        "approvedPngCopiedExactly": true,
+        "bpp": 8
+      }
+    },
+    {
+      "id": "gallery-gate",
+      "name": "gallery-gate.png",
+      "reviewName": "gallery-gate-review.png",
+      "path": "Assets/sprites/gallery-gate.png",
+      "sha256": "bf7e7f9d8dc3ea72e28f37d83fb44b6e34aaf2fe7b6555ec107edabac9324e50",
+      "width": 256,
+      "height": 64,
+      "consumer": "OBJ",
+      "license": "Project-owned AI-generated artwork",
+      "origin": "Original AI-generated artwork prepared without changing the approved pixels",
+      "sources": [
+        {
+          "origin": "AI-generated horizontal double gate without overhead beam",
+          "sha256": "657a3f90efa9a73d60f09151fe839c3a895878cec8d07ba011e849e262df902e",
+          "width": 1983,
+          "height": 793
+        }
+      ],
+      "preparation": {
+        "filter": "nearest",
+        "approvedPngCopiedExactly": true,
+        "binaryAlpha": true,
+        "palette": "approved scene palette",
+        "frameWidth": 64,
+        "frameHeight": 64,
+        "frameCount": 4
+      }
+    }
+  ],
+  "gallery": {
+    "version": "V2.1",
+    "world": [
+      384,
+      256
+    ],
+    "viewport": [
+      240,
+      160
+    ],
+    "camera": "follow_player",
+    "background": "gallery-tides.png",
+    "gate": "gallery-gate.png",
+    "gateOpening": "horizontal double leaves; no overhead beam",
+    "gateAnimations": [
+      "closed",
+      "opening",
+      "open"
+    ],
+    "gateSpriteNativeOffset": [
+      -16,
+      -20
+    ],
+    "gateCollision": [
+      0,
+      0,
+      32,
+      32
+    ],
+    "light": "lantern player 120 120 58 3600 circle",
+    "hud": "hud-farol-trial",
+    "spriteFrameOrigin": [
+      -8,
+      -36
+    ],
+    "sourceTileOffset": [
+      -24,
+      0
+    ],
+    "gateActorPosition": [
+      35,
+      12
+    ]
+  }
+}

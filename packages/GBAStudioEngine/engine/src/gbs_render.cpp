@@ -953,4 +953,14 @@ void disable_hblank_effects() {
     clear_hblank_affine_raster();
 }
 
+bool set_hblank_window1(const uint16_t* bounds, size_t count) {
+    if (bounds == nullptr || count != 161) return false;
+    gbs_hw_start_hblank_window1(bounds);
+    return true;
+}
+
+void disable_hblank_window1() {
+    gbs_hw_disable_hblank_window1();
+}
+
 } // namespace gbs

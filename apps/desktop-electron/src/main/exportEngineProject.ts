@@ -400,6 +400,10 @@ export interface EngineExportTopdownRoom {
     on_enter?: EngineExportProjectEventCommand[];
     on_leave?: EngineExportProjectEventCommand[];
   }>;
+  interactions?: Array<{
+    area: { x: number; y: number; width: number; height: number };
+    script: EngineExportProjectEventCommand[];
+  }>;
   camera_zones?: EngineExportCameraZone[];
   npcs?: Array<{
     name: string;
@@ -6031,7 +6035,7 @@ function buildTopdownRooms(
       ? [{ op: "attach_button_event" as const, button: "start", index: startMenuScriptIndex, override: true }]
       : [];
     const mapRestore = mapStateRestoreCommands(data, room);
-    const restore = [...mapRestore, ...compileRestoreEvent(data, nullableStringField(eventBindings, "onRestore"), rooms, dialogues, audioItems, audioPack, events)];
+    const restore = [...mapRestore, ...compileRestoreEvent(data, nullableStringField(eventBindings, "onRestore"), rooms, dialogues, audioItems, audioPack, events), ...startMenuBinding];
     if (restore.length) roomData.on_restore = restore;
     const boot = mapRestore.length ? [...mapRestore, { op: "wait" as const, frames: 1 }, ...roomDialogueBoot] : roomDialogueBoot;
     const onEnterScript = mergeRoomOnEnterScript(boot, [...(onEnter ?? []), ...startMenuBinding]);
@@ -6081,6 +6085,8 @@ function buildTopdownRooms(
         const legacyExit = defaultRoomConnectionExitArea(width, height);
         const legacyEntry = defaultRoomConnectionEntryArea(targetWidth, targetHeight);
         const exitArea = connectionAreaField(connection, "exit", legacyExit);
+        // Event/actor links in the scene overview have no physical exit area.
+        if (exitArea.width <= 0 || exitArea.height <= 0) return [];
         const entryArea = connectionAreaField(connection, "entry", legacyEntry);
         if (roomData.paged_source_tiles && projectArray(data, "triggers").some(trigger => {
           const eventName = nullableStringField(connection, "eventName");
@@ -6157,6 +6163,13 @@ function buildTopdownRooms(
           ...(onLeave && onLeave.length > 0 ? { on_leave: onLeave } : {})
         }];
       });
+      const interactions = triggers.flatMap((trigger) => {
+        const script = scriptForEventName(data, resolveTriggerInteractEventName(trigger), events, rooms, dialogues, audioItems, audioPack);
+        if (!script?.length) return [];
+        const bounds = entityBounds(trigger, "trigger", { x: 0, y: 0, width: 1, height: 1 });
+        return [{ area: gbaTopdownAreaToPixels(bounds), script }];
+      });
+      if (interactions.length) roomData.interactions = interactions;
     }
 
     if (npcs.length > 0) {

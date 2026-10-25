@@ -7,6 +7,38 @@ gbs::VisualEffectsController scene_transition_effects {};
 bool scene_transition_effects_initialized = false;
 gbs::VisibilityEffectController visibility_controller {};
 bool visibility_rendered = false;
+bool visibility_raster_rendered = false;
+uint16_t visibility_window_rows[161] {};
+uint16_t circle_half_width[241] {};
+int cached_circle_radius = -1;
+int clamp_value(int value, int minimum, int maximum);
+
+void release_visibility_raster() {
+    if (visibility_raster_rendered) gbs::disable_hblank_window1();
+    visibility_raster_rendered = false;
+}
+
+void build_circular_window(gbs::Vec2i center, int radius) {
+    if (radius != cached_circle_radius) {
+        int span = radius;
+        for (int dy = 0; dy <= radius; ++dy) {
+            while (span * span + dy * dy > radius * radius) --span;
+            circle_half_width[dy] = static_cast<uint16_t>(span);
+        }
+        cached_circle_radius = radius;
+    }
+    for (int y = 0; y < 160; ++y) {
+        int dy = y - center.y;if (dy < 0) dy = -dy;
+        int left = 0, right = 0;
+        if (dy < radius) {
+            const int span = circle_half_width[dy];
+            left = clamp_value(center.x - span, 0, 240);
+            right = clamp_value(center.x + span, 0, 240);
+        }
+        visibility_window_rows[y] = static_cast<uint16_t>((left << 8) | right);
+    }
+    visibility_window_rows[160] = 0;
+}
 
 int clamp_value(int value, int minimum, int maximum) {
     if (value < minimum) return minimum;
@@ -119,13 +151,14 @@ VisualEffectsController& scene_transition_controller() {
 const VisibilityEffectController& visibility_effect() { return visibility_controller; }
 
 void stop_visibility_effect() {
+    release_visibility_raster();
     disable_window1();
     if (visibility_rendered) disable_blending();
     visibility_controller = {};
     visibility_rendered = false;
 }
 
-void start_visibility_effect(int actor, int width, int height, int intensity, int frames, bool reveal) {
+void start_visibility_effect(int actor, int width, int height, int intensity, int frames, bool reveal, bool circular) {
     stop_visibility_effect();
     if (frames <= 0 || actor < -1 || actor >= static_cast<int>(max_event_actor_state_slots)) return;
     visibility_controller.actor = static_cast<int16_t>(actor);
@@ -136,6 +169,7 @@ void start_visibility_effect(int actor, int width, int height, int intensity, in
     visibility_controller.remaining_frames = visibility_controller.duration_frames;
     visibility_controller.reveal = reveal;
     visibility_controller.active = true;
+    visibility_controller.circular = circular;
 }
 
 void consume_visibility_event_commands(const EventState& state) {
@@ -143,7 +177,7 @@ void consume_visibility_event_commands(const EventState& state) {
         const EventActorCommand& command = state.actor_commands[i];
         if (command.op != EventActorOp::VisibilityLantern && command.op != EventActorOp::VisibilityReveal) continue;
         start_visibility_effect(command.actor_index, (command.a >> 8) & 255, command.a & 255,
-            command.c, command.b, command.op == EventActorOp::VisibilityReveal);
+            command.c & 127, command.b, command.op == EventActorOp::VisibilityReveal, (command.c & 256) != 0);
     }
 }
 
@@ -154,7 +188,10 @@ VisibilityRenderStatus visibility_render_status(const VisualEffectsController& o
         other.kind == VisualEffectKind::ColorFade || other.kind == VisualEffectKind::PaletteFlash ||
         other.kind == VisualEffectKind::Mask || other.kind == VisualEffectKind::Letterbox ||
         other.kind == VisualEffectKind::Push || other.kind == VisualEffectKind::Pull);
-    return shared_effect ? VisibilityRenderStatus::EffectOwnsResources : VisibilityRenderStatus::Visible;
+    const bool raster_effect = visibility_controller.circular && other.active &&
+        (other.kind == VisualEffectKind::Wave || other.kind == VisualEffectKind::WaterRipple ||
+         other.kind == VisualEffectKind::ParallaxLineScroll);
+    return shared_effect || raster_effect ? VisibilityRenderStatus::EffectOwnsResources : VisibilityRenderStatus::Visible;
 }
 
 void render_visibility_effects(Vec2i center_screen, const VisualEffectsController& other, bool transition_active) {
@@ -162,6 +199,7 @@ void render_visibility_effects(Vec2i center_screen, const VisualEffectsControlle
     const VisibilityRenderStatus status = visibility_render_status(other, transition_active);
     if (status == VisibilityRenderStatus::Inactive) return;
     if (status != VisibilityRenderStatus::Visible) {
+        release_visibility_raster();
         disable_window1();
         visibility_rendered = false;
         return;
@@ -178,7 +216,13 @@ void render_visibility_effects(Vec2i center_screen, const VisualEffectsControlle
     const bool visible = left < right && top < bottom;
     const WindowRect rect = visible ? WindowRect { static_cast<uint8_t>(left), static_cast<uint8_t>(right),
         static_cast<uint8_t>(top), static_cast<uint8_t>(bottom) } : WindowRect { 0, 1, 0, 1 };
-    set_window1(WindowConfig { rect, static_cast<uint16_t>(visible ? 0x1F : 0x3F), 0x3F, true });
+    if (effect.circular) {
+        build_circular_window(center_screen, (width < height ? width : height) / 2);
+        // DMA owns WIN1H while the circle is active. Rewriting the full-width
+        // rectangle during visible rendering leaks light onto that scanline.
+        if (!visibility_raster_rendered) set_window1(WindowConfig { {0, 240, 0, 160}, 0x1F, 0x3F, true });
+        visibility_raster_rendered = set_hblank_window1(visibility_window_rows, 161);
+    } else set_window1(WindowConfig { rect, static_cast<uint16_t>(visible ? 0x1F : 0x3F), 0x3F, true });
     set_blending(BlendConfig { 0x3F, 0, BlendMode::Darken, 0, 0, static_cast<uint8_t>((effect.intensity * 16) / 100) });
     visibility_rendered = true;
 }

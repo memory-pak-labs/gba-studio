@@ -38,6 +38,48 @@ def function_body(source: str, name: str) -> str:
 
 
 class HardwareSourceContractTests(unittest.TestCase):
+    def test_circular_window_publishes_complete_rows_and_rearms_after_missed_frames(self):
+        source = HARDWARE_SOURCE.read_text()
+        start = function_body(source, "gbs_hw_start_hblank_window1")
+        stop = function_body(source, "gbs_hw_disable_hblank_window1")
+        rearm = function_body(source, "rearm_active_window1_hblank")
+        commit = function_body(source, "commit_hblank_bg_scroll")
+        code = '''#include <stdint.h>
+#include <assert.h>
+uint16_t REG_WIN1H;
+static uint16_t window1_hblank_rows[2][161];
+static uint8_t window1_hblank_active_buffer,window1_hblank_active;
+static uint8_t pending_window1_hblank_enabled,pending_window1_hblank_dirty;
+static uint8_t affine_hblank_enabled,affine_hblank_active_buffer;
+static uint8_t pending_hblank_scroll_enabled,pending_hblank_scroll_dirty;
+static int pending_hblank_scroll_layer;
+static const int16_t* pending_hblank_scroll_offsets;
+static int arms;static const uint16_t* armed_rows;
+void gbs_hw_hdma_stop(int channel){assert(channel==0);}
+void gbs_hw_hdma_start(int channel,const void* rows,volatile void* dest,uint32_t units,int words){
+ assert(channel==0 && dest==&REG_WIN1H && units==1 && words==0);++arms;armed_rows=(const uint16_t*)rows;
+}
+void rearm_active_affine_hblank(void){}
+void rearm_active_window1_hblank(void) REARM
+void start(const uint16_t* bounds) START
+void stop(void) STOP
+void commit(void) COMMIT
+int main(void){
+ uint16_t a[161],b[161];for(int i=0;i<161;++i){a[i]=(uint16_t)(i+10);b[i]=(uint16_t)(i+1000);}
+ start(a);assert(arms==0 && !window1_hblank_active);commit();assert(arms==1 && REG_WIN1H==10 && armed_rows[0]==11 && armed_rows[159]==170);
+ const uint16_t* active=armed_rows;start(b);assert(armed_rows==active && active[0]==11);
+ rearm_active_window1_hblank();assert(armed_rows==active && REG_WIN1H==10);
+ commit();assert(armed_rows!=active && REG_WIN1H==1000 && armed_rows[159]==1160);
+ rearm_active_window1_hblank();assert(REG_WIN1H==1000 && armed_rows[0]==1001);
+ stop();commit();assert(!window1_hblank_active);int calls=arms;commit();assert(arms==calls);
+ start(0);commit();assert(arms==calls);
+}
+'''.replace('REARM',rearm).replace('START',start).replace('STOP',stop).replace('COMMIT',commit)
+        with tempfile.TemporaryDirectory() as directory:
+            file=Path(directory)/'window.c';file.write_text(code);binary=Path(directory)/'window'
+            subprocess.run(['cc',str(file),'-o',str(binary)],check=True)
+            subprocess.run([str(binary)],check=True)
+
     def test_audio_profiler_measures_the_vblank_mixer_work(self):
         body = function_body(AUDIO_SOURCE.read_text(), "audio_vblank_update")
         code = '''
@@ -685,6 +727,9 @@ int main() {
 #include <assert.h>
 uint16_t REG_IF=1,REG_IE=1,BIOS_IRQ_FLAGS=0;int keypad_irq_pending,arms;
 static int affine_hblank_enabled=1;
+static int window1_hblank_active=0;
+static int window_arms;
+static void rearm_active_window1_hblank(void){++window_arms;}
 static uint32_t ticks,irq_ticks;
 uint32_t gbs_hw_frame_counter_ticks(void){return ticks++;}
 void record_irq(uint32_t elapsed){irq_ticks+=elapsed;}
@@ -692,7 +737,7 @@ void (*gbs_profiler_record_irq)(uint32_t)=record_irq;
 static void rearm_active_affine_hblank(void){++arms;}
 void commit_pcm_stream_block(void){} void gbs_audio_vblank_update(void){} void gbs_dispatch_hardware_interrupts(uint16_t flags){}
 void dispatch(void) {"""+irq+"""}
-int main(void){dispatch();dispatch();assert(arms==2);assert(irq_ticks==2);REG_IF=0;dispatch();assert(arms==2);assert(irq_ticks==2);}
+int main(void){dispatch();dispatch();assert(arms==2);assert(irq_ticks==2);REG_IF=0;dispatch();assert(arms==2);assert(irq_ticks==2);REG_IF=1;window1_hblank_active=1;dispatch();dispatch();assert(window_arms==2 && arms==2);}
 """
         with tempfile.TemporaryDirectory() as directory:
             source=Path(directory)/"irq.c";source.write_text(code);binary=Path(directory)/"irq"

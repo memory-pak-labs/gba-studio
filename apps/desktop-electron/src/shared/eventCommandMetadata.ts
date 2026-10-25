@@ -2,8 +2,8 @@ import { TILE_REPLACEMENT_COLLISIONS } from "./tileReplacement.js";
 
 /** Authoring metadata only. Never rewrites a command or its serialized arguments. */
 const parameterLabels: Record<string, string[]> = {
-  lantern: ["Ator", "Largura (pixels, 8–240)", "Altura (pixels, 8–160)", "Escuridão (0–100%)", "Duração (quadros, 1–3600)"],
-  reveal_area: ["Ator", "Largura inicial (pixels, 8–240)", "Altura inicial (pixels, 8–160)", "Escuridão (0–100%)", "Duração (quadros, 1–3600)"],
+  lantern: ["Ator", "Largura (pixels, 8–240)", "Altura (pixels, 8–160)", "Escuridão (0–100%)", "Duração (quadros, 1–3600)", "Formato opcional (circle)"],
+  reveal_area: ["Ator", "Largura inicial (pixels, 8–240)", "Altura inicial (pixels, 8–160)", "Escuridão (0–100%)", "Duração (quadros, 1–3600)", "Formato opcional (circle)"],
   set_map_state: ["Estado de mapa (ID)", "Variante (ID)"],
   replace_tile: ["X (tiles)", "Y (tiles)", "Tile", "Camada", "Colisão"],
   replace_tile_sequence: ["X (tiles)", "Y (tiles)", "Tile", "Quantidade", "Camada", "Colisão"],
@@ -53,8 +53,8 @@ const parameterLabels: Record<string, string[]> = {
 };
 
 const descriptions: Record<string, string> = {
-  lantern: "Área retangular iluminada que acompanha o ator. Escurece o exterior durante a duração escolhida. Fades e máscaras têm prioridade enquanto ativos.",
-  reveal_area: "Expande a área retangular ao redor do ator até revelar a tela. Largura e altura definem a abertura inicial; ao terminar, remove o escurecimento.",
+  lantern: "Ilumina uma área ao redor do ator e escurece o exterior. Acrescente circle após a duração para luz circular, com largura e altura iguais. Fades e máscaras têm prioridade; o círculo compartilha DMA0 com efeitos raster.",
+  reveal_area: "Expande a área ao redor do ator até revelar a tela. Acrescente circle após a duração para uma abertura circular, com largura e altura iniciais iguais. Ao terminar, remove o escurecimento.",
   clear_visibility: "Remove a lanterna ou a revelação e restaura a visibilidade da cena.",
   set_map_state: "Aplica uma variante nomeada com tiles, colisão e variável persistente. Configure os estados na cena. O estado é restaurado ao voltar à cena ou carregar o save.",
   replace_tile: "Troca um tile da cena. BG0 é o alias do piso BG2. Colisão keep preserva o terreno; free libera a passagem. Alterações valem durante a visita à cena.",

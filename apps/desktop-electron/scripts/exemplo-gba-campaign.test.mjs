@@ -53,7 +53,7 @@ describe("campanha canônica O Último Farol", () => {
       startScene: "logo",
       startSceneType: "cutscene"
     });
-    expect(project.scenas).toHaveLength(VERTICE_CAMPAIGN_SCENES.length + VERTICE_SUPPORT_SCENES.length);
+    expect(project.scenas).toHaveLength(VERTICE_CAMPAIGN_SCENES.length + VERTICE_SUPPORT_SCENES.length + 1);
     expect(project.scenas.some((scene) => scene.sceneType === "custom")).toBe(false);
 
     for (const [chapter, definition] of VERTICE_CAMPAIGN_SCENES.entries()) {
@@ -116,7 +116,7 @@ describe("campanha canônica O Último Farol", () => {
     expect(flow.unreachableScenes).toEqual([]);
     expect(flow.invalidTransitions).toEqual([]);
     expect(flow.deadEnds).toEqual([]);
-    expect(flow.reachableScenes).toHaveLength(VERTICE_CAMPAIGN_SCENES.length + VERTICE_SUPPORT_SCENES.length);
+    expect(flow.reachableScenes).toHaveLength(VERTICE_CAMPAIGN_SCENES.length + VERTICE_SUPPORT_SCENES.length + 1);
     const sortTransitions = (transitions) => [...transitions].sort((left, right) => (
       left.from.localeCompare(right.from) || left.to.localeCompare(right.to)
     ));
@@ -132,6 +132,8 @@ describe("campanha canônica O Último Farol", () => {
       { from: "arena_tatica", to: "mercado_suspenso" },
       { from: "porto_lumen", to: "farol_interior" },
       { from: "farol_interior", to: "porto_lumen" },
+      {from:"farol_interior",to:"galeria_das_mares"},
+      {from:"galeria_das_mares",to:"farol_interior"},
       ...VERTICE_CAMPAIGN_SCENES
         .filter(({ name }) => name !== "titulo" && name !== "mapa_rota")
         .map(({ name, nextScene }) => ({ from: name, to: nextScene })),
@@ -738,6 +740,7 @@ describe("campanha canônica O Último Farol", () => {
       "var_rtc_minute",
       "porto_player_health", "var_penedos_farol", "penedos_player_health", "penedos_tokens",
       "penedos_defeated_crab", "penedos_defeated_moth", "penedos_defeated_crab_east", "penedos_defeated_moth_east",
+      "z_feature_quest_state", "z_feature_shop_stock", "var_gallery_gate", "var_gallery_record",
       ...LOST_SIGNAL_VARIABLES, ...SHOWCASE_VARIABLES, FAROL_RELAY.variable
     ]));
     expect(VERTICE_PROGRESS_KEYS).toHaveLength(15);

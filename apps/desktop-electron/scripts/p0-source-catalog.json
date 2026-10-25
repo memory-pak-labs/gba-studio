@@ -2061,6 +2061,24 @@
           "sha256": "80ac915233dcd96cb84f98f455974d9570c3097449b288f7c399ea5a0caf20bd",
           "contract": "farol-relay-v2-approved",
           "provenance": "fixtures/asset-provenance/farol-relay-v2.json"
+        },
+        {
+          "path": "Assets/sprites/gallery-props.png",
+          "sha256": "a9c62a15e143f78805d667f7c4432e5e757bd168e817cf3dce3226c197722bac",
+          "contract": "campaign-evolutions-user-approved-2026-10-24",
+          "provenance": "fixtures/asset-provenance/gallery-v21-approved.json"
+        },
+        {
+          "path": "Assets/backgrounds/gallery-tides.png",
+          "sha256": "5e22120456aa99e79e2d5604541bdbefdf734f861da9c7d10a20b5ce2483df6c",
+          "contract": "campaign-evolutions-user-approved-2026-10-24",
+          "provenance": "fixtures/asset-provenance/gallery-v21-approved.json"
+        },
+        {
+          "path": "Assets/sprites/gallery-gate.png",
+          "sha256": "bf7e7f9d8dc3ea72e28f37d83fb44b6e34aaf2fe7b6555ec107edabac9324e50",
+          "contract": "campaign-evolutions-user-approved-2026-10-24",
+          "provenance": "fixtures/asset-provenance/gallery-v21-approved.json"
         }
       ],
       "retired": [

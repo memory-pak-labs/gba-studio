@@ -36,13 +36,14 @@ struct VisibilityEffectController {
     uint8_t intensity;
     bool reveal;
     bool active;
+    bool circular;
 };
 
 enum class VisibilityRenderStatus : uint8_t { Inactive, Visible, TransitionOwnsResources, EffectOwnsResources };
 // WIN1 + brightness are exclusive with transitions and window/blend effects.
 VisibilityRenderStatus visibility_render_status(const VisualEffectsController& other, bool transition_active = false);
 const VisibilityEffectController& visibility_effect();
-void start_visibility_effect(int actor, int width, int height, int intensity, int frames, bool reveal);
+void start_visibility_effect(int actor, int width, int height, int intensity, int frames, bool reveal, bool circular = false);
 void stop_visibility_effect();
 void consume_visibility_event_commands(const EventState& state);
 // Fade/mask transitions own the shared hardware effects while active.

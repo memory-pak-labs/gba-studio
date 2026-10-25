@@ -46,7 +46,7 @@ function canonicalVerticeSceneCount() {
   const sceneNames = [
     ...VERTICE_CAMPAIGN_SCENES.map((scene) => scene.name),
     ...VERTICE_SUPPORT_SCENES.map((scene) => scene.name),
-    "circuito_perspectiva"
+    "circuito_perspectiva", "galeria_das_mares"
   ].filter((name) => name !== "menu_inicial");
   return new Set(sceneNames).size;
 }
@@ -362,7 +362,7 @@ describe("materialização canônica de Vértice", () => {
     expect(project.scenas.slice(0, 6).map((scene) => scene.name)).toEqual([
       "logo", "abertura", "titulo", "prologo", "porto_lumen", "mapa_rota"
     ]);
-    expect(project.scenas).toHaveLength(31);
+    expect(project.scenas).toHaveLength(32);
     expect(project.scenas.some((scene) => scene.name === "menu_inicial")).toBe(false);
     expect(project.scenas).toHaveLength(canonicalVerticeSceneCount());
     expect(project.scenas.some((scene) => scene.sceneType === "custom")).toBe(false);
@@ -647,7 +647,7 @@ describe("materialização canônica de Vértice", () => {
   it("preserva a composição V2 aprovada e o carrossel de opções no título", () => {
     const saved = JSON.parse(readFileSync(templateURL, "utf8"));
     for (const project of [saved, promoteExemploGBAVerticeCampaign(saved)]) {
-      expect(project.scenas).toHaveLength(31);
+      expect(project.scenas).toHaveLength(32);
       const title = project.scenas.find((scene) => scene.name === "titulo");
       const titleOptions = title.runtime.config.screens.find((screen) => screen.id === "title_options");
       expect(title.backgroundAssetName).toBe("title-porto-lumen-240x160-4bpp.png");
@@ -2053,6 +2053,7 @@ describe("materialização canônica de Vértice", () => {
     for(const asset of Object.values(routeManifest.assets))allowedAssets.add(asset.name);
     for (const a of JSON.parse(readFileSync(new URL('../fixtures/asset-provenance/market-approved-manifest.json',import.meta.url))).assets) allowedAssets.add(a.name);
     for (const a of JSON.parse(readFileSync(new URL('../fixtures/asset-provenance/platformer-approved-manifest.json',import.meta.url))).assets) allowedAssets.add(a.name);
+    for(const a of JSON.parse(readFileSync(new URL('../fixtures/asset-provenance/gallery-v21-approved.json',import.meta.url))).assets)allowedAssets.add(a.name);
     expect(new Set(project.assets.map((asset) => asset.name))).toEqual(allowedAssets);
     expect(project.audioItems).toHaveLength(69);
     expect(project.audioItems.find(a=>a.name==='mapa_mar_aberto')).toMatchObject({bpm:84,format:'COMPOSED',loops:true});
@@ -2092,7 +2093,7 @@ describe("materialização canônica de Vértice", () => {
       "conselho_guardia",
       "circuito_final",
       "arena_tatica",
-      "circuito_perspectiva"
+      "circuito_perspectiva", "galeria_das_mares"
     ].includes(actor.roomName))).toBe(true);
   });
 

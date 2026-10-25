@@ -9592,12 +9592,15 @@ def event_command_from_json(command, description, animation_lookup=None):
         height = event_int(command, ["height"], 64)
         intensity = event_int(command, ["intensity"], 75)
         frames = event_int(command, ["frames"], 180)
+        shape = command.get("shape", "rectangle")
+        if shape not in ("rectangle", "circle") or (shape == "circle" and width != height):
+            raise SystemExit("Circular visibility requires equal width and height; shape must be rectangle or circle")
         if not (-1 <= actor < 96 and 8 <= width <= 240 and 8 <= height <= 160 and 0 <= intensity <= 100 and 1 <= frames <= 3600):
             raise SystemExit("Visibility actor, area, intensity or duration out of range")
         area = (width << 8) | height
         if area > 32767:
             area -= 65536
-        return (op, actor, area, frames, intensity | (128 if effect == "reveal" else 0))
+        return (op, actor, area, frames, intensity | (128 if effect == "reveal" else 0) | (256 if shape == "circle" else 0))
     if op == "ActorEffects":
         return (op, event_int(command, ["actor"], -1), event_int(command, ["index"], 0), event_int(command, ["frames"], 30), event_int(command, ["intensity"], 50))
     if op == "CancelActorMovement":

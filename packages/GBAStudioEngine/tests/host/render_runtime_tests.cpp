@@ -783,6 +783,8 @@ void gbs_hw_start_hblank_bg_scroll(int layer, const int16_t* offsets) {
     first_hblank_scroll = offsets[0];
 }
 void gbs_hw_disable_hblank_effects(void) { ++hblank_disable_calls; }
+void gbs_hw_start_hblank_window1(const uint16_t*) {}
+void gbs_hw_disable_hblank_window1(void) {}
 int gbs_hw_get_vcount(void) { return hblank_vcount; }
 void gbs_hw_apply_affine_bg_raster_line(int, int16_t, int16_t, int32_t, int32_t) {
     ++hblank_affine_calls;
