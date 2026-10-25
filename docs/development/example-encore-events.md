@@ -43,9 +43,30 @@ procedimentos, para conservar entradas executáveis na tabela de scripts.
 
 ## Reproduzir a validação
 
-Execute npm e Node a partir de `apps/desktop-electron`. Crie a cópia com
-`node scripts/prepare-encore-review.mjs DIRETORIO_QA`, após preparar seus dois
-assets em `DIRETORIO_QA/assets`. A cópia fica em `DIRETORIO_QA/project`.
+Execute npm e Node a partir de `apps/desktop-electron`:
+
+```sh
+node scripts/prepare-encore-review.mjs /novo/diretorio/externo
+```
+
+O diretório deve ser novo, com o pai existente, e ficar fora de todo o checkout,
+inclusive por links simbólicos. O script recusa sobrescritas. Por padrão, copia
+o projeto canônico sem reescrever seu JSON e confere os dois assets contra o
+manifesto aprovado. A cópia fica em `DIRETORIO_QA/project`; seus assets e manifesto
+ficam em `DIRETORIO_QA/assets`, e `review.json` identifica o modo e o hash da fonte.
+
+Para preparar uma nova proposta, coloque `recovered-radio.png` e
+`radio-lume-pcm.wav` em outra pasta e use explicitamente:
+
+```sh
+node scripts/prepare-encore-review.mjs /novo/diretorio/externo --candidate-assets=/pasta/com/os/assets
+```
+
+Nesse modo, os novos assets e o manifesto são marcados como candidatos, sem
+herdar a aprovação anterior. A origem e a licença dos arquivos novos precisam
+ser verificadas antes de uma promoção. Só a cópia de revisão recebe as substituições;
+cenários, atores e HUD do template continuam intactos. O script não promove
+assets nem altera o catálogo P0.
 
 `smoke-lost-signal-play.mjs SAIDA --project=PROJETO --encore=radio|arena|epilogue`
 dirige o Play real com botões. Use os caminhos `romPath` e `exportDir` de seu
