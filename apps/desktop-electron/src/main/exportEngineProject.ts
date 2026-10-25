@@ -464,6 +464,7 @@ export interface EngineExportTopdownProject {
     pushable?: boolean;
     affine_obj?: EngineExportAffineObj;
     speed: number;
+    allow_diagonal?: boolean;
     interact_button: string;
     emit_animation_fallback: boolean;
     on_start?: EngineExportProjectEventCommand[];
@@ -6330,6 +6331,7 @@ function buildTopdownProject(
       pushable: playerActor?.pushable === true,
       ...(playerAffineObj ? { affine_obj: playerAffineObj } : {}),
       speed: buildEngineTopdownPlayerSpeed(topdownSettings),
+      allow_diagonal: topdownSettings?.allowDiagonal !== false,
       interact_button: buildEngineInteractButton(topdownSettings),
       ...(playerOnStart && playerOnStart.length > 0 ? { on_start: playerOnStart } : {}),
       ...(playerOnUpdate && playerOnUpdate.length > 0 ? { on_update: playerOnUpdate } : {}),

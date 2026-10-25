@@ -14,7 +14,8 @@ describe("approved Porto Lumen actor and HUD integration", () => {
       const animations = (data.animations as any[]).filter((animation: any) => animation.spriteSheet === name);
       expect(animations).toHaveLength(8);
       expect(animations.filter(a => a.name.startsWith("walk_")).every(a => a.frameCount === 4)).toBe(true);
-      expect(animations[0]).toMatchObject({ frameCount: 1, hitboxWidth: 16, hitboxHeight: 16, originX: 0, originY: 0 });
+      const player = name === 'porto-nara-animations48.png';
+      expect(animations[0]).toMatchObject({ frameCount: 1, hitboxWidth: 16, hitboxHeight: player ? 8 : 16, hitboxY: player ? 0 : -8, originX: 0, originY: 0 });
     }
     expect((data.actors as any[]).find(actor => actor.id === "port-nara").spriteSheet).toBe("porto-nara-animations48.png");
   });

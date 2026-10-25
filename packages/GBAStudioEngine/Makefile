@@ -231,9 +231,9 @@ $(ISOMETRIC_GBA): $(ISOMETRIC_ELF)
 	$(GBAFIX) $@ -tGBS_ISO -cGBS0 -m00 -r00 >/dev/null
 	@echo "ROM gerada: $@"
 
-$(HOST_BUILD)/topdown_tests: tests/host/topdown_tests.cpp engine/src/gbs_topdown.cpp engine/src/gbs_event.cpp engine/src/gbs_dialogue_locale.cpp $(HOST_EVENT_RUNTIME_SRCS)
+$(HOST_BUILD)/topdown_tests: tests/host/topdown_tests.cpp engine/src/gbs_topdown.cpp engine/src/gbs_event.cpp engine/src/gbs_dialogue_locale.cpp $(HOST_EVENT_RUNTIME_SRCS) engine/include/gbs/topdown.hpp engine/include/gbs/project.hpp
 	@mkdir -p $(@D)
-	$(HOST_CXX) $(HOST_CXXFLAGS) $^ -o $@
+	$(HOST_CXX) $(HOST_CXXFLAGS) $(filter %.cpp,$^) -o $@
 
 $(HOST_BUILD)/topdown_fixture_tests: tests/host/topdown_fixture_tests.cpp engine/src/gbs_resource_manager.cpp engine/src/gbs_dma.cpp
 	@mkdir -p $(@D)

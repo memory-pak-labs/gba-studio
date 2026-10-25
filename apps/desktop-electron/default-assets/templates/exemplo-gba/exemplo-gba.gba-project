@@ -5278,9 +5278,9 @@
       "originX": 0,
       "originY": 0,
       "hitboxX": 0,
-      "hitboxY": -8,
+      "hitboxY": 0,
       "hitboxWidth": 16,
-      "hitboxHeight": 16,
+      "hitboxHeight": 8,
       "frames": [
         {
           "frameIndex": 0,
@@ -5337,9 +5337,9 @@
       "originX": 0,
       "originY": 0,
       "hitboxX": 0,
-      "hitboxY": -8,
+      "hitboxY": 0,
       "hitboxWidth": 16,
-      "hitboxHeight": 16,
+      "hitboxHeight": 8,
       "frames": [
         {
           "frameIndex": 0,
@@ -5510,9 +5510,9 @@
       "originX": 0,
       "originY": 0,
       "hitboxX": 0,
-      "hitboxY": -8,
+      "hitboxY": 0,
       "hitboxWidth": 16,
-      "hitboxHeight": 16,
+      "hitboxHeight": 8,
       "frames": [
         {
           "frameIndex": 0,
@@ -5569,9 +5569,9 @@
       "originX": 0,
       "originY": 0,
       "hitboxX": 0,
-      "hitboxY": -8,
+      "hitboxY": 0,
       "hitboxWidth": 16,
-      "hitboxHeight": 16,
+      "hitboxHeight": 8,
       "frames": [
         {
           "frameIndex": 0,
@@ -5742,9 +5742,9 @@
       "originX": 0,
       "originY": 0,
       "hitboxX": 0,
-      "hitboxY": -8,
+      "hitboxY": 0,
       "hitboxWidth": 16,
-      "hitboxHeight": 16,
+      "hitboxHeight": 8,
       "frames": [
         {
           "frameIndex": 0,
@@ -5801,9 +5801,9 @@
       "originX": 0,
       "originY": 0,
       "hitboxX": 0,
-      "hitboxY": -8,
+      "hitboxY": 0,
       "hitboxWidth": 16,
-      "hitboxHeight": 16,
+      "hitboxHeight": 8,
       "frames": [
         {
           "frameIndex": 0,
@@ -5974,9 +5974,9 @@
       "originX": 0,
       "originY": 0,
       "hitboxX": 0,
-      "hitboxY": -8,
+      "hitboxY": 0,
       "hitboxWidth": 16,
-      "hitboxHeight": 16,
+      "hitboxHeight": 8,
       "frames": [
         {
           "frameIndex": 0,
@@ -6033,9 +6033,9 @@
       "originX": 0,
       "originY": 0,
       "hitboxX": 0,
-      "hitboxY": -8,
+      "hitboxY": 0,
       "hitboxWidth": 16,
-      "hitboxHeight": 16,
+      "hitboxHeight": 8,
       "frames": [
         {
           "frameIndex": 0,
@@ -171308,11 +171308,11 @@
           ],
           [
             "solid",
-            28
+            27
           ],
           [
             "free",
-            4
+            5
           ],
           [
             "solid",
@@ -171332,11 +171332,11 @@
           ],
           [
             "solid",
-            26
+            25
           ],
           [
             "free",
-            4
+            5
           ],
           [
             "solid",
@@ -172726,11 +172726,11 @@
           ],
           [
             "solid",
-            28
+            27
           ],
           [
             "free",
-            4
+            5
           ],
           [
             "solid",
@@ -172750,11 +172750,11 @@
           ],
           [
             "solid",
-            26
+            25
           ],
           [
             "free",
-            4
+            5
           ],
           [
             "solid",
@@ -245878,11 +245878,11 @@
           ],
           [
             "solid",
-            28
+            27
           ],
           [
             "free",
-            4
+            5
           ],
           [
             "solid",
@@ -245902,11 +245902,11 @@
           ],
           [
             "solid",
-            26
+            25
           ],
           [
             "free",
-            4
+            5
           ],
           [
             "solid",
@@ -247296,11 +247296,11 @@
           ],
           [
             "solid",
-            28
+            27
           ],
           [
             "free",
-            4
+            5
           ],
           [
             "solid",
@@ -247320,11 +247320,11 @@
           ],
           [
             "solid",
-            26
+            25
           ],
           [
             "free",
-            4
+            5
           ],
           [
             "solid",
@@ -318890,15 +318890,16 @@
       }
     },
     "topdown": {
-      "allowDiagonal": false,
+      "allowDiagonal": true,
       "directionalAnimation": "4-way animation",
       "gridSize": "16 px",
       "interactButton": "A",
       "mirrorLeftFromRight": true,
       "movementBehavior": "Tile",
-      "movementType": "4 direcoes",
+      "movementType": "8 direcoes",
       "playerSprite": "canonical-topdown-actor-gba.png",
-      "walkSpeed": 1
+      "walkSpeed": 1,
+      "normalizeDiagonal": true
     },
     "uiDialogs": {
       "boxHeight": 40,

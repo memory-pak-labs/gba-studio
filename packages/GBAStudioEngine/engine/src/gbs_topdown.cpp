@@ -10,6 +10,47 @@ namespace {
 
 constexpr uint8_t max_path_nodes = 64;
 
+gbs::Vec2i player_input_delta(gbs::Actor& player, gbs::InputState input) {
+    int x = int(input.is_held(gbs::ButtonRight)) - int(input.is_held(gbs::ButtonLeft));
+    int y = int(input.is_held(gbs::ButtonDown)) - int(input.is_held(gbs::ButtonUp));
+    if (!x && !y) {
+        player.diagonal_step_remainder = 128;
+        return { 0, 0 };
+    }
+    const uint8_t horizontal = x < 0 ? 2 : 3, vertical = y < 0 ? 1 : 0;
+    if (x && y) {
+        // Four animation facings serve eight travel directions. Keep a compatible
+        // facing; changing an orthogonal component must not turn the body at once.
+        if (player.direction != horizontal && player.direction != vertical)
+            player.direction = vertical;
+        if (!player.allow_diagonal) {
+            const bool pressed_x = input.was_pressed(gbs::ButtonLeft) || input.was_pressed(gbs::ButtonRight);
+            const bool pressed_y = input.was_pressed(gbs::ButtonUp) || input.was_pressed(gbs::ButtonDown);
+            if (pressed_x != pressed_y) player.direction = pressed_x ? horizontal : vertical;
+            if (player.direction == horizontal) y = 0;
+            else x = 0;
+        }
+    } else player.direction = x ? horizontal : vertical;
+
+    int step = player.speed_pixels > 0 ? player.speed_pixels : 0;
+    if (x && y) {
+        // 181/256 approximates 1/sqrt(2). Carry the fraction so 1px movement and
+        // event-controlled fractional speeds keep moving without integer truncation.
+        const int scaled = step * 181 + player.diagonal_step_remainder;
+        step = scaled / 256;
+        player.diagonal_step_remainder = static_cast<uint8_t>(scaled % 256);
+    } else player.diagonal_step_remainder = 128;
+    return { x * step, y * step };
+}
+
+void finish_player_facing(gbs::Actor& player, gbs::Vec2i before, gbs::Vec2i requested, uint8_t facing) {
+    const int x = player.position_pixels.x - before.x, y = player.position_pixels.y - before.y;
+    player.direction = facing;
+    // When a diagonal meets a wall, face the axis along which the feet can slide.
+    if (requested.x && requested.y && bool(x) != bool(y))
+        player.direction = x ? (x < 0 ? 2 : 3) : (y < 0 ? 1 : 0);
+}
+
 gbs::Rect actor_rect(const gbs::Actor& actor, gbs::Vec2i position);
 
 bool tile_blocks_for_delta(const gbs::TileMap& map, int tile_x, int tile_y, gbs::Vec2i delta) {
@@ -480,33 +521,11 @@ void update_player_with_actor_collisions(
     const Actor* blocking_actors,
     size_t blocking_actor_count
 ) {
-    Vec2i delta { 0, 0 };
-    if (input.is_held(ButtonLeft)) {
-        delta.x -= player.speed_pixels;
-        player.direction = 2;
-    }
-    if (input.is_held(ButtonRight)) {
-        delta.x += player.speed_pixels;
-        player.direction = 3;
-    }
-    if (input.is_held(ButtonUp)) {
-        delta.y -= player.speed_pixels;
-        player.direction = 1;
-    }
-    if (input.is_held(ButtonDown)) {
-        delta.y += player.speed_pixels;
-        player.direction = 0;
-    }
-
-    Vec2i next_x { player.position_pixels.x + delta.x, player.position_pixels.y };
-    if (can_move_to_without_actor_collision(map, player, next_x, Vec2i { delta.x, 0 }, blocking_actors, blocking_actor_count)) {
-        player.position_pixels = next_x;
-    }
-
-    Vec2i next_y { player.position_pixels.x, player.position_pixels.y + delta.y };
-    if (can_move_to_without_actor_collision(map, player, next_y, Vec2i { 0, delta.y }, blocking_actors, blocking_actor_count)) {
-        player.position_pixels = next_y;
-    }
+    const Vec2i before = player.position_pixels;
+    const Vec2i delta = player_input_delta(player, input);
+    const uint8_t facing = player.direction;
+    move_actor_by_delta_with_actor_collisions(map, player, delta, blocking_actors, blocking_actor_count);
+    finish_player_facing(player, before, delta, facing);
 }
 
 void update_player_with_actor_push(
@@ -516,23 +535,9 @@ void update_player_with_actor_push(
     Actor* blocking_actors,
     size_t blocking_actor_count
 ) {
-    Vec2i delta { 0, 0 };
-    if (input.is_held(ButtonLeft)) {
-        delta.x -= player.speed_pixels;
-        player.direction = 2;
-    }
-    if (input.is_held(ButtonRight)) {
-        delta.x += player.speed_pixels;
-        player.direction = 3;
-    }
-    if (input.is_held(ButtonUp)) {
-        delta.y -= player.speed_pixels;
-        player.direction = 1;
-    }
-    if (input.is_held(ButtonDown)) {
-        delta.y += player.speed_pixels;
-        player.direction = 0;
-    }
+    const Vec2i before = player.position_pixels;
+    const Vec2i delta = player_input_delta(player, input);
+    const uint8_t facing = player.direction;
     move_actor_by_delta_with_actor_push(
         map,
         player,
@@ -540,6 +545,7 @@ void update_player_with_actor_push(
         blocking_actors,
         blocking_actor_count
     );
+    finish_player_facing(player, before, delta, facing);
 }
 
 PathStep find_actor_path_step(const TileMap& map, const Actor& actor, Vec2i target_pixels, uint8_t max_search_tiles) {

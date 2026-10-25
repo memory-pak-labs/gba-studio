@@ -63,6 +63,9 @@ struct Actor {
     Vec2i collision_offset_pixels = Vec2i { 0, 0 };
     uint8_t push_priority = 0;
     bool pushable = false;
+    // Fractional diagonal travel; these two bytes fit the actor's existing padding.
+    uint8_t diagonal_step_remainder = 128;
+    bool allow_diagonal = true;
 };
 
 struct Camera {

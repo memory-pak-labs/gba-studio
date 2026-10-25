@@ -2155,6 +2155,7 @@ uint16_t room_palette_backdrop_color(const gbs::TopDownRoomData& room_data) {
 }
 
 bool apply_room_metadata(bool use_room_player_start) {
+    player.diagonal_step_remainder = 128;
     const gbs::TopDownRoomData& room_data = project.rooms[current_room];
     room_backdrop_color = room_palette_backdrop_color(room_data);
     if (room_data.metadata.has_backdrop_color) {
@@ -2194,7 +2195,7 @@ bool capture_topdown_runtime_state(gbs::UniversalSaveData& data) {
             event_state.equipped_items,
             gbs::universal_save_equipment_slot_count,
             play_time_frames,
-            0,
+            player.direction,
             nullptr,
             0,
             event_state.text_variables,
@@ -2269,6 +2270,7 @@ bool restore_runtime_state(int slot_index) {
     configure_dialogue_ui_for_active_room();
     reset_active_room_visual_tiles();
     player.position_pixels = gbs::Vec2i { data.player_x, data.player_y };
+    player.direction = static_cast<uint8_t>(data.flags & 3u);
     camera.position_pixels = gbs::Vec2i { data.camera_x, data.camera_y };
     if (!gbs::read_universal_save_common_state(
             data,
@@ -3281,12 +3283,20 @@ gbs::RuntimeAdapterFrameResult update_topdown_runtime(const gbs::RuntimeFrameCon
                 player_moved_this_frame = player.position_pixels.x != player_position_before_update.x ||
                     player.position_pixels.y != player_position_before_update.y;
                 if (player.speed_pixels > 0 && !player_moved_this_frame && player_wants_to_move) {
-                    runtime_blocked_direction_bits |= runtime_input_direction_bits(player_input);
                     gbs::Rect attempted_rect = gbs::actor_rect(player);
                     if (player_input.is_held(gbs::ButtonRight)) ++attempted_rect.x;
                     if (player_input.is_held(gbs::ButtonLeft)) --attempted_rect.x;
                     if (player_input.is_held(gbs::ButtonDown)) ++attempted_rect.y;
                     if (player_input.is_held(gbs::ButtonUp)) --attempted_rect.y;
+                    const gbs::Vec2i attempted_delta {
+                        int(player_input.is_held(gbs::ButtonRight)) - int(player_input.is_held(gbs::ButtonLeft)),
+                        int(player_input.is_held(gbs::ButtonDown)) - int(player_input.is_held(gbs::ButtonUp))
+                    };
+                    // A fractional diagonal step may legitimately travel zero pixels.
+                    // Publish blockage only when the intended foot box meets an obstacle.
+                    if (gbs::rect_hits_blocking_tile(room.collision, attempted_rect, attempted_delta) ||
+                        gbs::rect_hits_any_blocking_actor(attempted_rect, player, player_blockers, player_blocker_count))
+                        runtime_blocked_direction_bits |= runtime_input_direction_bits(player_input);
                     runtime_telemetry.seen_slope_bits |= runtime_slope_bits_in_rect(room.collision, attempted_rect);
                 }
                 refresh_player_directional_animation(player_wants_to_move);

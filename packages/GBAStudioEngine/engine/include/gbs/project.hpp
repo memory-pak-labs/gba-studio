@@ -243,6 +243,7 @@ struct TopDownActorData {
     uint8_t push_priority = 0;
     bool pushable = false;
     TopDownAffineObjectData affine_obj = TopDownAffineObjectData {};
+    bool allow_diagonal = true;
 };
 
 struct TopDownActorSpriteData {
@@ -438,7 +439,9 @@ constexpr Actor actor_from_data(const TopDownActorData& actor) {
         actor.collision_mask,
         actor.collision_offset_pixels,
         actor.push_priority,
-        actor.pushable
+        actor.pushable,
+        128,
+        actor.allow_diagonal
     };
 }
 
@@ -506,8 +509,15 @@ constexpr Rect actor_rect(const Actor& actor) {
 
 constexpr Rect actor_interaction_rect(const Actor& actor) {
     Rect interaction = actor_rect(actor);
+    // A shallow foot box improves navigation, but must not make side-facing
+    // interaction require exact vertical alignment. Keep a square reach around
+    // the feet; this does not enlarge the physical collision box.
+    if (interaction.height < interaction.width) {
+        interaction.y -= (interaction.width - interaction.height) / 2;
+        interaction.height = interaction.width;
+    }
     const int reach_x = actor.size_pixels.x > 0 ? actor.size_pixels.x : 1;
-    const int reach_y = actor.size_pixels.y > 0 ? actor.size_pixels.y : 1;
+    const int reach_y = interaction.height > 0 ? interaction.height : 1;
     switch (static_cast<TopDownActorDirection>(actor.direction)) {
         case TopDownActorDirection::Down:
             interaction.height += reach_y;

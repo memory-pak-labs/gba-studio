@@ -631,7 +631,10 @@
           "$ref": "#/$defs/video_composition"
         },
         "player": {
-          "type": "object"
+          "type": "object",
+          "properties": {
+            "allow_diagonal": { "type": "boolean", "default": true, "description": "Enable normalized eight-way topdown travel with four animation facings." }
+          }
         },
         "actor_sprites": {
           "type": "array",
