@@ -310,6 +310,20 @@ constexpr const MetaSprite* menu_actor_metasprite_at(
     return actor.metasprite;
 }
 
+struct MenuAudioCue {
+    int index = -1;
+    bool pcm = false;
+    uint8_t volume = 15;
+    uint8_t priority = 8;
+};
+
+struct MenuAudioFeedback {
+    MenuAudioCue navigate;
+    MenuAudioCue confirm;
+    MenuAudioCue back;
+    MenuAudioCue unavailable;
+};
+
 struct MenuScreenData {
     const char* name;
     int background_index;
@@ -345,6 +359,7 @@ struct MenuScreenData {
     uint16_t hud_text_color = 0x7FFF;
     bool hud_transparent_text = false;
     bool hud_feedback_in_details = false;
+    MenuAudioFeedback audio_feedback {};
 };
 
 enum class MenuSaveFeedback : uint8_t { None, Confirm, Saved, Failed };
@@ -428,6 +443,20 @@ struct MenuProjectData {
     const PaletteAsset* obj_palettes = nullptr;
     size_t obj_palette_count = 0;
 };
+
+constexpr bool is_valid_menu_audio_cue(const MenuProjectData& project, const MenuAudioCue& cue) {
+    if (cue.volume > 15 || cue.index < -1) return false;
+    if (cue.index == -1) return true;
+    return cue.pcm
+        ? project.pcm_assets != nullptr && static_cast<size_t>(cue.index) < project.pcm_asset_count
+        : project.sfx_assets != nullptr && static_cast<size_t>(cue.index) < project.sfx_asset_count;
+}
+
+inline bool play_menu_audio_cue(const MenuProjectData& project, const MenuAudioCue& cue) {
+    if (cue.index < 0 || !is_valid_menu_audio_cue(project, cue)) return false;
+    return cue.pcm ? play_pcm_sfx(project.pcm_assets[cue.index], cue.priority, cue.volume)
+                   : play_sfx(project.sfx_assets[cue.index]);
+}
 
 constexpr int menu_screen_background_index(
     const MenuScreenData& screen,
@@ -1037,6 +1066,10 @@ constexpr bool is_valid_menu_project_data(const MenuProjectData& project) {
     }
     for (size_t index = 0; index < project.screen_count; ++index) {
         const MenuScreenData& screen = project.screens[index];
+        if (!is_valid_menu_audio_cue(project, screen.audio_feedback.navigate) ||
+            !is_valid_menu_audio_cue(project, screen.audio_feedback.confirm) ||
+            !is_valid_menu_audio_cue(project, screen.audio_feedback.back) ||
+            !is_valid_menu_audio_cue(project, screen.audio_feedback.unavailable)) return false;
         if (!is_valid_menu_background_index(project, screen.background_index) ||
             !is_valid_menu_dialogue_line_index(project, screen.title_line_index) ||
             screen.auto_advance_frames < 0 ||

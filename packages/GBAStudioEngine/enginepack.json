@@ -608,6 +608,7 @@
       "menu_autosave_slot0",
       "menu_hud_screen_stack",
       "menu_back_navigation",
+      "menu_audio_feedback",
       "menu_dialogue_lines",
       "menu_item_scripts",
       "menu_text_input",

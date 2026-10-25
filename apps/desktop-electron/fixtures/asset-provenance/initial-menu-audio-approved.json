@@ -1,0 +1,195 @@
+{
+  "revision": "initial-menu-audio-v1-2026-10-25",
+  "approval": {
+    "approved": true,
+    "auditory": true,
+    "date": "2026-10-25",
+    "evidence": "User: aprovado pode integrar",
+    "scope": "All five V1 effects; integrate into the initial menu."
+  },
+  "author": "Original deterministic synthesis by Codex under the project owner's direction",
+  "license": "MIT",
+  "source": "create-initial-menu-audio-candidates.mjs; no imported samples or melodies",
+  "direction": "Soft wooden/glass mallets in D major. Brief interaction cues; no continuous music or loop.",
+  "assets": [
+    {
+      "id": "initial-menu-abrir-v1",
+      "name": "menu-abrir-v1.wav",
+      "kind": "SFX",
+      "metadata": {
+        "source": "Assets/audio/menu-abrir-v1.wav",
+        "license": "MIT; original deterministic synthesis",
+        "generatedBy": "create-initial-menu-audio-candidates.mjs",
+        "reviewStatus": "approved",
+        "approved": true,
+        "preparedSha256": "d62043e77ecf6f4c906fa6d106757ef0b62e2d8aee55adfb46b828c21c58d6da",
+        "sampleRate": 31536,
+        "channels": 1,
+        "bitsPerSample": 16,
+        "durationSeconds": 0.48,
+        "approvedAt": "2026-10-25"
+      }
+    },
+    {
+      "id": "initial-menu-navegar-v1",
+      "name": "menu-navegar-v1.wav",
+      "kind": "SFX",
+      "metadata": {
+        "source": "Assets/audio/menu-navegar-v1.wav",
+        "license": "MIT; original deterministic synthesis",
+        "generatedBy": "create-initial-menu-audio-candidates.mjs",
+        "reviewStatus": "approved",
+        "approved": true,
+        "preparedSha256": "1577a11d0019f10d238047a904f5b7c47403d5613e99acdb865f5eb9856fb44a",
+        "sampleRate": 31536,
+        "channels": 1,
+        "bitsPerSample": 16,
+        "durationSeconds": 0.1,
+        "approvedAt": "2026-10-25"
+      }
+    },
+    {
+      "id": "initial-menu-confirmar-v1",
+      "name": "menu-confirmar-v1.wav",
+      "kind": "SFX",
+      "metadata": {
+        "source": "Assets/audio/menu-confirmar-v1.wav",
+        "license": "MIT; original deterministic synthesis",
+        "generatedBy": "create-initial-menu-audio-candidates.mjs",
+        "reviewStatus": "approved",
+        "approved": true,
+        "preparedSha256": "7803bac180ceb187e886522485a6512954074d9d98edc1b6c91a1f12d15fea53",
+        "sampleRate": 31536,
+        "channels": 1,
+        "bitsPerSample": 16,
+        "durationSeconds": 0.4,
+        "approvedAt": "2026-10-25"
+      }
+    },
+    {
+      "id": "initial-menu-voltar-v1",
+      "name": "menu-voltar-v1.wav",
+      "kind": "SFX",
+      "metadata": {
+        "source": "Assets/audio/menu-voltar-v1.wav",
+        "license": "MIT; original deterministic synthesis",
+        "generatedBy": "create-initial-menu-audio-candidates.mjs",
+        "reviewStatus": "approved",
+        "approved": true,
+        "preparedSha256": "015d5240f1fc288415187db3eadaa6b0df9719aa3c909caa2254247b5b20f145",
+        "sampleRate": 31536,
+        "channels": 1,
+        "bitsPerSample": 16,
+        "durationSeconds": 0.25,
+        "approvedAt": "2026-10-25"
+      }
+    },
+    {
+      "id": "initial-menu-indisponivel-v1",
+      "name": "menu-indisponivel-v1.wav",
+      "kind": "SFX",
+      "metadata": {
+        "source": "Assets/audio/menu-indisponivel-v1.wav",
+        "license": "MIT; original deterministic synthesis",
+        "generatedBy": "create-initial-menu-audio-candidates.mjs",
+        "reviewStatus": "approved",
+        "approved": true,
+        "preparedSha256": "b3d6cb14d19175a9cabc22fe4bfd2c54aebd5e2cf3c03538c98c17181cceeeeb",
+        "sampleRate": 31536,
+        "channels": 1,
+        "bitsPerSample": 16,
+        "durationSeconds": 0.24,
+        "approvedAt": "2026-10-25"
+      }
+    }
+  ],
+  "audioItems": [
+    {
+      "id": "initial-menu-abrir-v1",
+      "name": "menu-abrir-v1.wav",
+      "kind": "SFX",
+      "format": "WAV",
+      "sourceAssetID": "initial-menu-abrir-v1",
+      "exportID": "menu_abrir_v1",
+      "loops": false,
+      "volume": 65
+    },
+    {
+      "id": "initial-menu-navegar-v1",
+      "name": "menu-navegar-v1.wav",
+      "kind": "SFX",
+      "format": "WAV",
+      "sourceAssetID": "initial-menu-navegar-v1",
+      "exportID": "menu_navegar_v1",
+      "loops": false,
+      "volume": 65
+    },
+    {
+      "id": "initial-menu-confirmar-v1",
+      "name": "menu-confirmar-v1.wav",
+      "kind": "SFX",
+      "format": "WAV",
+      "sourceAssetID": "initial-menu-confirmar-v1",
+      "exportID": "menu_confirmar_v1",
+      "loops": false,
+      "volume": 65
+    },
+    {
+      "id": "initial-menu-voltar-v1",
+      "name": "menu-voltar-v1.wav",
+      "kind": "SFX",
+      "format": "WAV",
+      "sourceAssetID": "initial-menu-voltar-v1",
+      "exportID": "menu_voltar_v1",
+      "loops": false,
+      "volume": 65
+    },
+    {
+      "id": "initial-menu-indisponivel-v1",
+      "name": "menu-indisponivel-v1.wav",
+      "kind": "SFX",
+      "format": "WAV",
+      "sourceAssetID": "initial-menu-indisponivel-v1",
+      "exportID": "menu_indisponivel_v1",
+      "loops": false,
+      "volume": 65
+    }
+  ],
+  "measurements": [
+    {
+      "id": "abrir",
+      "durationSeconds": 0.4800228310502283,
+      "peakDbfs": -20.122259538841476,
+      "rmsDbfs": -30.189305791639406,
+      "clippedSamples": 0
+    },
+    {
+      "id": "navegar",
+      "durationSeconds": 0.10001268391679351,
+      "peakDbfs": -21.966210504647847,
+      "rmsDbfs": -29.434792829782648,
+      "clippedSamples": 0
+    },
+    {
+      "id": "confirmar",
+      "durationSeconds": 0.4000190258751903,
+      "peakDbfs": -16.69141521065814,
+      "rmsDbfs": -28.68634067115004,
+      "clippedSamples": 0
+    },
+    {
+      "id": "voltar",
+      "durationSeconds": 0.25,
+      "peakDbfs": -19.258067740081152,
+      "rmsDbfs": -29.674800928128917,
+      "clippedSamples": 0
+    },
+    {
+      "id": "indisponivel",
+      "durationSeconds": 0.24001141552511415,
+      "peakDbfs": -20.74633013718401,
+      "rmsDbfs": -31.072463724195323,
+      "clippedSamples": 0
+    }
+  ]
+}

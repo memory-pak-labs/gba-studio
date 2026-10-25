@@ -1920,6 +1920,7 @@ export interface EngineExportMenuActor {
 }
 
 export interface EngineExportMenuScreen {
+  audio_feedback?: Partial<Record<"navigate" | "confirm" | "back" | "unavailable", { pcm?: number; sfx?: number; volume: number; priority: number }>>;
   name: string;
   resource_bank_group?: string;
   hud_preset_id?: string;
@@ -9268,6 +9269,7 @@ function menuScreenSources(rooms: Record<string, unknown>[]): MenuScreenSource[]
           nextScreenID: screen.nextScreenID,
           items: screen.items,
           carousel: screen.carousel,
+          actionSounds: screen.actionSounds,
           onBackEventName: screen.onBackEventName ?? "",
           menuProfile: screen.menuProfile ?? menuConfig.menuProfile,
           presentationMode: screen.presentationMode ?? menuConfig.presentationMode,
@@ -9512,6 +9514,18 @@ function buildMenuScreens(
       title_line: titleLine,
       items,
       ...(menuConfig?.carousel ? { carousel: true } : {}),
+      ...(menuConfig?.actionSounds ? { audio_feedback: Object.fromEntries(
+        Object.entries(menuConfig.actionSounds).map(([action, name]) => {
+          const resolved = resolveAudioPlayback(audioItems, audioPack, name);
+          if (!resolved || resolved.op === "run_audio_routine") throw new Error(`Efeito de menu requer SFX PSG ou PCM: ${name}`);
+          const audio = audioItems[audioIndexByName(audioItems, name)];
+          return [action, {
+            [resolved.op === "play_pcm_sfx" ? "pcm" : "sfx"]: resolved.index,
+            volume: hardwareAudioVolume(String(integerField(audio, "volume", 100))),
+            priority: 8
+          }];
+        })
+      ) } : {}),
       menu_profile: source.menuProfile,
       presentation_mode: source.presentationMode,
       entry_policy: source.entryPolicy,
@@ -10968,6 +10982,10 @@ function buildEngineExportProjectContractUncached(
   if (videoAsset || projectUsesRoomAffine(data)) {
     features.push("render.video_composition");
   }
+  if (exportRoomsForKind(data, "menu").some(room => {
+    const config = normalizeMenuSceneConfig(child(child(room, "runtime"), "config"));
+    return config.actionSounds || config.screens?.some(screen => screen.actionSounds);
+  })) features.push("menu_audio_feedback");
   features.push("hardware.gba_native_contract");
   features.push("events.native_authoring_v2");
   if (exportRoomsForKind(data, "topdown").some(room => {

@@ -148823,6 +148823,96 @@
         "visualStatus": "not-applicable",
         "approvalDate": "2026-10-25"
       }
+    },
+    {
+      "id": "initial-menu-abrir-v1",
+      "name": "menu-abrir-v1.wav",
+      "kind": "SFX",
+      "metadata": {
+        "source": "Assets/audio/menu-abrir-v1.wav",
+        "license": "MIT; original deterministic synthesis",
+        "generatedBy": "create-initial-menu-audio-candidates.mjs",
+        "reviewStatus": "approved",
+        "approved": true,
+        "preparedSha256": "d62043e77ecf6f4c906fa6d106757ef0b62e2d8aee55adfb46b828c21c58d6da",
+        "sampleRate": 31536,
+        "channels": 1,
+        "bitsPerSample": 16,
+        "durationSeconds": 0.48,
+        "approvedAt": "2026-10-25"
+      }
+    },
+    {
+      "id": "initial-menu-navegar-v1",
+      "name": "menu-navegar-v1.wav",
+      "kind": "SFX",
+      "metadata": {
+        "source": "Assets/audio/menu-navegar-v1.wav",
+        "license": "MIT; original deterministic synthesis",
+        "generatedBy": "create-initial-menu-audio-candidates.mjs",
+        "reviewStatus": "approved",
+        "approved": true,
+        "preparedSha256": "1577a11d0019f10d238047a904f5b7c47403d5613e99acdb865f5eb9856fb44a",
+        "sampleRate": 31536,
+        "channels": 1,
+        "bitsPerSample": 16,
+        "durationSeconds": 0.1,
+        "approvedAt": "2026-10-25"
+      }
+    },
+    {
+      "id": "initial-menu-confirmar-v1",
+      "name": "menu-confirmar-v1.wav",
+      "kind": "SFX",
+      "metadata": {
+        "source": "Assets/audio/menu-confirmar-v1.wav",
+        "license": "MIT; original deterministic synthesis",
+        "generatedBy": "create-initial-menu-audio-candidates.mjs",
+        "reviewStatus": "approved",
+        "approved": true,
+        "preparedSha256": "7803bac180ceb187e886522485a6512954074d9d98edc1b6c91a1f12d15fea53",
+        "sampleRate": 31536,
+        "channels": 1,
+        "bitsPerSample": 16,
+        "durationSeconds": 0.4,
+        "approvedAt": "2026-10-25"
+      }
+    },
+    {
+      "id": "initial-menu-voltar-v1",
+      "name": "menu-voltar-v1.wav",
+      "kind": "SFX",
+      "metadata": {
+        "source": "Assets/audio/menu-voltar-v1.wav",
+        "license": "MIT; original deterministic synthesis",
+        "generatedBy": "create-initial-menu-audio-candidates.mjs",
+        "reviewStatus": "approved",
+        "approved": true,
+        "preparedSha256": "015d5240f1fc288415187db3eadaa6b0df9719aa3c909caa2254247b5b20f145",
+        "sampleRate": 31536,
+        "channels": 1,
+        "bitsPerSample": 16,
+        "durationSeconds": 0.25,
+        "approvedAt": "2026-10-25"
+      }
+    },
+    {
+      "id": "initial-menu-indisponivel-v1",
+      "name": "menu-indisponivel-v1.wav",
+      "kind": "SFX",
+      "metadata": {
+        "source": "Assets/audio/menu-indisponivel-v1.wav",
+        "license": "MIT; original deterministic synthesis",
+        "generatedBy": "create-initial-menu-audio-candidates.mjs",
+        "reviewStatus": "approved",
+        "approved": true,
+        "preparedSha256": "b3d6cb14d19175a9cabc22fe4bfd2c54aebd5e2cf3c03538c98c17181cceeeeb",
+        "sampleRate": 31536,
+        "channels": 1,
+        "bitsPerSample": 16,
+        "durationSeconds": 0.24,
+        "approvedAt": "2026-10-25"
+      }
     }
   ],
   "audioItems": [
@@ -149647,53 +149737,6 @@
       ],
       "patternOrder": [
         "farol_sfx_dialogo-main"
-      ]
-    },
-    {
-      "id": "gba-audio-farol_sfx_cursor",
-      "name": "farol_sfx_cursor",
-      "kind": "SFX",
-      "format": "COMPOSED",
-      "exportID": "farol_sfx_cursor",
-      "loops": false,
-      "bpm": 240,
-      "volume": 72,
-      "patterns": [
-        {
-          "id": "farol_sfx_cursor-main",
-          "name": "Cursor",
-          "steps": 16,
-          "channels": [
-            {
-              "id": "farol_sfx_cursor-main-pulse1",
-              "name": "Cursor",
-              "type": "pulse1",
-              "instrument": "Pulse Lead",
-              "envelope": "Short Decay",
-              "notes": [
-                "C4",
-                "",
-                "D4",
-                "",
-                "E4",
-                "",
-                "",
-                "",
-                "",
-                "",
-                "",
-                "",
-                "",
-                "",
-                "",
-                ""
-              ]
-            }
-          ]
-        }
-      ],
-      "patternOrder": [
-        "farol_sfx_cursor-main"
       ]
     },
     {
@@ -157478,6 +157521,56 @@
       "exportID": "radio_lume_pcm",
       "loops": false,
       "volume": 80
+    },
+    {
+      "id": "initial-menu-abrir-v1",
+      "name": "menu-abrir-v1.wav",
+      "kind": "SFX",
+      "format": "WAV",
+      "sourceAssetID": "initial-menu-abrir-v1",
+      "exportID": "menu_abrir_v1",
+      "loops": false,
+      "volume": 65
+    },
+    {
+      "id": "initial-menu-navegar-v1",
+      "name": "menu-navegar-v1.wav",
+      "kind": "SFX",
+      "format": "WAV",
+      "sourceAssetID": "initial-menu-navegar-v1",
+      "exportID": "menu_navegar_v1",
+      "loops": false,
+      "volume": 65
+    },
+    {
+      "id": "initial-menu-confirmar-v1",
+      "name": "menu-confirmar-v1.wav",
+      "kind": "SFX",
+      "format": "WAV",
+      "sourceAssetID": "initial-menu-confirmar-v1",
+      "exportID": "menu_confirmar_v1",
+      "loops": false,
+      "volume": 65
+    },
+    {
+      "id": "initial-menu-voltar-v1",
+      "name": "menu-voltar-v1.wav",
+      "kind": "SFX",
+      "format": "WAV",
+      "sourceAssetID": "initial-menu-voltar-v1",
+      "exportID": "menu_voltar_v1",
+      "loops": false,
+      "volume": 65
+    },
+    {
+      "id": "initial-menu-indisponivel-v1",
+      "name": "menu-indisponivel-v1.wav",
+      "kind": "SFX",
+      "format": "WAV",
+      "sourceAssetID": "initial-menu-indisponivel-v1",
+      "exportID": "menu_indisponivel_v1",
+      "loops": false,
+      "volume": 65
     }
   ],
   "dialogues": [
@@ -162254,7 +162347,7 @@
       "steps": [
         {
           "id": "event-title-enter-audio",
-          "command": "play_music farol_tema_principal",
+          "command": "stop_music",
           "isEnabled": true
         }
       ]
@@ -162265,11 +162358,11 @@
       "roomName": "titulo",
       "category": "Cena",
       "detail": "Autoria: titulo_abrir_menu. Sequência editável com 2 passos. Os eventos chamados permanecem acessíveis na timeline. Vínculos: rooms.2 (eventName), actors.12 (onInteract).",
-      "command": "play_sfx farol_sfx_cursor",
+      "command": "play_sfx menu-abrir-v1.wav 65 8",
       "steps": [
         {
           "id": "event-title-open-menu-audio",
-          "command": "play_sfx farol_sfx_cursor",
+          "command": "play_sfx menu-abrir-v1.wav 65 8",
           "isEnabled": true
         },
         {
@@ -162302,11 +162395,6 @@
       "detail": "Autoria: titulo_novo_jogo. Sequência editável com 18 passos. Os eventos chamados permanecem acessíveis na timeline. Vínculos: rooms.2 (eventName).",
       "command": "noop",
       "steps": [
-        {
-          "id": "event-menu-initial-new-audio",
-          "command": "play_sfx farol_sfx_confirmar",
-          "isEnabled": true
-        },
         {
           "id": "event-menu-initial-new-step-1",
           "command": "remove_save_game 0",
@@ -164293,7 +164381,13 @@
       "category": "Cena",
       "detail": "Autoria: logo_ao_entrar. Entrada sem comandos customizados. Em Eventos > Ao iniciar, abra os quadros da sequência: fundo, poses, movimento, duração e avanço. O evento inicial pode ficar vazio; os quadros já executam a encenação nativa. Vínculos: rooms.0 (onInit).",
       "command": "noop",
-      "steps": []
+      "steps": [
+        {
+          "id": "quiet-initial-logo_ao_entrar",
+          "command": "stop_music",
+          "isEnabled": true
+        }
+      ]
     },
     {
       "id": "event-abertura-enter",
@@ -164302,7 +164396,13 @@
       "category": "Cena",
       "detail": "Autoria: abertura_ao_entrar. Entrada sem comandos customizados. Em Eventos > Ao iniciar, abra os quadros da sequência: fundo, poses, movimento, duração e avanço. O evento inicial pode ficar vazio; os quadros já executam a encenação nativa. Vínculos: rooms.1 (onInit).",
       "command": "noop",
-      "steps": []
+      "steps": [
+        {
+          "id": "quiet-initial-abertura_ao_entrar",
+          "command": "stop_music",
+          "isEnabled": true
+        }
+      ]
     },
     {
       "id": "event-creditos-enter",
@@ -176025,7 +176125,7 @@
       "gbStudioUseBackgroundLayout": true,
       "height": 20,
       "id": "scene-logo",
-      "music": "farol_tema_principal",
+      "music": "",
       "name": "logo",
       "paletteBankPolicy": "full-screen",
       "parallax": {
@@ -176613,7 +176713,7 @@
       "gbStudioUseBackgroundLayout": true,
       "height": 20,
       "id": "scene-abertura",
-      "music": "farol_tema_principal",
+      "music": "",
       "name": "abertura",
       "paletteBankPolicy": "full-screen",
       "parallax": {
@@ -176925,7 +177025,7 @@
       "gbStudioUseBackgroundLayout": true,
       "height": 20,
       "id": "scene-titulo",
-      "music": "farol_tema_principal",
+      "music": "",
       "name": "titulo",
       "paletteBankPolicy": "full-screen",
       "parallax": {
@@ -177073,7 +177173,13 @@
                     "height": 32
                   }
                 }
-              ]
+              ],
+              "actionSounds": {
+                "navigate": "menu-navegar-v1.wav",
+                "confirm": "menu-confirmar-v1.wav",
+                "back": "menu-voltar-v1.wav",
+                "unavailable": "menu-indisponivel-v1.wav"
+              }
             }
           ],
           "titleOverlayAssetName": "",
@@ -218867,7 +218973,7 @@
       "gbStudioUseBackgroundLayout": true,
       "height": 20,
       "id": "scene-escolha_genero",
-      "music": "farol_tema_principal",
+      "music": "",
       "name": "escolha_genero",
       "paletteBankPolicy": "ui-reserved",
       "parallax": {
@@ -218930,7 +219036,13 @@
             }
           ],
           "menuProfile": "initial",
-          "hudMode": "none"
+          "hudMode": "none",
+          "actionSounds": {
+            "navigate": "menu-navegar-v1.wav",
+            "confirm": "menu-confirmar-v1.wav",
+            "back": "menu-voltar-v1.wav",
+            "unavailable": "menu-indisponivel-v1.wav"
+          }
         }
       },
       "tileLayers": [],
@@ -218984,7 +219096,7 @@
       "gbStudioUseBackgroundLayout": true,
       "height": 20,
       "id": "scene-nome_jogador",
-      "music": "farol_tema_principal",
+      "music": "",
       "name": "nome_jogador",
       "paletteBankPolicy": "ui-reserved",
       "parallax": {
@@ -219064,7 +219176,13 @@
             }
           },
           "menuProfile": "initial",
-          "hudMode": "none"
+          "hudMode": "none",
+          "actionSounds": {
+            "navigate": "menu-navegar-v1.wav",
+            "confirm": "menu-confirmar-v1.wav",
+            "back": "menu-voltar-v1.wav",
+            "unavailable": "menu-indisponivel-v1.wav"
+          }
         }
       },
       "tileLayers": [],
@@ -219117,7 +219235,7 @@
       "gbStudioUseBackgroundLayout": true,
       "height": 20,
       "id": "scene-carregar_jogo",
-      "music": "farol_tema_principal",
+      "music": "",
       "name": "carregar_jogo",
       "paletteBankPolicy": "full-screen",
       "parallax": {
@@ -219236,7 +219354,13 @@
           "hudPresetId": "hud-book-carregar_jogo",
           "hudTextColor": 6306,
           "hudTransparentText": true,
-          "hudListRows": 4
+          "hudListRows": 4,
+          "actionSounds": {
+            "navigate": "menu-navegar-v1.wav",
+            "confirm": "menu-confirmar-v1.wav",
+            "back": "menu-voltar-v1.wav",
+            "unavailable": "menu-indisponivel-v1.wav"
+          }
         }
       },
       "tileLayers": [],
@@ -219290,7 +219414,7 @@
       "gbStudioUseBackgroundLayout": true,
       "height": 20,
       "id": "scene-configuracoes",
-      "music": "farol_tema_principal",
+      "music": "",
       "name": "configuracoes",
       "paletteBankPolicy": "full-screen",
       "parallax": {
@@ -219461,7 +219585,13 @@
           "hudPresetId": "hud-book-configuracoes",
           "hudTextColor": 6306,
           "hudTransparentText": true,
-          "hudListRows": 5
+          "hudListRows": 5,
+          "actionSounds": {
+            "navigate": "menu-navegar-v1.wav",
+            "confirm": "menu-confirmar-v1.wav",
+            "back": "menu-voltar-v1.wav",
+            "unavailable": "menu-indisponivel-v1.wav"
+          }
         }
       },
       "tileLayers": [],
@@ -219515,7 +219645,7 @@
       "gbStudioUseBackgroundLayout": true,
       "height": 20,
       "id": "scene-creditos",
-      "music": "farol_tema_principal",
+      "music": "",
       "name": "creditos",
       "paletteBankPolicy": "full-screen",
       "parallax": {
@@ -219582,7 +219712,13 @@
           "presentationMode": "hud",
           "hudTextColor": 6306,
           "hudTransparentText": true,
-          "hudListRows": 2
+          "hudListRows": 2,
+          "actionSounds": {
+            "navigate": "menu-navegar-v1.wav",
+            "confirm": "menu-confirmar-v1.wav",
+            "back": "menu-voltar-v1.wav",
+            "unavailable": "menu-indisponivel-v1.wav"
+          }
         }
       },
       "tileLayers": [],
@@ -253865,7 +254001,7 @@
       "gbStudioUseBackgroundLayout": true,
       "height": 20,
       "id": "scene-logo",
-      "music": "farol_tema_principal",
+      "music": "",
       "name": "logo",
       "paletteBankPolicy": "full-screen",
       "parallax": {
@@ -254453,7 +254589,7 @@
       "gbStudioUseBackgroundLayout": true,
       "height": 20,
       "id": "scene-abertura",
-      "music": "farol_tema_principal",
+      "music": "",
       "name": "abertura",
       "paletteBankPolicy": "full-screen",
       "parallax": {
@@ -254765,7 +254901,7 @@
       "gbStudioUseBackgroundLayout": true,
       "height": 20,
       "id": "scene-titulo",
-      "music": "farol_tema_principal",
+      "music": "",
       "name": "titulo",
       "paletteBankPolicy": "full-screen",
       "parallax": {
@@ -254913,7 +255049,13 @@
                     "height": 32
                   }
                 }
-              ]
+              ],
+              "actionSounds": {
+                "navigate": "menu-navegar-v1.wav",
+                "confirm": "menu-confirmar-v1.wav",
+                "back": "menu-voltar-v1.wav",
+                "unavailable": "menu-indisponivel-v1.wav"
+              }
             }
           ],
           "titleOverlayAssetName": "",
@@ -296707,7 +296849,7 @@
       "gbStudioUseBackgroundLayout": true,
       "height": 20,
       "id": "scene-escolha_genero",
-      "music": "farol_tema_principal",
+      "music": "",
       "name": "escolha_genero",
       "paletteBankPolicy": "ui-reserved",
       "parallax": {
@@ -296770,7 +296912,13 @@
             }
           ],
           "menuProfile": "initial",
-          "hudMode": "none"
+          "hudMode": "none",
+          "actionSounds": {
+            "navigate": "menu-navegar-v1.wav",
+            "confirm": "menu-confirmar-v1.wav",
+            "back": "menu-voltar-v1.wav",
+            "unavailable": "menu-indisponivel-v1.wav"
+          }
         }
       },
       "tileLayers": [],
@@ -296824,7 +296972,7 @@
       "gbStudioUseBackgroundLayout": true,
       "height": 20,
       "id": "scene-nome_jogador",
-      "music": "farol_tema_principal",
+      "music": "",
       "name": "nome_jogador",
       "paletteBankPolicy": "ui-reserved",
       "parallax": {
@@ -296904,7 +297052,13 @@
             }
           },
           "menuProfile": "initial",
-          "hudMode": "none"
+          "hudMode": "none",
+          "actionSounds": {
+            "navigate": "menu-navegar-v1.wav",
+            "confirm": "menu-confirmar-v1.wav",
+            "back": "menu-voltar-v1.wav",
+            "unavailable": "menu-indisponivel-v1.wav"
+          }
         }
       },
       "tileLayers": [],
@@ -296957,7 +297111,7 @@
       "gbStudioUseBackgroundLayout": true,
       "height": 20,
       "id": "scene-carregar_jogo",
-      "music": "farol_tema_principal",
+      "music": "",
       "name": "carregar_jogo",
       "paletteBankPolicy": "full-screen",
       "parallax": {
@@ -297076,7 +297230,13 @@
           "hudPresetId": "hud-book-carregar_jogo",
           "hudTextColor": 6306,
           "hudTransparentText": true,
-          "hudListRows": 4
+          "hudListRows": 4,
+          "actionSounds": {
+            "navigate": "menu-navegar-v1.wav",
+            "confirm": "menu-confirmar-v1.wav",
+            "back": "menu-voltar-v1.wav",
+            "unavailable": "menu-indisponivel-v1.wav"
+          }
         }
       },
       "tileLayers": [],
@@ -297130,7 +297290,7 @@
       "gbStudioUseBackgroundLayout": true,
       "height": 20,
       "id": "scene-configuracoes",
-      "music": "farol_tema_principal",
+      "music": "",
       "name": "configuracoes",
       "paletteBankPolicy": "full-screen",
       "parallax": {
@@ -297301,7 +297461,13 @@
           "hudPresetId": "hud-book-configuracoes",
           "hudTextColor": 6306,
           "hudTransparentText": true,
-          "hudListRows": 5
+          "hudListRows": 5,
+          "actionSounds": {
+            "navigate": "menu-navegar-v1.wav",
+            "confirm": "menu-confirmar-v1.wav",
+            "back": "menu-voltar-v1.wav",
+            "unavailable": "menu-indisponivel-v1.wav"
+          }
         }
       },
       "tileLayers": [],
@@ -297355,7 +297521,7 @@
       "gbStudioUseBackgroundLayout": true,
       "height": 20,
       "id": "scene-creditos",
-      "music": "farol_tema_principal",
+      "music": "",
       "name": "creditos",
       "paletteBankPolicy": "full-screen",
       "parallax": {
@@ -297422,7 +297588,13 @@
           "presentationMode": "hud",
           "hudTextColor": 6306,
           "hudTransparentText": true,
-          "hudListRows": 2
+          "hudListRows": 2,
+          "actionSounds": {
+            "navigate": "menu-navegar-v1.wav",
+            "confirm": "menu-confirmar-v1.wav",
+            "back": "menu-voltar-v1.wav",
+            "unavailable": "menu-indisponivel-v1.wav"
+          }
         }
       },
       "tileLayers": [],

@@ -11261,6 +11261,27 @@ def menu_item_binding_from_json(item, item_path):
     return (source_name, index, format_map[raw_format])
 
 
+def emit_menu_audio_feedback(screen, screen_index):
+    feedback = screen.get("audio_feedback", {})
+    actions = ("navigate", "confirm", "back", "unavailable")
+    if not isinstance(feedback, dict) or set(feedback) - set(actions):
+        raise SystemExit(f"menu_project.screens[{screen_index}].audio_feedback invalido")
+    cues = []
+    for action in actions:
+        cue = feedback.get(action)
+        if cue is None:
+            cues.append("gbs::MenuAudioCue {}")
+            continue
+        if not isinstance(cue, dict) or set(cue) - {"pcm", "sfx", "volume", "priority"} or (("pcm" in cue) == ("sfx" in cue)):
+            raise SystemExit(f"menu audio {action} requer exatamente pcm ou sfx")
+        index = cue.get("pcm", cue.get("sfx"))
+        volume, priority = cue.get("volume", 15), cue.get("priority", 8)
+        if any(not isinstance(value, int) or isinstance(value, bool) for value in (index, volume, priority)) or not 0 <= index <= 65535 or not 0 <= volume <= 15 or not 0 <= priority <= 255:
+            raise SystemExit(f"menu audio {action} indice/volume/prioridade invalido")
+        cues.append(f"gbs::MenuAudioCue {{ {index}, {'true' if 'pcm' in cue else 'false'}, {volume}, {priority} }}")
+    return "gbs::MenuAudioFeedback { " + ", ".join(cues) + " }"
+
+
 def emit_menu_items(output, screen, screen_index):
     items = screen.get("items", screen.get("options", []))
     if items is None:
@@ -11720,7 +11741,8 @@ def emit_menu_project_data_header(menu_project, asset_report=None):
             f"gbs::MenuScenePresentationMode::{presentation_mode_map[presentation_mode]}, {hud_list_rows}, {title_text_variable}, "
             f"{'true' if carousel else 'false'}, {hud_text_color}, "
             f"{'true' if screen.get('hud_transparent_text', False) else 'false'}, "
-            f"{'true' if screen.get('hud_feedback_in_details', False) else 'false'} "
+            f"{'true' if screen.get('hud_feedback_in_details', False) else 'false'}, "
+            f"{emit_menu_audio_feedback(screen, screen_index)} "
             "},"
         )
     output.append("constexpr gbs::MenuScreenData screens[] = {")

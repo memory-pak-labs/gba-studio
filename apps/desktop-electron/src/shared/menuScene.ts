@@ -106,8 +106,11 @@ export interface MenuBackgroundAnimationConfig {
 }
 
 export type MenuHudMode = "none";
+export type MenuAudioAction = "navigate" | "confirm" | "back" | "unavailable";
+export type MenuActionSounds = Partial<Record<MenuAudioAction, string>>;
 
 export interface MenuEmbeddedScreenConfig {
+  actionSounds?: MenuActionSounds;
   id: string;
   screenType: MenuScreenType;
   title: string;
@@ -136,6 +139,7 @@ export interface MenuEmbeddedScreenConfig {
 }
 
 export interface MenuSceneConfig {
+  actionSounds?: MenuActionSounds;
   screenType: MenuScreenType;
   role: MenuSceneRole;
   title: string;
@@ -462,6 +466,13 @@ function normalizeBackgroundAnimation(value: unknown): MenuBackgroundAnimationCo
   };
 }
 
+function normalizeActionSounds(value: unknown): MenuActionSounds | undefined {
+  const source = record(value);
+  const entries = (["navigate", "confirm", "back", "unavailable"] as const)
+    .flatMap(action => stringValue(source[action]) ? [[action, stringValue(source[action])]] : []);
+  return entries.length ? Object.fromEntries(entries) : undefined;
+}
+
 function normalizeEmbeddedScreens(value: unknown, parentProfile: MenuSceneProfile): MenuEmbeddedScreenConfig[] {
   if (!Array.isArray(value)) return [];
   const seenIDs = new Set<string>();
@@ -477,11 +488,13 @@ function normalizeEmbeddedScreens(value: unknown, parentProfile: MenuSceneProfil
     const hudMode = source.hudMode === "none" ? "none" as const : undefined;
     const hudPresetId = stringValue(source.hudPresetId);
     const onBackEventName = stringValue(source.onBackEventName);
+    const actionSounds = normalizeActionSounds(source.actionSounds);
     const backgroundAnimation = normalizeBackgroundAnimation(source.backgroundAnimation);
     const screenProfile = menuSceneProfile(source.menuProfile, parentProfile);
     const lifecycle = lifecycleForMenuProfile(screenProfile);
     const presentationMode = menuScenePresentationMode(source.presentationMode, presentationModeForMenuProfile(screenProfile));
     screens.push({
+      ...(actionSounds ? { actionSounds } : {}),
       id,
       screenType: kind,
       title: stringValue(source.title, defaults.title),
@@ -580,7 +593,9 @@ export function normalizeMenuSceneConfig(value: unknown): MenuSceneConfig {
   const hudMode = source.hudMode === "none" ? "none" as const : undefined;
   const hudPresetId = stringValue(source.hudPresetId);
   const backgroundAnimation = normalizeBackgroundAnimation(source.backgroundAnimation);
+  const actionSounds = normalizeActionSounds(source.actionSounds);
   const config: MenuSceneConfig = {
+    ...(actionSounds ? { actionSounds } : {}),
     screenType: kind,
     role,
     title: stringValue(source.title, defaults.title),

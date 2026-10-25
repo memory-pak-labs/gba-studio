@@ -1562,7 +1562,8 @@ void move_selection(int direction_x, int direction_y) {
     if (next < 0 && direction_y != 0 && !screen->carousel) {
         next = gbs::menu_next_visible_item_index(*screen, event_state, menu_state.selected_item_index, direction_y);
     }
-    if (next >= 0) {
+    if (next >= 0 && next != menu_state.selected_item_index) {
+        gbs::play_menu_audio_cue(project, screen->audio_feedback.navigate);
         menu_state.selected_item_index = next;
         temporary_message_frames = 0;
         refresh_menu_text();
@@ -1605,6 +1606,8 @@ void pop_screen() {
 void back_from_screen() {
     if (menu_state.screen_stack_count == 0 && event_state.scene_stack_count > 0) gbs::request_suspended_runtime_resume(event_state);
     const gbs::MenuScreenData* screen = gbs::menu_screen_for(project, menu_state.screen_index);
+    if (screen != nullptr && (menu_state.screen_stack_count > 0 || event_state.scene_stack_count > 0 ||
+        gbs::has_event_script(screen->on_back))) gbs::play_menu_audio_cue(project, screen->audio_feedback.back);
     if (menu_state.screen_stack_count == 0 && screen != nullptr &&
         start_menu_event_script(screen->on_back, MenuPendingAction { MenuPendingActionKind::None, -1, -1 })) {
         return;
@@ -1629,6 +1632,9 @@ void adjust_current_item(int direction) {
         event_state.variables[item->value.variable_index],
         direction
     );
+    if (next_value != event_state.variables[item->value.variable_index]) {
+        gbs::play_menu_audio_cue(project, screen->audio_feedback.navigate);
+    }
     event_state.variables[item->value.variable_index] = next_value;
     apply_menu_audio_binding(*item, next_value);
     start_menu_event_script(item->on_select, MenuPendingAction { MenuPendingActionKind::None, -1, -1 });
@@ -1729,6 +1735,7 @@ void activate_selection() {
         return;
     }
     if (!gbs::menu_item_is_available(event_state, *item)) {
+        gbs::play_menu_audio_cue(project, screen->audio_feedback.unavailable);
         refresh_menu_text();
         return;
     }
@@ -1737,6 +1744,8 @@ void activate_selection() {
         adjust_current_item(1);
         return;
     }
+    gbs::play_menu_audio_cue(project, item->action == gbs::MenuItemAction::PopScreen
+        ? screen->audio_feedback.back : screen->audio_feedback.confirm);
     if (item->action == gbs::MenuItemAction::PopScreen && menu_state.screen_stack_count == 0 && event_state.scene_stack_count > 0) {
         gbs::request_suspended_runtime_resume(event_state);
     }

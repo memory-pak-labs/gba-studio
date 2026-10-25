@@ -1,3 +1,4 @@
+import {silenceInitialMenuMusic,preserveApprovedInitialMenuAudio} from './initial-menu-audio.mjs';
 import {reviewExemploLocalization} from './exemplo-gba-localization-review.mjs';
 import {preserveExampleEncore} from './encore-project.mjs';
 import {preserveCoastDepthCampaign} from './coast-depth-project.mjs';
@@ -9020,7 +9021,7 @@ function buildExemploGBAVerticeCampaign(data) {
 }
 
 export function promoteExemploGBAVerticeCampaign(data) {
-  return preserveTideAnnex(data, preserveExampleEncore(data, preserveTideAnnex(data, preserveCoastDepthCampaign(data, integrateApprovedPlayerWalk(refineExampleTopdownMovement(preserveTideAnnex(data, preserveApprovedCampaignEvolutions(data, reviewExemploLocalization(promoteFarolRelay(pruneUnusedExampleAssets(promoteApprovedCouncilV13(promoteShowcaseSystems(promoteLostSignalMission(materializeExampleAuthoring(buildExemploGBAVerticeCampaign(data))))))))))))))));
+  return preserveApprovedInitialMenuAudio(data, silenceInitialMenuMusic(preserveTideAnnex(data, preserveExampleEncore(data, preserveTideAnnex(data, preserveCoastDepthCampaign(data, integrateApprovedPlayerWalk(refineExampleTopdownMovement(preserveTideAnnex(data, preserveApprovedCampaignEvolutions(data, reviewExemploLocalization(promoteFarolRelay(pruneUnusedExampleAssets(promoteApprovedCouncilV13(promoteShowcaseSystems(promoteLostSignalMission(materializeExampleAuthoring(buildExemploGBAVerticeCampaign(data))))))))))))))))));
 }
 
 const invokedPath = process.argv[1] ? fileURLToPath(import.meta.url) === process.argv[1] : false;

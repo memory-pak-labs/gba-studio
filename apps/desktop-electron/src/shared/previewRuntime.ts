@@ -4642,7 +4642,7 @@ function runScriptFrameCommands(state: PreviewRuntimeState, frame: PreviewRuntim
     }
 
     if (verb === "play_sfx") {
-      const activeSfx = operand || null;
+      const activeSfx = parts[0] || null;
       const activeSfxAsset = assetByName(currentState.project, activeSfx);
       const hasPlaybackOptions = parts[1] !== undefined || parts[2] !== undefined;
       const audioMix = hasPlaybackOptions
@@ -7497,8 +7497,22 @@ function applyPreviewTopdownQuest(state: PreviewRuntimeState): PreviewRuntimeSta
   });
 }
 
+function playSceneMenuActionSound(state: PreviewRuntimeState, action: "navigate" | "confirm" | "back" | "unavailable"): PreviewRuntimeState {
+  const name = sceneMenuConfigForState(state)?.actionSounds?.[action];
+  if (!name) return state;
+  const audio = projectArray(state.project, "audioItems").find(item => item.name === name || item.exportID === name);
+  const volume = Math.max(0, Math.min(100, Number(audio?.volume ?? 100)));
+  return runEvent(state, "menu_audio_feedback", [], false, [`play_sfx ${name} ${volume} 8`]);
+}
+
+function sceneMenuItemAvailable(state: PreviewRuntimeState, item: MenuSceneItem): boolean {
+  return item.enabled && (!item.requiresSave || (typeof item.saveSlot === "number" && item.saveSlot >= 0
+    ? !!state.saveSlots[item.saveSlot] : Object.values(state.saveSlots).some(Boolean)));
+}
+
 function changeSceneMenuValue(state: PreviewRuntimeState, direction: -1 | 1): PreviewRuntimeState {
   const config = sceneMenuConfigForState(state);
+  if (config?.carousel) return moveSceneMenuSelection(state, direction);
   const item = config?.items[state.sceneMenu.selectedIndex];
   if (!item || item.action !== "adjust_variable") return updateDebug(state);
   const variableName = variableNameAtIndex(state, item.variableIndex);
@@ -7510,7 +7524,8 @@ function changeSceneMenuValue(state: PreviewRuntimeState, direction: -1 | 1): Pr
   }
   const current = sceneMenuItemValue(state, item);
   const value = Math.max(item.minValue, Math.min(item.maxValue, current + direction * item.step));
-  const nextState = applySceneMenuAudioBinding(setRuntimeVariable(state, variableName, value), item, value);
+  const sounded = value !== current ? playSceneMenuActionSound(state, "navigate") : state;
+  const nextState = applySceneMenuAudioBinding(setRuntimeVariable(sounded, variableName, value), item, value);
   return updateDebug({
     ...nextState,
     sceneMenu: { ...nextState.sceneMenu, notice: null }
@@ -7521,8 +7536,9 @@ function moveSceneMenuSelection(state: PreviewRuntimeState, delta: -1 | 1): Prev
   const items = previewRuntimeSceneMenuItems(state);
   if (items.length === 0) return updateDebug(state);
   const selectedIndex = (state.sceneMenu.selectedIndex + delta + items.length) % items.length;
+  const sounded = selectedIndex !== state.sceneMenu.selectedIndex ? playSceneMenuActionSound(state, "navigate") : state;
   return updateDebug({
-    ...state,
+    ...sounded,
     sceneMenu: { ...state.sceneMenu, selectedIndex, notice: null }
   });
 }
@@ -7531,7 +7547,12 @@ function selectSceneMenuItem(state: PreviewRuntimeState): PreviewRuntimeState {
   const config = sceneMenuConfigForState(state);
   const roomConfig = sceneMenuConfigForRoom(state.currentRoom);
   const item = config?.items[state.sceneMenu.selectedIndex];
-  if (!item || !item.enabled) return updateDebug(state);
+  if (!item) return updateDebug(state);
+  if (!sceneMenuItemAvailable(state, item)) return updateDebug({
+    ...playSceneMenuActionSound(state, "unavailable"),
+    sceneMenu: { ...state.sceneMenu, notice: "Opção indisponível." }
+  });
+  state = playSceneMenuActionSound(state, item.action === "pop_screen" ? "back" : "confirm");
 
   const eventState = item.eventName ? runEvent(state, item.eventName) : state;
   const sceneChanged = eventState.currentRoom?.id !== state.currentRoom?.id
@@ -7718,8 +7739,8 @@ export function dispatchPreviewRuntimeAction(
   }
 
   if (state.sceneMenu.visible && !state.activeDialogue) {
-    if (action === "up") return moveSceneMenuSelection(state, -1);
-    if (action === "down") return moveSceneMenuSelection(state, 1);
+    if (action === "up") return sceneMenuConfigForState(state)?.carousel ? updateDebug(state) : moveSceneMenuSelection(state, -1);
+    if (action === "down") return sceneMenuConfigForState(state)?.carousel ? updateDebug(state) : moveSceneMenuSelection(state, 1);
     if (action === "left") return changeSceneMenuValue(state, -1);
     if (action === "right") return changeSceneMenuValue(state, 1);
     if (action === "action" || action === "start") {
@@ -7737,6 +7758,7 @@ export function dispatchPreviewRuntimeAction(
       const previousEntry = previousID ? parseMenuStackEntry(previousID) : null;
       const previous = previousEntry ? roomByName(state.rooms, previousEntry.roomID) : null;
       if (previous) {
+        state = playSceneMenuActionSound(state, "back");
         const restored = setCurrentRoom({
           ...state,
           sceneMenu: { ...state.sceneMenu, stack: state.sceneMenu.stack.slice(0, -1) }
