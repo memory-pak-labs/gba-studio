@@ -54,7 +54,7 @@ describe('example authoring library',()=>{
   const reopened=parseGBAProjectFile(serializeGBAProjectFile({data:next,summary:summarizeGBAProject(next)})).data;
   expect(reopened).toEqual(next);
   const inventory=exampleAuthoringInventory(reopened);expect(inventory.missingEvents).toEqual([]);
-  expect(inventory.scenes).toHaveLength(32);
+  expect(inventory.scenes).toHaveLength(33);
   const contract=buildEngineExportProjectContract(reopened);
   expect(contract.topdown_project.rooms.find(r=>r.name==='porto_lumen').npcs.filter(a=>a.on_interact?.length)).toHaveLength(6);
  });

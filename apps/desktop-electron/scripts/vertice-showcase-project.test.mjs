@@ -46,7 +46,7 @@ function canonicalVerticeSceneCount() {
   const sceneNames = [
     ...VERTICE_CAMPAIGN_SCENES.map((scene) => scene.name),
     ...VERTICE_SUPPORT_SCENES.map((scene) => scene.name),
-    "circuito_perspectiva", "galeria_das_mares"
+    "circuito_perspectiva", "galeria_das_mares", "sala_mare_vazante"
   ].filter((name) => name !== "menu_inicial");
   return new Set(sceneNames).size;
 }
@@ -362,7 +362,7 @@ describe("materialização canônica de Vértice", () => {
     expect(project.scenas.slice(0, 6).map((scene) => scene.name)).toEqual([
       "logo", "abertura", "titulo", "prologo", "porto_lumen", "mapa_rota"
     ]);
-    expect(project.scenas).toHaveLength(32);
+    expect(project.scenas).toHaveLength(33);
     expect(project.scenas.some((scene) => scene.name === "menu_inicial")).toBe(false);
     expect(project.scenas).toHaveLength(canonicalVerticeSceneCount());
     expect(project.scenas.some((scene) => scene.sceneType === "custom")).toBe(false);
@@ -647,7 +647,7 @@ describe("materialização canônica de Vértice", () => {
   it("preserva a composição V2 aprovada e o carrossel de opções no título", () => {
     const saved = JSON.parse(readFileSync(templateURL, "utf8"));
     for (const project of [saved, promoteExemploGBAVerticeCampaign(saved)]) {
-      expect(project.scenas).toHaveLength(32);
+      expect(project.scenas).toHaveLength(33);
       const title = project.scenas.find((scene) => scene.name === "titulo");
       const titleOptions = title.runtime.config.screens.find((screen) => screen.id === "title_options");
       expect(title.backgroundAssetName).toBe("title-porto-lumen-240x160-4bpp.png");
@@ -966,16 +966,17 @@ describe("materialização canônica de Vértice", () => {
   });
 
 
-  it("materializa o Inventário com os cinco módulos adquiríveis e detalhes de consulta", () => {
+  it("materializa o Inventário com cinco módulos principais e o estabilizador opcional", () => {
     const project = verticeProject();
     const items = project.scenas.find(scene => scene.name === "inventario").runtime.config.items;
-    expect(items.filter(item => item.binding).map(item => item.binding.index)).toEqual([1, 4, 2, 6, 7]);
-    expect(items.some(item => item.binding?.index === 5)).toBe(false);
+    expect(items.filter(item => item.binding).map(item => item.binding.index)).toEqual([1, 4, 2, 6, 7, 5]);
+    expect(items.some(item => item.binding?.index === 5)).toBe(true);
     for (const item of items.filter(item => item.eventName)) {
       const commands = project.events.find(event => event.name === item.eventName).steps.map(step => step.command);
-      expect(commands).toEqual([expect.stringMatching(/^show_dialogue ingame-item-/)]);
+      if(item.id==='stabilizer')expect(commands).toEqual(expect.arrayContaining(['if_variable var_stabilizer 1','show_dialogue tide_owned','show_dialogue tide_location']));
+      else expect(commands).toEqual([expect.stringMatching(/^show_dialogue ingame-item-/)]);
     }
-    expect(project.actors.filter(actor => actor.roomName === "inventario")).toHaveLength(12);
+    expect(project.actors.filter(actor => actor.roomName === "inventario")).toHaveLength(14);
   });
 
 
@@ -2054,6 +2055,7 @@ describe("materialização canônica de Vértice", () => {
     for (const a of JSON.parse(readFileSync(new URL('../fixtures/asset-provenance/market-approved-manifest.json',import.meta.url))).assets) allowedAssets.add(a.name);
     for (const a of JSON.parse(readFileSync(new URL('../fixtures/asset-provenance/platformer-approved-manifest.json',import.meta.url))).assets) allowedAssets.add(a.name);
     for(const a of JSON.parse(readFileSync(new URL('../fixtures/asset-provenance/gallery-v21-approved.json',import.meta.url))).assets)allowedAssets.add(a.name);
+    for(const a of JSON.parse(readFileSync(new URL('../fixtures/asset-provenance/tide-annex-approved.json',import.meta.url))).assets)allowedAssets.add(a.name);
     expect(new Set(project.assets.map((asset) => asset.name))).toEqual(allowedAssets);
     expect(project.audioItems).toHaveLength(69);
     expect(project.audioItems.find(a=>a.name==='mapa_mar_aberto')).toMatchObject({bpm:84,format:'COMPOSED',loops:true});
@@ -2093,7 +2095,7 @@ describe("materialização canônica de Vértice", () => {
       "conselho_guardia",
       "circuito_final",
       "arena_tatica",
-      "circuito_perspectiva", "galeria_das_mares"
+      "circuito_perspectiva", "galeria_das_mares", "sala_mare_vazante"
     ].includes(actor.roomName))).toBe(true);
   });
 

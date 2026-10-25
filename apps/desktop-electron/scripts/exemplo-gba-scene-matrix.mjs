@@ -48,6 +48,7 @@ export const EXEMPLO_SCENE_BATCHES = Object.freeze([
       "porto_lumen",
       "farol_interior",
       "galeria_das_mares",
+      "sala_mare_vazante",
       "penedos_vento",
       "armazem_das_mares",
       "observatorio_do_farol",

@@ -5286,14 +5286,17 @@ function compileEvent(
   pluginRegistry: ProjectPluginRegistry = emptyProjectPluginRegistry(),
   campaignRoom?: Record<string, unknown>
 ): EngineExportProjectEventCommand[] {
-  const registries = buildEventValueRegistries(
-    events,
-    pluginRegistry,
-    [],
-    [],
-    sceneRouteVariableKeys(data),
-    projectVariableKeys(data)
-  );
+  // Every event slice uses the same indices for this project, event collection
+  // and plugin registry. Keep them only inside the current synchronous export.
+  const registryCache = memoizeEngineExport(data, "main.compileEventValueRegistries", () =>
+    new WeakMap<object, WeakMap<object, EngineExportEventValueRegistries>>());
+  let byPlugin = registryCache.get(events);
+  if (!byPlugin) { byPlugin = new WeakMap(); registryCache.set(events, byPlugin); }
+  let registries = byPlugin.get(pluginRegistry);
+  if (!registries) {
+    registries = buildEventValueRegistries(events, pluginRegistry, [], [], sceneRouteVariableKeys(data), projectVariableKeys(data));
+    byPlugin.set(pluginRegistry, registries);
+  }
   const resolvedCampaignRoom = campaignRoom ?? campaignRoomForEvent(data, event);
   const steps = sceneConnectionEventSteps(data, eventSteps(event), resolvedCampaignRoom);
   const commands: EngineExportProjectEventCommand[] = [];

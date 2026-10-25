@@ -20,7 +20,7 @@ describe("carrossel canônico do título", () => {
     const sceneNames = project.scenas.map((scene) => scene.name);
     const { title, splash, options } = titleContract(project);
 
-    expect(sceneNames).toHaveLength(32);
+    expect(sceneNames).toHaveLength(33);
     expect(sceneNames).not.toContain("menu_inicial");
     expect(title?.runtime?.type).toBe("menu");
     expect(splash?.id).toBe("title");
@@ -53,7 +53,7 @@ describe("carrossel canônico do título", () => {
     const promoted = promoteExemploGBAVerticeCampaign(structuredClone(project));
     const { options } = titleContract(promoted);
 
-    expect(promoted.scenas).toHaveLength(32);
+    expect(promoted.scenas).toHaveLength(33);
     expect(promoted.scenas.some((scene) => scene.name === "menu_inicial")).toBe(false);
     expect(options?.carousel).toBe(true);
     expect(options?.items.map((item) => item.id)).toEqual([

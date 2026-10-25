@@ -129,7 +129,7 @@ describe("matriz de execução do Exemplo GBA", () => {
 
     expect(markdown).toContain("# Matriz de execução do Exemplo GBA");
     expect(markdown).toContain("| P0 | Startup e entrada | 5 |");
-    expect(markdown).toContain("| P1 | Campanha e mundo | 8 |");
+    expect(markdown).toContain("| P1 | Campanha e mundo | 9 |");
     expect(markdown).toContain("`usina_combate`");
     expect(markdown).toContain("npm run gate:complete-project");
   });

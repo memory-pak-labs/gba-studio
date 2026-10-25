@@ -12901,6 +12901,18 @@ def emit_shmup_project_data_header(shmup_project, asset_report=None, base_dir=No
         shmup_project.get("dialogue_lines", []),
         "shmup_project.dialogue_lines",
     )
+    scripts = shmup_project.get("scripts", []) or []
+    if not isinstance(scripts, list):
+        raise SystemExit("shmup_project.scripts precisa ser lista")
+    script_entries = [emit_event_script(
+        output, f"shmup_project_script_{index}",
+        script.get("script", script.get("commands", [])) if isinstance(script, dict) else script,
+        f"shmup_project.scripts[{index}]") for index, script in enumerate(scripts)]
+    scripts_name = "shmup_project_scripts" if script_entries else "nullptr"
+    if script_entries:
+        output.append("constexpr gbs::EventScript shmup_project_scripts[] = {")
+        output.extend(f"    {entry}," for entry in script_entries)
+        output.extend(["};", ""])
     actor_sprites = dialogue_emote_assets_from_json(
         shmup_project.get("actor_sprites"),
         "shmup_project.actor_sprites",
@@ -13063,8 +13075,8 @@ def emit_shmup_project_data_header(shmup_project, asset_report=None, base_dir=No
         f"    {asset_refs['sfx_assets'][1]},",
         f"    {asset_refs['music_assets'][0]},",
         f"    {asset_refs['music_assets'][1]},",
-        "    nullptr,",
-        "    0,",
+        f"    {scripts_name},",
+        f"    {len(script_entries)},",
         f"    {asset_refs['pcm_assets'][0]},",
         f"    {asset_refs['pcm_assets'][1]},",
         f"    {asset_refs['tracker_assets'][0]},",

@@ -1233,6 +1233,17 @@ bool run_button_event_binding() {
     return overrides_default;
 }
 
+void run_timer_event_binding() {
+    if (!gbs::update_timer_event_bindings(event_state)) return;
+    const int script_index = event_state.last_script;
+    event_state.last_script = -1;
+    if (script_index >= 0 && static_cast<size_t>(script_index) < project.script_count) {
+        run_shmup_event_script(project.scripts[script_index]);
+        consume_event_state();
+        consume_projectile_event_request();
+    }
+}
+
 void update_projectiles() {
     for (size_t index = 0; index < max_runtime_projectiles; ++index) {
         RuntimeProjectile& projectile = runtime_projectiles[index];
@@ -1790,6 +1801,13 @@ gbs::RuntimeAdapterFrameResult update_shmup_runtime(const gbs::RuntimeFrameConte
 #endif
     gbs::set_event_input_state(event_state, input.held, input.pressed, input.released);
     gbs::update_hud_behavior(event_state, hud.visible);
+    if (!dialogue.visible
+#if GBS_MULTI_RUNTIME
+        && !gbs::event_runner_is_active(shmup_event_runner)
+#endif
+    ) {
+        run_timer_event_binding();
+    }
 #if GBS_MULTI_RUNTIME
     if (!dialogue.visible && gbs::event_runner_is_active(shmup_event_runner)) {
         if (shmup_event_wait_frames > 0) --shmup_event_wait_frames;

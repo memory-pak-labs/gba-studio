@@ -30,7 +30,8 @@ export const EXEMPLO_GB_STUDIO_SCENE_TYPES = Object.freeze({
   arena_tatica: "isometric",
   farol_interior: "topdown",
   circuito_perspectiva: "racing",
-  galeria_das_mares: "topdown"
+  galeria_das_mares: "topdown",
+  sala_mare_vazante: "topdown"
 });
 
 const LEGACY_DIALOGUE_ASSET_NAMES = new Set([

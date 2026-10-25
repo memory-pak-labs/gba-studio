@@ -517,6 +517,7 @@ $(HOST_BUILD)/debug_tests: tests/host/debug_tests.cpp engine/src/gbs_debug.cpp
 	$(HOST_CXX) $(HOST_CXXFLAGS) $^ -o $@
 
 assetc-test:
+	python3 tests/host/assetc_shmup_event_bindings_tests.py
 	python3 tests/host/hud_behavior_export_tests.py
 	python3 tests/host/background_event_tests.py
 	python3 tests/host/dialogue_font_contract_tests.py

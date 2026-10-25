@@ -21,7 +21,7 @@ it.each(["compact","monolithic","split"])("preserves the complete example card l
     expect(reopened.error).toBeUndefined();
     expect(sceneMapPositions(reopened.project!.data)).toEqual(sceneMapPositions(data));
     expect(sceneMapPositions(reopened.project!.data).porto_lumen).toEqual({x:777,y:555});
-    expect(Object.keys(sceneMapPositions(reopened.project!.data))).toHaveLength(32);
+    expect(Object.keys(sceneMapPositions(reopened.project!.data))).toHaveLength(33);
     expect(reopened.project!.data.editorState).toEqual(data.editorState);
     expect((source.editorState as Record<string,unknown>).sceneMapPositions).not.toEqual(sceneMapPositions(data));
   } finally {await rm(root,{recursive:true,force:true});}

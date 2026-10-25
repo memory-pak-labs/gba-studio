@@ -52,7 +52,7 @@ describe("título com opções em carrossel", () => {
     const project = promoteExemploGBAVerticeCampaign(template);
     const title = project.scenas.find((scene) => scene.name === "titulo");
 
-    expect(project.scenas).toHaveLength(32);
+    expect(project.scenas).toHaveLength(33);
     expect(project.scenas.some((scene) => scene.name === "menu_inicial")).toBe(false);
     expect(title.runtime.config.screens.map((screen) => screen.id)).toEqual(["title", "title_options"]);
     expect(project.actors.filter((actor) => actor.roomName === "titulo")).toHaveLength(7);

@@ -53,7 +53,7 @@ describe("campanha canônica O Último Farol", () => {
       startScene: "logo",
       startSceneType: "cutscene"
     });
-    expect(project.scenas).toHaveLength(VERTICE_CAMPAIGN_SCENES.length + VERTICE_SUPPORT_SCENES.length + 1);
+    expect(project.scenas).toHaveLength(VERTICE_CAMPAIGN_SCENES.length + VERTICE_SUPPORT_SCENES.length + 2);
     expect(project.scenas.some((scene) => scene.sceneType === "custom")).toBe(false);
 
     for (const [chapter, definition] of VERTICE_CAMPAIGN_SCENES.entries()) {
@@ -116,7 +116,7 @@ describe("campanha canônica O Último Farol", () => {
     expect(flow.unreachableScenes).toEqual([]);
     expect(flow.invalidTransitions).toEqual([]);
     expect(flow.deadEnds).toEqual([]);
-    expect(flow.reachableScenes).toHaveLength(VERTICE_CAMPAIGN_SCENES.length + VERTICE_SUPPORT_SCENES.length + 1);
+    expect(flow.reachableScenes).toHaveLength(VERTICE_CAMPAIGN_SCENES.length + VERTICE_SUPPORT_SCENES.length + 2);
     const sortTransitions = (transitions) => [...transitions].sort((left, right) => (
       left.from.localeCompare(right.from) || left.to.localeCompare(right.to)
     ));
@@ -140,7 +140,9 @@ describe("campanha canônica O Último Farol", () => {
       ...["porto_lumen","penedos_vento","armazem_das_mares","observatorio_do_farol","mercado_suspenso","usina_submersa","conselho_guardia","circuito_final"].map(to => ({from:"mapa_rota",to})),
       { from: "mercado_suspenso", to: "arena_tatica" },
       {from:"circuito_final",to:"circuito_perspectiva"},
-      {from:"circuito_perspectiva",to:"circuito_final"}
+      {from:"circuito_perspectiva",to:"circuito_final"},
+      {from:"galeria_das_mares",to:"sala_mare_vazante"},
+      {from:"sala_mare_vazante",to:"galeria_das_mares"}
     ]));
     expect(project.events.every((event) => (
       project.scenas.some((scene) => scene.name === event.roomName)
@@ -740,7 +742,7 @@ describe("campanha canônica O Último Farol", () => {
       "var_rtc_minute",
       "porto_player_health", "var_penedos_farol", "penedos_player_health", "penedos_tokens",
       "penedos_defeated_crab", "penedos_defeated_moth", "penedos_defeated_crab_east", "penedos_defeated_moth_east",
-      "z_feature_quest_state", "z_feature_shop_stock", "var_gallery_gate", "var_gallery_record",
+      "z_feature_quest_state", "z_feature_shop_stock", "var_gallery_gate", "var_gallery_record", "var_telescope_alignment", "var_coast_usina", "var_coast_minute", "var_coast_evening", "var_coast_lift", "var_coast_clock_ready", "var_radio_heard", "var_epilogue_phase", "var_epilogue_tick", "var_arena_lesson", "var_tide_state",
       ...LOST_SIGNAL_VARIABLES, ...SHOWCASE_VARIABLES, FAROL_RELAY.variable
     ]));
     expect(VERTICE_PROGRESS_KEYS).toHaveLength(15);

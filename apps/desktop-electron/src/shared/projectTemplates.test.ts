@@ -486,12 +486,15 @@ describe("projectTemplates", () => {
     expect(new Set(actors.filter((actor) => actor.menuItemID).map((actor) => `${actor.x},${actor.y}`)).size).toBe(1);
   });
 
-  it("mantém os sprites dos atores ancorados na caixa de colisão dos pés", () => {
+  it("mantém a âncora dos pés no gameplay e as posições em pixels dos atores de menu", () => {
     const project = buildProjectFromTemplate("exemplo-gba", { name: "Atores GBA" });
     const actors = project.actors as Array<Record<string, unknown>>;
     const animations = project.animations as Array<Record<string, unknown>>;
     const assets = new Set((project.assets as Array<Record<string, unknown>>).map((asset) => String(asset.name)));
     const scenes = new Map((project.scenas as Array<Record<string, unknown>>).map((scene) => [String(scene.name), scene]));
+    const inventory=scenes.get('inventario')!;
+    const menuEntities = new Map(deriveRoomsWorkspacePresentation({...project,rooms:[inventory],scenas:[inventory]}).entities
+      .filter(entity=>entity.id==='tide-inventory-module').map(entity=>[entity.id,entity] as const));
     const placements = actors.map((actor) => {
       const scene = scenes.get(String(actor.roomName));
       expect(scene, `cena ausente para ${String(actor.name)}`).toBeDefined();
@@ -521,10 +524,18 @@ describe("projectTemplates", () => {
 
       const frame = resolveGbaActorSprite(project, actor)?.frame;
       expect(frame, `frame ausente para ${String(actor.name)}`).not.toBeNull();
+      const menuEntity=scene?.sceneType==='menu'?menuEntities.get(String(actor.id)):undefined;
+      if(menuEntity){
+        expect(menuEntity.spriteFrame).not.toBeNull();
+        const placed=gbaActorSpriteRoomPlacementFromFrame(menuEntity.x,menuEntity.y,menuEntity.spriteFrame!);
+        const pixels=actor.menuPositionPixels as {x:number;y:number}|undefined;
+        expect({x:placed.leftTiles*8,y:placed.topTiles*8},String(actor.name)).toEqual(pixels??{x:Number(actor.x)*8,y:Number(actor.y)*8});
+      }
       const x = Number(actor.x);
       const y = Number(actor.y);
       const placement = gbaActorSpriteRoomPlacementFromFrame(x, y, frame!);
       return {
+        menu: Boolean(menuEntity),
         // Platformer scene coordinates identify the collision anchor 8px before the box.
         collisionOffsetX: x - placement.leftTiles + (actor.roomName === "penedos_vento" ? 1 : 0),
         collisionOffsetY: y - placement.topTiles,
@@ -534,6 +545,7 @@ describe("projectTemplates", () => {
 
     expect(placements).toHaveLength(actors.length);
     for (const item of placements) {
+      if(item.menu)continue; // Menus use the pixel placement verified above, without a gameplay foot pivot.
       expect(item.collisionOffsetX).toBeGreaterThanOrEqual(0);
       expect(item.collisionOffsetX).toBeLessThanOrEqual(item.placement.widthTiles);
       expect(item.collisionOffsetY).toBeGreaterThanOrEqual(0);
@@ -616,6 +628,8 @@ describe("projectTemplates", () => {
       "tempestade-approved-explosion.png",
       "tempestade-approved-player.png",
       "tempestade-approved-shot.png",
+      "tide-stabilizer.png",
+      "tide-valve.png",
       "toolcase-item-boost-40x48.png",
       "toolcase-item-cell-40x48.png",
       "toolcase-item-frame-40x48.png",

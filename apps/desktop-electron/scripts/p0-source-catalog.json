@@ -2079,6 +2079,30 @@
           "sha256": "bf7e7f9d8dc3ea72e28f37d83fb44b6e34aaf2fe7b6555ec107edabac9324e50",
           "contract": "campaign-evolutions-user-approved-2026-10-24",
           "provenance": "fixtures/asset-provenance/gallery-v21-approved.json"
+        },
+        {
+          "path": "Assets/backgrounds/tide-room.png",
+          "sha256": "73b748848b57228eab04ae361516eb31f09e24d091580a970a1951915fa4e92a",
+          "contract": "tide-annex-v13-user-approved-2026-10-25",
+          "provenance": "fixtures/asset-provenance/tide-annex-approved.json"
+        },
+        {
+          "path": "Assets/sprites/tide-stabilizer.png",
+          "sha256": "896908afbd3f08a1069e0c26c2e6cc26ffeb426183ccbeefa29378da50453ec2",
+          "contract": "tide-annex-v13-user-approved-2026-10-25",
+          "provenance": "fixtures/asset-provenance/tide-annex-approved.json"
+        },
+        {
+          "path": "Assets/sprites/tide-valve.png",
+          "sha256": "c7b79b672564cc18832c6bb6aa88a5cec763b973c2552323c52cbbbcfae699ae",
+          "contract": "tide-annex-v13-user-approved-2026-10-25",
+          "provenance": "fixtures/asset-provenance/tide-annex-approved.json"
+        },
+        {
+          "path": "Assets/sprites/tide-stabilizer-menu.png",
+          "sha256": "896908afbd3f08a1069e0c26c2e6cc26ffeb426183ccbeefa29378da50453ec2",
+          "contract": "tide-annex-v13-user-approved-2026-10-25",
+          "provenance": "fixtures/asset-provenance/tide-annex-approved.json"
         }
       ],
       "retired": [

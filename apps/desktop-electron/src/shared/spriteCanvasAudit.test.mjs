@@ -7,10 +7,10 @@ import { deriveProjectHealthReport } from "./projectHealth.js";
 const canonical = JSON.parse(readFileSync(new URL("../../default-assets/templates/exemplo-gba/exemplo-gba.gba-project", import.meta.url), "utf8"));
 
 describe("canonical sprite canvas audit", () => {
-  it("contains all 120 active sheets and 519 frames without cropping or missing compositions", () => {
+  it("contains all 123 active sheets and 523 frames without cropping or missing compositions", () => {
     const rows = auditProjectSpriteFrames(canonical);
-    expect(rows).toHaveLength(120);
-    expect(rows.reduce((n, r) => n + r.frames, 0)).toBe(519);
+    expect(rows).toHaveLength(123);
+    expect(rows.reduce((n, r) => n + r.frames, 0)).toBe(523);
     expect(rows.find(row => row.sheet === "farol-relay-v2.png")).toMatchObject({ animations: 3, frames: 3 });
     expect(rows.filter(r => r.clippedFrames || r.missingFrames)).toEqual([]);
     expect(fitProjectSpriteFrames(canonical)).toEqual(canonical);

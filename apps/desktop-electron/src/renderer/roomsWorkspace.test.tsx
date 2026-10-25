@@ -1039,7 +1039,8 @@ describe("RoomsWorkspace React smoke", () => {
       "menu_start",
       "farol_interior",
       "circuito_perspectiva",
-      "galeria_das_mares"
+      "galeria_das_mares",
+      "sala_mare_vazante"
     ]);
 
     for (const scene of hudScenes) {
