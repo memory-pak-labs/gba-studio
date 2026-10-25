@@ -162162,120 +162162,120 @@
         "y": 36
       },
       "porto_lumen": {
-        "x": 2415,
-        "y": 36
+        "x": 36,
+        "y": 338
       },
       "mapa_rota": {
-        "x": 564,
+        "x": 324,
         "y": 338
       },
       "penedos_vento": {
-        "x": 36,
-        "y": 4300
+        "x": 612,
+        "y": 338
       },
       "armazem_das_mares": {
-        "x": 1407,
-        "y": 488
+        "x": 900,
+        "y": 338
       },
       "observatorio_do_farol": {
         "x": 36,
-        "y": 800
+        "y": 640
       },
       "mercado_suspenso": {
         "x": 324,
-        "y": 800
+        "y": 640
       },
       "usina_submersa": {
-        "x": 884,
-        "y": 800
+        "x": 612,
+        "y": 640
       },
       "usina_combate": {
-        "x": 1172,
-        "y": 800
+        "x": 900,
+        "y": 640
       },
       "usina_saida": {
         "x": 36,
-        "y": 1286
+        "y": 942
       },
       "conselho_guardia": {
         "x": 324,
-        "y": 1286
+        "y": 942
       },
       "tempestade": {
         "x": 612,
-        "y": 1286
+        "y": 942
       },
       "guardiao_rele": {
-        "x": 1380,
-        "y": 1286
+        "x": 900,
+        "y": 942
       },
       "arena_arrancada": {
         "x": 36,
-        "y": 1588
+        "y": 1244
       },
       "circuito_final": {
-        "x": 0,
-        "y": 4820
+        "x": 324,
+        "y": 1244
       },
       "escolha_genero": {
-        "x": 852,
-        "y": 1588
+        "x": 612,
+        "y": 1244
       },
       "nome_jogador": {
-        "x": 1140,
-        "y": 1588
+        "x": 900,
+        "y": 1244
       },
       "carregar_jogo": {
         "x": 36,
-        "y": 2050
+        "y": 1546
       },
       "configuracoes": {
         "x": 324,
-        "y": 2050
+        "y": 1546
       },
       "creditos": {
         "x": 612,
-        "y": 2050
+        "y": 1546
       },
       "missoes": {
         "x": 900,
-        "y": 2050
+        "y": 1546
       },
       "inventario": {
         "x": 36,
-        "y": 2352
+        "y": 1848
       },
       "mapa_menu": {
         "x": 324,
-        "y": 2352
+        "y": 1848
       },
       "salvar": {
         "x": 612,
-        "y": 2352
+        "y": 1848
       },
       "menu_start": {
         "x": 900,
-        "y": 2352
+        "y": 1848
       },
       "arena_tatica": {
         "x": 36,
-        "y": 3454
+        "y": 2150
       },
       "farol_interior": {
         "x": 324,
-        "y": 2654
+        "y": 2150
       },
       "circuito_perspectiva": {
-        "x": 700,
-        "y": 4820
+        "x": 612,
+        "y": 2150
       },
       "galeria_das_mares": {
-        "x": 36,
-        "y": 2956
+        "x": 900,
+        "y": 2150
       },
       "sala_mare_vazante": {
-        "x": 596,
-        "y": 2956
+        "x": 36,
+        "y": 2452
       }
     },
     "sceneMapZoom": 0.6818181818181818,
@@ -162318,19 +162318,93 @@
           "id": "scene-group-1789915067123",
           "name": "Menu Inicial",
           "sceneIDs": [
-            "scene-creditos",
-            "scene-carregar_jogo",
+            "scene-titulo",
             "scene-escolha_genero",
-            "scene-nome_jogador"
+            "scene-nome_jogador",
+            "scene-carregar_jogo",
+            "scene-creditos"
+          ]
+        },
+        {
+          "id": "scene-group-example-story",
+          "name": "Abertura e História",
+          "sceneIDs": [
+            "scene-logo",
+            "scene-abertura",
+            "scene-prologo",
+            "scene-conselho_guardia"
+          ]
+        },
+        {
+          "id": "scene-group-example-port-lighthouse",
+          "name": "Porto e Farol",
+          "sceneIDs": [
+            "scene-porto_lumen",
+            "scene-mapa_rota",
+            "scene-farol_interior",
+            "scene-galeria_das_mares",
+            "scene-sala_mare_vazante"
+          ]
+        },
+        {
+          "id": "scene-group-example-exploration",
+          "name": "Exploração",
+          "sceneIDs": [
+            "scene-armazem_das_mares",
+            "scene-observatorio_do_farol"
+          ]
+        },
+        {
+          "id": "scene-group-example-platform-flight",
+          "name": "Plataforma e Voo",
+          "sceneIDs": [
+            "scene-penedos_vento",
+            "scene-tempestade"
           ]
         },
         {
           "id": "scene-group-1789915162535",
           "name": "Dungeon Crawler",
           "sceneIDs": [
-            "scene-usina_saida",
+            "scene-usina_submersa",
             "scene-usina_combate",
-            "scene-usina_submersa"
+            "scene-usina_saida"
+          ]
+        },
+        {
+          "id": "scene-group-example-isometric",
+          "name": "Mercado e Tática",
+          "sceneIDs": [
+            "scene-mercado_suspenso",
+            "scene-arena_tatica"
+          ]
+        },
+        {
+          "id": "scene-group-example-battles",
+          "name": "Combates",
+          "sceneIDs": [
+            "scene-guardiao_rele",
+            "scene-arena_arrancada"
+          ]
+        },
+        {
+          "id": "scene-group-example-circuits",
+          "name": "Circuitos",
+          "sceneIDs": [
+            "scene-circuito_final",
+            "room-circuito_perspectiva"
+          ]
+        },
+        {
+          "id": "scene-group-example-game-menus",
+          "name": "Menus do Jogo",
+          "sceneIDs": [
+            "scene-menu_start",
+            "scene-missoes",
+            "scene-inventario",
+            "scene-mapa_menu",
+            "scene-salvar",
+            "scene-configuracoes"
           ]
         }
       ]
