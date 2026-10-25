@@ -52,6 +52,7 @@ BattleMenuPage battle_menu_page=BattleMenuPage::Root;
 bool battle_menu_wait_for_enemy_turn=false;
 int battle_menu_parent_choice=0;
 gbs::DialogueState battle_menu_dialogue;
+gbs::DialogueLine battle_menu_notice_line { "ACAO EXECUTADA." };
 gbs::DialogueChoice battle_root_choices[]={{"ATACAR",0},{"EQUIPE",1},{"ITENS",2},{"FUGIR",3}};
 char authored_prompt[64],authored_commands[64],authored_cursor[16];
 ''' + helper + prompt + '''
@@ -87,6 +88,14 @@ int main() {
     assert(std::strcmp(battle_hud.text_slots[5],"ATACAR\\nEQUIPE\\nITENS\\n")==0);
     battle_menu_dialogue.visible=true;battle_menu_dialogue.selected_choice=2;update_battle_hud();
     assert(battle_hud.text_slot_count==6);
+    battle_menu_page=BattleMenuPage::Notice;battle_menu_parent_choice=0;
+    battle_menu_wait_for_enemy_turn=false;update_battle_hud();
+    assert(std::strcmp(battle_hud.text_slots[4],"ACAO EXECUTADA\\n\\n")==0);
+    battle_menu_notice_line.text="ACAO INDISPONIVEL!";update_battle_hud();
+    assert(std::strcmp(battle_hud.text_slots[4],"SEM ALTERACAO\\n\\n")==0);
+    battle_menu_notice_line.text="ACAO EXECUTADA.";battle_menu_wait_for_enemy_turn=true;update_battle_hud();
+    assert(std::strcmp(battle_hud.text_slots[4],"ACAO EXECUTADA\\n\\nAGUARDE")==0);
+    battle_menu_page=BattleMenuPage::Root;battle_menu_wait_for_enemy_turn=false;
     custom_ui=false;encounter.party[0].hud_label=nullptr;
     gbs::current=nullptr; update_battle_hud();
     assert(battle_hud.text_slot_count==3);
