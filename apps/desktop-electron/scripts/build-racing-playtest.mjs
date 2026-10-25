@@ -9,7 +9,7 @@ const app = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const root = process.argv[2];
 if (!root)
     throw new Error('Provide a new output directory');
-const projectPath = path.join(app, 'default-assets/templates/exemplo-gba/exemplo-gba.gba-project');
+const projectPath = process.argv[4] ? path.resolve(process.argv[4]) : path.join(app, 'default-assets/templates/exemplo-gba/exemplo-gba.gba-project');
 const enginePackPath = resolveEnginePackRoot(app);
 const bundle = await build({ stdin: { contents: 'export { prepareEngineProjectExport } from "./src/main/exportEngineProject.ts"; export { writeEngineSchemaExport } from "./src/main/engineProjectExport.ts";', resolveDir: app }, bundle: true, platform: 'node', format: 'esm', write: false,
     loader: { '.gba-project': 'text' }, banner: { js: `import {createRequire} from 'node:module'; const require=createRequire(${JSON.stringify(path.join(app, 'package.json'))});` } });

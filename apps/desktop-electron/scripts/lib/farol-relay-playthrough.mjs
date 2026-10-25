@@ -11,7 +11,15 @@ export async function playFarolRelay(driver,project,exported){
  async function inspect(c){await c.walkTo(29,13);await driver.run(4,16);await driver.run(8,0);await c.tap(1,80);}
  async function picture(c,label){await c.walkTo(28,15);await driver.run(8,0);await driver.capture(label);}
  async function stairs(c,label){await c.walkTo(27,20);await driver.run(48,16);const x=(await driver.state()).player.x;await driver.run(24,16);assert.equal((await driver.state()).player.x,x);assert.ok(x<232,'the staircase opening is always protected');await driver.run(8,0);await driver.capture(label);}
- async function base(c,label){await c.walkTo(31,15);await driver.run(48,64);const y=(await driver.state()).player.y;assert.ok(y>=116,'the relay base blocks the player under its visible body');await driver.run(16,64);assert.equal((await driver.state()).player.y,y);await driver.run(8,0);await driver.capture(label);await driver.run(8,128);await driver.run(24,32);await c.walkTo(28,15);}
+ async function base(c,label){
+  await c.walkTo(31,15);await driver.run(48,64);const y=(await driver.state()).player.y;
+  const room=exported.topdown_project.rooms[1],relayActor=project.actors.find(a=>a.id==='farol-relay');
+  const relay=room.npcs.find(a=>a.name===relayActor.name);assert.ok(relay);
+  const baseBottom=relay.position.y+(relay.collision_offset?.y??0)+relay.size.y;
+  const feetTop=y+(exported.topdown_project.player.collision_offset?.y??0);
+  assert.equal(feetTop,baseBottom,'the physical foot box stops exactly below the relay base');
+  await driver.run(16,64);assert.equal((await driver.state()).player.y,y);await driver.run(8,0);await driver.capture(label);await driver.run(8,128);await driver.run(24,32);await c.walkTo(28,15);
+ }
  async function load(c,slot,label){await driver.reboot();await driver.run(180,0);await c.loadSlot(slot,label);await driver.capture(label+'-loaded');await c.close();await room();}
  const result=await playLostSignalMission(driver,project,exported,{
   beforeMission:async c=>{
@@ -20,6 +28,11 @@ export async function playFarolRelay(driver,project,exported){
    // Keep the first manual slot occupied: native load navigation skips empty
    // slots. Slot 3 is used later, after both earlier slots contain real saves.
    await c.saveSlot(1,'relay-before-quest-save');await driver.checkpoint('relay-before-quest');await load(c,1,'relay-before-quest-load');assert.equal(await value('var_farol_relay'),0);await picture(c,'relay-before-quest-restored');await leave(c);
+  },
+  beforeTelescope:async c=>{
+   // The integrated campaign first aligns the telescope, then reveals the clue.
+   await c.hotspot('Telescópio');assert.equal(await value('var_telescope_alignment'),1);assert.equal(await value('var_signal_observation'),0);
+   await driver.capture('relay-telescope-alignment');await c.close();
   },
   approachRepair:async c=>{
    assert.equal(await value('var_farol_relay'),0);await picture(c,'relay-ready-to-repair');await c.saveSlot(2,'relay-faulty-save');
@@ -35,7 +48,9 @@ export async function playFarolRelay(driver,project,exported){
   afterMission:async c=>{
    await enter(c);assert.equal(await value('var_farol_relay'),2);await picture(c,'relay-revisited');
    for(const [target,locale]of [[0,'pt-BR'],[1,'en'],[2,'es']]){
-    await c.tap(8,55);for(let n=0;n<4;n++)await c.tap(128);await c.tap(1,55);for(let n=0;n<4;n++)await c.tap(128);
+    const settingsIndex=project.rooms.find(r=>r.name==='menu_start').runtime.config.items.findIndex(i=>i.id==='settings');
+    assert.ok(settingsIndex>=0,'pause settings option exists');
+    await c.tap(8,55);for(let n=0;n<settingsIndex;n++)await c.tap(128);await c.tap(1,55);for(let n=0;n<4;n++)await c.tap(128);
     const current=await value('var_language');for(let n=current;n<target;n++)await c.tap(16);for(let n=current;n>target;n--)await c.tap(32);
     for(let n=0;n<5&&(await driver.state()).runtimeKind===3;n++)await c.tap(2,55);await room();
     await inspect(c);const d=(await driver.ui()).dialogue;assert.equal(d?.key,'signal_done');

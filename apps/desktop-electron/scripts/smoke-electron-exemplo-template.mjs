@@ -100,7 +100,10 @@ async function waitForText(cdp, predicate, description, timeoutMs = 15_000) {
 }
 
 async function assertSelectedEntityInspector(cdp, kind, entityName) {
-  const state = await evaluate(cdp, `
+  const deadline=Date.now()+15000;
+  let state;
+  do {
+   state = await evaluate(cdp, `
     (() => {
       const panel = document.querySelector('.room-selected-entity-inspector');
       const number = (label) => panel?.querySelector('input[aria-label="' + label + '"]');
@@ -124,10 +127,10 @@ async function assertSelectedEntityInspector(cdp, kind, entityName) {
       };
     })()
   `);
-  if (!state?.selected || !state.coordinates || !state.tab.includes("Objeto")
-    || (kind === "actor" ? !state.sprite : !state.dimensions)) {
-    throw new Error(`Inspetor contextual de ${kind} ${entityName} inválido: ${JSON.stringify(state)}`);
-  }
+   if(state?.selected && state.coordinates && state.tab.includes("Objeto") && (kind === "actor" ? state.sprite : state.dimensions))return;
+   await wait(150);
+  } while(Date.now()<deadline);
+  throw new Error(`Inspetor contextual de ${kind} ${entityName} inválido: ${JSON.stringify(state)}`);
 }
 
 async function waitForVisualComparison(cdp, timeoutMs = 5_000) {
@@ -1049,7 +1052,7 @@ async function inspectBackgroundLayoutRendering(cdp, project) {
     expectedSceneImage("mercado_suspenso", { requireIsometricTilemap: true })
   ];
   const advancedBackgroundScenes = ["usina_submersa", "usina_combate", "usina_saida"].map(name => expectedSceneImage(name, { requireDungeonCamera: true, expectedActors: name === "usina_submersa" ? 0 : 1 }));
-  const authoredLowColorScenes = ["titulo", "prologo", "tempestade", "guardiao_rele", "conselho_guardia", "mapa_rota"]
+  const authoredLowColorScenes = ["titulo", "prologo", "tempestade", "guardiao_rele", "conselho_guardia", "mapa_rota", "galeria_das_mares"]
     .map((name) => expectedSceneImage(name, { minColors: 2 }));
   const result = await evaluate(cdp, `
     (async () => {
@@ -1220,7 +1223,7 @@ async function inspectBackgroundLayoutRendering(cdp, project) {
         const authoredBackgrounds = authoredLowColorScenes.map((scene) => {
           const card = cardFor(scene.name);
           const canvas = card?.querySelector("canvas.room-stage-card-preview-canvas");
-          const image = card?.querySelector("img.room-stage-background-layout");
+          const image = card?.querySelector('img.room-stage-background-layout[data-background-layer="BG2"]') ?? card?.querySelector("img.room-stage-background-layout");
           const visual = canvas ?? image;
           return {
             ...scene,

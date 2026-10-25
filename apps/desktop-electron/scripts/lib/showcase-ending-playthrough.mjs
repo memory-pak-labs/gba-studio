@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 /** Full canonical project, explicit development start at the final race. */
-export async function playShowcaseEnding(driver, project, manifest, path) {
+export async function playShowcaseEnding(driver, project, manifest, path, options={}) {
   const points=manifest.scenes.find(s=>s.name==='circuito_final').pathPoints;
   const target=r=>{
     let best;
@@ -13,6 +13,10 @@ export async function playShowcaseEnding(driver, project, manifest, path) {
     for(let n=0;n<points.length;n++){const p=points[i],q=points[(i+1)%points.length],len=Math.hypot(q.x-p.x,q.y-p.y);if(d<=len)return{x:p.x+(q.x-p.x)*d/len,y:p.y+(q.y-p.y)*d/len};d-=len;i=(i+1)%points.length;}
     return points[0];
   };
+  if(options.fromTitle){
+    const tap=async(key,settle=40)=>{await driver.run(4,key);await driver.run(settle,0);};
+    await driver.run(180,0);await tap(8);await tap(1);await tap(1);await tap(1);await tap(2);await tap(128);await tap(1,120);
+  }
   await driver.run(600,0);assert.equal((await driver.state()).runtimeKind,7);assert.equal((await driver.state()).variables[project.variables.findIndex(v=>v.name==='var_council_path')],path,'Explicit fixture pact reaches native racing state');await driver.capture('ending-race-start');
   let victory=false;
   for(let frame=0;frame<18000;frame++) {
@@ -28,6 +32,7 @@ export async function playShowcaseEnding(driver, project, manifest, path) {
     const ui=await driver.ui();
     if(ui.dialogue?.key===key&&!seen){await driver.run(400,0);await driver.capture('ending-branch-'+path);seen=true;}
     const state=await driver.state();
+    if(seen&&state.runtimeKind===0&&options.tour)return options.tour();
     if(seen&&state.runtimeKind===3){await driver.run(180,0);await driver.capture('ending-title-'+path);return{passed:true,endingPath:path,scope:'Whole canonical ROM; development start at final race with explicit initial council decision. Three laps and ending are driven by buttons.'};}
     await driver.run(4,1);await driver.run(35,0);
   }

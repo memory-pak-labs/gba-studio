@@ -10,6 +10,7 @@ import { promisify } from "node:util";
 import { auditNativeIsometricComposition, decodeNativeIsometricPagedComposition } from './native-isometric-composition-contract.mjs';
 import { decodeMGBAHardwareVideoState, exportedHudFramebufferMasks, framebufferOcclusionPixels, nativeSinglePartSpriteObject, pointClickCursorFramebufferMask, resolveWorldMapNativeFramebufferMasks, transformRacingSpriteSheetRgba } from './native-scene-framebuffer-contract.mjs';
 import { auditStreamedObjResidency } from "./streamed-obj-residency.mjs";
+import { dungeonActorViewCoordinates } from "./native-scene-framebuffer-contract.mjs";
 
 import {
   cdpSession,
@@ -1390,12 +1391,9 @@ function authoredActorFramebufferTarget(room, runtime, actor, frameWidth, frameH
     ];
     const forward = forwardByDirection[Number(position?.direction)] ?? forwardByDirection[0];
     const right = { x: -forward.y, y: forward.x };
-    const deltaX = Number(actor.x) - Number(position.x);
-    const deltaY = Number(actor.y) - Number(position.y);
-    const distance = deltaX * forward.x + deltaY * forward.y;
-    const lateral = deltaX * forward.y - deltaY * forward.x;
-    const viewDistance = Number(runtimeRoom.config?.view_distance ?? 0);
-    if (distance < 1 || distance > viewDistance || lateral < -1 || lateral > 1) return null;
+    const view = dungeonActorViewCoordinates(runtimeRoom, actor, runtimeState);
+    if (!view) return null;
+    const {distance,lateral} = view;
     for (let nearer = 1; nearer < distance; nearer += 1) {
       const xAtDistance = Number(position.x) + forward.x * nearer + right.x * lateral;
       const yAtDistance = Number(position.y) + forward.y * nearer + right.y * lateral;
