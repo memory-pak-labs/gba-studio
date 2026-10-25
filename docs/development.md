@@ -806,7 +806,7 @@ não certifica equivalência de cada frame de todos os comandos/runtimes. O gate
 canônico completo continua obrigatório. O [roteiro físico de versão](hardware-release-validation.md)
 registra a fronteira que o emulador não cobre.
 
-## Farol · relé persistente
+## Farol · relé persistente e localização
 
 O relé auxiliar da V2 aprovada ocupa a área livre à direita da lente do Farol.
 É um ator independente de 48 × 48 pixels, com os estados avariado, instalação
@@ -827,6 +827,13 @@ aprovação da V2 e preparação do sprite estão em
 reutiliza a paleta OBJ de 8 bpp já aprovada dos NPCs; isso evita reservar outro
 banco e mantém as cores dos personagens e da interface. O resultado final,
 incluindo a conversão de cores, foi aprovado no Play e na ROM em 24/10/2026.
+
+`scripts/exemplo-gba-localization-review.mjs` executa a revisão final depois
+das promoções de cena: mantém inglês como idioma fonte, explicita as falas e
+escolhas em inglês, português e espanhol e corrige três instruções do diário
+e o nome da estrutura da aeronave no inventário.
+Traduções alteradas recebem `draft-ai`; não são marcadas como aprovadas por
+uma pessoa. Nomes e textos desenhados nas artes dos menus são preservados.
 
 Execute em `apps/desktop-electron`, usando diretórios externos para os artefatos:
 

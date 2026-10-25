@@ -157368,136 +157368,178 @@
   "dialogues": [
     {
       "character": "Narrador",
-      "choiceTranslations": {},
+      "choiceTranslations": {
+        "en": [],
+        "pt-BR": [],
+        "es": []
+      },
       "choices": [],
       "confirmSound": "farol_sfx_dialogo",
       "emote": "",
       "key": "prologo_frame_1",
       "portrait": "",
-      "text": "Os faróis da costa se apagam um a um. O último clarão ainda recorta o cais.",
+      "text": "The coastal lighthouses go dark one by one. The last beam still cuts across the pier.",
       "textSound": "farol_sfx_texto",
       "translations": {
         "pt-BR": "Os faróis da costa se apagam um a um. O último clarão ainda recorta o cais.",
-        "es": "Os faróis da costa se apagam um a um. O último clarão ainda recorta o cais."
+        "es": "Los faros de la costa se apagan uno a uno. El último haz de luz aún cruza el muelle.",
+        "en": "The coastal lighthouses go dark one by one. The last beam still cuts across the pier."
       },
       "translationStatus": {
         "pt-BR": "approved",
-        "es": "approved"
+        "es": "draft-ai",
+        "en": "draft-ai"
       }
     },
     {
       "character": "Narrador",
-      "choiceTranslations": {},
+      "choiceTranslations": {
+        "en": [],
+        "pt-BR": [],
+        "es": []
+      },
       "choices": [],
       "confirmSound": "farol_sfx_dialogo",
       "emote": "",
       "key": "prologo_frame_2",
       "portrait": "",
-      "text": "A rota aérea desaparece sobre a tempestade. Nara encontra a aeronave antes que a noite feche o porto.",
+      "text": "The air route disappears into the storm. Nara finds the airship before night closes in on the port.",
       "textSound": "farol_sfx_texto",
       "translations": {
         "pt-BR": "A rota aérea desaparece sobre a tempestade. Nara encontra a aeronave antes que a noite feche o porto.",
-        "es": "A rota aérea desaparece sobre a tempestade. Nara encontra a aeronave antes que a noite feche o porto."
+        "es": "La ruta aérea desaparece entre la tormenta. Nara encuentra la aeronave antes de que la noche cierre el puerto.",
+        "en": "The air route disappears into the storm. Nara finds the airship before night closes in on the port."
       },
       "translationStatus": {
         "pt-BR": "approved",
-        "es": "approved"
+        "es": "draft-ai",
+        "en": "draft-ai"
       }
     },
     {
       "character": "Nara",
-      "choiceTranslations": {},
+      "choiceTranslations": {
+        "en": [],
+        "pt-BR": [],
+        "es": []
+      },
       "choices": [],
       "confirmSound": "farol_sfx_dialogo",
       "emote": "",
       "key": "prologo_frame_3",
       "portrait": "nara-portrait.png",
       "portraitSlot": "Esquerda",
-      "text": "Se o farol não pode guiar o caminho, eu vou acendê-lo de novo.",
+      "text": "If the lighthouse cannot guide the way, I will light it again.",
       "textSound": "farol_sfx_texto",
       "translations": {
         "pt-BR": "Se o farol não pode guiar o caminho, eu vou acendê-lo de novo.",
-        "es": "Se o farol não pode guiar o caminho, eu vou acendê-lo de novo."
+        "es": "Si el faro no puede guiar el camino, volveré a encenderlo.",
+        "en": "If the lighthouse cannot guide the way, I will light it again."
       },
       "translationStatus": {
         "pt-BR": "approved",
-        "es": "approved"
+        "es": "draft-ai",
+        "en": "draft-ai"
       }
     },
     {
       "character": "Nara",
-      "choiceTranslations": {},
+      "choiceTranslations": {
+        "en": [],
+        "pt-BR": [],
+        "es": []
+      },
       "choices": [],
       "confirmSound": "farol_sfx_dialogo",
       "emote": "",
       "key": "porto_objetivo",
       "portrait": "",
-      "text": "A estrutura da aeronave está no cais leste.",
+      "text": "The airship frame is on the eastern dock.",
       "textSound": "farol_sfx_texto",
       "translations": {
         "pt-BR": "A estrutura da aeronave está no cais leste.",
-        "es": "A estrutura da aeronave está no cais leste."
+        "es": "La estructura de la aeronave está en el muelle este.",
+        "en": "The airship frame is on the eastern dock."
       },
       "translationStatus": {
         "pt-BR": "approved",
-        "es": "approved"
+        "es": "draft-ai",
+        "en": "draft-ai"
       }
     },
     {
       "character": "Nara",
-      "choiceTranslations": {},
+      "choiceTranslations": {
+        "en": [],
+        "pt-BR": [],
+        "es": []
+      },
       "choices": [],
       "confirmSound": "farol_sfx_dialogo",
       "emote": "",
       "key": "farol_interior_objetivo",
       "portrait": "",
-      "text": "A lente ainda responde, mas o mecanismo precisa de manutenção. Vou falar com o guardião.",
+      "text": "The lens still responds, but the mechanism needs maintenance. I will speak to the keeper.",
       "textSound": "farol_sfx_texto",
       "translations": {
         "pt-BR": "A lente ainda responde, mas o mecanismo precisa de manutenção. Vou falar com o guardião.",
-        "es": "A lente ainda responde, mas o mecanismo precisa de manutenção. Vou falar com o guardião."
+        "es": "La lente aún responde, pero el mecanismo necesita mantenimiento. Hablaré con el guardián.",
+        "en": "The lens still responds, but the mechanism needs maintenance. I will speak to the keeper."
       },
       "translationStatus": {
         "pt-BR": "approved",
-        "es": "approved"
+        "es": "draft-ai",
+        "en": "draft-ai"
       }
     },
     {
       "character": "Guardião do farol",
-      "choiceTranslations": {},
+      "choiceTranslations": {
+        "en": [],
+        "pt-BR": [],
+        "es": []
+      },
       "choices": [],
       "confirmSound": "farol_sfx_dialogo",
       "emote": "",
       "key": "farol_guardiao",
       "portrait": "",
-      "text": "A maré trouxe sal para os encaixes. Examine a lente e depois volte ao cais; o sinal precisa de uma rota livre.",
+      "text": "The tide brought salt into the fittings. Examine the lens, then return to the dock; the signal needs a clear route.",
       "textSound": "farol_sfx_texto",
       "translations": {
         "pt-BR": "A maré trouxe sal para os encaixes. Examine a lente e depois volte ao cais; o sinal precisa de uma rota livre.",
-        "es": "A maré trouxe sal para os encaixes. Examine a lente e depois volte ao cais; o sinal precisa de uma rota livre."
+        "es": "La marea dejó sal en los encajes. Examina la lente y vuelve al muelle; la señal necesita una ruta despejada.",
+        "en": "The tide brought salt into the fittings. Examine the lens, then return to the dock; the signal needs a clear route."
       },
       "translationStatus": {
         "pt-BR": "approved",
-        "es": "approved"
+        "es": "draft-ai",
+        "en": "draft-ai"
       }
     },
     {
       "character": "Nara",
-      "choiceTranslations": {},
+      "choiceTranslations": {
+        "en": [],
+        "pt-BR": [],
+        "es": []
+      },
       "choices": [],
       "confirmSound": "farol_sfx_dialogo",
       "emote": "",
       "key": "farol_lente",
       "portrait": "",
-      "text": "A lente está intacta. O farol pode voltar a guiar Porto de Lúmen.",
+      "text": "The lens is intact. The lighthouse can guide Lumen Port again.",
       "textSound": "farol_sfx_texto",
       "translations": {
         "pt-BR": "A lente está intacta. O farol pode voltar a guiar Porto de Lúmen.",
-        "es": "A lente está intacta. O farol pode voltar a guiar Porto de Lúmen."
+        "es": "La lente está intacta. El faro puede volver a guiar el Puerto de Lumen.",
+        "en": "The lens is intact. The lighthouse can guide Lumen Port again."
       },
       "translationStatus": {
         "pt-BR": "approved",
-        "es": "approved"
+        "es": "draft-ai",
+        "en": "draft-ai"
       }
     },
     {
@@ -157527,116 +157569,152 @@
     },
     {
       "character": "Nara",
-      "choiceTranslations": {},
+      "choiceTranslations": {
+        "en": [],
+        "pt-BR": [],
+        "es": []
+      },
       "choices": [],
       "confirmSound": "farol_sfx_dialogo",
       "emote": "",
       "key": "usina_combate_objetivo",
       "portrait": "",
-      "text": "A sentinela fechou o núcleo. Vou derrotá-la para abrir o compartimento de energia.",
+      "text": "The sentinel sealed the core. I must defeat it to open the energy compartment.",
       "textSound": "farol_sfx_texto",
       "translations": {
         "pt-BR": "A sentinela fechou o núcleo. Vou derrotá-la para abrir o compartimento de energia.",
-        "es": "A sentinela fechou o núcleo. Vou derrotá-la para abrir o compartimento de energia."
+        "es": "La centinela selló el núcleo. Debo derrotarla para abrir el compartimento de energía.",
+        "en": "The sentinel sealed the core. I must defeat it to open the energy compartment."
       },
       "translationStatus": {
         "pt-BR": "approved",
-        "es": "approved"
+        "es": "draft-ai",
+        "en": "draft-ai"
       }
     },
     {
       "character": "Sentinela",
-      "choiceTranslations": {},
+      "choiceTranslations": {
+        "en": [],
+        "pt-BR": [],
+        "es": []
+      },
       "choices": [],
       "confirmSound": "farol_sfx_dialogo",
       "emote": "",
       "key": "usina_sentinela",
       "portrait": "",
-      "text": "O núcleo está protegido. A passagem só responde depois que a célula de energia for retirada.",
+      "text": "The core is protected. The passage only responds after the energy cell is removed.",
       "textSound": "farol_sfx_texto",
       "translations": {
         "pt-BR": "O núcleo está protegido. A passagem só responde depois que a célula de energia for retirada.",
-        "es": "O núcleo está protegido. A passagem só responde depois que a célula de energia for retirada."
+        "es": "El núcleo está protegido. El paso solo responde después de retirar la célula de energía.",
+        "en": "The core is protected. The passage only responds after the energy cell is removed."
       },
       "translationStatus": {
         "pt-BR": "approved",
-        "es": "approved"
+        "es": "draft-ai",
+        "en": "draft-ai"
       }
     },
     {
       "character": "Nara",
-      "choiceTranslations": {},
+      "choiceTranslations": {
+        "en": [],
+        "pt-BR": [],
+        "es": []
+      },
       "choices": [],
       "confirmSound": "farol_sfx_dialogo",
       "emote": "",
       "key": "usina_celula_recuperada",
       "portrait": "",
-      "text": "Célula recuperada. A porta da antecâmara foi energizada; agora posso retornar pelo corredor.",
+      "text": "Cell recovered. The antechamber door is powered; now I can return through the corridor.",
       "textSound": "farol_sfx_texto",
       "translations": {
         "pt-BR": "Célula recuperada. A porta da antecâmara foi energizada; agora posso retornar pelo corredor.",
-        "es": "Célula recuperada. A porta da antecâmara foi energizada; agora posso retornar pelo corredor."
+        "es": "Célula recuperada. La puerta de la antecámara tiene energía; ya puedo volver por el corredor.",
+        "en": "Cell recovered. The antechamber door is powered; now I can return through the corridor."
       },
       "translationStatus": {
         "pt-BR": "approved",
-        "es": "approved"
+        "es": "draft-ai",
+        "en": "draft-ai"
       }
     },
     {
       "character": "Nara",
-      "choiceTranslations": {},
+      "choiceTranslations": {
+        "en": [],
+        "pt-BR": [],
+        "es": []
+      },
       "choices": [],
       "confirmSound": "farol_sfx_dialogo",
       "emote": "",
       "key": "usina_celula_ja_recuperada",
       "portrait": "",
-      "text": "A célula já está no compartimento da aeronave. A antecâmara permanece liberada.",
+      "text": "The cell is already aboard the airship. The antechamber remains open.",
       "textSound": "farol_sfx_texto",
       "translations": {
         "pt-BR": "A célula já está no compartimento da aeronave. A antecâmara permanece liberada.",
-        "es": "A célula já está no compartimento da aeronave. A antecâmara permanece liberada."
+        "es": "La célula ya está en la aeronave. La antecámara permanece abierta.",
+        "en": "The cell is already aboard the airship. The antechamber remains open."
       },
       "translationStatus": {
         "pt-BR": "approved",
-        "es": "approved"
+        "es": "draft-ai",
+        "en": "draft-ai"
       }
     },
     {
       "character": "Nara",
-      "choiceTranslations": {},
+      "choiceTranslations": {
+        "en": [],
+        "pt-BR": [],
+        "es": []
+      },
       "choices": [],
       "confirmSound": "farol_sfx_dialogo",
       "emote": "",
       "key": "usina_saida_bloqueada",
       "portrait": "",
-      "text": "A porta não responde. O núcleo ainda precisa da célula de energia.",
+      "text": "The door does not respond. The core still needs the energy cell.",
       "textSound": "farol_sfx_texto",
       "translations": {
         "pt-BR": "A porta não responde. O núcleo ainda precisa da célula de energia.",
-        "es": "A porta não responde. O núcleo ainda precisa da célula de energia."
+        "es": "La puerta no responde. El núcleo aún necesita la célula de energía.",
+        "en": "The door does not respond. The core still needs the energy cell."
       },
       "translationStatus": {
         "pt-BR": "approved",
-        "es": "approved"
+        "es": "draft-ai",
+        "en": "draft-ai"
       }
     },
     {
       "character": "Nara",
-      "choiceTranslations": {},
+      "choiceTranslations": {
+        "en": [],
+        "pt-BR": [],
+        "es": []
+      },
       "choices": [],
       "confirmSound": "farol_sfx_dialogo",
       "emote": "",
       "key": "usina_saida_objetivo",
       "portrait": "",
-      "text": "O corredor está livre. Vou recuperar a célula e alcançar a antecâmara da guardiã.",
+      "text": "The corridor is clear. I will recover the cell and reach the Guardian antechamber.",
       "textSound": "farol_sfx_texto",
       "translations": {
         "pt-BR": "O corredor está livre. Vou recuperar a célula e alcançar a antecâmara da guardiã.",
-        "es": "O corredor está livre. Vou recuperar a célula e alcançar a antecâmara da guardiã."
+        "es": "El corredor está despejado. Recuperaré la célula y llegaré a la antecámara de la Guardiana.",
+        "en": "The corridor is clear. I will recover the cell and reach the Guardian antechamber."
       },
       "translationStatus": {
         "pt-BR": "approved",
-        "es": "approved"
+        "es": "draft-ai",
+        "en": "draft-ai"
       }
     },
     {
@@ -157649,6 +157727,10 @@
         "es": [
           "Proteger la costa",
           "Explorar nuevas rutas"
+        ],
+        "en": [
+          "Protect the coast",
+          "Explore new routes"
         ]
       },
       "choices": [
@@ -157664,485 +157746,637 @@
       "textSound": "farol_sfx_texto",
       "translations": {
         "pt-BR": "Qual será o nosso pacto?",
-        "es": "¿Cuál será nuestro pacto?"
+        "es": "¿Cuál será nuestro pacto?",
+        "en": "Which pact shall we make?"
       },
       "translationStatus": {
         "pt-BR": "draft-ai",
-        "es": "draft-ai"
+        "es": "draft-ai",
+        "en": "draft-ai"
       }
     },
     {
       "character": "Rival",
-      "choiceTranslations": {},
+      "choiceTranslations": {
+        "en": [],
+        "pt-BR": [],
+        "es": []
+      },
       "choices": [],
       "confirmSound": "farol_sfx_dialogo",
       "emote": "",
       "key": "arena_derrota",
       "portrait": "",
-      "text": "A pista não perdoa hesitação. Tente outra vez.",
+      "text": "The track leaves no room for hesitation. Try again.",
       "textSound": "farol_sfx_texto",
       "translations": {
         "pt-BR": "A pista não perdoa hesitação. Tente outra vez.",
-        "es": "A pista não perdoa hesitação. Tente outra vez."
+        "es": "La pista no perdona las dudas. Inténtalo de nuevo.",
+        "en": "The track leaves no room for hesitation. Try again."
       },
       "translationStatus": {
         "pt-BR": "approved",
-        "es": "approved"
+        "es": "draft-ai",
+        "en": "draft-ai"
       }
     },
     {
       "character": "Projeto",
-      "choiceTranslations": {},
+      "choiceTranslations": {
+        "en": [],
+        "pt-BR": [],
+        "es": []
+      },
       "choices": [],
       "confirmSound": "farol_sfx_dialogo",
       "emote": "",
       "key": "creditos_projeto",
       "portrait": "",
-      "text": "Exemplo GBA: uma campanha de estudo para validar cenas, menus, atores, backgrounds e eventos no hardware do Game Boy Advance.",
+      "text": "Example GBA: a study campaign demonstrating scenes, menus, actors, backgrounds and events on Game Boy Advance hardware.",
       "textSound": "farol_sfx_texto",
       "translations": {
         "pt-BR": "Exemplo GBA: uma campanha de estudo para validar cenas, menus, atores, backgrounds e eventos no hardware do Game Boy Advance.",
-        "es": "Exemplo GBA: uma campanha de estudo para validar cenas, menus, atores, backgrounds e eventos no hardware do Game Boy Advance."
+        "es": "Ejemplo GBA: una campaña de estudio para demostrar escenas, menús, actores, fondos y eventos en Game Boy Advance.",
+        "en": "Example GBA: a study campaign demonstrating scenes, menus, actors, backgrounds and events on Game Boy Advance hardware."
       },
       "translationStatus": {
         "pt-BR": "approved",
-        "es": "approved"
+        "es": "draft-ai",
+        "en": "draft-ai"
       }
     },
     {
       "character": "Engine",
-      "choiceTranslations": {},
+      "choiceTranslations": {
+        "en": [],
+        "pt-BR": [],
+        "es": []
+      },
       "choices": [],
       "confirmSound": "farol_sfx_dialogo",
       "emote": "",
       "key": "creditos_engine",
       "portrait": "",
-      "text": "GBA Studio Engine: runtime e exportador usados pelo projeto, com arquitetura própria orientada às capacidades do GBA.",
+      "text": "GBA Studio Engine: the project runtime and exporter, with its own architecture built around GBA capabilities.",
       "textSound": "farol_sfx_texto",
       "translations": {
         "pt-BR": "GBA Studio Engine: runtime e exportador usados pelo projeto, com arquitetura própria orientada às capacidades do GBA.",
-        "es": "GBA Studio Engine: runtime e exportador usados pelo projeto, com arquitetura própria orientada às capacidades do GBA."
+        "es": "GBA Studio Engine: el motor y exportador del proyecto, con arquitectura propia orientada a las capacidades del GBA.",
+        "en": "GBA Studio Engine: the project runtime and exporter, with its own architecture built around GBA capabilities."
       },
       "translationStatus": {
         "pt-BR": "approved",
-        "es": "approved"
+        "es": "draft-ai",
+        "en": "draft-ai"
       }
     },
     {
       "character": "Narrador",
-      "choiceTranslations": {},
+      "choiceTranslations": {
+        "en": [],
+        "pt-BR": [],
+        "es": []
+      },
       "choices": [],
       "confirmSound": "farol_sfx_dialogo",
       "emote": "",
       "key": "epilogo",
       "portrait": "",
-      "text": "Os faróis voltam a acender e a rota de Lúmen permanece livre.",
+      "text": "The lighthouses shine again, and the Lumen route remains open.",
       "textSound": "farol_sfx_texto",
       "translations": {
         "pt-BR": "Os faróis voltam a acender e a rota de Lúmen permanece livre.",
-        "es": "Os faróis voltam a acender e a rota de Lúmen permanece livre."
+        "es": "Los faros vuelven a brillar y la ruta de Lumen permanece abierta.",
+        "en": "The lighthouses shine again, and the Lumen route remains open."
       },
       "translationStatus": {
         "pt-BR": "approved",
-        "es": "approved"
+        "es": "draft-ai",
+        "en": "draft-ai"
       }
     },
     {
       "character": "Nara",
-      "choiceTranslations": {},
+      "choiceTranslations": {
+        "en": [],
+        "pt-BR": [],
+        "es": []
+      },
       "choices": [],
       "confirmSound": "farol_sfx_dialogo",
       "emote": "",
       "key": "armazem_das_mares_carta",
       "portrait": "",
-      "text": "A carta ainda marca a rota do farol.",
+      "text": "The chart still marks the lighthouse route.",
       "textSound": "farol_sfx_texto",
       "translations": {
         "pt-BR": "A carta ainda marca a rota do farol.",
-        "es": "A carta ainda marca a rota do farol."
+        "es": "La carta aún marca la ruta del faro.",
+        "en": "The chart still marks the lighthouse route."
       },
       "translationStatus": {
         "pt-BR": "approved",
-        "es": "approved"
+        "es": "draft-ai",
+        "en": "draft-ai"
       }
     },
     {
       "character": "Nara",
-      "choiceTranslations": {},
+      "choiceTranslations": {
+        "en": [],
+        "pt-BR": [],
+        "es": []
+      },
       "choices": [],
       "confirmSound": "farol_sfx_dialogo",
       "emote": "",
       "key": "armazem_das_mares_bau",
       "portrait": "",
-      "text": "O baú guarda um mecanismo lacrado.",
+      "text": "The chest holds a sealed mechanism.",
       "textSound": "farol_sfx_texto",
       "translations": {
         "pt-BR": "O baú guarda um mecanismo lacrado.",
-        "es": "O baú guarda um mecanismo lacrado."
+        "es": "El cofre guarda un mecanismo sellado.",
+        "en": "The chest holds a sealed mechanism."
       },
       "translationStatus": {
         "pt-BR": "approved",
-        "es": "approved"
+        "es": "draft-ai",
+        "en": "draft-ai"
       }
     },
     {
       "character": "Nara",
-      "choiceTranslations": {},
+      "choiceTranslations": {
+        "en": [],
+        "pt-BR": [],
+        "es": []
+      },
       "choices": [],
       "confirmSound": "farol_sfx_dialogo",
       "emote": "",
       "key": "observatorio_do_farol_telescopio",
       "portrait": "",
-      "text": "O telescópio ainda encontra o último farol.",
+      "text": "The telescope can still find the last lighthouse.",
       "textSound": "farol_sfx_texto",
       "translations": {
         "pt-BR": "O telescópio ainda encontra o último farol.",
-        "es": "O telescópio ainda encontra o último farol."
+        "es": "El telescopio aún encuentra el último faro.",
+        "en": "The telescope can still find the last lighthouse."
       },
       "translationStatus": {
         "pt-BR": "approved",
-        "es": "approved"
+        "es": "draft-ai",
+        "en": "draft-ai"
       }
     },
     {
       "character": "Nara",
-      "choiceTranslations": {},
+      "choiceTranslations": {
+        "en": [],
+        "pt-BR": [],
+        "es": []
+      },
       "choices": [],
       "confirmSound": "farol_sfx_dialogo",
       "emote": "",
       "key": "observatorio_do_farol_mapa",
       "portrait": "",
-      "text": "A mesa reúne a rota e a maré.",
+      "text": "The table brings together the route and the tide.",
       "textSound": "farol_sfx_texto",
       "translations": {
         "pt-BR": "A mesa reúne a rota e a maré.",
-        "es": "A mesa reúne a rota e a maré."
+        "es": "La mesa reúne la ruta y la marea.",
+        "en": "The table brings together the route and the tide."
       },
       "translationStatus": {
         "pt-BR": "approved",
-        "es": "approved"
+        "es": "draft-ai",
+        "en": "draft-ai"
       }
     },
     {
       "key": "ingame-next-0",
       "character": "",
-      "text": "A luz do farol foi restaurada. A campanha esta completa.",
+      "text": "The lighthouse beam is restored. The campaign is complete.",
       "portrait": "",
       "emote": "",
       "choices": [],
       "translations": {
         "pt-BR": "A luz do farol foi restaurada. A campanha esta completa.",
-        "es": "La luz del faro ha sido restaurada. La campaña está completa."
+        "es": "La luz del faro ha sido restaurada. La campaña está completa.",
+        "en": "The lighthouse beam is restored. The campaign is complete."
       },
       "translationStatus": {
         "pt-BR": "approved",
-        "es": "draft"
+        "es": "draft",
+        "en": "draft-ai"
       },
-      "choiceTranslations": {},
+      "choiceTranslations": {
+        "en": [],
+        "pt-BR": [],
+        "es": []
+      },
       "textSound": "farol_sfx_texto",
       "confirmSound": "farol_sfx_dialogo"
     },
     {
       "key": "ingame-next-1",
       "character": "",
-      "text": "Dispute o Circuito Final e complete as tres voltas.",
+      "text": "Race the Final Circuit and complete all three laps.",
       "portrait": "",
       "emote": "",
       "choices": [],
       "translations": {
         "pt-BR": "Dispute o Circuito Final e complete as tres voltas.",
-        "es": "Compite en el Circuito Final y completa las tres vueltas."
+        "es": "Compite en el Circuito Final y completa las tres vueltas.",
+        "en": "Race the Final Circuit and complete all three laps."
       },
       "translationStatus": {
         "pt-BR": "approved",
-        "es": "draft"
+        "es": "draft",
+        "en": "draft-ai"
       },
-      "choiceTranslations": {},
+      "choiceTranslations": {
+        "en": [],
+        "pt-BR": [],
+        "es": []
+      },
       "textSound": "farol_sfx_texto",
       "confirmSound": "farol_sfx_dialogo"
     },
     {
       "key": "ingame-next-2",
       "character": "",
-      "text": "Venca a Arena Arrancada para conquistar o impulso.",
+      "text": "Win the Starting Arena to earn the booster.",
       "portrait": "",
       "emote": "",
       "choices": [],
       "translations": {
         "pt-BR": "Venca a Arena Arrancada para conquistar o impulso.",
-        "es": "Gana la Arena Arrancada para conseguir el impulso."
+        "es": "Gana la Arena Arrancada para conseguir el impulso.",
+        "en": "Win the Starting Arena to earn the booster."
       },
       "translationStatus": {
         "pt-BR": "approved",
-        "es": "draft"
+        "es": "draft",
+        "en": "draft-ai"
       },
-      "choiceTranslations": {},
+      "choiceTranslations": {
+        "en": [],
+        "pt-BR": [],
+        "es": []
+      },
       "textSound": "farol_sfx_texto",
       "confirmSound": "farol_sfx_dialogo"
     },
     {
       "key": "ingame-next-3",
       "character": "",
-      "text": "Derrote o Guardiao do Rele e libere a arena.",
+      "text": "Defeat the Relay Guardian to unlock the arena.",
       "portrait": "",
       "emote": "",
       "choices": [],
       "translations": {
         "pt-BR": "Derrote o Guardiao do Rele e libere a arena.",
-        "es": "Derrota al Guardián del Relé y libera la arena."
+        "es": "Derrota al Guardián del Relé y libera la arena.",
+        "en": "Defeat the Relay Guardian to unlock the arena."
       },
       "translationStatus": {
         "pt-BR": "approved",
-        "es": "draft"
+        "es": "draft",
+        "en": "draft-ai"
       },
-      "choiceTranslations": {},
+      "choiceTranslations": {
+        "en": [],
+        "pt-BR": [],
+        "es": []
+      },
       "textSound": "farol_sfx_texto",
       "confirmSound": "farol_sfx_dialogo"
     },
     {
       "key": "ingame-next-4",
       "character": "",
-      "text": "Atravesse a Tempestade para obter a blindagem.",
+      "text": "Cross the Storm to obtain the armor.",
       "portrait": "",
       "emote": "",
       "choices": [],
       "translations": {
         "pt-BR": "Atravesse a Tempestade para obter a blindagem.",
-        "es": "Atraviesa la Tormenta para obtener el blindaje."
+        "es": "Atraviesa la Tormenta para obtener el blindaje.",
+        "en": "Cross the Storm to obtain the armor."
       },
       "translationStatus": {
         "pt-BR": "approved",
-        "es": "draft"
+        "es": "draft",
+        "en": "draft-ai"
       },
-      "choiceTranslations": {},
+      "choiceTranslations": {
+        "en": [],
+        "pt-BR": [],
+        "es": []
+      },
       "textSound": "farol_sfx_texto",
       "confirmSound": "farol_sfx_dialogo"
     },
     {
       "key": "ingame-next-5",
       "character": "",
-      "text": "Leve a celula ao Conselho e confirme a alianca.",
+      "text": "Take the cell to the Council and confirm the pact.",
       "portrait": "",
       "emote": "",
       "choices": [],
       "translations": {
         "pt-BR": "Leve a celula ao Conselho e confirme a alianca.",
-        "es": "Lleva la célula al Consejo y confirma la alianza."
+        "es": "Lleva la célula al Consejo y confirma la alianza.",
+        "en": "Take the cell to the Council and confirm the pact."
       },
       "translationStatus": {
         "pt-BR": "approved",
-        "es": "draft"
+        "es": "draft",
+        "en": "draft-ai"
       },
-      "choiceTranslations": {},
+      "choiceTranslations": {
+        "en": [],
+        "pt-BR": [],
+        "es": []
+      },
       "textSound": "farol_sfx_texto",
       "confirmSound": "farol_sfx_dialogo"
     },
     {
       "key": "ingame-next-6",
       "character": "",
-      "text": "Encontre a celula na saida da Usina Submersa.",
+      "text": "Find the cell at the Submerged Plant exit.",
       "portrait": "",
       "emote": "",
       "choices": [],
       "translations": {
         "pt-BR": "Encontre a celula na saida da Usina Submersa.",
-        "es": "Encuentra la célula a la salida de la Planta Sumergida."
+        "es": "Encuentra la célula a la salida de la Planta Sumergida.",
+        "en": "Find the cell at the Submerged Plant exit."
       },
       "translationStatus": {
         "pt-BR": "approved",
-        "es": "draft"
+        "es": "draft",
+        "en": "draft-ai"
       },
-      "choiceTranslations": {},
+      "choiceTranslations": {
+        "en": [],
+        "pt-BR": [],
+        "es": []
+      },
       "textSound": "farol_sfx_texto",
       "confirmSound": "farol_sfx_dialogo"
     },
     {
       "key": "ingame-next-7",
       "character": "",
-      "text": "Atravesse a Usina Submersa e derrote a sentinela.",
+      "text": "Cross the Submerged Plant and defeat the sentinel.",
       "portrait": "",
       "emote": "",
       "choices": [],
       "translations": {
         "pt-BR": "Atravesse a Usina Submersa e derrote a sentinela.",
-        "es": "Atraviesa la Planta Sumergida y derrota al centinela."
+        "es": "Atraviesa la Planta Sumergida y derrota al centinela.",
+        "en": "Cross the Submerged Plant and defeat the sentinel."
       },
       "translationStatus": {
         "pt-BR": "approved",
-        "es": "draft"
+        "es": "draft",
+        "en": "draft-ai"
       },
-      "choiceTranslations": {},
+      "choiceTranslations": {
+        "en": [],
+        "pt-BR": [],
+        "es": []
+      },
       "textSound": "farol_sfx_texto",
       "confirmSound": "farol_sfx_dialogo"
     },
     {
       "key": "ingame-next-8",
       "character": "",
-      "text": "Siga ate o Mercado Suspenso e encontre o atalho.",
+      "text": "Go to the Hanging Market and find the shortcut.",
       "portrait": "",
       "emote": "",
       "choices": [],
       "translations": {
         "pt-BR": "Siga ate o Mercado Suspenso e encontre o atalho.",
-        "es": "Ve al Mercado Suspendido y encuentra el atajo."
+        "es": "Ve al Mercado Suspendido y encuentra el atajo.",
+        "en": "Go to the Hanging Market and find the shortcut."
       },
       "translationStatus": {
         "pt-BR": "approved",
-        "es": "draft"
+        "es": "draft",
+        "en": "draft-ai"
       },
-      "choiceTranslations": {},
+      "choiceTranslations": {
+        "en": [],
+        "pt-BR": [],
+        "es": []
+      },
       "textSound": "farol_sfx_texto",
       "confirmSound": "farol_sfx_dialogo"
     },
     {
       "key": "ingame-next-9",
       "character": "",
-      "text": "Examine o Observatorio do Farol.",
+      "text": "Examine the Lighthouse Observatory.",
       "portrait": "",
       "emote": "",
       "choices": [],
       "translations": {
         "pt-BR": "Examine o Observatorio do Farol.",
-        "es": "Examina el Observatorio del Faro."
+        "es": "Examina el Observatorio del Faro.",
+        "en": "Examine the Lighthouse Observatory."
       },
       "translationStatus": {
         "pt-BR": "approved",
-        "es": "draft"
+        "es": "draft",
+        "en": "draft-ai"
       },
-      "choiceTranslations": {},
+      "choiceTranslations": {
+        "en": [],
+        "pt-BR": [],
+        "es": []
+      },
       "textSound": "farol_sfx_texto",
       "confirmSound": "farol_sfx_dialogo"
     },
     {
       "key": "ingame-next-10",
       "character": "",
-      "text": "Explore o Armazem das Mares e consulte a carta.",
+      "text": "Explore the Tidal Warehouse and read the chart.",
       "portrait": "",
       "emote": "",
       "choices": [],
       "translations": {
         "pt-BR": "Explore o Armazem das Mares e consulte a carta.",
-        "es": "Explora el Almacén de los Mares y consulta la carta."
+        "es": "Explora el Almacén de los Mares y consulta la carta.",
+        "en": "Explore the Tidal Warehouse and read the chart."
       },
       "translationStatus": {
         "pt-BR": "approved",
-        "es": "draft"
+        "es": "draft",
+        "en": "draft-ai"
       },
-      "choiceTranslations": {},
+      "choiceTranslations": {
+        "en": [],
+        "pt-BR": [],
+        "es": []
+      },
       "textSound": "farol_sfx_texto",
       "confirmSound": "farol_sfx_dialogo"
     },
     {
       "key": "ingame-next-11",
       "character": "",
-      "text": "Use o mapa de viagem para seguir aos Penedos do Vento.",
+      "text": "Use the travel map to reach the Wind Cliffs.",
       "portrait": "",
       "emote": "",
       "choices": [],
       "translations": {
         "pt-BR": "Use o mapa de viagem para seguir aos Penedos do Vento.",
-        "es": "Usa el mapa de viaje para llegar a los Peñascos del Viento."
+        "es": "Usa el mapa de viaje para llegar a los Peñascos del Viento.",
+        "en": "Use the travel map to reach the Wind Cliffs."
       },
       "translationStatus": {
         "pt-BR": "approved",
-        "es": "draft"
+        "es": "draft",
+        "en": "draft-ai"
       },
-      "choiceTranslations": {},
+      "choiceTranslations": {
+        "en": [],
+        "pt-BR": [],
+        "es": []
+      },
       "textSound": "farol_sfx_texto",
       "confirmSound": "farol_sfx_dialogo"
     },
     {
       "key": "ingame-next-start",
       "character": "",
-      "text": "Converse com a Guardia em Porto Lumen para obter a estrutura do farol.",
+      "text": "Speak to the mechanic on the eastern dock in Lumen Port to obtain the airship frame.",
       "portrait": "",
       "emote": "",
       "choices": [],
       "translations": {
-        "pt-BR": "Converse com a Guardia em Porto Lumen para obter a estrutura do farol.",
-        "es": "Habla con la Guardiana en Puerto Lumen para obtener la estructura del faro."
+        "pt-BR": "Converse com a mecânica no cais leste de Porto de Lúmen para obter a estrutura da aeronave.",
+        "es": "Habla con la mecánica del muelle este del Puerto de Lumen para obtener la estructura de la aeronave.",
+        "en": "Speak to the mechanic on the eastern dock in Lumen Port to obtain the airship frame."
       },
       "translationStatus": {
-        "pt-BR": "approved",
-        "es": "draft"
+        "pt-BR": "draft-ai",
+        "es": "draft-ai",
+        "en": "draft-ai"
       },
-      "choiceTranslations": {},
+      "choiceTranslations": {
+        "en": [],
+        "pt-BR": [],
+        "es": []
+      },
       "textSound": "farol_sfx_texto",
       "confirmSound": "farol_sfx_dialogo"
     },
     {
       "key": "ingame-mission-frame",
       "character": "",
-      "text": "Converse com a Guardia em Porto Lumen. OK indica que a estrutura foi obtida.",
+      "text": "Speak to the mechanic on the eastern dock in Lumen Port. OK means the airship frame has been obtained.",
       "portrait": "",
       "emote": "",
       "choices": [],
       "translations": {
-        "pt-BR": "Converse com a Guardia em Porto Lumen. OK indica que a estrutura foi obtida.",
-        "es": "Habla con la Guardiana en Puerto Lumen. OK indica que obtuviste la estructura."
+        "pt-BR": "Converse com a mecânica no cais leste de Porto de Lúmen. OK indica que a estrutura da aeronave foi obtida.",
+        "es": "Habla con la mecánica del muelle este del Puerto de Lumen. OK indica que ya tienes la estructura de la aeronave.",
+        "en": "Speak to the mechanic on the eastern dock in Lumen Port. OK means the airship frame has been obtained."
       },
       "translationStatus": {
-        "pt-BR": "approved",
-        "es": "draft"
+        "pt-BR": "draft-ai",
+        "es": "draft-ai",
+        "en": "draft-ai"
       },
-      "choiceTranslations": {},
+      "choiceTranslations": {
+        "en": [],
+        "pt-BR": [],
+        "es": []
+      },
       "textSound": "farol_sfx_texto",
       "confirmSound": "farol_sfx_dialogo"
     },
     {
       "key": "ingame-mission-cell",
       "character": "",
-      "text": "Derrote a sentinela e encontre a celula na saida da Usina.",
+      "text": "Defeat the sentinel and find the cell at the Plant exit.",
       "portrait": "",
       "emote": "",
       "choices": [],
       "translations": {
         "pt-BR": "Derrote a sentinela e encontre a celula na saida da Usina.",
-        "es": "Derrota al centinela y encuentra la célula a la salida de la Planta."
+        "es": "Derrota al centinela y encuentra la célula a la salida de la Planta.",
+        "en": "Defeat the sentinel and find the cell at the Plant exit."
       },
       "translationStatus": {
         "pt-BR": "approved",
-        "es": "draft"
+        "es": "draft",
+        "en": "draft-ai"
       },
-      "choiceTranslations": {},
+      "choiceTranslations": {
+        "en": [],
+        "pt-BR": [],
+        "es": []
+      },
       "textSound": "farol_sfx_texto",
       "confirmSound": "farol_sfx_dialogo"
     },
     {
       "key": "ingame-mission-bond",
       "character": "",
-      "text": "Confirme a alianca no Conselho da Guardia.",
+      "text": "Confirm the pact at the Guardian Council.",
       "portrait": "",
       "emote": "",
       "choices": [],
       "translations": {
         "pt-BR": "Confirme a alianca no Conselho da Guardia.",
-        "es": "Confirma la alianza en el Consejo de la Guardiana."
+        "es": "Confirma la alianza en el Consejo de la Guardiana.",
+        "en": "Confirm the pact at the Guardian Council."
       },
       "translationStatus": {
         "pt-BR": "approved",
-        "es": "draft"
+        "es": "draft",
+        "en": "draft-ai"
       },
-      "choiceTranslations": {},
+      "choiceTranslations": {
+        "en": [],
+        "pt-BR": [],
+        "es": []
+      },
       "textSound": "farol_sfx_texto",
       "confirmSound": "farol_sfx_dialogo"
     },
     {
       "key": "ingame-mission-final",
       "character": "",
-      "text": "Conclua o Circuito Final para restaurar a luz.",
+      "text": "Complete the Final Circuit to restore the light.",
       "portrait": "",
       "emote": "",
       "choices": [],
       "translations": {
         "pt-BR": "Conclua o Circuito Final para restaurar a luz.",
-        "es": "Completa el Circuito Final para restaurar la luz."
+        "es": "Completa el Circuito Final para restaurar la luz.",
+        "en": "Complete the Final Circuit to restore the light."
       },
       "translationStatus": {
         "pt-BR": "approved",
-        "es": "draft"
+        "es": "draft",
+        "en": "draft-ai"
       },
-      "choiceTranslations": {},
+      "choiceTranslations": {
+        "en": [],
+        "pt-BR": [],
+        "es": []
+      },
       "textSound": "farol_sfx_texto",
       "confirmSound": "farol_sfx_dialogo"
     },
@@ -158274,183 +158508,241 @@
     {
       "key": "ingame-map-porto",
       "character": "",
-      "text": "Inicio da jornada. Fale com a Guardia para obter a estrutura. Este mapa serve apenas para consulta.",
+      "text": "The journey begins here. Speak to the mechanic on the eastern dock to obtain the airship frame. This map is for reference only.",
       "portrait": "",
       "emote": "",
       "choices": [],
       "translations": {
-        "pt-BR": "Inicio da jornada. Fale com a Guardia para obter a estrutura. Este mapa serve apenas para consulta.",
-        "es": "Inicio del viaje. Habla con la Guardiana para obtener la estructura. Este mapa es solo de consulta."
+        "pt-BR": "Início da jornada. Fale com a mecânica no cais leste para obter a estrutura da aeronave. Este mapa serve apenas para consulta.",
+        "es": "La aventura empieza aquí. Habla con la mecánica del muelle este para obtener la estructura de la aeronave. Este mapa es solo de consulta.",
+        "en": "The journey begins here. Speak to the mechanic on the eastern dock to obtain the airship frame. This map is for reference only."
       },
       "translationStatus": {
-        "pt-BR": "approved",
-        "es": "draft"
+        "pt-BR": "draft-ai",
+        "es": "draft-ai",
+        "en": "draft-ai"
       },
-      "choiceTranslations": {},
+      "choiceTranslations": {
+        "en": [],
+        "pt-BR": [],
+        "es": []
+      },
       "textSound": "farol_sfx_texto",
       "confirmSound": "farol_sfx_dialogo"
     },
     {
       "key": "ingame-map-penedos",
       "character": "",
-      "text": "Acesso pelo mapa de viagem. Complete o percurso de plataforma. Este mapa serve apenas para consulta.",
+      "text": "Travel here from the route map. Complete the platforming course. This map is for reference only.",
       "portrait": "",
       "emote": "",
       "choices": [],
       "translations": {
         "pt-BR": "Acesso pelo mapa de viagem. Complete o percurso de plataforma. Este mapa serve apenas para consulta.",
-        "es": "Accede desde el mapa de viaje. Completa la ruta de plataformas. Este mapa es solo de consulta."
+        "es": "Accede desde el mapa de viaje. Completa la ruta de plataformas. Este mapa es solo de consulta.",
+        "en": "Travel here from the route map. Complete the platforming course. This map is for reference only."
       },
       "translationStatus": {
         "pt-BR": "approved",
-        "es": "draft"
+        "es": "draft",
+        "en": "draft-ai"
       },
-      "choiceTranslations": {},
+      "choiceTranslations": {
+        "en": [],
+        "pt-BR": [],
+        "es": []
+      },
       "textSound": "farol_sfx_texto",
       "confirmSound": "farol_sfx_dialogo"
     },
     {
       "key": "ingame-map-armazem",
       "character": "",
-      "text": "Depois dos Penedos. Examine a carta para seguir ao Observatorio. Este mapa serve apenas para consulta.",
+      "text": "After the Cliffs, read the chart to continue to the Observatory. This map is for reference only.",
       "portrait": "",
       "emote": "",
       "choices": [],
       "translations": {
         "pt-BR": "Depois dos Penedos. Examine a carta para seguir ao Observatorio. Este mapa serve apenas para consulta.",
-        "es": "Después de los Peñascos, examina la carta para ir al Observatorio. Este mapa es solo de consulta."
+        "es": "Después de los Peñascos, examina la carta para ir al Observatorio. Este mapa es solo de consulta.",
+        "en": "After the Cliffs, read the chart to continue to the Observatory. This map is for reference only."
       },
       "translationStatus": {
         "pt-BR": "approved",
-        "es": "draft"
+        "es": "draft",
+        "en": "draft-ai"
       },
-      "choiceTranslations": {},
+      "choiceTranslations": {
+        "en": [],
+        "pt-BR": [],
+        "es": []
+      },
       "textSound": "farol_sfx_texto",
       "confirmSound": "farol_sfx_dialogo"
     },
     {
       "key": "ingame-map-observatorio",
       "character": "",
-      "text": "Leia o registro do farol antes de seguir ao Mercado. Este mapa serve apenas para consulta.",
+      "text": "Read the lighthouse record before heading to the Market. This map is for reference only.",
       "portrait": "",
       "emote": "",
       "choices": [],
       "translations": {
         "pt-BR": "Leia o registro do farol antes de seguir ao Mercado. Este mapa serve apenas para consulta.",
-        "es": "Lee el registro del faro antes de ir al Mercado. Este mapa es solo de consulta."
+        "es": "Lee el registro del faro antes de ir al Mercado. Este mapa es solo de consulta.",
+        "en": "Read the lighthouse record before heading to the Market. This map is for reference only."
       },
       "translationStatus": {
         "pt-BR": "approved",
-        "es": "draft"
+        "es": "draft",
+        "en": "draft-ai"
       },
-      "choiceTranslations": {},
+      "choiceTranslations": {
+        "en": [],
+        "pt-BR": [],
+        "es": []
+      },
       "textSound": "farol_sfx_texto",
       "confirmSound": "farol_sfx_dialogo"
     },
     {
       "key": "ingame-map-mercado",
       "character": "",
-      "text": "Atravesse o mercado e descubra o acesso a Usina. Este mapa serve apenas para consulta.",
+      "text": "Cross the Market and find the Plant entrance. This map is for reference only.",
       "portrait": "",
       "emote": "",
       "choices": [],
       "translations": {
         "pt-BR": "Atravesse o mercado e descubra o acesso a Usina. Este mapa serve apenas para consulta.",
-        "es": "Atraviesa el Mercado y descubre el acceso a la Planta. Este mapa es solo de consulta."
+        "es": "Atraviesa el Mercado y descubre el acceso a la Planta. Este mapa es solo de consulta.",
+        "en": "Cross the Market and find the Plant entrance. This map is for reference only."
       },
       "translationStatus": {
         "pt-BR": "approved",
-        "es": "draft"
+        "es": "draft",
+        "en": "draft-ai"
       },
-      "choiceTranslations": {},
+      "choiceTranslations": {
+        "en": [],
+        "pt-BR": [],
+        "es": []
+      },
       "textSound": "farol_sfx_texto",
       "confirmSound": "farol_sfx_dialogo"
     },
     {
       "key": "ingame-map-usina",
       "character": "",
-      "text": "Explore, derrote a sentinela e recolha a celula de energia. Este mapa serve apenas para consulta.",
+      "text": "Explore, defeat the sentinel and collect the energy cell. This map is for reference only.",
       "portrait": "",
       "emote": "",
       "choices": [],
       "translations": {
         "pt-BR": "Explore, derrote a sentinela e recolha a celula de energia. Este mapa serve apenas para consulta.",
-        "es": "Explora, derrota al centinela y recoge la célula de energía. Este mapa es solo de consulta."
+        "es": "Explora, derrota al centinela y recoge la célula de energía. Este mapa es solo de consulta.",
+        "en": "Explore, defeat the sentinel and collect the energy cell. This map is for reference only."
       },
       "translationStatus": {
         "pt-BR": "approved",
-        "es": "draft"
+        "es": "draft",
+        "en": "draft-ai"
       },
-      "choiceTranslations": {},
+      "choiceTranslations": {
+        "en": [],
+        "pt-BR": [],
+        "es": []
+      },
       "textSound": "farol_sfx_texto",
       "confirmSound": "farol_sfx_dialogo"
     },
     {
       "key": "ingame-map-conselho",
       "character": "",
-      "text": "Confirme a alianca. Depois: Tempestade, Rele, Arena e Circuito Final. Este mapa serve apenas para consulta.",
+      "text": "Confirm the pact. Next: Storm, Relay, Arena and Final Circuit. This map is for reference only.",
       "portrait": "",
       "emote": "",
       "choices": [],
       "translations": {
         "pt-BR": "Confirme a alianca. Depois: Tempestade, Rele, Arena e Circuito Final. Este mapa serve apenas para consulta.",
-        "es": "Confirma la alianza. Después: Tormenta, Relé, Arena y Circuito Final. Este mapa es solo de consulta."
+        "es": "Confirma la alianza. Después: Tormenta, Relé, Arena y Circuito Final. Este mapa es solo de consulta.",
+        "en": "Confirm the pact. Next: Storm, Relay, Arena and Final Circuit. This map is for reference only."
       },
       "translationStatus": {
         "pt-BR": "approved",
-        "es": "draft"
+        "es": "draft",
+        "en": "draft-ai"
       },
-      "choiceTranslations": {},
+      "choiceTranslations": {
+        "en": [],
+        "pt-BR": [],
+        "es": []
+      },
       "textSound": "farol_sfx_texto",
       "confirmSound": "farol_sfx_dialogo"
     },
     {
       "key": "ingame-map-circuito",
       "character": "",
-      "text": "Complete tres voltas. Consulte Missoes para o proximo objetivo. Este mapa serve apenas para consulta.",
+      "text": "Complete three laps. Check Missions for your next objective. This map is for reference only.",
       "portrait": "",
       "emote": "",
       "choices": [],
       "translations": {
         "pt-BR": "Complete tres voltas. Consulte Missoes para o proximo objetivo. Este mapa serve apenas para consulta.",
-        "es": "Completa tres vueltas. Consulta Misiones para ver el próximo objetivo. Este mapa es solo de consulta."
+        "es": "Completa tres vueltas. Consulta Misiones para ver el próximo objetivo. Este mapa es solo de consulta.",
+        "en": "Complete three laps. Check Missions for your next objective. This map is for reference only."
       },
       "translationStatus": {
         "pt-BR": "approved",
-        "es": "draft"
+        "es": "draft",
+        "en": "draft-ai"
       },
-      "choiceTranslations": {},
+      "choiceTranslations": {
+        "en": [],
+        "pt-BR": [],
+        "es": []
+      },
       "textSound": "farol_sfx_texto",
       "confirmSound": "farol_sfx_dialogo"
     },
     {
       "key": "ingame-controls",
       "character": "",
-      "text": "Direcional: mover e selecionar. A: confirmar ou interagir. B: voltar. Start: pausa. Dungeon: R pausa, Start mapa, Select mochila. Na corrida: A acelera, B freia; direcional vira.",
+      "text": "D-pad: move and select. A: confirm or interact. B: back. Start: pause. Dungeon: R pauses, Start opens the map, Select opens the bag. Racing: A accelerates, B brakes; D-pad steers.",
       "portrait": "",
       "emote": "",
       "choices": [],
       "translations": {
         "pt-BR": "Direcional: mover e selecionar. A: confirmar ou interagir. B: voltar. Start: pausa. Dungeon: R pausa, Start mapa, Select mochila. Na corrida: A acelera, B freia; direcional vira.",
-        "es": "Cruceta: mover y elegir. A: confirmar o interactuar. B: volver. Start: pausa. Mazmorra: R pausa, Start mapa, Select mochila. Carrera: A acelera, B frena; cruceta gira."
+        "es": "Cruceta: mover y elegir. A: confirmar o interactuar. B: volver. Start: pausa. Mazmorra: R pausa, Start mapa, Select mochila. Carrera: A acelera, B frena; cruceta gira.",
+        "en": "D-pad: move and select. A: confirm or interact. B: back. Start: pause. Dungeon: R pauses, Start opens the map, Select opens the bag. Racing: A accelerates, B brakes; D-pad steers."
       },
       "translationStatus": {
         "pt-BR": "approved",
-        "es": "draft"
+        "es": "draft",
+        "en": "draft-ai"
       },
-      "choiceTranslations": {},
+      "choiceTranslations": {
+        "en": [],
+        "pt-BR": [],
+        "es": []
+      },
       "textSound": "farol_sfx_texto",
       "confirmSound": "farol_sfx_dialogo"
     },
     {
       "character": "Nara",
-      "choiceTranslations": {},
+      "choiceTranslations": {
+        "en": [],
+        "pt-BR": [],
+        "es": []
+      },
       "choices": [],
       "confirmSound": "farol_sfx_dialogo",
       "emote": "",
       "key": "mercado_objetivo",
       "portrait": "",
-      "text": "Vou registrar a carga no posto da ponte. Assim o guarda libera o acesso à usina.",
+      "text": "I'll register the cargo at the bridge checkpoint so the guard can open the way to the plant.",
       "textSound": "farol_sfx_texto",
       "translations": {
         "pt-BR": "Vou registrar a carga no posto da ponte. Assim o guarda libera o acesso à usina.",
@@ -158465,13 +158757,17 @@
     },
     {
       "character": "Mercador",
-      "choiceTranslations": {},
+      "choiceTranslations": {
+        "en": [],
+        "pt-BR": [],
+        "es": []
+      },
       "choices": [],
       "confirmSound": "farol_sfx_dialogo",
       "emote": "",
       "key": "mercado_mercador",
       "portrait": "",
-      "text": "O posto de registro fica na ponte de carga. Confirme a entrega ali; o guarda sairá da passagem norte.",
+      "text": "The cargo checkpoint is on the bridge. Confirm the delivery there; the guard will clear the northern passage.",
       "textSound": "farol_sfx_texto",
       "translations": {
         "pt-BR": "O posto de registro fica na ponte de carga. Confirme a entrega ali; o guarda sairá da passagem norte.",
@@ -158486,13 +158782,17 @@
     },
     {
       "character": "Nara",
-      "choiceTranslations": {},
+      "choiceTranslations": {
+        "en": [],
+        "pt-BR": [],
+        "es": []
+      },
       "choices": [],
       "confirmSound": "farol_sfx_dialogo",
       "emote": "",
       "key": "mercado_ponte_organizada",
       "portrait": "",
-      "text": "Carga registrada! O guarda liberou a passagem. O acesso à usina fica no deck superior.",
+      "text": "Cargo registered! The guard has cleared the passage. The plant entrance is on the upper deck.",
       "textSound": "farol_sfx_texto",
       "translations": {
         "pt-BR": "Carga registrada! O guarda liberou a passagem. O acesso à usina fica no deck superior.",
@@ -158507,13 +158807,17 @@
     },
     {
       "character": "Mercador",
-      "choiceTranslations": {},
+      "choiceTranslations": {
+        "en": [],
+        "pt-BR": [],
+        "es": []
+      },
       "choices": [],
       "confirmSound": "farol_sfx_dialogo",
       "emote": "",
       "key": "mercado_ponte_ja_organizada",
       "portrait": "",
-      "text": "A entrega já está registrada. Siga pelo deck superior até a passagem da usina.",
+      "text": "The delivery is already registered. Follow the upper deck to the plant entrance.",
       "textSound": "farol_sfx_texto",
       "translations": {
         "pt-BR": "A entrega já está registrada. Siga pelo deck superior até a passagem da usina.",
@@ -158528,13 +158832,17 @@
     },
     {
       "character": "Nara",
-      "choiceTranslations": {},
+      "choiceTranslations": {
+        "en": [],
+        "pt-BR": [],
+        "es": []
+      },
       "choices": [],
       "confirmSound": "farol_sfx_dialogo",
       "emote": "",
       "key": "mercado_saida_bloqueada",
       "portrait": "",
-      "text": "Ainda falta registrar a entrega no posto da ponte de carga.",
+      "text": "I still need to register the delivery at the bridge checkpoint.",
       "textSound": "farol_sfx_texto",
       "translations": {
         "pt-BR": "Ainda falta registrar a entrega no posto da ponte de carga.",
@@ -158550,11 +158858,15 @@
     {
       "key": "mercado_guarda",
       "character": "Guarda",
-      "text": "Registre a carga na ponte para acessar a usina. Para treinar contra a sentinela, feche esta fala e pressione R. Na Arena, L traz você de volta.",
+      "text": "Register the cargo at the bridge to access the plant. To train against the sentinel, close this dialogue and press R. In the Arena, L brings you back.",
       "portrait": "",
       "emote": "",
       "choices": [],
-      "choiceTranslations": {},
+      "choiceTranslations": {
+        "en": [],
+        "pt-BR": [],
+        "es": []
+      },
       "textSound": "farol_sfx_texto",
       "confirmSound": "farol_sfx_dialogo",
       "translations": {
@@ -158601,14 +158913,20 @@
       "text": "We restored the coastal signals. How do we cross the storm?",
       "translations": {
         "pt-BR": "Restauramos os sinais da costa. Como atravessamos a tempestade?",
-        "es": "Restauramos las señales de la costa. ¿Cómo cruzamos la tormenta?"
+        "es": "Restauramos las señales de la costa. ¿Cómo cruzamos la tormenta?",
+        "en": "We restored the coastal signals. How do we cross the storm?"
       },
       "translationStatus": {
         "pt-BR": "draft-ai",
-        "es": "draft-ai"
+        "es": "draft-ai",
+        "en": "draft-ai"
       },
       "choices": [],
-      "choiceTranslations": {},
+      "choiceTranslations": {
+        "en": [],
+        "pt-BR": [],
+        "es": []
+      },
       "emote": "",
       "textSound": "farol_sfx_texto",
       "confirmSound": "farol_sfx_dialogo"
@@ -158616,7 +158934,7 @@
     {
       "key": "penedos_teste_npc_fala",
       "character": "Trabalhador",
-      "text": "A salta; A no ar dá outro salto. B dá impulso, R plana e CIMA sobe escadas. Use L para golpear e A perto do farol para salvar.",
+      "text": "A jumps; press A in the air to jump again. B dashes, R glides and UP climbs ladders. Use L to attack and A near the beacon to save.",
       "confirmSound": "farol_sfx_dialogo",
       "textSound": "farol_sfx_texto",
       "portrait": "",
@@ -158624,17 +158942,24 @@
       "choices": [],
       "translations": {
         "pt-BR": "A salta; A no ar dá outro salto. B dá impulso, R plana e CIMA sobe escadas. Use L para golpear e A perto do farol para salvar.",
-        "es": "Usa la cruceta para moverte, A para saltar y B para impulsarte. Habla conmigo pulsando A."
+        "es": "Usa la cruceta para moverte, A para saltar y B para impulsarte. Habla conmigo pulsando A.",
+        "en": "A jumps; press A in the air to jump again. B dashes, R glides and UP climbs ladders. Use L to attack and A near the beacon to save."
       },
       "translationStatus": {
         "pt-BR": "approved",
-        "es": "draft-ai"
+        "es": "draft-ai",
+        "en": "draft-ai"
+      },
+      "choiceTranslations": {
+        "en": [],
+        "pt-BR": [],
+        "es": []
       }
     },
     {
       "key": "penedos_teste_checkpoint_fala",
       "character": "Farol",
-      "text": "Sinal aceso. Progresso salvo! Você retorna aqui se cair ou tocar em um inimigo.",
+      "text": "Beacon lit. Progress saved! You return here after falling or touching an enemy.",
       "confirmSound": "farol_sfx_dialogo",
       "textSound": "farol_sfx_texto",
       "portrait": "",
@@ -158642,11 +158967,18 @@
       "choices": [],
       "translations": {
         "pt-BR": "Sinal aceso. Progresso salvo! Você retorna aqui se cair ou tocar em um inimigo.",
-        "es": "Progreso guardado. El faro marca tu punto de retorno cuando toques a un enemigo."
+        "es": "Progreso guardado. El faro marca tu punto de retorno cuando toques a un enemigo.",
+        "en": "Beacon lit. Progress saved! You return here after falling or touching an enemy."
       },
       "translationStatus": {
         "pt-BR": "approved",
-        "es": "draft-ai"
+        "es": "draft-ai",
+        "en": "draft-ai"
+      },
+      "choiceTranslations": {
+        "en": [],
+        "pt-BR": [],
+        "es": []
       }
     },
     {
@@ -158661,6 +158993,12 @@
         "en": "The workshop is on the central path. Talk to the mechanic before you set off.",
         "es": "El taller está en el camino central. Habla con la mecánica antes de partir.",
         "pt-BR": "A oficina fica no caminho central. Fale com a mecânica antes de seguir viagem."
+      },
+      "translationStatus": {},
+      "choiceTranslations": {
+        "en": [],
+        "pt-BR": [],
+        "es": []
       }
     },
     {
@@ -158675,6 +159013,12 @@
         "en": "The lighthouse route opens once the structure is ready. Check the map to choose your destination.",
         "es": "La ruta de los faros se abre cuando la estructura está lista. Consulta el mapa para elegir tu destino.",
         "pt-BR": "A rota dos faróis abre quando a estrutura estiver pronta. Consulte o mapa para escolher o destino."
+      },
+      "translationStatus": {},
+      "choiceTranslations": {
+        "en": [],
+        "pt-BR": [],
+        "es": []
       }
     },
     {
@@ -158689,6 +159033,12 @@
         "en": "The coastal chart shows the destinations along the lighthouse route. Each stretch has a different passage.",
         "es": "La carta costera muestra los destinos de la ruta de los faros. Cada tramo tiene un paso diferente.",
         "pt-BR": "A carta da costa mostra os destinos da rota dos faróis. Cada trecho tem uma passagem diferente."
+      },
+      "translationStatus": {},
+      "choiceTranslations": {
+        "en": [],
+        "pt-BR": [],
+        "es": []
       }
     },
     {
@@ -158703,6 +159053,12 @@
         "en": "I can see the coastal lighthouses from the pier. I want to see them all shining again!",
         "es": "Desde el muelle veo los faros de la costa. ¡Quiero verlos todos encendidos otra vez!",
         "pt-BR": "Do cais eu vejo os faróis da costa. Quero ver todos acesos outra vez!"
+      },
+      "translationStatus": {},
+      "choiceTranslations": {
+        "en": [],
+        "pt-BR": [],
+        "es": []
       }
     },
     {
@@ -158717,6 +159073,12 @@
         "en": "The lighthouse interior is to the north. You can examine the lens and the mechanism there.",
         "es": "El interior del faro está al norte. Allí puedes examinar la lente y el mecanismo.",
         "pt-BR": "O interior do farol fica ao norte. Lá você pode examinar a lente e o mecanismo."
+      },
+      "translationStatus": {},
+      "choiceTranslations": {
+        "en": [],
+        "pt-BR": [],
+        "es": []
       }
     },
     {
@@ -158730,15 +159092,18 @@
       "choices": [],
       "translations": {
         "pt-BR": "O sinal perdido: busque a carta e a peça no Armazém. Fale com o cartógrafo. Durante a viagem, R + A na porta volta ao Porto.",
-        "es": "La señal perdida: busca la carta y la pieza en el Almacén. Habla con el cartógrafo. Durante el viaje, R + A en la puerta vuelve al Puerto."
+        "es": "La señal perdida: busca la carta y la pieza en el Almacén. Habla con el cartógrafo. Durante el viaje, R + A en la puerta vuelve al Puerto.",
+        "en": "The lost signal: find the chart and relay in the Warehouse. Speak to the cartographer. During the trip, hold R and press A on a door to return to Port."
       },
       "choiceTranslations": {
         "pt-BR": [],
-        "es": []
+        "es": [],
+        "en": []
       },
       "translationStatus": {
         "pt-BR": "draft-ai",
-        "es": "draft-ai"
+        "es": "draft-ai",
+        "en": "draft-ai"
       }
     },
     {
@@ -158752,15 +159117,18 @@
       "choices": [],
       "translations": {
         "pt-BR": "O sinal perdido: consulte OBJETIVO no diário. A carta e a peça estão no Armazém; a pista final está no Observatório.",
-        "es": "La señal perdida: consulta OBJETIVO en el diario. La carta y la pieza están en el Almacén; la pista final está en el Observatorio."
+        "es": "La señal perdida: consulta OBJETIVO en el diario. La carta y la pieza están en el Almacén; la pista final está en el Observatorio.",
+        "en": "The lost signal: check OBJECTIVE in the journal. The chart and relay are in the Warehouse; the final clue is in the Observatory."
       },
       "choiceTranslations": {
         "pt-BR": [],
-        "es": []
+        "es": [],
+        "en": []
       },
       "translationStatus": {
         "pt-BR": "draft-ai",
-        "es": "draft-ai"
+        "es": "draft-ai",
+        "en": "draft-ai"
       }
     },
     {
@@ -158774,15 +159142,18 @@
       "choices": [],
       "translations": {
         "pt-BR": "O baú tem uma trava náutica. Examine primeiro a carta sobre a mesa.",
-        "es": "El cofre tiene un cierre náutico. Examina primero la carta de la mesa."
+        "es": "El cofre tiene un cierre náutico. Examina primero la carta de la mesa.",
+        "en": "The chest has a nautical latch. Examine the chart on the table first."
       },
       "choiceTranslations": {
         "pt-BR": [],
-        "es": []
+        "es": [],
+        "en": []
       },
       "translationStatus": {
         "pt-BR": "draft-ai",
-        "es": "draft-ai"
+        "es": "draft-ai",
+        "en": "draft-ai"
       }
     },
     {
@@ -158796,15 +159167,18 @@
       "choices": [],
       "translations": {
         "pt-BR": "Carta recolhida: leia os sinais de LESTE para OESTE. O telescópio e a mesa da maré revelam os três números.",
-        "es": "Carta recogida: lee las señales de ESTE a OESTE. El telescopio y la mesa de mareas revelan los tres números."
+        "es": "Carta recogida: lee las señales de ESTE a OESTE. El telescopio y la mesa de mareas revelan los tres números.",
+        "en": "Chart collected: read the signals EAST to WEST. The telescope and tide table reveal the three numbers."
       },
       "choiceTranslations": {
         "pt-BR": [],
-        "es": []
+        "es": [],
+        "en": []
       },
       "translationStatus": {
         "pt-BR": "draft-ai",
-        "es": "draft-ai"
+        "es": "draft-ai",
+        "en": "draft-ai"
       }
     },
     {
@@ -158818,15 +159192,18 @@
       "choices": [],
       "translations": {
         "pt-BR": "A carta já está com você. A leitura segue de LESTE para OESTE.",
-        "es": "Ya tienes la carta. La lectura va de ESTE a OESTE."
+        "es": "Ya tienes la carta. La lectura va de ESTE a OESTE.",
+        "en": "You already have the chart. Read it EAST to WEST."
       },
       "choiceTranslations": {
         "pt-BR": [],
-        "es": []
+        "es": [],
+        "en": []
       },
       "translationStatus": {
         "pt-BR": "draft-ai",
-        "es": "draft-ai"
+        "es": "draft-ai",
+        "en": "draft-ai"
       }
     },
     {
@@ -158840,15 +159217,18 @@
       "choices": [],
       "translations": {
         "pt-BR": "Peça de relé recolhida. Leve-a ao farol depois de decifrar os sinais no Observatório.",
-        "es": "Pieza de relé recogida. Llévala al faro después de descifrar las señales en el Observatorio."
+        "es": "Pieza de relé recogida. Llévala al faro después de descifrar las señales en el Observatorio.",
+        "en": "Relay collected. Take it to the lighthouse after decoding the signals in the Observatory."
       },
       "choiceTranslations": {
         "pt-BR": [],
-        "es": []
+        "es": [],
+        "en": []
       },
       "translationStatus": {
         "pt-BR": "draft-ai",
-        "es": "draft-ai"
+        "es": "draft-ai",
+        "en": "draft-ai"
       }
     },
     {
@@ -158862,15 +159242,18 @@
       "choices": [],
       "translations": {
         "pt-BR": "A peça já foi recolhida. Não há outra no baú.",
-        "es": "Ya recogiste la pieza. El cofre está vacío."
+        "es": "Ya recogiste la pieza. El cofre está vacío.",
+        "en": "You already collected the relay. The chest is empty."
       },
       "choiceTranslations": {
         "pt-BR": [],
-        "es": []
+        "es": [],
+        "en": []
       },
       "translationStatus": {
         "pt-BR": "draft-ai",
-        "es": "draft-ai"
+        "es": "draft-ai",
+        "en": "draft-ai"
       }
     },
     {
@@ -158884,15 +159267,18 @@
       "choices": [],
       "translations": {
         "pt-BR": "Pelo telescópio: três sinais a LESTE, um ao CENTRO e quatro a OESTE. Confira a ordem na mesa da maré.",
-        "es": "Por el telescopio: tres señales al ESTE, una al CENTRO y cuatro al OESTE. Comprueba el orden en la mesa de mareas."
+        "es": "Por el telescopio: tres señales al ESTE, una al CENTRO y cuatro al OESTE. Comprueba el orden en la mesa de mareas.",
+        "en": "Through the telescope: three signals EAST, one CENTER and four WEST. Check their order on the tide table."
       },
       "choiceTranslations": {
         "pt-BR": [],
-        "es": []
+        "es": [],
+        "en": []
       },
       "translationStatus": {
         "pt-BR": "draft-ai",
-        "es": "draft-ai"
+        "es": "draft-ai",
+        "en": "draft-ai"
       }
     },
     {
@@ -158906,15 +159292,18 @@
       "choices": [],
       "translations": {
         "pt-BR": "A mesa mostra a ordem da carta, mas faltam os sinais. Examine o telescópio e volte aqui.",
-        "es": "La mesa muestra el orden de la carta, pero faltan las señales. Examina el telescopio y vuelve."
+        "es": "La mesa muestra el orden de la carta, pero faltan las señales. Examina el telescopio y vuelve.",
+        "en": "The table shows the chart order, but the signals are missing. Examine the telescope and return here."
       },
       "choiceTranslations": {
         "pt-BR": [],
-        "es": []
+        "es": [],
+        "en": []
       },
       "translationStatus": {
         "pt-BR": "draft-ai",
-        "es": "draft-ai"
+        "es": "draft-ai",
+        "en": "draft-ai"
       }
     },
     {
@@ -158928,15 +159317,18 @@
       "choices": [],
       "translations": {
         "pt-BR": "LESTE, CENTRO, OESTE: 3, 1, 4. A combinação é 314. Volte pela porta e fale com o guardião junto à lente do farol.",
-        "es": "ESTE, CENTRO, OESTE: 3, 1, 4. La combinación es 314. Vuelve por la puerta y habla con el guardián junto a la lente del faro."
+        "es": "ESTE, CENTRO, OESTE: 3, 1, 4. La combinación es 314. Vuelve por la puerta y habla con el guardián junto a la lente del faro.",
+        "en": "EAST, CENTER, WEST: 3, 1, 4. The code is 314. Return through the door and speak to the keeper beside the lighthouse lens."
       },
       "choiceTranslations": {
         "pt-BR": [],
-        "es": []
+        "es": [],
+        "en": []
       },
       "translationStatus": {
         "pt-BR": "draft-ai",
-        "es": "draft-ai"
+        "es": "draft-ai",
+        "en": "draft-ai"
       }
     },
     {
@@ -158950,15 +159342,18 @@
       "choices": [],
       "translations": {
         "pt-BR": "O painel precisa da carta e da peça do Armazém. O cartógrafo pode levar você de volta.",
-        "es": "El panel necesita la carta y la pieza del Almacén. El cartógrafo puede llevarte de vuelta."
+        "es": "El panel necesita la carta y la pieza del Almacén. El cartógrafo puede llevarte de vuelta.",
+        "en": "The panel needs the Warehouse chart and relay. The cartographer can take you back."
       },
       "choiceTranslations": {
         "pt-BR": [],
-        "es": []
+        "es": [],
+        "en": []
       },
       "translationStatus": {
         "pt-BR": "draft-ai",
-        "es": "draft-ai"
+        "es": "draft-ai",
+        "en": "draft-ai"
       }
     },
     {
@@ -158972,15 +159367,18 @@
       "choices": [],
       "translations": {
         "pt-BR": "A peça serve, mas falta a combinação. Examine o telescópio e a mesa da maré no Observatório.",
-        "es": "La pieza encaja, pero falta la combinación. Examina el telescopio y la mesa de mareas del Observatorio."
+        "es": "La pieza encaja, pero falta la combinación. Examina el telescopio y la mesa de mareas del Observatorio.",
+        "en": "The relay fits, but you still need the code. Examine the telescope and tide table in the Observatory."
       },
       "choiceTranslations": {
         "pt-BR": [],
-        "es": []
+        "es": [],
+        "en": []
       },
       "translationStatus": {
         "pt-BR": "draft-ai",
-        "es": "draft-ai"
+        "es": "draft-ai",
+        "en": "draft-ai"
       }
     },
     {
@@ -158994,15 +159392,18 @@
       "choices": [],
       "translations": {
         "pt-BR": "Painel do farol: esquerda/direita escolhe o dígito; cima/baixo altera. A confirma; B cancela.",
-        "es": "Panel del faro: izquierda/derecha elige el dígito; arriba/abajo lo cambia. A confirma; B cancela."
+        "es": "Panel del faro: izquierda/derecha elige el dígito; arriba/abajo lo cambia. A confirma; B cancela.",
+        "en": "Lighthouse panel: left/right selects a digit; up/down changes it. A confirms; B cancels."
       },
       "choiceTranslations": {
         "pt-BR": [],
-        "es": []
+        "es": [],
+        "en": []
       },
       "translationStatus": {
         "pt-BR": "draft-ai",
-        "es": "draft-ai"
+        "es": "draft-ai",
+        "en": "draft-ai"
       }
     },
     {
@@ -159016,15 +159417,18 @@
       "choices": [],
       "translations": {
         "pt-BR": "A combinação não confere. A pista é 314. Você pode tentar novamente sem perder a peça.",
-        "es": "La combinación no coincide. La pista es 314. Puedes intentarlo de nuevo sin perder la pieza."
+        "es": "La combinación no coincide. La pista es 314. Puedes intentarlo de nuevo sin perder la pieza.",
+        "en": "Incorrect code. The clue is 314. Try again without losing the relay."
       },
       "choiceTranslations": {
         "pt-BR": [],
-        "es": []
+        "es": [],
+        "en": []
       },
       "translationStatus": {
         "pt-BR": "draft-ai",
-        "es": "draft-ai"
+        "es": "draft-ai",
+        "en": "draft-ai"
       }
     },
     {
@@ -159038,15 +159442,18 @@
       "choices": [],
       "translations": {
         "pt-BR": "Painel fechado. A peça continua com você.",
-        "es": "Panel cerrado. La pieza sigue contigo."
+        "es": "Panel cerrado. La pieza sigue contigo.",
+        "en": "Panel closed. You still have the relay."
       },
       "choiceTranslations": {
         "pt-BR": [],
-        "es": []
+        "es": [],
+        "en": []
       },
       "translationStatus": {
         "pt-BR": "draft-ai",
-        "es": "draft-ai"
+        "es": "draft-ai",
+        "en": "draft-ai"
       }
     },
     {
@@ -159060,15 +159467,18 @@
       "choices": [],
       "translations": {
         "pt-BR": "O sinal voltou! A peça foi instalada. Volte à mecânica no Porto para concluir a missão.",
-        "es": "¡La señal volvió! La pieza está instalada. Vuelve con la mecánica del Puerto para completar la misión."
+        "es": "¡La señal volvió! La pieza está instalada. Vuelve con la mecánica del Puerto para completar la misión.",
+        "en": "The signal is back! The relay is installed. Return to the mechanic in the Port to finish the mission."
       },
       "choiceTranslations": {
         "pt-BR": [],
-        "es": []
+        "es": [],
+        "en": []
       },
       "translationStatus": {
         "pt-BR": "draft-ai",
-        "es": "draft-ai"
+        "es": "draft-ai",
+        "en": "draft-ai"
       }
     },
     {
@@ -159082,15 +159492,18 @@
       "choices": [],
       "translations": {
         "pt-BR": "Missão concluída: O sinal perdido. A mecânica agradece e entrega 2 moedas. Progresso salvo.",
-        "es": "Misión completada: La señal perdida. La mecánica te agradece y entrega 2 monedas. Progreso guardado."
+        "es": "Misión completada: La señal perdida. La mecánica te agradece y entrega 2 monedas. Progreso guardado.",
+        "en": "Mission complete: The lost signal. The mechanic thanks you and gives you 2 coins. Progress saved."
       },
       "choiceTranslations": {
         "pt-BR": [],
-        "es": []
+        "es": [],
+        "en": []
       },
       "translationStatus": {
         "pt-BR": "draft-ai",
-        "es": "draft-ai"
+        "es": "draft-ai",
+        "en": "draft-ai"
       }
     },
     {
@@ -159104,15 +159517,18 @@
       "choices": [],
       "translations": {
         "pt-BR": "O sinal perdido: missão concluída e recompensa recebida. O farol segue operando.",
-        "es": "La señal perdida: misión completada y recompensa recibida. El faro sigue funcionando."
+        "es": "La señal perdida: misión completada y recompensa recibida. El faro sigue funcionando.",
+        "en": "The lost signal: mission complete and reward collected. The lighthouse is operating."
       },
       "choiceTranslations": {
         "pt-BR": [],
-        "es": []
+        "es": [],
+        "en": []
       },
       "translationStatus": {
         "pt-BR": "draft-ai",
-        "es": "draft-ai"
+        "es": "draft-ai",
+        "en": "draft-ai"
       }
     },
     {
@@ -159126,15 +159542,18 @@
       "choices": [],
       "translations": {
         "pt-BR": "O sinal perdido: fale com a mecânica no cais leste do Porto de Lúmen.",
-        "es": "La señal perdida: habla con la mecánica del muelle este del Puerto de Lumen."
+        "es": "La señal perdida: habla con la mecánica del muelle este del Puerto de Lumen.",
+        "en": "The lost signal: speak to the mechanic on the eastern dock in Lumen Port."
       },
       "choiceTranslations": {
         "pt-BR": [],
-        "es": []
+        "es": [],
+        "en": []
       },
       "translationStatus": {
         "pt-BR": "draft-ai",
-        "es": "draft-ai"
+        "es": "draft-ai",
+        "en": "draft-ai"
       }
     },
     {
@@ -159152,7 +159571,8 @@
       ],
       "translations": {
         "pt-BR": "O sinal perdido: para onde vamos?",
-        "es": "La señal perdida: ¿adónde vamos?"
+        "es": "La señal perdida: ¿adónde vamos?",
+        "en": "The lost signal: where shall we go?"
       },
       "choiceTranslations": {
         "pt-BR": [
@@ -159164,11 +159584,17 @@
           "Almacén",
           "Observatorio",
           "Faro"
+        ],
+        "en": [
+          "Warehouse",
+          "Observatory",
+          "Lighthouse"
         ]
       },
       "translationStatus": {
         "pt-BR": "draft-ai",
-        "es": "draft-ai"
+        "es": "draft-ai",
+        "en": "draft-ai"
       }
     },
     {
@@ -159182,15 +159608,18 @@
       "choices": [],
       "translations": {
         "pt-BR": "O sinal perdido: a carta já está com você. Examine o baú do Armazém para recolher a peça.",
-        "es": "La señal perdida: ya tienes la carta. Examina el cofre del Almacén para recoger la pieza."
+        "es": "La señal perdida: ya tienes la carta. Examina el cofre del Almacén para recoger la pieza.",
+        "en": "The lost signal: you have the chart. Examine the Warehouse chest to collect the relay."
       },
       "choiceTranslations": {
         "pt-BR": [],
-        "es": []
+        "es": [],
+        "en": []
       },
       "translationStatus": {
         "pt-BR": "draft-ai",
-        "es": "draft-ai"
+        "es": "draft-ai",
+        "en": "draft-ai"
       }
     },
     {
@@ -159201,7 +159630,8 @@
       "text": "What comes next?",
       "translations": {
         "pt-BR": "Qual é o próximo passo?",
-        "es": "¿Cuál es el siguiente paso?"
+        "es": "¿Cuál es el siguiente paso?",
+        "en": "What comes next?"
       },
       "choices": [
         "Visit the Council",
@@ -159218,11 +159648,17 @@
           "Visitar el Consejo",
           "Estado de la costa",
           "Conversar"
+        ],
+        "en": [
+          "Visit the Council",
+          "Coast report",
+          "Talk"
         ]
       },
       "translationStatus": {
         "pt-BR": "draft-ai",
-        "es": "draft-ai"
+        "es": "draft-ai",
+        "en": "draft-ai"
       },
       "textSound": "farol_sfx_texto",
       "confirmSound": "farol_sfx_dialogo"
@@ -159235,7 +159671,8 @@
       "text": "Trader: what do you need?",
       "translations": {
         "pt-BR": "Viajante: o que deseja?",
-        "es": "Viajero: ¿qué deseas?"
+        "es": "Viajero: ¿qué deseas?",
+        "en": "Trader: what do you need?"
       },
       "choices": [
         "Buy tool",
@@ -159252,11 +159689,17 @@
           "Comprar herramienta",
           "Equipo",
           "Conversar"
+        ],
+        "en": [
+          "Buy tool",
+          "Equipment",
+          "Talk"
         ]
       },
       "translationStatus": {
         "pt-BR": "draft-ai",
-        "es": "draft-ai"
+        "es": "draft-ai",
+        "en": "draft-ai"
       },
       "textSound": "farol_sfx_texto",
       "confirmSound": "farol_sfx_dialogo"
@@ -159269,16 +159712,19 @@
       "text": "Choose the tool in the first slot. Carrying it is different from equipping it. B goes back.",
       "translations": {
         "pt-BR": "Escolha a ferramenta no primeiro slot. Ter o item na mochila é diferente de usá-lo. B retorna ao menu anterior.",
-        "es": "Elige la herramienta en el primer espacio. Llevarla no es lo mismo que equiparla. B vuelve."
+        "es": "Elige la herramienta en el primer espacio. Llevarla no es lo mismo que equiparla. B vuelve.",
+        "en": "Choose the tool in the first slot. Carrying it is different from equipping it. B goes back."
       },
       "choices": [],
       "choiceTranslations": {
         "pt-BR": [],
-        "es": []
+        "es": [],
+        "en": []
       },
       "translationStatus": {
         "pt-BR": "draft-ai",
-        "es": "draft-ai"
+        "es": "draft-ai",
+        "en": "draft-ai"
       },
       "textSound": "farol_sfx_texto",
       "confirmSound": "farol_sfx_dialogo"
@@ -159291,7 +159737,8 @@
       "text": "Calibrate the lighthouse?",
       "translations": {
         "pt-BR": "Calibrar o farol?",
-        "es": "¿Calibramos el faro?"
+        "es": "¿Calibramos el faro?",
+        "en": "Calibrate the lighthouse?"
       },
       "choices": [
         "Start calibration",
@@ -159308,11 +159755,17 @@
           "Iniciar calibración",
           "Equipo",
           "Conversar"
+        ],
+        "en": [
+          "Start calibration",
+          "Equipment",
+          "Talk"
         ]
       },
       "translationStatus": {
         "pt-BR": "draft-ai",
-        "es": "draft-ai"
+        "es": "draft-ai",
+        "en": "draft-ai"
       },
       "textSound": "farol_sfx_texto",
       "confirmSound": "farol_sfx_dialogo"
@@ -159325,16 +159778,19 @@
       "text": "Finish The lost signal and collect the mechanic reward first.",
       "translations": {
         "pt-BR": "Primeiro conclua O sinal perdido e receba a recompensa da mecânica.",
-        "es": "Primero completa La señal perdida y recoge la recompensa."
+        "es": "Primero completa La señal perdida y recoge la recompensa.",
+        "en": "Finish The lost signal and collect the mechanic reward first."
       },
       "choices": [],
       "choiceTranslations": {
         "pt-BR": [],
-        "es": []
+        "es": [],
+        "en": []
       },
       "translationStatus": {
         "pt-BR": "draft-ai",
-        "es": "draft-ai"
+        "es": "draft-ai",
+        "en": "draft-ai"
       },
       "textSound": "farol_sfx_texto",
       "confirmSound": "farol_sfx_dialogo"
@@ -159347,16 +159803,19 @@
       "text": "Equip the Port trader tool in the first slot. Carrying it in the bag does not activate the calibrator.",
       "translations": {
         "pt-BR": "Equipe a ferramenta do viajante do Porto no primeiro slot. Só carregá-la na mochila não aciona o calibrador.",
-        "es": "Equipa la herramienta del viajero del Puerto en el primer espacio. Llevarla en la mochila no activa el calibrador."
+        "es": "Equipa la herramienta del viajero del Puerto en el primer espacio. Llevarla en la mochila no activa el calibrador.",
+        "en": "Equip the Port trader tool in the first slot. Carrying it in the bag does not activate the calibrator."
       },
       "choices": [],
       "choiceTranslations": {
         "pt-BR": [],
-        "es": []
+        "es": [],
+        "en": []
       },
       "translationStatus": {
         "pt-BR": "draft-ai",
-        "es": "draft-ai"
+        "es": "draft-ai",
+        "en": "draft-ai"
       },
       "textSound": "farol_sfx_texto",
       "confirmSound": "farol_sfx_dialogo"
@@ -159369,16 +159828,19 @@
       "text": "After closing this text, reach the lower door before time runs out. The center number shows remaining charge. You can retry.",
       "translations": {
         "pt-BR": "Ao fechar esta fala, corra até a porta inferior antes do tempo acabar. O número central mostra a carga restante. Errar permite tentar outra vez.",
-        "es": "Al cerrar este texto, llega a la puerta inferior antes de que termine el tiempo. El número central indica la carga restante. Puedes reintentar."
+        "es": "Al cerrar este texto, llega a la puerta inferior antes de que termine el tiempo. El número central indica la carga restante. Puedes reintentar.",
+        "en": "After closing this text, reach the lower door before time runs out. The center number shows remaining charge. You can retry."
       },
       "choices": [],
       "choiceTranslations": {
         "pt-BR": [],
-        "es": []
+        "es": [],
+        "en": []
       },
       "translationStatus": {
         "pt-BR": "draft-ai",
-        "es": "draft-ai"
+        "es": "draft-ai",
+        "en": "draft-ai"
       },
       "textSound": "farol_sfx_texto",
       "confirmSound": "farol_sfx_dialogo"
@@ -159391,16 +159853,19 @@
       "text": "The test signal faded. Your tool stays equipped. Return to the keeper to retry.",
       "translations": {
         "pt-BR": "O sinal de teste apagou. Sua ferramenta continua equipada. Volte ao guardião para tentar novamente.",
-        "es": "La señal de prueba se apagó. La herramienta sigue equipada. Vuelve al guardián para reintentar."
+        "es": "La señal de prueba se apagó. La herramienta sigue equipada. Vuelve al guardián para reintentar.",
+        "en": "The test signal faded. Your tool stays equipped. Return to the keeper to retry."
       },
       "choices": [],
       "choiceTranslations": {
         "pt-BR": [],
-        "es": []
+        "es": [],
+        "en": []
       },
       "translationStatus": {
         "pt-BR": "draft-ai",
-        "es": "draft-ai"
+        "es": "draft-ai",
+        "en": "draft-ai"
       },
       "textSound": "farol_sfx_texto",
       "confirmSound": "farol_sfx_dialogo"
@@ -159413,16 +159878,19 @@
       "text": "Circuit calibrated! One coin for the first calibration. Your result and equipment are saved.",
       "translations": {
         "pt-BR": "Circuito calibrado! Você recebe uma moeda pela primeira calibração. O resultado e os equipamentos foram salvos.",
-        "es": "¡Circuito calibrado! Una moneda por la primera calibración. El resultado y el equipo están guardados."
+        "es": "¡Circuito calibrado! Una moneda por la primera calibración. El resultado y el equipo están guardados.",
+        "en": "Circuit calibrated! One coin for the first calibration. Your result and equipment are saved."
       },
       "choices": [],
       "choiceTranslations": {
         "pt-BR": [],
-        "es": []
+        "es": [],
+        "en": []
       },
       "translationStatus": {
         "pt-BR": "draft-ai",
-        "es": "draft-ai"
+        "es": "draft-ai",
+        "en": "draft-ai"
       },
       "textSound": "farol_sfx_texto",
       "confirmSound": "farol_sfx_dialogo"
@@ -159435,16 +159903,19 @@
       "text": "The emergency circuit is calibrated. Its reward can only be collected once.",
       "translations": {
         "pt-BR": "O circuito de emergência já foi calibrado. A recompensa só pode ser recebida uma vez.",
-        "es": "El circuito de emergencia ya está calibrado. Su recompensa solo se recibe una vez."
+        "es": "El circuito de emergencia ya está calibrado. Su recompensa solo se recibe una vez.",
+        "en": "The emergency circuit is calibrated. Its reward can only be collected once."
       },
       "choices": [],
       "choiceTranslations": {
         "pt-BR": [],
-        "es": []
+        "es": [],
+        "en": []
       },
       "translationStatus": {
         "pt-BR": "draft-ai",
-        "es": "draft-ai"
+        "es": "draft-ai",
+        "en": "draft-ai"
       },
       "textSound": "farol_sfx_texto",
       "confirmSound": "farol_sfx_dialogo"
@@ -159457,16 +159928,19 @@
       "text": "The circuit is active. Carry the signal to the lower door before time runs out.",
       "translations": {
         "pt-BR": "O circuito está ativo. Leve o sinal até a porta inferior antes que o tempo acabe.",
-        "es": "El circuito está activo. Lleva la señal a la puerta inferior a tiempo."
+        "es": "El circuito está activo. Lleva la señal a la puerta inferior a tiempo.",
+        "en": "The circuit is active. Carry the signal to the lower door before time runs out."
       },
       "choices": [],
       "choiceTranslations": {
         "pt-BR": [],
-        "es": []
+        "es": [],
+        "en": []
       },
       "translationStatus": {
         "pt-BR": "draft-ai",
-        "es": "draft-ai"
+        "es": "draft-ai",
+        "en": "draft-ai"
       },
       "textSound": "farol_sfx_texto",
       "confirmSound": "farol_sfx_dialogo"
@@ -159479,16 +159953,19 @@
       "text": "Your choice protects coastal shelters. The Guardian sent two repair coins; the Port remembers the pact.",
       "translations": {
         "pt-BR": "Sua escolha protege os abrigos da costa. A Guardiã enviou duas moedas para ajudar nos reparos; o Porto se lembra do acordo.",
-        "es": "Tu elección protege los refugios costeros. La Guardiana envió dos monedas; el Puerto recuerda el acuerdo."
+        "es": "Tu elección protege los refugios costeros. La Guardiana envió dos monedas; el Puerto recuerda el acuerdo.",
+        "en": "Your choice protects coastal shelters. The Guardian sent two repair coins; the Port remembers the pact."
       },
       "choices": [],
       "choiceTranslations": {
         "pt-BR": [],
-        "es": []
+        "es": [],
+        "en": []
       },
       "translationStatus": {
         "pt-BR": "draft-ai",
-        "es": "draft-ai"
+        "es": "draft-ai",
+        "en": "draft-ai"
       },
       "textSound": "farol_sfx_texto",
       "confirmSound": "farol_sfx_dialogo"
@@ -159501,16 +159978,19 @@
       "text": "Your choice opens new routes. The Guardian compass extends the calibration window to 18 charge units.",
       "translations": {
         "pt-BR": "Sua escolha abriu novas rotas. A bússola da Guardiã amplia a janela de calibração para 18 unidades de carga.",
-        "es": "Tu elección abre nuevas rutas. La brújula de la Guardiana amplía la calibración a 18 unidades de carga."
+        "es": "Tu elección abre nuevas rutas. La brújula de la Guardiana amplía la calibración a 18 unidades de carga.",
+        "en": "Your choice opens new routes. The Guardian compass extends the calibration window to 18 charge units."
       },
       "choices": [],
       "choiceTranslations": {
         "pt-BR": [],
-        "es": []
+        "es": [],
+        "en": []
       },
       "translationStatus": {
         "pt-BR": "draft-ai",
-        "es": "draft-ai"
+        "es": "draft-ai",
+        "en": "draft-ai"
       },
       "textSound": "farol_sfx_texto",
       "confirmSound": "farol_sfx_dialogo"
@@ -159523,16 +160003,19 @@
       "text": "The Guardian awaits your choice: shelters or new routes. The captain can take you to the Council after the signal is restored.",
       "translations": {
         "pt-BR": "A Guardiã espera sua decisão: apoiar os abrigos ou explorar novas rotas. O capitão pode levar você ao Conselho após restaurar o sinal.",
-        "es": "La Guardiana espera tu decisión: refugios o nuevas rutas. El capitán te lleva al Consejo tras restaurar la señal."
+        "es": "La Guardiana espera tu decisión: refugios o nuevas rutas. El capitán te lleva al Consejo tras restaurar la señal.",
+        "en": "The Guardian awaits your choice: shelters or new routes. The captain can take you to the Council after the signal is restored."
       },
       "choices": [],
       "choiceTranslations": {
         "pt-BR": [],
-        "es": []
+        "es": [],
+        "en": []
       },
       "translationStatus": {
         "pt-BR": "draft-ai",
-        "es": "draft-ai"
+        "es": "draft-ai",
+        "en": "draft-ai"
       },
       "textSound": "farol_sfx_texto",
       "confirmSound": "farol_sfx_dialogo"
@@ -159545,16 +160028,19 @@
       "text": "You have the trader tool. Equip it before asking the keeper to calibrate the lighthouse circuit.",
       "translations": {
         "pt-BR": "Você trouxe a ferramenta do viajante. Equipe-a antes de pedir ao guardião para calibrar o circuito do Farol.",
-        "es": "Tienes la herramienta del viajero. Equípala antes de pedir la calibración al guardián."
+        "es": "Tienes la herramienta del viajero. Equípala antes de pedir la calibración al guardián.",
+        "en": "You have the trader tool. Equip it before asking the keeper to calibrate the lighthouse circuit."
       },
       "choices": [],
       "choiceTranslations": {
         "pt-BR": [],
-        "es": []
+        "es": [],
+        "en": []
       },
       "translationStatus": {
         "pt-BR": "draft-ai",
-        "es": "draft-ai"
+        "es": "draft-ai",
+        "en": "draft-ai"
       },
       "textSound": "farol_sfx_texto",
       "confirmSound": "farol_sfx_dialogo"
@@ -159567,16 +160053,19 @@
       "text": "I saw the lighthouse test! Now the coast has an emergency signal too.",
       "translations": {
         "pt-BR": "Eu vi o teste do farol! Agora a costa tem também um sinal de emergência.",
-        "es": "¡Vi la prueba del faro! Ahora la costa tiene una señal de emergencia."
+        "es": "¡Vi la prueba del faro! Ahora la costa tiene una señal de emergencia.",
+        "en": "I saw the lighthouse test! Now the coast has an emergency signal too."
       },
       "choices": [],
       "choiceTranslations": {
         "pt-BR": [],
-        "es": []
+        "es": [],
+        "en": []
       },
       "translationStatus": {
         "pt-BR": "draft-ai",
-        "es": "draft-ai"
+        "es": "draft-ai",
+        "en": "draft-ai"
       },
       "textSound": "farol_sfx_texto",
       "confirmSound": "farol_sfx_dialogo"
@@ -159589,16 +160078,19 @@
       "text": "With the beacons lit, coastal shelters welcome travelers again. The protection pact you chose helps the coast thrive.",
       "translations": {
         "pt-BR": "Com os faróis acesos, os abrigos voltaram a receber viajantes. A costa prospera pelo pacto de proteção que você escolheu.",
-        "es": "Con los faros encendidos, los refugios reciben viajeros. El pacto de protección que elegiste hace prosperar la costa."
+        "es": "Con los faros encendidos, los refugios reciben viajeros. El pacto de protección que elegiste hace prosperar la costa.",
+        "en": "With the beacons lit, coastal shelters welcome travelers again. The protection pact you chose helps the coast thrive."
       },
       "choices": [],
       "choiceTranslations": {
         "pt-BR": [],
-        "es": []
+        "es": [],
+        "en": []
       },
       "translationStatus": {
         "pt-BR": "draft-ai",
-        "es": "draft-ai"
+        "es": "draft-ai",
+        "en": "draft-ai"
       },
       "textSound": "farol_sfx_texto",
       "confirmSound": "farol_sfx_dialogo"
@@ -159611,16 +160103,19 @@
       "text": "With the beacons lit, the compass points beyond the storm. Your exploration pact opens a new journey.",
       "translations": {
         "pt-BR": "Com os faróis acesos, a bússola aponta além da tempestade. O pacto de exploração que você escolheu abre uma nova jornada.",
-        "es": "Con los faros encendidos, la brújula señala más allá de la tormenta. Tu pacto de exploración abre otra aventura."
+        "es": "Con los faros encendidos, la brújula señala más allá de la tormenta. Tu pacto de exploración abre otra aventura.",
+        "en": "With the beacons lit, the compass points beyond the storm. Your exploration pact opens a new journey."
       },
       "choices": [],
       "choiceTranslations": {
         "pt-BR": [],
-        "es": []
+        "es": [],
+        "en": []
       },
       "translationStatus": {
         "pt-BR": "draft-ai",
-        "es": "draft-ai"
+        "es": "draft-ai",
+        "en": "draft-ai"
       },
       "textSound": "farol_sfx_texto",
       "confirmSound": "farol_sfx_dialogo"

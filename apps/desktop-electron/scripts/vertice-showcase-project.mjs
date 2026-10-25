@@ -1,3 +1,4 @@
+import {reviewExemploLocalization} from './exemplo-gba-localization-review.mjs';
 import {preserveCoastDepthCampaign} from './coast-depth-project.mjs';
 import {preserveApprovedCampaignEvolutions} from './campaign-evolutions-approved.mjs';
 import {integrateApprovedPlayerWalk} from './topdown-player-walk-project.mjs';
@@ -9018,7 +9019,7 @@ function buildExemploGBAVerticeCampaign(data) {
 }
 
 export function promoteExemploGBAVerticeCampaign(data) {
-  return preserveTideAnnex(data, preserveCoastDepthCampaign(data, integrateApprovedPlayerWalk(refineExampleTopdownMovement(preserveTideAnnex(data, preserveApprovedCampaignEvolutions(data, promoteFarolRelay(pruneUnusedExampleAssets(promoteApprovedCouncilV13(promoteShowcaseSystems(promoteLostSignalMission(materializeExampleAuthoring(buildExemploGBAVerticeCampaign(data)))))))))))));
+  return preserveTideAnnex(data, preserveCoastDepthCampaign(data, integrateApprovedPlayerWalk(refineExampleTopdownMovement(preserveTideAnnex(data, preserveApprovedCampaignEvolutions(data, reviewExemploLocalization(promoteFarolRelay(pruneUnusedExampleAssets(promoteApprovedCouncilV13(promoteShowcaseSystems(promoteLostSignalMission(materializeExampleAuthoring(buildExemploGBAVerticeCampaign(data))))))))))))));
 }
 
 const invokedPath = process.argv[1] ? fileURLToPath(import.meta.url) === process.argv[1] : false;
