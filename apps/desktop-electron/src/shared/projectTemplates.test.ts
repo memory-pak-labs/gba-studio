@@ -203,11 +203,12 @@ describe("projectTemplates", () => {
       : [];
     expect(localizedDialogues.find((dialogue) => dialogue.key === "prologo_frame_1")?.translations).toMatchObject({
       "pt-BR": "Os faróis da costa se apagam um a um. O último clarão ainda recorta o cais.",
-      es: "Os faróis da costa se apagam um a um. O último clarão ainda recorta o cais."
+      en: "The coastal lighthouses go dark one by one. The last beam still cuts across the pier.",
+      es: "Los faros de la costa se apagan uno a uno. El último haz de luz aún cruza el muelle."
     });
     const audio = deriveAudioWorkspacePresentation(project);
     const audioPack = buildAssetcAudioPackGeneration(project);
-    expect(audio.items).toHaveLength(69);
+    expect(audio.items).toHaveLength(74);
     expect(audio.items.flatMap(item => item.errors)).toEqual([]);
     // The bundled SFX explicitly author their effective Pulse 1 voice.
     // New projects should start without legacy channel warnings.
@@ -216,7 +217,9 @@ describe("projectTemplates", () => {
     const authoredAudio = Array.isArray(project.audioItems)
       ? project.audioItems as Array<Record<string, unknown>>
       : [];
-    expect(authoredAudio).toHaveLength(69);
+    expect(authoredAudio).toHaveLength(74);
+    expect(authoredAudio.filter(item => String(item.id).startsWith("initial-menu-"))).toHaveLength(5);
+    expect(authoredAudio.some(item => item.name === "farol_sfx_cursor")).toBe(false);
     expect(authoredAudio).toEqual(expect.arrayContaining([
       expect.objectContaining({ name: "mapa_mar_aberto", bpm: 84 })
     ]));
@@ -253,8 +256,10 @@ describe("projectTemplates", () => {
     });
     const referencedAudio = [...new Set([...eventAudio, ...roomAudio, ...dialogueAudio, ...tacticalAudio, ...actionAudio])];
     expect(referencedAudio.every((name) => audioNames.has(name))).toBe(true);
-    expect(referencedAudio).toHaveLength(56);
+    expect(referencedAudio).toHaveLength(62);
     expect(referencedAudio).toEqual(expect.arrayContaining([
+      "menu-abrir-v1.wav", "menu-navegar-v1.wav", "menu-confirmar-v1.wav", "menu-voltar-v1.wav", "menu-indisponivel-v1.wav",
+      "radio-lume-pcm.wav",
       "farol_tema_principal",
       "farol_sfx_texto",
       "farol_sfx_dialogo",
@@ -423,7 +428,7 @@ describe("projectTemplates", () => {
       expect.objectContaining({ name: "Mercador suspenso", spriteSheet: "market-approved-actors-64x64.png", animationStateID: "market-adventure-merchant-state" }),
       expect.objectContaining({ name: "Guarda do mercado", spriteSheet: "market-approved-actors-64x64.png", animationStateID: "market-adventure-guard-state" })
     ]));
-    expect(actors.filter((actor) => String(actor.roomName) === "usina_submersa")).toEqual([]);
+    expect(actors.filter((actor) => String(actor.roomName) === "usina_submersa").map(a=>a.id)).toEqual(["coast-valve-a-off","coast-valve-a-on","coast-valve-b-off","coast-valve-b-on","coast-valve-c-off","coast-valve-c-on"]);
     expect(actors.filter((actor) => String(actor.roomName) === "usina_combate")).toEqual(expect.arrayContaining([
       expect.objectContaining({ name: "Sentinela da Usina", spriteSheet: "dungeon-approved-sentinel-near.png" })
     ]));
@@ -581,6 +586,11 @@ describe("projectTemplates", () => {
       "arena-nara-complete-64x64.png",
       "arena-rival-complete-64x64.png",
       "book-nara-approved-32x48.png",
+      "coast-freight-lift.png",
+      "coast-port-lantern.png",
+      "coast-valve-far.png",
+      "coast-valve-mid.png",
+      "coast-valve-near.png",
       "council-v13-guardian.png",
       "council-v13-nara.png",
       "dungeon-approved-cell-far.png",
@@ -617,10 +627,12 @@ describe("projectTemplates", () => {
       "relay-approved-effects.png",
       "relay-approved-guardian.png",
       "relay-approved-nara.png",
+      "relay-mechanic.png",
       "tactical-approved-nara-64x64.png",
       "tactical-approved-sentinel-64x64.png",
       "tactical-compact-nara-portrait.png",
       "tactical-compact-sentinel-portrait.png",
+      "telescope-dial.png",
       "tempestade-approved-bolt.png",
       "tempestade-approved-boss.png",
       "tempestade-approved-drone-a.png",

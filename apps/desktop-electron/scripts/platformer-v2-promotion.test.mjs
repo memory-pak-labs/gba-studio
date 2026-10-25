@@ -19,7 +19,7 @@ describe('Penedos coastal V2 presentation', () => {
     expect([room.width, room.height, room.cameraMode]).toEqual([120, 40, 'follow_player']);
     expect(room.tileLayers.map(layer => layer.mapping)).toEqual(['BG3', 'BG2']);
     expect(new Set(room.tileLayers.map(layer => layer.tileSourceAssetNames[0])).size).toBe(2);
-    expect(result.actors.filter(actor => actor.roomName === 'penedos_vento')).toHaveLength(7);
+    expect(result.actors.filter(actor => actor.roomName === 'penedos_vento')).toHaveLength(9);
     for (const key of ['rooms', 'scenas']) {
       expect(result[key].filter(room => room.name !== 'penedos_vento'))
         .toEqual(source[key].filter(room => room.name !== 'penedos_vento'));

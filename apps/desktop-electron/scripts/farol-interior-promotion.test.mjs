@@ -49,7 +49,8 @@ it('keeps walking access to the lens, keeper and exit while blocking furniture, 
  for(const point of [[0,0],[2,15],[24,10],[33,20],[6,15],[42,15]])expect(free(...point),point.join(',')).toBe(false);
  expect(p.triggers.filter(t=>t.roomName===scene).map(t=>({id:t.id,x:t.x,y:t.y,width:t.width,height:t.height}))).toEqual([
   {id:'trigger-lighthouse-lens',x:21,y:13,width:6,height:2},
-  {id:'trigger-lighthouse-exit',x:22,y:30,width:4,height:2}]);
+  {id:'trigger-lighthouse-exit',x:22,y:30,width:4,height:2},
+  {id:'evolution-gallery-stairs',x:28,y:18,width:1,height:4}]);
 });
 
 it('regenerates the approved Farol idempotently without touching other scenes or actor drawings',async()=>{

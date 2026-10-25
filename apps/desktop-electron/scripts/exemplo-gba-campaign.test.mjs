@@ -37,7 +37,7 @@ function campaignProject() {
 function commands(project, eventName) {
   return project.events
     .find((event) => event.name === eventName)
-    ?.steps.flatMap((step) => step.command.startsWith("call_procedure ") ? commands(project, step.command.split(" ")[1]) : [step.command]) ?? [];
+    ?.steps.filter(step=>!step.id?.includes("-coast-")).flatMap((step) => step.command.startsWith("call_procedure ") ? commands(project, step.command.split(" ")[1]) : [step.command]) ?? [];
 }
 
 describe("campanha canônica O Último Farol", () => {
@@ -134,25 +134,25 @@ describe("campanha canônica O Último Farol", () => {
       { from: "arena_tatica", to: "mercado_suspenso" },
       { from: "porto_lumen", to: "farol_interior" },
       { from: "farol_interior", to: "porto_lumen" },
-      {from:"farol_interior",to:"galeria_das_mares"},
-      {from:"galeria_das_mares",to:"farol_interior"},
+      { from: "farol_interior", to: "galeria_das_mares" },
+      { from: "galeria_das_mares", to: "farol_interior" },
+      { from: "galeria_das_mares", to: "sala_mare_vazante" },
+      { from: "sala_mare_vazante", to: "galeria_das_mares" },
       ...VERTICE_CAMPAIGN_SCENES
         .filter(({ name }) => name !== "titulo" && name !== "mapa_rota")
         .map(({ name, nextScene }) => ({ from: name, to: nextScene })),
       ...["porto_lumen","penedos_vento","armazem_das_mares","observatorio_do_farol","mercado_suspenso","usina_submersa","conselho_guardia","circuito_final"].map(to => ({from:"mapa_rota",to})),
       { from: "mercado_suspenso", to: "arena_tatica" },
       {from:"circuito_final",to:"circuito_perspectiva"},
-      {from:"circuito_perspectiva",to:"circuito_final"},
-      {from:"galeria_das_mares",to:"sala_mare_vazante"},
-      {from:"sala_mare_vazante",to:"galeria_das_mares"}
+      {from:"circuito_perspectiva",to:"circuito_final"}
     ]));
     expect(project.events.every((event) => (
-      project.scenas.some((scene) => scene.name === event.roomName)
+      event.category === "Global" || project.scenas.some((scene) => scene.name === event.roomName)
     ))).toBe(true);
 
     for (const scene of VERTICE_CAMPAIGN_SCENES) {
       const pointClickExit = ["armazem_das_mares", "observatorio_do_farol"].includes(scene.name);
-      const expectedTransition = scene.transitionEvent === "mapa_viajar_penedos"
+      const expectedTransition = scene.name === "circuito_final" ? "change_scene porto_lumen 37 68 up" : scene.transitionEvent === "mapa_viajar_penedos"
         ? "change_scene penedos_vento 8 34 right"
         : pointClickExit
           ? "advance_campaign"
@@ -212,15 +212,15 @@ describe("campanha canônica O Último Farol", () => {
     expect(JSON.stringify(options)).not.toContain("Ir às falésias");
   });
 
-  it("mantém seis entradas do Menu Start em linhas distintas da HUD", () => {
+  it("mantém sete entradas do Menu Start paginadas nas seis linhas da HUD", () => {
     const project = campaignProject();
     const items = project.scenas.find(scene => scene.name === "menu_start").runtime.config.items;
-    expect(items.map(item => item.id)).toEqual(["missions", "inventory", "map", "save", "settings", "back"]);
-    expect(items.map(item => item.clickBox.y)).toEqual([30,44,58,73,87,101]);
+    expect(items.map(item => item.id)).toEqual(["missions", "inventory", "map", "save", "load", "settings", "back"]);
+    expect(items.map(item => item.clickBox.y)).toEqual([30,44,58,73,87,101,30]);
     const actors = project.actors.filter(actor => actor.roomName === "menu_start");
-    expect(actors).toHaveLength(8);
-    expect(actors.filter(actor => actor.menuActorRole === "option").map(actor => actor.menuItemID))
-      .toEqual(items.map(item => item.id));
+    expect(actors).toHaveLength(9);
+    expect(actors.filter(actor => actor.menuActorRole === "option").map(actor => actor.menuItemID).sort())
+      .toEqual(items.map(item => item.id).sort());
     expect(actors.filter(actor => actor.menuActorRole === "decorative").map(actor => ({
       variable: actor.menuVisibilityVariable,
       value: actor.menuVisibilityValue
@@ -319,14 +319,14 @@ describe("campanha canônica O Último Farol", () => {
       "if_variable var_market_shortcut 1", "set_actor_position market-guard-v1 23 3",
       "else", "set_actor_position market-guard-v1 24 3", "condition_end"
     ]);
-    expect(commands(project, "mercado_falar_mercador")).toEqual([
+    expect(commands(project, "coast_base_mercado_falar_mercador")).toEqual([
       "show_dialogue mercado_objetivo",
       "show_dialogue mercado_mercador"
     ]);
     expect(commands(project, "mercado_abrir_atalho")).toEqual([
       "if_variable var_market_shortcut 0",
       "set_variable var_market_shortcut 1",
-      "set_actor_position market-guard-v1 23 3",
+      "move_actor_relative market-guard-v1 -1 0",
       "play_sfx farol_sfx_dialogo",
       "save_game 0",
       "show_dialogue mercado_ponte_organizada",
@@ -346,7 +346,7 @@ describe("campanha canônica O Último Farol", () => {
   it("divide a Usina em exploração, combate e saída até a coleta da célula", () => {
     const project = campaignProject();
 
-    expect(commands(project, "usina_ao_entrar")).toEqual([
+    expect(commands(project, "coast_base_usina_ao_entrar")).toEqual([
       "play_music dungeon_tide",
       "call_event aplicar_perfil_jogador",
       "show_dialogue usina_objetivo",
@@ -354,7 +354,7 @@ describe("campanha canônica O Último Farol", () => {
       "change_scene usina_saida 5 5 down",
       "condition_end"
     ]);
-    expect(commands(project, "usina_abrir_combate")).toEqual([
+    expect(commands(project, "coast_base_usina_abrir_combate")).toEqual([
       "if_variable var_usina_combat_cleared 0",
       "change_scene usina_combate 9 3 up",
       "else",
@@ -449,7 +449,7 @@ describe("campanha canônica O Último Farol", () => {
     expect(room.collisionTypes.filter(c=>c==="free")).toHaveLength(51);
     expect(room.collisionTypes[9 * room.width + 1]).toBe("free");
     expect(room.collisionTypes[1 * room.width + 9]).toBe("free");
-    expect(explorationActors).toEqual([]);
+    expect(explorationActors.map(a=>a.id)).toEqual(["coast-valve-a-off","coast-valve-a-on","coast-valve-b-off","coast-valve-b-on","coast-valve-c-off","coast-valve-c-on"]);
     expect(combatActors).toEqual(expect.arrayContaining([
       expect.objectContaining({ id: "usina-sentinel-v2", x: 9, y: 2, width: 1, height: 1 })
     ]));
@@ -610,7 +610,7 @@ describe("campanha canônica O Último Farol", () => {
     runtime = runPreviewRuntimeEvent(runtime, "guardiao_vitoria");
     runtime = runPreviewRuntimeEvent(runtime, "arena_vencer_rival");
     runtime = runPreviewRuntimeEvent(runtime, "circuito_concluir");
-    for(let i=0;i<20;i++)runtime=tickPreviewRuntime(runtime,100);
+    for(let i=0;i<400;i++)runtime=tickPreviewRuntime(runtime,100);
 
     expect(runtime.currentRoom?.name).toBe("titulo");
     expect(runtime.variables).toMatchObject({
@@ -628,18 +628,18 @@ describe("campanha canônica O Último Farol", () => {
       var_campaign_finished: 1
     });
     expect(runtime.saveSlots[0]).toMatchObject({
-      roomName: "circuito_final",
-      variables: expect.objectContaining({ var_campaign_finished: 1 })
+      roomName: "farol_interior",
+      variables: expect.objectContaining({ var_campaign_finished: 1, var_epilogue_phase: 3 })
     });
     expect(runtime.diagnostics.filter((diagnostic) => diagnostic.severity === "error")).toEqual([]);
 
     const rebooted = rebootPreviewRuntimePreservingSaves(runtime);
     const loaded = runPreviewRuntimeEvent(rebooted, "carregar_jogo_slot_1");
 
-    expect(loaded.currentRoom?.name).toBe("circuito_final");
-    expect(loaded.variables).toMatchObject({ var_campaign_finished: 1 });
+    expect(loaded.currentRoom?.name).toBe("farol_interior");
+    expect(loaded.variables).toMatchObject({ var_campaign_finished: 1, var_epilogue_phase: 3 });
     expect(loaded.player).toMatchObject({
-      spriteSheet: "racing-approved-overhead-nara.png",
+      spriteSheet: "porto-nara-animations48.png",
       animationName: "idle_up"
     });
   });
@@ -744,8 +744,11 @@ describe("campanha canônica O Último Farol", () => {
       "var_rtc_minute",
       "porto_player_health", "var_penedos_farol", "penedos_player_health", "penedos_tokens",
       "penedos_defeated_crab", "penedos_defeated_moth", "penedos_defeated_crab_east", "penedos_defeated_moth_east",
-      "z_feature_quest_state", "z_feature_shop_stock", "var_gallery_gate", "var_gallery_record", "var_telescope_alignment", "var_coast_usina", "var_coast_minute", "var_coast_evening", "var_coast_lift", "var_coast_clock_ready", "var_radio_heard", "var_epilogue_phase", "var_epilogue_tick", "var_arena_lesson", "var_tide_state",
-      ...LOST_SIGNAL_VARIABLES, ...SHOWCASE_VARIABLES, FAROL_RELAY.variable
+      ...LOST_SIGNAL_VARIABLES, ...SHOWCASE_VARIABLES, FAROL_RELAY.variable,
+      "z_feature_quest_state", "z_feature_shop_stock",
+      "var_gallery_gate", "var_gallery_record", "var_telescope_alignment",
+      "var_coast_usina", "var_coast_minute", "var_coast_evening", "var_coast_lift", "var_coast_clock_ready",
+      "var_radio_heard", "var_epilogue_phase", "var_epilogue_tick", "var_arena_lesson", "var_tide_state"
     ]));
     expect(VERTICE_PROGRESS_KEYS).toHaveLength(15);
   });

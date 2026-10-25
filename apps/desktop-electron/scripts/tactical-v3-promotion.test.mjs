@@ -33,7 +33,7 @@ describe("tactical provenance: archived V5 and current large Arena", () => {
     expect(room.cameraBounds).toEqual({x:0,y:0,width:768,height:512});
     expect(room.runtime.config.pagedSurface).toMatchObject({width:768,height:512});
     expect(room.runtime.config.tacticalPresentation.compactHud.font).toBe("tactical-compact-font-8x8.png");
-    expect(room.runtime.config.tacticalPresentation.assets.filter(a=>a.consumer!=="audio")).toHaveLength(16);
+    expect(room.runtime.config.tacticalPresentation.assets.filter(a=>a.consumer!=="audio")).toHaveLength(14);
     expect(expandedCollisions(room)[4*16+3]).toBe("free");
     expect(room.rampFlags[4*16+3]).toBe(8);
     expect(room.heightLevels[4*16+3]).toBe(1);
@@ -50,7 +50,10 @@ describe("tactical provenance: archived V5 and current large Arena", () => {
       const bytes = readFileSync(new URL(`tactical-${state}-diamond-32x16-4bpp.png`, diamondRootURL));
       expect(retired.find(a => a.name === name)?.sha256).toBe(sha256(bytes));
       expect(project.assets.some(a => a.name === name)).toBe(false);
-      expect(project.rooms.find(r => r.name === 'arena_tatica').runtime.config.tacticalPresentation[`${state}Asset`]).toBe(`tactical-${state}-48x24.png`);
+      expect(project.rooms.find(r => r.name === 'arena_tatica').runtime.config.tacticalPresentation[`${state}Asset`]).toBe("tactical-cursor-48x24.png");
+      const original=readFileSync(new URL(`../default-assets/templates/exemplo-gba/Assets/sprites/tactical-${state}-48x24.png`,import.meta.url));
+      const shared=readFileSync(new URL("../default-assets/templates/exemplo-gba/Assets/sprites/tactical-cursor-48x24.png",import.meta.url));
+      expect(sha256(original)).toBe(sha256(shared));
     }
   });
 

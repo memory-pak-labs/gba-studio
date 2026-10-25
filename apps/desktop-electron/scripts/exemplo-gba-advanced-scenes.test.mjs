@@ -12,6 +12,7 @@ function canonicalProject() {
 
 function encodedLength(value) {
   if (Array.isArray(value)) return value.length;
+  if (value?.encoding === "metatile-v1") return value.width * value.height;
   if (value && typeof value === "object" && Number.isInteger(value.length)) return value.length;
   return 0;
 }
@@ -70,21 +71,25 @@ describe("cenas avançadas do template Exemplo GBA", () => {
           gameplayMode: "tactical",
           tactical: { enabled: true, activeTeam: "player", units: [
             expect.objectContaining({ actorIndex: 0, team: "player", moveRange: 2, attackRange: 1 }),
-            expect.objectContaining({ actorIndex: 1, team: "enemy", moveRange: 2, attackRange: 1 })
+            expect.objectContaining({ actorIndex: 1, team: "enemy", moveRange: 2, attackRange: 1 }),
+            expect.objectContaining({ actorIndex: 2, team: "player", moveRange: 3, attackRange: 2 }),
+            expect.objectContaining({ actorIndex: 3, team: "enemy", moveRange: 1, attackRange: 2 })
           ] }
         }
       }
     });
     expect(arenaActors).toEqual([
       expect.objectContaining({ name: "Nara · Arena Tática", x: 5, y: 9, spriteSheet: "tactical-approved-nara-64x64.png", animationName: "idle_right" }),
-      expect.objectContaining({ name: "Sentinela · Arena Tática", x: 8, y: 9, spriteSheet: "tactical-approved-sentinel-64x64.png", animationName: "idle_down" })
+      expect.objectContaining({ name: "Sentinela · Arena Tática", x: 8, y: 9, spriteSheet: "tactical-approved-sentinel-64x64.png", animationName: "idle_down" }),
+      expect.objectContaining({ id:"coast-tactical-support",x:5,y:11,spriteSheet:"tactical-approved-sentinel-64x64.png" }),
+      expect.objectContaining({ id:"coast-tactical-ranged",x:8,y:11,spriteSheet:"tactical-approved-sentinel-64x64.png" })
     ]);
     expect(arena.runtime.config.tacticalPresentation).toMatchObject({
       schema: 1,
       compactHud: expect.objectContaining({turnPanel:"tactical-compact-turnPanel.png"}),
       cursorAsset: "tactical-cursor-48x24.png",
-      rangeAsset: "tactical-range-48x24.png",
-      targetAsset: "tactical-target-48x24.png"
+      rangeAsset: "tactical-cursor-48x24.png",
+      targetAsset: "tactical-cursor-48x24.png"
     });
     expect(arena.runtime.config.tacticalPresentation.audio).toMatchObject({
       music: "farol_arena_tatica",
@@ -162,7 +167,7 @@ describe("cenas avançadas do template Exemplo GBA", () => {
   it("mantém o Armazém e o Observatório como cenas point-and-click com atores e saídas", () => {
     const project = canonicalProject();
     for (const expected of [
-      { name: "armazem_das_mares", background: "warehouse-frontal-bg-240x160.png", cursor: "Cursor do Armazém", triggers: ["Carta Náutica", "Baú Vermelho", "Saída do Armazém"] },
+      { name: "armazem_das_mares", background: "warehouse-frontal-bg-240x160.png", cursor: "Cursor do Armazém", triggers: ["Carta Náutica", "Baú Vermelho", "Saída do Armazém", "Rádio de Lúmen"] },
       { name: "observatorio_do_farol", background: "observatory-frontal-bg-240x160.png", cursor: "Cursor do Observatório", triggers: ["Telescópio", "Mesa da Maré", "Saída do Observatório"] }
     ]) {
       const scene = project.scenas.find((candidate) => candidate.name === expected.name);
@@ -175,8 +180,8 @@ describe("cenas avançadas do template Exemplo GBA", () => {
         runtime: { type: "pointAndClick" }
       });
       const actors = project.actors.filter((actor) => actor.roomName === expected.name);
-      expect(actors).toHaveLength(1);
-      expect(actors[0]).toMatchObject({ name: expected.cursor, spriteSheet: "white-hand-cursor-32x32.png" });
+      expect(actors).toHaveLength(expected.name === 'observatorio_do_farol' ? 4 : 2);
+      expect(actors.find(a=>a.name===expected.cursor)).toMatchObject({ name: expected.cursor, spriteSheet: "white-hand-cursor-32x32.png" });
       expect(project.triggers.filter((trigger) => trigger.roomName === expected.name).map((trigger) => trigger.name))
         .toEqual(expected.triggers);
     }

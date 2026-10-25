@@ -37,7 +37,7 @@ describe("isometric scene integration", () => {
   });
   it("abre uma passagem real e restaura seu estado ao voltar", () => {
     expect(fixed.actors.find(actor => actor.id === "market-guard-v1")).toMatchObject({ x:24, y:3, eventBindings: { onInteract: "mercado_falar_guarda" } });
-    expect(commands("mercado_abrir_atalho")).toContain("set_actor_position market-guard-v1 23 3");
+    expect(commands("mercado_abrir_atalho")).toContain("move_actor_relative market-guard-v1 -1 0");
     expect(commands("mercado_ao_entrar")).toEqual(expect.arrayContaining(["if_variable var_market_shortcut 1", "set_actor_position market-guard-v1 24 3", "set_actor_position market-guard-v1 23 3"]));
   });
   it("liga o guarda à Arena e o retorno ao Mercado sem criar menu extra", () => {

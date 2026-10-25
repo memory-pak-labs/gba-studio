@@ -35,20 +35,24 @@ describe('approved wide Penedos integration', () => {
         expect(Object.keys(c.platformer_project.player.animations).sort()).toEqual(['idle', 'walk', 'jump', 'fall', 'climb', 'wall_slide', 'dash', 'glide', 'attack', 'hurt', 'land'].sort());
         expect(c.platformer_project.player.animations.attack.loops).toBe(false);
         for (const a of p.actors.filter(a => a.roomName === manifest.scene)) {
+            if(a.id.startsWith('coast-')) {
+                expect(a).toEqual(source().actors.find(old=>old.id===a.id));
+                continue;
+            }
             const frame = resolveGbaActorSprite(p, a).frame;
             expect(frame.originX).toBe(a.originX);
             expect(frame.originY).toBe(a.originY);
             const place = gbaActorSpriteRoomPlacementFromFrame(a.x, a.y, frame);
             expect(place.leftTiles).toBe(a.x - a.originX / 8);
         }
-        expect(p.actors.filter(a => a.roomName === manifest.scene)).toHaveLength(7);
+        expect(p.actors.filter(a => a.roomName === manifest.scene)).toHaveLength(9);
     });
     it('keeps the new presentation through complete example regeneration and scene entries', async () => {
         const { promoteExemploGBAVerticeCampaign } = await import('./vertice-showcase-project.mjs');
         const p = promoteExemploGBAVerticeCampaign(promoteApprovedPlatformer(source()));
         expect(p.rooms.find(r => r.name === manifest.scene).backgroundAssetName).toBe('penedos-approved-terrain.png');
         expect(p.scenas.find(r => r.name === manifest.scene)).toEqual(p.rooms.find(r => r.name === manifest.scene));
-        expect(p.actors.filter(a => a.roomName === manifest.scene)).toHaveLength(7);
+        expect(p.actors.filter(a => a.roomName === manifest.scene)).toHaveLength(9);
         for (const e of p.events)
             for (const s of e.steps ?? [])
                 if (s.command.startsWith('change_scene penedos_vento '))

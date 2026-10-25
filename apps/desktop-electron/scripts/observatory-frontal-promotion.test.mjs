@@ -11,11 +11,11 @@ it('integrates the approved frontal Observatory and fingertip cursor with three 
  expect(room.backgroundAssetName).toBe('observatory-frontal-bg-240x160.png');
  expect(canonical.scenas.find(r=>r.name===name)).toEqual(room);
  const actor=canonical.actors.find(a=>a.id===name+'-cursor');
- expect(canonical.actors.filter(a=>a.roomName===name)).toEqual([actor]);
+ expect(canonical.actors.filter(a=>a.roomName===name)).toEqual([actor,...[0,1,2].map(n=>expect.objectContaining({id:'telescope-dial-'+n,visibleVariable:'var_telescope_alignment',visibleValue:n}))]);
  expect(actor.spriteSheet).toBe('white-hand-cursor-32x32.png');
  expect(resolveGbaActorSprite(canonical,actor).frame).toMatchObject({originX:13,originY:6});
  const c=buildEngineExportProjectContract(canonical),exported=c.point_click_project.scenes.find(s=>s.name===name);
- expect(exported.props??[]).toHaveLength(0);
+ expect(exported.props??[]).toHaveLength(3);
  expect(exported.cursor.metasprite.asset).toBe('white_hand_cursor_32x32');
  expect(exported.cursor.animations.find(a=>a.name==='idle').frame_metasprites[0].parts).toEqual([
   expect.objectContaining({x:-13,y:-6,width:32,height:32,slice_x:0,slice_y:0})
@@ -55,6 +55,6 @@ it('keeps approved Observatory presentation when the canonical example is regene
  for(const source of [canonical]){
   const result=promoteExemploGBAVerticeCampaign(source);
   expect(result.rooms.find(r=>r.name===name).backgroundAssetName).toBe('observatory-frontal-bg-240x160.png');
-  expect(result.actors.filter(a=>a.roomName===name).map(a=>a.spriteSheet)).toEqual(['white-hand-cursor-32x32.png']);
+  expect(result.actors.filter(a=>a.roomName===name).map(a=>a.spriteSheet).sort()).toEqual(['white-hand-cursor-32x32.png',...Array(3).fill('telescope-dial.png')].sort());
  }
 });

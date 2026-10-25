@@ -15,7 +15,7 @@ function titleContract(project) {
 }
 
 describe("carrossel canônico do título", () => {
-  it("mantém 31 cenas e o menu inicial dentro da cena título", () => {
+  it("mantém 32 cenas e o menu inicial dentro da cena título", () => {
     const project = JSON.parse(readFileSync(projectURL, "utf8"));
     const sceneNames = project.scenas.map((scene) => scene.name);
     const { title, splash, options } = titleContract(project);
@@ -34,7 +34,7 @@ describe("carrossel canônico do título", () => {
     expect(options?.id).toBe("title_options");
     expect(options?.carousel).toBe(true);
     expect(project.events.find((event) => event.name === "titulo_abrir_menu")?.steps.map((step) => step.command))
-      .toEqual(["play_sfx farol_sfx_cursor", "slider title_options"]);
+      .toEqual(["play_sfx menu-abrir-v1.wav 65 8", "slider title_options"]);
     expect(options?.items.map((item) => [item.id, item.targetScreenID])).toEqual([
       ["new-game", "escolha_genero"],
       ["load-game", "carregar_jogo"],

@@ -46,7 +46,9 @@ function canonicalVerticeSceneCount() {
   const sceneNames = [
     ...VERTICE_CAMPAIGN_SCENES.map((scene) => scene.name),
     ...VERTICE_SUPPORT_SCENES.map((scene) => scene.name),
-    "circuito_perspectiva", "galeria_das_mares", "sala_mare_vazante"
+    "circuito_perspectiva",
+    "galeria_das_mares",
+    "sala_mare_vazante"
   ].filter((name) => name !== "menu_inicial");
   return new Set(sceneNames).size;
 }
@@ -121,7 +123,7 @@ describe("materialização canônica de Vértice", () => {
         for (const direction of ['down', 'up', 'left', 'right']) {
           expect(animations.find(a => a.name === `idle_${direction}`)).toMatchObject({frameWidth:32,frameHeight:48,frameCount:1});
           const walk = animations.find(a => a.name === `walk_${direction}`);
-          expect(walk).toMatchObject({frameWidth:32,frameHeight:48,frameCount:4,hitboxWidth:16,hitboxHeight:16});
+          expect(walk).toMatchObject({frameWidth:32,frameHeight:48,frameCount:4,hitboxWidth:16,hitboxHeight:sheet==='porto-nara-animations48.png'?8:16,hitboxY:sheet==='porto-nara-animations48.png'?0:-8});
           expect(new Set(walk.frames.map(f => f.sourceFrameIndex)).size).toBe(4);
         }
       }
@@ -971,7 +973,6 @@ describe("materialização canônica de Vértice", () => {
     const project = verticeProject();
     const items = project.scenas.find(scene => scene.name === "inventario").runtime.config.items;
     expect(items.filter(item => item.binding).map(item => item.binding.index)).toEqual([1, 4, 2, 6, 7, 5]);
-    expect(items.some(item => item.binding?.index === 5)).toBe(true);
     for (const item of items.filter(item => item.eventName)) {
       const commands = project.events.find(event => event.name === item.eventName).steps.map(step => step.command);
       if(item.id==='stabilizer')expect(commands).toEqual(expect.arrayContaining(['if_variable var_stabilizer 1','show_dialogue tide_owned','show_dialogue tide_location']));
@@ -1317,11 +1318,11 @@ describe("materialização canônica de Vértice", () => {
   });
 
 
-  it("materializa o Menu Start com seis opções e retorno à partida", () => {
+  it("materializa o Menu Start com sete opções e retorno à partida", () => {
     const project = verticeProject();
     const startMenu = project.scenas.find(scene => scene.name === "menu_start");
     expect(project.scenas).toHaveLength(canonicalVerticeSceneCount());
-    expect(startMenu.runtime.config.items.map(item => item.id)).toEqual(["missions", "inventory", "map", "save", "settings", "back"]);
+    expect(startMenu.runtime.config.items.map(item => item.id)).toEqual(["missions", "inventory", "map", "save", "load", "settings", "back"]);
     expect(startMenu.runtime.config.items.at(-1)).toMatchObject({ label: "RETOMAR", action: "pop_screen" });
     expect(startMenu.eventBindings).toMatchObject({ onInit: "menu_start_ao_entrar" });
   });
@@ -1362,7 +1363,7 @@ describe("materialização canônica de Vértice", () => {
       expect(room).toMatchObject({width:11,height:11,backgroundAssetName:manifest.scenes.scenes[i].background,runtime:{type:'dungeonCrawler'}});
       expect(project.assets.find(a=>a.name===room.backgroundAssetName)?.metadata).toMatchObject({approved:true,colorMode:'4bpp',runtimeDependencies:expect.arrayContaining([manifest.cache.tilesAsset,manifest.cache.mapsAsset,manifest.cache.palettesAsset])});
     }
-    expect(project.actors.filter(a=>a.roomName==='usina_submersa')).toEqual([]);
+    expect(project.actors.filter(a=>a.roomName==='usina_submersa').map(a=>a.id)).toEqual(["coast-valve-a-off","coast-valve-a-on","coast-valve-b-off","coast-valve-b-on","coast-valve-c-off","coast-valve-c-on"]);
     expect(project.actors.find(a=>a.id==='usina-sentinel-v2')).toMatchObject({x:9,y:2,spriteSheet:manifest.sentinel.near,animationName:'poses',dungeonDepthSheets:manifest.sentinel});
     expect(project.actors.find(a=>a.id==='usina-energy-cell-v2')).toMatchObject({x:5,y:6,spriteSheet:manifest.cell.near,animationName:'poses',eventName:'usina_coletar_celula'});
   });
@@ -1401,8 +1402,8 @@ describe("materialização canônica de Vértice", () => {
         gbStudioUseBackgroundLayout: true,
         showcase: { lane: "campaign", access: "campaign" }
       });
-      expect(project.actors.filter((actor) => actor.roomName === scene.name)).toHaveLength(1);
-      expect(project.triggers.filter((trigger) => trigger.roomName === scene.name)).toHaveLength(3);
+      expect(project.actors.filter((actor) => actor.roomName === scene.name)).toHaveLength(scene.name === "observatorio_do_farol" ? 4 : 2);
+      expect(project.triggers.filter((trigger) => trigger.roomName === scene.name)).toHaveLength(scene.name === "observatorio_do_farol" ? 3 : 4);
     }
   });
 
@@ -1456,7 +1457,7 @@ describe("materialização canônica de Vértice", () => {
     expect(cells[34*120+2]).toBe("solid");
     expect(cells[39*120+16]).toBe("damage");
     expect(cells[30*120+27]).toBe("down");
-    expect(project.actors.filter(a => a.roomName === "penedos_vento")).toHaveLength(7);
+    expect(project.actors.filter(a => a.roomName === "penedos_vento")).toHaveLength(9);
   });
 
   it("exporta o contrato compacto aprovado dos Penedos com BG3 e BG2", () => {
@@ -1575,7 +1576,7 @@ describe("materialização canônica de Vértice", () => {
     const project = verticeProject();
     const flow = analyzeConditionalSceneFlow(project);
 
-    expect(project.events.every((event) => project.scenas.some((scene) => scene.name === event.roomName))).toBe(true);
+    expect(project.events.every((event) => event.category === "Global" || project.scenas.some((scene) => scene.name === event.roomName))).toBe(true);
     expect(project.events.map((event) => event.name)).toEqual(expect.arrayContaining([
       "titulo_abrir_menu",
       "missoes_detalhar_proximo",
@@ -1810,13 +1811,14 @@ describe("materialização canônica de Vértice", () => {
         "porto-lume-traveler-pilot",
         "porto-lume-cartographer-pilot",
         "porto-lume-fisherchild-pilot",
-        "porto-lume-lighthousekeeper-pilot"
+        "porto-lume-lighthousekeeper-pilot",
+        "coast-port-lamp-0", "coast-port-lamp-1"
       ]);
   });
 
   it("materializa o elenco atual do Porto sem as animações das versões aposentadas", () => {
     const project = verticeProject(), actors = project.actors.filter(a => a.roomName === 'porto_lumen');
-    expect(actors).toHaveLength(7);
+    expect(actors).toHaveLength(9);
     for(const actor of actors) {
       expect(project.assets.some(a => a.name === actor.spriteSheet)).toBe(true);
       expect(project.animationStates.some(state => state.id === actor.animationStateID && state.spriteSheet === actor.spriteSheet)).toBe(true);
@@ -2055,10 +2057,21 @@ describe("materialização canônica de Vértice", () => {
     for(const asset of Object.values(routeManifest.assets))allowedAssets.add(asset.name);
     for (const a of JSON.parse(readFileSync(new URL('../fixtures/asset-provenance/market-approved-manifest.json',import.meta.url))).assets) allowedAssets.add(a.name);
     for (const a of JSON.parse(readFileSync(new URL('../fixtures/asset-provenance/platformer-approved-manifest.json',import.meta.url))).assets) allowedAssets.add(a.name);
-    for(const a of JSON.parse(readFileSync(new URL('../fixtures/asset-provenance/gallery-v21-approved.json',import.meta.url))).assets)allowedAssets.add(a.name);
-    for(const a of JSON.parse(readFileSync(new URL('../fixtures/asset-provenance/tide-annex-approved.json',import.meta.url))).assets)allowedAssets.add(a.name);
+    const evolutionsManifest=JSON.parse(readFileSync(new URL("../fixtures/asset-provenance/campaign-evolutions-approved.json",import.meta.url)));
+    for(const asset of evolutionsManifest.assets)allowedAssets.add(asset.name);
+    const coastManifest=JSON.parse(readFileSync(new URL('../fixtures/asset-provenance/coastal-depth-approved.json',import.meta.url)));
+    for(const asset of coastManifest.assets)allowedAssets.add(asset.name);
+    for(const alias of coastManifest.retainedAliases)allowedAssets.delete(alias.source.split('/').at(-1));
+    const encoreManifest=JSON.parse(readFileSync(new URL('../fixtures/asset-provenance/encore-approved.json',import.meta.url)));
+    for(const asset of encoreManifest.assets)allowedAssets.add(asset.name);
+    const tideManifest=JSON.parse(readFileSync(new URL('../fixtures/asset-provenance/tide-annex-approved.json',import.meta.url)));
+    for(const asset of tideManifest.assets)allowedAssets.add(asset.name);
+    const menuAudioManifest = JSON.parse(readFileSync(new URL('../fixtures/asset-provenance/initial-menu-audio-approved.json', import.meta.url)));
+    expect(menuAudioManifest.approval.auditory).toBe(true);
+    for (const asset of menuAudioManifest.assets) allowedAssets.add(asset.name);
     expect(new Set(project.assets.map((asset) => asset.name))).toEqual(allowedAssets);
-    expect(project.audioItems).toHaveLength(69);
+    expect(project.audioItems).toHaveLength(74);
+    expect(project.audioItems.filter(item => item.id.startsWith('initial-menu-'))).toEqual(menuAudioManifest.audioItems);
     expect(project.audioItems.find(a=>a.name==='mapa_mar_aberto')).toMatchObject({bpm:84,format:'COMPOSED',loops:true});
     expect(project.events.flatMap((event) => event.steps ?? []).some((step) => /play_(music|sfx) /.test(step.command))).toBe(true);
     expect(project.scenas.filter((scene) => pendingSceneNames.includes(scene.name)))
@@ -2096,7 +2109,9 @@ describe("materialização canônica de Vértice", () => {
       "conselho_guardia",
       "circuito_final",
       "arena_tatica",
-      "circuito_perspectiva", "galeria_das_mares", "sala_mare_vazante"
+      "circuito_perspectiva",
+      "galeria_das_mares",
+    "sala_mare_vazante"
     ].includes(actor.roomName))).toBe(true);
   });
 
@@ -2171,6 +2186,7 @@ describe("materialização canônica de Vértice", () => {
       "change_scene arena_tatica 5 9 down"
     ]);
     expect(eventCommands("arena_tatica_ao_entrar")).toEqual([
+      "call_procedure coast_audio_preferences", "call_procedure coast_audio_mute", "fade_audio_volume music 100 45 var_audio_music_volume var_audio_master_volume",
       "remove_button r",
       "attach_button l arena_tatica_sair true",
       "show_dialogue arena_tatica_controles"

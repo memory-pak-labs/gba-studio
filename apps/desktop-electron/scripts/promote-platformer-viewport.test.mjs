@@ -14,7 +14,7 @@ describe('approved wide platformer composition', () => {
       expect(s.hudPresetId).toBe('hud-penedos-approved');
       expect(s.cameraBounds).toEqual({x:0,y:0,width:120,height:40});
     }
-    expect(p.actors.filter(a => a.roomName === 'penedos_vento')).toHaveLength(7);
+    expect(p.actors.filter(a => a.roomName === 'penedos_vento')).toHaveLength(9);
     const assets = new Set(p.assets.map(a => a.name));
     for (const a of p.actors.filter(a => a.roomName === 'penedos_vento')) {
       expect(a.x).toBeGreaterThanOrEqual(0);

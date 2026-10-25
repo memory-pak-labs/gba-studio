@@ -11,11 +11,14 @@ const retired = JSON.parse(readFileSync(new URL("../fixtures/asset-provenance/ex
 const retained = JSON.parse(readFileSync(new URL('../fixtures/asset-provenance/market-approved-manifest.json', import.meta.url))).retainedOriginals;
 const source = JSON.parse(readFileSync(new URL('../default-assets/templates/exemplo-gba/exemplo-gba.gba-project', import.meta.url)));
 const approved = buildArenaV5(source);
+approved.actors=approved.actors.filter(a=>a.roomName!=="arena_tatica"||!a.id.startsWith("coast-"));
 // Keep the legacy compiler regression independent of the current promoted Arena.
 for(const r of [...approved.rooms,...approved.scenas].filter(r=>r.name==='arena_tatica')) {
  r.cameraMode='fixed_center';r.cameraBounds={x:0,y:0,width:240,height:160};
  r.runtime.config.worldMode='static_composition';delete r.runtime.config.pagedSurface;
  const t=r.runtime.config.tacticalPresentation;delete t.compactHud;
+ r.runtime.config.tactical.units=r.runtime.config.tactical.units.filter(u=>u.actorIndex<2);
+ t.units=t.units.filter(u=>["tactical-nara","tactical-sentinel"].includes(u.actorId));
  t.surfaceAsset='tactical-v5-surface.png';
  t.surfaceResidency={exclusiveBankGroups:['arena_tatica_coastal'],maxResidentGroups:1,prefetchMarginPixels:0};
  for(const u of t.units){u.sheet=u.actorId==='tactical-nara'?'tactical-nara-v5.png':'tactical-sentinel-v5.png';delete u.portrait;delete u.label;u.animations=Object.fromEntries(Object.keys(u.animations).map(k=>[k,k]));}

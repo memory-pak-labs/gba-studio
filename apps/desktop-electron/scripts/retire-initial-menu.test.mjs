@@ -22,7 +22,7 @@ describe("título com opções em carrossel", () => {
     expect(project.rooms.map((scene) => scene.name)).toEqual(project.scenas.map((scene) => scene.name));
     expect(options.carousel).toBe(true);
     expect(project.events.find((event) => event.name === "titulo_abrir_menu")?.steps.map((step) => step.command))
-      .toEqual(["play_sfx farol_sfx_cursor", "slider title_options"]);
+      .toEqual(["play_sfx menu-abrir-v1.wav 65 8", "slider title_options"]);
     expect(options.items.map((item) => item.id)).toEqual([
       "new-game", "load-game", "language", "settings", "credits"
     ]);

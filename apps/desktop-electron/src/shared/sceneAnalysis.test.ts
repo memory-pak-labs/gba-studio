@@ -35,6 +35,7 @@ describe('scene analysis boundary', () => {
     expect(JSON.stringify(snapshot.facts)).not.toMatch(/private|secret|apiKey/);
     expect(snapshot.descriptions.objective).toBe('private objective');
   });
+  // This audits every scene in the complete campaign, rather than one screen.
   it('evaluates real canonical scenes without changing project data', () => {
     const parsed = parseGBAProjectFile(readFileSync('default-assets/templates/exemplo-gba/exemplo-gba.gba-project', 'utf8'));
     const before = JSON.stringify(parsed.data);
@@ -44,7 +45,7 @@ describe('scene analysis boundary', () => {
       expect(sceneDecisionQuestions.classification.criteria).toHaveProperty(result.classification);
     }
     expect(JSON.stringify(parsed.data)).toBe(before);
-  });
+  }, 60000);
   it('rejects malformed answers and out of range probabilities', () => {
     expect(() => validateSceneDecision({})).toThrow();
     expect(() => validateSceneDecision({ model: 'jev', answers: { completeness: { type: 'noul', noul: 2 } } })).toThrow();

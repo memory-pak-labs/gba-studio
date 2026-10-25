@@ -25,7 +25,7 @@ describe('tactical paged surface', () => {
         const p = fixture(), room = buildEngineExportProjectContract(p).isometric_project!.rooms.find(r => r.name === 'arena_tatica')!;
         expect(room.paged_surface).toMatchObject({ width: 768, height: 512 });
         expect(room.grid).toMatchObject({ gameplay_mode: 'tactical', movement_model: 'tile', tile_width_pixels: 48, tile_height_pixels: 24 });
-        expect(room.tactical?.units).toHaveLength(2);
+        expect(room.tactical?.units).toHaveLength(4);
         expect(room.camera).toMatchObject({ position: { x: 168, y: 168 }, dead_zone: { x: 120, y: 80, width: 0, height: 0 } });
         expect(room.camera).toMatchObject({ follow_enabled: true, bounds: { width: 768, height: 512 } });
         expect(room.tactical_presentation?.surface_asset).toBeUndefined();

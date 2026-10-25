@@ -38,7 +38,15 @@ describe('example authoring library',()=>{
  it('connects the five remaining Port Lumen NPCs to visible dialogue chains',()=>{
   const next=materializeExampleAuthoring(source());
   for(const id of ['captain','traveler','cartographer','fisherchild','lighthousekeeper']){
-   const actor=next.actors.find(a=>a.id===`porto-lume-${id}-pilot`),event=next.events.find(e=>e.name===actor.eventBindings.onInteract);
+   const actor=next.actors.find(a=>a.id===`porto-lume-${id}-pilot`);
+   let event=next.events.find(e=>e.name===actor.eventBindings.onInteract);
+   if(id==='captain'){
+    expect(event.steps.map(s=>s.command)).toContain('choice_event encore_epilogue_menu 0 encore_epilogue_replay');
+    event=next.events.find(e=>e.name==='encore_base_porto_conversar_captain');
+    expect(event.steps.map(s=>s.command)).toContain('show_dialogue coast_captain_shift');
+    const delegate=event.steps.find(s=>s.command.startsWith('call_procedure coast_base_'));
+    event=next.events.find(e=>e.name===delegate.command.split(' ')[1]);
+   }
    if(id==='cartographer')expect(event.steps).toEqual(expect.arrayContaining([expect.objectContaining({command:'show_choice signal_travel'})]));
    else if(['captain','traveler'].includes(id))expect(event.steps).toEqual(expect.arrayContaining([expect.objectContaining({command:`choice_event showcase_${id==='captain'?'captain':'trader'}_menu 2 showcase_${id}_talk`})]));
    const conversation=next.events.find(e=>e.name===`showcase_base_${id==='fisherchild'?'fisher':id}`)??event;

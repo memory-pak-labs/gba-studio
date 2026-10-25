@@ -1,16 +1,15 @@
-import {silenceInitialMenuMusic,preserveApprovedInitialMenuAudio} from './initial-menu-audio.mjs';
-import {reviewExemploLocalization} from './exemplo-gba-localization-review.mjs';
-import {preserveExampleEncore} from './encore-project.mjs';
-import {preserveCoastDepthCampaign} from './coast-depth-project.mjs';
-import {preserveApprovedCampaignEvolutions} from './campaign-evolutions-approved.mjs';
-import {integrateApprovedPlayerWalk} from './topdown-player-walk-project.mjs';
-import {refineExampleTopdownMovement} from './topdown-movement-project.mjs';
-import {preserveTideAnnex} from './tide-annex-project.mjs';
 import { materializeExampleAuthoring } from "./example-authoring-library.mjs";
 import { promoteApprovedCouncilV13 } from "./council-v13-promotion.mjs";
 import { promoteLostSignalMission } from './lost-signal-mission.mjs';
 import { promoteShowcaseSystems } from './showcase-systems.mjs';
 import { promoteFarolRelay } from './farol-relay.mjs';
+import { reviewExemploLocalization } from './exemplo-gba-localization-review.mjs';
+import { preserveApprovedCampaignEvolutions } from './campaign-evolutions-approved.mjs';
+import { refineExampleTopdownMovement } from './topdown-movement-project.mjs';
+import { integrateApprovedPlayerWalk } from './topdown-player-walk-project.mjs';
+import { preserveCoastDepthCampaign } from './coast-depth-project.mjs';
+import { preserveExampleEncore } from './encore-project.mjs';
+import { preserveTideAnnex } from './tide-annex-project.mjs';
 import { pruneObsoleteExampleScripts } from './prune-obsolete-example-scripts.mjs';
 import { promoteApprovedStartupFade } from './startup-fade-promotion.mjs';
 import { promoteApprovedDungeon } from './dungeon-approved-promotion.mjs';
@@ -57,6 +56,7 @@ import { refineInGameMenus } from "./in-game-menu-project.mjs";
 import { refineRouteMap } from "./route-map-project.mjs";
 import { correctIsometricScenes } from "./isometric-scene-corrections.mjs";
 import { retireInitialMenuScene } from "./retire-initial-menu.mjs";
+import { silenceInitialMenuMusic, preserveApprovedInitialMenuAudio } from "./initial-menu-audio.mjs";
 import { applyExampleSceneTransitions } from "./exemplo-scene-transitions.mjs";
 import { promoteApprovedPortoLumenPaged } from "./porto-lumen-paged-promotion.mjs";
 import { promoteApprovedPlatformer } from "./platformer-approved-promotion.mjs";
@@ -9021,7 +9021,8 @@ function buildExemploGBAVerticeCampaign(data) {
 }
 
 export function promoteExemploGBAVerticeCampaign(data) {
-  return preserveApprovedInitialMenuAudio(data, silenceInitialMenuMusic(preserveTideAnnex(data, preserveExampleEncore(data, preserveTideAnnex(data, preserveCoastDepthCampaign(data, integrateApprovedPlayerWalk(refineExampleTopdownMovement(preserveTideAnnex(data, preserveApprovedCampaignEvolutions(data, reviewExemploLocalization(promoteFarolRelay(pruneUnusedExampleAssets(promoteApprovedCouncilV13(promoteShowcaseSystems(promoteLostSignalMission(materializeExampleAuthoring(buildExemploGBAVerticeCampaign(data))))))))))))))))));
+  const generated = silenceInitialMenuMusic(preserveExampleEncore(data, preserveCoastDepthCampaign(data, integrateApprovedPlayerWalk(refineExampleTopdownMovement(preserveApprovedCampaignEvolutions(data, reviewExemploLocalization(promoteFarolRelay(pruneUnusedExampleAssets(promoteApprovedCouncilV13(promoteShowcaseSystems(promoteLostSignalMission(materializeExampleAuthoring(buildExemploGBAVerticeCampaign(data))))))))))))));
+  return preserveApprovedInitialMenuAudio(data, preserveTideAnnex(data, generated));
 }
 
 const invokedPath = process.argv[1] ? fileURLToPath(import.meta.url) === process.argv[1] : false;
