@@ -5,8 +5,22 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>GBA Studio Player</title>
   <style>
-    html, body, #runtime-game { width: 100%; height: 100%; margin: 0; overflow: hidden; background: #05060a; }
-    #runtime-game { display: grid; place-items: center; }
+    html, body { width: 100%; height: 100%; margin: 0; overflow: hidden; background: #05060a; color: #f5f3ff; font: 12px system-ui,sans-serif; }
+    #player-shell { height:100%; display:grid; grid-template-rows:minmax(0,1fr) auto; }
+    #runtime-game { width:100%; min-height:0; display: grid; place-items: center; overflow:hidden; }
+    #touch-controls[hidden] { display:none; }
+    #touch-controls { padding:8px 12px; background:#141321; border-top:1px solid #393247; display:grid; grid-template-columns:132px 1fr 112px; gap:6px; align-items:center; touch-action:none; user-select:none; -webkit-user-select:none; }
+    #touch-controls button { border:1px solid #77639f; background:#2b2141; color:white; border-radius:10px; min-width:40px; min-height:40px; font:700 13px system-ui,sans-serif; touch-action:none; -webkit-tap-highlight-color:transparent; }
+    #touch-controls button[data-pressed="true"] { background:#7340e3; border-color:#c6adff; }
+    .dpad { display:grid; grid-template-columns:40px 40px 40px; grid-template-rows:40px 40px; gap:3px; }
+    .dpad [data-gba-key="64"] { grid-column:2; }
+    .dpad [data-gba-key="32"] { grid-row:2; }
+    .dpad [data-gba-key="128"] { grid-row:2;grid-column:2; }
+    .dpad [data-gba-key="16"] { grid-row:2;grid-column:3; }
+    .system-buttons,.action-buttons { display:flex; justify-content:center; flex-wrap:wrap; gap:6px; }
+    .action-buttons button { width:48px; height:48px; border-radius:50%; }
+    #battery-status { grid-column:1/-1; text-align:center; margin:2px 0; min-height:17px; color:#c9bddf; font-size:11px; }
+    @media(max-width:480px) { #touch-controls { padding:7px; grid-template-columns:126px 1fr 94px; gap:3px; } .action-buttons button { width:42px;height:42px; } .system-buttons { gap:4px; } .system-buttons button { font-size:10px; min-width:36px; padding:2px; } }
     #runtime-game.ejs_parent { width: 100% !important; height: 100% !important; }
     #runtime-game canvas, #runtime-game .ejs_canvas {
       width: 240px;
@@ -18,7 +32,15 @@
   </style>
 </head>
 <body>
+  <div id="player-shell">
   <div id="runtime-game" role="status"></div>
+  <div id="touch-controls" aria-label="Controles do Game Boy Advance" hidden>
+    <div class="dpad"><button type="button" data-gba-key="64" aria-label="Cima">▲</button><button type="button" data-gba-key="32" aria-label="Esquerda">◀</button><button type="button" data-gba-key="128" aria-label="Baixo">▼</button><button type="button" data-gba-key="16" aria-label="Direita">▶</button></div>
+    <div class="system-buttons"><button type="button" data-gba-key="512" aria-label="Botão L">L</button><button type="button" data-gba-key="256" aria-label="Botão R">R</button><button type="button" data-gba-key="4" aria-label="Select">Select</button><button type="button" data-gba-key="8" aria-label="Start">Start</button></div>
+    <div class="action-buttons"><button type="button" data-gba-key="2" aria-label="Botão B">B</button><button type="button" data-gba-key="1" aria-label="Botão A">A</button></div>
+    <p id="battery-status" role="status" aria-live="polite"></p>
+  </div>
+  </div>
   <script type="module">
     const parameters = new URLSearchParams(window.location.search);
     const locale = parameters.get("locale") || "pt-BR";
@@ -33,6 +55,8 @@
     const replayEnabled = parameters.get("replay") === "1";
     const keyboardEnabled = parameters.get("keyboard") === "1";
     const container = document.querySelector("#runtime-game");
+    const touchControls = parameters.get("touch") === "1" ? document.querySelector("#touch-controls") : null;
+    if (touchControls) touchControls.hidden = false;
     container.textContent = messages[0];
     const publishProfilerTelemetry = (stats) => {
       window.gbaStudio?.publishRomPlayerTelemetry?.(stats);
@@ -43,6 +67,13 @@
     } else {
       try {
         const { startMGBAPlayer } = await import("./mgba-direct-player.mjs");
+        const batteryHash = parameters.get("battery");
+        let batteryOptions;
+        if (/^[a-f0-9]{64}$/.test(batteryHash ?? "")) {
+          const { createWebBatteryStore } = await import("./web-battery-storage.mjs");
+          const labels = language === "en-US" ? {ready:"Progress saved by the game stays in this browser.",restored:"Game data restored in this browser.",saving:"Saving…",saved:"Game data saved in this browser.",unavailable:"Browser saving is unavailable. Keep this page open."} : language === "es-ES" ? {ready:"El progreso guardado queda en este navegador.",restored:"Datos del juego restaurados en este navegador.",saving:"Guardando…",saved:"Datos del juego guardados en este navegador.",unavailable:"No se puede guardar en el navegador. Mantén esta página abierta."} : {ready:"O progresso salvo pelo jogo fica neste navegador.",restored:"Dados do jogo restaurados neste navegador.",saving:"Salvando…",saved:"Dados do jogo salvos neste navegador.",unavailable:"Salvamento no navegador indisponível. Mantenha esta página aberta."};
+          batteryOptions = { romSha256: batteryHash, store: createWebBatteryStore({romSha256:batteryHash}), onStatus: status => { document.querySelector("#battery-status").textContent = labels[status]; } };
+        }
         const replay = replayEnabled ? await fetch("./input-replay.json")
           .then((response) => response.ok ? response.json() : null)
           .catch(() => null) : null;
@@ -55,6 +86,8 @@
           storageKey: `gba-studio:${parameters.get("title") || "game"}:state`,
           replay,
           keyboardBindings,
+          batteryOptions,
+          touchControls,
           onFrameStats: publishProfilerTelemetry
         });
       } catch (error) {

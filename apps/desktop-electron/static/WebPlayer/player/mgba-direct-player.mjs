@@ -1,3 +1,6 @@
+import { createBatteryPersistence } from './web-battery-storage.mjs';
+import { createPointerInput, bindTouchControls } from './web-touch-controls.mjs';
+
 const WIDTH = 240;
 const HEIGHT = 160;
 const FRAME_BYTES = WIDTH * HEIGHT * 4;
@@ -100,6 +103,7 @@ export function createKeyboardInputLatch() {
     release(key) {
       held.delete(key);
     },
+    clear() { held.clear(); pendingPresses.clear(); },
     sample(framesToRun) {
       const keys = [...held, ...pendingPresses.keys()].reduce((value, key) => value | key, 0);
       if (framesToRun > 0) {
@@ -721,8 +725,11 @@ function base64ToBytes(value) {
   return Uint8Array.from(text, (character) => character.charCodeAt(0));
 }
 
-function gamepadKeys() {
-  const gamepad = [...navigator.getGamepads?.() ?? []].find(Boolean);
+export function gamepadKeys(navigatorObject = navigator) {
+  let gamepads;
+  try { gamepads = navigatorObject.getGamepads?.() ?? []; }
+  catch { return 0; } // Optional Gamepad access may be denied inside a sandbox.
+  const gamepad = [...gamepads].find(Boolean);
   if (!gamepad) return 0;
   let keys = 0;
   const pressed = (index) => gamepad.buttons[index]?.pressed === true;
@@ -739,7 +746,7 @@ function gamepadKeys() {
   return keys;
 }
 
-export async function startMGBAPlayer({ container, romUrl, storageKey, onFrameStats, replay, keyboardBindings }) {
+export async function startMGBAPlayer({ container, romUrl, storageKey, onFrameStats, replay, keyboardBindings, batteryOptions, touchControls }) {
   if (!(container instanceof HTMLElement)) throw new Error("Container do GBA Studio Player invalido.");
   const keyboardKeys = keyboardKeyMapForBindings(keyboardBindings);
   const [{ default: createMGBA }, response] = await Promise.all([
@@ -803,6 +810,17 @@ export async function startMGBAPlayer({ container, romUrl, storageKey, onFrameSt
     if (!context) throw new Error("Canvas 2D indisponivel.");
     const image = context.createImageData(WIDTH, HEIGHT);
     const keyboardInput = createKeyboardInputLatch();
+    const touchInput = createPointerInput();
+    const battery = batteryOptions ? createBatteryPersistence({
+      ...batteryOptions,
+      copy: () => copyModuleSavedata(module),
+      restore: bytes => restoreModuleSavedata(module, bytes),
+      onStatus: status => { canvas.dataset.save = status; batteryOptions.onStatus?.(status); }
+    }) : null;
+    if (battery) {
+      cleanup.push(() => battery.destroy());
+      await battery.initialize();
+    }
     const replayDriver = replay ? createReplayDriver(replay) : null;
     const AudioContext = window.AudioContext ?? window.webkitAudioContext;
     const audioSampleRate = typeof module._gba_audio_sample_rate === "function"
@@ -931,6 +949,14 @@ export async function startMGBAPlayer({ container, romUrl, storageKey, onFrameSt
     const onKeyDown = (event) => onKey(event, true);
     const onKeyUp = (event) => onKey(event, false);
     const onPointerDown = () => { void ensureAudioRunning(); };
+    if (touchControls) cleanup.push(bindTouchControls({ controls: touchControls, input: touchInput, onInteraction: () => { canvas.focus({ preventScroll: true }); void ensureAudioRunning(); } }));
+    const releaseInputs = () => { keyboardInput.clear(); touchInput.clear(); };
+    const flushBattery = () => { void battery?.flush(); };
+    const onVisibilityChange = () => { if (document.hidden) { releaseInputs(); flushBattery(); } };
+    window.addEventListener('blur', releaseInputs);
+    window.addEventListener('pagehide', flushBattery);
+    document.addEventListener('visibilitychange', onVisibilityChange);
+    cleanup.push(() => { window.removeEventListener('blur', releaseInputs); window.removeEventListener('pagehide', flushBattery); document.removeEventListener('visibilitychange', onVisibilityChange); });
     window.addEventListener("keydown", onKeyDown);
     cleanup.push(() => window.removeEventListener("keydown", onKeyDown));
     window.addEventListener("keyup", onKeyUp);
@@ -959,7 +985,7 @@ export async function startMGBAPlayer({ container, romUrl, storageKey, onFrameSt
       const plan = planEmulationFrames({ accumulatorMs, elapsedMs: elapsedSinceAnimationFrame });
       accumulatorMs = plan.accumulatorMs;
       sampleDroppedFrames += plan.droppedFrames;
-      const manualKeys = keyboardInput.sample(plan.framesToRun) | gamepadKeys();
+      const manualKeys = keyboardInput.sample(plan.framesToRun) | touchInput.sample(plan.framesToRun) | gamepadKeys();
       const inputMasks = inputMasksForEmulatedFrames({
         framesToRun: plan.framesToRun,
         manualKeys,
@@ -978,6 +1004,7 @@ export async function startMGBAPlayer({ container, romUrl, storageKey, onFrameSt
       }
 
       if (plan.framesToRun > 0) {
+        void battery?.flush();
         const source = module.HEAPU8.subarray(module._gba_framebuffer(), module._gba_framebuffer() + FRAME_BYTES);
         image.data.set(source);
         for (let offset = 3; offset < FRAME_BYTES; offset += 4) image.data[offset] = 255;

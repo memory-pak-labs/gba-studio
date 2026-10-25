@@ -1,6 +1,7 @@
 import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
+import { createHash } from "node:crypto";
 import { afterEach, describe, expect, it } from "vitest";
 import { prepareWebProjectExport, ensureWebExportRomSource, resolveWebExportRomSource, writeWebProjectExport } from "./exportWebProject.js";
 import { parseGBAProjectFile } from "../shared/projectFile.js";
@@ -156,6 +157,11 @@ describe("Web project export", () => {
     const copiedRom = path.join(destination, "roms", "web_demo.gba");
     expect(result.files).toContain(copiedRom);
     await expect(readFile(copiedRom, "utf8")).resolves.toBe("gba-rom-bytes");
+    const romSha256 = createHash("sha256").update("gba-rom-bytes").digest("hex");
+    expect(JSON.parse(await readFile(path.join(destination, "manifest.json"), "utf8")).romSha256).toBe(romSha256);
+    expect(await readFile(path.join(destination, "index.html"), "utf8")).toContain(`romSha256: "${romSha256}"`);
+    expect(result.files).toContain(path.join(destination, "player", "web-battery-storage.mjs"));
+    expect(result.files).toContain(path.join(destination, "player", "web-touch-controls.mjs"));
   });
 
   it("auto-discovers a built ROM from the project export folder when no explicit romSourcePath is passed", async () => {
