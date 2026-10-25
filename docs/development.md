@@ -332,6 +332,31 @@ estática. O estado visual é transitório e não altera o formato do checkpoint
 A fonte opaca da HUD usa uma cópia com `metadata.preserveOpaqueColors`, de modo
 que os outros consumidores da fonte aprovada permaneçam iguais.
 
+As extensões aprovadas do exemplo estão registradas em
+`fixtures/asset-provenance/campaign-evolutions-approved.json`. A Galeria das
+Marés é uma sala opcional de 384×256 acessível pelo Farol, com câmera seguindo
+a Nara, caixa e contrapeso, lanterna circular e portão OBJ separado do fundo.
+Os eventos aguardam a abertura lateral antes de liberar a passagem; os postes
+mantêm a colisão. O estado do portão e o registro encontrado sobrevivem ao save.
+Ao carregar uma tentativa incompleta, Nara retorna à entrada segura e a caixa
+volta à origem; o arquivo concluído preserva a posição salva. Novo jogo limpa
+os estados da Galeria e do telescópio.
+O Observatório salva o alinhamento do telescópio; a Tempestade usa nuvens em
+BG3 com parallax e HBlank; a mecânica do Porto participa da equipe no Guardião
+do Relé, com cura do aliado selecionado e defesa própria. Fundo, atores e HUD
+continuam separados. As variáveis novas são anexadas às posições existentes.
+As chaves antes implícitas `z_feature_quest_state` e `z_feature_shop_stock`
+mantêm os slots 49 e 50; os três estados novos ocupam 51 a 53.
+
+O comando `lantern player 120 120 58 3600 circle` ativa a opção circular;
+largura e altura devem ser iguais. Sem `circle`, a janela retangular conserva
+o comportamento anterior. O círculo usa WIN1 e DMA0; fades, máscaras e efeitos
+raster conflitantes têm prioridade. Os smokes `smoke-lost-signal-mission.mjs`
+e `smoke-lost-signal-play.mjs`, com `--evolutions=mission`, percorrem a Galeria
+e a missão completa e reiniciam a ROM para carregar saves parciais e completos.
+Os modos `--evolutions=storm` e `--evolutions=relay` verificam as duas ondas e
+a batalha de apoio separadamente.
+
 A abertura ilustrada possui uma regressão de pixels e tempo. Exporte uma ROM
 do exemplo com o início de desenvolvimento em `abertura`, preservando o início
 canônico em `logo`, e execute em `apps/desktop-electron`:

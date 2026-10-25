@@ -53,9 +53,11 @@ export function promoteApprovedFarolInterior(source) {
    if(step.command.startsWith('change_player_sprite '))step.command='change_player_sprite '+manifest.preservedActors.player;
    if(step.command.startsWith('set_actor_animation Player '))step.command='set_actor_animation Player idle_up';
   }
-  for(const step of event.steps??[])if(step.command.startsWith('change_scene farol_interior '))step.command=`change_scene farol_interior ${playerStart.x} ${playerStart.y} up`;
+  // The optional archive returns beside its own stairs, not at the main door.
+  if(event.name!=='gallery_leave')for(const step of event.steps??[])if(step.command.startsWith('change_scene farol_interior '))step.command=`change_scene farol_interior ${playerStart.x} ${playerStart.y} up`;
  }
  for(const c of p.editorState?.scenaConnections??[]){
+  if(c.from==='galeria_das_mares'||c.to==='galeria_das_mares')continue;
   if(c.to===name)Object.assign(c.entry,playerStart);
   if(c.from===name)c.exit={...exitTrigger};
  }

@@ -2072,13 +2072,13 @@
           "path": "Assets/backgrounds/gallery-tides.png",
           "sha256": "5e22120456aa99e79e2d5604541bdbefdf734f861da9c7d10a20b5ce2483df6c",
           "contract": "campaign-evolutions-user-approved-2026-10-24",
-          "provenance": "fixtures/asset-provenance/gallery-v21-approved.json"
+          "provenance": "fixtures/asset-provenance/campaign-evolutions-approved.json"
         },
         {
           "path": "Assets/sprites/gallery-gate.png",
           "sha256": "bf7e7f9d8dc3ea72e28f37d83fb44b6e34aaf2fe7b6555ec107edabac9324e50",
           "contract": "campaign-evolutions-user-approved-2026-10-24",
-          "provenance": "fixtures/asset-provenance/gallery-v21-approved.json"
+          "provenance": "fixtures/asset-provenance/campaign-evolutions-approved.json"
         },
         {
           "path": "Assets/backgrounds/tide-room.png",
@@ -2103,6 +2103,24 @@
           "sha256": "896908afbd3f08a1069e0c26c2e6cc26ffeb426183ccbeefa29378da50453ec2",
           "contract": "tide-annex-v13-user-approved-2026-10-25",
           "provenance": "fixtures/asset-provenance/tide-annex-approved.json"
+        },
+        {
+          "path": "Assets/sprites/relay-mechanic.png",
+          "sha256": "d3ddfc20e3c9f7bc5155eecbe7582dfe47305154175bd3682cdc1205c84dff4c",
+          "contract": "campaign-evolutions-user-approved-2026-10-24",
+          "provenance": "fixtures/asset-provenance/campaign-evolutions-approved.json"
+        },
+        {
+          "path": "Assets/sprites/telescope-dial.png",
+          "sha256": "6a9b3f30d0734c3a3d2bbbf8a5a02a5609661bc70dab563985c97f5c9af7fbc3",
+          "contract": "campaign-evolutions-user-approved-2026-10-24",
+          "provenance": "fixtures/asset-provenance/campaign-evolutions-approved.json"
+        },
+        {
+          "path": "Assets/backgrounds/storm-clouds.png",
+          "sha256": "fe9223b9ee2471f11a8404d567029059bffde66370d33c6dac9800489ac0ac82",
+          "contract": "campaign-evolutions-user-approved-2026-10-24",
+          "provenance": "fixtures/asset-provenance/campaign-evolutions-approved.json"
         }
       ],
       "retired": [

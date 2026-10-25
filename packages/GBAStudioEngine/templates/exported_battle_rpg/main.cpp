@@ -132,16 +132,28 @@ void present_battle_action(bool enemy, int actor, int target, gbs::BattleRpgAbil
         if(victim.animation_set)gbs::play_battle_rpg_pose(hit,victim.animation_set->hurt);
     }
     if(!e.presentation)return;
-    const int cue=kind==gbs::BattleRpgAbilityKind::Defend?5:kind==gbs::BattleRpgAbilityKind::Magic?3:2;
+    const bool support=kind==gbs::BattleRpgAbilityKind::Heal || kind==gbs::BattleRpgAbilityKind::Defend;
+    const int cue=support?5:kind==gbs::BattleRpgAbilityKind::Magic?3:2;
     battle_sound(cue);
     if(offensive)hurt_sound_delay=6;
-    const int fx=kind==gbs::BattleRpgAbilityKind::Defend?2:kind==gbs::BattleRpgAbilityKind::Magic?1:enemy?3:0;
+    const int fx=support?2:kind==gbs::BattleRpgAbilityKind::Magic?1:enemy?3:0;
     if(e.presentation->effects[fx])gbs::play_sprite_animation(effect_animator,*e.presentation->effects[fx]);
     effect_position=kind==gbs::BattleRpgAbilityKind::Defend?gbs::Vec2i{166,81}:enemy?gbs::Vec2i{54,84}:kind==gbs::BattleRpgAbilityKind::Magic?gbs::Vec2i{182,82}:gbs::Vec2i{180,86};
+    if(kind==gbs::BattleRpgAbilityKind::Heal || (!enemy && kind==gbs::BattleRpgAbilityKind::Defend)) {
+        const int recipient=kind==gbs::BattleRpgAbilityKind::Heal?target:actor;
+        const int count=enemy?e.enemy_count:e.party_count;
+        if(recipient>=0 && recipient<count) {
+            const auto& unit=enemy?e.enemies[recipient]:e.party[recipient];
+            const auto position=unit.use_authored_position?unit.position:
+                (enemy?gbs::Vec2i{176,24+recipient*28}:gbs::Vec2i{48,32+recipient*40});
+            effect_position={position.x,position.y-(unit.use_authored_position?28:0)};
+        }
+    }
 }
 bool use_presented_battle_ability(const gbs::BattleRpgEncounterData& e) {
-    const int actor=state.selected_party, target=state.selected_enemy;
+    const int actor=state.selected_party;
     const auto kind=e.party[actor].abilities[state.selected_ability].kind;
+    const int target=kind==gbs::BattleRpgAbilityKind::Heal?state.selected_ally:state.selected_enemy;
     const bool used=gbs::use_selected_battle_ability(state,e);
     if(used)present_battle_action(false,actor,target,kind);
     return used;
@@ -569,7 +581,9 @@ void update_battle_hud() {
         }
         else if(state.outcome==gbs::BattleRpgOutcome::Defeat){first="GRUPO CAIU";second="TENTE NOVAMENTE";}
         else if(battle_menu_page==BattleMenuPage::Notice){
-            first=battle_menu_wait_for_enemy_turn?"ACAO EXECUTADA":"SEM ALTERACAO";second=battle_menu_wait_for_enemy_turn?"AGUARDE":"";
+            const bool action_succeeded = battle_menu_wait_for_enemy_turn ||
+                (battle_menu_notice_line.text != nullptr && std::strcmp(battle_menu_notice_line.text, "ACAO EXECUTADA.") == 0);
+            first=action_succeeded?"ACAO EXECUTADA":"SEM ALTERACAO";second=battle_menu_wait_for_enemy_turn?"AGUARDE":"";
             if(battle_menu_parent_choice==3)first="FUGA BLOQUEADA";
             if(battle_menu_parent_choice==2)first="SEM ITENS";
             if(battle_menu_parent_choice==1)first="EQUIPE PRONTA";

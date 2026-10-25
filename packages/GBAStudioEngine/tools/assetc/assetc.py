@@ -10833,7 +10833,7 @@ def emit_point_click_props(output, scene, scene_index, asset_report, base_dir=No
             prop.get("visible_variable", prop.get("visible_variable_index", -1)),
             f"{description}.visible_variable",
             -1,
-            15,
+            63,
         )
         visible_value = require_int(
             prop.get("visible_value", prop.get("visible_variable_value", 1)),

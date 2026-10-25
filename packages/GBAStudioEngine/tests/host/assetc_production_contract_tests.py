@@ -1190,6 +1190,22 @@ def test_point_click_emits_layered_backgrounds_and_props():
     assert "gbs::Vec2i { 112, 96 }, 3, 1" in header
 
 
+def test_point_click_prop_accepts_the_last_native_event_variable():
+    assetc = load_assetc_module()
+    project = {"scenes": [{"name": "archive", "background": -1, "props": [{
+        "name": "dial", "metasprite": {"asset": "dial", "index": 0},
+        "position": {"x": 48, "y": 64}, "visible_variable": 63, "visible_value": 2,
+    }]}]}
+    header = assetc.emit_point_click_project_data_header(project, sprite_asset_report("dial"))
+    assert "gbs::Vec2i { 48, 64 }, 63, 2" in header
+    project["scenes"][0]["props"][0]["visible_variable"] = 64
+    try:
+        assetc.emit_point_click_project_data_header(project, sprite_asset_report("dial"))
+    except SystemExit:
+        return
+    raise AssertionError("variable 64 must remain outside the native 64-slot save")
+
+
 
 def test_point_click_prop_preserves_the_authored_initial_animation():
     assetc = load_assetc_module()

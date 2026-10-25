@@ -2017,6 +2017,7 @@ hud-racing-test: $(HOST_BUILD)/hud_racing_tests
 	python3 tests/host/hud_behavior_export_tests.py
 $(HOST_BUILD)/hud_racing_tests: tests/host/hud_racing_tests.cpp engine/include/gbs/hud_racing.hpp
 	@mkdir -p $(@D)
+	python3 tests/host/battle_rpg_support_presentation_tests.py
 	$(HOST_CXX) $(HOST_CXXFLAGS) $< -o $@
 
 .PHONY: racing-perspective-test

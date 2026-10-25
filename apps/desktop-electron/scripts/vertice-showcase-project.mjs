@@ -1,7 +1,7 @@
+import {preserveApprovedCampaignEvolutions} from './campaign-evolutions-approved.mjs';
 import {integrateApprovedPlayerWalk} from './topdown-player-walk-project.mjs';
 import {refineExampleTopdownMovement} from './topdown-movement-project.mjs';
 import {preserveTideAnnex} from './tide-annex-project.mjs';
-import {preserveApprovedGallery} from './gallery-approved-project.mjs';
 import { materializeExampleAuthoring } from "./example-authoring-library.mjs";
 import { promoteApprovedCouncilV13 } from "./council-v13-promotion.mjs";
 import { promoteLostSignalMission } from './lost-signal-mission.mjs';
@@ -9017,7 +9017,7 @@ function buildExemploGBAVerticeCampaign(data) {
 }
 
 export function promoteExemploGBAVerticeCampaign(data) {
-  return integrateApprovedPlayerWalk(refineExampleTopdownMovement(preserveTideAnnex(data, preserveApprovedGallery(data, promoteFarolRelay(pruneUnusedExampleAssets(promoteApprovedCouncilV13(promoteShowcaseSystems(promoteLostSignalMission(materializeExampleAuthoring(buildExemploGBAVerticeCampaign(data)))))))))));
+  return integrateApprovedPlayerWalk(refineExampleTopdownMovement(preserveTideAnnex(data, preserveApprovedCampaignEvolutions(data, promoteFarolRelay(pruneUnusedExampleAssets(promoteApprovedCouncilV13(promoteShowcaseSystems(promoteLostSignalMission(materializeExampleAuthoring(buildExemploGBAVerticeCampaign(data)))))))))));
 }
 
 const invokedPath = process.argv[1] ? fileURLToPath(import.meta.url) === process.argv[1] : false;

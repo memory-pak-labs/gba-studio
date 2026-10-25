@@ -3926,10 +3926,8 @@ function buildEventValueRegistries(
     }
   }
 
-  // Point-and-click prop visibility is encoded by the native assetc contract
-  // in a 4-bit field, so every variable referenced by visible_variable must
-  // occupy one of the first sixteen runtime slots. Keep the mapping
-  // deterministic while reserving those slots for the visual-state keys.
+  // Props use the same EventState variables as scripts and saves. Preserve
+  // declared slot order; a visual reference must not rearrange persisted data.
   const declaredKeys = Array.from(new Set(declaredVariableKeys.map((key) => key.trim()).filter(Boolean)));
   const declaredKeySet = new Set(declaredKeys);
   const orderedVariableKeys = [
@@ -3942,8 +3940,8 @@ function buildEventValueRegistries(
   const variableIndexByKey = new Map(orderedVariableKeys.map((key, index) => [key, index] as const));
   for (const key of visibleVariableKeys) {
     const index = variableIndexByKey.get(key);
-    if (index === undefined || index > 15) {
-      throw new Error(`Variavel visual de point-and-click fora dos 16 slots nativos: ${key}.`);
+    if (index === undefined || index >= EVENT_VARIABLE_CAPACITY) {
+      throw new Error(`Variavel visual de point-and-click fora dos ${EVENT_VARIABLE_CAPACITY} slots nativos: ${key}.`);
     }
   }
   const itemIndexByKey = new Map([...itemKeys].sort().map((key, index) => [key, index] as const));
