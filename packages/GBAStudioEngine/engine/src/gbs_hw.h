@@ -40,6 +40,7 @@ void gbs_hw_set_bg_screen_base(int layer, uint16_t screen_base);
 void gbs_hw_load_bg_tiles_at_character_base(const uint8_t* data, uint32_t destination_tile, uint32_t tile_count, uint16_t character_base);
 void gbs_hw_set_bg_enabled(int layer, int enabled);
 void gbs_hw_hide_all_sprites(void);
+void gbs_hw_hide_world_sprites(void);
 void gbs_hw_hide_sprites(int first, int count);
 void gbs_hw_set_sprite(int index, int x, int y, uint16_t tile_index, uint16_t palette, int hflip, int vflip, int visible, uint16_t priority, uint16_t mode, int mosaic, uint16_t shape, uint16_t size);
 void gbs_hw_set_sprite_color_depth(int index, int eight_bpp);
@@ -69,6 +70,9 @@ void gbs_hw_configure_hud_box_skin(const uint8_t* tiles, const uint16_t* palette
 void gbs_hw_configure_hud_box(int x, int y, int width, int height);
 void gbs_hw_invalidate_hud_layout(void);
 void gbs_hw_begin_hud_layout(int visible);
+int gbs_hw_hud_layout_retained(void);
+void gbs_hw_clear_hud_background_rect(int x, int y, int width, int height);
+void gbs_hw_refresh_hud_text_palette(int color);
 void gbs_hw_set_hud_font(const uint8_t* tiles, int color);
 void gbs_hw_set_hud_font_shadow(int color);
 void gbs_hw_draw_hud_layout_component(int kind, int x, int y, int width, int height, const char* text, int text_slot, const void* metasprite, int visible);

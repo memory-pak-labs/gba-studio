@@ -8,6 +8,7 @@ source = (root / 'engine/src/gbs_hw.c').read_text()
 start = source.index('void gbs_hw_draw_hud_layout_component(')
 helper = source[start:source.index('\nvoid gbs_hw_end_hud_layout(', start)]
 code = '''#include <assert.h>
+static unsigned char hud_layout_object_only;
 enum { GBS_HW_HUD_COMPONENT_FRAME, GBS_HW_HUD_COMPONENT_BAR, GBS_HW_HUD_COMPONENT_ICON, GBS_HW_HUD_COMPONENT_TEXT, GBS_HW_HUD_COMPONENT_COMPACT_TEXT, GBS_HW_HUD_COMPONENT_FOREGROUND_BAR, GBS_HW_HUD_COMPONENT_SPACED_TEXT };
 int clears, fills, icons, text_calls, compact_calls, spaced_calls, image_priority;
 int gbs_hw_draw_hud_icon(const void* image,int x,int y,int visible,int behind) {

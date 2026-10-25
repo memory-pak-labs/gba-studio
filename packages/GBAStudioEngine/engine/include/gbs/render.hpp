@@ -563,6 +563,8 @@ bool set_affine_bg_transform_at_frame(
 );
 void set_metasprite(int first_index, const MetaSprite& metasprite, Vec2i position);
 void hide_all_sprites();
+// Start a world frame while preserving the active HUD's reserved OBJ slots.
+void hide_world_sprites();
 void hide_sprites(int first_index, int count);
 bool set_hblank_bg_scroll(BackgroundLayer layer, const int16_t* offsets, size_t count);
 bool set_hblank_affine_raster(

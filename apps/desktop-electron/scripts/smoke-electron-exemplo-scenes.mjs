@@ -5355,6 +5355,38 @@ async function runPlatformerInputExercise(cdp, sceneName, faceButtons) {
   };
   const readAndRecord = async (label) => record(label, await readRuntimeState());
 
+  // Observe the action while the keys are held. A fixed wall-clock wait can
+  // miss the collision or jump and sample a later fall/respawn at full cadence.
+  const holdUntil = async (held, reached, label, maxFrames) => {
+    const before = await readRuntimeState();
+    const deadline = Date.now() + 5_000;
+    try {
+      for (const button of held) await cdp.send("Input.dispatchKeyEvent", {
+        type: "keyDown", code: button.code, key: button.key,
+        windowsVirtualKeyCode: button.windowsVirtualKeyCode, autoRepeat: false,
+        nativeVirtualKeyCode: button.windowsVirtualKeyCode
+      });
+      const signal = await evaluate(cdp, "window.GBAStudioDirectPlayer?.canvas?.dataset.input ?? null");
+      if (signal !== "keyboard-down") throw new Error(`Player não recebeu ${label}.`);
+      for (let sample = 0; Date.now() < deadline; ++sample) {
+        await wait(25);
+        const state = await readAndRecord(`${label}_${sample}`);
+        if (state?.runtimeKind !== before?.runtimeKind || state?.currentRoom !== before?.currentRoom) {
+          throw new Error(`O input ${label} trocou de cena: ${JSON.stringify(state)}.`);
+        }
+        if (reached(state)) return state;
+        if (Number(state?.frame) - Number(before?.frame) >= maxFrames) break;
+      }
+      throw new Error(`O input ${label} não atingiu o estado esperado: ${JSON.stringify(trace.slice(-12))}.`);
+    } finally {
+      for (const button of [...held].reverse()) await cdp.send("Input.dispatchKeyEvent", {
+        type: "keyUp", code: button.code, key: button.key,
+        windowsVirtualKeyCode: button.windowsVirtualKeyCode,
+        nativeVirtualKeyCode: button.windowsVirtualKeyCode
+      });
+    }
+  };
+
   await wait(500);
   const initial = await readAndRecord("initial");
   if (Number(initial?.runtimeKind) !== runtimeKindByName.platformer || Number(initial?.currentRoom) !== 0) {
@@ -5382,34 +5414,25 @@ async function runPlatformerInputExercise(cdp, sceneName, faceButtons) {
 
   let current = landedAfterJump;
   const walkOrigin = current;
-  for (let step = 0; step < 2; step += 1) {
-    const before = current;
-    await pressPlayerButton(cdp, buttons.right.code, buttons.right.key, buttons.right.windowsVirtualKeyCode, 320);
-    current = await readAndRecord(`walk_right_${step + 1}`);
-    if (Number(current?.player?.x) <= Number(before?.player?.x)) {
-      throw new Error(`A movimentação horizontal não avançou na plataforma: ${JSON.stringify({ before: before?.player, after: current?.player, collision: current?.collision, trace: trace.slice(-10) })}.`);
-    }
+  // The authored wide bridge uses slopes and a one-way deck. Exercise that
+  // crossing before the crab, rather than requiring an obsolete vertical wall.
+  current = await holdUntil([buttons.right], (state) =>
+    Number(state?.player?.x) >= Number(walkOrigin?.player?.x) + 64, "walk_right", 120);
+  if (Number(current?.player?.x) <= Number(walkOrigin?.player?.x)) {
+    throw new Error(`A movimentação horizontal não avançou na plataforma: ${JSON.stringify(trace)}.`);
   }
-  if ((Number(current?.collision?.blockedDirectionBits) & 1) === 0) {
-    throw new Error(`A primeira barreira dos Penedos não registrou bloqueio à direita: ${JSON.stringify(current?.collision)}.`);
-  }
-
   const platformJumpOrigin = current;
-  await pressPlayerButton(cdp, buttons.a.code, buttons.a.key, buttons.a.windowsVirtualKeyCode, 80);
-  await holdPlayerButtons(cdp, [buttons.right, buttons.a], 700);
-  const platformJump = await readAndRecord("upper_platform_jump");
-  let jumpMovement = platformJump;
-  for (let sample = 0; sample < 8; sample += 1) {
-    await wait(80);
-    jumpMovement = await readAndRecord(`upper_platform_sample_${sample + 1}`);
-  }
+  const jumpMovement = await holdUntil([buttons.right, buttons.a], (state) =>
+    Number(state?.player?.y) < Number(platformJumpOrigin?.player?.y) - 8 &&
+    Number(state?.player?.x) > Number(platformJumpOrigin?.player?.x) + 2,
+  "bridge_jump", 90);
   if (Number(jumpMovement?.player?.y) >= Number(platformJumpOrigin?.player?.y) - 1) {
-    throw new Error(`O salto em direção à plataforma superior não alterou a altura do jogador: ${JSON.stringify({ origin: platformJumpOrigin?.player, observed: jumpMovement?.player, collision: jumpMovement?.collision, trace: trace.slice(-14) })}.`);
+    throw new Error(`O salto na ponte não alterou a altura do jogador: ${JSON.stringify({ origin: platformJumpOrigin?.player, observed: jumpMovement?.player, collision: jumpMovement?.collision, trace: trace.slice(-14) })}.`);
   }
 
   const returnOrigin = jumpMovement;
-  await pressPlayerButton(cdp, buttons.left.code, buttons.left.key, buttons.left.windowsVirtualKeyCode, 640);
-  const returnLeft = await readAndRecord("return_left");
+  const returnLeft = await holdUntil([buttons.left], (state) =>
+    Number(state?.player?.x) < Number(returnOrigin?.player?.x) - 8, "return_left", 90);
   if (Number(returnLeft?.player?.x) >= Number(returnOrigin?.player?.x)) {
     throw new Error(`O retorno para a esquerda não moveu o jogador: ${JSON.stringify({ origin: returnOrigin?.player, observed: returnLeft?.player, collision: returnLeft?.collision })}.`);
   }
@@ -5417,7 +5440,7 @@ async function runPlatformerInputExercise(cdp, sceneName, faceButtons) {
   return {
     ok: true,
     scene: sceneName,
-    route: ["jump", "walk_right", "upper_platform_jump", "return_left"],
+    route: ["jump", "walk_right", "bridge_jump", "return_left"],
     initial,
     jump: { originY: jumpOriginY, apex: jumpApex?.player, landed: landedAfterJump?.player },
     walkRight: { origin: walkOrigin?.player, final: current?.player },
@@ -5724,6 +5747,15 @@ async function main() {
         playerEvidence = await waitForIsometricCameraRest(playerCdp, playerEvidence);
       }
       playerEvidence = { ...playerEvidence, audio: playbackAudio };
+      let platformerCadence = null;
+      if (scene.name === "penedos_vento") {
+        const roms = activeBuildRomPaths(await filesNamed(dirname(exported.path), "exemplo.gba"));
+        if (roms.length !== 1) throw new Error(`ROM canônica ambígua para medir plataforma: ${JSON.stringify(roms)}`);
+        const { stdout } = await execFileAsync(process.execPath, [
+          join(appRoot, "scripts", "smoke-platformer-cadence.mjs"), roms[0]
+        ], { timeout: 30_000, maxBuffer: 1024 * 1024 });
+        platformerCadence = JSON.parse(stdout.trim());
+      }
       let isometricCadence = null;
       if (scene.name === "mercado_suspenso") {
         const roms = activeBuildRomPaths(await filesNamed(dirname(exported.path), "exemplo.gba"));
@@ -6287,6 +6319,7 @@ async function main() {
         isometricCadence,
         isometricTacticalInput,
         platformerInput,
+        platformerCadence,
         pointClickInput,
         colorFidelity,
         cutscenePortraits,

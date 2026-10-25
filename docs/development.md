@@ -150,6 +150,20 @@ marcador não entram na janela, mesmo quando chegam atrasadas ao editor. Um
 contador abaixo do frame observado, ou um reinício dentro da janela, reprova
 o teste; amostras lentas posteriores ao marcador continuam na medição.
 
+Em Penedos do Vento, o smoke também executa `smoke-platformer-cadence.mjs`
+na ROM mista exportada. O contador de vídeo do mGBA é comparado ao contador
+de gameplay em repouso, caminhada nos dois sentidos e salto. Cada janela deve
+sustentar pelo menos 55 atualizações por segundo, sem trocar de cena ou reiniciar
+o contador. Os FPS de apresentação do Player, sozinhos, não comprovam essa
+cadência: o emulador pode apresentar quadros repetidos enquanto a ROM está lenta.
+
+A plataforma preserva os OBJ reservados de uma HUD composta por imagens e
+contadores quando os valores e a visibilidade continuam iguais. Troca de cena,
+fonte ou tiles invalida essa reutilização; HUDs com BG ou comportamentos dinâmicos
+seguem o desenho completo. As consultas frequentes de colisão executam em ARM na
+IWRAM, enquanto a memória de comportamento dos componentes fica na EWRAM. O
+relatório pós-link e a reserva de pilhas verificam o espaço estático resultante.
+
 ## Motor
 
 Os testes host precisam de C++17, make e Python 3. São independentes de ROM e de

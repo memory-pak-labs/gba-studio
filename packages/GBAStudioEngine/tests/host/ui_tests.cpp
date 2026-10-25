@@ -31,6 +31,9 @@ int last_hud_layout_component_visible = 0;
 const char* last_hud_layout_text = nullptr;
 const gbs::MetaSprite* last_hud_layout_metasprite = nullptr;
 int hud_tile_upload_calls = 0;
+bool hardware_hud_retained = false;
+int foreground_clear_calls = 0;
+int retained_palette_refreshes = 0;
 
 }
 
@@ -74,6 +77,9 @@ extern "C" void gbs_hw_draw_hud_layout_component(
 extern "C" void gbs_hw_end_hud_layout(void) {
     ++hud_layout_end_calls;
 }
+extern "C" int gbs_hw_hud_layout_retained(void) { return hardware_hud_retained; }
+extern "C" void gbs_hw_clear_hud_background_rect(int,int,int,int) { ++foreground_clear_calls; }
+extern "C" void gbs_hw_refresh_hud_text_palette(int) { ++retained_palette_refreshes; }
 
 extern "C" void gbs_hw_invalidate_hud_layout(void) {
 }
@@ -518,7 +524,52 @@ void test_four_independent_fight_gauges() {
     gbs::draw_hud(hud); assert(hud_tile_upload_calls==5);
 }
 
+void test_object_hud_retains_static_frames_and_refreshes_live_values() {
+    const gbs::MetaSpritePart part {0,0,0,0,false,false,8,8};
+    const gbs::MetaSprite image {&part,1};
+    gbs::HudLayoutComponent components[] = {
+        {"frame","frame","","","",16,6,40,16,0,true,&image},
+        {"life","bar","","","",22,10,32,16,1,true,&image},
+        {"coins","text","","00","",204,10,12,8,1,true}
+    };
+    components[2].text_advance=6; components[2].value_variable=2;
+    gbs::HudLayout layout {"object-hud","advanced",components,3};
+    gbs::configure_hud_layouts(&layout,1); assert(gbs::configure_hud_layout(layout.id));
+    gbs::HudState hud{}; gbs::init_hud(hud); gbs::set_hud_text(hud,"","");
+    gbs::EventState events{}; events.variables[2]=8;
+    gbs::update_hud_behavior(events,true); gbs::draw_hud(hud);
+    const int drawn=hud_layout_component_calls;
+    const int palettes=retained_palette_refreshes;
+    const int cleared=foreground_clear_calls;
+    assert(std::strcmp(last_hud_layout_text,"08")==0);
+    hardware_hud_retained=true;
+    gbs::update_hud_behavior(events,true); gbs::draw_hud(hud);
+    assert(hud_layout_component_calls==drawn);
+    assert(retained_palette_refreshes==palettes+1);
+    assert(foreground_clear_calls==cleared+1);
+    events.variables[2]=9;
+    gbs::update_hud_behavior(events,true); gbs::draw_hud(hud);
+    assert(hud_layout_component_calls==drawn+3 && std::strcmp(last_hud_layout_text,"09")==0);
+    hardware_hud_retained=false; // Full sprite clearing or a tile/font upload.
+    gbs::draw_hud(hud); assert(hud_layout_component_calls==drawn+6);
+    hardware_hud_retained=true;
+    hud.visible=false; gbs::draw_hud(hud);
+    assert(hud_layout_component_calls==drawn+9 && !last_hud_layout_component_visible);
+    hud.visible=true; gbs::draw_hud(hud);
+    assert(hud_layout_component_calls==drawn+12 && last_hud_layout_component_visible);
+    assert(gbs::configure_hud_layout(layout.id));
+    gbs::draw_hud(hud); assert(hud_layout_component_calls==drawn+15);
+    // BG-backed layouts continue to redraw, since dialogue can repaint their cells.
+    components[0].metasprite=nullptr;
+    assert(gbs::configure_hud_layout(layout.id));
+    const int fallback=hud_layout_component_calls;
+    gbs::draw_hud(hud); gbs::draw_hud(hud);
+    assert(hud_layout_component_calls==fallback+6);
+    hardware_hud_retained=false;
+}
+
 int main() {
+    test_object_hud_retains_static_frames_and_refreshes_live_values();
     test_four_independent_fight_gauges();
     test_hud_project_values_refresh_and_clear_on_scene_change();
     test_hud_gauge_updates_only_when_value_or_layout_changes();

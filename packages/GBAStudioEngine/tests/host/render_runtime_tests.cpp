@@ -676,6 +676,7 @@ extern "C" {
 void gbs_hw_demo_tiles(void) {}
 void gbs_hw_restore_ui_assets(void) {}
 void gbs_hw_hide_all_sprites(void) {}
+void gbs_hw_hide_world_sprites(void) {}
 void gbs_hw_hide_sprites(int, int) {}
 void gbs_hw_draw_text_at(int, int, int, const char*) {}
 void gbs_hw_draw_text_overlay(int, int, int, const char*, int) {}
@@ -812,9 +813,10 @@ void gbs_hw_draw_room_to_bg(int layer, const uint8_t*, int, int, int, int) {
     last_room_draw_layer = layer;
 }
 
-void gbs_hw_draw_room16_to_bg(int layer, const uint16_t*, int, int, int, int) {
+void gbs_hw_draw_room16_to_bg(int layer, const uint16_t* source, int width, int height, int x, int y) {
     ++room_draw_calls;
     last_room_draw_layer = layer;
+    gbs_stage_room_tilemap16(captured_tilemaps[layer],source,width,height,x,y);
 }
 
 void gbs_hw_set_bg_mosaic(int layer, int enabled) {
@@ -932,6 +934,21 @@ static void test_room_edits_stage_independent_layers_and_refresh_without_camera_
 }
 
 int main() {
+    {
+        const uint16_t tiles[] {0x1801,0x2C02,3,4};
+        gbs::RoomTileEdits edits {};
+        gbs::RoomTilemapCache cache {};
+        const int draws=room_draw_calls;
+        gbs::draw_room_to_bg_cached(gbs::BackgroundLayer::BG2,tiles,4,1,0,0,cache,edits);
+        assert(room_draw_calls==draws+1); // No intermediate copy without an edited tile.
+        assert(captured_tilemaps[2][1]==0x2C02);
+        assert(gbs::set_room_tile_edit(edits,2,1,0,4,1,99));
+        gbs::draw_room_to_bg_cached(gbs::BackgroundLayer::BG2,tiles,4,1,0,0,cache,edits);
+        assert(captured_tilemaps[2][1]==99);
+        edits={};
+        gbs::draw_room_to_bg_cached(gbs::BackgroundLayer::BG2,tiles,4,1,0,0,cache,edits);
+        assert(captured_tilemaps[2][1]==0x2C02); // Clearing edits restores the source without camera motion.
+    }
     test_room_edits_stage_independent_layers_and_refresh_without_camera_motion();
     test_room_tilemap_rows_preserve_edges_and_full_entries();
     test_room_tilemap_cache_preserves_scroll_and_invalidates_sources();

@@ -1,5 +1,11 @@
 #include "gbs/topdown.hpp"
 
+#if defined(__arm__) || defined(__thumb__)
+#define GBS_TILE_COLLISION_HOT __attribute__((section(".iwram"), target("arm"), optimize("O2"), noinline, long_call))
+#else
+#define GBS_TILE_COLLISION_HOT
+#endif
+
 namespace {
 
 constexpr uint8_t max_path_nodes = 64;
@@ -303,17 +309,19 @@ gbs::Rect effective_camera_bounds(const gbs::Camera& camera, int room_width_pixe
 
 namespace gbs {
 
-uint8_t tile_flags_at(const TileMap& map, int tile_x, int tile_y) {
+GBS_TILE_COLLISION_HOT uint8_t tile_flags_at(const TileMap& map, int tile_x, int tile_y) {
     if (map.flags == nullptr || tile_x < 0 || tile_y < 0 || tile_x >= map.width || tile_y >= map.height) {
         return TileSolid;
     }
-    const auto* edit = map.edits != nullptr ? find_room_tile_edit(*map.edits, 2, tile_x, tile_y) : nullptr;
+    const auto* edit = map.edits != nullptr && map.edits->count != 0
+        ? find_room_tile_edit(*map.edits, 2, tile_x, tile_y) : nullptr;
     return edit != nullptr && edit->collision_flags >= 0
         ? static_cast<uint8_t>(edit->collision_flags) : map.flags[tile_y * map.width + tile_x];
 }
 
-TileSlope tile_slope_at(const TileMap& map, int tile_x, int tile_y) {
-    const auto* edit = map.edits != nullptr ? find_room_tile_edit(*map.edits, 2, tile_x, tile_y) : nullptr;
+GBS_TILE_COLLISION_HOT TileSlope tile_slope_at(const TileMap& map, int tile_x, int tile_y) {
+    const auto* edit = map.edits != nullptr && map.edits->count != 0
+        ? find_room_tile_edit(*map.edits, 2, tile_x, tile_y) : nullptr;
     if (edit != nullptr && edit->collision_flags >= 0) return TileSlope::None;
     if (map.slopes == nullptr || tile_x < 0 || tile_y < 0 || tile_x >= map.width || tile_y >= map.height) {
         return TileSlope::None;

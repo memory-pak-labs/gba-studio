@@ -74,6 +74,9 @@ static uint8_t shadow_oam_dirty_last;
 static uint32_t oam_overflow_count;
 static uint8_t hud_icon_obj_count;
 static uint8_t hud_compact_obj_count;
+static uint8_t hud_layout_objects_retained;
+static uint8_t hud_layout_pixels_valid;
+static uint8_t hud_layout_object_only;
 static int hud_icon_obj_write;
 static uint16_t shadow_bg_tilemaps[4][32 * 32] __attribute__((section(".ewram_bss")));
 static uint8_t shadow_bg_tilemap_pending_mask;
@@ -678,6 +681,7 @@ static unsigned hud_pixel_text_obj_count = 0;
 static uint16_t hud_pixel_text_glyphs[1024 - DYNAMIC_TEXT_OBJ_TILE_BASE];
 
 static void invalidate_hud_pixel_text_tiles(void) {
+    hud_layout_pixels_valid=0;
     for (unsigned i = 0; i < 1024 - DYNAMIC_TEXT_OBJ_TILE_BASE; ++i)
         hud_pixel_text_glyphs[i] = 0xFFFFu;
 }
@@ -885,7 +889,10 @@ static unsigned dialogue_bg_tile_for_codepoint(uint32_t codepoint) {
 static unsigned dialogue_obj_tile_for_codepoint(uint32_t codepoint, unsigned slot) {
     const unsigned glyph = gbs_text_glyph_index(codepoint);
     const unsigned tile = DYNAMIC_TEXT_OBJ_TILE_BASE + slot;
-    if (slot < 1024 - DYNAMIC_TEXT_OBJ_TILE_BASE) hud_pixel_text_glyphs[slot] = 0xFFFFu;
+    if (slot < 1024 - DYNAMIC_TEXT_OBJ_TILE_BASE) {
+        hud_pixel_text_glyphs[slot] = 0xFFFFu;
+        hud_layout_pixels_valid=0;
+    }
     if (configured_dialogue_font_tiles == 0) {
         write_obj_glyph_tile(tile, gbs_font_rows[glyph]);
     } else {
@@ -1389,9 +1396,20 @@ void gbs_hw_hide_sprites(int first, int count) {
 }
 
 void gbs_hw_hide_all_sprites(void) {
+    hud_layout_objects_retained=0;
+    hud_layout_pixels_valid=0;
     hud_icon_obj_count = 0;
     hud_compact_obj_count = 0;
     gbs_hw_hide_sprites(0, 128);
+}
+
+void gbs_hw_hide_world_sprites(void) {
+    gbs_hw_hide_sprites(0, 128);
+    hud_layout_objects_retained=hud_layout_pixels_valid;
+}
+
+int gbs_hw_hud_layout_retained(void) {
+    return hud_layout_objects_retained && hud_layout_pixels_valid;
 }
 
 void gbs_hw_set_sprite(int index, int x, int y, uint16_t tile_index, uint16_t palette, int hflip, int vflip, int visible, uint16_t priority, uint16_t mode, int mosaic, uint16_t shape, uint16_t size) {
@@ -1990,12 +2008,7 @@ static void gbs_hw_clear_text_overlay_slots(int first, int count) {
     if (first + count > DYNAMIC_TEXT_OBJ_OAM_COUNT) {
         count = DYNAMIC_TEXT_OBJ_OAM_COUNT - first;
     }
-    for (int index = 0; index < count; ++index) {
-        gbs_hw_set_sprite(
-            DYNAMIC_TEXT_OBJ_OAM_BASE + first + index,
-            0, 160, 0, DIALOGUE_PALETTE, 0, 0, 0, 0, 0, 0, 0, 0
-        );
-    }
+    gbs_hw_hide_sprites(DYNAMIC_TEXT_OBJ_OAM_BASE + first, count);
 }
 
 static void gbs_hw_clear_hud_icon_slots(void) {
@@ -2457,6 +2470,8 @@ void gbs_hw_invalidate_hud_layout(void) {
 }
 
 void gbs_hw_begin_hud_layout(int visible) {
+    hud_layout_objects_retained=0;
+    hud_layout_object_only=1;
     gbs_hw_clear_hud_layout_rects();
     gbs_hw_clear_text_overlay_slots(0, DYNAMIC_TEXT_OBJ_OAM_COUNT);
     gbs_hw_clear_hud_icon_slots();
@@ -2475,6 +2490,10 @@ static int configured_hud_text_color=-1;
 static int configured_hud_shadow_color=-1;
 static const uint8_t* cached_hud_pixel_font;
 void gbs_hw_set_hud_font_shadow(int color) { configured_hud_shadow_color=color; }
+void gbs_hw_refresh_hud_text_palette(int color) {
+    MEM_PALETTE[256+HUD_PALETTE_BASE+DIALOGUE_COLOR_TEXT] = color>=0
+        ? (uint16_t)color : MEM_PALETTE[HUD_PALETTE_BASE+DIALOGUE_COLOR_TEXT];
+}
 
 static void gbs_hw_draw_hud_pixel_text(int x, int y, int width, int height, const char* text, int visible) {
     if (!visible || text == 0) return;
@@ -2560,6 +2579,14 @@ static void gbs_hw_draw_hud_surface(int box_x, int box_y, int box_w, int box_h, 
     gbs_hw_mark_ui_tilemap_dirty();
 }
 
+void gbs_hw_clear_hud_background_rect(int x, int y, int width, int height) {
+    if (x<0 || y<0 || width<=0 || height<=0 || x>=240 || y>=160) return;
+    int w=(width+7)/8, h=(height+7)/8;
+    if (x/8+w>32) w=32-x/8;
+    if (y/8+h>32) h=32-y/8;
+    gbs_hw_draw_hud_surface(x/8,y/8,w,h,0,0);
+}
+
 static void gbs_hw_remember_hud_layout_rect(int x, int y, int width, int height) {
     if (hud_layout_current_count >= HUD_LAYOUT_MAX_COMPONENTS) {
         return;
@@ -2576,6 +2603,9 @@ static int gbs_hw_allocate_hud_compact_slot(void) {
     return gbs_hw_hud_icon_slot(HUD_ICON_OBJ_OAM_COUNT-1-hud_compact_obj_count++);
 }
 
+static const uint8_t* hud_compact_fonts[31] __attribute__((section(".ewram_bss")));
+static uint16_t hud_compact_glyphs[31][5] __attribute__((section(".ewram_bss")));
+
 static void gbs_hw_draw_hud_compact_text(int x, int y, int width, const char* text, int visible) {
     if (!visible || text == 0) return;
     MEM_PALETTE[256 + HUD_PALETTE_BASE + DIALOGUE_COLOR_TEXT] = configured_hud_text_color >= 0
@@ -2584,27 +2614,42 @@ static void gbs_hw_draw_hud_compact_text(int x, int y, int width, const char* te
     unsigned column=0;
     const unsigned columns=(unsigned)width/6;
     while (*text && column<columns && hud_pixel_text_obj_count<DYNAMIC_TEXT_OBJ_OAM_COUNT) {
-        const unsigned tile=DYNAMIC_TEXT_OBJ_TILE_BASE+hud_pixel_text_obj_count*4;
+        const unsigned group=hud_pixel_text_obj_count;
+        const unsigned tile=DYNAMIC_TEXT_OBJ_TILE_BASE+group*4;
         if (tile+4>1024) return;
         const int slot=gbs_hw_allocate_hud_compact_slot();
         if (slot<0) return;
-        uint8_t glyphs[160]={0}, pixels[128]; unsigned count=0;
-        while (*text && count<5 && column+count<columns) {
-            const unsigned glyph=gbs_text_glyph_index(gbs_text_next_codepoint(&text));
-            for (unsigned row=0; row<8; ++row) for (unsigned half=0; half<2; ++half) {
-                const uint8_t* source=font_tiles ? font_tiles+glyph*32+row*4+half*2 : 0;
-                const uint16_t value=source ? (uint16_t)(source[0]|(source[1]<<8)) :
-                    pack_font_pixels(gbs_font_rows[glyph][row],half*4,0,DIALOGUE_COLOR_TEXT);
-                glyphs[count*32+row*4+half*2]=value&255;
-                glyphs[count*32+row*4+half*2+1]=value>>8;
+        uint16_t ids[5]={0xfffe,0xfffe,0xfffe,0xfffe,0xfffe};
+        unsigned count=0;
+        while (*text && count<5 && column+count<columns)
+            ids[count++]=(uint16_t)gbs_text_glyph_index(gbs_text_next_codepoint(&text));
+        // Share invalidation with the eight/seven-pixel renderers and OBJ uploads.
+        // The custom font path preserves source ink; fallback fonts normalize it.
+        const uint16_t marker=0x4000u | (configured_hud_font_tiles != 0);
+        int cached=hud_compact_fonts[group]==font_tiles;
+        for (unsigned i=0; i<4; ++i)
+            if (hud_pixel_text_glyphs[group*4+i]!=marker) cached=0;
+        for (unsigned i=0; i<5; ++i)
+            if (hud_compact_glyphs[group][i]!=ids[i]) cached=0;
+        if (!cached) {
+            uint8_t glyphs[160]={0}, pixels[128];
+            for (unsigned g=0; g<count; ++g) {
+                for (unsigned row=0; row<8; ++row) for (unsigned half=0; half<2; ++half) {
+                    const uint8_t* source=font_tiles ? font_tiles+ids[g]*32+row*4+half*2 : 0;
+                    const uint16_t value=source ? (uint16_t)(source[0]|(source[1]<<8)) :
+                        pack_font_pixels(gbs_font_rows[ids[g]][row],half*4,0,DIALOGUE_COLOR_TEXT);
+                    glyphs[g*32+row*4+half*2]=value&255;
+                    glyphs[g*32+row*4+half*2+1]=value>>8;
+                }
             }
-            ++count;
+            if (configured_hud_font_tiles) gbs_compose_spaced_hud_text(glyphs,count,6,pixels);
+            else gbs_compose_compact_hud_text(glyphs,count,pixels);
+            volatile uint16_t* target=MEM_OBJ_TILES+tile*16u;
+            for (unsigned i=0; i<64; ++i) target[i]=pixels[i*2]|(pixels[i*2+1]<<8);
+            for (unsigned i=0; i<4; ++i) hud_pixel_text_glyphs[group*4+i]=marker;
+            for (unsigned i=0; i<5; ++i) hud_compact_glyphs[group][i]=ids[i];
+            hud_compact_fonts[group]=font_tiles;
         }
-        if (configured_hud_font_tiles) gbs_compose_spaced_hud_text(glyphs,count,6,pixels);
-        else gbs_compose_compact_hud_text(glyphs,count,pixels);
-        volatile uint16_t* target=MEM_OBJ_TILES+tile*16u;
-        for (unsigned i=0; i<64; ++i) target[i]=pixels[i*2]|(pixels[i*2+1]<<8);
-        for (unsigned i=0; i<4; ++i) hud_pixel_text_glyphs[tile-DYNAMIC_TEXT_OBJ_TILE_BASE+i]=0xFFFFu;
         ++hud_pixel_text_obj_count;
         hud_icon_obj_write=1;
         gbs_hw_set_sprite(slot,x+column*6,y,tile,HUD_PALETTE,0,0,1,0,0,0,1,1);
@@ -2683,6 +2728,7 @@ void gbs_hw_draw_hud_layout_component(
         /* A full-panel metasprite sits behind BG0 text; ordinary icons stay
          * in front. Both use the existing reserved HUD OAM slots. */
         if (metasprite != 0 && gbs_hw_draw_hud_icon(metasprite, x, y, visible, 1)) return;
+        if (visible) hud_layout_object_only=0;
         gbs_hw_draw_hud_surface(box_x, box_y, box_w, box_h, 1, visible);
         if (visible) gbs_hw_remember_hud_layout_rect(box_x, box_y, box_w, box_h);
         return;
@@ -2694,6 +2740,7 @@ void gbs_hw_draw_hud_layout_component(
             if (visible) gbs_hw_draw_hud_surface(box_x, box_y, box_w, box_h, 0, 0);
             return;
         }
+        if (visible) hud_layout_object_only=0;
         gbs_hw_draw_hud_surface(box_x, box_y, box_w, box_h, 0, visible);
         if (visible) gbs_hw_remember_hud_layout_rect(box_x, box_y, box_w, box_h);
         return;
@@ -2702,6 +2749,7 @@ void gbs_hw_draw_hud_layout_component(
         return;
     }
     if (kind == GBS_HW_HUD_COMPONENT_TEXT || kind == GBS_HW_HUD_COMPONENT_ICON) {
+        if (visible) hud_layout_object_only=0;
         (void)text_slot;
         if ((x & 7) != 0 || (y & 7) != 0) {
             gbs_hw_draw_hud_pixel_text(x, y, width, height, text, visible);
@@ -2713,6 +2761,7 @@ void gbs_hw_draw_hud_layout_component(
 }
 
 void gbs_hw_end_hud_layout(void) {
+    hud_layout_pixels_valid=hud_layout_object_only;
     hud_layout_previous_count = hud_layout_current_count;
     hud_layout_current_count = 0;
 }

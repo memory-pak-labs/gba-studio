@@ -12,7 +12,7 @@ namespace {
 const gbs::HudLayout* configured_hud_layouts = nullptr;
 size_t configured_hud_layout_count = 0;
 const gbs::HudLayout* selected_hud_layout = nullptr;
-gbs::HudElementMemory hud_element_memory[64] {};
+gbs::HudElementMemory hud_element_memory[64] GBS_UI_EWRAM {};
 uint8_t hud_gauge_buffers[4][1536] GBS_UI_EWRAM {};
 struct HudGaugeCache {
     const gbs::HudLayoutComponent* component = nullptr;
@@ -22,6 +22,11 @@ HudGaugeCache hud_gauge_cache[4] {};
 char hud_value_text[64][9] GBS_UI_EWRAM {};
 uint32_t hud_project_values[64] GBS_UI_EWRAM {};
 bool hud_project_values_ready = false;
+uint32_t retained_hud_values[64] GBS_UI_EWRAM {};
+bool object_hud_layout = false;
+bool retained_hud_valid = false;
+bool retained_hud_visible = false;
+bool retained_hud_values_ready = false;
 
 bool string_equals(const char* left, const char* right) {
     if (left == nullptr || right == nullptr) {
@@ -40,6 +45,26 @@ int hud_component_kind(const char* kind) {
     if (string_equals(kind, "bar")) return GBS_HW_HUD_COMPONENT_BAR;
     if (string_equals(kind, "icon")) return GBS_HW_HUD_COMPONENT_ICON;
     return -1;
+}
+
+bool is_object_hud_layout(const gbs::HudLayout& layout) {
+    if (!string_equals(layout.mode,"advanced") || layout.component_count>64) return false;
+    for (size_t i=0; i<layout.component_count; ++i) {
+        const auto& component=layout.components[i];
+        if (!component.visible) continue;
+        const auto& behavior=component.behavior;
+        if (behavior.event_count || behavior.selected.variable>=0 ||
+            behavior.disabled.variable>=0 || behavior.hidden.variable>=0 ||
+            component.value_source!=gbs::HudValueSource::None) return false;
+        const int kind=hud_component_kind(component.kind);
+        if (kind==GBS_HW_HUD_COMPONENT_TEXT) {
+            if ((component.text_advance!=6 && component.text_advance!=7) ||
+                (component.value_variable<0 && component.inventory_item<0)) return false;
+        } else if (kind<0 || !component.metasprite || !gbs::is_valid_metasprite(*component.metasprite)) {
+            return false;
+        }
+    }
+    return true;
 }
 
 int clamp_selection(const gbs::MenuItem* items, size_t item_count, int desired) {
@@ -244,6 +269,24 @@ void update_hud_behavior(EventState& state, bool visible) {
 
 void draw_hud(const HudState& state) {
     if (selected_hud_layout != nullptr && string_equals(selected_hud_layout->mode, "advanced")) {
+        bool unchanged=object_hud_layout && retained_hud_valid &&
+            retained_hud_visible==state.visible && retained_hud_values_ready==hud_project_values_ready;
+        if (unchanged) for (size_t i=0; i<selected_hud_layout->component_count; ++i)
+            if (retained_hud_values[i]!=hud_project_values[i]) { unchanged=false; break; }
+        if (unchanged && gbs_hw_hud_layout_retained()) {
+            // OAM is still protected from world rendering. Keep the foreground
+            // gauge cells transparent even when a dialogue repaints BG0.
+            if (state.visible) for (size_t i=0; i<selected_hud_layout->component_count; ++i) {
+                const auto& component=selected_hud_layout->components[i];
+                const bool bound=component.value_variable>=0 || component.inventory_item>=0;
+                if (component.visible && (!bound || hud_project_values_ready) &&
+                    string_equals(component.kind,"bar"))
+                    gbs_hw_clear_hud_background_rect(component.x,component.y,component.width,component.height);
+                if (component.visible && hud_project_values_ready && string_equals(component.kind,"text"))
+                    gbs_hw_refresh_hud_text_palette(selected_hud_layout->font_color);
+            }
+            return;
+        }
         constexpr size_t hud_layout_order_capacity = 64;
         size_t order[hud_layout_order_capacity];
         size_t order_count = 0;
@@ -339,12 +382,21 @@ void draw_hud(const HudState& state) {
         }
         gbs_hw_set_hud_font(nullptr,-1);
         gbs_hw_end_hud_layout();
+        if (object_hud_layout) {
+            for (size_t i=0; i<selected_hud_layout->component_count; ++i)
+                retained_hud_values[i]=hud_project_values[i];
+            retained_hud_visible=state.visible;
+            retained_hud_values_ready=hud_project_values_ready;
+            retained_hud_valid=true;
+        }
         return;
     }
     gbs_hw_draw_hud_bar(state.left_text, state.right_text, state.visible ? 1 : 0);
 }
 
 void configure_hud_layouts(const HudLayout* layouts, size_t count) {
+    retained_hud_valid=false;
+    object_hud_layout=false;
     configured_hud_layouts = layouts;
     configured_hud_layout_count = layouts == nullptr ? 0 : count;
     selected_hud_layout = nullptr;
@@ -353,6 +405,8 @@ void configure_hud_layouts(const HudLayout* layouts, size_t count) {
 }
 
 bool configure_hud_layout(const char* layout_id) {
+    retained_hud_valid=false;
+    object_hud_layout=false;
     hud_project_values_ready = false;
     // Scene setup may have reloaded the full image into the same VRAM slot.
     for (auto& cache : hud_gauge_cache) cache = HudGaugeCache {};
@@ -366,6 +420,7 @@ bool configure_hud_layout(const char* layout_id) {
         if (!string_equals(configured_hud_layouts[index].id, layout_id)) continue;
         if (selected_hud_layout != &configured_hud_layouts[index]) for (auto& memory : hud_element_memory) memory = HudElementMemory {};
         selected_hud_layout = &configured_hud_layouts[index];
+        object_hud_layout=is_object_hud_layout(*selected_hud_layout);
         gbs_hw_invalidate_hud_layout();
         return true;
     }

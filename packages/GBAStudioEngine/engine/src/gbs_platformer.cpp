@@ -1,5 +1,11 @@
 #include "gbs/platformer.hpp"
 
+#if defined(__arm__) || defined(__thumb__)
+#define GBS_PLATFORMER_COLLISION_HOT __attribute__((section(".iwram"), target("arm"), optimize("O2"), noinline, long_call))
+#else
+#define GBS_PLATFORMER_COLLISION_HOT
+#endif
+
 namespace {
 
 int abs_int(int value) {
@@ -82,7 +88,7 @@ bool tile_blocks_platformer_vertical(
     return false;
 }
 
-bool rect_hits_platformer_horizontal(const gbs::TileMap& map, gbs::Rect rect, int direction) {
+GBS_PLATFORMER_COLLISION_HOT bool rect_hits_platformer_horizontal(const gbs::TileMap& map, gbs::Rect rect, int direction) {
     int left = rect.x / gbs::gba_tile_size;
     int top = rect.y / gbs::gba_tile_size;
     int right = (rect.right() - 1) / gbs::gba_tile_size;
@@ -134,7 +140,7 @@ bool clamp_platformer_enemy_to_patrol_bounds(gbs::PlatformerEnemy& enemy) {
     return false;
 }
 
-bool rect_hits_platformer_vertical(const gbs::TileMap& map, gbs::Rect rect, int direction, int previous_bottom, bool ignore_one_way) {
+GBS_PLATFORMER_COLLISION_HOT bool rect_hits_platformer_vertical(const gbs::TileMap& map, gbs::Rect rect, int direction, int previous_bottom, bool ignore_one_way) {
     int left = rect.x / gbs::gba_tile_size;
     int top = rect.y / gbs::gba_tile_size;
     int right = (rect.right() - 1) / gbs::gba_tile_size;
@@ -165,6 +171,12 @@ int move_axis(
     int moved = 0;
     hit = false;
     landed = false;
+    int clear_steps = 0;
+    if (ignore_all_collisions) {
+        if (horizontal) rect.x += delta_pixels;
+        else rect.y += delta_pixels;
+        return delta_pixels;
+    }
 
     while (remaining > 0) {
         gbs::Rect next = rect;
@@ -175,11 +187,11 @@ int move_axis(
             next.y += direction;
         }
 
-        bool blocked = horizontal
-            ? rect_hits_platformer_horizontal(map, next, direction)
-            : rect_hits_platformer_vertical(map, next, direction, previous_bottom, ignore_one_way);
-        if (ignore_all_collisions) {
-            blocked = false;
+        bool blocked = false;
+        if (clear_steps == 0) {
+            blocked = horizontal
+                ? rect_hits_platformer_horizontal(map, next, direction)
+                : rect_hits_platformer_vertical(map, next, direction, previous_bottom, ignore_one_way);
         }
         if (blocked) {
             hit = true;
@@ -188,6 +200,15 @@ int move_axis(
         }
 
         rect = next;
+        if (clear_steps > 0) {
+            --clear_steps;
+        } else if (next.x >= 0 && next.y >= 0 && next.width > 0 && next.height > 0) {
+            // Reuse the successful query until either edge enters another tile.
+            // Negative coordinates retain the original stepping/division rules.
+            const int low = (horizontal ? next.x : next.y) & 7;
+            const int high = (horizontal ? next.right() - 1 : next.bottom() - 1) & 7;
+            clear_steps = direction > 0 ? 7 - (low > high ? low : high) : (low < high ? low : high);
+        }
         moved += direction;
         --remaining;
     }

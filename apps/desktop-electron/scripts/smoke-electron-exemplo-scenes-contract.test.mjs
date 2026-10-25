@@ -384,7 +384,7 @@ describe("exemplo scenes smoke wiring", () => {
     expect(source).toContain("await pressPlayerButton(cdp, faceButtons.a.code, faceButtons.a.key, faceButtons.a.windowsVirtualKeyCode, 80);");
   });
 
-  it("mantém um exercício isolado de movimento, salto, rampa, escada e bloqueio para os Penedos", async () => {
+  it("mantém um exercício isolado de movimento e salto na ponte dos Penedos", async () => {
     const source = await readFile(
       new URL("./smoke-electron-exemplo-scenes.mjs", import.meta.url),
       "utf8"
@@ -397,8 +397,8 @@ describe("exemplo scenes smoke wiring", () => {
     expect(source).toContain("async function runPlatformerInputExercise(cdp, sceneName, faceButtons)");
     expect(source).toContain("a: faceButtons.a");
     expect(source).toContain("sceneName !== \"penedos_vento\"");
-    expect(source).toContain('route: ["jump", "walk_right", "upper_platform_jump", "return_left"]');
-    expect(source).toContain("upper_platform_jump");
+    expect(source).toContain('route: ["jump", "walk_right", "bridge_jump", "return_left"]');
+    expect(source).toContain("bridge_jump");
     expect(source).toContain("return_left");
     expect(platformerRuntimeSource).toContain("uint32_t runtime_blocked_direction_bits = 0;");
     expect(platformerRuntimeSource).toContain("runtime_blocked_direction_bits |= player.facing");

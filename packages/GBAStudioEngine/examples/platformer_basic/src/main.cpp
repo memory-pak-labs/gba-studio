@@ -1910,7 +1910,7 @@ void render_platformer_runtime(const gbs::RuntimeFrameContext& context) {
                 gbs::render_visibility_effects({ center.x - camera.position_pixels.x, center.y - camera.position_pixels.y }, visual_effects);
             }
         }
-        gbs::hide_all_sprites();
+        gbs::hide_world_sprites();
         int next_world_sprite_index = 1;
         const gbs::MetaSprite* player_metasprite = gbs::current_metasprite(player_animator);
         if (!gbs::sync_sprite_animation_tiles(player_animator, player_streamed_tile_asset_loaded)) return;

@@ -2000,6 +2000,8 @@ host-test: hud-compact-text-test
 hud-compact-text-test: $(HOST_BUILD)/hud_compact_text_tests
 	$(HOST_BUILD)/hud_compact_text_tests
 	python3 tests/host/hud_spaced_text_tests.py
+	python3 tests/host/hud_compact_cache_tests.py
+	python3 tests/host/platformer_collision_cadence_tests.py
 $(HOST_BUILD)/hud_compact_text_tests: tests/host/hud_compact_text_tests.cpp engine/include/gbs/hud_compact_text.h
 	@mkdir -p $(HOST_BUILD)
 	$(HOST_CXX) $(HOST_CXXFLAGS) $< -o $@

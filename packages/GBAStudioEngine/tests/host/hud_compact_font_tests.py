@@ -2,7 +2,7 @@
 from pathlib import Path
 import subprocess, tempfile
 root=Path(__file__).resolve().parents[2]
-s=(root/'engine/src/gbs_hw.c').read_text();a=s.index('static void gbs_hw_draw_hud_compact_text(');b=s.index('\nstatic const uint8_t* hud_spaced_fonts',a)
+s=(root/'engine/src/gbs_hw.c').read_text();a=s.index('static const uint8_t* hud_compact_fonts');b=s.index('\nstatic const uint8_t* hud_spaced_fonts',a)
 code=r'''
 #include <stdint.h>
 #include <assert.h>
@@ -27,7 +27,7 @@ unsigned gbs_text_next_codepoint(const char** s){return (unsigned char)*(*s)++;}
 unsigned gbs_text_glyph_index(unsigned ch){return ch-32;}
 uint16_t pack_font_pixels(unsigned a,unsigned b,unsigned c,unsigned d){return 0;}
 void gbs_hw_set_sprite(int a,int b,int c,int d,int e,int f,int g,int h,int i,int j,int k,int l,int m){}
-'''+s[a:b]+r'''
+'''+s[a:b].replace('__attribute__((section(".ewram_bss")))', '')+r'''
 int main(void){
  fonts[0][('A'-32)*32]=4;
  fonts[0][('A'-32)*32+3]=0x40;

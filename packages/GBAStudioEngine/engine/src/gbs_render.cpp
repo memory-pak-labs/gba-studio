@@ -762,6 +762,16 @@ void draw_room_to_bg_cached(BackgroundLayer layer, const uint16_t* tiles, int wi
     if (cache.valid && cache.tiles == tiles && cache.width == width && cache.height == height &&
         cache.layer == layer && cache.tile_x == tile_x && cache.tile_y == tile_y &&
         cache.edits_revision == edits.revision) return;
+    bool edited_layer=false;
+    for (size_t i=0; i<edits.count; ++i)
+        if ((edits.entries[i].key>>28)==static_cast<uint32_t>(layer)) { edited_layer=true; break; }
+    if (!edited_layer) {
+        // The hardware already stages an unchanged source into this layer's shadow.
+        // Avoid staging a second 2 KiB copy through the shared decode scratch.
+        draw_room_to_bg(layer,tiles,width,height,camera_x,camera_y);
+        cache=RoomTilemapCache{tiles,width,height,tile_x,tile_y,layer,true,edits.revision};
+        return;
+    }
     // load_tilemap stages this 32x32 window and its size at the frame boundary.
     // It must not write edits directly into VRAM before the pending map commits.
     // The upload copies into the per-layer shadow immediately, so reuse the
@@ -910,6 +920,10 @@ void set_metasprite(int first_index, const MetaSprite& metasprite, Vec2i positio
 
 void hide_all_sprites() {
     gbs_hw_hide_all_sprites();
+}
+
+void hide_world_sprites() {
+    gbs_hw_hide_world_sprites();
 }
 
 void hide_sprites(int first_index, int count) {
