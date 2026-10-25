@@ -52,6 +52,19 @@ function graphNodesOverlap(nodes: Array<Pick<EventsWorkspaceGraphNode, "x" | "y"
 }
 
 describe("Events workspace presentation", () => {
+  it("keeps repeated command rows independent and refreshes their resource diagnostics after edits",()=>{
+    const data:GBAProjectData={events:[{name:"repeated",steps:[{command:"show_dialogue intro",isEnabled:true},{command:"show_dialogue intro",isEnabled:true}]}],dialogues:[]};
+    const steps=deriveEventsWorkspacePresentation(data).groups.flatMap(g=>g.events)[0]!.steps;
+    expect(steps[0]!.missingReferences).toHaveLength(1);
+    steps[0]!.missingReferences.push("modified");
+    expect(steps[1]!.missingReferences).toHaveLength(1);
+    steps[0]!.commandParameters[0]!.options.push("modified");
+    expect(steps[1]!.commandParameters[0]!.options).not.toContain("modified");
+    data.dialogues=[{key:"intro",text:"Ready"}];
+    const refreshed=deriveEventsWorkspacePresentation(data).groups.flatMap(g=>g.events)[0]!;
+    expect(refreshed.missingReferences).toEqual([]);
+    expect(refreshed.steps.every(s=>s.missingReferences.length===0)).toBe(true);
+  });
   it("creates independent event copies when a behavior is applied to an actor group", () => {
     const result = createBoundEventsForTargetsInProject({
       actors: [{ name: "Guide" }, { name: "Merchant" }],

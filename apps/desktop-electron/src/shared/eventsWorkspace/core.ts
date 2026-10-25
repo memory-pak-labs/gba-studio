@@ -677,14 +677,12 @@ function stepFlow(command: string, index: number, steps: EventStep[]): EventsWor
 
 function workspaceSteps(
   event: Record<string, unknown>,
-  data: GBAProjectData,
-  eventNames: Set<string>,
-  palette: EventsWorkspaceCommandSuggestion[],
-  resourceOptions: EventCommandResourceOptions
+  insightForCommand: (command: string) => ReturnType<typeof commandInsightForStep>,
+  missingReferencesForCommand: (command: string) => string[]
 ): EventsWorkspaceStep[] {
   const steps = eventSteps(event);
   return steps.map((step, index) => {
-    const insight = commandInsightForStep(step.command, palette, resourceOptions);
+    const insight = insightForCommand(step.command);
     return {
       index,
       command: step.command,
@@ -698,10 +696,10 @@ function workspaceSteps(
       commandAvailability: insight.commandAvailability,
       commandTemplate: insight.commandTemplate,
       commandPaletteID: insight.commandPaletteID,
-      commandParameters: insight.commandParameters,
-      paletteSuggestions: insight.paletteSuggestions,
+      commandParameters: insight.commandParameters.map(parameter=>({...parameter,options:[...parameter.options]})),
+      paletteSuggestions: insight.paletteSuggestions.map(suggestion=>({...suggestion})),
       flow: stepFlow(step.command, index, steps),
-      missingReferences: step.isEnabled ? missingResourceReferences(step.command, data, eventNames) : []
+      missingReferences: step.isEnabled ? [...missingReferencesForCommand(step.command)] : []
     };
   });
 }
@@ -3289,11 +3287,27 @@ export function deriveEventsWorkspacePresentation(
   const eventNames = new Set(eventDocuments.map((event) => event.name));
   const resourceOptions = commandResourceOptions(data, sourceEvents);
   const palette = commandPalette(data, sourceEvents, pluginRegistry);
+  // Commands recur across scene entries and actor callbacks. Analyze each once
+  // per derivation; a new project edit always receives fresh resource context.
+  const insightCache=new Map<string,ReturnType<typeof commandInsightForStep>>();
+  const missingReferenceCache=new Map<string,string[]>();
+  const insightForCommand=(command:string)=>{
+    let insight=insightCache.get(command);
+    if(!insight){insight=commandInsightForStep(command,palette,resourceOptions);insightCache.set(command,insight);}
+    return insight;
+  };
+  const missingReferencesForCommand=(command:string)=>{
+    let missing=missingReferenceCache.get(command);
+    if(!missing){missing=missingResourceReferences(command,data,eventNames);missingReferenceCache.set(command,missing);}
+    return missing;
+  };
   const graphEdges = sourceEvents.flatMap((event, index) => graphEdgesForEvent(event, index, eventNames));
   const bindings = boundEventNames(data);
   const bindingLabels = bindingLabelsByEventName(data);
   const commandEventReferences = sourceEvents.flatMap((event) => eventSteps(event).flatMap((step) => commandReferencedEvents(step.command)));
   const referenceNames = [...bindings, ...commandEventReferences];
+  const referenceCounts=new Map<string,number>();
+  for(const name of referenceNames)referenceCounts.set(name,(referenceCounts.get(name)??0)+1);
 
   const events = sourceEvents.map((event, index) => {
     const eventDocument = eventDocuments[index]!;
@@ -3304,9 +3318,9 @@ export function deriveEventsWorkspacePresentation(
     const enabledSteps = steps.filter((step) => step.isEnabled);
     const commandVerbs = Array.from(new Set(enabledSteps.map((step) => commandVerb(step.command))));
     const missingReferences = Array.from(
-      new Set(enabledSteps.flatMap((step) => missingResourceReferences(step.command, data, eventNames)))
+      new Set(enabledSteps.flatMap((step) => missingReferencesForCommand(step.command)))
     );
-    const referenceCount = referenceNames.filter((reference) => reference === name).length;
+    const referenceCount = referenceCounts.get(name) ?? 0;
 
     const eventKind: EventsWorkspaceEvent["eventKind"] = eventDocument.eventKind;
     return {
@@ -3315,7 +3329,7 @@ export function deriveEventsWorkspacePresentation(
       category,
       detail: eventDocument.detail,
       primaryCommand: eventDocument.primaryCommand,
-      steps: workspaceSteps(event, data, eventNames, palette, resourceOptions),
+      steps: workspaceSteps(event, insightForCommand, missingReferencesForCommand),
       stepCount: steps.length,
       enabledStepCount: enabledSteps.length,
       referenceCount,
