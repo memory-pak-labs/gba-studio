@@ -2151,6 +2151,18 @@
           "sha256": "2bbfa35d0057c6d20924aab1c23d354573ebfdec2640def4a2223e6dd71652b1",
           "contract": "coastal-depth-user-approved-2026-10-25",
           "provenance": "fixtures/asset-provenance/coastal-depth-approved.json"
+        },
+        {
+          "path": "Assets/sprites/recovered-radio.png",
+          "sha256": "b46ecd3a9f7d054cf41764d10f17a42baa32aa7f257714e79bfe471085d12761",
+          "contract": "encore-radio-user-approved-2026-10-25",
+          "provenance": "fixtures/asset-provenance/encore-approved.json"
+        },
+        {
+          "path": "Assets/audio/radio-lume-pcm.wav",
+          "sha256": "4ddca1394c4bfd8ae14a3128e8e48c0f23e6bebaf445e97d2007f1f5cb8e4cab",
+          "contract": "encore-radio-user-approved-2026-10-25",
+          "provenance": "fixtures/asset-provenance/encore-approved.json"
         }
       ],
       "retired": [

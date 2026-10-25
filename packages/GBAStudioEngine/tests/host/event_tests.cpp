@@ -1205,6 +1205,29 @@ void test_camera_property_command_updates_runtime_state() {
     assert(state.camera_property_value == 32);
 }
 
+void test_follow_camera_cancels_an_earlier_pan_in_the_same_frame() {
+    gbs::EventState state {};
+    gbs::init_event_state(state);
+    const gbs::EventCommand stop_tour[] = {
+        { gbs::EventOp::MoveCamera, 1, -2, 0 },
+        { gbs::EventOp::FollowCamera, 0, 0, 0 },
+        { gbs::EventOp::End, 0, 0, 0 }
+    };
+    gbs::run_event_script(state, stop_tour, 3);
+    assert(state.camera_changed && state.camera_follow_player);
+    assert(!state.camera_move_changed);
+    assert(state.camera_delta_x == 0 && state.camera_delta_y == 0);
+
+    const gbs::EventCommand start_another_pan[] = {
+        { gbs::EventOp::FollowCamera, 0, 0, 0 },
+        { gbs::EventOp::MoveCamera, 4, 3, 0 },
+        { gbs::EventOp::End, 0, 0, 0 }
+    };
+    gbs::run_event_script(state, start_another_pan, 3);
+    assert(state.camera_move_changed);
+    assert(state.camera_delta_x == 4 && state.camera_delta_y == 3);
+}
+
 void test_button_event_bindings_route_pressed_input_to_script() {
     gbs::EventState state {};
     gbs::init_event_state(state);
@@ -2082,6 +2105,7 @@ int main() {
     test_actor_position_condition_supports_wide_maps();
     test_call_script_command_records_project_script_index();
     test_camera_property_command_updates_runtime_state();
+    test_follow_camera_cancels_an_earlier_pan_in_the_same_frame();
     test_button_event_bindings_route_pressed_input_to_script();
     test_adventure_callback_bindings_route_runtime_callbacks_to_script();
     test_platform_callback_bindings_route_runtime_callbacks_to_script();

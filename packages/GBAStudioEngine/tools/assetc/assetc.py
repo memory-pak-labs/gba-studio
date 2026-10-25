@@ -18323,6 +18323,19 @@ def emit_luta_project_data_header(luta_project, asset_report=None, base_dir=None
         output,
         luta_project.get("dialogue_lines", []),
     )
+    project_scripts = luta_project.get("scripts", []) or []
+    if not isinstance(project_scripts, list):
+        raise SystemExit("luta_project.scripts precisa ser lista")
+    script_entries = []
+    for index, script in enumerate(project_scripts):
+        commands = script.get("script", script.get("commands", [])) if isinstance(script, dict) else script
+        script_entries.append(emit_event_script(output, f"luta_project_script_{index}", commands, f"luta_project.scripts[{index}]"))
+    scripts_name = "nullptr"
+    if script_entries:
+        scripts_name = "luta_project_scripts"
+        output.append(f"constexpr gbs::EventScript {scripts_name}[] = {{")
+        output.extend(f"    {script}," for script in script_entries)
+        output.extend(["};", ""])
     backgrounds_name, background_count = emit_luta_backgrounds(output, luta_project, asset_report)
     hud_name = emit_luta_hud(output, luta_project, asset_report)
 
@@ -18423,7 +18436,9 @@ def emit_luta_project_data_header(luta_project, asset_report=None, base_dir=None
         "    &save_bank,",
         "    save_enabled,",
         "    save_autosave,",
-        f"    {hud_name}",
+        f"    {hud_name},",
+        f"    {scripts_name},",
+        f"    {len(script_entries)}",
         "};",
         "",
         "} // namespace gbastudio_luta_project",

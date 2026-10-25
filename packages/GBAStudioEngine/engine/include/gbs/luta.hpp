@@ -198,6 +198,8 @@ struct LutaProjectData {
     bool save_enabled;
     bool save_autosave;
     const LutaBackgroundData* hud;
+    const EventScript* scripts = nullptr;
+    size_t script_count = 0;
 };
 
 struct LutaRuntimeState {

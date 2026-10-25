@@ -22,7 +22,7 @@ it('promotes the approved warehouse bytes and leaves the old image in the librar
 it('removes only the three decorative warehouse NPCs and preserves campaign, dialogues and Observatory',()=>{
  const source=prior(),snapshot=structuredClone(source),p=promoteApprovedFrontalWarehouse(source);
  expect(source).toEqual(snapshot);
- expect(p.actors.filter(a=>a.roomName===name).map(a=>a.id)).toEqual(['armazem_das_mares-cursor']);
+ expect(p.actors.filter(a=>a.roomName===name).map(a=>a.id).sort()).toEqual(['armazem_das_mares-cursor','encore-radio']);
  expect(p.actors.filter(a=>a.roomName!==name)).toEqual(source.actors.filter(a=>a.roomName!==name));
  for(const key of ['events','dialogues','variables','settings'])expect(p[key],key).toEqual(source[key]);
  for(const key of ['animations','animationStates'])expect(p[key].filter(a=>!a.id.startsWith(name+'-cursor')),key).toEqual(source[key].filter(a=>!a.id.startsWith(name+'-cursor')));
@@ -31,24 +31,25 @@ it('removes only the three decorative warehouse NPCs and preserves campaign, dia
  expect(p.triggers.filter(t=>t.roomName!==name)).toEqual(source.triggers.filter(t=>t.roomName!==name));
  expect(promoteApprovedFrontalWarehouse(p)).toEqual(p);
 });
-it('exports three correctly positioned hotspots, no decorative props and the same exit to Observatory',()=>{
+it('exports the three original hotspots, the separate radio and the same exit to Observatory',()=>{
  const p=promoteApprovedFrontalWarehouse(prior()),c=buildEngineExportProjectContract(p),scenes=c.point_click_project.scenes;
  const room=scenes.find(s=>s.name===name);
- expect(room.props??[]).toHaveLength(0);
- expect(scenes.find(s=>s.name==='observatorio_do_farol').props).toHaveLength(3);
- expect(room.hotspots.map(h=>({name:h.name,area:h.area}))).toEqual([
+ expect(room.props).toHaveLength(1);
+ expect(room.props[0].name).toBe('Rádio de Lúmen');
+ expect(scenes.find(s=>s.name==='observatorio_do_farol').props).toHaveLength(6);
+ expect(room.hotspots.filter(h=>h.name!=='Rádio de Lúmen').map(h=>({name:h.name,area:h.area}))).toEqual([
  {name:'Carta Náutica',area:{x:40,y:72,width:72,height:16}},
  {name:'Baú Vermelho',area:{x:192,y:80,width:48,height:48}},
  {name:'Saída do Armazém',area:{x:136,y:32,width:48,height:72}}]);
  for(const key of ['carta','bau'])expect(p.events.find(e=>e.name===name+'_'+key).steps.map(s=>s.command)).toEqual(['show_dialogue '+name+'_'+key]);
  expect(p.events.find(e=>e.name===name+'_saida').steps.map(s=>s.command)).toEqual(['advance_campaign']);
- expect(room.hotspots[2].on_click).toEqual(expect.arrayContaining([{op:'set_variable',variable:10,value:1},expect.objectContaining({op:'warp_runtime',runtime:'point_click',room:1})]));
+ expect(room.hotspots.find(h=>h.name==='Saída do Armazém').on_click).toEqual(expect.arrayContaining([{op:'set_variable',variable:10,value:1},expect.objectContaining({op:'warp_runtime',runtime:'point_click',room:1})]));
  expect(c.asset_pack.assets.find(a=>a.id==='warehouse_frontal_bg_240x160')).toMatchObject({background_bpp:4,background_palette_banks:14,background_tile_budget:600});
 });
 it('keeps the frontal warehouse when the example is regenerated',()=>{
  const p=promoteExemploGBAVerticeCampaign(canonical);
  expect(p.rooms.find(r=>r.name===name).backgroundAssetName).toBe(manifest.asset.file);
- expect(p.actors.filter(a=>a.roomName===name)).toHaveLength(1);
+ expect(p.actors.filter(a=>a.roomName===name).map(a=>a.id).sort()).toEqual(['armazem_das_mares-cursor','encore-radio']);
 });
 
 it('exports the approved hand anchored at its fingertip only in Warehouse',()=>{

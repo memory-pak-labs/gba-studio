@@ -3639,7 +3639,7 @@ function buildAssetcAudioPackGenerationUncached(data: GBAProjectData): AssetcAud
     const loops = booleanField(audio, "loops", false);
     const fileName = stringField(asset, "name", name).replace(/^.*[\\/]/, "");
     const output = `assets/audio/${normalizeIdentifier(fileName.replace(/\.[a-z0-9]+$/i, ""), exportID)}${fileName.match(/\.[a-z0-9]+$/i)?.[0].toLowerCase() ?? ""}`;
-    const audioReference = fileName;
+    const audioReference = output.slice("assets/audio/".length);
 
     sourceCopies.push({
       id: stringField(asset, "id", `asset-${index + 1}`),

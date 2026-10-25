@@ -22,8 +22,7 @@ describe("scene connection transitions on event-driven navigation", () => {
     ["armazem_das_mares", "observatorio_do_farol", "point_click"],
     ["usina_submersa", "usina_combate", "dungeon_crawler"],
     ["mapa_rota", "penedos_vento", "world_map"],
-    ["guardiao_rele", "arena_arrancada", "battle_rpg"],
-    ["circuito_final", "titulo", "racing"]
+    ["guardiao_rele", "arena_arrancada", "battle_rpg"]
   ])("honors %s → %s in the %s event script", (from, to, kind) => {
     const { data, connection } = fixture(from, to);
     const commands = script(data, kind, connection.eventName);
@@ -37,6 +36,15 @@ describe("scene connection transitions on event-driven navigation", () => {
       { op: "wait", frames: 24 }
     ]);
     expect(commands[warp + 1]).toEqual({ op: "visual_effect", effect: "push", layer: "all", frames: 24, intensity: 100, phase: "reveal" });
+  });
+
+  it("defers the final title handoff until the Porto and Farol epilogue finishes",()=>{
+    const contract=buildEngineExportProjectContract(canonical);
+    const finish=contract.racing_project!.scripts!.find(s=>s.name==='circuito_concluir')!.script;
+    expect(finish).toContainEqual(expect.objectContaining({op:'warp_runtime',runtime:'topdown',room:0}));
+    expect(finish.some(c=>c.op==='warp_runtime'&&c.runtime==='menu')).toBe(false);
+    const tour=contract.topdown_project!.scripts.find(s=>s.name==='encore_epilogue_2_tick')!.script;
+    expect(tour).toContainEqual(expect.objectContaining({op:'warp_runtime',runtime:'menu',room:0}));
   });
 
   it("keeps a blocked exit outside the cover/reveal branch and avoids double wrapping its door", () => {

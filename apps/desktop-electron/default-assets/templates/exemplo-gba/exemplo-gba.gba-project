@@ -2665,6 +2665,19 @@
         "onInteract": "coast_lift_toggle"
       },
       "collisionGroup": 0
+    },
+    {
+      "id": "encore-radio",
+      "name": "Rádio de Lúmen",
+      "roomName": "armazem_das_mares",
+      "x": 24,
+      "y": 10,
+      "z": 0,
+      "spriteSheet": "recovered-radio.png",
+      "animationName": "idle",
+      "animationStateID": "encore-radio-state",
+      "collisionMask": 0,
+      "eventBindings": {}
     }
   ],
   "animationStates": [
@@ -3733,6 +3746,16 @@
       "animationIDs": [
         "coast-coast-port-lantern-off",
         "coast-coast-port-lantern-on"
+      ]
+    },
+    {
+      "id": "encore-radio-state",
+      "name": "default",
+      "spriteSheet": "recovered-radio.png",
+      "animationType": "fixed",
+      "mirrorLeftFromRight": false,
+      "animationIDs": [
+        "encore-radio-idle"
       ]
     }
   ],
@@ -24188,6 +24211,49 @@
               "sliceY": 0,
               "sourceSheet": "coast-port-lantern.png",
               "tileWidth": 16,
+              "tileHeight": 32,
+              "flipX": false,
+              "flipY": false,
+              "objPalette": "OBP0",
+              "paletteIndex": 0,
+              "priority": false
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "encore-radio-idle",
+      "name": "idle",
+      "spriteSheet": "recovered-radio.png",
+      "stateID": "encore-radio-state",
+      "frameWidth": 32,
+      "frameHeight": 32,
+      "frameCount": 1,
+      "fps": 1,
+      "loops": true,
+      "state": "idle",
+      "direction": "none",
+      "colorMode": "4bpp",
+      "sourceColorMode": "4bpp",
+      "originX": 0,
+      "originY": 8,
+      "frames": [
+        {
+          "frameIndex": 0,
+          "sourceFrameIndex": 0,
+          "width": 32,
+          "height": 32,
+          "originX": 8,
+          "originY": 8,
+          "tiles": [
+            {
+              "x": -8,
+              "y": 0,
+              "sliceX": 0,
+              "sliceY": 0,
+              "sourceSheet": "recovered-radio.png",
+              "tileWidth": 32,
               "tileHeight": 32,
               "flipX": false,
               "flipY": false,
@@ -148718,6 +148784,45 @@
         "visualStatus": "approved",
         "approvalDate": "2026-10-25"
       }
+    },
+    {
+      "id": "encore-radio",
+      "name": "recovered-radio.png",
+      "kind": "Sprite",
+      "metadata": {
+        "source": "Assets/sprites/recovered-radio.png",
+        "license": "Original AI-generated artwork under user direction",
+        "generatedBy": "image_gen + gba-sprite-prep",
+        "reviewStatus": "approved",
+        "approved": true,
+        "preparedSha256": "b46ecd3a9f7d054cf41764d10f17a42baa32aa7f257714e79bfe471085d12761",
+        "frameWidth": 32,
+        "frameHeight": 32,
+        "frameCount": 1,
+        "colorMode": "4bpp",
+        "anchor": "bottom-center",
+        "visualStatus": "approved",
+        "approvalDate": "2026-10-25"
+      }
+    },
+    {
+      "id": "encore-radio-pcm",
+      "name": "radio-lume-pcm.wav",
+      "kind": "SFX",
+      "metadata": {
+        "source": "Assets/audio/radio-lume-pcm.wav",
+        "license": "MIT; original deterministic synthesis, generate-radio-pcm.mjs",
+        "generatedBy": "generate-radio-pcm.mjs",
+        "reviewStatus": "approved",
+        "approved": true,
+        "preparedSha256": "4ddca1394c4bfd8ae14a3128e8e48c0f23e6bebaf445e97d2007f1f5cb8e4cab",
+        "sampleRate": 15768,
+        "channels": 1,
+        "bitsPerSample": 16,
+        "durationSeconds": 4,
+        "visualStatus": "not-applicable",
+        "approvalDate": "2026-10-25"
+      }
     }
   ],
   "audioItems": [
@@ -157363,6 +157468,16 @@
         "map-B-part-2",
         "map-B-part-3"
       ]
+    },
+    {
+      "id": "encore-radio-pcm",
+      "name": "radio-lume-pcm.wav",
+      "kind": "SFX",
+      "format": "WAV",
+      "sourceAssetID": "encore-radio-pcm",
+      "exportID": "radio_lume_pcm",
+      "loops": false,
+      "volume": 80
     }
   ],
   "dialogues": [
@@ -159677,23 +159792,27 @@
       "choices": [
         "Buy tool",
         "Equipment",
-        "Talk"
+        "Talk",
+        "Arena training"
       ],
       "choiceTranslations": {
         "pt-BR": [
           "Comprar ferramenta",
           "Equipamento",
-          "Conversar"
+          "Conversar",
+          "Treino da Arena"
         ],
         "es": [
           "Comprar herramienta",
           "Equipo",
-          "Conversar"
+          "Conversar",
+          "Entrenamiento de Arena"
         ],
         "en": [
           "Buy tool",
           "Equipment",
-          "Talk"
+          "Talk",
+          "Arena training"
         ]
       },
       "translationStatus": {
@@ -160843,6 +160962,168 @@
         "en": "draft-ai",
         "es": "draft-ai"
       }
+    },
+    {
+      "key": "encore_radio_message",
+      "character": "",
+      "portrait": "",
+      "emote": "",
+      "text": "Transcript: L U M E. Call sign received. The coastal network responds. The operator noted: the Lighthouse is the relay maintenance point.",
+      "translations": {
+        "pt-BR": "Transcrição: L U M E. Indicativo recebido. A rede da costa responde. O operador anotou: o Farol é o ponto de manutenção do relé.",
+        "en": "Transcript: L U M E. Call sign received. The coastal network responds. The operator noted: the Lighthouse is the relay maintenance point.",
+        "es": "Transcripción: L U M E. Indicativo recibido. La red costera responde. El operador anotó: el Faro es el punto de mantenimiento del relé."
+      },
+      "choices": [],
+      "choiceTranslations": {
+        "pt-BR": [],
+        "en": [],
+        "es": []
+      },
+      "translationStatus": {
+        "pt-BR": "draft-ai",
+        "en": "draft-ai",
+        "es": "draft-ai"
+      },
+      "textSound": "farol_sfx_texto",
+      "confirmSound": "farol_sfx_dialogo"
+    },
+    {
+      "key": "encore_arena_guard",
+      "character": "",
+      "portrait": "",
+      "emote": "",
+      "text": "Training 1/2: X-ISM. Left/right: move. Down: guard. A: punch; B: kick. Win one round to advance. Select: leave. Each lesson starts with a save in slot 1.",
+      "translations": {
+        "pt-BR": "Treino 1/2: X-ISM. Esquerda/direita: aproximar. Baixo: defender. A: soco; B: chute. Vença um round para avançar. Select: sair. O início de cada etapa é salvo no espaço 1.",
+        "en": "Training 1/2: X-ISM. Left/right: move. Down: guard. A: punch; B: kick. Win one round to advance. Select: leave. Each lesson starts with a save in slot 1.",
+        "es": "Entrenamiento 1/2: X-ISM. Izquierda/derecha: mover. Abajo: defender. A: puño; B: patada. Gana un asalto para avanzar. Select: salir. Cada etapa se guarda al inicio en el espacio 1."
+      },
+      "choices": [],
+      "choiceTranslations": {
+        "pt-BR": [],
+        "en": [],
+        "es": []
+      },
+      "translationStatus": {
+        "pt-BR": "draft-ai",
+        "en": "draft-ai",
+        "es": "draft-ai"
+      },
+      "textSound": "farol_sfx_texto",
+      "confirmSound": "farol_sfx_dialogo"
+    },
+    {
+      "key": "encore_arena_super",
+      "character": "",
+      "portrait": "",
+      "emote": "",
+      "text": "Training 2/2: A-ISM. SUPER starts full. L: super; R: alpha counter just after taking a hit (half gauge). Watch the gauge decrease. Win one round. Select: leave.",
+      "translations": {
+        "pt-BR": "Treino 2/2: A-ISM. A barra SUPER começa cheia. L: especial; R: contra-ataque alfa logo após receber um golpe (meia barra). Observe a barra diminuir. Vença um round. Select: sair.",
+        "en": "Training 2/2: A-ISM. SUPER starts full. L: super; R: alpha counter just after taking a hit (half gauge). Watch the gauge decrease. Win one round. Select: leave.",
+        "es": "Entrenamiento 2/2: A-ISM. SUPER empieza lleno. L: especial; R: contraataque alfa justo después de recibir un golpe (media barra). Observa la barra bajar. Gana un asalto. Select: salir."
+      },
+      "choices": [],
+      "choiceTranslations": {
+        "pt-BR": [],
+        "en": [],
+        "es": []
+      },
+      "translationStatus": {
+        "pt-BR": "draft-ai",
+        "en": "draft-ai",
+        "es": "draft-ai"
+      },
+      "textSound": "farol_sfx_texto",
+      "confirmSound": "farol_sfx_dialogo"
+    },
+    {
+      "key": "encore_arena_retry",
+      "character": "",
+      "portrait": "",
+      "emote": "",
+      "text": "Let us repeat this lesson. Guard before answering and watch your attack range.",
+      "translations": {
+        "pt-BR": "Vamos repetir esta etapa. Defenda antes de responder e observe a distância dos golpes.",
+        "en": "Let us repeat this lesson. Guard before answering and watch your attack range.",
+        "es": "Repitamos esta etapa. Defiende antes de responder y observa el alcance de los golpes."
+      },
+      "choices": [],
+      "choiceTranslations": {
+        "pt-BR": [],
+        "en": [],
+        "es": []
+      },
+      "translationStatus": {
+        "pt-BR": "draft-ai",
+        "en": "draft-ai",
+        "es": "draft-ai"
+      },
+      "textSound": "farol_sfx_texto",
+      "confirmSound": "farol_sfx_dialogo"
+    },
+    {
+      "key": "encore_arena_done",
+      "character": "",
+      "portrait": "",
+      "emote": "",
+      "text": "Training complete! You tried guard, two styles and the SUPER gauge. Ask the Trader to repeat. Campaign results are tracked separately.",
+      "translations": {
+        "pt-BR": "Treino concluído! Você experimentou defesa, dois estilos e a barra SUPER. Pode repetir com o Viajante. O resultado da campanha continua separado.",
+        "en": "Training complete! You tried guard, two styles and the SUPER gauge. Ask the Trader to repeat. Campaign results are tracked separately.",
+        "es": "¡Entrenamiento completo! Probaste defensa, dos estilos y la barra SUPER. Pide al Viajero repetir. El resultado de la campaña se registra por separado."
+      },
+      "choices": [],
+      "choiceTranslations": {
+        "pt-BR": [],
+        "en": [],
+        "es": []
+      },
+      "translationStatus": {
+        "pt-BR": "draft-ai",
+        "en": "draft-ai",
+        "es": "draft-ai"
+      },
+      "textSound": "farol_sfx_texto",
+      "confirmSound": "farol_sfx_dialogo"
+    },
+    {
+      "key": "encore_epilogue_menu",
+      "character": "",
+      "portrait": "",
+      "emote": "",
+      "text": "The route is open. Revisit the path that reconnected the coast? B skips the tour; Start lets you save.",
+      "translations": {
+        "pt-BR": "A rota está livre. Quer rever o caminho que reconectou a costa? B pula o passeio; Start permite salvar.",
+        "en": "The route is open. Revisit the path that reconnected the coast? B skips the tour; Start lets you save.",
+        "es": "La ruta está libre. ¿Revisitar el camino que reconectó la costa? B omite el paseo; Start permite guardar."
+      },
+      "choices": [
+        "Replay epilogue",
+        "Talk"
+      ],
+      "choiceTranslations": {
+        "pt-BR": [
+          "Rever epílogo",
+          "Conversar"
+        ],
+        "en": [
+          "Replay epilogue",
+          "Talk"
+        ],
+        "es": [
+          "Repetir epílogo",
+          "Conversar"
+        ]
+      },
+      "translationStatus": {
+        "pt-BR": "draft-ai",
+        "en": "draft-ai",
+        "es": "draft-ai"
+      },
+      "textSound": "farol_sfx_texto",
+      "confirmSound": "farol_sfx_dialogo"
     }
   ],
   "editorState": {
@@ -162260,6 +162541,26 @@
           "id": "coast-reset-var_coast_clock_ready",
           "command": "set_variable var_coast_clock_ready 1",
           "isEnabled": true
+        },
+        {
+          "id": "encore-reset-var_radio_heard",
+          "command": "set_variable var_radio_heard 0",
+          "isEnabled": true
+        },
+        {
+          "id": "encore-reset-var_epilogue_phase",
+          "command": "set_variable var_epilogue_phase 0",
+          "isEnabled": true
+        },
+        {
+          "id": "encore-reset-var_epilogue_tick",
+          "command": "set_variable var_epilogue_tick 0",
+          "isEnabled": true
+        },
+        {
+          "id": "encore-reset-var_arena_lesson",
+          "command": "set_variable var_arena_lesson 0",
+          "isEnabled": true
         }
       ]
     },
@@ -162470,32 +162771,52 @@
       "id": "porto_ao_entrar",
       "name": "porto_ao_entrar",
       "roomName": "porto_lumen",
-      "category": "Cena",
+      "category": "Exemplo · Rádio, epílogo e treino",
       "command": "noop",
       "steps": [
         {
-          "id": "porto_ao_entrar-coast-audio-preferences",
-          "command": "call_procedure coast_audio_preferences",
-          "isEnabled": true
-        },
-        {
-          "id": "porto_ao_entrar-coast-audio-mute",
-          "command": "call_procedure coast_audio_mute",
-          "isEnabled": true
-        },
-        {
-          "id": "porto_ao_entrar-coast-music",
-          "command": "fade_audio_volume music 100 45 var_audio_music_volume var_audio_master_volume",
-          "isEnabled": true
-        },
-        {
           "id": "porto_ao_entrar-0",
-          "command": "call_procedure coast_base_porto_ao_entrar",
+          "command": "if_variable var_epilogue_phase 1",
           "isEnabled": true
         },
         {
           "id": "porto_ao_entrar-1",
-          "command": "call_procedure coast_port_restore",
+          "command": "call_procedure encore_epilogue_1_restore_boot",
+          "isEnabled": true
+        },
+        {
+          "id": "porto_ao_entrar-2",
+          "command": "else",
+          "isEnabled": true
+        },
+        {
+          "id": "porto_ao_entrar-3",
+          "command": "if_variable var_epilogue_phase 4",
+          "isEnabled": true
+        },
+        {
+          "id": "porto_ao_entrar-4",
+          "command": "call_procedure encore_epilogue_1_restore_boot",
+          "isEnabled": true
+        },
+        {
+          "id": "porto_ao_entrar-5",
+          "command": "else",
+          "isEnabled": true
+        },
+        {
+          "id": "porto_ao_entrar-6",
+          "command": "call_procedure encore_base_porto_ao_entrar",
+          "isEnabled": true
+        },
+        {
+          "id": "porto_ao_entrar-7",
+          "command": "condition_end",
+          "isEnabled": true
+        },
+        {
+          "id": "porto_ao_entrar-8",
+          "command": "condition_end",
           "isEnabled": true
         }
       ]
@@ -162586,41 +162907,55 @@
       ]
     },
     {
-      "id": "event-lighthouse-enter",
+      "id": "farol_interior_ao_entrar",
       "name": "farol_interior_ao_entrar",
       "roomName": "farol_interior",
-      "category": "Exemplo · Sistemas conectados",
-      "detail": "Exemplo de sistemas conectados: estado persistente, requisitos e efeitos separados do cenário.",
+      "category": "Exemplo · Rádio, epílogo e treino",
       "command": "noop",
       "steps": [
         {
-          "id": "farol_interior_ao_entrar-coast-audio-preferences",
-          "command": "call_procedure coast_audio_preferences",
-          "isEnabled": true
-        },
-        {
-          "id": "farol_interior_ao_entrar-coast-audio-mute",
-          "command": "call_procedure coast_audio_mute",
-          "isEnabled": true
-        },
-        {
-          "id": "farol_interior_ao_entrar-coast-music",
-          "command": "fade_audio_volume music 70 45 var_audio_music_volume var_audio_master_volume",
-          "isEnabled": true
-        },
-        {
-          "id": "farol-relay-entry-sync",
-          "command": "call_procedure farol_relay_sync",
+          "id": "farol_interior_ao_entrar-0",
+          "command": "if_variable var_epilogue_phase 2",
           "isEnabled": true
         },
         {
           "id": "farol_interior_ao_entrar-1",
-          "command": "call_procedure showcase_trial_watchdog",
+          "command": "call_procedure encore_epilogue_2_restore_boot",
           "isEnabled": true
         },
         {
           "id": "farol_interior_ao_entrar-2",
-          "command": "call_procedure showcase_base_farol_enter",
+          "command": "else",
+          "isEnabled": true
+        },
+        {
+          "id": "farol_interior_ao_entrar-3",
+          "command": "if_variable var_epilogue_phase 5",
+          "isEnabled": true
+        },
+        {
+          "id": "farol_interior_ao_entrar-4",
+          "command": "call_procedure encore_epilogue_2_restore_boot",
+          "isEnabled": true
+        },
+        {
+          "id": "farol_interior_ao_entrar-5",
+          "command": "else",
+          "isEnabled": true
+        },
+        {
+          "id": "farol_interior_ao_entrar-6",
+          "command": "call_procedure encore_base_farol_interior_ao_entrar",
+          "isEnabled": true
+        },
+        {
+          "id": "farol_interior_ao_entrar-7",
+          "command": "condition_end",
+          "isEnabled": true
+        },
+        {
+          "id": "farol_interior_ao_entrar-8",
+          "command": "condition_end",
           "isEnabled": true
         }
       ]
@@ -163755,81 +164090,148 @@
       ]
     },
     {
-      "id": "event-arena-enter",
+      "id": "arena_ao_entrar",
       "name": "arena_ao_entrar",
       "roomName": "arena_arrancada",
-      "category": "Cena",
-      "detail": "Autoria: arena_ao_entrar. Sequência editável com 1 passos. Os eventos chamados permanecem acessíveis na timeline. Vínculos: rooms.16 (onInit).",
+      "category": "Exemplo · Rádio, epílogo e treino",
       "command": "noop",
       "steps": [
         {
-          "id": "arena_ao_entrar-coast-audio-preferences",
-          "command": "call_procedure coast_audio_preferences",
+          "id": "arena_ao_entrar-0",
+          "command": "call_procedure encore_base_arena_ao_entrar",
           "isEnabled": true
         },
         {
-          "id": "arena_ao_entrar-coast-audio-mute",
-          "command": "call_procedure coast_audio_mute",
+          "id": "arena_ao_entrar-1",
+          "command": "if_variable_greater_than var_arena_lesson 0",
           "isEnabled": true
         },
         {
-          "id": "arena_ao_entrar-coast-music",
-          "command": "fade_audio_volume music 100 45 var_audio_music_volume var_audio_master_volume",
+          "id": "arena_ao_entrar-2",
+          "command": "call_procedure encore_arena_lesson",
           "isEnabled": true
         },
         {
-          "id": "event-arena-enter-music",
-          "command": "play_music farol_arena_mare",
+          "id": "arena_ao_entrar-3",
+          "command": "condition_end",
           "isEnabled": true
         }
       ]
     },
     {
-      "id": "event-arena-win",
+      "id": "arena_vencer_rival",
       "name": "arena_vencer_rival",
       "roomName": "arena_arrancada",
-      "category": "Cena",
-      "detail": "Autoria: arena_vencer_rival. Sequência editável com 3 passos. Os eventos chamados permanecem acessíveis na timeline. Vínculos: rooms.16 (onVictory).",
+      "category": "Exemplo · Rádio, epílogo e treino",
       "command": "noop",
       "steps": [
         {
-          "id": "event-arena-win-step-1",
-          "command": "set_variable var_boost 1",
+          "id": "arena_vencer_rival-0",
+          "command": "if_variable var_arena_lesson 1",
           "isEnabled": true
         },
         {
-          "id": "tide-item-encore_base_arena_vencer_rival",
-          "command": "show_dialogue tide_module_boost",
+          "id": "arena_vencer_rival-1",
+          "command": "set_variable var_arena_lesson 2",
           "isEnabled": true
         },
         {
-          "id": "event-arena-win-step-2",
-          "command": "save_game 0",
+          "id": "arena_vencer_rival-2",
+          "command": "luta_start_match arena_arrancada",
           "isEnabled": true
         },
         {
-          "id": "event-arena-win-step-3",
-          "command": "advance_campaign",
+          "id": "arena_vencer_rival-3",
+          "command": "call_procedure encore_arena_lesson",
+          "isEnabled": true
+        },
+        {
+          "id": "arena_vencer_rival-4",
+          "command": "else",
+          "isEnabled": true
+        },
+        {
+          "id": "arena_vencer_rival-5",
+          "command": "if_variable var_arena_lesson 2",
+          "isEnabled": true
+        },
+        {
+          "id": "arena_vencer_rival-6",
+          "command": "set_variable var_arena_lesson 3",
+          "isEnabled": true
+        },
+        {
+          "id": "arena_vencer_rival-7",
+          "command": "show_dialogue encore_arena_done",
+          "isEnabled": true
+        },
+        {
+          "id": "arena_vencer_rival-8",
+          "command": "call_procedure encore_arena_exit",
+          "isEnabled": true
+        },
+        {
+          "id": "arena_vencer_rival-9",
+          "command": "else",
+          "isEnabled": true
+        },
+        {
+          "id": "arena_vencer_rival-10",
+          "command": "call_procedure encore_base_arena_vencer_rival",
+          "isEnabled": true
+        },
+        {
+          "id": "arena_vencer_rival-11",
+          "command": "condition_end",
+          "isEnabled": true
+        },
+        {
+          "id": "arena_vencer_rival-12",
+          "command": "condition_end",
           "isEnabled": true
         }
       ]
     },
     {
-      "id": "event-arena-lose",
+      "id": "arena_derrota",
       "name": "arena_derrota",
       "roomName": "arena_arrancada",
-      "category": "Cena",
-      "detail": "Autoria: arena_derrota. Sequência editável com 2 passos. Os eventos chamados permanecem acessíveis na timeline. Vínculos: rooms.16 (onDefeat).",
+      "category": "Exemplo · Rádio, epílogo e treino",
       "command": "noop",
       "steps": [
         {
-          "id": "event-arena-lose-step-1",
-          "command": "show_dialogue arena_derrota",
+          "id": "arena_derrota-0",
+          "command": "if_variable_greater_than var_arena_lesson 0",
           "isEnabled": true
         },
         {
-          "id": "event-arena-lose-step-2",
-          "command": "change_scene arena_arrancada 9 15 right",
+          "id": "arena_derrota-1",
+          "command": "show_dialogue encore_arena_retry",
+          "isEnabled": true
+        },
+        {
+          "id": "arena_derrota-2",
+          "command": "luta_start_match arena_arrancada",
+          "isEnabled": true
+        },
+        {
+          "id": "arena_derrota-3",
+          "command": "call_procedure encore_arena_lesson",
+          "isEnabled": true
+        },
+        {
+          "id": "arena_derrota-4",
+          "command": "else",
+          "isEnabled": true
+        },
+        {
+          "id": "arena_derrota-5",
+          "command": "call_procedure encore_base_arena_derrota",
+          "isEnabled": true
+        },
+        {
+          "id": "arena_derrota-6",
+          "command": "condition_end",
           "isEnabled": true
         }
       ]
@@ -163879,7 +164281,7 @@
         },
         {
           "id": "circuito_concluir-8",
-          "command": "advance_campaign",
+          "command": "call_procedure encore_epilogue_begin",
           "isEnabled": true
         }
       ]
@@ -165835,27 +166237,42 @@
       "id": "porto_conversar_captain",
       "name": "porto_conversar_captain",
       "roomName": "porto_lumen",
-      "category": "Cena",
+      "category": "Exemplo · Rádio, epílogo e treino",
       "command": "noop",
       "steps": [
         {
           "id": "porto_conversar_captain-0",
-          "command": "if_variable_greater_than var_coast_evening 0",
+          "command": "if_variable var_campaign_finished 1",
           "isEnabled": true
         },
         {
           "id": "porto_conversar_captain-1",
-          "command": "show_dialogue coast_captain_shift",
+          "command": "choice_event encore_epilogue_menu 0 encore_epilogue_replay",
           "isEnabled": true
         },
         {
           "id": "porto_conversar_captain-2",
-          "command": "condition_end",
+          "command": "choice_event encore_epilogue_menu 1 encore_epilogue_talk",
           "isEnabled": true
         },
         {
           "id": "porto_conversar_captain-3",
-          "command": "call_procedure coast_base_porto_conversar_captain",
+          "command": "show_choice encore_epilogue_menu",
+          "isEnabled": true
+        },
+        {
+          "id": "porto_conversar_captain-4",
+          "command": "else",
+          "isEnabled": true
+        },
+        {
+          "id": "porto_conversar_captain-5",
+          "command": "call_procedure encore_base_porto_conversar_captain",
+          "isEnabled": true
+        },
+        {
+          "id": "porto_conversar_captain-6",
+          "command": "condition_end",
           "isEnabled": true
         }
       ]
@@ -165868,6 +166285,11 @@
       "detail": "Exemplo de sistemas conectados: estado persistente, requisitos e efeitos separados do cenário.",
       "command": "noop",
       "steps": [
+        {
+          "id": "encore-trader-training",
+          "command": "choice_event showcase_trader_menu 3 encore_arena_begin",
+          "isEnabled": true
+        },
         {
           "id": "porto_conversar_traveler-1",
           "command": "choice_event showcase_trader_menu 0 showcase_open_shop",
@@ -174540,6 +174962,1006 @@
           "isEnabled": true
         }
       ]
+    },
+    {
+      "id": "encore_radio_menu",
+      "name": "encore_radio_menu",
+      "roomName": "armazem_das_mares",
+      "category": "Exemplo · Rádio, epílogo e treino",
+      "command": "noop",
+      "steps": [
+        {
+          "id": "encore_radio_menu-0",
+          "command": "call_procedure encore_radio_play",
+          "isEnabled": true
+        }
+      ]
+    },
+    {
+      "id": "encore_radio_play",
+      "name": "encore_radio_play",
+      "roomName": "armazem_das_mares",
+      "category": "Exemplo · Rádio, epílogo e treino",
+      "command": "noop",
+      "steps": [
+        {
+          "id": "encore_radio_play-0",
+          "command": "play_sfx radio-lume-pcm.wav 80 12",
+          "isEnabled": true
+        },
+        {
+          "id": "encore_radio_play-1",
+          "command": "show_dialogue encore_radio_message",
+          "isEnabled": true
+        },
+        {
+          "id": "encore_radio_play-2",
+          "command": "set_variable var_radio_heard 1",
+          "isEnabled": true
+        },
+        {
+          "id": "encore_radio_play-3",
+          "command": "save_game 0",
+          "isEnabled": true
+        }
+      ],
+      "eventKind": "procedure",
+      "procedure": {
+        "parameters": [],
+        "locals": []
+      }
+    },
+    {
+      "id": "encore_arena_begin",
+      "name": "encore_arena_begin",
+      "roomName": "porto_lumen",
+      "category": "Exemplo · Rádio, epílogo e treino",
+      "command": "noop",
+      "steps": [
+        {
+          "id": "encore_arena_begin-0",
+          "command": "set_variable var_arena_lesson 1",
+          "isEnabled": true
+        },
+        {
+          "id": "encore_arena_begin-1",
+          "command": "change_scene arena_arrancada 9 15 right",
+          "isEnabled": true
+        }
+      ]
+    },
+    {
+      "id": "encore_base_arena_ao_entrar",
+      "name": "encore_base_arena_ao_entrar",
+      "roomName": "arena_arrancada",
+      "category": "Cena",
+      "detail": "Autoria: arena_ao_entrar. Sequência editável com 1 passos. Os eventos chamados permanecem acessíveis na timeline. Vínculos: rooms.16 (onInit).",
+      "command": "noop",
+      "steps": [
+        {
+          "id": "arena_ao_entrar-coast-audio-preferences",
+          "command": "call_procedure coast_audio_preferences",
+          "isEnabled": true
+        },
+        {
+          "id": "arena_ao_entrar-coast-audio-mute",
+          "command": "call_procedure coast_audio_mute",
+          "isEnabled": true
+        },
+        {
+          "id": "arena_ao_entrar-coast-music",
+          "command": "fade_audio_volume music 100 45 var_audio_music_volume var_audio_master_volume",
+          "isEnabled": true
+        },
+        {
+          "id": "event-arena-enter-music",
+          "command": "play_music farol_arena_mare",
+          "isEnabled": true
+        }
+      ],
+      "eventKind": "procedure",
+      "procedure": {
+        "parameters": [],
+        "locals": []
+      }
+    },
+    {
+      "id": "encore_arena_lesson",
+      "name": "encore_arena_lesson",
+      "roomName": "arena_arrancada",
+      "category": "Exemplo · Rádio, epílogo e treino",
+      "command": "noop",
+      "steps": [
+        {
+          "id": "encore_arena_lesson-0",
+          "command": "attach_button select encore_arena_leave_button true",
+          "isEnabled": true
+        },
+        {
+          "id": "encore_arena_lesson-1",
+          "command": "luta_set_rounds_to_win 1",
+          "isEnabled": true
+        },
+        {
+          "id": "encore_arena_lesson-2",
+          "command": "luta_set_round_timer 60",
+          "isEnabled": true
+        },
+        {
+          "id": "encore_arena_lesson-3",
+          "command": "luta_set_guard_power nara-fighter 100",
+          "isEnabled": true
+        },
+        {
+          "id": "encore_arena_lesson-4",
+          "command": "if_variable var_arena_lesson 1",
+          "isEnabled": true
+        },
+        {
+          "id": "encore_arena_lesson-5",
+          "command": "luta_set_ism_style nara-fighter x-ism",
+          "isEnabled": true
+        },
+        {
+          "id": "encore_arena_lesson-6",
+          "command": "show_dialogue encore_arena_guard",
+          "isEnabled": true
+        },
+        {
+          "id": "encore_arena_lesson-7",
+          "command": "else",
+          "isEnabled": true
+        },
+        {
+          "id": "encore_arena_lesson-8",
+          "command": "luta_set_ism_style nara-fighter a-ism",
+          "isEnabled": true
+        },
+        {
+          "id": "encore_arena_lesson-9",
+          "command": "luta_set_super_gauge nara-fighter 100",
+          "isEnabled": true
+        },
+        {
+          "id": "encore_arena_lesson-10",
+          "command": "luta_enable_alpha_counter nara-fighter true",
+          "isEnabled": true
+        },
+        {
+          "id": "encore_arena_lesson-11",
+          "command": "show_dialogue encore_arena_super",
+          "isEnabled": true
+        },
+        {
+          "id": "encore_arena_lesson-12",
+          "command": "condition_end",
+          "isEnabled": true
+        },
+        {
+          "id": "encore_arena_lesson-13",
+          "command": "save_game 0",
+          "isEnabled": true
+        }
+      ],
+      "eventKind": "procedure",
+      "procedure": {
+        "parameters": [],
+        "locals": []
+      }
+    },
+    {
+      "id": "encore_arena_leave_button",
+      "name": "encore_arena_leave_button",
+      "roomName": "arena_arrancada",
+      "category": "Exemplo · Rádio, epílogo e treino",
+      "command": "noop",
+      "steps": [
+        {
+          "id": "encore_arena_leave_button-0",
+          "command": "call_procedure encore_arena_exit",
+          "isEnabled": true
+        }
+      ]
+    },
+    {
+      "id": "encore_base_arena_vencer_rival",
+      "name": "encore_base_arena_vencer_rival",
+      "roomName": "arena_arrancada",
+      "category": "Cena",
+      "detail": "Autoria: arena_vencer_rival. Sequência editável com 3 passos. Os eventos chamados permanecem acessíveis na timeline. Vínculos: rooms.16 (onVictory).",
+      "command": "noop",
+      "steps": [
+        {
+          "id": "event-arena-win-step-1",
+          "command": "set_variable var_boost 1",
+          "isEnabled": true
+        },
+        {
+          "id": "tide-item-encore_base_arena_vencer_rival",
+          "command": "show_dialogue tide_module_boost",
+          "isEnabled": true
+        },
+        {
+          "id": "event-arena-win-step-2",
+          "command": "save_game 0",
+          "isEnabled": true
+        },
+        {
+          "id": "event-arena-win-step-3",
+          "command": "advance_campaign",
+          "isEnabled": true
+        }
+      ],
+      "eventKind": "procedure",
+      "procedure": {
+        "parameters": [],
+        "locals": []
+      }
+    },
+    {
+      "id": "encore_base_arena_derrota",
+      "name": "encore_base_arena_derrota",
+      "roomName": "arena_arrancada",
+      "category": "Cena",
+      "detail": "Autoria: arena_derrota. Sequência editável com 2 passos. Os eventos chamados permanecem acessíveis na timeline. Vínculos: rooms.16 (onDefeat).",
+      "command": "noop",
+      "steps": [
+        {
+          "id": "event-arena-lose-step-1",
+          "command": "show_dialogue arena_derrota",
+          "isEnabled": true
+        },
+        {
+          "id": "event-arena-lose-step-2",
+          "command": "change_scene arena_arrancada 9 15 right",
+          "isEnabled": true
+        }
+      ],
+      "eventKind": "procedure",
+      "procedure": {
+        "parameters": [],
+        "locals": []
+      }
+    },
+    {
+      "id": "encore_arena_exit",
+      "name": "encore_arena_exit",
+      "roomName": "arena_arrancada",
+      "category": "Exemplo · Rádio, epílogo e treino",
+      "command": "noop",
+      "steps": [
+        {
+          "id": "encore_arena_exit-0",
+          "command": "remove_button select",
+          "isEnabled": true
+        },
+        {
+          "id": "encore_arena_exit-1",
+          "command": "set_variable var_arena_lesson 0",
+          "isEnabled": true
+        },
+        {
+          "id": "encore_arena_exit-2",
+          "command": "change_scene porto_lumen 41 64 down",
+          "isEnabled": true
+        }
+      ],
+      "eventKind": "procedure",
+      "procedure": {
+        "parameters": [],
+        "locals": []
+      }
+    },
+    {
+      "id": "encore_epilogue_begin",
+      "name": "encore_epilogue_begin",
+      "roomName": "circuito_final",
+      "category": "Exemplo · Rádio, epílogo e treino",
+      "command": "noop",
+      "steps": [
+        {
+          "id": "encore_epilogue_begin-0",
+          "command": "set_variable var_epilogue_phase 1",
+          "isEnabled": true
+        },
+        {
+          "id": "encore_epilogue_begin-1",
+          "command": "change_scene porto_lumen 37 68 up",
+          "isEnabled": true
+        }
+      ],
+      "eventKind": "procedure",
+      "procedure": {
+        "parameters": [],
+        "locals": []
+      }
+    },
+    {
+      "id": "encore_epilogue_replay",
+      "name": "encore_epilogue_replay",
+      "roomName": "porto_lumen",
+      "category": "Exemplo · Rádio, epílogo e treino",
+      "command": "noop",
+      "steps": [
+        {
+          "id": "encore_epilogue_replay-0",
+          "command": "set_variable var_epilogue_phase 4",
+          "isEnabled": true
+        },
+        {
+          "id": "encore_epilogue_replay-1",
+          "command": "set_actor_position port-nara 37 68",
+          "isEnabled": true
+        },
+        {
+          "id": "encore_epilogue_replay-2",
+          "command": "set_actor_direction port-nara up",
+          "isEnabled": true
+        },
+        {
+          "id": "encore_epilogue_replay-3",
+          "command": "call_procedure encore_epilogue_1_restore",
+          "isEnabled": true
+        }
+      ]
+    },
+    {
+      "id": "encore_base_porto_conversar_captain",
+      "name": "encore_base_porto_conversar_captain",
+      "roomName": "porto_lumen",
+      "category": "Cena",
+      "command": "noop",
+      "steps": [
+        {
+          "id": "porto_conversar_captain-0",
+          "command": "if_variable_greater_than var_coast_evening 0",
+          "isEnabled": true
+        },
+        {
+          "id": "porto_conversar_captain-1",
+          "command": "show_dialogue coast_captain_shift",
+          "isEnabled": true
+        },
+        {
+          "id": "porto_conversar_captain-2",
+          "command": "condition_end",
+          "isEnabled": true
+        },
+        {
+          "id": "porto_conversar_captain-3",
+          "command": "call_procedure coast_base_porto_conversar_captain",
+          "isEnabled": true
+        }
+      ],
+      "eventKind": "procedure",
+      "procedure": {
+        "parameters": [],
+        "locals": []
+      }
+    },
+    {
+      "id": "encore_epilogue_talk",
+      "name": "encore_epilogue_talk",
+      "roomName": "porto_lumen",
+      "category": "Exemplo · Rádio, epílogo e treino",
+      "command": "noop",
+      "steps": [
+        {
+          "id": "encore_epilogue_talk-0",
+          "command": "call_procedure encore_base_porto_conversar_captain",
+          "isEnabled": true
+        }
+      ]
+    },
+    {
+      "id": "encore_epilogue_1_restore",
+      "name": "encore_epilogue_1_restore",
+      "roomName": "porto_lumen",
+      "category": "Exemplo · Rádio, epílogo e treino",
+      "command": "noop",
+      "steps": [
+        {
+          "id": "encore_epilogue_1_restore-0",
+          "command": "if_variable var_epilogue_phase 1",
+          "isEnabled": true
+        },
+        {
+          "id": "encore_epilogue_1_restore-1",
+          "command": "call_procedure encore_epilogue_1_restore_start",
+          "isEnabled": true
+        },
+        {
+          "id": "encore_epilogue_1_restore-2",
+          "command": "else",
+          "isEnabled": true
+        },
+        {
+          "id": "encore_epilogue_1_restore-3",
+          "command": "if_variable var_epilogue_phase 4",
+          "isEnabled": true
+        },
+        {
+          "id": "encore_epilogue_1_restore-4",
+          "command": "call_procedure encore_epilogue_1_restore_start",
+          "isEnabled": true
+        },
+        {
+          "id": "encore_epilogue_1_restore-5",
+          "command": "condition_end",
+          "isEnabled": true
+        },
+        {
+          "id": "encore_epilogue_1_restore-6",
+          "command": "condition_end",
+          "isEnabled": true
+        }
+      ],
+      "eventKind": "procedure",
+      "procedure": {
+        "parameters": [],
+        "locals": []
+      }
+    },
+    {
+      "id": "encore_epilogue_1_restore_start",
+      "name": "encore_epilogue_1_restore_start",
+      "roomName": "porto_lumen",
+      "category": "Exemplo · Rádio, epílogo e treino",
+      "command": "noop",
+      "steps": [
+        {
+          "id": "encore_epilogue_1_restore_start-0",
+          "command": "pause_scene_type topdown",
+          "isEnabled": true
+        },
+        {
+          "id": "encore_epilogue_1_restore_start-1",
+          "command": "attach_button b encore_epilogue_skip true",
+          "isEnabled": true
+        },
+        {
+          "id": "encore_epilogue_1_restore_start-2",
+          "command": "set_variable var_epilogue_tick 0",
+          "isEnabled": true
+        },
+        {
+          "id": "encore_epilogue_1_restore_start-3",
+          "command": "camera_set_position 200 460",
+          "isEnabled": true
+        },
+        {
+          "id": "encore_epilogue_1_restore_start-4",
+          "command": "timer_attach 6 encore_epilogue_1_tick",
+          "isEnabled": true
+        }
+      ],
+      "eventKind": "procedure",
+      "procedure": {
+        "parameters": [],
+        "locals": []
+      }
+    },
+    {
+      "id": "encore_epilogue_1_tick",
+      "name": "encore_epilogue_1_tick",
+      "roomName": "porto_lumen",
+      "category": "Exemplo · Rádio, epílogo e treino",
+      "command": "noop",
+      "steps": [
+        {
+          "id": "encore_epilogue_1_tick-skip-guard-0",
+          "command": "if_variable var_epilogue_phase 3",
+          "isEnabled": true
+        },
+        {
+          "id": "encore_epilogue_1_tick-skip-guard-1",
+          "command": "noop",
+          "isEnabled": true
+        },
+        {
+          "id": "encore_epilogue_1_tick-skip-guard-2",
+          "command": "else",
+          "isEnabled": true
+        },
+        {
+          "id": "encore_epilogue_1_tick-0",
+          "command": "camera_move 1 0",
+          "isEnabled": true
+        },
+        {
+          "id": "encore_epilogue_1_tick-1",
+          "command": "add_variable var_epilogue_tick 1",
+          "isEnabled": true
+        },
+        {
+          "id": "encore_epilogue_1_tick-2",
+          "command": "if_variable_greater_than var_epilogue_tick 63",
+          "isEnabled": true
+        },
+        {
+          "id": "encore_epilogue_1_tick-3",
+          "command": "timer_remove encore_epilogue_1_tick",
+          "isEnabled": true
+        },
+        {
+          "id": "encore_epilogue_1_tick-4",
+          "command": "if_variable var_epilogue_phase 1",
+          "isEnabled": true
+        },
+        {
+          "id": "encore_epilogue_1_tick-5",
+          "command": "set_variable var_epilogue_phase 2",
+          "isEnabled": true
+        },
+        {
+          "id": "encore_epilogue_1_tick-6",
+          "command": "else",
+          "isEnabled": true
+        },
+        {
+          "id": "encore_epilogue_1_tick-7",
+          "command": "set_variable var_epilogue_phase 5",
+          "isEnabled": true
+        },
+        {
+          "id": "encore_epilogue_1_tick-8",
+          "command": "condition_end",
+          "isEnabled": true
+        },
+        {
+          "id": "encore_epilogue_1_tick-9",
+          "command": "change_scene farol_interior 23 27 up",
+          "isEnabled": true
+        },
+        {
+          "id": "encore_epilogue_1_tick-10",
+          "command": "condition_end",
+          "isEnabled": true
+        },
+        {
+          "id": "encore_epilogue_1_tick-skip-guard-end",
+          "command": "condition_end",
+          "isEnabled": true
+        }
+      ]
+    },
+    {
+      "id": "encore_base_porto_ao_entrar",
+      "name": "encore_base_porto_ao_entrar",
+      "roomName": "porto_lumen",
+      "category": "Cena",
+      "command": "noop",
+      "steps": [
+        {
+          "id": "porto_ao_entrar-coast-audio-preferences",
+          "command": "call_procedure coast_audio_preferences",
+          "isEnabled": true
+        },
+        {
+          "id": "porto_ao_entrar-coast-audio-mute",
+          "command": "call_procedure coast_audio_mute",
+          "isEnabled": true
+        },
+        {
+          "id": "porto_ao_entrar-coast-music",
+          "command": "fade_audio_volume music 100 45 var_audio_music_volume var_audio_master_volume",
+          "isEnabled": true
+        },
+        {
+          "id": "porto_ao_entrar-0",
+          "command": "call_procedure coast_base_porto_ao_entrar",
+          "isEnabled": true
+        },
+        {
+          "id": "porto_ao_entrar-1",
+          "command": "call_procedure coast_port_restore",
+          "isEnabled": true
+        }
+      ],
+      "eventKind": "procedure",
+      "procedure": {
+        "parameters": [],
+        "locals": []
+      }
+    },
+    {
+      "id": "encore_epilogue_1_restore_boot",
+      "name": "encore_epilogue_1_restore_boot",
+      "roomName": "porto_lumen",
+      "category": "Exemplo · Rádio, epílogo e treino",
+      "command": "noop",
+      "steps": [
+        {
+          "id": "encore_epilogue_1_restore_boot-0",
+          "command": "call_procedure coast_audio_preferences",
+          "isEnabled": true
+        },
+        {
+          "id": "encore_epilogue_1_restore_boot-1",
+          "command": "call_procedure coast_audio_mute",
+          "isEnabled": true
+        },
+        {
+          "id": "encore_epilogue_1_restore_boot-2",
+          "command": "play_music farol_enseada",
+          "isEnabled": true
+        },
+        {
+          "id": "encore_epilogue_1_restore_boot-3",
+          "command": "call_event coast_restore_porto_lumen",
+          "isEnabled": true
+        },
+        {
+          "id": "encore_epilogue_1_restore_boot-4",
+          "command": "call_procedure encore_epilogue_1_restore",
+          "isEnabled": true
+        }
+      ],
+      "eventKind": "procedure",
+      "procedure": {
+        "parameters": [],
+        "locals": []
+      }
+    },
+    {
+      "id": "encore_restore_porto_lumen",
+      "name": "encore_restore_porto_lumen",
+      "roomName": "porto_lumen",
+      "category": "Exemplo · Rádio, epílogo e treino",
+      "command": "noop",
+      "steps": [
+        {
+          "id": "encore_restore_porto_lumen-0",
+          "command": "call_event coast_restore_porto_lumen",
+          "isEnabled": true
+        },
+        {
+          "id": "encore_restore_porto_lumen-1",
+          "command": "call_procedure encore_epilogue_1_restore",
+          "isEnabled": true
+        }
+      ]
+    },
+    {
+      "id": "encore_epilogue_2_restore",
+      "name": "encore_epilogue_2_restore",
+      "roomName": "farol_interior",
+      "category": "Exemplo · Rádio, epílogo e treino",
+      "command": "noop",
+      "steps": [
+        {
+          "id": "encore_epilogue_2_restore-0",
+          "command": "if_variable var_epilogue_phase 2",
+          "isEnabled": true
+        },
+        {
+          "id": "encore_epilogue_2_restore-1",
+          "command": "call_procedure encore_epilogue_2_restore_start",
+          "isEnabled": true
+        },
+        {
+          "id": "encore_epilogue_2_restore-2",
+          "command": "else",
+          "isEnabled": true
+        },
+        {
+          "id": "encore_epilogue_2_restore-3",
+          "command": "if_variable var_epilogue_phase 5",
+          "isEnabled": true
+        },
+        {
+          "id": "encore_epilogue_2_restore-4",
+          "command": "call_procedure encore_epilogue_2_restore_start",
+          "isEnabled": true
+        },
+        {
+          "id": "encore_epilogue_2_restore-5",
+          "command": "condition_end",
+          "isEnabled": true
+        },
+        {
+          "id": "encore_epilogue_2_restore-6",
+          "command": "condition_end",
+          "isEnabled": true
+        }
+      ],
+      "eventKind": "procedure",
+      "procedure": {
+        "parameters": [],
+        "locals": []
+      }
+    },
+    {
+      "id": "encore_epilogue_2_restore_start",
+      "name": "encore_epilogue_2_restore_start",
+      "roomName": "farol_interior",
+      "category": "Exemplo · Rádio, epílogo e treino",
+      "command": "noop",
+      "steps": [
+        {
+          "id": "encore_epilogue_2_restore_start-0",
+          "command": "pause_scene_type topdown",
+          "isEnabled": true
+        },
+        {
+          "id": "encore_epilogue_2_restore_start-1",
+          "command": "attach_button b encore_epilogue_skip true",
+          "isEnabled": true
+        },
+        {
+          "id": "encore_epilogue_2_restore_start-2",
+          "command": "set_variable var_epilogue_tick 0",
+          "isEnabled": true
+        },
+        {
+          "id": "encore_epilogue_2_restore_start-3",
+          "command": "camera_set_position 0 0",
+          "isEnabled": true
+        },
+        {
+          "id": "encore_epilogue_2_restore_start-4",
+          "command": "timer_attach 6 encore_epilogue_2_tick",
+          "isEnabled": true
+        }
+      ],
+      "eventKind": "procedure",
+      "procedure": {
+        "parameters": [],
+        "locals": []
+      }
+    },
+    {
+      "id": "encore_epilogue_2_tick",
+      "name": "encore_epilogue_2_tick",
+      "roomName": "farol_interior",
+      "category": "Exemplo · Rádio, epílogo e treino",
+      "command": "noop",
+      "steps": [
+        {
+          "id": "encore_epilogue_2_tick-skip-guard-0",
+          "command": "if_variable var_epilogue_phase 3",
+          "isEnabled": true
+        },
+        {
+          "id": "encore_epilogue_2_tick-skip-guard-1",
+          "command": "noop",
+          "isEnabled": true
+        },
+        {
+          "id": "encore_epilogue_2_tick-skip-guard-2",
+          "command": "else",
+          "isEnabled": true
+        },
+        {
+          "id": "encore_epilogue_2_tick-0",
+          "command": "camera_move 1 0",
+          "isEnabled": true
+        },
+        {
+          "id": "encore_epilogue_2_tick-1",
+          "command": "add_variable var_epilogue_tick 1",
+          "isEnabled": true
+        },
+        {
+          "id": "encore_epilogue_2_tick-2",
+          "command": "if_variable_greater_than var_epilogue_tick 47",
+          "isEnabled": true
+        },
+        {
+          "id": "encore_epilogue_2_tick-3",
+          "command": "timer_remove encore_epilogue_2_tick",
+          "isEnabled": true
+        },
+        {
+          "id": "encore_epilogue_2_tick-4",
+          "command": "call_procedure encore_epilogue_finish",
+          "isEnabled": true
+        },
+        {
+          "id": "encore_epilogue_2_tick-5",
+          "command": "condition_end",
+          "isEnabled": true
+        },
+        {
+          "id": "encore_epilogue_2_tick-skip-guard-end",
+          "command": "condition_end",
+          "isEnabled": true
+        }
+      ]
+    },
+    {
+      "id": "encore_base_farol_interior_ao_entrar",
+      "name": "encore_base_farol_interior_ao_entrar",
+      "roomName": "farol_interior",
+      "category": "Exemplo · Sistemas conectados",
+      "detail": "Exemplo de sistemas conectados: estado persistente, requisitos e efeitos separados do cenário.",
+      "command": "noop",
+      "steps": [
+        {
+          "id": "farol_interior_ao_entrar-coast-audio-preferences",
+          "command": "call_procedure coast_audio_preferences",
+          "isEnabled": true
+        },
+        {
+          "id": "farol_interior_ao_entrar-coast-audio-mute",
+          "command": "call_procedure coast_audio_mute",
+          "isEnabled": true
+        },
+        {
+          "id": "farol_interior_ao_entrar-coast-music",
+          "command": "fade_audio_volume music 70 45 var_audio_music_volume var_audio_master_volume",
+          "isEnabled": true
+        },
+        {
+          "id": "farol-relay-entry-sync",
+          "command": "call_procedure farol_relay_sync",
+          "isEnabled": true
+        },
+        {
+          "id": "farol_interior_ao_entrar-1",
+          "command": "call_procedure showcase_trial_watchdog",
+          "isEnabled": true
+        },
+        {
+          "id": "farol_interior_ao_entrar-2",
+          "command": "call_procedure showcase_base_farol_enter",
+          "isEnabled": true
+        }
+      ],
+      "eventKind": "procedure",
+      "procedure": {
+        "parameters": [],
+        "locals": []
+      }
+    },
+    {
+      "id": "encore_epilogue_2_restore_boot",
+      "name": "encore_epilogue_2_restore_boot",
+      "roomName": "farol_interior",
+      "category": "Exemplo · Rádio, epílogo e treino",
+      "command": "noop",
+      "steps": [
+        {
+          "id": "encore_epilogue_2_restore_boot-0",
+          "command": "call_procedure coast_audio_preferences",
+          "isEnabled": true
+        },
+        {
+          "id": "encore_epilogue_2_restore_boot-1",
+          "command": "call_procedure coast_audio_mute",
+          "isEnabled": true
+        },
+        {
+          "id": "encore_epilogue_2_restore_boot-2",
+          "command": "play_music farol_memorias",
+          "isEnabled": true
+        },
+        {
+          "id": "encore_epilogue_2_restore_boot-3",
+          "command": "call_event coast_restore_farol_interior",
+          "isEnabled": true
+        },
+        {
+          "id": "encore_epilogue_2_restore_boot-4",
+          "command": "call_procedure encore_epilogue_2_restore",
+          "isEnabled": true
+        }
+      ],
+      "eventKind": "procedure",
+      "procedure": {
+        "parameters": [],
+        "locals": []
+      }
+    },
+    {
+      "id": "encore_restore_farol_interior",
+      "name": "encore_restore_farol_interior",
+      "roomName": "farol_interior",
+      "category": "Exemplo · Rádio, epílogo e treino",
+      "command": "noop",
+      "steps": [
+        {
+          "id": "encore_restore_farol_interior-0",
+          "command": "call_event coast_restore_farol_interior",
+          "isEnabled": true
+        },
+        {
+          "id": "encore_restore_farol_interior-1",
+          "command": "call_procedure encore_epilogue_2_restore",
+          "isEnabled": true
+        }
+      ]
+    },
+    {
+      "id": "encore_epilogue_skip",
+      "name": "encore_epilogue_skip",
+      "category": "Global",
+      "command": "noop",
+      "steps": [
+        {
+          "id": "encore_epilogue_skip-0",
+          "command": "call_procedure encore_epilogue_finish",
+          "isEnabled": true
+        }
+      ]
+    },
+    {
+      "id": "encore_epilogue_finish",
+      "name": "encore_epilogue_finish",
+      "category": "Global",
+      "command": "noop",
+      "steps": [
+        {
+          "id": "encore_epilogue_finish-0",
+          "command": "timer_remove encore_epilogue_1_tick",
+          "isEnabled": true
+        },
+        {
+          "id": "encore_epilogue_finish-1",
+          "command": "timer_remove encore_epilogue_2_tick",
+          "isEnabled": true
+        },
+        {
+          "id": "encore_epilogue_finish-2",
+          "command": "remove_button b",
+          "isEnabled": true
+        },
+        {
+          "id": "encore_epilogue_finish-3",
+          "command": "resume_scene_type topdown",
+          "isEnabled": true
+        },
+        {
+          "id": "encore_epilogue_finish-4",
+          "command": "camera_follow_player",
+          "isEnabled": true
+        },
+        {
+          "id": "encore_epilogue_finish-5",
+          "command": "if_variable_greater_than var_epilogue_phase 3",
+          "isEnabled": true
+        },
+        {
+          "id": "encore_epilogue_finish-6",
+          "command": "set_variable var_epilogue_phase 3",
+          "isEnabled": true
+        },
+        {
+          "id": "encore_epilogue_finish-7",
+          "command": "change_scene porto_lumen 37 68 up",
+          "isEnabled": true
+        },
+        {
+          "id": "encore_epilogue_finish-8",
+          "command": "else",
+          "isEnabled": true
+        },
+        {
+          "id": "encore_epilogue_finish-9",
+          "command": "set_variable var_epilogue_phase 3",
+          "isEnabled": true
+        },
+        {
+          "id": "encore_epilogue_finish-10",
+          "command": "save_game 0",
+          "isEnabled": true
+        },
+        {
+          "id": "encore_epilogue_finish-11",
+          "command": "change_scene titulo",
+          "isEnabled": true
+        },
+        {
+          "id": "encore_epilogue_finish-12",
+          "command": "condition_end",
+          "isEnabled": true
+        }
+      ],
+      "eventKind": "procedure",
+      "procedure": {
+        "parameters": [],
+        "locals": []
+      }
     }
   ],
   "gbStudioImport": {
@@ -178682,7 +180104,7 @@
       },
       "eventBindings": {
         "onInit": "porto_ao_entrar",
-        "onRestore": "coast_restore_porto_lumen"
+        "onRestore": "encore_restore_porto_lumen"
       },
       "gbStudioName": "03 · Porto da Enseada",
       "gbStudioSceneID": "94c18861-b352-4f49-a64d-52f2e3415077",
@@ -224196,7 +225618,7 @@
       ],
       "eventBindings": {
         "onInit": "farol_interior_ao_entrar",
-        "onRestore": "coast_restore_farol_interior"
+        "onRestore": "encore_restore_farol_interior"
       },
       "gbStudioName": "02 · A Jornada do Farol",
       "gbStudioSceneID": "4912bee2-387a-472f-ae4f-6679b6149517",
@@ -256522,7 +257944,7 @@
       },
       "eventBindings": {
         "onInit": "porto_ao_entrar",
-        "onRestore": "coast_restore_porto_lumen"
+        "onRestore": "encore_restore_porto_lumen"
       },
       "gbStudioName": "03 · Porto da Enseada",
       "gbStudioSceneID": "94c18861-b352-4f49-a64d-52f2e3415077",
@@ -302036,7 +303458,7 @@
       ],
       "eventBindings": {
         "onInit": "farol_interior_ao_entrar",
-        "onRestore": "coast_restore_farol_interior"
+        "onRestore": "encore_restore_farol_interior"
       },
       "gbStudioName": "02 · A Jornada do Farol",
       "gbStudioSceneID": "4912bee2-387a-472f-ae4f-6679b6149517",
@@ -334870,6 +336292,19 @@
       "eventBindings": {
         "onEnter": "tide_leave"
       }
+    },
+    {
+      "id": "encore-radio-hotspot",
+      "name": "Rádio de Lúmen",
+      "roomName": "armazem_das_mares",
+      "x": 23,
+      "y": 7,
+      "width": 3,
+      "height": 3,
+      "eventBindings": {
+        "onInteract": "encore_radio_menu"
+      },
+      "scriptName": "encore_radio_menu"
     }
   ],
   "sceneRouteTables": [

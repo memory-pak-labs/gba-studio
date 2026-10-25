@@ -1018,6 +1018,11 @@ EventStepResult execute_event_command(
     case EventOp::FollowCamera:
         state.camera_changed = true;
         state.camera_follow_player = true;
+        // A timer can request a pan before the skip button restores follow in
+        // this same frame. The later explicit command must cancel that pan.
+        state.camera_move_changed = false;
+        state.camera_delta_x = 0;
+        state.camera_delta_y = 0;
         break;
     case EventOp::LockCamera:
         state.camera_changed = true;

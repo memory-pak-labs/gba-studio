@@ -1,0 +1,69 @@
+{
+  "approval": {
+    "approved": true,
+    "visual": true,
+    "audio": true,
+    "date": "2026-10-25",
+    "source": "User explicitly approved: Aprovo a arte e o áudio",
+    "scope": [
+      "Armazém radio actor",
+      "Original LUME PCM signal"
+    ],
+    "runtimeReviewApproved": false
+  },
+  "assets": [
+    {
+      "id": "encore-radio",
+      "name": "recovered-radio.png",
+      "kind": "Sprite",
+      "metadata": {
+        "source": "Assets/sprites/recovered-radio.png",
+        "license": "Original AI-generated artwork under user direction",
+        "generatedBy": "image_gen + gba-sprite-prep",
+        "reviewStatus": "approved",
+        "approved": true,
+        "preparedSha256": "b46ecd3a9f7d054cf41764d10f17a42baa32aa7f257714e79bfe471085d12761",
+        "frameWidth": 32,
+        "frameHeight": 32,
+        "frameCount": 1,
+        "colorMode": "4bpp",
+        "anchor": "bottom-center",
+        "visualStatus": "approved",
+        "approvalDate": "2026-10-25"
+      }
+    },
+    {
+      "id": "encore-radio-pcm",
+      "name": "radio-lume-pcm.wav",
+      "kind": "SFX",
+      "metadata": {
+        "source": "Assets/audio/radio-lume-pcm.wav",
+        "license": "MIT; original deterministic synthesis, generate-radio-pcm.mjs",
+        "generatedBy": "generate-radio-pcm.mjs",
+        "reviewStatus": "approved",
+        "approved": true,
+        "preparedSha256": "4ddca1394c4bfd8ae14a3128e8e48c0f23e6bebaf445e97d2007f1f5cb8e4cab",
+        "sampleRate": 15768,
+        "channels": 1,
+        "bitsPerSample": 16,
+        "durationSeconds": 4,
+        "visualStatus": "not-applicable",
+        "approvalDate": "2026-10-25"
+      }
+    }
+  ],
+  "schemaVersion": 1,
+  "sources": [
+    {
+      "name": "radio-source.png",
+      "sha256": "5b20b75c12a3edbdf56b2782406281c85f57a6ea1a611f864064f51b80f24fe1",
+      "origin": "OpenAI image generation under user direction",
+      "license": "Original project-owned AI-generated artwork"
+    },
+    {
+      "name": "generate-radio-pcm.mjs",
+      "origin": "Original deterministic synthesis in repository source",
+      "license": "MIT"
+    }
+  ]
+}

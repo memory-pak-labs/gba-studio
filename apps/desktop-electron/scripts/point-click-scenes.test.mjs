@@ -90,11 +90,14 @@ describe("point-and-click scene promotion", () => {
     const templateUrl = new URL("../default-assets/templates/exemplo-gba/", import.meta.url);
     const canonical = JSON.parse(readFileSync(new URL("exemplo-gba.gba-project", templateUrl), "utf8"));
     for (const sceneName of POINT_CLICK_SCENE_NAMES) {
-      const actors = canonical.actors.filter((actor) => actor.roomName === sceneName);
+      const sceneActors = canonical.actors.filter((actor) => actor.roomName === sceneName);
+      const dials = sceneActors.filter((actor) => actor.id.startsWith('telescope-dial-'));
+      const actors = sceneActors.filter((actor) => !actor.id.startsWith('telescope-dial-'));
+      expect(dials.map(actor=>[actor.visibleVariable,actor.visibleValue])).toEqual(sceneName==='observatorio_do_farol'?[0,1,2].map(value=>['var_telescope_alignment',value]):[]);
       const triggers = canonical.triggers.filter((trigger) => trigger.roomName === sceneName);
-      expect(actors).toHaveLength(1);
-      expect(triggers).toHaveLength(3);
-      expect(actors.every((actor) => actor.name.startsWith("Cursor") || ["Lia do Pergaminho", "Mecânico do Cais", "Guardião da Lanterna"].includes(actor.name))).toBe(true);
+      expect(actors).toHaveLength(sceneName==='armazem_das_mares'?2:1);
+      expect(triggers).toHaveLength(sceneName==='armazem_das_mares'?4:3);
+      expect(actors.every((actor) => actor.id==='encore-radio' || actor.name.startsWith("Cursor") || ["Lia do Pergaminho", "Mecânico do Cais", "Guardião da Lanterna"].includes(actor.name))).toBe(true);
     }
   });
 

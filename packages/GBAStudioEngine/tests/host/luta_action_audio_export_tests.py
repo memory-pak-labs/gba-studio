@@ -21,6 +21,20 @@ class LutaActionAudioExportTests(unittest.TestCase):
         del project['stages'][0]['action_sounds']
         self.assertIn('gbs::LutaActionSounds { -1, -1, -1, -1 }', assetc.emit_luta_project_data_header(project))
 
+    def test_keeps_authored_button_script_table_in_native_project(self):
+        project = self.project()
+        project['scripts'] = [{'name': 'leave_training', 'script': [
+            {'op': 'set_variable', 'variable': 62, 'value': 0}]}]
+        project['stages'][0]['on_enter'] = [
+            {'op': 'attach_button_event', 'button': 'select', 'index': 0, 'override': True}]
+        header = assetc.emit_luta_project_data_header(project)
+        self.assertIn('constexpr gbs::EventScript luta_project_scripts[]', header)
+        self.assertIn('gbs::EventOp::AttachButtonEvent', header)
+        self.assertIn('gbs::EventOp::SetVariable', header)
+        self.assertIn('    luta_project_scripts,\n    1\n};', header)
+        project['scripts'] = 'invalid'
+        with self.assertRaises(SystemExit): assetc.emit_luta_project_data_header(project)
+
     def test_rejects_missing_asset_unknown_cue_and_out_of_range(self):
         for sounds in [{'hit': -1}, {'hit': 4}, {'walking': 0}]:
             project = self.project()

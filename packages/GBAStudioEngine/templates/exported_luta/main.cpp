@@ -115,13 +115,15 @@ gbs::EventScript checkpoint_script_for(int room, int script_index) {
     case 0: return room_data.on_enter;
     case 1: return room_data.on_victory;
     case 2: return room_data.on_defeat;
-    default: return gbs::empty_event_script();
+    default:
+        return script_index >= 3 && static_cast<size_t>(script_index - 3) < project.script_count
+            ? project.scripts[script_index - 3] : gbs::empty_event_script();
     }
 }
 
 int current_checkpoint_script_index() {
     if (!gbs::has_event_script(luta_event_runner.script)) return -1;
-    for (int index = 0; index < 3; ++index) {
+    for (int index = 0; index < static_cast<int>(project.script_count) + 3; ++index) {
         const auto script = checkpoint_script_for(stage_index, index);
         if (script.commands == luta_event_runner.script.commands && script.command_count == luta_event_runner.script.command_count) return index;
     }
@@ -540,6 +542,32 @@ void tick_luta_animation_states(const gbs::LutaStageData& stage) {
     );
 }
 
+void draw_luta_fighter(int first_index, const gbs::MetaSprite& metasprite, gbs::Vec2i position) {
+    if (!dialogue.visible) {
+        gbs::set_metasprite(first_index, metasprite, position);
+        return;
+    }
+    if (!gbs::is_valid_metasprite(metasprite)) return;
+    // Equal-priority OBJ pixels cover BG0 on GBA. During a dialogue keep
+    // fighters below the UI, while retaining their normal position and art.
+    for (uint8_t index = 0; index < metasprite.part_count; ++index) {
+        const auto& part = metasprite.parts[index];
+        gbs::Sprite sprite {};
+        sprite.x = position.x + part.x;
+        sprite.y = position.y + part.y;
+        sprite.tile_index = part.tile_index;
+        sprite.palette = part.palette;
+        sprite.hflip = part.hflip;
+        sprite.vflip = part.vflip;
+        sprite.visible = true;
+        sprite.priority = 1;
+        sprite.width = part.width;
+        sprite.height = part.height;
+        sprite.color_depth = part.color_depth;
+        gbs::set_sprite(first_index + index, sprite);
+    }
+}
+
 void draw_luta() {
     const gbs::LutaStageData& stage = project.stages[stage_index];
     gbs::hide_all_sprites();
@@ -585,12 +613,12 @@ void draw_luta() {
         : nullptr;
     if (p1_metasprite && state.p1_hp > 0 && sprite_index < 128) {
         if (!gbs::sync_sprite_animation_tiles(p1_visual_state.animator, p1_streamed_tile_asset_loaded)) return;
-        gbs::set_metasprite(sprite_index, *p1_metasprite, gbs::Vec2i { state.p1_x, state.p1_y });
+        draw_luta_fighter(sprite_index, *p1_metasprite, gbs::Vec2i { state.p1_x, state.p1_y });
         sprite_index += p1_metasprite->part_count;
     }
     if (p2_metasprite && state.p2_hp > 0 && sprite_index < 128) {
         if (!gbs::sync_sprite_animation_tiles(p2_visual_state.animator, p2_streamed_tile_asset_loaded)) return;
-        gbs::set_metasprite(sprite_index, *p2_metasprite, gbs::Vec2i { state.p2_x, state.p2_y });
+        draw_luta_fighter(sprite_index, *p2_metasprite, gbs::Vec2i { state.p2_x, state.p2_y });
         sprite_index += p2_metasprite->part_count;
     }
     if (layout && layout->mode && layout->mode[0] == 'a') {
@@ -854,8 +882,20 @@ gbs::RuntimeAdapterFrameResult update_luta_runtime(const gbs::RuntimeFrameContex
 #endif
     gbs::set_event_input_state(event_state, input.held, input.pressed, input.released);
     gbs::update_hud_behavior(event_state, true);
+    bool overrides_default = false;
+    if (!dialogue.visible && gbs::update_button_event_bindings(event_state)) {
+        const int script_index = event_state.last_script;
+        const bool requested_override = event_state.last_button_binding_overrides_default;
+        event_state.last_script = -1;
+        event_state.last_button_binding_overrides_default = false;
+        if (script_index >= 0 && static_cast<size_t>(script_index) < project.script_count &&
+            gbs::has_event_script(project.scripts[script_index])) {
+            overrides_default = requested_override;
+            start_luta_event_script(project.scripts[script_index]);
+        }
+    }
     const bool script_active = update_luta_event_script(input);
-    if (!script_active && !dialogue.visible) {
+    if (!script_active && !dialogue.visible && !overrides_default) {
         // RoundEnd is the existing pause state. Handle Start outside the
         // InProgress branch so the same button can resume the match.
         if (input.was_pressed(gbs::ButtonStart) && state.round_state == gbs::LutaRoundState::RoundEnd) {

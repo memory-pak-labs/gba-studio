@@ -40,7 +40,7 @@ export function promoteApprovedPortoLumenPaged(project) {
     if (source) for (const key of ["x", "y", "width", "height"]) trigger[key] = source[key];
   }
   for (const event of result.events ?? []) for (const step of event.steps ?? []) {
-    if (event.name !== "showcase_leave_council" && step.command?.startsWith("change_scene porto_lumen ")) step.command = `change_scene porto_lumen ${["farol_sair_porto", "showcase_base_exit"].includes(event.name) ? "23 20" : "88 50"} down`;
+    if (event.name !== "showcase_leave_council" && !event.name.startsWith("encore_") && step.command?.startsWith("change_scene porto_lumen ")) step.command = `change_scene porto_lumen ${["farol_sair_porto", "showcase_base_exit"].includes(event.name) ? "23 20" : "88 50"} down`;
   }
   for (const table of result.sceneRouteTables ?? []) {
     for (const route of [...(table.routes ?? []), table.fallback].filter(Boolean)) {
