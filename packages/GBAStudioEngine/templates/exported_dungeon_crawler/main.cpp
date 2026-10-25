@@ -883,7 +883,7 @@ void consume_event_state() {
         gbs::fade_audio_channel_volume(
             gbs::audio_channel_from_event_value(event_state.audio_fade_channel),
             static_cast<uint8_t>(event_state.audio_fade_target_volume),
-            static_cast<uint16_t>(event_state.audio_fade_frames)
+            static_cast<uint16_t>(event_state.audio_fade_frames), static_cast<uint8_t>(event_state.audio_fade_ceiling_volume)
         );
         event_state.audio_fade_changed = false;
     }
@@ -1120,13 +1120,12 @@ bool actor_is_ahead(const gbs::DungeonCrawlerActorData& actor, int& distance) {
     return actor_view_coordinates(actor, distance, lateral) && lateral == 0;
 }
 
-bool actor_is_occluded(int distance, int lateral) {
+bool actor_is_occluded(int distance, int lateral, bool wall_mounted = false) {
     const gbs::DungeonCrawlerRoomData& room = project.rooms[current_room_index];
     if(room.presentation){
         const auto f=gbs::dungeon_forward_delta(runtime_state.direction);const int dx=f.x*distance-f.y*lateral,dy=f.y*distance+f.x*lateral;
-        const int steps=((dx<0?-dx:dx)>(dy<0?-dy:dy)?(dx<0?-dx:dx):(dy<0?-dy:dy))*10;
-        for(int i=1;i<steps;++i)if(gbs::dungeon_cell_blocked(room,{(runtime_state.position.x*10+5+dx*10*i/steps)/10,(runtime_state.position.y*10+5+dy*10*i/steps)/10}))return true;
-        return false;
+        return gbs::dungeon_actor_is_occluded(room,runtime_state.position,
+            {runtime_state.position.x+dx,runtime_state.position.y+dy},wall_mounted);
     }
     for (int nearer = 1; nearer < distance; ++nearer) {
         if (gbs::dungeon_view_cell(room, runtime_state, nearer, lateral).blocked) {
@@ -1177,7 +1176,7 @@ void draw_actors() {
             if (actor.metasprite == nullptr ||
                 !actor_view_coordinates(actor, actor_distance, lateral) ||
                 actor_distance != distance ||
-                actor_is_occluded(actor_distance, lateral)) {
+                actor_is_occluded(actor_distance, lateral, actor.wall_mounted)) {
                 continue;
             }
             const gbs::MetaSprite* metasprite = gbs::dungeon_runtime_metasprite(
@@ -1371,7 +1370,10 @@ int initialize_dungeon_crawler_runtime() {
     gbastudio_dialogue_ui::configure_for_scene(project.rooms[current_room_index].name, true);
     if (!restored) {
         start_runtime_event_script(project.rooms[current_room_index].on_enter);
-    } else if (battle_state.active && !dungeon_enemy_defeated) {
+    } else {
+        start_runtime_event_script(project.rooms[current_room_index].on_restore);
+    }
+    if (restored && battle_state.active && !dungeon_enemy_defeated) {
         if(dungeon_presentation())dungeon_set_pose(gbs::DungeonPose::Alert);else show_dungeon_battle_menu();
     }
     return 0;

@@ -119,7 +119,7 @@ export function DungeonScenePreview({ room, entities, projectData, projectPath, 
   const projected = entities.filter(e => showActors && e.kind === "actor" && e.id!==playerActor?.id).flatMap(entity => {
     const raw = record(list(projectData?.actors).find(a => record(a).id === entity.id));
     if(raw.dungeonViewAnchor && typeof raw.dungeonViewAnchor==="object")return [];
-    const projection = projectDungeonActor(grid, camera, entity, Boolean(raw.dungeonCell),{modern:Boolean(config.presentation),viewDistance:Number(config.viewDistance??5)});
+    const projection = projectDungeonActor(grid, camera, entity, Boolean(raw.dungeonCell),{modern:Boolean(config.presentation),viewDistance:Number(config.viewDistance??5),wallMounted:raw.dungeonWallMounted===true});
     if (!projection) return [];
     const visual=projectData ? dungeonActorVisual(projectData,raw,projection,Boolean(config.presentation)) : null;
     const url=visual ? dungeonAssetURL(projectData,projectPath,visual.sheet) : resolveAssetURL(projectPath, entity.spriteSource ?? null, entity.spriteBundledDefaultAsset ?? null);

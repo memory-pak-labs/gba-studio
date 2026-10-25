@@ -630,7 +630,7 @@ export interface PreviewRuntimeVisualEffectState {
 }
 
 export interface PreviewRuntimeHudState {
-  gameClock: { minutes: number; frames: number; mode: string; currentMinute: number; elapsedFrames: number } | null;
+  gameClock: { minutes: number; frames: number; mode: string; currentMinute: number; elapsedFrames: number; variable?: string } | null;
   hearts: { stat: string; x: number; y: number } | null;
   numbers: Record<string, { variable: string; x: number; y: number; digits: number }>;
   statBars: Record<string, { stat: string; x: number; y: number; width: number; orientation: string }>;
@@ -3877,7 +3877,7 @@ function handleHudInventoryCommand(state: PreviewRuntimeState, parts: string[]):
     return { ...state, hud: { ...state.hud, numbers: { ...state.hud.numbers, [key]: { variable: key, x: numberToken(parts[2], 0), y: numberToken(parts[3], 0), digits: numberToken(parts[4], 0) } } } };
   }
   if (verb === "start_game_clock") {
-    return { ...state, hud: { ...state.hud, gameClock: { minutes: numberToken(parts[1], 0), frames: numberToken(parts[2], 0), mode: parts[3] ?? "hud", currentMinute: 0, elapsedFrames: 0 } } };
+    return { ...state, hud: { ...state.hud, gameClock: { minutes: numberToken(parts[1], 0), frames: numberToken(parts[2], 0), mode: parts[3] ?? "hud", currentMinute: parts[4] ? ((variableNumber(state, parts[4]) % 1440) + 1440) % 1440 : 0, elapsedFrames: 0, ...(parts[4] ? { variable: parts[4] } : {}) } } };
   }
   if (verb === "modify_wallet") {
     const current = state.wallet[key] ?? { value: 0, max: null };
@@ -4062,7 +4062,9 @@ function appendRecognizedScript(
         ...(muted && (selected === "sfx" || selected === "all") ? { activeSfx: null, activeSfxAsset: null } : {})
       }, eventName, command, "audio", `${selected}:${muted}`));
     }
-    const volume = previewHardwareAudioVolume(parts[2]);
+    const baseVolume = previewHardwareAudioVolume(parts[2]);
+    const preference=verb === "fade_audio_volume" ? [parts[4],parts[5]].reduce((factor,name)=>factor*(name?Math.max(0,Math.min(100,variableNumber(state,name)))/100:1),1) : 1;
+    const volume = Math.round(baseVolume * preference);
     if (verb === "set_audio_volume") {
       buses.forEach((bus) => {
         audioMix.volumes[bus] = volume;
@@ -4072,6 +4074,7 @@ function appendRecognizedScript(
     }
     const frames = Math.max(0, Math.min(3600, numberToken(parts[3], 30)));
     buses.forEach((bus) => {
+      if(parts[4]||parts[5])audioMix.volumes[bus]=Math.min(audioMix.volumes[bus],Math.round(15*preference));
       audioMix.fades[bus] = frames === 0 ? null : {
         start: audioMix.volumes[bus],
         target: volume,
@@ -4488,9 +4491,10 @@ function runScriptFrameCommands(state: PreviewRuntimeState, frame: PreviewRuntim
       const tokens = commandTokens(command);
       const previous = currentState.hud.gameClock ?? { minutes: 0, frames: 0, mode: "hidden", currentMinute: 0, elapsedFrames: 0 };
       const gameClock = verb === "start_game_clock"
-        ? { minutes: Number(tokens[1]), frames: Number(tokens[2]), mode: tokens[3]!, currentMinute: 0, elapsedFrames: 0 }
+        ? { minutes: Number(tokens[1]), frames: Number(tokens[2]), mode: tokens[3]!, currentMinute: tokens[4] ? ((variableNumber(currentState, tokens[4]) % 1440) + 1440) % 1440 : 0, elapsedFrames: 0, ...(tokens[4] ? { variable: tokens[4] } : {}) }
         : { ...previous, currentMinute: ((previous.currentMinute + Number(tokens[1])) % 1440 + 1440) % 1440 };
       currentState = runtimeScriptLog({ ...currentState, hud: { ...currentState.hud, gameClock } }, resolvedEventName, command, "relógio do jogo atualizado");
+      if (gameClock.variable) currentState = setRuntimeVariable(currentState, gameClock.variable, gameClock.currentMinute);
       break doCommand;
     }
     if (isLutaEventVerb(verb)) {
@@ -6482,6 +6486,7 @@ function tickPreviewRuntimeFrame(
     state = { ...state, hud: { ...state.hud, gameClock: { ...clock,
       currentMinute: (clock.currentMinute + Math.floor(elapsed / clock.frames) * clock.minutes) % 1440,
       elapsedFrames: elapsed % clock.frames } } };
+    if (clock.variable) state = setRuntimeVariable(state, clock.variable, state.hud.gameClock!.currentMinute);
   }
   state = tickIntegratedNativeSimulation(state,state.previewFrame-previousPreviewFrame);
   if(state.currentRoom?.sceneType==="topdown" && state.nativeEvents.adventure.state==="blank") heldMovement=null;

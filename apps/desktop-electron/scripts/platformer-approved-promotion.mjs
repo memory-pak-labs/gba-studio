@@ -64,8 +64,8 @@ export function promoteApprovedPlatformer(source) {
     const exit = ['set_variable var_grip 1', 'play_sfx penedos_item_candidato', 'save_game 0', 'advance_campaign'];
     add('penedos_recolher_aderencia', exit);
     add('penedos_retornar_armazem', exit);
-    p.actors = [...p.actors.filter(a => a.roomName !== name), ...actors];
-    p.events = [...p.events.filter(e => e.roomName !== name), ...events];
+    p.actors = [...p.actors.filter(a => a.roomName !== name), ...actors, ...p.actors.filter(a=>a.roomName===name&&a.id?.startsWith('coast-'))];
+    p.events = [...p.events.filter(e => e.roomName !== name), ...events, ...p.events.filter(e=>e.roomName===name&&e.name?.startsWith('coast_'))];
     const variables = [['penedos_player_health', 3], ['penedos_tokens', 0], ...enemies.map(a => ['penedos_defeated_' + a.id.replace('penedos-', '').replaceAll('-', '_'), 0]), ['var_penedos_farol',0]].map(([name, initialValue]) => ({ id: 'variable-' + name, name, displayName: name, initialValue }));
     for (const v of variables)
         if (!p.variables.some(x => x.name === v.name))

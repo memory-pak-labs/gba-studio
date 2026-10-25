@@ -24,6 +24,7 @@ volatile void* last_dma_destination = nullptr;
 int hardware_init_calls = 0;
 int render_init_calls = 0;
 int audio_init_calls = 0;
+bool audio_mix_preserved = false;
 int audio_update_calls = 0;
 int hardware_vblank_wait_calls = 0;
 int hardware_publication_blocked = 0;
@@ -127,8 +128,9 @@ void render_init() {
     ++render_init_calls;
 }
 
-void audio_init() {
+void audio_init(bool preserve_mix) {
     ++audio_init_calls;
+    audio_mix_preserved = preserve_mix;
 }
 
 void audio_update() {
@@ -441,6 +443,7 @@ void test_runtime_handoff_keeps_publication_blocked_across_reinitialization() {
 
     gbs::init();
 
+    assert(audio_mix_preserved);
     assert(gbs::render_publication_transaction_active());
     assert(hardware_publication_blocked == 1);
     gbs::wait_vblank();

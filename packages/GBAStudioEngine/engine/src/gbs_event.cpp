@@ -1137,12 +1137,22 @@ EventStepResult execute_event_command(
         state.audio_volume_channel = clamp_int(command.a, 0, 4);
         state.audio_volume = clamp_int(command.b, 0, 15);
         break;
-    case EventOp::FadeAudioVolume:
+    case EventOp::FadeAudioVolume: {
         state.audio_fade_changed = true;
         state.audio_fade_channel = clamp_int(command.a, 0, 4);
         state.audio_fade_target_volume = clamp_int(command.b, 0, 15);
+        state.audio_fade_ceiling_volume = 15;
+        // Optional saved channel/master indices are packed as index+1, one byte each.
+        const int channel_variable = (command.d & 255) - 1;
+        const int master_variable = ((command.d >> 8) & 255) - 1;
+        int preference = is_valid_event_variable(channel_variable)
+            ? clamp_int(state.variables[channel_variable], 0, 100) * 100 : 10000;
+        if (is_valid_event_variable(master_variable)) preference = preference * clamp_int(state.variables[master_variable], 0, 100) / 100;
+        state.audio_fade_target_volume = (state.audio_fade_target_volume * preference + 5000) / 10000;
+        state.audio_fade_ceiling_volume = (15 * preference + 5000) / 10000;
         state.audio_fade_frames = clamp_int(command.c, 0, 3600);
         break;
+    }
     case EventOp::SetAllSpritesVisible:
         state.all_sprites_visible_changed = true;
         state.all_sprites_visible = command.a != 0;
@@ -1435,11 +1445,14 @@ EventStepResult execute_event_command(
         state.clock_minutes_per_tick = command.a > 0 ? command.a : 10;
         state.clock_frames_per_tick = command.b > 0 ? command.b : 180;
         state.clock_hud_enabled = command.c != 0;
-        state.clock_minute = 0;
+        state.clock_variable = is_valid_event_variable(command.d - 1) ? command.d - 1 : -1;
+        state.clock_minute = state.clock_variable >= 0
+            ? ((state.variables[state.clock_variable] % 1440) + 1440) % 1440 : 0;
         state.clock_frame_accumulator = 0;
         break;
     case EventOp::AdvanceTime:
         state.clock_minute = ((state.clock_minute + command.a) % 1440 + 1440) % 1440;
+        if (state.clock_variable >= 0) state.variables[state.clock_variable] = state.clock_minute;
         break;
     case EventOp::SetStat:
         if (is_valid_event_stat(command.a)) {
@@ -1727,6 +1740,7 @@ void init_event_state(EventState& state) {
     state.clock_minutes_per_tick = 0;
     state.clock_frames_per_tick = 0;
     state.clock_hud_enabled = false;
+    state.clock_variable = -1;
     for (size_t index = 0; index < max_event_stats; ++index) {
         state.stats[index] = 0;
         state.stat_max[index] = 0;
@@ -1764,6 +1778,7 @@ void init_event_state(EventState& state) {
     state.audio_fade_changed = false;
     state.audio_fade_channel = 0;
     state.audio_fade_target_volume = 15;
+    state.audio_fade_ceiling_volume = 15;
     state.audio_fade_frames = 0;
     state.all_sprites_visible_changed = false;
     state.all_sprites_visible = true;
@@ -1872,6 +1887,7 @@ void tick_event_frame_counter(EventState& state) {
         if (++state.clock_frame_accumulator >= state.clock_frames_per_tick) {
             state.clock_frame_accumulator = 0;
             state.clock_minute = (state.clock_minute + state.clock_minutes_per_tick) % 1440;
+            if (state.clock_variable >= 0) state.variables[state.clock_variable] = state.clock_minute;
         }
     }
     if (runtime_transition.pending && runtime_transition.cover_wait_frames > 0) {

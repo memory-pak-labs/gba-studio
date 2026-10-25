@@ -743,6 +743,7 @@ export interface UpdateRoomEntityFields {
   dungeonDepthSheets?: Record<string, string>;
   dungeonDepthAnimationName?: string;
   dungeonCell?: boolean;
+  dungeonWallMounted?: boolean;
   dungeonViewAnchor?: { x: number; y: number };
   waveIndex?: number;
   shmup?: Record<string, string | number>;
@@ -3840,9 +3841,10 @@ function applyApprovedIsometricPreset(data: GBAProjectData, room: Record<string,
   const runtime = isRecord(room.runtime) ? room.runtime : {};
   const config = isRecord(runtime.config) ? runtime.config : {};
   const presentation = isRecord(config.tacticalPresentation) ? config.tacticalPresentation : {};
-  if (Array.isArray(presentation.units)) presentation.units = presentation.units.map(unit => (
+  if (Array.isArray(presentation.units)) presentation.units = presentation.units.filter(unit=>isRecord(unit)&&actorIDs.has(unit.actorId)).map(unit => (
     isRecord(unit) ? {...unit, actorId: actorIDs.get(unit.actorId) ?? unit.actorId} : unit
   ));
+  if(isRecord(config.tactical)&&Array.isArray(config.tactical.units))config.tactical.units=config.tactical.units.filter(unit=>isRecord(unit)&&Number(unit.actorIndex)<actors.length);
   const sprites = new Set(actors.map(actor => actor.spriteSheet));
   const animations = projectRecords(template, "animations").filter(animation => sprites.has(animation.spriteSheet));
   const states = projectRecords(template, "animationStates").filter(state => sprites.has(state.spriteSheet));
@@ -4708,6 +4710,7 @@ export function updateRoomEntityInProject(
     }
     if (fields.dungeonDepthAnimationName !== undefined) entity.dungeonDepthAnimationName = fields.dungeonDepthAnimationName.trim();
     if (fields.dungeonCell !== undefined) entity.dungeonCell = fields.dungeonCell;
+    if (fields.dungeonWallMounted !== undefined) entity.dungeonWallMounted = fields.dungeonWallMounted;
     if (fields.dungeonViewAnchor !== undefined) entity.dungeonViewAnchor = {
       x: clampInteger(fields.dungeonViewAnchor.x,-128,368),
       y: clampInteger(fields.dungeonViewAnchor.y,-128,288)

@@ -102,7 +102,7 @@ void init() {
     gbs_hw_init();
     gbs_hw_frame_counter_init();
     render_init();
-    audio_init();
+    audio_init(preserve_runtime_handoff);
     reset_scene_transition_visual_effects();
     reset_input();
     reset_runtime_telemetry();

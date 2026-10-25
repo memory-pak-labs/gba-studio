@@ -1140,6 +1140,49 @@ bool snap_platformer_actor_to_npcs(PlatformerActor& actor, Rect previous_bounds,
     return false;
 }
 
+bool carry_platformer_actor_with_npc(const TileMap& map, PlatformerActor& actor, Rect previous_platform, Rect current_platform) {
+    if (actor.velocity_x256.y < 0 || actor.bounds_pixels.bottom() != previous_platform.y ||
+        actor.bounds_pixels.right() <= previous_platform.x || actor.bounds_pixels.x >= previous_platform.right()) return false;
+    const int dx = current_platform.x - previous_platform.x;
+    const int dy = current_platform.y - previous_platform.y;
+    // Absolute scene repositioning is not a ride. Event-driven platforms move in small steps.
+    if (abs_int(dx) > 64 || abs_int(dy) > 64) return false;
+    bool hit = false, landed = false;
+    move_axis(map, actor.bounds_pixels, dx, true, hit, landed);
+    actor.hit_wall = actor.hit_wall || hit;
+    const int moved_y = move_axis(map, actor.bounds_pixels, dy, false, hit, landed);
+    actor.hit_ceiling = actor.hit_ceiling || (hit && dy < 0);
+    actor.on_ground = moved_y == dy;
+    return true;
+}
+
+bool capture_platformer_npc_save_data(PlatformerSceneSaveData& save, const PlatformerNpcRuntime* npcs, size_t count) {
+    if (count > max_saved_platformer_npcs || (count != 0 && npcs == nullptr)) return false;
+    save.signature = 0x3150;
+    save.npc_count = static_cast<uint16_t>(count);
+    for (size_t i = 0; i < count; ++i) {
+        save.npcs[i] = {npcs[i].actor.position_pixels.x, npcs[i].actor.position_pixels.y,
+            npcs[i].actor.direction, static_cast<uint8_t>(npcs[i].visible), static_cast<uint8_t>(npcs[i].active), 0};
+    }
+    return true;
+}
+bool apply_platformer_npc_save_data(const PlatformerSceneSaveData& save, PlatformerNpcRuntime* npcs, size_t count) {
+    if (save.signature != 0x3150 || count > max_saved_platformer_npcs || save.npc_count != count ||
+        (count != 0 && npcs == nullptr)) return false;
+    for (size_t i = 0; i < count; ++i) {
+        const auto& v = save.npcs[i];
+        if (v.direction > 3 || v.visible > 1 || v.active > 1 || v.reserved != 0 ||
+            v.x < -1048576 || v.x > 1048576 || v.y < -1048576 || v.y > 1048576) return false;
+    }
+    for (size_t i = 0; i < count; ++i) {
+        npcs[i].actor.position_pixels = {save.npcs[i].x, save.npcs[i].y};
+        npcs[i].actor.direction = save.npcs[i].direction;
+        npcs[i].visible = save.npcs[i].visible != 0;
+        npcs[i].active = save.npcs[i].active != 0;
+    }
+    return true;
+}
+
 bool apply_platformer_moving_platform_delta(PlatformerActor& actor, const PlatformerMovingPlatform& platform, Vec2i delta_pixels) {
     if (!platformer_actor_stands_on_platform(actor, platform)) {
         return false;

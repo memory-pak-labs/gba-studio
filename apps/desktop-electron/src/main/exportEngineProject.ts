@@ -864,7 +864,7 @@ function tacticalPresentationReferences(
   return references.filter(Boolean);
 }
 
-export function tacticalMarkerIndices(cursorAsset: string, rangeAsset: string, targetAsset: string): {
+export function tacticalMarkerIndices(cursorAsset: string, rangeAsset: string, targetAsset: string, availableFrames: Record<string, number> = {}): {
   cursor: number;
   range: number;
   target: number;
@@ -872,11 +872,16 @@ export function tacticalMarkerIndices(cursorAsset: string, rangeAsset: string, t
   const [cursorSheet] = cursorAsset.split("#", 1);
   const [rangeSheet] = rangeAsset.split("#", 1);
   const [targetSheet] = targetAsset.split("#", 1);
-  return {
+  const indices = {
     cursor: 0,
     range: Number(rangeSheet === cursorSheet),
     target: Number(targetSheet === cursorSheet) + Number(targetSheet === rangeSheet)
   };
+  for (const [key, sheet] of [['cursor',cursorSheet],['range',rangeSheet],['target',targetSheet]] as const) {
+    const count = availableFrames[sheet!];
+    if (count && indices[key] >= count) indices[key] = 0;
+  }
+  return indices;
 }
 
 function buildIsometricTacticalPresentation(
@@ -1031,7 +1036,15 @@ function buildIsometricTacticalPresentation(
     indices
   };
   if (enabled.has("tactical_feedback") && output.cursor_asset && output.range_asset && output.target_asset) {
-    output.indices.markers = tacticalMarkerIndices(output.cursor_asset, output.range_asset, output.target_asset);
+    const markerFrames = Object.fromEntries([
+      [output.cursor_asset, presentation.cursorAsset], [output.range_asset, presentation.rangeAsset], [output.target_asset, presentation.targetAsset]
+    ].flatMap(([assetID, reference]) => {
+      const sheet = reference?.split('#', 1)[0];
+      const asset = projectArray(data, 'assets').find(a => a.name === sheet || a.id === sheet);
+      const count = integerField(child(asset, 'metadata') ?? {}, 'frameCount', 0);
+      return count > 0 ? [[assetID, count]] : [];
+    }));
+    output.indices.markers = tacticalMarkerIndices(output.cursor_asset, output.range_asset, output.target_asset, markerFrames);
   }
   if (enabled.has("tactical_audio") && presentation.audio) {
     const cues = Object.fromEntries(ISO_TACTICAL_AUDIO_CUES.map((cue) => [
@@ -1201,6 +1214,7 @@ export interface EngineExportIsometricTacticalPresentation {
 }
 
 export interface EngineExportIsometricRoom {
+  on_restore?: EngineExportProjectEventCommand[];
   name: string;
   world_mode: "scrollable_tiled_world" | "static_composition";
   width_tiles: number;
@@ -1302,6 +1316,7 @@ export interface EngineExportIsometricProject {
 }
 
 export interface EngineExportDungeonCrawlerRoom {
+  on_restore?: EngineExportProjectEventCommand[];
   player_view?: {
     metasprite: { asset: string; index: number };
     animation?: Omit<AssetcSpriteAnimationExportEntry,"name">;
@@ -1339,6 +1354,7 @@ export interface EngineExportDungeonCrawlerRoom {
     metasprite: { asset: string; index: number };
     depth_frames?: Record<string, Omit<AssetcSpriteAnimationExportEntry,"name">>;
     cell?: boolean;
+    wall_mounted?: boolean;
     depth_metasprites?: {
       far: { asset: string; index: number };
       mid: { asset: string; index: number };
@@ -3894,6 +3910,9 @@ function buildEventValueRegistries(
         variableKeys.add(parts[1]);
       } else if (["read_rtc", "store_engine_field", "store_save_variable", "open_menu"].includes(verb) && parts[2]) {
         variableKeys.add(parts[2]);
+      } else if (["start_game_clock", "fade_audio_volume"].includes(verb) && parts[4]) {
+        variableKeys.add(parts[4]);
+        if(verb === "fade_audio_volume" && parts[5])variableKeys.add(parts[5]);
       } else if (verb === "store_actor_position") {
         if (parts[2]) variableKeys.add(parts[2]);
         if (parts[3]) variableKeys.add(parts[3]);
@@ -4425,7 +4444,8 @@ function compileEventStep(
     case "noop":
       return [];
     case "start_game_clock":
-      return [{ op: verb, minutes_per_tick: Number(parts[1]), frames_per_tick: Number(parts[2]), hud: parts[3] === "hud" }];
+      return [{ op: verb, minutes_per_tick: Number(parts[1]), frames_per_tick: Number(parts[2]), hud: parts[3] === "hud",
+        ...(parts[4] ? { variable: registries.variableIndex(parts[4]) } : {}) }];
     case "advance_time":
       return [{ op: verb, minutes: Number(parts[1]) }];
     case "set_background": {
@@ -4567,7 +4587,9 @@ function compileEventStep(
         op: "fade_audio_volume",
         channel: operand || "all",
         volume: hardwareAudioVolume(parts[2]),
-        frames: Math.max(0, Math.min(3600, integerPart(parts[3], 30)))
+        frames: Math.max(0, Math.min(3600, integerPart(parts[3], 30))),
+        ...(parts[4] ? { variable: registries.variableIndex(parts[4]) } : {}),
+        ...(parts[5] ? { other_variable: registries.variableIndex(parts[5]) } : {})
       }];
     case "push_actor":
       return [{op:"push_actor",actor:eventActorIndex(data,rooms,operand),value:parts[2]==="true"}];
@@ -6610,7 +6632,7 @@ function buildPlatformerRooms(
       ? [{ op: "attach_button_event" as const, button: "start", index: startMenuScriptIndex, override: true }]
       : [];
     const mapRestore = mapStateRestoreCommands(data, room);
-    const restore = [...mapRestore, ...compileRestoreEvent(data, nullableStringField(eventBindings, "onRestore"), rooms, dialogues, audioItems, audioPack, events)];
+    const restore = [...mapRestore, ...compileRestoreEvent(data, nullableStringField(eventBindings, "onRestore"), rooms, dialogues, audioItems, audioPack, events), ...startMenuBinding];
     if (restore.length) roomData.on_restore = restore;
     const boot = mapRestore.length ? [...mapRestore, { op: "wait" as const, frames: 1 }, ...roomDialogueBoot] : roomDialogueBoot;
     const onEnterScript = mergeRoomOnEnterScript(boot, [...(onEnter ?? []), ...startMenuBinding]);
@@ -7077,6 +7099,8 @@ function buildIsometricRooms(
       ? [{ op: "attach_button_event" as const, button: "start", index: startMenuScriptIndex, override: true }]
       : [];
     const onEnterScript = mergeRoomOnEnterScript(roomDialogueBoot, [...(onEnter ?? []), ...startMenuBinding]);
+    const restore = [...compileRestoreEvent(data, nullableStringField(eventBindings, "onRestore"), rooms, dialogues, audioItems, audioPack, events), ...startMenuBinding];
+    if (restore.length) roomData.on_restore = restore;
     if (onEnterScript) {
       roomData.on_enter = onEnterScript;
     }
@@ -7555,6 +7579,7 @@ function buildDungeonCrawlerRooms(
       ? [{ op: "attach_button_event" as const, button: roomFeatureRuntime.mapEnabled ? "r" : "start", index: startMenuScriptIndex, override: true }]
       : [];
     const onEnterScript = mergeRoomOnEnterScript(index === startIndex ? dialogueBoot : [], [...(onEnter ?? []), ...startMenuBinding]);
+    const onRestoreScript = [...compileRestoreEvent(data, nullableStringField(eventBindings, "onRestore"), rooms, dialogues, audioItems, audioPack, events), ...startMenuBinding];
     const currentRoomName = roomName(room, index);
     let playerView: EngineExportDungeonCrawlerRoom["player_view"];
     if (config?.presentation?.playerView?.enabled) {
@@ -7599,6 +7624,7 @@ function buildDungeonCrawlerRooms(
         metasprite: sprite.metasprite,
         ...(depthMetasprites ? { depth_metasprites: depthMetasprites } : {}),
         ...(depthFrames ? {depth_frames:depthFrames,cell:actor.dungeonCell===true} : {}),
+        ...(actor.dungeonWallMounted === true ? {wall_mounted:true} : {}),
         ...(onInteract && onInteract.length > 0 ? { on_interact: onInteract } : {})
       }];
     });
@@ -7641,6 +7667,7 @@ function buildDungeonCrawlerRooms(
       video: buildRoomVideoComposition(data, room, tilesetPack),
       ...(backgroundIndexByRoomName.has(currentRoomName) ? { background: backgroundIndexByRoomName.get(currentRoomName) } : {}),
       ...(onEnterScript ? { on_enter: onEnterScript } : {}),
+      ...(onRestoreScript.length ? {on_restore:onRestoreScript} : {}),
       ...(triggers.length > 0 ? { triggers } : {}),
       ...(actors.length > 0 ? { actors } : {})
     };

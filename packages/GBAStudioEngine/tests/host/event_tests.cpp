@@ -144,6 +144,49 @@ void test_ready_system_event_ops_update_runtime_state() {
     assert(state.player_bounce_frames == 20);
 }
 
+void test_bound_clock_restores_and_updates_saved_minutes() {
+    gbs::EventState state {};
+    gbs::init_event_state(state);
+    state.variables[16] = 1439;
+    const gbs::EventCommand start[] = {{gbs::EventOp::StartGameClock, 1, 3, 0, 17}};
+    gbs::run_event_script(state, start, 1);
+    assert(state.clock_minute == 1439);
+    for (int i = 0; i < 3; ++i) gbs::tick_event_frame_counter(state);
+    assert(state.clock_minute == 0 && state.variables[16] == 0);
+    const gbs::EventCommand advance[] = {{gbs::EventOp::AdvanceTime, 1080, 0, 0}};
+    gbs::run_event_script(state, advance, 1);
+    assert(state.variables[16] == 1080);
+    gbs::EventState restored {};
+    gbs::init_event_state(restored);
+    restored.variables[16] = state.variables[16];
+    gbs::run_event_script(restored, start, 1);
+    assert(restored.clock_minute == 1080);
+    for (int i = 0; i < 3; ++i) gbs::tick_event_frame_counter(restored);
+    assert(restored.variables[16] == 1081);
+}
+
+void test_scene_fades_respect_saved_music_volume_and_mute() {
+    gbs::EventState state {}; gbs::init_event_state(state);
+    const gbs::EventCommand fade[] = {{gbs::EventOp::FadeAudioVolume, 0, 11, 30, 17}};
+    state.variables[16] = 50;
+    gbs::run_event_script(state, fade, 1);
+    assert(state.audio_fade_target_volume == 6);
+    assert(state.audio_fade_ceiling_volume == 8);
+    state.variables[16] = 0;
+    gbs::run_event_script(state, fade, 1);
+    assert(state.audio_fade_target_volume == 0);
+    assert(state.audio_fade_ceiling_volume == 0);
+    const gbs::EventCommand with_master[] = {{gbs::EventOp::FadeAudioVolume, 0, 11, 30, 17 | (18 << 8)}};
+    state.variables[16] = 50; state.variables[17] = 50;
+    gbs::run_event_script(state, with_master, 1);
+    assert(state.audio_fade_target_volume == 3);
+    assert(state.audio_fade_ceiling_volume == 4);
+    state.variables[17] = 0;
+    gbs::run_event_script(state, with_master, 1);
+    assert(state.audio_fade_target_volume == 0);
+    assert(state.audio_fade_ceiling_volume == 0);
+}
+
 void test_player_event_commands_apply_to_reserved_player_slot() {
     gbs::EventState state {};
     gbs::init_event_state(state);
@@ -1987,6 +2030,8 @@ static void test_restore_consumer_does_not_drop_commands_beyond_the_queue_capaci
 }
 
 int main() {
+    test_scene_fades_respect_saved_music_volume_and_mute();
+    test_bound_clock_restores_and_updates_saved_minutes();
     test_restore_consumer_does_not_drop_commands_beyond_the_queue_capacity();
     test_tile_replacement_extended_coordinates_and_collision();
  test_adventure_movement_consumes_state();

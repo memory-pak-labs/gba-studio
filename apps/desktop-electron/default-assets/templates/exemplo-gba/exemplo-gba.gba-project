@@ -658,10 +658,10 @@
       "name": "Selection settings",
       "roomName": "menu_start",
       "x": 2,
-      "y": 11,
+      "y": 12,
       "menuPositionPixels": {
         "x": 22,
-        "y": 89
+        "y": 103
       },
       "spriteSheet": "book-cursor-approved-8x8.png",
       "animationName": "book-menu-book-cursor",
@@ -674,10 +674,10 @@
       "name": "Selection back",
       "roomName": "menu_start",
       "x": 2,
-      "y": 12,
+      "y": 4,
       "menuPositionPixels": {
         "x": 22,
-        "y": 103
+        "y": 32
       },
       "spriteSheet": "book-cursor-approved-8x8.png",
       "animationName": "book-menu-book-cursor",
@@ -2430,6 +2430,241 @@
         "victory": "relay-mechanic-victory",
         "defeat": "relay-mechanic-defeat"
       }
+    },
+    {
+      "id": "coast-menu-load",
+      "name": "Selection load",
+      "roomName": "menu_start",
+      "x": 2,
+      "y": 11,
+      "menuPositionPixels": {
+        "x": 22,
+        "y": 89
+      },
+      "spriteSheet": "book-cursor-approved-8x8.png",
+      "animationName": "book-menu-book-cursor",
+      "menuActorRole": "option",
+      "menuItemID": "load",
+      "menuActorSelectedOnly": true
+    },
+    {
+      "id": "coast-tactical-support",
+      "name": "Autômato de apoio",
+      "roomName": "arena_tatica",
+      "x": 5,
+      "y": 11,
+      "z": 0,
+      "spriteSheet": "tactical-approved-sentinel-64x64.png",
+      "animationName": "idle_down",
+      "animationStateID": "tactical-approved-sentinel-state",
+      "eventBindings": {},
+      "direction": "left"
+    },
+    {
+      "id": "coast-tactical-ranged",
+      "name": "Vigia de treino",
+      "roomName": "arena_tatica",
+      "x": 8,
+      "y": 11,
+      "z": 0,
+      "spriteSheet": "tactical-approved-sentinel-64x64.png",
+      "animationName": "idle_down",
+      "animationStateID": "tactical-approved-sentinel-state",
+      "eventBindings": {},
+      "direction": "left"
+    },
+    {
+      "id": "coast-valve-a-off",
+      "name": "Admissão · desligada",
+      "roomName": "usina_submersa",
+      "x": 2,
+      "y": 8,
+      "z": 0,
+      "spriteSheet": "coast-valve-near.png",
+      "animationName": "off",
+      "animationStateID": "coast-coast-valve-near-state",
+      "dungeonDepthSheets": {
+        "near": "coast-valve-near.png",
+        "mid": "coast-valve-mid.png",
+        "far": "coast-valve-far.png"
+      },
+      "dungeonDepthAnimationName": "off",
+      "dungeonWallMounted": true,
+      "eventBindings": {
+        "onInteract": "coast_usina_a"
+      },
+      "scriptName": "coast_usina_a"
+    },
+    {
+      "id": "coast-valve-a-on",
+      "name": "Admissão · pronta",
+      "roomName": "usina_submersa",
+      "x": 2,
+      "y": 8,
+      "z": 0,
+      "spriteSheet": "coast-valve-near.png",
+      "animationName": "on",
+      "animationStateID": "coast-coast-valve-near-state",
+      "dungeonDepthSheets": {
+        "near": "coast-valve-near.png",
+        "mid": "coast-valve-mid.png",
+        "far": "coast-valve-far.png"
+      },
+      "dungeonDepthAnimationName": "on",
+      "dungeonWallMounted": true,
+      "eventBindings": {
+        "onInteract": "coast_usina_a"
+      },
+      "scriptName": "coast_usina_a"
+    },
+    {
+      "id": "coast-valve-b-off",
+      "name": "Turbina · desligada",
+      "roomName": "usina_submersa",
+      "x": 4,
+      "y": 6,
+      "z": 0,
+      "spriteSheet": "coast-valve-near.png",
+      "animationName": "off",
+      "animationStateID": "coast-coast-valve-near-state",
+      "dungeonDepthSheets": {
+        "near": "coast-valve-near.png",
+        "mid": "coast-valve-mid.png",
+        "far": "coast-valve-far.png"
+      },
+      "dungeonDepthAnimationName": "off",
+      "dungeonWallMounted": true,
+      "eventBindings": {
+        "onInteract": "coast_usina_b"
+      },
+      "scriptName": "coast_usina_b"
+    },
+    {
+      "id": "coast-valve-b-on",
+      "name": "Turbina · pronta",
+      "roomName": "usina_submersa",
+      "x": 4,
+      "y": 6,
+      "z": 0,
+      "spriteSheet": "coast-valve-near.png",
+      "animationName": "on",
+      "animationStateID": "coast-coast-valve-near-state",
+      "dungeonDepthSheets": {
+        "near": "coast-valve-near.png",
+        "mid": "coast-valve-mid.png",
+        "far": "coast-valve-far.png"
+      },
+      "dungeonDepthAnimationName": "on",
+      "dungeonWallMounted": true,
+      "eventBindings": {
+        "onInteract": "coast_usina_b"
+      },
+      "scriptName": "coast_usina_b"
+    },
+    {
+      "id": "coast-valve-c-off",
+      "name": "Saída · desligada",
+      "roomName": "usina_submersa",
+      "x": 8,
+      "y": 4,
+      "z": 0,
+      "spriteSheet": "coast-valve-near.png",
+      "animationName": "off",
+      "animationStateID": "coast-coast-valve-near-state",
+      "dungeonDepthSheets": {
+        "near": "coast-valve-near.png",
+        "mid": "coast-valve-mid.png",
+        "far": "coast-valve-far.png"
+      },
+      "dungeonDepthAnimationName": "off",
+      "dungeonWallMounted": true,
+      "eventBindings": {
+        "onInteract": "coast_usina_c"
+      },
+      "scriptName": "coast_usina_c"
+    },
+    {
+      "id": "coast-valve-c-on",
+      "name": "Saída · pronta",
+      "roomName": "usina_submersa",
+      "x": 8,
+      "y": 4,
+      "z": 0,
+      "spriteSheet": "coast-valve-near.png",
+      "animationName": "on",
+      "animationStateID": "coast-coast-valve-near-state",
+      "dungeonDepthSheets": {
+        "near": "coast-valve-near.png",
+        "mid": "coast-valve-mid.png",
+        "far": "coast-valve-far.png"
+      },
+      "dungeonDepthAnimationName": "on",
+      "dungeonWallMounted": true,
+      "eventBindings": {
+        "onInteract": "coast_usina_c"
+      },
+      "scriptName": "coast_usina_c"
+    },
+    {
+      "id": "coast-port-lamp-0",
+      "name": "Lanterna do cais 1",
+      "roomName": "porto_lumen",
+      "x": 35,
+      "y": 66,
+      "z": 0,
+      "spriteSheet": "coast-port-lantern.png",
+      "animationName": "off",
+      "animationStateID": "coast-coast-port-lantern-state",
+      "collisionMask": 0,
+      "eventBindings": {}
+    },
+    {
+      "id": "coast-port-lamp-1",
+      "name": "Lanterna do cais 2",
+      "roomName": "porto_lumen",
+      "x": 41,
+      "y": 66,
+      "z": 0,
+      "spriteSheet": "coast-port-lantern.png",
+      "animationName": "off",
+      "animationStateID": "coast-coast-port-lantern-state",
+      "collisionMask": 0,
+      "eventBindings": {}
+    },
+    {
+      "id": "coast-freight-lift",
+      "name": "Montacargas do Vento",
+      "roomName": "penedos_vento",
+      "x": 45,
+      "y": 36,
+      "z": 0,
+      "spriteSheet": "coast-freight-lift.png",
+      "animationName": "idle",
+      "animationStateID": "coast-coast-freight-lift-state",
+      "collisionGroup": 2,
+      "direction": "left",
+      "eventBindings": {
+        "onInit": "coast_lift_init",
+        "onUpdate": "coast_lift_update"
+      }
+    },
+    {
+      "id": "coast-lift-worker",
+      "name": "Operador do montacargas",
+      "roomName": "penedos_vento",
+      "x": 39,
+      "y": 34,
+      "z": 0,
+      "spriteSheet": "penedos-approved-worker.png",
+      "animationName": "idle_right",
+      "animationStateID": "penedos-approved-worker-state",
+      "originX": 16,
+      "originY": 56,
+      "eventBindings": {
+        "onInit": "coast_worker_init",
+        "onInteract": "coast_lift_toggle"
+      },
+      "collisionGroup": 0
     }
   ],
   "animationStates": [
@@ -3444,6 +3679,60 @@
       "mirrorLeftFromRight": false,
       "animationIDs": [
         "telescope-dial-dial-2"
+      ]
+    },
+    {
+      "id": "coast-coast-freight-lift-state",
+      "name": "default",
+      "spriteSheet": "coast-freight-lift.png",
+      "animationType": "fixed",
+      "mirrorLeftFromRight": false,
+      "animationIDs": [
+        "coast-coast-freight-lift-idle"
+      ]
+    },
+    {
+      "id": "coast-coast-valve-near-state",
+      "name": "default",
+      "spriteSheet": "coast-valve-near.png",
+      "animationType": "fixed",
+      "mirrorLeftFromRight": false,
+      "animationIDs": [
+        "coast-coast-valve-near-off",
+        "coast-coast-valve-near-on"
+      ]
+    },
+    {
+      "id": "coast-coast-valve-mid-state",
+      "name": "default",
+      "spriteSheet": "coast-valve-mid.png",
+      "animationType": "fixed",
+      "mirrorLeftFromRight": false,
+      "animationIDs": [
+        "coast-coast-valve-mid-off",
+        "coast-coast-valve-mid-on"
+      ]
+    },
+    {
+      "id": "coast-coast-valve-far-state",
+      "name": "default",
+      "spriteSheet": "coast-valve-far.png",
+      "animationType": "fixed",
+      "mirrorLeftFromRight": false,
+      "animationIDs": [
+        "coast-coast-valve-far-off",
+        "coast-coast-valve-far-on"
+      ]
+    },
+    {
+      "id": "coast-coast-port-lantern-state",
+      "name": "default",
+      "spriteSheet": "coast-port-lantern.png",
+      "animationType": "fixed",
+      "mirrorLeftFromRight": false,
+      "animationIDs": [
+        "coast-coast-port-lantern-off",
+        "coast-coast-port-lantern-on"
       ]
     }
   ],
@@ -23503,6 +23792,402 @@
               "sliceY": 0,
               "sourceSheet": "telescope-dial.png",
               "tileWidth": 32,
+              "tileHeight": 32,
+              "flipX": false,
+              "flipY": false,
+              "objPalette": "OBP0",
+              "paletteIndex": 0,
+              "priority": false
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "coast-coast-freight-lift-idle",
+      "name": "idle",
+      "spriteSheet": "coast-freight-lift.png",
+      "stateID": "coast-coast-freight-lift-state",
+      "frameWidth": 64,
+      "frameHeight": 32,
+      "frameCount": 1,
+      "fps": 1,
+      "loops": true,
+      "state": "idle",
+      "direction": "none",
+      "colorMode": "8bpp",
+      "sourceColorMode": "8bpp",
+      "originX": 0,
+      "originY": 8,
+      "originSpace": "animator",
+      "frames": [
+        {
+          "frameIndex": 0,
+          "sourceFrameIndex": 0,
+          "width": 64,
+          "height": 32,
+          "originX": 8,
+          "originY": 8,
+          "tiles": [
+            {
+              "x": -24,
+              "y": 0,
+              "sliceX": 0,
+              "sliceY": 0,
+              "sourceSheet": "coast-freight-lift.png",
+              "tileWidth": 64,
+              "tileHeight": 32,
+              "flipX": false,
+              "flipY": false,
+              "objPalette": "OBP0",
+              "paletteIndex": 0,
+              "priority": false
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "coast-coast-valve-near-off",
+      "name": "off",
+      "spriteSheet": "coast-valve-near.png",
+      "stateID": "coast-coast-valve-near-state",
+      "frameWidth": 32,
+      "frameHeight": 64,
+      "frameCount": 1,
+      "fps": 1,
+      "loops": true,
+      "state": "off",
+      "direction": "none",
+      "colorMode": "8bpp",
+      "sourceColorMode": "8bpp",
+      "originX": 0,
+      "originY": 8,
+      "originSpace": "animator",
+      "frames": [
+        {
+          "frameIndex": 0,
+          "sourceFrameIndex": 0,
+          "width": 32,
+          "height": 64,
+          "originX": 8,
+          "originY": 8,
+          "tiles": [
+            {
+              "x": -8,
+              "y": 0,
+              "sliceX": 0,
+              "sliceY": 0,
+              "sourceSheet": "coast-valve-near.png",
+              "tileWidth": 32,
+              "tileHeight": 64,
+              "flipX": false,
+              "flipY": false,
+              "objPalette": "OBP0",
+              "paletteIndex": 0,
+              "priority": false
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "coast-coast-valve-near-on",
+      "name": "on",
+      "spriteSheet": "coast-valve-near.png",
+      "stateID": "coast-coast-valve-near-state",
+      "frameWidth": 32,
+      "frameHeight": 64,
+      "frameCount": 1,
+      "fps": 1,
+      "loops": true,
+      "state": "on",
+      "direction": "none",
+      "colorMode": "8bpp",
+      "sourceColorMode": "8bpp",
+      "originX": 0,
+      "originY": 8,
+      "originSpace": "animator",
+      "frames": [
+        {
+          "frameIndex": 0,
+          "sourceFrameIndex": 1,
+          "width": 32,
+          "height": 64,
+          "originX": 8,
+          "originY": 8,
+          "tiles": [
+            {
+              "x": -8,
+              "y": 0,
+              "sliceX": 32,
+              "sliceY": 0,
+              "sourceSheet": "coast-valve-near.png",
+              "tileWidth": 32,
+              "tileHeight": 64,
+              "flipX": false,
+              "flipY": false,
+              "objPalette": "OBP0",
+              "paletteIndex": 0,
+              "priority": false
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "coast-coast-valve-mid-off",
+      "name": "off",
+      "spriteSheet": "coast-valve-mid.png",
+      "stateID": "coast-coast-valve-mid-state",
+      "frameWidth": 16,
+      "frameHeight": 32,
+      "frameCount": 1,
+      "fps": 1,
+      "loops": true,
+      "state": "off",
+      "direction": "none",
+      "colorMode": "8bpp",
+      "sourceColorMode": "8bpp",
+      "originX": 0,
+      "originY": 8,
+      "originSpace": "animator",
+      "frames": [
+        {
+          "frameIndex": 0,
+          "sourceFrameIndex": 0,
+          "width": 16,
+          "height": 32,
+          "originX": 8,
+          "originY": 8,
+          "tiles": [
+            {
+              "x": 0,
+              "y": 0,
+              "sliceX": 0,
+              "sliceY": 0,
+              "sourceSheet": "coast-valve-mid.png",
+              "tileWidth": 16,
+              "tileHeight": 32,
+              "flipX": false,
+              "flipY": false,
+              "objPalette": "OBP0",
+              "paletteIndex": 0,
+              "priority": false
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "coast-coast-valve-mid-on",
+      "name": "on",
+      "spriteSheet": "coast-valve-mid.png",
+      "stateID": "coast-coast-valve-mid-state",
+      "frameWidth": 16,
+      "frameHeight": 32,
+      "frameCount": 1,
+      "fps": 1,
+      "loops": true,
+      "state": "on",
+      "direction": "none",
+      "colorMode": "8bpp",
+      "sourceColorMode": "8bpp",
+      "originX": 0,
+      "originY": 8,
+      "originSpace": "animator",
+      "frames": [
+        {
+          "frameIndex": 0,
+          "sourceFrameIndex": 1,
+          "width": 16,
+          "height": 32,
+          "originX": 8,
+          "originY": 8,
+          "tiles": [
+            {
+              "x": 0,
+              "y": 0,
+              "sliceX": 16,
+              "sliceY": 0,
+              "sourceSheet": "coast-valve-mid.png",
+              "tileWidth": 16,
+              "tileHeight": 32,
+              "flipX": false,
+              "flipY": false,
+              "objPalette": "OBP0",
+              "paletteIndex": 0,
+              "priority": false
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "coast-coast-valve-far-off",
+      "name": "off",
+      "spriteSheet": "coast-valve-far.png",
+      "stateID": "coast-coast-valve-far-state",
+      "frameWidth": 8,
+      "frameHeight": 16,
+      "frameCount": 1,
+      "fps": 1,
+      "loops": true,
+      "state": "off",
+      "direction": "none",
+      "colorMode": "8bpp",
+      "sourceColorMode": "8bpp",
+      "originX": 0,
+      "originY": 8,
+      "originSpace": "animator",
+      "frames": [
+        {
+          "frameIndex": 0,
+          "sourceFrameIndex": 0,
+          "width": 8,
+          "height": 16,
+          "originX": 4,
+          "originY": 8,
+          "tiles": [
+            {
+              "x": 0,
+              "y": 0,
+              "sliceX": 0,
+              "sliceY": 0,
+              "sourceSheet": "coast-valve-far.png",
+              "tileWidth": 8,
+              "tileHeight": 16,
+              "flipX": false,
+              "flipY": false,
+              "objPalette": "OBP0",
+              "paletteIndex": 0,
+              "priority": false
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "coast-coast-valve-far-on",
+      "name": "on",
+      "spriteSheet": "coast-valve-far.png",
+      "stateID": "coast-coast-valve-far-state",
+      "frameWidth": 8,
+      "frameHeight": 16,
+      "frameCount": 1,
+      "fps": 1,
+      "loops": true,
+      "state": "on",
+      "direction": "none",
+      "colorMode": "8bpp",
+      "sourceColorMode": "8bpp",
+      "originX": 0,
+      "originY": 8,
+      "originSpace": "animator",
+      "frames": [
+        {
+          "frameIndex": 0,
+          "sourceFrameIndex": 1,
+          "width": 8,
+          "height": 16,
+          "originX": 4,
+          "originY": 8,
+          "tiles": [
+            {
+              "x": 0,
+              "y": 0,
+              "sliceX": 8,
+              "sliceY": 0,
+              "sourceSheet": "coast-valve-far.png",
+              "tileWidth": 8,
+              "tileHeight": 16,
+              "flipX": false,
+              "flipY": false,
+              "objPalette": "OBP0",
+              "paletteIndex": 0,
+              "priority": false
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "coast-coast-port-lantern-off",
+      "name": "off",
+      "spriteSheet": "coast-port-lantern.png",
+      "stateID": "coast-coast-port-lantern-state",
+      "frameWidth": 16,
+      "frameHeight": 32,
+      "frameCount": 1,
+      "fps": 1,
+      "loops": true,
+      "state": "off",
+      "direction": "none",
+      "colorMode": "8bpp",
+      "sourceColorMode": "8bpp",
+      "originX": 0,
+      "originY": 8,
+      "originSpace": "animator",
+      "frames": [
+        {
+          "frameIndex": 0,
+          "sourceFrameIndex": 0,
+          "width": 16,
+          "height": 32,
+          "originX": 8,
+          "originY": 8,
+          "tiles": [
+            {
+              "x": 0,
+              "y": 0,
+              "sliceX": 0,
+              "sliceY": 0,
+              "sourceSheet": "coast-port-lantern.png",
+              "tileWidth": 16,
+              "tileHeight": 32,
+              "flipX": false,
+              "flipY": false,
+              "objPalette": "OBP0",
+              "paletteIndex": 0,
+              "priority": false
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "coast-coast-port-lantern-on",
+      "name": "on",
+      "spriteSheet": "coast-port-lantern.png",
+      "stateID": "coast-coast-port-lantern-state",
+      "frameWidth": 16,
+      "frameHeight": 32,
+      "frameCount": 1,
+      "fps": 1,
+      "loops": true,
+      "state": "on",
+      "direction": "none",
+      "colorMode": "8bpp",
+      "sourceColorMode": "8bpp",
+      "originX": 0,
+      "originY": 8,
+      "originSpace": "animator",
+      "frames": [
+        {
+          "frameIndex": 0,
+          "sourceFrameIndex": 1,
+          "width": 16,
+          "height": 32,
+          "originX": 8,
+          "originY": 8,
+          "tiles": [
+            {
+              "x": 0,
+              "y": 0,
+              "sliceX": 16,
+              "sliceY": 0,
+              "sourceSheet": "coast-port-lantern.png",
+              "tileWidth": 16,
               "tileHeight": 32,
               "flipX": false,
               "flipY": false,
@@ -110407,7 +111092,8 @@
         "colorMode": "4bpp",
         "frameWidth": 8,
         "frameHeight": 8,
-        "frameCount": 224
+        "frameCount": 224,
+        "streamFrames": true
       }
     },
     {
@@ -110417,60 +111103,6 @@
       "systemImage": "square.stack.3d.up.fill",
       "metadata": {
         "source": "Assets/sprites/tactical-cursor-48x24.png",
-        "width": 64,
-        "height": 32,
-        "license": "Project-owned AI-generated artwork",
-        "reviewStatus": "approved",
-        "visualStatus": "approved",
-        "preparedSha256": "41d304c4f9a1f74948e4a29010e47b526117a11ecd153d5bea48c13fbc892cc2",
-        "visualApproval": {
-          "date": "2026-10-17",
-          "record": "User approved gallery8809 and requested integration, cursor camera and combat testing."
-        },
-        "colorMode": "4bpp",
-        "frameWidth": 64,
-        "frameHeight": 32,
-        "frameCount": 1,
-        "transparentCanvasOffset": {
-          "x": 0,
-          "y": 2
-        }
-      }
-    },
-    {
-      "id": "approved-tactical-range-48x24",
-      "name": "tactical-range-48x24.png",
-      "kind": "Sprite",
-      "systemImage": "square.stack.3d.up.fill",
-      "metadata": {
-        "source": "Assets/sprites/tactical-range-48x24.png",
-        "width": 64,
-        "height": 32,
-        "license": "Project-owned AI-generated artwork",
-        "reviewStatus": "approved",
-        "visualStatus": "approved",
-        "preparedSha256": "41d304c4f9a1f74948e4a29010e47b526117a11ecd153d5bea48c13fbc892cc2",
-        "visualApproval": {
-          "date": "2026-10-17",
-          "record": "User approved gallery8809 and requested integration, cursor camera and combat testing."
-        },
-        "colorMode": "4bpp",
-        "frameWidth": 64,
-        "frameHeight": 32,
-        "frameCount": 1,
-        "transparentCanvasOffset": {
-          "x": 0,
-          "y": 2
-        }
-      }
-    },
-    {
-      "id": "approved-tactical-target-48x24",
-      "name": "tactical-target-48x24.png",
-      "kind": "Sprite",
-      "systemImage": "square.stack.3d.up.fill",
-      "metadata": {
-        "source": "Assets/sprites/tactical-target-48x24.png",
         "width": 64,
         "height": 32,
         "license": "Project-owned AI-generated artwork",
@@ -147200,6 +147832,892 @@
         "approvedAt": "2026-10-24",
         "provenance": "fixtures/asset-provenance/campaign-evolutions-approved.json"
       }
+    },
+    {
+      "id": "coast-coast-freight-lift",
+      "name": "coast-freight-lift.png",
+      "kind": "Sprite",
+      "metadata": {
+        "source": "Assets/sprites/coast-freight-lift.png",
+        "generatedBy": "image_gen + canonical stage candidate",
+        "license": "Original project-owned AI-generated artwork under user direction",
+        "reviewStatus": "approved",
+        "approved": true,
+        "frameWidth": 64,
+        "frameHeight": 32,
+        "frameCount": 1,
+        "colorMode": "8bpp",
+        "streamFrames": true,
+        "objectPaletteValues": [
+          0,
+          24511,
+          22399,
+          18271,
+          19263,
+          15167,
+          14079,
+          10943,
+          703,
+          671,
+          1663,
+          19294,
+          5790,
+          16092,
+          16052,
+          7741,
+          574,
+          2557,
+          3611,
+          2491,
+          2428,
+          5529,
+          5528,
+          13843,
+          4469,
+          13735,
+          17792,
+          17760,
+          15712,
+          2364,
+          3351,
+          4405,
+          1333,
+          3317,
+          5460,
+          5428,
+          4404,
+          1332,
+          5396,
+          4372,
+          2324,
+          1236,
+          3378,
+          5395,
+          4371,
+          4370,
+          1298,
+          4338,
+          2290,
+          3282,
+          2320,
+          4336,
+          2288,
+          4304,
+          3280,
+          1232,
+          3310,
+          3278,
+          4331,
+          8423,
+          14625,
+          16672,
+          15648,
+          14624,
+          14592,
+          12544,
+          13504,
+          12480,
+          10432,
+          2192,
+          4270,
+          3246,
+          2222,
+          2158,
+          3245,
+          3181,
+          3212,
+          2124,
+          3210,
+          1162,
+          3178,
+          4198,
+          3112,
+          3109,
+          10370,
+          11425,
+          10369,
+          10337,
+          8321,
+          7265,
+          4131,
+          4130,
+          5153,
+          2082,
+          2081,
+          4098,
+          2050,
+          4097,
+          2049,
+          10368,
+          8320,
+          9312,
+          7264,
+          7232,
+          6176,
+          5152,
+          3104,
+          7168,
+          6144,
+          5120,
+          4096,
+          3072,
+          1024,
+          9408,
+          2253,
+          12126,
+          23487,
+          1397,
+          23372,
+          19008,
+          5454,
+          572,
+          2814,
+          18944,
+          17034,
+          23339,
+          6307,
+          13730
+        ],
+        "preparedSha256": "3f2f481dfcb2bafcda978cb4c219c0d69dc6e74602585712f7dad278d8c725a8",
+        "anchor": "bottom-center",
+        "visualStatus": "approved",
+        "approvalDate": "2026-10-25"
+      }
+    },
+    {
+      "id": "coast-coast-valve-near",
+      "name": "coast-valve-near.png",
+      "kind": "Sprite",
+      "metadata": {
+        "source": "Assets/sprites/coast-valve-near.png",
+        "generatedBy": "image_gen + canonical stage candidate",
+        "license": "Original project-owned AI-generated artwork under user direction",
+        "reviewStatus": "approved",
+        "approved": true,
+        "frameWidth": 32,
+        "frameHeight": 64,
+        "frameCount": 2,
+        "colorMode": "8bpp",
+        "streamFrames": true,
+        "objectPaletteValues": [
+          0,
+          31742,
+          25566,
+          18334,
+          13118,
+          5950,
+          7934,
+          4894,
+          2814,
+          16094,
+          2782,
+          31702,
+          17174,
+          31689,
+          30602,
+          32709,
+          32707,
+          29540,
+          26339,
+          30592,
+          30560,
+          29472,
+          27392,
+          26336,
+          25280,
+          2717,
+          638,
+          1661,
+          3708,
+          2652,
+          3675,
+          572,
+          2619,
+          2618,
+          507,
+          6650,
+          1562,
+          506,
+          7732,
+          1528,
+          13802,
+          18946,
+          23168,
+          22080,
+          21024,
+          18944,
+          19936,
+          18912,
+          17888,
+          473,
+          1496,
+          441,
+          408,
+          1463,
+          1431,
+          407,
+          1430,
+          4471,
+          4470,
+          374,
+          1397,
+          4438,
+          341,
+          2452,
+          5492,
+          372,
+          4436,
+          340,
+          1394,
+          1362,
+          338,
+          10667,
+          14790,
+          13734,
+          12678,
+          13700,
+          18880,
+          17856,
+          17824,
+          16800,
+          14752,
+          15744,
+          11589,
+          11588,
+          11586,
+          13664,
+          13632,
+          276,
+          307,
+          4371,
+          275,
+          274,
+          305,
+          273,
+          4337,
+          241,
+          1327,
+          271,
+          239,
+          1293,
+          1261,
+          4303,
+          207,
+          1230,
+          1229,
+          2189,
+          4300,
+          1228,
+          1196,
+          3273,
+          2218,
+          1194,
+          2215,
+          9475,
+          9474,
+          7362,
+          1162,
+          2185,
+          3177,
+          1128,
+          2150,
+          2149,
+          3171,
+          2116,
+          4163,
+          2115,
+          1059,
+          2114,
+          3106,
+          1058,
+          1026,
+          11520,
+          9441,
+          9440,
+          8417,
+          8385,
+          8384,
+          7361,
+          7328,
+          6304,
+          6272,
+          5216,
+          4161,
+          4160,
+          2112,
+          3105,
+          5152,
+          4128,
+          3104,
+          1057,
+          2080,
+          32,
+          4097,
+          4096,
+          3072,
+          1025,
+          1,
+          2048,
+          1024,
+          0
+        ],
+        "preparedSha256": "5056634b62338d299286bec20818a84ca0c3c2e81546bbf048357deeb784c57d",
+        "anchor": "bottom-center",
+        "visualStatus": "approved",
+        "approvalDate": "2026-10-25"
+      }
+    },
+    {
+      "id": "coast-coast-valve-mid",
+      "name": "coast-valve-mid.png",
+      "kind": "Sprite",
+      "metadata": {
+        "source": "Assets/sprites/coast-valve-mid.png",
+        "generatedBy": "image_gen + canonical stage candidate",
+        "license": "Original project-owned AI-generated artwork under user direction",
+        "reviewStatus": "approved",
+        "approved": true,
+        "frameWidth": 16,
+        "frameHeight": 32,
+        "frameCount": 2,
+        "colorMode": "8bpp",
+        "streamFrames": true,
+        "objectPaletteValues": [
+          0,
+          31742,
+          25566,
+          18334,
+          13118,
+          5950,
+          7934,
+          4894,
+          2814,
+          16094,
+          2782,
+          31702,
+          17174,
+          31689,
+          30602,
+          32709,
+          32707,
+          29540,
+          26339,
+          30592,
+          30560,
+          29472,
+          27392,
+          26336,
+          25280,
+          2717,
+          638,
+          1661,
+          3708,
+          2652,
+          3675,
+          572,
+          2619,
+          2618,
+          507,
+          6650,
+          1562,
+          506,
+          7732,
+          1528,
+          13802,
+          18946,
+          23168,
+          22080,
+          21024,
+          18944,
+          19936,
+          18912,
+          17888,
+          473,
+          1496,
+          441,
+          408,
+          1463,
+          1431,
+          407,
+          1430,
+          4471,
+          4470,
+          374,
+          1397,
+          4438,
+          341,
+          2452,
+          5492,
+          372,
+          4436,
+          340,
+          1394,
+          1362,
+          338,
+          10667,
+          14790,
+          13734,
+          12678,
+          13700,
+          18880,
+          17856,
+          17824,
+          16800,
+          14752,
+          15744,
+          11589,
+          11588,
+          11586,
+          13664,
+          13632,
+          276,
+          307,
+          4371,
+          275,
+          274,
+          305,
+          273,
+          4337,
+          241,
+          1327,
+          271,
+          239,
+          1293,
+          1261,
+          4303,
+          207,
+          1230,
+          1229,
+          2189,
+          4300,
+          1228,
+          1196,
+          3273,
+          2218,
+          1194,
+          2215,
+          9475,
+          9474,
+          7362,
+          1162,
+          2185,
+          3177,
+          1128,
+          2150,
+          2149,
+          3171,
+          2116,
+          4163,
+          2115,
+          1059,
+          2114,
+          3106,
+          1058,
+          1026,
+          11520,
+          9441,
+          9440,
+          8417,
+          8385,
+          8384,
+          7361,
+          7328,
+          6304,
+          6272,
+          5216,
+          4161,
+          4160,
+          2112,
+          3105,
+          5152,
+          4128,
+          3104,
+          1057,
+          2080,
+          32,
+          4097,
+          4096,
+          3072,
+          1025,
+          1,
+          2048,
+          1024,
+          0
+        ],
+        "preparedSha256": "db12f26953b479ba53d744446bea587e0a2f95c283a753fae4a815b6dc2e1889",
+        "anchor": "bottom-center",
+        "visualStatus": "approved",
+        "approvalDate": "2026-10-25"
+      }
+    },
+    {
+      "id": "coast-coast-valve-far",
+      "name": "coast-valve-far.png",
+      "kind": "Sprite",
+      "metadata": {
+        "source": "Assets/sprites/coast-valve-far.png",
+        "generatedBy": "image_gen + canonical stage candidate",
+        "license": "Original project-owned AI-generated artwork under user direction",
+        "reviewStatus": "approved",
+        "approved": true,
+        "frameWidth": 8,
+        "frameHeight": 16,
+        "frameCount": 2,
+        "colorMode": "8bpp",
+        "streamFrames": true,
+        "objectPaletteValues": [
+          0,
+          31742,
+          25566,
+          18334,
+          13118,
+          5950,
+          7934,
+          4894,
+          2814,
+          16094,
+          2782,
+          31702,
+          17174,
+          31689,
+          30602,
+          32709,
+          32707,
+          29540,
+          26339,
+          30592,
+          30560,
+          29472,
+          27392,
+          26336,
+          25280,
+          2717,
+          638,
+          1661,
+          3708,
+          2652,
+          3675,
+          572,
+          2619,
+          2618,
+          507,
+          6650,
+          1562,
+          506,
+          7732,
+          1528,
+          13802,
+          18946,
+          23168,
+          22080,
+          21024,
+          18944,
+          19936,
+          18912,
+          17888,
+          473,
+          1496,
+          441,
+          408,
+          1463,
+          1431,
+          407,
+          1430,
+          4471,
+          4470,
+          374,
+          1397,
+          4438,
+          341,
+          2452,
+          5492,
+          372,
+          4436,
+          340,
+          1394,
+          1362,
+          338,
+          10667,
+          14790,
+          13734,
+          12678,
+          13700,
+          18880,
+          17856,
+          17824,
+          16800,
+          14752,
+          15744,
+          11589,
+          11588,
+          11586,
+          13664,
+          13632,
+          276,
+          307,
+          4371,
+          275,
+          274,
+          305,
+          273,
+          4337,
+          241,
+          1327,
+          271,
+          239,
+          1293,
+          1261,
+          4303,
+          207,
+          1230,
+          1229,
+          2189,
+          4300,
+          1228,
+          1196,
+          3273,
+          2218,
+          1194,
+          2215,
+          9475,
+          9474,
+          7362,
+          1162,
+          2185,
+          3177,
+          1128,
+          2150,
+          2149,
+          3171,
+          2116,
+          4163,
+          2115,
+          1059,
+          2114,
+          3106,
+          1058,
+          1026,
+          11520,
+          9441,
+          9440,
+          8417,
+          8385,
+          8384,
+          7361,
+          7328,
+          6304,
+          6272,
+          5216,
+          4161,
+          4160,
+          2112,
+          3105,
+          5152,
+          4128,
+          3104,
+          1057,
+          2080,
+          32,
+          4097,
+          4096,
+          3072,
+          1025,
+          1,
+          2048,
+          1024,
+          0
+        ],
+        "preparedSha256": "856442eac231036060db7b711c93967b682817d4a33a0e29a42d5191589250b4",
+        "anchor": "bottom-center",
+        "visualStatus": "approved",
+        "approvalDate": "2026-10-25"
+      }
+    },
+    {
+      "id": "coast-coast-port-lantern",
+      "name": "coast-port-lantern.png",
+      "kind": "Sprite",
+      "metadata": {
+        "source": "Assets/sprites/coast-port-lantern.png",
+        "generatedBy": "image_gen + canonical stage candidate",
+        "license": "Original project-owned AI-generated artwork under user direction",
+        "reviewStatus": "approved",
+        "approved": true,
+        "frameWidth": 16,
+        "frameHeight": 32,
+        "frameCount": 2,
+        "colorMode": "8bpp",
+        "streamFrames": true,
+        "objectPaletteValues": [
+          0,
+          2048,
+          13572,
+          13605,
+          12516,
+          9346,
+          2718,
+          5322,
+          4669,
+          8660,
+          1363,
+          18104,
+          22332,
+          26526,
+          11998,
+          22367,
+          5391,
+          4366,
+          3174,
+          6375,
+          5457,
+          13982,
+          12891,
+          18174,
+          6547,
+          9690,
+          6551,
+          2619,
+          2685,
+          19196,
+          5185,
+          9478,
+          11590,
+          11591,
+          4466,
+          4266,
+          7706,
+          8893,
+          16094,
+          13947,
+          15037,
+          19230,
+          4302,
+          4311,
+          10674,
+          4301,
+          5220,
+          3320,
+          5432,
+          6589,
+          21343,
+          17150,
+          18070,
+          9446,
+          7469,
+          10541,
+          13709,
+          9516,
+          17932,
+          3072,
+          22398,
+          7500,
+          7363,
+          5354,
+          10639,
+          18138,
+          18173,
+          4343,
+          3279,
+          10846,
+          3513,
+          14014,
+          5487,
+          3678,
+          8352,
+          8386,
+          19043,
+          17985,
+          25503,
+          2719,
+          26558,
+          11071,
+          4564,
+          3708,
+          13839,
+          24444,
+          17986,
+          6272,
+          6495,
+          24447,
+          6344,
+          22366,
+          6462,
+          6429,
+          6362,
+          5216,
+          23454,
+          6878,
+          20447,
+          3742,
+          4605,
+          11038,
+          21407,
+          11488,
+          2049,
+          4269,
+          6208,
+          13508,
+          19019,
+          2782,
+          7707,
+          4268,
+          18945,
+          2051,
+          19262,
+          24478,
+          8797,
+          7402,
+          2154,
+          11934,
+          15102,
+          12484,
+          19937,
+          4235,
+          440,
+          14688,
+          18912,
+          6519,
+          17147,
+          4370,
+          5460,
+          20351,
+          20319,
+          26591,
+          7542,
+          25535,
+          26559,
+          9720,
+          13911,
+          8385,
+          8390,
+          3476,
+          6518,
+          2052,
+          2118,
+          4234,
+          539,
+          605,
+          407,
+          6550,
+          21273,
+          20285,
+          15991,
+          18137,
+          30687,
+          4166,
+          4201,
+          9585,
+          7572,
+          31673,
+          28605,
+          11868,
+          15036
+        ],
+        "preparedSha256": "2bbfa35d0057c6d20924aab1c23d354573ebfdec2640def4a2223e6dd71652b1",
+        "anchor": "bottom-center",
+        "visualStatus": "approved",
+        "approvalDate": "2026-10-25"
+      }
     }
   ],
   "audioItems": [
@@ -155983,22 +157501,28 @@
       }
     },
     {
-      "character": "Nara",
-      "choiceTranslations": {},
+      "character": "",
+      "choiceTranslations": {
+        "pt-BR": [],
+        "en": [],
+        "es": []
+      },
       "choices": [],
       "confirmSound": "farol_sfx_dialogo",
       "emote": "",
       "key": "usina_objetivo",
       "portrait": "",
-      "text": "A água tomou o núcleo. Vou avançar pelo corredor central e localizar a porta da sentinela.",
+      "text": "The power station has lost pressure. Press A to inspect the valves along the path: intake, turbine, then output. Afterward, reach the core door.",
       "textSound": "farol_sfx_texto",
       "translations": {
-        "pt-BR": "A água tomou o núcleo. Vou avançar pelo corredor central e localizar a porta da sentinela.",
-        "es": "A água tomou o núcleo. Vou avançar pelo corredor central e localizar a porta da sentinela."
+        "pt-BR": "A Usina perdeu a pressão. Examine com A as válvulas no caminho: admissão, turbina e saída, nessa ordem. Depois alcance a porta do núcleo.",
+        "en": "The power station has lost pressure. Press A to inspect the valves along the path: intake, turbine, then output. Afterward, reach the core door.",
+        "es": "La central perdió presión. Pulsa A para examinar las válvulas del camino: admisión, turbina y salida, en ese orden. Después, llega a la puerta del núcleo."
       },
       "translationStatus": {
-        "pt-BR": "approved",
-        "es": "approved"
+        "pt-BR": "draft-ai",
+        "en": "draft-ai",
+        "es": "draft-ai"
       }
     },
     {
@@ -157046,23 +158570,27 @@
     },
     {
       "key": "arena_tatica_controles",
-      "character": "Sentinela",
-      "text": "Selecione Nara com A. No menu, use o direcional e A: Mover, Atacar ou Esperar. Após mover, escolha Atacar. B volta. O inimigo joga sozinho. L volta ao Mercado.",
+      "character": "",
+      "text": "Team training: Nara attacks up close; SUPPORT reaches two tiles. Select an allied unit with A. Move, Attack or Wait; B goes back; Select ends the turn; L returns to the market.",
       "portrait": "",
       "emote": "",
       "choices": [],
-      "choiceTranslations": {},
+      "choiceTranslations": {
+        "pt-BR": [],
+        "en": [],
+        "es": []
+      },
       "textSound": "farol_sfx_texto",
       "confirmSound": "farol_sfx_dialogo",
       "translations": {
-        "pt-BR": "Selecione Nara com A. No menu, use o direcional e A: Mover, Atacar ou Esperar. Após mover, escolha Atacar. B volta. O inimigo joga sozinho. L volta ao Mercado.",
-        "en": "Select Nara with A. Use the D-pad and A in the menu: Move, Attack or Wait. After moving, choose Attack. B goes back. The enemy plays automatically. L returns to the Market.",
-        "es": "Elige a Nara con A. Usa la cruceta y A en el menu: Mover, Atacar o Esperar. Tras moverte, elige Atacar. B vuelve. El enemigo juega solo. L vuelve al Mercado."
+        "pt-BR": "Treino em dupla: Nara ataca de perto; APOIO alcança dois espaços. Selecione uma unidade aliada com A. Mover, Atacar ou Esperar; B volta; Select encerra o turno; L retorna ao Mercado.",
+        "en": "Team training: Nara attacks up close; SUPPORT reaches two tiles. Select an allied unit with A. Move, Attack or Wait; B goes back; Select ends the turn; L returns to the market.",
+        "es": "Entrenamiento en pareja: Nara ataca de cerca; APOYO alcanza dos casillas. Selecciona un aliado con A. Mover, Atacar o Esperar; B vuelve; Select termina el turno; L regresa al mercado."
       },
       "translationStatus": {
-        "pt-BR": "draft",
-        "en": "draft",
-        "es": "draft"
+        "pt-BR": "draft-ai",
+        "en": "draft-ai",
+        "es": "draft-ai"
       }
     },
     {
@@ -158545,6 +160073,281 @@
         "en": "draft-ai",
         "es": "draft-ai"
       }
+    },
+    {
+      "key": "coast_usina_order",
+      "character": "",
+      "portrait": "",
+      "emote": "",
+      "text": "The panel reads: INTAKE → TURBINE → OUTPUT. An out-of-order adjustment resets only this circuit. All three valves lie on the way to the core.",
+      "textSound": "farol_sfx_texto",
+      "confirmSound": "farol_sfx_dialogo",
+      "choices": [],
+      "translations": {
+        "pt-BR": "O painel indica: ADMISSÃO → TURBINA → SAÍDA. Uma manobra fora de ordem desarma apenas este circuito. As três válvulas ficam no caminho até o núcleo.",
+        "en": "The panel reads: INTAKE → TURBINE → OUTPUT. An out-of-order adjustment resets only this circuit. All three valves lie on the way to the core.",
+        "es": "El panel indica: ADMISIÓN → TURBINA → SALIDA. Una maniobra fuera de orden reinicia solo este circuito. Las tres válvulas están de camino al núcleo."
+      },
+      "choiceTranslations": {
+        "pt-BR": [],
+        "en": [],
+        "es": []
+      },
+      "translationStatus": {
+        "pt-BR": "draft-ai",
+        "en": "draft-ai",
+        "es": "draft-ai"
+      }
+    },
+    {
+      "key": "coast_usina_a_ready",
+      "character": "",
+      "portrait": "",
+      "emote": "",
+      "text": "Intake opened. Water now feeds the turbine.",
+      "textSound": "farol_sfx_texto",
+      "confirmSound": "farol_sfx_dialogo",
+      "choices": [],
+      "translations": {
+        "pt-BR": "Admissão aberta. A água agora alimenta a turbina.",
+        "en": "Intake opened. Water now feeds the turbine.",
+        "es": "Admisión abierta. El agua alimenta la turbina."
+      },
+      "choiceTranslations": {
+        "pt-BR": [],
+        "en": [],
+        "es": []
+      },
+      "translationStatus": {
+        "pt-BR": "draft-ai",
+        "en": "draft-ai",
+        "es": "draft-ai"
+      }
+    },
+    {
+      "key": "coast_usina_b_ready",
+      "character": "",
+      "portrait": "",
+      "emote": "",
+      "text": "Turbine stabilized. Connect the output to the core next.",
+      "textSound": "farol_sfx_texto",
+      "confirmSound": "farol_sfx_dialogo",
+      "choices": [],
+      "translations": {
+        "pt-BR": "Turbina estabilizada. Falta conectar a saída ao núcleo.",
+        "en": "Turbine stabilized. Connect the output to the core next.",
+        "es": "Turbina estabilizada. Falta conectar la salida al núcleo."
+      },
+      "choiceTranslations": {
+        "pt-BR": [],
+        "en": [],
+        "es": []
+      },
+      "translationStatus": {
+        "pt-BR": "draft-ai",
+        "en": "draft-ai",
+        "es": "draft-ai"
+      }
+    },
+    {
+      "key": "coast_usina_c_ready",
+      "character": "",
+      "portrait": "",
+      "emote": "",
+      "text": "All three indicators turned blue. The circuit is stable and the core door is unlocked.",
+      "textSound": "farol_sfx_texto",
+      "confirmSound": "farol_sfx_dialogo",
+      "choices": [],
+      "translations": {
+        "pt-BR": "Os três indicadores ficaram azuis. O circuito está estável e a porta do núcleo foi liberada.",
+        "en": "All three indicators turned blue. The circuit is stable and the core door is unlocked.",
+        "es": "Los tres indicadores están azules. El circuito está estable y la puerta del núcleo está abierta."
+      },
+      "choiceTranslations": {
+        "pt-BR": [],
+        "en": [],
+        "es": []
+      },
+      "translationStatus": {
+        "pt-BR": "draft-ai",
+        "en": "draft-ai",
+        "es": "draft-ai"
+      }
+    },
+    {
+      "key": "coast_usina_already",
+      "character": "",
+      "portrait": "",
+      "emote": "",
+      "text": "This valve is already in the correct position.",
+      "textSound": "farol_sfx_texto",
+      "confirmSound": "farol_sfx_dialogo",
+      "choices": [],
+      "translations": {
+        "pt-BR": "Esta válvula já está na posição correta.",
+        "en": "This valve is already in the correct position.",
+        "es": "Esta válvula ya está en la posición correcta."
+      },
+      "choiceTranslations": {
+        "pt-BR": [],
+        "en": [],
+        "es": []
+      },
+      "translationStatus": {
+        "pt-BR": "draft-ai",
+        "en": "draft-ai",
+        "es": "draft-ai"
+      }
+    },
+    {
+      "key": "coast_market_delivery",
+      "character": "",
+      "portrait": "",
+      "emote": "",
+      "text": "The passage is clear. Your delivery is registered; you can head to the power station.",
+      "textSound": "farol_sfx_texto",
+      "confirmSound": "farol_sfx_dialogo",
+      "choices": [],
+      "translations": {
+        "pt-BR": "A passagem está liberada. Sua entrega já está registrada; pode seguir para a Usina.",
+        "en": "The passage is clear. Your delivery is registered; you can head to the power station.",
+        "es": "El paso está libre. Tu entrega está registrada; puedes ir a la central."
+      },
+      "choiceTranslations": {
+        "pt-BR": [],
+        "en": [],
+        "es": []
+      },
+      "translationStatus": {
+        "pt-BR": "draft-ai",
+        "en": "draft-ai",
+        "es": "draft-ai"
+      }
+    },
+    {
+      "key": "coast_market_memory",
+      "character": "",
+      "portrait": "",
+      "emote": "",
+      "text": "You recorded the Tide Memory? Then the old archive still has stories to tell.",
+      "textSound": "farol_sfx_texto",
+      "confirmSound": "farol_sfx_dialogo",
+      "choices": [],
+      "translations": {
+        "pt-BR": "A Memória das Marés chegou ao diário? Então o antigo arquivo ainda tem histórias para contar.",
+        "en": "You recorded the Tide Memory? Then the old archive still has stories to tell.",
+        "es": "¿Registraste la Memoria de las Mareas? El viejo archivo aún tiene historias que contar."
+      },
+      "choiceTranslations": {
+        "pt-BR": [],
+        "en": [],
+        "es": []
+      },
+      "translationStatus": {
+        "pt-BR": "draft-ai",
+        "en": "draft-ai",
+        "es": "draft-ai"
+      }
+    },
+    {
+      "key": "coast_market_relay",
+      "character": "",
+      "portrait": "",
+      "emote": "",
+      "text": "We have received the relay signal! Your work is reconnecting the coast.",
+      "textSound": "farol_sfx_texto",
+      "confirmSound": "farol_sfx_dialogo",
+      "choices": [],
+      "translations": {
+        "pt-BR": "Já recebemos o sinal do relé! O trabalho de vocês está reconectando a costa.",
+        "en": "We have received the relay signal! Your work is reconnecting the coast.",
+        "es": "¡Ya recibimos la señal del relé! Su trabajo está reconectando la costa."
+      },
+      "choiceTranslations": {
+        "pt-BR": [],
+        "en": [],
+        "es": []
+      },
+      "translationStatus": {
+        "pt-BR": "draft-ai",
+        "en": "draft-ai",
+        "es": "draft-ai"
+      }
+    },
+    {
+      "key": "coast_captain_shift",
+      "character": "",
+      "portrait": "",
+      "emote": "",
+      "text": "The shift is ending. The dock lanterns come on at dusk; your route stays open.",
+      "textSound": "farol_sfx_texto",
+      "confirmSound": "farol_sfx_dialogo",
+      "choices": [],
+      "translations": {
+        "pt-BR": "O expediente está terminando. As lanternas do cais entram em serviço ao anoitecer; a rota continua aberta para você.",
+        "en": "The shift is ending. The dock lanterns come on at dusk; your route stays open.",
+        "es": "La jornada termina. Las linternas del muelle se encienden al anochecer; tu ruta sigue abierta."
+      },
+      "choiceTranslations": {
+        "pt-BR": [],
+        "en": [],
+        "es": []
+      },
+      "translationStatus": {
+        "pt-BR": "draft-ai",
+        "en": "draft-ai",
+        "es": "draft-ai"
+      }
+    },
+    {
+      "key": "coast_lift_on",
+      "character": "",
+      "portrait": "",
+      "emote": "",
+      "text": "Freight lift on! Ride the platform and jump to continue. It is optional; the normal route stays clear. Talk to me to pause it.",
+      "textSound": "farol_sfx_texto",
+      "confirmSound": "farol_sfx_dialogo",
+      "choices": [],
+      "translations": {
+        "pt-BR": "Montacargas ligado! Suba na plataforma e salte para continuar. É um apoio opcional; o caminho normal continua livre. Fale comigo para pausá-lo.",
+        "en": "Freight lift on! Ride the platform and jump to continue. It is optional; the normal route stays clear. Talk to me to pause it.",
+        "es": "¡Montacargas en marcha! Sube y salta para continuar. Es opcional; la ruta normal sigue libre. Habla conmigo para pausarlo."
+      },
+      "choiceTranslations": {
+        "pt-BR": [],
+        "en": [],
+        "es": []
+      },
+      "translationStatus": {
+        "pt-BR": "draft-ai",
+        "en": "draft-ai",
+        "es": "draft-ai"
+      }
+    },
+    {
+      "key": "coast_lift_off",
+      "character": "",
+      "portrait": "",
+      "emote": "",
+      "text": "The lift is paused at its current position. You can restart it whenever you want.",
+      "textSound": "farol_sfx_texto",
+      "confirmSound": "farol_sfx_dialogo",
+      "choices": [],
+      "translations": {
+        "pt-BR": "Montacargas pausado na posição atual. Pode ligá-lo novamente quando quiser.",
+        "en": "The lift is paused at its current position. You can restart it whenever you want.",
+        "es": "El montacargas está pausado en su posición actual. Puedes volver a activarlo cuando quieras."
+      },
+      "choiceTranslations": {
+        "pt-BR": [],
+        "en": [],
+        "es": []
+      },
+      "translationStatus": {
+        "pt-BR": "draft-ai",
+        "en": "draft-ai",
+        "es": "draft-ai"
+      }
     }
   ],
   "editorState": {
@@ -159937,6 +161740,31 @@
           "id": "new-game-reset-var_telescope_alignment",
           "command": "set_variable var_telescope_alignment 0",
           "isEnabled": true
+        },
+        {
+          "id": "coast-reset-var_coast_usina",
+          "command": "set_variable var_coast_usina 0",
+          "isEnabled": true
+        },
+        {
+          "id": "coast-reset-var_coast_minute",
+          "command": "set_variable var_coast_minute 1020",
+          "isEnabled": true
+        },
+        {
+          "id": "coast-reset-var_coast_evening",
+          "command": "set_variable var_coast_evening 0",
+          "isEnabled": true
+        },
+        {
+          "id": "coast-reset-var_coast_lift",
+          "command": "set_variable var_coast_lift 0",
+          "isEnabled": true
+        },
+        {
+          "id": "coast-reset-var_coast_clock_ready",
+          "command": "set_variable var_coast_clock_ready 1",
+          "isEnabled": true
         }
       ]
     },
@@ -160144,71 +161972,35 @@
       ]
     },
     {
-      "id": "event-port-enter",
+      "id": "porto_ao_entrar",
       "name": "porto_ao_entrar",
       "roomName": "porto_lumen",
-      "category": "Exemplo · Sistemas conectados",
-      "detail": "Exemplo de sistemas conectados: estado persistente, requisitos e efeitos separados do cenário.",
+      "category": "Cena",
       "command": "noop",
       "steps": [
         {
+          "id": "porto_ao_entrar-coast-audio-preferences",
+          "command": "call_procedure coast_audio_preferences",
+          "isEnabled": true
+        },
+        {
+          "id": "porto_ao_entrar-coast-audio-mute",
+          "command": "call_procedure coast_audio_mute",
+          "isEnabled": true
+        },
+        {
+          "id": "porto_ao_entrar-coast-music",
+          "command": "fade_audio_volume music 100 45 var_audio_music_volume var_audio_master_volume",
+          "isEnabled": true
+        },
+        {
+          "id": "porto_ao_entrar-0",
+          "command": "call_procedure coast_base_porto_ao_entrar",
+          "isEnabled": true
+        },
+        {
           "id": "porto_ao_entrar-1",
-          "command": "call_procedure showcase_base_port_enter",
-          "isEnabled": true
-        },
-        {
-          "id": "porto_ao_entrar-2",
-          "command": "if_variable var_council_visit 1",
-          "isEnabled": true
-        },
-        {
-          "id": "porto_ao_entrar-3",
-          "command": "set_variable var_council_visit 0",
-          "isEnabled": true
-        },
-        {
-          "id": "porto_ao_entrar-4",
-          "command": "save_game 0",
-          "isEnabled": true
-        },
-        {
-          "id": "porto_ao_entrar-5",
-          "command": "condition_end",
-          "isEnabled": true
-        },
-        {
-          "id": "porto_ao_entrar-6",
-          "command": "if_variable var_council_path 1",
-          "isEnabled": true
-        },
-        {
-          "id": "porto_ao_entrar-7",
-          "command": "set_actor_animation port-mechanic idle_left",
-          "isEnabled": true
-        },
-        {
-          "id": "porto_ao_entrar-8",
-          "command": "else",
-          "isEnabled": true
-        },
-        {
-          "id": "porto_ao_entrar-9",
-          "command": "if_variable var_council_path 2",
-          "isEnabled": true
-        },
-        {
-          "id": "porto_ao_entrar-10",
-          "command": "set_actor_animation port-mechanic idle_right",
-          "isEnabled": true
-        },
-        {
-          "id": "porto_ao_entrar-11",
-          "command": "condition_end",
-          "isEnabled": true
-        },
-        {
-          "id": "porto_ao_entrar-12",
-          "command": "condition_end",
+          "command": "call_procedure coast_port_restore",
           "isEnabled": true
         }
       ]
@@ -160306,6 +162098,21 @@
       "detail": "Exemplo de sistemas conectados: estado persistente, requisitos e efeitos separados do cenário.",
       "command": "noop",
       "steps": [
+        {
+          "id": "farol_interior_ao_entrar-coast-audio-preferences",
+          "command": "call_procedure coast_audio_preferences",
+          "isEnabled": true
+        },
+        {
+          "id": "farol_interior_ao_entrar-coast-audio-mute",
+          "command": "call_procedure coast_audio_mute",
+          "isEnabled": true
+        },
+        {
+          "id": "farol_interior_ao_entrar-coast-music",
+          "command": "fade_audio_volume music 70 45 var_audio_music_volume var_audio_master_volume",
+          "isEnabled": true
+        },
         {
           "id": "farol-relay-entry-sync",
           "command": "call_procedure farol_relay_sync",
@@ -160602,6 +162409,21 @@
       "command": "noop",
       "steps": [
         {
+          "id": "armazem_das_mares_ao_entrar-coast-audio-preferences",
+          "command": "call_procedure coast_audio_preferences",
+          "isEnabled": true
+        },
+        {
+          "id": "armazem_das_mares_ao_entrar-coast-audio-mute",
+          "command": "call_procedure coast_audio_mute",
+          "isEnabled": true
+        },
+        {
+          "id": "armazem_das_mares_ao_entrar-coast-music",
+          "command": "fade_audio_volume music 70 45 var_audio_music_volume var_audio_master_volume",
+          "isEnabled": true
+        },
+        {
           "id": "armazem_das_mares_ao_entrar-step-1",
           "command": "play_music farol_enseada",
           "isEnabled": true
@@ -160622,6 +162444,21 @@
       "command": "noop",
       "steps": [
         {
+          "id": "observatorio_do_farol_ao_entrar-coast-audio-preferences",
+          "command": "call_procedure coast_audio_preferences",
+          "isEnabled": true
+        },
+        {
+          "id": "observatorio_do_farol_ao_entrar-coast-audio-mute",
+          "command": "call_procedure coast_audio_mute",
+          "isEnabled": true
+        },
+        {
+          "id": "observatorio_do_farol_ao_entrar-coast-music",
+          "command": "fade_audio_volume music 70 45 var_audio_music_volume var_audio_master_volume",
+          "isEnabled": true
+        },
+        {
           "id": "observatorio_do_farol_ao_entrar-step-1",
           "command": "play_music farol_memorias",
           "isEnabled": true
@@ -160634,21 +162471,75 @@
       ]
     },
     {
-      "id": "event-market-trader",
+      "id": "mercado_falar_mercador",
       "name": "mercado_falar_mercador",
       "roomName": "mercado_suspenso",
-      "category": "Ator",
-      "detail": "Autoria: mercado_falar_mercador. Sequência editável com 2 passos. Os eventos chamados permanecem acessíveis na timeline. Vínculos: actors.3 (scriptName), actors.3 (onInteract).",
+      "category": "Cena",
       "command": "noop",
       "steps": [
         {
-          "id": "event-market-trader-step-1",
-          "command": "show_dialogue mercado_objetivo",
+          "id": "mercado_falar_mercador-0",
+          "command": "if_variable var_relay_cleared 1",
           "isEnabled": true
         },
         {
-          "id": "event-market-trader-step-2",
-          "command": "show_dialogue mercado_mercador",
+          "id": "mercado_falar_mercador-1",
+          "command": "show_dialogue coast_market_relay",
+          "isEnabled": true
+        },
+        {
+          "id": "mercado_falar_mercador-2",
+          "command": "else",
+          "isEnabled": true
+        },
+        {
+          "id": "mercado_falar_mercador-3",
+          "command": "if_variable var_gallery_record 1",
+          "isEnabled": true
+        },
+        {
+          "id": "mercado_falar_mercador-4",
+          "command": "show_dialogue coast_market_memory",
+          "isEnabled": true
+        },
+        {
+          "id": "mercado_falar_mercador-5",
+          "command": "else",
+          "isEnabled": true
+        },
+        {
+          "id": "mercado_falar_mercador-6",
+          "command": "if_variable var_market_shortcut 1",
+          "isEnabled": true
+        },
+        {
+          "id": "mercado_falar_mercador-7",
+          "command": "show_dialogue coast_market_delivery",
+          "isEnabled": true
+        },
+        {
+          "id": "mercado_falar_mercador-8",
+          "command": "else",
+          "isEnabled": true
+        },
+        {
+          "id": "mercado_falar_mercador-9",
+          "command": "call_procedure coast_base_mercado_falar_mercador",
+          "isEnabled": true
+        },
+        {
+          "id": "mercado_falar_mercador-10",
+          "command": "condition_end",
+          "isEnabled": true
+        },
+        {
+          "id": "mercado_falar_mercador-11",
+          "command": "condition_end",
+          "isEnabled": true
+        },
+        {
+          "id": "mercado_falar_mercador-12",
+          "command": "condition_end",
           "isEnabled": true
         }
       ]
@@ -160689,74 +162580,88 @@
       ]
     },
     {
-      "id": "event-plant-enter",
+      "id": "usina_ao_entrar",
       "name": "usina_ao_entrar",
       "roomName": "usina_submersa",
       "category": "Cena",
-      "detail": "Autoria: usina_ao_entrar. Sequência editável com 6 passos. Os eventos chamados permanecem acessíveis na timeline. Vínculos: rooms.10 (onInit).",
       "command": "noop",
       "steps": [
         {
-          "id": "dungeon-approved-music-usina_ao_entrar",
-          "command": "play_music dungeon_tide"
-        },
-        {
-          "id": "event-plant-enter-step-1",
-          "command": "call_event aplicar_perfil_jogador",
+          "id": "usina_ao_entrar-coast-audio-preferences",
+          "command": "call_procedure coast_audio_preferences",
           "isEnabled": true
         },
         {
-          "id": "event-plant-enter-step-2",
-          "command": "show_dialogue usina_objetivo",
+          "id": "usina_ao_entrar-coast-audio-mute",
+          "command": "call_procedure coast_audio_mute",
           "isEnabled": true
         },
         {
-          "id": "event-plant-enter-step-3",
-          "command": "if_variable var_usina_combat_cleared 1",
+          "id": "usina_ao_entrar-coast-music",
+          "command": "fade_audio_volume music 70 45 var_audio_music_volume var_audio_master_volume",
           "isEnabled": true
         },
         {
-          "id": "event-plant-enter-step-4",
-          "command": "change_scene usina_saida 5 5 down",
+          "id": "usina_ao_entrar-0",
+          "command": "call_procedure coast_base_usina_ao_entrar",
           "isEnabled": true
         },
         {
-          "id": "event-plant-enter-step-5",
-          "command": "condition_end",
+          "id": "usina_ao_entrar-1",
+          "command": "call_procedure coast_usina_sync",
           "isEnabled": true
         }
       ]
     },
     {
-      "id": "event-plant-combat-gate",
+      "id": "usina_abrir_combate",
       "name": "usina_abrir_combate",
       "roomName": "usina_submersa",
-      "category": "Hotspot",
-      "detail": "Autoria: usina_abrir_combate. Sequência editável com 5 passos. Os eventos chamados permanecem acessíveis na timeline. Vínculos: triggers.6 (onEnter).",
+      "category": "Cena",
       "command": "noop",
       "steps": [
         {
-          "id": "event-plant-combat-gate-step-1",
-          "command": "if_variable var_usina_combat_cleared 0",
+          "id": "usina_abrir_combate-0",
+          "command": "if_variable var_usina_combat_cleared 1",
           "isEnabled": true
         },
         {
-          "id": "event-plant-combat-gate-step-2",
-          "command": "change_scene usina_combate 9 3 up",
+          "id": "usina_abrir_combate-1",
+          "command": "call_procedure coast_base_usina_abrir_combate",
           "isEnabled": true
         },
         {
-          "id": "event-plant-combat-gate-step-3",
+          "id": "usina_abrir_combate-2",
           "command": "else",
           "isEnabled": true
         },
         {
-          "id": "event-plant-combat-gate-step-4",
-          "command": "change_scene usina_saida 5 5 down",
+          "id": "usina_abrir_combate-3",
+          "command": "if_variable var_coast_usina 3",
           "isEnabled": true
         },
         {
-          "id": "event-plant-combat-gate-step-5",
+          "id": "usina_abrir_combate-4",
+          "command": "call_procedure coast_base_usina_abrir_combate",
+          "isEnabled": true
+        },
+        {
+          "id": "usina_abrir_combate-5",
+          "command": "else",
+          "isEnabled": true
+        },
+        {
+          "id": "usina_abrir_combate-6",
+          "command": "show_dialogue coast_usina_order",
+          "isEnabled": true
+        },
+        {
+          "id": "usina_abrir_combate-7",
+          "command": "condition_end",
+          "isEnabled": true
+        },
+        {
+          "id": "usina_abrir_combate-8",
           "command": "condition_end",
           "isEnabled": true
         }
@@ -160770,6 +162675,21 @@
       "detail": "Autoria: usina_combate_ao_entrar. Sequência editável com 6 passos. Os eventos chamados permanecem acessíveis na timeline. Vínculos: rooms.11 (onInit).",
       "command": "noop",
       "steps": [
+        {
+          "id": "usina_combate_ao_entrar-coast-audio-preferences",
+          "command": "call_procedure coast_audio_preferences",
+          "isEnabled": true
+        },
+        {
+          "id": "usina_combate_ao_entrar-coast-audio-mute",
+          "command": "call_procedure coast_audio_mute",
+          "isEnabled": true
+        },
+        {
+          "id": "usina_combate_ao_entrar-coast-music",
+          "command": "fade_audio_volume music 70 45 var_audio_music_volume var_audio_master_volume",
+          "isEnabled": true
+        },
         {
           "id": "dungeon-approved-music-usina_combate_ao_entrar",
           "command": "play_music dungeon_patrol"
@@ -160874,6 +162794,21 @@
       "detail": "Autoria: usina_saida_ao_entrar. Sequência editável com 6 passos. Os eventos chamados permanecem acessíveis na timeline. Vínculos: rooms.12 (onInit).",
       "command": "noop",
       "steps": [
+        {
+          "id": "usina_saida_ao_entrar-coast-audio-preferences",
+          "command": "call_procedure coast_audio_preferences",
+          "isEnabled": true
+        },
+        {
+          "id": "usina_saida_ao_entrar-coast-audio-mute",
+          "command": "call_procedure coast_audio_mute",
+          "isEnabled": true
+        },
+        {
+          "id": "usina_saida_ao_entrar-coast-music",
+          "command": "fade_audio_volume music 70 45 var_audio_music_volume var_audio_master_volume",
+          "isEnabled": true
+        },
         {
           "id": "dungeon-approved-music-usina_saida_ao_entrar",
           "command": "play_music dungeon_tide"
@@ -161014,6 +162949,21 @@
       "command": "noop",
       "steps": [
         {
+          "id": "conselho_ao_entrar-coast-audio-preferences",
+          "command": "call_procedure coast_audio_preferences",
+          "isEnabled": true
+        },
+        {
+          "id": "conselho_ao_entrar-coast-audio-mute",
+          "command": "call_procedure coast_audio_mute",
+          "isEnabled": true
+        },
+        {
+          "id": "conselho_ao_entrar-coast-music",
+          "command": "fade_audio_volume music 70 45 var_audio_music_volume var_audio_master_volume",
+          "isEnabled": true
+        },
+        {
           "id": "conselho_ao_entrar-1",
           "command": "choice_event conselho 0 conselho_confirmar_alianca",
           "isEnabled": true
@@ -161098,6 +163048,21 @@
       "detail": "Autoria: tempestade_ao_entrar. Sequência editável com 1 passos. Os eventos chamados permanecem acessíveis na timeline. Vínculos: rooms.14 (onInit).",
       "command": "noop",
       "steps": [
+        {
+          "id": "tempestade_ao_entrar-coast-audio-preferences",
+          "command": "call_procedure coast_audio_preferences",
+          "isEnabled": true
+        },
+        {
+          "id": "tempestade_ao_entrar-coast-audio-mute",
+          "command": "call_procedure coast_audio_mute",
+          "isEnabled": true
+        },
+        {
+          "id": "tempestade_ao_entrar-coast-music",
+          "command": "fade_audio_volume music 100 45 var_audio_music_volume var_audio_master_volume",
+          "isEnabled": true
+        },
         {
           "id": "tempestade_ao_entrar-0",
           "command": "play_music tempestade_travessia",
@@ -161228,6 +163193,21 @@
       "command": "noop",
       "steps": [
         {
+          "id": "guardiao_ao_entrar-coast-audio-preferences",
+          "command": "call_procedure coast_audio_preferences",
+          "isEnabled": true
+        },
+        {
+          "id": "guardiao_ao_entrar-coast-audio-mute",
+          "command": "call_procedure coast_audio_mute",
+          "isEnabled": true
+        },
+        {
+          "id": "guardiao_ao_entrar-coast-music",
+          "command": "fade_audio_volume music 100 45 var_audio_music_volume var_audio_master_volume",
+          "isEnabled": true
+        },
+        {
           "id": "guardiao_ao_entrar-0",
           "command": "play_music relay_pulse",
           "isEnabled": true
@@ -161287,6 +163267,21 @@
       "detail": "Autoria: arena_ao_entrar. Sequência editável com 1 passos. Os eventos chamados permanecem acessíveis na timeline. Vínculos: rooms.16 (onInit).",
       "command": "noop",
       "steps": [
+        {
+          "id": "arena_ao_entrar-coast-audio-preferences",
+          "command": "call_procedure coast_audio_preferences",
+          "isEnabled": true
+        },
+        {
+          "id": "arena_ao_entrar-coast-audio-mute",
+          "command": "call_procedure coast_audio_mute",
+          "isEnabled": true
+        },
+        {
+          "id": "arena_ao_entrar-coast-music",
+          "command": "fade_audio_volume music 100 45 var_audio_music_volume var_audio_master_volume",
+          "isEnabled": true
+        },
         {
           "id": "event-arena-enter-music",
           "command": "play_music farol_arena_mare",
@@ -162570,6 +164565,21 @@
       "command": "noop",
       "steps": [
         {
+          "id": "mapa_ao_entrar-coast-audio-preferences",
+          "command": "call_procedure coast_audio_preferences",
+          "isEnabled": true
+        },
+        {
+          "id": "mapa_ao_entrar-coast-audio-mute",
+          "command": "call_procedure coast_audio_mute",
+          "isEnabled": true
+        },
+        {
+          "id": "mapa_ao_entrar-coast-music",
+          "command": "fade_audio_volume music 100 45 var_audio_music_volume var_audio_master_volume",
+          "isEnabled": true
+        },
+        {
           "id": "route-v2-mapa_ao_entrar-0",
           "command": "play_music mapa_mar_aberto",
           "isEnabled": true
@@ -162745,6 +164755,21 @@
       "command": "noop",
       "steps": [
         {
+          "id": "mercado_ao_entrar-coast-audio-preferences",
+          "command": "call_procedure coast_audio_preferences",
+          "isEnabled": true
+        },
+        {
+          "id": "mercado_ao_entrar-coast-audio-mute",
+          "command": "call_procedure coast_audio_mute",
+          "isEnabled": true
+        },
+        {
+          "id": "mercado_ao_entrar-coast-music",
+          "command": "fade_audio_volume music 100 45 var_audio_music_volume var_audio_master_volume",
+          "isEnabled": true
+        },
+        {
           "id": "mercado-health-if",
           "command": "if_variable porto_player_health 0",
           "isEnabled": true
@@ -162826,7 +164851,7 @@
         },
         {
           "id": "mercado_abrir_atalho-guard-clear",
-          "command": "set_actor_position market-guard-v1 23 3",
+          "command": "move_actor_relative market-guard-v1 -1 0",
           "isEnabled": true
         },
         {
@@ -162915,6 +164940,21 @@
       "command": "noop",
       "steps": [
         {
+          "id": "arena_tatica_ao_entrar-coast-audio-preferences",
+          "command": "call_procedure coast_audio_preferences",
+          "isEnabled": true
+        },
+        {
+          "id": "arena_tatica_ao_entrar-coast-audio-mute",
+          "command": "call_procedure coast_audio_mute",
+          "isEnabled": true
+        },
+        {
+          "id": "arena_tatica_ao_entrar-coast-music",
+          "command": "fade_audio_volume music 100 45 var_audio_music_volume var_audio_master_volume",
+          "isEnabled": true
+        },
+        {
           "id": "iso-v4-arena_tatica_ao_entrar-0",
           "command": "remove_button r",
           "isEnabled": true
@@ -162958,6 +164998,21 @@
       "category": "Cena",
       "command": "noop",
       "steps": [
+        {
+          "id": "circuito_final_ao_entrar-coast-audio-preferences",
+          "command": "call_procedure coast_audio_preferences",
+          "isEnabled": true
+        },
+        {
+          "id": "circuito_final_ao_entrar-coast-audio-mute",
+          "command": "call_procedure coast_audio_mute",
+          "isEnabled": true
+        },
+        {
+          "id": "circuito_final_ao_entrar-coast-music",
+          "command": "fade_audio_volume music 100 45 var_audio_music_volume var_audio_master_volume",
+          "isEnabled": true
+        },
         {
           "id": "circuito_final_ao_entrar-0",
           "command": "play_music corrida_circuito_dos_farois",
@@ -163053,6 +165108,21 @@
       "category": "Cena",
       "command": "noop",
       "steps": [
+        {
+          "id": "circuito_perspectiva_ao_entrar-coast-audio-preferences",
+          "command": "call_procedure coast_audio_preferences",
+          "isEnabled": true
+        },
+        {
+          "id": "circuito_perspectiva_ao_entrar-coast-audio-mute",
+          "command": "call_procedure coast_audio_mute",
+          "isEnabled": true
+        },
+        {
+          "id": "circuito_perspectiva_ao_entrar-coast-music",
+          "command": "fade_audio_volume music 100 45 var_audio_music_volume var_audio_master_volume",
+          "isEnabled": true
+        },
         {
           "id": "circuito_perspectiva_ao_entrar-0",
           "command": "play_music corrida_rota_da_mare",
@@ -163267,51 +165337,30 @@
       ]
     },
     {
-      "id": "event-porto_conversar_captain",
+      "id": "porto_conversar_captain",
       "name": "porto_conversar_captain",
       "roomName": "porto_lumen",
-      "category": "Exemplo · Sistemas conectados",
-      "detail": "Exemplo de sistemas conectados: estado persistente, requisitos e efeitos separados do cenário.",
+      "category": "Cena",
       "command": "noop",
       "steps": [
         {
+          "id": "porto_conversar_captain-0",
+          "command": "if_variable_greater_than var_coast_evening 0",
+          "isEnabled": true
+        },
+        {
           "id": "porto_conversar_captain-1",
-          "command": "if_variable var_signal_stage 3",
+          "command": "show_dialogue coast_captain_shift",
           "isEnabled": true
         },
         {
           "id": "porto_conversar_captain-2",
-          "command": "choice_event showcase_captain_menu 0 showcase_visit_council",
+          "command": "condition_end",
           "isEnabled": true
         },
         {
           "id": "porto_conversar_captain-3",
-          "command": "choice_event showcase_captain_menu 1 showcase_coast_report_event",
-          "isEnabled": true
-        },
-        {
-          "id": "porto_conversar_captain-4",
-          "command": "choice_event showcase_captain_menu 2 showcase_captain_talk",
-          "isEnabled": true
-        },
-        {
-          "id": "porto_conversar_captain-5",
-          "command": "show_choice showcase_captain_menu",
-          "isEnabled": true
-        },
-        {
-          "id": "porto_conversar_captain-6",
-          "command": "else",
-          "isEnabled": true
-        },
-        {
-          "id": "porto_conversar_captain-7",
-          "command": "call_procedure showcase_base_captain",
-          "isEnabled": true
-        },
-        {
-          "id": "porto_conversar_captain-8",
-          "command": "condition_end",
+          "command": "call_procedure coast_base_porto_conversar_captain",
           "isEnabled": true
         }
       ]
@@ -163498,6 +165547,21 @@
       "category": "Cena",
       "command": "noop",
       "steps": [
+        {
+          "id": "penedos_ao_entrar-coast-audio-preferences",
+          "command": "call_procedure coast_audio_preferences",
+          "isEnabled": true
+        },
+        {
+          "id": "penedos_ao_entrar-coast-audio-mute",
+          "command": "call_procedure coast_audio_mute",
+          "isEnabled": true
+        },
+        {
+          "id": "penedos_ao_entrar-coast-music",
+          "command": "fade_audio_volume music 100 45 var_audio_music_volume var_audio_master_volume",
+          "isEnabled": true
+        },
         {
           "id": "penedos_ao_entrar-0",
           "command": "play_music penedos_vento_de_lumen_candidato",
@@ -167049,6 +169113,21 @@
       "command": "noop",
       "steps": [
         {
+          "id": "gallery_enter-coast-audio-preferences",
+          "command": "call_procedure coast_audio_preferences",
+          "isEnabled": true
+        },
+        {
+          "id": "gallery_enter-coast-audio-mute",
+          "command": "call_procedure coast_audio_mute",
+          "isEnabled": true
+        },
+        {
+          "id": "gallery_enter-coast-music",
+          "command": "fade_audio_volume music 70 45 var_audio_music_volume var_audio_master_volume",
+          "isEnabled": true
+        },
+        {
           "id": "gallery_enter-0",
           "command": "play_music farol_memorias",
           "isEnabled": true
@@ -168251,6 +170330,16 @@
       "category": "Exemplo · Maré vazante",
       "command": "noop",
       "steps": [
+        {
+          "id": "tide_enter-0",
+          "command": "call_procedure coast_audio_preferences",
+          "isEnabled": true
+        },
+        {
+          "id": "tide_enter-1",
+          "command": "call_procedure coast_audio_mute",
+          "isEnabled": true
+        },
         {
           "id": "tide_enter-2",
           "command": "play_music farol_memorias",
@@ -170648,6 +172737,1311 @@
         {
           "id": "tide_wind_tick-0",
           "command": "move_actor_relative player 0 0.125",
+          "isEnabled": true
+        }
+      ]
+    },
+    {
+      "id": "coast_usina_sync",
+      "name": "coast_usina_sync",
+      "roomName": "usina_submersa",
+      "category": "Cena",
+      "command": "noop",
+      "steps": [
+        {
+          "id": "coast_usina_sync-0",
+          "command": "if_variable_less_than var_coast_usina 1",
+          "isEnabled": true
+        },
+        {
+          "id": "coast_usina_sync-1",
+          "command": "set_actor_visible coast-valve-a-off true",
+          "isEnabled": true
+        },
+        {
+          "id": "coast_usina_sync-2",
+          "command": "set_actor_visible coast-valve-a-on false",
+          "isEnabled": true
+        },
+        {
+          "id": "coast_usina_sync-3",
+          "command": "else",
+          "isEnabled": true
+        },
+        {
+          "id": "coast_usina_sync-4",
+          "command": "set_actor_visible coast-valve-a-off false",
+          "isEnabled": true
+        },
+        {
+          "id": "coast_usina_sync-5",
+          "command": "set_actor_visible coast-valve-a-on true",
+          "isEnabled": true
+        },
+        {
+          "id": "coast_usina_sync-6",
+          "command": "condition_end",
+          "isEnabled": true
+        },
+        {
+          "id": "coast_usina_sync-7",
+          "command": "if_variable_less_than var_coast_usina 2",
+          "isEnabled": true
+        },
+        {
+          "id": "coast_usina_sync-8",
+          "command": "set_actor_visible coast-valve-b-off true",
+          "isEnabled": true
+        },
+        {
+          "id": "coast_usina_sync-9",
+          "command": "set_actor_visible coast-valve-b-on false",
+          "isEnabled": true
+        },
+        {
+          "id": "coast_usina_sync-10",
+          "command": "else",
+          "isEnabled": true
+        },
+        {
+          "id": "coast_usina_sync-11",
+          "command": "set_actor_visible coast-valve-b-off false",
+          "isEnabled": true
+        },
+        {
+          "id": "coast_usina_sync-12",
+          "command": "set_actor_visible coast-valve-b-on true",
+          "isEnabled": true
+        },
+        {
+          "id": "coast_usina_sync-13",
+          "command": "condition_end",
+          "isEnabled": true
+        },
+        {
+          "id": "coast_usina_sync-14",
+          "command": "if_variable_less_than var_coast_usina 3",
+          "isEnabled": true
+        },
+        {
+          "id": "coast_usina_sync-15",
+          "command": "set_actor_visible coast-valve-c-off true",
+          "isEnabled": true
+        },
+        {
+          "id": "coast_usina_sync-16",
+          "command": "set_actor_visible coast-valve-c-on false",
+          "isEnabled": true
+        },
+        {
+          "id": "coast_usina_sync-17",
+          "command": "else",
+          "isEnabled": true
+        },
+        {
+          "id": "coast_usina_sync-18",
+          "command": "set_actor_visible coast-valve-c-off false",
+          "isEnabled": true
+        },
+        {
+          "id": "coast_usina_sync-19",
+          "command": "set_actor_visible coast-valve-c-on true",
+          "isEnabled": true
+        },
+        {
+          "id": "coast_usina_sync-20",
+          "command": "condition_end",
+          "isEnabled": true
+        }
+      ],
+      "eventKind": "procedure",
+      "procedure": {
+        "parameters": [],
+        "locals": []
+      }
+    },
+    {
+      "id": "coast_usina_a",
+      "name": "coast_usina_a",
+      "roomName": "usina_submersa",
+      "category": "Cena",
+      "command": "noop",
+      "steps": [
+        {
+          "id": "coast_usina_a-0",
+          "command": "if_variable var_coast_usina 0",
+          "isEnabled": true
+        },
+        {
+          "id": "coast_usina_a-1",
+          "command": "set_variable var_coast_usina 1",
+          "isEnabled": true
+        },
+        {
+          "id": "coast_usina_a-2",
+          "command": "call_procedure coast_usina_sync",
+          "isEnabled": true
+        },
+        {
+          "id": "coast_usina_a-3",
+          "command": "play_sfx dungeon_porta",
+          "isEnabled": true
+        },
+        {
+          "id": "coast_usina_a-4",
+          "command": "save_game 0",
+          "isEnabled": true
+        },
+        {
+          "id": "coast_usina_a-5",
+          "command": "show_dialogue coast_usina_a_ready",
+          "isEnabled": true
+        },
+        {
+          "id": "coast_usina_a-6",
+          "command": "else",
+          "isEnabled": true
+        },
+        {
+          "id": "coast_usina_a-7",
+          "command": "if_variable_greater_than var_coast_usina 0",
+          "isEnabled": true
+        },
+        {
+          "id": "coast_usina_a-8",
+          "command": "show_dialogue coast_usina_already",
+          "isEnabled": true
+        },
+        {
+          "id": "coast_usina_a-9",
+          "command": "else",
+          "isEnabled": true
+        },
+        {
+          "id": "coast_usina_a-10",
+          "command": "set_variable var_coast_usina 0",
+          "isEnabled": true
+        },
+        {
+          "id": "coast_usina_a-11",
+          "command": "call_procedure coast_usina_sync",
+          "isEnabled": true
+        },
+        {
+          "id": "coast_usina_a-12",
+          "command": "play_sfx dungeon_bloqueio",
+          "isEnabled": true
+        },
+        {
+          "id": "coast_usina_a-13",
+          "command": "save_game 0",
+          "isEnabled": true
+        },
+        {
+          "id": "coast_usina_a-14",
+          "command": "show_dialogue coast_usina_order",
+          "isEnabled": true
+        },
+        {
+          "id": "coast_usina_a-15",
+          "command": "condition_end",
+          "isEnabled": true
+        },
+        {
+          "id": "coast_usina_a-16",
+          "command": "condition_end",
+          "isEnabled": true
+        }
+      ]
+    },
+    {
+      "id": "coast_usina_b",
+      "name": "coast_usina_b",
+      "roomName": "usina_submersa",
+      "category": "Cena",
+      "command": "noop",
+      "steps": [
+        {
+          "id": "coast_usina_b-0",
+          "command": "if_variable var_coast_usina 1",
+          "isEnabled": true
+        },
+        {
+          "id": "coast_usina_b-1",
+          "command": "set_variable var_coast_usina 2",
+          "isEnabled": true
+        },
+        {
+          "id": "coast_usina_b-2",
+          "command": "call_procedure coast_usina_sync",
+          "isEnabled": true
+        },
+        {
+          "id": "coast_usina_b-3",
+          "command": "play_sfx dungeon_porta",
+          "isEnabled": true
+        },
+        {
+          "id": "coast_usina_b-4",
+          "command": "save_game 0",
+          "isEnabled": true
+        },
+        {
+          "id": "coast_usina_b-5",
+          "command": "show_dialogue coast_usina_b_ready",
+          "isEnabled": true
+        },
+        {
+          "id": "coast_usina_b-6",
+          "command": "else",
+          "isEnabled": true
+        },
+        {
+          "id": "coast_usina_b-7",
+          "command": "if_variable_greater_than var_coast_usina 1",
+          "isEnabled": true
+        },
+        {
+          "id": "coast_usina_b-8",
+          "command": "show_dialogue coast_usina_already",
+          "isEnabled": true
+        },
+        {
+          "id": "coast_usina_b-9",
+          "command": "else",
+          "isEnabled": true
+        },
+        {
+          "id": "coast_usina_b-10",
+          "command": "set_variable var_coast_usina 0",
+          "isEnabled": true
+        },
+        {
+          "id": "coast_usina_b-11",
+          "command": "call_procedure coast_usina_sync",
+          "isEnabled": true
+        },
+        {
+          "id": "coast_usina_b-12",
+          "command": "play_sfx dungeon_bloqueio",
+          "isEnabled": true
+        },
+        {
+          "id": "coast_usina_b-13",
+          "command": "save_game 0",
+          "isEnabled": true
+        },
+        {
+          "id": "coast_usina_b-14",
+          "command": "show_dialogue coast_usina_order",
+          "isEnabled": true
+        },
+        {
+          "id": "coast_usina_b-15",
+          "command": "condition_end",
+          "isEnabled": true
+        },
+        {
+          "id": "coast_usina_b-16",
+          "command": "condition_end",
+          "isEnabled": true
+        }
+      ]
+    },
+    {
+      "id": "coast_usina_c",
+      "name": "coast_usina_c",
+      "roomName": "usina_submersa",
+      "category": "Cena",
+      "command": "noop",
+      "steps": [
+        {
+          "id": "coast_usina_c-0",
+          "command": "if_variable var_coast_usina 2",
+          "isEnabled": true
+        },
+        {
+          "id": "coast_usina_c-1",
+          "command": "set_variable var_coast_usina 3",
+          "isEnabled": true
+        },
+        {
+          "id": "coast_usina_c-2",
+          "command": "call_procedure coast_usina_sync",
+          "isEnabled": true
+        },
+        {
+          "id": "coast_usina_c-3",
+          "command": "fade_audio_volume music 0 18 var_audio_music_volume var_audio_master_volume",
+          "isEnabled": true
+        },
+        {
+          "id": "coast_usina_c-4",
+          "command": "play_sfx dungeon_porta",
+          "isEnabled": true
+        },
+        {
+          "id": "coast_usina_c-5",
+          "command": "save_game 0",
+          "isEnabled": true
+        },
+        {
+          "id": "coast_usina_c-6",
+          "command": "show_dialogue coast_usina_c_ready",
+          "isEnabled": true
+        },
+        {
+          "id": "coast_usina_c-7",
+          "command": "else",
+          "isEnabled": true
+        },
+        {
+          "id": "coast_usina_c-8",
+          "command": "if_variable_greater_than var_coast_usina 2",
+          "isEnabled": true
+        },
+        {
+          "id": "coast_usina_c-9",
+          "command": "show_dialogue coast_usina_already",
+          "isEnabled": true
+        },
+        {
+          "id": "coast_usina_c-10",
+          "command": "else",
+          "isEnabled": true
+        },
+        {
+          "id": "coast_usina_c-11",
+          "command": "set_variable var_coast_usina 0",
+          "isEnabled": true
+        },
+        {
+          "id": "coast_usina_c-12",
+          "command": "call_procedure coast_usina_sync",
+          "isEnabled": true
+        },
+        {
+          "id": "coast_usina_c-13",
+          "command": "play_sfx dungeon_bloqueio",
+          "isEnabled": true
+        },
+        {
+          "id": "coast_usina_c-14",
+          "command": "save_game 0",
+          "isEnabled": true
+        },
+        {
+          "id": "coast_usina_c-15",
+          "command": "show_dialogue coast_usina_order",
+          "isEnabled": true
+        },
+        {
+          "id": "coast_usina_c-16",
+          "command": "condition_end",
+          "isEnabled": true
+        },
+        {
+          "id": "coast_usina_c-17",
+          "command": "condition_end",
+          "isEnabled": true
+        }
+      ]
+    },
+    {
+      "id": "coast_base_usina_ao_entrar",
+      "name": "coast_base_usina_ao_entrar",
+      "roomName": "usina_submersa",
+      "category": "Cena",
+      "detail": "Autoria: usina_ao_entrar. Sequência editável com 6 passos. Os eventos chamados permanecem acessíveis na timeline. Vínculos: rooms.10 (onInit).",
+      "command": "noop",
+      "steps": [
+        {
+          "id": "dungeon-approved-music-usina_ao_entrar",
+          "command": "play_music dungeon_tide"
+        },
+        {
+          "id": "event-plant-enter-step-1",
+          "command": "call_event aplicar_perfil_jogador",
+          "isEnabled": true
+        },
+        {
+          "id": "event-plant-enter-step-2",
+          "command": "show_dialogue usina_objetivo",
+          "isEnabled": true
+        },
+        {
+          "id": "event-plant-enter-step-3",
+          "command": "if_variable var_usina_combat_cleared 1",
+          "isEnabled": true
+        },
+        {
+          "id": "event-plant-enter-step-4",
+          "command": "change_scene usina_saida 5 5 down",
+          "isEnabled": true
+        },
+        {
+          "id": "event-plant-enter-step-5",
+          "command": "condition_end",
+          "isEnabled": true
+        }
+      ],
+      "eventKind": "procedure",
+      "procedure": {
+        "parameters": [],
+        "locals": []
+      }
+    },
+    {
+      "id": "coast_base_usina_abrir_combate",
+      "name": "coast_base_usina_abrir_combate",
+      "roomName": "usina_submersa",
+      "category": "Hotspot",
+      "detail": "Autoria: usina_abrir_combate. Sequência editável com 5 passos. Os eventos chamados permanecem acessíveis na timeline. Vínculos: triggers.6 (onEnter).",
+      "command": "noop",
+      "steps": [
+        {
+          "id": "event-plant-combat-gate-step-1",
+          "command": "if_variable var_usina_combat_cleared 0",
+          "isEnabled": true
+        },
+        {
+          "id": "event-plant-combat-gate-step-2",
+          "command": "change_scene usina_combate 9 3 up",
+          "isEnabled": true
+        },
+        {
+          "id": "event-plant-combat-gate-step-3",
+          "command": "else",
+          "isEnabled": true
+        },
+        {
+          "id": "event-plant-combat-gate-step-4",
+          "command": "change_scene usina_saida 5 5 down",
+          "isEnabled": true
+        },
+        {
+          "id": "event-plant-combat-gate-step-5",
+          "command": "condition_end",
+          "isEnabled": true
+        }
+      ],
+      "eventKind": "procedure",
+      "procedure": {
+        "parameters": [],
+        "locals": []
+      }
+    },
+    {
+      "id": "coast_base_mercado_falar_mercador",
+      "name": "coast_base_mercado_falar_mercador",
+      "roomName": "mercado_suspenso",
+      "category": "Ator",
+      "detail": "Autoria: mercado_falar_mercador. Sequência editável com 2 passos. Os eventos chamados permanecem acessíveis na timeline. Vínculos: actors.3 (scriptName), actors.3 (onInteract).",
+      "command": "noop",
+      "steps": [
+        {
+          "id": "event-market-trader-step-1",
+          "command": "show_dialogue mercado_objetivo",
+          "isEnabled": true
+        },
+        {
+          "id": "event-market-trader-step-2",
+          "command": "show_dialogue mercado_mercador",
+          "isEnabled": true
+        }
+      ],
+      "eventKind": "procedure",
+      "procedure": {
+        "parameters": [],
+        "locals": []
+      }
+    },
+    {
+      "id": "coast_port_sync",
+      "name": "coast_port_sync",
+      "roomName": "porto_lumen",
+      "category": "Cena",
+      "command": "noop",
+      "steps": [
+        {
+          "id": "coast_port_sync-0",
+          "command": "if_variable_greater_than var_coast_minute 1079",
+          "isEnabled": true
+        },
+        {
+          "id": "coast_port_sync-1",
+          "command": "if_variable var_coast_evening 0",
+          "isEnabled": true
+        },
+        {
+          "id": "coast_port_sync-2",
+          "command": "set_variable var_coast_evening 1",
+          "isEnabled": true
+        },
+        {
+          "id": "coast_port_sync-3",
+          "command": "set_actor_direction porto-lume-captain-pilot right",
+          "isEnabled": true
+        },
+        {
+          "id": "coast_port_sync-4",
+          "command": "condition_end",
+          "isEnabled": true
+        },
+        {
+          "id": "coast_port_sync-5",
+          "command": "condition_end",
+          "isEnabled": true
+        },
+        {
+          "id": "coast_port_sync-6",
+          "command": "if_variable_greater_than var_coast_minute 1109",
+          "isEnabled": true
+        },
+        {
+          "id": "coast_port_sync-7",
+          "command": "set_variable var_coast_evening 2",
+          "isEnabled": true
+        },
+        {
+          "id": "coast_port_sync-8",
+          "command": "condition_end",
+          "isEnabled": true
+        },
+        {
+          "id": "coast_port_sync-9",
+          "command": "if_variable_greater_than var_coast_evening 0",
+          "isEnabled": true
+        },
+        {
+          "id": "coast_port_sync-10",
+          "command": "set_actor_direction porto-lume-captain-pilot right",
+          "isEnabled": true
+        },
+        {
+          "id": "coast_port_sync-11",
+          "command": "condition_end",
+          "isEnabled": true
+        },
+        {
+          "id": "coast_port_sync-12",
+          "command": "if_variable var_coast_evening 2",
+          "isEnabled": true
+        },
+        {
+          "id": "coast_port_sync-13",
+          "command": "set_actor_animation coast-port-lamp-0 on",
+          "isEnabled": true
+        },
+        {
+          "id": "coast_port_sync-14",
+          "command": "set_actor_animation coast-port-lamp-1 on",
+          "isEnabled": true
+        },
+        {
+          "id": "coast_port_sync-15",
+          "command": "else",
+          "isEnabled": true
+        },
+        {
+          "id": "coast_port_sync-16",
+          "command": "set_actor_animation coast-port-lamp-0 off",
+          "isEnabled": true
+        },
+        {
+          "id": "coast_port_sync-17",
+          "command": "set_actor_animation coast-port-lamp-1 off",
+          "isEnabled": true
+        },
+        {
+          "id": "coast_port_sync-18",
+          "command": "condition_end",
+          "isEnabled": true
+        }
+      ],
+      "eventKind": "procedure",
+      "procedure": {
+        "parameters": [],
+        "locals": []
+      }
+    },
+    {
+      "id": "coast_port_restore",
+      "name": "coast_port_restore",
+      "roomName": "porto_lumen",
+      "category": "Cena",
+      "command": "noop",
+      "steps": [
+        {
+          "id": "coast_port_restore-0",
+          "command": "if_variable var_coast_clock_ready 0",
+          "isEnabled": true
+        },
+        {
+          "id": "coast_port_restore-1",
+          "command": "set_variable var_coast_minute 1020",
+          "isEnabled": true
+        },
+        {
+          "id": "coast_port_restore-2",
+          "command": "set_variable var_coast_clock_ready 1",
+          "isEnabled": true
+        },
+        {
+          "id": "coast_port_restore-3",
+          "command": "condition_end",
+          "isEnabled": true
+        },
+        {
+          "id": "coast_port_restore-4",
+          "command": "start_game_clock 1 60 hidden var_coast_minute",
+          "isEnabled": true
+        },
+        {
+          "id": "coast_port_restore-5",
+          "command": "call_procedure coast_port_sync",
+          "isEnabled": true
+        },
+        {
+          "id": "coast_port_restore-6",
+          "command": "timer_attach 60 coast_port_clock_tick",
+          "isEnabled": true
+        }
+      ],
+      "eventKind": "procedure",
+      "procedure": {
+        "parameters": [],
+        "locals": []
+      }
+    },
+    {
+      "id": "coast_port_clock_tick",
+      "name": "coast_port_clock_tick",
+      "roomName": "porto_lumen",
+      "category": "Cena",
+      "command": "noop",
+      "steps": [
+        {
+          "id": "coast_port_clock_tick-0",
+          "command": "call_procedure coast_port_sync",
+          "isEnabled": true
+        }
+      ]
+    },
+    {
+      "id": "coast_base_porto_ao_entrar",
+      "name": "coast_base_porto_ao_entrar",
+      "roomName": "porto_lumen",
+      "category": "Exemplo · Sistemas conectados",
+      "detail": "Exemplo de sistemas conectados: estado persistente, requisitos e efeitos separados do cenário.",
+      "command": "noop",
+      "steps": [
+        {
+          "id": "porto_ao_entrar-1",
+          "command": "call_procedure showcase_base_port_enter",
+          "isEnabled": true
+        },
+        {
+          "id": "porto_ao_entrar-2",
+          "command": "if_variable var_council_visit 1",
+          "isEnabled": true
+        },
+        {
+          "id": "porto_ao_entrar-3",
+          "command": "set_variable var_council_visit 0",
+          "isEnabled": true
+        },
+        {
+          "id": "porto_ao_entrar-4",
+          "command": "save_game 0",
+          "isEnabled": true
+        },
+        {
+          "id": "porto_ao_entrar-5",
+          "command": "condition_end",
+          "isEnabled": true
+        },
+        {
+          "id": "porto_ao_entrar-6",
+          "command": "if_variable var_council_path 1",
+          "isEnabled": true
+        },
+        {
+          "id": "porto_ao_entrar-7",
+          "command": "set_actor_animation port-mechanic idle_left",
+          "isEnabled": true
+        },
+        {
+          "id": "porto_ao_entrar-8",
+          "command": "else",
+          "isEnabled": true
+        },
+        {
+          "id": "porto_ao_entrar-9",
+          "command": "if_variable var_council_path 2",
+          "isEnabled": true
+        },
+        {
+          "id": "porto_ao_entrar-10",
+          "command": "set_actor_animation port-mechanic idle_right",
+          "isEnabled": true
+        },
+        {
+          "id": "porto_ao_entrar-11",
+          "command": "condition_end",
+          "isEnabled": true
+        },
+        {
+          "id": "porto_ao_entrar-12",
+          "command": "condition_end",
+          "isEnabled": true
+        }
+      ],
+      "eventKind": "procedure",
+      "procedure": {
+        "parameters": [],
+        "locals": []
+      }
+    },
+    {
+      "id": "coast_base_porto_conversar_captain",
+      "name": "coast_base_porto_conversar_captain",
+      "roomName": "porto_lumen",
+      "category": "Exemplo · Sistemas conectados",
+      "detail": "Exemplo de sistemas conectados: estado persistente, requisitos e efeitos separados do cenário.",
+      "command": "noop",
+      "steps": [
+        {
+          "id": "porto_conversar_captain-1",
+          "command": "if_variable var_signal_stage 3",
+          "isEnabled": true
+        },
+        {
+          "id": "porto_conversar_captain-2",
+          "command": "choice_event showcase_captain_menu 0 showcase_visit_council",
+          "isEnabled": true
+        },
+        {
+          "id": "porto_conversar_captain-3",
+          "command": "choice_event showcase_captain_menu 1 showcase_coast_report_event",
+          "isEnabled": true
+        },
+        {
+          "id": "porto_conversar_captain-4",
+          "command": "choice_event showcase_captain_menu 2 showcase_captain_talk",
+          "isEnabled": true
+        },
+        {
+          "id": "porto_conversar_captain-5",
+          "command": "show_choice showcase_captain_menu",
+          "isEnabled": true
+        },
+        {
+          "id": "porto_conversar_captain-6",
+          "command": "else",
+          "isEnabled": true
+        },
+        {
+          "id": "porto_conversar_captain-7",
+          "command": "call_procedure showcase_base_captain",
+          "isEnabled": true
+        },
+        {
+          "id": "porto_conversar_captain-8",
+          "command": "condition_end",
+          "isEnabled": true
+        }
+      ],
+      "eventKind": "procedure",
+      "procedure": {
+        "parameters": [],
+        "locals": []
+      }
+    },
+    {
+      "id": "coast_worker_init",
+      "name": "coast_worker_init",
+      "roomName": "penedos_vento",
+      "category": "Cena",
+      "command": "noop",
+      "steps": [
+        {
+          "id": "coast_worker_init-0",
+          "command": "set_actor_collision_enabled coast-lift-worker false",
+          "isEnabled": true
+        },
+        {
+          "id": "coast_worker_init-1",
+          "command": "set_actor_animation coast-lift-worker idle_right",
+          "isEnabled": true
+        }
+      ]
+    },
+    {
+      "id": "coast_lift_init",
+      "name": "coast_lift_init",
+      "roomName": "penedos_vento",
+      "category": "Cena",
+      "command": "noop",
+      "steps": [
+        {
+          "id": "coast_lift_init-0",
+          "command": "set_actor_collision_box coast-freight-lift -32 -16 64 4",
+          "isEnabled": true
+        },
+        {
+          "id": "coast_lift_init-1",
+          "command": "set_actor_collision_enabled coast-freight-lift true",
+          "isEnabled": true
+        }
+      ]
+    },
+    {
+      "id": "coast_lift_update",
+      "name": "coast_lift_update",
+      "roomName": "penedos_vento",
+      "category": "Cena",
+      "command": "noop",
+      "steps": [
+        {
+          "id": "coast_lift_update-0",
+          "command": "if_variable var_coast_lift 1",
+          "isEnabled": true
+        },
+        {
+          "id": "coast_lift_update-1",
+          "command": "if_actor_at_position coast-freight-lift 45 29",
+          "isEnabled": true
+        },
+        {
+          "id": "coast_lift_update-2",
+          "command": "set_actor_direction coast-freight-lift right",
+          "isEnabled": true
+        },
+        {
+          "id": "coast_lift_update-3",
+          "command": "condition_end",
+          "isEnabled": true
+        },
+        {
+          "id": "coast_lift_update-4",
+          "command": "if_actor_at_position coast-freight-lift 45 36",
+          "isEnabled": true
+        },
+        {
+          "id": "coast_lift_update-5",
+          "command": "set_actor_direction coast-freight-lift left",
+          "isEnabled": true
+        },
+        {
+          "id": "coast_lift_update-6",
+          "command": "condition_end",
+          "isEnabled": true
+        },
+        {
+          "id": "coast_lift_update-7",
+          "command": "if_actor_direction coast-freight-lift left",
+          "isEnabled": true
+        },
+        {
+          "id": "coast_lift_update-8",
+          "command": "move_actor_relative coast-freight-lift 0 -0.125",
+          "isEnabled": true
+        },
+        {
+          "id": "coast_lift_update-9",
+          "command": "else",
+          "isEnabled": true
+        },
+        {
+          "id": "coast_lift_update-10",
+          "command": "move_actor_relative coast-freight-lift 0 0.125",
+          "isEnabled": true
+        },
+        {
+          "id": "coast_lift_update-11",
+          "command": "condition_end",
+          "isEnabled": true
+        },
+        {
+          "id": "coast_lift_update-12",
+          "command": "condition_end",
+          "isEnabled": true
+        },
+        {
+          "id": "coast_lift_update-13",
+          "command": "wait 2",
+          "isEnabled": true
+        }
+      ]
+    },
+    {
+      "id": "coast_lift_toggle",
+      "name": "coast_lift_toggle",
+      "roomName": "penedos_vento",
+      "category": "Cena",
+      "command": "noop",
+      "steps": [
+        {
+          "id": "coast_lift_toggle-0",
+          "command": "if_variable var_coast_lift 0",
+          "isEnabled": true
+        },
+        {
+          "id": "coast_lift_toggle-1",
+          "command": "set_variable var_coast_lift 1",
+          "isEnabled": true
+        },
+        {
+          "id": "coast_lift_toggle-2",
+          "command": "play_sfx penedos_checkpoint_candidato",
+          "isEnabled": true
+        },
+        {
+          "id": "coast_lift_toggle-3",
+          "command": "show_dialogue coast_lift_on",
+          "isEnabled": true
+        },
+        {
+          "id": "coast_lift_toggle-4",
+          "command": "else",
+          "isEnabled": true
+        },
+        {
+          "id": "coast_lift_toggle-5",
+          "command": "set_variable var_coast_lift 0",
+          "isEnabled": true
+        },
+        {
+          "id": "coast_lift_toggle-6",
+          "command": "play_sfx farol_sfx_confirmar",
+          "isEnabled": true
+        },
+        {
+          "id": "coast_lift_toggle-7",
+          "command": "show_dialogue coast_lift_off",
+          "isEnabled": true
+        },
+        {
+          "id": "coast_lift_toggle-8",
+          "command": "condition_end",
+          "isEnabled": true
+        },
+        {
+          "id": "coast_lift_toggle-9",
+          "command": "save_game 0",
+          "isEnabled": true
+        }
+      ]
+    },
+    {
+      "id": "coast_audio_preferences",
+      "name": "coast_audio_preferences",
+      "category": "Global",
+      "command": "noop",
+      "steps": [
+        {
+          "id": "coast_audio_preferences-0",
+          "command": "if_variable var_audio_initialized 0",
+          "isEnabled": true
+        },
+        {
+          "id": "coast_audio_preferences-1",
+          "command": "set_variable var_audio_master_volume 100",
+          "isEnabled": true
+        },
+        {
+          "id": "coast_audio_preferences-2",
+          "command": "set_variable var_audio_music_volume 80",
+          "isEnabled": true
+        },
+        {
+          "id": "coast_audio_preferences-3",
+          "command": "set_variable var_audio_sfx_volume 90",
+          "isEnabled": true
+        },
+        {
+          "id": "coast_audio_preferences-4",
+          "command": "set_variable var_audio_enabled 1",
+          "isEnabled": true
+        },
+        {
+          "id": "coast_audio_preferences-5",
+          "command": "set_audio_volume all 100",
+          "isEnabled": true
+        },
+        {
+          "id": "coast_audio_preferences-6",
+          "command": "set_audio_volume music 80",
+          "isEnabled": true
+        },
+        {
+          "id": "coast_audio_preferences-7",
+          "command": "set_audio_volume sfx 90",
+          "isEnabled": true
+        },
+        {
+          "id": "coast_audio_preferences-8",
+          "command": "set_variable var_audio_initialized 1",
+          "isEnabled": true
+        },
+        {
+          "id": "coast_audio_preferences-9",
+          "command": "condition_end",
+          "isEnabled": true
+        }
+      ],
+      "eventKind": "procedure",
+      "procedure": {
+        "parameters": [],
+        "locals": []
+      }
+    },
+    {
+      "id": "coast_audio_mute",
+      "name": "coast_audio_mute",
+      "category": "Global",
+      "command": "noop",
+      "steps": [
+        {
+          "id": "coast_audio_mute-0",
+          "command": "if_variable var_audio_master_volume 0",
+          "isEnabled": true
+        },
+        {
+          "id": "coast_audio_mute-1",
+          "command": "mute_audio_channel all true",
+          "isEnabled": true
+        },
+        {
+          "id": "coast_audio_mute-2",
+          "command": "else",
+          "isEnabled": true
+        },
+        {
+          "id": "coast_audio_mute-3",
+          "command": "if_variable var_audio_enabled 0",
+          "isEnabled": true
+        },
+        {
+          "id": "coast_audio_mute-4",
+          "command": "mute_audio_channel all true",
+          "isEnabled": true
+        },
+        {
+          "id": "coast_audio_mute-5",
+          "command": "else",
+          "isEnabled": true
+        },
+        {
+          "id": "coast_audio_mute-6",
+          "command": "mute_audio_channel all false",
+          "isEnabled": true
+        },
+        {
+          "id": "coast_audio_mute-7",
+          "command": "condition_end",
+          "isEnabled": true
+        },
+        {
+          "id": "coast_audio_mute-8",
+          "command": "condition_end",
+          "isEnabled": true
+        }
+      ],
+      "eventKind": "procedure",
+      "procedure": {
+        "parameters": [],
+        "locals": []
+      }
+    },
+    {
+      "id": "coast_restore_porto_lumen",
+      "name": "coast_restore_porto_lumen",
+      "roomName": "porto_lumen",
+      "category": "Cena",
+      "command": "noop",
+      "steps": [
+        {
+          "id": "coast_restore_porto_lumen-0",
+          "command": "call_procedure coast_port_restore",
+          "isEnabled": true
+        },
+        {
+          "id": "coast_restore_porto_lumen-1",
+          "command": "call_procedure coast_audio_mute",
+          "isEnabled": true
+        },
+        {
+          "id": "coast_restore_porto_lumen-2",
+          "command": "fade_audio_volume music 100 45 var_audio_music_volume var_audio_master_volume",
+          "isEnabled": true
+        }
+      ]
+    },
+    {
+      "id": "coast_restore_penedos_vento",
+      "name": "coast_restore_penedos_vento",
+      "roomName": "penedos_vento",
+      "category": "Cena",
+      "command": "noop",
+      "steps": [
+        {
+          "id": "coast_restore_penedos_vento-0",
+          "command": "call_procedure coast_audio_mute",
+          "isEnabled": true
+        },
+        {
+          "id": "coast_restore_penedos_vento-1",
+          "command": "fade_audio_volume music 100 45 var_audio_music_volume var_audio_master_volume",
+          "isEnabled": true
+        }
+      ]
+    },
+    {
+      "id": "coast_restore_mercado_suspenso",
+      "name": "coast_restore_mercado_suspenso",
+      "roomName": "mercado_suspenso",
+      "category": "Cena",
+      "command": "noop",
+      "steps": [
+        {
+          "id": "coast_restore_mercado_suspenso-0",
+          "command": "call_procedure coast_audio_mute",
+          "isEnabled": true
+        },
+        {
+          "id": "coast_restore_mercado_suspenso-1",
+          "command": "fade_audio_volume music 100 45 var_audio_music_volume var_audio_master_volume",
+          "isEnabled": true
+        }
+      ]
+    },
+    {
+      "id": "coast_restore_usina_submersa",
+      "name": "coast_restore_usina_submersa",
+      "roomName": "usina_submersa",
+      "category": "Cena",
+      "command": "noop",
+      "steps": [
+        {
+          "id": "coast_restore_usina_submersa-0",
+          "command": "call_procedure coast_usina_sync",
+          "isEnabled": true
+        },
+        {
+          "id": "coast_restore_usina_submersa-1",
+          "command": "call_procedure coast_audio_mute",
+          "isEnabled": true
+        },
+        {
+          "id": "coast_restore_usina_submersa-2",
+          "command": "fade_audio_volume music 70 45 var_audio_music_volume var_audio_master_volume",
+          "isEnabled": true
+        }
+      ]
+    },
+    {
+      "id": "coast_restore_usina_combate",
+      "name": "coast_restore_usina_combate",
+      "roomName": "usina_combate",
+      "category": "Cena",
+      "command": "noop",
+      "steps": [
+        {
+          "id": "coast_restore_usina_combate-0",
+          "command": "call_procedure coast_audio_mute",
+          "isEnabled": true
+        },
+        {
+          "id": "coast_restore_usina_combate-1",
+          "command": "fade_audio_volume music 70 45 var_audio_music_volume var_audio_master_volume",
+          "isEnabled": true
+        }
+      ]
+    },
+    {
+      "id": "coast_restore_usina_saida",
+      "name": "coast_restore_usina_saida",
+      "roomName": "usina_saida",
+      "category": "Cena",
+      "command": "noop",
+      "steps": [
+        {
+          "id": "coast_restore_usina_saida-0",
+          "command": "call_procedure coast_audio_mute",
+          "isEnabled": true
+        },
+        {
+          "id": "coast_restore_usina_saida-1",
+          "command": "fade_audio_volume music 70 45 var_audio_music_volume var_audio_master_volume",
+          "isEnabled": true
+        }
+      ]
+    },
+    {
+      "id": "coast_restore_arena_tatica",
+      "name": "coast_restore_arena_tatica",
+      "roomName": "arena_tatica",
+      "category": "Cena",
+      "command": "noop",
+      "steps": [
+        {
+          "id": "coast_restore_arena_tatica-0",
+          "command": "call_procedure coast_audio_mute",
+          "isEnabled": true
+        },
+        {
+          "id": "coast_restore_arena_tatica-1",
+          "command": "fade_audio_volume music 100 45 var_audio_music_volume var_audio_master_volume",
+          "isEnabled": true
+        }
+      ]
+    },
+    {
+      "id": "coast_restore_farol_interior",
+      "name": "coast_restore_farol_interior",
+      "roomName": "farol_interior",
+      "category": "Cena",
+      "command": "noop",
+      "steps": [
+        {
+          "id": "coast_restore_farol_interior-0",
+          "command": "call_event farol_relay_restore",
+          "isEnabled": true
+        },
+        {
+          "id": "coast_restore_farol_interior-1",
+          "command": "call_procedure coast_audio_mute",
+          "isEnabled": true
+        },
+        {
+          "id": "coast_restore_farol_interior-2",
+          "command": "fade_audio_volume music 70 45 var_audio_music_volume var_audio_master_volume",
+          "isEnabled": true
+        }
+      ]
+    },
+    {
+      "id": "coast_restore_galeria_das_mares",
+      "name": "coast_restore_galeria_das_mares",
+      "roomName": "galeria_das_mares",
+      "category": "Cena",
+      "command": "noop",
+      "steps": [
+        {
+          "id": "coast_restore_galeria_das_mares-0",
+          "command": "call_event gallery_restore",
+          "isEnabled": true
+        },
+        {
+          "id": "coast_restore_galeria_das_mares-1",
+          "command": "call_procedure coast_audio_mute",
+          "isEnabled": true
+        },
+        {
+          "id": "coast_restore_galeria_das_mares-2",
+          "command": "fade_audio_volume music 70 45 var_audio_music_volume var_audio_master_volume",
           "isEnabled": true
         }
       ]
@@ -174792,7 +178186,8 @@
         ]
       },
       "eventBindings": {
-        "onInit": "porto_ao_entrar"
+        "onInit": "porto_ao_entrar",
+        "onRestore": "coast_restore_porto_lumen"
       },
       "gbStudioName": "03 · Porto da Enseada",
       "gbStudioSceneID": "94c18861-b352-4f49-a64d-52f2e3415077",
@@ -176454,7 +179849,8 @@
       },
       "eventBindings": {
         "onInit": "penedos_ao_entrar",
-        "onHitGroup1": "penedos_teste_contato_inimigo"
+        "onHitGroup1": "penedos_teste_contato_inimigo",
+        "onRestore": "coast_restore_penedos_vento"
       },
       "gbStudioName": "04 · Falésias do Sinal",
       "gbStudioSceneID": "f8f027ef-b818-4038-9eda-0ac477facb41",
@@ -178518,7 +181914,8 @@
         }
       },
       "eventBindings": {
-        "onInit": "mercado_ao_entrar"
+        "onInit": "mercado_ao_entrar",
+        "onRestore": "coast_restore_mercado_suspenso"
       },
       "tileLayers": [],
       "heightLevels": [
@@ -184430,7 +187827,8 @@
         }
       },
       "eventBindings": {
-        "onInit": "usina_ao_entrar"
+        "onInit": "usina_ao_entrar",
+        "onRestore": "coast_restore_usina_submersa"
       },
       "tileLayers": [],
       "playerActorName": "",
@@ -184919,7 +188317,8 @@
         }
       },
       "eventBindings": {
-        "onInit": "usina_combate_ao_entrar"
+        "onInit": "usina_combate_ao_entrar",
+        "onRestore": "coast_restore_usina_combate"
       },
       "tileLayers": [],
       "playerActorName": "",
@@ -185410,7 +188809,8 @@
         }
       },
       "eventBindings": {
-        "onInit": "usina_saida_ao_entrar"
+        "onInit": "usina_saida_ao_entrar",
+        "onRestore": "coast_restore_usina_saida"
       },
       "tileLayers": [],
       "playerActorName": "",
@@ -215379,6 +218779,19 @@
               }
             },
             {
+              "id": "load",
+              "label": "CARREGAR",
+              "action": "push_screen",
+              "targetScreenID": "carregar_jogo",
+              "eventName": "",
+              "clickBox": {
+                "x": 20,
+                "y": 87,
+                "width": 112,
+                "height": 12
+              }
+            },
+            {
               "id": "settings",
               "label": "AJUSTES",
               "targetScreenID": "configuracoes",
@@ -215387,7 +218800,7 @@
               "enabled": true,
               "clickBox": {
                 "x": 20,
-                "y": 87,
+                "y": 101,
                 "width": 112,
                 "height": 12
               }
@@ -215401,7 +218814,7 @@
               "enabled": true,
               "clickBox": {
                 "x": 20,
-                "y": 101,
+                "y": 30,
                 "width": 112,
                 "height": 12
               }
@@ -215959,7 +219372,8 @@
         "solid"
       ],
       "eventBindings": {
-        "onInit": "arena_tatica_ao_entrar"
+        "onInit": "arena_tatica_ao_entrar",
+        "onRestore": "coast_restore_arena_tatica"
       },
       "gbStudioName": "02 · A Jornada do Farol",
       "gbStudioSceneID": "4912bee2-387a-472f-ae4f-6679b6149517",
@@ -216262,7 +219676,7 @@
                 "team": "player",
                 "moveRange": 2,
                 "attackRange": 1,
-                "maxHp": 5,
+                "maxHp": 6,
                 "attackPower": 2
               },
               {
@@ -216271,6 +219685,22 @@
                 "moveRange": 2,
                 "attackRange": 1,
                 "maxHp": 4,
+                "attackPower": 1
+              },
+              {
+                "actorIndex": 2,
+                "team": "player",
+                "moveRange": 3,
+                "attackRange": 2,
+                "maxHp": 4,
+                "attackPower": 1
+              },
+              {
+                "actorIndex": 3,
+                "team": "enemy",
+                "moveRange": 1,
+                "attackRange": 2,
+                "maxHp": 3,
                 "attackPower": 1
               }
             ]
@@ -216489,25 +219919,11 @@
                 "consumer": "obj",
                 "required": true,
                 "status": "approved"
-              },
-              {
-                "id": "approved-tactical-range-48x24",
-                "path": "tactical-range-48x24.png",
-                "consumer": "obj",
-                "required": true,
-                "status": "approved"
-              },
-              {
-                "id": "approved-tactical-target-48x24",
-                "path": "tactical-target-48x24.png",
-                "consumer": "obj",
-                "required": true,
-                "status": "approved"
               }
             ],
             "cursorAsset": "tactical-cursor-48x24.png",
-            "rangeAsset": "tactical-range-48x24.png",
-            "targetAsset": "tactical-target-48x24.png",
+            "rangeAsset": "tactical-cursor-48x24.png",
+            "targetAsset": "tactical-cursor-48x24.png",
             "units": [
               {
                 "actorId": "tactical-nara",
@@ -216564,6 +219980,62 @@
                 },
                 "portrait": "tactical-compact-sentinel-portrait.png",
                 "label": "SENTINELA"
+              },
+              {
+                "actorId": "coast-tactical-support",
+                "sheet": "tactical-approved-sentinel-64x64.png",
+                "animations": {
+                  "idle_down": "idle_down",
+                  "idle_up": "idle_up",
+                  "idle_left": "idle_left",
+                  "idle_right": "idle_right",
+                  "move_down": "walk_down",
+                  "move_up": "walk_up",
+                  "move_left": "walk_left",
+                  "move_right": "walk_right",
+                  "attack_down": "attack_down",
+                  "attack_up": "attack_up",
+                  "attack_left": "attack_left",
+                  "attack_right": "attack_right",
+                  "hurt_down": "hurt_down",
+                  "hurt_up": "hurt_up",
+                  "hurt_left": "hurt_left",
+                  "hurt_right": "hurt_right",
+                  "defeat_down": "defeat_down",
+                  "defeat_up": "defeat_up",
+                  "defeat_left": "defeat_left",
+                  "defeat_right": "defeat_right"
+                },
+                "portrait": "tactical-compact-sentinel-portrait.png",
+                "label": "APOIO"
+              },
+              {
+                "actorId": "coast-tactical-ranged",
+                "sheet": "tactical-approved-sentinel-64x64.png",
+                "animations": {
+                  "idle_down": "idle_down",
+                  "idle_up": "idle_up",
+                  "idle_left": "idle_left",
+                  "idle_right": "idle_right",
+                  "move_down": "walk_down",
+                  "move_up": "walk_up",
+                  "move_left": "walk_left",
+                  "move_right": "walk_right",
+                  "attack_down": "attack_down",
+                  "attack_up": "attack_up",
+                  "attack_left": "attack_left",
+                  "attack_right": "attack_right",
+                  "hurt_down": "hurt_down",
+                  "hurt_up": "hurt_up",
+                  "hurt_left": "hurt_left",
+                  "hurt_right": "hurt_right",
+                  "defeat_down": "defeat_down",
+                  "defeat_up": "defeat_up",
+                  "defeat_left": "defeat_left",
+                  "defeat_right": "defeat_right"
+                },
+                "portrait": "tactical-compact-sentinel-portrait.png",
+                "label": "VIGIA"
               }
             ],
             "props": [],
@@ -216874,9 +220346,9 @@
       ],
       "supportBriefing": {
         "title": "Arena Tática",
-        "objective": "Treinar contra a sentinela autônoma.",
+        "objective": "Treinar em dupla contra duas sentinelas, combinando os alcances de Nara e do autômato de apoio.",
         "controls": "A abre o menu da unidade; direcional escolhe Mover, Atacar ou Esperar; A confirma; B volta; Select encerra o turno; L volta ao Mercado.",
-        "success": "Derrotar a sentinela da arena.",
+        "success": "Derrotar as duas sentinelas. O treino pode ser repetido sem alterar a campanha.",
         "failureRecovery": "Volte ao Mercado com L e fale com o guarda para tentar novamente."
       },
       "interfaceThemeId": "farol-tatica-v2",
@@ -220229,7 +223701,7 @@
       ],
       "eventBindings": {
         "onInit": "farol_interior_ao_entrar",
-        "onRestore": "farol_relay_restore"
+        "onRestore": "coast_restore_farol_interior"
       },
       "gbStudioName": "02 · A Jornada do Farol",
       "gbStudioSceneID": "4912bee2-387a-472f-ae4f-6679b6149517",
@@ -240583,7 +244055,7 @@
       },
       "eventBindings": {
         "onInit": "gallery_enter",
-        "onRestore": "gallery_restore"
+        "onRestore": "coast_restore_galeria_das_mares"
       },
       "gbStudioName": "Galeria das Marés",
       "gbStudioSceneID": "evolution-gallery",
@@ -252554,7 +256026,8 @@
         ]
       },
       "eventBindings": {
-        "onInit": "porto_ao_entrar"
+        "onInit": "porto_ao_entrar",
+        "onRestore": "coast_restore_porto_lumen"
       },
       "gbStudioName": "03 · Porto da Enseada",
       "gbStudioSceneID": "94c18861-b352-4f49-a64d-52f2e3415077",
@@ -254216,7 +257689,8 @@
       },
       "eventBindings": {
         "onInit": "penedos_ao_entrar",
-        "onHitGroup1": "penedos_teste_contato_inimigo"
+        "onHitGroup1": "penedos_teste_contato_inimigo",
+        "onRestore": "coast_restore_penedos_vento"
       },
       "gbStudioName": "04 · Falésias do Sinal",
       "gbStudioSceneID": "f8f027ef-b818-4038-9eda-0ac477facb41",
@@ -256280,7 +259754,8 @@
         }
       },
       "eventBindings": {
-        "onInit": "mercado_ao_entrar"
+        "onInit": "mercado_ao_entrar",
+        "onRestore": "coast_restore_mercado_suspenso"
       },
       "tileLayers": [],
       "heightLevels": [
@@ -262192,7 +265667,8 @@
         }
       },
       "eventBindings": {
-        "onInit": "usina_ao_entrar"
+        "onInit": "usina_ao_entrar",
+        "onRestore": "coast_restore_usina_submersa"
       },
       "tileLayers": [],
       "playerActorName": "",
@@ -262681,7 +266157,8 @@
         }
       },
       "eventBindings": {
-        "onInit": "usina_combate_ao_entrar"
+        "onInit": "usina_combate_ao_entrar",
+        "onRestore": "coast_restore_usina_combate"
       },
       "tileLayers": [],
       "playerActorName": "",
@@ -263172,7 +266649,8 @@
         }
       },
       "eventBindings": {
-        "onInit": "usina_saida_ao_entrar"
+        "onInit": "usina_saida_ao_entrar",
+        "onRestore": "coast_restore_usina_saida"
       },
       "tileLayers": [],
       "playerActorName": "",
@@ -293141,6 +296619,19 @@
               }
             },
             {
+              "id": "load",
+              "label": "CARREGAR",
+              "action": "push_screen",
+              "targetScreenID": "carregar_jogo",
+              "eventName": "",
+              "clickBox": {
+                "x": 20,
+                "y": 87,
+                "width": 112,
+                "height": 12
+              }
+            },
+            {
               "id": "settings",
               "label": "AJUSTES",
               "targetScreenID": "configuracoes",
@@ -293149,7 +296640,7 @@
               "enabled": true,
               "clickBox": {
                 "x": 20,
-                "y": 87,
+                "y": 101,
                 "width": 112,
                 "height": 12
               }
@@ -293163,7 +296654,7 @@
               "enabled": true,
               "clickBox": {
                 "x": 20,
-                "y": 101,
+                "y": 30,
                 "width": 112,
                 "height": 12
               }
@@ -293721,7 +297212,8 @@
         "solid"
       ],
       "eventBindings": {
-        "onInit": "arena_tatica_ao_entrar"
+        "onInit": "arena_tatica_ao_entrar",
+        "onRestore": "coast_restore_arena_tatica"
       },
       "gbStudioName": "02 · A Jornada do Farol",
       "gbStudioSceneID": "4912bee2-387a-472f-ae4f-6679b6149517",
@@ -294024,7 +297516,7 @@
                 "team": "player",
                 "moveRange": 2,
                 "attackRange": 1,
-                "maxHp": 5,
+                "maxHp": 6,
                 "attackPower": 2
               },
               {
@@ -294033,6 +297525,22 @@
                 "moveRange": 2,
                 "attackRange": 1,
                 "maxHp": 4,
+                "attackPower": 1
+              },
+              {
+                "actorIndex": 2,
+                "team": "player",
+                "moveRange": 3,
+                "attackRange": 2,
+                "maxHp": 4,
+                "attackPower": 1
+              },
+              {
+                "actorIndex": 3,
+                "team": "enemy",
+                "moveRange": 1,
+                "attackRange": 2,
+                "maxHp": 3,
                 "attackPower": 1
               }
             ]
@@ -294251,25 +297759,11 @@
                 "consumer": "obj",
                 "required": true,
                 "status": "approved"
-              },
-              {
-                "id": "approved-tactical-range-48x24",
-                "path": "tactical-range-48x24.png",
-                "consumer": "obj",
-                "required": true,
-                "status": "approved"
-              },
-              {
-                "id": "approved-tactical-target-48x24",
-                "path": "tactical-target-48x24.png",
-                "consumer": "obj",
-                "required": true,
-                "status": "approved"
               }
             ],
             "cursorAsset": "tactical-cursor-48x24.png",
-            "rangeAsset": "tactical-range-48x24.png",
-            "targetAsset": "tactical-target-48x24.png",
+            "rangeAsset": "tactical-cursor-48x24.png",
+            "targetAsset": "tactical-cursor-48x24.png",
             "units": [
               {
                 "actorId": "tactical-nara",
@@ -294326,6 +297820,62 @@
                 },
                 "portrait": "tactical-compact-sentinel-portrait.png",
                 "label": "SENTINELA"
+              },
+              {
+                "actorId": "coast-tactical-support",
+                "sheet": "tactical-approved-sentinel-64x64.png",
+                "animations": {
+                  "idle_down": "idle_down",
+                  "idle_up": "idle_up",
+                  "idle_left": "idle_left",
+                  "idle_right": "idle_right",
+                  "move_down": "walk_down",
+                  "move_up": "walk_up",
+                  "move_left": "walk_left",
+                  "move_right": "walk_right",
+                  "attack_down": "attack_down",
+                  "attack_up": "attack_up",
+                  "attack_left": "attack_left",
+                  "attack_right": "attack_right",
+                  "hurt_down": "hurt_down",
+                  "hurt_up": "hurt_up",
+                  "hurt_left": "hurt_left",
+                  "hurt_right": "hurt_right",
+                  "defeat_down": "defeat_down",
+                  "defeat_up": "defeat_up",
+                  "defeat_left": "defeat_left",
+                  "defeat_right": "defeat_right"
+                },
+                "portrait": "tactical-compact-sentinel-portrait.png",
+                "label": "APOIO"
+              },
+              {
+                "actorId": "coast-tactical-ranged",
+                "sheet": "tactical-approved-sentinel-64x64.png",
+                "animations": {
+                  "idle_down": "idle_down",
+                  "idle_up": "idle_up",
+                  "idle_left": "idle_left",
+                  "idle_right": "idle_right",
+                  "move_down": "walk_down",
+                  "move_up": "walk_up",
+                  "move_left": "walk_left",
+                  "move_right": "walk_right",
+                  "attack_down": "attack_down",
+                  "attack_up": "attack_up",
+                  "attack_left": "attack_left",
+                  "attack_right": "attack_right",
+                  "hurt_down": "hurt_down",
+                  "hurt_up": "hurt_up",
+                  "hurt_left": "hurt_left",
+                  "hurt_right": "hurt_right",
+                  "defeat_down": "defeat_down",
+                  "defeat_up": "defeat_up",
+                  "defeat_left": "defeat_left",
+                  "defeat_right": "defeat_right"
+                },
+                "portrait": "tactical-compact-sentinel-portrait.png",
+                "label": "VIGIA"
               }
             ],
             "props": [],
@@ -294636,9 +298186,9 @@
       ],
       "supportBriefing": {
         "title": "Arena Tática",
-        "objective": "Treinar contra a sentinela autônoma.",
+        "objective": "Treinar em dupla contra duas sentinelas, combinando os alcances de Nara e do autômato de apoio.",
         "controls": "A abre o menu da unidade; direcional escolhe Mover, Atacar ou Esperar; A confirma; B volta; Select encerra o turno; L volta ao Mercado.",
-        "success": "Derrotar a sentinela da arena.",
+        "success": "Derrotar as duas sentinelas. O treino pode ser repetido sem alterar a campanha.",
         "failureRecovery": "Volte ao Mercado com L e fale com o guarda para tentar novamente."
       },
       "interfaceThemeId": "farol-tatica-v2",
@@ -297991,7 +301541,7 @@
       ],
       "eventBindings": {
         "onInit": "farol_interior_ao_entrar",
-        "onRestore": "farol_relay_restore"
+        "onRestore": "coast_restore_farol_interior"
       },
       "gbStudioName": "02 · A Jornada do Farol",
       "gbStudioSceneID": "4912bee2-387a-472f-ae4f-6679b6149517",
@@ -318345,7 +321895,7 @@
       },
       "eventBindings": {
         "onInit": "gallery_enter",
-        "onRestore": "gallery_restore"
+        "onRestore": "coast_restore_galeria_das_mares"
       },
       "gbStudioName": "Galeria das Marés",
       "gbStudioSceneID": "evolution-gallery",

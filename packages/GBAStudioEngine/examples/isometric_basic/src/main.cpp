@@ -391,6 +391,21 @@ int restore_slot_index = -1;
 const gbs::IsometricRoomData* room_data = nullptr;
 gbs::IsoActor actors[max_actor_count] __attribute__((section(".ewram_bss")));
 gbs::IsoActorAnimationState actor_animation_states[max_actor_count] __attribute__((section(".ewram_bss")));
+gbs::IsoScriptedMove scripted_actor_moves[max_actor_count] {};
+
+void consume_iso_scene_actor_commands(gbs::IsoActor* scene_actors, size_t count, gbs::EventState& state, bool smooth) {
+    if (!smooth) for (auto& move : scripted_actor_moves) move = {};
+    for (size_t i = 0; smooth && i < state.actor_command_count; ++i) {
+        auto& command = state.actor_commands[i];
+        if (command.op == gbs::EventActorOp::MoveRelative && command.actor_index > 0 &&
+            static_cast<size_t>(command.actor_index) < count) {
+            const size_t index = static_cast<size_t>(command.actor_index);
+            gbs::begin_iso_scripted_move(scene_actors[index], scripted_actor_moves[index], {command.a, command.b});
+            command.op = gbs::EventActorOp::None;
+        }
+    }
+    gbs::consume_iso_actor_event_commands(scene_actors, count, state);
+}
 bool iso_actor_touching_player[max_actor_count] __attribute__((section(".ewram_bss")));
 size_t actor_count = 0;
 gbs::IsoDrawItem draw_items[max_draw_count] __attribute__((section(".ewram_bss")));
@@ -636,6 +651,15 @@ void advance_iso_tactical_turn(IsoTacticalRuntimeState& state) {
     state.turn_number = static_cast<uint16_t>(state.turn_number + 1);
     state.active_team = state.active_team == 0 ? 1 : 0;
     state.active_unit_index = first_iso_tactical_unit_for_team(state, state.active_team);
+    size_t alive_count = 0;
+    for (const auto& unit : state.units) if (unit.configured && unit.hp > 0 && unit.team == state.active_team) ++alive_count;
+    size_t ordinal = gbs::iso_tactical_turn_ordinal(state.turn_number, alive_count);
+    for (size_t index = 0; index < max_actor_count; ++index) {
+        const auto& unit = state.units[index];
+        if (unit.configured && unit.hp > 0 && unit.team == state.active_team && ordinal-- == 0) {
+            state.active_unit_index = index; break;
+        }
+    }
     state.moved_this_turn = false;
     state.enemy_delay = 30;
 }
@@ -905,7 +929,10 @@ void handle_iso_tactical_action(
     if (!state.selected) {
         const size_t actor_index = gbs::find_iso_actor_at_cursor(cursor, actors, actor_count, 0, true);
         const size_t unit_index = iso_tactical_unit_for_actor(state, actor_index);
-        if (unit_index != no_tactical_unit_index && unit_index == state.active_unit_index && state.units[unit_index].team == state.active_team) {
+        if (unit_index != no_tactical_unit_index && state.units[unit_index].hp > 0 &&
+            gbs::iso_tactical_can_select_unit(state.active_team, state.moved_this_turn,
+                state.active_unit_index, unit_index, state.units[unit_index].team)) {
+            state.active_unit_index = unit_index;
             state.selected = true;
             state.selected_unit_index = unit_index;
             state.menu_open = state.active_team == 0;
@@ -2043,7 +2070,7 @@ void consume_event_state(gbs::EventState& event_state) {
         gbs::fade_audio_channel_volume(
             gbs::audio_channel_from_event_value(event_state.audio_fade_channel),
             static_cast<uint8_t>(event_state.audio_fade_target_volume),
-            static_cast<uint16_t>(event_state.audio_fade_frames)
+            static_cast<uint16_t>(event_state.audio_fade_frames), static_cast<uint8_t>(event_state.audio_fade_ceiling_volume)
         );
         event_state.audio_fade_changed = false;
     }
@@ -2537,6 +2564,7 @@ int initialize_isometric_runtime() {
             gbs::run_event_script(event_state, gbs::iso_actor_start_event_script_for(*room_data, index));
         }
     }
+    if (restored_save || resumed_pause) gbs::run_event_script(event_state, room_data->on_restore);
     gbs::consume_iso_actor_event_commands(actors, actor_count, event_state);
     apply_iso_event_camera(camera, event_state);
     initialize_iso_tactical_facing(tactical_state, actors, actor_animation_states, actor_count);
@@ -2705,7 +2733,10 @@ gbs::RuntimeAdapterFrameResult update_isometric_runtime(const gbs::RuntimeFrameC
             gbs::run_event_script(event_state,
                 iso_exploration_interact_script(*room_data, actors, actor_count, cursor));
         }
-        gbs::consume_iso_actor_event_commands(actors, actor_count, event_state);
+        consume_iso_scene_actor_commands(actors, actor_count, event_state, !tactical_state.enabled);
+        for (size_t index = 1; !tactical_state.enabled && index < actor_count; ++index) {
+            gbs::update_iso_scripted_move(actors[index], actor_animation_states[index], scripted_actor_moves[index]);
+        }
         bool room_changed = apply_iso_event_room_change(
             project,
             current_room,
@@ -2724,6 +2755,7 @@ gbs::RuntimeAdapterFrameResult update_isometric_runtime(const gbs::RuntimeFrameC
             }
         }
         if (room_changed) {
+            for (auto& move : scripted_actor_moves) move = {};
             ++runtime_room_change_count;
             iso_camera_zone_active = false;
             tactical_presentation_maps_loaded = false;

@@ -239,13 +239,13 @@ $(HOST_BUILD)/topdown_fixture_tests: tests/host/topdown_fixture_tests.cpp engine
 	@mkdir -p $(@D)
 	$(HOST_CXX) $(HOST_CXXFLAGS) $^ -o $@
 
-$(HOST_BUILD)/platformer_tests: tests/host/platformer_tests.cpp engine/src/gbs_platformer.cpp engine/src/gbs_topdown.cpp engine/src/gbs_event.cpp engine/src/gbs_dialogue_locale.cpp $(HOST_EVENT_RUNTIME_SRCS)
+$(HOST_BUILD)/platformer_tests: tests/host/platformer_tests.cpp engine/src/gbs_platformer.cpp engine/src/gbs_topdown.cpp engine/src/gbs_event.cpp engine/src/gbs_dialogue_locale.cpp $(HOST_EVENT_RUNTIME_SRCS) engine/include/gbs/platformer.hpp
 	@mkdir -p $(@D)
-	$(HOST_CXX) $(HOST_CXXFLAGS) $^ -o $@
+	$(HOST_CXX) $(HOST_CXXFLAGS) $(filter %.cpp,$^) -o $@
 
-$(HOST_BUILD)/isometric_tests: tests/host/isometric_tests.cpp engine/src/gbs_isometric.cpp engine/src/gbs_event.cpp engine/src/gbs_dialogue_locale.cpp $(HOST_EVENT_RUNTIME_SRCS)
+$(HOST_BUILD)/isometric_tests: tests/host/isometric_tests.cpp engine/src/gbs_isometric.cpp engine/src/gbs_event.cpp engine/src/gbs_dialogue_locale.cpp $(HOST_EVENT_RUNTIME_SRCS) engine/include/gbs/isometric.hpp
 	@mkdir -p $(@D)
-	$(HOST_CXX) $(HOST_CXXFLAGS) $^ -o $@
+	$(HOST_CXX) $(HOST_CXXFLAGS) $(filter %.cpp,$^) -o $@
 
 $(HOST_BUILD)/dungeon_crawler_tests: tests/host/dungeon_crawler_tests.cpp engine/src/gbs_dungeon_crawler.cpp engine/src/gbs_event.cpp engine/src/gbs_save.cpp engine/src/gbs_info.cpp engine/src/gbs_dialogue_locale.cpp $(HOST_EVENT_RUNTIME_SRCS)
 	@mkdir -p $(@D)

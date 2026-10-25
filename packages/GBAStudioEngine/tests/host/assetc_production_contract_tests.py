@@ -1453,7 +1453,16 @@ def test_racing_upload_sources_are_scoped_to_referenced_assets():
     assert '#include "other_scene.hpp"' not in header
     assert "resource_bank_upload_sources," in header
 
+def test_scene_fade_preserves_optional_channel_and_master_preferences():
+    assetc = load_assetc_module()
+    base = {"op": "fade_audio_volume", "channel": "music", "volume": 11, "frames": 30}
+    assert assetc.event_command_from_json(base, "fade") == ("FadeAudioVolume", 0, 11, 30)
+    assert assetc.event_command_from_json({**base, "variable": 16}, "fade") == ("FadeAudioVolume", 0, 11, 30, 17)
+    assert assetc.event_command_from_json({**base, "variable": 16, "other_variable": 17}, "fade") == ("FadeAudioVolume", 0, 11, 30, 4625)
+
+
 def main():
+    test_scene_fade_preserves_optional_channel_and_master_preferences()
     test_referenced_asset_ids_cover_nested_references_and_raw_cpp_symbols()
     test_generated_asset_includes_keep_required_and_explicit_headers()
     test_export_racing_omits_unreferenced_asset_header_without_omitting_asset()
@@ -1485,6 +1494,7 @@ def main():
     test_world_map_background_uses_tilemap_palette_zero_as_backdrop()
     test_point_click_emits_custom_cursor_animations()
     test_point_click_emits_layered_backgrounds_and_props()
+    test_point_click_prop_accepts_the_last_native_event_variable()
     test_point_click_prop_preserves_the_authored_initial_animation()
     test_point_click_project_background_count_is_not_overwritten_by_scene_layers()
     test_replace_tile_sequence_packs_tile_asset_index()

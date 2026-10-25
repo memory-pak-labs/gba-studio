@@ -13,6 +13,20 @@ afterEach(cleanup);
 type Row = Record<string, any>;
 const rows = (value:unknown) => value as Row[];
 
+it("authors a wall-mounted Dungeon actor and preserves it through save and export", () => {
+  let result=createRoomInProject(buildProjectFromTemplate("blank",{name:"Panels"}),{id:"maze",name:"Maze",sceneType:"dungeonCrawler",width:11,height:11});
+  result=createActorInProject(result,{id:"panel",name:"Panel",roomID:"maze",x:2,y:2});
+  function Harness(){
+    const [data,setData]=useState(result);result=data;
+    return <ActorRuntimeResourcesInspector sceneType="dungeonCrawler" actorID="panel" data={data} onChange={fields=>setData(updateRoomEntityInProject(data,"actor","panel",fields))}/>;
+  }
+  render(<Harness/>);fireEvent.click(screen.getByText("Recursos do ator"));
+  fireEvent.click(screen.getByRole("checkbox",{name:"Fixado à parede"}));
+  const saved=parseGBAProjectFile(serializeGBAProjectFile({data:result,summary:summarizeGBAProject(result)})).data;
+  expect(rows(saved.actors).find(a=>a.id==='panel')?.dungeonWallMounted).toBe(true);
+  expect(rows(saved.actors).find(a=>a.id==='panel')?.x).toBe(2);
+});
+
 it("edits Dungeon resources and preserves them through save and export", () => {
   let result=createRoomInProject(buildProjectFromTemplate("blank",{name:"Resources"}),{id:"maze",name:"Maze",sceneType:"dungeonCrawler",width:11,height:11});
   function Harness(){

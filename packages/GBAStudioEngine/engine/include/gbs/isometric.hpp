@@ -129,6 +129,20 @@ struct IsoActorAnimationState {
     bool completed = false;
 };
 
+struct IsoScriptedMove {
+    int32_t from_x256 = 0, from_y256 = 0;
+    uint8_t frame = 0;
+    bool active = false;
+};
+constexpr bool iso_tactical_can_select_unit(uint8_t active_team, bool moved, size_t active_unit, size_t candidate, uint8_t team) {
+    return team == active_team && ((active_team == 0 && !moved) || active_unit == candidate);
+}
+constexpr size_t iso_tactical_turn_ordinal(uint16_t turn, size_t count) {
+    return count == 0 ? 0 : ((turn > 0 ? turn - 1 : 0) / 2) % count;
+}
+void begin_iso_scripted_move(IsoActor& actor, IsoScriptedMove& move, Vec2i delta);
+void update_iso_scripted_move(IsoActor& actor, IsoActorAnimationState& animation, IsoScriptedMove& move);
+
 struct IsoActorEventData {
     size_t actor_index;
     EventScript script;
@@ -504,6 +518,7 @@ struct IsometricRoomData {
     EventScript on_hit_group1 = empty_event_script();
     EventScript on_hit_group2 = empty_event_script();
     EventScript on_hit_group3 = empty_event_script();
+    EventScript on_restore = empty_event_script();
 };
 
 constexpr bool is_tactical_isometric_room(const IsometricRoomData& room) {

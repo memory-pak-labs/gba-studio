@@ -695,7 +695,7 @@ void consume_event_state(gbs::EventState& event_state, int* local_wait_frames = 
         gbs::fade_audio_channel_volume(
             gbs::audio_channel_from_event_value(event_state.audio_fade_channel),
             static_cast<uint8_t>(event_state.audio_fade_target_volume),
-            static_cast<uint16_t>(event_state.audio_fade_frames)
+            static_cast<uint16_t>(event_state.audio_fade_frames), static_cast<uint8_t>(event_state.audio_fade_ceiling_volume)
         );
         event_state.audio_fade_changed = false;
     }
@@ -840,7 +840,31 @@ void consume_platformer_actor_commands(
     event_state.player_x = player_event_runtime.x;
     event_state.player_y = player_event_runtime.y;
     event_state.player_direction = player_event_runtime.direction;
+    gbs::Rect previous_platforms[max_room_npcs] {};
+    bool moving_platforms[max_room_npcs] {};
+    for (size_t index = 0; index < event_state.actor_command_count; ++index) {
+        const auto& command = event_state.actor_commands[index];
+        if (command.op != gbs::EventActorOp::MoveRelative || command.actor_index < 0 ||
+            static_cast<size_t>(command.actor_index) >= platformer_npc_count) continue;
+        const size_t npc_index = static_cast<size_t>(command.actor_index);
+        const auto& npc = platformer_npc_runtimes[npc_index];
+        if (npc.active && npc.visible && npc.actor.collision_mask != 0 &&
+            room_data.config.platform_actor_collision_group != 0 &&
+            npc.collision_group == room_data.config.platform_actor_collision_group) {
+            previous_platforms[npc_index] = gbs::platformer_npc_actor_rect(npc);
+            moving_platforms[npc_index] = true;
+        }
+    }
     gbs::consume_actor_event_commands(platformer_npc_runtimes, platformer_npc_count, event_state);
+    for (size_t index = 0; index < platformer_npc_count; ++index) {
+        if (moving_platforms[index] && player_event_active) {
+            gbs::carry_platformer_actor_with_npc(collision, player, previous_platforms[index],
+                gbs::platformer_npc_actor_rect(platformer_npc_runtimes[index]));
+        }
+    }
+    const auto carried_anchor = gbs::platformer_actor_anchor_position(player);
+    event_state.player_x = carried_anchor.x;
+    event_state.player_y = carried_anchor.y;
     for (size_t index = 0; index < platformer_npc_count; ++index) {
         const gbs::SpriteAnimation* next_animation = gbs::platformer_npc_animation_for_index(
             room_data.npcs[index],
@@ -1096,7 +1120,8 @@ bool platformer_npc_is_visible_in_camera(const gbs::PlatformerNpcRuntime& npc, c
 bool capture_platformer_runtime_state(gbs::UniversalSaveData& universal_save, int current_room, const gbs::PlatformerActor& player,
     const gbs::PlatformerRuntimeState& runtime_state, const gbs::Camera& camera,
     const gbs::EventState& event_state) {
-    gbs::PlatformerSaveData save_data {};
+    gbs::PlatformerSceneSaveData saved {};
+    auto& save_data = saved.scene;
     gbs::capture_platformer_save_data(
         save_data,
         current_room,
@@ -1106,7 +1131,8 @@ bool capture_platformer_runtime_state(gbs::UniversalSaveData& universal_save, in
         event_state,
         gbs::frame_count()
     );
-    static_assert(sizeof(gbs::PlatformerSaveData) <= gbs::universal_save_payload_capacity, "platformer save payload exceeds the universal envelope");
+    static_assert(sizeof(gbs::PlatformerSceneSaveData) <= gbs::universal_save_payload_capacity, "platformer save payload exceeds the universal envelope");
+    if (!gbs::capture_platformer_npc_save_data(saved, platformer_npc_runtimes, platformer_npc_count)) return false;
     if (!gbs::make_universal_save_data(
             universal_save,
             gbs::UniversalSaveRuntime::Platformer,
@@ -1123,8 +1149,8 @@ bool capture_platformer_runtime_state(gbs::UniversalSaveData& universal_save, in
             gbs::universal_save_equipment_slot_count,
             save_data.play_time_frames,
             save_data.flags,
-            &save_data,
-            sizeof(save_data))) {
+            &saved,
+            sizeof(saved))) {
         return false;
     }
     return true;
@@ -1182,12 +1208,13 @@ bool restore_platformer_runtime_state(
         !gbs::is_valid_universal_save_data(universal_save)) {
         return false;
     }
-    gbs::PlatformerSaveData save_data {};
+    gbs::PlatformerSceneSaveData saved {};
+    auto& save_data = saved.scene;
     if (!gbs::read_universal_save_payload(
             universal_save,
             gbs::UniversalSaveRuntime::Platformer,
-            &save_data,
-            sizeof(save_data))) {
+            &saved,
+            sizeof(saved))) {
         return false;
     }
     if (!gbs::apply_platformer_save_data(project, save_data, player, runtime_state, camera, event_state)) {
@@ -1215,6 +1242,7 @@ bool restore_platformer_runtime_state(
     room.collision.edits = &room_tile_edits;
     for (auto& cache : room_layer_cache) cache = {};
     load_platformer_room_runtime_objects(*room_data);
+    if (!gbs::apply_platformer_npc_save_data(saved, platformer_npc_runtimes, platformer_npc_count)) return false;
     player.collision_offset_pixels = room_data->player_collision_offset_pixels;
     player.bounds_pixels.width = room_data->player_start.width;
     player.bounds_pixels.height = room_data->player_start.height;
@@ -1494,10 +1522,13 @@ int initialize_platformer_runtime() {
     gbs::UniversalSaveData paused_data {};
     const bool resumed_pause = runtime_entry && gbs::consume_suspended_runtime_resume(gbs::UniversalSaveRuntime::Platformer, current_room, paused_data);
     if (resumed_pause) {
-        gbs::PlatformerSaveData state {};
-        if (!gbs::read_universal_save_payload(paused_data, gbs::UniversalSaveRuntime::Platformer, &state, sizeof(state)) ||
+        gbs::PlatformerSceneSaveData saved {};
+        auto& state = saved.scene;
+        if (!gbs::read_universal_save_payload(paused_data, gbs::UniversalSaveRuntime::Platformer, &saved, sizeof(saved)) ||
             !gbs::apply_platformer_save_data(project, state, player, runtime_state, camera, event_state) ||
+            !gbs::apply_platformer_npc_save_data(saved, platformer_npc_runtimes, platformer_npc_count) ||
             !gbs::restore_suspended_common_state(paused_data, event_state)) return -1;
+        queue_platformer_script(room_data->on_restore);
     } else {
         queue_platformer_script(room_data->on_enter);
         queue_platformer_player_start_script();

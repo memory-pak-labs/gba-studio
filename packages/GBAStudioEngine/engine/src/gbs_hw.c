@@ -1604,6 +1604,16 @@ void gbs_hw_load_bg_tilemap(int layer, const uint16_t* entries, uint32_t width, 
     shadow_bg_map_size[layer] = (uint8_t)(map_size & 3u);
     shadow_bg_map_size_pending_mask = (uint8_t)(shadow_bg_map_size_pending_mask | (1u << layer));
 
+    if (stage_tilemap && width == 32 && height == 32) {
+        // A full screenblock already replaces every entry. Keep the VBlank
+        // staging, without clearing it and recomputing coordinates per tile.
+        for (uint32_t index = 0; index < 1024; ++index) {
+            shadow_bg_tilemaps[layer][index] = entries[index];
+        }
+        shadow_bg_tilemap_pending_mask = (uint8_t)(shadow_bg_tilemap_pending_mask | (1u << layer));
+        return;
+    }
+
     for (uint32_t block = 0; block < screenblock_count; ++block) {
         volatile uint16_t* screenblock = stage_tilemap && block == 0
             ? shadow_bg_tilemaps[layer]

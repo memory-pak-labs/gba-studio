@@ -2121,6 +2121,36 @@
           "sha256": "fe9223b9ee2471f11a8404d567029059bffde66370d33c6dac9800489ac0ac82",
           "contract": "campaign-evolutions-user-approved-2026-10-24",
           "provenance": "fixtures/asset-provenance/campaign-evolutions-approved.json"
+        },
+        {
+          "path": "Assets/sprites/coast-freight-lift.png",
+          "sha256": "3f2f481dfcb2bafcda978cb4c219c0d69dc6e74602585712f7dad278d8c725a8",
+          "contract": "coastal-depth-user-approved-2026-10-25",
+          "provenance": "fixtures/asset-provenance/coastal-depth-approved.json"
+        },
+        {
+          "path": "Assets/sprites/coast-valve-near.png",
+          "sha256": "5056634b62338d299286bec20818a84ca0c3c2e81546bbf048357deeb784c57d",
+          "contract": "coastal-depth-user-approved-2026-10-25",
+          "provenance": "fixtures/asset-provenance/coastal-depth-approved.json"
+        },
+        {
+          "path": "Assets/sprites/coast-valve-mid.png",
+          "sha256": "db12f26953b479ba53d744446bea587e0a2f95c283a753fae4a815b6dc2e1889",
+          "contract": "coastal-depth-user-approved-2026-10-25",
+          "provenance": "fixtures/asset-provenance/coastal-depth-approved.json"
+        },
+        {
+          "path": "Assets/sprites/coast-valve-far.png",
+          "sha256": "856442eac231036060db7b711c93967b682817d4a33a0e29a42d5191589250b4",
+          "contract": "coastal-depth-user-approved-2026-10-25",
+          "provenance": "fixtures/asset-provenance/coastal-depth-approved.json"
+        },
+        {
+          "path": "Assets/sprites/coast-port-lantern.png",
+          "sha256": "2bbfa35d0057c6d20924aab1c23d354573ebfdec2640def4a2223e6dd71652b1",
+          "contract": "coastal-depth-user-approved-2026-10-25",
+          "provenance": "fixtures/asset-provenance/coastal-depth-approved.json"
         }
       ],
       "retired": [

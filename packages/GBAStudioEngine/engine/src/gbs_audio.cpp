@@ -931,7 +931,7 @@ bool is_valid_pcm_asset(const PcmAsset& asset) {
            is_valid_pcm_loop(asset);
 }
 
-void audio_init() {
+void audio_init(bool preserve_mix) {
     [[maybe_unused]] const AudioStateLock lock;
     reset_sfx_state();
     reset_music_state();
@@ -941,8 +941,10 @@ void audio_init() {
     pcm_output_active = false;
     pcm_submitted_blocks = 0;
     pcm_voice_age = 1;
-    reset_audio_mutes();
-    reset_audio_volumes();
+    if (!preserve_mix) {
+        reset_audio_mutes();
+        reset_audio_volumes();
+    }
     gbs_hw_audio_init();
 }
 
@@ -1039,22 +1041,25 @@ bool set_audio_channel_volume(AudioChannel channel, uint8_t volume) {
     return true;
 }
 
-bool fade_audio_channel_volume(AudioChannel channel, uint8_t target_volume, uint16_t frames) {
-    if (!is_valid_audio_volume(target_volume)) {
+bool fade_audio_channel_volume(AudioChannel channel, uint8_t target_volume, uint16_t frames, uint8_t ceiling) {
+    if (!is_valid_audio_volume(target_volume) || !is_valid_audio_volume(ceiling)) {
         return false;
     }
     [[maybe_unused]] const AudioStateLock lock;
+    if (target_volume > ceiling) target_volume = ceiling;
     if (frames == 0) {
         return set_audio_channel_volume(channel, target_volume);
     }
     if (channel == AudioChannel::All) {
         for (size_t index = 0; index < 4; ++index) {
             AudioVolumeState& state = channel_volumes[index];
+            if (state.current > ceiling) state.current = ceiling;
             state = AudioVolumeState { state.current, state.current, target_volume, frames, frames };
         }
         return true;
     }
     AudioVolumeState& state = channel_volumes[audio_channel_index(channel)];
+    if (state.current > ceiling) state.current = ceiling;
     state = AudioVolumeState { state.current, state.current, target_volume, frames, frames };
     return true;
 }

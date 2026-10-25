@@ -2650,7 +2650,7 @@ void consume_event_outputs(bool trigger_room_enter) {
         gbs::fade_audio_channel_volume(
             audio_channel_for_event_value(event_state.audio_fade_channel),
             static_cast<uint8_t>(event_state.audio_fade_target_volume),
-            static_cast<uint16_t>(event_state.audio_fade_frames)
+            static_cast<uint16_t>(event_state.audio_fade_frames), static_cast<uint8_t>(event_state.audio_fade_ceiling_volume)
         );
         event_state.audio_fade_changed = false;
     }
@@ -3049,6 +3049,7 @@ int initialize_topdown_runtime() {
     if (resumed_pause) {
         camera.position_pixels = gbs::Vec2i { paused_data.camera_x, paused_data.camera_y };
         play_time_frames = paused_data.play_time_frames;
+        restored_room_events_pending = true;
     }
     if (!room_handled_music && project.music_asset_count > 0) {
         gbs::play_music(project.music_assets[0]);

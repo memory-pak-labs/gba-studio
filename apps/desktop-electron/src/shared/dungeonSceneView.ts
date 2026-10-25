@@ -18,13 +18,16 @@ export function nearestDungeonPassage(grid:DungeonGrid,origin:{x:number;y:number
   }
   return closest;
 }
-export function projectDungeonActor(grid:DungeonGrid,camera:DungeonCamera,actor:{x:number;y:number},cell:boolean,options?:{modern?:boolean;viewDistance?:number}) {
+export function projectDungeonActor(grid:DungeonGrid,camera:DungeonCamera,actor:{x:number;y:number},cell:boolean,options?:{modern?:boolean;viewDistance?:number;wallMounted?:boolean}) {
   const [dx,dy]=DUNGEON_DIRECTIONS[camera.direction&3];const vx=actor.x-camera.x,vy=actor.y-camera.y;
   const distance=vx*dx+vy*dy,lateral=-vx*dy+vy*dx;
   if(distance<1||distance>(options?.viewDistance??8)||Math.abs(lateral)>distance||options?.modern&&Math.abs(lateral)*100>distance*65)return null;
   if(options?.modern){
     const steps=Math.max(Math.abs(vx),Math.abs(vy))*10;
-    for(let i=1;i<steps;i++)if(dungeonBlocked(grid,Math.trunc((camera.x*10+5+Math.trunc(vx*10*i/steps))/10),Math.trunc((camera.y*10+5+Math.trunc(vy*10*i/steps))/10)))return null;
+    for(let i=1;i<steps;i++){
+      const x=Math.trunc((camera.x*10+5+Math.trunc(vx*10*i/steps))/10),y=Math.trunc((camera.y*10+5+Math.trunc(vy*10*i/steps))/10);
+      if(dungeonBlocked(grid,x,y)&&!(options.wallMounted&&x===actor.x&&y===actor.y))return null;
+    }
   }else for(let step=1;step<distance;step++)if(dungeonBlocked(grid,camera.x+dx*step-dy*Math.round(lateral*step/distance),camera.y+dy*step+dx*Math.round(lateral*step/distance)))return null;
   const depth=distance===1?'near':distance<=3?'mid':'far';const size=(depth==='near'?64:depth==='mid'?32:16)/(cell?2:1);
   return {x:Math.trunc(120+lateral*100/distance)-size/2,y:Math.trunc(58+48/distance)-size+4,size,depth,distance};

@@ -1,0 +1,149 @@
+{
+  "schemaVersion": 1,
+  "approval": {
+    "approved": true,
+    "visual": true,
+    "palette": true,
+    "date": "2026-10-25",
+    "source": "User explicitly approved the three artworks after reviewing native ROM and Play captures",
+    "scope": [
+      "Usina wall-mounted panels",
+      "Port lanterns",
+      "Penedos freight-lift platform"
+    ],
+    "runtimeReviewApproved": false
+  },
+  "sources": [
+    {
+      "name": "lift-source.png",
+      "sha256": "8cbb29a988cfaa6d6fc86691fd6edc7e0bea4105fa08368d5259c2fd6c9aeafc",
+      "origin": "OpenAI image generation under user direction",
+      "license": "Original project-owned AI-generated artwork"
+    },
+    {
+      "name": "valve-source.png",
+      "sha256": "494fb5d51c71e8d25a604142adbfdf61fb3e698350532e6ce46709b13a2f26cd",
+      "origin": "OpenAI image generation under user direction",
+      "license": "Original project-owned AI-generated artwork"
+    },
+    {
+      "name": "valve-on-source.png",
+      "sha256": "f757186197c69a3f650b067ad49209257b8417b5a70aaf1249213a1cd899af3a",
+      "origin": "OpenAI image generation under user direction",
+      "license": "Original project-owned AI-generated artwork"
+    },
+    {
+      "name": "lamp-source.png",
+      "sha256": "2aea1a4916fb0d656044c8bf7f022691e77d62c9180ba8f340300d6d4cfcb4bb",
+      "origin": "OpenAI image generation under user direction",
+      "license": "Original project-owned AI-generated artwork"
+    }
+  ],
+  "preparation": [
+    {
+      "asset": "coast-freight-lift.png",
+      "paletteReference": "penedos-approved-checkpoint.png",
+      "rgbRmse": 9.513485704851306,
+      "visibleRgb555": 33,
+      "sha256": "3f2f481dfcb2bafcda978cb4c219c0d69dc6e74602585712f7dad278d8c725a8"
+    },
+    {
+      "asset": "coast-valve-near.png",
+      "paletteReference": "dungeon-approved-cell-near.png",
+      "rgbRmse": 9.95268315138621,
+      "visibleRgb555": 77,
+      "sha256": "5056634b62338d299286bec20818a84ca0c3c2e81546bbf048357deeb784c57d"
+    },
+    {
+      "asset": "coast-valve-mid.png",
+      "paletteReference": "dungeon-approved-cell-near.png",
+      "rgbRmse": 10.489681398478425,
+      "visibleRgb555": 64,
+      "sha256": "db12f26953b479ba53d744446bea587e0a2f95c283a753fae4a815b6dc2e1889"
+    },
+    {
+      "asset": "coast-valve-far.png",
+      "paletteReference": "dungeon-approved-cell-near.png",
+      "rgbRmse": 7.81958675262049,
+      "visibleRgb555": 41,
+      "sha256": "856442eac231036060db7b711c93967b682817d4a33a0e29a42d5191589250b4"
+    },
+    {
+      "asset": "coast-port-lantern.png",
+      "rgbRmse": 12.08982954779031,
+      "sha256": "2bbfa35d0057c6d20924aab1c23d354573ebfdec2640def4a2223e6dd71652b1",
+      "sourceSha256": "2aea1a4916fb0d656044c8bf7f022691e77d62c9180ba8f340300d6d4cfcb4bb"
+    }
+  ],
+  "policy": {
+    "sampling": "Nearest-neighbor only, declared source regions; native frame grids",
+    "alpha": "Binary alpha after an inspected 128 threshold",
+    "palette": "Nearest RGB555 in the existing consumer scene palettes; no global 15-color reduction",
+    "separation": "Background, actors and HUD remain separate",
+    "scenery": "The original 32 room geometries and all 302 existing asset hashes are preserved"
+  },
+  "assets": [
+    {
+      "name": "coast-freight-lift.png",
+      "sha256": "3f2f481dfcb2bafcda978cb4c219c0d69dc6e74602585712f7dad278d8c725a8",
+      "source": "Assets/sprites/coast-freight-lift.png",
+      "license": "Original project-owned AI-generated artwork under user direction",
+      "frameWidth": 64,
+      "frameHeight": 32,
+      "frameCount": 1,
+      "approved": true
+    },
+    {
+      "name": "coast-valve-near.png",
+      "sha256": "5056634b62338d299286bec20818a84ca0c3c2e81546bbf048357deeb784c57d",
+      "source": "Assets/sprites/coast-valve-near.png",
+      "license": "Original project-owned AI-generated artwork under user direction",
+      "frameWidth": 32,
+      "frameHeight": 64,
+      "frameCount": 2,
+      "approved": true
+    },
+    {
+      "name": "coast-valve-mid.png",
+      "sha256": "db12f26953b479ba53d744446bea587e0a2f95c283a753fae4a815b6dc2e1889",
+      "source": "Assets/sprites/coast-valve-mid.png",
+      "license": "Original project-owned AI-generated artwork under user direction",
+      "frameWidth": 16,
+      "frameHeight": 32,
+      "frameCount": 2,
+      "approved": true
+    },
+    {
+      "name": "coast-valve-far.png",
+      "sha256": "856442eac231036060db7b711c93967b682817d4a33a0e29a42d5191589250b4",
+      "source": "Assets/sprites/coast-valve-far.png",
+      "license": "Original project-owned AI-generated artwork under user direction",
+      "frameWidth": 8,
+      "frameHeight": 16,
+      "frameCount": 2,
+      "approved": true
+    },
+    {
+      "name": "coast-port-lantern.png",
+      "sha256": "2bbfa35d0057c6d20924aab1c23d354573ebfdec2640def4a2223e6dd71652b1",
+      "source": "Assets/sprites/coast-port-lantern.png",
+      "license": "Original project-owned AI-generated artwork under user direction",
+      "frameWidth": 16,
+      "frameHeight": 32,
+      "frameCount": 2,
+      "approved": true
+    }
+  ],
+  "retainedAliases": [
+    {
+      "source": "Assets/sprites/tactical-range-48x24.png",
+      "sha256": "41d304c4f9a1f74948e4a29010e47b526117a11ecd153d5bea48c13fbc892cc2",
+      "reason": "Byte-identical marker consolidated into tactical-cursor-48x24.png; original PNG retained unchanged"
+    },
+    {
+      "source": "Assets/sprites/tactical-target-48x24.png",
+      "sha256": "41d304c4f9a1f74948e4a29010e47b526117a11ecd153d5bea48c13fbc892cc2",
+      "reason": "Byte-identical marker consolidated into tactical-cursor-48x24.png; original PNG retained unchanged"
+    }
+  ]
+}

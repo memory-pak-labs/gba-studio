@@ -101,7 +101,7 @@ export function eventCommandIntegrationIssue(command: string, runtime?: string):
   if (verb === "set_actor_animation_state" && (parts.length !== 3 || !parts[1] || !parts[2])) return "Estado de animação requer ator e estado cadastrado.";
   if (verb === "projectile_load_slot" && (parts.length !== 5 || !integer(parts[1], 7) || !parts[2] || !integer(parts[3], 32767) || Number(parts[3]) < 1 || !integer(parts[4], 32767) || Number(parts[4]) < 1)) return "Projétil requer slot 0–7, sprite, dano e velocidade positivos.";
   if (verb === "launch_projectile_slot" && (parts.length !== 4 || !parts[1] || !integer(parts[2], 7) || !["down", "left", "right", "up", "down_left", "down_right", "up_left", "up_right"].includes(parts[3] ?? ""))) return "Lançar projétil requer ator, slot 0–7 e direção.";
-  if (verb === "start_game_clock" && (parts.length !== 4 || !integer(parts[1], 1439) || Number(parts[1]) < 1 ||
+  if (verb === "start_game_clock" && (![4, 5].includes(parts.length) || !integer(parts[1], 1439) || Number(parts[1]) < 1 ||
     !integer(parts[2], 32767) || Number(parts[2]) < 1 || !["hud", "hidden"].includes(parts[3] ?? "")))
     return "Relógio requer minutos por tick (1–1439), quadros por tick (1–32767) e hud ou hidden.";
   if (verb === "advance_time" && (parts.length !== 2 || !/^-?\d+$/.test(parts[1] ?? "") || Math.abs(Number(parts[1])) > 32767))

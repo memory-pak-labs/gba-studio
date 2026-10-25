@@ -4,6 +4,45 @@
 
 namespace {
 
+void test_event_platform_carries_a_rider_and_respects_solid_tiles() {
+    const uint8_t free_tiles[64] = {};
+    const gbs::TileMap open {free_tiles, 8, 8};
+    auto actor = gbs::platformer_actor_from_rect({16, 16, 8, 8});
+    actor.on_ground = true;
+    assert(gbs::carry_platformer_actor_with_npc(open, actor, {8, 24, 32, 8}, {10, 22, 32, 8}));
+    assert(actor.bounds_pixels.x == 18 && actor.bounds_pixels.y == 14);
+    actor.velocity_x256.y = -256;
+    assert(!gbs::carry_platformer_actor_with_npc(open, actor, {10, 22, 32, 8}, {10, 21, 32, 8}));
+    actor = gbs::platformer_actor_from_rect({16, 16, 8, 8});
+    actor.on_ground = true;
+    uint8_t flags[64] = {}; flags[1 * 8 + 2] = gbs::TileSolid;
+    const gbs::TileMap ceiling {flags, 8, 8};
+    assert(gbs::carry_platformer_actor_with_npc(ceiling, actor, {8, 24, 32, 8}, {8, 22, 32, 8}));
+    assert(actor.bounds_pixels.y == 16);
+    assert(actor.hit_ceiling);
+    actor = gbs::platformer_actor_from_rect({48, 16, 8, 8});
+    assert(!gbs::carry_platformer_actor_with_npc(open, actor, {8, 24, 32, 8}, {9, 24, 32, 8}));
+}
+
+void test_event_platform_save_restores_position_and_motion_direction() {
+    gbs::PlatformerNpcRuntime original[2] {};
+    original[0].actor.position_pixels = {360, 237};
+    original[0].actor.direction = 2;
+    original[0].active = true;
+    original[0].visible = true;
+    gbs::PlatformerSceneSaveData save {};
+    assert(gbs::capture_platformer_npc_save_data(save, original, 2));
+    gbs::PlatformerNpcRuntime restored[2] {};
+    assert(gbs::apply_platformer_npc_save_data(save, restored, 2));
+    assert(restored[0].actor.position_pixels.x == 360 && restored[0].actor.position_pixels.y == 237);
+    assert(restored[0].actor.direction == 2 && restored[0].active && restored[0].visible);
+    assert(!gbs::apply_platformer_npc_save_data(save, restored, 1));
+    save.npcs[1].visible = 2;
+    restored[0].actor.position_pixels.x = 0;
+    assert(!gbs::apply_platformer_npc_save_data(save, restored, 2));
+    assert(restored[0].actor.position_pixels.x == 0);
+}
+
 constexpr gbs::PlatformerConfig test_config {
     0x0200,
     0x0100,
@@ -978,6 +1017,14 @@ void test_platformer_npc_interaction_and_collision_use_runtime_bounds() {
     runtimes[0].active = false;
     assert(!gbs::has_event_script(gbs::platformer_npc_interaction_script_for(room, runtimes, 1, player_bounds)));
     assert(!gbs::platformer_actor_intersects_npcs(player_bounds, runtimes, 1));
+    gbs::PlatformerNpcData overlapping[] = { npcs[0], npcs[0] };
+    overlapping[0].on_interact = gbs::empty_event_script();
+    gbs::PlatformerNpcRuntime nearby[] = {
+        gbs::platformer_npc_runtime_from_data(overlapping[0]),
+        gbs::platformer_npc_runtime_from_data(overlapping[1])
+    };
+    room.npcs = overlapping; room.npc_count = 2;
+    assert(gbs::has_event_script(gbs::platformer_npc_interaction_script_for(room, nearby, 2, player_bounds)));
 }
 
 void test_platformer_npc_collision_uses_local_offset_from_gb_studio_anchor() {
@@ -1055,6 +1102,8 @@ void test_platformer_walks_off_platform_group_npc() {
 }
 
 int main() {
+    test_event_platform_save_restores_position_and_motion_direction();
+    test_event_platform_carries_a_rider_and_respects_solid_tiles();
     test_platformer_walks_off_platform_group_npc();
     test_fractional_gravity_keeps_grounded_animation_stable();
     test_platformer_falls_and_lands_on_solid_floor();

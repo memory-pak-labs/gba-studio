@@ -489,6 +489,7 @@ struct EventState {
     int clock_minutes_per_tick;
     int clock_frames_per_tick;
     bool clock_hud_enabled;
+    int clock_variable;
     int stats[max_event_stats];
     int stat_max[max_event_stats];
     int hud_stat_bar_stat;
@@ -524,6 +525,7 @@ struct EventState {
     bool audio_fade_changed;
     int audio_fade_channel;
     int audio_fade_target_volume;
+    int audio_fade_ceiling_volume;
     int audio_fade_frames;
     bool all_sprites_visible_changed;
     bool all_sprites_visible;

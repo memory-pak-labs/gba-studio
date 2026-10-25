@@ -454,7 +454,8 @@ constexpr EventScript platformer_npc_interaction_script_for(
     }
     const size_t count = room.npc_count < npc_count ? room.npc_count : npc_count;
     for (size_t index = 0; index < count; ++index) {
-        if (npcs[index].active && npcs[index].visible && intersects(player_bounds, platformer_npc_actor_rect(npcs[index]))) {
+        if (npcs[index].active && npcs[index].visible && has_event_script(room.npcs[index].on_interact) &&
+            intersects(player_bounds, platformer_npc_actor_rect(npcs[index]))) {
             return room.npcs[index].on_interact;
         }
     }
@@ -563,6 +564,20 @@ struct PlatformerSaveData {
     uint32_t play_time_frames;
     uint16_t flags;
 };
+
+constexpr size_t max_saved_platformer_npcs = 16;
+struct PlatformerNpcSavedState {
+    int32_t x, y;
+    uint8_t direction, visible, active, reserved;
+};
+struct PlatformerSceneSaveData {
+    PlatformerSaveData scene {};
+    uint16_t signature = 0x3150;
+    uint16_t npc_count = 0;
+    PlatformerNpcSavedState npcs[max_saved_platformer_npcs] {};
+};
+bool capture_platformer_npc_save_data(PlatformerSceneSaveData& save, const PlatformerNpcRuntime* npcs, size_t count);
+bool apply_platformer_npc_save_data(const PlatformerSceneSaveData& save, PlatformerNpcRuntime* npcs, size_t count);
 
 constexpr PlatformerRoom platformer_room_from_tilemap(const uint16_t* visual_tiles, TileMap collision) {
     return PlatformerRoom { visual_tiles, collision, collision.width, collision.height };
@@ -849,6 +864,7 @@ Vec2i update_platformer_moving_platform(PlatformerMovingPlatform& platform);
 bool platformer_actor_stands_on_platform(const PlatformerActor& actor, const PlatformerMovingPlatform& platform);
 bool snap_platformer_actor_to_moving_platforms(PlatformerActor& actor, const PlatformerMovingPlatform* platforms, size_t platform_count, size_t* platform_index = nullptr, int max_snap_pixels = 4);
 bool snap_platformer_actor_to_npcs(PlatformerActor& actor, Rect previous_bounds, const PlatformerNpcRuntime* npcs, size_t npc_count, uint8_t platform_group);
+bool carry_platformer_actor_with_npc(const TileMap& map, PlatformerActor& actor, Rect previous_platform, Rect current_platform);
 bool apply_platformer_moving_platform_delta(PlatformerActor& actor, const PlatformerMovingPlatform& platform, Vec2i delta_pixels);
 
 } // namespace gbs

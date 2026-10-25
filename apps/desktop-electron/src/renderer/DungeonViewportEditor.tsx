@@ -48,7 +48,7 @@ export function DungeonViewportEditor(p: Props): React.ReactElement {
   const projected = p.entities.filter(e=>e.kind==="actor" ? p.showActors!==false&&e.id!==playerActor?.id : p.showTriggers!==false).flatMap(entity=>{
     const raw=Array.isArray(p.projectData?.actors)?p.projectData.actors.find(a=>a && typeof a==="object" && (a as Record<string,unknown>).id===entity.id) as Record<string,unknown>|undefined:undefined;
     if(entity.kind==="actor" && raw?.dungeonViewAnchor && typeof raw.dungeonViewAnchor==="object")return [];
-    const projection=projectDungeonActor(grid,p.camera,entity,entity.kind==="trigger"||Boolean(raw?.dungeonCell),entity.kind==="actor"?projectionOptions:undefined);
+    const projection=projectDungeonActor(grid,p.camera,entity,entity.kind==="trigger"||Boolean(raw?.dungeonCell),entity.kind==="actor"?{...projectionOptions,wallMounted:raw?.dungeonWallMounted===true}:undefined);
     const visual=projection && entity.kind==="actor" && raw && p.projectData ? dungeonActorVisual(p.projectData,raw,projection,Boolean((p.room.runtime?.config as Record<string,unknown>)?.presentation)) : null;
     return projection ? [{entity,projection,visual}] : [];
   }).sort((a,b)=>b.projection.distance-a.projection.distance);

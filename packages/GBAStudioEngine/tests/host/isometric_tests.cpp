@@ -14,6 +14,30 @@ bool load_tiles(const TileAsset&) { return true; }
 
 namespace {
 
+void test_scripted_step_interpolates_and_finishes_without_drift() {
+    gbs::IsoActor actor {}; actor.tile = {3, 3, 0};
+    gbs::IsoActorAnimationState animation {};
+    gbs::IsoScriptedMove move {};
+    gbs::begin_iso_scripted_move(actor, move, {-1, 0});
+    assert(move.active && actor.tile.x == 2 && actor.position_x256 == 768);
+    for (int i = 0; i < 8; ++i) gbs::update_iso_scripted_move(actor, animation, move);
+    assert(actor.position_x256 == 640 && animation.walking);
+    for (int i = 0; i < 8; ++i) gbs::update_iso_scripted_move(actor, animation, move);
+    assert(!move.active && actor.position_x256 == 512 && !animation.walking);
+}
+
+void test_tactical_allies_are_selectable_and_enemy_turns_rotate() {
+    assert(gbs::iso_tactical_can_select_unit(0, false, 0, 2, 0));
+    assert(!gbs::iso_tactical_can_select_unit(0, true, 0, 2, 0));
+    assert(!gbs::iso_tactical_can_select_unit(0, false, 0, 1, 1));
+    assert(!gbs::iso_tactical_can_select_unit(1, false, 1, 3, 1));
+    assert(gbs::iso_tactical_can_select_unit(1, false, 1, 1, 1));
+    assert(gbs::iso_tactical_turn_ordinal(2, 2) == 0);
+    assert(gbs::iso_tactical_turn_ordinal(4, 2) == 1);
+    assert(gbs::iso_tactical_turn_ordinal(6, 2) == 0);
+    assert(gbs::iso_tactical_turn_ordinal(4, 1) == 0);
+}
+
 constexpr gbs::IsoGridConfig grid { 32, 16, gbs::Vec2i { 120, 16 } };
 
 void test_iso_tile_to_screen_uses_2_to_1_projection() {
@@ -1411,6 +1435,8 @@ void test_tactical_stairs_support_negative_axes_without_crossing_other_edges() {
 }
 
 int main() {
+    test_tactical_allies_are_selectable_and_enemy_turns_rotate();
+    test_scripted_step_interpolates_and_finishes_without_drift();
     {
         // Enemy navigation must use the traversable route, not slide towards
         // the target through a wall, and must stop before the occupied tile.

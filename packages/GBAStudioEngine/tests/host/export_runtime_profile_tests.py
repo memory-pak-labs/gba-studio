@@ -1846,7 +1846,7 @@ def assert_mixed_runtime_dispatch_export(repo_root, build_dir):
     assert '#include "gbs/dma.hpp"' in mixed_runtime
     assert "gbs::audio_init();" not in mixed_runtime
     assert "gbs::audio_init();" not in topdown_runtime
-    assert "audio_init();" in core_runtime
+    assert "audio_init(preserve_runtime_handoff);" in core_runtime
     assert "audio_update();" in core_runtime
     assert "gbs::dma_reset_vblank_queue();" in mixed_runtime
     assert "gbs::RuntimeKind::Menu" in mixed_header

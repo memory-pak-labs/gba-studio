@@ -67,7 +67,7 @@ export function promoteNeutralMenus(source) {
     }
     components.forEach((component,i)=>{ if(rows ? i<rows+2 || Boolean(details[name]) : i>=2) component.runtimeText=true; });
     presets.push({id:config.hudPresetId,name:titles[name],description:'Composição neutra aprovada, atores e dados da partida separados do fundo.',backgroundImage:'',selectorImage:'',font:'neutral-menu-font-gba.png',textColor:3171,position:'Superior',width:240,height:160,mode:'advanced',components});
-    const icons=name==='inventario'?itemIcons:name==='mapa_menu'?mapIcons:name==='menu_start'?['mission','bag','map','save','gear','return']:name==='missoes'?['mission','item-estrutura','item-celula','marker-conselho','marker-circuito','return']:name==='configuracoes'?['gear','mission','gear','gear','gear','gear','gear','return']:name==='creditos'?['mission','gear']:['portrait-small-male','portrait-small-male','portrait-small-male','return'];
+    const icons=name==='inventario'?itemIcons:name==='mapa_menu'?mapIcons:name==='menu_start'?items.map(i=>({missions:'mission',inventory:'bag',map:'map',save:'save',load:'save',settings:'gear',back:'return'})[i.id]):name==='missoes'?['mission','item-estrutura','item-celula','marker-conselho','marker-circuito','return']:name==='configuracoes'?['gear','mission','gear','gear','gear','gear','gear','return']:name==='creditos'?['mission','gear']:['portrait-small-male','portrait-small-male','portrait-small-male','return'];
     for(const [i,item] of items.entries()) {
       const box=item.clickBox;
       if(name==='inventario'&&item.id==='stabilizer'){

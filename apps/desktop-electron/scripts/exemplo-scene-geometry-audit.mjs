@@ -331,6 +331,12 @@ export function auditExemploSceneGeometry(project, options = {}) {
         }
       }
       for (const actor of sceneActors) {
+        if(runtime === "dungeonCrawler" && actor.dungeonWallMounted === true){
+          const wall=cellType(scene,actor.x,actor.y);
+          const accessible=[[1,0],[-1,0],[0,1],[0,-1]].some(([dx,dy])=>isPassable(scene,actor.x+dx,actor.y+dy));
+          if(wall!=="solid"||!accessible)issues.push(`Cena ${name}: painel ${actor?.name ?? actor?.id ?? "sem-nome"} precisa de parede com face acessível.`);
+          continue;
+        }
         if (Number.isInteger(actor?.x) && Number.isInteger(actor?.y) && !(runtime === "platformer" ? platformerBodyIsPassable(project,scene,actor) : isPassable(scene, actor.x, actor.y))) {
           issues.push(`Cena ${name}: ator ${actor?.name ?? actor?.id ?? "sem-nome"} começa em célula bloqueada.`);
         }

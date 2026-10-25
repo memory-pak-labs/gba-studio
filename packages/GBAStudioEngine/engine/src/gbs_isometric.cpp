@@ -273,6 +273,23 @@ gbs::IsoPathStep build_iso_path_step_from_node(
 
 namespace gbs {
 
+void begin_iso_scripted_move(IsoActor& actor, IsoScriptedMove& move, Vec2i delta) {
+    if (!actor.position_initialized) sync_iso_actor_position_from_tile(actor);
+    move = {actor.position_x256, actor.position_y256, 0, delta.x != 0 || delta.y != 0};
+    actor.tile.x += delta.x;
+    actor.tile.y += delta.y;
+}
+void update_iso_scripted_move(IsoActor& actor, IsoActorAnimationState& animation, IsoScriptedMove& move) {
+    if (!move.active) return;
+    const int32_t target_x = actor.tile.x * 256, target_y = actor.tile.y * 256;
+    const Vec2i delta {target_x - move.from_x256, target_y - move.from_y256};
+    ++move.frame;
+    actor.position_x256 = move.from_x256 + delta.x * move.frame / 16;
+    actor.position_y256 = move.from_y256 + delta.y * move.frame / 16;
+    move.active = move.frame < 16;
+    set_iso_actor_motion(animation, delta, move.active);
+}
+
 GBS_IWRAM_CODE Vec2i iso_tile_to_screen(IsoCoord tile, const IsoGridConfig& config) {
     if (!is_valid_iso_grid(config)) {
         return config.origin_pixels;

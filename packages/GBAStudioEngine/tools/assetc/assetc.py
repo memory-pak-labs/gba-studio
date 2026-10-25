@@ -9954,12 +9954,15 @@ def event_command_from_json(command, description, animation_lookup=None):
             0,
         )
     if op == "FadeAudioVolume":
-        return (
+        values = (
             op,
             event_audio_channel(command),
             max(0, min(15, event_int(command, ["volume", "target", "value"], 15))),
             max(0, min(3600, event_int(command, ["frames", "duration"], 30))),
         )
+        if "variable" in command or "other_variable" in command:
+            return values + ((event_int(command, ["variable"], -1) + 1) | ((event_int(command, ["other_variable"], -1) + 1) << 8),)
+        return values
     if op in ("SetActorVisible", "SetActorActive", "SetActorSpeed"):
         return (
             op,
@@ -10109,12 +10112,13 @@ def event_command_from_json(command, description, animation_lookup=None):
             0,
         )
     if op == "StartGameClock":
-        return (
+        values = (
             op,
             event_int(command, ["minutes_per_tick", "minutesPerTick"], 10),
             event_int(command, ["frames_per_tick", "framesPerTick"], 180),
             1 if event_bool(command, ["hud", "hud_enabled"], True) else 0,
         )
+        return values + (event_int(command, ["variable"], -1) + 1,) if "variable" in command else values
     if op == "AdvanceTime":
         return (op, event_int(command, ["minutes", "value"], 60), 0, 0)
     if op == "SetStat":
@@ -16751,7 +16755,7 @@ def emit_advanced_runtime_actors(output, room, room_index, description, cpp_type
             name = f"dungeon_room_{room_index}_actor_{actor_index}_frames"
             output.append(f"constexpr gbs::DungeonActorFrames {name} {{ &{symbols[0]}, &{symbols[1]}, &{symbols[2]}, {'true' if actor.get('cell') else 'false'} }};")
             frames_pointer=f"&{name}"
-        depth_suffix = f", {depth_pointer}, {frames_pointer}" if supports_depth_metasprites else ""
+        depth_suffix = f", {depth_pointer}, {frames_pointer}, {'true' if actor.get('wall_mounted') else 'false'}" if supports_depth_metasprites else ""
         entries.append(
             f"    {cpp_type} {{ "
             f"{cpp_string_literal(actor.get('name', f'actor_{actor_index}'))}, "
@@ -17088,6 +17092,8 @@ def emit_dungeon_crawler_project_data_header(dungeon_project, asset_report=None,
             room.get("on_enter"),
             f"dungeon_crawler_project.rooms[{room_index}].on_enter",
         )
+        on_restore = emit_event_script(output, f"dungeon_room_{room_index}_on_restore",
+            room.get("on_restore"), f"dungeon_crawler_project.rooms[{room_index}].on_restore")
         triggers_name, trigger_count = emit_runtime_triggers(
             output,
             f"dungeon_room_{room_index}",
@@ -17180,7 +17186,7 @@ def emit_dungeon_crawler_project_data_header(dungeon_project, asset_report=None,
             f"{actors_name}, {actor_count}, "
             f"{resource_group_expr}, "
             f"{'true' if bool(room.get('battle_enabled', False)) else 'false'}, "
-            f"{room_video_literal}, {presentation_pointer}, {player_view_pointer} "
+            f"{room_video_literal}, {presentation_pointer}, {player_view_pointer}, {on_restore} "
             "},"
         )
 
@@ -18751,6 +18757,8 @@ def emit_isometric_project_data_header(isometric_project, asset_report=None, bas
             room.get("on_enter"),
             f"isometric_project.rooms[{room_index}].on_enter",
         )
+        on_restore_script = emit_event_script(output, f"{prefix}_on_restore",
+            room.get("on_restore"), f"isometric_project.rooms[{room_index}].on_restore")
         on_exit_script = emit_event_script(
             output,
             f"{prefix}_on_exit",
@@ -19210,7 +19218,8 @@ def emit_isometric_project_data_header(isometric_project, asset_report=None, bas
             f"        {emit_baked_isometric_reference(output, prefix, room, asset_report, output_dir, source_assets, base_dir)},\n"
             f"        {on_hit_group_scripts[0]},\n"
             f"        {on_hit_group_scripts[1]},\n"
-            f"        {on_hit_group_scripts[2]}\n"
+            f"        {on_hit_group_scripts[2]},\n"
+            f"        {on_restore_script}\n"
             "    }"
         )
 

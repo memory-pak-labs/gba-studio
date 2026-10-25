@@ -1,5 +1,20 @@
 import { decodeRgb555 } from './rgb555-framebuffer-contract.mjs';
 
+export function dungeonActorViewCoordinates(room, actor, runtimeState) {
+  const p = runtimeState?.player;
+  const forward = [[0,-1],[1,0],[0,1],[-1,0]][p?.direction];
+  if (!forward || !Number.isFinite(p.x) || !Number.isFinite(p.y)) return null;
+  const [fx,fy] = forward, dx = actor.x-p.x, dy = actor.y-p.y;
+  const distance = dx*fx+dy*fy, lateral = dx*fy-dy*fx;
+  if (distance < 1 || distance > Number(room?.config?.view_distance ?? 0)) return null;
+  if (room.presentation) {
+    // Match actor_view_coordinates in the native presentation renderer.
+    return Math.abs(lateral)*100 <= distance*65 ? {distance,lateral:0-lateral} : null;
+  }
+  if (Math.abs(lateral)>1) return null;
+  return {distance,lateral};
+}
+
 export function exportedHudFramebufferMasks(header, presetId) {
   const escaped = String(presetId).replace(/[.*+?^${}()|[\]\\]/g,'\\$&');
   const symbol = header.match(new RegExp(`\\{\\s*"${escaped}",\\s*"(?:advanced|standard)",\\s*(\\w+),\\s*\\d+\\s*(?:,[^}\\n]*)?\\}`))?.[1];

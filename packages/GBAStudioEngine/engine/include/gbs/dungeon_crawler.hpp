@@ -55,6 +55,7 @@ struct DungeonCrawlerActorData {
     EventScript on_interact = empty_event_script();
     const DungeonCrawlerDepthSprites* depth_sprites = nullptr;
     const DungeonActorFrames* frames = nullptr;
+    bool wall_mounted = false;
 };
 
 struct DungeonCrawlerRoomData {
@@ -76,7 +77,9 @@ struct DungeonCrawlerRoomData {
     VideoComposition video = default_video_composition();
     const DungeonPresentation* presentation = nullptr;
     const DungeonCrawlerPlayerView* player_view = nullptr;
+    EventScript on_restore = empty_event_script();
 };
+bool dungeon_actor_is_occluded(const DungeonCrawlerRoomData& room, Vec2i from, Vec2i target, bool wall_mounted);
 
 struct DungeonCrawlerInventoryItemData {
     const char* label;

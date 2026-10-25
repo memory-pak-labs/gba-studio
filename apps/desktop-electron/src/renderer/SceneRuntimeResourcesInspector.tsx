@@ -144,6 +144,7 @@ export function ActorRuntimeResourcesInspector({ sceneType, actorID, data, onCha
       <label><span>{ui("Animação das poses")}</span><input aria-label={ui("Animação das poses")} defaultValue={actor.dungeonDepthAnimationName ?? "poses"} key={actor.dungeonDepthAnimationName ?? "poses"} onBlur={e=>onChange({dungeonDepthAnimationName:e.currentTarget.value})}/></label>
       <p>{ui("A faixa de poses usa a ordem: parado, alerta, ataque, dano, derrota, defesa e interação. Profundidades não selecionadas usam o sprite principal.")}</p>
       <label><input type="checkbox" checked={actor.dungeonCell === true} onChange={e=>onChange({dungeonCell:e.currentTarget.checked})}/>{ui("Objeto pequeno de coleta")}</label>
+      <label><input type="checkbox" checked={actor.dungeonWallMounted === true} onChange={e=>onChange({dungeonWallMounted:e.currentTarget.checked})}/>{ui("Fixado à parede")}</label>
       </>}
     </> : null}
     {sceneType === "shmup" ? <>

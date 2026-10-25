@@ -2,6 +2,14 @@ import {describe,it,expect} from 'vitest';
 import {dungeonActorVisual,dungeonGeometryKey,projectDungeonActor,renderDungeonWorld} from './dungeonSceneView.js';
 import type {GBAProjectData} from './projectFile.js';
 describe('Dungeon authoring camera contract',()=>{
+ it('shows a mounted panel on its own wall while an intervening wall still hides it',()=>{
+  const grid={width:5,height:5,cells:Array(25).fill(false)},camera={x:2,y:3,direction:0};
+  grid.cells[7]=true;
+  expect(projectDungeonActor(grid,camera,{x:2,y:1},false,{modern:true})).toBeNull();
+  expect(projectDungeonActor(grid,camera,{x:2,y:1},false,{modern:true,wallMounted:true})).not.toBeNull();
+  grid.cells[12]=true;
+  expect(projectDungeonActor(grid,camera,{x:2,y:1},false,{modern:true,wallMounted:true})).toBeNull();
+ });
  it('anchors ordinary NPCs to the modern floor without requiring depth sheets, preserving their native frame',()=>{
   const data={animations:[{name:'idle',spriteSheet:'guard.png',frameWidth:32,frameHeight:32,frames:[{}]}]} as GBAProjectData;
   const grid={width:19,height:19,cells:Array(361).fill(false)},camera={x:9,y:9,direction:0};

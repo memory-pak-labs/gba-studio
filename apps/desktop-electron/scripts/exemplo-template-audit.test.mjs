@@ -55,6 +55,20 @@ describe("auditoria do template Vértice", () => {
     expect(auditExemploTemplate(persisted)).toMatchObject({ ok: true });
   });
 
+  it("exige parede com uma face acessível para os painéis montados da Usina", () => {
+    expect(auditExemploTemplate(project).geometry.issues.filter(i=>i.includes('Admissão'))).toEqual([]);
+    const floor=structuredClone(project);
+    floor.actors.find(a=>a.id==='coast-valve-a-off').x=1;
+    expect(auditExemploTemplate(floor).geometry.issues).toContain('Cena usina_submersa: painel Admissão · desligada precisa de parede com face acessível.');
+    const sealed=structuredClone(project);
+    for(const r of [...sealed.rooms,...sealed.scenas].filter(r=>r.name==='usina_submersa')){
+      const cells=expandCompactSequence(r.collisionTypes);
+      for(const [x,y]of [[1,8],[3,8],[2,7],[2,9]])cells[y*r.width+x]='solid';
+      r.collisionTypes=cells;r.collisions=[...cells];
+    }
+    expect(auditExemploTemplate(sealed).geometry.issues).toContain('Cena usina_submersa: painel Admissão · desligada precisa de parede com face acessível.');
+  });
+
   it("aceita a posição fracionária do cursor no mapa e rejeita coordenadas fora da cena", () => {
     const currentIssues = auditExemploTemplate(project).geometry.issues;
     expect(currentIssues.some((issue) => issue.includes("ator Dirigível Lumen está fora dos limites"))).toBe(false);

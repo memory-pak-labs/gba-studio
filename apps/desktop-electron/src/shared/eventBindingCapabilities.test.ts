@@ -60,9 +60,10 @@ describe("resolveEventBindingCapabilities", () => {
       .toEqual(["onHitGroup1", "onHitGroup2", "onHitGroup3"]);
 
     expect(resolveEventBindingCapabilities({ targetKind: "room", sceneType: "isometric" })
-      .map((slot) => slot.bindingKey)).toEqual(["onInit", "onHitPlayer", "onExit", "onUpdate"]);
+      .map((slot) => slot.bindingKey)).toEqual(["onInit", "onRestore", "onHitPlayer", "onExit", "onUpdate"]);
 
-    for (const sceneType of ["dungeonCrawler", "menu", "visualNovel", "cutscene", "worldMap"]) {
+    expect(resolveEventBindingCapabilities({targetKind:"room",sceneType:"dungeonCrawler"}).map(s=>s.bindingKey)).toEqual(["onInit","onRestore"]);
+    for (const sceneType of ["menu", "visualNovel", "cutscene", "worldMap"]) {
       expect(resolveEventBindingCapabilities({ targetKind: "room", sceneType })
         .map((slot) => slot.bindingKey), sceneType).toEqual(["onInit"]);
     }

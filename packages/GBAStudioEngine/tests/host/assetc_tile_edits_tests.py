@@ -14,7 +14,7 @@ class TileEditsExportTests(unittest.TestCase):
         schema = json.loads((root / "schemas/export_project.schema.json").read_text())
         commands = schema["properties"]["topdown_project"]["properties"]["event_command"]
         self.assertIn("visibility", commands["properties"]["op"]["enum"])
-        for runtime in ("topdown", "platformer"):
+        for runtime in ("topdown", "platformer", "isometric", "dungeon_crawler"):
             room = schema["properties"][runtime + "_project"]["properties"]["rooms"]["items"]
             self.assertEqual(room["properties"]["on_restore"], room["properties"]["on_enter"])
         pack = json.loads((root / "enginepack.json").read_text())
@@ -56,6 +56,14 @@ class TileEditsExportTests(unittest.TestCase):
         for invalid in ({"width": 241}, {"height": 0}, {"intensity": 101}, {"frames": -1}, {"actor": 96}):
             with self.subTest(invalid=invalid), self.assertRaises(SystemExit):
                 assetc.event_command_from_json({**command, **invalid}, "lantern")
+
+    def test_circular_lantern_is_opt_in_and_requires_equal_dimensions(self):
+        command = {"op": "visibility", "effect": "lantern", "actor": -1,
+                   "width": 120, "height": 120, "intensity": 58, "frames": 3600, "shape": "circle"}
+        self.assertEqual(assetc.event_command_from_json(command, "circle"), ("Visibility", -1, (120 << 8) | 120, 3600, 256 | 58))
+        for invalid in ({"width": 80}, {"shape": "diamond"}):
+            with self.subTest(invalid=invalid), self.assertRaises(SystemExit):
+                assetc.event_command_from_json({**command, **invalid}, "circle")
 
     def test_invalid_coordinates_and_collision_are_rejected(self):
         for bad in ({"x": -1}, {"x": 512}, {"y": -1}, {"y": 512},

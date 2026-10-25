@@ -499,6 +499,50 @@ int main(void) {
         self.assertIn("shadow_bg_tilemap_pending_mask", set_tile)
         self.assertIn("shadow_bg_tilemap_pending_mask", self.source)
 
+    def test_full_screenblock_copy_preserves_staging_without_per_tile_addressing(self) -> None:
+        body = function_body(self.source, "gbs_hw_load_bg_tilemap")
+        harness = r'''
+#include <assert.h>
+#include <stdint.h>
+#include <string.h>
+static uint16_t shadow_bg_tilemaps[4][1024], video[4][1024];
+static uint8_t shadow_bg_map_size[4], shadow_bg_map_size_pending_mask;
+static uint8_t shadow_bg_tilemap_pending_mask;
+static int bg_screenblocks[4] = {0, 1, 2, 3}, address_calculations;
+static uint32_t screenblock_count_for_map_size(uint32_t size) { return size < 4 ? 1u << ((size & 1u) + (size >> 1)) : 0; }
+static uint32_t tilemap_block_index(uint32_t w, uint32_t h, uint32_t x, uint32_t y) {
+    (void)h; ++address_calculations; return y / 32 * (w > 32 ? 2 : 1) + x / 32;
+}
+static volatile uint16_t* screenblock_address(int block) { return video[block]; }
+void gbs_hw_load_bg_tilemap(int layer, const uint16_t* entries, uint32_t width, uint32_t height, uint32_t map_size)
+''' + body + r'''
+int main(void) {
+    uint16_t source[1024];
+    memset(video, 0x5a, sizeof(video));
+    for (int layer = 0; layer < 4; ++layer) {
+        for (int i = 0; i < 1024; ++i) source[i] = (uint16_t)(i * 67 + layer);
+        address_calculations = 0;
+        gbs_hw_load_bg_tilemap(layer, source, 32, 32, 0);
+        assert(address_calculations == 0);
+        assert(memcmp(shadow_bg_tilemaps[layer], source, sizeof(source)) == 0);
+        assert(shadow_bg_tilemap_pending_mask == (1u << (layer + 1)) - 1);
+        assert(shadow_bg_map_size_pending_mask == shadow_bg_tilemap_pending_mask);
+        assert(shadow_bg_map_size[layer] == 0);
+        for (int j = 0; j < 4; ++j) for (int i = 0; i < 1024; ++i) assert(video[j][i] == 0x5a5a);
+    }
+    // Partial maps still clear their unused cells; they are not full blocks.
+    gbs_hw_load_bg_tilemap(2, source, 30, 20, 0);
+    for (int y = 0; y < 32; ++y) for (int x = 0; x < 32; ++x)
+        assert(shadow_bg_tilemaps[2][y * 32 + x] == (x < 30 && y < 20 ? source[y * 30 + x] : 0));
+}
+'''
+        with tempfile.TemporaryDirectory() as directory:
+            source = Path(directory) / "tilemap-copy.c"
+            executable = Path(directory) / "tilemap-copy"
+            source.write_text(harness)
+            subprocess.run(["cc", "-std=c11", "-Wall", "-Wextra", "-Werror", str(source), "-o", str(executable)], check=True)
+            subprocess.run([str(executable)], check=True)
+
     def test_vblank_commits_the_staged_ui_bg0_map(self) -> None:
         commit_body = function_body(self.source, "commit_shadow_bg_tilemaps")
         wait_body = function_body(self.source, "gbs_hw_wait_vblank")
