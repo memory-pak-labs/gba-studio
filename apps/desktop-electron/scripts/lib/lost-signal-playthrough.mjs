@@ -96,6 +96,9 @@ export async function playLostSignalMission(driver, project, exported, options =
     await driver.run(8, 0);
   }
   async function mechanic() {
+    // Returning from an optional room can show the harbor arrival dialogue.
+    // Close it before treating an A press as a mechanic interaction.
+    await close();
     // Her native wander stays in the existing eastern dock. Approach her actual position.
     for (let n = 0; n < 12; n++) {
       const s = await telemetry(), npc = s.firstActor;
@@ -141,15 +144,25 @@ export async function playLostSignalMission(driver, project, exported, options =
     assert.equal((await driver.state()).runtimeKind, 0, 'Saving returns to the gameplay family');
     await driver.capture(label);
   }
+  const controls={tap,close,walkTo,expect,loadSlot,saveSlot,mechanic};
+  if(options.resume)return controls;
   await driver.run(180, 0); await expect(3, 0, 'title');
   await tap(8); await tap(1); await expect(3, 2, 'new-game-gender');
   await tap(1); await expect(3, 3, 'new-game-name');
   await tap(1); await tap(2); await tap(128); await tap(1, 100);
   await expect(8, 2, 'prologue'); await tap(8, 120);
   await expect(0, 0, 'port-start');
-  const controls={tap,close,walkTo,expect,loadSlot,saveSlot,mechanic};
+  // Other controller-only journeys share the canonical title/new-game flow.
+  if (options.journey) return options.journey(controls);
   await options.beforeMission?.(controls);
-  await mechanic(); assert.equal(await value('stage'), 1); await driver.capture('mission-request'); await close();
+  await mechanic();
+  if(await value('stage')===0){
+    assert.equal((await driver.ui()).dialogue?.key,'tide_module_frame','The first visit grants the airship frame before the quest briefing');
+    assert.equal((await driver.state()).variables[indices.var_frame],1);
+    await driver.capture('mission-frame-received');
+    for(let n=0;n<28&&await value('stage')===0;n++)await tap(2,15);
+  }
+  assert.equal(await value('stage'), 1); await driver.capture('mission-request'); await close();
   await walkTo(61, 64); await driver.run(1, 64); await driver.run(4, 0); await tap(1, 150); await driver.capture('cartographer-destinations');
   await chooseFirstDestination(5, 0); await expect(5, 0, 'warehouse-arrival');
   await hotspot('Baú Vermelho'); assert.equal(await value('part'), 0); await driver.capture('chest-before-chart'); await close();
@@ -174,6 +187,7 @@ export async function playLostSignalMission(driver, project, exported, options =
   assert.equal(await driver.item('zz_signal_chart'),1);assert.equal(await driver.item('zz_signal_relay'),1);
   await hotspot('Saída do Armazém'); await chooseFirstDestination(5, 1); await expect(5, 1, 'observatory-arrival');
   await hotspot('Mesa da Maré'); assert.equal(await value('code'), 0); await driver.capture('table-before-telescope'); await close();
+  await options.beforeTelescope?.({...controls,hotspot});
   await hotspot('Telescópio'); assert.equal(await value('observation'), 1); await driver.capture('telescope-clue'); await close();
   await hotspot('Mesa da Maré'); assert.equal(await value('code'), 1); await driver.capture('code-314'); await close();
   await hotspot('Saída do Observatório'); await chooseFirstDestination(0, 1); await expect(0, 1, 'lighthouse-arrival'); await close();
