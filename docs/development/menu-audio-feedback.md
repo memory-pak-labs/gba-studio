@@ -5,6 +5,19 @@ em 25/10/2026, e permanece sem trilha contínua. Os WAVs e seus hashes estão em
 `apps/desktop-electron/fixtures/asset-provenance/initial-menu-audio-approved.json`.
 Os arquivos aprovados são copiados sem regeneração ou normalização de volume.
 
+A fonte reproduzível dos cinco WAVs é
+`apps/desktop-electron/scripts/create-initial-menu-audio-candidates.mjs`.
+Para gerar uma cópia de revisão, execute no aplicativo:
+
+```sh
+node scripts/create-initial-menu-audio-candidates.mjs /novo/diretorio/externo
+```
+
+O diretório deve ser novo, com o pai existente, e ficar fora de todo o checkout,
+inclusive por links simbólicos. O script recusa sobrescritas. Os WAVs V1 são
+idênticos aos aprovados, mas o novo manifesto continua candidato: gerar sons não
+concede aprovação nem modifica os assets do template.
+
 As configurações de menu e suas telas embutidas aceitam `actionSounds` com
 `navigate`, `confirm`, `back` e `unavailable`. Os valores identificam itens de
 áudio do projeto. A entrada no carrossel usa o evento `titulo_abrir_menu` para
