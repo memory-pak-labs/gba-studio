@@ -9793,6 +9793,21 @@ export const studioUiMessages: Record<string, readonly [string, string, string]>
     "Sprite sheet",
     "Hoja de sprites"
   ],
+  "Folha de quadros": [
+    "Folha de quadros",
+    "Frame sheet",
+    "Hoja de fotogramas"
+  ],
+  "Expandir folhas de sprites e quadros": [
+    "Expandir folhas de sprites e quadros",
+    "Expand sprite and frame sheets",
+    "Expandir hojas de sprites y fotogramas"
+  ],
+  "Recolher folhas de sprites e quadros": [
+    "Recolher folhas de sprites e quadros",
+    "Collapse sprite and frame sheets",
+    "Contraer hojas de sprites y fotogramas"
+  ],
   "FONTE": [
     "FONTE",
     "SOURCE",

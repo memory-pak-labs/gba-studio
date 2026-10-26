@@ -2465,10 +2465,13 @@ export function SpritesWorkspace({
           </WorkspaceContextToolbar>
           {activeSheet ? (
             <SpritesEditorCenter
-              bottomPane={(
-                <div className="sprites-editor-bottom-content">
+              bottomPane={(onCollapse) => (
+                <div className="sprites-editor-bottom-content is-stacked">
                   <section className="sprites-editor-tiles-row" aria-label={ui("Paleta de tiles")}>
-                    <div className="sprites-editor-row-label">{paletteSourceKind === "reference" ? ui("Referência visual") : ui("Folha de sprites")}</div>
+                    <div className="sprites-editor-row-label">
+                      <span>{paletteSourceKind === "reference" ? ui("Referência visual") : ui("Folha de sprites")}</span>
+                      <button aria-expanded={true} aria-label={ui("Recolher folhas de sprites e quadros")} className="sprites-editor-collapse" onClick={onCollapse} type="button">{ui("Recolher")}</button>
+                    </div>
                     {spriteSheetPreview(
                       activeSheet,
                       activePreviewAnimation,
@@ -2496,7 +2499,7 @@ export function SpritesWorkspace({
                     )}
                   </section>
                   <section className="sprites-editor-frames-row" aria-label={ui("Quadros da animação")}>
-                    <div className="sprites-editor-row-label">{ui("Quadros")}{activeGroup ? ` · ${activeGroup.label}` : ""}</div>
+                    <div className="sprites-editor-row-label"><span>{ui("Folha de quadros")}</span>{activeGroup ? <span className="sprites-editor-row-context">{activeGroup.label}</span> : null}</div>
                     <SpriteFrameTileStrip
                       activeBrush={activePaintBrush}
                       activeFrame={activePreviewMetaspriteFrame}

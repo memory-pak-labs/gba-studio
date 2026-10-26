@@ -9,7 +9,7 @@ import {
 } from "../shared/spriteEditorLayout";
 
 type SpritesEditorCenterProps = {
-  bottomPane: ReactNode;
+  bottomPane: (onCollapse: () => void) => ReactNode;
   canvasPane: ReactNode;
 };
 
@@ -101,16 +101,18 @@ export function SpritesEditorCenter({
         className={isBottomCollapsed ? "sprites-editor-bottom-pane is-collapsed" : "sprites-editor-bottom-pane"}
         style={{ height: `${bottomHeight}px` }}
       >
-        <button
-          aria-expanded={!isBottomCollapsed}
-          className="sprites-editor-bottom-toggle"
-          onClick={toggleBottomPane}
-          type="button"
-        >
-          <span>{ui("Folha · Quadros")}</span>
-          <span>{isBottomCollapsed ? ui("Expandir") : ui("Recolher")}</span>
-        </button>
-        {isBottomCollapsed ? null : bottomPane}
+        {isBottomCollapsed ? (
+          <button
+            aria-expanded={false}
+            aria-label={ui("Expandir folhas de sprites e quadros")}
+            className="sprites-editor-bottom-toggle"
+            onClick={toggleBottomPane}
+            type="button"
+          >
+            <span>{ui("Folha de sprites")}</span>
+            <span>{ui("Expandir")}</span>
+          </button>
+        ) : bottomPane(toggleBottomPane)}
       </section>
     </div>
   );
