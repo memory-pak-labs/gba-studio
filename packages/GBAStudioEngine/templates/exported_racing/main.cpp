@@ -3,6 +3,7 @@
 #include "gbs/engine.hpp"
 #include "gbs/input.hpp"
 #include "gbs/racing.hpp"
+#include "gbs/racing_minimap.hpp"
 #include "gbs/racing_animation.hpp"
 #include "gbs/render.hpp"
 #include "gbs/resource_manager.hpp"
@@ -12,6 +13,16 @@
 #include "gbs/hud_racing.hpp"
 #include "gbs/racing_feedback.hpp"
 #include <cstring>
+#if defined(__arm__) || defined(__thumb__)
+// The scanline transform and marker compositor run every displayed frame.
+// Execute these small hot paths in ARM IWRAM; leave the rest sized for ROM.
+#define GBS_RACING_HOT_CODE __attribute__((section(".iwram"), target("arm"), optimize("O2"), noinline, long_call))
+#define GBS_RACING_RENDER_CODE __attribute__((optimize("O2"), noinline))
+#else
+#define GBS_RACING_HOT_CODE
+#define GBS_RACING_RENDER_CODE
+#endif
+
 #include "gbs/visual_effects.hpp"
 #ifndef GBS_RACING_PROJECT_DATA_HEADER
 #define GBS_RACING_PROJECT_DATA_HEADER "racing_project_data.hpp"
@@ -47,7 +58,10 @@ const gbs::RacingProjectData& project = gbastudio_racing_project::project;
 int current_room_index = 0;
 gbs::RacingRuntimeState runtime_state {};
 gbs::RacingInput previous_racing_controls {};
-uint16_t relocated_panorama_map[64*64] {};
+uint16_t relocated_panorama_map[64*64] __attribute__((section(".ewram_bss"))) {};
+alignas(4) uint8_t racing_minimap_tiles[gbs::racing_minimap_bytes] __attribute__((section(".ewram_bss")));
+gbs::RacingMinimapCache racing_minimap_cache __attribute__((section(".ewram_bss")));
+gbs::Vec2i minimap_rival_positions[8] {};
 gbs::SpriteAnimatorState vehicle_animator {};
 const gbs::TileAsset* vehicle_loaded_frame = nullptr;
 gbs::DialogueState dialogue __attribute__((section(".ewram_bss")));
@@ -71,6 +85,7 @@ const gbs::RacingRoomData* circuit_floor_basis_room = nullptr;
 gbs::Vec2i previous_pseudo3d_player_marker { -1, -1 };
     gbs::Vec2i previous_pseudo3d_rival_marker { -1, -1 };
     bool race_result_dispatched = false;
+    bool racing_dialogue_was_drawn=false;
     bool racing_controls_active = false;
     gbs::HudState racing_hud {};
 volatile gbs::RuntimeTelemetryBlock& runtime_telemetry = gbs::runtime_telemetry_block();
@@ -173,6 +188,8 @@ void apply_room_visuals() {
     const gbs::RacingRoomData& room = project.rooms[current_room_index];
     gbs::disable_hblank_effects();
     gbs::disable_window0();
+    racing_minimap_cache={};
+    racing_dialogue_was_drawn=true;
     // The room stream already uploaded its scoped assets. Other rooms can
     // reuse these VRAM ranges, so loading the entire campaign overwrites them.
     if (!assets_are_streamed || project.resource_bank_upload_source_count == 0) {
@@ -551,7 +568,26 @@ bool update_runtime_event_script(const gbs::InputState& input) {
     return true;
 }
 
-void draw_pseudo3d_hud(const gbs::RacingRoomData& room) {
+GBS_RACING_RENDER_CODE void draw_pseudo3d_hud(const gbs::RacingRoomData& room) {
+    // A geometric minimap needs no additional image and follows authored track edits.
+    if(gbs::racing_uses_generated_minimap(room)) {
+        const bool restore_map=!racing_minimap_cache.frame_valid;
+        const bool changed=gbs::update_racing_minimap(racing_minimap_cache,racing_minimap_tiles,room,runtime_state,minimap_rival_positions);
+        if(restore_map) {
+        static constexpr uint16_t colors[]={8352,26558,17986,26526,3708,24444};
+        gbs::load_palette(gbs::PaletteAsset{colors,6,230},false);
+        static constexpr uint8_t blank[32] {};
+        gbs::load_bg_tiles_at_character_base(gbs::TileAsset{blank,1,0,false},2);
+        gbs::set_bg_character_base(gbs::BackgroundLayer::BG0,2);
+        for(int y=0;y<5;++y)for(int x=0;x<8;++x)
+            gbs::set_bg_tile(gbs::BackgroundLayer::BG0,1+x,12+y,32,32,static_cast<uint16_t>((14u<<12)+1+y*8+x));
+        }
+        if(changed) {
+            const gbs::TileAsset tiles{racing_minimap_tiles,40,1,false};
+            gbs::load_bg_tiles_at_character_base(tiles,2);
+        }
+        return;
+    }
     const gbs::RacingPseudo3DVisualData* visual = pseudo3d_visual(room);
     if (visual == nullptr || visual->minimap_tilemap == nullptr || !room.config.pseudo3d.show_minimap) return;
     runtime_telemetry.seen_tile_effects = 200;
@@ -598,7 +634,7 @@ void draw_pseudo3d_hud(const gbs::RacingRoomData& room) {
     previous_pseudo3d_rival_marker = rival_marker;
 }
 
-void draw_pseudo3d_track(const gbs::RacingRoomData& room) {
+GBS_RACING_HOT_CODE void draw_pseudo3d_track(const gbs::RacingRoomData& room) {
     const gbs::RacingPseudo3DVisualData* visual = pseudo3d_visual(room);
     if (visual == nullptr) return;
     // Transition effects release WIN0 when they finish; restore the runtime's horizon clip.
@@ -640,7 +676,6 @@ void draw_pseudo3d_track(const gbs::RacingRoomData& room) {
     runtime_telemetry.seen_tile_effects = 152;
     gbs::set_hblank_affine_raster(gbs::BackgroundLayer::BG2, pseudo3d_affine_raster, gbs::hblank_affine_raster_line_count);
     runtime_telemetry.seen_tile_effects = 153;
-    draw_pseudo3d_hud(room);
     runtime_telemetry.seen_tile_effects = 154;
 }
 
@@ -665,7 +700,7 @@ void append_hud_number(char* buffer, size_t capacity, size_t& length, unsigned i
     if (length < capacity) buffer[length] = '\0';
 }
 
-void draw_racing_hud(const gbs::RacingRoomData& room) {
+GBS_RACING_RENDER_CODE void draw_racing_hud(const gbs::RacingRoomData& room) {
     const int maximum_speed = gbs::racing_boost_max_speed_x256(room, runtime_state);
     const unsigned int speed = maximum_speed > 0
         ? static_cast<unsigned int>(clamp_int((runtime_state.speed_x256 * 99) / maximum_speed, 0, 99))
@@ -782,9 +817,9 @@ const gbs::MetaSprite* current_vehicle_sprite() {
     return runtime_state.speed_x256 > 0 && drive ? drive : idle;
 }
 
-void draw_pseudo3d_actors(const gbs::RacingRoomData& room, bool controls_active) {
+GBS_RACING_RENDER_CODE void draw_pseudo3d_actors(const gbs::RacingRoomData& room, bool controls_active) {
     (void)controls_active;
-    gbs::hide_all_sprites();
+    gbs::hide_world_sprites();
     const auto* player_sprite=current_vehicle_sprite();
     int sprite_index=0;
     const auto* visual=pseudo3d_visual(room);
@@ -796,13 +831,15 @@ void draw_pseudo3d_actors(const gbs::RacingRoomData& room, bool controls_active)
         sprite_index+=player_sprite->part_count;
     }
     if(gbs::racing_uses_circuit_track(room)) {
+        for(size_t i=0;i<room.actor_count && i<8;++i)
+            minimap_rival_positions[i]=gbs::racing_topdown_rival_pose(runtime_state,room,i,false).position_pixels;
         // Near objects take earlier OAM entries and cover more distant ones.
-        gbs::RacingProjectedPoint points[31]{};
-        int order[31]{};int count=0;
+        gbs::RacingProjectedPoint points[31];
+        int order[31];int count=0;
         for(size_t i=0;i<room.actor_count && i<31;++i) {
             if(!room.actors[i].metasprite) continue;
-            const auto pose=gbs::racing_topdown_rival_pose(runtime_state,room,i);
-            const auto point=gbs::racing_camera_project(camera,{pose.position_pixels.x*256,pose.position_pixels.y*256},room.perspective_camera,horizon);
+            const auto position=i<8?minimap_rival_positions[i]:gbs::racing_topdown_rival_pose(runtime_state,room,i,false).position_pixels;
+            const auto point=gbs::racing_camera_project(camera,{position.x*256,position.y*256},room.perspective_camera,horizon);
             if(point.visible) {points[i]=point;order[count++]=static_cast<int>(i);}
         }
         for(int i=1;i<count;++i) {const int value=order[i];int j=i;while(j>0&&points[order[j-1]].depth_x256>points[value].depth_x256){order[j]=order[j-1];--j;}order[j]=value;}
@@ -1084,19 +1121,24 @@ gbs::RuntimeAdapterFrameResult update_racing_runtime(const gbs::RuntimeFrameCont
 void render_racing_runtime(const gbs::RuntimeFrameContext& context) {
     const gbs::SubsystemProfilerScope profiler_scope(gbs::ProfilerSubsystem::Render);
     (void)context;
-    if (!dialogue.visible) {
-        // The hidden dialogue clears its previous BG0 rectangle. Do that
-        // before drawing the HUD, whose speed panel may occupy the same rows.
+    if(dialogue.visible)racing_minimap_cache.frame_valid=false;
+    if (!dialogue.visible && racing_dialogue_was_drawn) {
+        // Clear the outgoing dialogue once. Clearing an already hidden box
+        // every frame erases the minimap and dirties the entire BG0 tilemap.
         gbs::draw_dialogue(dialogue);
+        racing_dialogue_was_drawn=false;
+        racing_minimap_cache.frame_valid=false;
     }
     draw_track();
     runtime_telemetry.seen_tile_effects = 160;
     draw_actors(racing_controls_active);
     draw_racing_hud(project.rooms[current_room_index]);
+    if(!dialogue.visible && gbs::racing_uses_pseudo3d(project.rooms[current_room_index])) draw_pseudo3d_hud(project.rooms[current_room_index]);
     runtime_telemetry.seen_tile_effects = 170;
     sync_runtime_telemetry();
     if (dialogue.visible) {
         gbs::draw_dialogue(dialogue);
+        racing_dialogue_was_drawn=true;
     }
     gbs::wait_vblank();
 }

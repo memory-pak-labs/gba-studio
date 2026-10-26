@@ -27,6 +27,27 @@ bool object_hud_layout = false;
 bool retained_hud_valid = false;
 bool retained_hud_visible = false;
 bool retained_hud_values_ready = false;
+// Copy text bytes: racing HUD formatters reuse the same stack addresses.
+constexpr size_t retained_hud_text_capacity = 64;
+char retained_hud_text[gbs::hud_text_slot_capacity + 2][retained_hud_text_capacity] GBS_UI_EWRAM {};
+
+bool retain_hud_text(const gbs::HudState& state, bool copy) {
+    bool matches = true;
+    for (size_t slot=0; slot<gbs::hud_text_slot_capacity+2; ++slot) {
+        const char* text = slot==gbs::hud_text_slot_capacity ? state.left_text :
+            slot==gbs::hud_text_slot_capacity+1 ? state.right_text :
+            slot<state.text_slot_count ? state.text_slots[slot] : nullptr;
+        size_t i=0;
+        for (; text && text[i] && i+1<retained_hud_text_capacity; ++i) {
+            if (copy) retained_hud_text[slot][i]=text[i];
+            else if (retained_hud_text[slot][i]!=text[i]) matches=false;
+        }
+        if (text && text[i]) return false; // Long labels use the uncached path.
+        if (copy) retained_hud_text[slot][i]='\0';
+        else if (retained_hud_text[slot][i]!='\0') matches=false;
+    }
+    return matches;
+}
 
 bool string_equals(const char* left, const char* right) {
     if (left == nullptr || right == nullptr) {
@@ -58,8 +79,7 @@ bool is_object_hud_layout(const gbs::HudLayout& layout) {
             component.value_source!=gbs::HudValueSource::None) return false;
         const int kind=hud_component_kind(component.kind);
         if (kind==GBS_HW_HUD_COMPONENT_TEXT) {
-            if ((component.text_advance!=6 && component.text_advance!=7) ||
-                (component.value_variable<0 && component.inventory_item<0)) return false;
+            if (component.text_advance!=6 && component.text_advance!=7) return false;
         } else if (kind<0 || !component.metasprite || !gbs::is_valid_metasprite(*component.metasprite)) {
             return false;
         }
@@ -267,13 +287,16 @@ void update_hud_behavior(EventState& state, bool visible) {
     hud_project_values_ready = true;
 }
 
+#if defined(__arm__) || defined(__thumb__)
+__attribute__((optimize("O2")))
+#endif
 void draw_hud(const HudState& state) {
     if (selected_hud_layout != nullptr && string_equals(selected_hud_layout->mode, "advanced")) {
         bool unchanged=object_hud_layout && retained_hud_valid &&
             retained_hud_visible==state.visible && retained_hud_values_ready==hud_project_values_ready;
         if (unchanged) for (size_t i=0; i<selected_hud_layout->component_count; ++i)
             if (retained_hud_values[i]!=hud_project_values[i]) { unchanged=false; break; }
-        if (unchanged && gbs_hw_hud_layout_retained()) {
+        if (unchanged && retain_hud_text(state,false) && gbs_hw_hud_layout_retained()) {
             // OAM is still protected from world rendering. Keep the foreground
             // gauge cells transparent even when a dialogue repaints BG0.
             if (state.visible) for (size_t i=0; i<selected_hud_layout->component_count; ++i) {
@@ -387,7 +410,7 @@ void draw_hud(const HudState& state) {
                 retained_hud_values[i]=hud_project_values[i];
             retained_hud_visible=state.visible;
             retained_hud_values_ready=hud_project_values_ready;
-            retained_hud_valid=true;
+            retained_hud_valid=retain_hud_text(state,true);
         }
         return;
     }

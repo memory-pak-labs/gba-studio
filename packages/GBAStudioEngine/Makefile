@@ -2081,3 +2081,19 @@ tile-edits-test: $(HOST_BUILD)/tile_edits_tests
 $(HOST_BUILD)/tile_edits_tests: tests/host/tile_edits_tests.cpp engine/src/gbs_topdown.cpp engine/include/gbs/tile_edits.hpp engine/include/gbs/paged_background.hpp
 	@mkdir -p $(@D)
 	$(HOST_CXX) $(HOST_CXXFLAGS) tests/host/tile_edits_tests.cpp engine/src/gbs_topdown.cpp -o $@
+
+.PHONY: racing-minimap-test
+host-test: racing-minimap-test
+racing-minimap-test: $(HOST_BUILD)/racing_minimap_tests
+	$(HOST_BUILD)/racing_minimap_tests
+$(HOST_BUILD)/racing_minimap_tests: tests/host/racing_minimap_tests.cpp engine/include/gbs/racing_minimap.hpp engine/include/gbs/racing.hpp
+	@mkdir -p $(@D)
+	$(HOST_CXX) $(HOST_CXXFLAGS) $< -o $@
+
+.PHONY: racing-progress-test
+racing-progress-test: $(HOST_BUILD)/racing_progress_tests
+	$(HOST_BUILD)/racing_progress_tests
+host-test: racing-progress-test
+$(HOST_BUILD)/racing_progress_tests: tests/host/racing_progress_tests.cpp engine/include/gbs/racing.hpp
+	@mkdir -p $(dir $@)
+	$(HOST_CXX) $(HOST_CXXFLAGS) $< -o $@

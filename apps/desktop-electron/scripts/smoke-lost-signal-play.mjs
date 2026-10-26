@@ -6,6 +6,7 @@ import { fileURLToPath } from 'node:url';
 import { createHash } from 'node:crypto';
 import { copySmokeProject, cdpSession, createElectronSmokeEnv, electronExecutablePath, terminateChild, wait } from './lib/electron-smoke-helpers.mjs';
 import { resolveExemploSmokeFaceButton } from './exemplo-scene-playtest-contract.mjs';
+import {playRacingCadence} from './lib/racing-cadence-playthrough.mjs';
 import { playShowcaseEnding } from './lib/showcase-ending-playthrough.mjs';
 import { readNativeUI, readNativePlayerAnimation, readNativeCoastState, readNativeAudio, runtimeNativeSymbols } from './lib/native-ui-diagnostics.mjs';
 import { playShowcaseSystems } from './lib/showcase-systems-playthrough.mjs';
@@ -69,10 +70,14 @@ try {
   // Gate this disposable window's render clock, as a browser clock fixture does.
   // Each queued callback is the unmodified production mGBA player renderer.
   await evaluate(player,`(() => {
+    const liveRAF=window.requestAnimationFrame.bind(window);
     const queue=new Map();let id=100000,time=performance.now();
     window.requestAnimationFrame=callback=>{queue.set(++id,callback);return id;};
     window.cancelAnimationFrame=key=>queue.delete(key);
-    window.__missionClock={run(count){for(let n=0;n<count;n++){time+=1000/60;const callbacks=[...queue.values()];queue.clear();for(const callback of callbacks)callback(time);}},get ready(){return queue.size>0;}};
+    window.__missionClock={run(count){for(let n=0;n<count;n++){time+=1000/60;const callbacks=[...queue.values()];queue.clear();for(const callback of callbacks)callback(time);}},async live(ms){const started=performance.now(),virtual=time,frame=window.GBAStudioDirectPlayer.inspectRuntime().state.frame;
+      await new Promise(resolve=>{const tick=now=>{time=virtual+now-started;const callbacks=[...queue.values()];queue.clear();for(const callback of callbacks)callback(time);if(now-started>=ms)resolve();else liveRAF(tick);};liveRAF(tick);});
+      const elapsed=performance.now()-started,updates=window.GBAStudioDirectPlayer.inspectRuntime().state.frame-frame;
+      return {milliseconds:elapsed,updates,hz:updates*1000/elapsed};},get ready(){return queue.size>0;}};
   })()`);
   await until(()=>evaluate(player,'window.__missionClock.ready'),'render clock gate');
   const romPath=files(exportRoot).find(f=>f.endsWith('.gba')&&fs.existsSync(path.join(path.dirname(path.dirname(f)),'export_project.json')));
@@ -111,6 +116,8 @@ try {
   }
   const driver={
     audioOutput:()=>evaluate(player,'window.GBAStudioDirectPlayer.inspectAudio()'),
+    async videoFrame(){return (await snapshot()).bytes.readUInt32LE(0x1fc);},
+    async liveCadence(ms){cached=null;const result=await evaluate(player,`window.__missionClock.live(${ms})`);cached=null;return result;},
     async timers(){const s=await snapshot(),a=addressFor(s),e=d.layouts.event;return Array.from({length:word(s.bytes,a+e.timer_binding_count)},(_,i)=>({script:word(s.bytes,a+e.timer_bindings+i*12),frames:word(s.bytes,a+e.timer_bindings+i*12+4),remaining:word(s.bytes,a+e.timer_bindings+i*12+8)}));},
     async animation(){const s=await snapshot();const byte=a=>a>=0x08000000?romBytes[a-0x08000000]:s.bytes[(a>=0x03000000?d.iwramOffset+a-0x03000000:d.ewramOffset+a-0x02000000)];return readNativePlayerAnimation(runtimeNativeSymbols(d.symbols,s.state.runtimeKind),d.layouts,byte,a=>word(s.bytes,a));},
     recordMovement:label=>movementRecorder.select(label),
@@ -168,6 +175,7 @@ try {
     await player.send('Input.dispatchMouseEvent',{type:'mouseReleased',button:'left',clickCount:1,...bounds});
     Object.assign(report,await playInitialMenuAudio(driver));
   }
+  else if(process.argv.includes('--racing-cadence'))Object.assign(report,await playRacingCadence(driver));
   else if(process.argv.some(a=>a.startsWith('--tide=')))Object.assign(report,await playTideAnnex(driver,project,exported,process.argv.find(a=>a.startsWith('--tide=')).slice(7),{projectRoot:copy}));
   else if(process.argv.some(a=>a.startsWith('--encore=')))Object.assign(report,await playExampleEncore(driver,project,exported,process.argv.find(a=>a.startsWith('--encore=')).slice(9)));
   else if(endingPath){

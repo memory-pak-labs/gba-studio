@@ -612,7 +612,8 @@ constexpr uint8_t racing_heading_for_vector(int dx, int dy) {
 
 constexpr RacingTopdownPose racing_topdown_pose_at_distance(
     const RacingTopdownTrackData& track,
-    int distance_x256
+    int distance_x256,
+    bool include_heading = true
 ) {
     const int path_length_x256 = racing_topdown_path_length_pixels(track) * 256;
     if (path_length_x256 <= 0) return { { 0, 0 }, track.start_heading };
@@ -626,7 +627,7 @@ constexpr RacingTopdownPose racing_topdown_pose_at_distance(
             return {
                 { from.x + (to.x - from.x) * remaining / segment,
                   from.y + (to.y - from.y) * remaining / segment },
-                racing_heading_for_vector(to.x - from.x, to.y - from.y)
+                include_heading ? racing_heading_for_vector(to.x - from.x, to.y - from.y) : track.start_heading
             };
         }
         remaining -= segment;
@@ -640,38 +641,75 @@ constexpr int racing_topdown_path_progress_x256(
 ) {
     if (track.path_points == nullptr || track.path_point_count < 2) return 0;
     int prefix_x256 = 0;
-    int best_progress_x256 = 0;
+    int best_prefix_x256 = 0, best_segment_x256 = 0;
+    int64_t best_bounded = 0, best_denominator = 1;
     int64_t best_distance_squared = 0x7fffffffffffffffLL;
     for (size_t index = 0; index < track.path_point_count; ++index) {
         const Vec2i from = track.path_points[index];
         const Vec2i to = track.path_points[(index + 1) % track.path_point_count];
         const int dx = to.x - from.x;
         const int dy = to.y - from.y;
-        const int64_t denominator = static_cast<int64_t>(dx) * dx + static_cast<int64_t>(dy) * dy;
-        if (denominator == 0) continue;
-        const int64_t numerator = static_cast<int64_t>(position_pixels.x - from.x) * dx +
-            static_cast<int64_t>(position_pixels.y - from.y) * dy;
-        const int64_t bounded = numerator < 0 ? 0 : numerator > denominator ? denominator : numerator;
-        const int projected_x = from.x + static_cast<int>(static_cast<int64_t>(dx) * bounded / denominator);
-        const int projected_y = from.y + static_cast<int>(static_cast<int64_t>(dy) * bounded / denominator);
+        int64_t denominator=1, bounded=0;
+        int projected_x=from.x, projected_y=from.y;
+        if(dx==0 && dy==0) continue;
+        if(dy==0) {
+            const int offset=racing_clamp_int(position_pixels.x-from.x,dx<0?dx:0,dx>0?dx:0);
+            projected_x+=offset;
+            denominator=dx<0?-static_cast<int64_t>(dx):dx;
+            bounded=offset<0?-static_cast<int64_t>(offset):offset;
+        } else if(dx==0) {
+            const int offset=racing_clamp_int(position_pixels.y-from.y,dy<0?dy:0,dy>0?dy:0);
+            projected_y+=offset;
+            denominator=dy<0?-static_cast<int64_t>(dy):dy;
+            bounded=offset<0?-static_cast<int64_t>(offset):offset;
+        } else if((dx==dy || dx==-dy) && dx>=-512 && dx<=512) {
+            const int64_t along=(dx<0?-static_cast<int64_t>(position_pixels.x-from.x):position_pixels.x-from.x)+
+                (dy<0?-static_cast<int64_t>(position_pixels.y-from.y):position_pixels.y-from.y);
+            denominator=2*(dx<0?-dx:dx);
+            bounded=along<0?0:along>denominator?denominator:along;
+            const int offset=static_cast<int>(bounded)/2;
+            projected_x+=dx<0?-offset:offset;
+            projected_y+=dy<0?-offset:offset;
+        } else {
+            denominator=static_cast<int64_t>(dx)*dx+static_cast<int64_t>(dy)*dy;
+            const int64_t numerator=static_cast<int64_t>(position_pixels.x-from.x)*dx+
+                static_cast<int64_t>(position_pixels.y-from.y)*dy;
+            bounded=numerator<0?0:numerator>denominator?denominator:numerator;
+            if(dx>=-512 && dx<=512 && dy>=-512 && dy<=512) {
+                projected_x+=dx*static_cast<int>(bounded)/static_cast<int>(denominator);
+                projected_y+=dy*static_cast<int>(bounded)/static_cast<int>(denominator);
+            } else {
+                projected_x+=static_cast<int>(static_cast<int64_t>(dx)*bounded/denominator);
+                projected_y+=static_cast<int>(static_cast<int64_t>(dy)*bounded/denominator);
+            }
+        }
+        const int segment_x256 = racing_topdown_segment_length_pixels(from, to) * 256;
         const int64_t offset_x = position_pixels.x - projected_x;
         const int64_t offset_y = position_pixels.y - projected_y;
         const int64_t distance_squared = offset_x * offset_x + offset_y * offset_y;
         if (distance_squared < best_distance_squared) {
             best_distance_squared = distance_squared;
-            best_progress_x256 = prefix_x256 + static_cast<int>(
-                racing_topdown_segment_length_pixels(from, to) * 256LL * bounded / denominator
-            );
+            best_prefix_x256 = prefix_x256;
+            best_segment_x256 = segment_x256;
+            best_bounded = bounded;
+            best_denominator = denominator;
         }
-        prefix_x256 += racing_topdown_segment_length_pixels(from, to) * 256;
+        prefix_x256 += segment_x256;
     }
-    return best_progress_x256;
+    // Only the nearest segment contributes to ranking. Ties still keep the
+    // first segment, and division retains the original truncation exactly.
+    const int64_t product=static_cast<int64_t>(best_segment_x256)*best_bounded;
+    const int progress=product<=0xffffffffLL && best_denominator<=0xffffffffLL
+        ? static_cast<int>(static_cast<uint32_t>(product)/static_cast<uint32_t>(best_denominator))
+        : static_cast<int>(product/best_denominator);
+    return best_prefix_x256+progress;
 }
 
 constexpr RacingTopdownPose racing_topdown_rival_pose(
     const RacingRuntimeState& state,
     const RacingRoomData& room,
-    size_t rival_index
+    size_t rival_index,
+    bool include_heading = true
 ) {
     if (!racing_uses_circuit_track(room) || room.topdown_track->path_point_count < 2) {
         return { room.actors[rival_index].position_pixels,
@@ -679,7 +717,8 @@ constexpr RacingTopdownPose racing_topdown_rival_pose(
     }
     return racing_topdown_pose_at_distance(
         *room.topdown_track,
-        state.rival_distance_x256 - static_cast<int>(rival_index + 1) * 32 * 256
+        state.rival_distance_x256 - static_cast<int>(rival_index + 1) * 32 * 256,
+        include_heading
     );
 }
 

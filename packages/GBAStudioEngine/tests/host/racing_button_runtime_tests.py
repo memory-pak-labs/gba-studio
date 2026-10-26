@@ -2,7 +2,7 @@
 from pathlib import Path
 import subprocess,tempfile
 root=Path(__file__).resolve().parents[2]
-s=(root/'templates/exported_racing/main.cpp').read_text();a=s.index('bool update_runtime_event_script(');b=s.index('\nvoid draw_pseudo3d_hud',a)
+s=(root/'templates/exported_racing/main.cpp').read_text();a=s.index('bool update_runtime_event_script(');b=s.rfind('\n',a,s.index('void draw_pseudo3d_hud',a))
 code='''#include <cassert>
 #include <cstddef>
 namespace gbs {struct InputState{};struct Script{};struct EventState{int last_script=-1;};struct Runner{bool active=false;};

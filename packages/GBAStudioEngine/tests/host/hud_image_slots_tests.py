@@ -23,6 +23,9 @@ globals += '\n'.join(re.findall(r'static uint8_t hud_layout_(?:objects_retained|
 constants = ', '.join(re.findall(r'HUD_ICON_OBJ_OAM_(?:BASE|COUNT) = \d+', source))
 code = '#include <stdint.h>\n#include <assert.h>\n#include <string.h>\n' + structs + '\n' + globals
 code += '\nenum { ' + constants + ', DIALOGUE_PALETTE = 15, DYNAMIC_TEXT_OBJ_TILE_BASE = 900, DYNAMIC_TEXT_OBJ_OAM_COUNT = 31 };\n'
+cache_start=source.index('static uint32_t hud_layout_old_icons;')
+cache_end=source.index('static int gbs_hw_draw_hud_icon(',cache_start)
+code += source[cache_start:cache_end].replace('__attribute__((section(".ewram_bss")))','')
 code += r'''
 uint16_t shadow_oam[512];
 uint16_t hud_pixel_text_glyphs[124];
@@ -109,6 +112,28 @@ int main() {
     assert(!gbs_hw_hud_layout_retained() && shadow_oam[88*4]==0x200);
     gbs_hw_hide_world_sprites();
     assert(!gbs_hw_hud_layout_retained());
+    // Updating a number keeps immutable panels; shrinking removes old slots.
+    gbs_hw_begin_hud_layout(1);
+    assert(gbs_hw_draw_hud_icon(&first,8,8,1,0));
+    assert(gbs_hw_draw_hud_icon(&second,16,8,1,0));
+    gbs_hw_end_hud_layout();gbs_hw_hide_world_sprites();
+    uint16_t retained[4];memcpy(retained,shadow_oam+88*4,sizeof(retained));
+    gbs_hw_begin_hud_layout(1);
+    assert(memcmp(retained,shadow_oam+88*4,sizeof(retained))==0);
+    assert(gbs_hw_draw_hud_icon(&first,8,8,1,0));
+    gbs_hw_end_hud_layout();
+    assert(memcmp(retained,shadow_oam+88*4,sizeof(retained))==0);
+    assert(shadow_oam[89*4]==0x200);
+    gbs_hw_hide_world_sprites();gbs_hw_begin_hud_layout(1);
+    assert(gbs_hw_draw_hud_icon(&first,12,8,1,0));gbs_hw_end_hud_layout();
+    assert((shadow_oam[88*4+1]&511)==12);
+    gbs_hw_hide_world_sprites();gbs_hw_begin_hud_layout(1);
+    assert(gbs_hw_draw_hud_icon(&first,12,8,1,0));
+    assert(gbs_hw_draw_hud_icon(&second,16,8,1,0));gbs_hw_end_hud_layout();
+    assert(shadow_oam[89*4]!=0x200 && (shadow_oam[89*4+2]&1023)==22);
+    gbs_hw_hide_world_sprites();gbs_hw_begin_hud_layout(0);gbs_hw_end_hud_layout();
+    assert(shadow_oam[88*4]==0x200);
+    gbs_hw_hide_all_sprites();
     // An otherwise valid image layout can exhaust the shared OBJ arena.
     // Its BG fallback must redraw after dialogue paints the same cells.
     gbs_hw_begin_hud_layout(1);

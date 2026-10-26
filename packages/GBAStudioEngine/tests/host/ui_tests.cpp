@@ -568,7 +568,40 @@ void test_object_hud_retains_static_frames_and_refreshes_live_values() {
     hardware_hud_retained=false;
 }
 
+void test_retained_hud_copies_dynamic_text_and_invalidates() {
+    gbs::MetaSpritePart part {}; part.width=32; part.height=16;
+    const gbs::MetaSprite frame {&part,1};
+    gbs::HudLayoutComponent components[2] {};
+    components[0].kind="frame"; components[0].visible=true;
+    components[0].width=32; components[0].height=16; components[0].metasprite=&frame;
+    components[1].kind="text"; components[1].visible=true;
+    components[1].width=60; components[1].height=8; components[1].text_advance=6;
+    const gbs::HudLayout layout {"race-slots","advanced",components,2};
+    gbs::configure_hud_layouts(&layout,1); assert(gbs::configure_hud_layout(layout.id));
+    gbs::HudState hud {}; gbs::init_hud(hud);
+    char speed[16]="080 KMH";
+    const char* slots[]={speed};
+    gbs::set_hud_text_slots(hud,slots,1);
+    hardware_hud_retained=false; gbs::draw_hud(hud);
+    const int drawn=hud_layout_component_calls;
+    hardware_hud_retained=true; gbs::draw_hud(hud);
+    assert(hud_layout_component_calls==drawn);
+    // Same pointer, different bytes: racing formatters reuse stack storage.
+    speed[1]='9'; gbs::draw_hud(hud);
+    assert(hud_layout_component_calls==drawn+2);
+    hardware_hud_retained=false; gbs::draw_hud(hud);
+    assert(hud_layout_component_calls==drawn+4);
+    hardware_hud_retained=true; gbs::hide_hud(hud); gbs::draw_hud(hud);
+    assert(hud_layout_component_calls==drawn+6);
+    gbs::set_hud_text_slots(hud,slots,1); gbs::draw_hud(hud);
+    assert(hud_layout_component_calls==drawn+8);
+    assert(gbs::configure_hud_layout(layout.id)); gbs::draw_hud(hud);
+    assert(hud_layout_component_calls==drawn+10);
+    hardware_hud_retained=false;
+}
+
 int main() {
+    test_retained_hud_copies_dynamic_text_and_invalidates();
     test_object_hud_retains_static_frames_and_refreshes_live_values();
     test_four_independent_fight_gauges();
     test_hud_project_values_refresh_and_clear_on_scene_change();

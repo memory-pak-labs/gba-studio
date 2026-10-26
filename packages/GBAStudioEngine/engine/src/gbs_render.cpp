@@ -943,6 +943,9 @@ bool set_hblank_bg_scroll(BackgroundLayer layer, const int16_t* offsets, size_t 
     return true;
 }
 
+#if defined(__arm__) || defined(__thumb__)
+__attribute__((section(".iwram"), target("arm"), optimize("O2"), noinline, long_call))
+#endif
 bool set_hblank_affine_raster(
     BackgroundLayer layer,
     const HBlankAffineRasterLine* lines,
