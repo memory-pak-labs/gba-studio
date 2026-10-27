@@ -845,12 +845,10 @@ static void write_obj_dialogue_tiles(void) {
 static uint8_t dialogue_font_bg_byte(uint8_t value) {
     uint8_t low = value & 0x0F;
     uint8_t high = (value >> 4) & 0x0F;
-    /* The authored font contract is binary: zero is transparent/background
-     * and every non-zero source nibble is the foreground glyph. Remap the
-     * latter to the active dialogue text slot instead of leaking the PNG's
-     * palette index into the GBA UI palette. */
-    low = low == 0 ? (bg_font_transparent ? 0 : DIALOGUE_COLOR_BACKGROUND) : DIALOGUE_COLOR_TEXT;
-    high = high == 0 ? (bg_font_transparent ? 0 : DIALOGUE_COLOR_BACKGROUND) : DIALOGUE_COLOR_TEXT;
+    /* Exported colored HUD fonts use 5 for shadow/background and 4 for
+     * foreground. Treating shadow as ink fills the dialogue with white. */
+    low = (low == 0 || low == 5) ? (bg_font_transparent ? 0 : DIALOGUE_COLOR_BACKGROUND) : DIALOGUE_COLOR_TEXT;
+    high = (high == 0 || high == 5) ? (bg_font_transparent ? 0 : DIALOGUE_COLOR_BACKGROUND) : DIALOGUE_COLOR_TEXT;
     return (uint8_t)(low | (high << 4));
 }
 
@@ -1527,6 +1525,12 @@ void gbs_hw_restore_ui_assets(void) {
     }
     write_name_input_tiles();
     write_obj_dialogue_tiles();
+    /* A runtime transition may have restored the defaults above after the
+     * scene's skin was configured. Restore that skin's own palette too. */
+    if (configured_dialogue_skin_palette != 0) {
+        gbs_hw_load_bg_palette(configured_dialogue_skin_palette, DIALOGUE_PALETTE_BASE, 16);
+        gbs_hw_load_obj_palette(configured_dialogue_skin_palette, DIALOGUE_PALETTE_BASE, 16);
+    }
 }
 
 void gbs_hw_load_bg_palette(const uint16_t* colors, uint32_t start_index, uint32_t color_count) {

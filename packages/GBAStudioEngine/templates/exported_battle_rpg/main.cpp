@@ -66,6 +66,7 @@ gbs::EventState event_state __attribute__((section(".ewram_bss")));
     int battle_initialization_result = -1;
     int battle_event_wait_frames = 0;
 bool battle_script_controls_dialogue = false;
+bool battle_dialogue_was_drawn = false;
 bool battle_ui_restore_pending = true;
 bool outcome_hook_started = false;
 bool outcome_hook_handled = false;
@@ -356,6 +357,8 @@ void consume_event_state() {
             project.dialogue_line_count,
             event_state.last_dialogue
         );
+        gbs::set_dialogue_frame(dialogue, gbs::active_dialogue_ui_config().full_width_bottom
+            ? gbs::dialogue_frame_full_width : gbs::dialogue_frame_default);
         event_state.last_dialogue = -1;
         battle_script_controls_dialogue = dialogue.visible;
     }
@@ -976,14 +979,28 @@ void draw_battle_participant_metasprite(
     uint8_t sprite_scale
 ) {
     if (sprite_scale <= 1) {
-        gbs::set_metasprite(first_index, metasprite, position);
+        if (!dialogue.visible) {
+            gbs::set_metasprite(first_index, metasprite, position);
+            return;
+        }
+        // BG0 owns the dialogue and name label. Lowering actor priority only
+        // during a scripted line keeps those boxes legible over combatants.
+        for (uint8_t i = 0; i < metasprite.part_count; ++i) {
+            const auto& part = metasprite.parts[i];
+            gbs::set_sprite(first_index + i, gbs::Sprite {
+                position.x + part.x, position.y + part.y, part.tile_index,
+                part.palette, part.hflip, part.vflip, true, 1,
+                gbs::SpriteRenderMode::Normal, false, part.width, part.height,
+                false, false, 0, part.color_depth
+            });
+        }
         return;
     }
 
     for (uint8_t part_index = 0; part_index < metasprite.part_count; ++part_index) {
         const gbs::MetaSpritePart& part = metasprite.parts[part_index];
         if (part.width > 32 || part.height > 32) {
-            gbs::set_metasprite(first_index, metasprite, position);
+            draw_battle_participant_metasprite(first_index, metasprite, position, 1);
             return;
         }
         gbs::set_sprite(first_index + part_index, gbs::Sprite {
@@ -994,7 +1011,7 @@ void draw_battle_participant_metasprite(
             part.hflip,
             part.vflip,
             true,
-            0,
+            static_cast<uint8_t>(dialogue.visible ? 1 : 0),
             gbs::SpriteRenderMode::Normal,
             false,
             part.width,
@@ -1094,7 +1111,7 @@ void draw_battle() {
         );
         sprite_index += metasprite->part_count;
     }
-    if(encounter.presentation && !encounter.config.escape_enabled &&
+    if(encounter.presentation && !dialogue.visible && !encounter.config.escape_enabled &&
         (battle_menu_page==BattleMenuPage::Root || battle_menu_page==BattleMenuPage::Notice || !battle_menu_dialogue.visible) && encounter.presentation->disabled_escape)
         gbs::set_metasprite(84,*encounter.presentation->disabled_escape,{172,148});
     if(encounter.presentation && encounter.presentation->cursor && !dialogue.visible){
@@ -1191,6 +1208,7 @@ bool restart_standalone_battle_from_transition() {
         return false;
     }
     gbs::init_dialogue(dialogue);
+    battle_dialogue_was_drawn = false;
     gbs::init_dialogue(battle_prompt_dialogue);
     gbs::init_dialogue(battle_menu_dialogue);
     gbs::init_hud(battle_hud);
@@ -1217,6 +1235,7 @@ bool restart_standalone_battle_from_transition() {
 int initialize_battle_rpg_runtime() {
     gbs::init();
     gbs::init_dialogue(dialogue);
+    battle_dialogue_was_drawn = false;
     gbs::init_dialogue(battle_prompt_dialogue);
     gbs::init_dialogue(battle_menu_dialogue);
     gbs::init_hud(battle_hud);
@@ -1380,15 +1399,32 @@ void render_battle_rpg_runtime(const gbs::RuntimeFrameContext& context) {
         gbs::render_ui_assets();
         battle_ui_restore_pending = false;
     }
-    if (dialogue.visible) {
+    // A hidden dialogue must clear its previous rectangles once, before HUD
+    // components are redrawn. Otherwise its stale tiles cover battle commands.
+    if (!dialogue.visible && battle_dialogue_was_drawn) {
         gbs::draw_dialogue(dialogue);
-    } else if(!authored_battle_ui()) {
+        battle_dialogue_was_drawn = false;
+    }
+    if(!dialogue.visible && !authored_battle_ui()) {
         gbs::draw_dialogue(battle_prompt_dialogue);
         gbs::draw_dialogue(battle_menu_dialogue);
     }
-    /* Draw the battle HUD last so the status labels remain visible after
-     * the dialogue layer refreshes its UI resources and BG0 contents. */
-    gbs::draw_hud(battle_hud);
+    if (dialogue.visible && authored_battle_ui()) {
+        const auto box = gbs::dialogue_box_layout_for_frame(dialogue.frame_index);
+        int top = box.y;
+        const auto& config = gbs::active_dialogue_ui_config();
+        if (config.name_label_above && config.show_character_name && dialogue.speaker && dialogue.speaker[0]) {
+            top = gbs::dialogue_name_label_layout_for_frame(dialogue.frame_index, box.w).y;
+        }
+        if (top < 0) top = 0;
+        gbs::draw_hud_excluding(battle_hud, 0, top * 8, 240, 160 - top * 8);
+    } else {
+        gbs::draw_hud(battle_hud);
+    }
+    if (dialogue.visible) {
+        gbs::draw_dialogue(dialogue);
+        battle_dialogue_was_drawn = true;
+    }
     const auto* presentation=project.encounters[encounter_index].presentation;
     // The authored BG1 frame owns bank 14; the generic HUD skin also uses it.
     // Restore only the encounter's 16-color frame bank after native UI writes.
@@ -1397,6 +1433,7 @@ void render_battle_rpg_runtime(const gbs::RuntimeFrameContext& context) {
 }
 
 void leave_battle_rpg_runtime() {
+    battle_dialogue_was_drawn = false;
     gbs::release_resource_bank_group(resource_manager, active_resource_bank_group);
 }
 

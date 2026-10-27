@@ -1056,7 +1056,21 @@ void test_dialogue_frame_transitions_erase_previous_owned_regions() {
     gbs::configure_dialogue_ui(gbs::default_dialogue_ui_config());
 }
 
+void test_full_width_dialogue_frame_and_scene_config() {
+    auto config = gbs::default_dialogue_ui_config();
+    config.full_width_bottom = true;
+    gbs::configure_dialogue_ui(config);
+    assert(gbs::active_dialogue_ui_config().full_width_bottom);
+    const auto box = gbs::dialogue_box_layout_for_frame(gbs::dialogue_frame_full_width);
+    assert(box.x == 0 && box.y == 15 && box.w == 30 && box.h == 5);
+    const auto label = gbs::dialogue_name_label_layout_for_frame(gbs::dialogue_frame_full_width, 8);
+    assert(label.x == 0 && label.y == 12);
+    gbs::configure_dialogue_ui(gbs::default_dialogue_ui_config());
+    assert(!gbs::active_dialogue_ui_config().full_width_bottom);
+}
+
 int main() {
+    test_full_width_dialogue_frame_and_scene_config();
     test_dialogue_frame_transitions_erase_previous_owned_regions();
     test_portrait_tab_preserves_text_rows_and_uses_approved_portrait_insets();
     test_checkpoint_restores_dialogue_page_and_reveal_progress();

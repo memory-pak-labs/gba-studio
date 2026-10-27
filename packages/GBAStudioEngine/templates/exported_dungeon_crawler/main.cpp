@@ -298,7 +298,8 @@ void show_dungeon_notice(const char* text, bool return_to_battle) {
         1,
         0
     );
-    gbs::set_dialogue_frame(interaction_dialogue, gbs::dialogue_frame_default);
+    gbs::set_dialogue_frame(interaction_dialogue, gbs::active_dialogue_ui_config().full_width_bottom
+        ? gbs::dialogue_frame_full_width : gbs::dialogue_frame_default);
 }
 
 void show_dungeon_inventory() {
@@ -320,7 +321,8 @@ void show_dungeon_inventory() {
         inventory_choices,
         2
     );
-    gbs::set_dialogue_frame(interaction_dialogue, gbs::dialogue_frame_default);
+    gbs::set_dialogue_frame(interaction_dialogue, gbs::active_dialogue_ui_config().full_width_bottom
+        ? gbs::dialogue_frame_full_width : gbs::dialogue_frame_default);
 }
 
 int dungeon_map_width(const gbs::DungeonCrawlerRoomData& room) {
@@ -833,7 +835,8 @@ void consume_event_state() {
             project.dialogue_line_count,
             event_state.last_dialogue
         );
-        gbs::set_dialogue_frame(dungeon_dialogue, gbs::dialogue_frame_default);
+        gbs::set_dialogue_frame(dungeon_dialogue, gbs::active_dialogue_ui_config().full_width_bottom
+            ? gbs::dialogue_frame_full_width : gbs::dialogue_frame_default);
         event_state.last_dialogue = -1;
         runtime_script_controls_dialogue = dungeon_dialogue.visible;
     }

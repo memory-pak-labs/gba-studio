@@ -28,6 +28,7 @@ constexpr int dialogue_frame_top = 1;
 constexpr int dialogue_frame_center = 2;
 constexpr int dialogue_frame_battle_prompt = 3;
 constexpr int dialogue_frame_battle_menu = 4;
+constexpr int dialogue_frame_full_width = 5;
 constexpr size_t dialogue_font_tile_count = GBS_TEXT_GLYPH_COUNT;
 constexpr size_t dialogue_page_character_capacity =
     dialogue_wrap_columns_max * dialogue_wrap_rows_max + dialogue_wrap_rows_max + 1;
@@ -48,6 +49,8 @@ struct DialogueUiConfig {
     int box_height_tiles = dialogue_box_height_tiles_default;
     /** Opt-in 224x40 lower panel with a 48px portrait and integrated 16px name tab. */
     bool portrait_tab = false;
+    /** Scene opts into a 240x40 lower dialogue panel. */
+    bool full_width_bottom = false;
 };
 
 struct DialoguePortraitEntry {

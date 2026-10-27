@@ -290,9 +290,9 @@ void update_hud_behavior(EventState& state, bool visible) {
 #if defined(__arm__) || defined(__thumb__)
 __attribute__((optimize("O2")))
 #endif
-void draw_hud(const HudState& state) {
+static void draw_hud_impl(const HudState& state, const int* exclusion) {
     if (selected_hud_layout != nullptr && string_equals(selected_hud_layout->mode, "advanced")) {
-        bool unchanged=object_hud_layout && retained_hud_valid &&
+        bool unchanged=exclusion == nullptr && object_hud_layout && retained_hud_valid &&
             retained_hud_visible==state.visible && retained_hud_values_ready==hud_project_values_ready;
         if (unchanged) for (size_t i=0; i<selected_hud_layout->component_count; ++i)
             if (retained_hud_values[i]!=hud_project_values[i]) { unchanged=false; break; }
@@ -335,6 +335,9 @@ void draw_hud(const HudState& state) {
             const HudLayoutComponent& component = selected_hud_layout->components[order[order_index]];
             const int kind = hud_component_kind(component.kind);
             if (kind < 0) continue;
+            const bool excluded = exclusion != nullptr && exclusion[2] > 0 && exclusion[3] > 0 &&
+                component.x < exclusion[0] + exclusion[2] && component.x + component.width > exclusion[0] &&
+                component.y < exclusion[1] + exclusion[3] && component.y + component.height > exclusion[1];
             const auto status = hud_element_memory[order[order_index]].state;
             const char* text = status == HudElementState::Selected && component.behavior.selected.text ? component.behavior.selected.text :
                 status == HudElementState::Disabled && component.behavior.disabled.text ? component.behavior.disabled.text : component.text;
@@ -397,7 +400,7 @@ void draw_hud(const HudState& state) {
                 text,
                 text_oam_offset,
                 image,
-                state.visible && available && status != HudElementState::Hidden ? 1 : 0
+                state.visible && available && !excluded && status != HudElementState::Hidden ? 1 : 0
             );
             if (kind == GBS_HW_HUD_COMPONENT_TEXT || (kind == GBS_HW_HUD_COMPONENT_ICON && image == nullptr)) {
                 text_oam_offset += (component.width + 7) / 8;
@@ -405,16 +408,25 @@ void draw_hud(const HudState& state) {
         }
         gbs_hw_set_hud_font(nullptr,-1);
         gbs_hw_end_hud_layout();
-        if (object_hud_layout) {
+        if (object_hud_layout && exclusion == nullptr) {
             for (size_t i=0; i<selected_hud_layout->component_count; ++i)
                 retained_hud_values[i]=hud_project_values[i];
             retained_hud_visible=state.visible;
             retained_hud_values_ready=hud_project_values_ready;
             retained_hud_valid=retain_hud_text(state,true);
+        } else if (exclusion != nullptr) {
+            retained_hud_valid = false;
         }
         return;
     }
-    gbs_hw_draw_hud_bar(state.left_text, state.right_text, state.visible ? 1 : 0);
+    gbs_hw_draw_hud_bar(state.left_text, state.right_text, state.visible && exclusion == nullptr ? 1 : 0);
+}
+
+void draw_hud(const HudState& state) { draw_hud_impl(state, nullptr); }
+
+void draw_hud_excluding(const HudState& state, int x, int y, int width, int height) {
+    const int exclusion[] = {x, y, width, height};
+    draw_hud_impl(state, exclusion);
 }
 
 void configure_hud_layouts(const HudLayout* layouts, size_t count) {

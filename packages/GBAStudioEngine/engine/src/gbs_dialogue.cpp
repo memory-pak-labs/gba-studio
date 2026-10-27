@@ -335,6 +335,7 @@ void configure_dialogue_ui(const DialogueUiConfig& config) {
     active_dialogue_ui.box_width_tiles = box_width_tiles;
     active_dialogue_ui.box_height_tiles = box_height_tiles;
     active_dialogue_ui.portrait_tab = config.portrait_tab;
+    active_dialogue_ui.full_width_bottom = config.full_width_bottom;
     if (config.portrait_tab) {
         active_dialogue_ui.frame_index = 0;
         active_dialogue_ui.wrap_columns = 26;
@@ -653,6 +654,11 @@ DialogueBoxLayout dialogue_box_layout_for_frame(int frame_index) {
         layout.y = 0;
     } else if (frame_index == dialogue_frame_center) {
         layout.y = (20 - layout.h) / 2;
+    } else if (frame_index == dialogue_frame_full_width) {
+        layout.x = 0;
+        layout.y = 15;
+        layout.w = 30;
+        layout.h = 5;
     } else if (frame_index == dialogue_frame_battle_prompt) {
         layout.y = 15;
         layout.w = 18;
@@ -684,7 +690,7 @@ DialogueBoxLayout dialogue_portrait_slot_layout_for_frame(int frame_index, bool 
          * portrait frame inside that band so it cannot touch the box below. */
         layout.y = 0;
         if (layout.h > 7) layout.h = 7;
-    } else if (frame_index == dialogue_frame_default) {
+    } else if ((frame_index == dialogue_frame_default || frame_index == dialogue_frame_full_width)) {
         const DialogueBoxLayout box = dialogue_box_layout_for_frame(frame_index);
         layout.y = box.y - layout.h;
         if (layout.y < 0) layout.y = 0;
@@ -704,7 +710,7 @@ DialogueBoxLayout dialogue_name_label_layout_for_frame(
     const DialogueBoxLayout box = dialogue_box_layout_for_frame(frame_index);
     int x = box.x;
     int available_width = box.w;
-    if (avoid_portrait_slots && portrait_visible && frame_index == dialogue_frame_default) {
+    if (avoid_portrait_slots && portrait_visible && (frame_index == dialogue_frame_default || frame_index == dialogue_frame_full_width)) {
         const DialogueBoxLayout portrait = dialogue_portrait_slot_layout_for_frame(
             frame_index, portrait_on_right, portrait_width, portrait_height);
         if (!portrait_on_right && portrait.x == box.x) {
@@ -722,7 +728,7 @@ DialogueBoxLayout dialogue_name_label_layout_for_frame(
         ? 3
         : (label_width > available_width ? available_width : label_width);
     if (portrait_on_right && (!portrait_visible ||
-        (avoid_portrait_slots && frame_index == dialogue_frame_default))) {
+        (avoid_portrait_slots && (frame_index == dialogue_frame_default || frame_index == dialogue_frame_full_width)))) {
         x = box.x + available_width - width;
     }
     int y = box.y - dialogue_name_label_height;

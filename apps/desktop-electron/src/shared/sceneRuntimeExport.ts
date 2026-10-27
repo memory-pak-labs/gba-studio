@@ -667,7 +667,7 @@ export interface EngineDialogueUiConfig {
     hud_height: number;
   }>;
   /** Resolved frame skins applied on scene entry after the HUD layout binding. */
-  scene_skins?: Array<{ scene_name: string; box_skin?: string; hud_skin?: string; presentation?: DialoguePresentation; runtime_kind?: number }>;
+  scene_skins?: Array<{ scene_name: string; box_skin?: string; hud_skin?: string; close_bottom_edge?: boolean; full_width_bottom?: boolean; presentation?: DialoguePresentation; runtime_kind?: number }>;
   hud_scene_bindings?: Array<{
     scene_name: string;
     preset_id: string;

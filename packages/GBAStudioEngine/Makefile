@@ -2017,6 +2017,10 @@ hud-racing-test: $(HOST_BUILD)/hud_racing_tests
 	python3 tests/host/hud_dungeon_layer_tests.py
 	python3 tests/host/hud_battle_meters_tests.py
 	python3 tests/host/hud_battle_status_tests.py
+	python3 tests/host/hud_battle_dialogue_render_tests.py
+	python3 tests/host/battle_dialogue_actor_priority_tests.py
+	python3 tests/host/hud_dialogue_occlusion_tests.py
+	python3 tests/host/dialogue_colored_font_tests.py
 	python3 tests/host/battle_rpg_support_presentation_tests.py
 	python3 tests/host/hud_battle_menu_frame_tests.py
 	python3 tests/host/hud_bar_surface_tests.py

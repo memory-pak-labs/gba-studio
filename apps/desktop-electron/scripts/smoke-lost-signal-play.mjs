@@ -21,6 +21,7 @@ import {tideAnnexTestFixture} from './lib/tide-annex-test-fixture.mjs';
 import {playTideAnnex} from './lib/tide-annex-playthrough.mjs';
 import { createMovementRecorder } from './lib/movement-video-recorder.mjs';
 import { playInitialMenuAudio } from './lib/initial-menu-audio-playthrough.mjs';
+import { playBattleDialogue, playDungeonDialogue } from './lib/battle-dialogue-playthrough.mjs';
 import { decodeMGBAHardwareVideoState } from './native-scene-framebuffer-contract.mjs';
 import { decodePngRgba } from './lib/png-icons.mjs';
 
@@ -169,7 +170,9 @@ try {
       const state=await this.state();report.captures.push({label,state,battle:state.runtimeKind===11?await this.battle():undefined});console.log(label);
     }
   };
-  if(process.argv.includes('--menu-audio')){
+  if(process.argv.includes('--battle-dialogue')) Object.assign(report,await playBattleDialogue(driver));
+  else if(process.argv.includes('--dungeon-dialogue')) Object.assign(report,await playDungeonDialogue(driver));
+  else if(process.argv.includes('--menu-audio')){
     const bounds=await evaluate(player,'(()=>{const r=document.querySelector("canvas").getBoundingClientRect();return {x:r.x+r.width/2,y:r.y+r.height/2};})()');
     await player.send('Input.dispatchMouseEvent',{type:'mousePressed',button:'left',clickCount:1,...bounds});
     await player.send('Input.dispatchMouseEvent',{type:'mouseReleased',button:'left',clickCount:1,...bounds});

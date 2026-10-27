@@ -15278,12 +15278,24 @@ def scene_interface_skins_from_json(items, base_dir, description):
         runtime_kind = item.get("runtime_kind", 9)
         if isinstance(runtime_kind, bool) or not isinstance(runtime_kind, int) or not 0 <= runtime_kind <= 12:
             raise SystemExit(f"{label}.runtime_kind precisa estar entre 0 e 12")
-        skins = {"scene_name": item["scene_name"], "portrait_tab": presentation == "portrait_tab", "runtime_kind": runtime_kind}
+        full_width_bottom = item.get("full_width_bottom", False)
+        if not isinstance(full_width_bottom, bool):
+            raise SystemExit(f"{label}.full_width_bottom precisa ser booleano")
+        skins = {"scene_name": item["scene_name"], "portrait_tab": presentation == "portrait_tab", "runtime_kind": runtime_kind, "full_width_bottom": full_width_bottom}
         for key in ("box_skin", "hud_skin"):
             if key in item:
                 if not isinstance(item[key], str) or not item[key].strip():
                     raise SystemExit(f"{label}.{key} precisa ser caminho nao vazio")
                 skins[key] = dialogue_box_skin_from_json(item[key], base_dir, f"{label}.{key}")
+        close_bottom = item.get("close_bottom_edge", False)
+        if not isinstance(close_bottom, bool):
+            raise SystemExit(f"{label}.close_bottom_edge precisa ser booleano")
+        if close_bottom and "box_skin" in skins:
+            tiles = skins["box_skin"]["tiles"]
+            # The source remains untouched. Complete only a missing edge by
+            # reflecting its existing top tile; keep deliberate artwork intact.
+            if tiles[7] == tiles[4] and tiles[1] != tiles[4]:
+                tiles[7] = sum((tiles[1][row * 4:row * 4 + 4] for row in range(7, -1, -1)), [])
         result.append(skins)
     return result
 
@@ -15670,12 +15682,12 @@ def emit_shared_dialogue_ui_assets_header(box_skin, hud_skin, selector, font, di
         return skin_symbols[key]
     scene_entries = []
     for entry in scene_skins:
-        scene_entries.append((entry["scene_name"], scene_skin_symbol(entry.get("box_skin")), scene_skin_symbol(entry.get("hud_skin")), entry.get("portrait_tab", False)))
-    output.append("struct SceneSkin { const char* scene_name; const gbs::DialogueBoxSkin* box; const gbs::DialogueBoxSkin* hud; bool portrait_tab; };")
+        scene_entries.append((entry["scene_name"], scene_skin_symbol(entry.get("box_skin")), scene_skin_symbol(entry.get("hud_skin")), entry.get("portrait_tab", False), entry.get("full_width_bottom", False)))
+    output.append("struct SceneSkin { const char* scene_name; const gbs::DialogueBoxSkin* box; const gbs::DialogueBoxSkin* hud; bool portrait_tab; bool full_width_bottom; };")
     if scene_entries:
         output.append("constexpr SceneSkin scene_skins[] = {")
-        for name, box, hud, portrait_tab in scene_entries:
-            output.append(f"    {{ {cpp_string_literal(name)}, {box}, {hud}, {str(portrait_tab).lower()} }},")
+        for name, box, hud, portrait_tab, full_width_bottom in scene_entries:
+            output.append(f"    {{ {cpp_string_literal(name)}, {box}, {hud}, {str(portrait_tab).lower()}, {str(full_width_bottom).lower()} }},")
         output.append("};")
     else:
         output.append("constexpr const SceneSkin* scene_skins = nullptr;")
@@ -15773,6 +15785,7 @@ def emit_shared_dialogue_ui_assets_header(box_skin, hud_skin, selector, font, di
         "        if (!scene_name_equals(skin.scene_name, scene_name)) continue;",
         "        auto scene_dialogue_ui = dialogue_ui;",
         "        scene_dialogue_ui.portrait_tab = skin.portrait_tab;",
+        "        scene_dialogue_ui.full_width_bottom = skin.full_width_bottom;",
         "        gbs::configure_dialogue_ui(scene_dialogue_ui);",
         "        if (skin.box != nullptr) gbs::configure_dialogue_box_skin(skin.box);",
         "        if (skin.hud != nullptr) gbs::configure_hud_box_skin(skin.hud);",

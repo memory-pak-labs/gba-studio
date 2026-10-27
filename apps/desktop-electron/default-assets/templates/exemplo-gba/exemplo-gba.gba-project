@@ -73433,7 +73433,8 @@
         "visualProfile": "ultimo-farol-v2-dark",
         "provenance": "ImageGen V2; preparação nine-slice revisada; aprovada pelo usuário em 2026-09-27",
         "sourceSha256": "2d971e4469ce4b58c7ab93b0488f93b86a87b480f16e0158a06f78bf44f23bd7",
-        "visualApproval": "approved"
+        "visualApproval": "approved",
+        "completeFrameBottom": true
       }
     },
     {
@@ -189954,7 +189955,8 @@
       "runtimeBaseBackgroundAssetName": "dungeon-approved-exploracao-background.png",
       "runtimeCompositeBackgroundAssetName": "dungeon-approved-exploracao-background.png",
       "dungeonVisualRevision": "dungeon-porto-approved-2026-10-18",
-      "authoringNotes": "Objetivo: Atravessar o corredor inundado e localizar a porta do núcleo. Mapa edita células; Tela ampliada mostra a câmera frontal. Movimento, projeção e combate são nativos. Atores usam escalas por distância; eventos executam interação, coleta e passagem entre salas. Controles: Esquerda e direita giram; cima avança; baixo recua; A interage."
+      "authoringNotes": "Objetivo: Atravessar o corredor inundado e localizar a porta do núcleo. Mapa edita células; Tela ampliada mostra a câmera frontal. Movimento, projeção e combate são nativos. Atores usam escalas por distância; eventos executam interação, coleta e passagem entre salas. Controles: Esquerda e direita giram; cima avança; baixo recua; A interage.",
+      "dialogueFullWidth": true
     },
     {
       "id": "scene-usina_combate",
@@ -190444,7 +190446,8 @@
       "runtimeBaseBackgroundAssetName": "dungeon-approved-combate-background.png",
       "runtimeCompositeBackgroundAssetName": "dungeon-approved-combate-background.png",
       "dungeonVisualRevision": "dungeon-porto-approved-2026-10-18",
-      "authoringNotes": "Objetivo: Vencer a sentinela que bloqueia o núcleo inundado. Mapa edita células; Tela ampliada mostra a câmera frontal. Movimento, projeção e combate são nativos. Atores usam escalas por distância; eventos executam interação, coleta e passagem entre salas. Controles: Esquerda e direita giram; cima avança; A ataca ou interage."
+      "authoringNotes": "Objetivo: Vencer a sentinela que bloqueia o núcleo inundado. Mapa edita células; Tela ampliada mostra a câmera frontal. Movimento, projeção e combate são nativos. Atores usam escalas por distância; eventos executam interação, coleta e passagem entre salas. Controles: Esquerda e direita giram; cima avança; A ataca ou interage.",
+      "dialogueFullWidth": true
     },
     {
       "id": "scene-usina_saida",
@@ -190936,7 +190939,8 @@
       "runtimeBaseBackgroundAssetName": "dungeon-approved-saida-background.png",
       "runtimeCompositeBackgroundAssetName": "dungeon-approved-saida-background.png",
       "dungeonVisualRevision": "dungeon-porto-approved-2026-10-18",
-      "authoringNotes": "Objetivo: Recuperar a célula de energia e alcançar a antecâmara da guardiã. Mapa edita células; Tela ampliada mostra a câmera frontal. Movimento, projeção e combate são nativos. Atores usam escalas por distância; eventos executam interação, coleta e passagem entre salas. Controles: Esquerda e direita giram; cima avança; A interage."
+      "authoringNotes": "Objetivo: Recuperar a célula de energia e alcançar a antecâmara da guardiã. Mapa edita células; Tela ampliada mostra a câmera frontal. Movimento, projeção e combate são nativos. Atores usam escalas por distância; eventos executam interação, coleta e passagem entre salas. Controles: Esquerda e direita giram; cima avança; A interage.",
+      "dialogueFullWidth": true
     },
     {
       "backgroundAssetName": "council-v13-background.png",
@@ -202272,7 +202276,8 @@
       "runtimeCompositeBackgroundAssetName": "relay-approved-background.png",
       "relayVisualRevision": "relay-porto-approved-2026-10-18",
       "visualPromotionStatus": "canonical-integrated",
-      "authoringNotes": "Objetivo: Vencer o autômato que mantém o último farol sob bloqueio. O runtime executa turnos, habilidades e animações. Edite atributos nos atores; Ao vencer e Ao perder ligam recompensa, save, avanço ou reinício à campanha. Controles: Direcional escolhe comandos; A confirma; B retorna."
+      "authoringNotes": "Objetivo: Vencer o autômato que mantém o último farol sob bloqueio. O runtime executa turnos, habilidades e animações. Edite atributos nos atores; Ao vencer e Ao perder ligam recompensa, save, avanço ou reinício à campanha. Controles: Direcional escolhe comandos; A confirma; B retorna.",
+      "dialogueFullWidth": true
     },
     {
       "backgroundAssetName": "arena-coastal-240x160.png",
@@ -267830,7 +267835,8 @@
       "runtimeBaseBackgroundAssetName": "dungeon-approved-exploracao-background.png",
       "runtimeCompositeBackgroundAssetName": "dungeon-approved-exploracao-background.png",
       "dungeonVisualRevision": "dungeon-porto-approved-2026-10-18",
-      "authoringNotes": "Objetivo: Atravessar o corredor inundado e localizar a porta do núcleo. Mapa edita células; Tela ampliada mostra a câmera frontal. Movimento, projeção e combate são nativos. Atores usam escalas por distância; eventos executam interação, coleta e passagem entre salas. Controles: Esquerda e direita giram; cima avança; baixo recua; A interage."
+      "authoringNotes": "Objetivo: Atravessar o corredor inundado e localizar a porta do núcleo. Mapa edita células; Tela ampliada mostra a câmera frontal. Movimento, projeção e combate são nativos. Atores usam escalas por distância; eventos executam interação, coleta e passagem entre salas. Controles: Esquerda e direita giram; cima avança; baixo recua; A interage.",
+      "dialogueFullWidth": true
     },
     {
       "id": "scene-usina_combate",
@@ -268320,7 +268326,8 @@
       "runtimeBaseBackgroundAssetName": "dungeon-approved-combate-background.png",
       "runtimeCompositeBackgroundAssetName": "dungeon-approved-combate-background.png",
       "dungeonVisualRevision": "dungeon-porto-approved-2026-10-18",
-      "authoringNotes": "Objetivo: Vencer a sentinela que bloqueia o núcleo inundado. Mapa edita células; Tela ampliada mostra a câmera frontal. Movimento, projeção e combate são nativos. Atores usam escalas por distância; eventos executam interação, coleta e passagem entre salas. Controles: Esquerda e direita giram; cima avança; A ataca ou interage."
+      "authoringNotes": "Objetivo: Vencer a sentinela que bloqueia o núcleo inundado. Mapa edita células; Tela ampliada mostra a câmera frontal. Movimento, projeção e combate são nativos. Atores usam escalas por distância; eventos executam interação, coleta e passagem entre salas. Controles: Esquerda e direita giram; cima avança; A ataca ou interage.",
+      "dialogueFullWidth": true
     },
     {
       "id": "scene-usina_saida",
@@ -268812,7 +268819,8 @@
       "runtimeBaseBackgroundAssetName": "dungeon-approved-saida-background.png",
       "runtimeCompositeBackgroundAssetName": "dungeon-approved-saida-background.png",
       "dungeonVisualRevision": "dungeon-porto-approved-2026-10-18",
-      "authoringNotes": "Objetivo: Recuperar a célula de energia e alcançar a antecâmara da guardiã. Mapa edita células; Tela ampliada mostra a câmera frontal. Movimento, projeção e combate são nativos. Atores usam escalas por distância; eventos executam interação, coleta e passagem entre salas. Controles: Esquerda e direita giram; cima avança; A interage."
+      "authoringNotes": "Objetivo: Recuperar a célula de energia e alcançar a antecâmara da guardiã. Mapa edita células; Tela ampliada mostra a câmera frontal. Movimento, projeção e combate são nativos. Atores usam escalas por distância; eventos executam interação, coleta e passagem entre salas. Controles: Esquerda e direita giram; cima avança; A interage.",
+      "dialogueFullWidth": true
     },
     {
       "backgroundAssetName": "council-v13-background.png",
@@ -280148,7 +280156,8 @@
       "runtimeCompositeBackgroundAssetName": "relay-approved-background.png",
       "relayVisualRevision": "relay-porto-approved-2026-10-18",
       "visualPromotionStatus": "canonical-integrated",
-      "authoringNotes": "Objetivo: Vencer o autômato que mantém o último farol sob bloqueio. O runtime executa turnos, habilidades e animações. Edite atributos nos atores; Ao vencer e Ao perder ligam recompensa, save, avanço ou reinício à campanha. Controles: Direcional escolhe comandos; A confirma; B retorna."
+      "authoringNotes": "Objetivo: Vencer o autômato que mantém o último farol sob bloqueio. O runtime executa turnos, habilidades e animações. Edite atributos nos atores; Ao vencer e Ao perder ligam recompensa, save, avanço ou reinício à campanha. Controles: Direcional escolhe comandos; A confirma; B retorna.",
+      "dialogueFullWidth": true
     },
     {
       "backgroundAssetName": "arena-coastal-240x160.png",

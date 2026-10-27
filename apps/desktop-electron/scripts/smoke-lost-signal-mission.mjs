@@ -15,6 +15,7 @@ import { playLostSignalMission, lostSignalInventoryIndices } from './lib/lost-si
 import { playCampaignEvolutions } from './lib/campaign-evolutions-playthrough.mjs';
 import { playTopdownMovement } from './lib/topdown-movement-playthrough.mjs';
 import { playCoastDepth } from './lib/coast-depth-playthrough.mjs';
+import { playBattleDialogue, playDungeonDialogue } from './lib/battle-dialogue-playthrough.mjs';
 import { playExampleEncore } from './lib/encore-playthrough.mjs';
 import {playTideAnnex} from './lib/tide-annex-playthrough.mjs';
 import { createMovementRecorder } from './lib/movement-video-recorder.mjs';
@@ -145,6 +146,8 @@ try {
     assert.equal(driver.state().variables[project.variables.findIndex(v=>v.name==='var_signal_stage')],1);
     driver.capture('return-after-load');report.passed=true;
   } else if (process.argv.includes('--diagnostics-only')) { driver.run(180,0); driver.capture('title'); report.passed=true; }
+  else if (process.argv.includes('--battle-dialogue')) Object.assign(report, await playBattleDialogue(driver));
+  else if (process.argv.includes('--dungeon-dialogue')) Object.assign(report, await playDungeonDialogue(driver));
   else if(process.argv.some(a=>a.startsWith('--tide=')))Object.assign(report,await playTideAnnex(driver,project,exported,process.argv.find(a=>a.startsWith('--tide=')).slice(7),{projectRoot:path.dirname(projectFile)}));
   else if(process.argv.some(a=>a.startsWith('--encore=')))Object.assign(report,await playExampleEncore(driver,project,exported,process.argv.find(a=>a.startsWith('--encore=')).slice(9)));
   else if(process.argv.some(a=>a.startsWith('--coast=')))Object.assign(report,await playCoastDepth(driver,project,exported,process.argv.find(a=>a.startsWith('--coast=')).slice(8),{projectRoot:path.dirname(projectFile),output}));

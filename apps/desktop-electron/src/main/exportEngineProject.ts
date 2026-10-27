@@ -10559,16 +10559,17 @@ function buildEngineDialogueUiConfigForExportUncached(data: GBAProjectData): Eng
     hudIconSpritePack?.assetsBySheet[asset]?.name ?? asset
   );
   const hudSceneBindingMap = new Map<string, string>();
-  const sceneSkins = new Map<string, { scene_name: string; box_skin?: string; hud_skin?: string; presentation?: "portrait_tab"; runtime_kind?: number }>();
+  const sceneSkins = new Map<string, { scene_name: string; box_skin?: string; hud_skin?: string; close_bottom_edge?: boolean; full_width_bottom?: boolean; presentation?: "portrait_tab"; runtime_kind?: number }>();
   const addSceneSkin = (sceneName: string, room: Record<string, unknown>, request: { scenePresetId?: unknown; roomPresetId?: unknown } = {}): void => {
     const roomID = stringField(room, "id", stringField(room, "name", ""));
     const resolved = resolveInterfaceTheme(data, roomID);
+    const fullWidth = room.dialogueFullWidth === true ? { full_width_bottom: true as const } : {};
     const presentation = resolveSceneDialogueUiSettings(data, roomID).presentation === "portrait_tab"
       ? { presentation: "portrait_tab" as const, runtime_kind: ({topdown:0,platformer:1,isometric:2,menu:3,shmup:4,pointAndClick:5,dungeonCrawler:6,racing:7,cutscene:8,visualNovel:9,worldMap:10,battleRPG:11,battleRpg:11,luta:12} as Record<string,number>)[roomSceneType(room)] ?? 0 } : {};
 
     if (resolved.missing) throw new Error(`Tema de moldura ausente em ${sceneName}: ${resolved.themeId}`);
     if (!resolved.theme) {
-      if (resolveSceneDialogueUiSettings(data, roomID).presentation === "portrait_tab") sceneSkins.set(sceneName, { scene_name: sceneName, ...presentation });
+      if (resolveSceneDialogueUiSettings(data, roomID).presentation === "portrait_tab" || room.dialogueFullWidth === true) sceneSkins.set(sceneName, { scene_name: sceneName, ...presentation, ...fullWidth });
       return;
     }
     for (const name of [resolved.theme.boxImage, resolved.theme.hudImage].filter(Boolean)) {
@@ -10580,7 +10581,9 @@ function buildEngineDialogueUiConfigForExportUncached(data: GBAProjectData): Eng
     const hudImage = binding?.preset.backgroundImage || resolved.theme.hudImage;
     const ui = resolveHudUiSkin(data, resolveDialogueUiBoxSkin(data, { ...baseDialogueUi, box_image: boxImage, hud_image: hudImage }));
     if ((resolved.theme.boxImage && !ui.box_skin) || (resolved.theme.hudImage && !ui.hud_skin)) throw new Error(`Moldura sem arquivo de skin em ${sceneName}.`);
-    sceneSkins.set(sceneName, { scene_name: sceneName, ...presentation, ...(ui.box_skin ? { box_skin: ui.box_skin } : {}), ...(ui.hud_skin ? { hud_skin: ui.hud_skin } : {}) });
+    const boxAsset = projectArray(data, "assets").find(asset => asset.name === boxImage);
+    const closeBottomEdge = child(boxAsset, "metadata")?.completeFrameBottom === true;
+    sceneSkins.set(sceneName, { scene_name: sceneName, ...presentation, ...fullWidth, ...(ui.box_skin ? { box_skin: ui.box_skin } : {}), ...(ui.hud_skin ? { hud_skin: ui.hud_skin } : {}), ...(closeBottomEdge ? { close_bottom_edge: true } : {}) });
   };
   const addHudSceneBinding = (
     sceneName: string,
