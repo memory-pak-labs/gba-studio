@@ -1231,7 +1231,7 @@ export function EventInspectorPanel({
         <EventCommandMenu
           allowRecipes={commandMenuStepIndex === null}
           event={event}
-          contextLabel={`${context?.name ? context.name + " · " : ""}${triggerLabel}${commandMenuInsertionTarget.kind === "trueBranch" ? " · Se sim" : commandMenuInsertionTarget.kind === "falseBranch" ? " · Se não" : ""}`}
+          contextLabel={`${context?.name ? context.name + " · " : ""}${ui(triggerLabel)}${commandMenuInsertionTarget.kind === "trueBranch" ? " · " + ui("Se sim") : commandMenuInsertionTarget.kind === "falseBranch" ? " · " + ui("Se não") : ""}`}
           onChangeQuery={setCommandMenuQuery}
           onChangeTab={setCommandMenuTab}
           onChooseSuggestion={(suggestion) => {

@@ -1,4 +1,5 @@
-import { uiText as ui, useStudioUiText } from "./studioUiText";
+import { useStudioUiText } from "./studioUiText";
+import { useStudioLocale } from "./i18n";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { Clock, Search, Star, X } from "lucide-react";
@@ -33,9 +34,10 @@ function libraryItems(suggestions: EventsWorkspaceCommandSuggestion[]): LibraryI
   }
   return [...unique.values()];
 }
-function description(item: EventsWorkspaceCommandSuggestion): string {
-  if (item.isRecipe) return `Insere uma sequência de ${item.steps?.length ?? 1} eventos para este comportamento.`;
-  return eventCommandDescription(item.command.split(/\s+/)[0] ?? "") ?? `Ação: ${item.label}. Configure os valores no inspetor após adicionar.`;
+function description(item: EventsWorkspaceCommandSuggestion, ui: ReturnType<typeof useStudioUiText>): string {
+  if (item.isRecipe) return ui("Insere uma sequência de {0} eventos para este comportamento.", { 0: item.steps?.length ?? 1 });
+  const text = eventCommandDescription(item.command.split(/\s+/)[0] ?? "");
+  return text ? ui(text) : ui("Ação: {0}. Configure os valores no inspetor após adicionar.", { 0: ui(item.label) });
 }
 function status(item: EventsWorkspaceCommandSuggestion): string {
   if (item.isRecipe) return "Modelo de script";
@@ -46,6 +48,7 @@ function status(item: EventsWorkspaceCommandSuggestion): string {
 
 export function EventBlockLibrary({ allowRecipes, event, contextLabel, stepIndex, query, tab, suggestions, onChangeQuery, onChangeTab, onChooseSuggestion, onClose }: EventCommandMenuProps): React.ReactElement {
   const ui = useStudioUiText();
+  const locale = useStudioLocale();
   const dialogRef = useRef<HTMLDivElement>(null);
   const searchRef = useRef<HTMLInputElement>(null);
   const returnFocusRef = useRef(document.activeElement as HTMLElement | null);
@@ -67,21 +70,28 @@ export function EventBlockLibrary({ allowRecipes, event, contextLabel, stepIndex
     const saved = item.preferenceIDs.map(id => favoriteOverrides[id]).filter(value => value !== undefined);
     return saved.length ? saved.some(Boolean) : item.isFavorite;
   };
-  const filtered = filterEventsCommandSuggestions(items, { query, tab: recipes ? "recipes" : "all" })
+  const matchingIDs = new Set(filterEventsCommandSuggestions(items.map(item => ({
+    ...item,
+    searchAliases: [...(item.searchAliases ?? []), ui(item.label), description(item, ui),
+      ...groups(item).map(group => `${ui(group.category)} ${ui(group.section ?? "")}`),
+      ...item.parameters.map(parameter => ui(parameter.label))]
+  })), { query, tab: recipes ? "recipes" : "all" }).map(item => item.id));
+  const filtered = items.filter(item => matchingIDs.has(item.id))
     .filter(item => recipes ? item.isRecipe : !item.isRecipe)
     .map(item => item as LibraryItem)
     .filter(item => shortcut === "favorites" ? favorites(item) : shortcut === "recent" ? item.preferenceIDs.some(id => recentIDs.includes(id)) : true);
   const counts = new Map<string, number>();
   filtered.forEach(item => new Set(groups(item).map(group => group.category)).forEach(name => counts.set(name, (counts.get(name) ?? 0) + 1)));
-  const categories = [...counts.entries()].sort(([left], [right]) => left.localeCompare(right, "pt-BR"));
+  const categories = [...counts.entries()].sort(([left], [right]) => ui(left).localeCompare(ui(right), locale));
   function itemGroup(item: LibraryItem) { return groups(item).find(group => !category || group.category === category)!; }
   const visible = filtered.filter(item => !category || groups(item).some(group => group.category === category))
     .sort((left, right) => {
       const a = itemGroup(left); const b = itemGroup(right);
-      return a.category.localeCompare(b.category, "pt-BR") || (a.section ?? "").localeCompare(b.section ?? "", "pt-BR") || left.label.localeCompare(right.label, "pt-BR");
+      return ui(a.category).localeCompare(ui(b.category), locale) || ui(a.section ?? "").localeCompare(ui(b.section ?? ""), locale) || ui(left.label).localeCompare(ui(right.label), locale);
     });
   const selected = visible.find(item => item.id === selectedID) ?? visible[0] ?? null;
-  const title = event ? `${stepIndex === null ? "Adicionar evento em" : "Trocar evento de"} ${event.name}` : `Escolher evento para ${contextLabel ?? "novo script"}`;
+  const context = contextLabel ?? event?.name ?? ui("Novo script");
+  const title = event ? ui(stepIndex === null ? "Adicionar evento em {0}" : "Trocar evento de {0}", { 0: event.name }) : ui("Escolher evento para {0}", { 0: context });
 
   useEffect(() => {
     searchRef.current?.focus();
@@ -119,7 +129,7 @@ export function EventBlockLibrary({ allowRecipes, event, contextLabel, stepIndex
   }
   const menu = <div className="event-library-backdrop" onMouseDown={e => { if (e.target === e.currentTarget) onClose(); }}>
     <div aria-label={title} aria-modal="true" role="dialog" className="event-library" ref={dialogRef} onKeyDown={keyDown}>
-      <header className="event-library-header"><div><strong>{stepIndex === null ? ui("Adicionar evento") : ui("Trocar evento")}</strong><small>{contextLabel ?? event?.name ?? ui("Novo script")}</small></div><button aria-label={ui("Fechar biblioteca de eventos")} onClick={onClose} type="button"><X size={16}/></button></header>
+      <header className="event-library-header"><div><strong>{stepIndex === null ? ui("Adicionar evento") : ui("Trocar evento")}</strong><small>{context}</small></div><button aria-label={ui("Fechar biblioteca de eventos")} onClick={onClose} type="button"><X size={16}/></button></header>
       <label className="event-library-search"><Search size={16}/><input aria-label={ui("Buscar evento")} placeholder={ui("Buscar evento por nome ou ação")} ref={searchRef} value={query} onChange={e => onChangeQuery(e.currentTarget.value)} type="search"/></label>
       <div className="event-library-tabs" role="tablist" aria-label={ui("Tipo de item")}><button role="tab" aria-selected={!recipes} onClick={() => { onChangeTab("all"); setCategory(null); setShortcut("all"); }} type="button">{ui("Eventos")}</button>{allowRecipes ? <button role="tab" aria-selected={recipes} onClick={() => { onChangeTab("recipes"); setCategory(null); setShortcut("all"); }} type="button">{ui("Modelos de script")}</button> : null}</div>
       <div className="event-library-body">
@@ -127,18 +137,18 @@ export function EventBlockLibrary({ allowRecipes, event, contextLabel, stepIndex
           <button type="button" aria-pressed={shortcut === "favorites"} onClick={() => { setShortcut(shortcut === "favorites" ? "all" : "favorites"); setCategory(null); }}><Star size={14}/>{ui("Favoritos")}</button>
           <button type="button" aria-pressed={shortcut === "recent"} onClick={() => { setShortcut(shortcut === "recent" ? "all" : "recent"); setCategory(null); }}><Clock size={14}/>{ui("Recentes")}</button>
           <hr/><button aria-pressed={!category && shortcut === "all"} type="button" onClick={() => { setCategory(null); setShortcut("all"); }}>{ui("Todos")}</button>
-          {categories.map(([name,count]) => <button key={name} aria-pressed={category === name} type="button" onClick={() => setCategory(name)}><span>{name}</span><small>{count}</small></button>)}
+          {categories.map(([name,count]) => <button key={name} aria-pressed={category === name} type="button" onClick={() => setCategory(name)}><span>{ui(name)}</span><small>{count}</small></button>)}
         </nav>
-        <section className="event-library-results" aria-label={ui("Resultados da busca")}><header><strong>{category ?? (shortcut === "all" ? recipes ? "Modelos de script" : "Eventos" : shortcut === "favorites" ? "Favoritos" : "Recentes")}</strong><small>{visible.length} {ui(" itens")}</small></header>
+        <section className="event-library-results" aria-label={ui("Resultados da busca")}><header><strong>{ui(category ?? (shortcut === "all" ? recipes ? "Modelos de script" : "Eventos" : shortcut === "favorites" ? "Favoritos" : "Recentes"))}</strong><small>{ui(visible.length === 1 ? "{0} item" : "{0} itens", { 0: visible.length })}</small></header>
           {visible.length ? visible.map((item, index) => {
             const group = itemGroup(item); const previous = index ? itemGroup(visible[index - 1]!) : null;
             const heading = !previous || group.category !== previous.category || group.section !== previous.section;
-            return <div key={item.id}>{heading && (!category || group.section) ? <h3 className="event-library-group">{category ? group.section : `${group.category}${group.section ? ` · ${group.section}` : ""}`}</h3> : null}<div className="event-library-row"><button type="button" aria-label={ui(item.label)} aria-pressed={selected?.id === item.id} tabIndex={selected?.id === item.id ? 0 : -1} className={`event-library-result${selected?.id === item.id ? " is-selected" : ""}`} onClick={() => setSelectedID(item.id)}><strong>{ui(item.label)}{item.isExtension ? <span className="event-library-origin">{ui("GBA Studio")}</span> : null}</strong><small>{description(item)}</small></button><button className="event-library-star" type="button" aria-label={ui("{0} {1} {2} favoritos", { 0: favorites(item) ? "Remover" : "Adicionar", 1: ui(item.label), 2: favorites(item) ? "dos" : "aos" })} aria-pressed={favorites(item)} onClick={() => toggleFavorite(item)}><Star size={14} fill={favorites(item) ? "currentColor" : "none"}/></button></div></div>;
+            return <div key={item.id}>{heading && (!category || group.section) ? <h3 className="event-library-group">{category ? ui(group.section) : `${ui(group.category)}${group.section ? ` · ${ui(group.section)}` : ""}`}</h3> : null}<div className="event-library-row"><button type="button" aria-label={ui(item.label)} aria-pressed={selected?.id === item.id} tabIndex={selected?.id === item.id ? 0 : -1} className={`event-library-result${selected?.id === item.id ? " is-selected" : ""}`} onClick={() => setSelectedID(item.id)}><strong>{ui(item.label)}{item.isExtension ? <span className="event-library-origin">{ui("GBA Studio")}</span> : null}</strong><small>{description(item, ui)}</small></button><button className="event-library-star" type="button" aria-label={ui(favorites(item) ? "Remover {0} dos favoritos" : "Adicionar {0} aos favoritos", { 0: ui(item.label) })} aria-pressed={favorites(item)} onClick={() => toggleFavorite(item)}><Star size={14} fill={favorites(item) ? "currentColor" : "none"}/></button></div></div>;
           }) : <p className="muted">{ui("Nenhum evento corresponde à busca.")}</p>}
         </section>
-        <aside className="event-library-preview" aria-label={ui("Descrição do evento")}>{selected ? <><header><strong>{ui(selected.label)}</strong><small className={`event-library-status is-${selected.runtimeStatus}`}>{status(selected)}</small>{selected.isExtension ? <small>{ui("Extensão GBA Studio")}</small> : null}</header><p>{description(selected)}</p>{selected.adaptation ? <p>{selected.adaptation}</p> : null}<strong>{ui("O que este evento configura")}</strong><dl>{selected.parameters.map(p => <div key={p.id}><dt>{ui(p.label)}</dt><dd>{p.options.length ? ui("Selecione um recurso ou valor.") : ui("Valor definido no inspetor.")}</dd></div>)}</dl>{selected.isRecipe ? <p>{selected.steps?.length ?? 1} {ui(" eventos serão inseridos juntos.")}</p> : <p className="muted">{ui("Configure os valores no inspetor após adicionar.")}</p>}<details><summary>{ui("Detalhes técnicos")}</summary><code>{selected.commandTemplate ?? selected.command}</code></details></> : <p>{ui("Selecione um evento para conhecer a ação.")}</p>}</aside>
+        <aside className="event-library-preview" aria-label={ui("Descrição do evento")}>{selected ? <><header><strong>{ui(selected.label)}</strong><small className={`event-library-status is-${selected.runtimeStatus}`}>{ui(status(selected))}</small>{selected.isExtension ? <small>{ui("Extensão GBA Studio")}</small> : null}</header><p>{description(selected, ui)}</p>{selected.adaptation ? <p>{ui(selected.adaptation)}</p> : null}<strong>{ui("O que este evento configura")}</strong><dl>{selected.parameters.map(p => <div key={p.id}><dt>{ui(p.label)}</dt><dd>{p.options.length ? ui("Selecione um recurso ou valor.") : ui("Valor definido no inspetor.")}</dd></div>)}</dl>{selected.isRecipe ? <p>{ui("{0} eventos serão inseridos juntos.", { 0: selected.steps?.length ?? 1 })}</p> : <p className="muted">{ui("Configure os valores no inspetor após adicionar.")}</p>}<details><summary>{ui("Detalhes técnicos")}</summary><code>{selected.commandTemplate ?? selected.command}</code></details></> : <p>{ui("Selecione um evento para conhecer a ação.")}</p>}</aside>
       </div>
-      <footer className="event-library-footer"><small>{stepIndex !== null ? ui("Substituir evento {0}", { 0: stepIndex + 1 }) : ui("Inserir em {0}", { 0: contextLabel ?? event?.name ?? "novo script" })}<span>{ui("↑↓ escolher · Enter adicionar · Esc fechar")}</span></small><button type="button" onClick={onClose}>{ui("Cancelar")}</button><button className="primary-button" disabled={!selected} type="button" onClick={choose}>{stepIndex === null ? ui("Adicionar evento selecionado") : ui("Trocar evento selecionado")}</button></footer>
+      <footer className="event-library-footer"><small>{stepIndex !== null ? ui("Substituir evento {0}", { 0: stepIndex + 1 }) : ui("Inserir em {0}", { 0: context })}<span>{ui("↑↓ escolher · Enter adicionar · Esc fechar")}</span></small><button type="button" onClick={onClose}>{ui("Cancelar")}</button><button className="primary-button" disabled={!selected} type="button" onClick={choose}>{stepIndex === null ? ui("Adicionar evento selecionado") : ui("Trocar evento selecionado")}</button></footer>
     </div>
   </div>;
   return createPortal(menu, document.body);
