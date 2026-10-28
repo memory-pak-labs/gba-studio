@@ -56,6 +56,7 @@ function fileMenu(sendCommand: (command: AppCommand) => void): MenuItemConstruct
         label: "Exportar ROM .gba"
       },
       { type: "separator" },
+      { label: "Fechar", role: "close", accelerator: "CmdOrCtrl+W" },
       { label: "Sair", role: "quit" }
     ]
   };

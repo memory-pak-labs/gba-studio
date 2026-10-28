@@ -23,6 +23,7 @@ describe("app menu template", () => {
       "Exportar Engine Pack",
       "Executar ROM",
       "Exportar ROM .gba",
+      "Fechar",
       "Sair"
     ]);
 
@@ -41,6 +42,15 @@ describe("app menu template", () => {
     expect(sendCommand).toHaveBeenCalledWith("engine:export");
     expect(sendCommand).toHaveBeenCalledWith("project:play");
     expect(sendCommand).toHaveBeenCalledWith("project:export-rom");
+  });
+
+  it.each([true, false])("closes the focused window through the native role (mac=%s)", (isMac) => {
+    const template = createAppMenuTemplate({ appName: "GBA Studio", isMac, locale: "pt-BR", sendCommand: vi.fn() });
+    const fileMenu = template.find(item => item.label === "Arquivo");
+    const close = (fileMenu!.submenu as Array<{ role?: string; accelerator?: string; click?: unknown }>)
+      .find(item => item.role === "close");
+    expect(close).toMatchObject({ role: "close", accelerator: "CmdOrCtrl+W" });
+    expect(close?.click).toBeUndefined();
   });
 
   it("keeps the macOS app menu before the File menu", () => {
