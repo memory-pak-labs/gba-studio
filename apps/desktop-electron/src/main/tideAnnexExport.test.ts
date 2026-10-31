@@ -15,8 +15,8 @@ it('exports the approved optional tide room and its saved inventory upgrade',()=
  expect(gallery.portals??[]).toEqual([]);
  const reset=exported.menu_project!.scripts!.find(s=>s.name==='titulo_novo_jogo')!.script;
  expect(reset).toContainEqual({op:'set_variable',variable:63,value:0});
- const inventory=exported.menu_project!.screens.find(s=>s.name==='inventario')!;
+ const inventory=exported.menu_project!.screens.find(s=>s.name==='inventario_modulos_2')!;
  expect(inventory.items).toContainEqual(expect.objectContaining({label:'ESTABILIZADOR',binding:{source:'variable',index:5,format:'on_off'}}));
  const wind=exported.shmup_project!.scripts!.find(s=>s.name==='tide_wind_tick')!;
- expect(wind.script).toContainEqual({op:'move_actor',actor:-1,x:0,y:1});
+ expect(wind.script).toContainEqual({op:'move_actor_relative',actor:-1,x:0,y:1});
 },30000);
