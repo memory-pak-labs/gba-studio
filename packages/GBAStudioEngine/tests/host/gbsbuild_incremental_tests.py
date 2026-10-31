@@ -167,7 +167,8 @@ class IncrementalBuildTests(unittest.TestCase):
         self.change_same_mtime(self.project/"npc.hpp","new-npc")
         calls=self.run_build()
         self.assertEqual(len(calls),1)
-        self.assertIn(str((self.project/"npc.cpp").resolve()),calls[0]["args"])
+        args=calls[0]["args"]
+        self.assertEqual(Path(args[args.index("-c")+1]).resolve(), (self.project/"npc.cpp").resolve())
     def test_shared_header_rebuilds_both_consumers(self):
         self.run_build();self.change_same_mtime(self.project/"shared.hpp","new-shared")
         self.assertEqual(len(self.run_build()),2)
