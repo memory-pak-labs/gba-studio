@@ -978,6 +978,8 @@
                 "set_actor_collision_enabled",
                 "set_actor_direction",
                 "set_actor_position",
+                "move_actor_to",
+                "move_actor_relative",
                 "set_actor_speed",
                 "set_actor_visible",
                 "set_audio_volume",

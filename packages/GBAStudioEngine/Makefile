@@ -35,6 +35,23 @@ GBA_LDFLAGS := $(GBA_ARCH) -nostartfiles -Wl,--gc-sections -T engine/startup/gba
 HOST_CXXFLAGS := -std=c++17 -Wall -Wextra -Werror -Iengine/include
 HOST_EVENT_RUNTIME_SRCS := engine/src/gbs_runtime.cpp engine/src/gbs_rtc.cpp engine/src/gbs_link.cpp engine/src/rumble.cpp engine/src/deferred_work.cpp engine/src/gbs_engine_global.cpp tests/host/hw_stubs.cpp
 
+.PHONY: racing-challenge-test menu-presentation-test
+host-test: racing-challenge-test menu-presentation-test
+racing-challenge-test: $(HOST_BUILD)/racing_challenge_tests
+	$(HOST_BUILD)/racing_challenge_tests
+$(HOST_BUILD)/racing_challenge_tests: tests/host/racing_challenge_tests.cpp engine/src/gbs_racing.cpp engine/src/gbs_event.cpp engine/src/gbs_save.cpp engine/src/gbs_info.cpp engine/src/gbs_dialogue_locale.cpp $(HOST_EVENT_RUNTIME_SRCS)
+	@mkdir -p $(@D)
+	$(HOST_CXX) $(HOST_CXXFLAGS) $^ -o $@
+menu-presentation-test: $(HOST_BUILD)/menu_presentation_tests
+	$(HOST_BUILD)/menu_presentation_tests
+	python3 tests/host/menu_hud_label_tests.py
+	python3 tests/host/hud_selector_pixels_tests.py
+	python3 tests/host/menu_text_input_presentation_tests.py
+	python3 tests/host/name_input_palette_tests.py
+$(HOST_BUILD)/menu_presentation_tests: tests/host/menu_presentation_tests.cpp engine/include/gbs/menu.hpp engine/include/gbs/menu_presentation.hpp
+	@mkdir -p $(@D)
+	$(HOST_CXX) $(HOST_CXXFLAGS) tests/host/menu_presentation_tests.cpp -o $@
+
 MOTION_HOST_TESTS := actor_move_runner_tests actor_move_threads_tests actor_move_relative_experimental_tests actor_move_sync_compat_experimental_tests iso_event_scheduler_tests iso_checkpoint_catalog_tests iso_checkpoint_scheduler_tests iso_temporal_checkpoint_tests iso_relative_checkpoint_experimental_tests iso_temporal_motion_tests motion_checkpoint_experimental_tests platformer_motion_catalog_experimental_tests platformer_motion_checkpoint_experimental_tests platformer_scripted_motion_tests scripted_motion_manager_tests topdown_motion_catalog_experimental_tests save_failure_feedback_experimental_tests menu_checkpoint_guard_tests isometric_screen_facing_tests
 MOTION_HOST_SRCS := engine/src/gbs_event.cpp engine/src/gbs_dialogue_locale.cpp engine/src/gbs_platformer.cpp engine/src/gbs_isometric.cpp engine/src/gbs_topdown.cpp $(HOST_EVENT_RUNTIME_SRCS) tests/host/motion_render_stubs.cpp
 MOTION_HOST_BINARIES := $(addprefix $(HOST_BUILD)/,$(MOTION_HOST_TESTS))
@@ -42,6 +59,8 @@ MOTION_HOST_BINARIES := $(addprefix $(HOST_BUILD)/,$(MOTION_HOST_TESTS))
 .PHONY: motion-checkpoint-test
 motion-checkpoint-test: $(MOTION_HOST_BINARIES)
 	@set -e; for test in $(MOTION_HOST_BINARIES); do "$$test"; echo "PASS $$test"; done
+	python3 tests/host/actor_motion_export_tests.py
+	python3 tests/host/isometric_screen_export_tests.py
 	python3 tests/host/isometric_save_dispatch_tests.py
 
 host-test: motion-checkpoint-test
@@ -592,6 +611,7 @@ assetc-test:
 	python3 tests/host/assetc_menu_focus_tests.py
 	python3 tests/host/assetc_menu_audio_feedback_tests.py
 	python3 tests/host/assetc_shmup_event_bindings_tests.py
+	python3 tests/host/player_damage_events_tests.py
 	@mkdir -p $(HOST_BUILD)/assetc
 	python3 tests/host/assetc_palette_quantization_tests.py
 	python3 tests/host/assetc_color_lookup_tests.py
@@ -2135,6 +2155,7 @@ portrait-tab-test: $(HOST_BUILD)/portrait_tab_tests
 	python3 tests/host/portrait_tab_frame_data_tests.py
 	$(HOST_BUILD)/portrait_tab_tests
 	python3 tests/host/interface_theme_tests.py
+	python3 tests/host/runtime_dialogue_portrait_tests.py
 
 $(HOST_BUILD)/portrait_tab_tests: tests/host/portrait_tab_tests.cpp engine/src/gbs_portrait_tab.c engine/src/gbs_text.c engine/include/gbs/portrait_tab_frame_data.h
 	@mkdir -p $(@D)
