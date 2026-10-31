@@ -23,6 +23,8 @@ code = r'''
 #include "gbs/render.hpp"
 gbs::EventState event_state {};
 gbs::EventPlayerRuntimeState player_event_runtime {true,0,0,0};
+bool scene_player_enabled=true;
+bool controlled_player_active() { return player_event_runtime.active && scene_player_enabled; }
 gbs::Actor player {};
 gbs::TopDownActorRuntime npc_runtimes[2] {};
 size_t current_npc_count() { return 2; }
@@ -52,7 +54,8 @@ int main() {
     event_state.actor_gesture_index=0; event_state.actor_gesture_frames=2; consume_topdown_actor_gesture();
     draw_topdown_actor_gesture({8,4}); assert(drawn==3 && drawn_at.x==112 && drawn_at.y==44);
     player_event_runtime.active=false; draw_topdown_actor_gesture({8,4}); assert(drawn==3);
-    player_event_runtime.active=true; event_state.actor_gesture_index=9; draw_topdown_actor_gesture({8,4}); assert(drawn==3);
+    player_event_runtime.active=true; scene_player_enabled=false; draw_topdown_actor_gesture({8,4}); assert(drawn==3);
+    scene_player_enabled=true; event_state.actor_gesture_index=9; draw_topdown_actor_gesture({8,4}); assert(drawn==3);
     event_state.actor_gesture_index=0; event_state.actor_gesture_actor=7; draw_topdown_actor_gesture({8,4}); assert(drawn==3);
     event_state.actor_gesture_actor=1; npc_runtimes[1].visible=false; draw_topdown_actor_gesture({8,4}); assert(drawn==3);
 }
