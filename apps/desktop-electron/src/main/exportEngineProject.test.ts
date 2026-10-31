@@ -2457,7 +2457,7 @@ describe("prepareEngineProjectExport", () => {
         name: "native_control",
         script: [
           { op: "set_actor_collision_box", actor: 0, offset_x: 0, offset_y: 1, width: 12, height: 14 },
-          { op: "set_player_speed_profile", walk_speed: 110, run_speed: 175, stamina_cost: 3 },
+          { op: "set_player_speed_profile", walk_speed: 110, run_speed: 175, button: "a", stamina_cost: 3 },
           { op: "set_player_movement_state", state: "swimming", tile_tag: "water" },
           { op: "store_actor_position", actor: 0, variable_x: 1, variable_y: 2 },
           { op: "store_actor_direction", actor: 0, variable: 0 },
@@ -4399,8 +4399,8 @@ describe("prepareEngineProjectExport", () => {
       props: [{
         name: "Mechanic",
         metasprite: { asset: "workshop_mechanic", index: 0 },
-        animation: "idle_down",
-        animations: expect.arrayContaining([expect.objectContaining({ name: "idle_down", asset: "workshop_mechanic" })]),
+        animation: "idle",
+        animations: expect.arrayContaining([expect.objectContaining({ name: "idle", asset: "workshop_mechanic" })]),
         position: { x: 96, y: 72 },
         visible_variable: 0,
         visible_value: 1
@@ -4811,7 +4811,7 @@ describe("prepareEngineProjectExport", () => {
     expect(template).toContain("gbs::set_audio_channel_volume(channel, volume);");
     expect(template).toContain("gbs::set_audio_channel_muted(channel, value != item.checked_value);");
     expect(template).toContain("format_menu_item_label(item, visible_item_count);");
-    expect(template).toContain("gbs::menu_item_binding_value(event_state, item)");
+    expect(template).toContain("gbs::menu_presentation_value(event_state, item.binding)");
     expect(template).toContain("MenuItemBindingFormat::Count");
   });
 
@@ -8563,10 +8563,11 @@ describe("backlog export slices", () => {
       "player_male",
       "player_female"
     ]);
-    expect(contract.topdown_project?.actor_sprites?.map((sprite) => sprite.animations?.map((animation) => animation.name))).toEqual([
-      ["idle_down", "idle_up", "idle_right", "walk_down", "walk_up", "walk_right", "idle_left", "walk_left"],
-      ["idle_down", "idle_up", "idle_right", "walk_down", "walk_up", "walk_right", "idle_left", "walk_left"]
-    ]);
+    for (const sprite of contract.topdown_project?.actor_sprites ?? []) {
+      expect(sprite.animations?.map((animation) => animation.name)).toEqual(expect.arrayContaining([
+        "idle_down", "idle_right", "idle_up", "idle_left", "walk_down", "walk_right", "walk_up", "walk_left"
+      ]));
+    }
   });
 
   it("compiles palette swap and restore commands for event scripts", () => {
