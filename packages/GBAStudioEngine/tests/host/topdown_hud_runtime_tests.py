@@ -40,6 +40,9 @@ extern "C" {
 void gbs_hw_begin_hud_layout(int) {}
 void gbs_hw_end_hud_layout() {}
 void gbs_hw_invalidate_hud_layout() {}
+int gbs_hw_hud_layout_retained() { return 0; }
+void gbs_hw_clear_hud_background_rect(int, int, int, int) {}
+void gbs_hw_refresh_hud_text_palette(int) {}
 void gbs_hw_draw_hud_layout_component(int, int, int, int, int, const char*, int, const void*, int) {}
 void gbs_hw_draw_hud_bar(const char*, const char*, int) {}
 void gbs_hw_draw_overlay_rect(int, int, int, int, int) {}

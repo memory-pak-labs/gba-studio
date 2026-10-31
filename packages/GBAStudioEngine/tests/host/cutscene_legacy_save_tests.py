@@ -20,6 +20,7 @@ def function(src, name):
     return src[match.start():end]
 code = r'''
 #include <cassert>
+#include <cstdlib>
 #include <cstring>
 #include "gbs/engine.hpp"
 #include "gbs/cutscene.hpp"
@@ -36,6 +37,18 @@ gbs::RuntimeSaveService service {bank,nullptr,&caps,1};
 gbs::UniversalSaveData universal {};
 unsigned char wire[2048] {}; size_t wire_size=0; unsigned cutscene_save_sequence=0;
 namespace gbs {
+// Fail if unrelated hardware operations are invoked by the save regression.
+// PE/COFF linkers can retain these event handlers even when ELF/Mach-O discard them.
+bool runtime_read_rtc_datetime(RtcDateTime&) { std::abort(); }
+void rumble_on() { std::abort(); }
+void rumble_on_for(uint16_t) { std::abort(); }
+void rumble_off() { std::abort(); }
+void multiplayer_open(MultiplayerSession&, uint8_t) { std::abort(); }
+void multiplayer_close(MultiplayerSession&) { std::abort(); }
+void multiplayer_set_data(MultiplayerSession&, uint16_t) { std::abort(); }
+bool multiplayer_transfer(MultiplayerSession&) { std::abort(); }
+uint8_t multiplayer_connected_count(const MultiplayerSession&) { std::abort(); }
+uint16_t multiplayer_get_data(const MultiplayerSession&, uint8_t) { std::abort(); }
 RuntimeSaveService* active_runtime_save_service(){return &service;}
 uint32_t frame_count(){return 123;}
 SaveStatus write_runtime_save(RuntimeSaveService& svc,int slot,const UniversalSaveData& data,const SaveMetadata& metadata) {universal=data;return write_save_slot_record(svc.bank,static_cast<size_t>(slot),&data,sizeof(data),metadata,1);}
