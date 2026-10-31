@@ -186,7 +186,8 @@ describe("runtime de telas de apresentação do menu", () => {
     )?.[0] ?? "";
 
     expect(helper).toContain("for (size_t actor_index = 0; actor_index < screen->actor_count; ++actor_index)");
-    expect(helper).toContain("if (menu_text_input_config(screen) != nullptr)");
+    expect(helper).toContain("if (menu_screen_uses_text_input_presentation(screen))");
+    expect(source).toMatch(/return menu_text_input_config\(screen\) != nullptr\s*&&\s*\(screen->hud_list_rows == 0 \|\| menu_text_input.editing\)/);
     expect(helper).toContain("actor.role == gbs::MenuActorRole::Option");
   });
 
