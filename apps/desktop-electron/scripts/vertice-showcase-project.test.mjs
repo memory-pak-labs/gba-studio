@@ -1856,6 +1856,11 @@ describe("materialização canônica de Vértice", () => {
         scene: "mapa_rota",
         requiredRoles: expect.arrayContaining(["route-map", "route-islands", "route-marker", "route-airship"]),
         missingRequiredRoles: []
+      }),
+      expect.objectContaining({
+        scene: "circuito_final",
+        requiredRoles: expect.arrayContaining(["racing-topdown-track", "racing-player", "racing-rival"]),
+        missingRequiredRoles: []
       })
     ]));
     expect(coverage.scenes.filter((scene) => [

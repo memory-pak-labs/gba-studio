@@ -8324,7 +8324,11 @@ export function projectAssetCoverage(project) {
     ['initial-menu-bg', 'title-porto-lumen-240x160-4bpp.png'],
     ['port-tiles', 'porto-lumen-continuous-paged.png'],
     ['nara-topdown', 'porto-nara-animations48.png'],
+    ['nara-topdown', 'nara-topdown-walk-run-v1.png'],
     ['mechanic', 'porto-mechanic-animations48.png'],
+    ['racing-topdown-track', 'racing-approved-topdown.png'],
+    ['racing-player', 'racing-approved-overhead-nara.png'],
+    ['racing-rival', 'racing-approved-overhead-rival.png'],
     ['dialogue-ui', 'gba-dialogue-font-v3.png'],
     ...[1, 2, 3].map(i => [`prologue-frame-${i}`, `prologue-clean-frame-${i}-240x160-4bpp.png`])
   ]) if (assets.some(asset => asset.name === file)) assetRoles.set(role, [file]);
