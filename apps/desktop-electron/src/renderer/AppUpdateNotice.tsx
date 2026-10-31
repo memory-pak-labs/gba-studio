@@ -3,10 +3,12 @@ import type { AppUpdateResult, AppUpdateState } from "../shared/appUpdates.js";
 import { useStudioI18n } from "./i18n";
 import { appUpdateText } from "./appUpdateText";
 import { StudioButton } from "./studioUi";
+import { useStudioUiText } from "./studioUiText";
 import "./styles/app-updates.css";
 
 export function AppUpdateNotice({ onRestart }: { onRestart(): Promise<AppUpdateResult> }): React.ReactElement | null {
   const { locale } = useStudioI18n();
+  const ui = useStudioUiText();
   const text = appUpdateText(locale);
   const [state, setState] = useState<AppUpdateState>({ status: "idle", currentVersion: "" });
   const [visible, setVisible] = useState(false);
@@ -60,7 +62,7 @@ export function AppUpdateNotice({ onRestart }: { onRestart(): Promise<AppUpdateR
     <section className="app-update-notice" aria-label={text.title}>
       <div role="status" aria-live="polite">
         <h2>{heading}</h2>
-        {state.currentVersion && <p className="app-update-version">GBA Studio {state.currentVersion}{state.version ? ` → ${state.version}` : ""}</p>}
+        {state.currentVersion && <p className="app-update-version">{ui("GBA Studio")} {state.currentVersion}{state.version ? ` → ${state.version}` : ""}</p>}
         <p>{installing || busy ? text.preparing : message}</p>
       </div>
       {state.status === "downloading" && <><progress aria-label={text.downloading} value={state.progress ?? 0} max={100}>{state.progress ?? 0}%</progress><span aria-hidden="true">{state.progress ?? 0}%</span></>}
