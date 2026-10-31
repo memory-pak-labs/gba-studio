@@ -108,7 +108,7 @@ describe("functionalIsometricProject", () => {
             tile: { x: 2, y: 2, z: 0 },
             screen_offset: { x: -16, y: -24 },
             metasprite: { asset: "actor_isometric", index: 0 },
-            animation: "idle_down",
+            animation: "idle_down_left",
             animations: expect.arrayContaining([
               expect.objectContaining({ name: "idle_down" }),
               expect.objectContaining({ name: "idle_up" }),
