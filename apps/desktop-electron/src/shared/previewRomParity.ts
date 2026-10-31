@@ -110,12 +110,14 @@ export function previewCommandToExportOps(command: string): string[] {
       return ["move_camera"];
     case "camera_set_bounds":
       return ["set_camera_bounds_x", "set_camera_bounds_y"];
-    case "move_actor":
     case "move_actor_relative":
+      return ["move_actor_relative"];
+    case "move_actor":
     case "set_actor_relative_position":
       return ["move_actor"];
-    case "set_actor_position":
     case "move_actor_to":
+      return ["move_actor_to"];
+    case "set_actor_position":
     case "teleport_actor":
       return ["set_actor_position"];
     case "set_actor_visible":

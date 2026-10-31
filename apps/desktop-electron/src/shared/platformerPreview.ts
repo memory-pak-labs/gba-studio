@@ -209,6 +209,12 @@ function moveAxis(
   return { hit, landed };
 }
 
+// Uses the same directional tile rules as ordinary Platformer physics.
+export function platformerScriptedStepBlocked(map: PlatformerPreviewMap, rect: {x: number; y: number; width: number; height: number}, dx: number, dy: number): boolean {
+  const body = createPlatformerPreviewBody(rect.x, rect.y, rect.width, rect.height);
+  return moveAxis(body, map, dx || dy, dx !== 0, false, false).hit;
+}
+
 function hasFloorSupport(body: PlatformerPreviewBody, map: PlatformerPreviewMap, ignoreOneWay: boolean): boolean {
   const candidate = { ...body, y: body.y + 0.5 };
   return verticalBlocked(candidate, map, 1, body.y + body.height, ignoreOneWay, false);

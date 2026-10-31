@@ -77,6 +77,7 @@ import {
   createPlatformerPreviewBody,
   stepPlatformerPreview,
   stepPlatformerBlankPreview,
+  platformerScriptedStepBlocked,
   type PlatformerPreviewBody,
   type PlatformerPreviewInput,
   type PlatformerPreviewMap
@@ -146,6 +147,7 @@ import {
 } from "./menuScene.js";
 import {
   isSpriteAnimationType,
+  isometricScreenFacingDirection,
   normalizeSpriteDirection,
   normalizeSpriteStateSlots,
   resolveSpriteStateForActor,
@@ -522,6 +524,7 @@ export interface PreviewNativeModal {
  variable?: string; code?: string; expected?: number; cursor: number; slots?: number; slot?: number; pause: boolean;
 }
 export interface PreviewNativeThread { frame: PreviewRuntimeScriptFrame; wait: number; continuations: PreviewRuntimeScriptFrame[]; }
+export interface PreviewActorMotion { token:number; actorID:string; targetX:number; targetY:number; remainder:number; owner:string|null; }
 export interface PreviewNativeEvents {
  buttons: Record<string, { event: string; override: boolean }>;
  pressedButtons: string[];
@@ -529,6 +532,8 @@ export interface PreviewNativeEvents {
  timers: Record<string, { frames: number; remaining: number; pending: boolean }>;
  threads: Record<string,PreviewNativeThread>;
  executingSegment: string | null;
+ actorMotions: Record<string,PreviewActorMotion>;
+ actorMotionSerial: number;
  actorStates: Record<string,string>;
  actorEffects: Record<string,{kind:string,frames:number,intensity:number,visible:boolean}>;
  cancelledMovement: Record<string,boolean>;
@@ -538,7 +543,7 @@ export interface PreviewNativeEvents {
  adventure: {state:string,frames:number};
 }
 function initialNativeEvents(): PreviewNativeEvents {
- return {buttons:{},pressedButtons:[],modal:null,timers:{},threads:{},executingSegment:null,actorStates:{},actorEffects:{},cancelledMovement:{},projectileSlots:{},projectiles:[],texts:[],adventure:{state:"ground",frames:0}};
+ return {buttons:{},pressedButtons:[],modal:null,timers:{},threads:{},executingSegment:null,actorMotions:{},actorMotionSerial:0,actorStates:{},actorEffects:{},cancelledMovement:{},projectileSlots:{},projectiles:[],texts:[],adventure:{state:"ground",frames:0}};
 }
 const integratedNativeSimulationVerbs=new Set(["attach_button","remove_button","open_menu","open_shop","open_code_lock","open_equip_menu","draw_text","start_segment","stop_segment","timer_attach","timer_restart","timer_remove","set_adventure_state","push_actor","cancel_actor_movement","set_actor_animation_state","actor_effects","projectile_load_slot","launch_projectile_slot"]);
 
@@ -551,6 +556,8 @@ export interface PreviewRuntimeScriptFrame {
   eventName: string;
   resolvedEventName: string;
   skipNextReason: string | null;
+  actorMotionID?: string;
+  actorMotionToken?: number;
   repeatCommandIndex?: number;
   repeatIterations?: number;
   /** Native exit/enter callback scripts suppress the room-enter consumer. */
@@ -3216,6 +3223,7 @@ function stateWithActors(state: PreviewRuntimeState, actors: PreviewRuntimeActor
         ...state.player,
         x: matchingPlayer.x,
         y: matchingPlayer.y,
+        z: matchingPlayer.z,
         direction: matchingPlayer.direction,
         renderLayer: matchingPlayer.renderLayer,
         spriteSheet: matchingPlayer.spriteSheet,
@@ -4563,6 +4571,32 @@ function runScriptFrameCommands(state: PreviewRuntimeState, frame: PreviewRuntim
       break doCommand;
     }
 
+    if ((verb === "move_actor_to" || verb === "move_actor_relative") && ["topdown", "platformer", "isometric", "isometricAdventure", "isometricTactical"].includes(currentState.currentRoom?.sceneType ?? "")) {
+      if (frame.actorMotionID !== undefined && frame.actorMotionToken !== undefined) {
+        const pending = currentState.nativeEvents.actorMotions[frame.actorMotionID];
+        if (!pending || pending.token !== frame.actorMotionToken) break doCommand;
+        return updateDebug({ ...currentState, scriptWaitFrames: 1,
+          scriptContinuations: [{ ...scriptFrameBase(), commandIndex: commandIndex + 1,
+            actorMotionID: frame.actorMotionID, actorMotionToken: frame.actorMotionToken }, ...currentState.scriptContinuations] });
+      }
+      const actor = actorByName(currentState, parts[0] ?? "");
+      if (!actor) {
+        currentState = appendUnsupported(currentState, resolvedEventName, command, "Ator inexistente.");
+        break doCommand;
+      }
+      const token = currentState.nativeEvents.actorMotionSerial + 1;
+      const motion: PreviewActorMotion = { token, actorID: actor.id,
+        targetX: verb === "move_actor_relative" ? actor.x + numberToken(parts[1], 0) : numberToken(parts[1], actor.x),
+        targetY: verb === "move_actor_relative" ? actor.y + numberToken(parts[2], 0) : numberToken(parts[2], actor.y),
+        remainder: 0, owner: currentState.nativeEvents.executingSegment };
+      currentState = runtimeScriptLog({ ...currentState, nativeEvents: { ...currentState.nativeEvents,
+        actorMotionSerial: token, actorMotions: { ...currentState.nativeEvents.actorMotions, [actor.id]: motion } } },
+        resolvedEventName, command, "movimento iniciado");
+      return updateDebug({ ...currentState, scriptWaitFrames: 1,
+        scriptContinuations: [{ ...scriptFrameBase(), commandIndex: commandIndex + 1,
+          actorMotionID: actor.id, actorMotionToken: token }, ...currentState.scriptContinuations] });
+    }
+
     if (verb === "idle" || verb === "wait") {
       const frames = eventWaitFrames(parseEventInstruction(command, undefined, false));
       currentState = runtimeScriptLog(currentState, resolvedEventName, command, `${frames} quadros`);
@@ -4932,11 +4966,17 @@ function applyIntegratedNativeSimulation(state:PreviewRuntimeState,parts:string[
  let native={...state.nativeEvents};
  if(verb==="attach_button") native.buttons={...native.buttons,[target!.toLowerCase()]:{event:arg!,override:extra==="true"}};
  else if(verb==="remove_button") {native.buttons={...native.buttons};delete native.buttons[target!.toLowerCase()];}
- else if(verb==="start_segment") native.threads={...native.threads,[target!]:{frame:nativeThreadFrame(state,arg!),wait:0,continuations:[]}};
+ else if(verb==="start_segment") {
+  native.actorMotions=Object.fromEntries(Object.entries(native.actorMotions).filter(([,motion])=>motion.owner!==target));
+  native.threads={...native.threads,[target!]:{frame:nativeThreadFrame(state,arg!),wait:0,continuations:[]}};
+ }
  else if(verb==="timer_attach") native.timers={...native.timers,[arg!]:{frames:Math.max(1,Number(target)),remaining:Math.max(1,Number(target)),pending:false}};
  else if(verb==="timer_restart") {if(native.timers[target!])native.timers={...native.timers,[target!]:{...native.timers[target!]!,remaining:native.timers[target!]!.frames,pending:false}};}
  else if(verb==="timer_remove") {native.timers={...native.timers};delete native.timers[target!];}
- else if(verb==="stop_segment") {native.threads={...native.threads};delete native.threads[target!];}
+ else if(verb==="stop_segment") {
+  native.threads={...native.threads};delete native.threads[target!];
+  native.actorMotions=Object.fromEntries(Object.entries(native.actorMotions).filter(([,motion])=>motion.owner!==target));
+ }
  else if(verb==="set_adventure_state") native.adventure={state:target!,frames:["dash","knockback","push"].includes(target!) ? (target==="push" ? 8 : 12) : 0};
  else if(verb==="draw_text") {
   const entry={x:Number(target),y:Number(arg),layer:extra!,text:parts.slice(4).join(" ")};
@@ -4961,7 +5001,10 @@ function applyIntegratedNativeSimulation(state:PreviewRuntimeState,parts:string[
    const direction=extra!;const dx=direction.includes("left") ? -1 : direction.includes("right") ? 1 : 0;
    const dy=direction.includes("up") ? -1 : direction.includes("down") ? 1 : 0;
    if(native.projectiles.length<8) native.projectiles=[...native.projectiles,{...slot,x:actor.x+0.5,y:actor.y+0.5,dx,dy,source:actor.id}];
-  } else if(verb==="cancel_actor_movement") native.cancelledMovement={...native.cancelledMovement,[actor.id]:true};
+  } else if(verb==="cancel_actor_movement") {
+   native.cancelledMovement={...native.cancelledMovement,[actor.id]:true};
+   native.actorMotions={...native.actorMotions};delete native.actorMotions[actor.id];
+  }
   else if(verb==="actor_effects") native.actorEffects={...native.actorEffects,[actor.id]:{kind:arg!,frames:Number(extra),intensity:Number(parts[4]),visible:actor.visible}};
   else if(verb==="set_actor_animation_state") {
    const matches=projectArray(state.project,"animationStates").filter(entry=>entry.id===arg || (entry.name===arg && entry.spriteSheet===actor.spriteSheet));
@@ -5022,8 +5065,83 @@ function dispatchIntegratedNativeModal(state:PreviewRuntimeState,action:PreviewR
   return {...state,equippedItems:equipped};
  } return state;
 }
+function previewActorRect(actor: PreviewRuntimeActor, x: number, y: number) {
+  const box = actor.collisionBox ?? { x: 0, y: 0, width: 16, height: 16 };
+  return { x: x + box.x, y: y + box.y, width: Math.max(0, box.width), height: Math.max(0, box.height) };
+}
+function previewActorMotionBlocked(state: PreviewRuntimeState, actor: PreviewRuntimeActor, x: number, y: number, dx: number, dy: number): boolean {
+  const room = state.currentRoom!;
+  const rect = previewActorRect(actor, x, y);
+  if (rect.width <= 0 || rect.height <= 0) return false;
+  const left = Math.floor(rect.x / 8), right = Math.floor((rect.x + rect.width - 1) / 8);
+  const top = Math.floor(rect.y / 8), bottom = Math.floor((rect.y + rect.height - 1) / 8);
+  if (room.sceneType === "platformer") {
+    const current = previewActorRect(actor, x - dx, y - dy);
+    if (platformerScriptedStepBlocked({ width: room.width, height: room.height, collisionTypes: room.collisionTypes }, current, dx, dy)) return true;
+  } else {
+    for (let ty = top; ty <= bottom; ty++) for (let tx = left; tx <= right; tx++)
+      if (isBlocked(room, tx, ty)) return true;
+  }
+  if (!actor.collisionEnabled) return false;
+  return state.actors.some(other => {
+    if (other.id === actor.id || !other.active || !other.visible || !other.collisionEnabled) return false;
+    const bounds = previewActorRect(other, Math.round(other.x * 8), Math.round(other.y * 8));
+    return rect.x < bounds.x + bounds.width && rect.x + rect.width > bounds.x &&
+      rect.y < bounds.y + bounds.height && rect.y + rect.height > bounds.y;
+  });
+}
+
+function tickPreviewActorMotions(state: PreviewRuntimeState): PreviewRuntimeState {
+  const room = state.currentRoom;
+  if (!room || !["topdown", "platformer", "isometric", "isometricAdventure", "isometricTactical"].includes(room.sceneType) || state.activeDialogue || state.startMenu.visible ||
+      state.nativeEvents.modal?.pause || previewSceneTypePaused(state)) return state;
+  const motions = { ...state.nativeEvents.actorMotions };
+  for (const [id, move] of Object.entries(motions)) {
+    const actor = actorByName(state, id);
+    if (!actor || !actor.active || !actor.visible || (move.owner !== null && !state.nativeEvents.threads[move.owner])) {
+      delete motions[id]; continue;
+    }
+    const isIso = ["isometric", "isometricAdventure", "isometricTactical"].includes(room.sceneType);
+    const scale = isIso ? 16 : 8;
+    let x = Math.round(actor.x * scale), y = Math.round(actor.y * scale), z = actor.z;
+    const targetX = Math.round(move.targetX * scale), targetY = Math.round(move.targetY * scale);
+    const speed = actor.movementSpeed ?? 100;
+    if (speed <= 0 || (x === targetX && y === targetY)) { delete motions[id]; continue; }
+    let total = move.remainder + speed;
+    let steps = Math.floor(total / 100);
+    total %= 100;
+    let direction = actor.direction;
+    while (steps-- > 0) {
+      const dx = x !== targetX ? (x < targetX ? 1 : -1) : 0;
+      const dy = dx === 0 && y !== targetY ? (y < targetY ? 1 : -1) : 0;
+      const nx = x + dx, ny = y + dy;
+      direction = dx < 0 ? "left" : dx > 0 ? "right" : dy < 0 ? "up" : "down";
+      let blocked = false;
+      if (isIso) {
+        const fromX = Math.floor(x / scale), fromY = Math.floor(y / scale);
+        const toX = Math.floor(nx / scale), toY = Math.floor(ny / scale);
+        if (fromX !== toX || fromY !== toY) {
+          const nextZ = room.heightLevels[toY * room.width + toX] ?? 0;
+          blocked = isBlocked(room, toX, toY) || Math.abs(nextZ - z) > 1 ||
+            !isometricRampAllowsTransition(room, fromX, fromY, toX, toY, {x: toX - fromX, y: toY - fromY}, z, nextZ) ||
+            state.actors.some(other => other.id !== id && other.active && other.visible &&
+              Math.floor(other.x) === toX && Math.floor(other.y) === toY && other.z === nextZ);
+          if (!blocked) z = nextZ;
+        }
+      } else blocked = previewActorMotionBlocked(state, actor, nx, ny, dx, dy);
+      if (blocked) { delete motions[id]; break; }
+      x = nx; y = ny;
+      if (x === targetX && y === targetY) { delete motions[id]; break; }
+    }
+    if (motions[id]) motions[id] = { ...move, remainder: total };
+    state = updateRuntimeActor(state, id, current => ({ ...current, x: x / scale, y: y / scale, z, direction }));
+  }
+  return { ...state, nativeEvents: { ...state.nativeEvents, actorMotions: motions } };
+}
+
 function tickIntegratedNativeSimulation(state:PreviewRuntimeState,frames:number):PreviewRuntimeState {
  for(let frame=0;frame<frames;++frame) {
+  state = tickPreviewActorMotions(state);
   for (const name of Object.keys(state.nativeEvents.timers)) {
    const timer = state.nativeEvents.timers[name]; if (!timer) continue;
    const due = timer.remaining <= 1;
@@ -5256,6 +5374,44 @@ function isBlocked(room: PreviewRuntimeRoom, x: number, y: number): boolean {
 function isometricFreeMovementEnabled(room: PreviewRuntimeRoom): boolean {
   const config = isometricSceneConfigFromRuntime(room.runtime);
   return room.sceneType === "isometric" && config?.gameplayMode === "adventure" && config.movement === "free";
+}
+
+type IsometricFreeInput = { delta: { x: number; y: number }; direction: string };
+
+function isometricFreeInput(action: PreviewRuntimeAction, heldActions: PreviewRuntimeAction[] = []): IsometricFreeInput | null {
+  const keys = new Set([action, ...heldActions]);
+  const horizontal = Number(keys.has("right")) - Number(keys.has("left"));
+  const vertical = Number(keys.has("down")) - Number(keys.has("up"));
+  const x = Math.sign(horizontal + vertical);
+  const y = Math.sign(vertical - horizontal);
+  if (!x && !y) return null;
+  const direction = horizontal && vertical
+    ? `${vertical < 0 ? "up" : "down"}-${horizontal < 0 ? "left" : "right"}`
+    : `screen_${horizontal ? (horizontal < 0 ? "left" : "right") : (vertical < 0 ? "up" : "down")}`;
+  return { delta: { x, y }, direction };
+}
+
+function isometricFreeStepSpeed(room: PreviewRuntimeRoom, delta: { x: number; y: number }): number {
+  if (!delta.x || !delta.y) return previewIsometricFreeMovementSpeedTilesPerSecond;
+  const config = isometricSceneConfigFromRuntime(room.runtime);
+  const width = config?.tileWidth ?? 32;
+  const height = config?.tileHeight ?? 16;
+  const edge = Math.floor(Math.sqrt(width * width + height * height));
+  const axis = delta.x === delta.y ? height : width;
+  return axis > 0 ? Math.floor((16 * edge + axis) / (2 * axis)) * 60 / 256 : 0;
+}
+
+function isometricFreeActorBlocks(state: PreviewRuntimeState, x: number, y: number, height: number): boolean {
+  return state.actors.some((actor) => actor.id !== state.player?.id && actor.roomName === state.currentRoom?.name && actor.visible
+    && Math.floor(actor.x) === x && Math.floor(actor.y) === y && actor.z === height);
+}
+
+function isometricFreeCornerIsOpen(state: PreviewRuntimeState, room: PreviewRuntimeRoom, fromX: number, fromY: number, toX: number, toY: number, height: number): boolean {
+  if (fromX === toX || fromY === toY) return true;
+  const heightAt = (x: number, y: number) => room.heightLevels[y * room.width + x] ?? 0;
+  return !isBlocked(room, toX, fromY) && !isBlocked(room, fromX, toY)
+    && !isometricFreeActorBlocks(state, toX, fromY, height) && !isometricFreeActorBlocks(state, fromX, toY, height)
+    && heightAt(toX, fromY) === height && heightAt(fromX, toY) === height && heightAt(toX, toY) === height;
 }
 
 function isometricRampAllowsTransition(
@@ -6462,7 +6618,21 @@ export function tickPreviewRuntime(
   heldMovement: PreviewRuntimeAction | null = null,
   heldActions: PreviewRuntimeAction[] = []
 ): PreviewRuntimeState {
-  const next = tickPreviewRuntimeFrame(state, deltaMs, heldMovement, heldActions);
+  let next = state;
+  let remaining = Math.max(0, deltaMs);
+  const frameDuration = 1000 / 60;
+  while (remaining > 0.0001 && (Object.keys(next.nativeEvents.actorMotions).length > 0 ||
+      previewScriptPending(next) || Object.keys(next.nativeEvents.threads).length > 0) &&
+      !isPreviewDebuggerBlocking(next) && !next.activeDialogue && !next.startMenu.visible &&
+      !next.nativeEvents.modal?.pause && !previewSceneTypePaused(next)) {
+    const chunk = Math.min(remaining, Math.max(0.0001, frameDuration - next.previewFrameElapsedMs));
+    const beforeFrame = next.previewFrame;
+    next = tickPreviewRuntimeFrame(next, chunk, heldMovement, heldActions);
+    if (next.previewFrame !== beforeFrame && next.nativeEvents.pressedButtons.length)
+      next = { ...next, nativeEvents: { ...next.nativeEvents, pressedButtons: [] } };
+    remaining -= chunk;
+  }
+  if (remaining > 0.0001 || next === state) next = tickPreviewRuntimeFrame(next, remaining, heldMovement, heldActions);
   if (!next.nativeEvents.pressedButtons.length || next.previewFrame === state.previewFrame) return next;
   return { ...next, nativeEvents: { ...next.nativeEvents, pressedButtons: [] } };
 }
@@ -6479,6 +6649,7 @@ function tickPreviewRuntimeFrame(
 
   const previousPreviewFrame = state.previewFrame;
   const topdownScriptWasActive = state.currentRoom?.sceneType === "topdown" && previewScriptPending(state);
+  const playerMotionWasActive = !!state.player && !!state.nativeEvents.actorMotions[state.player.id];
   state = tickPreviewFrameClock(tickPreviewAudioMix(state, deltaMs), deltaMs);
   if (state.hud.gameClock && state.hud.gameClock.frames > 0) {
     const clock = state.hud.gameClock;
@@ -6497,7 +6668,9 @@ function tickPreviewRuntimeFrame(
 
   if (state.currentRoom?.sceneType === "isometric" && state.player) {
     const heldDirection = heldMovement && isPreviewMovementAction(heldMovement)
-      ? isometricDirectionForAction(heldMovement)
+      ? isometricFreeMovementEnabled(state.currentRoom)
+        ? isometricFreeInput(heldMovement, heldActions)?.direction ?? null
+        : isometricDirectionForAction(heldMovement)
       : null;
     if (!heldDirection) {
       state = applyIsometricPlayerAnimation(state, "idle", state.player.direction);
@@ -6552,7 +6725,17 @@ function tickPreviewRuntimeFrame(
   const platformerFrameDelta = state.previewFrame - previousPreviewFrame;
 
   if (platformerPreviewActive && !previewSceneTypePaused(state)) {
-    nextState = tickPlatformerPreview(state, platformerFrameDelta, heldMovement, heldActions);
+    if (playerMotionWasActive && state.platformerPhysics && state.player) {
+      const body = state.platformerPhysics;
+      nextState = { ...state, platformerPhysics: { ...body,
+        x: state.player.x * gbaTileSizePx + body.collisionOffsetX,
+        y: state.player.y * gbaTileSizePx + body.collisionOffsetY,
+        facing: state.player.direction === "left" ? "left" : state.player.direction === "right" ? "right" : body.facing
+      } };
+      nextState = applyPreviewCameraZone(runTriggerOverlap(applyPlatformerPreviewCamera(nextState)));
+    } else {
+      nextState = tickPlatformerPreview(state, platformerFrameDelta, heldMovement, heldActions);
+    }
     nextState = { ...nextState, movementElapsedMs: 0 };
   } else if (
     heldMovement &&
@@ -6564,10 +6747,12 @@ function tickPreviewRuntimeFrame(
     state.currentRoom &&
     state.player
     && !previewSceneTypePaused(state)
+    && !playerMotionWasActive && !(state.player && state.nativeEvents.actorMotions[state.player.id])
     && !topdownScriptWasActive && !(state.currentRoom.sceneType === "topdown" && previewScriptPending(state))
   ) {
     if (isometricFreeMovementEnabled(state.currentRoom)) {
-      nextState = tryMovePreviewPlayerContinuously(state, heldMovement, deltaMs);
+      const input = isometricFreeInput(heldMovement, heldActions);
+      nextState = input ? tryMovePreviewPlayerContinuously(state, input, deltaMs) : state;
       nextState = { ...nextState, movementElapsedMs: 0 };
     } else {
       const settings = isRecord(state.project.settings) ? state.project.settings : {};
@@ -6873,6 +7058,18 @@ function applyIsometricPlayerAnimation(
     animationStateID: nullableString(actor?.animationStateID),
     spriteSheet: state.player.spriteSheet
   });
+  const screenDirection = /^screen_(up|down|left|right)$/.exec(direction)?.[1];
+  const allowedIDs = selectedState ? new Set(selectedState.animationIDs) : null;
+  const screenAnimation = screenDirection ? animations.find((candidate) => {
+    const id = nullableString(candidate.id);
+    if (!id || (allowedIDs && !allowedIDs.has(id)) || nullableString(candidate.spriteSheet) !== state.player?.spriteSheet) return false;
+    const name = nullableString(candidate.name) ?? undefined;
+    const stateName = (nullableString(candidate.state) ?? "").toLowerCase();
+    const motion = /^(walk|walking|move|moving|run|running)$/.test(stateName) || /^(walk|move|moving|run)[_-]/i.test(name ?? "")
+      ? "walk" : stateName === "idle" || /^idle[_-]/i.test(name ?? "") ? "idle" : null;
+    return motion === animationState && isometricScreenFacingDirection({ id, name, direction: nullableString(candidate.direction) }) === screenDirection;
+  }) : undefined;
+  const legacyDirection = ({ screen_up: "down", screen_down: "right", screen_left: "down", screen_right: "right" } as Record<string, string>)[direction] ?? direction;
   const normalizedAnimationID = selectedState
     ? normalizeSpriteStateSlots(
         selectedState,
@@ -6887,12 +7084,12 @@ function applyIsometricPlayerAnimation(
           }] : [];
         }),
         "isometric"
-      ).slots[`${animationState === "walk" ? "moving" : "idle"}_${normalizeSpriteDirection(direction, "isometric")}`].animationID
+      ).slots[`${animationState === "walk" ? "moving" : "idle"}_${normalizeSpriteDirection(legacyDirection, "isometric")}`].animationID
     : null;
   const normalizedAnimation = normalizedAnimationID
     ? animations.find((candidate) => nullableString(candidate.id) === normalizedAnimationID)
     : undefined;
-  const animation = normalizedAnimation ?? animations.find((candidate) => (
+  const animation = screenAnimation ?? normalizedAnimation ?? animations.find((candidate) => (
     nullableString(candidate.spriteSheet) === state.player?.spriteSheet &&
     nullableString(candidate.state) === animationState &&
     nullableString(candidate.direction) === direction
@@ -6924,13 +7121,14 @@ function tryMovePreviewPlayer(state: PreviewRuntimeState, action: PreviewRuntime
     return updateDebug(state);
   }
 
+  const freeInput = isometricFreeMovementEnabled(state.currentRoom) ? isometricFreeInput(action) : null;
   const isometricDirection = state.currentRoom.sceneType === "isometric"
-    ? isometricDirectionForAction(action)
+    ? freeInput?.direction ?? isometricDirectionForAction(action)
     : null;
   const room = state.currentRoom;
   const player = state.player;
   if (!room || !player) return updateDebug(state);
-  const delta = room.sceneType === "isometric"
+  const delta = freeInput?.delta ?? (room.sceneType === "isometric"
     ? ({
         up: { x: 0, y: -1 },
         down: { x: -1, y: 0 },
@@ -6942,19 +7140,26 @@ function tryMovePreviewPlayer(state: PreviewRuntimeState, action: PreviewRuntime
         down: { x: 0, y: 1 },
         left: { x: -1, y: 0 },
         right: { x: 1, y: 0 }
-      }[action as "up" | "down" | "left" | "right"]);
+      }[action as "up" | "down" | "left" | "right"]));
 
   const nextX = player.x + delta.x;
   const nextY = player.y + delta.y;
-  if (isBlocked(room, nextX, nextY)) {
+  const tileX = freeInput ? Math.floor(nextX) : nextX;
+  const tileY = freeInput ? Math.floor(nextY) : nextY;
+  const fromTileX = freeInput ? Math.floor(player.x) : player.x;
+  const fromTileY = freeInput ? Math.floor(player.y) : player.y;
+  const targetHeight = room.heightLevels[tileY * room.width + tileX] ?? 0;
+  if (isBlocked(room, tileX, tileY) || (freeInput && (isometricFreeActorBlocks(state, tileX, tileY, targetHeight)
+    || !isometricFreeCornerIsOpen(state, room, fromTileX, fromTileY, tileX, tileY, player.z)))) {
     return updateDebug(isometricDirection
       ? applyIsometricPlayerAnimation(state, "idle", isometricDirection)
       : state);
   }
   const nextZ = room.sceneType === "isometric"
-    ? room.heightLevels[nextY * room.width + nextX] ?? 0
+    ? targetHeight
     : player.z;
-  if (room.sceneType === "isometric" && Math.abs(nextZ - player.z) > 1) {
+  if (room.sceneType === "isometric" && (Math.abs(nextZ - player.z) > 1 ||
+    (freeInput && !isometricRampAllowsTransition(room, fromTileX, fromTileY, tileX, tileY, delta, player.z, nextZ)))) {
     return updateDebug(isometricDirection
       ? applyIsometricPlayerAnimation(state, "idle", isometricDirection)
       : state);
@@ -6977,29 +7182,21 @@ function tryMovePreviewPlayer(state: PreviewRuntimeState, action: PreviewRuntime
 
 function tryMovePreviewPlayerContinuously(
   state: PreviewRuntimeState,
-  action: PreviewRuntimeAction,
+  input: IsometricFreeInput,
   deltaMs: number
 ): PreviewRuntimeState {
   if (!state.currentRoom || !state.player || state.activeDialogue || deltaMs <= 0) {
     return updateDebug(state);
   }
 
-  const isometricDirection = isometricDirectionForAction(action);
-  if (!isometricDirection) return updateDebug(state);
   const room = state.currentRoom;
   const player = state.player;
-  const delta = ({
-    up: { x: 0, y: -1 },
-    down: { x: -1, y: 0 },
-    left: { x: 0, y: 1 },
-    right: { x: 1, y: 0 }
-  } as const)[action as "up" | "down" | "left" | "right"];
-  if (!delta) return updateDebug(state);
+  const { delta, direction } = input;
 
   let x = player.x;
   let y = player.y;
   let z = player.z;
-  let remaining = Math.max(0, deltaMs) / 1000 * previewIsometricFreeMovementSpeedTilesPerSecond;
+  let remaining = Math.max(0, deltaMs) / 1000 * isometricFreeStepSpeed(room, delta);
   let moved = false;
 
   while (remaining > 0) {
@@ -7016,6 +7213,8 @@ function tryMovePreviewPlayerContinuously(
       : z;
 
     if (isBlocked(room, nextTileX, nextTileY)
+      || (changedTile && isometricFreeActorBlocks(state, nextTileX, nextTileY, nextZ))
+      || (changedTile && !isometricFreeCornerIsOpen(state, room, currentTileX, currentTileY, nextTileX, nextTileY, z))
       || (changedTile && Math.abs(nextZ - z) > 1)
       || (changedTile && !isometricRampAllowsTransition(
         room,
@@ -7049,7 +7248,7 @@ function tryMovePreviewPlayerContinuously(
   const animatedState = applyIsometricPlayerAnimation(
     movedState,
     moved ? "walk" : "idle",
-    isometricDirection
+    direction
   );
   return applyPreviewCameraZone(runTriggerOverlap(animatedState));
 }

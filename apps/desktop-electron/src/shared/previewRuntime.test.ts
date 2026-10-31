@@ -876,13 +876,14 @@ describe("Preview Runtime", () => {
 
     expect(bootResults.map((item) => item.command)).toEqual(commands);
     const unavailableVerbs = new Set([
-      "launch_projectile_slot", "cancel_actor_movement", "actor_effects", "set_actor_animation_state", "open_shop", "push_actor",
+      "launch_projectile_slot", "cancel_actor_movement", "move_actor_to", "move_actor_relative", "actor_effects", "set_actor_animation_state", "open_shop", "push_actor",
       "luta_start_match", "luta_end_match", "luta_set_super_gauge", "luta_add_super_gauge", "luta_set_guard_power",
       "luta_set_ism_style", "luta_trigger_super", "luta_enable_alpha_counter", "luta_set_round_timer", "luta_set_rounds_to_win",
       "gbvm_script", "printer",
       // The carried player makes this catalog branch reachable after a topdown warp.
       "attach_platform_callback", "set_platform_state", "remove_platform_callback", "run_audio_routine"
     ]);
+    expect(bootResults.find(item => item.command.startsWith("move_actor_to "))).toMatchObject({ result: "unsupported", detail: "Ator inexistente." });
     expect(bootResults.filter(item => item.result === "unsupported").map(item => item.command.split(/\s+/)[0])).toEqual(
       commands.map(command => command.split(/\s+/)[0]).filter(verb => unavailableVerbs.has(verb!))
     );
@@ -913,7 +914,7 @@ describe("Preview Runtime", () => {
             { command: "set_flag story.progress true" },
             { command: "add_variable_flags story.flags 1" },
             { command: "set_actor_position Guide 6 7" },
-            { command: "move_actor_relative Guide 1 -2" },
+            { command: "set_actor_relative_position Guide 1 -2" },
             { command: "set_actor_direction Guide left" },
             { command: "set_actor_animation Guide walk" },
             { command: "set_actor_visible Guide false" },
@@ -1910,16 +1911,16 @@ describe("Preview Runtime", () => {
 
     const walking = tickPreviewRuntime(runtime, 200, "right");
     expect(walking.player).toMatchObject({
-      x: 2.75,
-      y: 2,
+      x: 2.421875,
+      y: 1.578125,
       z: 0,
-      direction: "down-right",
+      direction: "screen_right",
       animationName: "idle_down_right"
     });
 
     const idle = tickPreviewRuntime(walking, 0, null);
     expect(idle.player).toMatchObject({
-      direction: "down-right",
+      direction: "screen_right",
       animationName: "idle_down_right"
     });
   });
@@ -1928,16 +1929,16 @@ describe("Preview Runtime", () => {
     const project = setRoomCollisionCellInProject(
       buildFunctionalIsometricProject(),
       "room-market",
-      (2 * 30) + 3,
+      (1 * 30) + 3,
       true
     );
     const runtime = createPreviewRuntime(project);
 
-    const blocked = tickPreviewRuntime(runtime, 400, "right");
+    const blocked = tickPreviewRuntime(runtime, 1000, "right");
 
     expect(blocked.player).toMatchObject({
-      y: 2,
-      direction: "down-right",
+      y: 1.0625,
+      direction: "screen_right",
       animationName: "idle_down_right"
     });
     expect(blocked.player?.x).toBeCloseTo(2.9375);
@@ -3522,7 +3523,7 @@ describe("Preview Runtime", () => {
         cameraZones: [{
           id: "camera-zone-iso",
           name: "Mapa",
-          area: { x: 2, y: 1, width: 1, height: 1 },
+          area: { x: 2, y: 0, width: 1, height: 1 },
           bounds: { x: 0, y: 0, width: 512, height: 256 },
           offset: { x: 0, y: 0 },
           lockX: false,
@@ -3535,7 +3536,7 @@ describe("Preview Runtime", () => {
     const entered = dispatchPreviewRuntimeAction(runtime, "right");
 
     expect(entered.activeCameraZoneID).toBe("camera-zone-iso");
-    expect(entered.camera).toMatchObject({ x: 40, y: 0 });
+    expect(entered.camera).toMatchObject({ x: 56, y: 0 });
   });
 
   it("boots an isometric room with the same player framing used after movement", () => {
