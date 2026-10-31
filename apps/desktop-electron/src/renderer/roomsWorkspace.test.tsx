@@ -1040,7 +1040,10 @@ describe("RoomsWorkspace React smoke", () => {
       "farol_interior",
       "circuito_perspectiva",
       "galeria_das_mares",
-      "sala_mare_vazante"
+      "sala_mare_vazante",
+      "corrida_preparacao",
+      "corrida_resultados",
+      "inventario_ferramentas"
     ]);
 
     for (const scene of hudScenes) {
@@ -1068,7 +1071,7 @@ describe("RoomsWorkspace React smoke", () => {
 
       cleanup();
     }
-  }, 90_000);
+  }, 180_000);
 
   it("exibe sprites de componentes da HUD no canvas e permite escolher o asset no inspetor", async () => {
     const user = userEvent.setup();
