@@ -18,6 +18,10 @@ describe('approved campaign extensions survive regeneration',()=>{
   for(const asset of before.assets.filter(a=>a.name && authored.includes(a.name)))expect(after.assets.find(a=>a.id===asset.id)).toEqual(asset);
   for(const dialogue of before.dialogues.filter(d=>d.key?.startsWith('race_')))expect(after.dialogues.find(d=>d.key===dialogue.key)).toEqual(dialogue);
   for(const event of before.events.filter(e=>e.name?.startsWith('race_')||e.name==='nara_configurar_corrida'))expect(after.events.find(e=>e.name===event.name)).toEqual(event);
+  const extraNames=new Set(['corrida_preparacao','corrida_resultados','inventario_ferramentas']);
+  const extraConnections=project=>project.editorState.scenaConnections.filter(c=>extraNames.has(c.from)||extraNames.has(c.to));
+  expect(extraConnections(before).length).toBeGreaterThan(0);
+  expect(extraConnections(after)).toEqual(extraConnections(before));
   for(const key of ['scenas','actors','events','assets','animations','animationStates']) {
    const ids=new Set(after[key].map(item=>item.id));
    expect(before[key].filter(item=>!ids.has(item.id))).toEqual([]);

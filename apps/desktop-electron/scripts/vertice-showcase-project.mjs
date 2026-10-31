@@ -9072,6 +9072,11 @@ export function promoteExemploGBAVerticeCampaign(data) {
   result.editorState = result.editorState ?? {};
   result.editorState.sceneMapPositions = { ...(result.editorState.sceneMapPositions ?? {}) };
   for (const scene of extraScenes) if (sourcePositions[scene.name]) result.editorState.sceneMapPositions[scene.name] = structuredClone(sourcePositions[scene.name]);
+  const touchesExtraScene = connection => APPROVED_EXTRA_MENU_SCENES.has(connection?.from) || APPROVED_EXTRA_MENU_SCENES.has(connection?.to);
+  result.editorState.scenaConnections = [
+    ...(result.editorState.scenaConnections ?? []).filter(connection => !touchesExtraScene(connection)),
+    ...(data.editorState?.scenaConnections ?? []).filter(touchesExtraScene).map(connection => structuredClone(connection))
+  ];
   return result;
 }
 
