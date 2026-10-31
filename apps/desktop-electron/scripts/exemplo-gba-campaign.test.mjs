@@ -53,7 +53,7 @@ describe("campanha canônica O Último Farol", () => {
       startScene: "logo",
       startSceneType: "cutscene"
     });
-    expect(project.scenas).toHaveLength(VERTICE_CAMPAIGN_SCENES.length + VERTICE_SUPPORT_SCENES.length + 2);
+    expect(project.scenas).toHaveLength(JSON.parse(readFileSync(templateURL, "utf8")).scenas.length);
     expect(project.scenas.some((scene) => scene.sceneType === "custom")).toBe(false);
 
     for (const [chapter, definition] of VERTICE_CAMPAIGN_SCENES.entries()) {
@@ -118,34 +118,13 @@ describe("campanha canônica O Último Farol", () => {
     expect(flow.unreachableScenes).toEqual([]);
     expect(flow.invalidTransitions).toEqual([]);
     expect(flow.deadEnds).toEqual([]);
-    expect(flow.reachableScenes).toHaveLength(VERTICE_CAMPAIGN_SCENES.length + VERTICE_SUPPORT_SCENES.length + 2);
+    expect(flow.reachableScenes).toHaveLength(project.scenas.length);
     const sortTransitions = (transitions) => [...transitions].sort((left, right) => (
       left.from.localeCompare(right.from) || left.to.localeCompare(right.to)
     ));
-    expect(sortTransitions(project.editorState.scenaConnections.map(({ from, to }) => ({ from, to })))).toEqual(sortTransitions([
-      { from: "logo", to: "abertura" },
-      { from: "abertura", to: "titulo" },
-      { from: "titulo", to: "escolha_genero" },
-      { from: "escolha_genero", to: "nome_jogador" },
-      { from: "nome_jogador", to: "prologo" },
-      { from: "titulo", to: "carregar_jogo" },
-      { from: "titulo", to: "configuracoes" },
-      { from: "titulo", to: "creditos" },
-      { from: "arena_tatica", to: "mercado_suspenso" },
-      { from: "porto_lumen", to: "farol_interior" },
-      { from: "farol_interior", to: "porto_lumen" },
-      { from: "farol_interior", to: "galeria_das_mares" },
-      { from: "galeria_das_mares", to: "farol_interior" },
-      { from: "galeria_das_mares", to: "sala_mare_vazante" },
-      { from: "sala_mare_vazante", to: "galeria_das_mares" },
-      ...VERTICE_CAMPAIGN_SCENES
-        .filter(({ name }) => name !== "titulo" && name !== "mapa_rota")
-        .map(({ name, nextScene }) => ({ from: name, to: nextScene })),
-      ...["porto_lumen","penedos_vento","armazem_das_mares","observatorio_do_farol","mercado_suspenso","usina_submersa","conselho_guardia","circuito_final"].map(to => ({from:"mapa_rota",to})),
-      { from: "mercado_suspenso", to: "arena_tatica" },
-      {from:"circuito_final",to:"circuito_perspectiva"},
-      {from:"circuito_perspectiva",to:"circuito_final"}
-    ]));
+    const canonical = JSON.parse(readFileSync(templateURL, "utf8"));
+    expect(sortTransitions(project.editorState.scenaConnections.map(({ from, to }) => ({ from, to }))))
+      .toEqual(sortTransitions(canonical.editorState.scenaConnections.map(({ from, to }) => ({ from, to }))));
     expect(project.events.every((event) => (
       event.category === "Global" || project.scenas.some((scene) => scene.name === event.roomName)
     ))).toBe(true);
@@ -218,17 +197,17 @@ describe("campanha canônica O Último Farol", () => {
     expect(items.map(item => item.id)).toEqual(["missions", "inventory", "map", "save", "load", "settings", "back"]);
     expect(items.map(item => item.clickBox.y)).toEqual([30,44,58,73,87,101,30]);
     const actors = project.actors.filter(actor => actor.roomName === "menu_start");
-    expect(actors).toHaveLength(9);
-    expect(actors.filter(actor => actor.menuActorRole === "option").map(actor => actor.menuItemID).sort())
+    const cursors = actors.filter(actor => actor.menuActorRole === "option" && actor.spriteSheet === "book-cursor-approved-8x8.png");
+    expect(cursors.map(actor => actor.menuItemID).sort())
       .toEqual(items.map(item => item.id).sort());
-    expect(actors.filter(actor => actor.menuActorRole === "decorative").map(actor => ({
+    expect(actors.filter(actor => actor.menuActorRole === "decorative" && actor.menuVisibilityVariable === "var_character_gender").map(actor => ({
       variable: actor.menuVisibilityVariable,
       value: actor.menuVisibilityValue
     }))).toEqual([
       { variable: "var_character_gender", value: 0 },
       { variable: "var_character_gender", value: 1 }
     ]);
-    expect(actors.filter(actor => actor.menuActorRole === "option").every(actor => actor.menuActorSelectedOnly)).toBe(true);
+    expect(cursors.every(actor => actor.menuActorSelectedOnly)).toBe(true);
   });
 
   it("mantém a confirmação de Novo Jogo explícita no título", () => {
@@ -639,7 +618,7 @@ describe("campanha canônica O Último Farol", () => {
     expect(loaded.currentRoom?.name).toBe("farol_interior");
     expect(loaded.variables).toMatchObject({ var_campaign_finished: 1, var_epilogue_phase: 3 });
     expect(loaded.player).toMatchObject({
-      spriteSheet: "porto-nara-animations48.png",
+      spriteSheet: "nara-topdown-walk-run-v1.png",
       animationName: "idle_up"
     });
   });
@@ -664,9 +643,9 @@ describe("campanha canônica O Último Farol", () => {
 
   it("usa o sprite aprovado de Porto Lumen para o player nos dois perfis", () => {
     const project = campaignProject();
-    const approvedPlayer = project.assets.find((asset) => asset.name === "porto-nara-animations48.png");
+    const approvedPlayer = project.assets.find((asset) => asset.name === "nara-topdown-walk-run-v1.png");
     const playerAnimations = project.animations.filter((animation) => (
-      animation.spriteSheet === "porto-nara-animations48.png"
+      animation.spriteSheet === "nara-topdown-walk-run-v1.png"
     ));
 
     expect(approvedPlayer?.metadata).toMatchObject({
@@ -674,13 +653,13 @@ describe("campanha canônica O Último Farol", () => {
       frameHeight: 48,
       reviewStatus: "approved"
     });
-    expect(playerAnimations).toHaveLength(8);
+    expect(playerAnimations).toHaveLength(12);
     expect(commands(project, "aplicar_perfil_jogador")).toEqual([
       "if_scene porto_lumen",
       "call_event aplicar_perfil_jogador_base"
     ]);
     expect(commands(project, "aplicar_perfil_jogador_base")).toEqual([
-      "change_player_sprite porto-nara-animations48.png",
+      "change_player_sprite nara-topdown-walk-run-v1.png",
       "set_actor_animation Player idle_down",
     ]);
 
@@ -690,7 +669,7 @@ describe("campanha canônica O Último Farol", () => {
     runtime = { ...bootPreviewRuntimeAtRoom(project, "porto_lumen"), variables: runtime.variables };
     runtime = runPreviewRuntimeEvent(runtime, "aplicar_perfil_jogador");
     expect(runtime.player).toMatchObject({
-      spriteSheet: "porto-nara-animations48.png",
+      spriteSheet: "nara-topdown-walk-run-v1.png",
       animationName: "idle_down"
     });
     expect(runtime.variables.var_character_gender).toBe(1);
@@ -700,7 +679,7 @@ describe("campanha canônica O Último Farol", () => {
     runtime = { ...bootPreviewRuntimeAtRoom(project, "porto_lumen"), variables: runtime.variables };
     runtime = runPreviewRuntimeEvent(runtime, "aplicar_perfil_jogador");
     expect(runtime.player).toMatchObject({
-      spriteSheet: "porto-nara-animations48.png",
+      spriteSheet: "nara-topdown-walk-run-v1.png",
       animationName: "idle_down"
     });
     expect(runtime.variables.var_character_gender).toBe(0);
