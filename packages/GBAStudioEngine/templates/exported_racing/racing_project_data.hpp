@@ -5,6 +5,9 @@
 
 namespace gbastudio_racing_project {
 
+constexpr const gbs::DialoguePortraitEntry* dialogue_portrait_assets = nullptr;
+constexpr size_t dialogue_portrait_asset_count = 0;
+
 constexpr bool save_enabled = false;
 constexpr gbs::SaveBank save_bank {
     0u,

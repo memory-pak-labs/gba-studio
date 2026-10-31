@@ -232,7 +232,14 @@ resource-manager-stack-test: check-toolchain
 runtime-save-memory-test: check-toolchain
 	DEVKITARM="$(DEVKITARM)" python3 tests/host/runtime_save_memory_tests.py
 
-test: runtime-save-memory-test
+test: runtime-save-memory-test default-dialogue-templates-test
+
+.PHONY: default-dialogue-templates-test
+default-dialogue-templates-test: check-toolchain
+	@mkdir -p $(BUILD_DIR)/default-dialogue-templates
+	$(ARM_CXX) $(GBA_CXXFLAGS) -c templates/exported_shmup/main.cpp -o $(BUILD_DIR)/default-dialogue-templates/shmup.o
+	$(ARM_CXX) $(GBA_CXXFLAGS) -c templates/exported_racing/main.cpp -o $(BUILD_DIR)/default-dialogue-templates/racing.o
+	$(ARM_CXX) $(GBA_CXXFLAGS) -c templates/exported_battle_rpg/main.cpp -o $(BUILD_DIR)/default-dialogue-templates/battle_rpg.o
 
 topdown_basic.gba: check-toolchain $(EXAMPLE_GBA)
 
