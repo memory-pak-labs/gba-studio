@@ -105,5 +105,8 @@ export function resolveEventBindingCapabilities(input: EventBindingCapabilityInp
     { bindingKey: "onClear", label: "Ao concluir ondas", section: null, requiresFrequency: false },
     { bindingKey: "onDefeat", label: "Ao perder", section: null, requiresFrequency: false }
   );
+  if (["battlerpg", "shmup"].includes(runtime)) lifecycle.push(
+    { bindingKey: "onHitPlayer", label: "Ao acertar Player", section: null, requiresFrequency: false }
+  );
   return lifecycle;
 }
