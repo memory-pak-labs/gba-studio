@@ -31,7 +31,7 @@ for arch in ['arm64', 'x64']:
  for extension in ['dmg', 'zip']:
   name = 'GBA-Studio-'+version+'-macOS-'+arch+'.'+extension
   data = name.encode(); part = 'upload-chunk-mac-'+arch+'-'+extension+'-000.part'
-  checksums[name] = digest(data); content[part] = data
+  checksums[name] = digest(data); content[part] = data; content[name] = data
   existing[part] = asset(part, data)
   files.append(dict(name=name, bytes=len(data), sha256=digest(data), parts=[dict(name=part, bytes=len(data), sha256=digest(data))]))
 # Already uploaded files and metadata must survive without replacement.
@@ -49,7 +49,7 @@ def gh(args, text=True):
  assert args[0] == 'gh'; args = args[1:]
  with lock:
   if args[:2] == ['release', 'view']:
-   return json.dumps(dict(isDraft=True, tagName=tag, targetCommitish=sha, assets=list(existing.values())))
+   return json.dumps(dict(isDraft=True, tagName=tag, targetCommitish=sha, createdAt='2026-10-31T12:00:00Z', assets=list(existing.values())))
   if args[0] == 'api':
    return json.dumps(dict(head_sha=sha, conclusion='failure' if scenario == 'failed-ci' else 'success', path='.github/workflows/desktop-packages.yml'))
   if args[:2] == ['release', 'download']:
@@ -59,7 +59,7 @@ def gh(args, text=True):
    for filename in ci[name]: (directory/filename).write_bytes(payloads[filename])
    return ''
   if args[:2] == ['release', 'upload']:
-   path = Path(args[3]); name = path.name; assert name not in existing; existing[name] = asset(name, path.read_bytes()); uploads.append(name); return ''
+   path = Path(args[3]); name = path.name; assert name not in existing; content[name] = path.read_bytes(); existing[name] = asset(name, content[name]); uploads.append(name); return ''
   if args[:2] == ['release', 'delete-asset']:
    name = args[3]; assert name.startswith('upload-chunk-') or name == 'UPLOAD_CHUNKS.json'; deleted.append(name); del existing[name]; return ''
   raise AssertionError(args)
@@ -73,7 +73,18 @@ with patch.object(subprocess, 'check_output', gh):
  else:
   assert scenario == 'success'
   assert all(existing[name] == value for name, value in baseline.items())
-  assert len(existing) == 17 and len(deleted) == 5
+  assert len(existing) == 20 and len(deleted) == 5
+  import base64
+  for feed_name, expected in {
+   'latest.yml': ['GBA.Studio.Setup.'+version+'.exe'],
+   'latest-linux.yml': ['GBA-Studio-'+version+'-linux-x86_64.AppImage'],
+   'latest-mac.yml': ['GBA-Studio-'+version+'-macOS-arm64.zip', 'GBA-Studio-'+version+'-macOS-x64.zip']}.items():
+   feed = json.loads(content[feed_name]); assert feed['version'] == version
+   assert {item['url'] for item in feed['files']} == set(expected)
+   for item in feed['files']:
+    data = content[item['url']]; assert item['size'] == len(data)
+    assert item['sha512'] == base64.b64encode(hashlib.sha512(data).digest()).decode()
+   assert all(uploads.index(name) < uploads.index(feed_name) for name in expected if name in uploads)
   assert kept not in uploads
   assert not any('universal' in name.lower() for name in existing)
 print('fixture OK')

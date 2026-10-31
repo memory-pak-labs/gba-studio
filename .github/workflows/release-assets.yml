@@ -37,7 +37,7 @@ jobs:
           SOURCE_SHA: ${{ inputs.source_sha }}
         run: |
           python3 - <<'PY'
-          import concurrent.futures, hashlib, json, os, re, subprocess
+          import base64, concurrent.futures, hashlib, json, os, re, subprocess
           from pathlib import Path
 
           repo = os.environ['GITHUB_REPOSITORY']
@@ -54,12 +54,12 @@ jobs:
 
           def release():
               result = json.loads(gh('release', 'view', tag, '--repo', repo,
-                  '--json', 'assets,isDraft,tagName,targetCommitish'))
+                  '--json', 'assets,createdAt,isDraft,tagName,targetCommitish'))
               assert result['isDraft'], 'Only draft releases can be assembled'
               assert result['tagName'] == tag and result['targetCommitish'] == sha
               return result
 
-          release()
+          release_created = release()['createdAt']
           run = json.loads(gh('api', f'repos/{repo}/actions/runs/{run_id}'))
           assert run['head_sha'] == sha and run['conclusion'] == 'success'
           assert run['path'] == '.github/workflows/desktop-packages.yml'
@@ -152,9 +152,46 @@ jobs:
               asset = uploaded[name]
               assert asset['state'] == 'uploaded' and asset['size'] == path.stat().st_size
               assert asset['digest'] == 'sha256:' + checksums[name], f'Uploaded hash mismatch: {name}'
+
+          # Create feeds from the final verified bytes and public names, including
+          # the notarized Mac ZIPs after they have been reconstructed from chunks.
+          # JSON is a YAML subset accepted by electron-updater's YAML parser.
+          def update_entry(path, name):
+              sha512 = hashlib.sha512()
+              with path.open('rb') as stream:
+                  for data in iter(lambda: stream.read(1024 * 1024), b''):
+                      sha512.update(data)
+              return {'url': name, 'sha512': base64.b64encode(sha512.digest()).decode(),
+                      'size': path.stat().st_size}
+
+          def select(predicate, count):
+              selected = [(path, name) for path, name in installers if predicate(name)]
+              assert len(selected) == count, f'Expected {count} update installers, found {len(selected)}'
+              return [update_entry(path, name) for path, name in sorted(selected, key=lambda item: item[1])]
+
+          feeds = {
+              'latest.yml': select(lambda name: name.endswith('.exe'), 1),
+              'latest-linux.yml': select(lambda name: name.endswith('.AppImage'), 1),
+              'latest-mac.yml': select(lambda name: name in {f'GBA-Studio-{version}-macOS-{arch}.zip' for arch in ['arm64', 'x64']}, 2),
+          }
+          update_files = []
+          for name, entries in feeds.items():
+              feed = {'version': version, 'files': entries, 'path': entries[0]['url'],
+                      'sha512': entries[0]['sha512'], 'releaseDate': release_created}
+              path = stage / name
+              path.write_text(json.dumps(feed, ensure_ascii=False, indent=2) + '\n')
+              checksums[name] = digest(path)
+              update_files.append((path, name))
+          for item in update_files:
+              upload(item)
+          uploaded = {a['name']: a for a in release()['assets']}
+          for path, name in update_files:
+              asset = uploaded[name]
+              assert asset['state'] == 'uploaded' and asset['size'] == path.stat().st_size
+              assert asset['digest'] == 'sha256:' + checksums[name], f'Uploaded feed hash mismatch: {name}'
           for part in parts:
               gh('release', 'delete-asset', tag, part['name'], '--repo', repo, '--yes')
           gh('release', 'delete-asset', tag, 'UPLOAD_CHUNKS.json', '--repo', repo, '--yes')
           release()
-          print('Nine installers and two CI source supplements verified; temporary chunks removed; release remains a draft.')
+          print('Installers and update feeds verified; temporary chunks removed; release remains a draft.')
           PY
