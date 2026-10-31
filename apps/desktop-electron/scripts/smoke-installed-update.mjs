@@ -8,7 +8,7 @@ import { fileURLToPath } from 'node:url';
 import { createRequire } from 'node:module';
 import { promisify } from 'node:util';
 import { cdpSession, copySmokeProject, createElectronSmokeEnv, prepareElectronSmokeLocale, terminateChild, wait } from './lib/electron-smoke-helpers.mjs';
-import { findWindowsUpdatedProcess } from './updater-qa-fixture.mjs';
+import { findLinuxUpdatedProcess, findWindowsUpdatedProcess } from './updater-qa-fixture.mjs';
 
 const appRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const asar = createRequire(import.meta.url)('@electron/asar');
@@ -54,9 +54,9 @@ let logs = '';
 let exited = false;
 let cdp;
 const checks = [];
-function launchForInspection() {
+function launchForInspection(executable = fixture.sourceExecutable) {
   exited = false;
-  child = spawn(fixture.sourceExecutable, fixture.platform === 'linux' ? ['--no-sandbox'] : [], { cwd: appRoot, env, stdio: ['ignore', 'pipe', 'pipe'], windowsHide: true });
+  child = spawn(executable, fixture.platform === 'linux' ? ['--no-sandbox'] : [], { cwd: appRoot, env, stdio: ['ignore', 'pipe', 'pipe'], windowsHide: true });
   child.stdout.on('data', (data) => { logs += data; });
   child.stderr.on('data', (data) => { logs += data; });
   child.once('exit', () => { exited = true; });
@@ -142,6 +142,26 @@ try {
       return stdout.trim() === 'exited';
     }, 'updated instance exits', 30_000);
     launchForInspection();
+  } else {
+    const installedImage = path.join(path.dirname(fixture.sourceExecutable), targetName);
+    const restarted = await poll(async () => {
+      if (await hash(installedImage, 'sha256', 'hex') !== targetHash) return null;
+      const { stdout } = await execFileAsync('ps', ['-eo', 'pid=,ppid=,args=']);
+      const processes = stdout.split('\n').map((line) => line.trim().match(/^(\d+)\s+(\d+)\s+(.+)$/)).filter(Boolean)
+        .map(([, pid, ppid, args]) => ({ pid: Number(pid), ppid: Number(ppid), args }));
+      return findLinuxUpdatedProcess(processes, installedImage);
+    }, 'Linux installation and automatic restart', 180_000);
+    assert(Boolean(restarted), 'Linux installed the target AppImage and automatically restarted it');
+    // Inspect a fresh instance with the same QA profile after confirming the automatic restart.
+    process.kill(restarted.appPid, 'SIGTERM');
+    await poll(async () => {
+      for (const pid of [restarted.appPid, restarted.launcherPid]) {
+        try { process.kill(pid, 0); return false; }
+        catch (error) { if (error.code !== 'ESRCH') throw error; }
+      }
+      return true;
+    }, 'updated instance exits', 30_000);
+    launchForInspection(installedImage);
   }
   cdp = await connect();
   await waitFor("Boolean(document.querySelector('.app-shell'))", 'updated editor', 180_000);

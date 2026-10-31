@@ -5,6 +5,16 @@ import path from 'node:path';
 const require = createRequire(import.meta.url);
 const asar = require('@electron/asar');
 
+/** Identify the isolated AppImage launcher and its extracted Electron main process. */
+export function findLinuxUpdatedProcess(processes, image) {
+  const launcher = processes.find((process) => process.args === image);
+  if (!launcher) return null;
+  const app = processes.find((process) => process.ppid === launcher.pid
+    && /^\/tmp\/appimage_extracted_[^/]+\/gba-studio(?:\s|$)/.test(process.args)
+    && !/(?:^|\s)--type=/.test(process.args));
+  return app ? { launcherPid: launcher.pid, appPid: app.pid } : null;
+}
+
 /** NSIS restarts through the Windows shell, which does not inherit the test's environment. */
 export function findWindowsUpdatedProcess(processes, executable) {
   const expected = path.win32.normalize(executable).toLowerCase();

@@ -3,12 +3,22 @@ import { mkdtemp, mkdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { copyAppWithQaVersion, findWindowsUpdatedProcess, removeAppImageWrapperIcon } from './updater-qa-fixture.mjs';
+import { copyAppWithQaVersion, findLinuxUpdatedProcess, findWindowsUpdatedProcess, removeAppImageWrapperIcon } from './updater-qa-fixture.mjs';
 
 const require = createRequire(import.meta.url);
 const asar = require('@electron/asar');
 
 describe('updater QA fixture', () => {
+  it('identifies the application launched by the updated isolated AppImage', () => {
+    const processes = [
+      { pid: 20, ppid: 1, args: '/qa/target.AppImage' },
+      { pid: 21, ppid: 20, args: '/tmp/appimage_extracted_123/gba-studio --no-sandbox' },
+      { pid: 22, ppid: 21, args: '/tmp/appimage_extracted_123/gba-studio --type=renderer' },
+    ];
+    expect(findLinuxUpdatedProcess(processes, '/qa/target.AppImage')).toEqual({ launcherPid: 20, appPid: 21 });
+    expect(findLinuxUpdatedProcess(processes, '/other/target.AppImage')).toBeNull();
+    expect(findLinuxUpdatedProcess([processes[0], processes[2]], '/qa/target.AppImage')).toBeNull();
+  });
   it('identifies only the updated instance from the isolated installation', () => {
     const processes = [
       { ProcessId: 9, ExecutablePath: 'C:\\other\\gba-studio.exe', CommandLine: 'gba-studio.exe --updated' },
