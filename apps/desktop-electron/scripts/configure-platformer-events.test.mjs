@@ -73,8 +73,8 @@ describe('Penedos: eventos dos atores', () => {
     ] }];
     const out = buildEngineExportProjectContract(p).platformer_project;
     expect(out.scripts.find(s => s.name === 'subtile').script).toEqual([
-      { op: 'move_actor', actor: 1, x: 1, y: 0 },
-      { op: 'move_actor', actor: 1, x: -1, y: 0 },
+      { op: 'move_actor_relative', actor: 1, x: 1, y: 0 },
+      { op: 'move_actor_relative', actor: 1, x: -1, y: 0 },
       { op: 'move_actor', actor: 2, x: 0, y: 2 }
     ]);
   });
