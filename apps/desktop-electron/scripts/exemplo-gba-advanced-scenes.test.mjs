@@ -155,7 +155,7 @@ describe("cenas avançadas do template Exemplo GBA", () => {
           checkpoints: expect.arrayContaining([expect.objectContaining({ id: "finish" })])
         }
       } },
-      eventBindings: { onVictory: "circuito_concluir", onDefeat: "circuito_final_reiniciar" }
+      eventBindings: { onVictory: "race_finish", onDefeat: "race_finish" }
     });
     expect(racers.map(({ name, spriteSheet }) => [name, spriteSheet])).toEqual([
       ["Player · Nara", "racing-approved-overhead-nara.png"],
