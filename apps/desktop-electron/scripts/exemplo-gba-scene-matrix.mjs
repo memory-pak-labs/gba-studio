@@ -33,6 +33,9 @@ export const EXEMPLO_SCENE_BATCHES = Object.freeze([
       "creditos",
       "missoes",
       "inventario",
+      "inventario_ferramentas",
+      "corrida_preparacao",
+      "corrida_resultados",
       "mapa_menu",
       "salvar",
       "menu_start"
