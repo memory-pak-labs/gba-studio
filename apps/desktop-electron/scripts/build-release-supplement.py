@@ -98,7 +98,7 @@ if __name__ == "__main__":
     parser.add_argument("--repo", type=Path, default=Path(__file__).resolve().parents[3])
     parser.add_argument("--runtime", type=Path, required=True)
     parser.add_argument("--output", type=Path, required=True)
-    parser.add_argument("--platform", choices=["macos-universal", "windows-x64", "linux-x64"], required=True)
+    parser.add_argument("--platform", choices=["macos-arm64", "macos-x64", "macos-universal", "windows-x64", "linux-x64"], required=True)
     parser.add_argument("--allow-generated-icons", action="store_true", help="Retain the six known icon build outputs if regenerated")
     args = parser.parse_args()
     build(args.repo.resolve(), args.runtime.resolve(), args.output.resolve(), args.platform, args.allow_generated_icons)

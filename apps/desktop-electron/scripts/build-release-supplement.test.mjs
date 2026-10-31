@@ -28,6 +28,18 @@ it("exports committed source, original notices and hashes while excluding privat
     put(runtime, "Runtime/runtime.json", '{"hostPackageVersions":["make 4.4.1"]}');
     const args = ["-I", script, "--repo", repo, "--runtime", runtime, "--output", output, "--platform", "linux-x64"];
     execFileSync(python, args, { stdio: "pipe" });
+    for (const platform of ["macos-arm64", "macos-x64"]) {
+      const platformArgs = [...args.slice(0, -1), platform];
+      execFileSync(python, platformArgs, { stdio: "pipe" });
+      execFileSync(python, ["-I", "-c", `
+import json,zipfile
+with zipfile.ZipFile(${JSON.stringify(output)}) as z:
+    assert json.loads(z.read('MANIFEST.json'))['platform'] == ${JSON.stringify(platform)}
+    assert 'bundled/Toolchain/licenses/GPL.txt' in z.namelist()
+    assert 'bundled/Runtime/Sources/tool.c' in z.namelist()
+`], { stdio: "pipe" });
+    }
+    execFileSync(python, args, { stdio: "pipe" });
     execFileSync(python, ["-I", "-c", `
 import hashlib,io,json,tarfile,zipfile
 with zipfile.ZipFile(${JSON.stringify(output)}) as z:
