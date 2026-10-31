@@ -85,14 +85,26 @@ export async function writeProjectMemoryReport(
   options: WriteProjectMemoryReportOptions
 ): Promise<{ path: string; report: ProjectMemoryReport }> {
   const mapPath = options.romPath.replace(/\.gba$/i, ".map");
-  const [romInfo, mapContents, assetContents] = await Promise.all([
+  const [romInfo, mapContents] = await Promise.all([
     stat(options.romPath),
-    readFile(mapPath, "utf8"),
-    readFile(options.assetReportPath, "utf8")
+    readFile(mapPath, "utf8")
   ]);
   const mapEntries = parseGnuLinkerMap(mapContents);
   const occupancy = deriveRomOccupancyReport(mapEntries);
-  const assetReport = JSON.parse(assetContents) as AssetPackBudgetReport;
+  let assetReport: AssetPackBudgetReport;
+  let assetPackOmitted = false;
+  try {
+    assetReport = JSON.parse(await readFile(options.assetReportPath, "utf8")) as AssetPackBudgetReport;
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
+    // An asset-free export intentionally has no assetc report. Never treat a
+    // missing report as empty when a pack was actually declared or the
+    // export contract cannot establish that this is an asset-free project.
+    const contract = JSON.parse(await readFile(path.join(path.dirname(options.assetReportPath), "export_project.json"), "utf8")) as Record<string, unknown>;
+    if (contract.schema !== 1 || contract.backend !== "gbastudio_engine" || contract.asset_pack != null) throw error;
+    assetPackOmitted = true;
+    assetReport = {} as AssetPackBudgetReport;
+  }
   const resources = Object.fromEntries(
     Object.entries(assetReport.budget_summary ?? {}).map(([name, usage]) => [
       name,
@@ -129,6 +141,7 @@ export async function writeProjectMemoryReport(
     }))
     .sort((left, right) => right.peakPercent - left.peakPercent);
   const warnings = [
+    ...(assetPackOmitted ? ["Orçamento de assets não gerado: a exportação não contém asset_pack."] : []),
     ...Object.entries({ EWRAM: ewram, IWRAM: iwram })
       .filter(([, usage]) => usage.severity !== "ok")
       .map(([name, usage]) => `${name}: ${usage.remainingBytes} bytes de margem estática; ${usage.percent}% ocupado, incluindo reservas.`),

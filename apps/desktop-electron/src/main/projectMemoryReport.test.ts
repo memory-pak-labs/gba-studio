@@ -17,6 +17,31 @@ const memorySymbols = (bssEnd = 0x03005c8c, ewramEnd = 0x0203fee8) => `
 `;
 
 describe("project memory report", () => {
+  it("reports linked memory when a valid export has no asset pack", async () => {
+    const root = await mkdtemp(path.join(os.tmpdir(), "gba-memory-no-assets-"));
+    try {
+      const romPath = path.join(root, "game.gba");
+      await writeFile(romPath, Buffer.alloc(4));
+      await writeFile(path.join(root, "game.map"), memorySymbols(0x03000080, 0x02000900));
+      await writeFile(path.join(root, "export_project.json"), JSON.stringify({ schema: 1, backend: "gbastudio_engine" }));
+      const { report } = await writeProjectMemoryReport({ romPath, assetReportPath: path.join(root, "asset_pack_report.json") });
+      expect(report.ram.iwram.usedBytes).toBeGreaterThan(0);
+      expect(report.resources).toEqual({});
+      expect(report.warnings.join(" ")).toMatch(/asset_pack/);
+    } finally { await rm(root, { recursive: true, force: true }); }
+  });
+
+  it("still rejects a missing asset report when the export declares an asset pack", async () => {
+    const root = await mkdtemp(path.join(os.tmpdir(), "gba-memory-missing-assets-"));
+    try {
+      const romPath = path.join(root, "game.gba");
+      await writeFile(romPath, Buffer.alloc(4));
+      await writeFile(path.join(root, "game.map"), memorySymbols());
+      await writeFile(path.join(root, "export_project.json"), JSON.stringify({ schema: 1, backend: "gbastudio_engine", asset_pack: { assets: [] } }));
+      await expect(writeProjectMemoryReport({ romPath, assetReportPath: path.join(root, "asset_pack_report.json") })).rejects.toThrow();
+    } finally { await rm(root, { recursive: true, force: true }); }
+  });
+
   it("combines post-link ROM/RAM usage with compiled GBA resource pressure", async () => {
     const root = await mkdtemp(path.join(os.tmpdir(), "gba-project-memory-"));
     try {
