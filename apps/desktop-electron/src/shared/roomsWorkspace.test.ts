@@ -321,7 +321,7 @@ describe("Rooms workspace presentation", () => {
     }];
 
     expect(deriveRoomEventSceneLinks(project)).toEqual([{
-      id: "event-scene-link-event-exit-0",
+      id: "event-scene-link-event-exit-0-cave",
       from: "cave",
       to: "town",
       eventName: "cave_exit",
@@ -393,7 +393,7 @@ describe("Rooms workspace presentation", () => {
     }];
 
     expect(deriveRoomEventSceneLinks(project)).toEqual([{
-      id: "event-scene-link-event-exit-0",
+      id: "event-scene-link-event-exit-0-cave",
       from: "cave",
       to: "town",
       eventName: "cave_exit",
@@ -907,6 +907,7 @@ describe("Rooms workspace presentation", () => {
         battle: { side: "none", maxHp: 24, attack: 7, defense: 2, speed: 5, abilities: ["attack"] },
         collisionGroup: 0,
         collisionMask: 65535,
+        health: 1,
         pushPriority: 0,
         pushable: false,
         isInActiveRoom: true
@@ -929,6 +930,7 @@ describe("Rooms workspace presentation", () => {
         battle: { side: "none", maxHp: 24, attack: 7, defense: 2, speed: 5, abilities: ["attack"] },
         collisionGroup: 0,
         collisionMask: 65535,
+        health: 1,
         pushPriority: 0,
         pushable: false,
         isInActiveRoom: false
@@ -1447,7 +1449,7 @@ describe("Rooms workspace presentation", () => {
     expect(next.scena).toMatchObject({ id: "room-1", name: "overworld" });
     expect(next.room).toBeUndefined();
     expect(next.scenas).toHaveLength(1);
-    expect(next.settings).toEqual({ general: { gameTitle: "Demo", startScene: "overworld" } });
+    expect(next.settings).toEqual({ general: { gameTitle: "Demo", startScene: "overworld", startPlayer: "Player" } });
     expect(next.editorState).toEqual({ sceneMapPositions: { overworld: { x: 36, y: 36 } } });
   });
 
