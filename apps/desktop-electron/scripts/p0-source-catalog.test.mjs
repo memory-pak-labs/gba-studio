@@ -167,6 +167,7 @@ describe("P0 source catalog", () => {
       ["Assets/fonts/gba-dialogue-font-v3.png", "c11501185dfdd6bd20b63b9670796c32445663bdd572789d9934c29b4eec3798"],
       ["Assets/backgrounds/tactical-v5-surface.png", "df1a3c5538911918664da5cc510c78329ab64752b01c81e6b5ae9b70d236589b"],
       ["Assets/backgrounds/tactical-arena-large-768x512.png", "c4ba0bcd0f84fdb41e6191136ea77348624d0e9b17a6b00a1dacc236c2000000"],
+      ["Assets/sprites/market-approved-actors-64x64.png", "b448ec11325521c0970fc476348cdf5a6ef782164f5aa0a03761b955c67d866a"],
       ["Assets/backgrounds/route-map-paged-v2.png", "6887d224a8490c8858fc5e66c779932ad8264f3a87535168e88c64755d88de0c"],
       ["Assets/sprites/route-airship-v2.png", "6ecb8e65271ff381671cb69e79455f20d77b8532a8d8977b960f6cc84b918868"],
       ["Assets/backgrounds/council-v5-background.png", "98a6ccb4597f25f2156e30fed19ce7f9e9f88a5403ea5b46f1cefb1281c1cdff"],

@@ -31,7 +31,10 @@ export const EXEMPLO_GB_STUDIO_SCENE_TYPES = Object.freeze({
   farol_interior: "topdown",
   circuito_perspectiva: "racing",
   galeria_das_mares: "topdown",
-  sala_mare_vazante: "topdown"
+  sala_mare_vazante: "topdown",
+  corrida_preparacao: "menu",
+  corrida_resultados: "menu",
+  inventario_ferramentas: "menu"
 });
 
 const LEGACY_DIALOGUE_ASSET_NAMES = new Set([
@@ -306,8 +309,9 @@ export function promoteExemploGBStudioSceneTypes(project) {
       kind: "UI",
       metadata: {
         source: "Assets/ui/dialogue-selector-gba-v4.png",
-        provenance: "Seletor fornecido pelo usuário, variante alpha-t80 normalizada para célula 8x8 4 BPP",
-        license: "User-provided",
+        provenance: "Criado pelo proprietário do projeto; variante alpha-t80 normalizada para célula 8x8 4 BPP; autoria confirmada em 2026-10-30",
+        license: "MIT",
+        author: "GBA Studio project owner",
         gbaRole: "dialogue-choice-selector",
         width: 8,
         height: 8,

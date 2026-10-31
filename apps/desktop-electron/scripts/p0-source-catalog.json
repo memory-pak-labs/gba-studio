@@ -2003,8 +2003,8 @@
         },
         {
           "path": "Assets/sprites/market-approved-actors-64x64.png",
-          "sha256": "4a9bb556cf2413304c7a6928a94620bfbf7c34031b6c00b4f6ec870a79482215",
-          "contract": "mercado-suspenso-v2-user-approved-2026-10-20-compatible-palette"
+          "sha256": "b448ec11325521c0970fc476348cdf5a6ef782164f5aa0a03761b955c67d866a",
+          "contract": "mercado-eight-directions-user-approved-2026-10-30"
         },
         {
           "path": "Assets/sprites/market-approved-delivery-icon.png",
@@ -2193,6 +2193,231 @@
           "sha256": "896908afbd3f08a1069e0c26c2e6cc26ffeb426183ccbeefa29378da50453ec2",
           "contract": "tide-annex-v13-user-approved-2026-10-25",
           "provenance": "fixtures/asset-provenance/tide-annex-approved.json"
+        },
+        {
+          "path": "Assets/sprites/arrival-v21-interface-part-0.png",
+          "sha256": "5521cf94be4aab081a0eac712ed99790da8cee42390f655134cc9a986c934411",
+          "contract": "approved-menu-scenes-v21"
+        },
+        {
+          "path": "Assets/sprites/arrival-v21-interface-part-1.png",
+          "sha256": "fa7352d840061c7e15a81c83eb7dc9d3de8c7f45ec9f904b68a6b8a00cd4b1ff",
+          "contract": "approved-menu-scenes-v21"
+        },
+        {
+          "path": "Assets/sprites/arrival-v21-interface-part-2.png",
+          "sha256": "79863f6662ab2b537c8c2bd8335a442895166368e658787fdbe8f1ea3bafe04d",
+          "contract": "approved-menu-scenes-v21"
+        },
+        {
+          "path": "Assets/sprites/arrival-v21-interface-part-3.png",
+          "sha256": "61db1e06fe7c5f3c2cd72e550f330be2a2d781cb27d192ce7e58a04b710b085f",
+          "contract": "approved-menu-scenes-v21"
+        },
+        {
+          "path": "Assets/sprites/arrival-v21-map.png",
+          "sha256": "b2fca0bdcaf47d1ac67105b067865f567123dc11dbb646b39723fbdc9bca199c",
+          "contract": "approved-menu-scenes-v21"
+        },
+        {
+          "path": "Assets/sprites/arrival-v21-nameplate.png",
+          "sha256": "ec3f560f92d713cd7715cc1fb3fd90ecedba755cd618489666d716074621da50",
+          "contract": "approved-menu-scenes-v21"
+        },
+        {
+          "path": "Assets/sprites/arrival-v21-nara.png",
+          "sha256": "483fc2217f8f17a0dc99aabcca307f7d24e20fa72db4b1c44145e908b3c90f85",
+          "contract": "approved-menu-scenes-v21"
+        },
+        {
+          "path": "Assets/sprites/arrival-v21-rival.png",
+          "sha256": "ae4ad55c7f9d208a2224dfad64c5283ff0bdb12298b2434c6ea9d6b65c02dd78",
+          "contract": "approved-menu-scenes-v21"
+        },
+        {
+          "path": "Assets/sprites/arrival-v21-rival2.png",
+          "sha256": "1e67164fc6a04835f0bb071b0fe3e0495b3307c375e9e457f85ae51bfdf2747a",
+          "contract": "approved-menu-scenes-v21"
+        },
+        {
+          "path": "Assets/sprites/arrival-v21-story.png",
+          "sha256": "e0abd1cc9e50cb0200fd93d5aec5d4ff4b8617bd0fdb7d6c40da1b64f1b55514",
+          "contract": "approved-menu-scenes-v21"
+        },
+        {
+          "path": "Assets/sprites/arrival-v21-title-farol.png",
+          "sha256": "830615249a1a6f8cbdbe84505800c491f6e4ca98f3c4b88bf97f02a0d660a142",
+          "contract": "approved-menu-scenes-v21"
+        },
+        {
+          "path": "Assets/sprites/arrival-v21-title-mare.png",
+          "sha256": "5f57f2b6ca15ece73e48f99931d15b8525b1bf400e144f5100097c0c8427f2c4",
+          "contract": "approved-menu-scenes-v21"
+        },
+        {
+          "path": "Assets/sprites/pause-v2-back.png",
+          "sha256": "2ea72cf41141fc353abc10bd209a943ff0b8f9fbac3c04fbb5fb0b18147d7214",
+          "contract": "approved-menu-scenes-v21"
+        },
+        {
+          "path": "Assets/sprites/pause-v2-page-1.png",
+          "sha256": "d2303290e8dec9cefa26924d9e32ff9151c23ba40b650009b6fe5fa952c622c6",
+          "contract": "approved-menu-scenes-v21"
+        },
+        {
+          "path": "Assets/sprites/pause-v2-page-2.png",
+          "sha256": "e4f0a44ed229dbd92e2be6efc38bfecdee29ae2751957ae9723d9697d865ccab",
+          "contract": "approved-menu-scenes-v21"
+        },
+        {
+          "path": "Assets/sprites/toolcase-v2-chart.png",
+          "sha256": "c9be2a3f55a8f6be61c9da5986ff6ea1540f1b959817ac596e41ffb65abc4e82",
+          "contract": "approved-menu-scenes-v21"
+        },
+        {
+          "path": "Assets/sprites/toolcase-v2-compass.png",
+          "sha256": "f41775d8c473888eb080e36ab6d7a0b22fb8a61865f75a8a6ed6512130ecdf95",
+          "contract": "approved-menu-scenes-v21"
+        },
+        {
+          "path": "Assets/sprites/toolcase-v2-equip-part-0.png",
+          "sha256": "c898383d617b1d6b748966d42623fcf8287c83db617990bf0f10d8b7b34e4851",
+          "contract": "approved-menu-scenes-v21"
+        },
+        {
+          "path": "Assets/sprites/toolcase-v2-equip-part-1.png",
+          "sha256": "07baefa5a59a4617e6fc470babe7e377ed0b872979f5f632c6e856eb86fd855c",
+          "contract": "approved-menu-scenes-v21"
+        },
+        {
+          "path": "Assets/sprites/toolcase-v2-mark-0.png",
+          "sha256": "67d86d1f7ab6fe6988b53d903e703ca26aabd76ff05e321587c09ee1fedb6f5d",
+          "contract": "approved-menu-scenes-v21"
+        },
+        {
+          "path": "Assets/sprites/toolcase-v2-mark-1.png",
+          "sha256": "e9fabcda9d63b0dcb2b11a18dccda6fb7418b5b6c489d7a7a6ca8c075a72ae17",
+          "contract": "approved-menu-scenes-v21"
+        },
+        {
+          "path": "Assets/sprites/toolcase-v2-mark-2.png",
+          "sha256": "a8ac7a2dca6397c286f8bcfe3ba0a203cb70338a5e0dc635c22e45b6cd08330c",
+          "contract": "approved-menu-scenes-v21"
+        },
+        {
+          "path": "Assets/sprites/toolcase-v2-mark-e.png",
+          "sha256": "a7538fc3e876903ea69eb1a4e1883a51117f3f9174a0b6208663d6ebe2a10b60",
+          "contract": "approved-menu-scenes-v21"
+        },
+        {
+          "path": "Assets/sprites/toolcase-v2-page-0-part-0.png",
+          "sha256": "f376334c44ce614442caa4aba5db0873d3aedabcd42c9c72465f43fed199ef11",
+          "contract": "approved-menu-scenes-v21"
+        },
+        {
+          "path": "Assets/sprites/toolcase-v2-page-0-part-1.png",
+          "sha256": "479cac253a7db72c585c3255249cb122f6b4ffb5330590adf4cc4c23ce3ee8ac",
+          "contract": "approved-menu-scenes-v21"
+        },
+        {
+          "path": "Assets/sprites/toolcase-v2-page-1-part-0.png",
+          "sha256": "f376334c44ce614442caa4aba5db0873d3aedabcd42c9c72465f43fed199ef11",
+          "contract": "approved-menu-scenes-v21"
+        },
+        {
+          "path": "Assets/sprites/toolcase-v2-page-1-part-1.png",
+          "sha256": "1885bd4c9e6549056701334699f29ef1b115801709036b6ec24cd0eaf8745e18",
+          "contract": "approved-menu-scenes-v21"
+        },
+        {
+          "path": "Assets/sprites/toolcase-v2-page-2-part-0.png",
+          "sha256": "ddb878f136eccd0f6d162c2d70fc021e0a9663bbb89254f965c7e83107d22423",
+          "contract": "approved-menu-scenes-v21"
+        },
+        {
+          "path": "Assets/sprites/toolcase-v2-page-2-part-1.png",
+          "sha256": "db666131cf66301e7356cf56cfb3ba881936966e1cbb3934383dd734e8acf480",
+          "contract": "approved-menu-scenes-v21"
+        },
+        {
+          "path": "Assets/sprites/toolcase-v2-relay.png",
+          "sha256": "833a8d2eb423cae9c4df513dba9cd6c6a1aeeb4af7fcad56de975faefb581c82",
+          "contract": "approved-menu-scenes-v21"
+        },
+        {
+          "path": "Assets/sprites/toolcase-v2-remove-part-0.png",
+          "sha256": "0a53b103fc893c432a02ae5420012e55a8384daa6296faa6f07b9f605ef51042",
+          "contract": "approved-menu-scenes-v21"
+        },
+        {
+          "path": "Assets/sprites/toolcase-v2-remove-part-1.png",
+          "sha256": "15892a658d5a9e3dc590fec593dd832e11b023215ae397ccc47a5e038e9e09ad",
+          "contract": "approved-menu-scenes-v21"
+        },
+        {
+          "path": "Assets/sprites/toolcase-v2-tool.png",
+          "sha256": "4614e788c4bd5b4031203e5b46cca7b88e91c702e8f1d4165ad78ea997c37977",
+          "contract": "approved-menu-scenes-v21"
+        },
+        {
+          "path": "Assets/sprites/toolcase-v2-view-part-0.png",
+          "sha256": "81c7cf82f8100b87c8cbf051efd3374b8c716447695d0185d3db4f000555dbf0",
+          "contract": "approved-menu-scenes-v21"
+        },
+        {
+          "path": "Assets/sprites/toolcase-v2-view-part-1.png",
+          "sha256": "4830a4e1c8b6fb9a181e1489cb9b83784fb79bba0d36a9ef99f7bb001549fdba",
+          "contract": "approved-menu-scenes-v21"
+        },
+        {
+          "path": "Assets/backgrounds/arrival-v21-background.png",
+          "sha256": "0e97f34bf7f689f7a53c9132d331dd84b5ddefefe15aa683fbfd8fc8407c41a7",
+          "contract": "approved-menu-scenes-v21"
+        },
+        {
+          "path": "Assets/sprites/arrival-v21-interface-part-4.png",
+          "sha256": "ea12075586d658a8cf2359678b3e0a10d3f92d65d1ce2f2f0e644601873365e9",
+          "contract": "approved-menu-scenes-v21"
+        },
+        {
+          "path": "Assets/sprites/arrival-v21-interface-part-5.png",
+          "sha256": "d18ac3562296213c881bcc15663c36644130abae162679c8874fd172886a6834",
+          "contract": "approved-menu-scenes-v21"
+        },
+        {
+          "path": "Assets/sprites/arrival-v21-interface-part-6.png",
+          "sha256": "2a3230085ca6fb95ff7c4b99ed46acecff46a98cc773da4ecab7c3b3816e3fbc",
+          "contract": "approved-menu-scenes-v21"
+        },
+        {
+          "path": "Assets/sprites/arrival-v21-interface-part-7.png",
+          "sha256": "ef54cfb780ad468b8347a512753db3d313255f1631845bcdff72a3d9648a205e",
+          "contract": "approved-menu-scenes-v21"
+        },
+        {
+          "path": "Assets/sprites/arrival-v21-interface-part-8.png",
+          "sha256": "6ee41da8f93d97ad9e945cfdde3931dd457c71933c095aedfaba7c3173993d07",
+          "contract": "approved-menu-scenes-v21"
+        },
+        {
+          "path": "Assets/sprites/arrival-v21-interface-part-9.png",
+          "sha256": "1c15255da62d41a87fd0ec11b82f85601933a69c438e044de9172e228e1cf031",
+          "contract": "approved-menu-scenes-v21"
+        },
+        {
+          "path": "Assets/sprites/arrival-v21-interface-part-10.png",
+          "sha256": "bb18ef43b0d00dbe3d81c1bd9210ffe535bbb998699bb0d521c5f670fde4be26",
+          "contract": "approved-menu-scenes-v21"
+        },
+        {
+          "path": "Assets/sprites/arrival-v21-interface-part-11.png",
+          "sha256": "c60ec8aa560bf3a7b0f8deeecd8df565e8e140c2ddcbb1e2b87cf6e25931c84b",
+          "contract": "approved-menu-scenes-v21"
+        },
+        {
+          "path": "Assets/sprites/nara-topdown-walk-run-v1.png",
+          "sha256": "b8e993dfb938de6936d33b8da555824dbb034d912472b08aa45c5ea6ea6cf76e",
+          "contract": "nara-topdown-held-r-v1"
         }
       ],
       "retired": [
