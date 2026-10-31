@@ -5,9 +5,10 @@ import path from 'node:path';
 const require = createRequire(import.meta.url);
 const asar = require('@electron/asar');
 
-/** AppImageTarget recreates this wrapper symlink when repacking the extracted QA copy. */
+/** AppImageTarget recreates these wrapper symlinks when repacking the extracted QA copy. */
 export async function removeAppImageWrapperIcon(directory) {
   await rm(path.join(directory, '.DirIcon'), { force: true });
+  await rm(path.join(directory, 'gba-studio.png'), { force: true });
 }
 
 /** Copy an installed application and change the copy's version for isolated QA. */

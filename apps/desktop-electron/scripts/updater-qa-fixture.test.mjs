@@ -9,13 +9,15 @@ const require = createRequire(import.meta.url);
 const asar = require('@electron/asar');
 
 describe('updater QA fixture', () => {
-  it('removes only the extracted AppImage wrapper icon before repacking', async () => {
+  it('removes only the extracted AppImage wrapper icons before repacking', async () => {
     const root = await mkdtemp(path.join(tmpdir(), 'gba-appimage-fixture-'));
     try {
       await writeFile(path.join(root, '.DirIcon'), 'wrapper');
+      await writeFile(path.join(root, 'gba-studio.png'), 'wrapper');
       await writeFile(path.join(root, 'AppRun'), 'launcher');
       await removeAppImageWrapperIcon(root);
       await expect(readFile(path.join(root, '.DirIcon'))).rejects.toMatchObject({ code: 'ENOENT' });
+      await expect(readFile(path.join(root, 'gba-studio.png'))).rejects.toMatchObject({ code: 'ENOENT' });
       expect(await readFile(path.join(root, 'AppRun'), 'utf8')).toBe('launcher');
     } finally {
       await rm(root, { recursive: true, force: true });
