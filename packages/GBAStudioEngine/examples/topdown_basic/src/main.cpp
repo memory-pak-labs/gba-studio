@@ -2340,6 +2340,10 @@ bool apply_warp(const gbs::WarpResult& warp) {
         return false;
     }
 
+    // A gesture belongs to the room where it was started. A new request in
+    // the same event batch still belongs to the destination room.
+    if (!event_state.actor_gesture_changed) event_state.actor_gesture_frames = 0;
+
     int previous_room = current_room;
     const int selected_player_sprite_index = player_event_runtime.sprite_index;
     current_room = warp.room_index;
@@ -2538,6 +2542,41 @@ void update_unpaused_event_interaction_world() {
         refresh_npc_directional_animation(actor,moved);
     }
     update_topdown_quests();
+}
+
+void consume_topdown_actor_gesture() {
+    event_state.actor_gesture_changed = false;
+}
+
+void tick_topdown_actor_gesture() {
+    if (event_state.actor_gesture_frames > 0) --event_state.actor_gesture_frames;
+}
+
+void draw_topdown_actor_gesture(gbs::Vec2i render_camera) {
+    const int index = event_state.actor_gesture_index;
+    const gbs::DialogueEmoteEntry* assets = gbastudio_project::dialogue_emote_assets;
+    if (event_state.actor_gesture_frames <= 0 || index < 0 ||
+        static_cast<size_t>(index) >= gbastudio_project::dialogue_emote_asset_count ||
+        assets == nullptr) return;
+    const gbs::MetaSprite* emote = assets[index].metasprite;
+    if (emote == nullptr || emote->part_count > 128 - gbs::dialogue_emote_oam_index) return;
+    const int target = event_state.actor_gesture_actor;
+    if (!gbs::event_actor_effect_visible(event_state, target)) return;
+    gbs::Vec2i position {};
+    if (target == gbs::event_player_actor_index) {
+        if (!player_event_runtime.active) return;
+        position = player.position_pixels;
+    } else {
+        if (target < 0 || static_cast<size_t>(target) >= current_npc_count() ||
+            !npc_runtimes[target].active || !npc_runtimes[target].visible) return;
+        position = npc_runtimes[target].actor.position_pixels;
+    }
+    position.x -= render_camera.x;
+    // Actor coordinates mark the lower part of the character. Raise the
+    // gesture anchor so the emote sits above the character's head.
+    position.y -= render_camera.y + 16;
+    gbs::set_metasprite(gbs::dialogue_emote_oam_index, *emote,
+        gbs::dialogue_emote_position_pixels(position));
 }
 
 void consume_event_outputs(bool trigger_room_enter) {
@@ -2815,6 +2854,7 @@ void consume_event_outputs(bool trigger_room_enter) {
         event_state.last_script = -1;
     }
 
+    if (event_state.actor_gesture_changed) consume_topdown_actor_gesture();
     if (room_changed && trigger_room_enter) {
         if (!queue_adventure_callback(adventure_callback_on_room_enter, false)) {
             queue_script(project.rooms[current_room].on_enter, true);
@@ -3139,6 +3179,9 @@ gbs::RuntimeAdapterFrameResult update_topdown_runtime(const gbs::RuntimeFrameCon
         }
 #endif
         gbs::set_event_input_state(event_state, input.held, input.pressed, input.released);
+        if (!pause_menu.visible && !gbs::event_scene_type_is_paused(event_state, scene_type_topdown)) {
+            tick_topdown_actor_gesture();
+        }
     gbs::update_hud_behavior(event_state, hud.visible);
         sync_event_player_actor_state();
         sync_event_actor_animation_state();
@@ -3611,6 +3654,7 @@ void render_topdown_runtime(const gbs::RuntimeFrameContext& context) {
             gbs::draw_event_clock(event_state);
         }
         if (draw_world_sprites) {
+            if (!gbs::dialogue_should_show_emote(dialogue)) draw_topdown_actor_gesture(render_camera);
             draw_active_dialogue_emote(
                 dialogue,
                 gbs::Vec2i {

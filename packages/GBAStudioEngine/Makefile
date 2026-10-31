@@ -147,6 +147,11 @@ mixed-runtime-overlay-test:
 stress-projects-contract-test:
 	python3 tests/host/stress_projects_tests.py
 
+.PHONY: topdown-actor-gesture-test
+host-test: topdown-actor-gesture-test
+topdown-actor-gesture-test:
+	python3 tests/host/topdown_actor_gesture_tests.py
+
 topdown-backdrop-runtime-test:
 	python3 tests/host/topdown_backdrop_runtime_contract_tests.py
 
