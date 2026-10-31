@@ -24,12 +24,13 @@ namespace {
 #endif
 
 uint16_t tilemap_decode_buffer[max_rle16_tilemap_entries] GBS_RENDER_EWRAM;
-uint8_t lz77_tilemap_decode_buffer[max_lz77_tilemap_bytes] GBS_RENDER_EWRAM;
-uint8_t lz77_tile_decode_buffer[max_lz77_tile_asset_bytes] GBS_RENDER_EWRAM;
-uint8_t lz77_palette_decode_buffer[max_lz77_palette_bytes] GBS_RENDER_EWRAM;
-alignas(4) uint8_t huffman_tilemap_decode_buffer[max_lz77_tilemap_bytes] GBS_RENDER_EWRAM;
-alignas(4) uint8_t huffman_tile_decode_buffer[max_huffman_tile_asset_bytes] GBS_RENDER_EWRAM;
-alignas(4) uint8_t huffman_palette_decode_buffer[max_huffman_palette_bytes] GBS_RENDER_EWRAM;
+// Both codecs decode synchronously into these workspaces. The tile workspace
+// may be borrowed by queued DMA, so every reuse waits for that source below.
+static_assert(max_lz77_tile_asset_bytes == max_huffman_tile_asset_bytes, "shared tile scratch capacity");
+static_assert(max_lz77_palette_bytes == max_huffman_palette_bytes, "shared palette scratch capacity");
+alignas(4) uint8_t compressed_tilemap_decode_buffer[max_lz77_tilemap_bytes] GBS_RENDER_EWRAM;
+alignas(4) uint8_t compressed_tile_decode_buffer[max_lz77_tile_asset_bytes] GBS_RENDER_EWRAM;
+alignas(4) uint8_t compressed_palette_decode_buffer[max_lz77_palette_bytes] GBS_RENDER_EWRAM;
 uint16_t palette_decode_buffer[max_lz77_palette_colors] GBS_RENDER_EWRAM;
 uint16_t dynamic_palette_buffer[256] GBS_RENDER_EWRAM;
 int background_scroll_x[4] {};
@@ -119,14 +120,14 @@ bool load_palette(const Lz77PaletteAsset& asset, bool object_palette) {
         return false;
     }
     if (!dma_wait_for_source(palette_decode_buffer, sizeof(palette_decode_buffer))) return false;
-    if (!decode_lz77_runtime(asset.data, lz77_palette_decode_buffer, max_lz77_palette_bytes)) {
+    if (!decode_lz77_runtime(asset.data, compressed_palette_decode_buffer, max_lz77_palette_bytes)) {
         return false;
     }
 
     for (size_t index = 0; index < asset.color_count; ++index) {
         palette_decode_buffer[index] = static_cast<uint16_t>(
-            lz77_palette_decode_buffer[index * 2] |
-            (static_cast<uint16_t>(lz77_palette_decode_buffer[index * 2 + 1]) << 8));
+            compressed_palette_decode_buffer[index * 2] |
+            (static_cast<uint16_t>(compressed_palette_decode_buffer[index * 2 + 1]) << 8));
     }
 
     if (object_palette) {
@@ -142,14 +143,14 @@ bool load_palette(const HuffmanPaletteAsset& asset, bool object_palette) {
         return false;
     }
     if (!dma_wait_for_source(palette_decode_buffer, sizeof(palette_decode_buffer))) return false;
-    if (!decode_huffman_runtime(asset.data, huffman_palette_decode_buffer, max_huffman_palette_bytes)) {
+    if (!decode_huffman_runtime(asset.data, compressed_palette_decode_buffer, max_huffman_palette_bytes)) {
         return false;
     }
 
     for (size_t index = 0; index < asset.color_count; ++index) {
         palette_decode_buffer[index] = static_cast<uint16_t>(
-            huffman_palette_decode_buffer[index * 2] |
-            (static_cast<uint16_t>(huffman_palette_decode_buffer[index * 2 + 1]) << 8));
+            compressed_palette_decode_buffer[index * 2] |
+            (static_cast<uint16_t>(compressed_palette_decode_buffer[index * 2 + 1]) << 8));
     }
 
     if (object_palette) {
@@ -257,19 +258,19 @@ bool load_tiles(const Lz77TileAsset& asset) {
     if (!is_valid_lz77_tile_asset(asset)) {
         return false;
     }
-    if (!dma_wait_for_source(lz77_tile_decode_buffer, sizeof(lz77_tile_decode_buffer))) return false;
-    if (!decode_lz77_runtime(asset.data, lz77_tile_decode_buffer, max_lz77_tile_asset_bytes)) {
+    if (!dma_wait_for_source(compressed_tile_decode_buffer, sizeof(compressed_tile_decode_buffer))) return false;
+    if (!decode_lz77_runtime(asset.data, compressed_tile_decode_buffer, max_lz77_tile_asset_bytes)) {
         return false;
     }
 
     if (asset.object_tiles) {
         if (asset.color_depth == ColorDepth::Bpp8) {
-            gbs_hw_load_obj_tiles_8bpp(lz77_tile_decode_buffer, asset.destination_tile, asset.tile_count);
+            gbs_hw_load_obj_tiles_8bpp(compressed_tile_decode_buffer, asset.destination_tile, asset.tile_count);
         } else {
-            gbs_hw_load_obj_tiles(lz77_tile_decode_buffer, asset.destination_tile, asset.tile_count);
+            gbs_hw_load_obj_tiles(compressed_tile_decode_buffer, asset.destination_tile, asset.tile_count);
         }
     } else {
-        gbs_hw_load_bg_tiles(lz77_tile_decode_buffer, asset.destination_tile, asset.tile_count);
+        gbs_hw_load_bg_tiles(compressed_tile_decode_buffer, asset.destination_tile, asset.tile_count);
     }
     return true;
 }
@@ -278,19 +279,19 @@ bool load_tiles(const HuffmanTileAsset& asset) {
     if (!is_valid_huffman_tile_asset(asset)) {
         return false;
     }
-    if (!dma_wait_for_source(huffman_tile_decode_buffer, sizeof(huffman_tile_decode_buffer))) return false;
-    if (!decode_huffman_runtime(asset.data, huffman_tile_decode_buffer, max_huffman_tile_asset_bytes)) {
+    if (!dma_wait_for_source(compressed_tile_decode_buffer, sizeof(compressed_tile_decode_buffer))) return false;
+    if (!decode_huffman_runtime(asset.data, compressed_tile_decode_buffer, max_huffman_tile_asset_bytes)) {
         return false;
     }
 
     if (asset.object_tiles) {
         if (asset.color_depth == ColorDepth::Bpp8) {
-            gbs_hw_load_obj_tiles_8bpp(huffman_tile_decode_buffer, asset.destination_tile, asset.tile_count);
+            gbs_hw_load_obj_tiles_8bpp(compressed_tile_decode_buffer, asset.destination_tile, asset.tile_count);
         } else {
-            gbs_hw_load_obj_tiles(huffman_tile_decode_buffer, asset.destination_tile, asset.tile_count);
+            gbs_hw_load_obj_tiles(compressed_tile_decode_buffer, asset.destination_tile, asset.tile_count);
         }
     } else {
-        gbs_hw_load_bg_tiles(huffman_tile_decode_buffer, asset.destination_tile, asset.tile_count);
+        gbs_hw_load_bg_tiles(compressed_tile_decode_buffer, asset.destination_tile, asset.tile_count);
     }
     return true;
 }
@@ -388,15 +389,15 @@ bool load_tilemap(BackgroundLayer layer, const Lz77TileMapAsset& asset) {
         return false;
     }
     if (!dma_wait_for_source(tilemap_decode_buffer, sizeof(tilemap_decode_buffer))) return false;
-    if (!decode_lz77_runtime(asset.data, lz77_tilemap_decode_buffer, max_lz77_tilemap_bytes)) {
+    if (!decode_lz77_runtime(asset.data, compressed_tilemap_decode_buffer, max_lz77_tilemap_bytes)) {
         return false;
     }
 
     size_t entry_count = static_cast<size_t>(asset.width) * asset.height;
     for (size_t index = 0; index < entry_count; ++index) {
         tilemap_decode_buffer[index] = static_cast<uint16_t>(
-            lz77_tilemap_decode_buffer[index * 2] |
-            (static_cast<uint16_t>(lz77_tilemap_decode_buffer[index * 2 + 1]) << 8));
+            compressed_tilemap_decode_buffer[index * 2] |
+            (static_cast<uint16_t>(compressed_tilemap_decode_buffer[index * 2 + 1]) << 8));
     }
 
     gbs_hw_load_bg_tilemap(static_cast<int>(layer), tilemap_decode_buffer, asset.width, asset.height, static_cast<uint32_t>(size));
@@ -409,15 +410,15 @@ bool load_tilemap(BackgroundLayer layer, const HuffmanTileMapAsset& asset) {
         return false;
     }
     if (!dma_wait_for_source(tilemap_decode_buffer, sizeof(tilemap_decode_buffer))) return false;
-    if (!decode_huffman_runtime(asset.data, huffman_tilemap_decode_buffer, max_lz77_tilemap_bytes)) {
+    if (!decode_huffman_runtime(asset.data, compressed_tilemap_decode_buffer, max_lz77_tilemap_bytes)) {
         return false;
     }
 
     const size_t entry_count = static_cast<size_t>(asset.width) * asset.height;
     for (size_t index = 0; index < entry_count; ++index) {
         tilemap_decode_buffer[index] = static_cast<uint16_t>(
-            huffman_tilemap_decode_buffer[index * 2] |
-            (static_cast<uint16_t>(huffman_tilemap_decode_buffer[index * 2 + 1]) << 8));
+            compressed_tilemap_decode_buffer[index * 2] |
+            (static_cast<uint16_t>(compressed_tilemap_decode_buffer[index * 2 + 1]) << 8));
     }
 
     gbs_hw_load_bg_tilemap(static_cast<int>(layer), tilemap_decode_buffer, asset.width, asset.height, static_cast<uint32_t>(size));
