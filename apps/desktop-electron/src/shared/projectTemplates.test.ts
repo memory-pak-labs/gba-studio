@@ -604,6 +604,7 @@ describe("projectTemplates", () => {
       "gallery-gate.png",
       "gallery-props.png",
       "market-approved-actors-64x64.png",
+      "nara-topdown-walk-run-v1.png",
       "opening-local-animation-128x96.png",
       "penedos-approved-checkpoint.png",
       "penedos-approved-crab-east.png",
