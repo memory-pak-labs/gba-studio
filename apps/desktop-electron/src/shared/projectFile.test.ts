@@ -193,6 +193,23 @@ describe("GBA project file contract", () => {
     })).toEqual([]);
   });
 
+  it("validates compact metatile maps without accepting corrupt dictionaries or indices", () => {
+    const map = { encoding: "metatile-v1", width: 4, height: 2, blockWidth: 2, blockHeight: 2,
+      dictionary: [[0, 1, 2, 3], [4, 5, 6, 7]], indices: [0, 1] };
+    const room = (tilemap: unknown) => ({ scenas: [{ name: "map", width: 4, height: 2, tilemap }] });
+    expect(validateRoomSchemaCoverage(room(map))).toEqual([]);
+    for (const corrupt of [
+      { ...map, width: 2, height: 4 },
+      { ...map, blockWidth: 3 },
+      { ...map, dictionary: [[0, 1, 2]] },
+      { ...map, dictionary: [[0, 1, 2, "bad"]] },
+      { ...map, indices: [0, 2] },
+      { ...map, indices: [0] }
+    ]) expect(validateRoomSchemaCoverage(room(corrupt))).toEqual([
+      { roomIndex: 0, roomName: "map", missingFields: [], invalidFields: ["tilemap"] }
+    ]);
+  });
+
   it("validates detailed room entity schema coverage for actors and triggers", () => {
     const project = parseGBAProjectFile(readFileSync(fixturePath, "utf8"));
     expect(validateRoomEntitySchemaCoverage(project.data)).toEqual([]);

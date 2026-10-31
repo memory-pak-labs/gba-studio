@@ -466,8 +466,26 @@ function roomCellCount(width: unknown, height: unknown): number | null {
   return positiveNumberIsValid(width) && positiveNumberIsValid(height) ? width * height : null;
 }
 
-function validateRoomTilemap(value: unknown, expectedCellCount: number | null, invalidFields: string[]): void {
+function validateRoomTilemap(value: unknown, roomWidth: unknown, roomHeight: unknown, expectedCellCount: number | null, invalidFields: string[]): void {
   if (value === undefined) return;
+
+  if (isRecord(value) && value.encoding === "metatile-v1") {
+    const { width, height, blockWidth, blockHeight, dictionary, indices } = value;
+    const positiveInteger = (entry: unknown): entry is number =>
+      typeof entry === "number" && Number.isSafeInteger(entry) && entry > 0;
+    const validDimensions = positiveInteger(width) && positiveInteger(height)
+      && positiveInteger(blockWidth) && positiveInteger(blockHeight)
+      && width === roomWidth && height === roomHeight
+      && width % blockWidth === 0 && height % blockHeight === 0;
+    const validDictionary = validDimensions && Array.isArray(dictionary) && dictionary.length > 0
+      && dictionary.every(block => Array.isArray(block) && block.length === blockWidth * blockHeight
+        && block.every(entry => typeof entry === "number" && Number.isFinite(entry)));
+    const validIndices = validDictionary && Array.isArray(indices)
+      && indices.length === (width / blockWidth) * (height / blockHeight)
+      && indices.every(index => Number.isSafeInteger(index) && index >= 0 && index < dictionary.length);
+    if (!validIndices) invalidFields.push("tilemap");
+    return;
+  }
 
   if (isCompactRoomSequence(value)) {
     validateCompactRoomSequence(value, expectedCellCount, "tilemap", (entry) => (
@@ -617,7 +635,7 @@ export function validateRoomSchemaCoverage(data: GBAProjectData): GBAProjectRoom
     }
 
     const expectedCellCount = roomCellCount(width, height);
-    validateRoomTilemap(room.tilemap, expectedCellCount, invalidFields);
+    validateRoomTilemap(room.tilemap, width, height, expectedCellCount, invalidFields);
     validateRoomCollisionTypes(room.collisionTypes, expectedCellCount, invalidFields);
 
     if (missingFields.length === 0 && invalidFields.length === 0) return [];
