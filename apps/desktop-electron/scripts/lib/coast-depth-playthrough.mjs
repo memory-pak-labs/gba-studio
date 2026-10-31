@@ -9,12 +9,13 @@ export async function playCoastDepth(driver, project, exported, feature, context
   const tap=async(key,settle=24)=>{await driver.run(6,key);await driver.run(settle,0);};
   const close=async()=>{for(let i=0;i<50;i++){if(!await driver.dialogue()){await driver.run(8,0);if(!await driver.dialogue())return;}await tap(2,12);}assert.fail('Dialogue closes through controller input');};
   const shot=label=>driver.capture('coast-'+label);
+  const screen=name=>{const index=exported.menu_project.screens.findIndex(entry=>entry.name===name);assert.notEqual(index,-1,`Exported menu ${name} exists`);return index;};
   async function saveSlot(slot,label){
     await close();const kind=(await driver.state()).runtimeKind;
     await tap(kind===6?256:8,55);assert.equal((await driver.state()).runtimeKind,3,'The runtime menu shortcut opens the authored menu');
-    assert.equal((await driver.state()).currentRoom,11);
+    assert.equal((await driver.state()).currentRoom,screen('menu_start'));
     for(let i=0;i<3;i++)await tap(128);
-    await tap(1,55);assert.equal((await driver.state()).currentRoom,10,'Save screen opens');
+    await tap(1,55);assert.equal((await driver.state()).currentRoom,screen('salvar'),'Save screen opens');
     for(let i=0;i<slot;i++)await tap(128);
     await tap(1);await tap(1);await driver.checkpoint(label);
     await tap(2);await tap(2);await tap(2,70);
@@ -116,7 +117,7 @@ export async function playCoastDepth(driver, project, exported, feature, context
       assert.fail('The platform gameplay clock advances');
     };
     assert.equal((await driver.state()).runtimeKind,1);await shot('lift-initial');
-    await tap(8,55);assert.equal((await driver.state()).currentRoom,11);
+    await tap(8,55);assert.equal((await driver.state()).currentRoom,screen('menu_start'));
     for(let i=0;i<4;i++)await tap(128);await shot('pause-load-cursor');
     await tap(128);await shot('pause-settings-cursor');
     await tap(128);await shot('pause-resume-second-page');
@@ -190,7 +191,7 @@ export async function playCoastDepth(driver, project, exported, feature, context
       assert.ok(previous.has(x+','+y),'Market route is reachable through the authored ramps');
       const route=[];let p=[x,y];while(previous.get(p.join(','))){route.push(p);p=previous.get(p.join(','));}
       for(const[xx,yy]of route.reverse())for(const[field,target]of [['x256',xx*256],['y256',yy*256]]){
-        for(let n=0;n<100;n++){const a=await actor(0),delta=target-a[field];if(Math.abs(delta)<16)break;const key=field==='x256'?(delta>0?144:96):(delta>0?160:80);await driver.run(Math.min(4,Math.floor(Math.abs(delta)/16)),key);if(n===99)assert.fail('Market player reaches '+[xx,yy]+' '+JSON.stringify(await actor(0)));}
+        for(let n=0;n<100;n++){const a=await actor(0),delta=target-a[field];if(Math.abs(delta)<16)break;const key=field==='x256'?(delta>0?144:96):(delta>0?160:80);await driver.run(Math.min(4,Math.floor(Math.abs(delta)/16)),key);if(n===99){await shot('market-route-blocked');assert.fail('Market player reaches '+[xx,yy]+' '+JSON.stringify({coast:await driver.coast(),ui:await driver.ui()}));}}
       }
       await driver.run(8,0);
     }
