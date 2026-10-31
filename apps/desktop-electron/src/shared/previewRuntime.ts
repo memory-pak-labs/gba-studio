@@ -1,3 +1,6 @@
+import { parseEventInstruction, sceneEntryPlan, eventWaitFrames, type SceneEntryReason } from "./eventExecutionContract.js";
+import { parseVisibilityPreset, visibilityPresetVerbs, type VisibilityPreset } from "./visibilityPresets.js";
+import { roomMapStates, resolveMapState, mapStateTileCommands } from "./mapStates.js";
 import { resolveProjectConstantCommand } from "./projectConstants.js";
 import { resolveSceneDialogueUiSettings } from "./interfaceThemes.js";
 import { eventCommandRuntimeVerbs } from "./eventCommandLibrary.js";
@@ -48,7 +51,8 @@ import {
 } from "./projectLocalization.js";
 import { projectIsometricCoordinate } from "./isometricProjection.js";
 import { deriveIsometricCameraPositionForPlayer } from "./isometricCamera.js";
-import { blockedCollisionCellsFromRoom } from "./roomCollisionTypes.js";
+import { blockedCollisionCellsFromRoom, isBlockedCollisionTypeForScene } from "./roomCollisionTypes.js";
+import { tileReplacementCollision, tileReplacementCollisionFields } from "./tileReplacement.js";
 import {
   battleRpgSceneConfigFromRuntime,
   dungeonCrawlerSceneConfigFromRuntime,
@@ -73,6 +77,7 @@ import {
   createPlatformerPreviewBody,
   stepPlatformerPreview,
   stepPlatformerBlankPreview,
+  platformerScriptedStepBlocked,
   type PlatformerPreviewBody,
   type PlatformerPreviewInput,
   type PlatformerPreviewMap
@@ -142,6 +147,7 @@ import {
 } from "./menuScene.js";
 import {
   isSpriteAnimationType,
+  isometricScreenFacingDirection,
   normalizeSpriteDirection,
   normalizeSpriteStateSlots,
   resolveSpriteStateForActor,
@@ -518,10 +524,16 @@ export interface PreviewNativeModal {
  variable?: string; code?: string; expected?: number; cursor: number; slots?: number; slot?: number; pause: boolean;
 }
 export interface PreviewNativeThread { frame: PreviewRuntimeScriptFrame; wait: number; continuations: PreviewRuntimeScriptFrame[]; }
+export interface PreviewActorMotion { token:number; actorID:string; targetX:number; targetY:number; remainder:number; owner:string|null; }
 export interface PreviewNativeEvents {
+ buttons: Record<string, { event: string; override: boolean }>;
+ pressedButtons: string[];
  modal: PreviewNativeModal | null;
+ timers: Record<string, { frames: number; remaining: number; pending: boolean }>;
  threads: Record<string,PreviewNativeThread>;
  executingSegment: string | null;
+ actorMotions: Record<string,PreviewActorMotion>;
+ actorMotionSerial: number;
  actorStates: Record<string,string>;
  actorEffects: Record<string,{kind:string,frames:number,intensity:number,visible:boolean}>;
  cancelledMovement: Record<string,boolean>;
@@ -531,9 +543,9 @@ export interface PreviewNativeEvents {
  adventure: {state:string,frames:number};
 }
 function initialNativeEvents(): PreviewNativeEvents {
- return {modal:null,threads:{},executingSegment:null,actorStates:{},actorEffects:{},cancelledMovement:{},projectileSlots:{},projectiles:[],texts:[],adventure:{state:"ground",frames:0}};
+ return {buttons:{},pressedButtons:[],modal:null,timers:{},threads:{},executingSegment:null,actorMotions:{},actorMotionSerial:0,actorStates:{},actorEffects:{},cancelledMovement:{},projectileSlots:{},projectiles:[],texts:[],adventure:{state:"ground",frames:0}};
 }
-const integratedNativeSimulationVerbs=new Set(["open_menu","open_shop","open_code_lock","open_equip_menu","draw_text","start_segment","stop_segment","set_adventure_state","push_actor","cancel_actor_movement","set_actor_animation_state","actor_effects","projectile_load_slot","launch_projectile_slot"]);
+const integratedNativeSimulationVerbs=new Set(["attach_button","remove_button","open_menu","open_shop","open_code_lock","open_equip_menu","draw_text","start_segment","stop_segment","timer_attach","timer_restart","timer_remove","set_adventure_state","push_actor","cancel_actor_movement","set_actor_animation_state","actor_effects","projectile_load_slot","launch_projectile_slot"]);
 
 export interface PreviewRuntimeScriptFrame {
   callStack: string[];
@@ -544,6 +556,8 @@ export interface PreviewRuntimeScriptFrame {
   eventName: string;
   resolvedEventName: string;
   skipNextReason: string | null;
+  actorMotionID?: string;
+  actorMotionToken?: number;
   repeatCommandIndex?: number;
   repeatIterations?: number;
   /** Native exit/enter callback scripts suppress the room-enter consumer. */
@@ -608,6 +622,11 @@ export interface PreviewRuntimeAudioMixState {
   lastPcmSfx: { volume: number; priority: number } | null;
 }
 
+export interface PreviewRuntimeVisibilityState extends VisibilityPreset {
+  remainingFrames: number;
+  elapsedMs: number;
+}
+
 export interface PreviewRuntimeVisualEffectState {
   effect: string;
   layer: string;
@@ -618,7 +637,7 @@ export interface PreviewRuntimeVisualEffectState {
 }
 
 export interface PreviewRuntimeHudState {
-  gameClock: { minutes: number; frames: number; mode: string; currentMinute: number; elapsedFrames: number } | null;
+  gameClock: { minutes: number; frames: number; mode: string; currentMinute: number; elapsedFrames: number; variable?: string } | null;
   hearts: { stat: string; x: number; y: number } | null;
   numbers: Record<string, { variable: string; x: number; y: number; digits: number }>;
   statBars: Record<string, { stat: string; x: number; y: number; width: number; orientation: string }>;
@@ -705,6 +724,7 @@ function previewRuntimeRtcFieldValue(state: PreviewRuntimeState, field: string):
 export const PREVIEW_ACTOR_UPDATE_INTERVAL_MS = 1000 / 60;
 
 export interface PreviewRuntimeState {
+  sceneLifecycle?: ReturnType<typeof sceneEntryPlan>;
   ready: boolean;
   error: string | null;
   rooms: PreviewRuntimeRoom[];
@@ -739,6 +759,7 @@ export interface PreviewRuntimeState {
   platformerInputRequests: { jump: boolean; dash: boolean };
   activeCameraZoneID: string | null;
   visualEffect: PreviewRuntimeVisualEffectState | null;
+  visibility?: PreviewRuntimeVisibilityState | null;
   choiceEvents: PreviewRuntimeChoiceEvent[];
   eventLog: PreviewRuntimeEventLogItem[];
   equippedItems: Record<string, string>;
@@ -1276,9 +1297,7 @@ function topdownFeatureRuntimeForState(state: PreviewRuntimeState): TopdownFeatu
   return resolveTopdownFeatureRuntime((config as Record<string, unknown>).modules);
 }
 
-function topdownInventoryKey(state: PreviewRuntimeState, item: number): string {
-  // Authored shop commands use the ROM registry, including named inventory items.
-  if (state.nativeEvents.modal?.kind !== "shop") return String(item);
+function eventInventoryKeys(state: PreviewRuntimeState): string[] {
   const keys = new Set<string>();
   const expanded = expandEventProcedures(projectArray(state.project, "events"));
   for (const event of expanded.events) {
@@ -1286,10 +1305,16 @@ function topdownInventoryKey(state: PreviewRuntimeState, item: number): string {
     for (const step of steps) {
       const parts = commandTokens(resolveProjectConstantCommand(state.project, stringField(step.command, "")));
       const key = parts[0] === "set_equipped_item" ? parts[2] : ["add_item", "has_item"].includes(parts[0] ?? "") ? parts[1] : null;
-      if (key) keys.add(key);
+      if (key && key !== "none") keys.add(key);
     }
   }
-  return [...keys].sort()[item] ?? String(item);
+  return [...keys].sort();
+}
+
+function topdownInventoryKey(state: PreviewRuntimeState, item: number): string {
+  // Authored shop commands use the ROM registry, including named inventory items.
+  if (state.nativeEvents.modal?.kind !== "shop") return String(item);
+  return eventInventoryKeys(state)[item] ?? String(item);
 }
 
 function topdownInventoryCount(state: PreviewRuntimeState, item: number): number {
@@ -1784,7 +1809,7 @@ function openPreviewTextInput(
       variableName,
       value,
       maxLength: effectiveMaxLength,
-      cursorIndex: Math.min(value.length, effectiveMaxLength - 1),
+      cursorIndex: Math.min(value.length, layout === "grid" ? effectiveMaxLength : effectiveMaxLength - 1),
       keyboardIndex: 0,
       lowercase: false,
       layout
@@ -1806,11 +1831,12 @@ function updatePreviewTextInput(state: PreviewRuntimeState, action: PreviewRunti
 
     const keyboardIndex = state.textInput.keyboardIndex;
     if (keyboardIndex >= 0 && keyboardIndex < 26) {
+      if (state.textInput.cursorIndex >= state.textInput.maxLength) return state;
       const character = MENU_TEXT_INPUT_ALPHABET[keyboardIndex] ?? "";
       const nextCharacter = state.textInput.lowercase ? character.toLowerCase() : character;
       const padded = state.textInput.value.padEnd(state.textInput.maxLength, " ").split("");
       padded[state.textInput.cursorIndex] = nextCharacter;
-      const nextCursorIndex = Math.min(state.textInput.maxLength - 1, state.textInput.cursorIndex + 1);
+      const nextCursorIndex = state.textInput.cursorIndex + 1;
       return withPreviewTextInputValue({
         ...state,
         textInput: { ...state.textInput, cursorIndex: nextCursorIndex }
@@ -2913,8 +2939,27 @@ export function stepPreviewDebuggerScript(state: PreviewRuntimeState): PreviewRu
   }, frame);
 }
 
-function setCurrentRoom(state: PreviewRuntimeState, room: PreviewRuntimeRoom, triggerRoomEnter = true): PreviewRuntimeState {
+function applyMapStateTiles(state: PreviewRuntimeState): PreviewRuntimeState {
+  const room = roomRecordByRuntimeRoom(state.project, state.currentRoom);
+  if (!room) return state;
+  let next = state;
+  for (const definition of roomMapStates(room)) {
+    const value = Number(next.variables[definition.variable] ?? 0);
+    const variant = definition.variants.find(item => item.value === value);
+    if (!variant) continue;
+    for (const command of mapStateTileCommands(variant)) next = handleActorCommand(next, commandTokens(command)) ?? next;
+  }
+  return next;
+}
+
+function setCurrentRoom(state: PreviewRuntimeState, room: PreviewRuntimeRoom, triggerRoomEnter = true, reason: SceneEntryReason = state.currentRoom ? "return" : "first-entry"): PreviewRuntimeState {
   const previousRoom = state.currentRoom;
+  const source = roomRecordByRuntimeRoom(state.project, room);
+  if (source) {
+    // Room-local tile edits expire on entry/load, before saved map states reapply.
+    room = toRuntimeRoom(state.project, source, projectRooms(state.project).indexOf(source));
+    state = { ...state, rooms: state.rooms.map(item => item.id === room.id ? room : item) };
+  }
   state={...state,nativeEvents:{...initialNativeEvents(),projectileSlots:state.nativeEvents.projectileSlots}};
   const roomActors = actorsForRoom(state.project, room);
   const destinationPlayerName = roomRecordByRuntimeRoom(state.project, room)?.playerActorName;
@@ -2932,6 +2977,8 @@ function setCurrentRoom(state: PreviewRuntimeState, room: PreviewRuntimeRoom, tr
   const entered = applyPointClickCursorAnimation(updateDebug({
     ...state,
     currentRoom: room,
+    sceneLifecycle: sceneEntryPlan(reason, { hasMapStates: source ? roomMapStates(source).length > 0 : false, restoreOnly: source?.restorePolicy === "restore-only" }),
+    visibility: null,
     dialogueUi: dialogueUiSettings(state.project, room.id),
     camera: roomUsesPagedTacticalSurfaceInPreview(room) ? initialRuntimeCameraStateForRoom(room) : state.camera,
     runtimeProfile: runtimeProfileForRoom(room),
@@ -2963,7 +3010,7 @@ function setCurrentRoom(state: PreviewRuntimeState, room: PreviewRuntimeRoom, tr
     battleTurnIndex: 0,
     battleEscaped: false
   }));
-  const transitioned = applySceneConnectionTransition(entered, previousRoom, room);
+  const transitioned = applySceneConnectionTransition(applyMapStateTiles(entered), previousRoom, room);
   return triggerRoomEnter && previousRoom?.id !== room.id && room.sceneType === "topdown"
     ? queuePreviewCallback(transitioned, transitioned.adventureCallbacks[1] ?? roomBootEventName(transitioned),
         !transitioned.adventureCallbacks[1]) : transitioned;
@@ -3073,7 +3120,8 @@ function skipPreviewLogo(state: PreviewRuntimeState): PreviewRuntimeState {
 }
 
 function commandTokens(command: string): string[] {
-  return command.split(/\s+/).filter(Boolean);
+  const instruction = parseEventInstruction(command, undefined, false);
+  return [instruction.verb, ...instruction.operands];
 }
 
 function numberToken(value: string | undefined, fallback = 0): number {
@@ -3111,6 +3159,12 @@ function scalarEquals(left: PreviewRuntimeScalar | undefined, right: PreviewRunt
 }
 
 function engineFieldValue(state: PreviewRuntimeState, field: string): PreviewRuntimeScalar {
+  const equipment = /^equipped_item_([0-7])$/.exec(field);
+  if (equipment) {
+    const item = state.equippedItems[equipment[1]!];
+    return item ? eventInventoryKeys(state).indexOf(item) : -1;
+  }
+  if (field === "timer_count") return Object.keys(state.nativeEvents.timers).length;
   if (["current_scene_index", "current_room", "scene", "room"].includes(field)) {
     const rooms = state.rooms.filter(room => room.sceneType === state.currentRoom?.sceneType);
     return Math.max(0, rooms.findIndex(room => room.id === state.currentRoom?.id));
@@ -3169,6 +3223,7 @@ function stateWithActors(state: PreviewRuntimeState, actors: PreviewRuntimeActor
         ...state.player,
         x: matchingPlayer.x,
         y: matchingPlayer.y,
+        z: matchingPlayer.z,
         direction: matchingPlayer.direction,
         renderLayer: matchingPlayer.renderLayer,
         spriteSheet: matchingPlayer.spriteSheet,
@@ -3374,7 +3429,7 @@ function runtimeScriptLog(
 function evaluateConditionCommand(state: PreviewRuntimeState, parts: string[]): boolean | null {
   const verb = parts[0] ?? "noop";
   const key = parts[1] ?? "";
-  if (verb === "if_variable") return scalarEquals(state.variables[key], scalarToken(parts[2]));
+  if (verb === "if_variable") return scalarEquals(state.variables[key] ?? 0, scalarToken(parts[2]));
   if (verb === "if_variable_variable") return scalarEquals(state.variables[key], state.variables[parts[2] ?? ""]);
   if (verb === "if_variable_greater_than") return variableNumber(state, key) > numberToken(parts[2], 0);
   if (verb === "if_variable_less_than") return variableNumber(state, key) < numberToken(parts[2], 0);
@@ -3411,7 +3466,7 @@ function evaluateConditionCommand(state: PreviewRuntimeState, parts: string[]): 
     const slot = Math.max(0, Math.min(255, numberToken(parts[1], 0)));
     return previewRuntimeSaveSlotAvailable(state, slot) && state.saveSlots[slot] !== undefined;
   }
-  if (verb === "if_button") return false;
+  if (verb === "if_button") return state.nativeEvents.pressedButtons.includes(key.toLowerCase());
   return null;
 }
 
@@ -3632,21 +3687,44 @@ function handleActorCommand(state: PreviewRuntimeState, parts: string[]): Previe
   if (verb === "wait_actor_animation") {
     return state;
   }
+  if (verb === "set_map_state") {
+    const { room, state: mapState, variant } = resolveMapState(projectRooms(state.project), parts[1] ?? "", parts[2] ?? "");
+    const next = { ...state, variables: { ...state.variables, [mapState.variable]: variant.value } };
+    return room.name === state.currentRoom?.name ? applyMapStateTiles(next) : next;
+  }
   if (verb === "replace_tile" || verb === "replace_tile_sequence") {
     const room = state.currentRoom;
     if (!room) return state;
     const x = numberToken(parts[1], 0);
     const y = numberToken(parts[2], 0);
     const startTile = numberToken(parts[3], 0);
-    const count = verb === "replace_tile_sequence" ? Math.max(1, numberToken(parts[4], 1)) : 1;
-    const tileCells = [...room.tileCells];
+    const count = verb === "replace_tile_sequence" ? Math.max(1, Math.min(64, numberToken(parts[4], 1))) : 1;
+    const layerToken = parts[verb === "replace_tile_sequence" ? 5 : 4] ?? "bg0";
+    const layer = layerToken === "bg0" ? "BG2" : layerToken.toUpperCase() as "BG1" | "BG2" | "BG3";
+    if (!["BG1", "BG2", "BG3"].includes(layer)) return state;
+    const collisionToken = parts[verb === "replace_tile_sequence" ? 6 : 5];
+    tileReplacementCollisionFields(collisionToken, layer.toLowerCase());
+    const collision = tileReplacementCollision(collisionToken);
+    const renderLayer = room.renderLayers.backgrounds[layer];
+    const tileCells = [...renderLayer.tileCells];
+    const collisionCells = [...room.collisionCells];
+    const collisionTypes = [...room.collisionTypes];
     for (let tileOffset = 0; tileOffset < count; tileOffset += 1) {
+      if (x + tileOffset < 0 || x + tileOffset >= room.width || y < 0 || y >= room.height) continue;
       const cellIndex = y * room.width + (x + tileOffset);
       if (cellIndex >= 0 && cellIndex < tileCells.length) {
         tileCells[cellIndex] = startTile + tileOffset;
+        if (layer === "BG2" && collision !== undefined) {
+          collisionTypes[cellIndex] = collision;
+          collisionCells[cellIndex] = isBlockedCollisionTypeForScene(collision, room.sceneType);
+        }
       }
     }
-    const nextRoom = { ...room, tileCells };
+    const nextLayer = {...renderLayer, tileCells};
+    const renderLayers = {...room.renderLayers, backgrounds: {...room.renderLayers.backgrounds, [layer]: nextLayer}};
+    const nextRoom = { ...room, tileCells: layer === "BG2" ? tileCells : room.tileCells,
+      bg2: layer === "BG2" ? {...room.bg2, tileCells} : room.bg2,
+      renderLayers, collisionCells, collisionTypes };
     return {
       ...state,
       currentRoom: nextRoom,
@@ -3755,6 +3833,12 @@ function handleCameraCommand(state: PreviewRuntimeState, parts: string[]): Previ
 }
 
 function handleVisualEffectCommand(state: PreviewRuntimeState, parts: string[]): PreviewRuntimeState | null {
+  if (visibilityPresetVerbs.includes(parts[0] ?? "")) {
+    const preset = parseVisibilityPreset(parts);
+    if (preset.effect === "clear") return { ...state, visibility: null };
+    if (!actorByName(state, preset.actor)) throw new Error(`Ator de visibilidade inexistente: ${preset.actor}`);
+    return { ...state, visibility: { ...preset, remainingFrames: preset.frames, elapsedMs: 0 } };
+  }
   if ((parts[0] ?? "noop") !== "visual_effect") return null;
   const effect = (parts[1] ?? "clear").trim().toLowerCase();
   if (effect === "clear") return { ...state, visualEffect: null };
@@ -3801,7 +3885,7 @@ function handleHudInventoryCommand(state: PreviewRuntimeState, parts: string[]):
     return { ...state, hud: { ...state.hud, numbers: { ...state.hud.numbers, [key]: { variable: key, x: numberToken(parts[2], 0), y: numberToken(parts[3], 0), digits: numberToken(parts[4], 0) } } } };
   }
   if (verb === "start_game_clock") {
-    return { ...state, hud: { ...state.hud, gameClock: { minutes: numberToken(parts[1], 0), frames: numberToken(parts[2], 0), mode: parts[3] ?? "hud", currentMinute: 0, elapsedFrames: 0 } } };
+    return { ...state, hud: { ...state.hud, gameClock: { minutes: numberToken(parts[1], 0), frames: numberToken(parts[2], 0), mode: parts[3] ?? "hud", currentMinute: parts[4] ? ((variableNumber(state, parts[4]) % 1440) + 1440) % 1440 : 0, elapsedFrames: 0, ...(parts[4] ? { variable: parts[4] } : {}) } } };
   }
   if (verb === "modify_wallet") {
     const current = state.wallet[key] ?? { value: 0, max: null };
@@ -3818,6 +3902,11 @@ function handleHudInventoryCommand(state: PreviewRuntimeState, parts: string[]):
     const slot = parts[1] ?? "";
     const item = parts[2] ?? "";
     if (!slot || !item) return state;
+    if (item === "none") {
+      const equippedItems = { ...state.equippedItems };
+      delete equippedItems[slot];
+      return { ...state, equippedItems };
+    }
     return { ...state, equippedItems: { ...state.equippedItems, [slot]: item } };
   }
   return null;
@@ -3981,7 +4070,9 @@ function appendRecognizedScript(
         ...(muted && (selected === "sfx" || selected === "all") ? { activeSfx: null, activeSfxAsset: null } : {})
       }, eventName, command, "audio", `${selected}:${muted}`));
     }
-    const volume = previewHardwareAudioVolume(parts[2]);
+    const baseVolume = previewHardwareAudioVolume(parts[2]);
+    const preference=verb === "fade_audio_volume" ? [parts[4],parts[5]].reduce((factor,name)=>factor*(name?Math.max(0,Math.min(100,variableNumber(state,name)))/100:1),1) : 1;
+    const volume = Math.round(baseVolume * preference);
     if (verb === "set_audio_volume") {
       buses.forEach((bus) => {
         audioMix.volumes[bus] = volume;
@@ -3991,6 +4082,7 @@ function appendRecognizedScript(
     }
     const frames = Math.max(0, Math.min(3600, numberToken(parts[3], 30)));
     buses.forEach((bus) => {
+      if(parts[4]||parts[5])audioMix.volumes[bus]=Math.min(audioMix.volumes[bus],Math.round(15*preference));
       audioMix.fades[bus] = frames === 0 ? null : {
         start: audioMix.volumes[bus],
         target: volume,
@@ -4029,8 +4121,10 @@ function appendRecognizedScript(
     if (!savedRoom || runtimeProfileForRoom(savedRoom).sceneType !== snapshot.runtime) {
       return updateDebug(appendLog(state, eventName, command, "skipped", `Save slot ${slot} possui runtime ou room invalido.`));
     }
-    const restoredRoomState = setCurrentRoom(state, savedRoom);
-    return updateDebug(appendLog({
+    const savedSource = roomRecordByRuntimeRoom(state.project, savedRoom);
+    const plan = sceneEntryPlan("load", { hasMapStates: savedSource ? roomMapStates(savedSource).length > 0 : false, restoreOnly: savedSource?.restorePolicy === "restore-only" });
+    const restoredRoomState = setCurrentRoom({ ...state, variables: { ...snapshot.variables } }, savedRoom, plan.runInit, "load");
+    const restored = updateDebug(appendLog({
       ...restoredRoomState,
       player: restoredRoomState.player && snapshot.player
         ? { ...restoredRoomState.player, x: snapshot.player.x, y: snapshot.player.y }
@@ -4044,6 +4138,8 @@ function appendRecognizedScript(
       equippedItems: { ...snapshot.equippedItems },
       dialogueLocale: snapshot.dialogueLocale ?? state.dialogueLocale
     }, eventName, command, "script", `slot=${slot}`));
+    const restoreEvent = (savedSource?.eventBindings as Record<string, unknown> | undefined)?.onRestore;
+    return typeof restoreEvent === "string" && restoreEvent ? runPreviewRuntimeEvent(restored, restoreEvent) : restored;
   }
 
   if (verb === "remove_save_game") {
@@ -4099,6 +4195,15 @@ function appendRecognizedScript(
       return runtimeScriptLog(state, eventName, command, `idioma-invalido:${operand}`);
     }
     return runtimeScriptLog({ ...state, dialogueLocale: locale }, eventName, command, locale);
+  }
+
+  if (visibilityPresetVerbs.includes(verb) || verb === "set_map_state") {
+    try {
+      const next = verb === "set_map_state" ? handleActorCommand(state, parts) : handleVisualEffectCommand(state, parts);
+      return runtimeScriptLog(next ?? state, eventName, command, operand || verb);
+    } catch (error) {
+      return updateDebug(appendLog(state, eventName, command, "skipped", error instanceof Error ? error.message : String(error)));
+    }
   }
 
   const handledState = handleVariableCommand(state, parts) ??
@@ -4310,6 +4415,14 @@ function runScriptFrameCommands(state: PreviewRuntimeState, frame: PreviewRuntim
       break doCommand;
     }
 
+    const skippedParent = conditionalScopes.at(-1);
+    if (skippedParent && skippedParent.mode !== "then" && previewConditionCommandVerbs.has(verb)
+      && structuredConditionBoundary(commands, commandIndex).endIndex !== null) {
+      conditionalScopes = [...conditionalScopes, { mode: "skip_to_end" }];
+      currentState = appendLog(currentState, resolvedEventName, command, "skipped", "Condição dentro de um ramo ignorado.");
+      break doCommand;
+    }
+
     if (verb === "condition_end") {
       if (conditionalScopes.length === 0) {
         currentState = appendLog(currentState, resolvedEventName, command, "noop", "condition_end sem bloco condicional ativo.");
@@ -4386,9 +4499,10 @@ function runScriptFrameCommands(state: PreviewRuntimeState, frame: PreviewRuntim
       const tokens = commandTokens(command);
       const previous = currentState.hud.gameClock ?? { minutes: 0, frames: 0, mode: "hidden", currentMinute: 0, elapsedFrames: 0 };
       const gameClock = verb === "start_game_clock"
-        ? { minutes: Number(tokens[1]), frames: Number(tokens[2]), mode: tokens[3]!, currentMinute: 0, elapsedFrames: 0 }
+        ? { minutes: Number(tokens[1]), frames: Number(tokens[2]), mode: tokens[3]!, currentMinute: tokens[4] ? ((variableNumber(currentState, tokens[4]) % 1440) + 1440) % 1440 : 0, elapsedFrames: 0, ...(tokens[4] ? { variable: tokens[4] } : {}) }
         : { ...previous, currentMinute: ((previous.currentMinute + Number(tokens[1])) % 1440 + 1440) % 1440 };
       currentState = runtimeScriptLog({ ...currentState, hud: { ...currentState.hud, gameClock } }, resolvedEventName, command, "relógio do jogo atualizado");
+      if (gameClock.variable) currentState = setRuntimeVariable(currentState, gameClock.variable, gameClock.currentMinute);
       break doCommand;
     }
     if (isLutaEventVerb(verb)) {
@@ -4457,8 +4571,34 @@ function runScriptFrameCommands(state: PreviewRuntimeState, frame: PreviewRuntim
       break doCommand;
     }
 
+    if ((verb === "move_actor_to" || verb === "move_actor_relative") && ["topdown", "platformer", "isometric", "isometricAdventure", "isometricTactical"].includes(currentState.currentRoom?.sceneType ?? "")) {
+      if (frame.actorMotionID !== undefined && frame.actorMotionToken !== undefined) {
+        const pending = currentState.nativeEvents.actorMotions[frame.actorMotionID];
+        if (!pending || pending.token !== frame.actorMotionToken) break doCommand;
+        return updateDebug({ ...currentState, scriptWaitFrames: 1,
+          scriptContinuations: [{ ...scriptFrameBase(), commandIndex: commandIndex + 1,
+            actorMotionID: frame.actorMotionID, actorMotionToken: frame.actorMotionToken }, ...currentState.scriptContinuations] });
+      }
+      const actor = actorByName(currentState, parts[0] ?? "");
+      if (!actor) {
+        currentState = appendUnsupported(currentState, resolvedEventName, command, "Ator inexistente.");
+        break doCommand;
+      }
+      const token = currentState.nativeEvents.actorMotionSerial + 1;
+      const motion: PreviewActorMotion = { token, actorID: actor.id,
+        targetX: verb === "move_actor_relative" ? actor.x + numberToken(parts[1], 0) : numberToken(parts[1], actor.x),
+        targetY: verb === "move_actor_relative" ? actor.y + numberToken(parts[2], 0) : numberToken(parts[2], actor.y),
+        remainder: 0, owner: currentState.nativeEvents.executingSegment };
+      currentState = runtimeScriptLog({ ...currentState, nativeEvents: { ...currentState.nativeEvents,
+        actorMotionSerial: token, actorMotions: { ...currentState.nativeEvents.actorMotions, [actor.id]: motion } } },
+        resolvedEventName, command, "movimento iniciado");
+      return updateDebug({ ...currentState, scriptWaitFrames: 1,
+        scriptContinuations: [{ ...scriptFrameBase(), commandIndex: commandIndex + 1,
+          actorMotionID: actor.id, actorMotionToken: token }, ...currentState.scriptContinuations] });
+    }
+
     if (verb === "idle" || verb === "wait") {
-      const frames = Math.max(0, Math.min(32767, numberToken(parts[0], 0)));
+      const frames = eventWaitFrames(parseEventInstruction(command, undefined, false));
       currentState = runtimeScriptLog(currentState, resolvedEventName, command, `${frames} quadros`);
       if (frames > 0) {
         return updateDebug({
@@ -4536,7 +4676,7 @@ function runScriptFrameCommands(state: PreviewRuntimeState, frame: PreviewRuntim
     }
 
     if (verb === "play_sfx") {
-      const activeSfx = operand || null;
+      const activeSfx = parts[0] || null;
       const activeSfxAsset = assetByName(currentState.project, activeSfx);
       const hasPlaybackOptions = parts[1] !== undefined || parts[2] !== undefined;
       const audioMix = hasPlaybackOptions
@@ -4824,8 +4964,19 @@ function nativeThreadFrame(state:PreviewRuntimeState,eventName:string):PreviewRu
 function applyIntegratedNativeSimulation(state:PreviewRuntimeState,parts:string[]):PreviewRuntimeState {
  const [verb,target,arg,extra]=parts;
  let native={...state.nativeEvents};
- if(verb==="start_segment") native.threads={...native.threads,[target!]:{frame:nativeThreadFrame(state,arg!),wait:0,continuations:[]}};
- else if(verb==="stop_segment") {native.threads={...native.threads};delete native.threads[target!];}
+ if(verb==="attach_button") native.buttons={...native.buttons,[target!.toLowerCase()]:{event:arg!,override:extra==="true"}};
+ else if(verb==="remove_button") {native.buttons={...native.buttons};delete native.buttons[target!.toLowerCase()];}
+ else if(verb==="start_segment") {
+  native.actorMotions=Object.fromEntries(Object.entries(native.actorMotions).filter(([,motion])=>motion.owner!==target));
+  native.threads={...native.threads,[target!]:{frame:nativeThreadFrame(state,arg!),wait:0,continuations:[]}};
+ }
+ else if(verb==="timer_attach") native.timers={...native.timers,[arg!]:{frames:Math.max(1,Number(target)),remaining:Math.max(1,Number(target)),pending:false}};
+ else if(verb==="timer_restart") {if(native.timers[target!])native.timers={...native.timers,[target!]:{...native.timers[target!]!,remaining:native.timers[target!]!.frames,pending:false}};}
+ else if(verb==="timer_remove") {native.timers={...native.timers};delete native.timers[target!];}
+ else if(verb==="stop_segment") {
+  native.threads={...native.threads};delete native.threads[target!];
+  native.actorMotions=Object.fromEntries(Object.entries(native.actorMotions).filter(([,motion])=>motion.owner!==target));
+ }
  else if(verb==="set_adventure_state") native.adventure={state:target!,frames:["dash","knockback","push"].includes(target!) ? (target==="push" ? 8 : 12) : 0};
  else if(verb==="draw_text") {
   const entry={x:Number(target),y:Number(arg),layer:extra!,text:parts.slice(4).join(" ")};
@@ -4850,7 +5001,10 @@ function applyIntegratedNativeSimulation(state:PreviewRuntimeState,parts:string[
    const direction=extra!;const dx=direction.includes("left") ? -1 : direction.includes("right") ? 1 : 0;
    const dy=direction.includes("up") ? -1 : direction.includes("down") ? 1 : 0;
    if(native.projectiles.length<8) native.projectiles=[...native.projectiles,{...slot,x:actor.x+0.5,y:actor.y+0.5,dx,dy,source:actor.id}];
-  } else if(verb==="cancel_actor_movement") native.cancelledMovement={...native.cancelledMovement,[actor.id]:true};
+  } else if(verb==="cancel_actor_movement") {
+   native.cancelledMovement={...native.cancelledMovement,[actor.id]:true};
+   native.actorMotions={...native.actorMotions};delete native.actorMotions[actor.id];
+  }
   else if(verb==="actor_effects") native.actorEffects={...native.actorEffects,[actor.id]:{kind:arg!,frames:Number(extra),intensity:Number(parts[4]),visible:actor.visible}};
   else if(verb==="set_actor_animation_state") {
    const matches=projectArray(state.project,"animationStates").filter(entry=>entry.id===arg || (entry.name===arg && entry.spriteSheet===actor.spriteSheet));
@@ -4911,8 +5065,94 @@ function dispatchIntegratedNativeModal(state:PreviewRuntimeState,action:PreviewR
   return {...state,equippedItems:equipped};
  } return state;
 }
+function previewActorRect(actor: PreviewRuntimeActor, x: number, y: number) {
+  const box = actor.collisionBox ?? { x: 0, y: 0, width: 16, height: 16 };
+  return { x: x + box.x, y: y + box.y, width: Math.max(0, box.width), height: Math.max(0, box.height) };
+}
+function previewActorMotionBlocked(state: PreviewRuntimeState, actor: PreviewRuntimeActor, x: number, y: number, dx: number, dy: number): boolean {
+  const room = state.currentRoom!;
+  const rect = previewActorRect(actor, x, y);
+  if (rect.width <= 0 || rect.height <= 0) return false;
+  const left = Math.floor(rect.x / 8), right = Math.floor((rect.x + rect.width - 1) / 8);
+  const top = Math.floor(rect.y / 8), bottom = Math.floor((rect.y + rect.height - 1) / 8);
+  if (room.sceneType === "platformer") {
+    const current = previewActorRect(actor, x - dx, y - dy);
+    if (platformerScriptedStepBlocked({ width: room.width, height: room.height, collisionTypes: room.collisionTypes }, current, dx, dy)) return true;
+  } else {
+    for (let ty = top; ty <= bottom; ty++) for (let tx = left; tx <= right; tx++)
+      if (isBlocked(room, tx, ty)) return true;
+  }
+  if (!actor.collisionEnabled) return false;
+  return state.actors.some(other => {
+    if (other.id === actor.id || !other.active || !other.visible || !other.collisionEnabled) return false;
+    const bounds = previewActorRect(other, Math.round(other.x * 8), Math.round(other.y * 8));
+    return rect.x < bounds.x + bounds.width && rect.x + rect.width > bounds.x &&
+      rect.y < bounds.y + bounds.height && rect.y + rect.height > bounds.y;
+  });
+}
+
+function tickPreviewActorMotions(state: PreviewRuntimeState): PreviewRuntimeState {
+  const room = state.currentRoom;
+  if (!room || !["topdown", "platformer", "isometric", "isometricAdventure", "isometricTactical"].includes(room.sceneType) || state.activeDialogue || state.startMenu.visible ||
+      state.nativeEvents.modal?.pause || previewSceneTypePaused(state)) return state;
+  const motions = { ...state.nativeEvents.actorMotions };
+  for (const [id, move] of Object.entries(motions)) {
+    const actor = actorByName(state, id);
+    if (!actor || !actor.active || !actor.visible || (move.owner !== null && !state.nativeEvents.threads[move.owner])) {
+      delete motions[id]; continue;
+    }
+    const isIso = ["isometric", "isometricAdventure", "isometricTactical"].includes(room.sceneType);
+    const scale = isIso ? 16 : 8;
+    let x = Math.round(actor.x * scale), y = Math.round(actor.y * scale), z = actor.z;
+    const targetX = Math.round(move.targetX * scale), targetY = Math.round(move.targetY * scale);
+    const speed = actor.movementSpeed ?? 100;
+    if (speed <= 0 || (x === targetX && y === targetY)) { delete motions[id]; continue; }
+    let total = move.remainder + speed;
+    let steps = Math.floor(total / 100);
+    total %= 100;
+    let direction = actor.direction;
+    while (steps-- > 0) {
+      const dx = x !== targetX ? (x < targetX ? 1 : -1) : 0;
+      const dy = dx === 0 && y !== targetY ? (y < targetY ? 1 : -1) : 0;
+      const nx = x + dx, ny = y + dy;
+      direction = dx < 0 ? "left" : dx > 0 ? "right" : dy < 0 ? "up" : "down";
+      let blocked = false;
+      if (isIso) {
+        const fromX = Math.floor(x / scale), fromY = Math.floor(y / scale);
+        const toX = Math.floor(nx / scale), toY = Math.floor(ny / scale);
+        if (fromX !== toX || fromY !== toY) {
+          const nextZ = room.heightLevels[toY * room.width + toX] ?? 0;
+          blocked = isBlocked(room, toX, toY) || Math.abs(nextZ - z) > 1 ||
+            !isometricRampAllowsTransition(room, fromX, fromY, toX, toY, {x: toX - fromX, y: toY - fromY}, z, nextZ) ||
+            state.actors.some(other => other.id !== id && other.active && other.visible &&
+              Math.floor(other.x) === toX && Math.floor(other.y) === toY && other.z === nextZ);
+          if (!blocked) z = nextZ;
+        }
+      } else blocked = previewActorMotionBlocked(state, actor, nx, ny, dx, dy);
+      if (blocked) { delete motions[id]; break; }
+      x = nx; y = ny;
+      if (x === targetX && y === targetY) { delete motions[id]; break; }
+    }
+    if (motions[id]) motions[id] = { ...move, remainder: total };
+    state = updateRuntimeActor(state, id, current => ({ ...current, x: x / scale, y: y / scale, z, direction }));
+  }
+  return { ...state, nativeEvents: { ...state.nativeEvents, actorMotions: motions } };
+}
+
 function tickIntegratedNativeSimulation(state:PreviewRuntimeState,frames:number):PreviewRuntimeState {
  for(let frame=0;frame<frames;++frame) {
+  state = tickPreviewActorMotions(state);
+  for (const name of Object.keys(state.nativeEvents.timers)) {
+   const timer = state.nativeEvents.timers[name]; if (!timer) continue;
+   const due = timer.remaining <= 1;
+   const next = { ...timer, remaining: due ? timer.frames : timer.remaining - 1, pending: timer.pending || due };
+   state = { ...state, nativeEvents: { ...state.nativeEvents, timers: { ...state.nativeEvents.timers, [name]: next } } };
+   if (next.pending && !state.activeDialogue && !state.startMenu.visible && !state.nativeEvents.modal) {
+    state = { ...state, nativeEvents: { ...state.nativeEvents, timers: { ...state.nativeEvents.timers, [name]: { ...next, pending: false } } } };
+    state = runPreviewRuntimeEvent(state, name);
+    break;
+   }
+  }
   if(!state.nativeEvents.modal?.pause && !state.activeDialogue && !state.startMenu.visible) {
    for(const slot of Object.keys(state.nativeEvents.threads)) {
     const thread=state.nativeEvents.threads[slot];if(!thread) continue;
@@ -5134,6 +5374,44 @@ function isBlocked(room: PreviewRuntimeRoom, x: number, y: number): boolean {
 function isometricFreeMovementEnabled(room: PreviewRuntimeRoom): boolean {
   const config = isometricSceneConfigFromRuntime(room.runtime);
   return room.sceneType === "isometric" && config?.gameplayMode === "adventure" && config.movement === "free";
+}
+
+type IsometricFreeInput = { delta: { x: number; y: number }; direction: string };
+
+function isometricFreeInput(action: PreviewRuntimeAction, heldActions: PreviewRuntimeAction[] = []): IsometricFreeInput | null {
+  const keys = new Set([action, ...heldActions]);
+  const horizontal = Number(keys.has("right")) - Number(keys.has("left"));
+  const vertical = Number(keys.has("down")) - Number(keys.has("up"));
+  const x = Math.sign(horizontal + vertical);
+  const y = Math.sign(vertical - horizontal);
+  if (!x && !y) return null;
+  const direction = horizontal && vertical
+    ? `${vertical < 0 ? "up" : "down"}-${horizontal < 0 ? "left" : "right"}`
+    : `screen_${horizontal ? (horizontal < 0 ? "left" : "right") : (vertical < 0 ? "up" : "down")}`;
+  return { delta: { x, y }, direction };
+}
+
+function isometricFreeStepSpeed(room: PreviewRuntimeRoom, delta: { x: number; y: number }): number {
+  if (!delta.x || !delta.y) return previewIsometricFreeMovementSpeedTilesPerSecond;
+  const config = isometricSceneConfigFromRuntime(room.runtime);
+  const width = config?.tileWidth ?? 32;
+  const height = config?.tileHeight ?? 16;
+  const edge = Math.floor(Math.sqrt(width * width + height * height));
+  const axis = delta.x === delta.y ? height : width;
+  return axis > 0 ? Math.floor((16 * edge + axis) / (2 * axis)) * 60 / 256 : 0;
+}
+
+function isometricFreeActorBlocks(state: PreviewRuntimeState, x: number, y: number, height: number): boolean {
+  return state.actors.some((actor) => actor.id !== state.player?.id && actor.roomName === state.currentRoom?.name && actor.visible
+    && Math.floor(actor.x) === x && Math.floor(actor.y) === y && actor.z === height);
+}
+
+function isometricFreeCornerIsOpen(state: PreviewRuntimeState, room: PreviewRuntimeRoom, fromX: number, fromY: number, toX: number, toY: number, height: number): boolean {
+  if (fromX === toX || fromY === toY) return true;
+  const heightAt = (x: number, y: number) => room.heightLevels[y * room.width + x] ?? 0;
+  return !isBlocked(room, toX, fromY) && !isBlocked(room, fromX, toY)
+    && !isometricFreeActorBlocks(state, toX, fromY, height) && !isometricFreeActorBlocks(state, fromX, toY, height)
+    && heightAt(toX, fromY) === height && heightAt(fromX, toY) === height && heightAt(toX, toY) === height;
 }
 
 function isometricRampAllowsTransition(
@@ -5971,6 +6249,7 @@ export function bootPreviewRuntimeAtRoom(
     platformerInputRequests: { jump: false, dash: false },
     activeCameraZoneID: null,
     visualEffect: null,
+    visibility: null,
     choiceEvents: [],
     eventLog: [],
     equippedItems: {},
@@ -6014,8 +6293,9 @@ export function bootPreviewRuntimeAtRoom(
     platformerPlayerActive: true
   });
 
-  const booted = options.skipBootEvents ? applyPointClickCursorAnimation(baseState)
-    : runEvent(applyPointClickCursorAnimation(baseState), roomBootEventName(baseState));
+  const mapStateBoot = applyMapStateTiles(baseState);
+  const booted = options.skipBootEvents ? applyPointClickCursorAnimation(mapStateBoot)
+    : runEvent(applyPointClickCursorAnimation(mapStateBoot), roomBootEventName(mapStateBoot));
   const initialScreen = embeddedMenuScreenForConfig(
     sceneMenuConfigForRoom(booted.currentRoom),
     booted.sceneMenu.screenID
@@ -6338,12 +6618,38 @@ export function tickPreviewRuntime(
   heldMovement: PreviewRuntimeAction | null = null,
   heldActions: PreviewRuntimeAction[] = []
 ): PreviewRuntimeState {
+  let next = state;
+  let remaining = Math.max(0, deltaMs);
+  const frameDuration = 1000 / 60;
+  while (remaining > 0.0001 && (Object.keys(next.nativeEvents.actorMotions).length > 0 ||
+      previewScriptPending(next) || Object.keys(next.nativeEvents.threads).length > 0) &&
+      !isPreviewDebuggerBlocking(next) && !next.activeDialogue && !next.startMenu.visible &&
+      !next.nativeEvents.modal?.pause && !previewSceneTypePaused(next)) {
+    const chunk = Math.min(remaining, Math.max(0.0001, frameDuration - next.previewFrameElapsedMs));
+    const beforeFrame = next.previewFrame;
+    next = tickPreviewRuntimeFrame(next, chunk, heldMovement, heldActions);
+    if (next.previewFrame !== beforeFrame && next.nativeEvents.pressedButtons.length)
+      next = { ...next, nativeEvents: { ...next.nativeEvents, pressedButtons: [] } };
+    remaining -= chunk;
+  }
+  if (remaining > 0.0001 || next === state) next = tickPreviewRuntimeFrame(next, remaining, heldMovement, heldActions);
+  if (!next.nativeEvents.pressedButtons.length || next.previewFrame === state.previewFrame) return next;
+  return { ...next, nativeEvents: { ...next.nativeEvents, pressedButtons: [] } };
+}
+
+function tickPreviewRuntimeFrame(
+  state: PreviewRuntimeState,
+  deltaMs: number,
+  heldMovement: PreviewRuntimeAction | null = null,
+  heldActions: PreviewRuntimeAction[] = []
+): PreviewRuntimeState {
   if (isPreviewDebuggerBlocking(state)) {
     return updateDebug(state);
   }
 
   const previousPreviewFrame = state.previewFrame;
   const topdownScriptWasActive = state.currentRoom?.sceneType === "topdown" && previewScriptPending(state);
+  const playerMotionWasActive = !!state.player && !!state.nativeEvents.actorMotions[state.player.id];
   state = tickPreviewFrameClock(tickPreviewAudioMix(state, deltaMs), deltaMs);
   if (state.hud.gameClock && state.hud.gameClock.frames > 0) {
     const clock = state.hud.gameClock;
@@ -6351,6 +6657,7 @@ export function tickPreviewRuntime(
     state = { ...state, hud: { ...state.hud, gameClock: { ...clock,
       currentMinute: (clock.currentMinute + Math.floor(elapsed / clock.frames) * clock.minutes) % 1440,
       elapsedFrames: elapsed % clock.frames } } };
+    if (clock.variable) state = setRuntimeVariable(state, clock.variable, state.hud.gameClock!.currentMinute);
   }
   state = tickIntegratedNativeSimulation(state,state.previewFrame-previousPreviewFrame);
   if(state.currentRoom?.sceneType==="topdown" && state.nativeEvents.adventure.state==="blank") heldMovement=null;
@@ -6361,7 +6668,9 @@ export function tickPreviewRuntime(
 
   if (state.currentRoom?.sceneType === "isometric" && state.player) {
     const heldDirection = heldMovement && isPreviewMovementAction(heldMovement)
-      ? isometricDirectionForAction(heldMovement)
+      ? isometricFreeMovementEnabled(state.currentRoom)
+        ? isometricFreeInput(heldMovement, heldActions)?.direction ?? null
+        : isometricDirectionForAction(heldMovement)
       : null;
     if (!heldDirection) {
       state = applyIsometricPlayerAnimation(state, "idle", state.player.direction);
@@ -6381,6 +6690,14 @@ export function tickPreviewRuntime(
 
   let nextState = state;
   let nextVisualEffect = state.visualEffect;
+  let nextVisibility = state.visibility;
+  if (state.visibility && deltaMs > 0) {
+    const elapsed = state.visibility.elapsedMs + deltaMs;
+    const frames = Math.floor(elapsed * 60 / 1000);
+    const remainingFrames = Math.max(0, state.visibility.remainingFrames - frames);
+    nextVisibility = remainingFrames === 0 ? null : { ...state.visibility,
+      remainingFrames, elapsedMs: elapsed - frames * 1000 / 60 };
+  }
 
   if (nextVisualEffect && deltaMs > 0) {
     const frameDurationMs = 1000 / 60;
@@ -6408,7 +6725,17 @@ export function tickPreviewRuntime(
   const platformerFrameDelta = state.previewFrame - previousPreviewFrame;
 
   if (platformerPreviewActive && !previewSceneTypePaused(state)) {
-    nextState = tickPlatformerPreview(state, platformerFrameDelta, heldMovement, heldActions);
+    if (playerMotionWasActive && state.platformerPhysics && state.player) {
+      const body = state.platformerPhysics;
+      nextState = { ...state, platformerPhysics: { ...body,
+        x: state.player.x * gbaTileSizePx + body.collisionOffsetX,
+        y: state.player.y * gbaTileSizePx + body.collisionOffsetY,
+        facing: state.player.direction === "left" ? "left" : state.player.direction === "right" ? "right" : body.facing
+      } };
+      nextState = applyPreviewCameraZone(runTriggerOverlap(applyPlatformerPreviewCamera(nextState)));
+    } else {
+      nextState = tickPlatformerPreview(state, platformerFrameDelta, heldMovement, heldActions);
+    }
     nextState = { ...nextState, movementElapsedMs: 0 };
   } else if (
     heldMovement &&
@@ -6420,10 +6747,12 @@ export function tickPreviewRuntime(
     state.currentRoom &&
     state.player
     && !previewSceneTypePaused(state)
+    && !playerMotionWasActive && !(state.player && state.nativeEvents.actorMotions[state.player.id])
     && !topdownScriptWasActive && !(state.currentRoom.sceneType === "topdown" && previewScriptPending(state))
   ) {
     if (isometricFreeMovementEnabled(state.currentRoom)) {
-      nextState = tryMovePreviewPlayerContinuously(state, heldMovement, deltaMs);
+      const input = isometricFreeInput(heldMovement, heldActions);
+      nextState = input ? tryMovePreviewPlayerContinuously(state, input, deltaMs) : state;
       nextState = { ...nextState, movementElapsedMs: 0 };
     } else {
       const settings = isRecord(state.project.settings) ? state.project.settings : {};
@@ -6467,6 +6796,8 @@ export function tickPreviewRuntime(
   } else if (state.movementElapsedMs !== 0) {
     nextState = { ...state, movementElapsedMs: 0 };
   }
+
+  if (nextState.visibility !== nextVisibility) nextState = { ...nextState, visibility: nextVisibility };
 
   if (nextState.visualEffect !== nextVisualEffect) {
     nextState = { ...nextState, visualEffect: nextVisualEffect };
@@ -6727,6 +7058,18 @@ function applyIsometricPlayerAnimation(
     animationStateID: nullableString(actor?.animationStateID),
     spriteSheet: state.player.spriteSheet
   });
+  const screenDirection = /^screen_(up|down|left|right)$/.exec(direction)?.[1];
+  const allowedIDs = selectedState ? new Set(selectedState.animationIDs) : null;
+  const screenAnimation = screenDirection ? animations.find((candidate) => {
+    const id = nullableString(candidate.id);
+    if (!id || (allowedIDs && !allowedIDs.has(id)) || nullableString(candidate.spriteSheet) !== state.player?.spriteSheet) return false;
+    const name = nullableString(candidate.name) ?? undefined;
+    const stateName = (nullableString(candidate.state) ?? "").toLowerCase();
+    const motion = /^(walk|walking|move|moving|run|running)$/.test(stateName) || /^(walk|move|moving|run)[_-]/i.test(name ?? "")
+      ? "walk" : stateName === "idle" || /^idle[_-]/i.test(name ?? "") ? "idle" : null;
+    return motion === animationState && isometricScreenFacingDirection({ id, name, direction: nullableString(candidate.direction) }) === screenDirection;
+  }) : undefined;
+  const legacyDirection = ({ screen_up: "down", screen_down: "right", screen_left: "down", screen_right: "right" } as Record<string, string>)[direction] ?? direction;
   const normalizedAnimationID = selectedState
     ? normalizeSpriteStateSlots(
         selectedState,
@@ -6741,12 +7084,12 @@ function applyIsometricPlayerAnimation(
           }] : [];
         }),
         "isometric"
-      ).slots[`${animationState === "walk" ? "moving" : "idle"}_${normalizeSpriteDirection(direction, "isometric")}`].animationID
+      ).slots[`${animationState === "walk" ? "moving" : "idle"}_${normalizeSpriteDirection(legacyDirection, "isometric")}`].animationID
     : null;
   const normalizedAnimation = normalizedAnimationID
     ? animations.find((candidate) => nullableString(candidate.id) === normalizedAnimationID)
     : undefined;
-  const animation = normalizedAnimation ?? animations.find((candidate) => (
+  const animation = screenAnimation ?? normalizedAnimation ?? animations.find((candidate) => (
     nullableString(candidate.spriteSheet) === state.player?.spriteSheet &&
     nullableString(candidate.state) === animationState &&
     nullableString(candidate.direction) === direction
@@ -6778,13 +7121,14 @@ function tryMovePreviewPlayer(state: PreviewRuntimeState, action: PreviewRuntime
     return updateDebug(state);
   }
 
+  const freeInput = isometricFreeMovementEnabled(state.currentRoom) ? isometricFreeInput(action) : null;
   const isometricDirection = state.currentRoom.sceneType === "isometric"
-    ? isometricDirectionForAction(action)
+    ? freeInput?.direction ?? isometricDirectionForAction(action)
     : null;
   const room = state.currentRoom;
   const player = state.player;
   if (!room || !player) return updateDebug(state);
-  const delta = room.sceneType === "isometric"
+  const delta = freeInput?.delta ?? (room.sceneType === "isometric"
     ? ({
         up: { x: 0, y: -1 },
         down: { x: -1, y: 0 },
@@ -6796,19 +7140,26 @@ function tryMovePreviewPlayer(state: PreviewRuntimeState, action: PreviewRuntime
         down: { x: 0, y: 1 },
         left: { x: -1, y: 0 },
         right: { x: 1, y: 0 }
-      }[action as "up" | "down" | "left" | "right"]);
+      }[action as "up" | "down" | "left" | "right"]));
 
   const nextX = player.x + delta.x;
   const nextY = player.y + delta.y;
-  if (isBlocked(room, nextX, nextY)) {
+  const tileX = freeInput ? Math.floor(nextX) : nextX;
+  const tileY = freeInput ? Math.floor(nextY) : nextY;
+  const fromTileX = freeInput ? Math.floor(player.x) : player.x;
+  const fromTileY = freeInput ? Math.floor(player.y) : player.y;
+  const targetHeight = room.heightLevels[tileY * room.width + tileX] ?? 0;
+  if (isBlocked(room, tileX, tileY) || (freeInput && (isometricFreeActorBlocks(state, tileX, tileY, targetHeight)
+    || !isometricFreeCornerIsOpen(state, room, fromTileX, fromTileY, tileX, tileY, player.z)))) {
     return updateDebug(isometricDirection
       ? applyIsometricPlayerAnimation(state, "idle", isometricDirection)
       : state);
   }
   const nextZ = room.sceneType === "isometric"
-    ? room.heightLevels[nextY * room.width + nextX] ?? 0
+    ? targetHeight
     : player.z;
-  if (room.sceneType === "isometric" && Math.abs(nextZ - player.z) > 1) {
+  if (room.sceneType === "isometric" && (Math.abs(nextZ - player.z) > 1 ||
+    (freeInput && !isometricRampAllowsTransition(room, fromTileX, fromTileY, tileX, tileY, delta, player.z, nextZ)))) {
     return updateDebug(isometricDirection
       ? applyIsometricPlayerAnimation(state, "idle", isometricDirection)
       : state);
@@ -6831,29 +7182,21 @@ function tryMovePreviewPlayer(state: PreviewRuntimeState, action: PreviewRuntime
 
 function tryMovePreviewPlayerContinuously(
   state: PreviewRuntimeState,
-  action: PreviewRuntimeAction,
+  input: IsometricFreeInput,
   deltaMs: number
 ): PreviewRuntimeState {
   if (!state.currentRoom || !state.player || state.activeDialogue || deltaMs <= 0) {
     return updateDebug(state);
   }
 
-  const isometricDirection = isometricDirectionForAction(action);
-  if (!isometricDirection) return updateDebug(state);
   const room = state.currentRoom;
   const player = state.player;
-  const delta = ({
-    up: { x: 0, y: -1 },
-    down: { x: -1, y: 0 },
-    left: { x: 0, y: 1 },
-    right: { x: 1, y: 0 }
-  } as const)[action as "up" | "down" | "left" | "right"];
-  if (!delta) return updateDebug(state);
+  const { delta, direction } = input;
 
   let x = player.x;
   let y = player.y;
   let z = player.z;
-  let remaining = Math.max(0, deltaMs) / 1000 * previewIsometricFreeMovementSpeedTilesPerSecond;
+  let remaining = Math.max(0, deltaMs) / 1000 * isometricFreeStepSpeed(room, delta);
   let moved = false;
 
   while (remaining > 0) {
@@ -6870,6 +7213,8 @@ function tryMovePreviewPlayerContinuously(
       : z;
 
     if (isBlocked(room, nextTileX, nextTileY)
+      || (changedTile && isometricFreeActorBlocks(state, nextTileX, nextTileY, nextZ))
+      || (changedTile && !isometricFreeCornerIsOpen(state, room, currentTileX, currentTileY, nextTileX, nextTileY, z))
       || (changedTile && Math.abs(nextZ - z) > 1)
       || (changedTile && !isometricRampAllowsTransition(
         room,
@@ -6903,7 +7248,7 @@ function tryMovePreviewPlayerContinuously(
   const animatedState = applyIsometricPlayerAnimation(
     movedState,
     moved ? "walk" : "idle",
-    isometricDirection
+    direction
   );
   return applyPreviewCameraZone(runTriggerOverlap(animatedState));
 }
@@ -7351,8 +7696,22 @@ function applyPreviewTopdownQuest(state: PreviewRuntimeState): PreviewRuntimeSta
   });
 }
 
+function playSceneMenuActionSound(state: PreviewRuntimeState, action: "navigate" | "confirm" | "back" | "unavailable"): PreviewRuntimeState {
+  const name = sceneMenuConfigForState(state)?.actionSounds?.[action];
+  if (!name) return state;
+  const audio = projectArray(state.project, "audioItems").find(item => item.name === name || item.exportID === name);
+  const volume = Math.max(0, Math.min(100, Number(audio?.volume ?? 100)));
+  return runEvent(state, "menu_audio_feedback", [], false, [`play_sfx ${name} ${volume} 8`]);
+}
+
+function sceneMenuItemAvailable(state: PreviewRuntimeState, item: MenuSceneItem): boolean {
+  return item.enabled && (!item.requiresSave || (typeof item.saveSlot === "number" && item.saveSlot >= 0
+    ? !!state.saveSlots[item.saveSlot] : Object.values(state.saveSlots).some(Boolean)));
+}
+
 function changeSceneMenuValue(state: PreviewRuntimeState, direction: -1 | 1): PreviewRuntimeState {
   const config = sceneMenuConfigForState(state);
+  if (config?.carousel) return moveSceneMenuSelection(state, direction);
   const item = config?.items[state.sceneMenu.selectedIndex];
   if (!item || item.action !== "adjust_variable") return updateDebug(state);
   const variableName = variableNameAtIndex(state, item.variableIndex);
@@ -7364,7 +7723,8 @@ function changeSceneMenuValue(state: PreviewRuntimeState, direction: -1 | 1): Pr
   }
   const current = sceneMenuItemValue(state, item);
   const value = Math.max(item.minValue, Math.min(item.maxValue, current + direction * item.step));
-  const nextState = applySceneMenuAudioBinding(setRuntimeVariable(state, variableName, value), item, value);
+  const sounded = value !== current ? playSceneMenuActionSound(state, "navigate") : state;
+  const nextState = applySceneMenuAudioBinding(setRuntimeVariable(sounded, variableName, value), item, value);
   return updateDebug({
     ...nextState,
     sceneMenu: { ...nextState.sceneMenu, notice: null }
@@ -7375,8 +7735,9 @@ function moveSceneMenuSelection(state: PreviewRuntimeState, delta: -1 | 1): Prev
   const items = previewRuntimeSceneMenuItems(state);
   if (items.length === 0) return updateDebug(state);
   const selectedIndex = (state.sceneMenu.selectedIndex + delta + items.length) % items.length;
+  const sounded = selectedIndex !== state.sceneMenu.selectedIndex ? playSceneMenuActionSound(state, "navigate") : state;
   return updateDebug({
-    ...state,
+    ...sounded,
     sceneMenu: { ...state.sceneMenu, selectedIndex, notice: null }
   });
 }
@@ -7385,7 +7746,12 @@ function selectSceneMenuItem(state: PreviewRuntimeState): PreviewRuntimeState {
   const config = sceneMenuConfigForState(state);
   const roomConfig = sceneMenuConfigForRoom(state.currentRoom);
   const item = config?.items[state.sceneMenu.selectedIndex];
-  if (!item || !item.enabled) return updateDebug(state);
+  if (!item) return updateDebug(state);
+  if (!sceneMenuItemAvailable(state, item)) return updateDebug({
+    ...playSceneMenuActionSound(state, "unavailable"),
+    sceneMenu: { ...state.sceneMenu, notice: "Opção indisponível." }
+  });
+  state = playSceneMenuActionSound(state, item.action === "pop_screen" ? "back" : "confirm");
 
   const eventState = item.eventName ? runEvent(state, item.eventName) : state;
   const sceneChanged = eventState.currentRoom?.id !== state.currentRoom?.id
@@ -7429,7 +7795,7 @@ function selectSceneMenuItem(state: PreviewRuntimeState): PreviewRuntimeState {
         const restored = setCurrentRoom({
           ...state,
           sceneMenu: { ...state.sceneMenu, stack: state.sceneMenu.stack.slice(0, -1) }
-        }, previous);
+        }, previous, false, "resume");
         return previousEntry.screenID
           ? setCurrentMenuScreen(restored, previousEntry.screenID)
           : runActiveMenuScreenEnter(restored);
@@ -7507,6 +7873,13 @@ export function dispatchPreviewRuntimeAction(
     return updatePreviewTextInput(state, action);
   }
 
+  const button = action === "action" ? "a" : action === "back" ? "b" : action;
+  const attached = state.nativeEvents.buttons[button];
+  if (attached && !state.activeDialogue && !state.textInput.active && !state.startMenu.visible) {
+    state = runPreviewRuntimeEvent({ ...state, nativeEvents: { ...state.nativeEvents, pressedButtons: [button] } }, attached.event);
+    if (attached.override) return state;
+  }
+
   if (action === "start" && !(state.sceneMenu.visible && !state.activeDialogue)) {
     if (state.activeDialogue) return updateDebug(state);
     const skippedLogo = skipPreviewLogo(state);
@@ -7565,8 +7938,8 @@ export function dispatchPreviewRuntimeAction(
   }
 
   if (state.sceneMenu.visible && !state.activeDialogue) {
-    if (action === "up") return moveSceneMenuSelection(state, -1);
-    if (action === "down") return moveSceneMenuSelection(state, 1);
+    if (action === "up") return sceneMenuConfigForState(state)?.carousel ? updateDebug(state) : moveSceneMenuSelection(state, -1);
+    if (action === "down") return sceneMenuConfigForState(state)?.carousel ? updateDebug(state) : moveSceneMenuSelection(state, 1);
     if (action === "left") return changeSceneMenuValue(state, -1);
     if (action === "right") return changeSceneMenuValue(state, 1);
     if (action === "action" || action === "start") {
@@ -7584,10 +7957,11 @@ export function dispatchPreviewRuntimeAction(
       const previousEntry = previousID ? parseMenuStackEntry(previousID) : null;
       const previous = previousEntry ? roomByName(state.rooms, previousEntry.roomID) : null;
       if (previous) {
+        state = playSceneMenuActionSound(state, "back");
         const restored = setCurrentRoom({
           ...state,
           sceneMenu: { ...state.sceneMenu, stack: state.sceneMenu.stack.slice(0, -1) }
-        }, previous);
+        }, previous, false, "resume");
         return previousEntry?.screenID
           ? setCurrentMenuScreen(restored, previousEntry.screenID)
           : runActiveMenuScreenEnter(restored);
@@ -7720,5 +8094,5 @@ export function dispatchPreviewRuntimeAction(
     return updateDebug(state);
   }
 
-  return tryMovePreviewPlayer(state, action);
+  return isPreviewMovementAction(action) ? tryMovePreviewPlayer(state, action) : updateDebug(state);
 }

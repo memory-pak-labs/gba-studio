@@ -44,6 +44,7 @@ jobs:
           tag = os.environ['RELEASE_TAG']
           run_id = os.environ['PACKAGE_RUN_ID']
           sha = os.environ['SOURCE_SHA']
+          version = tag.removeprefix('v')
           assert re.fullmatch(r'v[0-9][A-Za-z0-9._-]*', tag), 'Invalid release tag'
           assert run_id.isdigit(), 'Invalid packaging run ID'
           assert re.fullmatch(r'[0-9a-f]{40}', sha), 'Invalid source commit'
@@ -73,8 +74,11 @@ jobs:
               checksums[name] = digest
 
           def digest(path):
+              result = hashlib.sha256()
               with path.open('rb') as stream:
-                  return hashlib.file_digest(stream, 'sha256').hexdigest()
+                  for data in iter(lambda: stream.read(1024 * 1024), b''):
+                      result.update(data)
+              return result.hexdigest()
 
           def artifact(name):
               gh('run', 'download', run_id, '--repo', repo, '--name', name, '--dir', str(stage / name))
@@ -83,18 +87,26 @@ jobs:
               list(executor.map(artifact, ['GBA-Studio-windows-x64', 'GBA-Studio-linux-x64']))
           installers = []
           for folder in ['GBA-Studio-windows-x64', 'GBA-Studio-linux-x64']:
-              for path in (stage / folder).rglob('*'):
+              for path in list((stage / folder).rglob('*')):
                   if path.is_file():
                       name = path.name.replace(' ', '.')
+                      for platform in ['windows-x64', 'linux-x64']:
+                          if name == f'GBA-Studio-{platform}-licenses-and-sources.zip':
+                              name = f'GBA-Studio-{version}-{platform}-licenses-and-sources.zip'
                       assert name in checksums, f'Unexpected package file: {name}'
                       assert digest(path) == checksums[name], f'Package hash mismatch: {name}'
+                      if name != path.name:
+                          path = path.rename(stage / name)
                       installers.append((path, name))
-          assert len(installers) == 5
+          assert len(installers) == 7
 
           gh('release', 'download', tag, '--repo', repo, '--pattern', 'UPLOAD_CHUNKS.json', '--dir', str(stage))
           manifest = json.loads((stage / 'UPLOAD_CHUNKS.json').read_text())
           assert manifest['tag'] == tag and manifest['sourceTagTarget'] == sha
-          assert len(manifest['files']) == 2
+          expected_mac = {f'GBA-Studio-{version}-macOS-{arch}.{extension}'
+                          for arch in ['arm64', 'x64'] for extension in ['dmg', 'zip']}
+          assert len(manifest['files']) == 4
+          assert {file['name'] for file in manifest['files']} == expected_mac
           parts = [p for f in manifest['files'] for p in f['parts']]
           assert len({p['name'] for p in parts}) == len(parts)
           chunks = stage / 'chunks'
@@ -102,7 +114,7 @@ jobs:
 
           def chunk(part):
               name = part['name']
-              assert re.fullmatch(r'upload-chunk-mac-(dmg|zip)-[0-9]{3}\.part', name)
+              assert re.fullmatch(r'upload-chunk-mac-(arm64|x64)-(dmg|zip)-[0-9]{3}\.part', name)
               gh('release', 'download', tag, '--repo', repo, '--pattern', name, '--dir', str(chunks))
               path = chunks / name
               assert path.stat().st_size == part['bytes'] and digest(path) == part['sha256']
@@ -112,7 +124,7 @@ jobs:
           for file in manifest['files']:
               name = file['name']
               assert Path(name).name == name and name in checksums
-              assert name.endswith(('-macOS-arm64.dmg', '-macOS-arm64.zip'))
+              assert name in expected_mac
               assert file['sha256'] == checksums[name]
               path = stage / name
               with path.open('wb') as output:
@@ -122,7 +134,7 @@ jobs:
                               output.write(data)
               assert path.stat().st_size == file['bytes'] and digest(path) == checksums[name]
               installers.append((path, name))
-          assert len({name for _, name in installers}) == 7
+          assert len({name for _, name in installers}) == 11
           existing = {a['name']: a for a in release()['assets']}
 
           def upload(item):
@@ -144,5 +156,5 @@ jobs:
               gh('release', 'delete-asset', tag, part['name'], '--repo', repo, '--yes')
           gh('release', 'delete-asset', tag, 'UPLOAD_CHUNKS.json', '--repo', repo, '--yes')
           release()
-          print('Seven installers verified and uploaded; temporary chunks removed; release remains a draft.')
+          print('Nine installers and two CI source supplements verified; temporary chunks removed; release remains a draft.')
           PY

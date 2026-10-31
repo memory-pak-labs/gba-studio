@@ -86,6 +86,7 @@ export function resolveEventBindingCapabilities(input: EventBindingCapabilityInp
   }
 
   const lifecycle = [standardRoomCapabilities[0]!];
+  if (["topdown", "platformer", "isometric", "dungeoncrawler"].includes(runtime)) lifecycle.push({ bindingKey: "onRestore", label: "Ao restaurar", section: null, requiresFrequency: false });
   if (["topdown", "platformer", "isometric"].includes(runtime)) {
     lifecycle.push(standardRoomCapabilities[1]!);
     lifecycle.push({ bindingKey: "onExit", label: "Ao sair", section: null, requiresFrequency: false });
@@ -100,6 +101,12 @@ export function resolveEventBindingCapabilities(input: EventBindingCapabilityInp
     );
   }
   if (runtime === "battlerpg") lifecycle.push({ bindingKey: "onEscape", label: "Ao fugir", section: null, requiresFrequency: false });
-  if (runtime === "shmup") lifecycle.push({ bindingKey: "onClear", label: "Ao concluir ondas", section: null, requiresFrequency: false });
+  if (runtime === "shmup") lifecycle.push(
+    { bindingKey: "onClear", label: "Ao concluir ondas", section: null, requiresFrequency: false },
+    { bindingKey: "onDefeat", label: "Ao perder", section: null, requiresFrequency: false }
+  );
+  if (["battlerpg", "shmup"].includes(runtime)) lifecycle.push(
+    { bindingKey: "onHitPlayer", label: "Ao acertar Player", section: null, requiresFrequency: false }
+  );
   return lifecycle;
 }

@@ -28,6 +28,17 @@ describe("auditoria do template Vértice", () => {
     });
   });
 
+  it("valida o corpo acima da âncora e rejeita um ator enterrado ou uma saída toda sólida na plataforma", () => {
+    expect(auditExemploTemplate(project).geometry.issues.filter(i => i.includes("penedos_vento"))).toEqual([]);
+    const broken=structuredClone(project);
+    broken.actors.find(a=>a.id==="penedos-player").y+=1;
+    const exit=broken.triggers.find(t=>t.id==="trigger-penedos-grip-module");
+    exit.x=113;exit.y=35;exit.width=2;exit.height=2;
+    const issues=auditExemploTemplate(broken).geometry.issues;
+    expect(issues).toContain("Cena penedos_vento: ator jogador Nara · Penedos começa em célula bloqueada.");
+    expect(issues).toContain("Cena penedos_vento: área do gatilho trigger-penedos-grip-module atravessa célula bloqueada.");
+  });
+
   it("aceita o formato persistido que mantém collisionTypes sem o alias collisions", () => {
     const persisted = structuredClone(project);
     persisted.scenas = persisted.scenas.map((scene) => {
@@ -44,14 +55,28 @@ describe("auditoria do template Vértice", () => {
     expect(auditExemploTemplate(persisted)).toMatchObject({ ok: true });
   });
 
+  it("exige parede com uma face acessível para os painéis montados da Usina", () => {
+    expect(auditExemploTemplate(project).geometry.issues.filter(i=>i.includes('Admissão'))).toEqual([]);
+    const floor=structuredClone(project);
+    floor.actors.find(a=>a.id==='coast-valve-a-off').x=1;
+    expect(auditExemploTemplate(floor).geometry.issues).toContain('Cena usina_submersa: painel Admissão · desligada precisa de parede com face acessível.');
+    const sealed=structuredClone(project);
+    for(const r of [...sealed.rooms,...sealed.scenas].filter(r=>r.name==='usina_submersa')){
+      const cells=expandCompactSequence(r.collisionTypes);
+      for(const [x,y]of [[1,8],[3,8],[2,7],[2,9]])cells[y*r.width+x]='solid';
+      r.collisionTypes=cells;r.collisions=[...cells];
+    }
+    expect(auditExemploTemplate(sealed).geometry.issues).toContain('Cena usina_submersa: painel Admissão · desligada precisa de parede com face acessível.');
+  });
+
   it("aceita a posição fracionária do cursor no mapa e rejeita coordenadas fora da cena", () => {
     const currentIssues = auditExemploTemplate(project).geometry.issues;
-    expect(currentIssues.some((issue) => issue.includes("ator Aeronave de viagem está fora dos limites"))).toBe(false);
+    expect(currentIssues.some((issue) => issue.includes("ator Dirigível Lumen está fora dos limites"))).toBe(false);
 
     const broken = structuredClone(project);
     broken.actors.find((actor) => actor.id === "map-cursor").x = 60.5;
     expect(auditExemploTemplate(broken).geometry.issues).toContain(
-      "Cena mapa_rota: ator Aeronave de viagem está fora dos limites."
+      "Cena mapa_rota: ator Dirigível Lumen está fora dos limites."
     );
   });
 
@@ -60,9 +85,9 @@ describe("auditoria do template Vértice", () => {
     expect(currentIssues.some((issue) => issue.startsWith("Cena mercado_suspenso: background"))).toBe(false);
 
     const broken = structuredClone(project);
-    broken.assets.find((asset) => asset.name === "mercado-adventure-foreground.png").metadata.height = 336;
+    broken.assets.find((asset) => asset.name === "market-approved-foreground-768x512.png").metadata.height = 504;
     expect(auditExemploTemplate(broken).geometry.issues).toContain(
-      "Cena mercado_suspenso: foreground 512x336 não cobre a superfície paginada 512x344."
+      "Cena mercado_suspenso: foreground 768x504 não cobre a superfície paginada 768x512."
     );
   });
 
@@ -74,9 +99,10 @@ describe("auditoria do template Vértice", () => {
   it("detecta ator fora da área caminhável e gatilho fora dos limites da cena", () => {
     const broken = structuredClone(project);
     const portActor = broken.actors.find((actor) => actor.name === "Nara" && actor.roomName === "porto_lumen");
-    portActor.x = 58;
-    portActor.y = 38;
-    broken.triggers.find((trigger) => trigger.id === "trigger-porto-exit").x = 59;
+    portActor.x = 0;
+    portActor.y = 0;
+    const port = broken.scenas.find(scene => scene.name === "porto_lumen");
+    broken.triggers.find((trigger) => trigger.id === "trigger-porto-exit").x = port.width - 1;
 
     const audit = auditExemploTemplate(broken);
 

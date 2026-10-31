@@ -13,7 +13,11 @@ enum {
     GBS_HW_HUD_COMPONENT_FRAME = 0,
     GBS_HW_HUD_COMPONENT_TEXT = 1,
     GBS_HW_HUD_COMPONENT_BAR = 2,
-    GBS_HW_HUD_COMPONENT_ICON = 3
+    GBS_HW_HUD_COMPONENT_ICON = 3,
+    GBS_HW_HUD_COMPONENT_COMPACT_TEXT = 4,
+    GBS_HW_HUD_COMPONENT_SPACED_TEXT = 6,
+    GBS_HW_HUD_COMPONENT_SELECTOR = 7,
+    GBS_HW_HUD_COMPONENT_FOREGROUND_BAR = 5
 };
 
 void gbs_hw_init(void);
@@ -37,7 +41,9 @@ void gbs_hw_set_bg_screen_base(int layer, uint16_t screen_base);
 void gbs_hw_load_bg_tiles_at_character_base(const uint8_t* data, uint32_t destination_tile, uint32_t tile_count, uint16_t character_base);
 void gbs_hw_set_bg_enabled(int layer, int enabled);
 void gbs_hw_hide_all_sprites(void);
+void gbs_hw_hide_world_sprites(void);
 void gbs_hw_hide_sprites(int first, int count);
+void gbs_hw_set_dialogue_oam_front(int enabled);
 void gbs_hw_set_sprite(int index, int x, int y, uint16_t tile_index, uint16_t palette, int hflip, int vflip, int visible, uint16_t priority, uint16_t mode, int mosaic, uint16_t shape, uint16_t size);
 void gbs_hw_set_sprite_color_depth(int index, int eight_bpp);
 void gbs_hw_set_sprite_affine(int index, int enabled, int double_size, uint16_t matrix_index);
@@ -52,6 +58,7 @@ void gbs_hw_draw_room_to_bg(int layer, const uint8_t* tiles, int width, int heig
 void gbs_hw_draw_room16_to_bg(int layer, const uint16_t* tiles, int width, int height, int camera_x, int camera_y);
 void gbs_hw_draw_dialogue_box(const char* text, int visible);
 void gbs_hw_draw_text_box(int x, int y, int width, int height, const char* text, int visible);
+void gbs_hw_draw_portrait_tab(const char* speaker, const char* text, int visible, int portrait, int right);
 void gbs_hw_draw_text_at(int x, int y, int width, const char* text);
 void gbs_hw_draw_text_overlay(int x, int y, int width, const char* text, int visible);
 void gbs_hw_draw_text_overlay_slot(int x, int y, int width, const char* text, int oam_offset, int visible);
@@ -65,6 +72,11 @@ void gbs_hw_configure_hud_box_skin(const uint8_t* tiles, const uint16_t* palette
 void gbs_hw_configure_hud_box(int x, int y, int width, int height);
 void gbs_hw_invalidate_hud_layout(void);
 void gbs_hw_begin_hud_layout(int visible);
+int gbs_hw_hud_layout_retained(void);
+void gbs_hw_clear_hud_background_rect(int x, int y, int width, int height);
+void gbs_hw_refresh_hud_text_palette(int color);
+void gbs_hw_set_hud_font(const uint8_t* tiles, int color);
+void gbs_hw_set_hud_font_shadow(int color);
 void gbs_hw_draw_hud_layout_component(int kind, int x, int y, int width, int height, const char* text, int text_slot, const void* metasprite, int visible);
 void gbs_hw_end_hud_layout(void);
 void gbs_hw_configure_dialogue_font(const uint8_t* tiles);
@@ -126,6 +138,8 @@ void gbs_hw_dma_copy(int channel, const void* source, volatile void* destination
 void gbs_hw_hdma_start(int channel, const void* source, volatile void* destination, uint32_t units, int word_sized);
 void gbs_hw_hdma_stop(int channel);
 void gbs_hw_start_hblank_bg_scroll(int layer, const int16_t* offsets);
+void gbs_hw_start_hblank_window1(const uint16_t* bounds);
+void gbs_hw_disable_hblank_window1(void);
 void gbs_hw_disable_hblank_effects(void);
 void gbs_hw_start_hblank_affine(int layer, const uint32_t* words);
 uint32_t* gbs_hw_hblank_affine_buffer(void);

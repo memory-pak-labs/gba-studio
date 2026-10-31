@@ -12,8 +12,8 @@ import type {
 } from "../shared/projectMemory.js";
 import {
   deriveRomOccupancyReport,
+  linkedAddressBytes,
   parseGnuLinkerMap,
-  type LinkerMapEntry
 } from "../shared/romOccupancy.js";
 
 const gbaRomCapacityBytes = 32 * 1024 * 1024;
@@ -44,42 +44,25 @@ function pool(used: number, capacity: number, severity = "ok"): ProjectMemoryRep
   };
 }
 
-function bytePool(usedBytes: number, capacityBytes: number): ProjectMemoryReportBytePool {
+function bytePool(staticBytes: number, linkedBytes: number, capacityBytes: number, reservedBytes = 0): ProjectMemoryReportBytePool {
+  const usedBytes = staticBytes + reservedBytes;
   return {
     usedBytes,
+    linkedBytes,
+    paddingBytes: Math.max(0, staticBytes - linkedBytes),
+    reservedBytes,
     capacityBytes,
     remainingBytes: Math.max(0, capacityBytes - usedBytes),
     percent: percent(usedBytes, capacityBytes),
-    severity: usedBytes > capacityBytes ? "error" : "ok"
+    severity: usedBytes > capacityBytes ? "error" : usedBytes >= capacityBytes * 0.9 ? "warning" : "ok"
   };
 }
 
-function addressExtentBytes(entries: readonly LinkerMapEntry[], start: number, end: number): number {
-  const ranges = entries
-    .filter((entry) => !entry.discarded && entry.address >= start && entry.address < end)
-    .map((entry) => [entry.address, Math.min(end, entry.address + entry.bytes)] as const)
-    .filter(([rangeStart, rangeEnd]) => rangeEnd > rangeStart)
-    .sort(([leftStart], [rightStart]) => leftStart - rightStart);
-
-  let total = 0;
-  let currentStart: number | null = null;
-  let currentEnd = 0;
-  for (const [rangeStart, rangeEnd] of ranges) {
-    if (currentStart === null) {
-      currentStart = rangeStart;
-      currentEnd = rangeEnd;
-      continue;
-    }
-    if (rangeStart > currentEnd) {
-      total += currentEnd - currentStart;
-      currentStart = rangeStart;
-      currentEnd = rangeEnd;
-      continue;
-    }
-    currentEnd = Math.max(currentEnd, rangeEnd);
-  }
-  if (currentStart !== null) total += currentEnd - currentStart;
-  return total;
+function linkerSymbol(contents: string, name: string): number {
+  const body = contents.slice(Math.max(0, contents.indexOf("Linker script and memory map")));
+  const match = body.match(new RegExp(`^\\s+0x([0-9a-fA-F]+)\\s+${name}\\s*=`, "m"));
+  if (!match) throw new Error(`Símbolo obrigatório ausente no mapa de memória: ${name}`);
+  return Number.parseInt(match[1], 16);
 }
 
 function budgetPool(usage: AssetPackBudgetUsage): ProjectMemoryReportPool {
@@ -102,22 +85,53 @@ export async function writeProjectMemoryReport(
   options: WriteProjectMemoryReportOptions
 ): Promise<{ path: string; report: ProjectMemoryReport }> {
   const mapPath = options.romPath.replace(/\.gba$/i, ".map");
-  const [romInfo, mapContents, assetContents] = await Promise.all([
+  const [romInfo, mapContents] = await Promise.all([
     stat(options.romPath),
-    readFile(mapPath, "utf8"),
-    readFile(options.assetReportPath, "utf8")
+    readFile(mapPath, "utf8")
   ]);
   const mapEntries = parseGnuLinkerMap(mapContents);
   const occupancy = deriveRomOccupancyReport(mapEntries);
-  const assetReport = JSON.parse(assetContents) as AssetPackBudgetReport;
+  let assetReport: AssetPackBudgetReport;
+  let assetPackOmitted = false;
+  try {
+    assetReport = JSON.parse(await readFile(options.assetReportPath, "utf8")) as AssetPackBudgetReport;
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
+    // An asset-free export intentionally has no assetc report. Never treat a
+    // missing report as empty when a pack was actually declared or the
+    // export contract cannot establish that this is an asset-free project.
+    const contract = JSON.parse(await readFile(path.join(path.dirname(options.assetReportPath), "export_project.json"), "utf8")) as Record<string, unknown>;
+    if (contract.schema !== 1 || contract.backend !== "gbastudio_engine" || contract.asset_pack != null) throw error;
+    assetPackOmitted = true;
+    assetReport = {} as AssetPackBudgetReport;
+  }
   const resources = Object.fromEntries(
     Object.entries(assetReport.budget_summary ?? {}).map(([name, usage]) => [
       name,
       budgetPool(usage)
     ])
   );
-  const ewramBytes = addressExtentBytes(mapEntries, 0x02000000, 0x02040000);
-  const iwramBytes = addressExtentBytes(mapEntries, 0x03000000, 0x03008000);
+  const iwramStart = 0x03000000, iwramEnd = iwramStart + gbaIwramCapacityBytes;
+  const bssEnd = linkerSymbol(mapContents, "__bss_end");
+  const ewramEnd = linkerSymbol(mapContents, "__ewram_bss_end");
+  const stackBottom = linkerSymbol(mapContents, "__stack_bottom");
+  const stackTop = linkerSymbol(mapContents, "__stack_top");
+  const svcBottom = linkerSymbol(mapContents, "__svc_stack_bottom");
+  const svcTop = linkerSymbol(mapContents, "__svc_stack_top");
+  const irqBottom = linkerSymbol(mapContents, "__irq_stack_bottom");
+  const irqTop = linkerSymbol(mapContents, "__irq_stack_top");
+  if (bssEnd < iwramStart || ewramEnd < 0x02000000 || stackBottom < iwramStart
+      || stackTop < stackBottom || svcBottom < stackTop || svcTop < svcBottom
+      || irqBottom < svcTop || irqTop < irqBottom || irqTop > iwramEnd) {
+    throw new Error("Limites de RAM ou reservas de pilha inválidos no mapa de memória.");
+  }
+  const ewram = bytePool(ewramEnd - 0x02000000,
+    linkedAddressBytes(mapEntries, 0x02000000, 0x02040000), gbaEwramCapacityBytes);
+  const iwram = {
+    ...bytePool(bssEnd - iwramStart, linkedAddressBytes(mapEntries, iwramStart, iwramEnd),
+      gbaIwramCapacityBytes, iwramEnd - stackBottom),
+    stacks: { systemBytes: stackTop - stackBottom, irqBytes: irqTop - irqBottom, supervisorBytes: svcTop - svcBottom }
+  };
   const peakGroups = (assetReport.group_pressure_report ?? [])
     .map((group) => ({
       name: group.name,
@@ -127,6 +141,10 @@ export async function writeProjectMemoryReport(
     }))
     .sort((left, right) => right.peakPercent - left.peakPercent);
   const warnings = [
+    ...(assetPackOmitted ? ["Orçamento de assets não gerado: a exportação não contém asset_pack."] : []),
+    ...Object.entries({ EWRAM: ewram, IWRAM: iwram })
+      .filter(([, usage]) => usage.severity !== "ok")
+      .map(([name, usage]) => `${name}: ${usage.remainingBytes} bytes de margem estática; ${usage.percent}% ocupado, incluindo reservas.`),
     ...Object.entries(resources)
       .filter(([, usage]) => usage.severity !== "ok")
       .map(([name, usage]) => `${name}: ${usage.percent}% do limite compilado.`),
@@ -135,7 +153,7 @@ export async function writeProjectMemoryReport(
       .map((group) => `${group.name}: pico de ${group.peakPercent}% em um pool de hardware.`)
   ];
   const report: ProjectMemoryReport = {
-    schema: 1,
+    schema: 2,
     generatedAt: new Date().toISOString(),
     rom: {
       fileBytes: romInfo.size,
@@ -147,8 +165,8 @@ export async function writeProjectMemoryReport(
       largestEntries: occupancy.largestEntries
     },
     ram: {
-      ewram: bytePool(ewramBytes, gbaEwramCapacityBytes),
-      iwram: bytePool(iwramBytes, gbaIwramCapacityBytes),
+      ewram,
+      iwram,
       linkedBytes: occupancy.ramBytes
     },
     resources,

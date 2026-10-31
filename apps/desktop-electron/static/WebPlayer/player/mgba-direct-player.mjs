@@ -1,3 +1,6 @@
+import { createBatteryPersistence } from './web-battery-storage.mjs';
+import { createPointerInput, bindTouchControls } from './web-touch-controls.mjs';
+
 const WIDTH = 240;
 const HEIGHT = 160;
 const FRAME_BYTES = WIDTH * HEIGHT * 4;
@@ -100,6 +103,7 @@ export function createKeyboardInputLatch() {
     release(key) {
       held.delete(key);
     },
+    clear() { held.clear(); pendingPresses.clear(); },
     sample(framesToRun) {
       const keys = [...held, ...pendingPresses.keys()].reduce((value, key) => value | key, 0);
       if (framesToRun > 0) {
@@ -413,11 +417,94 @@ export function readRuntimeTelemetryFromHeap(module) {
   );
 }
 
+const PROFILER_SUBSYSTEMS = ["scripts", "audio", "render", "streaming", "interrupts"];
+
+function readProfilerTelemetry(module, address, runtime) {
+  if (runtime.schema !== 4 || address < 0x02000000 || address + 320 > 0x02040000 ||
+      typeof module._gba_audio_register !== "function") return null;
+  const readWord = (index) => {
+    const offset = address + 256 + index * 4;
+    return (module._gba_audio_register(offset) | (module._gba_audio_register(offset + 2) << 16)) >>> 0;
+  };
+  return decodeProfilerTelemetry(readWord, runtime);
+}
+
+function decodeProfilerTelemetry(readWord, runtime) {
+  if (runtime.schema !== 4) return null;
+  if (readWord(0) !== 0x47535046 || readWord(1) !== 1 || readWord(2) !== 16 ||
+      readWord(3) !== runtime.frame || readWord(4) !== 262144) return null;
+  const valid = readWord(5);
+  const frameTicks = {}, scenePeakTicks = {};
+  PROFILER_SUBSYSTEMS.forEach((label, index) => {
+    if ((valid & (1 << index)) === 0) return;
+    frameTicks[label] = readWord(6 + index);
+    scenePeakTicks[label] = readWord(11 + index);
+  });
+  return Object.freeze({ ticksPerSecond: 262144, frameTicks: Object.freeze(frameTicks), scenePeakTicks: Object.freeze(scenePeakTicks) });
+}
+
+export function readEventTraceTelemetry(module, address) {
+  if (typeof module._gba_audio_register !== "function") return null;
+  const word = index => { const offset = address + 320 + index * 4; return (module._gba_audio_register(offset) | module._gba_audio_register(offset + 2) << 16) >>> 0; };
+  return decodeEventTraceTelemetry(word);
+}
+
+function decodeEventTraceTelemetry(word) {
+  if (word(0) !== 0x47534554 || word(1) !== 1 || word(2) !== 20) return null;
+  const sequence = word(3), entries = [];
+  for (let i = Math.max(0, sequence - 4); i < sequence; ++i) {
+    const start = 4 + (i % 4) * 4, packed = word(start + 2), context = word(start + 3);
+    entries.push({ commandAddress: word(start), frame: word(start + 1), step: packed & 65535, op: (packed >>> 16) & 255, status: packed >>> 24, room: (context << 16) >> 16, waitFrames: context >>> 16 });
+  }
+  return Object.freeze({ sequence, entries });
+}
+
+function decodeRuntimeDiagnostics(words) {
+  const decoded = decodeRuntimeTelemetryWords(words);
+  if (!decoded) return null;
+  return Object.freeze({ ...decoded,
+    subsystems: decodeProfilerTelemetry(index => words[64 + index], decoded),
+    eventTrace: decoded.schema === 4 ? decodeEventTraceTelemetry(index => words[80 + index]) : null
+  });
+}
+
+export function prepareRuntimeInspection(module) {
+  // Prepare host-only decoders before cadence/audio clocks start. These words
+  // never enter emulator memory and no emulated frame or save operation runs.
+  const words = new Uint32Array(100);
+  words.set([RUNTIME_TELEMETRY_MAGIC, RUNTIME_TELEMETRY_SCHEMA, RUNTIME_TELEMETRY_WORD_COUNT, 42]);
+  words.set([0x47535046, 1, 16, 42, 262144, 31, 10, 20, 30, 40, 50, 11, 22, 33, 44, 55], 64);
+  words.set([0x47534554, 1, 20, 4], 80);
+  for (let index = 0; index < 4; ++index) {
+    words.set([0x08000100 + index * 4, 42, index | (3 << 16), 4 | (12 << 16)], 84 + index * 4);
+  }
+  for (let iteration = 0; iteration < 3; ++iteration) {
+    words[50] = 0;
+    decodeRuntimeDiagnostics(words);
+    words[50] = 0x3ff;
+    decodeRuntimeDiagnostics(words);
+    analyzePcmSamples(new Int16Array([0, 8, 9, -32768, 32767]));
+  }
+  if (typeof module._gba_analyze_rgba === "function") {
+    analyzeModuleRgbaFrame(module, new Uint8Array([0, 0, 0, 255, 4, 4, 4, 255, 5, 0, 0, 255, 0, 5, 0, 255]), 2, 2);
+  }
+}
+
 export function readRuntimeTelemetry(module) {
+  if (typeof module._gba_runtime_telemetry_snapshot === "function") {
+    const pointer = module._gba_runtime_telemetry_snapshot();
+    const heap = module.HEAPU8;
+    // The bridge owns a contiguous 100-word snapshot, including both extensions.
+    if (!Number.isInteger(pointer) || pointer <= 0 || pointer % 4 !== 0 ||
+        !heap || pointer + 400 > heap.byteLength) return null;
+    const words = new Uint32Array(heap.buffer, heap.byteOffset + pointer, 100);
+    return decodeRuntimeDiagnostics(words);
+  }
   const hasNativeBridge = typeof module._gba_find_runtime_telemetry === "function" &&
     typeof module._gba_runtime_telemetry_word === "function";
   if (hasNativeBridge) {
-    if (module._gba_find_runtime_telemetry() !== 0) {
+    const address = module._gba_find_runtime_telemetry() >>> 0;
+    if (address !== 0) {
       const wordCount = module._gba_runtime_telemetry_word(2) >>> 0;
       if (wordCount === RUNTIME_TELEMETRY_LEGACY_WORD_COUNT || wordCount === RUNTIME_TELEMETRY_PREVIOUS_WORD_COUNT || wordCount === RUNTIME_TELEMETRY_WORD_COUNT) {
         const words = Uint32Array.from(
@@ -425,7 +512,7 @@ export function readRuntimeTelemetry(module) {
           (_, index) => module._gba_runtime_telemetry_word(index) >>> 0
         );
         const decoded = decodeRuntimeTelemetryWords(words);
-        if (decoded) return decoded;
+        if (decoded) return Object.freeze({ ...decoded, subsystems: readProfilerTelemetry(module, address, decoded), eventTrace: readEventTraceTelemetry(module, address) });
       }
     }
     return null;
@@ -477,6 +564,38 @@ export function analyzeRgbaFrame(bytes, width = WIDTH, height = HEIGHT) {
     dominantColorRatio,
     signature: (signatureHash >>> 0).toString(16).padStart(8, "0")
   });
+}
+
+export function analyzeModuleRgbaFrame(module, bytes, width = WIDTH, height = HEIGHT) {
+  if (typeof module._gba_analyze_rgba !== "function") return analyzeRgbaFrame(bytes, width, height);
+  const pixelCount = width * height;
+  if (!Number.isSafeInteger(pixelCount) || pixelCount <= 0 || pixelCount > WIDTH * HEIGHT
+      || !bytes || bytes.length < pixelCount * 4) throw new Error("Framebuffer RGBA invalido para analise visual.");
+  const pointer = module._malloc(pixelCount * 4);
+  if (!pointer) throw new Error("Memoria insuficiente para analise do framebuffer.");
+  try {
+    module.HEAPU8.set(bytes.subarray(0, pixelCount * 4), pointer);
+    const result = module._gba_analyze_rgba(pointer, pixelCount) >>> 0;
+    const heap = module.HEAPU8;
+    if (!result || result % 4 || result + 32 > heap.byteLength) throw new Error("Resultado invalido da analise nativa.");
+    const header = new Uint32Array(heap.buffer, heap.byteOffset + result, 8);
+    const [magic, version, pixels, nonBlackPixelCount, dominant, signature, uniqueColorCount] = header;
+    if (magic !== 0x47465241 || version !== 1 || pixels !== pixelCount || nonBlackPixelCount > pixels
+        || dominant > pixels || !uniqueColorCount || uniqueColorCount > pixels
+        || result + 32 + uniqueColorCount * 8 > heap.byteLength) throw new Error("Resultado invalido da analise nativa.");
+    const counts = new Uint32Array(heap.buffer, heap.byteOffset + result + 32, uniqueColorCount * 2);
+    const colorHistogram = [];
+    for (let index = 0; index < uniqueColorCount; ++index) {
+      const color = counts[index * 2];
+      colorHistogram.push({ count: counts[index * 2 + 1], rgb: [(color >> 16) & 255, (color >> 8) & 255, color & 255] });
+    }
+    const nonBlackRatio = nonBlackPixelCount / pixelCount;
+    const dominantColorRatio = dominant / pixelCount;
+    return Object.freeze({ colorHistogram,
+      meaningful: nonBlackRatio >= 0.01 && uniqueColorCount >= 3 && dominantColorRatio < 0.995,
+      pixelCount, nonBlackPixelCount, nonBlackRatio, uniqueColorCount, dominantColorRatio,
+      signature: signature.toString(16).padStart(8, "0") });
+  } finally { module._free(pointer); }
 }
 
 export function analyzePcmSamples(samples) {
@@ -552,8 +671,14 @@ export function inspectSavedataBytes(bytes) {
   return Object.freeze({
     bytes: savedata.length,
     contentChecksum: savedataChecksum(savedata),
-    hasUniversalSlotRecord: slotSignatureOffset >= 0
-      && recordMagicOffset === slotSignatureOffset + 16,
+    // GBSM is the common metadata wrapper, also used by standalone saves.
+    // UniversalSaveData has its own GBUS magic after the 40-byte wrapper.
+    hasUniversalSlotRecord: payloadFits
+      && recordMagicOffset === payloadStart
+      && payloadSize >= 44
+      && readLittleEndian(savedata, payloadStart + 4, 2) === 1
+      && readLittleEndian(savedata, payloadStart + 6, 2) + 40 === payloadSize
+      && readLittleEndian(savedata, payloadStart + 40, 4) === 0x53554247,
     recordMagicOffset,
     slot,
     slotSignatureOffset
@@ -592,6 +717,7 @@ export function restoreModuleSavedata(module, savedata) {
 }
 
 function bytesToBase64(bytes) {
+  if (typeof bytes.toBase64 === "function") return bytes.toBase64();
   let text = "";
   for (let offset = 0; offset < bytes.length; offset += 0x8000) {
     text += String.fromCharCode(...bytes.subarray(offset, offset + 0x8000));
@@ -600,12 +726,16 @@ function bytesToBase64(bytes) {
 }
 
 function base64ToBytes(value) {
+  if (typeof Uint8Array.fromBase64 === "function") return Uint8Array.fromBase64(value);
   const text = atob(value);
   return Uint8Array.from(text, (character) => character.charCodeAt(0));
 }
 
-function gamepadKeys() {
-  const gamepad = [...navigator.getGamepads?.() ?? []].find(Boolean);
+export function gamepadKeys(navigatorObject = navigator) {
+  let gamepads;
+  try { gamepads = navigatorObject.getGamepads?.() ?? []; }
+  catch { return 0; } // Optional Gamepad access may be denied inside a sandbox.
+  const gamepad = [...gamepads].find(Boolean);
   if (!gamepad) return 0;
   let keys = 0;
   const pressed = (index) => gamepad.buttons[index]?.pressed === true;
@@ -622,7 +752,7 @@ function gamepadKeys() {
   return keys;
 }
 
-export async function startMGBAPlayer({ container, romUrl, storageKey, onFrameStats, replay, keyboardBindings }) {
+export async function startMGBAPlayer({ container, romUrl, storageKey, onFrameStats, replay, keyboardBindings, batteryOptions, touchControls }) {
   if (!(container instanceof HTMLElement)) throw new Error("Container do GBA Studio Player invalido.");
   const keyboardKeys = keyboardKeyMapForBindings(keyboardBindings);
   const [{ default: createMGBA }, response] = await Promise.all([
@@ -660,7 +790,9 @@ export async function startMGBAPlayer({ container, romUrl, storageKey, onFrameSt
       module._free(romPointer);
     }
     if (loaded !== 1) throw new Error("A ROM foi rejeitada pelo core mGBA.");
+    prepareRuntimeInspection(module);
     onFrameStats?.({
+      sampledAtUnixMs: performance.timeOrigin + performance.now(),
       cpuPercent: 0,
       droppedFrameRatio: 0,
       droppedFrames: 0,
@@ -684,6 +816,17 @@ export async function startMGBAPlayer({ container, romUrl, storageKey, onFrameSt
     if (!context) throw new Error("Canvas 2D indisponivel.");
     const image = context.createImageData(WIDTH, HEIGHT);
     const keyboardInput = createKeyboardInputLatch();
+    const touchInput = createPointerInput();
+    const battery = batteryOptions ? createBatteryPersistence({
+      ...batteryOptions,
+      copy: () => copyModuleSavedata(module),
+      restore: bytes => restoreModuleSavedata(module, bytes),
+      onStatus: status => { canvas.dataset.save = status; batteryOptions.onStatus?.(status); }
+    }) : null;
+    if (battery) {
+      cleanup.push(() => battery.destroy());
+      await battery.initialize();
+    }
     const replayDriver = replay ? createReplayDriver(replay) : null;
     const AudioContext = window.AudioContext ?? window.webkitAudioContext;
     const audioSampleRate = typeof module._gba_audio_sample_rate === "function"
@@ -727,10 +870,8 @@ export async function startMGBAPlayer({ container, romUrl, storageKey, onFrameSt
       if (audioContext.state !== "running") await audioContext.resume();
       if (!active) return false;
       canvas.dataset.audio = audioContext.state;
-      nextAudioTime = planPcmBufferSchedule({
-        currentTime: audioContext.currentTime,
-        nextAudioTime
-      }).nextAudioTime;
+      // Only queueNativeAudio advances the playback clock. Resuming before the
+      // first PCM block must not create a gap, or hide one on a later key press.
       return audioContext.state === "running";
     };
     const queueNativeAudio = () => {
@@ -745,10 +886,6 @@ export async function startMGBAPlayer({ container, romUrl, storageKey, onFrameSt
       emittedNonSilentSamples += analysis.nonSilentSampleCount;
       emittedAudioPeak = Math.max(emittedAudioPeak, analysis.peak);
       if (!audioContext || audioContext.state !== "running" || !audioDestination) return;
-      const schedule = planPcmBufferSchedule({ currentTime: audioContext.currentTime, nextAudioTime });
-      nextAudioTime = schedule.nextAudioTime;
-      if (schedule.resynchronized) audioResynchronizationCount += 1;
-      if (schedule.underrun) audioUnderrunCount += 1;
       const buffer = audioContext.createBuffer(2, frameCount, audioSampleRate);
       const left = buffer.getChannelData(0);
       const right = buffer.getChannelData(1);
@@ -763,6 +900,12 @@ export async function startMGBAPlayer({ container, romUrl, storageKey, onFrameSt
         queuedAudioSources.delete(source);
         source.disconnect();
       };
+      // Buffer creation and conversion can be expensive on the first call.
+      // Sample the audio clock only once the source is actually ready to start.
+      const schedule = planPcmBufferSchedule({ currentTime: audioContext.currentTime, nextAudioTime });
+      nextAudioTime = schedule.nextAudioTime;
+      if (schedule.resynchronized) audioResynchronizationCount += 1;
+      if (schedule.underrun) audioUnderrunCount += 1;
       source.start(nextAudioTime);
       queuedAudioSources.add(source);
       nextAudioTime += frameCount / audioSampleRate;
@@ -812,6 +955,14 @@ export async function startMGBAPlayer({ container, romUrl, storageKey, onFrameSt
     const onKeyDown = (event) => onKey(event, true);
     const onKeyUp = (event) => onKey(event, false);
     const onPointerDown = () => { void ensureAudioRunning(); };
+    if (touchControls) cleanup.push(bindTouchControls({ controls: touchControls, input: touchInput, onInteraction: () => { canvas.focus({ preventScroll: true }); void ensureAudioRunning(); } }));
+    const releaseInputs = () => { keyboardInput.clear(); touchInput.clear(); };
+    const flushBattery = () => { void battery?.flush(); };
+    const onVisibilityChange = () => { if (document.hidden) { releaseInputs(); flushBattery(); } };
+    window.addEventListener('blur', releaseInputs);
+    window.addEventListener('pagehide', flushBattery);
+    document.addEventListener('visibilitychange', onVisibilityChange);
+    cleanup.push(() => { window.removeEventListener('blur', releaseInputs); window.removeEventListener('pagehide', flushBattery); document.removeEventListener('visibilitychange', onVisibilityChange); });
     window.addEventListener("keydown", onKeyDown);
     cleanup.push(() => window.removeEventListener("keydown", onKeyDown));
     window.addEventListener("keyup", onKeyUp);
@@ -825,6 +976,7 @@ export async function startMGBAPlayer({ container, romUrl, storageKey, onFrameSt
     let frameHandle = 0;
     cleanup.push(() => cancelAnimationFrame(frameHandle));
     let presentedRuntimeState = null;
+    let previousPresentedRuntimeState = null;
     let accumulatorMs = GBA_FRAME_DURATION_MS;
     let lastAnimationFrameAt = performance.now();
     let sampleDroppedFrames = 0;
@@ -839,7 +991,7 @@ export async function startMGBAPlayer({ container, romUrl, storageKey, onFrameSt
       const plan = planEmulationFrames({ accumulatorMs, elapsedMs: elapsedSinceAnimationFrame });
       accumulatorMs = plan.accumulatorMs;
       sampleDroppedFrames += plan.droppedFrames;
-      const manualKeys = keyboardInput.sample(plan.framesToRun) | gamepadKeys();
+      const manualKeys = keyboardInput.sample(plan.framesToRun) | touchInput.sample(plan.framesToRun) | gamepadKeys();
       const inputMasks = inputMasksForEmulatedFrames({
         framesToRun: plan.framesToRun,
         manualKeys,
@@ -849,6 +1001,7 @@ export async function startMGBAPlayer({ container, romUrl, storageKey, onFrameSt
       for (let frame = 0; frame < plan.framesToRun; frame += 1) {
         module._gba_set_keys(inputMasks[frame]);
         const emulationStartedAt = performance.now();
+        previousPresentedRuntimeState = presentedRuntimeState;
         module._gba_run_frame();
         presentedRuntimeState = readRuntimeTelemetry(module);
         queueNativeAudio();
@@ -857,6 +1010,7 @@ export async function startMGBAPlayer({ container, romUrl, storageKey, onFrameSt
       }
 
       if (plan.framesToRun > 0) {
+        void battery?.flush();
         const source = module.HEAPU8.subarray(module._gba_framebuffer(), module._gba_framebuffer() + FRAME_BYTES);
         image.data.set(source);
         for (let offset = 3; offset < FRAME_BYTES; offset += 4) image.data[offset] = 255;
@@ -876,6 +1030,7 @@ export async function startMGBAPlayer({ container, romUrl, storageKey, onFrameSt
         });
         const nativeTelemetry = readRuntimeTelemetry(module);
         onFrameStats?.({
+          sampledAtUnixMs: performance.timeOrigin + now,
           ...cadence,
           romBytes: rom.length,
           runtimeState: nativeTelemetry,
@@ -944,9 +1099,9 @@ export async function startMGBAPlayer({ container, romUrl, storageKey, onFrameSt
         manualKeys: keyboardInput.sample(0),
         replayActive: Boolean(replayDriver && !replayDriver.complete)
       }),
-      inspectPresentedRuntime: () => Object.freeze({ state: presentedRuntimeState }),
+      inspectPresentedRuntime: () => Object.freeze({ state: presentedRuntimeState, previousState: previousPresentedRuntimeState }),
       inspectFrame: () => Object.freeze({
-        ...analyzeRgbaFrame(image.data, WIDTH, HEIGHT),
+        ...analyzeModuleRgbaFrame(module, image.data, WIDTH, HEIGHT),
         framebufferBytes: module._gba_framebuffer_size(),
         expectedRgbaBytes: FRAME_BYTES
       }),

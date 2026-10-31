@@ -22,13 +22,13 @@ describe("scene connection transitions on event-driven navigation", () => {
     ["armazem_das_mares", "observatorio_do_farol", "point_click"],
     ["usina_submersa", "usina_combate", "dungeon_crawler"],
     ["mapa_rota", "penedos_vento", "world_map"],
-    ["guardiao_rele", "arena_arrancada", "battle_rpg"],
-    ["circuito_final", "titulo", "racing"]
+    ["guardiao_rele", "arena_arrancada", "battle_rpg"]
   ])("honors %s → %s in the %s event script", (from, to, kind) => {
     const { data, connection } = fixture(from, to);
     const commands = script(data, kind, connection.eventName);
-    const warp = commands.findIndex(c => c.op === "warp" || c.op === "warp_runtime");
     const cover = commands.findIndex(c => c.op === "visual_effect" && c.phase === "cover");
+    // Optional routes can warp elsewhere before the configured connection branch.
+    const warp = commands.findIndex((c, index) => index > cover && (c.op === "warp" || c.op === "warp_runtime"));
     expect(cover).toBeGreaterThanOrEqual(0);
     expect(cover + 1).toBeLessThan(warp);
     expect(commands.slice(cover, cover + 2)).toEqual([
@@ -36,6 +36,18 @@ describe("scene connection transitions on event-driven navigation", () => {
       { op: "wait", frames: 24 }
     ]);
     expect(commands[warp + 1]).toEqual({ op: "visual_effect", effect: "push", layer: "all", frames: 24, intensity: 100, phase: "reveal" });
+  });
+
+  it("defers the final title handoff until the Porto and Farol epilogue finishes",()=>{
+    const contract=buildEngineExportProjectContract(canonical);
+    const finish=contract.racing_project!.scripts!.find(s=>s.name==='race_finish')!.script;
+    expect(finish).toContainEqual(expect.objectContaining({op:'warp_runtime',runtime:'menu'}));
+    const results=contract.menu_project!.screens.find(s=>s.name==='corrida_resultados')!;
+    const continueStory=results.items.find(item=>item.label==='CONTINUAR')!.on_select!;
+    expect(continueStory).toContainEqual(expect.objectContaining({op:'jump_if_engine_field_equals',field:'racing_result',value:1}));
+    expect(continueStory).toContainEqual(expect.objectContaining({op:'warp_runtime',runtime:'topdown',room:0}));
+    const tour=contract.topdown_project!.scripts.find(s=>s.name==='encore_epilogue_2_tick')!.script;
+    expect(tour).toContainEqual(expect.objectContaining({op:'warp_runtime',runtime:'menu',room:0}));
   });
 
   it("keeps a blocked exit outside the cover/reveal branch and avoids double wrapping its door", () => {

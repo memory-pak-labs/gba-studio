@@ -89,6 +89,10 @@ constexpr gbs::DungeonCrawlerActorData sentinel_actor {
 } // namespace
 
 int main() {
+    assert(gbs::dungeon_actor_is_occluded(room, {1, 2}, {2, 2}, false));
+    assert(!gbs::dungeon_actor_is_occluded(room, {1, 2}, {2, 2}, true));
+    assert(gbs::dungeon_actor_is_occluded(room, {1, 2}, {3, 2}, true));
+    assert(!gbs::dungeon_actor_is_occluded(room, {1, 3}, {3, 3}, false));
     static_assert(gbs::is_valid_dungeon_crawler_project_data(project));
     static_assert(gbs::resource_bank_batch_from_dungeon_crawler_project(project).bank_count == 1);
     static_assert(gbs::find_dungeon_crawler_resource_bank_group_index(project, "crypt_group") == 0);

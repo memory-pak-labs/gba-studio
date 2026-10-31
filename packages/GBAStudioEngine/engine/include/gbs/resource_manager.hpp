@@ -14,14 +14,33 @@ struct ResourceReservation {
     bool success;
 };
 
+// Fixed storage; copying a snapshot copies the bits, never references to a pool.
+struct ResourceOccupancy {
+    uint32_t words[32];
+
+    struct Reference {
+        uint32_t& word;
+        uint32_t mask;
+        operator bool() const { return (word & mask) != 0; }
+        Reference& operator=(bool value) {
+            word = value ? word | mask : word & ~mask;
+            return *this;
+        }
+        Reference& operator=(const Reference& other) { return *this = static_cast<bool>(other); }
+    };
+
+    bool operator[](size_t index) const { return (words[index / 32] & (uint32_t(1) << (index % 32))) != 0; }
+    Reference operator[](size_t index) { return { words[index / 32], uint32_t(1) << (index % 32) }; }
+};
+
 struct StaticResourcePool {
-    bool used[1024];
+    ResourceOccupancy used;
     uint16_t capacity;
     uint16_t used_count;
 };
 
 struct ResourcePoolSnapshot {
-    bool used[1024];
+    ResourceOccupancy used;
     uint16_t capacity;
     bool valid;
 };

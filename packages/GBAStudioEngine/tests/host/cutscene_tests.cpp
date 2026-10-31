@@ -158,6 +158,41 @@ static_assert(!gbs::is_valid_cutscene_actor_motion(scenes[0], invalid_actor_moti
 } // namespace
 
 int main() {
+    gbs::ResourceBank small_banks[] = {
+        { gbs::ResourcePoolKind::BgTiles, 0, 2, 1, "small_tiles" },
+        { gbs::ResourcePoolKind::BgPalette, 0, 1, 1, "small_palette" }
+    };
+    gbs::ResourceBank large_banks[] = {
+        { gbs::ResourcePoolKind::BgTiles, 0, 96, 1, "large_tiles" },
+        { gbs::ResourcePoolKind::BgPalette, 0, 1, 1, "large_palette" }
+    };
+    gbs::ResourceBankGroup fade_groups[] = {
+        { "small", small_banks, 2 }, { "large", large_banks, 2 }
+    };
+    gbs::CutsceneStepData fade_steps[] = {
+        { -1, 1, gbs::empty_event_script(), -1, true },
+        { -1, 1, gbs::empty_event_script(), -1, true }
+    };
+    fade_steps[0].resource_bank_group_name = "small";
+    fade_steps[1].resource_bank_group_name = "large";
+    auto fade_scene = scenes[0];
+    fade_scene.steps = fade_steps; fade_scene.step_count = 2; fade_scene.actor_count = 0;
+    fade_scene.on_enter = gbs::empty_event_script();
+    auto fade_project = project;
+    fade_project.resource_bank_groups = fade_groups; fade_project.resource_bank_group_count = 2;
+    if (gbs::cutscene_resident_background_group_index(fade_project, fade_scene) != 1) return 20;
+    small_banks[0].start = 100;
+    if (gbs::cutscene_resident_background_group_index(fade_project, fade_scene) != -1) return 21;
+    small_banks[0].start = 0;
+    small_banks[0].kind = gbs::ResourcePoolKind::ObjTiles;
+    if (gbs::cutscene_resident_background_group_index(fade_project, fade_scene) != -1) return 22;
+    small_banks[0].kind = gbs::ResourcePoolKind::BgTiles;
+    fade_scene.actor_count = 1;
+    if (gbs::cutscene_resident_background_group_index(fade_project, fade_scene) != -1) return 23;
+    fade_scene.actor_count = 0; fade_steps[0].line_index = 0;
+    if (gbs::cutscene_resident_background_group_index(fade_project, fade_scene) != -1) return 24;
+    fade_steps[0].line_index = -1; fade_steps[0].script = { step_commands, 1 };
+    if (gbs::cutscene_resident_background_group_index(fade_project, fade_scene) != -1) return 25;
     if (!gbs::is_valid_cutscene_project_data(project)) {
         return 1;
     }

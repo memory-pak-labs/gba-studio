@@ -220,7 +220,7 @@ function collectRoomUsages(data: GBAProjectData, usages: AssetUsageMap): void {
     });
     const runtime = isRecord(room.runtime) ? room.runtime : null;
     const runtimeConfig = runtime && isRecord(runtime.config) ? runtime.config : null;
-    addUsage(usages, nullableString(runtimeConfig?.hudAssetName), {
+    addUsage(usages, nullableString(runtimeConfig?.hudAssetName) ?? nullableString(isRecord(runtimeConfig?.presentation)?runtimeConfig.presentation.hudAssetName:null), {
       label: `HUD de runtime: ${roomName}`,
       workspace: "Editor",
       targetID: roomID,
@@ -495,6 +495,12 @@ function collectSettingsUsages(data: GBAProjectData, usages: AssetUsageMap): voi
         targetName: presetName,
         usageKind: "hud-preset-component"
       });
+      const stateAssets = [...(Array.isArray(component.stateAssets) ? component.stateAssets : []),
+        ...(isRecord(component.gauge) ? [component.gauge.emptyAsset] : [])];
+      for (const stateAsset of stateAssets) addUsage(usages, nullableString(stateAsset), {
+        label: `HUD ${presetName}: ${componentName} (estado)`, workspace: "Editor", targetID,
+        targetName: presetName, usageKind: "hud-preset-component"
+      });
     }
   }
 
@@ -617,6 +623,16 @@ function collectAssetUsages(data: GBAProjectData, assetNames: Set<string>): Asse
   collectDialogueUsages(data, usages);
   collectSettingsUsages(data, usages);
   collectEventCommandUsages(data, usages, assetNames);
+  const queue=projectArray(data,"assets").filter(asset=>usages.has(String(asset.name))),seen=new Set<string>();
+  while(queue.length){
+    const asset=queue.shift()!;const name=String(asset.name);if(seen.has(name))continue;seen.add(name);
+    const metadata=isRecord(asset.metadata)?asset.metadata:{};
+    for(const dependency of Array.isArray(metadata.runtimeDependencies)?metadata.runtimeDependencies:[]){
+      if(typeof dependency!=="string" || !assetNames.has(dependency))continue;
+      addUsage(usages,dependency,{label:`Runtime: ${name}`,workspace:"Editor",usageKind:"runtime-dependency"});
+      const child=projectArray(data,"assets").find(a=>a.name===dependency);if(child)queue.push(child);
+    }
+  }
   return usages;
 }
 
@@ -1545,10 +1561,21 @@ export function replaceAssetFileInProject(
   const asset = assets.find((item, index) => assetID(item, index) === assetIDToReplace);
   if (!asset) return data;
 
-  asset.kind = replacement.kind || asset.kind;
-  asset.systemImage = replacement.systemImage || asset.systemImage;
+  // Replacing the file preserves its authored role and all name-based uses.
+  asset.kind = asset.kind || replacement.kind;
+  asset.systemImage = asset.systemImage || replacement.systemImage;
+  const metadata = isRecord(asset.metadata) ? { ...asset.metadata } : {};
+  // These describe the old pixels, rather than the asset's runtime settings.
+  for (const field of [
+    "bundledDefaultAsset", "sourceSha256", "preparedSha256", "runtimeSourceSha256",
+    "provenance", "license", "generatedBy", "approved", "reviewStatus", "visualStatus",
+    "palettePreparationVisuallyApproved", "width", "height", "backgroundPaletteReferencePlan"
+  ]) {
+    delete metadata[field];
+  }
   asset.metadata = {
-    ...(isRecord(asset.metadata) ? asset.metadata : {}),
+    ...metadata,
+    ...replacement.metadata,
     source: replacement.relativePath
   };
   next.assets = assets;

@@ -47,7 +47,9 @@ enum class LutaVisualState : uint8_t {
     Attack = 1,
     Special = 2,
     Guard = 3,
-    Hurt = 4
+    Hurt = 4,
+    Walk = 5,
+    Jump = 6
 };
 
 enum class LutaVisualFallback : uint8_t {
@@ -62,12 +64,25 @@ struct LutaAnimationSet {
     const SpriteAnimation* special;
     const SpriteAnimation* guard;
     const SpriteAnimation* hurt;
+    const SpriteAnimation* walk = nullptr;
+    const SpriteAnimation* jump = nullptr;
 };
 
 struct LutaVisualStateData {
     LutaVisualState state;
     SpriteAnimatorState animator;
     LutaVisualFallback fallback;
+    int16_t previous_x = 0;
+    bool position_initialized = false;
+    uint8_t landing_frames = 0;
+};
+
+enum class LutaActionFeedback : uint8_t { None, Miss, Hit, Guard, Special };
+struct LutaActionSounds {
+    int16_t hit = -1;
+    int16_t guard = -1;
+    int16_t special = -1;
+    int16_t miss = -1;
 };
 
 struct LutaSpecialMove {
@@ -152,6 +167,7 @@ struct LutaStageData {
     EventScript on_defeat = empty_event_script();
     int background_index = -1;
     const char* resource_bank_group_name = nullptr;
+    LutaActionSounds action_sounds {};
 };
 
 struct LutaProjectData {
@@ -182,6 +198,8 @@ struct LutaProjectData {
     bool save_enabled;
     bool save_autosave;
     const LutaBackgroundData* hud;
+    const EventScript* scripts = nullptr;
+    size_t script_count = 0;
 };
 
 struct LutaRuntimeState {
@@ -225,7 +243,11 @@ struct LutaRuntimeState {
     uint8_t p2_attack_cooldown;
     uint8_t p1_input_buffer;
     uint8_t p2_input_buffer;
+    LutaActionFeedback p1_action_feedback = LutaActionFeedback::None;
+    LutaActionFeedback p2_action_feedback = LutaActionFeedback::None;
 };
+
+LutaActionFeedback consume_luta_action_feedback(LutaRuntimeState& state, bool player_one);
 
 struct LutaSaveData {
     uint16_t p1_hp;

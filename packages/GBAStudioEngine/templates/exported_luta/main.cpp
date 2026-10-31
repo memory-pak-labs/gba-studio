@@ -1,3 +1,5 @@
+#include "gbs/profiler.hpp"
+#define GBS_DIALOGUE_UI_RUNTIME_KIND 12
 #include "gbs/engine.hpp"
 #include "gbs/audio.hpp"
 #include "gbs/dialogue.hpp"
@@ -113,13 +115,15 @@ gbs::EventScript checkpoint_script_for(int room, int script_index) {
     case 0: return room_data.on_enter;
     case 1: return room_data.on_victory;
     case 2: return room_data.on_defeat;
-    default: return gbs::empty_event_script();
+    default:
+        return script_index >= 3 && static_cast<size_t>(script_index - 3) < project.script_count
+            ? project.scripts[script_index - 3] : gbs::empty_event_script();
     }
 }
 
 int current_checkpoint_script_index() {
     if (!gbs::has_event_script(luta_event_runner.script)) return -1;
-    for (int index = 0; index < 3; ++index) {
+    for (int index = 0; index < static_cast<int>(project.script_count) + 3; ++index) {
         const auto script = checkpoint_script_for(stage_index, index);
         if (script.commands == luta_event_runner.script.commands && script.command_count == luta_event_runner.script.command_count) return index;
     }
@@ -131,7 +135,7 @@ bool capture_luta_checkpoint(gbs::UniversalSaveData& data) {
     const int script_index = current_checkpoint_script_index();
     if (luta_event_runner.active && script_index < 0) return false;
     const LutaRuntimeCheckpoint snapshot {
-        1, state, gbs::capture_checkpoint_script(luta_event_runner, script_index),
+        2, state, gbs::capture_checkpoint_script(luta_event_runner, script_index, event_state),
         gbs::capture_checkpoint_dialogue(dialogue), gbs::capture_checkpoint_events(event_state),
         checkpoint_music_index, checkpoint_tracker_index, luta_event_wait_frames,
         luta_cpu_attack_wait_frames,
@@ -146,15 +150,15 @@ bool restore_luta_checkpoint(int slot) {
     gbs::UniversalSaveData data {};
     LutaRuntimeCheckpoint snapshot {};
     if (service == nullptr || gbs::read_runtime_save(*service, slot, data) != gbs::SaveStatus::Ok ||
-        !gbs::read_universal_save_payload(data, gbs::UniversalSaveRuntime::Luta, &snapshot, sizeof(snapshot)) ||
-        snapshot.version != 1 || data.room_index < 0 || static_cast<size_t>(data.room_index) >= project.stage_count ||
+        !gbs::read_checkpoint_snapshot(data, gbs::UniversalSaveRuntime::Luta, snapshot) ||
+        snapshot.version != 2 || data.room_index < 0 || static_cast<size_t>(data.room_index) >= project.stage_count ||
         snapshot.wait_frames < 0 || snapshot.music_index < -1 || snapshot.tracker_index < -1 ||
         (snapshot.music_index >= 0 && static_cast<size_t>(snapshot.music_index) >= project.music_asset_count) ||
         (snapshot.tracker_index >= 0 && static_cast<size_t>(snapshot.tracker_index) >= project.tracker_asset_count) ||
         !gbs::valid_checkpoint_dialogue(snapshot.dialogue, project.dialogue_line_count)) return false;
     gbs::EventRunner restored_runner {};
     if (!gbs::restore_checkpoint_script(snapshot.script,
-            checkpoint_script_for(data.room_index, snapshot.script.script_index), restored_runner)) return false;
+            checkpoint_script_for(data.room_index, snapshot.script.script_index), restored_runner, &event_state)) return false;
     if (snapshot.cpu_wait_frames < 0 || snapshot.state.round_state > gbs::LutaRoundState::Draw ||
         snapshot.state.p1_ism_style > gbs::LutaIsmStyle::VIsm || snapshot.state.p2_ism_style > gbs::LutaIsmStyle::VIsm ||
         snapshot.state.p1_hp > snapshot.state.p1_max_hp || snapshot.state.p2_hp > snapshot.state.p2_max_hp) return false;
@@ -189,6 +193,7 @@ void consume_luta_checkpoint_request() {
 }
 #endif
 
+int last_luta_action_sfx = -1;
 void sync_runtime_telemetry() {
     runtime_telemetry.magic = gbs::runtime_telemetry_magic;
     runtime_telemetry.schema = gbs::runtime_telemetry_schema;
@@ -211,7 +216,7 @@ void sync_runtime_telemetry() {
     runtime_telemetry.first_actor_direction = static_cast<int>(state.p1_ism_style);
     runtime_telemetry.first_actor_visible = state.p2_hp > 0 ? 1 : 0;
     runtime_telemetry.last_music = event_state.last_music;
-    runtime_telemetry.last_sfx = event_state.last_sfx >= 0 ? event_state.last_sfx : event_state.last_pcm_sfx;
+    runtime_telemetry.last_sfx = event_state.last_sfx >= 0 ? event_state.last_sfx : last_luta_action_sfx;
     runtime_telemetry.current_tile_flags = static_cast<uint32_t>(state.p1_wins);
     runtime_telemetry.current_tile_slope = static_cast<uint32_t>(state.p2_wins);
     runtime_telemetry.room_change_count = outcome_hook_handled ? 1u : 0u;
@@ -310,7 +315,7 @@ void consume_event_state() {
         gbs::fade_audio_channel_volume(
             gbs::audio_channel_from_event_value(event_state.audio_fade_channel),
             static_cast<uint8_t>(event_state.audio_fade_target_volume),
-            static_cast<uint16_t>(event_state.audio_fade_frames)
+            static_cast<uint16_t>(event_state.audio_fade_frames), static_cast<uint8_t>(event_state.audio_fade_ceiling_volume)
         );
         event_state.audio_fade_changed = false;
     }
@@ -382,14 +387,33 @@ bool stream_stage_resource_group(const gbs::LutaStageData& stage) {
     if (group.bank_count == 0) {
         return false;
     }
-    return gbs::stream_resource_bank_group_with_uploads(
-        resource_manager,
-        active_resource_bank_group,
-        scratch_resource_bank_group,
-        group,
-        project.resource_bank_upload_sources,
-        project.resource_bank_upload_source_count
-    ).success;
+    bool waited_for_queue = false;
+    for (;;) {
+        const gbs::ResourceStreamResult result = gbs::stream_resource_bank_group_with_uploads(
+            resource_manager,
+            active_resource_bank_group,
+            scratch_resource_bank_group,
+            group,
+            project.resource_bank_upload_sources,
+            project.resource_bank_upload_source_count
+        );
+        if (result.success) {
+            // A drain can finish the previous publication transaction. Keep
+            // the newly queued arena hidden until its uploads also finish.
+            if (waited_for_queue) gbs::begin_render_publication_transaction();
+            return true;
+        }
+        // UI uploads can temporarily fill the queue before the arena is
+        // admitted. Drain them while publication is hidden, then retry.
+        // An oversized group or a stalled DMA must still fail explicitly.
+        if (result.status != gbs::ResourceStreamStatus::DmaQueueFull ||
+            gbs::dma_vblank_queue_count() == 0) return false;
+        const size_t before = gbs::dma_vblank_queue_stats().queued_bytes;
+        gbs::begin_render_publication_transaction();
+        gbs::wait_vblank();
+        waited_for_queue = true;
+        if (gbs::dma_vblank_queue_stats().queued_bytes >= before) return false;
+    }
 }
 
 void write_three_digits(char* text, uint16_t value) {
@@ -477,10 +501,13 @@ const gbs::LutaCharacter* luta_stage_fighter(const gbs::LutaStageData& stage, bo
 void reset_luta_animation_states(const gbs::LutaStageData& stage) {
     gbs::init_luta_visual_state(p1_visual_state);
     gbs::init_luta_visual_state(p2_visual_state);
+    last_luta_action_sfx = -1;
     const gbs::LutaCharacter* p1 = luta_stage_fighter(stage, true);
     const gbs::LutaCharacter* p2 = luta_stage_fighter(stage, false);
     gbs::set_luta_visual_state(p1_visual_state, p1 != nullptr ? p1->animation_set : nullptr, gbs::LutaVisualState::Idle);
     gbs::set_luta_visual_state(p2_visual_state, p2 != nullptr ? p2->animation_set : nullptr, gbs::LutaVisualState::Idle);
+    p1_visual_state.previous_x = state.p1_x; p1_visual_state.position_initialized = true;
+    p2_visual_state.previous_x = state.p2_x; p2_visual_state.position_initialized = true;
 }
 
 void set_luta_action_visual(bool player_one, gbs::LutaVisualState visual_state, const gbs::LutaStageData& stage) {
@@ -491,6 +518,22 @@ void set_luta_action_visual(bool player_one, gbs::LutaVisualState visual_state, 
         fighter != nullptr ? fighter->animation_set : nullptr,
         visual_state
     );
+}
+
+void consume_luta_action_feedback(const gbs::LutaStageData& stage) {
+    for (int player = 0; player < 2; ++player) {
+        const bool player_one = player == 0;
+        const auto feedback = gbs::consume_luta_action_feedback(state, player_one);
+        if (feedback == gbs::LutaActionFeedback::None) continue;
+        set_luta_action_visual(player_one, feedback == gbs::LutaActionFeedback::Special
+            ? gbs::LutaVisualState::Special : gbs::LutaVisualState::Attack, stage);
+        const auto& sounds = stage.action_sounds;
+        const int index = feedback == gbs::LutaActionFeedback::Special ? sounds.special :
+            feedback == gbs::LutaActionFeedback::Guard ? sounds.guard :
+            feedback == gbs::LutaActionFeedback::Hit ? sounds.hit : sounds.miss;
+        if (index >= 0 && static_cast<size_t>(index) < project.sfx_asset_count &&
+            gbs::play_sfx(project.sfx_assets[index])) last_luta_action_sfx = index;
+    }
 }
 
 void tick_luta_animation_states(const gbs::LutaStageData& stage) {
@@ -516,6 +559,32 @@ void tick_luta_animation_states(const gbs::LutaStageData& stage) {
         p2_visual_state,
         p2 != nullptr ? p2->animation_set : nullptr
     );
+}
+
+void draw_luta_fighter(int first_index, const gbs::MetaSprite& metasprite, gbs::Vec2i position) {
+    if (!dialogue.visible) {
+        gbs::set_metasprite(first_index, metasprite, position);
+        return;
+    }
+    if (!gbs::is_valid_metasprite(metasprite)) return;
+    // Equal-priority OBJ pixels cover BG0 on GBA. During a dialogue keep
+    // fighters below the UI, while retaining their normal position and art.
+    for (uint8_t index = 0; index < metasprite.part_count; ++index) {
+        const auto& part = metasprite.parts[index];
+        gbs::Sprite sprite {};
+        sprite.x = position.x + part.x;
+        sprite.y = position.y + part.y;
+        sprite.tile_index = part.tile_index;
+        sprite.palette = part.palette;
+        sprite.hflip = part.hflip;
+        sprite.vflip = part.vflip;
+        sprite.visible = true;
+        sprite.priority = 1;
+        sprite.width = part.width;
+        sprite.height = part.height;
+        sprite.color_depth = part.color_depth;
+        gbs::set_sprite(first_index + index, sprite);
+    }
 }
 
 void draw_luta() {
@@ -563,12 +632,12 @@ void draw_luta() {
         : nullptr;
     if (p1_metasprite && state.p1_hp > 0 && sprite_index < 128) {
         if (!gbs::sync_sprite_animation_tiles(p1_visual_state.animator, p1_streamed_tile_asset_loaded)) return;
-        gbs::set_metasprite(sprite_index, *p1_metasprite, gbs::Vec2i { state.p1_x, state.p1_y });
+        draw_luta_fighter(sprite_index, *p1_metasprite, gbs::Vec2i { state.p1_x, state.p1_y });
         sprite_index += p1_metasprite->part_count;
     }
     if (p2_metasprite && state.p2_hp > 0 && sprite_index < 128) {
         if (!gbs::sync_sprite_animation_tiles(p2_visual_state.animator, p2_streamed_tile_asset_loaded)) return;
-        gbs::set_metasprite(sprite_index, *p2_metasprite, gbs::Vec2i { state.p2_x, state.p2_y });
+        draw_luta_fighter(sprite_index, *p2_metasprite, gbs::Vec2i { state.p2_x, state.p2_y });
         sprite_index += p2_metasprite->part_count;
     }
     if (layout && layout->mode && layout->mode[0] == 'a') {
@@ -580,6 +649,8 @@ void draw_luta() {
         gbs::set_hud_value(hud,gbs::HudValueSource::RoundTime,state.round_timer / 60u);
         gbs::set_hud_value(hud,gbs::HudValueSource::P1Rounds,state.p1_wins);
         gbs::set_hud_value(hud,gbs::HudValueSource::P2Rounds,state.p2_wins);
+        gbs::set_hud_value(hud,gbs::HudValueSource::P1Super,state.p1_super_gauge,state.super_gauge_max);
+        gbs::set_hud_value(hud,gbs::HudValueSource::P2Super,state.p2_super_gauge,state.super_gauge_max);
         gbs::draw_hud(hud);
     } else {
         draw_luta_status_hud();
@@ -662,11 +733,6 @@ bool restore_luta_runtime_state(int slot_index) {
 void update_luta_controls(const gbs::InputState& input) {
     const gbs::LutaStageData& stage = project.stages[stage_index];
     gbs::luta_p1_set_guard(state, input.is_held(gbs::ButtonDown));
-    if (state.p1_guarding && p1_visual_state.state != gbs::LutaVisualState::Guard) {
-        set_luta_action_visual(true, gbs::LutaVisualState::Guard, stage);
-    } else if (p1_visual_state.state == gbs::LutaVisualState::Guard) {
-        set_luta_action_visual(true, gbs::LutaVisualState::Idle, stage);
-    }
     if (input.is_held(gbs::ButtonLeft)) {
         gbs::luta_p1_move(state, stage, -1);
     } else if (input.is_held(gbs::ButtonRight)) {
@@ -677,28 +743,15 @@ void update_luta_controls(const gbs::InputState& input) {
     }
     if (input.was_pressed(gbs::ButtonA)) {
         gbs::luta_p1_attack(state, stage, gbs::LutaAttackStrength::Light, gbs::LutaAttackType::Punch);
-        set_luta_action_visual(true, gbs::LutaVisualState::Attack, stage);
     }
     if (input.was_pressed(gbs::ButtonB)) {
         gbs::luta_p1_attack(state, stage, gbs::LutaAttackStrength::Light, gbs::LutaAttackType::Kick);
-        set_luta_action_visual(true, gbs::LutaVisualState::Attack, stage);
     }
     if (input.was_pressed(gbs::ButtonL)) {
-        const uint16_t gauge_before = state.p1_super_gauge;
         gbs::luta_p1_super(state);
-        if (state.p1_super_gauge != gauge_before) {
-            set_luta_action_visual(true, gbs::LutaVisualState::Special, stage);
-        }
     }
     if (input.was_pressed(gbs::ButtonR)) {
-        const uint16_t gauge_before = state.p1_super_gauge;
         gbs::luta_p1_alpha_counter(state);
-        if (state.p1_super_gauge != gauge_before) {
-            set_luta_action_visual(true, gbs::LutaVisualState::Special, stage);
-        }
-    }
-    if (input.was_pressed(gbs::ButtonStart)) {
-        gbs::luta_pause(state);
     }
 }
 
@@ -716,8 +769,11 @@ void update_luta_cpu() {
         gbs::luta_p2_set_guard(state, false);
     } else if (luta_cpu_attack_wait_frames == 0) {
         gbs::luta_p2_set_guard(state, false);
-        gbs::luta_p2_attack(state, stage, gbs::LutaAttackStrength::Light, gbs::LutaAttackType::Kick);
-        set_luta_action_visual(false, gbs::LutaVisualState::Attack, stage);
+        if (state.p2_super_gauge >= state.super_gauge_max) {
+            gbs::luta_p2_super(state);
+        } else {
+            gbs::luta_p2_attack(state, stage, gbs::LutaAttackStrength::Light, gbs::LutaAttackType::Kick);
+        }
         luta_cpu_attack_wait_frames = luta_cpu_attack_interval_frames;
     } else {
         gbs::luta_p2_set_guard(state, state.p1_hitstun > 0);
@@ -755,8 +811,11 @@ bool restart_standalone_luta_from_transition() {
 
 int initialize_luta_runtime() {
     gbs::init();
+    // Standalone ROMs bypass the mixed-runtime dispatcher.
+    gbs::debug_set_runtime_kind(GBS_DIALOGUE_UI_RUNTIME_KIND);
     gbs::init_dialogue(dialogue);
     gbs::init_event_state(event_state);
+    gbs::bind_event_scripts(event_state, project.scripts, project.script_count);
     gbs::init_event_runner(luta_event_runner);
     gbs::init_resource_manager(resource_manager);
     gbs::reset_runtime_telemetry();
@@ -845,15 +904,39 @@ gbs::RuntimeAdapterFrameResult update_luta_runtime(const gbs::RuntimeFrameContex
 #endif
     gbs::set_event_input_state(event_state, input.held, input.pressed, input.released);
     gbs::update_hud_behavior(event_state, true);
-    const bool script_active = update_luta_event_script(input);
-    if (!script_active && !dialogue.visible && state.round_state == gbs::LutaRoundState::InProgress) {
-        update_luta_controls(input);
-        update_luta_cpu();
-        gbs::tick_luta(state, project.stages[stage_index]);
+    bool overrides_default = false;
+    if (!dialogue.visible && gbs::update_button_event_bindings(event_state)) {
+        const int script_index = event_state.last_script;
+        const bool requested_override = event_state.last_button_binding_overrides_default;
+        event_state.last_script = -1;
+        event_state.last_button_binding_overrides_default = false;
+        if (script_index >= 0 && static_cast<size_t>(script_index) < project.script_count &&
+            gbs::has_event_script(project.scripts[script_index])) {
+            overrides_default = requested_override;
+            start_luta_event_script(project.scripts[script_index]);
+        }
     }
-    tick_luta_animation_states(project.stages[stage_index]);
+    const bool script_active = update_luta_event_script(input);
+    if (!script_active && !dialogue.visible && !overrides_default) {
+        // RoundEnd is the existing pause state. Handle Start outside the
+        // InProgress branch so the same button can resume the match.
+        if (input.was_pressed(gbs::ButtonStart) && state.round_state == gbs::LutaRoundState::RoundEnd) {
+            state.round_state = gbs::LutaRoundState::InProgress;
+        } else if (input.was_pressed(gbs::ButtonStart) && state.round_state == gbs::LutaRoundState::InProgress) {
+            gbs::luta_pause(state);
+        } else if (state.round_state == gbs::LutaRoundState::InProgress) {
+            update_luta_controls(input);
+            update_luta_cpu();
+            consume_luta_action_feedback(project.stages[stage_index]);
+            gbs::tick_luta(state, project.stages[stage_index]);
+        }
+    }
+    if (state.round_state != gbs::LutaRoundState::RoundEnd) {
+        tick_luta_animation_states(project.stages[stage_index]);
+    }
 
-    if (state.round_state != gbs::LutaRoundState::InProgress && !outcome_hook_started) {
+    if (state.round_state != gbs::LutaRoundState::InProgress &&
+        state.round_state != gbs::LutaRoundState::RoundEnd && !outcome_hook_started) {
         outcome_hook_started = true;
         const gbs::EventScript outcome_script = gbs::luta_outcome_script(
             project.stages[stage_index],
@@ -882,6 +965,7 @@ gbs::RuntimeAdapterFrameResult update_luta_runtime(const gbs::RuntimeFrameContex
 }
 
 void render_luta_runtime(const gbs::RuntimeFrameContext& context) {
+    const gbs::SubsystemProfilerScope profiler_scope(gbs::ProfilerSubsystem::Render);
     (void)context;
     draw_luta();
     sync_runtime_telemetry();

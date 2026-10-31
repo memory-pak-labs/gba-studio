@@ -118,6 +118,12 @@
   min-width: 0;
 }
 
+.studio-status-bar-spinner {
+  flex-shrink: 0;
+  height: 14px;
+  width: 14px;
+}
+
 .studio-status-bar-dot {
   background: var(--studio-color-ok);
   border-radius: var(--studio-radius-pill);

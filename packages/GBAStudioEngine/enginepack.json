@@ -1,7 +1,7 @@
 {
   "schema": 1,
   "name": "GBAStudioEnginePack",
-  "version": "2.26.0",
+  "version": "2.27.0",
   "version_file": "VERSION",
   "tools": {
     "assetc": "tools/assetc",
@@ -545,6 +545,7 @@
       "point_click_export_template"
     ],
     "shmup_runtime": [
+      "player_damage_event",
       "shmup_project_data_contract",
       "shmup_player_control",
       "shmup_player_projectiles",
@@ -608,6 +609,7 @@
       "menu_autosave_slot0",
       "menu_hud_screen_stack",
       "menu_back_navigation",
+      "menu_audio_feedback",
       "menu_dialogue_lines",
       "menu_item_scripts",
       "menu_text_input",
@@ -672,6 +674,10 @@
       "visual_effect_runtime_topdown",
       "visual_effect_runtime_platformer",
       "visual_effect_runtime_isometric",
+      "visibility_lantern",
+      "visibility_reveal",
+      "visibility_runtime_topdown",
+      "visibility_runtime_platformer",
       "display_mode_control",
       "render.video_composition",
       "affine_bg_transform",
@@ -944,6 +950,7 @@
     "topdown_runtime": [
       "advanced_tools_data",
       "camera_zones",
+      "paged_background",
       "native",
       "feature_modules",
       "inventory",
@@ -953,7 +960,14 @@
     "dialogue_portrait_assets": true,
     "dialogue_emote_assets": true,
     "dialogue_box_skin": true,
+    "dialogue_portrait_tab": true,
     "hud_box_skin": true,
+    "hud_runtime_text_profiles": true,
+    "hud_menu_selector": true,
+    "hud_project_value_bindings": true,
+    "hud_compact_text": true,
+    "hud_spaced_text": true,
+    "hud_foreground_images": true,
     "dialogue_font": true,
     "dialogue_choice_selector": true,
     "platformer_runtime": [
@@ -1016,6 +1030,8 @@
       "bg2_surface",
       "bg1_tactical_grid",
       "bg0_tactical_hud",
+      "paged_tactical_surface",
+      "compact_hud",
       "tactical_unit_states",
       "tactical_props",
       "tactical_feedback",
@@ -1058,7 +1074,17 @@
       "result_events",
       "racing_export_template"
     ],
+    "racing_challenge_progress": true,
+    "racing_save_resume": true,
+    "menu_hud_header": true,
+    "menu_text_bindings": true,
+    "menu_runtime_conditions": true,
+    "menu_hud_bindings": true,
+    "menu_page_navigation": true,
+    "menu_actor_visibility_conditions": true,
+    "topdown_run_profile": true,
     "battle_rpg_runtime": [
+      "player_damage_event",
       "battle_rpg_project_data_contract",
       "turn_progression",
       "target_selection",
@@ -1275,6 +1301,7 @@
       "runtime_audio_telemetry"
     ],
     "events": [
+      "named_animation_keys",
       "room_enter",
       "room_exit",
       "portal",
@@ -1310,6 +1337,7 @@
       "follow_camera",
       "lock_camera",
       "visual_effect",
+      "visibility",
       "call_script",
       "set_actor_visible",
       "set_actor_active",

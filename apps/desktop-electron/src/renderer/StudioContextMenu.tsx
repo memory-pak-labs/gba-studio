@@ -1,3 +1,4 @@
+import { uiText as ui, useStudioUiText } from "./studioUiText";
 import { useEffect, useRef } from "react";
 
 export interface StudioContextMenuState {
@@ -19,6 +20,7 @@ interface StudioContextMenuProps {
 }
 
 export function StudioContextMenu({ state, actions, onClose }: StudioContextMenuProps): React.ReactElement {
+  const ui = useStudioUiText();
   const menuRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
@@ -60,7 +62,7 @@ export function StudioContextMenu({ state, actions, onClose }: StudioContextMenu
       role="presentation"
     >
       <div
-        aria-label={`Ações para ${state.label}`}
+        aria-label={ui("Ações para {0}", { 0: ui(state.label) })}
         className="studio-context-menu"
         onPointerDown={(event) => event.stopPropagation()}
         ref={menuRef}
@@ -78,7 +80,7 @@ export function StudioContextMenu({ state, actions, onClose }: StudioContextMenu
             role="menuitem"
             type="button"
           >
-            {action.label}
+            {ui(action.label)}
           </button>
         ))}
       </div>

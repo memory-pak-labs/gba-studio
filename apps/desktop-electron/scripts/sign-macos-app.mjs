@@ -1,15 +1,40 @@
 import { execFile } from "node:child_process";
 import { existsSync } from "node:fs";
-import { createRequire } from "node:module";
-import { dirname, join } from "node:path";
+import { readFile } from "node:fs/promises";
+import { sign } from "@electron/osx-sign";
+import { dirname, join, resolve } from "node:path";
 import { promisify } from "node:util";
 import { fileURLToPath } from "node:url";
 
 const execFileAsync = promisify(execFile);
 const appRoot = dirname(dirname(fileURLToPath(import.meta.url)));
-const require = createRequire(import.meta.url);
-const { signAsync } = require("@electron/osx-sign");
 const localEntitlementsPath = join(appRoot, "build/entitlements.mac.local.plist");
+
+export function localSigningOptions(filePath) {
+  const isApp = filePath.endsWith(".app") || filePath.includes("/Contents/MacOS/");
+  const isBundledTool = filePath.includes("/Contents/Resources/")
+    && /\/(?:bin|libexec)\//.test(filePath)
+    && !/\.(?:dylib|so|node)(?:\.\d+)*$/.test(filePath);
+  return {
+    entitlements: isApp ? localEntitlementsPath : isBundledTool ? ["com.apple.security.cs.disable-library-validation"] : [],
+    hardenedRuntime: true,
+    timestamp: "none"
+  };
+}
+
+export async function signMacosAppAdHoc(appPath) {
+  await sign({
+    app: appPath,
+    identity: "-",
+    identityValidation: false,
+    platform: "darwin",
+    preAutoEntitlements: false,
+    preEmbedProvisioningProfile: false,
+    strictVerify: true,
+    ignore: JSON.parse(await readFile(join(appRoot, "package.json"), "utf8")).build.mac.signIgnore,
+    optionsForFile: localSigningOptions
+  });
+}
 
 function packagedAppPath() {
   return [
@@ -46,20 +71,7 @@ async function main() {
     return;
   }
 
-  await signAsync({
-    app: appPath,
-    identity: "-",
-    identityValidation: false,
-    platform: "darwin",
-    preAutoEntitlements: false,
-    preEmbedProvisioningProfile: false,
-    strictVerify: true,
-    optionsForFile: () => ({
-      entitlements: localEntitlementsPath,
-      hardenedRuntime: true,
-      timestamp: "none"
-    })
-  });
+  await signMacosAppAdHoc(appPath);
   await execFileAsync("codesign", ["--verify", "--deep", "--strict", "--verbose=2", appPath], {
     maxBuffer: 8 * 1024 * 1024
   });
@@ -68,7 +80,7 @@ async function main() {
   console.log(`[sign-macos-app] app: ${appPath}`);
 }
 
-main().catch((error) => {
+if (resolve(process.argv[1] ?? "") === fileURLToPath(import.meta.url)) main().catch((error) => {
   console.error("[sign-macos-app] failed");
   console.error(error);
   process.exit(1);

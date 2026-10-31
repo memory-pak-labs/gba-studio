@@ -4,6 +4,7 @@
 #include <stdint.h>
 #include "gbs/input.hpp"
 #include "gbs/types.hpp"
+#include "gbs/tile_edits.hpp"
 
 namespace gbs {
 
@@ -32,6 +33,7 @@ struct TileMap {
     int width;
     int height;
     const TileSlope* slopes = nullptr;
+    const RoomTileEdits* edits = nullptr;
 };
 
 struct Portal {
@@ -61,6 +63,9 @@ struct Actor {
     Vec2i collision_offset_pixels = Vec2i { 0, 0 };
     uint8_t push_priority = 0;
     bool pushable = false;
+    // Fractional diagonal travel; these two bytes fit the actor's existing padding.
+    uint8_t diagonal_step_remainder = 128;
+    bool allow_diagonal = true;
 };
 
 struct Camera {
@@ -143,6 +148,7 @@ constexpr bool actor_collision_groups_overlap(const Actor& mover, const Actor& b
         (blocker.collision_mask & mover_group) != 0;
 }
 bool rect_hits_any_blocking_actor(Rect rect, const Actor& mover, const Actor* actors, size_t actor_count);
+bool player_has_walk_path(const TileMap& map, const Actor& player, InputState input, const Actor* actors, size_t actor_count);
 uint8_t tile_flags_at(const TileMap& map, int tile_x, int tile_y);
 TileSlope tile_slope_at(const TileMap& map, int tile_x, int tile_y);
 uint8_t tile_flags_in_rect(const TileMap& map, Rect rect);

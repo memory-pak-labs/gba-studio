@@ -52,6 +52,19 @@ function graphNodesOverlap(nodes: Array<Pick<EventsWorkspaceGraphNode, "x" | "y"
 }
 
 describe("Events workspace presentation", () => {
+  it("keeps repeated command rows independent and refreshes their resource diagnostics after edits",()=>{
+    const data:GBAProjectData={events:[{name:"repeated",steps:[{command:"show_dialogue intro",isEnabled:true},{command:"show_dialogue intro",isEnabled:true}]}],dialogues:[]};
+    const steps=deriveEventsWorkspacePresentation(data).groups.flatMap(g=>g.events)[0]!.steps;
+    expect(steps[0]!.missingReferences).toHaveLength(1);
+    steps[0]!.missingReferences.push("modified");
+    expect(steps[1]!.missingReferences).toHaveLength(1);
+    steps[0]!.commandParameters[0]!.options.push("modified");
+    expect(steps[1]!.commandParameters[0]!.options).not.toContain("modified");
+    data.dialogues=[{key:"intro",text:"Ready"}];
+    const refreshed=deriveEventsWorkspacePresentation(data).groups.flatMap(g=>g.events)[0]!;
+    expect(refreshed.missingReferences).toEqual([]);
+    expect(refreshed.steps.every(s=>s.missingReferences.length===0)).toBe(true);
+  });
   it("creates independent event copies when a behavior is applied to an actor group", () => {
     const result = createBoundEventsForTargetsInProject({
       actors: [{ name: "Guide" }, { name: "Merchant" }],
@@ -425,6 +438,22 @@ describe("Events workspace presentation", () => {
     expect(describeEventFlow(event)).toBe(
       "Executa 3 passos: exibe o diálogo intro; verifica score; e quando a condição for verdadeira, chama o evento reward."
     );
+  });
+
+  it("recognizes the player alias in visibility preset actor fields", () => {
+    const presentation = deriveEventsWorkspacePresentation({
+      actors: [{ name: "Player" }, { name: "Guide" }],
+      events: [{ id: "visibility", name: "visibility", category: "Cena", steps: [
+        { command: "lantern player 80 64 75 240" },
+        { command: "reveal_area player 24 24 100 120" }
+      ] }]
+    });
+    const event = presentation.groups.flatMap(group => group.events).find(item => item.id === "visibility")!;
+    for (const step of event.steps) {
+      expect(step.commandParameters[0]).toMatchObject({
+        value: "player", options: ["player", "Player", "Guide"], isKnownValue: true
+      });
+    }
   });
 
   it("derives command cards and editable parameters for the ROM-ready registry", () => {
@@ -1486,11 +1515,10 @@ describe("Events workspace presentation", () => {
     const roomNode = presentation.graphNodes.find((node) => node.targetName === "room_1");
     const battleNode = presentation.graphNodes.find((node) => node.targetName === "arena");
     const playerNode = presentation.graphNodes.find((node) => node.targetName === "Player");
-    expect(roomNode?.contextBindingSlots.map((slot) => slot.bindingKey)).toEqual(["onInit", "onHitPlayer", "onExit", "onInteract"]);
-    expect(roomNode?.pendingBindingCount).toBe(5);
-    expect(battleNode?.contextBindingSlots.map((slot) => slot.bindingKey)).toEqual(["onInit", "onVictory", "onDefeat", "onEscape"]);
-    expect(battleNode?.contextBindingSlots.some((slot) => slot.bindingKey === "onHitPlayer")).toBe(false);
-    expect(battleNode?.pendingBindingCount).toBe(4);
+    expect(roomNode?.contextBindingSlots.map((slot) => slot.bindingKey)).toEqual(["onInit", "onRestore", "onHitPlayer", "onExit", "onInteract"]);
+    expect(roomNode?.pendingBindingCount).toBe(6);
+    expect(battleNode?.contextBindingSlots.map((slot) => slot.bindingKey)).toEqual(["onInit", "onVictory", "onDefeat", "onEscape", "onHitPlayer"]);
+    expect(battleNode?.pendingBindingCount).toBe(5);
     expect(presentation.bindingTargets.map((target) => target.id)).not.toContain("room:arena:onHitGroup3");
     expect(presentation.bindingTargets.map((target) => target.id)).not.toContain("room:arena:onHitGroup2");
     expect(playerNode?.contextBindingSlots.find((slot) => slot.bindingKey === "onInteract")?.eventName).toBe("player_start");
@@ -1751,8 +1779,8 @@ describe("Events workspace presentation", () => {
         bindingKeys: ["onInit", "onExit"],
         boundEventNames: ["room_boot", "missing_event"],
         missingReferenceCount: 1,
-        pendingBindingCount: 4,
-        flowLabels: ["Cena", "4 pendentes"]
+        pendingBindingCount: 5,
+        flowLabels: ["Cena", "5 pendentes"]
       }),
       expect.objectContaining({
         id: "context-room-shop",
@@ -1765,8 +1793,8 @@ describe("Events workspace presentation", () => {
         bindingKeys: [],
         boundEventNames: [],
         missingReferenceCount: 0,
-        pendingBindingCount: 6,
-        flowLabels: ["Cena", "6 pendentes"]
+        pendingBindingCount: 7,
+        flowLabels: ["Cena", "7 pendentes"]
       }),
       expect.objectContaining({
         id: "event-room",

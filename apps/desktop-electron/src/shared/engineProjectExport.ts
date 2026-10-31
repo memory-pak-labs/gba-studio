@@ -1,3 +1,5 @@
+import { memoizeEngineExport } from "./engineExportContext.js";
+import { sceneChangeCommandParts } from "./sceneChangeCommand.js";
 import { spriteColorModeForSheet } from "./spriteColorDepth.js";
 import { decomposeGbaMetaspriteFrame } from "./gbaMetaspriteLayout.js";
 import { resolveAudioInstrumentComposition } from "./audioInstruments.js";
@@ -29,6 +31,7 @@ import {
   type ScenePaletteBankPolicy
 } from "./paletteContract.js";
 import {
+  isometricScreenFacingDirection,
   isSpriteAnimationType,
   normalizeSpriteStateSlots,
   resolveSpriteStateForActor,
@@ -92,6 +95,10 @@ function projectArray(data: GBAProjectData, key: string): Record<string, unknown
 }
 
 function projectRooms(data: GBAProjectData): Record<string, unknown>[] {
+  return memoizeEngineExport(data, "shared.projectRooms", () => projectRoomsUncached(data));
+}
+
+function projectRoomsUncached(data: GBAProjectData): Record<string, unknown>[] {
   const scenas = projectArray(data, "scenas");
   if (scenas.length > 0) return scenas;
 
@@ -130,6 +137,10 @@ export function engineEventBackgroundGroupName(room: Record<string, unknown>, in
 }
 
 function eventBackgroundAssetNames(data: GBAProjectData): string[] {
+  return memoizeEngineExport(data, "shared.eventBackgroundAssetNames", () => eventBackgroundAssetNamesUncached(data));
+}
+
+function eventBackgroundAssetNamesUncached(data: GBAProjectData): string[] {
   return [...new Set(projectArray(data, "events").flatMap(event => {
     const steps = Array.isArray(event.steps) ? recordArray(event, "steps") : [event];
     return steps.filter(step => step.isEnabled !== false).flatMap(step => {
@@ -149,6 +160,7 @@ interface AssetcSceneBankFields {
 }
 
 interface AssetcTilesetPlacement {
+  bg_palette_colors?: {start:number};
   bg_tiles: { start: number };
 }
 
@@ -282,6 +294,10 @@ export function engineUsedHudPresetIDs(data: GBAProjectData): Set<string> {
 }
 
 function hudSceneGroupsByIcon(data: GBAProjectData): ReadonlyMap<string, readonly string[]> {
+  return memoizeEngineExport(data, "shared.hudSceneGroupsByIcon", () => hudSceneGroupsByIconUncached(data));
+}
+
+function hudSceneGroupsByIconUncached(data: GBAProjectData): ReadonlyMap<string, readonly string[]> {
   const projectSettings = settings(data);
   const presets = recordArray(projectSettings ?? {}, "hudPresets");
   const groupsByIcon = new Map<string, string[]>();
@@ -292,9 +308,9 @@ function hudSceneGroupsByIcon(data: GBAProjectData): ReadonlyMap<string, readonl
   );
   const requestedActiveID = nullableStringField(projectSettings, "hudPresetId") || "hud-default";
   const activePreset = presetByID.get(requestedActiveID) ?? presets[0];
-  const iconsByPreset = new Map(presets.map((preset) => [preset, recordArray(preset, "components")
+  const iconsByPreset = new Map(presets.map((preset) => [preset, [nullableStringField(preset, "selectorImage"), ...recordArray(preset, "components")
     .filter((component) => ["icon", "frame", "bar"].includes(nullableStringField(component, "kind")) && nullableStringField(component, "asset"))
-    .flatMap((component) => [nullableStringField(component, "asset"), nullableStringField(child(component,"gauge"),"emptyAsset"), ...(Array.isArray(component.stateAssets) ? component.stateAssets.filter((v):v is string => typeof v === "string") : [])].filter(Boolean))]));
+    .flatMap((component) => [nullableStringField(component, "asset"), nullableStringField(child(component,"gauge"),"emptyAsset"), ...(Array.isArray(component.stateAssets) ? component.stateAssets.filter((v):v is string => typeof v === "string") : [])])].filter(Boolean)]));
   projectRooms(data).forEach((room, index) => {
     const presetIDs = hudPresetIDsInValue(room);
     if (presetIDs.size === 0 && activePreset && !usesBlankPlayerDefaults(data)) presetIDs.add(nullableStringField(activePreset, "id"));
@@ -458,8 +474,8 @@ function sceneBankFieldsForAsset(
       const runtimeConfig = nullableStringField(runtime, "type") === "menu"
         ? child(runtime, "config")
         : undefined;
-      const lutaHudName = nullableStringField(runtime, "type") === "luta"
-        ? nullableStringField(child(runtime, "config"), "hudAssetName")
+      const lutaHudName = ["luta", "battleRpg", "dungeonCrawler"].includes(nullableStringField(runtime, "type"))
+        ? (nullableStringField(child(runtime, "config"), "hudAssetName") || nullableStringField(child(child(runtime,"config"),"presentation"),"hudAssetName"))
         : "";
       const menuOverlayNames = runtimeConfig
         ? [
@@ -517,7 +533,7 @@ function sceneBankFieldsForAsset(
       ...rooms.map((room) => nullableStringField(room, "playerActorName")).filter(Boolean)
     ]);
     projectArray(data, "actors").forEach((actor) => {
-      if (nullableStringField(actor, "spriteSheet") !== assetName) return;
+      if (nullableStringField(actor, "spriteSheet") !== assetName && !Object.values(child(actor,"dungeonDepthSheets")??{}).includes(assetName)) return;
       const actorName = nullableStringField(actor, "name");
       const actorRoom = nullableStringField(actor, "roomName");
       const configuredPlayerEntries = roomEntries.filter((entry, index) => (
@@ -558,7 +574,7 @@ function sceneBankFieldsForAsset(
         .filter((entry) => entry === actorRoomEntry)
         .forEach((entry) => groups.add(entry.group));
     });
-    if (["playerSprite", "projectileSprite", "enemyProjectileSprite", "enemySprite"].some((key) => (
+    if (["playerSprite", "playerExplosionSprite", "projectileSprite", "enemyProjectileSprite", "enemySprite"].some((key) => (
       nullableStringField(shmup, key) === assetName
     ))) {
       rooms.forEach((room, index) => {
@@ -580,6 +596,14 @@ function sceneBankFieldsForAsset(
     tacticalPageGroups.shared.forEach((group) => groups.add(group));
   } else {
     tacticalSurfacePageBankGroupsForAsset(data, assetName).objects.forEach((group) => groups.add(group));
+    rooms.forEach((room,index)=>{
+      const config=child(child(room,"runtime"),"config"),presentation=child(config,"tacticalPresentation");
+      if(!presentation)return;
+      const refs=[...recordArray(presentation,"units").flatMap(unit=>[nullableStringField(unit,"sheet"),nullableStringField(unit,"portrait")]),
+        ...recordArray(presentation,"assets").filter(asset=>asset.consumer==="obj").flatMap(asset=>[nullableStringField(asset,"path"),nullableStringField(asset,"id")]),
+        ...Object.values(child(presentation,"compactHud")??{})];
+      if(refs.some(ref=>typeof ref==="string" && ref.split("#",1)[0]===assetName))groups.add(engineSceneResourceBankGroupName(room,index));
+    });
   }
 
   // Replacements use independent residency groups; never reserve all BGs at once.
@@ -797,7 +821,7 @@ function eventSteps(event: Record<string, unknown>): Record<string, unknown>[] {
 }
 
 function commandParts(command: string): string[] {
-  return command.split(/\s+/).filter(Boolean);
+  return sceneChangeCommandParts(command);
 }
 
 function integerPart(value: string | undefined, fallback: number): number {
@@ -1035,12 +1059,12 @@ export function deriveAudioEngineExportDiagnostics(audioItems: Record<string, un
       });
     }
 
-    if (bpm > 0 && (bpm < 40 || bpm > 240)) {
+    if (bpm > 0 && (bpm < 40 || bpm > (kind === "SFX" ? 360 : 240))) {
       diagnostics.push({
         audioID,
         audioName,
         level: "warning",
-        message: `BPM ${bpm} fora da faixa 40-240 recomendada pela engine subset.`
+        message: `BPM ${bpm} fora da faixa 40-${kind === "SFX" ? 360 : 240} recomendada pela engine subset.`
       });
     }
 
@@ -3409,8 +3433,8 @@ function roomReferencesTileset(room: Record<string, unknown>, assetName: string)
 function roomReferencesPaletteAsset(room: Record<string, unknown>, assetName: string): boolean {
   if (roomReferencesTileset(room, assetName)) return true;
   const runtime = child(room, "runtime");
-  return nullableStringField(runtime, "type") === "luta"
-    && nullableStringField(child(runtime, "config"), "hudAssetName") === assetName;
+  return ["luta", "battleRpg", "dungeonCrawler"].includes(nullableStringField(runtime, "type"))
+    && (nullableStringField(child(runtime, "config"), "hudAssetName") || nullableStringField(child(child(runtime,"config"),"presentation"),"hudAssetName")) === assetName;
 }
 
 export function backgroundPaletteBankPolicyForAsset(
@@ -3509,6 +3533,10 @@ export interface AssetcPaletteFamilyPackGeneration {
 }
 
 export function buildAssetcPaletteFamilyPackGeneration(data: GBAProjectData): AssetcPaletteFamilyPackGeneration | null {
+  return memoizeEngineExport(data, "shared.buildAssetcPaletteFamilyPackGeneration", () => buildAssetcPaletteFamilyPackGenerationUncached(data));
+}
+
+function buildAssetcPaletteFamilyPackGenerationUncached(data: GBAProjectData): AssetcPaletteFamilyPackGeneration | null {
   const families = exportPaletteFamilies(data);
   if (families.length === 0) return null;
 
@@ -3546,6 +3574,10 @@ export function buildAssetcPaletteFamilyPackGeneration(data: GBAProjectData): As
 }
 
 export function buildAssetcAudioPackGeneration(data: GBAProjectData): AssetcAudioPackGeneration | null {
+  return memoizeEngineExport(data, "shared.buildAssetcAudioPackGeneration", () => buildAssetcAudioPackGenerationUncached(data));
+}
+
+function buildAssetcAudioPackGenerationUncached(data: GBAProjectData): AssetcAudioPackGeneration | null {
   const tracker: AssetcAudioJsonDocument["tracker"] = [];
   const pcm: AssetcAudioJsonDocument["pcm"] = [];
   const sfx: AssetcAudioJsonDocument["sfx"] = [];
@@ -3609,7 +3641,7 @@ export function buildAssetcAudioPackGeneration(data: GBAProjectData): AssetcAudi
     const loops = booleanField(audio, "loops", false);
     const fileName = stringField(asset, "name", name).replace(/^.*[\\/]/, "");
     const output = `assets/audio/${normalizeIdentifier(fileName.replace(/\.[a-z0-9]+$/i, ""), exportID)}${fileName.match(/\.[a-z0-9]+$/i)?.[0].toLowerCase() ?? ""}`;
-    const audioReference = fileName;
+    const audioReference = output.slice("assets/audio/".length);
 
     sourceCopies.push({
       id: stringField(asset, "id", `asset-${index + 1}`),
@@ -3692,7 +3724,7 @@ export interface AssetcSpriteAnimationExportEntry {
   frame_metasprites?: AssetcFrameMetaspriteExport[];
 }
 
-export type AssetcLutaAnimationState = "idle" | "attack" | "special" | "guard" | "hurt";
+export type AssetcLutaAnimationState = "idle" | "attack" | "special" | "guard" | "hurt" | "walk" | "jump";
 
 export type AssetcLutaAnimationExport = Omit<AssetcSpriteAnimationExportEntry, "name">;
 
@@ -3703,6 +3735,8 @@ export interface AssetcLutaAnimationSetExport {
   special?: AssetcLutaAnimationExport;
   guard?: AssetcLutaAnimationExport;
   hurt?: AssetcLutaAnimationExport;
+  walk?: AssetcLutaAnimationExport;
+  jump?: AssetcLutaAnimationExport;
 }
 
 export interface AssetcMetaspritePartExport {
@@ -3726,6 +3760,7 @@ export interface AssetcActorSpriteExportFields {
   animation: string | { asset: string };
   animations?: AssetcSpriteAnimationExportEntry[];
   luta_animation_set?: AssetcLutaAnimationSetExport;
+  battle_rpg_animation_set?: Partial<Record<BattleRpgAnimationState, AssetcLutaAnimationExport>>;
   emit_animation_fallback: false;
 }
 
@@ -3774,6 +3809,7 @@ function uniqueSpriteSheetsFromActors(data: GBAProjectData, hudGroups: ReadonlyM
   projectArray(data, "actors").forEach((actor) => {
     const spriteSheet = nullableStringField(actor, "spriteSheet");
     if (spriteSheet) sheets.add(spriteSheet);
+    Object.values(child(actor,"dungeonDepthSheets")??{}).forEach(value=>{if(typeof value==="string")sheets.add(value);});
   });
   projectArray(data, "events").forEach((event) => {
     const steps = Array.isArray(event.steps) ? event.steps.filter(isRecord) : [];
@@ -3850,19 +3886,8 @@ function spriteStateContracts(data: GBAProjectData): SpriteStateContract[] {
   });
 }
 
-const TOPDOWN_IDLE_ANIMATION_ORDER = ["idle_down", "idle_up", "idle_right", "idle_left"] as const;
-const TOPDOWN_WALK_ANIMATION_ORDER = ["walk_down", "walk_up", "walk_right", "walk_left"] as const;
-
 export function sortTopdownSpriteAnimationsForExport(animations: Record<string, unknown>[]): Record<string, unknown>[] {
-  const hasWalk = animations.some((animation) => stringField(animation, "name", "").startsWith("walk_"));
-  const order = hasWalk
-    ? [
-      ...TOPDOWN_IDLE_ANIMATION_ORDER.slice(0, 3),
-      ...TOPDOWN_WALK_ANIMATION_ORDER.slice(0, 3),
-      "idle_left",
-      "walk_left"
-    ]
-    : [...TOPDOWN_IDLE_ANIMATION_ORDER];
+  const order = SPRITE_ANIMATION_SLOT_ORDER.map((slot) => slot.replace("moving_", "walk_"));
   const rank = new Map(order.map((name, index) => [name, index]));
   return [...animations].sort((left, right) => {
     const leftRank = rank.get(stringField(left, "name", "")) ?? 999;
@@ -3958,9 +3983,7 @@ function metaspriteIndexForAnimationFrame(
   const frameHeight = positiveSpriteInteger(animation.frameHeight, spriteHeight);
   const sheetSize = inferSpriteSheetImageSize(data, spriteSheet, frameWidth, frameHeight);
   const frames = Array.isArray(animation.frames) ? animation.frames.filter(isRecord) : [];
-  const normalizedIndex = frames.length > 0
-    ? ((Math.floor(frameIndex) % frames.length) + frames.length) % frames.length
-    : Math.max(0, Math.floor(frameIndex));
+  const normalizedIndex = Math.max(0, Math.floor(frameIndex));
   const frame = isRecord(frames[normalizedIndex]) ? frames[normalizedIndex] : {};
   const tiles = Array.isArray(frame.tiles) ? frame.tiles.filter(isRecord) : [];
   const firstTile = tiles[0];
@@ -4113,7 +4136,7 @@ function buildSpriteAnimationExportEntry(
     const frameWidth = positiveSpriteInteger(animation.frameWidth, spriteWidth);
     const frameHeight = positiveSpriteInteger(animation.frameHeight, spriteHeight);
     const frames = Array.isArray(animation.frames) ? animation.frames.filter(isRecord) : [];
-    const frameCount = frames.length > 0 ? frames.length : positiveSpriteInteger(animation.frameCount, 1);
+    const frameCount = positiveSpriteInteger(animation.frameCount, frames.length || 1);
     const animationOriginX = signedSpriteInteger(animation.originX, 0);
     const animationOriginY = signedSpriteInteger(animation.originY, 0);
     const frameParts = Array.from({ length: frameCount }, (_item, frameIndex) => {
@@ -4225,7 +4248,7 @@ function buildSpriteAnimationExportEntries(
     throw new Error(`SpriteState ${spriteState.name} nao preenche os slots: ${normalized.missingSlots.join(", ")}.`);
   }
 
-  return SPRITE_ANIMATION_SLOT_ORDER.map((slot) => {
+  const directional = SPRITE_ANIMATION_SLOT_ORDER.map((slot) => {
     const resolved = normalized.slots[slot];
     const record = resolved.animationID ? recordsByID.get(resolved.animationID) : undefined;
     if (!record) throw new Error(`SpriteState ${spriteState.name} referencia uma animacao ausente no slot ${slot}.`);
@@ -4241,6 +4264,32 @@ function buildSpriteAnimationExportEntries(
       resolved.flipX
     );
   });
+  if (directionAdapter === "topdown") {
+    const runs = ["down", "right", "up", "left"].map(direction =>
+      animations.find(animation => stringField(animation, "name", "") === `run_${direction}`
+        && spriteState.animationIDs.includes(stringField(animation, "id", ""))));
+    if (runs.some(Boolean)) {
+      if (runs.some(animation => !animation)) throw new Error(`SpriteState ${spriteState.name} precisa das quatro direcoes de corrida.`);
+      directional.push(...runs.map(animation => buildSpriteAnimationExportEntry(
+        data, spriteSheet, spriteWidth, spriteHeight, packAssetName,
+        animation!, animations.indexOf(animation!), stringField(animation!, "name", "")
+      )));
+    }
+  }
+
+  // Native movement uses the leading directional slots. Events also address
+  // authored clip names, including fixed-state clips such as "off" and "on".
+  const exportedNames = new Set(directional.map(animation => animation.name));
+  for (const [index, animation] of animations.entries()) {
+    const id = nullableStringField(animation, "id") || `animation-${index + 1}`;
+    const name = stringField(animation, "name", `animation_${index + 1}`);
+    if (!spriteState.animationIDs.includes(id) || exportedNames.has(name)) continue;
+    directional.push(buildSpriteAnimationExportEntry(
+      data, spriteSheet, spriteWidth, spriteHeight, packAssetName, animation, index, name
+    ));
+    exportedNames.add(name);
+  }
+  return directional;
 }
 
 function buildIsometricTacticalAnimationExportEntries(
@@ -4358,6 +4407,30 @@ export function buildActorEngineSpriteExport(
     options.directionAdapter ?? "topdown",
     options.preserveAuthoredAnimations
   );
+  if (options.directionAdapter === "isometric") {
+    const spriteState = resolveSpriteStateForActor(spriteStateContracts(data), {
+      animationStateID: nullableStringField(actor, "animationStateID"), spriteSheet
+    });
+    const allowed = spriteState ? new Set(spriteState.animationIDs) : null;
+    const records = animationsForSpriteSheet(data, spriteSheet);
+    const names = new Set(baseAnimations.map((entry) => entry.name));
+    for (const [index, animation] of records.entries()) {
+      const id = nullableStringField(animation, "id") || `animation-${index + 1}`;
+      if (allowed && !allowed.has(id)) continue;
+      const direction = isometricScreenFacingDirection({
+        id, name: nullableStringField(animation, "name") ?? undefined, direction: nullableStringField(animation, "direction")
+      });
+      const state = stringField(animation, "state", "").toLowerCase();
+      const name = stringField(animation, "name", "").toLowerCase();
+      const motion = /^(walk|walking|move|moving|run|running)$/.test(state) || /^(walk|move|moving|run)[_-]/.test(name)
+        ? "walk" : state === "idle" || name.startsWith("idle_") ? "idle" : null;
+      if (!direction || !motion) continue;
+      const alias = `${motion}_screen_${direction}`;
+      if (names.has(alias)) continue;
+      baseAnimations.push(buildSpriteAnimationExportEntry(data, spriteSheet, spriteWidth, spriteHeight, packAsset.name, animation, index, alias));
+      names.add(alias);
+    }
+  }
   const tacticalAnimations = options.includeIsometricTacticalAnimations
     ? buildIsometricTacticalAnimationExportEntries(
       data,
@@ -4408,7 +4481,9 @@ export function buildActorEngineSpriteExport(
   return fields;
 }
 
-const LUTA_ANIMATION_STATES: AssetcLutaAnimationState[] = ["idle", "attack", "special", "guard", "hurt"];
+export type BattleRpgAnimationState = "idle" | "attack" | "magic" | "heal" | "defend" | "hurt" | "defeat" | "victory" | "reactivate";
+
+const LUTA_ANIMATION_STATES: AssetcLutaAnimationState[] = ["idle", "attack", "special", "guard", "hurt", "walk", "jump"];
 
 /**
  * Builds the explicit animation map used only by the native Luta runtime.
@@ -4470,7 +4545,60 @@ export function buildLutaActorEngineSpriteExport(
   return { ...base, luta_animation_set: animationSet };
 }
 
+export function buildBattleRpgActorEngineSpriteExport(
+  data: GBAProjectData,
+  actor: Record<string, unknown>,
+  spritePack: AssetcSpritePackGeneration | null
+): AssetcActorSpriteExportFields | null {
+  const base = buildActorEngineSpriteExport(data, actor, spritePack);
+  if (!base) return null;
+
+  const rawConfig = actor.battleAnimations;
+  if (rawConfig === undefined) return base;
+  if (!isRecord(rawConfig)) {
+    throw new Error("Actor battleAnimations precisa ser um objeto quando configurado.");
+  }
+
+  const spriteSheet = nullableStringField(actor, "spriteSheet");
+  const animations = animationsForSpriteSheet(data, spriteSheet);
+  const { spriteWidth, spriteHeight } = resolveSpriteSheetDimensions(data, spriteSheet);
+  const packAsset = base.metasprite.asset;
+  const animationSet: Partial<Record<BattleRpgAnimationState, AssetcLutaAnimationExport>> = {};
+
+  (["idle", "attack", "magic", "heal", "defend", "hurt", "defeat", "victory", "reactivate"] as BattleRpgAnimationState[]).forEach((state) => {
+    const sourceName = rawConfig[state];
+    if (sourceName === undefined || sourceName === null || sourceName === "") return;
+    if (typeof sourceName !== "string" || sourceName.trim().length === 0) {
+      throw new Error(`Actor battleAnimations.${state} precisa ser o nome ou id de uma animacao.`);
+    }
+    const sourceIndex = animations.findIndex((animation, index) => (
+      animationMatchesActorExport(animation, index, spriteSheet, sourceName.trim())
+    ));
+    if (sourceIndex < 0) {
+      throw new Error(`Actor battleAnimations.${state} referencia uma animacao ausente: ${sourceName}.`);
+    }
+    const sourceAnimation = animations[sourceIndex];
+    const { name: _name, ...entry } = buildSpriteAnimationExportEntry(
+      data,
+      spriteSheet,
+      spriteWidth,
+      spriteHeight,
+      packAsset,
+      sourceAnimation,
+      sourceIndex,
+      state
+    );
+    animationSet[state] = entry;
+  });
+
+  return { ...base, battle_rpg_animation_set: animationSet };
+}
+
 export function buildAssetcSpritePackGeneration(data: GBAProjectData): AssetcSpritePackGeneration | null {
+  return memoizeEngineExport(data, "shared.buildAssetcSpritePackGeneration", () => buildAssetcSpritePackGenerationUncached(data));
+}
+
+function buildAssetcSpritePackGenerationUncached(data: GBAProjectData): AssetcSpritePackGeneration | null {
   const hudGroups = hudSceneGroupsByIcon(data);
   const spriteSheets = uniqueSpriteSheetsFromActors(data, hudGroups);
   if (spriteSheets.length === 0) return null;
@@ -4601,6 +4729,7 @@ export interface AssetcPortraitPackAsset extends AssetcSceneBankFields {
   png: string;
   sprite_width: number;
   sprite_height: number;
+  sprite_bpp?: 8;
   header: string;
   symbol: string;
   portraitName: string;
@@ -4657,6 +4786,7 @@ export function buildAssetcPortraitPackGeneration(
       png: output,
       sprite_width: spriteWidth,
       sprite_height: spriteHeight,
+      ...(spriteColorModeForSheet(data, portraitName) === "8bpp" ? { sprite_bpp: 8 as const } : {}),
       header: `${assetId}.hpp`,
       symbol: assetId,
       portraitName,
@@ -4782,7 +4912,7 @@ export function uniqueDialogueEmoteNames(data: GBAProjectData): string[] {
     steps.forEach((step) => {
       const command = nullableStringField(step, "command");
       if (!command) return;
-      const parts = command.split(/\s+/).filter(Boolean);
+      const parts = commandParts(command);
       if (parts[0] === "show_actor_gesture" && parts[2]) names.add(parts[2]);
     });
   });
@@ -5024,9 +5154,9 @@ function uniqueTilesetsFromRooms(data: GBAProjectData): string[] {
         if (backgroundAssetName) tilesets.add(backgroundAssetName);
       });
     }
-    if (nullableStringField(runtime, "type") === "luta") {
+    if (["luta", "battleRpg", "dungeonCrawler"].includes(nullableStringField(runtime, "type"))) {
       const config = child(runtime, "config");
-      const hudAssetName = nullableStringField(config, "hudAssetName");
+      const hudAssetName = nullableStringField(config, "hudAssetName") || nullableStringField(child(config,"presentation"),"hudAssetName");
       if (hudAssetName) tilesets.add(hudAssetName);
     }
     if (nullableStringField(runtime, "type") === "isometric") {
@@ -5080,10 +5210,18 @@ function uniqueTilesetsForPack(data: GBAProjectData): string[] {
 }
 
 export function buildAssetcTilesetPackGeneration(data: GBAProjectData): AssetcTilesetPackGeneration | null {
+  return memoizeEngineExport(data, "shared.buildAssetcTilesetPackGeneration", () => buildAssetcTilesetPackGenerationUncached(data));
+}
+
+function buildAssetcTilesetPackGenerationUncached(data: GBAProjectData): AssetcTilesetPackGeneration | null {
   const tilesetNames = uniqueTilesetsForPack(data);
   if (tilesetNames.length === 0) return null;
 
   const affineFloorAssets = racingPseudo3dFloorAssetNames(data);
+  const pagedSurfaceAssets = new Set(projectArray(data,"rooms").flatMap(room => {
+    const surface=child(child(child(room,"runtime"),"config"),"pagedSurface");
+    return surface ? [nullableStringField(surface,"backgroundAsset"),nullableStringField(surface,"foregroundAsset")].filter(Boolean) : [];
+  }));
 
   const packAssets: AssetcTilesetPackAsset[] = [];
   const assetsBySheet: Record<string, AssetcTilesetPackAsset> = {};
@@ -5099,7 +5237,7 @@ export function buildAssetcTilesetPackGeneration(data: GBAProjectData): AssetcTi
     const isAffineAsset = affineFloorAssets.has(tilesetName)
       || metadataKind === "affine_bg"
       || assetKind === "affine_bg";
-    const isPagedBackground = metadataKind === "paged_bg" || assetKind === "paged_bg";
+    const isPagedBackground = pagedSurfaceAssets.has(tilesetName) || metadataKind === "paged_bg" || assetKind === "paged_bg";
     const isIndexedIsometricSource = isPagedBackground || metadataKind === "indexed_bg"
       || assetKind === "indexed_bg";
     const colorMode = nullableStringField(asset, "colorMode") || nullableStringField(metadata, "colorMode");
@@ -5109,7 +5247,7 @@ export function buildAssetcTilesetPackGeneration(data: GBAProjectData): AssetcTi
       : isIndexedIsometricSource
         ? ["8bpp-indexed"]
         : ["4bpp"];
-    if (normalizedColorMode && !validColorModes.includes(normalizedColorMode)) {
+    if (normalizedColorMode && !validColorModes.includes(normalizedColorMode) && !(pagedSurfaceAssets.has(tilesetName) && normalizedColorMode === "4bpp")) {
       const expectedColorMode = isAffineAsset
         ? "4bpp or 8bpp-affine"
         : isIndexedIsometricSource
@@ -5169,6 +5307,7 @@ export function buildAssetcTilesetPackGeneration(data: GBAProjectData): AssetcTi
         background_palette_reference_colors: paletteFamily.background.map(rgb555ToRgb888)
       } : {}),
       ...(pointClickPlacement ? { placement: pointClickPlacement } : {}),
+      ...(Number.isInteger(metadata?.backgroundTileStart) ? {placement:{bg_tiles:{start:Number(metadata!.backgroundTileStart)},...(Number.isInteger(metadata?.backgroundPaletteStart)?{bg_palette_colors:{start:Number(metadata!.backgroundPaletteStart)}}:{})}} : {}),
       png: output,
       header: `${assetId}.hpp`,
       symbol: assetId,

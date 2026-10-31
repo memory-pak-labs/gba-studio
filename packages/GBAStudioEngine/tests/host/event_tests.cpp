@@ -144,6 +144,49 @@ void test_ready_system_event_ops_update_runtime_state() {
     assert(state.player_bounce_frames == 20);
 }
 
+void test_bound_clock_restores_and_updates_saved_minutes() {
+    gbs::EventState state {};
+    gbs::init_event_state(state);
+    state.variables[16] = 1439;
+    const gbs::EventCommand start[] = {{gbs::EventOp::StartGameClock, 1, 3, 0, 17}};
+    gbs::run_event_script(state, start, 1);
+    assert(state.clock_minute == 1439);
+    for (int i = 0; i < 3; ++i) gbs::tick_event_frame_counter(state);
+    assert(state.clock_minute == 0 && state.variables[16] == 0);
+    const gbs::EventCommand advance[] = {{gbs::EventOp::AdvanceTime, 1080, 0, 0}};
+    gbs::run_event_script(state, advance, 1);
+    assert(state.variables[16] == 1080);
+    gbs::EventState restored {};
+    gbs::init_event_state(restored);
+    restored.variables[16] = state.variables[16];
+    gbs::run_event_script(restored, start, 1);
+    assert(restored.clock_minute == 1080);
+    for (int i = 0; i < 3; ++i) gbs::tick_event_frame_counter(restored);
+    assert(restored.variables[16] == 1081);
+}
+
+void test_scene_fades_respect_saved_music_volume_and_mute() {
+    gbs::EventState state {}; gbs::init_event_state(state);
+    const gbs::EventCommand fade[] = {{gbs::EventOp::FadeAudioVolume, 0, 11, 30, 17}};
+    state.variables[16] = 50;
+    gbs::run_event_script(state, fade, 1);
+    assert(state.audio_fade_target_volume == 6);
+    assert(state.audio_fade_ceiling_volume == 8);
+    state.variables[16] = 0;
+    gbs::run_event_script(state, fade, 1);
+    assert(state.audio_fade_target_volume == 0);
+    assert(state.audio_fade_ceiling_volume == 0);
+    const gbs::EventCommand with_master[] = {{gbs::EventOp::FadeAudioVolume, 0, 11, 30, 17 | (18 << 8)}};
+    state.variables[16] = 50; state.variables[17] = 50;
+    gbs::run_event_script(state, with_master, 1);
+    assert(state.audio_fade_target_volume == 3);
+    assert(state.audio_fade_ceiling_volume == 4);
+    state.variables[17] = 0;
+    gbs::run_event_script(state, with_master, 1);
+    assert(state.audio_fade_target_volume == 0);
+    assert(state.audio_fade_ceiling_volume == 0);
+}
+
 void test_player_event_commands_apply_to_reserved_player_slot() {
     gbs::EventState state {};
     gbs::init_event_state(state);
@@ -900,6 +943,34 @@ void test_engine_field_commands_store_and_gate_runtime_state() {
     assert(state.player_x == 9);
 }
 
+void test_equipment_and_timer_fields_follow_native_state() {
+    gbs::EventState state {};
+    gbs::init_event_state(state);
+    const gbs::EventCommand empty[] = {{gbs::EventOp::StoreEngineField, 6, 0, 0}};
+    gbs::run_event_script(state, empty, 1);
+    assert(state.variables[0] == -1);
+    for (int slot = 0; slot < 8; ++slot) {
+        const gbs::EventCommand equip[] = {
+            {gbs::EventOp::SetEquippedItem, static_cast<int16_t>(slot), static_cast<int16_t>(slot + 2), 0},
+            {gbs::EventOp::StoreEngineField, static_cast<int16_t>(6 + slot), static_cast<int16_t>(slot), 0}
+        };
+        gbs::run_event_script(state, equip, 2);
+        assert(state.variables[slot] == slot + 2);
+    }
+    const gbs::EventCommand clear[] = {{gbs::EventOp::SetEquippedItem, 0, -1, 0}, {gbs::EventOp::StoreEngineField, 6, 0, 0}};
+    gbs::run_event_script(state, clear, 2);
+    assert(state.variables[0] == -1);
+    const gbs::EventCommand timers[] = {
+        {gbs::EventOp::AttachTimerEvent, 60, 4, 0},
+        {gbs::EventOp::StoreEngineField, 14, 8, 0},
+        {gbs::EventOp::RemoveTimerEvent, 4, 0, 0},
+        {gbs::EventOp::StoreEngineField, 14, 9, 0}
+    };
+    gbs::run_event_script(state, timers, 4);
+    assert(state.variables[8] == 1);
+    assert(state.variables[9] == 0);
+}
+
 void test_store_actor_state_commands_copy_actor_state_to_variables() {
     gbs::EventState state {};
     gbs::init_event_state(state);
@@ -1132,6 +1203,29 @@ void test_camera_property_command_updates_runtime_state() {
     assert(state.camera_property_changed);
     assert(state.camera_property == 0);
     assert(state.camera_property_value == 32);
+}
+
+void test_follow_camera_cancels_an_earlier_pan_in_the_same_frame() {
+    gbs::EventState state {};
+    gbs::init_event_state(state);
+    const gbs::EventCommand stop_tour[] = {
+        { gbs::EventOp::MoveCamera, 1, -2, 0 },
+        { gbs::EventOp::FollowCamera, 0, 0, 0 },
+        { gbs::EventOp::End, 0, 0, 0 }
+    };
+    gbs::run_event_script(state, stop_tour, 3);
+    assert(state.camera_changed && state.camera_follow_player);
+    assert(!state.camera_move_changed);
+    assert(state.camera_delta_x == 0 && state.camera_delta_y == 0);
+
+    const gbs::EventCommand start_another_pan[] = {
+        { gbs::EventOp::FollowCamera, 0, 0, 0 },
+        { gbs::EventOp::MoveCamera, 4, 3, 0 },
+        { gbs::EventOp::End, 0, 0, 0 }
+    };
+    gbs::run_event_script(state, start_another_pan, 3);
+    assert(state.camera_move_changed);
+    assert(state.camera_delta_x == 4 && state.camera_delta_y == 3);
 }
 
 void test_button_event_bindings_route_pressed_input_to_script() {
@@ -1725,6 +1819,13 @@ void test_cross_runtime_warp_preserves_target_position_and_variables() {
         gbs::EventState source_state {};
         gbs::init_event_state(source_state);
         source_state.variables[3] = 42;
+        const bool target_supports_temporal_motion = runtime == gbs::RuntimeKind::Platformer;
+        source_state.supports_temporal_actor_motion = !target_supports_temporal_motion;
+        const gbs::EventCommand source_commands[] = {
+            {gbs::EventOp::SetVariable, 4, 11, 0}
+        };
+        const gbs::EventScript source_scripts[] = {{source_commands, 1}};
+        gbs::bind_event_scripts(source_state, source_scripts, 1);
 
         const int packed_target = (static_cast<int>(runtime) << 12) | room;
         const gbs::EventCommand commands[] = {
@@ -1743,6 +1844,12 @@ void test_cross_runtime_warp_preserves_target_position_and_variables() {
 
         gbs::EventState target_state {};
         gbs::init_event_state(target_state);
+        const gbs::EventCommand target_commands[] = {
+            {gbs::EventOp::SetVariable, 4, 22, 0}
+        };
+        const gbs::EventScript target_scripts[] = {{target_commands, 1}};
+        gbs::bind_event_scripts(target_state, target_scripts, 1);
+        target_state.supports_temporal_actor_motion = target_supports_temporal_motion;
         int target_room = -1;
         int target_x = -1;
         int target_y = -1;
@@ -1751,6 +1858,12 @@ void test_cross_runtime_warp_preserves_target_position_and_variables() {
         assert(target_x == x);
         assert(target_y == y);
         assert(target_state.variables[3] == 42);
+        assert(target_state.supports_temporal_actor_motion == target_supports_temporal_motion);
+        const gbs::EventCommand call_target[] = {
+            {gbs::EventOp::CallScript, 0, 0, 0}, {gbs::EventOp::End, 0, 0, 0}
+        };
+        gbs::run_event_script(target_state, call_target, 2);
+        assert(target_state.variables[4] == 22);
         assert(!gbs::runtime_transition_pending());
     };
 
@@ -1804,6 +1917,9 @@ void test_runtime_save_restore_transition_preserves_target_and_slot() {
     assert(gbs::request_runtime_save_restore(gbs::RuntimeKind::Platformer, 2));
     assert(gbs::runtime_transition_pending());
     assert(gbs::runtime_transition_target() == gbs::RuntimeKind::Platformer);
+    gbs::RuntimeTransitionRoute route {};
+    assert(gbs::runtime_transition_route(route));
+    assert(route.entry_reason == gbs::SceneEntryReason::Load);
 
     gbs::EventState state {};
     gbs::init_event_state(state);
@@ -1925,7 +2041,41 @@ void test_adventure_movement_consumes_state() {
  assert(gbs::adventure_event_input(state,{gbs::ButtonRight,0,0},0).held==0);
 }
 
+void test_tile_replacement_extended_coordinates_and_collision() {
+    gbs::EventState state {};
+    gbs::init_event_state(state);
+    const gbs::EventCommand commands[] = {
+        {gbs::EventOp::ReplaceTile, (2 << 12) | (21 << 6) | 61, 7, 1, 4609},
+        {gbs::EventOp::ReplaceTileSequence, (2 << 12) | (21 << 6) | 61, 3, (2 << 8) | 1, 4609}
+    };
+    gbs::run_event_script(state, commands, 2);
+    assert(state.tile_command_count == 2);
+    for (size_t i = 0; i < 2; ++i) {
+        assert(state.tile_commands[i].x == 125 && state.tile_commands[i].y == 85);
+        assert(state.tile_commands[i].layer == 2 && state.tile_commands[i].collision_flags == 0);
+    }
+}
+
+static unsigned restored_actor_commands = 0;
+static void consume_restored_commands(gbs::EventState& state, void*) {
+    restored_actor_commands += static_cast<unsigned>(state.actor_command_count);
+    gbs::clear_event_actor_commands(state);
+}
+static void test_restore_consumer_does_not_drop_commands_beyond_the_queue_capacity() {
+    gbs::EventState state {}; gbs::init_event_state(state);
+    gbs::EventCommand commands[24];
+    for (auto& command : commands) command = { gbs::EventOp::SetActorVisible, 0, 0, 0 };
+    restored_actor_commands = 0;
+    gbs::run_event_script_consuming(state, { commands, 24 }, consume_restored_commands);
+    assert(restored_actor_commands == 24);
+    assert(state.actor_command_count == 0);
+}
+
 int main() {
+    test_scene_fades_respect_saved_music_volume_and_mute();
+    test_bound_clock_restores_and_updates_saved_minutes();
+    test_restore_consumer_does_not_drop_commands_beyond_the_queue_capacity();
+    test_tile_replacement_extended_coordinates_and_collision();
  test_adventure_movement_consumes_state();
  test_parallel_scripts_wait_and_cancel();
  test_interactive_lock_and_equipment();
@@ -1963,6 +2113,7 @@ int main() {
     test_variable_to_variable_jump_gates_next_command();
     test_room_conditional_jump_gates_next_command();
     test_engine_field_commands_store_and_gate_runtime_state();
+    test_equipment_and_timer_fields_follow_native_state();
     test_store_actor_state_commands_copy_actor_state_to_variables();
     test_button_pressed_jump_gates_next_command();
     test_wait_button_pressed_pauses_runner_until_matching_input();
@@ -1973,6 +2124,7 @@ int main() {
     test_actor_position_condition_supports_wide_maps();
     test_call_script_command_records_project_script_index();
     test_camera_property_command_updates_runtime_state();
+    test_follow_camera_cancels_an_earlier_pan_in_the_same_frame();
     test_button_event_bindings_route_pressed_input_to_script();
     test_adventure_callback_bindings_route_runtime_callbacks_to_script();
     test_platform_callback_bindings_route_runtime_callbacks_to_script();

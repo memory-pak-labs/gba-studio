@@ -120,12 +120,16 @@ jobs:
           (Join-Path $env:MSYS_ROOT 'usr\bin') >> $env:GITHUB_PATH
           "GBA_STUDIO_MSYS_SOURCE=$(Join-Path $env:MSYS_ROOT 'usr')" >> $env:GITHUB_ENV
       - run: npm ci
+      - name: Audit cross-platform package config
+        run: npm run audit:cross-platform -- --strict
       - name: Verify the WebPlayer core
         run: npm run verify:mgba-web
       - name: Package x64 desktop
         run: npm run ${{ matrix.script }}
       - name: Check installer files
         run: npm run smoke:ci-artifacts -- --platform ${{ matrix.platform }}
+      - name: Export exact source and bundled license supplement
+        run: python scripts/build-release-supplement.py --runtime build/embedded-runtime --platform ${{ matrix.platform }}-x64 --output release/GBA-Studio-${{ matrix.platform }}-x64-licenses-and-sources.zip --allow-generated-icons
       - name: Smoke Linux packaged editor and complete project
         if: matrix.platform == 'linux'
         run: |

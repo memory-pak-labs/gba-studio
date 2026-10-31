@@ -1,3 +1,5 @@
+#include "gbs/profiler.hpp"
+#define GBS_DIALOGUE_UI_RUNTIME_KIND 6
 #include "gbs/dungeon_crawler.hpp"
 #include "gbs/engine.hpp"
 #include "gbs/input.hpp"
@@ -41,7 +43,7 @@ const gbs::DungeonCrawlerProjectData& project = gbastudio_dungeon_crawler_projec
 int current_room_index = 0;
 gbs::DungeonCrawlerRuntimeState runtime_state {};
 gbs::HudState hud {};
-gbs::DialogueState dialogue __attribute__((section(".ewram_bss")));
+gbs::DialogueState dungeon_dialogue __attribute__((section(".ewram_bss")));
 gbs::DialogueState interaction_dialogue __attribute__((section(".ewram_bss")));
 gbs::DialogueState map_dialogue __attribute__((section(".ewram_bss")));
 gbs::DialogueLine interaction_line { "INVENTARIO" };
@@ -108,6 +110,22 @@ gbs::ResourceBankBatchReservation scratch_resource_banks {
 };
 const bool assets_are_streamed = project.resource_bank_group_count > 0;
 int dungeon_initialization_result = -1;
+uint16_t dungeon_view_map[600] __attribute__((section(".ewram_bss")));
+uint16_t dungeon_resident_ids[511] __attribute__((section(".ewram_bss")));
+uint8_t dungeon_view_tiles[512*32] __attribute__((section(".ewram_bss")));
+gbs::DungeonPose dungeon_pose = gbs::DungeonPose::Idle;
+unsigned dungeon_pose_at = 0;
+unsigned dungeon_step_at = 0;
+unsigned dungeon_player_view_started_at = 0;
+const gbs::TileAsset* dungeon_player_uploaded_tiles = nullptr;
+bool dungeon_cell_interacting=false;
+unsigned dungeon_cell_collected_at=0;
+char dungeon_direction_text[2] {};
+char dungeon_quantity_text[3] {};
+const gbs::DungeonPresentation* dungeon_presentation() {return project.rooms[current_room_index].presentation;}
+void dungeon_cue(int index) {if(index>=0 && size_t(index)<project.sfx_asset_count)gbs::play_sfx(project.sfx_assets[index]);}
+void dungeon_set_pose(gbs::DungeonPose pose) {dungeon_pose=pose;dungeon_pose_at=gbs::frame_count();}
+
 
 void reset_trigger_states();
 
@@ -127,6 +145,7 @@ void consume_dungeon_actor_commands() {
         if (command.actor_index < 0 ||
             static_cast<size_t>(command.actor_index) >= max_dungeon_actor_visibility) continue;
         if (command.op == gbs::EventActorOp::SetVisible || command.op == gbs::EventActorOp::SetActive) {
+            if(dungeon_presentation() && dungeon_cell_interacting && command.a==0){dungeon_cell_collected_at=gbs::frame_count();dungeon_cell_interacting=false;}
             dungeon_actor_visible[command.actor_index] = command.a != 0;
         }
     }
@@ -279,7 +298,8 @@ void show_dungeon_notice(const char* text, bool return_to_battle) {
         1,
         0
     );
-    gbs::set_dialogue_frame(interaction_dialogue, gbs::dialogue_frame_default);
+    gbs::set_dialogue_frame(interaction_dialogue, gbs::active_dialogue_ui_config().full_width_bottom
+        ? gbs::dialogue_frame_full_width : gbs::dialogue_frame_default);
 }
 
 void show_dungeon_inventory() {
@@ -301,7 +321,8 @@ void show_dungeon_inventory() {
         inventory_choices,
         2
     );
-    gbs::set_dialogue_frame(interaction_dialogue, gbs::dialogue_frame_default);
+    gbs::set_dialogue_frame(interaction_dialogue, gbs::active_dialogue_ui_config().full_width_bottom
+        ? gbs::dialogue_frame_full_width : gbs::dialogue_frame_default);
 }
 
 int dungeon_map_width(const gbs::DungeonCrawlerRoomData& room) {
@@ -434,6 +455,11 @@ void show_dungeon_map() {
     map_scroll_y = runtime_state.position.y / 2;
     if (map_scroll_x < 0) map_scroll_x = 0;
     if (map_scroll_y < 0) map_scroll_y = 0;
+    if(dungeon_presentation()){
+        map_scroll_x=runtime_state.position.x>5?runtime_state.position.x-5:0;
+        map_scroll_y=runtime_state.position.y>5?runtime_state.position.y-5:0;
+        interaction_mode=DungeonInteractionMode::Map;return;
+    }
     rebuild_dungeon_map_text();
     interaction_mode = DungeonInteractionMode::Map;
     dungeon_lateral_hud_visible = true;
@@ -454,6 +480,19 @@ void mark_dungeon_exploration() {
 
 bool update_dungeon_map(const gbs::InputState& input) {
     if (interaction_mode != DungeonInteractionMode::Map) return false;
+    if(dungeon_presentation()){
+        const auto& room=project.rooms[current_room_index];
+        if(input.was_pressed(gbs::ButtonLeft)&&map_scroll_x>0)--map_scroll_x;
+        if(input.was_pressed(gbs::ButtonRight)&&map_scroll_x<room.width_tiles-11)++map_scroll_x;
+        if(input.was_pressed(gbs::ButtonUp)&&map_scroll_y>0)--map_scroll_y;
+        if(input.was_pressed(gbs::ButtonDown)&&map_scroll_y<room.height_tiles-11)++map_scroll_y;
+        if(input.was_pressed(gbs::ButtonA)||input.was_pressed(gbs::ButtonB)||input.was_pressed(gbs::ButtonStart)){
+            interaction_mode=DungeonInteractionMode::None;
+            for(int y=0;y<13;++y)for(int x=0;x<13;++x)gbs::set_bg_tile(gbs::BackgroundLayer::BG0,x,y,32,32,0);
+            gbs::render_ui_assets();
+        }
+        return true;
+    }
     const gbs::DungeonCrawlerRoomData& room = project.rooms[current_room_index];
     const int max_scroll_x = dungeon_map_max_scroll(dungeon_map_width(room), 15);
     const int max_scroll_y = dungeon_map_max_scroll(dungeon_map_height(room), 2);
@@ -547,10 +586,29 @@ void draw_view() {
         cached_view_direction == runtime_state.direction) {
         return;
     }
+    if(room.presentation && room.presentation->views) {
+        const auto& cache=*room.presentation->views;
+        const auto* view=gbs::find_dungeon_view(cache,runtime_state.position.x,runtime_state.position.y,int(runtime_state.direction));
+        if(!view)return;
+        const int count=gbs::prepare_dungeon_view(cache,*view,dungeon_view_map,600,dungeon_resident_ids,511);
+        if(count<0)return;
+        for(int b=0;b<32;++b)dungeon_view_tiles[b]=0;
+        for(int n=0;n<count;++n)for(int b=0;b<32;++b)dungeon_view_tiles[(n+1)*32+b]=cache.tiles[size_t(dungeon_resident_ids[n])*32+b];
+        // Assemble in EWRAM first, then commit tiles, palettes and map in one VBlank.
+        gbs::wait_vblank();
+        gbs::set_bg_character_base(gbs::BackgroundLayer::BG2,0);
+        gbs::load_bg_tiles_at_character_base(gbs::TileAsset{dungeon_view_tiles,uint16_t(count+1),0,false},0);
+        gbs::load_palette(gbs::PaletteAsset{cache.palettes+view->palette_offset,view->palette_colors,0},false);
+        gbs::load_tilemap(gbs::BackgroundLayer::BG2,gbs::TileMapAsset{dungeon_view_map,30,20});
+        gbs::set_bg_priority(gbs::BackgroundLayer::BG2,2);
+        gbs::set_bg_enabled(gbs::BackgroundLayer::BG2,true);
+        cached_view_room=current_room_index;cached_view_position=runtime_state.position;cached_view_direction=runtime_state.direction;
+        return;
+    }
     if (room.background_index >= 0 && static_cast<size_t>(room.background_index) < project.background_count) {
         // An authored dungeon viewport is already the first-person camera. Keep
         // the procedural fallback unpainted, but leave BG0 enabled because it
-        // is the fixed UI layer used by the approved HUD and dialogue box.
+        // is the fixed UI layer used by the approved HUD and dungeon_dialogue box.
         fill_rect(0, 0, 30, 20, 0, gbs::BackgroundLayer::BG0);
         gbs::set_bg_enabled(gbs::BackgroundLayer::BG0, true);
         cached_view_room = current_room_index;
@@ -594,6 +652,8 @@ void draw_view() {
 
 void apply_room_visuals() {
     const gbs::DungeonCrawlerRoomData& room = project.rooms[current_room_index];
+    dungeon_player_view_started_at = gbs::frame_count();
+    dungeon_player_uploaded_tiles = nullptr;
     invalidate_dungeon_view_cache();
     // Streamed rooms already uploaded their scoped palettes and tiles in
     // stream_resources_for_room(). Reloading every project asset here would
@@ -612,13 +672,13 @@ void apply_room_visuals() {
             gbs::load_tiles(project.tile_assets[index]);
         }
     }
-    // Scene palettes can reuse the UI banks. Restore the dialogue/map glyphs
+    // Scene palettes can reuse the UI banks. Restore the dungeon_dialogue/map glyphs
     // before configuring the authored HUD and drawing the dungeon overlays.
     gbs::render_ui_assets();
     if (room.background_index >= 0 && static_cast<size_t>(room.background_index) < project.background_count) {
         const gbs::DungeonCrawlerBackgroundData& background = project.backgrounds[room.background_index];
         gbs::set_backdrop_color(background.backdrop_color);
-        // BG0 is reserved for the fixed UI layer (HUD/dialogue); the authored
+        // BG0 is reserved for the fixed UI layer (HUD/dungeon_dialogue); the authored
         // dungeon viewport is loaded on the world layer instead.
         gbs::set_bg_enabled(gbs::BackgroundLayer::BG0, true);
         gbs::set_bg_priority(gbs::BackgroundLayer::BG0, 0);
@@ -633,10 +693,17 @@ void apply_room_visuals() {
         gbs::set_bg_enabled(gbs::BackgroundLayer::BG0, true);
     }
     gbs::apply_video_composition(room.video);
+    if(room.presentation && room.presentation->hud_background_index>=0 && size_t(room.presentation->hud_background_index)<project.background_count){
+        const auto& chrome=project.backgrounds[room.presentation->hud_background_index];
+        gbs::set_bg_character_base(chrome.layer,0);gbs::load_tilemap(chrome.layer,chrome.tilemap);
+        gbs::set_bg_priority(chrome.layer,1);gbs::set_bg_enabled(chrome.layer,true);gbs::set_bg_scroll(chrome.layer,0,0);
+    }
+    if(room.presentation){dungeon_set_pose(gbs::DungeonPose::Idle);dungeon_step_at=0;dungeon_cell_interacting=false;dungeon_cell_collected_at=0;}
+
     if (room.background_index < 0 || static_cast<size_t>(room.background_index) >= project.background_count) {
         // The procedural view uses the world plane; BG0 stays above the
-        // image HUD for text and dialogue instead of covering its bottom.
-        gbs::set_bg_enabled(gbs::BackgroundLayer::BG1, true);
+        // image HUD for text and dungeon_dialogue instead of covering its bottom.
+        gbs::set_bg_enabled(gbs::BackgroundLayer::BG1, !room.presentation || room.presentation->hud_background_index>=0);
         gbs::set_bg_priority(gbs::BackgroundLayer::BG1, 2);
         gbs::set_bg_priority(gbs::BackgroundLayer::BG0, 0);
     }
@@ -729,7 +796,7 @@ bool apply_dungeon_event_warp() {
     battle_state = gbs::DungeonCrawlerBattleState {};
     dungeon_enemy_defeated = false;
     notice_returns_to_battle = false;
-    gbs::hide_dialogue(dialogue);
+    gbs::hide_dialogue(dungeon_dialogue);
     gbs::hide_dialogue(interaction_dialogue);
     gbs::hide_dialogue(map_dialogue);
     gbs::stop_event_runner(runtime_event_runner);
@@ -763,14 +830,15 @@ void consume_event_state() {
     );
     if (event_state.last_dialogue >= 0) {
         gbs::show_dialogue(
-            dialogue,
+            dungeon_dialogue,
             project.dialogue_lines,
             project.dialogue_line_count,
             event_state.last_dialogue
         );
-        gbs::set_dialogue_frame(dialogue, gbs::dialogue_frame_default);
+        gbs::set_dialogue_frame(dungeon_dialogue, gbs::active_dialogue_ui_config().full_width_bottom
+            ? gbs::dialogue_frame_full_width : gbs::dialogue_frame_default);
         event_state.last_dialogue = -1;
-        runtime_script_controls_dialogue = dialogue.visible;
+        runtime_script_controls_dialogue = dungeon_dialogue.visible;
     }
     if (event_state.last_sfx >= 0) {
         if (static_cast<size_t>(event_state.last_sfx) < project.sfx_asset_count) {
@@ -818,7 +886,7 @@ void consume_event_state() {
         gbs::fade_audio_channel_volume(
             gbs::audio_channel_from_event_value(event_state.audio_fade_channel),
             static_cast<uint8_t>(event_state.audio_fade_target_volume),
-            static_cast<uint16_t>(event_state.audio_fade_frames)
+            static_cast<uint16_t>(event_state.audio_fade_frames), static_cast<uint8_t>(event_state.audio_fade_ceiling_volume)
         );
         event_state.audio_fade_changed = false;
     }
@@ -830,7 +898,7 @@ void consume_event_state() {
         event_state.stop_music = false;
     }
     if (event_state.close_dialogue) {
-        gbs::hide_dialogue(dialogue);
+        gbs::hide_dialogue(dungeon_dialogue);
         event_state.close_dialogue = false;
         runtime_script_controls_dialogue = false;
     }
@@ -875,9 +943,9 @@ bool start_runtime_event_script(gbs::EventScript script) {
 }
 
 bool update_runtime_event_script(const gbs::InputState& input) {
-    if (runtime_script_controls_dialogue && dialogue.visible) {
-        gbs::advance_dialogue(dialogue, input);
-        if (!dialogue.visible) {
+    if (runtime_script_controls_dialogue && dungeon_dialogue.visible) {
+        gbs::advance_dialogue(dungeon_dialogue, input);
+        if (!dungeon_dialogue.visible) {
             runtime_script_controls_dialogue = false;
         }
         return true;
@@ -916,17 +984,31 @@ bool start_dungeon_battle(size_t actor_index) {
         !gbs::is_valid_dungeon_crawler_battle_data(project.battle, room.actor_count)) {
         return false;
     }
-    // A battle owns the interaction layer. Clear any event dialogue that may
+    // A battle owns the interaction layer. Clear any event dungeon_dialogue that may
     // still be visible so it cannot leave a stale full-width box under the
     // battle menu.
-    gbs::hide_dialogue(dialogue);
+    gbs::hide_dialogue(dungeon_dialogue);
     runtime_script_controls_dialogue = false;
     battle_state = gbs::make_dungeon_crawler_battle_state(project.battle);
-    show_dungeon_battle_menu();
+    if(room.presentation){dungeon_set_pose(gbs::DungeonPose::Alert);interaction_mode=DungeonInteractionMode::None;}else show_dungeon_battle_menu();
     return true;
 }
 
 bool update_dungeon_interaction(const gbs::InputState& input) {
+    if(dungeon_presentation() && battle_state.active && !dungeon_enemy_defeated && interaction_mode==DungeonInteractionMode::None) {
+        if(gbs::frame_count()-dungeon_pose_at<36)return true;
+        if(input.was_pressed(gbs::ButtonB)){dungeon_set_pose(gbs::DungeonPose::Defend);dungeon_cue(dungeon_presentation()->blocked_sfx);return true;}
+        if(input.was_pressed(gbs::ButtonA)){
+            if(battle_state.player_hp<=0){battle_state=gbs::make_dungeon_crawler_battle_state(project.battle);dungeon_set_pose(gbs::DungeonPose::Reactivate);return true;}
+            gbs::dungeon_battle_player_attack(battle_state,project.battle);
+            if(gbs::dungeon_battle_is_victory(battle_state)){
+                dungeon_enemy_defeated=true;dungeon_set_pose(gbs::DungeonPose::Defeat);dungeon_cue(dungeon_presentation()->defeat_sfx);
+                if(gbs::is_valid_inventory_item_index(project.battle.reward_item))event_state.inventory[project.battle.reward_item]+=project.battle.reward_quantity;
+            }else {gbs::dungeon_battle_enemy_turn(battle_state,project.battle);dungeon_set_pose(gbs::DungeonPose::Hurt);dungeon_cue(dungeon_presentation()->hit_sfx);}
+        }
+        return true;
+    }
+
     if (interaction_mode == DungeonInteractionMode::Map) {
         return update_dungeon_map(input);
     }
@@ -1028,6 +1110,7 @@ bool actor_view_coordinates(const gbs::DungeonCrawlerActorData& actor, int& dist
     const int delta_y = actor.position.y - runtime_state.position.y;
     distance = delta_x * forward.x + delta_y * forward.y;
     lateral = delta_x * forward.y - delta_y * forward.x;
+    if(dungeon_presentation()){lateral=-lateral;return distance>0 && distance<=project.rooms[current_room_index].config.view_distance && (lateral<0?-lateral:lateral)*100<=distance*65;}
     return gbs::dungeon_actor_is_visible_in_view(
         distance,
         lateral,
@@ -1040,8 +1123,13 @@ bool actor_is_ahead(const gbs::DungeonCrawlerActorData& actor, int& distance) {
     return actor_view_coordinates(actor, distance, lateral) && lateral == 0;
 }
 
-bool actor_is_occluded(int distance, int lateral) {
+bool actor_is_occluded(int distance, int lateral, bool wall_mounted = false) {
     const gbs::DungeonCrawlerRoomData& room = project.rooms[current_room_index];
+    if(room.presentation){
+        const auto f=gbs::dungeon_forward_delta(runtime_state.direction);const int dx=f.x*distance-f.y*lateral,dy=f.y*distance+f.x*lateral;
+        return gbs::dungeon_actor_is_occluded(room,runtime_state.position,
+            {runtime_state.position.x+dx,runtime_state.position.y+dy},wall_mounted);
+    }
     for (int nearer = 1; nearer < distance; ++nearer) {
         if (gbs::dungeon_view_cell(room, runtime_state, nearer, lateral).blocked) {
             return true;
@@ -1050,15 +1138,40 @@ bool actor_is_occluded(int distance, int lateral) {
     return false;
 }
 
+int draw_dungeon_foreground_sprite(int first, const gbs::MetaSprite& metasprite, gbs::Vec2i anchor) {
+    if(!gbs::is_valid_metasprite(metasprite))return 0;
+    int count=0;
+    for(uint8_t i=0;i<metasprite.part_count && first+count<128;++i){
+        const auto& part=metasprite.parts[i];
+        // BG0 text stays above the first-person sprite; BG2 world stays below.
+        gbs::Sprite sprite {anchor.x+part.x,anchor.y+part.y,part.tile_index,part.palette,part.hflip,part.vflip,true,1,gbs::SpriteRenderMode::Normal,false,part.width,part.height};
+        sprite.color_depth=part.color_depth;
+        gbs::set_sprite(first+count++,sprite);
+    }
+    return count;
+}
+
 void draw_actors() {
     gbs::hide_all_sprites();
     const gbs::DungeonCrawlerRoomData& room = project.rooms[current_room_index];
     int sprite_index = 0;
+    if(room.player_view){
+        const auto& view=*room.player_view;
+        const auto* frame=gbs::dungeon_player_view_frame(view,gbs::frame_count()-dungeon_player_view_started_at);
+        const auto* sprite=frame?&frame->metasprite:view.metasprite;
+        if(frame && frame->streamed_tile_asset && frame->streamed_tile_asset!=dungeon_player_uploaded_tiles){
+            gbs::load_tiles(*frame->streamed_tile_asset);
+            dungeon_player_uploaded_tiles=frame->streamed_tile_asset;
+        }
+        // Reserve the lowest OAM indices so a world actor cannot cover the hands.
+        if(sprite)sprite_index=draw_dungeon_foreground_sprite(0,*sprite,view.anchor);
+    }
     for (int distance = room.config.view_distance; distance >= 1 && sprite_index < 128; --distance) {
         for (size_t index = 0; index < room.actor_count && sprite_index < 128; ++index) {
             const gbs::DungeonCrawlerActorData& actor = room.actors[index];
-            if (!dungeon_actor_is_enabled(index)) continue;
-            if (dungeon_enemy_defeated && project.battle.enemy_actor_index == static_cast<int>(index)) {
+            const bool collecting=actor.frames && actor.frames->cell && dungeon_cell_collected_at && gbs::frame_count()-dungeon_cell_collected_at<30;
+            if (!dungeon_actor_is_enabled(index) && !collecting) continue;
+            if (dungeon_enemy_defeated && project.battle.enemy_actor_index == static_cast<int>(index) && (!room.presentation || dungeon_pose!=gbs::DungeonPose::Defeat || gbs::frame_count()-dungeon_pose_at>=60)) {
                 continue;
             }
             int actor_distance = 0;
@@ -1066,7 +1179,7 @@ void draw_actors() {
             if (actor.metasprite == nullptr ||
                 !actor_view_coordinates(actor, actor_distance, lateral) ||
                 actor_distance != distance ||
-                actor_is_occluded(actor_distance, lateral)) {
+                actor_is_occluded(actor_distance, lateral, actor.wall_mounted)) {
                 continue;
             }
             const gbs::MetaSprite* metasprite = gbs::dungeon_runtime_metasprite(
@@ -1076,8 +1189,22 @@ void draw_actors() {
                 room.config.view_distance
             );
             if (metasprite == nullptr) continue;
-            const gbs::DungeonActorProjection projection = gbs::dungeon_project_actor(actor_distance, lateral);
-            gbs::set_metasprite(sprite_index, *metasprite, gbs::Vec2i { projection.x, projection.y });
+            gbs::DungeonActorProjection projection = gbs::dungeon_project_actor(actor_distance, lateral);
+            if(room.presentation) {
+                const auto anchor=gbs::dungeon_actor_view_anchor(actor_distance,lateral,gbs::frame_count()-dungeon_step_at);
+                projection={anchor.x,anchor.y};
+            }
+            if(room.presentation && actor.frames) {
+                const auto* clip=actor_distance==1?actor.frames->near:actor_distance<=3?actor.frames->mid:actor.frames->far;
+                const unsigned age=gbs::frame_count()-dungeon_pose_at;
+                auto pose=actor.frames->cell?(collecting?gbs::DungeonPose::CellCharged:gbs::DungeonPose::CellActive):dungeon_pose;
+                if(pose==gbs::DungeonPose::Hurt && age>=14 && age<35)pose=gbs::DungeonPose::Attack;
+                const unsigned pose_age=collecting?gbs::frame_count()-dungeon_cell_collected_at:pose==gbs::DungeonPose::Attack && dungeon_pose==gbs::DungeonPose::Hurt?age-14:age;
+                const uint8_t frame=gbs::dungeon_pose_frame(pose,pose_age);
+                if(clip && clip->frame_count){const auto& f=clip->frames[frame<clip->frame_count?frame:0];if(f.streamed_tile_asset)gbs::load_tiles(*f.streamed_tile_asset);metasprite=&f.metasprite;}
+            }
+            if(room.player_view)draw_dungeon_foreground_sprite(sprite_index,*metasprite,{projection.x,projection.y});
+            else gbs::set_metasprite(sprite_index, *metasprite, gbs::Vec2i { projection.x, projection.y });
             sprite_index += metasprite->part_count;
         }
     }
@@ -1093,6 +1220,7 @@ void interact_with_actor(const gbs::InputState& input) {
             if (start_dungeon_battle(index)) {
                 return;
             }
+            if(room.presentation && room.actors[index].frames && room.actors[index].frames->cell)dungeon_cell_interacting=true;
             start_runtime_event_script(room.actors[index].on_interact);
             return;
         }
@@ -1125,6 +1253,11 @@ void perform_action(const gbs::InputState& input) {
         return;
     }
     const gbs::DungeonCrawlerRoomData& room = project.rooms[current_room_index];
+    const auto old_position=runtime_state.position;const auto old_direction=runtime_state.direction;
+    if(room.presentation && (input.was_pressed(gbs::ButtonUp)||input.was_pressed(gbs::ButtonDown))){
+        const auto delta=gbs::dungeon_forward_delta(runtime_state.direction);const int sign=input.was_pressed(gbs::ButtonUp)?1:-1;
+        for(size_t i=0;i<room.actor_count;++i)if(dungeon_actor_is_enabled(i) && !(dungeon_enemy_defeated && project.battle.enemy_actor_index==int(i)) && room.actors[i].position.x==old_position.x+delta.x*sign && room.actors[i].position.y==old_position.y+delta.y*sign){dungeon_cue(room.presentation->blocked_sfx);return;}
+    }
     if (input.was_pressed(gbs::ButtonLeft)) {
         gbs::turn_dungeon_left(runtime_state);
         runtime_state.action_frames_remaining = room.config.turn_duration_frames;
@@ -1138,18 +1271,27 @@ void perform_action(const gbs::InputState& input) {
         if (gbs::try_dungeon_step_backward(runtime_state, room)) mark_dungeon_exploration();
         runtime_state.action_frames_remaining = room.config.step_duration_frames;
     }
+    if(room.presentation){
+        if(old_position.x!=runtime_state.position.x||old_position.y!=runtime_state.position.y)dungeon_step_at=gbs::frame_count();
+        if(runtime_state.direction!=old_direction)dungeon_cue(room.presentation->turn_sfx);
+        else if(input.was_pressed(gbs::ButtonUp)||input.was_pressed(gbs::ButtonDown))dungeon_cue(old_position.x!=runtime_state.position.x||old_position.y!=runtime_state.position.y?room.presentation->step_sfx:room.presentation->blocked_sfx);
+    }
+
 }
 
 } // namespace
 
 int initialize_dungeon_crawler_runtime() {
     gbs::init();
-    gbs::init_dialogue(dialogue);
+    // Standalone ROMs bypass the mixed-runtime dispatcher.
+    gbs::debug_set_runtime_kind(GBS_DIALOGUE_UI_RUNTIME_KIND);
+    gbs::init_dialogue(dungeon_dialogue);
     gbs::init_dialogue(interaction_dialogue);
     gbs::init_dialogue(map_dialogue);
     gbs::init_hud(hud);
     gbs::set_hud_text(hud, "HP 03", "START: ITEM");
     gbs::init_event_state(event_state);
+    gbs::bind_event_scripts(event_state, project.scripts, project.script_count);
     gbs::init_event_runner(runtime_event_runner);
     gbs::reset_runtime_telemetry();
     gbs::set_backdrop_color(gbs::rgb15(2, 2, 4));
@@ -1234,8 +1376,11 @@ int initialize_dungeon_crawler_runtime() {
     gbastudio_dialogue_ui::configure_for_scene(project.rooms[current_room_index].name, true);
     if (!restored) {
         start_runtime_event_script(project.rooms[current_room_index].on_enter);
-    } else if (battle_state.active && !dungeon_enemy_defeated) {
-        show_dungeon_battle_menu();
+    } else {
+        start_runtime_event_script(project.rooms[current_room_index].on_restore);
+    }
+    if (restored && battle_state.active && !dungeon_enemy_defeated) {
+        if(dungeon_presentation())dungeon_set_pose(gbs::DungeonPose::Alert);else show_dungeon_battle_menu();
     }
     return 0;
 }
@@ -1256,7 +1401,7 @@ gbs::RuntimeAdapterFrameResult update_dungeon_crawler_runtime(const gbs::Runtime
     gbs::set_event_input_state(event_state, input.held, input.pressed, input.released);
     gbs::update_hud_behavior(event_state, hud.visible);
     const bool button_binding_overrides_default =
-        !dialogue.visible &&
+        !dungeon_dialogue.visible &&
         !interaction_dialogue.visible &&
         runtime_event_wait_frames <= 0 &&
         !gbs::event_runner_is_active(runtime_event_runner) &&
@@ -1292,15 +1437,41 @@ gbs::RuntimeAdapterFrameResult update_dungeon_crawler_runtime(const gbs::Runtime
     return gbs::RuntimeAdapterFrameResult::Continue;
 }
 
+void draw_presented_dungeon_map() {
+    if(!dungeon_presentation() || interaction_mode!=DungeonInteractionMode::Map)return;
+    const uint16_t neutral_colors[16]={0,gbs::rgb15(1,4,6),gbs::rgb15(6,10,11),gbs::rgb15(25,24,20),gbs::rgb15(30,22,7)};
+    const gbs::PaletteAsset neutral_palette {neutral_colors,16,224};
+    const auto* palette=dungeon_presentation()->hud_palette;
+    if(!palette){palette=&neutral_palette;gbs::load_palette(neutral_palette,false);}
+    const uint16_t wanted[4]={gbs::rgb15(1,4,6),gbs::rgb15(6,10,11),gbs::rgb15(25,24,20),gbs::rgb15(30,22,7)};
+    uint8_t colors[4] {};for(int n=0;n<4;++n){int best=99999;for(int i=1;i<16;++i){const auto c=palette->colors[i];const int dr=int(c&31)-int(wanted[n]&31),dg=int((c>>5)&31)-int((wanted[n]>>5)&31),db=int((c>>10)&31)-int((wanted[n]>>10)&31);const int d=dr*dr+dg*dg+db*db;if(d<best){best=d;colors[n]=i;}}}
+    uint8_t tiles[128] {};for(int n=0;n<4;++n)for(int y=0;y<8;++y)for(int x=0;x<8;++x){const auto color=colors[x==7||y==7?0:n];tiles[n*32+y*4+x/2]|=color<<((x%2)*4);}
+    gbs::load_tiles(gbs::TileAsset{tiles,4,800,false});
+    const auto& room=project.rooms[current_room_index];
+    const int max_x=room.width_tiles>11?room.width_tiles-11:0,max_y=room.height_tiles>11?room.height_tiles-11:0;
+    if(map_scroll_x>max_x)map_scroll_x=max_x;if(map_scroll_y>max_y)map_scroll_y=max_y;
+    for(int y=0;y<room.height_tiles && y<11;++y)for(int x=0;x<room.width_tiles && x<11;++x){const int mx=x+map_scroll_x,my=y+map_scroll_y;const int tile=runtime_state.position.x==mx&&runtime_state.position.y==my?3:gbs::dungeon_cell_blocked(room,{mx,my})?1:2;gbs::set_bg_tile(gbs::BackgroundLayer::BG0,x+1,y+1,32,32,uint16_t(800+tile+(14<<12)));}
+}
+
 void render_dungeon_crawler_runtime(const gbs::RuntimeFrameContext& context) {
+    const gbs::SubsystemProfilerScope profiler_scope(gbs::ProfilerSubsystem::Render);
     (void)context;
+    if(dungeon_presentation() && dungeon_presentation()->hud_palette)gbs::load_palette(*dungeon_presentation()->hud_palette,false);
     draw_view();
+    if(dungeon_presentation())gbs::set_bg_scroll(gbs::BackgroundLayer::BG2,0,-gbs::dungeon_camera_bob(gbs::frame_count()-dungeon_step_at));
     draw_actors();
     sync_runtime_telemetry();
     // The dungeon HUD is fixed chrome. Reassert its authored state after
     // room/camera rendering so a scene update cannot leave the top bar
-    // hidden while dialogue remains visible.
-    if (dungeon_lateral_hud_active()) {
+    // hidden while dungeon_dialogue remains visible.
+    if(dungeon_presentation()) {
+        dungeon_direction_text[0]="NLSO"[int(runtime_state.direction)];
+        int quantity=0;if(project.inventory_items && project.inventory_item_count)quantity=event_state.inventory[project.inventory_items[0].item_index];
+        quantity=quantity<0?0:quantity>99?99:quantity;dungeon_quantity_text[0]='0'+quantity/10;dungeon_quantity_text[1]='0'+quantity%10;
+        const char* slots[]={dungeon_presentation()->player_label,dungeon_direction_text,"MAPA",dungeon_quantity_text,"A",project.rooms[current_room_index].battle_enabled?"ATACAR":project.rooms[current_room_index].actor_count?"COLETAR":"EXAMINAR"};gbs::set_hud_text_slots(hud,slots,6);
+        gbs::set_hud_value(hud,gbs::HudValueSource::P1Health,dungeon_player_hp(),3);
+        gbs::set_hud_value(hud,gbs::HudValueSource::P2Health,battle_state.active?battle_state.enemy_hp:project.battle.max_hp,project.battle.max_hp);
+    } else if (dungeon_lateral_hud_active()) {
         if (dungeon_lateral_hud_visible || !dungeon_string_equals(gbs::active_hud_layout()->id, "hud-usina-lateral")) {
             rebuild_dungeon_sidebar_text();
             const char* text_slots[] = {
@@ -1334,14 +1505,16 @@ void render_dungeon_crawler_runtime(const gbs::RuntimeFrameContext& context) {
     // Visible dialogues render afterward so they remain above the HUD.
     gbs::set_bg_enabled(gbs::BackgroundLayer::BG0, true);
     gbs::set_bg_priority(gbs::BackgroundLayer::BG0, 0);
-    // Every hidden dialogue clears its old BG0 rectangle. Clear all hidden
+    // Every hidden dungeon_dialogue clears its old BG0 rectangle. Clear all hidden
     // surfaces first; otherwise an inactive interaction panel erases the
-    // visible map (or an inactive map erases an authored event dialogue).
-    if (!dialogue.visible) gbs::draw_dialogue(dialogue);
+    // visible map (or an inactive map erases an authored event dungeon_dialogue).
+    if (!dungeon_dialogue.visible) gbs::draw_dialogue(dungeon_dialogue);
     if (!map_dialogue.visible) gbs::draw_dialogue(map_dialogue);
     if (!interaction_dialogue.visible) gbs::draw_dialogue(interaction_dialogue);
+    if(dungeon_presentation() && (dungeon_dialogue.visible || interaction_dialogue.visible || map_dialogue.visible))gbs::hide_hud(hud);
     gbs::draw_hud(hud);
-    if (dialogue.visible) gbs::draw_dialogue(dialogue);
+    draw_presented_dungeon_map();
+    if (dungeon_dialogue.visible) gbs::draw_dialogue(dungeon_dialogue);
     if (map_dialogue.visible) gbs::draw_dialogue(map_dialogue);
     if (interaction_dialogue.visible) gbs::draw_dialogue(interaction_dialogue);
     gbs::wait_vblank();
@@ -1357,6 +1530,7 @@ void leave_dungeon_crawler_runtime() {
         }
     }
 #endif
+    gbs::set_bg_character_base(gbs::BackgroundLayer::BG2,0);
     gbs::release_resource_bank_group(resource_manager, active_resource_banks);
 }
 

@@ -24,6 +24,7 @@ volatile void* last_dma_destination = nullptr;
 int hardware_init_calls = 0;
 int render_init_calls = 0;
 int audio_init_calls = 0;
+bool audio_mix_preserved = false;
 int audio_update_calls = 0;
 int hardware_vblank_wait_calls = 0;
 int hardware_publication_blocked = 0;
@@ -127,8 +128,9 @@ void render_init() {
     ++render_init_calls;
 }
 
-void audio_init() {
+void audio_init(bool preserve_mix) {
     ++audio_init_calls;
+    audio_mix_preserved = preserve_mix;
 }
 
 void audio_update() {
@@ -411,9 +413,13 @@ void test_render_publication_transaction_waits_for_dma_queue() {
     gbs::dma_reset_vblank_queue();
     hardware_publication_blocked = 0;
     hardware_vblank_publication_blocked = -1;
+    hardware_handoff_fallback_calls = 0;
     assert(gbs::dma_enqueue_vblank16(&source, &destination, 1));
 
     gbs::begin_render_publication_transaction();
+    // Deferring shadow registers alone still exposes the old screen to VRAM
+    // uploads. Hide it before the first resource is replaced.
+    assert(hardware_handoff_fallback_calls == 1);
     assert(gbs::render_publication_transaction_active());
     gbs::wait_vblank();
 
@@ -437,6 +443,7 @@ void test_runtime_handoff_keeps_publication_blocked_across_reinitialization() {
 
     gbs::init();
 
+    assert(audio_mix_preserved);
     assert(gbs::render_publication_transaction_active());
     assert(hardware_publication_blocked == 1);
     gbs::wait_vblank();
@@ -932,7 +939,29 @@ void test_global_input_repeat_fires_after_initial_delay() {
 
 } // namespace
 
+static void test_dma_fences_hold_sources_until_the_last_partial_transfer() {
+    gbs::dma_reset_vblank_queue();
+    uint16_t source[12] {}, destination[12] {};
+    assert(gbs::dma_enqueue_vblank16(source, destination, 12));
+    const auto fence = gbs::dma_vblank_fence();
+    assert(gbs::dma_fence_status(fence) == gbs::DmaFenceStatus::Pending);
+    assert(gbs::dma_source_pending(source, sizeof(source)));
+    gbs::dma_flush_vblank_queue_budget(gbs::DmaChannel::Channel3, 8);
+    assert(gbs::dma_fence_status(fence) == gbs::DmaFenceStatus::Pending);
+    assert(gbs::dma_source_pending(source, sizeof(source)));
+    gbs::dma_reset_vblank_queue_stats();
+    assert(gbs::dma_fence_status(fence) == gbs::DmaFenceStatus::Pending);
+    gbs::dma_flush_vblank_queue();
+    assert(gbs::dma_fence_status(fence) == gbs::DmaFenceStatus::Complete);
+    assert(!gbs::dma_source_pending(source, sizeof(source)));
+    assert(gbs::dma_enqueue_vblank16(source, destination, 12));
+    const auto canceled = gbs::dma_vblank_fence();
+    gbs::dma_reset_vblank_queue();
+    assert(gbs::dma_fence_status(canceled) == gbs::DmaFenceStatus::Canceled);
+}
+
 int main() {
+    test_dma_fences_hold_sources_until_the_last_partial_transfer();
     test_dma_validation();
     test_unaligned_affine_map_upload_preserves_byte_pairs_and_budget();
     test_hblank_dma_lifecycle_is_explicit();

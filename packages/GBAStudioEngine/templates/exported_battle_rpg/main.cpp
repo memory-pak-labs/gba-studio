@@ -1,6 +1,10 @@
+#include "gbs/profiler.hpp"
+#define GBS_DIALOGUE_UI_RUNTIME_KIND 11
 #include "gbs/engine.hpp"
+#include "gbs/battle_rpg_presentation.hpp"
 #include "gbs/audio.hpp"
 #include "gbs/dialogue.hpp"
+#include "gbs/dialogue_portrait.hpp"
 #include "gbs/event.hpp"
 #include "gbs/input.hpp"
 #include "gbs/render.hpp"
@@ -63,6 +67,7 @@ gbs::EventState event_state __attribute__((section(".ewram_bss")));
     int battle_initialization_result = -1;
     int battle_event_wait_frames = 0;
 bool battle_script_controls_dialogue = false;
+bool battle_dialogue_was_drawn = false;
 bool battle_ui_restore_pending = true;
 bool outcome_hook_started = false;
 bool outcome_hook_handled = false;
@@ -71,6 +76,8 @@ BattleMenuPage battle_menu_page = BattleMenuPage::Root;
 int battle_menu_parent_choice = 0;
 bool battle_menu_wait_for_enemy_turn = false;
 bool battle_menu_target_is_ally = false;
+bool battle_menu_target_is_item = false;
+int battle_menu_item_index = -1;
 char battle_prompt_text[96] = {};
 gbs::DialogueLine battle_prompt_line { battle_prompt_text };
 gbs::DialogueLine battle_menu_line { "COMANDO" };
@@ -82,14 +89,125 @@ gbs::DialogueChoice battle_root_choices[] = {
     { "FUGIR", 3 }
 };
 gbs::DialogueChoice battle_move_choices[4] = {};
-gbs::DialogueChoice battle_target_choices[4] = {};
-gbs::DialogueChoice battle_party_choices[4] = {};
-gbs::DialogueChoice battle_item_choices[] = {{ "NENHUM ITEM", 0 }};
+gbs::DialogueChoice battle_target_choices[gbs::BattleRpgMaxEnemies] = {};
+gbs::DialogueChoice battle_party_choices[gbs::BattleRpgMaxParty] = {};
+char battle_target_labels[gbs::BattleRpgMaxEnemies][96] = {};
+char battle_party_labels[gbs::BattleRpgMaxParty][96] = {};
+gbs::DialogueChoice battle_item_choices[gbs::max_event_inventory_items] = {};
+char battle_item_labels[gbs::max_event_inventory_items][48] = {};
+int battle_item_indices[gbs::max_event_inventory_items] = {};
 bool persist_battle_rpg_runtime_state(int slot_index = 0);
+bool battle_has_status_hud();
+gbs::Vec2i battle_participant_position(const gbs::BattleRpgEncounterData& encounter, int index, bool enemy);
 char battle_party_hud_text[48] = {};
 char battle_enemy_hud_text[48] = {};
 char battle_enemy_hp_hud_text[8] = {};
 char battle_party_hp_hud_text[8] = {};
+#if GBS_MULTI_RUNTIME
+int checkpoint_music_index = -1;
+int checkpoint_tracker_index = -1;
+#endif
+gbs::BattleRpgActorPresentation party_visuals[gbs::BattleRpgMaxParty] {};
+gbs::BattleRpgActorPresentation enemy_visuals[gbs::BattleRpgMaxEnemies] {};
+gbs::SpriteAnimatorState effect_animator {};
+const gbs::TileAsset* effect_loaded_tiles = nullptr;
+gbs::Vec2i effect_position {};
+int hurt_sound_delay = 0;
+int outcome_visual_frames = 0;
+bool outcome_visual_started = false;
+char authored_prompt[64] = {}, authored_commands[128] = {}, authored_cursor[16] = {};
+
+bool authored_battle_ui() { return project.encounters[encounter_index].presentation != nullptr; }
+void battle_sound(int cue) {
+    const auto* p=project.encounters[encounter_index].presentation;
+    if(p==nullptr || cue<0 || cue>=7) return;
+    const int index=p->action_sounds[cue];
+    if(index>=0 && static_cast<size_t>(index)<project.sfx_asset_count) gbs::play_sfx(project.sfx_assets[index]);
+}
+bool battle_visual_busy() {
+    const auto& e=project.encounters[encounter_index];
+    for(int i=0;i<e.party_count;++i) if(gbs::battle_rpg_actor_busy(party_visuals[i])) return true;
+    for(int i=0;i<e.enemy_count;++i) if(gbs::battle_rpg_actor_busy(enemy_visuals[i])) return true;
+    return false;
+}
+void present_battle_action(bool enemy, int actor, int target, gbs::BattleRpgAbilityKind kind) {
+    const auto& e=project.encounters[encounter_index];
+    auto& visual=enemy?enemy_visuals[actor]:party_visuals[actor];
+    const auto& participant=enemy?e.enemies[actor]:e.party[actor];
+    if(participant.animation_set)gbs::play_battle_rpg_action(visual,*participant.animation_set,kind);
+    const bool offensive=kind==gbs::BattleRpgAbilityKind::Attack || kind==gbs::BattleRpgAbilityKind::Magic;
+    if(offensive && target>=0){
+        auto& hit=enemy?party_visuals[target]:enemy_visuals[target];
+        const auto& victim=enemy?e.party[target]:e.enemies[target];
+        if(victim.animation_set)gbs::play_battle_rpg_pose(hit,victim.animation_set->hurt);
+    }
+    if(!e.presentation)return;
+    const bool support=kind==gbs::BattleRpgAbilityKind::Heal || kind==gbs::BattleRpgAbilityKind::Defend;
+    const int cue=support?5:kind==gbs::BattleRpgAbilityKind::Magic?3:2;
+    battle_sound(cue);
+    if(offensive)hurt_sound_delay=6;
+    const int fx=support?2:kind==gbs::BattleRpgAbilityKind::Magic?1:enemy?3:0;
+    if(e.presentation->effects[fx])gbs::play_sprite_animation(effect_animator,*e.presentation->effects[fx]);
+    effect_position=kind==gbs::BattleRpgAbilityKind::Defend?gbs::Vec2i{166,81}:enemy?gbs::Vec2i{54,84}:kind==gbs::BattleRpgAbilityKind::Magic?gbs::Vec2i{182,82}:gbs::Vec2i{180,86};
+    if(kind==gbs::BattleRpgAbilityKind::Heal || (!enemy && kind==gbs::BattleRpgAbilityKind::Defend)) {
+        const int recipient=kind==gbs::BattleRpgAbilityKind::Heal?target:actor;
+        const int count=enemy?e.enemy_count:e.party_count;
+        if(recipient>=0 && recipient<count) {
+            const auto& unit=enemy?e.enemies[recipient]:e.party[recipient];
+            const auto position=battle_participant_position(e,recipient,enemy);
+            effect_position={position.x,position.y-(unit.use_authored_position?28:0)};
+        }
+    }
+    if(battle_has_status_hud()) {
+        const bool recipient_enemy=support?enemy:!enemy;
+        const int recipient=kind==gbs::BattleRpgAbilityKind::Defend?actor:target;
+        const int count=recipient_enemy?e.enemy_count:e.party_count;
+        if(recipient>=0 && recipient<count) {
+            const auto& unit=recipient_enemy?e.enemies[recipient]:e.party[recipient];
+            if(!unit.use_authored_position) {
+                const auto position=battle_participant_position(e,recipient,recipient_enemy);
+                effect_position={position.x+16,position.y+16};
+            }
+        }
+    }
+}
+bool use_presented_battle_ability(const gbs::BattleRpgEncounterData& e) {
+    const int actor=state.selected_party;
+    const auto kind=e.party[actor].abilities[state.selected_ability].kind;
+    const int target=kind==gbs::BattleRpgAbilityKind::Heal?state.selected_ally:state.selected_enemy;
+    const bool used=gbs::use_selected_battle_ability(state,e);
+    if(used)present_battle_action(false,actor,target,kind);
+    return used;
+}
+void update_battle_presentation() {
+    const auto& e=project.encounters[encounter_index];
+    if(hurt_sound_delay>0 && --hurt_sound_delay==0)battle_sound(4);
+    gbs::update_sprite_animator(effect_animator);
+    for(int i=0;i<e.party_count;++i)if(e.party[i].animation_set){
+        if(outcome_visual_started && state.outcome==gbs::BattleRpgOutcome::Victory)gbs::update_sprite_animator(party_visuals[i].animator);
+        else gbs::update_battle_rpg_actor_presentation(party_visuals[i],*e.party[i].animation_set,state.party_hp[i]<=0,state.party_defending[i]);
+    }
+    for(int i=0;i<e.enemy_count;++i)if(e.enemies[i].animation_set)
+        gbs::update_battle_rpg_actor_presentation(enemy_visuals[i],*e.enemies[i].animation_set,state.enemy_hp[i]<=0,state.enemy_defending[i]);
+    if(!e.presentation || state.outcome==gbs::BattleRpgOutcome::InProgress || battle_visual_busy())return;
+    if(!outcome_visual_started){
+        outcome_visual_started=true;
+        battle_sound(6);
+        if(state.outcome==gbs::BattleRpgOutcome::Victory){
+            for(int i=0;i<e.party_count;++i)if(e.party[i].animation_set)gbs::play_battle_rpg_pose(party_visuals[i],e.party[i].animation_set->victory);
+            const int track=e.presentation->victory_tracker;
+            if(track>=0 && static_cast<size_t>(track)<project.tracker_asset_count){
+                gbs::play_tracker_music(project.tracker_assets[track]);
+#if GBS_MULTI_RUNTIME
+                checkpoint_tracker_index=track;checkpoint_music_index=-1;
+#endif
+            }
+        }
+    }
+    ++outcome_visual_frames;
+    if(outcome_visual_frames==45 && state.outcome==gbs::BattleRpgOutcome::Victory)
+        for(int i=0;i<e.enemy_count;++i)if(e.enemies[i].animation_set)gbs::play_battle_rpg_pose(enemy_visuals[i],e.enemies[i].animation_set->reactivate);
+}
 volatile gbs::RuntimeTelemetryBlock& runtime_telemetry = gbs::runtime_telemetry_block();
 constexpr size_t max_resource_bank_reservations = 64;
 gbs::ResourceBankReservation active_resource_bank_reservations[max_resource_bank_reservations] __attribute__((section(".ewram_bss"))) = {};
@@ -110,8 +228,6 @@ gbs::ResourceBankBatchReservation scratch_resource_bank_group {
 };
 
 #if GBS_MULTI_RUNTIME
-int checkpoint_music_index = -1;
-int checkpoint_tracker_index = -1;
 struct BattleRpgRuntimeCheckpoint {
     uint32_t version;
     gbs::BattleRpgRuntimeState state;
@@ -135,13 +251,15 @@ gbs::EventScript checkpoint_script_for(int room, int script_index) {
     case 1: return room_data.on_victory;
     case 2: return room_data.on_defeat;
     case 3: return room_data.on_escape;
-    default: return gbs::empty_event_script();
+    case 4: return room_data.on_hit_player;
+    default: return script_index >= 5 && static_cast<size_t>(script_index - 5) < project.script_count
+        ? project.scripts[script_index - 5] : gbs::empty_event_script();
     }
 }
 
 int current_checkpoint_script_index() {
     if (!gbs::has_event_script(battle_event_runner.script)) return -1;
-    for (int index = 0; index < 4; ++index) {
+    for (int index = 0; index < 5 + static_cast<int>(project.script_count); ++index) {
         const auto script = checkpoint_script_for(encounter_index, index);
         if (script.commands == battle_event_runner.script.commands && script.command_count == battle_event_runner.script.command_count) return index;
     }
@@ -153,7 +271,7 @@ bool capture_battle_rpg_checkpoint(gbs::UniversalSaveData& data) {
     const int script_index = current_checkpoint_script_index();
     if (battle_event_runner.active && script_index < 0) return false;
     const BattleRpgRuntimeCheckpoint snapshot {
-        1, state, gbs::capture_checkpoint_script(battle_event_runner, script_index),
+        2, state, gbs::capture_checkpoint_script(battle_event_runner, script_index, event_state),
         gbs::capture_checkpoint_dialogue(dialogue), gbs::capture_checkpoint_events(event_state),
         checkpoint_music_index, checkpoint_tracker_index, battle_event_wait_frames,
         battle_script_controls_dialogue, outcome_hook_started, outcome_hook_handled
@@ -167,15 +285,15 @@ bool restore_battle_rpg_checkpoint(int slot) {
     gbs::UniversalSaveData data {};
     BattleRpgRuntimeCheckpoint snapshot {};
     if (service == nullptr || gbs::read_runtime_save(*service, slot, data) != gbs::SaveStatus::Ok ||
-        !gbs::read_universal_save_payload(data, gbs::UniversalSaveRuntime::BattleRpg, &snapshot, sizeof(snapshot)) ||
-        snapshot.version != 1 || data.room_index < 0 || static_cast<size_t>(data.room_index) >= project.encounter_count ||
+        !gbs::read_checkpoint_snapshot(data, gbs::UniversalSaveRuntime::BattleRpg, snapshot) ||
+        snapshot.version != 2 || data.room_index < 0 || static_cast<size_t>(data.room_index) >= project.encounter_count ||
         snapshot.wait_frames < 0 || snapshot.music_index < -1 || snapshot.tracker_index < -1 ||
         (snapshot.music_index >= 0 && static_cast<size_t>(snapshot.music_index) >= project.music_asset_count) ||
         (snapshot.tracker_index >= 0 && static_cast<size_t>(snapshot.tracker_index) >= project.tracker_asset_count) ||
         !gbs::valid_checkpoint_dialogue(snapshot.dialogue, project.dialogue_line_count)) return false;
     gbs::EventRunner restored_runner {};
     if (!gbs::restore_checkpoint_script(snapshot.script,
-            checkpoint_script_for(data.room_index, snapshot.script.script_index), restored_runner)) return false;
+            checkpoint_script_for(data.room_index, snapshot.script.script_index), restored_runner, &event_state)) return false;
     const auto& encounter = project.encounters[data.room_index];
     if (snapshot.state.outcome > gbs::BattleRpgOutcome::Escaped ||
         snapshot.state.selected_party < 0 || snapshot.state.selected_party >= encounter.party_count ||
@@ -261,6 +379,8 @@ void consume_event_state() {
             project.dialogue_line_count,
             event_state.last_dialogue
         );
+        gbs::set_dialogue_frame(dialogue, gbs::active_dialogue_ui_config().full_width_bottom
+            ? gbs::dialogue_frame_full_width : gbs::dialogue_frame_default);
         event_state.last_dialogue = -1;
         battle_script_controls_dialogue = dialogue.visible;
     }
@@ -318,7 +438,7 @@ void consume_event_state() {
         gbs::fade_audio_channel_volume(
             gbs::audio_channel_from_event_value(event_state.audio_fade_channel),
             static_cast<uint8_t>(event_state.audio_fade_target_volume),
-            static_cast<uint16_t>(event_state.audio_fade_frames)
+            static_cast<uint16_t>(event_state.audio_fade_frames), static_cast<uint8_t>(event_state.audio_fade_ceiling_volume)
         );
         event_state.audio_fade_changed = false;
     }
@@ -394,11 +514,32 @@ void append_hud_number(char* output, int& cursor, int value) {
     output[cursor++] = static_cast<char>('0' + (value % 10));
 }
 
-void format_battle_hud_text(char* output, const char* label, int hp, int max_hp) {
-    int cursor = 0;
-    for (int index = 0; index < 4 && label != nullptr && label[index] != '\0'; ++index) {
-        output[cursor++] = label[index];
+void append_battle_label(char* output, size_t capacity, const char* text, size_t max_glyphs) {
+    if(text==nullptr || capacity==0)return;
+    size_t cursor=std::strlen(output);
+    for(size_t glyph=0;*text && glyph<max_glyphs;++glyph) {
+        const char* next=text;
+        gbs_text_next_codepoint(&next);
+        if(cursor+static_cast<size_t>(next-text)>=capacity)break;
+        while(text<next)output[cursor++]=*text++;
     }
+    output[cursor]='\0';
+}
+
+void format_battle_participant_choice(char* output, size_t capacity,
+    const gbs::BattleRpgParticipantData& participant, int index, int count) {
+    output[0]='\0';
+    if(count>1 && capacity>=3) {
+        output[0]=static_cast<char>('1'+index);output[1]=' ';output[2]='\0';
+    }
+    const char* name=participant.hud_label && participant.hud_label[0]?participant.hud_label:participant.name;
+    append_battle_label(output,capacity,name,31);
+}
+
+void format_battle_hud_text(char* output, const char* label, int hp, int max_hp) {
+    output[0]='\0';
+    append_battle_label(output,48,label,4);
+    int cursor=static_cast<int>(std::strlen(output));
     output[cursor++] = ' ';
     append_hud_number(output, cursor, hp);
     output[cursor++] = '/';
@@ -416,15 +557,6 @@ bool battle_hud_uses_compact_status() {
     return false;
 }
 
-void format_battle_hud_name(char* output, const char* label) {
-    int cursor = 0;
-    while (label != nullptr && label[cursor] != '\0' && cursor < 47) {
-        output[cursor] = label[cursor];
-        ++cursor;
-    }
-    output[cursor] = '\0';
-}
-
 void update_battle_hud() {
     const bool compact = battle_hud_uses_compact_status();
     const gbs::BattleRpgEncounterData& encounter = project.encounters[encounter_index];
@@ -435,7 +567,7 @@ void update_battle_hud() {
         ? state.selected_enemy
         : 0;
     if (encounter.party_count > 0) {
-        if (compact) format_battle_hud_name(battle_party_hud_text, encounter.party[party_index].name);
+        if (compact) format_battle_participant_choice(battle_party_hud_text,sizeof(battle_party_hud_text),encounter.party[party_index],party_index,encounter.party_count);
         else format_battle_hud_text(
             battle_party_hud_text,
             encounter.party[party_index].name,
@@ -453,7 +585,7 @@ void update_battle_hud() {
         gbs::set_hud_value(battle_hud, gbs::HudValueSource::P1Health, 0, 0);
     }
     if (encounter.enemy_count > 0) {
-        if (compact) format_battle_hud_name(battle_enemy_hud_text, encounter.enemies[enemy_index].name);
+        if (compact) format_battle_participant_choice(battle_enemy_hud_text,sizeof(battle_enemy_hud_text),encounter.enemies[enemy_index],enemy_index,encounter.enemy_count);
         else format_battle_hud_text(
             battle_enemy_hud_text,
             encounter.enemies[enemy_index].name,
@@ -473,6 +605,44 @@ void update_battle_hud() {
         battle_enemy_hud_text[0] = '\0';
         battle_enemy_hp_hud_text[0] = '\0';
         gbs::set_hud_value(battle_hud, gbs::HudValueSource::P2Health, 0, 0);
+    }
+    if(authored_battle_ui()) {
+        char selected_name[24]={},reward_text[32]={};
+        const auto& selected_unit=encounter.party[party_index];
+        format_battle_participant_choice(selected_name,sizeof(selected_name)-1,selected_unit,party_index,encounter.party_count);
+        std::strcat(selected_name,"?");
+        const char* first="O QUE FARA", *second=selected_name;
+        if(state.outcome==gbs::BattleRpgOutcome::Victory){
+            first=encounter.presentation->victory_label;
+            int cursor=0;append_hud_number(reward_text,cursor,state.reward_gold);reward_text[cursor++]=' ';reward_text[cursor++]='G';reward_text[cursor++]=' ';reward_text[cursor++]=' ';
+            append_hud_number(reward_text,cursor,state.reward_experience);reward_text[cursor++]=' ';reward_text[cursor++]='E';reward_text[cursor++]='X';reward_text[cursor++]='P';reward_text[cursor]='\0';second=reward_text;
+        }
+        else if(state.outcome==gbs::BattleRpgOutcome::Defeat){first="GRUPO CAIU";second="TENTE NOVAMENTE";}
+        else if(battle_menu_page==BattleMenuPage::Notice){
+            const bool action_succeeded = battle_menu_wait_for_enemy_turn ||
+                (battle_menu_notice_line.text != nullptr && std::strcmp(battle_menu_notice_line.text, "ACAO EXECUTADA.") == 0);
+            first=action_succeeded?"ACAO EXECUTADA":"SEM ALTERACAO";second=battle_menu_wait_for_enemy_turn?"AGUARDE":"";
+            if(battle_menu_parent_choice==3)first="FUGA BLOQUEADA";
+            if(battle_menu_parent_choice==2)first=action_succeeded?"ITEM USADO":"SEM ALTERACAO";
+            if(battle_menu_parent_choice==1)first="EQUIPE PRONTA";
+        } else if(state.enemy_turn_pending){first="TURNO DO RELE";second="AGUARDE";}
+        authored_prompt[0]='\0';append_battle_label(authored_prompt,sizeof(authored_prompt)-2,first,24);
+        std::strcat(authored_prompt,"\n\n");append_battle_label(authored_prompt,sizeof(authored_prompt),second,24);
+        authored_commands[0]='\0'; authored_cursor[0]='\0';
+        const bool root=battle_menu_page==BattleMenuPage::Root || battle_menu_page==BattleMenuPage::Notice || !battle_menu_dialogue.visible;
+        const auto* choices=root?battle_root_choices:battle_menu_dialogue.choices;
+        const int count=root?4:static_cast<int>(battle_menu_dialogue.choice_count);
+        const int first_choice=root || battle_menu_dialogue.selected_choice<0?0:(battle_menu_dialogue.selected_choice/4)*4;
+        for(int row=0;row<4 && first_choice+row<count;++row){
+            const int i=first_choice+row;
+            if(row)std::strcat(authored_commands,"\n");
+            if(root && i==3 && !encounter.config.escape_enabled)continue;
+            const char* label=choices[i].text;
+            // Seven complete glyphs fit each command row; no wrapping into the next option.
+            append_battle_label(authored_commands,sizeof(authored_commands),label,7);
+        }
+        const char* slots[]={battle_party_hud_text,battle_enemy_hud_text,battle_party_hp_hud_text,battle_enemy_hp_hud_text,authored_prompt,authored_commands};
+        gbs::set_hud_text_slots(battle_hud,slots,6);return;
     }
     if (compact) {
         const char* slots[] = { battle_party_hud_text, battle_enemy_hud_text, battle_party_hp_hud_text, battle_enemy_hp_hud_text };
@@ -546,6 +716,8 @@ void show_battle_menu_choices(
 }
 
 void show_battle_menu_root(int selected_choice = 0) {
+    battle_menu_target_is_item = false;
+    battle_menu_item_index = -1;
     show_battle_menu_choices(
         BattleMenuPage::Root,
         battle_root_choices,
@@ -590,7 +762,8 @@ void prepare_battle_move_choices(const gbs::BattleRpgEncounterData& encounter) {
 
 void prepare_battle_party_choices(const gbs::BattleRpgEncounterData& encounter) {
     for (int index = 0; index < encounter.party_count; ++index) {
-        battle_party_choices[index] = { encounter.party[index].name, index };
+        format_battle_participant_choice(battle_party_labels[index],sizeof(battle_party_labels[index]),encounter.party[index],index,encounter.party_count);
+        battle_party_choices[index] = { battle_party_labels[index], index };
     }
 }
 
@@ -598,8 +771,47 @@ void prepare_battle_target_choices(const gbs::BattleRpgEncounterData& encounter,
     const gbs::BattleRpgParticipantData* participants = ally ? encounter.party : encounter.enemies;
     const int participant_count = ally ? encounter.party_count : encounter.enemy_count;
     for (int index = 0; index < participant_count; ++index) {
-        battle_target_choices[index] = { participants[index].name, index };
+        format_battle_participant_choice(battle_target_labels[index],sizeof(battle_target_labels[index]),participants[index],index,participant_count);
+        battle_target_choices[index] = { battle_target_labels[index], index };
     }
+}
+
+void show_battle_item_choices(const gbs::BattleRpgEncounterData& encounter) {
+    size_t count = 0;
+    for (size_t index = 0; index < encounter.inventory_item_count; ++index) {
+        const auto& item = encounter.inventory_items[index];
+        const int quantity = event_state.inventory[item.item_index];
+        if (quantity <= 0) continue;
+        char* label = battle_item_labels[count];
+        int cursor = 0;
+        append_hud_number(label, cursor, quantity);
+        label[cursor++] = ' ';
+        const char* text = item.label;
+        for (int glyph = 0; *text && glyph < 8; ++glyph) {
+            const char* next = text;
+            gbs_text_next_codepoint(&next);
+            while (text < next) label[cursor++] = *text++;
+        }
+        label[cursor] = '\0';
+        battle_item_choices[count] = { label, static_cast<int>(index) };
+        battle_item_indices[count++] = static_cast<int>(index);
+    }
+    if (count == 0) {
+        battle_item_choices[0] = { "VAZIO", -1 };
+        battle_item_indices[0] = -1;
+        count = 1;
+    }
+    show_battle_menu_choices(BattleMenuPage::Items, battle_item_choices, count, 2);
+}
+
+void use_presented_battle_item(const gbs::BattleRpgEncounterData& encounter, int target) {
+    const bool used = gbs::use_battle_inventory_item(state, encounter, event_state, battle_menu_item_index, target);
+    if (used) {
+        present_battle_action(false, state.selected_party, target, gbs::BattleRpgAbilityKind::Heal);
+        if (gbastudio_battle_rpg_project::save_autosave) persist_battle_rpg_runtime_state();
+    }
+    battle_menu_target_is_item = false;
+    show_battle_menu_notice(used ? "ITEM USADO." : "ITEM INDISPONIVEL.", 2, used);
 }
 
 bool update_battle_menu(const gbs::InputState& input) {
@@ -615,6 +827,11 @@ bool update_battle_menu(const gbs::InputState& input) {
         gbs::hide_dialogue(battle_menu_dialogue);
         if (battle_menu_page == BattleMenuPage::Targets) {
             const gbs::BattleRpgEncounterData& encounter = project.encounters[encounter_index];
+            if (battle_menu_target_is_item) {
+                battle_menu_target_is_item = false;
+                show_battle_item_choices(encounter);
+                return true;
+            }
             prepare_battle_move_choices(encounter);
             show_battle_menu_choices(
                 BattleMenuPage::Moves,
@@ -634,10 +851,12 @@ bool update_battle_menu(const gbs::InputState& input) {
         input.was_pressed(gbs::ButtonRight);
     if (navigation_pressed && !input.was_pressed(gbs::ButtonA)) {
         gbs::advance_dialogue(battle_menu_dialogue, input);
+        battle_sound(0);
         return true;
     }
     if (!input.was_pressed(gbs::ButtonA) && !dismiss_notice) return false;
 
+    battle_sound(1);
     gbs::advance_dialogue(battle_menu_dialogue, input);
     if (battle_menu_dialogue.visible) return true;
     const int selected_choice = battle_menu_dialogue.last_choice_index;
@@ -665,7 +884,7 @@ bool update_battle_menu(const gbs::InputState& input) {
             return true;
         }
         if (selected_choice == 2) {
-            show_battle_menu_choices(BattleMenuPage::Items, battle_item_choices, 1, 2);
+            show_battle_item_choices(encounter);
             return true;
         }
         if (gbs::try_escape_battle(state, encounter)) {
@@ -695,7 +914,7 @@ bool update_battle_menu(const gbs::InputState& input) {
             );
             return true;
         }
-        const bool action_started = gbs::use_selected_battle_ability(state, encounter);
+        const bool action_started = use_presented_battle_ability(encounter);
         if (action_started && gbastudio_battle_rpg_project::save_autosave) {
             persist_battle_rpg_runtime_state();
         }
@@ -711,12 +930,16 @@ bool update_battle_menu(const gbs::InputState& input) {
     }
 
     if (battle_menu_page == BattleMenuPage::Targets) {
+        if (battle_menu_target_is_item) {
+            use_presented_battle_item(encounter, selected_choice);
+            return true;
+        }
         if (battle_menu_target_is_ally) {
             state.selected_ally = selected_choice;
         } else {
             state.selected_enemy = selected_choice;
         }
-        const bool action_started = gbs::use_selected_battle_ability(state, encounter);
+        const bool action_started = use_presented_battle_ability(encounter);
         if (action_started && gbastudio_battle_rpg_project::save_autosave) {
             persist_battle_rpg_runtime_state();
         }
@@ -740,7 +963,17 @@ bool update_battle_menu(const gbs::InputState& input) {
     }
 
     if (battle_menu_page == BattleMenuPage::Items) {
-        show_battle_menu_notice("NAO HA ITENS DISPONIVEIS.", 2);
+        battle_menu_item_index = battle_item_indices[selected_choice];
+        if (battle_menu_item_index < 0) {
+            show_battle_menu_notice("NAO HA ITENS DISPONIVEIS.", 2);
+        } else if (encounter.party_count > 1) {
+            battle_menu_target_is_ally = true;
+            battle_menu_target_is_item = true;
+            prepare_battle_target_choices(encounter, true);
+            show_battle_menu_choices(BattleMenuPage::Targets, battle_target_choices, encounter.party_count, 2);
+        } else {
+            use_presented_battle_item(encounter, 0);
+        }
         return true;
     }
 
@@ -784,6 +1017,10 @@ bool stream_encounter_resource_group(const gbs::BattleRpgEncounterData& encounte
 
 void apply_battle_visuals(const gbs::BattleRpgEncounterData& encounter) {
     battle_ui_restore_pending = true;
+    for(auto& visual:party_visuals)gbs::reset_battle_rpg_actor_presentation(visual);
+    for(auto& visual:enemy_visuals)gbs::reset_battle_rpg_actor_presentation(visual);
+    gbs::init_sprite_animator(effect_animator);effect_loaded_tiles=nullptr;
+    outcome_visual_frames=0;outcome_visual_started=false;hurt_sound_delay=0;
     /* Battle scenes use a dedicated authored layer (normally BG2). Disable
      * optional layers first so a previous runtime cannot leak stale maps into
      * the encounter, then enable the layer selected by the encounter below. */
@@ -820,12 +1057,43 @@ void apply_battle_visuals(const gbs::BattleRpgEncounterData& encounter) {
     gbs::load_tilemap(background->layer, background->tilemap);
     gbs::set_bg_enabled(background->layer, true);
     gbs::set_bg_scroll(background->layer, 0, 0);
+    if(encounter.presentation && encounter.presentation->hud_background_index>=0 && static_cast<size_t>(encounter.presentation->hud_background_index)<project.background_count){
+        const auto& hud=project.backgrounds[encounter.presentation->hud_background_index];
+        gbs::load_tilemap(hud.layer,hud.tilemap);gbs::set_bg_enabled(hud.layer,true);gbs::set_bg_scroll(hud.layer,0,0);
+    }
 }
 
 void clear_battle_meter_tiles(int x, int y, int width) {
     for (int offset = 0; offset < width; ++offset) {
         gbs::set_bg_tile(gbs::BackgroundLayer::BG0, x + offset, y, 32, 32, 0);
     }
+}
+
+bool battle_has_status_hud() {
+    const auto* layout=gbs::active_hud_layout();
+    if(!layout)return false;
+    for(size_t i=0;i<layout->component_count;++i)
+        if(layout->components[i].value_source==gbs::HudValueSource::P1Health ||
+            layout->components[i].value_source==gbs::HudValueSource::P2Health)return true;
+    return false;
+}
+
+gbs::Vec2i battle_participant_position(const gbs::BattleRpgEncounterData& encounter, int index, bool enemy) {
+    const auto& participant=enemy?encounter.enemies[index]:encounter.party[index];
+    if(participant.use_authored_position)return participant.position;
+    if(!battle_has_status_hud())return enemy?gbs::Vec2i{176,24+index*28}:gbs::Vec2i{48,32+index*40};
+    const int count=enemy?encounter.enemy_count:encounter.party_count;
+    // Keep automatic 32px formations inside the playfield between the status
+    // panels and lower command box. Authored positions retain full control.
+    if(enemy) {
+        if(count==1)return {176,56};
+        if(count==2)return {136+index*48,56};
+        if(count<=4)return {136+(index%2)*48,48+(index/2)*32};
+        return {112+(index%4)*32,48+(index/4)*32};
+    }
+    if(count==1)return {48,32};
+    if(count==2)return {24+index*48,32};
+    return {24+(index%2)*48,(index/2)*32};
 }
 
 void draw_battle_participant_metasprite(
@@ -835,14 +1103,23 @@ void draw_battle_participant_metasprite(
     uint8_t sprite_scale
 ) {
     if (sprite_scale <= 1) {
-        gbs::set_metasprite(first_index, metasprite, position);
+        // World combatants stay behind the BG0 HUD and dialogue surfaces.
+        for (uint8_t i = 0; i < metasprite.part_count; ++i) {
+            const auto& part = metasprite.parts[i];
+            gbs::set_sprite(first_index + i, gbs::Sprite {
+                position.x + part.x, position.y + part.y, part.tile_index,
+                part.palette, part.hflip, part.vflip, true, 1,
+                gbs::SpriteRenderMode::Normal, false, part.width, part.height,
+                false, false, 0, part.color_depth
+            });
+        }
         return;
     }
 
     for (uint8_t part_index = 0; part_index < metasprite.part_count; ++part_index) {
         const gbs::MetaSpritePart& part = metasprite.parts[part_index];
         if (part.width > 32 || part.height > 32) {
-            gbs::set_metasprite(first_index, metasprite, position);
+            draw_battle_participant_metasprite(first_index, metasprite, position, 1);
             return;
         }
         gbs::set_sprite(first_index + part_index, gbs::Sprite {
@@ -853,7 +1130,7 @@ void draw_battle_participant_metasprite(
             part.hflip,
             part.vflip,
             true,
-            0,
+            1,
             gbs::SpriteRenderMode::Normal,
             false,
             part.width,
@@ -914,37 +1191,53 @@ void draw_battle() {
     gbs::hide_sprites(0, 88);
     draw_battle_meters(encounter);
     int sprite_index = 0;
+    // Lower OAM indices win at equal priority: action overlays must precede actors.
+    if(effect_animator.playing){
+        gbs::sync_sprite_animation_tiles(effect_animator,effect_loaded_tiles);
+        const auto* fx=gbs::current_metasprite(effect_animator);
+        if(fx){draw_battle_participant_metasprite(0,*fx,effect_position,1);sprite_index=fx->part_count;}
+    }
     gbs::set_affine_sprite_transform(0, gbs::AffineSpriteTransform { 128, 0, 0, 128 });
     for (int index = 0; index < encounter.party_count && sprite_index < 128; ++index) {
-        const gbs::MetaSprite* metasprite = gbs::battle_rpg_participant_metasprite_for(
-            encounter.party[index]
-        );
-        if (metasprite == nullptr || state.party_hp[index] <= 0) {
+        auto& visual=party_visuals[index];
+        gbs::sync_sprite_animation_tiles(visual.animator,visual.loaded_tiles);
+        const gbs::MetaSprite* metasprite = gbs::current_metasprite(visual.animator);
+        if(!metasprite)metasprite=encounter.party[index].metasprite;
+        if (metasprite == nullptr || (state.party_hp[index] <= 0 && !encounter.party[index].animation_set)) {
             continue;
         }
         draw_battle_participant_metasprite(
             sprite_index,
             *metasprite,
-            gbs::Vec2i { 48, 32 + index * 40 },
+            battle_participant_position(encounter,index,false),
             encounter.party[index].sprite_scale
         );
         sprite_index += metasprite->part_count;
     }
     for (int index = 0; index < encounter.enemy_count && sprite_index < 128; ++index) {
-        const gbs::MetaSprite* metasprite = gbs::battle_rpg_participant_metasprite_for(
-            encounter.enemies[index]
-        );
-        if (metasprite == nullptr || state.enemy_hp[index] <= 0) {
+        auto& visual=enemy_visuals[index];
+        gbs::sync_sprite_animation_tiles(visual.animator,visual.loaded_tiles);
+        const gbs::MetaSprite* metasprite = gbs::current_metasprite(visual.animator);
+        if(!metasprite)metasprite=encounter.enemies[index].metasprite;
+        if (metasprite == nullptr || (state.enemy_hp[index] <= 0 && !encounter.enemies[index].animation_set)) {
             continue;
         }
         draw_battle_participant_metasprite(
             sprite_index,
             *metasprite,
-            gbs::Vec2i { 176, 24 + index * 28 },
+            battle_participant_position(encounter,index,true),
             encounter.enemies[index].sprite_scale
         );
         sprite_index += metasprite->part_count;
     }
+    if(encounter.presentation && !dialogue.visible && !encounter.config.escape_enabled &&
+        (battle_menu_page==BattleMenuPage::Root || battle_menu_page==BattleMenuPage::Notice || !battle_menu_dialogue.visible) && encounter.presentation->disabled_escape)
+        gbs::set_metasprite(84,*encounter.presentation->disabled_escape,{172,148});
+    if(encounter.presentation && encounter.presentation->cursor && !dialogue.visible){
+        const int row=battle_menu_dialogue.visible && battle_menu_page!=BattleMenuPage::Notice?battle_menu_dialogue.selected_choice:0;
+        gbs::set_metasprite(86,*encounter.presentation->cursor,{160,124+8*(row>=0?row%4:0)});
+    }
+
 }
 
 bool persist_battle_rpg_runtime_state(int slot_index) {
@@ -1034,6 +1327,7 @@ bool restart_standalone_battle_from_transition() {
         return false;
     }
     gbs::init_dialogue(dialogue);
+    battle_dialogue_was_drawn = false;
     gbs::init_dialogue(battle_prompt_dialogue);
     gbs::init_dialogue(battle_menu_dialogue);
     gbs::init_hud(battle_hud);
@@ -1059,11 +1353,17 @@ bool restart_standalone_battle_from_transition() {
 
 int initialize_battle_rpg_runtime() {
     gbs::init();
+    // Standalone ROMs bypass the mixed-runtime dispatcher.
+    gbs::debug_set_runtime_kind(GBS_DIALOGUE_UI_RUNTIME_KIND);
+    gbs::configure_dialogue_portraits(gbastudio_battle_rpg_project::dialogue_portrait_assets,
+        gbastudio_battle_rpg_project::dialogue_portrait_asset_count);
     gbs::init_dialogue(dialogue);
+    battle_dialogue_was_drawn = false;
     gbs::init_dialogue(battle_prompt_dialogue);
     gbs::init_dialogue(battle_menu_dialogue);
     gbs::init_hud(battle_hud);
     gbs::init_event_state(event_state);
+    gbs::bind_event_scripts(event_state, project.scripts, project.script_count);
     gbs::init_event_runner(battle_event_runner);
     gbs::init_resource_manager(resource_manager);
     gbs::reset_runtime_telemetry();
@@ -1123,6 +1423,11 @@ int initialize_battle_rpg_runtime() {
 #endif
     if (!restored) {
         const gbs::BattleRpgEncounterData& encounter = project.encounters[encounter_index];
+        for (size_t index = 0; index < encounter.inventory_item_count; ++index) {
+            const auto& item = encounter.inventory_items[index];
+            if (event_state.inventory[item.item_index] < item.initial_quantity)
+                event_state.inventory[item.item_index] = item.initial_quantity;
+        }
         start_battle_event_script(encounter.on_enter);
         if (gbastudio_battle_rpg_project::save_autosave) {
             persist_battle_rpg_runtime_state();
@@ -1137,6 +1442,19 @@ int initialize_battle_rpg_runtime() {
     }
 
     return 0;
+}
+
+void tick_battle_turn() {
+    const bool pending = state.enemy_turn_pending;
+    const auto before_turn = state;
+    const auto& encounter = project.encounters[encounter_index];
+    gbs::tick_battle_rpg(state, encounter);
+    if (gbs::battle_rpg_party_took_damage(before_turn, state, encounter)) {
+        start_battle_event_script(encounter.on_hit_player);
+    }
+    if (pending && !state.enemy_turn_pending && state.last_enemy_actor >= 0) {
+        present_battle_action(true, state.last_enemy_actor, state.last_enemy_target, state.last_enemy_ability);
+    }
 }
 
 gbs::RuntimeAdapterFrameResult update_battle_rpg_runtime(const gbs::RuntimeFrameContext& context) {
@@ -1154,15 +1472,19 @@ gbs::RuntimeAdapterFrameResult update_battle_rpg_runtime(const gbs::RuntimeFrame
 #endif
     gbs::set_event_input_state(event_state, input.held, input.pressed, input.released);
     gbs::update_hud_behavior(event_state, battle_hud.visible);
+    update_battle_presentation();
     const bool script_active = update_battle_event_script(input);
     if (!script_active && !dialogue.visible) {
         if (state.outcome == gbs::BattleRpgOutcome::InProgress) {
             if (!battle_menu_dialogue.visible && !state.enemy_turn_pending) {
                 show_battle_menu_root(battle_menu_parent_choice);
             }
-            update_battle_controls(input);
-            if (!battle_menu_dialogue.visible) {
-                gbs::tick_battle_rpg(state, project.encounters[encounter_index]);
+            if(!battle_visual_busy()){
+                if(authored_battle_ui() && battle_menu_page==BattleMenuPage::Notice && battle_menu_wait_for_enemy_turn){gbs::hide_dialogue(battle_menu_dialogue);battle_menu_wait_for_enemy_turn=false;}
+                else update_battle_controls(input);
+            }
+            if (!battle_menu_dialogue.visible && !battle_visual_busy()) {
+                tick_battle_turn();
             }
             if (!battle_menu_dialogue.visible && !state.enemy_turn_pending &&
                 state.outcome == gbs::BattleRpgOutcome::InProgress) {
@@ -1173,7 +1495,10 @@ gbs::RuntimeAdapterFrameResult update_battle_rpg_runtime(const gbs::RuntimeFrame
         }
     }
 
-    if (state.outcome != gbs::BattleRpgOutcome::InProgress && !outcome_hook_started) {
+    if (state.outcome != gbs::BattleRpgOutcome::InProgress && !outcome_hook_started &&
+        !gbs::event_runner_is_active(battle_event_runner) &&
+        !battle_script_controls_dialogue && battle_event_wait_frames == 0 &&
+        (!authored_battle_ui() || outcome_visual_frames>=project.encounters[encounter_index].presentation->outcome_hold_frames)) {
         outcome_hook_started = true;
         const gbs::EventScript outcome_script = gbs::battle_rpg_outcome_script(
             project.encounters[encounter_index],
@@ -1202,6 +1527,7 @@ gbs::RuntimeAdapterFrameResult update_battle_rpg_runtime(const gbs::RuntimeFrame
 }
 
 void render_battle_rpg_runtime(const gbs::RuntimeFrameContext& context) {
+    const gbs::SubsystemProfilerScope profiler_scope(gbs::ProfilerSubsystem::Render);
     (void)context;
     draw_battle();
     update_battle_hud();
@@ -1215,19 +1541,48 @@ void render_battle_rpg_runtime(const gbs::RuntimeFrameContext& context) {
         gbs::render_ui_assets();
         battle_ui_restore_pending = false;
     }
-    if (dialogue.visible) {
+    // A hidden dialogue must clear its previous rectangles once, before HUD
+    // components are redrawn. Otherwise its stale tiles cover battle commands.
+    if (!dialogue.visible && battle_dialogue_was_drawn) {
         gbs::draw_dialogue(dialogue);
-    } else {
+        battle_dialogue_was_drawn = false;
+    }
+    if(!dialogue.visible && !authored_battle_ui()) {
         gbs::draw_dialogue(battle_prompt_dialogue);
         gbs::draw_dialogue(battle_menu_dialogue);
     }
-    /* Draw the battle HUD last so the status labels remain visible after
-     * the dialogue layer refreshes its UI resources and BG0 contents. */
-    gbs::draw_hud(battle_hud);
+    if (dialogue.visible) {
+        const auto box = gbs::dialogue_box_layout_for_frame(dialogue.frame_index);
+        int top = box.y * 8;
+        const auto& config = gbs::active_dialogue_ui_config();
+        if (config.name_label_above && config.show_character_name && dialogue.speaker && dialogue.speaker[0]) {
+            top = gbs::dialogue_name_label_layout_for_frame(dialogue.frame_index, box.w).y * 8;
+        }
+        if (gbs::dialogue_should_show_portrait(dialogue)) {
+            // Reserve the portrait and its frame margin, including small
+            // portraits centered inside the minimum slot dimensions.
+            const int portrait_top = gbs::dialogue_portrait_position_pixels(dialogue).y - 8;
+            if (portrait_top < top) top = portrait_top;
+        }
+        if (top < 0) top = 0;
+        gbs::draw_hud_excluding(battle_hud, 0, top, 240, 160 - top);
+    } else {
+        gbs::draw_hud(battle_hud);
+    }
+    if (dialogue.visible) {
+        gbs::draw_dialogue(dialogue);
+        gbs::draw_dialogue_portrait(dialogue);
+        battle_dialogue_was_drawn = true;
+    }
+    const auto* presentation=project.encounters[encounter_index].presentation;
+    // The authored BG1 frame owns bank 14; the generic HUD skin also uses it.
+    // Restore only the encounter's 16-color frame bank after native UI writes.
+    if(presentation && presentation->hud_palette)gbs::load_palette(*presentation->hud_palette,false);
     gbs::wait_vblank();
 }
 
 void leave_battle_rpg_runtime() {
+    battle_dialogue_was_drawn = false;
     gbs::release_resource_bank_group(resource_manager, active_resource_bank_group);
 }
 

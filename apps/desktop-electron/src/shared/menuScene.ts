@@ -26,13 +26,31 @@ export type MenuSceneReturnPolicy = "title" | "resume";
 /** Define se o menu é aberto como cena nativa, HUD legado ou ambos. */
 export type MenuScenePresentationMode = "scene" | "hud" | "both";
 
-export type MenuSceneItemBindingSource = "variable" | "inventory" | "stat" | "equipped";
+export type MenuSceneItemBindingSource = "variable" | "inventory" | "stat" | "equipped" | "text" | "context";
 export type MenuSceneItemBindingFormat = "number" | "count" | "percent" | "on_off";
 
 export interface MenuSceneItemBinding {
   source: MenuSceneItemBindingSource;
   index: number;
   format: MenuSceneItemBindingFormat;
+}
+
+export interface MenuHudBinding {
+  slot: number;
+  columns?: number;
+  binding?: MenuSceneItemBinding;
+  selectedItem?: boolean;
+}
+
+export interface MenuPageNavigation {
+  previousScreenID: string;
+  nextScreenID: string;
+}
+
+export interface MenuVisibilityCondition {
+  binding: MenuSceneItemBinding;
+  value: number;
+  negate?: boolean;
 }
 
 export type MenuSceneItemAction =
@@ -65,6 +83,7 @@ export interface MenuSceneItem {
   step: number;
   checkedValue: number;
   binding?: MenuSceneItemBinding;
+  availableRuntime?: "racing";
   audioChannel?: "music" | "sfx" | "pcm_music" | "pcm_sfx" | "all";
   requiresSave?: boolean;
   saveSlot?: number;
@@ -106,8 +125,13 @@ export interface MenuBackgroundAnimationConfig {
 }
 
 export type MenuHudMode = "none";
+export type MenuAudioAction = "navigate" | "confirm" | "back" | "unavailable";
+export type MenuActionSounds = Partial<Record<MenuAudioAction, string>>;
 
 export interface MenuEmbeddedScreenConfig {
+  hudBindings?: MenuHudBinding[];
+  pageNavigation?: MenuPageNavigation;
+  actionSounds?: MenuActionSounds;
   id: string;
   screenType: MenuScreenType;
   title: string;
@@ -116,7 +140,9 @@ export interface MenuEmbeddedScreenConfig {
   hudPresetId?: string;
   hudListRows?: number;
   hudTextColor?: number;
+  hudHeader?: {x:number;y:number;width:number;backgroundColor:number;textColor:number};
   hudTransparentText?: boolean;
+  hudFeedbackInDetails?: boolean;
   titleTextVariableName?: string;
   backgroundAnimation?: MenuBackgroundAnimationConfig;
   titleFadeFrames: number;
@@ -135,6 +161,9 @@ export interface MenuEmbeddedScreenConfig {
 }
 
 export interface MenuSceneConfig {
+  hudBindings?: MenuHudBinding[];
+  pageNavigation?: MenuPageNavigation;
+  actionSounds?: MenuActionSounds;
   screenType: MenuScreenType;
   role: MenuSceneRole;
   title: string;
@@ -143,7 +172,9 @@ export interface MenuSceneConfig {
   hudPresetId?: string;
   hudListRows?: number;
   hudTextColor?: number;
+  hudHeader?: {x:number;y:number;width:number;backgroundColor:number;textColor:number};
   hudTransparentText?: boolean;
+  hudFeedbackInDetails?: boolean;
   titleTextVariableName?: string;
   backgroundAnimation?: MenuBackgroundAnimationConfig;
   titleFadeFrames: number;
@@ -332,10 +363,16 @@ function normalizeClickBox(value: unknown, index: number): MenuClickBox {
   };
 }
 
-function normalizeMenuItemBinding(value: unknown): MenuSceneItemBinding | undefined {
+function normalizeHudHeader(value: unknown): MenuSceneConfig["hudHeader"] {
+  if(!value || typeof value !== "object")return undefined;
+  const h=record(value),x=integer(h.x,0,0,29);
+  return {x,y:integer(h.y,0,0,19),width:integer(h.width,1,1,30-x),backgroundColor:integer(h.backgroundColor,0,0,32767),textColor:integer(h.textColor,32767,0,32767)};
+}
+
+export function normalizeMenuItemBinding(value: unknown): MenuSceneItemBinding | undefined {
   const source = record(value);
   const bindingSource = source.source;
-  if (bindingSource !== "variable" && bindingSource !== "inventory" && bindingSource !== "stat" && bindingSource !== "equipped") {
+  if (bindingSource !== "variable" && bindingSource !== "inventory" && bindingSource !== "stat" && bindingSource !== "equipped" && bindingSource !== "text" && bindingSource !== "context") {
     return undefined;
   }
   const format = source.format === "count" || source.format === "percent" || source.format === "on_off"
@@ -345,9 +382,45 @@ function normalizeMenuItemBinding(value: unknown): MenuSceneItemBinding | undefi
     ? { minimum: 0, maximum: 63 }
     : bindingSource === "inventory"
       ? { minimum: 0, maximum: 15 }
-      : { minimum: 0, maximum: 7 };
+      : bindingSource === "context" ? {minimum:0,maximum:2} : { minimum: 0, maximum: 7 };
   const index = integer(source.index, -1, -1, limits.maximum);
   return index < limits.minimum ? undefined : { source: bindingSource, index, format };
+}
+
+function normalizeMenuPresentation(source: Record<string, unknown>): Pick<MenuSceneConfig, 'hudBindings'|'pageNavigation'> {
+  const values: MenuHudBinding[] = [];
+  if (Array.isArray(source.hudBindings)) for (const raw of source.hudBindings.slice(0,8)) {
+    const row = record(raw);
+    if (!Number.isInteger(row.slot) || Number(row.slot)<0 || Number(row.slot)>7 || values.some(v=>v.slot===row.slot)) continue;
+    const columns=Number.isInteger(row.columns)&&Number(row.columns)>0&&Number(row.columns)<=31?{columns:Number(row.columns)}:{};
+    if(row.selectedItem===true) { values.push({slot:Number(row.slot),selectedItem:true,...columns});continue; }
+    const rawBinding=record(row.binding), binding=normalizeMenuItemBinding(rawBinding);
+    if(binding && binding.index===rawBinding.index) values.push({slot:Number(row.slot),binding,...columns});
+  }
+  const page=record(source.pageNavigation), previousScreenID=stringValue(page.previousScreenID),nextScreenID=stringValue(page.nextScreenID);
+  return {...(values.length?{hudBindings:values}:{}),...(previousScreenID||nextScreenID?{pageNavigation:{previousScreenID,nextScreenID}}:{})};
+}
+
+export function normalizeMenuVisibilityConditions(value: unknown): MenuVisibilityCondition[] {
+  if(!Array.isArray(value)) return [];
+  return value.slice(0,8).flatMap(raw=>{
+    const row=record(raw),rawBinding=record(row.binding),binding=normalizeMenuItemBinding(rawBinding);
+    return binding && binding.index===rawBinding.index && Number.isInteger(row.value)
+      ? [{binding,value:Number(row.value),...(row.negate===true?{negate:true}:{})}] : [];
+  });
+}
+
+/** Editor composition represents a first-place result; runtime bindings are read by the ROM. */
+export function menuActorVisibleForEditor(actor: Record<string,unknown> | undefined, variables: Array<Record<string,unknown>> = []): boolean {
+  const conditions=normalizeMenuVisibilityConditions(actor?.menuVisibilityConditions);
+  const matches=(condition:MenuVisibilityCondition)=>{
+    const b=condition.binding;
+    const value=b.source==='variable'?Number(variables[b.index]?.initialValue??0)
+      : b.source==='equipped'?-1:b.source==='text'?(b.index===4?1:-1)
+      : b.source==='context'?[0,1,7][b.index]:0;
+    return (value===condition.value)!==Boolean(condition.negate);
+  };
+  return !conditions.length || (actor?.menuVisibilityAny===true?conditions.some(matches):conditions.every(matches));
 }
 
 function normalizeMenuItem(value: unknown, index: number): MenuSceneItem {
@@ -379,6 +452,7 @@ function normalizeMenuItem(value: unknown, index: number): MenuSceneItem {
     step: integer(source.step, 1, 1, 32767),
     checkedValue: integer(source.checkedValue, maxValue, minValue, maxValue),
     ...(binding ? { binding } : {}),
+    ...(source.availableRuntime === "racing" ? { availableRuntime: "racing" as const } : {}),
     ...(source.audioChannel === "music" || source.audioChannel === "sfx" || source.audioChannel === "pcm_music" || source.audioChannel === "pcm_sfx" || source.audioChannel === "all"
       ? { audioChannel: source.audioChannel }
       : {}),
@@ -460,6 +534,13 @@ function normalizeBackgroundAnimation(value: unknown): MenuBackgroundAnimationCo
   };
 }
 
+function normalizeActionSounds(value: unknown): MenuActionSounds | undefined {
+  const source = record(value);
+  const entries = (["navigate", "confirm", "back", "unavailable"] as const)
+    .flatMap(action => stringValue(source[action]) ? [[action, stringValue(source[action])]] : []);
+  return entries.length ? Object.fromEntries(entries) : undefined;
+}
+
 function normalizeEmbeddedScreens(value: unknown, parentProfile: MenuSceneProfile): MenuEmbeddedScreenConfig[] {
   if (!Array.isArray(value)) return [];
   const seenIDs = new Set<string>();
@@ -475,17 +556,22 @@ function normalizeEmbeddedScreens(value: unknown, parentProfile: MenuSceneProfil
     const hudMode = source.hudMode === "none" ? "none" as const : undefined;
     const hudPresetId = stringValue(source.hudPresetId);
     const onBackEventName = stringValue(source.onBackEventName);
+    const actionSounds = normalizeActionSounds(source.actionSounds);
     const backgroundAnimation = normalizeBackgroundAnimation(source.backgroundAnimation);
     const screenProfile = menuSceneProfile(source.menuProfile, parentProfile);
     const lifecycle = lifecycleForMenuProfile(screenProfile);
     const presentationMode = menuScenePresentationMode(source.presentationMode, presentationModeForMenuProfile(screenProfile));
     screens.push({
+      ...normalizeMenuPresentation(source),
+      ...(actionSounds ? { actionSounds } : {}),
       id,
       screenType: kind,
       title: stringValue(source.title, defaults.title),
       titleOverlayAssetName: stringValue(source.titleOverlayAssetName),
       ...(hudMode ? { hudMode } : {}),
       ...(source.hudTransparentText === true ? {hudTransparentText:true} : {}),
+      ...(source.hudFeedbackInDetails === true ? {hudFeedbackInDetails:true} : {}),
+      ...(source.hudHeader ? {hudHeader:normalizeHudHeader(source.hudHeader)} : {}),
       ...(Number.isInteger(source.hudTextColor) ? { hudTextColor: integer(source.hudTextColor, 32767, 0, 32767) } : {}),
       ...(Number(source.hudListRows) > 0 ? { hudListRows: integer(source.hudListRows, 4, 1, 6) } : {}),
       ...(stringValue(source.titleTextVariableName) ? { titleTextVariableName: stringValue(source.titleTextVariableName) } : {}),
@@ -577,13 +663,18 @@ export function normalizeMenuSceneConfig(value: unknown): MenuSceneConfig {
   const hudMode = source.hudMode === "none" ? "none" as const : undefined;
   const hudPresetId = stringValue(source.hudPresetId);
   const backgroundAnimation = normalizeBackgroundAnimation(source.backgroundAnimation);
+  const actionSounds = normalizeActionSounds(source.actionSounds);
   const config: MenuSceneConfig = {
+    ...normalizeMenuPresentation(source),
+    ...(actionSounds ? { actionSounds } : {}),
     screenType: kind,
     role,
     title: stringValue(source.title, defaults.title),
     titleOverlayAssetName: stringValue(source.titleOverlayAssetName),
     ...(hudMode ? { hudMode } : {}),
       ...(source.hudTransparentText === true ? {hudTransparentText:true} : {}),
+      ...(source.hudFeedbackInDetails === true ? {hudFeedbackInDetails:true} : {}),
+      ...(source.hudHeader ? {hudHeader:normalizeHudHeader(source.hudHeader)} : {}),
       ...(Number.isInteger(source.hudTextColor) ? { hudTextColor: integer(source.hudTextColor, 32767, 0, 32767) } : {}),
       ...(Number(source.hudListRows) > 0 ? { hudListRows: integer(source.hudListRows, 4, 1, 6) } : {}),
       ...(stringValue(source.titleTextVariableName) ? { titleTextVariableName: stringValue(source.titleTextVariableName) } : {}),

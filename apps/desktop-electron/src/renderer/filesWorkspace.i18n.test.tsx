@@ -59,7 +59,7 @@ describe("FilesWorkspace i18n", () => {
     expect(screen.getByText("Select a file to preview.")).toBeInTheDocument();
   });
 
-  it("renders the Files workspace chrome in Latin American Spanish", () => {
+  it("renders the Files workspace chrome in Spanish", () => {
     renderFilesWorkspace("es-ES");
 
     expect(screen.getByRole("region", { name: "Workspace Archivos" })).toBeInTheDocument();
@@ -67,8 +67,8 @@ describe("FilesWorkspace i18n", () => {
     expect(screen.getAllByRole("button", { name: "Importar" }).length).toBeGreaterThan(0);
     expect(screen.getByPlaceholderText("Buscar archivos")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Lista" })).toBeInTheDocument();
-    expect(screen.getByRole("heading", { name: "Donde se usa" })).toBeInTheDocument();
-    expect(screen.getByText("Ningun asset encontrado en el proyecto abierto.")).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Dónde se usa" })).toBeInTheDocument();
+    expect(screen.getByText("Ningún asset encontrado en el proyecto abierto.")).toBeInTheDocument();
     expect(screen.getByText("Selecciona un archivo para previsualizar.")).toBeInTheDocument();
   });
 });

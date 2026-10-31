@@ -5,6 +5,16 @@ import { DEFAULT_HUD_PRESET } from '../shared/hudPresets.js';
 const component: HudComponent = {id:'frame',kind:'frame',label:'',text:'',asset:'',x:8,y:8,width:224,height:144,zIndex:0,visible:true};
 const context = () => ({drawImage:vi.fn(),fillRect:vi.fn(),strokeRect:vi.fn(),fillText:vi.fn()}) as unknown as CanvasRenderingContext2D;
 describe('HUD rendering matches the tile frame contract', () => {
+  it('preserves padded native OBJ pixels without enlarging or cropping the approved frame', () => {
+    const ctx=context(), image={naturalWidth:64,naturalHeight:32} as HTMLImageElement;
+    drawHudComponent(ctx,{...component,x:4,y:4,width:60,height:18,pixelPosition:true},image,'');
+    expect(ctx.drawImage).toHaveBeenCalledWith(image,0,0,60,18,4,4,60,18);
+  });
+  it('keeps the six-pixel numeric advance while preserving complete custom font cells', () => {
+    const ctx=context(), atlas={} as HTMLCanvasElement;
+    drawHudComponent(ctx,{...component,kind:'text',text:'008',x:204,y:9,width:18,height:8,textAdvance:6},undefined,'',atlas);
+    expect(vi.mocked(ctx.drawImage).mock.calls.map(call=>call.slice(5))).toEqual([[204,9,8,8],[210,9,8,8],[216,9,8,8]]);
+  });
   it('preserves an authored purple bar image without an orange overlay', () => {
     const ctx=context();const image={naturalWidth:72,naturalHeight:8} as HTMLImageElement;
     drawHudComponent(ctx,{...component,kind:'bar',width:72,height:8},image,'');

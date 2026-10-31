@@ -1,25 +1,9 @@
 import { readFileSync } from "node:fs";
-import { dirname, resolve } from "node:path";
-import { fileURLToPath } from "node:url";
-
-const repositoryRoot = resolve(dirname(fileURLToPath(import.meta.url)), "../../..");
-const canonicalProjectPath = resolve(
-  repositoryRoot,
-  "apps/desktop-electron",
-  "default-assets/templates/exemplo-gba/exemplo-gba.gba-project"
-);
-
-const canonicalProject = JSON.parse(readFileSync(canonicalProjectPath, "utf8"));
-const canonicalArenaBackground = canonicalProject.assets?.find(
-  (asset) => asset?.name === "arena-gba.png"
-);
-const backgroundPlan = canonicalArenaBackground?.metadata?.backgroundPaletteReferencePlan;
-
-if (!backgroundPlan || typeof backgroundPlan !== "object") {
-  throw new Error(
-    `Plano de paleta da Arena ausente no projeto P0 canônico: ${canonicalProjectPath}`
-  );
-}
+// Historical authoring contract for the base campaign builder. It must not
+// require a retired image to remain in the live example library.
+const backgroundPlan = JSON.parse(readFileSync(
+  new URL("../fixtures/asset-provenance/arena-original-palette-plan.json", import.meta.url), "utf8"
+));
 
 export const VERTICE_LUTA_BACKGROUND_PALETTE_PLAN = Object.freeze(backgroundPlan);
 

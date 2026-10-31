@@ -1,3 +1,4 @@
+import { uiText as ui, useStudioUiText } from "./studioUiText";
 import { useEffect, useRef, type ReactNode } from "react";
 import { ChevronDown } from "lucide-react";
 
@@ -6,6 +7,7 @@ export function EditorPopover({ label, ariaLabel = label, icon, children, classN
   label: string; ariaLabel?: string; icon?: ReactNode; children: ReactNode;
   className?: string; closeOnAction?: boolean;
 }): React.ReactElement {
+  const ui = useStudioUiText();
   const ref = useRef<HTMLDetailsElement>(null);
   useEffect(() => {
     const dismiss = (event: PointerEvent) => {
@@ -26,7 +28,7 @@ export function EditorPopover({ label, ariaLabel = label, icon, children, classN
     };
   }, []);
   return <details className={`editor-popover ${className}`} ref={ref}>
-    <summary aria-label={ariaLabel}>{icon}<span>{label}</span><ChevronDown aria-hidden="true" size={12} /></summary>
+    <summary aria-label={ui(ariaLabel)}>{icon}<span>{ui(label)}</span><ChevronDown aria-hidden="true" size={12} /></summary>
     <div className="editor-popover-content" onClick={(event) => {
       if (!closeOnAction || !(event.target instanceof Element) || !event.target.closest("button")) return;
       ref.current?.removeAttribute("open");

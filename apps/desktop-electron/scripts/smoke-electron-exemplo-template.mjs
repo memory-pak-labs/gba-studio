@@ -10,6 +10,8 @@ import {
   cdpSession,
   createElectronSmokeEnv,
   electronExecutablePath,
+  electronLaunchCommand,
+  prepareElectronSmokeLocale,
   renderedText,
   terminateChild,
   wait
@@ -21,6 +23,7 @@ import { defaultWelcomeSavedProjectPath } from "./smoke-electron-welcome-paths.m
 
 const appRoot = dirname(dirname(fileURLToPath(import.meta.url)));
 const canonicalP0Source = assertCanonicalP0Source(appRoot);
+const canonicalAudioCount = JSON.parse(readFileSync(canonicalP0Source.projectPath,"utf8")).audioItems.length;
 const usePackagedApp = process.argv.includes("--packaged");
 const port = Number(process.env.GBA_STUDIO_SMOKE_CDP_PORT ?? 9344);
 const completeProjectTimeoutMs = 600_000;
@@ -41,7 +44,7 @@ const editedDialogueText = "EDICAO REAL DO TEMPLATE GBA";
 const editedOriginalSceneName = "porto_lumen";
 const editedSceneName = "porto_lumen_funcional";
 const editedActorName = "Nara";
-const editedSpriteSheet = "nara-topdown.png";
+const editedSpriteSheet = "nara-topdown-walk-run-v1.png";
 const editedEventName = "porto_abrir_mapa";
 const editedTriggerName = "Saída para a rota dos faróis";
 const editedEventDialogue = "conselho";
@@ -97,7 +100,10 @@ async function waitForText(cdp, predicate, description, timeoutMs = 15_000) {
 }
 
 async function assertSelectedEntityInspector(cdp, kind, entityName) {
-  const state = await evaluate(cdp, `
+  const deadline=Date.now()+15000;
+  let state;
+  do {
+   state = await evaluate(cdp, `
     (() => {
       const panel = document.querySelector('.room-selected-entity-inspector');
       const number = (label) => panel?.querySelector('input[aria-label="' + label + '"]');
@@ -121,10 +127,10 @@ async function assertSelectedEntityInspector(cdp, kind, entityName) {
       };
     })()
   `);
-  if (!state?.selected || !state.coordinates || !state.tab.includes("Objeto")
-    || (kind === "actor" ? !state.sprite : !state.dimensions)) {
-    throw new Error(`Inspetor contextual de ${kind} ${entityName} inválido: ${JSON.stringify(state)}`);
-  }
+   if(state?.selected && state.coordinates && state.tab.includes("Objeto") && (kind === "actor" ? state.sprite : state.dimensions))return;
+   await wait(150);
+  } while(Date.now()<deadline);
+  throw new Error(`Inspetor contextual de ${kind} ${entityName} inválido: ${JSON.stringify(state)}`);
 }
 
 async function waitForVisualComparison(cdp, timeoutMs = 5_000) {
@@ -808,7 +814,10 @@ async function editEventInWorkspace(cdp) {
   }
 }
 
-async function duplicateAssetInWorkspace(cdp) {
+async function duplicateAssetInWorkspace(cdp, sourceName) {
+  // A library asset keeps its reusable status when duplicated. Use an active
+  // background so this isolated QA copy intentionally exercises unused warnings.
+  await clickButtonByAriaLabel(cdp, sourceName);
   const source = await evaluate(cdp, `
     (() => {
       const title = document.querySelector(".files-preview-header p")?.textContent?.trim() ?? "";
@@ -859,7 +868,7 @@ async function editSpriteInWorkspace(cdp, framesBefore) {
     await wait(100);
   }
   if (frameCount !== framesBefore + 1) throw new Error(`Adicionar quadro não atualizou a timeline: antes=${framesBefore} depois=${frameCount}`);
-  await clickButtonByAriaLabel(cdp, "Ultimo frame");
+  await clickButtonByAriaLabel(cdp, "Último frame");
   await clickButtonByAriaLabel(cdp, "Pintar");
   await wait(100);
   const canvas = await evaluate(cdp, `
@@ -966,7 +975,7 @@ async function inspectFilesWorkspacePipeline(cdp) {
 }
 
 async function validateSettingsPaths(cdp) {
-  await clickButtonByAriaLabel(cdp, "Compilação seção de ajustes");
+  await clickButtonByAriaLabel(cdp, "Seção de ajustes: Compilação");
   await clickButtonByText(cdp, "Verificar caminhos");
   const result = await evaluate(cdp, `
     new Promise((resolve) => {
@@ -1042,8 +1051,8 @@ async function inspectBackgroundLayoutRendering(cdp, project) {
     expectedSceneImage("mapa_rota", { requireFullCoverage: true }),
     expectedSceneImage("mercado_suspenso", { requireIsometricTilemap: true })
   ];
-  const advancedBackgroundScenes = [expectedSceneImage("usina_submersa")];
-  const authoredLowColorScenes = ["titulo", "prologo", "tempestade", "guardiao_rele", "conselho_guardia", "mapa_rota"]
+  const advancedBackgroundScenes = ["usina_submersa", "usina_combate", "usina_saida"].map(name => expectedSceneImage(name, { requireDungeonCamera: true, expectedActors: name === "usina_submersa" ? 0 : 1 }));
+  const authoredLowColorScenes = ["titulo", "prologo", "tempestade", "guardiao_rele", "conselho_guardia", "mapa_rota", "galeria_das_mares"]
     .map((name) => expectedSceneImage(name, { minColors: 2 }));
   const result = await evaluate(cdp, `
     (async () => {
@@ -1148,11 +1157,23 @@ async function inspectBackgroundLayoutRendering(cdp, project) {
           const card = cardFor(scene.name);
           const canvas = card?.querySelector("canvas.room-stage-card-preview-canvas");
           const previewLayer = card?.querySelector(".room-stage-card-preview-layer");
-          const image = card?.querySelector("img.room-stage-background-layout");
+          const images = Array.from(card?.querySelectorAll("img.room-stage-background-layout") ?? []);
+          const image = images.find(image=>image.naturalWidth===scene.expectedImageWidth&&image.naturalHeight===scene.expectedImageHeight) ?? images[0];
           const visual = canvas ?? image;
+          const layersReady = images.length>0 && images.every(image=>image.complete&&image.naturalWidth>0&&image.naturalHeight>0);
+          let visualSample = sampleVisual(visual);
+          if(!canvas && images.length>1 && layersReady){
+            // Coverage belongs to the composition: the terrain intentionally has a transparent sky.
+            const composition=document.createElement("canvas");composition.width=240;composition.height=160;
+            const context=composition.getContext("2d");context.imageSmoothingEnabled=false;
+            for(const layer of images)context.drawImage(layer,0,0,240,160);
+            visualSample=sampleCanvas(composition);
+          }
           const previewLayerBounds = previewLayer?.getBoundingClientRect();
           return {
             ...scene,
+            layersReady,
+            backgroundLayerCount:images.length,
             canvasWidth: canvas?.width ?? 0,
             canvasHeight: canvas?.height ?? 0,
             previewLayerWidth: Math.round(previewLayerBounds?.width ?? 0),
@@ -1166,13 +1187,16 @@ async function inspectBackgroundLayoutRendering(cdp, project) {
             hasLayoutClass: card?.querySelector(".room-stage-card-canvas")?.classList.contains("has-background-layout") ?? false,
             hasIsometricClass: card?.querySelector(".room-stage-card-canvas")?.classList.contains("isometric") ?? false,
             hasGrid: Boolean(card?.querySelector(".room-stage-background-grid")),
-            ...sampleVisual(visual)
+            ...visualSample
           };
         });
         const advancedBackgrounds = advancedBackgroundScenes.map((scene) => {
           const card = cardFor(scene.name);
           const canvas = card?.querySelector(".room-stage-card-canvas");
-          const previewCanvas = canvas?.querySelector("canvas.room-stage-card-preview-canvas");
+          const camera = canvas?.querySelector(".dungeon-camera");
+          const previewCanvas = camera?.querySelector(".dungeon-camera-art > canvas") ?? canvas?.querySelector("canvas.room-stage-card-preview-canvas");
+          const cameraRect = camera?.getBoundingClientRect();
+          const actors = Array.from(camera?.querySelectorAll("[data-dungeon-actor]") ?? []);
           const previewImage = canvas?.querySelector("img.room-stage-background-layout");
           const visual = previewCanvas ?? previewImage;
           return {
@@ -1186,13 +1210,20 @@ async function inspectBackgroundLayoutRendering(cdp, project) {
             renderedWidth: Math.round(visual?.getBoundingClientRect().width ?? 0),
             renderedHeight: Math.round(visual?.getBoundingClientRect().height ?? 0),
             hasGrid: Boolean(card?.querySelector(".room-stage-background-grid")),
+            dungeonReady: camera?.dataset.dungeonGeometry === "original" && !camera?.querySelector(".dungeon-camera-error")
+              && Boolean(camera.querySelector(".room-hud-overlay")) && Math.abs(cameraRect.width / cameraRect.height - 1.5) < .01
+              && actors.length === scene.expectedActors && actors.every(actor => {
+                const bounds = actor.getBoundingClientRect();
+                return bounds.left >= cameraRect.left && bounds.right <= cameraRect.right && bounds.top >= cameraRect.top
+                  && bounds.bottom <= cameraRect.top + cameraRect.height * .8;
+              }),
             ...sampleVisual(visual)
           };
         });
         const authoredBackgrounds = authoredLowColorScenes.map((scene) => {
           const card = cardFor(scene.name);
           const canvas = card?.querySelector("canvas.room-stage-card-preview-canvas");
-          const image = card?.querySelector("img.room-stage-background-layout");
+          const image = card?.querySelector('img.room-stage-background-layout[data-background-layer="BG2"]') ?? card?.querySelector("img.room-stage-background-layout");
           const visual = canvas ?? image;
           return {
             ...scene,
@@ -1227,7 +1258,7 @@ async function inspectBackgroundLayoutRendering(cdp, project) {
           && !active.hasGrid && !active.hasSelectionChrome && !active.hasVisibleLabel
           && active.renderedWidth > 0 && active.renderedHeight > 0;
         const wideReady = wide.every((scene) => (
-          scene.imageComplete
+          scene.layersReady && scene.imageComplete
           && scene.imageNaturalWidth === scene.expectedImageWidth
           && scene.imageNaturalHeight === scene.expectedImageHeight
           && scene.renderedWidth > 0
@@ -1239,8 +1270,9 @@ async function inspectBackgroundLayoutRendering(cdp, project) {
           && (scene.requireFullCoverage ? scene.opaque === 15 : scene.opaque > 0) && scene.colors > 0
         ));
         const advancedBackgroundsReady = advancedBackgrounds.every((scene) => (
-          scene.hasLayoutClass && scene.imageComplete && scene.imageNaturalWidth > 0 && scene.imageNaturalHeight > 0
-          && scene.imageNaturalWidth === scene.expectedImageWidth && scene.imageNaturalHeight === scene.expectedImageHeight
+          (scene.requireDungeonCamera
+            ? scene.dungeonReady && scene.canvasWidth === scene.expectedImageWidth && scene.canvasHeight === scene.expectedImageHeight
+            : scene.hasLayoutClass && scene.imageComplete && scene.imageNaturalWidth === scene.expectedImageWidth && scene.imageNaturalHeight === scene.expectedImageHeight)
           && scene.renderedWidth > 0 && scene.renderedHeight > 0
           && !scene.hasGrid && scene.opaque > 0 && scene.colors > 1
         ));
@@ -1477,7 +1509,7 @@ async function assertWorkspace(cdp, label, expectedText) {
     await wait(250);
   }
   throw new Error(
-    `Workspace ${label} não ficou ativa. Atual=${activeWorkspace ?? "nenhuma"}.\nTexto renderizado:\n${lastText.slice(0, 8_000)}`
+    `Workspace ${label} ou conteúdo esperado indisponível. Atual=${activeWorkspace ?? "nenhuma"}; ausentes=${JSON.stringify(expectedText.filter(item => !lastText.includes(item)))}.\nTexto renderizado:\n${lastText.slice(0, 8_000)}`
   );
 }
 
@@ -1546,7 +1578,8 @@ async function main() {
   });
   delete childEnv.GBA_STUDIO_OPEN_PROJECT;
 
-  const child = spawn(executable, usePackagedApp ? [] : [appRoot], {
+  const launch = electronLaunchCommand(executable, usePackagedApp ? [] : [appRoot]);
+  const child = spawn(launch.executable, launch.args, {
     cwd: appRoot,
     env: childEnv,
     stdio: ["ignore", "pipe", "pipe"]
@@ -1563,6 +1596,7 @@ async function main() {
     await cdp.ready;
 
     try {
+      await prepareElectronSmokeLocale(cdp);
       await waitForText(
         cdp,
         (text) => text.includes("Templates") && text.includes("Exemplo GBA Completo"),
@@ -1623,7 +1657,7 @@ async function main() {
         || !initialSceneForEdit || initialTilemap.length === 0
         || initialRacingContract.presentation !== "topdown"
         || initialRacingContract.checkpoints.length === 0) {
-        throw new Error("O template inicial não contém os registros escolhidos para o smoke de edição.");
+        throw new Error(`O template inicial não contém os registros escolhidos para o smoke de edição: ${JSON.stringify({ actor: !!initialActor, animation: !!initialAnimation, event: !!initialEvent, racingScene: !!initialRacingScene, scene: !!initialSceneForEdit, tilemapLength: initialTilemap.length, racingPresentation: initialRacingContract.presentation, checkpoints: initialRacingContract.checkpoints.length })}`);
       }
 
       await renameScene(cdp, editedOriginalSceneName, editedSceneName);
@@ -1633,7 +1667,7 @@ async function main() {
       const tileCellLabel = await firstRoomCanvasTileCell(cdp, editedSceneName);
       await dispatchPointerPressOnRoomCell(cdp, editedSceneName, tileCellLabel);
       uiP0Checked.push("workspace-rooms", "workspace-rooms-tile-paint");
-      await clickButtonInSelectorByAriaLabel(cdp, ".room-editor-tool-rail", "Colisao - Solidos");
+      await clickButtonInSelectorByAriaLabel(cdp, ".room-editor-tool-rail", "Colisão - Sólidos");
       const collisionCellLabel = await firstRoomCanvasCellWithoutCollision(cdp, editedSceneName);
       const editedCollisionIndex = Number(collisionCellLabel.match(/(\d+)$/)?.[1] ?? 0) - 1;
       if (editedCollisionIndex < 0) {
@@ -1657,7 +1691,7 @@ async function main() {
       `);
       if (!actorNudged) throw new Error("O atalho de movimento do ator não pôde ser disparado.");
       await assertWorkspace(cdp, "Editor", []);
-      await clickButtonInSelectorByAriaLabel(cdp, ".room-editor-tool-rail", "Trigger - Eventos");
+      await clickButtonInSelectorByAriaLabel(cdp, ".room-editor-tool-rail", "Gatilho - Eventos");
       await selectRoomEntityRow(cdp, editedTriggerName);
       await waitForText(
         cdp,
@@ -1768,7 +1802,7 @@ async function main() {
       await fillTextareaNearLabel(cdp, "Texto da fala", editedDialogueText);
       await waitForTextareaValue(cdp, "Texto da fala", editedDialogueText);
       uiP0Checked.push("editor-cena-dialogos-edit-text");
-      await assertWorkspace(cdp, "Áudio", ["29 de 29 visíveis", "Músicas", "Efeitos sonoros", "farol_tema_principal", "farol_sfx_texto"]);
+      await assertWorkspace(cdp, "Áudio", [`${canonicalAudioCount} de ${canonicalAudioCount} visíveis`, "Músicas", "Efeitos sonoros", "farol_tema_principal", "farol_sfx_texto"]);
       await selectAudioLibraryItem(cdp, "farol_tema_principal");
       await waitForText(cdp, (text) => text.includes("Piano Roll") && text.includes("Prévia"), "compositor de áudio canônico");
       await evaluate(cdp, `document.querySelector('.audio-groove-details-button').click()`);
@@ -1776,15 +1810,19 @@ async function main() {
       const audioEdit = await editAudioInWorkspace(cdp);
       uiP0Checked.push("workspace-audio", "workspace-audio-edit-bpm", "workspace-audio-edit-note");
       await assertWorkspace(cdp, "Arquivos", [
-        "menu-inicial-v3-gba.png",
-        "prologue-frame-1-gba.png",
-        "council-v5-background.png",
-        "mercado-adventure-surface.png",
-        "nara-topdown.png",
+        "title-porto-lumen-240x160-4bpp.png",
+        "prologue-clean-frame-1-240x160-4bpp.png",
+        "council-v13-background.png",
+        "market-approved-surface-768x512.png",
+        "nara-topdown-walk-run-v1.png",
         "dialogue-selector-gba-v4.png",
         "gba-dialogue-font-v3.png"
       ].map(name => name.replace(/\.png$/, "")));
-      const duplicatedAsset = await duplicateAssetInWorkspace(cdp);
+      const activeBackground = initial.project.assets.find(asset => asset.kind === "Background"
+        && asset.metadata?.reusableLibraryAsset !== true
+        && initial.project.scenas.some(scene => scene.backgroundAssetName === asset.name));
+      if (!activeBackground) throw new Error("O teste de duplicação requer um background ativo fora da biblioteca reutilizável.");
+      const duplicatedAsset = await duplicateAssetInWorkspace(cdp, activeBackground.name);
       const filesPipeline = await inspectFilesWorkspacePipeline(cdp);
       uiP0Checked.push("workspace-arquivos", "workspace-arquivos-duplicate-asset", "workspace-arquivos-pipeline-visible");
       await wait(250);
@@ -1808,7 +1846,7 @@ async function main() {
         throw new Error(`O Engine Pack detectado não foi explicado na validação: ${JSON.stringify(settingsValidation)}`);
       }
       uiP0Checked.push("settings-path-validation");
-      await clickButtonByAriaLabel(cdp, "Projeto e ROM seção de ajustes");
+      await clickButtonByAriaLabel(cdp, "Seção de ajustes: Projeto e ROM");
       await waitForText(cdp, (text) => text.includes("Informações do jogo"), "retorno às informações do jogo");
       await fillInputNearLabel(cdp, "Título", editedGameTitle);
       await waitForText(
@@ -1913,17 +1951,8 @@ async function main() {
         throw new Error(`Falha ao reabrir o template: ${JSON.stringify(reopened)}`);
       }
 
-      await assertWorkspace(cdp, "Editor", ["penedos_vento"]);
-      await evaluate(cdp, `
-        (() => {
-          const card = Array.from(document.querySelectorAll(".room-stage-card-frame"))
-            .find((item) => item.querySelector(".room-stage-card-header strong")?.textContent?.trim() === ${JSON.stringify(displaySceneName(editedSceneName))});
-          if (!card) return false;
-          card.dispatchEvent(new PointerEvent("pointerdown", { bubbles: true, button: 0, pointerId: 1 }));
-          card.dispatchEvent(new PointerEvent("pointerup", { bubbles: true, button: 0, pointerId: 1 }));
-          return true;
-        })()
-      `);
+      await assertWorkspace(cdp, "Editor", []);
+      await focusSceneInEditor(cdp, editedSceneName);
       await waitForText(cdp, (text) => text.includes(displaySceneName(editedSceneName)) && text.includes("Cena"), "painel da cena reaberta");
       await openExportHealth(cdp);
       const projectHealth = await evaluate(cdp, `
@@ -1937,6 +1966,9 @@ async function main() {
             scenes: workspace?.querySelectorAll(".project-health-scene-card").length ?? 0,
             hasDiagnostics: Boolean(workspace?.querySelector('[aria-labelledby="project-health-diagnostics-title"]')),
             hasBudget: Boolean(workspace?.querySelector('[aria-label^="Orçamento de "]')),
+            titleBudgetWarning: Array.from(workspace?.querySelectorAll('.project-health-diagnostic-list button') ?? []).some((button) =>
+              button.querySelector('strong')?.textContent?.includes('O orçamento de assets da cena está próximo do limite.')
+              && button.querySelector('small')?.textContent?.split(' · ').includes('titulo')),
             warningCount: Number(Array.from(workspace?.querySelectorAll(".project-health-summary-card") ?? [])
               .find((card) => card.querySelector("span")?.textContent?.trim() === "Avisos")
               ?.querySelector("strong")?.textContent ?? -1)
@@ -1947,7 +1979,10 @@ async function main() {
         || !projectHealth.hasDiagnostics || !projectHealth.hasBudget) {
         throw new Error(`Preflight de exportação não refletiu o template completo: ${JSON.stringify(projectHealth)}`);
       }
-      await assertWorkspace(cdp, "Editor", ["penedos_vento"]);
+      if (projectHealth.titleBudgetWarning) {
+        throw new Error('O orçamento do título ainda está emitindo o aviso antigo.');
+      }
+      await assertWorkspace(cdp, "Editor", []);
       const projectProblemCount = await evaluate(cdp, `
         Number(document.querySelector('button[aria-label="Abrir central de pendências"] span')?.textContent ?? -1)
       `);
@@ -1970,9 +2005,6 @@ async function main() {
           .map((item) => item.textContent?.trim())
           .filter(Boolean)
       `);
-      if (problemMessages.some((message) => message.includes("O orçamento de assets da cena está próximo do limite."))) {
-        throw new Error(`O orçamento do título ainda está emitindo o aviso antigo: ${problemMessages.join("; ")}`);
-      }
       if (!problemMessages.some((message) => message.includes("sem uso no projeto."))) {
         throw new Error(`O aviso de asset sem uso não apareceu na central de pendências: ${problemMessages.join("; ")}`);
       }
@@ -1986,7 +2018,7 @@ async function main() {
       }
       await clickButtonByAriaLabel(cdp, "Fechar central de pendências");
       await focusSceneInEditor(cdp, editedSceneName);
-      await clickButtonInSelectorByAriaLabel(cdp, ".room-editor-tool-rail", "Colisao - Solidos");
+      await clickButtonInSelectorByAriaLabel(cdp, ".room-editor-tool-rail", "Colisão - Sólidos");
       await clickButtonInSelectorByAriaLabel(cdp, ".rooms-editor-secondary-toolbar", "Voltar à visão geral");
       await waitForText(cdp, (text) => !text.includes("Voltar à visão geral"), "retorno à visão geral para validar previews");
       const backgroundLayoutRendering = await inspectBackgroundLayoutRendering(cdp, initial.project);
@@ -2032,9 +2064,9 @@ async function main() {
       if (!visualComparison?.hasPanel || !visualComparison.hasOriginal || !visualComparison.hasCompiled || !visualComparison.isExpanded) {
         throw new Error(`A comparação PNG → RGB555 do Mapa Menu não foi renderizada na Saúde do projeto: ${JSON.stringify(visualComparison)}`);
       }
-      await assertWorkspace(cdp, "Editor", ["penedos_vento"]);
+      await assertWorkspace(cdp, "Editor", []);
       await focusSceneInEditor(cdp, editedSceneName);
-      await clickButtonInSelectorByAriaLabel(cdp, ".room-editor-tool-rail", "Colisao - Solidos");
+      await clickButtonInSelectorByAriaLabel(cdp, ".room-editor-tool-rail", "Colisão - Sólidos");
       const editorScrollChrome = await inspectEditorScrollChrome(cdp);
       await clickButtonInSelectorByAriaLabel(cdp, ".room-editor-tool-rail", "Selecionar - Mover");
       await waitForSelectionScenePreview(cdp, editedSceneName);

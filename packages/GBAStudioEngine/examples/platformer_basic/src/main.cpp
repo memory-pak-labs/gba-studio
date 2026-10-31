@@ -1,11 +1,16 @@
+#include "gbs/profiler.hpp"
+#define GBS_DIALOGUE_UI_RUNTIME_KIND 1
 #include "gbs/engine.hpp"
 #include "gbs/event_ui.hpp"
 #include "gbs/animation.hpp"
+#include "gbs/event_animation.hpp"
 #include "gbs/audio.hpp"
 #include "gbs/dialogue.hpp"
 #include "gbs/input.hpp"
 #include "gbs/link.hpp"
 #include "gbs/platformer.hpp"
+#include "gbs/scripted_movement.hpp"
+#include "gbs/platformer_motion_checkpoint.hpp"
 #include "gbs/render.hpp"
 #include "gbs/resource_manager.hpp"
 #include "gbs/runtime.hpp"
@@ -104,11 +109,18 @@ int platformer_npc_wait_frames[max_room_npcs];
 size_t platformer_npc_count = 0;
 gbs::EventRunner platformer_npc_interaction_runner;
 gbs::EventRunner platformer_event_runner;
+gbs::ScriptedMovementPool platformer_scripted_movements __attribute__((section(".ewram_bss")));
+int platformer_player_script_speed = 100;
+int platformer_npc_script_speeds[max_room_npcs]{};
+gbs::PlatformerMotionScratch platformer_motion_scratch __attribute__((section(".ewram_bss")));
+bool platformer_motion_restored = false;
 gbs::EventScriptQueue platformer_event_queue;
 gbs::EventState platformer_event_state __attribute__((section(".ewram_bss")));
 int platformer_event_wait_frames = 0;
 gbs::DialogueState dialogue __attribute__((section(".ewram_bss")));
 gbs::HudState hud;
+gbs::PlatformerPlayerPresentation player_presentation {};
+bool player_hurt_presentation_requested = false;
 gbs::LinkSession link_session;
 
 bool open_link(gbs::LinkRole role, uint16_t timeout_frames) {
@@ -147,10 +159,13 @@ gbs::PlatformerRoom room {};
 gbs::PlatformerActor player {};
 bool player_event_active = true;
 gbs::SpriteAnimatorState player_animator;
+bool player_script_animation_active = false;
+int player_animation_speed_percent = 100;
 const gbs::TileAsset* player_streamed_tile_asset_loaded = nullptr;
 const gbs::TileAsset* npc_streamed_tile_assets_loaded[max_room_npcs] = {};
 gbs::PlatformerRuntimeState runtime_state {};
 int current_room = 0;
+gbs::RoomTileEdits room_tile_edits __attribute__((section(".ewram_bss")));
 int active_platformer_state = 0;
 gbs::Camera camera {};
 bool previous_camera_zone_active = false;
@@ -210,6 +225,14 @@ constexpr int scene_type_platformer = 1;
 void queue_platformer_script(gbs::EventScript script) {
     if (gbs::has_event_script(script)) {
         gbs::enqueue_event_script(platformer_event_queue, script);
+    }
+}
+
+void consume_platformer_script_request(gbs::EventState& event_state) {
+    const int script_index = event_state.last_script;
+    event_state.last_script = -1;
+    if (gbs::is_valid_platformer_project_script_index(project, script_index)) {
+        queue_platformer_script(project.scripts[script_index]);
     }
 }
 
@@ -317,7 +340,7 @@ void set_platformer_metasprite(
             hflip ? !part.hflip : part.hflip,
             part.vflip,
             true,
-            0,
+            static_cast<uint8_t>(dialogue.visible ? 1 : 0),
             gbs::SpriteRenderMode::Normal,
             mosaic,
             part.width,
@@ -340,6 +363,7 @@ void load_platformer_room_npcs(const gbs::PlatformerRoomData& room_data) {
         platformer_npc_start_complete[index] = false;
         platformer_npc_touching_player[index] = false;
         platformer_npc_wait_frames[index] = 0;
+        platformer_npc_script_speeds[index] = 100;
         platformer_npc_runtimes[index] = gbs::PlatformerNpcRuntime {
             gbs::Actor { gbs::Vec2i { 0, 0 }, gbs::Vec2i { 0, 0 }, 0 },
             nullptr,
@@ -640,6 +664,7 @@ void consume_event_state(gbs::EventState& event_state, int* local_wait_frames = 
         project.obj_palette_count
     );
     consume_link_event_outputs(event_state);
+    consume_platformer_script_request(event_state);
     if (event_state.last_dialogue >= 0) {
         gbs::show_dialogue(dialogue, project.dialogue_lines, project.dialogue_line_count, event_state.last_dialogue);
         event_state.last_dialogue = -1;
@@ -690,7 +715,7 @@ void consume_event_state(gbs::EventState& event_state, int* local_wait_frames = 
         gbs::fade_audio_channel_volume(
             gbs::audio_channel_from_event_value(event_state.audio_fade_channel),
             static_cast<uint8_t>(event_state.audio_fade_target_volume),
-            static_cast<uint16_t>(event_state.audio_fade_frames)
+            static_cast<uint16_t>(event_state.audio_fade_frames), static_cast<uint8_t>(event_state.audio_fade_ceiling_volume)
         );
         event_state.audio_fade_changed = false;
     }
@@ -736,10 +761,135 @@ bool run_button_event_binding() {
     event_state.last_script = -1;
     event_state.last_button_binding_overrides_default = false;
     if (gbs::is_valid_platformer_project_script_index(project, script_index)) {
-        gbs::run_event_script(event_state, project.scripts[script_index]);
-        consume_event_state(event_state);
+        queue_platformer_script(project.scripts[script_index]);
     }
     return overrides_default;
+}
+
+void consume_platformer_tile_commands(gbs::EventState& event_state, const gbs::PlatformerRoomData& room_data) {
+    for (size_t i = 0; i < event_state.tile_command_count; ++i) {
+        const auto& command = event_state.tile_commands[i];
+        const int layer = command.layer == 0 ? 2 : command.layer;
+        for (int offset = 0; offset < command.count; ++offset) {
+            const int x = command.x + offset, y = command.y;
+            if (x < 0 || y < 0 || x >= room_data.width_tiles || y >= room_data.height_tiles) continue;
+            auto resolved = command;
+            resolved.tile += offset;
+            const uint16_t tile = gbs::resolve_event_tile(resolved, project.tile_assets, project.tile_asset_count);
+            gbs::debug_assert(gbs::set_room_tile_edit(room_tile_edits, layer, x, y,
+                room_data.width_tiles, room_data.height_tiles, tile, command.collision_flags), "room tile edit cap", 32);
+        }
+    }
+    gbs::clear_event_tile_commands(event_state);
+}
+
+void reset_platformer_player_runtime_animation() {
+    player_script_animation_active = false;
+    player_animation_speed_percent = 100;
+    gbs::init_sprite_animator(player_animator);
+    if (project.player_animations.idle != nullptr) {
+        gbs::select_sprite_animation(player_animator, *project.player_animations.idle);
+    }
+    player_streamed_tile_asset_loaded = nullptr;
+    player_presentation = {};
+    player_hurt_presentation_requested = false;
+}
+
+void consume_platformer_player_animation_request() {
+    if (!event_state.player_animation_changed) return;
+    event_state.player_animation_changed = false;
+    const auto* next = gbs::platformer_player_animation_for_index(project, event_state.player_animation_index);
+    if (next == nullptr) return;
+    player_script_animation_active = true;
+    if (next != player_animator.animation || !player_animator.playing) {
+        gbs::play_sprite_animation(player_animator, *next);
+    }
+}
+
+void update_platformer_player_runtime_animation(gbs::InputState player_input, bool landed) {
+    const gbs::SpriteAnimation* player_animation = gbs::update_platformer_player_presentation(
+        player_presentation,
+        project.player_animations,
+        player,
+        player_input,
+        landed,
+        player_hurt_presentation_requested
+    );
+    const bool interrupted = player_hurt_presentation_requested ||
+        (player_input.held & (gbs::ButtonLeft | gbs::ButtonRight | gbs::ButtonUp | gbs::ButtonDown |
+            gbs::ButtonA | gbs::ButtonB | gbs::ButtonL | gbs::ButtonR)) != 0;
+    player_hurt_presentation_requested = false;
+    if (player_script_animation_active && !interrupted && player_animator.playing) return;
+    player_script_animation_active = false;
+    const bool player_animation_should_advance = player_animation != nullptr && player_animation->frame_count > 1;
+    if (player_animation != player_animator.animation) {
+        if (player_animation != nullptr) {
+            if (player_animation_should_advance) {
+                gbs::play_sprite_animation(player_animator, *player_animation);
+            } else {
+                gbs::select_sprite_animation(player_animator, *player_animation);
+            }
+        } else {
+            gbs::init_sprite_animator(player_animator);
+        }
+    } else if (!player_animation_should_advance && player_animation != nullptr && player_animator.playing) {
+        gbs::select_sprite_animation(player_animator, *player_animation);
+    }
+    if (player_animation_should_advance) {
+        gbs::update_sprite_animator_scaled(player_animator, player_animation_speed_percent);
+    }
+}
+
+void advance_platformer_runtime_animations() {
+    if (player_script_animation_active) {
+        if (player_animator.playing) gbs::update_sprite_animator_scaled(player_animator, player_animation_speed_percent);
+        else update_platformer_player_runtime_animation({}, false);
+    }
+    for (size_t index = 0; index < platformer_npc_count; ++index) {
+        if (platformer_npc_runtimes[index].active && platformer_npc_runtimes[index].visible) {
+            gbs::update_sprite_animator_scaled(
+                platformer_npc_animators[index],
+                platformer_npc_runtimes[index].animation_speed_percent
+            );
+        }
+    }
+}
+
+void tick_platformer_scripted_movements() {
+    for (auto& motion : platformer_scripted_movements.moves) {
+        if (motion.owner == nullptr) continue;
+        const int index = motion.actor_index;
+        const bool is_player = index == gbs::event_player_actor_index;
+        if ((!is_player && (index < 0 || static_cast<size_t>(index) >= platformer_npc_count ||
+            !platformer_npc_runtimes[index].active || !platformer_npc_runtimes[index].visible)) ||
+            (is_player && !player_event_active)) {
+            gbs::finish_scripted_movement(motion); continue;
+        }
+        const auto anchor = gbs::platformer_actor_anchor_position(player);
+        gbs::Actor player_proxy { anchor, { player.bounds_pixels.width, player.bounds_pixels.height }, 1 };
+        player_proxy.collision_offset_pixels = player.collision_offset_pixels;
+        gbs::Actor* target = is_player ? &player_proxy : &platformer_npc_runtimes[index].actor;
+        gbs::Actor blockers[max_room_npcs + 1]{};
+        size_t count = 0;
+        if (!is_player && player_event_active) blockers[count++] = player_proxy;
+        for (size_t i = 0; i < platformer_npc_count && count < max_room_npcs + 1; ++i) {
+            if (static_cast<int>(i) == index || !platformer_npc_runtimes[i].active || !platformer_npc_runtimes[i].visible) continue;
+            blockers[count++] = platformer_npc_runtimes[i].actor;
+        }
+        const int speed = is_player ? platformer_player_script_speed : platformer_npc_script_speeds[index];
+        const auto result = gbs::tick_scripted_movement(platformer_scripted_movements, index, *target,
+            room.collision, speed, blockers, count, gbs::move_platformer_scripted_step);
+        if (is_player) {
+            gbs::set_platformer_actor_anchor_position(player, player_proxy.position_pixels);
+            if (player_proxy.direction == 2) player.facing = gbs::PlatformerFacing::Left;
+            if (player_proxy.direction == 3) player.facing = gbs::PlatformerFacing::Right;
+            event_state.player_x = player_proxy.position_pixels.x;
+            event_state.player_y = player_proxy.position_pixels.y;
+            event_state.player_direction = player.facing == gbs::PlatformerFacing::Left ? 2 : 3;
+            if (result == gbs::ScriptedMovementResult::Reached || result == gbs::ScriptedMovementResult::Stopped)
+                player.on_ground = gbs::platformer_actor_on_ground(room.collision, player);
+        }
+    }
 }
 
 void consume_platformer_actor_commands(
@@ -748,7 +898,47 @@ void consume_platformer_actor_commands(
     const gbs::PlatformerRoomData& room_data,
     bool& player_event_active
 ) {
-    const gbs::TileMap collision = gbs::platformer_collision_map_from_room(room_data);
+    gbs::consume_visibility_event_commands(event_state);
+    consume_platformer_tile_commands(event_state, room_data);
+    const uint32_t animation_sync = gbs::platformer_npc_animation_sync_mask(
+        platformer_npc_runtimes, platformer_npc_animators, platformer_npc_count, event_state);
+    if (event_state.actor_command_count == 0 && !event_state.player_animation_changed && animation_sync == 0) {
+        // Conditions use actor anchors, even when the previous physics step
+        // produced no event commands.
+        const auto anchor = gbs::platformer_actor_anchor_position(player);
+        event_state.player_x = anchor.x;
+        event_state.player_y = anchor.y;
+        event_state.player_direction = player.facing == gbs::PlatformerFacing::Left ? 2 : 3;
+        return;
+    }
+    const gbs::TileMap collision = room.collision;
+    for (size_t i = 0; i < event_state.actor_command_count; ++i) {
+        const auto& command = event_state.actor_commands[i];
+        const int index = command.actor_index;
+        const bool valid = index == gbs::event_player_actor_index ||
+            (index >= 0 && static_cast<size_t>(index) < platformer_npc_count);
+        if (command.op == gbs::EventActorOp::SetSpeed && valid) {
+            if (index == gbs::event_player_actor_index) platformer_player_script_speed = command.a;
+            else platformer_npc_script_speeds[index] = command.a;
+        } else if (command.op == gbs::EventActorOp::MoveTo) {
+            if (!valid) {
+                if (command.motion_owner) gbs::complete_event_actor_movement(*command.motion_owner, command.motion_token);
+            } else {
+                if (index == gbs::event_player_actor_index) {
+                    player.velocity_x256 = {0,0}; player.movement_remainder_x256 = {0,0};
+                    player.dashing = false; player.dash_timer = 0; player.jump_hold_timer = 0;
+                }
+                const gbs::Vec2i origin = index == gbs::event_player_actor_index
+                    ? gbs::platformer_actor_anchor_position(player) : platformer_npc_runtimes[index].actor.position_pixels;
+                gbs::EventActorCommand resolved {};
+                if (gbs::resolve_scripted_movement_destination(command, origin, resolved))
+                    gbs::start_scripted_movement(platformer_scripted_movements, resolved);
+                else if (command.motion_owner) gbs::complete_event_actor_movement(*command.motion_owner, command.motion_token);
+            }
+        } else if (command.op == gbs::EventActorOp::CancelMovement || command.op == gbs::EventActorOp::SetPosition) {
+            gbs::cancel_scripted_movement(platformer_scripted_movements, index);
+        }
+    }
     for (size_t command_index = 0; command_index < event_state.actor_command_count; ++command_index) {
         const gbs::EventActorCommand& command = event_state.actor_commands[command_index];
         if (command.op != gbs::EventActorOp::Push ||
@@ -786,8 +976,15 @@ void consume_platformer_actor_commands(
         player.facing == gbs::PlatformerFacing::Left ? 2 : 3
     };
     for (size_t index = 0; index < event_state.actor_command_count; ++index) {
-        gbs::apply_event_player_command(player_event_runtime, event_state.actor_commands[index]);
         const gbs::EventActorCommand& command = event_state.actor_commands[index];
+        gbs::apply_event_player_command(player_event_runtime, command);
+        if (command.actor_index == gbs::event_player_actor_index && command.op == gbs::EventActorOp::SetAnimation) {
+            event_state.player_animation_changed = true;
+            event_state.player_animation_index = command.a;
+            consume_platformer_player_animation_request();
+        }
+        gbs::apply_event_player_animation_command(player_animator, player_animation_speed_percent,
+            command);
         if (command.actor_index == gbs::event_player_actor_index &&
             command.op == gbs::EventActorOp::SetPosition) {
             // Absolute positioning is a teleport, not a continuation of the fall/dash.
@@ -798,6 +995,7 @@ void consume_platformer_actor_commands(
             player.jump_hold_timer = 0;
         }
     }
+    consume_platformer_player_animation_request();
     player_event_active = player_event_runtime.active;
     gbs::set_platformer_actor_anchor_position(
         player,
@@ -812,15 +1010,43 @@ void consume_platformer_actor_commands(
     player.facing = player_event_runtime.direction == 2
         ? gbs::PlatformerFacing::Left
         : gbs::PlatformerFacing::Right;
-    event_state.player_x = player.bounds_pixels.x;
-    event_state.player_y = player.bounds_pixels.y;
+    // Event conditions compare authored actor anchors, including NPC foot positions.
+    // The collision rectangle is offset from that anchor and must stay internal to physics.
+    event_state.player_x = player_event_runtime.x;
+    event_state.player_y = player_event_runtime.y;
     event_state.player_direction = player_event_runtime.direction;
+    gbs::Rect previous_platforms[max_room_npcs] {};
+    bool moving_platforms[max_room_npcs] {};
+    for (size_t index = 0; index < event_state.actor_command_count; ++index) {
+        const auto& command = event_state.actor_commands[index];
+        if (command.op != gbs::EventActorOp::MoveRelative || command.actor_index < 0 ||
+            static_cast<size_t>(command.actor_index) >= platformer_npc_count) continue;
+        const size_t npc_index = static_cast<size_t>(command.actor_index);
+        const auto& npc = platformer_npc_runtimes[npc_index];
+        if (npc.active && npc.visible && npc.actor.collision_mask != 0 &&
+            room_data.config.platform_actor_collision_group != 0 &&
+            npc.collision_group == room_data.config.platform_actor_collision_group) {
+            previous_platforms[npc_index] = gbs::platformer_npc_actor_rect(npc);
+            moving_platforms[npc_index] = true;
+        }
+    }
     gbs::consume_actor_event_commands(platformer_npc_runtimes, platformer_npc_count, event_state);
     for (size_t index = 0; index < platformer_npc_count; ++index) {
+        if (moving_platforms[index] && player_event_active) {
+            gbs::carry_platformer_actor_with_npc(collision, player, previous_platforms[index],
+                gbs::platformer_npc_actor_rect(platformer_npc_runtimes[index]));
+        }
+    }
+    const auto carried_anchor = gbs::platformer_actor_anchor_position(player);
+    event_state.player_x = carried_anchor.x;
+    event_state.player_y = carried_anchor.y;
+    for (size_t index = 0; index < platformer_npc_count; ++index) {
+        if ((animation_sync & (1u << index)) == 0) continue;
         const gbs::SpriteAnimation* next_animation = gbs::platformer_npc_animation_for_index(
             room_data.npcs[index],
             platformer_npc_runtimes[index].animation_index
         );
+        if (next_animation == nullptr) next_animation = platformer_npc_runtimes[index].animation;
         if (next_animation != platformer_npc_runtimes[index].animation) {
             platformer_npc_runtimes[index].animation = next_animation;
             gbs::init_sprite_animator(platformer_npc_animators[index]);
@@ -902,6 +1128,7 @@ bool consume_platformer_state_request(
     if (next_state < 0 || next_state > 9) {
         return false;
     }
+    if (next_state == 6) player_hurt_presentation_requested = true;
 
     transition_platformer_callback_state(event_state, active_state, next_state);
     player_event_active = next_state != 7;
@@ -972,6 +1199,9 @@ void update_platformer_event_script(
     }
     gbs::update_event_runner(platformer_event_runner, event_state);
     consume_event_state(event_state);
+    // Script waits skip the physics branch that consumes effects later in update.
+    // Publish each effect before the runner advances to its next phase.
+    gbs::consume_visual_effect_event(event_state, visual_effects);
     consume_platformer_actor_commands(event_state, player, room_data, player_event_active);
     consume_platformer_state_request(
         event_state,
@@ -1005,6 +1235,14 @@ void update_platformer_npc_scripts(
             continue;
         }
         gbs::EventRunner& runner = platformer_npc_runners[index];
+        // No actor outputs can be produced once startup has finished and the
+        // actor has neither a running nor a recurring script. In particular,
+        // avoid resynchronizing every actor for each idle NPC every frame.
+        if (platformer_npc_start_complete[index] &&
+            !gbs::event_runner_is_active(runner) &&
+            room_data.npcs[index].on_update.command_count == 0) {
+            continue;
+        }
         if (!platformer_npc_start_complete[index]) {
             if (!gbs::event_runner_is_active(runner)) {
                 gbs::start_event_runner(runner, room_data.npcs[index].on_start);
@@ -1064,10 +1302,29 @@ bool platformer_npc_is_visible_in_camera(const gbs::PlatformerNpcRuntime& npc, c
     );
 }
 
+constexpr uint32_t platformer_motion_checkpoint_magic=0x314d4650u; // PFM1
+bool has_platformer_motion_checkpoint(const gbs::UniversalSaveData& data) {
+    if(data.payload_size<sizeof(uint32_t))return false;gbs::CheckpointPayloadReader reader(data);uint32_t magic=0;
+    return reader.read(magic)&&magic==platformer_motion_checkpoint_magic;
+}
+gbs::PlatformerMotionView platformer_motion_view(int room,gbs::EventState& state,gbs::PlatformerActor& actor,bool* started,size_t count) {
+    return {&project,room,&state,&platformer_event_runner,&platformer_event_wait_frames,&platformer_event_queue,
+        platformer_npc_runners,platformer_npc_wait_frames,started,&platformer_npc_interaction_runner,
+        &platformer_scripted_movements,&actor,platformer_npc_runtimes,count,&platformer_player_script_speed,platformer_npc_script_speeds};
+}
+bool read_platformer_motion_prefix(gbs::CheckpointPayloadReader& reader,gbs::PlatformerSceneSaveData& saved,uint16_t& starts) {
+    uint32_t magic=0;if(!reader.read(magic)||magic!=platformer_motion_checkpoint_magic||!reader.read(saved.scene)||
+        !reader.read(saved.npc_count)||saved.npc_count>gbs::max_saved_platformer_npcs ||
+        !reader.read_bytes(saved.npcs,saved.npc_count*sizeof(saved.npcs[0]))||!reader.read(starts))return false;
+    const uint32_t mask=saved.npc_count==16 ? 0xffffu : ((1u<<saved.npc_count)-1u);
+    return (starts&~mask)==0;
+}
+
 bool capture_platformer_runtime_state(gbs::UniversalSaveData& universal_save, int current_room, const gbs::PlatformerActor& player,
     const gbs::PlatformerRuntimeState& runtime_state, const gbs::Camera& camera,
     const gbs::EventState& event_state) {
-    gbs::PlatformerSaveData save_data {};
+    gbs::PlatformerSceneSaveData saved {};
+    auto& save_data = saved.scene;
     gbs::capture_platformer_save_data(
         save_data,
         current_room,
@@ -1077,7 +1334,8 @@ bool capture_platformer_runtime_state(gbs::UniversalSaveData& universal_save, in
         event_state,
         gbs::frame_count()
     );
-    static_assert(sizeof(gbs::PlatformerSaveData) <= gbs::universal_save_payload_capacity, "platformer save payload exceeds the universal envelope");
+    static_assert(sizeof(gbs::PlatformerSceneSaveData) <= gbs::universal_save_payload_capacity, "platformer save payload exceeds the universal envelope");
+    if (!gbs::capture_platformer_npc_save_data(saved, platformer_npc_runtimes, platformer_npc_count)) return false;
     if (!gbs::make_universal_save_data(
             universal_save,
             gbs::UniversalSaveRuntime::Platformer,
@@ -1094,9 +1352,19 @@ bool capture_platformer_runtime_state(gbs::UniversalSaveData& universal_save, in
             gbs::universal_save_equipment_slot_count,
             save_data.play_time_frames,
             save_data.flags,
-            &save_data,
-            sizeof(save_data))) {
+            &saved,
+            sizeof(saved))) {
         return false;
+    }
+    bool moving=false;for(const auto& motion:platformer_scripted_movements.moves) moving=moving||gbs::scripted_movement_is_live(motion);
+    if(moving) {
+        if(dialogue.visible)return false;
+        uint16_t starts=0;for(size_t i=0;i<platformer_npc_count;++i)if(platformer_npc_start_complete[i])starts|=static_cast<uint16_t>(1u<<i);
+        gbs::CheckpointPayloadWriter writer(universal_save);
+        auto view=platformer_motion_view(current_room,const_cast<gbs::EventState&>(event_state),const_cast<gbs::PlatformerActor&>(player),platformer_npc_start_complete,platformer_npc_count);
+        if(!writer.write(platformer_motion_checkpoint_magic)||!writer.write(saved.scene)||!writer.write(saved.npc_count)||
+            !writer.write_bytes(saved.npcs,saved.npc_count*sizeof(saved.npcs[0]))||!writer.write(starts)||
+            !gbs::write_platformer_motion_checkpoint(writer,view,platformer_motion_scratch))return false;
     }
     return true;
 }
@@ -1107,16 +1375,21 @@ void persist_platformer_runtime_state(int current_room, const gbs::PlatformerAct
     if (!gbastudio_platformer_project::save_enabled || slot_index < 0 ||
         static_cast<size_t>(slot_index) >= gbastudio_platformer_project::save_bank.slot_count) return;
     gbs::UniversalSaveData universal_save {};
-    if (!capture_platformer_runtime_state(universal_save, current_room, player, runtime_state, camera, event_state)) return;
-    ++platformer_save_sequence;
+    if (!capture_platformer_runtime_state(universal_save, current_room, player, runtime_state, camera, event_state)) {
+        if(pause_menu.visible)gbs::hide_menu(pause_menu);
+        gbs::show_checkpoint_save_failure(dialogue);return;
+    }
+    const uint32_t next_sequence=platformer_save_sequence+1;
     gbs::SaveMetadata metadata = gbs::make_save_metadata(
         "PLATFORMER",
         gbs::frame_count(),
-        platformer_save_sequence,
+        next_sequence,
         static_cast<uint16_t>(current_room),
         0
     );
-    gbs::write_save_slot_record(gbastudio_platformer_project::save_bank, static_cast<size_t>(slot_index), &universal_save, sizeof(universal_save), metadata, platformer_save_sequence);
+    if(gbs::write_save_slot_record(gbastudio_platformer_project::save_bank, static_cast<size_t>(slot_index),
+        &universal_save, sizeof(universal_save), metadata, next_sequence)==gbs::SaveStatus::Ok) platformer_save_sequence=next_sequence;
+    else {if(pause_menu.visible)gbs::hide_menu(pause_menu);gbs::show_checkpoint_backend_failure(dialogue);}
 }
 
 bool restore_platformer_runtime_state(
@@ -1153,14 +1426,20 @@ bool restore_platformer_runtime_state(
         !gbs::is_valid_universal_save_data(universal_save)) {
         return false;
     }
-    gbs::PlatformerSaveData save_data {};
-    if (!gbs::read_universal_save_payload(
-            universal_save,
-            gbs::UniversalSaveRuntime::Platformer,
-            &save_data,
-            sizeof(save_data))) {
-        return false;
-    }
+    gbs::PlatformerSceneSaveData saved {};
+    auto& save_data = saved.scene;
+    const bool motion_save=has_platformer_motion_checkpoint(universal_save);
+    gbs::CheckpointPayloadReader motion_reader(universal_save);uint16_t starts=0;bool saved_starts[max_room_npcs]{};
+    if(motion_save) {
+        if(universal_save.runtime!=gbs::UniversalSaveRuntime::Platformer ||
+            !gbs::is_valid_platformer_room_index(project,universal_save.room_index) ||
+            !read_platformer_motion_prefix(motion_reader,saved,starts) ||
+            saved.npc_count!=project.rooms[universal_save.room_index].npc_count)return false;
+        for(size_t i=0;i<saved.npc_count;++i)saved_starts[i]=(starts&(1u<<i))!=0;
+        auto validation=motion_reader;auto view=platformer_motion_view(universal_save.room_index,event_state,player,saved_starts,saved.npc_count);
+        if(!gbs::read_platformer_motion_checkpoint(validation,view,platformer_motion_scratch,true))return false;
+    } else if (!gbs::read_universal_save_payload(
+            universal_save,gbs::UniversalSaveRuntime::Platformer,&saved,sizeof(saved))) return false;
     if (!gbs::apply_platformer_save_data(project, save_data, player, runtime_state, camera, event_state)) {
         return false;
     }
@@ -1181,12 +1460,33 @@ bool restore_platformer_runtime_state(
     room_data = &project.rooms[current_room];
     apply_active_room_video(project, current_room);
     room = gbs::platformer_room_from_data(*room_data);
+    gbs::stop_visibility_effect();
+    room_tile_edits = {};
+    room.collision.edits = &room_tile_edits;
+    for (auto& cache : room_layer_cache) cache = {};
     load_platformer_room_runtime_objects(*room_data);
+    if (!gbs::apply_platformer_npc_save_data(saved, platformer_npc_runtimes, platformer_npc_count)) return false;
     player.collision_offset_pixels = room_data->player_collision_offset_pixels;
     player.bounds_pixels.width = room_data->player_start.width;
     player.bounds_pixels.height = room_data->player_start.height;
+    platformer_motion_restored=false;
+    if(motion_save) {
+        for(size_t i=0;i<saved.npc_count;++i)platformer_npc_start_complete[i]=saved_starts[i];
+        auto view=platformer_motion_view(current_room,event_state,player,platformer_npc_start_complete,platformer_npc_count);
+        if(!gbs::read_platformer_motion_checkpoint(motion_reader,view,platformer_motion_scratch))return false;
+        platformer_motion_restored=true;
+    }
     gbs::SaveInfo info = gbs::inspect_save_slot(gbastudio_platformer_project::save_bank, static_cast<size_t>(slot_index));
     platformer_save_sequence = info.sequence;
+    gbs::clear_event_tile_commands(event_state);
+    reset_platformer_player_runtime_animation();
+    struct RestoreContext { gbs::PlatformerActor* player; const gbs::PlatformerRoomData* room; } restore_context { &player, room_data };
+    gbs::run_event_script_consuming(event_state, room_data->on_restore, +[](gbs::EventState& state, void* opaque) {
+        const auto& context = *static_cast<RestoreContext*>(opaque);
+        consume_platformer_actor_commands(state, *context.player, *context.room, player_event_active);
+        gbs::clear_event_actor_commands(state);
+        gbs::clear_event_tile_commands(state);
+    }, &restore_context);
     return true;
 }
 
@@ -1223,6 +1523,10 @@ bool apply_event_room_change(
     room_data = &project_data.rooms[current_room];
     apply_active_room_video(project_data, current_room);
     room = gbs::platformer_room_from_data(*room_data);
+    gbs::stop_visibility_effect();
+    room_tile_edits = {};
+    room.collision.edits = &room_tile_edits;
+    for (auto& cache : room_layer_cache) cache = {};
     load_platformer_room_runtime_objects(*room_data);
     player = gbs::platformer_actor_from_rect(
         room_data->player_start,
@@ -1276,7 +1580,7 @@ void draw_platformer_room_layers(
         room.height_tiles,
         bg3_camera_x,
         bg3_camera_y,
-        room_layer_cache[3]
+        room_layer_cache[3], room_tile_edits
     );
     gbs::set_bg_scroll(
         gbs::BackgroundLayer::BG3,
@@ -1303,7 +1607,7 @@ void draw_platformer_room_layers(
         room.height_tiles,
         camera.position_pixels.x,
         camera.position_pixels.y,
-        room_layer_cache[2]
+        room_layer_cache[2], room_tile_edits
     );
     gbs::set_bg_scroll(
         gbs::BackgroundLayer::BG2,
@@ -1322,7 +1626,7 @@ void draw_platformer_room_layers(
         room.height_tiles,
         camera.position_pixels.x,
         camera.position_pixels.y,
-        room_layer_cache[1]
+        room_layer_cache[1], room_tile_edits
     );
     gbs::set_bg_scroll(
         gbs::BackgroundLayer::BG1,
@@ -1335,6 +1639,8 @@ void draw_platformer_room_layers(
 
 int initialize_platformer_runtime() {
     gbs::init();
+    // Standalone ROMs bypass the mixed-runtime dispatcher.
+    gbs::debug_set_runtime_kind(GBS_DIALOGUE_UI_RUNTIME_KIND);
     gbs::reset_runtime_telemetry();
     runtime_trigger_enter_count = 0;
     runtime_trigger_leave_count = 0;
@@ -1349,6 +1655,10 @@ int initialize_platformer_runtime() {
     }
 
     gbs::init_event_state(event_state);
+    event_state.supports_temporal_actor_motion = true;
+    gbs::bind_event_scripts(event_state, project.scripts, project.script_count);
+    gbs::clear_scripted_movements(platformer_scripted_movements);
+    platformer_player_script_speed = 100;
     gbs::init_event_runner(platformer_event_runner);
     gbs::init_event_script_queue(platformer_event_queue);
     platformer_event_wait_frames = 0;
@@ -1385,13 +1695,17 @@ int initialize_platformer_runtime() {
         return -1;
     }
     room = gbs::platformer_room_from_data(*room_data);
+    gbs::stop_visibility_effect();
+    room_tile_edits = {};
+    room.collision.edits = &room_tile_edits;
+    for (auto& cache : room_layer_cache) cache = {};
     load_platformer_room_runtime_objects(*room_data);
     player = gbs::platformer_actor_from_rect(
         room_data->player_start,
         room_data->player_collision_offset_pixels
     );
     player_event_active = true;
-    gbs::init_sprite_animator(player_animator);
+    reset_platformer_player_runtime_animation();
     if (runtime_entry) {
         gbs::set_platformer_actor_anchor_position(player, gbs::Vec2i { entry_x, entry_y });
         player.facing = event_state.player_direction == 2
@@ -1403,6 +1717,8 @@ int initialize_platformer_runtime() {
         0
     );
     active_platformer_state = player.on_ground ? 1 : 0;
+    player_presentation = {};
+    player_hurt_presentation_requested = false;
     camera = room_data->camera_start;
     gbs::init_dialogue(dialogue);
     gbs::init_menu(pause_menu);
@@ -1443,11 +1759,26 @@ int initialize_platformer_runtime() {
     gbs::UniversalSaveData paused_data {};
     const bool resumed_pause = runtime_entry && gbs::consume_suspended_runtime_resume(gbs::UniversalSaveRuntime::Platformer, current_room, paused_data);
     if (resumed_pause) {
-        gbs::PlatformerSaveData state {};
-        if (!gbs::read_universal_save_payload(paused_data, gbs::UniversalSaveRuntime::Platformer, &state, sizeof(state)) ||
-            !gbs::apply_platformer_save_data(project, state, player, runtime_state, camera, event_state) ||
-            !gbs::restore_suspended_common_state(paused_data, event_state)) return -1;
-    } else {
+        gbs::PlatformerSceneSaveData saved {};
+        auto& state = saved.scene;
+        const bool motion_save=has_platformer_motion_checkpoint(paused_data);
+        gbs::CheckpointPayloadReader motion_reader(paused_data);uint16_t starts=0;bool saved_starts[max_room_npcs]{};
+        if(motion_save) {
+            if(!read_platformer_motion_prefix(motion_reader,saved,starts) || saved.npc_count!=platformer_npc_count)return -1;
+            for(size_t i=0;i<saved.npc_count;++i)saved_starts[i]=(starts&(1u<<i))!=0;
+            auto validation=motion_reader;auto view=platformer_motion_view(current_room,event_state,player,saved_starts,saved.npc_count);
+            if(!gbs::read_platformer_motion_checkpoint(validation,view,platformer_motion_scratch,true))return -1;
+        } else if(!gbs::read_universal_save_payload(paused_data,gbs::UniversalSaveRuntime::Platformer,&saved,sizeof(saved)))return -1;
+        if(!gbs::apply_platformer_save_data(project,state,player,runtime_state,camera,event_state) ||
+            !gbs::apply_platformer_npc_save_data(saved,platformer_npc_runtimes,platformer_npc_count) ||
+            !gbs::restore_suspended_common_state(paused_data,event_state))return -1;
+        if(motion_save) {
+            for(size_t i=0;i<saved.npc_count;++i)platformer_npc_start_complete[i]=saved_starts[i];
+            auto view=platformer_motion_view(current_room,event_state,player,platformer_npc_start_complete,platformer_npc_count);
+            if(!gbs::read_platformer_motion_checkpoint(motion_reader,view,platformer_motion_scratch))return -1;
+        }
+        queue_platformer_script(room_data->on_restore);
+    } else if (!restored_save) {
         queue_platformer_script(room_data->on_enter);
         queue_platformer_player_start_script();
     }
@@ -1472,6 +1803,18 @@ int initialize_platformer_runtime() {
     return 0;
 }
 
+#ifdef GBS_MULTI_RUNTIME
+bool platformer_transition_ready() {
+    if (gbs::runtime_transition_target() != gbs::RuntimeKind::Menu || event_state.scene_stack_count == 0) return true;
+    gbs::UniversalSaveData data {};
+    const bool captured = capture_platformer_runtime_state(data, current_room, player, runtime_state, camera, event_state);
+    if (gbs::checkpoint_allow_menu_transition(event_state, captured)) return true;
+    gbs::reset_scene_transition_visual_effects();
+    gbs::show_checkpoint_menu_failure(dialogue);
+    return false;
+}
+#endif
+
 gbs::RuntimeAdapterFrameResult update_platformer_runtime(const gbs::RuntimeFrameContext& context) {
     (void)context;
     if (platformer_initialization_result != 0) {
@@ -1483,7 +1826,7 @@ gbs::RuntimeAdapterFrameResult update_platformer_runtime(const gbs::RuntimeFrame
 #ifdef GBS_MULTI_RUNTIME
         if (gbs::runtime_transition_pending()) {
             sync_runtime_telemetry(player, room, event_state);
-            return gbs::RuntimeAdapterFrameResult::Transition;
+            return platformer_transition_ready() ? gbs::RuntimeAdapterFrameResult::Transition : gbs::RuntimeAdapterFrameResult::Continue;
         }
 #endif
         current_input = gbs::begin_frame().input;
@@ -1493,13 +1836,17 @@ gbs::RuntimeAdapterFrameResult update_platformer_runtime(const gbs::RuntimeFrame
 #if GBS_MULTI_RUNTIME
         if (gbs::runtime_transition_requested()) {
             gbs::consume_scene_transition_visual_effect_event(event_state);
-            return gbs::runtime_transition_pending()
+            return gbs::runtime_transition_pending() && platformer_transition_ready()
                 ? gbs::RuntimeAdapterFrameResult::Transition
                 : gbs::RuntimeAdapterFrameResult::Continue;
         }
 #endif
         gbs::set_event_input_state(event_state, input.held, input.pressed, input.released);
+        gbs::set_event_actor_animation_state(event_state, gbs::event_player_actor_index,
+            player_script_animation_active && player_animator.playing);
     gbs::update_hud_behavior(event_state, hud.visible);
+        if (!pause_menu.visible && !dialogue.visible && !gbs::event_scene_type_is_paused(event_state, scene_type_platformer))
+            tick_platformer_scripted_movements();
         const bool button_binding_overrides_default =
             !pause_menu.visible &&
             !dialogue.visible &&
@@ -1510,7 +1857,7 @@ gbs::RuntimeAdapterFrameResult update_platformer_runtime(const gbs::RuntimeFrame
 #ifdef GBS_MULTI_RUNTIME
         if (gbs::runtime_transition_pending()) {
             sync_runtime_telemetry(player, room, event_state);
-            return gbs::RuntimeAdapterFrameResult::Transition;
+            return platformer_transition_ready() ? gbs::RuntimeAdapterFrameResult::Transition : gbs::RuntimeAdapterFrameResult::Continue;
         }
 #endif
         if (gbs::update_timer_event_bindings(event_state)) {
@@ -1591,12 +1938,14 @@ gbs::RuntimeAdapterFrameResult update_platformer_runtime(const gbs::RuntimeFrame
             gbs::update_platformer_enemy_patrol(active_enemies[index], room.collision);
         }
         const bool was_on_ground = player.on_ground;
+        const uint8_t previous_air_jumps = player.air_jumps_used;
         const gbs::Rect player_bounds_before_update = player.bounds_pixels;
         const gbs::Vec2i player_remainder_before_update = player.movement_remainder_x256;
-        const gbs::InputState player_input = player_event_active && !dialogue.visible
+        const bool player_scripted = gbs::has_scripted_movement(platformer_scripted_movements, gbs::event_player_actor_index);
+        const gbs::InputState player_input = player_event_active && !dialogue.visible && !player_scripted
             ? input
             : gbs::InputState { 0, 0, 0 };
-        if (player_event_active) {
+        if (player_event_active && !player_scripted) {
             gbs::update_platformer_actor(room.collision, player, player_input, room_data->config);
         } else if (active_platformer_state == 7) {
             gbs::update_platformer_blank_actor(
@@ -1627,33 +1976,15 @@ gbs::RuntimeAdapterFrameResult update_platformer_runtime(const gbs::RuntimeFrame
                 gbs::platformer_moving_platform_event_script_for(*room_data, landed_platform_index)
             );
         }
-        if (!was_on_ground && player.on_ground) {
-            transition_platformer_callback_state(event_state, active_platformer_state, 1);
-        } else if (was_on_ground && !player.on_ground) {
-            transition_platformer_callback_state(event_state, active_platformer_state, 0);
-        }
-        const gbs::PlatformerActorAnimationState player_animation_state = gbs::platformer_actor_animation_state(player);
-        const bool player_animation_should_advance = player_animation_state != gbs::PlatformerActorAnimationState::Idle;
-        const gbs::SpriteAnimation* player_animation = gbs::platformer_player_animation_for_state(
-            project.player_animations,
-            player_animation_state
-        );
-        if (player_animation != player_animator.animation) {
-            if (player_animation != nullptr) {
-                if (player_animation_should_advance) {
-                    gbs::play_sprite_animation(player_animator, *player_animation);
-                } else {
-                    gbs::select_sprite_animation(player_animator, *player_animation);
-                }
-            } else {
-                gbs::init_sprite_animator(player_animator);
+        if (player_event_active) {
+            const int next_state = gbs::platformer_callback_state_for_actor(player);
+            // A second accepted jump starts another sound even while already ascending.
+            if (next_state == 2 && active_platformer_state == 2 && player.air_jumps_used != previous_air_jumps) {
+                run_platform_callback(event_state, platform_callback_jump_start);
             }
-        } else if (!player_animation_should_advance && player_animation != nullptr && player_animator.playing) {
-            gbs::select_sprite_animation(player_animator, *player_animation);
+            transition_platformer_callback_state(event_state, active_platformer_state, next_state);
         }
-        if (player_animation_should_advance) {
-            gbs::update_sprite_animator(player_animator);
-        }
+        update_platformer_player_runtime_animation(player_input, !was_on_ground && player.on_ground);
         gbs::run_event_script(event_state, room_data->on_update);
         queue_platformer_player_update_script();
         if (!player.dashing || room_data->config.dash_through < 2) {
@@ -1755,8 +2086,10 @@ gbs::RuntimeAdapterFrameResult update_platformer_runtime(const gbs::RuntimeFrame
             previous_camera_zone_index
         );
         if (room_changed) {
+            gbs::clear_scripted_movements(platformer_scripted_movements);
             player_event_active = true;
             active_platformer_state = player.on_ground ? 1 : 0;
+            reset_platformer_player_runtime_animation();
             ++runtime_room_change_count;
             runtime_blocked_direction_bits = 0;
             if (room_data->trigger_count > max_room_triggers || room_data->npc_count > max_room_npcs) {
@@ -1788,19 +2121,30 @@ gbs::RuntimeAdapterFrameResult update_platformer_runtime(const gbs::RuntimeFrame
             active_platformer_state
         );
         gbs::consume_visual_effect_event(event_state, visual_effects);
-        for (size_t index = 0; index < platformer_npc_count; ++index) {
-            if (platformer_npc_runtimes[index].active && platformer_npc_runtimes[index].visible) {
-                gbs::update_sprite_animator_scaled(
-                    platformer_npc_animators[index],
-                    platformer_npc_runtimes[index].animation_speed_percent
-                );
-            }
         }
+        // Scene waits/dialogue suspend physics, not authored animation clocks.
+        if (!pause_menu.visible && !gbs::event_scene_type_is_paused(event_state, scene_type_platformer)) {
+            advance_platformer_runtime_animations();
         }
         gbs::update_dialogue(dialogue);
-        if (event_state.save_request == 1) {
+        if (event_state.save_request != 0) {
+            const int request = event_state.save_request;
             const int slot = event_state.save_request_slot;
-            persist_platformer_runtime_state(current_room, player, runtime_state, camera, event_state, slot);
+            if (request == 1) {
+                persist_platformer_runtime_state(current_room, player, runtime_state, camera, event_state, slot);
+            } else if (request == 2 && slot >= 0 && restore_platformer_runtime_state(
+                current_room, room_data, room, player, runtime_state, camera, event_state, slot)) {
+                if(!platformer_motion_restored) {
+                    gbs::clear_scripted_movements(platformer_scripted_movements);
+                    gbs::stop_event_runner(platformer_event_runner);
+                    gbs::clear_event_script_queue(platformer_event_queue);
+                    platformer_event_wait_frames = 0;
+                }
+                gbs::hide_dialogue(dialogue);
+            } else if (request == 3 && gbastudio_platformer_project::save_enabled && slot >= 0 &&
+                static_cast<size_t>(slot) < gbastudio_platformer_project::save_bank.slot_count) {
+                gbs::clear_save_slot(gbastudio_platformer_project::save_bank, static_cast<size_t>(slot));
+            }
             if (slot >= 0 && static_cast<size_t>(slot) < gbastudio_platformer_project::save_bank.slot_count &&
                 static_cast<size_t>(slot) < gbs::max_event_save_slots) {
                 event_state.save_slot_exists[slot] = gbs::inspect_save_slot(
@@ -1820,10 +2164,24 @@ gbs::RuntimeAdapterFrameResult update_platformer_runtime(const gbs::RuntimeFrame
 }
 
 void render_platformer_runtime(const gbs::RuntimeFrameContext& context) {
+    const gbs::SubsystemProfilerScope profiler_scope(gbs::ProfilerSubsystem::Render);
     (void)context;
         draw_platformer_room_layers(*room_data, camera, visual_effects);
         gbs::render_visual_effects(visual_effects);
-        gbs::hide_all_sprites();
+        if (gbs::visibility_effect().active) {
+            const int target = gbs::visibility_effect().actor;
+            gbs::Vec2i center { player.bounds_pixels.x + player.bounds_pixels.width / 2,
+                player.bounds_pixels.y + player.bounds_pixels.height / 2 };
+            if (target >= 0 && static_cast<size_t>(target) >= platformer_npc_count) gbs::stop_visibility_effect();
+            else {
+                if (target >= 0) {
+                    const auto& actor = platformer_npc_runtimes[target].actor;
+                    center = { actor.position_pixels.x + actor.size_pixels.x / 2, actor.position_pixels.y + actor.size_pixels.y / 2 };
+                }
+                gbs::render_visibility_effects({ center.x - camera.position_pixels.x, center.y - camera.position_pixels.y }, visual_effects);
+            }
+        }
+        gbs::hide_world_sprites();
         int next_world_sprite_index = 1;
         const gbs::MetaSprite* player_metasprite = gbs::current_metasprite(player_animator);
         if (!gbs::sync_sprite_animation_tiles(player_animator, player_streamed_tile_asset_loaded)) return;
@@ -1857,7 +2215,7 @@ void render_platformer_runtime(const gbs::RuntimeFrameContext& context) {
                 !active_enemies[index].facing_right,
                 false,
                 active_enemies[index].active,
-                0,
+                static_cast<uint8_t>(dialogue.visible ? 1 : 0),
                 gbs::SpriteRenderMode::Normal,
                 gbs::visual_effect_sprite_mosaic_enabled(visual_effects)
             });
@@ -1871,7 +2229,7 @@ void render_platformer_runtime(const gbs::RuntimeFrameContext& context) {
                 false,
                 false,
                 active_moving_platforms[index].active,
-                0,
+                static_cast<uint8_t>(dialogue.visible ? 1 : 0),
                 gbs::SpriteRenderMode::Normal,
                 gbs::visual_effect_sprite_mosaic_enabled(visual_effects)
             });
@@ -1904,8 +2262,14 @@ void render_platformer_runtime(const gbs::RuntimeFrameContext& context) {
             );
             next_world_sprite_index += npc_metasprite->part_count;
         }
-        gbs::draw_dialogue(dialogue);
-        gbs::draw_menu(pause_menu);
+        // Clear a closed menu before drawing overlapping dialogue regions.
+        if (!pause_menu.visible) gbs::draw_menu(pause_menu);
+        if (!dialogue.visible) gbs::draw_dialogue(dialogue);
+        // HUD refresh can clear OAM slots shared with the portrait. An open
+        // dialogue is drawn afterwards; cleanup runs first when it is closed.
+        gbs::draw_hud(hud);
+        if (dialogue.visible) gbs::draw_dialogue(dialogue);
+        if (pause_menu.visible) gbs::draw_menu(pause_menu);
         if (gbs::dialogue_should_show_emote(dialogue)) {
             const gbs::MetaSprite* emote = gbs::dialogue_emote_metasprite(dialogue.emote);
             if (emote != nullptr) {
@@ -1929,8 +2293,6 @@ void render_platformer_runtime(const gbs::RuntimeFrameContext& context) {
                 );
             }
         }
-        // Draw the scene HUD last so dialogue and portrait cleanup cannot mask it.
-        gbs::draw_hud(hud);
         gbs::draw_event_clock(event_state);
         gbs::tick_visual_effects(visual_effects);
         sync_runtime_telemetry(player, room, event_state);

@@ -12,6 +12,7 @@ function canonicalProject() {
 
 function encodedLength(value) {
   if (Array.isArray(value)) return value.length;
+  if (value?.encoding === "metatile-v1") return value.width * value.height;
   if (value && typeof value === "object" && Number.isInteger(value.length)) return value.length;
   return 0;
 }
@@ -56,35 +57,39 @@ describe("cenas avançadas do template Exemplo GBA", () => {
 
     expect(arena).toMatchObject({
       sceneType: "isometric",
-      width: 6,
-      height: 6,
-      backgroundAssetName: "tactical-v5-surface.png",
-      tilesetAssetName: "tactical-v5-surface.png",
-      cameraMode: "fixed_center",
+      width: 16,
+      height: 16,
+      backgroundAssetName: "tactical-arena-large-768x512.png",
+      tilesetAssetName: "tactical-arena-large-768x512.png",
+      cameraMode: "follow_player",
       runtime: {
         type: "isometric",
         config: {
           profile: "diamond-2to1",
           movement: "tile",
-          worldMode: "static_composition",
+          worldMode: "scrollable_tiled_world",
           gameplayMode: "tactical",
           tactical: { enabled: true, activeTeam: "player", units: [
             expect.objectContaining({ actorIndex: 0, team: "player", moveRange: 2, attackRange: 1 }),
-            expect.objectContaining({ actorIndex: 1, team: "enemy", moveRange: 2, attackRange: 1 })
+            expect.objectContaining({ actorIndex: 1, team: "enemy", moveRange: 2, attackRange: 1 }),
+            expect.objectContaining({ actorIndex: 2, team: "player", moveRange: 3, attackRange: 2 }),
+            expect.objectContaining({ actorIndex: 3, team: "enemy", moveRange: 1, attackRange: 2 })
           ] }
         }
       }
     });
     expect(arenaActors).toEqual([
-      expect.objectContaining({ name: "Nara · Arena Tática", x: 1, y: 4, spriteSheet: "tactical-nara-v5.png", animationName: "idle_right" }),
-      expect.objectContaining({ name: "Sentinela · Arena Tática", x: 4, y: 1, spriteSheet: "tactical-sentinel-v5.png", animationName: "idle_left" })
+      expect.objectContaining({ name: "Nara · Arena Tática", x: 5, y: 9, spriteSheet: "tactical-approved-nara-64x64.png", animationName: "idle_right" }),
+      expect.objectContaining({ name: "Sentinela · Arena Tática", x: 8, y: 9, spriteSheet: "tactical-approved-sentinel-64x64.png", animationName: "idle_down" }),
+      expect.objectContaining({ id:"coast-tactical-support",x:5,y:11,spriteSheet:"tactical-approved-sentinel-64x64.png" }),
+      expect.objectContaining({ id:"coast-tactical-ranged",x:8,y:11,spriteSheet:"tactical-approved-sentinel-64x64.png" })
     ]);
     expect(arena.runtime.config.tacticalPresentation).toMatchObject({
       schema: 1,
-      surfacePages: [expect.objectContaining({ asset: "tactical-v5-surface.png", world: { x: 0, y: 0, width: 240, height: 160 } })],
-      cursorAsset: "tactical-cursor-diamond-32x16-v1.png",
-      rangeAsset: "tactical-range-diamond-32x16-v1.png",
-      targetAsset: "tactical-target-diamond-32x16-v1.png"
+      compactHud: expect.objectContaining({turnPanel:"tactical-compact-turnPanel.png"}),
+      cursorAsset: "tactical-cursor-48x24.png",
+      rangeAsset: "tactical-cursor-48x24.png",
+      targetAsset: "tactical-cursor-48x24.png"
     });
     expect(arena.runtime.config.tacticalPresentation.audio).toMatchObject({
       music: "farol_arena_tatica",
@@ -93,24 +98,24 @@ describe("cenas avançadas do template Exemplo GBA", () => {
 
     expect(market).toMatchObject({
       sceneType: "isometric",
-      width: 36,
-      height: 36,
-      backgroundAssetName: "mercado-adventure-surface.png",
+      width: 52,
+      height: 52,
+      backgroundAssetName: "market-approved-surface-768x512.png",
       playerActorName: "Aventureiro · Mercado",
       cameraMode: "follow_player",
       runtime: { type: "isometric", config: {
-        profile: "market-suspenso-isometric-world-v1",
+        profile: "market-suspenso-approved-adventure-v2",
         movement: "free",
         worldMode: "scrollable_tiled_world",
         gameplayMode: "adventure",
-        pagedSurface: { backgroundAsset: "mercado-adventure-surface.png", foregroundAsset: "mercado-adventure-foreground.png" }
+        pagedSurface: { backgroundAsset: "market-approved-surface-768x512.png", foregroundAsset: "market-approved-foreground-768x512.png" }
       } }
     });
     expect(project.actors.filter((actor) => actor.roomName === "mercado_suspenso").map(({ name, spriteSheet }) => [name, spriteSheet]))
       .toEqual([
-        ["Aventureiro · Mercado", "tactical-nara-v5.png"],
-        ["Mercador suspenso", "market-adventure-merchant.png"],
-        ["Guarda do mercado", "market-adventure-guard.png"]
+        ["Aventureiro · Mercado", "market-approved-actors-64x64.png"],
+        ["Mercador suspenso", "market-approved-actors-64x64.png"],
+        ["Guarda do mercado", "market-approved-actors-64x64.png"]
       ]);
   });
 
@@ -136,34 +141,34 @@ describe("cenas avançadas do template Exemplo GBA", () => {
 
     expect(racing).toMatchObject({
       sceneType: "racing",
-      backgroundAssetName: "circuit-final-loop-v2-runtime.png",
-      playerActorName: "Carro de Nara",
+      backgroundAssetName: "racing-approved-topdown.png",
+      playerActorName: "Player · Nara",
       cameraMode: "follow_player",
       runtime: { type: "racing", config: {
         presentation: "topdown",
         rivalSpeed: 105,
         showMinimap: false,
         topdownTrack: {
-          cameraDeadZoneX: 56,
-          cameraDeadZoneY: 40,
-          pathPoints: expect.arrayContaining([expect.objectContaining({ x: 180, y: 56 })]),
-          checkpoints: expect.arrayContaining([expect.objectContaining({ id: "ilha-largada" })])
+          cameraDeadZoneX: 120,
+          cameraDeadZoneY: 80,
+          pathPoints: expect.arrayContaining([expect.objectContaining({ x: 240, y: 80 })]),
+          checkpoints: expect.arrayContaining([expect.objectContaining({ id: "finish" })])
         }
       } },
-      eventBindings: { onVictory: "circuito_concluir", onDefeat: "circuito_reiniciar" }
+      eventBindings: { onVictory: "race_finish", onDefeat: "race_finish" }
     });
     expect(racers.map(({ name, spriteSheet }) => [name, spriteSheet])).toEqual([
-      ["Carro de Nara", "nara-racer.png"],
-      ["Rival de Nara", "rival-racer.png"],
-      ["Rival da Ilha", "rival-racer.png"]
+      ["Player · Nara", "racing-approved-overhead-nara.png"],
+      ["Rival · Coral", "racing-approved-overhead-rival.png"],
+      ["Rival · Ilha", "racing-approved-overhead-rival.png"]
     ]);
   });
 
   it("mantém o Armazém e o Observatório como cenas point-and-click com atores e saídas", () => {
     const project = canonicalProject();
     for (const expected of [
-      { name: "armazem_das_mares", background: "armazem-das-mares-gba.png", cursor: "Cursor do Armazém", triggers: ["Carta Náutica", "Baú Vermelho", "Saída do Armazém"] },
-      { name: "observatorio_do_farol", background: "observatorio-do-farol-gba.png", cursor: "Cursor do Observatório", triggers: ["Telescópio", "Mesa da Maré", "Saída do Observatório"] }
+      { name: "armazem_das_mares", background: "warehouse-frontal-bg-240x160.png", cursor: "Cursor do Armazém", triggers: ["Carta Náutica", "Baú Vermelho", "Saída do Armazém", "Rádio de Lúmen"] },
+      { name: "observatorio_do_farol", background: "observatory-frontal-bg-240x160.png", cursor: "Cursor do Observatório", triggers: ["Telescópio", "Mesa da Maré", "Saída do Observatório"] }
     ]) {
       const scene = project.scenas.find((candidate) => candidate.name === expected.name);
       expect(scene).toMatchObject({
@@ -175,8 +180,8 @@ describe("cenas avançadas do template Exemplo GBA", () => {
         runtime: { type: "pointAndClick" }
       });
       const actors = project.actors.filter((actor) => actor.roomName === expected.name);
-      expect(actors).toHaveLength(4);
-      expect(actors[0]).toMatchObject({ name: expected.cursor, spriteSheet: "point-click-cursor.png" });
+      expect(actors).toHaveLength(expected.name === 'observatorio_do_farol' ? 4 : 2);
+      expect(actors.find(a=>a.name===expected.cursor)).toMatchObject({ name: expected.cursor, spriteSheet: "white-hand-cursor-32x32.png" });
       expect(project.triggers.filter((trigger) => trigger.roomName === expected.name).map((trigger) => trigger.name))
         .toEqual(expected.triggers);
     }

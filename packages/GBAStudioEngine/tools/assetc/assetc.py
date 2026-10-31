@@ -1,8 +1,10 @@
 #!/usr/bin/env python3
 import argparse
+import base64
 from collections import Counter, OrderedDict
 from contextlib import contextmanager
 from contextvars import ContextVar
+from functools import wraps
 import hashlib
 import json
 import math
@@ -83,6 +85,42 @@ PACK_COMPRESSION_STRATEGIES = ("none", "rle16", "lz77", "huffman")
 OBJ_LOOKUP_CACHE_MAX_ENTRIES = 32
 OBJ_LOOKUP_CACHE_MAX_KEYS = 32768
 OBJ_LOOKUP_CACHE = ContextVar("assetc_obj_lookup_cache", default=None)
+ANIMATION_EVENT_KEYS = ContextVar("assetc_animation_event_keys", default=None)
+
+
+def with_animation_event_keys(emitter):
+    @wraps(emitter)
+    def emit(project, *args, **kwargs):
+        names = set()
+
+        def collect(value):
+            if isinstance(value, dict):
+                for collection in ("animations", "script_animations"):
+                    entries = value.get(collection)
+                    for index, entry in enumerate(entries if isinstance(entries, list) else []):
+                        if isinstance(entry, str):
+                            name = entry
+                        elif isinstance(entry, dict):
+                            name = entry.get("name", entry.get("id", f"animation_{index}"))
+                        else:
+                            continue
+                        names.add(animation_lookup_key(name))
+                for child in value.values():
+                    collect(child)
+            elif isinstance(value, list):
+                for child in value:
+                    collect(child)
+
+        collect(project)
+        if len(names) > 32768:
+            raise SystemExit("Projeto excede 32768 nomes de animacao para eventos")
+        keys = {name: index + 1 for index, name in enumerate(sorted(names))}
+        token = ANIMATION_EVENT_KEYS.set(keys)
+        try:
+            return emitter(project, *args, **kwargs)
+        finally:
+            ANIMATION_EVENT_KEYS.reset(token)
+    return emit
 
 
 @contextmanager
@@ -800,53 +838,75 @@ def plan_pack_obj_palettes(assets, base_dir):
         colors, indices = prepare_obj_asset_pixels(colors, indices, transparent, a)
         visible[id(a)] = list(dict.fromkeys(rgb15(colors[i]) for i in indices if i != 0))
 
-    # Reindex compatible icons into the same 4bpp bank, without losing a color.
-    # Their bank is fixed even when an icon/effect is shared by different scenes.
-    bins = []
-    assignments = {}
-    for a in sorted(four, key=lambda a: -len(visible[id(a)])):
-        colors = visible[id(a)]
-        choices = [(len(set(colors) - set(bank)), index) for index, bank in enumerate(bins)
-                   if len(set(colors).union(bank)) <= 15]
-        if choices:
-            _, bank_index = min(choices)
-        else:
-            bank_index = len(bins)
-            if bank_index >= OBJ_BUILTIN_PALETTE_BANK:
-                raise SystemExit("paleta OBJ compartilhada: mais de 12 bancos 4bpp; banco 12 reservado ao fallback do motor e bancos 13-15 ao texto/UI")
-            bins.append([])
-        bins[bank_index].extend(color for color in colors if color not in bins[bank_index])
-        assignments[id(a)] = bank_index
-    for a in four:
-        bank = assignments[id(a)]
-        values = [0, *bins[bank]] + [0] * (15 - len(bins[bank]))
-        a["object_palette_plan"] = {"values": values, "palette_bank": bank, "groups": sorted(scopes(a).union(all_eight_groups))}
-
-    # A shared 4bpp palette does not join the color budgets of disjoint scenes.
-    # Only an 8bpp sheet used in multiple scenes needs one master across them.
+    # Only shared 8bpp sheets join scene masters. Shared 4bpp icons retain a
+    # fixed bank, but do not force unrelated scene colors into one master.
+    components = []
     pending = list(eight)
     while pending:
-        component = [pending.pop(0)]
-        groups = scopes(component[0])
+        members = [pending.pop(0)]
+        groups = scopes(members[0])
         changed = True
         while changed:
             changed = False
             for candidate in pending[:]:
                 if overlaps(groups, scopes(candidate)):
-                    component.append(candidate)
+                    members.append(candidate)
                     pending.remove(candidate)
                     groups.update(scopes(candidate))
                     changed = True
+        components.append((members, groups))
+
+    def palette_scopes(a):
+        groups = scopes(a)
+        for _, master_groups in components:
+            if overlaps(groups, master_groups):
+                groups = groups.union(master_groups)
+        return groups
+
+    # Each bank can be reused by disjoint residency scopes. Within a scope,
+    # compatible icons share exactly one palette, including shared icons.
+    banks = [[] for _ in range(OBJ_BUILTIN_PALETTE_BANK)]
+    for a in sorted(four, key=lambda a: -len(visible[id(a)])):
+        colors = visible[id(a)]
+        groups = palette_scopes(a)
+        choices = []
+        for bank_index, clusters in enumerate(banks):
+            shared = [cluster for cluster in clusters if overlaps(groups, cluster["groups"])]
+            existing = set(color for cluster in shared for color in cluster["colors"])
+            if len(existing.union(colors)) <= 15:
+                choices.append((len(set(colors) - existing), bank_index, shared))
+        if not choices:
+            raise SystemExit("paleta OBJ compartilhada: mais de 12 bancos 4bpp no mesmo escopo; banco 12 reservado ao fallback do motor e bancos 13-15 ao texto/UI")
+        _, bank, shared = min(choices, key=lambda choice: (choice[0], choice[1]))
+        combined = list(dict.fromkeys([*(color for cluster in shared for color in cluster["colors"]), *colors]))
+        merged_groups = groups.union(*(cluster["groups"] for cluster in shared))
+        members = [*(member for cluster in shared for member in cluster["members"]), a]
+        for cluster in shared:
+            banks[bank].remove(cluster)
+        banks[bank].append({"colors": combined, "groups": merged_groups, "members": members})
+    for bank, clusters in enumerate(banks):
+        for cluster in clusters:
+            values = [0, *cluster["colors"]] + [0] * (15 - len(cluster["colors"]))
+            for a in cluster["members"]:
+                a["object_palette_plan"] = {"values": values, "palette_bank": bank, "groups": sorted(cluster["groups"])}
+
+    for component, groups in components:
         master = [0] * OBJ_MASTER_PALETTE_COLORS
         builtin_start = OBJ_BUILTIN_PALETTE_BANK * 16
         master[builtin_start:builtin_start + 16] = OBJ_BUILTIN_PALETTE_VALUES
         occupied = {0, *range(builtin_start, builtin_start + 16)}
         first_index = {}
-        for bank, colors in enumerate(bins):
-            master[bank * 16:bank * 16 + 16] = [0, *colors] + [0] * (15 - len(colors))
-            occupied.update(range(bank * 16, bank * 16 + 16))
-            for index, color in enumerate(colors, 1):
-                first_index.setdefault(color, bank * 16 + index)
+        bank_count = 0
+        for bank, clusters in enumerate(banks):
+            for cluster in clusters:
+                if not overlaps(groups, cluster["groups"]):
+                    continue
+                colors = cluster["colors"]
+                master[bank * 16:bank * 16 + 16] = [0, *colors] + [0] * (15 - len(colors))
+                occupied.update(range(bank * 16, bank * 16 + 16))
+                bank_count += 1
+                for index, color in enumerate(colors, 1):
+                    first_index.setdefault(color, bank * 16 + index)
         for index, color in enumerate(OBJ_BUILTIN_PALETTE_VALUES[1:4], 1):
             first_index.setdefault(color, builtin_start + index)
         for a in component:
@@ -860,7 +920,7 @@ def plan_pack_obj_palettes(assets, base_dir):
                 occupied.add(free)
                 first_index[color] = free
         for a in component:
-            a["object_palette_plan"] = {"values": master, "palette_bank": 0, "groups": sorted(groups), "indices": first_index, "shared_bank_colors": len(bins) * 16}
+            a["object_palette_plan"] = {"values": master, "palette_bank": 0, "groups": sorted(groups), "indices": first_index, "shared_bank_colors": bank_count * 16}
     return result
 
 
@@ -2593,7 +2653,7 @@ def emit_header(
     lines.extend([
         "",
         f"constexpr gbs::PaletteAsset {name}_palette_asset = {{ {name}_palette, {len(palette_values)}, {palette_start}{palette_compression_fields} }};",
-        f"const gbs::TileAsset {name}_tile_asset = {{ reinterpret_cast<const uint8_t*>({name}_tiles), {name}_tile_count, {destination_tile}, {object_literal}{', gbs::ColorDepth::Bpp4' if tiles_compression != 'none' else ''}{tiles_compression_fields} }};",
+        f"constexpr gbs::TileAsset {name}_tile_asset = {{ &{name}_tiles[0][0], {name}_tile_count, {destination_tile}, {object_literal}{', gbs::ColorDepth::Bpp4' if tiles_compression != 'none' else ''}{tiles_compression_fields} }};",
         f"constexpr gbs::TileMapAsset {name}_tilemap_asset = {{ {name}_tilemap_entries, {name}_tilemap_width, {name}_tilemap_height{tilemap_compression_fields} }};",
     ])
     collision_flags = None
@@ -2831,7 +2891,7 @@ def emit_indexed_background_header(name, width, height, colors, indices, max_sou
         "",
         f"constexpr uint16_t {name}_tilemap_entries[{len(tilemap_entries)}] = {{ {', '.join(hex(v) for v in tilemap_entries)} }};",
         f"constexpr gbs::PaletteAsset {name}_palette_asset = {{ {name}_palette, {len(palette_values)}, 0 }};",
-        f"const gbs::TileAsset {name}_tile_asset = {{ reinterpret_cast<const uint8_t*>({name}_tiles), {name}_tile_count, 0, false, gbs::ColorDepth::Bpp8 }};",
+        f"constexpr gbs::TileAsset {name}_tile_asset = {{ &{name}_tiles[0][0], {name}_tile_count, 0, false, gbs::ColorDepth::Bpp8 }};",
         f"constexpr gbs::TileMapAsset {name}_tilemap_asset = {{ {name}_tilemap_entries, {name}_tilemap_width, {name}_tilemap_height }};",
         "",
     ])
@@ -2920,7 +2980,7 @@ def emit_sprite_header(
     lines.append("};")
     lines.extend([
         "",
-        f"const gbs::TileAsset {name}_tile_asset = {{ reinterpret_cast<const uint8_t*>({name}_tiles), {name}_tile_count, {destination_tile}, {object_literal}{', gbs::ColorDepth::Bpp8' if sprite_bpp == 8 else ''} }};",
+        f"constexpr gbs::TileAsset {name}_tile_asset = {{ &{name}_tiles[0][0], {name}_tile_count, {destination_tile}, {object_literal}{', gbs::ColorDepth::Bpp8' if sprite_bpp == 8 else ''} }};",
         "",
     ])
     if stream_frames:
@@ -2932,7 +2992,7 @@ def emit_sprite_header(
                 lines.append("    { " + ", ".join(hex(v) for v in tile) + " },")
             lines.extend([
                 "};",
-                f"const gbs::TileAsset {name}_frame_{frame}_tile_asset = {{ reinterpret_cast<const uint8_t*>({name}_frame_{frame}_tiles), {len(frame_data)}, {destination_tile}, {object_literal}{', gbs::ColorDepth::Bpp8' if sprite_bpp == 8 else ''} }};",
+                f"constexpr gbs::TileAsset {name}_frame_{frame}_tile_asset = {{ &{name}_frame_{frame}_tiles[0][0], {len(frame_data)}, {destination_tile}, {object_literal}{', gbs::ColorDepth::Bpp8' if sprite_bpp == 8 else ''} }};",
                 "",
             ])
     if lz77_palette:
@@ -7374,6 +7434,10 @@ def tilemap_values_from_asset_pack_entry(asset_report, base_dir, asset_id, descr
         raise SystemExit(f"{description} precisa do diretorio base para remapear visual_tilemap")
 
     args = header.get("assetc_args", [])
+    if "--paged-tilemap" in args:
+        width, height, _colors, indices = read_png(base_dir / source, max_colors=224)
+        _tiles, entries, _width, _height = build_indexed_background_tiles(width, height, indices, max_source_tiles=65535)
+        return entries
     background_bpp = assetc_arg_int(args, "--background-bpp", 4)
     width, height, colors, indices = read_png(base_dir / source, max_colors=256)
     if background_bpp != 4:
@@ -7421,6 +7485,49 @@ def source_asset_tilemap_for_dimensions(tilemap_values, asset_report, asset_id, 
     ]
 
 
+def validate_topdown_paged_background(room, width, height, room_index, asset_report, base_dir=None):
+    description = f"topdown_project.rooms[{room_index}]"
+    source = room.get("paged_source_tiles")
+    bpp = int(room.get("background_bits_per_pixel", 4))
+    if source is None:
+        if bpp != 4:
+            raise SystemExit(f"{description}: 8bpp requires explicit paged_source_tiles")
+        return
+    if not isinstance(source, str) or source != room.get("visual_tilemap"):
+        raise SystemExit(f"{description}: paged_source_tiles must match visual_tilemap")
+    if bpp != 8 or room.get("visual_tilemap_layout") != "source_asset":
+        raise SystemExit(f"{description}: paged background requires 8bpp and source_asset layout")
+    header = asset_pack_header_for_id(asset_report, source)
+    args = header.get("assetc_args", []) if header else []
+    if "--paged-tilemap" not in args:
+        raise SystemExit(f"{description}: source must be a paged_bg atlas")
+    if any(flag in args for flag in ("--lz77-tiles", "--huffman-tiles", "--lz77-tilemap", "--huffman-tilemap", "--rle-tilemap")):
+        raise SystemExit(f"{description}: paged source must remain directly addressable in ROM")
+    resources = header.get("resources", {})
+    if resources.get("tilemap_width") != width or resources.get("tilemap_height") != height:
+        raise SystemExit(f"{description}: paged map dimensions must match the room")
+    if any(value > 0 for value in room.get("foreground_tiles", [])):
+        raise SystemExit(f"{description}: paged BG cannot share its character block with foreground_tiles")
+    values = tilemap_values_from_asset_pack_entry(asset_report, base_dir, source, description)
+    count = resources.get("rom_source_bytes", 0) // 64
+    if not isinstance(values, list) or len(values) != width * height or count < 1 or any(not isinstance(v, int) or v < 0 or v >= count for v in values):
+        raise SystemExit(f"{description}: invalid paged ROM tile index")
+    return values
+
+
+def remap_editor_tilemap_indices(tiles, tilemap_values, description):
+    # Editor IDs reserve zero for an empty cell; source entries are zero-based.
+    remapped = []
+    for tile_id in tiles:
+        if tile_id <= 0:
+            remapped.append(0)
+        elif tile_id > len(tilemap_values):
+            raise SystemExit(f"{description} referencia tile {tile_id}, mas a origem possui {len(tilemap_values)} entradas")
+        else:
+            remapped.append(tilemap_values[tile_id - 1])
+    return remapped
+
+
 def remap_topdown_visual_tiles_from_asset(room, visual, room_index, asset_report, base_dir):
     asset_id = room.get("visual_tilemap", room.get("visual_tilemap_asset"))
     if asset_id is None:
@@ -7446,6 +7553,8 @@ def remap_topdown_visual_tiles_from_asset(room, visual, room_index, asset_report
             height,
             f"topdown_project.rooms[{room_index}].visual_tilemap",
         )
+    if room.get("visual_tilemap_layout") == "editor_tiles":
+        return remap_editor_tilemap_indices(visual, tilemap_values, f"topdown_project.rooms[{room_index}].visual_tiles")
     remapped = []
     for tile_index in visual:
         if tile_index < 0 or tile_index >= len(tilemap_values):
@@ -7482,6 +7591,8 @@ def remap_platformer_visual_tiles_from_asset(room, visual, room_index, asset_rep
             height,
             f"platformer_project.rooms[{room_index}].visual_tilemap",
         )
+    if room.get("visual_tilemap_layout") == "editor_tiles":
+        return remap_editor_tilemap_indices(visual, tilemap_values, f"platformer_project.rooms[{room_index}].visual_tiles")
     remapped = []
     for tile_index in visual:
         if tile_index < 0 or tile_index >= len(tilemap_values):
@@ -7517,6 +7628,8 @@ def remap_platformer_layer_tiles_from_asset(layer, tiles, room_width, room_heigh
             room_height,
             f"{description}.tilemap",
         )
+    if layer.get("tilemap_layout") == "editor_tiles":
+        return remap_editor_tilemap_indices(tiles, tilemap_values, f"{description}.tiles")
     remapped = []
     for tile_index in tiles:
         if tile_index < 0 or tile_index >= len(tilemap_values):
@@ -7542,6 +7655,8 @@ def remap_topdown_foreground_tiles_from_asset(room, foreground, room_index, asse
         asset_id,
         f"topdown_project.rooms[{room_index}].visual_tilemap",
     )
+    if room.get("visual_tilemap_layout") == "editor_tiles":
+        return remap_editor_tilemap_indices(foreground, tilemap_values, f"topdown_project.rooms[{room_index}].foreground_tiles")
     remapped = []
     for tile_index in foreground:
         if tile_index < 0:
@@ -7651,7 +7766,10 @@ def emit_topdown_animation_frame_subset(output, prefix, name, entry, asset_repor
         else:
             output.append(f"    {{ {metasprites}[{frame_index}], {duration}{streamed_asset} }},")
     output.append("};")
-    output.append(f"constexpr gbs::SpriteAnimation {symbol} {{ {frames_symbol}, {len(frame_indices)}, {'true' if loops else 'false'} }};")
+    keys = ANIMATION_EVENT_KEYS.get()
+    event_key = keys.get(animation_lookup_key(name), 0) if keys is not None else 0
+    event_key_literal = f", {event_key}" if event_key else ""
+    output.append(f"constexpr gbs::SpriteAnimation {symbol} {{ {frames_symbol}, {len(frame_indices)}, {'true' if loops else 'false'}{event_key_literal} }};")
     output.append("")
     return symbol
 
@@ -7682,6 +7800,13 @@ def topdown_npc_animation_entries(output, prefix, npc, asset_report, description
                 symbol = resolve_project_animation_symbol(reference, asset_report, entry_description)
         else:
             raise SystemExit(f"{entry_description} precisa ser string ou objeto")
+        keys = ANIMATION_EVENT_KEYS.get()
+        generated_entry = isinstance(entry, dict) and entry.get("frame_indices", entry.get("frames")) is not None
+        if keys is not None and not generated_entry:
+            alias = f"{pack_safe_identifier(prefix)}_named_animation_{index}"
+            output.append(f"constexpr gbs::SpriteAnimation {alias} = gbs::named_sprite_animation({symbol}, {keys[animation_lookup_key(name)]});")
+            output.append("")
+            symbol = alias
         entries.append((str(name), symbol))
     return entries
 
@@ -7776,6 +7901,8 @@ def emit_isometric_actor_animation_set(output, prefix, actor, asset_report, desc
         "attack_down", "attack_up", "attack_left", "attack_right",
         "hurt_down", "hurt_up", "hurt_left", "hurt_right",
         "defeat_down", "defeat_up", "defeat_left", "defeat_right",
+        "idle_screen_down", "idle_screen_up", "idle_screen_left", "idle_screen_right",
+        "walk_screen_down", "walk_screen_up", "walk_screen_left", "walk_screen_right",
     )
     set_symbol = f"{prefix}_animation_set"
     output.append(f"constexpr gbs::IsoActorAnimationSet {set_symbol} {{")
@@ -7950,6 +8077,7 @@ def emit_isometric_tactical_presentation(
     actor_animation_lookups,
     asset_report,
     description,
+    base_dir=None,
 ):
     if presentation is None:
         return "nullptr"
@@ -8079,7 +8207,8 @@ def emit_isometric_tactical_presentation(
                 f"{description}.units[{unit_index}]",
             )
             unit_entries.append(
-                f"    gbs::IsoTacticalUnitPresentationData {{ {actor_index}, &{tactical_animation_set} }},"
+                f"    gbs::IsoTacticalUnitPresentationData {{ {actor_index}, &{tactical_animation_set}" +
+                (f", {tactical_metasprite_pointer(unit.get('portrait'),0,asset_report,description)}, {cpp_string_literal(unit.get('label')) if unit.get('label') else 'nullptr'}" if unit.get('portrait') or unit.get('label') else "") + " },"
             )
         output.append(f"constexpr gbs::IsoTacticalUnitPresentationData {unit_array_name}[] = {{")
         output.extend(unit_entries)
@@ -8207,6 +8336,22 @@ def emit_isometric_tactical_presentation(
         audio_expr = audio_array_name
         audio_count = len(ISOMETRIC_TACTICAL_AUDIO_CUES)
 
+    compact_expr = "nullptr"
+    if presentation.get("compact_hud"):
+        compact = presentation["compact_hud"]
+        fields=[tactical_metasprite_pointer(compact.get(key),0,asset_report,description) for key in ["turnPanel","unitPanel","actionsPanel","selection","healthFull"]]
+        fields += [tactical_asset_pointer(compact.get(key),"tile_assets",asset_report,description) for key in ["healthFull","healthEmpty"]]
+        if "nullptr" in fields: raise SystemExit(f"{description}.compact_hud requires all panels and gauges")
+        font_header=asset_pack_header_for_id(asset_report,compact.get("font"))
+        if not font_header or not font_header.get("inputs"): raise SystemExit(f"{description}.compact_hud.font is missing")
+        font=dialogue_font_from_json(font_header["inputs"][0],base_dir,description+".compact_hud.font")
+        emit_dialogue_font(output,font,prefix+"_compact_font")
+        fields.append(prefix+"_compact_font")
+        _,_,font_colors,font_indices=read_png(resolve_project_path(base_dir,font_header["inputs"][0],description),max_colors=2)
+        font_ink=next(index for index in font_indices if index!=font_indices[0])
+        fields.append(str(rgb15(font_colors[font_ink])))
+        compact_expr="&"+prefix+"_compact_hud"
+        output.append(f"constexpr gbs::IsoTacticalCompactHud {prefix}_compact_hud {{ " + ", ".join(fields) + " };")
     presentation_name = f"{prefix}_tactical_presentation"
     output.append(f"constexpr gbs::IsoTacticalPresentationData {presentation_name} {{")
     output.extend([
@@ -8229,7 +8374,8 @@ def emit_isometric_tactical_presentation(
         f"    {feedback_expr},",
         f"    {music_expr},",
         f"    {audio_expr},",
-        f"    {audio_count}",
+        f"    {audio_count},",
+        f"    {compact_expr}",
     ])
     output.append("};")
     output.append("")
@@ -8276,7 +8422,7 @@ def emit_platformer_player_animation_set(output, player, asset_report, base_dir=
         raise SystemExit("platformer_project.player.animations precisa ser objeto")
 
     symbols = {}
-    for state in ("idle", "walk", "jump", "fall", "climb", "wall_slide", "dash", "glide"):
+    for state in ("idle", "walk", "jump", "fall", "climb", "wall_slide", "dash", "glide", "attack", "hurt", "land"):
         entry = raw_animations.get(state)
         if entry is None:
             continue
@@ -8302,8 +8448,8 @@ def emit_platformer_player_animation_set(output, player, asset_report, base_dir=
 
     idle_symbol = symbols.get("idle", default_symbol)
     expressions = []
-    for state in ("idle", "walk", "jump", "fall", "climb", "wall_slide", "dash", "glide"):
-        symbol = symbols.get(state, idle_symbol)
+    for state in ("idle", "walk", "jump", "fall", "climb", "wall_slide", "dash", "glide", "attack", "hurt", "land"):
+        symbol = symbols.get(state, None if state in ("attack", "hurt", "land") else idle_symbol)
         expressions.append(f"&{symbol}" if symbol is not None else "nullptr")
     return f"gbs::PlatformerPlayerAnimationSet {{ {', '.join(expressions)} }}"
 
@@ -8649,6 +8795,7 @@ def event_op_from_json(value):
         "projectile_load_slot": "ProjectileLoadSlot",
         "cancel_actor_movement": "CancelActorMovement",
         "actor_effects": "ActorEffects",
+        "visibility": "Visibility",
         "open_menu": "OpenMenu",
         "open_shop": "OpenShop",
         "set_adventure_state": "SetAdventureState",
@@ -8712,6 +8859,8 @@ def event_op_from_json(value):
         "set_actor_collision_box": "SetActorCollisionBox",
         "set_all_sprites_visible": "SetAllSpritesVisible",
         "set_actor_position": "SetActorPosition",
+        "move_actor_to": "MoveActorTo",
+        "move_actor_relative": "MoveActorRelative",
         "move_actor": "MoveActor",
         "set_actor_direction": "SetActorDirection",
         "set_actor_speed": "SetActorSpeed",
@@ -9013,6 +9162,24 @@ def event_named_index(command, keys, lookup, default=0):
     return default
 
 
+def event_animation_reference(command, lookup, description):
+    keys = ANIMATION_EVENT_KEYS.get()
+    for field in ("animation", "value", "index"):
+        if field not in command:
+            continue
+        value = command[field]
+        try:
+            return int(value)
+        except (TypeError, ValueError):
+            if keys is None:
+                return event_named_index(command, [field], lookup, 0)
+            name = animation_lookup_key(value)
+            if name not in keys:
+                raise SystemExit(f"{description}: animacao inexistente: {value}")
+            return -keys[name]
+    return 0
+
+
 def event_pack_i8_pair(high, low):
     packed = ((int(high) & 0xFF) << 8) | (int(low) & 0xFF)
     return packed - 0x10000 if packed >= 0x8000 else packed
@@ -9059,10 +9226,23 @@ def event_layer_index(command, keys=("layer", "background"), default=0):
 
 
 def event_tile_location(command):
-    x = max(0, min(63, event_int(command, ["x", "tile_x"], 0)))
-    y = max(0, min(63, event_int(command, ["y", "tile_y"], 0)))
+    x = event_int(command, ["x", "tile_x"], 0)
+    y = event_int(command, ["y", "tile_y"], 0)
+    if not 0 <= x <= 511 or not 0 <= y <= 511:
+        raise SystemExit("ReplaceTile coordinates must be between 0 and 511")
     layer = max(0, min(3, event_layer_index(command)))
-    return (layer << 12) | (y << 6) | x
+    return (layer << 12) | ((y & 63) << 6) | (x & 63)
+
+
+def event_tile_options(command):
+    x = event_int(command, ["x", "tile_x"], 0)
+    y = event_int(command, ["y", "tile_y"], 0)
+    collision = event_int(command, ["collision_flags"], -1)
+    if not -1 <= collision <= 255:
+        raise SystemExit("ReplaceTile collision_flags must be between 0 and 255")
+    if collision >= 0 and event_layer_index(command) not in (0, 2):
+        raise SystemExit("ReplaceTile collision is only supported on the scene floor (BG2)")
+    return (collision + 1) | ((x >> 6) << 9) | ((y >> 6) << 12)
 
 
 def event_engine_field(command, keys=("field", "engine_field"), default=0):
@@ -9080,6 +9260,11 @@ def event_engine_field(command, keys=("field", "engine_field"), default=0):
             "player_y": 4,
             "plat_blank_grav": 5,
             "platformer_blank_gravity": 5,
+            **{f"equipped_item_{slot}": 6 + slot for slot in range(8)},
+            "timer_count": 14,
+            "previous_runtime": 15,
+            "previous_room": 16,
+            "racing_result": 17,
         },
         default,
     )
@@ -9233,7 +9418,7 @@ def event_audio_channel(command):
     )
 
 
-def event_command_from_json(command, description, animation_lookup=None):
+def event_command_from_json(command, description, animation_lookup=None, actor_animation_lookups=None):
     if not isinstance(command, dict):
         raise SystemExit(f"{description} precisa ser objeto")
     op = event_op_from_json(command.get("op", "end"))
@@ -9468,6 +9653,26 @@ def event_command_from_json(command, description, animation_lookup=None):
         elif verb == "luta_set_rounds_to_win":
             target, value = max(1, min(255, event_int(command, ["count"], 2))), 0
         return (op, actions.index(verb), target, value)
+    if op == "Visibility":
+        effect = command.get("effect")
+        if effect == "clear":
+            return (op, -1, 0, 0, 0)
+        if effect not in ("lantern", "reveal"):
+            raise SystemExit("Visibility effect must be lantern, reveal or clear")
+        actor = event_int(command, ["actor"], -1)
+        width = event_int(command, ["width"], 80)
+        height = event_int(command, ["height"], 64)
+        intensity = event_int(command, ["intensity"], 75)
+        frames = event_int(command, ["frames"], 180)
+        shape = command.get("shape", "rectangle")
+        if shape not in ("rectangle", "circle") or (shape == "circle" and width != height):
+            raise SystemExit("Circular visibility requires equal width and height; shape must be rectangle or circle")
+        if not (-1 <= actor < 96 and 8 <= width <= 240 and 8 <= height <= 160 and 0 <= intensity <= 100 and 1 <= frames <= 3600):
+            raise SystemExit("Visibility actor, area, intensity or duration out of range")
+        area = (width << 8) | height
+        if area > 32767:
+            area -= 65536
+        return (op, actor, area, frames, intensity | (128 if effect == "reveal" else 0) | (256 if shape == "circle" else 0))
     if op == "ActorEffects":
         return (op, event_int(command, ["actor"], -1), event_int(command, ["index"], 0), event_int(command, ["frames"], 30), event_int(command, ["intensity"], 50))
     if op == "CancelActorMovement":
@@ -9769,12 +9974,14 @@ def event_command_from_json(command, description, animation_lookup=None):
             0,
         )
     if op == "ReplaceTile":
-        return (
+        result = (
             op,
             event_tile_location(command),
             event_int(command, ["tile", "tile_id", "value"], 0),
             max(1, min(64, event_int(command, ["count", "length"], 1))),
         )
+        options = event_tile_options(command)
+        return result + (options,) if options else result
     if op == "ReplaceTileSequence":
         variable = max(0, min(15, event_int(command, ["variable", "var"], 0)))
         frames = max(1, min(255, event_int(command, ["frames", "count", "length"], 1)))
@@ -9783,12 +9990,9 @@ def event_command_from_json(command, description, animation_lookup=None):
         packed_tile = tile
         if tile_asset >= 0:
             packed_tile |= (max(0, min(30, tile_asset)) + 1) << 10
-        return (
-            op,
-            event_tile_location(command),
-            packed_tile,
-            (frames << 8) | variable,
-        )
+        result = (op, event_tile_location(command), packed_tile, (frames << 8) | variable)
+        options = event_tile_options(command)
+        return result + (options,) if options else result
     if op == "OverlayLine":
         return (op, event_int(command, ["line", "y", "height"], 0), 0, 0)
     if op == "OverlayShow":
@@ -9822,12 +10026,15 @@ def event_command_from_json(command, description, animation_lookup=None):
             0,
         )
     if op == "FadeAudioVolume":
-        return (
+        values = (
             op,
             event_audio_channel(command),
             max(0, min(15, event_int(command, ["volume", "target", "value"], 15))),
             max(0, min(3600, event_int(command, ["frames", "duration"], 30))),
         )
+        if "variable" in command or "other_variable" in command:
+            return values + ((event_int(command, ["variable"], -1) + 1) | ((event_int(command, ["other_variable"], -1) + 1) << 8),)
+        return values
     if op in ("SetActorVisible", "SetActorActive", "SetActorSpeed"):
         return (
             op,
@@ -9868,16 +10075,19 @@ def event_command_from_json(command, description, animation_lookup=None):
             0,
         )
     if op == "SetActorAnimation":
+        actor_index = event_int(command, ["actor", "actor_index", "index"], 0)
+        if actor_animation_lookups is not None and 0 <= actor_index < len(actor_animation_lookups):
+            animation_lookup = actor_animation_lookups[actor_index]
         return (
             op,
-            event_int(command, ["actor", "actor_index", "index"], 0),
-            event_named_index(command, ["animation", "value", "index"], animation_lookup, 0),
+            actor_index,
+            event_animation_reference(command, animation_lookup, description),
             0,
         )
     if op == "SetPlayerAnimation":
         return (
             op,
-            event_named_index(command, ["animation", "value", "index"], animation_lookup, 0),
+            event_animation_reference(command, animation_lookup, description),
             0,
             0,
         )
@@ -9902,7 +10112,7 @@ def event_command_from_json(command, description, animation_lookup=None):
             event_int(command, ["frame", "value"], 0),
             0,
         )
-    if op in ("SetActorPosition", "MoveActor"):
+    if op in ("SetActorPosition", "MoveActor", "MoveActorTo", "MoveActorRelative"):
         position = command.get("position", command.get("delta", None))
         if isinstance(position, dict):
             x = int(position.get("x", command.get("x", 0)))
@@ -9968,6 +10178,7 @@ def event_command_from_json(command, description, animation_lookup=None):
             event_int(command, ["walk_speed", "walkSpeed", "walk"], 100),
             event_int(command, ["run_speed", "runSpeed", "run"], 160),
             event_int(command, ["stamina_cost", "staminaCost", "energy_cost"], 0),
+            event_button_mask(command, default=0),
         )
     if op == "SetPlayerMovementState":
         return (
@@ -9977,12 +10188,13 @@ def event_command_from_json(command, description, animation_lookup=None):
             0,
         )
     if op == "StartGameClock":
-        return (
+        values = (
             op,
             event_int(command, ["minutes_per_tick", "minutesPerTick"], 10),
             event_int(command, ["frames_per_tick", "framesPerTick"], 180),
             1 if event_bool(command, ["hud", "hud_enabled"], True) else 0,
         )
+        return values + (event_int(command, ["variable"], -1) + 1,) if "variable" in command else values
     if op == "AdvanceTime":
         return (op, event_int(command, ["minutes", "value"], 60), 0, 0)
     if op == "SetStat":
@@ -10030,7 +10242,7 @@ def event_command_from_json(command, description, animation_lookup=None):
     raise SystemExit(f"evento op ainda nao suportado no export topdown: {op}")
 
 
-def emit_event_script(output, name, commands, description, animation_lookup=None):
+def emit_event_script(output, name, commands, description, animation_lookup=None, actor_animation_lookups=None):
     if commands is None:
         return "gbs::empty_event_script()"
     if not isinstance(commands, list):
@@ -10039,12 +10251,15 @@ def emit_event_script(output, name, commands, description, animation_lookup=None
         return "gbs::empty_event_script()"
 
     parsed = [
-        event_command_from_json(command, f"{description}[{index}]", animation_lookup=animation_lookup)
+        event_command_from_json(command, f"{description}[{index}]", animation_lookup=animation_lookup, actor_animation_lookups=actor_animation_lookups)
         for index, command in enumerate(commands)
     ]
     if parsed[-1][0] != "End":
         parsed.append(("End", 0, 0, 0))
 
+    for index, command in enumerate(commands):
+        if isinstance(command, dict) and isinstance(command.get("source"), dict):
+            output.append("// @gbs-event-source " + json.dumps({"symbol": name + "_commands", "index": index, "eventID": str(command["source"].get("eventID", "")), "stepID": str(command["source"].get("stepID", ""))}, ensure_ascii=True))
     output.append(f"constexpr gbs::EventCommand {name}_commands[] = {{")
     for command in parsed:
         op, a, b, c = command[:4]
@@ -10698,7 +10913,7 @@ def emit_point_click_props(output, scene, scene_index, asset_report, base_dir=No
             prop.get("visible_variable", prop.get("visible_variable_index", -1)),
             f"{description}.visible_variable",
             -1,
-            15,
+            63,
         )
         visible_value = require_int(
             prop.get("visible_value", prop.get("visible_variable_value", 1)),
@@ -10748,6 +10963,47 @@ def emit_point_click_props(output, scene, scene_index, asset_report, base_dir=No
     return (props_name, len(props))
 
 
+def emit_point_click_cursor_visual(output, cursor_config, prefix, asset_report, base_dir, description):
+    cursor_metasprite_expr = "nullptr"
+    cursor_idle_animation_expr = "nullptr"
+    cursor_hover_animation_expr = "nullptr"
+    cursor_click_animation_expr = "nullptr"
+    if cursor_config is not None:
+        if not isinstance(cursor_config, dict):
+            raise SystemExit(f"{description} precisa ser objeto")
+        cursor_metasprite = resolve_project_metasprite_symbol(
+            cursor_config.get("metasprite"),
+            None,
+            asset_report,
+            f"{description}.metasprite",
+        )
+        if cursor_metasprite is None:
+            raise SystemExit(f"{description}.metasprite precisa referenciar asset valido")
+        cursor_metasprite_expr = f"&{cursor_metasprite}"
+        for entry in cursor_config.get("animations", []) or []:
+            if isinstance(entry, dict) and animation_lookup_key(entry.get("name", "")) == "click" and entry.get("loops", True):
+                raise SystemExit(f"{description} click animation cannot loop")
+        cursor_animation_entries = topdown_npc_animation_entries(
+            output,
+            prefix,
+            cursor_config,
+            asset_report,
+            description,
+            base_dir,
+        )
+        cursor_animation_symbols = {
+            animation_lookup_key(name): symbol
+            for name, symbol in cursor_animation_entries
+        }
+        if cursor_animation_symbols.get("idle") is not None:
+            cursor_idle_animation_expr = f"&{cursor_animation_symbols['idle']}"
+        if cursor_animation_symbols.get("hover") is not None:
+            cursor_hover_animation_expr = f"&{cursor_animation_symbols['hover']}"
+        if cursor_animation_symbols.get("click") is not None:
+            cursor_click_animation_expr = f"&{cursor_animation_symbols['click']}"
+    return (cursor_metasprite_expr, cursor_idle_animation_expr, cursor_hover_animation_expr, cursor_click_animation_expr)
+
+
 def emit_point_click_project_data_header(point_click_project, asset_report=None, base_dir=None):
     if not isinstance(point_click_project, dict):
         raise SystemExit("point_click_project precisa ser objeto")
@@ -10777,44 +11033,9 @@ def emit_point_click_project_data_header(point_click_project, asset_report=None,
     emit_save_config(output, save_config)
 
     asset_refs = emit_project_asset_references(output, point_click_project, "point_click_project", "point_click_project", include_audio=True, asset_report=asset_report)
-    cursor_config = point_click_project.get("cursor")
-    cursor_metasprite_expr = "nullptr"
-    cursor_idle_animation_expr = "nullptr"
-    cursor_hover_animation_expr = "nullptr"
-    cursor_click_animation_expr = "nullptr"
-    if cursor_config is not None:
-        if not isinstance(cursor_config, dict):
-            raise SystemExit("point_click_project.cursor precisa ser objeto")
-        cursor_metasprite = resolve_project_metasprite_symbol(
-            cursor_config.get("metasprite"),
-            None,
-            asset_report,
-            "point_click_project.cursor.metasprite",
-        )
-        if cursor_metasprite is None:
-            raise SystemExit("point_click_project.cursor.metasprite precisa referenciar asset valido")
-        cursor_metasprite_expr = f"&{cursor_metasprite}"
-        for entry in cursor_config.get("animations", []) or []:
-            if isinstance(entry, dict) and animation_lookup_key(entry.get("name", "")) == "click" and entry.get("loops", True):
-                raise SystemExit("point_click_project.cursor click animation cannot loop")
-        cursor_animation_entries = topdown_npc_animation_entries(
-            output,
-            "point_click_cursor",
-            cursor_config,
-            asset_report,
-            "point_click_project.cursor",
-            base_dir,
-        )
-        cursor_animation_symbols = {
-            animation_lookup_key(name): symbol
-            for name, symbol in cursor_animation_entries
-        }
-        if cursor_animation_symbols.get("idle") is not None:
-            cursor_idle_animation_expr = f"&{cursor_animation_symbols['idle']}"
-        if cursor_animation_symbols.get("hover") is not None:
-            cursor_hover_animation_expr = f"&{cursor_animation_symbols['hover']}"
-        if cursor_animation_symbols.get("click") is not None:
-            cursor_click_animation_expr = f"&{cursor_animation_symbols['click']}"
+    cursor_metasprite_expr, cursor_idle_animation_expr, cursor_hover_animation_expr, cursor_click_animation_expr = emit_point_click_cursor_visual(
+        output, point_click_project.get("cursor"), "point_click_cursor", asset_report, base_dir, "point_click_project.cursor"
+    )
     backgrounds_name, project_background_count = emit_point_click_backgrounds(
         output,
         point_click_project,
@@ -10827,6 +11048,13 @@ def emit_point_click_project_data_header(point_click_project, asset_report=None,
         asset_report,
     )
     emit_resource_bank_upload_sources(output, asset_report)
+
+    portrait_assets = dialogue_portrait_assets_from_json(
+        point_click_project.get("portrait_assets"),
+        "point_click_project.portrait_assets",
+        asset_report,
+    )
+    emit_dialogue_portrait_assets(output, portrait_assets)
 
     dialogue_lines_name, dialogue_line_count = emit_dialogue_lines(
         output,
@@ -10866,6 +11094,9 @@ def emit_point_click_project_data_header(point_click_project, asset_report=None,
             )
             output.append("")
         props_name, prop_count = emit_point_click_props(output, scene, scene_index, asset_report, base_dir)
+        scene_cursor = emit_point_click_cursor_visual(
+            output, scene.get("cursor"), f"point_click_scene_{scene_index}_cursor", asset_report, base_dir, f"point_click_project.scenes[{scene_index}].cursor"
+        )
         on_enter = emit_event_script(
             output,
             f"point_click_scene_{scene_index}_on_enter",
@@ -10893,7 +11124,8 @@ def emit_point_click_project_data_header(point_click_project, asset_report=None,
             f"{background_indices_name}, "
             f"{scene_background_count}, "
             f"{props_name}, "
-            f"{prop_count} "
+            f"{prop_count}, "
+            f"{', '.join(scene_cursor)} "
             "},"
         )
     output.append("constexpr gbs::PointClickSceneData scenes[] = {")
@@ -11092,6 +11324,8 @@ def menu_item_binding_from_json(item, item_path):
         "inventory": ("Inventory", 16),
         "stat": ("Stat", 8),
         "equipped": ("Equipped", 8),
+        "text": ("Text", 8),
+        "context": ("Context", 3),
     }
     if source not in source_map:
         raise SystemExit(f"{item_path}.binding.source invalido: {source}")
@@ -11110,6 +11344,27 @@ def menu_item_binding_from_json(item, item_path):
     if raw_format not in format_map:
         raise SystemExit(f"{item_path}.binding.format invalido: {raw_format}")
     return (source_name, index, format_map[raw_format])
+
+
+def emit_menu_audio_feedback(screen, screen_index):
+    feedback = screen.get("audio_feedback", {})
+    actions = ("navigate", "confirm", "back", "unavailable")
+    if not isinstance(feedback, dict) or set(feedback) - set(actions):
+        raise SystemExit(f"menu_project.screens[{screen_index}].audio_feedback invalido")
+    cues = []
+    for action in actions:
+        cue = feedback.get(action)
+        if cue is None:
+            cues.append("gbs::MenuAudioCue {}")
+            continue
+        if not isinstance(cue, dict) or set(cue) - {"pcm", "sfx", "volume", "priority"} or (("pcm" in cue) == ("sfx" in cue)):
+            raise SystemExit(f"menu audio {action} requer exatamente pcm ou sfx")
+        index = cue.get("pcm", cue.get("sfx"))
+        volume, priority = cue.get("volume", 15), cue.get("priority", 8)
+        if any(not isinstance(value, int) or isinstance(value, bool) for value in (index, volume, priority)) or not 0 <= index <= 65535 or not 0 <= volume <= 15 or not 0 <= priority <= 255:
+            raise SystemExit(f"menu audio {action} indice/volume/prioridade invalido")
+        cues.append(f"gbs::MenuAudioCue {{ {index}, {'true' if 'pcm' in cue else 'false'}, {volume}, {priority} }}")
+    return "gbs::MenuAudioFeedback { " + ", ".join(cues) + " }"
 
 
 def emit_menu_items(output, screen, screen_index):
@@ -11137,6 +11392,10 @@ def emit_menu_items(output, screen, screen_index):
         )
         action = menu_item_action_from_json(item, item_path)
         condition_variable, condition_value, condition_hide = menu_item_condition_from_json(item)
+        available_runtime = item.get("available_runtime", "")
+        if available_runtime not in ("", "racing"):
+            raise SystemExit(f"{item_path}.available_runtime invalido")
+        condition_runtime_suffix = ", 7" if available_runtime == "racing" else ""
         value_variable, value_min, value_max, value_step = menu_item_value_from_json(item, action)
         click_box = item.get("click_box", {})
         if click_box is None:
@@ -11181,7 +11440,7 @@ def emit_menu_items(output, screen, screen_index):
             f"{target_screen}, "
             f"{'true' if bool(item.get('enabled', True)) else 'false'}, "
             f"gbs::MenuItemAction::{action}, "
-            f"gbs::MenuItemConditionData {{ {condition_variable}, {condition_value}, {'true' if condition_hide else 'false'} }}, "
+            f"gbs::MenuItemConditionData {{ {condition_variable}, {condition_value}, {'true' if condition_hide else 'false'}{condition_runtime_suffix} }}, "
             f"gbs::MenuItemValueData {{ {value_variable}, {value_min}, {value_max}, {value_step} }}, "
             f"gbs::MenuClickBox {{ {click_x}, {click_y}, {click_width}, {click_height} }}, "
             f"{checked_value}, "
@@ -11278,6 +11537,22 @@ def emit_menu_actors(output, screen, screen_index, asset_report=None):
             f"{description}.on_update",
         )
         cursor_offset = vec2_from_json(actor.get("cursor_offset_pixels", {"x": 0, "y": 0}), description + ".cursor_offset_pixels")
+        conditions = actor.get("visibility_conditions", [])
+        if not isinstance(conditions, list) or len(conditions) > 8:
+            raise SystemExit(f"{description}.visibility_conditions invalido")
+        condition_name = "nullptr"
+        if conditions:
+            condition_name = f"menu_screen_{screen_index}_actor_{actor_index}_conditions"
+            output.append(f"constexpr gbs::MenuVisibilityConditionData {condition_name}[] = {{")
+            for condition in conditions:
+                if not isinstance(condition, dict):
+                    raise SystemExit(f"{description}.visibility_conditions precisa conter objetos")
+                bs, bi, bf = menu_item_binding_from_json(condition, description)
+                if bs == "None":
+                    raise SystemExit(f"{description}.visibility_conditions requer binding")
+                value = int(condition.get("value", 0))
+                output.append(f"    {{ {{gbs::MenuItemBindingSource::{bs}, {bi}, gbs::MenuItemBindingFormat::{bf}}}, {value}, {'true' if condition.get('negate', False) else 'false'} }},")
+            output.append("};")
         actor_entries.append(
             "    gbs::MenuActorData { "
             f"{cpp_string_literal(name)}, &{metasprite}, "
@@ -11294,7 +11569,8 @@ def emit_menu_actors(output, screen, screen_index, asset_report=None):
             f"{'true' if actor.get('flip_horizontal', False) else 'false'}, "
             f"{'true' if actor.get('cursor_follows_option', False) else 'false'}, "
             f"gbs::Vec2i {{ {cursor_offset[0]}, {cursor_offset[1]} }}, "
-            f"{'true' if actor.get('selected_only', False) else 'false'} "
+            f"{'true' if actor.get('selected_only', False) else 'false'}, "
+            f"{condition_name}, {len(conditions)}, {'true' if actor.get('visibility_any', False) else 'false'} "
             "},"
         )
 
@@ -11531,6 +11807,16 @@ def emit_menu_project_data_header(menu_project, asset_report=None):
         presentation_mode_map = {"scene": "Scene", "hud": "Hud", "both": "Both"}
         if presentation_mode not in presentation_mode_map:
             raise SystemExit(f"menu_project.screens[{screen_index}].presentation_mode invalido: {presentation_mode}")
+        header=screen.get("hud_header")
+        header_suffix=", gbs::MenuHeaderData {}"
+        if header is not None:
+            if not isinstance(header,dict): raise SystemExit("hud_header precisa ser objeto")
+            hx=require_int(header.get("x",0),"hud_header.x",0,29)
+            hy=require_int(header.get("y",0),"hud_header.y",0,19)
+            hw=require_int(header.get("width",1),"hud_header.width",1,30-hx)
+            hb=require_int(header.get("background_color",0),"hud_header.background_color",0,32767)
+            ht=require_int(header.get("text_color",32767),"hud_header.text_color",0,32767)
+            header_suffix=f", gbs::MenuHeaderData {{ {hx}, {hy}, {hw}, {hb}, {ht} }}"
         hud_list_rows = int(screen.get("hud_list_rows", 0))
         title_text_variable = int(screen.get("title_text_variable", -1))
         carousel = bool(screen.get("carousel", False))
@@ -11539,6 +11825,28 @@ def emit_menu_project_data_header(menu_project, asset_report=None):
             raise SystemExit("hud_text_color precisa ser RGB555")
         if not 0 <= hud_list_rows <= 6 or not -1 <= title_text_variable < 8:
             raise SystemExit(f"menu_project.screens[{screen_index}] HUD list contract invalido")
+        fields = screen.get("hud_bindings", [])
+        if not isinstance(fields, list) or len(fields) > 8:
+            raise SystemExit("hud_bindings precisa ter no máximo 8 campos")
+        fields_name = "nullptr"
+        seen_slots = set()
+        if fields:
+            fields_name = f"menu_screen_{screen_index}_hud_bindings"
+            output.append(f"constexpr gbs::MenuHudBindingData {fields_name}[] = {{")
+            for field in fields:
+                slot = require_int(field.get("slot", -1), "hud_bindings.slot", 0, 7)
+                if slot in seen_slots:
+                    raise SystemExit("hud_bindings.slot duplicado")
+                seen_slots.add(slot)
+                bs, bi, bf = menu_item_binding_from_json(field, "hud_bindings")
+                selected = bool(field.get("selected_item", False))
+                if bs == "None" and not selected:
+                    raise SystemExit("hud_bindings requer binding ou selected_item")
+                columns = require_int(field.get("columns", 0), "hud_bindings.columns", 0, 31)
+                output.append(f"    {{ {slot}, {{gbs::MenuItemBindingSource::{bs}, {bi}, gbs::MenuItemBindingFormat::{bf}}}, {'true' if selected else 'false'}, {columns} }},")
+            output.append("};")
+        previous_page = require_int(screen.get("previous_page_screen", -1), "previous_page_screen", -1, len(screens) - 1)
+        next_page = require_int(screen.get("next_page_screen", -1), "next_page_screen", -1, len(screens) - 1)
         screen_entries.append(
             "    gbs::MenuScreenData { "
             f"{cpp_string_literal(screen.get('name', f'screen_{screen_index}'))}, "
@@ -11570,7 +11878,10 @@ def emit_menu_project_data_header(menu_project, asset_report=None):
             f"{'true' if suspends_gameplay else 'false'}, "
             f"gbs::MenuScenePresentationMode::{presentation_mode_map[presentation_mode]}, {hud_list_rows}, {title_text_variable}, "
             f"{'true' if carousel else 'false'}, {hud_text_color}, "
-            f"{'true' if screen.get('hud_transparent_text', False) else 'false'} "
+            f"{'true' if screen.get('hud_transparent_text', False) else 'false'}, "
+            f"{'true' if screen.get('hud_feedback_in_details', False) else 'false'}, "
+            f"{emit_menu_audio_feedback(screen, screen_index)}{header_suffix}, "
+            f"{fields_name}, {len(fields)}, {previous_page}, {next_page} "
             "},"
         )
     output.append("constexpr gbs::MenuScreenData screens[] = {")
@@ -11651,7 +11962,7 @@ def emit_cutscene_backgrounds(output, cutscene_project, asset_report=None):
     return ("cutscene_backgrounds", len(backgrounds))
 
 
-def emit_cutscene_steps(output, scene, scene_index):
+def emit_cutscene_steps(output, scene, scene_index, asset_report=None):
     steps = scene.get("steps", scene.get("timeline", []))
     if steps is None:
         steps = []
@@ -11662,6 +11973,35 @@ def emit_cutscene_steps(output, scene, scene_index):
     for step_index, step in enumerate(steps):
         if not isinstance(step, dict):
             raise SystemExit(f"cutscene_project.scenes[{scene_index}].steps[{step_index}] precisa ser objeto")
+        actor_frames = step.get("actor_frames", [])
+        if not isinstance(actor_frames, list):
+            raise SystemExit("cutscene actor_frames precisa ser lista")
+        frame_entries = []
+        selected_actors = set()
+        for frame in actor_frames:
+            if not isinstance(frame, dict):
+                raise SystemExit("cutscene actor_frames precisa conter objetos")
+            actor_index = frame.get("actor_index", -1)
+            frame_index = frame.get("frame_index", -1)
+            actors = scene.get("actors", [])
+            if (not isinstance(actor_index, int) or not isinstance(frame_index, int) or
+                    actor_index < 0 or actor_index >= len(actors) or frame_index < 0 or frame_index > 255 or
+                    actor_index in selected_actors or actors[actor_index].get("animation") is None):
+                raise SystemExit("cutscene actor_frames referencia ator/animacao/quadro invalido ou duplicado")
+            selected_actors.add(actor_index)
+            reference = actors[actor_index].get("animation")
+            asset_id = reference.get("asset") if isinstance(reference, dict) else reference
+            resources = (asset_report or {}).get("asset_reports", {}).get(asset_id, {}).get("resources", {})
+            frame_count = resources.get("sprite_frames")
+            if isinstance(frame_count, int) and frame_index >= frame_count:
+                raise SystemExit("cutscene actor_frames.frame_index excede a spritesheet exportada")
+            frame_entries.append(f"    gbs::CutsceneActorFrameData {{ {actor_index}, {frame_index} }},")
+        frames_name = "nullptr"
+        if frame_entries:
+            frames_name = f"cutscene_scene_{scene_index}_step_{step_index}_actor_frames"
+            output.append(f"constexpr gbs::CutsceneActorFrameData {frames_name}[] = {{")
+            output.extend(frame_entries)
+            output.extend(["};", ""])
         actor_motions = step.get("actor_motions", step.get("actorMotions", []))
         if actor_motions is None:
             actor_motions = []
@@ -11755,7 +12095,7 @@ def emit_cutscene_steps(output, scene, scene_index):
             f"{int(step.get('background', step.get('background_index', -1)))}, "
             f"{resource_group_expr}, "
             f"{motions_name}, "
-            f"{motion_count} "
+            f"{motion_count}, {frames_name}, {len(frame_entries)} "
             "},"
         )
 
@@ -11796,10 +12136,13 @@ def emit_cutscene_actors(output, scene, scene_index, asset_report=None):
             actor.get("position", {"x": actor.get("x", 0), "y": actor.get("y", 0)}),
             f"{description}.position",
         )
+        animation = resolve_project_animation_symbol(actor.get("animation"), asset_report, f"{description}.animation")
+        animation_expr = f"&{animation}" if animation else "nullptr"
+        initial_frame = actor.get("metasprite", {}).get("index", 0) if isinstance(actor.get("metasprite"), dict) else 0
         actor_entries.append(
             "    gbs::CutsceneActorData { "
             f"{cpp_string_literal(name)}, &{metasprite}, "
-            f"gbs::Vec2i {{ {position[0]}, {position[1]} }} "
+            f"gbs::Vec2i {{ {position[0]}, {position[1]} }}, {animation_expr}, {int(initial_frame)} "
             "},"
         )
 
@@ -11868,7 +12211,7 @@ def emit_cutscene_project_data_header(cutscene_project, asset_report=None):
     for scene_index, scene in enumerate(scenes):
         if not isinstance(scene, dict):
             raise SystemExit(f"cutscene_project.scenes[{scene_index}] precisa ser objeto")
-        steps_name, step_count = emit_cutscene_steps(output, scene, scene_index)
+        steps_name, step_count = emit_cutscene_steps(output, scene, scene_index, asset_report)
         actors_name, actor_count = emit_cutscene_actors(output, scene, scene_index, asset_report)
         on_enter = emit_event_script(
             output,
@@ -12202,7 +12545,8 @@ def emit_world_map_project_data_header(world_map_project, asset_report=None):
         f"    {on_enter}, {on_cancel}, {on_start},",
         f"    {max(1, min(600, int(world_map_project.get('journey_frames', 120))))},",
         f"    {'true' if world_map_project.get('cursor_affine', False) else 'false'},",
-        f"    {'true' if world_map_project.get('embedded_nodes', False) else 'false'}",
+        f"    {'true' if world_map_project.get('embedded_nodes', False) else 'false'},",
+        "    gbs::WorldMapHudLabels { " + ", ".join(cpp_string_literal(world_map_project.get('hud_labels', {}).get(key, default)) for key, default in [('available', 'A VIAJAR'), ('journey', 'EM VOO'), ('locked', 'BLOQUEADO')]) + " }",
         "};",
         "",
         "} // namespace gbastudio_world_map_project",
@@ -12548,7 +12892,21 @@ def shmup_vec_from_entry(entry, key, fallback, description):
     return vec2_from_json(value, description)
 
 
-def emit_shmup_enemies(output, wave, wave_index, asset_report=None):
+def chain_damage_event_commands(callback, scene_hook):
+    """Keep relative branches/waits intact and stop only the local callback at End."""
+    if not scene_hook:
+        return callback
+    if not isinstance(scene_hook, list) or (callback is not None and not isinstance(callback, list)):
+        raise SystemExit("damage callbacks precisam ser listas")
+    callback = callback or []
+    # End exits a callback, not the scene hook that follows it. Relative branch
+    # offsets already address the same commands when a script is concatenated.
+    return [dict(command, op="jump", offset=len(callback) - index)
+            if isinstance(command, dict) and command.get("op") == "end" else command
+            for index, command in enumerate(callback)] + scene_hook
+
+
+def emit_shmup_enemies(output, wave, wave_index, asset_report=None, base_dir=None):
     enemies = wave.get("enemies", [])
     if enemies is None:
         enemies = []
@@ -12600,7 +12958,7 @@ def emit_shmup_enemies(output, wave, wave_index, asset_report=None):
         on_hit_player = emit_event_script(
             output,
             f"shmup_wave_{wave_index}_enemy_{enemy_index}_on_hit_player",
-            enemy.get("on_hit_player"),
+            chain_damage_event_commands(enemy.get("on_hit_player"), wave.get("on_hit_player")),
             f"shmup_project.waves[{wave_index}].enemies[{enemy_index}].on_hit_player",
         )
         resource_group = enemy.get("resource_bank_group", enemy.get("bank_group"))
@@ -12612,6 +12970,14 @@ def emit_shmup_enemies(output, wave, wave_index, asset_report=None):
             f"shmup_project.waves[{wave_index}].enemies[{enemy_index}].metasprite",
         )
         enemy_metasprite_expr = f"&{enemy_metasprite}" if enemy_metasprite else "nullptr"
+        animation_expr = "nullptr"
+        if "animation" in enemy:
+            clip = enemy["animation"]
+            description = f"shmup_project.waves[{wave_index}].enemies[{enemy_index}].animation"
+            if not isinstance(clip, dict) or not clip.get("frame_indices") or not isinstance(clip.get("loops", True), bool):
+                raise SystemExit(f"{description} precisa declarar frame_indices e loops booleano")
+            symbol = emit_topdown_animation_frame_subset(output, f"shmup_enemy_{wave_index}_{enemy_index}", "idle", clip, asset_report, description, base_dir)
+            animation_expr = f"&{symbol}"
         enemy_entries.append(
             "    gbs::ShmupEnemyData { "
             f"{cpp_string_literal(enemy.get('name', f'enemy_{enemy_index}'))}, "
@@ -12628,7 +12994,7 @@ def emit_shmup_enemies(output, wave, wave_index, asset_report=None):
             f"{on_destroy}, "
             f"{on_hit_player}, "
             f"{resource_group_expr}, "
-            f"{enemy_metasprite_expr} "
+            f"{enemy_metasprite_expr}, {animation_expr} "
             "},"
         )
 
@@ -12709,11 +13075,30 @@ def emit_shmup_project_data_header(shmup_project, asset_report=None, base_dir=No
     )
     emit_resource_bank_upload_sources(output, asset_report)
 
+    portrait_assets = dialogue_portrait_assets_from_json(
+        shmup_project.get("portrait_assets"),
+        "shmup_project.portrait_assets",
+        asset_report,
+    )
+    emit_dialogue_portrait_assets(output, portrait_assets)
+
     dialogue_lines_name, dialogue_line_count = emit_dialogue_lines(
         output,
         shmup_project.get("dialogue_lines", []),
         "shmup_project.dialogue_lines",
     )
+    scripts = shmup_project.get("scripts", []) or []
+    if not isinstance(scripts, list):
+        raise SystemExit("shmup_project.scripts precisa ser lista")
+    script_entries = [emit_event_script(
+        output, f"shmup_project_script_{index}",
+        script.get("script", script.get("commands", [])) if isinstance(script, dict) else script,
+        f"shmup_project.scripts[{index}]") for index, script in enumerate(scripts)]
+    scripts_name = "shmup_project_scripts" if script_entries else "nullptr"
+    if script_entries:
+        output.append("constexpr gbs::EventScript shmup_project_scripts[] = {")
+        output.extend(f"    {entry}," for entry in script_entries)
+        output.extend(["};", ""])
     actor_sprites = dialogue_emote_assets_from_json(
         shmup_project.get("actor_sprites"),
         "shmup_project.actor_sprites",
@@ -12791,7 +13176,7 @@ def emit_shmup_project_data_header(shmup_project, asset_report=None, base_dir=No
     for wave_index, wave in enumerate(waves):
         if not isinstance(wave, dict):
             raise SystemExit(f"shmup_project.waves[{wave_index}] precisa ser objeto")
-        enemies_name, enemy_count = emit_shmup_enemies(output, wave, wave_index, asset_report)
+        enemies_name, enemy_count = emit_shmup_enemies(output, wave, wave_index, asset_report, base_dir)
         max_enemy_count = max(max_enemy_count, enemy_count)
         on_start = emit_event_script(
             output,
@@ -12805,6 +13190,12 @@ def emit_shmup_project_data_header(shmup_project, asset_report=None, base_dir=No
             wave.get("on_clear"),
             f"shmup_project.waves[{wave_index}].on_clear",
         )
+        on_defeat = emit_event_script(output, f"shmup_wave_{wave_index}_on_defeat", wave.get("on_defeat"), f"shmup_project.waves[{wave_index}].on_defeat")
+        on_projectile_hit_player = emit_event_script(
+            output, f"shmup_wave_{wave_index}_projectile_on_hit_player",
+            chain_damage_event_commands(enemy_projectile.get("on_hit_player"), wave["on_hit_player"])
+            if wave.get("on_hit_player") else None,
+            f"shmup_project.waves[{wave_index}].on_hit_player")
         resource_group = wave.get("resource_bank_group", wave.get("bank_group"))
         resource_group_expr = cpp_string_literal(resource_group) if isinstance(resource_group, str) and resource_group else "nullptr"
         wave_entries.append(
@@ -12818,7 +13209,7 @@ def emit_shmup_project_data_header(shmup_project, asset_report=None, base_dir=No
             f"{on_clear}, "
             f"{resource_group_expr}, "
             f"static_cast<uint8_t>({int(wave.get('player_speed', wave.get('player_speed_pixels_per_frame', 0)))}), "
-            f"static_cast<uint8_t>({int(wave.get('fire_cooldown', wave.get('fire_cooldown_frames', 0)))}) "
+            f"static_cast<uint8_t>({int(wave.get('fire_cooldown', wave.get('fire_cooldown_frames', 0)))}), {on_defeat}, {on_projectile_hit_player} "
             "},"
         )
     output.append("constexpr gbs::ShmupWaveData waves[] = {")
@@ -12875,8 +13266,8 @@ def emit_shmup_project_data_header(shmup_project, asset_report=None, base_dir=No
         f"    {asset_refs['sfx_assets'][1]},",
         f"    {asset_refs['music_assets'][0]},",
         f"    {asset_refs['music_assets'][1]},",
-        "    nullptr,",
-        "    0,",
+        f"    {scripts_name},",
+        f"    {len(script_entries)},",
         f"    {asset_refs['pcm_assets'][0]},",
         f"    {asset_refs['pcm_assets'][1]},",
         f"    {asset_refs['tracker_assets'][0]},",
@@ -13485,6 +13876,9 @@ def emit_topdown_room_metadata(room, room_index):
         camera_bounds_value if has_camera_bounds else {"x": 0, "y": 0, "width": 0, "height": 0},
         f"topdown_project.rooms[{room_index}].metadata.camera_bounds",
     )
+    player_enabled = metadata.get("player_enabled", True)
+    if not isinstance(player_enabled, bool):
+        raise SystemExit(f"topdown_project.rooms[{room_index}].metadata.player_enabled precisa ser booleano")
 
     return (
         "gbs::TopDownRoomMetadata {\n"
@@ -13498,11 +13892,13 @@ def emit_topdown_room_metadata(room, room_index):
         f"            {'true' if has_backdrop_color else 'false'},\n"
         f"            static_cast<uint16_t>({backdrop_color}),\n"
         f"            {'true' if has_camera_bounds else 'false'},\n"
-        f"            gbs::Rect {{ {camera_bounds[0]}, {camera_bounds[1]}, {camera_bounds[2]}, {camera_bounds[3]} }}\n"
+        f"            gbs::Rect {{ {camera_bounds[0]}, {camera_bounds[1]}, {camera_bounds[2]}, {camera_bounds[3]} }},\n"
+        f"            {'true' if player_enabled else 'false'}\n"
         "        }"
     )
 
 
+@with_animation_event_keys
 def emit_topdown_project_data_header(topdown_project, asset_report=None, base_dir=None):
     if not isinstance(topdown_project, dict):
         raise SystemExit("topdown_project precisa ser objeto")
@@ -13699,6 +14095,9 @@ def emit_topdown_project_data_header(topdown_project, asset_report=None, base_di
         height = int(room.get("height_tiles", 0))
         if not has_valid_streaming_room_dimensions(width, height):
             raise SystemExit(f"topdown_project.rooms[{room_index}] dimensoes invalidas")
+        paged_values = validate_topdown_paged_background(room, width, height, room_index, asset_report, base_dir)
+        if room.get("paged_source_tiles") is not None and (int(topdown_project.get("video", {}).get("display_mode", 0)) != 0 or int(room.get("video", {}).get("display_mode", 0)) != 0):
+            raise SystemExit("Paged topdown background requires Mode 0")
         tile_count = width * height
         prefix = pack_safe_identifier(room.get("name", f"room_{room_index}"))
         visual = int_list_from_json(
@@ -13707,7 +14106,7 @@ def emit_topdown_project_data_header(topdown_project, asset_report=None, base_di
             f"topdown_project.rooms[{room_index}].visual_tiles",
             maximum=0xFFFF,
         )
-        visual = remap_topdown_visual_tiles_from_asset(room, visual, room_index, asset_report, base_dir)
+        visual = paged_values if paged_values is not None else remap_topdown_visual_tiles_from_asset(room, visual, room_index, asset_report, base_dir)
         foreground_name = "nullptr"
         if "foreground_tiles" in room:
             foreground = int_list_from_json(
@@ -13754,12 +14153,32 @@ def emit_topdown_project_data_header(topdown_project, asset_report=None, base_di
                 output.append(f"    gbs::TileSlope::{slope_names[value]},")
             output.append("};")
             output.append("")
+        room_npcs_for_animation = room.get("npcs", [])
+        room_actor_animation_lookups = []
+        if isinstance(room_npcs_for_animation, list):
+            for npc in room_npcs_for_animation:
+                entries = npc.get("animations", []) if isinstance(npc, dict) else []
+                lookup = {}
+                if isinstance(entries, list):
+                    for index, entry in enumerate(entries):
+                        name = entry if isinstance(entry, str) else entry.get("name", entry.get("id", f"animation_{index}")) if isinstance(entry, dict) else f"animation_{index}"
+                        lookup[animation_lookup_key(name)] = index
+                room_actor_animation_lookups.append(lookup)
         on_enter_script = emit_event_script(
             output,
             f"{prefix}_on_enter",
             room.get("on_enter"),
             f"topdown_project.rooms[{room_index}].on_enter",
             animation_lookup=player_animation_lookup,
+            actor_animation_lookups=room_actor_animation_lookups,
+        )
+        on_restore_script = emit_event_script(
+            output,
+            f"{prefix}_on_restore",
+            room.get("on_restore"),
+            f"topdown_project.rooms[{room_index}].on_restore",
+            animation_lookup=player_animation_lookup,
+            actor_animation_lookups=room_actor_animation_lookups,
         )
         on_exit_script = emit_event_script(
             output,
@@ -13767,6 +14186,7 @@ def emit_topdown_project_data_header(topdown_project, asset_report=None, base_di
             room.get("on_exit"),
             f"topdown_project.rooms[{room_index}].on_exit",
             animation_lookup=player_animation_lookup,
+            actor_animation_lookups=room_actor_animation_lookups,
         )
         on_interact_script = emit_event_script(
             output,
@@ -13774,6 +14194,7 @@ def emit_topdown_project_data_header(topdown_project, asset_report=None, base_di
             room.get("on_interact"),
             f"topdown_project.rooms[{room_index}].on_interact",
             animation_lookup=player_animation_lookup,
+            actor_animation_lookups=room_actor_animation_lookups,
         )
         on_hit_group_scripts = []
         for group_index in (1, 2, 3):
@@ -13783,6 +14204,7 @@ def emit_topdown_project_data_header(topdown_project, asset_report=None, base_di
                 room.get(f"on_hit_group{group_index}"),
                 f"topdown_project.rooms[{room_index}].on_hit_group{group_index}",
                 animation_lookup=player_animation_lookup,
+                actor_animation_lookups=room_actor_animation_lookups,
             ))
 
         portals = room.get("portals", [])
@@ -13829,6 +14251,7 @@ def emit_topdown_project_data_header(topdown_project, asset_report=None, base_di
                     portal.get("script", portal.get("event")),
                     f"topdown_project.rooms[{room_index}].portals[{portal_index}].script",
                     animation_lookup=player_animation_lookup,
+                    actor_animation_lookups=room_actor_animation_lookups,
                 )
                 if portal_script != "gbs::empty_event_script()":
                     portal_event_entries.append((portal_index, portal_script))
@@ -13865,6 +14288,7 @@ def emit_topdown_project_data_header(topdown_project, asset_report=None, base_di
                     interaction.get("script", interaction.get("event")),
                     f"topdown_project.rooms[{room_index}].interactions[{interaction_index}].script",
                     animation_lookup=player_animation_lookup,
+                    actor_animation_lookups=room_actor_animation_lookups,
                 )
                 interaction_lines.append(
                     "    gbs::TopDownInteractionData { "
@@ -13920,63 +14344,72 @@ def emit_topdown_project_data_header(topdown_project, asset_report=None, base_di
                     f"{prefix}_npc_{npc_index}_on_interact",
                     npc.get("on_interact", npc.get("script")),
                     f"topdown_project.rooms[{room_index}].npcs[{npc_index}].on_interact",
-                    animation_lookup=animation_lookup,
+                    animation_lookup=player_animation_lookup,
+                    actor_animation_lookups=room_actor_animation_lookups,
                 )
                 on_start = emit_event_script(
                     output,
                     f"{prefix}_npc_{npc_index}_on_start",
                     npc.get("on_start"),
                     f"topdown_project.rooms[{room_index}].npcs[{npc_index}].on_start",
-                    animation_lookup=animation_lookup,
+                    animation_lookup=player_animation_lookup,
+                    actor_animation_lookups=room_actor_animation_lookups,
                 )
                 on_update = emit_event_script(
                     output,
                     f"{prefix}_npc_{npc_index}_on_update",
                     npc.get("on_update"),
                     f"topdown_project.rooms[{room_index}].npcs[{npc_index}].on_update",
-                    animation_lookup=animation_lookup,
+                    animation_lookup=player_animation_lookup,
+                    actor_animation_lookups=room_actor_animation_lookups,
                 )
                 on_hit_actor = emit_event_script(
                     output,
                     f"{prefix}_npc_{npc_index}_on_hit_actor",
                     npc.get("on_hit_actor"),
                     f"topdown_project.rooms[{room_index}].npcs[{npc_index}].on_hit_actor",
-                    animation_lookup=animation_lookup,
+                    animation_lookup=player_animation_lookup,
+                    actor_animation_lookups=room_actor_animation_lookups,
                 )
                 on_hit_player = emit_event_script(
                     output,
                     f"{prefix}_npc_{npc_index}_on_hit_player",
                     npc.get("on_hit_player"),
                     f"topdown_project.rooms[{room_index}].npcs[{npc_index}].on_hit_player",
-                    animation_lookup=animation_lookup,
+                    animation_lookup=player_animation_lookup,
+                    actor_animation_lookups=room_actor_animation_lookups,
                 )
                 on_hit_group1 = emit_event_script(
                     output,
                     f"{prefix}_npc_{npc_index}_on_hit_group1",
                     npc.get("on_hit_group1"),
                     f"topdown_project.rooms[{room_index}].npcs[{npc_index}].on_hit_group1",
-                    animation_lookup=animation_lookup,
+                    animation_lookup=player_animation_lookup,
+                    actor_animation_lookups=room_actor_animation_lookups,
                 )
                 on_hit_group2 = emit_event_script(
                     output,
                     f"{prefix}_npc_{npc_index}_on_hit_group2",
                     npc.get("on_hit_group2"),
                     f"topdown_project.rooms[{room_index}].npcs[{npc_index}].on_hit_group2",
-                    animation_lookup=animation_lookup,
+                    animation_lookup=player_animation_lookup,
+                    actor_animation_lookups=room_actor_animation_lookups,
                 )
                 on_hit_group3 = emit_event_script(
                     output,
                     f"{prefix}_npc_{npc_index}_on_hit_group3",
                     npc.get("on_hit_group3"),
                     f"topdown_project.rooms[{room_index}].npcs[{npc_index}].on_hit_group3",
-                    animation_lookup=animation_lookup,
+                    animation_lookup=player_animation_lookup,
+                    actor_animation_lookups=room_actor_animation_lookups,
                 )
                 on_defeated = emit_event_script(
                     output,
                     f"{prefix}_npc_{npc_index}_on_defeated",
                     npc.get("on_defeated"),
                     f"topdown_project.rooms[{room_index}].npcs[{npc_index}].on_defeated",
-                    animation_lookup=animation_lookup,
+                    animation_lookup=player_animation_lookup,
+                    actor_animation_lookups=room_actor_animation_lookups,
                 )
                 direction = topdown_actor_direction_from_json(npc.get("direction", "down"))
                 movement = emit_topdown_npc_movement(npc.get("movement"), room_index, npc_index)
@@ -14042,6 +14475,7 @@ def emit_topdown_project_data_header(topdown_project, asset_report=None, base_di
                     trigger.get("on_enter", trigger.get("script")),
                     f"topdown_project.rooms[{room_index}].triggers[{trigger_index}].on_enter",
                     animation_lookup=player_animation_lookup,
+                    actor_animation_lookups=room_actor_animation_lookups,
                 )
                 on_leave = emit_event_script(
                     output,
@@ -14049,6 +14483,7 @@ def emit_topdown_project_data_header(topdown_project, asset_report=None, base_di
                     trigger.get("on_leave"),
                     f"topdown_project.rooms[{room_index}].triggers[{trigger_index}].on_leave",
                     animation_lookup=player_animation_lookup,
+                    actor_animation_lookups=room_actor_animation_lookups,
                 )
                 condition = emit_event_script(
                     output,
@@ -14056,6 +14491,7 @@ def emit_topdown_project_data_header(topdown_project, asset_report=None, base_di
                     trigger.get("condition"),
                     f"topdown_project.rooms[{room_index}].triggers[{trigger_index}].condition",
                     animation_lookup=player_animation_lookup,
+                    actor_animation_lookups=room_actor_animation_lookups,
                 )
                 kind = topdown_trigger_kind_from_json(trigger.get("kind", "standard"))
                 trigger_lines.append(
@@ -14102,22 +14538,18 @@ def emit_topdown_project_data_header(topdown_project, asset_report=None, base_di
             output.append("")
 
         room_metadata = emit_topdown_room_metadata(room, room_index)
-        background_bits_per_pixel = int(room.get("background_bits_per_pixel", 4))
-        if background_bits_per_pixel != 4:
-            raise SystemExit(
-                f"topdown_project.rooms[{room_index}].background_bits_per_pixel suporta somente 4"
-            )
         room_name_literal = cpp_string_literal(room.get("name", f"room_{room_index}"))
         room_bank_group = room.get("resource_bank_group", room.get("bank_group", None))
         if room_bank_group is not None and not isinstance(room_bank_group, str):
             raise SystemExit(f"topdown_project.rooms[{room_index}].resource_bank_group precisa ser string")
         room_bank_group_literal = cpp_string_literal(room_bank_group) if room_bank_group else "nullptr"
         visual_tilemap = room.get("visual_tilemap", room.get("visual_tilemap_asset"))
-        uses_visual_tilemap = visual_tilemap is not None
+        has_visual_asset = visual_tilemap is not None
+        uses_visual_tilemap = has_visual_asset and room.get("visual_tilemap_layout") != "editor_tiles"
         visual_tilemap_literal = "nullptr"
         visual_tiles_literal = "nullptr"
         visual_palette_literal = "nullptr"
-        if uses_visual_tilemap:
+        if has_visual_asset:
             visual_tilemap_symbol = resolve_project_asset_symbol(
                 visual_tilemap,
                 "tilemap",
@@ -14179,7 +14611,9 @@ def emit_topdown_project_data_header(topdown_project, asset_report=None, base_di
             f"        {room_video_literal},\n"
             f"        {on_hit_group_scripts[0]},\n"
             f"        {on_hit_group_scripts[1]},\n"
-            f"        {on_hit_group_scripts[2]}\n"
+            f"        {on_hit_group_scripts[2]},\n"
+            f"        {visual_tiles_literal if room.get('paged_source_tiles') else 'nullptr'},\n"
+            f"        {on_restore_script}\n"
             "    }"
         )
 
@@ -14312,7 +14746,8 @@ def emit_topdown_project_data_header(topdown_project, asset_report=None, base_di
         f"        gbs::Vec2i {{ {player_collision_offset[0]}, {player_collision_offset[1]} }},",
         f"        {max(0, min(255, int(player.get('push_priority', 0))))},",
         f"        {'true' if player.get('pushable', False) else 'false'},",
-        f"        {player_affine_obj}",
+        f"        {player_affine_obj},",
+        f"        {'true' if player.get('allow_diagonal', True) else 'false'}",
         "    },",
         f"    gbs::Camera {{ gbs::Vec2i {{ {camera_position[0]}, {camera_position[1]} }}, {'true' if camera_follow else 'false'}, false, gbs::Rect {{ 0, 0, 0, 0 }}, {camera_zoom_x256} }},",
         f"    static_cast<uint16_t>({backdrop_color}),",
@@ -14689,13 +15124,25 @@ DIALOGUE_FONT_CONTRACT = json.loads(_font_contract_path.read_text(encoding="utf-
 DIALOGUE_FONT_CODEPOINTS = [ord(glyph["character"]) for glyph in DIALOGUE_FONT_CONTRACT["glyphs"]]
 
 
-def dialogue_font_from_json(font_image_value, base_dir, description):
+def dialogue_font_from_json(font_image_value, base_dir, description, preserve_colors=False, preserve_opaque_colors=False):
     if not font_image_value:
         return None
     if base_dir is None:
         raise SystemExit(f"{description}: exportacao sem base_dir nao pode resolver PNG da fonte")
     image_path = resolve_project_path(base_dir, font_image_value, description)
-    width, height, _colors, indices = read_png(image_path, max_colors=2)
+    colored = None
+    if preserve_colors:
+        w, h, colors, pixels, transparent = read_png(image_path, max_colors=None, include_transparency=True)
+        opaque = [i for i in range(len(colors)) if i != transparent]
+        if len(opaque) == 1 and transparent is not None:
+            colored = {"foreground": rgb15(colors[opaque[0]])}
+            width, height, indices = w, h, [0 if i == transparent else 4 for i in pixels]
+        if len(opaque) == 2 and (transparent is not None or preserve_opaque_colors):
+            foreground, shadow = sorted(opaque, key=lambda i: sum(colors[i][:3]), reverse=True)
+            colored = {"foreground": rgb15(colors[foreground]), "shadow": rgb15(colors[shadow])}
+            width, height, indices = w, h, [0 if i == transparent else 4 if i == foreground else 5 for i in pixels]
+    if colored is None:
+        width, height, _colors, indices = read_png(image_path, max_colors=2)
     if width != 128 or height != 112:
         raise SystemExit(
             f"{description}: PNG precisa ter 128x112 pixels (U+0020..U+00FF em grade 16x14 de tiles 8x8), "
@@ -14704,14 +15151,14 @@ def dialogue_font_from_json(font_image_value, base_dir, description):
     background_index = indices[0]
     # Palette index 1 is the dialogue skin fill. Custom glyph foregrounds
     # must use the shared text index so the font remains readable on the skin.
-    binary_indices = [0 if value == background_index else 4 for value in indices]
+    binary_indices = indices if colored is not None else [0 if value == background_index else 4 for value in indices]
     tiles = []
     for codepoint in DIALOGUE_FONT_CODEPOINTS:
         atlas_index = codepoint - 0x20
         tile_x = (atlas_index % 16) * 8
         tile_y = (atlas_index // 16) * 8
         tiles.append(pack_tile(width, binary_indices, tile_x, tile_y))
-    return {"tiles": tiles}
+    return {"tiles": tiles, **(colored or {})}
 
 
 def emit_dialogue_font(output, font, symbol_prefix="dialogue_font"):
@@ -14972,7 +15419,21 @@ def hud_layouts_from_json(value, description):
             normalized["kind"] = kind
             normalized["visible"] = visible
             binding = component.get("value_binding")
-            bindings = ("p1-health","p2-health","round-time","p1-rounds","p2-rounds","score","lives")
+            project_binding = "value_variable" in component or "inventory_item" in component
+            if "text_advance" in component:
+                if component["text_advance"] not in (6, 7, 8) or isinstance(component["text_advance"], bool) or kind != "text":
+                    raise SystemExit(f"{component_description}.text_advance precisa ser 6, 7 ou 8 em um texto")
+                normalized["text_advance"] = component["text_advance"]
+            if "foreground_image" in component:
+                if not isinstance(component["foreground_image"], bool) or kind != "bar":
+                    raise SystemExit(f"{component_description}.foreground_image precisa ser booleano em uma barra")
+                normalized["foreground_image"] = component["foreground_image"]
+            if sum(key in component for key in ("value_variable", "inventory_item", "value_binding")) > 1:
+                raise SystemExit(f"{component_description}: selecione uma unica fonte de valor")
+            for key, limit in (("value_variable", 63), ("inventory_item", 15), ("value_maximum", 0xFFFFFFFF)):
+                if key in component:
+                    normalized[key] = require_int(component[key], f"{component_description}.{key}", 1 if key == "value_maximum" else 0, limit)
+            bindings = ("p1-health","p2-health","round-time","p1-rounds","p2-rounds","score","lives","p1-super","p2-super","wave")
             if binding is not None:
                 if binding not in bindings: raise SystemExit(f"{component_description}.value_binding invalido")
                 normalized["value_binding"] = binding
@@ -14982,7 +15443,7 @@ def hud_layouts_from_json(value, description):
             normalized["state_assets"] = states
             if "gauge" in component:
                 gauge=component["gauge"]
-                if kind!="bar" or binding is None or not isinstance(gauge,dict): raise SystemExit(f"{component_description}.gauge invalido")
+                if kind!="bar" or (binding is None and not project_binding) or not isinstance(gauge,dict): raise SystemExit(f"{component_description}.gauge invalido")
                 if not isinstance(gauge.get("empty_asset"),str) or not gauge["empty_asset"]: raise SystemExit(f"{component_description}.gauge.empty_asset invalido")
                 for key in ("x","y","width","height"):
                     if isinstance(gauge.get(key),bool) or not isinstance(gauge.get(key),int) or gauge[key] < (1 if key in ("width","height") else 0):
@@ -14994,11 +15455,19 @@ def hud_layouts_from_json(value, description):
             if "behavior" in component:
                 normalized["behavior"] = hud_behavior_from_json(component["behavior"], component_description+".behavior")
             normalized_components.append(normalized)
-        if sum("gauge" in component for component in normalized_components) > 2:
-            raise SystemExit(f"{layout_description} excede duas barras dinamicas")
+        if sum("gauge" in component for component in normalized_components) > 4:
+            raise SystemExit(f"{layout_description} excede quatro barras dinamicas")
         if any(component["x"] + component["width"] > 240 or component["y"] + component["height"] > 160 for component in normalized_components):
             raise SystemExit(f"{layout_description}.components precisa caber no viewport 240x160")
-        layouts.append({"id": layout_id, "mode": mode, "components": normalized_components})
+        selector_asset = layout.get("selector_asset", "")
+        if not isinstance(selector_asset, str):
+            raise SystemExit(f"{layout_description}.selector_asset precisa ser string")
+        text_profile = layout.get("text_profile", "standard")
+        if text_profile not in ("standard", "dungeon-status", "dungeon-sidebar", "dungeon-sidebar-contextual"):
+            raise SystemExit(f"{layout_description}.text_profile invalido")
+        layouts.append({"id": layout_id, "mode": mode, "components": normalized_components,
+                        **({"selector_asset": selector_asset} if selector_asset else {}),
+                        **({"text_profile": text_profile} if text_profile != "standard" else {})})
     return layouts
 
 
@@ -15012,12 +15481,30 @@ def scene_interface_skins_from_json(items, base_dir, description):
             raise SystemExit(f"{label}.scene_name precisa ser string nao vazia")
         if any(existing["scene_name"] == item["scene_name"] for existing in result):
             raise SystemExit(f"{label}.scene_name duplicado: {item['scene_name']}")
-        skins = {"scene_name": item["scene_name"]}
+        presentation = item.get("presentation", "standard")
+        if presentation not in ("standard", "portrait_tab"):
+            raise SystemExit(f"{label}.presentation precisa ser standard ou portrait_tab")
+        runtime_kind = item.get("runtime_kind", 9)
+        if isinstance(runtime_kind, bool) or not isinstance(runtime_kind, int) or not 0 <= runtime_kind <= 12:
+            raise SystemExit(f"{label}.runtime_kind precisa estar entre 0 e 12")
+        full_width_bottom = item.get("full_width_bottom", False)
+        if not isinstance(full_width_bottom, bool):
+            raise SystemExit(f"{label}.full_width_bottom precisa ser booleano")
+        skins = {"scene_name": item["scene_name"], "portrait_tab": presentation == "portrait_tab", "runtime_kind": runtime_kind, "full_width_bottom": full_width_bottom}
         for key in ("box_skin", "hud_skin"):
             if key in item:
                 if not isinstance(item[key], str) or not item[key].strip():
                     raise SystemExit(f"{label}.{key} precisa ser caminho nao vazio")
                 skins[key] = dialogue_box_skin_from_json(item[key], base_dir, f"{label}.{key}")
+        close_bottom = item.get("close_bottom_edge", False)
+        if not isinstance(close_bottom, bool):
+            raise SystemExit(f"{label}.close_bottom_edge precisa ser booleano")
+        if close_bottom and "box_skin" in skins:
+            tiles = skins["box_skin"]["tiles"]
+            # The source remains untouched. Complete only a missing edge by
+            # reflecting its existing top tile; keep deliberate artwork intact.
+            if tiles[7] == tiles[4] and tiles[1] != tiles[4]:
+                tiles[7] = sum((tiles[1][row * 4:row * 4 + 4] for row in range(7, -1, -1)), [])
         result.append(skins)
     return result
 
@@ -15081,6 +15568,8 @@ def shared_dialogue_ui_assets_from_project(project_data, base_dir):
                 (
                     layout["id"],
                     layout["mode"],
+                    layout.get("text_profile", "standard"),
+                    layout.get("selector_asset", ""),
                     tuple(
                         (
                             component["id"],
@@ -15174,6 +15663,8 @@ def shared_dialogue_ui_assets_from_project(project_data, base_dir):
             font_value,
             base_dir,
             f"{description}.font_image",
+            preserve_colors=True,
+            preserve_opaque_colors=preset.get("font_preserve_opaque_colors") is True,
         )
         hud_presets.append({
             "id": preset_id,
@@ -15209,8 +15700,25 @@ def shared_dialogue_ui_assets_from_project(project_data, base_dir):
     return box_skin, hud_skin, selector, font, dialogue_ui_from_json(selected_ui, f"{selected_key}.dialogue_ui"), hud_box_config_from_json(selected_ui), hud_presets, hud_scene_bindings, hud_layouts, active_hud_layout_id, scene_interface_skins_from_json(selected_ui.get("scene_skins", []), base_dir, "dialogue_ui.scene_skins")
 
 
+def validate_portrait_tab_resources(scene_skins, asset_report):
+    for entry in scene_skins:
+        if not entry.get("portrait_tab"):
+            continue
+        group = pack_safe_identifier("scene_" + entry["scene_name"])
+        for asset in (asset_report or {}).get("allocations", []):
+            groups = asset.get("bank_groups", [asset.get("bank_group", "global")])
+            if "global" not in groups and group not in groups:
+                continue
+            tiles = asset.get("allocations", {}).get("obj_tiles", {})
+            start, count = tiles.get("start", 0), tiles.get("count", 0)
+            if count and start < 896 and start + count > 512:
+                raise SystemExit(f"portrait_tab em {entry['scene_name']}: OBJ {asset.get('id')} ocupa tiles reservados 512..895; reduza os OBJ residentes ou use a apresentacao standard")
+
+
 def emit_shared_dialogue_ui_assets_header(box_skin, hud_skin, selector, font, dialogue_ui_config, hud_config, hud_presets=None, hud_scene_bindings=None, hud_layouts=None, active_hud_layout_id=None, asset_report=None, scene_skins=None):
     scene_skins = scene_skins or []
+    validate_portrait_tab_resources(scene_skins, asset_report)
+    portrait_tab_mask = sum(1 << kind for kind in set(entry["runtime_kind"] for entry in scene_skins if entry.get("portrait_tab")))
     hud_presets = hud_presets or []
     hud_scene_bindings = hud_scene_bindings or []
     hud_layouts = hud_layouts or []
@@ -15220,9 +15728,15 @@ def emit_shared_dialogue_ui_assets_header(box_skin, hud_skin, selector, font, di
         "#include <cstddef>",
         '#include "gbs/dialogue.hpp"',
         '#include "gbs/render.hpp"',
+        '#include "gbs/portrait_tab.h"',
     ]
     hud_icon_headers = []
     for layout in hud_layouts:
+        if layout.get("selector_asset"):
+            header = asset_pack_header_map(asset_report).get(layout["selector_asset"])
+            if header is None or asset_pack_member_symbol(asset_report, layout["selector_asset"], "metasprite") is None:
+                raise SystemExit(f"HUD {layout['id']}: selector_asset nao referencia um sprite exportado: {layout['selector_asset']}")
+            if header not in hud_icon_headers: hud_icon_headers.append(header)
         for component in layout.get("components", []):
             if component.get("kind") != "icon" and not (
                 component.get("kind") in ("frame", "bar") and component.get("asset")
@@ -15283,7 +15797,7 @@ def emit_shared_dialogue_ui_assets_header(box_skin, hud_skin, selector, font, di
                 ):
                     metasprite = asset_pack_member_symbol(asset_report, component["asset"], "metasprite")
                 metasprite_expression = f"&{metasprite}" if metasprite is not None else "nullptr"
-                binding_names={"p1-health":"P1Health","p2-health":"P2Health","round-time":"RoundTime","p1-rounds":"P1Rounds","p2-rounds":"P2Rounds","score":"Score","lives":"Lives"}
+                binding_names={"p1-health":"P1Health","p2-health":"P2Health","round-time":"RoundTime","p1-rounds":"P1Rounds","p2-rounds":"P2Rounds","score":"Score","lives":"Lives","p1-super":"P1Super","p2-super":"P2Super","wave":"Wave"}
                 binding="gbs::HudValueSource::"+binding_names.get(component.get("value_binding"),"None")
                 gauge_expression="{}"
                 if "gauge" in component:
@@ -15304,7 +15818,7 @@ def emit_shared_dialogue_ui_assets_header(box_skin, hud_skin, selector, font, di
                     f"{cpp_string_literal(component['label'])}, {cpp_string_literal(component['text'])}, "
                     f"{cpp_string_literal(component['asset'])}, {component['x']}, {component['y']}, "
                     f"{component['width']}, {component['height']}, {component['z_index']}, "
-                    f"{'true' if component['visible'] else 'false'}, {metasprite_expression}, {behavior_expressions[component_index]}, {binding}, {gauge_expression}, {state_expression} }},"
+                    f"{'true' if component['visible'] else 'false'}, {metasprite_expression}, {behavior_expressions[component_index]}, {binding}, {gauge_expression}, {state_expression}, {component.get('value_variable', -1)}, {component.get('inventory_item', -1)}, {component.get('value_maximum', 100)}, {component.get('text_advance', 8)}, {'true' if component.get('foreground_image') else 'false'} }},"
                 )
             output.append("};")
         else:
@@ -15313,9 +15827,24 @@ def emit_shared_dialogue_ui_assets_header(box_skin, hud_skin, selector, font, di
         output.append("constexpr gbs::HudLayout hud_layouts[] = {")
         for layout_index, layout in enumerate(hud_layouts):
             component_symbol = f"hud_layout_{pack_safe_identifier(layout['id'])}_{layout_index}_components"
+            layout_font = next((preset["font"] for preset in hud_presets if preset["id"] == layout["id"]), None)
+            font_fields = ""
+            selector_fields = ""
+            profile_fields = ""
+            if layout.get("text_profile"):
+                profile_fields = f", {cpp_string_literal(layout['text_profile'])}"
+                font_fields = ", nullptr, -1, -1"
+                selector_fields = ", nullptr"
+            if layout.get("selector_asset"):
+                selector_symbol = asset_pack_member_symbol(asset_report, layout["selector_asset"], "metasprite")
+                selector_fields = f", &{selector_symbol}"
+                font_fields = ", nullptr, -1, -1"
+            if layout_font is not None:
+                symbol = f"hud_preset_{pack_safe_identifier(layout['id'])}_font_tiles"
+                font_fields = f", &{symbol}[0][0], {layout_font.get('foreground', -1)}, {layout_font.get('shadow', -1)}"
             output.append(
                 f"    {{ {cpp_string_literal(layout['id'])}, {cpp_string_literal(layout['mode'])}, "
-                f"{component_symbol}, {len(layout['components'])} }},"
+                f"{component_symbol}, {len(layout['components'])}{font_fields}{selector_fields}{profile_fields} }},"
             )
         output.append("};")
         output.append(f"constexpr std::size_t hud_layout_count = {len(hud_layouts)};")
@@ -15379,12 +15908,12 @@ def emit_shared_dialogue_ui_assets_header(box_skin, hud_skin, selector, font, di
         return skin_symbols[key]
     scene_entries = []
     for entry in scene_skins:
-        scene_entries.append((entry["scene_name"], scene_skin_symbol(entry.get("box_skin")), scene_skin_symbol(entry.get("hud_skin"))))
-    output.append("struct SceneSkin { const char* scene_name; const gbs::DialogueBoxSkin* box; const gbs::DialogueBoxSkin* hud; };")
+        scene_entries.append((entry["scene_name"], scene_skin_symbol(entry.get("box_skin")), scene_skin_symbol(entry.get("hud_skin")), entry.get("portrait_tab", False), entry.get("full_width_bottom", False)))
+    output.append("struct SceneSkin { const char* scene_name; const gbs::DialogueBoxSkin* box; const gbs::DialogueBoxSkin* hud; bool portrait_tab; bool full_width_bottom; };")
     if scene_entries:
         output.append("constexpr SceneSkin scene_skins[] = {")
-        for name, box, hud in scene_entries:
-            output.append(f"    {{ {cpp_string_literal(name)}, {box}, {hud} }},")
+        for name, box, hud, portrait_tab, full_width_bottom in scene_entries:
+            output.append(f"    {{ {cpp_string_literal(name)}, {box}, {hud}, {str(portrait_tab).lower()}, {str(full_width_bottom).lower()} }},")
         output.append("};")
     else:
         output.append("constexpr const SceneSkin* scene_skins = nullptr;")
@@ -15397,10 +15926,24 @@ def emit_shared_dialogue_ui_assets_header(box_skin, hud_skin, selector, font, di
         "}",
         "",
     ])
+    if portrait_tab_mask:
+        output.extend([
+            "#ifndef GBS_DIALOGUE_UI_RUNTIME_KIND",
+            "#define GBS_DIALOGUE_UI_RUNTIME_KIND 31",
+            "#endif",
+            f"constexpr bool portrait_tab_enabled = ({portrait_tab_mask}u & (1u << GBS_DIALOGUE_UI_RUNTIME_KIND)) != 0;",
+            "#if defined(__arm__)",
+            '#define GBS_DIALOGUE_UI_WORKSPACE __attribute__((section(".ewram_bss")))',
+            "#else",
+            "#define GBS_DIALOGUE_UI_WORKSPACE",
+            "#endif",
+            'alignas(4) static uint8_t portrait_tab_workspace[portrait_tab_enabled ? sizeof(GbsPortraitTabWorkspace) : 1] GBS_DIALOGUE_UI_WORKSPACE;',
+            "",
+        ])
     output.append("static inline void load_hud_layout_images(const char* preset_id) {")
     output.append("    if (preset_id == nullptr) return;")
     for layout in hud_layouts:
-        references = []
+        references = [layout["selector_asset"]] if layout.get("selector_asset") else []
         for component in layout.get("components", []):
             if component.get("kind") not in ("frame", "bar", "icon"): continue
             for reference in [component.get("asset"), *component.get("state_assets", []), component.get("gauge", {}).get("empty_asset")]:
@@ -15434,6 +15977,7 @@ def emit_shared_dialogue_ui_assets_header(box_skin, hud_skin, selector, font, di
         "}",
         "",
         "static inline void configure() {",
+        *(["    gbs_portrait_tab_set_workspace(portrait_tab_enabled ? portrait_tab_workspace : nullptr, sizeof(portrait_tab_workspace));"] if portrait_tab_mask else []),
         "    gbs::configure_dialogue_ui(dialogue_ui);",
         "    gbs::configure_dialogue_box_skin(dialogue_box_skin);",
         "    gbs::configure_hud_box_skin(hud_box_skin);",
@@ -15456,7 +16000,7 @@ def emit_shared_dialogue_ui_assets_header(box_skin, hud_skin, selector, font, di
         "        const HudPresetConfig* preset = find_hud_preset(hud_scene_bindings[index].preset_id);",
         "        if (preset == nullptr) break;",
         "        gbs::configure_hud_box_skin(preset->skin);",
-        "        gbs::configure_dialogue_font(preset->font != nullptr ? preset->font : dialogue_font);",
+        "        // HUD glyphs belong to the selected layout; dialogue keeps its complete font.",
         "        gbs::configure_hud_box(preset->box);",
         "        load_hud_layout_images(preset->id);",
         "        gbs::configure_hud_layout(preset->id);",
@@ -15465,6 +16009,10 @@ def emit_shared_dialogue_ui_assets_header(box_skin, hud_skin, selector, font, di
         "    for (std::size_t index = 0; index < scene_skin_count; ++index) {",
         "        const auto& skin = scene_skins[index];",
         "        if (!scene_name_equals(skin.scene_name, scene_name)) continue;",
+        "        auto scene_dialogue_ui = dialogue_ui;",
+        "        scene_dialogue_ui.portrait_tab = skin.portrait_tab;",
+        "        scene_dialogue_ui.full_width_bottom = skin.full_width_bottom;",
+        "        gbs::configure_dialogue_ui(scene_dialogue_ui);",
         "        if (skin.box != nullptr) gbs::configure_dialogue_box_skin(skin.box);",
         "        if (skin.hud != nullptr) gbs::configure_hud_box_skin(skin.hud);",
         "        break;",
@@ -15557,6 +16105,7 @@ def emit_runtime_triggers(output, prefix, room, description):
     return (name, len(entries))
 
 
+@with_animation_event_keys
 def emit_platformer_project_data_header(platformer_project, asset_report=None, base_dir=None):
     if not isinstance(platformer_project, dict):
         raise SystemExit("platformer_project precisa ser objeto")
@@ -15599,6 +16148,11 @@ def emit_platformer_project_data_header(platformer_project, asset_report=None, b
         "",
     ])
     player_animation_set_expr = emit_platformer_player_animation_set(output, player, asset_report, base_dir)
+    _, player_script_animations, player_script_animation_count, _ = emit_topdown_npc_animation_table(
+        output, "platformer_player_script",
+        {"animations": player.get("script_animations", [])} if isinstance(player, dict) else {},
+        asset_report, "platformer_project.player.script_animations", base_dir,
+    )
     player_on_start = emit_event_script(
         output,
         "platformer_player_on_start",
@@ -15764,6 +16318,12 @@ def emit_platformer_project_data_header(platformer_project, asset_report=None, b
             f"{prefix}_on_enter",
             room.get("on_enter"),
             f"platformer_project.rooms[{room_index}].on_enter",
+        )
+        on_restore_script = emit_event_script(
+            output,
+            f"{prefix}_on_restore",
+            room.get("on_restore"),
+            f"platformer_project.rooms[{room_index}].on_restore",
         )
         on_exit_script = emit_event_script(
             output,
@@ -16241,7 +16801,8 @@ def emit_platformer_project_data_header(platformer_project, asset_report=None, b
             f"        {room_video_literal},\n"
             f"        {on_hit_group_scripts[0]},\n"
             f"        {on_hit_group_scripts[1]},\n"
-            f"        {on_hit_group_scripts[2]}\n"
+            f"        {on_hit_group_scripts[2]},\n"
+            f"        {on_restore_script}\n"
             "    }"
         )
 
@@ -16281,7 +16842,9 @@ def emit_platformer_project_data_header(platformer_project, asset_report=None, b
         f"    {player_metasprite_expr},",
         f"    {player_animation_set_expr},",
         f"    {player_on_start},",
-        f"    {player_on_update}",
+        f"    {player_on_update},",
+        f"    {player_script_animations},",
+        f"    {player_script_animation_count}",
         "};",
         "",
         "} // namespace gbastudio_platformer_project",
@@ -16397,7 +16960,7 @@ def emit_advanced_runtime_backgrounds(output, project, description, cpp_type, ar
     return (array_name, len(backgrounds))
 
 
-def emit_advanced_runtime_actors(output, room, room_index, description, cpp_type, prefix, asset_report=None, pixel_positions=False):
+def emit_advanced_runtime_actors(output, room, room_index, description, cpp_type, prefix, asset_report=None, pixel_positions=False, base_dir=None):
     actors = room.get("actors", [])
     if actors is None:
         actors = []
@@ -16454,7 +17017,14 @@ def emit_advanced_runtime_actors(output, room, room_index, description, cpp_type
             actor.get("on_interact"),
             f"{actor_path}.on_interact",
         )
-        depth_suffix = f", {depth_pointer}" if supports_depth_metasprites else ""
+        frames_pointer = "nullptr"
+        if supports_depth_metasprites and actor.get("depth_frames") is not None:
+            frames = actor["depth_frames"]
+            symbols = [emit_topdown_animation_frame_subset(output, f"dungeon_room_{room_index}_actor_{actor_index}", depth, frames[depth], asset_report, actor_path, base_dir) for depth in ("near","mid","far")]
+            name = f"dungeon_room_{room_index}_actor_{actor_index}_frames"
+            output.append(f"constexpr gbs::DungeonActorFrames {name} {{ &{symbols[0]}, &{symbols[1]}, &{symbols[2]}, {'true' if actor.get('cell') else 'false'} }};")
+            frames_pointer=f"&{name}"
+        depth_suffix = f", {depth_pointer}, {frames_pointer}, {'true' if actor.get('wall_mounted') else 'false'}" if supports_depth_metasprites else ""
         entries.append(
             f"    {cpp_type} {{ "
             f"{cpp_string_literal(actor.get('name', f'actor_{actor_index}'))}, "
@@ -16470,7 +17040,172 @@ def emit_advanced_runtime_actors(output, room, room_index, description, cpp_type
     return (array_name, len(entries))
 
 
-def emit_dungeon_crawler_project_data_header(dungeon_project, asset_report=None):
+def emit_dungeon_view_cache(output, source, base_dir):
+    if source is None: return "nullptr"
+    if not isinstance(source, dict) or base_dir is None:
+        raise SystemExit("dungeon view cache requires source directory")
+    root = Path(base_dir).resolve()
+    buffers = {}
+    for key, kind in (("tiles", "uint8_t"), ("maps", "uint16_t"), ("palettes", "uint16_t")):
+        value = source.get(key)
+        if not isinstance(value, str) or Path(value).is_absolute(): raise SystemExit("dungeon cache source must be relative")
+        file = (root / value).resolve()
+        if root not in file.parents: raise SystemExit("dungeon cache outside project")
+        raw = file.read_bytes()
+        if not raw or len(raw) % (32 if key == "tiles" else 2): raise SystemExit("dungeon cache invalid binary length")
+        if len(raw)>4*1024*1024: raise SystemExit("dungeon cache binary exceeds limit")
+        buffers[key] = raw
+    return emit_dungeon_cache_buffers(output, buffers, source.get("index"), "dungeon")
+
+
+def emit_dungeon_cache_buffers(output, raw_buffers, views, prefix):
+    buffers = {}
+    for key, kind in (("tiles", "uint8_t"), ("maps", "uint16_t"), ("palettes", "uint16_t")):
+        raw = raw_buffers[key]
+        values = list(raw) if kind == "uint8_t" else [int.from_bytes(raw[n:n+2],"little") for n in range(0,len(raw),2)]
+        buffers[key] = values
+        output.append(f"alignas(4) const {kind} {prefix}_view_{key}[] = {{")
+        for n in range(0,len(values),32): output.append(",".join(str(v) for v in values[n:n+32])+",")
+        output.append("};")
+    if not isinstance(views,list) or not views: raise SystemExit("dungeon view index empty")
+    output.append(f"constexpr gbs::DungeonViewEntry {prefix}_views[] = {{")
+    seen=set()
+    for view in views:
+        x,y,d=map(int,view["view"].split("-")); mo=int(view["mapOffset"]); po=int(view["paletteOffset"]); colors=int(view["paletteColors"])
+        if (x,y,d) in seen or not(0<=x<=255 and 0<=y<=255 and 0<=d<4) or mo<0 or mo%4 or mo//2+1200>len(buffers["maps"]) or po<0 or po%2 or po//2+colors>len(buffers["palettes"]) or colors<16 or colors>224 or colors%16:
+            raise SystemExit("dungeon view index invalid")
+        for cell in range(mo//2,mo//2+1200,2):
+            pattern,flags=buffers["maps"][cell:cell+2]
+            if pattern*32+32>len(buffers["tiles"]) or flags&1023 or (flags>>12)*16>=colors:
+                raise SystemExit("dungeon view tile or palette reference invalid")
+        seen.add((x,y,d));output.append(f"{{{x},{y},{d},{mo//2},{po//2},{colors}}},")
+    output.append("};")
+    output.append(f"const gbs::DungeonViewCache {prefix}_view_cache {{ {prefix}_view_tiles, sizeof({prefix}_view_tiles), {prefix}_view_maps, sizeof({prefix}_view_maps)/2, {prefix}_view_palettes, sizeof({prefix}_view_palettes)/2, {prefix}_views, sizeof({prefix}_views)/sizeof(*{prefix}_views) }};")
+    return f"&{prefix}_view_cache"
+
+
+def dungeon_recipe_materials(recipe, base_dir=None):
+    if not isinstance(recipe, dict): raise SystemExit("dungeon view recipe must be an object")
+    width, height = recipe.get("width"), recipe.get("height")
+    cells = recipe.get("cells")
+    if not isinstance(width, int) or not isinstance(height, int) or not(1 <= width <= 64 and 1 <= height <= 64) or not isinstance(cells, list) or len(cells) != width * height or any(type(v) is not bool for v in cells):
+        raise SystemExit("dungeon view recipe invalid grid")
+    if not 1 <= cells.count(False) <= 256: raise SystemExit("dungeon view recipe supports 1 to 256 free cells")
+    raw = recipe.get("materials")
+    assets = recipe.get("material_assets")
+    if assets is not None:
+        if raw is not None or not isinstance(assets, list) or len(assets) != 8 or base_dir is None:
+            raise SystemExit("dungeon recipe requires eight material images")
+        root = Path(base_dir).resolve()
+        textures = []
+        for name in assets:
+            if not isinstance(name, str) or not name:
+                raise SystemExit("dungeon material image path invalid")
+            source = (root / name).resolve()
+            try: source.relative_to(root)
+            except ValueError: raise SystemExit("dungeon material image escapes project")
+            try:
+                from PIL import Image
+                with Image.open(source) as image:
+                    if image.size != (64, 64): raise SystemExit("dungeon materials require 64x64 pixels")
+                    pixels = list(image.convert("RGBA").getdata())
+                    if any(c[3] != 255 for c in pixels): raise SystemExit("dungeon materials must be opaque")
+                    textures.append([tuple((v >> 3) << 3 for v in c[:3]) for c in pixels])
+            except (OSError, ValueError): raise SystemExit("dungeon material image unavailable")
+        return textures
+    if raw is None:
+        # Same neutral procedural materials as the editor; no external artwork
+        # or example cache is needed to author a new maze.
+        return [[(32,64,72) if x % 16 == 0 or y % 16 == 0 else
+                 (48,88,96) if material == 4 else (112,144,128)
+                 for y in range(64) for x in range(64)] for material in range(8)]
+    if not isinstance(raw, list) or len(raw) != 8: raise SystemExit("dungeon view recipe requires eight RGB555 materials")
+    textures = []
+    for encoded in raw:
+        try:
+            if not isinstance(encoded, str) or len(encoded) != 10924: raise ValueError()
+            data = base64.b64decode(encoded, validate=True)
+            if len(data) != 8192: raise ValueError()
+            colors = struct.unpack("<4096H", data)
+            if any(c > 32767 for c in colors): raise ValueError()
+            textures.append([((c & 31) << 3, (c >> 5 & 31) << 3, (c >> 10 & 31) << 3) for c in colors])
+        except (ValueError, TypeError): raise SystemExit("dungeon view recipe invalid material")
+    door = recipe.get("door", {})
+    if not isinstance(door, dict) or any(type(door.get(k)) is not int for k in ("x", "y")): raise SystemExit("dungeon view recipe invalid door")
+    return textures
+
+
+def render_dungeon_recipe(recipe, x, y, direction, textures):
+    """Compile-time nearest sampling. Runtime only streams the resulting GBA views."""
+    width, height, cells = recipe["width"], recipe["height"], recipe["cells"]
+    def blocked(mx, my): return mx < 0 or my < 0 or mx >= width or my >= height or cells[my * width + mx]
+    dx, dy = ((0, -1), (1, 0), (0, 1), (-1, 0))[direction]
+    px, py = x + .5, y + .5
+    out = [(8, 32, 48)] * (240 * 160)
+    for sy in range(128):
+        den = sy - 58
+        if not den: continue
+        distance = (48 if den > 0 else 72) / abs(den)
+        for sx in range(240):
+            q = (2 * (sx + .5) / 240 - 1) * .66
+            wx, wy = px + distance * (dx - dy * q), py + distance * (dy + dx * q)
+            material = 4 if den > 0 else 5
+            if den > 0 and min(wx % 1, wy % 1, 1 - wx % 1, 1 - wy % 1) < .09: material = 7
+            out[sy * 240 + sx] = textures[material][(math.floor(wy * 64) % 64) * 64 + math.floor(wx * 64) % 64]
+    for sx in range(240):
+        q = (2 * (sx + .5) / 240 - 1) * .66
+        rx, ry = dx - dy * q, dy + dx * q
+        mx, my = x, y
+        ddx, ddy = abs(1 / rx) if rx else 1e10, abs(1 / ry) if ry else 1e10
+        stepx, stepy = 1 if rx >= 0 else -1, 1 if ry >= 0 else -1
+        ax, ay = (mx + 1 - px if rx >= 0 else px - mx) * ddx, (my + 1 - py if ry >= 0 else py - my) * ddy
+        side = 0
+        for _ in range(512):
+            if ax < ay: ax += ddx; mx += stepx; side = 0
+            else: ay += ddy; my += stepy; side = 1
+            if blocked(mx, my): break
+        distance = max(.1, (my - py + (1 - stepy) / 2) / ry if side else (mx - px + (1 - stepx) / 2) / rx)
+        hit = px + distance * rx if side else py + distance * ry
+        u = math.floor(hit % 1 * 64)
+        top, bottom = 58 - 72 / distance, 58 + 48 / distance
+        seed = (mx * 11 + my * 7) % 13
+        material = 6 if (mx, my) == (recipe["door"]["x"], recipe["door"]["y"]) else 1 if seed == 0 else 2 if seed == 2 else 3 if seed == 4 else 0
+        for sy in range(max(0, math.ceil(top)), min(128, math.floor(bottom) + 1)):
+            v = min(63, max(0, math.floor((sy - top) / (bottom - top) * 64)))
+            out[sy * 240 + sx] = textures[material][v * 64 + u]
+    return out
+
+
+def build_dungeon_recipe_cache(recipe, base_dir=None):
+    textures = dungeon_recipe_materials(recipe, base_dir)
+    patterns, lookup = [bytes(32)], {bytes(32): 0}
+    maps, palettes, views = bytearray(), bytearray(), []
+    for y in range(recipe["height"]):
+        for x in range(recipe["width"]):
+            if recipe["cells"][y * recipe["width"] + x]: continue
+            for direction in range(4):
+                pixels = render_dungeon_recipe(recipe, x, y, direction, textures)
+                colors = list(dict.fromkeys(pixels)); color_lookup = {c: i for i, c in enumerate(colors)}
+                indices = [color_lookup[c] for c in pixels]
+                palette, tiles, entries, _, _ = build_4bpp_background(240, 160, colors, indices, max_palette_banks=14)
+                if len(tiles) > 479: raise SystemExit(f"dungeon view {x},{y},{direction} exceeds 479 world tiles; simplify geometry or materials")
+                ids = []
+                for tile in tiles:
+                    block = bytes(tile)
+                    if block not in lookup: lookup[block] = len(patterns); patterns.append(block)
+                    ids.append(lookup[block])
+                if len(patterns) >= 65536: raise SystemExit("dungeon recipe exceeds shared tile pattern limit")
+                mo, po = len(maps), len(palettes)
+                for entry in entries: maps.extend(struct.pack("<HH", ids[entry & 1023], entry & 0xfc00))
+                palettes.extend(struct.pack("<" + "H" * len(palette), *(rgb15(c) for c in palette)))
+                views.append(dict(view=f"{x}-{y}-{direction}", mapOffset=mo, paletteOffset=po, paletteColors=len(palette), residentTiles=len(tiles)))
+    buffers = dict(tiles=b"".join(patterns), maps=maps, palettes=palettes)
+    if any(len(value) > 4 * 1024 * 1024 for value in buffers.values()): raise SystemExit("dungeon generated cache binary exceeds limit")
+    return buffers, views
+
+
+
+def emit_dungeon_crawler_project_data_header(dungeon_project, asset_report=None, base_dir=None):
     if not isinstance(dungeon_project, dict):
         raise SystemExit("dungeon_crawler_project precisa ser objeto")
     rooms = dungeon_project.get("rooms")
@@ -16593,6 +17328,8 @@ def emit_dungeon_crawler_project_data_header(dungeon_project, asset_report=None)
             f"{int(battle.get('reward_quantity', 0))} "
             "}"
         )
+    view_cache_pointer = emit_dungeon_view_cache(output, dungeon_project.get("view_cache"), base_dir)
+    generated_caches = {}
     room_entries = []
     for room_index, room in enumerate(rooms):
         if not isinstance(room, dict):
@@ -16624,6 +17361,8 @@ def emit_dungeon_crawler_project_data_header(dungeon_project, asset_report=None)
             room.get("on_enter"),
             f"dungeon_crawler_project.rooms[{room_index}].on_enter",
         )
+        on_restore = emit_event_script(output, f"dungeon_room_{room_index}_on_restore",
+            room.get("on_restore"), f"dungeon_crawler_project.rooms[{room_index}].on_restore")
         triggers_name, trigger_count = emit_runtime_triggers(
             output,
             f"dungeon_room_{room_index}",
@@ -16638,6 +17377,7 @@ def emit_dungeon_crawler_project_data_header(dungeon_project, asset_report=None)
             "gbs::DungeonCrawlerActorData",
             "dungeon",
             asset_report,
+            base_dir=base_dir,
         )
         resource_group = room.get("resource_bank_group", room.get("bank_group"))
         if resource_group is not None and (
@@ -16656,6 +17396,47 @@ def emit_dungeon_crawler_project_data_header(dungeon_project, asset_report=None)
             f"dungeon_crawler_project.rooms[{room_index}]",
             asset_report,
         )
+        player_view_pointer = "nullptr"
+        if room.get("player_view") is not None:
+            view = room["player_view"]
+            if not isinstance(view, dict): raise SystemExit("dungeon player_view must be an object")
+            anchor = view.get("position_pixels", {})
+            if not isinstance(anchor, dict) or any(type(anchor.get(k)) is not int for k in ("x","y")):
+                raise SystemExit("dungeon player_view requires a pixel anchor")
+            if not -128 <= anchor["x"] <= 368 or not -128 <= anchor["y"] <= 288:
+                raise SystemExit("dungeon player_view anchor outside supported screen bounds")
+            sprite = resolve_project_metasprite_symbol(view.get("metasprite"), None, asset_report, "dungeon player_view.metasprite")
+            if sprite is None: raise SystemExit("dungeon player_view requires a metasprite")
+            animation_pointer = "nullptr"
+            if view.get("animation") is not None:
+                symbol = emit_topdown_animation_frame_subset(output, f"dungeon_room_{room_index}", "player_view", view["animation"], asset_report, "dungeon player_view.animation", base_dir)
+                animation_pointer = "&" + symbol
+            name = f"dungeon_room_{room_index}_player_view"
+            output.append(f"const gbs::DungeonCrawlerPlayerView {name} {{ &{sprite}, {animation_pointer}, gbs::Vec2i {{ {anchor['x']}, {anchor['y']} }} }};")
+            player_view_pointer = "&" + name
+        presentation_pointer="nullptr"
+        if room.get("presentation") is not None:
+            pres=room["presentation"]; sounds=pres.get("action_sounds",{}); name=f"dungeon_room_{room_index}_presentation"
+            values=", ".join(str(int(sounds.get(cue,-1))) for cue in ("step","turn","blocked","hit","defeat"))
+            hud_index = int(pres.get("hud_background", -1))
+            if hud_index < -1 or hud_index >= len(dungeon_project.get("backgrounds", [])):
+                raise SystemExit("dungeon HUD background invalid")
+            hud_palette = resolve_project_asset_symbol(dungeon_project["backgrounds"][hud_index]["tilemap"], "palette_asset", asset_report,"dungeon HUD palette") if hud_index >= 0 else None
+            room_cache_pointer = view_cache_pointer
+            if pres.get("view_recipe") is not None:
+                recipe = pres["view_recipe"]
+                if recipe.get("width") != width or recipe.get("height") != height or recipe.get("cells") != [bool(v) for v in flags]:
+                    raise SystemExit("dungeon recipe geometry differs from runtime collision grid")
+                key = json.dumps(recipe, sort_keys=True, separators=(",", ":"))
+                if key not in generated_caches:
+                    buffers, index = build_dungeon_recipe_cache(recipe, base_dir)
+                    generated_caches[key] = emit_dungeon_cache_buffers(output, buffers, index, f"dungeon_generated_{room_index}")
+                room_cache_pointer = generated_caches[key]
+            if room_cache_pointer == "nullptr": raise SystemExit("dungeon presentation requires generated views or view cache")
+            palette_pointer = "&" + hud_palette if hud_palette else "nullptr"
+            label = cpp_string_literal(pres.get("player_label", "Player"))
+            output.append(f"const gbs::DungeonPresentation {name} {{ {room_cache_pointer}, {hud_index}, {palette_pointer}, {values}, {label} }};")
+            presentation_pointer=f"&{name}"
         room_entries.append(
             "    gbs::DungeonCrawlerRoomData { "
             f"{cpp_string_literal(room.get('name', f'room_{room_index}'))}, "
@@ -16674,7 +17455,7 @@ def emit_dungeon_crawler_project_data_header(dungeon_project, asset_report=None)
             f"{actors_name}, {actor_count}, "
             f"{resource_group_expr}, "
             f"{'true' if bool(room.get('battle_enabled', False)) else 'false'}, "
-            f"{room_video_literal} "
+            f"{room_video_literal}, {presentation_pointer}, {player_view_pointer}, {on_restore} "
             "},"
         )
 
@@ -16859,6 +17640,13 @@ def emit_racing_project_data_header(racing_project, asset_report=None, base_dir=
         racing_project,
         asset_report,
     )
+    portrait_assets = dialogue_portrait_assets_from_json(
+        racing_project.get("portrait_assets"),
+        "racing_project.portrait_assets",
+        asset_report,
+    )
+    emit_dialogue_portrait_assets(output, portrait_assets)
+
     dialogue_lines_name, dialogue_line_count = emit_dialogue_lines(
         output,
         racing_project.get("dialogue_lines", []),
@@ -16872,6 +17660,17 @@ def emit_racing_project_data_header(racing_project, asset_report=None, base_dir=
     idle_metasprite = resolve_project_metasprite_symbol(player.get("idle_metasprite"), None, asset_report, "racing_project.player.idle_metasprite")
     drive_metasprite = resolve_project_metasprite_symbol(player.get("drive_metasprite"), None, asset_report, "racing_project.player.drive_metasprite")
     player_animations = emit_racing_player_animation_set(output, player, asset_report, base_dir)
+    project_scripts = racing_project.get("scripts", []) or []
+    if not isinstance(project_scripts, list):
+        raise SystemExit("racing_project.scripts precisa ser lista")
+    script_entries = [emit_event_script(output, f"racing_project_script_{index}",
+        script.get("script", script.get("commands", [])) if isinstance(script, dict) else script,
+        f"racing_project.scripts[{index}]") for index, script in enumerate(project_scripts)]
+    scripts_name = "racing_project_scripts" if script_entries else "nullptr"
+    if script_entries:
+        output.append("constexpr gbs::EventScript racing_project_scripts[] = {")
+        output.extend(f"    {entry}," for entry in script_entries)
+        output.append("};")
     room_entries = []
     for room_index, room in enumerate(rooms):
         if not isinstance(room, dict):
@@ -17145,6 +17944,22 @@ def emit_racing_project_data_header(racing_project, asset_report=None, base_dir=
             output.append("};")
             output.append(f"constexpr gbs::AffineTileMapAsset {floor_name} {{ {floor_name}_entries, {width}, {height} }};")
             floor_expression = f"&{floor_name}"
+        sounds = room.get("action_sounds", {})
+        cues = ("accelerate", "brake", "collision", "checkpoint")
+        if not isinstance(sounds, dict) or set(sounds) - set(cues):
+            raise SystemExit(f"racing_project.rooms[{room_index}].action_sounds invalid cue")
+        sound_indices = [str(require_int(sounds[key], f"racing_project.rooms[{room_index}].action_sounds.{key}", 0, asset_refs['sfx_assets'][1] - 1)) if key in sounds else "-1" for key in cues]
+        sounds_expr = "gbs::RacingActionSounds { " + ", ".join(sound_indices) + " }"
+        challenge=room.get("challenge", {})
+        if not isinstance(challenge,dict): raise SystemExit("racing challenge precisa ser objeto")
+        text_keys=["best_time_text_index","result_time_text_index","result_position_text_index","result_rating_text_index","result_best_text_index"]
+        slots=[require_int(challenge.get(key,-1),"racing.challenge."+key,-1,7) for key in text_keys]
+        if challenge and (-1 in slots or len(set(slots))!=len(slots)): raise SystemExit("racing challenge requer slots de texto distintos")
+        boost_index=require_int(challenge.get("boost_variable_index",-1),"racing.challenge.boost_variable_index",-1,63)
+        gold=require_int(challenge.get("gold_seconds",80),"racing.challenge.gold_seconds",1,5999)
+        silver=require_int(challenge.get("silver_seconds",120),"racing.challenge.silver_seconds",gold,5999)
+        challenge_expr="gbs::RacingChallengeData { "+", ".join(str(n) for n in [boost_index,*slots,gold,silver])+" }"
+
         room_entries.append(
             "    gbs::RacingRoomData { "
             f"{cpp_string_literal(room.get('name', f'room_{room_index}'))}, "
@@ -17164,7 +17979,7 @@ def emit_racing_project_data_header(racing_project, asset_report=None, base_dir=
             f"{on_enter}, {triggers_name}, {trigger_count}, {actors_name}, {actor_count}, "
             f"{resource_group_expr}, {on_victory}, {on_defeat}, {pseudo3d_visual_expr}, "
             f"{track_segments_expr}, {track_segment_count}, {topdown_track_expr}, "
-            f"{room_video_literal}, gbs::RacingCameraConfig {{ {camera_height}, {camera_distance}, {camera_focal} }}, {floor_expression}, {empty_floor_expression}, {room_player_expression} "
+            f"{room_video_literal}, gbs::RacingCameraConfig {{ {camera_height}, {camera_distance}, {camera_focal} }}, {floor_expression}, {empty_floor_expression}, {room_player_expression}, {sounds_expr}, {challenge_expr} "
             "},"
         )
 
@@ -17203,7 +18018,9 @@ def emit_racing_project_data_header(racing_project, asset_report=None, base_dir=
         f"    {resource_bank_group_count},",
         f"    {player_animations},",
         f"    {resource_bank_upload_sources_name},",
-        f"    {resource_bank_upload_source_count}",
+        f"    {resource_bank_upload_source_count},",
+        f"    {scripts_name}, {len(script_entries)},",
+        f"    {next((i for i, entry in enumerate(project_scripts) if isinstance(entry,dict) and entry.get('name') == '__gbastudio_start_menu__'), -1)}",
         "};",
         "",
         "} // namespace gbastudio_racing_project",
@@ -17247,7 +18064,70 @@ def emit_battle_rpg_backgrounds(output, battle_project, asset_report=None):
     return ("battle_rpg_backgrounds", len(backgrounds))
 
 
-def emit_battle_rpg_project_data_header(battle_project, asset_report=None):
+BATTLE_RPG_ANIMATION_STATES = ("idle", "attack", "magic", "heal", "defend", "hurt", "defeat", "victory", "reactivate")
+
+
+def emit_battle_rpg_animation_set(output, prefix, participant, asset_report, base_dir=None):
+    clips = participant.get("animation_set")
+    if clips is None:
+        return "nullptr"
+    if not isinstance(clips, dict) or set(clips) - set(BATTLE_RPG_ANIMATION_STATES):
+        raise SystemExit(f"{prefix}.animation_set possui estados invalidos")
+    symbols = {}
+    for state, clip in clips.items():
+        if not isinstance(clip, dict) or (state not in ("idle", "defend", "victory") and clip.get("loops", False)):
+            raise SystemExit(f"{prefix}.animation_set.{state} precisa ser um clip one-shot")
+        symbols[state] = emit_topdown_animation_frame_subset(output, prefix, state, clip, asset_report, prefix + "." + state, base_dir)
+    name = prefix + "_animation_set"
+    output.append(f"constexpr gbs::BattleRpgAnimationSet {name} {{")
+    for state in BATTLE_RPG_ANIMATION_STATES:
+        output.append("    " + ("&" + symbols[state] if state in symbols else "nullptr") + ",")
+    output.extend(["};", ""])
+    return "&" + name
+
+
+def emit_battle_rpg_presentation(output, prefix, presentation, project, asset_report, base_dir):
+    if presentation is None:
+        return "nullptr"
+    if not isinstance(presentation, dict):
+        raise SystemExit(prefix + ".presentation precisa ser objeto")
+    cues = ("cursor", "confirm", "attack", "magic", "hurt", "defend", "defeat")
+    sounds = presentation.get("action_sounds", {})
+    if not isinstance(sounds, dict) or set(sounds) - set(cues):
+        raise SystemExit(prefix + ".action_sounds invalido")
+    count = len(project.get("assets", {}).get("sfx_assets", []))
+    if any(type(v) is not int or v < 0 or v >= count for v in sounds.values()):
+        raise SystemExit(prefix + ".action_sounds referencia SFX ausente")
+    hud = presentation.get("hud_background", -1)
+    if type(hud) is not int or hud < -1 or hud >= len(project.get("backgrounds", [])):
+        raise SystemExit(prefix + ".hud_background ausente")
+    tracker = presentation.get("victory_tracker", -1)
+    if type(tracker) is not int or tracker < -1 or tracker >= len(project.get("assets", {}).get("tracker_assets", [])):
+        raise SystemExit(prefix + ".victory_tracker ausente")
+    effects = presentation.get("effects", {})
+    if not isinstance(effects, dict) or set(effects) - {"hit", "energy", "shield", "electric"}:
+        raise SystemExit(prefix + ".effects invalido")
+    effect_refs = []
+    for key in ("hit", "energy", "shield", "electric"):
+        clip = effects.get(key)
+        if clip and clip.get("loops", False):
+            raise SystemExit(prefix + ".effects precisa ser one-shot")
+        symbol = emit_topdown_animation_frame_subset(output, prefix, key, clip, asset_report, prefix + ".effects." + key, base_dir) if clip else None
+        effect_refs.append("&" + symbol if symbol else "nullptr")
+    disabled = resolve_project_metasprite_symbol(presentation.get("disabled_escape"),None,asset_report,prefix + ".disabled_escape")
+    cursor = resolve_project_metasprite_symbol(presentation.get("cursor"),None,asset_report,prefix + ".cursor")
+    hud_palette = resolve_project_asset_symbol(project["backgrounds"][hud]["tilemap"],"bg_palettes",asset_report,prefix + ".hud_palette") if hud >= 0 else None
+    hold = presentation.get("outcome_hold_frames",120)
+    if type(hold) is not int or not 1 <= hold <= 600:
+        raise SystemExit(prefix + ".outcome_hold_frames invalido")
+    sound_refs = ", ".join(str(sounds.get(key,-1)) for key in cues)
+    output.extend([f"constexpr gbs::BattleRpgPresentationData {prefix}_presentation {{",
+        f"    {hud}, {{ {sound_refs} }}, {tracker}, {hold},",
+        "    { " + ", ".join(effect_refs) + " }, " + ("&" + disabled if disabled else "nullptr") + ", " + cpp_string_literal(presentation.get("victory_label","VITORIA")) + ", " + ("&" + hud_palette if hud_palette else "nullptr") + ", " + ("&" + cursor if cursor else "nullptr"), "};", ""])
+    return "&" + prefix + "_presentation"
+
+
+def emit_battle_rpg_project_data_header(battle_project, asset_report=None, base_dir=None):
     if not isinstance(battle_project, dict):
         raise SystemExit("battle_rpg_project precisa ser objeto")
     encounters = battle_project.get("encounters")
@@ -17257,7 +18137,7 @@ def emit_battle_rpg_project_data_header(battle_project, asset_report=None):
         string_list_from_json(battle_project.get("includes", []), "battle_rpg_project.includes"),
         project_auto_includes(battle_project, asset_report),
     )
-    output = ["#pragma once", "#include \"gbs/battle_rpg.hpp\"", "#include \"gbs/runtime_save_restore.hpp\""]
+    output = ["#pragma once", "#include \"gbs/battle_rpg.hpp\"", "#include \"gbs/dialogue.hpp\"", "#include \"gbs/runtime_save_restore.hpp\""]
     for include in includes:
         output.append(f'#include "{include}"')
     output.extend(["", "namespace gbastudio_battle_rpg_project {", ""])
@@ -17288,6 +18168,12 @@ def emit_battle_rpg_project_data_header(battle_project, asset_report=None):
         battle_project.get("dialogue_lines", []),
         "battle_rpg_project.dialogue_lines",
     )
+    portrait_assets = dialogue_portrait_assets_from_json(
+        battle_project.get("portrait_assets"),
+        "battle_rpg_project.portrait_assets",
+        asset_report,
+    )
+    emit_dialogue_portrait_assets(output, portrait_assets)
     project_script_entries = []
     project_scripts = battle_project.get("scripts", battle_project.get("event_scripts", []))
     if project_scripts is None:
@@ -17350,13 +18236,19 @@ def emit_battle_rpg_project_data_header(battle_project, asset_report=None):
                     asset_report,
                     f"battle_rpg_project.encounters[{index}].{side}[{participant_index}].metasprite",
                 )
+                animation_set = emit_battle_rpg_animation_set(output, f"encounter_{index}_{side}_{participant_index}",participant,asset_report,base_dir)
+                position = participant.get("position", {})
+                if not isinstance(position, dict) or any(type(position.get(k,0)) is not int or not -32768 <= position.get(k,0) <= 32767 for k in ("x","y")):
+                    raise SystemExit("battle_rpg participant.position invalida")
                 participant_entries.append(
                     "    gbs::BattleRpgParticipantData { "
                     f"{cpp_string_literal(participant.get('name', f'{side}_{participant_index}'))}, "
                     f"gbs::BattleRpgUnitData {{ {int(unit.get('max_hp', 24))}, {int(unit.get('attack', 7))}, {int(unit.get('defense', 2))}, {int(unit.get('speed', 5))} }}, "
                     f"{abilities_name}, {len(abilities)}, "
                     f"{'&' + metasprite if metasprite else 'nullptr'}, "
-                    f"{max(1, min(2, int(participant.get('sprite_scale', 1))))} "
+                    f"{max(1, min(2, int(participant.get('sprite_scale', 1))))}, {animation_set}, "
+                    f"{'true' if 'position' in participant else 'false'}, gbs::Vec2i {{ {position.get('x',0)}, {position.get('y',0)} }}, "
+                    f"{cpp_optional_string_literal(participant.get('hud_label'))} "
                     "},"
                 )
             participants_name = f"encounter_{index}_{side}"
@@ -17388,8 +18280,31 @@ def emit_battle_rpg_project_data_header(battle_project, asset_report=None):
             encounter.get("on_escape"),
             f"battle_rpg_project.encounters[{index}].on_escape",
         )
+        on_hit_player = emit_event_script(output, f"encounter_{index}_on_hit_player",
+            encounter.get("on_hit_player"), f"battle_rpg_project.encounters[{index}].on_hit_player")
         resource_group = encounter.get("resource_bank_group", encounter.get("bank_group"))
         resource_group_expr = cpp_string_literal(resource_group) if isinstance(resource_group, str) and resource_group else "nullptr"
+        presentation = emit_battle_rpg_presentation(output, f"encounter_{index}", encounter.get("presentation"), battle_project, asset_report, base_dir)
+        inventory = encounter.get("inventory_items", [])
+        if not isinstance(inventory, list) or len(inventory) > 16:
+            raise SystemExit(f"battle_rpg_project.encounters[{index}].inventory_items invalido")
+        inventory_name = "nullptr"
+        if inventory:
+            inventory_name = f"encounter_{index}_inventory_items"
+            output.append(f"constexpr gbs::BattleRpgInventoryItemData {inventory_name}[] = {{")
+            seen_items = set()
+            for item in inventory:
+                if not isinstance(item, dict) or not isinstance(item.get("label"), str) or not item["label"].strip():
+                    raise SystemExit("Battle RPG inventory item requer label")
+                slot, quantity, healing = item.get("item"), item.get("initial_quantity", 0), item.get("heal_amount")
+                if (type(slot) is not int or not 0 <= slot < 16 or slot in seen_items or
+                        type(quantity) is not int or not 0 <= quantity <= 999 or
+                        type(healing) is not int or not 1 <= healing <= 999):
+                    raise SystemExit("Battle RPG inventory item/initial_quantity/heal_amount invalido")
+                seen_items.add(slot)
+                output.append("    gbs::BattleRpgInventoryItemData { " +
+                    f"{cpp_string_literal(item['label'])}, {slot}, {quantity}, {healing}" + " },")
+            output.extend(["};", ""])
         entries.append(
             "    gbs::BattleRpgEncounterData { "
             f"{cpp_string_literal(encounter.get('name', f'encounter_{index}'))}, "
@@ -17402,7 +18317,7 @@ def emit_battle_rpg_project_data_header(battle_project, asset_report=None):
             f"gbs::BattleRpgRewards {{ {int(rewards.get('gold', 25))}, {int(rewards.get('experience', 10))} }}, "
             f"{on_enter}, {on_victory}, {on_defeat}, {on_escape}, "
             f"{int(encounter.get('background', encounter.get('background_index', -1)))}, "
-            f"{resource_group_expr} "
+            f"{resource_group_expr}, {presentation}, {on_hit_player}, {inventory_name}, {len(inventory)} "
             "},"
         )
     output.append("constexpr gbs::BattleRpgEncounterData encounters[] = {")
@@ -17461,7 +18376,7 @@ def luta_ism_style_from_json(value, description):
     return styles[normalized]
 
 
-LUTA_VISUAL_ANIMATION_STATES = ("idle", "attack", "special", "guard", "hurt")
+LUTA_VISUAL_ANIMATION_STATES = ("idle", "attack", "special", "guard", "hurt", "walk", "jump")
 
 
 def emit_luta_animation_set(output, prefix, fighter, asset_report, description, base_dir=None):
@@ -17723,6 +18638,19 @@ def emit_luta_project_data_header(luta_project, asset_report=None, base_dir=None
         output,
         luta_project.get("dialogue_lines", []),
     )
+    project_scripts = luta_project.get("scripts", []) or []
+    if not isinstance(project_scripts, list):
+        raise SystemExit("luta_project.scripts precisa ser lista")
+    script_entries = []
+    for index, script in enumerate(project_scripts):
+        commands = script.get("script", script.get("commands", [])) if isinstance(script, dict) else script
+        script_entries.append(emit_event_script(output, f"luta_project_script_{index}", commands, f"luta_project.scripts[{index}]"))
+    scripts_name = "nullptr"
+    if script_entries:
+        scripts_name = "luta_project_scripts"
+        output.append(f"constexpr gbs::EventScript {scripts_name}[] = {{")
+        output.extend(f"    {script}," for script in script_entries)
+        output.extend(["};", ""])
     backgrounds_name, background_count = emit_luta_backgrounds(output, luta_project, asset_report)
     hud_name = emit_luta_hud(output, luta_project, asset_report)
 
@@ -17758,6 +18686,12 @@ def emit_luta_project_data_header(luta_project, asset_report=None, base_dir=None
         hitstun_decay = float(config.get("hitstun_decay", 0.85))
         if not math.isfinite(hitstun_decay):
             raise SystemExit(f"{stage_path}.config.hitstun_decay precisa ser numero finito")
+        sounds = stage.get("action_sounds", {})
+        if not isinstance(sounds, dict) or set(sounds) - {"hit", "guard", "special", "miss"}:
+            raise SystemExit(f"{stage_path}.action_sounds precisa de hit, guard, special ou miss")
+        sound_indices = [str(require_int(sounds[key], f"{stage_path}.action_sounds.{key}", 0, asset_refs['sfx_assets'][1] - 1))
+                         if key in sounds else "-1" for key in ("hit", "guard", "special", "miss")]
+        sounds_expr = "gbs::LutaActionSounds { " + ", ".join(sound_indices) + " }"
         stage_entries.append(
             "    gbs::LutaStageData { "
             f"{cpp_string_literal(stage.get('name', f'stage_{stage_index}'))}, "
@@ -17781,7 +18715,7 @@ def emit_luta_project_data_header(luta_project, asset_report=None, base_dir=None
             f"{max(0, min(65535, int(config.get('player2_start_x', 200))))}u, "
             f"{characters_name}, {character_count}, {player1_name}, {player1_count}, {player2_name}, {player2_count}, "
             f"nullptr, 0, {backgrounds_name}, {background_count}, {on_enter}, {on_victory}, {on_defeat}, "
-            f"{int(stage.get('background', stage.get('background_index', -1)))}, {resource_group_expr} "
+            f"{int(stage.get('background', stage.get('background_index', -1)))}, {resource_group_expr}, {sounds_expr} "
             "},"
         )
 
@@ -17817,7 +18751,9 @@ def emit_luta_project_data_header(luta_project, asset_report=None, base_dir=None
         "    &save_bank,",
         "    save_enabled,",
         "    save_autosave,",
-        f"    {hud_name}",
+        f"    {hud_name},",
+        f"    {scripts_name},",
+        f"    {len(script_entries)}",
         "};",
         "",
         "} // namespace gbastudio_luta_project",
@@ -17889,7 +18825,15 @@ def compose_isometric_paged_surface(back, front):
         raise SystemExit('Paged isometric surface dimensions must match')
     if not 0 < len(front['tiles']) <= 117:
         raise SystemExit('Paged isometric foreground exceeds the 117 resident tiles')
-    palette = [0] + back['palette'] + front['palette'][1:]
+    palette = [0]
+    background_indices=[]
+    for color in back['palette']:
+        if color not in palette[1:]: palette.append(color)
+        background_indices.append(palette.index(color,1))
+    foreground_indices=[0]
+    for color in front['palette'][1:]:
+        if color not in palette[1:]: palette.append(color)
+        foreground_indices.append(palette.index(color,1))
     if len(palette) > 224:
         raise SystemExit('Paged isometric palette exceeds 224 colors with UI reserved')
     for source in (back, front):
@@ -17904,8 +18848,8 @@ def compose_isometric_paged_surface(back, front):
         raise SystemExit('Paged isometric ROM tile index exceeds uint16')
     # GBA index zero is transparent. Reserve it so HUD/dialogue backdrop changes
     # cannot turn the opaque ocean into holes, while preserving every RGB555 color.
-    tiles = [bytes(pixel + 1 for pixel in tile) for tile in back['tiles']]
-    tiles += [bytes(pixel + len(back['palette']) if pixel else 0 for pixel in tile) for tile in front['tiles']]
+    tiles = [bytes(background_indices[pixel] for pixel in tile) for tile in back['tiles']]
+    tiles += [bytes(foreground_indices[pixel] for pixel in tile) for tile in front['tiles']]
     return dict(tiles=tiles, background=back['entries'], foreground=[first + index for index in front['entries']],
                 palette=palette, foreground_first_tile=first, width=back['width'], height=back['height'], x=0, y=0)
 
@@ -17913,8 +18857,8 @@ def compose_isometric_paged_surface(back, front):
 def emit_paged_isometric_reference(output, prefix, room, output_dir, source_assets):
     surface = room['paged_surface']
     grid = room.get('grid', {})
-    if room.get('world_mode') != 'scrollable_tiled_world' or grid.get('gameplay_mode', 'adventure') != 'adventure' or grid.get('movement_model', 'free') != 'free':
-        raise SystemExit('Paged isometric surface requires scrollable adventure with free movement')
+    if room.get('world_mode') != 'scrollable_tiled_world' or (grid.get('gameplay_mode', 'adventure'), grid.get('movement_model', 'free')) not in [('adventure','free'), ('tactical','tile')]:
+        raise SystemExit('Paged isometric surface requires scrollable adventure/free or tactical/tile')
     if room.get('tileset') or room.get('authored_background'):
         raise SystemExit('Paged isometric surface cannot also declare tileset or authored_background')
     def read_source(name):
@@ -17933,10 +18877,16 @@ def emit_paged_isometric_reference(output, prefix, room, output_dir, source_asse
         pixels = values('_tiles')
         return dict(width=dimension('_tilemap_width'), height=dimension('_tilemap_height'), palette=values('_palette'),
                     tiles=[bytes(pixels[i:i+64]) for i in range(0, len(pixels), 64)], entries=values('_tilemap_entries'))
-    front_asset = next((asset for asset in (source_assets or []) if asset.get('name') == surface['foreground']), {})
-    if front_asset.get('paged_palette_owner') != surface['background']:
-        raise SystemExit('Paged isometric foreground must share its background palette reservation')
-    baked = compose_isometric_paged_surface(read_source(surface['background']), read_source(surface['foreground']))
+    back = read_source(surface['background'])
+    if surface.get('foreground'):
+        front_asset = next((asset for asset in (source_assets or []) if asset.get('name') == surface['foreground']), {})
+        if front_asset.get('paged_palette_owner') != surface['background']:
+            raise SystemExit('Paged isometric foreground must share its background palette reservation')
+        front = read_source(surface['foreground'])
+    else:
+        front = dict(width=back['width'], height=back['height'], palette=[0], tiles=[bytes(64)],
+                     entries=[0] * (back['width'] * back['height']))
+    baked = compose_isometric_paged_surface(back, front)
     if baked['width'] * 8 != surface['width'] or baked['height'] * 8 != surface['height']:
         raise SystemExit('Paged isometric declared dimensions differ from compiled PNG dimensions')
     for suffix, ctype, data in [('tiles', 'uint8_t', [v for tile in baked['tiles'] for v in tile]),
@@ -18036,6 +18986,13 @@ def emit_isometric_project_data_header(isometric_project, asset_report=None, bas
     emit_save_config(output, save_config)
     resource_banks_name, resource_bank_count, resource_bank_groups_name, resource_bank_group_count = emit_project_resource_banks(output, isometric_project, "isometric_project", asset_report)
     emit_resource_bank_upload_sources(output, asset_report)
+    portrait_assets = dialogue_portrait_assets_from_json(
+        isometric_project.get("portrait_assets"),
+        "isometric_project.portrait_assets",
+        asset_report,
+    )
+    emit_dialogue_portrait_assets(output, portrait_assets)
+
     dialogue_lines_name, dialogue_line_count = emit_dialogue_lines(
         output,
         isometric_project.get("dialogue_lines", []),
@@ -18137,6 +19094,8 @@ def emit_isometric_project_data_header(isometric_project, asset_report=None, bas
             room.get("on_enter"),
             f"isometric_project.rooms[{room_index}].on_enter",
         )
+        on_restore_script = emit_event_script(output, f"{prefix}_on_restore",
+            room.get("on_restore"), f"isometric_project.rooms[{room_index}].on_restore")
         on_exit_script = emit_event_script(
             output,
             f"{prefix}_on_exit",
@@ -18249,6 +19208,7 @@ def emit_isometric_project_data_header(isometric_project, asset_report=None, bas
             actor_animation_lookups,
             asset_report,
             f"isometric_project.rooms[{room_index}].tactical_presentation",
+            base_dir,
         )
         for actor_index, interact_commands, start_commands, update_commands in actor_event_sources:
             interact_script = emit_event_script(
@@ -18595,7 +19555,8 @@ def emit_isometric_project_data_header(isometric_project, asset_report=None, bas
             f"        {emit_baked_isometric_reference(output, prefix, room, asset_report, output_dir, source_assets, base_dir)},\n"
             f"        {on_hit_group_scripts[0]},\n"
             f"        {on_hit_group_scripts[1]},\n"
-            f"        {on_hit_group_scripts[2]}\n"
+            f"        {on_hit_group_scripts[2]},\n"
+            f"        {on_restore_script}\n"
             "    }"
         )
 
@@ -19040,7 +20001,7 @@ def emit_export_project(project_data, base_dir, output_dir):
         dungeon_crawler_project = project_with_mixed_save_config(dungeon_crawler_project)
         dungeon_crawler_header = "dungeon_crawler_project_data.hpp" if is_mixed_runtime else project_header
         write_text_if_changed(output_dir / dungeon_crawler_header,
-            emit_dungeon_crawler_project_data_header(dungeon_crawler_project, asset_report),
+            emit_dungeon_crawler_project_data_header(dungeon_crawler_project, asset_report, base_dir),
             encoding="utf-8",
         )
 
@@ -19060,7 +20021,7 @@ def emit_export_project(project_data, base_dir, output_dir):
         battle_rpg_project = project_with_mixed_save_config(battle_rpg_project)
         battle_rpg_header = "battle_rpg_project_data.hpp" if is_mixed_runtime else project_header
         write_text_if_changed(output_dir / battle_rpg_header,
-            emit_battle_rpg_project_data_header(battle_rpg_project, asset_report),
+            emit_battle_rpg_project_data_header(battle_rpg_project, asset_report, base_dir),
             encoding="utf-8",
         )
 
@@ -19235,7 +20196,7 @@ def main():
         args.indexed_tilemap = True
 
     if args.version:
-        print("assetc 2.25.0")
+        print("assetc 2.27.0")
         return 0
 
     if not args.input or not args.output:

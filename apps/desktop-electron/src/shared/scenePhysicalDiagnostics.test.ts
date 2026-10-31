@@ -17,6 +17,14 @@ function projectData(): GBAProjectData {
 }
 
 describe("scene physical diagnostics", () => {
+  it("budgets the paged top-down viewport instead of all ROM source tiles", () => {
+    const diagnostics = deriveScenePhysicalDiagnostics({
+      scenas: [{ name: "porto", sceneType: "topdown", width: 126, height: 86, backgroundAssetName: "porto.png" }],
+      assets: [{ name: "porto.png", kind: "Background", metadata: { kind: "paged_bg", tileCount: 10609, colorMode: "8bpp-indexed" } }]
+    }, "porto");
+    expect(diagnostics.metrics.find(m => m.id === "bgTiles")).toMatchObject({ estimate: 1302, safeLimit: 1408, criticalOverflow: false });
+    expect(diagnostics.metrics.find(m => m.id === "vramBytes")).toMatchObject({ estimate: 43712 });
+  });
   it("keeps editor estimate, exporter plan, runtime measurement, safe limit, and critical overflow separate", () => {
     const diagnostics = deriveScenePhysicalDiagnostics(projectData(), "Arena", {
       planned: { bgTiles: 40, objTiles: 8, oam: 4, eventBytes: 96, audioBytes: 4096, dmaBytes: 1536 },

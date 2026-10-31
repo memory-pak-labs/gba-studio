@@ -321,7 +321,7 @@ describe("Rooms workspace presentation", () => {
     }];
 
     expect(deriveRoomEventSceneLinks(project)).toEqual([{
-      id: "event-scene-link-event-exit-0",
+      id: "event-scene-link-event-exit-0-cave",
       from: "cave",
       to: "town",
       eventName: "cave_exit",
@@ -393,7 +393,7 @@ describe("Rooms workspace presentation", () => {
     }];
 
     expect(deriveRoomEventSceneLinks(project)).toEqual([{
-      id: "event-scene-link-event-exit-0",
+      id: "event-scene-link-event-exit-0-cave",
       from: "cave",
       to: "town",
       eventName: "cave_exit",
@@ -464,8 +464,8 @@ describe("Rooms workspace presentation", () => {
   it("creates distinct room presets and initializes isometric rooms with the bundled tilemap", () => {
     const base = createBlankProjectData({ name: "Presets de room" });
     const expected = {
-      isometricAdventure: {width: 36, height: 36, sceneType: "isometric", cameraMode: "follow_player"},
-      isometricTactical: {width: 6, height: 6, sceneType: "isometric", cameraMode: "fixed_center"},
+      isometricAdventure: {width: 52, height: 52, sceneType: "isometric", cameraMode: "follow_player"},
+      isometricTactical: {width: 16, height: 16, sceneType: "isometric", cameraMode: "follow_player"},
       interior: { width: 30, height: 20, sceneType: "topdown", cameraMode: "fixed_center" },
       exterior: { width: 30, height: 20, sceneType: "topdown", cameraMode: "follow_player" },
       battle: { width: 30, height: 20, sceneType: "battleRpg", cameraMode: "fixed_center" },
@@ -671,14 +671,14 @@ describe("Rooms workspace presentation", () => {
     expect(sceneMapPositions(next)).toEqual({
       logo: { x: 36, y: 36 },
       wide: { x: 324, y: 36 },
-      menu: { x: 852, y: 36 },
-      next: { x: 1140, y: 36 },
-      after: { x: 36, y: 498 }
+      menu: { x: 612, y: 36 },
+      next: { x: 900, y: 36 },
+      after: { x: 36, y: 338 }
     });
     expect(project.editorState.sceneMapPositions.logo).toEqual({ x: 1000, y: 1000 });
   });
 
-  it("organizes isometric cards using their composed surface dimensions", () => {
+  it("organizes isometric cards using the same viewport dimensions", () => {
     const project = {
       scenas: [
         { id: "market", name: "market", width: 25, height: 25, sceneType: "isometric", runtime: {
@@ -693,8 +693,8 @@ describe("Rooms workspace presentation", () => {
       ]
     };
     const positions = sceneMapPositions(organizeSceneMapPositionsInProject(project));
-    expect(positions.next).toEqual({ x: 596, y: 36 });
-    expect(positions.below).toEqual({ x: 36, y: 522 });
+    expect(positions.next).toEqual({ x: 324, y: 36 });
+    expect(positions.below).toEqual({ x: 36, y: 338 });
   });
 
   it("derives rooms from current scenas fields with active and start-room markers", () => {
@@ -907,6 +907,7 @@ describe("Rooms workspace presentation", () => {
         battle: { side: "none", maxHp: 24, attack: 7, defense: 2, speed: 5, abilities: ["attack"] },
         collisionGroup: 0,
         collisionMask: 65535,
+        health: 1,
         pushPriority: 0,
         pushable: false,
         isInActiveRoom: true
@@ -929,6 +930,7 @@ describe("Rooms workspace presentation", () => {
         battle: { side: "none", maxHp: 24, attack: 7, defense: 2, speed: 5, abilities: ["attack"] },
         collisionGroup: 0,
         collisionMask: 65535,
+        health: 1,
         pushPriority: 0,
         pushable: false,
         isInActiveRoom: false
@@ -1297,6 +1299,7 @@ describe("Rooms workspace presentation", () => {
         music: null,
         hudPresetId: null,
         eventBindings: {},
+        mapStates: [],
       cameraMode: "fixed_center",
       cameraZoom: 100,
       cameraBounds: { x: 0, y: 0, width: 1, height: 1 },
@@ -1446,7 +1449,7 @@ describe("Rooms workspace presentation", () => {
     expect(next.scena).toMatchObject({ id: "room-1", name: "overworld" });
     expect(next.room).toBeUndefined();
     expect(next.scenas).toHaveLength(1);
-    expect(next.settings).toEqual({ general: { gameTitle: "Demo", startScene: "overworld" } });
+    expect(next.settings).toEqual({ general: { gameTitle: "Demo", startScene: "overworld", startPlayer: "Player" } });
     expect(next.editorState).toEqual({ sceneMapPositions: { overworld: { x: 36, y: 36 } } });
   });
 
@@ -2796,6 +2799,14 @@ describe("Rooms workspace presentation", () => {
     expect(overlays[7]).toMatchObject({ actorCount: 0, collision: false, collisionType: "free", triggerCount: 1 });
     expect(overlays[10]).toMatchObject({ actorCount: 0, collision: false, collisionType: "free", triggerCount: 1 });
     expect(overlays[11]).toMatchObject({ actorCount: 0, collision: false, collisionType: "free", triggerCount: 1 });
+  });
+
+  it("keeps Dungeon camera dimensions independent from its logical maze", () => {
+    const source = createBlankProjectData({ name: "Dungeon camera" });
+    Object.assign((source.scenas as Record<string, unknown>[])[0]!, { sceneType: "dungeonCrawler", width: 11, height: 11 });
+    expect(deriveRoomsWorkspacePresentation(source).rooms[0]!.gbaResolution).toBe("240 x 160");
+    const room = { ...deriveRoomsWorkspacePresentation(createBlankProjectData({ name: "Dungeon dimensions" })).rooms[0]!, sceneType: "dungeonCrawler" as const, width: 11, height: 11, background: "dungeon.png", backgroundPixelWidth: 240, backgroundPixelHeight: 160, gbStudioUseBackgroundLayout: true };
+    expect(deriveRoomGeometryDiagnostics(room, []).backgroundAlignment).toMatchObject({ status: "aligned", expectedWidth: 240, expectedHeight: 160 });
   });
 
   it("derives background alignment and placement diagnostics for actors and triggers", () => {
@@ -4894,8 +4905,9 @@ describe("Isometric authoring modes and actor support", () => {
         sceneType: "isometric", presetID});
       const scene = (next.scenas as Record<string, any>[]).at(-1)!;
       expect(scene.sceneType).toBe("isometric");
-      expect(scene.width).toBe(presetID === "isometricAdventure" ? 36 : 6);
-      expect(scene.height).toBe(presetID === "isometricAdventure" ? 36 : 6);
+      expect(scene.width).toBe(presetID === "isometricAdventure" ? 52 : 16);
+      expect(scene.height).toBe(presetID === "isometricAdventure" ? 52 : 16);
+      if (presetID === "isometricAdventure") expect(scene.cameraZones[0].bounds).toEqual({x: 0, y: 0, width: 768, height: 512});
       expect(scene.runtime.config.gameplayMode).toBe(presetID === "isometricAdventure" ? "adventure" : "tactical");
       const actors = (next.actors as Record<string, unknown>[]).filter(actor => actor.roomName === presetID);
       expect(actors).toHaveLength(presetID === "isometricAdventure" ? 1 : 2);
@@ -4923,13 +4935,13 @@ describe("Isometric authoring modes and actor support", () => {
     });
     const actor = (next.actors as Record<string, unknown>[])[0]!;
     expect(next.assets).toEqual(expect.arrayContaining([expect.objectContaining({name: actor.spriteSheet,
-      metadata: expect.objectContaining({bundledDefaultAsset: "template:exemplo-gba/Assets/sprites/tactical-nara-v5.png"})})]));
+      metadata: expect.objectContaining({bundledDefaultAsset: "template:exemplo-gba/Assets/sprites/tactical-approved-nara-64x64.png"})})]));
     expect(next.animations).toEqual(expect.arrayContaining([expect.objectContaining({spriteSheet: actor.spriteSheet, name: actor.animationName})]));
     const room = (next.scenas as Record<string, any>[]).at(-1)!;
-    expect(room.runtime.config).toMatchObject({worldMode: "static_composition", originX: 120, originY: 40});
+    expect(room.runtime.config).toMatchObject({worldMode: "scrollable_tiled_world", originX: 384, originY: 68});
     expect(room.runtime.config.tacticalPresentation.units[0].actorId).toBe(actor.id);
-    expect(room.runtime.config.tacticalPresentation.surfacePages[0].asset).toBe("tactical-v5-surface.png");
-    expect((next.actors as Record<string, unknown>[])[1]).toMatchObject({x: 4, y: 1, z: 1});
+    expect(room.runtime.config.pagedSurface).toMatchObject({backgroundAsset:"tactical-arena-large-768x512.png",width:768,height:512});
+    expect((next.actors as Record<string, unknown>[])[1]).toMatchObject({x: 8, y: 9, z: 0});
   });
 
   it("snaps an actor to the supporting height when placing it and moving back to ground", () => {

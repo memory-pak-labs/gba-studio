@@ -4,12 +4,13 @@ import { applyInterfaceThemeToHudPreset } from "./interfaceThemes.js";
 
 export type HudPresetPosition = "Superior" | "Inferior";
 export type HudPresetMode = "standard" | "advanced";
+export type HudRuntimeTextProfile = "standard" | "dungeon-status" | "dungeon-sidebar" | "dungeon-sidebar-contextual";
 export type HudComponentKind = "frame" | "text" | "bar" | "icon";
-export const HUD_VALUE_BINDINGS = ["p1-health", "p2-health", "round-time", "p1-rounds", "p2-rounds", "score", "lives"] as const;
+export const HUD_VALUE_BINDINGS = ["p1-health", "p2-health", "round-time", "p1-rounds", "p2-rounds", "score", "lives", "p1-super", "p2-super", "wave"] as const;
 export type HudValueBinding = typeof HUD_VALUE_BINDINGS[number];
 export const HUD_VALUE_BINDING_LABELS: Record<HudValueBinding, string> = {
   "p1-health":"Vida P1", "p2-health":"Vida P2", "round-time":"Tempo do round",
-  "p1-rounds":"Rounds P1", "p2-rounds":"Rounds P2", score:"Pontuação", lives:"Vidas"
+  "p1-rounds":"Rounds P1", "p2-rounds":"Rounds P2", score:"Pontuação", lives:"Vidas", "p1-super":"Especial P1", "p2-super":"Especial P2", wave:"Onda"
 };
 export type HudCornerAnchor = "freeform" | "top-left" | "top-right" | "bottom-left" | "bottom-right";
 
@@ -27,9 +28,14 @@ export interface HudComponent {
   text: string;
   runtimeText?: boolean;
   valueBinding?: HudValueBinding;
+  valueVariable?: string;
+  inventoryItem?: number;
+  valueMaximum?: number;
+  textAdvance?: 6 | 7 | 8;
+  foregroundImage?: boolean;
   stateAssets?: string[];
   gauge?: { emptyAsset: string; x: number; y: number; width: number; height: number; reverse?: boolean };
-  /** Authored text may use pixel positions; legacy components keep the 8px grid. */
+  /** Pixel-authored overlays preserve positions and dimensions; other components use the 8px grid. */
   pixelPosition?: boolean;
   asset: string;
   x: number;
@@ -56,6 +62,7 @@ export interface HudPreset {
   width: number;
   height: number;
   mode: HudPresetMode;
+  runtimeTextProfile?: HudRuntimeTextProfile;
   showExperienceBar?: boolean;
   showHealthBars?: boolean;
   components: HudComponent[];
@@ -124,6 +131,7 @@ export interface UpdateHudPresetFields {
   width?: number;
   height?: number;
   mode?: HudPresetMode;
+  runtimeTextProfile?: HudRuntimeTextProfile;
   showExperienceBar?: boolean;
   showHealthBars?: boolean;
   components?: HudComponent[];
@@ -237,11 +245,11 @@ function snap(value: number, minimum: number, maximum: number, grid = HUD_GRID):
 
 function normalizeHudComponent(value: unknown, index: number): HudComponent | null {
   if (!isRecord(value)) return null;
-  const width = snap(numberField(value.width, HUD_GRID), HUD_GRID, HUD_VIEWPORT_WIDTH);
-  const height = snap(numberField(value.height, HUD_GRID), HUD_GRID, HUD_VIEWPORT_HEIGHT);
-  const anchor = componentAnchor(value.anchor);
-  const pixelPosition = value.pixelPosition === true && componentKind(value.kind) === "text";
+  const pixelPosition = value.pixelPosition === true;
   const positionGrid = pixelPosition ? 1 : HUD_GRID;
+  const width = snap(numberField(value.width, HUD_GRID), positionGrid, HUD_VIEWPORT_WIDTH, positionGrid);
+  const height = snap(numberField(value.height, HUD_GRID), positionGrid, HUD_VIEWPORT_HEIGHT, positionGrid);
+  const anchor = componentAnchor(value.anchor);
   const rawX = snap(numberField(value.x, 0), 0, HUD_VIEWPORT_WIDTH - width, positionGrid);
   const rawY = snap(numberField(value.y, 0), 0, HUD_VIEWPORT_HEIGHT - height, positionGrid);
   const offsetX = snap(numberField(value.anchorOffsetX, rawX), 0, HUD_VIEWPORT_WIDTH - width, positionGrid);
@@ -256,6 +264,11 @@ function normalizeHudComponent(value: unknown, index: number): HudComponent | nu
     text: typeof value.text === "string" ? value.text : "",
     ...(value.runtimeText === true ? {runtimeText:true} : {}),
     ...(HUD_VALUE_BINDINGS.includes(value.valueBinding as HudValueBinding) ? {valueBinding:value.valueBinding as HudValueBinding} : {}),
+    ...(typeof value.valueVariable === "string" && value.valueVariable.trim() ? { valueVariable: value.valueVariable.trim() } : {}),
+    ...(Number.isInteger(value.inventoryItem) && Number(value.inventoryItem) >= 0 && Number(value.inventoryItem) < 16 ? { inventoryItem: Number(value.inventoryItem) } : {}),
+    ...(typeof value.valueMaximum === "number" && value.valueMaximum > 0 ? { valueMaximum: Math.trunc(value.valueMaximum) } : {}),
+    ...(value.textAdvance === 6 || value.textAdvance === 7 ? { textAdvance: value.textAdvance } : {}),
+    ...(value.foregroundImage === true && componentKind(value.kind) === "bar" ? { foregroundImage: true } : {}),
     ...(Array.isArray(value.stateAssets) ? {stateAssets:value.stateAssets.filter((v): v is string => typeof v === "string").slice(0,2)} : {}),
     ...(isRecord(value.gauge) ? {gauge: {
       emptyAsset:stringField(value.gauge.emptyAsset,""),
@@ -290,6 +303,18 @@ function normalizeHudComponents(value: unknown): HudComponent[] {
     });
 }
 
+function runtimeTextProfile(value: unknown, id: string): HudRuntimeTextProfile | undefined {
+  if (value === "standard" || value === "dungeon-status" || value === "dungeon-sidebar" || value === "dungeon-sidebar-contextual") return value;
+  // These current bundled presets predate the explicit field. Copy their contract
+  // with the composition so authoring a variation does not depend on its new ID.
+  if (value === undefined) {
+    if (id === "hud-neutral-dungeon-crawler") return "dungeon-status";
+    if (id === "hud-usina-lateral") return "dungeon-sidebar-contextual";
+    if (["hud-usina-exploration-v3", "hud-usina-combat-v3", "hud-usina-exit-v3"].includes(id)) return "dungeon-sidebar";
+  }
+  return undefined;
+}
+
 function normalizeHudPreset(value: unknown, index: number, builtIn: boolean): HudPresetPresentation | null {
   if (!isRecord(value)) return null;
   const id = stringField(value.id, `hud-preset-${index + 1}`);
@@ -304,6 +329,7 @@ function normalizeHudPreset(value: unknown, index: number, builtIn: boolean): Hu
     width: Math.max(24, Math.min(240, numberField(value.width, 240))),
     height: Math.max(8, Math.min(160, numberField(value.height, 24))),
     mode: modeField(value.mode, "standard"),
+    ...(runtimeTextProfile(value.runtimeTextProfile, id) ? { runtimeTextProfile: runtimeTextProfile(value.runtimeTextProfile, id) } : {}),
     ...(Number.isInteger(value.textColor) ? {textColor: Math.max(0, Math.min(32767, Number(value.textColor)))} : {}),
     ...(typeof value.showExperienceBar === "boolean" ? { showExperienceBar: value.showExperienceBar } : {}),
     ...(typeof value.showHealthBars === "boolean" ? { showHealthBars: value.showHealthBars } : {}),
@@ -461,6 +487,7 @@ export function updateHudPresetInProject(data: GBAProjectData, presetID: string,
   if (fields.width !== undefined && Number.isFinite(fields.width)) preset.width = Math.max(24, Math.min(240, Math.round(fields.width)));
   if (fields.height !== undefined && Number.isFinite(fields.height)) preset.height = Math.max(8, Math.min(160, Math.round(fields.height)));
   if (fields.mode !== undefined) preset.mode = fields.mode;
+  if (fields.runtimeTextProfile !== undefined) preset.runtimeTextProfile = fields.runtimeTextProfile;
   if (fields.showExperienceBar !== undefined) preset.showExperienceBar = fields.showExperienceBar;
   if (fields.showHealthBars !== undefined) preset.showHealthBars = fields.showHealthBars;
   if (fields.components !== undefined) preset.components = fields.components.map((component, index) => normalizeHudComponent(component, index)).filter((component): component is HudComponent => Boolean(component));

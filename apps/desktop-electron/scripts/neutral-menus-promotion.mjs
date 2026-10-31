@@ -43,7 +43,7 @@ export function promoteNeutralMenus(source) {
   for(const name of NEUTRAL_MENU_SCENES) {
     const room=project.rooms.find(r=>r.name===name);if(!room)throw new Error(`Menu ausente: ${name}`);
     const rows=name==='inventario'||name==='mapa_menu'?0:name==='menu_start'?6:name==='configuracoes'?5:name==='creditos'?2:4;
-    const items=room.runtime.config.items.map((item,i)=>({...item,clickBox:geometry(name,i),...(details[name]?{detailLines:details[name][i]}:{}),...(name==='inventario'&&i===2?{label:'Celula'}:{}),...(name==='creditos'?{label:['Projeto GBA Studio','Engine GBA Studio'][i]}:{}),...(name==='missoes'?{label:['Objetivo','Estrut.','Celula','Alianca','Farol','Voltar'][i]}:{})}));
+    const items=room.runtime.config.items.map((item,i)=>({...item,clickBox:geometry(name,i),...(details[name]?{detailLines:item.id==='stabilizer'?item.detailLines:details[name][i]??item.detailLines}:{}),...(name==='inventario'&&i===2?{label:'Celula'}:{}),...(name==='creditos'?{label:['Projeto GBA Studio','Engine GBA Studio'][i]}:{}),...(name==='missoes'?{label:['Objetivo','Estrut.','Celula','Alianca','Farol','Voltar'][i]}:{})}));
     const config={...room.runtime.config,title:'',items,hudPresetId:`hud-neutral-${name}`,presentationMode:'hud',hudTextColor:3171,hudTransparentText:true};
     delete config.screens;delete config.hudMode;delete config.hudListRows;delete config.carousel;delete config.titleTextVariableName;
     if(name==='menu_start')config.titleTextVariableName='var_character_name';
@@ -67,9 +67,16 @@ export function promoteNeutralMenus(source) {
     }
     components.forEach((component,i)=>{ if(rows ? i<rows+2 || Boolean(details[name]) : i>=2) component.runtimeText=true; });
     presets.push({id:config.hudPresetId,name:titles[name],description:'Composição neutra aprovada, atores e dados da partida separados do fundo.',backgroundImage:'',selectorImage:'',font:'neutral-menu-font-gba.png',textColor:3171,position:'Superior',width:240,height:160,mode:'advanced',components});
-    const icons=name==='inventario'?itemIcons:name==='mapa_menu'?mapIcons:name==='menu_start'?['mission','bag','map','save','gear','return']:name==='missoes'?['mission','item-estrutura','item-celula','marker-conselho','marker-circuito','return']:name==='configuracoes'?['gear','mission','gear','gear','gear','gear','gear','return']:name==='creditos'?['mission','gear']:['portrait-small-male','portrait-small-male','portrait-small-male','return'];
+    const icons=name==='inventario'?itemIcons:name==='mapa_menu'?mapIcons:name==='menu_start'?items.map(i=>({missions:'mission',inventory:'bag',map:'map',save:'save',load:'save',settings:'gear',back:'return'})[i.id]):name==='missoes'?['mission','item-estrutura','item-celula','marker-conselho','marker-circuito','return']:name==='configuracoes'?['gear','mission','gear','gear','gear','gear','gear','return']:name==='creditos'?['mission','gear']:['portrait-small-male','portrait-small-male','portrait-small-male','return'];
     for(const [i,item] of items.entries()) {
-      const box=item.clickBox;const icon=rows&&!icons[i].startsWith('portrait-small-')?`compact-${icons[i]}`:icons[i];let x=box.x,y=box.y;
+      const box=item.clickBox;
+      if(name==='inventario'&&item.id==='stabilizer'){
+        const original=source.actors.find(a=>a.roomName===name&&a.spriteSheet==='tide-stabilizer-menu.png');
+        if(original)project.actors.push({...structuredClone(original),id:'neutral-inventario-option-stabilizer',x:Math.floor(box.x/8),y:Math.floor(box.y/8),menuPositionPixels:{x:box.x,y:box.y},menuActorRole:'option',menuItemID:item.id});
+        continue;
+      }
+      const sourceIcon=name==='inventario'&&item.id==='back'?'return':icons[i];
+      const icon=rows&&!sourceIcon.startsWith('portrait-small-')?`compact-${sourceIcon}`:sourceIcon;let x=box.x,y=box.y;
       if(rows)x=box.x+8;
       if(icon.startsWith('portrait-small-'))y+=2;
       actor(name,`option-${item.id}`,icon,x,y,'option',{menuItemID:item.id});

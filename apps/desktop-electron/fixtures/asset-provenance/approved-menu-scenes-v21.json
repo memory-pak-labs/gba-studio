@@ -1,0 +1,3067 @@
+{
+  "version": "V2.1",
+  "approval": {
+    "date": "2026-10-26",
+    "source": "Direct user approval in this chat",
+    "pause": "approved",
+    "inventory": "approved",
+    "arrival": "approved",
+    "integration": "authorized"
+  },
+  "license": "Project-owned artwork generated under user direction; approved glyphs and existing racing sprites reused.",
+  "parts": {
+    "arrival-v21-interface.png": [
+      {
+        "file": "arrival-v21-interface-part-0.png",
+        "x": 0,
+        "y": 0,
+        "width": 64,
+        "height": 64
+      },
+      {
+        "file": "arrival-v21-interface-part-1.png",
+        "x": 64,
+        "y": 0,
+        "width": 64,
+        "height": 64
+      },
+      {
+        "file": "arrival-v21-interface-part-2.png",
+        "x": 128,
+        "y": 0,
+        "width": 64,
+        "height": 64
+      },
+      {
+        "file": "arrival-v21-interface-part-3.png",
+        "x": 192,
+        "y": 0,
+        "width": 48,
+        "height": 64
+      },
+      {
+        "file": "arrival-v21-interface-part-4.png",
+        "x": 0,
+        "y": 64,
+        "width": 64,
+        "height": 64
+      },
+      {
+        "file": "arrival-v21-interface-part-5.png",
+        "x": 64,
+        "y": 64,
+        "width": 64,
+        "height": 64
+      },
+      {
+        "file": "arrival-v21-interface-part-6.png",
+        "x": 128,
+        "y": 64,
+        "width": 64,
+        "height": 64
+      },
+      {
+        "file": "arrival-v21-interface-part-7.png",
+        "x": 192,
+        "y": 64,
+        "width": 48,
+        "height": 64
+      },
+      {
+        "file": "arrival-v21-interface-part-8.png",
+        "x": 0,
+        "y": 128,
+        "width": 64,
+        "height": 32
+      },
+      {
+        "file": "arrival-v21-interface-part-9.png",
+        "x": 64,
+        "y": 128,
+        "width": 64,
+        "height": 32
+      },
+      {
+        "file": "arrival-v21-interface-part-10.png",
+        "x": 128,
+        "y": 128,
+        "width": 64,
+        "height": 32
+      },
+      {
+        "file": "arrival-v21-interface-part-11.png",
+        "x": 192,
+        "y": 128,
+        "width": 48,
+        "height": 32
+      }
+    ],
+    "arrival-v21-map.png": [
+      {
+        "file": "arrival-v21-map.png",
+        "x": 0,
+        "y": 0,
+        "width": 128,
+        "height": 8
+      }
+    ],
+    "arrival-v21-nameplate.png": [
+      {
+        "file": "arrival-v21-nameplate.png",
+        "x": 0,
+        "y": 0,
+        "width": 32,
+        "height": 16
+      }
+    ],
+    "arrival-v21-nara.png": [
+      {
+        "file": "arrival-v21-nara.png",
+        "x": 0,
+        "y": 0,
+        "width": 32,
+        "height": 32
+      }
+    ],
+    "arrival-v21-rival.png": [
+      {
+        "file": "arrival-v21-rival.png",
+        "x": 0,
+        "y": 0,
+        "width": 32,
+        "height": 32
+      }
+    ],
+    "arrival-v21-rival2.png": [
+      {
+        "file": "arrival-v21-rival2.png",
+        "x": 0,
+        "y": 0,
+        "width": 32,
+        "height": 32
+      }
+    ],
+    "arrival-v21-story.png": [
+      {
+        "file": "arrival-v21-story.png",
+        "x": 0,
+        "y": 0,
+        "width": 128,
+        "height": 8
+      }
+    ],
+    "arrival-v21-title-farol.png": [
+      {
+        "file": "arrival-v21-title-farol.png",
+        "x": 0,
+        "y": 0,
+        "width": 128,
+        "height": 8
+      }
+    ],
+    "arrival-v21-title-mare.png": [
+      {
+        "file": "arrival-v21-title-mare.png",
+        "x": 0,
+        "y": 0,
+        "width": 128,
+        "height": 8
+      }
+    ],
+    "pause-v2-back.png": [
+      {
+        "file": "pause-v2-back.png",
+        "x": 0,
+        "y": 0,
+        "width": 64,
+        "height": 8
+      }
+    ],
+    "pause-v2-page-1.png": [
+      {
+        "file": "pause-v2-page-1.png",
+        "x": 0,
+        "y": 0,
+        "width": 32,
+        "height": 8
+      }
+    ],
+    "pause-v2-page-2.png": [
+      {
+        "file": "pause-v2-page-2.png",
+        "x": 0,
+        "y": 0,
+        "width": 32,
+        "height": 8
+      }
+    ],
+    "toolcase-v2-chart.png": [
+      {
+        "file": "toolcase-v2-chart.png",
+        "x": 0,
+        "y": 0,
+        "width": 40,
+        "height": 48
+      }
+    ],
+    "toolcase-v2-compass.png": [
+      {
+        "file": "toolcase-v2-compass.png",
+        "x": 0,
+        "y": 0,
+        "width": 40,
+        "height": 48
+      }
+    ],
+    "toolcase-v2-equip.png": [
+      {
+        "file": "toolcase-v2-equip-part-0.png",
+        "x": 0,
+        "y": 0,
+        "width": 96,
+        "height": 8
+      },
+      {
+        "file": "toolcase-v2-equip-part-1.png",
+        "x": 96,
+        "y": 0,
+        "width": 96,
+        "height": 8
+      }
+    ],
+    "toolcase-v2-mark-0.png": [
+      {
+        "file": "toolcase-v2-mark-0.png",
+        "x": 0,
+        "y": 0,
+        "width": 8,
+        "height": 8
+      }
+    ],
+    "toolcase-v2-mark-1.png": [
+      {
+        "file": "toolcase-v2-mark-1.png",
+        "x": 0,
+        "y": 0,
+        "width": 8,
+        "height": 8
+      }
+    ],
+    "toolcase-v2-mark-2.png": [
+      {
+        "file": "toolcase-v2-mark-2.png",
+        "x": 0,
+        "y": 0,
+        "width": 8,
+        "height": 8
+      }
+    ],
+    "toolcase-v2-mark-e.png": [
+      {
+        "file": "toolcase-v2-mark-e.png",
+        "x": 0,
+        "y": 0,
+        "width": 8,
+        "height": 8
+      }
+    ],
+    "toolcase-v2-page-0.png": [
+      {
+        "file": "toolcase-v2-page-0-part-0.png",
+        "x": 0,
+        "y": 0,
+        "width": 96,
+        "height": 8
+      },
+      {
+        "file": "toolcase-v2-page-0-part-1.png",
+        "x": 96,
+        "y": 0,
+        "width": 96,
+        "height": 8
+      }
+    ],
+    "toolcase-v2-page-1.png": [
+      {
+        "file": "toolcase-v2-page-1-part-0.png",
+        "x": 0,
+        "y": 0,
+        "width": 96,
+        "height": 8
+      },
+      {
+        "file": "toolcase-v2-page-1-part-1.png",
+        "x": 96,
+        "y": 0,
+        "width": 96,
+        "height": 8
+      }
+    ],
+    "toolcase-v2-page-2.png": [
+      {
+        "file": "toolcase-v2-page-2-part-0.png",
+        "x": 0,
+        "y": 0,
+        "width": 96,
+        "height": 8
+      },
+      {
+        "file": "toolcase-v2-page-2-part-1.png",
+        "x": 96,
+        "y": 0,
+        "width": 96,
+        "height": 8
+      }
+    ],
+    "toolcase-v2-relay.png": [
+      {
+        "file": "toolcase-v2-relay.png",
+        "x": 0,
+        "y": 0,
+        "width": 40,
+        "height": 48
+      }
+    ],
+    "toolcase-v2-remove.png": [
+      {
+        "file": "toolcase-v2-remove-part-0.png",
+        "x": 0,
+        "y": 0,
+        "width": 96,
+        "height": 8
+      },
+      {
+        "file": "toolcase-v2-remove-part-1.png",
+        "x": 96,
+        "y": 0,
+        "width": 96,
+        "height": 8
+      }
+    ],
+    "toolcase-v2-tool.png": [
+      {
+        "file": "toolcase-v2-tool.png",
+        "x": 0,
+        "y": 0,
+        "width": 40,
+        "height": 48
+      }
+    ],
+    "toolcase-v2-view.png": [
+      {
+        "file": "toolcase-v2-view-part-0.png",
+        "x": 0,
+        "y": 0,
+        "width": 96,
+        "height": 8
+      },
+      {
+        "file": "toolcase-v2-view-part-1.png",
+        "x": 96,
+        "y": 0,
+        "width": 96,
+        "height": 8
+      }
+    ]
+  },
+  "assets": [
+    {
+      "id": "approved-menu-arrival-v21-interface-part-0",
+      "name": "arrival-v21-interface-part-0.png",
+      "kind": "Sprite",
+      "metadata": {
+        "source": "Assets/sprites/arrival-v21-interface-part-0.png",
+        "width": 64,
+        "height": 64,
+        "colorMode": "4bpp",
+        "kind": "sprite",
+        "license": "Project-owned artwork generated under user direction; approved glyphs and existing racing sprites reused.",
+        "generatedBy": "approved-menu-scenes-v21",
+        "reviewStatus": "approved",
+        "visualStatus": "approved",
+        "approvedAt": "2026-10-26",
+        "provenance": "fixtures/asset-provenance/approved-menu-scenes-v21.json",
+        "sourceSha256": "0d808fe2b7356fd0bd12ba5a24c67236db0420fbb27dc7861d7be94eccbe281f",
+        "preparedSha256": "5521cf94be4aab081a0eac712ed99790da8cee42390f655134cc9a986c934411",
+        "maskPixelDifferences": 0,
+        "objectPaletteValues": [
+          0,
+          8418,
+          9442,
+          10464,
+          13733,
+          15065,
+          24477,
+          25535
+        ]
+      }
+    },
+    {
+      "id": "approved-menu-arrival-v21-interface-part-1",
+      "name": "arrival-v21-interface-part-1.png",
+      "kind": "Sprite",
+      "metadata": {
+        "source": "Assets/sprites/arrival-v21-interface-part-1.png",
+        "width": 64,
+        "height": 64,
+        "colorMode": "4bpp",
+        "kind": "sprite",
+        "license": "Project-owned artwork generated under user direction; approved glyphs and existing racing sprites reused.",
+        "generatedBy": "approved-menu-scenes-v21",
+        "reviewStatus": "approved",
+        "visualStatus": "approved",
+        "approvedAt": "2026-10-26",
+        "provenance": "fixtures/asset-provenance/approved-menu-scenes-v21.json",
+        "sourceSha256": "b5894ea48bf27f2542e8ed398a5cc3b78b28c1e0ad16be0f3399adda1e041abb",
+        "preparedSha256": "fa7352d840061c7e15a81c83eb7dc9d3de8c7f45ec9f904b68a6b8a00cd4b1ff",
+        "maskPixelDifferences": 0,
+        "objectPaletteValues": [
+          0,
+          8418,
+          9442,
+          10464,
+          13733,
+          15065,
+          24477,
+          25535
+        ]
+      }
+    },
+    {
+      "id": "approved-menu-arrival-v21-interface-part-2",
+      "name": "arrival-v21-interface-part-2.png",
+      "kind": "Sprite",
+      "metadata": {
+        "source": "Assets/sprites/arrival-v21-interface-part-2.png",
+        "width": 64,
+        "height": 64,
+        "colorMode": "4bpp",
+        "kind": "sprite",
+        "license": "Project-owned artwork generated under user direction; approved glyphs and existing racing sprites reused.",
+        "generatedBy": "approved-menu-scenes-v21",
+        "reviewStatus": "approved",
+        "visualStatus": "approved",
+        "approvedAt": "2026-10-26",
+        "provenance": "fixtures/asset-provenance/approved-menu-scenes-v21.json",
+        "sourceSha256": "8beabfe6aa15381b7bdc509158e566209e9bd4be5c4f054d3ce65dec83bde71b",
+        "preparedSha256": "79863f6662ab2b537c8c2bd8335a442895166368e658787fdbe8f1ea3bafe04d",
+        "maskPixelDifferences": 0,
+        "objectPaletteValues": [
+          0,
+          8418,
+          9442,
+          10464,
+          13733,
+          15065,
+          24477,
+          25535
+        ]
+      }
+    },
+    {
+      "id": "approved-menu-arrival-v21-interface-part-3",
+      "name": "arrival-v21-interface-part-3.png",
+      "kind": "Sprite",
+      "metadata": {
+        "source": "Assets/sprites/arrival-v21-interface-part-3.png",
+        "width": 64,
+        "height": 64,
+        "colorMode": "4bpp",
+        "kind": "sprite",
+        "license": "Project-owned artwork generated under user direction; approved glyphs and existing racing sprites reused.",
+        "generatedBy": "approved-menu-scenes-v21",
+        "reviewStatus": "approved",
+        "visualStatus": "approved",
+        "approvedAt": "2026-10-26",
+        "provenance": "fixtures/asset-provenance/approved-menu-scenes-v21.json",
+        "sourceSha256": "1b141cd402651c36cce9fd679691870e1898bd4b64e96a529f21c0493f1d831e",
+        "preparedSha256": "61db1e06fe7c5f3c2cd72e550f330be2a2d781cb27d192ce7e58a04b710b085f",
+        "maskPixelDifferences": 0,
+        "objectPaletteValues": [
+          0,
+          8418,
+          9442,
+          10464,
+          13733,
+          15065,
+          24477,
+          25535
+        ]
+      }
+    },
+    {
+      "id": "approved-menu-arrival-v21-map",
+      "name": "arrival-v21-map.png",
+      "kind": "Sprite",
+      "metadata": {
+        "source": "Assets/sprites/arrival-v21-map.png",
+        "width": 128,
+        "height": 8,
+        "colorMode": "4bpp",
+        "kind": "sprite",
+        "license": "Project-owned artwork generated under user direction; approved glyphs and existing racing sprites reused.",
+        "generatedBy": "approved-menu-scenes-v21",
+        "reviewStatus": "approved",
+        "visualStatus": "approved",
+        "approvedAt": "2026-10-26",
+        "provenance": "fixtures/asset-provenance/approved-menu-scenes-v21.json",
+        "sourceSha256": "39814df929befd71c85faad720c03f601e4c5056b489ecfbf448c65811206975",
+        "preparedSha256": "b2fca0bdcaf47d1ac67105b067865f567123dc11dbb646b39723fbdc9bca199c",
+        "maskPixelDifferences": 0
+      }
+    },
+    {
+      "id": "approved-menu-arrival-v21-nameplate",
+      "name": "arrival-v21-nameplate.png",
+      "kind": "Sprite",
+      "metadata": {
+        "source": "Assets/sprites/arrival-v21-nameplate.png",
+        "width": 32,
+        "height": 16,
+        "colorMode": "4bpp",
+        "kind": "sprite",
+        "license": "Project-owned artwork generated under user direction; approved glyphs and existing racing sprites reused.",
+        "generatedBy": "approved-menu-scenes-v21",
+        "reviewStatus": "approved",
+        "visualStatus": "approved",
+        "approvedAt": "2026-10-26",
+        "provenance": "fixtures/asset-provenance/approved-menu-scenes-v21.json",
+        "sourceSha256": "2d9c1d15d6b83c01430f088822b2d3806cbe48e9488d0e03980936ec879e533a",
+        "preparedSha256": "ec3f560f92d713cd7715cc1fb3fd90ecedba755cd618489666d716074621da50",
+        "maskPixelDifferences": 0
+      }
+    },
+    {
+      "id": "approved-menu-arrival-v21-nara",
+      "name": "arrival-v21-nara.png",
+      "kind": "Sprite",
+      "metadata": {
+        "source": "Assets/sprites/arrival-v21-nara.png",
+        "width": 32,
+        "height": 32,
+        "colorMode": "4bpp",
+        "kind": "sprite",
+        "license": "Project-owned artwork generated under user direction; approved glyphs and existing racing sprites reused.",
+        "generatedBy": "approved-menu-scenes-v21",
+        "reviewStatus": "approved",
+        "visualStatus": "approved",
+        "approvedAt": "2026-10-26",
+        "provenance": "fixtures/asset-provenance/approved-menu-scenes-v21.json",
+        "sourceSha256": "0e736d9963dc904e2c38cc1325897cb4899672ed2092c284d07820981df1f686",
+        "preparedSha256": "483fc2217f8f17a0dc99aabcca307f7d24e20fa72db4b1c44145e908b3c90f85",
+        "maskPixelDifferences": 0
+      }
+    },
+    {
+      "id": "approved-menu-arrival-v21-rival",
+      "name": "arrival-v21-rival.png",
+      "kind": "Sprite",
+      "metadata": {
+        "source": "Assets/sprites/arrival-v21-rival.png",
+        "width": 32,
+        "height": 32,
+        "colorMode": "4bpp",
+        "kind": "sprite",
+        "license": "Project-owned artwork generated under user direction; approved glyphs and existing racing sprites reused.",
+        "generatedBy": "approved-menu-scenes-v21",
+        "reviewStatus": "approved",
+        "visualStatus": "approved",
+        "approvedAt": "2026-10-26",
+        "provenance": "fixtures/asset-provenance/approved-menu-scenes-v21.json",
+        "sourceSha256": "98b7651a334b0d15addfe249b2323e81c52f2db0e5f7bb70c41e25ec712b7952",
+        "preparedSha256": "ae4ad55c7f9d208a2224dfad64c5283ff0bdb12298b2434c6ea9d6b65c02dd78",
+        "maskPixelDifferences": 0
+      }
+    },
+    {
+      "id": "approved-menu-arrival-v21-rival2",
+      "name": "arrival-v21-rival2.png",
+      "kind": "Sprite",
+      "metadata": {
+        "source": "Assets/sprites/arrival-v21-rival2.png",
+        "width": 32,
+        "height": 32,
+        "colorMode": "4bpp",
+        "kind": "sprite",
+        "license": "Project-owned artwork generated under user direction; approved glyphs and existing racing sprites reused.",
+        "generatedBy": "approved-menu-scenes-v21",
+        "reviewStatus": "approved",
+        "visualStatus": "approved",
+        "approvedAt": "2026-10-26",
+        "provenance": "fixtures/asset-provenance/approved-menu-scenes-v21.json",
+        "sourceSha256": "3ea70c6b2948db2e5cb0e3e0f3dcd9fab13f8b03aca8843be4cc905f83cbbb70",
+        "preparedSha256": "1e67164fc6a04835f0bb071b0fe3e0495b3307c375e9e457f85ae51bfdf2747a",
+        "maskPixelDifferences": 0
+      }
+    },
+    {
+      "id": "approved-menu-arrival-v21-story",
+      "name": "arrival-v21-story.png",
+      "kind": "Sprite",
+      "metadata": {
+        "source": "Assets/sprites/arrival-v21-story.png",
+        "width": 128,
+        "height": 8,
+        "colorMode": "4bpp",
+        "kind": "sprite",
+        "license": "Project-owned artwork generated under user direction; approved glyphs and existing racing sprites reused.",
+        "generatedBy": "approved-menu-scenes-v21",
+        "reviewStatus": "approved",
+        "visualStatus": "approved",
+        "approvedAt": "2026-10-26",
+        "provenance": "fixtures/asset-provenance/approved-menu-scenes-v21.json",
+        "sourceSha256": "599bf076a3902b7d110c1b8a4c747ed01c4f14e572337238256fa226ebddded0",
+        "preparedSha256": "e0abd1cc9e50cb0200fd93d5aec5d4ff4b8617bd0fdb7d6c40da1b64f1b55514",
+        "maskPixelDifferences": 0
+      }
+    },
+    {
+      "id": "approved-menu-arrival-v21-title-farol",
+      "name": "arrival-v21-title-farol.png",
+      "kind": "Sprite",
+      "metadata": {
+        "source": "Assets/sprites/arrival-v21-title-farol.png",
+        "width": 128,
+        "height": 8,
+        "colorMode": "4bpp",
+        "kind": "sprite",
+        "license": "Project-owned artwork generated under user direction; approved glyphs and existing racing sprites reused.",
+        "generatedBy": "approved-menu-scenes-v21",
+        "reviewStatus": "approved",
+        "visualStatus": "approved",
+        "approvedAt": "2026-10-26",
+        "provenance": "fixtures/asset-provenance/approved-menu-scenes-v21.json",
+        "sourceSha256": "492224ec5135d1f6b2f32059b3cdde5d6c5ff5d179afe874044ac04a7cd7a486",
+        "preparedSha256": "830615249a1a6f8cbdbe84505800c491f6e4ca98f3c4b88bf97f02a0d660a142",
+        "maskPixelDifferences": 0
+      }
+    },
+    {
+      "id": "approved-menu-arrival-v21-title-mare",
+      "name": "arrival-v21-title-mare.png",
+      "kind": "Sprite",
+      "metadata": {
+        "source": "Assets/sprites/arrival-v21-title-mare.png",
+        "width": 128,
+        "height": 8,
+        "colorMode": "4bpp",
+        "kind": "sprite",
+        "license": "Project-owned artwork generated under user direction; approved glyphs and existing racing sprites reused.",
+        "generatedBy": "approved-menu-scenes-v21",
+        "reviewStatus": "approved",
+        "visualStatus": "approved",
+        "approvedAt": "2026-10-26",
+        "provenance": "fixtures/asset-provenance/approved-menu-scenes-v21.json",
+        "sourceSha256": "3b68628dfa8ba6a6244e091cae2db29badb929076f97c654590a17cb123ed704",
+        "preparedSha256": "5f57f2b6ca15ece73e48f99931d15b8525b1bf400e144f5100097c0c8427f2c4",
+        "maskPixelDifferences": 0
+      }
+    },
+    {
+      "id": "approved-menu-pause-v2-back",
+      "name": "pause-v2-back.png",
+      "kind": "Sprite",
+      "metadata": {
+        "source": "Assets/sprites/pause-v2-back.png",
+        "width": 64,
+        "height": 8,
+        "colorMode": "4bpp",
+        "kind": "sprite",
+        "license": "Project-owned artwork generated under user direction; approved glyphs and existing racing sprites reused.",
+        "generatedBy": "approved-menu-scenes-v21",
+        "reviewStatus": "approved",
+        "visualStatus": "approved",
+        "approvedAt": "2026-10-26",
+        "provenance": "fixtures/asset-provenance/approved-menu-scenes-v21.json",
+        "sourceSha256": "6ef5c6ad49f94bbf87548dc510aa0d5e179e7c99d954b7df767846c0c650fa15",
+        "preparedSha256": "2ea72cf41141fc353abc10bd209a943ff0b8f9fbac3c04fbb5fb0b18147d7214",
+        "maskPixelDifferences": 0
+      }
+    },
+    {
+      "id": "approved-menu-pause-v2-page-1",
+      "name": "pause-v2-page-1.png",
+      "kind": "Sprite",
+      "metadata": {
+        "source": "Assets/sprites/pause-v2-page-1.png",
+        "width": 32,
+        "height": 8,
+        "colorMode": "4bpp",
+        "kind": "sprite",
+        "license": "Project-owned artwork generated under user direction; approved glyphs and existing racing sprites reused.",
+        "generatedBy": "approved-menu-scenes-v21",
+        "reviewStatus": "approved",
+        "visualStatus": "approved",
+        "approvedAt": "2026-10-26",
+        "provenance": "fixtures/asset-provenance/approved-menu-scenes-v21.json",
+        "sourceSha256": "b47d6efee4764a4a40aca01b7a7f7a851a035ff8254f1ca1b71d0264506e0edd",
+        "preparedSha256": "d2303290e8dec9cefa26924d9e32ff9151c23ba40b650009b6fe5fa952c622c6",
+        "maskPixelDifferences": 0
+      }
+    },
+    {
+      "id": "approved-menu-pause-v2-page-2",
+      "name": "pause-v2-page-2.png",
+      "kind": "Sprite",
+      "metadata": {
+        "source": "Assets/sprites/pause-v2-page-2.png",
+        "width": 32,
+        "height": 8,
+        "colorMode": "4bpp",
+        "kind": "sprite",
+        "license": "Project-owned artwork generated under user direction; approved glyphs and existing racing sprites reused.",
+        "generatedBy": "approved-menu-scenes-v21",
+        "reviewStatus": "approved",
+        "visualStatus": "approved",
+        "approvedAt": "2026-10-26",
+        "provenance": "fixtures/asset-provenance/approved-menu-scenes-v21.json",
+        "sourceSha256": "173b52d941df1e3c611da565ba17cc7b42368890a508ffd904c2d158445deb05",
+        "preparedSha256": "e4f0a44ed229dbd92e2be6efc38bfecdee29ae2751957ae9723d9697d865ccab",
+        "maskPixelDifferences": 0
+      }
+    },
+    {
+      "id": "approved-menu-toolcase-v2-chart",
+      "name": "toolcase-v2-chart.png",
+      "kind": "Sprite",
+      "metadata": {
+        "source": "Assets/sprites/toolcase-v2-chart.png",
+        "width": 40,
+        "height": 48,
+        "colorMode": "4bpp",
+        "kind": "sprite",
+        "license": "Project-owned artwork generated under user direction; approved glyphs and existing racing sprites reused.",
+        "generatedBy": "approved-menu-scenes-v21",
+        "reviewStatus": "approved",
+        "visualStatus": "approved",
+        "approvedAt": "2026-10-26",
+        "provenance": "fixtures/asset-provenance/approved-menu-scenes-v21.json",
+        "sourceSha256": "627d7d539896eac630191c07cb27cdb0f9a2bb5c14e8491c7ecc9bffacdef5eb",
+        "preparedSha256": "c9be2a3f55a8f6be61c9da5986ff6ea1540f1b959817ac596e41ffb65abc4e82",
+        "maskPixelDifferences": 0
+      }
+    },
+    {
+      "id": "approved-menu-toolcase-v2-compass",
+      "name": "toolcase-v2-compass.png",
+      "kind": "Sprite",
+      "metadata": {
+        "source": "Assets/sprites/toolcase-v2-compass.png",
+        "width": 40,
+        "height": 48,
+        "colorMode": "4bpp",
+        "kind": "sprite",
+        "license": "Project-owned artwork generated under user direction; approved glyphs and existing racing sprites reused.",
+        "generatedBy": "approved-menu-scenes-v21",
+        "reviewStatus": "approved",
+        "visualStatus": "approved",
+        "approvedAt": "2026-10-26",
+        "provenance": "fixtures/asset-provenance/approved-menu-scenes-v21.json",
+        "sourceSha256": "6822ee3abada281ff7c6ec97110aca02fed6fbe971ca87baef6004e1d89d93d3",
+        "preparedSha256": "f41775d8c473888eb080e36ab6d7a0b22fb8a61865f75a8a6ed6512130ecdf95",
+        "maskPixelDifferences": 0
+      }
+    },
+    {
+      "id": "approved-menu-toolcase-v2-equip-part-0",
+      "name": "toolcase-v2-equip-part-0.png",
+      "kind": "Sprite",
+      "metadata": {
+        "source": "Assets/sprites/toolcase-v2-equip-part-0.png",
+        "width": 96,
+        "height": 8,
+        "colorMode": "4bpp",
+        "kind": "sprite",
+        "license": "Project-owned artwork generated under user direction; approved glyphs and existing racing sprites reused.",
+        "generatedBy": "approved-menu-scenes-v21",
+        "reviewStatus": "approved",
+        "visualStatus": "approved",
+        "approvedAt": "2026-10-26",
+        "provenance": "fixtures/asset-provenance/approved-menu-scenes-v21.json",
+        "sourceSha256": "f959f67dd48ef049a7d765eb74f081492cdc0fd000703c13c11c5691d8771351",
+        "preparedSha256": "c898383d617b1d6b748966d42623fcf8287c83db617990bf0f10d8b7b34e4851",
+        "maskPixelDifferences": 0
+      }
+    },
+    {
+      "id": "approved-menu-toolcase-v2-equip-part-1",
+      "name": "toolcase-v2-equip-part-1.png",
+      "kind": "Sprite",
+      "metadata": {
+        "source": "Assets/sprites/toolcase-v2-equip-part-1.png",
+        "width": 96,
+        "height": 8,
+        "colorMode": "4bpp",
+        "kind": "sprite",
+        "license": "Project-owned artwork generated under user direction; approved glyphs and existing racing sprites reused.",
+        "generatedBy": "approved-menu-scenes-v21",
+        "reviewStatus": "approved",
+        "visualStatus": "approved",
+        "approvedAt": "2026-10-26",
+        "provenance": "fixtures/asset-provenance/approved-menu-scenes-v21.json",
+        "sourceSha256": "9b75be17d622e23933cc0ce46a70dddbd390cf9680ccc9947bdc39c94e2c972e",
+        "preparedSha256": "07baefa5a59a4617e6fc470babe7e377ed0b872979f5f632c6e856eb86fd855c",
+        "maskPixelDifferences": 0
+      }
+    },
+    {
+      "id": "approved-menu-toolcase-v2-mark-0",
+      "name": "toolcase-v2-mark-0.png",
+      "kind": "Sprite",
+      "metadata": {
+        "source": "Assets/sprites/toolcase-v2-mark-0.png",
+        "width": 8,
+        "height": 8,
+        "colorMode": "4bpp",
+        "kind": "sprite",
+        "license": "Project-owned artwork generated under user direction; approved glyphs and existing racing sprites reused.",
+        "generatedBy": "approved-menu-scenes-v21",
+        "reviewStatus": "approved",
+        "visualStatus": "approved",
+        "approvedAt": "2026-10-26",
+        "provenance": "fixtures/asset-provenance/approved-menu-scenes-v21.json",
+        "sourceSha256": "80d3c5471debd5cdc20f077d622ded6a161f85dac062e809925f7e4678217999",
+        "preparedSha256": "67d86d1f7ab6fe6988b53d903e703ca26aabd76ff05e321587c09ee1fedb6f5d",
+        "maskPixelDifferences": 0
+      }
+    },
+    {
+      "id": "approved-menu-toolcase-v2-mark-1",
+      "name": "toolcase-v2-mark-1.png",
+      "kind": "Sprite",
+      "metadata": {
+        "source": "Assets/sprites/toolcase-v2-mark-1.png",
+        "width": 8,
+        "height": 8,
+        "colorMode": "4bpp",
+        "kind": "sprite",
+        "license": "Project-owned artwork generated under user direction; approved glyphs and existing racing sprites reused.",
+        "generatedBy": "approved-menu-scenes-v21",
+        "reviewStatus": "approved",
+        "visualStatus": "approved",
+        "approvedAt": "2026-10-26",
+        "provenance": "fixtures/asset-provenance/approved-menu-scenes-v21.json",
+        "sourceSha256": "1477f9895ddfed4d503392661290d43604a7e0101f0f3e1a6969bcb5c2e561ed",
+        "preparedSha256": "e9fabcda9d63b0dcb2b11a18dccda6fb7418b5b6c489d7a7a6ca8c075a72ae17",
+        "maskPixelDifferences": 0
+      }
+    },
+    {
+      "id": "approved-menu-toolcase-v2-mark-2",
+      "name": "toolcase-v2-mark-2.png",
+      "kind": "Sprite",
+      "metadata": {
+        "source": "Assets/sprites/toolcase-v2-mark-2.png",
+        "width": 8,
+        "height": 8,
+        "colorMode": "4bpp",
+        "kind": "sprite",
+        "license": "Project-owned artwork generated under user direction; approved glyphs and existing racing sprites reused.",
+        "generatedBy": "approved-menu-scenes-v21",
+        "reviewStatus": "approved",
+        "visualStatus": "approved",
+        "approvedAt": "2026-10-26",
+        "provenance": "fixtures/asset-provenance/approved-menu-scenes-v21.json",
+        "sourceSha256": "37a7df0308e60e195652314203bd3289068582fcaaf1dc7865acea7b4a3ef4fd",
+        "preparedSha256": "a8ac7a2dca6397c286f8bcfe3ba0a203cb70338a5e0dc635c22e45b6cd08330c",
+        "maskPixelDifferences": 0
+      }
+    },
+    {
+      "id": "approved-menu-toolcase-v2-mark-e",
+      "name": "toolcase-v2-mark-e.png",
+      "kind": "Sprite",
+      "metadata": {
+        "source": "Assets/sprites/toolcase-v2-mark-e.png",
+        "width": 8,
+        "height": 8,
+        "colorMode": "4bpp",
+        "kind": "sprite",
+        "license": "Project-owned artwork generated under user direction; approved glyphs and existing racing sprites reused.",
+        "generatedBy": "approved-menu-scenes-v21",
+        "reviewStatus": "approved",
+        "visualStatus": "approved",
+        "approvedAt": "2026-10-26",
+        "provenance": "fixtures/asset-provenance/approved-menu-scenes-v21.json",
+        "sourceSha256": "33914f0f9ccca8c4e7e1b1169d54a074deddbf6461fd9ccdc69d1ff75ab52ff1",
+        "preparedSha256": "a7538fc3e876903ea69eb1a4e1883a51117f3f9174a0b6208663d6ebe2a10b60",
+        "maskPixelDifferences": 0
+      }
+    },
+    {
+      "id": "approved-menu-toolcase-v2-page-0-part-0",
+      "name": "toolcase-v2-page-0-part-0.png",
+      "kind": "Sprite",
+      "metadata": {
+        "source": "Assets/sprites/toolcase-v2-page-0-part-0.png",
+        "width": 96,
+        "height": 8,
+        "colorMode": "4bpp",
+        "kind": "sprite",
+        "license": "Project-owned artwork generated under user direction; approved glyphs and existing racing sprites reused.",
+        "generatedBy": "approved-menu-scenes-v21",
+        "reviewStatus": "approved",
+        "visualStatus": "approved",
+        "approvedAt": "2026-10-26",
+        "provenance": "fixtures/asset-provenance/approved-menu-scenes-v21.json",
+        "sourceSha256": "948a6cca559289705720982330884722f5851a7fe5311edd091d96c4b0ff38fe",
+        "preparedSha256": "f376334c44ce614442caa4aba5db0873d3aedabcd42c9c72465f43fed199ef11",
+        "maskPixelDifferences": 0
+      }
+    },
+    {
+      "id": "approved-menu-toolcase-v2-page-0-part-1",
+      "name": "toolcase-v2-page-0-part-1.png",
+      "kind": "Sprite",
+      "metadata": {
+        "source": "Assets/sprites/toolcase-v2-page-0-part-1.png",
+        "width": 96,
+        "height": 8,
+        "colorMode": "4bpp",
+        "kind": "sprite",
+        "license": "Project-owned artwork generated under user direction; approved glyphs and existing racing sprites reused.",
+        "generatedBy": "approved-menu-scenes-v21",
+        "reviewStatus": "approved",
+        "visualStatus": "approved",
+        "approvedAt": "2026-10-26",
+        "provenance": "fixtures/asset-provenance/approved-menu-scenes-v21.json",
+        "sourceSha256": "f8630160188f5b5d64dab88bd2a38120bbb17d9f189b9a8fd2c860baeaaf366f",
+        "preparedSha256": "479cac253a7db72c585c3255249cb122f6b4ffb5330590adf4cc4c23ce3ee8ac",
+        "maskPixelDifferences": 0
+      }
+    },
+    {
+      "id": "approved-menu-toolcase-v2-page-1-part-0",
+      "name": "toolcase-v2-page-1-part-0.png",
+      "kind": "Sprite",
+      "metadata": {
+        "source": "Assets/sprites/toolcase-v2-page-1-part-0.png",
+        "width": 96,
+        "height": 8,
+        "colorMode": "4bpp",
+        "kind": "sprite",
+        "license": "Project-owned artwork generated under user direction; approved glyphs and existing racing sprites reused.",
+        "generatedBy": "approved-menu-scenes-v21",
+        "reviewStatus": "approved",
+        "visualStatus": "approved",
+        "approvedAt": "2026-10-26",
+        "provenance": "fixtures/asset-provenance/approved-menu-scenes-v21.json",
+        "sourceSha256": "948a6cca559289705720982330884722f5851a7fe5311edd091d96c4b0ff38fe",
+        "preparedSha256": "f376334c44ce614442caa4aba5db0873d3aedabcd42c9c72465f43fed199ef11",
+        "maskPixelDifferences": 0
+      }
+    },
+    {
+      "id": "approved-menu-toolcase-v2-page-1-part-1",
+      "name": "toolcase-v2-page-1-part-1.png",
+      "kind": "Sprite",
+      "metadata": {
+        "source": "Assets/sprites/toolcase-v2-page-1-part-1.png",
+        "width": 96,
+        "height": 8,
+        "colorMode": "4bpp",
+        "kind": "sprite",
+        "license": "Project-owned artwork generated under user direction; approved glyphs and existing racing sprites reused.",
+        "generatedBy": "approved-menu-scenes-v21",
+        "reviewStatus": "approved",
+        "visualStatus": "approved",
+        "approvedAt": "2026-10-26",
+        "provenance": "fixtures/asset-provenance/approved-menu-scenes-v21.json",
+        "sourceSha256": "b330361efe7557e48868303439a31d9a414003587b19eb0840141f580b5d1c2c",
+        "preparedSha256": "1885bd4c9e6549056701334699f29ef1b115801709036b6ec24cd0eaf8745e18",
+        "maskPixelDifferences": 0
+      }
+    },
+    {
+      "id": "approved-menu-toolcase-v2-page-2-part-0",
+      "name": "toolcase-v2-page-2-part-0.png",
+      "kind": "Sprite",
+      "metadata": {
+        "source": "Assets/sprites/toolcase-v2-page-2-part-0.png",
+        "width": 96,
+        "height": 8,
+        "colorMode": "4bpp",
+        "kind": "sprite",
+        "license": "Project-owned artwork generated under user direction; approved glyphs and existing racing sprites reused.",
+        "generatedBy": "approved-menu-scenes-v21",
+        "reviewStatus": "approved",
+        "visualStatus": "approved",
+        "approvedAt": "2026-10-26",
+        "provenance": "fixtures/asset-provenance/approved-menu-scenes-v21.json",
+        "sourceSha256": "4d73e333ef5b12a17e45c8cb8c242b9968bd97ebefcb16806fef120688158821",
+        "preparedSha256": "ddb878f136eccd0f6d162c2d70fc021e0a9663bbb89254f965c7e83107d22423",
+        "maskPixelDifferences": 0
+      }
+    },
+    {
+      "id": "approved-menu-toolcase-v2-page-2-part-1",
+      "name": "toolcase-v2-page-2-part-1.png",
+      "kind": "Sprite",
+      "metadata": {
+        "source": "Assets/sprites/toolcase-v2-page-2-part-1.png",
+        "width": 96,
+        "height": 8,
+        "colorMode": "4bpp",
+        "kind": "sprite",
+        "license": "Project-owned artwork generated under user direction; approved glyphs and existing racing sprites reused.",
+        "generatedBy": "approved-menu-scenes-v21",
+        "reviewStatus": "approved",
+        "visualStatus": "approved",
+        "approvedAt": "2026-10-26",
+        "provenance": "fixtures/asset-provenance/approved-menu-scenes-v21.json",
+        "sourceSha256": "c580d12900040e8f542f8c7ce1d6201cf408f5edf6ea2ab185012354a7ccdcf0",
+        "preparedSha256": "db666131cf66301e7356cf56cfb3ba881936966e1cbb3934383dd734e8acf480",
+        "maskPixelDifferences": 0
+      }
+    },
+    {
+      "id": "approved-menu-toolcase-v2-relay",
+      "name": "toolcase-v2-relay.png",
+      "kind": "Sprite",
+      "metadata": {
+        "source": "Assets/sprites/toolcase-v2-relay.png",
+        "width": 40,
+        "height": 48,
+        "colorMode": "4bpp",
+        "kind": "sprite",
+        "license": "Project-owned artwork generated under user direction; approved glyphs and existing racing sprites reused.",
+        "generatedBy": "approved-menu-scenes-v21",
+        "reviewStatus": "approved",
+        "visualStatus": "approved",
+        "approvedAt": "2026-10-26",
+        "provenance": "fixtures/asset-provenance/approved-menu-scenes-v21.json",
+        "sourceSha256": "2249e0ed41a27e52b047f518ec67c5da7464244d45cbc7a9d1f55628f927d7d0",
+        "preparedSha256": "833a8d2eb423cae9c4df513dba9cd6c6a1aeeb4af7fcad56de975faefb581c82",
+        "maskPixelDifferences": 0
+      }
+    },
+    {
+      "id": "approved-menu-toolcase-v2-remove-part-0",
+      "name": "toolcase-v2-remove-part-0.png",
+      "kind": "Sprite",
+      "metadata": {
+        "source": "Assets/sprites/toolcase-v2-remove-part-0.png",
+        "width": 96,
+        "height": 8,
+        "colorMode": "4bpp",
+        "kind": "sprite",
+        "license": "Project-owned artwork generated under user direction; approved glyphs and existing racing sprites reused.",
+        "generatedBy": "approved-menu-scenes-v21",
+        "reviewStatus": "approved",
+        "visualStatus": "approved",
+        "approvedAt": "2026-10-26",
+        "provenance": "fixtures/asset-provenance/approved-menu-scenes-v21.json",
+        "sourceSha256": "15163ce1c40700e1a6f76767173642e7ad5dcd847b5783025f425e880d0d5b81",
+        "preparedSha256": "0a53b103fc893c432a02ae5420012e55a8384daa6296faa6f07b9f605ef51042",
+        "maskPixelDifferences": 0
+      }
+    },
+    {
+      "id": "approved-menu-toolcase-v2-remove-part-1",
+      "name": "toolcase-v2-remove-part-1.png",
+      "kind": "Sprite",
+      "metadata": {
+        "source": "Assets/sprites/toolcase-v2-remove-part-1.png",
+        "width": 96,
+        "height": 8,
+        "colorMode": "4bpp",
+        "kind": "sprite",
+        "license": "Project-owned artwork generated under user direction; approved glyphs and existing racing sprites reused.",
+        "generatedBy": "approved-menu-scenes-v21",
+        "reviewStatus": "approved",
+        "visualStatus": "approved",
+        "approvedAt": "2026-10-26",
+        "provenance": "fixtures/asset-provenance/approved-menu-scenes-v21.json",
+        "sourceSha256": "4417be13fbabbe9e348baebefd0544f059c918e1ae6b3cc90488f91754cb0df5",
+        "preparedSha256": "15892a658d5a9e3dc590fec593dd832e11b023215ae397ccc47a5e038e9e09ad",
+        "maskPixelDifferences": 0
+      }
+    },
+    {
+      "id": "approved-menu-toolcase-v2-tool",
+      "name": "toolcase-v2-tool.png",
+      "kind": "Sprite",
+      "metadata": {
+        "source": "Assets/sprites/toolcase-v2-tool.png",
+        "width": 40,
+        "height": 48,
+        "colorMode": "4bpp",
+        "kind": "sprite",
+        "license": "Project-owned artwork generated under user direction; approved glyphs and existing racing sprites reused.",
+        "generatedBy": "approved-menu-scenes-v21",
+        "reviewStatus": "approved",
+        "visualStatus": "approved",
+        "approvedAt": "2026-10-26",
+        "provenance": "fixtures/asset-provenance/approved-menu-scenes-v21.json",
+        "sourceSha256": "84f1bcace18e79bbfeaccacce3d8f7aa64878acc4db446a5b4972a3670e8f488",
+        "preparedSha256": "4614e788c4bd5b4031203e5b46cca7b88e91c702e8f1d4165ad78ea997c37977",
+        "maskPixelDifferences": 0
+      }
+    },
+    {
+      "id": "approved-menu-toolcase-v2-view-part-0",
+      "name": "toolcase-v2-view-part-0.png",
+      "kind": "Sprite",
+      "metadata": {
+        "source": "Assets/sprites/toolcase-v2-view-part-0.png",
+        "width": 96,
+        "height": 8,
+        "colorMode": "4bpp",
+        "kind": "sprite",
+        "license": "Project-owned artwork generated under user direction; approved glyphs and existing racing sprites reused.",
+        "generatedBy": "approved-menu-scenes-v21",
+        "reviewStatus": "approved",
+        "visualStatus": "approved",
+        "approvedAt": "2026-10-26",
+        "provenance": "fixtures/asset-provenance/approved-menu-scenes-v21.json",
+        "sourceSha256": "dd4570185acbf483c5eec96f5db0ebb7f005d59d7937bfd47304c2ed90ae4cee",
+        "preparedSha256": "81c7cf82f8100b87c8cbf051efd3374b8c716447695d0185d3db4f000555dbf0",
+        "maskPixelDifferences": 0
+      }
+    },
+    {
+      "id": "approved-menu-toolcase-v2-view-part-1",
+      "name": "toolcase-v2-view-part-1.png",
+      "kind": "Sprite",
+      "metadata": {
+        "source": "Assets/sprites/toolcase-v2-view-part-1.png",
+        "width": 96,
+        "height": 8,
+        "colorMode": "4bpp",
+        "kind": "sprite",
+        "license": "Project-owned artwork generated under user direction; approved glyphs and existing racing sprites reused.",
+        "generatedBy": "approved-menu-scenes-v21",
+        "reviewStatus": "approved",
+        "visualStatus": "approved",
+        "approvedAt": "2026-10-26",
+        "provenance": "fixtures/asset-provenance/approved-menu-scenes-v21.json",
+        "sourceSha256": "ba87bee5ad38ebcace18562e3c728c2038b358b960e7b5466b79672df5c08fdc",
+        "preparedSha256": "4830a4e1c8b6fb9a181e1489cb9b83784fb79bba0d36a9ef99f7bb001549fdba",
+        "maskPixelDifferences": 0
+      }
+    },
+    {
+      "id": "approved-menu-arrival-v21-background",
+      "name": "arrival-v21-background.png",
+      "kind": "Background",
+      "metadata": {
+        "source": "Assets/backgrounds/arrival-v21-background.png",
+        "width": 240,
+        "height": 160,
+        "colorMode": "4bpp",
+        "backgroundBpp": 4,
+        "backgroundPaletteBankBudget": 14,
+        "backgroundPaletteReferencePlan": {
+          "banks": [
+            [
+              null,
+              [
+                0,
+                128,
+                248
+              ],
+              [
+                0,
+                136,
+                248
+              ],
+              [
+                0,
+                112,
+                240
+              ],
+              [
+                0,
+                144,
+                248
+              ],
+              [
+                0,
+                112,
+                248
+              ]
+            ],
+            [
+              null,
+              [
+                232,
+                200,
+                152
+              ],
+              [
+                224,
+                192,
+                152
+              ],
+              [
+                200,
+                176,
+                136
+              ],
+              [
+                184,
+                160,
+                120
+              ],
+              [
+                168,
+                144,
+                112
+              ],
+              [
+                160,
+                136,
+                112
+              ],
+              [
+                152,
+                128,
+                104
+              ],
+              [
+                160,
+                136,
+                112
+              ],
+              [
+                112,
+                120,
+                80
+              ],
+              [
+                136,
+                128,
+                96
+              ],
+              [
+                152,
+                136,
+                104
+              ],
+              [
+                240,
+                208,
+                160
+              ],
+              [
+                240,
+                224,
+                176
+              ],
+              [
+                112,
+                144,
+                80
+              ],
+              [
+                144,
+                152,
+                104
+              ]
+            ],
+            [
+              null,
+              [
+                48,
+                24,
+                8
+              ],
+              [
+                8,
+                32,
+                24
+              ],
+              [
+                112,
+                64,
+                8
+              ],
+              [
+                152,
+                72,
+                0
+              ],
+              [
+                0,
+                112,
+                32
+              ],
+              [
+                144,
+                72,
+                16
+              ],
+              [
+                208,
+                176,
+                120
+              ],
+              [
+                232,
+                208,
+                160
+              ],
+              [
+                24,
+                40,
+                48
+              ],
+              [
+                96,
+                104,
+                104
+              ],
+              [
+                144,
+                120,
+                104
+              ],
+              [
+                200,
+                112,
+                24
+              ],
+              [
+                232,
+                168,
+                40
+              ],
+              [
+                24,
+                104,
+                56
+              ],
+              [
+                104,
+                88,
+                72
+              ]
+            ],
+            [
+              null,
+              [
+                0,
+                128,
+                240
+              ],
+              [
+                240,
+                240,
+                224
+              ],
+              [
+                128,
+                208,
+                240
+              ],
+              [
+                136,
+                208,
+                240
+              ],
+              [
+                8,
+                128,
+                240
+              ],
+              [
+                8,
+                144,
+                240
+              ],
+              [
+                32,
+                144,
+                240
+              ],
+              [
+                72,
+                168,
+                240
+              ],
+              [
+                144,
+                216,
+                240
+              ],
+              [
+                112,
+                200,
+                240
+              ],
+              [
+                128,
+                208,
+                240
+              ],
+              [
+                216,
+                232,
+                232
+              ],
+              [
+                232,
+                240,
+                224
+              ],
+              [
+                168,
+                216,
+                232
+              ],
+              [
+                184,
+                224,
+                232
+              ]
+            ],
+            [
+              null,
+              [
+                0,
+                136,
+                248
+              ],
+              [
+                32,
+                176,
+                72
+              ],
+              [
+                120,
+                192,
+                80
+              ],
+              [
+                24,
+                184,
+                40
+              ],
+              [
+                104,
+                216,
+                24
+              ],
+              [
+                0,
+                152,
+                80
+              ],
+              [
+                0,
+                144,
+                168
+              ],
+              [
+                0,
+                160,
+                80
+              ],
+              [
+                0,
+                144,
+                160
+              ],
+              [
+                0,
+                128,
+                208
+              ],
+              [
+                0,
+                72,
+                64
+              ],
+              [
+                0,
+                112,
+                72
+              ],
+              [
+                0,
+                120,
+                112
+              ],
+              [
+                0,
+                136,
+                120
+              ],
+              [
+                48,
+                120,
+                112
+              ]
+            ],
+            [
+              null,
+              [
+                0,
+                136,
+                240
+              ],
+              [
+                0,
+                120,
+                232
+              ],
+              [
+                0,
+                104,
+                224
+              ],
+              [
+                0,
+                96,
+                216
+              ],
+              [
+                0,
+                112,
+                224
+              ],
+              [
+                120,
+                64,
+                8
+              ],
+              [
+                216,
+                144,
+                16
+              ],
+              [
+                240,
+                208,
+                80
+              ],
+              [
+                8,
+                16,
+                24
+              ],
+              [
+                8,
+                88,
+                184
+              ],
+              [
+                0,
+                88,
+                216
+              ],
+              [
+                0,
+                80,
+                200
+              ],
+              [
+                0,
+                80,
+                208
+              ],
+              [
+                128,
+                104,
+                80
+              ],
+              [
+                160,
+                168,
+                160
+              ]
+            ],
+            [
+              null,
+              [
+                232,
+                208,
+                160
+              ],
+              [
+                176,
+                152,
+                120
+              ],
+              [
+                160,
+                144,
+                120
+              ],
+              [
+                160,
+                136,
+                112
+              ],
+              [
+                152,
+                128,
+                112
+              ],
+              [
+                144,
+                128,
+                104
+              ],
+              [
+                208,
+                184,
+                144
+              ],
+              [
+                24,
+                184,
+                16
+              ],
+              [
+                96,
+                176,
+                48
+              ],
+              [
+                32,
+                24,
+                24
+              ],
+              [
+                72,
+                72,
+                80
+              ],
+              [
+                120,
+                96,
+                88
+              ],
+              [
+                128,
+                120,
+                112
+              ],
+              [
+                192,
+                160,
+                120
+              ],
+              [
+                192,
+                168,
+                136
+              ]
+            ],
+            [
+              null,
+              [
+                0,
+                88,
+                208
+              ],
+              [
+                192,
+                232,
+                240
+              ],
+              [
+                136,
+                136,
+                104
+              ],
+              [
+                184,
+                208,
+                208
+              ],
+              [
+                104,
+                200,
+                240
+              ],
+              [
+                72,
+                80,
+                88
+              ],
+              [
+                32,
+                128,
+                208
+              ],
+              [
+                0,
+                136,
+                248
+              ],
+              [
+                0,
+                128,
+                232
+              ],
+              [
+                0,
+                160,
+                240
+              ],
+              [
+                0,
+                120,
+                208
+              ],
+              [
+                0,
+                136,
+                240
+              ],
+              [
+                0,
+                112,
+                232
+              ],
+              [
+                0,
+                104,
+                216
+              ],
+              [
+                0,
+                120,
+                224
+              ]
+            ],
+            [
+              null,
+              [
+                0,
+                112,
+                224
+              ],
+              [
+                232,
+                208,
+                168
+              ],
+              [
+                200,
+                176,
+                112
+              ],
+              [
+                0,
+                88,
+                208
+              ],
+              [
+                0,
+                40,
+                40
+              ],
+              [
+                72,
+                40,
+                8
+              ],
+              [
+                152,
+                72,
+                8
+              ],
+              [
+                16,
+                72,
+                56
+              ],
+              [
+                8,
+                88,
+                176
+              ],
+              [
+                32,
+                192,
+                16
+              ],
+              [
+                96,
+                216,
+                16
+              ],
+              [
+                0,
+                128,
+                24
+              ],
+              [
+                0,
+                112,
+                56
+              ],
+              [
+                104,
+                96,
+                88
+              ],
+              [
+                168,
+                136,
+                104
+              ]
+            ],
+            [
+              null,
+              [
+                0,
+                168,
+                240
+              ],
+              [
+                144,
+                72,
+                8
+              ],
+              [
+                48,
+                80,
+                64
+              ],
+              [
+                32,
+                96,
+                160
+              ],
+              [
+                216,
+                128,
+                16
+              ],
+              [
+                232,
+                152,
+                24
+              ],
+              [
+                176,
+                120,
+                64
+              ],
+              [
+                104,
+                152,
+                176
+              ],
+              [
+                0,
+                128,
+                232
+              ],
+              [
+                0,
+                112,
+                232
+              ],
+              [
+                0,
+                104,
+                224
+              ],
+              [
+                0,
+                80,
+                200
+              ],
+              [
+                0,
+                88,
+                216
+              ],
+              [
+                0,
+                120,
+                128
+              ],
+              [
+                0,
+                104,
+                224
+              ]
+            ],
+            [
+              null,
+              [
+                0,
+                128,
+                240
+              ],
+              [
+                0,
+                96,
+                216
+              ],
+              [
+                184,
+                104,
+                16
+              ],
+              [
+                0,
+                88,
+                208
+              ],
+              [
+                0,
+                80,
+                200
+              ],
+              [
+                40,
+                24,
+                16
+              ],
+              [
+                104,
+                56,
+                16
+              ],
+              [
+                0,
+                8,
+                16
+              ],
+              [
+                0,
+                64,
+                136
+              ],
+              [
+                216,
+                192,
+                136
+              ],
+              [
+                240,
+                240,
+                208
+              ],
+              [
+                56,
+                72,
+                88
+              ],
+              [
+                40,
+                104,
+                176
+              ],
+              [
+                80,
+                168,
+                208
+              ],
+              [
+                176,
+                152,
+                128
+              ]
+            ],
+            [
+              null,
+              [
+                16,
+                56,
+                56
+              ],
+              [
+                32,
+                176,
+                40
+              ],
+              [
+                160,
+                160,
+                152
+              ],
+              [
+                232,
+                216,
+                192
+              ],
+              [
+                96,
+                96,
+                104
+              ],
+              [
+                16,
+                80,
+                176
+              ],
+              [
+                8,
+                120,
+                192
+              ],
+              [
+                0,
+                144,
+                240
+              ],
+              [
+                48,
+                64,
+                88
+              ],
+              [
+                64,
+                96,
+                96
+              ],
+              [
+                136,
+                128,
+                112
+              ],
+              [
+                160,
+                168,
+                88
+              ],
+              [
+                168,
+                152,
+                120
+              ],
+              [
+                112,
+                112,
+                112
+              ],
+              [
+                96,
+                216,
+                24
+              ]
+            ],
+            [
+              null,
+              [
+                232,
+                208,
+                160
+              ],
+              [
+                24,
+                176,
+                16
+              ],
+              [
+                136,
+                120,
+                104
+              ],
+              [
+                208,
+                184,
+                136
+              ],
+              [
+                0,
+                112,
+                24
+              ],
+              [
+                32,
+                104,
+                64
+              ],
+              [
+                176,
+                152,
+                128
+              ],
+              [
+                128,
+                64,
+                8
+              ],
+              [
+                192,
+                104,
+                16
+              ],
+              [
+                232,
+                184,
+                32
+              ],
+              [
+                208,
+                184,
+                120
+              ],
+              [
+                144,
+                192,
+                40
+              ],
+              [
+                176,
+                152,
+                112
+              ],
+              [
+                0,
+                48,
+                24
+              ],
+              [
+                32,
+                40,
+                32
+              ]
+            ],
+            [
+              null,
+              [
+                0,
+                144,
+                200
+              ],
+              [
+                248,
+                216,
+                144
+              ],
+              [
+                240,
+                208,
+                128
+              ],
+              [
+                0,
+                104,
+                224
+              ],
+              [
+                88,
+                128,
+                144
+              ],
+              [
+                208,
+                200,
+                176
+              ],
+              [
+                8,
+                120,
+                80
+              ],
+              [
+                24,
+                184,
+                88
+              ],
+              [
+                80,
+                208,
+                64
+              ],
+              [
+                136,
+                200,
+                64
+              ],
+              [
+                72,
+                216,
+                48
+              ],
+              [
+                56,
+                136,
+                88
+              ],
+              [
+                56,
+                208,
+                48
+              ],
+              [
+                0,
+                88,
+                176
+              ],
+              [
+                0,
+                88,
+                216
+              ]
+            ]
+          ],
+          "tile_palette_banks": [
+            0,
+            0,
+            0,
+            0,
+            0,
+            10,
+            3,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            3,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            10,
+            10,
+            0,
+            0,
+            10,
+            3,
+            3,
+            3,
+            3,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            3,
+            3,
+            3,
+            3,
+            3,
+            0,
+            0,
+            0,
+            0,
+            5,
+            10,
+            5,
+            10,
+            10,
+            10,
+            10,
+            7,
+            7,
+            3,
+            3,
+            3,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            3,
+            3,
+            7,
+            0,
+            0,
+            0,
+            0,
+            10,
+            10,
+            10,
+            10,
+            11,
+            4,
+            4,
+            4,
+            4,
+            4,
+            4,
+            4,
+            4,
+            4,
+            4,
+            4,
+            4,
+            4,
+            4,
+            4,
+            4,
+            4,
+            4,
+            4,
+            4,
+            11,
+            4,
+            0,
+            7,
+            3,
+            10,
+            10,
+            10,
+            9,
+            11,
+            11,
+            11,
+            11,
+            11,
+            11,
+            11,
+            13,
+            11,
+            11,
+            11,
+            13,
+            11,
+            11,
+            11,
+            13,
+            13,
+            11,
+            11,
+            11,
+            11,
+            11,
+            11,
+            10,
+            7,
+            7,
+            10,
+            10,
+            9,
+            10,
+            10,
+            5,
+            7,
+            9,
+            7,
+            9,
+            5,
+            5,
+            5,
+            5,
+            7,
+            5,
+            13,
+            5,
+            7,
+            7,
+            5,
+            5,
+            7,
+            7,
+            7,
+            7,
+            9,
+            10,
+            9,
+            10,
+            10,
+            10,
+            10,
+            6,
+            10,
+            8,
+            8,
+            5,
+            5,
+            10,
+            9,
+            9,
+            10,
+            10,
+            5,
+            8,
+            8,
+            8,
+            13,
+            7,
+            13,
+            5,
+            9,
+            7,
+            5,
+            7,
+            9,
+            5,
+            5,
+            8,
+            6,
+            12,
+            6,
+            12,
+            12,
+            12,
+            8,
+            8,
+            10,
+            10,
+            10,
+            10,
+            10,
+            6,
+            10,
+            8,
+            12,
+            6,
+            2,
+            10,
+            10,
+            5,
+            7,
+            5,
+            5,
+            10,
+            10,
+            6,
+            10,
+            12,
+            12,
+            12,
+            6,
+            12,
+            12,
+            2,
+            12,
+            12,
+            6,
+            6,
+            6,
+            6,
+            6,
+            6,
+            6,
+            12,
+            12,
+            6,
+            12,
+            12,
+            8,
+            12,
+            2,
+            2,
+            5,
+            5,
+            5,
+            6,
+            12,
+            12,
+            2,
+            2,
+            2,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            12,
+            12,
+            11,
+            11,
+            11,
+            12,
+            2,
+            2,
+            2,
+            12,
+            2,
+            2,
+            2,
+            12,
+            2,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            12,
+            12,
+            6,
+            6,
+            11,
+            12,
+            1,
+            6,
+            11,
+            12,
+            2,
+            8,
+            2,
+            12,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            12,
+            12,
+            6,
+            6,
+            12,
+            12,
+            6,
+            6,
+            12,
+            12,
+            6,
+            6,
+            12,
+            12,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            12,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1
+          ]
+        },
+        "backgroundTileOptimizer": {
+          "enabled": true,
+          "tileBudget": 895
+        },
+        "license": "Project-owned artwork generated under user direction; approved glyphs and existing racing sprites reused.",
+        "generatedBy": "approved-menu-scenes-v21",
+        "reviewStatus": "approved",
+        "visualStatus": "approved",
+        "approvedAt": "2026-10-26",
+        "provenance": "fixtures/asset-provenance/approved-menu-scenes-v21.json",
+        "sourceSha256": "6135bb78cf982d87d44749a6dce365d58c170a539796c9e2cb3993728909b8f8",
+        "preparedSha256": "0e97f34bf7f689f7a53c9132d331dd84b5ddefefe15aa683fbfd8fc8407c41a7",
+        "assetcStatus": "attention",
+        "technicalNote": "14-bank RGB555 candidate compared with the approved source; final Play/ROM validation pending. Native reduction retains the coastline, lighthouse, paving and podium."
+      }
+    },
+    {
+      "id": "approved-menu-arrival-v21-interface-part-4",
+      "name": "arrival-v21-interface-part-4.png",
+      "kind": "Sprite",
+      "metadata": {
+        "source": "Assets/sprites/arrival-v21-interface-part-4.png",
+        "width": 64,
+        "height": 64,
+        "colorMode": "4bpp",
+        "kind": "sprite",
+        "license": "Project-owned artwork generated under user direction; approved glyphs and existing racing sprites reused.",
+        "generatedBy": "approved-menu-scenes-v21",
+        "reviewStatus": "approved",
+        "visualStatus": "approved",
+        "approvedAt": "2026-10-26",
+        "provenance": "fixtures/asset-provenance/approved-menu-scenes-v21.json",
+        "sourceSha256": "275000f083312687e65d8678375d5c156098540cc5da0bf705df16b4e70cf060",
+        "preparedSha256": "ea12075586d658a8cf2359678b3e0a10d3f92d65d1ce2f2f0e644601873365e9",
+        "maskPixelDifferences": 0,
+        "objectPaletteValues": [
+          0,
+          8418,
+          9442,
+          10464,
+          13733,
+          15065,
+          24477,
+          25535
+        ]
+      }
+    },
+    {
+      "id": "approved-menu-arrival-v21-interface-part-5",
+      "name": "arrival-v21-interface-part-5.png",
+      "kind": "Sprite",
+      "metadata": {
+        "source": "Assets/sprites/arrival-v21-interface-part-5.png",
+        "width": 64,
+        "height": 64,
+        "colorMode": "4bpp",
+        "kind": "sprite",
+        "license": "Project-owned artwork generated under user direction; approved glyphs and existing racing sprites reused.",
+        "generatedBy": "approved-menu-scenes-v21",
+        "reviewStatus": "approved",
+        "visualStatus": "approved",
+        "approvedAt": "2026-10-26",
+        "provenance": "fixtures/asset-provenance/approved-menu-scenes-v21.json",
+        "sourceSha256": "da4b9fcaf0690534fdd80d951ad67c08c8c3cee3ed1317d51fc0c2ffbec415c7",
+        "preparedSha256": "d18ac3562296213c881bcc15663c36644130abae162679c8874fd172886a6834",
+        "maskPixelDifferences": 0,
+        "objectPaletteValues": [
+          0,
+          8418,
+          9442,
+          10464,
+          13733,
+          15065,
+          24477,
+          25535
+        ]
+      }
+    },
+    {
+      "id": "approved-menu-arrival-v21-interface-part-6",
+      "name": "arrival-v21-interface-part-6.png",
+      "kind": "Sprite",
+      "metadata": {
+        "source": "Assets/sprites/arrival-v21-interface-part-6.png",
+        "width": 64,
+        "height": 64,
+        "colorMode": "4bpp",
+        "kind": "sprite",
+        "license": "Project-owned artwork generated under user direction; approved glyphs and existing racing sprites reused.",
+        "generatedBy": "approved-menu-scenes-v21",
+        "reviewStatus": "approved",
+        "visualStatus": "approved",
+        "approvedAt": "2026-10-26",
+        "provenance": "fixtures/asset-provenance/approved-menu-scenes-v21.json",
+        "sourceSha256": "a9855cbaccfc117495f88f97601c9b12ba96f4789fc76ccebdb4eb9777d01da5",
+        "preparedSha256": "2a3230085ca6fb95ff7c4b99ed46acecff46a98cc773da4ecab7c3b3816e3fbc",
+        "maskPixelDifferences": 0,
+        "objectPaletteValues": [
+          0,
+          8418,
+          9442,
+          10464,
+          13733,
+          15065,
+          24477,
+          25535
+        ]
+      }
+    },
+    {
+      "id": "approved-menu-arrival-v21-interface-part-7",
+      "name": "arrival-v21-interface-part-7.png",
+      "kind": "Sprite",
+      "metadata": {
+        "source": "Assets/sprites/arrival-v21-interface-part-7.png",
+        "width": 64,
+        "height": 64,
+        "colorMode": "4bpp",
+        "kind": "sprite",
+        "license": "Project-owned artwork generated under user direction; approved glyphs and existing racing sprites reused.",
+        "generatedBy": "approved-menu-scenes-v21",
+        "reviewStatus": "approved",
+        "visualStatus": "approved",
+        "approvedAt": "2026-10-26",
+        "provenance": "fixtures/asset-provenance/approved-menu-scenes-v21.json",
+        "sourceSha256": "17b5e52d83c1cc19b3988082364c3d52f63ddbda62644c4677f2560525e9c94b",
+        "preparedSha256": "ef54cfb780ad468b8347a512753db3d313255f1631845bcdff72a3d9648a205e",
+        "maskPixelDifferences": 0,
+        "objectPaletteValues": [
+          0,
+          8418,
+          9442,
+          10464,
+          13733,
+          15065,
+          24477,
+          25535
+        ]
+      }
+    },
+    {
+      "id": "approved-menu-arrival-v21-interface-part-8",
+      "name": "arrival-v21-interface-part-8.png",
+      "kind": "Sprite",
+      "metadata": {
+        "source": "Assets/sprites/arrival-v21-interface-part-8.png",
+        "width": 64,
+        "height": 64,
+        "colorMode": "4bpp",
+        "kind": "sprite",
+        "license": "Project-owned artwork generated under user direction; approved glyphs and existing racing sprites reused.",
+        "generatedBy": "approved-menu-scenes-v21",
+        "reviewStatus": "approved",
+        "visualStatus": "approved",
+        "approvedAt": "2026-10-26",
+        "provenance": "fixtures/asset-provenance/approved-menu-scenes-v21.json",
+        "sourceSha256": "ea28862d6a45c64002ff8166885636f825ef36ee931b7cdaec2c1bf135733348",
+        "preparedSha256": "6ee41da8f93d97ad9e945cfdde3931dd457c71933c095aedfaba7c3173993d07",
+        "maskPixelDifferences": 0,
+        "objectPaletteValues": [
+          0,
+          8418,
+          9442,
+          10464,
+          13733,
+          15065,
+          24477,
+          25535
+        ]
+      }
+    },
+    {
+      "id": "approved-menu-arrival-v21-interface-part-9",
+      "name": "arrival-v21-interface-part-9.png",
+      "kind": "Sprite",
+      "metadata": {
+        "source": "Assets/sprites/arrival-v21-interface-part-9.png",
+        "width": 64,
+        "height": 64,
+        "colorMode": "4bpp",
+        "kind": "sprite",
+        "license": "Project-owned artwork generated under user direction; approved glyphs and existing racing sprites reused.",
+        "generatedBy": "approved-menu-scenes-v21",
+        "reviewStatus": "approved",
+        "visualStatus": "approved",
+        "approvedAt": "2026-10-26",
+        "provenance": "fixtures/asset-provenance/approved-menu-scenes-v21.json",
+        "sourceSha256": "9732a2e68a643e3fe2448d577cfb097152453e15e71f0b5f05e7842d9ca2d97d",
+        "preparedSha256": "1c15255da62d41a87fd0ec11b82f85601933a69c438e044de9172e228e1cf031",
+        "maskPixelDifferences": 0,
+        "objectPaletteValues": [
+          0,
+          8418,
+          9442,
+          10464,
+          13733,
+          15065,
+          24477,
+          25535
+        ]
+      }
+    },
+    {
+      "id": "approved-menu-arrival-v21-interface-part-10",
+      "name": "arrival-v21-interface-part-10.png",
+      "kind": "Sprite",
+      "metadata": {
+        "source": "Assets/sprites/arrival-v21-interface-part-10.png",
+        "width": 64,
+        "height": 64,
+        "colorMode": "4bpp",
+        "kind": "sprite",
+        "license": "Project-owned artwork generated under user direction; approved glyphs and existing racing sprites reused.",
+        "generatedBy": "approved-menu-scenes-v21",
+        "reviewStatus": "approved",
+        "visualStatus": "approved",
+        "approvedAt": "2026-10-26",
+        "provenance": "fixtures/asset-provenance/approved-menu-scenes-v21.json",
+        "sourceSha256": "a9fe52e4c1b68314900098f2cc3af641fb3e3ae57c435249297564fdedda6b1d",
+        "preparedSha256": "bb18ef43b0d00dbe3d81c1bd9210ffe535bbb998699bb0d521c5f670fde4be26",
+        "maskPixelDifferences": 0,
+        "objectPaletteValues": [
+          0,
+          8418,
+          9442,
+          10464,
+          13733,
+          15065,
+          24477,
+          25535
+        ]
+      }
+    },
+    {
+      "id": "approved-menu-arrival-v21-interface-part-11",
+      "name": "arrival-v21-interface-part-11.png",
+      "kind": "Sprite",
+      "metadata": {
+        "source": "Assets/sprites/arrival-v21-interface-part-11.png",
+        "width": 64,
+        "height": 64,
+        "colorMode": "4bpp",
+        "kind": "sprite",
+        "license": "Project-owned artwork generated under user direction; approved glyphs and existing racing sprites reused.",
+        "generatedBy": "approved-menu-scenes-v21",
+        "reviewStatus": "approved",
+        "visualStatus": "approved",
+        "approvedAt": "2026-10-26",
+        "provenance": "fixtures/asset-provenance/approved-menu-scenes-v21.json",
+        "sourceSha256": "f2258043eb63fe3624771508582d8f11233bcf0534376608c68b78d56bee12c5",
+        "preparedSha256": "c60ec8aa560bf3a7b0f8deeecd8df565e8e140c2ddcbb1e2b87cf6e25931c84b",
+        "maskPixelDifferences": 0,
+        "objectPaletteValues": [
+          0,
+          8418,
+          9442,
+          10464,
+          13733,
+          15065,
+          24477,
+          25535
+        ]
+      }
+    }
+  ]
+}

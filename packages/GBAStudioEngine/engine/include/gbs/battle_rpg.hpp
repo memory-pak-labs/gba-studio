@@ -4,6 +4,7 @@
 #include <stdint.h>
 
 #include "gbs/audio.hpp"
+#include "gbs/animation.hpp"
 #include "gbs/assets.hpp"
 #include "gbs/dialogue.hpp"
 #include "gbs/event.hpp"
@@ -37,6 +38,30 @@ struct BattleRpgAbilityData {
     int power;
 };
 
+struct BattleRpgAnimationSet {
+    const SpriteAnimation* idle = nullptr;
+    const SpriteAnimation* attack = nullptr;
+    const SpriteAnimation* magic = nullptr;
+    const SpriteAnimation* heal = nullptr;
+    const SpriteAnimation* defend = nullptr;
+    const SpriteAnimation* hurt = nullptr;
+    const SpriteAnimation* defeat = nullptr;
+    const SpriteAnimation* victory = nullptr;
+    const SpriteAnimation* reactivate = nullptr;
+};
+
+struct BattleRpgPresentationData {
+    int hud_background_index = -1;
+    int action_sounds[7] = {-1,-1,-1,-1,-1,-1,-1}; // cursor, confirm, attack, magic, hurt, defend, defeat
+    int victory_tracker = -1;
+    int outcome_hold_frames = 120;
+    const SpriteAnimation* effects[4] = {}; // hit, energy, shield, electric
+    const MetaSprite* disabled_escape = nullptr;
+    const char* victory_label = "VITORIA";
+    const PaletteAsset* hud_palette = nullptr;
+    const MetaSprite* cursor = nullptr;
+};
+
 struct BattleRpgParticipantData {
     const char* name;
     BattleRpgUnitData unit;
@@ -44,6 +69,10 @@ struct BattleRpgParticipantData {
     int ability_count;
     const MetaSprite* metasprite = nullptr;
     uint8_t sprite_scale = 1;
+    const BattleRpgAnimationSet* animation_set = nullptr;
+    bool use_authored_position = false;
+    Vec2i position {};
+    const char* hud_label = nullptr;
 };
 
 struct BattleRpgBackgroundData {
@@ -56,6 +85,13 @@ struct BattleRpgBackgroundData {
 struct BattleRpgRewards {
     int gold;
     int experience;
+};
+
+struct BattleRpgInventoryItemData {
+    const char* label;
+    int item_index;
+    int initial_quantity;
+    int heal_amount;
 };
 
 struct BattleRpgEncounterData {
@@ -72,6 +108,10 @@ struct BattleRpgEncounterData {
     EventScript on_escape = empty_event_script();
     int background_index = -1;
     const char* resource_bank_group_name = nullptr;
+    const BattleRpgPresentationData* presentation = nullptr;
+    EventScript on_hit_player = empty_event_script();
+    const BattleRpgInventoryItemData* inventory_items = nullptr;
+    size_t inventory_item_count = 0;
 };
 
 struct BattleRpgProjectData {
@@ -133,7 +173,16 @@ struct BattleRpgSaveData {
     int32_t variables[event_variable_count];
     uint32_t play_time_frames;
     uint16_t flags;
+    int32_t inventory[max_event_inventory_items];
 };
+
+constexpr bool battle_rpg_party_took_damage(const BattleRpgRuntimeState& before,
+    const BattleRpgRuntimeState& after, const BattleRpgEncounterData& encounter) {
+    for (int index = 0; index < encounter.party_count; ++index) {
+        if (after.party_hp[index] < before.party_hp[index]) return true;
+    }
+    return false;
+}
 
 constexpr bool is_valid_battle_rpg_config(const BattleRpgConfig& config) {
     return config.max_party_size > 0 && config.max_party_size <= BattleRpgMaxParty &&
@@ -168,6 +217,16 @@ constexpr bool is_valid_battle_rpg_encounter(const BattleRpgEncounterData& encou
     }
     for (int index = 0; index < encounter.enemy_count; ++index) {
         if (!is_valid_battle_rpg_participant(encounter.enemies[index])) return false;
+    }
+    if (encounter.inventory_item_count > max_event_inventory_items ||
+        (encounter.inventory_item_count > 0 && encounter.inventory_items == nullptr)) return false;
+    for (size_t index = 0; index < encounter.inventory_item_count; ++index) {
+        const auto& item = encounter.inventory_items[index];
+        if (item.label == nullptr || item.label[0] == '\0' || !is_valid_inventory_item_index(item.item_index) ||
+            item.initial_quantity < 0 || item.initial_quantity > 999 || item.heal_amount <= 0 || item.heal_amount > 999) return false;
+        for (size_t previous = 0; previous < index; ++previous) {
+            if (encounter.inventory_items[previous].item_index == item.item_index) return false;
+        }
     }
     return true;
 }
@@ -266,6 +325,9 @@ constexpr bool is_valid_battle_rpg_save_data(
     const BattleRpgProjectData& project,
     const BattleRpgSaveData& save_data
 ) {
+    for (size_t index = 0; index < max_event_inventory_items; ++index) {
+        if (save_data.inventory[index] < 0 || save_data.inventory[index] > 999) return false;
+    }
     return save_data.encounter_index < project.encounter_count &&
         save_data.runtime_state.outcome >= BattleRpgOutcome::InProgress &&
         save_data.runtime_state.outcome <= BattleRpgOutcome::Escaped;
@@ -286,6 +348,9 @@ inline void capture_battle_rpg_save_data(
     }
     save_data.play_time_frames = play_time_frames;
     save_data.flags = flags;
+    for (size_t index = 0; index < max_event_inventory_items; ++index) {
+        save_data.inventory[index] = event_state.inventory[index];
+    }
 }
 
 inline bool apply_battle_rpg_save_data(
@@ -303,6 +368,9 @@ inline bool apply_battle_rpg_save_data(
     for (size_t index = 0; index < event_variable_count; ++index) {
         event_state.variables[index] = save_data.variables[index];
     }
+    for (size_t index = 0; index < max_event_inventory_items; ++index) {
+        event_state.inventory[index] = save_data.inventory[index];
+    }
     return true;
 }
 
@@ -313,6 +381,8 @@ void select_next_battle_ability(BattleRpgRuntimeState& state, const BattleRpgEnc
 bool battle_player_attack(BattleRpgRuntimeState& state, const BattleRpgEncounterData& encounter);
 bool use_battle_ability(BattleRpgRuntimeState& state, const BattleRpgEncounterData& encounter, int party_index, int ability_index, int target_index);
 bool use_selected_battle_ability(BattleRpgRuntimeState& state, const BattleRpgEncounterData& encounter);
+bool use_battle_inventory_item(BattleRpgRuntimeState& state, const BattleRpgEncounterData& encounter,
+    EventState& event_state, int item_index, int target_index);
 void tick_battle_rpg(BattleRpgRuntimeState& state, const BattleRpgEncounterData& encounter);
 bool try_escape_battle(BattleRpgRuntimeState& state, const BattleRpgEncounterData& encounter);
 bool consume_battle_rpg_runtime_transition(

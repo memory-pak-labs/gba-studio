@@ -1,3 +1,5 @@
+#include "gbs/profiler.hpp"
+#define GBS_DIALOGUE_UI_RUNTIME_KIND 10
 #include "gbs/engine.hpp"
 #include <string.h>
 #include "gbs/audio.hpp"
@@ -209,7 +211,7 @@ void refresh_hud() {
     hud_left_buffer[0] = '\0';
     append_text(left, left_end, node != nullptr ? (node->label != nullptr ? node->label : node->name) : "MAPA");
     const auto status = gbs::world_map_node_status(project,world_map_state.node_index,event_state);
-    const char* texts[] = {hud_left_buffer, journey.active ? "EM VOO" : status == gbs::WorldMapNodeStatus::Available ? "A VIAJAR" : "BLOQUEADO", "D DESTINO  B PORTO", "START PAUSA"};
+    const char* texts[] = {hud_left_buffer, gbs::world_map_hud_status_text(project,status,journey.active), "D DESTINO  B PORTO", "START PAUSA"};
     gbs::set_hud_text_slots(hud,texts,4);
 }
 
@@ -309,7 +311,7 @@ void consume_event_state() {
         event_state.audio_volume_changed = false;
     }
     if (event_state.audio_fade_changed) {
-        gbs::fade_audio_channel_volume(gbs::audio_channel_from_event_value(event_state.audio_fade_channel), static_cast<uint8_t>(event_state.audio_fade_target_volume), static_cast<uint16_t>(event_state.audio_fade_frames));
+        gbs::fade_audio_channel_volume(gbs::audio_channel_from_event_value(event_state.audio_fade_channel), static_cast<uint8_t>(event_state.audio_fade_target_volume), static_cast<uint16_t>(event_state.audio_fade_frames), static_cast<uint8_t>(event_state.audio_fade_ceiling_volume));
         event_state.audio_fade_changed = false;
     }
     if (event_state.close_dialogue) {
@@ -495,8 +497,11 @@ void draw_nodes() {
 
 int initialize_world_map_runtime() {
     gbs::init();
+    // Standalone ROMs bypass the mixed-runtime dispatcher.
+    gbs::debug_set_runtime_kind(GBS_DIALOGUE_UI_RUNTIME_KIND);
     gbs::init_dialogue(dialogue);
     gbs::init_event_state(event_state);
+    gbs::bind_event_scripts(event_state, project.scripts, project.script_count);
     gbs::init_hud(hud);
     gbs::init_resource_manager(resource_manager);
     gbs::set_backdrop_color(gbs::rgb15(1, 6, 12));
@@ -594,6 +599,7 @@ gbs::RuntimeAdapterFrameResult update_world_map_runtime(const gbs::RuntimeFrameC
 }
 
 void render_world_map_runtime(const gbs::RuntimeFrameContext& context) {
+    const gbs::SubsystemProfilerScope profiler_scope(gbs::ProfilerSubsystem::Render);
     (void)context;
         gbs::set_event_player_actor_state(event_state,journey.position.x,journey.position.y,0,1);
         auto& telemetry=gbs::runtime_telemetry_block();

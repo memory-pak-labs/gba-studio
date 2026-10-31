@@ -58,8 +58,24 @@ elif name=='arm-none-eabi-objcopy':
 else:
  rom=Path(args[0]);rom.write_bytes(rom.read_bytes()+('|'.join(args[1:])).encode())
 '''
+# The fixture must use the same POSIX interpreter as the build harness, even
+# when the Windows runner also exposes a native Python/Pillow earlier in PATH.
+FAKE = FAKE.replace("#!/usr/bin/env python3", "#!" + sys.executable, 1)
 
 class IncrementalBuildTests(unittest.TestCase):
+    @unittest.skipIf(os.name == "nt", "directory symlink privileges vary on Windows")
+    def test_absolute_path_preserves_space_free_symlink(self):
+        target = self.root / "disk with spaces"
+        target.mkdir()
+        alias = self.root / "alias"
+        alias.symlink_to(target, target_is_directory=True)
+        spec = importlib.util.spec_from_file_location("gbsbuild_symlink_test", TOOL)
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+        self.assertEqual(module.absolute_path(str(alias)), alias.absolute())
+        self.assertNotIn(" ", str(module.absolute_path(str(alias))))
+        self.assertTrue(module.absolute_path(str(alias)).is_dir())
+
     def test_bundled_shell_with_spaces_is_used_for_make_recipes(self):
         shell = self.root / "GBA Studio shell" / "bash"
         shell.parent.mkdir()
@@ -109,6 +125,25 @@ class IncrementalBuildTests(unittest.TestCase):
         return [c for c in calls if "-c" in c["args"]]
     def change_same_mtime(self, file, contents):
         old=file.stat();file.write_text(contents);os.utime(file,ns=(old.st_atime_ns,old.st_mtime_ns))
+    def test_reports_and_logs_are_not_build_inputs(self):
+        self.run_build()
+        (self.project/"build.log").write_text("diagnostic output")
+        (self.project/"memory_report.json").write_text("{}")
+        self.assertEqual(self.run_build(), [])
+        self.assertEqual(self.log.read_text(), "", "reports must not cause relinking")
+        report=json.loads((self.project/"build/build_decisions.json").read_text())
+        self.assertEqual(report["result"], "reused")
+
+    def test_explicit_inputs_invalidate_on_binary_data_change(self):
+        (self.project/"palette.bin").write_bytes(b"one")
+        self.manifest["build"]["inputs"]=["palette.bin"]
+        self.save();self.run_build()
+        (self.project/"palette.bin").write_bytes(b"two")
+        self.assertEqual(len(self.run_build()), 2, "binary includes must not remain embedded in stale objects")
+        self.assertNotEqual(self.log.read_text(), "")
+        report=json.loads((self.project/"build/build_decisions.json").read_text())
+        self.assertIn("project:palette.bin", report["changedInputs"])
+
     def test_identical_play_runs_no_compiler_and_matches_clean_rom(self):
         self.assertEqual(len(self.run_build()),2)
         rom=self.project/"build/game.gba";sha=hashlib.sha256(rom.read_bytes()).hexdigest()
@@ -132,7 +167,19 @@ class IncrementalBuildTests(unittest.TestCase):
         self.change_same_mtime(self.project/"npc.hpp","new-npc")
         calls=self.run_build()
         self.assertEqual(len(calls),1)
-        self.assertIn(str((self.project/"npc.cpp").resolve()),calls[0]["args"])
+        args=calls[0]["args"]
+        self.assertEqual(Path(args[args.index("-c")+1]).resolve(), (self.project/"npc.cpp").resolve())
+    def test_copied_project_rebuilds_when_its_local_header_changes(self):
+        self.run_build()
+        copied = self.root / "copied project"
+        shutil.copytree(self.project, copied)
+        self.project = copied
+        self.change_same_mtime(self.project / "npc.hpp", "new-npc-in-copy")
+        calls = self.run_build()
+        self.assertEqual(len(calls), 2, "relocated depfiles must be rebuilt for the copied project")
+        incremental = (self.project / "build/game.gba").read_bytes()
+        self.run_build("--clean")
+        self.assertEqual(incremental, (self.project / "build/game.gba").read_bytes())
     def test_shared_header_rebuilds_both_consumers(self):
         self.run_build();self.change_same_mtime(self.project/"shared.hpp","new-shared")
         self.assertEqual(len(self.run_build()),2)

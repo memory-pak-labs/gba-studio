@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { analyzeSpriteVram } from "./spriteVramAnalysis.js";
+
 import type { SpritesWorkspaceAnimation } from "./spritesWorkspace/core.js";
 import {
   createSpriteAnimationInProject,
@@ -1041,12 +1042,25 @@ describe("Sprites workspace presentation", () => {
 
     expect(options).toEqual({
       states: ["attack", "idle", "walk"],
-      directions: ["down", "right", "up"]
+      directions: ["down", "left", "right", "up"]
+    });
+    expect(deriveSpriteStateDirectionOptions({
+      spriteSheet: "new.png",
+      animations: [{ spriteSheet: "new.png", state: "idle", direction: "down" }],
+      references: []
+    })).toEqual({
+      states: ["idle", "walk"],
+      directions: ["down", "left", "right", "up"]
     });
     expect(deriveSpriteStateDirectionOptions({ spriteSheet: "empty.png", animations: [], references: [] })).toEqual({
       states: ["idle", "walk"],
       directions: ["down", "left", "right", "up"]
     });
+  });
+
+  it("offers all four screen-facing directions for authoring isometric sprites", () => {
+    const directions = deriveSpriteStateDirectionOptions({ spriteSheet: "hero.png", animations: [], references: [], includeIsometricScreenDirections: true }).directions;
+    expect(directions).toEqual(expect.arrayContaining(["screen_up", "screen_down", "screen_left", "screen_right"]));
   });
 
   it("does not infer preview frames when declared dimensions do not fit the image", () => {
@@ -1627,6 +1641,8 @@ describe("Sprites workspace presentation", () => {
         spriteSheet: "hero.png",
         frameWidth: 16,
         frameHeight: 32,
+        originX: 0,
+        originY: 0,
         fps: 8,
         loops: true,
         frameCount: 1,

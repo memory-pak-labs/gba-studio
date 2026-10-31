@@ -1,3 +1,5 @@
+import { profilerSubsystems, type ProfilerSubsystem, type ProfilerSubsystemTicks } from "./hardwareProfiler.js";
+
 export interface HardwareProfilerFrame {
   frame: number;
   roomIndex: number;
@@ -8,11 +10,12 @@ export interface HardwareProfilerFrame {
   vram: number;
   oam: number;
   scanline: number;
+  subsystems?: ProfilerSubsystemTicks;
 }
 
 export type HardwareProfilerFrameMetric = Exclude<
   keyof HardwareProfilerFrame,
-  "frame" | "roomIndex" | "runtime" | "sceneName"
+  "frame" | "roomIndex" | "runtime" | "sceneName" | "subsystems"
 >;
 
 export interface HardwareProfilerPeak {
@@ -28,6 +31,7 @@ export interface HardwareProfilerScenePeak {
   sceneName: string;
   runtime: string;
   frameCount: number;
+  subsystems?: Partial<Record<ProfilerSubsystem, Pick<HardwareProfilerPeak, "frame" | "value">>>;
   peaks: Record<HardwareProfilerFrameMetric, Pick<HardwareProfilerPeak, "frame" | "value">>;
 }
 
@@ -89,6 +93,16 @@ export function appendHardwareProfilerFrame(
     scenePeaks.push(scene);
   }
   scene.frameCount += 1;
+  if (frame.subsystems) {
+    scene.subsystems ??= {};
+    for (const subsystem of profilerSubsystems) {
+      const value = frame.subsystems[subsystem];
+      if (value === undefined || !Number.isFinite(value) || value < 0) continue;
+      if (!scene.subsystems[subsystem] || value > scene.subsystems[subsystem]!.value) {
+        scene.subsystems[subsystem] = { frame: frame.frame, value };
+      }
+    }
+  }
   for (const metric of metrics) {
     if (frame[metric] > scene.peaks[metric].value) {
       scene.peaks[metric] = { frame: frame.frame, value: frame[metric] };

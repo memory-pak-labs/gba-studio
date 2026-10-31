@@ -1185,10 +1185,7 @@
   background: var(--studio-color-surface);
   border-top: 1px solid #dfe4ea;
   color: var(--studio-color-text-primary);
-  position: fixed;
-  bottom: 0;
-  left: 0;
-  width: 100%;
+  position: relative;
   z-index: 10;
   min-width: 0;
 }
@@ -2545,6 +2542,16 @@ body.room-scene-map-card-dragging .room-stage-card-frame.is-dragging {
   display: block;
 }
 
+.room-stage-card-viewport-hud {
+  position: absolute;
+  inset: 0 auto auto 0;
+  width: 240px;
+  height: 160px;
+  transform-origin: top left;
+  pointer-events: none;
+  z-index: 5;
+}
+
 .room-stage-card-grid-toggle {
   cursor: pointer;
 }
@@ -2956,6 +2963,8 @@ body.room-scene-map-card-dragging .room-stage-card-frame.is-dragging {
 .room-stage-card-canvas.isometric .room-stage-cell {
   background-color: transparent;
   overflow: visible;
+  /* The atlas can extend beyond the cell; only its diamond receives input. */
+  pointer-events: none;
   position: absolute;
 }
 
@@ -2966,7 +2975,7 @@ body.room-scene-map-card-dragging .room-stage-card-frame.is-dragging {
   content: "";
   height: 100%;
   left: 0;
-  pointer-events: none;
+  pointer-events: auto;
   position: absolute;
   top: 0;
   width: 100%;
@@ -3002,6 +3011,12 @@ body.room-scene-map-card-dragging .room-stage-card-frame.is-dragging {
   z-index: 1000;
 }
 
+/* A composed floor has no tall tile artwork above it. Keep its grid on the
+   ground, below actors and foreground, so lines do not cut through bodies. */
+.room-stage-card-canvas.isometric.has-background-layout .room-stage-isometric-grid {
+  z-index: 8;
+}
+
 .room-stage-isometric-grid-cell {
   fill: transparent;
   shape-rendering: crispEdges;
@@ -3021,7 +3036,8 @@ body.room-scene-map-card-dragging .room-stage-card-frame.is-dragging {
   stroke-width: 2;
 }
 
-.room-stage-isometric-grid-cell.is-selected {
+.room-stage-isometric-grid-cell.is-selected,
+.room-stage-isometric-grid-cell.is-entity-selected {
   fill: rgba(255, 209, 102, 0.16);
   stroke: #ffd166;
   stroke-width: 2;
@@ -3258,6 +3274,21 @@ body.room-scene-map-card-dragging .room-stage-card-frame.is-dragging {
   box-shadow: 0 0 0 2px #ffd166;
 }
 
+/* Borders shrink the background painting area and distort the source frame.
+   The selected logical diamond marks occupancy; only selection shows frame bounds. */
+.room-stage-card-canvas.isometric .room-stage-entity.actor.has-sprite {
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+  min-height: 0;
+  min-width: 0;
+}
+
+.room-stage-card-canvas.isometric .room-stage-entity.actor.has-sprite.selected {
+  outline: 1px dashed #6d2bf1;
+  outline-offset: 1px;
+}
+
 .room-stage-entity-label {
   background: rgba(255, 255, 255, 0.94);
   border-radius: 4px;
@@ -3319,6 +3350,10 @@ body.room-scene-map-card-dragging .room-stage-card-frame.is-dragging {
 
 .room-runtime-hud-overlay {
   border: 0;
+}
+
+.room-runtime-hud-background {
+  z-index: 7;
 }
 
 .room-runtime-hud-overlay img {
@@ -8962,6 +8997,8 @@ body.room-scene-map-card-dragging .room-stage-card-frame.is-dragging {
   height: 100%;
   min-height: 0;
   overflow: hidden;
+  grid-template-rows: minmax(0, 1fr) auto;
+  gap: 0;
 }
 
 .rooms-editor-layout {
@@ -9980,7 +10017,9 @@ body.room-scene-map-card-dragging .room-stage-card-frame.is-dragging {
   border-radius: 5px;
   color: var(--studio-color-text-primary);
   font: inherit;
+  box-sizing: border-box;
   min-width: 0;
+  max-width: 100%;
   padding: 6px 8px;
   width: 100%;
 }
@@ -10125,6 +10164,48 @@ body.room-scene-map-card-dragging .room-stage-card-frame.is-dragging {
   width: 14px;
 }
 
+.editor-prefab-fields {
+  display: grid;
+  gap: var(--studio-space-3);
+  margin: 4px 8px 12px 24px;
+  min-width: 0;
+}
+
+.editor-prefab-fields > p {
+  color: var(--studio-color-text-secondary);
+  line-height: 1.5;
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.editor-prefab-fields > label {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.editor-prefab-fields input:not([type="checkbox"]),
+.editor-prefab-fields select {
+  background: var(--studio-color-surface);
+  border: 1px solid var(--studio-color-border);
+  border-radius: 6px;
+  color: var(--studio-color-text-primary);
+  font: inherit;
+  min-width: 0;
+  padding: 6px 8px;
+  width: 100%;
+}
+
+.editor-prefab-fields > label:has(input[type="checkbox"]) {
+  align-items: center;
+  display: flex;
+}
+
+.editor-prefab-fields > button {
+  max-width: 100%;
+  white-space: normal;
+}
+
 .rooms-workspace .editor-project-rail .project-tree-toolbar {
   gap: 6px;
 }
@@ -10258,8 +10339,8 @@ body.room-scene-map-card-dragging .room-stage-card-frame.is-dragging {
   outline: none;
 }
 
-.rooms-workspace .workspace-explorer-rail .scene-tree-group-actions button[aria-label^="Remover"]:hover,
-.rooms-workspace .workspace-explorer-rail .scene-tree-group-actions button[aria-label^="Remover"]:focus-visible {
+.rooms-workspace .workspace-explorer-rail .scene-tree-group-actions .scene-tree-group-remove:hover,
+.rooms-workspace .workspace-explorer-rail .scene-tree-group-actions .scene-tree-group-remove:focus-visible {
   background: rgba(208, 65, 87, 0.12);
   color: var(--studio-color-danger, #c0394f);
 }
@@ -11475,3 +11556,35 @@ body.room-scene-map-card-dragging .room-stage-card-frame.is-dragging {
 .room-stage-entity-label.is-player-default-label { max-width: none; display: block; opacity: 1; background: #166941; color: white; pointer-events: none; }
 
 .room-stage-entity.is-player:has(.is-player-default-label) { overflow: visible; }
+
+/* Uniform viewport cards keep names, actions and metadata in fixed rows. */
+.rooms-editor-layout .is-viewport-card .room-stage-card-header {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-rows: minmax(0, 1fr) auto;
+  gap: 3px 6px;
+  align-items: center;
+}
+.rooms-editor-layout .is-viewport-card .room-stage-card-title-block { display: contents; }
+.rooms-editor-layout .is-viewport-card .room-stage-card-title-row { grid-column: 1 / -1; min-width: 0; }
+.rooms-editor-layout .is-viewport-card .room-stage-card-title-drag { min-width: 0; flex: 1; }
+.rooms-editor-layout .is-viewport-card .room-stage-card-title-row strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.rooms-editor-layout .is-viewport-card .room-stage-card-tags { grid-column: 1; grid-row: 2; }
+.rooms-editor-layout .is-viewport-card .room-stage-card-actions { grid-column: 2; grid-row: 2; }
+.rooms-editor-layout .is-viewport-card .room-stage-card-footer { gap: 6px; padding-inline: 6px; }
+.rooms-editor-layout .is-viewport-card .room-stage-card-dimensions { flex: 1 0 auto; }
+.rooms-editor-layout .is-viewport-card .room-stage-card-count,
+.rooms-editor-layout .is-viewport-card .room-stage-card-player { display: inline-flex; align-items: center; gap: 2px; flex: 0 0 auto; }
+.rooms-canvas-stage[data-card-density="mini"] .is-viewport-card .room-stage-card-header { grid-template-rows: 1fr; }
+.rooms-canvas-stage[data-card-density="mini"] .is-viewport-card .room-stage-card-title-row { grid-column: 1; }
+.rooms-canvas-stage[data-card-density="mini"] .is-viewport-card .room-stage-card-tags { display: none; }
+.rooms-canvas-stage[data-card-density="mini"] .is-viewport-card .room-stage-card-actions { grid-row: 1; }
+.rooms-canvas-stage[data-card-density="mini"] .is-viewport-card .room-stage-card-actions > :not(.room-stage-card-more-button) { display: none; }
+.room-stage-card-runtime-hud { position: absolute; inset: 0; width: 100%; height: 100%; image-rendering: pixelated; pointer-events: none; z-index: 4; }
+
+/* Persistent map variants stay optional in the scene inspector. */
+.room-map-states .room-map-state,
+.room-map-states .scene-resource-subsection { min-width: 0; }
+.room-map-states code { display: block; overflow-wrap: anywhere; }
+.room-map-states input,
+.room-map-states select { min-width: 0; width: 100%; }

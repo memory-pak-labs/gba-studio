@@ -1,5 +1,11 @@
 #include "gbs/platformer.hpp"
 
+#if defined(__arm__) || defined(__thumb__)
+#define GBS_PLATFORMER_COLLISION_HOT __attribute__((section(".iwram"), target("arm"), optimize("O2"), noinline, long_call))
+#else
+#define GBS_PLATFORMER_COLLISION_HOT
+#endif
+
 namespace {
 
 int abs_int(int value) {
@@ -82,7 +88,7 @@ bool tile_blocks_platformer_vertical(
     return false;
 }
 
-bool rect_hits_platformer_horizontal(const gbs::TileMap& map, gbs::Rect rect, int direction) {
+GBS_PLATFORMER_COLLISION_HOT bool rect_hits_platformer_horizontal(const gbs::TileMap& map, gbs::Rect rect, int direction) {
     int left = rect.x / gbs::gba_tile_size;
     int top = rect.y / gbs::gba_tile_size;
     int right = (rect.right() - 1) / gbs::gba_tile_size;
@@ -134,7 +140,7 @@ bool clamp_platformer_enemy_to_patrol_bounds(gbs::PlatformerEnemy& enemy) {
     return false;
 }
 
-bool rect_hits_platformer_vertical(const gbs::TileMap& map, gbs::Rect rect, int direction, int previous_bottom, bool ignore_one_way) {
+GBS_PLATFORMER_COLLISION_HOT bool rect_hits_platformer_vertical(const gbs::TileMap& map, gbs::Rect rect, int direction, int previous_bottom, bool ignore_one_way) {
     int left = rect.x / gbs::gba_tile_size;
     int top = rect.y / gbs::gba_tile_size;
     int right = (rect.right() - 1) / gbs::gba_tile_size;
@@ -165,6 +171,12 @@ int move_axis(
     int moved = 0;
     hit = false;
     landed = false;
+    int clear_steps = 0;
+    if (ignore_all_collisions) {
+        if (horizontal) rect.x += delta_pixels;
+        else rect.y += delta_pixels;
+        return delta_pixels;
+    }
 
     while (remaining > 0) {
         gbs::Rect next = rect;
@@ -175,11 +187,11 @@ int move_axis(
             next.y += direction;
         }
 
-        bool blocked = horizontal
-            ? rect_hits_platformer_horizontal(map, next, direction)
-            : rect_hits_platformer_vertical(map, next, direction, previous_bottom, ignore_one_way);
-        if (ignore_all_collisions) {
-            blocked = false;
+        bool blocked = false;
+        if (clear_steps == 0) {
+            blocked = horizontal
+                ? rect_hits_platformer_horizontal(map, next, direction)
+                : rect_hits_platformer_vertical(map, next, direction, previous_bottom, ignore_one_way);
         }
         if (blocked) {
             hit = true;
@@ -188,6 +200,15 @@ int move_axis(
         }
 
         rect = next;
+        if (clear_steps > 0) {
+            --clear_steps;
+        } else if (next.x >= 0 && next.y >= 0 && next.width > 0 && next.height > 0) {
+            // Reuse the successful query until either edge enters another tile.
+            // Negative coordinates retain the original stepping/division rules.
+            const int low = (horizontal ? next.x : next.y) & 7;
+            const int high = (horizontal ? next.right() - 1 : next.bottom() - 1) & 7;
+            clear_steps = direction > 0 ? 7 - (low > high ? low : high) : (low < high ? low : high);
+        }
         moved += direction;
         --remaining;
     }
@@ -198,6 +219,21 @@ int move_axis(
 } // namespace
 
 namespace gbs {
+
+bool move_platformer_scripted_step(const TileMap& map, Actor& actor, Vec2i delta,
+    const Actor* blockers, size_t blocker_count) {
+    if ((delta.x != 0 && delta.y != 0) || (delta.x == 0 && delta.y == 0) ||
+        delta.x > 1 || delta.x < -1 || delta.y > 1 || delta.y < -1) return false;
+    Rect rect { actor.position_pixels.x + actor.collision_offset_pixels.x,
+        actor.position_pixels.y + actor.collision_offset_pixels.y, actor.size_pixels.x, actor.size_pixels.y };
+    bool hit = false, landed = false;
+    const int amount = delta.x != 0 ? delta.x : delta.y;
+    const int moved = move_axis(map, rect, amount, delta.x != 0, hit, landed);
+    if (hit || moved != amount || rect_hits_any_blocking_actor(rect, actor, blockers, blocker_count)) return false;
+    actor.position_pixels.x += delta.x;
+    actor.position_pixels.y += delta.y;
+    return true;
+}
 
 PlatformerActor platformer_actor_from_rect(Rect anchor_bounds_pixels, Vec2i collision_offset_pixels) {
     return PlatformerActor {
@@ -385,6 +421,45 @@ const SpriteAnimation* platformer_player_animation_for_state(
             break;
     }
     return selected != nullptr ? selected : animations.idle;
+}
+
+int platformer_callback_state_for_actor(const PlatformerActor& actor) {
+    switch (platformer_actor_animation_state(actor)) {
+    case PlatformerActorAnimationState::Jump: return 2;
+    case PlatformerActorAnimationState::Fall: return 0;
+    case PlatformerActorAnimationState::Dash: return 3;
+    case PlatformerActorAnimationState::Climb: return 4;
+    case PlatformerActorAnimationState::WallSlide: return 5;
+    case PlatformerActorAnimationState::Glide: return 9;
+    default: return 1; // Walking and idle both remain on the ground.
+    }
+}
+
+const SpriteAnimation* update_platformer_player_presentation(
+    PlatformerPlayerPresentation& state,
+    const PlatformerPlayerAnimationSet& animations,
+    const PlatformerActor& actor,
+    InputState input,
+    bool landed,
+    bool hurt
+) {
+    const SpriteAnimation* requested = hurt ? animations.hurt
+        : state.frames_remaining == 0 && input.was_pressed(ButtonL) && !actor.dashing ? animations.attack
+        : state.frames_remaining == 0 && landed ? animations.land : nullptr;
+    if (requested != nullptr && requested->frames != nullptr && requested->frame_count > 0) {
+        state.one_shot = requested;
+        state.frames_remaining = 0;
+        for (uint8_t i = 0; i < requested->frame_count; ++i) {
+            state.frames_remaining += requested->frames[i].duration_frames > 0
+                ? requested->frames[i].duration_frames : 1;
+        }
+    }
+    if (state.frames_remaining > 0 && state.one_shot != nullptr) {
+        --state.frames_remaining;
+        return state.one_shot;
+    }
+    state.one_shot = nullptr;
+    return platformer_player_animation_for_state(animations, platformer_actor_animation_state(actor));
 }
 
 void update_platformer_actor(const TileMap& map, PlatformerActor& actor, InputState input, const PlatformerConfig& config) {
@@ -1078,6 +1153,49 @@ bool snap_platformer_actor_to_npcs(PlatformerActor& actor, Rect previous_bounds,
         return true;
     }
     return false;
+}
+
+bool carry_platformer_actor_with_npc(const TileMap& map, PlatformerActor& actor, Rect previous_platform, Rect current_platform) {
+    if (actor.velocity_x256.y < 0 || actor.bounds_pixels.bottom() != previous_platform.y ||
+        actor.bounds_pixels.right() <= previous_platform.x || actor.bounds_pixels.x >= previous_platform.right()) return false;
+    const int dx = current_platform.x - previous_platform.x;
+    const int dy = current_platform.y - previous_platform.y;
+    // Absolute scene repositioning is not a ride. Event-driven platforms move in small steps.
+    if (abs_int(dx) > 64 || abs_int(dy) > 64) return false;
+    bool hit = false, landed = false;
+    move_axis(map, actor.bounds_pixels, dx, true, hit, landed);
+    actor.hit_wall = actor.hit_wall || hit;
+    const int moved_y = move_axis(map, actor.bounds_pixels, dy, false, hit, landed);
+    actor.hit_ceiling = actor.hit_ceiling || (hit && dy < 0);
+    actor.on_ground = moved_y == dy;
+    return true;
+}
+
+bool capture_platformer_npc_save_data(PlatformerSceneSaveData& save, const PlatformerNpcRuntime* npcs, size_t count) {
+    if (count > max_saved_platformer_npcs || (count != 0 && npcs == nullptr)) return false;
+    save.signature = 0x3150;
+    save.npc_count = static_cast<uint16_t>(count);
+    for (size_t i = 0; i < count; ++i) {
+        save.npcs[i] = {npcs[i].actor.position_pixels.x, npcs[i].actor.position_pixels.y,
+            npcs[i].actor.direction, static_cast<uint8_t>(npcs[i].visible), static_cast<uint8_t>(npcs[i].active), 0};
+    }
+    return true;
+}
+bool apply_platformer_npc_save_data(const PlatformerSceneSaveData& save, PlatformerNpcRuntime* npcs, size_t count) {
+    if (save.signature != 0x3150 || count > max_saved_platformer_npcs || save.npc_count != count ||
+        (count != 0 && npcs == nullptr)) return false;
+    for (size_t i = 0; i < count; ++i) {
+        const auto& v = save.npcs[i];
+        if (v.direction > 3 || v.visible > 1 || v.active > 1 || v.reserved != 0 ||
+            v.x < -1048576 || v.x > 1048576 || v.y < -1048576 || v.y > 1048576) return false;
+    }
+    for (size_t i = 0; i < count; ++i) {
+        npcs[i].actor.position_pixels = {save.npcs[i].x, save.npcs[i].y};
+        npcs[i].actor.direction = save.npcs[i].direction;
+        npcs[i].visible = save.npcs[i].visible != 0;
+        npcs[i].active = save.npcs[i].active != 0;
+    }
+    return true;
 }
 
 bool apply_platformer_moving_platform_delta(PlatformerActor& actor, const PlatformerMovingPlatform& platform, Vec2i delta_pixels) {

@@ -3,6 +3,24 @@
 
 namespace {
 
+void test_scene_audio_handoff_preserves_mix_and_caps_saved_preferences() {
+    gbs::audio_init();
+    gbs::set_audio_channel_volume(gbs::AudioChannel::Music, 8);
+    gbs::set_audio_channel_muted(gbs::AudioChannel::Sfx, true);
+    gbs::audio_init(true);
+    assert(gbs::audio_channel_volume(gbs::AudioChannel::Music) == 8);
+    assert(gbs::audio_is_channel_muted(gbs::AudioChannel::Sfx));
+    gbs::audio_init();
+    assert(gbs::audio_channel_volume(gbs::AudioChannel::Music) == 15);
+    assert(gbs::fade_audio_channel_volume(gbs::AudioChannel::Music, 6, 30, 8));
+    assert(gbs::audio_channel_volume(gbs::AudioChannel::Music) == 8);
+    for(int i=0;i<30;++i)gbs::audio_update();
+    assert(gbs::audio_channel_volume(gbs::AudioChannel::Music) == 6);
+    assert(gbs::fade_audio_channel_volume(gbs::AudioChannel::Music, 0, 45, 0));
+    assert(gbs::audio_channel_volume(gbs::AudioChannel::Music) == 0);
+    assert(gbs::audio_channel_fade_remaining(gbs::AudioChannel::Music) == 45);
+}
+
 int last_pcm_right_first_sample = 0;
 int square_starts = 0;
 int wave_starts = 0;
@@ -1056,6 +1074,7 @@ int main() {
     test_tracker_music_without_loop_finishes();
     test_simple_music_stops_tracker_music();
     test_music_channel_mute_blocks_and_unblocks_music_sources();
+    test_scene_audio_handoff_preserves_mix_and_caps_saved_preferences();
     test_audio_bus_volume_and_timed_fade_apply_to_psg_and_pcm();
     test_pcm_asset_validation();
     test_pcm_sfx_playback_lifetime();

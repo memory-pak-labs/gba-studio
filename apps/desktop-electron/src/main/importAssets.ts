@@ -74,6 +74,9 @@ function importedAssetKindForSourcePath(sourcePath: string): string {
   }
 
   if (IMAGE_EXTENSIONS.includes(extension)) {
+    if (tokenMatches(sourcePath, ["background", "backgrounds", "fundo", "fundos"])) {
+      return "Background";
+    }
     if (tokenMatches(sourcePath, ["tile", "tiles", "tileset", "tilesets", "tilemap"])) {
       return "Tileset";
     }

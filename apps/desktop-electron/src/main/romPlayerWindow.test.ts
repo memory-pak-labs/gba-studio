@@ -26,6 +26,25 @@ afterEach(async () => {
 });
 
 describe("romPlayerWindow", () => {
+  it("enables the desktop battery only for the requested player", async () => {
+    const root = await tempRoot(); const romPath = path.join(root, "game.gba");
+    await writeFile(romPath, new Uint8Array([1, 2, 3]));
+    const player = await createRomPlayerServer({ romPath, webPlayerRoot: root, title: "Game", desktopBattery: true });
+    const plain = await createRomPlayerServer({ romPath, webPlayerRoot: root, title: "Game" });
+    try {
+      expect(new URL(player.url).searchParams.get("desktopBattery")).toBe("1");
+      expect(new URL(plain.url).searchParams.has("desktopBattery")).toBe(false);
+    } finally { await player.close(); await plain.close(); }
+  });
+  it("preserves the producer clock across telemetry IPC and rejects invalid timestamps", () => {
+    const stats = { cpuPercent: 8, droppedFrameRatio: 0, droppedFrames: 0, emulationFps: 60,
+      emulationMs: 1.2, fps: 60, frameMs: 16.67, presentationFps: 60, romBytes: 85000 };
+    expect(normalizeRomPlayerFrameStats({ ...stats, sampledAtUnixMs: 1792798000123.5 }))
+      .toMatchObject({ sampledAtUnixMs: 1792798000123.5 });
+    for (const sampledAtUnixMs of [-1, NaN, Infinity, "1792798000123"]) {
+      expect(normalizeRomPlayerFrameStats({ ...stats, sampledAtUnixMs })).toBeNull();
+    }
+  });
   it("preserves validated native Luta runtime state in Play telemetry", () => {
     const runtimeState = {
       schema: 2,
@@ -132,6 +151,7 @@ describe("romPlayerWindow", () => {
       runtimeState: {
         ...runtimeState,
         schema: 4,
+        subsystems: { ticksPerSecond: 262144, frameTicks: { scripts: 12, audio: 7 }, scenePeakTicks: { scripts: 50, audio: 18 } },
         audio: {
           pcmSourceBytes: 600,
           mixerBufferBytes: 4096,
@@ -143,6 +163,7 @@ describe("romPlayerWindow", () => {
     })).toEqual(expect.objectContaining({
       runtimeState: expect.objectContaining({
         schema: 4,
+        subsystems: { ticksPerSecond: 262144, frameTicks: { scripts: 12, audio: 7 }, scenePeakTicks: { scripts: 50, audio: 18 } },
         audio: {
           pcmSourceBytes: 600,
           mixerBufferBytes: 4096,
@@ -152,6 +173,15 @@ describe("romPlayerWindow", () => {
         }
       })
     }));
+    for (const subsystems of [
+      { ticksPerSecond: 0, frameTicks: {}, scenePeakTicks: {} },
+      { ticksPerSecond: 262144, frameTicks: { audio: -1 }, scenePeakTicks: { audio: 2 } },
+      { ticksPerSecond: 262144, frameTicks: { scripts: 1 }, scenePeakTicks: {} }
+    ]) {
+      expect(normalizeRomPlayerFrameStats({ cpuPercent: 8, emulationMs: 1.2, fps: 60, frameMs: 16.67, romBytes: 85000,
+        runtimeState: { ...runtimeState, schema: 4, subsystems }
+      })).toBeNull();
+    }
   });
 
   it("abre o Play em uma janela normal sem fullscreen", () => {

@@ -251,7 +251,22 @@ struct ShmupEnemyData {
     EventScript on_hit_player;
     const char* resource_bank_group_name;
     const MetaSprite* metasprite = nullptr;
+    const SpriteAnimation* animation = nullptr;
 };
+
+// An absolute scene clock keeps shared streamed sheets in phase, including
+// after a checkpoint restore, without loading different frames into one slot.
+inline const SpriteAnimationFrame* shmup_animation_frame_at(const SpriteAnimation& animation, uint32_t tick) {
+    if (!is_valid_sprite_animation(animation)) return nullptr;
+    uint32_t duration = 0;
+    for (size_t i = 0; i < animation.frame_count; ++i) duration += animation.frames[i].duration_frames;
+    if (animation.loop) tick %= duration;
+    for (size_t i = 0; i < animation.frame_count; ++i) {
+        if (tick < animation.frames[i].duration_frames) return &animation.frames[i];
+        tick -= animation.frames[i].duration_frames;
+    }
+    return &animation.frames[animation.frame_count - 1];
+}
 
 struct ShmupWaveData {
     const char* name;
@@ -264,6 +279,9 @@ struct ShmupWaveData {
     const char* resource_bank_group_name;
     uint8_t player_speed_pixels_per_frame = 0;
     uint8_t fire_cooldown_frames = 0;
+    EventScript on_defeat = empty_event_script();
+    // Compiled projectile callback followed by the scene's damage callback.
+    EventScript on_projectile_hit_player = empty_event_script();
 };
 
 constexpr bool shmup_wave_spawn_ready(const ShmupWaveData& wave, uint16_t frame_counter) {
@@ -495,6 +513,7 @@ constexpr bool is_valid_shmup_enemy(const ShmupProjectData& project, const Shmup
     return enemy.size_pixels.x > 0 &&
         enemy.size_pixels.y > 0 &&
         enemy.health > 0 &&
+        (enemy.animation == nullptr || is_valid_sprite_animation(*enemy.animation)) &&
         is_valid_shmup_enemy_movement_kind(enemy.movement) &&
         is_valid_shmup_dialogue_line_index(project, enemy.line_index);
 }
@@ -584,6 +603,13 @@ constexpr EventScript shmup_player_fire_script(const ShmupProjectData& project) 
 
 constexpr bool shmup_player_is_vulnerable(const ShmupRuntimeState& state) {
     return state.invulnerability_frames_remaining == 0 && state.lives > 0;
+}
+
+constexpr bool shmup_apply_player_damage(ShmupRuntimeState& state, uint8_t invulnerability_frames) {
+    if (!shmup_player_is_vulnerable(state)) return false;
+    --state.lives;
+    state.invulnerability_frames_remaining = invulnerability_frames;
+    return true;
 }
 
 constexpr bool is_valid_shmup_save_data(const ShmupProjectData& project, const ShmupSaveData& save_data) {

@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import path from "node:path";
+import { readFileSync } from "node:fs";
 
 import {
   devkitProToolsPath,
@@ -93,5 +94,11 @@ describe("prepare embedded runtime", () => {
     expect(patched).toContain("DEVKITARM={logical_path(args.devkitarm)}");
     expect(patched).toContain('str(logical_path(args.devkitarm))');
     expect(patched).toContain("engine_pack = absolute_path(args.engine_pack)");
+  });
+
+  it("accepts the current gbsbuild when absolute paths already preserve symbolic links", () => {
+    const source = readFileSync(new URL("../../../packages/GBAStudioEngine/tools/gbsbuild/gbsbuild.py", import.meta.url), "utf8");
+    expect(source).toContain("return Path(os.path.abspath(Path(value).expanduser()))");
+    expect(preserveToolchainSymlinks(source)).toBe(source);
   });
 });

@@ -1,3 +1,5 @@
+extern "C" __attribute__((weak)) void gbs_debug_record_event(const void*, unsigned, unsigned, unsigned, int, int) {}
+#include "gbs/profiler.hpp"
 #include "gbs/event.hpp"
 #include "gbs/runtime.hpp"
 #include "gbs/assets.hpp"
@@ -18,6 +20,7 @@ struct RuntimeTransitionState {
     bool pending;
     int cover_wait_frames;
     RuntimeTransitionMode mode;
+    gbs::SceneEntryReason entry_reason;
     gbs::RuntimeKind target;
     int room;
     int player_x;
@@ -59,6 +62,7 @@ void request_runtime_transition(
     }
     runtime_transition.pending = true;
     runtime_transition.mode = RuntimeTransitionMode::Warp;
+    runtime_transition.entry_reason = SceneEntryReason::Return;
     runtime_transition.target = static_cast<gbs::RuntimeKind>(runtime_value);
     runtime_transition.room = room;
     runtime_transition.player_x = player_x;
@@ -234,6 +238,7 @@ void restore_scene_stack_entry(EventState& state, const EventSceneStackEntry& en
     if (entry.runtime != current_runtime) {
         const int packed_target = (static_cast<int>(entry.runtime) << 12) | (entry.room & 0x0FFF);
         request_runtime_transition(state, packed_target, entry.player_x, entry.player_y);
+        runtime_transition.entry_reason = SceneEntryReason::Resume;
     }
 }
 
@@ -327,6 +332,18 @@ int random_range(EventState& state, int minimum, int maximum) {
 }
 
 int engine_field_value(const EventState& state, int field) {
+    if (field >= 6 && field < 6 + static_cast<int>(max_event_equipment_slots)) {
+        return state.equipped_items[field - 6];
+    }
+    if (field == 14) {
+        return static_cast<int>(state.timer_binding_count);
+    }
+    if (field == 17) return state.racing_result;
+    if (field == 15 || field == 16) {
+        if (state.scene_stack_count == 0) return -1;
+        const auto& previous = state.scene_stack[state.scene_stack_count-1];
+        return field == 15 ? static_cast<int>(previous.runtime) : previous.room;
+    }
     switch (field) {
     case 0:
         return state.current_room;
@@ -408,7 +425,8 @@ void push_tile_command(
     int packed_location,
     int tile,
     int count,
-    int tile_asset = -1
+    int tile_asset = -1,
+    int options = 0
 ) {
     if (state.tile_command_count >= gbs::max_event_tile_commands) {
         return;
@@ -416,11 +434,12 @@ void push_tile_command(
 
     state.tile_commands[state.tile_command_count] = gbs::EventTileCommand {
         (packed_location >> 12) & 0x3,
-        packed_location & 0x3F,
-        (packed_location >> 6) & 0x3F,
+        (packed_location & 0x3F) | (((options >> 9) & 7) << 6),
+        ((packed_location >> 6) & 0x3F) | (((options >> 12) & 7) << 6),
         tile,
         clamp_int(count, 1, 64),
-        tile_asset
+        tile_asset,
+        (options & 0x1FF) - 1
     };
     ++state.tile_command_count;
 }
@@ -674,18 +693,30 @@ EventStepResult execute_event_command(
         if (is_valid_save_slot_index(command.a)) {
             state.save_request = 1;
             state.save_request_slot = command.a;
+            if (pause_on_wait) {
+                ++index;
+                return EventStepResult::Pause;
+            }
         }
         break;
     case EventOp::LoadGame:
         if (is_valid_save_slot_index(command.a)) {
             state.save_request = 2;
             state.save_request_slot = command.a;
+            if (pause_on_wait) {
+                ++index;
+                return EventStepResult::Pause;
+            }
         }
         break;
     case EventOp::RemoveSaveGame:
         if (is_valid_save_slot_index(command.a)) {
             state.save_request = 3;
             state.save_request_slot = command.a;
+            if (pause_on_wait) {
+                ++index;
+                return EventStepResult::Pause;
+            }
         }
         break;
     case EventOp::SetDialogueLanguage:
@@ -852,8 +883,8 @@ EventStepResult execute_event_command(
         }
         break;
     case EventOp::StoreActorDirection:
-        if (is_valid_actor_state_slot(command.a) && is_valid_event_variable(command.b)) {
-            state.variables[command.b] = state.actor_direction[command.a];
+        if (is_valid_actor_condition_index(command.a) && is_valid_event_variable(command.b)) {
+            state.variables[command.b] = actor_condition_direction(state, command.a);
         }
         break;
     case EventOp::JumpIfEngineFieldEquals:
@@ -886,7 +917,8 @@ EventStepResult execute_event_command(
         }
         break;
     case EventOp::WaitActorAnimation:
-        if (is_valid_actor_state_slot(command.a) && state.actor_animation_playing[command.a]) {
+        if ((command.a == event_player_actor_index && state.player_animation_playing) ||
+            (is_valid_actor_state_slot(command.a) && state.actor_animation_playing[command.a])) {
             return pause_on_wait ? EventStepResult::Pause : EventStepResult::Stop;
         }
         break;
@@ -1005,6 +1037,11 @@ EventStepResult execute_event_command(
     case EventOp::FollowCamera:
         state.camera_changed = true;
         state.camera_follow_player = true;
+        // A timer can request a pan before the skip button restores follow in
+        // this same frame. The later explicit command must cancel that pan.
+        state.camera_move_changed = false;
+        state.camera_delta_x = 0;
+        state.camera_delta_y = 0;
         break;
     case EventOp::LockCamera:
         state.camera_changed = true;
@@ -1050,7 +1087,7 @@ EventStepResult execute_event_command(
         state.camera_bounds_max_y = command.b;
         break;
     case EventOp::ReplaceTile:
-        push_tile_command(state, command.a, command.b, command.c);
+        push_tile_command(state, command.a, command.b, command.c, -1, command.d);
         break;
     case EventOp::ReplaceTileSequence: {
         const int variable = command.c & 0xFF;
@@ -1065,7 +1102,7 @@ EventStepResult execute_event_command(
         if (tile < base_tile || tile >= base_tile + frame_count) {
             tile = base_tile;
         }
-        push_tile_command(state, command.a, tile, 1, tile_asset);
+        push_tile_command(state, command.a, tile, 1, tile_asset, command.d);
         state.variables[variable] = tile + 1;
         if (state.variables[variable] >= base_tile + frame_count) {
             state.variables[variable] = base_tile;
@@ -1124,20 +1161,36 @@ EventStepResult execute_event_command(
         state.audio_volume_channel = clamp_int(command.a, 0, 4);
         state.audio_volume = clamp_int(command.b, 0, 15);
         break;
-    case EventOp::FadeAudioVolume:
+    case EventOp::FadeAudioVolume: {
         state.audio_fade_changed = true;
         state.audio_fade_channel = clamp_int(command.a, 0, 4);
         state.audio_fade_target_volume = clamp_int(command.b, 0, 15);
+        state.audio_fade_ceiling_volume = 15;
+        // Optional saved channel/master indices are packed as index+1, one byte each.
+        const int channel_variable = (command.d & 255) - 1;
+        const int master_variable = ((command.d >> 8) & 255) - 1;
+        int preference = is_valid_event_variable(channel_variable)
+            ? clamp_int(state.variables[channel_variable], 0, 100) * 100 : 10000;
+        if (is_valid_event_variable(master_variable)) preference = preference * clamp_int(state.variables[master_variable], 0, 100) / 100;
+        state.audio_fade_target_volume = (state.audio_fade_target_volume * preference + 5000) / 10000;
+        state.audio_fade_ceiling_volume = (15 * preference + 5000) / 10000;
         state.audio_fade_frames = clamp_int(command.c, 0, 3600);
         break;
+    }
     case EventOp::SetAllSpritesVisible:
         state.all_sprites_visible_changed = true;
         state.all_sprites_visible = command.a != 0;
         break;
-    case EventOp::SetPlayerAnimation:
-        state.player_animation_changed = true;
-        state.player_animation_index = command.a < 0 ? 0 : command.a;
+    case EventOp::SetPlayerAnimation: {
+        const size_t previous_count = state.actor_command_count;
+        push_actor_command(state, EventActorOp::SetAnimation, event_player_actor_index, command.a, 0);
+        if (state.actor_command_count != previous_count) {
+            state.player_animation_changed = true;
+            state.player_animation_index = command.a;
+            state.player_animation_playing = true;
+        }
         break;
+    }
     case EventOp::PlayerBounce:
         state.player_bounce_requested = true;
         state.player_bounce_height_tiles = clamp_int(command.a, 1, 8);
@@ -1268,6 +1321,10 @@ EventStepResult execute_event_command(
         state.fade_direction = -1;
         state.fade_frames = clamp_int(command.a, 1, 600);
         break;
+    case EventOp::Visibility:
+        push_actor_command(state, (command.d & 128) != 0 ? EventActorOp::VisibilityReveal : EventActorOp::VisibilityLantern,
+            command.a, static_cast<uint16_t>(command.b), clamp_int(command.c, 0, 3600), clamp_int(command.d & 127, 0, 100) | (command.d & 256));
+        break;
     case EventOp::VisualEffect:
         if (runtime_transition.pending &&
             runtime_transition.mode == RuntimeTransitionMode::Warp &&
@@ -1307,15 +1364,27 @@ EventStepResult execute_event_command(
             event_unsigned_byte(command.c, 0)
         );
         break;
+    case EventOp::MoveActorTo:
+        // Preserve the legacy instant move for synchronous execution, where
+        // no runner exists to resume an asynchronous movement.
+        push_actor_command(state, EventActorOp::SetPosition, command.a, command.b, command.c);
+        break;
     case EventOp::SetActorPosition:
         push_actor_command(state, EventActorOp::SetPosition, command.a, command.b, command.c);
         break;
+    case EventOp::MoveActorRelative:
     case EventOp::MoveActor:
         push_actor_command(state, EventActorOp::MoveRelative, command.a, command.b, command.c);
         break;
-    case EventOp::SetActorDirection:
+    case EventOp::SetActorDirection: {
+        const size_t previous_count = state.actor_command_count;
         push_actor_command(state, EventActorOp::SetDirection, command.a, command.b, 0);
+        if (state.actor_command_count != previous_count) {
+            if (command.a == event_player_actor_index) state.player_direction = command.b;
+            else if (is_valid_actor_state_slot(command.a)) state.actor_direction[command.a] = command.b;
+        }
         break;
+    }
     case EventOp::SetActorSpeed:
         push_actor_command(state, EventActorOp::SetSpeed, command.a, command.b, 0);
         break;
@@ -1323,7 +1392,13 @@ EventStepResult execute_event_command(
         if (is_valid_actor_state_slot(command.a)) {
             state.actor_animation_playing[command.a] = true;
         }
-        push_actor_command(state, EventActorOp::SetAnimation, command.a, command.b, 0);
+        {
+            const size_t previous_count = state.actor_command_count;
+            push_actor_command(state, EventActorOp::SetAnimation, command.a, command.b, 0);
+            if (command.a == event_player_actor_index && state.actor_command_count != previous_count) {
+                state.player_animation_playing = true;
+            }
+        }
         break;
     case EventOp::SetActorAnimationSpeed:
         push_actor_command(state, EventActorOp::SetAnimationSpeed, command.a, command.b, 0);
@@ -1402,9 +1477,10 @@ EventStepResult execute_event_command(
         state.adventure_frames=state.adventure_state==5 ? 8 : 12;
         break;
     case EventOp::SetPlayerSpeedProfile:
-        state.player_walk_speed = command.a > 0 ? command.a : 100;
-        state.player_run_speed = command.b >= state.player_walk_speed ? command.b : state.player_walk_speed;
+        state.player_walk_speed = clamp_int(command.a,1,400);
+        state.player_run_speed = clamp_int(command.b,state.player_walk_speed,400);
         state.player_stamina_cost = command.c >= 0 ? command.c : 0;
+        state.player_run_button = command.d == ButtonA || command.d == ButtonB || command.d == ButtonL || command.d == ButtonR ? command.d : 0;
         break;
     case EventOp::SetPlayerMovementState:
         state.player_movement_state = command.a;
@@ -1418,11 +1494,14 @@ EventStepResult execute_event_command(
         state.clock_minutes_per_tick = command.a > 0 ? command.a : 10;
         state.clock_frames_per_tick = command.b > 0 ? command.b : 180;
         state.clock_hud_enabled = command.c != 0;
-        state.clock_minute = 0;
+        state.clock_variable = is_valid_event_variable(command.d - 1) ? command.d - 1 : -1;
+        state.clock_minute = state.clock_variable >= 0
+            ? ((state.variables[state.clock_variable] % 1440) + 1440) % 1440 : 0;
         state.clock_frame_accumulator = 0;
         break;
     case EventOp::AdvanceTime:
         state.clock_minute = ((state.clock_minute + command.a) % 1440 + 1440) % 1440;
+        if (state.clock_variable >= 0) state.variables[state.clock_variable] = state.clock_minute;
         break;
     case EventOp::SetStat:
         if (is_valid_event_stat(command.a)) {
@@ -1528,6 +1607,11 @@ bool runtime_transition_pending() {
     return runtime_transition.pending && runtime_transition.cover_wait_frames == 0;
 }
 
+void cancel_runtime_transition() {
+    runtime_transition.pending = false;
+    runtime_transition.cover_wait_frames = 0;
+}
+
 RuntimeKind runtime_transition_target() {
     return runtime_transition.target;
 }
@@ -1538,6 +1622,7 @@ bool runtime_transition_route(RuntimeTransitionRoute& route) {
     }
     route.runtime = runtime_transition.target;
     route.local_index = runtime_transition.room;
+    route.entry_reason = runtime_transition.entry_reason;
     return true;
 }
 
@@ -1551,6 +1636,7 @@ bool request_runtime_save_restore(RuntimeKind runtime, int slot_index) {
     runtime_transition.pending = true;
     runtime_transition.cover_wait_frames = 0;
     runtime_transition.mode = RuntimeTransitionMode::SaveRestore;
+    runtime_transition.entry_reason = SceneEntryReason::Load;
     runtime_transition.target = runtime;
     runtime_transition.room = 0;
     runtime_transition.player_x = 0;
@@ -1585,7 +1671,16 @@ bool consume_runtime_transition(
         runtime_transition.target != runtime) {
         return false;
     }
+    // Script tables and motion support belong to the destination runtime.
+    // They can differ even when both runtimes share the same project, because
+    // exported script tables omit scripts unused by that particular runtime.
+    const EventScript* const destination_scripts = state.project_scripts;
+    const size_t destination_script_count = state.project_script_count;
+    const bool destination_temporal_actor_motion = state.supports_temporal_actor_motion;
     state = runtime_transition.event_state;
+    state.project_scripts = destination_scripts;
+    state.project_script_count = destination_script_count;
+    state.supports_temporal_actor_motion = destination_temporal_actor_motion;
     room = runtime_transition.room;
     player_x = runtime_transition.player_x;
     player_y = runtime_transition.player_y;
@@ -1613,6 +1708,13 @@ bool consume_runtime_transition(
 }
 
 void init_event_state(EventState& state) {
+    state.supports_temporal_actor_motion = false;
+    state.actor_motion_serial = 0;
+    state.player_animation_playing = false;
+    state.project_scripts = nullptr;
+    state.project_script_count = 0;
+    state.script_call_overflow = false;
+    state.racing_result = 0;
     state.luta_command_count = 0;
     for (size_t i = 0; i <= max_event_actor_state_slots; ++i) { state.actor_effect_frames[i]=0; state.actor_effect_intensity[i]=0; state.actor_effect_kind[i]=0; }
     state.current_room = 0;
@@ -1696,6 +1798,7 @@ void init_event_state(EventState& state) {
     state.player_walk_speed = 1;
     state.player_run_speed = 1;
     state.player_stamina_cost = 0;
+    state.player_run_button = 0;
     state.adventure_state=0;state.adventure_frames=0;
     for(auto& text:state.draw_text) text=EventDrawText{};
     state.player_movement_state = 0;
@@ -1708,6 +1811,7 @@ void init_event_state(EventState& state) {
     state.clock_minutes_per_tick = 0;
     state.clock_frames_per_tick = 0;
     state.clock_hud_enabled = false;
+    state.clock_variable = -1;
     for (size_t index = 0; index < max_event_stats; ++index) {
         state.stats[index] = 0;
         state.stat_max[index] = 0;
@@ -1745,6 +1849,7 @@ void init_event_state(EventState& state) {
     state.audio_fade_changed = false;
     state.audio_fade_channel = 0;
     state.audio_fade_target_volume = 15;
+    state.audio_fade_ceiling_volume = 15;
     state.audio_fade_frames = 0;
     state.all_sprites_visible_changed = false;
     state.all_sprites_visible = true;
@@ -1842,7 +1947,9 @@ void set_event_input_state(EventState& state, uint16_t held, uint16_t pressed, u
 }
 
 void set_event_actor_animation_state(EventState& state, int actor_index, bool playing) {
-    if (is_valid_actor_state_slot(actor_index)) {
+    if (actor_index == event_player_actor_index) {
+        state.player_animation_playing = playing;
+    } else if (is_valid_actor_state_slot(actor_index)) {
         state.actor_animation_playing[actor_index] = playing;
     }
 }
@@ -1853,6 +1960,7 @@ void tick_event_frame_counter(EventState& state) {
         if (++state.clock_frame_accumulator >= state.clock_frames_per_tick) {
             state.clock_frame_accumulator = 0;
             state.clock_minute = (state.clock_minute + state.clock_minutes_per_tick) % 1440;
+            if (state.clock_variable >= 0) state.variables[state.clock_variable] = state.clock_minute;
         }
     }
     if (runtime_transition.pending && runtime_transition.cover_wait_frames > 0) {
@@ -1989,75 +2097,153 @@ void run_event_script(EventState& state, EventScript script) {
 }
 
 void run_event_script(EventState& state, const EventCommand* commands, size_t count) {
-    if (commands == nullptr || count == 0) {
-        return;
-    }
+    run_event_script_consuming(state, EventScript { commands, count }, nullptr);
+}
 
-    size_t index = 0;
+namespace {
+
+bool advance_event_runner(EventRunner& runner, EventState& state, bool pause_on_wait,
+    EventCommandConsumer consumer = nullptr, void* context = nullptr) {
+    runner.yielded = false;
+    if (!runner.active) return false;
+    if (runner.actor_motion_pending) { runner.yielded = true; return true; }
+    const SubsystemProfilerScope profiler_scope(ProfilerSubsystem::Scripts);
+    const size_t budget = runner.step_budget > 0 ? runner.step_budget : runner.script.command_count * 8 + 8;
     size_t steps = 0;
-    const size_t max_steps = count * 8 + 8;
-    while (index < count && steps < max_steps) {
-        ++steps;
-        const EventCommand& command = commands[index];
-        EventStepResult result = execute_event_command(state, command, index, count, false);
+    size_t synchronous_steps[max_event_script_call_depth + 1] = {};
+    while (runner.active) {
+        const size_t depth = runner.call_depth;
+        if (depth > max_event_script_call_depth || (depth > 0 &&
+            (state.project_scripts == nullptr || runner.calls[depth - 1].script_index >= state.project_script_count))) {
+            state.script_call_overflow = true;
+            runner.active = false;
+            runner.call_depth = 0;
+            return false;
+        }
+        const EventScript script = depth == 0 ? runner.script
+            : state.project_scripts[runner.calls[depth - 1].script_index];
+        size_t index = depth == 0 ? runner.command_index : runner.calls[depth - 1].command_index;
+        if (!has_event_script(script) || index >= script.command_count) {
+            if (depth > 0) { --runner.call_depth; continue; }
+            runner.active = false;
+            break;
+        }
+        if (pause_on_wait) {
+            if (steps++ >= budget) break;
+        } else if (synchronous_steps[depth]++ >= script.command_count * 8 + 8) {
+            if (depth > 0) { --runner.call_depth; continue; }
+            runner.active = false;
+            break;
+        }
+        const EventCommand& command = script.commands[index];
+        const size_t source_index = index;
+        EventStepResult result;
+        if (command.op == EventOp::MoveActorTo || command.op == EventOp::MoveActorRelative) {
+            if (!pause_on_wait || !state.supports_temporal_actor_motion) {
+                // Synchronous callers and unsupported runtimes preserve legacy behavior.
+                push_actor_command(state, command.op == EventOp::MoveActorRelative ? EventActorOp::MoveRelative : EventActorOp::SetPosition, command.a, command.b, command.c);
+                ++index;
+                result = EventStepResult::Continue;
+            } else if (!is_valid_actor_condition_index(command.a)) {
+                ++index;
+                result = EventStepResult::Continue;
+            } else if (state.actor_command_count >= max_event_actor_commands) {
+                result = EventStepResult::Pause;
+            } else {
+                push_actor_command(state, EventActorOp::MoveTo, command.a, command.b, command.c, command.op == EventOp::MoveActorRelative ? 1 : 0);
+                if (++state.actor_motion_serial == 0) ++state.actor_motion_serial;
+                runner.actor_motion_token = state.actor_motion_serial;
+                state.actor_commands[state.actor_command_count - 1].motion_owner = &runner;
+                state.actor_commands[state.actor_command_count - 1].motion_token = runner.actor_motion_token;
+                // Keep the PC at the move so a restored checkpoint restarts it.
+                runner.actor_motion_pending = true;
+                result = EventStepResult::Pause;
+            }
+        } else if (command.op == EventOp::CallScript && state.project_scripts != nullptr) {
+            ++index;
+            result = EventStepResult::Continue;
+            if (!event_script_is_locked(state, command.a) && command.a >= 0 &&
+                static_cast<size_t>(command.a) < state.project_script_count &&
+                has_event_script(state.project_scripts[command.a])) {
+                if (depth == max_event_script_call_depth) {
+                    state.script_call_overflow = true;
+                    runner.active = false;
+                    runner.call_depth = 0;
+                    result = EventStepResult::Stop;
+                } else {
+                    runner.calls[runner.call_depth++] = EventScriptCallFrame {
+                        static_cast<uint32_t>(command.a), 0
+                    };
+                    synchronous_steps[runner.call_depth] = 0;
+                }
+            }
+        } else {
+            result = execute_event_command(state, command, index, script.command_count, pause_on_wait);
+        }
+        if (depth == 0) runner.command_index = index;
+        else runner.calls[depth - 1].command_index = static_cast<uint32_t>(index);
+        gbs_debug_record_event(&command, source_index, static_cast<unsigned>(command.op),
+            static_cast<unsigned>(result), state.current_room, state.wait_frames);
+        if (consumer) consumer(state, context);
+        if (!runner.active) return false;
+        if (result == EventStepResult::Pause) {
+            runner.yielded = true;
+            return true;
+        }
         if (result == EventStepResult::Stop) {
-            return;
+            if (depth > 0) --runner.call_depth;
+            else runner.active = false;
         }
     }
+    return runner.active;
+}
+
+} // namespace
+
+void bind_event_scripts(EventState& state, const EventScript* scripts, size_t count) {
+    state.project_scripts = scripts;
+    state.project_script_count = scripts == nullptr ? 0 : count;
+}
+
+void run_event_script_consuming(EventState& state, EventScript script, EventCommandConsumer consumer, void* context) {
+    EventRunner runner {};
+    start_event_runner(runner, script);
+    advance_event_runner(runner, state, false, consumer, context);
 }
 
 void init_event_runner(EventRunner& runner) {
-    runner.script = empty_event_script();
-    runner.command_index = 0;
-    runner.active = false;
-    runner.step_budget = 0;
+    stop_event_runner(runner);
 }
 
 void start_event_runner(EventRunner& runner, EventScript script) {
     runner.script = script;
     runner.command_index = 0;
     runner.active = has_event_script(script);
+    runner.yielded = false;
+    runner.actor_motion_pending = false;
     runner.step_budget = 0;
+    runner.call_depth = 0;
 }
 
 void stop_event_runner(EventRunner& runner) {
     runner.script = empty_event_script();
     runner.command_index = 0;
     runner.active = false;
+    runner.yielded = false;
+    runner.actor_motion_pending = false;
     runner.step_budget = 0;
+    runner.call_depth = 0;
+}
+
+void complete_event_actor_movement(EventRunner& runner, uint32_t token) {
+    if (!runner.active || !runner.actor_motion_pending || token != runner.actor_motion_token) return;
+    runner.actor_motion_pending = false;
+    if (runner.call_depth == 0) ++runner.command_index;
+    else ++runner.calls[runner.call_depth - 1].command_index;
 }
 
 bool update_event_runner(EventRunner& runner, EventState& state) {
-    if (!runner.active) {
-        return false;
-    }
-    if (!has_event_script(runner.script) || runner.command_index >= runner.script.command_count) {
-        runner.active = false;
-        return false;
-    }
-
-    size_t steps = 0;
-    const size_t max_steps = runner.step_budget > 0 ? runner.step_budget : runner.script.command_count * 8 + 8;
-    while (runner.command_index < runner.script.command_count && steps < max_steps) {
-        ++steps;
-        size_t index = runner.command_index;
-        const EventCommand& command = runner.script.commands[index];
-        EventStepResult result = execute_event_command(state, command, index, runner.script.command_count, true);
-        runner.command_index = index;
-        if (result == EventStepResult::Pause) {
-            return true;
-        }
-        if (result == EventStepResult::Stop) {
-            runner.active = false;
-            return false;
-        }
-    }
-
-    if (runner.command_index >= runner.script.command_count) {
-        runner.active = false;
-        return false;
-    }
-    return true;
+    return advance_event_runner(runner, state, true);
 }
 
 void init_event_script_queue(EventScriptQueue& queue) {

@@ -7,10 +7,12 @@ import { deriveProjectHealthReport } from "./projectHealth.js";
 const canonical = JSON.parse(readFileSync(new URL("../../default-assets/templates/exemplo-gba/exemplo-gba.gba-project", import.meta.url), "utf8"));
 
 describe("canonical sprite canvas audit", () => {
-  it("contains all 129 sheets and 362 frames without cropping or missing compositions", () => {
+  it("covers every animated sheet without cropping or missing compositions", () => {
     const rows = auditProjectSpriteFrames(canonical);
-    expect(rows).toHaveLength(129);
-    expect(rows.reduce((n, r) => n + r.frames, 0)).toBe(362);
+    const animatedSheets = new Set(canonical.animations.map(animation => animation.spriteSheet));
+    const auditedSheets = new Set(rows.map(row => row.sheet));
+    expect([...animatedSheets].filter(sheet => !auditedSheets.has(sheet))).toEqual([]);
+    expect(rows.find(row => row.sheet === "farol-relay-v2.png")).toMatchObject({ animations: 3, frames: 3 });
     expect(rows.filter(r => r.clippedFrames || r.missingFrames)).toEqual([]);
     expect(fitProjectSpriteFrames(canonical)).toEqual(canonical);
   });
@@ -31,7 +33,7 @@ describe("canonical sprite canvas audit", () => {
 
   it("keeps the export identical when materializing a 48px implicit portrait", () => {
     const before = structuredClone(canonical);
-    const animation = before.animations.find(a => a.spriteSheet === "council-v5-nara.png");
+    const animation = before.animations.find(a => a.spriteSheet === "council-v13-nara.png");
     delete animation.frames;
     const after = fitProjectSpriteFrames(before);
     const actor = { id: "audit", spriteSheet: animation.spriteSheet };

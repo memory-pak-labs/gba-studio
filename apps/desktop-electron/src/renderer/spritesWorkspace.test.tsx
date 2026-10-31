@@ -72,7 +72,7 @@ describe("SpritesWorkspace React smoke", () => {
     const onUpdateAnimationFields = vi.fn();
     render(<SpritesWorkspace presentation={deriveSpritesWorkspacePresentation(createBlankProjectData({ name: "Quadros" }))} {...spritesWorkspaceHandlers({ onUpdateAnimationFields })} />);
     await user.click(screen.getByRole("button", { name: "player_topdown_4dir.png" }));
-    expect(screen.getByRole("button", { name: "Remover ultimo quadro" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Remover último quadro" })).toBeDisabled();
     await user.click(screen.getByRole("button", { name: "Adicionar quadro" }));
     expect(onUpdateAnimationFields).toHaveBeenCalledWith(expect.any(String), { frameCount: 2 });
   });

@@ -29,9 +29,9 @@ for(const who of ['nara','sentinel']){
   project.animations=project.animations.filter(a=>a.spriteSheet!==name).concat(animations);
   const previous=project.animationStates.find(s=>s.id===`tactical-${who}-v3-state`)
     ??project.animationStates.find(s=>s.id===`tactical-${who}-v5-state`);
-  if(!previous)throw new Error(`Estado de animação não encontrado para ${who}.`);
+  const state = previous ?? { name: 'default', animationType: 'four_direction_movement', mirrorLeftFromRight: false }; // Self-contained historical fixture.
   project.animationStates=project.animationStates.filter(s=>s.id!==`tactical-${who}-v5-state`);
-  project.animationStates.push({...previous,id:`tactical-${who}-v5-state`,spriteSheet:name,animationIDs:animations.map(a=>a.id)});
+  project.animationStates.push({...state,id:`tactical-${who}-v5-state`,spriteSheet:name,animationIDs:animations.map(a=>a.id)});
   const actor=project.actors.find(a=>a.id===`tactical-${who}`);
   Object.assign(actor,who==='nara'?board.spawn:board.enemy,{spriteSheet:name,animationStateID:`tactical-${who}-v5-state`,animationName:who==='nara'?'idle_right':'idle_left',direction:who==='nara'?'right':'left'});
 }

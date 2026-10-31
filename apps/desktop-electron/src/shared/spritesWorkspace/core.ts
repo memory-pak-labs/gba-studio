@@ -438,6 +438,7 @@ export interface DeriveSpriteStateDirectionOptions {
   spriteSheet: string;
   animations: Record<string, unknown>[];
   references: Record<string, unknown>[];
+  includeIsometricScreenDirections?: boolean;
 }
 
 export interface CanvasPointToMetaspriteTilePositionOptions {
@@ -634,6 +635,8 @@ function makeSpriteAnimation(options: CreateSpriteAnimationOptions): Record<stri
     spriteSheet,
     frameWidth: 16,
     frameHeight: 32,
+    originX: 0,
+    originY: 0,
     fps: 8,
     loops: true,
     frameCount: 1,
@@ -715,6 +718,16 @@ function applyAnimationFields(animation: Record<string, unknown>, fields: Update
     animation.frameHeight = positiveInteger(fields.frameHeight, positiveInteger(animation.frameHeight, 32));
   }
 
+  if ((fields.frameWidth !== undefined || fields.frameHeight !== undefined) && Array.isArray(animation.frames)) {
+    animation.frames = animation.frames.map((frame) => isRecord(frame)
+      ? {
+          ...frame,
+          ...(fields.frameWidth !== undefined ? { width: animation.frameWidth } : {}),
+          ...(fields.frameHeight !== undefined ? { height: animation.frameHeight } : {})
+        }
+      : frame);
+  }
+
   if (fields.fps !== undefined) {
     animation.fps = positiveInteger(fields.fps, positiveInteger(animation.fps, 8));
   }
@@ -775,8 +788,8 @@ function makeEmptyMetaspriteFrame(animation: Record<string, unknown>): Record<st
   return {
     width,
     height,
-    originX: Math.floor(width / 2),
-    originY: Math.max(0, height - 8),
+    originX: signedInteger(animation.originX, Math.floor(width / 2)),
+    originY: signedInteger(animation.originY, Math.max(0, height - 8)),
     tiles: []
   };
 }
@@ -1069,17 +1082,20 @@ export function deriveSpriteStateDirectionOptions(options: DeriveSpriteStateDire
   const matchingAnimations = options.animations.filter((animation) => stringField(animation.spriteSheet, "") === spriteSheet);
   const matchingReferences = options.references.filter((reference) => nullableString(reference.generatedSpriteAssetName) === spriteSheet);
   const states = uniqueSortedNonEmpty([
+    "idle", "walk",
     ...matchingAnimations.map((animation) => nullableString(animation.state)),
     ...matchingReferences.map((reference) => nullableString(reference.state))
   ]);
   const directions = uniqueSortedNonEmpty([
+    "down", "left", "right", "up",
+    ...(options.includeIsometricScreenDirections ? ["screen_down", "screen_left", "screen_right", "screen_up"] : []),
     ...matchingAnimations.map((animation) => nullableString(animation.direction)),
     ...matchingReferences.map((reference) => nullableString(reference.direction))
   ]);
 
   return {
-    states: states.length > 0 ? states : ["idle", "walk"],
-    directions: directions.length > 0 ? directions : ["down", "left", "right", "up"]
+    states,
+    directions
   };
 }
 
@@ -2376,6 +2392,7 @@ export function deriveSpritesWorkspacePresentation(data: GBAProjectData): Sprite
       sheet.name,
       deriveSpriteStateDirectionOptions({
         animations,
+        includeIsometricScreenDirections: true,
         references: projectArray(data, "spriteReferenceImages"),
         spriteSheet: sheet.name
       })
@@ -2512,7 +2529,7 @@ export function deriveSpritesWorkspaceValidationIssues(
     if (animations.length === 0) {
       issues.push({
         id: `no-animations-${sheet.name}`,
-        severity: "warning",
+        severity: "info",
         message: `${sheet.name} nao possui animacoes.`,
         spriteSheet: sheet.name
       });

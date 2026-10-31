@@ -67,6 +67,15 @@ function normalizedToken(value: string | null | undefined): string {
   return (value ?? "").trim().toLowerCase().replace(/[\s_]+/g, "-");
 }
 
+/** Cardinal screen views complement the four projected isometric views. */
+export function isometricScreenFacingDirection(animation: SpriteAnimationDescriptor): SpriteDirection | null {
+  const direction = normalizedToken(animation.direction);
+  const name = normalizedToken(animation.name);
+  const match = /^(?:screen-(up|down|left|right))$/.exec(direction)
+    ?? /^(?:idle|walk|move|moving|run)-screen-(up|down|left|right)$/.exec(name);
+  return (match?.[1] as SpriteDirection | undefined) ?? null;
+}
+
 function motionForAnimation(animation: SpriteAnimationDescriptor): SpriteMotion {
   const state = normalizedToken(animation.state);
   if (MOVING_STATE_NAMES.has(state)) return "moving";
@@ -129,7 +138,8 @@ export function normalizeSpriteStateSlots(
   adapter: SpriteDirectionAdapter = "topdown"
 ): NormalizedSpriteStateSlots {
   const allowedIDs = new Set(state.animationIDs);
-  const authored = animations.filter((animation) => allowedIDs.has(animation.id));
+  const authored = animations.filter((animation) => allowedIDs.has(animation.id)
+    && (adapter !== "isometric" || !isometricScreenFacingDirection(animation)));
   const slots = emptySlots();
   const find = (motion: SpriteMotion, direction?: SpriteDirection): SpriteAnimationDescriptor | undefined => (
     authored.find((animation) => (

@@ -2478,6 +2478,7 @@ EXPORT_KIND_VALUES = (
 
 ASSET_PACK_KIND_VALUES = (
     "bg",
+    "paged_bg",
     "obj",
     "affine_bg",
     "bitmap3",
@@ -2745,7 +2746,7 @@ def validate_asset_pack_payload(payload):
             if not isinstance(background_bpp, int) or isinstance(background_bpp, bool) or background_bpp not in (4, 8):
                 validation_error(errors, f"{asset_path}.background_bpp", "background_bpp deve ser 4 ou 8")
             else:
-                expected_bpp = 8 if kind == "affine_bg" else 4
+                expected_bpp = 8 if kind in ("affine_bg", "paged_bg") else 4
                 if background_bpp != expected_bpp:
                     validation_error(
                         errors,

@@ -1,3 +1,4 @@
+import { uiText as ui, useStudioUiText } from "./studioUiText";
 import { EventEditingContext } from "./EventEditingContext";
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
@@ -126,6 +127,7 @@ export function RoomEventBindingsInspector({
   focusedEventRequestID,
   renderEventInspector
 }: RoomEventBindingsInspectorProps): React.ReactElement {
+  const ui = useStudioUiText();
   const sourceTarget = entity ?? room ?? {};
   const menuState = contextKind === "actor" && ownerScene ? menuActorRuntimeState(ownerScene, sourceTarget) : null;
   const target = useMemo(() => menuState ? {
@@ -289,14 +291,14 @@ export function RoomEventBindingsInspector({
 
   const focusedEventInspector = focusedEventName && focusedEventRequestID && !focusedEventIsBoundToTarget && renderEventInspector
     ? (
-      <div className="room-event-editor-shell" aria-label={`Script de ${focusedEventName}`}>
+      <div className="room-event-editor-shell" aria-label={ui("Script de {0}", { 0: focusedEventName })}>
         {renderEventInspector(focusedEventName, "Evento selecionado")}
       </div>
     )
     : null;
   const activeEventInspector = focusedEventInspector ?? (activeDisplaySlot?.eventName && !activeDisplaySlot.isMissing && renderEventInspector
     ? (
-      <div className="room-event-editor-shell" aria-label={`Script de ${activeDisplaySlot.label}`}>
+      <div className="room-event-editor-shell" aria-label={ui("Script de {0}", { 0: ui(activeDisplaySlot.label) })}>
         {renderEventInspector(activeDisplaySlot.eventName, activeDisplaySlot.label)}
       </div>
     )
@@ -304,9 +306,9 @@ export function RoomEventBindingsInspector({
 
   const frequencyEditor = activeDisplaySlot?.requiresFrequency ? (
       <label className="room-event-binding-frequency">
-        <span>Frequência</span>
+        <span>{ui("Frequência")}</span>
         <select
-          aria-label={`Frequência de ${activeDisplaySlot.label}`}
+          aria-label={ui("Frequência de {0}", { 0: ui(activeDisplaySlot.label) })}
           onChange={(event) => {
             const frames = Number.parseInt(event.currentTarget.value, 10) || 30;
             setUpdateFrequencyByBinding((current) => ({ ...current, [activeDisplaySlot.bindingKey]: frames }));
@@ -314,17 +316,17 @@ export function RoomEventBindingsInspector({
           }}
           value={String(frequencyFor(activeDisplaySlot))}
         >
-          <option value="1">A cada quadro</option>
-          <option value="15">A cada 15 quadros</option>
-          <option value="30">A cada 30 quadros</option>
-          <option value="60">A cada 60 quadros</option>
+          <option value="1">{ui("A cada quadro")}</option>
+          <option value="15">{ui("A cada 15 quadros")}</option>
+          <option value="30">{ui("A cada 30 quadros")}</option>
+          <option value="60">{ui("A cada 60 quadros")}</option>
         </select>
       </label>
     ) : null;
 
   const slotEditor = activeDisplaySlot ? (
     activeEventInspector ? (
-      <div className="room-event-binding-timeline" aria-label={`Timeline de ${activeDisplaySlot.label}`}>
+      <div className="room-event-binding-timeline" aria-label={ui("Timeline de {0}", { 0: ui(activeDisplaySlot.label) })}>
         <EventEditingContext.Provider value={{
           name: String(target.name ?? ""),
           activeKey: activeDisplaySlot.bindingKey,
@@ -336,31 +338,31 @@ export function RoomEventBindingsInspector({
         }}>{activeEventInspector}</EventEditingContext.Provider>
       </div>
     ) : activeDisplaySlot.isPending && (hasNativeActions || showSequence) ? (
-      <button className="room-event-binding-open" onClick={() => openBehaviorPicker(activeDisplaySlot)} type="button">Adicionar evento</button>
+      <button className="room-event-binding-open" onClick={() => openBehaviorPicker(activeDisplaySlot)} type="button">{ui("Adicionar evento")}</button>
     ) : activeDisplaySlot.isPending ? (
-      <div className="room-event-binding-empty" aria-label={`Fluxo vazio de ${activeDisplaySlot.label}`}>
-        <strong>Este estado ainda não tem eventos.</strong>
-        <p>Comece a montar a cadeia diretamente neste estado.</p>
+      <div className="room-event-binding-empty" aria-label={ui("Fluxo vazio de {0}", { 0: ui(activeDisplaySlot.label) })}>
+        <strong>{ui("Este estado ainda não tem eventos.")}</strong>
+        <p>{ui("Comece a montar a cadeia diretamente neste estado.")}</p>
         <button
-          aria-label={`Começar script em ${activeDisplaySlot.label}`}
+          aria-label={ui("Começar script em {0}", { 0: ui(activeDisplaySlot.label) })}
           onClick={() => openBehaviorPicker(activeDisplaySlot)}
           type="button"
         >
           <Plus aria-hidden="true" size={15} strokeWidth={2.4} />
-          <span>Começar script</span>
+          <span>{ui("Começar script")}</span>
         </button>
       </div>
     ) : activeDisplaySlot.isMissing ? (
-      <div className="room-event-binding-empty is-warning" aria-label={`Fluxo indisponível de ${activeDisplaySlot.label}`}>
-        <strong>O fluxo vinculado não está disponível.</strong>
-        <p>Crie uma nova sequência de eventos para este estado.</p>
+      <div className="room-event-binding-empty is-warning" aria-label={ui("Fluxo indisponível de {0}", { 0: ui(activeDisplaySlot.label) })}>
+        <strong>{ui("O fluxo vinculado não está disponível.")}</strong>
+        <p>{ui("Crie uma nova sequência de eventos para este estado.")}</p>
         <button
-          aria-label={`Reconstruir script em ${activeDisplaySlot.label}`}
+          aria-label={ui("Reconstruir script em {0}", { 0: ui(activeDisplaySlot.label) })}
           onClick={() => openBehaviorPicker(activeDisplaySlot)}
           type="button"
         >
           <Plus aria-hidden="true" size={15} strokeWidth={2.4} />
-          <span>Reconstruir fluxo</span>
+          <span>{ui("Reconstruir fluxo")}</span>
         </button>
       </div>
     ) : activeDisplaySlot.eventName && onOpenEvent ? (
@@ -369,21 +371,20 @@ export function RoomEventBindingsInspector({
         onClick={() => onOpenEvent(activeDisplaySlot.eventName!)}
         type="button"
       >
-        Abrir script
-      </button>
+        {ui("Abrir script")}</button>
     ) : null
 
   ) : null;
   const nativeEditor = activeDisplaySlot ? <>
     {nativeTimeline}
-    {showSequence ? <div className="room-native-event-timeline" aria-label="Timeline da sequência em Ao iniciar">
+    {showSequence ? <div className="room-native-event-timeline" aria-label={ui("Timeline da sequência em Ao iniciar")}>
       {sequenceStates.map((state, index) => <details className="room-native-event-block" key={state.bindingKey} open={index === 0}>
-        <summary>{state.label}</summary>
+        <summary>{ui(state.label)}</summary>
         <NativeStateTimeline state={state} onUpdate={onUpdateRuntimeState} />
         {state.eventName && eventOptions.some((option) => option.value === state.eventName) && renderEventInspector
-          ? <div className="room-event-binding-timeline" aria-label={`Eventos de ${state.label}`}>{renderEventInspector(state.eventName, state.label)}</div>
-          : state.eventName ? <span role="status">Fluxo não encontrado: {state.eventName}</span> : null}
-        <button className="room-event-binding-open" type="button" onClick={() => openBehaviorPicker({ bindingKey: state.bindingKey, label: state.label, requiresFrequency: false })}>{state.eventName ? "Substituir fluxo do quadro" : "Adicionar evento ao quadro"}</button>
+          ? <div className="room-event-binding-timeline" aria-label={ui("Eventos de {0}", { 0: ui(state.label) })}>{renderEventInspector(state.eventName, state.label)}</div>
+          : state.eventName ? <span role="status">{ui("Fluxo não encontrado: ")}{state.eventName}</span> : null}
+        <button className="room-event-binding-open" type="button" onClick={() => openBehaviorPicker({ bindingKey: state.bindingKey, label: state.label, requiresFrequency: false })}>{state.eventName ? ui("Substituir fluxo do quadro") : ui("Adicionar evento ao quadro")}</button>
       </details>)}
     </div> : null}</> : null;
   const expandedEmptyState = Boolean(expandedHost && !activeEventInspector && activeDisplaySlot);
@@ -400,28 +401,31 @@ export function RoomEventBindingsInspector({
   }, [expandedEmptyState, behaviorPickerSlot]);
 
   return (
-    <div className="room-event-bindings-inspector" aria-label={`${isPlayer ? "Configuração do Player" : contextTitle(contextKind)} ${String(target.name ?? "")}`}>
+    <div className="room-event-bindings-inspector" aria-label={`${ui(isPlayer ? "Configuração do Player" : contextTitle(contextKind))} ${String(target.name ?? "")}`}>
+      {contextKind === "room" && typeof target.authoringNotes === "string" ? <details className="room-native-event-block">
+        <summary>{ui("Detalhe")}</summary>
+        <p>{target.authoringNotes}</p>
+      </details> : null}
       <div className="room-event-state-toolbar">
         <label className="room-event-state-picker">
-          <span>Quando</span>
-          <select aria-label="Estado do evento" value={activeDisplaySlot?.bindingKey ?? ""}
+          <span>{ui("Quando")}</span>
+          <select aria-label={ui("Estado do evento")} value={activeDisplaySlot?.bindingKey ?? ""}
             disabled={!activeDisplaySlot} onChange={event => selectState(event.currentTarget.value)}>
             {orderedSlots.map(slot => slot.groupedBindingKeys?.length
-              ? <optgroup key={slot.bindingKey} label={slot.label}>{slot.groupedBindingKeys.map(group =>
-                  <option key={group.bindingKey} value={group.bindingKey}>{slot.label} · {group.label}</option>
+              ? <optgroup key={slot.bindingKey} label={ui(slot.label)}>{slot.groupedBindingKeys.map(group =>
+                  <option key={group.bindingKey} value={group.bindingKey}>{ui(slot.label)} · {ui(group.label)}</option>
                 )}</optgroup>
-              : <option key={slot.bindingKey} value={slot.bindingKey}>{slot.label}</option>)}
+              : <option key={slot.bindingKey} value={slot.bindingKey}>{ui(slot.label)}</option>)}
           </select>
         </label>
-        <button ref={expandButtonRef} type="button" aria-label="Expandir eventos" disabled={!activeDisplaySlot}
+        <button ref={expandButtonRef} type="button" aria-label={ui("Expandir eventos")} disabled={!activeDisplaySlot}
           onClick={event => changeExpandedHost(event.currentTarget.closest(".rooms-editor-layout")?.querySelector<HTMLElement>(".rooms-event-focus-host") ?? document.body)}>
-          <Maximize2 aria-hidden="true" size={15}/>Expandir
-        </button>
+          <Maximize2 aria-hidden="true" size={15}/>{ui("Expandir")}</button>
       </div>
       {contextKind === "actor" && collisionSupported && onChangeCollisionGroup ? (
         <div className="room-event-collision-group">
-          <span>Grupo de colisão</span>
-          <div aria-label="Grupo de colisão" className="room-event-collision-group-options" role="radiogroup">
+          <span>{ui("Grupo de colisão")}</span>
+          <div aria-label={ui("Grupo de colisão")} className="room-event-collision-group-options" role="radiogroup">
             {collisionGroupOptions(resolvedCollisionGroup).map((group) => (
               <button
                 aria-checked={group === resolvedCollisionGroup}
@@ -431,7 +435,7 @@ export function RoomEventBindingsInspector({
                 role="radio"
                 type="button"
               >
-                {group === 0 ? "Nenhum" : group}
+                {group === 0 ? ui("Nenhum") : group}
               </button>
             ))}
           </div>
@@ -439,13 +443,13 @@ export function RoomEventBindingsInspector({
       ) : null}
       {isPlayer ? (
         <details className="room-event-player-guidance">
-          <summary>Sobre os eventos do Player</summary>
-          <p>Os estados próprios do Player ficam neste fluxo. As colisões contra ele ficam nos estados da cena.</p>
+          <summary>{ui("Sobre os eventos do Player")}</summary>
+          <p>{ui("Os estados próprios do Player ficam neste fluxo. As colisões contra ele ficam nos estados da cena.")}</p>
         </details>
       ) : null}
       {activeDisplaySlot ? (
         <div
-          aria-label={activeDisplaySlot.label}
+          aria-label={ui(activeDisplaySlot.label)}
           className={["room-event-binding", activeDisplaySlot.isPending ? "is-pending" : "", activeDisplaySlot.isMissing ? "is-missing" : ""].filter(Boolean).join(" ")}
           id={`room-event-panel-${activeDisplaySlot.bindingKey}`}
           role="region"
@@ -455,19 +459,19 @@ export function RoomEventBindingsInspector({
         </div>
       ) : null}
       {expandedEmptyState && expandedHost && activeDisplaySlot ? createPortal(
-        <section aria-label={`Editor de ${activeDisplaySlot.label}`} className={`event-inspector-flow is-event-authoring is-expanded${expandedHost === document.body ? " is-standalone" : ""}`}>
+        <section aria-label={ui("Editor de {0}", { 0: ui(activeDisplaySlot.label) })} className={`event-inspector-flow is-event-authoring is-expanded${expandedHost === document.body ? " is-standalone" : ""}`}>
           <header className="event-authoring-header">
-            <button type="button" onClick={() => changeExpandedHost(null)}><ArrowLeft size={15}/>Voltar à cena</button>
-            <div><small>{String(target.name ?? "")} / Eventos</small><strong>{activeDisplaySlot.label}</strong><small>{hasNativeActions || showSequence ? "Ações da cena" : "Fluxo vazio"}</small></div>
+            <button type="button" onClick={() => changeExpandedHost(null)}><ArrowLeft size={15}/>{ui("Voltar à cena")}</button>
+            <div><small>{String(target.name ?? "")} {ui(" / Eventos")}</small><strong>{ui(activeDisplaySlot.label)}</strong><small>{hasNativeActions || showSequence ? ui("Ações da cena") : ui("Fluxo vazio")}</small></div>
           </header>
-          <div className="event-authoring-states" role="tablist" aria-label="Estados de evento expandido">
-            {orderedSlots.map(slot => <button key={slot.bindingKey} type="button" role="tab" aria-selected={activeSlot?.bindingKey === slot.bindingKey} onClick={() => setActiveBindingKey(slot.bindingKey)}>{slot.label}</button>)}
+          <div className="event-authoring-states" role="tablist" aria-label={ui("Estados de evento expandido")}>
+            {orderedSlots.map(slot => <button key={slot.bindingKey} type="button" role="tab" aria-selected={activeSlot?.bindingKey === slot.bindingKey} onClick={() => setActiveBindingKey(slot.bindingKey)}>{ui(slot.label)}</button>)}
           </div>
-          {groupedSlots.length ? <div className="event-authoring-states" role="tablist" aria-label={`Grupos de ${activeSlot?.label}`}>
-            {groupedSlots.map(slot => <button key={slot.bindingKey} type="button" role="tab" aria-selected={activeDisplaySlot.bindingKey === slot.bindingKey} onClick={() => setActiveGroupBindingKey(slot.bindingKey)}>{slot.label}</button>)}
+          {groupedSlots.length ? <div className="event-authoring-states" role="tablist" aria-label={ui("Grupos de {0}", { 0: ui(activeSlot?.label) })}>
+            {groupedSlots.map(slot => <button key={slot.bindingKey} type="button" role="tab" aria-selected={activeDisplaySlot.bindingKey === slot.bindingKey} onClick={() => setActiveGroupBindingKey(slot.bindingKey)}>{ui(slot.label)}</button>)}
           </div> : null}
           <div className="event-authoring-layout"><div className="event-authoring-flow">{frequencyEditor}{slotEditor}{nativeEditor}</div>
-            <aside className="event-authoring-parameters"><p className="event-selected-empty">Adicione um evento para começar este fluxo. Trocar de estado mantém o editor aberto.</p></aside>
+            <aside className="event-authoring-parameters"><p className="event-selected-empty">{ui("Adicione um evento para começar este fluxo. Trocar de estado mantém o editor aberto.")}</p></aside>
           </div>
         </section>, expandedHost
       ) : null}
@@ -496,6 +500,7 @@ export function RoomEventBindingsInspector({
 }
 
 function NativeFieldEditor({ state, field, onUpdate }: { state: RuntimeEventState; field: NativeEventField; onUpdate?: RoomEventBindingsInspectorProps["onUpdateRuntimeState"] }): React.ReactElement {
+  const ui = useStudioUiText();
   const [draft, setDraft] = useState(String(field.value));
   useEffect(() => setDraft(String(field.value)), [field.value, state.bindingKey, field.key]);
   const isBoolean = typeof field.value === "boolean";
@@ -508,8 +513,8 @@ function NativeFieldEditor({ state, field, onUpdate }: { state: RuntimeEventStat
     const value = typeof field.value === "number" ? Number(draft) : draft;
     if (value !== field.value) onUpdate(state.bindingKey, field.key, value);
   };
-  return <label className={isBoolean ? "room-native-event-checkbox" : undefined}><span>{field.label}</span><input
-    aria-label={`${state.label} · ${field.label}`}
+  return <label className={isBoolean ? "room-native-event-checkbox" : undefined}><span>{ui(field.label)}</span><input
+    aria-label={`${ui(state.label)} · ${ui(field.label)}`}
     type={isBoolean ? "checkbox" : typeof field.value === "number" ? "number" : "text"}
     checked={isBoolean ? Boolean(field.value) : undefined}
     value={isBoolean ? undefined : draft}
@@ -521,9 +526,10 @@ function NativeFieldEditor({ state, field, onUpdate }: { state: RuntimeEventStat
 }
 
 function NativeStateTimeline({ state, onUpdate }: { state: RuntimeEventState; onUpdate?: RoomEventBindingsInspectorProps["onUpdateRuntimeState"] }): React.ReactElement {
-  return <div className="room-native-event-timeline" aria-label={`Ações de ${state.label}`}>
+  const ui = useStudioUiText();
+  return <div className="room-native-event-timeline" aria-label={ui("Ações de {0}", { 0: ui(state.label) })}>
     {state.actions.map((action, index) => <details className="room-native-event-block" key={`${state.bindingKey}-${index}`}>
-      <summary>{action.title}</summary>
+      <summary>{ui(action.title)}</summary>
       <div className="room-native-event-fields">{action.fields.map((field) => <NativeFieldEditor key={field.key} state={state} field={field} onUpdate={onUpdate} />)}</div>
     </details>)}
   </div>;

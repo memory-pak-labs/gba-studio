@@ -16,6 +16,7 @@ import {
   planEmulationFrames,
   planPcmBufferSchedule,
   readRuntimeTelemetry,
+  readEventTraceTelemetry,
   readRuntimeTelemetryFromHeap,
   restoreModuleSavedata
 } from "../static/WebPlayer/player/mgba-direct-player.mjs";
@@ -83,10 +84,12 @@ describe("mGBA direct player framebuffer", () => {
     const bytes = new Uint8Array(2048);
     bytes.fill(0xFF);
     bytes.set([0x47, 0x42, 0x55, 0x53], 0);
-    bytes.set([0x01, 0x00, 0x04, 0x00], 4);
-    bytes.set([0x47, 0x42, 0x53, 0x4D], 16);
+    bytes.set([0x01, 0x00, 0x2C, 0x00], 4);
+    bytes.fill(0, 16, 60);
+    bytes.set([0x47, 0x42, 0x53, 0x4D, 0x01, 0x00, 0x04, 0x00], 16);
+    bytes.set([0x47, 0x42, 0x55, 0x53], 56);
     let checksum = 2166136261;
-    for (const byte of bytes.subarray(16, 20)) {
+    for (const byte of bytes.subarray(16, 60)) {
       checksum = Math.imul(checksum ^ byte, 16777619) >>> 0;
     }
     new DataView(bytes.buffer).setUint32(8, checksum, true);
@@ -99,7 +102,7 @@ describe("mGBA direct player framebuffer", () => {
       slotSignatureOffset: 0,
       slot: {
         checksumValid: true,
-        payloadSize: 4,
+        payloadSize: 44,
         sequence: 7,
         status: "ok",
         version: 1
@@ -111,6 +114,23 @@ describe("mGBA direct player framebuffer", () => {
       checksumValid: false,
       status: "checksum-mismatch"
     });
+  });
+
+  it("does not identify a standalone Cutscene record or a truncated record as universal", () => {
+    const bytes = new Uint8Array(2048);
+    const view = new DataView(bytes.buffer);
+    bytes.set([0x47, 0x42, 0x55, 0x53, 1, 0], 0);
+    view.setUint16(6, 448, true);
+    bytes.set([0x47, 0x42, 0x53, 0x4D, 1, 0, 0x98, 1], 16);
+    view.setUint16(58, 1, true); // standalone Cutscene step, not UniversalSaveData magic
+    let checksum = 2166136261;
+    for (const byte of bytes.subarray(16, 464)) checksum = Math.imul(checksum ^ byte, 16777619) >>> 0;
+    view.setUint32(8, checksum, true);
+    expect(inspectSavedataBytes(bytes)).toMatchObject({ hasUniversalSlotRecord: false, slot: { status: "ok" } });
+
+    view.setUint16(6, 4, true);
+    bytes.set([0x47, 0x42, 0x55, 0x53], 56);
+    expect(inspectSavedataBytes(bytes).hasUniversalSlotRecord).toBe(false);
   });
 
   it("round-trips savedata through the native mGBA adapter", () => {
@@ -538,5 +558,85 @@ describe("mGBA direct player framebuffer", () => {
     expect(analyzeRgbaFrame(first, 4, 4).signature).not.toBe(
       analyzeRgbaFrame(second, 4, 4).signature
     );
+  });
+});
+
+
+describe("native subsystem profiler extension", () => {
+  it("reads measured ticks without changing the existing mGBA telemetry bridge", () => {
+    const words = new Uint32Array(64);
+    words.set([0x47535452, 4, 64, 42]);
+    const extension = new Uint32Array([0x47535046, 1, 16, 42, 262144, 31, 10, 20, 30, 40, 50, 11, 22, 33, 44, 55]);
+    const module = {
+      _gba_find_runtime_telemetry: () => 0x02001000,
+      _gba_runtime_telemetry_word: (index) => words[index],
+      _gba_audio_register: (address) => {
+        const offset = address - 0x02001100;
+        return extension[offset >>> 2] >>> ((offset & 2) * 8) & 0xffff;
+      }
+    };
+    expect(readRuntimeTelemetry(module).subsystems).toEqual({
+      ticksPerSecond: 262144,
+      frameTicks: { scripts: 10, audio: 20, render: 30, streaming: 40, interrupts: 50 },
+      scenePeakTicks: { scripts: 11, audio: 22, render: 33, streaming: 44, interrupts: 55 }
+    });
+    extension[3] = 41;
+    expect(readRuntimeTelemetry(module).subsystems).toBeNull();
+    extension[0] = 0;
+    expect(readRuntimeTelemetry(module).subsystems).toBeNull();
+  });
+});
+
+it("decodes only the bounded native event trace extension and preserves wait context", () => {
+  const words = [0x47534554, 1, 20, 5, ...Array(16).fill(0)];
+  words[4] = 0x08000100; words[5] = 90; words[6] = 7 | (3 << 16) | (2 << 24); words[7] = 4 | (12 << 16);
+  const module = { _gba_audio_register(address) { const offset = address - 320; const word = words[Math.floor(offset / 4)] ?? 0; return (offset % 4 === 0 ? word : word >>> 16) & 65535; } };
+  expect(readEventTraceTelemetry(module, 0).entries.at(-1)).toMatchObject({ commandAddress: 0x08000100, frame: 90, step: 7, op: 3, status: 2, room: 4, waitFrames: 12 });
+  words[0] = 0;
+  expect(readEventTraceTelemetry(module, 0)).toBeNull();
+});
+
+describe("bulk native telemetry snapshot", () => {
+  function fixture() {
+    const HEAPU8 = new Uint8Array(1024);
+    const words = new Uint32Array(HEAPU8.buffer, 128, 100);
+    words.set([0x47535452, 4, 64, 42]);
+    words[5] = 123;
+    words[22] = 704;
+    words[23] = 400;
+    words[62] = 3;
+    words.set([0x47535046, 1, 16, 42, 262144, 31, 10, 20, 30, 40, 50, 11, 22, 33, 44, 55], 64);
+    words.set([0x47534554, 1, 20, 1, 0x08000100, 42, 7 | (3 << 16), 4 | (12 << 16)], 80);
+    const forbidden = vi.fn(() => { throw new Error("per-word bridge calls exceed the frame budget"); });
+    const module = { HEAPU8, _gba_runtime_telemetry_snapshot: vi.fn(() => 128),
+      _gba_find_runtime_telemetry: forbidden, _gba_runtime_telemetry_word: forbidden, _gba_audio_register: forbidden };
+    return { module, words, forbidden };
+  }
+
+  it("reads gameplay, profiler and event trace in one bridge call and owns its decoded values", () => {
+    const { module, words, forbidden } = fixture();
+    const state = readRuntimeTelemetry(module);
+    expect(state).toMatchObject({ frame: 42, player: { x: 704, y: 400 }, audio: { pcmUnderrunCount: 3 },
+      subsystems: { frameTicks: { scripts: 10, render: 30 } },
+      eventTrace: { entries: [{ commandAddress: 0x08000100, frame: 42, step: 7, room: 4, waitFrames: 12 }] } });
+    words.fill(0);
+    expect(state.frame).toBe(42);
+    expect(state.player.x).toBe(704);
+    expect(state.variables[0]).toBe(123);
+    expect(module._gba_runtime_telemetry_snapshot).toHaveBeenCalledTimes(1);
+    expect(forbidden).not.toHaveBeenCalled();
+  });
+
+  it.each([0, 129, 900])("rejects an unavailable or invalid snapshot pointer: %s", pointer => {
+    const { module, forbidden } = fixture();
+    module._gba_runtime_telemetry_snapshot.mockReturnValue(pointer);
+    expect(readRuntimeTelemetry(module)).toBeNull();
+    expect(forbidden).not.toHaveBeenCalled();
+  });
+
+  it("rejects stale profiler data without discarding gameplay telemetry", () => {
+    const { module, words } = fixture();
+    words[67] = 41;
+    expect(readRuntimeTelemetry(module)).toMatchObject({ frame: 42, subsystems: null });
   });
 });

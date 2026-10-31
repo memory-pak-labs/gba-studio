@@ -1,4 +1,4 @@
-import { hasPagedWorldMap } from './pagedWorldMap.js';
+import { hasPagedBackground } from './pagedWorldMap.js';
 import { gbaMetaspriteFramePartCount } from "./gbaMetaspriteLayout.js";
 import type { GBAProjectData } from "./projectFile.js";
 import {
@@ -24,7 +24,7 @@ import {
   type GbaBackgroundMapSizeDefinition
 } from "./gbaVideoModes.js";
 
-export type GbaHardwareIssueSeverity = "warning" | "error";
+export type GbaHardwareIssueSeverity = "info" | "warning" | "error";
 
 export interface GbaHardwareIssue {
   code: string;
@@ -169,7 +169,8 @@ function sceneHardwareContract(
   index: number,
   configuredMapSize: GbaBackgroundMapSizeDefinition,
   videoMode: { id: number; label: string },
-  pagedWorldMap = false
+  pagedWorldMap = false,
+  explicitMapSize = false
 ): GbaHardwareSceneContract {
   const name = sceneName(scene, index);
   const { widthTiles, heightTiles } = sceneDimensions(scene);
@@ -177,14 +178,16 @@ function sceneHardwareContract(
   // gbs_hw.c:stage_room_tilemap16. Its logical room is not a resident BG map.
   // Keep other runtimes/modes on their existing resident-map contract.
   const streamedPlatformer = (["platformer", "shmup"].includes(sceneType(scene)) || pagedWorldMap) && videoMode.id === 0;
-  const residentWidth = streamedPlatformer ? 32 : widthTiles;
-  const residentHeight = streamedPlatformer ? 32 : heightTiles;
+  const dungeonCamera = sceneType(scene) === "dungeonCrawler";
+  const residentWindow = streamedPlatformer || dungeonCamera;
+  const residentWidth = residentWindow ? 32 : widthTiles;
+  const residentHeight = residentWindow ? 32 : heightTiles;
   const requiredMapSize = gbaBackgroundMapSizeForDimensions(residentWidth, residentHeight);
   const fits = gbaBackgroundMapSizeFits(configuredMapSize.id, residentWidth, residentHeight);
-  const effectiveMapSize = streamedPlatformer ? requiredMapSize : (fits ? configuredMapSize : requiredMapSize);
+  const effectiveMapSize = residentWindow ? requiredMapSize : (fits ? configuredMapSize : requiredMapSize);
   const issues: GbaHardwareIssue[] = [];
 
-  if (sceneType(scene) !== "isometric" && (widthTiles < gbaSceneViewportWidthTiles || heightTiles < gbaSceneViewportHeightTiles)) {
+  if (!dungeonCamera && sceneType(scene) !== "isometric" && (widthTiles < gbaSceneViewportWidthTiles || heightTiles < gbaSceneViewportHeightTiles)) {
     issues.push(issue(
       "SCENE_BELOW_GBA_VIEWPORT",
       "warning",
@@ -194,7 +197,7 @@ function sceneHardwareContract(
       name
     ));
   }
-  if (!streamedPlatformer && (widthTiles > 64 || heightTiles > 64)) {
+  if (!residentWindow && (widthTiles > 64 || heightTiles > 64)) {
     issues.push(issue(
       "SCENE_EXCEEDS_GBA_BACKGROUND_MAP",
       "error",
@@ -207,7 +210,7 @@ function sceneHardwareContract(
   if (!fits) {
     issues.push(issue(
       "BACKGROUND_MAP_SIZE_EXPANDED",
-      "warning",
+      explicitMapSize ? "warning" : "info",
       `O mapa configurado ${configuredMapSize.id} não comporta ${name}; o contrato selecionará ${requiredMapSize.id}.`,
       "settings.backgrounds.defaultMapSize",
       `Use ${requiredMapSize.label} ou deixe o modo automático selecionar o menor mapa oficial que comporte a cena.`,
@@ -287,7 +290,7 @@ function assetContract(asset: RecordValue, index: number, frame?: {width: number
     if (nativeObjDimension === null && objWidth !== null && objHeight !== null) {
       issues.push(issue(
         "SPRITE_ASSET_REQUIRES_METASPRITE",
-        "warning",
+        "info",
         `O ${frame ? "quadro do sprite" : "sprite"} ${name} não cabe em um único OBJ nativo (${objWidth}×${objHeight} px); será decomposto em ${oamEntries} OBJs.`,
         `assets.${name}.metadata`,
         "Mantenha a dimensão alinhada a 8 px e revise o custo de OAM; use uma dimensão nativa quando a arte puder ser simplificada."
@@ -390,7 +393,7 @@ function metaspriteFrameIssues(
   if (decomposedSizes.size > 0) {
     issues.push(issue(
       "SPRITE_METASPRITE_PART_REQUIRES_DECOMPOSITION",
-      "warning",
+      "info",
       `O frame ${frameIndex + 1} de ${animationName} contém peças ${[...decomposedSizes].join(", ")} que não são um único OBJ nativo; a exportação as fatiará automaticamente.`,
       `animations.${animationName}.frames[${frameIndex}].tiles`,
       "Mantenha as peças alinhadas em 8×8 e revise o custo de OBJ exibido no workspace."
@@ -430,7 +433,7 @@ function animationIssues(data: GBAProjectData): GbaHardwareIssue[] {
     if (nativeDimension === null) {
       issues.push(issue(
         "SPRITE_FRAME_REQUIRES_METASPRITE",
-        "warning",
+        "info",
         `A animação ${name} (${widthPixels}×${heightPixels} px) será montada como metasprite com ${gbaSpriteOamEntriesForPixels(widthPixels, heightPixels)} OBJs.`,
         `animations.${name}.frameWidth`,
         "Revise OAM e mantenha a dimensão múltipla de 8; não é necessário deformar a arte para caber em um único OBJ."
@@ -464,7 +467,8 @@ export function buildGbaHardwareContract(data: GBAProjectData): GbaHardwareContr
     index,
     configuredMapSize,
     { id: videoModeDefinition.id, label: videoModeDefinition.label },
-    hasPagedWorldMap(data, scene)
+    hasPagedBackground(data, scene),
+    explicitMapSize
   ));
   const framesBySheet = new Map<string, {width: number; height: number}>();
   for (const animation of records(data.animations)) {
@@ -486,7 +490,7 @@ export function buildGbaHardwareContract(data: GBAProjectData): GbaHardwareContr
   if (!explicitMapSize && sceneContracts.some((scene) => scene.mapSizeExpandedAutomatically)) {
     issues.push({
       code: "BACKGROUND_MAP_SIZE_AUTO_SELECTED",
-      severity: "warning",
+      severity: "info",
       field: "settings.backgrounds.defaultMapSize",
       message: "O projeto não fixa um mapa BG; o exportador selecionará o menor tamanho oficial por cena.",
       resolution: "Defina o mapa padrão nas configurações se o projeto precisar de uma política explícita."

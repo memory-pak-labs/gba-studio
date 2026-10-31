@@ -133,6 +133,20 @@ describe("asset import filesystem integration", () => {
     await expect(readFile(path.join(projectRoot, relativePath), "utf8")).resolves.toBe("updated");
   });
 
+  it("keeps backgrounds in their category when importing and replacing a PNG", async () => {
+    const projectRoot = await makeTemporaryRoot("gbastudio-background-project-");
+    const sourceRoot = await makeTemporaryRoot("gbastudio-background-source-");
+    const projectPath = path.join(projectRoot, "Demo.gba-project");
+    const sourcePath = path.join(sourceRoot, "backgrounds", "menu.png");
+    await mkdir(path.dirname(sourcePath), { recursive: true });
+    await writeFile(sourcePath, "new-background", "utf8");
+    const imported = await copyFilesIntoProjectAssets(projectPath, [sourcePath], () => "background");
+    expect(imported[0]).toMatchObject({ kind: "Background", relativePath: "Assets/backgrounds/menu.png" });
+    const replaced = await reimportFileIntoProjectAsset(projectPath, sourcePath, "Assets/backgrounds/menu.png", () => "replacement");
+    expect(replaced.kind).toBe("Background");
+    await expect(readFile(path.join(projectRoot, replaced.relativePath), "utf8")).resolves.toBe("new-background");
+  });
+
   it("copies a project reference image into Assets using the requested sprite file name", async () => {
     const projectRoot = await makeTemporaryRoot("gbastudio-electron-project-");
     const projectPath = path.join(projectRoot, "Demo.gba-project");

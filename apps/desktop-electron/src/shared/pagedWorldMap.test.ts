@@ -15,7 +15,7 @@ it('budgets the resident 8bpp window while keeping the complete world map in ROM
   expect(buildScenePreflightReport(data,'map').budget.safeLimit.bgTiles).toBe(1408);
   const diagnostics=deriveScenePhysicalDiagnostics(data,'map');
   expect(diagnostics.metrics.find(metric => metric.id==='bgTiles')).toMatchObject({estimate:1302,safeLimit:1408});
-  expect(diagnostics.metrics.find(metric => metric.id==='vramBytes')?.estimate).toBe(41664);
+  expect(diagnostics.metrics.find(metric => metric.id==='vramBytes')?.estimate).toBe(41664 + 2048);
   const regular=structuredClone(data);
   (regular.assets as Array<{metadata:Record<string,unknown>}>)[0].metadata.kind='bg';
   expect(buildGbaHardwareContract(regular).scenes[0].requiredMapSize.id).toBe('64x64');

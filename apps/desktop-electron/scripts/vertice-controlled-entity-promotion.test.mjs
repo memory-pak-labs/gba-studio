@@ -75,11 +75,11 @@ describe("pilotos de entidades controláveis de Vértice", () => {
     ];
 
     expect(project.assets.filter((asset) => declinedNames.includes(asset.name))).toEqual([]);
-    expect(project.assets.find((asset) => asset.name === "tempestade-v3-player.png")).toEqual(expect.objectContaining({
-      name: "tempestade-v3-player.png",
+    expect(project.assets.find((asset) => asset.name === "tempestade-approved-player.png")).toEqual(expect.objectContaining({
+      name: "tempestade-approved-player.png",
       metadata: expect.objectContaining({ reviewStatus: "approved" })
     }));
-    expect(project.animations.some((animation) => animation.spriteSheet === "tempestade-v3-player.png")).toBe(true);
+    expect(project.animations.some((animation) => animation.spriteSheet === "tempestade-approved-player.png")).toBe(true);
     expect(project.animations.filter((animation) => declinedNames.includes(animation.spriteSheet))).toEqual([]);
     expect(project.animationStates.filter((state) => declinedNames.includes(state.spriteSheet))).toEqual([]);
   });

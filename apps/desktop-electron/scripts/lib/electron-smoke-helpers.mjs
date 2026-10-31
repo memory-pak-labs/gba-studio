@@ -31,8 +31,58 @@ export function createElectronSmokeEnv(overrides = {}) {
   return env;
 }
 
+/** Set the language fixture only in a disposable smoke profile. */
+export async function prepareElectronSmokeLocale(cdp, locale = "pt-BR") {
+  const deadline = Date.now() + 15_000;
+  let requested = false;
+  const evaluate = async (expression) => {
+    const response = await cdp.send("Runtime.evaluate", { expression, returnByValue: true });
+    if (response.exceptionDetails) throw new Error(response.exceptionDetails.exception?.description ?? response.exceptionDetails.text ?? "Locale evaluation failed");
+    return response.result?.value;
+  };
+  while (Date.now() < deadline) {
+    try {
+      // CDP can connect before React mounts. Reloading then races the provider's
+      // initial locale read; wait for its own rendered acknowledgement first.
+      const state = await evaluate(`({
+        mounted: Boolean(document.documentElement?.dataset.studioLocale),
+        locale: document.documentElement?.dataset.studioLocale,
+        lang: document.documentElement?.lang
+      })`);
+      if (state?.mounted && state.locale === locale && state.lang === locale) return;
+      if (state?.mounted && !requested) {
+        requested = true;
+        await evaluate(`(() => {
+          const locale = ${JSON.stringify(locale)};
+          const language = document.querySelector('.studio-language-switcher select');
+          if (language) {
+            language.value = locale;
+            language.dispatchEvent(new Event("change", { bubbles: true }));
+          } else {
+            localStorage.setItem("gbaStudio.locale", locale);
+            location.reload();
+          }
+        })()`);
+      }
+    } catch (error) {
+      if (!/Execution context was destroyed|Cannot find context with specified id/.test(String(error))) throw error;
+    }
+    await wait(100);
+  }
+  throw new Error(`Estado não alcançado: idioma renderizado ${locale}.`);
+}
+
 function firstExistingPath(paths) {
   return paths.find((item) => existsSync(item)) ?? paths[0];
+}
+
+export function electronLaunchCommand(executable, args = [], options = {}) {
+  const architecture = options.architecture ?? process.env.GBA_STUDIO_SMOKE_ARCH?.trim();
+  const platform = options.platform ?? process.platform;
+  if (!architecture) return { executable, args };
+  if (platform !== "darwin") throw new Error("A selecao de arquitetura do smoke requer macOS.");
+  if (!["arm64", "x86_64"].includes(architecture)) throw new Error(`Arquitetura do smoke invalida: ${architecture}`);
+  return { executable: "/usr/bin/arch", args: [`-${architecture}`, executable, ...args] };
 }
 
 export function packagedDarwinElectronExecutableCandidates(appRoot) {

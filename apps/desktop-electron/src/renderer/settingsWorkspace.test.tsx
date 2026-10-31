@@ -6,6 +6,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import type { ProjectHealthReport } from "../shared/projectHealth.js";
 import { deriveSettingsWorkspacePresentation } from "../shared/settingsWorkspace.js";
+import { translateStudioMessage } from "../shared/studioUiMessages";
 import { StudioI18nProvider } from "./i18n.js";
 import { SettingsWorkspace } from "./settingsWorkspace.js";
 
@@ -39,7 +40,7 @@ describe("SettingsWorkspace React", () => {
     const user = userEvent.setup();
     const handlers = settingsHandlers();
     const { rerender } = render(<SettingsWorkspace scope="export" presentation={deriveSettingsWorkspacePresentation({ settings: {} })} focusedSectionID="health" focusRequestID={1} {...handlers} />);
-    await user.click(screen.getByRole("button", { name: "Projeto e ROM seção de ajustes" }));
+    await user.click(screen.getByRole("button", { name: "Seção de ajustes: Projeto e ROM" }));
     rerender(<StudioI18nProvider><SettingsWorkspace scope="export" presentation={deriveSettingsWorkspacePresentation({ settings: { general: { gameTitle: "Editado" } } })} focusedSectionID="health" focusRequestID={1} {...handlers} /></StudioI18nProvider>);
     expect(screen.getByRole("region", { name: "Editar Projeto e ROM" })).toBeInTheDocument();
   });
@@ -52,7 +53,7 @@ describe("SettingsWorkspace React", () => {
     expect(screen.getByRole("option", { name: "Referência inválida (removed)" })).toBeInTheDocument();
     await user.selectOptions(screen.getByRole("combobox", { name: "Cena inicial" }), "logo");
     expect(onUpdateSetting).toHaveBeenLastCalledWith("general", "startScene", "logo");
-    await user.selectOptions(screen.getByRole("combobox", { name: "Player inicial" }), "Nara");
+    await user.selectOptions(screen.getByRole("combobox", { name: "Jogador inicial" }), "Nara");
     expect(onUpdateSetting).toHaveBeenLastCalledWith("general", "startPlayer", "Nara");
     fireEvent.change(screen.getByRole("textbox", { name: "Nome da ROM" }), { target: { value: "changed.gba" } });
     expect(onUpdateSetting).toHaveBeenLastCalledWith("build", "romFileName", "changed.gba");
@@ -66,7 +67,7 @@ describe("SettingsWorkspace React", () => {
     fireEvent.change(screen.getByRole("searchbox", { name: "Buscar ajustes" }), { target: { value: "Código do jogo" } });
     expect(screen.getByRole("button", { name: "Abrir Projeto e ROM" })).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Abrir Compilação" })).not.toBeInTheDocument();
-    await user.click(screen.getByRole("button", { name: "Compilação seção de ajustes" }));
+    await user.click(screen.getByRole("button", { name: "Seção de ajustes: Compilação" }));
     expect(screen.queryByRole("textbox", { name: "Nome da ROM" })).not.toBeInTheDocument();
     expect(screen.getByRole("checkbox", { name: "Cache incremental persistente" })).toBeInTheDocument();
   });
@@ -84,17 +85,17 @@ describe("SettingsWorkspace React", () => {
     const presentation = deriveSettingsWorkspacePresentation({ settings: { audio: { sampleRate: 15768 }, build: { compilerPath: "/old/compiler" } } });
     const { rerender } = render(<SettingsWorkspace scope="export" presentation={presentation} {...settingsHandlers({ hasEngineBuild: true })} />);
     expect(screen.getByText("Caminhos ainda não verificados")).toBeInTheDocument();
-    await user.click(screen.getByRole("button", { name: "Compilação seção de ajustes" }));
+    await user.click(screen.getByRole("button", { name: "Seção de ajustes: Compilação" }));
     await user.click(screen.getByText("Toolchain e caminhos avançados"));
     expect(screen.getByLabelText("Compiler")).toHaveTextContent("Automático via devkitARM");
     expect(screen.queryByRole("textbox", { name: "Compiler" })).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: "gbsbuild dry-run" })).toBeDisabled();
     rerender(<StudioI18nProvider><SettingsWorkspace scope="export" presentation={presentation} {...settingsHandlers({ hasEngineBuild: true })} hasCurrentEngineExport /></StudioI18nProvider>);
     expect(screen.getByRole("button", { name: "gbsbuild dry-run" })).toBeEnabled();
-    await user.click(screen.getByRole("button", { name: "Hardware GBA seção de ajustes" }));
+    await user.click(screen.getByRole("button", { name: "Seção de ajustes: Hardware GBA" }));
     expect(screen.getByLabelText("Resolução")).toHaveTextContent("240 x 160");
     expect(screen.queryByRole("button", { name: "Restaurar padrão de Hardware GBA" })).not.toBeInTheDocument();
-    await user.click(screen.getByRole("button", { name: "Áudio seção de ajustes" }));
+    await user.click(screen.getByRole("button", { name: "Seção de ajustes: Áudio" }));
     expect(screen.getByRole("combobox", { name: "Sample rate" })).toHaveValue("15768");
   });
   afterEach(() => {
@@ -115,7 +116,7 @@ describe("SettingsWorkspace React", () => {
     expect(screen.queryByRole("region", { name: "Editar Geral" })).not.toBeInTheDocument();
     expect(screen.queryByRole("region", { name: "Editar Build" })).not.toBeInTheDocument();
     expect(screen.queryByRole("region", { name: "Editar Tipos de Cena" })).not.toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "UI / Diálogos seção de ajustes" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Seção de ajustes: UI / Diálogos" })).not.toBeInTheDocument();
     expect(container.querySelector(".settings-value-list")).not.toBeInTheDocument();
   });
 
@@ -126,7 +127,7 @@ describe("SettingsWorkspace React", () => {
 
     render(<SettingsWorkspace presentation={presentation} {...settingsHandlers({ onUpdateSetting })} />);
 
-    await user.click(screen.getByRole("button", { name: "Controles seção de ajustes" }));
+    await user.click(screen.getByRole("button", { name: "Seção de ajustes: Controles" }));
     expect(screen.getByText("Separe várias teclas por vírgulas" )).toBeInTheDocument();
 
     const upInput = screen.getByLabelText("Cima");
@@ -147,7 +148,7 @@ describe("SettingsWorkspace React", () => {
 
     render(<SettingsWorkspace presentation={presentation} {...settingsHandlers({ onUpdateSetting })} />);
 
-    await user.click(screen.getByRole("button", { name: "Atalhos seção de ajustes" }));
+    await user.click(screen.getByRole("button", { name: "Seção de ajustes: Atalhos" }));
     expect(screen.getByRole("region", { name: "Editar Atalhos" })).toBeInTheDocument();
     expect(screen.getByText(/Clique em Capturar/)).toBeInTheDocument();
     const shortcutPanel = screen.getByRole("region", { name: "Configuração dos atalhos do editor" });
@@ -197,7 +198,7 @@ describe("SettingsWorkspace React", () => {
       />
     );
 
-    fireEvent.click(screen.getByRole("button", { name: "Compilação seção de ajustes" }));
+    fireEvent.click(screen.getByRole("button", { name: "Seção de ajustes: Compilação" }));
     expect(screen.getByText("Engine Pack detectado automaticamente.")).toBeInTheDocument();
     expect(screen.getByText("Usado: /workspace/packages/GBAStudioEngine/dist/GBAStudioEnginePack")).toBeInTheDocument();
   });
@@ -209,7 +210,7 @@ describe("SettingsWorkspace React", () => {
 
     render(<SettingsWorkspace presentation={presentation} {...settingsHandlers({ onUpdateSetting })} />);
 
-    await user.click(screen.getByRole("button", { name: "Atalhos seção de ajustes" }));
+    await user.click(screen.getByRole("button", { name: "Seção de ajustes: Atalhos" }));
     const captureButton = screen.getByRole("button", { name: "Capturar atalho de Selecionar" });
     await user.click(captureButton);
     fireEvent.keyDown(captureButton, { code: "KeyB", key: "b", ctrlKey: true, shiftKey: true });
@@ -232,7 +233,7 @@ describe("SettingsWorkspace React", () => {
 
     render(<SettingsWorkspace presentation={presentation} {...settingsHandlers({ onUpdateSetting, onResetSection })} />);
 
-    await user.click(screen.getByRole("button", { name: "Atalhos seção de ajustes" }));
+    await user.click(screen.getByRole("button", { name: "Seção de ajustes: Atalhos" }));
 
     expect(screen.getByText("Selecionar e mover entidades")).toBeInTheDocument();
     expect(screen.getByText("Conflita com Pintura.")).toBeInTheDocument();
@@ -255,7 +256,7 @@ describe("SettingsWorkspace React", () => {
 
     render(<SettingsWorkspace presentation={presentation} {...settingsHandlers()} />);
 
-    await user.click(screen.getByRole("button", { name: "Créditos seção de ajustes" }));
+    await user.click(screen.getByRole("button", { name: "Seção de ajustes: Créditos" }));
     expect(screen.getByRole("region", { name: "Editar Créditos" })).toBeInTheDocument();
     expect(screen.getByText("Sobre o GBA Studio")).toBeInTheDocument();
     expect(screen.getByText("Matheus Melo")).toBeInTheDocument();
@@ -346,14 +347,14 @@ describe("SettingsWorkspace React", () => {
 
     expect(screen.queryByRole("region", { name: "Editar Áudio" })).not.toBeInTheDocument();
     expect(screen.queryByRole("region", { name: "Editar Save Data" })).not.toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "Áudio seção de ajustes" })).not.toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "Save Data seção de ajustes" })).not.toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "Preview seção de ajustes" })).not.toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "Runtime Universal seção de ajustes" })).not.toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "Projéteis seção de ajustes" })).not.toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "Sprites seção de ajustes" })).not.toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "Backgrounds seção de ajustes" })).not.toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "Logs e orçamentos seção de ajustes" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Seção de ajustes: Áudio" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Seção de ajustes: Save Data" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Seção de ajustes: Preview" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Seção de ajustes: Runtime Universal" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Seção de ajustes: Projéteis" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Seção de ajustes: Sprites" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Seção de ajustes: Backgrounds" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Seção de ajustes: Logs e orçamentos" })).not.toBeInTheDocument();
   });
 
   it("renders scene rules in the dedicated Cenas workspace", async () => {
@@ -364,10 +365,10 @@ describe("SettingsWorkspace React", () => {
 
     expect(screen.getByRole("heading", { level: 3, name: "Cenas" })).toBeInTheDocument();
     expect(screen.getByRole("region", { name: "Editar Top-down" })).toBeInTheDocument();
-    expect(screen.getByLabelText("Player padrão · Aventura / Top-down")).toBeInTheDocument();
-    await user.click(screen.getByRole("button", { name: "Players e backgrounds seção de ajustes" }));
-    const players = screen.getByRole("region", { name: "Editar Players e backgrounds" });
-    expect(within(players).getByLabelText("Player padrão · Aventura / Top-down")).toBeInTheDocument();
+    expect(screen.getByLabelText("Jogador padrão · Aventura / Top-down")).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Seção de ajustes: Jogadores e fundos" }));
+    const players = screen.getByRole("region", { name: "Editar Jogadores e fundos" });
+    expect(within(players).getByLabelText("Jogador padrão · Aventura / Top-down")).toBeInTheDocument();
     expect(screen.queryByRole("region", { name: "Editar Tipos de Cena" })).not.toBeInTheDocument();
     expect(screen.queryByRole("region", { name: "Disponibilidade dos tipos de cena" })).not.toBeInTheDocument();
     expect(screen.queryByRole("region", { name: "Editar Top-down" })).not.toBeInTheDocument();
@@ -397,7 +398,7 @@ describe("SettingsWorkspace React", () => {
 
     render(<SettingsWorkspace scope="scene" title="Cenas" presentation={presentation} {...settingsHandlers({ onUpdateSetting })} />);
 
-    await user.click(screen.getByRole("button", { name: "Batalha RPG seção de ajustes" }));
+    await user.click(screen.getByRole("button", { name: "Seção de ajustes: Batalha RPG" }));
     const battle = screen.getByRole("region", { name: "Editar Batalha RPG" });
     expect(within(battle).getByText("Regras da batalha")).toBeInTheDocument();
     expect(within(battle).getByRole("checkbox", { name: "Permitir fuga" })).toBeChecked();
@@ -455,11 +456,11 @@ describe("SettingsWorkspace React", () => {
     expect(screen.getByRole("region", { name: "Editar Top-down" })).toBeInTheDocument();
     expect(screen.queryByRole("region", { name: "Editar Apontar e Clicar" })).not.toBeInTheDocument();
     expect(screen.queryByRole("region", { name: "Editar Plataforma" })).not.toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Plataforma seção de ajustes" })).toBeInTheDocument();
-    await user.click(screen.getByRole("button", { name: "Plataforma seção de ajustes" }));
+    expect(screen.getByRole("button", { name: "Seção de ajustes: Plataforma" })).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Seção de ajustes: Plataforma" }));
     expect(screen.getByRole("region", { name: "Editar Plataforma" })).toBeInTheDocument();
     expect(screen.queryByRole("region", { name: "Editar Top-down" })).not.toBeInTheDocument();
-    await user.click(screen.getByRole("button", { name: "Apontar e Clicar seção de ajustes" }));
+    await user.click(screen.getByRole("button", { name: "Seção de ajustes: Apontar e Clicar" }));
     expect(screen.getByRole("region", { name: "Editar Apontar e Clicar" })).toBeInTheDocument();
   });
 
@@ -511,7 +512,7 @@ describe("SettingsWorkspace React", () => {
       />
     );
 
-    fireEvent.click(screen.getByRole("button", { name: "Orçamentos seção de ajustes" }));
+    fireEvent.click(screen.getByRole("button", { name: "Seção de ajustes: Orçamentos" }));
     expect(screen.getByRole("checkbox", { name: "CPU" })).toBeChecked();
     expect(screen.getByRole("checkbox", { name: "VRAM" })).toBeChecked();
     expect(screen.queryByRole("region", { name: "Depurador de hardware" })).not.toBeInTheDocument();
@@ -546,7 +547,7 @@ describe("SettingsWorkspace React", () => {
       />
     );
 
-    await user.click(screen.getByRole("button", { name: "MCP local seção de ajustes" }));
+    await user.click(screen.getByRole("button", { name: "Seção de ajustes: MCP local" }));
     expect(screen.getByRole("region", { name: "Editar MCP local" })).toBeInTheDocument();
     expect(screen.getByText("Usar rede")).toBeInTheDocument();
     expect(screen.getByText("Bloqueado · stdio local")).toBeInTheDocument();
@@ -582,7 +583,7 @@ describe("SettingsWorkspace React", () => {
 
     render(<SettingsWorkspace scope="export" title="Exportar" presentation={presentation} {...settingsHandlers({ onUpdateSetting })} />);
 
-    await user.click(screen.getByRole("button", { name: "Runtime Universal seção de ajustes" }));
+    await user.click(screen.getByRole("button", { name: "Seção de ajustes: Runtime Universal" }));
     expect(screen.getByRole("region", { name: "Capacidades universais do runtime" })).toBeInTheDocument();
     expect(screen.getByRole("checkbox", { name: "Relógio em tempo real (RTC)" })).toBeChecked();
     expect(screen.getByRole("checkbox", { name: "Link cable / multiplayer" })).not.toBeChecked();
@@ -606,7 +607,7 @@ describe("SettingsWorkspace React", () => {
 
     const { rerender } = render(<SettingsWorkspace scope="scene" title="Cenas" presentation={presentation} {...settingsHandlers({ onUpdateSetting })} />);
 
-    await user.click(screen.getByRole("button", { name: "Backgrounds seção de ajustes" }));
+    await user.click(screen.getByRole("button", { name: "Seção de ajustes: Backgrounds" }));
     expect(screen.getByRole("region", { name: "Padrão de vídeo dos backgrounds" })).toBeInTheDocument();
     expect(screen.getByText(/Use este modo como base do pipeline/)).toBeInTheDocument();
     expect(screen.getByText("Prévia da transformação")).toBeInTheDocument();
@@ -620,7 +621,7 @@ describe("SettingsWorkspace React", () => {
       </StudioI18nProvider>
     );
 
-    await user.click(screen.getByRole("button", { name: "Salvamento seção de ajustes" }));
+    await user.click(screen.getByRole("button", { name: "Seção de ajustes: Salvamento" }));
     expect(screen.getByRole("region", { name: "Construtor visual de saves" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Selecionar slot 2" })).toHaveAttribute("aria-pressed", "true");
     expect(screen.getByText("Continuar")).toBeInTheDocument();
@@ -651,9 +652,9 @@ describe("SettingsWorkspace React", () => {
 
     render(<SettingsWorkspace scope="scene" title="Cenas" presentation={presentation} {...settingsHandlers({ onUpdateSetting })} />);
 
-    await user.click(screen.getByRole("button", { name: "Plataforma seção de ajustes" }));
+    await user.click(screen.getByRole("button", { name: "Seção de ajustes: Plataforma" }));
     await user.selectOptions(
-      screen.getByRole("combobox", { name: "Player padrão · Plataforma" }),
+      screen.getByRole("combobox", { name: "Jogador padrão · Plataforma" }),
       "hero-topdown.png"
     );
     expect(onUpdateSetting).toHaveBeenCalledWith(
@@ -679,10 +680,10 @@ describe("SettingsWorkspace React", () => {
         const normalize = (value: string) => value.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
         const labels = Array.from(page.querySelectorAll("label, [aria-label]")).map(label => normalize(label.getAttribute("aria-label") ?? label.textContent ?? ""));
         // Every field remains reachable, including technical controls inside the disclosure.
-        expect(labels.some(label => label.includes(normalize(field.label)) || label === "dash" && field.key === "dash"), `${selected.id}.${field.key}`).toBe(true);
+        expect(labels.some(label => label.includes(normalize(translateStudioMessage("pt-BR", field.label))) || label === "dash" && field.key === "dash"), `${selected.id}.${field.key}`).toBe(true);
       }
     }
-    await user.click(screen.getByRole("button", { name: "Plataforma seção de ajustes" }));
+    await user.click(screen.getByRole("button", { name: "Seção de ajustes: Plataforma" }));
     expect(screen.getByLabelText("Botão de pulo")).toHaveValue("Start");
     expect(screen.getByRole("status")).toHaveTextContent("Personalizado");
     await user.click(screen.getByText("Valores técnicos"));
@@ -694,7 +695,7 @@ describe("SettingsWorkspace React", () => {
     const user = userEvent.setup();
     const onUpdateSetting = vi.fn();
     render(<SettingsWorkspace scope="scene" presentation={deriveSettingsWorkspacePresentation({ settings: {} })} {...settingsHandlers({ onUpdateSetting })} />);
-    await user.click(screen.getByRole("button", { name: "Plataforma seção de ajustes" }));
+    await user.click(screen.getByRole("button", { name: "Seção de ajustes: Plataforma" }));
     await user.click(screen.getByRole("checkbox", { name: "Pulo duplo" }));
     expect(onUpdateSetting).toHaveBeenLastCalledWith("platformer", "doubleJump", true);
     await user.selectOptions(screen.getByLabelText("Botão de pulo"), "L");
@@ -711,7 +712,7 @@ describe("SettingsWorkspace React", () => {
     const onResetSection = vi.fn();
     const onUpdateSetting = vi.fn();
     render(<SettingsWorkspace scope="scene" presentation={deriveSettingsWorkspacePresentation({ settings: { platformer: { gravity: 0.51 } } })} {...settingsHandlers({ onResetSection, onUpdateSetting })} />);
-    await user.click(screen.getByRole("button", { name: "Plataforma seção de ajustes" }));
+    await user.click(screen.getByRole("button", { name: "Seção de ajustes: Plataforma" }));
     await user.click(screen.getByRole("button", { name: "Restaurar padrão de Plataforma" }));
     expect(onResetSection).not.toHaveBeenCalled();
     await user.click(screen.getByRole("button", { name: "Cancelar" }));
@@ -727,7 +728,7 @@ describe("SettingsWorkspace React", () => {
     const onApplySettingsPreset = vi.fn();
     const onUpdateSetting = vi.fn();
     render(<SettingsWorkspace scope="scene" presentation={deriveSettingsWorkspacePresentation({ settings: {} })} {...settingsHandlers({ onUpdateSetting })} onApplySettingsPreset={onApplySettingsPreset} />);
-    await user.click(screen.getByRole("button", { name: "Plataforma seção de ajustes" }));
+    await user.click(screen.getByRole("button", { name: "Seção de ajustes: Plataforma" }));
     await user.click(screen.getByRole("button", { name: "Aplicar Flutuante em Plataforma" }));
     expect(onApplySettingsPreset).toHaveBeenCalledExactlyOnceWith("platformer", [
       { fieldKey: "gravity", value: 0.32 },

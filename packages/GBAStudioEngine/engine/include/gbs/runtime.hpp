@@ -24,9 +24,12 @@ struct RuntimeSceneRegistry {
     int initial_scene;
 };
 
+enum class SceneEntryReason : uint8_t { FirstEntry, Return, Load, Resume, Restart };
+
 struct RuntimeTransitionRoute {
     RuntimeKind runtime;
     int local_index;
+    SceneEntryReason entry_reason = SceneEntryReason::Return;
 };
 
 struct RuntimeFrameContext {
@@ -35,6 +38,7 @@ struct RuntimeFrameContext {
     int active_scene;
     const FrameContext* frame_state;
     uint32_t transition_count;
+    SceneEntryReason entry_reason = SceneEntryReason::FirstEntry;
 };
 
 enum class RuntimeAdapterFrameResult : uint8_t {

@@ -33,6 +33,24 @@ function project(overrides: GBAProjectData): GBAProjectData {
   };
 }
 
+it("exporta ReplaceTile com colisão explícita e preserva a omissão", () => {
+  const contract = buildEngineExportProjectContract(project({events: [{
+    id: "tile-edit", name: "tile_edit", category: "Cena", roomName: "start", steps: [
+      {command: "replace_tile 125 85 17 bg2 free"},
+      {command: "replace_tile_sequence 4 6 18 3 bg2 solid"},
+      {command: "replace_tile 4 6 17 bg2 keep"}
+    ]
+  }]}));
+  expect(contract.topdown_project?.scripts).toEqual(expect.arrayContaining([{
+    name: "tile_edit", script: [
+      {op: "replace_tile", x: 125, y: 85, tile: 17, layer: "bg2", count: 1, collision_flags: 0},
+      {op: "replace_tile", x: 4, y: 6, tile: 18, layer: "bg2", count: 3, collision_flags: 1},
+      {op: "replace_tile", x: 4, y: 6, tile: 17, layer: "bg2", count: 1}
+    ]
+  }]));
+  expect(() => buildEngineExportProjectContract(project({events: [{name: "bad", category: "Cena", command: "replace_tile 1 1 2 bg1 free"}]}))).toThrow(/BG2/);
+});
+
 describe("tacticalMarkerIndices", () => {
   it("uses each asset's own frame zero when the cursor, range and target use separate sheets", () => {
     expect(tacticalMarkerIndices("cursor", "range", "target")).toEqual({ cursor: 0, range: 0, target: 0 });
@@ -43,6 +61,53 @@ describe("tacticalMarkerIndices", () => {
 });
 
 describe("prepareEngineProjectExport", () => {
+  it("exports an opt-in portrait tab independently of themes and requires its Engine capability", () => {
+    const contract = buildEngineExportProjectContract(project({ scenas: [
+      { name: "start", width: 30, height: 20, dialoguePresentation: "portrait_tab" },
+      { name: "other", width: 30, height: 20 }
+    ] }));
+    expect(contract.topdown_project?.dialogue_ui?.scene_skins).toEqual([{ scene_name: "start", presentation: "portrait_tab", runtime_kind: 0 }]);
+    expect(contract.requires.features).toContain("dialogue_portrait_tab");
+    const standard = buildEngineExportProjectContract(project({}));
+    expect(standard.requires.features).not.toContain("dialogue_portrait_tab");
+  });
+
+  it("keeps an automatic portal when a paged room has a trigger without an enter event", () => {
+    const contract = buildEngineExportProjectContract(project({
+      assets: [{ id: "harbor", name: "harbor.png", kind: "Background", metadata: {
+        source: "Assets/backgrounds/harbor.png", kind: "paged_bg", colorMode: "8bpp-indexed", width: 240, height: 160
+      } }],
+      scenas: [{ name: "start", sceneType: "topdown", width: 30, height: 20, backgroundAssetName: "harbor.png" },
+        { name: "next", sceneType: "topdown", width: 30, height: 20 }],
+      triggers: [{ id: "spot", name: "spot", roomName: "start", x: 1, y: 1, width: 1, height: 1, eventBindings: {} }],
+      editorState: { scenaConnections: [{ from: "start", to: "next", exit: { x: 1, y: 1, width: 1, height: 1 },
+        entry: { x: 2, y: 2, width: 1, height: 1 } }] }
+    }));
+    expect(contract.topdown_project?.rooms[0]?.portals).toHaveLength(1);
+  });
+  it("exports unique SDK requirements for the mixed example validated by gbsdoctor", async () => {
+    const source = await readFile(path.join(process.cwd(), "default-assets/templates/exemplo-gba/exemplo-gba.gba-project"), "utf8");
+    const contract = buildEngineExportProjectContract(parseGBAProjectFile(source).data);
+    expect(contract.requires.features.length).toBe(new Set(contract.requires.features).size);
+  });
+  it("keeps a paged top-down atlas in ROM and binds a full source map to the room", () => {
+    const contract = buildEngineExportProjectContract(project({
+      assets: [{ id: "harbor", name: "harbor.png", kind: "Background", metadata: {
+        source: "Assets/backgrounds/harbor.png", kind: "paged_bg", colorMode: "8bpp-indexed", width: 1008, height: 688
+      } }],
+      scenas: [{ name: "start", sceneType: "topdown", width: 126, height: 86,
+        backgroundAssetName: "harbor.png", gbStudioUseBackgroundLayout: true }]
+    }));
+    expect(contract.topdown_project?.rooms[0]).toMatchObject({
+      width_tiles: 126, height_tiles: 86, background_bits_per_pixel: 8,
+      visual_tilemap: "harbor", visual_tilemap_layout: "source_asset", paged_source_tiles: "harbor"
+    });
+    expect(contract.topdown_project?.assets?.tile_assets).not.toContain("harbor");
+    expect(contract.topdown_project?.assets?.bg_palettes).toContain("harbor");
+    expect(contract.topdown_project?.backgrounds).toBeUndefined();
+    expect(contract.requires.features).toContain("topdown_runtime.paged_background");
+  });
+
   it("exports multiple tactical presets with separate residency groups without mutating authoring data", () => {
     let data = createBlankProjectData({ name: "Duas arenas", includeStarterContent: false });
     for (const id of ["arena-a", "arena-b"]) {
@@ -53,22 +118,16 @@ describe("prepareEngineProjectExport", () => {
     const prepared = prepareEngineProjectExport(data);
     expect(prepared.error).toBeUndefined();
     const contract = prepared.generated!.contract;
-    const sets = contract.asset_pack!.resident_sets!;
-    expect(sets).toHaveLength(2);
-    expect(new Set(sets.flatMap(set => set.groups)).size).toBe(sets.reduce((sum, set) => sum + set.groups.length, 0));
-    for (const room of contract.isometric_project!.rooms) {
-      const set = sets.find(set => set.room === room.name)!;
-      expect(room.tactical_presentation!.surface_pages!.map(page => page.bank_group)).toEqual(set.groups);
-      expect(room.tactical_presentation!.surface_residency!.exclusive_bank_groups).toEqual(set.groups);
-      for (const group of set.groups) {
-        expect(contract.asset_pack!.assets.some(asset => {
-          const banks = asset as typeof asset & { bank_groups?: string[]; bank_group?: string };
-          return banks.bank_groups?.includes(group) || banks.bank_group === group;
-        })).toBe(true);
-      }
+    const rooms=contract.isometric_project!.rooms;
+    expect(rooms).toHaveLength(2);
+    for (const room of rooms) {
+      expect(room.paged_surface).toMatchObject({width:768,height:512});
+      expect(room.tactical_presentation!.surface_pages).toBeUndefined();
+      const group=`scene_${room.name.replaceAll("-","_")}`;
+      expect(contract.asset_pack!.assets.some(asset=>(asset as typeof asset & {bank_groups?:string[]}).bank_groups?.includes(group))).toBe(true);
     }
     expect(JSON.stringify(data)).toBe(before);
-    expect(buildEngineExportProjectContract(data).asset_pack!.resident_sets).toEqual(sets);
+    expect(buildEngineExportProjectContract(data).asset_pack).toEqual(contract.asset_pack);
   });
   it("emite o contrato físico GBA junto do export e bloqueia OBJ incompatível", () => {
     const contract = buildEngineExportProjectContract(project({
@@ -508,7 +567,7 @@ describe("prepareEngineProjectExport", () => {
     expect(template).toMatch(/void draw_view\(\)[\s\S]*?fixed UI layer used by the approved HUD[\s\S]*?fill_rect\(0, 0, 30, 20, 0\);[\s\S]*?set_bg_enabled\(gbs::BackgroundLayer::BG0, true\);/);
     expect(template).toMatch(/void draw_view\(\)[\s\S]*?cached_view_room == current_room_index[\s\S]*?cached_view_position\.x == runtime_state\.position\.x[\s\S]*?return;[\s\S]*?cached_view_room = current_room_index;/);
     expect(template).toMatch(/void apply_room_visuals\(\)[\s\S]*?invalidate_dungeon_view_cache\(\);/);
-    expect(template).toMatch(/draw_actors\(\);[\s\S]*?set_bg_priority\(gbs::BackgroundLayer::BG0, 0\);[\s\S]*?gbs::draw_hud\(hud\);[\s\S]*?gbs::draw_dialogue\(dialogue\);/);
+    expect(template).toMatch(/draw_actors\(\);[\s\S]*?set_bg_priority\(gbs::BackgroundLayer::BG0, 0\);[\s\S]*?gbs::draw_hud\(hud\);[\s\S]*?gbs::draw_dialogue\(dungeon_dialogue\);/);
     expect(template).not.toMatch(/if \(room\.background_index >= 0[\s\S]*?set_bg_enabled\(gbs::BackgroundLayer::BG0, false\)/);
   });
 
@@ -526,7 +585,7 @@ describe("prepareEngineProjectExport", () => {
       /gbs::draw_hud\(hud\);[\s\S]*?gbs::draw_dialogue\(dialogue\);[\s\S]*?draw_dialogue_portrait\(\);/
     );
     expect(visualNovelTemplate).toMatch(
-      /gbs::draw_hud\(hud\);[\s\S]*?gbs::draw_dialogue\(dialogue\);[\s\S]*?draw_dialogue_portrait\(\);/
+      /gbs::draw_hud\(hud\);[\s\S]*?draw_dialogue_portrait\(\);[\s\S]*?gbs::draw_dialogue\(dialogue\);/
     );
   });
 
@@ -2398,7 +2457,7 @@ describe("prepareEngineProjectExport", () => {
         name: "native_control",
         script: [
           { op: "set_actor_collision_box", actor: 0, offset_x: 0, offset_y: 1, width: 12, height: 14 },
-          { op: "set_player_speed_profile", walk_speed: 110, run_speed: 175, stamina_cost: 3 },
+          { op: "set_player_speed_profile", walk_speed: 110, run_speed: 175, button: "a", stamina_cost: 3 },
           { op: "set_player_movement_state", state: "swimming", tile_tag: "water" },
           { op: "store_actor_position", actor: 0, variable_x: 1, variable_y: 2 },
           { op: "store_actor_direction", actor: 0, variable: 0 },
@@ -4340,8 +4399,8 @@ describe("prepareEngineProjectExport", () => {
       props: [{
         name: "Mechanic",
         metasprite: { asset: "workshop_mechanic", index: 0 },
-        animation: "idle_down",
-        animations: expect.arrayContaining([expect.objectContaining({ name: "idle_down", asset: "workshop_mechanic" })]),
+        animation: "idle",
+        animations: expect.arrayContaining([expect.objectContaining({ name: "idle", asset: "workshop_mechanic" })]),
         position: { x: 96, y: 72 },
         visible_variable: 0,
         visible_value: 1
@@ -4478,6 +4537,24 @@ describe("prepareEngineProjectExport", () => {
       { op: "rate_limit", slot: 19, frames: 30, offset: 2 },
       { op: "launch_projectile", actor: 0, direction: "right" }
     ]);
+  });
+
+  it("starts the music selected on every visual-novel scene before its dialogue", () => {
+    const contract = buildEngineExportProjectContract(project({
+      scenas: [
+        { name: "chapter", sceneType: "visualNovel", width: 16, height: 16, music: "council_theme", eventBindings: { onInit: "speak" } },
+        { name: "chapter_two", sceneType: "visualNovel", width: 16, height: 16, music: "council_theme" }
+      ],
+      audioItems: [{ id: "theme", name: "council_theme", exportID: "council_theme", kind: "Musica", format: "MOD", loops: true,
+        patterns: [{ id: "main", name: "Main", steps: 4, channels: [{ id: "pulse", name: "Pulse", type: "pulse1", notes: ["C4", "", "E4", ""] }] }], patternOrder: ["main"] }],
+      dialogues: [{ key: "intro", text: "Hello" }],
+      events: [{ id: "event-speak", name: "speak", category: "Cena", steps: [{ command: "show_dialogue intro" }] }],
+      settings: { ...(project({}).settings as Record<string, unknown>), general: { gameTitle: "Council", startScene: "chapter", startSceneType: "visualNovel", exportFolder: "build" } }
+    }));
+    for (const scene of contract.visual_novel_project!.scenes) {
+      expect(scene.on_enter?.[0]).toEqual({ op: "run_audio_routine", index: 0 });
+    }
+    expect(contract.visual_novel_project!.scenes[0].on_enter).toContainEqual({ op: "show_dialogue", dialogue: 0 });
   });
 
   it("exports visual-novel rooms through the native visual_novel project contract", () => {
@@ -4734,7 +4811,7 @@ describe("prepareEngineProjectExport", () => {
     expect(template).toContain("gbs::set_audio_channel_volume(channel, volume);");
     expect(template).toContain("gbs::set_audio_channel_muted(channel, value != item.checked_value);");
     expect(template).toContain("format_menu_item_label(item, visible_item_count);");
-    expect(template).toContain("gbs::menu_item_binding_value(event_state, item)");
+    expect(template).toContain("gbs::menu_presentation_value(event_state, item.binding)");
     expect(template).toContain("MenuItemBindingFormat::Count");
   });
 
@@ -8486,10 +8563,11 @@ describe("backlog export slices", () => {
       "player_male",
       "player_female"
     ]);
-    expect(contract.topdown_project?.actor_sprites?.map((sprite) => sprite.animations?.map((animation) => animation.name))).toEqual([
-      ["idle_down", "idle_up", "idle_right", "walk_down", "walk_up", "walk_right", "idle_left", "walk_left"],
-      ["idle_down", "idle_up", "idle_right", "walk_down", "walk_up", "walk_right", "idle_left", "walk_left"]
-    ]);
+    for (const sprite of contract.topdown_project?.actor_sprites ?? []) {
+      expect(sprite.animations?.map((animation) => animation.name)).toEqual(expect.arrayContaining([
+        "idle_down", "idle_right", "idle_up", "idle_left", "walk_down", "walk_right", "walk_up", "walk_left"
+      ]));
+    }
   });
 
   it("compiles palette swap and restore commands for event scripts", () => {

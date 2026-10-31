@@ -285,5 +285,11 @@ int main() {
     if (gbs::apply_world_map_save_data(project, save_data, restored_runtime, restored_event_state)) {
         return 13;
     }
+    if (!gbs::world_map_strings_equal(gbs::world_map_hud_status_text(project, gbs::WorldMapNodeStatus::Available, false), "A VIAJAR")) return 14;
+    auto customized = project;
+    customized.hud_labels = {"< Viajar    > Porto", "Travessia", "Rota bloqueada"};
+    if (!gbs::world_map_strings_equal(gbs::world_map_hud_status_text(customized, gbs::WorldMapNodeStatus::Available, false), "< Viajar    > Porto")) return 15;
+    if (!gbs::world_map_strings_equal(gbs::world_map_hud_status_text(customized, gbs::WorldMapNodeStatus::Available, true), "Travessia")) return 16;
+    if (!gbs::world_map_strings_equal(gbs::world_map_hud_status_text(customized, gbs::WorldMapNodeStatus::Locked, false), "Rota bloqueada")) return 17;
     return 0;
 }

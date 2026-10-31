@@ -2,6 +2,7 @@
 
 #include <stddef.h>
 #include <stdint.h>
+#include "gbs/animation.hpp"
 #include "gbs/audio.hpp"
 #include "gbs/assets.hpp"
 #include "gbs/dialogue.hpp"
@@ -40,6 +41,14 @@ struct PlatformerPlayerAnimationSet {
     const SpriteAnimation* wall_slide = nullptr;
     const SpriteAnimation* dash = nullptr;
     const SpriteAnimation* glide = nullptr;
+    const SpriteAnimation* attack = nullptr;
+    const SpriteAnimation* hurt = nullptr;
+    const SpriteAnimation* land = nullptr;
+};
+
+struct PlatformerPlayerPresentation {
+    const SpriteAnimation* one_shot = nullptr;
+    uint16_t frames_remaining = 0;
 };
 
 enum class PlatformerEnemyContactResult : uint8_t {
@@ -235,6 +244,28 @@ struct PlatformerNpcRuntime {
     uint8_t collision_group = 0;
 };
 
+// NPC animation state only needs reconciliation when an animation command or
+// a change in the animator's playing/frame state actually affects that NPC.
+inline uint32_t platformer_npc_animation_sync_mask(const PlatformerNpcRuntime* npcs,
+    const SpriteAnimatorState* animators, size_t count, const EventState& state) {
+    if (npcs == nullptr || animators == nullptr) return 0;
+    if (count > 32) count = 32;
+    uint32_t mask = 0;
+    for (size_t i = 0; i < count; ++i) {
+        if (npcs[i].animation_frame_changed ||
+            (i < max_event_actor_state_slots && state.actor_animation_playing[i] != animators[i].playing))
+            mask |= 1u << i;
+    }
+    for (size_t i = 0; i < state.actor_command_count; ++i) {
+        const auto& command = state.actor_commands[i];
+        if (command.actor_index >= 0 && static_cast<size_t>(command.actor_index) < count &&
+            (command.op == EventActorOp::SetAnimation || command.op == EventActorOp::SetAnimationFrame ||
+             command.op == EventActorOp::SetSprite))
+            mask |= 1u << command.actor_index;
+    }
+    return mask;
+}
+
 struct PlatformerHazardEventData {
     size_t hazard_index;
     EventScript script;
@@ -307,6 +338,7 @@ struct PlatformerRoomData {
     EventScript on_hit_group1 = empty_event_script();
     EventScript on_hit_group2 = empty_event_script();
     EventScript on_hit_group3 = empty_event_script();
+    EventScript on_restore = empty_event_script();
 };
 
 struct PlatformerProjectData {
@@ -341,7 +373,23 @@ struct PlatformerProjectData {
     PlatformerPlayerAnimationSet player_animations {};
     EventScript player_on_start = empty_event_script();
     EventScript player_on_update = empty_event_script();
+    const SpriteAnimation* const* player_script_animations = nullptr;
+    size_t player_script_animation_count = 0;
 };
+
+constexpr const SpriteAnimation* platformer_player_animation_for_index(const PlatformerProjectData& project, int index) {
+    if (project.player_script_animations != nullptr && project.player_script_animation_count > 0) {
+        return sprite_animation_for_reference(project.player_script_animations,
+            project.player_script_animation_count, project.player_animations.idle, index);
+    }
+    const SpriteAnimation* clips[] = {
+        project.player_animations.idle, project.player_animations.walk, project.player_animations.jump,
+        project.player_animations.fall, project.player_animations.climb, project.player_animations.wall_slide,
+        project.player_animations.dash, project.player_animations.glide, project.player_animations.attack,
+        project.player_animations.hurt, project.player_animations.land
+    };
+    return sprite_animation_for_reference(clips, 11, project.player_animations.idle, index);
+}
 
 struct PlatformerRuntimeState {
     Vec2i respawn_position_pixels;
@@ -378,10 +426,7 @@ constexpr PlatformerNpcRuntime platformer_npc_runtime_from_data(const Platformer
 }
 
 constexpr const SpriteAnimation* platformer_npc_animation_for_index(const PlatformerNpcData& npc, int animation_index) {
-    if (npc.animations == nullptr || animation_index < 0 || static_cast<size_t>(animation_index) >= npc.animation_count) {
-        return npc.animation;
-    }
-    return npc.animations[animation_index];
+    return sprite_animation_for_reference(npc.animations, npc.animation_count, npc.animation, animation_index);
 }
 
 constexpr Rect platformer_npc_actor_rect(const PlatformerNpcRuntime& npc) {
@@ -445,7 +490,8 @@ constexpr EventScript platformer_npc_interaction_script_for(
     }
     const size_t count = room.npc_count < npc_count ? room.npc_count : npc_count;
     for (size_t index = 0; index < count; ++index) {
-        if (npcs[index].active && npcs[index].visible && intersects(player_bounds, platformer_npc_actor_rect(npcs[index]))) {
+        if (npcs[index].active && npcs[index].visible && has_event_script(room.npcs[index].on_interact) &&
+            intersects(player_bounds, platformer_npc_actor_rect(npcs[index]))) {
             return room.npcs[index].on_interact;
         }
     }
@@ -478,6 +524,9 @@ constexpr void apply_platformer_npc_event_command(
     case EventActorOp::SetActive:
         runtime.active = command.a != 0;
         break;
+    case EventActorOp::MoveTo:
+        // The scene runtime consumes this asynchronous request before this helper.
+        break;
     case EventActorOp::SetPosition:
         runtime.actor.position_pixels = Vec2i { command.a, command.b };
         break;
@@ -509,6 +558,8 @@ constexpr void apply_platformer_npc_event_command(
         runtime.actor.size_pixels = Vec2i { command.c, command.d };
         break;
     case EventActorOp::SetSprite:
+    case EventActorOp::VisibilityLantern:
+    case EventActorOp::VisibilityReveal:
     case EventActorOp::PushFacing:
     case EventActorOp::Push:
     case EventActorOp::CancelMovement: // Export currently restricts cancellation to topdown.
@@ -552,6 +603,20 @@ struct PlatformerSaveData {
     uint32_t play_time_frames;
     uint16_t flags;
 };
+
+constexpr size_t max_saved_platformer_npcs = 16;
+struct PlatformerNpcSavedState {
+    int32_t x, y;
+    uint8_t direction, visible, active, reserved;
+};
+struct PlatformerSceneSaveData {
+    PlatformerSaveData scene {};
+    uint16_t signature = 0x3150;
+    uint16_t npc_count = 0;
+    PlatformerNpcSavedState npcs[max_saved_platformer_npcs] {};
+};
+bool capture_platformer_npc_save_data(PlatformerSceneSaveData& save, const PlatformerNpcRuntime* npcs, size_t count);
+bool apply_platformer_npc_save_data(const PlatformerSceneSaveData& save, PlatformerNpcRuntime* npcs, size_t count);
 
 constexpr PlatformerRoom platformer_room_from_tilemap(const uint16_t* visual_tiles, TileMap collision) {
     return PlatformerRoom { visual_tiles, collision, collision.width, collision.height };
@@ -798,6 +863,7 @@ constexpr EventScript platformer_moving_platform_event_script_for(const Platform
     return empty_event_script();
 }
 
+bool move_platformer_scripted_step(const TileMap& map, Actor& actor, Vec2i delta, const Actor* blockers, size_t blocker_count);
 PlatformerActor platformer_actor_from_rect(Rect anchor_bounds_pixels, Vec2i collision_offset_pixels = Vec2i { 0, 0 });
 PlatformerRuntimeState platformer_state_from_spawn(Vec2i respawn_position_pixels, uint16_t checkpoint_id = 0);
 Rect platformer_actor_rect(const PlatformerActor& actor);
@@ -808,6 +874,15 @@ bool platformer_actor_on_ground(const TileMap& map, const PlatformerActor& actor
 bool platformer_slope_floor_y_at(const TileMap& map, int pixel_x, int tile_y, int* floor_y);
 bool snap_platformer_actor_to_slope_floor(const TileMap& map, PlatformerActor& actor, int max_snap_pixels = 4);
 PlatformerActorAnimationState platformer_actor_animation_state(const PlatformerActor& actor, int run_threshold_x256 = 0x0080);
+int platformer_callback_state_for_actor(const PlatformerActor& actor);
+const SpriteAnimation* update_platformer_player_presentation(
+    PlatformerPlayerPresentation& state,
+    const PlatformerPlayerAnimationSet& animations,
+    const PlatformerActor& actor,
+    InputState input,
+    bool landed,
+    bool hurt
+);
 const SpriteAnimation* platformer_player_animation_for_state(
     const PlatformerPlayerAnimationSet& animations,
     PlatformerActorAnimationState state
@@ -829,6 +904,7 @@ Vec2i update_platformer_moving_platform(PlatformerMovingPlatform& platform);
 bool platformer_actor_stands_on_platform(const PlatformerActor& actor, const PlatformerMovingPlatform& platform);
 bool snap_platformer_actor_to_moving_platforms(PlatformerActor& actor, const PlatformerMovingPlatform* platforms, size_t platform_count, size_t* platform_index = nullptr, int max_snap_pixels = 4);
 bool snap_platformer_actor_to_npcs(PlatformerActor& actor, Rect previous_bounds, const PlatformerNpcRuntime* npcs, size_t npc_count, uint8_t platform_group);
+bool carry_platformer_actor_with_npc(const TileMap& map, PlatformerActor& actor, Rect previous_platform, Rect current_platform);
 bool apply_platformer_moving_platform_delta(PlatformerActor& actor, const PlatformerMovingPlatform& platform, Vec2i delta_pixels);
 
 } // namespace gbs

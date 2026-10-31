@@ -7,6 +7,15 @@ import {
 } from "./gbaHardwareContract.js";
 
 describe("gbaHardwareContract", () => {
+  it("accepts a large top-down source only when an explicit paged background supplies the viewport", () => {
+    const scene = { name: "porto", sceneType: "topdown", width: 126, height: 86, backgroundAssetName: "porto.png", gbStudioUseBackgroundLayout: true };
+    const asset = { name: "porto.png", kind: "Background", metadata: { kind: "paged_bg", width: 1008, height: 688 } };
+    const paged = buildGbaHardwareContract({ scenas: [scene], assets: [asset] });
+    expect(paged.scenes[0]).toMatchObject({ widthPixels: 1008, heightPixels: 688, requiredMapSize: { id: "32x32" } });
+    expect(paged.issues.some(i => i.code === "SCENE_EXCEEDS_GBA_BACKGROUND_MAP")).toBe(false);
+    const staticMap = buildGbaHardwareContract({ scenas: [scene], assets: [{ ...asset, metadata: { kind: "bg" } }] });
+    expect(staticMap.issues.some(i => i.code === "SCENE_EXCEEDS_GBA_BACKGROUND_MAP")).toBe(true);
+  });
   it("keeps cached native geometry independent of edits to a returned layout", () => {
     const first = decomposeGbaMetaspriteFrame(48, 48);
     const original = first.map(part => ({ ...part }));
@@ -93,15 +102,15 @@ describe("gbaHardwareContract", () => {
     ]));
   });
 
-  it("keeps non-native but tile-aligned actor frames as metasprite warnings", () => {
+  it("keeps non-native but tile-aligned actor frames as metasprite information", () => {
     const contract = buildGbaHardwareContract({
       animations: [{ name: "idle", frameWidth: 24, frameHeight: 24, colorMode: "4bpp" }],
       assets: [{ name: "hero.png", kind: "Sprite", metadata: { width: 24, height: 24, colorMode: "4bpp" } }]
     });
 
     expect(contract.issues).toEqual(expect.arrayContaining([
-      expect.objectContaining({ code: "SPRITE_ASSET_REQUIRES_METASPRITE", severity: "warning" }),
-      expect.objectContaining({ code: "SPRITE_FRAME_REQUIRES_METASPRITE", severity: "warning" })
+      expect.objectContaining({ code: "SPRITE_ASSET_REQUIRES_METASPRITE", severity: "info" }),
+      expect.objectContaining({ code: "SPRITE_FRAME_REQUIRES_METASPRITE", severity: "info" })
     ]));
     expect(auditGbaHardwareBlockingErrors({
       animations: [{ name: "idle", frameWidth: 24, frameHeight: 24, colorMode: "4bpp" }]
@@ -137,7 +146,7 @@ describe("gbaHardwareContract", () => {
     });
 
     expect(contract.issues).toEqual(expect.arrayContaining([
-      expect.objectContaining({ code: "SPRITE_METASPRITE_PART_REQUIRES_DECOMPOSITION", severity: "warning" })
+      expect.objectContaining({ code: "SPRITE_METASPRITE_PART_REQUIRES_DECOMPOSITION", severity: "info" })
     ]));
     expect(auditGbaHardwareBlockingErrors({
       animations: [{

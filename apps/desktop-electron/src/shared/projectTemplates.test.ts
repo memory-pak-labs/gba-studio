@@ -68,12 +68,11 @@ describe("projectTemplates", () => {
     const rooms = deriveRoomsWorkspacePresentation(project);
     expect(rooms.rooms).toHaveLength(1);
     expect(rooms.rooms[0]).toMatchObject({ name: "cena_1", width: 30, height: 20 });
-    expect((project.rooms as Array<Record<string, unknown>>)[0].backgroundAssetName).toBe("neutral-background-topdown.png");
+    expect((project.rooms as Array<Record<string, unknown>>)[0].backgroundAssetName || "").toBe("");
     expect(rooms.rooms[0]?.tileCells).toHaveLength(600);
-    expect(rooms.entities).toHaveLength(1);
-    expect(rooms.entities[0]).toMatchObject({ name: "Player", spriteSheet: "neutral-player-topdown.png" });
+    expect(rooms.entities).toHaveLength(0);
     expect(project.settings).toMatchObject({
-      general: { gameTitle: "Meu jogo", startScene: "cena_1", startPlayer: "Player", exportFolder: "build" },
+      general: { gameTitle: "Meu jogo", startScene: "cena_1", startPlayer: "", exportFolder: "build" },
       build: { romFileName: "meu_jogo.gba" },
       sceneTypes: { defaultPlayerSprites: { topdown: "neutral-player-topdown.png" } },
       topdown: { playerSprite: "neutral-player-topdown.png" },
@@ -102,18 +101,18 @@ describe("projectTemplates", () => {
     const layers = scene.tileLayers as Array<Record<string, unknown>>;
 
     expect(Array.isArray(scene.tilemap)).toBe(true);
-    expect(scene.tilemap).toHaveLength(600);
+    expect(scene.tilemap).toHaveLength(4800);
     expect(layers.map((layer) => layer.mapping)).toEqual(["BG3", "BG2"]);
-    expect(layers.map((layer) => layer.tilemap)).toEqual([Array(600).fill(0), Array(600).fill(0)]);
+    expect(layers.map((layer) => layer.tilemap)).toEqual([Array(4800).fill(0), Array(4800).fill(0)]);
     expect(layers.map((layer) => layer.tileSourceAssetNames)).toEqual([
-      Array(600).fill("penedos-v13-fundo-240x160.png"),
-      Array(600).fill("penedos-v13-terreno-240x160.png")
+      Array(4800).fill("penedos-approved-sky.png"),
+      Array(4800).fill("penedos-approved-terrain.png")
     ]);
     expect(rooms.find((room) => room.name === "penedos_vento")?.tileLayers).toEqual(layers);
     expect(deriveRoomsWorkspacePresentation(project).rooms.find((room) => room.name === "penedos_vento")?.backgroundLayers)
       .toEqual([
-        expect.objectContaining({ mapping: "BG3", assetName: "penedos-v13-fundo-240x160.png", source: "Assets/backgrounds/penedos-v13-fundo-240x160.png" }),
-        expect.objectContaining({ mapping: "BG2", assetName: "penedos-v13-terreno-240x160.png", source: "Assets/backgrounds/penedos-v13-terreno-240x160.png" })
+        expect.objectContaining({ mapping: "BG3", assetName: "penedos-approved-sky.png", source: "Assets/backgrounds/penedos-approved-sky.png" }),
+        expect.objectContaining({ mapping: "BG2", assetName: "penedos-approved-terrain.png", source: "Assets/backgrounds/penedos-approved-terrain.png" })
       ]);
   });
 
@@ -140,10 +139,10 @@ describe("projectTemplates", () => {
     });
     expect(assets).toEqual(expect.arrayContaining([
       expect.objectContaining({
-        name: "opening-v4-per-tile-14-banks.png",
+        name: "opening-medium-shot-240x160.png",
         metadata: expect.objectContaining({
-          source: "Assets/backgrounds/opening-v4-per-tile-14-banks.png",
-          bundledDefaultAsset: "template:exemplo-gba/Assets/backgrounds/opening-v4-per-tile-14-banks.png"
+          source: "Assets/backgrounds/opening-medium-shot-240x160.png",
+          bundledDefaultAsset: "template:exemplo-gba/Assets/backgrounds/opening-medium-shot-240x160.png"
         })
       })
     ]));
@@ -184,25 +183,11 @@ describe("projectTemplates", () => {
     });
     expect(tacticalExportRoom?.camera?.bounds).toEqual(tacticalScene?.cameraBounds);
     const tacticalPresentation = tacticalExportRoom?.tactical_presentation;
-    expect(tacticalPresentation?.surface_pages).toHaveLength(tacticalPages.length);
-    expect(tacticalPresentation?.surface_pages).toEqual(tacticalPages.map((page) => expect.objectContaining({
-      id: page.id,
-      bank_group: page.bankGroup,
-      world: page.world
-    })));
-    expect(tacticalPresentation?.surface_residency).toEqual({
-      exclusive_bank_groups: tacticalResidency?.exclusiveBankGroups,
-      max_resident_groups: tacticalResidency?.maxResidentGroups,
-      prefetch_margin_pixels: tacticalResidency?.prefetchMarginPixels
-    });
-    expect(exportContract.asset_pack?.resident_sets).toEqual([
-      {
-        id: `${tacticalScene?.name}_surface_pages`,
-        room: "arena_tatica",
-        groups: tacticalResidency?.exclusiveBankGroups,
-        max_resident_groups: tacticalResidency?.maxResidentGroups
-      }
-    ]);
+    expect(tacticalExportRoom?.paged_surface).toMatchObject({width:768,height:512});
+    expect(tacticalPresentation?.compact_hud).toMatchObject({font:"tactical_compact_font_8x8"});
+    expect(tacticalPresentation?.surface_pages).toBeUndefined();
+    expect(tacticalPresentation?.surface_residency).toBeUndefined();
+    expect(exportContract.asset_pack?.resident_sets).toBeUndefined();
     const dialogues = deriveDialoguesWorkspacePresentation(project);
     const dialogueIssues = deriveDialoguesWorkspaceValidationIssues(dialogues);
     expect(dialogues.localization).toEqual({
@@ -217,11 +202,12 @@ describe("projectTemplates", () => {
       : [];
     expect(localizedDialogues.find((dialogue) => dialogue.key === "prologo_frame_1")?.translations).toMatchObject({
       "pt-BR": "Os faróis da costa se apagam um a um. O último clarão ainda recorta o cais.",
-      es: "Os faróis da costa se apagam um a um. O último clarão ainda recorta o cais."
+      en: "The coastal lighthouses go dark one by one. The last beam still cuts across the pier.",
+      es: "Los faros de la costa se apagan uno a uno. El último haz de luz aún cruza el muelle."
     });
     const audio = deriveAudioWorkspacePresentation(project);
     const audioPack = buildAssetcAudioPackGeneration(project);
-    expect(audio.items).toHaveLength(29);
+    expect(audio.items).toHaveLength(74);
     expect(audio.items.flatMap(item => item.errors)).toEqual([]);
     // The bundled SFX explicitly author their effective Pulse 1 voice.
     // New projects should start without legacy channel warnings.
@@ -230,7 +216,12 @@ describe("projectTemplates", () => {
     const authoredAudio = Array.isArray(project.audioItems)
       ? project.audioItems as Array<Record<string, unknown>>
       : [];
-    expect(authoredAudio).toHaveLength(29);
+    expect(authoredAudio).toHaveLength(74);
+    expect(authoredAudio.filter(item => String(item.id).startsWith("initial-menu-"))).toHaveLength(5);
+    expect(authoredAudio.some(item => item.name === "farol_sfx_cursor")).toBe(false);
+    expect(authoredAudio).toEqual(expect.arrayContaining([
+      expect.objectContaining({ name: "mapa_mar_aberto", bpm: 84 })
+    ]));
     expect(JSON.stringify(project)).not.toContain("gb_builtin_crash");
     const audioNames = new Set(authoredAudio.map((item) => String(item.name)));
     const eventAudio = (project.events as Array<Record<string, unknown>>).flatMap((event) => (
@@ -256,14 +247,32 @@ describe("projectTemplates", () => {
         ...Object.values((audio.cues as Record<string, unknown> | undefined) ?? {})
       ].filter((name): name is string => typeof name === "string" && name.length > 0);
     });
-    const referencedAudio = [...new Set([...eventAudio, ...roomAudio, ...dialogueAudio, ...tacticalAudio])];
+    const actionAudio = (project.rooms as Array<Record<string, unknown>>).flatMap(room => {
+      const runtime = room.runtime as Record<string, unknown> | undefined;
+      const config = runtime?.config as Record<string, unknown> | undefined;
+      return Object.values((config?.actionSounds as Record<string, unknown> | undefined) ?? {})
+        .filter((name): name is string => typeof name === "string");
+    });
+    const referencedAudio = [...new Set([...eventAudio, ...roomAudio, ...dialogueAudio, ...tacticalAudio, ...actionAudio])];
     expect(referencedAudio.every((name) => audioNames.has(name))).toBe(true);
-    expect(referencedAudio).toHaveLength(29);
+    expect(referencedAudio).toHaveLength(62);
     expect(referencedAudio).toEqual(expect.arrayContaining([
+      "menu-abrir-v1.wav", "menu-navegar-v1.wav", "menu-confirmar-v1.wav", "menu-voltar-v1.wav", "menu-indisponivel-v1.wav",
+      "radio-lume-pcm.wav",
       "farol_tema_principal",
       "farol_sfx_texto",
       "farol_sfx_dialogo",
-      "farol_sfx_vitoria"
+      "farol_sfx_vitoria",
+      "mapa_mar_aberto",
+      "corrida_circuito_dos_farois",
+      "corrida_rota_da_mare",
+      "corrida_contagem",
+      "corrida_largada",
+      "corrida_motor",
+      "corrida_freio",
+      "corrida_impacto",
+      "corrida_checkpoint",
+      "corrida_chegada"
     ]));
     expect(JSON.stringify(project)).not.toMatch(/\/Users|\.cache/);
   });
@@ -285,7 +294,7 @@ describe("projectTemplates", () => {
     });
     expect(dialogues.find((dialogue) => dialogue.key === "conselho")).toMatchObject({
       character: "Guardiã",
-      portrait: "council-v5-guardian.png",
+      portrait: "council-v13-guardian.png",
       portraitSlot: "right"
     });
   });
@@ -295,7 +304,7 @@ describe("projectTemplates", () => {
     const room = deriveRoomsWorkspacePresentation(project).rooms.find((candidate) => candidate.name === "mercado_suspenso");
 
     expect(room).toMatchObject({
-      background: "mercado-adventure-surface.png",
+      background: "market-approved-surface-768x512.png",
       backgroundTileWidth: 8,
       backgroundTileHeight: 8
     });
@@ -313,15 +322,16 @@ describe("projectTemplates", () => {
       expect.objectContaining({ id: "hud-default", mode: "standard" }),
       expect.objectContaining({
         id: "hud-mercado-avancada",
-        name: "HUD Mercado",
+        name: "Mercado Suspenso · Entrega",
         mode: "advanced",
         width: 240,
         height: 24,
         components: expect.arrayContaining([
-          expect.objectContaining({ kind: "frame", x: 0, y: 0, width: 240, height: 24 }),
-          expect.objectContaining({ kind: "icon", asset: "dialogue-sigil.png", x: 8, y: 8, width: 16, height: 16 }),
-          expect.objectContaining({ kind: "text", text: "NARA", x: 32, y: 8 }),
-          expect.objectContaining({ kind: "text", text: "A INTERAGIR", x: 136, y: 8, width: 88 })
+          expect.objectContaining({ kind: "frame", x: 4, y: 4, width: 60, height: 18 }),
+          expect.objectContaining({ kind: "icon", asset: "market-approved-delivery-icon.png", x: 187, y: 9, width: 10, height: 9 }),
+          expect.objectContaining({ kind: "bar", valueVariable: "porto_player_health", valueMaximum: 3 }),
+          expect.objectContaining({ kind: "text", valueVariable: "var_market_shortcut", x: 205, y: 9, width: 6 }),
+          expect.objectContaining({ kind: "text", text: "/1", x: 211, y: 9, width: 12 })
         ])
       })
     ]));
@@ -341,14 +351,14 @@ describe("projectTemplates", () => {
       ["usina_submersa", "hud-usina-exploration-v3"],
       ["usina_combate", "hud-usina-combat-v3"],
       ["usina_saida", "hud-usina-exit-v3"],
-      ["tempestade", "hud-tempestade-score"],
+      ["tempestade", "hud-tempestade-voo-livre"],
       ["guardiao_rele", "hud-guardiao-rele"]
     ];
 
     for (const [sceneName, presetID] of expectedBindings) {
       expect(scenes.find((scene) => scene.name === sceneName)).toMatchObject({ hudPresetId: presetID });
-      const expectedFrame = presetID.startsWith("hud-usina-")
-        ? { kind: "frame", x: 176, y: 0, width: 64, height: 112 }
+      const expectedFrame = presetID === "hud-guardiao-rele" ? {kind:"bar",x:12,y:18,width:64,height:8,valueBinding:"p1-health"} : presetID === "hud-tempestade-voo-livre" ? {kind:"frame",width:16,height:16} : presetID.startsWith("hud-usina-")
+        ? { kind: "bar", x:38, y:144, width:48, height:16, valueBinding:"p1-health" }
         : { kind: "frame", width: 240, height: 24 };
       expect(presetByID.get(presetID)).toMatchObject({
         mode: "advanced",
@@ -369,7 +379,7 @@ describe("projectTemplates", () => {
       expect.objectContaining({ id: "hud-tempestade-score-wave", kind: "text", text: "" })
     ]));
 
-    expect(scenes.find((scene) => scene.name === "mapa_menu")).toHaveProperty("hudPresetId", "hud-neutral-mapa_menu");
+    expect(scenes.find((scene) => scene.name === "mapa_menu")).toHaveProperty("hudPresetId", "hud-book-mapa_menu");
     expect(presetByID.get("hud-menu-map-controls")).toMatchObject({
       mode: "advanced",
       components: expect.arrayContaining([
@@ -385,27 +395,24 @@ describe("projectTemplates", () => {
     ]));
   });
 
-  it("preserva a HUD na biblioteca e libera a composição aprovada de plataforma", () => {
+  it("integra a HUD costeira V2 dinâmica na fase ampliada de plataforma", () => {
     const project = buildProjectFromTemplate("exemplo-gba", { name: "HUD Plataforma" });
     const scenes = project.scenas as Array<Record<string, unknown>>;
     const settings = project.settings as Record<string, unknown>;
     const hudPresets = settings.hudPresets as Array<Record<string, unknown>>;
     const platformerScene = scenes.find((scene) => scene.name === "penedos_vento");
-    const platformerHud = hudPresets.find((preset) => preset.id === "hud-penedos-platformer");
+    const platformerHud = hudPresets.find((preset) => preset.id === "hud-penedos-approved");
     const components = platformerHud?.components as Array<Record<string, unknown>>;
 
-    expect(platformerScene).toMatchObject({ width: 30, height: 20, cameraMode: "fixed_center" });
-    expect(platformerScene).not.toHaveProperty("hudPresetId");
-    expect(platformerHud).toMatchObject({
-      mode: "advanced",
-      description: "Duas áreas superiores para vida e itens durante a fase de plataforma."
-    });
-    expect(components).toHaveLength(4);
+    expect(platformerScene).toMatchObject({ width: 120, height: 40, cameraMode: "follow_player" });
+    expect(platformerScene?.hudPresetId).toBe("hud-penedos-approved");
+    expect(platformerHud).toMatchObject({ mode: "advanced" });
+    expect(components).toHaveLength(5);
     expect(components).toEqual(expect.arrayContaining([
-      expect.objectContaining({ id: "hud-penedos-platformer-top-left-frame", anchor: "top-left", width: 96 }),
-      expect.objectContaining({ id: "hud-penedos-platformer-top-left-text", label: "Vida", text: "VIDA 03" }),
-      expect.objectContaining({ id: "hud-penedos-platformer-top-right-frame", anchor: "top-right", width: 96 }),
-      expect.objectContaining({ id: "hud-penedos-platformer-top-right-text", label: "Itens", text: "ITENS 00" })
+      expect.objectContaining({ id: "life-frame", asset: "penedos-v2-life-frame.png", x: 16, y: 6, width: 40, height: 16 }),
+      expect.objectContaining({ id: "money-frame", asset: "penedos-v2-token-frame.png", x: 184, y: 6, width: 40, height: 16 }),
+      expect.objectContaining({ id: "hearts", valueVariable: "penedos_player_health" }),
+      expect.objectContaining({ id: "coins", valueVariable: "penedos_tokens" })
     ]));
     expect(components.some((component) => String(component.anchor ?? "").startsWith("bottom"))).toBe(false);
   });
@@ -416,23 +423,21 @@ describe("projectTemplates", () => {
     const assets = new Set((project.assets as Array<Record<string, unknown>>).map((asset) => String(asset.name)));
 
     expect(actors.filter((actor) => String(actor.roomName) === "mercado_suspenso")).toEqual(expect.arrayContaining([
-      expect.objectContaining({ name: "Aventureiro · Mercado", spriteSheet: "tactical-nara-v5.png", animationStateID: "market-adventure-player-state" }),
-      expect.objectContaining({ name: "Mercador suspenso", spriteSheet: "market-adventure-merchant.png", animationStateID: "market-adventure-merchant-state" }),
-      expect.objectContaining({ name: "Guarda do mercado", spriteSheet: "market-adventure-guard.png", animationStateID: "market-adventure-guard-state" })
+      expect.objectContaining({ name: "Aventureiro · Mercado", spriteSheet: "market-approved-actors-64x64.png", animationStateID: "market-adventure-player-state" }),
+      expect.objectContaining({ name: "Mercador suspenso", spriteSheet: "market-approved-actors-64x64.png", animationStateID: "market-adventure-merchant-state" }),
+      expect.objectContaining({ name: "Guarda do mercado", spriteSheet: "market-approved-actors-64x64.png", animationStateID: "market-adventure-guard-state" })
     ]));
-    expect(actors.filter((actor) => String(actor.roomName) === "usina_submersa")).toEqual([]);
+    expect(actors.filter((actor) => String(actor.roomName) === "usina_submersa").map(a=>a.id)).toEqual(["coast-valve-a-off","coast-valve-a-on","coast-valve-b-off","coast-valve-b-on","coast-valve-c-off","coast-valve-c-on"]);
     expect(actors.filter((actor) => String(actor.roomName) === "usina_combate")).toEqual(expect.arrayContaining([
-      expect.objectContaining({ name: "Sentinela da Usina", spriteSheet: "sentinel-depth-far-mid-near-192x64-v3-4bpp.png" })
+      expect.objectContaining({ name: "Sentinela da Usina", spriteSheet: "dungeon-approved-sentinel-near.png" })
     ]));
     expect(actors.filter((actor) => String(actor.roomName) === "usina_saida")).toEqual(expect.arrayContaining([
-      expect.objectContaining({ name: "Célula de energia", spriteSheet: "usina-energy-cell-v3-4bpp.png" })
+      expect.objectContaining({ name: "Célula de energia", spriteSheet: "dungeon-approved-cell-near.png" })
     ]));
-    expect(assets.has("tactical-nara-v5.png")).toBe(true);
-    expect(assets.has("market-adventure-merchant.png")).toBe(true);
-    expect(assets.has("market-adventure-guard.png")).toBe(true);
-    expect(assets.has("mercado-adventure-surface.png")).toBe(true);
-    expect(assets.has("mercado-adventure-foreground.png")).toBe(true);
-    expect(assets.has("sentinel-depth-far-mid-near-192x64-v3-4bpp.png")).toBe(true);
+    expect(assets.has("market-approved-actors-64x64.png")).toBe(true);
+    expect(assets.has("market-approved-surface-768x512.png")).toBe(true);
+    expect(assets.has("market-approved-foreground-768x512.png")).toBe(true);
+    expect(assets.has("dungeon-approved-sentinel-near.png")).toBe(true);
   });
 
   it("loads the official Exemplo GBA project from bundled template assets instead of fixtures", () => {
@@ -485,12 +490,15 @@ describe("projectTemplates", () => {
     expect(new Set(actors.filter((actor) => actor.menuItemID).map((actor) => `${actor.x},${actor.y}`)).size).toBe(1);
   });
 
-  it("mantém os sprites dos atores ancorados na caixa de colisão dos pés", () => {
+  it("mantém a âncora dos pés no gameplay e as posições em pixels dos atores de menu", () => {
     const project = buildProjectFromTemplate("exemplo-gba", { name: "Atores GBA" });
     const actors = project.actors as Array<Record<string, unknown>>;
     const animations = project.animations as Array<Record<string, unknown>>;
     const assets = new Set((project.assets as Array<Record<string, unknown>>).map((asset) => String(asset.name)));
     const scenes = new Map((project.scenas as Array<Record<string, unknown>>).map((scene) => [String(scene.name), scene]));
+    const inventory=scenes.get('inventario')!;
+    const menuEntities = new Map(deriveRoomsWorkspacePresentation({...project,rooms:[inventory],scenas:[inventory]}).entities
+      .filter(entity=>entity.id==='tide-inventory-module').map(entity=>[entity.id,entity] as const));
     const placements = actors.map((actor) => {
       const scene = scenes.get(String(actor.roomName));
       expect(scene, `cena ausente para ${String(actor.name)}`).toBeDefined();
@@ -520,10 +528,18 @@ describe("projectTemplates", () => {
 
       const frame = resolveGbaActorSprite(project, actor)?.frame;
       expect(frame, `frame ausente para ${String(actor.name)}`).not.toBeNull();
+      const menuEntity=scene?.sceneType==='menu'?menuEntities.get(String(actor.id)):undefined;
+      if(menuEntity){
+        expect(menuEntity.spriteFrame).not.toBeNull();
+        const placed=gbaActorSpriteRoomPlacementFromFrame(menuEntity.x,menuEntity.y,menuEntity.spriteFrame!);
+        const pixels=actor.menuPositionPixels as {x:number;y:number}|undefined;
+        expect({x:placed.leftTiles*8,y:placed.topTiles*8},String(actor.name)).toEqual(pixels??{x:Number(actor.x)*8,y:Number(actor.y)*8});
+      }
       const x = Number(actor.x);
       const y = Number(actor.y);
       const placement = gbaActorSpriteRoomPlacementFromFrame(x, y, frame!);
       return {
+        menu: Boolean(menuEntity),
         // Platformer scene coordinates identify the collision anchor 8px before the box.
         collisionOffsetX: x - placement.leftTiles + (actor.roomName === "penedos_vento" ? 1 : 0),
         collisionOffsetY: y - placement.topTiles,
@@ -533,6 +549,7 @@ describe("projectTemplates", () => {
 
     expect(placements).toHaveLength(actors.length);
     for (const item of placements) {
+      if(item.menu)continue; // Menus use the pixel placement verified above, without a gameplay foot pivot.
       expect(item.collisionOffsetX).toBeGreaterThanOrEqual(0);
       expect(item.collisionOffsetX).toBeLessThanOrEqual(item.placement.widthTiles);
       expect(item.collisionOffsetY).toBeGreaterThanOrEqual(0);
@@ -564,7 +581,75 @@ describe("projectTemplates", () => {
       .map((asset) => asset.name)
       .sort();
 
-    expect(approved8bppAssets).toEqual([]);
+    expect(approved8bppAssets).toEqual([
+      "arena-nara-complete-64x64.png",
+      "arena-rival-complete-64x64.png",
+      "book-nara-approved-32x48.png",
+      "coast-freight-lift.png",
+      "coast-port-lantern.png",
+      "coast-valve-far.png",
+      "coast-valve-mid.png",
+      "coast-valve-near.png",
+      "council-v13-guardian.png",
+      "council-v13-nara.png",
+      "dungeon-approved-cell-far.png",
+      "dungeon-approved-cell-icon.png",
+      "dungeon-approved-cell-mid.png",
+      "dungeon-approved-cell-near.png",
+      "dungeon-approved-portrait.png",
+      "dungeon-approved-sentinel-far.png",
+      "dungeon-approved-sentinel-mid.png",
+      "dungeon-approved-sentinel-near.png",
+      "farol-relay-v2.png",
+      "gallery-gate.png",
+      "gallery-props.png",
+      "market-approved-actors-64x64.png",
+      "nara-topdown-walk-run-v1.png",
+      "opening-local-animation-128x96.png",
+      "penedos-approved-checkpoint.png",
+      "penedos-approved-crab-east.png",
+      "penedos-approved-crab.png",
+      "penedos-approved-moth-east.png",
+      "penedos-approved-moth.png",
+      "penedos-approved-nara.png",
+      "penedos-approved-worker.png",
+      "porto-captain-body48.png",
+      "porto-cartographer-body48.png",
+      "porto-fisherchild-body48.png",
+      "porto-lighthousekeeper-body48.png",
+      "porto-mechanic-animations48.png",
+      "porto-traveler-body48.png",
+      "racing-approved-overhead-nara.png",
+      "racing-approved-overhead-rival.png",
+      "racing-approved-rear-nara.png",
+      "racing-approved-rear-rival.png",
+      "relay-approved-effects.png",
+      "relay-approved-guardian.png",
+      "relay-approved-nara.png",
+      "relay-mechanic.png",
+      "tactical-approved-nara-64x64.png",
+      "tactical-approved-sentinel-64x64.png",
+      "tactical-compact-nara-portrait.png",
+      "tactical-compact-sentinel-portrait.png",
+      "telescope-dial.png",
+      "tempestade-approved-bolt.png",
+      "tempestade-approved-boss.png",
+      "tempestade-approved-drone-a.png",
+      "tempestade-approved-drone-b.png",
+      "tempestade-approved-explosion.png",
+      "tempestade-approved-player.png",
+      "tempestade-approved-shot.png",
+      "tide-stabilizer.png",
+      "tide-valve.png",
+      "toolcase-item-boost-40x48.png",
+      "toolcase-item-cell-40x48.png",
+      "toolcase-item-frame-40x48.png",
+      "toolcase-item-grip-40x48.png",
+      "toolcase-item-shield-40x48.png",
+      "toolcase-selection-40x48.png",
+      "traveler-gender-portraits-64x64.png",
+      "traveler-name-portraits-48x48.png",
+    ]);
     expect(assets.filter((asset) => (
       (asset.metadata as Record<string, unknown> | undefined)?.visualProfile === "cohesive-lighthouse-adventure-v2"
     ))).toEqual([]);
@@ -585,14 +670,14 @@ describe("projectTemplates", () => {
     ))).toBe(true);
     const pagedAssets = assets.filter(asset => (asset.metadata as Record<string, unknown> | undefined)?.kind === "paged_bg");
     expect(pagedAssets.map(asset => asset.name)).toEqual(expect.arrayContaining([
-      "route-map-paged-v2.png",
-      "mercado-adventure-surface.png",
-      "mercado-adventure-foreground.png"
+      "route-lumen-paged.png",
+      "market-approved-surface-768x512.png",
+      "market-approved-foreground-768x512.png"
     ]));
-    expect(pagedAssets[0]?.metadata).toMatchObject({colorMode:"8bpp-indexed", backgroundPaletteBankBudget:14});
-    expect(pagedAssets.slice(1).every((asset) => (asset.metadata as Record<string, unknown>)?.colorMode === "8bpp-indexed")).toBe(true);
+    expect(pagedAssets.find(asset => asset.name === "route-lumen-paged.png")?.metadata).toMatchObject({colorMode:"8bpp-indexed", backgroundPaletteBankBudget:14});
+    expect(pagedAssets.every((asset) => (asset.metadata as Record<string, unknown>)?.colorMode === "8bpp-indexed")).toBe(true);
     expect(assets.filter((asset) => (
-      !affineAssets.includes(asset) && !indexedIsometricAssets.includes(asset) && !pagedAssets.includes(asset)
+      !affineAssets.includes(asset) && !indexedIsometricAssets.includes(asset) && !pagedAssets.includes(asset) && !approved8bppAssets.includes(asset.name)
     )).every((asset) => (
       ((asset.metadata as Record<string, unknown> | undefined)?.colorMode === undefined
         || (asset.metadata as Record<string, unknown> | undefined)?.colorMode === "4bpp")

@@ -1,4 +1,5 @@
 import "@testing-library/jest-dom/vitest";
+import { beforeEach } from "vitest";
 
 class InMemoryStorage implements Storage {
   private readonly items = new Map<string, string>();
@@ -43,3 +44,9 @@ if (typeof window !== "undefined") {
     writable: true
   });
 }
+
+// Existing authoring fixtures are in Portuguese. First-run locale tests remove
+// this explicit preference to exercise the application's real default.
+beforeEach(() => {
+  testLocalStorage.setItem("gbaStudio.locale", "pt-BR");
+});

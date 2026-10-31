@@ -9,6 +9,14 @@ spec=importlib.util.spec_from_file_location('hud_assetc',root/'tools/assetc/asse
 assetc=importlib.util.module_from_spec(spec)
 spec.loader.exec_module(assetc)
 class HudBehaviorExport(unittest.TestCase):
+ def test_project_value_bindings_are_validated_and_emitted(self):
+  component=self.component();component.update(value_variable=3,value_maximum=3)
+  layout=assetc.hud_layouts_from_json([dict(id='hud',mode='advanced',components=[component])],'hud')[0]
+  self.assertEqual(layout['components'][0]['value_variable'],3)
+  header=assetc.emit_shared_dialogue_ui_assets_header(None,None,None,None,assetc.dialogue_ui_from_json({},'ui'),assetc.hud_box_config_from_json({}),hud_layouts=[layout])
+  self.assertIn('3, -1, 3',header)
+  component.update(inventory_item=0)
+  with self.assertRaises(SystemExit):assetc.hud_layouts_from_json([dict(id='hud',mode='advanced',components=[component])],'hud')
  def test_image_layout_loads_its_tiles_and_palette_without_an_actor_reference(self):
   component=self.component();component.update(kind='frame',asset='panel')
   layout=assetc.hud_layouts_from_json([dict(id='hud',mode='advanced',components=[component])],'hud')[0]
@@ -44,9 +52,9 @@ class HudBehaviorExport(unittest.TestCase):
  def test_invalid_variable_is_rejected(self):
   component=self.component();component['behavior']['states']['selected']['variable']=64
   with self.assertRaises(SystemExit): assetc.hud_layouts_from_json([dict(id='hud',mode='advanced',components=[component])],'hud')
- def test_more_than_two_dynamic_gauges_are_rejected(self):
+ def test_more_than_four_dynamic_gauges_are_rejected(self):
   components=[]
-  for index in range(3):
+  for index in range(5):
    component=self.component();component.update(id='bar'+str(index),kind='bar',asset='full',value_binding='lives',gauge=dict(empty_asset='empty',x=0,y=0,width=64,height=8))
    components.append(component)
   with self.assertRaises(SystemExit): assetc.hud_layouts_from_json([dict(id='hud',mode='advanced',components=components)],'hud')

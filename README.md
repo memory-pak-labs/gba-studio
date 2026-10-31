@@ -3,16 +3,21 @@
 Editor visual e motor próprio para criar jogos de Game Boy Advance.
 O projeto pertence à [Memory Pak Labs](https://github.com/memory-pak-labs).
 
-**Beta em desenvolvimento.** Esta base comunitária parte do código da beta.3
-(`0.1.0-beta.3`, Engine Pack `2.26.0`). APIs e formato de projeto ainda podem
-mudar. A experiência lembra o GB Studio; o alvo é GBA e os limites do hardware
-fazem parte do desenvolvimento.
+**Beta em desenvolvimento.** Este código está na candidata `0.1.0-rc.3` e usa
+GBAStudioEngine Pack `2.27.0`; a candidata ainda depende das verificações finais
+de distribuição. APIs e formato de projeto ainda podem mudar. A experiência
+lembra o GB Studio; o alvo é GBA e os limites do hardware fazem parte do
+desenvolvimento.
 
 ## Baixar a beta
 
 Os instaladores da [beta.3](https://github.com/memory-pak-labs/gba-studio/releases/tag/v0.1.0-beta.3)
 incluem Python, compilador ARM e Engine Pack para gerar ROMs sem instalar
 Python ou devkitPro separadamente.
+
+A [RC2](https://github.com/memory-pak-labs/gba-studio/releases/tag/v0.1.0-rc.2)
+também está disponível como pré-lançamento, com pacotes para macOS, Windows e
+Linux. Seus detalhes e limitações estão na própria página da versão.
 
 | Sistema | Download recomendado |
 | --- | --- |

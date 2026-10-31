@@ -1,3 +1,4 @@
+import { uiText as ui, useStudioUiText } from "./studioUiText";
 import { useEffect, useRef, useState } from "react";
 
 import {
@@ -24,6 +25,7 @@ export function PluginCatalogModal({
   onInstalled,
   setStatus
 }: PluginCatalogModalProps): React.ReactElement {
+  const ui = useStudioUiText();
   const { confirm } = useStudioDialog();
   const urlInput = useRef<HTMLInputElement>(null);
   const [repositoryURL, setRepositoryURL] = useState(() => (
@@ -114,15 +116,15 @@ export function PluginCatalogModal({
       >
         <header className="modal-card-header">
           <div>
-            <h2 id="plugin-catalog-title">Plugins para GBA Studio</h2>
-            <p>Receba plugins criados para o GBA Studio por um catálogo da comunidade.</p>
+            <h2 id="plugin-catalog-title">{ui("Plugins para GBA Studio")}</h2>
+            <p>{ui("Receba plugins criados para o GBA Studio por um catálogo da comunidade.")}</p>
           </div>
-          <StudioButton className="ghost-button" onClick={onClose} type="button" variant="ghost">Fechar</StudioButton>
+          <StudioButton className="ghost-button" onClick={onClose} type="button" variant="ghost">{ui("Fechar")}</StudioButton>
         </header>
 
         <div className="plugin-catalog-controls">
           <label className="studio-field">
-            <span>URL do catálogo</span>
+            <span>{ui("URL do catálogo")}</span>
             <input
               ref={urlInput}
               className="ui-field"
@@ -133,25 +135,25 @@ export function PluginCatalogModal({
             />
           </label>
           <StudioButton disabled={loading || !repositoryURL.trim()} onClick={() => void loadRepository()} type="button" variant="secondary">
-            {loading ? "Carregando..." : "Carregar catálogo"}
+            {loading ? ui("Carregando...") : ui("Carregar catálogo")}
           </StudioButton>
         </div>
 
         {!repository && !error && !loading ? <div role="status">
-          <p>{repositoryURL.trim() ? "Catálogo ainda não carregado." : "Nenhum catálogo configurado."}</p>
-          <p>Ainda não há um catálogo padrão. Quando houver plugins para GBA Studio, informe a URL acima. Para instalar por pasta ou ZIP, use “Instalar plugin” no menu Projeto.</p>
+          <p>{repositoryURL.trim() ? ui("Catálogo ainda não carregado.") : ui("Nenhum catálogo configurado.")}</p>
+          <p>{ui("Ainda não há um catálogo padrão. Quando houver plugins para GBA Studio, informe a URL acima. Para instalar por pasta ou ZIP, use “Instalar plugin” no menu Projeto.")}</p>
         </div> : null}
-        {error ? <p className="workspace-error" role="alert">{error}</p> : null}
+        {error ? <p className="workspace-error" role="alert">{ui(error)}</p> : null}
 
         {repository ? (
           <div className="plugin-catalog-list">
-            <p className="plugin-catalog-meta">{repository.name} · {repository.plugins.length} plugin(s)</p>
-            {repository.plugins.length === 0 ? <p role="status">Este catálogo ainda não tem plugins.</p> : null}
+            <p className="plugin-catalog-meta">{repository.name} · {repository.plugins.length} {ui(" plugin(s)")}</p>
+            {repository.plugins.length === 0 ? <p role="status">{ui("Este catálogo ainda não tem plugins.")}</p> : null}
             {repository.plugins.map((entry) => (
               <article key={entry.id} className="plugin-catalog-entry">
                 <div>
                   <h3>{entry.name}</h3>
-                  <p>{entry.description}</p>
+                  <p>{ui(entry.description)}</p>
                   <p className="plugin-catalog-entry-meta">
                     {entry.author} · v{entry.version} · {entry.type}
                   </p>
@@ -162,7 +164,7 @@ export function PluginCatalogModal({
                   type="button"
                   variant="primary"
                 >
-                  {installingId === entry.id ? "Instalando..." : "Instalar"}
+                  {installingId === entry.id ? ui("Instalando...") : ui("Instalar")}
                 </StudioButton>
               </article>
             ))}

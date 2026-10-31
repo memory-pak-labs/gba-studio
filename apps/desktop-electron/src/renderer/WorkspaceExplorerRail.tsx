@@ -1,3 +1,4 @@
+import { uiText as ui, useStudioUiText } from "./studioUiText";
 import { useState } from "react";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 
@@ -24,8 +25,9 @@ export function WorkspaceExplorerRail({
   expandLabel = "Expandir navegador",
   workspaceId
 }: WorkspaceExplorerRailProps): React.ReactElement {
+  const ui = useStudioUiText();
   const [collapsed, setCollapsed] = useState(() => readExplorerRailCollapsed(workspaceId));
-  const toggleLabel = collapsed ? expandLabel : collapseLabel;
+  const toggleLabel = ui(collapsed ? expandLabel : collapseLabel);
 
   function toggleCollapsed(): void {
     setCollapsed((current) => {
@@ -37,7 +39,7 @@ export function WorkspaceExplorerRail({
 
   return (
     <aside
-      aria-label={ariaLabel}
+      aria-label={ui(ariaLabel)}
       className={[
         "workspace-explorer-rail",
         collapsed ? "is-collapsed" : "",

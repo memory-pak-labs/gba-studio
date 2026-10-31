@@ -110,7 +110,19 @@ struct IsoActorAnimationSet {
     const SpriteAnimation* defeat_up = nullptr;
     const SpriteAnimation* defeat_left = nullptr;
     const SpriteAnimation* defeat_right = nullptr;
+    // Optional cardinal screen-facing clips complement the four projected
+    // directions above. Projects without them keep their existing poses.
+    const SpriteAnimation* idle_screen_down = nullptr;
+    const SpriteAnimation* idle_screen_up = nullptr;
+    const SpriteAnimation* idle_screen_left = nullptr;
+    const SpriteAnimation* idle_screen_right = nullptr;
+    const SpriteAnimation* walk_screen_down = nullptr;
+    const SpriteAnimation* walk_screen_up = nullptr;
+    const SpriteAnimation* walk_screen_left = nullptr;
+    const SpriteAnimation* walk_screen_right = nullptr;
 };
+
+enum class IsoScreenFacing : uint8_t { None, Down, Up, Left, Right };
 
 enum class IsoActorAnimationMode : uint8_t {
     Idle = 0,
@@ -127,7 +139,22 @@ struct IsoActorAnimationState {
     uint8_t frame_elapsed = 0;
     IsoActorAnimationMode mode = IsoActorAnimationMode::Idle;
     bool completed = false;
+    IsoScreenFacing screen_facing = IsoScreenFacing::None;
 };
+
+struct IsoScriptedMove {
+    int32_t from_x256 = 0, from_y256 = 0;
+    uint8_t frame = 0;
+    bool active = false;
+};
+constexpr bool iso_tactical_can_select_unit(uint8_t active_team, bool moved, size_t active_unit, size_t candidate, uint8_t team) {
+    return team == active_team && ((active_team == 0 && !moved) || active_unit == candidate);
+}
+constexpr size_t iso_tactical_turn_ordinal(uint16_t turn, size_t count) {
+    return count == 0 ? 0 : ((turn > 0 ? turn - 1 : 0) / 2) % count;
+}
+void begin_iso_scripted_move(IsoActor& actor, IsoScriptedMove& move, Vec2i delta);
+void update_iso_scripted_move(IsoActor& actor, IsoActorAnimationState& animation, IsoScriptedMove& move);
 
 struct IsoActorEventData {
     size_t actor_index;
@@ -152,6 +179,8 @@ enum IsoRampFlags : uint8_t {
     IsoRampNone = 0,
     IsoRampUpRight = 1 << 1,
     IsoRampUpLeft = 1 << 2,
+    IsoRampDownLeft = 1 << 3,
+    IsoRampDownRight = 1 << 4,
 };
 
 enum class IsoWorldMode : uint8_t {
@@ -219,6 +248,8 @@ constexpr uint16_t iso_tactical_capability_bit(IsoTacticalCapability capability)
 struct IsoTacticalUnitPresentationData {
     size_t actor_index;
     const IsoActorAnimationSet* animations;
+    const MetaSprite* portrait = nullptr;
+    const char* label = nullptr;
 };
 
 struct IsoTacticalPropData {
@@ -267,6 +298,13 @@ constexpr Vec2i iso_tactical_surface_page_scroll(
     };
 }
 
+struct IsoTacticalCompactHud {
+    const MetaSprite *turn_panel, *unit_panel, *actions_panel, *selection, *health;
+    const TileAsset *health_full, *health_empty;
+    const DialogueFont* font;
+    uint16_t font_color;
+};
+
 struct IsoTacticalPresentationData {
     uint16_t capability_mask;
     const TileMapAsset* surface;
@@ -288,6 +326,7 @@ struct IsoTacticalPresentationData {
     const TrackerAsset* music;
     const SfxAsset* audio_cues;
     size_t audio_cue_count;
+    const IsoTacticalCompactHud* compact_hud = nullptr;
 };
 
 constexpr bool iso_tactical_capability_enabled(
@@ -492,6 +531,7 @@ struct IsometricRoomData {
     EventScript on_hit_group1 = empty_event_script();
     EventScript on_hit_group2 = empty_event_script();
     EventScript on_hit_group3 = empty_event_script();
+    EventScript on_restore = empty_event_script();
 };
 
 constexpr bool is_tactical_isometric_room(const IsometricRoomData& room) {
@@ -916,6 +956,9 @@ constexpr void apply_iso_actor_event_command(
     case EventActorOp::SetActive:
         actor.visible = command.a != 0;
         break;
+    case EventActorOp::MoveTo:
+        // The isometric scene consumer owns asynchronous motion.
+        break;
     case EventActorOp::SetPosition:
         actor.tile.x = command.a;
         actor.tile.y = command.b;
@@ -943,6 +986,8 @@ constexpr void apply_iso_actor_event_command(
     case EventActorOp::SetCollisionBox:
         break;
     case EventActorOp::SetSprite:
+    case EventActorOp::VisibilityLantern:
+    case EventActorOp::VisibilityReveal:
     case EventActorOp::PushFacing:
     case EventActorOp::Push:
     case EventActorOp::CancelMovement: // Export currently restricts cancellation to topdown.

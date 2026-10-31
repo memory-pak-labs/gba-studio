@@ -1,3 +1,4 @@
+import { uiText as ui, useStudioUiText } from "./studioUiText";
 import type { GBAProjectData } from "../shared/projectFile";
 import { resolveSceneDialogueUiSettings } from "../shared/interfaceThemes";
 import { DialoguePreviewSnapshot } from "./dialoguePreviewSnapshot";
@@ -12,12 +13,13 @@ export function DialogueScenePreview({ projectData, projectPath, roomId, dialogu
   scale: number;
   ariaLabel?: string;
 }): React.ReactElement {
+  const ui = useStudioUiText();
   const settings = resolveSceneDialogueUiSettings(projectData, roomId);
   const asset = (name: string) => hudAssetURL(projectData, projectPath, name);
   const portrait = (Array.isArray(projectData.assets) ? projectData.assets : []).find(asset => asset.name === dialogue?.portrait);
   const metadata = (portrait?.metadata ?? {}) as Record<string, unknown>;
-  return <div className="scene-dialogue-preview" aria-label={ariaLabel} style={{ width: 240 * scale, height: 160 * scale }}>
-    <span className="scene-dialogue-preview-caption">{dialogue ? `Prévia congelada · ${dialogue.key}` : "Prévia de exemplo · não salva como fala"}</span>
+  return <div className="scene-dialogue-preview" aria-label={ui(ariaLabel)} style={{ width: 240 * scale, height: 160 * scale }}>
+    <span className="scene-dialogue-preview-caption">{dialogue ? ui("Prévia congelada · {0}", { 0: dialogue.key }) : ui("Prévia de exemplo · não salva como fala")}</span>
     <DialoguePreviewSnapshot settings={settings} speaker={dialogue ? dialogue.character : "Personagem"}
       portraitSlot={dialogue?.portraitSlot === "right" || dialogue?.portraitSlot === "Direita" ? "Direita" : dialogue?.portraitSlot === "left" || dialogue?.portraitSlot === "Esquerda" ? "Esquerda" : settings.portraitPosition}
       text={dialogue?.text ?? "Esta é uma prévia da aparência dos diálogos."}

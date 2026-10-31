@@ -103,6 +103,31 @@ describe("Files workspace presentation", () => {
     }]);
     expect(next.animations[0].spriteSheet).toBe("hero.png");
   });
+  it("replaces background pixels without retaining the old file palette, dimensions or approval", () => {
+    const project = {
+      assets: [{ id: "menu", name: "menu.png", kind: "Background", systemImage: "photo", metadata: {
+        source: "Assets/backgrounds/menu.png", bundledDefaultAsset: "template:blank/Assets/backgrounds/menu.png",
+        width: 240, height: 160, sourceSha256: "old-image", preparedSha256: "old-prepared", runtimeSourceSha256: "old-runtime",
+        provenance: "Old approved image", license: "Old license", generatedBy: "old-generator", approved: true,
+        reviewStatus: "approved", visualStatus: "approved", palettePreparationVisuallyApproved: true,
+        backgroundPaletteReferencePlan: { banks: [[null, [56, 24, 16]]], tile_palette_banks: [0] },
+        colorMode: "4bpp", backgroundPaletteBankBudget: 14, backgroundTileOptimizer: { enabled: true, tileBudget: 640 },
+        note: "menu backdrop"
+      } }],
+      rooms: [{ id: "sound", backgroundAssetName: "menu.png" }]
+    };
+    const next = replaceAssetFileInProject(project, "menu", {
+      id: "replacement", name: "new-menu.png", relativePath: "Assets/backgrounds/menu.png", kind: "Sprite", systemImage: "photo",
+      metadata: { width: 320, height: 160, sourceSha256: "new-image" }
+    });
+    expect(next.assets).toEqual([{ id: "menu", name: "menu.png", kind: "Background", systemImage: "photo", metadata: {
+      source: "Assets/backgrounds/menu.png", width: 320, height: 160, sourceSha256: "new-image",
+      colorMode: "4bpp", backgroundPaletteBankBudget: 14, backgroundTileOptimizer: { enabled: true, tileBudget: 640 }, note: "menu backdrop"
+    } }]);
+    expect(next.rooms).toEqual(project.rooms);
+    expect(project.assets[0]!.metadata.sourceSha256).toBe("old-image");
+  });
+
   it("derives assets, type counts and group membership from current .gba-project fields", () => {
     const presentation = deriveFilesWorkspacePresentation({
       assets: [
@@ -399,6 +424,7 @@ describe("Files workspace presentation", () => {
         { id: "selector", name: "dialogue-selector.png", kind: "UI" },
         { id: "font", name: "dialogue-font.png", kind: "FONT" },
         { id: "icon", name: "hud-icon.png", kind: "UI" },
+        { id: "empty", name: "hud-empty.png", kind: "UI" },
         { id: "unused", name: "unused.png", kind: "UI" }
       ],
       settings: {
@@ -408,7 +434,7 @@ describe("Files workspace presentation", () => {
           backgroundImage: "dialogue-box.png",
           selectorImage: "dialogue-selector.png",
           font: "dialogue-font.png",
-          components: [{ id: "portrait-frame", label: "Moldura", asset: "hud-icon.png" }]
+          components: [{ id: "portrait-frame", label: "Moldura", asset: "hud-icon.png", gauge: { emptyAsset: "hud-empty.png" } }]
         }]
       }
     });
@@ -418,6 +444,7 @@ describe("Files workspace presentation", () => {
       ["dialogue-selector.png", true, "hud-preset-selector"],
       ["dialogue-font.png", true, "hud-preset-font"],
       ["hud-icon.png", true, "hud-preset-component"],
+      ["hud-empty.png", true, "hud-preset-component"],
       ["unused.png", false, undefined]
     ]);
   });

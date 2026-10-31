@@ -1,3 +1,4 @@
+import { uiText as ui, useStudioUiText } from "./studioUiText";
 import { useEffect, useState } from "react";
 import { CheckCircle2, ChevronRight, Circle, Monitor, RotateCcw, Settings2 } from "lucide-react";
 import { applyStudioUiAppearance, DEFAULT_STUDIO_UI_APPEARANCE, readStudioUiAppearance, writeStudioUiAppearance, type StudioUiAppearance } from "../shared/studioUiAppearance";
@@ -9,6 +10,7 @@ const lightThemeImage = new URL("./assets/settings-theme-light.png", import.meta
 const darkThemeImage = new URL("./assets/settings-theme-dark.png", import.meta.url).href;
 
 export function SettingsInterfaceSection(): React.ReactElement {
+  const ui = useStudioUiText();
   const { t } = useStudioI18n();
   const { theme, setTheme } = useStudioTheme();
   const [appearance, setAppearance] = useState(() => readStudioUiAppearance());
@@ -39,7 +41,7 @@ export function SettingsInterfaceSection(): React.ReactElement {
     { key: "brightness", label: "settings.interface.brightness", description: "settings.interface.brightnessHint" }
   ] as const;
 
-  return <section className="settings-interface-page" id="settings-section-interface" aria-label="Editar Interface">
+  return <section className="settings-interface-page" id="settings-section-interface" aria-label={ui("Editar Interface")}>
     <header className="settings-interface-header">
       <div>
         <div className="settings-interface-heading"><h2>{t("settings.interface.title")}</h2><span className="settings-interface-device"><Monitor size={16} aria-hidden="true" />{t("settings.interface.device")}</span></div>

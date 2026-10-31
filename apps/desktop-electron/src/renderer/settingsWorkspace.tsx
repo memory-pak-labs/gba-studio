@@ -1,3 +1,4 @@
+import { uiText as ui, useStudioUiText } from "./studioUiText";
 import type { SceneActionHandler, SceneActionAuditEntry } from "../shared/sceneActionRouting.js";
 import { Fragment, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import {
@@ -85,6 +86,7 @@ import { ProjectHealthWorkspace } from "./projectHealthWorkspace";
 import { TranslationPacksPanel } from "./TranslationPacksPanel";
 import { CreditsContent } from "./CreditsContent";
 import { mcpRegistrationEnginePackPath } from "../shared/mcpSettings";
+import { readStoredLocale } from "./i18n";
 
 interface SettingsWorkspaceProps {
   scope?: Exclude<SettingsWorkspaceScope, "all">;
@@ -143,10 +145,11 @@ function LocalSettingsNavigation({ sections, selectedSectionID, onNavigate }: {
   selectedSectionID: SettingsNavigationSectionID;
   onNavigate(sectionID: SettingsNavigationSectionID): void;
 }): React.ReactElement {
+  const ui = useStudioUiText();
   return <>{sections.map(section => {
     const Icon = section.icon;
     return <button
-      aria-label={section.sectionID === "interface" ? "Seção de ajustes da interface" : `${section.title} seção de ajustes`}
+      aria-label={section.sectionID === "interface" ? ui("Seção de ajustes da interface") : ui("{0} seção de ajustes", { 0: ui(section.title) })}
       aria-pressed={selectedSectionID === section.sectionID}
       className={sectionNavClassName(selectedSectionID === section.sectionID)}
       key={section.sectionID}
@@ -154,7 +157,7 @@ function LocalSettingsNavigation({ sections, selectedSectionID, onNavigate }: {
       type="button"
     >
       <span className="settings-nav-icon" aria-hidden="true"><Icon size={15} strokeWidth={2.2} /></span>
-      <span className="settings-nav-copy"><strong>{section.title}</strong><span>{section.detail}</span></span>
+      <span className="settings-nav-copy"><strong>{ui(section.title)}</strong><span>{ui(section.detail)}</span></span>
     </button>;
   })}</>;
 }
@@ -193,6 +196,8 @@ function sectionNavClassName(isActive: boolean): string {
 }
 
 function polishSettingsText(value: string): string {
+  const localized = ui(value);
+  if (localized !== value || readStoredLocale() !== "pt-BR") return localized;
   const replacements: Array<[string, string]> = [
     ["Isometrico", "Isométrico"],
     ["Identificacao", "Identificação"],
@@ -472,7 +477,10 @@ function settingControl(
           )}
           value={String(field.value)}
         >
-          {options.map((option) => <option key={option.value} value={option.value}>{polishSettingsText(option.label)}</option>)}
+          {options.map((option) => <option key={option.value} value={option.value}>{
+            (field.key === "startScene" || field.key === "startPlayer" || /^default(PlayerSprites|Backgrounds)\./.test(field.key)) && option.value && option.label === option.value
+              ? option.label : polishSettingsText(option.label)
+          }</option>)}
         </select>
       </label>
     );
@@ -511,7 +519,7 @@ function settingControl(
           value={String(field.value)}
         />
         {field.pathPicker ? (
-          <button aria-label={`Escolher ${polishSettingsText(field.label)}`} type="button" onClick={() => onSelectPath(sectionID, field)}><Folder size={18} aria-hidden="true" />Escolher</button>
+          <button aria-label={ui("Escolher {0}", { 0: polishSettingsText(field.label) })} type="button" onClick={() => onSelectPath(sectionID, field)}><Folder size={18} aria-hidden="true" />{ui("Escolher")}</button>
         ) : null}
       </div>
     </label>
@@ -522,6 +530,7 @@ function ShortcutSettingsPanel({
   section,
   onUpdateSetting
 }: Pick<SettingsSectionPanelProps, "section" | "onUpdateSetting">): React.ReactElement {
+  const ui = useStudioUiText();
   const [capturingFieldKey, setCapturingFieldKey] = useState<string | null>(null);
   const [captureFeedback, setCaptureFeedback] = useState<Record<string, string>>({});
   const fieldsByKey = new Map(section.editableFields.map((field) => [field.key, field]));
@@ -581,12 +590,12 @@ function ShortcutSettingsPanel({
   }
 
   return (
-    <section aria-label="Configuração dos atalhos do editor" className="settings-shortcut-panel">
+    <section aria-label={ui("Configuração dos atalhos do editor")} className="settings-shortcut-panel">
       <div className="settings-shortcut-intro">
         <div>
-          <strong>Atalhos das ferramentas</strong>
-          <span>Clique em Capturar e pressione uma letra ou número, com Shift, Ctrl/Cmd ou Alt.</span>
-          <span>Alt+clique captura colisão, botão direito apaga, Shift+setas move em passos de 8 tiles, Ctrl/Cmd+D duplica e Escape cancela ou sai do foco.</span>
+          <strong>{ui("Atalhos das ferramentas")}</strong>
+          <span>{ui("Clique em Capturar e pressione uma letra ou número, com Shift, Ctrl/Cmd ou Alt.")}</span>
+          <span>{ui("Alt+clique captura colisão, botão direito apaga, Shift+setas move em passos de 8 tiles, Ctrl/Cmd+D duplica e Escape cancela ou sai do foco.")}</span>
         </div>
         <span className={issueFieldCount > 0 ? "settings-shortcut-status warning" : "settings-shortcut-status ok"} role="status" aria-live="polite">
           {statusMessage}
@@ -625,7 +634,7 @@ function ShortcutSettingsPanel({
                   value={formatRoomEditorShortcut(field.value)}
                 />
                 <button
-                  aria-label={`${capturingFieldKey === field.key ? "Pressione…" : "Capturar"} atalho de ${polishSettingsText(field.label)}`}
+                  aria-label={ui("{0} atalho de {1}", { 0: capturingFieldKey === field.key ? "Pressione…" : "Capturar", 1: polishSettingsText(field.label) })}
                   aria-pressed={capturingFieldKey === field.key}
                   className={capturingFieldKey === field.key ? "active" : ""}
                   onClick={() => {
@@ -638,17 +647,16 @@ function ShortcutSettingsPanel({
                   }}
                   type="button"
                 >
-                  {capturingFieldKey === field.key ? "Pressione…" : "Capturar"}
+                  {capturingFieldKey === field.key ? ui("Pressione…") : ui("Capturar")}
                 </button>
                 <button
-                  aria-label={`Restaurar atalho padrão de ${polishSettingsText(field.label)}`}
+                  aria-label={ui("Restaurar atalho padrão de {0}", { 0: polishSettingsText(field.label) })}
                   disabled={isDefault}
                   onClick={() => onUpdateSetting(section.id, field.key, field.defaultValue)}
-                  title={`Restaurar para ${formatRoomEditorShortcut(binding.defaultKey)}`}
+                  title={ui("Restaurar para {0}", { 0: formatRoomEditorShortcut(binding.defaultKey) })}
                   type="button"
                 >
-                  Padrão
-                </button>
+                  {ui("Padrão")}</button>
               </div>
               {hasIssue ? (
                 <span className="settings-shortcut-issue" id={issueID} role="alert">
@@ -661,7 +669,7 @@ function ShortcutSettingsPanel({
       </div>
 
       <div className="settings-shortcut-actions">
-        <span>Use “Padrão” para restaurar uma tecla ou “Restaurar padrão” no cabeçalho para restaurar a seção.</span>
+        <span>{ui("Use “Padrão” para restaurar uma tecla ou “Restaurar padrão” no cabeçalho para restaurar a seção.")}</span>
       </div>
     </section>
   );
@@ -691,6 +699,7 @@ function RuntimeCapabilitiesPanel({
   section,
   onUpdateSetting
 }: Pick<SettingsSectionPanelProps, "section" | "onUpdateSetting">): React.ReactElement {
+  const ui = useStudioUiText();
   const fields = new Map(section.editableFields.map((field) => [field.key, field]));
   const enabledCount = RUNTIME_CAPABILITY_ROWS.filter((row) => fields.get(row.key)?.value === true).length;
   const affineUsage = section.runtimeCapabilityUsage ?? { enabled: false, projectDefault: false, sceneCount: 0 };
@@ -703,13 +712,13 @@ function RuntimeCapabilitiesPanel({
         : "Não utilizada";
 
   return (
-    <section aria-label="Capacidades universais do runtime" className="settings-runtime-capabilities">
+    <section aria-label={ui("Capacidades universais do runtime")} className="settings-runtime-capabilities">
       <header className="settings-runtime-capabilities-header">
         <div>
-          <strong>Capacidades do projeto</strong>
-          <span>Serviços globais são configuráveis; Affine é derivado do uso real nas cenas.</span>
+          <strong>{ui("Capacidades do projeto")}</strong>
+          <span>{ui("Serviços globais são configuráveis; Affine é derivado do uso real nas cenas.")}</span>
         </div>
-        <b>{enabledCount} de {RUNTIME_CAPABILITY_ROWS.length} ativas</b>
+        <b>{enabledCount} {ui(" de ")}{RUNTIME_CAPABILITY_ROWS.length} {ui(" ativas")}</b>
       </header>
       <div className="settings-runtime-capability-list">
         {RUNTIME_CAPABILITY_ROWS.map((row) => {
@@ -719,12 +728,12 @@ function RuntimeCapabilitiesPanel({
             <label className={enabled ? "settings-runtime-capability-row enabled" : "settings-runtime-capability-row"} key={row.key}>
               <span className="settings-runtime-capability-icon" aria-hidden="true"><Icon size={19} strokeWidth={2.1} /></span>
               <span className="settings-runtime-capability-copy">
-                <strong>{row.label}</strong>
-                <small>{row.detail}</small>
+                <strong>{ui(row.label)}</strong>
+                <small>{ui(row.detail)}</small>
               </span>
-              <span className="settings-runtime-capability-status">{enabled ? "Ativa" : "Desativada"}</span>
+              <span className="settings-runtime-capability-status">{enabled ? ui("Ativa") : ui("Desativada")}</span>
               <input
-                aria-label={row.label}
+                aria-label={ui(row.label)}
                 checked={enabled}
                 onChange={(event) => onUpdateSetting("runtimeCapabilities", row.key, event.currentTarget.checked)}
                 type="checkbox"
@@ -735,13 +744,13 @@ function RuntimeCapabilitiesPanel({
         <div className={affineUsage.enabled ? "settings-runtime-capability-derived enabled" : "settings-runtime-capability-derived"} role="status">
           <span className="settings-runtime-capability-icon" aria-hidden="true"><ScanLine size={19} strokeWidth={2.1} /></span>
           <span className="settings-runtime-capability-copy">
-            <strong>Composição Affine</strong>
-            <small>Capability automática a partir do padrão de Backgrounds ou do opt-in no Inspetor da cena.</small>
+            <strong>{ui("Composição Affine")}</strong>
+            <small>{ui("Capability automática a partir do padrão de Backgrounds ou do opt-in no Inspetor da cena.")}</small>
           </span>
           <span className="settings-runtime-capability-status">{affineStatus}</span>
         </div>
       </div>
-      <p className="settings-runtime-capabilities-note">Save Data é configurado na seção própria. Affine é derivado dos padrões gráficos em Cenas ou da composição própria no Inspetor.</p>
+      <p className="settings-runtime-capabilities-note">{ui("Save Data é configurado na seção própria. Affine é derivado dos padrões gráficos em Cenas ou da composição própria no Inspetor.")}</p>
     </section>
   );
 }
@@ -796,28 +805,29 @@ function sectionFieldValues(section: SettingsWorkspaceSection): Record<string, S
 function AdvancedVideoComposer({
   section
 }: Pick<SettingsSectionPanelProps, "section">): React.ReactElement {
+  const ui = useStudioUiText();
   const composition = deriveAdvancedVideoComposition(sectionFieldValues(section));
   const affineEnabled = composition.mode === 1 || composition.mode === 2;
   const bitmapEnabled = composition.mode >= 3;
   return (
-    <section aria-label="Padrão de vídeo dos backgrounds" className="settings-visual-builder settings-video-composer">
-      <header><div><strong>Padrão de vídeo dos backgrounds</strong><span>Fallback do projeto para cenas sem composição própria</span></div><b>Modo {composition.mode}</b></header>
-      <p className="settings-video-composer-note">Use este modo como base do pipeline. Para uma cena específica, configure o Compositor da cena no Inspetor; o opt-in da cena tem prioridade.</p>
+    <section aria-label={ui("Padrão de vídeo dos backgrounds")} className="settings-visual-builder settings-video-composer">
+      <header><div><strong>{ui("Padrão de vídeo dos backgrounds")}</strong><span>{ui("Fallback do projeto para cenas sem composição própria")}</span></div><b>{ui("Modo ")}{composition.mode}</b></header>
+      <p className="settings-video-composer-note">{ui("Use este modo como base do pipeline. Para uma cena específica, configure o Compositor da cena no Inspetor; o opt-in da cena tem prioridade.")}</p>
       <div className="settings-video-builder-body">
         <div className="settings-video-preview">
-          <strong>Prévia da transformação</strong>
+          <strong>{ui("Prévia da transformação")}</strong>
           <div className={bitmapEnabled ? "bitmap" : "affine"}>
             <span style={affineEnabled ? {
               transform: `rotate(${composition.affine.rotationDegrees}deg) scale(${composition.affine.scaleX}, ${composition.affine.scaleY})`
-            } : undefined}>{bitmapEnabled ? composition.bitmapAsset || "Selecione uma imagem" : composition.affine.asset || composition.affine.layer}</span>
+            } : undefined}>{bitmapEnabled ? composition.bitmapAsset || ui("Selecione uma imagem") : composition.affine.asset || composition.affine.layer}</span>
           </div>
         </div>
         <dl>
-          <div><dt>Camada</dt><dd>{affineEnabled ? composition.affine.layer : bitmapEnabled ? "Framebuffer" : "Tilemaps"}</dd></div>
-          <div><dt>Rotação</dt><dd>{composition.affine.rotationDegrees}°</dd></div>
-          <div><dt>Escala</dt><dd>{composition.affine.scaleX} × {composition.affine.scaleY}</dd></div>
-          <div><dt>Origem</dt><dd>{composition.affine.originX}, {composition.affine.originY}</dd></div>
-          <div><dt>Página</dt><dd>{composition.bitmapPage}</dd></div>
+          <div><dt>{ui("Camada")}</dt><dd>{affineEnabled ? composition.affine.layer : bitmapEnabled ? ui("Framebuffer") : ui("Tilemaps")}</dd></div>
+          <div><dt>{ui("Rotação")}</dt><dd>{composition.affine.rotationDegrees}°</dd></div>
+          <div><dt>{ui("Escala")}</dt><dd>{composition.affine.scaleX} × {composition.affine.scaleY}</dd></div>
+          <div><dt>{ui("Origem")}</dt><dd>{composition.affine.originX}, {composition.affine.originY}</dd></div>
+          <div><dt>{ui("Página")}</dt><dd>{composition.bitmapPage}</dd></div>
         </dl>
       </div>
     </section>
@@ -828,6 +838,7 @@ function SaveMenuVisualBuilder({
   section,
   onUpdateSetting
 }: Pick<SettingsSectionPanelProps, "section" | "onUpdateSetting">): React.ReactElement {
+  const ui = useStudioUiText();
   const config = deriveSaveMenuBuilder(sectionFieldValues(section));
   const cards = saveMenuSlotCards(config, [{
     slot: config.selectedSlot,
@@ -837,25 +848,25 @@ function SaveMenuVisualBuilder({
     location: "Cena atual"
   }]);
   return (
-    <section aria-label="Construtor visual de saves" className="settings-visual-builder settings-save-builder">
-      <header><div><strong>Construtor visual de saves</strong><span>A tela usa os metadados gravados pela engine</span></div><b>{config.slotCount} slots</b></header>
+    <section aria-label={ui("Construtor visual de saves")} className="settings-visual-builder settings-save-builder">
+      <header><div><strong>{ui("Construtor visual de saves")}</strong><span>{ui("A tela usa os metadados gravados pela engine")}</span></div><b>{config.slotCount} {ui(" slots")}</b></header>
       <div className={`settings-save-slots ${config.layout}`}>
         {cards.map((card) => (
           <button
-            aria-label={`Selecionar slot ${card.slot}`}
+            aria-label={ui("Selecionar slot {0}", { 0: card.slot })}
             aria-pressed={card.selected}
             key={card.slot}
             onClick={() => onUpdateSetting("save", "selectedSlot", card.slot)}
             type="button"
           >
-            <small>SLOT {card.slot}</small>
+            <small>{ui("SLOT ")}{card.slot}</small>
             {config.metadata.playerName ? <strong>{card.playerName}</strong> : null}
             {config.metadata.playTime ? <span>{card.playTime}</span> : null}
             {config.metadata.location ? <em>{card.location}</em> : null}
           </button>
         ))}
       </div>
-      <div className="settings-save-actions" aria-label="Prévia das ações do menu de saves">
+      <div className="settings-save-actions" aria-label={ui("Prévia das ações do menu de saves")}>
         <button disabled type="button">{config.actions.continue}</button>
         <button disabled type="button">{config.actions.load}</button>
         <button disabled type="button">{config.actions.delete}</button>
@@ -877,14 +888,15 @@ function McpScopeRow({
   status: string;
   tone?: "allowed" | "blocked" | "warning";
 }): React.ReactElement {
+  const ui = useStudioUiText();
   return (
     <div className="settings-mcp-scope-row">
       <span className="settings-mcp-scope-icon" aria-hidden="true"><Icon size={18} strokeWidth={2.1} /></span>
       <div>
         <strong>{title}</strong>
-        <span>{detail}</span>
+        <span>{ui(detail)}</span>
       </div>
-      <small className={`settings-mcp-status ${tone}`}>{status}</small>
+      <small className={`settings-mcp-status ${tone}`}>{ui(status)}</small>
     </div>
   );
 }
@@ -897,6 +909,7 @@ function McpSettingsPanel({
   getMcpServerRegistration,
   getCodexMcpServerRegistration
 }: Pick<SettingsSectionPanelProps, "section" | "onUpdateSetting" | "projectPath" | "enginePackPath" | "getMcpServerRegistration" | "getCodexMcpServerRegistration">): React.ReactElement {
+  const ui = useStudioUiText();
   const enabledField = section.editableFields.find((field) => field.key === "enabled");
   const enabled = enabledField?.value === true;
   const [registration, setRegistration] = useState<string | null>(null);
@@ -971,99 +984,97 @@ function McpSettingsPanel({
       <header className="settings-section-hero settings-mcp-hero">
         <span className="settings-section-badge" aria-hidden="true"><ShieldCheck size={20} strokeWidth={2.2} /></span>
         <div className="settings-section-hero-copy">
-          <strong>MCP local</strong>
-          <span>Conecte clientes de IA ao projeto atual com limites explícitos.</span>
+          <strong>{ui("MCP local")}</strong>
+          <span>{ui("Conecte clientes de IA ao projeto atual com limites explícitos.")}</span>
         </div>
         <div className="settings-section-status">
-          <span>Somente leitura</span>
-          <strong>stdio local</strong>
+          <span>{ui("Somente leitura")}</span>
+          <strong>{ui("stdio local")}</strong>
         </div>
       </header>
 
-      <article className="settings-mcp-card" role="region" aria-label="Editar MCP local">
+      <article className="settings-mcp-card" role="region" aria-label={ui("Editar MCP local")}>
         <label className="settings-mcp-primary-row">
           <span className="settings-mcp-primary-icon" aria-hidden="true"><ShieldCheck size={22} strokeWidth={2.2} /></span>
           <span>
-            <strong>Ativar MCP local</strong>
-            <small>Permite que clientes MCP leiam informações deste projeto. Salve o projeto após alterar esta autorização.</small>
+            <strong>{ui("Ativar MCP local")}</strong>
+            <small>{ui("Permite que clientes MCP leiam informações deste projeto. Salve o projeto após alterar esta autorização.")}</small>
           </span>
           <input
-            aria-label="Ativar MCP local"
+            aria-label={ui("Ativar MCP local")}
             checked={enabled}
             onChange={(event) => onUpdateSetting("mcp", "enabled", event.currentTarget.checked)}
             type="checkbox"
           />
         </label>
 
-        <div className="settings-mcp-scope-list" aria-label="Escopo das permissões MCP">
+        <div className="settings-mcp-scope-list" aria-label={ui("Escopo das permissões MCP")}>
           <McpScopeRow
             icon={Files}
-            title="Ler dados e assets deste projeto"
+            title={ui("Ler dados e assets deste projeto")}
             detail="Resumo, diagnósticos e metadados de assets permanecem dentro da pasta do projeto."
             status={enabled ? "Permitido quando conectado" : "Desativado"}
             tone={enabled ? "allowed" : "blocked"}
           />
           <McpScopeRow
             icon={LockKeyhole}
-            title="Alterar arquivos do projeto"
+            title={ui("Alterar arquivos do projeto")}
             detail="Nenhuma ferramenta MCP cria, edita, move ou salva arquivos."
             status="Bloqueado · somente leitura"
           />
           <McpScopeRow
             icon={LockKeyhole}
-            title="Acessar arquivos fora do projeto"
+            title={ui("Acessar arquivos fora do projeto")}
             detail="Caminhos absolutos, saídas da pasta e links simbólicos externos são recusados."
             status="Bloqueado · projeto atual"
           />
           <McpScopeRow
             icon={Network}
-            title="Usar rede"
+            title={ui("Usar rede")}
             detail="A conexão usa stdin/stdout no computador local e não abre portas de rede."
             status="Bloqueado · stdio local"
           />
           <McpScopeRow
             icon={ClipboardCopy}
-            title="Analisar orçamento da ROM"
+            title={ui("Analisar orçamento da ROM")}
             detail="Disponibiliza o diagnóstico de orçamento sem gravar a ROM nem o projeto."
             status={registeredEnginePackPath ? "Configuração inclui Engine Pack" : "Requer Engine Pack"}
             tone={registeredEnginePackPath ? "allowed" : "warning"}
           />
         </div>
 
-        <section className="settings-mcp-connection" aria-label="Configuração de conexão MCP">
+        <section className="settings-mcp-connection" aria-label={ui("Configuração de conexão MCP")}>
           <div>
-            <strong>Configuração para clientes MCP</strong>
-            <span>Registro JSON genérico para clientes que aceitam configuração MCP nesse formato.</span>
+            <strong>{ui("Configuração para clientes MCP")}</strong>
+            <span>{ui("Registro JSON genérico para clientes que aceitam configuração MCP nesse formato.")}</span>
           </div>
           {registration ? (
-            <textarea aria-label="Configuração MCP para copiar" readOnly value={registration} />
+            <textarea aria-label={ui("Configuração MCP para copiar")} readOnly value={registration} />
           ) : (
-            <p>{registrationError ?? "Gerando configuração de conexão…"}</p>
+            <p>{registrationError ?? ui("Gerando configuração de conexão…")}</p>
           )}
           <div className="settings-mcp-connection-actions">
             <button disabled={!registration} onClick={() => void copyRegistration()} type="button">
               <ClipboardCopy size={15} strokeWidth={2.1} />
-              Copiar configuração
-            </button>
+              {ui("Copiar configuração")}</button>
             {copyFeedback ? <span role="status">{copyFeedback}</span> : null}
           </div>
         </section>
 
-        <section className="settings-mcp-connection" aria-label="Configuração de conexão do Codex">
+        <section className="settings-mcp-connection" aria-label={ui("Configuração de conexão do Codex")}>
           <div>
-            <strong>Configuração para Codex</strong>
-            <span>Cole este bloco em <code>~/.codex/config.toml</code> ou adicione-o pelos servidores MCP do Codex. Reinicie o Codex após salvar.</span>
+            <strong>{ui("Configuração para Codex")}</strong>
+            <span>{ui("Cole este bloco em ")}<code>{"~/.codex/config.toml"}</code> {ui(" ou adicione-o pelos servidores MCP do Codex. Reinicie o Codex após salvar.")}</span>
           </div>
           {codexRegistration ? (
-            <textarea aria-label="Configuração TOML do Codex para copiar" readOnly value={codexRegistration} />
+            <textarea aria-label={ui("Configuração TOML do Codex para copiar")} readOnly value={codexRegistration} />
           ) : (
-            <p>{codexRegistrationError ?? "Gerando configuração do Codex…"}</p>
+            <p>{codexRegistrationError ?? ui("Gerando configuração do Codex…")}</p>
           )}
           <div className="settings-mcp-connection-actions">
             <button disabled={!codexRegistration} onClick={() => void copyCodexRegistration()} type="button">
               <ClipboardCopy size={15} strokeWidth={2.1} />
-              Copiar para Codex
-            </button>
+              {ui("Copiar para Codex")}</button>
             {codexCopyFeedback ? <span role="status">{codexCopyFeedback}</span> : null}
           </div>
         </section>
@@ -1073,33 +1084,34 @@ function McpSettingsPanel({
 }
 
 function SettingsTranslationSection(): React.ReactElement {
+  const ui = useStudioUiText();
   return <section className="settings-continuous-section" id="settings-section-translationPacks">
     <div className="settings-section-hero">
       <span className="settings-section-badge" aria-hidden="true"><Languages size={20} strokeWidth={2.2} /></span>
-      <div className="settings-section-hero-copy"><strong>Tradução offline</strong><span>Pacotes de idiomas instalados neste dispositivo</span></div>
-      <div className="settings-section-status"><span>Neste dispositivo</span></div>
+      <div className="settings-section-hero-copy"><strong>{ui("Tradução offline")}</strong><span>{ui("Pacotes de idiomas instalados neste dispositivo")}</span></div>
+      <div className="settings-section-status"><span>{ui("Neste dispositivo")}</span></div>
     </div>
-    <article className="settings-section-card active" role="region" aria-label="Gerenciar tradução offline"><TranslationPacksPanel /></article>
+    <article className="settings-section-card active" role="region" aria-label={ui("Gerenciar tradução offline")}><TranslationPacksPanel /></article>
   </section>;
 }
 
 function SettingsPluginsSection({ projectPath, onOpenPluginCatalog }: Pick<SettingsWorkspaceProps, "projectPath" | "onOpenPluginCatalog">): React.ReactElement {
+  const ui = useStudioUiText();
   return <section className="settings-continuous-section" id="settings-section-plugins">
     <div className="settings-section-hero">
       <span className="settings-section-badge" aria-hidden="true"><Puzzle size={20} strokeWidth={2.2} /></span>
-      <div className="settings-section-hero-copy"><strong>Plugins</strong><span>Catálogo e instalação no projeto</span></div>
-      <div className="settings-section-status"><span>Neste projeto</span></div>
+      <div className="settings-section-hero-copy"><strong>{ui("Plugins")}</strong><span>{ui("Catálogo e instalação no projeto")}</span></div>
+      <div className="settings-section-status"><span>{ui("Neste projeto")}</span></div>
     </div>
-    <article className="settings-section-card settings-plugins-card active" role="region" aria-label="Plugins do projeto">
+    <article className="settings-section-card settings-plugins-card active" role="region" aria-label={ui("Plugins do projeto")}>
       <div className="settings-plugins-copy">
-        <p>Esta área está preparada para plugins criados para o GBA Studio. Ainda não há um catálogo padrão.</p>
-        <p>Instale por pasta ou ZIP no menu Projeto ou abra um futuro catálogo da comunidade.</p>
-        {!projectPath ? <p>Salve o projeto para abrir o catálogo.</p> : null}
+        <p>{ui("Esta área está preparada para plugins criados para o GBA Studio. Ainda não há um catálogo padrão.")}</p>
+        <p>{ui("Instale por pasta ou ZIP no menu Projeto ou abra um futuro catálogo da comunidade.")}</p>
+        {!projectPath ? <p>{ui("Salve o projeto para abrir o catálogo.")}</p> : null}
       </div>
       <button disabled={!projectPath || !onOpenPluginCatalog} onClick={onOpenPluginCatalog} type="button">
         <Puzzle aria-hidden="true" size={15} strokeWidth={2.1} />
-        Abrir catálogo de plugins
-      </button>
+        {ui("Abrir catálogo de plugins")}</button>
     </article>
   </section>;
 }
@@ -1122,6 +1134,7 @@ function SettingsSectionPanel({
   onCancelReset,
   onConfirmReset
 }: SettingsSectionPanelProps): React.ReactElement {
+  const ui = useStudioUiText();
   if (section.id === "mcp") {
     return <McpSettingsPanel
       section={section}
@@ -1168,8 +1181,8 @@ function SettingsSectionPanel({
       onRequestReset={() => onRequestReset(section.id)} onCancelReset={onCancelReset}
       onConfirmReset={() => onConfirmReset(section.id)}
       extraContent={section.id === "backgrounds" ? <AdvancedVideoComposer section={section} /> : section.id === "battleRpg" ? <>
-        <section className="scene-defaults-battle-rules"><h3>Regras da batalha</h3><div className="scene-defaults-switches">{battleRuleFields.map(field => settingControl(section.id, field, onUpdateSetting, onSelectPath))}</div></section>
-        <p className="settings-battle-hud-note">A visibilidade das barras de HP e experiência é configurada em Editor → HUD → Aparência, junto da apresentação do combate.</p>
+        <section className="scene-defaults-battle-rules"><h3>{ui("Regras da batalha")}</h3><div className="scene-defaults-switches">{battleRuleFields.map(field => settingControl(section.id, field, onUpdateSetting, onSelectPath))}</div></section>
+        <p className="settings-battle-hud-note">{ui("A visibilidade das barras de HP e experiência é configurada em Editor → HUD → Aparência, junto da apresentação do combate.")}</p>
       </> : null}
     />;
   }
@@ -1182,44 +1195,42 @@ function SettingsSectionPanel({
           <SectionIcon size={20} strokeWidth={2.2} />
         </span>
         <div className="settings-section-hero-copy">
-          <strong>{sectionTitle}</strong>
+          <strong>{ui(sectionTitle)}</strong>
           <span>{sectionDetail}</span>
         </div>
         {section.id === "credits" || section.editableFields.every((field) => field.readOnly) ? (
           <div className="settings-section-status">
-            <span>Informação</span>
-            <strong>{section.id === "hardware" ? "Limites fixos" : section.id === "credits" ? "GBA Studio" : "Projeto"}</strong>
+            <span>{ui("Informação")}</span>
+            <strong>{section.id === "hardware" ? ui("Limites fixos") : section.id === "credits" ? ui("GBA Studio") : ui("Projeto")}</strong>
           </div>
         ) : (
           <>
             <div className="settings-section-status">
-              <span>{section.id === "build" ? "Build + salvamento" : section.exportScope === "play-only" ? "Só Play" : section.exportScope === "preview-only" ? "Só preview" : section.exportScope === "export" ? "Exporta na ROM" : section.exportScope === "editor-only" ? "Só editor" : "Preview + ROM"}</span>
-              <strong>{changeSummary.changedCount} {changeSummary.changedCount === 1 ? "alteração" : "alterações"}</strong>
+              <span>{section.id === "build" ? ui("Build + salvamento") : section.exportScope === "play-only" ? ui("Só Play") : section.exportScope === "preview-only" ? ui("Só preview") : section.exportScope === "export" ? ui("Exporta na ROM") : section.exportScope === "editor-only" ? ui("Só editor") : ui("Preview + ROM")}</span>
+              <strong>{changeSummary.changedCount} {changeSummary.changedCount === 1 ? ui("alteração") : ui("alterações")}</strong>
             </div>
             <button
-              aria-label={`Restaurar padrão de ${sectionTitle}`}
+              aria-label={ui("Restaurar padrão de {0}", { 0: ui(sectionTitle) })}
               type="button"
               onClick={() => onRequestReset(section.id)}
             >
-              Restaurar padrão
-            </button>
+              {ui("Restaurar padrão")}</button>
           </>
         )}
       </div>
 
       {resetConfirmationSectionID === section.id ? (
-        <section className="settings-reset-confirmation" aria-label="Confirmar restauração dos ajustes">
-          <strong>Restaurar {sectionTitle}?</strong>
+        <section className="settings-reset-confirmation" aria-label={ui("Confirmar restauração dos ajustes")}>
+          <strong>{ui("Restaurar ")}{ui(sectionTitle)}?</strong>
           <p>
             {changeSummary.changedCount > 0
               ? polishSettingsText(changeSummary.changedFields.join(", "))
-              : "Esta seção já usa os valores padrão."}
+              : ui("Esta seção já usa os valores padrão.")}
           </p>
           <div>
-            <button onClick={onCancelReset} type="button">Cancelar</button>
-            <button aria-label="Confirmar restauração" onClick={() => onConfirmReset(section.id)} type="button">
-              Restaurar
-            </button>
+            <button onClick={onCancelReset} type="button">{ui("Cancelar")}</button>
+            <button aria-label={ui("Confirmar restauração")} onClick={() => onConfirmReset(section.id)} type="button">
+              {ui("Restaurar")}</button>
           </div>
         </section>
       ) : null}
@@ -1227,13 +1238,13 @@ function SettingsSectionPanel({
       </>}
 
       {section.intentGroups.length > 0 ? (
-        <section className="settings-intent-panel" aria-label={`Ajustes por intenção de ${sectionTitle}`}>
+        <section className="settings-intent-panel" aria-label={ui("Ajustes por intenção de {0}", { 0: ui(sectionTitle) })}>
           <div className="settings-intent-header">
             <div>
-              <strong>Ajustes rápidos</strong>
-              <span>Combinações prontas para este perfil</span>
+              <strong>{ui("Ajustes rápidos")}</strong>
+              <span>{ui("Combinações prontas para este perfil")}</span>
             </div>
-            <span>{section.intentGroups.length} grupos</span>
+            <span>{section.intentGroups.length} {ui(" grupos")}</span>
           </div>
           <div className="settings-intent-groups">
             {section.intentGroups.map((group) => (
@@ -1242,7 +1253,7 @@ function SettingsSectionPanel({
                 <div className="settings-intent-options">
                   {group.options.map((option) => (
                     <button
-                      aria-label={`Aplicar ${polishSettingsText(option.title)} em ${sectionTitle}`}
+                      aria-label={ui("Aplicar {0} em {1}", { 0: polishSettingsText(option.title), 1: ui(sectionTitle) })}
                       aria-pressed={option.applied}
                       className={option.applied ? "settings-intent-card applied" : "settings-intent-card"}
                       key={option.id}
@@ -1254,7 +1265,7 @@ function SettingsSectionPanel({
                     >
                       <span className="settings-intent-card-title">
                         <strong>{polishSettingsText(option.title)}</strong>
-                        <small>{option.applied ? "Aplicado" : `${option.fieldCount} campos`}</small>
+                        <small>{option.applied ? ui("Aplicado") : ui("{0} campos", { 0: option.fieldCount })}</small>
                       </span>
                       <span className="settings-intent-card-detail">{polishSettingsText(option.detail)}</span>
                     </button>
@@ -1266,18 +1277,18 @@ function SettingsSectionPanel({
         </section>
       ) : null}
 
-      <article className="settings-section-card active" role="region" aria-label={`Editar ${sectionTitle}`}>
+      <article className="settings-section-card active" role="region" aria-label={ui("Editar {0}", { 0: ui(sectionTitle) })}>
         {section.id === "credits" ? <CreditsContent className="settings-credits-content" /> : <>
         {isSceneSection && advancedFields.length > 0 ? (
           <details className="settings-advanced-fields settings-scene-advanced-fields">
             <summary>
               <span className="settings-scene-advanced-summary">
                 <SlidersHorizontal aria-hidden="true" size={16} strokeWidth={2.2} />
-                <span>{sceneAdvancedCopy.title}</span>
+                <span>{ui(sceneAdvancedCopy.title)}</span>
               </span>
-              <small>{advancedFields.length} {advancedFields.length === 1 ? "campo" : "campos"}</small>
+              <small>{advancedFields.length} {advancedFields.length === 1 ? ui("campo") : ui("campos")}</small>
             </summary>
-            <p>{sceneAdvancedCopy.detail}</p>
+            <p>{ui(sceneAdvancedCopy.detail)}</p>
             <div className="settings-edit-list">
               {advancedFields.map((field) => settingControl(section.id, field, onUpdateSetting, onSelectPath))}
             </div>
@@ -1288,11 +1299,11 @@ function SettingsSectionPanel({
             <summary>
               <span className="settings-scene-advanced-summary">
                 <ShieldCheck aria-hidden="true" size={16} strokeWidth={2.2} />
-                <span>Regras da batalha</span>
+                <span>{ui("Regras da batalha")}</span>
               </span>
-              <small>{battleRuleFields.length} regras</small>
+              <small>{battleRuleFields.length} {ui(" regras")}</small>
             </summary>
-            <p>Defina as mecânicas padrão do combate. A entrada, a vitória, a derrota e a fuga continuam sendo montadas na aba Eventos.</p>
+            <p>{ui("Defina as mecânicas padrão do combate. A entrada, a vitória, a derrota e a fuga continuam sendo montadas na aba Eventos.")}</p>
             <div className="settings-edit-list">
               {battleRuleFields.map((field) => settingControl(section.id, field, onUpdateSetting, onSelectPath))}
             </div>
@@ -1300,19 +1311,19 @@ function SettingsSectionPanel({
         ) : null}
         {section.id === "battleRpg" ? (
           <div className="settings-battle-hud-note" role="note">
-            <strong>HUD da batalha</strong>
-            <span>A visibilidade das barras de HP e experiência é configurada em Editor → HUD → Aparência, junto da apresentação do combate.</span>
+            <strong>{ui("HUD da batalha")}</strong>
+            <span>{ui("A visibilidade das barras de HP e experiência é configurada em Editor → HUD → Aparência, junto da apresentação do combate.")}</span>
           </div>
         ) : null}
         {section.id === "controls" ? (
           <div className="settings-controls-note" role="note">
-            <strong>Várias teclas por ação</strong>
-            <span>Separe várias teclas por vírgulas</span>
-            <span>Exemplo: <code>ArrowUp,w</code></span>
-            <span>Mapeia o teclado no Play integrado. Os botões físicos do GBA e as ações de cada perfil são configurados em Cenas e no Inspetor.</span>
+            <strong>{ui("Várias teclas por ação")}</strong>
+            <span>{ui("Separe várias teclas por vírgulas")}</span>
+            <span>{ui("Exemplo: ")}<code>{"ArrowUp,w"}</code></span>
+            <span>{ui("Mapeia o teclado no Play integrado. Os botões físicos do GBA e as ações de cada perfil são configurados em Cenas e no Inspetor.")}</span>
           </div>
         ) : null}
-        {section.id === "shortcuts" ? <p className="settings-controls-note">Estes atalhos são salvos neste projeto. Aparência, idioma do aplicativo e pacotes offline são preferências deste dispositivo.</p> : null}
+        {section.id === "shortcuts" ? <p className="settings-controls-note">{ui("Estes atalhos são salvos neste projeto. Aparência, idioma do aplicativo e pacotes offline são preferências deste dispositivo.")}</p> : null}
         {section.id === "shortcuts" ? (
           <ShortcutSettingsPanel section={section} onUpdateSetting={onUpdateSetting} />
         ) : null}
@@ -1320,7 +1331,7 @@ function SettingsSectionPanel({
         {section.id === "save" ? <SaveMenuVisualBuilder section={section} onUpdateSetting={onUpdateSetting} /> : null}
         {section.id === "runtimeCapabilities" ? <RuntimeCapabilitiesPanel section={section} onUpdateSetting={onUpdateSetting} /> : (
           section.id === "shortcuts" ? null : (
-            <div className="settings-edit-list" aria-label={`Editar ${sectionTitle}`}>
+            <div className="settings-edit-list" aria-label={ui("Editar {0}", { 0: ui(sectionTitle) })}>
               {primaryFields.map((field) => settingControl(section.id, field, onUpdateSetting, onSelectPath))}
             </div>
           )
@@ -1328,10 +1339,10 @@ function SettingsSectionPanel({
         {advancedFields.length > 0 && !isSceneSection ? (
           <details className="settings-advanced-fields">
             <summary>
-              <span>Toolchain e caminhos avançados</span>
-              <small>{advancedFields.length} {advancedFields.length === 1 ? "campo" : "campos"}</small>
+              <span>{ui("Toolchain e caminhos avançados")}</span>
+              <small>{advancedFields.length} {advancedFields.length === 1 ? ui("campo") : ui("campos")}</small>
             </summary>
-            <p>Escolha um Engine Pack compatível. A toolchain e o compilador são detectados automaticamente.</p>
+            <p>{ui("Escolha um Engine Pack compatível. A toolchain e o compilador são detectados automaticamente.")}</p>
             <div className="settings-edit-list">
               {advancedFields.map((field) => settingControl(section.id, field, onUpdateSetting, onSelectPath))}
             </div>
@@ -1385,6 +1396,7 @@ export function SettingsWorkspace({
   onSceneAction,
   sceneActionHistory
 }: SettingsWorkspaceProps): React.ReactElement {
+  const ui = useStudioUiText();
   const workspaceTitle = title ?? (scope === "scene" ? "Cenas" : scope === "export" ? "Exportar" : "Ajustes");
   const isGlobalWorkspace = scope === "global";
   const isExportWorkspace = scope === "export";
@@ -1404,21 +1416,30 @@ export function SettingsWorkspace({
   const hasPluginsSection = isGlobalWorkspace && Boolean(onOpenPluginCatalog) && Boolean(presentation);
   const initialSectionID: SettingsNavigationSectionID = isGlobalWorkspace ? "interface" : isSceneWorkspace ? visibleSections.find(section => section.id === "topdown")?.id ?? visibleSections[0]?.id ?? "sceneTypes" : visibleSections[0]?.id ?? "general";
   const searchResults = useMemo(() => {
+    const searchPresentation = presentation ? {
+      ...presentation,
+      sections: (isExportWorkspace ? visibleSections : presentation.sections).map(section => ({
+        ...section, title: ui(section.title), detail: ui(section.detail),
+        editableFields: section.editableFields.map(field => ({ ...field, label: ui(field.label), description: ui(field.description) })),
+        intentGroups: section.intentGroups.map(group => ({ ...group, title: ui(group.title),
+          options: group.options.map(option => ({ ...option, title: ui(option.title), detail: ui(option.detail) })) }))
+      }))
+    } : null;
     const projectResults = presentation
-      ? deriveSettingsWorkspaceSearchResults(isExportWorkspace ? { ...presentation, sections: visibleSections } : presentation, searchQuery)
+      ? deriveSettingsWorkspaceSearchResults(searchPresentation!, searchQuery)
         .filter((result) => visibleSections.some((section) => section.id === result.sectionID))
       : [];
     const normalize = (value: string) => value.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLocaleLowerCase("pt-BR");
     const tokens = normalize(searchQuery).split(/\s+/).filter(Boolean);
     const localSections = isGlobalWorkspace ? [...DEVICE_SETTINGS_SECTIONS, ...(hasPluginsSection ? [PLUGINS_SETTINGS_SECTION] : [])] : [];
     const localResults = tokens.length ? localSections.filter((section) => {
-      const text = normalize(`${section.title} ${section.detail} ${section.keywords}`);
+      const text = normalize(`${ui(section.title)} ${ui(section.detail)} ${section.keywords}`);
       return tokens.every(token => text.includes(token));
     }) : [];
-    const healthResults = isExportWorkspace && tokens.length && tokens.every(token => normalize("Saúde do projeto Preflight contrato erros avisos").includes(token))
+    const healthResults = isExportWorkspace && tokens.length && tokens.every(token => normalize(`${ui("Saúde do projeto")} ${ui("Preflight do projeto e da ROM")}`).includes(token))
       ? [{ sectionID: "health" as const, title: "Saúde do projeto", detail: "Preflight do projeto e da ROM" }] : [];
     return [...localResults, ...projectResults, ...healthResults];
-  }, [hasPluginsSection, isGlobalWorkspace, isExportWorkspace, presentation, searchQuery, visibleSections]);
+  }, [hasPluginsSection, isGlobalWorkspace, isExportWorkspace, presentation, searchQuery, visibleSections, ui]);
   useEffect(() => {
     setSearchQuery("");
     setResetConfirmationSectionID(null);
@@ -1515,21 +1536,21 @@ export function SettingsWorkspace({
   const searchControls = (
     <div className="settings-search">
       <label>
-        <span>Buscar ajustes</span>
+        <span>{ui("Buscar ajustes")}</span>
         {isDiscreteWorkspace ? <Search className="settings-search-icon" size={17} aria-hidden="true" /> : null}
         <input
-          aria-label="Buscar ajustes"
+          aria-label={ui("Buscar ajustes")}
           onChange={(event) => setSearchQuery(event.currentTarget.value)}
-          placeholder={isGlobalWorkspace ? "Buscar ajuste..." : isSceneWorkspace || isExportWorkspace ? "Buscar configuração..." : "Campo, seção ou intenção"}
+          placeholder={isGlobalWorkspace ? ui("Buscar ajuste...") : isSceneWorkspace || isExportWorkspace ? ui("Buscar configuração...") : ui("Campo, seção ou intenção")}
           type="search"
           value={searchQuery}
         />
       </label>
       {searchQuery.trim() ? (
-        <div className="settings-search-results" aria-label="Resultados da busca de ajustes">
+        <div className="settings-search-results" aria-label={ui("Resultados da busca de ajustes")}>
           {searchResults.length > 0 ? searchResults.map((result) => (
             <button
-              aria-label={`Abrir ${result.title}`}
+              aria-label={ui("Abrir {0}", { 0: ui(result.title) })}
               key={result.sectionID}
               onClick={() => navigateToSection(result.sectionID)}
               type="button"
@@ -1537,7 +1558,7 @@ export function SettingsWorkspace({
               <strong>{polishSettingsText(result.title)}</strong>
               <span>{polishSettingsText(result.detail)}</span>
             </button>
-          )) : <p>Nenhum ajuste encontrado.</p>}
+          )) : <p>{ui("Nenhum ajuste encontrado.")}</p>}
         </div>
       ) : null}
     </div>
@@ -1545,19 +1566,19 @@ export function SettingsWorkspace({
 
   if (!presentation) {
     return (
-      <section className={workspaceClassName} aria-label={`Workspace ${workspaceTitle}`}>
-        <h3 className="studio-visually-hidden">{workspaceTitle}</h3>
+      <section className={workspaceClassName} aria-label={ui("Workspace {0}", { 0: ui(workspaceTitle) })}>
+        <h3 className="studio-visually-hidden">{ui(workspaceTitle)}</h3>
         <div className="settings-layout">
-          <aside className="settings-nav" aria-label={`Seções de ${workspaceTitle.toLocaleLowerCase("pt-BR")}`}>
+          <aside className="settings-nav" aria-label={ui("Seções de {0}", { 0: workspaceTitle.toLocaleLowerCase("pt-BR") })}>
             <div className="settings-nav-title">
-              <strong>{workspaceTitle}</strong>
-              <span>{isGlobalWorkspace ? "2 seções" : "Sem projeto"}</span>
+              <strong>{ui(workspaceTitle)}</strong>
+              <span>{isGlobalWorkspace ? ui("2 seções") : ui("Sem projeto")}</span>
             </div>
             {isGlobalWorkspace ? searchControls : null}
             <div className="settings-nav-list" role="list">
               {isGlobalWorkspace ? (
-                <section className="settings-nav-group" aria-label="Aplicativo">
-                  <h4>Aplicativo</h4>
+                <section className="settings-nav-group" aria-label={ui("Aplicativo")}>
+                  <h4>{ui("Aplicativo")}</h4>
                   <div className="settings-nav-group-list">
                     <LocalSettingsNavigation sections={DEVICE_SETTINGS_SECTIONS} selectedSectionID={selectedSectionID} onNavigate={navigateToSection} />
                   </div>
@@ -1571,12 +1592,12 @@ export function SettingsWorkspace({
               {selectedSectionID === "translationPacks" ? <SettingsTranslationSection /> : null}
             </div> : null}
             {!isGlobalWorkspace ? <WorkspaceEmptyState
-              title="Projeto não aberto"
+              title={ui("Projeto não aberto")}
               description={scope === "scene"
-                ? "Abra um projeto para visualizar os tipos e perfis de cena."
+                ? ui("Abra um projeto para visualizar os tipos e perfis de cena.")
                 : scope === "export"
-                  ? "Abra um projeto para configurar, validar e gerar a ROM do Game Boy Advance."
-                  : "Abra um projeto para configurar atalhos, controles do Play e permissões MCP. As preferências deste dispositivo continuam disponíveis acima."}
+                  ? ui("Abra um projeto para configurar, validar e gerar a ROM do Game Boy Advance.")
+                  : ui("Abra um projeto para configurar atalhos, controles do Play e permissões MCP. As preferências deste dispositivo continuam disponíveis acima.")}
             /> : null}
           </main>
         </div>
@@ -1585,14 +1606,14 @@ export function SettingsWorkspace({
   }
 
   return (
-    <section className={workspaceClassName} aria-label={`Workspace ${workspaceTitle}`}>
-      <h3 className="studio-visually-hidden">{workspaceTitle}</h3>
+    <section className={workspaceClassName} aria-label={ui("Workspace {0}", { 0: ui(workspaceTitle) })}>
+      <h3 className="studio-visually-hidden">{ui(workspaceTitle)}</h3>
 
       <div className="settings-layout">
-        <aside className="settings-nav" aria-label={`Seções de ${workspaceTitle.toLocaleLowerCase("pt-BR")}`}>
+        <aside className="settings-nav" aria-label={ui("Seções de {0}", { 0: workspaceTitle.toLocaleLowerCase("pt-BR") })}>
           <div className="settings-nav-title">
-            <strong>{workspaceTitle}</strong>
-            <span>{isGlobalWorkspace ? `${visibleSections.length + DEVICE_SETTINGS_SECTIONS.length + (hasPluginsSection ? 1 : 0)} seções` : isExportWorkspace ? `${visibleSections.length + 1} seções` : `${visibleSections.length} seções`}</span>
+            <strong>{ui(workspaceTitle)}</strong>
+            <span>{isGlobalWorkspace ? ui("{0} seções", { 0: visibleSections.length + DEVICE_SETTINGS_SECTIONS.length + (hasPluginsSection ? 1 : 0) }) : isExportWorkspace ? ui("{0} seções", { 0: visibleSections.length + 1 }) : ui("{0} seções", { 0: visibleSections.length })}</span>
           </div>
           {searchControls}
           <div className="settings-nav-list" role="list">
@@ -1608,7 +1629,7 @@ export function SettingsWorkspace({
                     return (
                       <Fragment key={section.id}>
                         <button
-                          aria-label={`${polishSettingsText(section.title)} seção de ajustes`}
+                          aria-label={ui("{0} seção de ajustes", { 0: polishSettingsText(section.title) })}
                           aria-pressed={selectedSectionID === section.id}
                           className={sectionNavClassName(selectedSectionID === section.id)}
                           onClick={() => navigateToSection(section.id)}
@@ -1625,7 +1646,7 @@ export function SettingsWorkspace({
                       </Fragment>
                     );
                   })}
-                  {isExportWorkspace && group.group === "Avançado" ? <button aria-label="Saúde seção de exportação" aria-pressed={selectedSectionID === "health"} className={sectionNavClassName(selectedSectionID === "health")} onClick={() => navigateToSection("health")} type="button"><span className="settings-nav-icon" aria-hidden="true"><ShieldCheck size={18} /></span><span className="settings-nav-copy"><strong>Saúde do projeto</strong><span>Preflight do projeto e da ROM</span></span></button> : null}
+                  {isExportWorkspace && group.group === "Avançado" ? <button aria-label={ui("Saúde seção de exportação")} aria-pressed={selectedSectionID === "health"} className={sectionNavClassName(selectedSectionID === "health")} onClick={() => navigateToSection("health")} type="button"><span className="settings-nav-icon" aria-hidden="true"><ShieldCheck size={18} /></span><span className="settings-nav-copy"><strong>{ui("Saúde do projeto")}</strong><span>{ui("Preflight do projeto e da ROM")}</span></span></button> : null}
                   {hasPluginsSection && group.group === "Projeto" ? <LocalSettingsNavigation sections={[PLUGINS_SETTINGS_SECTION]} selectedSectionID={selectedSectionID} onNavigate={navigateToSection} /> : null}
                 </div>
               </section>
@@ -1705,34 +1726,34 @@ export function SettingsWorkspace({
               ) : null}
             </div>
 
-            {isExportWorkspace && selectedSectionID === "build" ? <div className="settings-support-grid" aria-label="Validação e ferramentas de exportação">
+            {isExportWorkspace && selectedSectionID === "build" ? <div className="settings-support-grid" aria-label={ui("Validação e ferramentas de exportação")}>
             <section className="settings-inspector-card">
               <div className="settings-inspector-header">
-                <strong>Build e paths</strong>
-                <span>{pathValidationRunning ? "Validando" : pathValidation ? pathValidation.ok ? "Paths validados" : "Revisar paths" : "Paths não verificados"}</span>
+                <strong>{ui("Build e paths")}</strong>
+                <span>{pathValidationRunning ? ui("Validando") : pathValidation ? pathValidation.ok ? ui("Paths validados") : ui("Revisar paths") : ui("Paths não verificados")}</span>
               </div>
               <div className="settings-path-summary">
                 <div>
-                  <span>Backend</span>
+                  <span>{ui("Backend")}</span>
                   <strong>{polishSettingsText(presentation.summary.engineBackend)}</strong>
                 </div>
                 <div>
-                  <span>Engine Pack</span>
+                  <span>{ui("Engine Pack")}</span>
                   <strong>{engineStatus?.selected?.path ?? (enginePackField ? String(enginePackField.value) || "Detecção automática" : "Detecção automática")}</strong>
                 </div>
                 <div>
-                  <span>Play</span>
-                  <strong>mGBA integrado</strong>
+                  <span>{ui("Play")}</span>
+                  <strong>{ui("mGBA integrado")}</strong>
                 </div>
               </div>
             </section>
 
             <section className="settings-inspector-card">
               <div className="settings-inspector-header">
-                <strong>Diagnóstico</strong>
-                <span>{presentation.summary.diagnosticWarningCount} alerta(s)</span>
+                <strong>{ui("Diagnóstico")}</strong>
+                <span>{presentation.summary.diagnosticWarningCount} {ui(" alerta(s)")}</span>
               </div>
-              <div className="settings-diagnostics" aria-label="Diagnóstico de settings">
+              <div className="settings-diagnostics" aria-label={ui("Diagnóstico de settings")}>
                 {presentation.diagnostics.map((diagnostic) => (
                   <div className={diagnosticClassName(diagnostic.tone)} key={diagnostic.id}>
                     <span>{polishSettingsText(diagnostic.label)}</span>
@@ -1745,8 +1766,8 @@ export function SettingsWorkspace({
             {pathValidation ? (
               <section className={pathValidation.ok ? "settings-path-validation ok" : "settings-path-validation warning"}>
                 <div className="settings-path-validation-header">
-                  <strong>{pathValidation.ok ? "Paths validados" : "Paths com pendências"}</strong>
-                  <span>{pathValidation.items.length} verificados</span>
+                  <strong>{pathValidation.ok ? ui("Paths validados") : ui("Paths com pendências")}</strong>
+                  <span>{pathValidation.items.length} {ui(" verificados")}</span>
                 </div>
                 {pathValidation.items.length > 0 ? (
                   <div className="settings-path-validation-list">
@@ -1755,42 +1776,41 @@ export function SettingsWorkspace({
                         <span>{polishSettingsText(item.label)}</span>
                         <strong>{validationItemDetail(item)}</strong>
                         <small>{item.path}</small>
-                        {item.resolvedPath && item.resolvedPath !== item.path ? <small>Usado: {item.resolvedPath}</small> : null}
+                        {item.resolvedPath && item.resolvedPath !== item.path ? <small>{ui("Usado: ")}{item.resolvedPath}</small> : null}
                       </div>
                     ))}
                   </div>
                 ) : (
-                  <p>Nenhum caminho configurado para validar.</p>
+                  <p>{ui("Nenhum caminho configurado para validar.")}</p>
                 )}
               </section>
             ) : null}
 
             <section className="settings-inspector-card settings-engine-pack-card">
               <div className="settings-inspector-header">
-                <strong>Testar Engine Pack</strong>
-                <span>{engineStatus?.selected?.path ? "Configurado" : "Não detectado"}</span>
+                <strong>{ui("Testar Engine Pack")}</strong>
+                <span>{engineStatus?.selected?.path ? ui("Configurado") : ui("Não detectado")}</span>
               </div>
               <div className="settings-engine-pack-actions">
                 <button disabled={doctorRunning || !hasEngineAssetc} onClick={onRunEngineDoctor} type="button">
-                  {doctorRunning ? "Rodando doctor..." : "Rodar doctor"}
+                  {doctorRunning ? ui("Rodando doctor...") : ui("Rodar doctor")}
                 </button>
                 <button disabled={buildDryRunRunning || !hasEngineBuild || !hasCurrentEngineExport} onClick={onRunEngineBuildDryRun} type="button">
-                  {buildDryRunRunning ? "Rodando dry-run..." : "gbsbuild dry-run"}
+                  {buildDryRunRunning ? ui("Rodando dry-run...") : ui("gbsbuild dry-run")}
                 </button>
               </div>
-              {!hasCurrentEngineExport ? <p>Exporte o projeto atual antes de testar a compilação. Após editar o projeto, exporte novamente.</p> : null}
-              <p>O doctor verifica o Engine Pack e a toolchain instalada.</p>
+              {!hasCurrentEngineExport ? <p>{ui("Exporte o projeto atual antes de testar a compilação. Após editar o projeto, exporte novamente.")}</p> : null}
+              <p>{ui("O doctor verifica o Engine Pack e a toolchain instalada.")}</p>
               {doctorResult?.summary ? (
                 <div className={doctorResult.summary.ok ? "settings-engine-pack-result ok" : "settings-engine-pack-result warning"}>
-                  <strong>{doctorResult.summary.ok ? "Doctor OK" : "Doctor com bloqueios"}</strong>
+                  <strong>{doctorResult.summary.ok ? ui("Doctor OK") : ui("Doctor com bloqueios")}</strong>
                   <span>
-                    {doctorResult.summary.checksPassed}/{doctorResult.summary.checksTotal} checks
-                    {doctorResult.summary.engineVersion ? ` · ${doctorResult.summary.engineVersion}` : ""}
+                    {doctorResult.summary.checksPassed}/{doctorResult.summary.checksTotal} {ui(" checks")}{doctorResult.summary.engineVersion ? ` · ${doctorResult.summary.engineVersion}` : ""}
                   </span>
                   {doctorResult.summary.blockers.length > 0 ? (
                     <ul>
                       {doctorResult.summary.blockers.map((blocker) => (
-                        <li key={blocker.id}>{blocker.message}</li>
+                        <li key={blocker.id}>{ui(blocker.message)}</li>
                       ))}
                     </ul>
                   ) : null}
@@ -1800,15 +1820,15 @@ export function SettingsWorkspace({
               ) : null}
               {buildDryRunResult?.summary ? (
                 <div className="settings-engine-pack-result">
-                  <strong>Dry-run pronto</strong>
-                  <span>Target {buildDryRunResult.summary.target ?? "game"} · {buildDryRunResult.summary.projectDir ?? "sem projeto"}</span>
+                  <strong>{ui("Dry-run pronto")}</strong>
+                  <span>{ui("Target ")}{buildDryRunResult.summary.target ?? ui("game")} · {buildDryRunResult.summary.projectDir ?? ui("sem projeto")}</span>
                 </div>
               ) : buildDryRunResult?.error ? (
                 <p className="settings-engine-pack-error">{buildDryRunResult.error}</p>
               ) : null}
             </section>
             </div> : null}
-            {isExportWorkspace && selectedSectionID === "build" && advancedTools ? <details className="export-extra-tools"><summary>Fontes e localização</summary>{advancedTools}</details> : null}
+            {isExportWorkspace && selectedSectionID === "build" && advancedTools ? <details className="export-extra-tools"><summary>{ui("Fontes e localização")}</summary>{advancedTools}</details> : null}
             {isExportWorkspace && selectedSectionID !== "general" ? <ExportRomActions onShowPaths={selectedSectionID !== "build" ? () => navigateToSection("build") : undefined} pathValidation={pathValidation} validating={pathValidationRunning} running={romRunning} onValidatePaths={onValidatePaths} onGenerateRom={onGenerateRom} onPlayProject={onPlayProject} generateDisabled={generateRomDisabled} playDisabled={playProjectDisabled} /> : null}
 
         </main>

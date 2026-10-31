@@ -286,6 +286,7 @@
 }
 
 .focus-mode .rooms-side-stack,
+.focus-mode .rooms-workspace > .rooms-debugger,
 .focus-mode .rooms-editor-layout > :not(.rooms-canvas-stage),
 .focus-mode .room-editor-tool-rail {
   display: none;
@@ -499,6 +500,14 @@
 .app-topbar.native-macos-titlebar {
   padding-left: 96px;
   -webkit-app-region: drag;
+}
+
+.app-topbar.native-macos-titlebar.is-fullscreen {
+  padding-left: var(--studio-space-5);
+}
+
+.app-topbar.native-macos-titlebar.is-fullscreen .topbar-brand-logo {
+  height: calc(var(--studio-font-size-lg) * 1.1);
 }
 
 .app-topbar.native-macos-titlebar :is(button, a, input, select, textarea, [role="button"], .project-action-menu) {

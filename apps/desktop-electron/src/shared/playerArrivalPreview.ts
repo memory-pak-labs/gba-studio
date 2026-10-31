@@ -23,7 +23,8 @@ export function playerArrivalPreview(data: GBAProjectData, roomName: string, pla
   const stableMovementPose = authoredAnimationName && /^(fly|flight|flying|hover|float)(?:$|[_-])/i.test(authoredAnimationName)
     ? animations.find(a => a.name === authoredAnimationName || a.id === authoredAnimationName)
     : null;
-  const animation = exact ?? neutral ?? mirrorSource ?? stableMovementPose;
+  const singleIdlePose = animations.length === 1 && idle.length === 1 ? idle[0] : null;
+  const animation = exact ?? neutral ?? mirrorSource ?? stableMovementPose ?? singleIdlePose;
   if (!animation) return null;
   const animationName = typeof animation.name === 'string'
     ? animation.name

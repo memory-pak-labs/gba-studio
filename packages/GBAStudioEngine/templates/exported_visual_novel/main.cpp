@@ -1,3 +1,5 @@
+#include "gbs/profiler.hpp"
+#define GBS_DIALOGUE_UI_RUNTIME_KIND 9
 #include "gbs/engine.hpp"
 #include "gbs/audio.hpp"
 #include "gbs/dialogue.hpp"
@@ -115,6 +117,9 @@ gbs::EventScript checkpoint_script_for(int room, int script_index) {
     const auto* group = gbs::visual_novel_choice_group_for(project, scene->choice_group_index);
     if (group != nullptr && script_index >= 2 && static_cast<size_t>(script_index - 2) < group->choice_count)
         return gbs::visual_novel_choice_script(*group, script_index - 2);
+    const int shared_start = 2 + (group == nullptr ? 0 : static_cast<int>(group->choice_count));
+    if (script_index >= shared_start && static_cast<size_t>(script_index - shared_start) < project.script_count)
+        return project.scripts[script_index - shared_start];
     return gbs::empty_event_script();
 }
 
@@ -122,7 +127,7 @@ int current_checkpoint_script_index() {
     if (!gbs::has_event_script(visual_novel_event_runner.script)) return -1;
     const auto* scene = gbs::visual_novel_scene_for(project, current_scene_index);
     const auto* group = gbs::visual_novel_choice_group_for(project, scene->choice_group_index);
-    const int count = 2 + (group == nullptr ? 0 : static_cast<int>(group->choice_count));
+    const int count = 2 + (group == nullptr ? 0 : static_cast<int>(group->choice_count)) + static_cast<int>(project.script_count);
     for (int index = 0; index < count; ++index) {
         const auto script = checkpoint_script_for(current_scene_index, index);
         if (script.commands == visual_novel_event_runner.script.commands &&
@@ -136,10 +141,10 @@ bool capture_visual_novel_checkpoint(gbs::UniversalSaveData& data) {
     const int script_index = current_checkpoint_script_index();
     if (visual_novel_event_runner.active && script_index < 0) return false;
     VisualNovelRuntimeCheckpoint snapshot {};
-    snapshot.version = 1;
+    snapshot.version = 2;
     for (size_t index = 0; index < history.count; ++index) snapshot.history_lines[index] = history.line_indices[index];
     snapshot.history_count = static_cast<uint32_t>(history.count);
-    snapshot.script = gbs::capture_checkpoint_script(visual_novel_event_runner, script_index);
+    snapshot.script = gbs::capture_checkpoint_script(visual_novel_event_runner, script_index, event_state);
     snapshot.dialogue = gbs::capture_checkpoint_dialogue(dialogue);
     snapshot.events = gbs::capture_checkpoint_events(event_state);
     snapshot.music_index = checkpoint_music_index;
@@ -273,6 +278,18 @@ void draw_dialogue_portrait() {
 }
 
 void consume_event_state() {
+    if (event_state.dialogue_text_speed_changed) {
+        gbs::set_dialogue_text_speed(dialogue, event_state.dialogue_text_speed_frames);
+        event_state.dialogue_text_speed_changed = false;
+    }
+    if (event_state.dialogue_text_sfx_changed) {
+        gbs::set_dialogue_text_sfx(dialogue, event_state.dialogue_text_sfx_index);
+        event_state.dialogue_text_sfx_changed = false;
+    }
+    if (event_state.dialogue_frame_changed) {
+        gbs::set_dialogue_frame(dialogue, event_state.dialogue_frame_index);
+        event_state.dialogue_frame_changed = false;
+    }
     gbs::consume_scene_transition_visual_effect_event(event_state);
     gbs::consume_event_palette_changes(
         event_state,
@@ -332,7 +349,7 @@ void consume_event_state() {
         event_state.audio_volume_changed = false;
     }
     if (event_state.audio_fade_changed) {
-        gbs::fade_audio_channel_volume(gbs::audio_channel_from_event_value(event_state.audio_fade_channel), static_cast<uint8_t>(event_state.audio_fade_target_volume), static_cast<uint16_t>(event_state.audio_fade_frames));
+        gbs::fade_audio_channel_volume(gbs::audio_channel_from_event_value(event_state.audio_fade_channel), static_cast<uint8_t>(event_state.audio_fade_target_volume), static_cast<uint16_t>(event_state.audio_fade_frames), static_cast<uint8_t>(event_state.audio_fade_ceiling_volume));
         event_state.audio_fade_changed = false;
     }
     if (event_state.close_dialogue) {
@@ -467,8 +484,8 @@ bool restore_visual_novel_checkpoint(int slot) {
     gbs::UniversalSaveData data {};
     VisualNovelRuntimeCheckpoint snapshot {};
     if (service == nullptr || gbs::read_runtime_save(*service, slot, data) != gbs::SaveStatus::Ok ||
-        !gbs::read_universal_save_payload(data, gbs::UniversalSaveRuntime::VisualNovel, &snapshot, sizeof(snapshot)) ||
-        snapshot.version != 1 || !gbs::is_valid_visual_novel_scene_index(project, data.room_index) ||
+        !gbs::read_checkpoint_snapshot(data, gbs::UniversalSaveRuntime::VisualNovel, snapshot) ||
+        snapshot.version != 2 || !gbs::is_valid_visual_novel_scene_index(project, data.room_index) ||
         snapshot.history_count > gbs::visual_novel_history_capacity || snapshot.wait_frames < 0 ||
         (snapshot.next_scene_index != -1 && !gbs::is_valid_visual_novel_scene_index(project, snapshot.next_scene_index)) ||
         snapshot.music_index < -1 || snapshot.tracker_index < -1 ||
@@ -479,7 +496,7 @@ bool restore_visual_novel_checkpoint(int slot) {
         if (snapshot.history_lines[index] < 0 || static_cast<size_t>(snapshot.history_lines[index]) >= project.dialogue_line_count) return false;
     gbs::EventRunner restored_runner {};
     if (!gbs::restore_checkpoint_script(snapshot.script,
-            checkpoint_script_for(data.room_index, snapshot.script.script_index), restored_runner) ||
+            checkpoint_script_for(data.room_index, snapshot.script.script_index), restored_runner, &event_state) ||
         !gbs::restore_checkpoint_events(snapshot.events, event_state) ||
         !gbs::restore_suspended_common_state(data, event_state)) return false;
     current_scene_index = data.room_index;
@@ -576,6 +593,12 @@ void finish_scene_choice_if_needed(bool was_choice_mode) {
     if (group == nullptr) {
         return;
     }
+    if (dialogue.last_choice_index < 0) {
+        // Cancelling a scene choice must not consume its result or strand the
+        // scene without content. Keep the mandatory decision available.
+        show_choice_group(*group);
+        return;
+    }
     if (gbs::is_valid_event_variable(group->variable_index)) {
         event_state.variables[group->variable_index] = dialogue.last_choice_value;
     }
@@ -652,6 +675,8 @@ void advance_scene_if_ready() {
 
 int initialize_visual_novel_runtime() {
     gbs::init();
+    // Standalone ROMs bypass the mixed-runtime dispatcher.
+    gbs::debug_set_runtime_kind(GBS_DIALOGUE_UI_RUNTIME_KIND);
     /* Visual novel scenes do not render room actors through this runtime;
      * the active dialogue portrait is the only OAM element used here. */
     gbs::hide_all_sprites();
@@ -661,7 +686,10 @@ int initialize_visual_novel_runtime() {
     gbs::set_bg_enabled(gbs::BackgroundLayer::BG2, false);
     gbs::set_bg_enabled(gbs::BackgroundLayer::BG3, false);
     gbs::init_dialogue(dialogue);
+    // Match the editor Normal default; authored boot commands may override it.
+    gbs::set_dialogue_text_speed(dialogue, 2);
     gbs::init_event_state(event_state);
+    gbs::bind_event_scripts(event_state, project.scripts, project.script_count);
     gbs::init_hud(hud);
     gbs::init_resource_manager(resource_manager);
     gbs::set_backdrop_color(gbs::rgb15(1, 1, 6));
@@ -737,7 +765,15 @@ gbs::RuntimeAdapterFrameResult update_visual_novel_runtime(const gbs::RuntimeFra
 #endif
         if (dialogue.visible) {
             bool was_choice_mode = dialogue.choice_mode;
+            const int confirm_sfx = dialogue.confirm_sfx_index;
+            const int confirm_pcm = dialogue.confirm_pcm_index;
             gbs::advance_dialogue(dialogue, input);
+            if (!dialogue.visible) {
+                if (confirm_sfx >= 0 && static_cast<size_t>(confirm_sfx) < project.sfx_asset_count)
+                    gbs::play_sfx(project.sfx_assets[confirm_sfx]);
+                else if (confirm_pcm >= 0 && static_cast<size_t>(confirm_pcm) < project.pcm_asset_count)
+                    gbs::play_pcm_sfx(project.pcm_assets[confirm_pcm]);
+            }
             finish_scene_choice_if_needed(was_choice_mode);
             show_scene_content_if_ready();
             if (!dialogue.visible) {
@@ -763,16 +799,24 @@ gbs::RuntimeAdapterFrameResult update_visual_novel_runtime(const gbs::RuntimeFra
 }
 
 void render_visual_novel_runtime(const gbs::RuntimeFrameContext& context) {
+    const gbs::SubsystemProfilerScope profiler_scope(gbs::ProfilerSubsystem::Render);
     (void)context;
+        gbs::update_dialogue(dialogue);
+        if (dialogue.revealed_char_this_frame && dialogue.text_sfx_index >= 0 &&
+            static_cast<size_t>(dialogue.text_sfx_index) < project.sfx_asset_count) {
+            gbs::play_sfx(project.sfx_assets[dialogue.text_sfx_index]);
+        }
         /* The scene title/history bar is runtime diagnostics, not authored
          * scene content. Keep the UI layer clear so a mixed-runtime handoff
          * cannot leak a HUD from the previous scene. */
         gbs::hide_hud(hud);
         gbs::draw_hud(hud);
-        gbs::draw_dialogue(dialogue);
         /* Advanced HUD text uses OAM 96-127. Draw fixed dialogue portraits
-         * after it so the HUD cleanup cannot hide the active portrait. */
+         * after it so the HUD cleanup cannot hide the active portrait.
+         * The optional dialogue frame also owns OBJ slots and follows the
+         * portrait pass, which clears scene OBJ before drawing the face. */
         draw_dialogue_portrait();
+        gbs::draw_dialogue(dialogue);
         gbs::runtime_telemetry_block().current_room = current_scene_index;
         for (size_t index = 0; index < gbs::runtime_telemetry_variable_count; ++index)
             gbs::runtime_telemetry_block().variables[index] = event_state.variables[index];

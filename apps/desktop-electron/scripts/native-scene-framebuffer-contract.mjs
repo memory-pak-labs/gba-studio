@@ -1,8 +1,23 @@
 import { decodeRgb555 } from './rgb555-framebuffer-contract.mjs';
 
+export function dungeonActorViewCoordinates(room, actor, runtimeState) {
+  const p = runtimeState?.player;
+  const forward = [[0,-1],[1,0],[0,1],[-1,0]][p?.direction];
+  if (!forward || !Number.isFinite(p.x) || !Number.isFinite(p.y)) return null;
+  const [fx,fy] = forward, dx = actor.x-p.x, dy = actor.y-p.y;
+  const distance = dx*fx+dy*fy, lateral = dx*fy-dy*fx;
+  if (distance < 1 || distance > Number(room?.config?.view_distance ?? 0)) return null;
+  if (room.presentation) {
+    // Match actor_view_coordinates in the native presentation renderer.
+    return Math.abs(lateral)*100 <= distance*65 ? {distance,lateral:0-lateral} : null;
+  }
+  if (Math.abs(lateral)>1) return null;
+  return {distance,lateral};
+}
+
 export function exportedHudFramebufferMasks(header, presetId) {
   const escaped = String(presetId).replace(/[.*+?^${}()|[\]\\]/g,'\\$&');
-  const symbol = header.match(new RegExp(`\\{\\s*"${escaped}",\\s*"(?:advanced|standard)",\\s*(\\w+),\\s*\\d+\\s*\\}`))?.[1];
+  const symbol = header.match(new RegExp(`\\{\\s*"${escaped}",\\s*"(?:advanced|standard)",\\s*(\\w+),\\s*\\d+\\s*(?:,[^}\\n]*)?\\}`))?.[1];
   if (!symbol) return [];
   const body = header.match(new RegExp(`HudLayoutComponent ${symbol}\\[\\] = \\{([\\s\\S]*?)\\};`))?.[1];
   if (!body) throw new Error(`Missing declared HUD components for ${presetId}`);
@@ -27,10 +42,20 @@ export function decodeMGBAHardwareVideoState(bytes) {
     const affine=(a0&0x100)!==0, matrixIndex=(a1>>9)&31;
     const matrix = affine ? Object.fromEntries(['pa','pb','pc','pd'].map((key,i)=>[key,view.getInt16(0xc00+matrixIndex*32+6+i*8,true)])) : null;
     objects.push({index,x:(a1&511)>255?(a1&511)-512:a1&511,y:(a0&255)>159?(a0&255)-256:a0&255,
-      width:size[0],height:size[1],tile:a2&1023,palette:a2>>12,priority:(a2>>10)&3,affine,matrix,
+      width:size[0],height:size[1],tile:a2&1023,palette:a2>>12,priority:(a2>>10)&3,affine,matrix,doubleSize:affine&&(a0&0x200)!==0,
       flipX:!affine&&(a1&0x1000)!==0,flipY:!affine&&(a1&0x2000)!==0});
   }
   return {bg:[0,1,2,3].map(i=>({cnt:word(0x408+2*i),x:word(0x410+4*i),y:word(0x412+4*i)})),objects};
+}
+
+export function resolveWorldMapNativeFramebufferMasks(nativeVideo) {
+  if (!Array.isArray(nativeVideo?.objects) || !nativeVideo.objects.length) throw new Error('Native world-map OAM unavailable');
+  return nativeVideo.objects.map(object => {
+    if (!['x','y','width','height'].every(key=>Number.isFinite(object[key])) || object.width<=0 || object.height<=0)
+      throw new Error('Native world-map OAM unavailable');
+    const factor=object.affine && object.doubleSize ? 2 : 1;
+    return {x:object.x,y:object.y,width:object.width*factor,height:object.height*factor};
+  });
 }
 
 // Match an unambiguous single-part asset to its actual native OAM entry.
@@ -41,6 +66,13 @@ export function nativeSinglePartSpriteObject(header, symbol, nativeVideo) {
   const objects = (nativeVideo?.objects ?? []).filter(object => !object.affine && frames.some(frame =>
     object.tile === Number(frame[1]) && object.palette === Number(frame[2])));
   return objects.length === 1 ? objects[0] : null;
+}
+
+export function pointClickCursorFramebufferMask(runtimeState) {
+  const cursor = runtimeState?.nativeVideo?.objects?.find(object => object.index === 0);
+  if (!cursor || !['x','y','width','height'].every(key => Number.isFinite(cursor[key]))
+    || cursor.width <= 0 || cursor.height <= 0) throw new Error('Native point-click cursor OAM unavailable');
+  return {x:cursor.x,y:cursor.y,width:cursor.width,height:cursor.height};
 }
 
 // Coordinate and color must both match a declared overlay. A palette-wide

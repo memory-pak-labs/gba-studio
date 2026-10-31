@@ -16,6 +16,9 @@ import {
   auditExemploSessionSoak,
   auditExemploInterfaceScenePlaytest,
   auditExemploVisualQualityGate,
+  resolveTopdownActorFramebufferTarget,
+  resolveTopdownCameraPosition,
+  resolveTopdownActorFramebufferTargets,
   auditIntegerFramebufferDisplay,
   consolidateExemploScenePlaytestRuns,
   editorProjectReadyForScenePlaytest,
@@ -28,7 +31,8 @@ import {
   parseExemploSceneSoakMinutes,
   resolveExemploSmokeFaceButton,
   reusableExemploScenePlaytestRuns,
-  selectExemploScenePlaytestPlan
+  selectExemploScenePlaytestPlan,
+  selectSceneCadenceWindow
 } from "./exemplo-scene-playtest-contract.mjs";
 
 const appRoot = dirname(dirname(fileURLToPath(import.meta.url)));
@@ -48,15 +52,16 @@ describe("música das oito cenas canônicas", () => {
   it("cobra PCM não silencioso no Play dessas cenas", () => {
     expect(EXEMPLO_NON_SILENT_AUDIO_SCENES).toEqual([
       "porto_lumen", "farol_interior", "penedos_vento", "armazem_das_mares",
-      "observatorio_do_farol", "tempestade", "guardiao_rele", "arena_arrancada"
+      "observatorio_do_farol", "tempestade", "guardiao_rele", "arena_arrancada", "circuito_final", "circuito_perspectiva"
     ]);
   });
   it("inicia a faixa declarada por cada cena no evento onInit", () => {
-    const names = ["porto_lumen", "farol_interior", "penedos_vento", "armazem_das_mares", "observatorio_do_farol", "tempestade", "guardiao_rele", "arena_arrancada"];
+    const names = ["porto_lumen", "farol_interior", "penedos_vento", "armazem_das_mares", "observatorio_do_farol", "tempestade", "guardiao_rele", "arena_arrancada", "circuito_final", "circuito_perspectiva"];
     for (const name of names) {
       const scene = project.scenas.find((entry) => entry.name === name);
       const onInit = project.events.find((event) => event.name === scene?.eventBindings?.onInit);
-      expect(onInit?.steps?.[0]?.command, name).toBe(`play_music ${scene?.music}`);
+      const commands=event=>(event?.steps??[]).flatMap(s=>s.command.startsWith("call_procedure ")?commands(project.events.find(e=>e.name===s.command.split(" ")[1])):[s.command]);
+      expect(commands(onInit).find(c=>c.startsWith("play_music ")), name).toBe(`play_music ${scene?.music}`);
     }
   });
 });
@@ -127,7 +132,62 @@ function healthyInterfaceResult(scene, index = 0) {
   };
 }
 
+describe("GBA BG and OBJ palette capacity", () => {
+  it("anchors the authored Porto actors to the following camera and their exported multipart offsets", () => {
+    const parts = [{x:-8,y:-40,width:32,height:32},{x:-8,y:-8,width:32,height:16}];
+    const entity = {position:{x:704,y:400},size:{x:16,y:16},animations:[{frame_metasprites:[{parts}]}]};
+    const exported = {topdown_project:{player:entity,camera:{follow_player:true},rooms:[{name:"porto_lumen",width_tiles:126,height_tiles:86,npcs:[{...entity,name:"Mecânica",position:{x:752,y:376}}]}]}};
+    const room = {name:"porto_lumen",playerActorName:"Nara"};
+    const state = {player:{x:704,y:400}};
+    expect(resolveTopdownActorFramebufferTarget(room,{name:"Nara"},state,exported)).toEqual({x:104,y:32});
+    expect(resolveTopdownActorFramebufferTarget(room,{name:"Mecânica"},state,exported)).toEqual({x:152,y:8});
+    expect(resolveTopdownActorFramebufferTarget(room,{name:"Nara"},{player:{x:0,y:0}},exported)).toEqual({x:-8,y:-40});
+  });
+  it("uses the current native position of a moving first NPC rather than its spawn", () => {
+    const parts = [{x:-8,y:-40,width:32,height:32},{x:-8,y:-8,width:32,height:16}];
+    const player = {size:{x:16,y:16}};
+    const npc = {name:"Mecânica",position:{x:752,y:376},movement:{kind:"wander_box"},animations:[{frame_metasprites:[{parts}]}]};
+    const exported = {topdown_project:{player,camera:{follow_player:true},rooms:[{name:"porto_lumen",width_tiles:126,height_tiles:86,npcs:[npc]}]}};
+    const state = {player:{x:704,y:400},firstActor:{x:784,y:392}};
+    expect(resolveTopdownActorFramebufferTarget({name:"porto_lumen",playerActorName:"Nara"},{name:"Mecânica"},state,exported)).toEqual({x:184,y:24});
+  });
+  it("admits only current or immediately previous native positions in the same room", () => {
+    const parts=[{x:-8,y:-40,width:32,height:32}];
+    const npc={name:"Mecânica",movement:{kind:"wander_box"},animations:[{frame_metasprites:[{parts}]}]};
+    const exported={topdown_project:{player:{size:{x:16,y:16}},camera:{follow_player:true},rooms:[{name:"porto_lumen",width_tiles:126,height_tiles:86,npcs:[npc]}]}};
+    const room={name:"porto_lumen",playerActorName:"Nara"}, actor={name:"Mecânica"};
+    const current={frame:18,currentRoom:0,player:{x:704,y:400},firstActor:{x:748,y:392}};
+    const previous={...current,frame:17,firstActor:{x:747,y:392}};
+    expect(resolveTopdownActorFramebufferTargets(room,actor,current,exported,previous)).toEqual([{x:148,y:24},{x:147,y:24}]);
+    expect(resolveTopdownActorFramebufferTargets(room,actor,current,exported,{...previous,frame:10})).toEqual([{x:148,y:24}]);
+    expect(resolveTopdownActorFramebufferTargets(room,actor,current,exported,{...previous,currentRoom:1})).toEqual([{x:148,y:24}]);
+    expect(()=>resolveTopdownActorFramebufferTarget(room,actor,{...current,firstActor:null},exported)).toThrow(/Telemetria/);
+  });
+  it("accepts separate BG/OBJ palettes while rejecting overflow and unknown colors", () => {
+    const results = exemploScenePlaytestPlan(project).map(healthyVisualResult);
+    const porto = results.find(result => result.name === "porto_lumen");
+    porto.frame.uniqueColorCount = 281;
+    expect(auditExemploVisualQualityGate(project,results).ok).toBe(true);
+    porto.frame.uniqueColorCount = 513;
+    expect(auditExemploVisualQualityGate(project,results).ok).toBe(false);
+    porto.frame.uniqueColorCount = 281; porto.paletteFidelity.ok = false;
+    expect(auditExemploVisualQualityGate(project,results).ok).toBe(false);
+  });
+  it("requires authored actor fidelity for Porto and Farol instead of the retired default sheet", () => {
+    expect(EXEMPLO_EXPLICIT_ACTOR_BINDING_SCENES).toContain("porto_lumen");
+    expect(EXEMPLO_EXPLICIT_ACTOR_BINDING_SCENES).toContain("farol_interior");
+    expect(EXEMPLO_EXACT_BACKGROUND_FRAMEBUFFER_SCENES).toContain("farol_interior");
+  });
+});
+
 describe("contrato de playtest de Vértice", () => {
+  it("uses the same bounded Farol camera for background and actor pixel audits", () => {
+    const room={name:'farol_interior'};
+    const exported={topdown_project:{player:{size:{x:16,y:16}},camera:{follow_player:true},rooms:[{name:room.name,width_tiles:48,height_tiles:32}]}};
+    expect(resolveTopdownCameraPosition(room,{player:{x:184,y:216}},exported)).toEqual({x:72,y:96});
+    expect(resolveTopdownCameraPosition(room,{player:{x:0,y:0}},exported)).toEqual({x:0,y:0});
+    expect(resolveTopdownCameraPosition(room,{player:{x:376,y:248}},exported)).toEqual({x:144,y:96});
+  });
   it("resolve todos os assets declarados pela animação de background da cena", () => {
     expect(exemploSceneBackgroundAnimationAssetNames({
       id: "titulo",
@@ -167,17 +227,17 @@ describe("contrato de playtest de Vértice", () => {
     const plan = exemploScenePlaytestPlan(project);
     const results = plan.map(healthyVisualResult);
 
-    expect(plan).toHaveLength(17);
+    expect(plan).toHaveLength(18);
     expect(plan.map((scene) => scene.name)).toEqual([
       "titulo", "prologo", "porto_lumen", "mapa_rota",
       "penedos_vento", "armazem_das_mares", "observatorio_do_farol", "mercado_suspenso", "usina_submersa",
       "usina_combate", "usina_saida",
       "conselho_guardia", "tempestade", "guardiao_rele", "arena_arrancada",
-      "circuito_final", "arena_tatica"
+      "circuito_final", "arena_tatica", "circuito_perspectiva"
     ]);
     expect(auditExemploVisualQualityGate(project, results)).toMatchObject({
       ok: true,
-      counts: { expected: 17, passed: 17, failed: 0 }
+      counts: { expected: 18, passed: 18, failed: 0 }
     });
   });
 
@@ -269,7 +329,7 @@ describe("contrato de playtest de Vértice", () => {
       "logo", "abertura", "escolha_genero", "nome_jogador", "carregar_jogo",
       "configuracoes",
       "creditos", "missoes", "inventario", "mapa_menu",
-      "salvar", "menu_start"
+      "salvar", "menu_start", "corrida_preparacao", "corrida_resultados", "inventario_ferramentas"
     ]);
     expect(selectExemploScenePlaytestPlan(project, "logo")).toEqual([
       expect.objectContaining({ name: "logo", runtime: "cutscene" })
@@ -323,12 +383,12 @@ describe("contrato de playtest de Vértice", () => {
     });
 
     expect(consolidated).toMatchObject({
-      audit: { ok: true, counts: { expected: 12, passed: 12, failed: 0 } },
+      audit: { ok: true, counts: { expected: interfacePlan.length, passed: interfacePlan.length, failed: 0 } },
       ok: true
     });
     expect(reusableExemploScenePlaytestRuns(project, runs, {
       plan: exemploInterfaceScenePlaytestPlan
-    })).toHaveLength(12);
+    })).toHaveLength(interfacePlan.length);
   });
 
   it("exige um soak que cubra as dezessete cenas e save/load", () => {
@@ -342,13 +402,76 @@ describe("contrato de playtest de Vértice", () => {
       audioSamples: [{ audioUnderrunCount: 0 }],
       saveLoad: { attempted: true, saveSucceeded: true, loadSucceeded: true, stateChanged: true, restored: true },
       sceneSamples
-    })).toMatchObject({ ok: true, scenes: { count: 17, complete: true } });
+    })).toMatchObject({ ok: true, scenes: { count: 18, complete: true } });
     expect(parseExemploSceneSoakMinutes(["--soak-minutes=20"])).toBe(20);
   });
 
   it("resolve assets do template pelo metadado atual", () => {
-    expect(exemploProjectAssetSource(project, "menu-inicial-v3-gba.png"))
-      .toBe("Assets/backgrounds/menu-inicial-v3-gba.png");
+    expect(exemploProjectAssetSource(project, "title-porto-lumen-240x160-4bpp.png"))
+      .toBe("Assets/backgrounds/title-porto-lumen-240x160-4bpp.png");
     expect(() => exemploProjectAssetSource(project, "ausente.png")).toThrow("ausente.png");
+  });
+});
+
+
+describe("janela de cadência da cena selecionada", () => {
+  const scope = { runtimeKind: 8, currentRoom: 2 };
+  const samples = () => Array.from({ length: 6 }, (_, i) => ({
+    presentationFps: i === 1 ? 40 : 60, emulationFps: 60, droppedFrameRatio: 0,
+    runtimeState: { runtimeKind: 8, currentRoom: 2, frame: 20 + i * 30 }
+  }));
+  it("descarta somente a telemetria produzida antes do marcador, mesmo se o IPC atrasar", () => {
+    const current = samples().map((sample, index) => ({ ...sample, sampledAtUnixMs: 1000 + index * 500 }));
+    const delayedBoot = { sampledAtUnixMs: 500, presentationFps: 27.4,
+      runtimeState: { runtimeKind: -1, currentRoom: -1, frame: 0 } };
+    const selected = selectSceneCadenceWindow([delayedBoot, ...current], {
+      ...scope, notBeforeUnixMs: 1000, initialFrame: 9
+    });
+    expect(selected).toEqual(current.slice(0, 4));
+    expect(selected[1].presentationFps).toBe(40);
+  });
+  it("rejeita um reinício posterior ao marcador, inclusive na primeira amostra", () => {
+    const current = samples().map((sample, index) => ({ ...sample, sampledAtUnixMs: 1000 + index * 500 }));
+    current[0].runtimeState.frame = 0;
+    expect(() => selectSceneCadenceWindow(current, { ...scope, notBeforeUnixMs: 1000, initialFrame: 9 }))
+      .toThrow(/cadencia|cadência/i);
+  });
+  it("exige quatro amostras com o relógio de origem quando há marcador temporal", () => {
+    expect(() => selectSceneCadenceWindow(samples(), { ...scope, notBeforeUnixMs: 1000, initialFrame: 9 }))
+      .toThrow(/cadencia|cadência/i);
+    const current = samples().map((sample, index) => ({ ...sample, sampledAtUnixMs: 500 + index * 100 }));
+    expect(() => selectSceneCadenceWindow(current, { ...scope, notBeforeUnixMs: 1000, initialFrame: 9 }))
+      .toThrow(/cadencia|cadência/i);
+  });
+  it("mantém as primeiras quatro amostras, incluindo uma queda, sem escolher as melhores", () => {
+    const input = samples();
+    expect(selectSceneCadenceWindow(input, scope)).toEqual(input.slice(0, 4));
+    expect(selectSceneCadenceWindow(input, scope)[1].presentationFps).toBe(40);
+  });
+  it.each([
+    ["menu", { runtimeKind: 3 }],
+    ["outra cena", { currentRoom: 11 }],
+    ["reinício", { frame: 1 }],
+    ["telemetria ausente", null]
+  ])("rejeita amostras misturadas com %s", (_label, state) => {
+    const input = samples();
+    input[2].runtimeState = state === null ? null : { ...input[2].runtimeState, ...state };
+    expect(() => selectSceneCadenceWindow(input, scope)).toThrow(/cadencia|cadência/i);
+  });
+  it("não mistura um menu posterior à janela de medição", () => {
+    const input = samples();
+    input[4].runtimeState = { runtimeKind: 3, currentRoom: 11, frame: 0 };
+    expect(selectSceneCadenceWindow(input, scope)).toEqual(input.slice(0, 4));
+  });
+  it("rejeita um contador inicial inválido", () => {
+    const input = samples();
+    input[0].runtimeState.frame = -1;
+    expect(() => selectSceneCadenceWindow(input, scope)).toThrow(/cadencia|cadência/i);
+  });
+  it("exige a janela completa e frames que continuam avançando", () => {
+    expect(() => selectSceneCadenceWindow(samples().slice(0, 3), scope)).toThrow(/cadencia|cadência/i);
+    const input = samples();
+    input.forEach(s => { s.runtimeState.frame = 20; });
+    expect(() => selectSceneCadenceWindow(input, scope)).toThrow(/cadencia|cadência/i);
   });
 });

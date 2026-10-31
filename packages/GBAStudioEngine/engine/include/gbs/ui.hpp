@@ -17,7 +17,9 @@ struct HudState {
     size_t text_slot_count;
     uint32_t values[hud_value_source_count] {};
     uint32_t maximums[hud_value_source_count] {};
-    uint8_t value_sources = 0;
+    uint16_t value_sources = 0;
+    /** One-based text slot for the menu selector; zero keeps globals in BSS. */
+    uint8_t selected_text_slot_plus_one = 0;
 };
 
 struct OverlayState {
@@ -59,6 +61,8 @@ void set_hud_text_slots(HudState& state, const char* const* text_slots, size_t t
 void set_hud_value(HudState& state, HudValueSource source, uint32_t value, uint32_t maximum = 100);
 void hide_hud(HudState& state);
 void draw_hud(const HudState& state);
+/** Draw the HUD while suppressing components that intersect a screen region. */
+void draw_hud_excluding(const HudState& state, int x, int y, int width, int height);
 void update_hud_behavior(EventState& state, bool visible);
 
 void init_overlay(OverlayState& state);

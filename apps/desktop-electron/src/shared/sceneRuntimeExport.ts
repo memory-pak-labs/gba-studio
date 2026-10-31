@@ -667,7 +667,7 @@ export interface EngineDialogueUiConfig {
     hud_height: number;
   }>;
   /** Resolved frame skins applied on scene entry after the HUD layout binding. */
-  scene_skins?: Array<{ scene_name: string; box_skin?: string; hud_skin?: string }>;
+  scene_skins?: Array<{ scene_name: string; box_skin?: string; hud_skin?: string; close_bottom_edge?: boolean; full_width_bottom?: boolean; presentation?: DialoguePresentation; runtime_kind?: number }>;
   hud_scene_bindings?: Array<{
     scene_name: string;
     preset_id: string;
@@ -676,6 +676,8 @@ export interface EngineDialogueUiConfig {
   hud_layouts?: Array<{
     id: string;
     mode: "standard" | "advanced";
+    selector_asset?: string;
+    text_profile?: "dungeon-status" | "dungeon-sidebar" | "dungeon-sidebar-contextual";
     components: Array<{
       id: string;
       kind: "frame" | "text" | "bar" | "icon";
@@ -689,6 +691,11 @@ export interface EngineDialogueUiConfig {
       z_index: number;
       visible: boolean;
       value_binding?: string;
+      value_variable?: number;
+      inventory_item?: number;
+      value_maximum?: number;
+      text_advance?: number;
+      foreground_image?: boolean;
       state_assets?: string[];
       gauge?: {empty_asset:string;x:number;y:number;width:number;height:number;reverse:boolean};
       behavior?: {
@@ -716,8 +723,10 @@ export interface EngineDialogueUiConfig {
 
 export type DialoguePortraitLayout = "inline" | "fixed_slots";
 export type DialogueNameLabelMode = "inline" | "above";
+export type DialoguePresentation = "standard" | "portrait_tab";
 
 export interface DialogueUiSettingsContract {
+  presentation?: DialoguePresentation;
   boxImage: string;
   selectorImage: string;
   font: string;
@@ -920,6 +929,12 @@ export function dialoguePreviewLayoutForSettings(
     width: Math.max(DIALOGUE_TILE_SIZE, box.width - DIALOGUE_TILE_SIZE * 2),
     height: Math.max(DIALOGUE_TILE_SIZE, box.height - DIALOGUE_TILE_SIZE * 2)
   };
+  if (resolved.presentation === "portrait_tab") {
+    const nameWidth = Math.min(168, Array.from(speaker).length * 8 + 16);
+    return { frameIndex: 0, box, text, portraitOnRight,
+      portraitSlot: { x: portraitOnRight ? 176 : 8, y: 56, width: 56, height: 56 },
+      nameLabel: { x: portraitVisible ? (portraitOnRight ? 176 - nameWidth : 64) : 8, y: 96, width: nameWidth, height: 16 } };
+  }
   return {
     frameIndex,
     box,
@@ -965,17 +980,18 @@ export function resolveDialogueUiSettings(
     ? "above"
     : "inline";
   return {
+    presentation: source.presentation === "portrait_tab" ? "portrait_tab" : "standard",
     boxImage: dialogueString(source.boxImage, "ui/dialogue_box.png"),
     selectorImage: dialogueString(source.selectorImage, "ui/dialogue_cursor.png"),
     font: dialogueString(source.font, "GBA padrao"),
-    boxPosition: dialogueString(source.boxPosition, "Inferior"),
-    boxWidth: positiveInteger(source.boxWidth, 224),
-    boxHeight: positiveInteger(source.boxHeight, DEFAULT_DIALOGUE_BOX_HEIGHT_TILES * DIALOGUE_TILE_SIZE),
+    boxPosition: source.presentation === "portrait_tab" ? "Inferior" : dialogueString(source.boxPosition, "Inferior"),
+    boxWidth: source.presentation === "portrait_tab" ? 224 : positiveInteger(source.boxWidth, 224),
+    boxHeight: source.presentation === "portrait_tab" ? 40 : positiveInteger(source.boxHeight, DEFAULT_DIALOGUE_BOX_HEIGHT_TILES * DIALOGUE_TILE_SIZE),
     showPortrait: typeof source.showPortrait === "boolean" ? source.showPortrait : true,
     showCharacterName: typeof source.showCharacterName === "boolean" ? source.showCharacterName : true,
     portraitPosition: dialogueString(source.portraitPosition, "Esquerda"),
-    portraitLayout,
-    nameLabelMode,
+    portraitLayout: source.presentation === "portrait_tab" ? "fixed_slots" : portraitLayout,
+    nameLabelMode: source.presentation === "portrait_tab" ? "above" : nameLabelMode,
     textSpeed: dialogueString(source.textSpeed, "Normal")
   };
 }

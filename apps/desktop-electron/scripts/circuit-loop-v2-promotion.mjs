@@ -90,7 +90,7 @@ function racingBackgroundAsset(existing) {
 
 export function promoteApprovedCircuitLoopV2(project) {
   const room = project.rooms?.find((item) => item.name === "circuito_final");
-  if (!room) return project;
+  if (!room || room.racingVisualRevision === "racing-two-views-approved-2026-10-18") return project;
   if (room.runtime?.type !== "racing" || room.width !== 60 || room.height !== 40) {
     throw new Error("circuito_final racing 60×40 ausente");
   }

@@ -30,7 +30,7 @@ export function correctIsometricScenes(input) {
   const project = structuredClone(input);
   if (!project.rooms?.some(room => room.name === "mercado_suspenso")) return project;
   // The legacy modular correction must not restore old coordinates over the approved paged adventure.
-  if (project.rooms.some(room => room.name === "mercado_suspenso" && room.width === 36 && room.backgroundAssetName === "mercado-adventure-surface.png")) return project;
+  if (project.rooms.some(room => room.name === "mercado_suspenso" && room.runtime?.config?.pagedSurface && room.runtime?.config?.gameplayMode === "adventure")) return project;
   const marketHud = project.settings?.hudPresets?.find(item => item.id === "hud-mercado-avancada");
   if (marketHud) {
     marketHud.description = "Nome da personagem e comando de interação no Mercado Suspenso.";

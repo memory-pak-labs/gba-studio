@@ -1,4 +1,4 @@
-import { copyFile } from "node:fs/promises";
+import { copyFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 
 import type { EnginePackBuildResult } from "../shared/ipc.js";
@@ -19,6 +19,13 @@ export async function publishEnginePackRomToProjectRoot(
 
   try {
     await copyFile(sourcePath, publishedPath);
+    try {
+      await copyFile(path.join(path.dirname(sourcePath), "event_source_map.json"), `${publishedPath}.events.json`);
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
+      // Clear an older map when a build has no event sources.
+      await writeFile(`${publishedPath}.events.json`, JSON.stringify({ schema: 1, entries: [] }), "utf8");
+    }
     return {
       ...result,
       summary: {

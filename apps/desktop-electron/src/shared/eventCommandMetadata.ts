@@ -1,5 +1,12 @@
+import { TILE_REPLACEMENT_COLLISIONS } from "./tileReplacement.js";
+
 /** Authoring metadata only. Never rewrites a command or its serialized arguments. */
 const parameterLabels: Record<string, string[]> = {
+  lantern: ["Ator", "Largura (pixels, 8–240)", "Altura (pixels, 8–160)", "Escuridão (0–100%)", "Duração (quadros, 1–3600)", "Formato opcional (circle)"],
+  reveal_area: ["Ator", "Largura inicial (pixels, 8–240)", "Altura inicial (pixels, 8–160)", "Escuridão (0–100%)", "Duração (quadros, 1–3600)", "Formato opcional (circle)"],
+  set_map_state: ["Estado de mapa (ID)", "Variante (ID)"],
+  replace_tile: ["X (tiles)", "Y (tiles)", "Tile", "Camada", "Colisão"],
+  replace_tile_sequence: ["X (tiles)", "Y (tiles)", "Tile", "Quantidade", "Camada", "Colisão"],
   draw_text: ["X (tiles)", "Y (tiles)", "Destino", "Texto"],
   start_segment: ["Segmento (0–31)", "Script"], stop_segment: ["Segmento (0–31)"],
   set_adventure_state: ["Estado"], push_actor: ["Ator", "Continuar até colisão"],
@@ -8,7 +15,7 @@ const parameterLabels: Record<string, string[]> = {
   cancel_actor_movement: ["Ator"], set_actor_animation_state: ["Ator", "Estado de animação"],
   projectile_load_slot: ["Slot", "Sprite", "Dano", "Velocidade (centésimos de pixel/quadro)"], launch_projectile_slot: ["Ator", "Slot", "Direção"],
   actor_effects: ["Ator", "Efeito", "Duração (quadros)", "Intensidade"],
-  start_game_clock: ["Minutos por avanço", "Quadros por avanço", "Apresentação"], advance_time: ["Minutos"],
+  start_game_clock: ["Minutos por avanço", "Quadros por avanço", "Apresentação", "Variável dos minutos (opcional)"], advance_time: ["Minutos"],
   luta_start_match: ["Cena de Luta"], luta_end_match: ["Vencedor"],
   luta_set_super_gauge: ["Lutador", "Medidor"], luta_add_super_gauge: ["Lutador", "Quantidade"],
   luta_set_guard_power: ["Lutador", "Poder de guarda"], luta_set_ism_style: ["Lutador", "Estilo"],
@@ -31,6 +38,7 @@ const parameterLabels: Record<string, string[]> = {
   pause_scene_type: ["Lógica da cena"], resume_scene_type: ["Lógica da cena"], run_audio_routine: ["Música tracker"],
   fade_in: ["Duração (quadros)"], fade_out: ["Duração (quadros)"],
   play_music: ["Música"], play_sfx: ["Efeito sonoro"], set_music_volume: ["Volume"],
+  fade_audio_volume: ["Canal", "Volume da cena (%)", "Duração (quadros)", "Variável do volume preferido (opcional)", "Variável do volume geral (opcional)"],
   show_dialogue: ["Diálogo"], show_choice: ["Diálogo de escolhas", "Variável de resposta"],
   call_event: ["Script"], call_procedure: ["Rotina"], if_button: ["Botão"],
   set_actor_position: ["Ator", "X", "Y"], set_actor_relative_position: ["Ator", "Deslocamento X", "Deslocamento Y"],
@@ -46,6 +54,12 @@ const parameterLabels: Record<string, string[]> = {
 };
 
 const descriptions: Record<string, string> = {
+  lantern: "Ilumina uma área ao redor do ator e escurece o exterior. Acrescente circle após a duração para luz circular, com largura e altura iguais. Fades e máscaras têm prioridade; o círculo compartilha DMA0 com efeitos raster.",
+  reveal_area: "Expande a área ao redor do ator até revelar a tela. Acrescente circle após a duração para uma abertura circular, com largura e altura iniciais iguais. Ao terminar, remove o escurecimento.",
+  clear_visibility: "Remove a lanterna ou a revelação e restaura a visibilidade da cena.",
+  set_map_state: "Aplica uma variante nomeada com tiles, colisão e variável persistente. Configure os estados na cena. O estado é restaurado ao voltar à cena ou carregar o save.",
+  replace_tile: "Troca um tile da cena. BG0 é o alias do piso BG2. Colisão keep preserva o terreno; free libera a passagem. Alterações valem durante a visita à cena.",
+  replace_tile_sequence: "Troca tiles consecutivos na mesma linha. A colisão opcional aplica-se ao piso BG2; keep preserva a colisão existente.",
   draw_text: "Desenha uma linha sem caixa de diálogo. background usa coordenadas da cena na grade de tiles; overlay usa coordenadas fixas da tela.",
   start_segment: "Executa outro script em paralelo, com esperas independentes, e guarda seu identificador 0–31.",
   stop_segment: "Interrompe o script paralelo do segmento, incluindo as chamadas iniciadas por ele.",
@@ -60,8 +74,9 @@ const descriptions: Record<string, string> = {
   projectile_load_slot: "Liga um sprite do projeto, dano e velocidade ao slot de projétil 0–7.",
   launch_projectile_slot: "Lança o projétil configurado no slot a partir do ator, com colisão e dano.",
   actor_effects: "Pisca (flash) ou desloca visualmente (shake) apenas o ator durante a duração configurada.",
-  start_game_clock: "Inicia o relógio do jogo e avança a hora na cadência configurada. hud mostra HH:MM; hidden oculta a hora.",
+  start_game_clock: "Inicia o relógio do jogo na cadência configurada. hud mostra HH:MM; hidden oculta a hora. Uma variável opcional restaura e acompanha os minutos para salvar e carregar.",
   advance_time: "Adiciona ou retira minutos do relógio do jogo, com retorno ao início do dia após 24 horas.",
+  fade_audio_volume: "Altera gradualmente o volume do canal. As variáveis opcionais de preferência e volume geral (0–100) multiplicam o volume da cena, preservando o silêncio em zero.",
   luta_start_match: "Inicia uma partida na cena de Luta selecionada, restaurando os lutadores e os rounds.",
   luta_end_match: "Finaliza a partida com vitória de player1, player2 ou empate e executa o resultado da cena.",
   luta_set_super_gauge: "Define o medidor do lutador, limitado ao máximo configurado na cena.",
@@ -110,6 +125,7 @@ export function eventCommandParameterLabel(verb: string, tokenIndex: number, fal
 }
 
 export function eventCommandParameterChoices(verb: string, tokenIndex: number): string[] | null {
+  if ((verb === "replace_tile" && tokenIndex === 5) || (verb === "replace_tile_sequence" && tokenIndex === 6)) return TILE_REPLACEMENT_COLLISIONS;
   if(verb==="set_adventure_state" && tokenIndex===1) return ["ground","dash","knockback","blank","run","push"];
   if(verb==="actor_effects" && tokenIndex===2) return ["flash","shake"];
   if((verb==="push_actor" && tokenIndex===2) || (verb==="open_equip_menu" && tokenIndex===2)) return ["true","false"];

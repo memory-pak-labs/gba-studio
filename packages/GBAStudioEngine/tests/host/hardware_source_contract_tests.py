@@ -38,6 +38,70 @@ def function_body(source: str, name: str) -> str:
 
 
 class HardwareSourceContractTests(unittest.TestCase):
+    def test_circular_window_publishes_complete_rows_and_rearms_after_missed_frames(self):
+        source = HARDWARE_SOURCE.read_text()
+        start = function_body(source, "gbs_hw_start_hblank_window1")
+        stop = function_body(source, "gbs_hw_disable_hblank_window1")
+        rearm = function_body(source, "rearm_active_window1_hblank")
+        commit = function_body(source, "commit_hblank_bg_scroll")
+        code = '''#include <stdint.h>
+#include <assert.h>
+uint16_t REG_WIN1H;
+static uint16_t window1_hblank_rows[2][161];
+static uint8_t window1_hblank_active_buffer,window1_hblank_active;
+static uint8_t pending_window1_hblank_enabled,pending_window1_hblank_dirty;
+static uint8_t affine_hblank_enabled,affine_hblank_active_buffer;
+static uint8_t pending_hblank_scroll_enabled,pending_hblank_scroll_dirty;
+static int pending_hblank_scroll_layer;
+static const int16_t* pending_hblank_scroll_offsets;
+static int arms;static const uint16_t* armed_rows;
+void gbs_hw_hdma_stop(int channel){assert(channel==0);}
+void gbs_hw_hdma_start(int channel,const void* rows,volatile void* dest,uint32_t units,int words){
+ assert(channel==0 && dest==&REG_WIN1H && units==1 && words==0);++arms;armed_rows=(const uint16_t*)rows;
+}
+void rearm_active_affine_hblank(void){}
+void rearm_active_window1_hblank(void) REARM
+void start(const uint16_t* bounds) START
+void stop(void) STOP
+void commit(void) COMMIT
+int main(void){
+ uint16_t a[161],b[161];for(int i=0;i<161;++i){a[i]=(uint16_t)(i+10);b[i]=(uint16_t)(i+1000);}
+ start(a);assert(arms==0 && !window1_hblank_active);commit();assert(arms==1 && REG_WIN1H==10 && armed_rows[0]==11 && armed_rows[159]==170);
+ const uint16_t* active=armed_rows;start(b);assert(armed_rows==active && active[0]==11);
+ rearm_active_window1_hblank();assert(armed_rows==active && REG_WIN1H==10);
+ commit();assert(armed_rows!=active && REG_WIN1H==1000 && armed_rows[159]==1160);
+ rearm_active_window1_hblank();assert(REG_WIN1H==1000 && armed_rows[0]==1001);
+ stop();commit();assert(!window1_hblank_active);int calls=arms;commit();assert(arms==calls);
+ start(0);commit();assert(arms==calls);
+}
+'''.replace('REARM',rearm).replace('START',start).replace('STOP',stop).replace('COMMIT',commit)
+        with tempfile.TemporaryDirectory() as directory:
+            file=Path(directory)/'window.c';file.write_text(code);binary=Path(directory)/'window'
+            subprocess.run(['cc',str(file),'-o',str(binary)],check=True)
+            subprocess.run([str(binary)],check=True)
+
+    def test_audio_profiler_measures_the_vblank_mixer_work(self):
+        body = function_body(AUDIO_SOURCE.read_text(), "audio_vblank_update")
+        code = '''
+#include <cassert>
+#include <cstdint>
+uint32_t ticks=100, measured=0;
+uint32_t gbs_hw_frame_counter_ticks() { return ticks; }
+void subsystem_profiler_record_audio(uint32_t elapsed) { measured += elapsed; }
+void update_audio_volume_fades() { ticks+=1; }
+void update_sfx() { ticks+=2; }
+void update_music() { ticks+=3; }
+void update_tracker() { ticks+=4; }
+void update_pcm_mixer() { ticks+=5; }
+void audio_vblank_update() BODY
+int main() { audio_vblank_update(); assert(measured==15); }
+'''.replace("BODY", body)
+        with tempfile.TemporaryDirectory(prefix="gba-audio-profiler-") as directory:
+            source=Path(directory)/"test.cpp";binary=Path(directory)/"test"
+            source.write_text(code)
+            subprocess.run(["c++","-std=c++17","-DGBS_ENABLE_PROFILER_SCOPES",str(source),"-o",str(binary)],check=True)
+            subprocess.run([str(binary)],check=True)
+
     @classmethod
     def setUpClass(cls) -> None:
         cls.source = HARDWARE_SOURCE.read_text(encoding="utf-8")
@@ -435,6 +499,50 @@ int main(void) {
         self.assertIn("shadow_bg_tilemap_pending_mask", set_tile)
         self.assertIn("shadow_bg_tilemap_pending_mask", self.source)
 
+    def test_full_screenblock_copy_preserves_staging_without_per_tile_addressing(self) -> None:
+        body = function_body(self.source, "gbs_hw_load_bg_tilemap")
+        harness = r'''
+#include <assert.h>
+#include <stdint.h>
+#include <string.h>
+static uint16_t shadow_bg_tilemaps[4][1024], video[4][1024];
+static uint8_t shadow_bg_map_size[4], shadow_bg_map_size_pending_mask;
+static uint8_t shadow_bg_tilemap_pending_mask;
+static int bg_screenblocks[4] = {0, 1, 2, 3}, address_calculations;
+static uint32_t screenblock_count_for_map_size(uint32_t size) { return size < 4 ? 1u << ((size & 1u) + (size >> 1)) : 0; }
+static uint32_t tilemap_block_index(uint32_t w, uint32_t h, uint32_t x, uint32_t y) {
+    (void)h; ++address_calculations; return y / 32 * (w > 32 ? 2 : 1) + x / 32;
+}
+static volatile uint16_t* screenblock_address(int block) { return video[block]; }
+void gbs_hw_load_bg_tilemap(int layer, const uint16_t* entries, uint32_t width, uint32_t height, uint32_t map_size)
+''' + body + r'''
+int main(void) {
+    uint16_t source[1024];
+    memset(video, 0x5a, sizeof(video));
+    for (int layer = 0; layer < 4; ++layer) {
+        for (int i = 0; i < 1024; ++i) source[i] = (uint16_t)(i * 67 + layer);
+        address_calculations = 0;
+        gbs_hw_load_bg_tilemap(layer, source, 32, 32, 0);
+        assert(address_calculations == 0);
+        assert(memcmp(shadow_bg_tilemaps[layer], source, sizeof(source)) == 0);
+        assert(shadow_bg_tilemap_pending_mask == (1u << (layer + 1)) - 1);
+        assert(shadow_bg_map_size_pending_mask == shadow_bg_tilemap_pending_mask);
+        assert(shadow_bg_map_size[layer] == 0);
+        for (int j = 0; j < 4; ++j) for (int i = 0; i < 1024; ++i) assert(video[j][i] == 0x5a5a);
+    }
+    // Partial maps still clear their unused cells; they are not full blocks.
+    gbs_hw_load_bg_tilemap(2, source, 30, 20, 0);
+    for (int y = 0; y < 32; ++y) for (int x = 0; x < 32; ++x)
+        assert(shadow_bg_tilemaps[2][y * 32 + x] == (x < 30 && y < 20 ? source[y * 30 + x] : 0));
+}
+'''
+        with tempfile.TemporaryDirectory() as directory:
+            source = Path(directory) / "tilemap-copy.c"
+            executable = Path(directory) / "tilemap-copy"
+            source.write_text(harness)
+            subprocess.run(["cc", "-std=c11", "-Wall", "-Wextra", "-Werror", str(source), "-o", str(executable)], check=True)
+            subprocess.run([str(executable)], check=True)
+
     def test_vblank_commits_the_staged_ui_bg0_map(self) -> None:
         commit_body = function_body(self.source, "commit_shadow_bg_tilemaps")
         wait_body = function_body(self.source, "gbs_hw_wait_vblank")
@@ -521,8 +629,8 @@ int main(void) {
         self.assertIn("volatile uint16_t* target", obj_body)
         self.assertIn("source[i * 2]", obj_body)
         self.assertIn("source[i * 2 + 1]", obj_body)
-        self.assertIn("low = low == 0 ? (bg_font_transparent ? 0 : DIALOGUE_COLOR_BACKGROUND) : DIALOGUE_COLOR_TEXT", font_byte_body)
-        self.assertIn("high = high == 0 ? (bg_font_transparent ? 0 : DIALOGUE_COLOR_BACKGROUND) : DIALOGUE_COLOR_TEXT", font_byte_body)
+        self.assertIn("low = (low == 0 || low == 5) ? (bg_font_transparent ? 0 : DIALOGUE_COLOR_BACKGROUND) : DIALOGUE_COLOR_TEXT", font_byte_body)
+        self.assertIn("high = (high == 0 || high == 5) ? (bg_font_transparent ? 0 : DIALOGUE_COLOR_BACKGROUND) : DIALOGUE_COLOR_TEXT", font_byte_body)
         self.assertNotIn("volatile uint8_t* target", bg_body)
         self.assertNotIn("volatile uint8_t* target", obj_body)
         self.assertIn("configured_dialogue_font_tiles = tiles;", configure_body)
@@ -541,8 +649,10 @@ int main(void) {
         bg_font_transparent = transparent;
         for (int value = 0; value < 256; ++value) {
             unsigned background = transparent ? 0 : DIALOGUE_COLOR_BACKGROUND;
-            unsigned low = (value & 15) ? DIALOGUE_COLOR_TEXT : background;
-            unsigned high = (value >> 4) ? DIALOGUE_COLOR_TEXT : background;
+            unsigned low_nibble = value & 15;
+            unsigned high_nibble = value >> 4;
+            unsigned low = (low_nibble == 0 || low_nibble == 5) ? background : DIALOGUE_COLOR_TEXT;
+            unsigned high = (high_nibble == 0 || high_nibble == 5) ? background : DIALOGUE_COLOR_TEXT;
             if (dialogue_font_bg_byte((uint8_t)value) != (low | (high << 4))) return 1;
         }
     }
@@ -636,7 +746,14 @@ int main() {
     def test_name_input_glyphs_use_a_dark_palette_slot(self) -> None:
         glyph_body = function_body(self.source, "gbs_hw_draw_text_input_keyboard_glyph")
 
-        self.assertIn("NAME_INPUT_TEXT_PALETTE = 11", self.source)
+        self.assertIn("NAME_INPUT_TEXT_PALETTE = 15", self.source)
+        self.assertIn("NAME_INPUT_BG_PALETTE = 15", self.source)
+        self.assertIn("MEM_PALETTE + NAME_INPUT_BG_PALETTE * 16", function_body(self.source, "queue_name_input_background_palette_restore"))
+        palette = re.search(r"name_input_palette_colors\[16\] = \{([^}]+)\}", self.source)
+        self.assertIsNotNone(palette)
+        colors = [int(value, 16) for value in re.findall(r"0x[0-9A-Fa-f]+", palette.group(1))]
+        self.assertEqual(colors[1], 0x7FFF)  # light surface
+        self.assertEqual(colors[4], 0x1862)  # dark glyph
         self.assertIn("name_input_glyph_tile_entry", glyph_body)
         self.assertNotIn("name_input_tile_entry(dialogue_bg_tile_for_codepoint", glyph_body)
 
@@ -644,6 +761,41 @@ int main() {
         value = re.search(r"#define DMA_DEST_FIXED (0x[0-9A-Fa-f]+)u", self.source)
         self.assertIsNotNone(value)
         self.assertEqual((int(value.group(1), 16) >> 21) & 3, 2)
+
+    def test_disabling_one_window_preserves_the_other_window_outside_mask(self):
+        parameters = "uint16_t left,uint16_t right,uint16_t top,uint16_t bottom,uint16_t inside_mask,uint16_t outside_mask,int enabled"
+        code = "#include <stdint.h>\n#include <assert.h>\nuint16_t REG_WIN0H,REG_WIN0V,REG_WIN1H,REG_WIN1V,REG_WININ,REG_WINOUT,REG_DISPCNT;\n"
+        for window in (0, 1):
+            code += "void window" + str(window) + "(" + parameters + "){" + function_body(self.source, "gbs_hw_set_window" + str(window)) + "}\n"
+        code += "int main(void){window0(0,120,0,160,63,0,1);window1(0,240,0,160,63,63,0);assert((REG_WINOUT&63)==0);window1(0,120,0,160,31,4,1);window0(0,240,0,160,63,63,0);assert((REG_WINOUT&63)==4);}"
+        with tempfile.TemporaryDirectory() as directory:
+            source = Path(directory)/"windows.c"; source.write_text(code)
+            binary = Path(directory)/"windows"
+            subprocess.run(["cc",str(source),"-o",str(binary)],check=True)
+            subprocess.run([str(binary)],check=True)
+
+    def test_vblank_rearms_the_last_complete_affine_table_even_when_render_misses_a_frame(self):
+        irq = function_body(self.source, "gbs_hw_irq_dispatch")
+        code = """#include <stdint.h>
+#include <assert.h>
+uint16_t REG_IF=1,REG_IE=1,BIOS_IRQ_FLAGS=0;int keypad_irq_pending,arms;
+static int affine_hblank_enabled=1;
+static int window1_hblank_active=0;
+static int window_arms;
+static void rearm_active_window1_hblank(void){++window_arms;}
+static uint32_t ticks,irq_ticks;
+uint32_t gbs_hw_frame_counter_ticks(void){return ticks++;}
+void record_irq(uint32_t elapsed){irq_ticks+=elapsed;}
+void (*gbs_profiler_record_irq)(uint32_t)=record_irq;
+static void rearm_active_affine_hblank(void){++arms;}
+void commit_pcm_stream_block(void){} void gbs_audio_vblank_update(void){} void gbs_dispatch_hardware_interrupts(uint16_t flags){}
+void dispatch(void) {"""+irq+"""}
+int main(void){dispatch();dispatch();assert(arms==2);assert(irq_ticks==2);REG_IF=0;dispatch();assert(arms==2);assert(irq_ticks==2);REG_IF=1;window1_hblank_active=1;dispatch();dispatch();assert(window_arms==2 && arms==2);}
+"""
+        with tempfile.TemporaryDirectory() as directory:
+            source=Path(directory)/"irq.c";source.write_text(code);binary=Path(directory)/"irq"
+            subprocess.run(["cc",str(source),"-o",str(binary)],check=True)
+            subprocess.run([str(binary)],check=True)
 
     def test_hblank_dma_uses_repeat_and_hblank_start_timing(self) -> None:
         start_body = function_body(self.source, "gbs_hw_hdma_start")
@@ -666,8 +818,10 @@ int main() {
         self.assertIn("affine_hblank_active_buffer^1u", affine_body)
         self.assertIn("pending_hblank_scroll_dirty=1", affine_body)
         self.assertIn("if(pending_hblank_scroll_dirty) affine_hblank_active_buffer ^= 1u", commit_body)
-        self.assertIn("DMA_REPEAT|DMA_START_HBLANK|DMA_32BIT|DMA_ENABLE", commit_body)
-        self.assertIn("4u|0x00600000u", commit_body)
+        active_body=function_body(self.source,"rearm_active_affine_hblank")
+        self.assertIn("rearm_active_affine_hblank();",commit_body)
+        self.assertIn("DMA_REPEAT|DMA_START_HBLANK|DMA_32BIT|DMA_ENABLE", active_body)
+        self.assertIn("4u|0x00600000u", active_body)
 
     def test_immediate_dma_disables_previous_transfer_before_reprogramming(self) -> None:
         body = function_body(self.source, "gbs_hw_dma_copy")
@@ -786,9 +940,9 @@ int main() {
     def test_large_render_staging_buffers_are_kept_in_ewram(self) -> None:
         buffers = (
             "tilemap_decode_buffer",
-            "lz77_tilemap_decode_buffer",
-            "lz77_tile_decode_buffer",
-            "lz77_palette_decode_buffer",
+            "compressed_tilemap_decode_buffer",
+            "compressed_tile_decode_buffer",
+            "compressed_palette_decode_buffer",
             "palette_decode_buffer",
             "dynamic_palette_buffer",
         )
@@ -799,6 +953,8 @@ int main() {
         )
         self.assertIn("#if defined(__arm__) || defined(__thumb__)", self.render_source)
         self.assertIn("#else\n#define GBS_RENDER_EWRAM\n#endif", self.render_source)
+        self.assertIn("max_lz77_tile_asset_bytes == max_huffman_tile_asset_bytes", self.render_source)
+        self.assertIn("max_lz77_palette_bytes == max_huffman_palette_bytes", self.render_source)
         for buffer in buffers:
             declaration = next(
                 line for line in self.render_source.splitlines() if buffer in line

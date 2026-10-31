@@ -53,6 +53,8 @@ export interface RecentProjectEntry {
 
 export interface SaveProjectRequest {
   path?: string;
+  /** Existing project whose asset library must accompany a separate copy. */
+  sourcePath?: string;
   project: ParsedGBAProject;
 }
 
@@ -82,6 +84,7 @@ export interface LaunchRomInEmulatorResult {
 export interface OpenRomPlayerWindowRequest {
   romPath: string;
   title?: string;
+  saveScope?: string;
   replay?: InputReplay;
   keyboardBindings?: GBAKeyboardBindings;
 }
@@ -317,6 +320,7 @@ export interface EnginePackBuildSummary {
 }
 
 export interface EnginePackBuildResult {
+  environment?: import("./buildDiagnosticReport.js").BuildEnvironmentSnapshot;
   ran: boolean;
   exitCode: number | null;
   command?: string;
@@ -331,6 +335,7 @@ export interface ExportEngineProjectRequest {
   projectPath?: string;
   destinationRoot?: string;
   developmentStartScene?: DevelopmentSceneLaunch;
+  reusePlayRom?: boolean;
 }
 
 export interface DevelopmentSceneLaunch {
@@ -357,6 +362,9 @@ export interface ExportEngineProjectResult {
   files?: string[];
   warnings?: string[];
   target?: string;
+  romPath?: string;
+  playBuildResult?: EnginePackBuildResult;
+  playDoctorResult?: EnginePackDoctorResult;
   error?: string;
 }
 
@@ -483,7 +491,10 @@ export interface DownloadTranslationPackResult {
 }
 
 export interface GBAStudioDesktopAPI {
+  setAppLocale?(locale: string): Promise<void>;
   platform: NodeJS.Platform;
+  getWindowFullscreen(): Promise<boolean>;
+  onWindowFullscreenChange(listener: (fullscreen: boolean) => void): () => void;
   onAppCommand(listener: (command: AppCommand) => void): () => void;
   onExternalProjectOpen(listener: (result: OpenProjectResult) => void): () => void;
   onExternalAssetChange(listener: (event: ExternalAssetChangeEvent) => void): () => void;
@@ -528,9 +539,12 @@ export interface GBAStudioDesktopAPI {
 }
 
 export const ipcChannels = {
+  setAppLocale: "app:set-locale",
   appCommand: "app:command",
   confirmWindowClose: "window:confirm-close",
   setWindowDocumentState: "window:set-document-state",
+  getWindowFullscreen: "window:get-fullscreen",
+  windowFullscreenChanged: "window:fullscreen-changed",
   externalProjectOpen: "project:external-open",
   externalAssetChange: "assets:external-change",
   getLaunchProject: "project:get-launch",
@@ -542,6 +556,7 @@ export const ipcChannels = {
   launchRomInEmulator: "shell:launch-rom-in-emulator",
   openRomPlayerWindow: "rom-player:open-window",
   romPlayerTelemetry: "rom-player:telemetry",
+  romPlayerBattery: "rom-player:battery",
   selectPath: "shell:select-path",
   validateSettingsPaths: "settings:validate-paths",
   getMcpServerRegistration: "mcp:get-server-registration",

@@ -40,11 +40,16 @@ extern "C" {
 void gbs_hw_begin_hud_layout(int) {}
 void gbs_hw_end_hud_layout() {}
 void gbs_hw_invalidate_hud_layout() {}
+int gbs_hw_hud_layout_retained() { return 0; }
+void gbs_hw_clear_hud_background_rect(int, int, int, int) {}
+void gbs_hw_refresh_hud_text_palette(int) {}
 void gbs_hw_draw_hud_layout_component(int, int, int, int, int, const char*, int, const void*, int) {}
 void gbs_hw_draw_hud_bar(const char*, const char*, int) {}
 void gbs_hw_draw_overlay_rect(int, int, int, int, int) {}
 void gbs_hw_draw_text_box(int, int, int, int, const char*, int) {}
 void gbs_hw_load_obj_tiles(const uint8_t*, uint32_t, uint32_t) {}
+void gbs_hw_set_hud_font(const uint8_t*, int) {}
+void gbs_hw_set_hud_font_shadow(int) {}
 }
 struct Room { const char* name; };
 const Room rooms[] = {{"blank"}, {"authored"}, {"no-hud"}, {nullptr}};

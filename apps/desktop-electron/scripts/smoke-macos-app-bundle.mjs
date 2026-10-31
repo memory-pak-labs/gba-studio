@@ -6,7 +6,7 @@ import { dirname, join } from "node:path";
 import { promisify } from "node:util";
 import { fileURLToPath } from "node:url";
 
-import { auditUniversalMachOTree } from "./macos-universal-runtime.mjs";
+import { auditUniversalMachOTree, macosMachOArchitecture } from "./macos-universal-runtime.mjs";
 
 const execFileAsync = promisify(execFile);
 const appRoot = dirname(dirname(fileURLToPath(import.meta.url)));
@@ -169,8 +169,16 @@ async function main() {
     }
     nestedSignatures.push(signature);
   }
-  const architectureAudit = await auditUniversalMachOTree(appPath);
+  const targetArchitecture = process.env.GBA_STUDIO_MAC_ARCH?.trim();
+  if (targetArchitecture) macosMachOArchitecture(targetArchitecture);
+  const architectureAudit = await auditUniversalMachOTree(appPath, appPath.includes("mac-universal") || targetArchitecture
+    ? { maximumMacosVersion: "12.0", architecture: targetArchitecture } : {});
+  if (targetArchitecture) {
+    assert(architectureAudit.total > 0 && architectureAudit.invalid.length === 0, `Bundle contains Mach-O incompatible with ${targetArchitecture}.`);
+    assert(architectureAudit.incompatibleMinimum.length === 0, "Bundle requires a macOS newer than 12.0.");
+  }
   if (appPath.includes("mac-universal")) {
+    assert(architectureAudit.incompatibleMinimum.length === 0, "Universal bundle requires a macOS newer than 12.0.");
     assert(
       architectureAudit.invalid.length === 0,
       `Universal bundle contains single-arch Mach-O files: ${architectureAudit.invalid.map((item) => item.relativePath).join(", ")}.`
@@ -198,7 +206,8 @@ async function main() {
     nestedSignatures,
     architectureAudit: {
       machOBinaries: architectureAudit.total,
-      invalid: architectureAudit.invalid
+      invalid: architectureAudit.invalid,
+      incompatibleMinimum: architectureAudit.incompatibleMinimum
     }
   };
 

@@ -34,10 +34,22 @@ describe("gate acústico do projeto completo", () => {
     const sfx = Array.isArray(audioPack?.document.sfx) ? audioPack.document.sfx : [];
     expect(audioItems.length).toBeGreaterThan(0);
     expect(presentation.items).toHaveLength(audioItems.length);
-    expect(tracker.length + sfx.length).toBe(audioItems.length);
+    const pcm=audioPack?.document.pcm??[];
+    expect(pcm).toEqual([
+      "radio_lume_pcm", "menu_abrir_v1", "menu_navegar_v1", "menu_confirmar_v1", "menu_voltar_v1", "menu_indisponivel_v1"
+    ].map(name => expect.objectContaining({ name, wav: `${name}.wav` })));
+    expect(tracker.length + sfx.length + pcm.length).toBe(audioItems.length);
     expect(rooms).toHaveLength(scenes.length);
-    expect(rooms.filter((room) => typeof room.music === "string" && room.music.length > 0))
-      .toHaveLength(scenes.length);
+    const quietInitialScenes = [
+      "logo", "abertura", "titulo", "escolha_genero", "nome_jogador",
+      "carregar_jogo", "configuracoes", "creditos"
+    ];
+    for (const collection of [rooms, scenes]) {
+      expect(collection.filter((scene) => scene.music === "").map((scene) => scene.name).sort())
+        .toEqual([...quietInitialScenes].sort());
+      expect(collection.filter((scene) => typeof scene.music === "string" && scene.music.length > 0))
+        .toHaveLength(scenes.length - quietInitialScenes.length);
+    }
 
     const eventCommands = events.flatMap((event) => (
       Array.isArray(event.steps)
@@ -72,6 +84,16 @@ describe("gate acústico do projeto completo", () => {
           return match ? [match[1]] : [];
         })
         : []),
+      ...scenes.flatMap((scene) => {
+        const p = ((scene.runtime as any)?.config as any)?.presentation;
+        return p ? [p.victoryMusic,...Object.values(p.actionSounds??{})].filter((n):n is string=>typeof n==='string'&&n.length>0) : [];
+      }),
+      ...scenes.flatMap((scene) => {
+        const runtime = scene.runtime as Record<string, unknown> | undefined;
+        const config = runtime?.config as Record<string, unknown> | undefined;
+        return Object.values((config?.actionSounds as Record<string, unknown> | undefined) ?? {})
+          .filter((name): name is string => typeof name === "string" && name.length > 0);
+      }),
       ...scenes.flatMap((scene) => {
         const runtime = scene.runtime as Record<string, unknown> | undefined;
         const config = runtime?.config as Record<string, unknown> | undefined;

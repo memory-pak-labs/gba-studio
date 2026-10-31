@@ -8,7 +8,7 @@ const DEFAULT_THRESHOLDS = Object.freeze({
 
 const GBA_FRAMEBUFFER_WIDTH = 240;
 const GBA_FRAMEBUFFER_HEIGHT = 160;
-const EXEMPLO_SCENE_COUNT = 17;
+const EXEMPLO_SCENE_COUNT = 18;
 const EXEMPLO_PLAYER_RUNTIMES = new Set([
   "topdown",
   "platformer",
@@ -19,6 +19,51 @@ const EXEMPLO_PLAYER_RUNTIMES = new Set([
   "battleRpg",
   "luta"
 ]);
+
+export function resolveTopdownCameraPosition(room, state, exported) {
+  const project = exported?.topdown_project;
+  const runtimeRoom = project?.rooms?.find(candidate => candidate.name === room?.name);
+  if (!runtimeRoom || !Number.isFinite(state?.player?.x) || !Number.isFinite(state?.player?.y)) return null;
+  const size = project.player?.size ?? {x:16,y:16};
+  const camera = project.camera ?? {};
+  return camera.follow_player === true ? {
+    x: Math.max(0,Math.min(runtimeRoom.width_tiles*8-240,state.player.x+size.x/2-120)),
+    y: Math.max(0,Math.min(runtimeRoom.height_tiles*8-160,state.player.y+size.y/2-80))
+  } : {x:Number(camera.position?.x ?? 0),y:Number(camera.position?.y ?? 0)};
+}
+
+export function resolveTopdownActorFramebufferTarget(room, actor, state, exported) {
+  const project = exported?.topdown_project;
+  const runtimeRoom = project?.rooms?.find(candidate => candidate.name === room?.name);
+  const isPlayer = actor?.name === room?.playerActorName;
+  const entity = isPlayer ? project?.player : runtimeRoom?.npcs?.find(candidate => candidate.name === actor?.name);
+  const movingNpc = !isPlayer && entity?.movement?.kind && entity.movement.kind !== "none";
+  const npcIndex = runtimeRoom?.npcs?.indexOf(entity);
+  const position = isPlayer ? state?.player : movingNpc && npcIndex === 0 ? state?.firstActor : movingNpc ? null : entity?.position;
+  if (movingNpc && (!Number.isFinite(position?.x) || !Number.isFinite(position?.y))) {
+    throw new Error(`Telemetria de posição ausente para NPC em movimento: ${actor?.name}.`);
+  }
+  const parts = entity?.animations?.[0]?.frame_metasprites?.[0]?.parts;
+  if (!runtimeRoom || !parts?.length || !Number.isFinite(position?.x) || !Number.isFinite(position?.y)) return null;
+  const camera = resolveTopdownCameraPosition(room,state,exported);
+  if (!camera) return null;
+  return {x:position.x-camera.x+Math.min(...parts.map(part=>part.x)),y:position.y-camera.y+Math.min(...parts.map(part=>part.y))};
+}
+
+export function resolveTopdownActorFramebufferTargets(room, actor, state, exported, previousState) {
+  const current = resolveTopdownActorFramebufferTarget(room, actor, state, exported);
+  if (!current) return [];
+  const candidates = [current];
+  // Native scanout can finish before the next CPU telemetry publish. Only
+  // the immediately adjacent snapshot in the same room is admissible.
+  if (previousState && previousState.currentRoom === state?.currentRoom
+    && Number.isInteger(previousState.frame) && Number.isInteger(state?.frame)
+    && previousState.frame <= state.frame && previousState.frame >= state.frame - 1) {
+    const previous = resolveTopdownActorFramebufferTarget(room, actor, previousState, exported);
+    if (previous && (previous.x !== current.x || previous.y !== current.y)) candidates.push(previous);
+  }
+  return candidates;
+}
 
 export function resolveExemploSmokeFaceButton(controls, action) {
   if (action !== "a" && action !== "b") {
@@ -237,7 +282,9 @@ export const EXEMPLO_NON_SILENT_AUDIO_SCENES = Object.freeze([
   "observatorio_do_farol",
   "tempestade",
   "guardiao_rele",
-  "arena_arrancada"
+  "arena_arrancada",
+  "circuito_final",
+  "circuito_perspectiva"
 ]);
 
 export const EXEMPLO_PLAYER_FRAMEBUFFER_SCENES = Object.freeze([
@@ -249,14 +296,17 @@ export const EXEMPLO_PLAYER_FRAMEBUFFER_SCENES = Object.freeze([
   "tempestade",
   "guardiao_rele",
   "arena_arrancada",
-  "circuito_final"
+  "circuito_final",
+  "circuito_perspectiva"
 ]);
 
-// Penedos liga o player ao mesmo asset autorado da Nara; a arena tática
+// Porto, Farol e Penedos ligam o player ao asset autorado da Nara; a arena tática
 // também usa atores explícitos. Nenhuma deve auditar o player padrão.
 export const EXEMPLO_EXPLICIT_ACTOR_BINDING_SCENES = Object.freeze([
   "arena_tatica",
-  "penedos_vento"
+  "penedos_vento",
+  "porto_lumen",
+  "farol_interior"
 ]);
 
 export const EXEMPLO_EXACT_PLAYER_FRAMEBUFFER_SCENES = Object.freeze([
@@ -267,7 +317,8 @@ export const EXEMPLO_EXACT_PLAYER_FRAMEBUFFER_SCENES = Object.freeze([
   "tempestade",
   "guardiao_rele",
   "arena_arrancada",
-  "circuito_final"
+  "circuito_final",
+  "circuito_perspectiva"
 ]);
 
 // A aeronave da rota e um cursor de viagem, sem player livre.
@@ -279,6 +330,7 @@ export const EXEMPLO_EXACT_BACKGROUND_FRAMEBUFFER_SCENES = Object.freeze([
   // o quadro nativo quando a cena chega ao Play/mGBA.
   "titulo",
   "prologo",
+  "farol_interior",
   "abertura",
   "conselho_guardia",
   "mapa_rota",
@@ -293,6 +345,9 @@ export function exemploScenePlaytestPlan(project) {
   const scenes = Array.isArray(project?.scenas) ? project.scenas : [];
   return scenes
     .filter((scene) => Boolean(scene?.campaign) || (
+      scene?.name === "circuito_perspectiva"
+      && scene?.racingVisualRevision === "racing-two-views-approved-2026-10-18"
+    ) || (
       scene?.sceneType === "isometric"
       && scene?.runtime?.config?.gameplayMode === "tactical"
 
@@ -336,7 +391,7 @@ export function selectExemploScenePlaytestPlan(project, sceneName) {
         : "topdown"
     }));
   const topdownInteriorPlan = (Array.isArray(project?.scenas) ? project.scenas : [])
-    .filter((scene) => scene?.name === sceneName && scene?.runtime?.config?.profile === "lighthouse-interior")
+    .filter((scene) => scene?.name === sceneName && ["lighthouse-interior", "farol-interior-scale-v2-approved"].includes(scene?.runtime?.config?.profile))
     .map((scene, index) => ({
       id: typeof scene?.id === "string" ? scene.id : null,
       index,
@@ -422,6 +477,39 @@ export function selectExemploScenePlaytestProjectPath(args, defaultProjectPath) 
 
 export function exemploSceneScreenshotPath(evidencePath, sceneName) {
   return join(dirname(evidencePath), "scenes", `${sceneName}.png`);
+}
+
+export function selectSceneCadenceWindow(samples, scope) {
+  const hasProducerMarker = scope?.notBeforeUnixMs !== undefined;
+  if (hasProducerMarker) {
+    if (!Number.isFinite(scope.notBeforeUnixMs) || scope.notBeforeUnixMs < 0
+        || !Number.isInteger(scope.initialFrame) || scope.initialFrame < 0) {
+      throw new Error("Marcador de cadencia invalido.");
+    }
+    if (!Array.isArray(samples) || samples.some(sample => !Number.isFinite(sample?.sampledAtUnixMs))) {
+      throw new Error("Janela de cadencia sem relogio de origem.");
+    }
+    samples = samples.filter(sample => sample.sampledAtUnixMs >= scope.notBeforeUnixMs);
+  }
+  if (!Array.isArray(samples) || samples.length < 4) {
+    throw new Error("Janela de cadencia incompleta: esperadas quatro amostras da cena.");
+  }
+  // Keep the first complete window, including slow samples. Later menu/reset
+  // telemetry must never replace the selected scene's playback measurements.
+  const selected = samples.slice(0, 4);
+  let previousFrame = hasProducerMarker ? scope.initialFrame : -1;
+  for (const sample of selected) {
+    const state = sample?.runtimeState;
+    if (!state || state.runtimeKind !== scope.runtimeKind || state.currentRoom !== scope.currentRoom
+        || !Number.isInteger(state.frame) || state.frame < 0 || state.frame < previousFrame) {
+      throw new Error("Janela de cadencia mistura runtimes, cenas ou um reinicio da ROM.");
+    }
+    previousFrame = state.frame;
+  }
+  if (selected.at(-1).runtimeState.frame <= selected[0].runtimeState.frame) {
+    throw new Error("Janela de cadencia sem avanco de frames do jogo.");
+  }
+  return selected;
 }
 
 export function steadyFrameSamples(samples, sampleCount = 3) {
@@ -631,7 +719,9 @@ export function auditExemploVisualQualityGate(project, results) {
       geometry: result?.backgroundFidelity?.checks?.dimensions === true
         && result?.displayFidelity?.ok === true
         && Number(result?.frame?.pixelCount) === GBA_FRAMEBUFFER_WIDTH * GBA_FRAMEBUFFER_HEIGHT,
-      colorCount: backgroundless || (uniqueColorCount >= minimumColors && uniqueColorCount <= 256),
+      // GBA palette RAM has separate 256-entry BG and OBJ regions (Tonc video).
+      // Exported palette membership is checked independently below.
+      colorCount: backgroundless || (uniqueColorCount >= minimumColors && uniqueColorCount <= 512),
       contrast: backgroundless || contrastSpan >= 0.3 || playerContrastCompensation,
       paletteCoherence: backgroundless
         || (result?.paletteFidelity?.ok === true

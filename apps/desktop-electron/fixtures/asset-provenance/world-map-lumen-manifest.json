@@ -1,0 +1,613 @@
+{
+  "version": 1,
+  "approvedOn": "2026-10-19",
+  "approval": "Gostei dessa versão com o dirigível. Pode integrar a cena mapa-múndi ao Exemplo GBA, mantendo o affine.",
+  "license": "Project-owned; AI-generated under user direction; approved for the Exemplo GBA template. Engine font and procedural HUD use the repository MIT license.",
+  "assets": {
+    "background": {
+      "id": "world-map-lumen-background",
+      "kind": "Background",
+      "name": "route-lumen-paged.png",
+      "metadata": {
+        "source": "Assets/backgrounds/route-lumen-paged.png",
+        "width": 480,
+        "height": 320,
+        "colorMode": "8bpp-indexed",
+        "preparedSha256": "54b45b3d6d7f5111ab96c29624d51990f6ece4f4a8a4bc7dae9f2cd2783937c4",
+        "reviewStatus": "approved",
+        "visualStatus": "approved",
+        "generatedBy": "image_gen + native pixel preparation",
+        "license": "Project-owned; AI-generated under user direction; approved for the Exemplo GBA template. Engine font and procedural HUD use the repository MIT license.",
+        "provenance": "fixtures/asset-provenance/world-map-lumen-sources.md",
+        "kind": "paged_bg",
+        "role": "route-map",
+        "profile": "worldMap",
+        "backgroundPaletteBankBudget": 14,
+        "paletteBankCount": 14,
+        "sourcePipeline": "paged-rgb555-adaptive-224-colors",
+        "sourceSha256": "e1b238f7eb5142b9763f1da30cac63a0b7231eb025e0be129fc3ecf9a0d07dac",
+        "sceneRoles": [
+          "route-map",
+          "route-islands"
+        ],
+        "visualApproval": {
+          "date": "2026-10-19",
+          "contract": "world-map-lumen-user-approved-2026-10-19"
+        }
+      }
+    },
+    "player": {
+      "id": "world-map-lumen-player",
+      "kind": "Sprite",
+      "name": "route-dirigible-lumen-64.png",
+      "metadata": {
+        "source": "Assets/sprites/route-dirigible-lumen-64.png",
+        "width": 64,
+        "height": 64,
+        "colorMode": "4bpp",
+        "preparedSha256": "9ea0da26b97f5cdaedf580bfde27b3f65f9955e98fda8f899b4336d1a13171c2",
+        "reviewStatus": "approved",
+        "visualStatus": "approved",
+        "generatedBy": "image_gen + native pixel preparation",
+        "license": "Project-owned; AI-generated under user direction; approved for the Exemplo GBA template. Engine font and procedural HUD use the repository MIT license.",
+        "provenance": "fixtures/asset-provenance/world-map-lumen-sources.md",
+        "role": "route-airship",
+        "profile": "worldMap",
+        "frameWidth": 64,
+        "frameHeight": 64,
+        "frameCount": 1,
+        "hardwareObjectsPerFrame": 1,
+        "sourceSha256": "fd381d1d1ae053d3212d31e56677d2fd00e465ef29a4c0657c4a97822920d852",
+        "sceneRoles": [
+          "route-airship",
+          "route-marker"
+        ]
+      }
+    },
+    "font": {
+      "id": "world-map-lumen-font",
+      "kind": "FONT",
+      "name": "route-lumen-hud-font.png",
+      "metadata": {
+        "source": "Assets/fonts/route-lumen-hud-font.png",
+        "width": 128,
+        "height": 112,
+        "colorMode": "4bpp",
+        "preparedSha256": "39a033cc111aefebb5b38798385aec191657aa5f8219cc7db8e262ba094d4a68",
+        "reviewStatus": "approved",
+        "visualStatus": "approved",
+        "generatedBy": "approved Canvas raster + engine glyphs",
+        "license": "Project-owned; AI-generated under user direction; approved for the Exemplo GBA template. Engine font and procedural HUD use the repository MIT license.",
+        "provenance": "fixtures/asset-provenance/world-map-lumen-sources.md"
+      }
+    },
+    "hud0": {
+      "id": "world-map-lumen-hud-0",
+      "kind": "UI",
+      "name": "route-lumen-hud-card-0.png",
+      "metadata": {
+        "source": "Assets/ui/route-lumen-hud-card-0.png",
+        "width": 64,
+        "height": 32,
+        "colorMode": "4bpp",
+        "preparedSha256": "517e503651771f3e8c6e4a78860560fffc84c2cf9d0032dc1ac715ff4e5e71be",
+        "reviewStatus": "approved",
+        "visualStatus": "approved",
+        "generatedBy": "approved Canvas raster + engine glyphs",
+        "license": "Project-owned; AI-generated under user direction; approved for the Exemplo GBA template. Engine font and procedural HUD use the repository MIT license.",
+        "provenance": "fixtures/asset-provenance/world-map-lumen-sources.md",
+        "frameWidth": 64,
+        "frameHeight": 32,
+        "frameCount": 1,
+        "consumer": "hud-obj",
+        "runtimeConsumer": "hud-obj"
+      }
+    },
+    "hud1": {
+      "id": "world-map-lumen-hud-1",
+      "kind": "UI",
+      "name": "route-lumen-hud-card-1.png",
+      "metadata": {
+        "source": "Assets/ui/route-lumen-hud-card-1.png",
+        "width": 64,
+        "height": 32,
+        "colorMode": "4bpp",
+        "preparedSha256": "5c259cf83ab3923d0f43722d0d3e73be8dfaac02135c2a106d3dbdf345084081",
+        "reviewStatus": "approved",
+        "visualStatus": "approved",
+        "generatedBy": "approved Canvas raster + engine glyphs",
+        "license": "Project-owned; AI-generated under user direction; approved for the Exemplo GBA template. Engine font and procedural HUD use the repository MIT license.",
+        "provenance": "fixtures/asset-provenance/world-map-lumen-sources.md",
+        "frameWidth": 64,
+        "frameHeight": 32,
+        "frameCount": 1,
+        "consumer": "hud-obj",
+        "runtimeConsumer": "hud-obj"
+      }
+    },
+    "hud2": {
+      "id": "world-map-lumen-hud-2",
+      "kind": "UI",
+      "name": "route-lumen-hud-card-2.png",
+      "metadata": {
+        "source": "Assets/ui/route-lumen-hud-card-2.png",
+        "width": 64,
+        "height": 32,
+        "colorMode": "4bpp",
+        "preparedSha256": "d473f331ca22dc4ee47648f6a5ae915f0308a63eb44074b9e4f61833c11e4ea4",
+        "reviewStatus": "approved",
+        "visualStatus": "approved",
+        "generatedBy": "approved Canvas raster + engine glyphs",
+        "license": "Project-owned; AI-generated under user direction; approved for the Exemplo GBA template. Engine font and procedural HUD use the repository MIT license.",
+        "provenance": "fixtures/asset-provenance/world-map-lumen-sources.md",
+        "frameWidth": 64,
+        "frameHeight": 32,
+        "frameCount": 1,
+        "consumer": "hud-obj",
+        "runtimeConsumer": "hud-obj"
+      }
+    }
+  },
+  "music": {
+    "id": "audio-mapa-mar-aberto",
+    "name": "mapa_mar_aberto",
+    "kind": "Musica",
+    "format": "COMPOSED",
+    "exportID": "mapa_mar_aberto",
+    "loops": true,
+    "bpm": 84,
+    "volume": 65,
+    "patterns": [
+      {
+        "id": "map-B-part-0",
+        "name": "Partida",
+        "steps": 16,
+        "channels": [
+          {
+            "id": "map-B-0-pulse1",
+            "name": "Melodia",
+            "type": "pulse1",
+            "instrument": "Pulse Lead",
+            "envelope": "Soft ADSR",
+            "notes": [
+              "F#5",
+              "",
+              "",
+              "",
+              "A5",
+              "",
+              "E5",
+              "",
+              "D5",
+              "",
+              "",
+              "",
+              "E5",
+              "",
+              "F#5",
+              ""
+            ],
+            "volume": 55
+          },
+          {
+            "id": "map-B-0-pulse2",
+            "name": "Arpejo",
+            "type": "pulse2",
+            "instrument": "Pulse Warm",
+            "envelope": "Soft ADSR",
+            "notes": [
+              "",
+              "",
+              "F#4",
+              "",
+              "",
+              "",
+              "D5",
+              "",
+              "",
+              "",
+              "F#4",
+              "",
+              "",
+              "",
+              "D5",
+              ""
+            ],
+            "volume": 32
+          },
+          {
+            "id": "map-B-0-wave",
+            "name": "Baixo",
+            "type": "wave",
+            "instrument": "Wave Bass",
+            "envelope": "Soft ADSR",
+            "notes": [
+              "D3",
+              "",
+              "A3",
+              "",
+              "D3",
+              "",
+              "A3",
+              "",
+              "D3",
+              "",
+              "A3",
+              "",
+              "D3",
+              "",
+              "A3",
+              ""
+            ],
+            "volume": 45
+          },
+          {
+            "id": "map-B-0-noise",
+            "name": "Pulso leve",
+            "type": "noise",
+            "instrument": "Noise Tick",
+            "envelope": "Short",
+            "notes": [
+              "",
+              "",
+              "",
+              "",
+              "C2",
+              "",
+              "",
+              "",
+              "",
+              "",
+              "",
+              "",
+              "C2",
+              "",
+              "",
+              ""
+            ],
+            "volume": 12
+          }
+        ]
+      },
+      {
+        "id": "map-B-part-1",
+        "name": "Travessia",
+        "steps": 16,
+        "channels": [
+          {
+            "id": "map-B-1-pulse1",
+            "name": "Melodia",
+            "type": "pulse1",
+            "instrument": "Pulse Lead",
+            "envelope": "Soft ADSR",
+            "notes": [
+              "B4",
+              "",
+              "D5",
+              "",
+              "F#5",
+              "",
+              "",
+              "",
+              "A5",
+              "",
+              "F#5",
+              "",
+              "E5",
+              "",
+              "",
+              ""
+            ],
+            "volume": 55
+          },
+          {
+            "id": "map-B-1-pulse2",
+            "name": "Arpejo",
+            "type": "pulse2",
+            "instrument": "Pulse Warm",
+            "envelope": "Soft ADSR",
+            "notes": [
+              "",
+              "",
+              "D4",
+              "",
+              "",
+              "",
+              "B4",
+              "",
+              "",
+              "",
+              "D4",
+              "",
+              "",
+              "",
+              "B4",
+              ""
+            ],
+            "volume": 32
+          },
+          {
+            "id": "map-B-1-wave",
+            "name": "Baixo",
+            "type": "wave",
+            "instrument": "Wave Bass",
+            "envelope": "Soft ADSR",
+            "notes": [
+              "B2",
+              "",
+              "F#3",
+              "",
+              "B2",
+              "",
+              "F#3",
+              "",
+              "B2",
+              "",
+              "F#3",
+              "",
+              "B2",
+              "",
+              "F#3",
+              ""
+            ],
+            "volume": 45
+          },
+          {
+            "id": "map-B-1-noise",
+            "name": "Pulso leve",
+            "type": "noise",
+            "instrument": "Noise Tick",
+            "envelope": "Short",
+            "notes": [
+              "",
+              "",
+              "",
+              "",
+              "C2",
+              "",
+              "",
+              "",
+              "",
+              "",
+              "",
+              "",
+              "C2",
+              "",
+              "",
+              ""
+            ],
+            "volume": 12
+          }
+        ]
+      },
+      {
+        "id": "map-B-part-2",
+        "name": "Horizonte",
+        "steps": 16,
+        "channels": [
+          {
+            "id": "map-B-2-pulse1",
+            "name": "Melodia",
+            "type": "pulse1",
+            "instrument": "Pulse Lead",
+            "envelope": "Soft ADSR",
+            "notes": [
+              "D5",
+              "",
+              "",
+              "",
+              "G5",
+              "",
+              "A5",
+              "",
+              "B5",
+              "",
+              "A5",
+              "",
+              "G5",
+              "",
+              "",
+              ""
+            ],
+            "volume": 55
+          },
+          {
+            "id": "map-B-2-pulse2",
+            "name": "Arpejo",
+            "type": "pulse2",
+            "instrument": "Pulse Warm",
+            "envelope": "Soft ADSR",
+            "notes": [
+              "",
+              "",
+              "B3",
+              "",
+              "",
+              "",
+              "G4",
+              "",
+              "",
+              "",
+              "B3",
+              "",
+              "",
+              "",
+              "G4",
+              ""
+            ],
+            "volume": 32
+          },
+          {
+            "id": "map-B-2-wave",
+            "name": "Baixo",
+            "type": "wave",
+            "instrument": "Wave Bass",
+            "envelope": "Soft ADSR",
+            "notes": [
+              "G2",
+              "",
+              "D3",
+              "",
+              "G2",
+              "",
+              "D3",
+              "",
+              "G2",
+              "",
+              "D3",
+              "",
+              "G2",
+              "",
+              "D3",
+              ""
+            ],
+            "volume": 45
+          },
+          {
+            "id": "map-B-2-noise",
+            "name": "Pulso leve",
+            "type": "noise",
+            "instrument": "Noise Tick",
+            "envelope": "Short",
+            "notes": [
+              "",
+              "",
+              "",
+              "",
+              "C2",
+              "",
+              "",
+              "",
+              "",
+              "",
+              "",
+              "",
+              "C2",
+              "",
+              "",
+              ""
+            ],
+            "volume": 12
+          }
+        ]
+      },
+      {
+        "id": "map-B-part-3",
+        "name": "Retorno",
+        "steps": 16,
+        "channels": [
+          {
+            "id": "map-B-3-pulse1",
+            "name": "Melodia",
+            "type": "pulse1",
+            "instrument": "Pulse Lead",
+            "envelope": "Soft ADSR",
+            "notes": [
+              "E5",
+              "",
+              "F#5",
+              "",
+              "A5",
+              "",
+              "",
+              "",
+              "G5",
+              "",
+              "E5",
+              "",
+              "D5",
+              "",
+              "",
+              ""
+            ],
+            "volume": 55
+          },
+          {
+            "id": "map-B-3-pulse2",
+            "name": "Arpejo",
+            "type": "pulse2",
+            "instrument": "Pulse Warm",
+            "envelope": "Soft ADSR",
+            "notes": [
+              "",
+              "",
+              "C#4",
+              "",
+              "",
+              "",
+              "A4",
+              "",
+              "",
+              "",
+              "C#4",
+              "",
+              "",
+              "",
+              "A4",
+              ""
+            ],
+            "volume": 32
+          },
+          {
+            "id": "map-B-3-wave",
+            "name": "Baixo",
+            "type": "wave",
+            "instrument": "Wave Bass",
+            "envelope": "Soft ADSR",
+            "notes": [
+              "A2",
+              "",
+              "E3",
+              "",
+              "A2",
+              "",
+              "E3",
+              "",
+              "A2",
+              "",
+              "E3",
+              "",
+              "A2",
+              "",
+              "E3",
+              ""
+            ],
+            "volume": 45
+          },
+          {
+            "id": "map-B-3-noise",
+            "name": "Pulso leve",
+            "type": "noise",
+            "instrument": "Noise Tick",
+            "envelope": "Short",
+            "notes": [
+              "",
+              "",
+              "",
+              "",
+              "C2",
+              "",
+              "",
+              "",
+              "",
+              "",
+              "",
+              "",
+              "C2",
+              "",
+              "",
+              ""
+            ],
+            "volume": 12
+          }
+        ]
+      }
+    ],
+    "patternOrder": [
+      "map-B-part-0",
+      "map-B-part-1",
+      "map-B-part-2",
+      "map-B-part-3"
+    ]
+  }
+}

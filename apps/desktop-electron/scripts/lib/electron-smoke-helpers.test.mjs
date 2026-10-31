@@ -2,12 +2,24 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { mkdir, mkdtemp, readFile, readdir, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { runInNewContext } from "node:vm";
 import {
   cdpSession,
   copySmokeProject,
   createElectronSmokeEnv,
-  packagedDarwinElectronExecutableCandidates
+  electronLaunchCommand,
+  packagedDarwinElectronExecutableCandidates,
+  prepareElectronSmokeLocale
 } from "./electron-smoke-helpers.mjs";
+
+it("forces the requested macOS architecture instead of silently testing the host slice twice", () => {
+  expect(electronLaunchCommand("/app/Contents/MacOS/gba-studio", [], { platform: "darwin", architecture: "x86_64" })).toEqual({
+    executable: "/usr/bin/arch", args: ["-x86_64", "/app/Contents/MacOS/gba-studio"]
+  });
+  expect(electronLaunchCommand("/app", ["project"], { platform: "darwin", architecture: "arm64" }).args).toEqual(["-arm64", "/app", "project"]);
+  expect(() => electronLaunchCommand("/app", [], { platform: "darwin", architecture: "invalid" })).toThrow(/arquitetura/i);
+  expect(() => electronLaunchCommand("/app", [], { platform: "linux", architecture: "x86_64" })).toThrow(/macOS/);
+});
 
 it("copies authored project files without copying generated builds and caches", async () => {
   const temporary = await mkdtemp(join(tmpdir(), "gba-smoke-copy-test-"));
@@ -31,8 +43,89 @@ it("copies authored project files without copying generated builds and caches", 
 });
 
 afterEach(() => {
+  vi.useRealTimers();
   vi.unstubAllGlobals();
   vi.unstubAllEnvs();
+});
+
+describe("prepareElectronSmokeLocale", () => {
+  function renderer({ mounted = false, switcher = true, stored = "en-US" } = {}) {
+    const context = {
+      document: { documentElement: { dataset: mounted ? { studioLocale: "en-US" } : {}, lang: mounted ? "en-US" : "" } },
+      localStorage: { getItem: vi.fn(() => stored), setItem: vi.fn((_key, value) => { stored = value; }) },
+      location: { reload: vi.fn() },
+      Event: class { constructor(type) { this.type = type; } }
+    };
+    const select = { value: "en-US", dispatchEvent: vi.fn(() => {
+      context.localStorage.setItem("gbaStudio.locale", select.value);
+      setTimeout(() => {
+        context.document.documentElement.dataset.studioLocale = select.value;
+        context.document.documentElement.lang = select.value;
+      }, 200);
+    }) };
+    context.document.querySelector = () => switcher && context.document.documentElement.dataset.studioLocale ? select : null;
+    const cdp = { send: vi.fn(async (_method, { expression }) => ({ result: { value: runInNewContext(expression, context) } })) };
+    return { context, cdp };
+  }
+
+  it("waits for the actual provider before changing locale and for its rendered acknowledgement", async () => {
+    vi.useFakeTimers();
+    const { context, cdp } = renderer();
+    let settled = false;
+    const pending = prepareElectronSmokeLocale(cdp).then(() => { settled = true; });
+    await vi.advanceTimersByTimeAsync(100);
+    expect(settled).toBe(false);
+    expect(context.localStorage.setItem).not.toHaveBeenCalled();
+    expect(context.location.reload).not.toHaveBeenCalled();
+    context.document.documentElement.dataset.studioLocale = "en-US";
+    context.document.documentElement.lang = "en-US";
+    await vi.advanceTimersByTimeAsync(100);
+    expect(settled).toBe(false);
+    await vi.advanceTimersByTimeAsync(300);
+    await pending;
+    expect(context.document.documentElement.lang).toBe("pt-BR");
+    expect(context.location.reload).not.toHaveBeenCalled();
+  });
+
+  it("reloads a mounted editor without a switcher only once and waits for the new provider", async () => {
+    vi.useFakeTimers();
+    const { context, cdp } = renderer({ mounted: true, switcher: false });
+    const pending = prepareElectronSmokeLocale(cdp);
+    await vi.advanceTimersByTimeAsync(200);
+    expect(context.location.reload).toHaveBeenCalledTimes(1);
+    context.document.documentElement.dataset.studioLocale = "pt-BR";
+    context.document.documentElement.lang = "pt-BR";
+    await vi.advanceTimersByTimeAsync(100);
+    await pending;
+  });
+
+  it("waits across the initial empty document before the first HTML element exists", async () => {
+    vi.useFakeTimers();
+    const { context, cdp } = renderer();
+    const element = context.document.documentElement;
+    context.document.documentElement = null;
+    const pending = prepareElectronSmokeLocale(cdp);
+    const checked = expect(pending).resolves.toBeUndefined();
+    await vi.advanceTimersByTimeAsync(100);
+    context.document.documentElement = element;
+    element.dataset.studioLocale = "en-US";
+    element.lang = "en-US";
+    await vi.advanceTimersByTimeAsync(400);
+    await checked;
+  });
+
+  it("fails rather than accepting a provider that never applies the selected language", async () => {
+    vi.useFakeTimers();
+    const { cdp } = renderer();
+    const pending = expect(prepareElectronSmokeLocale(cdp)).rejects.toThrow(/idioma.*pt-BR/i);
+    await vi.runAllTimersAsync();
+    await pending;
+  });
+
+  it("propagates renderer evaluation exceptions", async () => {
+    const cdp = { send: vi.fn(async () => ({ exceptionDetails: { text: "Locale script failed" } })) };
+    await expect(prepareElectronSmokeLocale(cdp)).rejects.toThrow("Locale script failed");
+  });
 });
 
 describe("cdpSession", () => {

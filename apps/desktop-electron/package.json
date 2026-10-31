@@ -1,6 +1,6 @@
 {
   "name": "@gbastudio/desktop-electron",
-  "version": "0.1.0-beta.3",
+  "version": "0.1.0-rc.3",
   "private": true,
   "description": "Visual editor and native engine workflow for Game Boy Advance games.",
   "author": "GBA Studio",
@@ -22,6 +22,7 @@
     "verify:macos-universal-runtime": "node scripts/verify-macos-universal-runtime.mjs",
     "prepare:translation-models": "node scripts/prepare-translation-models.mjs",
     "audit:i18n-coverage": "node scripts/report-i18n-coverage.mjs",
+    "audit:i18n-ui": "node scripts/audit-ui-copy.mjs",
     "audit:p0-sources": "node scripts/audit-p0-sources.mjs",
     "audit:p0-sources:strict": "node scripts/audit-p0-sources.mjs --strict",
     "package": "npm run icons && npm run prepare:translation-models && npm run build && npm run prepare:embedded-runtime && node scripts/prepare-package-output.mjs && electron-builder --dir && node scripts/sign-macos-app.mjs",
@@ -30,7 +31,7 @@
     "dist": "npm run icons && npm run build && electron-builder",
     "dist:linux": "npm run icons && npm run build && node scripts/prepare-portable-engine-pack.mjs && node scripts/prepare-portable-runtime.mjs && electron-builder --linux --x64 --publish never",
     "package:mac:universal": "npm run icons && npm run prepare:translation-models && npm run build && npm run prepare:embedded-runtime:universal && npm run verify:macos-universal-runtime && node scripts/prepare-package-output.mjs && electron-builder --dir --universal && node scripts/sign-macos-app.mjs",
-    "dist:mac": "npm run icons && npm run prepare:translation-models && npm run build && npm run prepare:embedded-runtime:universal && npm run verify:macos-universal-runtime && electron-builder --mac --universal",
+    "dist:mac": "node scripts/package-macos.mjs --arch all",
     "dist:win": "npm run icons && npm run build && node scripts/prepare-portable-engine-pack.mjs && node scripts/prepare-portable-runtime.mjs && electron-builder --win --x64 --publish never",
     "preview": "electron-vite preview",
     "mcp": "electron . --mcp",
@@ -110,7 +111,12 @@
     "typecheck": "tsc --noEmit -p tsconfig.node.json && tsc --noEmit -p tsconfig.web.json",
     "verify:mgba-web": "node scripts/verify-mgba-web-core.mjs",
     "play:mgba-native": "node scripts/open-mgba-native.mjs",
-    "verify:mgba-av": "node scripts/verify-mgba-final.mjs"
+    "verify:mgba-av": "node scripts/verify-mgba-final.mjs",
+    "test:perf:project-open": "vitest run src/shared/projectOpenPerf.test.ts --maxWorkers=1 --no-file-parallelism",
+    "package:mac:arm64": "node scripts/package-macos.mjs --arch arm64 --dir",
+    "package:mac:x64": "node scripts/package-macos.mjs --arch x64 --dir",
+    "dist:mac:arm64": "node scripts/package-macos.mjs --arch arm64",
+    "dist:mac:x64": "node scripts/package-macos.mjs --arch x64"
   },
   "build": {
     "afterPack": "./scripts/after-pack-macos.mjs",
@@ -162,8 +168,13 @@
       }
     ],
     "mac": {
+      "minimumSystemVersion": "12.0",
+      "artifactName": "GBA-Studio-${version}-macOS-${arch}.${ext}",
+      "signIgnore": [
+        "\\.(?:pyc|pyo|a|o|whl|lz|gz|zip|asar|png|icns|ico|wasm|pak|dat|bin)$"
+      ],
       "bundleShortVersion": "0.1.0",
-      "bundleVersion": "3",
+      "bundleVersion": "7",
       "category": "public.app-category.developer-tools",
       "icon": "build/icon.icns",
       "hardenedRuntime": true,
@@ -182,6 +193,9 @@
         "dmg",
         "zip"
       ]
+    },
+    "dmg": {
+      "sign": true
     },
     "win": {
       "extraResources": [
@@ -216,11 +230,11 @@
   },
   "dependencies": {
     "@browsermt/bergamot-translator": "^0.4.9",
-    "@modelcontextprotocol/server": "^2.0.0",
+    "@modelcontextprotocol/server": "^2.4.0",
     "lucide-react": "^0.468.0",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
-    "zod": "^4.4.3"
+    "zod": "^4.6.7"
   },
   "devDependencies": {
     "@electron/osx-sign": "^2.6.0",
@@ -231,12 +245,12 @@
     "@types/react": "^18.3.17",
     "@types/react-dom": "^18.3.5",
     "@vitejs/plugin-react": "^5.1.4",
-    "electron": "^43.7.9",
+    "electron": "^43.8.6",
     "electron-builder": "^26.17.0",
     "electron-vite": "^5.0.0",
-    "happy-dom": "^20.10.6",
+    "happy-dom": "^21.0.4",
     "typescript": "^5.7.2",
-    "vite": "^7.3.6",
+    "vite": "^7.3.7",
     "vitest": "^4.1.11"
   },
   "overrides": {
@@ -259,10 +273,10 @@
     "tar": "7.5.21",
     "@electron/get": {
       ".": "5.0.0",
-      "undici": "7.30.0"
+      "undici": "7.30.1"
     },
     "node-gyp": {
-      "undici": "6.29.0"
+      "undici": "6.29.1"
     }
   },
   "license": "MIT",

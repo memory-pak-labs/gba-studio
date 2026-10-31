@@ -96,6 +96,11 @@ struct WindowConfig {
     bool enabled;
 };
 
+// One packed WIN1H value per display line plus the final HBlank sentinel.
+// Shares DMA0 with affine and scrolling raster effects.
+bool set_hblank_window1(const uint16_t* bounds, size_t count);
+void disable_hblank_window1();
+
 struct Sprite {
     int x;
     int y;
@@ -526,9 +531,13 @@ struct RoomTilemapCache {
     int width = 0, height = 0, tile_x = 0, tile_y = 0;
     BackgroundLayer layer = BackgroundLayer::BG0;
     bool valid = false;
+    uint32_t edits_revision = 0;
 };
+struct RoomTileEdits;
 void draw_room_to_bg_cached(BackgroundLayer layer, const uint16_t* tiles, int width, int height,
     int camera_x, int camera_y, RoomTilemapCache& cache);
+void draw_room_to_bg_cached(BackgroundLayer layer, const uint16_t* tiles, int width, int height,
+    int camera_x, int camera_y, RoomTilemapCache& cache, const RoomTileEdits& edits);
 void draw_text_at(int x, int y, int width, const char* text);
 void draw_text_overlay(int x, int y, int width, const char* text, bool visible = true);
 void draw_text_overlay_slot(int x, int y, int width, const char* text, int oam_offset, bool visible = true);
@@ -554,6 +563,8 @@ bool set_affine_bg_transform_at_frame(
 );
 void set_metasprite(int first_index, const MetaSprite& metasprite, Vec2i position);
 void hide_all_sprites();
+// Start a world frame while preserving the active HUD's reserved OBJ slots.
+void hide_world_sprites();
 void hide_sprites(int first_index, int count);
 bool set_hblank_bg_scroll(BackgroundLayer layer, const int16_t* offsets, size_t count);
 bool set_hblank_affine_raster(

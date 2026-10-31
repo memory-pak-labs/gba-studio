@@ -1,3 +1,4 @@
+import { uiText as ui, useStudioUiText } from "./studioUiText";
 import { useMemo, useState } from "react";
 import { Plus, UsersRound } from "lucide-react";
 
@@ -37,6 +38,7 @@ export function RoomEntityGroupEventsInspector({
   runtimeType,
   sceneType
 }: RoomEntityGroupEventsInspectorProps): React.ReactElement | null {
+  const ui = useStudioUiText();
   const [frequencyByBinding, setFrequencyByBinding] = useState<Record<string, number>>({});
   const [createdCount, setCreatedCount] = useState<number | null>(null);
   const [behaviorPickerCapability, setBehaviorPickerCapability] = useState<EventBindingCapability | null>(null);
@@ -88,38 +90,38 @@ export function RoomEntityGroupEventsInspector({
           <p>{entities.map((entity) => entity.name).join(", ")}</p>
         </div>
       </header>
-      <p className="muted">Cada item recebe uma cópia independente do comportamento, para você poder ajustá-los depois sem afetar o grupo.</p>
+      <p className="muted">{ui("Cada item recebe uma cópia independente do comportamento, para você poder ajustá-los depois sem afetar o grupo.")}</p>
       <ul>
         {capabilities.map((capability) => {
           const frequency = frequencyByBinding[capability.bindingKey] ?? 30;
           return (
             <li key={capability.bindingKey}>
-              <span>{capability.label}</span>
+              <span>{ui(capability.label)}</span>
               {capability.requiresFrequency ? (
                 <label>
-                  <span>Frequência</span>
+                  <span>{ui("Frequência")}</span>
                   <select
-                    aria-label={`Frequência do grupo em ${capability.label}`}
+                    aria-label={ui("Frequência do grupo em {0}", { 0: ui(capability.label) })}
                     onChange={(event) => setFrequencyByBinding((current) => ({
                       ...current,
                       [capability.bindingKey]: Number.parseInt(event.currentTarget.value, 10) || 30
                     }))}
                     value={String(frequency)}
                   >
-                    <option value="1">A cada quadro</option>
-                    <option value="15">A cada 15 quadros</option>
-                    <option value="30">A cada 30 quadros</option>
-                    <option value="60">A cada 60 quadros</option>
+                    <option value="1">{ui("A cada quadro")}</option>
+                    <option value="15">{ui("A cada 15 quadros")}</option>
+                    <option value="30">{ui("A cada 30 quadros")}</option>
+                    <option value="60">{ui("A cada 60 quadros")}</option>
                   </select>
                 </label>
               ) : null}
               <button
-                aria-label={`Adicionar comportamento em grupo em ${capability.label}`}
+                aria-label={ui("Adicionar comportamento em grupo em {0}", { 0: ui(capability.label) })}
                 onClick={() => openBehaviorPicker(capability)}
                 type="button"
               >
                 <Plus aria-hidden="true" size={15} strokeWidth={2.4} />
-                <span>Adicionar comportamento</span>
+                <span>{ui("Adicionar comportamento")}</span>
               </button>
             </li>
           );
@@ -146,7 +148,7 @@ export function RoomEntityGroupEventsInspector({
         />
       ) : null}
       {createdCount !== null ? (
-        <p role="status">{createdCount} comportamento{createdCount === 1 ? "" : "s"} independente{createdCount === 1 ? "" : "s"} criado{createdCount === 1 ? "" : "s"}.</p>
+        <p role="status">{createdCount} {ui(" comportamento")}{createdCount === 1 ? "" : "s"} {ui(" independente")}{createdCount === 1 ? "" : "s"} {ui(" criado")}{createdCount === 1 ? "" : "s"}.</p>
       ) : null}
     </section>
   );

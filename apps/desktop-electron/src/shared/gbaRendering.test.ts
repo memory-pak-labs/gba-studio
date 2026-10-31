@@ -14,11 +14,27 @@ import {
   resolveGbaActorSprite,
   resolveGbaActorSpriteFrame,
   resolveGbaRoomBackgroundLayers,
+  resolveGbaRoomBackgroundLayer,
   resolveGbaRoomRenderLayers,
   resolveGbaRoomTileset
 } from "./gbaRendering.js";
 
 describe("GBA rendering helpers", () => {
+  it("resolves a large layer without rereading all authored sources for every painted cell", () => {
+    const count = 100;
+    let reads = 0;
+    const sources = Array(count).fill("");
+    for (let index=0;index<count;index++) Object.defineProperty(sources,index,{
+      get:()=>{reads++;return index===count-1 ? " edge.png " : "";},enumerable:true
+    });
+    const data = {assets:[{name:"edge.png",kind:"Tileset",metadata:{source:"Assets/edge.png"}}]};
+    const result = resolveGbaRoomBackgroundLayer(data,{width:count,height:1,
+      tileLayers:[{mapping:"BG1",tilemap:Array(count).fill(1),tileSourceAssetNames:sources}]
+    },"BG1");
+    expect(result).toMatchObject({assetName:"edge.png",paintedTileCount:count});
+    expect(result.tileCells).toEqual(Array(count).fill(1));
+    expect(reads).toBeLessThanOrEqual(count*4);
+  });
   it.each([32, 48, 64])("keeps scene placement when a complete %ipx frame is fitted in the animator", (width) => {
     const shiftedX = -(width / 2 - 8);
     const project = (fitted: boolean, generatedOrigin: boolean) => ({

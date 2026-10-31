@@ -9,7 +9,7 @@ import { SettingsInterfaceSection } from "./SettingsInterfaceSection";
 import { StudioThemeToggle } from "./StudioThemeToggle";
 import { StudioI18nProvider } from "./i18n";
 
-beforeEach(() => { localStorage.clear(); document.documentElement.removeAttribute("data-studio-theme"); });
+beforeEach(() => { localStorage.clear(); localStorage.setItem("gbaStudio.locale", "pt-BR"); document.documentElement.removeAttribute("data-studio-theme"); });
 afterEach(() => { cleanup(); localStorage.clear(); });
 const view = () => <StudioI18nProvider><StudioThemeToggle /><SettingsInterfaceSection /></StudioI18nProvider>;
 

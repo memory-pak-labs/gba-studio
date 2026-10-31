@@ -192,8 +192,8 @@ async function assertNativeVisualExportArtifacts(destination: string, expectedTa
 
   const mainCpp = await readFile(path.join(destination, "main.cpp"), "utf8");
   expect(mainCpp).toContain("load_project_assets()");
-  expect(mainCpp).toContain("gbs::draw_room_to_bg(gbs::BackgroundLayer::BG2");
-  expect(mainCpp).toContain("gbs::draw_room_to_bg(gbs::BackgroundLayer::BG1");
+  expect(mainCpp).toContain("gbs::draw_room_to_bg_cached(gbs::BackgroundLayer::BG2");
+  expect(mainCpp).toContain("gbs::draw_room_to_bg_cached(gbs::BackgroundLayer::BG1");
   expect(mainCpp).toContain("set_actor_metasprite(");
   expect(mainCpp).not.toContain("struct RuntimeWitnessState");
   expect(mainCpp).not.toContain("tile_runtime_player");
@@ -1079,7 +1079,7 @@ describe("Engine project export writer", () => {
     expect(contract).toContain('"on_click"');
     expect(contract).toContain('"cursor_speed": 4');
     expect(header).toContain('gbs::PointClickSceneData { "office"');
-    expect(header).toContain('"scene_office", 4, nullptr, 0, nullptr, 0 }');
+    expect(header).toContain('"scene_office", 4, nullptr, 0, nullptr, 0, nullptr, nullptr, nullptr, nullptr }');
 
     const build = await runGbsbuild({
       enginePackPath: localEnginePackPath,

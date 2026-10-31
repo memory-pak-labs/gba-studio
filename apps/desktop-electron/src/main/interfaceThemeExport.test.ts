@@ -22,6 +22,23 @@ function fixture() {
   return p;
 }
 describe("interface theme export", () => {
+  it("opts in only the requested scene to the full-width dialogue", () => {
+    const p = fixture();
+    (p.scenas as Array<Record<string, unknown>>)[0].dialogueFullWidth = true;
+    const skins = buildEngineExportProjectContract(p).topdown_project?.dialogue_ui?.scene_skins;
+    expect(skins?.find(s => s.scene_name === "porto")).toMatchObject({ full_width_bottom: true });
+    expect(skins?.find(s => s.scene_name === "outra")).not.toHaveProperty("full_width_bottom");
+  });
+  it("exports the asset's explicit missing-bottom repair only for scenes using that skin", () => {
+    const p = fixture();
+    const sea = (p.assets as Array<{ name: string; metadata: Record<string, unknown> }>)
+      .find((asset) => asset.name === "sea.png");
+    if (!sea || !sea.metadata) throw new Error("missing fixture asset");
+    sea.metadata.completeFrameBottom = true;
+    const skins = buildEngineExportProjectContract(p).topdown_project?.dialogue_ui?.scene_skins;
+    expect(skins?.find((skin) => skin.scene_name === "porto")).toMatchObject({ close_bottom_edge: true });
+    expect(skins?.find((skin) => skin.scene_name === "outra")).not.toHaveProperty("close_bottom_edge");
+  });
   it("exports per-scene skins with explicit HUD images taking precedence, without enabling extra HUDs", () => {
     const ui = buildEngineExportProjectContract(fixture()).topdown_project?.dialogue_ui;
     expect(ui?.box_skin).toBe("assets/ui/story.png");

@@ -1,4 +1,7 @@
+#include "gbs/profiler.hpp"
+#define GBS_DIALOGUE_UI_RUNTIME_KIND 4
 #include "gbs/engine.hpp"
+#include "gbs/dialogue_portrait.hpp"
 #include "gbs/audio.hpp"
 #include "gbs/dialogue.hpp"
 #include "gbs/event.hpp"
@@ -59,6 +62,7 @@ gbs::RoomTilemapCache background_layer_cache[4] {};
 gbs::ShmupPlayerAnimator player_animator;
 const gbs::TileAsset* player_streamed_tile_asset_loaded = nullptr;
 bool player_fired_this_frame = false;
+bool defeat_consumed = false;
 bool player_damaged_this_frame = false;
 gbs::EventPlayerRuntimeState player_event_runtime { true, 0, 0, 3 };
 volatile gbs::RuntimeTelemetryBlock& runtime_telemetry = gbs::runtime_telemetry_block();
@@ -99,6 +103,7 @@ struct RuntimeEnemy {
     bool destroying = false;
     gbs::EventRunner destroy_runner {};
     uint16_t destroy_wait_frames = 0;
+    const gbs::TileAsset* streamed_tile_asset_loaded = nullptr;
 };
 
 struct RuntimeActorGesture {
@@ -123,9 +128,10 @@ bool run_wave_spawn_scripts = true;
 int runtime_last_wave = -1;
 uint32_t runtime_wave_change_count = 0;
 
-#if GBS_MULTI_RUNTIME
 gbs::EventRunner shmup_event_runner {};
 int shmup_event_wait_frames = 0;
+void consume_event_state();
+#if GBS_MULTI_RUNTIME
 int checkpoint_resume_script_index = -1;
 bool checkpoint_resuming_script = false;
 bool wave_start_pending = false;
@@ -162,6 +168,80 @@ struct ShmupEnemyCheckpoint {
 };
 struct ShmupProjectileCheckpoint { int16_t x; int16_t y; uint8_t pool; uint8_t index; };
 
+bool write_shmup_checkpoint(gbs::CheckpointPayloadWriter& writer, const ShmupRuntimeCheckpoint& saved) {
+    return writer.write(saved.version) &&
+        writer.write(saved.state) &&
+        writer.write(saved.player) &&
+        gbs::write_checkpoint_script(writer, saved.script) &&
+        writer.write(saved.dialogue) &&
+        writer.write(saved.gesture) &&
+        writer.write(saved.player_sprite) &&
+        writer.write(saved.music_index) &&
+        writer.write(saved.tracker_index) &&
+        writer.write(saved.wait_frames) &&
+        writer.write(saved.high_score) &&
+        writer.write(saved.enemy_count) &&
+        writer.write(saved.projectile_count) &&
+        writer.write(saved.clear_consumed) &&
+        writer.write(saved.spawned) &&
+        writer.write(saved.spawn_scripts) &&
+        writer.write(saved.start_pending);
+}
+
+bool read_shmup_checkpoint(gbs::CheckpointPayloadReader& reader, ShmupRuntimeCheckpoint& saved, uint32_t* source_version = nullptr) {
+    auto cursor = reader;
+    uint32_t version = 0;
+    if (!cursor.read(version)) return false;
+    if (source_version != nullptr) *source_version = version;
+    if (version == 1) {
+        if (!gbs::read_legacy_checkpoint_record(reader, saved)) return false;
+        saved.version = 2;
+        return true;
+    }
+    if (version != 2) return false;
+    return reader.read(saved.version) &&
+        reader.read(saved.state) &&
+        reader.read(saved.player) &&
+        gbs::read_checkpoint_script(reader, saved.script) &&
+        reader.read(saved.dialogue) &&
+        reader.read(saved.gesture) &&
+        reader.read(saved.player_sprite) &&
+        reader.read(saved.music_index) &&
+        reader.read(saved.tracker_index) &&
+        reader.read(saved.wait_frames) &&
+        reader.read(saved.high_score) &&
+        reader.read(saved.enemy_count) &&
+        reader.read(saved.projectile_count) &&
+        reader.read(saved.clear_consumed) &&
+        reader.read(saved.spawned) &&
+        reader.read(saved.spawn_scripts) &&
+        reader.read(saved.start_pending);
+}
+
+bool write_shmup_enemy_checkpoint(gbs::CheckpointPayloadWriter& writer, const ShmupEnemyCheckpoint& saved) {
+    return writer.write(saved.position) &&
+        gbs::write_checkpoint_script(writer, saved.script) &&
+        writer.write(saved.sprite) &&
+        writer.write(saved.wait_frames) &&
+        writer.write(saved.health) &&
+        writer.write(saved.cooldown) &&
+        writer.write(saved.active) &&
+        writer.write(saved.destroying);
+}
+
+bool read_shmup_enemy_checkpoint(gbs::CheckpointPayloadReader& reader, ShmupEnemyCheckpoint& saved, uint32_t source_version = 2) {
+    if (source_version == 1) return gbs::read_legacy_checkpoint_record(reader, saved);
+    if (source_version != 2) return false;
+    return reader.read(saved.position) &&
+        gbs::read_checkpoint_script(reader, saved.script) &&
+        reader.read(saved.sprite) &&
+        reader.read(saved.wait_frames) &&
+        reader.read(saved.health) &&
+        reader.read(saved.cooldown) &&
+        reader.read(saved.active) &&
+        reader.read(saved.destroying);
+}
+
 gbs::EventScript checkpoint_script_for(int room, int index) {
     const auto* wave = gbs::shmup_wave_for(project, room);
     if (wave == nullptr) return gbs::empty_event_script();
@@ -169,6 +249,8 @@ gbs::EventScript checkpoint_script_for(int room, int index) {
     if (index == 1) return wave->on_clear;
     if (index == 2) return project.player.on_fire;
     if (index == 3) return project.enemy_projectile.on_hit_player;
+    if (index == 4) return wave->on_defeat;
+    if (index == 5) return wave->on_projectile_hit_player;
     if (index >= 100 && index < 100 + static_cast<int>(wave->enemy_count)) return wave->enemies[index - 100].on_spawn;
     if (index >= 1000 && static_cast<size_t>(index - 1000) < project.script_count) return project.scripts[index - 1000];
     for (size_t enemy = 0; enemy < wave->enemy_count; ++enemy)
@@ -178,11 +260,11 @@ gbs::EventScript checkpoint_script_for(int room, int index) {
 int current_checkpoint_script_index() {
     if (!gbs::has_event_script(shmup_event_runner.script)) return -1;
     const auto* wave = gbs::shmup_wave_for(project, shmup_state.wave_index);
-    for (size_t candidate = 0; candidate < 4 + wave->enemy_count * 2 + project.script_count; ++candidate) {
-        const int index = candidate < 4 ? static_cast<int>(candidate)
-            : candidate < 4 + wave->enemy_count ? 100 + static_cast<int>(candidate - 4)
-            : candidate < 4 + wave->enemy_count * 2 ? 200 + static_cast<int>(candidate - 4 - wave->enemy_count)
-            : 1000 + static_cast<int>(candidate - 4 - wave->enemy_count * 2);
+    for (size_t candidate = 0; candidate < 6 + wave->enemy_count * 2 + project.script_count; ++candidate) {
+        const int index = candidate < 6 ? static_cast<int>(candidate)
+            : candidate < 6 + wave->enemy_count ? 100 + static_cast<int>(candidate - 6)
+            : candidate < 6 + wave->enemy_count * 2 ? 200 + static_cast<int>(candidate - 6 - wave->enemy_count)
+            : 1000 + static_cast<int>(candidate - 6 - wave->enemy_count * 2);
         const auto script = checkpoint_script_for(shmup_state.wave_index, index);
         if (script.commands == shmup_event_runner.script.commands && script.command_count == shmup_event_runner.script.command_count) return index;
     }
@@ -199,19 +281,19 @@ bool capture_shmup_checkpoint(gbs::UniversalSaveData& data) {
     for (const auto& projectile : runtime_projectiles) if (projectile.active) ++projectile_count;
     for (const auto& projectile : runtime_enemy_projectiles) if (projectile.active) ++projectile_count;
     const ShmupRuntimeCheckpoint snapshot {
-        1, shmup_state, player_event_runtime, gbs::capture_checkpoint_script(shmup_event_runner, script_index),
+        2, shmup_state, player_event_runtime, gbs::capture_checkpoint_script(shmup_event_runner, script_index, event_state),
         gbs::capture_checkpoint_dialogue(dialogue), runtime_actor_gesture, player_sprite_index,
         checkpoint_music_index, checkpoint_tracker_index, shmup_event_wait_frames, shmup_high_score,
         static_cast<uint16_t>(wave->enemy_count), projectile_count, wave_clear_consumed, wave_spawned, run_wave_spawn_scripts, wave_start_pending
     };
     gbs::CheckpointPayloadWriter writer(data);
-    if (!writer.write(snapshot) || !gbs::write_checkpoint_events(writer, gbs::capture_checkpoint_events(event_state))) return false;
+    if (!write_shmup_checkpoint(writer, snapshot) || !gbs::write_checkpoint_events(writer, gbs::capture_checkpoint_events(event_state))) return false;
     for (size_t index = 0; index < wave->enemy_count; ++index) {
         const auto& enemy = runtime_enemies[index];
-        const auto bookmark = enemy.destroying ? gbs::capture_checkpoint_script(enemy.destroy_runner, static_cast<int>(index)) : gbs::CheckpointScript {};
+        const auto bookmark = enemy.destroying ? gbs::capture_checkpoint_script(enemy.destroy_runner, static_cast<int>(index), event_state) : gbs::CheckpointScript {};
         const ShmupEnemyCheckpoint saved { enemy.position_pixels, bookmark, enemy.sprite_index,
             enemy.destroy_wait_frames, enemy.health, enemy.fire_cooldown_frames, enemy.active, enemy.destroying };
-        if (!writer.write(saved)) return false;
+        if (!write_shmup_enemy_checkpoint(writer, saved)) return false;
     }
     for (uint8_t pool = 0; pool < 2; ++pool) {
         const auto* projectiles = pool == 0 ? runtime_projectiles : runtime_enemy_projectiles;
@@ -241,20 +323,26 @@ void consume_event_state();
 #endif
 
 void run_shmup_event_script(gbs::EventScript script) {
-#if GBS_MULTI_RUNTIME
+    if (!gbs::has_event_script(script)) return;
+    shmup_event_wait_frames = 0;
     gbs::start_event_runner(shmup_event_runner, script);
     // Existing synchronous hooks keep their timing. Split only at Save so its
     // continuation is captured before subsequent rewards/warps.
     const size_t budget = script.command_count * 8 + 8;
     for (size_t step = 0; step < budget && shmup_event_runner.active; ++step) {
         const auto previous_index = shmup_event_runner.command_index;
+#if GBS_MULTI_RUNTIME
         gbs::update_checkpoint_event_runner(shmup_event_runner, event_state);
-        consume_event_state();
-        if (previous_index == shmup_event_runner.command_index || gbs::runtime_transition_requested()) break;
-    }
 #else
-    gbs::run_event_script(event_state, script);
+        gbs::update_event_runner(shmup_event_runner, event_state);
 #endif
+        consume_event_state();
+        if (event_state.wait_frames > 0) {
+            shmup_event_wait_frames = event_state.wait_frames;
+            event_state.wait_frames = 0;
+        }
+        if (shmup_event_wait_frames > 0 || dialogue.visible || previous_index == shmup_event_runner.command_index || gbs::runtime_transition_requested()) break;
+    }
 }
 
 constexpr uint16_t obj_palette_colors[] = {
@@ -461,6 +549,7 @@ void refresh_hud() {
     gbs::set_hud_text_slots(hud, text_slots, 3);
     gbs::set_hud_value(hud,gbs::HudValueSource::Score,project.score_enabled ? shmup_state.score : 0);
     gbs::set_hud_value(hud,gbs::HudValueSource::Lives,shmup_state.lives,project.initial_lives);
+    gbs::set_hud_value(hud,gbs::HudValueSource::Wave,project.waves_enabled ? shmup_state.wave_index + 1 : 0);
 }
 
 void load_assets() {
@@ -870,7 +959,7 @@ void consume_event_state() {
         event_state.audio_volume_changed = false;
     }
     if (event_state.audio_fade_changed) {
-        gbs::fade_audio_channel_volume(gbs::audio_channel_from_event_value(event_state.audio_fade_channel), static_cast<uint8_t>(event_state.audio_fade_target_volume), static_cast<uint16_t>(event_state.audio_fade_frames));
+        gbs::fade_audio_channel_volume(gbs::audio_channel_from_event_value(event_state.audio_fade_channel), static_cast<uint8_t>(event_state.audio_fade_target_volume), static_cast<uint16_t>(event_state.audio_fade_frames), static_cast<uint8_t>(event_state.audio_fade_ceiling_volume));
         event_state.audio_fade_changed = false;
     }
     if (event_state.stop_music) {
@@ -935,6 +1024,7 @@ void persist_shmup_runtime_state() {
 }
 
 void clear_runtime_objects() {
+    defeat_consumed = false;
     gbs::init_shmup_player_animator(player_animator);
     player_streamed_tile_asset_loaded = nullptr;
     for (size_t index = 0; index < max_runtime_enemies; ++index) {
@@ -1013,9 +1103,10 @@ bool restore_shmup_checkpoint(int slot) {
         data.runtime != gbs::UniversalSaveRuntime::Shmup || !gbs::is_valid_shmup_wave_index(project, data.room_index)) return false;
     gbs::CheckpointPayloadReader reader(data);
     ShmupRuntimeCheckpoint snapshot {};
+    uint32_t source_version = 0;
     gbs::CheckpointEvents saved_events {};
     const auto& wave = project.waves[data.room_index];
-    if (!reader.read(snapshot) || snapshot.version != 1 || snapshot.state.wave_index != data.room_index ||
+    if (!read_shmup_checkpoint(reader, snapshot, &source_version) || snapshot.version != 2 || snapshot.state.wave_index != data.room_index ||
         snapshot.enemy_count != wave.enemy_count || snapshot.enemy_count > max_runtime_enemies ||
         snapshot.projectile_count > max_runtime_projectiles + max_runtime_enemy_projectiles || snapshot.wait_frames < 0 ||
         snapshot.music_index < -1 || snapshot.tracker_index < -1 ||
@@ -1025,15 +1116,15 @@ bool restore_shmup_checkpoint(int slot) {
         !gbs::read_checkpoint_events(reader, saved_events)) return false;
     gbs::EventRunner restored_runner {};
     if (!gbs::restore_checkpoint_script(snapshot.script,
-            checkpoint_script_for(data.room_index, snapshot.script.script_index), restored_runner)) return false;
+            checkpoint_script_for(data.room_index, snapshot.script.script_index), restored_runner, &event_state)) return false;
     // Validate the complete variable-sized payload before touching live actors.
     const auto enemy_reader = reader;
     for (size_t index = 0; index < snapshot.enemy_count; ++index) {
         ShmupEnemyCheckpoint enemy {};
         gbs::EventRunner runner {};
-        if (!reader.read(enemy) || enemy.health > wave.enemies[index].health || enemy.sprite < -1 ||
+        if (!read_shmup_enemy_checkpoint(reader, enemy, source_version) || enemy.health > wave.enemies[index].health || enemy.sprite < -1 ||
             (enemy.sprite >= 0 && static_cast<size_t>(enemy.sprite) >= project.actor_sprite_count) ||
-            !gbs::restore_checkpoint_script(enemy.script, wave.enemies[index].on_destroy, runner)) return false;
+            !gbs::restore_checkpoint_script(enemy.script, wave.enemies[index].on_destroy, runner, &event_state)) return false;
     }
     uint32_t projectile_slots[2] = {};
     for (size_t index = 0; index < snapshot.projectile_count; ++index) {
@@ -1048,6 +1139,7 @@ bool restore_shmup_checkpoint(int slot) {
     if (!gbs::restore_checkpoint_events(saved_events, event_state) ||
         !gbs::restore_suspended_common_state(data, event_state)) return false;
     shmup_state = snapshot.state;
+    defeat_consumed = snapshot.script.script_index == 4;
     player_event_runtime = snapshot.player;
     shmup_event_runner = restored_runner;
     checkpoint_resume_script_index = snapshot.script.script_index;
@@ -1065,7 +1157,7 @@ bool restore_shmup_checkpoint(int slot) {
     auto replay = enemy_reader;
     for (size_t index = 0; index < snapshot.enemy_count; ++index) {
         ShmupEnemyCheckpoint saved {};
-        replay.read(saved);
+        read_shmup_enemy_checkpoint(replay, saved, source_version);
         auto& enemy = runtime_enemies[index];
         enemy.position_pixels = saved.position;
         enemy.health = saved.health;
@@ -1074,7 +1166,7 @@ bool restore_shmup_checkpoint(int slot) {
         enemy.destroying = saved.destroying;
         enemy.sprite_index = saved.sprite;
         enemy.destroy_wait_frames = saved.wait_frames;
-        gbs::restore_checkpoint_script(saved.script, wave.enemies[index].on_destroy, enemy.destroy_runner);
+        gbs::restore_checkpoint_script(saved.script, wave.enemies[index].on_destroy, enemy.destroy_runner, &event_state);
     }
     for (auto& projectile : runtime_projectiles) projectile.active = false;
     for (auto& projectile : runtime_enemy_projectiles) projectile.active = false;
@@ -1225,6 +1317,17 @@ bool run_button_event_binding() {
     return overrides_default;
 }
 
+void run_timer_event_binding() {
+    if (!gbs::update_timer_event_bindings(event_state)) return;
+    const int script_index = event_state.last_script;
+    event_state.last_script = -1;
+    if (script_index >= 0 && static_cast<size_t>(script_index) < project.script_count) {
+        run_shmup_event_script(project.scripts[script_index]);
+        consume_event_state();
+        consume_projectile_event_request();
+    }
+}
+
 void update_projectiles() {
     for (size_t index = 0; index < max_runtime_projectiles; ++index) {
         RuntimeProjectile& projectile = runtime_projectiles[index];
@@ -1347,12 +1450,10 @@ void update_enemies() {
 }
 
 void damage_player(gbs::EventScript script) {
-    if (!gbs::shmup_player_is_vulnerable(shmup_state)) {
+    if (!gbs::shmup_apply_player_damage(shmup_state, player_hit_invulnerability_frames)) {
         return;
     }
-    --shmup_state.lives;
     player_damaged_this_frame = true;
-    shmup_state.invulnerability_frames_remaining = player_hit_invulnerability_frames;
     run_shmup_event_script(script);
     consume_event_state();
     refresh_hud();
@@ -1429,7 +1530,8 @@ void handle_collisions() {
         };
         if (gbs::intersects(projectile_rect, player_rect)) {
             projectile.active = false;
-            damage_player(project.enemy_projectile.on_hit_player);
+            damage_player(gbs::has_event_script(wave->on_projectile_hit_player)
+                ? wave->on_projectile_hit_player : project.enemy_projectile.on_hit_player);
         }
     }
 
@@ -1546,10 +1648,41 @@ void update_shmup(gbs::InputState input, bool allow_default_fire) {
         { shmup_state.player_position_pixels.x - previous_position.x,
           shmup_state.player_position_pixels.y - previous_position.y },
         player_fired_this_frame, player_damaged_this_frame, shmup_state.lives > 0);
+    // Complete damage callbacks (including waits/dialogue) before clear/defeat
+    // hooks can replace the runner on a lethal or last-enemy collision.
+    if (gbs::event_runner_is_active(shmup_event_runner) || shmup_event_wait_frames > 0 || dialogue.visible) return;
+    if (shmup_state.lives == 0 && !defeat_consumed && !player_animator.animator.playing) {
+        defeat_consumed = true;
+        if (wave != nullptr) run_shmup_event_script(wave->on_defeat);
+        consume_event_state();
+    }
     maybe_advance_wave();
     ++shmup_state.frame_counter;
     if ((shmup_state.frame_counter % 60) == 0) {
         persist_shmup_runtime_state();
+    }
+}
+
+void draw_shmup_sprite(int index, gbs::Sprite sprite) {
+    // At equal GBA priority, OBJ covers BG0. The modal dialogue owns BG0;
+    // keep gameplay sprites below it while preserving explicit lower depths.
+    if (dialogue.visible && sprite.priority == 0) sprite.priority = 1;
+    gbs::set_sprite(index, sprite);
+}
+
+void draw_shmup_metasprite(int first_index, const gbs::MetaSprite& metasprite, gbs::Vec2i position) {
+    if (!dialogue.visible) {
+        gbs::set_metasprite(first_index, metasprite, position);
+        return;
+    }
+    for (uint8_t index = 0; index < metasprite.part_count; ++index) {
+        const auto& part = metasprite.parts[index];
+        draw_shmup_sprite(first_index + index, gbs::Sprite {
+            position.x + part.x, position.y + part.y, part.tile_index,
+            part.palette, part.hflip, part.vflip, true, 0,
+            gbs::SpriteRenderMode::Normal, false, part.width, part.height,
+            false, false, 0, part.color_depth
+        });
     }
 }
 
@@ -1571,10 +1704,10 @@ void draw_scene() {
         }
     }
     if (player_visible && player_metasprite != nullptr && gbs::is_valid_metasprite(*player_metasprite)) {
-        gbs::set_metasprite(sprite_index, *player_metasprite, shmup_state.player_position_pixels);
+        draw_shmup_metasprite(sprite_index, *player_metasprite, shmup_state.player_position_pixels);
         sprite_index += player_metasprite->part_count;
     } else if (player_visible) {
-        gbs::set_sprite(sprite_index++, gbs::Sprite {
+        draw_shmup_sprite(sprite_index++, gbs::Sprite {
             shmup_state.player_position_pixels.x,
             shmup_state.player_position_pixels.y,
             static_cast<uint16_t>(builtin_tile_start + player_tile_asset.destination_tile),
@@ -1590,7 +1723,7 @@ void draw_scene() {
     if (wave != nullptr) {
         const size_t enemy_count = wave->enemy_count;
         for (size_t index = 0; index < enemy_count && sprite_index < 40; ++index) {
-            const RuntimeEnemy& runtime_enemy = runtime_enemies[index];
+            RuntimeEnemy& runtime_enemy = runtime_enemies[index];
             if (!runtime_enemy.active) {
                 continue;
             }
@@ -1600,12 +1733,18 @@ void draw_scene() {
                 screen_position.y + enemy.size_pixels.y <= 0 || screen_position.y >= screen_height) {
                 continue;
             }
-            const gbs::MetaSprite* enemy_metasprite = actor_sprite_for_index(runtime_enemy.sprite_index, enemy.metasprite);
+            const auto* frame = enemy.animation == nullptr ? nullptr : gbs::shmup_animation_frame_at(*enemy.animation, shmup_state.frame_counter);
+            if (frame != nullptr && runtime_enemy.sprite_index < 0 && frame->streamed_tile_asset != nullptr &&
+                frame->streamed_tile_asset != runtime_enemy.streamed_tile_asset_loaded && gbs::load_tiles(*frame->streamed_tile_asset)) {
+                runtime_enemy.streamed_tile_asset_loaded = frame->streamed_tile_asset;
+            }
+            const gbs::MetaSprite* enemy_metasprite = actor_sprite_for_index(runtime_enemy.sprite_index,
+                frame == nullptr ? enemy.metasprite : &frame->metasprite);
             if (enemy_metasprite != nullptr && gbs::is_valid_metasprite(*enemy_metasprite)) {
-                gbs::set_metasprite(sprite_index, *enemy_metasprite, screen_position);
+                draw_shmup_metasprite(sprite_index, *enemy_metasprite, screen_position);
                 sprite_index += enemy_metasprite->part_count;
             } else {
-                gbs::set_sprite(sprite_index++, gbs::Sprite {
+                draw_shmup_sprite(sprite_index++, gbs::Sprite {
                     screen_position.x,
                     screen_position.y,
                     static_cast<uint16_t>(builtin_tile_start + enemy_tile_asset.destination_tile),
@@ -1631,7 +1770,7 @@ void draw_scene() {
         }
         if (emote != nullptr && gbs::is_valid_metasprite(*emote) && sprite_index + emote->part_count <= 64) {
             const gbs::Vec2i emote_position = gbs::dialogue_emote_position_pixels(actor_position);
-            gbs::set_metasprite(sprite_index, *emote, emote_position);
+            draw_shmup_metasprite(sprite_index, *emote, emote_position);
             sprite_index += emote->part_count;
         }
     }
@@ -1642,10 +1781,10 @@ void draw_scene() {
             continue;
         }
         if (project.player_projectile.metasprite != nullptr && gbs::is_valid_metasprite(*project.player_projectile.metasprite)) {
-            gbs::set_metasprite(sprite_index, *project.player_projectile.metasprite, projectile.position_pixels);
+            draw_shmup_metasprite(sprite_index, *project.player_projectile.metasprite, projectile.position_pixels);
             sprite_index += project.player_projectile.metasprite->part_count;
         } else {
-            gbs::set_sprite(sprite_index++, gbs::Sprite {
+            draw_shmup_sprite(sprite_index++, gbs::Sprite {
                 projectile.position_pixels.x,
                 projectile.position_pixels.y,
                 static_cast<uint16_t>(builtin_tile_start + bullet_tile_asset.destination_tile),
@@ -1666,10 +1805,10 @@ void draw_scene() {
         }
         if (project.enemy_projectile.metasprite != nullptr &&
             gbs::is_valid_metasprite(*project.enemy_projectile.metasprite)) {
-            gbs::set_metasprite(sprite_index, *project.enemy_projectile.metasprite, projectile.position_pixels);
+            draw_shmup_metasprite(sprite_index, *project.enemy_projectile.metasprite, projectile.position_pixels);
             sprite_index += project.enemy_projectile.metasprite->part_count;
         } else {
-            gbs::set_sprite(sprite_index++, gbs::Sprite {
+            draw_shmup_sprite(sprite_index++, gbs::Sprite {
                 projectile.position_pixels.x,
                 projectile.position_pixels.y,
                 static_cast<uint16_t>(builtin_tile_start + bullet_tile_asset.destination_tile),
@@ -1688,15 +1827,24 @@ void draw_scene() {
 
 int initialize_shmup_runtime() {
     gbs::init();
+    // Standalone ROMs bypass the mixed-runtime dispatcher.
+    gbs::debug_set_runtime_kind(GBS_DIALOGUE_UI_RUNTIME_KIND);
     gbs::reset_runtime_telemetry();
     runtime_last_wave = -1;
     runtime_wave_change_count = 0;
     gbs::init_dialogue(dialogue);
+    gbs::configure_dialogue_portraits(gbastudio_shmup_project::dialogue_portrait_assets,
+        gbastudio_shmup_project::dialogue_portrait_asset_count);
     gbs::init_shmup_player_animator(player_animator);
     player_streamed_tile_asset_loaded = nullptr;
     gbs::configure_dialogue_emotes(project.emote_assets, project.emote_asset_count);
     gbs::init_hud(hud);
     gbs::init_event_state(event_state);
+    gbs::bind_event_scripts(event_state, project.scripts, project.script_count);
+#if GBS_MULTI_RUNTIME
+    shmup_event_runner = {};
+    shmup_event_wait_frames = 0;
+#endif
     player_event_runtime = gbs::EventPlayerRuntimeState {
         true,
         0,
@@ -1754,6 +1902,27 @@ int initialize_shmup_runtime() {
     return 0;
 }
 
+bool update_shmup_event_script() {
+    if (dialogue.visible || !gbs::event_runner_is_active(shmup_event_runner)) return false;
+    if (shmup_event_wait_frames > 0) --shmup_event_wait_frames;
+    else {
+#if GBS_MULTI_RUNTIME
+        gbs::update_checkpoint_event_runner(shmup_event_runner, event_state);
+#else
+        gbs::update_event_runner(shmup_event_runner, event_state);
+#endif
+        if (event_state.wait_frames > 0) {
+            shmup_event_wait_frames = event_state.wait_frames;
+            event_state.wait_frames = 0;
+        }
+        consume_event_state();
+#if GBS_MULTI_RUNTIME
+        finish_restored_shmup_script();
+#endif
+    }
+    return true;
+}
+
 gbs::RuntimeAdapterFrameResult update_shmup_runtime(const gbs::RuntimeFrameContext& context) {
     (void)context;
     gbastudio_dialogue_ui::configure_for_scene(project.waves[shmup_state.wave_index].name);
@@ -1771,22 +1940,16 @@ gbs::RuntimeAdapterFrameResult update_shmup_runtime(const gbs::RuntimeFrameConte
 #endif
     gbs::set_event_input_state(event_state, input.held, input.pressed, input.released);
     gbs::update_hud_behavior(event_state, hud.visible);
-#if GBS_MULTI_RUNTIME
-    if (!dialogue.visible && gbs::event_runner_is_active(shmup_event_runner)) {
-        if (shmup_event_wait_frames > 0) --shmup_event_wait_frames;
-        else {
-            gbs::update_checkpoint_event_runner(shmup_event_runner, event_state);
-            if (event_state.wait_frames > 0) {
-                shmup_event_wait_frames = event_state.wait_frames;
-                event_state.wait_frames = 0;
-            }
-            consume_event_state();
-            finish_restored_shmup_script();
-        }
+    if (!dialogue.visible
+        && !gbs::event_runner_is_active(shmup_event_runner)
+    ) {
+        run_timer_event_binding();
+    }
+    if (update_shmup_event_script()) {
+        // A running callback owns this frame until its wait/dialogue completes.
     } else
-#endif
-    if (dialogue.visible && input.was_pressed(gbs::ButtonA)) {
-        gbs::advance_dialogue(dialogue, input);
+    if (dialogue.visible) {
+        if (input.was_pressed(gbs::ButtonA)) gbs::advance_dialogue(dialogue, input);
     } else {
         const bool overrides_default = gbs::button_event_binding_overrides_default(event_state, input.held);
         run_button_event_binding();
@@ -1801,6 +1964,7 @@ gbs::RuntimeAdapterFrameResult update_shmup_runtime(const gbs::RuntimeFrameConte
 }
 
 void render_shmup_runtime(const gbs::RuntimeFrameContext& context) {
+    const gbs::SubsystemProfilerScope profiler_scope(gbs::ProfilerSubsystem::Render);
     (void)context;
     stream_background();
     refresh_affine_background();
@@ -1809,6 +1973,7 @@ void render_shmup_runtime(const gbs::RuntimeFrameContext& context) {
     refresh_hud();
     gbs::draw_hud(hud);
     gbs::draw_dialogue(dialogue);
+    gbs::draw_dialogue_portrait(dialogue);
     sync_runtime_telemetry();
     gbs::wait_vblank();
 }

@@ -12,14 +12,43 @@ namespace {
 const gbs::HudLayout* configured_hud_layouts = nullptr;
 size_t configured_hud_layout_count = 0;
 const gbs::HudLayout* selected_hud_layout = nullptr;
-gbs::HudElementMemory hud_element_memory[64] {};
-uint8_t hud_gauge_buffers[2][1536] GBS_UI_EWRAM {};
+gbs::HudElementMemory hud_element_memory[64] GBS_UI_EWRAM {};
+uint8_t hud_gauge_buffers[4][1536] GBS_UI_EWRAM {};
 struct HudGaugeCache {
     const gbs::HudLayoutComponent* component = nullptr;
     uint32_t value = 0, maximum = 0;
 };
-HudGaugeCache hud_gauge_cache[2] {};
+HudGaugeCache hud_gauge_cache[4] {};
 char hud_value_text[64][9] GBS_UI_EWRAM {};
+uint32_t hud_project_values[64] GBS_UI_EWRAM {};
+bool hud_project_values_ready = false;
+uint32_t retained_hud_values[64] GBS_UI_EWRAM {};
+bool object_hud_layout = false;
+bool retained_hud_valid = false;
+bool retained_hud_visible = false;
+bool retained_hud_values_ready = false;
+uint8_t retained_hud_selected_text_slot_plus_one = 0;
+// Copy text bytes: racing HUD formatters reuse the same stack addresses.
+constexpr size_t retained_hud_text_capacity = 64;
+char retained_hud_text[gbs::hud_text_slot_capacity + 2][retained_hud_text_capacity] GBS_UI_EWRAM {};
+
+bool retain_hud_text(const gbs::HudState& state, bool copy) {
+    bool matches = true;
+    for (size_t slot=0; slot<gbs::hud_text_slot_capacity+2; ++slot) {
+        const char* text = slot==gbs::hud_text_slot_capacity ? state.left_text :
+            slot==gbs::hud_text_slot_capacity+1 ? state.right_text :
+            slot<state.text_slot_count ? state.text_slots[slot] : nullptr;
+        size_t i=0;
+        for (; text && text[i] && i+1<retained_hud_text_capacity; ++i) {
+            if (copy) retained_hud_text[slot][i]=text[i];
+            else if (retained_hud_text[slot][i]!=text[i]) matches=false;
+        }
+        if (text && text[i]) return false; // Long labels use the uncached path.
+        if (copy) retained_hud_text[slot][i]='\0';
+        else if (retained_hud_text[slot][i]!='\0') matches=false;
+    }
+    return matches;
+}
 
 bool string_equals(const char* left, const char* right) {
     if (left == nullptr || right == nullptr) {
@@ -38,6 +67,25 @@ int hud_component_kind(const char* kind) {
     if (string_equals(kind, "bar")) return GBS_HW_HUD_COMPONENT_BAR;
     if (string_equals(kind, "icon")) return GBS_HW_HUD_COMPONENT_ICON;
     return -1;
+}
+
+bool is_object_hud_layout(const gbs::HudLayout& layout) {
+    if (!string_equals(layout.mode,"advanced") || layout.component_count>64) return false;
+    for (size_t i=0; i<layout.component_count; ++i) {
+        const auto& component=layout.components[i];
+        if (!component.visible) continue;
+        const auto& behavior=component.behavior;
+        if (behavior.event_count || behavior.selected.variable>=0 ||
+            behavior.disabled.variable>=0 || behavior.hidden.variable>=0 ||
+            component.value_source!=gbs::HudValueSource::None) return false;
+        const int kind=hud_component_kind(component.kind);
+        if (kind==GBS_HW_HUD_COMPONENT_TEXT) {
+            if (component.text_advance!=6 && component.text_advance!=7) return false;
+        } else if (kind<0 || !component.metasprite || !gbs::is_valid_metasprite(*component.metasprite)) {
+            return false;
+        }
+    }
+    return true;
 }
 
 int clamp_selection(const gbs::MenuItem* items, size_t item_count, int desired) {
@@ -101,32 +149,63 @@ void append_char(char*& out, char* end, char value) {
     }
 }
 
-void append_limited_text(char*& out, char* end, const char* text, int max_chars) {
+void append_limited_text(char*& out, char* end, const char* text, int max_chars, bool ellipsize = false) {
     if (text == nullptr) {
         return;
     }
+    int width = 0;
+    for (const char* cursor = text; *cursor && *cursor != '\n'; ++cursor) {
+        if ((static_cast<unsigned char>(*cursor) & 0xC0u) != 0x80u) ++width;
+    }
+    const bool clipped = ellipsize && width > max_chars && max_chars >= 3;
+    if (clipped) max_chars -= 3;
     int count = 0;
     while (*text != '\0' && *text != '\n' && count < max_chars) {
-        append_char(out, end, *text);
+        const char* glyph = text;
         ++text;
+        while ((static_cast<unsigned char>(*text) & 0xC0u) == 0x80u) ++text;
+        if (end - out < text - glyph) break;
+        while (glyph < text) append_char(out, end, *glyph++);
         ++count;
+    }
+    if (clipped) {
+        append_char(out, end, '.');
+        append_char(out, end, '.');
+        append_char(out, end, '.');
     }
 }
 
-char menu_buffer[26 * 5 + 5 + 1];
+void append_menu_page_number(char*& out, char* end, size_t value) {
+    char digits[3 * sizeof(size_t)] {};
+    size_t count = 0;
+    do {
+        digits[count++] = static_cast<char>('0' + value % 10);
+        value /= 10;
+    } while (value && count < sizeof(digits));
+    while (count) append_char(out, end, digits[--count]);
+}
+
+constexpr int menu_text_columns = 26 - 2;
+char menu_buffer[(menu_text_columns * 5 + 5) * 4 + 1] GBS_UI_EWRAM;
 
 const char* menu_page_text(const gbs::MenuState& state) {
     char* out = menu_buffer;
     char* end = menu_buffer + sizeof(menu_buffer) - 1;
-    append_limited_text(out, end, state.title, 26);
-    if (gbs::menu_has_previous_page(state)) {
-        append_char(out, end, ' ');
-        append_char(out, end, '^');
+    char page_label[6 * sizeof(size_t) + 3] {};
+    char* page_out = page_label;
+    char* page_end = page_label + sizeof(page_label) - 1;
+    if (state.item_count > gbs::menu_max_visible_items) {
+        append_char(page_out, page_end, ' ');
+        append_menu_page_number(page_out, page_end,
+            gbs::menu_first_visible_index(state) / gbs::menu_max_visible_items + 1);
+        append_char(page_out, page_end, '/');
+        append_menu_page_number(page_out, page_end,
+            (state.item_count + gbs::menu_max_visible_items - 1) / gbs::menu_max_visible_items);
     }
-    if (gbs::menu_has_next_page(state)) {
-        append_char(out, end, ' ');
-        append_char(out, end, 'v');
-    }
+    *page_out = '\0';
+    const int title_columns = menu_text_columns - static_cast<int>(page_out - page_label);
+    append_limited_text(out, end, state.title, title_columns, true);
+    append_limited_text(out, end, page_label, menu_text_columns);
 
     size_t first_item = gbs::menu_first_visible_index(state);
     size_t visible_count = gbs::menu_visible_item_count(state);
@@ -136,7 +215,7 @@ const char* menu_page_text(const gbs::MenuState& state) {
         append_char(out, end, '\n');
         append_char(out, end, static_cast<int>(item_index) == state.selected_index ? '!' : '-');
         append_char(out, end, state.items[item_index].enabled ? ' ' : 'X');
-        append_limited_text(out, end, state.items[item_index].text, 24);
+        append_limited_text(out, end, state.items[item_index].text, menu_text_columns - 2, true);
     }
 
     *out = '\0';
@@ -186,6 +265,7 @@ void init_hud(HudState& state) {
     state.right_text = nullptr;
     state.text_slot_count = 0;
     state.value_sources = 0;
+    state.selected_text_slot_plus_one = 0;
     for (size_t index = 0; index < hud_text_slot_capacity; ++index) {
         state.text_slots[index] = nullptr;
     }
@@ -198,6 +278,7 @@ void set_hud_text(HudState& state, const char* left_text, const char* right_text
 
 void set_hud_text_slots(HudState& state, const char* const* text_slots, size_t text_slot_count) {
     state.visible = true;
+    state.selected_text_slot_plus_one = 0;
     state.text_slot_count = text_slots == nullptr
         ? 0
         : text_slot_count < hud_text_slot_capacity ? text_slot_count : hud_text_slot_capacity;
@@ -231,11 +312,39 @@ void update_hud_behavior(EventState& state, bool visible) {
     for (size_t index=0; index<selected_hud_layout->component_count && index<64; ++index) {
         const auto& component=selected_hud_layout->components[index];
         update_hud_element(component.behavior,hud_element_memory[index],state,visible && component.visible,state.input_pressed);
+        const int value = component.value_variable >= 0 && component.value_variable < static_cast<int>(event_variable_count)
+            ? state.variables[component.value_variable]
+            : component.inventory_item >= 0 && component.inventory_item < static_cast<int>(max_event_inventory_items)
+                ? state.inventory[component.inventory_item] : 0;
+        hud_project_values[index] = value > 0 ? static_cast<uint32_t>(value) : 0;
     }
+    hud_project_values_ready = true;
 }
 
-void draw_hud(const HudState& state) {
+#if defined(__arm__) || defined(__thumb__)
+__attribute__((optimize("O2")))
+#endif
+static void draw_hud_impl(const HudState& state, const int* exclusion) {
     if (selected_hud_layout != nullptr && string_equals(selected_hud_layout->mode, "advanced")) {
+        bool unchanged=exclusion == nullptr && object_hud_layout && retained_hud_valid &&
+            retained_hud_visible==state.visible && retained_hud_values_ready==hud_project_values_ready &&
+            retained_hud_selected_text_slot_plus_one==state.selected_text_slot_plus_one;
+        if (unchanged) for (size_t i=0; i<selected_hud_layout->component_count; ++i)
+            if (retained_hud_values[i]!=hud_project_values[i]) { unchanged=false; break; }
+        if (unchanged && retain_hud_text(state,false) && gbs_hw_hud_layout_retained()) {
+            // OAM is still protected from world rendering. Keep the foreground
+            // gauge cells transparent even when a dialogue repaints BG0.
+            if (state.visible) for (size_t i=0; i<selected_hud_layout->component_count; ++i) {
+                const auto& component=selected_hud_layout->components[i];
+                const bool bound=component.value_variable>=0 || component.inventory_item>=0;
+                if (component.visible && (!bound || hud_project_values_ready) &&
+                    string_equals(component.kind,"bar"))
+                    gbs_hw_clear_hud_background_rect(component.x,component.y,component.width,component.height);
+                if (component.visible && hud_project_values_ready && string_equals(component.kind,"text"))
+                    gbs_hw_refresh_hud_text_palette(selected_hud_layout->font_color);
+            }
+            return;
+        }
         constexpr size_t hud_layout_order_capacity = 64;
         size_t order[hud_layout_order_capacity];
         size_t order_count = 0;
@@ -252,6 +361,8 @@ void draw_hud(const HudState& state) {
         }
 
         gbs_hw_begin_hud_layout(state.visible ? 1 : 0);
+        gbs_hw_set_hud_font(selected_hud_layout->font_tiles,selected_hud_layout->font_color);
+        gbs_hw_set_hud_font_shadow(selected_hud_layout->font_shadow_color);
         int text_slot = 0;
         int text_oam_offset = 0;
         size_t gauge_buffer = 0;
@@ -259,18 +370,22 @@ void draw_hud(const HudState& state) {
             const HudLayoutComponent& component = selected_hud_layout->components[order[order_index]];
             const int kind = hud_component_kind(component.kind);
             if (kind < 0) continue;
+            const bool excluded = exclusion != nullptr && exclusion[2] > 0 && exclusion[3] > 0 &&
+                component.x < exclusion[0] + exclusion[2] && component.x + component.width > exclusion[0] &&
+                component.y < exclusion[1] + exclusion[3] && component.y + component.height > exclusion[1];
             const auto status = hud_element_memory[order[order_index]].state;
             const char* text = status == HudElementState::Selected && component.behavior.selected.text ? component.behavior.selected.text :
                 status == HudElementState::Disabled && component.behavior.disabled.text ? component.behavior.disabled.text : component.text;
             const int value_index = static_cast<int>(component.value_source);
-            const bool bound = value_index >= 0 && static_cast<size_t>(value_index) < hud_value_source_count;
-            const bool available = !bound || (state.value_sources & (1u << value_index));
+            const bool project_bound = component.value_variable >= 0 || component.inventory_item >= 0;
+            const bool bound = project_bound || (value_index >= 0 && static_cast<size_t>(value_index) < hud_value_source_count);
+            const bool available = project_bound ? hud_project_values_ready : !bound || (state.value_sources & (1u << value_index));
             const MetaSprite* image = component.metasprite;
             if (bound && available) {
-                const uint32_t value = state.values[value_index];
+                const uint32_t value = project_bound ? hud_project_values[order[order_index]] : state.values[value_index];
                 if (kind == GBS_HW_HUD_COMPONENT_TEXT) {
                     char* digits = hud_value_text[order[order_index]];
-                    const size_t columns = static_cast<size_t>((component.width + 7) / 8);
+                    const size_t columns = static_cast<size_t>((component.width + component.text_advance - 1) / component.text_advance);
                     size_t length = 0;
                     if (component.text) while (component.text[length] && length < 8) ++length;
                     if (length == 0 || length > columns) length = columns < 8 ? columns : 8;
@@ -281,11 +396,11 @@ void draw_hud(const HudState& state) {
                 } else if (kind == GBS_HW_HUD_COMPONENT_ICON && value > 0) {
                     image = component.state_assets[value > 1 ? 1 : 0];
                     if (!image) image = component.metasprite;
-                } else if (kind == GBS_HW_HUD_COMPONENT_BAR && image && gauge_buffer < 2 &&
+                } else if (kind == GBS_HW_HUD_COMPONENT_BAR && image && gauge_buffer < 4 &&
                     state.visible && status != HudElementState::Hidden) {
                     const size_t buffer = gauge_buffer++;
                     auto& cache = hud_gauge_cache[buffer];
-                    const uint32_t maximum = state.maximums[value_index];
+                    const uint32_t maximum = project_bound ? component.value_maximum : state.maximums[value_index];
                     if ((cache.component != &component || cache.value != value || cache.maximum != maximum) &&
                         compose_hud_gauge(*image,component.gauge,value,maximum,hud_gauge_buffers[buffer],1536)) {
                         gbs_hw_load_obj_tiles(hud_gauge_buffers[buffer],component.gauge.full->destination_tile,component.gauge.full->tile_count);
@@ -310,7 +425,9 @@ void draw_hud(const HudState& state) {
                 }
             }
             gbs_hw_draw_hud_layout_component(
-                kind,
+                kind == GBS_HW_HUD_COMPONENT_TEXT && component.text_advance == 7 ? GBS_HW_HUD_COMPONENT_SPACED_TEXT :
+                kind == GBS_HW_HUD_COMPONENT_TEXT && component.text_advance == 6 ? GBS_HW_HUD_COMPONENT_COMPACT_TEXT :
+                    kind == GBS_HW_HUD_COMPONENT_BAR && component.foreground_image ? GBS_HW_HUD_COMPONENT_FOREGROUND_BAR : kind,
                 component.x,
                 component.y,
                 component.width,
@@ -318,19 +435,46 @@ void draw_hud(const HudState& state) {
                 text,
                 text_oam_offset,
                 image,
-                state.visible && available && status != HudElementState::Hidden ? 1 : 0
+                state.visible && available && !excluded && status != HudElementState::Hidden ? 1 : 0
             );
+            if (kind == GBS_HW_HUD_COMPONENT_TEXT && state.selected_text_slot_plus_one != 0 && component_text_slot + 1 == state.selected_text_slot_plus_one) {
+                gbs_hw_draw_hud_layout_component(
+                    GBS_HW_HUD_COMPONENT_SELECTOR, component.x, component.y, 8, 8, nullptr, 0,
+                    selected_hud_layout->selector_metasprite,
+                    state.visible && available && !excluded && status != HudElementState::Hidden ? 1 : 0
+                );
+            }
             if (kind == GBS_HW_HUD_COMPONENT_TEXT || (kind == GBS_HW_HUD_COMPONENT_ICON && image == nullptr)) {
                 text_oam_offset += (component.width + 7) / 8;
             }
         }
+        gbs_hw_set_hud_font(nullptr,-1);
         gbs_hw_end_hud_layout();
+        if (object_hud_layout && exclusion == nullptr) {
+            for (size_t i=0; i<selected_hud_layout->component_count; ++i)
+                retained_hud_values[i]=hud_project_values[i];
+            retained_hud_visible=state.visible;
+            retained_hud_selected_text_slot_plus_one=state.selected_text_slot_plus_one;
+            retained_hud_values_ready=hud_project_values_ready;
+            retained_hud_valid=retain_hud_text(state,true);
+        } else if (exclusion != nullptr) {
+            retained_hud_valid = false;
+        }
         return;
     }
-    gbs_hw_draw_hud_bar(state.left_text, state.right_text, state.visible ? 1 : 0);
+    gbs_hw_draw_hud_bar(state.left_text, state.right_text, state.visible && exclusion == nullptr ? 1 : 0);
+}
+
+void draw_hud(const HudState& state) { draw_hud_impl(state, nullptr); }
+
+void draw_hud_excluding(const HudState& state, int x, int y, int width, int height) {
+    const int exclusion[] = {x, y, width, height};
+    draw_hud_impl(state, exclusion);
 }
 
 void configure_hud_layouts(const HudLayout* layouts, size_t count) {
+    retained_hud_valid=false;
+    object_hud_layout=false;
     configured_hud_layouts = layouts;
     configured_hud_layout_count = layouts == nullptr ? 0 : count;
     selected_hud_layout = nullptr;
@@ -339,6 +483,9 @@ void configure_hud_layouts(const HudLayout* layouts, size_t count) {
 }
 
 bool configure_hud_layout(const char* layout_id) {
+    retained_hud_valid=false;
+    object_hud_layout=false;
+    hud_project_values_ready = false;
     // Scene setup may have reloaded the full image into the same VRAM slot.
     for (auto& cache : hud_gauge_cache) cache = HudGaugeCache {};
     if (layout_id == nullptr) {
@@ -351,6 +498,7 @@ bool configure_hud_layout(const char* layout_id) {
         if (!string_equals(configured_hud_layouts[index].id, layout_id)) continue;
         if (selected_hud_layout != &configured_hud_layouts[index]) for (auto& memory : hud_element_memory) memory = HudElementMemory {};
         selected_hud_layout = &configured_hud_layouts[index];
+        object_hud_layout=is_object_hud_layout(*selected_hud_layout);
         gbs_hw_invalidate_hud_layout();
         return true;
     }

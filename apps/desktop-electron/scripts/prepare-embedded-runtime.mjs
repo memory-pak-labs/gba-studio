@@ -5,10 +5,13 @@ import { fileURLToPath } from "node:url";
 
 import {
   auditUniversalMachOTree,
+  macosMachOArchitecture,
   mergeUniversalBinary,
   mergeUniversalMachOTrees,
   normalizeInfoPlistsToXml
 } from "./macos-universal-runtime.mjs";
+import { prepareMacosUniversalToolchain, resolveUniversalToolchainSources } from "./prepare-macos-universal-toolchain.mjs";
+import { prepareMacosSupportRuntime } from "./prepare-macos-support-runtime.mjs";
 
 const scriptPath = fileURLToPath(import.meta.url);
 const scriptsDir = path.dirname(scriptPath);
@@ -42,7 +45,7 @@ export function embeddedRuntimeRequirements(profile) {
   };
 }
 
-export function embeddedToolWrapper(toolName, profile = "offline") {
+export function embeddedToolWrapper(toolName, profile = "offline", pythonRelativePath = "Runtime/Python3.framework/Versions/Current/bin/python3") {
   if (!toolNames.has(toolName)) {
     throw new Error(`Ferramenta Python desconhecida: ${toolName}`);
   }
@@ -90,12 +93,15 @@ export DEVKITPRO DEVKITARM
 set -eu
 SCRIPT_DIR="$(CDPATH= cd -- "\${0%/*}" && pwd)"
 RESOURCES_DIR="$(CDPATH= cd -- "$SCRIPT_DIR/../../.." && pwd)"
-PYTHON="$RESOURCES_DIR/Runtime/Python3.framework/Versions/Current/bin/python3"
+PYTHON="$RESOURCES_DIR/${pythonRelativePath}"
 DEVKITPRO="$RESOURCES_DIR/Toolchain"
 DEVKITARM="$DEVKITPRO/devkitARM"
 PATH="$RESOURCES_DIR/Runtime/bin:$RESOURCES_DIR/Toolchain/bin:/usr/bin:/bin"
 export DEVKITPRO DEVKITARM
 export PATH
+unset PYTHONHOME PYTHONPATH VIRTUAL_ENV
+PYTHONDONTWRITEBYTECODE=1
+export PYTHONDONTWRITEBYTECODE
 
 if [ ! -x "$PYTHON" ]; then
   echo "Runtime Python embutido nao encontrado: $PYTHON" >&2
@@ -119,7 +125,17 @@ export function universalRuntimeRequested(environment = process.env) {
   return environment.GBA_STUDIO_REQUIRE_UNIVERSAL_RUNTIME === "1";
 }
 
+export function embeddedRuntimeArchitecture(environment = process.env) {
+  const architecture = environment.GBA_STUDIO_MAC_ARCH?.trim();
+  if (!architecture) return undefined;
+  macosMachOArchitecture(architecture);
+  if (universalRuntimeRequested(environment)) throw new Error("Selecione um runtime por arquitetura ou Universal, nunca ambos.");
+  return architecture;
+}
+
 export function preserveToolchainSymlinks(source) {
+  const symlinkSafeDefinition = "def absolute_path(value):\n    return Path(os.path.abspath(Path(value).expanduser()))\n";
+  if (source.includes(symlinkSafeDefinition)) return source;
   const absolutePathDefinition = "def absolute_path(value):\n    return Path(value).expanduser().resolve()\n";
   if (!source.includes(absolutePathDefinition)) {
     throw new Error("gbsbuild.py nao possui a definicao esperada de absolute_path().");
@@ -134,7 +150,7 @@ export function preserveToolchainSymlinks(source) {
     .replaceAll("absolute_path(args.devkitarm)", "logical_path(args.devkitarm)");
 }
 
-function resolveSources(profile) {
+async function resolveSources(profile) {
   const enginePack = path.join(repositoryRoot, "packages", "GBAStudioEngine", "dist", "GBAStudioEnginePack");
   if (profile === "compact") {
     if (!existsSync(enginePack)) {
@@ -143,14 +159,29 @@ function resolveSources(profile) {
     return { enginePack, universal: false };
   }
   const requireUniversal = universalRuntimeRequested();
-  const devkitProArm64 = firstExisting([
+  const architecture = embeddedRuntimeArchitecture();
+  if (architecture) {
+    if (!existsSync(enginePack)) throw new Error("GBAStudioEnginePack ausente.");
+    const toolchains = await prepareMacosUniversalToolchain({ architecture });
+    const support = await prepareMacosSupportRuntime({ architecture });
+    const toolchainRoot = architecture === "arm64" ? toolchains.arm64Root : toolchains.x86_64Root;
+    return {
+      enginePack, architecture, universal: false,
+      pythonFramework: support.pythonRoot, pythonLayout: "Python", pythonRelativePath: "Runtime/Python/bin/python3",
+      devkitArm: path.join(toolchainRoot, "devkitARM"), devkitProTools: path.join(toolchainRoot, "tools"), make: support.make
+    };
+  }
+  const universalSources = requireUniversal ? await resolveUniversalToolchainSources() : null;
+  const supportRuntime = requireUniversal && !process.env.GBA_STUDIO_PYTHON_FRAMEWORK_SOURCE
+    ? await prepareMacosSupportRuntime() : null;
+  const devkitProArm64 = universalSources?.arm64Root ?? firstExisting([
     process.env.GBA_STUDIO_DEVKITPRO_ARM64_SOURCE?.trim(),
     "/opt/devkitpro"
   ]);
-  const devkitProX86_64 = firstExisting([
+  const devkitProX86_64 = universalSources?.x86_64Root ?? firstExisting([
     process.env.GBA_STUDIO_DEVKITPRO_X86_64_SOURCE?.trim()
   ]);
-  const pythonFramework = firstExisting([
+  const pythonFramework = supportRuntime?.pythonRoot ?? firstExisting([
     process.env.GBA_STUDIO_PYTHON_FRAMEWORK_SOURCE?.trim(),
     "/Applications/Xcode.app/Contents/Developer/Library/Frameworks/Python3.framework"
   ]);
@@ -163,10 +194,12 @@ function resolveSources(profile) {
     ]);
   const make = firstExisting([
     process.env.GBA_STUDIO_MAKE_SOURCE?.trim(),
+    supportRuntime?.make,
     "/Applications/Xcode.app/Contents/Developer/usr/bin/make"
   ]);
   const makeX86_64 = firstExisting([
     process.env.GBA_STUDIO_MAKE_X86_64_SOURCE?.trim(),
+    supportRuntime?.make,
     "/usr/bin/make"
   ]);
   const devkitProTools = requireUniversal
@@ -197,6 +230,8 @@ function resolveSources(profile) {
   return {
     enginePack,
     pythonFramework,
+    pythonRelativePath: supportRuntime ? "Runtime/Python/bin/python3" : "Runtime/Python3.framework/Versions/Current/bin/python3",
+    pythonLayout: supportRuntime ? "Python" : "Python3.framework",
     devkitArm,
     devkitProTools,
     make,
@@ -219,7 +254,7 @@ async function copyTree(source, destination) {
 export async function prepareEmbeddedRuntime(options = {}) {
   const profile = options.profile ?? embeddedRuntimeProfile();
   const requirements = embeddedRuntimeRequirements(profile);
-  const sources = resolveSources(profile);
+  const sources = await resolveSources(profile);
   const embeddedEnginePack = path.join(outputRoot, "EnginePack", "GBAStudioEnginePack");
   const embeddedTools = path.join(embeddedEnginePack, "tools");
 
@@ -229,7 +264,7 @@ export async function prepareEmbeddedRuntime(options = {}) {
 
   if (requirements.bundledPython && requirements.bundledToolchain) {
     await Promise.all([
-      copyTree(sources.pythonFramework, path.join(outputRoot, "Runtime", "Python3.framework")),
+      copyTree(sources.pythonFramework, path.join(outputRoot, "Runtime", sources.pythonLayout)),
       copyTree(sources.devkitArm, path.join(outputRoot, "Toolchain", "devkitARM")),
       copyTree(sources.devkitProTools, path.join(outputRoot, "Toolchain", "tools"))
     ]);
@@ -241,7 +276,7 @@ export async function prepareEmbeddedRuntime(options = {}) {
     await writeFile(pythonShim, `#!/bin/sh
 set -eu
 RUNTIME_DIR="$(CDPATH= cd -- "\${0%/*}/.." && pwd)"
-exec "$RUNTIME_DIR/Python3.framework/Versions/Current/bin/python3" "$@"
+exec "$RUNTIME_DIR/${sources.pythonRelativePath.replace(/^Runtime\//, "")}" "$@"
 `, "utf8");
     await chmod(pythonShim, 0o755);
     const embeddedMake = path.join(toolchainBin, "make");
@@ -272,7 +307,7 @@ exec "$RUNTIME_DIR/Python3.framework/Versions/Current/bin/python3" "$@"
       const source = await readFile(pythonToolPath, "utf8");
       await writeFile(pythonToolPath, preserveToolchainSymlinks(source), "utf8");
     }
-    await writeFile(toolPath, embeddedToolWrapper(toolName, profile), "utf8");
+    await writeFile(toolPath, embeddedToolWrapper(toolName, profile, sources.pythonRelativePath), "utf8");
     await chmod(toolPath, 0o755);
   }
 
@@ -284,7 +319,7 @@ exec "$RUNTIME_DIR/Python3.framework/Versions/Current/bin/python3" "$@"
     `Engine Pack: ${sources.enginePack}`,
     `Python: ${requirements.bundledPython ? sources.pythonFramework : "external (python3 or GBA_STUDIO_PYTHON)"}`,
     `Toolchain: ${requirements.bundledToolchain ? sources.devkitArm : "external (DEVKITPRO/DEVKITARM)"}`,
-    `Architecture: ${sources.universal ? "Universal (arm64 + x86_64)" : process.arch}`,
+    `Architecture: ${sources.universal ? "Universal (arm64 + x86_64)" : sources.architecture ?? process.arch}`,
     `Universal toolchain binaries: ${mergedToolchainBinaries.length}`,
     `Info.plist XML normalizados: ${normalizedInfoPlists.length}`,
     requirements.bundledToolchain
@@ -293,10 +328,14 @@ exec "$RUNTIME_DIR/Python3.framework/Versions/Current/bin/python3" "$@"
     ""
   ].join("\n"), "utf8");
 
-  const architectureAudit = await auditUniversalMachOTree(outputRoot);
-  if (sources.universal && architectureAudit.invalid.length > 0) {
+  const architectureAudit = await auditUniversalMachOTree(outputRoot, sources.universal || sources.architecture
+    ? { maximumMacosVersion: "12.0", architecture: sources.architecture } : {});
+  if ((sources.universal || sources.architecture) && architectureAudit.incompatibleMinimum.length > 0) {
+    throw new Error(`Runtime exige macOS superior a 12.0: ${architectureAudit.incompatibleMinimum.map((item) => item.relativePath).join(", ")}`);
+  }
+  if ((sources.universal || sources.architecture) && architectureAudit.invalid.length > 0) {
     throw new Error(
-      `Runtime embarcado ainda contem Mach-O single-arch: ${architectureAudit.invalid.map((item) => item.relativePath).join(", ")}`
+      `Runtime embarcado contem Mach-O incompatível com ${sources.architecture ?? "Universal"}: ${architectureAudit.invalid.map((item) => item.relativePath).join(", ")}`
     );
   }
 

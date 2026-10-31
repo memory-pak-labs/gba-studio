@@ -15,12 +15,12 @@ function titleContract(project) {
 }
 
 describe("carrossel canônico do título", () => {
-  it("mantém 30 cenas e o menu inicial dentro da cena título", () => {
+  it("mantém o menu inicial dentro da cena título", () => {
     const project = JSON.parse(readFileSync(projectURL, "utf8"));
     const sceneNames = project.scenas.map((scene) => scene.name);
     const { title, splash, options } = titleContract(project);
 
-    expect(sceneNames).toHaveLength(30);
+    expect(new Set(sceneNames).size).toBe(sceneNames.length);
     expect(sceneNames).not.toContain("menu_inicial");
     expect(title?.runtime?.type).toBe("menu");
     expect(splash?.id).toBe("title");
@@ -34,7 +34,7 @@ describe("carrossel canônico do título", () => {
     expect(options?.id).toBe("title_options");
     expect(options?.carousel).toBe(true);
     expect(project.events.find((event) => event.name === "titulo_abrir_menu")?.steps.map((step) => step.command))
-      .toEqual(["play_sfx farol_sfx_cursor", "slider title_options"]);
+      .toEqual(["play_sfx menu-abrir-v1.wav 65 8", "slider title_options"]);
     expect(options?.items.map((item) => [item.id, item.targetScreenID])).toEqual([
       ["new-game", "escolha_genero"],
       ["load-game", "carregar_jogo"],
@@ -53,7 +53,7 @@ describe("carrossel canônico do título", () => {
     const promoted = promoteExemploGBAVerticeCampaign(structuredClone(project));
     const { options } = titleContract(promoted);
 
-    expect(promoted.scenas).toHaveLength(30);
+    expect(promoted.scenas).toHaveLength(project.scenas.length);
     expect(promoted.scenas.some((scene) => scene.name === "menu_inicial")).toBe(false);
     expect(options?.carousel).toBe(true);
     expect(options?.items.map((item) => item.id)).toEqual([

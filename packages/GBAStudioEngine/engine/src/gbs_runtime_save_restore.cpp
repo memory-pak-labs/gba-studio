@@ -5,11 +5,20 @@ namespace gbs {
 
 namespace {
 
-UniversalSaveData suspended_save {};
+#if defined(__arm__) || defined(__thumb__)
+#define GBS_SAVE_EWRAM __attribute__((section(".ewram_bss")))
+#else
+#define GBS_SAVE_EWRAM
+#endif
+
+// Save/resume storage persists across runtime overlays and is not IRQ-hot data.
+UniversalSaveData suspended_save GBS_SAVE_EWRAM {};
 bool suspended_save_valid = false;
 bool suspended_resume_requested = false;
-uint8_t suspended_transient[suspended_runtime_transient_capacity] = {};
+uint8_t suspended_transient[suspended_runtime_transient_capacity] GBS_SAVE_EWRAM = {};
 size_t suspended_transient_size = 0;
+
+#undef GBS_SAVE_EWRAM
 
 uint32_t sequence_for_write(uint32_t sequence) {
     return sequence == 0 ? 1u : sequence;

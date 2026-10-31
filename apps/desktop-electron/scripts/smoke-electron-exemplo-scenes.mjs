@@ -1,3 +1,4 @@
+import { platformerCameraPosition, composePlatformerViewport } from './platformer-viewport-contract.mjs';
 import { execFile, spawn } from "node:child_process";
 import { createHash } from "node:crypto";
 import { existsSync, readFileSync } from "node:fs";
@@ -7,13 +8,15 @@ import { basename, dirname, extname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { promisify } from "node:util";
 import { auditNativeIsometricComposition, decodeNativeIsometricPagedComposition } from './native-isometric-composition-contract.mjs';
-import { decodeMGBAHardwareVideoState, exportedHudFramebufferMasks, framebufferOcclusionPixels, nativeSinglePartSpriteObject, transformRacingSpriteSheetRgba } from './native-scene-framebuffer-contract.mjs';
+import { decodeMGBAHardwareVideoState, exportedHudFramebufferMasks, framebufferOcclusionPixels, nativeSinglePartSpriteObject, pointClickCursorFramebufferMask, resolveWorldMapNativeFramebufferMasks, transformRacingSpriteSheetRgba } from './native-scene-framebuffer-contract.mjs';
 import { auditStreamedObjResidency } from "./streamed-obj-residency.mjs";
+import { dungeonActorViewCoordinates } from "./native-scene-framebuffer-contract.mjs";
 
 import {
   cdpSession,
   createElectronSmokeEnv,
   electronExecutablePath,
+  electronLaunchCommand,
   renderedText,
   terminateChild,
   wait
@@ -41,17 +44,22 @@ import {
   exemploScenePlaytestPlan,
   parseExemploSceneSoakMinutes,
   resolveExemploSmokeFaceButton,
+  resolveTopdownActorFramebufferTarget,
+  resolveTopdownCameraPosition,
+  resolveTopdownActorFramebufferTargets,
   selectExemploScenePlaytestPlan,
   selectExemploScenePlaytestProjectPath,
-  steadyFrameSamples
+  steadyFrameSamples,
+  selectSceneCadenceWindow
 } from "./exemplo-scene-playtest-contract.mjs";
 import {
   decodePngRgba
 } from "./lib/png-icons.mjs";
 import { renderPngContactSheet } from "./lib/png-contact-sheet.mjs";
-import { resolveLutaFighterFramebufferMasks } from "./luta-framebuffer-contract.mjs";
+import { resolveLutaNativeFramebufferMasks, resolveLutaFighterOcclusionPixels } from "./luta-framebuffer-contract.mjs";
 import { auditTemporalVisualStability } from "./visual-frame-stability.mjs";
 import {
+  approvedObjectPaletteSourceRgba,
   auditAlphaBlendedRgbaAgainstFramebuffer,
   auditOpaqueRgbaAgainstFramebufferRegion,
   auditRgbaAgainstFramebufferWithMasks,
@@ -84,6 +92,7 @@ import {
 import { classifyP0ProjectPath, resolveCanonicalP0Source } from "./p0-source-catalog.mjs";
 import { activeBuildRomPaths } from "./exemplo-template-smoke-contract.mjs";
 import { defaultWelcomeSavedProjectPath } from "./smoke-electron-welcome-paths.mjs";
+import { readPlayerPlaybackReadiness } from "./player-playback-readiness.mjs";
 
 const appRoot = dirname(dirname(fileURLToPath(import.meta.url)));
 const canonicalTemplatePath = join(appRoot, "default-assets", "templates", "exemplo-gba", "exemplo-gba.gba-project");
@@ -122,6 +131,8 @@ const evidencePath = requestedEvidencePath
 const canonicalP0Source = resolveCanonicalP0Source(appRoot);
 const defaultTemplatePath = canonicalP0Source.projectPath;
 const authoredActorFramebufferScenes = new Set([
+  "porto_lumen",
+  "farol_interior",
   "usina_submersa",
   "arena_tatica"
 ]);
@@ -218,6 +229,7 @@ function currentTemplateRuntimeSpriteSpec(assetName) {
   const frameHeight = Number(metadata.frameHeight) || image.height;
   const frameCount = Number(metadata.frameCount) || Math.floor(image.width / frameWidth) * Math.floor(image.height / frameHeight);
   return Object.freeze({
+    colorMode: metadata.colorMode ?? "4bpp",
     allowPaletteRemap: metadata.assetcStatus === "pending" || metadata.assetcReviewed !== true,
     assetName,
     frameCount,
@@ -234,7 +246,7 @@ function currentTemplateRuntimeSpriteSpec(assetName) {
 }
 
 const runtimePlayerSpecs = Object.freeze({
-  platformer: currentTemplateRuntimeSpriteSpec("penedos-v10-nara.png"),
+  platformer: currentTemplateRuntimeSpriteSpec("penedos-approved-nara.png"),
   pointAndClick: Object.freeze({
     assetName: "point-click-cursor.png",
     frameCount: 2,
@@ -251,56 +263,10 @@ const runtimePlayerSpecs = Object.freeze({
     tileCount: 8,
     transparentPaletteIndex: 0
   }),
-  shmup: Object.freeze({
-    assetName: "tempestade-v3-player.png",
-    frameCount: 1,
-    frameHeight: 64,
-    frameWidth: 64,
-    palette: Object.freeze([
-      0x0000, 8489, 6417, 6519, 19057, 23387, 18036, 3136,
-      7363, 13702, 21204, 23318, 14794, 17997, 17048, 18235
-    ]),
-    sheetHeight: 64,
-    sheetWidth: 64,
-    sha256: "3eb41a92131ae9e71c384aea57457e6222ce298b64dc040549d5edb901802f8a",
-    symbol: "tempestade_v3_player",
-    tileCount: 64,
-    // OBJ transparency is encoded by palette index 0. The RGB value stored
-    // in that slot may be non-zero when the exporter remaps the object
-    // palette, so the audit must not infer transparency from the color value.
-    transparentPaletteIndex: 0
-  }),
-  isometric: currentTemplateRuntimeSpriteSpec("tactical-nara-v5.png"),
-  racing: Object.freeze({
-    assetName: "nara-racer.png",
-    frameCount: 3,
-    frameHeight: 32,
-    frameWidth: 32,
-    palette: Object.freeze([
-      0, 6339, 17113, 4193, 17009, 15849, 5428, 7575,
-      13701, 21307, 9513, 20107, 9477, 22365, 21202, 9618
-    ]),
-    sheetHeight: 32,
-    sheetWidth: 96,
-    sha256: "d933dc6a743c06312ea3c343079080430272e43ff0fe1bed0a5d5cc016446185",
-    symbol: "nara_racer",
-    tileCount: 48
-  }),
-  battleRpg: Object.freeze({
-    assetName: "battle-rpg-scene-party-mechanic-alpha128-v2.png",
-    frameCount: 6,
-    frameHeight: 64,
-    frameWidth: 64,
-    palette: Object.freeze([
-      0x0000, 0x1482, 0x18c6, 0x18ec, 0x1d4f, 0x4250, 0x2528, 0x2dd1,
-      0x31aa, 0x52f5, 0x42b9, 0x575d, 0x29f8, 0x1975, 0x325d, 0x42de
-    ]),
-    sheetHeight: 64,
-    sheetWidth: 384,
-    sha256: "7cfffa6566c2a2b3790891c8b9d3ce9a189da204174fd00f620610e44caf0c10",
-    symbol: "battle_rpg_scene_party_mechanic_alpha128_v2",
-    tileCount: 320
-  })
+  shmup: currentTemplateRuntimeSpriteSpec("tempestade-approved-player.png"),
+  isometric: currentTemplateRuntimeSpriteSpec("market-approved-actors-64x64.png"),
+  racing: currentTemplateRuntimeSpriteSpec("racing-approved-overhead-nara.png"),
+  battleRpg: currentTemplateRuntimeSpriteSpec("relay-approved-nara.png")
 });
 
 const topdownPlayerSpec = Object.freeze({
@@ -522,6 +488,25 @@ async function waitForRunSceneEnabled(cdp, sceneName) {
   throw new Error(`O editor nao reabilitou ${ariaLabel}: ${JSON.stringify(lastState)}.`);
 }
 
+async function waitForPlayerPlaybackReady(cdp) {
+  return evaluate(cdp, `new Promise(resolve => {
+    const read = ${readPlayerPlaybackReadiness.toString()};
+    const started = performance.now();
+    const check = () => {
+      const sample = read(window.GBAStudioDirectPlayer, performance.timeOrigin + performance.now());
+      if (sample.ok) {
+        requestAnimationFrame(() => {
+          const presented = read(window.GBAStudioDirectPlayer, performance.timeOrigin + performance.now());
+          if (presented.ok) resolve(presented);
+          else setTimeout(check, 100);
+        });
+      } else if (performance.now() - started > 15000) resolve(sample);
+      else setTimeout(check, 100);
+    };
+    check();
+  })`, true);
+}
+
 async function waitForPlayerEvidence(cdp, captureFramebuffer = false) {
   const evidence = await evaluate(cdp, `
     new Promise((resolve) => {
@@ -547,7 +532,8 @@ async function waitForPlayerEvidence(cdp, captureFramebuffer = false) {
           // sampled from the same render pass; otherwise a transient previous
           // OBJ frame can make an exact sprite audit fail intermittently.
           requestAnimationFrame(() => {
-            const presentedAfterPaint = player?.inspectPresentedRuntime?.()?.state ?? null;
+            const presentedSnapshot = player?.inspectPresentedRuntime?.();
+            const presentedAfterPaint = presentedSnapshot?.state ?? null;
             const runtimeAfterPaint = player?.inspectRuntime?.()?.state ?? null;
             const frameAfterPaint = player?.inspectFrame?.() ?? frame;
             let framebufferRgbaBase64 = null;
@@ -583,7 +569,9 @@ async function waitForPlayerEvidence(cdp, captureFramebuffer = false) {
               frame: frameAfterPaint,
               framebufferRgbaBase64,
               nativeStateBase64,
+              observedAtUnixMs: performance.timeOrigin + performance.now(),
               presentedRuntimeState: presentedAfterPaint,
+              previousPresentedRuntimeState: presentedSnapshot?.previousState ?? null,
               runtimeState: runtimeAfterPaint
             });
           });
@@ -606,6 +594,38 @@ async function waitForPlayerEvidence(cdp, captureFramebuffer = false) {
     delete evidence.nativeStateBase64;
   }
   return evidence;
+}
+
+async function waitForIsometricCameraRest(cdp, initialEvidence) {
+  // Follow-camera easing continues after the first meaningful boot frame.
+  // A native savestate can also lead the presented canvas by one update.
+  // Compare exact pixels only after both scroll and player OAM have stopped;
+  // keep all pixel/palette/actor checks unchanged.
+  const deadline = Date.now() + 15_000;
+  const samples = [];
+  let evidence = initialEvidence;
+  let previousSignature = null;
+  let previousFrame = -1;
+  let stableSamples = 0;
+  while (Date.now() < deadline) {
+    const state = evidence.presentedRuntimeState;
+    const video = state?.nativeVideo;
+    const player = video?.objects?.find(object => object.index === 0);
+    const scroll = video?.bg?.[2];
+    const signature = JSON.stringify([state?.currentRoom, scroll?.x, scroll?.y, player?.x, player?.y]);
+    const fullyVisible = player && player.x >= 0 && player.y >= 0
+      && player.x + player.width <= 240 && player.y + player.height <= 160;
+    if (scroll && fullyVisible && Number(state?.frame) > previousFrame) {
+      stableSamples = signature === previousSignature ? stableSamples + 1 : 0;
+      previousSignature = signature;
+      previousFrame = Number(state.frame);
+      samples.push({frame: state.frame, scroll, player: {x: player.x, y: player.y}});
+      if (stableSamples >= 3) return {...evidence, cameraRest: {stableSamples, samples}};
+    } else stableSamples = 0;
+    await wait(100);
+    evidence = await waitForPlayerEvidence(cdp, true);
+  }
+  throw new Error(`A câmera isométrica não estabilizou com o jogador visível: ${JSON.stringify(samples)}.`);
 }
 
 async function samplePlayerVisualStability(cdp, sampleCount = 36, actorRegions = []) {
@@ -924,24 +944,33 @@ function average(samples, key) {
   return samples.reduce((total, sample) => total + Number(sample[key] ?? 0), 0) / samples.length;
 }
 
-async function waitForPerformance(mainCdp, knownWindowIDs) {
+async function waitForPerformance(mainCdp, knownWindowIDs, scope = null) {
   const value = await evaluate(mainCdp, `
     new Promise((resolve) => {
       const known = new Set(${JSON.stringify([...knownWindowIDs])});
+      const notBefore = ${JSON.stringify(scope?.notBeforeUnixMs ?? null)};
+      const inWindow = (event) => notBefore === null || (
+        Number.isFinite(event.stats?.sampledAtUnixMs) && event.stats.sampledAtUnixMs >= notBefore
+      );
       const started = Date.now();
       const check = () => {
-        const events = window.__gbaStudioScenePlaytestTelemetry ?? [];
+        const events = (window.__gbaStudioScenePlaytestTelemetry ?? []).slice(${JSON.stringify(scope?.afterIndex ?? 0)});
         const candidate = [...events].reverse().find((event) => (
           event.state === "running" &&
           !known.has(event.windowID) &&
+          inWindow(event) &&
           Number(event.stats?.presentationFps) > 0
         ));
         const samples = candidate
-          ? events.filter((event) => event.windowID === candidate.windowID && Number(event.stats?.presentationFps) > 0).map((event) => event.stats)
+          ? events.filter((event) => event.windowID === candidate.windowID && inWindow(event) && Number(event.stats?.presentationFps) > 0).map((event) => event.stats)
           : [];
         const timedOut = Date.now() - started > 15_000;
         if (candidate && (samples.length >= 4 || (timedOut && samples.length >= 3))) {
-          resolve({ ok: true, samples, windowID: candidate.windowID });
+          const excludedBeforeScope = notBefore === null ? [] : events
+            .filter(event => event.windowID === candidate.windowID && Number(event.stats?.presentationFps) > 0
+              && Number.isFinite(event.stats?.sampledAtUnixMs) && event.stats.sampledAtUnixMs < notBefore)
+            .map(event => event.stats);
+          resolve({ ok: true, samples, windowID: candidate.windowID, excludedBeforeScope });
           return;
         }
         if (timedOut) {
@@ -954,13 +983,23 @@ async function waitForPerformance(mainCdp, knownWindowIDs) {
     })
   `, true);
   if (!value?.ok) throw new Error(`Telemetria de cadencia insuficiente: ${JSON.stringify(value)}.`);
-  const samples = steadyFrameSamples(value.samples);
+  let observedSamples;
+  try {
+    observedSamples = scope ? selectSceneCadenceWindow(value.samples, scope) : value.samples;
+  } catch (error) {
+    // Preserve the actual rejected sequence before the smoke closes its Player.
+    await writeFile(join(evidenceRoot, `cadence-rejected-${value.windowID}.json`),
+      JSON.stringify({ scope, ...value }, null, 2));
+    throw error;
+  }
+  const samples = steadyFrameSamples(observedSamples);
   return {
     droppedFrameRatio: Math.round(average(samples, "droppedFrameRatio") * 10_000) / 10_000,
     droppedFrames: Math.round(average(samples, "droppedFrames")),
     emulationFps: Math.round(average(samples, "emulationFps") * 100) / 100,
     emulationMs: Math.round(average(samples, "emulationMs") * 100) / 100,
     presentationFps: Math.round(average(samples, "presentationFps") * 100) / 100,
+    ...(scope ? { scope, observedSamples, excludedBeforeScope: value.excludedBeforeScope } : {}),
     samples,
     windowID: value.windowID
   };
@@ -1299,13 +1338,15 @@ function exportedIntegerConstant(headerSource, symbol, suffix) {
 }
 
 function authoredActorFramebufferTarget(room, runtime, actor, frameWidth, frameHeight, runtimeState, exportedProject) {
+  if (runtime === "topdown") return resolveTopdownActorFramebufferTarget(room,actor,runtimeState,exportedProject);
   const x = Number(actor?.x) * 8;
   const y = Number(actor?.y) * 8;
   if (!Number.isFinite(x) || !Number.isFinite(y)) return null;
   if (runtime === "pointAndClick" && actor?.name === room?.playerActorName
     && Number.isFinite(Number(runtimeState?.player?.x))
     && Number.isFinite(Number(runtimeState?.player?.y))) {
-    return { x: Number(runtimeState.player.x), y: Number(runtimeState.player.y) - 8 };
+    const cursor = pointClickCursorFramebufferMask(runtimeState);
+    return {x:cursor.x,y:cursor.y};
   }
   if (runtime === "platformer") {
     return { x: x - frameWidth / 2, y: y - frameHeight + 8 };
@@ -1350,12 +1391,9 @@ function authoredActorFramebufferTarget(room, runtime, actor, frameWidth, frameH
     ];
     const forward = forwardByDirection[Number(position?.direction)] ?? forwardByDirection[0];
     const right = { x: -forward.y, y: forward.x };
-    const deltaX = Number(actor.x) - Number(position.x);
-    const deltaY = Number(actor.y) - Number(position.y);
-    const distance = deltaX * forward.x + deltaY * forward.y;
-    const lateral = deltaX * forward.y - deltaY * forward.x;
-    const viewDistance = Number(runtimeRoom.config?.view_distance ?? 0);
-    if (distance < 1 || distance > viewDistance || lateral < -1 || lateral > 1) return null;
+    const view = dungeonActorViewCoordinates(runtimeRoom, actor, runtimeState);
+    if (!view) return null;
+    const {distance,lateral} = view;
     for (let nearer = 1; nearer < distance; nearer += 1) {
       const xAtDistance = Number(position.x) + forward.x * nearer + right.x * lateral;
       const yAtDistance = Number(position.y) + forward.y * nearer + right.y * lateral;
@@ -1372,9 +1410,13 @@ function authoredActorFramebufferTarget(room, runtime, actor, frameWidth, frameH
     };
   }
   if (runtime === "battleRpg") {
-    return actor?.battle?.side === "enemy"
-      ? { x: 176, y: 24 }
-      : { x: 48, y: 32 };
+    const encounter=exportedProject?.battle_rpg_project?.encounters?.find(e=>e.name===room?.name);
+    const participant=(actor?.battle?.side==="enemy"?encounter?.enemies:encounter?.party)?.find(p=>p.name===actor?.name);
+    if(participant?.position){
+      const part=participant.animation_set?.idle?.frame_metasprites?.[0]?.parts?.[0];
+      return {x:participant.position.x+(part?.x??0),y:participant.position.y+(part?.y??0)};
+    }
+    return actor?.battle?.side === "enemy" ? { x: 176, y: 24 } : { x: 48, y: 32 };
   }
   if (runtime === "shmup") {
     return { x, y };
@@ -1432,6 +1474,24 @@ function temporalActorRegionsForScene({ project, exportedProject, room, runtime,
   return regions;
 }
 
+async function topdownHudOcclusionPixels(exportPath, exported, sceneName) {
+  const ui = exported?.topdown_project?.dialogue_ui;
+  const id = ui?.hud_scene_bindings?.find(binding=>binding.scene_name===sceneName)?.preset_id;
+  const layout = ui?.hud_layouts?.find(candidate=>candidate.id===id);
+  const layers = [];
+  for (const component of layout?.components ?? []) {
+    if (!component.visible || !component.asset || !['frame','icon'].includes(component.kind)) continue;
+    const header = await readFile(join(dirname(exportPath),`${component.asset}.hpp`),'utf8');
+    const source = decodeExportedSpriteSheetRgba({headerSource:header,symbol:component.asset,
+      frameCount:1,frameWidth:exportedIntegerConstant(header,component.asset,'sprite_width'),
+      frameHeight:exportedIntegerConstant(header,component.asset,'sprite_height')});
+    layers.push({source,x:component.x,y:component.y});
+  }
+  // Only an exact declared overlay pixel can cover the actor. HUD bounds alone
+  // would also hide corrupted actor pixels under transparent padding.
+  return framebufferOcclusionPixels(layers);
+}
+
 async function auditExportedAuthoredActors(exportPath, exported, project, room, frame, exactOptions = null) {
   const actors = (Array.isArray(project?.actors) ? project.actors : [])
     .filter((actor) => actor?.roomName === room?.name);
@@ -1441,6 +1501,7 @@ async function auditExportedAuthoredActors(exportPath, exported, project, room, 
   const runtime = exactOptions?.runtime ?? room?.sceneType ?? null;
   const frameRuntimeState = exactOptions?.presentedRuntimeState ?? exactOptions?.runtimeState;
   const framebufferRuntimeSupport = new Set([
+    "topdown",
     "battleRpg",
     "dungeonCrawler",
     "isometric",
@@ -1478,6 +1539,7 @@ async function auditExportedAuthoredActors(exportPath, exported, project, room, 
     : [];
   const allowedNativeOcclusionPixels = runtime === 'isometric'
     ? await isometricNativeOcclusionPixels(exportPath, exactOptions?.exportedProject ?? exported, room.name, frameRuntimeState)
+    : runtime === 'topdown' ? await topdownHudOcclusionPixels(exportPath,exported,room.name)
     : new Set();
   const audits = await Promise.all(actors.map(async (actor) => {
     const sourceAssetName = typeof actor?.spriteSheet === "string" ? actor.spriteSheet : null;
@@ -1504,6 +1566,9 @@ async function auditExportedAuthoredActors(exportPath, exported, project, room, 
         readFile(sourcePath)
       ]);
       const source = decodePngRgba(sourceBytes);
+      const metadata = project.assets?.find(asset => asset.name === sourceAssetName)?.metadata;
+      const approvedRuntimeSource = approvedObjectPaletteSourceRgba(source, metadata);
+      const approvedPaletteRemap = approvedRuntimeSource !== source;
       const frameWidth = exportedIntegerConstant(header, symbol, "sprite_width")
         ?? spriteFrameDimensions(sourceAssetName, actor, project?.animations)?.width
         ?? source.width;
@@ -1515,6 +1580,7 @@ async function auditExportedAuthoredActors(exportPath, exported, project, room, 
       const sheetWidth = exportedIntegerConstant(header, symbol, "width") ?? source.width;
       const sheetHeight = exportedIntegerConstant(header, symbol, "height") ?? source.height;
       const objectPaletteOverride = exportedObjectPaletteOverride(exactOptions?.exportedProject ?? exported, symbol);
+      const allowPaletteRemap = objectPaletteOverride !== null && parseExportedBackgroundTileAsset(header,symbol).bitsPerPixel !== 8;
       const sourceFrames = Array.from({ length: frameCount }, (_, frameIndex) => {
         const origin = spriteSheetFrameOrigin(source, frameIndex, frameWidth, frameHeight);
         return auditRgbaAgainstExportedSpriteFrame({
@@ -1522,13 +1588,13 @@ async function auditExportedAuthoredActors(exportPath, exported, project, room, 
           frameIndex,
           frameWidth,
           headerSource: header,
-          pixels: source.pixels,
+          pixels: approvedRuntimeSource.pixels,
           sheetWidth: source.width,
           symbol,
           sourceX: origin.sourceX,
           sourceY: origin.sourceY,
           transparentPaletteIndex: 0,
-          allowPaletteRemap: objectPaletteOverride !== null
+          allowPaletteRemap
         });
       });
       const palette = parseExportedRgb555Palette(header, symbol);
@@ -1536,7 +1602,10 @@ async function auditExportedAuthoredActors(exportPath, exported, project, room, 
         ? Math.max(1, Math.min(2, Number(actor?.battle?.spriteScale) || 1))
         : 1;
       let framebufferPixels = { audited: false, ok: true };
-      const visibleInInitialFrame = typeof actor?.visibleVariable !== "string";
+      const inactiveActionEffect = runtime === "battleRpg"
+        && room?.runtime?.config?.presentation?.effectsActorId === actor?.id
+        && !nativeSinglePartSpriteObject(header,symbol,frameRuntimeState?.nativeVideo);
+      const visibleInInitialFrame = typeof actor?.visibleVariable !== "string" && !inactiveActionEffect;
       const authoredTarget = authoredActorFramebufferTarget(
         room,
         runtime,
@@ -1558,7 +1627,7 @@ async function auditExportedAuthoredActors(exportPath, exported, project, room, 
         && intersectsInitialFramebuffer
       );
       if (framebufferRequired) {
-        const nativeActorObject = ['platformer', 'luta'].includes(runtime)
+        const nativeActorObject = ['platformer', 'luta', 'battleRpg'].includes(runtime)
           ? nativeSinglePartSpriteObject(header, symbol, frameRuntimeState?.nativeVideo)
           : null;
         let compiledSource = scaleRgbaSpriteSheet(decodeExportedSpriteSheetRgba({
@@ -1574,6 +1643,10 @@ async function auditExportedAuthoredActors(exportPath, exported, project, room, 
         }
         const allowedRacingOcclusionPixels = nativeRacingObject
           ? await racingNativeOcclusionPixels(exportPath,exactOptions?.exportedProject ?? exported,room.name,frameRuntimeState,nativeRacingObject.index)
+          : new Set();
+        const allowedLutaOcclusionPixels = runtime === 'luta' && nativeActorObject
+          ? await lutaNativeOcclusionPixels(exportPath, exactOptions?.exportedProject ?? exported,
+            frameRuntimeState, framebufferRgba, nativeActorObject.index)
           : new Set();
         const renderedFrameWidth = frameWidth * spriteScale;
         const renderedFrameHeight = frameHeight * spriteScale;
@@ -1594,8 +1667,10 @@ async function auditExportedAuthoredActors(exportPath, exported, project, room, 
           ...findBestOpaqueRgbaFramebufferFrame({
             candidateFlipsX: nativeActorObject ? [nativeActorObject.flipX] : [false],
             candidateSourceXs,
-            candidateTargets: nativeActorObject ? [{x:nativeActorObject.x,y:nativeActorObject.y}]
-              : runtime === 'racing' && authoredTarget ? [authoredTarget] : authoredTarget ? [authoredTarget, ...detectedTargets] : detectedTargets,
+            candidateTargets: runtime === 'topdown'
+              ? resolveTopdownActorFramebufferTargets(room,actor,frameRuntimeState,exactOptions?.exportedProject,exactOptions?.previousPresentedRuntimeState)
+              : nativeActorObject ? [{x:nativeActorObject.x,y:nativeActorObject.y}]
+              : ['racing','topdown'].includes(runtime) && authoredTarget ? [authoredTarget] : authoredTarget ? [authoredTarget, ...detectedTargets] : detectedTargets,
             framebuffer: framebufferRgba,
             framebufferHeight: SCREEN_HEIGHT,
             framebufferWidth: SCREEN_WIDTH,
@@ -1605,7 +1680,8 @@ async function auditExportedAuthoredActors(exportPath, exported, project, room, 
             // an actor in the isometric depth order. Other OBJ layers remain
             // visible mismatches instead of being silently accepted.
             allowedOcclusionRgb555: allowedTacticalOcclusionRgb555,
-            allowedOcclusionPixels: runtime === 'racing' ? allowedRacingOcclusionPixels : allowedNativeOcclusionPixels,
+            allowedOcclusionPixels: runtime === 'luta' ? allowedLutaOcclusionPixels
+              : runtime === 'racing' ? allowedRacingOcclusionPixels : allowedNativeOcclusionPixels,
             sourcePixels: compiledSource.pixels,
             sourceSheetWidth: compiledSource.width
           })
@@ -1628,7 +1704,7 @@ async function auditExportedAuthoredActors(exportPath, exported, project, room, 
           audited: framebufferRequired,
           ok: !framebufferRequired || framebufferPixels.ok,
           required: framebufferRequired,
-          reason: !visibleInInitialFrame
+          reason: inactiveActionEffect ? "efeito-de-acao-inativo-no-frame-inicial" : !visibleInInitialFrame
             ? "ator-condicional-ausente-no-frame-inicial"
             : !intersectsInitialFramebuffer
               ? "ator-fora-do-framebuffer-inicial"
@@ -1641,7 +1717,7 @@ async function auditExportedAuthoredActors(exportPath, exported, project, room, 
         renderedFrameHeight: frameHeight * spriteScale,
         renderedFrameWidth: frameWidth * spriteScale,
         palette,
-        paletteRemapped: objectPaletteOverride !== null,
+        paletteRemapped: allowPaletteRemap || approvedPaletteRemap,
         sourceFrames,
         sourcePath,
         spriteScale,
@@ -1810,30 +1886,20 @@ function exactBackgroundFramebufferMasks(
   const masks = runtime === "platformer"
     ? []
     : [{ height: 8, width: 240, x: 0, y: 0 }];
+  if (runtime === "worldMap" && runtimeState?.nativeVideo) {
+    // Use the actual vehicle, markers and HUD bounds, including the affine
+    // double-size display area, rather than assuming a 32px player frame.
+    return [...masks,...resolveWorldMapNativeFramebufferMasks(runtimeState.nativeVideo)];
+  }
+  if (runtime === "topdown" && runtimeState?.nativeVideo) {
+    // These are actual OAM rectangles, including the separately audited actors
+    // and HUD. Background comparisons keep the native scrolling coordinates.
+    return [...masks,...runtimeState.nativeVideo.objects.map(({x,y,width,height})=>({x,y,width,height}))];
+  }
   if (runtime === "luta") {
-    // The luta runtime composes its fixed HUD on BG0 and its fighters on OAM.
-    // Exclude those native surfaces while proving that the authored stage is
-    // still exact in the framebuffer.
-    const lutaHudMasks = [
-      // The approved 240x160 HUD has opaque top and bottom panels plus a
-      // centered round/timer medallion. Keep the mask aligned to the native
-      // asset bounds so the stage comparison does not treat HUD pixels as
-      // background regressions.
-      { height: 32, width: 240, x: 0, y: 0 },
-      { height: 32, width: 240, x: 0, y: 128 },
-      { height: 32, width: 32, x: 104, y: 0 }
-    ];
-    masks.push(...lutaHudMasks);
-    // Os alvos vêm da mesma auditoria de pixels que prova cada lutador. Isso
-    // acompanha anchors/metasprites diferentes sem mascarar uma área fixa do
-    // cenário maior que os OBJ efetivamente desenhados.
-    masks.push(...resolveLutaFighterFramebufferMasks({
-      fighters: lutaFighters,
-      sourceX,
-      sourceY
-    }));
-    masks.push({ height: 72, width: 176, x: 64, y: 72 });
-    return masks;
+    // Modular frames, round markers and glyphs are OBJ alongside the fighters.
+    // Their real OAM replaces the former fixed HUD and broad floor masks.
+    return [...masks,...resolveLutaNativeFramebufferMasks(runtimeState?.nativeVideo)];
   }
   if (runtime === "racing") {
     // The racing runtime keeps its status bar on BG0 for the full race. The
@@ -1879,6 +1945,9 @@ function exactBackgroundFramebufferMasks(
     // uma divergência que não é perda da arte de fundo.
     masks.push({ height: 32, width: 240, x: 0, y: 0 });
   }
+  if (runtime === "platformer" && runtimeState?.nativeVideo) {
+    return runtimeState.nativeVideo.objects.map(({x,y,width,height})=>({x,y,width,height}));
+  }
   if (runtime === "platformer" && room?.name === "penedos_vento") {
     // O preset aprovado usa duas molduras superiores para vida e itens. Elas
     // são UI deliberada e não pertencem ao background composto da plataforma.
@@ -1893,10 +1962,8 @@ function exactBackgroundFramebufferMasks(
   }
   if (runtime === "pointAndClick" && runtimeRoom) {
     masks.push(...resolvePointClickPropFramebufferMasks(runtimeRoom));
-    // Props use exported metasprite offsets, rather than the editor canvas.
-    // The pointer is audited separately and occupies its native 16px frame.
-    masks.push({ height: 16, width: 16,
-      x: Number(runtimeState?.player?.x), y: Number(runtimeState?.player?.y) - 8 });
+    // The cursor is audited separately; mask only its real native OAM rectangle.
+    masks.push(pointClickCursorFramebufferMask(runtimeState));
     return masks;
   }
   if (runtime === "worldMap" && runtimeRoom) {
@@ -2124,42 +2191,6 @@ async function racingNativeOcclusionPixels(exportPath, exported, roomName, runti
   return framebufferOcclusionPixels(layers);
 }
 
-function platformerCameraPosition(exportedRoom, runtimeState) {
-  const roomWidthPixels = Number(exportedRoom?.width_tiles ?? 0) * 8;
-  const roomHeightPixels = Number(exportedRoom?.height_tiles ?? 0) * 8;
-  const playerWidth = Number(exportedRoom?.player_start?.width ?? 16);
-  const playerHeight = Number(exportedRoom?.player_start?.height ?? 16);
-  const initialPosition = exportedRoom?.camera?.position ?? { x: 0, y: 0 };
-  const config = exportedRoom?.config ?? {};
-  const followDirections = Number(config.camera_follow_directions ?? 15);
-  const deadZoneX = Number(config.camera_deadzone_x_pixels ?? 0);
-  const cameraLockEdge = Number(config.camera_lock_edge ?? 0);
-  let cameraX = Number(initialPosition.x ?? 0);
-  let cameraY = Number(initialPosition.y ?? 0);
-  if (exportedRoom?.camera?.follow_player === true) {
-    const centerX = Number(runtimeState?.player?.x ?? 0) + Math.floor(playerWidth / 2);
-    const centerY = Number(runtimeState?.player?.y ?? 0) + Math.floor(playerHeight / 2);
-    if ((followDirections & 0x01) !== 0 || (followDirections & 0x02) !== 0) {
-      const viewportCenterX = cameraX + (SCREEN_WIDTH / 2);
-      if (deadZoneX <= 0) {
-        cameraX = centerX - (SCREEN_WIDTH / 2);
-      } else if ((followDirections & 0x01) !== 0 && centerX > viewportCenterX + deadZoneX) {
-        cameraX += centerX - (viewportCenterX + deadZoneX);
-      } else if ((followDirections & 0x02) !== 0 && centerX < viewportCenterX - deadZoneX) {
-        cameraX -= (viewportCenterX - deadZoneX) - centerX;
-      }
-    }
-    if ((followDirections & 0x04) !== 0 || (followDirections & 0x08) !== 0) {
-      cameraY = centerY - (SCREEN_HEIGHT / 2);
-    }
-    if (cameraLockEdge === 1) cameraX = 0;
-    else if (cameraLockEdge === 2) cameraX = roomWidthPixels - SCREEN_WIDTH;
-  }
-  return {
-    x: Math.max(0, Math.min(cameraX, Math.max(0, roomWidthPixels - SCREEN_WIDTH))),
-    y: Math.max(0, Math.min(cameraY, Math.max(0, roomHeightPixels - SCREEN_HEIGHT)))
-  };
-}
 
 function auditIsometricRoomFramebuffer(source, room, runtimeState, framebufferRgbaBase64, options = null) {
   const sourceTileDestination = Number(options?.sourceTileDestination ?? 0);
@@ -2367,6 +2398,8 @@ async function auditLayeredPlatformerFramebuffer(exportPath, project, room, exac
   const sourceY = exactOptions.runtime === "platformer"
     ? camera.y
     : Number(exactOptions.sourceY ?? camera.y ?? 0);
+  const viewportLayers = compiledLayers.map((image,index)=>({...image,parallax:exportedLayers.find(layer=>layer.layer===layerChecks[index].mapping)?.parallax}));
+  const composedViewport = composePlatformerViewport(viewportLayers,camera);
   const framebufferPixels = {
     audited: true,
     ...auditRgbaAgainstFramebufferWithMasks({
@@ -2375,7 +2408,7 @@ async function auditLayeredPlatformerFramebuffer(exportPath, project, room, exac
       framebuffer,
       framebufferHeight: 160,
       framebufferWidth: 240,
-      height,
+      height: 160,
       masks: exactBackgroundFramebufferMasks(
         room,
         exactOptions.actors,
@@ -2386,10 +2419,10 @@ async function auditLayeredPlatformerFramebuffer(exportPath, project, room, exac
         exportedRoom,
         exactOptions.animations
       ),
-      sourcePixels: compiledPreview.pixels,
-      sourceX,
-      sourceY,
-      width
+      sourcePixels: composedViewport.pixels,
+      sourceX: 0,
+      sourceY: 0,
+      width: 240
     })
   };
   return {
@@ -2905,6 +2938,7 @@ async function auditExportedSceneBackgroundAsset(exportPath, project, room, fram
     : null;
   const backgroundSourceX = Number(
     authoredIsometricScroll?.x
+      ?? (exactOptions?.runtime === 'topdown' ? resolveTopdownCameraPosition(room,frameRuntimeState,exactOptions.exportedProject)?.x : null)
       ?? worldMapViewport?.x
       ?? platformerViewport?.x
       ?? exactOptions?.sourceX
@@ -2912,6 +2946,7 @@ async function auditExportedSceneBackgroundAsset(exportPath, project, room, fram
   );
   const backgroundSourceY = Number(
     authoredIsometricScroll?.y
+      ?? (exactOptions?.runtime === 'topdown' ? resolveTopdownCameraPosition(room,frameRuntimeState,exactOptions.exportedProject)?.y : null)
       ?? worldMapViewport?.y
       ?? platformerViewport?.y
       ?? exactOptions?.sourceY
@@ -2993,7 +3028,9 @@ async function auditExportedSceneBackgroundAsset(exportPath, project, room, fram
       ? palette.length <= 256
       : palette.length <= 256 && palette.length % 16 === 0),
     png,
-    sourcePixels: nativeComposition?.audited ? nativeComposition.ok : exactOptions?.framebufferRgbaBase64 ? sourcePixelsWithNativeReduction.ok : true,
+    sourcePixels: nativeComposition?.audited ? nativeComposition.ok
+      : exactOptions?.framebufferRgbaBase64 || sourceAsset?.metadata?.kind === "affine_bg"
+        ? sourcePixelsWithNativeReduction.ok : true,
     tilemap: framebuffer.exportCoverage.tilemapEntryCount === (
       usesSourceAssetLayout ? (sourceWidth / 8) * (sourceHeight / 8) : Number(room.width) * Number(room.height)
     ) && framebuffer.exportCoverage.pixelCount === sourceWidth * sourceHeight
@@ -3351,7 +3388,7 @@ function exportedRuntimePlayerAsset(exported, runtime) {
   if (runtime === "pointAndClick") return exported?.point_click_project?.cursor?.metasprite?.asset ?? null;
   if (runtime === "shmup") return exported?.shmup_project?.player?.metasprite?.asset ?? null;
   if (runtime === "isometric") return exported?.isometric_project?.rooms?.[0]?.actors?.[0]?.metasprite?.asset ?? null;
-  if (runtime === "racing") return exported?.racing_project?.player?.idle_metasprite?.asset ?? null;
+  if (runtime === "racing") { const p=exported?.racing_project; return (p?.rooms?.[p?.initial_room ?? 0]?.player ?? p?.player)?.idle_metasprite?.asset ?? null; }
   if (runtime === "battleRpg") {
     const battle = exported?.battle_rpg_project;
     return battle?.encounters?.[battle?.initial_encounter ?? 0]?.party?.[0]?.metasprite?.asset ?? null;
@@ -3417,19 +3454,36 @@ function opaqueAnchorFramebufferTargets({
   return [...targets.values()];
 }
 
+async function lutaNativeOcclusionPixels(exportPath, exported, runtimeState, framebuffer, targetObjectIndex) {
+  const project=exported.luta_project, stage=project?.stages?.[project.initial_stage ?? 0], fighters=[];
+  for(const side of ['player1','player2']) {
+    const symbol=stage?.[side]?.[0]?.metasprite?.asset;
+    if(!symbol) continue;
+    const header=await readFile(join(dirname(exportPath),`${symbol}.hpp`),'utf8');
+    const object=nativeSinglePartSpriteObject(header,symbol,runtimeState?.nativeVideo);
+    if(!object || object.index>=targetObjectIndex) continue;
+    const frameWidth=exportedIntegerConstant(header,symbol,'sprite_width');
+    const frameHeight=exportedIntegerConstant(header,symbol,'sprite_height');
+    const frameCount=exportedIntegerConstant(header,symbol,'frame_count');
+    const source=decodeExportedSpriteSheetRgba({headerSource:header,symbol,frameWidth,frameHeight,frameCount});
+    fighters.push({object,source,frameWidth,frameHeight,frameCount});
+  }
+  return resolveLutaFighterOcclusionPixels({fighters,targetObjectIndex,framebuffer});
+}
+
 async function auditExportedLutaPlayers(exportPath, exported, frame, requireFramebuffer, exactOptions = null) {
   const lutaProject = exported?.luta_project;
   const initialStage = Number(lutaProject?.initial_stage ?? 0);
   const stage = lutaProject?.stages?.[initialStage];
   const nativePositions = Object.freeze({
-    player1: { x: 80, y: 80 },
-    player2: { x: 200, y: 80 }
+    player1: { x: stage?.config?.player1_start_x, y: 80 },
+    player2: { x: stage?.config?.player2_start_x, y: 80 }
   });
-  const expectedSourceSha256 = Object.freeze({
-    nara_fighter: "9cb22e4861725b9a6e74274c7c5756360b2d0204d2696724159b3e99bfe44bf5",
-    nara_penedos_platformer_64x64: "6f0b745ae3525aea518577033ac96566a4e654cbd722c4bf74310d173472a477",
-    rival_fighter: "fcd446b1fb7c7bcba6549d545c62859e88fe91a292704af230993bf66cc43376"
-  });
+  const approval=JSON.parse(readFileSync(new URL('../fixtures/asset-provenance/arena-approved-manifest.json',import.meta.url),'utf8'));
+  const approvedSources=Object.fromEntries(approval.actors.map(actor=>{
+    const asset=approval.assets.find(asset=>asset.name===actor.spriteSheet);
+    return [actor.battle.side,{symbol:exportedAssetSymbol(asset.name),sha256:asset.sha256}];
+  }));
   const project = exactOptions?.project;
   const projectAssets = Array.isArray(project?.assets) ? project.assets : [];
   const players = ["player1", "player2"].map((side) => ({
@@ -3544,7 +3598,10 @@ async function auditExportedLutaPlayers(exportPath, exported, frame, requireFram
         audited: true,
         frameIndex,
         ...findBestOpaqueRgbaFramebufferFrame({
-          allowedOcclusionRgb555: backgroundPalette,
+          allowedOcclusionPixels: nativeFighterObject
+            ? await lutaNativeOcclusionPixels(exportPath, exported,
+              exactOptions?.presentedRuntimeState ?? exactOptions?.runtimeState, framebufferRgba, nativeFighterObject.index)
+            : new Set(),
           candidateFlipsX: nativeFighterObject ? [nativeFighterObject.flipX] : [false],
           candidateSourceXs,
           candidateTargets: nativeFighterObject
@@ -3570,17 +3627,17 @@ async function auditExportedLutaPlayers(exportPath, exported, frame, requireFram
       }
     }
     const checks = {
-      binding: symbol === (side === "player1" ? "nara_fighter" : "rival_fighter"),
+      binding: symbol === approvedSources[side].symbol,
       framebuffer: !requireFramebuffer || framebufferAudit.ok,
       framebufferPixels: !framebufferRgba || framebufferPixels.ok,
       frameCount: header.includes(`constexpr int ${symbol}_frame_count = ${frameCount};`),
       frameSize: header.includes(`constexpr int ${symbol}_sprite_width = ${frameWidth};`)
         && header.includes(`constexpr int ${symbol}_sprite_height = ${frameHeight};`),
       metasprites: header.includes(`constexpr gbs::MetaSprite ${symbol}_metasprites[${frameCount}]`),
-      palette: palette.length === 16 && palette[0] === 0,
+      palette: palette.length === 208 && palette[0] === 0,
       sheetSize: header.includes(`constexpr int ${symbol}_width = ${source.width};`)
         && header.includes(`constexpr int ${symbol}_height = ${source.height};`),
-      sourceSha256: sourceSha256 === expectedSourceSha256[symbol],
+      sourceSha256: sourceSha256 === approvedSources[side].sha256,
       sourcePixels: source.width % frameWidth === 0
         && source.height === frameHeight
         && sourceFrames.every((sourceFrame) => sourceFrame.ok),
@@ -3656,7 +3713,10 @@ async function auditExportedRuntimePlayer(exportPath, exported, runtime, frame, 
     };
   }
   const selectedSymbol = exportedRuntimePlayerAsset(exported, runtime);
-  const spec = runtimePlayerSpecs[runtime];
+  const spec = runtime === "pointAndClick" && selectedSymbol?.startsWith("white_hand_cursor_32x32")
+    ? currentTemplateRuntimeSpriteSpec("white-hand-cursor-32x32.png")
+    : runtime === "racing" && selectedSymbol?.startsWith("racing_approved_rear_nara")
+      ? currentTemplateRuntimeSpriteSpec("racing-approved-rear-nara.png") : runtimePlayerSpecs[runtime];
   if (!spec) return { audited: false, ok: false, runtime };
   const frameRuntimeState = exactOptions?.presentedRuntimeState ?? exactOptions?.runtimeState;
   const playerSymbol = selectedSymbol ?? spec.symbol;
@@ -3669,12 +3729,15 @@ async function auditExportedRuntimePlayer(exportPath, exported, runtime, frame, 
   ]);
   const sourceSha256 = createHash("sha256").update(sourceBytes).digest("hex");
   const source = decodePngRgba(sourceBytes);
+  const approvedSource = approvedObjectPaletteSourceRgba(
+    source, canonicalTemplateAssetsByName.get(spec.assetName)?.metadata
+  );
   const sourceRgb555Colors = new Set();
-  for (let offset = 0; offset < source.pixels.length; offset += 4) {
-    if (source.pixels[offset + 3] === 0) continue;
-    const red = source.pixels[offset] >> 3;
-    const green = source.pixels[offset + 1] >> 3;
-    const blue = source.pixels[offset + 2] >> 3;
+  for (let offset = 0; offset < approvedSource.pixels.length; offset += 4) {
+    if (approvedSource.pixels[offset + 3] === 0) continue;
+    const red = approvedSource.pixels[offset] >> 3;
+    const green = approvedSource.pixels[offset + 1] >> 3;
+    const blue = approvedSource.pixels[offset + 2] >> 3;
     sourceRgb555Colors.add(red | (green << 5) | (blue << 10));
   }
   const spriteScale = runtime === "battleRpg"
@@ -3716,11 +3779,11 @@ async function auditExportedRuntimePlayer(exportPath, exported, runtime, frame, 
     frameIndex,
     frameWidth: spec.frameWidth,
     headerSource: header,
-    pixels: source.pixels,
+    pixels: approvedSource.pixels,
     sheetWidth: source.width,
     symbol: playerSymbol,
     transparentPaletteIndex: spec.transparentPaletteIndex ?? 0,
-    allowPaletteRemap: objectPaletteOverride !== null || spec.allowPaletteRemap === true
+    allowPaletteRemap: spec.colorMode !== "8bpp" && (objectPaletteOverride !== null || spec.allowPaletteRemap === true)
   }));
   const framebuffer = auditRgb555FramebufferColors({
     colorHistogram: frame?.colorHistogram,
@@ -3756,6 +3819,10 @@ async function auditExportedRuntimePlayer(exportPath, exported, runtime, frame, 
           camera
         );
       }
+      if (runtime === "shmup") {
+        const object = nativeSinglePartSpriteObject(header, playerSymbol, frameRuntimeState?.nativeVideo);
+        if (object) target = { x: object.x, y: object.y };
+      }
       if (runtime === "racing") {
         const camera = racingCameraPosition(racingRoom, frameRuntimeState);
         target = {
@@ -3764,7 +3831,8 @@ async function auditExportedRuntimePlayer(exportPath, exported, runtime, frame, 
         };
       }
       if (runtime === "battleRpg") {
-        target = { x: 48, y: 32 };
+        const object=nativeSinglePartSpriteObject(header,playerSymbol,frameRuntimeState?.nativeVideo);
+        target=object?{x:object.x,y:object.y}:{x:48,y:32};
       }
       const candidateSourceXs = Array.from({ length: spec.frameCount }, (_, index) => index * renderedFrameWidth);
       const detectedTargets = opaqueAnchorFramebufferTargets({
@@ -3812,7 +3880,10 @@ async function auditExportedRuntimePlayer(exportPath, exported, runtime, frame, 
     framebuffer: !requireFramebuffer || framebuffer.ok,
     framebufferPixels: !exactOptions || framebufferPixels.ok,
     metasprites: header.includes(`constexpr gbs::MetaSprite ${playerSymbol}_metasprites[${spec.frameCount}]`),
-    palette: objectPaletteOverride
+    palette: spec.colorMode === "8bpp"
+      ? palette.length > sourceRgb555Colors.size && palette.length <= 256
+        && [...sourceRgb555Colors].every(value=>palette.includes(value))
+      : objectPaletteOverride
       ? palette.length === 16
         && palette.every((value, index) => value === (objectPaletteOverride[index] ?? 0))
       : Array.isArray(spec.palette)
@@ -3881,9 +3952,9 @@ async function captureBattleMenuRegion(cdp, sceneName, step) {
   const screenshotPath = await capturePlayerScreenshot(cdp, `${sceneName}_battle_${step}`);
   // Compare intrinsic GBA pixels, not screenshot pixels: the Electron window
   // can move its scaled canvas by a physical pixel when input restores focus.
-  const regionWidth = 84;
+  const regionWidth = 240;
   const regionHeight = 44;
-  const regionX = 154;
+  const regionX = 0;
   const regionY = 114;
   const regionBase64 = await evaluate(cdp, `(() => {
     const canvas = window.GBAStudioDirectPlayer?.canvas;
@@ -3901,8 +3972,10 @@ async function captureBattleMenuRegion(cdp, sceneName, step) {
   }
   const region = Buffer.from(regionBase64, "base64");
   let lowerChoiceInk = 0;
-  for (let y = 22; y < 32; y += 1) {
-    for (let x = 0; x < regionWidth; x += 1) {
+  // The current attack submenu has two entries. The third row distinguishes
+  // the four-option root menu without mistaking TECNICA for a root item.
+  for (let y = 27; y < 33; y += 1) {
+    for (let x = 154; x < 238; x += 1) {
       const offset = (y * regionWidth + x) * 4;
       if (region[offset] > 180 && region[offset + 1] > 180 && region[offset + 2] > 180) {
         lowerChoiceInk += 1;
@@ -4137,15 +4210,20 @@ async function runShmupWavesExercise(cdp, sceneName, faceButtons) {
     throw new Error(`A primeira wave SHMUP não removeu um inimigo: ${JSON.stringify(afterFirstWaveTop)}.`);
   }
 
-  await movePlayerToY(84);
+  await movePlayerToY(100);
   const afterSecondEnemy = await fireUntilCountOrRuntimeTransition(initialEnemyCount - 2, runtimeKindByName.shmup);
   if (
     Number(afterSecondEnemy?.runtimeKind) === runtimeKindByName.shmup &&
+    Number(afterSecondEnemy?.currentRoom) === 0 &&
     Number(afterSecondEnemy?.actorCount) !== initialEnemyCount - 2
   ) {
     throw new Error(`A primeira wave SHMUP não removeu o segundo inimigo: ${JSON.stringify(afterSecondEnemy)}.`);
   }
 
+  const bossWave = await waitForRuntimeScene(cdp, "shmup", 1, 2, 10_000);
+  if (!bossWave?.ok) throw new Error("A Tempestade não iniciou a onda do farol.");
+  await movePlayerToY(64);
+  await fireUntilActorCount(0);
   const transition = await waitForRuntimeScene(cdp, "battleRpg", 0, 2, 10_000);
   const afterTransition = transition?.runtimeState ?? null;
   if (
@@ -4426,6 +4504,33 @@ async function runFeatureModulesInputExercise(cdp, sceneName, startMenuScreenInd
       throw new Error(`SHMUP não manteve a primeira wave após o disparo: antes=${JSON.stringify(initial)} depois=${JSON.stringify(afterFire)}.`);
     }
     return { ok: true, scene: sceneName, initial, afterFire, waveIndex: Number(afterFire?.currentRoom) };
+  }
+
+  // Approved first-person presentation: logical maze and camera are separate;
+  // the long route and cross-scene campaign are covered by smoke-dungeon-approved.
+  if (["usina_submersa","usina_combate","usina_saida"].includes(sceneName) && JSON.parse(await readFile(templatePath,"utf8")).rooms?.find(r=>r.name===sceneName)?.dungeonVisualRevision) {
+    const right = {code:"ArrowRight",key:"ArrowRight",windowsVirtualKeyCode:39};
+    const settle=async(frames=40)=>{const start=Number((await readRuntimeState())?.frame??0);for(let n=0;n<140;n++){const state=await readRuntimeState();if(Number(state?.frame)>=start+frames)return state;await wait(50);}throw Error("Dungeon frame deadline");};
+    const action=async()=>{await pressPlayerButton(cdp,a.code,a.key,a.windowsVirtualKeyCode,80);await settle(40);return readRuntimeState();};
+    await settle(30);await action();await action();
+    const initial=await readRuntimeState(),index=["usina_submersa","usina_combate","usina_saida"].indexOf(sceneName);
+    const spawn=[[1,9],[9,3],[5,5]][index];
+    if(Number(initial?.runtimeKind)!==6||Number(initial?.currentRoom)!==index||initial.player.x!==spawn[0]||initial.player.y!==spawn[1])throw Error(`Dungeon approved spawn: ${JSON.stringify(initial)}`);
+    const screenshot=await capturePlayerScreenshot(cdp,sceneName+"_approved");
+    if(index===0){
+      await pressPlayerButton(cdp,start.code,start.key,start.windowsVirtualKeyCode,80);await settle(8);const mapScreenshot=await capturePlayerScreenshot(cdp,sceneName+"_map");
+      await pressPlayerButton(cdp,b.code,b.key,b.windowsVirtualKeyCode,80);await settle(8);
+      const dirs=[];for(let n=0;n<4;n++){await pressPlayerButton(cdp,right.code,right.key,right.windowsVirtualKeyCode,80);await settle(14);dirs.push((await readRuntimeState()).player.direction);}
+      if(new Set(dirs).size!==4)throw Error("Dungeon camera must turn in all four directions");return {ok:true,scene:sceneName,initial,screenshot,mapScreenshot,directions:dirs};
+    }
+    if(index===1){
+      let battle=await readRuntimeState();for(let n=0;n<5&&battle.collision.currentFlags===0;n++)battle=await action();
+      if(battle.collision.currentFlags!==3)throw Error("Dungeon battle did not start");
+      const firstAttack=await action();if(firstAttack.collision.currentFlags!==2||firstAttack.collision.currentSlope!==2)throw Error("Dungeon attack must change both HP values");
+      await action();const victory=await action();if(victory.roomChangeCount!==1)throw Error("Dungeon victory did not open passage");return {ok:true,scene:sceneName,initial,screenshot,firstAttack,victory};
+    }
+    let collected=await readRuntimeState();for(let n=0;n<5&&collected.variables[2]!==1;n++)collected=await action();
+    if(collected.variables[2]!==1||collected.firstActor.visible)throw Error("Dungeon collection must persist the cell and hide its actor");return {ok:true,scene:sceneName,initial,screenshot,collected};
   }
 
   if (sceneName === "usina_submersa") {
@@ -5253,6 +5358,38 @@ async function runPlatformerInputExercise(cdp, sceneName, faceButtons) {
   };
   const readAndRecord = async (label) => record(label, await readRuntimeState());
 
+  // Observe the action while the keys are held. A fixed wall-clock wait can
+  // miss the collision or jump and sample a later fall/respawn at full cadence.
+  const holdUntil = async (held, reached, label, maxFrames) => {
+    const before = await readRuntimeState();
+    const deadline = Date.now() + 5_000;
+    try {
+      for (const button of held) await cdp.send("Input.dispatchKeyEvent", {
+        type: "keyDown", code: button.code, key: button.key,
+        windowsVirtualKeyCode: button.windowsVirtualKeyCode, autoRepeat: false,
+        nativeVirtualKeyCode: button.windowsVirtualKeyCode
+      });
+      const signal = await evaluate(cdp, "window.GBAStudioDirectPlayer?.canvas?.dataset.input ?? null");
+      if (signal !== "keyboard-down") throw new Error(`Player não recebeu ${label}.`);
+      for (let sample = 0; Date.now() < deadline; ++sample) {
+        await wait(25);
+        const state = await readAndRecord(`${label}_${sample}`);
+        if (state?.runtimeKind !== before?.runtimeKind || state?.currentRoom !== before?.currentRoom) {
+          throw new Error(`O input ${label} trocou de cena: ${JSON.stringify(state)}.`);
+        }
+        if (reached(state)) return state;
+        if (Number(state?.frame) - Number(before?.frame) >= maxFrames) break;
+      }
+      throw new Error(`O input ${label} não atingiu o estado esperado: ${JSON.stringify(trace.slice(-12))}.`);
+    } finally {
+      for (const button of [...held].reverse()) await cdp.send("Input.dispatchKeyEvent", {
+        type: "keyUp", code: button.code, key: button.key,
+        windowsVirtualKeyCode: button.windowsVirtualKeyCode,
+        nativeVirtualKeyCode: button.windowsVirtualKeyCode
+      });
+    }
+  };
+
   await wait(500);
   const initial = await readAndRecord("initial");
   if (Number(initial?.runtimeKind) !== runtimeKindByName.platformer || Number(initial?.currentRoom) !== 0) {
@@ -5280,34 +5417,25 @@ async function runPlatformerInputExercise(cdp, sceneName, faceButtons) {
 
   let current = landedAfterJump;
   const walkOrigin = current;
-  for (let step = 0; step < 2; step += 1) {
-    const before = current;
-    await pressPlayerButton(cdp, buttons.right.code, buttons.right.key, buttons.right.windowsVirtualKeyCode, 320);
-    current = await readAndRecord(`walk_right_${step + 1}`);
-    if (Number(current?.player?.x) <= Number(before?.player?.x)) {
-      throw new Error(`A movimentação horizontal não avançou na plataforma: ${JSON.stringify({ before: before?.player, after: current?.player, collision: current?.collision, trace: trace.slice(-10) })}.`);
-    }
+  // The authored wide bridge uses slopes and a one-way deck. Exercise that
+  // crossing before the crab, rather than requiring an obsolete vertical wall.
+  current = await holdUntil([buttons.right], (state) =>
+    Number(state?.player?.x) >= Number(walkOrigin?.player?.x) + 64, "walk_right", 120);
+  if (Number(current?.player?.x) <= Number(walkOrigin?.player?.x)) {
+    throw new Error(`A movimentação horizontal não avançou na plataforma: ${JSON.stringify(trace)}.`);
   }
-  if ((Number(current?.collision?.blockedDirectionBits) & 1) === 0) {
-    throw new Error(`A primeira barreira dos Penedos não registrou bloqueio à direita: ${JSON.stringify(current?.collision)}.`);
-  }
-
   const platformJumpOrigin = current;
-  await pressPlayerButton(cdp, buttons.a.code, buttons.a.key, buttons.a.windowsVirtualKeyCode, 80);
-  await holdPlayerButtons(cdp, [buttons.right, buttons.a], 700);
-  const platformJump = await readAndRecord("upper_platform_jump");
-  let jumpMovement = platformJump;
-  for (let sample = 0; sample < 8; sample += 1) {
-    await wait(80);
-    jumpMovement = await readAndRecord(`upper_platform_sample_${sample + 1}`);
-  }
+  const jumpMovement = await holdUntil([buttons.right, buttons.a], (state) =>
+    Number(state?.player?.y) < Number(platformJumpOrigin?.player?.y) - 8 &&
+    Number(state?.player?.x) > Number(platformJumpOrigin?.player?.x) + 2,
+  "bridge_jump", 90);
   if (Number(jumpMovement?.player?.y) >= Number(platformJumpOrigin?.player?.y) - 1) {
-    throw new Error(`O salto em direção à plataforma superior não alterou a altura do jogador: ${JSON.stringify({ origin: platformJumpOrigin?.player, observed: jumpMovement?.player, collision: jumpMovement?.collision, trace: trace.slice(-14) })}.`);
+    throw new Error(`O salto na ponte não alterou a altura do jogador: ${JSON.stringify({ origin: platformJumpOrigin?.player, observed: jumpMovement?.player, collision: jumpMovement?.collision, trace: trace.slice(-14) })}.`);
   }
 
   const returnOrigin = jumpMovement;
-  await pressPlayerButton(cdp, buttons.left.code, buttons.left.key, buttons.left.windowsVirtualKeyCode, 640);
-  const returnLeft = await readAndRecord("return_left");
+  const returnLeft = await holdUntil([buttons.left], (state) =>
+    Number(state?.player?.x) < Number(returnOrigin?.player?.x) - 8, "return_left", 90);
   if (Number(returnLeft?.player?.x) >= Number(returnOrigin?.player?.x)) {
     throw new Error(`O retorno para a esquerda não moveu o jogador: ${JSON.stringify({ origin: returnOrigin?.player, observed: returnLeft?.player, collision: returnLeft?.collision })}.`);
   }
@@ -5315,7 +5443,7 @@ async function runPlatformerInputExercise(cdp, sceneName, faceButtons) {
   return {
     ok: true,
     scene: sceneName,
-    route: ["jump", "walk_right", "upper_platform_jump", "return_left"],
+    route: ["jump", "walk_right", "bridge_jump", "return_left"],
     initial,
     jump: { originY: jumpOriginY, apex: jumpApex?.player, landed: landedAfterJump?.player },
     walkRight: { origin: walkOrigin?.player, final: current?.player },
@@ -5470,7 +5598,8 @@ async function main() {
   });
   if (useExplicitProject) childEnv.GBA_STUDIO_OPEN_PROJECT = templatePath;
   else delete childEnv.GBA_STUDIO_OPEN_PROJECT;
-  const child = spawn(executable, usePackagedApp ? [] : [appRoot], {
+  const launch = electronLaunchCommand(executable, usePackagedApp ? [] : [appRoot]);
+  const child = spawn(launch.executable, launch.args, {
     cwd: appRoot,
     env: childEnv,
     stdio: ["ignore", "pipe", "pipe"]
@@ -5488,6 +5617,16 @@ async function main() {
     await mainCdp.ready;
     traceSceneSmoke("main-ready");
     if (!useExplicitProject) {
+      await waitForText(mainCdp, (text) => text.includes("Exemplo GBA Completo") || text.includes("Exemplo GBA Complete"), "Welcome com template Exemplo");
+      // This route asserts Portuguese editor labels. Select that locale through
+      // the Welcome control in the disposable smoke profile, including first run.
+      await evaluate(mainCdp, `(() => {
+        const language = document.querySelector('select[aria-label="App language"]');
+        if (language) {
+          language.value = "pt-BR";
+          language.dispatchEvent(new Event("change", { bubbles: true }));
+        }
+      })()`);
       await waitForText(mainCdp, (text) => text.includes("Exemplo GBA Completo"), "Welcome com template Exemplo");
       await clickButtonByText(mainCdp, "Exemplo GBA Completo");
     }
@@ -5542,10 +5681,42 @@ async function main() {
       const affineShowcaseScene = scene.name === "affine_lab";
       const exactBackgroundFramebuffer = EXEMPLO_EXACT_BACKGROUND_FRAMEBUFFER_SCENES.includes(scene.name)
         || affineShowcaseScene;
-      const playerEvidence = await waitForPlayerEvidence(
-        playerCdp,
-        exactPlayerFramebuffer || exactBackgroundFramebuffer || authoredActorFramebufferScenes.has(scene.name)
-      );
+      if (scene.name === 'farol_interior') {
+        // The intro box legitimately covers the lower part of48pxNara. Audit
+        // the unobstructed room after advancing it through the authored A input.
+        await waitForPlayerPlaybackReady(playerCdp);
+        await wait(750);
+        for (let page=0;page<5;page++) {
+          await pressPlayerButton(playerCdp,faceButtons.a.code,faceButtons.a.key,faceButtons.a.windowsVirtualKeyCode,120);
+          await wait(200);
+        }
+      }
+      if(scene.name==='arena_tatica') {
+        // The authored introduction has three pages in the default PT locale.
+        // Advance through real A input before comparing both unobstructed actors.
+        await waitForPlayerPlaybackReady(playerCdp);
+        await wait(750);
+        for(let page=0;page<3;page++) {
+          await pressPlayerButton(playerCdp,faceButtons.a.code,faceButtons.a.key,faceButtons.a.windowsVirtualKeyCode,120);
+          await wait(200);
+        }
+      }
+      if (scene.name === 'guardiao_rele') {
+        // The opening dialogue nameplate covers Nara. Advance the authored
+        // message before comparing her unobstructed framebuffer pixels.
+        await waitForPlayerPlaybackReady(playerCdp);
+        await wait(750);
+        for (let page = 0; page < 2; page++) {
+          await pressPlayerButton(playerCdp, faceButtons.a.code, faceButtons.a.key, faceButtons.a.windowsVirtualKeyCode, 120);
+          await wait(300);
+        }
+      }
+      // Observe readiness without serializing a framebuffer/save state. CDP
+      // serialization and native-state inspection block the Player renderer,
+      // so they belong after the uninterrupted playback measurement.
+      const captureInitialFramebuffer = exactPlayerFramebuffer || exactBackgroundFramebuffer
+        || authoredActorFramebufferScenes.has(scene.name);
+      let playerEvidence = await waitForPlayerPlaybackReady(playerCdp);
       if (!playerEvidence?.ok) throw new Error(`${scene.name} nao produziu frame/audio/runtime: ${JSON.stringify(playerEvidence)}.`);
       traceSceneSmoke(scene.name, "evidence-ready");
       const exported = await latestExportContract(engineExportRoot);
@@ -5567,6 +5738,36 @@ async function main() {
             runtimeKind: observedRuntimeState.runtimeKind
           }
         })}`);
+      }
+      // Measure this scene while it is running normally. The later pixel
+      // audits and input exercises deliberately perform expensive inspection,
+      // enter menus and reset/load the ROM; those are separate assertions.
+      const cadenceScope = {
+        // Renderer IPC can arrive after observation even though it was produced
+        // during boot. Use the Player's clock, not Main's delivery-array index.
+        notBeforeUnixMs: playerEvidence.observedAtUnixMs,
+        initialFrame: Number(observedRuntimeState.frame),
+        runtimeKind: runtimeKindByName[expectedRuntimeName],
+        currentRoom: Number(launchContract.currentRoom)
+      };
+      const performance = await waitForPerformance(mainCdp, knownWindowIDs, cadenceScope);
+      traceSceneSmoke(scene.name, "performance-ready");
+      knownWindowIDs.add(performance.windowID);
+      const playbackAudio = await evaluate(playerCdp, "window.GBAStudioDirectPlayer.inspectAudio()");
+      // Every visual proof remains required, after the uninterrupted window.
+      playerEvidence = await waitForPlayerEvidence(playerCdp, captureInitialFramebuffer);
+      if (scene.runtime === "isometric" && templateRoomForScene(template, scene.name)?.runtime?.config?.pagedSurface) {
+        playerEvidence = await waitForIsometricCameraRest(playerCdp, playerEvidence);
+      }
+      playerEvidence = { ...playerEvidence, audio: playbackAudio };
+      let platformerCadence = null;
+      if (scene.name === "penedos_vento") {
+        const roms = activeBuildRomPaths(await filesNamed(dirname(exported.path), "exemplo.gba"));
+        if (roms.length !== 1) throw new Error(`ROM canônica ambígua para medir plataforma: ${JSON.stringify(roms)}`);
+        const { stdout } = await execFileAsync(process.execPath, [
+          join(appRoot, "scripts", "smoke-platformer-cadence.mjs"), roms[0]
+        ], { timeout: 30_000, maxBuffer: 1024 * 1024 });
+        platformerCadence = JSON.parse(stdout.trim());
       }
       let isometricCadence = null;
       if (scene.name === "mercado_suspenso") {
@@ -5850,6 +6051,7 @@ async function main() {
             framebufferRgbaBase64: playerEvidence.framebufferRgbaBase64,
             exportedProject: exported.project,
             presentedRuntimeState: playerEvidence.presentedRuntimeState,
+            previousPresentedRuntimeState: playerEvidence.previousPresentedRuntimeState,
             runtime: scene.runtime,
             runtimeState: playerEvidence.runtimeState
           }
@@ -5965,8 +6167,14 @@ async function main() {
           throw new Error(`A seleção feminina nao persistiu a variável de gênero: ${JSON.stringify(selectedGender)}.`);
         }
         const genderScreen = menuScreens[genderRoom];
-        if (genderScreen.items.length !== 2 || genderScreen.actors.filter(actor => actor.role === "cursor").length !== 1) {
-          throw new Error("Escolha de gênero exige duas opções e uma única moldura cursor.");
+        const genderCursors = genderScreen.actors.filter(actor => actor.role === "cursor");
+        const genderCursorOffsets = [[-12, -16], [68, -16], [-12, 88], [68, 88]];
+        if (genderScreen.items.length !== 2 || genderCursors.length !== 4
+          || genderCursors.some((actor, index) => actor.cursor_follows_option !== true
+            || actor.cursor_for_menu !== "escolha_genero"
+            || actor.cursor_offset_pixels?.x !== genderCursorOffsets[index][0]
+            || actor.cursor_offset_pixels?.y !== genderCursorOffsets[index][1])) {
+          throw new Error("Escolha de gênero exige duas opções e os quatro cantos aprovados seguindo a seleção.");
         }
         const nameRoom = menuScreens.findIndex((screen) => screen.name === "nome_jogador");
         const genderToName = template.editorState?.scenaConnections?.find(connection =>
@@ -6102,6 +6310,7 @@ async function main() {
           loadWithoutSaveState,
           optionsToGender: genderEvidence,
           selectedGender,
+          genderCursorOffsets,
           genderToName: nameEvidence,
           nameInput: nameInputScreenshotPath,
           saveData,
@@ -6109,9 +6318,6 @@ async function main() {
           optionsToPrologue: transitionEvidence
         };
       }
-      const performance = await waitForPerformance(mainCdp, knownWindowIDs);
-      traceSceneSmoke(scene.name, "performance-ready");
-      knownWindowIDs.add(performance.windowID);
       const romBytes = Number(performance.samples.at(-1)?.romBytes ?? 0);
       results.push({
         ...scene,
@@ -6126,6 +6332,7 @@ async function main() {
         isometricCadence,
         isometricTacticalInput,
         platformerInput,
+        platformerCadence,
         pointClickInput,
         colorFidelity,
         cutscenePortraits,

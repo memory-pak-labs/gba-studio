@@ -56,7 +56,7 @@ async function viewport(width, height) {
 }
 async function openPlatformer() {
   await click('[aria-label="Workspace Cenas"]');
-  await click('[aria-label="Plataforma seção de ajustes"]');
+  await click('[aria-label="Seção de ajustes: Plataforma"]');
   assert.equal(await evaluate(`document.querySelectorAll('.scene-defaults-page').length`), 1);
 }
 async function saveCopy() {
@@ -87,7 +87,7 @@ try {
     await capture(`section-${state.id.replace('settings-section-', '')}`); checks.push({ name: "scene-navigation", label, ...state });
   }
   assert.deepEqual(await readFile(projectPath), originalBytes, "Navigation rewrote isolated project");
-  await click('[aria-label="Plataforma seção de ajustes"]');
+  await click('[aria-label="Seção de ajustes: Plataforma"]');
   for (const theme of ["light", "dark"]) {
     await click('[aria-label="Workspace Ajustes"]');
     await click(`.settings-interface-theme-choice input[value="${theme}"]`);
@@ -144,7 +144,7 @@ try {
   assert(player, "No sprite for linked default player"); await change('[aria-label="Player padrão · Plataforma"]', player);
   const saved = await saveCopy(); assert.equal(saved.settings.platformer.gravity, gravity); assert.equal(saved.settings.platformer.jumpButton, "L"); assert.equal(saved.settings.platformer.doubleJump, true); assert.equal(saved.settings.platformer.maxFallSpeed, 4); assert.equal(saved.settings.sceneTypes.defaultPlayerSprites.platformer, player);
   for (const key of ["scena", "scenas", "actors", "assets", "events"]) assert.deepEqual(saved[key], originalProject[key], `Settings modified ${key}`);
-  await click('[aria-label="Players Padrão seção de ajustes"]'); assert.equal(await evaluate(`Array.from(document.querySelectorAll('.settings-edit-row')).find(e=>e.querySelector('span')?.textContent==='Player padrão · Plataforma').querySelector('select').value`), player);
+  await click('[aria-label="Seção de ajustes: Players Padrão"]'); assert.equal(await evaluate(`Array.from(document.querySelectorAll('.settings-edit-row')).find(e=>e.querySelector('span')?.textContent==='Player padrão · Plataforma').querySelector('select').value`), player);
   await cdp.send("Page.reload"); await waitForRenderedText(cdp, text => text.includes("Editor") && text.includes("Cenas"), "reloaded project"); await openPlatformer();
   assert.equal(await evaluate(`document.querySelector('[aria-label="Botão de pulo"]').value`), "L");
   assert.equal(await evaluate(`document.querySelector('[aria-label="Player padrão · Plataforma"]').value`), player);

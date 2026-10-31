@@ -1,0 +1,50 @@
+.dungeon-camera{position:relative;width:240px;height:160px;overflow:hidden;background:#082030;isolation:isolate;image-rendering:pixelated}
+.dungeon-camera-art>canvas,.dungeon-camera-hud{position:absolute;inset:0;width:240px;height:160px;image-rendering:pixelated;pointer-events:none}
+.dungeon-camera-actors{position:absolute;inset:0 0 32px;overflow:hidden;pointer-events:none}
+.dungeon-camera-hud{z-index:2}.dungeon-camera>.room-hud-overlay{position:absolute!important;inset:0!important;transform:none!important;z-index:3}
+.dungeon-camera-error{position:absolute;inset:0;display:grid;place-content:center;padding:12px;background:var(--studio-color-surface);color:var(--studio-color-text-primary);z-index:5}
+.dungeon-scene-editor{display:flex;flex-wrap:wrap;gap:20px;padding:20px;width:100%;height:100%;overflow:auto;align-content:flex-start;background:var(--studio-color-bg-canvas)}
+.dungeon-scene-editor section{border:1px solid var(--studio-color-border);border-radius:12px;background:var(--studio-color-surface);padding:14px;min-width:0;max-width:100%}
+.dungeon-scene-editor header{display:flex;gap:12px;align-items:center;justify-content:space-between;margin-bottom:10px}.dungeon-scene-editor header label{display:flex;align-items:center;gap:6px;}
+.dungeon-scene-editor p{max-width:480px;line-height:1.5;color:var(--studio-color-text-secondary);margin:10px 0}
+.dungeon-grid-scroll,.dungeon-camera-scroll{overflow:auto;max-width:100%}.dungeon-grid{display:grid;width:max-content;margin-inline:auto;border:1px solid #64748b;gap:1px;background:#64748b}
+.dungeon-grid button{border:0;border-radius:0;min-width:0;padding:0;font-family:ui-monospace,monospace;color:#133c48;cursor:crosshair;position:relative}
+.dungeon-grid .wall{background:#344759;color:#e5edf5}.dungeon-grid .passage{background:#e7efe9}.dungeon-grid .start{box-shadow:inset 0 0 0 2px #e5a83d}.dungeon-grid .camera{background:#d9c5ff;color:#6121d9;box-shadow:inset 0 0 0 2px #7637df}.dungeon-grid .selected{outline:2px solid #ed8e26;z-index:1}.dungeon-grid button:focus-visible{outline:3px solid #7637df;z-index:2}
+.dungeon-camera-controls{display:flex;gap:6px;flex-wrap:wrap;margin-top:10px}.dungeon-camera-controls button,.dungeon-entity-list button{border:1px solid var(--studio-color-border);border-radius:6px;padding:7px 9px;background:var(--studio-color-surface-muted);color:inherit;cursor:pointer;}
+.dungeon-entity-list{list-style:none;padding:0;margin:0;display:grid;gap:6px}.dungeon-entity-list button[aria-pressed=true]{border-color:var(--studio-color-accent);background:var(--studio-color-accent-soft)}.dungeon-preview-status{border-top:1px solid var(--studio-color-border);padding-top:10px}
+.room-stage-card-canvas>.dungeon-card-camera{position:absolute;inset:0;overflow:hidden}.dungeon-card-camera>.dungeon-camera{transform-origin:top left}
+/* Same view switch as the other scene editors: camera first, whole map separately. */
+.dungeon-scene-editor{position:relative;display:flex;flex-direction:column;flex-wrap:nowrap;gap:0;align-content:normal;padding:0;overflow:hidden}
+.dungeon-scene-editor>section{flex:1;min-height:0;max-width:none;width:100%;border:0;border-radius:0;background:transparent;padding:16px 24px;overflow:auto}
+.dungeon-scene-editor>section header{justify-content:center}.dungeon-scene-editor .dungeon-grid-scroll{max-height:100%;display:block;padding:16px}
+.dungeon-scene-editor .dungeon-maze-pane>p,.dungeon-scene-editor .dungeon-maze-pane>.dungeon-entity-list{margin-left:auto;margin-right:auto}
+.dungeon-scene-editor .dungeon-camera-scroll{display:grid;place-content:center;min-height:calc(100% - 32px)}
+.dungeon-navigation{flex:none;display:flex;flex-wrap:wrap;gap:8px 16px;align-items:center;justify-content:center;padding:8px 14px;border-top:1px solid var(--studio-color-border);background:var(--studio-color-surface)}
+.dungeon-navigation p,.dungeon-navigation .dungeon-camera-controls{margin:0}.dungeon-navigation .dungeon-preview-status{flex-basis:100%;border:0;padding:0;text-align:center;max-width:none}
+.dungeon-scene-editor .room-focus-preview-panel .dungeon-camera{margin:auto}
+.dungeon-grid .draft{box-shadow:inset 0 0 0 2px #a279ec;background:#ccb8ec}
+.dungeon-scene-editor .room-focus-preview-panel{bottom:110px}
+
+.dungeon-camera-art{position:absolute;left:0;top:0;width:240px;height:160px;transform-origin:top left;pointer-events:none}
+/* The focused camera shares the full canvas fit and editable overlays of other scenes. */
+.dungeon-scene-editor>.dungeon-camera-pane{padding:0;overflow:auto}
+.dungeon-edit-surface{position:relative;isolation:isolate;touch-action:none}
+.dungeon-tile-grid{position:absolute;inset:0;pointer-events:none;z-index:4;background-image:linear-gradient(to right,rgba(255,255,255,.16) 1px,transparent 1px),linear-gradient(to bottom,rgba(255,255,255,.16) 1px,transparent 1px)}
+.dungeon-edit-handles{position:absolute;inset:0;z-index:5;pointer-events:none;overflow:hidden}
+.dungeon-entity-handle,.dungeon-floor-cell{position:absolute;pointer-events:auto;padding:0;border-radius:0;background:transparent;min-width:0;min-height:0;touch-action:none}
+.dungeon-entity-handle{border:1px solid var(--studio-color-accent);cursor:grab;opacity:.5}
+.dungeon-entity-handle.is-trigger{border-style:dashed}
+.dungeon-entity-handle:hover,.dungeon-entity-handle.is-selected{opacity:1;outline:1px solid var(--studio-color-accent)}
+.dungeon-entity-handle>span{display:none;position:absolute;bottom:100%;left:0;padding:3px 5px;white-space:nowrap;background:var(--studio-color-accent);color:var(--studio-color-text-on-accent,#fff)}
+.dungeon-entity-handle.is-selected>span,.dungeon-entity-handle:focus-visible>span{display:block}
+.dungeon-floor-cell{border:1px solid transparent;background:transparent;cursor:crosshair}
+.dungeon-floor-cell.is-wall:hover,.dungeon-floor-cell.is-wall:focus-visible{border-color:#f4b45e}
+.dungeon-floor-cell>span{opacity:0;pointer-events:none;white-space:nowrap;background:var(--studio-color-surface);color:var(--studio-color-text-primary)}
+.dungeon-floor-cell:hover,.dungeon-floor-cell:focus-visible{background:var(--studio-color-accent-soft);outline:2px solid var(--studio-color-accent);z-index:20}
+.dungeon-floor-cell:hover>span,.dungeon-floor-cell:focus-visible>span{opacity:1}
+.dungeon-drop-marker{position:absolute;transform:translate(-50%,-50%);pointer-events:none;padding:4px 8px;border:2px solid #f3b844;background:var(--studio-color-surface);color:var(--studio-color-text-primary);z-index:30}
+.dungeon-cell-feedback{position:absolute;left:8px;bottom:8px;z-index:6;background:var(--studio-color-surface);color:var(--studio-color-text-primary);padding:4px 8px;pointer-events:none}
+.dungeon-camera-zoom{display:flex;align-items:center;gap:6px}
+.dungeon-edit-surface.is-dragging .dungeon-entity-handle{cursor:grabbing}
+
+.dungeon-edit-surface.is-bounds-hidden .dungeon-entity-handle:not(.is-selected):not(:hover):not(:focus-visible){border-color:transparent;outline:0}

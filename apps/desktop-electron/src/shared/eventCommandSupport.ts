@@ -1,3 +1,4 @@
+import { parseVisibilityPreset, visibilityPresetVerbs } from "./visibilityPresets.js";
 import { nativeEventCommandExportHandling, type NativeEventCommandExportHandling } from "./eventCommandRegistry.js";
 import { eventCommandCatalog } from "./eventCommandLibrary.js";
 import { eventCommandReview } from "./eventCommandReview.js";
@@ -10,6 +11,11 @@ const excluded: Record<string, string> = {
 };
 
 const scoped: Record<string, string[]> = {
+  ...Object.fromEntries(visibilityPresetVerbs.map(verb => [verb, ["topdown", "platformer"]])),
+  set_map_state: ["topdown", "platformer"],
+  replace_tile: ["topdown", "platformer"],
+  replace_tile_sequence: ["topdown", "platformer"],
+  replace_tile_animation: ["topdown", "platformer"],
   draw_text:["topdown"],
   start_segment:["topdown"], stop_segment:["topdown"], set_adventure_state:["topdown"], push_actor:["topdown"],
   open_menu: ["topdown"], open_shop: ["topdown"], open_equip_menu: ["topdown"], open_code_lock: ["topdown"],
@@ -57,7 +63,7 @@ const platformCallbacks = new Set([
   "knockbackstart", "knockback_start", "knockbackend", "knockback_end", "blankstart", "blank_start", "blankend", "blank_end",
   "runstart", "run_start", "runend", "run_end", "floatstart", "float_start", "floatend", "float_end"
 ]);
-export const nativeEngineReadFields = new Set(["current_scene_index", "current_room", "scene", "room", "camera_x", "camera_y", "player_x", "player_y", "plat_blank_grav", "platformer_blank_gravity"]);
+export const nativeEngineReadFields = new Set(["current_scene_index", "current_room", "scene", "room", "camera_x", "camera_y", "player_x", "player_y", "plat_blank_grav", "platformer_blank_gravity", ...Array.from({ length: 8 }, (_, slot) => `equipped_item_${slot}`), "timer_count"]);
 export const nativePlatformStates = new Set(["fall", "ground", "jump", "dash", "ladder", "wall", "knockback", "blank", "run", "float"]);
 
 /** Validate the newly integrated paths; existing native commands retain their own validators. */
@@ -69,6 +75,9 @@ export function eventCommandIntegrationIssue(command: string, runtime?: string):
   const transitionEffect = verb === "visual_effect" && ["cover", "reveal"].includes(parts[5] ?? "");
   if (runtime && support.runtimes && !support.runtimes.includes(runtime) && !transitionEffect) {
     return `Comando ${verb} não possui consumidor em ${runtime}; use ${support.runtimes.join(" ou ")}.`;
+  }
+  if (visibilityPresetVerbs.includes(verb)) {
+    try { parseVisibilityPreset(parts); } catch (error) { return error instanceof Error ? error.message : "Preset de visibilidade inválido."; }
   }
   if (isLutaEventVerb(verb)) {
     try { parseLutaEventCommand(command); } catch (error) { return error instanceof Error ? error.message : "Evento de Luta inválido."; }
@@ -92,7 +101,7 @@ export function eventCommandIntegrationIssue(command: string, runtime?: string):
   if (verb === "set_actor_animation_state" && (parts.length !== 3 || !parts[1] || !parts[2])) return "Estado de animação requer ator e estado cadastrado.";
   if (verb === "projectile_load_slot" && (parts.length !== 5 || !integer(parts[1], 7) || !parts[2] || !integer(parts[3], 32767) || Number(parts[3]) < 1 || !integer(parts[4], 32767) || Number(parts[4]) < 1)) return "Projétil requer slot 0–7, sprite, dano e velocidade positivos.";
   if (verb === "launch_projectile_slot" && (parts.length !== 4 || !parts[1] || !integer(parts[2], 7) || !["down", "left", "right", "up", "down_left", "down_right", "up_left", "up_right"].includes(parts[3] ?? ""))) return "Lançar projétil requer ator, slot 0–7 e direção.";
-  if (verb === "start_game_clock" && (parts.length !== 4 || !integer(parts[1], 1439) || Number(parts[1]) < 1 ||
+  if (verb === "start_game_clock" && (![4, 5].includes(parts.length) || !integer(parts[1], 1439) || Number(parts[1]) < 1 ||
     !integer(parts[2], 32767) || Number(parts[2]) < 1 || !["hud", "hidden"].includes(parts[3] ?? "")))
     return "Relógio requer minutos por tick (1–1439), quadros por tick (1–32767) e hud ou hidden.";
   if (verb === "advance_time" && (parts.length !== 2 || !/^-?\d+$/.test(parts[1] ?? "") || Math.abs(Number(parts[1])) > 32767))

@@ -1,3 +1,4 @@
+import { uiText as ui, useStudioUiText } from "./studioUiText";
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
   deriveDialogueExportSummary,
@@ -139,6 +140,7 @@ export function DialoguesWorkspace({
   onExportDialogue,
   onUpdateDialogue,
 }: DialoguesWorkspaceProps): React.ReactElement {
+  const ui = useStudioUiText();
   const { t } = useStudioI18n();
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<DialoguesWorkspaceStatusFilter>("all");
@@ -227,9 +229,11 @@ export function DialoguesWorkspace({
   const defaultPortraitSlot = presentation?.chromePanel.portraitPosition === "Direita"
     ? "Direita"
     : "Esquerda";
-  const previewPortraitSlot = preview?.portraitSlot === "Direita" || preview?.portraitSlot === "Esquerda"
-    ? preview.portraitSlot
-    : defaultPortraitSlot;
+  const previewPortraitSlot = preview?.portraitSlot === "right" || preview?.portraitSlot === "Direita"
+    ? "Direita"
+    : preview?.portraitSlot === "left" || preview?.portraitSlot === "Esquerda"
+      ? "Esquerda"
+      : defaultPortraitSlot;
   const defaultDialogueSettings = useMemo<DialogueUiSettingsContract>(() => ({
     boxImage: presentation?.boxPanel.boxImage ?? "ui/dialogue_box.png",
     selectorImage: presentation?.boxPanel.selectorImage ?? "ui/dialogue_cursor.png",
@@ -346,7 +350,7 @@ export function DialoguesWorkspace({
           <details className="dialogues-additional-filters"><summary>{t("dialogues.review.moreFilters")}</summary>{filterChips.filter(chip => ["warning", "choices"].includes(chip.value)).map(chip => <button aria-pressed={chip.isActive} key={chip.id} onClick={() => setStatusFilter(chip.value)} type="button">{dialogueFilterLabel(chip.value, t)} ({chip.count})</button>)}</details>
           <div className="dialogues-list" role="list" aria-label={t("dialogues.list")}>
             {visibleDialogues.length ? [...groups.entries()].map(([id, group]) => <section className="dialogues-scene-group" key={id}>
-              <h4>{group.title}</h4>
+              <h4>{ui(group.title)}</h4>
               {group.dialogues.map(dialogue => <button aria-label={`${dialogue.key} · ${dialogue.character}`} aria-pressed={activeDialogue?.key === dialogue.key} className={activeDialogue?.key === dialogue.key ? "dialogue-row active" : "dialogue-row"} key={dialogue.key} onClick={() => setSelectedKey(dialogue.key)} title={dialogue.key} type="button">
                 <span className="dialogues-row-icon">{projectAssetURL(projectData, projectPath, dialogue.portrait) ? <img src={projectAssetURL(projectData, projectPath, dialogue.portrait)!} alt=""/> : <MessageSquare aria-hidden="true" size={18}/>}</span>
                 <span className="dialogues-row-copy"><strong>{dialogueDisplayTitle(dialogue.key, scenes.find(scene => scene.usages.has(dialogue.key)))}</strong><span>{dialogue.character}</span><small>{dialogue.text || t("dialogues.preview.noDialogue")}</small>{dialogue.warnings.length ? <em>{t("dialogues.warningCount", { count: dialogue.warnings.length })}</em> : null}</span>
@@ -368,7 +372,7 @@ export function DialoguesWorkspace({
             </div>
             <select aria-label={t("dialogues.review.previewLanguage")} onChange={event => setPreviewLocale(event.currentTarget.value)} value={language}>{presentation.localization.enabledLocales.map(locale => <option key={locale} value={locale}>{projectLocaleLabel(locale)}</option>)}</select>
           </div>
-          {validationOpen ? <div className="dialogues-validation-panel" aria-label={t("dialogues.diagnostics")}>{validationIssues.map(issue => <button className={issue.severity === "error" ? "danger-chip" : issue.severity === "warning" ? "warning-chip" : ""} key={issue.id} onClick={() => { if (issue.dialogueKey) { setSearchQuery(""); setStatusFilter("all"); setCharacterFilter(""); setSelectedKey(issue.dialogueKey); } }} type="button">{issue.message}</button>)}</div> : null}
+          {validationOpen ? <div className="dialogues-validation-panel" aria-label={t("dialogues.diagnostics")}>{validationIssues.map(issue => <button className={issue.severity === "error" ? "danger-chip" : issue.severity === "warning" ? "warning-chip" : ""} key={issue.id} onClick={() => { if (issue.dialogueKey) { setSearchQuery(""); setStatusFilter("all"); setCharacterFilter(""); setSelectedKey(issue.dialogueKey); } }} type="button">{ui(issue.message)}</button>)}</div> : null}
           <div className="dialogues-review-content">
           {activeDialogue && authoringMode === "review" ? (
             <section id="dialogues-authoring-panel-review" role="tabpanel" aria-labelledby="dialogues-authoring-tab-review" className="dialogues-text-panel">
@@ -378,7 +382,7 @@ export function DialoguesWorkspace({
               <div className="dialogues-pages-heading"><h3>{t("dialogues.review.pages")}</h3><span>{t("dialogues.review.pageCount", { count: previewPages.length })}</span></div>
               <div className="dialogues-page-list" aria-label={t("dialogues.review.pages")}>{previewPages.map((item, index) => <button aria-pressed={currentPage === index} aria-label={t("dialogues.review.page", { page: index + 1 })} key={index} onClick={() => selectPage(index)} type="button"><strong>{index + 1}</strong><span>{item.lines.join(" ") || "—"}</span></button>)}</div>
               <div className="dialogues-choices-summary">{activeDialogue.choices.length ? <><h3>{t("dialogues.field.choices")}</h3><ol>{shownChoices.map((choice, index) => <li key={index}>{choice}</li>)}</ol></> : <span>{t("dialogues.review.noChoices")}</span>}</div>
-              {activeDialogue.warnings.length ? <p role="alert">{activeDialogue.warnings.join(" · ")}</p> : null}
+              {activeDialogue.warnings.length ? <p role="alert">{activeDialogue.warnings.map(warning => ui(warning)).join(" · ")}</p> : null}
               <section className="dialogues-review-usages" aria-label={t("dialogues.usedBy")}><h3>{t("dialogues.usedBy")}</h3>
                 {activeDialogue.usages.length ? activeDialogue.usages.map((usage, index) => <div className="dialogues-usage-entry" key={`${usage.eventID}-${index}`}><MessageSquare aria-hidden="true" size={20}/><span><strong>{usage.eventName}</strong><small>{usage.command}</small></span><button disabled={usage.verb === "scene_dialogue" && !onEditDialogue} onClick={() => usage.verb === "scene_dialogue" ? onEditDialogue?.(activeDialogue.key, usage.eventID) : onOpenDialogueEvent(usage.eventName)} type="button"><ExternalLink aria-hidden="true" size={14}/>{t(usage.verb === "scene_dialogue" ? "dialogues.review.openScene" : "dialogues.actions.openEvent")}</button></div>) : <p className="muted">{t("dialogues.review.noUsage")}</p>}
               </section>
@@ -394,9 +398,9 @@ export function DialoguesWorkspace({
             >
               <header className="dialogues-translation-heading">
                 <h4>{t("dialogues.translation")}</h4>
-                <span>{visibleDialogues.length} diálogo(s) visível(is) · {t("dialogues.translationComplete", { completion: presentation.summary.translationCompletion })}</span>
+                <span>{visibleDialogues.length} {ui(" diálogo(s) visível(is) · ")}{t("dialogues.translationComplete", { completion: presentation.summary.translationCompletion })}</span>
               </header>
-              {translationError ? <p role="alert">{translationError}</p> : null}
+              {translationError ? <p role="alert">{ui(translationError)}</p> : null}
               {visibleDialogues.map((dialogue) => (
                 <details
                   className="dialogues-translation-row"
@@ -415,18 +419,18 @@ export function DialoguesWorkspace({
                     <label>
                       <span>{t("dialogues.field.translation")}</span>
                       <textarea
-                        aria-label={`Tradução de ${dialogue.key}`}
+                        aria-label={ui("Tradução de {0}", { 0: dialogue.key })}
                         onChange={(event) => onUpdateDialogue(dialogue.key, { translationLanguageCode: dialogue.translationLanguageCode, translation: event.currentTarget.value })}
                         rows={3}
                         value={dialogue.translation}
                       />
                     </label>
-                    {dialogue.choices.length ? <label><span>{t("dialogues.field.choiceTranslations")}</span><textarea aria-label={`Tradução das escolhas de ${dialogue.key}`} rows={3} value={choiceTranslationsText(dialogue)} onChange={event => onUpdateDialogue(dialogue.key, { translationLanguageCode: dialogue.translationLanguageCode, choiceTranslations: event.currentTarget.value.split("\n") })} /></label> : null}
+                    {dialogue.choices.length ? <label><span>{t("dialogues.field.choiceTranslations")}</span><textarea aria-label={ui("Tradução das escolhas de {0}", { 0: dialogue.key })} rows={3} value={choiceTranslationsText(dialogue)} onChange={event => onUpdateDialogue(dialogue.key, { translationLanguageCode: dialogue.translationLanguageCode, choiceTranslations: event.currentTarget.value.split("\n") })} /></label> : null}
                     <div className="dialogues-translation-actions">
                       <label>
                         <span>{t("dialogues.field.translationLanguage")}</span>
                         <select
-                          aria-label={`Idioma de ${dialogue.key}`}
+                          aria-label={ui("Idioma de {0}", { 0: dialogue.key })}
                           onChange={(event) => onUpdateDialogue(dialogue.key, { translationLanguageCode: event.currentTarget.value })}
                           value={dialogue.translationLanguageCode}
                         >
@@ -435,8 +439,8 @@ export function DialoguesWorkspace({
                             .map((locale) => <option key={locale} value={locale}>{projectLocaleLabel(locale)}</option>)}
                         </select>
                       </label>
-                      <button type="button" onClick={() => onUpdateDialogue(dialogue.key, { translationLanguageCode: dialogue.translationLanguageCode, translationStatus: "approved" })}>Marcar tradução como revisada</button>
-                      <button type="button" disabled={!onEditDialogue} onClick={() => onEditDialogue?.(dialogue.key)}>Editar origem no Editor</button>
+                      <button type="button" onClick={() => onUpdateDialogue(dialogue.key, { translationLanguageCode: dialogue.translationLanguageCode, translationStatus: "approved" })}>{ui("Marcar tradução como revisada")}</button>
+                      <button type="button" disabled={!onEditDialogue} onClick={() => onEditDialogue?.(dialogue.key)}>{ui("Editar origem no Editor")}</button>
                       <button
                         aria-label={t("dialogues.translation.offlineAria", { key: dialogue.key })}
                         disabled={translationBusyKey !== null || !dialogue.text.trim()}
@@ -455,8 +459,8 @@ export function DialoguesWorkspace({
           )}
 
           {activeDialogue ? <section className="dialogues-preview-panel dialogues-review-preview" aria-label={t("dialogues.preview.title")}>
-            <div className="dialogues-preview-title"><h3>{t("dialogues.preview.title")}</h3><span>240 × 160 px</span><div className="dialogues-preview-zoom" aria-label={t("dialogues.review.zoom")}>{(["1", "2", "fit"] as const).map(zoom => <button aria-pressed={previewZoom === zoom} key={zoom} onClick={() => setPreviewZoom(zoom)} type="button">{zoom === "fit" ? t("files.preview.fit") : `${zoom}×`}</button>)}</div></div>
-            {linkedScenes.length > 1 ? <select aria-label={t("dialogues.review.previewScene")} value={activeScene?.id ?? ""} onChange={event => setPreviewSceneID(event.currentTarget.value)}>{linkedScenes.map(scene => <option key={scene.id} value={scene.id}>{scene.title}</option>)}</select> : null}
+            <div className="dialogues-preview-title"><h3>{t("dialogues.preview.title")}</h3><span>{ui("240 × 160 px")}</span><div className="dialogues-preview-zoom" aria-label={t("dialogues.review.zoom")}>{(["1", "2", "fit"] as const).map(zoom => <button aria-pressed={previewZoom === zoom} key={zoom} onClick={() => setPreviewZoom(zoom)} type="button">{zoom === "fit" ? t("files.preview.fit") : `${zoom}×`}</button>)}</div></div>
+            {linkedScenes.length > 1 ? <select aria-label={t("dialogues.review.previewScene")} value={activeScene?.id ?? ""} onChange={event => setPreviewSceneID(event.currentTarget.value)}>{linkedScenes.map(scene => <option key={scene.id} value={scene.id}>{ui(scene.title)}</option>)}</select> : null}
             <div className="dialogues-preview-viewport" data-zoom={previewZoom}>
               <div className="dialogues-preview-stage" style={previewZoom === "fit" ? undefined : { width: 240 * Number(previewZoom), height: 160 * Number(previewZoom) }}>
                 {backgroundURL ? <img className="dialogues-preview-background" alt={t("dialogues.review.sceneBackground", { scene: activeScene?.title ?? "" })} src={backgroundURL}/> : null}

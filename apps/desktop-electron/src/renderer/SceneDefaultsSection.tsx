@@ -1,3 +1,4 @@
+import { uiText as ui, useStudioUiText } from "./studioUiText";
 import { ChevronRight, Info, RotateCcw, SlidersHorizontal, type LucideIcon } from "lucide-react";
 import type { ReactElement, ReactNode } from "react";
 import type { SettingsEditableField, SettingsEditableValue, SettingsSectionID, SettingsWorkspaceSection } from "../shared/settingsWorkspace";
@@ -36,6 +37,7 @@ const PLATFORM_PRESET_HINTS: StudioTranslationKey[] = ["settings.scene.presetHin
 export function SceneDefaultsSection({ section, title, detail, icon: Icon, primaryFields, advancedFields,
   playerField, backgroundFields = [], extraContent, resetPending, onRequestReset, onCancelReset, onConfirmReset,
   onUpdateSetting, onApplySettingsPreset, renderField, polish }: SceneDefaultsSectionProps): ReactElement {
+  const ui = useStudioUiText();
   const { t } = useStudioI18n();
   const isPlatformer = section.id === "platformer";
   const details = [...advancedFields, ...primaryFields.filter(field => isPlatformer && PLATFORM_DETAILS.has(field.key))];
@@ -45,23 +47,23 @@ export function SceneDefaultsSection({ section, title, detail, icon: Icon, prima
   const core = primaryFields.filter(field => !buttons.includes(field) && !abilities.includes(field) && !details.includes(field));
   const changeSummary = deriveSettingsSectionChangeSummary(section);
 
-  return <section className="scene-defaults-page" id={`settings-section-${section.id}`} role="region" aria-label={`Editar ${title}`}>
+  return <section className="scene-defaults-page" id={`settings-section-${section.id}`} role="region" aria-label={ui("Editar {0}", { 0: title })}>
     <header className="scene-defaults-header">
       <span className="scene-defaults-icon" aria-hidden="true"><Icon size={28} /></span>
       <div className="scene-defaults-heading">
         <div><h2>{title}</h2><span className="scene-defaults-scope">{t("settings.scene.scope")}</span></div>
         <p>{isPlatformer ? t("settings.scene.platformerSubtitle") : detail}</p>
       </div>
-      <button className="scene-defaults-reset" aria-label={`Restaurar padrão de ${title}`} onClick={onRequestReset} type="button"><RotateCcw size={16} aria-hidden="true" />{t("settings.interface.reset")}</button>
+      <button className="scene-defaults-reset" aria-label={ui("Restaurar padrão de {0}", { 0: title })} onClick={onRequestReset} type="button"><RotateCcw size={16} aria-hidden="true" />{t("settings.interface.reset")}</button>
     </header>
     <p className="scene-defaults-note" role="note"><Info size={17} aria-hidden="true" />{t("settings.scene.overrideHint")}</p>
-    {resetPending ? <section className="settings-reset-confirmation" aria-label="Confirmar restauração dos ajustes">
-      <strong>Restaurar {title}?</strong>
-      <p>{changeSummary.changedCount ? polish(changeSummary.changedFields.join(", ")) : "Esta seção já usa os valores padrão."}</p>
-      <div><button onClick={onCancelReset} type="button">Cancelar</button><button aria-label="Confirmar restauração" onClick={onConfirmReset} type="button">Restaurar</button></div>
+    {resetPending ? <section className="settings-reset-confirmation" aria-label={ui("Confirmar restauração dos ajustes")}>
+      <strong>{ui("Restaurar ")}{title}?</strong>
+      <p>{changeSummary.changedCount ? polish(changeSummary.changedFields.join(", ")) : ui("Esta seção já usa os valores padrão.")}</p>
+      <div><button onClick={onCancelReset} type="button">{ui("Cancelar")}</button><button aria-label={ui("Confirmar restauração")} onClick={onConfirmReset} type="button">{ui("Restaurar")}</button></div>
     </section> : null}
 
-    {section.intentGroups.length ? <section className="scene-defaults-presets" aria-label={`Ajustes por intenção de ${title}`}>
+    {section.intentGroups.length ? <section className="scene-defaults-presets" aria-label={ui("Ajustes por intenção de {0}", { 0: title })}>
       <h3>{t(isPlatformer ? "settings.scene.movement" : "settings.scene.quick")}</h3>
       {section.intentGroups.map((group, index) => {
         const groupID = `scene-preset-${section.id}-${index}`;
@@ -70,7 +72,7 @@ export function SceneDefaultsSection({ section, title, detail, icon: Icon, prima
           <div className="scene-defaults-copy"><strong id={groupID}>{polish(group.title)}</strong><p>{isPlatformer ? t(PLATFORM_PRESET_HINTS[index] ?? "settings.scene.quick") : selected ? polish(selected.detail) : t("settings.scene.custom")}</p></div>
           <div>
             <div className="scene-defaults-segments" role="group" aria-labelledby={groupID}>
-              {group.options.map(option => <button aria-label={`Aplicar ${polish(option.title)} em ${title}`} aria-pressed={option.applied} title={polish(option.detail)} key={option.id} type="button" onClick={() => onApplySettingsPreset ? onApplySettingsPreset(section.id, option.changes) : option.changes.forEach(change => onUpdateSetting(section.id, change.fieldKey, change.value))}>{polish(option.title)}</button>)}
+              {group.options.map(option => <button aria-label={ui("Aplicar {0} em {1}", { 0: polish(option.title), 1: title })} aria-pressed={option.applied} title={polish(option.detail)} key={option.id} type="button" onClick={() => onApplySettingsPreset ? onApplySettingsPreset(section.id, option.changes) : option.changes.forEach(change => onUpdateSetting(section.id, change.fieldKey, change.value))}>{polish(option.title)}</button>)}
             </div>
             {!selected ? <small className="scene-defaults-custom" role="status">{t("settings.scene.custom")}</small> : null}
           </div>
@@ -95,14 +97,14 @@ export function SceneDefaultsSection({ section, title, detail, icon: Icon, prima
 
     {playerField ? <div className="scene-defaults-player"><div className="scene-defaults-copy"><strong>{t("settings.scene.player")}</strong><p>{t("settings.scene.playerHint")}</p></div>
       <select aria-label={polish(playerField.label)} value={String(playerField.value)} onChange={event => onUpdateSetting("sceneTypes", playerField.key, event.currentTarget.value)}>
-        {(playerField.options?.some(option => option.value === playerField.value) ? playerField.options : [...(playerField.options ?? []), { value: String(playerField.value), label: `Referência inválida (${playerField.value})` }]).map(option => <option key={option.value} value={option.value}>{polish(option.label)}</option>)}
+        {(playerField.options?.some(option => option.value === playerField.value) ? playerField.options : [...(playerField.options ?? []), { value: String(playerField.value), label: `Referência inválida (${playerField.value})` }]).map(option => <option key={option.value} value={option.value}>{option.value && option.label === option.value ? option.label : polish(option.label)}</option>)}
       </select>
     </div> : null}
 
     {backgroundFields.map(field => <div className="scene-defaults-player" key={field.key}>
       <div className="scene-defaults-copy"><strong>{backgroundFields.length > 1 ? polish(field.label) : t("settings.scene.background")}</strong><p>{t("settings.scene.backgroundHint")}</p></div>
       <select aria-label={polish(field.label)} value={String(field.value)} onChange={event => onUpdateSetting("sceneTypes", field.key, event.currentTarget.value)}>
-        {(field.options?.some(option => option.value === field.value) ? field.options : [...(field.options ?? []), { value: String(field.value), label: `Referência inválida (${field.value})` }]).map(option => <option key={option.value} value={option.value}>{polish(option.label)}</option>)}
+        {(field.options?.some(option => option.value === field.value) ? field.options : [...(field.options ?? []), { value: String(field.value), label: `Referência inválida (${field.value})` }]).map(option => <option key={option.value} value={option.value}>{option.value && option.label === option.value ? option.label : polish(option.label)}</option>)}
       </select>
     </div>)}
 

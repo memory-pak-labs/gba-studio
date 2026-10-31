@@ -1,3 +1,4 @@
+import { uiText as ui, useStudioUiText } from "./studioUiText";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Plus } from "lucide-react";
 import {
@@ -69,6 +70,7 @@ function ContextMenu({
   onAction(action: string, data?: Record<string, unknown>): void;
   onClose(): void;
 }): React.ReactElement | null {
+  const ui = useStudioUiText();
   const menuRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -127,7 +129,7 @@ function ContextMenu({
           }}
           type="button"
         >
-          {item.label}
+          {ui(item.label)}
         </button>
       ))}
     </div>
@@ -262,6 +264,7 @@ function ColorsLibraryPanel({
   searchQuery: string;
   setSearchQuery(query: string): void;
 }): React.ReactElement {
+  const ui = useStudioUiText();
   const [filterType, setFilterType] = useState<"all" | "manual" | "auto">("all");
   const [filterSlot, setFilterSlot] = useState<"all" | "bg" | "obj" | "problems">("all");
   const [contextMenu, setContextMenu] = useState<ContextMenuState | null>(null);
@@ -307,7 +310,7 @@ function ColorsLibraryPanel({
         onDuplicateFamily(familyID);
         break;
       case "rename": {
-        const nextName = window.prompt("Renomear família", family.name);
+        const nextName = window.prompt(ui("Renomear família"), family.name);
         if (nextName === null) return;
         const trimmed = nextName.trim();
         if (trimmed) {
@@ -316,7 +319,7 @@ function ColorsLibraryPanel({
         break;
       }
       case "remove":
-        if (window.confirm(`Remover a família ${family.name}?`)) {
+        if (window.confirm(ui("Remover a família {0}?", { 0: family.name }))) {
           onRemoveFamily(familyID);
         }
         break;
@@ -350,82 +353,75 @@ function ColorsLibraryPanel({
     <div className="colors-panel">
       <div className="colors-panel-header">
         <div className="colors-panel-header-row">
-          <h4>Biblioteca</h4>
+          <h4>{ui("Biblioteca")}</h4>
           <button
             className="colors-create-family-button"
             onClick={onCreateFamily}
             type="button"
           >
             <Plus aria-hidden="true" size={14} strokeWidth={2.4} />
-            <span>Nova família</span>
+            <span>{ui("Nova família")}</span>
           </button>
         </div>
-        <p>Famílias reutilizáveis</p>
+        <p>{ui("Famílias reutilizáveis")}</p>
         <div className="colors-search">
           <svg className="colors-search-icon" width="14" height="14" viewBox="0 0 16 16" fill="none">
             <circle cx="6.5" cy="6.5" r="5" stroke="currentColor" strokeWidth="1.5"/>
             <path d="M10 10L14.5 14.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
           </svg>
           <input
-            aria-label="Buscar família de cores"
-            placeholder="Buscar"
+            aria-label={ui("Buscar família de cores")}
+            placeholder={ui("Buscar")}
             type="text"
             value={searchQuery}
             onChange={(e) => { setSearchQuery(e.target.value); onSearch(e.target.value); }}
           />
         </div>
-        <div className="colors-filter-chips" role="group" aria-label="Origem das famílias">
+        <div className="colors-filter-chips" role="group" aria-label={ui("Origem das famílias")}>
           <button
             className={`colors-filter-chip${filterType === "all" ? " active" : ""}`}
             onClick={() => setFilterType("all")}
             type="button"
           >
-            Todas
-          </button>
+            {ui("Todas")}</button>
           <button
             className={`colors-filter-chip${filterType === "auto" ? " active" : ""}`}
             onClick={() => setFilterType("auto")}
             type="button"
           >
-            Automáticas
-          </button>
+            {ui("Automáticas")}</button>
           <button
             className={`colors-filter-chip${filterType === "manual" ? " active" : ""}`}
             onClick={() => setFilterType("manual")}
             type="button"
           >
-            Manuais
-          </button>
+            {ui("Manuais")}</button>
         </div>
-        <div className="colors-filter-chips" role="group" aria-label="Uso e problemas das famílias">
+        <div className="colors-filter-chips" role="group" aria-label={ui("Uso e problemas das famílias")}>
           <button
             className={`colors-filter-chip${filterSlot === "all" ? " active" : ""}`}
             onClick={() => setFilterSlot("all")}
             type="button"
           >
-            Todas
-          </button>
+            {ui("Todas")}</button>
           <button
             className={`colors-filter-chip${filterSlot === "bg" ? " active" : ""}`}
             onClick={() => setFilterSlot("bg")}
             type="button"
           >
-            BG
-          </button>
+            {ui("BG")}</button>
           <button
             className={`colors-filter-chip${filterSlot === "obj" ? " active" : ""}`}
             onClick={() => setFilterSlot("obj")}
             type="button"
           >
-            OBJ
-          </button>
+            {ui("OBJ")}</button>
           <button
             className={`colors-filter-chip attention${filterSlot === "problems" ? " active" : ""}`}
             onClick={() => setFilterSlot("problems")}
             type="button"
           >
-            Com problemas
-          </button>
+            {ui("Com problemas")}</button>
         </div>
       </div>
       <div className="colors-panel-body">
@@ -440,16 +436,15 @@ function ColorsLibraryPanel({
               >
                 <span className="colors-family-item-name">{family.name}</span>
                 <span className="colors-family-item-meta">
-                  {family.background.length + family.objects.length} var. · {family.usageCount} uso(s)
-                </span>
+                  {family.background.length + family.objects.length} {ui(" var. · ")}{family.usageCount} {ui(" uso(s)")}</span>
               </button>
             </li>
           ))}
           {filteredFamilies.length === 0 ? (
             <li>
               <div className="colors-empty-state" role="status" aria-live="polite">
-                <strong>Nenhuma família encontrada neste filtro.</strong>
-                <span>Ajuste ou limpe os filtros para continuar.</span>
+                <strong>{ui("Nenhuma família encontrada neste filtro.")}</strong>
+                <span>{ui("Ajuste ou limpe os filtros para continuar.")}</span>
               </div>
             </li>
           ) : null}
@@ -497,6 +492,7 @@ function ColorsFamilyEditor({
   onReorderColor(id: string, slot: PaletteSlot, fromIndex: number, toIndex: number): void;
   onCopyPaletteSlot(id: string, slot: PaletteSlot): void;
 }): React.ReactElement {
+  const ui = useStudioUiText();
   const [activeSlot, setActiveSlot] = useState<PaletteSlot>("background");
   const [selectedColorIndex, setSelectedColorIndex] = useState(0);
   const [renaming, setRenaming] = useState(false);
@@ -690,7 +686,7 @@ function ColorsFamilyEditor({
     <div className="colors-panel">
       <div className="colors-panel-header">
         <div className="colors-family-header">
-          <span className="colors-family-label">Família</span>
+          <span className="colors-family-label">{ui("Família")}</span>
           <div className="colors-family-title-row">
             {renaming ? (
               <input
@@ -709,10 +705,10 @@ function ColorsFamilyEditor({
             )}
             <div className="colors-family-actions">
               <button
-                aria-label="Copiar paleta"
+                aria-label={ui("Copiar paleta")}
                 className="colors-icon-button"
                 onClick={() => onCopyPaletteSlot(family.id, activeSlot)}
-                title="Copiar paleta"
+                title={ui("Copiar paleta")}
                 type="button"
               >
                 <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
@@ -721,10 +717,10 @@ function ColorsFamilyEditor({
                 </svg>
               </button>
               <button
-                aria-label="Renomear família"
+                aria-label={ui("Renomear família")}
                 className="colors-icon-button"
                 onClick={() => { setRenaming(true); setRenameValue(family.name); }}
-                title="Renomear"
+                title={ui("Renomear")}
                 type="button"
               >
                 <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
@@ -732,10 +728,10 @@ function ColorsFamilyEditor({
                 </svg>
               </button>
               <button
-                aria-label="Remover família"
+                aria-label={ui("Remover família")}
                 className="colors-icon-button"
                 onClick={() => onRemove(family.id)}
-                title="Remover"
+                title={ui("Remover")}
                 type="button"
               >
                 <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
@@ -745,19 +741,19 @@ function ColorsFamilyEditor({
             </div>
           </div>
           <div className="colors-family-variant-row">
-            <button className="colors-variant-button active" type="button">Padrão</button>
+            <button className="colors-variant-button active" type="button">{ui("Padrão")}</button>
             <button className="colors-variant-add" type="button">+</button>
           </div>
         </div>
         <div className="colors-toolbar">
-          <button onClick={() => onDuplicate(family.id)} type="button">Duplicar</button>
-          <button onClick={() => { setRenaming(true); setRenameValue(family.name); }} type="button">Renomear</button>
-          <button aria-label="Remover família" onClick={() => onRemove(family.id)} type="button">
+          <button onClick={() => onDuplicate(family.id)} type="button">{ui("Duplicar")}</button>
+          <button onClick={() => { setRenaming(true); setRenameValue(family.name); }} type="button">{ui("Renomear")}</button>
+          <button aria-label={ui("Remover família")} onClick={() => onRemove(family.id)} type="button">
             <svg width="12" height="12" viewBox="0 0 16 16" fill="none">
               <path d="M2 4H14M5 4V2H11V4M6 7V12M10 7V12M3 4L4 14H12L13 4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
             </svg>
           </button>
-          <button onClick={() => onOptimizeDuplicates(family.id)} type="button">Otimizar duplicadas</button>
+          <button onClick={() => onOptimizeDuplicates(family.id)} type="button">{ui("Otimizar duplicadas")}</button>
         </div>
         <div className="colors-slot-toggle">
           <button
@@ -765,19 +761,17 @@ function ColorsFamilyEditor({
             onClick={() => setActiveSlot("background")}
             type="button"
           >
-            BG
-          </button>
+            {ui("BG")}</button>
           <button
             className={`colors-filter-chip${activeSlot === "objects" ? " active" : ""}`}
             onClick={() => setActiveSlot("objects")}
             type="button"
           >
-            OBJ
-          </button>
+            {ui("OBJ")}</button>
         </div>
       </div>
       <div className="colors-panel-body">
-        <div className="colors-palette-grid" aria-label={`Paleta ${activeSlot === "background" ? "BG" : "OBJ"}`} ref={gridRef} tabIndex={0}>
+        <div className="colors-palette-grid" aria-label={ui("Paleta {0}", { 0: activeSlot === "background" ? "BG" : "OBJ" })} ref={gridRef} tabIndex={0}>
           {Array.from({ length: 16 }, (_, index) => {
             const isColorDragOver = colorDragOverIndex === index && colorDragPreviewIndex !== index;
             const color = palette[index] ?? 0;
@@ -792,8 +786,8 @@ function ColorsFamilyEditor({
                   const btn = e.currentTarget;
                   handleColorDragStart(e, index, btn);
                 }}
-                aria-label={`Slot ${index}: ${formatRgb555Hex(color)}`}
-                title={`Slot ${index}: ${formatRgb555Hex(color)}`}
+                aria-label={ui("Slot {0}: {1}", { 0: index, 1: formatRgb555Hex(color) })}
+                title={ui("Slot {0}: {1}", { 0: index, 1: formatRgb555Hex(color) })}
                 type="button"
                 key={index}
               >
@@ -809,7 +803,7 @@ function ColorsFamilyEditor({
               style={{ backgroundColor: rgbToCssColor(selectedColor) }}
             />
             <div className="colors-color-hex-group">
-              <span className="colors-color-hex-label">RGB555 hexadecimal</span>
+              <span className="colors-color-hex-label">{ui("RGB555 hexadecimal")}</span>
               <div className="colors-color-hex-input-row">
                 <input
                   className="colors-color-hex-input"
@@ -828,8 +822,7 @@ function ColorsFamilyEditor({
                   onClick={handleApplyColor}
                   type="button"
                 >
-                  Aplicar cor
-                </button>
+                  {ui("Aplicar cor")}</button>
                 <button
                   className="colors-color-reset-button"
                   onClick={() => onResetPaletteColor(family.id, activeSlot, selectedColorIndex)}
@@ -839,8 +832,7 @@ function ColorsFamilyEditor({
                     <path d="M2 8C2 4.69 4.69 2 8 2C11.31 2 14 4.69 14 8C14 11.31 11.31 14 8 14C5.94 14 4.12 12.95 3.05 11.35" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
                     <path d="M2 5V8H5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
                   </svg>
-                  Restaurar variação
-                </button>
+                  {ui("Restaurar variação")}</button>
               </div>
             </div>
           </div>
@@ -868,11 +860,12 @@ function ColorsConsumersPanel({
   paletteConflicts: ColorsWorkspacePresentation["paletteConflicts"];
   roomName: string | null;
 }): React.ReactElement {
+  const ui = useStudioUiText();
   return (
     <div className="colors-panel inspector-readable">
       <div className="colors-panel-header">
         <div className="colors-consumers-header">
-          <h4>Consumidores e bancos</h4>
+          <h4>{ui("Consumidores e bancos")}</h4>
         </div>
         {roomName ? <p>{roomName}</p> : null}
         </div>
@@ -880,46 +873,42 @@ function ColorsConsumersPanel({
           <div className="colors-consumers-panel">
           <div className="colors-budget-stats">
             <div className="colors-budget-stat">
-              <span className="colors-budget-stat-label">FONTE</span>
-              <span className="colors-budget-stat-value">Cenas atribuídas</span>
+              <span className="colors-budget-stat-label">{ui("FONTE")}</span>
+              <span className="colors-budget-stat-value">{ui("Cenas atribuídas")}</span>
             </div>
             <div className="colors-budget-stat">
-              <span className="colors-budget-stat-label">BG OCUPADOS</span>
+              <span className="colors-budget-stat-label">{ui("BG OCUPADOS")}</span>
               <span className="colors-budget-stat-value">{bankUsage.bgOccupied}/{bankUsage.bgCapacity}</span>
             </div>
             <div className="colors-budget-stat">
-              <span className="colors-budget-stat-label">OBJ OCUPADOS</span>
+              <span className="colors-budget-stat-label">{ui("OBJ OCUPADOS")}</span>
               <span className="colors-budget-stat-value">{bankUsage.objOccupied}/{bankUsage.objCapacity}</span>
             </div>
           </div>
           <p className="colors-panel-help">
-            {bankUsage.assignedRoomCount} cenas usam uma família; {bankUsage.unassignedRoomCount} estão sem família.
-            {bankUsage.unknownFamilyCount > 0 ? ` ${bankUsage.unknownFamilyCount} têm uma família inexistente.` : ""}
+            {bankUsage.assignedRoomCount} {ui(" cenas usam uma família; ")}{bankUsage.unassignedRoomCount} {ui(" estão sem família.")}{bankUsage.unknownFamilyCount > 0 ? ui(" {0} têm uma família inexistente.", { 0: bankUsage.unknownFamilyCount }) : ""}
           </p>
           {bankUsage.consumers.length > 0 ? (
-            <div className="colors-consumer-list" aria-label="Cenas consumidoras">
+            <div className="colors-consumer-list" aria-label={ui("Cenas consumidoras")}>
               {bankUsage.consumers.map((consumer) => (
                 <div className="colors-consumer-row" key={consumer.roomID}>
                   <span>{consumer.roomName}</span>
                   <span>
-                    {consumer.familyName ?? "Sem família"} · {consumer.backgroundBankLimit} BG
-                  </span>
+                    {consumer.familyName ?? ui("Sem família")} · {consumer.backgroundBankLimit} {ui(" BG")}</span>
                 </div>
               ))}
             </div>
           ) : null}
           {paletteConflicts.some((conflict) => !conflict.resolvedByExport) ? (
             <div aria-live="polite" className="colors-palette-conflicts">
-              <h5>Conflitos que exigem revisão</h5>
+              <h5>{ui("Conflitos que exigem revisão")}</h5>
               {paletteConflicts.filter((conflict) => !conflict.resolvedByExport).map((conflict) => (
                 <p key={`${conflict.kind}:${conflict.assetName}`}>
-                  {conflict.kind === "sprite" ? "Sprite" : "Background"} <strong>{conflict.assetName}</strong> é usado por
-                  {" "}{conflict.roomNames.join(", ")} com famílias incompatíveis ou ausentes.
-                  {" "}
+                  {conflict.kind === "sprite" ? ui("Sprite") : ui("Background")} <strong>{conflict.assetName}</strong> {ui(" é usado por")}{" "}{conflict.roomNames.join(", ")} {ui(" com famílias incompatíveis ou ausentes.")}{" "}
                   <span className="colors-conflict-resolution">
                     {conflict.resolution === "sprite-variant"
-                      ? "Use uma variante da folha por família ou unifique a família das cenas."
-                      : "Reempacote o background ou revise explicitamente a política dos consumidores."}
+                      ? ui("Use uma variante da folha por família ou unifique a família das cenas.")
+                      : ui("Reempacote o background ou revise explicitamente a política dos consumidores.")}
                   </span>
                   <small>
                     {conflict.references.map((reference) => (
@@ -934,28 +923,25 @@ function ColorsConsumersPanel({
           ) : null}
           {paletteBudgetWarnings.length > 0 ? (
             <div aria-live="polite" className="colors-palette-conflicts">
-              <h5>Risco de perda de cores</h5>
+              <h5>{ui("Risco de perda de cores")}</h5>
               {paletteBudgetWarnings.map((warning) => (
                 <p key={warning.assetName}>
                   <strong>{warning.assetName}</strong>{" "}
                   {warning.detectedBanks === null
-                    ? `tem orçamento de ${warning.requestedBanks} bancos BG`
-                    : `usa ${warning.detectedBanks} bancos BG (orçamento ${warning.requestedBanks})`}
-                  , mas a política {warning.policy === "full-screen" ? "tela cheia" : "UI compartilhada"} das cenas
-                  {" "}{warning.roomNames.join(", ")} libera {warning.effectiveBanks}. Ação recomendada: preparar o asset
-                  {" "}para até {warning.effectiveBanks} banks ou revisar explicitamente a política em Cenas.
-                </p>
+                    ? ui("tem orçamento de {0} bancos BG", { 0: warning.requestedBanks })
+                    : ui("usa {0} bancos BG (orçamento {1})", { 0: warning.detectedBanks, 1: warning.requestedBanks })}
+                  {ui(", mas a política ")}{warning.policy === "full-screen" ? ui("tela cheia") : ui("UI compartilhada")} {ui(" das cenas")}{" "}{warning.roomNames.join(", ")} {ui(" libera ")}{warning.effectiveBanks}{ui(". Ação recomendada: preparar o asset")}{" "}{ui("para até ")}{warning.effectiveBanks} {ui(" banks ou revisar explicitamente a política em Cenas.")}</p>
               ))}
             </div>
           ) : null}
           <div className="colors-bank-section">
-            <h5>Bancos BG</h5>
+            <h5>{ui("Bancos BG")}</h5>
             <div className="colors-bank-grid">
               {bankUsage.bgBanks.map((slot) => (
                 <div
                   className={`colors-bank-slot${slot.occupied ? " occupied" : ""}`}
                   key={slot.index}
-                  title={slot.familyName ?? `Banco ${slot.index}`}
+                  title={slot.familyName ?? ui("Banco {0}", { 0: slot.index })}
                 >
                   <span>{slot.index}</span>
                   <span>{slot.occupied ? 1 : 0}</span>
@@ -964,13 +950,13 @@ function ColorsConsumersPanel({
             </div>
           </div>
           <div className="colors-bank-section">
-            <h5>Bancos OBJ</h5>
+            <h5>{ui("Bancos OBJ")}</h5>
             <div className="colors-bank-grid">
               {bankUsage.objBanks.map((slot) => (
                 <div
                   className={`colors-bank-slot${slot.occupied ? " occupied" : ""}`}
                   key={slot.index}
-                  title={slot.familyName ?? `Banco ${slot.index}`}
+                  title={slot.familyName ?? ui("Banco {0}", { 0: slot.index })}
                 >
                   <span>{slot.index}</span>
                   <span>{slot.occupied ? 1 : 0}</span>
@@ -1000,6 +986,7 @@ export function ColorsWorkspace({
   onPastePaletteSlot,
   onGenerateAutomaticFamilies
 }: ColorsWorkspaceProps): React.ReactElement | null {
+  const ui = useStudioUiText();
   const [searchQuery, setSearchQuery] = useState("");
   const [clipboardPalette, setClipboardPalette] = useState<number[]>([]);
 
@@ -1022,7 +1009,7 @@ export function ColorsWorkspace({
   return (
     <section
       className="colors-workspace"
-      aria-label="Cores"
+      aria-label={ui("Cores")}
     >
       <div className="colors-layout">
         <ColorsLibraryPanel
@@ -1055,7 +1042,7 @@ export function ColorsWorkspace({
         ) : (
           <div className="colors-panel">
             <div className="colors-empty-state">
-              <span>Selecione uma família para editar</span>
+              <span>{ui("Selecione uma família para editar")}</span>
             </div>
           </div>
         )}

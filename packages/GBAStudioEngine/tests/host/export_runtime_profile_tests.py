@@ -1011,6 +1011,7 @@ def world_map_project():
 def run_assetc(repo_root, manifest_path, output_dir, capture_output=False):
     subprocess.run(
         [
+            sys.executable,
             str(repo_root / "tools" / "assetc" / "assetc.py"),
             str(manifest_path),
             "-o",
@@ -1169,6 +1170,7 @@ def assert_scene_banks_reuse_vram_ranges(repo_root, build_dir):
         ]
     }, indent=2) + "\n", encoding="utf-8")
     subprocess.run([
+        sys.executable,
         str(repo_root / "tools" / "assetc" / "assetc.py"),
         str(pack_path),
         "-o",
@@ -1589,7 +1591,8 @@ def assert_mixed_runtime_dispatch_export(repo_root, build_dir):
     assert "struct HudLayoutComponent" not in dialogue_ui_header
     assert "configure_for_scene" in dialogue_ui_header
     assert "gbs::configure_dialogue_font(dialogue_font);" in dialogue_ui_header
-    assert "gbs::configure_dialogue_font(preset->font != nullptr ? preset->font : dialogue_font);" in dialogue_ui_header
+    assert "gbs::configure_dialogue_font(preset->font != nullptr ? preset->font : dialogue_font);" not in dialogue_ui_header
+    assert "HUD glyphs belong to the selected layout; dialogue keeps its complete font." in dialogue_ui_header
 
     runtime_sources = (
         repo_root / "examples" / "topdown_basic" / "src" / "main.cpp",
@@ -1688,7 +1691,7 @@ def assert_mixed_runtime_dispatch_export(repo_root, build_dir):
     assert "gbs::RuntimeAdapterFrameResult update_topdown_runtime(const gbs::RuntimeFrameContext& context)" in topdown_runtime
     assert "void render_topdown_runtime(const gbs::RuntimeFrameContext& context)" in topdown_runtime
     assert "void leave_topdown_runtime()" in topdown_runtime
-    assert "return gbs::RuntimeAdapterFrameResult::Transition;" in topdown_runtime
+    assert "return topdown_transition_ready() ? gbs::RuntimeAdapterFrameResult::Transition : gbs::RuntimeAdapterFrameResult::Continue;" in topdown_runtime
     assert "GBS_TOPDOWN_RUNTIME_UPDATE" in topdown_runtime
     assert 'gbs::ResourceBankReservation project_bank_reservations[max_project_resource_banks] __attribute__((section(".ewram_bss")));' in topdown_runtime
     assert 'gbs::ResourceBankReservation project_bank_scratch_reservations[max_project_resource_banks] __attribute__((section(".ewram_bss")));' in topdown_runtime
@@ -1786,25 +1789,27 @@ def assert_mixed_runtime_dispatch_export(repo_root, build_dir):
     assert "gbs::draw_hud(hud)" in dungeon_runtime
     assert "gbs::init_hud(hud)" in dungeon_runtime
     hud_render_index = dungeon_runtime.find("gbs::draw_hud(hud);")
-    hidden_dialogue_index = dungeon_runtime.find("if (!dialogue.visible) gbs::draw_dialogue(dialogue);")
+    hidden_dialogue_index = dungeon_runtime.find("if (!dungeon_dialogue.visible) gbs::draw_dialogue(dungeon_dialogue);")
     hidden_map_index = dungeon_runtime.find("if (!map_dialogue.visible) gbs::draw_dialogue(map_dialogue);")
     hidden_interaction_index = dungeon_runtime.find("if (!interaction_dialogue.visible) gbs::draw_dialogue(interaction_dialogue);")
-    visible_dialogue_index = dungeon_runtime.find("if (dialogue.visible) gbs::draw_dialogue(dialogue);")
+    visible_dialogue_index = dungeon_runtime.find("if (dungeon_dialogue.visible) gbs::draw_dialogue(dungeon_dialogue);")
     visible_map_index = dungeon_runtime.find("if (map_dialogue.visible) gbs::draw_dialogue(map_dialogue);")
     visible_interaction_index = dungeon_runtime.find("if (interaction_dialogue.visible) gbs::draw_dialogue(interaction_dialogue);")
     assert -1 not in (hidden_dialogue_index, hidden_map_index, hidden_interaction_index, hud_render_index,
                       visible_dialogue_index, visible_map_index, visible_interaction_index)
     assert hidden_dialogue_index < hidden_map_index < hidden_interaction_index < hud_render_index
     assert hud_render_index < visible_dialogue_index < visible_map_index < visible_interaction_index
-    assert "gbs::set_dialogue_frame(interaction_dialogue, gbs::dialogue_frame_default);" in dungeon_runtime
+    assert "gbs::set_dialogue_frame(interaction_dialogue, gbs::active_dialogue_ui_config().full_width_bottom" in dungeon_runtime
+    assert "? gbs::dialogue_frame_full_width : gbs::dialogue_frame_default);" in dungeon_runtime
     assert "gbs::set_dialogue_frame(interaction_dialogue, gbs::dialogue_frame_battle_menu);" in dungeon_runtime
     battle_start_index = dungeon_runtime.find("bool start_dungeon_battle(size_t actor_index)")
     battle_update_index = dungeon_runtime.find("bool update_dungeon_interaction(", battle_start_index)
     assert battle_start_index >= 0 and battle_update_index > battle_start_index
     battle_start_runtime = dungeon_runtime[battle_start_index:battle_update_index]
-    assert "gbs::hide_dialogue(dialogue);" in battle_start_runtime
+    assert "gbs::hide_dialogue(dungeon_dialogue);" in battle_start_runtime
     assert "runtime_script_controls_dialogue = false;" in battle_start_runtime
-    assert "gbs::set_dialogue_frame(dialogue, gbs::dialogue_frame_default);" in dungeon_runtime
+    assert "gbs::set_dialogue_frame(dungeon_dialogue, gbs::active_dialogue_ui_config().full_width_bottom" in dungeon_runtime
+    assert "? gbs::dialogue_frame_full_width : gbs::dialogue_frame_default);" in dungeon_runtime
     assert "gbs::update_runtime_trigger" in dungeon_runtime
     assert "const bool assets_are_streamed = project.resource_bank_group_count > 0;" in dungeon_runtime
     assert "stream_resources_for_room" in dungeon_runtime
@@ -1844,7 +1849,7 @@ def assert_mixed_runtime_dispatch_export(repo_root, build_dir):
     assert '#include "gbs/dma.hpp"' in mixed_runtime
     assert "gbs::audio_init();" not in mixed_runtime
     assert "gbs::audio_init();" not in topdown_runtime
-    assert "audio_init();" in core_runtime
+    assert "audio_init(preserve_runtime_handoff);" in core_runtime
     assert "audio_update();" in core_runtime
     assert "gbs::dma_reset_vblank_queue();" in mixed_runtime
     assert "gbs::RuntimeKind::Menu" in mixed_header
@@ -1856,7 +1861,7 @@ def assert_mixed_runtime_dispatch_export(repo_root, build_dir):
     assert 'gbs::EngineResourceManager resource_manager __attribute__((section(".ewram_bss")));' in cutscene_runtime
     assert "gbs::cutscene_step_background_index(*scene, *step)" in cutscene_runtime
     assert "apply_current_step_background();" in cutscene_runtime
-    assert "if (input.was_pressed(gbs::ButtonA)) {\n        advance_step();" in cutscene_runtime
+    assert "if (input.was_pressed(gbs::ButtonA)) {\n        if (dialogue.visible) {\n            gbs::advance_dialogue(dialogue, input);\n            if (dialogue.visible) return;\n        }\n        advance_step();" in cutscene_runtime
     assert "if (input.was_pressed(gbs::ButtonB)) {\n        skip_step();" in cutscene_runtime
     assert "if (input.was_pressed(gbs::ButtonStart)) {\n        skip_step();" in cutscene_runtime
     assert "gbs::RuntimeKind::Cutscene" in mixed_runtime
@@ -2848,12 +2853,12 @@ def assert_topdown_npc_animation_commands_export(repo_root, build_dir):
         repo_root,
         output_dir,
         "gbastudio_project_data.hpp",
-        "gbastudio_project::project.rooms[0].npcs[0].animation == &guide_sprite_animation && "
+        "gbastudio_project::project.rooms[0].npcs[0].animation == gbastudio_project::project.rooms[0].npcs[0].animations[0] && "
         "gbastudio_project::project.rooms[0].npcs[0].animation_count == 2 && "
-        "gbastudio_project::project.rooms[0].npcs[0].animations[1] == &guide_sprite_animation && "
+        "gbastudio_project::project.rooms[0].npcs[0].animations[1]->frames == guide_sprite_animation.frames && "
         "gbastudio_project::project.rooms[0].npcs[0].on_interact.commands[0].op == gbs::EventOp::SetActorAnimation && "
         "gbastudio_project::project.rooms[0].npcs[0].on_interact.commands[0].a == 0 && "
-        "gbastudio_project::project.rooms[0].npcs[0].on_interact.commands[0].b == 1 && "
+        "gbs::sprite_animation_for_reference(gbastudio_project::project.rooms[0].npcs[0].animations, 2, nullptr, gbastudio_project::project.rooms[0].npcs[0].on_interact.commands[0].b) == gbastudio_project::project.rooms[0].npcs[0].animations[1] && "
         "gbastudio_project::project.rooms[0].npcs[0].on_interact.commands[1].op == gbs::EventOp::WaitActorAnimation && "
         "gbastudio_project::project.rooms[0].npcs[0].on_interact.commands[1].a == 0 && "
         "gbastudio_project::project.rooms[0].npcs[0].on_interact.commands[2].op == gbs::EventOp::SetActorAnimationSpeed && "
@@ -2945,11 +2950,11 @@ def assert_topdown_player_animation_commands_export(repo_root, build_dir):
         repo_root,
         output_dir,
         "gbastudio_project_data.hpp",
-        "gbastudio_project::project.player.animation == &hero_sprite_animation && "
+        "gbastudio_project::project.player.animation == gbastudio_project::project.player.animations[0] && "
         "gbastudio_project::project.player.animation_count == 2 && "
-        "gbastudio_project::project.player.animations[1] == &hero_sprite_animation && "
+        "gbastudio_project::project.player.animations[1]->frames == hero_sprite_animation.frames && "
         "gbastudio_project::project.rooms[0].on_enter.commands[0].op == gbs::EventOp::SetPlayerAnimation && "
-        "gbastudio_project::project.rooms[0].on_enter.commands[0].a == 1",
+        "gbs::sprite_animation_for_reference(gbastudio_project::project.player.animations, 2, nullptr, gbastudio_project::project.rooms[0].on_enter.commands[0].a) == gbastudio_project::project.player.animations[1]",
         "topdown_player_animation_commands_compile",
     )
 
@@ -3114,7 +3119,7 @@ def assert_platformer_custom_player_metasprite_export(repo_root, build_dir):
     assert "project.player_animations" in template
     assert "project.player_on_start" in template
     assert "project.player_on_update" in template
-    assert "platformer_player_animation_for_state" in template
+    assert "update_platformer_player_presentation" in template
     assert "current_metasprite" in template
     assert "gbs::set_metasprite" in template
     assert "input.was_pressed(gbs::ButtonStart)" in template
@@ -3453,7 +3458,11 @@ def assert_topdown_template_animates_player_only_while_moving(repo_root):
         "const gbs::Vec2i player_position_before_update = player.position_pixels;",
         "player_moved_this_frame = player.position_pixels.x != player_position_before_update.x ||",
         "if (player_moved_this_frame) {",
-        "gbs::update_sprite_animator_scaled(player_animator, project.player.animation_speed_percent);",
+        "gbs::update_sprite_animator_travel(player_animator, player_animation_travelled_pixels, player_animation_speed_percent);",
+        "player.position_pixels.x - player_position_before_update.x",
+        "player.position_pixels.y - player_position_before_update.y",
+        "gbs::continue_sprite_animation(player_animator, *next_animation)",
+        "gbs::player_has_walk_path(room.collision, player, player_input, player_blockers, player_blocker_count)",
         "gbs::select_sprite_animation(npc_animators[index], *npc_runtimes[index].animation);",
         "room_data.npcs[index].movement.kind == gbs::TopDownNpcMovementKind::None",
         "refresh_npc_runtime_animation(index, moving);",
@@ -3498,12 +3507,13 @@ def assert_topdown_template_hides_world_sprites_during_pause_menu(repo_root):
         "pause_render_camera_ready",
         "const gbs::Vec2i render_camera = pause_menu.visible && pause_render_camera_ready",
         # Ground on BG2, foreground on BG1; UI (menu/dialogue/HUD) stays on BG0.
-        "gbs::draw_room_to_bg(gbs::BackgroundLayer::BG2, active_room_visual_tiles(), room.width_tiles, room.height_tiles, render_camera.x, render_camera.y);",
-        "gbs::draw_room_to_bg(gbs::BackgroundLayer::BG1, project.rooms[current_room].foreground_tiles, room.width_tiles, room.height_tiles, render_camera.x, render_camera.y);",
+        "gbs::draw_room_to_bg_cached(gbs::BackgroundLayer::BG2, active_room_visual_tiles(), room.width_tiles, room.height_tiles, render_camera.x, render_camera.y, room_layer_cache[2], room_tile_edits);",
+        "gbs::draw_room_to_bg_cached(gbs::BackgroundLayer::BG1, project.rooms[current_room].foreground_tiles, room.width_tiles, room.height_tiles, render_camera.x, render_camera.y, room_layer_cache[1], room_tile_edits);",
         "gbs::set_bg_scroll(gbs::BackgroundLayer::BG1, render_camera.x & 7, render_camera.y & 7)",
         "const bool affine_room = active_room_data.video.affine_enabled || project.video.affine_enabled;",
-        "const int bg2_scroll_x = affine_room ? 0 : (active_room_data.uses_visual_tilemap ? render_camera.x : (render_camera.x & 7));",
-        "const int bg2_scroll_y = affine_room ? 0 : (active_room_data.uses_visual_tilemap ? render_camera.y : (render_camera.y & 7));",
+        "const gbs::Vec2i background_camera = paged_room ? update_paged_room_background(render_camera) : render_camera;",
+        "const int bg2_scroll_x = affine_room ? 0 : (paged_room ? background_camera.x % 256 : (active_room_data.uses_visual_tilemap && room_tile_edits.count == 0 ? render_camera.x : (render_camera.x & 7)));",
+        "const int bg2_scroll_y = affine_room ? 0 : (paged_room ? background_camera.y % 256 : (active_room_data.uses_visual_tilemap && room_tile_edits.count == 0 ? render_camera.y : (render_camera.y & 7)));",
         "gbs::set_bg_scroll(gbs::BackgroundLayer::BG2, bg2_scroll_x, bg2_scroll_y);",
         "gbs::set_bg_scroll(gbs::BackgroundLayer::BG0, 0, 0)",
         "gbs::draw_menu(pause_menu);",
@@ -3822,7 +3832,8 @@ def assert_player_event_commands_reach_mixed_runtimes(repo_root):
     assert "gbs::InputState { 0, 0, 0 }" in templates["topdown"]
     assert "gbs::InputState { 0, 0, 0 }" in templates["platformer"]
     assert "gbs::collect_visible_topdown_actor_draw_slots(" in templates["topdown"]
-    assert "player_event_runtime.active," in templates["topdown"]
+    assert "gbs::topdown_controlled_player_active(project.rooms[current_room], player_event_runtime.active)" in templates["topdown"]
+    assert "controlled_player_active()," in templates["topdown"]
     assert "if (player_event_active && player_metasprite" in templates["platformer"]
     assert "else if (player_event_active && player_metasprite == nullptr)" in templates["platformer"]
     assert "gbs::set_sprite(0, gbs::Sprite" not in templates["platformer"]
@@ -4188,8 +4199,8 @@ def assert_topdown_template_switches_directional_animations(repo_root):
         "constexpr size_t topdown_directional_animation_count = 8;",
         "topdown_idle_directional_animation_count",
         "topdown_has_idle_directional_animations",
-        "bool topdown_direction_uses_horizontal_flip(uint8_t direction)",
-        "refresh_player_directional_animation(player_wants_to_move);",
+        "bool topdown_direction_uses_horizontal_flip(uint8_t direction, size_t animation_count)",
+        "refresh_player_directional_animation(player_wants_to_move && (player_moved_this_frame ||",
         "refresh_npc_directional_animation(index, npc_moved);",
         "set_actor_metasprite(",
         "position.x + size.x - static_cast<int>(part.x) - part.width",
@@ -4206,7 +4217,9 @@ def assert_topdown_template_switches_directional_animations(repo_root):
         assert snippet in template
     assert template.index("gbs::draw_debug_overlay(false);") < template.index("gbs::draw_hud(hud);")
     assert template.index("gbs::draw_hud(hud);") < template.index("gbs::draw_debug_overlay(true);")
-    assert template.index("gbs::draw_debug_overlay(true);") < template.index("gbs::draw_menu(pause_menu);")
+    debug_index = template.index("gbs::draw_debug_overlay(true);")
+    visible_menu_index = template.index("if (pause_menu.visible) {", debug_index)
+    assert debug_index < visible_menu_index < template.index("gbs::draw_menu(pause_menu);", visible_menu_index)
 
 
 def assert_topdown_template_consumes_link_event_outputs(repo_root):
@@ -4408,7 +4421,7 @@ def assert_point_click_profile_output(repo_root, output_dir):
     assert "constexpr gbs::PointClickInventoryItemData point_click_inventory_items" in header
     assert "point_click_scene_0_hotspot_1_on_use_item" in header
     assert 'gbs::PointClickSceneData { "room", -1, point_click_scene_0_hotspots, 2' in header
-    assert 'nullptr, 4, nullptr, 0, nullptr, 0 },' in header
+    assert 'nullptr, 4, nullptr, 0, nullptr, 0, nullptr, nullptr, nullptr, nullptr },' in header
     assert "scene->cursor_speed_pixels > 0" in main_cpp
     assert "gbs::EventOp::ShowDialogue" in header
     assert "gbs::EventOp::SetVariable" in header
@@ -5443,6 +5456,8 @@ def assert_luta_native_export(repo_root, build_dir):
                         "special": {"asset": "arena_fighter", "frame_indices": [1, 0], "durations": [4, 4], "loops": False},
                         "guard": {"asset": "arena_fighter", "frame_indices": [0], "durations": [6]},
                         "hurt": {"asset": "arena_fighter", "frame_indices": [1], "durations": [6]},
+                        "walk": {"asset": "arena_fighter", "frame_indices": [0, 1], "durations": [6, 6]},
+                        "jump": {"asset": "arena_fighter", "frame_indices": [1, 0], "durations": [3, 3], "loops": False},
                     },
                 }],
                 "player2": [{
@@ -5456,6 +5471,8 @@ def assert_luta_native_export(repo_root, build_dir):
                         "special": {"asset": "arena_fighter", "frame_indices": [1, 0], "durations": [4, 4], "loops": False},
                         "guard": {"asset": "arena_fighter", "frame_indices": [0], "durations": [6]},
                         "hurt": {"asset": "arena_fighter", "frame_indices": [1], "durations": [6]},
+                        "walk": {"asset": "arena_fighter", "frame_indices": [0, 1], "durations": [6, 6]},
+                        "jump": {"asset": "arena_fighter", "frame_indices": [1, 0], "durations": [3, 3], "loops": False},
                     },
                 }],
                 "on_victory": [{"op": "show_dialogue", "dialogue": 1}],
@@ -5474,6 +5491,8 @@ def assert_luta_native_export(repo_root, build_dir):
     assert "gbs::LutaAnimationSet luta_stage_0_player2_0_animation_set" in header
     assert "luta_stage_0_player1_0_attack_animation" in header
     assert "luta_stage_0_player2_0_hurt_animation" in header
+    assert "&luta_stage_0_player1_0_walk_animation," in header
+    assert "&luta_stage_0_player2_0_jump_animation," in header
     compile_generated_header(
         repo_root,
         output_dir,
@@ -5494,6 +5513,7 @@ def assert_luta_native_export(repo_root, build_dir):
     invalid_manifest_path.write_text(json.dumps(invalid_manifest, indent=2) + "\n", encoding="utf-8")
     invalid_result = subprocess.run(
         [
+            sys.executable,
             str(repo_root / "tools" / "assetc" / "assetc.py"),
             str(invalid_manifest_path),
             "-o",
@@ -5517,7 +5537,7 @@ def assert_luta_template_consumes_animation_states(repo_root):
         "gbs::tick_luta_visual_state(",
         "gbs::LutaVisualState::Attack",
         "gbs::LutaVisualState::Special",
-        "gbs::LutaVisualState::Guard",
+        "gbs::consume_luta_action_feedback(state, player_one)",
     ]:
         assert snippet in template
 

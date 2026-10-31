@@ -1,3 +1,5 @@
+import { uiText as ui, useStudioUiText } from "./studioUiText";
+import { resolveExternalProjectOpen } from "./externalProjectOpen.js";
 import { createAudioInstrumentFromChannel, updateAudioInstrumentInProject, removeAudioInstrumentFromProject, type UpdateAudioInstrumentFields } from "../shared/audioInstruments.js";
 import { audioPhysicalChannel } from "../shared/audioContract.js";
 import { listLogicValueUsages, updateLogicValueInProject, type LogicValuePatch } from "../shared/logicWorkspace";
@@ -121,6 +123,8 @@ import {
   createProjectPrefabFromEntity,
   instantiateProjectPrefab,
   synchronizeProjectPrefabInstances,
+  setProjectPrefabOverrides,
+  clearProjectPrefabOverrides,
   updateProjectPrefab,
   type ProjectPrefabKind,
   type ProjectPrefabPlacement
@@ -246,6 +250,7 @@ import {
   X
 } from "lucide-react";
 import { studioWordmarkURL } from "./brandingAssets";
+import { useWindowFullscreen } from "./useWindowFullscreen";
 import { AudioWorkspace } from "./audioWorkspace";
 import { WorkspaceAdvancedTools } from "./contextualAdvancedTools";
 import { DialoguesWorkspace } from "./dialoguesWorkspace";
@@ -271,6 +276,7 @@ import {
 } from "../shared/gbaStudioPlugins";
 import { PluginCatalogModal } from "./PluginCatalogModal";
 import { saveNewProjectSession } from "./newProjectCreationFlow";
+import { saveExistingProjectSession } from "./projectSaveFlow";
 import { selectProjectSessionRoom, type ProjectSession } from "./projectSession";
 import { copyName, uniqueDefaultRoomName, droppedFiles, statusText } from "./rendererHelpers";
 import { RoomsWorkspace } from "./roomsWorkspace";
@@ -336,6 +342,8 @@ const projectActionIcons: Record<ProjectActionID, React.ReactElement> = {
 type ToolbarMenuActionID = "save" | "open" | "commands" | "focus" | "diagnostics";
 
 function App(): React.ReactElement {
+  const windowFullscreen = useWindowFullscreen();
+  const ui = useStudioUiText();
   const { t } = useStudioI18n();
   const [session, setSession] = useState<ProjectSession | null>(null);
   const dialogueSessionRef = useRef(session);
@@ -431,6 +439,16 @@ function App(): React.ReactElement {
     void loadLaunchProject();
   }, []);
 
+  function openSourceEvent(eventName: string, sourceRoomName?: string): void {
+    const requestID = ++focusedEventRequestSequence.current;
+    if (sourceRoomName) setFocusedAssetRequest({
+      assetID: sourceRoomName, assetName: sourceRoomName, kind: "Room",
+      label: `Cena · ${sourceRoomName}`, requestID, targetName: sourceRoomName, workspace: "Editor"
+    });
+    setFocusedEventRequest({ eventName, requestID });
+    openEventsInspector(eventName);
+  }
+
   function openEventsInspector(eventName?: string): void {
     setPendingFocusInspectorTab("events");
     requestAnimationFrame(() => {
@@ -447,12 +465,13 @@ function App(): React.ReactElement {
       sourceWorkspace: "Editor"
     });
     setSelectedWorkspace("Exportar");
-    setStatus("Saúde do projeto aberta.");
+    setStatus(ui("Saúde do projeto aberta."));
   }
 
   useEffect(() => {
     const nextReadyStatus = t("app.readyToOpen");
-    setStatus((current) => current === readyStatusRef.current ? nextReadyStatus : current);
+    const previousReadyStatus = readyStatusRef.current;
+    setStatus((current) => current === previousReadyStatus ? nextReadyStatus : current);
     readyStatusRef.current = nextReadyStatus;
   }, [t]);
 
@@ -524,9 +543,8 @@ function App(): React.ReactElement {
   useEffect(() => {
     return window.gbaStudio.onExternalProjectOpen((result) => {
       void (async () => {
-        if (await confirmDiscard()) {
-          applyOpenProjectResult(result);
-        }
+        const accepted = await resolveExternalProjectOpen(result, confirmDiscard, (path) => window.gbaStudio.openProjectAtPath(path));
+        if (accepted) applyOpenProjectResult(accepted);
       })();
     });
   }, [confirmDiscard, session]);
@@ -535,7 +553,7 @@ function App(): React.ReactElement {
     return window.gbaStudio.onExternalAssetChange((change) => {
       if (!session?.path || change.projectPath !== session.path) return;
       setExternalAssetRevision((current) => current + 1);
-      setStatus(`Assets externos atualizados: ${change.relativePaths.join(", ")}.`);
+      setStatus(ui("Assets externos atualizados: {0}.", { 0: change.relativePaths.join(", ") }));
     });
   }, [session?.path]);
 
@@ -624,7 +642,7 @@ function App(): React.ReactElement {
     if (!result.ok || !result.registry) {
       setPluginRegistry(emptyProjectPluginRegistry());
       if (result.error) {
-        setStatus(`Plugins: ${result.error}`);
+        setStatus(ui("Plugins: {0}", { 0: result.error }));
       }
       return;
     }
@@ -698,7 +716,8 @@ function App(): React.ReactElement {
       dma: physicalMetric("dmaBytes"),
       vram: physicalMetric("vramBytes"),
       oam: physicalMetric("oam"),
-      scanline: runtime.timing.renderSkipCount
+      scanline: runtime.timing.renderSkipCount,
+      subsystems: runtime.subsystems?.scenePeakTicks
     }));
   }, [hardwareProfiler, romPlayerTelemetry]);
   useEffect(() => {
@@ -790,7 +809,7 @@ function App(): React.ReactElement {
 
   async function installProjectPlugin(): Promise<void> {
     if (!session?.path) {
-      setStatus("Salve o projeto antes de instalar plugins.");
+      setStatus(ui("Salve o projeto antes de instalar plugins."));
       return;
     }
 
@@ -827,27 +846,23 @@ function App(): React.ReactElement {
 
   async function saveProject(): Promise<void> {
     if (!session) return;
-    const result = await window.gbaStudio.saveProject(session);
+    const { result, session: savedSession } = await saveExistingProjectSession(session, window.gbaStudio.saveProject);
     publishFeedback(saveProjectFeedback(result));
-    if (!result.canceled && result.path) {
-      setSession({ ...session, path: result.path, dirty: false });
-    }
+    if (savedSession !== session) setSession(savedSession);
   }
 
   async function saveProjectAs(): Promise<void> {
     if (!session) return;
-    const result = await window.gbaStudio.saveProject({ project: session.project });
+    const { result, session: savedSession } = await saveExistingProjectSession(session, window.gbaStudio.saveProject, true);
     publishFeedback(saveProjectFeedback(result));
-    if (!result.canceled && result.path) {
-      setSession({ ...session, path: result.path, dirty: false });
-    }
+    if (savedSession !== session) setSession(savedSession);
   }
 
   async function createBackup(): Promise<void> {
     if (!session) return;
-    const result = await window.gbaStudio.saveProject({ project: session.project });
+    const { result } = await saveExistingProjectSession(session, window.gbaStudio.saveProject, true);
     if (result.canceled) {
-      setStatus("Criacao de backup cancelada.");
+      setStatus(ui("Criacao de backup cancelada."));
       return;
     }
     if (result.error || !result.path) {
@@ -855,7 +870,7 @@ function App(): React.ReactElement {
       return;
     }
 
-    notifySuccess(`Backup criado: ${result.path}`);
+    notifySuccess(ui("Backup criado: {0}", { 0: result.path }));
   }
 
   async function closeProject(): Promise<void> {
@@ -869,7 +884,7 @@ function App(): React.ReactElement {
     setProjectActionsOpen(false);
     setFocusedAssetRequest(null);
     setFocusedEventRequest(null);
-    notifySuccess("Projeto fechado.");
+    notifySuccess(ui("Projeto fechado."));
   }
 
   function openAssetWorkspaceFromFiles(request: FilesWorkspaceOpenRequest): void {
@@ -891,7 +906,7 @@ function App(): React.ReactElement {
     } else {
       setSelectedWorkspace(request.workspace);
     }
-    setStatus(`Arquivo aberto em ${request.workspace}: ${request.assetName}.`);
+    setStatus(ui("Arquivo aberto em {0}: {1}.", { 0: request.workspace, 1: request.assetName }));
   }
 
   function runProjectAction(actionID: ProjectActionID): void {
@@ -939,7 +954,7 @@ function App(): React.ReactElement {
       void installProjectPlugin();
     } else if (command === "project:plugin-catalog") {
       if (!session?.path) {
-        setStatus("Salve o projeto antes de abrir o catalogo de plugins.");
+        setStatus(ui("Salve o projeto antes de abrir o catalogo de plugins."));
         return;
       }
       setPluginCatalogOpen(true);
@@ -1019,14 +1034,14 @@ function App(): React.ReactElement {
   function enableAdvancedTool(toolID: AdvancedToolID): void {
     if (!session) return;
     commitProjectData(enableAdvancedToolInProject(session.project.data, toolID));
-    setStatus("Ferramenta adicionada ao projeto.");
+    setStatus(ui("Ferramenta adicionada ao projeto."));
   }
 
   function toggleInputRecording(): void {
     if (inputRecording) {
       if (session && inputReplaySession) {
         commitProjectData(saveInputReplayInProject(session.project.data, inputReplaySession));
-        notifySuccess(`Replay salvo com ${inputReplaySession.frameCount} frames.`);
+        notifySuccess(ui("Replay salvo com {0} frames.", { 0: inputReplaySession.frameCount }));
       }
       setInputRecording(false);
       return;
@@ -1042,7 +1057,7 @@ function App(): React.ReactElement {
     }));
     lastRecordedInputFrame.current = -1;
     setInputRecording(true);
-    setStatus("Gravação de inputs iniciada.");
+    setStatus(ui("Gravação de inputs iniciada."));
   }
 
   function runReplay(replay: InputReplay): void {
@@ -1071,7 +1086,7 @@ function App(): React.ReactElement {
       redoStack: history.redoStack,
       undoStack: history.undoStack
     });
-    setStatus("Alteracao desfeita.");
+    setStatus(ui("Alteracao desfeita."));
   }
 
   function redoProjectEdit(): void {
@@ -1093,7 +1108,7 @@ function App(): React.ReactElement {
       redoStack: history.redoStack,
       undoStack: history.undoStack
     });
-    setStatus("Alteracao refeita.");
+    setStatus(ui("Alteracao refeita."));
   }
 
   async function createProject(projectName: string, templateID: ProjectTemplateID = "exemplo-gba"): Promise<void> {
@@ -1115,7 +1130,7 @@ function App(): React.ReactElement {
     setFocusedAssetRequest(null);
     setFocusedEventRequest(null);
     setSelectedWorkspace("Editor");
-    notifySuccess(`Template ${templateID} criado em ${createdSession.path}.`);
+    notifySuccess(ui("Template {0} criado em {1}.", { 0: templateID, 1: createdSession.path }));
   }
 
   async function renameAsset(assetID: string, currentName: string): Promise<void> {
@@ -1125,7 +1140,7 @@ function App(): React.ReactElement {
     const nextData = renameAssetInProject(session.project.data, assetID, nextName);
     if (nextData !== session.project.data) {
       updateProjectData(nextData);
-      notifySuccess(`Asset renomeado para ${nextName.trim()}.`);
+      notifySuccess(ui("Asset renomeado para {0}.", { 0: nextName.trim() }));
     }
   }
 
@@ -1136,7 +1151,7 @@ function App(): React.ReactElement {
     const nextData = removeAssetFromProject(session.project.data, assetID);
     if (nextData !== session.project.data) {
       updateProjectData(nextData);
-      notifySuccess(`Asset removido: ${currentName}.`);
+      notifySuccess(ui("Asset removido: {0}.", { 0: currentName }));
     }
   }
 
@@ -1152,7 +1167,7 @@ function App(): React.ReactElement {
     });
     if (nextData !== session.project.data) {
       updateProjectData(nextData);
-      setStatus(`Asset duplicado: ${nextName.trim()}.`);
+      setStatus(ui("Asset duplicado: {0}.", { 0: nextName.trim() }));
     }
   }
 
@@ -1161,7 +1176,7 @@ function App(): React.ReactElement {
     const nextData = moveAssetsToGroupInProject(session.project.data, assetIDs, groupID);
     if (nextData === session.project.data) return;
     updateProjectData(nextData);
-    notifySuccess(`${assetIDs.length} assets organizados.`);
+    notifySuccess(ui("{0} assets organizados.", { 0: assetIDs.length }));
   }
 
   function convertAssetsInBatch(assetIDs: string[], kind: string): void {
@@ -1169,7 +1184,7 @@ function App(): React.ReactElement {
     const nextData = updateAssetKindsInProject(session.project.data, assetIDs, kind);
     if (nextData === session.project.data) return;
     updateProjectData(nextData);
-    notifySuccess(`${assetIDs.length} assets convertidos para ${kind}.`);
+    notifySuccess(ui("{0} assets convertidos para {1}.", { 0: assetIDs.length, 1: kind }));
   }
 
   async function renameAssetsInBatch(assetIDs: string[]): Promise<void> {
@@ -1181,7 +1196,7 @@ function App(): React.ReactElement {
     const nextData = renameAssetsWithPatternInProject(session.project.data, assetIDs, { prefix, suffix });
     if (nextData === session.project.data) return;
     updateProjectData(nextData);
-    notifySuccess(`${assetIDs.length} assets renomeados.`);
+    notifySuccess(ui("{0} assets renomeados.", { 0: assetIDs.length }));
   }
 
   async function removeAssetsInBatch(assetIDs: string[]): Promise<void> {
@@ -1196,7 +1211,7 @@ function App(): React.ReactElement {
     const nextData = removeAssetsFromProject(session.project.data, assetIDs);
     if (nextData === session.project.data) return;
     updateProjectData(nextData);
-    notifySuccess(`${selectedAssets.length} assets removidos.`);
+    notifySuccess(ui("{0} assets removidos.", { 0: selectedAssets.length }));
   }
 
   function repairAssetReferences(): void {
@@ -1204,7 +1219,7 @@ function App(): React.ReactElement {
     const count = filesPresentation?.missingGroupAssetReferenceCount ?? 0;
     const nextData = repairAssetGroupReferencesInProject(session.project.data);
     updateProjectData(nextData);
-    notifySuccess(`${count} referências inválidas reparadas.`);
+    notifySuccess(ui("{0} referências inválidas reparadas.", { 0: count }));
   }
 
   async function replaceAssetFile(assetID: string, currentName: string): Promise<void> {
@@ -1224,7 +1239,7 @@ function App(): React.ReactElement {
       importAssets: (request) => window.gbaStudio.importAssets({ ...request, replaceRelativePath }),
       onSaveResult: (saveResult) => {
         publishFeedback(saveProjectFeedback(saveResult));
-        if (saveResult.canceled) pushToast("Salvamento cancelado.", { kind: "info" });
+        if (saveResult.canceled) pushToast(ui("Salvamento cancelado."), { kind: "info" });
         if (!saveResult.canceled && !saveResult.error && saveResult.path) {
           setSession({ ...session, path: saveResult.path, dirty: false });
         }
@@ -1233,8 +1248,8 @@ function App(): React.ReactElement {
     if (!flow) return;
     const { projectPath, result } = flow;
     if (result.canceled) {
-      setStatus("Substituicao cancelada.");
-      pushToast("Substituicao cancelada.", { kind: "info" });
+      setStatus(ui("Substituicao cancelada."));
+      pushToast(ui("Substituicao cancelada."), { kind: "info" });
       return;
     }
     if (result.error) {
@@ -1243,13 +1258,13 @@ function App(): React.ReactElement {
     }
     const replacements = result.assets ?? [];
     if (replacements.length !== 1) {
-      notifyError("Selecione exatamente um arquivo para substituir o asset.");
+      notifyError(ui("Selecione exatamente um arquivo para substituir o asset."));
       return;
     }
     const nextData = replaceAssetFileInProject(session.project.data, assetID, replacements[0]);
     if (nextData === session.project.data) return;
     commitProjectData(nextData, { path: projectPath });
-    notifySuccess(`Arquivo de ${currentName} substituído sem quebrar referências.`);
+    notifySuccess(ui("Arquivo de {0} substituído sem quebrar referências.", { 0: currentName }));
   }
 
   async function importAssets(): Promise<void> {
@@ -1260,7 +1275,7 @@ function App(): React.ReactElement {
       importAssets: (request) => window.gbaStudio.importAssets(request),
       onSaveResult: (saveResult) => {
         publishFeedback(saveProjectFeedback(saveResult));
-        if (saveResult.canceled) pushToast("Salvamento cancelado.", { kind: "info" });
+        if (saveResult.canceled) pushToast(ui("Salvamento cancelado."), { kind: "info" });
         if (!saveResult.canceled && !saveResult.error && saveResult.path) {
           setSession({ ...session, path: saveResult.path, dirty: false });
         }
@@ -1269,8 +1284,8 @@ function App(): React.ReactElement {
     if (!flow) return;
     const { projectPath, result } = flow;
     if (result.canceled) {
-      setStatus("Importação cancelada.");
-      pushToast("Importação cancelada.", { kind: "info" });
+      setStatus(ui("Importação cancelada."));
+      pushToast(ui("Importação cancelada."), { kind: "info" });
       return;
     }
 
@@ -1281,32 +1296,32 @@ function App(): React.ReactElement {
 
     const importedAssets = result.assets ?? [];
     if (importedAssets.length === 0) {
-      notifyError("Nenhum asset importado.");
+      notifyError(ui("Nenhum asset importado."));
       return;
     }
 
     commitProjectData(appendImportedAssetsToProject(session.project.data, importedAssets), { path: projectPath });
     const plural = importedAssets.length === 1 ? "" : "s";
-    notifySuccess(`${importedAssets.length} asset${plural} importado${plural}.`);
+    notifySuccess(ui("{0} asset{1} importado{2}.", { 0: importedAssets.length, 1: plural, 2: plural }));
   }
 
   async function importGifAnimation(): Promise<void> {
     if (!session) return;
     const activeScene = session.project.data.scena;
     if (!activeScene || typeof activeScene !== "object" || Array.isArray(activeScene)) {
-      notifyError("Abra uma cena Cutscene antes de importar uma animação GIF.");
+      notifyError(ui("Abra uma cena Cutscene antes de importar uma animação GIF."));
       return;
     }
     const activeSceneRecord = activeScene as Record<string, unknown>;
     if (activeSceneRecord.sceneType !== "cutscene") {
-      notifyError("A animação GIF é aplicada automaticamente à cena Cutscene ativa.");
+      notifyError(ui("A animação GIF é aplicada automaticamente à cena Cutscene ativa."));
       return;
     }
     const targetRoomID = typeof activeSceneRecord.id === "string" && activeSceneRecord.id.trim()
       ? activeSceneRecord.id
       : typeof activeSceneRecord.name === "string" ? activeSceneRecord.name : "";
     if (!targetRoomID) {
-      notifyError("A cena Cutscene ativa não possui uma identificação válida.");
+      notifyError(ui("A cena Cutscene ativa não possui uma identificação válida."));
       return;
     }
 
@@ -1316,7 +1331,7 @@ function App(): React.ReactElement {
       importAssets: (request) => window.gbaStudio.importAssets({ ...request, scope: "animation" }),
       onSaveResult: (saveResult) => {
         publishFeedback(saveProjectFeedback(saveResult));
-        if (saveResult.canceled) pushToast("Salvamento cancelado.", { kind: "info" });
+        if (saveResult.canceled) pushToast(ui("Salvamento cancelado."), { kind: "info" });
         if (!saveResult.canceled && !saveResult.error && saveResult.path) {
           setSession({ ...session, path: saveResult.path, dirty: false });
         }
@@ -1325,8 +1340,8 @@ function App(): React.ReactElement {
     if (!flow) return;
     const { projectPath, result } = flow;
     if (result.canceled) {
-      setStatus("Importação de GIF cancelada.");
-      pushToast("Importação de GIF cancelada.", { kind: "info" });
+      setStatus(ui("Importação de GIF cancelada."));
+      pushToast(ui("Importação de GIF cancelada."), { kind: "info" });
       return;
     }
     if (result.error) {
@@ -1334,29 +1349,29 @@ function App(): React.ReactElement {
       return;
     }
     if (!result.animation || !result.assets?.length) {
-      notifyError("Nenhuma animação GIF foi importada.");
+      notifyError(ui("Nenhuma animação GIF foi importada."));
       return;
     }
 
     const withAssets = appendImportedAssetsToProject(session.project.data, result.assets);
     const nextData = applyImportedAnimationToCutscene(withAssets, targetRoomID, result.animation);
     if (nextData === withAssets) {
-      notifyError("Não foi possível aplicar a animação à Cutscene ativa.");
+      notifyError(ui("Não foi possível aplicar a animação à Cutscene ativa."));
       return;
     }
     commitProjectData(nextData, { path: projectPath });
-    notifySuccess(`GIF convertido: ${result.animation.frameCount} frames em ${result.animation.totalDurationFrames} frames GBA.`);
+    notifySuccess(ui("GIF convertido: {0} frames em {1} frames GBA.", { 0: result.animation.frameCount, 1: result.animation.totalDurationFrames }));
   }
 
   async function importAudio(): Promise<void> {
     if (!session?.path) {
-      setStatus("Salve o projeto antes de importar áudio.");
+      setStatus(ui("Salve o projeto antes de importar áudio."));
       return;
     }
 
     const result = await window.gbaStudio.importAssets({ projectPath: session.path, scope: "audio" });
     if (result.canceled) {
-      setStatus("Importação de áudio cancelada.");
+      setStatus(ui("Importação de áudio cancelada."));
       return;
     }
 
@@ -1367,13 +1382,13 @@ function App(): React.ReactElement {
 
     const importedAssets = result.assets ?? [];
     if (importedAssets.length === 0) {
-      setStatus("Nenhum arquivo de áudio importado.");
+      setStatus(ui("Nenhum arquivo de áudio importado."));
       return;
     }
 
     updateProjectData(appendImportedAssetsToProject(session.project.data, importedAssets));
     const plural = importedAssets.length === 1 ? "" : "s";
-    notifySuccess(`${importedAssets.length} áudio${plural} importado${plural}.`);
+    notifySuccess(ui("{0} áudio{1} importado{2}.", { 0: importedAssets.length, 1: plural, 2: plural }));
   }
 
   async function importSpriteSheets(): Promise<void> {
@@ -1390,7 +1405,7 @@ function App(): React.ReactElement {
 
     const result = await window.gbaStudio.importAssets({ projectPath, scope: "sprite" });
     if (result.canceled) {
-      setStatus("Importação de sprite cancelada.");
+      setStatus(ui("Importação de sprite cancelada."));
       return;
     }
 
@@ -1401,7 +1416,7 @@ function App(): React.ReactElement {
 
     const importedAssets = result.assets ?? [];
     if (importedAssets.length === 0) {
-      setStatus("Nenhum sprite importado.");
+      setStatus(ui("Nenhum sprite importado."));
       return;
     }
 
@@ -1420,7 +1435,7 @@ function App(): React.ReactElement {
     });
     setSelectedWorkspace("Sprites");
     const plural = importedAssets.length === 1 ? "" : "s";
-    notifySuccess(`${importedAssets.length} sprite${plural} importado${plural}.`);
+    notifySuccess(ui("{0} sprite{1} importado{2}.", { 0: importedAssets.length, 1: plural, 2: plural }));
   }
 
   async function importTilesetForRoom(roomID: string): Promise<void> {
@@ -1431,7 +1446,7 @@ function App(): React.ReactElement {
       : await window.gbaStudio.saveProject({ project: session.project });
     const resolvedPath = resolvePersistedProjectPathAfterSave(session.path, saveResult);
     if (resolvedPath.canceled) {
-      setStatus("Importação de tileset cancelada.");
+      setStatus(ui("Importação de tileset cancelada."));
       return;
     }
     if (!resolvedPath.path) {
@@ -1441,7 +1456,7 @@ function App(): React.ReactElement {
 
     const result = await window.gbaStudio.importAssets({ projectPath: resolvedPath.path, scope: "tileset" });
     if (result.canceled) {
-      setStatus("Importação de tileset cancelada.");
+      setStatus(ui("Importação de tileset cancelada."));
       return;
     }
 
@@ -1452,7 +1467,7 @@ function App(): React.ReactElement {
 
     const importedAssets = result.assets ?? [];
     if (importedAssets.length === 0) {
-      setStatus("Nenhum tileset importado.");
+      setStatus(ui("Nenhum tileset importado."));
       return;
     }
 
@@ -1461,7 +1476,7 @@ function App(): React.ReactElement {
     nextData = updateRoomFieldsInProject(nextData, roomID, { backgroundAssetName: imported.name });
     commitProjectData(nextData, { path: resolvedPath.path });
     const plural = importedAssets.length === 1 ? "" : "s";
-    notifySuccess(`${importedAssets.length} tileset${plural} importado${plural} e aplicado${plural} na room.`);
+    notifySuccess(ui("{0} tileset{1} importado{2} e aplicado{3} na room.", { 0: importedAssets.length, 1: plural, 2: plural, 3: plural }));
   }
 
   async function importTiledMapForRoom(roomID: string): Promise<void> {
@@ -1472,7 +1487,7 @@ function App(): React.ReactElement {
       : await window.gbaStudio.saveProject({ project: session.project });
     const resolvedPath = resolvePersistedProjectPathAfterSave(session.path, saveResult);
     if (resolvedPath.canceled) {
-      setStatus("Importação de mapa Tiled cancelada.");
+      setStatus(ui("Importação de mapa Tiled cancelada."));
       return;
     }
     if (!resolvedPath.path) {
@@ -1482,7 +1497,7 @@ function App(): React.ReactElement {
 
     const result = await window.gbaStudio.importTiledMap({ projectPath: resolvedPath.path });
     if (result.canceled) {
-      setStatus("Importação de mapa Tiled cancelada.");
+      setStatus(ui("Importação de mapa Tiled cancelada."));
       return;
     }
     if (result.error) {
@@ -1490,7 +1505,7 @@ function App(): React.ReactElement {
       return;
     }
     if (!result.parsed) {
-      setStatus("Mapa Tiled invalido.");
+      setStatus(ui("Mapa Tiled invalido."));
       return;
     }
 
@@ -1510,13 +1525,13 @@ function App(): React.ReactElement {
 
     commitProjectData(nextData, { path: resolvedPath.path });
     const mapLabel = result.sourcePath ? result.sourcePath.split(/[\\/]/).pop() : "mapa";
-    notifySuccess(`Mapa Tiled importado (${mapLabel}) na room.`);
+    notifySuccess(ui("Mapa Tiled importado ({0}) na room.", { 0: mapLabel }));
   }
 
   async function revealAsset(source: string | null): Promise<void> {
     const resolvedPath = resolveAssetSourcePath(session?.path, source);
     if (!resolvedPath) {
-      setStatus("Nao foi possivel resolver o caminho do asset.");
+      setStatus(ui("Nao foi possivel resolver o caminho do asset."));
       return;
     }
 
@@ -1539,7 +1554,7 @@ function App(): React.ReactElement {
     if (promptedName === null) return;
     const trimmedName = promptedName.trim();
     if (!trimmedName) {
-      setStatus("Não foi possível criar a cena. Verifique o nome informado.");
+      setStatus(ui("Não foi possível criar a cena. Verifique o nome informado."));
       return;
     }
     const newRoomID = globalThis.crypto.randomUUID();
@@ -1565,7 +1580,7 @@ function App(): React.ReactElement {
       notifySuccess(activeRoomName ? `Room criada e conectada: ${activeRoomName} -> ${trimmedName}.` : `Room criada: ${trimmedName}.`);
       return newRoomID;
     }
-    setStatus("Não foi possível criar a cena. Verifique o nome informado.");
+    setStatus(ui("Não foi possível criar a cena. Verifique o nome informado."));
   }
 
   async function duplicateRoom(roomID: string, currentName: string): Promise<string | void> {
@@ -1575,7 +1590,7 @@ function App(): React.ReactElement {
     if (promptedName === null) return;
     const trimmedName = promptedName.trim();
     if (!trimmedName) {
-      setStatus("Não foi possível duplicar a cena. Verifique o nome informado.");
+      setStatus(ui("Não foi possível duplicar a cena. Verifique o nome informado."));
       return;
     }
     const newRoomID = globalThis.crypto.randomUUID();
@@ -1586,23 +1601,23 @@ function App(): React.ReactElement {
     });
     if (nextData !== session.project.data) {
       updateProjectData(nextData);
-      setStatus(`Cena duplicada: ${currentName} -> ${trimmedName}.`);
+      setStatus(ui("Cena duplicada: {0} -> {1}.", { 0: currentName, 1: trimmedName }));
       return newRoomID;
     }
-    setStatus("Não foi possível duplicar a cena. Verifique o nome informado.");
+    setStatus(ui("Não foi possível duplicar a cena. Verifique o nome informado."));
   }
 
   function renameRoom(roomID: string, nextName: string): void {
     if (!session) return;
     const trimmedName = nextName.trim();
     if (!trimmedName) {
-      setStatus("Não foi possível renomear a cena. Verifique o nome informado.");
+      setStatus(ui("Não foi possível renomear a cena. Verifique o nome informado."));
       return;
     }
     const nextData = renameRoomInProject(session.project.data, roomID, trimmedName);
     if (nextData !== session.project.data) {
       updateProjectData(nextData);
-      setStatus(`Cena renomeada para ${trimmedName}.`);
+      setStatus(ui("Cena renomeada para {0}.", { 0: trimmedName }));
     }
   }
 
@@ -1613,22 +1628,26 @@ function App(): React.ReactElement {
     const nextData = removeRoomFromProject(session.project.data, roomID);
     if (nextData !== session.project.data) {
       updateProjectData(nextData);
-      setStatus(`Cena removida: ${currentName}.`);
+      setStatus(ui("Cena removida: {0}.", { 0: currentName }));
     }
   }
 
   function setActiveRoom(roomID: string, currentName: string): void {
     if (!session) return;
     setSession((current) => current ? selectProjectSessionRoom(current, roomID) : current);
-    setStatus(`Cena aberta: ${currentName}.`);
+    setStatus(ui("Cena aberta: {0}.", { 0: currentName }));
   }
 
   function updateRoomFields(roomID: string, fields: UpdateRoomFields, historyGroupID?: string): void {
     if (!session) return;
-    const nextData = updateRoomFieldsInProject(session.project.data, roomID, fields);
-    if (nextData !== session.project.data) {
-      updateProjectData(nextData, { historyGroupID });
-      setStatus("Cena atualizada.");
+    try {
+      const nextData = updateRoomFieldsInProject(session.project.data, roomID, fields);
+      if (nextData !== session.project.data) {
+        updateProjectData(nextData, { historyGroupID });
+        setStatus(ui("Cena atualizada."));
+      }
+    } catch (error) {
+      setStatus(error instanceof Error ? ui(error.message) : ui("Não foi possível atualizar a cena."));
     }
   }
 
@@ -1637,7 +1656,7 @@ function App(): React.ReactElement {
     const nextData = updateRoomBackgroundTilesetGridInProject(session.project.data, roomID, fields);
     if (nextData !== session.project.data) {
       updateProjectData(nextData);
-      setStatus("Grade do tileset atualizada.");
+      setStatus(ui("Grade do tileset atualizada."));
     }
   }
 
@@ -1647,7 +1666,7 @@ function App(): React.ReactElement {
     if (nextData !== session.project.data) {
       updateProjectData(nextData, { historyGroupID });
       const toolStatus = options.tool === "fill" ? "preenchido" : options.tool === "eraser" ? "apagado" : "atualizado";
-      setStatus(`Tilemap da cena ${toolStatus}.`);
+      setStatus(ui("Tilemap da cena {0}.", { 0: toolStatus }));
     }
   }
 
@@ -1656,7 +1675,7 @@ function App(): React.ReactElement {
     const nextData = setActiveTileLayerMappingInProject(session.project.data, mapping);
     if (nextData !== session.project.data) {
       updateProjectData(nextData);
-      setStatus("Camada de pintura atualizada.");
+      setStatus(ui("Camada de pintura atualizada."));
     }
   }
 
@@ -1665,7 +1684,7 @@ function App(): React.ReactElement {
     const nextData = toggleRoomCollisionCellInProject(session.project.data, roomID, cellIndex);
     if (nextData !== session.project.data) {
       updateProjectData(nextData);
-      setStatus("Colisão da cena atualizada.");
+      setStatus(ui("Colisão da cena atualizada."));
     }
   }
 
@@ -1674,7 +1693,7 @@ function App(): React.ReactElement {
     const nextData = setRoomCollisionTypeInProject(session.project.data, roomID, cellIndex, collisionType);
     if (nextData !== session.project.data) {
       updateProjectData(nextData, { historyGroupID });
-      setStatus("Colisao atualizada no canvas.");
+      setStatus(ui("Colisao atualizada no canvas."));
     }
   }
 
@@ -1683,7 +1702,7 @@ function App(): React.ReactElement {
     const nextData = applyRoomCollisionFillInProject(session.project.data, roomID, cellIndex, collisionType);
     if (nextData !== session.project.data) {
       updateProjectData(nextData, { historyGroupID });
-      setStatus("Região de colisão preenchida no canvas.");
+      setStatus(ui("Região de colisão preenchida no canvas."));
     }
   }
 
@@ -1692,7 +1711,7 @@ function App(): React.ReactElement {
     const nextData = setRoomHeightLevelInProject(session.project.data, roomID, cellIndex, heightLevel);
     if (nextData !== session.project.data) {
       updateProjectData(nextData, { historyGroupID });
-      setStatus(`Altura isometrica atualizada para o nivel ${heightLevel}.`);
+      setStatus(ui("Altura isometrica atualizada para o nivel {0}.", { 0: heightLevel }));
     }
   }
 
@@ -1701,7 +1720,7 @@ function App(): React.ReactElement {
     const nextData = createRoomConnectionInProject(session.project.data, { from: fromName, to: toName, eventName });
     if (nextData !== session.project.data) {
       updateProjectData(nextData);
-      notifySuccess(`Conexao criada: ${fromName} -> ${toName}.`);
+      notifySuccess(ui("Conexao criada: {0} -> {1}.", { 0: fromName, 1: toName }));
       const connections = nextData.editorState && typeof nextData.editorState === "object" && !Array.isArray(nextData.editorState)
         ? (nextData.editorState as Record<string, unknown>).scenaConnections
         : null;
@@ -1722,7 +1741,7 @@ function App(): React.ReactElement {
     const nextData = createRoomWarpConnectionInProject(session.project.data, { area, from: fromName, side, to: toName, eventName });
     if (nextData !== session.project.data) {
       updateProjectData(nextData, { historyGroupID });
-      notifySuccess(`Zona de ${side === "exit" ? "saída" : "entrada"} criada: ${fromName} -> ${toName}.`);
+      notifySuccess(ui("Zona de {0} criada: {1} -> {2}.", { 0: side === "exit" ? "saída" : "entrada", 1: fromName, 2: toName }));
       const connections = nextData.editorState && typeof nextData.editorState === "object" && !Array.isArray(nextData.editorState)
         ? (nextData.editorState as Record<string, unknown>).scenaConnections
         : null;
@@ -1736,7 +1755,7 @@ function App(): React.ReactElement {
     const nextData = removeRoomConnectionFromProject(session.project.data, connectionIndex);
     if (nextData !== session.project.data) {
       updateProjectData(nextData);
-      notifySuccess("Conexão de cena removida.");
+      notifySuccess(ui("Conexão de cena removida."));
     }
   }
 
@@ -1745,7 +1764,7 @@ function App(): React.ReactElement {
     const nextData = updateRoomConnectionInProject(session.project.data, connectionIndex, fields);
     if (nextData !== session.project.data) {
       updateProjectData(nextData, { historyGroupID });
-      notifySuccess("Conexão de cena atualizada.");
+      notifySuccess(ui("Conexão de cena atualizada."));
     }
   }
 
@@ -1754,7 +1773,7 @@ function App(): React.ReactElement {
     const nextData = updateSceneMapPositionInProject(session.project.data, sceneName, position);
     if (nextData !== session.project.data) {
       updateProjectData(nextData);
-      setStatus(`Posicao da cena ${sceneName} atualizada.`);
+      setStatus(ui("Posicao da cena {0} atualizada.", { 0: sceneName }));
     }
   }
 
@@ -1763,7 +1782,7 @@ function App(): React.ReactElement {
     const nextData = organizeSceneMapPositionsInProject(session.project.data);
     if (nextData !== session.project.data) {
       updateProjectData(nextData);
-      setStatus("Cards das cenas organizados por ordem e tamanho.");
+      setStatus(ui("Cards das cenas organizados por ordem e tamanho."));
     }
   }
 
@@ -1779,13 +1798,15 @@ function App(): React.ReactElement {
     const nextData = setStartRoomInProject(session.project.data, roomID);
     if (nextData !== session.project.data) {
       updateProjectData(nextData);
-      setStatus(`Cena inicial definida: ${currentName}.`);
+      setStatus(ui("Cena inicial definida: {0}.", { 0: currentName }));
     }
   }
 
   function updateRoomEntity(kind: RoomsWorkspaceEntityKind, entityID: string, fields: UpdateRoomEntityFields, historyGroupID?: string): void {
     if (!session) return;
-    const nextData = updateRoomEntityInProject(session.project.data, kind, entityID, fields);
+    const updated = updateRoomEntityInProject(session.project.data, kind, entityID, fields);
+    const entity = (updated[kind === "actor" ? "actors" : "triggers"] as Record<string, unknown>[]).find(item => item.id === entityID);
+    const nextData = entity?.prefabID ? setProjectPrefabOverrides(updated, kind, entityID, Object.fromEntries(Object.keys(fields).map(key => [key, entity[key]]))) : updated;
     if (nextData !== session.project.data) {
       updateProjectData(nextData, { historyGroupID });
       setStatus(kind === "actor" ? "Ator da cena atualizado." : "Trigger da cena atualizado.");
@@ -1795,7 +1816,7 @@ function App(): React.ReactElement {
   function synchronizePrefabs(): void {
     if (!session) return;
     updateProjectData(synchronizeProjectPrefabInstances(session.project.data));
-    setStatus("Pre-fabricados aplicados as instancias vinculadas.");
+    setStatus(ui("Pre-fabricados aplicados as instancias vinculadas."));
   }
 
   function createPrefabFromEntity(kind: ProjectPrefabKind, entityID: string): void {
@@ -1808,7 +1829,9 @@ function App(): React.ReactElement {
 
   function instantiatePrefab(kind: ProjectPrefabKind, prefabID: string, placement: ProjectPrefabPlacement): void {
     if (!session) return;
-    const result = instantiateProjectPrefab(session.project.data, kind, prefabID, placement);
+    let result: ReturnType<typeof instantiateProjectPrefab>;
+    try { result = instantiateProjectPrefab(session.project.data, kind, prefabID, placement); }
+    catch (error) { setStatus(error instanceof Error ? error.message : String(error)); return; }
     if (!result.entityID) return;
     updateProjectData(result.data);
     setStatus(kind === "actor" ? "Instancia de ator criada na cena." : "Instancia de trigger criada na cena.");
@@ -1819,7 +1842,7 @@ function App(): React.ReactElement {
     const nextData = updateProjectPrefab(session.project.data, kind, prefabID, fields);
     if (nextData === session.project.data) return;
     updateProjectData(nextData);
-    setStatus("Pre-fabricado e instancias vinculadas atualizados.");
+    setStatus(ui("Pre-fabricado e instancias vinculadas atualizados."));
   }
 
   function placeRoomEntity(kind: RoomsWorkspaceEntityKind, entityID: string, options: PlaceRoomEntityInRoomOptions, historyGroupID?: string): void {
@@ -1836,7 +1859,7 @@ function App(): React.ReactElement {
     const nextData = resizeRoomTriggerToTileInProject(session.project.data, triggerID, options);
     if (nextData !== session.project.data) {
       updateProjectData(nextData, { historyGroupID });
-      setStatus("Area da trigger atualizada no canvas.");
+      setStatus(ui("Area da trigger atualizada no canvas."));
     }
   }
 
@@ -1856,7 +1879,7 @@ function App(): React.ReactElement {
       return id.length > 0 && !previousActorIDs.has(id);
     }) as { id?: string } | undefined;
     updateProjectData(nextData, { historyGroupID });
-    setStatus("Ator criado no canvas.");
+    setStatus(ui("Ator criado no canvas."));
     return createdActor?.id;
   }
 
@@ -1876,7 +1899,7 @@ function App(): React.ReactElement {
       return id.length > 0 && !previousTriggerIDs.has(id);
     }) as { id?: string } | undefined;
     updateProjectData(nextData, { historyGroupID });
-    setStatus("Trigger criada no canvas.");
+    setStatus(ui("Trigger criada no canvas."));
     return createdTrigger?.id;
   }
 
@@ -1891,7 +1914,7 @@ function App(): React.ReactElement {
     });
     if (nextData !== session.project.data) {
       updateProjectData(nextData);
-      setStatus(`Selecao movida: ${selectedKeys.length} entidades.`);
+      setStatus(ui("Selecao movida: {0} entidades.", { 0: selectedKeys.length }));
     }
   }
 
@@ -1932,7 +1955,7 @@ function App(): React.ReactElement {
     });
     if (nextData !== session.project.data) {
       updateProjectData(nextData);
-      setStatus(`Selecao removida: ${selectedKeys.length} entidades.`);
+      setStatus(ui("Selecao removida: {0} entidades.", { 0: selectedKeys.length }));
     }
   }
 
@@ -1945,7 +1968,7 @@ function App(): React.ReactElement {
     });
     if (nextData !== session.project.data) {
       updateProjectData(nextData);
-      setStatus(`Selecao duplicada: ${selectedKeys.length} entidades.`);
+      setStatus(ui("Selecao duplicada: {0} entidades.", { 0: selectedKeys.length }));
     }
   }
 
@@ -1961,7 +1984,7 @@ function App(): React.ReactElement {
     });
     if (nextData !== session.project.data) {
       updateProjectData(nextData);
-      setStatus(`Animacao criada: ${trimmedName}.`);
+      setStatus(ui("Animacao criada: {0}.", { 0: trimmedName }));
     }
   }
 
@@ -1972,7 +1995,7 @@ function App(): React.ReactElement {
     const nextData = renameSpriteAnimationInProject(session.project.data, animationID, nextName);
     if (nextData !== session.project.data) {
       updateProjectData(nextData);
-      setStatus(`Animacao renomeada para ${nextName.trim()}.`);
+      setStatus(ui("Animacao renomeada para {0}.", { 0: nextName.trim() }));
     }
   }
 
@@ -1981,7 +2004,7 @@ function App(): React.ReactElement {
     const nextData = updateSpriteAnimationFieldsInProject(session.project.data, animationID, fields);
     if (nextData !== session.project.data) {
       updateProjectData(nextData);
-      setStatus("Animacao atualizada.");
+      setStatus(ui("Animacao atualizada."));
     }
   }
 
@@ -1990,7 +2013,7 @@ function App(): React.ReactElement {
     const nextData = updateSpriteAnimationStateInProject(session.project.data, animationStateID, fields);
     if (nextData !== session.project.data) {
       updateProjectData(nextData);
-      setStatus("Tipo do conjunto de animacoes atualizado.");
+      setStatus(ui("Tipo do conjunto de animacoes atualizado."));
     }
   }
 
@@ -1999,7 +2022,7 @@ function App(): React.ReactElement {
     const nextData = updateSpriteMetaspriteFrameInProject(session.project.data, animationID, options);
     if (nextData !== session.project.data) {
       updateProjectData(nextData);
-      setStatus(`Metasprite atualizado no frame ${options.frameIndex + 1}.`);
+      setStatus(ui("Metasprite atualizado no frame {0}.", { 0: options.frameIndex + 1 }));
     }
   }
 
@@ -2008,7 +2031,7 @@ function App(): React.ReactElement {
     const nextData = addSpriteMetaspriteTileInProject(session.project.data, animationID, options);
     if (nextData !== session.project.data) {
       updateProjectData(nextData);
-      setStatus(`Tile adicionado ao metasprite no frame ${options.frameIndex + 1}.`);
+      setStatus(ui("Tile adicionado ao metasprite no frame {0}.", { 0: options.frameIndex + 1 }));
     }
   }
 
@@ -2017,7 +2040,7 @@ function App(): React.ReactElement {
     const nextData = removeSpriteMetaspriteTileInProject(session.project.data, animationID, options);
     if (nextData !== session.project.data) {
       updateProjectData(nextData);
-      setStatus(`Tile removido do metasprite no frame ${options.frameIndex + 1}.`);
+      setStatus(ui("Tile removido do metasprite no frame {0}.", { 0: options.frameIndex + 1 }));
     }
   }
 
@@ -2026,7 +2049,7 @@ function App(): React.ReactElement {
     const nextData = updateSpriteMetaspriteTileInProject(session.project.data, animationID, options);
     if (nextData !== session.project.data) {
       updateProjectData(nextData);
-      setStatus(`Tile de metasprite atualizado no frame ${options.frameIndex + 1}.`);
+      setStatus(ui("Tile de metasprite atualizado no frame {0}.", { 0: options.frameIndex + 1 }));
     }
   }
 
@@ -2035,7 +2058,7 @@ function App(): React.ReactElement {
     const nextData = moveSpriteMetaspriteTilesInProject(session.project.data, animationID, options);
     if (nextData !== session.project.data) {
       updateProjectData(nextData);
-      setStatus(`${options.tileIndexes.length} tile(s) movidos no frame ${options.frameIndex + 1}.`);
+      setStatus(ui("{0} tile(s) movidos no frame {1}.", { 0: options.tileIndexes.length, 1: options.frameIndex + 1 }));
     }
   }
 
@@ -2065,7 +2088,7 @@ function App(): React.ReactElement {
     });
     if (nextData !== session.project.data) {
       updateProjectData(nextData);
-      setStatus(`${tileIndexes.length} tile(s) removidos do frame ${frameIndex + 1}.`);
+      setStatus(ui("{0} tile(s) removidos do frame {1}.", { 0: tileIndexes.length, 1: frameIndex + 1 }));
     }
   }
 
@@ -2074,7 +2097,7 @@ function App(): React.ReactElement {
     const nextData = fitSpriteAnimationHitboxToVisibleTilesInProject(session.project.data, animationID, frameIndex);
     if (nextData !== session.project.data) {
       updateProjectData(nextData);
-      setStatus(`Hitbox ajustada ao frame ${frameIndex + 1}.`);
+      setStatus(ui("Hitbox ajustada ao frame {0}.", { 0: frameIndex + 1 }));
     }
   }
 
@@ -2083,7 +2106,7 @@ function App(): React.ReactElement {
     const nextData = copySpriteAnimationGeometryToSheetSiblingsInProject(session.project.data, animationID);
     if (nextData !== session.project.data) {
       updateProjectData(nextData);
-      setStatus("Geometria copiada para animacoes irmas.");
+      setStatus(ui("Geometria copiada para animacoes irmas."));
     }
   }
 
@@ -2121,7 +2144,7 @@ function App(): React.ReactElement {
     });
     if (nextData !== session.project.data) {
       updateProjectData(nextData);
-      setStatus(`Sprite gerado a partir da referencia: ${spriteSheetName}.`);
+      setStatus(ui("Sprite gerado a partir da referencia: {0}.", { 0: spriteSheetName }));
     }
   }
 
@@ -2137,7 +2160,7 @@ function App(): React.ReactElement {
     });
     if (nextData !== session.project.data) {
       updateProjectData(nextData);
-      setStatus(`Animacao duplicada: ${nextName.trim()}.`);
+      setStatus(ui("Animacao duplicada: {0}.", { 0: nextName.trim() }));
     }
   }
 
@@ -2148,7 +2171,7 @@ function App(): React.ReactElement {
     const nextData = removeSpriteAnimationFromProject(session.project.data, animationID);
     if (nextData !== session.project.data) {
       updateProjectData(nextData);
-      setStatus(`Animacao removida: ${currentName}.`);
+      setStatus(ui("Animacao removida: {0}.", { 0: currentName }));
     }
   }
 
@@ -2165,7 +2188,7 @@ function App(): React.ReactElement {
     });
     if (nextData !== session.project.data) {
       updateProjectData(nextData);
-      setStatus(`Evento criado: ${trimmedName}.`);
+      setStatus(ui("Evento criado: {0}.", { 0: trimmedName }));
       return trimmedName;
     }
   }
@@ -2186,11 +2209,11 @@ function App(): React.ReactElement {
       valueType
     });
     if (nextData === session.project.data) {
-      setStatus(`${label[0]!.toUpperCase()}${label.slice(1)} ja existe ou nome invalido.`);
+      setStatus(ui("{0}{1} ja existe ou nome invalido.", { 0: label[0]!.toUpperCase(), 1: label.slice(1) }));
       return;
     }
     updateProjectData(nextData);
-    setStatus(`${label[0]!.toUpperCase()}${label.slice(1)} criada: ${trimmedName}.`);
+    setStatus(ui("{0}{1} criada: {2}.", { 0: label[0]!.toUpperCase(), 1: label.slice(1), 2: trimmedName }));
     return trimmedName;
   }
 
@@ -2203,12 +2226,12 @@ function App(): React.ReactElement {
   async function removeVariable(name: string, kind: ProjectVariableKind): Promise<void> {
     if (!session) return;
     const label = kind === "constant" ? "constante" : "variavel";
-    if (listLogicValueUsages(session.project.data, name).length) { setStatus("Este item possui referências. Remova os vínculos antes de excluir."); return; }
+    if (listLogicValueUsages(session.project.data, name).length) { setStatus(ui("Este item possui referências. Remova os vínculos antes de excluir.")); return; }
     if (!await confirm(`Remover ${label} "${name}"?`)) return;
     const nextData = removeProjectVariableFromProject(session.project.data, { name, kind });
     if (nextData !== session.project.data) {
       updateProjectData(nextData);
-      setStatus(`${label[0]!.toUpperCase()}${label.slice(1)} removida: ${name}.`);
+      setStatus(ui("{0}{1} removida: {2}.", { 0: label[0]!.toUpperCase(), 1: label.slice(1), 2: name }));
     }
   }
 
@@ -2219,7 +2242,7 @@ function App(): React.ReactElement {
     const nextData = renameEventInProject(session.project.data, eventID, nextName);
     if (nextData !== session.project.data) {
       updateProjectData(nextData);
-      setStatus(`Evento renomeado para ${nextName.trim()}.`);
+      setStatus(ui("Evento renomeado para {0}.", { 0: nextName.trim() }));
     }
   }
 
@@ -2235,7 +2258,7 @@ function App(): React.ReactElement {
     });
     if (nextData !== session.project.data) {
       updateProjectData(nextData);
-      setStatus(`Evento duplicado: ${nextName.trim()}.`);
+      setStatus(ui("Evento duplicado: {0}.", { 0: nextName.trim() }));
     }
   }
 
@@ -2252,7 +2275,7 @@ function App(): React.ReactElement {
     const nextData = removeEventFromProject(session.project.data, eventID);
     if (nextData !== session.project.data) {
       updateProjectData(nextData);
-      notifySuccess(`Evento removido: ${currentName}.`);
+      notifySuccess(ui("Evento removido: {0}.", { 0: currentName }));
     }
   }
 
@@ -2261,7 +2284,7 @@ function App(): React.ReactElement {
     const nextData = updateEventFieldsInProject(session.project.data, eventID, fields);
     if (nextData !== session.project.data) {
       updateProjectData(nextData);
-      setStatus("Evento atualizado.");
+      setStatus(ui("Evento atualizado."));
     }
   }
 
@@ -2270,7 +2293,7 @@ function App(): React.ReactElement {
     const nextData = addEventStepInProject(session.project.data, eventID, command);
     if (nextData !== session.project.data) {
       updateProjectData(nextData);
-      setStatus(`Passo adicionado em ${eventName}.`);
+      setStatus(ui("Passo adicionado em {0}.", { 0: eventName }));
     }
   }
 
@@ -2279,7 +2302,7 @@ function App(): React.ReactElement {
     const nextData = insertEventStepsInProject(session.project.data, eventID, target, commands);
     if (nextData !== session.project.data) {
       updateProjectData(nextData);
-      setStatus("Comando inserido no ramo do evento.");
+      setStatus(ui("Comando inserido no ramo do evento."));
     }
   }
 
@@ -2290,7 +2313,7 @@ function App(): React.ReactElement {
     const nextData = setEventUpdateFrequencyInProject(session.project.data, event.id, frames, 0);
     if (nextData !== session.project.data) {
       updateProjectData(nextData);
-      setStatus(`Frequência de ${eventName} atualizada.`);
+      setStatus(ui("Frequência de {0} atualizada.", { 0: eventName }));
     }
   }
 
@@ -2299,7 +2322,7 @@ function App(): React.ReactElement {
     const nextData = updateEventStepInProject(session.project.data, eventID, stepIndex, fields);
     if (nextData !== session.project.data) {
       updateProjectData(nextData);
-      setStatus("Passo de evento atualizado.");
+      setStatus(ui("Passo de evento atualizado."));
     }
   }
 
@@ -2308,7 +2331,7 @@ function App(): React.ReactElement {
     const nextData = updateSceneRouteTableInProject(session.project.data, tableID, patch);
     if (nextData !== session.project.data) {
       updateProjectData(nextData);
-      setStatus("Tabela de rotas atualizada.");
+      setStatus(ui("Tabela de rotas atualizada."));
     }
   }
 
@@ -2317,7 +2340,7 @@ function App(): React.ReactElement {
     const nextData = updateMenuSliderItemInProject(session.project.data, sceneName, screenID, itemID, patch);
     if (nextData !== session.project.data) {
       updateProjectData(nextData);
-      setStatus(`Opção ${itemID} do Slider atualizada.`);
+      setStatus(ui("Opção {0} do Slider atualizada.", { 0: itemID }));
     }
   }
 
@@ -2326,7 +2349,7 @@ function App(): React.ReactElement {
     const nextData = updateEventGraphNodePositionInProject(session.project.data, eventID, position);
     if (nextData !== session.project.data) {
       updateProjectData(nextData);
-      setStatus("Grafo de eventos atualizado.");
+      setStatus(ui("Grafo de eventos atualizado."));
     }
   }
 
@@ -2335,7 +2358,7 @@ function App(): React.ReactElement {
     const nextData = relayoutEventsGraphInProject(session.project.data);
     if (nextData !== session.project.data) {
       updateProjectData(nextData);
-      setStatus("Canvas de eventos reorganizado.");
+      setStatus(ui("Canvas de eventos reorganizado."));
     }
   }
 
@@ -2344,7 +2367,7 @@ function App(): React.ReactElement {
     const nextData = retargetEventGraphEdgeInProject(session.project.data, options);
     if (nextData !== session.project.data) {
       updateProjectData(nextData);
-      setStatus(`Chamada de evento redirecionada para ${options.targetEventName}.`);
+      setStatus(ui("Chamada de evento redirecionada para {0}.", { 0: options.targetEventName }));
     }
   }
 
@@ -2353,7 +2376,7 @@ function App(): React.ReactElement {
     const nextData = connectEventGraphNodesInProject(session.project.data, options);
     if (nextData !== session.project.data) {
       updateProjectData(nextData);
-      setStatus(`Chamada criada para ${options.targetEventName}.`);
+      setStatus(ui("Chamada criada para {0}.", { 0: options.targetEventName }));
     }
   }
 
@@ -2362,7 +2385,7 @@ function App(): React.ReactElement {
     const nextData = removeEventGraphEdgeInProject(session.project.data, options);
     if (nextData !== session.project.data) {
       updateProjectData(nextData);
-      setStatus("Chamada entre eventos removida.");
+      setStatus(ui("Chamada entre eventos removida."));
     }
   }
 
@@ -2371,7 +2394,7 @@ function App(): React.ReactElement {
     const nextData = bindEventToTargetInProject(session.project.data, eventID, options);
     if (nextData !== session.project.data) {
       updateProjectData(nextData);
-      setStatus(`Evento vinculado a ${options.targetName}.${options.bindingKey}.`);
+      setStatus(ui("Evento vinculado a {0}.{1}.", { 0: options.targetName, 1: options.bindingKey }));
     }
   }
 
@@ -2405,7 +2428,7 @@ function App(): React.ReactElement {
     if (!result) return [];
     if (result.data !== session.project.data) {
       updateProjectData(result.data);
-      setStatus(`${result.eventNames.length} comportamento${result.eventNames.length === 1 ? "" : "s"} criado${result.eventNames.length === 1 ? "" : "s"}.`);
+      setStatus(ui("{0} comportamento{1} criado{2}.", { 0: result.eventNames.length, 1: result.eventNames.length === 1 ? "" : "s", 2: result.eventNames.length === 1 ? "" : "s" }));
     }
     return result.eventNames;
   }
@@ -2415,7 +2438,7 @@ function App(): React.ReactElement {
     const nextData = removeEventTargetBindingInProject(session.project.data, options);
     if (nextData !== session.project.data) {
       updateProjectData(nextData);
-      setStatus(`Vinculo removido de ${options.targetName}.${options.bindingKey}.`);
+      setStatus(ui("Vinculo removido de {0}.{1}.", { 0: options.targetName, 1: options.bindingKey }));
     }
   }
 
@@ -2425,7 +2448,7 @@ function App(): React.ReactElement {
     const nextData = removeEventStepInProject(session.project.data, eventID, stepIndex);
     if (nextData !== session.project.data) {
       updateProjectData(nextData);
-      setStatus(`Passo removido de ${eventName}.`);
+      setStatus(ui("Passo removido de {0}.", { 0: eventName }));
     }
   }
 
@@ -2445,7 +2468,7 @@ function App(): React.ReactElement {
     });
     if (nextData !== session.project.data) {
       updateProjectData(nextData);
-      setStatus(`Áudio criado: ${trimmedName}.`);
+      setStatus(ui("Áudio criado: {0}.", { 0: trimmedName }));
     }
   }
 
@@ -2454,18 +2477,18 @@ function App(): React.ReactElement {
     const name = await prompt("Nome do instrumento compartilhado", "Novo instrumento");
     if (name === null) return;
     const next = createAudioInstrumentFromChannel(session.project.data, audioID, channelID, { id: globalThis.crypto.randomUUID(), name });
-    if (next !== session.project.data) { updateProjectData(next); setStatus(`Instrumento salvo no banco: ${name.trim()}.`); }
+    if (next !== session.project.data) { updateProjectData(next); setStatus(ui("Instrumento salvo no banco: {0}.", { 0: name.trim() })); }
   }
   function updateAudioInstrument(id: string, fields: UpdateAudioInstrumentFields): void {
     if (!session) return;
     const next = updateAudioInstrumentInProject(session.project.data, id, fields);
-    if (next !== session.project.data) { updateProjectData(next); setStatus("Instrumento compartilhado atualizado em todas as músicas que o usam."); }
+    if (next !== session.project.data) { updateProjectData(next); setStatus(ui("Instrumento compartilhado atualizado em todas as músicas que o usam.")); }
   }
   function removeAudioInstrument(id: string): void {
     if (!session) return;
     const next = removeAudioInstrumentFromProject(session.project.data, id);
-    if (next !== session.project.data) { updateProjectData(next); setStatus("Instrumento removido do banco."); }
-    else setStatus("O instrumento está em uso. Troque-o nas faixas antes de remover.");
+    if (next !== session.project.data) { updateProjectData(next); setStatus(ui("Instrumento removido do banco.")); }
+    else setStatus(ui("O instrumento está em uso. Troque-o nas faixas antes de remover."));
   }
 
   async function renameAudio(audioID: string, currentName: string): Promise<void> {
@@ -2475,7 +2498,7 @@ function App(): React.ReactElement {
     const nextData = renameAudioItemInProject(session.project.data, audioID, nextName);
     if (nextData !== session.project.data) {
       updateProjectData(nextData);
-      setStatus(`Áudio renomeado para ${nextName.trim()}.`);
+      setStatus(ui("Áudio renomeado para {0}.", { 0: nextName.trim() }));
     }
   }
 
@@ -2484,7 +2507,7 @@ function App(): React.ReactElement {
     const nextData = updateAudioItemFieldsInProject(session.project.data, audioID, fields);
     if (nextData !== session.project.data) {
       updateProjectData(nextData);
-      setStatus("Áudio atualizado.");
+      setStatus(ui("Áudio atualizado."));
     }
   }
 
@@ -2505,7 +2528,7 @@ function App(): React.ReactElement {
     });
     if (nextData !== session.project.data) {
       updateProjectData(nextData);
-      setStatus("Nota do tracker atualizada.");
+      setStatus(ui("Nota do tracker atualizada."));
     }
   }
 
@@ -2518,7 +2541,7 @@ function App(): React.ReactElement {
     });
     if (nextData !== session.project.data) {
       updateProjectData(nextData);
-      setStatus("Nota movida no tracker.");
+      setStatus(ui("Nota movida no tracker."));
     }
   }
 
@@ -2527,7 +2550,7 @@ function App(): React.ReactElement {
     const nextData = applyAudioPatternPresetInProject(session.project.data, audioID);
     if (nextData !== session.project.data) {
       updateProjectData(nextData);
-      setStatus("Preset aplicado ao pattern ativo.");
+      setStatus(ui("Preset aplicado ao pattern ativo."));
     }
   }
 
@@ -2540,7 +2563,7 @@ function App(): React.ReactElement {
     });
     if (nextData !== session.project.data) {
       updateProjectData(nextData);
-      setStatus("Nota transposta no piano roll.");
+      setStatus(ui("Nota transposta no piano roll."));
     }
   }
 
@@ -2552,7 +2575,7 @@ function App(): React.ReactElement {
     });
     if (nextData !== session.project.data) {
       updateProjectData(nextData);
-      setStatus("Canal transposto no piano roll.");
+      setStatus(ui("Canal transposto no piano roll."));
     }
   }
 
@@ -2564,9 +2587,9 @@ function App(): React.ReactElement {
     });
     if (nextData !== session.project.data) {
       updateProjectData(nextData);
-      setStatus("Canal de áudio atualizado.");
+      setStatus(ui("Canal de áudio atualizado."));
     } else if (fields.type) {
-      setStatus("Esse tipo já está ocupado no pattern ou não é uma voz PSG válida.");
+      setStatus(ui("Esse tipo já está ocupado no pattern ou não é uma voz PSG válida."));
     }
   }
 
@@ -2585,7 +2608,7 @@ function App(): React.ReactElement {
       nextType = nextAudioChannelTypePreset(nextType);
       if (nextType !== currentType && available.includes(nextType)) { updateAudioChannelFields(audioID, channelID, { type: nextType, instrument: nextType === "noise" ? "Noise Kit" : nextType === "wave" ? "Wave Bass" : "Pulse Lead" }); return; }
     }
-    setStatus("Todas as outras vozes PSG já estão ocupadas neste pattern.");
+    setStatus(ui("Todas as outras vozes PSG já estão ocupadas neste pattern."));
 
   }
 
@@ -2593,7 +2616,7 @@ function App(): React.ReactElement {
     if (!session) return;
     const item = audioPresentation?.items.find(candidate => candidate.id === audioID);
     const available = (item?.kind === "SFX" ? ["pulse1", "noise"] : ["pulse1", "pulse2", "wave", "noise"]).filter(type => !item?.previewRows.some(row => audioPhysicalChannel(row.type) === audioPhysicalChannel(type)));
-    if (!item || item.previewRows.length >= (item.kind === "SFX" ? 1 : 4) || !available.length) { setStatus("O pattern já usa todas as vozes disponíveis."); return; }
+    if (!item || item.previewRows.length >= (item.kind === "SFX" ? 1 : 4) || !available.length) { setStatus(ui("O pattern já usa todas as vozes disponíveis.")); return; }
     const channelName = await prompt("Nome do canal", "Novo canal");
     if (channelName === null) return;
     const trimmedName = channelName.trim();
@@ -2612,9 +2635,9 @@ function App(): React.ReactElement {
     });
     if (nextData !== session.project.data) {
       updateProjectData(nextData);
-      setStatus(`Canal criado: ${trimmedName}.`);
+      setStatus(ui("Canal criado: {0}.", { 0: trimmedName }));
     } else {
-      setStatus("Canal não criado: revise o limite e escolha uma voz PSG livre (pulse1, pulse2, wave ou noise).");
+      setStatus(ui("Canal não criado: revise o limite e escolha uma voz PSG livre (pulse1, pulse2, wave ou noise)."));
     }
   }
 
@@ -2625,7 +2648,7 @@ function App(): React.ReactElement {
     const nextData = removeAudioChannelFromProject(session.project.data, audioID, channelID);
     if (nextData !== session.project.data) {
       updateProjectData(nextData);
-      setStatus(`Canal removido: ${currentName}.`);
+      setStatus(ui("Canal removido: {0}.", { 0: currentName }));
     }
   }
 
@@ -2650,7 +2673,7 @@ function App(): React.ReactElement {
     });
     if (nextData !== session.project.data) {
       updateProjectData(nextData);
-      setStatus(`Padrão criado: ${trimmedName}.`);
+      setStatus(ui("Padrão criado: {0}.", { 0: trimmedName }));
     }
   }
 
@@ -2661,7 +2684,7 @@ function App(): React.ReactElement {
     const nextData = renameAudioPatternInProject(session.project.data, audioID, patternID, nextName);
     if (nextData !== session.project.data) {
       updateProjectData(nextData);
-      setStatus(`Padrão renomeado para ${nextName.trim()}.`);
+      setStatus(ui("Padrão renomeado para {0}.", { 0: nextName.trim() }));
     }
   }
 
@@ -2672,7 +2695,7 @@ function App(): React.ReactElement {
     const nextData = removeAudioPatternFromProject(session.project.data, audioID, patternID);
     if (nextData !== session.project.data) {
       updateProjectData(nextData);
-      setStatus(`Padrão removido: ${currentName}.`);
+      setStatus(ui("Padrão removido: {0}.", { 0: currentName }));
     }
   }
 
@@ -2695,7 +2718,7 @@ function App(): React.ReactElement {
     });
     if (nextData !== session.project.data) {
       updateProjectData(nextData);
-      setStatus(`Pattern duplicado: ${nextName.trim()}.`);
+      setStatus(ui("Pattern duplicado: {0}.", { 0: nextName.trim() }));
     }
   }
 
@@ -2704,7 +2727,7 @@ function App(): React.ReactElement {
     const nextData = clearAudioPatternSequenceInProject(session.project.data, audioID);
     if (nextData !== session.project.data) {
       updateProjectData(nextData);
-      setStatus("Sequencia de patterns limpa.");
+      setStatus(ui("Sequencia de patterns limpa."));
     }
   }
 
@@ -2721,7 +2744,7 @@ function App(): React.ReactElement {
     const nextData = normalizeAudioInProject(session.project.data, audioID);
     if (nextData !== session.project.data) {
       updateProjectData(nextData);
-      setStatus("Parâmetros do áudio corrigidos para as faixas aceitas.");
+      setStatus(ui("Parâmetros do áudio corrigidos para as faixas aceitas."));
     }
   }
 
@@ -2737,7 +2760,7 @@ function App(): React.ReactElement {
     });
     if (nextData !== session.project.data) {
       updateProjectData(nextData);
-      setStatus(`Áudio duplicado: ${nextName.trim()}.`);
+      setStatus(ui("Áudio duplicado: {0}.", { 0: nextName.trim() }));
     }
   }
 
@@ -2754,21 +2777,21 @@ function App(): React.ReactElement {
     const nextData = removeAudioItemFromProject(session.project.data, audioID);
     if (nextData !== session.project.data) {
       updateProjectData(nextData);
-      setStatus(`Áudio removido: ${currentName}.`);
+      setStatus(ui("Áudio removido: {0}.", { 0: currentName }));
     }
   }
 
   function openDialogueInEditor(key: string, sceneID?: string): void {
     if (!session) return;
     const room = dialogueEditorScene(session.project.data, key, sceneID);
-    if (!room) { setStatus("Crie uma cena para editar diálogos."); return; }
+    if (!room) { setStatus(ui("Crie uma cena para editar diálogos.")); return; }
     const requestID = Date.now();
     setPendingFocusInspectorTab("dialogues");
     setFocusedEventRequest(null);
     setSceneDialogueFocus({ key, requestID });
     setFocusedAssetRequest({ assetID: room.id, assetName: room.name, kind: "Room", label: room.name, targetID: room.id, targetName: room.name, workspace: "Editor", requestID });
     setSelectedWorkspace("Editor");
-    setStatus(`Fala aberta no Editor: ${key}.`);
+    setStatus(ui("Fala aberta no Editor: {0}.", { 0: key }));
   }
 
   async function createDialogue(): Promise<string | null> {
@@ -2780,11 +2803,11 @@ function App(): React.ReactElement {
     const latest = dialogueSessionRef.current;
     if (!trimmedKey || !latest || latest.path !== current.path) return null;
     if (Array.isArray(latest.project.data.dialogues) && latest.project.data.dialogues.some(item => item.key === trimmedKey)) {
-      setStatus(`A chave ${trimmedKey} já existe. Escolha outra para criar uma fala.`); return null;
+      setStatus(ui("A chave {0} já existe. Escolha outra para criar uma fala.", { 0: trimmedKey })); return null;
     }
     const nextData = createDialogueInProject(latest.project.data, { key: trimmedKey, character: "Narrador", text: "Nova fala.", choices: [] });
     updateProjectData(nextData);
-    setStatus(`Fala criada no catálogo: ${trimmedKey}. Vincule a chave em um evento para executá-la.`);
+    setStatus(ui("Fala criada no catálogo: {0}. Vincule a chave em um evento para executá-la.", { 0: trimmedKey }));
     return trimmedKey;
   }
 
@@ -2793,7 +2816,7 @@ function App(): React.ReactElement {
     const nextData = updateDialogueInProject(session.project.data, key, fields);
     if (nextData !== session.project.data) {
       updateProjectData(nextData);
-      setStatus(`Dialogo atualizado: ${key}.`);
+      setStatus(ui("Dialogo atualizado: {0}.", { 0: key }));
     }
   }
 
@@ -2802,10 +2825,10 @@ function App(): React.ReactElement {
     const nextData = connectDialogueToStartEventInProject(session.project.data, key);
     if (nextData !== session.project.data) {
       updateProjectData(nextData);
-      setStatus(`Dialogo conectado ao inicio: ${key}.`);
+      setStatus(ui("Dialogo conectado ao inicio: {0}.", { 0: key }));
       return;
     }
-    setStatus(`Dialogo ja conectado ao inicio: ${key}.`);
+    setStatus(ui("Dialogo ja conectado ao inicio: {0}.", { 0: key }));
   }
 
   function openDialogueEvent(eventName: string): void {
@@ -2826,7 +2849,7 @@ function App(): React.ReactElement {
     const nextData = updateInterfaceThemeInProject(session.project.data, change);
     if (nextData !== session.project.data) {
       updateProjectData(nextData);
-      setStatus("Tema das molduras atualizado.");
+      setStatus(ui("Tema das molduras atualizado."));
     }
   }
 
@@ -2835,7 +2858,7 @@ function App(): React.ReactElement {
     const nextData = updateDialoguesUiInProject(session.project.data, fields);
     if (nextData !== session.project.data) {
       updateProjectData(nextData);
-      setStatus("UI de diálogos atualizada.");
+      setStatus(ui("UI de diálogos atualizada."));
     }
   }
 
@@ -2844,7 +2867,7 @@ function App(): React.ReactElement {
     const nextData = setActiveHudPresetInProject(session.project.data, presetID);
     if (nextData !== session.project.data) {
       updateProjectData(nextData);
-      setStatus(`HUD ativo: ${presetID}.`);
+      setStatus(ui("HUD ativo: {0}.", { 0: presetID }));
     }
   }
 
@@ -2853,7 +2876,7 @@ function App(): React.ReactElement {
     const nextData = updateHudPresetInProject(session.project.data, presetID, fields);
     if (nextData !== session.project.data) {
       updateProjectData(nextData);
-      setStatus(`Preset de HUD atualizado: ${presetID}.`);
+      setStatus(ui("Preset de HUD atualizado: {0}.", { 0: presetID }));
     }
   }
 
@@ -2873,11 +2896,11 @@ function App(): React.ReactElement {
     if (newName === null) return;
     const nextData = createSceneHudVariationInProject(session.project.data, roomID, sourcePresetID, newID.trim(), newName, screenID);
     if (nextData === session.project.data) {
-      setStatus("Não foi possível criar a HUD: o ID já existe ou é inválido.");
+      setStatus(ui("Não foi possível criar a HUD: o ID já existe ou é inválido."));
       return;
     }
     updateProjectData(nextData);
-    setStatus(`HUD criada e vinculada à cena: ${newName}.`);
+    setStatus(ui("HUD criada e vinculada à cena: {0}.", { 0: newName }));
   }
 
   async function duplicateHudPreset(presetID: string): Promise<void> {
@@ -2892,9 +2915,9 @@ function App(): React.ReactElement {
     const nextData = duplicateHudPresetInProject(session.project.data, presetID, newID, newName);
     if (nextData !== session.project.data) {
       updateProjectData(nextData);
-      setStatus(`Preset de HUD duplicado: ${newID.trim()}.`);
+      setStatus(ui("Preset de HUD duplicado: {0}.", { 0: newID.trim() }));
     } else {
-      setStatus("Não foi possível duplicar o preset: o ID já existe ou é inválido.");
+      setStatus(ui("Não foi possível duplicar o preset: o ID já existe ou é inválido."));
     }
   }
 
@@ -2904,14 +2927,14 @@ function App(): React.ReactElement {
     if (!preset || preset.builtIn) return;
     const usages = hudPresetUsages(session.project.data, presetID);
     if (usages.length) {
-      setStatus(`Substitua a HUD nas cenas antes de remover: ${usages.map(scene => scene.name).join(", ")}.`);
+      setStatus(ui("Substitua a HUD nas cenas antes de remover: {0}.", { 0: usages.map(scene => scene.name).join(", ") }));
       return;
     }
     if (!await confirm(`Remover o preset de HUD "${preset.name}" do projeto?`)) return;
     const nextData = removeHudPresetInProject(session.project.data, presetID);
     if (nextData !== session.project.data) {
       updateProjectData(nextData);
-      setStatus(`Preset de HUD removido: ${preset.name}.`);
+      setStatus(ui("Preset de HUD removido: {0}.", { 0: preset.name }));
     }
   }
 
@@ -2922,11 +2945,11 @@ function App(): React.ReactElement {
     const trimmedKey = nextKey?.trim();
     const latest = dialogueSessionRef.current;
     if (!trimmedKey || !latest || latest.path !== current.path) return null;
-    if (Array.isArray(latest.project.data.dialogues) && latest.project.data.dialogues.some(item => item.key === trimmedKey)) { setStatus("Esta chave de diálogo já existe."); return null; }
+    if (Array.isArray(latest.project.data.dialogues) && latest.project.data.dialogues.some(item => item.key === trimmedKey)) { setStatus(ui("Esta chave de diálogo já existe.")); return null; }
     const nextData = duplicateDialogueInProject(latest.project.data, { sourceKey: key, newKey: trimmedKey });
     if (nextData === latest.project.data) return null;
     updateProjectData(nextData);
-    setStatus(`Diálogo duplicado: ${trimmedKey}.`);
+    setStatus(ui("Diálogo duplicado: {0}.", { 0: trimmedKey }));
     return trimmedKey;
   }
 
@@ -2935,7 +2958,7 @@ function App(): React.ReactElement {
     const nextData = normalizeDialogueInProject(session.project.data, key);
     if (nextData !== session.project.data) {
       updateProjectData(nextData);
-      setStatus(`Dialogo normalizado: ${key}.`);
+      setStatus(ui("Dialogo normalizado: {0}.", { 0: key }));
     }
   }
 
@@ -2952,7 +2975,7 @@ function App(): React.ReactElement {
     const nextData = removeDialogueFromProject(session.project.data, key);
     if (nextData !== session.project.data) {
       updateProjectData(nextData);
-      notifySuccess(`Dialogo removido: ${key}.`);
+      notifySuccess(ui("Dialogo removido: {0}.", { 0: key }));
     }
   }
 
@@ -2962,7 +2985,7 @@ function App(): React.ReactElement {
     if (nextData !== session.project.data) {
       setSettingsPathValidation(null);
       updateProjectData(nextData);
-      setStatus(`Ajustes atualizado: ${sectionID}.${fieldKey}.`);
+      setStatus(ui("Ajustes atualizado: {0}.{1}.", { 0: sectionID, 1: fieldKey }));
     }
   }
 
@@ -2973,7 +2996,7 @@ function App(): React.ReactElement {
     if (nextData !== session.project.data) {
       setSettingsPathValidation(null);
       updateProjectData(nextData);
-      setStatus(`Preset aplicado: ${sectionID}.`);
+      setStatus(ui("Preset aplicado: {0}.", { 0: sectionID }));
     }
   }
 
@@ -2986,7 +3009,7 @@ function App(): React.ReactElement {
     });
     if (result.canceled) return;
     if (result.error) {
-      setStatus(`Falha ao escolher caminho: ${result.error}`);
+      setStatus(ui("Falha ao escolher caminho: {0}", { 0: result.error }));
       return;
     }
     if (!result.path) return;
@@ -2995,7 +3018,7 @@ function App(): React.ReactElement {
     if (nextData !== session.project.data) {
       setSettingsPathValidation(null);
       updateProjectData(nextData);
-      setStatus(`Ajustes atualizado: ${sectionID}.${field.key}.`);
+      setStatus(ui("Ajustes atualizado: {0}.{1}.", { 0: sectionID, 1: field.key }));
     }
   }
 
@@ -3008,7 +3031,7 @@ function App(): React.ReactElement {
     if (nextData !== session.project.data) {
       setSettingsPathValidation(null);
       updateProjectData(nextData);
-      setStatus(`Ajustes restaurado: ${sectionID}.`);
+      setStatus(ui("Ajustes restaurado: {0}.", { 0: sectionID }));
     }
   }
 
@@ -3079,13 +3102,13 @@ function App(): React.ReactElement {
     }
     setSelectedWorkspace(problem.workspace);
     setProblemsOpen(false);
-    setStatus(`Pendencia aberta em ${problem.workspace}: ${problem.message}`);
+    setStatus(ui("Pendencia aberta em {0}: {1}", { 0: problem.workspace, 1: problem.message }));
   }
 
   const commandActions: StudioCommandAction[] = [
     ...workspaceNames.map((workspace) => ({
       id: `workspace-${workspace}`,
-      label: `Ir para ${workspace}`,
+      label: ui("Ir para {0}", { 0: t(workspaceLabelKey(workspace)) }),
       detail: "Trocar workspace",
       keywords: ["abrir", "navegar", workspace],
       run: () => {
@@ -3110,7 +3133,7 @@ function App(): React.ReactElement {
     { id: "edit-undo", label: "Desfazer alteração", detail: `${session?.undoStack.length ?? 0} disponível(is)`, keywords: ["undo"], run: undoProjectEdit },
     { id: "edit-redo", label: "Refazer alteração", detail: `${session?.redoStack.length ?? 0} disponível(is)`, keywords: ["redo"], run: redoProjectEdit },
     { id: "view-focus", label: focusMode ? "Sair do modo foco" : "Entrar no modo foco", detail: selectedWorkspace, keywords: ["canvas tela cheia"], run: () => setFocusMode((current) => !current) },
-    { id: "project-problems", label: "Abrir central de pendências", detail: `${projectProblems.length} problema(s)`, keywords: ["erros avisos validar"], run: () => setProblemsOpen(true) }
+    { id: "project-problems", label: "Abrir central de pendências", detail: ui(projectProblems.length === 1 ? "{0} problema" : "{0} problemas", { 0: projectProblems.length }), keywords: ["erros avisos validar"], run: () => setProblemsOpen(true) }
   ];
 
   if (!session) {
@@ -3126,9 +3149,9 @@ function App(): React.ReactElement {
 
   return (
     <main className={`app-shell${focusMode ? " focus-mode" : ""}`}>
-      <header className={`app-topbar${window.gbaStudio.platform === "darwin" ? " native-macos-titlebar" : ""}`}>
+      <header className={`app-topbar${window.gbaStudio.platform === "darwin" ? " native-macos-titlebar" : ""}${windowFullscreen ? " is-fullscreen" : ""}`}>
         <div className="topbar-brand">
-          <img alt="GBA Studio" className="topbar-brand-logo" src={studioWordmarkURL} />
+          <img alt={ui("GBA Studio")} className="topbar-brand-logo" src={studioWordmarkURL} />
         </div>
 
         <div
@@ -3186,29 +3209,29 @@ function App(): React.ReactElement {
           <StudioThemeToggle className="topbar-theme-toggle icon-button" />
           <button
             className="topbar-history-button"
-            aria-label="Desfazer alteração"
+            aria-label={ui("Desfazer alteração")}
             disabled={session.undoStack.length === 0}
             onClick={undoProjectEdit}
-            title={session.undoStack.length > 0 ? `Desfazer (${session.undoStack.length})` : "Nada para desfazer"}
+            title={session.undoStack.length > 0 ? ui("Desfazer ({0})", { 0: session.undoStack.length }) : ui("Nada para desfazer")}
             type="button"
           >
             <Undo2 aria-hidden="true" strokeWidth={2.2} />
           </button>
           <button
             className="topbar-history-button"
-            aria-label="Refazer alteração"
+            aria-label={ui("Refazer alteração")}
             disabled={session.redoStack.length === 0}
             onClick={redoProjectEdit}
-            title={session.redoStack.length > 0 ? `Refazer (${session.redoStack.length})` : "Nada para refazer"}
+            title={session.redoStack.length > 0 ? ui("Refazer ({0})", { 0: session.redoStack.length }) : ui("Nada para refazer")}
             type="button"
           >
             <Redo2 aria-hidden="true" strokeWidth={2.2} />
           </button>
           <button
-            aria-label="Abrir central de pendências"
+            aria-label={ui("Abrir central de pendências")}
             className={projectProblems.length > 0 ? "topbar-problems-button has-problems" : "topbar-problems-button"}
             onClick={() => setProblemsOpen(true)}
-            title="Central de pendências"
+            title={ui("Central de pendências")}
             type="button"
           >
             <AlertTriangle aria-hidden="true" strokeWidth={2.2} />
@@ -3218,7 +3241,7 @@ function App(): React.ReactElement {
             className="run-button"
             type="button"
             aria-label={t("shell.play")}
-            title={playProjectDisabled ? playProjectBlockedReasonText ?? t("shell.playDisabledTitle") : t("shell.playTitle")}
+            title={playProjectDisabled ? ui(playProjectBlockedReasonText) ?? t("shell.playDisabledTitle") : t("shell.playTitle")}
             onClick={() => void playProject()}
             disabled={playProjectDisabled}
           >
@@ -3263,16 +3286,16 @@ function App(): React.ReactElement {
                 </button>
                 {localizedProjectActionItems.map((item) => (
                   <button
-                    aria-label={item.label}
+                    aria-label={ui(item.label)}
                     disabled={item.disabled}
                     key={item.id}
                     role="menuitem"
-                    title={item.reason}
+                    title={ui(item.reason)}
                     type="button"
                     onClick={() => runProjectAction(item.id)}
                   >
                     <span aria-hidden="true">{projectActionIcons[item.id]}</span>
-                    {item.label}
+                    {ui(item.label)}
                   </button>
                 ))}
                 <div className="project-menu-divider" />
@@ -3409,6 +3432,8 @@ function App(): React.ReactElement {
               onCreatePrefabFromEntity={createPrefabFromEntity}
               onInstantiatePrefab={instantiatePrefab}
               onUpdatePrefab={updatePrefab}
+              onApplyInteractiveObjects={data => updateProjectData(data)}
+              onResetPrefabOverrides={(kind, entityID) => updateProjectData(clearProjectPrefabOverrides(session.project.data, kind, entityID))}
               onPlaceRoomEntity={placeRoomEntity}
               onCreateTrigger={createTrigger}
               onCreateActor={createActor}
@@ -3444,25 +3469,7 @@ function App(): React.ReactElement {
               onImportAssets={importAssets}
               onAnalyzeProjectBudget={() => void analyzeProjectBudget()}
               onOpenProjectHealth={openProjectHealth}
-              onOpenEvent={(eventName, sourceRoomName) => {
-                const requestID = ++focusedEventRequestSequence.current;
-                if (sourceRoomName) {
-                  setFocusedAssetRequest({
-                    assetID: sourceRoomName,
-                    assetName: sourceRoomName,
-                    kind: "Room",
-                    label: `Cena · ${sourceRoomName}`,
-                    requestID,
-                    targetName: sourceRoomName,
-                    workspace: "Editor"
-                  });
-                }
-                setFocusedEventRequest({
-                  eventName,
-                  requestID
-                });
-                openEventsInspector(eventName);
-              }}
+              onOpenEvent={openSourceEvent}
               onUpdateEventStep={updateEventStep}
               onOpenDialoguesWorkspace={(dialogueKey) => {
                 if (dialogueKey) {
@@ -3601,7 +3608,7 @@ function App(): React.ReactElement {
           ) : selectedWorkspace === "Ajustes" || selectedWorkspace === "Cenas" || selectedWorkspace === "Exportar" ? (
             <SettingsWorkspace
               scope={selectedWorkspace === "Cenas" ? "scene" : selectedWorkspace === "Exportar" ? "export" : "global"}
-              title={selectedWorkspace === "Cenas" ? "Cenas" : selectedWorkspace === "Exportar" ? "Exportar" : "Ajustes"}
+              title={selectedWorkspace === "Cenas" ? ui("Cenas") : selectedWorkspace === "Exportar" ? ui("Exportar") : ui("Ajustes")}
               onOpenPluginCatalog={selectedWorkspace === "Ajustes" ? () => setPluginCatalogOpen(true) : undefined}
               advancedTools={selectedWorkspace === "Exportar" && projectData ? (
                 <WorkspaceAdvancedTools
@@ -3611,7 +3618,7 @@ function App(): React.ReactElement {
                   projectData={projectData}
                   detail="Fontes, idiomas e dados avançados usados na exportação dos diálogos."
                   surface="Dialogos"
-                  title="Diálogos: fontes e localização"
+                  title={ui("Diálogos: fontes e localização")}
                 />
               ) : null}
               presentation={settingsPresentation}
@@ -3681,6 +3688,8 @@ function App(): React.ReactElement {
         problems={projectProblems}
       />
       <TestingDiagnosticsDrawer
+        buildResult={buildResult}
+        doctorSummary={doctorResult?.summary}
         inputRecording={inputRecording}
         inputReplay={inputReplaySession}
         isOpen={testingDiagnosticsOpen}
@@ -3695,6 +3704,12 @@ function App(): React.ReactElement {
         projectData={session.project.data}
         memoryReport={buildResult?.summary?.memoryReport}
         romOccupancy={buildResult?.summary?.romOccupancy}
+        eventTrace={romPlayerTelemetry?.state === "running" ? romPlayerTelemetry.stats?.runtimeState?.eventTrace : null}
+        onOpenEvent={eventID => {
+          const event = (session.project.data.events as Record<string, unknown>[]).find(item => item.id === eventID || item.name === eventID);
+          setTestingDiagnosticsOpen(false);
+          openSourceEvent(String(event?.name ?? eventID), typeof event?.roomName === "string" ? event.roomName : typeof event?.sceneName === "string" ? event.sceneName : undefined);
+        }}
         runtimeAudio={romPlayerTelemetry?.state === "running" ? romPlayerTelemetry.stats?.runtimeState?.audio : null}
       />
       <StudioStatusBar message={status} workspace={selectedWorkspace} isBusy={statusBusy} />

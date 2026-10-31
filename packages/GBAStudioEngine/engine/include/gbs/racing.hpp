@@ -93,6 +93,25 @@ struct RacingTopdownTrackData {
 
 struct RacingPlayerVisual;
 
+struct RacingActionSounds {
+    int16_t accelerate = -1;
+    int16_t brake = -1;
+    int16_t collision = -1;
+    int16_t checkpoint = -1;
+};
+
+// Text slots belong to the existing common save envelope; no campaign variable is reused.
+struct RacingChallengeData {
+    int8_t boost_variable_index = -1;
+    int8_t best_time_text_index = -1;
+    int8_t result_time_text_index = -1;
+    int8_t result_position_text_index = -1;
+    int8_t result_rating_text_index = -1;
+    int8_t result_best_text_index = -1;
+    uint16_t gold_seconds = 80;
+    uint16_t silver_seconds = 120;
+};
+
 struct RacingRoomData {
     const char* name;
     const uint8_t* collision_flags;
@@ -118,6 +137,8 @@ struct RacingRoomData {
     const AffineTileMapAsset* circuit_floor = nullptr;
     int circuit_empty_tile = -1;
     const RacingPlayerVisual* player_visual = nullptr;
+    RacingActionSounds action_sounds {};
+    RacingChallengeData challenge {};
 };
 
 struct RacingVehicleDirectionAnimations {
@@ -175,6 +196,9 @@ struct RacingProjectData {
     RacingVehicleAnimationSet player_animations {};
     const ResourceBankUploadSource* resource_bank_upload_sources = nullptr;
     size_t resource_bank_upload_source_count = 0;
+    const EventScript* scripts = nullptr;
+    size_t script_count = 0;
+    int start_menu_script_index = -1;
 };
 
 struct RacingInput {
@@ -205,6 +229,7 @@ struct RacingRuntimeState {
     uint16_t heading_x256 = 0;
     uint8_t collision_frames = 0;
     int8_t last_checkpoint = -1;
+    uint32_t elapsed_frames = 0;
 };
 
 enum class RacingRaceResult : uint8_t {
@@ -263,10 +288,29 @@ constexpr bool racing_uses_circuit_track(const RacingRoomData& room) {
     return room.topdown_track != nullptr && room.topdown_track->checkpoint_count > 0;
 }
 
+// The affine source map occupies low VRAM. Keep the panorama after it and
+// below the fixed UI tiles (0x7000), independently of the floor's charblock 2.
+constexpr unsigned racing_panorama_base_tile(const RacingPseudo3DVisualData& visual) {
+    const unsigned bytes=visual.floor_tilemap ? visual.floor_tilemap->width*visual.floor_tilemap->height : 0;
+    const unsigned tile_bytes=visual.panorama_tiles && visual.panorama_tiles->color_depth==ColorDepth::Bpp8 ? 64 : 32;
+    return (bytes+tile_bytes-1)/tile_bytes;
+}
+constexpr uint16_t racing_panorama_map_entry(uint16_t entry,const RacingPseudo3DVisualData& visual) {
+    return static_cast<uint16_t>((entry&0xfc00u)|((entry&1023u)+racing_panorama_base_tile(visual)-visual.panorama_tiles->destination_tile));
+}
+constexpr bool is_valid_racing_panorama(const RacingPseudo3DVisualData& visual) {
+    if(!visual.panorama_tiles)return false;
+    const auto& tiles=*visual.panorama_tiles;
+    const unsigned limit=tiles.color_depth==ColorDepth::Bpp8 ? 448 : 896;
+    return tiles.data && !tiles.object_tiles && tiles.compression==AssetCompression::None &&
+        is_valid_color_depth(tiles.color_depth) && tiles.tile_count>0 &&
+        racing_panorama_base_tile(visual)+tiles.tile_count<=limit;
+}
+
 constexpr bool is_valid_racing_pseudo3d_visual_data(const RacingPseudo3DVisualData& visual) {
     return visual.horizon_y > 0 && visual.horizon_y < 160 &&
         ((visual.panorama_tiles == nullptr && visual.panorama_tilemap == nullptr && visual.panorama_palette == nullptr) ||
-         (visual.panorama_tiles != nullptr && is_valid_tile_asset(*visual.panorama_tiles) &&
+         (visual.panorama_tiles != nullptr && is_valid_racing_panorama(visual) &&
           visual.panorama_tilemap != nullptr && is_valid_tilemap_asset(*visual.panorama_tilemap) &&
           visual.panorama_palette != nullptr && is_valid_palette_asset(*visual.panorama_palette))) &&
         visual.floor_tiles != nullptr && is_valid_affine_tile_asset(*visual.floor_tiles) &&
@@ -304,7 +348,7 @@ constexpr int racing_topdown_path_length_pixels(const RacingTopdownTrackData& tr
     int length = 0;
     for (size_t index = 0; index < track.path_point_count; ++index) {
         length += racing_topdown_segment_length_pixels(
-            track.path_points[index], track.path_points[(index + 1) % track.path_point_count]
+            track.path_points[index], track.path_points[index + 1 == track.path_point_count ? 0 : index + 1]
         );
     }
     return length;
@@ -582,21 +626,22 @@ constexpr uint8_t racing_heading_for_vector(int dx, int dy) {
 
 constexpr RacingTopdownPose racing_topdown_pose_at_distance(
     const RacingTopdownTrackData& track,
-    int distance_x256
+    int distance_x256,
+    bool include_heading = true
 ) {
     const int path_length_x256 = racing_topdown_path_length_pixels(track) * 256;
     if (path_length_x256 <= 0) return { { 0, 0 }, track.start_heading };
     int remaining = racing_positive_mod(distance_x256, path_length_x256);
     for (size_t index = 0; index < track.path_point_count; ++index) {
         const Vec2i from = track.path_points[index];
-        const Vec2i to = track.path_points[(index + 1) % track.path_point_count];
+        const Vec2i to = track.path_points[index + 1 == track.path_point_count ? 0 : index + 1];
         const int segment = racing_topdown_segment_length_pixels(from, to) * 256;
         if (segment <= 0) continue;
         if (remaining < segment) {
             return {
                 { from.x + (to.x - from.x) * remaining / segment,
                   from.y + (to.y - from.y) * remaining / segment },
-                racing_heading_for_vector(to.x - from.x, to.y - from.y)
+                include_heading ? racing_heading_for_vector(to.x - from.x, to.y - from.y) : track.start_heading
             };
         }
         remaining -= segment;
@@ -610,38 +655,75 @@ constexpr int racing_topdown_path_progress_x256(
 ) {
     if (track.path_points == nullptr || track.path_point_count < 2) return 0;
     int prefix_x256 = 0;
-    int best_progress_x256 = 0;
+    int best_prefix_x256 = 0, best_segment_x256 = 0;
+    int64_t best_bounded = 0, best_denominator = 1;
     int64_t best_distance_squared = 0x7fffffffffffffffLL;
     for (size_t index = 0; index < track.path_point_count; ++index) {
         const Vec2i from = track.path_points[index];
-        const Vec2i to = track.path_points[(index + 1) % track.path_point_count];
+        const Vec2i to = track.path_points[index + 1 == track.path_point_count ? 0 : index + 1];
         const int dx = to.x - from.x;
         const int dy = to.y - from.y;
-        const int64_t denominator = static_cast<int64_t>(dx) * dx + static_cast<int64_t>(dy) * dy;
-        if (denominator == 0) continue;
-        const int64_t numerator = static_cast<int64_t>(position_pixels.x - from.x) * dx +
-            static_cast<int64_t>(position_pixels.y - from.y) * dy;
-        const int64_t bounded = numerator < 0 ? 0 : numerator > denominator ? denominator : numerator;
-        const int projected_x = from.x + static_cast<int>(static_cast<int64_t>(dx) * bounded / denominator);
-        const int projected_y = from.y + static_cast<int>(static_cast<int64_t>(dy) * bounded / denominator);
+        int64_t denominator=1, bounded=0;
+        int projected_x=from.x, projected_y=from.y;
+        if(dx==0 && dy==0) continue;
+        if(dy==0) {
+            const int offset=racing_clamp_int(position_pixels.x-from.x,dx<0?dx:0,dx>0?dx:0);
+            projected_x+=offset;
+            denominator=dx<0?-static_cast<int64_t>(dx):dx;
+            bounded=offset<0?-static_cast<int64_t>(offset):offset;
+        } else if(dx==0) {
+            const int offset=racing_clamp_int(position_pixels.y-from.y,dy<0?dy:0,dy>0?dy:0);
+            projected_y+=offset;
+            denominator=dy<0?-static_cast<int64_t>(dy):dy;
+            bounded=offset<0?-static_cast<int64_t>(offset):offset;
+        } else if((dx==dy || dx==-dy) && dx>=-512 && dx<=512) {
+            const int64_t along=(dx<0?-static_cast<int64_t>(position_pixels.x-from.x):position_pixels.x-from.x)+
+                (dy<0?-static_cast<int64_t>(position_pixels.y-from.y):position_pixels.y-from.y);
+            denominator=2*(dx<0?-dx:dx);
+            bounded=along<0?0:along>denominator?denominator:along;
+            const int offset=static_cast<int>(bounded)/2;
+            projected_x+=dx<0?-offset:offset;
+            projected_y+=dy<0?-offset:offset;
+        } else {
+            denominator=static_cast<int64_t>(dx)*dx+static_cast<int64_t>(dy)*dy;
+            const int64_t numerator=static_cast<int64_t>(position_pixels.x-from.x)*dx+
+                static_cast<int64_t>(position_pixels.y-from.y)*dy;
+            bounded=numerator<0?0:numerator>denominator?denominator:numerator;
+            if(dx>=-512 && dx<=512 && dy>=-512 && dy<=512) {
+                projected_x+=dx*static_cast<int>(bounded)/static_cast<int>(denominator);
+                projected_y+=dy*static_cast<int>(bounded)/static_cast<int>(denominator);
+            } else {
+                projected_x+=static_cast<int>(static_cast<int64_t>(dx)*bounded/denominator);
+                projected_y+=static_cast<int>(static_cast<int64_t>(dy)*bounded/denominator);
+            }
+        }
+        const int segment_x256 = racing_topdown_segment_length_pixels(from, to) * 256;
         const int64_t offset_x = position_pixels.x - projected_x;
         const int64_t offset_y = position_pixels.y - projected_y;
         const int64_t distance_squared = offset_x * offset_x + offset_y * offset_y;
         if (distance_squared < best_distance_squared) {
             best_distance_squared = distance_squared;
-            best_progress_x256 = prefix_x256 + static_cast<int>(
-                racing_topdown_segment_length_pixels(from, to) * 256LL * bounded / denominator
-            );
+            best_prefix_x256 = prefix_x256;
+            best_segment_x256 = segment_x256;
+            best_bounded = bounded;
+            best_denominator = denominator;
         }
-        prefix_x256 += racing_topdown_segment_length_pixels(from, to) * 256;
+        prefix_x256 += segment_x256;
     }
-    return best_progress_x256;
+    // Only the nearest segment contributes to ranking. Ties still keep the
+    // first segment, and division retains the original truncation exactly.
+    const int64_t product=static_cast<int64_t>(best_segment_x256)*best_bounded;
+    const int progress=product<=0xffffffffLL && best_denominator<=0xffffffffLL
+        ? static_cast<int>(static_cast<uint32_t>(product)/static_cast<uint32_t>(best_denominator))
+        : static_cast<int>(product/best_denominator);
+    return best_prefix_x256+progress;
 }
 
 constexpr RacingTopdownPose racing_topdown_rival_pose(
     const RacingRuntimeState& state,
     const RacingRoomData& room,
-    size_t rival_index
+    size_t rival_index,
+    bool include_heading = true
 ) {
     if (!racing_uses_circuit_track(room) || room.topdown_track->path_point_count < 2) {
         return { room.actors[rival_index].position_pixels,
@@ -649,19 +731,23 @@ constexpr RacingTopdownPose racing_topdown_rival_pose(
     }
     return racing_topdown_pose_at_distance(
         *room.topdown_track,
-        state.rival_distance_x256 - static_cast<int>(rival_index + 1) * 32 * 256
+        state.rival_distance_x256 - static_cast<int>(rival_index + 1) * 32 * 256,
+        include_heading
     );
 }
 
-constexpr unsigned int racing_position_for_hud(
+constexpr unsigned int racing_position_for_hud_with_track_length(
     const RacingRuntimeState& state,
-    const RacingRoomData& room
+    const RacingRoomData& room,
+    int track_length
 ) {
-    if (!racing_uses_circuit_track(room) || room.actor_count == 0) {
+    if (!racing_uses_circuit_track(room)) {
         return racing_position_for_hud(state);
     }
+    if (room.actor_count == 0) {
+        return 1;
+    }
     const bool has_path = room.topdown_track->path_point_count >= 2;
-    const int track_length = racing_track_length_x256(room);
     const int player_progress = has_path
         ? static_cast<int>(state.lap_count) * track_length + racing_topdown_path_progress_x256(
             *room.topdown_track, { state.position_x256 / 256, state.position_y256 / 256 })
@@ -676,6 +762,31 @@ constexpr unsigned int racing_position_for_hud(
         }
     }
     return position;
+}
+
+constexpr unsigned int racing_position_for_hud(const RacingRuntimeState& state, const RacingRoomData& room) {
+    if (!racing_uses_circuit_track(room)) return racing_position_for_hud(state);
+    if (room.actor_count == 0) return 1;
+    return racing_position_for_hud_with_track_length(state, room, racing_track_length_x256(room));
+}
+
+// Exported room data is immutable while a race is active; retain only its
+// geometry-derived length. Position and rival progress remain live each frame.
+struct RacingHudPositionCache {
+    const RacingRoomData* room = nullptr;
+    int track_length = 0;
+};
+
+constexpr unsigned int racing_position_for_hud(
+    const RacingRuntimeState& state, const RacingRoomData& room, RacingHudPositionCache& cache
+) {
+    if (!racing_uses_circuit_track(room)) return racing_position_for_hud(state);
+    if (room.actor_count == 0) return 1;
+    if (cache.room != &room) {
+        cache.room = &room;
+        cache.track_length = racing_track_length_x256(room);
+    }
+    return racing_position_for_hud_with_track_length(state, room, cache.track_length);
 }
 
 constexpr Vec2i racing_follow_camera(
@@ -902,7 +1013,8 @@ constexpr RacingRuntimeState make_racing_runtime_state(const RacingRoomData& roo
         0,
         0,
         0,
-        room.config.pseudo3d.rival_speed_x256_per_second > 0 &&
+        (!racing_uses_circuit_track(room) || room.actor_count > 0) &&
+            room.config.pseudo3d.rival_speed_x256_per_second > 0 &&
             (room.topdown_track == nullptr || room.topdown_track->path_point_count < 2)
             ? racing_track_length_x256(room) / 12
             : 0,
@@ -973,8 +1085,9 @@ inline bool apply_racing_save_data(
     // Legacy states ended after steering_frames and rounded to four bytes.
     constexpr size_t legacy_size = (offsetof(RacingRuntimeState, heading_x256) + 3u) & ~3u;
     const bool legacy = save_data.payload_size == legacy_size;
+    const bool untimed = save_data.payload_size == offsetof(RacingRuntimeState, elapsed_frames);
     if (!read_universal_save_payload(save_data, UniversalSaveRuntime::Racing, &payload,
-            legacy ? legacy_size : sizeof(payload))) return false;
+            legacy ? legacy_size : untimed ? offsetof(RacingRuntimeState, elapsed_frames) : sizeof(payload))) return false;
     if(legacy) {
         payload.runtime_state.heading_x256 = payload.runtime_state.heading * 256;
         payload.runtime_state.collision_frames = 0;

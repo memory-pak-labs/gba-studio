@@ -11,17 +11,16 @@ function records(data: GBAProjectData, key: string): Record<string, any>[] {
 }
 
 describe("approved players in blank projects", () => {
-  it("starts with the approved topdown player and fixed idle, without example content", () => {
+  it("starts with an empty scene and offers approved player animations", () => {
     const project = buildProjectFromTemplate("blank", { name: "Meu jogo" });
-    const actor = records(project, "actors")[0]!;
-    expect(actor).toMatchObject({ name: "Player", spriteSheet: "neutral-player-topdown.png", animationName: "idle_down" });
-    expect(records(project, "rooms")[0]).toMatchObject({ playerActorName: "Player", backgroundAssetName: "neutral-background-topdown.png" });
-    expect(project.settings).toMatchObject({ general: { startPlayer: "Player" } });
+    expect(records(project, "actors")).toEqual([]);
+    expect(records(project, "rooms")[0]).toMatchObject({ backgroundAssetName: "" });
+    expect(project.settings).toMatchObject({ general: { startPlayer: "" } });
     expect(records(project, "assets").every(asset => asset.metadata.bundledDefaultAsset.startsWith("template:blank/"))).toBe(true);
     for (const key of ["events", "triggers", "dialogues", "audioItems"]) expect(project[key]).toEqual([]);
     const animations = records(project, "animations");
     expect(animations.filter(animation => animation.state === "idle").every(animation => animation.frames.length === 1)).toBe(true);
-    const down = animations.find(animation => animation.spriteSheet === actor.spriteSheet && animation.name === "walk_down")!;
+    const down = animations.find(animation => animation.spriteSheet === "neutral-player-topdown.png" && animation.name === "walk_down")!;
     expect(down.frames).toHaveLength(4);
     const reopened = parseGBAProjectFile(serializeGBAProjectFile({ data: project, summary: summarizeGBAProject(project) })).data;
     expect(reopened).toEqual(project);
@@ -33,7 +32,8 @@ describe("approved players in blank projects", () => {
     ["luta", "neutral-player-fighter.png", 64, 80, 1],
     ["isometricAdventure", "neutral-player-isometric-adventure.png", 40, 48, 1],
     ["isometricTactical", "neutral-player-isometric-tactical.png", 32, 32, 2],
-    ["shmup", "neutral-player-shmup-horizontal.png", 32, 32, 1]
+    ["shmup", "neutral-player-shmup-horizontal.png", 32, 32, 1],
+    ["dungeonCrawler", "neutral-player-dungeon-hand.png", 64, 64, 1]
   ])("creates %s with its approved player and complete animation bindings", (sceneType, spriteSheet, width, height, actorCount) => {
     const base = buildProjectFromTemplate("blank", { name: "Cenas" });
     const next = createRoomInProject(base, {
@@ -105,14 +105,14 @@ describe("approved players in blank projects", () => {
 
   it("reserves each default player's sprite only in its own scenes", () => {
     let project = buildProjectFromTemplate("blank", { name: "Mixed scenes" });
-    for (const sceneType of ["platformer", "luta", "isometricAdventure", "isometricTactical", "shmup"]) {
+    for (const sceneType of ["topdown", "platformer", "luta", "isometricAdventure", "isometricTactical", "shmup"]) {
       project = createRoomInProject(project, {
         id: sceneType, name: sceneType, width: 6, height: 6, sceneType
       });
     }
     const pack = buildAssetcSpritePackGeneration(project)!;
     for (const [sheet, group] of [
-      ["neutral-player-topdown.png", "scene_cena_1"],
+      ["neutral-player-topdown.png", "scene_topdown"],
       ["neutral-player-platformer.png", "scene_platformer"],
       ["neutral-player-fighter.png", "scene_luta"],
       ["neutral-player-isometric-adventure.png", "scene_isometricadventure"],
@@ -138,7 +138,7 @@ describe("approved players in blank projects", () => {
     expect(records(next, "animationStates").some(state => state.id === player.animationStateID)).toBe(true);
     const switched = updateRoomFieldsInProject(next, sceneType, { sceneType: "topdown" });
     expect(records(switched, "actors").find(actor => actor.id === player.id)?.spriteSheet).toBe("neutral-player-topdown.png");
-    expect(records(base, "assets").filter(asset => String((asset.metadata as Record<string,unknown>)?.source).startsWith("Assets/sprites/"))).toHaveLength(10);
+    expect(records(base, "assets").filter(asset => String((asset.metadata as Record<string,unknown>)?.source).startsWith("Assets/sprites/"))).toHaveLength(14);
   });
 
   it("uses the approved hand as the blank point-and-click player, with a fixed pointer and complete click", () => {
@@ -181,7 +181,7 @@ describe("approved players in blank projects", () => {
     expect(player).toMatchObject({ spriteSheet: "neutral-player-shmup-horizontal.png", animationName: "idle", animationStateID: "state-neutral-shmup" });
     player.spriteSheet = "custom-ship.png";
     expect(records(updateRoomFieldsInProject(changed, room.id, { sceneType: "topdown" }), "actors")[0]!.spriteSheet).toBe("custom-ship.png");
-    expect(records(base, "actors")[0]!.spriteSheet).toBe("neutral-player-topdown.png");
+    expect(records(base, "actors")).toEqual([]);
   });
 
   it("binds the prepared ship's twelve frames and keeps explosion separate from the player", () => {
@@ -200,7 +200,7 @@ describe("approved players in blank projects", () => {
     expect(project.events).toEqual([]);
   });
 
-  it.each(["cutscene", "menu", "visualNovel", "battleRpg", "dungeonCrawler", "worldMap"])("does not add an unnecessary player to %s", sceneType => {
+  it.each(["cutscene", "menu", "visualNovel", "battleRpg", "worldMap"])("does not add an unnecessary player to %s", sceneType => {
     const next = createRoomInProject(buildProjectFromTemplate("blank", { name: "Sem player" }), {
       id: sceneType, name: sceneType, width: 30, height: 20, sceneType
     });

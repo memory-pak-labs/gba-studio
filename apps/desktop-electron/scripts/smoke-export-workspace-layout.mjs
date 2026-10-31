@@ -122,7 +122,7 @@ try {
   assert(await evaluate(`Boolean(document.querySelector('#settings-section-build'))`));
   await change('[aria-label="Buscar ajustes"]', "no-match-xyz"); assert((await evaluate(`document.querySelector('.settings-search-results').innerText`)).includes("Nenhum ajuste encontrado"));
   await change('[aria-label="Buscar ajustes"]', ""); checks.push({ name: "search-routing", ok: true });
-  await click('[aria-label="Projeto e ROM seção de ajustes"]');
+  await click('[aria-label="Seção de ajustes: Projeto e ROM"]');
   await change(fieldSelector("gameTitle"), "Export QA"); await change(fieldSelector("author"), "QA"); await change(fieldSelector("version"), "1.2.3");
   await change(fieldSelector("startScene"), "porto_lumen"); await change(fieldSelector("startPlayer"), "Nara");
   await change(fieldSelector("romFileName"), "layout-test.gba"); await change(fieldSelector("exportFolder"), "build-export-layout");
@@ -147,10 +147,10 @@ try {
   await waitUntil(`document.querySelector('.export-path-status').innerText.includes('Caminhos com pendências')`, "invalid path result"); await capture("invalid-path");
   await click('[aria-label="Desfazer alteração"]'); await waitUntil(`document.querySelector('${fieldSelector("exportFolder")}').value==='build-export-layout'`, "restore output path");
   await click('.export-rom-actions button:first-child'); await waitUntil(`document.querySelector('.export-path-status').innerText.includes('Caminhos verificados')`, "valid paths");
-  await click('[aria-label="Compilação seção de ajustes"]');
+  await click('[aria-label="Seção de ajustes: Compilação"]');
   assert((await evaluate(`document.querySelector('.settings-path-validation').innerText`)).includes("Engine Pack detectado automaticamente"));
   await capture("valid-paths"); checks.push({ name: "real-valid-and-invalid-paths", ok: true });
-  await click('[aria-label="Projeto e ROM seção de ajustes"]');
+  await click('[aria-label="Seção de ajustes: Projeto e ROM"]');
   // Restore the desired entry scene before testing the final artifact.
   await change(fieldSelector("startScene"), "logo"); await saveCopy();
   await waitUntil(`!document.querySelector('.export-generate-rom').disabled`, "build prerequisites");

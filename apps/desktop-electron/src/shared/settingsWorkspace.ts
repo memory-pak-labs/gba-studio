@@ -1074,6 +1074,7 @@ function editableFieldOptions(sectionID: SettingsSectionID, key: string, data: G
   }
   if (sectionID === "backgrounds" && key === "defaultMapSize") {
     return [
+      { value: "", label: "Automático" },
       { value: "32x32", label: "32×32 tiles · 256×256 px" },
       { value: "64x32", label: "64×32 tiles · 512×256 px" },
       { value: "32x64", label: "32×64 tiles · 256×512 px" },

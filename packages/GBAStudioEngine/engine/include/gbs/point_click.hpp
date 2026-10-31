@@ -61,6 +61,10 @@ struct PointClickSceneData {
     size_t background_count = 0;
     const PointClickPropData* props = nullptr;
     size_t prop_count = 0;
+    const MetaSprite* cursor_metasprite = nullptr;
+    const SpriteAnimation* cursor_idle_animation = nullptr;
+    const SpriteAnimation* cursor_hover_animation = nullptr;
+    const SpriteAnimation* cursor_click_animation = nullptr;
 };
 
 struct PointClickProjectData {
@@ -101,18 +105,32 @@ struct PointClickProjectData {
     const SpriteAnimation* cursor_click_animation = nullptr;
 };
 
+inline const PointClickSceneData* point_click_cursor_scene(const PointClickProjectData& project, int scene_index) {
+    if (project.scenes == nullptr || scene_index < 0 || static_cast<size_t>(scene_index) >= project.scene_count) return nullptr;
+    const auto* scene = &project.scenes[scene_index];
+    return scene->cursor_metasprite != nullptr ? scene : nullptr;
+}
+
+inline const MetaSprite* point_click_cursor_metasprite(const PointClickProjectData& project, int scene_index) {
+    const auto* scene = point_click_cursor_scene(project, scene_index);
+    return scene != nullptr ? scene->cursor_metasprite : project.cursor_metasprite;
+}
+
 inline void update_point_click_cursor_animator(
     SpriteAnimatorState& animator, const PointClickProjectData& project,
-    bool hovering, bool clicked
+    bool hovering, bool clicked, int scene_index = -1
 ) {
+    const auto* scene = point_click_cursor_scene(project, scene_index);
+    const auto* idle = scene != nullptr ? scene->cursor_idle_animation : project.cursor_idle_animation;
+    const auto* hover = scene != nullptr ? scene->cursor_hover_animation : project.cursor_hover_animation;
+    const auto* click = scene != nullptr ? scene->cursor_click_animation : project.cursor_click_animation;
     update_sprite_animator(animator);
-    const SpriteAnimation* next = hovering && project.cursor_hover_animation != nullptr
-        ? project.cursor_hover_animation : project.cursor_idle_animation;
-    if (clicked && project.cursor_click_animation != nullptr) {
-        play_sprite_animation(animator, *project.cursor_click_animation);
+    const SpriteAnimation* next = hovering && hover != nullptr ? hover : idle;
+    if (clicked && click != nullptr) {
+        play_sprite_animation(animator, *click);
         return;
     }
-    if (animator.animation == project.cursor_click_animation && animator.playing) return;
+    if (animator.animation == click && animator.playing) return;
     if (animator.animation != next) {
         if (next != nullptr) play_sprite_animation(animator, *next);
         else init_sprite_animator(animator);

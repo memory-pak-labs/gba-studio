@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { prepareEngineProjectExport } from "./exportEngineProject.js";
+import { prepareEngineProjectExport, tacticalMarkerIndices } from "./exportEngineProject.js";
 import { createPreviewRuntime, runPreviewRuntimeEvent, tickPreviewRuntime } from "../shared/previewRuntime.js";
 import type { GBAProjectData } from "../shared/projectFile.js";
 
@@ -19,6 +19,47 @@ function project(commands: string[]): GBAProjectData {
   };
 }
 describe("authored clock events", () => {
+  it.each([0,50])("scales a scene fade by music and master preferences (%i%% master)",master=>{
+    const data=project(["set_variable music_preference 50","set_variable master_preference "+master,"fade_audio_volume music 75 30 music_preference master_preference"]);
+    data.variables=[{name:"music_preference",initialValue:0},{name:"master_preference",initialValue:0}];
+    const result=prepareEngineProjectExport(data);
+    expect(result.error).toBeUndefined();
+    expect(result.generated!.contract.topdown_project!.scripts[0]!.script[2]).toEqual({op:"fade_audio_volume",channel:"music",volume:11,frames:30,variable:0,other_variable:1});
+    const state=runPreviewRuntimeEvent(createPreviewRuntime(data),"boot");
+    expect(state.audioMix.fades.music?.target).toBe(master===0?0:3);
+    expect(state.audioMix.volumes.music).toBeLessThanOrEqual(master===0?0:4);
+  });
+  it("shares a single approved marker frame without addressing nonexistent frames", () => {
+    expect(tacticalMarkerIndices("marker", "marker", "marker", { marker: 1 })).toEqual({cursor:0,range:0,target:0});
+  });
+  it("keeps a scene music fade relative to the saved music preference, including mute", () => {
+    const data = project(["set_variable music_preference 50", "fade_audio_volume music 75 30 music_preference"]);
+    data.variables = [{ id: "music", name: "music_preference", initialValue: 0 }];
+    const result = prepareEngineProjectExport(data);
+    expect(result.error).toBeUndefined();
+    expect(result.generated!.contract.topdown_project!.scripts[0]!.script[1]).toEqual({
+      op: "fade_audio_volume", channel: "music", volume: 11, frames: 30, variable: 0
+    });
+    const state = runPreviewRuntimeEvent(createPreviewRuntime(data), "boot");
+    expect(state.audioMix.fades.music?.target).toBe(6);
+    expect(state.audioMix.volumes.music).toBeLessThanOrEqual(8);
+  });
+  it("binds the game clock to a saved minute variable and resumes its cadence", () => {
+    const data = project(["set_variable harbor_minute 1079", "start_game_clock 1 3 hidden harbor_minute"]);
+    data.variables = [{ id: "minute", name: "harbor_minute", initialValue: 0 }];
+    const result = prepareEngineProjectExport(data);
+    expect(result.error).toBeUndefined();
+    expect(result.generated!.contract.topdown_project!.scripts[0]!.script[1]).toEqual({
+      op: "start_game_clock", minutes_per_tick: 1, frames_per_tick: 3, hud: false, variable: 0
+    });
+    let state = runPreviewRuntimeEvent(createPreviewRuntime(data), "boot");
+    expect(state.hud.gameClock?.currentMinute).toBe(1079);
+    state = tickPreviewRuntime(state, 3 * 1000 / 60);
+    expect(state.variables.harbor_minute).toBe(1080);
+    (data.events as Array<Record<string, unknown>>).push({ id: "resume", name: "resume", steps: [{ command: "start_game_clock 1 3 hidden harbor_minute", isEnabled: true }] });
+    state = runPreviewRuntimeEvent(state, "resume");
+    expect(state.hud.gameClock?.currentMinute).toBe(1080);
+  });
   it("exports clock cadence and HUD visibility independently from RTC", () => {
     const result = prepareEngineProjectExport(project(["start_game_clock 10 3 hud", "advance_time -20"]));
     expect(result.error).toBeUndefined();

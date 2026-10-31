@@ -2,6 +2,15 @@ import { describe, expect, it } from "vitest";
 import { deriveRomOccupancyReport, parseGnuLinkerMap } from "./romOccupancy.js";
 
 describe("ROM occupancy explorer", () => {
+  it("counts overlapping runtime RAM allocations once", () => {
+    const map = `Linker script and memory map
+ .ewram_bss 0x02000000 0x100 build/engine.o
+ .ewram_runtime_menu 0x02000100 0x80 build/menu_runtime.o
+ .ewram_runtime_iso 0x02000100 0x200 build/isometric_runtime.o
+ .bss 0x03000000 0x40 build/core.o
+`;
+    expect(deriveRomOccupancyReport(parseGnuLinkerMap(map)).ramBytes).toBe(0x340);
+  });
   it("parses linked and discarded GNU map sections and groups bytes by source", () => {
     const map = `
 Discarded input sections

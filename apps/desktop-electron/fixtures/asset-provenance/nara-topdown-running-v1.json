@@ -1,0 +1,33 @@
+{
+  "schemaVersion": 1,
+  "contract": "nara-topdown-held-r-v1",
+  "source": {
+    "generator": "image_gen",
+    "sha256": "e3beb244a4d4c2d47319b259c0f955443336287e01e9605b7d68fc4cb7d6a95f",
+    "license": "Project-owned; AI-generated under user direction"
+  },
+  "prepared": {
+    "file": "Assets/sprites/nara-topdown-walk-run-v1.png",
+    "sha256": "b8e993dfb938de6936d33b8da555824dbb034d912472b08aa45c5ea6ea6cf76e",
+    "frameWidth": 32,
+    "frameHeight": 48,
+    "columns": 9,
+    "rows": 4,
+    "frameCount": 36,
+    "runFramesPerDirection": 4,
+    "runFps": 12,
+    "colorMode": "8bpp",
+    "palettePolicy": "Reuse RGB555 colors already visible in the approved walking source; walking pixels remain unchanged."
+  },
+  "approval": {
+    "date": "2026-10-26",
+    "contract": "nara-topdown-held-r-v1",
+    "record": "User explicitly approved all four running animations for integration."
+  },
+  "preservation": {
+    "walkingPixelsUnchanged": true,
+    "backgroundsUnchanged": true,
+    "hudUnchanged": true
+  },
+  "consumer": "GBAStudioEngine streamed OBJ player; two hardware objects per frame"
+}

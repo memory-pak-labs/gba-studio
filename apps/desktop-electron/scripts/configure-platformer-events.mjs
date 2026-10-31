@@ -1,7 +1,9 @@
 import { promotePlatformerViewport } from './promote-platformer-viewport.mjs';
+import { promoteApprovedPlatformer } from './platformer-approved-promotion.mjs';
 
 // Event authoring only: keep the approved scene geometry and PNGs intact.
 export function configurePlatformerEvents(project) {
+  if ((project.scenas ?? project.rooms ?? []).some(s => s.name === 'penedos_vento' && s.runtime?.config?.profile === 'penedos-approved-wide-v2')) return promoteApprovedPlatformer(project);
   if ((project.scenas ?? project.rooms ?? []).some(s => s.name === 'penedos_vento' && s.platformerVisualRevision === 'v13-approved-viewport')) return promotePlatformerViewport(project);
   const next = structuredClone(project);
   if (!next.scenas?.some(s => s.name === 'penedos_vento')) return next;

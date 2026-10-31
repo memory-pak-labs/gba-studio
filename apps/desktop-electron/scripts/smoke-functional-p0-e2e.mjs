@@ -232,7 +232,7 @@ async function editTilemapAndCollision(cdp) {
     "pintura de tile"
   );
 
-  await clickAria(cdp, "Colisao - Solidos");
+  await clickAria(cdp, "Colisão - Sólidos");
   const collisionEdit = await evaluate(cdp, `
     (() => {
       const cells = Array.from(document.querySelectorAll(".room-stage-card-canvas button"));
@@ -279,7 +279,7 @@ async function inspectNpcAndTriggerInEditor(cdp) {
   `);
   assert(actorState?.guide && actorState?.player, `Editor não expôs Player e Guide: ${JSON.stringify(actorState)}`);
 
-  await clickAria(cdp, "Trigger - Eventos");
+  await clickAria(cdp, "Gatilho - Eventos");
   await waitForText(cdp, (text) => text.includes("Door to room 2") && text.includes("door_to_room_2"), "trigger e evento no editor");
   return actorState;
 }

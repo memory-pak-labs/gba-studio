@@ -40,9 +40,8 @@ describe("remaining approved scene HUDs", () => {
   });
   it("exports dialogue-only blank scenes without unrelated HUD and ship reservations", () => {
     const data=buildProjectFromTemplate("blank",{name:"Budget"});
-    const pack=buildAssetcSpritePackGeneration(data)!;
-    expect(pack.assetsBySheet["neutral-hud-frame-wide.png"]).toBeUndefined();
-    expect(pack.assetsBySheet["neutral-player-shmup-horizontal.png"]).toBeUndefined();
+    const pack=buildAssetcSpritePackGeneration(data);
+    expect(pack).toBeNull();
   });
   it("exports empty menu, world map and RPG defaults within the native scene contracts", () => {
     for(const sceneType of ["menu","worldMap","battleRpg"]){

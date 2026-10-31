@@ -1675,6 +1675,14 @@ describe("Engine project export", () => {
     ]);
   });
 
+  it("preserves the declared 8bpp color contract of a dialogue-only portrait", () => {
+    const pack = buildAssetcPortraitPackGeneration({
+      assets: [{ name: "portrait.png", kind: "Sprite", metadata: { source: "Assets/portrait.png", colorMode: "8bpp", width: 48, height: 48, frameWidth: 48, frameHeight: 48 } }],
+      dialogues: [{ key: "speech", portrait: "portrait.png" }]
+    }, null);
+    expect(pack?.assetsByPortraitName["portrait.png"]).toMatchObject({ sprite_bpp: 8, sprite_width: 48, sprite_height: 48 });
+  });
+
   it("preserves a 48x48 dialogue portrait frame without requiring a world actor", () => {
     const data = exportableProject({
       assets: [{ id: "guardian", name: "guardian.png", kind: "Sprite", metadata: { source: "Assets/sprites/guardian.png" } }],
@@ -1700,8 +1708,8 @@ describe("Engine project export", () => {
 
     expect(sorted.map((animation) => animation.name)).toEqual([
       "idle_down",
-      "idle_up",
       "idle_right",
+      "idle_up",
       "idle_left"
     ]);
   });
@@ -1718,11 +1726,11 @@ describe("Engine project export", () => {
 
     expect(sorted.map((animation) => animation.name)).toEqual([
       "idle_down",
-      "idle_up",
       "idle_right",
+      "idle_up",
       "walk_down",
-      "walk_up",
-      "walk_right"
+      "walk_right",
+      "walk_up"
     ]);
   });
 
@@ -1843,9 +1851,10 @@ describe("Engine project export", () => {
 
     expect(exportFields?.animations?.map((animation) => animation.name)).toEqual([
       "view_down", "view_right", "view_up", "view_left",
-      "moving_view_down", "moving_view_right", "moving_view_up", "moving_view_left"
+      "moving_view_down", "moving_view_right", "moving_view_up", "moving_view_left",
+      "idle_down", "idle_right", "idle_up", "idle_left",
+      "walk_down", "walk_right", "walk_up", "walk_left"
     ]);
-    expect(exportFields?.animations?.map((animation) => animation.name).some((name) => name.startsWith("walk_"))).toBe(false);
   });
 
   it("exports fixed SpriteState names so events can switch an actor between authored states", () => {
@@ -2092,10 +2101,12 @@ describe("Engine project export", () => {
           special: "special",
           guard: "guard",
           hurt: "hurt",
+          walk: "walk",
+          jump: "jump",
           fallback: "static_metasprite"
         }
       }],
-      animations: ["idle", "attack", "special", "guard", "hurt"].map((name, index) => ({
+      animations: ["idle", "attack", "special", "guard", "hurt", "walk", "jump"].map((name, index) => ({
         id: `anim-${name}`,
         name,
         spriteSheet: "fighter.png",
@@ -2120,7 +2131,9 @@ describe("Engine project export", () => {
       attack: { asset: "fighter", frame_indices: [0, 1], loops: false },
       special: { asset: "fighter", frame_indices: [0, 1], loops: false },
       guard: { asset: "fighter", frame_indices: [0] },
-      hurt: { asset: "fighter", frame_indices: [0] }
+      hurt: { asset: "fighter", frame_indices: [0] },
+      walk: { asset: "fighter", frame_indices: [0] },
+      jump: { asset: "fighter", frame_indices: [0] }
     });
 
     const fallbackFields = buildLutaActorEngineSpriteExport(

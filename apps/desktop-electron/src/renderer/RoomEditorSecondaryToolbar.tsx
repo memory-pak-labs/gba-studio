@@ -1,11 +1,13 @@
-import { Box, Camera, Eye, EyeOff, Grid3X3, Image, Layers3, LayoutTemplate, Lock, Map as MapIcon, Monitor, ScanLine, Shield, Unlock, UserRound, Zap } from "lucide-react";
+import { uiText as ui, useStudioUiText } from "./studioUiText";
+import { Box, Camera, Eye, EyeOff, Grid3X3, Image, Layers3, LayoutTemplate, Lock, Monitor, ScanLine, Shield, Unlock, UserRound, X, Zap } from "lucide-react";
+import { useEffect, useId, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import type { LucideIcon } from "lucide-react";
 import { RoomCollisionFloatingToolbar } from "./RoomCollisionFloatingToolbar";
 import { RoomPaintFloatingToolbar } from "./RoomPaintFloatingToolbar";
 import type { RoomCanvasLayerID, RoomEditorToolPanelMode } from "../shared/roomsWorkspace/core";
 import type { RoomCollisionType, RoomTilePaintTool } from "../shared/roomsWorkspace";
 import type { RoomsWorkspaceRoom } from "../shared/roomsWorkspace/core";
-import { EditorPopover } from "./EditorPopover";
 import { WorkspaceContextToolbar } from "./studioUi";
 import { sceneTypeProfile } from "../shared/sceneTypeProfiles";
 
@@ -84,9 +86,10 @@ export function RoomEditorSecondaryToolbar({
   videoModeId,
   videoModeLabel
 }: RoomEditorSecondaryToolbarProps): React.ReactElement {
+  const ui = useStudioUiText();
   return (
     <WorkspaceContextToolbar
-      aria-label="Ferramentas contextuais do Editor"
+      aria-label={ui("Ferramentas contextuais do Editor")}
       className={[
         "rooms-editor-secondary-toolbar",
         selectedToolPanelMode === "collision" ? "is-collision-toolbar" : ""
@@ -96,9 +99,9 @@ export function RoomEditorSecondaryToolbar({
         {sceneActions}
       </div>
       {selectedToolPanelMode === "paint" || selectedToolPanelMode === "collision" || selectedToolPanelMode === "hud" ? (
-        <div className="rooms-editor-secondary-toolbar-tools" aria-label="Opções da ferramenta">
+        <div className="rooms-editor-secondary-toolbar-tools" aria-label={ui("Opções da ferramenta")}>
           <strong className="room-context-tool-label">
-            {selectedToolPanelMode === "paint" ? "Pintura" : selectedToolPanelMode === "collision" ? "Colisão" : "HUD"}
+            {selectedToolPanelMode === "paint" ? ui("Pintura") : selectedToolPanelMode === "collision" ? ui("Colisão") : ui("HUD")}
           </strong>
           {selectedToolPanelMode === "paint" ? (
             <RoomPaintFloatingToolbar
@@ -138,38 +141,86 @@ export function RoomEditorSecondaryToolbar({
   );
 }
 
-export function RoomEditorCanvasControls({ canvasLayerLocks, canvasLayerVisibility, minimapAvailable, minimapVisible, room, setCanvasLayerLock, setCanvasLayerVisibility, setMinimapVisible, hideMinimapToggle = false }: Pick<RoomEditorSecondaryToolbarProps, "canvasLayerLocks" | "canvasLayerVisibility" | "minimapAvailable" | "minimapVisible" | "room" | "setCanvasLayerLock" | "setCanvasLayerVisibility" | "setMinimapVisible"> & { hideMinimapToggle?: boolean }): React.ReactElement {
+export function RoomEditorCanvasControls({ canvasLayerLocks, canvasLayerVisibility, room, setCanvasLayerLock, setCanvasLayerVisibility }: Pick<RoomEditorSecondaryToolbarProps, "canvasLayerLocks" | "canvasLayerVisibility" | "room" | "setCanvasLayerLock" | "setCanvasLayerVisibility">): React.ReactElement {
+  const ui = useStudioUiText();
+  const [open, setOpen] = useState(false);
+  const rootRef = useRef<HTMLDivElement>(null);
+  const panelRef = useRef<HTMLDivElement>(null);
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  const panelID = useId();
   const layers = [...roomCanvasLayers, ...(room.runtime?.type === "menu" ? menuCanvasLayers : [])];
-  return <div className="room-canvas-layer-toolbar" aria-label="Visibilidade do canvas">
-    <EditorPopover label="Camadas" icon={<Layers3 aria-hidden="true" size={14} />} className="room-canvas-layers-popover">
+
+  function closePanel(): void {
+    setOpen(false);
+    triggerRef.current?.focus();
+  }
+
+  useEffect(() => { setOpen(false); }, [room.id]);
+  useEffect(() => {
+    if (!open) return;
+    const dismiss = (event: PointerEvent): void => {
+      if (event.target instanceof Node && !rootRef.current?.contains(event.target) && !panelRef.current?.contains(event.target)) setOpen(false);
+    };
+    const escape = (event: KeyboardEvent): void => {
+      if (event.key !== "Escape") return;
+      event.preventDefault();
+      event.stopPropagation();
+      closePanel();
+    };
+    window.addEventListener("pointerdown", dismiss);
+    window.addEventListener("keydown", escape, true);
+    return () => {
+      window.removeEventListener("pointerdown", dismiss);
+      window.removeEventListener("keydown", escape, true);
+    };
+  }, [open]);
+
+  const rail = rootRef.current?.closest(".room-editor-tool-rail");
+  const panel = open ? <div aria-label={ui("Camadas")} className="room-canvas-layers-panel" id={panelID} ref={panelRef} role="region">
+      <div className="room-canvas-layers-panel-header">
+        <strong>{ui("Camadas")}</strong>
+        <button aria-label={ui("Fechar painel de camadas")} onClick={closePanel} title={ui("Fechar")} type="button">
+          <X aria-hidden="true" size={14} />
+        </button>
+      </div>
       <div className="room-canvas-layer-controls">
-        {layers.map(([layer, label, Icon]) => <div className="room-canvas-layer-control" key={layer}>
-          <Icon aria-hidden="true" size={14} /><span>{label}</span>
-          <button aria-label={`${canvasLayerVisibility[layer] ? "Ocultar" : "Mostrar"} camada ${label}`}
+        {layers.map(([layer, label, Icon]) => {
+          const visibilityLabel = canvasLayerVisibility[layer] ? ui("Ocultar camada {0}", { 0: ui(label) }) : ui("Mostrar camada {0}", { 0: ui(label) });
+          const lockLabel = canvasLayerLocks[layer] ? ui("Desbloquear camada {0}", { 0: ui(label) }) : ui("Bloquear camada {0}", { 0: ui(label) });
+          return <div className="room-canvas-layer-control" key={layer}>
+          <Icon aria-hidden="true" size={14} /><span>{ui(label)}</span>
+          <button aria-label={visibilityLabel}
             aria-pressed={canvasLayerVisibility[layer]} onClick={() => setCanvasLayerVisibility(layer, !canvasLayerVisibility[layer])}
-            title={`${canvasLayerVisibility[layer] ? "Ocultar" : "Mostrar"} ${label}`} type="button">
+            title={visibilityLabel} type="button">
             {canvasLayerVisibility[layer] ? <Eye aria-hidden="true" size={14} /> : <EyeOff aria-hidden="true" size={14} />}
           </button>
-          <button aria-label={`${canvasLayerLocks[layer] ? "Desbloquear" : "Bloquear"} camada ${label}`}
+          <button aria-label={lockLabel}
             aria-pressed={canvasLayerLocks[layer]} onClick={() => setCanvasLayerLock(layer, !canvasLayerLocks[layer])}
-            title={`${canvasLayerLocks[layer] ? "Desbloquear" : "Bloquear"} ${label}`} type="button">
+            title={lockLabel} type="button">
             {canvasLayerLocks[layer] ? <Lock aria-hidden="true" size={14} /> : <Unlock aria-hidden="true" size={14} />}
           </button>
-        </div>)}
-        {(room.sceneType === "isometric" ? isometricOverlayLayers : isometricOverlayLayers.filter(([layer]) => layer === "cameraBounds")).map(([layer, label, Icon]) => <div className="room-canvas-layer-control is-visibility-only" key={layer}>
-          <Icon aria-hidden="true" size={14} /><span>{label}</span>
-          <button aria-label={`${canvasLayerVisibility[layer] ? "Ocultar" : "Mostrar"} overlay ${label}`}
+        </div>; })}
+        {(room.sceneType === "isometric" ? isometricOverlayLayers : isometricOverlayLayers.filter(([layer]) => layer === "cameraBounds")).map(([layer, label, Icon]) => {
+          const visibilityLabel = canvasLayerVisibility[layer] ? ui("Ocultar overlay {0}", { 0: ui(label) }) : ui("Mostrar overlay {0}", { 0: ui(label) });
+          return <div className="room-canvas-layer-control is-visibility-only" key={layer}>
+          <Icon aria-hidden="true" size={14} /><span>{ui(label)}</span>
+          <button aria-label={visibilityLabel}
             aria-pressed={canvasLayerVisibility[layer]} onClick={() => setCanvasLayerVisibility(layer, !canvasLayerVisibility[layer])}
-            title={`${canvasLayerVisibility[layer] ? "Ocultar" : "Mostrar"} ${label}`} type="button">
+            title={visibilityLabel} type="button">
             {canvasLayerVisibility[layer] ? <Eye aria-hidden="true" size={14} /> : <EyeOff aria-hidden="true" size={14} />}
           </button>
-        </div>)}
+        </div>; })}
       </div>
-    </EditorPopover>
-    {!hideMinimapToggle ? <button aria-label={`${minimapVisible ? "Ocultar" : "Mostrar"} minimapa`} aria-pressed={minimapVisible}
-      className="room-canvas-minimap-toggle" disabled={!minimapAvailable} onClick={() => setMinimapVisible(!minimapVisible)}
-      title={minimapAvailable ? `${minimapVisible ? "Ocultar" : "Mostrar"} minimapa` : "Minimapa disponível quando a cena ultrapassa o viewport"} type="button">
-      <MapIcon aria-hidden="true" size={13} /><span>Minimapa</span>
-    </button> : null}
+      </div> : null;
+
+  return <div className="room-canvas-layer-toolbar" aria-label={ui("Visibilidade do canvas")}>
+    <div className="room-canvas-layers-control" ref={rootRef}>
+      <button aria-label={ui("Camadas")} aria-expanded={open} aria-controls={panelID}
+        className="room-canvas-layers-toggle" onClick={() => setOpen(current => !current)} ref={triggerRef}
+        title={ui("Camadas")} type="button">
+        <Layers3 aria-hidden="true" size={16} strokeWidth={2.2} />
+      </button>
+      {panel && rail ? createPortal(panel, rail) : panel}
+    </div>
   </div>;
 }

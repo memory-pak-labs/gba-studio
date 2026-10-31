@@ -159,6 +159,7 @@ struct TopDownRoomMetadata {
     uint16_t backdrop_color;
     bool has_camera_bounds = false;
     Rect camera_bounds_pixels = Rect { 0, 0, 0, 0 };
+    bool player_enabled = true;
 };
 
 constexpr TopDownRoomMetadata default_room_metadata() {
@@ -212,7 +213,14 @@ struct TopDownRoomData {
     EventScript on_hit_group1 = empty_event_script();
     EventScript on_hit_group2 = empty_event_script();
     EventScript on_hit_group3 = empty_event_script();
+    // Opt-in ROM atlas. Its map contains source indices, not hardware entries.
+    const TileAsset* paged_source_tiles = nullptr;
+    EventScript on_restore = empty_event_script();
 };
+
+constexpr bool topdown_controlled_player_active(const TopDownRoomData& room, bool actor_active) {
+    return room.metadata.player_enabled && actor_active;
+}
 
 struct TopDownActorData {
     Vec2i position_pixels;
@@ -240,6 +248,7 @@ struct TopDownActorData {
     uint8_t push_priority = 0;
     bool pushable = false;
     TopDownAffineObjectData affine_obj = TopDownAffineObjectData {};
+    bool allow_diagonal = true;
 };
 
 struct TopDownActorSpriteData {
@@ -435,7 +444,9 @@ constexpr Actor actor_from_data(const TopDownActorData& actor) {
         actor.collision_mask,
         actor.collision_offset_pixels,
         actor.push_priority,
-        actor.pushable
+        actor.pushable,
+        128,
+        actor.allow_diagonal
     };
 }
 
@@ -459,23 +470,14 @@ constexpr TopDownActorRuntime actor_runtime_from_data(const TopDownActorData& ac
 }
 
 constexpr const SpriteAnimation* topdown_actor_animation_for_index(const TopDownActorData& actor, int animation_index) {
-    if (actor.animations != nullptr &&
-        animation_index >= 0 &&
-        static_cast<size_t>(animation_index) < actor.animation_count) {
-        return actor.animations[animation_index];
-    }
-    return actor.animation;
+    return sprite_animation_for_reference(actor.animations, actor.animation_count, actor.animation, animation_index);
 }
 
 constexpr const SpriteAnimation* topdown_actor_animation_for_index(
     const TopDownActorSpriteData& actor_sprite,
     int animation_index
 ) {
-    if (actor_sprite.animations != nullptr && animation_index >= 0 &&
-        static_cast<size_t>(animation_index) < actor_sprite.animation_count) {
-        return actor_sprite.animations[animation_index];
-    }
-    return actor_sprite.animation;
+    return sprite_animation_for_reference(actor_sprite.animations, actor_sprite.animation_count, actor_sprite.animation, animation_index);
 }
 
 constexpr Actor actor_from_npc(const TopDownNpcData& npc) {
@@ -503,8 +505,15 @@ constexpr Rect actor_rect(const Actor& actor) {
 
 constexpr Rect actor_interaction_rect(const Actor& actor) {
     Rect interaction = actor_rect(actor);
+    // A shallow foot box improves navigation, but must not make side-facing
+    // interaction require exact vertical alignment. Keep a square reach around
+    // the feet; this does not enlarge the physical collision box.
+    if (interaction.height < interaction.width) {
+        interaction.y -= (interaction.width - interaction.height) / 2;
+        interaction.height = interaction.width;
+    }
     const int reach_x = actor.size_pixels.x > 0 ? actor.size_pixels.x : 1;
-    const int reach_y = actor.size_pixels.y > 0 ? actor.size_pixels.y : 1;
+    const int reach_y = interaction.height > 0 ? interaction.height : 1;
     switch (static_cast<TopDownActorDirection>(actor.direction)) {
         case TopDownActorDirection::Down:
             interaction.height += reach_y;
@@ -689,12 +698,7 @@ inline size_t collect_visible_topdown_actor_draw_slots(
 }
 
 constexpr const SpriteAnimation* topdown_npc_animation_for_index(const TopDownNpcData& npc, int animation_index) {
-    if (npc.animations != nullptr &&
-        animation_index >= 0 &&
-        static_cast<size_t>(animation_index) < npc.animation_count) {
-        return npc.animations[animation_index];
-    }
-    return npc.animation;
+    return sprite_animation_for_reference(npc.animations, npc.animation_count, npc.animation, animation_index);
 }
 
 constexpr int actor_runtime_movement_speed_x100(const TopDownNpcData& npc, const TopDownActorRuntime& runtime) {
@@ -879,6 +883,9 @@ constexpr void apply_actor_event_command(
     case EventActorOp::SetActive:
         runtime.active = command.a != 0;
         break;
+    case EventActorOp::MoveTo:
+        // The scene runtime consumes this asynchronous request before this helper.
+        break;
     case EventActorOp::SetPosition:
         runtime.actor.position_pixels = Vec2i { command.a, command.b };
         break;
@@ -925,6 +932,8 @@ constexpr void apply_actor_event_command(
         runtime.movement_step_accumulator = 0;
         runtime.movement_frame_counter = 0;
         break;
+    case EventActorOp::VisibilityLantern:
+    case EventActorOp::VisibilityReveal:
     case EventActorOp::PushFacing:
     case EventActorOp::Push:
         break;
@@ -1315,6 +1324,21 @@ constexpr ResourceBankGroup resource_bank_group_from_topdown_room(const TopDownP
     return resource_bank_group_from_topdown_project(project, resource_bank_group_name_for_topdown_room(room));
 }
 
+constexpr bool is_valid_topdown_paged_background(const TopDownRoomData& room) {
+    if (room.paged_source_tiles == nullptr) return true;
+    const auto* map = room.visual_tilemap;
+    const auto* palette = room.visual_palette;
+    const auto& atlas = *room.paged_source_tiles;
+    return room.uses_visual_tilemap && map != nullptr && map->entries != nullptr &&
+        map->width == room.width_tiles && map->height == room.height_tiles &&
+        map->compression == AssetCompression::None &&
+        room.visual_tile_asset == room.paged_source_tiles && atlas.data != nullptr &&
+        atlas.tile_count > 0 && !atlas.object_tiles && atlas.color_depth == ColorDepth::Bpp8 &&
+        atlas.compression == AssetCompression::None && atlas.destination_tile == 0 &&
+        palette != nullptr && palette->colors != nullptr && palette->color_count > 0 &&
+        palette->color_count <= 224 && palette->start_index == 0;
+}
+
 constexpr bool is_valid_topdown_project_data(const TopDownProjectData& project) {
     if (project.rooms == nullptr ||
         project.room_count == 0 ||
@@ -1326,6 +1350,9 @@ constexpr bool is_valid_topdown_project_data(const TopDownProjectData& project) 
     }
     if (project.background_count > 0 && project.backgrounds == nullptr) {
         return false;
+    }
+    for (size_t index = 0; index < project.room_count; ++index) {
+        if (!is_valid_topdown_paged_background(project.rooms[index])) return false;
     }
     for (size_t index = 0; index < project.background_count; ++index) {
         if (!is_valid_topdown_background_data(project.backgrounds[index])) {

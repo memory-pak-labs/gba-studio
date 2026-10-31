@@ -1,4 +1,5 @@
 #include <cassert>
+#include <cstring>
 #include "gbs/menu.hpp"
 
 namespace {
@@ -599,6 +600,15 @@ static_assert(!gbs::is_valid_menu_project_data(invalid_project), "invalid line i
 } // namespace
 
 int main() {
+    gbs::MenuScreenData feedback_screen {};
+    assert(!feedback_screen.hud_feedback_in_details);
+    assert(std::strcmp(gbs::menu_hud_save_feedback_line(gbs::MenuSaveFeedback::Confirm, 0), "REGRAVAR?") == 0);
+    assert(std::strcmp(gbs::menu_hud_save_feedback_line(gbs::MenuSaveFeedback::Confirm, 1), "A SIM") == 0);
+    assert(std::strcmp(gbs::menu_hud_save_feedback_line(gbs::MenuSaveFeedback::Confirm, 2), "B NÃO") == 0);
+    assert(std::strcmp(gbs::menu_hud_save_feedback_line(gbs::MenuSaveFeedback::Saved, 1), "SALVO") == 0);
+    assert(std::strcmp(gbs::menu_hud_save_feedback_line(gbs::MenuSaveFeedback::Failed, 0), "FALHA AO") == 0);
+    assert(gbs::menu_hud_save_feedback_line(gbs::MenuSaveFeedback::Failed, 3) == nullptr);
+    assert(gbs::menu_hud_save_feedback_line(gbs::MenuSaveFeedback::None, 0) == nullptr);
     static_assert(gbs::menu_name_field_padding_cells("Nara", 8) == 2);
     static_assert(gbs::menu_name_field_padding_cells("MATHEUSX", 8) == 0);
     static_assert(gbs::menu_name_field_padding_cells("João", 8) == 2);

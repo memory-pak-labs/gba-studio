@@ -2,6 +2,13 @@ import { describe, expect, it } from "vitest";
 import { auditProjectTilemapWarnings, auditProjectTilemapBlockingErrors, tilemapAuditWarningLabels, tilemapGbaMaxTileIndex } from "./tilemapAudit.js";
 
 describe("auditProjectTilemapWarnings", () => {
+  it("validates affine racing editor source cells separately from deduplicated hardware tiles",()=>{
+    const room={name:'race',runtime:{type:'racing',config:{presentation:'pseudo3d',topdownTrack:{},pseudo3dVisuals:{floorTilemapId:'floor.png'}}},tilemap:[0,1,4096]};
+    const data={scenas:[room],assets:[{name:'floor.png',metadata:{width:512,height:512}}]};
+    expect(auditProjectTilemapWarnings(data)).toEqual([]);
+    room.tilemap=[4097];
+    expect(auditProjectTilemapBlockingErrors(data).join(' ')).toMatch(/4097/);
+  });
   it("flags tile indices above the GBA practical limit", () => {
     const warnings = auditProjectTilemapWarnings({
       scenas: [

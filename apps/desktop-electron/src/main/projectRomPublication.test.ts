@@ -51,3 +51,13 @@ describe("project ROM publication", () => {
     await expect(publishEnginePackRomToProjectRoot(result, path.join(root, "game.gba-project"))).resolves.toEqual(result);
   });
 });
+
+it("keeps the event source map beside the copied Play ROM", async () => {
+  const root = await mkdtemp(path.join(os.tmpdir(), "gbastudio-source-map-")); temporaryRoots.push(root);
+  const buildDir = path.join(root, "build"); await mkdir(buildDir);
+  const romPath = path.join(buildDir, "game.gba"); await writeFile(romPath, "rom");
+  const map = { schema: 1, romSha256: "hash", entries: [{ address: 0x08000000, eventID: "door", stepID: "open" }] };
+  await writeFile(path.join(buildDir, "event_source_map.json"), JSON.stringify(map));
+  await publishEnginePackRomToProjectRoot({ ran: true, exitCode: 0, summary: { target: "game", projectDir: root, buildDir, romPath } }, path.join(root, "game.gba-project"));
+  await expect(readFile(path.join(root, "game.gba.events.json"), "utf8")).resolves.toBe(JSON.stringify(map));
+});

@@ -1,3 +1,4 @@
+import { uiText as ui, useStudioUiText } from "./studioUiText";
 import { useEffect, useState } from "react";
 
 import {
@@ -14,6 +15,7 @@ const fontSizeOptions: Array<{ value: StudioUiFontSize; label: string }> = [
 ];
 
 export function StudioUiFontSizeControl(): React.ReactElement {
+  const ui = useStudioUiText();
   const [fontSize, setFontSize] = useState<StudioUiFontSize>(() => readStudioUiFontSize());
 
   useEffect(() => {
@@ -27,8 +29,8 @@ export function StudioUiFontSizeControl(): React.ReactElement {
 
   return (
     <fieldset className="settings-ui-font-size-control">
-      <legend id="settings-ui-font-size-label">Tamanho da interface</legend>
-      <p>Altera a leitura do editor neste dispositivo.</p>
+      <legend id="settings-ui-font-size-label">{ui("Tamanho da interface")}</legend>
+      <p>{ui("Altera a leitura do editor neste dispositivo.")}</p>
       <div aria-labelledby="settings-ui-font-size-label" role="radiogroup">
         {fontSizeOptions.map((option) => (
           <label key={option.value}>
@@ -39,7 +41,7 @@ export function StudioUiFontSizeControl(): React.ReactElement {
               type="radio"
               value={option.value}
             />
-            <span>{option.label}</span>
+            <span>{ui(option.label)}</span>
           </label>
         ))}
       </div>

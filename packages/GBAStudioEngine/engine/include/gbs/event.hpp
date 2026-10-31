@@ -175,7 +175,10 @@ enum class EventOp : uint8_t {
     OpenMenu = 159,
     OpenShop = 160,
     SetAdventureState = 161,
-    DrawText = 162
+    DrawText = 162,
+    Visibility = 163,
+    MoveActorTo = 164,
+    MoveActorRelative = 165
 };
 
 enum class VisualEffectKind : uint8_t {
@@ -242,6 +245,8 @@ struct EventCommand {
     int16_t d = 0;
 };
 
+static_assert(sizeof(EventCommand) == 10, "source maps use the fixed native command stride");
+
 struct EventScript {
     const EventCommand* commands;
     size_t command_count;
@@ -269,8 +274,13 @@ enum class EventActorOp : uint8_t {
     SetSprite = 12,
     Push = 13,
     CancelMovement = 14,
-    PushFacing = 15
+    PushFacing = 15,
+    VisibilityLantern = 16,
+    VisibilityReveal = 17,
+    MoveTo = 18
 };
+
+struct EventRunner;
 
 struct EventActorCommand {
     EventActorOp op;
@@ -279,6 +289,8 @@ struct EventActorCommand {
     int b;
     int c = 0;
     int d = 0;
+    EventRunner* motion_owner = nullptr;
+    uint32_t motion_token = 0;
 };
 
 struct EventDrawText { int line=-1; int x=0; int y=0; bool overlay=true; };
@@ -291,6 +303,7 @@ struct EventTileCommand {
     int tile;
     int count;
     int tile_asset;
+    int collision_flags = -1;
 };
 
 constexpr size_t max_event_actor_commands = 8;
@@ -407,12 +420,15 @@ struct EventSceneStackEntry {
 };
 
 struct EventState {
+    bool supports_temporal_actor_motion;
+    uint32_t actor_motion_serial;
     EventCommand luta_commands[max_event_luta_commands];
     size_t luta_command_count;
     int current_room;
     int player_x;
     int player_y;
     int player_direction;
+    uint8_t racing_result = 0;
     int actor_condition_tile_size;
     uint16_t input_held;
     uint16_t input_pressed;
@@ -469,10 +485,12 @@ struct EventState {
     int actor_y[max_event_actor_state_slots];
     int actor_direction[max_event_actor_state_slots];
     bool actor_animation_playing[max_event_actor_state_slots];
+    bool player_animation_playing;
     bool actor_update_script_enabled[max_event_actor_state_slots];
     int player_walk_speed;
     int player_run_speed;
     int player_stamina_cost;
+    uint16_t player_run_button;
     int player_movement_state;
     int player_movement_tile_tag;
     bool platformer_state_changed;
@@ -483,6 +501,7 @@ struct EventState {
     int clock_minutes_per_tick;
     int clock_frames_per_tick;
     bool clock_hud_enabled;
+    int clock_variable;
     int stats[max_event_stats];
     int stat_max[max_event_stats];
     int hud_stat_bar_stat;
@@ -518,6 +537,7 @@ struct EventState {
     bool audio_fade_changed;
     int audio_fade_channel;
     int audio_fade_target_volume;
+    int audio_fade_ceiling_volume;
     int audio_fade_frames;
     bool all_sprites_visible_changed;
     bool all_sprites_visible;
@@ -597,11 +617,15 @@ struct EventState {
     int platform_callback_scripts[max_event_platform_callbacks];
     int adventure_callback_scripts[max_event_adventure_callbacks];
     bool scene_type_paused[max_event_scene_types];
+    const EventScript* project_scripts;
+    size_t project_script_count;
+    bool script_call_overflow;
 };
 
 // Requested includes the cover phase; pending means ready for adapter handoff.
 bool runtime_transition_requested();
 bool runtime_transition_pending();
+void cancel_runtime_transition();
 RuntimeKind runtime_transition_target();
 bool runtime_transition_route(RuntimeTransitionRoute& route);
 bool request_runtime_save_restore(RuntimeKind runtime, int slot_index);
@@ -614,11 +638,23 @@ bool consume_runtime_transition(
     int& player_y
 );
 
+constexpr size_t max_event_script_call_depth = 8;
+
+struct EventScriptCallFrame {
+    uint32_t script_index;
+    uint32_t command_index;
+};
+
 struct EventRunner {
     EventScript script;
     size_t command_index;
     bool active;
+    bool yielded;
+    bool actor_motion_pending;
+    uint32_t actor_motion_token;
     size_t step_budget;
+    EventScriptCallFrame calls[max_event_script_call_depth];
+    size_t call_depth;
 };
 
 void format_event_clock(const EventState& state, char (&display)[6]);
@@ -673,6 +709,7 @@ constexpr void reset_event_tile_commands(EventState& state) {
 }
 
 void init_event_state(EventState& state);
+void bind_event_scripts(EventState& state, const EventScript* scripts, size_t count);
 void set_event_player_actor_state(EventState& state, int x, int y, int direction, int tile_size);
 void set_event_input_state(EventState& state, uint16_t held, uint16_t pressed, uint16_t released);
 void set_event_actor_animation_state(EventState& state, int actor_index, bool playing);
@@ -682,6 +719,8 @@ int event_actor_effect_offset_x(const EventState& state, int actor_index);
 bool update_button_event_bindings(EventState& state);
 bool button_event_binding_overrides_default(const EventState& state, uint16_t buttons);
 bool update_timer_event_bindings(EventState& state);
+using EventCommandConsumer = void (*)(EventState& state, void* context);
+void run_event_script_consuming(EventState& state, EventScript script, EventCommandConsumer consumer, void* context = nullptr);
 void run_event_script(EventState& state, EventScript script);
 void run_event_script(EventState& state, const EventCommand* commands, size_t count);
 void clear_event_actor_commands(EventState& state);
@@ -695,6 +734,7 @@ bool adventure_callback_script(const EventState& state, int callback_index, int&
 void init_event_runner(EventRunner& runner);
 void start_event_runner(EventRunner& runner, EventScript script);
 void stop_event_runner(EventRunner& runner);
+void complete_event_actor_movement(EventRunner& runner, uint32_t token);
 bool update_event_runner(EventRunner& runner, EventState& state);
 uint16_t resolve_event_tile(const EventTileCommand& command, const TileAsset* assets, size_t asset_count);
 constexpr bool event_runner_is_active(const EventRunner& runner) {

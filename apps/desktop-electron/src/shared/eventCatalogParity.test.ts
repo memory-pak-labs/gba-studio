@@ -6,8 +6,10 @@ import { deriveEventsWorkspacePresentation, filterEventsCommandSuggestions, prep
 
 describe("GB Studio event authoring vocabulary", () => {
   it("preserves every historical ID and explicitly records the new authoring contracts", () => {
-    const identity = JSON.stringify(eventCommandCatalog.map(d => d.id));
-    expect(eventCommandCatalog).toHaveLength(200);
+    const additions = ["scene.lantern", "scene.reveal_area", "scene.clear_visibility", "scene.set_map_state"];
+    const identity = JSON.stringify(eventCommandCatalog.filter(d => !additions.includes(d.id)).map(d => d.id));
+    expect(eventCommandCatalog).toHaveLength(204);
+    expect(eventCommandCatalog.filter(d => additions.includes(d.id)).map(d => d.id)).toEqual(additions);
     expect(createHash("sha256").update(identity).digest("hex")).toBe("5b43298c2f390e41100e4381382c7dce4f1adba5faeff8fa073d867a15a735a8");
   });
 

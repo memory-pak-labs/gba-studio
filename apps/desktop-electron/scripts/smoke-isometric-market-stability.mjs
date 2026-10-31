@@ -5,6 +5,7 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import {
+  prepareElectronSmokeLocale,
   createElectronSmokeEnv,
   copySmokeProject,
   cdpSession,
@@ -265,6 +266,7 @@ async function run() {
     await cdp.ready;
     try {
       await cdp.send("Page.enable");
+      await prepareElectronSmokeLocale(cdp);
       await waitForRenderedText(cdp, (text) => text.includes("Cenas") && text.includes(sceneName), "projeto completo");
       await clickEditorWorkspace(cdp);
       await waitForRenderedText(cdp, (text) => text.includes("Ferramentas do Editor") && text.includes(sceneName), "workspace Editor");

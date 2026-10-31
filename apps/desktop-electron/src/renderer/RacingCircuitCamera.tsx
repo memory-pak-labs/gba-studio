@@ -1,3 +1,4 @@
+import { uiText as ui, useStudioUiText } from "./studioUiText";
 import { useEffect, useRef, useState } from "react";
 import { racingCameraFloorLine } from "../shared/racingCameraProjection";
 import { racingFloorSourceTileIndex } from "../shared/racingAuthoring";
@@ -6,6 +7,7 @@ import type { RoomsWorkspaceEntity, RoomsWorkspaceRoom } from "../shared/roomsWo
 
 export function RacingCircuitCamera({room,config,floorURL,panoramaURL,player,playerURL}:{room:RoomsWorkspaceRoom;config:RacingSceneConfig;
   floorURL:string|null;panoramaURL:string|null;player:RoomsWorkspaceEntity|null;playerURL:string|null}) {
+  const ui = useStudioUiText();
   const canvas=useRef<HTMLCanvasElement>(null);
   const [error,setError]=useState("");
   useEffect(()=>{
@@ -48,5 +50,5 @@ export function RacingCircuitCamera({room,config,floorURL,panoramaURL,player,pla
     }).catch(reason=>{if(!cancelled)setError(reason instanceof Error?reason.message:"Prévia indisponível");});
     return ()=>{cancelled=true;};
   },[room,config,floorURL,panoramaURL,player,playerURL]);
-  return <><canvas ref={canvas} width={240} height={160} aria-label="Circuito em perspectiva na posição de largada" style={{position:"absolute",inset:0,width:"100%",height:"100%",zIndex:2,imageRendering:"pixelated"}}/>{error?<span role="status">{error}</span>:null}</>;
+  return <><canvas ref={canvas} width={240} height={160} aria-label={ui("Circuito em perspectiva na posição de largada")} style={{position:"absolute",inset:0,width:"100%",height:"100%",zIndex:2,imageRendering:"pixelated"}}/>{error?<span role="status">{ui(error)}</span>:null}</>;
 }

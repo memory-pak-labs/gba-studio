@@ -33,6 +33,9 @@ export const EXEMPLO_SCENE_BATCHES = Object.freeze([
       "creditos",
       "missoes",
       "inventario",
+      "inventario_ferramentas",
+      "corrida_preparacao",
+      "corrida_resultados",
       "mapa_menu",
       "salvar",
       "menu_start"
@@ -47,6 +50,8 @@ export const EXEMPLO_SCENE_BATCHES = Object.freeze([
       "prologo",
       "porto_lumen",
       "farol_interior",
+      "galeria_das_mares",
+      "sala_mare_vazante",
       "penedos_vento",
       "armazem_das_mares",
       "observatorio_do_farol",
@@ -74,7 +79,8 @@ export const EXEMPLO_SCENE_BATCHES = Object.freeze([
       "tempestade",
       "guardiao_rele",
       "arena_arrancada",
-      "circuito_final"
+      "circuito_final",
+      "circuito_perspectiva"
     ]),
     focus: "visual novel, SHMUP, batalha RPG, luta e racing"
   }),

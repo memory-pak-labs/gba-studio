@@ -80,6 +80,19 @@
   position: absolute;
 }
 
+.studio-language-label {
+  color: var(--studio-color-text-secondary);
+  font-size: var(--studio-font-size-sm);
+  font-weight: var(--studio-font-weight-semibold);
+  margin-inline-end: auto;
+}
+
+.studio-language-chevron {
+  flex-shrink: 0;
+  height: 14px;
+  width: 14px;
+}
+
 .studio-language-switcher:has(select:focus-visible) {
   box-shadow: var(--studio-focus-ring);
 }

@@ -28,6 +28,7 @@ constexpr int dialogue_frame_top = 1;
 constexpr int dialogue_frame_center = 2;
 constexpr int dialogue_frame_battle_prompt = 3;
 constexpr int dialogue_frame_battle_menu = 4;
+constexpr int dialogue_frame_full_width = 5;
 constexpr size_t dialogue_font_tile_count = GBS_TEXT_GLYPH_COUNT;
 constexpr size_t dialogue_page_character_capacity =
     dialogue_wrap_columns_max * dialogue_wrap_rows_max + dialogue_wrap_rows_max + 1;
@@ -46,6 +47,10 @@ struct DialogueUiConfig {
     /** Dialogue box dimensions in 8px tiles; one tile remains as bottom margin. */
     int box_width_tiles = dialogue_box_width_tiles_default;
     int box_height_tiles = dialogue_box_height_tiles_default;
+    /** Opt-in 224x40 lower panel with a 48px portrait and integrated 16px name tab. */
+    bool portrait_tab = false;
+    /** Scene opts into a 240x40 lower dialogue panel. */
+    bool full_width_bottom = false;
 };
 
 struct DialoguePortraitEntry {
@@ -77,8 +82,8 @@ struct HudBoxConfig {
     uint8_t height;
 };
 
-enum class HudValueSource : int8_t { None = -1, P1Health, P2Health, RoundTime, P1Rounds, P2Rounds, Score, Lives };
-constexpr size_t hud_value_source_count = 7;
+enum class HudValueSource : int8_t { None = -1, P1Health, P2Health, RoundTime, P1Rounds, P2Rounds, Score, Lives, P1Super, P2Super, Wave };
+constexpr size_t hud_value_source_count = 10;
 
 /** Author-authored HUD composition exported for the native runtime. Positions
  * and dimensions are expressed in viewport pixels and snapped to 8px tiles. */
@@ -99,6 +104,11 @@ struct HudLayoutComponent {
     HudValueSource value_source = HudValueSource::None;
     HudGauge gauge {};
     const MetaSprite* state_assets[2] = {nullptr,nullptr};
+    int16_t value_variable = -1;
+    int16_t inventory_item = -1;
+    uint32_t value_maximum = 100;
+    uint8_t text_advance = 8;
+    bool foreground_image = false;
 };
 
 struct HudLayout {
@@ -106,6 +116,11 @@ struct HudLayout {
     const char* mode;
     const HudLayoutComponent* components;
     size_t component_count;
+    const uint8_t* font_tiles = nullptr;
+    int32_t font_color = -1;
+    int32_t font_shadow_color = -1;
+    const MetaSprite* selector_metasprite = nullptr;
+    const char* text_profile = nullptr;
 };
 
 constexpr HudBoxConfig default_hud_box_config() {

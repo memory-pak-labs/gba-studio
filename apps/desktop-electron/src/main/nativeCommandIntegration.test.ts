@@ -124,7 +124,7 @@ describe("native command integration", () => {
 
   it("classifies every catalog entry without mistaking pending handlers for native support", () => {
     const matrix = buildEventCommandSupportMatrix();
-    expect(matrix).toHaveLength(200);
+    expect(matrix).toHaveLength(204);
     expect(matrix.filter(entry => entry.status === "unknown")).toEqual([]);
     expect(matrix.filter(entry => entry.status === "pending")).toHaveLength(0);
     expect(matrix.filter(entry => entry.status === "not-applicable")).toHaveLength(2);

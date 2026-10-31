@@ -330,6 +330,7 @@ const CAPABILITY_SETTINGS: Partial<Record<SceneFeatureModule, readonly SceneCapa
   ],
   inventory: [
     { key: "item", type: "number" },
+    { key: "itemKey", type: "string" },
     { key: "label", type: "string" },
     { key: "initialQuantity", type: "number" },
     { key: "healAmount", type: "number" }
@@ -857,5 +858,19 @@ export function resolveDungeonCrawlerFeatureRuntime(value?: unknown): DungeonCra
         rewardQuantity: boundedSetting(battleSettings.rewardQuantity, 1, 0, 999)
       }
     } : {})
+  };
+}
+
+export function resolveBattleRpgInventory(value?: unknown): {
+  itemKey: string; label: string; initialQuantity: number; healAmount: number;
+} | undefined {
+  const inventory = moduleSettings(resolveSceneFeatureModules("battleRpg", value).modules, "inventory");
+  if (!inventory?.enabled) return undefined;
+  const config = inventory.settings;
+  return {
+    itemKey: stringSetting(config.itemKey, "potion"),
+    label: stringSetting(config.label, "ITEM"),
+    initialQuantity: boundedSetting(config.initialQuantity, 0, 0, 999),
+    healAmount: boundedSetting(config.healAmount, 1, 1, 999)
   };
 }

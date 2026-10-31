@@ -75,7 +75,10 @@ void update_race_progress(RacingRuntimeState& state, const RacingRoomData& room,
         }
     }
 
-    state.rival_distance_x256 += positive_per_frame(config.rival_speed_x256_per_second);
+    const bool has_rivals = !racing_uses_circuit_track(room) || room.actor_count > 0;
+    if (has_rivals) {
+        state.rival_distance_x256 += positive_per_frame(config.rival_speed_x256_per_second);
+    }
     const unsigned int checkpoints_per_lap = racing_uses_circuit_track(room)
         ? static_cast<unsigned int>(room.topdown_track->checkpoint_count)
         : config.checkpoints_per_lap;
@@ -86,7 +89,7 @@ void update_race_progress(RacingRuntimeState& state, const RacingRoomData& room,
         state.race_result = static_cast<uint8_t>(RacingRaceResult::Victory);
         return;
     }
-    if (track_length > 0 &&
+    if (has_rivals && track_length > 0 &&
         state.rival_distance_x256 / track_length >= config.laps_to_win) {
         state.race_result = static_cast<uint8_t>(RacingRaceResult::Defeat);
     }
@@ -100,6 +103,7 @@ bool tick_racing_vehicle(RacingRuntimeState& state, const RacingRoomData& room, 
     if (racing_result(state) != RacingRaceResult::InProgress) {
         return true;
     }
+    if (state.elapsed_frames != 0xffffffffu) ++state.elapsed_frames;
     if (input.use_item && state.boost_charges > 0 && state.boost_frames == 0) {
         --state.boost_charges;
         state.boost_frames = 45;
@@ -175,16 +179,15 @@ bool tick_racing_vehicle(RacingRuntimeState& state, const RacingRoomData& room, 
     if (blocked) {
         state.speed_x256 = 0;
         state.collision_frames=12;
+        if(state.boost_frames>0) --state.boost_frames;
         update_race_progress(state,room,previous_position);
         return false;
     }
 
     state.position_x256 = target_x256;
     state.position_y256 = target_y256;
-    state.speed_x256 = clamp_speed(
-        state.speed_x256,
-        racing_surface_speed_limit_x256(room, target_pixels)
-    );
+    const int surface_limit=racing_surface_speed_limit_x256(room,target_pixels);
+    state.speed_x256=clamp_speed(state.speed_x256,surface_limit>=room.config.max_speed_x256?maximum_speed:surface_limit);
     state.distance_x256 += state.speed_x256;
     if (completed_lap) ++state.lap_count;
     if (state.boost_frames > 0) {

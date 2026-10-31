@@ -66,6 +66,12 @@ export interface AssetPackCompressionCandidate {
 
 export interface AssetPackBudgetReport {
   schema: number;
+  allocations?: Array<{
+    bank_group?: string;
+    bank_groups?: string[];
+    omitted?: boolean;
+    allocations?: Record<string, { start: number; count: number }>;
+  }>;
   budget_summary?: Record<string, AssetPackBudgetUsage>;
   group_pressure_report?: AssetPackPressureReport[];
   room_pressure_report?: AssetPackPressureReport[];
@@ -93,6 +99,8 @@ export interface ProjectBudgetAnalysisResult {
 }
 
 export interface ProjectBudgetMetric {
+  /** The image must be compiled before its unique tile count is known. */
+  pending?: boolean;
   id: string;
   label: string;
   used: number;
@@ -118,6 +126,7 @@ export interface ProjectBudgetFragmentationItem {
 }
 
 export interface ProjectBudgetDmaDiagnostic {
+  pending?: boolean;
   estimatedBytes: number;
   budgetBytes: number;
   percent: number;
@@ -297,6 +306,15 @@ function estimateSceneMetrics(data: GBAProjectData, sceneName: string): ProjectB
   const room = rooms.find((candidate) => stringValue(candidate.name) === sceneName) ?? rooms[0] ?? {};
   const tiles = roomTileIDs(room).filter((tile) => tile > 0);
   const uniqueTiles = new Set(tiles);
+  const runtime = isRecord(room.runtime) ? room.runtime : {};
+  const config = isRecord(runtime.config) ? runtime.config : {};
+  const visuals = isRecord(config.pseudo3dVisuals) ? config.pseudo3dVisuals : {};
+  const affineFloor = (runtime.type === "racing" || room.sceneType === "racing") && config.presentation === "pseudo3d";
+  const floorName = stringValue(visuals.floorTilemapId) || stringValue(room.backgroundAssetName);
+  const floorAsset = records(data, "assets").find(asset => asset.name === floorName || asset.id === floorName);
+  const floorMetadata = floorAsset && isRecord(floorAsset.metadata) ? floorAsset.metadata : {};
+  const measuredFloorTiles = typeof floorMetadata.tileCount === "number" && Number.isInteger(floorMetadata.tileCount) && floorMetadata.tileCount >= 0
+    ? floorMetadata.tileCount : null;
   const actors = records(data, "actors").filter((actor) => actorRoomName(actor) === sceneName);
   const actorTiles = actors.map((actor) => actorTileCount(data, actor));
   const spriteSheets = new Set(actors.map((actor) => stringValue(actor.spriteSheet)).filter(Boolean));
@@ -327,15 +345,18 @@ function estimateSceneMetrics(data: GBAProjectData, sceneName: string): ProjectB
   }
 
   const estimates: Record<string, number> = {
-    bg_tiles: uniqueTiles.size,
-    affine_bg_tiles: 0,
+    bg_tiles: affineFloor ? 0 : uniqueTiles.size,
+    affine_bg_tiles: affineFloor ? measuredFloorTiles ?? 0 : 0,
     obj_tiles: actorTiles.reduce((total, count) => total + count, 0),
     oam_sprites: actors.reduce((total, actor) => total + actorOamCount(data, actor), 0),
     bg_palette_colors: bgPaletteColors,
     obj_palette_colors: objPaletteColors,
     pcm_bytes: 0
   };
-  return resourceOrder.map((id) => metricFromValues(id, estimates[id] ?? 0, resourceMetadata[id].capacity));
+  return resourceOrder.map((id) => ({
+    ...metricFromValues(id, estimates[id] ?? 0, resourceMetadata[id].capacity),
+    ...(id === "affine_bg_tiles" && affineFloor && measuredFloorTiles === null ? { pending: true } : {})
+  }));
 }
 
 function projectMetrics(report: AssetPackBudgetReport): ProjectBudgetMetric[] {
@@ -360,6 +381,26 @@ function pressureReport(report: AssetPackBudgetReport, sceneName: string): Asset
     ?? (reports.length === 1 ? reports[0] : undefined);
 }
 
+function affineAllocationCount(report: AssetPackBudgetReport, sceneName: string): number | undefined {
+  const groupNames = new Set([sceneName, projectBudgetSceneGroupName(sceneName)]);
+  // Affine tiles have physical allocations but are absent from assetc's generic
+  // bank plan. Merge shared intervals instead of counting aliases twice.
+  const ranges = (report.allocations ?? []).filter(asset => !asset.omitted
+    && [asset.bank_group, ...(asset.bank_groups ?? [])].some(group => group && groupNames.has(group)))
+    .flatMap(asset => {
+      const range = asset.allocations?.affine_bg_tiles;
+      return range && Number.isFinite(range.start) && Number.isFinite(range.count) && range.start >= 0 && range.count >= 0
+        ? [{ start: range.start, end: range.start + range.count }] : [];
+    }).sort((a, b) => a.start - b.start);
+  if (!ranges.length) return undefined;
+  let used = 0, end = 0;
+  for (const range of ranges) {
+    used += Math.max(0, range.end - Math.max(end, range.start));
+    end = Math.max(end, range.end);
+  }
+  return used;
+}
+
 function compiledSceneMetrics(report: AssetPackBudgetReport, sceneName: string): { assets: string[]; metrics: ProjectBudgetMetric[] } {
   const bankGroup = sceneBankGroup(report, sceneName);
   if (bankGroup) {
@@ -367,6 +408,8 @@ function compiledSceneMetrics(report: AssetPackBudgetReport, sceneName: string):
       result[bank.resource] = (result[bank.resource] ?? 0) + Math.max(0, finiteNumber(bank.count));
       return result;
     }, {});
+    const affineTiles = affineAllocationCount(report, sceneName);
+    if (counts.affine_bg_tiles === undefined && affineTiles !== undefined) counts.affine_bg_tiles = affineTiles;
     return {
       assets: bankGroup.assets,
       metrics: resourceOrder.map((id) => metricFromValues(id, counts[id] ?? 0, report.budget_summary?.[id]?.capacity ?? resourceMetadata[id].capacity))
@@ -428,7 +471,7 @@ function dmaDiagnostic(
   const byID = new Map(metrics.map((metric) => [metric.id, metric.used]));
   const estimatedBytes =
     ((byID.get("bg_tiles") ?? 0) * 32)
-    + ((byID.get("affine_bg_tiles") ?? 0) * 32)
+    + ((byID.get("affine_bg_tiles") ?? 0) * 64)
     + ((byID.get("obj_tiles") ?? 0) * 32)
     + ((byID.get("bg_palette_colors") ?? 0) * 2)
     + ((byID.get("obj_palette_colors") ?? 0) * 2)
@@ -453,7 +496,8 @@ function dmaDiagnostic(
     percent,
     tone,
     uploadCount,
-    action
+    action,
+    ...(metrics.some(metric => metric.pending) ? { pending: true } : {})
   };
 }
 

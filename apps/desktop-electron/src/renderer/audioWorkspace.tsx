@@ -1,3 +1,4 @@
+import { uiText as ui, useStudioUiText } from "./studioUiText";
 import { Play, Square, Plus, Minus, Search, Upload, Music2, AudioLines, ListFilter, AlertTriangle, SlidersHorizontal, X } from "lucide-react";
 import { AudioGroovePiano, grooveTrackName, grooveHardwareLabel, grooveTrackTone } from "./AudioGroovePiano";
 import type { UpdateAudioInstrumentFields } from "../shared/audioInstruments.js";
@@ -124,30 +125,30 @@ function audioEditor(
   onUpdateAudioFields: AudioWorkspaceProps["onUpdateAudioFields"]
 ): React.ReactElement {
   return (
-    <div className="audio-editor" aria-label={`Editar ${item.name}`}>
-      <label><span>Tipo</span><input readOnly value={item.kind === "Musica" ? "Música" : item.kind} /></label>
-      <label><span>Formato</span><input readOnly value={item.format} /></label>
+    <div className="audio-editor" aria-label={ui("Editar {0}", { 0: item.name })}>
+      <label><span>{ui("Tipo")}</span><input readOnly value={item.kind === "Musica" ? "Música" : item.kind} /></label>
+      <label><span>{ui("Formato")}</span><input readOnly value={item.format} /></label>
       <div className="audio-reference-field">
-        <span>Cena relacionada</span>
+        <span>{ui("Cena relacionada")}</span>
         <ProjectReferencePicker
-          ariaLabel="Cena relacionada"
-          emptyLabel="Sem cena"
-          invalidLabel="Cena não encontrada"
+          ariaLabel={ui("Cena relacionada")}
+          emptyLabel={ui("Sem cena")}
+          invalidLabel={ui("Cena não encontrada")}
           onChange={(assignedScene) => onUpdateAudioFields(item.id, { assignedScene })}
           options={[{ value: "Global", label: "Global", detail: "Todo o projeto" }, ...sceneOptions]}
           value={item.assignedScene ?? ""}
         />
       </div>
-      <p className="muted">A cena relacionada organiza a biblioteca. Para tocar, use a música da cena ou um evento.</p>
+      <p className="muted">{ui("A cena relacionada organiza a biblioteca. Para tocar, use a música da cena ou um evento.")}</p>
       {item.origin === "Composto" ? <InspectorRange
         defaultValue={80}
-        description="Ganho geral aplicado a todas as vozes da composição."
-        label="Volume geral"
+        description={ui("Ganho geral aplicado a todas as vozes da composição.")}
+        label={ui("Volume geral")}
         max={100} min={0}
         onChange={(volume) => onUpdateAudioFields(item.id, { volume })}
         presets={[{ label: "0", value: 0 }, { label: "50", value: 50 }, { label: "80", value: 80 }, { label: "100", value: 100 }]}
         unit="%" value={item.volume ?? 80}
-      /> : <p className="muted">Andamento e volume vêm do arquivo importado.</p>}
+      /> : <p className="muted">{ui("Andamento e volume vêm do arquivo importado.")}</p>}
     </div>
   );
 }
@@ -167,36 +168,33 @@ function audioPatternSequence(
   const activePatternID = item.activePatternID ?? item.patterns[0]?.id ?? null;
 
   return (
-    <div className="audio-pattern-sequence" aria-label={`Sequência de padrões de ${item.name}`}>
-      <div className="audio-sequence-toolbar" role="toolbar" aria-label="Ferramentas de sequencia">
-        <button onClick={() => onCreateAudioPattern(item.id)} type="button">+ Adicionar</button>
+    <div className="audio-pattern-sequence" aria-label={ui("Sequência de padrões de {0}", { 0: item.name })}>
+      <div className="audio-sequence-toolbar" role="toolbar" aria-label={ui("Ferramentas de sequencia")}>
+        <button onClick={() => onCreateAudioPattern(item.id)} type="button">{ui("+ Adicionar")}</button>
         <button
           disabled={!activePatternID}
           onClick={() => activePatternID && onDuplicatePattern(item.id, activePatternID, item.activePatternName ?? "Pattern")}
           type="button"
         >
-          Duplicar
-        </button>
+          {ui("Duplicar")}</button>
         <button
           disabled={!activePatternID}
           onClick={() => activePatternID && onRemoveAudioPattern(item.id, activePatternID, item.activePatternName ?? "Pattern")}
           type="button"
         >
-          Remover
-        </button>
+          {ui("Remover")}</button>
         <button disabled={item.patternSequence.length === 0} onClick={() => onClearPatternSequence(item.id)} type="button">
-          Limpar
-        </button>
+          {ui("Limpar")}</button>
       </div>
       <div className="audio-sequence-active-pattern">
-        <span>Pattern ativo</span>
-        <strong>{item.activePatternName ?? "Sem pattern"}</strong>
-        <em>{item.stepCount} passos</em>
+        <span>{ui("Pattern ativo")}</span>
+        <strong>{item.activePatternName ?? ui("Sem pattern")}</strong>
+        <em>{item.stepCount} {ui(" passos")}</em>
       </div>
-      <div className="audio-sequence-order" aria-label="Ordem de reprodução">
-        <h5>Ordem de reprodução</h5>
+      <div className="audio-sequence-order" aria-label={ui("Ordem de reprodução")}>
+        <h5>{ui("Ordem de reprodução")}</h5>
         {item.patternSequence.length === 0 ? (
-          <p className="muted">Nenhum pattern na sequência.</p>
+          <p className="muted">{ui("Nenhum pattern na sequência.")}</p>
         ) : (
           item.patternSequence.map((slot) => (
             <div className={slot.isMissing ? "audio-sequence-order-row missing" : "audio-sequence-order-row"} key={`${item.id}-order-${slot.index}`}>
@@ -204,7 +202,7 @@ function audioPatternSequence(
               <strong>{slot.label}</strong>
               <div className="audio-sequence-order-actions">
                 <button
-                  aria-label={`Mover ${slot.label} para cima`}
+                  aria-label={ui("Mover {0} para cima", { 0: slot.label })}
                   disabled={slot.index === 0}
                   onClick={() => onMovePatternOrderSlot(item.id, slot.index, -1)}
                   type="button"
@@ -212,7 +210,7 @@ function audioPatternSequence(
                   ↑
                 </button>
                 <button
-                  aria-label={`Mover ${slot.label} para baixo`}
+                  aria-label={ui("Mover {0} para baixo", { 0: slot.label })}
                   disabled={slot.index >= item.patternSequence.length - 1}
                   onClick={() => onMovePatternOrderSlot(item.id, slot.index, 1)}
                   type="button"
@@ -220,7 +218,7 @@ function audioPatternSequence(
                   ↓
                 </button>
                 <button
-                  aria-label={`Remover ${slot.label} da sequencia`}
+                  aria-label={ui("Remover {0} da sequencia", { 0: slot.label })}
                   onClick={() => onUpdateAudioPatternOrderSlot(item.id, slot.index, "")}
                   type="button"
                 >
@@ -231,8 +229,8 @@ function audioPatternSequence(
           ))
         )}
       </div>
-      <div className="audio-pattern-chip-list" aria-label={`Padrões de ${item.name}`}>
-        <h5>Padrões</h5>
+      <div className="audio-pattern-chip-list" aria-label={ui("Padrões de {0}", { 0: item.name })}>
+        <h5>{ui("Padrões")}</h5>
         <div>
           {item.patterns.map((pattern) => (
             <button
@@ -250,8 +248,7 @@ function audioPatternSequence(
         {activePatternID ? (
           <div className="audio-pattern-chip-actions">
             <button onClick={() => onRenameAudioPattern(item.id, activePatternID, item.activePatternName ?? "Pattern")} type="button">
-              Renomear
-            </button>
+              {ui("Renomear")}</button>
           </div>
         ) : null}
       </div>
@@ -276,20 +273,20 @@ function audioStepTracker(
   };
 
   return (
-    <div className="audio-step-tracker" aria-label={`Tracker por passos de ${item.name}`}>
+    <div className="audio-step-tracker" aria-label={ui("Tracker por passos de {0}", { 0: item.name })}>
       <div className="audio-step-tracker-header">
         <div>
-          <strong>Tracker por passos</strong>
-          <span>Edite cada passo como uma tabela musical, sem sair do compositor visual.</span>
+          <strong>{ui("Tracker por passos")}</strong>
+          <span>{ui("Edite cada passo como uma tabela musical, sem sair do compositor visual.")}</span>
         </div>
         <div className="audio-step-badges">
-          <span>{stepCount} passos</span>
-          <span>{item.previewRows.length} canal(is)</span>
-          <span>{item.noteCount} notas</span>
+          <span>{stepCount} {ui(" passos")}</span>
+          <span>{item.previewRows.length} {ui(" canal(is)")}</span>
+          <span>{item.noteCount} {ui(" notas")}</span>
         </div>
       </div>
-      <div className="audio-step-toolbar" role="toolbar" aria-label="Ações do tracker por passos">
-        <button type="button" onClick={() => onApplyAudioPatternPreset(item.id)}>Preset do pattern</button>
+      <div className="audio-step-toolbar" role="toolbar" aria-label={ui("Ações do tracker por passos")}>
+        <button type="button" onClick={() => onApplyAudioPatternPreset(item.id)}>{ui("Preset do pattern")}</button>
         <button
           disabled={!toolbarState.canMoveLeft || !selectedCell}
           onClick={() => {
@@ -300,8 +297,7 @@ function audioStepTracker(
           }}
           type="button"
         >
-          Mover esquerda
-        </button>
+          {ui("Mover esquerda")}</button>
         <button
           disabled={!toolbarState.canMoveRight || !selectedCell}
           onClick={() => {
@@ -312,8 +308,7 @@ function audioStepTracker(
           }}
           type="button"
         >
-          Mover direita
-        </button>
+          {ui("Mover direita")}</button>
         <button
           disabled={!toolbarState.canClearStep || !selectedCell}
           onClick={() => {
@@ -323,18 +318,17 @@ function audioStepTracker(
           }}
           type="button"
         >
-          Limpar passo
-        </button>
+          {ui("Limpar passo")}</button>
         <span className="audio-step-toolbar-status">
           {toolbarState.hasSelection
             ? `${toolbarState.selectedChannelLabel}: ${toolbarState.selectedNote ?? "vazio"}`
-            : "Nenhum passo selecionado"}
+            : ui("Nenhum passo selecionado")}
         </span>
       </div>
       {item.previewRows.length === 0 ? (
-        <p className="muted">Nenhum canal cadastrado para este áudio.</p>
+        <p className="muted">{ui("Nenhum canal cadastrado para este áudio.")}</p>
       ) : (
-        <div className="audio-step-table" role="table" aria-label="Notas por passo">
+        <div className="audio-step-table" role="table" aria-label={ui("Notas por passo")}>
           <div className="audio-step-row header" role="row" style={trackerGridStyle}>
             <span role="columnheader">#</span>
             {item.previewRows.map((row, rowIndex) => (
@@ -361,7 +355,7 @@ function audioStepTracker(
                 const isPlaying = playbackStepIndex === stepIndex;
                 return (
                   <button
-                    aria-label={cell?.note ? `${cell.note} no passo ${stepIndex + 1}` : `Passo vazio ${stepIndex + 1}`}
+                    aria-label={cell?.note ? ui("{0} no passo {1}", { 0: cell.note, 1: stepIndex + 1 }) : ui("Passo vazio {0}", { 0: stepIndex + 1 })}
                     className={[
                       cell?.isActive ? "active" : "",
                       cell?.isPercussion ? "percussion" : "",
@@ -421,6 +415,7 @@ export function AudioWorkspace({
   onImportAudio,
   onRemoveAudio
 }: AudioWorkspaceProps): React.ReactElement {
+  const ui = useStudioUiText();
   const [selectedCell, setSelectedCell] = useState<SelectedAudioCell | null>(null);
   const [selectedAudioID, setSelectedAudioID] = useState<string | null>(null);
   const [contextMenu, setContextMenu] = useState<AudioContextMenuState | null>(null);
@@ -567,23 +562,23 @@ export function AudioWorkspace({
   function audioCreationAssistant(): React.ReactElement | null {
     if (!creationAssistantOpen) return null;
     return (
-      <section aria-label="Assistente de criação de áudio" className="audio-creation-assistant" role="dialog">
+      <section aria-label={ui("Assistente de criação de áudio")} className="audio-creation-assistant" role="dialog">
         <div>
-          <strong>Novo áudio</strong>
-          <button aria-label="Fechar assistente" onClick={() => setCreationAssistantOpen(false)} type="button">×</button>
+          <strong>{ui("Novo áudio")}</strong>
+          <button aria-label={ui("Fechar assistente")} onClick={() => setCreationAssistantOpen(false)} type="button">×</button>
         </div>
-        <p>Escolha um ponto de partida. Você poderá ajustar tudo depois.</p>
-        <button aria-label="Música em loop" onClick={() => createFromAssistant("Musica")} type="button">
-          <strong>Música em loop</strong>
-          <span>4 canais GBA, pattern inicial e notas de exemplo.</span>
+        <p>{ui("Escolha um ponto de partida. Você poderá ajustar tudo depois.")}</p>
+        <button aria-label={ui("Música em loop")} onClick={() => createFromAssistant("Musica")} type="button">
+          <strong>{ui("Música em loop")}</strong>
+          <span>{ui("4 canais GBA, pattern inicial e notas de exemplo.")}</span>
         </button>
-        <button aria-label="SFX curto" onClick={() => createFromAssistant("SFX")} type="button">
-          <strong>SFX curto</strong>
-          <span>Efeito one-shot pronto para receber ou importar som.</span>
+        <button aria-label={ui("SFX curto")} onClick={() => createFromAssistant("SFX")} type="button">
+          <strong>{ui("SFX curto")}</strong>
+          <span>{ui("Efeito one-shot pronto para receber ou importar som.")}</span>
         </button>
-        <button aria-label="Importar arquivo" onClick={() => { onImportAudio(); setCreationAssistantOpen(false); }} type="button">
-          <strong>Importar arquivo</strong>
-          <span>Use um MOD ou WAV existente como fonte.</span>
+        <button aria-label={ui("Importar arquivo")} onClick={() => { onImportAudio(); setCreationAssistantOpen(false); }} type="button">
+          <strong>{ui("Importar arquivo")}</strong>
+          <span>{ui("Use um MOD ou WAV existente como fonte.")}</span>
         </button>
       </section>
     );
@@ -592,8 +587,8 @@ export function AudioWorkspace({
   if (!presentation) {
     return (
       <WorkspaceEmptyState
-        title="Áudio"
-        description="Abra um projeto para visualizar músicas, SFX, usos e dados do compositor."
+        title={ui("Áudio")}
+        description={ui("Abra um projeto para visualizar músicas, SFX, usos e dados do compositor.")}
       />
     );
   }
@@ -602,39 +597,39 @@ export function AudioWorkspace({
 
   if (isEmptyLibrary) {
     return (
-      <section className="audio-workspace" aria-label="Workspace Áudio">
-        <h3 className="studio-visually-hidden">Compositor de Áudio</h3>
+      <section className="audio-workspace" aria-label={ui("Workspace Áudio")}>
+        <h3 className="studio-visually-hidden">{ui("Compositor de Áudio")}</h3>
 
         <div className="audio-layout audio-layout-empty">
-          <aside className="audio-rail audio-rail-empty-state" aria-label="Biblioteca de áudio">
+          <aside className="audio-rail audio-rail-empty-state" aria-label={ui("Biblioteca de áudio")}>
             <div className="audio-rail-header">
-              <h4>Biblioteca</h4>
+              <h4>{ui("Biblioteca")}</h4>
             </div>
             <section className="audio-rail-empty">
-              <strong>A biblioteca de áudio está vazia.</strong>
-              <p>Crie uma música ou SFX para começar a compor.</p>
+              <strong>{ui("A biblioteca de áudio está vazia.")}</strong>
+              <p>{ui("Crie uma música ou SFX para começar a compor.")}</p>
               <div>
-                <button onClick={() => setCreationAssistantOpen(true)} type="button">Criar música</button>
-                <button onClick={() => setCreationAssistantOpen(true)} type="button">Criar SFX</button>
-                <button onClick={onImportAudio} type="button">Importar MOD/WAV</button>
+                <button onClick={() => setCreationAssistantOpen(true)} type="button">{ui("Criar música")}</button>
+                <button onClick={() => setCreationAssistantOpen(true)} type="button">{ui("Criar SFX")}</button>
+                <button onClick={onImportAudio} type="button">{ui("Importar MOD/WAV")}</button>
               </div>
               {audioCreationAssistant()}
             </section>
           </aside>
 
-          <section className="audio-composer-stage audio-composer-empty-state" aria-label="Compositor de áudio">
+          <section className="audio-composer-stage audio-composer-empty-state" aria-label={ui("Compositor de áudio")}>
             <div className="audio-empty-composer">
-              <span>Compositor de áudio</span>
-              <p>Crie ou importe um áudio para começar a compor.</p>
+              <span>{ui("Compositor de áudio")}</span>
+              <p>{ui("Crie ou importe um áudio para começar a compor.")}</p>
             </div>
           </section>
 
           <WorkspaceInspectorRail
-            ariaLabel="Resumo de áudio"
+            ariaLabel={ui("Resumo de áudio")}
             className="audio-side-panel"
             workspaceId="audio"
           >
-            <p className="muted">Nenhum áudio selecionado.</p>
+            <p className="muted">{ui("Nenhum áudio selecionado.")}</p>
           </WorkspaceInspectorRail>
         </div>
       </section>
@@ -838,7 +833,7 @@ export function AudioWorkspace({
   return (
     <section
       className="audio-workspace"
-      aria-label="Workspace Áudio"
+      aria-label={ui("Workspace Áudio")}
       onKeyDown={(event) => {
         const target = event.target as HTMLElement;
         if (target.matches("input, textarea, select") || target.isContentEditable || target.closest(".audio-groove-details")) return;
@@ -896,109 +891,109 @@ export function AudioWorkspace({
           state={contextMenu}
         />
       ) : null}
-      <h3 className="studio-visually-hidden">Compositor de Áudio</h3>
+      <h3 className="studio-visually-hidden">{ui("Compositor de Áudio")}</h3>
 
       {audioCreationAssistant()}
 
       <div className="audio-layout audio-groove-layout">
-        <aside className="audio-rail audio-groove-library" aria-label="Biblioteca de áudio">
-          <div className="audio-rail-header"><h4>Biblioteca</h4><div className="audio-groove-library-actions">
-            <button aria-label="Criar áudio" title="Criar áudio" onClick={() => setCreationAssistantOpen(true)} type="button"><Plus size={18} /></button>
-            <button aria-label="Importar áudio" title="Importar áudio" onClick={onImportAudio} type="button"><Upload size={16} /></button>
+        <aside className="audio-rail audio-groove-library" aria-label={ui("Biblioteca de áudio")}>
+          <div className="audio-rail-header"><h4>{ui("Biblioteca")}</h4><div className="audio-groove-library-actions">
+            <button aria-label={ui("Criar áudio")} title={ui("Criar áudio")} onClick={() => setCreationAssistantOpen(true)} type="button"><Plus size={18} /></button>
+            <button aria-label={ui("Importar áudio")} title={ui("Importar áudio")} onClick={onImportAudio} type="button"><Upload size={16} /></button>
           </div></div>
-          <label className="audio-groove-search"><span className="studio-visually-hidden">Buscar áudio</span><Search size={15} /><input type="search" aria-label="Buscar áudio" placeholder="Buscar…" value={searchQuery} onChange={event => setSearchQuery(event.currentTarget.value)} /></label>
-          <button className="audio-groove-filter-toggle" aria-expanded={filtersOpen} onClick={() => setFiltersOpen(!filtersOpen)} type="button"><ListFilter size={14} />Filtros{activeFilterCount ? ` (${activeFilterCount})` : ""}</button>
+          <label className="audio-groove-search"><span className="studio-visually-hidden">{ui("Buscar áudio")}</span><Search size={15} /><input type="search" aria-label={ui("Buscar áudio")} placeholder={ui("Buscar…")} value={searchQuery} onChange={event => setSearchQuery(event.currentTarget.value)} /></label>
+          <button className="audio-groove-filter-toggle" aria-expanded={filtersOpen} onClick={() => setFiltersOpen(!filtersOpen)} type="button"><ListFilter size={14} />{ui("Filtros")}{activeFilterCount ? ` (${activeFilterCount})` : ""}</button>
           {filtersOpen ? <div className="audio-groove-filters">
-            <label>Tipo<select value={selectedKind} onChange={event => setSelectedKind(event.currentTarget.value)}><option value="">Todos</option>{filterChips?.kind.map(chip => <option key={chip.id} value={chip.value}>{audioFilterChipLabel(chip.label)}</option>)}</select></label>
-            <label>Formato<select value={selectedFormat} onChange={event => setSelectedFormat(event.currentTarget.value)}><option value="">Todos</option>{filterChips?.format.map(chip => <option key={chip.id} value={chip.value}>{audioFormatLabel(chip.label)}</option>)}</select></label>
-            <label>Origem<select value={selectedOrigin} onChange={event => setSelectedOrigin(event.currentTarget.value as AudioWorkspaceOriginFilter)}><option value="">Todas</option><option>Composto</option><option>Importado</option><option>Sem fonte</option></select></label>
-            <label>Status<select value={filterStatus} onChange={event => setFilterStatus(event.currentTarget.value as AudioWorkspaceFilterStatus)}><option value="">Todos</option><option value="OK">OK</option><option value="Atencao">Atenção</option><option value="Bloqueado">Bloqueado</option></select></label>
-            <label>Ordenar<select value={sortOption} onChange={event => setSortOption(event.currentTarget.value as AudioWorkspaceSortOption)}><option value="name-asc">Nome A–Z</option><option value="name-desc">Nome Z–A</option><option value="bpm-desc">BPM</option><option value="usage-desc">Uso no jogo</option></select></label>
+            <label>{ui("Tipo")}<select value={selectedKind} onChange={event => setSelectedKind(event.currentTarget.value)}><option value="">{ui("Todos")}</option>{filterChips?.kind.map(chip => <option key={chip.id} value={chip.value}>{audioFilterChipLabel(chip.label)}</option>)}</select></label>
+            <label>{ui("Formato")}<select value={selectedFormat} onChange={event => setSelectedFormat(event.currentTarget.value)}><option value="">{ui("Todos")}</option>{filterChips?.format.map(chip => <option key={chip.id} value={chip.value}>{audioFormatLabel(chip.label)}</option>)}</select></label>
+            <label>{ui("Origem")}<select value={selectedOrigin} onChange={event => setSelectedOrigin(event.currentTarget.value as AudioWorkspaceOriginFilter)}><option value="">{ui("Todas")}</option><option value="Composto">{ui("Composto")}</option><option value="Importado">{ui("Importado")}</option><option value="Sem fonte">{ui("Sem fonte")}</option></select></label>
+            <label>{ui("Status")}<select value={filterStatus} onChange={event => setFilterStatus(event.currentTarget.value as AudioWorkspaceFilterStatus)}><option value="">{ui("Todos")}</option><option value="OK">{ui("OK")}</option><option value="Atencao">{ui("Atenção")}</option><option value="Bloqueado">{ui("Bloqueado")}</option></select></label>
+            <label>{ui("Ordenar")}<select value={sortOption} onChange={event => setSortOption(event.currentTarget.value as AudioWorkspaceSortOption)}><option value="name-asc">{ui("Nome A–Z")}</option><option value="name-desc">{ui("Nome Z–A")}</option><option value="bpm-desc">{ui("BPM")}</option><option value="usage-desc">{ui("Uso no jogo")}</option></select></label>
           </div> : null}
-          <div className="audio-groove-library-list" role="list" aria-label="Lista de áudio">
+          <div className="audio-groove-library-list" role="list" aria-label={ui("Lista de áudio")}>
             {[{ kind: "Musica", label: "Músicas" }, { kind: "SFX", label: "Efeitos sonoros" }, { kind: "Audio", label: "Áudio" }].map(group => {
               const items = visibleItems.filter(item => item.kind === group.kind || group.kind === "Audio" && !["Musica", "SFX"].includes(item.kind));
-              return items.length ? <div key={group.kind} className="audio-groove-library-group"><span>{group.kind === "Musica" ? <Music2 size={16} /> : <AudioLines size={16} />}{group.label}</span>
-                {items.map(item => <article key={item.id} role="listitem" aria-label={`Selecionar áudio ${item.name}`} onContextMenu={event => openAudioContextMenu(event, item)}>
-                  <button type="button" aria-label={`Selecionar áudio ${item.name}`} aria-pressed={activeItem?.id === item.id} className={activeItem?.id === item.id ? "selected" : ""}
+              return items.length ? <div key={group.kind} className="audio-groove-library-group"><span>{group.kind === "Musica" ? <Music2 size={16} /> : <AudioLines size={16} />}{ui(group.label)}</span>
+                {items.map(item => <article key={item.id} role="listitem" aria-label={ui("Selecionar áudio {0}", { 0: item.name })} onContextMenu={event => openAudioContextMenu(event, item)}>
+                  <button type="button" aria-label={ui("Selecionar áudio {0}", { 0: item.name })} aria-pressed={activeItem?.id === item.id} className={activeItem?.id === item.id ? "selected" : ""}
                     onClick={() => { stopAudioPreview(); setSelectedAudioID(item.id); setSelectedCell(null); }}>
                     {item.kind === "Musica" ? <Music2 size={17} /> : <AudioLines size={17} />}<span title={item.name}>{item.name}</span>{item.status !== "OK" ? <AlertTriangle size={14} aria-label={statusLabel(item)} /> : null}
                   </button>
-                  <button className="audio-groove-audition" type="button" aria-label={`Ouvir ${item.name}`} title={`Ouvir ${item.name}`} onClick={() => playAudioPreview(item)}><Play size={13} /></button>
+                  <button className="audio-groove-audition" type="button" aria-label={ui("Ouvir {0}", { 0: item.name })} title={ui("Ouvir {0}", { 0: item.name })} onClick={() => playAudioPreview(item)}><Play size={13} /></button>
                 </article>)}
               </div> : null;
             })}
-            {!visibleItems.length ? <p className="muted">Nenhum áudio encontrado.</p> : null}
+            {!visibleItems.length ? <p className="muted">{ui("Nenhum áudio encontrado.")}</p> : null}
           </div>
-          <small className="muted">{visibleItems.length} de {presentation.items.length} visíveis</small>
-          {activeFilterCount ? <button type="button" onClick={() => { setSearchQuery(""); setSelectedKind(""); setSelectedFormat(""); setSelectedOrigin(""); setFilterStatus(""); }}>Limpar filtros</button> : null}
+          <small className="muted">{visibleItems.length} {ui(" de ")}{presentation.items.length} {ui(" visíveis")}</small>
+          {activeFilterCount ? <button type="button" onClick={() => { setSearchQuery(""); setSelectedKind(""); setSelectedFormat(""); setSelectedOrigin(""); setFilterStatus(""); }}>{ui("Limpar filtros")}</button> : null}
         </aside>
-        <section className="audio-composer-stage audio-groove-composer" aria-label="Compositor de áudio">
-          <div className="audio-groove-transport" role="toolbar" aria-label="Transporte de áudio">
-            <div className="audio-groove-song-title"><h3>{activeItem?.name ?? "Sem áudio"}</h3><span>{activeItem?.kind === "Musica" ? "Música" : activeItem?.kind === "SFX" ? "Efeito sonoro" : "Áudio"}</span></div>
-            <button aria-label="Tocar áudio" className="audio-transport-play" disabled={!activeItem} onClick={() => activeItem && playAudioPreview(activeItem)} title="Tocar áudio" type="button"><Play size={22} fill="currentColor" /></button>
-            <button aria-label="Parar áudio" disabled={!auditionAudioID && !playbackStatus.startsWith("Preparando")} onClick={() => stopAudioPreview()} title="Parar áudio" type="button"><Square size={18} fill="currentColor" /></button>
-            <div className="audio-groove-tempo"><label><span className="studio-visually-hidden">BPM</span><input type="number" aria-label="BPM" min={40} max={240} value={activeItem?.bpm ?? 120} disabled={!activeItem || activeItem.origin !== "Composto"} onChange={event => activeItem && Number.isFinite(event.currentTarget.valueAsNumber) && onUpdateAudioFields(activeItem.id, { bpm: Math.max(40, Math.min(240, event.currentTarget.valueAsNumber)) })} /><span>BPM</span></label>
-              <button type="button" aria-label="Diminuir BPM" disabled={!activeItem || activeItem.origin !== "Composto" || (activeItem.bpm ?? 120) <= 40} onClick={() => activeItem && onUpdateAudioFields(activeItem.id, { bpm: (activeItem.bpm ?? 120) - 1 })}><Minus size={14} /></button>
-              <button type="button" aria-label="Aumentar BPM" disabled={!activeItem || activeItem.origin !== "Composto" || (activeItem.bpm ?? 120) >= 240} onClick={() => activeItem && onUpdateAudioFields(activeItem.id, { bpm: (activeItem.bpm ?? 120) + 1 })}><Plus size={14} /></button>
+        <section className="audio-composer-stage audio-groove-composer" aria-label={ui("Compositor de áudio")}>
+          <div className="audio-groove-transport" role="toolbar" aria-label={ui("Transporte de áudio")}>
+            <div className="audio-groove-song-title"><h3>{activeItem?.name ?? ui("Sem áudio")}</h3><span>{activeItem?.kind === "Musica" ? ui("Música") : activeItem?.kind === "SFX" ? ui("Efeito sonoro") : ui("Áudio")}</span></div>
+            <button aria-label={ui("Tocar áudio")} className="audio-transport-play" disabled={!activeItem} onClick={() => activeItem && playAudioPreview(activeItem)} title={ui("Tocar áudio")} type="button"><Play size={22} fill="currentColor" /></button>
+            <button aria-label={ui("Parar áudio")} disabled={!auditionAudioID && !playbackStatus.startsWith("Preparando")} onClick={() => stopAudioPreview()} title={ui("Parar áudio")} type="button"><Square size={18} fill="currentColor" /></button>
+            <div className="audio-groove-tempo"><label><span className="studio-visually-hidden">{ui("BPM")}</span><input type="number" aria-label={ui("BPM")} min={40} max={activeItem?.kind === "SFX" ? 360 : 240} value={activeItem?.bpm ?? 120} disabled={!activeItem || activeItem.origin !== "Composto"} onChange={event => activeItem && Number.isFinite(event.currentTarget.valueAsNumber) && onUpdateAudioFields(activeItem.id, { bpm: Math.max(40, Math.min(activeItem.kind === "SFX" ? 360 : 240, event.currentTarget.valueAsNumber)) })} /><span>{ui("BPM")}</span></label>
+              <button type="button" aria-label={ui("Diminuir BPM")} disabled={!activeItem || activeItem.origin !== "Composto" || (activeItem.bpm ?? 120) <= 40} onClick={() => activeItem && onUpdateAudioFields(activeItem.id, { bpm: (activeItem.bpm ?? 120) - 1 })}><Minus size={14} /></button>
+              <button type="button" aria-label={ui("Aumentar BPM")} disabled={!activeItem || activeItem.origin !== "Composto" || (activeItem.bpm ?? 120) >= (activeItem.kind === "SFX" ? 360 : 240)} onClick={() => activeItem && onUpdateAudioFields(activeItem.id, { bpm: (activeItem.bpm ?? 120) + 1 })}><Plus size={14} /></button>
             </div>
-            <label className="audio-groove-switch"><input type="checkbox" aria-label="Loop" checked={activeItem?.loops ?? false} disabled={!activeItem || activeItem.kind === "SFX" && activeItem.origin === "Composto"} onChange={event => activeItem && onUpdateAudioFields(activeItem.id, { loops: event.currentTarget.checked })} /><span>Repetir</span></label>
-            {activeItem?.origin === "Composto" ? <div className="audio-groove-preview-scope" aria-label="Trecho da prévia"><span>Prévia</span><button type="button" aria-pressed={previewScope === "pattern"} onClick={() => setPreviewScope("pattern")}>Padrão</button><button type="button" aria-pressed={previewScope === "sequence"} onClick={() => setPreviewScope("sequence")}>Música</button></div> : null}
+            <label className="audio-groove-switch"><input type="checkbox" aria-label={ui("Loop")} checked={activeItem?.loops ?? false} disabled={!activeItem || activeItem.kind === "SFX" && activeItem.origin === "Composto"} onChange={event => activeItem && onUpdateAudioFields(activeItem.id, { loops: event.currentTarget.checked })} /><span>{ui("Repetir")}</span></label>
+            {activeItem?.origin === "Composto" ? <div className="audio-groove-preview-scope" aria-label={ui("Trecho da prévia")}><span>{ui("Prévia")}</span><button type="button" aria-pressed={previewScope === "pattern"} onClick={() => setPreviewScope("pattern")}>{ui("Padrão")}</button><button type="button" aria-pressed={previewScope === "sequence"} onClick={() => setPreviewScope("sequence")}>{ui("Música")}</button></div> : null}
           </div>
           {activeItem?.origin === "Composto" ? <>
-            <div className="audio-groove-patterns" aria-label={`Padrões de ${activeItem.name}`}>
+            <div className="audio-groove-patterns" aria-label={ui("Padrões de {0}", { 0: activeItem.name })}>
               {activeItem.patterns.map(pattern => <button type="button" key={pattern.id} aria-pressed={activeItem.activePatternID === pattern.id} className={activeItem.activePatternID === pattern.id ? "active" : ""} onClick={() => { setSelectedCell(null); onSetActivePattern(activeItem.id, pattern.id); }} onContextMenu={event => openPatternContextMenu(event, pattern.id, pattern.name)}>{pattern.name}</button>)}
-              <button aria-label="Criar padrão" title="Criar padrão" onClick={() => onCreateAudioPattern(activeItem.id)} type="button"><Plus size={16} /></button>
-              <div className="audio-groove-view-modes" role="group" aria-label="Modo do compositor">{composerTabs.map(tab => <button key={tab.id} type="button" aria-pressed={composerTab === tab.id} onClick={() => setComposerTab(tab.id)}>{tab.label}</button>)}</div>
+              <button aria-label={ui("Criar padrão")} title={ui("Criar padrão")} onClick={() => onCreateAudioPattern(activeItem.id)} type="button"><Plus size={16} /></button>
+              <div className="audio-groove-view-modes" role="group" aria-label={ui("Modo do compositor")}>{composerTabs.map(tab => <button key={tab.id} type="button" aria-pressed={composerTab === tab.id} onClick={() => setComposerTab(tab.id)}>{ui(tab.label)}</button>)}</div>
             </div>
             {composerTab === "piano" ? <AudioGroovePiano item={activeItem} selectedCell={selectedCell} selectedChannelID={channelMixing.channelID} playbackStep={previewScope === "pattern" && auditionAudioID === activeItem.id ? playbackStepIndex : null}
               onSelectCell={setSelectedCell} onSetNote={(channelID, step, note) => onSetAudioChannelNote(activeItem.id, channelID, step, note)} onUpdateChannel={(channelID, fields) => onUpdateAudioChannelFields(activeItem.id, channelID, fields)} /> : null}
             {composerTab === "tracker" ? audioStepTracker(activeItem, selectedCell, setSelectedCell, onApplyAudioPatternPreset, onMoveAudioChannelNote, onSetAudioChannelNote, previewScope === "pattern" && auditionAudioID === activeItem.id ? playbackStepIndex : null) : null}
             {composerTab === "sequence" ? audioPatternSequence(activeItem, patternID => onSetActivePattern(activeItem.id, patternID), onUpdateAudioPatternOrderSlot, onDuplicatePattern, onClearPatternSequence, onMovePatternOrderSlot, onCreateAudioPattern, onRenameAudioPattern, onRemoveAudioPattern, openPatternContextMenu) : null}
-            <div className={`audio-groove-dock groove-${grooveTrackTone(selectedRow?.type ?? "pulse1")}`} aria-label="Controles da faixa">
-              <div className="audio-groove-dock-track"><span className="audio-groove-track-dot" aria-hidden="true" /><div><strong>{selectedRow ? grooveTrackName(selectedRow.label, selectedRow.type) : "Canal"}</strong><small>{selectedRow ? grooveHardwareLabel(selectedRow.type) : ""}</small></div></div>
-              <label className="audio-groove-instrument"><span>Instrumento</span><select aria-label="Instrumento do canal" disabled={!channelMixing.channelID} value={selectedRow?.instrumentID ? `bank:${selectedRow.instrumentID}` : channelMixing.sampleAssetID ? `sample:${channelMixing.sampleAssetID}` : channelMixing.instrument} onChange={event => {
+            <div className={`audio-groove-dock groove-${grooveTrackTone(selectedRow?.type ?? "pulse1")}`} aria-label={ui("Controles da faixa")}>
+              <div className="audio-groove-dock-track"><span className="audio-groove-track-dot" aria-hidden="true" /><div><strong>{selectedRow ? grooveTrackName(selectedRow.label, selectedRow.type) : ui("Canal")}</strong><small>{selectedRow ? grooveHardwareLabel(selectedRow.type) : ""}</small></div></div>
+              <label className="audio-groove-instrument"><span>{ui("Instrumento")}</span><select aria-label={ui("Instrumento do canal")} disabled={!channelMixing.channelID} value={selectedRow?.instrumentID ? `bank:${selectedRow.instrumentID}` : channelMixing.sampleAssetID ? `sample:${channelMixing.sampleAssetID}` : channelMixing.instrument} onChange={event => {
                 if (!channelMixing.channelID) return; const value = event.currentTarget.value;
                 onUpdateAudioChannelFields(activeItem.id, channelMixing.channelID, value.startsWith("bank:") ? { instrumentID: value.slice(5), sampleAssetID: null } : value.startsWith("sample:") ? { instrumentID: null, sampleAssetID: value.slice(7), sampleRootNote: "C4", sampleLoop: false } : { instrumentID: null, instrument: value, sampleAssetID: null });
               }}>
-                <optgroup label="Timbres PSG">{Array.from(new Set([channelMixing.instrument, ...(selectedRow?.type.includes("wave") ? ["Wave Bass", "Wave Organ", "Wave Saw"] : selectedRow?.type.includes("noise") ? ["Noise Kit", "Noise Short"] : ["Pulse Lead", "Pulse Warm", "Pulse Bright"])] )).map(instrument => <option key={instrument} value={instrument}>{instrument}</option>)}</optgroup>
+                <optgroup label={ui("Timbres PSG")}>{Array.from(new Set([channelMixing.instrument, ...(selectedRow?.type.includes("wave") ? ["Wave Bass", "Wave Organ", "Wave Saw"] : selectedRow?.type.includes("noise") ? ["Noise Kit", "Noise Short"] : ["Pulse Lead", "Pulse Warm", "Pulse Bright"])] )).map(instrument => <option key={instrument} value={instrument}>{instrument}</option>)}</optgroup>
                 {activeItem.kind === "Musica" && !/noise|sfx/i.test(selectedRow?.type ?? "") ? <>
-                  <optgroup label="Banco do projeto">{presentation.instruments?.map(instrument => <option key={instrument.id} value={`bank:${instrument.id}`}>{instrument.name}</option>)}</optgroup>
-                  <optgroup label="Samples da biblioteca">{presentation.sampleInstruments?.map(sample => <option key={sample.id} value={`sample:${sample.id}`}>{sample.name}</option>)}</optgroup>
+                  <optgroup label={ui("Banco do projeto")}>{presentation.instruments?.map(instrument => <option key={instrument.id} value={`bank:${instrument.id}`}>{instrument.name}</option>)}</optgroup>
+                  <optgroup label={ui("Samples da biblioteca")}>{presentation.sampleInstruments?.map(sample => <option key={sample.id} value={`sample:${sample.id}`}>{sample.name}</option>)}</optgroup>
                 </> : null}
               </select></label>
-              <label className="audio-groove-slider"><span>Volume <output>{channelMixing.volume}%</output></span><input aria-label="Volume da faixa" type="range" min={0} max={100} value={channelMixing.volume} onChange={event => channelMixing.channelID && onUpdateAudioChannelFields(activeItem.id, channelMixing.channelID, { volume: event.currentTarget.valueAsNumber })} /></label>
-              <label className="audio-groove-slider"><span>Panorama <output>{(selectedRow?.pan ?? 0) === 0 ? "Centro" : (selectedRow?.pan ?? 0) < 0 ? "Esquerda" : "Direita"}</output></span><input aria-label="Panorama da faixa" type="range" min={-127} max={127} value={selectedRow?.pan ?? 0} onChange={event => channelMixing.channelID && onUpdateAudioChannelFields(activeItem.id, channelMixing.channelID, { pan: event.currentTarget.valueAsNumber })} /></label>
-              <label className="audio-groove-envelope"><span>Envelope</span><select aria-label="Envelope" value={channelMixing.envelope} onChange={event => updateInstrumentControls({ envelope: event.currentTarget.value })}><option value="Soft ADSR">Suave</option><option value="Short Decay">Curto</option></select></label>
-              {channelMixing.sampleAssetID ? <label className="audio-groove-switch"><input aria-label="Repetir sample" type="checkbox" checked={channelMixing.sampleLoop} onChange={event => updateInstrumentControls({ sampleLoop: event.currentTarget.checked })} /><span>Repetir sample</span></label> : null}
-              <button ref={detailsButtonRef} className="audio-groove-details-button" type="button" aria-controls={detailsID} aria-expanded={detailsOpen} onClick={() => setDetailsOpen(!detailsOpen)}><SlidersHorizontal size={16} />Detalhes</button>
+              <label className="audio-groove-slider"><span>{ui("Volume ")}<output>{channelMixing.volume}%</output></span><input aria-label={ui("Volume da faixa")} type="range" min={0} max={100} value={channelMixing.volume} onChange={event => channelMixing.channelID && onUpdateAudioChannelFields(activeItem.id, channelMixing.channelID, { volume: event.currentTarget.valueAsNumber })} /></label>
+              <label className="audio-groove-slider"><span>{ui("Panorama ")}<output>{(selectedRow?.pan ?? 0) === 0 ? ui("Centro") : (selectedRow?.pan ?? 0) < 0 ? ui("Esquerda") : ui("Direita")}</output></span><input aria-label={ui("Panorama da faixa")} type="range" min={-127} max={127} value={selectedRow?.pan ?? 0} onChange={event => channelMixing.channelID && onUpdateAudioChannelFields(activeItem.id, channelMixing.channelID, { pan: event.currentTarget.valueAsNumber })} /></label>
+              <label className="audio-groove-envelope"><span>{ui("Envelope")}</span><select aria-label={ui("Envelope")} value={channelMixing.envelope} onChange={event => updateInstrumentControls({ envelope: event.currentTarget.value })}><option value="Soft ADSR">{ui("Suave")}</option><option value="Short Decay">{ui("Curto")}</option></select></label>
+              {channelMixing.sampleAssetID ? <label className="audio-groove-switch"><input aria-label={ui("Repetir sample")} type="checkbox" checked={channelMixing.sampleLoop} onChange={event => updateInstrumentControls({ sampleLoop: event.currentTarget.checked })} /><span>{ui("Repetir sample")}</span></label> : null}
+              <button ref={detailsButtonRef} className="audio-groove-details-button" type="button" aria-controls={detailsID} aria-expanded={detailsOpen} onClick={() => setDetailsOpen(!detailsOpen)}><SlidersHorizontal size={16} />{ui("Detalhes")}</button>
             </div>
-          </> : <div className="audio-empty-composer"><strong>Áudio importado</strong><p>{activeItem?.format === "WAV" ? "Tocar reproduz o arquivo WAV original." : "A prévia deste formato está disponível no Play do jogo."}</p><button ref={detailsButtonRef} type="button" aria-controls={detailsID} aria-expanded={detailsOpen} onClick={() => setDetailsOpen(!detailsOpen)}>Detalhes</button></div>}
-          <div className="audio-groove-status" role="status"><span>{playbackStatus}{playbackStepIndex !== null ? ` · ${playbackStepIndex + 1}/${previewPlan?.stepCount ?? activeItem?.stepCount}` : ""}{activeItem?.errors.length ? " · Áudio bloqueado — consulte Detalhes" : ""}</span><span>Espaço: tocar / parar · Delete: apagar nota</span></div>
+          </> : <div className="audio-empty-composer"><strong>{ui("Áudio importado")}</strong><p>{activeItem?.format === "WAV" ? ui("Tocar reproduz o arquivo WAV original.") : ui("A prévia deste formato está disponível no Play do jogo.")}</p><button ref={detailsButtonRef} type="button" aria-controls={detailsID} aria-expanded={detailsOpen} onClick={() => setDetailsOpen(!detailsOpen)}>{ui("Detalhes")}</button></div>}
+          <div className="audio-groove-status" role="status"><span>{ui(playbackStatus)}{playbackStepIndex !== null ? ` · ${playbackStepIndex + 1}/${previewPlan?.stepCount ?? activeItem?.stepCount}` : ""}{activeItem?.errors.length ? ui(" · Áudio bloqueado — consulte Detalhes") : ""}</span><span>{ui("Espaço: tocar / parar · Delete: apagar nota")}</span></div>
         </section>
-          {activeItem && detailsOpen ? <aside id={detailsID} className="audio-groove-details" aria-label={`Dados de ${activeItem.name}`} onKeyDown={event => {
+          {activeItem && detailsOpen ? <aside id={detailsID} className="audio-groove-details" aria-label={ui("Dados de {0}", { 0: activeItem.name })} onKeyDown={event => {
             if (event.key === "Escape") { event.preventDefault(); event.stopPropagation(); closeDetails(); }
           }}>
-            <header className="audio-groove-details-header"><h4>Detalhes da composição</h4><button ref={detailsCloseRef} type="button" aria-label="Fechar detalhes" onClick={closeDetails}><X size={18} /></button></header>
+            <header className="audio-groove-details-header"><h4>{ui("Detalhes da composição")}</h4><button ref={detailsCloseRef} type="button" aria-label={ui("Fechar detalhes")} onClick={closeDetails}><X size={18} /></button></header>
             <div className="audio-groove-details-body">
-            <div className="audio-actions"><button type="button" onClick={() => onRenameAudio(activeItem.id, activeItem.name)}>Renomear</button><button type="button" onClick={() => onDuplicateAudio(activeItem.id, activeItem.name)}>Duplicar</button><button type="button" onClick={() => onNormalizeAudio(activeItem.id)}>Corrigir parâmetros</button><button type="button" onClick={() => onExportAudio(activeItem.id, activeItem.name)}>Exportar JSON</button><button type="button" className="danger-button" onClick={() => onRemoveAudio(activeItem.id, activeItem.name)}>Remover</button></div>
+            <div className="audio-actions"><button type="button" onClick={() => onRenameAudio(activeItem.id, activeItem.name)}>{ui("Renomear")}</button><button type="button" onClick={() => onDuplicateAudio(activeItem.id, activeItem.name)}>{ui("Duplicar")}</button><button type="button" onClick={() => onNormalizeAudio(activeItem.id)}>{ui("Corrigir parâmetros")}</button><button type="button" onClick={() => onExportAudio(activeItem.id, activeItem.name)}>{ui("Exportar JSON")}</button><button type="button" className="danger-button" onClick={() => onRemoveAudio(activeItem.id, activeItem.name)}>{ui("Remover")}</button></div>
             {activeItem.origin === "Composto" ? <>
-              <div className="audio-groove-note-tools" role="toolbar" aria-label="Ferramentas do piano roll">
-                <button type="button" onClick={() => onApplyAudioPatternPreset(activeItem.id)}>Preset do pattern</button><button type="button" disabled={activeItem.previewRows.length >= (activeItem.kind === "SFX" ? 1 : 4)} onClick={() => onCreateAudioChannel(activeItem.id, activeItem.activePatternID)}>Novo canal</button>
-                <button type="button" disabled={!selectedCell} onClick={() => selectedCell && onUpdateAudioChannelNote(activeItem.id, selectedCell.channelID, selectedCell.stepIndex, selectedRow?.cells[selectedCell.stepIndex]?.note ?? null)}>Editar nota</button>
-                <button type="button" disabled={!selectedCell} onClick={() => selectedCell && onSetAudioChannelNote(activeItem.id, selectedCell.channelID, selectedCell.stepIndex, "")}>Limpar nota</button>
-                {[-1, 1].map(delta => <button type="button" key={delta} disabled={!selectedCell} onClick={() => selectedCell && onTransposeAudioChannelNote(activeItem.id, selectedCell.channelID, selectedCell.stepIndex, delta)}>Nota {delta > 0 ? "+1" : "-1"}</button>)}
+              <div className="audio-groove-note-tools" role="toolbar" aria-label={ui("Ferramentas do piano roll")}>
+                <button type="button" onClick={() => onApplyAudioPatternPreset(activeItem.id)}>{ui("Preset do pattern")}</button><button type="button" disabled={activeItem.previewRows.length >= (activeItem.kind === "SFX" ? 1 : 4)} onClick={() => onCreateAudioChannel(activeItem.id, activeItem.activePatternID)}>{ui("Novo canal")}</button>
+                <button type="button" disabled={!selectedCell} onClick={() => selectedCell && onUpdateAudioChannelNote(activeItem.id, selectedCell.channelID, selectedCell.stepIndex, selectedRow?.cells[selectedCell.stepIndex]?.note ?? null)}>{ui("Editar nota")}</button>
+                <button type="button" disabled={!selectedCell} onClick={() => selectedCell && onSetAudioChannelNote(activeItem.id, selectedCell.channelID, selectedCell.stepIndex, "")}>{ui("Limpar nota")}</button>
+                {[-1, 1].map(delta => <button type="button" key={delta} disabled={!selectedCell} onClick={() => selectedCell && onTransposeAudioChannelNote(activeItem.id, selectedCell.channelID, selectedCell.stepIndex, delta)}>{ui("Nota ")}{delta > 0 ? "+1" : "-1"}</button>)}
               </div>
-              {channelMixing.sampleAssetID ? <div className="audio-groove-sample-details"><label>Nota original do WAV<select aria-label="Nota original do WAV" value={channelMixing.sampleRootNote} onChange={event => updateInstrumentControls({ sampleRootNote: event.currentTarget.value })}>{Array.from({ length: 6 }, (_, octave) => ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"].map(note => `${note}${octave + 2}`)).flat().map(note => <option key={note}>{note}</option>)}</select></label>
-                <button type="button" disabled={!onCreateAudioInstrument || !channelMixing.channelID} onClick={() => channelMixing.channelID && onCreateAudioInstrument?.(activeItem.id, channelMixing.channelID)}>Salvar instrumento no banco</button>
-                {selectedRow?.instrumentID ? <p>Instrumento compartilhado: afinação, envelope e repetição atualizam todas as faixas que o usam. Volume e panorama pertencem a esta faixa.</p> : <p>Afine pela nota gravada no sample. C4 é o padrão.</p>}
+              {channelMixing.sampleAssetID ? <div className="audio-groove-sample-details"><label>{ui("Nota original do WAV")}<select aria-label={ui("Nota original do WAV")} value={channelMixing.sampleRootNote} onChange={event => updateInstrumentControls({ sampleRootNote: event.currentTarget.value })}>{Array.from({ length: 6 }, (_, octave) => ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"].map(note => `${note}${octave + 2}`)).flat().map(note => <option key={note}>{note}</option>)}</select></label>
+                <button type="button" disabled={!onCreateAudioInstrument || !channelMixing.channelID} onClick={() => channelMixing.channelID && onCreateAudioInstrument?.(activeItem.id, channelMixing.channelID)}>{ui("Salvar instrumento no banco")}</button>
+                {selectedRow?.instrumentID ? <p>{ui("Instrumento compartilhado: afinação, envelope e repetição atualizam todas as faixas que o usam. Volume e panorama pertencem a esta faixa.")}</p> : <p>{ui("Afine pela nota gravada no sample. C4 é o padrão.")}</p>}
               </div> : null}
-              <details><summary>Gerenciar canais</summary>{activeItem.previewRows.map(row => <div className="audio-actions" key={row.id}><strong>{row.label}</strong><button type="button" onClick={() => onRenameAudioChannel(activeItem.id, row.id, row.label)}>Renomear canal</button><button type="button" onClick={() => onUpdateAudioChannelType(activeItem.id, row.id, row.type)}>Tipo</button><button type="button" onClick={() => onTransposeAudioChannel(activeItem.id, row.id, -12)}>−8va</button><button type="button" onClick={() => onTransposeAudioChannel(activeItem.id, row.id, 12)}>+8va</button><button className="danger-button" type="button" onClick={() => onRemoveAudioChannel(activeItem.id, row.id, row.label)}>Remover canal</button></div>)}</details>
+              <details><summary>{ui("Gerenciar canais")}</summary>{activeItem.previewRows.map(row => <div className="audio-actions" key={row.id}><strong>{row.label}</strong><button type="button" onClick={() => onRenameAudioChannel(activeItem.id, row.id, row.label)}>{ui("Renomear canal")}</button><button type="button" onClick={() => onUpdateAudioChannelType(activeItem.id, row.id, row.type)}>{ui("Tipo")}</button><button type="button" onClick={() => onTransposeAudioChannel(activeItem.id, row.id, -12)}>{ui("−8va")}</button><button type="button" onClick={() => onTransposeAudioChannel(activeItem.id, row.id, 12)}>{ui("+8va")}</button><button className="danger-button" type="button" onClick={() => onRemoveAudioChannel(activeItem.id, row.id, row.label)}>{ui("Remover canal")}</button></div>)}</details>
             </> : null}
-            <details><summary>Banco de instrumentos ({presentation.instruments?.length ?? 0})</summary>{presentation.instruments?.length ? presentation.instruments.map(instrument => <div className="audio-groove-bank-row" key={instrument.id}><label>Nome<input aria-label={`Nome do instrumento ${instrument.name}`} value={instrument.name} onChange={event => onUpdateAudioInstrument?.(instrument.id, { name: event.currentTarget.value })} /></label><span>{instrument.usageCount} faixa(s)</span><button className="danger-button" type="button" disabled={instrument.usageCount > 0 || !onRemoveAudioInstrument} onClick={() => onRemoveAudioInstrument?.(instrument.id)}>Remover instrumento</button></div>) : <p>Escolha um WAV e salve o instrumento para reutilizá-lo em outras músicas.</p>}</details>
-            <details><summary>Dados técnicos</summary>{audioEditor(activeItem, sceneOptions, onUpdateAudioFields)}</details>
-            <details open={activeItem.errors.length > 0}><summary>Validação GBA · {activeItem.status === "Atencao" ? "Atenção" : activeItem.status}</summary>{[...activeItem.errors, ...activeItem.warnings].length ? <ul>{[...activeItem.errors, ...activeItem.warnings].map(message => <li key={message}>{message}</li>)}</ul> : <p>Sem bloqueios detectados. A ROM será validada ao compilar.</p>}</details>
-            {exportSummary ? <details><summary>Exportação</summary><p>{exportSummary.fileName} · {exportSummary.exportID}</p><p>{exportSummary.playbackBadge} · {exportSummary.playbackLabel}</p>{activeExportDiagnostics.length ? <ul>{activeExportDiagnostics.map(entry => <li key={entry.message}>{entry.message}</li>)}</ul> : null}</details> : null}
+            <details><summary>{ui("Banco de instrumentos (")}{presentation.instruments?.length ?? 0})</summary>{presentation.instruments?.length ? presentation.instruments.map(instrument => <div className="audio-groove-bank-row" key={instrument.id}><label>{ui("Nome")}<input aria-label={ui("Nome do instrumento {0}", { 0: instrument.name })} value={instrument.name} onChange={event => onUpdateAudioInstrument?.(instrument.id, { name: event.currentTarget.value })} /></label><span>{instrument.usageCount} {ui(" faixa(s)")}</span><button className="danger-button" type="button" disabled={instrument.usageCount > 0 || !onRemoveAudioInstrument} onClick={() => onRemoveAudioInstrument?.(instrument.id)}>{ui("Remover instrumento")}</button></div>) : <p>{ui("Escolha um WAV e salve o instrumento para reutilizá-lo em outras músicas.")}</p>}</details>
+            <details><summary>{ui("Dados técnicos")}</summary>{audioEditor(activeItem, sceneOptions, onUpdateAudioFields)}</details>
+            <details open={activeItem.errors.length > 0}><summary>{ui("Validação GBA · ")}{activeItem.status === "Atencao" ? ui("Atenção") : activeItem.status}</summary>{[...activeItem.errors, ...activeItem.warnings].length ? <ul>{[...activeItem.errors, ...activeItem.warnings].map(message => <li key={message}>{ui(message)}</li>)}</ul> : <p>{ui("Sem bloqueios detectados. A ROM será validada ao compilar.")}</p>}</details>
+            {exportSummary ? <details><summary>{ui("Exportação")}</summary><p>{exportSummary.fileName} · {exportSummary.exportID}</p><p>{exportSummary.playbackBadge} · {exportSummary.playbackLabel}</p>{activeExportDiagnostics.length ? <ul>{activeExportDiagnostics.map(entry => <li key={entry.message}>{ui(entry.message)}</li>)}</ul> : null}</details> : null}
             </div>
           </aside> : null}
       </div>

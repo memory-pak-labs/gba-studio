@@ -1,4 +1,5 @@
 import { readdir, readFile } from "node:fs/promises";
+import { createHash } from "node:crypto";
 import { describe, expect, it } from "vitest";
 import { createRequire } from "node:module";
 const { decodePngRgba } = createRequire(import.meta.url)("../../scripts/lib/png-icons.mjs") as {
@@ -52,7 +53,7 @@ describe("default assets accepted by the GBAStudio Engine assetc", () => {
     expect(project.assets.some((asset) => asset.name === "mercado-suspenso-modules-v5.png")).toBe(false);
   });
 
-  it("keeps only files declared by the current Exemplo GBA project", async () => {
+  it("keeps runtime files and only approved preserved sources in Exemplo GBA", async () => {
     const projectURL = new URL(
       "../../default-assets/templates/exemplo-gba/exemplo-gba.gba-project",
       import.meta.url
@@ -80,7 +81,14 @@ describe("default assets accepted by the GBAStudio Engine assetc", () => {
       .sort();
 
     expect(new Set(declared).size).toBe(declared.length);
-    await expect(walk(assetsURL)).resolves.toEqual(declared);
+    const physical = await walk(assetsURL);
+    expect(declared.filter(source => !physical.includes(source))).toEqual([]);
+    const catalog = JSON.parse(await readFile(new URL("../../scripts/p0-source-catalog.json", import.meta.url), "utf8"));
+    for (const source of physical.filter(source => !declared.includes(source))) {
+      const approved = catalog.canonicalP0.assetPolicy.approved.find((entry: { path: string }) => entry.path === `Assets/${source}`);
+      expect(approved, `undeclared source must have explicit provenance: ${source}`).toBeDefined();
+      expect(createHash("sha256").update(await readFile(new URL(source, assetsURL))).digest("hex")).toBe(approved.sha256);
+    }
   });
 
   it("keeps the current dialogue UI assets available", async () => {

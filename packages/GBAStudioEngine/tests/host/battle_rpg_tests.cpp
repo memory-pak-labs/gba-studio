@@ -97,6 +97,18 @@ constexpr gbs::BattleRpgProjectData scripted_project { scripted_encounters, 1, 0
 } // namespace
 
 int main() {
+    auto before_damage = gbs::make_battle_rpg_runtime_state(encounters[0]);
+    auto after_damage = before_damage;
+    assert(!gbs::battle_rpg_party_took_damage(before_damage, after_damage, encounters[0]));
+    --after_damage.enemy_hp[0];
+    assert(!gbs::battle_rpg_party_took_damage(before_damage, after_damage, encounters[0]));
+    --after_damage.party_hp[1];
+    assert(gbs::battle_rpg_party_took_damage(before_damage, after_damage, encounters[0]));
+    before_damage = after_damage;
+    ++after_damage.party_hp[1];
+    assert(!gbs::battle_rpg_party_took_damage(before_damage, after_damage, encounters[0]));
+    after_damage.party_hp[1] = 0;
+    assert(gbs::battle_rpg_party_took_damage(before_damage, after_damage, encounters[0]));
     static_assert(gbs::is_valid_battle_rpg_project_data(project));
     static_assert(gbs::battle_rpg_background_for(visual_project, encounters[0]) == &battle_backgrounds[0]);
     static_assert(gbs::battle_rpg_participant_metasprite_for(party[0]) == &hero_metasprite);
@@ -190,6 +202,8 @@ int main() {
     gbs::EventState event_state {};
     event_state.variables[5] = 42;
     event_state.variables[gbs::event_variable_count - 1] = 905;
+    event_state.inventory[0] = 3;
+    event_state.inventory[gbs::max_event_inventory_items - 1] = 2;
     locked.selected_ability = 0;
     gbs::BattleRpgSaveData save_data {};
     gbs::capture_battle_rpg_save_data(save_data, 0, locked, event_state, 1234, 7);
@@ -202,6 +216,40 @@ int main() {
     assert(restored.reward_gold == 100 && restored.reward_experience == 50);
     assert(restored_events.variables[5] == 42);
     assert(restored_events.variables[gbs::event_variable_count - 1] == 905);
+    assert(restored_events.inventory[0] == 3);
+    assert(restored_events.inventory[gbs::max_event_inventory_items - 1] == 2);
+
+    constexpr gbs::BattleRpgInventoryItemData items[] = {{ "TONICO", 3, 0, 10 }};
+    auto item_encounter = encounters[0];
+    item_encounter.inventory_items = items;
+    item_encounter.inventory_item_count = 1;
+    assert(gbs::is_valid_battle_rpg_encounter(item_encounter));
+    auto item_state = gbs::make_battle_rpg_runtime_state(item_encounter);
+    gbs::EventState inventory_state {};
+    inventory_state.inventory[3] = 2;
+    assert(!gbs::use_battle_inventory_item(item_state, item_encounter, inventory_state, 0, 1)); // Full HP does not consume.
+    assert(inventory_state.inventory[3] == 2 && !item_state.enemy_turn_pending);
+    item_state.party_hp[1] = 17;
+    assert(gbs::use_battle_inventory_item(item_state, item_encounter, inventory_state, 0, 1));
+    assert(item_state.party_hp[1] == 18 && item_state.party_hp[0] == 24);
+    assert(inventory_state.inventory[3] == 1 && item_state.enemy_turn_pending);
+    assert(!gbs::use_battle_inventory_item(item_state, item_encounter, inventory_state, 0, 2));
+    item_state.enemy_turn_pending = false;
+    item_state.party_hp[2] = 0;
+    assert(!gbs::use_battle_inventory_item(item_state, item_encounter, inventory_state, 0, 2)); // Does not revive.
+    assert(!gbs::use_battle_inventory_item(item_state, item_encounter, inventory_state, -1, 1));
+    assert(!gbs::use_battle_inventory_item(item_state, item_encounter, inventory_state, 1, 1));
+    item_state.party_hp[1] = 1;
+    assert(gbs::use_battle_inventory_item(item_state, item_encounter, inventory_state, 0, 1));
+    assert(item_state.party_hp[1] == 11 && inventory_state.inventory[3] == 0);
+    item_state.enemy_turn_pending = false;
+    assert(!gbs::use_battle_inventory_item(item_state, item_encounter, inventory_state, 0, 1));
+    gbs::capture_battle_rpg_save_data(save_data, 0, item_state, inventory_state);
+    restored_events.inventory[3] = 2;
+    assert(gbs::apply_battle_rpg_save_data(project, save_data, restored_encounter, restored, restored_events));
+    assert(restored_events.inventory[3] == 0 && restored.party_hp[1] == 11); // Consumed item stays consumed.
+    save_data.inventory[3] = -1;
+    assert(!gbs::apply_battle_rpg_save_data(project, save_data, restored_encounter, restored, restored_events));
 
     gbs::EventState transition_source {};
     gbs::init_event_state(transition_source);

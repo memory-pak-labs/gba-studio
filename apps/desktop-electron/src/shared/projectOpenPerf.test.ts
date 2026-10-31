@@ -41,7 +41,7 @@ describe("project open perf smoke", () => {
     timings.p0Sprites = elapsedMs(start);
 
     const total = Object.values(timings).reduce((sum, value) => sum + value, 0);
-    expect(total).toBeLessThan(750);
+    expect(total, JSON.stringify(timings)).toBeLessThan(750);
     expect(timings.p0Audio).toBeLessThan(500);
   });
 });

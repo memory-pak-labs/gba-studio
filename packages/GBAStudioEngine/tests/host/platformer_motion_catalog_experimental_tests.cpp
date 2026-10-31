@@ -1,0 +1,3 @@
+#include <cassert>
+#include "gbs/platformer_motion_catalog.hpp"
+int main(){const gbs::EventCommand a[]={{gbs::EventOp::End,0,0,0}};const gbs::EventScript scripts[]={{a,1}};gbs::PlatformerRoomData room{};room.on_enter={a,1};gbs::PlatformerProjectData project{};project.rooms=&room;project.room_count=1;project.scripts=scripts;project.script_count=1;gbs::PlatformerMotionCatalog c{&project,0};const int32_t id=gbs::platformer_motion_identify(room.on_enter,&c);assert(id>=0);assert(gbs::platformer_motion_resolve(id,&c).commands==a);assert(!gbs::has_event_script(gbs::platformer_motion_resolve(999,&c)));}

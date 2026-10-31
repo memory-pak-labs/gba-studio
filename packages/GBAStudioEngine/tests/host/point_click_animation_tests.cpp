@@ -37,4 +37,15 @@ int main() {
     project.cursor_click_animation = nullptr;
     gbs::update_point_click_cursor_animator(cursor, project, true, true);
     assert(cursor.animation == &idle);
+
+    gbs::PointClickSceneData scenes[2] {};
+    scenes[0].cursor_metasprite = &frames[0].metasprite;
+    scenes[0].cursor_idle_animation = &hover;
+    project.scenes = scenes;
+    project.scene_count = 2;
+    gbs::update_point_click_cursor_animator(cursor, project, true, true, 0);
+    assert(cursor.animation == &hover); // Scene without click/hover uses its own idle.
+    assert(gbs::point_click_cursor_metasprite(project, 0) == scenes[0].cursor_metasprite);
+    gbs::update_point_click_cursor_animator(cursor, project, false, false, 1);
+    assert(cursor.animation == &idle); // Next scene restores the project default.
 }

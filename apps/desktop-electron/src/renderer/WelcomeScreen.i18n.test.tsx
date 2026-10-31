@@ -11,9 +11,26 @@ describe("WelcomeScreen i18n", () => {
 
   beforeEach(() => {
     window.localStorage.clear();
+    window.localStorage.setItem("gbaStudio.locale", "pt-BR");
     window.gbaStudio = {
       getRecentProjects: vi.fn(async () => [])
     } as unknown as typeof window.gbaStudio;
+  });
+
+  it("starts in English with a visible Language label and preserves the next choice on remount", async () => {
+    window.localStorage.removeItem("gbaStudio.locale");
+    const user = userEvent.setup();
+    const welcome = <StudioI18nProvider><WelcomeScreen status="Ready." onCreateProject={vi.fn()} onOpenProject={vi.fn()} onOpenRecentProject={vi.fn()} /></StudioI18nProvider>;
+    const { unmount } = render(welcome);
+    expect(screen.getByLabelText("App language")).toHaveValue("en-US");
+    expect(screen.getByText("Language", { selector: ".studio-language-label" })).toBeVisible();
+    await user.selectOptions(screen.getByLabelText("App language"), "pt-BR");
+    expect(screen.getByText("Idioma", { selector: ".studio-language-label" })).toBeVisible();
+    expect(window.localStorage.getItem("gbaStudio.locale")).toBe("pt-BR");
+    unmount();
+    render(welcome);
+    expect(screen.getByLabelText("Idioma do app")).toHaveValue("pt-BR");
+    expect(screen.getByRole("heading", { name: "Criar projeto" })).toBeVisible();
   });
 
   it("switches the welcome UI between English and Latin American Spanish", async () => {
@@ -38,9 +55,9 @@ describe("WelcomeScreen i18n", () => {
     expect(screen.getByRole("button", { name: /Blank project/ })).toBeInTheDocument();
     expect(screen.getByDisplayValue("Choose when creating")).toBeInTheDocument();
     expect(screen.getByText("A folder named after the project will be created at the selected destination.")).toBeInTheDocument();
-    expect(screen.getByText("Complete project with 30 scenes and 13 native runtimes for Game Boy Advance.")).toBeInTheDocument();
+    expect(screen.getByText("Complete project with 36 scenes and 13 native runtimes for Game Boy Advance.")).toBeInTheDocument();
     expect(screen.queryByRole("heading", { name: "First path" })).not.toBeInTheDocument();
-    expect(screen.queryByText("Explore all 30 scenes, the different runtimes and the assets prepared for GBA.")).not.toBeInTheDocument();
+    expect(screen.queryByText("Explore all 31 scenes, the different runtimes and the assets prepared for GBA.")).not.toBeInTheDocument();
 
     await user.selectOptions(screen.getByLabelText("App language"), "es-ES");
 
@@ -49,7 +66,7 @@ describe("WelcomeScreen i18n", () => {
     expect(screen.getByRole("button", { name: "Empezar con el ejemplo" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /Proyecto en blanco/ })).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "Plantillas" })).toBeInTheDocument();
-    expect(screen.getByText("Proyecto completo con 30 escenas y 13 runtimes nativos para Game Boy Advance.")).toBeInTheDocument();
+    expect(screen.getByText("Proyecto completo con 36 escenas y 13 runtimes nativos para Game Boy Advance.")).toBeInTheDocument();
   });
 
   it("remove o bloco Primeiro caminho da Welcome", () => {

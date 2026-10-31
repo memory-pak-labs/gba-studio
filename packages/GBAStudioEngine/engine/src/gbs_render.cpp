@@ -1,8 +1,17 @@
+#include "gbs/dma.hpp"
 #include "gbs/render.hpp"
 #include "gbs/bios.hpp"
 #include "gbs/event.hpp"
 #include "gbs/interrupt.hpp"
 #include "gbs_hw.h"
+#include "gbs_room_tilemap.h"
+#include "gbs/tile_edits.hpp"
+
+#if !defined(__arm__) && !defined(__thumb__)
+// Pure render host fixtures omit the DMA transport. Full queue tests link the
+// strong implementation, which replaces this no-queue host stub.
+namespace gbs { __attribute__((weak)) bool dma_wait_for_source(const void*, size_t) { return true; } }
+#endif
 
 namespace gbs {
 
@@ -15,12 +24,13 @@ namespace {
 #endif
 
 uint16_t tilemap_decode_buffer[max_rle16_tilemap_entries] GBS_RENDER_EWRAM;
-uint8_t lz77_tilemap_decode_buffer[max_lz77_tilemap_bytes] GBS_RENDER_EWRAM;
-uint8_t lz77_tile_decode_buffer[max_lz77_tile_asset_bytes] GBS_RENDER_EWRAM;
-uint8_t lz77_palette_decode_buffer[max_lz77_palette_bytes] GBS_RENDER_EWRAM;
-alignas(4) uint8_t huffman_tilemap_decode_buffer[max_lz77_tilemap_bytes] GBS_RENDER_EWRAM;
-alignas(4) uint8_t huffman_tile_decode_buffer[max_huffman_tile_asset_bytes] GBS_RENDER_EWRAM;
-alignas(4) uint8_t huffman_palette_decode_buffer[max_huffman_palette_bytes] GBS_RENDER_EWRAM;
+// Both codecs decode synchronously into these workspaces. The tile workspace
+// may be borrowed by queued DMA, so every reuse waits for that source below.
+static_assert(max_lz77_tile_asset_bytes == max_huffman_tile_asset_bytes, "shared tile scratch capacity");
+static_assert(max_lz77_palette_bytes == max_huffman_palette_bytes, "shared palette scratch capacity");
+alignas(4) uint8_t compressed_tilemap_decode_buffer[max_lz77_tilemap_bytes] GBS_RENDER_EWRAM;
+alignas(4) uint8_t compressed_tile_decode_buffer[max_lz77_tile_asset_bytes] GBS_RENDER_EWRAM;
+alignas(4) uint8_t compressed_palette_decode_buffer[max_lz77_palette_bytes] GBS_RENDER_EWRAM;
 uint16_t palette_decode_buffer[max_lz77_palette_colors] GBS_RENDER_EWRAM;
 uint16_t dynamic_palette_buffer[256] GBS_RENDER_EWRAM;
 int background_scroll_x[4] {};
@@ -109,14 +119,15 @@ bool load_palette(const Lz77PaletteAsset& asset, bool object_palette) {
     if (!is_valid_lz77_palette_asset(asset)) {
         return false;
     }
-    if (!decode_lz77_runtime(asset.data, lz77_palette_decode_buffer, max_lz77_palette_bytes)) {
+    if (!dma_wait_for_source(palette_decode_buffer, sizeof(palette_decode_buffer))) return false;
+    if (!decode_lz77_runtime(asset.data, compressed_palette_decode_buffer, max_lz77_palette_bytes)) {
         return false;
     }
 
     for (size_t index = 0; index < asset.color_count; ++index) {
         palette_decode_buffer[index] = static_cast<uint16_t>(
-            lz77_palette_decode_buffer[index * 2] |
-            (static_cast<uint16_t>(lz77_palette_decode_buffer[index * 2 + 1]) << 8));
+            compressed_palette_decode_buffer[index * 2] |
+            (static_cast<uint16_t>(compressed_palette_decode_buffer[index * 2 + 1]) << 8));
     }
 
     if (object_palette) {
@@ -131,14 +142,15 @@ bool load_palette(const HuffmanPaletteAsset& asset, bool object_palette) {
     if (!is_valid_huffman_palette_asset(asset)) {
         return false;
     }
-    if (!decode_huffman_runtime(asset.data, huffman_palette_decode_buffer, max_huffman_palette_bytes)) {
+    if (!dma_wait_for_source(palette_decode_buffer, sizeof(palette_decode_buffer))) return false;
+    if (!decode_huffman_runtime(asset.data, compressed_palette_decode_buffer, max_huffman_palette_bytes)) {
         return false;
     }
 
     for (size_t index = 0; index < asset.color_count; ++index) {
         palette_decode_buffer[index] = static_cast<uint16_t>(
-            huffman_palette_decode_buffer[index * 2] |
-            (static_cast<uint16_t>(huffman_palette_decode_buffer[index * 2 + 1]) << 8));
+            compressed_palette_decode_buffer[index * 2] |
+            (static_cast<uint16_t>(compressed_palette_decode_buffer[index * 2 + 1]) << 8));
     }
 
     if (object_palette) {
@@ -246,18 +258,19 @@ bool load_tiles(const Lz77TileAsset& asset) {
     if (!is_valid_lz77_tile_asset(asset)) {
         return false;
     }
-    if (!decode_lz77_runtime(asset.data, lz77_tile_decode_buffer, max_lz77_tile_asset_bytes)) {
+    if (!dma_wait_for_source(compressed_tile_decode_buffer, sizeof(compressed_tile_decode_buffer))) return false;
+    if (!decode_lz77_runtime(asset.data, compressed_tile_decode_buffer, max_lz77_tile_asset_bytes)) {
         return false;
     }
 
     if (asset.object_tiles) {
         if (asset.color_depth == ColorDepth::Bpp8) {
-            gbs_hw_load_obj_tiles_8bpp(lz77_tile_decode_buffer, asset.destination_tile, asset.tile_count);
+            gbs_hw_load_obj_tiles_8bpp(compressed_tile_decode_buffer, asset.destination_tile, asset.tile_count);
         } else {
-            gbs_hw_load_obj_tiles(lz77_tile_decode_buffer, asset.destination_tile, asset.tile_count);
+            gbs_hw_load_obj_tiles(compressed_tile_decode_buffer, asset.destination_tile, asset.tile_count);
         }
     } else {
-        gbs_hw_load_bg_tiles(lz77_tile_decode_buffer, asset.destination_tile, asset.tile_count);
+        gbs_hw_load_bg_tiles(compressed_tile_decode_buffer, asset.destination_tile, asset.tile_count);
     }
     return true;
 }
@@ -266,18 +279,19 @@ bool load_tiles(const HuffmanTileAsset& asset) {
     if (!is_valid_huffman_tile_asset(asset)) {
         return false;
     }
-    if (!decode_huffman_runtime(asset.data, huffman_tile_decode_buffer, max_huffman_tile_asset_bytes)) {
+    if (!dma_wait_for_source(compressed_tile_decode_buffer, sizeof(compressed_tile_decode_buffer))) return false;
+    if (!decode_huffman_runtime(asset.data, compressed_tile_decode_buffer, max_huffman_tile_asset_bytes)) {
         return false;
     }
 
     if (asset.object_tiles) {
         if (asset.color_depth == ColorDepth::Bpp8) {
-            gbs_hw_load_obj_tiles_8bpp(huffman_tile_decode_buffer, asset.destination_tile, asset.tile_count);
+            gbs_hw_load_obj_tiles_8bpp(compressed_tile_decode_buffer, asset.destination_tile, asset.tile_count);
         } else {
-            gbs_hw_load_obj_tiles(huffman_tile_decode_buffer, asset.destination_tile, asset.tile_count);
+            gbs_hw_load_obj_tiles(compressed_tile_decode_buffer, asset.destination_tile, asset.tile_count);
         }
     } else {
-        gbs_hw_load_bg_tiles(huffman_tile_decode_buffer, asset.destination_tile, asset.tile_count);
+        gbs_hw_load_bg_tiles(compressed_tile_decode_buffer, asset.destination_tile, asset.tile_count);
     }
     return true;
 }
@@ -360,6 +374,7 @@ bool load_tilemap(BackgroundLayer layer, const Rle16TileMapAsset& asset) {
     if (!is_valid_background_layer(layer) || !is_valid_rle16_tilemap_asset(asset) || !is_valid_background_map_size(size)) {
         return false;
     }
+    if (!dma_wait_for_source(tilemap_decode_buffer, sizeof(tilemap_decode_buffer))) return false;
     if (!decode_rle16(asset.data, tilemap_decode_buffer, max_rle16_tilemap_entries)) {
         return false;
     }
@@ -373,15 +388,16 @@ bool load_tilemap(BackgroundLayer layer, const Lz77TileMapAsset& asset) {
     if (!is_valid_background_layer(layer) || !is_valid_lz77_tilemap_asset(asset) || !is_valid_background_map_size(size)) {
         return false;
     }
-    if (!decode_lz77_runtime(asset.data, lz77_tilemap_decode_buffer, max_lz77_tilemap_bytes)) {
+    if (!dma_wait_for_source(tilemap_decode_buffer, sizeof(tilemap_decode_buffer))) return false;
+    if (!decode_lz77_runtime(asset.data, compressed_tilemap_decode_buffer, max_lz77_tilemap_bytes)) {
         return false;
     }
 
     size_t entry_count = static_cast<size_t>(asset.width) * asset.height;
     for (size_t index = 0; index < entry_count; ++index) {
         tilemap_decode_buffer[index] = static_cast<uint16_t>(
-            lz77_tilemap_decode_buffer[index * 2] |
-            (static_cast<uint16_t>(lz77_tilemap_decode_buffer[index * 2 + 1]) << 8));
+            compressed_tilemap_decode_buffer[index * 2] |
+            (static_cast<uint16_t>(compressed_tilemap_decode_buffer[index * 2 + 1]) << 8));
     }
 
     gbs_hw_load_bg_tilemap(static_cast<int>(layer), tilemap_decode_buffer, asset.width, asset.height, static_cast<uint32_t>(size));
@@ -393,15 +409,16 @@ bool load_tilemap(BackgroundLayer layer, const HuffmanTileMapAsset& asset) {
     if (!is_valid_background_layer(layer) || !is_valid_huffman_tilemap_asset(asset) || !is_valid_background_map_size(size)) {
         return false;
     }
-    if (!decode_huffman_runtime(asset.data, huffman_tilemap_decode_buffer, max_lz77_tilemap_bytes)) {
+    if (!dma_wait_for_source(tilemap_decode_buffer, sizeof(tilemap_decode_buffer))) return false;
+    if (!decode_huffman_runtime(asset.data, compressed_tilemap_decode_buffer, max_lz77_tilemap_bytes)) {
         return false;
     }
 
     const size_t entry_count = static_cast<size_t>(asset.width) * asset.height;
     for (size_t index = 0; index < entry_count; ++index) {
         tilemap_decode_buffer[index] = static_cast<uint16_t>(
-            huffman_tilemap_decode_buffer[index * 2] |
-            (static_cast<uint16_t>(huffman_tilemap_decode_buffer[index * 2 + 1]) << 8));
+            compressed_tilemap_decode_buffer[index * 2] |
+            (static_cast<uint16_t>(compressed_tilemap_decode_buffer[index * 2 + 1]) << 8));
     }
 
     gbs_hw_load_bg_tilemap(static_cast<int>(layer), tilemap_decode_buffer, asset.width, asset.height, static_cast<uint32_t>(size));
@@ -739,6 +756,41 @@ void draw_room_to_bg_cached(BackgroundLayer layer, const uint16_t* tiles, int wi
     cache = RoomTilemapCache { tiles, width, height, tile_x, tile_y, layer, true };
 }
 
+void draw_room_to_bg_cached(BackgroundLayer layer, const uint16_t* tiles, int width, int height,
+    int camera_x, int camera_y, RoomTilemapCache& cache, const RoomTileEdits& edits) {
+    if (!is_valid_background_layer(layer)) return;
+    const int tile_x = camera_x / 8, tile_y = camera_y / 8;
+    if (cache.valid && cache.tiles == tiles && cache.width == width && cache.height == height &&
+        cache.layer == layer && cache.tile_x == tile_x && cache.tile_y == tile_y &&
+        cache.edits_revision == edits.revision) return;
+    bool edited_layer=false;
+    for (size_t i=0; i<edits.count; ++i)
+        if ((edits.entries[i].key>>28)==static_cast<uint32_t>(layer)) { edited_layer=true; break; }
+    if (!edited_layer) {
+        // The hardware already stages an unchanged source into this layer's shadow.
+        // Avoid staging a second 2 KiB copy through the shared decode scratch.
+        draw_room_to_bg(layer,tiles,width,height,camera_x,camera_y);
+        cache=RoomTilemapCache{tiles,width,height,tile_x,tile_y,layer,true,edits.revision};
+        return;
+    }
+    // load_tilemap stages this 32x32 window and its size at the frame boundary.
+    // It must not write edits directly into VRAM before the pending map commits.
+    // The upload copies into the per-layer shadow immediately, so reuse the
+    // existing decode scratch instead of reserving another 2 KiB of EWRAM.
+    static_assert(max_rle16_tilemap_entries >= 1024, "room staging scratch");
+    auto& window = tilemap_decode_buffer;
+    gbs_stage_room_tilemap16(window, tiles, width, height, camera_x, camera_y);
+    for (size_t i = 0; i < edits.count; ++i) {
+        const auto& edit = edits.entries[i];
+        if ((edit.key >> 28) != static_cast<uint32_t>(layer)) continue;
+        const int x = static_cast<int>(edit.key & 0x3FFF) - tile_x;
+        const int y = static_cast<int>((edit.key >> 14) & 0x3FFF) - tile_y;
+        if (x >= 0 && y >= 0 && x < 32 && y < 32) window[y * 32 + x] = edit.tile;
+    }
+    load_tilemap(layer, TileMapAsset {window, 32, 32});
+    cache = RoomTilemapCache {tiles, width, height, tile_x, tile_y, layer, true, edits.revision};
+}
+
 void draw_text_at(int x, int y, int width, const char* text) { gbs_hw_draw_text_at(x,y,width,text); }
 
 void draw_text_overlay(int x, int y, int width, const char* text, bool visible) {
@@ -871,6 +923,10 @@ void hide_all_sprites() {
     gbs_hw_hide_all_sprites();
 }
 
+void hide_world_sprites() {
+    gbs_hw_hide_world_sprites();
+}
+
 void hide_sprites(int first_index, int count) {
     gbs_hw_hide_sprites(first_index, count);
 }
@@ -888,6 +944,9 @@ bool set_hblank_bg_scroll(BackgroundLayer layer, const int16_t* offsets, size_t 
     return true;
 }
 
+#if defined(__arm__) || defined(__thumb__)
+__attribute__((section(".iwram"), target("arm"), optimize("O2"), noinline, long_call))
+#endif
 bool set_hblank_affine_raster(
     BackgroundLayer layer,
     const HBlankAffineRasterLine* lines,
@@ -910,6 +969,16 @@ bool set_hblank_affine_raster(
 
 void disable_hblank_effects() {
     clear_hblank_affine_raster();
+}
+
+bool set_hblank_window1(const uint16_t* bounds, size_t count) {
+    if (bounds == nullptr || count != 161) return false;
+    gbs_hw_start_hblank_window1(bounds);
+    return true;
+}
+
+void disable_hblank_window1() {
+    gbs_hw_disable_hblank_window1();
 }
 
 } // namespace gbs

@@ -1,16 +1,19 @@
 import { readFileSync } from "node:fs";
-import { createHash } from "node:crypto";
 import { describe, expect, it } from "vitest";
 
 import { promoteApprovedOpeningV3, OPENING_V3_FILES } from "./opening-v3-promotion.mjs";
 import { promoteApprovedOpeningV2 } from "./opening-v2-promotion.mjs";
+import { promoteApprovedOpeningV4 } from "./opening-v4-promotion.mjs";
 
 const projectPath = new URL("../default-assets/templates/exemplo-gba/exemplo-gba.gba-project", import.meta.url);
+const retired = JSON.parse(readFileSync(new URL("../fixtures/asset-provenance/example-library-cleanup.json", import.meta.url))).retiredAssets;
 const readProject = () => JSON.parse(readFileSync(projectPath, "utf8"));
 
 describe("opening-v3 promotion", () => {
   it("troca somente a arte aprovada da abertura e preserva o ritmo e os eventos", () => {
-    const source = readProject();
+    // Exercise the historical V2 -> V3 conversion on its own input, rather
+    // than assuming the current approved opening still uses those actors.
+    const source = promoteApprovedOpeningV4(promoteApprovedOpeningV2(readProject()));
     const promoted = promoteApprovedOpeningV3(source);
     const scene = promoted.rooms.find((room) => room.name === "abertura");
     const original = source.rooms.find((room) => room.name === "abertura");
@@ -46,8 +49,7 @@ describe("opening-v3 promotion", () => {
       expect(promoted.assets.some((asset) => asset.name === name)).toBe(true);
     }
     for (const { folder, name, sha256 } of OPENING_V3_FILES) {
-      const bytes = readFileSync(new URL(`Assets/${folder}/${name}`, projectPath));
-      expect(createHash("sha256").update(bytes).digest("hex")).toBe(sha256);
+      expect(retired.find(asset => asset.source === `Assets/${folder}/${name}`)?.sha256).toBe(sha256);
     }
     expect(promoted.assets.some((asset) => asset.id.startsWith("opening-v2-"))).toBe(false);
     expect(promoted.animations.some((animation) => animation.id.startsWith("opening-v2-"))).toBe(false);

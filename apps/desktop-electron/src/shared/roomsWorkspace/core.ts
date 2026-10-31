@@ -1,4 +1,8 @@
+import { roomMapStates, type MapStateDefinition } from "../mapStates.js";
+import { actorCommandReferences, sceneChangeCommand, sceneChangeCommandParts } from "../sceneChangeCommand.js";
+import { duplicateSceneContent } from "./duplicateSceneContent.js";
 import type { GBAProjectData } from "../projectFile.js";
+import { normalizePointClickTarget, type PointClickTargetConfig } from "../pointClickTargets.js";
 import { applyDefaultRoomBackground, defaultBackgroundActorPosition, defaultBackgroundForRoom } from "../blankBackgroundDefaults.js";
 import { createBlankProjectData } from "../newProject.js";
 import { buildProjectFromTemplate } from "../projectTemplates.js";
@@ -61,6 +65,7 @@ import { isometricGameplayModeForSceneTypeChoice, normalizeSceneTypeId, sceneTyp
 import {
   defaultSceneRuntime,
   isometricSceneConfigFromRuntime,
+  dungeonCrawlerSceneConfigFromRuntime,
   normalizeSceneRuntime,
   resolveSceneControlledEntityContract,
   DEFAULT_ISOMETRIC_SCENE_CONFIG,
@@ -83,6 +88,7 @@ import { deriveIsometricWorldSize, type IsometricWorldSize } from "../isometricA
 import {
   cameraModeLabel,
   centerRoomCameraBounds,
+  defaultRoomCameraBounds,
   normalizeCameraModeId,
   normalizeRoomCameraBounds,
   normalizeRoomCameraZoom,
@@ -106,6 +112,8 @@ import {
   defaultSceneActorPosition
 } from "../sceneDefaultActors.js";
 import { blankPlayerSpriteForRoom, usesBlankPlayerDefaults } from "../blankPlayerDefaults.js";
+import { blankDungeonInitialLayout, blankDungeonMaterials, blankDungeonNpcDefaults } from "../blankDungeonDefaults.js";
+import { nearestDungeonPassage } from "../dungeonSceneView.js";
 import { BLANK_SCENE_HUD_IDS } from "../blankSceneHudDefaults.js";
 
 export type { RoomCollisionType } from "../roomCollisionTypes.js";
@@ -141,6 +149,7 @@ export interface RoomBackgroundFidelity {
 }
 
 export interface RoomsWorkspaceRoom {
+  mapStates?: MapStateDefinition[];
   id: string;
   name: string;
   displayName?: string;
@@ -535,14 +544,19 @@ export interface RoomsWorkspaceEntity {
   spriteSource?: string | null;
   spriteBundledDefaultAsset?: string | null;
   spriteFrame?: RoomsWorkspaceSpriteFrame | null;
+  /** Source-frame pivot used by the isometric export, independent of padding. */
+  spritePivot?: { x: number; y: number };
   animationName?: string | null;
   animationStateID?: string | null;
   z?: number;
   hasCustomBounds?: boolean;
+  /** Authored animation hitbox, in pixels relative to the actor anchor. */
+  collisionBounds?: { x: number; y: number; width: number; height: number };
   collisionGroup?: number;
   collisionMask?: number;
   pushPriority?: number;
   pushable?: boolean;
+  health?: number;
   battle?: RoomsWorkspaceActorBattle;
   isInActiveRoom: boolean;
 }
@@ -639,7 +653,7 @@ export interface RoomPreset {
 }
 
 export const ROOM_PRESETS: RoomPreset[] = [
-  { id: "isometricAdventure", label: "Isométrica · Aventura", description: "Exploração livre com composição, rampas e sprites aprovados do Mercado.", width: 36, height: 36, sceneType: "isometricAdventure", cameraMode: "follow_player", borderCollision: false },
+  { id: "isometricAdventure", label: "Isométrica · Aventura", description: "Exploração livre com composição, rampas e sprites aprovados do Mercado.", width: 52, height: 52, sceneType: "isometricAdventure", cameraMode: "follow_player", borderCollision: false },
   { id: "isometricTactical", label: "Isométrica · Batalha tática RPG", description: "Arena por turnos com uma unidade aliada e uma inimiga.", width: 6, height: 6, sceneType: "isometricTactical", cameraMode: "fixed_center", borderCollision: false },
   { id: "interior", label: "Interior", description: "Cena compacta com bordas sólidas.", width: 30, height: 20, sceneType: "topdown", cameraMode: "fixed_center", borderCollision: true },
   { id: "exterior", label: "Exterior", description: "Área ampla com câmera seguindo o jogador.", width: 30, height: 20, sceneType: "topdown", cameraMode: "follow_player", borderCollision: false },
@@ -692,6 +706,7 @@ export interface UpdateRoomConnectionFields {
 }
 
 export interface UpdateRoomFields {
+  mapStates?: MapStateDefinition[];
   width?: number;
   height?: number;
   collisionTypes?: RoomCollisionType[];
@@ -717,6 +732,8 @@ export interface UpdateRoomFields {
 }
 
 export interface UpdateRoomEntityFields {
+  name?: string;
+  pointClick?: Partial<PointClickTargetConfig> | null;
   roomName?: string;
   x?: number;
   y?: number;
@@ -727,10 +744,20 @@ export interface UpdateRoomEntityFields {
   spriteSheet?: string;
   animationName?: string;
   animationStateID?: string;
+  lutaAnimations?: Record<string, string>;
+  battleAnimations?: Record<string, string>;
+  dungeonDepthSheets?: Record<string, string>;
+  dungeonDepthAnimationName?: string;
+  dungeonCell?: boolean;
+  dungeonWallMounted?: boolean;
+  dungeonViewAnchor?: { x: number; y: number };
+  waveIndex?: number;
+  shmup?: Record<string, string | number>;
   collisionGroup?: number;
   collisionMask?: number;
   pushPriority?: number;
   pushable?: boolean;
+  health?: number;
   battle?: Partial<RoomsWorkspaceActorBattle>;
 }
 
@@ -1624,7 +1651,7 @@ export function updateRoomEventSceneLinkCommand(
   command: string,
   fields: { x?: number; y?: number; direction?: RoomEventSceneLink["direction"] }
 ): string {
-  const parts = command.split(/\s+/).filter(Boolean);
+  const parts = sceneChangeCommandParts(command);
   if ((parts[0] ?? "").toLowerCase() !== "change_scene" || !parts[1]) return command;
   const x = Number.isFinite(fields.x) ? Math.max(0, Math.floor(fields.x as number)) : integerField(parts[2], 0);
   const y = Number.isFinite(fields.y) ? Math.max(0, Math.floor(fields.y as number)) : integerField(parts[3], 0);
@@ -1632,7 +1659,7 @@ export function updateRoomEventSceneLinkCommand(
   parts[2] = String(x);
   parts[3] = String(y);
   parts[4] = direction;
-  return parts.slice(0, 5).join(" ");
+  return sceneChangeCommand(parts.slice(0, 5));
 }
 
 export function deriveRoomEventSceneLinks(data: GBAProjectData): RoomEventSceneLink[] {
@@ -1660,7 +1687,7 @@ export function deriveRoomEventSceneLinks(data: GBAProjectData): RoomEventSceneL
 
     for (const [stepIndex, step] of steps.entries()) {
       const command = nullableString(step.command);
-      const parts = command?.split(/\s+/).filter(Boolean) ?? [];
+      const parts = command ? sceneChangeCommandParts(command) : [];
       if ((parts[0] ?? "").toLowerCase() !== "change_scene") continue;
       const to = parts[1] ?? null;
       if (!to || !knownRooms.has(to)) continue;
@@ -1672,7 +1699,7 @@ export function deriveRoomEventSceneLinks(data: GBAProjectData): RoomEventSceneL
         if (seen.has(key)) continue;
         seen.add(key);
         links.push({
-          id: "event-scene-link-" + eventID + "-" + stepIndex,
+          id: "event-scene-link-" + eventID + "-" + stepIndex + "-" + encodeURIComponent(from),
           from,
           to,
           eventName,
@@ -2108,6 +2135,11 @@ export function roomEntitySelectionFootprint(
     };
   }
 
+  // Dungeon actors occupy maze cells; sprite size describes their projected camera art.
+  if (sceneType === "dungeonCrawler") {
+    return { height: 1, width: 1, x: Math.floor(entity.x), y: Math.floor(entity.y) };
+  }
+
   if (entity.hasCustomBounds) {
     return {
       height: positiveInteger(entity.height, 1),
@@ -2159,16 +2191,32 @@ function footprintOutsideRoom(
 
 function footprintHasBlockedCollision(
   footprint: RoomEntitySelectionFootprint,
-  room: RoomsWorkspaceRoom
+  room: RoomsWorkspaceRoom,
+  requireEveryCell = false
 ): boolean {
   const collisionTypes = room.collisionTypes ?? [];
+  let hasBlockedCell = false;
   for (let y = footprint.y; y < footprint.y + footprint.height; y += 1) {
     for (let x = footprint.x; x < footprint.x + footprint.width; x += 1) {
       if (x < 0 || y < 0 || x >= room.width || y >= room.height) continue;
-      if (isBlockedCollisionType(collisionTypes[y * room.width + x] ?? "free")) return true;
+      const blocked = isBlockedCollisionType(collisionTypes[y * room.width + x] ?? "free");
+      if (!blocked && requireEveryCell) return false;
+      if (blocked) {
+        hasBlockedCell = true;
+        if (!requireEveryCell) return true;
+      }
     }
   }
-  return false;
+  return hasBlockedCell;
+}
+
+function roomEntityCollisionFootprint(entity: RoomsWorkspaceEntity, room: RoomsWorkspaceRoom): RoomEntitySelectionFootprint {
+  const bounds = room.sceneType === "platformer" && !entity.hasCustomBounds ? entity.collisionBounds : undefined;
+  if (!bounds) return roomEntitySelectionFootprint(entity, room.sceneType);
+  const left = entity.x * 8 + bounds.x;
+  const top = entity.y * 8 + bounds.y;
+  const x = Math.floor(left / 8), y = Math.floor(top / 8);
+  return { x, y, width: Math.ceil((left + bounds.width) / 8) - x, height: Math.ceil((top + bounds.height) / 8) - y };
 }
 
 function cutsceneActorUsesOffscreenStaging(
@@ -2199,6 +2247,7 @@ function cutsceneActorUsesOffscreenStaging(
 }
 
 function roomBackgroundExpectedDimensions(room: RoomsWorkspaceRoom): { width: number; height: number } {
+  if (room.sceneType === "dungeonCrawler") return { width: 240, height: 160 };
   const gridDimensions = {
     width: room.width * room.backgroundTileWidth,
     height: room.height * room.backgroundTileHeight
@@ -2262,7 +2311,12 @@ export function deriveRoomGeometryDiagnostics(
     if (entity.roomName !== room.name) continue;
     const footprint = roomEntitySelectionFootprint(entity, room.sceneType);
     const outsideBounds = footprintOutsideRoom(footprint, room);
-    const blocked = collisionChecksEnabled && !outsideBounds && footprintHasBlockedCollision(footprint, room);
+    // Platform triggers may extend into their supporting floor; an area is
+    // unreachable only when every cell is blocked. Actor diagnostics use the
+    // authored runtime hitbox rather than padding in the sprite frame.
+    const requireEveryCell = room.sceneType === "platformer" && entity.kind === "trigger";
+    const blocked = collisionChecksEnabled && !outsideBounds
+      && footprintHasBlockedCollision(roomEntityCollisionFootprint(entity, room), room, requireEveryCell);
     const target = entity.kind === "actor" ? actorPlacement : triggerPlacement;
     const actorIndex = entity.kind === "actor"
       ? roomActors.findIndex((actor) => actor.id === entity.id)
@@ -2856,6 +2910,12 @@ function entityPresentation(
   const spriteMetadataForSheet = spriteSheet ? spriteMetadata.get(spriteSheet) : undefined;
   const spriteSource = spriteSheet ? nullableString(spriteMetadataForSheet?.source) : null;
   const spriteBundledDefaultAsset = spriteSheet ? nullableString(spriteMetadataForSheet?.bundledDefaultAsset) : null;
+  const pivot = spriteMetadataForSheet?.pivot;
+  const spritePivot = kind === "actor" && isRecord(pivot)
+    && typeof pivot.x === "number" && Number.isFinite(pivot.x)
+    && typeof pivot.y === "number" && Number.isFinite(pivot.y)
+    ? { x: Math.round(pivot.x), y: Math.round(pivot.y) }
+    : null;
   const animationName = entityDocument.animationName;
   const animationStateID = entityDocument.animationStateID;
   const isPlayer = kind === "actor" && rooms.some((room) => (
@@ -2877,6 +2937,13 @@ function entityPresentation(
     || (typeof entity.height === "number" && Number.isFinite(entity.height))
     || isRecord(entity.size)
   );
+  const sheetAnimations = kind === "actor" ? projectRecords(data, "animations").filter(animation => animation.spriteSheet === spriteSheet) : [];
+  const collisionAnimation = sheetAnimations.find(animation => animation.name === animationName) ?? sheetAnimations[0];
+  const collisionBounds = collisionAnimation && ["hitboxX", "hitboxY", "hitboxWidth", "hitboxHeight"].every(key => (
+    typeof collisionAnimation[key] === "number" && Number.isFinite(collisionAnimation[key])
+  )) && Number(collisionAnimation.hitboxWidth) > 0 && Number(collisionAnimation.hitboxHeight) > 0
+    ? { x: Number(collisionAnimation.hitboxX), y: Number(collisionAnimation.hitboxY), width: Number(collisionAnimation.hitboxWidth), height: Number(collisionAnimation.hitboxHeight) }
+    : undefined;
   return {
     kind,
     id: entityDocument.id,
@@ -2892,17 +2959,20 @@ function entityPresentation(
     spriteSource,
     spriteBundledDefaultAsset,
     spriteFrame,
+    ...(spritePivot ? { spritePivot } : {}),
     animationName,
     ...(kind === "actor" && typeof entity.z === "number" && Number.isFinite(entity.z)
       ? { z: Math.floor(entity.z) }
       : {}),
     ...(hasCustomBounds ? { hasCustomBounds: true } : {}),
+    ...(collisionBounds ? { collisionBounds } : {}),
     ...(kind === "actor" ? {
       ...(animationStateID ? { animationStateID } : {}),
       collisionGroup: clampInteger(integerField(entity.collisionGroup, 0), 0, 15),
       collisionMask: clampInteger(integerField(entity.collisionMask, 0xFFFF), 0, 0xFFFF),
       pushPriority: clampInteger(integerField(entity.pushPriority, 0), 0, 255),
       pushable: entity.pushable === true,
+      health: clampInteger(integerField(entity.health, 1), 1, 999),
       battle: actorBattlePresentation(entity)
     } : {}),
     isInActiveRoom: active === resolvedRoomName
@@ -3129,19 +3199,20 @@ function renameActiveRoom(data: GBAProjectData, roomIDToRename: string, oldName:
 }
 
 function applyRoomFields(room: Record<string, unknown>, fields: UpdateRoomFields, neutralPlayers = false): void {
+  if (fields.mapStates !== undefined) room.mapStates = fields.mapStates;
   const oldWidth = positiveInteger(room.width, 30);
   const oldHeight = positiveInteger(room.height, 20);
 
   if (fields.width !== undefined) {
     room.width = Math.max(
-      normalizeSceneTypeId(fields.sceneType ?? stringField(room.sceneType, "topdown")) === "isometric" ? 1 : GBA_MIN_SCENE_WIDTH_TILES,
+      ["isometric", "dungeonCrawler"].includes(normalizeSceneTypeId(fields.sceneType ?? stringField(room.sceneType, "topdown"))) ? 1 : GBA_MIN_SCENE_WIDTH_TILES,
       positiveInteger(fields.width, positiveInteger(room.width, GBA_MIN_SCENE_WIDTH_TILES))
     );
   }
 
   if (fields.height !== undefined) {
     room.height = Math.max(
-      normalizeSceneTypeId(fields.sceneType ?? stringField(room.sceneType, "topdown")) === "isometric" ? 1 : GBA_MIN_SCENE_HEIGHT_TILES,
+      ["isometric", "dungeonCrawler"].includes(normalizeSceneTypeId(fields.sceneType ?? stringField(room.sceneType, "topdown"))) ? 1 : GBA_MIN_SCENE_HEIGHT_TILES,
       positiveInteger(fields.height, positiveInteger(room.height, GBA_MIN_SCENE_HEIGHT_TILES))
     );
   }
@@ -3152,19 +3223,20 @@ function applyRoomFields(room: Record<string, unknown>, fields: UpdateRoomFields
     const types = collisionTypes(room, oldWidth, oldHeight);
     room.collisionTypes = resizeCollisionTypeCells(types, oldWidth, oldHeight, newWidth, newHeight, "free");
     delete room.collisions;
-    if (["isometric", "racing"].includes(normalizeSceneTypeId(fields.sceneType ?? stringField(room.sceneType, "topdown")))) {
-      const resizeGrid = (value: unknown, fill: number): number[] => {
+    {
+      const resizeGrid = <T,>(value: unknown, fill: T): T[] => {
         const cells = Array.isArray(value) ? value : [];
         return Array.from({length: newWidth * newHeight}, (_, index) => {
           const x = index % newWidth;
           const y = Math.floor(index / newWidth);
-          return x < oldWidth && y < oldHeight ? integerField(cells[y * oldWidth + x], fill) : fill;
+          return x < oldWidth && y < oldHeight ? cells[y * oldWidth + x] ?? fill : fill;
         });
       };
       if (Array.isArray(room.heightLevels)) room.heightLevels = resizeGrid(room.heightLevels, 0);
       if (Array.isArray(room.tilemap)) room.tilemap = resizeGrid(room.tilemap, room.backgroundAssetName === DEFAULT_ISOMETRIC_TILESET_NAME ? 1 : 0);
       if (Array.isArray(room.tileLayers)) room.tileLayers = room.tileLayers.map(layer => isRecord(layer)
-        ? {...layer, tilemap: resizeGrid(layer.tilemap, layer.mapping === "BG2" && room.backgroundAssetName === DEFAULT_ISOMETRIC_TILESET_NAME ? 1 : -1)}
+        ? {...layer, tilemap: resizeGrid(layer.tilemap, layer.mapping === "BG2" && room.backgroundAssetName === DEFAULT_ISOMETRIC_TILESET_NAME ? 1 : -1),
+          ...(Array.isArray(layer.tileSourceAssetNames) ? { tileSourceAssetNames: resizeGrid(layer.tileSourceAssetNames, "") } : {})}
         : layer);
     }
   }
@@ -3180,6 +3252,10 @@ function applyRoomFields(room: Record<string, unknown>, fields: UpdateRoomFields
     const mode = isometricGameplayModeForSceneTypeChoice(fields.sceneType);
     if (mode) room.runtime = isometricRuntimeForMode(mode, room.runtime);
   }
+
+  // Validate against the requested dimensions/type before publishing the clone.
+  // Existing definitions must survive a scene edit without losing their cells.
+  if (room.mapStates !== undefined) room.mapStates = roomMapStates(room);
 
   if (fields.runtime !== undefined) {
     room.runtime = normalizeSceneRuntime(stringField(room.sceneType, "topdown"), fields.runtime);
@@ -3200,6 +3276,11 @@ function applyRoomFields(room: Record<string, unknown>, fields: UpdateRoomFields
   room.cameraZoom = normalizeRoomCameraZoom(fields.cameraZoom ?? room.cameraZoom);
 
   const currentCameraBounds = isRecord(room.cameraBounds) ? room.cameraBounds as Partial<RoomCameraBounds> : null;
+  const defaultCameraBounds = defaultRoomCameraBounds(oldWidth, oldHeight);
+  const followsSceneBounds = neutralPlayers && currentCameraBounds?.x === 0 && currentCameraBounds.y === 0
+    && currentCameraBounds.width === oldWidth && currentCameraBounds.height === oldHeight;
+  const enablesDefaultFollow = neutralPlayers && fields.cameraMode !== undefined && room.cameraMode === "follow_player"
+    && (!currentCameraBounds || Object.entries(defaultCameraBounds).every(([key, value]) => currentCameraBounds[key as keyof RoomCameraBounds] === value));
   if (fields.centerCameraBounds) {
     room.cameraBounds = centerRoomCameraBounds(newWidth, newHeight, fields.cameraBounds ?? currentCameraBounds);
   } else if (fields.resetCameraBoundsOrigin) {
@@ -3209,10 +3290,12 @@ function applyRoomFields(room: Record<string, unknown>, fields: UpdateRoomFields
     fields.cameraBounds !== undefined
     || fields.width !== undefined
     || fields.height !== undefined
+    || enablesDefaultFollow
     || !isRecord(room.cameraBounds)
   ) {
     room.cameraBounds = normalizeRoomCameraBounds(
-      fields.cameraBounds ?? currentCameraBounds,
+      fields.cameraBounds ?? (followsSceneBounds || enablesDefaultFollow
+        ? { x: 0, y: 0, width: newWidth, height: newHeight } : currentCameraBounds),
       newWidth,
       newHeight
     );
@@ -3298,7 +3381,9 @@ function applyRoomFields(room: Record<string, unknown>, fields: UpdateRoomFields
 
 function syncActiveRoomFields(data: GBAProjectData, sourceRoom: Record<string, unknown>, sourceIndex: number, fields: UpdateRoomFields): void {
   if (roomMatchesKnownRoom(data.scena, sourceRoom, sourceIndex)) {
-    applyRoomFields(data.scena, fields);
+    applyRoomFields(data.scena, fields, usesBlankPlayerDefaults(data));
+    if (sourceRoom.gbStudioUseBackgroundLayout !== undefined) data.scena.gbStudioUseBackgroundLayout = sourceRoom.gbStudioUseBackgroundLayout;
+    if (sourceRoom.tilemapIndexBase !== undefined) data.scena.tilemapIndexBase = sourceRoom.tilemapIndexBase;
   }
   delete data.room;
 }
@@ -3313,6 +3398,8 @@ function syncActiveRoomCollision(data: GBAProjectData, sourceRoom: Record<string
 function syncActiveRoomTilemap(data: GBAProjectData, sourceRoom: Record<string, unknown>, sourceIndex: number): void {
   if (roomMatchesKnownRoom(data.scena, sourceRoom, sourceIndex)) {
     data.scena.tilemap = cloneProjectData(sourceRoom.tilemap);
+    if (sourceRoom.gbStudioUseBackgroundLayout !== undefined) data.scena.gbStudioUseBackgroundLayout = sourceRoom.gbStudioUseBackgroundLayout;
+    if (sourceRoom.tilemapIndexBase !== undefined) data.scena.tilemapIndexBase = sourceRoom.tilemapIndexBase;
     if (Array.isArray(sourceRoom.tileLayers)) {
       data.scena.tileLayers = cloneProjectData(sourceRoom.tileLayers);
     }
@@ -3351,7 +3438,15 @@ function applyLayeredTileEdit(
   });
   room.tileLayers = result.layers;
   room.tilemap = result.exportTilemap;
+  useEditableBlankBackground(data, room);
   return true;
+}
+
+function useEditableBlankBackground(data: GBAProjectData, room: Record<string, unknown>): void {
+  if (usesBlankPlayerDefaults(data) && ["topdown", "platformer"].includes(String(room.sceneType))) {
+    room.tilemapIndexBase = 1;
+    if (room.backgroundAssetName === defaultBackgroundForRoom(data, room)) room.gbStudioUseBackgroundLayout = false;
+  }
 }
 
 function retargetActiveRoomAfterRemoval(data: GBAProjectData, roomIDToRemove: string, oldName: string, remainingRooms: Record<string, unknown>[]): void {
@@ -3395,6 +3490,11 @@ function roomNameSet(data: GBAProjectData): Set<string> {
 
 function renameChangeSceneCommand(command: unknown, oldName: string, nextName: string): unknown {
   if (typeof command !== "string") return command;
+  const parts = sceneChangeCommandParts(command);
+  if (parts[0] === "change_scene" && parts[1] === oldName) {
+    parts[1] = nextName;
+    return sceneChangeCommand(parts);
+  }
   if (command === `change_scene ${oldName}`) {
     return `change_scene ${nextName}`;
   }
@@ -3503,12 +3603,13 @@ function makeRoom(options: CreateRoomOptions, neutralPlayers = false): Record<st
   const preset = options.presetID ? ROOM_PRESETS.find((item) => item.id === options.presetID) : undefined;
   const choice = preset?.sceneType ?? stringField(options.sceneType, "topdown");
   const sceneType = normalizeSceneTypeId(choice, "topdown");
-  const width = Math.max(
-    sceneType === "isometric" ? 1 : GBA_MIN_SCENE_WIDTH_TILES,
+  const defaultDungeonSize = neutralPlayers && sceneType === "dungeonCrawler" && options.width === 30 && options.height === 20;
+  const width = defaultDungeonSize ? 11 : Math.max(
+    ["isometric", "dungeonCrawler"].includes(sceneType) ? 1 : GBA_MIN_SCENE_WIDTH_TILES,
     positiveInteger(preset?.width ?? options.width, GBA_MIN_SCENE_WIDTH_TILES)
   );
-  const height = Math.max(
-    sceneType === "isometric" ? 1 : GBA_MIN_SCENE_HEIGHT_TILES,
+  const height = defaultDungeonSize ? 11 : Math.max(
+    ["isometric", "dungeonCrawler"].includes(sceneType) ? 1 : GBA_MIN_SCENE_HEIGHT_TILES,
     positiveInteger(preset?.height ?? options.height, GBA_MIN_SCENE_HEIGHT_TILES)
   );
   const collisionTypes = preset?.borderCollision
@@ -3564,6 +3665,7 @@ function defaultPlayerSpriteForScene(data: GBAProjectData, sceneType: string, ro
     : sceneType === "isometric" && isometricSceneConfigFromRuntime(room?.runtime)?.gameplayMode === "tactical"
     ? "isometricTactical" : sceneType;
   const spriteSheet = defaults[key];
+  if(sceneType==="dungeonCrawler" && typeof spriteSheet==="string" && !spriteSheet.trim())return "";
   return typeof spriteSheet === "string" && spriteSheet.trim().length > 0
     ? spriteSheet.trim()
     : usesBlankPlayerDefaults(data) ? blankPlayerSpriteForRoom(room ?? { sceneType }) : defaultPlayerSpriteForSceneType(sceneType);
@@ -3609,7 +3711,9 @@ function addDefaultControlledEntityToRoom(
 ): void {
   const sceneType = stringField(room.sceneType, "topdown");
   const contract = resolveSceneControlledEntityContract(sceneType, room.runtime, data.settings);
-  if (!contract.required) return;
+  const dungeonView = sceneType === "dungeonCrawler" && usesBlankPlayerDefaults(data)
+    && dungeonCrawlerSceneConfigFromRuntime(room.runtime)?.presentation?.playerView?.enabled === true;
+  if (!contract.required && !dungeonView) return;
   const isWorldMapMarker = contract.role === "marker";
   const configuredPlayerName = stringField(room.playerActorName, "");
   const actorName = isWorldMapMarker
@@ -3686,9 +3790,10 @@ function addDefaultControlledEntityToRoom(
     name: actorName,
     roomName: roomNameValue,
     spriteSheet,
-    x: backgroundPosition?.x ?? (usesBlankPlayerDefaults(data) ? Math.floor(width / 2) : sceneType === "isometric" ? clampInteger(position.x, 0, width - 1) : position.x),
-    y: backgroundPosition?.y ?? (usesBlankPlayerDefaults(data) ? Math.floor(height / 2) : sceneType === "isometric" ? clampInteger(position.y, 0, height - 1) : position.y),
+    x: dungeonView ? dungeonCrawlerSceneConfigFromRuntime(room.runtime)?.playerStart?.x ?? Math.floor(width/2) : backgroundPosition?.x ?? (usesBlankPlayerDefaults(data) ? Math.floor(width / 2) : sceneType === "isometric" ? clampInteger(position.x, 0, width - 1) : position.x),
+    y: dungeonView ? dungeonCrawlerSceneConfigFromRuntime(room.runtime)?.playerStart?.y ?? Math.floor(height/2) : backgroundPosition?.y ?? (usesBlankPlayerDefaults(data) ? Math.floor(height / 2) : sceneType === "isometric" ? clampInteger(position.y, 0, height - 1) : position.y),
     eventBindings: {},
+    ...(dungeonView ? { dungeonViewAnchor: { x: 200, y: 120 } } : {}),
     ...(isWorldMapMarker ? { worldMapRole: "marker" } : {}),
     ...(animation.animationStateID ? { animationStateID: animation.animationStateID } : {}),
     ...(animation.animationName ? { animationName: animation.animationName } : {}),
@@ -3703,7 +3808,7 @@ function addDefaultControlledEntityToRoom(
 
 function defaultLutaPlayerAnimations(data: GBAProjectData, spriteSheet: string): Record<string, string> {
   const bindings: Record<string, string> = { fallback: "idle_animation" };
-  for (const state of ["idle", "attack", "hurt"]) {
+  for (const state of ["idle", "attack", "hurt", "walk", "jump", "guard", "special"]) {
     const animation = projectRecords(data, "animations").find(animation => (
       animation.spriteSheet === spriteSheet && animation.state === state && animation.direction === "right"
     ));
@@ -3721,7 +3826,7 @@ function applyApprovedIsometricPreset(data: GBAProjectData, room: Record<string,
   // Reuse approved pixels together with their authored geometry. Story events
   // and campaign state belong to the example, rather than the new scene.
   for (const key of ["width", "height", "backgroundAssetName", "tilesetAssetName", "gbStudioUseBackgroundLayout",
-    "backgroundRenderMode", "cameraMode", "cameraZoom", "cameraBounds", "parallax", "tilemap", "tileLayers",
+    "backgroundRenderMode", "cameraMode", "cameraZoom", "cameraBounds", "cameraZones", "parallax", "tilemap", "tileLayers",
     "heightLevels", "collisionTypes", "rampFlags", "runtime", "paletteFamilyID", "paletteBankPolicy"]) {
     if (source[key] !== undefined) room[key] = cloneProjectData(source[key]);
   }
@@ -3749,9 +3854,10 @@ function applyApprovedIsometricPreset(data: GBAProjectData, room: Record<string,
   const runtime = isRecord(room.runtime) ? room.runtime : {};
   const config = isRecord(runtime.config) ? runtime.config : {};
   const presentation = isRecord(config.tacticalPresentation) ? config.tacticalPresentation : {};
-  if (Array.isArray(presentation.units)) presentation.units = presentation.units.map(unit => (
+  if (Array.isArray(presentation.units)) presentation.units = presentation.units.filter(unit=>isRecord(unit)&&actorIDs.has(unit.actorId)).map(unit => (
     isRecord(unit) ? {...unit, actorId: actorIDs.get(unit.actorId) ?? unit.actorId} : unit
   ));
+  if(isRecord(config.tactical)&&Array.isArray(config.tactical.units))config.tactical.units=config.tactical.units.filter(unit=>isRecord(unit)&&Number(unit.actorIndex)<actors.length);
   const sprites = new Set(actors.map(actor => actor.spriteSheet));
   const animations = projectRecords(template, "animations").filter(animation => sprites.has(animation.spriteSheet));
   const states = projectRecords(template, "animationStates").filter(state => sprites.has(state.spriteSheet));
@@ -3767,6 +3873,53 @@ function applyApprovedIsometricPreset(data: GBAProjectData, room: Record<string,
   data.actors = [...currentActors, ...actors];
 }
 
+function blankSceneHudPresetID(data: GBAProjectData, room: Record<string, unknown>): string | undefined {
+  if (!usesBlankPlayerDefaults(data)) return undefined;
+  const key = room.sceneType === "isometric" && isometricSceneConfigFromRuntime(room.runtime)?.gameplayMode === "tactical"
+    ? "isometricTactical" : String(room.sceneType);
+  const id = BLANK_SCENE_HUD_IDS[key];
+  return id && projectRecords(data.settings as GBAProjectData, "hudPresets").some(p => p.id === id) ? id : undefined;
+}
+
+function applyBlankDungeonRuntime(data: GBAProjectData, room: Record<string, unknown>, authoredConfig: Record<string, unknown> = {}): void {
+  if (room.sceneType !== "dungeonCrawler") return;
+  const width = positiveInteger(room.width, 11), height = positiveInteger(room.height, 11);
+  const materials=blankDungeonMaterials(data,room);
+  const layout=materials&&(!Array.isArray(room.collisionTypes)||room.collisionTypes.length===0) ? blankDungeonInitialLayout(width,height) : undefined;
+  room.runtime = { type: "dungeonCrawler", config: {
+    presentation: { hudAssetName: "", actionSounds: {}, playerView: { enabled: true },
+      ...(materials ? { materialAssets: materials } : {}),...(layout?{door:layout.door}:{}) },
+    modules: [{ id: "map", enabled: true, settings: {} }, { id: "compass", enabled: true, settings: {} }],
+    playerStart: layout?.playerStart ?? { x: Math.min(width - 1, Math.floor(width / 2)), y: Math.max(0, height - 2), direction: "up" },
+    ...authoredConfig
+  } };
+  if (!Array.isArray(room.collisionTypes) || room.collisionTypes.length === 0) {
+    room.collisionTypes = layout?.collisionTypes ?? Array.from({ length: width * height }, (_, i) => {
+      const x = i % width, y = Math.floor(i / width);
+      return width > 2 && height > 2 && (x === 0 || y === 0 || x === width - 1 || y === height - 1) ? "solid" : "free";
+    });
+  }
+}
+
+function applyBlankSceneHudDefaults(data: GBAProjectData, room: Record<string, unknown>): void {
+  const defaultHud = blankSceneHudPresetID(data, room);
+  if (defaultHud) room.hudPresetId = defaultHud;
+  else delete room.hudPresetId;
+  if (!defaultHud) return;
+  if (room.sceneType === "menu") {
+    const runtime = isRecord(room.runtime) ? room.runtime : {};
+    room.runtime = { ...runtime, config: { ...defaultMenuSceneConfig("menu"), ...(isRecord(runtime.config) ? runtime.config : {}),
+      hudListRows: 3, presentationMode: "hud" } };
+  }
+  if (room.sceneType === "shmup") {
+    const runtime = isRecord(room.runtime) ? room.runtime : {};
+    const config = isRecord(runtime.config) ? runtime.config : {};
+    if (!Array.isArray(config.modules)) room.runtime = { ...runtime, type: "shmup", config: { ...config, modules: [
+      { id: "score", enabled: true, settings: { initialScore: 0, initialLives: 3, pointsPerEnemy: 100, persistHighScore: false } }
+    ] } };
+  }
+}
+
 export function createRoomInProject(data: GBAProjectData, options: CreateRoomOptions): GBAProjectData {
   const neutralPlayers = usesBlankPlayerDefaults(data);
   const room = makeRoom(options, neutralPlayers);
@@ -3778,23 +3931,7 @@ export function createRoomInProject(data: GBAProjectData, options: CreateRoomOpt
     room.runtime = {...runtime, type:"battleRpg", config:{...(isRecord(runtime.config)?runtime.config:{}),maxPartySize:4}};
   }
   if (!neutralPlayers) applyApprovedIsometricPreset(next, room, options.presetID);
-  const hudSceneKey = room.sceneType === "isometric" && isometricSceneConfigFromRuntime(room.runtime)?.gameplayMode === "tactical"
-    ? "isometricTactical" : String(room.sceneType);
-  const defaultHud = neutralPlayers ? BLANK_SCENE_HUD_IDS[hudSceneKey] : undefined;
-  if (defaultHud && projectRecords(next.settings as GBAProjectData, "hudPresets").some(p => p.id === defaultHud)) {
-    room.hudPresetId = defaultHud;
-    if (room.sceneType === "menu") {
-      const runtime = isRecord(room.runtime) ? room.runtime : {};
-      room.runtime = {...runtime,config:{...defaultMenuSceneConfig("menu"),...(isRecord(runtime.config)?runtime.config:{}),hudListRows:3,presentationMode:"hud"}};
-    }
-    if (room.sceneType === "shmup") {
-      const runtime = isRecord(room.runtime) ? room.runtime : {};
-      const config = isRecord(runtime.config) ? runtime.config : {};
-      room.runtime = { ...runtime, type: "shmup", config: { ...config, modules: [
-        { id: "score", enabled: true, settings: { initialScore: 0, initialLives: 3, pointsPerEnemy: 100, persistHighScore: false } }
-      ] } };
-    }
-  }
+  if (neutralPlayers) applyBlankSceneHudDefaults(next, room);
   if (room.sceneType === "isometric" && room.backgroundAssetName === DEFAULT_ISOMETRIC_TILESET_NAME) {
     ensureDefaultIsometricTilesetAsset(next);
   }
@@ -3808,6 +3945,7 @@ export function createRoomInProject(data: GBAProjectData, options: CreateRoomOpt
   }
 
   if (defaultBackgroundForRoom(next, room)) applyDefaultRoomBackground(next, room);
+  if (neutralPlayers) applyBlankDungeonRuntime(next, room);
   addDefaultControlledEntityToRoom(next, room);
   ensureIsometricTacticalPair(next, room);
   setProjectRooms(next, [...rooms, room]);
@@ -3820,6 +3958,7 @@ export function createRoomInProject(data: GBAProjectData, options: CreateRoomOpt
   if (rooms.length === 0) {
     next.scena = cloneProjectData(room);
     setStartScene(next, stringField(room.name, "Room 1"));
+    ensureSettingsGeneral(next).startPlayer = nullableString(room.playerActorName) ?? "";
   }
 
   return next;
@@ -3835,7 +3974,7 @@ export function duplicateRoomInProject(data: GBAProjectData, options: DuplicateR
   const next = cloneProjectData(data);
   const rooms = projectRooms(next);
   const source = rooms.find((room, index) => roomID(room, index) === options.sourceRoomID);
-  if (!source || rooms.some((room, index) => roomID(room, index) === newRoomID)) {
+  if (!source || rooms.some((room, index) => roomID(room, index) === newRoomID || roomName(room, index).toLowerCase() === newName.toLowerCase())) {
     return data;
   }
 
@@ -3848,6 +3987,7 @@ export function duplicateRoomInProject(data: GBAProjectData, options: DuplicateR
     ...rooms,
     duplicatedRoom
   ]);
+  duplicateSceneContent(next, source, duplicatedRoom, rooms[0] ? roomName(rooms[0], 0) : "");
   setSceneMapPosition(next, newName, nextFreeSceneMapPosition(next, projectRooms(next), duplicatedRoom, {
     anchorRoomID: options.sourceRoomID
   }));
@@ -3880,14 +4020,49 @@ export function updateRoomFieldsInProject(data: GBAProjectData, roomIDToUpdate: 
     : fields.runtime?.type === "isometric" ? isometricSceneConfigFromRuntime(fields.runtime)?.gameplayMode : undefined;
   if (compositionMode && requestedMode && compositionMode !== requestedMode) return data;
   const previousSceneType = room.sceneType;
+  const previousDefaultHud = blankSceneHudPresetID(next, room);
+  const followsDefaultHud = room.hudPresetId === undefined || room.hudPresetId === previousDefaultHud;
   const previousDefaultBackground = defaultBackgroundForRoom(next, room);
   const followsDefaultBackground = previousDefaultBackground !== "" && room.backgroundAssetName === previousDefaultBackground;
   const previousRacingPresentation = isRecord(room.runtime) && isRecord(room.runtime.config) ? room.runtime.config.presentation : undefined;
   applyRoomFields(room, fields, usesBlankPlayerDefaults(next));
+  if (usesBlankPlayerDefaults(next) && previousSceneType !== "battleRpg" && room.sceneType === "battleRpg") {
+    const runtime = isRecord(room.runtime) ? room.runtime : {};
+    const config = isRecord(runtime.config) ? runtime.config : {};
+    if (config.maxPartySize === undefined) room.runtime = { ...runtime, config: { ...config, maxPartySize: 4 } };
+  }
+  if ((fields.width !== undefined || fields.height !== undefined)
+    && (room.width !== projectRooms(data)[roomIndex]?.width || room.height !== projectRooms(data)[roomIndex]?.height)) {
+    useEditableBlankBackground(next, room);
+    if(room.sceneType==="dungeonCrawler"){
+      const runtime=isRecord(room.runtime)?room.runtime:{},config=isRecord(runtime.config)?runtime.config:{};
+      const start=isRecord(config.playerStart)?config.playerStart:null;
+      const grid={width:Number(room.width),height:Number(room.height),cells:(room.collisionTypes as string[]).map(v=>v!=="free")};
+      const safePosition=(x:unknown,y:unknown)=>nearestDungeonPassage(grid,{x:clampInteger(Number(x),0,grid.width-1),y:clampInteger(Number(y),0,grid.height-1)});
+      if(start)room.runtime={...runtime,config:{...config,playerStart:{...start,
+        ...safePosition(start.x,start.y)}}};
+      if(isRecord(config.presentation)&&isRecord(config.presentation.playerView)){
+        for(const actor of projectRecords(next,"actors").filter(a=>a.roomName===room.name&&(a.name===room.playerActorName||isRecord(a.dungeonViewAnchor)))){
+          const position=safePosition(actor.x,actor.y);actor.x=position.x;actor.y=position.y;
+        }
+      }
+    }
+  }
+  const changesDefaultHud = usesBlankPlayerDefaults(next) && followsDefaultHud && fields.hudPresetId === undefined
+    && (previousSceneType !== room.sceneType || previousDefaultHud !== blankSceneHudPresetID(next, room));
+  if (changesDefaultHud) applyBlankSceneHudDefaults(next, room);
   const changesDefaultBackground = followsDefaultBackground && fields.backgroundAssetName === undefined
     && (fields.runtime !== undefined || fields.sceneType !== undefined)
     && previousDefaultBackground !== defaultBackgroundForRoom(next, room);
   if (changesDefaultBackground) applyDefaultRoomBackground(next, room);
+  if (usesBlankPlayerDefaults(next) && previousSceneType !== room.sceneType && room.sceneType === "dungeonCrawler") {
+    // An untouched viewport-sized scene has not authored a logical maze yet.
+    if (room.width === 30 && room.height === 20 && Array.isArray(room.collisionTypes) && room.collisionTypes.every(v => v === "free")) {
+      applyRoomFields(room, { width: 11, height: 11 }, true);
+      room.collisionTypes = [];
+    }
+    applyBlankDungeonRuntime(next, room, fields.runtime && isRecord(fields.runtime.config) ? fields.runtime.config : {});
+  }
   if (fields.runtime !== undefined || fields.sceneType !== undefined) {
     const keepsIsometricActors = previousSceneType === "isometric" && room.sceneType === "isometric"
       && projectRecords(next, "actors").some(actor => actor.roomName === room.name);
@@ -3906,10 +4081,14 @@ export function updateRoomFieldsInProject(data: GBAProjectData, roomIDToUpdate: 
   }
   setProjectRooms(next, rooms);
   syncActiveRoomFields(next, room, roomIndex, fields);
+  if (changesDefaultHud && roomMatchesKnownRoom(next.scena, room, roomIndex)) {
+    if (room.hudPresetId === undefined) delete next.scena.hudPresetId;
+    else next.scena.hudPresetId = room.hudPresetId;
+  }
   if (changesDefaultBackground && roomMatchesKnownRoom(next.scena, room, roomIndex)) {
     next.scena = cloneProjectData(room);
   }
-  if ((fields.runtime !== undefined || fields.sceneType !== undefined) && roomMatchesKnownRoom(next.scena, room, roomIndex)) {
+  if ((fields.runtime !== undefined || fields.sceneType !== undefined || room.sceneType==="dungeonCrawler"&&(fields.width!==undefined||fields.height!==undefined)) && roomMatchesKnownRoom(next.scena, room, roomIndex)) {
     next.scena.runtime = cloneProjectData(room.runtime);
     if (room.playerActorName !== undefined) next.scena.playerActorName = room.playerActorName;
   }
@@ -4496,6 +4675,50 @@ export function removeRoomConnectionFromProject(data: GBAProjectData, connection
   return next;
 }
 
+function renameActorNameReferences(data: GBAProjectData, actor: Record<string, unknown>, name: string): void {
+  const oldName = stringField(actor.name, "");
+  const actors = projectRecords(data, "actors"), rooms = projectRooms(data);
+  const owner = entityRoomName(actor, rooms);
+  const actorNames = actors.flatMap(item => [stringField(item.name, ""), stringField(item.id, "")]).filter(Boolean);
+  // Preserve the compiler's identity resolution, including the scene-local
+  // Player alias. References by stable ID do not change when a label changes.
+  const rewritesNamedTarget = oldName.toLowerCase() !== "player"
+    && actors.find(item => item.name === oldName || item.id === oldName) === actor;
+  if (rewritesNamedTarget) {
+    for (const event of projectRecords(data, "events")) {
+      for (const step of projectRecords(event, "steps")) {
+        const command = stringField(step.command, ""), parts = sceneChangeCommandParts(command, actorNames);
+        let changed = false;
+        actorCommandReferences(command, actorNames).forEach((reference, index) => {
+          if (reference === oldName) { parts[index + 1] = name; changed = true; }
+        });
+        if (changed) step.command = sceneChangeCommand(parts);
+      }
+    }
+    const rewriteProperties = (value: unknown): void => {
+      if (Array.isArray(value)) value.forEach(rewriteProperties);
+      else if (isRecord(value)) for (const [key, field] of Object.entries(value)) {
+        if (key !== "playerActorName" && (key === "actorName" || key.endsWith("ActorName")) && field === oldName) value[key] = name;
+        else rewriteProperties(field);
+      }
+    };
+    rewriteProperties([actors, projectRecords(data, "triggers"), rooms]);
+  }
+  const general = isRecord(data.settings) && isRecord(data.settings.general) ? data.settings.general : null;
+  const defaultPlayer = stringField(general?.startPlayer, "Player");
+  const snapshots = [data.scena, data.room].filter(isRecord);
+  for (const room of [...rooms, ...snapshots]) {
+    if (stringField(room.name, "") === owner && stringField(room.playerActorName, defaultPlayer) === oldName) room.playerActorName = name;
+  }
+  if (general?.startPlayer === oldName && (actors.filter(item => item.name === oldName).length === 1 || stringField(general.startScene, rooms[0] ? roomName(rooms[0], 0) : "") === owner)) {
+    for (const room of [...rooms, ...snapshots]) {
+      const scene = stringField(room.name, "");
+      if (scene !== owner && !nullableString(room.playerActorName) && actors.some(item => entityRoomName(item, rooms) === scene && item.name === oldName)) room.playerActorName = oldName;
+    }
+    general.startPlayer = name;
+  }
+}
+
 export function updateRoomEntityInProject(
   data: GBAProjectData,
   kind: RoomsWorkspaceEntityKind,
@@ -4506,6 +4729,10 @@ export function updateRoomEntityInProject(
   const entities = projectRecords(data, collectionKey);
   const entityIndex = entities.findIndex((entity, index) => (nullableString(entity.id) ?? `${kind}-${index + 1}`) === entityID);
   if (entityIndex < 0) return data;
+  const nextName = fields.name?.trim();
+  if (fields.name !== undefined && nextName !== entities[entityIndex]?.name
+    && (!nextName || entities.some((entity, index) => index !== entityIndex && stringField(entity.name, "").toLowerCase() === nextName.toLowerCase()))) return data;
+  if (nextName === entities[entityIndex]?.name && Object.keys(fields).length === 1) return data;
 
   if (fields.roomName !== undefined) {
     const roomNames = roomNameSet(data);
@@ -4516,6 +4743,10 @@ export function updateRoomEntityInProject(
   const nextEntities = projectRecords(next, collectionKey);
   const entity = nextEntities[entityIndex];
   if (!entity) return data;
+  if (nextName !== undefined && nextName !== entity.name) {
+    if (kind === "actor") renameActorNameReferences(next, entity, nextName);
+    entity.name = nextName;
+  }
 
   if (fields.roomName !== undefined) entity.roomName = fields.roomName.trim();
   if (fields.x !== undefined && Number.isFinite(fields.x)) entity.x = Math.floor(fields.x);
@@ -4541,10 +4772,23 @@ export function updateRoomEntityInProject(
     if (fields.spriteSheet !== undefined) entity.spriteSheet = fields.spriteSheet.trim();
     if (fields.animationName !== undefined) entity.animationName = fields.animationName.trim();
     if (fields.animationStateID !== undefined) entity.animationStateID = fields.animationStateID.trim();
+    for (const key of ["lutaAnimations", "battleAnimations", "dungeonDepthSheets"] as const) {
+      if (fields[key] !== undefined) entity[key] = Object.fromEntries(Object.entries(fields[key]!).filter(([,v])=>typeof v === "string" && v.trim()).map(([k,v])=>[k,v.trim()]));
+    }
+    if (fields.dungeonDepthAnimationName !== undefined) entity.dungeonDepthAnimationName = fields.dungeonDepthAnimationName.trim();
+    if (fields.dungeonCell !== undefined) entity.dungeonCell = fields.dungeonCell;
+    if (fields.dungeonWallMounted !== undefined) entity.dungeonWallMounted = fields.dungeonWallMounted;
+    if (fields.dungeonViewAnchor !== undefined) entity.dungeonViewAnchor = {
+      x: clampInteger(fields.dungeonViewAnchor.x,-128,368),
+      y: clampInteger(fields.dungeonViewAnchor.y,-128,288)
+    };
+    if (fields.waveIndex !== undefined) entity.waveIndex = clampInteger(fields.waveIndex,0,63);
+    if (fields.shmup !== undefined) entity.shmup = { ...(isRecord(entity.shmup) ? entity.shmup : {}), ...fields.shmup };
     if (fields.collisionGroup !== undefined) entity.collisionGroup = clampInteger(fields.collisionGroup, 0, 15);
     if (fields.collisionMask !== undefined) entity.collisionMask = clampInteger(fields.collisionMask, 0, 0xFFFF);
     if (fields.pushPriority !== undefined) entity.pushPriority = clampInteger(fields.pushPriority, 0, 255);
     if (fields.pushable !== undefined) entity.pushable = fields.pushable;
+    if (fields.health !== undefined && Number.isFinite(fields.health)) entity.health = clampInteger(fields.health, 1, 999);
     if (fields.battle !== undefined) {
       const current = actorBattlePresentation(entity);
       const requestedAbilities = fields.battle.abilities ?? current.abilities;
@@ -4564,6 +4808,10 @@ export function updateRoomEntityInProject(
     return data;
   }
   if (kind === "trigger") {
+    if (fields.pointClick === null) delete entity.pointClick;
+    else if (fields.pointClick !== undefined) {
+      entity.pointClick = normalizePointClickTarget({ ...(isRecord(entity.pointClick) ? entity.pointClick : {}), ...fields.pointClick });
+    }
     if (fields.width !== undefined) entity.width = positiveInteger(fields.width, positiveInteger(entity.width, 1));
     if (fields.height !== undefined) entity.height = positiveInteger(fields.height, positiveInteger(entity.height, 1));
   }
@@ -4937,7 +5185,14 @@ export function createActorInProject(data: GBAProjectData, options: CreateActorI
   const identity = suggestActorIdentity(data);
   const id = options.id?.trim() || identity.id;
   const name = options.name?.trim() || identity.name;
-  const spriteSheet = options.spriteSheet ?? DEFAULT_ACTOR_SPRITE_SHEET;
+  const neutralActors = usesBlankPlayerDefaults(data);
+  const dungeonNpc = neutralActors && targetRoom.sceneType === "dungeonCrawler" && options.spriteSheet === undefined
+    ? blankDungeonNpcDefaults(data) : undefined;
+  const actorSceneType = ["pointAndClick","dungeonCrawler"].includes(String(targetRoom.sceneType)) ? "topdown" : stringField(targetRoom.sceneType, "topdown");
+  const defaultSprite = neutralActors
+    ? defaultPlayerSpriteForScene(data, actorSceneType, targetRoom) || defaultPlayerSpriteForScene(data, "topdown")
+    : DEFAULT_ACTOR_SPRITE_SHEET;
+  const spriteSheet = options.spriteSheet ?? dungeonNpc?.spriteSheet ?? defaultSprite;
   const animationStateID = options.animationStateID?.trim()
     || projectRecords(data, "animationStates")
       .find((state) => nullableString(state.spriteSheet) === spriteSheet)
@@ -4952,15 +5207,17 @@ export function createActorInProject(data: GBAProjectData, options: CreateActorI
   next.actors = [
     ...actors,
     {
-      animationName: options.animationName ?? DEFAULT_ACTOR_ANIMATION,
+      animationName: options.animationName ?? (neutralActors ? defaultPlayerAnimation(data, spriteSheet).animationName : DEFAULT_ACTOR_ANIMATION),
       ...(typeof animationStateID === "string" && animationStateID.trim() ? { animationStateID: animationStateID.trim() } : {}),
       eventBindings: {},
       id,
       name,
       roomName: targetRoomName,
       spriteSheet,
+      ...(dungeonNpc ? { dungeonDepthSheets: dungeonNpc.dungeonDepthSheets, dungeonDepthAnimationName: dungeonNpc.dungeonDepthAnimationName } : {}),
       x,
       y,
+      ...(neutralActors && targetRoom.sceneType === "luta" ? { battle: { side: "player2" }, lutaAnimations: defaultLutaPlayerAnimations(data, spriteSheet) } : {}),
       ...(targetRoom.sceneType === "isometric" ? {z: clampInteger(integerField(Array.isArray(targetRoom.heightLevels) ? targetRoom.heightLevels[y * roomWidth + x] : 0, 0), 0, 3)} : {})
     }
   ];
@@ -5179,7 +5436,7 @@ export function deriveRoomsWorkspacePresentation(data: GBAProjectData): RoomsWor
       ...(sceneDocument.campaign ? { campaign: sceneDocument.campaign } : {}),
       width,
       height,
-      gbaResolution: `${width * 8} x ${height * 8}`,
+      gbaResolution: sceneType === "dungeonCrawler" ? "240 x 160" : `${width * 8} x ${height * 8}`,
       music,
       hudPresetId: sceneDocument.hudPresetId,
       cameraMode,
@@ -5248,6 +5505,7 @@ export function deriveRoomsWorkspacePresentation(data: GBAProjectData): RoomsWor
       collisionCount: collisionCount(sceneProjection, width, height),
       collisionCells: collisionCells(sceneProjection, width, height),
       collisionTypes: collisionTypes(sceneProjection, width, height),
+      mapStates: roomMapStates(room),
       eventBindings: sceneDocument.eventBindings,
       heightLevels,
       foregroundTileCount,
@@ -5458,7 +5716,7 @@ export function deriveRoomsWorkspaceValidationIssues(
     }
   }
 
-  if (!presentation.summary.startRoomName) {
+  if (presentation.rooms.length > 0 && !presentation.summary.startRoomName) {
     issues.push({
       id: "missing-start-room",
       severity: "error",

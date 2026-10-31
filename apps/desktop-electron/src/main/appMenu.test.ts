@@ -1,5 +1,35 @@
 import { describe, expect, it, vi } from "vitest";
-import { createAppMenuTemplate } from "./appMenu.js";
+import { createAppMenuTemplate, dispatchAppMenuCommand } from "./appMenu.js";
+
+describe("app menu command destination", () => {
+  it("sends project commands to the editor even when another window has focus", () => {
+    const editor = {
+      isDestroyed: vi.fn(() => false),
+      isMinimized: vi.fn(() => false),
+      restore: vi.fn(), show: vi.fn(), focus: vi.fn(),
+      webContents: { send: vi.fn() }
+    };
+    dispatchAppMenuCommand(editor, "project:open");
+    expect(editor.focus).toHaveBeenCalledOnce();
+    expect(editor.webContents.send).toHaveBeenCalledWith("app:command", "project:open");
+    expect(editor.restore).not.toHaveBeenCalled();
+  });
+
+  it("restores a minimized editor and ignores a closed editor", () => {
+    const editor = {
+      isDestroyed: vi.fn(() => false),
+      isMinimized: vi.fn(() => true),
+      restore: vi.fn(), show: vi.fn(), focus: vi.fn(),
+      webContents: { send: vi.fn() }
+    };
+    dispatchAppMenuCommand(editor, "project:save");
+    expect(editor.restore).toHaveBeenCalledOnce();
+    editor.isDestroyed.mockReturnValue(true);
+    dispatchAppMenuCommand(editor, "project:open");
+    expect(editor.webContents.send).toHaveBeenCalledTimes(1);
+    expect(() => dispatchAppMenuCommand(undefined, "project:open")).not.toThrow();
+  });
+});
 
 function menuItemLabels(section: { submenu?: unknown }): string[] {
   const submenu = Array.isArray(section.submenu) ? section.submenu : [];
@@ -11,7 +41,7 @@ function menuItemLabels(section: { submenu?: unknown }): string[] {
 describe("app menu template", () => {
   it("exposes project commands with desktop accelerators", () => {
     const sendCommand = vi.fn();
-    const template = createAppMenuTemplate({ isMac: false, sendCommand });
+    const template = createAppMenuTemplate({ isMac: false, locale: "pt-BR", sendCommand });
     const fileMenu = template.find((item) => item.label === "Arquivo");
 
     expect(fileMenu).toBeDefined();
@@ -20,9 +50,10 @@ describe("app menu template", () => {
       "Abrir recentes",
       "Salvar",
       "Salvar como...",
-      "Export Engine",
-      "Play Window",
+      "Exportar Engine Pack",
+      "Executar ROM",
       "Exportar ROM .gba",
+      "Fechar",
       "Sair"
     ]);
 
@@ -30,12 +61,12 @@ describe("app menu template", () => {
     expect(submenu.find((item) => item.label === "Abrir projeto...")?.accelerator).toBe("CmdOrCtrl+O");
     expect(submenu.find((item) => item.label === "Salvar")?.accelerator).toBe("CmdOrCtrl+S");
     expect(submenu.find((item) => item.label === "Salvar como...")?.accelerator).toBe("Shift+CmdOrCtrl+S");
-    expect(submenu.find((item) => item.label === "Play Window")?.accelerator).toBe("CmdOrCtrl+B");
+    expect(submenu.find((item) => item.label === "Executar ROM")?.accelerator).toBe("CmdOrCtrl+B");
     expect(submenu.find((item) => item.label === "Exportar ROM .gba")?.accelerator).toBe("Shift+CmdOrCtrl+B");
     expect(submenu.find((item) => item.label === "Preview rapido")).toBeUndefined();
 
-    submenu.find((item) => item.label === "Export Engine")?.click?.();
-    submenu.find((item) => item.label === "Play Window")?.click?.();
+    submenu.find((item) => item.label === "Exportar Engine Pack")?.click?.();
+    submenu.find((item) => item.label === "Executar ROM")?.click?.();
     submenu.find((item) => item.label === "Exportar ROM .gba")?.click?.();
 
     expect(sendCommand).toHaveBeenCalledWith("engine:export");
@@ -43,8 +74,17 @@ describe("app menu template", () => {
     expect(sendCommand).toHaveBeenCalledWith("project:export-rom");
   });
 
+  it.each([true, false])("closes the focused window through the native role (mac=%s)", (isMac) => {
+    const template = createAppMenuTemplate({ appName: "GBA Studio", isMac, locale: "pt-BR", sendCommand: vi.fn() });
+    const fileMenu = template.find(item => item.label === "Arquivo");
+    const close = (fileMenu!.submenu as Array<{ role?: string; accelerator?: string; click?: unknown }>)
+      .find(item => item.role === "close");
+    expect(close).toMatchObject({ role: "close", accelerator: "CmdOrCtrl+W" });
+    expect(close?.click).toBeUndefined();
+  });
+
   it("keeps the macOS app menu before the File menu", () => {
-    const template = createAppMenuTemplate({ appName: "GBA Studio", isMac: true, sendCommand: vi.fn() });
+    const template = createAppMenuTemplate({ appName: "GBA Studio", isMac: true, locale: "pt-BR", sendCommand: vi.fn() });
     const labels = template.map((item) => item.label);
 
     expect(template[0].label).toBe("GBA Studio");
@@ -54,7 +94,7 @@ describe("app menu template", () => {
 
   it("routes undo and redo through renderer app commands", () => {
     const sendCommand = vi.fn();
-    const template = createAppMenuTemplate({ isMac: false, sendCommand });
+    const template = createAppMenuTemplate({ isMac: false, locale: "pt-BR", sendCommand });
     const editMenu = template.find((item) => item.label === "Editar");
     const submenu = editMenu!.submenu as Array<{ label: string; accelerator?: string; click?: () => void }>;
 

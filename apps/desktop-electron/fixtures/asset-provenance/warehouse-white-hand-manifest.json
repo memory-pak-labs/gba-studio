@@ -1,0 +1,32 @@
+{
+  "schemaVersion": 1,
+  "scene": "armazem_das_mares",
+  "approval": {
+    "approved": true,
+    "visual": true,
+    "palette": true,
+    "date": "2026-10-17",
+    "record": "User approved the white-hand candidate shown in gallery8797 and explicitly requested integration in Warehouse."
+  },
+  "license": "Project-owned AI-generated artwork",
+  "origin": "OpenAI Imagegen under user direction; own blank-project cursor as pose reference; no third-party pixels.",
+  "asset": {
+    "id": "warehouse-white-hand-approved",
+    "file": "white-hand-cursor-32x32.png",
+    "source": "Assets/sprites/white-hand-cursor-32x32.png",
+    "sha256": "5b5738fca8229a5b9f4ca5093d7f3437846d8a788e4119d54890075ecd99e8b2",
+    "sourceSha256": "2541b96ff972ef5274b2fac0bf43853bc8b8663096967156cf3f485d75a773ea",
+    "width": 32,
+    "height": 32,
+    "frameCount": 1,
+    "visibleColors": 15,
+    "hotspot": {
+      "x": 13,
+      "y": 6
+    },
+    "originX": 5,
+    "originY": -18,
+    "preparation": "Measured alpha/crop and nearest18x26; gba-sprite-prep free32x32 --no-snap median-cut15RGB555; approved prepared PNG promoted byte-for-byte."
+  },
+  "animation": "Single approved frame shared by idle and hover; no invented click animation."
+}

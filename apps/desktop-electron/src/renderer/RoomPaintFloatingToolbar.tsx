@@ -1,3 +1,4 @@
+import { uiText as ui, useStudioUiText } from "./studioUiText";
 import { useEffect, useState, type CSSProperties } from "react";
 
 import { resolveAssetURLWithBundledDefault } from "../shared/spriteAssetURL";
@@ -62,6 +63,7 @@ export function RoomPaintFloatingToolbar({
   videoModeId,
   videoModeLabel
 }: RoomPaintFloatingToolbarProps): React.ReactElement {
+  const ui = useStudioUiText();
   const backgroundURL = resolveAssetURLWithBundledDefault(
     projectPath,
     room.backgroundSource,
@@ -107,10 +109,10 @@ export function RoomPaintFloatingToolbar({
         "room-paint-floating-toolbar",
         layout === "docked" ? "is-docked" : ""
       ].filter(Boolean).join(" ")}
-      aria-label="Barra de pintura"
+      aria-label={ui("Barra de pintura")}
     >
       <div className="room-paint-floating-toolbar-row">
-        <div className="room-paint-floating-toolbar-preview" title={`Tile ${selectedTileID}`}>
+        <div className="room-paint-floating-toolbar-preview" title={ui("Tile {0}", { 0: selectedTileID })}>
           {backgroundURL && selectedRegion && tilesetSize ? (
             <span
               aria-hidden="true"
@@ -123,7 +125,7 @@ export function RoomPaintFloatingToolbar({
         </div>
 
         <label className="room-paint-floating-control">
-          <span>Camada</span>
+          <span>{ui("Camada")}</span>
           <select
             disabled={!presentation.layeredPaintingEnabled}
             onChange={(event) => onSetActiveTileLayerMapping(event.currentTarget.value)}
@@ -131,21 +133,21 @@ export function RoomPaintFloatingToolbar({
           >
             {layerOptions.map((option) => (
               <option disabled={!option.available} key={option.mapping} value={option.mapping}>
-                {option.label}
+                {ui(option.label)}
               </option>
             ))}
           </select>
         </label>
 
         <label className="room-paint-floating-control">
-          <span>Modo</span>
+          <span>{ui("Modo")}</span>
           <select
             onChange={(event) => setSelectedTool(event.currentTarget.value as RoomTilePaintTool)}
             value={selectedTool}
           >
-            <option value="brush">Pincel</option>
-            <option value="eraser">Borracha</option>
-            <option value="fill">Preencher</option>
+            <option value="brush">{ui("Pincel")}</option>
+            <option value="eraser">{ui("Borracha")}</option>
+            <option value="fill">{ui("Preencher")}</option>
           </select>
         </label>
 
@@ -155,13 +157,13 @@ export function RoomPaintFloatingToolbar({
             onChange={(event) => setGhostPreviewEnabled(event.currentTarget.checked)}
             type="checkbox"
           />
-          <span>Fantasma</span>
+          <span>{ui("Fantasma")}</span>
         </label>
 
-        <label className="room-paint-floating-opacity" title="Opacidade do preview fantasma · mínimo 0% · máximo 100% · passo 5%">
-          <span>Opac. {Math.round(ghostOpacity * 100)}%</span>
+        <label className="room-paint-floating-opacity" title={ui("Opacidade do preview fantasma · mínimo 0% · máximo 100% · passo 5%")}>
+          <span>{ui("Opac. ")}{Math.round(ghostOpacity * 100)}%</span>
           <input
-            aria-label="Opacidade do preview fantasma"
+            aria-label={ui("Opacidade do preview fantasma")}
             disabled={!ghostPreviewEnabled}
             max={1}
             min={0}

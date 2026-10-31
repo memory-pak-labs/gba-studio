@@ -33,6 +33,7 @@ describe("sceneRuntimeExport", () => {
       showPortrait: false,
       portraitLayout: "fixed_slots"
     })).toEqual({
+      presentation: "standard",
       boxImage: "ui/dialogue_box.png",
       selectorImage: "ui/cursor.png",
       font: "GBA padrao",

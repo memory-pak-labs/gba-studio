@@ -1,4 +1,5 @@
 import { prepareInterfaceFontPreview } from "./interfaceFontPreview";
+import { portraitTabPalette, portraitTabFramePixels } from "../shared/dialoguePortraitTab";
 import { dialogueFontCharacter, dialogueFontRows, normalizeDialogueText, wrapDialogueText } from "../shared/dialogueFont";
 import { useEffect, useMemo, useRef } from "react";
 import {
@@ -183,10 +184,11 @@ function drawGlyph(
   font: HTMLImageElement | HTMLCanvasElement | null,
   character: string,
   x: number,
-  y: number
+  y: number,
+  fallbackInk = "#d8d0b0"
 ): void {
   if (!font) {
-    context.fillStyle = "#d8d0b0";
+    context.fillStyle = fallbackInk;
     dialogueFontRows(character).forEach((row, dy) => {
       for (let dx = 0; dx < 8; dx += 1) if (row & (1 << (7 - dx))) context.fillRect(x + dx, y + dy, 1, 1);
     });
@@ -201,7 +203,8 @@ function drawTextLines(
   font: HTMLImageElement | HTMLCanvasElement | null,
   lines: string[],
   rect: { x: number; y: number; width: number; height: number },
-  selector: HTMLImageElement | null
+  selector: HTMLImageElement | null,
+  fallbackInk?: string
 ): void {
   const columns = Math.max(1, Math.floor(rect.width / TILE_SIZE));
   const rows = Math.max(1, Math.floor(rect.height / TILE_SIZE));
@@ -213,7 +216,7 @@ function drawTextLines(
         context.drawImage(selector, 0, 0, selector.naturalWidth || TILE_SIZE, selector.naturalHeight || TILE_SIZE, x, y, TILE_SIZE, TILE_SIZE);
         return;
       }
-      drawGlyph(context, font, character, x, y);
+      drawGlyph(context, font, character, x, y, fallbackInk);
     });
   });
 }
@@ -280,6 +283,51 @@ function renderDialogueSnapshot(
   if (!transparentBackground) {
     context.fillStyle = "#3c6b60";
     context.fillRect(0, 0, dialoguePreviewViewport.width, dialoguePreviewViewport.height);
+  }
+
+  if (settings.presentation === "portrait_tab") {
+    let colors = portraitTabPalette();
+    if (images.box) {
+      const skin = document.createElement("canvas"); skin.width = 24; skin.height = 24;
+      const skinContext = skin.getContext("2d");
+      try { if (skinContext?.getImageData) {
+        skinContext.drawImage(images.box, 0, 0);
+        colors = portraitTabPalette(skinContext.getImageData(0, 0, 24, 24).data);
+      } } catch { /* Keep the preset palette when a preview source cannot be read. */ }
+    }
+    const portrait = settings.showPortrait && Boolean(images.portrait);
+    const name = settings.showCharacterName && Boolean(speaker.trim());
+    const surface = document.createElement("canvas"); surface.width = 240; surface.height = 160;
+    const pixels = surface.getContext("2d");
+    if (pixels) {
+      const image = pixels.createImageData(240, 160);
+      image.data.set(portraitTabFramePixels(layout, portrait, name, colors));
+      pixels.putImageData(image, 0, 0); context.drawImage(surface, 0, 0);
+    }
+    const tint = (role: number): number => {
+      const rgb = colors[role].slice(1).match(/../g)!.map(c => parseInt(c, 16) / 8);
+      return rgb[0] | (rgb[1] << 5) | (rgb[2] << 10);
+    };
+    if (name) {
+      drawTextLines(context, prepareInterfaceFontPreview(images.font, null, tint(7)), [speaker], {
+        x: layout.nameLabel.x + 8, y: layout.nameLabel.y + 4, width: layout.nameLabel.width - 16, height: 8
+      }, null, colors[7]);
+    }
+    const lines = reviewTextLayout(settings, layout, speaker, text, choices, 0, maxTextRows, pageIndex, visibleCharacters).lines;
+    const bodyFont = prepareInterfaceFontPreview(images.font, null, tint(6));
+    lines.forEach((line, row) => {
+      if (row > 0 && /^[!-] /.test(line)) {
+        if (line[0] === "!") {
+          context.fillStyle = colors[8]; context.fillRect(26, 120 + row * 8, 198, 8);
+          context.fillStyle = colors[7];
+          for (let y = 1; y < 7; y++) context.fillRect(17, 120 + row * 8 + y, Math.min(y, 7 - y), 1);
+        }
+        line = ` ${line.slice(1)}`;
+      }
+      drawTextLines(context, bodyFont, [line], { ...layout.text, y: layout.text.y + row * 8, height: 8 }, null, colors[6]);
+    });
+    if (portrait) drawPortrait(context, images.portrait, layout.portraitSlot, portraitFrame.width, portraitFrame.height);
+    return;
   }
 
   if (settings.showPortrait && settings.portraitLayout === "fixed_slots" && images.portrait) {

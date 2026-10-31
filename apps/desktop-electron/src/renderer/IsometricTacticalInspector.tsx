@@ -1,3 +1,4 @@
+import { uiText as ui, useStudioUiText } from "./studioUiText";
 import { useMemo, type ReactElement } from "react";
 
 import {
@@ -90,6 +91,7 @@ export function IsometricTacticalInspector({
   onChangeCapabilities,
   onChangePresentation
 }: IsometricTacticalInspectorProps): ReactElement {
+  const ui = useStudioUiText();
   const resolution = useMemo(
     () => resolveIsometricTacticalCapabilities("isometric", capabilityValue, editorTools),
     [capabilityValue, editorTools]
@@ -159,13 +161,13 @@ export function IsometricTacticalInspector({
   }
 
   return (
-    <section aria-label="Autoria tática isométrica" className="room-detail-section room-detail-editor-span-2 isometric-tactical-inspector">
+    <section aria-label={ui("Autoria tática isométrica")} className="room-detail-section room-detail-editor-span-2 isometric-tactical-inspector">
       <div className="scene-feature-modules-heading">
         <div>
-          <h5>Autoria tática isométrica</h5>
-          <p className="room-detail-section-help">BG2, grade BG1, HUD BG0, unidades, props, feedback e áudio são opt-in independentes.</p>
+          <h5>{ui("Autoria tática isométrica")}</h5>
+          <p className="room-detail-section-help">{ui("BG2, grade BG1, HUD BG0, unidades, props, feedback e áudio são opt-in independentes.")}</p>
         </div>
-        <strong>{enabledCount}/{SCENE_TACTICAL_CAPABILITY_REGISTRY.length} ativos</strong>
+        <strong>{enabledCount}/{SCENE_TACTICAL_CAPABILITY_REGISTRY.length} {ui(" ativos")}</strong>
       </div>
 
       <div className="scene-feature-modules-grid isometric-tactical-capability-grid">
@@ -177,21 +179,21 @@ export function IsometricTacticalInspector({
             <fieldset className={`scene-feature-module-card scene-feature-advanced-card${enabled ? " is-enabled" : ""}`} key={definition.id}>
               <label className="scene-feature-module-toggle">
                 <input
-                  aria-label={`Ativar capability ${definition.label}`}
+                  aria-label={ui("Ativar capability {0}", { 0: ui(definition.label) })}
                   checked={enabled}
                   onChange={(event) => toggleCapability(definition.id as SceneTacticalCapabilityConfig["id"], event.currentTarget.checked)}
                   type="checkbox"
                 />
                 <span>
-                  <strong>{definition.label}</strong>
+                  <strong>{ui(definition.label)}</strong>
                   <small>
-                    {definition.available ? "Disponível" : "Indisponível"} · {enabled ? "Ativa nesta cena" : "Opt-in desativado"} · {configured?.required ? "Required" : "Opcional"} · {definition.verified ? "Verificada" : "Sem evidência"}
+                    {definition.available ? ui("Disponível") : ui("Indisponível")} · {enabled ? ui("Ativa nesta cena") : ui("Opt-in desativado")} · {configured?.required ? ui("Required") : ui("Opcional")} · {definition.verified ? ui("Verificada") : ui("Sem evidência")}
                   </small>
                 </span>
               </label>
-              <small>{definition.assets[0]?.kind ?? "sem asset"} · {CAPABILITY_ASSET_HINTS[definition.id]}</small>
-              <small>{definition.budget.bgTiles} BG · {definition.budget.objTiles} OBJ · {definition.budget.oam} OAM</small>
-              {missingTools.length > 0 ? <small className="scene-feature-advanced-fallback">Ferramentas ausentes: {missingTools.join(", ")}</small> : null}
+              <small>{definition.assets[0]?.kind ?? ui("sem asset")} · {CAPABILITY_ASSET_HINTS[definition.id]}</small>
+              <small>{definition.budget.bgTiles} {ui(" BG · ")}{definition.budget.objTiles} {ui(" OBJ · ")}{definition.budget.oam} {ui(" OAM")}</small>
+              {missingTools.length > 0 ? <small className="scene-feature-advanced-fallback">{ui("Ferramentas ausentes: ")}{missingTools.join(", ")}</small> : null}
             </fieldset>
           );
         })}
@@ -200,19 +202,19 @@ export function IsometricTacticalInspector({
       <div className="isometric-tactical-presentation-fields">
         <div className="scene-feature-modules-heading scene-feature-modules-advanced-heading">
           <div>
-            <h6>Bindings de apresentação</h6>
-            <p className="room-detail-section-help">Informe IDs/caminhos de assets já existentes. O editor não gera nem substitui arte.</p>
+            <h6>{ui("Bindings de apresentação")}</h6>
+            <p className="room-detail-section-help">{ui("Informe IDs/caminhos de assets já existentes. O editor não gera nem substitui arte.")}</p>
           </div>
-          <small>{presentation.schema === 1 ? "schema 1 declarado" : "schema ainda não declarado"}</small>
+          <small>{presentation.schema === 1 ? ui("schema 1 declarado") : ui("schema ainda não declarado")}</small>
         </div>
         <div className="scene-feature-module-settings">
           {PRESENTATION_FIELDS.map(([field, label]) => (
             <label key={field}>
-              <span>{label}</span>
+              <span>{ui(label)}</span>
               <input
-                aria-label={label}
+                aria-label={ui(label)}
                 onChange={(event) => updatePresentation(updateStringField(presentation, field, event.currentTarget.value))}
-                placeholder="ID ou caminho do asset"
+                placeholder={ui("ID ou caminho do asset")}
                 value={textValue(presentation[field])}
               />
             </label>
@@ -220,12 +222,12 @@ export function IsometricTacticalInspector({
         </div>
         {presentation.surfacePages?.length ? (
           <fieldset className="isometric-tactical-residency">
-            <legend>Páginas BG2 e residência</legend>
-            <small>Catálogo: {presentation.surfacePages.length} páginas · residentes simultâneos: {presentation.surfaceResidency?.maxResidentGroups ?? "—"}</small>
+            <legend>{ui("Páginas BG2 e residência")}</legend>
+            <small>{ui("Catálogo: ")}{presentation.surfacePages.length} {ui(" páginas · residentes simultâneos: ")}{presentation.surfaceResidency?.maxResidentGroups ?? "—"}</small>
             {presentation.surfacePages.map((page, index) => (
               <div className="isometric-tactical-row" key={page.id || index}>
-                <input aria-label={`Asset da página BG2 ${index + 1}`} onChange={(event) => updatePresentation(updateSurfacePageField(presentation, index, "asset", event.currentTarget.value))} placeholder="asset da página" value={page.asset} />
-                <input aria-label={`Bank group da página BG2 ${index + 1}`} onChange={(event) => updatePresentation(updateSurfacePageField(presentation, index, "bankGroup", event.currentTarget.value))} placeholder="bank group" value={page.bankGroup} />
+                <input aria-label={ui("Asset da página BG2 {0}", { 0: index + 1 })} onChange={(event) => updatePresentation(updateSurfacePageField(presentation, index, "asset", event.currentTarget.value))} placeholder={ui("asset da página")} value={page.asset} />
+                <input aria-label={ui("Bank group da página BG2 {0}", { 0: index + 1 })} onChange={(event) => updatePresentation(updateSurfacePageField(presentation, index, "bankGroup", event.currentTarget.value))} placeholder={ui("bank group")} value={page.bankGroup} />
                 <span>{page.world.x},{page.world.y} · {page.world.width}×{page.world.height}</span>
               </div>
             ))}
@@ -235,20 +237,20 @@ export function IsometricTacticalInspector({
 
       <div className="isometric-tactical-collections">
         <fieldset>
-          <legend>Unidades OBJ</legend>
+          <legend>{ui("Unidades OBJ")}</legend>
           {presentation.units.map((unit, index) => (
             <div className="isometric-tactical-row" key={`${unit.actorId}-${index}`}>
-              <input aria-label={`Actor ID da unidade ${index + 1}`} onChange={(event) => updateUnit(index, "actorId", event.currentTarget.value)} placeholder="actorId" value={unit.actorId} />
-              <input aria-label={`Sheet da unidade ${index + 1}`} onChange={(event) => updateUnit(index, "sheet", event.currentTarget.value)} placeholder="sheet" value={unit.sheet} />
-              <button onClick={() => removeUnit(index)} type="button">Remover</button>
+              <input aria-label={ui("Actor ID da unidade {0}", { 0: index + 1 })} onChange={(event) => updateUnit(index, "actorId", event.currentTarget.value)} placeholder={ui("actorId")} value={unit.actorId} />
+              <input aria-label={ui("Sheet da unidade {0}", { 0: index + 1 })} onChange={(event) => updateUnit(index, "sheet", event.currentTarget.value)} placeholder={ui("sheet")} value={unit.sheet} />
+              <button onClick={() => removeUnit(index)} type="button">{ui("Remover")}</button>
               <div className="isometric-tactical-animation-grid">
                 {ISO_TACTICAL_ANIMATION_BINDINGS.map((binding) => (
                   <label key={binding}>
                     <span>{binding}</span>
                     <input
-                      aria-label={`Animação ${binding} da unidade ${index + 1}`}
+                      aria-label={ui("Animação {0} da unidade {1}", { 0: binding, 1: index + 1 })}
                       onChange={(event) => updateUnitAnimation(index, binding, event.currentTarget.value)}
-                      placeholder="binding"
+                      placeholder={ui("binding")}
                       value={unit.animations?.[binding] ?? ""}
                     />
                   </label>
@@ -256,34 +258,34 @@ export function IsometricTacticalInspector({
               </div>
             </div>
           ))}
-          <button onClick={addUnit} type="button">Adicionar unidade</button>
+          <button onClick={addUnit} type="button">{ui("Adicionar unidade")}</button>
         </fieldset>
         <fieldset>
-          <legend>Props OBJ/BG</legend>
+          <legend>{ui("Props OBJ/BG")}</legend>
           {presentation.props.map((prop, index) => (
             <div className="isometric-tactical-row" key={`${prop.id}-${index}`}>
-              <input aria-label={`ID do prop ${index + 1}`} onChange={(event) => updateProp(index, "id", event.currentTarget.value)} placeholder="id" value={prop.id} />
-              <input aria-label={`Asset do prop ${index + 1}`} onChange={(event) => updateProp(index, "asset", event.currentTarget.value)} placeholder="asset" value={prop.asset} />
-              <select aria-label={`Tipo do prop ${index + 1}`} onChange={(event) => updateProp(index, "kind", event.currentTarget.value)} value={prop.kind}>
-                <option value="objective">Objetivo</option>
-                <option value="cover">Cover</option>
-                <option value="elevation">Elevação</option>
+              <input aria-label={ui("ID do prop {0}", { 0: index + 1 })} onChange={(event) => updateProp(index, "id", event.currentTarget.value)} placeholder={ui("id")} value={prop.id} />
+              <input aria-label={ui("Asset do prop {0}", { 0: index + 1 })} onChange={(event) => updateProp(index, "asset", event.currentTarget.value)} placeholder={ui("asset")} value={prop.asset} />
+              <select aria-label={ui("Tipo do prop {0}", { 0: index + 1 })} onChange={(event) => updateProp(index, "kind", event.currentTarget.value)} value={prop.kind}>
+                <option value="objective">{ui("Objetivo")}</option>
+                <option value="cover">{ui("Cover")}</option>
+                <option value="elevation">{ui("Elevação")}</option>
               </select>
-              <button onClick={() => removeProp(index)} type="button">Remover</button>
+              <button onClick={() => removeProp(index)} type="button">{ui("Remover")}</button>
             </div>
           ))}
-          <button onClick={addProp} type="button">Adicionar prop</button>
+          <button onClick={addProp} type="button">{ui("Adicionar prop")}</button>
         </fieldset>
       </div>
 
       <fieldset className="isometric-tactical-audio">
-        <legend>Áudio tático COMPOSED</legend>
-        <label><span>Música</span><input aria-label="Música tática" onChange={(event) => updatePresentation({ ...presentation, audio: { music: event.currentTarget.value, cues: { ...(presentation.audio?.cues ?? {}) } } })} placeholder="music id" value={presentation.audio?.music ?? ""} /></label>
+        <legend>{ui("Áudio tático COMPOSED")}</legend>
+        <label><span>{ui("Música")}</span><input aria-label={ui("Música tática")} onChange={(event) => updatePresentation({ ...presentation, audio: { music: event.currentTarget.value, cues: { ...(presentation.audio?.cues ?? {}) } } })} placeholder={ui("music id")} value={presentation.audio?.music ?? ""} /></label>
         <div className="scene-feature-module-settings">
           {ISO_TACTICAL_AUDIO_CUES.map((cue) => (
             <label key={cue}>
               <span>{cue}</span>
-              <input aria-label={`Cue ${cue}`} onChange={(event) => updateAudioCue(cue, event.currentTarget.value)} placeholder="cue id" value={presentation.audio?.cues[cue] ?? ""} />
+              <input aria-label={ui("Cue {0}", { 0: cue })} onChange={(event) => updateAudioCue(cue, event.currentTarget.value)} placeholder={ui("cue id")} value={presentation.audio?.cues[cue] ?? ""} />
             </label>
           ))}
         </div>
@@ -291,7 +293,7 @@ export function IsometricTacticalInspector({
 
       {resolution.issues.length > 0 ? (
         <ul className="scene-feature-modules-issues">
-          {resolution.issues.map((item, index) => <li key={`${item.code}-${item.module ?? "scene"}-${index}`}>{item.message}</li>)}
+          {resolution.issues.map((item, index) => <li key={`${item.code}-${item.module ?? "scene"}-${index}`}>{ui(item.message)}</li>)}
         </ul>
       ) : null}
     </section>

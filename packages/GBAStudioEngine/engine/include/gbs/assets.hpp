@@ -108,7 +108,33 @@ struct SpriteAnimation {
     const SpriteAnimationFrame* frames;
     uint8_t frame_count;
     bool loop;
+    uint16_t event_key = 0;
 };
+
+constexpr SpriteAnimation named_sprite_animation(const SpriteAnimation& animation, uint16_t event_key) {
+    return SpriteAnimation { animation.frames, animation.frame_count, animation.loop, event_key };
+}
+
+constexpr const SpriteAnimation* sprite_animation_for_reference(
+    const SpriteAnimation* const* animations,
+    size_t animation_count,
+    const SpriteAnimation* fallback,
+    int reference
+) {
+    if (animations != nullptr) {
+        if (reference >= 0 && static_cast<size_t>(reference) < animation_count) return animations[reference];
+        if (reference < 0 && reference >= -32768) {
+            // Named requests must not select an unrelated default on a missing key.
+            const uint16_t key = static_cast<uint16_t>(-reference);
+            for (size_t index = 0; index < animation_count; ++index) {
+                if (animations[index] != nullptr && animations[index]->event_key == key) return animations[index];
+            }
+            return nullptr;
+        }
+    }
+    if (reference < 0 && reference >= -32768) return nullptr;
+    return fallback;
+}
 
 struct RenderAssetCost {
     bool valid;

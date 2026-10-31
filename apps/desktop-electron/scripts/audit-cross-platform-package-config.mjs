@@ -9,6 +9,7 @@ const appRoot = path.resolve(path.dirname(scriptPath), "..");
 const repoRoot = path.resolve(appRoot, "../..");
 const packageJsonPath = path.join(appRoot, "package.json");
 const workflowPath = path.join(repoRoot, ".github", "workflows", "ci.yml");
+const desktopWorkflowPath = path.join(repoRoot, ".github", "workflows", "desktop-packages.yml");
 const mainProcessPath = path.join(appRoot, "src", "main", "main.ts");
 const outputDir = path.join(appRoot, "artifacts", "cross-platform-package", "latest");
 const outputJsonPath = path.join(outputDir, "cross_platform_package_config.json");
@@ -62,13 +63,17 @@ function fileExists(relativePath) {
   return existsSync(path.join(appRoot, relativePath));
 }
 
-function createReport(packageJson, workflowText, mainProcessText) {
+export function createCrossPlatformPackageConfigReport({ packageJson, workflowText, desktopWorkflowText, mainProcessText }) {
   const build = packageJson.build ?? {};
-  const localPackageJob = workflowJobText(workflowText, "package-local");
-  const localPackageUsesLegacySwift = /script\/package_app\.sh|dist\/GBAStudio-macOS|GBA_STUDIO_PREBUILT_BINARY/.test(localPackageJob);
+  const editorJob = workflowJobText(workflowText, "editor");
+  const desktopJob = workflowJobText(desktopWorkflowText, "desktop");
+  const auditIndex = desktopJob.indexOf("npm run audit:cross-platform -- --strict");
+  const packageIndex = desktopJob.indexOf("npm run ${{ matrix.script }}");
   const macTargets = targetsOf(build.mac);
   const macDistributionScript = packageJson.scripts?.["dist:mac"] ?? "";
-  const macUniversalPackageScript = packageJson.scripts?.["package:mac:universal"] ?? "";
+  const macArchitectureScripts = ["arm64", "x64"].every(architecture =>
+    packageJson.scripts?.[`dist:mac:${architecture}`] === `node scripts/package-macos.mjs --arch ${architecture}` &&
+    packageJson.scripts?.[`package:mac:${architecture}`] === `node scripts/package-macos.mjs --arch ${architecture} --dir`);
   const winTargets = targetsOf(build.win);
   const linuxTargets = targetsOf(build.linux);
   const associationExts = new Set(
@@ -107,7 +112,7 @@ function createReport(packageJson, workflowText, mainProcessText) {
       build.appId === "br.com.gbastudio.desktop" &&
         build.productName === "GBA Studio" &&
         build.executableName === "gba-studio" &&
-        packageJson.homepage === "https://github.com/matmel0/GBA-Studio" &&
+        packageJson.homepage === "https://github.com/memory-pak-labs/gba-studio" &&
         build.icon === "build/icon" &&
         build.directories?.buildResources === "build" &&
         build.directories?.output === "release" &&
@@ -154,19 +159,21 @@ function createReport(packageJson, workflowText, mainProcessText) {
       "Ajustar build.mac em package.json."
     ),
     check(
-      "macos-universal",
-      "Distribuicao macOS Universal",
-      /prepare:embedded-runtime:universal/.test(macDistributionScript) &&
-        /verify:macos-universal-runtime/.test(macDistributionScript) &&
-        /electron-builder --mac --universal/.test(macDistributionScript) &&
-        /electron-builder --dir --universal/.test(macUniversalPackageScript) &&
-        /macos-devkitpro-toolchain:/.test(workflowText) &&
-        /macos-15-intel/.test(workflowText) &&
-        /devkitpro-macos-arm64/.test(workflowText) &&
-        /devkitpro-macos-x86_64/.test(workflowText),
-      "dist:mac e package:mac:universal exigem runtime fat; CI prepara devkitPro arm64 e x86_64.",
-      "O pacote macOS ainda nao exige Electron, Engine Pack e toolchain Universal.",
-      "Usar --universal, verificar o runtime e preparar os dois toolchains no CI."
+      "macos-dmg-signing",
+      "Assinatura do instalador DMG",
+      build.dmg?.sign === true,
+      "O contêiner DMG exige assinatura própria antes da notarização.",
+      "O DMG nao exige assinatura, mesmo que o aplicativo esteja assinado.",
+      "Definir build.dmg.sign=true e validar o Gatekeeper no DMG final."
+    ),
+    check(
+      "macos-architectures",
+      "Instaladores macOS separados",
+      macDistributionScript === "node scripts/package-macos.mjs --arch all" && macArchitectureScripts &&
+        fileExists("scripts/package-macos.mjs") && fileExists("scripts/verify-macos-universal-runtime.mjs"),
+      "Apple Silicon (arm64) e Intel (x64) possuem pacotes, runtimes e verificações separados.",
+      "O fluxo macOS não exige os dois instaladores por arquitetura.",
+      "Manter dist:mac:arm64/dist:mac:x64 e validar o runtime correspondente antes de empacotar."
     ),
     check(
       "windows-targets",
@@ -191,67 +198,61 @@ function createReport(packageJson, workflowText, mainProcessText) {
     check(
       "ci-matrix",
       "CI cross-platform declarado",
-      hasWorkflowText(workflowText, [
-        /electron-desktop:/,
-        /macos-14/,
-        /windows-latest/,
-        /ubuntu-24\.04/,
-        /dist:mac/,
+      hasWorkflowText(editorJob, [/ubuntu-24\.04/, /windows-2022/, /npm run test:all/, /npm run typecheck/, /npm run build/]) &&
+      hasWorkflowText(desktopJob, [
+        /platform: linux/,
+        /platform: windows/,
+        /runner: windows-2022/,
+        /runner: ubuntu-24\.04/,
         /dist:win/,
         /dist:linux/,
-        /actions\/upload-artifact@v4/
+        /actions\/upload-artifact@[a-f0-9]{40}/
       ]),
-      ".github/workflows/ci.yml contem matriz macOS, Windows e Linux com upload de artefatos.",
-      "Workflow CI nao declara a matriz Electron esperada.",
-      "Atualizar .github/workflows/ci.yml com job electron-desktop em macOS, Windows e Linux."
+      "ci.yml valida o editor em Windows/Linux; desktop-packages.yml gera os instaladores nesses hosts. macOS e validado localmente.",
+      "Workflows nao declaram os testes e pacotes Windows/Linux esperados.",
+      "Manter testes/tipos/build no CI e empacotamento em hosts nativos no workflow Desktop packages."
     ),
     check(
       "ci-cross-platform-audit",
       "Auditoria cross-platform no CI",
       hasScript(packageJson, "audit:cross-platform") &&
         fileExists("scripts/audit-cross-platform-package-config.mjs") &&
-        hasWorkflowText(workflowJobText(workflowText, "electron-desktop"), [
-          /Audit cross-platform package config/,
-          /npm run audit:cross-platform -- --strict/
-        ]),
+        auditIndex >= 0 && packageIndex > auditIndex,
       hasScript(packageJson, "audit:cross-platform")
-        ? "CI roda audit:cross-platform --strict no job electron-desktop."
+        ? "Desktop packages declara a auditoria estrita antes do empacotamento."
         : "Script audit:cross-platform ausente.",
       "O CI ainda nao valida a configuracao cross-platform antes do empacotamento.",
-      "Rodar npm run audit:cross-platform -- --strict no job electron-desktop."
+      "Rodar npm run audit:cross-platform -- --strict antes de npm run ${{ matrix.script }}."
     ),
     check(
       "ci-artifact-validation",
       "Validacao de artefatos no CI",
       hasScript(packageJson, "smoke:ci-artifacts") &&
         fileExists("scripts/validate-ci-artifacts.mjs") &&
-        hasWorkflowText(workflowJobText(workflowText, "electron-desktop"), [
-          /Validate packaged artifacts/,
-          /npm run smoke:ci-artifacts -- --platform \${{ matrix\.os }}/
+        hasWorkflowText(desktopJob, [
+          /npm run smoke:ci-artifacts -- --platform \${{ matrix\.platform }}/,
+          /Smoke Linux packaged editor and complete project/,
+          /Smoke Windows packaged editor and complete project/,
+          /node scripts\/smoke-electron-exemplo-scenes\.mjs --packaged/,
+          /dpkg -L/,
+          /NSIS installation failed/,
+          /GBA_STUDIO_RUNTIME_SOURCES_READY == '1'/
         ]),
       hasScript(packageJson, "smoke:ci-artifacts")
         ? "CI valida os artefatos gerados antes do upload."
         : "Script smoke:ci-artifacts ausente.",
       "O CI ainda nao valida explicitamente os artefatos gerados antes do upload.",
-      "Rodar smoke:ci-artifacts no job electron-desktop apos o empacotamento."
+      "Validar artefatos, instalar e executar o exemplo offline antes do upload dos instaladores."
     ),
     check(
       "local-package-canonical",
       "Pacote local canonico Electron",
-      Boolean(localPackageJob) &&
-        hasWorkflowText(localPackageJob, [
-          /working-directory: apps\/desktop-electron/,
-          /npm run dist:mac/,
-          /npm run smoke:ci-artifacts -- --platform macos/,
-          /smoke-macos-app-bundle\.mjs/,
-          /GBAStudio-Electron-macOS-local-distribution/
-        ]) &&
-        !localPackageUsesLegacySwift,
-      localPackageJob
-        ? `package-local usa ${localPackageUsesLegacySwift ? "empacotamento Swift legado" : "empacotamento Electron"}`
-        : "job package-local ausente",
-      "O job manual/tag de distribuicao local ainda nao aponta para o pacote Electron canonico.",
-      "Trocar package-local para npm run dist:mac em apps/desktop-electron e publicar artefatos Electron."
+      macDistributionScript === "node scripts/package-macos.mjs --arch all" && macArchitectureScripts &&
+        !/script\/package_app\.sh|GBA_STUDIO_PREBUILT_BINARY/.test(macDistributionScript) &&
+        fileExists("scripts/smoke-macos-app-bundle.mjs"),
+      "dist:mac usa o empacotador Electron canonico e impede publicacao automatica; smoke local do bundle disponivel.",
+      "O pacote local macOS nao usa o fluxo Electron por arquitetura esperado.",
+      "Manter o empacotamento arm64/x64 com --publish never e validar cada bundle final localmente."
     )
   ];
 
@@ -261,6 +262,7 @@ function createReport(packageJson, workflowText, mainProcessText) {
     generatedAt: new Date().toISOString(),
     packageJsonPath,
     workflowPath,
+    desktopWorkflowPath,
     mainProcessPath,
     note:
       "Esta auditoria valida a configuracao local de empacotamento cross-platform; ela nao substitui uma execucao real do CI em Windows e Linux.",
@@ -302,7 +304,7 @@ function renderMarkdown(report) {
     "",
     "## Limite da evidencia",
     "",
-    "- Para contar como validacao cross-platform final, ainda e necessario rodar o job `electron-desktop` no GitHub Actions e baixar/testar os artefatos Windows e Linux."
+    "- Para validacao final, executar Desktop packages para Windows/Linux no commit da release e testar os pacotes macOS arm64 e x64 localmente. Configuracao aprovada nao comprova execucao desses testes."
   );
 
   return `${lines.join("\n")}\n`;
@@ -311,8 +313,9 @@ function renderMarkdown(report) {
 async function main() {
   const packageJson = await readJson(packageJsonPath);
   const workflowText = await readFile(workflowPath, "utf8");
+  const desktopWorkflowText = await readFile(desktopWorkflowPath, "utf8");
   const mainProcessText = await readFile(mainProcessPath, "utf8");
-  const report = createReport(packageJson, workflowText, mainProcessText);
+  const report = createCrossPlatformPackageConfigReport({ packageJson, workflowText, desktopWorkflowText, mainProcessText });
 
   await mkdir(outputDir, { recursive: true });
   await writeFile(outputJsonPath, `${JSON.stringify(report, null, 2)}\n`);

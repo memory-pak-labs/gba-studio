@@ -23,7 +23,7 @@ describe("actor resources authored in events", () => {
  expect(result.error).toBeUndefined();
  const p=result.generated!.contract.topdown_project!;
  expect(p.actor_sprites).toHaveLength(2);
- expect(p.actor_sprites?.[0]?.animations).toHaveLength(8);
+ expect(p.actor_sprites?.[0]?.animations).toHaveLength(10);
  expect(p.scripts[0]!.script).toEqual([
  {op:"set_actor_sprite",actor:0,sprite:0},{op:"cancel_actor_movement",actor:0},
  {op:"projectile_load_slot",slot:3,sprite:1,damage:12,speed:150},

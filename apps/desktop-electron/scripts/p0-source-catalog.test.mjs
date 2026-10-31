@@ -100,7 +100,9 @@ describe("P0 source catalog", () => {
       .map((candidate) => candidate?.metadata?.source)
       .filter((source) => typeof source === "string" && source.startsWith("Assets/"))
       .sort();
-    expect(assets.map((candidate) => candidate.path).sort()).toEqual(declaredPaths);
+    // Replaced approved PNGs and authoring layers remain in the template for
+    // provenance; the audit explicitly distinguishes them from runtime assets.
+    expect(assets.filter(candidate => candidate.declaredInProject).map((candidate) => candidate.path).sort()).toEqual(declaredPaths);
     expect(assets.some((candidate) => candidate.status === "baseline")).toBe(true);
   });
 
@@ -108,7 +110,7 @@ describe("P0 source catalog", () => {
     const assets = auditedCanonicalP0Assets();
     expect(assets).toEqual(expect.arrayContaining([
       expect.objectContaining({
-        path: "Assets/backgrounds/arena-gba.png",
+        path: "Assets/backgrounds/arena-coastal-240x160.png",
         status: "approved",
         approved: true,
         mirrorMatches: null
@@ -136,7 +138,7 @@ describe("P0 source catalog", () => {
       .toBeUndefined();
     expect(assets.find((asset) => asset.path === "Assets/sprites/tactical-nara-v3.png"))
       .toBeUndefined();
-    expect(assets.find((asset) => asset.path === "Assets/sprites/opening-v3-guardia-idle-48x64.png"))
+    expect(assets.find((asset) => asset.path === "Assets/sprites/opening-local-animation-128x96.png"))
       .toMatchObject({ status: "approved", approved: true });
   });
 
@@ -147,7 +149,7 @@ describe("P0 source catalog", () => {
     );
     expect(approvals).toHaveLength(19);
     expect(blockingCanonicalP0Assets(assets)).toEqual([]);
-    for (const entry of approvals) {
+    for (const entry of approvals.filter(entry => assets.some(asset => asset.path === entry.path && asset.declaredInProject))) {
       expect(assets.find((asset) => asset.path === entry.path)).toMatchObject({
         approved: true,
         declaredInProject: true,
@@ -160,11 +162,12 @@ describe("P0 source catalog", () => {
   it("recognizes explicitly approved active visual packages by their exact hashes", () => {
     const assets = auditedCanonicalP0Assets();
     const approvedPackages = [
-      ["Assets/backgrounds/opening-v4-per-tile-14-banks.png", "071905536628830df779a17d758eb4c9373baf14076612927680cb5f03d5ee74"],
+      ["Assets/backgrounds/opening-medium-shot-240x160.png", "c135edb87bb52260c612cbbc31ff26ec9d06f1f642b9a75b3a5854432824a90f"],
       ["Assets/backgrounds/title-day-centered-240x160-4bpp.png", "34de4e4b73def5a18a7e55d6fac176ca2b6fd99e2d39231935a2bcd075f6daf9"],
       ["Assets/fonts/gba-dialogue-font-v3.png", "c11501185dfdd6bd20b63b9670796c32445663bdd572789d9934c29b4eec3798"],
       ["Assets/backgrounds/tactical-v5-surface.png", "df1a3c5538911918664da5cc510c78329ab64752b01c81e6b5ae9b70d236589b"],
-      ["Assets/sprites/tactical-cursor-diamond-32x16-v1.png", "823a618bb9aff43fea787d681f4bba03f65bfee8dd13c33e916e5b89268af809"],
+      ["Assets/backgrounds/tactical-arena-large-768x512.png", "c4ba0bcd0f84fdb41e6191136ea77348624d0e9b17a6b00a1dacc236c2000000"],
+      ["Assets/sprites/market-approved-actors-64x64.png", "b448ec11325521c0970fc476348cdf5a6ef782164f5aa0a03761b955c67d866a"],
       ["Assets/backgrounds/route-map-paged-v2.png", "6887d224a8490c8858fc5e66c779932ad8264f3a87535168e88c64755d88de0c"],
       ["Assets/sprites/route-airship-v2.png", "6ecb8e65271ff381671cb69e79455f20d77b8532a8d8977b960f6cc84b918868"],
       ["Assets/backgrounds/council-v5-background.png", "98a6ccb4597f25f2156e30fed19ce7f9e9f88a5403ea5b46f1cefb1281c1cdff"],

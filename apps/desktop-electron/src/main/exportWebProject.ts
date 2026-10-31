@@ -1,5 +1,6 @@
 import { existsSync } from "node:fs";
-import { access, cp, mkdir, readdir, writeFile } from "node:fs/promises";
+import { access, cp, mkdir, readdir, readFile, writeFile } from "node:fs/promises";
+import { createHash } from "node:crypto";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { generateEngineProjectExport, type EngineProjectExport } from "../shared/engineProjectExport.js";
@@ -130,7 +131,7 @@ function escapeHtml(value: string): string {
     .replace(/'/g, "&#39;");
 }
 
-function webManifest(exported: WebProjectExport, romResolved: boolean): string {
+function webManifest(exported: WebProjectExport, romResolved: boolean, romSha256?: string): string {
   return `${JSON.stringify(
     {
       schema: 1,
@@ -140,6 +141,7 @@ function webManifest(exported: WebProjectExport, romResolved: boolean): string {
       romFileName: exported.romFileName,
       romPath: `roms/${exported.romFileName}`,
       romResolved,
+      ...(romSha256 ? { romSha256 } : {}),
       packageComplete: romResolved,
       playerPath: "player/gbastudio-player.js",
       engineProjectPath: "engine-project/gbastudio_project.json",
@@ -158,7 +160,7 @@ function webManifest(exported: WebProjectExport, romResolved: boolean): string {
   )}\n`;
 }
 
-function indexHtml(exported: WebProjectExport, romResolved: boolean): string {
+function indexHtml(exported: WebProjectExport, romResolved: boolean, romSha256?: string): string {
   const title = escapeHtml(exported.title);
   const romFile = escapeHtml(exported.romFileName);
   const romNotice = romResolved
@@ -186,11 +188,11 @@ function indexHtml(exported: WebProjectExport, romResolved: boolean): string {
     }
     main {
       width: min(100vw, 1280px);
-      height: min(100vh, 820px);
+      height: 100dvh;
       min-height: 0;
       padding: 24px;
       display: grid;
-      grid-template-rows: auto 1fr auto;
+      grid-template-rows: auto minmax(0, 1fr) auto;
       gap: 16px;
     }
     header, footer {
@@ -199,14 +201,13 @@ function indexHtml(exported: WebProjectExport, romResolved: boolean): string {
       justify-content: space-between;
       gap: 16px;
     }
-    h1 { margin: 0; font-size: 20px; letter-spacing: 0; }
+    h1 { margin: 0; font-size: 20px; line-height: 24px; letter-spacing: 0; }
     p { margin: 0; color: #abb2c2; }
     code { background: #232633; border-radius: 4px; padding: 2px 6px; color: #ffffff; }
+    @media (max-width: 600px) { main { padding: 12px; gap: 10px; } h1 { font-size: 16px; } header p, footer p { font-size: 11px; line-height: 16px; } }
     #game {
       width: 100%;
-      height: min(72vh, 720px);
-      min-height: 360px;
-      max-height: 720px;
+      min-height: 0;
       position: relative;
       display: flex;
       align-items: center;
@@ -236,7 +237,7 @@ function indexHtml(exported: WebProjectExport, romResolved: boolean): string {
   <main>
     <header>
       <h1>${title}</h1>
-      <p>ROM esperada: <code>roms/${romFile}</code></p>
+      <p>Game Boy Advance</p>
     </header>
 ${romNotice}    <div id="game"></div>
     <footer>
@@ -251,6 +252,8 @@ ${romNotice}    <div id="game"></div>
       romUrl: "roms/${romFile}",
       runtimeRomUrl: "../roms/${romFile}",
       runtimeUrl: "player/runtime.html",
+      romSha256: "${romSha256 ?? ""}",
+      touchControls: true,
       color: "#6d2df4"
     };
   </script>
@@ -497,8 +500,9 @@ export async function writeWebProjectExport(options: WriteWebProjectExportOption
   if (requireRom && !romSourcePath) {
     throw new Error(romWarning ?? "ROM obrigatoria para export Web.");
   }
-  await writeFile(files[0], indexHtml(options.generated, romResolved), "utf8");
-  await writeFile(files[1], webManifest(options.generated, romResolved), "utf8");
+  const romSha256 = romSourcePath ? createHash("sha256").update(await readFile(romSourcePath)).digest("hex") : undefined;
+  await writeFile(files[0], indexHtml(options.generated, romResolved, romSha256), "utf8");
+  await writeFile(files[1], webManifest(options.generated, romResolved, romSha256), "utf8");
   await writeFile(files[2], readme(options.generated), "utf8");
   await writeFile(files[3], itchToml(options.generated), "utf8");
   const romFile = romSourcePath

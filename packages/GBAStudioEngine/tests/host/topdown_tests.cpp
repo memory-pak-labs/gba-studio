@@ -1,10 +1,133 @@
 #include <cassert>
+#include <cmath>
+#include <initializer_list>
 #include "gbs/event.hpp"
 #include "gbs/input.hpp"
 #include "gbs/project.hpp"
 #include "gbs/topdown.hpp"
 
 namespace {
+
+void test_walk_animation_path_handles_fractional_steps_walls_and_sliding() {
+    uint8_t flags[4 * 4] = {};
+    const gbs::TileMap map { flags, 4, 4 };
+    const gbs::Actor player { { 8, 8 }, { 8, 8 }, 0 };
+    const gbs::InputState diagonal { gbs::ButtonRight | gbs::ButtonDown, 0, 0 };
+    assert(gbs::player_has_walk_path(map, player, diagonal, nullptr, 0));
+    flags[1 * 4 + 2] = gbs::TileSolid;
+    assert(gbs::player_has_walk_path(map, player, diagonal, nullptr, 0));
+    auto four_way = player;
+    four_way.allow_diagonal = false;
+    four_way.direction = 3;
+    assert(!gbs::player_has_walk_path(map, four_way, diagonal, nullptr, 0));
+    flags[2 * 4 + 1] = gbs::TileSolid;
+    assert(!gbs::player_has_walk_path(map, player, diagonal, nullptr, 0));
+    flags[1 * 4 + 2] = flags[2 * 4 + 1] = gbs::TileEmpty;
+    const gbs::Actor blockers[] = { { { 16, 8 }, { 8, 8 }, 0 }, { { 8, 16 }, { 8, 8 }, 0 } };
+    assert(gbs::player_has_walk_path(map, player, diagonal, blockers, 1));
+    assert(!gbs::player_has_walk_path(map, player, diagonal, blockers, 2));
+    assert(!gbs::player_has_walk_path(map, player, { gbs::ButtonRight | gbs::ButtonLeft, 0, 0 }, nullptr, 0));
+}
+
+void player_input_step(const gbs::TileMap& map, gbs::Actor& player, uint16_t held, bool push) {
+    const gbs::InputState input { held, held, 0 };
+    // Exercise both paths, including the push path with an actual blocker list.
+    gbs::Actor distant { { 0, 0 }, { 8, 8 }, 0 };
+    if (push) gbs::update_player_with_actor_push(map, player, input, &distant, 1);
+    else gbs::update_player_with_actor_collisions(map, player, input, &distant, 1);
+}
+
+void test_player_eight_way_speed_is_uniform() {
+    static const uint8_t flags[512 * 512] = {};
+    const gbs::TileMap map { flags, 512, 512 };
+    const uint16_t directions[] = {
+        gbs::ButtonRight, gbs::ButtonLeft, gbs::ButtonUp, gbs::ButtonDown,
+        gbs::ButtonRight | gbs::ButtonDown, gbs::ButtonLeft | gbs::ButtonDown,
+        gbs::ButtonRight | gbs::ButtonUp, gbs::ButtonLeft | gbs::ButtonUp
+    };
+    for (bool push : { false, true }) for (int speed : { 1, 3, 7 }) for (uint16_t keys : directions) {
+        gbs::Actor player { { 2048, 2048 }, { 8, 8 }, speed };
+        for (int frame = 0; frame < 200; ++frame) player_input_step(map, player, keys, push);
+        const int dx = player.position_pixels.x - 2048, dy = player.position_pixels.y - 2048;
+        assert(std::abs(std::sqrt(double(dx * dx + dy * dy)) - 200 * speed) < 1.5);
+    }
+}
+
+void test_player_diagonal_keeps_compatible_facing() {
+    const uint8_t flags[16 * 16] = {};
+    const gbs::TileMap map { flags, 16, 16 };
+    for (bool push : { false, true }) {
+        gbs::Actor player { { 48, 48 }, { 8, 8 }, 1 };
+        player_input_step(map, player, gbs::ButtonRight, push);
+        player_input_step(map, player, gbs::ButtonRight | gbs::ButtonDown, push);
+        assert(player.direction == 3);
+        player_input_step(map, player, gbs::ButtonDown, push);
+        player_input_step(map, player, gbs::ButtonRight | gbs::ButtonDown, push);
+        assert(player.direction == 0);
+        const auto before = player.position_pixels;
+        player_input_step(map, player, gbs::ButtonLeft | gbs::ButtonRight, push);
+        assert(player.position_pixels.x == before.x && player.position_pixels.y == before.y);
+        assert(player.direction == 0);
+        player_input_step(map, player, 0, push);
+        assert(player.direction == 0);
+        // A one-frame diagonal tap must respond even at the slowest integer speed.
+        player_input_step(map, player, gbs::ButtonRight | gbs::ButtonDown, push);
+        assert(player.position_pixels.x > before.x && player.position_pixels.y > before.y);
+    }
+}
+
+void test_player_diagonal_slides_along_wall_without_crossing_it() {
+    uint8_t flags[16 * 16] = {};
+    for (int y = 0; y < 16; ++y) flags[y * 16 + 3] = gbs::TileSolid;
+    const gbs::TileMap map { flags, 16, 16 };
+    for (bool push : { false, true }) {
+        gbs::Actor player { { 16, 16 }, { 8, 8 }, 1 };
+        player.direction = 3;
+        for (int frame = 0; frame < 30; ++frame)
+            player_input_step(map, player, gbs::ButtonRight | gbs::ButtonDown, push);
+        assert(player.position_pixels.x == 16);
+        assert(player.position_pixels.y > 16);
+        assert(player.direction == 0);
+    }
+}
+
+void test_player_four_way_setting_and_independent_fractional_steps() {
+    const uint8_t flags[32 * 32] = {};
+    const gbs::TileMap map { flags, 32, 32 };
+    for (bool push : { false, true }) {
+        gbs::Actor cardinal { { 64, 64 }, { 8, 8 }, 1 };
+        cardinal.allow_diagonal = false;
+        for (int frame = 0; frame < 60; ++frame)
+            player_input_step(map, cardinal, gbs::ButtonRight | gbs::ButtonDown, push);
+        assert(cardinal.position_pixels.x == 64 && cardinal.position_pixels.y == 124);
+        gbs::Actor a { { 64, 64 }, { 8, 8 }, 1 }, b = a;
+        for (int frame = 0; frame < 100; ++frame) {
+            // Event-controlled half speed supplies zero on alternating frames.
+            a.speed_pixels = b.speed_pixels = frame % 2;
+            player_input_step(map, a, gbs::ButtonRight | gbs::ButtonDown, push);
+            player_input_step(map, b, gbs::ButtonLeft | gbs::ButtonUp, push);
+        }
+        assert(a.position_pixels.x - 64 == 64 - b.position_pixels.x);
+        assert(a.position_pixels.y - 64 == 64 - b.position_pixels.y);
+        assert(a.position_pixels.x >= 99 && a.position_pixels.x <= 100);
+        assert(sizeof(gbs::Actor) == 36);
+    }
+}
+
+void test_shallow_foot_box_keeps_a_usable_interaction_area() {
+    gbs::Actor player { { 280, 80 }, { 16, 8 }, 1 };
+    player.direction = 3;
+    const auto side = gbs::actor_interaction_rect(player);
+    assert(gbs::intersects(side, gbs::Rect { 304, 88, 16, 16 }));
+    assert(side.x == 280 && side.y == 76 && side.width == 32 && side.height == 16);
+    player.direction = 1;
+    const auto up = gbs::actor_interaction_rect(player);
+    assert(up.y == 60 && up.height == 32);
+    // Square footprints retain their existing interaction bounds.
+    player.size_pixels = { 8, 8 };
+    const auto square = gbs::actor_interaction_rect(player);
+    assert(square.x == 280 && square.y == 72 && square.width == 8 && square.height == 16);
+}
 
 void test_player_stops_on_solid_tile() {
     const uint8_t flags[] = {
@@ -1250,6 +1373,12 @@ void test_topdown_quest_and_shop_modules_mutate_event_state_safely() {
 } // namespace
 
 int main() {
+    test_walk_animation_path_handles_fractional_steps_walls_and_sliding();
+    test_player_eight_way_speed_is_uniform();
+    test_player_diagonal_keeps_compatible_facing();
+    test_player_diagonal_slides_along_wall_without_crossing_it();
+    test_player_four_way_setting_and_independent_fractional_steps();
+    test_shallow_foot_box_keeps_a_usable_interaction_area();
     test_player_stops_on_solid_tile();
     test_player_moves_when_clear();
     test_directional_collision_blocks_only_matching_direction();

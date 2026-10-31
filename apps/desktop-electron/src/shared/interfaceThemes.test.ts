@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { createBlankProjectData } from "./newProject.js";
 import { parseGBAProjectFile, serializeGBAProjectFile } from "./projectFile.js";
 import { DEFAULT_HUD_PRESET, resolveExplicitHudPresetBinding } from "./hudPresets.js";
-import { resolveInterfaceTheme, updateInterfaceThemeBinding, updateInterfaceThemeSkin, resolveSceneDialogueUiSettings } from "./interfaceThemes.js";
+import { resolveInterfaceTheme, updateInterfaceThemeBinding, updateInterfaceThemeSkin, resolveSceneDialogueUiSettings, updateInterfaceThemeInProject } from "./interfaceThemes.js";
 
 function fixture() {
   const p = createBlankProjectData({ name: "Themes" });
@@ -17,6 +17,19 @@ function fixture() {
   return p;
 }
 describe("interface themes", () => {
+  it("opts a single scene into the compact portrait tab and persists both aliases", () => {
+    const p = fixture();
+    p.scenas = structuredClone(p.rooms);
+    p.scena = structuredClone((p.rooms as any[])[0]);
+    const next = updateInterfaceThemeInProject(p, { roomId: "port", presentation: "portrait_tab" });
+    const loaded = parseGBAProjectFile(serializeGBAProjectFile(parseGBAProjectFile(JSON.stringify(next)))).data;
+    expect(resolveSceneDialogueUiSettings(loaded, "port")).toMatchObject({ presentation: "portrait_tab", boxWidth: 224, boxHeight: 40, nameLabelMode: "above", portraitLayout: "fixed_slots" });
+    expect(resolveSceneDialogueUiSettings(loaded, "other").presentation).toBe("standard");
+    expect(next.rooms).toEqual(next.scenas);
+    expect((next.scena as any).dialoguePresentation).toBe("portrait_tab");
+    expect((p.scena as any).dialoguePresentation).toBeUndefined();
+    expect(resolveSceneDialogueUiSettings(updateInterfaceThemeInProject(next, { roomId: "port", presentation: "standard" }), "port").presentation).toBe("standard");
+  });
   it("resolves scene, type and project independently of the HUD layout", () => {
     const p = fixture();
     expect(resolveInterfaceTheme(p, "port")).toMatchObject({ source: "type", theme: { id: "sea" } });

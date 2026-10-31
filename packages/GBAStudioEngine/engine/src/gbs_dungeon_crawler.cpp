@@ -2,6 +2,20 @@
 
 namespace gbs {
 
+bool dungeon_actor_is_occluded(const DungeonCrawlerRoomData& room, Vec2i from, Vec2i target, bool wall_mounted) {
+    if (from.x < 0 || from.y < 0 || target.x < 0 || target.y < 0 ||
+        from.x >= room.width_tiles || target.x >= room.width_tiles || from.y >= room.height_tiles || target.y >= room.height_tiles) return true;
+    const int dx = target.x - from.x, dy = target.y - from.y;
+    const int ax = dx < 0 ? -dx : dx, ay = dy < 0 ? -dy : dy;
+    const int steps = (ax > ay ? ax : ay) * 10;
+    for (int i = 1; i < steps; ++i) {
+        const Vec2i cell {(from.x * 10 + 5 + dx * 10 * i / steps) / 10,
+                         (from.y * 10 + 5 + dy * 10 * i / steps) / 10};
+        if (dungeon_cell_blocked(room, cell) && !(wall_mounted && cell.x == target.x && cell.y == target.y)) return true;
+    }
+    return false;
+}
+
 Vec2i dungeon_forward_delta(DungeonDirection direction) {
     switch (direction) {
     case DungeonDirection::North: return Vec2i { 0, -1 };

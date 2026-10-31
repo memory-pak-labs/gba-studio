@@ -54,6 +54,21 @@ export interface RomPlayerAudioTelemetry {
   pcmSubmittedBlocks: number;
 }
 
+export const profilerSubsystems = ["scripts", "audio", "render", "streaming", "interrupts"] as const;
+export type ProfilerSubsystem = typeof profilerSubsystems[number];
+export type ProfilerSubsystemTicks = Partial<Record<ProfilerSubsystem, number>>;
+export interface RomPlayerSubsystemTelemetry {
+  ticksPerSecond: number;
+  frameTicks: ProfilerSubsystemTicks;
+  scenePeakTicks: ProfilerSubsystemTicks;
+}
+
+export interface RomPlayerEventTraceEntry {
+  commandAddress: number; frame: number; step: number; op: number; status: number; room: number; waitFrames: number;
+  eventID?: string; stepID?: string;
+}
+export interface RomPlayerEventTrace { sequence: number; entries: RomPlayerEventTraceEntry[] }
+
 export interface RomPlayerRuntimeState {
   schema: number;
   frame: number;
@@ -73,11 +88,14 @@ export interface RomPlayerRuntimeState {
   timing: RomPlayerRuntimeTimingState;
   input: RomPlayerRuntimeInputState;
   audio?: RomPlayerAudioTelemetry | null;
+  subsystems?: RomPlayerSubsystemTelemetry | null;
+  eventTrace?: RomPlayerEventTrace | null;
 }
 
 export type RomPlayerHardwareTelemetry = Partial<Record<ScenePhysicalMetricID, number>>;
 
 export interface RomPlayerFrameStats {
+  sampledAtUnixMs?: number;
   cpuPercent: number;
   droppedFrameRatio: number;
   droppedFrames: number;

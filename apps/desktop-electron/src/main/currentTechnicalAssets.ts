@@ -3,8 +3,8 @@ import { existsSync } from "node:fs";
 import path from "node:path";
 
 const CURRENT_ASSET_SOURCES: Record<string, string> = {
-  "tiles/tiles_topdown_sandbox.png": "backgrounds/arena-gba.png",
-  "tiles/tiles_overworld.png": "backgrounds/arena-gba.png",
+  "tiles/tiles_topdown_sandbox.png": "backgrounds/arena-coastal-240x160.png",
+  "tiles/tiles_overworld.png": "backgrounds/arena-coastal-240x160.png",
   "tiles/isometric-sandbox-sheet.png": "backgrounds/tactical-v5-surface.png",
   "sprites/player_topdown_4dir.png": "sprites/nara-topdown.png",
   "sprites/player_platformer.png": "sprites/penedos-v10-nara.png",

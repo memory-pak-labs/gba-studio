@@ -1,5 +1,6 @@
 /** @vitest-environment happy-dom */
-import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { Profiler } from "react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
@@ -97,7 +98,132 @@ async function openSceneInspector(user: ReturnType<typeof userEvent.setup>): Pro
   await user.click(tab ?? screen.getByRole("button", { name: "Propriedades da cena" }));
 }
 
+async function openCanvasLayers(user: ReturnType<typeof userEvent.setup>): Promise<void> {
+  const trigger = screen.getByRole("button", { name: "Camadas" });
+  if (trigger.getAttribute("aria-expanded") !== "true") await user.click(trigger);
+}
+
 describe("RoomsWorkspace React smoke", () => {
+  it("lets authors type scene dimensions before applying the minimum", async () => {
+    const user = userEvent.setup();
+    const project = buildProjectFromTemplate("blank", { name: "Dimension entry" });
+    const handlers = roomsWorkspaceHandlers();
+    render(<RoomsWorkspace projectData={project} presentation={deriveRoomsWorkspacePresentation(project)} {...handlers} />);
+    const width = screen.getByLabelText("Largura (tiles)");
+    await user.clear(width);
+    await user.type(width, "60");
+    expect(handlers.onUpdateRoomFields).not.toHaveBeenCalled();
+    await user.tab();
+    expect(handlers.onUpdateRoomFields).toHaveBeenLastCalledWith("room-1", { width: 60 });
+    expect(handlers.onUpdateRoomFields).not.toHaveBeenCalledWith("room-1", { width: 6 });
+  });
+
+  it("offers logical cell dimensions for Dungeon Crawler authoring", () => {
+    const project = buildProjectFromTemplate("blank", { name: "Dungeon grid" });
+    const room = (project.rooms as Record<string, unknown>[])[0]!;
+    room.sceneType = "dungeonCrawler";
+    room.runtime = { type: "dungeonCrawler", config: {} };
+    render(<RoomsWorkspace projectData={project} presentation={deriveRoomsWorkspacePresentation(project)} {...roomsWorkspaceHandlers()} />);
+    expect(screen.getByLabelText("Largura (células)")).toHaveAttribute("min", "1");
+    expect(screen.getByLabelText("Altura (células)")).toHaveAttribute("min", "1");
+  });
+
+  it("switches to uniform image-free diagram cards without changing authored positions", async () => {
+    const user = userEvent.setup();
+    let project = createBlankProjectData({ name: "Scene diagram" });
+    project = createRoomInProject(project, { id: "large-room", name: "large", height: 86, width: 126, sceneType: "topdown" });
+    project = createRoomInProject(project, { id: "end-room", name: "end", height: 20, width: 30, sceneType: "cutscene" });
+    const rooms = deriveRoomsWorkspacePresentation(project).rooms;
+    project.editorState = { ...(project.editorState as Record<string, unknown>), scenaConnections: [
+      { from: rooms[0].name, to: "large", eventName: "first" },
+      { from: "large", to: "end", eventName: "second" }
+    ] };
+    const source = JSON.stringify(project);
+    const onOrganizeSceneMap = vi.fn();
+    const handlers = roomsWorkspaceHandlers({ onOrganizeSceneMap });
+    const { container } = render(<RoomsWorkspace projectData={project} presentation={deriveRoomsWorkspacePresentation(project)} {...handlers} />);
+    const originalPositions = Array.from(container.querySelectorAll<HTMLElement>(".room-stage-card-frame"), card => [card.style.left, card.style.top]);
+    const toggle = screen.getByRole("button", { name: "Alternar visualização em organograma" });
+    await user.click(toggle);
+    expect(toggle).toHaveAttribute("aria-pressed", "true");
+    const world = container.querySelector(".rooms-canvas-world")!;
+    expect(world).toHaveAttribute("data-scene-map-view", "diagram");
+    expect(world.querySelectorAll("img, canvas")).toHaveLength(0);
+    const cards = world.querySelectorAll<HTMLElement>(".scene-diagram-card");
+    expect(cards).toHaveLength(rooms.length);
+    expect(new Set(Array.from(cards, card => `${card.style.width}:${card.style.height}`)).size).toBe(1);
+    expect(world.querySelectorAll(".room-card-connector-path")).toHaveLength(2);
+    await user.click(screen.getByRole("button", { name: "Executar somente a cena large" }));
+    expect(handlers.onRunRoom).toHaveBeenCalledWith("large-room", "large");
+    await user.click(screen.getByRole("button", { name: "Organizar cards das cenas" }));
+    expect(onOrganizeSceneMap).not.toHaveBeenCalled();
+    const frame = cards[0].parentElement!;
+    fireEvent.pointerDown(cards[0].querySelector("strong")!, { button: 0, pointerId: 7, clientX: 50, clientY: 50 });
+    fireEvent.pointerMove(window, { pointerId: 7, clientX: 150, clientY: 100 });
+    await waitFor(() => expect(frame.style.transform).toContain("translate3d"));
+    fireEvent.pointerUp(window, { pointerId: 7 });
+    expect(handlers.onUpdateSceneMapPosition).not.toHaveBeenCalled();
+    await user.click(toggle);
+    expect(container.querySelector(".scene-diagram-card")).toBeNull();
+    expect(Array.from(container.querySelectorAll<HTMLElement>(".room-stage-card-frame"), card => [card.style.left, card.style.top])).toEqual(originalPositions);
+    expect(JSON.stringify(project)).toBe(source);
+  });
+
+  it("restores moved diagram cards after reopening the workspace and persists Organizar", async () => {
+    const user=userEvent.setup();
+    const project=createBlankProjectData({name:"Persistent diagram"});
+    const source=JSON.stringify(project), projectPath="/games/diagram.gba-project";
+    const handlers=roomsWorkspaceHandlers({onOrganizeSceneMap:vi.fn()});
+    const props={projectData:project,projectPath,presentation:deriveRoomsWorkspacePresentation(project),...handlers};
+    let view=render(<RoomsWorkspace {...props}/>);
+    await user.click(screen.getByRole("button",{name:"Alternar visualização em organograma"}));
+    let card=view.container.querySelector<HTMLElement>(".scene-diagram-card")!;
+    const initial=[card.parentElement!.style.left,card.parentElement!.style.top];
+    fireEvent.pointerDown(card.querySelector("strong")!,{button:0,pointerId:7,clientX:50,clientY:50});
+    fireEvent.pointerMove(window,{pointerId:7,clientX:150,clientY:100});
+    await waitFor(()=>expect(card.parentElement!.style.transform).toContain("translate3d"));
+    fireEvent.pointerUp(window,{pointerId:7});
+    const moved=[card.parentElement!.style.left,card.parentElement!.style.top];
+    expect(moved).not.toEqual(initial);
+    view.unmount();
+    view=render(<RoomsWorkspace {...props}/>);
+    card=view.container.querySelector<HTMLElement>(".scene-diagram-card")!;
+    expect([card.parentElement!.style.left,card.parentElement!.style.top]).toEqual(moved);
+    await user.click(screen.getByRole("button",{name:"Organizar cards das cenas"}));
+    view.unmount();
+    view=render(<RoomsWorkspace {...props}/>);
+    card=view.container.querySelector<HTMLElement>(".scene-diagram-card")!;
+    expect([card.parentElement!.style.left,card.parentElement!.style.top]).toEqual(initial);
+    expect(handlers.onUpdateSceneMapPosition).not.toHaveBeenCalled();
+    expect(JSON.stringify(project)).toBe(source);
+  });
+
+  it("commits the final card position even when released before the next animation frame", () => {
+    const callbacks:FrameRequestCallback[]=[];
+    vi.spyOn(window,"requestAnimationFrame").mockImplementation(callback=>{callbacks.push(callback);return callbacks.length;});
+    vi.spyOn(window,"cancelAnimationFrame").mockImplementation(()=>{});
+    const project=createBlankProjectData({name:"Fast card drag"});
+    const handlers=roomsWorkspaceHandlers();
+    const {container}=render(<RoomsWorkspace projectData={project} presentation={deriveRoomsWorkspacePresentation(project)} {...handlers}/>);
+    const frame=container.querySelector<HTMLElement>(".room-stage-card-frame")!;
+    const x=Number.parseFloat(frame.style.left), y=Number.parseFloat(frame.style.top);
+    fireEvent.pointerDown(frame,{button:0,pointerId:11,clientX:20,clientY:20});
+    fireEvent.pointerMove(window,{pointerId:11,clientX:120,clientY:80});
+    fireEvent.pointerUp(window,{pointerId:11});
+    expect(handlers.onUpdateSceneMapPosition).toHaveBeenCalledWith(deriveRoomsWorkspacePresentation(project).rooms[0]!.name,{x:x+100,y:y+60});
+  });
+
+  it("opens a diagram scene with the keyboard and restores the mode when returning", async () => {
+    const user = userEvent.setup();
+    const project = createBlankProjectData({ name: "Diagram keyboard" });
+    const { container } = render(<RoomsWorkspace projectData={project} presentation={deriveRoomsWorkspacePresentation(project)} {...roomsWorkspaceHandlers()} />);
+    await user.click(screen.getByRole("button", { name: "Alternar visualização em organograma" }));
+    fireEvent.keyDown(container.querySelector(".scene-diagram-card")!, { key: "Enter" });
+    expect(container.querySelector(".room-focused-scene-editor-frame")).not.toBeNull();
+    await user.click(screen.getByRole("button", { name: "Voltar à visão geral" }));
+    expect(screen.getByRole("button", { name: "Alternar visualização em organograma" })).toHaveAttribute("aria-pressed", "true");
+  });
+
   afterEach(() => {
     cleanup();
     window.localStorage.clear();
@@ -131,7 +257,7 @@ describe("RoomsWorkspace React smoke", () => {
     const tools = container.querySelector<HTMLElement>(".room-editor-tool-group-focus")!;
     expect(within(tools).getByRole("button", { name: /Pintura - indisponível/ })).toBeDisabled();
     expect(within(tools).getByRole("button", { name: /Altura -/ })).toBeEnabled();
-    expect(within(tools).getByRole("button", { name: /Colisao -/ })).toBeEnabled();
+    expect(within(tools).getByRole("button", { name: /Colisão -/ })).toBeEnabled();
     expect(container.querySelector(".room-stage-isometric-grid-cell[data-cell-index='10']"))
       .toHaveAttribute("points", "120,48 136,56 120,64 104,56");
     const trigger = container.querySelector<HTMLElement>(".room-focused-scene-editor-frame .room-stage-entity.trigger")!;
@@ -489,7 +615,7 @@ describe("RoomsWorkspace React smoke", () => {
     const sceneEvents = screen.getByLabelText("Eventos da cena arena");
     expect(within(sceneEvents).getByRole("combobox", { name: "Estado do evento" })).toBeInTheDocument();
     expect(sceneEvents).toHaveTextContent("Ao iniciar");
-    expect(sceneEvents).not.toHaveTextContent("Ao acertar Player");
+    expect(sceneEvents).toHaveTextContent("Ao acertar Player");
     expect(sceneEvents).toHaveTextContent("Ao vencer");
     expect(sceneEvents).toHaveTextContent("Ao perder");
     expect(sceneEvents).toHaveTextContent("Ao fugir");
@@ -730,10 +856,12 @@ describe("RoomsWorkspace React smoke", () => {
     expect(container.querySelector(".room-focused-scene-editor-frame .room-stage-card-actions")).toBeNull();
     expect(canvas).toHaveClass("is-grid-visible");
 
+    await openCanvasLayers(user);
     const gridVisibilityToggle = screen.getByRole("button", { name: "Ocultar camada Grade" });
     expect(gridVisibilityToggle).toBeInTheDocument();
     expect(gridVisibilityToggle).not.toHaveTextContent("Grade");
     expect(gridVisibilityToggle.querySelector("svg")).not.toBeNull();
+    await openCanvasLayers(user);
     expect(screen.getByRole("button", { name: "Bloquear camada Grade" })).not.toHaveTextContent("Grade");
   });
 
@@ -770,11 +898,27 @@ describe("RoomsWorkspace React smoke", () => {
     expect(hudOverlay.querySelector('[data-hud-component-id="hud-frame"]')).not.toBeNull();
     expect(hudOverlay.querySelector('[data-hud-component-id="hud-status"]')).not.toBeNull();
 
+    await openCanvasLayers(user);
     await user.click(screen.getByRole("button", { name: "Ocultar camada HUD" }));
     expect(screen.queryByRole("img", { name: "Preview da HUD HUD Dungeon · origem Sala" })).not.toBeInTheDocument();
 
+    await openCanvasLayers(user);
     await user.click(screen.getByRole("button", { name: "Mostrar camada HUD" }));
     expect(screen.getByRole("img", { name: "Preview da HUD HUD Dungeon · origem Sala" })).toBeInTheDocument();
+  });
+
+  it("combina as molduras de batalha RPG com os componentes dinâmicos editáveis", async () => {
+    const user=userEvent.setup(),project=createBlankProjectData({name:"HUD RPG"});
+    const room=(project.scenas as Array<Record<string,unknown>>)[0]!;
+    room.sceneType="battleRpg";room.runtime={type:"battleRpg",config:{hudAssetName:"battle-hud.png"}};room.hudPresetId="battle-hud";
+    project.assets=[...(Array.isArray(project.assets)?project.assets:[]),{id:"battle-hud",kind:"Background",name:"battle-hud.png",metadata:{source:"Assets/backgrounds/battle-hud.png"}}];
+    (project.settings as any).hudPresets=[{id:"battle-hud",name:"Status RPG",mode:"advanced",width:240,height:160,components:[{id:"battle-party-name",kind:"text",text:"NARA",runtimeText:true,x:12,y:4,width:64,height:8,visible:true}]}];
+    render(<RoomsWorkspace presentation={deriveRoomsWorkspacePresentation(project)} projectData={project} projectPath="/tmp/hud-rpg.gba-project" {...roomsWorkspaceHandlers()}/>);
+    await focusActiveScene(user);
+    const image=screen.getByRole("img",{name:"Prévia da HUD RPG battle-hud.png"});
+    expect(image).toHaveClass("room-runtime-hud-background");
+    expect(image.querySelector("img")).toHaveAttribute("src",expect.stringContaining("battle-hud.png"));
+    expect(screen.getByRole("img",{name:/Preview da HUD Status RPG/})).toBeInTheDocument();
   });
 
   it("materializa a HUD de imagem da cena de luta no viewport sem preset", async () => {
@@ -804,6 +948,7 @@ describe("RoomsWorkspace React smoke", () => {
     expect(hudOverlay.querySelector("img")).toHaveAttribute("src", expect.stringContaining("fight-hud.png"));
     expect(screen.queryByRole("img", { name: /^Preview da HUD .*origem/ })).not.toBeInTheDocument();
 
+    await openCanvasLayers(user);
     await user.click(screen.getByRole("button", { name: "Ocultar camada HUD" }));
     expect(screen.queryByRole("img", { name: "Prévia da HUD de luta fight-hud.png" })).not.toBeInTheDocument();
   });
@@ -845,7 +990,7 @@ describe("RoomsWorkspace React smoke", () => {
 
       const hudOverlay = screen.getByRole("img", { name: "Preview da HUD HUD Todos os perfis · origem Sala" });
       expect(hudOverlay).toHaveClass("is-viewport-anchored");
-      expect(hudOverlay.parentElement).toHaveClass("rooms-canvas-viewport-host");
+      expect(hudOverlay.parentElement).toHaveClass(sceneType === "dungeonCrawler" ? "dungeon-camera" : "rooms-canvas-viewport-host");
 
       await user.click(screen.getByRole("button", { name: "HUD - 240×160" }));
       await user.click(screen.getByRole("button", { name: "Editar Status" }));
@@ -873,13 +1018,16 @@ describe("RoomsWorkspace React smoke", () => {
     });
 
     expect(hudScenes.map((scene) => scene.name)).toEqual([
+      "porto_lumen",
       "mapa_rota",
+      "penedos_vento",
       "mercado_suspenso",
       "usina_submersa",
       "usina_combate",
       "usina_saida",
       "tempestade",
       "guardiao_rele",
+      "arena_arrancada",
       "circuito_final",
       "carregar_jogo",
       "configuracoes",
@@ -888,7 +1036,14 @@ describe("RoomsWorkspace React smoke", () => {
       "inventario",
       "mapa_menu",
       "salvar",
-      "menu_start"
+      "menu_start",
+      "farol_interior",
+      "circuito_perspectiva",
+      "galeria_das_mares",
+      "sala_mare_vazante",
+      "corrida_preparacao",
+      "corrida_resultados",
+      "inventario_ferramentas"
     ]);
 
     for (const scene of hudScenes) {
@@ -905,7 +1060,7 @@ describe("RoomsWorkspace React smoke", () => {
 
       const hudOverlay = screen.getByRole("img", { name: /^Preview da HUD / });
       expect(hudOverlay).toHaveClass("is-viewport-anchored");
-      expect(hudOverlay.parentElement).toHaveClass("rooms-canvas-viewport-host");
+      expect(hudOverlay.parentElement).toHaveClass(scene.sceneType === "dungeonCrawler" ? "dungeon-camera" : "rooms-canvas-viewport-host");
       expect(hudOverlay.querySelector('canvas[data-hud-preview-renderer="native-contract"]')).toBeInTheDocument();
 
       await user.click(screen.getByRole("button", { name: "HUD - 240×160" }));
@@ -916,7 +1071,7 @@ describe("RoomsWorkspace React smoke", () => {
 
       cleanup();
     }
-  });
+  }, 180_000);
 
   it("exibe sprites de componentes da HUD no canvas e permite escolher o asset no inspetor", async () => {
     const user = userEvent.setup();
@@ -936,10 +1091,10 @@ describe("RoomsWorkspace React smoke", () => {
 
     const hudOverlay = screen.getByLabelText(/^Preview da HUD /);
     expect(hudOverlay.querySelector('canvas[data-hud-preview-renderer="native-contract"]')).toBeInTheDocument();
-    await user.click(screen.getByRole("button", { name: "Editar Sinal" }));
+    await user.click(screen.getAllByRole("button", { name: "Editar Entrega" })[0]!);
 
-    expect(screen.getByRole("combobox", { name: "Sprite do ícone" })).toHaveValue("dialogue-sigil.png");
-    expect(screen.getByRole("heading", { name: "Sinal" })).toBeInTheDocument();
+    expect(screen.getByRole("combobox", { name: "Sprite do ícone" })).toHaveValue("market-approved-delivery-icon.png");
+    expect(screen.getByRole("heading", { name: "Entrega" })).toBeInTheDocument();
   });
 
   it("separa os guias de composição do controle da HUD e respeita Sem HUD", async () => {
@@ -969,12 +1124,16 @@ describe("RoomsWorkspace React smoke", () => {
     await focusActiveScene(user);
 
     expect(screen.queryByRole("img", { name: "Prévia visual do menu Salvar" })).not.toBeInTheDocument();
+    await openCanvasLayers(user);
     expect(screen.getByRole("button", { name: "Mostrar camada Guias da composição" })).toBeInTheDocument();
+    await openCanvasLayers(user);
     expect(screen.getByRole("button", { name: "Ocultar camada HUD" })).toBeInTheDocument();
     expect(screen.queryByRole("img", { name: /Preview da HUD/ })).not.toBeInTheDocument();
 
+    await openCanvasLayers(user);
     await user.click(screen.getByRole("button", { name: "Mostrar camada Guias da composição" }));
     expect(screen.getByRole("img", { name: "Prévia visual do menu Salvar" })).toBeInTheDocument();
+    await openCanvasLayers(user);
     await user.click(screen.getByRole("button", { name: "Ocultar camada Guias da composição" }));
     expect(screen.queryByRole("img", { name: "Prévia visual do menu Salvar" })).not.toBeInTheDocument();
 
@@ -1428,6 +1587,82 @@ describe("RoomsWorkspace React smoke", () => {
     expect(screen.getByRole("button", { name: "Ocultar painel de prévia" })).toHaveAttribute("aria-pressed", "true");
   });
 
+  it("padroniza todos os cards do exemplo com câmera inicial, dimensões reais e HUD", () => {
+    const project = buildProjectFromTemplate("exemplo-gba", { name: "Cards uniformes" });
+    project.editorState = { ...(project.editorState as Record<string, unknown>), sceneMapZoom: 1 };
+    const presentation = deriveRoomsWorkspacePresentation(project);
+    const { container } = render(<RoomsWorkspace presentation={presentation} projectData={project} {...roomsWorkspaceHandlers()} />);
+    const cards = container.querySelectorAll<HTMLElement>('[data-scene-map-preview="true"]');
+    expect(cards).toHaveLength(presentation.rooms.length);
+    for (const card of cards) {
+      expect(card).toHaveClass("is-viewport-card");
+      expect(card).toHaveStyle({ width: "240px", height: "234px" });
+      expect(card.querySelector(".room-stage-card-canvas")).toHaveStyle({ height: "160px" });
+      expect(card.querySelectorAll(".room-stage-entity.trigger, .room-connection-zone")).toHaveLength(0);
+    }
+    const port = screen.getByLabelText("Card da cena porto_lumen · visão geral somente leitura");
+    expect(port.querySelector('[data-card-preview-framing="viewport"]')).toHaveAttribute("data-camera-x", "584");
+    expect(port.querySelector('[data-card-preview-framing="viewport"]')).toHaveAttribute("data-camera-y", "320");
+    expect(port.querySelector("canvas")).toHaveAttribute("width", "240");
+    expect(port.querySelector("canvas")).toHaveAttribute("height", "160");
+    expect(port.querySelector(".room-stage-card-dimensions")).toHaveTextContent("1008 × 688 px");
+    expect(port.querySelector('[data-hud-preset-id="hud-porto-lumen-b"]')).toBeInTheDocument();
+    expect(screen.getByLabelText("Card da cena usina_combate · visão geral somente leitura").querySelector(".dungeon-camera")).toBeInTheDocument();
+    expect(screen.getByLabelText("Card da cena circuito_perspectiva · visão geral somente leitura").querySelector(".racing-pseudo3d-camera-preview")).toBeInTheDocument();
+    expect(screen.getByLabelText("Card da cena arena_tatica · visão geral somente leitura").querySelector(".room-stage-card-tactical-hud")).toBeInTheDocument();
+  });
+
+  it("usa os limites da câmera isométrica no card e preserva a superfície inteira", () => {
+    const project = createBlankProjectData({ name: "Iso camera card" });
+    const room = (project.scenas as Array<Record<string, unknown>>)[0]!;
+    room.sceneType = "isometric";
+    room.width = 40; room.height = 40;
+    room.runtime = { type: "isometric", config: { tileWidth: 32, tileHeight: 16, originX: 0, originY: 0,
+      pagedSurface: { backgroundAsset: "map.png", foregroundAsset: "front.png", width: 800, height: 640 } } };
+    const presentation = deriveRoomsWorkspacePresentation(project);
+    const scene = presentation.rooms[0]!;
+    const player = presentation.entities.find(entity => entity.kind === "actor")!;
+    scene.playerActorName = player.name;
+    scene.cameraZones = [{ id: "locked", name: "Locked camera", area: { x: 0, y: 0, width: 40, height: 40 }, bounds: { x: 80, y: 120, width: 240, height: 160 },
+      offset: { x: 0, y: 0 }, lockX: true, lockY: true }];
+    const { container } = render(<RoomsWorkspace presentation={presentation} projectData={project} {...roomsWorkspaceHandlers()} />);
+    const layer = container.querySelector('[data-card-preview-framing="viewport"]');
+    expect(layer).toHaveAttribute("data-camera-x", "80");
+    expect(layer).toHaveAttribute("data-camera-y", "120");
+    expect(layer).toHaveStyle({ width: "800px", height: "640px", left: "-80px", top: "-120px" });
+  });
+
+  it.each(["topdown", "pseudo3d"])("mostra o viewport no card de corrida %s e mantém a pista inteira no editor", async (presentationMode) => {
+    const user = userEvent.setup();
+    const project = createRoomInProject(createBlankProjectData({ name: "Racing cards" }), {
+      anchorRoomID: "room-1", height: 64, id: "room-racing", name: "circuit", sceneType: "racing", width: 64
+    });
+    const racingRoom = (project.scenas as Array<Record<string, unknown>>).find(scene => scene.id === "room-racing")!;
+    racingRoom.runtime = { type: "racing", config: { presentation: presentationMode,
+      pseudo3dVisuals: { floorTilemapId: "floor.png", horizonY: 48 } } };
+    const { container } = render(<RoomsWorkspace presentation={deriveRoomsWorkspacePresentation(project)}
+      projectData={project} {...roomsWorkspaceHandlers()} />);
+    const card = screen.getByLabelText("Card da cena circuit · visão geral somente leitura");
+    const canvas = card.querySelector(".room-stage-card-canvas")!;
+    expect(canvas).toHaveStyle({ height: "160px" });
+    expect(card).toHaveStyle({ width: "240px" });
+    if (presentationMode === "pseudo3d") {
+      expect(within(card).getByRole("region", { name: "Câmera pseudo-3D da cena circuit" })).toBeInTheDocument();
+      expect(within(card).queryByRole("button", { name: "Abrir mapa técnico da cena circuit" })).not.toBeInTheDocument();
+    } else {
+      expect(canvas.querySelector('[data-card-preview-mode="racing-viewport"]')).toBeInTheDocument();
+    }
+    await user.click(screen.getByRole("button", { name: "Editar cena circuit" }));
+    await user.click(screen.getByRole("button", { name: "Mapa" }));
+    expect(container.querySelector(".room-focused-scene-editor-frame [role=grid]")).toBeInTheDocument();
+    expect(container.querySelectorAll(".room-focused-scene-editor-frame [role=gridcell]")).toHaveLength(64 * 64);
+    if (presentationMode === "topdown") {
+      await user.click(screen.getByRole("tab", { name: "Minimapa" }));
+      const minimap = screen.getByRole("complementary", { name: "Minimapa da cena circuit" });
+      expect(minimap.querySelector('[data-card-preview-mode="racing-viewport"]')).toBeNull();
+    }
+  });
+
   it("prioriza a câmera 240x160 e o minimapa de jogo para a corrida pseudo-3D em foco", async () => {
     const user = userEvent.setup();
     const project = setActiveRoomInProject(createRoomInProject(createBlankProjectData({ name: "Foco P3D" }), {
@@ -1505,8 +1740,24 @@ describe("RoomsWorkspace React smoke", () => {
     await user.click(screen.getByRole("tab", { name: "Pré-fabricados" }));
     expect(screen.getByText("NPC Base")).toBeInTheDocument();
     expect(screen.getByText("Porta Base")).toBeInTheDocument();
-    await user.click(screen.getByRole("button", { name: "Aplicar pre-fabricados as instancias" }));
+    await user.click(screen.getByRole("button", { name: "Aplicar pré-fabricados às instâncias" }));
     expect(handlers.onSynchronizePrefabs).toHaveBeenCalledOnce();
+  });
+
+  it("filtra a biblioteca por cena de origem e mostra como reutilizar o modelo", async () => {
+    const user = userEvent.setup();
+    const project = createBlankProjectData({ name: "Prefab guide" });
+    project.actorPrefabs = [
+      { id: "mechanic", name: "Mecânica", authoring: { sourceScene: "porto_lumen", description: "Conversa compartilhada de campanha." } },
+      { id: "sentinel", name: "Sentinela", authoring: { sourceScene: "usina_combate", description: "Combate nativo." } }
+    ];
+    render(<RoomsWorkspace presentation={deriveRoomsWorkspacePresentation(project)} projectData={project} {...roomsWorkspaceHandlers()} />);
+    await user.click(screen.getByRole("tab", { name: "Pré-fabricados" }));
+    fireEvent.change(screen.getByRole("searchbox", { name: "Buscar" }), { target: { value: "porto_lumen" } });
+    expect(screen.getByText("Mecânica")).toBeInTheDocument();
+    expect(screen.queryByText("Sentinela")).not.toBeInTheDocument();
+    await user.click(screen.getByText("Mecânica"));
+    expect(screen.getByText(/Conversa compartilhada de campanha/)).toBeVisible();
   });
 
   it("cria, edita e instancia prefabs pela biblioteca", async () => {
@@ -1521,11 +1772,11 @@ describe("RoomsWorkspace React smoke", () => {
       .find((button) => button.textContent?.includes("Player"));
     expect(playerRow).not.toBeNull();
     await user.click(playerRow!);
-    await user.click(screen.getByRole("button", { name: "Criar pre-fabricado do selecionado" }));
+    await user.click(screen.getByRole("button", { name: "Criar pré-fabricado do selecionado" }));
     expect(handlers.onCreatePrefabFromEntity).toHaveBeenCalledWith("actor", "actor-player");
 
     await user.click(screen.getByText("NPC Base"));
-    fireEvent.change(screen.getByLabelText("Animacao do prefab NPC Base"), { target: { value: "walk" } });
+    fireEvent.change(screen.getByLabelText("Animação do prefab NPC Base"), { target: { value: "walk" } });
     expect(handlers.onUpdatePrefab).toHaveBeenLastCalledWith("actor", "npc-base", { animationName: "walk" });
     await user.click(screen.getByRole("button", { name: "Instanciar NPC Base" }));
     expect(handlers.onInstantiatePrefab).toHaveBeenCalledWith("actor", "npc-base", expect.objectContaining({ roomID: "room-1" }));
@@ -1548,7 +1799,7 @@ describe("RoomsWorkspace React smoke", () => {
     );
 
     await focusScene(user, "patio");
-    const heightButton = container.querySelector<HTMLButtonElement>(".room-editor-tool-rail button[aria-label='Altura - Niveis 0 a 3']");
+    const heightButton = container.querySelector<HTMLButtonElement>(".room-editor-tool-rail button[aria-label='Altura - Níveis 0 a 3']");
     expect(heightButton).not.toBeNull();
     await user.click(heightButton!);
     expect(screen.getByRole("region", { name: "Pincel de altura" })).toBeInTheDocument();
@@ -1651,11 +1902,11 @@ describe("RoomsWorkspace React smoke", () => {
     expect(tool("Selecionar - Mover")).not.toBeNull();
     expect(tool("Pintura - Tiles")).not.toBeNull();
     expect(tool("Cena - Camera")).toBeNull();
-    expect(tool("Colisao - Solidos")).not.toBeNull();
-    expect(tool("Colisao - Solidos")).not.toBeDisabled();
+    expect(tool("Colisão - Sólidos")).not.toBeNull();
+    expect(tool("Colisão - Sólidos")).not.toBeDisabled();
     expect(tool("Ator - OBJ")).not.toBeNull();
-    expect(tool("Trigger - Eventos")).not.toBeNull();
-    expect(tool("Trigger - Eventos")).not.toBeDisabled();
+    expect(tool("Gatilho - Eventos")).not.toBeNull();
+    expect(tool("Gatilho - Eventos")).not.toBeDisabled();
     expect(tool("Zonas de câmera - Áreas")).toBeNull();
   });
 
@@ -1681,7 +1932,7 @@ describe("RoomsWorkspace React smoke", () => {
     await focusScene(user, "arena");
 
     const collisionButton = container.querySelector<HTMLButtonElement>(
-      ".room-editor-tool-rail button[aria-label='Colisao - Solidos']"
+      ".room-editor-tool-rail button[aria-label='Colisão - Sólidos']"
     );
     expect(collisionButton).not.toBeNull();
     expect(collisionButton).not.toBeDisabled();
@@ -1704,7 +1955,7 @@ describe("RoomsWorkspace React smoke", () => {
     );
 
     await focusScene(user, "rampa");
-    await user.click(container.querySelector<HTMLButtonElement>(".room-editor-tool-rail button[aria-label='Colisao - Solidos']")!);
+    await user.click(container.querySelector<HTMLButtonElement>(".room-editor-tool-rail button[aria-label='Colisão - Sólidos']")!);
     const cell = container.querySelector<HTMLButtonElement>(".rooms-canvas-stage .room-stage-cell")!;
     fireEvent.pointerDown(cell, { button: 0, pointerId: 8 });
     await user.click(screen.getByRole("button", { name: "Rampa subindo à direita" }));
@@ -1725,7 +1976,7 @@ describe("RoomsWorkspace React smoke", () => {
     );
 
     await focusScene(user, String(room.name));
-    await user.click(container.querySelector<HTMLButtonElement>(".room-editor-tool-rail button[aria-label='Colisao - Solidos']")!);
+    await user.click(container.querySelector<HTMLButtonElement>(".room-editor-tool-rail button[aria-label='Colisão - Sólidos']")!);
 
     expect(screen.getByText(/cada célula representa 8×8 px/)).toBeInTheDocument();
     expect(screen.getByText(/rampas mostram a área triangular/)).toBeInTheDocument();
@@ -1812,7 +2063,7 @@ describe("RoomsWorkspace React smoke", () => {
     expect(within(physical).getByRole("row", { name: /CPU/ })).toHaveTextContent("1600 ticks");
     expect(screen.getByRole("region", { name: "Estado nativo da ROM" })).toHaveTextContent("Sala 1");
     expect(screen.getByRole("region", { name: "Estado nativo da ROM" })).toHaveTextContent("VAR0 3 · FLAGS 0x00000003");
-    expect(screen.getByRole("region", { name: "Estado nativo da ROM" })).toHaveTextContent("Player 80, 64 · dir 1");
+    expect(screen.getByRole("region", { name: "Estado nativo da ROM" })).toHaveTextContent("Jogador 80, 64 · dir 1");
     expect(screen.getByRole("region", { name: "Estado nativo da ROM" })).toHaveTextContent("Ator 1/1 · 112, 64 · dir 2");
     expect(screen.getByRole("region", { name: "Estado nativo da ROM" })).toHaveTextContent("Colisão 0x20 · rampa 2");
     expect(screen.getByRole("region", { name: "Estado nativo da ROM" })).toHaveTextContent("Efeitos 0xE0 · rampas 0x14 · bloqueios 0xF");
@@ -2107,6 +2358,7 @@ describe("RoomsWorkspace React smoke", () => {
 
     render(<RoomsWorkspace presentation={deriveRoomsWorkspacePresentation(project)} projectData={project} {...handlers} />);
     await focusScene(user, "gender-select");
+    await openCanvasLayers(user);
     await user.click(screen.getByRole("button", { name: "Mostrar camada Guias da composição" }));
     const genderPreview = screen.getByRole("img", { name: "Prévia visual da escolha de gênero" });
     expect(genderPreview).toBeInTheDocument();
@@ -2136,6 +2388,7 @@ describe("RoomsWorkspace React smoke", () => {
     cleanup();
     render(<RoomsWorkspace presentation={deriveRoomsWorkspacePresentation(project)} projectData={project} {...handlers} />);
     await focusScene(user, "gender-select");
+    await openCanvasLayers(user);
     await user.click(screen.getByRole("button", { name: "Mostrar camada Guias da composição" }));
     const namePreview = screen.getByRole("img", { name: "Prévia visual da entrada do nome" });
     expect(namePreview).toHaveAttribute("data-menu-preview-cursor-index", "0");
@@ -2245,7 +2498,7 @@ describe("RoomsWorkspace React smoke", () => {
     expect(screen.getByRole("button", { name: "Adicionar zona" })).toBeInTheDocument();
   });
 
-  it("mantem Projeto e Pre-fabricados em abas exclusivas no navegador inferior", async () => {
+  it("mantem Projeto e Pré-fabricados em abas exclusivas no navegador inferior", async () => {
     const user = userEvent.setup();
     const project = createBlankProjectData({ name: "Navegador contextual" });
 
@@ -2261,10 +2514,10 @@ describe("RoomsWorkspace React smoke", () => {
     expect(navigator).toBeInTheDocument();
     expect(screen.getByRole("tab", { name: "Projeto" })).toHaveAttribute("aria-selected", "true");
     expect(screen.getByRole("region", { name: "Projeto" })).toBeInTheDocument();
-    expect(screen.queryByRole("region", { name: "Pre-fabricados" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("region", { name: "Pré-fabricados" })).not.toBeInTheDocument();
 
     await user.click(screen.getByRole("tab", { name: "Pré-fabricados" }));
-    expect(screen.getByRole("region", { name: "Pre-fabricados" })).toBeInTheDocument();
+    expect(screen.getByRole("region", { name: "Pré-fabricados" })).toBeInTheDocument();
     expect(screen.queryByRole("region", { name: "Projeto" })).not.toBeInTheDocument();
   });
 
@@ -2591,12 +2844,14 @@ describe("RoomsWorkspace React smoke", () => {
     expect(canvas?.querySelector(".room-stage-cell.has-isometric-foreground")).toBeNull();
     expect(canvas?.querySelector(".room-stage-cell-tile")).toBeNull();
     expect(canvas?.querySelector(".room-stage-cell .tile-overlay-collision")).not.toBeNull();
+    await openCanvasLayers(user);
     await user.click(screen.getByRole("button", { name: "Ocultar camada Colisão" }));
     expect(canvas?.querySelector(".room-stage-cell .tile-overlay-collision")).toBeNull();
+    await openCanvasLayers(user);
     await user.click(screen.getByRole("button", { name: "Mostrar camada Colisão" }));
     expect(canvas?.querySelector(".room-stage-cell .tile-overlay-collision")).not.toBeNull();
     await user.click(container.querySelector<HTMLButtonElement>(
-      ".room-editor-tool-rail button[aria-label='Colisao - Solidos']"
+      ".room-editor-tool-rail button[aria-label='Colisão - Sólidos']"
     )!);
     expect(canvas?.querySelector('[role="status"][aria-label="Colisão sobre preview RGB555"]')).not.toBeNull();
     const freeCollisionCell = canvas?.querySelector<HTMLButtonElement>(
@@ -2775,8 +3030,10 @@ describe("RoomsWorkspace React smoke", () => {
     expect(geometryOverlay?.querySelector(".room-stage-isometric-grid-world-bounds")).not.toBeNull();
     expect(geometryOverlay?.querySelector(".room-stage-isometric-grid-camera-bounds")).not.toBeNull();
     expect(geometryOverlay?.querySelector(".room-stage-isometric-grid-grid-bounds")).not.toBeNull();
+    await openCanvasLayers(user);
     await user.click(screen.getByRole("button", { name: "Ocultar overlay Câmera" }));
     expect(geometryOverlay?.querySelector(".room-stage-isometric-grid-camera-bounds")).toBeNull();
+    await openCanvasLayers(user);
     await user.click(screen.getByRole("button", { name: "Mostrar overlay Câmera" }));
     expect(geometryOverlay?.querySelector(".room-stage-isometric-grid-camera-bounds")).not.toBeNull();
   });
@@ -2800,17 +3057,20 @@ describe("RoomsWorkspace React smoke", () => {
     const canvas = container.querySelector<HTMLElement>(".room-focused-scene-editor-frame .room-stage-card-canvas");
     expect(canvas).toHaveClass("is-grid-visible");
 
+    await openCanvasLayers(user);
     await user.click(screen.getByRole("button", { name: "Ocultar camada Grade" }));
     expect(canvas).not.toHaveClass("is-grid-visible");
 
+    await openCanvasLayers(user);
     await user.click(screen.getByRole("button", { name: "Bloquear camada Colisão" }));
-    await user.click(screen.getByRole("button", { name: "Colisao - Solidos" }));
+    await user.click(screen.getByRole("button", { name: "Colisão - Sólidos" }));
     const collisionCell = canvas?.querySelector<HTMLButtonElement>(".room-stage-cell");
     expect(collisionCell).not.toBeNull();
     fireEvent.pointerDown(collisionCell!, { button: 0, buttons: 1, pointerId: 51 });
     fireEvent.pointerUp(collisionCell!, { button: 0, buttons: 0, pointerId: 51 });
 
     expect(handlers.onSetCollisionType).not.toHaveBeenCalled();
+    await openCanvasLayers(user);
     await user.click(screen.getByRole("button", { name: "Desbloquear camada Colisão" }));
     fireEvent.pointerDown(collisionCell!, { button: 0, buttons: 1, pointerId: 52 });
     expect(handlers.onSetCollisionType).toHaveBeenCalledWith(initialRoom.id, 0, "solid", expect.any(String));
@@ -2829,7 +3089,7 @@ describe("RoomsWorkspace React smoke", () => {
     );
 
     await focusActiveScene(user);
-    await user.click(container.querySelector<HTMLButtonElement>(".room-editor-tool-rail button[aria-label='Colisao - Solidos']")!);
+    await user.click(container.querySelector<HTMLButtonElement>(".room-editor-tool-rail button[aria-label='Colisão - Sólidos']")!);
     const canvas = container.querySelector<HTMLElement>(".room-focused-scene-editor-frame .room-stage-card-canvas")!;
     const cell = canvas.querySelector<HTMLButtonElement>(".room-stage-cell")!;
     fireEvent.pointerDown(cell, { button: 2, buttons: 2, pointerId: 81 });
@@ -2851,7 +3111,7 @@ describe("RoomsWorkspace React smoke", () => {
     );
 
     await focusActiveScene(user);
-    await user.click(container.querySelector<HTMLButtonElement>(".room-editor-tool-rail button[aria-label='Colisao - Solidos']")!);
+    await user.click(container.querySelector<HTMLButtonElement>(".room-editor-tool-rail button[aria-label='Colisão - Sólidos']")!);
     await user.click(screen.getByRole("button", { name: /Preencher Região/ }));
     const canvas = container.querySelector<HTMLElement>(".room-focused-scene-editor-frame .room-stage-card-canvas")!;
     const cell = canvas.querySelector<HTMLButtonElement>(".room-stage-cell")!;
@@ -2878,13 +3138,13 @@ describe("RoomsWorkspace React smoke", () => {
     );
 
     await focusActiveScene(user);
-    await user.click(container.querySelector<HTMLButtonElement>(".room-editor-tool-rail button[aria-label='Colisao - Solidos']")!);
+    await user.click(container.querySelector<HTMLButtonElement>(".room-editor-tool-rail button[aria-label='Colisão - Sólidos']")!);
     const canvas = container.querySelector<HTMLElement>(".room-focused-scene-editor-frame .room-stage-card-canvas")!;
     const cell = canvas.querySelector<HTMLButtonElement>(".room-stage-cell")!;
     fireEvent.pointerDown(cell, { altKey: true, button: 0, buttons: 1, pointerId: 82 });
 
     expect(handlers.onSetCollisionType).not.toHaveBeenCalled();
-    expect(screen.getByRole("button", { name: "Tipo de colisao Agua" })).toHaveAttribute("aria-pressed", "true");
+    expect(screen.getByRole("button", { name: "Tipo de colisão Água" })).toHaveAttribute("aria-pressed", "true");
   });
 
   it("preserva entidade selecionada quando a camada correspondente está bloqueada", async () => {
@@ -2908,6 +3168,7 @@ describe("RoomsWorkspace React smoke", () => {
     fireEvent.pointerUp(firstCell, { button: 0, buttons: 0, pointerId: 61 });
     expect(screen.getAllByText("Player").length).toBeGreaterThan(0);
 
+    await openCanvasLayers(user);
     await user.click(screen.getByRole("button", { name: "Bloquear camada Atores" }));
     fireEvent.keyDown(window, { key: "Delete" });
 
@@ -3092,6 +3353,41 @@ describe("RoomsWorkspace React smoke", () => {
     expect(screen.queryByRole("region", { name: `Editor da cena ${room.name}` })).not.toBeInTheDocument();
   });
 
+  it.each(["actor", "trigger"] as const)("move a prévia de %s sem reconciliar a grade e cancela com Escape", async (kind) => {
+    const user = userEvent.setup();
+    const project = createBlankProjectData({ name: "Arraste responsivo" });
+    const room = deriveRoomsWorkspacePresentation(project).rooms[0]!;
+    const entity = { id: "drag-preview", name: "Drag", roomName: room.name, x: 1, y: 1, width: 1, height: 1 };
+    if (kind === "actor") project.actors = [entity];
+    else project.triggers = [entity];
+    const handlers = roomsWorkspaceHandlers();
+    const commits = vi.fn();
+    const { container } = render(<Profiler id="scene" onRender={commits}>
+      <RoomsWorkspace presentation={deriveRoomsWorkspacePresentation(project)} projectData={project} {...handlers} />
+    </Profiler>);
+    await focusActiveScene(user);
+    const canvas = container.querySelector<HTMLElement>(".room-focused-scene-editor-frame .room-stage-card-canvas")!;
+    Object.defineProperty(canvas, "getBoundingClientRect", { configurable: true,
+      value: () => ({ left: 0, top: 0, width: room.width * 10, height: room.height * 10 }) });
+    const cells = canvas.querySelectorAll<HTMLButtonElement>(".room-stage-cell");
+    const overlay = canvas.querySelector<HTMLElement>(`.room-stage-entity.${kind}`)!;
+    const originalStyle = overlay.getAttribute("style");
+    fireEvent.pointerDown(cells[1 + room.width]!, { button: 0, buttons: 1, pointerId: 71, clientX: 15, clientY: 15 });
+    const initialCommits = commits.mock.calls.length;
+    for (let step = 2; step <= 4; step++) {
+      await act(async () => {
+        fireEvent.pointerMove(canvas, { buttons: 1, pointerId: 71, clientX: step * 10 + 5, clientY: 25 });
+        await new Promise(resolve => requestAnimationFrame(resolve));
+      });
+      expect(overlay.getAttribute("style")).not.toBe(originalStyle);
+    }
+    expect(commits.mock.calls.length - initialCommits).toBe(0);
+    expect(handlers.onPlaceRoomEntity).not.toHaveBeenCalled();
+    fireEvent.keyDown(window, { key: "Escape" });
+    expect(overlay.getAttribute("style")).toBe(originalStyle);
+    expect(handlers.onPlaceRoomEntity).not.toHaveBeenCalled();
+  });
+
   it("mantém a prévia do ator durante o arraste e persiste apenas ao soltar", async () => {
     const user = userEvent.setup();
     const project = createBlankProjectData({ name: "Arraste de ator" });
@@ -3133,6 +3429,39 @@ describe("RoomsWorkspace React smoke", () => {
       { roomID: room.id, x: 3, y: 2 },
       expect.any(String)
     );
+  });
+
+  it("restaura a prévia ao perder a captura e mantém a última posição de um arraste rápido", async () => {
+    const user = userEvent.setup();
+    const project = createBlankProjectData({ name: "Captura do arraste" });
+    const room = deriveRoomsWorkspacePresentation(project).rooms[0]!;
+    project.triggers = [{ id: "area", name: "Area", roomName: room.name, x: 1, y: 1, width: 2, height: 2 }];
+    const handlers = roomsWorkspaceHandlers();
+    const { container } = render(<RoomsWorkspace presentation={deriveRoomsWorkspacePresentation(project)} projectData={project} {...handlers} />);
+    await focusActiveScene(user);
+    const canvas = container.querySelector<HTMLElement>(".room-focused-scene-editor-frame .room-stage-card-canvas")!;
+    Object.defineProperty(canvas, "getBoundingClientRect", { configurable: true,
+      value: () => ({ left: 0, top: 0, width: room.width * 10, height: room.height * 10 }) });
+    const cells = canvas.querySelectorAll<HTMLButtonElement>(".room-stage-cell");
+    const start = cells[1 + room.width]!;
+    const overlay = canvas.querySelector<HTMLElement>(".room-stage-entity.trigger")!;
+    const original = overlay.getAttribute("style");
+    fireEvent.pointerDown(start, { button: 0, buttons: 1, pointerId: 82, clientX: 15, clientY: 15 });
+    fireEvent.pointerMove(canvas, { buttons: 1, pointerId: 82, clientX: 35, clientY: 25 });
+    await waitFor(() => expect(overlay.getAttribute("style")).not.toBe(original));
+    fireEvent.lostPointerCapture(start, { pointerId: 82 });
+    expect(overlay.getAttribute("style")).toBe(original);
+    fireEvent.pointerUp(canvas, { button: 0, pointerId: 82, clientX: 35, clientY: 25 });
+    expect(handlers.onPlaceRoomEntity).not.toHaveBeenCalled();
+
+    fireEvent.pointerDown(start, { button: 0, buttons: 1, pointerId: 83, clientX: 15, clientY: 15 });
+    fireEvent.pointerMove(canvas, { buttons: 1, pointerId: 83, clientX: 35, clientY: 25 });
+    // Release before the preview's animation frame, at the map edge.
+    fireEvent.pointerUp(canvas, { button: 0, pointerId: 83, clientX: room.width * 10 - 5, clientY: room.height * 10 - 5 });
+    expect(handlers.onPlaceRoomEntity).toHaveBeenCalledTimes(1);
+    expect(handlers.onPlaceRoomEntity).toHaveBeenCalledWith("trigger", "area", {
+      roomID: room.id, x: room.width - 2, y: room.height - 2
+    }, expect.any(String));
   });
 
   it("stacks authored BG3, BG2 and BG1 full-scene images in GBA draw order", async () => {
@@ -3316,7 +3645,7 @@ describe("RoomsWorkspace React smoke", () => {
     });
   });
 
-  it("apoia os atores no centro do losango e respeita a altura como a ROM", async () => {
+  it("apoia o pivô dos atores no centro do losango e respeita a altura como a ROM", async () => {
     const user = userEvent.setup();
     const project = createBlankProjectData({ name: "Arena elevada" });
     const room = (project.scenas as Array<Record<string, unknown>>)[0]!;
@@ -3329,7 +3658,7 @@ describe("RoomsWorkspace React smoke", () => {
     });
     project.assets = [
       {id: "floor", kind: "Background", name: "floor.png", metadata: {source: "Assets/backgrounds/floor.png", width: 240, height: 160}},
-      {id: "unit", kind: "Sprite", name: "unit.png", metadata: {source: "Assets/sprites/unit.png"}}
+      {id: "unit", kind: "Sprite", name: "unit.png", metadata: {source: "Assets/sprites/unit.png", pivot: {x: 20, y: 38}}}
     ];
     project.animations = [{
       id: "unit-idle", name: "idle", spriteSheet: "unit.png", frameWidth: 48, frameHeight: 40,
@@ -3345,11 +3674,18 @@ describe("RoomsWorkspace React smoke", () => {
     await focusActiveScene(user);
     const stage = container.querySelector('.room-focused-scene-editor-frame')!;
     const [lower, upper] = Array.from(stage.querySelectorAll<HTMLElement>('.room-stage-entity.actor'));
-    // Engine positions: top = originY + (x+y)*8 - z*8 + 8 - frameHeight.
-    expect(parseFloat(lower.style.top)).toBeCloseTo(30);
-    expect(parseFloat(upper.style.top)).toBeCloseTo(25);
-    expect(parseFloat(lower.style.left)).toBeCloseTo(20);
-    expect(parseFloat(upper.style.left)).toBeCloseTo(60);
+    // Match the export's metadata pivot, including transparent frame margins.
+    // Foot positions are (72,88) and (168,80); the frame is 48×40.
+    expect(parseFloat(lower.style.top)).toBeCloseTo(50 / 160 * 100);
+    expect(parseFloat(upper.style.top)).toBeCloseTo(42 / 160 * 100);
+    expect(parseFloat(lower.style.left)).toBeCloseTo(52 / 240 * 100);
+    expect(parseFloat(upper.style.left)).toBeCloseTo(148 / 240 * 100);
+    const cell = stage.querySelectorAll<HTMLElement>(".room-stage-cell")[4 * 6 + 1]!;
+    fireEvent.pointerDown(cell, { button: 0, buttons: 1, pointerId: 101 });
+    fireEvent.pointerUp(cell, { button: 0, pointerId: 101 });
+    expect(stage.querySelectorAll(".room-stage-isometric-grid-cell.is-entity-selected")).toHaveLength(1);
+    expect(stage.querySelector(".room-stage-isometric-grid-cell.is-entity-selected"))
+      .toHaveAttribute("data-cell-index", "25");
   });
 
   it("renderiza o frame logico completo de um ator isometrico formado por quatro tiles", async () => {
@@ -3788,15 +4124,16 @@ describe("RoomsWorkspace React smoke", () => {
     expect(paintMode).toHaveValue("fill");
     expect(topToolbar?.querySelector(".room-canvas-layer-toolbar")).toBeNull();
     const dock = container.querySelector(".room-scene-navigation");
-    expect(dock?.querySelector(".room-canvas-layer-toolbar")).toBeInTheDocument();
-    expect(dock).toHaveAttribute("aria-label", "Camadas e navegação");
-    const layers = dock!.querySelector("details")!;
-    expect(layers).not.toHaveAttribute("open");
-    await user.click(within(dock as HTMLElement).getByText("Camadas"));
-    expect(layers).toHaveAttribute("open");
+    expect(dock?.querySelector(".room-canvas-layer-toolbar")).toBeNull();
+    expect(dock).toHaveAttribute("aria-label", "Navegação da cena");
+    const layers = within(focusToolRail as HTMLElement).getByRole("button", { name: "Camadas" });
+    expect(layers).toHaveAttribute("aria-expanded", "false");
+    await user.click(layers);
+    expect(screen.getByRole("region", { name: "Camadas" })).toBeInTheDocument();
+    expect(paintButton).toHaveAttribute("aria-pressed", "true");
     await user.keyboard("{Escape}");
-    expect(layers).not.toHaveAttribute("open");
-    expect(layers.querySelector("summary")).toHaveFocus();
+    expect(layers).toHaveAttribute("aria-expanded", "false");
+    expect(layers).toHaveFocus();
 
     await user.click(within(focusToolRail as HTMLElement).getByRole("button", { name: /^HUD -/ }));
     const hudToolbar = screen.getByRole("toolbar", { name: "Ferramentas da HUD" });
@@ -3845,7 +4182,7 @@ describe("RoomsWorkspace React smoke", () => {
     const compactMarkerWidth = Number.parseFloat(compactMarker.getAttribute("markerWidth") ?? "");
 
     expect(compactStage.dataset.cardDensity).toBe("compact");
-    expect(Number.parseFloat(compactCard.style.height)).toBe(231.71);
+    expect(Number.parseFloat(compactCard.style.height)).toBe(234);
     expect(compactMarker.getAttribute("markerUnits")).toBe("userSpaceOnUse");
     expect(compactActionSize).toBeLessThanOrEqual(21);
     expect(compactStroke).toBeGreaterThan(0);
@@ -3922,12 +4259,12 @@ describe("RoomsWorkspace React smoke", () => {
 
     await focusActiveScene(user);
 
-    const collisionButton = screen.getByRole("button", { name: "Colisao - Solidos" });
-    const triggerButton = screen.getByRole("button", { name: "Trigger - Eventos" });
+    const collisionButton = screen.getByRole("button", { name: "Colisão - Sólidos" });
+    const triggerButton = screen.getByRole("button", { name: "Gatilho - Eventos" });
     expect(collisionButton).not.toBeDisabled();
     expect(triggerButton).not.toBeDisabled();
     expect(screen.queryByRole("region", { name: "Recursos indisponíveis nesta cena" })).not.toBeInTheDocument();
-    expect(container.querySelector(".room-editor-tool-rail button[aria-label^='Colisao - indisponível']")).toBeNull();
+    expect(container.querySelector(".room-editor-tool-rail button[aria-label^='Colisão - indisponível']")).toBeNull();
 
     await user.click(screen.getByRole("tab", { name: "Eventos" }));
     expect(screen.queryByRole("region", { name: "Recursos indisponíveis nesta cena" })).not.toBeInTheDocument();
@@ -3949,7 +4286,7 @@ describe("RoomsWorkspace React smoke", () => {
     );
 
     await focusActiveScene(user);
-    await user.click(container.querySelector<HTMLButtonElement>(".room-editor-tool-rail button[aria-label='Trigger - Eventos']")!);
+    await user.click(container.querySelector<HTMLButtonElement>(".room-editor-tool-rail button[aria-label='Gatilho - Eventos']")!);
     expect(screen.getByText("Nenhum gatilho vinculado a esta cena.")).toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "Criar gatilho" }));
 
@@ -3984,7 +4321,7 @@ describe("RoomsWorkspace React smoke", () => {
     );
 
     await focusActiveScene(user);
-    await user.click(screen.getByRole("button", { name: "Trigger - Eventos" }));
+    await user.click(screen.getByRole("button", { name: "Gatilho - Eventos" }));
 
     const canvas = container.querySelector<HTMLElement>(".room-focused-scene-editor-frame .room-stage-card-canvas");
     const cells = Array.from(canvas?.querySelectorAll<HTMLButtonElement>(".room-stage-cell") ?? []);
@@ -4018,7 +4355,7 @@ describe("RoomsWorkspace React smoke", () => {
     );
 
     await focusActiveScene(user);
-    await user.click(container.querySelector<HTMLButtonElement>(".room-editor-tool-rail button[aria-label='Colisao - Solidos']")!);
+    await user.click(container.querySelector<HTMLButtonElement>(".room-editor-tool-rail button[aria-label='Colisão - Sólidos']")!);
     await user.click(screen.getByRole("button", { name: "Retângulo Área" }));
 
     const cells = Array.from(container.querySelectorAll<HTMLButtonElement>(".room-stage-cell"));
@@ -4044,7 +4381,7 @@ describe("RoomsWorkspace React smoke", () => {
 
     await focusActiveScene(user);
     await user.click(container.querySelector<HTMLButtonElement>(
-      ".room-editor-tool-rail button[aria-label='Colisao - Solidos']"
+      ".room-editor-tool-rail button[aria-label='Colisão - Sólidos']"
     )!);
     await user.click(screen.getByRole("button", { name: "Retângulo Área" }));
 
@@ -4071,7 +4408,7 @@ describe("RoomsWorkspace React smoke", () => {
 
     await focusActiveScene(user);
     await user.click(container.querySelector<HTMLButtonElement>(
-      ".room-editor-tool-rail button[aria-label='Trigger - Eventos']"
+      ".room-editor-tool-rail button[aria-label='Gatilho - Eventos']"
     )!);
 
     const cells = Array.from(container.querySelectorAll<HTMLButtonElement>(".room-stage-cell"));
@@ -4103,15 +4440,17 @@ describe("RoomsWorkspace React smoke", () => {
     );
 
     await focusActiveScene(user);
+    expect(screen.queryByRole("grid")).not.toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Mapa" }));
     const collisionButton = container.querySelector<HTMLButtonElement>(
-      ".room-editor-tool-rail button[aria-label='Colisao - Solidos']"
+      ".room-editor-tool-rail button[aria-label='Colisão - Sólidos']"
     );
     expect(collisionButton).not.toBeNull();
     await user.click(collisionButton!);
     await user.click(screen.getByRole("button", { name: "Retângulo Área" }));
 
     const cells = Array.from(container.querySelectorAll<HTMLButtonElement>(
-      ".room-focused-scene-editor-frame .room-stage-cell"
+      ".dungeon-grid [role='gridcell']"
     ));
     fireEvent.pointerDown(cells[1]!, { button: 0, buttons: 1, pointerId: 51 });
     fireEvent.pointerEnter(cells[32]!, { buttons: 1, pointerId: 51 });
@@ -4121,7 +4460,7 @@ describe("RoomsWorkspace React smoke", () => {
       collisionTypes: expect.arrayContaining(["solid"])
     }), expect.any(String));
 
-    await user.click(screen.getByRole("button", { name: "Trigger - Eventos" }));
+    await user.click(screen.getByRole("button", { name: "Gatilho - Eventos" }));
     fireEvent.pointerDown(cells[124]!, { button: 0, buttons: 1, pointerId: 52 });
     fireEvent.pointerEnter(cells[156]!, { buttons: 1, pointerId: 52 });
     fireEvent.pointerUp(cells[156]!, { button: 0, buttons: 0, pointerId: 52 });
@@ -4155,8 +4494,8 @@ describe("RoomsWorkspace React smoke", () => {
     );
 
     await focusActiveScene(user);
-    const collisionButton = screen.getByRole("button", { name: "Colisao - Solidos" });
-    const triggerButton = screen.getByRole("button", { name: "Trigger - Eventos" });
+    const collisionButton = screen.getByRole("button", { name: "Colisão - Sólidos" });
+    const triggerButton = screen.getByRole("button", { name: "Gatilho - Eventos" });
     expect(collisionButton).not.toBeDisabled();
     expect(triggerButton).not.toBeDisabled();
 

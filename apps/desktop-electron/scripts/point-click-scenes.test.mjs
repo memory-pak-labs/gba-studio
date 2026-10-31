@@ -90,15 +90,18 @@ describe("point-and-click scene promotion", () => {
     const templateUrl = new URL("../default-assets/templates/exemplo-gba/", import.meta.url);
     const canonical = JSON.parse(readFileSync(new URL("exemplo-gba.gba-project", templateUrl), "utf8"));
     for (const sceneName of POINT_CLICK_SCENE_NAMES) {
-      const actors = canonical.actors.filter((actor) => actor.roomName === sceneName);
+      const sceneActors = canonical.actors.filter((actor) => actor.roomName === sceneName);
+      const dials = sceneActors.filter((actor) => actor.id.startsWith('telescope-dial-'));
+      const actors = sceneActors.filter((actor) => !actor.id.startsWith('telescope-dial-'));
+      expect(dials.map(actor=>[actor.visibleVariable,actor.visibleValue])).toEqual(sceneName==='observatorio_do_farol'?[0,1,2].map(value=>['var_telescope_alignment',value]):[]);
       const triggers = canonical.triggers.filter((trigger) => trigger.roomName === sceneName);
-      expect(actors).toHaveLength(4);
-      expect(triggers).toHaveLength(3);
-      expect(actors.every((actor) => actor.name.startsWith("Cursor") || ["Lia do Pergaminho", "Mecânico do Cais", "Guardião da Lanterna"].includes(actor.name))).toBe(true);
+      expect(actors).toHaveLength(sceneName==='armazem_das_mares'?2:1);
+      expect(triggers).toHaveLength(sceneName==='armazem_das_mares'?4:3);
+      expect(actors.every((actor) => actor.id==='encore-radio' || actor.name.startsWith("Cursor") || ["Lia do Pergaminho", "Mecânico do Cais", "Guardião da Lanterna"].includes(actor.name))).toBe(true);
     }
   });
 
-  it("keeps the approved 32x48 NPC artwork linked in both canonical scenes", () => {
+  it("preserves approved 32x48 NPC provenance in the historical generator without retaining replaced scene assets", () => {
     const templateUrl = new URL("../default-assets/templates/exemplo-gba/", import.meta.url);
     const repositoryUrl = new URL("../../../", import.meta.url);
     const canonical = JSON.parse(readFileSync(new URL("exemplo-gba.gba-project", templateUrl), "utf8"));
@@ -110,11 +113,13 @@ describe("point-and-click scene promotion", () => {
     ];
 
     for (const [spriteName, expectedHash] of approvedSprites) {
-      const png = readFileSync(new URL(`Assets/sprites/${spriteName}`, templateUrl));
+      const assetRecord = generated.assets.find(item => item.name === spriteName);
+      const png = readFileSync(new URL(assetRecord.metadata.sourceCandidate, repositoryUrl));
+      expect(canonical.assets.some(asset => asset.name === spriteName)).toBe(false);
       expect(createHash("sha256").update(png).digest("hex")).toBe(expectedHash);
       expect([png.readUInt32BE(16), png.readUInt32BE(20)]).toEqual([32, 48]);
 
-      for (const project of [generated, canonical]) {
+      for (const project of [generated]) {
         const asset = project.assets.find((item) => item.name === spriteName);
         expect(asset?.metadata).toMatchObject({
           frameWidth: 32,
@@ -126,7 +131,7 @@ describe("point-and-click scene promotion", () => {
         });
         const candidate = readFileSync(new URL(asset.metadata.sourceCandidate, repositoryUrl));
         expect(createHash("sha256").update(candidate).digest("hex")).toBe(expectedHash);
-        for (const sceneName of POINT_CLICK_SCENE_NAMES) {
+        for (const sceneName of project === canonical ? [] : POINT_CLICK_SCENE_NAMES) {
           const actor = project.actors.find((item) => item.roomName === sceneName && item.spriteSheet === spriteName);
           expect(actor).toBeDefined();
           const animationState = project.animationStates.find((item) => item.id === actor.animationStateID);

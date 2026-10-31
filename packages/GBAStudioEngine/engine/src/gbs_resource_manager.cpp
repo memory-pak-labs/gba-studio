@@ -1,3 +1,4 @@
+#include "gbs/profiler.hpp"
 #include "gbs/resource_manager.hpp"
 
 namespace gbs {
@@ -14,9 +15,7 @@ ResourceBankCacheEntry cached_reserve_cache_snapshot[max_resource_bank_cache_ent
 EngineResourceSnapshot cached_reserve_manager_snapshot GBS_RESOURCE_EWRAM;
 
 void capture_resource_pool_snapshot_into(const StaticResourcePool& pool, ResourcePoolSnapshot& snapshot) {
-    for (size_t index = 0; index < 1024; ++index) {
-        snapshot.used[index] = pool.used[index];
-    }
+    snapshot.used = pool.used;
     snapshot.capacity = pool.capacity;
     snapshot.valid = pool.capacity <= 1024;
 }
@@ -159,9 +158,7 @@ void init_resource_pool(StaticResourcePool& pool, uint16_t capacity) {
 }
 
 void reset_resource_pool(StaticResourcePool& pool) {
-    for (size_t index = 0; index < 1024; ++index) {
-        pool.used[index] = false;
-    }
+    pool.used = {};
     pool.used_count = 0;
 }
 
@@ -632,6 +629,9 @@ bool release_resource_bank(EngineResourceManager& manager, ResourceBankReservati
     if (!reservation.success) {
         return false;
     }
+    if (!dma_wait_for_destination(
+            reinterpret_cast<const volatile void*>(resource_bank_destination_address(reservation.kind, reservation.reservation.start)),
+            resource_bank_halfword_units(reservation.kind, reservation.reservation.count) * 2)) return false;
     StaticResourcePool* pool = resource_pool_for_kind(manager, reservation.kind);
     if (pool == nullptr || !release_resource_range(*pool, reservation.reservation)) {
         return false;
@@ -1013,6 +1013,7 @@ ResourceStreamResult stream_resource_bank_group_with_uploads(
         return make_stream_result(true, ResourceStreamStatus::AlreadyActive, group, nullptr, manager, 0, false);
     }
 
+    const SubsystemProfilerScope profiler_scope(ProfilerSubsystem::Streaming);
     const bool has_upload_sources = sources != nullptr && source_count > 0;
     const size_t upload_source_count = has_upload_sources ? required_upload_source_count(group) : 0;
     if (has_upload_sources) {
@@ -1473,6 +1474,7 @@ ResourceBankCacheGroupResult promote_resource_bank_group_from_cache(ResourceBank
 }
 
 ResourceBankCacheGroupResult hot_swap_resource_bank_group_from_cache(EngineResourceManager& manager, ResourceBankBatchReservation& active, ResourceBankCache& cache, const ResourceBankGroup& group) {
+    const SubsystemProfilerScope profiler_scope(ProfilerSubsystem::Streaming);
     if (!is_valid_resource_bank_group(group) ||
         !is_valid_bank_cache(cache) ||
         (active.success && active.reservations == nullptr) ||
@@ -1969,22 +1971,27 @@ ResourceBankPrefetchResult prefetch_resource_banks_for_camera_window_with_upload
 }
 
 bool release_bg_tiles(EngineResourceManager& manager, ResourceReservation reservation) {
+    if (!dma_wait_for_destination(reinterpret_cast<const volatile void*>(resource_bank_destination_address(ResourcePoolKind::BgTiles, reservation.start)), resource_bank_halfword_units(ResourcePoolKind::BgTiles, reservation.count) * 2)) return false;
     return release_resource_range(manager.bg_tiles, reservation);
 }
 
 bool release_obj_tiles(EngineResourceManager& manager, ResourceReservation reservation) {
+    if (!dma_wait_for_destination(reinterpret_cast<const volatile void*>(resource_bank_destination_address(ResourcePoolKind::ObjTiles, reservation.start)), resource_bank_halfword_units(ResourcePoolKind::ObjTiles, reservation.count) * 2)) return false;
     return release_resource_range(manager.obj_tiles, reservation);
 }
 
 bool release_bg_palette_colors(EngineResourceManager& manager, ResourceReservation reservation) {
+    if (!dma_wait_for_destination(reinterpret_cast<const volatile void*>(resource_bank_destination_address(ResourcePoolKind::BgPalette, reservation.start)), resource_bank_halfword_units(ResourcePoolKind::BgPalette, reservation.count) * 2)) return false;
     return release_resource_range(manager.bg_palette, reservation);
 }
 
 bool release_obj_palette_colors(EngineResourceManager& manager, ResourceReservation reservation) {
+    if (!dma_wait_for_destination(reinterpret_cast<const volatile void*>(resource_bank_destination_address(ResourcePoolKind::ObjPalette, reservation.start)), resource_bank_halfword_units(ResourcePoolKind::ObjPalette, reservation.count) * 2)) return false;
     return release_resource_range(manager.obj_palette, reservation);
 }
 
 bool release_oam_sprites(EngineResourceManager& manager, ResourceReservation reservation) {
+    if (!dma_wait_for_destination(reinterpret_cast<const volatile void*>(resource_bank_destination_address(ResourcePoolKind::OamSprites, reservation.start)), resource_bank_halfword_units(ResourcePoolKind::OamSprites, reservation.count) * 2)) return false;
     return release_resource_range(manager.oam_sprites, reservation);
 }
 

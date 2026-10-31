@@ -119,6 +119,17 @@ const hudNamespaceObject = findObjectDeclaration(
   namespaceSourcePaths[4]
 );
 const catalogKeys = objectKeys(ptObject);
+const uiCatalogPath = resolve(appRoot, "src/shared/studioUiCatalog.ts");
+const uiCatalogFile = ts.createSourceFile(uiCatalogPath, readFileSync(uiCatalogPath, "utf8"), ts.ScriptTarget.Latest, true);
+const uiCatalogObject = findObjectDeclaration("studioUiMessages", uiCatalogFile, uiCatalogPath);
+const primaryLocales = ["pt-BR", "en-US", "es-ES"];
+const uiCatalogCoverage = primaryLocales.map((locale, index) => {
+  const missingKeys = uiCatalogObject.properties.filter(property => !ts.isPropertyAssignment(property)
+    || !ts.isArrayLiteralExpression(property.initializer)
+    || !ts.isStringLiteral(property.initializer.elements[index])
+    || !property.initializer.elements[index].text.trim()).map(propertyKey);
+  return { locale, explicitCount: uiCatalogObject.properties.length - missingKeys.length, missingKeys };
+});
 const localeKeys = new Map();
 
 localeKeys.set("pt-BR", catalogKeys);
@@ -170,6 +181,8 @@ const report = {
   kind: "gba_studio_i18n_coverage",
   source: "src/renderer/i18n.tsx + src/renderer/i18nAdditionalFiles.ts + src/renderer/i18nAdditionalDialogues.ts + src/renderer/i18nAdditionalShellCredits.ts + src/renderer/i18nAdditionalWorkspaceUi.ts + src/renderer/i18nAdditionalHud.ts",
   catalogKeyCount: catalogKeys.length,
+  uiMessageCount: uiCatalogObject.properties.length,
+  uiCatalogCoverage,
   locales: reportLocales
 };
 
@@ -204,9 +217,10 @@ function formatMarkdown(value) {
     "## Leitura do snapshot",
     "",
     "- `pt-BR` é a fonte completa do catálogo e não possui fallback.",
-    `- \`en-US\` e \`es-ES\` possuem cobertura explícita de todas as ${catalogKeys.length} chaves.`,
-    `- Os 11 idiomas adicionais possuem cobertura explícita de todas as ${catalogKeys.length} chaves, incluindo a tela inicial, arquivos, diálogos, shell, workspace, créditos e os rótulos de interface auditados.`,
-    "- O relatório mede apenas chaves presentes no catálogo. Strings ainda hardcoded fora de `i18n.tsx` não entram nesta contagem.",
+    ...value.locales.filter(item => primaryLocales.includes(item.locale)).map(item => `- ${item.locale}: ${item.explicitCount}/${catalogKeys.length} chaves explícitas; ${item.fallbackCount} em fallback.`),
+    "- Os idiomas adicionais conservam a cobertura e os fallbacks indicados na tabela.",
+    `- Catálogo de interface: ${value.uiMessageCount} mensagens; ${value.uiCatalogCoverage.map(item => `${item.locale}: ${item.explicitCount}/${value.uiMessageCount}`).join("; ")}.`,
+    "- Catálogos completos não substituem a verificação das telas e dos estados dinâmicos.",
     "",
     "## Reproduzir",
     "",
@@ -226,3 +240,6 @@ if (process.argv.includes("--json")) {
 } else {
   console.log(formatMarkdown(report));
 }
+
+if (report.locales.some(item => primaryLocales.includes(item.locale) && item.fallbackCount > 0)
+  || uiCatalogCoverage.some(item => item.missingKeys.length > 0)) process.exitCode = 1;

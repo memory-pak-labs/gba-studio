@@ -71,14 +71,6 @@ export function deriveDungeonCrawlerAuthoringSummary(
     });
   }
 
-  if (width < 30 || height < 20) {
-    issues.push({
-      code: "room_below_gba_grid",
-      message: "A grade é menor que 30×20 células, o espaço lógico recomendado para um viewport GBA.",
-      severity: "warning"
-    });
-  }
-
   if (input.viewDistance > 8) {
     issues.push({
       code: "view_distance_runtime_cap",

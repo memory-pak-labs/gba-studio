@@ -252,6 +252,12 @@
   width: auto;
 }
 
+.scene-diagram-card { font-size: var(--studio-font-size-sm); }
+.scene-diagram-card-heading strong { font-size: var(--studio-font-size-lg); }
+.scene-diagram-card-type { font-size: var(--studio-font-size-sm); }
+.scene-diagram-card-type em, .scene-diagram-card-bottom > span { font-size: var(--studio-font-size-xs); }
+.scene-diagram-card-type em { font-style: normal; }
+
 .workspace {
   font-size: var(--studio-font-size-md);
   font-weight: var(--studio-font-weight-semibold);
@@ -1494,4 +1500,23 @@
 .event-library-origin {
   font-size: var(--studio-font-size-xs);
   font-weight: var(--studio-font-weight-regular);
+}
+
+/* Dungeon authoring controls share application typography; GBA pixels stay in the camera. */
+.dungeon-camera-error,
+.dungeon-scene-editor header label,
+.dungeon-scene-editor p,
+.dungeon-camera-controls button,
+.dungeon-entity-list button {
+  font-size: var(--studio-font-size-sm);
+}
+.dungeon-grid button {
+  font-size: var(--studio-font-size-lg);
+  font-weight: var(--studio-font-weight-semibold);
+}
+
+.rooms-editor-layout .is-viewport-card .room-stage-card-dimensions,
+.rooms-editor-layout .is-viewport-card .room-stage-card-count,
+.rooms-editor-layout .is-viewport-card .room-stage-card-player {
+  font-size: var(--studio-font-size-2xs);
 }

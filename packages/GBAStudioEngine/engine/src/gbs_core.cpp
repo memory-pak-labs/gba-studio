@@ -1,3 +1,5 @@
+#include <string.h>
+#include "gbs/profiler.hpp"
 #include "gbs/engine.hpp"
 #include "gbs/audio.hpp"
 #include "gbs/deferred_work.hpp"
@@ -10,6 +12,7 @@
 
 namespace {
 uint32_t g_frame_count = 0;
+int32_t profiler_room = -1;
 gbs::FrameSchedulerConfig scheduler_config {
     gbs::FrameSkipPolicy::Disabled,
     gbs::default_frame_budget_ticks,
@@ -68,6 +71,18 @@ void publish_frame_telemetry() {
     telemetry.input_held = current_context.input.held;
     telemetry.input_pressed = current_context.input.pressed;
     telemetry.input_released = current_context.input.released;
+    if (profiler_room != telemetry.current_room) {
+        gbs::subsystem_profiler_reset_peaks();
+        profiler_room = telemetry.current_room;
+    }
+    volatile gbs::RuntimeProfilerTelemetryBlock& profiler = gbs::runtime_profiler_telemetry_block();
+    profiler.valid_bits = gbs::subsystem_profiler_valid_bits();
+    for (size_t subsystem = 0; subsystem < 5; ++subsystem) {
+        const auto id = static_cast<gbs::ProfilerSubsystem>(subsystem);
+        profiler.frame_ticks[subsystem] = gbs::subsystem_profiler_frame_ticks(id);
+        profiler.scene_peak_ticks[subsystem] = gbs::subsystem_profiler_peak_ticks(id);
+    }
+    profiler.frame = telemetry.frame;
     gbs::sync_legacy_runtime_telemetry();
 }
 }
@@ -87,10 +102,12 @@ void init() {
     gbs_hw_init();
     gbs_hw_frame_counter_init();
     render_init();
-    audio_init();
+    audio_init(preserve_runtime_handoff);
     reset_scene_transition_visual_effects();
     reset_input();
     reset_runtime_telemetry();
+    subsystem_profiler_reset();
+    profiler_room = -1;
     deferred_work_init(deferred_work_queue());
     input_repeat_init(input_repeat_state());
     rumble_init();
@@ -106,6 +123,7 @@ void init() {
 }
 
 void wait_vblank() {
+    subsystem_profiler_frame_begin();
     if (!frame_active) {
         debug_begin_runtime_physical_sample();
         current_context.frame = g_frame_count;
@@ -121,6 +139,7 @@ void wait_vblank() {
     render_scene_transition_visual_effects();
     const uint32_t before_vblank = gbs_hw_frame_counter_ticks();
     gbs_hw_set_render_publication_blocked(render_publication_transaction ? 1 : 0);
+    subsystem_profiler_pause();
     gbs_hw_wait_vblank();
     const uint32_t after_vblank_wait = gbs_hw_frame_counter_ticks();
     dma_flush_vblank_queue_budget(DmaChannel::Channel3, dma_default_vblank_budget_bytes);
@@ -162,6 +181,7 @@ void wait_vblank() {
         }
     }
 
+    subsystem_profiler_frame_end();
     publish_frame_telemetry();
     runtime_frame_tick(g_frame_count, current_context);
     frame_active = false;
@@ -185,6 +205,7 @@ const FrameContext& begin_frame() {
         return current_context;
     }
     frame_active = true;
+    subsystem_profiler_frame_begin();
     debug_begin_runtime_physical_sample();
     frame_start_ticks = gbs_hw_frame_counter_ticks();
     current_context.frame = g_frame_count;
@@ -250,6 +271,9 @@ void begin_runtime_handoff() {
 
 void begin_render_publication_transaction() {
     render_publication_transaction = true;
+    // The old tilemap still references VRAM being replaced by staged DMA.
+    // Hiding register publication alone cannot preserve that old image.
+    gbs_hw_set_render_handoff_fallback();
     gbs_hw_set_render_publication_blocked(1);
 }
 

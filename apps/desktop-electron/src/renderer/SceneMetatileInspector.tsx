@@ -1,3 +1,4 @@
+import { uiText as ui, useStudioUiText } from "./studioUiText";
 import type { ReactElement } from "react";
 
 import {
@@ -59,6 +60,7 @@ export function SceneMetatileInspector({
   value,
   width
 }: SceneMetatileInspectorProps): ReactElement {
+  const ui = useStudioUiText();
   const dimensions = logicalDimensions(width, height);
   const resolution = resolveSceneMetatileAuthoring(value, width, height);
   const capabilityAuthoring = capabilityEnabled === true && !resolution.config.enabled;
@@ -124,50 +126,50 @@ export function SceneMetatileInspector({
   return (
     <InspectorSection
       className="scene-metatile-inspector room-detail-editor-span-2"
-      description="Metatiles são uma camada de autoria do GBA Studio: cada bloco 2×2 é expandido para quatro tiles BG no exportador."
-      title="Autoria de metatiles"
+      description={ui("Metatiles são uma camada de autoria do GBA Studio: cada bloco 2×2 é expandido para quatro tiles BG no exportador.")}
+      title={ui("Autoria de metatiles")}
     >
       {sceneType !== "topdown" ? (
-        <p className="room-detail-section-help">Este contrato está habilitado para o perfil Topdown nesta milestone; outras cenas permanecem no fluxo tiled padrão.</p>
+        <p className="room-detail-section-help">{ui("Este contrato está habilitado para o perfil Topdown nesta milestone; outras cenas permanecem no fluxo tiled padrão.")}</p>
       ) : null}
       <InspectorToggle
         checked={normalized.enabled}
-        description="Ausência ou desativação mantém o mapa como tiles individuais."
+        description={ui("Ausência ou desativação mantém o mapa como tiles individuais.")}
         disabled={sceneType !== "topdown"}
-        label="Ativar autoria de metatiles"
+        label={ui("Ativar autoria de metatiles")}
         onChange={enableAuthoring}
       />
       {normalized.enabled ? (
         <>
           <div className="scene-metatile-summary" role="status">
-            <span>{dimensions.width} × {dimensions.height} blocos lógicos</span>
-            <span>2 × 2 tiles BG físicos</span>
-            <span>{normalized.library.length} definição(ões)</span>
+            <span>{dimensions.width} × {dimensions.height} {ui(" blocos lógicos")}</span>
+            <span>{ui("2 × 2 tiles BG físicos")}</span>
+            <span>{normalized.library.length} {ui(" definição(ões)")}</span>
           </div>
           <div className="scene-metatile-toolbar">
-            <InspectorAction onClick={addDefinition}>Adicionar metatile</InspectorAction>
-            <InspectorAction disabled={normalized.library.length === 0} onClick={fillMap}>Preencher mapa com o primeiro</InspectorAction>
+            <InspectorAction onClick={addDefinition}>{ui("Adicionar metatile")}</InspectorAction>
+            <InspectorAction disabled={normalized.library.length === 0} onClick={fillMap}>{ui("Preencher mapa com o primeiro")}</InspectorAction>
           </div>
           {normalized.library.map((definition, index) => (
             <fieldset className="scene-metatile-definition" key={`${definition.id}-${index}`}>
-              <legend>{definition.label || `Metatile ${index + 1}`}</legend>
+              <legend>{definition.label || ui("Metatile {0}", { 0: index + 1 })}</legend>
               <div className="scene-metatile-definition-header">
                 <label>
-                  <span>ID</span>
-                  <input aria-label={`ID do metatile ${index + 1}`} onChange={(event) => updateDefinition(index, { id: event.currentTarget.value })} type="text" value={definition.id} />
+                  <span>{ui("ID")}</span>
+                  <input aria-label={ui("ID do metatile {0}", { 0: index + 1 })} onChange={(event) => updateDefinition(index, { id: event.currentTarget.value })} type="text" value={definition.id} />
                 </label>
                 <label>
-                  <span>Nome</span>
-                  <input aria-label={`Nome do metatile ${index + 1}`} onChange={(event) => updateDefinition(index, { label: event.currentTarget.value })} type="text" value={definition.label} />
+                  <span>{ui("Nome")}</span>
+                  <input aria-label={ui("Nome do metatile {0}", { 0: index + 1 })} onChange={(event) => updateDefinition(index, { label: event.currentTarget.value })} type="text" value={definition.label} />
                 </label>
-                <InspectorAction onClick={() => removeDefinition(index)}>Remover</InspectorAction>
+                <InspectorAction onClick={() => removeDefinition(index)}>{ui("Remover")}</InspectorAction>
               </div>
               <div className="scene-metatile-tile-grid">
                 {definition.tiles.map((tile, tileIndex) => (
                   <InspectorNumber
-                    ariaLabel={`Tile ${tileIndex + 1} do metatile ${index + 1}`}
+                    ariaLabel={ui("Tile {0} do metatile {1}", { 0: tileIndex + 1, 1: index + 1 })}
                     key={tileIndex}
-                    label={`Tile ${tileIndex + 1}`}
+                    label={ui("Tile {0}", { 0: tileIndex + 1 })}
                     max={PHYSICAL_TILE_LIMIT}
                     min={0}
                     onChange={(nextTile) => updateDefinition(index, { tiles: definition.tiles.map((entry, entryIndex) => entryIndex === tileIndex ? nextTile : entry) as [number, number, number, number] })}
@@ -177,31 +179,31 @@ export function SceneMetatileInspector({
               </div>
               <div className="scene-metatile-definition-header">
                 <InspectorSelect
-                  label="Colisão"
+                  label={ui("Colisão")}
                   onChange={(collision) => updateDefinitionSemantic(index, { collision: collision as RoomCollisionType })}
                   options={ROOM_COLLISION_TYPES.map((collision) => ({ label: roomCollisionTypeLabel(collision), value: collision }))}
                   value={definition.semantic.collision}
                 />
-                <InspectorNumber label="Dano" max={255} min={0} onChange={(damage) => updateDefinitionSemantic(index, { damage })} value={definition.semantic.damage} />
-                <InspectorNumber label="Velocidade %" max={200} min={0} onChange={(speedPercent) => updateDefinitionSemantic(index, { speedPercent })} value={definition.semantic.speedPercent} />
+                <InspectorNumber label={ui("Dano")} max={255} min={0} onChange={(damage) => updateDefinitionSemantic(index, { damage })} value={definition.semantic.damage} />
+                <InspectorNumber label={ui("Velocidade %")} max={200} min={0} onChange={(speedPercent) => updateDefinitionSemantic(index, { speedPercent })} value={definition.semantic.speedPercent} />
               </div>
             </fieldset>
           ))}
           <label className="scene-composition-textarea-field">
-            <span>Mapa lógico · {dimensions.width * dimensions.height} índices</span>
+            <span>{ui("Mapa lógico · ")}{dimensions.width * dimensions.height} {ui(" índices")}</span>
             <textarea
-              aria-label="Mapa lógico de metatiles"
+              aria-label={ui("Mapa lógico de metatiles")}
               onChange={(event) => update({ map: event.currentTarget.value.split(",").map((entry) => Number(entry.trim())).filter((entry) => Number.isFinite(entry)) })}
               rows={3}
               value={normalized.map.join(", ")}
             />
-            <small>O índice aponta para a definição na biblioteca. O export falha se o tamanho ou os índices não forem válidos.</small>
+            <small>{ui("O índice aponta para a definição na biblioteca. O export falha se o tamanho ou os índices não forem válidos.")}</small>
           </label>
         </>
       ) : null}
       {normalized.enabled && issues.length > 0 ? (
         <ul className="scene-composition-issues" role="status">
-          {issues.slice(0, 6).map((issue, index) => <li key={`${issue.code}-${index}`}>{issue.message}</li>)}
+          {issues.slice(0, 6).map((issue, index) => <li key={`${issue.code}-${index}`}>{ui(issue.message)}</li>)}
         </ul>
       ) : null}
     </InspectorSection>

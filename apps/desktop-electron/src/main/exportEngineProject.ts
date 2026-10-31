@@ -1,3 +1,10 @@
+import { actorCommandReferences, sceneChangeCommand, sceneChangeCommandParts } from "../shared/sceneChangeCommand.js";
+import { parseEventInstruction, eventWaitFrames } from "../shared/eventExecutionContract.js";
+import { parseVisibilityPreset } from "../shared/visibilityPresets.js";
+import { normalizePointClickTarget, pointClickInventoryItems, type PointClickInventoryItem } from "../shared/pointClickTargets.js";
+import { roomMapStates, resolveMapState, type MapStateVariant } from "../shared/mapStates.js";
+import { memoizeEngineExport, withEngineExportContext } from "../shared/engineExportContext.js";
+import { dungeonGeometryKey, dungeonPlayerActor } from "../shared/dungeonSceneView.js";
 import { audioContractIssues } from "../shared/audioContract.js";
 import { isLutaEventVerb, parseLutaEventCommand } from "../shared/lutaEventCommands.js";
 import { eventCommandIntegrationIssue, eventCommandSupport } from "../shared/eventCommandSupport.js";
@@ -18,6 +25,7 @@ import {
 import {
   buildActorEngineSpriteExport,
   buildLutaActorEngineSpriteExport,
+  buildBattleRpgActorEngineSpriteExport,
   buildAssetcAudioPackGeneration,
   buildAssetcPaletteFamilyPackGeneration,
   buildAssetcSpritePackGeneration,
@@ -54,7 +62,7 @@ import {
   dialogueChoiceTranslations,
   dialogueTranslations
 } from "../shared/projectLocalization.js";
-import { expandProjectTilemaps } from "../shared/projectResourceFormat.js";
+import { expandProjectTilemaps, normalizeProjectTilemaps } from "../shared/projectResourceFormat.js";
 import {
   gbaTileSizePx,
   gbaTopdownAreaToPixels,
@@ -76,7 +84,9 @@ import {
   type RoomConnectionArea
 } from "../shared/roomsWorkspace.js";
 import { normalizeSceneTypeId } from "../shared/sceneTypes.js";
+import { tileReplacementCollisionFields } from "../shared/tileReplacement.js";
 import {
+  resolveBattleRpgInventory,
   resolveDungeonCrawlerFeatureRuntime,
   resolveSceneCapabilityManifest,
   resolveSceneFeatureModules,
@@ -195,6 +205,7 @@ import {
 } from "../shared/sceneResourceContract.js";
 import {
   normalizeMenuSceneConfig,
+  normalizeMenuVisibilityConditions,
   type MenuSceneConfig,
   type MenuSceneItemBinding,
   type MenuSceneRole,
@@ -224,6 +235,7 @@ import {
 
 export interface EngineExportProjectEventCommand {
   op: string;
+  source?: { eventID: string; stepID: string };
   minutes?: number;
   minutes_per_tick?: number;
   frames_per_tick?: number;
@@ -350,6 +362,7 @@ export interface EngineExportCameraZone {
 }
 
 export interface EngineExportTopdownRoom {
+  on_restore?: EngineExportProjectEventCommand[];
   name: string;
   scene_type: string;
   runtime_profile: string;
@@ -358,7 +371,8 @@ export interface EngineExportTopdownRoom {
   visual_tiles: number[];
   foreground_tiles?: number[];
   visual_tilemap?: string;
-  visual_tilemap_layout?: "source_asset";
+  visual_tilemap_layout?: "source_asset" | "editor_tiles";
+  paged_source_tiles?: string;
   collision_flags: number[];
   collision_slopes: number[];
   collision_types: string[];
@@ -370,6 +384,7 @@ export interface EngineExportTopdownRoom {
     camera_mode: string;
     camera_position: { x: number; y: number };
     player_start: { x: number; y: number };
+    player_enabled: boolean;
     camera_bounds?: { x: number; y: number; width: number; height: number };
   };
   on_enter?: EngineExportProjectEventCommand[];
@@ -390,9 +405,14 @@ export interface EngineExportTopdownRoom {
     on_enter?: EngineExportProjectEventCommand[];
     on_leave?: EngineExportProjectEventCommand[];
   }>;
+  interactions?: Array<{
+    area: { x: number; y: number; width: number; height: number };
+    script: EngineExportProjectEventCommand[];
+  }>;
   camera_zones?: EngineExportCameraZone[];
   npcs?: Array<{
     name: string;
+    direction?: "up" | "down" | "left" | "right";
     position: { x: number; y: number };
     size: { x: number; y: number };
     collision_offset?: { x: number; y: number };
@@ -400,10 +420,12 @@ export interface EngineExportTopdownRoom {
     collision_mask?: number;
     push_priority?: number;
     pushable?: boolean;
+    health?: number;
+    movement?: { kind: "wander_box"; bounds: { x: number; y: number; width: number; height: number }; step_interval_frames?: number };
     affine_obj?: EngineExportAffineObj;
     metasprite?: { asset: string; index: number };
     animation?: string | { asset: string };
-    animations?: Array<{ name: string; asset: string; frame_indices: number[] }>;
+    animations?: AssetcSpriteAnimationExportEntry[];
     on_start?: EngineExportProjectEventCommand[];
     on_interact?: EngineExportProjectEventCommand[];
     on_update?: EngineExportProjectEventCommand[];
@@ -449,6 +471,7 @@ export interface EngineExportTopdownProject {
     pushable?: boolean;
     affine_obj?: EngineExportAffineObj;
     speed: number;
+    allow_diagonal?: boolean;
     interact_button: string;
     emit_animation_fallback: boolean;
     on_start?: EngineExportProjectEventCommand[];
@@ -522,17 +545,18 @@ export interface EngineExportAffineObj {
 }
 
 export interface EngineExportPlatformerRoom {
+  on_restore?: EngineExportProjectEventCommand[];
   name: string;
   width_tiles: number;
   height_tiles: number;
   visual_tiles: number[];
   visual_tilemap?: string;
-  visual_tilemap_layout?: "source_asset";
+  visual_tilemap_layout?: "source_asset" | "editor_tiles";
   background_layers?: Array<{
     layer: "bg3" | "bg2" | "bg1";
     tiles: number[];
     tilemap?: string;
-    tilemap_layout?: "source_asset";
+    tilemap_layout?: "source_asset" | "editor_tiles";
     parallax: { x: number; y: number };
   }>;
   collision_flags: number[];
@@ -606,9 +630,10 @@ export interface EngineExportPlatformerProject {
     metasprite: { asset: string; index: number };
     animation?: { asset: string };
     animations?: Partial<Record<
-      "idle" | "walk" | "jump" | "fall" | "climb" | "wall_slide" | "dash" | "glide",
+      "idle" | "walk" | "jump" | "fall" | "climb" | "wall_slide" | "dash" | "glide" | "attack" | "hurt" | "land",
       Omit<AssetcSpriteAnimationExportEntry, "name">
     >>;
+    script_animations?: AssetcSpriteAnimationExportEntry[];
     on_start?: EngineExportProjectEventCommand[];
     on_update?: EngineExportProjectEventCommand[];
   };
@@ -630,7 +655,7 @@ export interface EngineExportPlatformerProject {
   scripts: EngineExportProjectScript[];
 }
 
-type PlatformerPlayerAnimationState = "idle" | "walk" | "jump" | "fall" | "climb" | "wall_slide" | "dash" | "glide";
+type PlatformerPlayerAnimationState = "idle" | "walk" | "jump" | "fall" | "climb" | "wall_slide" | "dash" | "glide" | "attack" | "hurt" | "land";
 
 function platformerPlayerAnimationState(name: string): PlatformerPlayerAnimationState | null {
   const tokens = name.toLowerCase().split(/[^a-z0-9]+/).filter(Boolean);
@@ -642,6 +667,9 @@ function platformerPlayerAnimationState(name: string): PlatformerPlayerAnimation
   if (tokens.includes("wall") && tokens.some((token) => token === "slide" || token === "sliding")) return "wall_slide";
   if (tokens.some((token) => token === "dash" || token === "dashing")) return "dash";
   if (tokens.some((token) => token === "glide" || token === "gliding")) return "glide";
+  if (tokens.includes("attack")) return "attack";
+  if (tokens.includes("hurt")) return "hurt";
+  if (tokens.includes("land")) return "land";
   return null;
 }
 
@@ -657,7 +685,7 @@ function buildPlatformerPlayerAnimations(
   return Object.keys(animations).length > 0 ? animations : undefined;
 }
 
-function buildIsometricActorAnimations(
+export function buildIsometricActorAnimations(
   entries: AssetcSpriteAnimationExportEntry[] | undefined
 ): AssetcSpriteAnimationExportEntry[] | undefined {
   if (!entries || entries.length === 0) return undefined;
@@ -682,6 +710,17 @@ function buildIsometricActorAnimations(
     const hasUp = tokens.includes("up");
     const hasLeft = tokens.includes("left");
     const hasRight = tokens.includes("right");
+    // Optional screen-cardinal views complement the legacy projected views.
+    // Keep them separate so, for example, idle_screen_up cannot replace the
+    // existing idle_up clip used on the isometric tile edge.
+    if (tokens.includes("screen") && (state === "idle" || state === "walk" || state === "move")) {
+      const screenDirections = [hasDown && "down", hasUp && "up", hasLeft && "left", hasRight && "right"].filter(Boolean);
+      if (screenDirections.length === 1) {
+        const name = `${state === "move" ? "walk" : state}_screen_${screenDirections[0]}`;
+        if (!result.has(name)) result.set(name, { ...entry, name });
+      }
+      continue;
+    }
     const direction = hasDown && hasLeft
       ? "left"
       : hasDown && hasRight
@@ -702,6 +741,11 @@ function buildIsometricActorAnimations(
     if (!direction) continue;
     const name = `${state}_${direction}`;
     if (!result.has(name)) result.set(name, { ...entry, name });
+  }
+  // Directional aliases drive movement; scripts and the initial pose also
+  // address the authored names. Keep both in the native animation table.
+  for (const entry of entries) {
+    if (!result.has(entry.name)) result.set(entry.name, entry);
   }
   return result.size > 0 ? Array.from(result.values()) : undefined;
 }
@@ -826,7 +870,8 @@ function tacticalPresentationReferences(
   if (enabled.has("tactical_surface")) references.push(...(presentation.surfacePages ?? []).map((page) => page.asset));
   if (enabled.has("tactical_grid_overlay") && presentation.gridAsset) references.push(presentation.gridAsset);
   if (enabled.has("tactical_hud") && presentation.hudLayout) references.push(presentation.hudLayout);
-  if (enabled.has("tactical_units")) references.push(...presentation.units.map((unit) => unit.sheet));
+  if (enabled.has("tactical_units")) references.push(...presentation.units.flatMap((unit) => [unit.sheet,...(unit.portrait?[unit.portrait]:[])]));
+  if(enabled.has("tactical_hud") && presentation.compactHud) references.push(...Object.values(presentation.compactHud));
   if (enabled.has("tactical_props")) references.push(...presentation.props.map((prop) => prop.asset));
   if (enabled.has("tactical_feedback")) {
     references.push(...[
@@ -843,7 +888,7 @@ function tacticalPresentationReferences(
   return references.filter(Boolean);
 }
 
-export function tacticalMarkerIndices(cursorAsset: string, rangeAsset: string, targetAsset: string): {
+export function tacticalMarkerIndices(cursorAsset: string, rangeAsset: string, targetAsset: string, availableFrames: Record<string, number> = {}): {
   cursor: number;
   range: number;
   target: number;
@@ -851,11 +896,16 @@ export function tacticalMarkerIndices(cursorAsset: string, rangeAsset: string, t
   const [cursorSheet] = cursorAsset.split("#", 1);
   const [rangeSheet] = rangeAsset.split("#", 1);
   const [targetSheet] = targetAsset.split("#", 1);
-  return {
+  const indices = {
     cursor: 0,
     range: Number(rangeSheet === cursorSheet),
     target: Number(targetSheet === cursorSheet) + Number(targetSheet === rangeSheet)
   };
+  for (const [key, sheet] of [['cursor',cursorSheet],['range',rangeSheet],['target',targetSheet]] as const) {
+    const count = availableFrames[sheet!];
+    if (count && indices[key] >= count) indices[key] = 0;
+  }
+  return indices;
 }
 
 function buildIsometricTacticalPresentation(
@@ -945,6 +995,8 @@ function buildIsometricTacticalPresentation(
     ? presentation.units.map((unit) => ({
       actor_id: unit.actorId,
       sheet: canonicalAsset(unit.sheet, "obj"),
+      ...(unit.portrait ? {portrait:canonicalAsset(unit.portrait,"obj")} : {}),
+      ...(unit.label ? {label:unit.label} : {}),
       ...(unit.animations ? { animations: unit.animations } : {})
     }))
     : [];
@@ -989,6 +1041,7 @@ function buildIsometricTacticalPresentation(
     ...(enabled.has("tactical_hud") && presentation.hudLayout
       ? { hud_layout: canonicalAsset(presentation.hudLayout, "ui") }
       : {}),
+    ...(enabled.has("tactical_hud") && presentation.compactHud ? {compact_hud:Object.fromEntries(Object.entries(presentation.compactHud).map(([key,name])=>[key,canonicalAsset(name,"obj")])) as Record<string,string>} : {}),
     units,
     props,
     ...(enabled.has("tactical_feedback") && presentation.cursorAsset && presentation.rangeAsset && presentation.targetAsset
@@ -1007,7 +1060,15 @@ function buildIsometricTacticalPresentation(
     indices
   };
   if (enabled.has("tactical_feedback") && output.cursor_asset && output.range_asset && output.target_asset) {
-    output.indices.markers = tacticalMarkerIndices(output.cursor_asset, output.range_asset, output.target_asset);
+    const markerFrames = Object.fromEntries([
+      [output.cursor_asset, presentation.cursorAsset], [output.range_asset, presentation.rangeAsset], [output.target_asset, presentation.targetAsset]
+    ].flatMap(([assetID, reference]) => {
+      const sheet = reference?.split('#', 1)[0];
+      const asset = projectArray(data, 'assets').find(a => a.name === sheet || a.id === sheet);
+      const count = integerField(child(asset, 'metadata') ?? {}, 'frameCount', 0);
+      return count > 0 ? [[assetID, count]] : [];
+    }));
+    output.indices.markers = tacticalMarkerIndices(output.cursor_asset, output.range_asset, output.target_asset, markerFrames);
   }
   if (enabled.has("tactical_audio") && presentation.audio) {
     const cues = Object.fromEntries(ISO_TACTICAL_AUDIO_CUES.map((cue) => [
@@ -1143,9 +1204,12 @@ export interface EngineExportIsometricTacticalPresentation {
   };
   grid_asset?: string;
   hud_layout?: string;
+  compact_hud?: Record<string,string>;
   units: Array<{
     actor_id: string;
     sheet: string;
+    portrait?: string;
+    label?: string;
     animations?: NonNullable<IsoTacticalUnitPresentation["animations"]>;
   }>;
   props: Array<{
@@ -1174,6 +1238,7 @@ export interface EngineExportIsometricTacticalPresentation {
 }
 
 export interface EngineExportIsometricRoom {
+  on_restore?: EngineExportProjectEventCommand[];
   name: string;
   world_mode: "scrollable_tiled_world" | "static_composition";
   width_tiles: number;
@@ -1229,7 +1294,7 @@ export interface EngineExportIsometricRoom {
     bg0: number[];
   };
   authored_background?: string;
-  paged_surface?: { background: string; foreground: string; width: number; height: number };
+  paged_surface?: { background: string; foreground?: string; width: number; height: number };
   tileset?: string;
   tileset_tile_width_pixels?: number;
   tileset_tile_height_pixels?: number;
@@ -1275,6 +1340,14 @@ export interface EngineExportIsometricProject {
 }
 
 export interface EngineExportDungeonCrawlerRoom {
+  on_restore?: EngineExportProjectEventCommand[];
+  player_view?: {
+    metasprite: { asset: string; index: number };
+    animation?: Omit<AssetcSpriteAnimationExportEntry,"name">;
+    position_pixels: { x: number; y: number };
+  };
+  presentation?: { hud_background: number; action_sounds: Record<string,number>; player_label?: string;
+    view_recipe?: {width:number;height:number;cells:boolean[];materials?:string[];material_assets?:string[];door:{x:number;y:number}} };
   name: string;
   resource_bank_group?: string;
   width_tiles: number;
@@ -1303,6 +1376,9 @@ export interface EngineExportDungeonCrawlerRoom {
     name: string;
     position: { x: number; y: number };
     metasprite: { asset: string; index: number };
+    depth_frames?: Record<string, Omit<AssetcSpriteAnimationExportEntry,"name">>;
+    cell?: boolean;
+    wall_mounted?: boolean;
     depth_metasprites?: {
       far: { asset: string; index: number };
       mid: { asset: string; index: number };
@@ -1314,6 +1390,7 @@ export interface EngineExportDungeonCrawlerRoom {
 }
 
 export interface EngineExportDungeonCrawlerProject {
+  view_cache?: {tiles:string; maps:string; palettes:string; index:Array<{view:string;mapOffset:number;paletteOffset:number;paletteColors:number}>};
   initial_room: number;
   resource_banks?: "asset_pack";
   save?: {
@@ -1330,7 +1407,7 @@ export interface EngineExportDungeonCrawlerProject {
   scripts: EngineExportProjectScript[];
   assets?: EngineExportTopdownProject["assets"];
   backgrounds?: Array<{
-    layer: "bg2";
+    layer: "bg2" | "bg1";
     tilemap: string;
     backdrop_color?: number;
     backdrop_from_tilemap_palette?: boolean;
@@ -1368,8 +1445,13 @@ export interface EngineExportRacingPlayer {
 }
 
 export interface EngineExportRacingRoom {
+  action_sounds?: Partial<Record<"accelerate" | "brake" | "collision" | "checkpoint", number>>;
   player?: EngineExportRacingPlayer;
   name: string;
+  challenge?: { boost_variable_index: number; best_time_text_index: number; result_time_text_index: number;
+    result_position_text_index: number; result_rating_text_index: number; result_best_text_index: number;
+    gold_seconds: number; silver_seconds: number };
+
   resource_bank_group?: string;
   width_tiles: number;
   height_tiles: number;
@@ -1431,6 +1513,7 @@ export interface EngineExportRacingProject {
   save?: EngineProjectSaveConfig;
   dialogue_lines?: EngineExportDialogueLine[];
   dialogue_ui?: EngineDialogueUiConfig;
+  portrait_assets?: EngineExportPortraitAsset[];
   scripts?: EngineExportProjectScript[];
   assets?: EngineExportTopdownProject["assets"];
   backgrounds?: Array<{
@@ -1450,6 +1533,17 @@ export interface EngineExportRacingProject {
 }
 
 export interface EngineExportBattleRpgEncounter {
+  inventory_items?: Array<{ label: string; item: number; initial_quantity: number; heal_amount: number }>;
+  presentation?: {
+    cursor?: {asset:string;index:number};
+    victory_label?: string;
+    hud_background: number;
+    action_sounds: Partial<Record<string,number>>;
+    victory_tracker: number;
+    outcome_hold_frames: number;
+    effects: Record<string, Omit<AssetcSpriteAnimationExportEntry,"name">>;
+    disabled_escape?: {asset:string;index:number};
+  };
   name: string;
   background?: number;
   resource_bank_group?: string;
@@ -1477,9 +1571,13 @@ export interface EngineExportBattleRpgEncounter {
   on_victory?: EngineExportProjectEventCommand[];
   on_defeat?: EngineExportProjectEventCommand[];
   on_escape?: EngineExportProjectEventCommand[];
+  on_hit_player?: EngineExportProjectEventCommand[];
 }
 
 export interface EngineExportBattleRpgParticipant {
+  animation_set?: AssetcActorSpriteExportFields["battle_rpg_animation_set"];
+  position?: {x:number;y:number};
+  hud_label?: string;
   name: string;
   unit: { max_hp: number; attack: number; defense: number; speed: number };
   abilities: Array<{ kind: "attack" | "magic" | "heal" | "defend"; power: number }>;
@@ -1493,11 +1591,12 @@ export interface EngineExportBattleRpgProject {
   save?: EngineProjectSaveConfig;
   dialogue_lines?: EngineExportDialogueLine[];
   dialogue_ui?: EngineDialogueUiConfig;
+  portrait_assets?: EngineExportPortraitAsset[];
   scripts?: EngineExportProjectScript[];
   assets?: EngineExportTopdownProject["assets"] & { sprite_assets?: string[] };
   resource_banks?: "asset_pack";
   backgrounds?: Array<{
-    layer: "bg2";
+    layer: "bg1" | "bg2";
     tilemap: string;
     backdrop_color?: number;
     backdrop_from_tilemap_palette?: boolean;
@@ -1513,6 +1612,7 @@ export interface EngineExportLutaFighter {
 }
 
 export interface EngineExportLutaStage {
+  action_sounds?: Partial<Record<"hit" | "guard" | "special" | "miss", number>>;
   name: string;
   background?: number;
   resource_bank_group?: string;
@@ -1572,6 +1672,10 @@ export interface EngineExportPointClickHotspot {
   on_click?: EngineExportProjectEventCommand[];
   line?: number;
   target_scene?: number;
+  required_item?: number;
+  give_item?: number;
+  unavailable_line?: number;
+  on_use_item?: EngineExportProjectEventCommand[];
 }
 
 export interface EngineExportPointClickProp {
@@ -1593,9 +1697,11 @@ export interface EngineExportPointClickScene {
   cursor_speed?: number;
   hotspots?: EngineExportPointClickHotspot[];
   props?: EngineExportPointClickProp[];
+  cursor?: EngineExportPointClickProject["cursor"];
 }
 
 export interface EngineExportPointClickProject {
+  inventory_items?: PointClickInventoryItem[];
   initial_scene: number;
   cursor_start: { x: number; y: number };
   cursor_speed: number;
@@ -1641,6 +1747,7 @@ export interface EngineExportShmupEnemy {
   on_destroy?: EngineExportProjectEventCommand[];
   on_hit_player?: EngineExportProjectEventCommand[];
   metasprite?: { asset: string; index: number };
+  animation?: Omit<AssetcSpriteAnimationExportEntry, "name">;
 }
 
 export interface EngineExportShmupWave {
@@ -1653,6 +1760,8 @@ export interface EngineExportShmupWave {
   enemies: EngineExportShmupEnemy[];
   on_start?: EngineExportProjectEventCommand[];
   on_clear?: EngineExportProjectEventCommand[];
+  on_defeat?: EngineExportProjectEventCommand[];
+  on_hit_player?: EngineExportProjectEventCommand[];
 }
 
 export interface EngineExportShmupProject {
@@ -1708,6 +1817,7 @@ export interface EngineExportShmupProject {
     speed: number;
     fire_cooldown: number;
     projectile_offset: { x: number; y: number };
+    on_fire?: EngineExportProjectEventCommand[];
     metasprite?: { asset: string; index: number };
     animations?: Partial<Record<"idle" | "fly" | "bank_up" | "bank_down" | "shoot" | "hurt" | "explosion", Omit<AssetcSpriteAnimationExportEntry, "name">>>;
   };
@@ -1718,6 +1828,7 @@ export interface EngineExportShmupProject {
     metasprite?: { asset: string; index: number };
   };
   enemy_projectile?: {
+    on_hit_player?: EngineExportProjectEventCommand[];
     size: { x: number; y: number };
     velocity: { x: number; y: number };
     max_active: number;
@@ -1726,6 +1837,7 @@ export interface EngineExportShmupProject {
   waves: EngineExportShmupWave[];
   dialogue_lines: EngineExportDialogueLine[];
   dialogue_ui?: EngineDialogueUiConfig;
+  portrait_assets?: EngineExportPortraitAsset[];
   actor_sprites?: EngineExportEmoteAsset[];
   emote_assets?: EngineExportEmoteAsset[];
   composition?: ExportedSceneComposition;
@@ -1816,8 +1928,9 @@ export interface EngineExportMenuItem {
   save_slot?: number;
   value_labels?: string[];
   detail_lines?: string[];
+  available_runtime?: "racing";
   binding?: {
-    source: "variable" | "inventory" | "stat" | "equipped";
+    source: "variable" | "inventory" | "stat" | "equipped" | "text" | "context";
     index: number;
     format: "number" | "count" | "percent" | "on_off";
   };
@@ -1825,6 +1938,8 @@ export interface EngineExportMenuItem {
 }
 
 export interface EngineExportMenuActor {
+  visibility_conditions?: Array<{binding: NonNullable<EngineExportMenuItem['binding']>;value:number;negate?:boolean}>;
+  visibility_any?: boolean;
   name: string;
   position: { x: number; y: number };
   metasprite: { asset: string; index: number };
@@ -1847,12 +1962,18 @@ export interface EngineExportMenuActor {
 }
 
 export interface EngineExportMenuScreen {
+  hud_bindings?: Array<{slot:number;binding?:NonNullable<EngineExportMenuItem['binding']>;selected_item?:boolean;columns?:number}>;
+  previous_page_screen?: number;
+  next_page_screen?: number;
+  audio_feedback?: Partial<Record<"navigate" | "confirm" | "back" | "unavailable", { pcm?: number; sfx?: number; volume: number; priority: number }>>;
   name: string;
   resource_bank_group?: string;
   hud_preset_id?: string;
   hud_list_rows?: number;
   hud_text_color?: number;
+  hud_header?: {x:number;y:number;width:number;background_color:number;text_color:number};
   hud_transparent_text?: boolean;
+  hud_feedback_in_details?: boolean;
   title_text_variable?: number;
   background?: number;
   background_animation?: {
@@ -1957,12 +2078,14 @@ export interface EngineExportCutsceneStep {
     to_position: { x: number; y: number };
     duration_frames: number;
   }>;
+  actor_frames?: Array<{ actor_index: number; frame_index: number }>;
 }
 
 export interface EngineExportCutsceneActor {
   name: string;
   position: { x: number; y: number };
   metasprite: { asset: string; index: number };
+  animation?: { asset: string };
 }
 
 export interface EngineExportCutsceneScene {
@@ -2032,6 +2155,7 @@ export interface EngineExportWorldMapProject {
   on_start?: EngineExportProjectEventCommand[];
   journey_frames?: number;
   cursor_affine?: boolean;
+  hud_labels?: { available: string; journey: string; locked: string };
   embedded_nodes?: boolean;
   save?: {
     enabled: boolean;
@@ -2273,7 +2397,7 @@ export interface PreparedEngineProjectExport {
   error?: string;
 }
 
-const defaultEnginePackVersion = "2.26.0";
+const defaultEnginePackVersion = "2.27.0";
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return Boolean(value) && typeof value === "object" && !Array.isArray(value);
@@ -2712,6 +2836,10 @@ function gbaRomHeaderBuild(data: GBAProjectData): Pick<EngineExportProjectContra
 }
 
 function projectRooms(data: GBAProjectData): Record<string, unknown>[] {
+  return memoizeEngineExport(data, "main.projectRooms", () => projectRoomsUncached(data));
+}
+
+function projectRoomsUncached(data: GBAProjectData): Record<string, unknown>[] {
   const rooms = projectArray(data, "scenas");
   if (rooms.length > 0) return rooms;
   const persistedRooms = projectArray(data, "rooms");
@@ -2878,6 +3006,10 @@ function entityBounds(
 }
 
 function roomSceneType(room: Record<string, unknown>): string {
+  return memoizeEngineExport(room, "main.roomSceneType", () => roomSceneTypeUncached(room));
+}
+
+function roomSceneTypeUncached(room: Record<string, unknown>): string {
   return normalizeSceneTypeId(normalizeGBASceneDocument(room).sceneType, "topdown");
 }
 
@@ -3245,6 +3377,9 @@ function buildRuntimeContract(data: GBAProjectData, mixedRuntime = false): Engin
 function configuredPlayerActorName(data: GBAProjectData, room?: Record<string, unknown>): string {
   const roomPlayer = room ? nullableStringField(room, "playerActorName") : null;
   if (roomPlayer) return roomPlayer;
+  // Custom scenes opt in to a controlled entity; a global start player must
+  // not turn an ordinary actor into the player in a scene with no selection.
+  if (room && roomSceneType(room) === "custom") return "";
 
   const startPlayer = nullableStringField(child(settings(data), "general"), "startPlayer");
   return startPlayer || "Player";
@@ -3405,6 +3540,20 @@ function firstPlayerPosition(data: GBAProjectData, rooms: Record<string, unknown
   return playerPositionForRoom(data, rooms[initialRoomIndex] ?? rooms[0] ?? {}, initialRoomIndex);
 }
 
+function authoredTopdownActorDirection(
+  data: GBAProjectData,
+  actor: Record<string, unknown>
+): "up" | "down" | "left" | "right" {
+  const animationName = stringField(actor, "animationName", "");
+  const animation = projectArray(data, "animations").find(item => (
+    stringField(item, "spriteSheet", "") === stringField(actor, "spriteSheet", "") &&
+    (stringField(item, "name", "") === animationName || stringField(item, "id", "") === animationName)
+  ));
+  const suffix = animationName.split("_").at(-1) ?? "";
+  const direction = stringField(animation, "direction", suffix || stringField(actor, "direction", "down")).toLowerCase();
+  return direction === "up" || direction === "left" || direction === "right" ? direction : "down";
+}
+
 function initialTopdownPlayerSpawn(
   data: GBAProjectData,
   room: Record<string, unknown>,
@@ -3429,7 +3578,7 @@ function initialTopdownPlayerSpawn(
   if (playerActor) {
     return {
       ...playerPositionForRoom(data, room, roomIndex),
-      direction: "down"
+      direction: authoredTopdownActorDirection(data, playerActor)
     };
   }
   const width = integerField(room, "width", 20);
@@ -3463,7 +3612,9 @@ function npcActorsForRoom(
   return projectArray(data, "actors").filter((actor) => {
     const name = stringField(actor, "name", "");
     const roomNameValue = entitySceneName(actor, "actor");
-    return name !== playerName && (!roomNameValue || roomNameValue === roomDataName);
+    return name !== playerName
+      && !(roomSceneType(room)==="dungeonCrawler" && child(actor,"dungeonViewAnchor"))
+      && (!roomNameValue || roomNameValue === roomDataName);
   });
 }
 
@@ -3524,6 +3675,17 @@ function eventActorIndex(data: GBAProjectData, rooms: Record<string, unknown>[],
   }
   if (actorName.trim().toLowerCase() === "player" || isConfiguredPlayerActor(data, actorName)) {
     return -1;
+  }
+  return npcActorIndex(data, rooms, actorName);
+}
+
+function animationControlActorIndex(data: GBAProjectData, rooms: Record<string, unknown>[], actorName: string): number {
+  const actor = projectArray(data, "actors").find(item => (
+    stringField(item, "name", "") === actorName || stringField(item, "id", "") === actorName
+  ));
+  const targetRoom = rooms.find((room, index) => roomName(room, index) === entitySceneName(actor ?? {}, "actor")) ?? rooms[0];
+  if (targetRoom && (roomSceneType(targetRoom) === "topdown" || roomSceneType(targetRoom) === "platformer")) {
+    return eventActorIndex(data, rooms, actorName);
   }
   return npcActorIndex(data, rooms, actorName);
 }
@@ -3606,60 +3768,17 @@ function paddedCollisionFlagsFromTypes(types: RoomCollisionType[], count: number
 function eventSteps(event: Record<string, unknown>): Record<string, unknown>[] {
   return normalizeGBAEventDocument(event).steps
     .filter((step) => step.isEnabled)
-    .map((step) => ({ command: step.command, isEnabled: step.isEnabled }));
+    .map((step) => ({ id: step.id, sourceEventID: (Array.isArray(event.steps) ? event.steps as Record<string, unknown>[] : []).find(raw => raw.id === step.id)?.sourceEventID ?? event.id ?? event.name, command: step.command, isEnabled: step.isEnabled }));
 }
 
 function commandParts(command: string): string[] {
-  return command.split(/\s+/).filter(Boolean);
+  const instruction = parseEventInstruction(command, undefined, false);
+  return [instruction.verb, ...instruction.operands];
 }
 
-const ACTOR_COMMAND_VERBS = new Set([
-  "set_actor_position",
-  "move_actor_to",
-  "teleport_actor",
-  "move_actor",
-  "move_actor_relative",
-  "set_actor_relative_position",
-  "set_actor_visible",
-  "set_actor_active",
-  "set_actor_collision_enabled",
-  "launch_projectile",
-  "set_actor_animation_speed",
-  "set_actor_sprite",
-  "change_actor_sprite",
-  "show_actor_gesture",
-  "set_actor_collision_box",
-  "store_actor_position",
-  "store_actor_direction",
-  "set_actor_animation",
-  "set_actor_direction",
-  "turn_actor",
-  "set_actor_movement_speed",
-  "push_actor_away_from_player",
-  "wait_actor_animation",
-  "play_actor_animation",
-  "set_actor_animation_frame"
-]);
-
 function eventCommandParts(data: GBAProjectData, command: string): string[] {
-  const parts = commandParts(command);
-  const verb = parts[0] ?? "noop";
-  if (!ACTOR_COMMAND_VERBS.has(verb)) return parts;
-
-  const remainder = command.slice(verb.length).trim();
-  const actorNames = projectArray(data, "actors")
-    .map((actor) => stringField(actor, "name", ""))
-    .filter(Boolean)
-    .sort((left, right) => right.length - left.length);
-
-  for (const actorName of actorNames) {
-    if (remainder === actorName) return [verb, actorName];
-    if (remainder.startsWith(`${actorName} `)) {
-      return [verb, actorName, ...commandParts(remainder.slice(actorName.length).trim())];
-    }
-  }
-
-  return parts;
+  const actorNames = projectArray(data, "actors").map((actor) => stringField(actor, "name", ""));
+  return sceneChangeCommandParts(command, actorNames);
 }
 
 function integerPart(value: string | undefined, fallback: number): number {
@@ -3790,18 +3909,27 @@ const EVENT_ITEM_KEY_VERBS = new Set(["add_item", "has_item"]);
 const EVENT_VARIABLE_CAPACITY = 64;
 const EVENT_TEXT_VARIABLE_CAPACITY = 8;
 
+function projectInventoryItemKeys(data: GBAProjectData): string[] {
+  return projectArray(data, "rooms").flatMap(room => {
+    if (roomSceneType(room) !== "battleRpg") return [];
+    const inventory = resolveBattleRpgInventory(child(child(room, "runtime"), "config")?.modules);
+    return inventory ? [inventory.itemKey] : [];
+  });
+}
+
 function buildEventValueRegistries(
   events: Record<string, unknown>[],
   pluginRegistry: ProjectPluginRegistry = emptyProjectPluginRegistry(),
   actors: Record<string, unknown>[] = [],
   textInputVariableKeys: readonly string[] = [],
   sceneRouteVariableKeys: readonly string[] = [],
-  declaredVariableKeys: readonly string[] = []
+  declaredVariableKeys: readonly string[] = [],
+  declaredItemKeys: readonly string[] = []
 ): EngineExportEventValueRegistries {
   const variableKeys = new Set<string>();
   const textVariableKeys = new Set<string>(textInputVariableKeys);
   const visibleVariableKeys = new Set<string>();
-  const itemKeys = new Set<string>();
+  const itemKeys = new Set<string>(declaredItemKeys);
 
   sceneRouteVariableKeys.forEach((key) => {
     if (key.trim()) variableKeys.add(key.trim());
@@ -3822,6 +3950,9 @@ function buildEventValueRegistries(
         variableKeys.add(parts[1]);
       } else if (["read_rtc", "store_engine_field", "store_save_variable", "open_menu"].includes(verb) && parts[2]) {
         variableKeys.add(parts[2]);
+      } else if (["start_game_clock", "fade_audio_volume"].includes(verb) && parts[4]) {
+        variableKeys.add(parts[4]);
+        if(verb === "fade_audio_volume" && parts[5])variableKeys.add(parts[5]);
       } else if (verb === "store_actor_position") {
         if (parts[2]) variableKeys.add(parts[2]);
         if (parts[3]) variableKeys.add(parts[3]);
@@ -3835,7 +3966,7 @@ function buildEventValueRegistries(
         }
       } else if (EVENT_ITEM_KEY_VERBS.has(verb) && parts[1]) {
         itemKeys.add(parts[1]);
-      } else if (verb === "set_equipped_item" && parts[2]) {
+      } else if (verb === "set_equipped_item" && parts[2] && parts[2] !== "none") {
         itemKeys.add(parts[2]);
       }
     }
@@ -3854,10 +3985,8 @@ function buildEventValueRegistries(
     }
   }
 
-  // Point-and-click prop visibility is encoded by the native assetc contract
-  // in a 4-bit field, so every variable referenced by visible_variable must
-  // occupy one of the first sixteen runtime slots. Keep the mapping
-  // deterministic while reserving those slots for the visual-state keys.
+  // Props use the same EventState variables as scripts and saves. Preserve
+  // declared slot order; a visual reference must not rearrange persisted data.
   const declaredKeys = Array.from(new Set(declaredVariableKeys.map((key) => key.trim()).filter(Boolean)));
   const declaredKeySet = new Set(declaredKeys);
   const orderedVariableKeys = [
@@ -3870,8 +3999,8 @@ function buildEventValueRegistries(
   const variableIndexByKey = new Map(orderedVariableKeys.map((key, index) => [key, index] as const));
   for (const key of visibleVariableKeys) {
     const index = variableIndexByKey.get(key);
-    if (index === undefined || index > 15) {
-      throw new Error(`Variavel visual de point-and-click fora dos 16 slots nativos: ${key}.`);
+    if (index === undefined || index >= EVENT_VARIABLE_CAPACITY) {
+      throw new Error(`Variavel visual de point-and-click fora dos ${EVENT_VARIABLE_CAPACITY} slots nativos: ${key}.`);
     }
   }
   const itemIndexByKey = new Map([...itemKeys].sort().map((key, index) => [key, index] as const));
@@ -3914,7 +4043,8 @@ function warpPositionForChangeScene(
   rooms: Record<string, unknown>[],
   targetRoomIndex: number,
   parts: string[],
-  targetKind: SceneExportKind
+  targetKind: SceneExportKind,
+  sourceRoom?: Record<string, unknown>
 ): { x: number; y: number } {
   const exportPosition = (position: { x: number; y: number }): { x: number; y: number } => (
     targetKind === "isometric" || targetKind === "dungeon_crawler"
@@ -3931,7 +4061,8 @@ function warpPositionForChangeScene(
   const targetRoomName = roomName(rooms[targetRoomIndex] ?? {}, targetRoomIndex);
   const connections = child(data, "editorState")?.scenaConnections;
   const connection = Array.isArray(connections)
-    ? connections.filter(isRecord).find((entry) => nullableStringField(entry, "to") === targetRoomName)
+    ? connections.filter(isRecord).find((entry) => nullableStringField(entry, "to") === targetRoomName
+      && (!sourceRoom || nullableStringField(entry, "from") === roomName(sourceRoom, 0)))
     : undefined;
   if (connection) {
     const targetRoom = rooms[targetRoomIndex] ?? {};
@@ -3986,7 +4117,8 @@ function compileCampaignAdvance(
     targetRooms,
     targetRoomIndex,
     ["advance_campaign", nextScene],
-    targetKind
+    targetKind,
+    campaignRoom
   );
   commands.push(sceneWarpCommand(data, currentKind, targetKind, targetRooms, targetRoomIndex, position, campaignRoom));
   return commands;
@@ -4084,9 +4216,27 @@ function sceneRouteVariableKeys(data: GBAProjectData): string[] {
 }
 
 function projectVariableKeys(data: GBAProjectData): string[] {
-  return projectArray(data, "variables")
+  return [...projectArray(data, "variables")
     .map((variable) => stringField(variable, "name", "").trim())
-    .filter(Boolean);
+    .filter(Boolean), ...projectRooms(data).flatMap(room => roomMapStates(room).map(state => state.variable))];
+}
+
+function mapVariantCommands(variant: MapStateVariant): EngineExportProjectEventCommand[] {
+  return variant.tiles.map(tile => ({ op: "replace_tile", x: tile.x, y: tile.y,
+    tile: tile.tile, count: tile.count, layer: tile.layer, ...tileReplacementCollisionFields(tile.collision, tile.layer) }));
+}
+
+function mapStateRestoreCommands(data: GBAProjectData, room: Record<string, unknown>): EngineExportProjectEventCommand[] {
+  const definitions = roomMapStates(room);
+  if (!definitions.length) return [];
+  const registries = buildEventValueRegistries(projectArray(data, "events"), emptyProjectPluginRegistry(), [], [], sceneRouteVariableKeys(data), projectVariableKeys(data), projectInventoryItemKeys(data));
+  return definitions.flatMap(state => state.variants.flatMap(variant => {
+    const edits = mapVariantCommands(variant);
+    return [
+      { op: "jump_if_variable_equals" as const, variable: registries.variableIndex(state.variable), value: variant.value, offset: 2 },
+      { op: "jump" as const, offset: edits.length + 1 }, ...edits
+    ];
+  }));
 }
 
 function sceneRouteTransitionCommands(
@@ -4305,7 +4455,7 @@ function compileEventStep(
     return [compilePluginContractEventCommand(parts, pluginMapping)];
   }
 
-  const integrationIssue = eventCommandIntegrationIssue(parts.join(" "), resolveSceneRuntimeExport(roomSceneType(rooms[0] ?? {})).kind);
+  const integrationIssue = eventCommandIntegrationIssue(sceneChangeCommand(parts), resolveSceneRuntimeExport(roomSceneType(rooms[0] ?? {})).kind);
   if (integrationIssue) throw new Error(integrationIssue);
 
   if (isLutaEventVerb(verb)) {
@@ -4337,7 +4487,8 @@ function compileEventStep(
     case "noop":
       return [];
     case "start_game_clock":
-      return [{ op: verb, minutes_per_tick: Number(parts[1]), frames_per_tick: Number(parts[2]), hud: parts[3] === "hud" }];
+      return [{ op: verb, minutes_per_tick: Number(parts[1]), frames_per_tick: Number(parts[2]), hud: parts[3] === "hud",
+        ...(parts[4] ? { variable: registries.variableIndex(parts[4]) } : {}) }];
     case "advance_time":
       return [{ op: verb, minutes: Number(parts[1]) }];
     case "set_background": {
@@ -4425,7 +4576,7 @@ function compileEventStep(
         room = roomIndexByName(targetRooms, operand);
       }
       if (room < 0) throw new Error(`Evento referencia room inexistente no runtime de destino: ${operand}`);
-      const position = warpPositionForChangeScene(data, targetRooms, room, parts, targetKind);
+      const position = warpPositionForChangeScene(data, targetRooms, room, parts, targetKind, campaignRoom);
       const direction = ["up", "down", "left", "right"].includes((parts[4] ?? "").toLowerCase())
         ? parts[4]!.toLowerCase() as "up" | "down" | "left" | "right"
         : null;
@@ -4479,7 +4630,9 @@ function compileEventStep(
         op: "fade_audio_volume",
         channel: operand || "all",
         volume: hardwareAudioVolume(parts[2]),
-        frames: Math.max(0, Math.min(3600, integerPart(parts[3], 30)))
+        frames: Math.max(0, Math.min(3600, integerPart(parts[3], 30))),
+        ...(parts[4] ? { variable: registries.variableIndex(parts[4]) } : {}),
+        ...(parts[5] ? { other_variable: registries.variableIndex(parts[5]) } : {})
       }];
     case "push_actor":
       return [{op:"push_actor",actor:eventActorIndex(data,rooms,operand),value:parts[2]==="true"}];
@@ -4609,10 +4762,16 @@ function compileEventStep(
     case "modify_wallet":
       return [{ op: "modify_wallet", variable: registries.variableIndex(operand), amount: integerPart(parts[2], 0), max: integerPart(parts[3], 0) }];
     case "set_equipped_item":
-      return [{ op: "set_equipped_item", slot: integerPart(operand, 0), item: registries.itemIndex(parts[2] ?? "") }];
+      return [{ op: "set_equipped_item", slot: integerPart(operand, 0), item: parts[2] === "none" ? -1 : registries.itemIndex(parts[2] ?? "") }];
     case "fade_in":
     case "fade_out":
       return [{ op: verb, frames: Math.max(0, Math.min(600, integerPart(operand, 30))) }];
+    case "lantern":
+    case "reveal_area":
+    case "clear_visibility": {
+      const preset = parseVisibilityPreset(parts);
+      return [{ op: "visibility", ...preset, actor: eventActorIndex(data, rooms, preset.actor) }];
+    }
     case "visual_effect": {
       const effect = operand.trim().toLowerCase();
       const layer = (parts[2] ?? "all").trim().toLowerCase();
@@ -4668,13 +4827,13 @@ function compileEventStep(
       };
       const position = actorUsesIsometricCoordinates(data, rooms, operand)
         ? authored : gbaTopdownTilePointToPixels(authored);
-      return [{ op: "set_actor_position", actor: eventActorIndex(data, rooms, operand), x: position.x, y: position.y }];
+      return [{ op: verb === "move_actor_to" ? "move_actor_to" : "set_actor_position", actor: eventActorIndex(data, rooms, operand), x: position.x, y: position.y }];
     }
     case "move_actor":
     case "move_actor_relative":
     case "set_actor_relative_position":
       return [{
-        op: "move_actor",
+        op: verb === "move_actor_relative" ? "move_actor_relative" : "move_actor",
         actor: eventActorIndex(data, rooms, operand),
         x: actorUsesIsometricCoordinates(data, rooms, operand) ? integerPart(parts[2], 0) : actorTileDeltaToPixels(Number(parts[2] ?? 0)),
         y: actorUsesIsometricCoordinates(data, rooms, operand) ? integerPart(parts[3], 0) : actorTileDeltaToPixels(Number(parts[3] ?? 0))
@@ -4729,7 +4888,7 @@ function compileEventStep(
     case "set_actor_animation_speed":
       return [{
         op: "set_actor_animation_speed",
-        actor: npcActorIndex(data, rooms, operand),
+        actor: animationControlActorIndex(data, rooms, operand),
         percent: Math.max(1, Math.min(400, integerPart(parts[2], 100)))
       }];
     case "set_actor_sprite": {
@@ -4809,8 +4968,9 @@ function compileEventStep(
     case "set_player_speed_profile":
       return [{
         op: "set_player_speed_profile",
-        walk_speed: Math.max(1, integerPart(operand, 100)),
-        run_speed: Math.max(1, integerPart(parts[2], 160)),
+        walk_speed: Math.max(1, Math.min(400,integerPart(operand, 100))),
+        run_speed: Math.max(1, Math.min(400,integerPart(parts[2], 160))),
+        button: parts[3]?.toLowerCase() || "r",
         stamina_cost: Math.max(0, integerPart(parts[4], 0))
       }];
     case "set_player_movement_state":
@@ -4829,7 +4989,7 @@ function compileEventStep(
     case "store_actor_direction":
       return [{
         op: "store_actor_direction",
-        actor: npcActorIndex(data, rooms, operand),
+        actor: eventActorIndex(data, rooms, operand),
         variable: registries.variableIndex(parts[2] ?? "")
       }];
     case "set_random_seed":
@@ -4844,7 +5004,7 @@ function compileEventStep(
         max: integerPart(parts[3], integerPart(parts[2], 0))
       }];
     case "wait":
-      return [{ op: "wait", frames: Math.max(0, Math.min(600, integerPart(operand, 0))) }];
+      return [{ op: "wait", frames: eventWaitFrames(parseEventInstruction(rawCommand, undefined, false)) }];
     case "stop_music":
       return [{ op: "stop_music" }];
     case "close_dialogue":
@@ -4911,6 +5071,16 @@ function compileEventStep(
         x: integerPart(parts[2], 200),
         digits: integerPart(parts[4], 3)
       }];
+    case "set_map_state": {
+      const { room, state, variant } = resolveMapState(projectRooms(data), operand, parts[2] ?? "");
+      const assignment: EngineExportProjectEventCommand = { op: "set_variable", variable: registries.variableIndex(state.variable), value: variant.value };
+      const roomIndex = rooms.findIndex(candidate => candidate.name === room.name);
+      if (roomIndex < 0) return [assignment];
+      const edits = mapVariantCommands(variant);
+      return [{ op: "wait", frames: 1 }, assignment,
+        { op: "jump_if_room_equals", room: roomIndex, offset: 2 },
+        { op: "jump", offset: edits.length + 1 }, ...edits, { op: "wait", frames: 1 }];
+    }
     case "replace_tile":
       return [{
         op: "replace_tile",
@@ -4918,6 +5088,7 @@ function compileEventStep(
         y: integerPart(parts[2], 0),
         tile: integerPart(parts[3], 0),
         layer: parts[4] ?? "bg0",
+        ...tileReplacementCollisionFields(parts[5], parts[4] ?? "bg0"),
         count: 1
       }];
     case "replace_tile_sequence":
@@ -4927,7 +5098,8 @@ function compileEventStep(
         y: integerPart(parts[2], 0),
         tile: integerPart(parts[3], 0),
         count: Math.max(1, Math.min(64, integerPart(parts[4], 1))),
-        layer: parts[5] ?? "bg0"
+        layer: parts[5] ?? "bg0",
+        ...tileReplacementCollisionFields(parts[6], parts[5] ?? "bg0")
       }];
     case "replace_tile_animation":
       {
@@ -4963,11 +5135,11 @@ function compileEventStep(
         distance: Math.max(1, integerPart(parts[2], 2))
       }];
     case "wait_actor_animation":
-      return [{ op: "wait_actor_animation", actor: npcActorIndex(data, rooms, operand) }];
+      return [{ op: "wait_actor_animation", actor: animationControlActorIndex(data, rooms, operand) }];
     case "play_actor_animation": {
       const animationName = parts[2] ?? "";
       if (!animationName) throw new Error(`Comando incompleto: play_actor_animation requer animacao.`);
-      if (isConfiguredPlayerActor(data, operand)) {
+      if (operand.trim().toLowerCase() === "player" || isConfiguredPlayerActor(data, operand)) {
         return [{ op: "set_player_animation", animation: animationName }];
       }
       return [{
@@ -4979,7 +5151,7 @@ function compileEventStep(
     case "set_actor_animation_frame":
       return [{
         op: "set_actor_animation_frame",
-        actor: npcActorIndex(data, rooms, operand),
+        actor: animationControlActorIndex(data, rooms, operand),
         frame: integerPart(parts[2], 0)
       }];
     case "lock_script":
@@ -5179,20 +5351,26 @@ function compileEvent(
   pluginRegistry: ProjectPluginRegistry = emptyProjectPluginRegistry(),
   campaignRoom?: Record<string, unknown>
 ): EngineExportProjectEventCommand[] {
-  const registries = buildEventValueRegistries(
-    events,
-    pluginRegistry,
-    [],
-    [],
-    sceneRouteVariableKeys(data),
-    projectVariableKeys(data)
-  );
+  // Every event slice uses the same indices for this project, event collection
+  // and plugin registry. Keep them only inside the current synchronous export.
+  const registryCache = memoizeEngineExport(data, "main.compileEventValueRegistries", () =>
+    new WeakMap<object, WeakMap<object, EngineExportEventValueRegistries>>());
+  let byPlugin = registryCache.get(events);
+  if (!byPlugin) { byPlugin = new WeakMap(); registryCache.set(events, byPlugin); }
+  let registries = byPlugin.get(pluginRegistry);
+  if (!registries) {
+    registries = buildEventValueRegistries(events, pluginRegistry, [], [], sceneRouteVariableKeys(data), projectVariableKeys(data), projectInventoryItemKeys(data));
+    byPlugin.set(pluginRegistry, registries);
+  }
   const resolvedCampaignRoom = campaignRoom ?? campaignRoomForEvent(data, event);
   const steps = sceneConnectionEventSteps(data, eventSteps(event), resolvedCampaignRoom);
   const commands: EngineExportProjectEventCommand[] = [];
 
   for (let index = 0; index < steps.length; index += 1) {
-    const parts = commandParts(resolveProjectConstantCommand(data, stringField(steps[index], "command", "noop")));
+    const firstCommand = commands.length;
+    const source = { eventID: String(steps[index].sourceEventID ?? event.id ?? event.name ?? ""), stepID: String(steps[index].id ?? index) };
+    try {
+    const parts = eventCommandParts(data, resolveProjectConstantCommand(data, stringField(steps[index], "command", "noop")));
     if (parts[0] === "loop_begin") {
       const loopID = parts[1] ?? "";
       let cursor = index + 1;
@@ -5355,6 +5533,9 @@ function compileEvent(
     }
 
     commands.push(...compileEventStep(data, steps[index], rooms, dialogues, audioItems, audioPack, events, registries, resolvedCampaignRoom));
+    } finally {
+      if (data.eventDiagnostics === true) for (let ci = firstCommand; ci < commands.length; ++ci) commands[ci].source ??= source;
+    }
   }
 
   return commands;
@@ -5410,6 +5591,28 @@ function resolveActorOnUpdateEventName(actor: Record<string, unknown>): string {
     || nullableStringField(actor, "onUpdateEventName");
 }
 
+/** Restoration is synchronous: inline calls so several restored objects cannot overwrite last_script. */
+function compileRestoreEvent(data: GBAProjectData, name: string, rooms: Record<string, unknown>[], dialogues: Record<string, unknown>[], audioItems: Record<string, unknown>[], audioPack: AssetcAudioPackGeneration | null, events: Record<string, unknown>[]): EngineExportProjectEventCommand[] {
+  const expand = (eventName: string, stack: string[]): Record<string, unknown>[] => {
+    if (!eventName) return [];
+    if (stack.includes(eventName)) throw new Error(`Restauração recursiva: ${[...stack, eventName].join(" → ")}`);
+    const event = eventByName(events, eventName);
+    if (!event) throw new Error(`Evento de restauração inexistente: ${eventName}`);
+    return eventSteps(event).flatMap(step => {
+      const instruction = parseEventInstruction(String(step.command));
+      if (instruction.verb === "call_event" || instruction.verb === "call_procedure") return expand(instruction.operands[0] ?? "", [...stack, eventName]);
+      if (["wait", "idle", "wait_button", "wait_actor_animation", "show_dialogue", "show_choice",
+        "open_text_input", "open_code_lock", "open_shop", "open_equip_menu", "open_menu",
+        "load_game", "change_scene", "change_scene_by_variable", "advance_campaign",
+        "scene_stack_previous", "scene_stack_first"].includes(instruction.verb)) {
+        throw new Error(`Restauração não pode aguardar ou trocar cena: ${instruction.verb}`);
+      }
+      return [step];
+    });
+  };
+  return compileEvent(data, { id: name, name, steps: expand(name, []) }, rooms, dialogues, audioItems, audioPack, events);
+}
+
 function mergeRoomOnEnterScript(
   boot: EngineExportProjectEventCommand[],
   onEnter: EngineExportProjectEventCommand[] | undefined
@@ -5463,8 +5666,12 @@ function scriptForEventName(
   pluginRegistry: ProjectPluginRegistry = emptyProjectPluginRegistry()
 ): EngineExportProjectEventCommand[] | undefined {
   if (!eventName) return undefined;
-  const event = eventByName(events, eventName);
-  return event ? compileEvent(data, event, rooms, dialogues, audioItems, audioPack, events, pluginRegistry) : undefined;
+  const expansion = memoizeEngineExport(events, "bound-event-procedures", () => expandEventProcedures(events));
+  if (expansion.issues.length > 0) {
+    throw new Error(`Procedures invalidas: ${expansion.issues.join(" | ")}`);
+  }
+  const event = eventByName(expansion.events, eventName);
+  return event ? compileEvent(data, event, rooms, dialogues, audioItems, audioPack, expansion.events, pluginRegistry) : undefined;
 }
 
 function drawTextLiteralLines(data: GBAProjectData): string[] {
@@ -5559,9 +5766,24 @@ function buildTopdownScripts(
   const materializedEvents = expansion.events;
   const runtimeRoomNames = new Set(rooms.map((room, index) => roomName(room, index)));
   const documents = materializedEvents.map((event, index) => normalizeGBAEventDocument(event, index));
-  const owners = documents.map(document => document.sceneName ? new Set([document.sceneName]) : new Set([
-    ...eventSceneBindings(data, document.name), ...eventSceneBindings(data, document.id)
-  ]));
+  const actors = projectArray(data, "actors");
+  const actorNames = actors.map(actor => stringField(actor, "name", ""));
+  const owners = documents.map((document, index) => {
+    const scenes = document.sceneName ? new Set([document.sceneName]) : new Set([
+      ...eventSceneBindings(data, document.name), ...eventSceneBindings(data, document.id)
+    ]);
+    // An unused actor routine still belongs to its actors' scenes. Compiling it
+    // against Menu/VN rooms would resolve its actor indices in the wrong runtime.
+    if (!scenes.size) for (const step of eventSteps(materializedEvents[index]!)) {
+      if (step.isEnabled === false) continue;
+      for (const reference of actorCommandReferences(stringField(step, "command", "noop"), actorNames)) {
+        const actor = actors.find(actor => [actor.name, actor.id].includes(reference));
+        const sceneName = actor ? entitySceneName(actor, "actor") : "";
+        if (sceneName) scenes.add(sceneName);
+      }
+    }
+    return scenes;
+  });
   // Unbound callees inherit their callers' scenes, including callback and timer
   // targets. Keep empty entries in other runtimes so numeric script IDs stay stable.
   const callees = materializedEvents.map(event => eventSteps(event).flatMap(step =>
@@ -5606,9 +5828,12 @@ function dialogueChoices(dialogue: Record<string, unknown>): string[] {
   return Array.isArray(dialogue.choices) ? dialogue.choices.filter((choice): choice is string => typeof choice === "string") : [];
 }
 
-function choiceEventBindings(events: Record<string, unknown>[]): Map<string, Map<number, string>> {
+function choiceEventBindings(events: Record<string, unknown>[], rooms: Record<string, unknown>[]): Map<string, Map<number, string>> {
   const bindings = new Map<string, Map<number, string>>();
-  for (const event of events) {
+  const roomNames = new Set(rooms.map((room, index) => roomName(room, index)));
+  for (const [index, event] of events.entries()) {
+    const owner = normalizeGBAEventDocument(event, index).sceneName;
+    if (owner && !roomNames.has(owner)) continue;
     for (const step of eventSteps(event)) {
       const parts = commandParts(stringField(step, "command", "noop"));
       if ((parts[0] ?? "") !== "choice_event") continue;
@@ -5616,6 +5841,11 @@ function choiceEventBindings(events: Record<string, unknown>[]): Map<string, Map
       const choiceIndex = integerPart(parts[2], -1);
       const targetEventName = parts[3] ?? "";
       if (!dialogueKey || choiceIndex < 0 || !targetEventName) continue;
+      const targetEventIndex = events.findIndex((candidate) => stringField(candidate, "name", "") === targetEventName);
+      const targetOwner = targetEventIndex >= 0
+        ? normalizeGBAEventDocument(events[targetEventIndex]!, targetEventIndex).sceneName
+        : "";
+      if (targetOwner && !roomNames.has(targetOwner)) continue;
       const byChoiceIndex = bindings.get(dialogueKey) ?? new Map<number, string>();
       byChoiceIndex.set(choiceIndex, targetEventName);
       bindings.set(dialogueKey, byChoiceIndex);
@@ -5632,7 +5862,7 @@ function buildTopdownChoiceGroups(
   audioItems: Record<string, unknown>[],
   audioPack: AssetcAudioPackGeneration | null
 ): EngineExportTopdownChoiceGroup[] {
-  const bindings = choiceEventBindings(events);
+  const bindings = choiceEventBindings(events, rooms);
   const localization = deriveProjectLocalization(data);
   return dialogues.flatMap((dialogue, dialogueIndex) => {
     const choices = dialogueChoices(dialogue);
@@ -5717,9 +5947,10 @@ function buildTopdownProjectAssetSection(
   backgroundAssetNames?: string[]
 ): Pick<EngineExportTopdownProject, "assets" | "backgrounds" | "resource_banks"> {
   const regularTilesets = regularTilesetAssetNames(tilesetPack);
+  const pagedNames = new Set(tilesetPack?.packAssets.filter(asset => asset.kind === "paged_bg").map(asset => asset.name) ?? []);
   const backgroundTilesets = backgroundAssetNames === undefined
-    ? regularTilesets
-    : Array.from(new Set(backgroundAssetNames)).filter((assetName) => regularTilesets.includes(assetName));
+    ? regularTilesets.filter(name => !pagedNames.has(name))
+    : Array.from(new Set(backgroundAssetNames)).filter((assetName) => regularTilesets.includes(assetName) && !pagedNames.has(assetName));
   const bgPalettes = regularTilesets;
   const objPalettes = Array.from(new Set([
     ...(spritePack?.assetNames ?? []),
@@ -5727,7 +5958,7 @@ function buildTopdownProjectAssetSection(
     ...(emotePack?.assetNames ?? [])
   ]));
   const tileAssets = Array.from(new Set([
-    ...regularTilesets,
+    ...regularTilesets.filter(name => !pagedNames.has(name)),
     ...(spritePack?.assetNames ?? []),
     ...(portraitPack?.assetNames ?? []),
     ...(emotePack?.assetNames ?? [])
@@ -5762,7 +5993,31 @@ function buildTopdownProjectAssetSection(
 }
 
 function roomBackgroundAssetName(room: Record<string, unknown>): string {
+  return memoizeEngineExport(room, "main.roomBackgroundAssetName", () => roomBackgroundAssetNameUncached(room));
+}
+
+function roomBackgroundAssetNameUncached(room: Record<string, unknown>): string {
   return normalizeGBASceneDocument(room).background.assetName ?? "";
+}
+
+function topdownNpcMovementForExport(actor: Record<string, unknown>): NonNullable<EngineExportTopdownRoom["npcs"]>[number]["movement"] {
+  const movement = actor.topdownMovement;
+  if (movement === undefined) return undefined;
+  if (!isRecord(movement) || movement.kind !== "wander_box" || !isRecord(movement.bounds)) {
+    throw new Error("Actor topdownMovement requer wander_box com bounds em tiles.");
+  }
+  const bounds = movement.bounds;
+  if (!["x", "y", "width", "height"].every(key => Number.isInteger(bounds[key]))
+    || Number(bounds.x) < 0 || Number(bounds.y) < 0 || Number(bounds.width) <= 0 || Number(bounds.height) <= 0) {
+    throw new Error("Actor topdownMovement.bounds requer origem não negativa e dimensões inteiras positivas.");
+  }
+  const interval = movement.stepIntervalFrames;
+  if (interval !== undefined && (!Number.isInteger(interval) || Number(interval) < 1 || Number(interval) > 255)) {
+    throw new Error("Actor topdownMovement.stepIntervalFrames requer um inteiro de 1 a 255.");
+  }
+  return { kind: "wander_box", ...(interval === undefined ? {} : { step_interval_frames: Number(interval) }), bounds: gbaTopdownAreaToPixels({
+    x: Number(bounds.x), y: Number(bounds.y), width: Number(bounds.width), height: Number(bounds.height)
+  }) };
 }
 
 function buildTopdownRooms(
@@ -5833,6 +6088,7 @@ function buildTopdownRooms(
         camera_mode: roomCameraMode(room),
         camera_position: roomCameraPosition(room),
         player_start: gbaTopdownTilePointToPixels(roomPlayerPosition),
+        player_enabled: roomSceneType(room) !== "custom" || Boolean(nullableStringField(room, "playerActorName")),
         ...(cameraBounds ? { camera_bounds: gbaTopdownAreaToPixels(cameraBounds) } : {})
       }
     };
@@ -5848,8 +6104,18 @@ function buildTopdownRooms(
     if (tilesetAsset) {
       roomData.visual_tilemap = tilesetAsset.name;
       roomData.background_bits_per_pixel = tilesetAsset.background_bpp;
+      if (tilesetPack?.packAssets.some(asset => asset.name === tilesetAsset.name && asset.kind === "paged_bg")) {
+        if (roomData.foreground_tiles?.some(tile => tile > 0)) {
+          throw new Error(`Top-down scene ${roomData.name}: paged BG requires an exclusive BG character block.`);
+        }
+        roomData.paged_source_tiles = tilesetAsset.name;
+        roomData.visual_tilemap_layout = "source_asset";
+        delete roomData.foreground_tiles;
+      }
       if (room.gbStudioUseBackgroundLayout === true) {
         roomData.visual_tilemap_layout = "source_asset";
+      } else if (room.tilemapIndexBase === 1) {
+        roomData.visual_tilemap_layout = "editor_tiles";
       }
     }
 
@@ -5857,7 +6123,11 @@ function buildTopdownRooms(
     const startMenuBinding = startMenuScriptIndex >= 0
       ? [{ op: "attach_button_event" as const, button: "start", index: startMenuScriptIndex, override: true }]
       : [];
-    const onEnterScript = mergeRoomOnEnterScript(roomDialogueBoot, [...(onEnter ?? []), ...startMenuBinding]);
+    const mapRestore = mapStateRestoreCommands(data, room);
+    const restore = [...mapRestore, ...compileRestoreEvent(data, nullableStringField(eventBindings, "onRestore"), rooms, dialogues, audioItems, audioPack, events), ...startMenuBinding];
+    if (restore.length) roomData.on_restore = restore;
+    const boot = mapRestore.length ? [...mapRestore, { op: "wait" as const, frames: 1 }, ...roomDialogueBoot] : roomDialogueBoot;
+    const onEnterScript = mergeRoomOnEnterScript(boot, [...(onEnter ?? []), ...startMenuBinding]);
     if (onEnterScript) {
       roomData.on_enter = onEnterScript;
     }
@@ -5904,7 +6174,21 @@ function buildTopdownRooms(
         const legacyExit = defaultRoomConnectionExitArea(width, height);
         const legacyEntry = defaultRoomConnectionEntryArea(targetWidth, targetHeight);
         const exitArea = connectionAreaField(connection, "exit", legacyExit);
+        // Event/actor links in the scene overview have no physical exit area.
+        if (exitArea.width <= 0 || exitArea.height <= 0) return [];
         const entryArea = connectionAreaField(connection, "entry", legacyEntry);
+        if (roomData.paged_source_tiles && projectArray(data, "triggers").some(trigger => {
+          const eventName = nullableStringField(connection, "eventName");
+          if (!eventName) return false;
+          if (entitySceneName(trigger, "trigger") !== roomData.name ||
+            resolveTriggerEnterEventName(trigger) !== eventName) return false;
+          const bounds = entityBounds(trigger, "trigger", exitArea);
+          return bounds.x === exitArea.x && bounds.y === exitArea.y && bounds.width === exitArea.width && bounds.height === exitArea.height;
+        })) {
+          // The authored enter trigger already owns this connection event.
+          // A second, continuously checked portal would reopen gated dialogue.
+          return [];
+        }
         const targetCollisionTypes = paddedCollisionTypes(targetRoom.collisionTypes, targetWidth * targetHeight);
         const arrival = roomConnectionArrival(entryArea, targetWidth, targetHeight, targetCollisionTypes);
         const connectionScript = scriptForEventName(data, nullableStringField(connection, "eventName"), events, rooms, dialogues, audioItems, audioPack);
@@ -5968,6 +6252,13 @@ function buildTopdownRooms(
           ...(onLeave && onLeave.length > 0 ? { on_leave: onLeave } : {})
         }];
       });
+      const interactions = triggers.flatMap((trigger) => {
+        const script = scriptForEventName(data, resolveTriggerInteractEventName(trigger), events, rooms, dialogues, audioItems, audioPack);
+        if (!script?.length) return [];
+        const bounds = entityBounds(trigger, "trigger", { x: 0, y: 0, width: 1, height: 1 });
+        return [{ area: gbaTopdownAreaToPixels(bounds), script }];
+      });
+      if (interactions.length) roomData.interactions = interactions;
     }
 
     if (npcs.length > 0) {
@@ -5984,8 +6275,10 @@ function buildTopdownRooms(
         const spriteExport = buildActorEngineSpriteExport(data, actor, spritePack);
         const collisionGeometry = actorCollisionGeometry(data, actor, actorSizePx);
         const position = entityPosition(actor, "actor", { x: 8, y: 8 });
+        const movement = topdownNpcMovementForExport(actor);
         return {
           name: stringField(actor, "name", "NPC"),
+          direction: authoredTopdownActorDirection(data, actor),
           position: gbaTopdownTilePointToPixels({
             x: position.x,
             y: position.y
@@ -5999,6 +6292,8 @@ function buildTopdownRooms(
           collision_mask: Math.max(0, Math.min(0xFFFF, integerField(actor, "collisionMask", 0xFFFF))),
           push_priority: Math.max(0, Math.min(255, integerField(actor, "pushPriority", 0))),
           pushable: actor.pushable === true,
+          health: Math.max(1, Math.min(999, integerField(actor, "health", 1))),
+          ...(movement ? { movement } : {}),
           ...(roomAffineObjForExport(room) ? { affine_obj: roomAffineObjForExport(room) } : {}),
           ...(spriteExport ? {
             metasprite: spriteExport.metasprite,
@@ -6050,7 +6345,19 @@ function buildTopdownProject(
   const playerActor = playerActors.find((item) => {
     const actorRoom = entitySceneName(item, "actor");
     return !actorRoom || actorRoom === roomName(initialRoom, initialRoomIndex);
-  }) ?? playerActors[0];
+  }) ?? playerActors.find((actor) => {
+    const actorRoom = entitySceneName(actor, "actor");
+    return rooms.some((room, index) => actorRoom === roomName(room, index));
+  }) ?? (roomSceneType(initialRoom) === "custom" && !playerName
+    ? rooms.flatMap((candidate, index) => {
+        const name = configuredPlayerActorName(data, candidate);
+        if (!name) return [];
+        return projectArray(data, "actors").filter((actor) => {
+          const actorRoom = entitySceneName(actor, "actor");
+          return actorMatchesPlayerName(actor, name) && (!actorRoom || actorRoom === roomName(candidate, index));
+        });
+      })[0]
+    : undefined);
   const playerSpriteExport = playerActor ? buildActorEngineSpriteExport(data, playerActor, spritePack) : null;
   const textPositions=new Map<string,{layer:string,width:number}>();
   for(const event of events) for(const step of eventSteps(event)) {
@@ -6123,6 +6430,7 @@ function buildTopdownProject(
       pushable: playerActor?.pushable === true,
       ...(playerAffineObj ? { affine_obj: playerAffineObj } : {}),
       speed: buildEngineTopdownPlayerSpeed(topdownSettings),
+      allow_diagonal: topdownSettings?.allowDiagonal !== false,
       interact_button: buildEngineInteractButton(topdownSettings),
       ...(playerOnStart && playerOnStart.length > 0 ? { on_start: playerOnStart } : {}),
       ...(playerOnUpdate && playerOnUpdate.length > 0 ? { on_update: playerOnUpdate } : {}),
@@ -6360,6 +6668,8 @@ function buildPlatformerRooms(
       roomData.visual_tilemap = tilesetAsset.name;
       if (room.gbStudioUseBackgroundLayout === true) {
         roomData.visual_tilemap_layout = "source_asset";
+      } else if (room.tilemapIndexBase === 1) {
+        roomData.visual_tilemap_layout = "editor_tiles";
       }
     }
     if (tileLayers.length > 0) {
@@ -6372,7 +6682,7 @@ function buildPlatformerRooms(
         const sourceNames = Array.isArray(layer.tileSourceAssetNames)
           ? layer.tileSourceAssetNames.filter((value): value is string => typeof value === "string" && value.trim().length > 0)
           : [];
-        const sourceName = sourceNames[0] ?? (mapping === "BG2" && room.gbStudioUseBackgroundLayout === true
+        const sourceName = sourceNames[0] ?? (mapping === "BG2" && (room.gbStudioUseBackgroundLayout === true || room.tilemapIndexBase === 1)
           ? visualTilemapAssetName : "");
         const layerAsset = sourceName && tilesetPack ? tilesetPack.assetsBySheet[sourceName] : null;
         const hasPaintedTiles = Array.isArray(layer.tilemap) && layer.tilemap.some((value) => (
@@ -6384,6 +6694,7 @@ function buildPlatformerRooms(
           tiles: paddedNumberArray(layer.tilemap, tileCount),
           ...(layerAsset ? { tilemap: layerAsset.name } : {}),
           ...(layerAsset && room.gbStudioUseBackgroundLayout === true ? { tilemap_layout: "source_asset" as const } : {}),
+          ...(layerAsset && room.gbStudioUseBackgroundLayout !== true && room.tilemapIndexBase === 1 ? { tilemap_layout: "editor_tiles" as const } : {}),
           parallax: mapping === "BG3" && parallaxMode === "bg3"
             ? {
                 x: Math.max(0, Math.min(1024, integerField(roomParallax, "speedX", 256))),
@@ -6399,7 +6710,11 @@ function buildPlatformerRooms(
     const startMenuBinding = startMenuScriptIndex >= 0
       ? [{ op: "attach_button_event" as const, button: "start", index: startMenuScriptIndex, override: true }]
       : [];
-    const onEnterScript = mergeRoomOnEnterScript(roomDialogueBoot, [...(onEnter ?? []), ...startMenuBinding]);
+    const mapRestore = mapStateRestoreCommands(data, room);
+    const restore = [...mapRestore, ...compileRestoreEvent(data, nullableStringField(eventBindings, "onRestore"), rooms, dialogues, audioItems, audioPack, events), ...startMenuBinding];
+    if (restore.length) roomData.on_restore = restore;
+    const boot = mapRestore.length ? [...mapRestore, { op: "wait" as const, frames: 1 }, ...roomDialogueBoot] : roomDialogueBoot;
+    const onEnterScript = mergeRoomOnEnterScript(boot, [...(onEnter ?? []), ...startMenuBinding]);
     if (onEnterScript) {
       roomData.on_enter = onEnterScript;
     }
@@ -6605,6 +6920,7 @@ function buildPlatformerProject(
           ? { asset: playerSpriteExport.metasprite.asset }
           : playerSpriteExport.animation,
         ...(playerAnimations ? { animations: playerAnimations } : {}),
+        ...(playerSpriteExport.animations?.length ? { script_animations: playerSpriteExport.animations } : {}),
         ...(playerOnStart && playerOnStart.length > 0 ? { on_start: playerOnStart } : {}),
         ...(playerOnUpdate && playerOnUpdate.length > 0 ? { on_update: playerOnUpdate } : {})
       }
@@ -6751,7 +7067,9 @@ function buildIsometricRooms(
       height_tiles: height,
       visual_tiles: compiledTiles.visualTiles,
       collision_flags: paddedCollisionFlagsFromTypes(collisionTypes, tileCount),
-      ramp_flags: collisionSlopesFromTypes(collisionTypes),
+      ramp_flags: Array.isArray(room.rampFlags) && room.rampFlags.length===tileCount
+        ? room.rampFlags.map((flag:unknown)=>typeof flag==='number'&&Number.isInteger(flag)&&flag>=0&&flag<=30?flag:0)
+        : collisionSlopesFromTypes(collisionTypes),
       height_levels: compiledTiles.heightLevels,
       video: buildRoomVideoComposition(data, room, tilesetPack)
     };
@@ -6824,16 +7142,24 @@ function buildIsometricRooms(
       const surface = grid.pagedSurface;
       const background = tilesetPack?.assetsBySheet[surface.backgroundAsset];
       const foreground = tilesetPack?.assetsBySheet[surface.foregroundAsset];
-      if (!background || !foreground || background.kind !== "paged_bg" || foreground.kind !== "paged_bg") {
-        throw new Error(`Isometric scene ${roomData.name}: paged surface requires two paged_bg assets.`);
+      if (!background || background.kind !== "paged_bg" || (surface.foregroundAsset && (!foreground || foreground.kind !== "paged_bg"))) {
+        throw new Error(`Isometric scene ${roomData.name}: paged surface requires paged_bg sources.`);
       }
-      if (grid.worldMode !== "scrollable_tiled_world" || grid.gameplayMode !== "adventure" || grid.presentationZoom !== 100) {
-        throw new Error(`Isometric scene ${roomData.name}: paged surface requires adventure, scrolling and 100% runtime scale.`);
+      if (grid.worldMode !== "scrollable_tiled_world" || grid.presentationZoom !== 100) {
+        throw new Error(`Isometric scene ${roomData.name}: paged surface requires scrolling and 100% runtime scale.`);
       }
-      roomData.paged_surface = { background: background.name, foreground: foreground.name, width: surface.width, height: surface.height };
+      roomData.paged_surface = { background: background.name, ...(foreground ? {foreground:foreground.name} : {}), width: surface.width, height: surface.height };
       delete roomData.tileset;
+      if(roomData.tactical_presentation) delete roomData.tactical_presentation.surface_asset;
       delete roomData.tileset_render_offset_y_pixels;
       roomData.camera = { ...roomData.camera!, bounds: {x: 0, y: 0, width: surface.width, height: surface.height}, position: {x: 0, y: 0} };
+      if(grid.gameplayMode==="tactical") {
+        const actor=isometricActorsForRoom(data,room,index)[0];
+        const x=integerField(actor,"x",0),y=integerField(actor,"y",0),z=integerField(actor,"z",0);
+        roomData.camera.position={x:Math.max(0,Math.min(surface.width-240,grid.originX+(x-y)*grid.tileWidth/2-120)),
+          y:Math.max(0,Math.min(surface.height-160,grid.originY+(x+y)*grid.tileHeight/2+grid.tileHeight/2-z*grid.heightStep-80))};
+        roomData.camera.dead_zone={x:120,y:80,width:0,height:0};
+      }
     }
     if (
       authoredBackgroundAsset &&
@@ -6853,6 +7179,8 @@ function buildIsometricRooms(
       ? [{ op: "attach_button_event" as const, button: "start", index: startMenuScriptIndex, override: true }]
       : [];
     const onEnterScript = mergeRoomOnEnterScript(roomDialogueBoot, [...(onEnter ?? []), ...startMenuBinding]);
+    const restore = [...compileRestoreEvent(data, nullableStringField(eventBindings, "onRestore"), rooms, dialogues, audioItems, audioPack, events), ...startMenuBinding];
+    if (restore.length) roomData.on_restore = restore;
     if (onEnterScript) {
       roomData.on_enter = onEnterScript;
     }
@@ -6911,6 +7239,11 @@ function buildIsometricRooms(
               grid?.tileHeight
             )
           : { x: 0, y: 0 };
+        const pivot = child(child(projectArray(data,"assets").find(a=>a.name===actor.spriteSheet),"metadata"),"pivot");
+        if(pivot && typeof pivot.x === "number" && typeof pivot.y === "number") {
+          screenOffset.x = -Math.round(pivot.x);
+          screenOffset.y = Math.round((grid?.tileHeight ?? 0) / 2) - Math.round(pivot.y);
+        }
         return {
           tile: {
             x: actorX,
@@ -7119,8 +7452,8 @@ function dungeonCrawlerSafePlayerStart(
 function advancedRuntimeBackgrounds(
   rooms: Record<string, unknown>[],
   tilesetPack: AssetcTilesetPackGeneration | null
-): { backgrounds: NonNullable<EngineExportDungeonCrawlerProject["backgrounds"]>; indexByRoomName: Map<string, number> } {
-  const backgrounds: NonNullable<EngineExportDungeonCrawlerProject["backgrounds"]> = [];
+): { backgrounds: Array<{layer:"bg2";tilemap:string;backdrop_from_tilemap_palette?:boolean;backdrop_color?:number}>; indexByRoomName: Map<string, number> } {
+  const backgrounds: Array<{layer:"bg2";tilemap:string;backdrop_from_tilemap_palette?:boolean;backdrop_color?:number}> = [];
   const indexByRoomName = new Map<string, number>();
   rooms.forEach((room, index) => {
     const backgroundName = roomBackgroundAssetName(room);
@@ -7326,11 +7659,43 @@ function buildDungeonCrawlerRooms(
       ? [{ op: "attach_button_event" as const, button: roomFeatureRuntime.mapEnabled ? "r" : "start", index: startMenuScriptIndex, override: true }]
       : [];
     const onEnterScript = mergeRoomOnEnterScript(index === startIndex ? dialogueBoot : [], [...(onEnter ?? []), ...startMenuBinding]);
+    const onRestoreScript = [...compileRestoreEvent(data, nullableStringField(eventBindings, "onRestore"), rooms, dialogues, audioItems, audioPack, events), ...startMenuBinding];
     const currentRoomName = roomName(room, index);
+    let playerView: EngineExportDungeonCrawlerRoom["player_view"];
+    if (config?.presentation?.playerView?.enabled) {
+      const actor = dungeonPlayerActor(data, room);
+      if (actor) {
+        const sprite = buildActorEngineSpriteExport(data,actor,spritePack,{preserveAuthoredAnimations:true});
+        if (!sprite) throw new Error("Dungeon: o ator do jogador em primeira pessoa precisa de um sprite exportável.");
+        const selected = sprite.animations?.find(clip=>clip.name===actor.animationName) ?? sprite.animations?.[0];
+        const animation = selected ? (({name:_name,...clip})=>clip)(selected) : undefined;
+        const anchor=child(actor,"dungeonViewAnchor") ?? {};
+        playerView={metasprite:sprite.metasprite,...(animation?{animation}:{}),
+          position_pixels:{x:Math.max(-128,Math.min(368,integerField(anchor,"x",200))),y:Math.max(-128,Math.min(288,integerField(anchor,"y",120)))}};
+      }
+    }
     const actors = npcActorsForRoom(data, room, index).flatMap((actor) => {
-      const sprite = buildActorEngineSpriteExport(data, actor, spritePack);
+      const sprite = buildActorEngineSpriteExport(data, actor, spritePack, {preserveAuthoredAnimations:Boolean(config?.presentation)});
       if (!sprite) return [];
       const depthMetasprites = buildDungeonCrawlerDepthSpriteExports(data, actor, spritePack);
+      const sheets=child(actor,"dungeonDepthSheets");
+      let depthFrames=sheets && Object.values(sheets).some(Boolean) ? Object.fromEntries(["near","mid","far"].map(depth=>{
+        const clipName=nullableStringField(actor,"dungeonDepthAnimationName") || "poses";
+        const fields=buildActorEngineSpriteExport(data,{...actor,animationStateID:"",spriteSheet:sheets[depth]||actor.spriteSheet,animationName:clipName},spritePack,{preserveAuthoredAnimations:true});
+        const clip=fields?.animations?.find(a=>a.name===clipName) ?? fields?.animations?.[0];
+        if(!clip)throw new Error(`Dungeon depth animation missing: ${String(sheets[depth])}`);
+        const {name:_name,...entry}=clip;return [depth,entry];
+      })) : undefined;
+      if(!depthFrames && !depthMetasprites && config?.presentation){
+        const clip=sprite.animations?.find(a=>a.name===actor.animationName) ?? sprite.animations?.[0];
+        if(clip){
+          // A normal NPC keeps its authored origin and native size at every depth.
+          // Explicit depth sheets remain the opt-in contract for pose animations.
+          const {name:_name,...entry}=clip;
+          const frame={...entry,frame_indices:entry.frame_indices.slice(0,1),durations:entry.durations?.slice(0,1),frame_metasprites:entry.frame_metasprites?.slice(0,1),loops:false};
+          depthFrames={near:frame,mid:frame,far:frame};
+        }
+      }
       const onInteract = scriptForEventName(data, resolveActorInteractEventName(actor), events, rooms, dialogues, audioItems, audioPack, pluginRegistry);
       const position = entityPosition(actor, "actor");
       return [{
@@ -7338,6 +7703,8 @@ function buildDungeonCrawlerRooms(
         position,
         metasprite: sprite.metasprite,
         ...(depthMetasprites ? { depth_metasprites: depthMetasprites } : {}),
+        ...(depthFrames ? {depth_frames:depthFrames,cell:actor.dungeonCell===true} : {}),
+        ...(actor.dungeonWallMounted === true ? {wall_mounted:true} : {}),
         ...(onInteract && onInteract.length > 0 ? { on_interact: onInteract } : {})
       }];
     });
@@ -7354,6 +7721,7 @@ function buildDungeonCrawlerRooms(
     );
     return {
       name: currentRoomName,
+      ...(playerView ? {player_view:playerView} : {}),
       resource_bank_group: engineSceneResourceBankGroupName(room, index),
       width_tiles: width,
       height_tiles: height,
@@ -7369,10 +7737,18 @@ function buildDungeonCrawlerRooms(
         y: playerStart.y,
         direction: dungeonDirection(config?.playerStart?.direction ?? playerActor?.direction)
       },
+      ...(config?.presentation ? {presentation:{hud_background:-1,
+        player_label: config.presentation.playerLabel || nullableStringField(child(child(data,"settings"),"general"),"startPlayer")
+          || nullableStringField(playerActor, "name")
+          || nullableStringField(projectArray(projectArray(child(data,"settings") ?? {},"hudPresets").find(p=>p.id===room.hudPresetId) ?? {},"components").find(c=>c.kind==="text"),"text") || "Player",
+        action_sounds:Object.fromEntries(Object.entries(config.presentation.actionSounds).map(([cue,name])=>{
+        const audio=resolveAudioPlayback(audioItems,audioPack,name);if(audio?.op!=="play_sfx")throw new Error(`Dungeon cue must reference PSG SFX: ${name}`);return [cue,audio.index];
+      }))}} : {}),
       battle_enabled: roomFeatureRuntime.battleEnabled,
       video: buildRoomVideoComposition(data, room, tilesetPack),
       ...(backgroundIndexByRoomName.has(currentRoomName) ? { background: backgroundIndexByRoomName.get(currentRoomName) } : {}),
       ...(onEnterScript ? { on_enter: onEnterScript } : {}),
+      ...(onRestoreScript.length ? {on_restore:onRestoreScript} : {}),
       ...(triggers.length > 0 ? { triggers } : {}),
       ...(actors.length > 0 ? { actors } : {})
     };
@@ -7389,11 +7765,59 @@ function buildDungeonCrawlerProject(
   const audioPack = buildAssetcAudioPackGeneration(data);
   const spritePack = buildAssetcSpritePackGeneration(data);
   const tilesetPack = buildAssetcTilesetPackGeneration(data);
-  const visual = advancedRuntimeBackgrounds(rooms, tilesetPack);
+  const baseVisual = advancedRuntimeBackgrounds(rooms.filter(room => {
+    const presentation = dungeonCrawlerSceneConfigFromRuntime(room.runtime, data.settings)?.presentation;
+    const metadata = child(projectArray(data,"assets").find(a=>a.name===roomBackgroundAssetName(room)),"metadata");
+    return !presentation || Boolean(metadata?.dungeonViewCache);
+  }), tilesetPack);
+  const visual:{backgrounds:NonNullable<EngineExportDungeonCrawlerProject["backgrounds"]>;indexByRoomName:Map<string,number>} = baseVisual;
   const events = projectArray(data, "events");
   const scripts = buildTopdownScripts(data, events, rooms, dialogues, audioItems, audioPack, pluginRegistry, true, "dungeon_crawler");
   const startMenuScriptIndex = scripts.findIndex((entry) => entry.name === "__gbastudio_start_menu__");
   const dungeonRooms = buildDungeonCrawlerRooms(data, spritePack, tilesetPack, visual.indexByRoomName, pluginRegistry, startMenuScriptIndex);
+  const cacheRoom=rooms.find(r=>child(projectArray(data,"assets").find(a=>a.name===roomBackgroundAssetName(r)),"metadata")?.dungeonViewCache);
+  const sourceCache=cacheRoom ? child(child(projectArray(data,"assets").find(a=>a.name===roomBackgroundAssetName(cacheRoom)),"metadata"),"dungeonViewCache") : undefined;
+  const copies=exportableAssets(data);
+  const cachePath=(key:string)=>{const name=sourceCache?.[key];const copy=copies.find(a=>a.name===name);if(!copy)throw new Error(`Dungeon cache resource missing: ${String(name)}`);return copy.output;};
+  const viewCache=sourceCache ? {tiles:cachePath("tilesAsset"),maps:cachePath("mapsAsset"),palettes:cachePath("palettesAsset"),index:sourceCache.index as NonNullable<EngineExportDungeonCrawlerProject["view_cache"]>["index"]} : undefined;
+  for(let i=0;i<rooms.length;i++){
+    const presentation=dungeonCrawlerSceneConfigFromRuntime(rooms[i].runtime,data.settings)?.presentation;
+    if(!presentation)continue;
+    const roomAsset = projectArray(data,"assets").find(a=>a.name===roomBackgroundAssetName(rooms[i]));
+    const roomSource = child(child(roomAsset,"metadata"),"dungeonViewCache");
+    const available=new Set(viewCache?.index.map(v=>v.view));
+    const room=dungeonRooms[i];
+    const grid={width:room.width_tiles,height:room.height_tiles,cells:room.collision_flags.map(flag=>flag!==0)};
+    const authoring=child(roomSource,"authoring");
+    const customMaterials = presentation.materialAssets?.some(Boolean) === true;
+    const customDoor = presentation.door !== undefined && JSON.stringify(presentation.door) !== JSON.stringify(authoring?.door);
+    const sharesProjectCache = roomSource && sourceCache && ["tilesAsset","mapsAsset","palettesAsset","index"].every(key=>JSON.stringify(roomSource[key])===JSON.stringify(sourceCache[key]));
+    const rebuild = !sharesProjectCache || customMaterials || customDoor || dungeonGeometryKey(grid)!==authoring?.geometry;
+    if(rebuild){
+      if(grid.width>64||grid.height>64||grid.cells.filter(cell=>!cell).length>256)throw new Error("Dungeon: a reconstrução aceita até 64×64 células e 256 células livres por cena.");
+      if (grid.cells.every(Boolean)) throw new Error("Dungeon: adicione pelo menos uma célula livre para a câmera.");
+      let material_assets: string[] | undefined;
+      if (customMaterials) {
+        if (presentation.materialAssets?.length !== 8 || presentation.materialAssets.some(name=>!name)) throw new Error("Dungeon: selecione os oito materiais de 64×64 pixels ou use os materiais procedurais.");
+        material_assets = presentation.materialAssets.map(name=>{
+          const source=copies.find(a=>a.name===name); if(!source)throw new Error(`Dungeon: material ausente: ${name}`);
+          return source.output;
+        });
+      }
+      const materials = !customMaterials && Array.isArray(authoring?.materials) ? authoring.materials as string[] : undefined;
+      if (materials && (materials.length!==8 || materials.some(value=>typeof value!=="string"||value.length!==10924))) throw new Error("Dungeon: materiais de origem inválidos.");
+      const door=presentation.door ?? child(authoring,"door");
+      room.presentation!.view_recipe={...grid,...(material_assets?{material_assets}:materials?{materials}:{}),door:{x:integerField(door??{},"x",-1),y:integerField(door??{},"y",-1)}};
+      if (!roomSource) delete room.background;
+    }
+    for(let y=0;!rebuild&&y<room.height_tiles;y++)for(let x=0;x<room.width_tiles;x++)if(room.collision_flags[y*room.width_tiles+x]===0)for(let direction=0;direction<4;direction++){
+      if(!available.has(`${x}-${y}-${direction}`))throw new Error(`Dungeon view cache missing camera for ${room.name}: ${x},${y},${direction}`);
+    }
+    if (!presentation.hudAssetName) continue;
+    const asset=tilesetPack?.assetsBySheet[presentation.hudAssetName];if(!asset)throw new Error("Dungeon HUD background missing");
+    let n=visual.backgrounds.findIndex(b=>b.tilemap===asset.name);if(n<0){n=visual.backgrounds.length;visual.backgrounds.push({layer:"bg1",tilemap:asset.name,backdrop_from_tilemap_palette:true});}
+    dungeonRooms[i].presentation!.hud_background=n;
+  }
   const initialRoom = rooms[startRoomIndex(data, rooms)] ?? rooms[0] ?? {};
   const dungeonModules = rooms.flatMap((room) => {
     const modules = child(child(room, "runtime"), "config")?.modules;
@@ -7409,6 +7833,7 @@ function buildDungeonCrawlerProject(
   const dungeonSpriteAssets = Array.from(new Set(dungeonRooms.flatMap((room) =>
     room.actors?.flatMap((actor) => [
       actor.metasprite.asset,
+      ...Object.values(actor.depth_frames??{}).map(a=>a.asset),
       ...(actor.depth_metasprites ? Object.values(actor.depth_metasprites).map((metasprite) => metasprite.asset) : [])
     ]) ?? []
   )));
@@ -7425,6 +7850,7 @@ function buildDungeonCrawlerProject(
     dialogue_lines: buildDialogueLines(data, dialogues, audioItems, audioPack),
     dialogue_ui: buildEngineDialogueUiConfigForExport(data),
     scripts,
+    ...(viewCache ? {view_cache:viewCache} : {}),
     inventory_enabled: featureRuntime.inventoryEnabled,
     battle_enabled: featureRuntime.battleEnabled,
     compass_enabled: featureRuntime.compassEnabled,
@@ -7485,6 +7911,11 @@ function buildRacingRooms(
       if((config.pseudo3dVisuals?.horizonY??48)+camera.height*camera.focalLength/camera.distance>152)
         throw new Error("Câmera da corrida: aumente a distância ou reduza a altura/perspectiva para manter o carro dentro da tela.");
     }
+    const actionSounds = Object.fromEntries(Object.entries(config?.actionSounds ?? {}).map(([cue,name]) => {
+      const resolved=resolveAudioPlayback(audioItems,audioPack,name);
+      if(resolved?.op !== "play_sfx") throw new Error(`Corrida actionSounds.${cue} requer SFX PSG compilado: ${name}`);
+      return [cue,resolved.index];
+    }));
     const player = playerPositionForRoom(data, room, index);
     const currentRoomName = roomName(room, index);
     const eventBindings = child(room, "eventBindings");
@@ -7524,6 +7955,18 @@ function buildRacingRooms(
     ].some((asset) => asset.bank_groups.includes(resourceBankGroup));
     return {
       name: currentRoomName,
+      ...(Object.keys(actionSounds).length ? {action_sounds:actionSounds} : {}),
+      ...(config?.challenge ? { challenge: {
+        boost_variable_index: config.challenge.boostVariableIndex,
+        best_time_text_index: config.challenge.bestTimeTextIndex,
+        result_time_text_index: config.challenge.resultTimeTextIndex,
+        result_position_text_index: config.challenge.resultPositionTextIndex,
+        result_rating_text_index: config.challenge.resultRatingTextIndex,
+        result_best_text_index: config.challenge.resultBestTextIndex,
+        gold_seconds: config.challenge.goldSeconds,
+        silver_seconds: config.challenge.silverSeconds
+      } } : {}),
+
       ...(hasResourceBankGroup ? { resource_bank_group: resourceBankGroup } : {}),
       width_tiles: width,
       height_tiles: height,
@@ -7653,6 +8096,8 @@ function buildRacingProject(
   const events = projectArray(data, "events");
   const audioPack = buildAssetcAudioPackGeneration(data);
   const spritePack = buildAssetcSpritePackGeneration(data);
+  const portraitPack = buildAssetcPortraitPackGeneration(data, spritePack);
+  const portraitAssets = buildDialoguePortraitAssetsExport(data, portraitPack, spritePack);
   const tilesetPack = buildAssetcTilesetPackGeneration(data);
   const visual = advancedRuntimeBackgrounds(rooms.filter(room=>racingSceneConfigFromRuntime(room.runtime,data.settings)?.presentation!=="pseudo3d" || !racingSceneConfigFromRuntime(room.runtime,data.settings)?.topdownTrack), tilesetPack);
   const pseudo3d = buildRacingPseudo3DVisuals(data, rooms, tilesetPack);
@@ -7677,18 +8122,19 @@ function buildRacingProject(
       ...visual.backgrounds.map((background) => background.tilemap),
       ...pseudo3d.visuals.flatMap((entry) => [entry.panorama, entry.minimap].filter((name): name is string=>Boolean(name)))
     ],
-    racingSpriteAssets,
+    [...racingSpriteAssets, ...portraitAssets.map(entry => entry.metasprite.asset)],
     audioPack,
     pseudo3d.visuals.map((entry) => entry.floor)
   );
   return {
     initial_room: initialRoomIndex,
-    ...((tilesetPack || spritePack) ? { resource_banks: "asset_pack" as const } : {}),
+    ...((tilesetPack || spritePack || portraitPack) ? { resource_banks: "asset_pack" as const } : {}),
     save: buildProjectSaveConfig(data),
     rooms: racingRooms,
     dialogue_lines: buildDialogueLines(data, dialogues, audioItems, audioPack),
     dialogue_ui: buildEngineDialogueUiConfigForExport(data),
-    scripts: buildTopdownScripts(data, events, rooms, dialogues, audioItems, audioPack, pluginRegistry),
+    ...(portraitAssets.length > 0 ? { portrait_assets: portraitAssets } : {}),
+    scripts: buildTopdownScripts(data, events, rooms, dialogues, audioItems, audioPack, pluginRegistry, true, "racing"),
     ...(assetSection ? { assets: assetSection } : {}),
     ...(visual.backgrounds.length > 0 ? { backgrounds: visual.backgrounds } : {}),
     ...(pseudo3d.visuals.length > 0 ? { pseudo3d_visuals: pseudo3d.visuals } : {}),
@@ -7705,12 +8151,22 @@ function buildBattleRpgProject(
   const audioItems = projectArray(data, "audioItems");
   const audioPack = buildAssetcAudioPackGeneration(data);
   const spritePack = buildAssetcSpritePackGeneration(data);
+  const portraitPack = buildAssetcPortraitPackGeneration(data, spritePack);
+  const portraitAssets = buildDialoguePortraitAssetsExport(data, portraitPack, spritePack);
   const tilesetPack = buildAssetcTilesetPackGeneration(data);
   const visual = advancedRuntimeBackgrounds(rooms, tilesetPack);
+  const backgrounds: NonNullable<EngineExportBattleRpgProject["backgrounds"]> = [...visual.backgrounds];
+  const hudIndices = new Map<string,number>();
+  rooms.forEach(room=>{
+    const name=nullableStringField(child(child(room,"runtime"),"config"),"hudAssetName");
+    const asset=name && tilesetPack?.assetsBySheet[name];
+    if(asset){hudIndices.set(roomName(room,0),backgrounds.length); backgrounds.push({layer:"bg1",tilemap:asset.name});}
+  });
   const events = projectArray(data, "events");
-  const participantSpriteAssets = new Set<string>();
+  const itemRegistry = buildEventValueRegistries(events, pluginRegistry, [], [], sceneRouteVariableKeys(data), projectVariableKeys(data), projectInventoryItemKeys(data));
+  const participantSpriteAssets = new Set<string>(portraitAssets.map(entry => entry.metasprite.asset));
   const assetSection = advancedRuntimeAssetSection(
-    visual.backgrounds.map((background) => background.tilemap),
+    backgrounds.map((background) => background.tilemap),
     spritePack?.assetNames ?? [],
     audioPack
   );
@@ -7719,6 +8175,7 @@ function buildBattleRpgProject(
     save: buildProjectSaveConfig(data),
     dialogue_lines: buildDialogueLines(data, dialogues, audioItems, audioPack),
     dialogue_ui: buildEngineDialogueUiConfigForExport(data),
+    ...(portraitAssets.length > 0 ? { portrait_assets: portraitAssets } : {}),
     scripts: buildTopdownScripts(data, events, rooms, dialogues, audioItems, audioPack, pluginRegistry),
     encounters: rooms.map((room, index) => {
       const config = battleRpgSceneConfigFromRuntime(room.runtime, data.settings);
@@ -7741,7 +8198,7 @@ function buildBattleRpgProject(
           ? battle.abilities.filter((ability): ability is "attack" | "magic" | "heal" | "defend" => ability === "attack" || ability === "magic" || ability === "heal" || ability === "defend")
           : [];
         const uniqueKinds = Array.from(new Set(abilityKinds.length > 0 ? abilityKinds : ["attack" as const])).slice(0, 4);
-        const sprite = buildActorEngineSpriteExport(data, actor, spritePack);
+        const sprite = buildBattleRpgActorEngineSpriteExport(data, actor, spritePack);
         if (sprite) participantSpriteAssets.add(sprite.metasprite.asset);
         return [{
           side,
@@ -7753,7 +8210,10 @@ function buildBattleRpgProject(
               power: kind === "magic" ? attack : kind === "heal" ? Math.max(1, Math.floor(maxHp / 4)) : 0
             })),
             ...(spriteScale > 1 ? { sprite_scale: spriteScale } : {}),
-            ...(sprite ? { metasprite: sprite.metasprite } : {})
+            ...(sprite ? { metasprite: sprite.metasprite } : {}),
+            ...(sprite?.battle_rpg_animation_set ? {animation_set:sprite.battle_rpg_animation_set} : {}),
+            ...(battle.useAuthoredPosition === true ? {position:{x:integerField(actor,"x",0)*8,y:integerField(actor,"y",0)*8}} : {}),
+            ...(nullableStringField(battle,"hudLabel") ? {hud_label:nullableStringField(battle,"hudLabel")} : {})
           }
         }];
       });
@@ -7774,6 +8234,8 @@ function buildBattleRpgProject(
       const onVictory = hook("onVictory");
       const onDefeat = hook("onDefeat");
       const onEscape = hook("onEscape");
+      const onHitPlayer = hook("onHitPlayer");
+      const inventory = resolveBattleRpgInventory(config?.modules);
       const party = authoredParty.length > 0 ? authoredParty : Array.from({ length: maxPartySize }, (_item, participantIndex) => ({
         name: `Party ${participantIndex + 1}`,
         unit: { max_hp: 24, attack: 7, defense: 2, speed: 5 },
@@ -7784,7 +8246,34 @@ function buildBattleRpgProject(
         unit: { max_hp: 12, attack: 4, defense: 1, speed: 3 },
         abilities: [{ kind: "attack" as const, power: 0 }]
       }));
+      let presentation: EngineExportBattleRpgEncounter["presentation"];
+      if(config?.presentation){
+        const authored=config.presentation, hudBackground=hudIndices.get(encounterName);
+        if(config.hudAssetName && hudBackground===undefined) throw new Error("Battle RPG presentation requer hudAssetName valido");
+        const action_sounds=Object.fromEntries(Object.entries(authored.actionSounds).map(([cue,name])=>{
+          const audio=resolveAudioPlayback(audioItems,audioPack,name);
+          if(audio?.op!=="play_sfx") throw new Error(`Battle RPG actionSounds.${cue} requer SFX PSG: ${name}`);
+          return [cue,audio.index];
+        }));
+        const victory=resolveAudioPlayback(audioItems,audioPack,authored.victoryMusic);
+        if(authored.victoryMusic && victory?.op!=="run_audio_routine") throw new Error("Battle RPG victoryMusic requer musica tracker compilada");
+        const effectsActor=projectArray(data,"actors").find(a=>a.id===authored.effectsActorId && entitySceneName(a,"actor")===encounterName);
+        const effectsSprite=effectsActor && buildActorEngineSpriteExport(data,effectsActor,spritePack,{preserveAuthoredAnimations:true});
+        const effects=Object.fromEntries((effectsSprite?.animations??[]).map(({name,...clip})=>[name,clip]));
+        if(authored.effectsActorId && !effectsSprite)throw new Error("Battle RPG effectsActorId requer um ator de efeitos da cena");
+        const disabled=spritePack?.assetsBySheet[authored.disabledEscapeAssetName];
+        if(authored.disabledEscapeAssetName && !disabled) throw new Error("Battle RPG disabledEscapeAssetName ausente");
+        if(effectsSprite) participantSpriteAssets.add(effectsSprite.metasprite.asset);
+        if(disabled) participantSpriteAssets.add(disabled.name);
+        const cursor=spritePack?.assetsBySheet[authored.cursorAssetName??""];
+        if(authored.cursorAssetName&&!cursor)throw new Error("Battle RPG cursorAssetName ausente");
+        if(cursor)participantSpriteAssets.add(cursor.name);
+        presentation={...(cursor?{cursor:{asset:cursor.name,index:0}}:{}),victory_label:authored.victoryLabel,hud_background:hudBackground??-1,action_sounds,victory_tracker:victory?.op==="run_audio_routine"?victory.index:-1,outcome_hold_frames:authored.outcomeHoldFrames,effects,...(disabled?{disabled_escape:{asset:disabled.name,index:0}}:{})};
+      }
       return {
+        ...(presentation ? {presentation} : {}),
+        ...(inventory ? { inventory_items: [{ label: inventory.label, item: itemRegistry.itemIndex(inventory.itemKey),
+          initial_quantity: inventory.initialQuantity, heal_amount: inventory.healAmount }] } : {}),
         name: encounterName,
         ...(visual.indexByRoomName.has(encounterName) ? { background: visual.indexByRoomName.get(encounterName) } : {}),
         resource_bank_group: engineSceneResourceBankGroupName(room, index),
@@ -7811,17 +8300,18 @@ function buildBattleRpgProject(
         ...(onEnter && onEnter.length > 0 ? { on_enter: onEnter } : {}),
         ...(onVictory && onVictory.length > 0 ? { on_victory: onVictory } : {}),
         ...(onDefeat && onDefeat.length > 0 ? { on_defeat: onDefeat } : {}),
-        ...(onEscape && onEscape.length > 0 ? { on_escape: onEscape } : {})
+        ...(onEscape && onEscape.length > 0 ? { on_escape: onEscape } : {}),
+        ...(onHitPlayer && onHitPlayer.length > 0 ? { on_hit_player: onHitPlayer } : {})
       };
     }),
-    ...((tilesetPack || spritePack) ? { resource_banks: "asset_pack" as const } : {}),
+    ...((tilesetPack || spritePack || portraitPack) ? { resource_banks: "asset_pack" as const } : {}),
     ...(assetSection ? {
       assets: {
         ...assetSection,
         ...(participantSpriteAssets.size > 0 ? { sprite_assets: Array.from(participantSpriteAssets) } : {})
       }
     } : {}),
-    ...(visual.backgrounds.length > 0 ? { backgrounds: visual.backgrounds } : {})
+    ...(backgrounds.length > 0 ? { backgrounds } : {})
   };
 }
 
@@ -7875,6 +8365,11 @@ function buildLutaProject(
       const onEnter = hook("onInit");
       const onVictory = hook("onVictory");
       const onDefeat = hook("onDefeat");
+      const actionSounds = Object.fromEntries(Object.entries(config?.actionSounds ?? {}).map(([cue, name]) => {
+        const resolved = resolveAudioPlayback(audioItems, audioPack, name);
+        if (resolved?.op !== "play_sfx") throw new Error(`Luta actionSounds.${cue} requer SFX PSG compilado: ${name}`);
+        return [cue, resolved.index];
+      }));
       const participants = projectArray(data, "actors").flatMap((actor): Array<{ side: "player1" | "player2"; fighter: EngineExportLutaFighter }> => {
         if (entitySceneName(actor, "actor") !== stageName) return [];
         const battle = child(actor, "battle");
@@ -7916,6 +8411,7 @@ function buildLutaProject(
       }];
       return {
         name: stageName,
+        ...(Object.keys(actionSounds).length ? { action_sounds: actionSounds } : {}),
         ...(visual.indexByRoomName.has(stageName) ? { background: visual.indexByRoomName.get(stageName) } : {}),
         resource_bank_group: engineSceneResourceBankGroupName(room, index),
         ...(onEnter && onEnter.length > 0 ? { on_enter: onEnter } : {}),
@@ -7967,6 +8463,7 @@ interface PointClickSceneVisualExport {
   background?: number;
   backgrounds?: number[];
   props?: EngineExportPointClickProp[];
+  cursor?: EngineExportPointClickProject["cursor"];
   spriteAssetNames: string[];
 }
 
@@ -8030,6 +8527,14 @@ function buildPointClickVisualExport(
         })()),
       spriteAssetNames: []
     };
+    const playerName = configuredPlayerActorName(data, room);
+    const cursorActor = projectArray(data, "actors").find(actor =>
+      actorMatchesPlayerName(actor, playerName) && entitySceneName(actor, "actor") === sceneName);
+    const cursorSprite = cursorActor ? buildActorEngineSpriteExport(data, cursorActor, spritePack, { directionAdapter: "cursor" }) : null;
+    if (cursorSprite) {
+      visual.cursor = { metasprite: cursorSprite.metasprite, ...(cursorSprite.animations ? { animations: cursorSprite.animations } : {}) };
+      visual.spriteAssetNames.push(cursorSprite.metasprite.asset);
+    }
     const props = npcActorsForRoom(data, room, roomIndex).flatMap((actor) => {
       const sprite = buildActorEngineSpriteExport(data, actor, spritePack);
       if (!sprite) return [];
@@ -8072,6 +8577,12 @@ function buildPointClickScenes(
   const audioPack = buildAssetcAudioPackGeneration(data);
   const startIndex = startRoomIndex(data, rooms);
   const dialogueBoot = dialogueUiBootCommands(data, audioItems, audioPack);
+  const inventory = pointClickInventoryItems(data);
+  const itemIndex = (name: string): number => {
+    const index = inventory.findIndex(item => item.name === name);
+    if (index < 0) throw new Error(`Alvo de Point and Click referencia item inexistente: ${name}.`);
+    return index;
+  };
 
   return rooms.map((room, index) => {
     const width = integerField(room, "width", 20);
@@ -8087,6 +8598,7 @@ function buildPointClickScenes(
       ...(visual?.backgrounds ? { backgrounds: visual.backgrounds } : { background: visual?.background ?? -1 }),
       resource_bank_group: engineSceneResourceBankGroupName(room, index),
       ...(pointClickConfig ? { cursor_speed: Math.max(1, Math.round(pointClickConfig.cursorSpeed)) } : {}),
+      ...(visual?.cursor ? { cursor: visual.cursor } : {}),
       ...(visual?.props && visual.props.length > 0 ? { props: visual.props } : {})
     };
     const onEnterScript = mergeRoomOnEnterScript(roomDialogueBoot, onEnter);
@@ -8100,6 +8612,7 @@ function buildPointClickScenes(
     });
     if (triggers.length > 0) {
       scene.hotspots = triggers.flatMap((trigger) => {
+        const target = normalizePointClickTarget(trigger.pointClick);
         const onInteractHotspot = scriptForEventName(
           data,
           resolveTriggerInteractEventName(trigger),
@@ -8123,10 +8636,27 @@ function buildPointClickScenes(
         const right = Math.min(roomWidthPixels, baseArea.x + baseArea.width + padding);
         const bottom = Math.min(roomHeightPixels, baseArea.y + baseArea.height + padding);
         const area = { x, y, width: right - x, height: bottom - y };
+        const requiredItem = target.requiredItem ? itemIndex(target.requiredItem) : -1;
+        const unavailableLine = target.unavailableDialogue ? dialogues.findIndex(line => line.key === target.unavailableDialogue) : -1;
+        if (target.unavailableDialogue && unavailableLine < 0) {
+          throw new Error(`Alvo de Point and Click referencia diálogo inexistente: ${target.unavailableDialogue}.`);
+        }
+        const useItemScript = target.useItemEvent
+          ? scriptForEventName(data, target.useItemEvent, events, rooms, dialogues, audioItems, audioPack)
+          : onInteractHotspot;
+        if (target.useItemEvent && !events.some(event => event.name === target.useItemEvent)) {
+          throw new Error(`Alvo de Point and Click referencia evento inexistente: ${target.useItemEvent}.`);
+        }
+        const consume: EngineExportProjectEventCommand[] = requiredItem >= 0 && target.consumeRequiredItem
+          ? [{ op: "set_variable", variable: inventory[requiredItem].variable, value: 0 }] : [];
         return [{
           name: stringField(trigger, "name", "Hotspot"),
           area,
-          ...(onInteractHotspot && onInteractHotspot.length > 0 ? { on_click: onInteractHotspot } : {})
+          ...(onInteractHotspot && onInteractHotspot.length > 0 ? { on_click: onInteractHotspot } : {}),
+          ...(requiredItem >= 0 ? { required_item: requiredItem } : {}),
+          ...(target.giveItem ? { give_item: itemIndex(target.giveItem) } : {}),
+          ...(unavailableLine >= 0 ? { unavailable_line: unavailableLine } : {}),
+          ...(target.useItemEvent || consume.length ? { on_use_item: [...consume, ...(useItemScript ?? [])] } : {})
         }];
       });
     }
@@ -8145,6 +8675,7 @@ function buildPointClickProject(
   const audioPack = buildAssetcAudioPackGeneration(data);
   const events = projectArray(data, "events");
   const pointClickSettings = child(settings(data), "pointAndClick") ?? {};
+  const inventory = pointClickInventoryItems(data);
   const spritePack = buildAssetcSpritePackGeneration(data);
   const tilesetPack = buildAssetcTilesetPackGeneration(data);
   const portraitPack = buildAssetcPortraitPackGeneration(data, spritePack);
@@ -8162,7 +8693,8 @@ function buildPointClickProject(
     projectArray(data, "actors"),
     [],
     sceneRouteVariableKeys(data),
-    projectVariableKeys(data)
+    projectVariableKeys(data),
+    projectInventoryItemKeys(data)
   );
   const visual = buildPointClickVisualExport(data, rooms, spritePack, tilesetPack, eventValueRegistries);
   const pointClickSpriteAssetNames = Array.from(new Set([
@@ -8186,6 +8718,7 @@ function buildPointClickProject(
     initial_scene: startRoomIndex(data, rooms),
     cursor_start: { x: cursorPixels.x, y: cursorPixels.y },
     cursor_speed: cursorSpeedRaw === null ? 2 : Math.max(1, Math.round(cursorSpeedRaw)),
+    ...(inventory.length ? { inventory_items: inventory } : {}),
     ...(cursorSpriteExport ? {
       cursor: {
         metasprite: cursorSpriteExport.metasprite,
@@ -8271,6 +8804,7 @@ function buildShmupProject(
   const spritePack = buildAssetcSpritePackGeneration(data);
   const tilesetPack = buildAssetcTilesetPackGeneration(data);
   const portraitPack = buildAssetcPortraitPackGeneration(data, spritePack);
+  const portraitAssets = buildDialoguePortraitAssetsExport(data, portraitPack, spritePack);
   const emotePack = buildAssetcEmotePackGeneration(data, spritePack, portraitPack);
   const emoteAssets = buildDialogueEmoteAssetsExport(data, emotePack, portraitPack, spritePack);
   const spriteExportForSheet = (spriteSheet: string | null, animationName: string): ReturnType<typeof buildActorEngineSpriteExport> => (
@@ -8283,7 +8817,7 @@ function buildShmupProject(
     ? buildActorEngineSpriteExport(data, playerActor, spritePack, { preserveAuthoredAnimations: true })
     : spriteExportForSheet(nullableStringField(shmupSettings, "playerSprite"), "idle");
   const playerAnimations: NonNullable<EngineExportShmupProject["player"]["animations"]> = {};
-  const animationKeys: Record<string, keyof typeof playerAnimations> = { idle: "idle", idle_right: "idle", fly_right: "fly", walk_right: "fly", walk: "fly",
+  const animationKeys: Record<string, keyof typeof playerAnimations> = { fly: "fly", shoot: "shoot", idle: "idle", idle_right: "idle", fly_right: "fly", walk_right: "fly", walk: "fly",
       bank_up: "bank_up", walk_up: "bank_up", bank_down: "bank_down", walk_down: "bank_down",
       shoot_right: "shoot", attack_right: "shoot", attack: "shoot", hurt_right: "hurt", hurt: "hurt"
   };
@@ -8439,10 +8973,13 @@ function buildShmupProject(
     const roomEnemies = npcActorsForRoom(data, room, index)
       .filter((actor) => integerField(actor, "waveIndex", 0) === waveIndex)
       .map((actor, actorIndex) => {
-      const spriteExport = buildActorEngineSpriteExport(data, actor, spritePack);
+      const spriteExport = buildActorEngineSpriteExport(data, actor, spritePack, { preserveAuthoredAnimations: true });
+      const enemyConfig = child(actor, "shmup") ?? {};
+      const animated = spriteExport?.animations?.find(clip => clip.name === nullableStringField(actor, "animationName")) ?? spriteExport?.animations?.[0];
+      const { name: _clipName, ...enemyAnimation } = animated ?? {};
       const actorName = stringField(actor, "name", `enemy_${actorIndex + 1}`);
       const actorEventBindings = child(actor, "eventBindings");
-      const projectileLaunch = enemyProjectileLaunchByActor.get(actorName);
+      const projectileLaunch = enemyProjectileLaunchByActor.get(actorName) ?? enemyProjectileLaunchByActor.get(stringField(actor, "id", ""));
       const onSpawn = scriptForEventName(
         data,
         nullableStringField(actorEventBindings, "onInit"),
@@ -8480,19 +9017,20 @@ function buildShmupProject(
           x: position.x,
           y: position.y
         }),
-        size: { x: 16, y: 16 },
-        velocity: { x: -enemySpeed, y: 0 },
-        movement: "linear",
-        health: 1,
+        size: { x: integerField(enemyConfig, "width", 16), y: integerField(enemyConfig, "height", 16) },
+        velocity: { x: integerField(enemyConfig, "velocityX", -enemySpeed), y: integerField(enemyConfig, "velocityY", 0) },
+        movement: stringField(enemyConfig, "movement", "linear"),
+        health: Math.max(1, Math.min(255, integerField(enemyConfig, "health", 1))),
         score: featureRuntime.pointsPerEnemy,
-        fire_interval: projectileLaunch ? 24 : 0,
+        fire_interval: projectileLaunch ? Math.max(1, Math.min(255, integerField(enemyConfig, "fireInterval", 24))) : 0,
         ...(projectileLaunch ? {
           projectile_offset: { x: projectileLaunch.direction === "left" ? -4 : 16, y: 8 }
         } : {}),
         ...(onSpawn && onSpawn.length > 0 ? { on_spawn: onSpawn } : {}),
         ...(onHitPlayer && onHitPlayer.length > 0 ? { on_hit_player: onHitPlayer } : {}),
         ...(onDestroy && onDestroy.length > 0 ? { on_destroy: onDestroy } : {}),
-        ...(spriteExport ? { metasprite: spriteExport.metasprite } : {})
+        ...(spriteExport ? { metasprite: spriteExport.metasprite } : {}),
+        ...(animated ? { animation: enemyAnimation as Omit<AssetcSpriteAnimationExportEntry, "name"> } : {})
       };
     });
     const wave: EngineExportShmupWave = {
@@ -8506,6 +9044,8 @@ function buildShmupProject(
         player_speed: Math.max(1, Math.round(wavePlan.playerSpeed ?? shmupConfig?.playerSpeed ?? playerSpeed)),
         fire_cooldown: Math.max(1, Math.round(wavePlan.fireCooldown ?? shmupConfig?.fireCooldown ?? fireRate))
       } : {}),
+      on_defeat: scriptForEventName(data, nullableStringField(eventBindings, "onDefeat"), events, rooms, dialogues, audioItems, audioPack, pluginRegistry),
+      on_hit_player: scriptForEventName(data, nullableStringField(eventBindings, "onHitPlayer"), events, rooms, dialogues, audioItems, audioPack, pluginRegistry),
       enemies: roomEnemies.length > 0 ? roomEnemies : [{
         name: "scout",
         position: { x: 184, y: 48 },
@@ -8567,19 +9107,21 @@ function buildShmupProject(
       size: { x: 32, y: 32 },
       speed: Math.max(1, Math.round(playerSpeed)),
       fire_cooldown: Math.max(1, Math.round(fireRate)),
-      projectile_offset: { x: 24, y: 12 },
+      projectile_offset: { x: integerField(child(shmupSettings, "projectileOffset"), "x", 24), y: integerField(child(shmupSettings, "projectileOffset"), "y", 12) },
+      ...(playerActor ? { on_fire: scriptForEventName(data, nullableStringField(child(playerActor, "eventBindings"), "onInteract"), events, rooms, dialogues, audioItems, audioPack) } : {}),
       ...(playerSprite ? { metasprite: playerSprite.metasprite } : {}),
       ...(Object.keys(playerAnimations).length > 0 ? { animations: playerAnimations } : {})
     },
     projectile: {
-      size: projectileSprite ? { x: 16, y: 8 } : { x: 4, y: 8 },
+      size: projectileSprite ? { x: Math.max(1, integerField(child(shmupSettings, "projectileSize"), "x", 16)), y: Math.max(1, integerField(child(shmupSettings, "projectileSize"), "y", 8)) } : { x: 4, y: 8 },
       velocity: playerProjectileLaunch ? shmupProjectileVelocity(playerProjectileLaunch) : { x: 4, y: 0 },
       max_active: 6,
       ...(projectileSprite ? { metasprite: projectileSprite.metasprite } : {})
     },
     ...(firstEnemyProjectileLaunch ? {
       enemy_projectile: {
-        size: enemyProjectileSprite ? { x: 16, y: 8 } : { x: 4, y: 8 },
+        ...(playerActor ? { on_hit_player: scriptForEventName(data, nullableStringField(child(playerActor, "eventBindings"), "onHit1"), events, rooms, dialogues, audioItems, audioPack) } : {}),
+        size: enemyProjectileSprite ? { x: Math.max(1, integerField(child(shmupSettings, "projectileSize"), "x", 16)), y: Math.max(1, integerField(child(shmupSettings, "projectileSize"), "y", 8)) } : { x: 4, y: 8 },
         velocity: shmupProjectileVelocity(firstEnemyProjectileLaunch),
         max_active: 8,
         ...(enemyProjectileSprite ? { metasprite: enemyProjectileSprite.metasprite } : {})
@@ -8605,20 +9147,22 @@ function buildShmupProject(
     }],
     dialogue_lines: buildDialogueLines(data, dialogues, audioItems, audioPack),
     dialogue_ui: buildEngineDialogueUiConfigForExport(data),
+    ...(portraitAssets.length > 0 ? { portrait_assets: portraitAssets } : {}),
     ...(actorSprites.length > 0 ? { actor_sprites: actorSprites } : {}),
     ...(emoteAssets.length > 0 ? { emote_assets: emoteAssets } : {}),
     scripts: buildTopdownScripts(data, events, rooms, dialogues, audioItems, audioPack, pluginRegistry),
-    ...((spritePack || tilesetPack || emotePack) ? { resource_banks: "asset_pack" as const } : {}),
-    ...((spritePack || tilesetPack || emotePack || audioPack) ? {
+    ...((spritePack || tilesetPack || portraitPack || emotePack) ? { resource_banks: "asset_pack" as const } : {}),
+    ...((spritePack || tilesetPack || portraitPack || emotePack || audioPack) ? {
       assets: {
         ...(tilesetPack ? { bg_palettes: regularTilesetAssetNames(tilesetPack) } : {}),
-        ...((spritePack || emotePack) ? {
-          obj_palettes: Array.from(new Set([...(spritePack?.assetNames ?? []), ...(emotePack?.assetNames ?? [])])),
+        ...((spritePack || portraitPack || emotePack) ? {
+          obj_palettes: Array.from(new Set([...(spritePack?.assetNames ?? []), ...(portraitPack?.assetNames ?? []), ...(emotePack?.assetNames ?? [])])),
           ...(spritePack ? { sprite_assets: spritePack.assetNames } : {})
         } : {}),
         tile_assets: Array.from(new Set([
           ...regularTilesetAssetNames(tilesetPack),
           ...(spritePack?.assetNames ?? []),
+          ...(portraitPack?.assetNames ?? []),
           ...(emotePack?.assetNames ?? [])
         ])),
         ...(audioPack ? {
@@ -8637,7 +9181,7 @@ function buildVisualNovelChoiceGroups(
   audioItems: Record<string, unknown>[],
   audioPack: AssetcAudioPackGeneration | null
 ): EngineExportVisualNovelChoiceGroup[] {
-  const bindings = choiceEventBindings(events);
+  const bindings = choiceEventBindings(events, rooms);
   const localization = deriveProjectLocalization(data);
   return dialogues.flatMap((dialogue, dialogueIndex) => {
     const choices = dialogueChoices(dialogue);
@@ -8694,15 +9238,25 @@ function buildVisualNovelScenes(
       audioPack
     );
     const roomDialogueBoot = index === startIndex ? dialogueBoot : [];
-    const onEnterScript = mergeRoomOnEnterScript(roomDialogueBoot, onEnter);
+    const music = resolveAudioPlayback(audioItems, audioPack, stringField(room, "music", ""));
+    const sceneBoot: EngineExportProjectEventCommand[] = [
+      ...roomDialogueBoot,
+      ...(music ? [{ op: music.op, index: music.index }] : [])
+    ];
+    const onEnterScript = mergeRoomOnEnterScript(sceneBoot, onEnter);
 
     let line = -1;
     let choiceGroup = -1;
     if (onEnter) {
       for (const command of onEnter) {
         if (command.op === "show_dialogue" && typeof command.dialogue === "number") {
-          line = command.dialogue;
-          choiceGroup = choiceGroupByLine.get(line) ?? -1;
+          // The entry script already displays plain dialogue. Only retain an
+          // automatic scene group when that line has choices to present next.
+          const group = choiceGroupByLine.get(command.dialogue);
+          if (group !== undefined) {
+            line = command.dialogue;
+            choiceGroup = group;
+          }
           break;
         }
         if (command.op === "show_choice" && typeof command.group === "number") {
@@ -8847,6 +9401,14 @@ function menuScreenSources(rooms: Record<string, unknown>[]): MenuScreenSource[]
           titleOverlayAssetName: screen.titleOverlayAssetName,
           hudMode: screen.hudMode ?? (screen.hudPresetId ? undefined : menuConfig.hudMode),
           hudPresetId: screen.hudPresetId ?? menuConfig.hudPresetId,
+          hudBindings: screen.hudBindings,
+          pageNavigation: screen.pageNavigation,
+          hudListRows: screen.hudListRows,
+          hudTextColor: screen.hudTextColor,
+          hudHeader: screen.hudHeader,
+          hudTransparentText: screen.hudTransparentText,
+          hudFeedbackInDetails: screen.hudFeedbackInDetails,
+          titleTextVariableName: screen.titleTextVariableName,
           backgroundAnimation: screen.backgroundAnimation,
           titleFadeFrames: screen.titleFadeFrames,
           autoAdvanceFrames: screen.autoAdvanceFrames,
@@ -8854,6 +9416,7 @@ function menuScreenSources(rooms: Record<string, unknown>[]): MenuScreenSource[]
           nextScreenID: screen.nextScreenID,
           items: screen.items,
           carousel: screen.carousel,
+          actionSounds: screen.actionSounds,
           onBackEventName: screen.onBackEventName ?? "",
           menuProfile: screen.menuProfile ?? menuConfig.menuProfile,
           presentationMode: screen.presentationMode ?? menuConfig.presentationMode,
@@ -8917,7 +9480,7 @@ function buildMenuScreens(
   const startRoom = startRoomIndex(data, rooms);
   const initialScreen = Math.max(0, sources.findIndex((source) => source.roomIndex === startRoom));
   const dialogueBoot = dialogueUiBootCommands(data, audioItems, audioPack);
-  const bindings = choiceEventBindings(events);
+  const bindings = choiceEventBindings(events, rooms);
   const titleLine = menuTitleLineIndex(dialogues);
   const itemsDialogueIndex = menuItemsDialogueIndex(dialogues);
   const itemsDialogue = itemsDialogueIndex >= 0 ? dialogues[itemsDialogueIndex] : undefined;
@@ -8934,7 +9497,8 @@ function buildMenuScreens(
     [],
     textInputVariableKeys,
     sceneRouteVariableKeys(data),
-    projectVariableKeys(data)
+    projectVariableKeys(data),
+    projectInventoryItemKeys(data)
   );
 
   const allRooms = projectRooms(data);
@@ -9019,6 +9583,7 @@ function buildMenuScreens(
         ...(menuItem.saveSlot !== undefined ? { save_slot: menuItem.saveSlot } : {}),
         ...(menuItem.valueLabels ? { value_labels: menuItem.valueLabels } : {}),
         ...(menuItem.detailLines ? { detail_lines: menuItem.detailLines } : {}),
+        ...(menuItem.availableRuntime ? { available_runtime: menuItem.availableRuntime } : {}),
         click_box: { ...menuItem.clickBox }
       };
       if (globalTarget && targetKind !== "menu" && MIXED_RUNTIME_KINDS.has(targetKind)) {
@@ -9026,7 +9591,7 @@ function buildMenuScreens(
         const targetName = roomName(globalTarget, globalTargetIndex);
         const targetRoom = roomIndexByName(targetRooms, targetName);
         if (targetRoom >= 0) {
-          const position = warpPositionForChangeScene(data, targetRooms, targetRoom, ["change_scene", targetName], targetKind);
+          const position = warpPositionForChangeScene(data, targetRooms, targetRoom, ["change_scene", targetName], targetKind, room);
           onSelect = [
             ...(onSelect ?? []),
             { op: "warp_runtime", runtime: targetKind as MixedRuntimeKind, room: targetRoom, x: position.x, y: position.y }
@@ -9098,6 +9663,18 @@ function buildMenuScreens(
       title_line: titleLine,
       items,
       ...(menuConfig?.carousel ? { carousel: true } : {}),
+      ...(menuConfig?.actionSounds ? { audio_feedback: Object.fromEntries(
+        Object.entries(menuConfig.actionSounds).map(([action, name]) => {
+          const resolved = resolveAudioPlayback(audioItems, audioPack, name);
+          if (!resolved || resolved.op === "run_audio_routine") throw new Error(`Efeito de menu requer SFX PSG ou PCM: ${name}`);
+          const audio = audioItems[audioIndexByName(audioItems, name)];
+          return [action, {
+            [resolved.op === "play_pcm_sfx" ? "pcm" : "sfx"]: resolved.index,
+            volume: hardwareAudioVolume(String(integerField(audio, "volume", 100))),
+            priority: 8
+          }];
+        })
+      ) } : {}),
       menu_profile: source.menuProfile,
       presentation_mode: source.presentationMode,
       entry_policy: source.entryPolicy,
@@ -9146,6 +9723,7 @@ function buildMenuScreens(
           ? eventValueRegistries.variableIndex(visibilityVariableKey)
           : explicitVisibilityVariableIndex === null ? null : Math.floor(explicitVisibilityVariableIndex);
         const visibilityValue = integerField(actor, "menuVisibilityValue", integerField(actor, "menu_visibility_value", 0));
+        const visibilityConditions = normalizeMenuVisibilityConditions(actor.menuVisibilityConditions);
         const onInit = scriptForEventName(
           data,
           resolveActorInitEventName(actor),
@@ -9192,6 +9770,7 @@ function buildMenuScreens(
             entry_animation_frames: entryAnimationFrames
           } : {}),
           role: normalizedRole,
+          ...(visibilityConditions.length ? {visibility_conditions:visibilityConditions,...(actor.menuVisibilityAny===true?{visibility_any:true}:{})} : {}),
           ...(actor.menuActorSelectedOnly === true ? {selected_only:true} : {}),
           ...(menuItemIndex >= 0 ? { menu_item_index: menuItemIndex } : {}),
           ...(nullableStringField(actor, "cursorForMenu") ? { cursor_for_menu: nullableStringField(actor, "cursorForMenu") } : {}),
@@ -9225,9 +9804,18 @@ function buildMenuScreens(
     if (menuConfig) {
       screen.screen_type = menuConfig.screenType;
       screen.title = menuConfig.title;
+      if(menuConfig.hudBindings) screen.hud_bindings=menuConfig.hudBindings.map(b=>({slot:b.slot,...(b.binding?{binding:b.binding}:{}),...(b.selectedItem?{selected_item:true}:{}),...(b.columns?{columns:b.columns}:{})}));
+      if(menuConfig.pageNavigation) for(const [key,name] of [['previous_page_screen',menuConfig.pageNavigation.previousScreenID],['next_page_screen',menuConfig.pageNavigation.nextScreenID]] as const) {
+        if(!name) continue;
+        const index=sources.findIndex(s=>s.name===name);
+        if(index<0) throw new Error(`Página de menu inexistente: ${name}`);
+        screen[key]=index;
+      }
       if (menuConfig.hudListRows) screen.hud_list_rows = menuConfig.hudListRows;
       if (menuConfig.hudTextColor !== undefined) screen.hud_text_color = menuConfig.hudTextColor;
+      if (menuConfig.hudHeader) { const h=menuConfig.hudHeader; screen.hud_header={x:h.x,y:h.y,width:h.width,background_color:h.backgroundColor,text_color:h.textColor}; }
       if (menuConfig.hudTransparentText) screen.hud_transparent_text = true;
+      if (menuConfig.hudFeedbackInDetails) screen.hud_feedback_in_details = true;
       if (menuConfig.titleTextVariableName) screen.title_text_variable = eventValueRegistries.textVariableIndex(menuConfig.titleTextVariableName);
       if (menuConfig.backgroundAnimation && tilesetPack) {
         const frameIndexes = menuConfig.backgroundAnimation.frameAssetNames
@@ -9522,11 +10110,13 @@ function buildCutsceneScenes(
       audioItems,
       audioPack
     ) ?? [];
+    const exportedActorIndexes = new Map<number, number>();
     const actors = projectArray(data, "actors")
       .filter((actor) => entitySceneName(actor, "actor") === roomName(room, index))
-      .flatMap((actor): EngineExportCutsceneActor[] => {
+      .flatMap((actor, actorIndex): EngineExportCutsceneActor[] => {
         const spriteExport = buildActorEngineSpriteExport(data, actor, spritePack);
         if (!spriteExport) return [];
+        exportedActorIndexes.set(actorIndex, exportedActorIndexes.size);
         const position = entityPosition(actor, "actor");
         return [{
           name: stringField(actor, "name", "Actor"),
@@ -9534,7 +10124,9 @@ function buildCutsceneScenes(
             x: position.x,
             y: position.y
           }),
-          metasprite: spriteExport.metasprite
+          metasprite: spriteExport.metasprite,
+          ...(sceneConfig?.steps?.some(step => step.actorFrames?.some(frame => frame.actorIndex === actorIndex))
+            ? { animation: { asset: spriteExport.metasprite.asset } } : {})
         }];
       });
 
@@ -9585,6 +10177,15 @@ function buildCutsceneScenes(
             to_position: motion.toPosition,
             duration_frames: motion.durationFrames
           }))
+        } : {}),
+        ...(step.actorFrames && step.actorFrames.length > 0 ? {
+          actor_frames: step.actorFrames.map(frame => {
+            const actorIndex = exportedActorIndexes.get(frame.actorIndex);
+            if (actorIndex === undefined || frame.frameIndex < 0) {
+              throw new Error(`Cutscene ${roomName(room, index)}: pose referencia ator ou quadro inválido.`);
+            }
+            return { actor_index: actorIndex, frame_index: frame.frameIndex };
+          })
         } : {})
       };
     });
@@ -9872,6 +10473,7 @@ function buildWorldMapProject(
   if (assetSection?.tile_assets) assetSection.tile_assets = assetSection.tile_assets.filter(name => !pagedNames.has(name));
   const scene = rooms[0];
   const onEnter = scriptForEventName(data, nullableStringField(child(scene, "eventBindings"), "onInit"), events, rooms, dialogues, audioItems, audioPack);
+  const sceneConfig = worldMapSceneConfigFromRuntime(child(scene, "runtime"), child(data, "settings"));
   const startScreen = startMenuScreenIndex(data);
   return {
     initial_node: startRoomIndex(data, rooms),
@@ -9883,8 +10485,9 @@ function buildWorldMapProject(
       { op: "warp_runtime", runtime: "menu", room: startScreen, x: 0, y: 0 }
     ] : [],
     journey_frames: 120,
-    cursor_affine: Boolean(cursorEntry) && worldMapSceneConfigFromRuntime(child(scene, "runtime"), child(data, "settings"))?.cursorAffine === true,
-    embedded_nodes: rooms.length === 1 && (worldMapSceneConfigFromRuntime(child(scene, "runtime"), child(data, "settings"))?.nodes?.length ?? 0) > 0,
+    ...(sceneConfig?.hudLabels ? {hud_labels:sceneConfig.hudLabels} : {}),
+    cursor_affine: Boolean(cursorEntry) && sceneConfig?.cursorAffine === true,
+    embedded_nodes: rooms.length === 1 && (sceneConfig?.nodes?.length ?? 0) > 0,
     save: buildProjectSaveConfig(data),
     nodes,
     dialogue_lines: buildDialogueLines(data, dialogues, audioItems, audioPack),
@@ -10070,6 +10673,10 @@ function resolveDialogueFontAsset(
 }
 
 function buildEngineDialogueUiConfigForExport(data: GBAProjectData): EngineDialogueUiConfig {
+  return memoizeEngineExport(data, "main.buildEngineDialogueUiConfigForExport", () => buildEngineDialogueUiConfigForExportUncached(data));
+}
+
+function buildEngineDialogueUiConfigForExportUncached(data: GBAProjectData): EngineDialogueUiConfig {
   const hudPresentation = deriveHudPresetsWorkspacePresentation(data);
   const hudIconSpritePack = buildAssetcSpritePackGeneration(data);
   const activeHud = hudPresentation.activePreset;
@@ -10101,6 +10708,7 @@ function buildEngineDialogueUiConfigForExport(data: GBAProjectData): EngineDialo
       ...(presetUi.hud_image ? { hud_image: presetUi.hud_image } : {}),
       ...(presetUi.hud_skin ? { hud_skin: presetUi.hud_skin } : {}),
       ...resolveDialogueFontAsset(data, preset.font),
+      ...(child(projectArray(data,"assets").find(a=>a.name===preset.font),"metadata")?.preserveOpaqueColors === true ? {font_preserve_opaque_colors:true} : {}),
       hud_position: preset.position,
       hud_width: preset.width,
       hud_height: preset.height
@@ -10110,21 +10718,31 @@ function buildEngineDialogueUiConfigForExport(data: GBAProjectData): EngineDialo
     hudIconSpritePack?.assetsBySheet[asset]?.name ?? asset
   );
   const hudSceneBindingMap = new Map<string, string>();
-  const sceneSkins = new Map<string, { scene_name: string; box_skin?: string; hud_skin?: string }>();
+  const sceneSkins = new Map<string, { scene_name: string; box_skin?: string; hud_skin?: string; close_bottom_edge?: boolean; full_width_bottom?: boolean; presentation?: "portrait_tab"; runtime_kind?: number }>();
   const addSceneSkin = (sceneName: string, room: Record<string, unknown>, request: { scenePresetId?: unknown; roomPresetId?: unknown } = {}): void => {
     const roomID = stringField(room, "id", stringField(room, "name", ""));
     const resolved = resolveInterfaceTheme(data, roomID);
+    const fullWidth = room.dialogueFullWidth === true ? { full_width_bottom: true as const } : {};
+    const presentation = resolveSceneDialogueUiSettings(data, roomID).presentation === "portrait_tab"
+      ? { presentation: "portrait_tab" as const, runtime_kind: ({topdown:0,platformer:1,isometric:2,menu:3,shmup:4,pointAndClick:5,dungeonCrawler:6,racing:7,cutscene:8,visualNovel:9,worldMap:10,battleRPG:11,battleRpg:11,luta:12} as Record<string,number>)[roomSceneType(room)] ?? 0 } : {};
+
     if (resolved.missing) throw new Error(`Tema de moldura ausente em ${sceneName}: ${resolved.themeId}`);
-    if (!resolved.theme) return;
+    if (!resolved.theme) {
+      if (resolveSceneDialogueUiSettings(data, roomID).presentation === "portrait_tab" || room.dialogueFullWidth === true) sceneSkins.set(sceneName, { scene_name: sceneName, ...presentation, ...fullWidth });
+      return;
+    }
     for (const name of [resolved.theme.boxImage, resolved.theme.hudImage].filter(Boolean)) {
       if (!interfaceSkinAssets(data).some(asset => asset.name === name)) throw new Error(`Moldura ${name} em ${sceneName}: selecione um asset de skin 24×24 válido.`);
     }
     const binding = resolveExplicitHudPresetBinding(data, { ...request, roomID });
-    const boxImage = resolveSceneDialogueUiSettings(data, roomID).boxImage;
+    const sceneDialogueUi = resolveSceneDialogueUiSettings(data, roomID);
+    const boxImage = sceneDialogueUi.boxImage;
     const hudImage = binding?.preset.backgroundImage || resolved.theme.hudImage;
     const ui = resolveHudUiSkin(data, resolveDialogueUiBoxSkin(data, { ...baseDialogueUi, box_image: boxImage, hud_image: hudImage }));
     if ((resolved.theme.boxImage && !ui.box_skin) || (resolved.theme.hudImage && !ui.hud_skin)) throw new Error(`Moldura sem arquivo de skin em ${sceneName}.`);
-    sceneSkins.set(sceneName, { scene_name: sceneName, ...(ui.box_skin ? { box_skin: ui.box_skin } : {}), ...(ui.hud_skin ? { hud_skin: ui.hud_skin } : {}) });
+    const boxAsset = projectArray(data, "assets").find(asset => asset.name === boxImage);
+    const closeBottomEdge = child(boxAsset, "metadata")?.completeFrameBottom === true;
+    sceneSkins.set(sceneName, { scene_name: sceneName, ...presentation, ...fullWidth, ...(ui.box_skin ? { box_skin: ui.box_skin } : {}), ...(ui.hud_skin ? { hud_skin: ui.hud_skin } : {}), ...(closeBottomEdge ? { close_bottom_edge: true } : {}) });
   };
   const addHudSceneBinding = (
     sceneName: string,
@@ -10139,6 +10757,10 @@ function buildEngineDialogueUiConfigForExport(data: GBAProjectData): EngineDialo
     addSceneSkin(sceneName, room, { roomPresetId: room.hudPresetId });
     if (sceneType !== "menu") {
       addHudSceneBinding(sceneName, { roomPresetId: room.hudPresetId });
+    }
+    if (sceneType === "shmup") {
+      const config = shmupSceneConfigFromRuntime(room.runtime, data.settings);
+      for (const wave of config?.wavePlan ?? []) addHudSceneBinding(wave.name, { roomPresetId: room.hudPresetId });
     }
     if (sceneType === "worldMap") {
       const worldMapConfig = worldMapSceneConfigFromRuntime(child(room, "runtime"), projectSettings);
@@ -10178,12 +10800,19 @@ function buildEngineDialogueUiConfigForExport(data: GBAProjectData): EngineDialo
     hud_layouts: hudPresentation.presets.filter(preset => usedHudPresetIDs.has(preset.id)).map((preset) => ({
       id: preset.id,
       mode: preset.mode,
+      ...(preset.selectorImage ? { selector_asset: normalizeHudComponentAsset(preset.selectorImage) } : {}),
+      ...(preset.runtimeTextProfile && preset.runtimeTextProfile !== "standard" ? { text_profile: preset.runtimeTextProfile } : {}),
       components: preset.components.map((component) => ({
         id: component.id,
         kind: component.kind,
         label: component.label,
         text: component.runtimeText ? "" : component.text,
         ...(component.valueBinding ? {value_binding:component.valueBinding} : {}),
+        ...(component.valueVariable ? {value_variable:hudVariableIndex(component.valueVariable)} : {}),
+        ...(component.inventoryItem !== undefined ? {inventory_item:component.inventoryItem} : {}),
+        ...(component.valueMaximum !== undefined ? {value_maximum:component.valueMaximum} : {}),
+        ...(component.textAdvance ? {text_advance:component.textAdvance} : {}),
+        ...(component.foregroundImage ? {foreground_image:true} : {}),
         ...(component.stateAssets ? {state_assets:component.stateAssets.map(normalizeHudComponentAsset)} : {}),
         ...(component.gauge ? {gauge:{empty_asset:normalizeHudComponentAsset(component.gauge.emptyAsset),x:component.gauge.x,y:component.gauge.y,width:component.gauge.width,height:component.gauge.height,reverse:component.gauge.reverse === true}} : {}),
         asset: normalizeHudComponentAsset(component.asset),
@@ -10209,6 +10838,13 @@ function buildEngineDialogueUiConfigForExport(data: GBAProjectData): EngineDialo
 export function buildEngineExportProjectContract(
   data: GBAProjectData,
   options: BuildEngineExportProjectContractOptions = {}
+): EngineExportProjectContract {
+  return withEngineExportContext(() => buildEngineExportProjectContractUncached(normalizeProjectTilemaps(data), options));
+}
+
+function buildEngineExportProjectContractUncached(
+  data: GBAProjectData,
+  options: BuildEngineExportProjectContractOptions
 ): EngineExportProjectContract {
   if (options.developmentStartScene) {
     const { developmentStartScene, ...regularOptions } = options;
@@ -10402,6 +11038,12 @@ export function buildEngineExportProjectContract(
                       "events.progressive_event_runner"
                     ];
   const cameraZoneFeatures = new Set<string>();
+  rooms.forEach(room => {
+    const runtimeKind = resolveSceneRuntimeExport(roomSceneType(room)).kind;
+    if (["battle_rpg", "shmup"].includes(runtimeKind) && nullableStringField(child(room, "eventBindings"), "onHitPlayer")) {
+      features.push(`${runtimeKind}_runtime.player_damage_event`);
+    }
+  });
   rooms.forEach((room) => {
     if (!Array.isArray(room.cameraZones) || room.cameraZones.length === 0) return;
     const runtimeKind = resolveSceneRuntimeExport(roomSceneType(room)).kind;
@@ -10427,6 +11069,9 @@ export function buildEngineExportProjectContract(
   features.push(...runtimeCapabilities.capabilities
     .filter((capability) => capability.enabled)
     .map((capability) => `runtime.capability.${capability.id}`));
+  if (kind === "topdown" || kind === "platformer" || mixedRuntimeKinds.some(runtime => runtime === "topdown" || runtime === "platformer")) {
+    features.push("events.named_animation_keys");
+  }
   if (kind === "topdown" || kind === "platformer" || kind === "isometric" || kind === "mixed") {
     features.push("save.universal_runtime_envelope");
     features.push("audio.runtime_bus_volume");
@@ -10475,12 +11120,46 @@ export function buildEngineExportProjectContract(
   if (buildEngineDialogueUiConfigForExport(data).box_skin || buildEngineDialogueUiConfigForExport(data).scene_skins?.some(skin => skin.box_skin)) {
     features.push("dialogue_box_skin");
   }
+  if (buildEngineDialogueUiConfigForExport(data).scene_skins?.some(skin => skin.presentation === "portrait_tab")) {
+    features.push("dialogue_portrait_tab");
+  }
   if (buildEngineDialogueUiConfigForExport(data).hud_skin || buildEngineDialogueUiConfigForExport(data).scene_skins?.some(skin => skin.hud_skin)) {
     features.push("hud_box_skin");
   }
   if (buildEngineDialogueUiConfigForExport(data).font_image) {
     features.push("dialogue_font");
   }
+  for(const room of projectArray(data,"rooms")) {
+    const config=child(child(room,"runtime"),"config");
+    if(config?.gameplayMode==="tactical" && config.pagedSurface)features.push("isometric_runtime.paged_tactical_surface");
+    if(child(config,"tacticalPresentation")?.compactHud)features.push("isometric_runtime.compact_hud","hud_spaced_text");
+  }
+  for(const room of projectRooms(data)) {
+    const runtime=child(room,"runtime"),config=child(runtime,"config");
+    if(runtime?.type === "racing") {
+      if(config?.challenge)features.push("racing_challenge_progress");
+      if(startMenuScreenIndex(data)>=0)features.push("racing_save_resume");
+    }
+    if(runtime?.type === "menu") {
+      if(config?.hudHeader)features.push("menu_hud_header");
+      if(projectArray(config ?? {},"items").some(item=>child(item,"binding")?.source === "text"))features.push("menu_text_bindings");
+      if(projectArray(config ?? {},"items").some(item=>item.availableRuntime))features.push("menu_runtime_conditions");
+    }
+  }
+  const hudLayouts = buildEngineDialogueUiConfigForExport(data).hud_layouts ?? [];
+  if (hudLayouts.some(layout => layout.text_profile)) features.push("hud_runtime_text_profiles");
+  if (hudLayouts.some(layout => layout.selector_asset) || projectArray(data, "rooms").some(room =>
+    child(room, "runtime")?.type === "menu" && integerField(child(child(room, "runtime"), "config"), "hudListRows", 0) > 0)) {
+    features.push("hud_menu_selector");
+  }
+  if (hudLayouts.some(layout => layout.components.some(component => component.value_variable !== undefined || component.inventory_item !== undefined))) {
+    features.push("hud_project_value_bindings");
+  }
+  if (hudLayouts.some(layout => layout.components.some(component => component.text_advance === 7))) features.push("hud_spaced_text");
+  if (hudLayouts.some(layout => layout.components.some(component => component.text_advance === 6))) {
+    features.push("hud_compact_text");
+  }
+  if (hudLayouts.some(layout => layout.components.some(component => component.foreground_image))) features.push("hud_foreground_images");
   if (buildEngineDialogueUiConfigForExport(data).selector_skin) {
     features.push("dialogue_choice_selector");
   }
@@ -10493,8 +11172,22 @@ export function buildEngineExportProjectContract(
   if (videoAsset || projectUsesRoomAffine(data)) {
     features.push("render.video_composition");
   }
+  if (exportRoomsForKind(data, "menu").some(room => {
+    const config = normalizeMenuSceneConfig(child(child(room, "runtime"), "config"));
+    return config.actionSounds || config.screens?.some(screen => screen.actionSounds);
+  })) features.push("menu_audio_feedback");
+  for(const source of menuScreenSources(exportRoomsForKind(data,"menu"))) {
+    if(source.config?.hudBindings?.length)features.push("menu_hud_bindings");
+    if(source.config?.pageNavigation)features.push("menu_page_navigation");
+  }
+  if(projectArray(data,"actors").some(actor=>normalizeMenuVisibilityConditions(actor.menuVisibilityConditions).length))features.push("menu_actor_visibility_conditions");
+  if(projectArray(data,"events").some(event=>JSON.stringify(event).includes("set_player_speed_profile")))features.push("topdown_run_profile");
   features.push("hardware.gba_native_contract");
   features.push("events.native_authoring_v2");
+  if (exportRoomsForKind(data, "topdown").some(room => {
+    const name = roomBackgroundAssetName(room);
+    return tilesetPack?.packAssets.some(asset => asset.name === tilesetPack.assetsBySheet[name]?.name && asset.kind === "paged_bg");
+  })) features.push("topdown_runtime.paged_background");
   if (advancedTools.compiled.hasResources) {
     features.push("advanced_tools_data");
   }
@@ -10537,9 +11230,14 @@ export function buildEngineExportProjectContract(
   const startRoom = rooms[startGlobalRoomIndex] ?? rooms[0] ?? {};
   const initialRuntime = resolveSceneRuntimeExport(roomSceneType(startRoom)).kind as MixedRuntimeKind;
   const initialRuntimeRooms = isMixedRuntime ? exportRoomsForKind(data, initialRuntime) : rooms;
-  const initialRoom = isMixedRuntime
+  const initialRuntimeRoomIndex = isMixedRuntime
     ? Math.max(0, roomIndexByName(initialRuntimeRooms, roomName(startRoom, startGlobalRoomIndex)))
     : startRoomIndex(data, initialRuntimeRooms);
+  // Embedded menu screens expand a logical scene into multiple native indices.
+  // Match buildMenuScreens so dispatch and the launched adapter describe one scene.
+  const initialRoom = isMixedRuntime && initialRuntime === "menu"
+    ? Math.max(0, menuScreenSources(initialRuntimeRooms).findIndex(source => source.roomIndex === initialRuntimeRoomIndex))
+    : initialRuntimeRoomIndex;
   const mixedSources = [
     "main.cpp",
     ...mixedRuntimeKinds.map((runtime) => `${runtime}_runtime.cpp`)
@@ -10590,7 +11288,7 @@ export function buildEngineExportProjectContract(
     },
     requires: {
       engine_pack: `>=${enginePackVersion}`,
-      features
+      features: Array.from(new Set(features))
     },
     ...(isMixedRuntime
       ? {
@@ -10654,6 +11352,13 @@ export function buildEngineExportProjectContract(
 export function prepareEngineProjectExport(
   data: GBAProjectData,
   options: BuildEngineExportProjectContractOptions = {}
+): PreparedEngineProjectExport {
+  return withEngineExportContext(() => prepareEngineProjectExportUncached(data, options));
+}
+
+function prepareEngineProjectExportUncached(
+  data: GBAProjectData,
+  options: BuildEngineExportProjectContractOptions
 ): PreparedEngineProjectExport {
   try {
     data = projectWithIndependentTacticalResidency(expandProjectTilemaps(data));

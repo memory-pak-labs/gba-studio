@@ -1,4 +1,4 @@
-import { hasPagedWorldMap, PAGED_WORLD_MAP } from './pagedWorldMap.js';
+import { hasPagedBackground, PAGED_WORLD_MAP } from './pagedWorldMap.js';
 import type { GBAProjectData } from "./projectFile.js";
 import { buildGbaHardwareContract, type GbaHardwareSceneContract } from "./gbaHardwareContract.js";
 import { normalizeAffineScenePresentation } from "./affineScene.js";
@@ -1976,7 +1976,7 @@ export function buildScenePreflightReport(
   const requestedProfile = configuredProfile ?? inferredProfile;
   const selectedProfileID = requestedProfile === undefined ? null : profileID(requestedProfile);
   const baseProfile = scenePreflightProfile(type, requestedProfile);
-  const profile = hasPagedWorldMap(data, scene) ? {...baseProfile, budget:{...baseProfile.budget,
+  const profile = hasPagedBackground(data, scene) ? {...baseProfile, budget:{...baseProfile.budget,
     bgTiles:PAGED_WORLD_MAP.maxTileUnits, dmaBytes:PAGED_WORLD_MAP.dmaBudget}} : baseProfile;
   const actors = actorsForScene(data, name);
   const triggers = triggersForScene(data, name);

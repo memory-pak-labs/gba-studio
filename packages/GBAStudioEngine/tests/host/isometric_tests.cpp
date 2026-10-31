@@ -14,6 +14,30 @@ bool load_tiles(const TileAsset&) { return true; }
 
 namespace {
 
+void test_scripted_step_interpolates_and_finishes_without_drift() {
+    gbs::IsoActor actor {}; actor.tile = {3, 3, 0};
+    gbs::IsoActorAnimationState animation {};
+    gbs::IsoScriptedMove move {};
+    gbs::begin_iso_scripted_move(actor, move, {-1, 0});
+    assert(move.active && actor.tile.x == 2 && actor.position_x256 == 768);
+    for (int i = 0; i < 8; ++i) gbs::update_iso_scripted_move(actor, animation, move);
+    assert(actor.position_x256 == 640 && animation.walking);
+    for (int i = 0; i < 8; ++i) gbs::update_iso_scripted_move(actor, animation, move);
+    assert(!move.active && actor.position_x256 == 512 && !animation.walking);
+}
+
+void test_tactical_allies_are_selectable_and_enemy_turns_rotate() {
+    assert(gbs::iso_tactical_can_select_unit(0, false, 0, 2, 0));
+    assert(!gbs::iso_tactical_can_select_unit(0, true, 0, 2, 0));
+    assert(!gbs::iso_tactical_can_select_unit(0, false, 0, 1, 1));
+    assert(!gbs::iso_tactical_can_select_unit(1, false, 1, 3, 1));
+    assert(gbs::iso_tactical_can_select_unit(1, false, 1, 1, 1));
+    assert(gbs::iso_tactical_turn_ordinal(2, 2) == 0);
+    assert(gbs::iso_tactical_turn_ordinal(4, 2) == 1);
+    assert(gbs::iso_tactical_turn_ordinal(6, 2) == 0);
+    assert(gbs::iso_tactical_turn_ordinal(4, 1) == 0);
+}
+
 constexpr gbs::IsoGridConfig grid { 32, 16, gbs::Vec2i { 120, 16 } };
 
 void test_iso_tile_to_screen_uses_2_to_1_projection() {
@@ -1400,7 +1424,19 @@ void test_iso_tactical_audio_cues_have_stable_native_indices() {
 
 } // namespace
 
+void test_tactical_stairs_support_negative_axes_without_crossing_other_edges() {
+    uint8_t flags[9]={},heights[9]={0,2,0,0,1,0,0,0,0},ramps[9]={0,8,0,0,8,0,0,0,0};
+    gbs::IsoTileMap map{flags,3,3,heights,ramps}; gbs::IsoActor a{};a.tile={1,2,0};a.visible=true;
+    assert(gbs::move_iso_actor_by_delta(map,a,{0,-1}));assert(a.tile.z==1);
+    assert(gbs::move_iso_actor_by_delta(map,a,{0,-1}));assert(a.tile.z==2);
+    assert(gbs::move_iso_actor_by_delta(map,a,{0,1}));assert(a.tile.z==1);
+    assert(!gbs::move_iso_actor_by_delta(map,a,{1,0})); // A stair is not a free side exit.
+    assert(gbs::move_iso_actor_by_delta(map,a,{0,1}));assert(a.tile.z==0);
+}
+
 int main() {
+    test_tactical_allies_are_selectable_and_enemy_turns_rotate();
+    test_scripted_step_interpolates_and_finishes_without_drift();
     {
         // Enemy navigation must use the traversable route, not slide towards
         // the target through a wall, and must stop before the occupied tile.
@@ -1525,6 +1561,7 @@ int main() {
     test_render_iso_room_surface_scales_tiles_with_camera_zoom();
     test_render_iso_room_surface_decodes_real_32x16_4bpp_diamond();
     test_render_iso_room_surface_uses_visual_32x32_atlas_slots();
+    test_tactical_stairs_support_negative_axes_without_crossing_other_edges();
     test_sort_iso_draw_list_assigns_front_items_to_lower_oam_indices();
     test_iso_surface_tile_cache_only_reports_changed_hardware_tiles();
     test_iso_actor_uses_one_level_height_map_as_a_ramp();

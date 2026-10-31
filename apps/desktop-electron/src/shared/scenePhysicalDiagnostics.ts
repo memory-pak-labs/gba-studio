@@ -1,4 +1,4 @@
-import { hasPagedWorldMap, PAGED_WORLD_MAP } from './pagedWorldMap.js';
+import { hasPagedBackground, PAGED_WORLD_MAP } from './pagedWorldMap.js';
 import { projectBudgetSceneGroupName, type AssetPackBudgetReport } from "./projectBudget.js";
 import type { GBAProjectData } from "./projectFile.js";
 import {
@@ -366,7 +366,7 @@ function sceneAssetCosts(data: GBAProjectData, scene: SceneRecord | undefined): 
     const identity = stringValue(asset.id) ?? stringValue(asset.name) ?? reference;
     if (usedAssets.has(identity)) return total;
     usedAssets.add(identity);
-    if (metadata.kind === 'paged_bg' && hasPagedWorldMap(data, scene)) {
+    if (metadata.kind === 'paged_bg' && hasPagedBackground(data, scene)) {
       return {bgTiles:total.bgTiles+PAGED_WORLD_MAP.tileUnits,
         tileBytes:total.tileBytes+PAGED_WORLD_MAP.tileBytes,
         paletteColors:total.paletteColors+PAGED_WORLD_MAP.paletteColors};
@@ -393,6 +393,7 @@ function editorEstimate(data: GBAProjectData, scene: SceneRecord | undefined, na
   const visualAssets = sceneAssetCosts(data, scene);
   const bgTiles = visualAssets.bgTiles > 0 ? visualAssets.bgTiles : uniqueBgTiles.size;
   const bgTileBytes = visualAssets.tileBytes > 0 ? visualAssets.tileBytes : uniqueBgTiles.size * 32;
+  const bgMapBytes = hasPagedBackground(data, scene) ? PAGED_WORLD_MAP.mapBytes : 0;
   const bgPaletteColors = visualAssets.paletteColors > 0 ? visualAssets.paletteColors : bgPaletteBanks * 16;
   const paletteColors = bgPaletteColors + (spriteSheets.size * 16);
   const commandCount = eventCommandCount(data, name);
@@ -402,13 +403,13 @@ function editorEstimate(data: GBAProjectData, scene: SceneRecord | undefined, na
     + oam * 8
     + triggers.length * 12
     + commandCount * 4;
-  const dmaBytes = bgTileBytes + objTiles * 32 + paletteColors * 2 + oam * 8;
+  const dmaBytes = bgTileBytes + bgMapBytes + objTiles * 32 + paletteColors * 2 + oam * 8;
   const baseEstimate: Record<ScenePhysicalMetricID, number | null> = {
     bgTiles,
     objTiles,
     oam,
     paletteColors,
-    vramBytes: bgTileBytes + objTiles * 32,
+    vramBytes: bgTileBytes + bgMapBytes + objTiles * 32,
     eventBytes,
     audioBytes: audioBytes(data, scene, name),
     dmaBytes,
@@ -717,7 +718,7 @@ export function deriveScenePhysicalDiagnostics(
   const name = requestedSceneName ?? sceneName(scene);
   const type = sceneType(scene);
   const baseBudget = scenePreflightBudget(scene);
-  const profileBudget = hasPagedWorldMap(data, scene) ? {...baseBudget, bgTiles:PAGED_WORLD_MAP.maxTileUnits, dmaBytes:PAGED_WORLD_MAP.dmaBudget} : baseBudget;
+  const profileBudget = hasPagedBackground(data, scene) ? {...baseBudget, bgTiles:PAGED_WORLD_MAP.maxTileUnits, dmaBytes:PAGED_WORLD_MAP.dmaBudget} : baseBudget;
   const estimate = editorEstimate(data, scene, name);
   const resident = compilerPlan(options.assetPackReport, data, scene, name);
   const catalog = catalogPlan(options.assetPackReport, name);

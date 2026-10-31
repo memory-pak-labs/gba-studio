@@ -3,6 +3,7 @@ import json
 import importlib.util
 import struct
 import subprocess
+import sys
 import tempfile
 import zlib
 from pathlib import Path
@@ -37,7 +38,7 @@ def run_assetc_pack(payload):
         report_path = tmp_path / "report.json"
         pack_path.write_text(json.dumps(payload), encoding="utf-8")
         result = subprocess.run(
-            [str(ASSETC), str(pack_path), "-o", str(report_path), "--pack-json"],
+            [sys.executable, str(ASSETC), str(pack_path), "-o", str(report_path), "--pack-json"],
             cwd=REPO,
             text=True,
             stdout=subprocess.PIPE,
@@ -55,7 +56,7 @@ def run_assetc_export(payload, header_name):
         output_path = tmp_path / "output"
         project_path.write_text(json.dumps(payload), encoding="utf-8")
         result = subprocess.run(
-            [str(ASSETC), str(project_path), "-o", str(output_path), "--export-project-json"],
+            [sys.executable, str(ASSETC), str(project_path), "-o", str(output_path), "--export-project-json"],
             cwd=REPO,
             text=True,
             stdout=subprocess.PIPE,
@@ -73,7 +74,7 @@ def run_assetc_audio(payload):
         output_path = tmp_path / "audio.hpp"
         input_path.write_text(json.dumps(payload), encoding="utf-8")
         result = subprocess.run(
-            [str(ASSETC), str(input_path), "-o", str(output_path), "-n", "audio", "--audio-json"],
+            [sys.executable, str(ASSETC), str(input_path), "-o", str(output_path), "-n", "audio", "--audio-json"],
             cwd=REPO,
             text=True,
             stdout=subprocess.PIPE,
@@ -1189,6 +1190,22 @@ def test_point_click_emits_layered_backgrounds_and_props():
     assert "gbs::Vec2i { 112, 96 }, 3, 1" in header
 
 
+def test_point_click_prop_accepts_the_last_native_event_variable():
+    assetc = load_assetc_module()
+    project = {"scenes": [{"name": "archive", "background": -1, "props": [{
+        "name": "dial", "metasprite": {"asset": "dial", "index": 0},
+        "position": {"x": 48, "y": 64}, "visible_variable": 63, "visible_value": 2,
+    }]}]}
+    header = assetc.emit_point_click_project_data_header(project, sprite_asset_report("dial"))
+    assert "gbs::Vec2i { 48, 64 }, 63, 2" in header
+    project["scenes"][0]["props"][0]["visible_variable"] = 64
+    try:
+        assetc.emit_point_click_project_data_header(project, sprite_asset_report("dial"))
+    except SystemExit:
+        return
+    raise AssertionError("variable 64 must remain outside the native 64-slot save")
+
+
 
 def test_point_click_prop_preserves_the_authored_initial_animation():
     assetc = load_assetc_module()
@@ -1436,7 +1453,16 @@ def test_racing_upload_sources_are_scoped_to_referenced_assets():
     assert '#include "other_scene.hpp"' not in header
     assert "resource_bank_upload_sources," in header
 
+def test_scene_fade_preserves_optional_channel_and_master_preferences():
+    assetc = load_assetc_module()
+    base = {"op": "fade_audio_volume", "channel": "music", "volume": 11, "frames": 30}
+    assert assetc.event_command_from_json(base, "fade") == ("FadeAudioVolume", 0, 11, 30)
+    assert assetc.event_command_from_json({**base, "variable": 16}, "fade") == ("FadeAudioVolume", 0, 11, 30, 17)
+    assert assetc.event_command_from_json({**base, "variable": 16, "other_variable": 17}, "fade") == ("FadeAudioVolume", 0, 11, 30, 4625)
+
+
 def main():
+    test_scene_fade_preserves_optional_channel_and_master_preferences()
     test_referenced_asset_ids_cover_nested_references_and_raw_cpp_symbols()
     test_generated_asset_includes_keep_required_and_explicit_headers()
     test_export_racing_omits_unreferenced_asset_header_without_omitting_asset()
@@ -1468,6 +1494,7 @@ def main():
     test_world_map_background_uses_tilemap_palette_zero_as_backdrop()
     test_point_click_emits_custom_cursor_animations()
     test_point_click_emits_layered_backgrounds_and_props()
+    test_point_click_prop_accepts_the_last_native_event_variable()
     test_point_click_prop_preserves_the_authored_initial_animation()
     test_point_click_project_background_count_is_not_overwritten_by_scene_layers()
     test_replace_tile_sequence_packs_tile_asset_index()

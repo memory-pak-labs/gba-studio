@@ -5,7 +5,43 @@ import { describe, expect, it } from "vitest";
 
 import { writeProjectMemoryReport } from "./projectMemoryReport.js";
 
+const memorySymbols = (bssEnd = 0x03005c8c, ewramEnd = 0x0203fee8) => `
+                0x${bssEnd.toString(16)} __bss_end = .
+                0x${ewramEnd.toString(16)} __ewram_bss_end = .
+                0x03005cfc __stack_bottom = (__stack_top - __system_stack_size)
+                0x03007cfc __stack_top = __svc_stack_bottom
+                0x03007cfc __svc_stack_bottom = (__svc_stack_top - __svc_stack_size)
+                0x03007dfc __svc_stack_top = __irq_stack_bottom
+                0x03007dfc __irq_stack_bottom = (__irq_stack_top - __irq_stack_size)
+                0x03007ffc __irq_stack_top = __irq_handler_slot
+`;
+
 describe("project memory report", () => {
+  it("reports linked memory when a valid export has no asset pack", async () => {
+    const root = await mkdtemp(path.join(os.tmpdir(), "gba-memory-no-assets-"));
+    try {
+      const romPath = path.join(root, "game.gba");
+      await writeFile(romPath, Buffer.alloc(4));
+      await writeFile(path.join(root, "game.map"), memorySymbols(0x03000080, 0x02000900));
+      await writeFile(path.join(root, "export_project.json"), JSON.stringify({ schema: 1, backend: "gbastudio_engine" }));
+      const { report } = await writeProjectMemoryReport({ romPath, assetReportPath: path.join(root, "asset_pack_report.json") });
+      expect(report.ram.iwram.usedBytes).toBeGreaterThan(0);
+      expect(report.resources).toEqual({});
+      expect(report.warnings.join(" ")).toMatch(/asset_pack/);
+    } finally { await rm(root, { recursive: true, force: true }); }
+  });
+
+  it("still rejects a missing asset report when the export declares an asset pack", async () => {
+    const root = await mkdtemp(path.join(os.tmpdir(), "gba-memory-missing-assets-"));
+    try {
+      const romPath = path.join(root, "game.gba");
+      await writeFile(romPath, Buffer.alloc(4));
+      await writeFile(path.join(root, "game.map"), memorySymbols());
+      await writeFile(path.join(root, "export_project.json"), JSON.stringify({ schema: 1, backend: "gbastudio_engine", asset_pack: { assets: [] } }));
+      await expect(writeProjectMemoryReport({ romPath, assetReportPath: path.join(root, "asset_pack_report.json") })).rejects.toThrow();
+    } finally { await rm(root, { recursive: true, force: true }); }
+  });
+
   it("combines post-link ROM/RAM usage with compiled GBA resource pressure", async () => {
     const root = await mkdtemp(path.join(os.tmpdir(), "gba-project-memory-"));
     try {
@@ -20,6 +56,7 @@ Linker script and memory map
  .ewram.runtime.menu 0x02000400 0x300 build/menu_runtime.o
  .ewram.runtime.isometric 0x02000400 0x500 build/isometric_runtime.o
  .iwram.text 0x03000000 0x80 build/irq.o
+${memorySymbols(0x03000080, 0x02000900)}
 `, "utf8");
       await writeFile(assetReportPath, JSON.stringify({
         schema: 13,
@@ -50,11 +87,12 @@ Linker script and memory map
       const artifact = await writeProjectMemoryReport({ assetReportPath, romPath });
 
       expect(artifact.report).toMatchObject({
-        schema: 1,
+        schema: 2,
         rom: { fileBytes: 1024, linkedBytes: 0x300, capacityBytes: 32 * 1024 * 1024 },
         ram: {
           ewram: { usedBytes: 0x900, capacityBytes: 256 * 1024 },
-          iwram: { usedBytes: 0x80, capacityBytes: 32 * 1024 }
+          iwram: { usedBytes: 0x80 + 8964, linkedBytes: 0x80, reservedBytes: 8964, capacityBytes: 32 * 1024 },
+          linkedBytes: 0x980
         },
         resources: {
           bg_tiles: { used: 320, capacity: 896 },
@@ -66,5 +104,58 @@ Linker script and memory map
     } finally {
       await rm(root, { recursive: true, force: true });
     }
+  });
+
+  it("reports the static gap before reserved stacks, alignment and near-full RAM", async () => {
+    const root = await mkdtemp(path.join(os.tmpdir(), "gba-memory-stack-gap-"));
+    try {
+      const romPath = path.join(root, "game.gba"), assetReportPath = path.join(root, "assets.json");
+      await writeFile(romPath, Buffer.alloc(4));
+      await writeFile(assetReportPath, JSON.stringify({ schema: 13 }));
+      await writeFile(path.join(root, "game.map"), `
+Linker script and memory map
+ .bss 0x03000000 0x5c4c build/engine.o
+ .ewram_bss 0x02000000 0x1f2b0 build/engine.o
+ .ewram_runtime_menu 0x0201f2b0 0x1000 build/menu_runtime.o
+ .ewram_runtime_iso 0x0201f2b0 0x20c2c build/isometric_runtime.o
+${memorySymbols()}`);
+      const { report } = await writeProjectMemoryReport({ romPath, assetReportPath });
+      expect(report.ram.iwram).toMatchObject({
+        usedBytes: 32768 - 112, remainingBytes: 112, linkedBytes: 0x5c4c,
+        paddingBytes: 64, reservedBytes: 8964, severity: "warning",
+        stacks: { systemBytes: 8192, irqBytes: 512, supervisorBytes: 256 }
+      });
+      expect(report.ram.ewram).toMatchObject({
+        usedBytes: 262144 - 280, remainingBytes: 280, paddingBytes: 12,
+        reservedBytes: 0, severity: "warning"
+      });
+      expect(report.ram.linkedBytes).toBe(report.ram.iwram.linkedBytes + report.ram.ewram.linkedBytes);
+      expect(report.warnings.join(" ")).toContain("IWRAM");
+      expect(report.warnings.join(" ")).toContain("EWRAM");
+    } finally { await rm(root, { recursive: true, force: true }); }
+  });
+
+  it("does not label an overflowing static region as available RAM", async () => {
+    const root = await mkdtemp(path.join(os.tmpdir(), "gba-memory-overflow-"));
+    try {
+      const romPath = path.join(root, "game.gba"), assetReportPath = path.join(root, "assets.json");
+      await writeFile(romPath, Buffer.alloc(4));
+      await writeFile(assetReportPath, "{}");
+      await writeFile(path.join(root, "game.map"), memorySymbols(0x03005d00, 0x02040004));
+      const { report } = await writeProjectMemoryReport({ romPath, assetReportPath });
+      expect(report.ram.iwram).toMatchObject({ severity: "error", remainingBytes: 0 });
+      expect(report.ram.ewram).toMatchObject({ severity: "error", remainingBytes: 0 });
+    } finally { await rm(root, { recursive: true, force: true }); }
+  });
+
+  it("refuses an incomplete linker map instead of claiming unmeasured headroom", async () => {
+    const root = await mkdtemp(path.join(os.tmpdir(), "gba-memory-incomplete-"));
+    try {
+      const romPath = path.join(root, "game.gba"), assetReportPath = path.join(root, "assets.json");
+      await writeFile(romPath, Buffer.alloc(4));
+      await writeFile(assetReportPath, "{}");
+      await writeFile(path.join(root, "game.map"), "Linker script and memory map\n .bss 0x03000000 0x80 build/main.o");
+      await expect(writeProjectMemoryReport({ romPath, assetReportPath })).rejects.toThrow(/__bss_end|símbolo|symbol/i);
+    } finally { await rm(root, { recursive: true, force: true }); }
   });
 });

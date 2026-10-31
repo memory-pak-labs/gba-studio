@@ -1,3 +1,4 @@
+import { captureBuildEnvironment } from "./buildEnvironment.js";
 import { existsSync } from "node:fs";
 import { createHash } from "node:crypto";
 import { execFile, type ExecFileOptionsWithStringEncoding } from "node:child_process";
@@ -359,7 +360,10 @@ async function prepareGbsbuildRun(options: RunGbsbuildOptions): Promise<Prepared
   const identity = createHash("sha256").update(JSON.stringify([
     await realpath(options.projectDir), path.resolve(originalBuildDir), await realpath(options.enginePackPath)
   ])).digest("hex");
-  const stagingCacheRoot = path.join(os.tmpdir(), "gbastudio-engine-build-cache");
+  // Preserve a space-free alias to external volumes. If the configured temp
+  // path itself contains spaces, use the system temporary directory on POSIX.
+  const temporaryRoot = pathNeedsMakeStaging(os.tmpdir()) && process.platform !== "win32" ? "/tmp" : os.tmpdir();
+  const stagingCacheRoot = path.join(temporaryRoot, "gbastudio-engine-build-cache");
   const stagingRootRaw = path.join(stagingCacheRoot, identity);
   await pruneDiskCache(stagingCacheRoot, stagingCachePolicy);
   const release = await withDiskCacheLock(stagingCacheRoot, () => acquireBuildLock(`${stagingRootRaw}.lock`));
@@ -374,8 +378,11 @@ async function prepareGbsbuildRun(options: RunGbsbuildOptions): Promise<Prepared
   try {
     await mkdir(stagingRootRaw, { recursive: true });
     await touchDiskCacheEntry(stagingRootRaw);
-    // Resolve macOS /var aliases so gbsbuild's echoed paths remap exactly.
-    const stagingRoot = await realpath(stagingRootRaw);
+    // Resolve harmless system aliases, but keep a safe alias when its target
+    // contains spaces (for example an external SSD mounted with a spaced name).
+    const resolvedStagingRoot = await realpath(stagingRootRaw);
+    const stagingRoot = pathNeedsMakeStaging(resolvedStagingRoot) && !pathNeedsMakeStaging(stagingRootRaw)
+      ? stagingRootRaw : resolvedStagingRoot;
     const stagedProjectDir = path.join(stagingRoot, "project");
     const stagedEnginePackPath = path.join(stagingRoot, "engine-pack");
     const stagedBuildDir = path.join(stagingRoot, "build");
@@ -535,6 +542,12 @@ export async function runGbsbuildDryRun(options: RunGbsbuildDryRunOptions): Prom
 }
 
 export async function runGbsbuild(options: RunGbsbuildOptions): Promise<EnginePackBuildResult> {
+  const environment = await captureBuildEnvironment(options).catch(() => undefined);
+  const result = await executeGbsbuild(options);
+  return { ...result, ...(environment ? { environment } : {}) };
+}
+
+async function executeGbsbuild(options: RunGbsbuildOptions): Promise<EnginePackBuildResult> {
   let prepared: PreparedGbsbuildRun;
   try { prepared = await prepareGbsbuildRun(options); } catch (error) {
     return { ran: false, exitCode: null, error: error instanceof Error ? error.message : String(error) };
@@ -654,6 +667,7 @@ export async function runSelectedEnginePackBuild(projectDir: string, enginePackP
   const status = inspectEnginePack({ preferredPath: enginePackPath });
   if (!status.selected?.gbsbuildPath) {
     return {
+      environment: await captureBuildEnvironment({ projectDir, enginePackPath }).catch(() => undefined),
       ran: false,
       exitCode: null,
       error: enginePackMissingMessage(enginePackPath, "gbsbuild")

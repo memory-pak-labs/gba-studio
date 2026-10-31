@@ -2,6 +2,7 @@
 #include "gbs_hw.h"
 
 #include <stdio.h>
+#include <string.h>
 
 namespace gbs {
 
@@ -13,6 +14,28 @@ namespace {
 
 ProfilerRegion s_regions[profiler_max_regions] = {};
 size_t s_region_count = 0;
+uint32_t s_region_start[profiler_max_regions] = {};
+uint32_t s_region_frame[profiler_max_regions] = {};
+uint32_t s_region_last_frame[profiler_max_regions] = {};
+uint32_t s_region_peak_frame[profiler_max_regions] = {};
+uint16_t s_region_depth[profiler_max_regions] = {};
+volatile uint32_t s_irq_ticks = 0;
+volatile uint32_t s_audio_ticks = 0;
+volatile bool s_audio_measured = false;
+uint32_t s_audio_frame_start = 0;
+uint32_t s_frame_irq_start = 0;
+bool s_frame_active = false;
+struct SubsystemTiming {
+    uint32_t start, current, last, peak;
+    uint16_t depth;
+};
+struct SubsystemProfiler {
+    SubsystemTiming regions[static_cast<size_t>(ProfilerSubsystem::Count)];
+    uint32_t irq_start, valid_bits;
+    bool active;
+};
+static_assert(sizeof(SubsystemProfiler) <= 128, "native subsystem profiler RAM budget");
+SubsystemProfiler s_subsystems {};
 uint32_t s_frame_total_ticks = 0;
 uint32_t s_last_frame_total_ticks = 0;
 uint32_t s_frame_count = 0;
@@ -30,56 +53,163 @@ bool s_host_output_enabled = true;
 
 } // namespace
 
+void subsystem_profiler_reset() { s_subsystems = {}; s_irq_ticks = s_audio_ticks = 0; s_audio_measured = false; s_audio_frame_start = 0; }
+
+void subsystem_profiler_record_audio(uint32_t ticks) { s_audio_ticks += ticks; s_audio_measured = true; }
+
+void subsystem_profiler_begin(ProfilerSubsystem subsystem) {
+    const size_t index = static_cast<size_t>(subsystem);
+    if (index >= static_cast<size_t>(ProfilerSubsystem::Count)) return;
+    s_subsystems.valid_bits |= 1u << index;
+    SubsystemTiming& region = s_subsystems.regions[index];
+    if (region.depth++ == 0) region.start = read_ticks();
+}
+
+void subsystem_profiler_end(ProfilerSubsystem subsystem) {
+    const size_t index = static_cast<size_t>(subsystem);
+    if (index >= static_cast<size_t>(ProfilerSubsystem::Count)) return;
+    SubsystemTiming& region = s_subsystems.regions[index];
+    if (region.depth == 0 || --region.depth != 0) return;
+    region.current += read_ticks() - region.start;
+}
+
+void subsystem_profiler_frame_begin() {
+    if (s_subsystems.active) return;
+    s_subsystems.active = true;
+    s_subsystems.irq_start = s_irq_ticks;
+    s_audio_frame_start = s_audio_ticks;
+    for (auto& region : s_subsystems.regions) region.current = 0;
+}
+
+void subsystem_profiler_pause() {
+    for (size_t i = 0; i < static_cast<size_t>(ProfilerSubsystem::Count); ++i) {
+        if (s_subsystems.regions[i].depth == 0) continue;
+        s_subsystems.regions[i].depth = 1;
+        subsystem_profiler_end(static_cast<ProfilerSubsystem>(i));
+    }
+}
+
+void subsystem_profiler_frame_end() {
+    if (!s_subsystems.active) return;
+    subsystem_profiler_pause();
+    if (s_audio_measured) {
+        s_subsystems.regions[static_cast<size_t>(ProfilerSubsystem::Audio)].current += s_audio_ticks - s_audio_frame_start;
+        s_subsystems.valid_bits |= 1u << static_cast<size_t>(ProfilerSubsystem::Audio);
+    }
+    s_subsystems.regions[static_cast<size_t>(ProfilerSubsystem::Interrupts)].current = s_irq_ticks - s_subsystems.irq_start;
+    s_subsystems.valid_bits |= 1u << static_cast<size_t>(ProfilerSubsystem::Interrupts);
+    for (auto& region : s_subsystems.regions) {
+        region.last = region.current;
+        if (region.last > region.peak) region.peak = region.last;
+    }
+    s_subsystems.active = false;
+}
+
+void subsystem_profiler_reset_peaks() {
+    for (auto& region : s_subsystems.regions) region.peak = region.last;
+}
+uint32_t subsystem_profiler_valid_bits() { return s_subsystems.valid_bits; }
+uint32_t subsystem_profiler_frame_ticks(ProfilerSubsystem subsystem) {
+    const size_t index = static_cast<size_t>(subsystem);
+    return index < static_cast<size_t>(ProfilerSubsystem::Count) ? s_subsystems.regions[index].last : 0;
+}
+uint32_t subsystem_profiler_peak_ticks(ProfilerSubsystem subsystem) {
+    const size_t index = static_cast<size_t>(subsystem);
+    return index < static_cast<size_t>(ProfilerSubsystem::Count) ? s_subsystems.regions[index].peak : 0;
+}
+
 void profiler_reset() {
     for (size_t i = 0; i < profiler_max_regions; ++i) {
         s_regions[i] = ProfilerRegion {};
+        s_region_start[i] = s_region_frame[i] = s_region_last_frame[i] = s_region_peak_frame[i] = 0;
+        s_region_depth[i] = 0;
     }
     s_region_count = 0;
-    s_frame_total_ticks = 0;
-    s_last_frame_total_ticks = 0;
-    s_frame_count = 0;
+    s_frame_total_ticks = s_last_frame_total_ticks = s_frame_count = 0;
+    s_irq_ticks = s_frame_irq_start = 0;
+    s_frame_active = false;
 }
 
 uint8_t profiler_begin(const char* label) {
-    if (s_region_count >= profiler_max_regions) {
-        return 0xFF;
+    if (label == nullptr || label[0] == '\0') return 0xFF;
+    size_t index = 0;
+    while (index < s_region_count && strncmp(s_regions[index].label, label, profiler_label_length - 1) != 0) ++index;
+    if (index == s_region_count) {
+        if (s_region_count == profiler_max_regions) return 0xFF;
+        strncpy(s_regions[index].label, label, profiler_label_length - 1);
+        ++s_region_count;
     }
-    const uint8_t index = static_cast<uint8_t>(s_region_count);
-    ProfilerRegion& region = s_regions[index];
-    for (size_t i = 0; i < profiler_label_length - 1 && label != nullptr && label[i] != '\0'; ++i) {
-        region.label[i] = label[i];
-    }
-    s_region_count++;
-    region.last_ticks = read_ticks();
-    return index;
+    if (s_region_depth[index]++ == 0) s_region_start[index] = read_ticks();
+    return static_cast<uint8_t>(index);
 }
 
-void profiler_end(uint8_t region) {
-    if (region >= s_region_count) {
-        return;
-    }
-    ProfilerRegion& r = s_regions[region];
-    const uint32_t now = read_ticks();
-    const uint32_t delta = (now >= r.last_ticks) ? (now - r.last_ticks) : 0;
-    r.last_ticks = now;
-    r.samples++;
-    r.total_ticks += delta;
-    if (r.samples == 1 || delta < r.min_ticks) {
-        r.min_ticks = delta;
-    }
-    if (delta > r.max_ticks) {
-        r.max_ticks = delta;
-    }
+void profiler_end(uint8_t index) {
+    if (index >= s_region_count || s_region_depth[index] == 0) return;
+    if (--s_region_depth[index] != 0) return;
+    ProfilerRegion& region = s_regions[index];
+    const uint32_t delta = read_ticks() - s_region_start[index];
+    region.last_ticks = delta;
+    ++region.samples;
+    region.total_ticks += delta;
+    if (region.samples == 1 || delta < region.min_ticks) region.min_ticks = delta;
+    if (delta > region.max_ticks) region.max_ticks = delta;
+    s_region_frame[index] += delta;
     s_frame_total_ticks += delta;
 }
 
 void profiler_frame_begin() {
+    if (s_frame_active) return;
+    s_frame_active = true;
     s_frame_total_ticks = 0;
+    s_frame_irq_start = s_irq_ticks;
+    for (size_t i = 0; i < profiler_max_regions; ++i) s_region_frame[i] = 0;
+}
+
+void profiler_pause() {
+    // Render callbacks may wait for VBlank internally. Close before that wait,
+    // so idle time and the following frame never become rendering work.
+    for (size_t i = 0; i < s_region_count; ++i) {
+        if (s_region_depth[i] != 0) {
+            s_region_depth[i] = 1;
+            profiler_end(static_cast<uint8_t>(i));
+        }
+    }
 }
 
 void profiler_frame_end() {
+    if (!s_frame_active) return;
+    profiler_pause();
+    const uint8_t irq = profiler_begin("interrupts");
+    if (irq != 0xFF) {
+        s_region_depth[irq] = 0;
+        const uint32_t delta = s_irq_ticks - s_frame_irq_start;
+        s_region_frame[irq] = delta;
+        ProfilerRegion& region = s_regions[irq];
+        region.last_ticks = delta;
+        ++region.samples;
+        region.total_ticks += delta;
+        if (region.samples == 1 || delta < region.min_ticks) region.min_ticks = delta;
+        if (delta > region.max_ticks) region.max_ticks = delta;
+    }
+    for (size_t i = 0; i < s_region_count; ++i) {
+        s_region_last_frame[i] = s_region_frame[i];
+        if (s_region_frame[i] > s_region_peak_frame[i]) s_region_peak_frame[i] = s_region_frame[i];
+    }
     s_last_frame_total_ticks = s_frame_total_ticks;
     ++s_frame_count;
+    s_frame_active = false;
+}
+
+uint32_t profiler_region_frame_ticks(uint8_t index) {
+    return index < s_region_count ? s_region_last_frame[index] : 0;
+}
+
+uint32_t profiler_region_peak_frame_ticks(uint8_t index) {
+    return index < s_region_count ? s_region_peak_frame[index] : 0;
+}
+
+void profiler_reset_frame_peaks() {
+    for (size_t i = 0; i < s_region_count; ++i) s_region_peak_frame[i] = s_region_last_frame[i];
 }
 
 size_t profiler_region_count() {
@@ -247,3 +377,5 @@ LogLevel log_host_last_level() {
 #endif
 
 } // namespace gbs
+
+extern "C" void gbs_profiler_record_irq(uint32_t ticks) { gbs::s_irq_ticks += ticks; }

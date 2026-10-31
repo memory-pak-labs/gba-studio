@@ -1,4 +1,4 @@
-import { access, copyFile, mkdir, readFile, rename, rm, writeFile } from "node:fs/promises";
+import { access, copyFile, mkdir, mkdtemp, readFile, readdir, realpath, rename, rm, stat, writeFile } from "node:fs/promises";
 import { createHash, randomUUID } from "node:crypto";
 import path from "node:path";
 import type { OpenProjectResult } from "../shared/ipc.js";
@@ -20,9 +20,12 @@ import { importGBStudioProject } from "./gbStudioProjectImport.js";
 export interface SaveProjectFileOptions {
   appPath?: string;
   bundledAssetConflictPolicy?: "preserve" | "replace";
+  sourceProjectPath?: string;
+  requireEmptyDestination?: boolean;
 }
 
 const ASSETS_FOLDER_NAME = "Assets";
+export const occupiedProjectDestinationMessage = "A pasta de destino já contém arquivos. Escolha um novo nome ou uma pasta vazia.";
 
 const CURRENT_TEMPLATE_ASSET_FILES: Record<string, string> = {
   "topdown-player-4dir": "sprites/nara-topdown.png",
@@ -47,7 +50,8 @@ export function resolveProjectSaveDestination(
 ): string {
   if (currentPath) return currentPath;
 
-  const slug = projectSlug(projectName);
+  const selectedName = path.basename(selectedPath).replace(/\.gba-project$/i, "");
+  const slug = projectSlug(selectedName || projectName);
   const selectedDirectory = path.dirname(selectedPath);
   const projectDirectory = path.basename(selectedDirectory).toLowerCase() === slug.toLowerCase()
     ? selectedDirectory
@@ -196,6 +200,35 @@ async function materializeBundledDefaultAssets(
   }
 }
 
+/** Prepare the complete asset library before replacing any destination bytes. */
+async function stageProjectAssets(sourceProjectPath: string, destination: string, stagingRoot: string): Promise<void> {
+  const sourceRoot = path.dirname(path.resolve(sourceProjectPath));
+  const sourceAssets = await resolvePluginPathWithinRoot(sourceRoot, ASSETS_FOLDER_NAME);
+  if (!sourceAssets) throw new Error("Assets fora do projeto de origem.");
+  const relativeDestination = path.relative(sourceAssets, await realpath(path.dirname(destination)));
+  if (!relativeDestination || (!relativeDestination.startsWith(`..${path.sep}`) && relativeDestination !== ".." && !path.isAbsolute(relativeDestination))) {
+    throw new Error("O destino de Salvar como não pode ficar dentro de Assets da origem.");
+  }
+  const visiting = new Set<string>();
+  async function copy(relative: string): Promise<void> {
+    const source = await resolvePluginPathWithinRoot(sourceRoot, relative);
+    const target = await resolvePluginPathWithinRoot(stagingRoot, relative);
+    if (!source || !target) throw new Error(`Asset fora do projeto: ${relative}`);
+    const info = await stat(source);
+    if (info.isDirectory()) {
+      if (visiting.has(source)) throw new Error(`Ciclo na pasta de assets: ${relative}`);
+      visiting.add(source);
+      await mkdir(target, { recursive: true });
+      for (const name of await readdir(source)) await copy(path.posix.join(relative, name));
+      visiting.delete(source);
+    } else if (info.isFile()) {
+      await mkdir(path.dirname(target), { recursive: true });
+      await copyFile(source, target);
+    }
+  }
+  if (await fileExists(sourceAssets)) await copy(ASSETS_FOLDER_NAME);
+}
+
 export async function openProjectFile(projectPath: string): Promise<OpenProjectResult> {
   try {
     if (path.extname(projectPath).toLowerCase() === ".gbsproj") {
@@ -267,10 +300,34 @@ async function writeProjectFileAtomically(
   const directory = path.dirname(destination);
   const basename = path.basename(destination);
   const temporaryPath = path.join(directory, `.${basename}.${randomUUID()}.tmp`);
+  const assetsPath = path.join(directory, ASSETS_FOLDER_NAME);
+  let stagingRoot: string | undefined;
+  let assetsBackedUp = false;
+  let assetsInstalled = false;
+
+  // A Save As/first save can resolve to a folder different from the path
+  // checked by the native dialog. Do not replace any existing user files in
+  // that effective destination, even before preparing split resources.
+  const savingSourceInPlace = options.sourceProjectPath !== undefined &&
+    path.resolve(options.sourceProjectPath) === path.resolve(destination);
+  if ((options.requireEmptyDestination || options.sourceProjectPath) && !savingSourceInPlace) {
+    const entries = await readdir(directory, { withFileTypes: true }).catch((error: NodeJS.ErrnoException) => {
+      if (error.code === "ENOENT") return [];
+      throw error;
+    });
+    // A failed copy can leave the empty Assets folder created below. It is
+    // safe to retry, but do not follow an Assets symlink or discard files.
+    const emptyAssetsOnly = entries.length === 1 && entries[0]!.name === ASSETS_FOLDER_NAME &&
+      entries[0]!.isDirectory() && (await readdir(assetsPath)).length === 0;
+    if (entries.length > 0 && !emptyAssetsOnly) {
+      throw new Error(occupiedProjectDestinationMessage);
+    }
+  }
 
   try {
     await mkdir(directory, { recursive: true });
-    await mkdir(path.join(directory, ASSETS_FOLDER_NAME), { recursive: true });
+    if (!await resolvePluginPathWithinRoot(directory, ASSETS_FOLDER_NAME)) throw new Error("Assets fora do projeto de destino.");
+    await mkdir(assetsPath, { recursive: true });
     const buildSettings = projectBuildSettings(project);
     const splitResources = buildSettings.splitProjectResources === true;
     const compactTilemaps = buildSettings.compactTilemaps !== false;
@@ -285,15 +342,34 @@ async function writeProjectFileAtomically(
     } else {
       await writeFile(temporaryPath, serializeGBAProjectFile(project), "utf8");
     }
-    await materializeBundledDefaultAssets(
-      destination,
-      project,
-      options.appPath ?? process.cwd(),
-      options.bundledAssetConflictPolicy ?? "preserve"
-    );
+    const copyAssets = options.sourceProjectPath && path.resolve(path.dirname(options.sourceProjectPath)) !== path.resolve(directory);
+    if (copyAssets) {
+      stagingRoot = await mkdtemp(path.join(directory, ".save-as-"));
+      await stageProjectAssets(options.sourceProjectPath!, destination, stagingRoot);
+      await materializeBundledDefaultAssets(path.join(stagingRoot, basename), project, options.appPath ?? process.cwd(), "preserve");
+      await mkdir(path.join(stagingRoot, ASSETS_FOLDER_NAME), { recursive: true });
+      await rename(assetsPath, path.join(stagingRoot, "previous-assets"));
+      assetsBackedUp = true;
+      await rename(path.join(stagingRoot, ASSETS_FOLDER_NAME), assetsPath);
+      assetsInstalled = true;
+    } else {
+      await materializeBundledDefaultAssets(destination, project, options.appPath ?? process.cwd(),
+        options.sourceProjectPath ? "preserve" : options.bundledAssetConflictPolicy ?? "preserve");
+    }
     await rename(temporaryPath, destination);
   } catch (error) {
     await rm(temporaryPath, { force: true });
+    if (assetsBackedUp && stagingRoot) {
+      try {
+        if (assetsInstalled) await rm(assetsPath, { recursive: true, force: true });
+        await rename(path.join(stagingRoot, "previous-assets"), assetsPath);
+      } catch {
+        // Keep the backup if the filesystem also rejects recovery.
+        throw new Error(`Falha ao restaurar assets; cópia preservada em ${stagingRoot}`, { cause: error });
+      }
+    }
+    if (stagingRoot) await rm(stagingRoot, { recursive: true, force: true });
     throw error;
   }
+  if (stagingRoot) await rm(stagingRoot, { recursive: true, force: true }).catch(() => undefined);
 }

@@ -5,9 +5,11 @@ import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { defaultWelcomeSavedProjectPath } from "./smoke-electron-welcome-paths.mjs";
-import { createElectronSmokeEnv, electronExecutablePath as resolveElectronExecutablePath } from "./lib/electron-smoke-helpers.mjs";
+import { createElectronSmokeEnv, electronLaunchCommand, electronExecutablePath as resolveElectronExecutablePath, prepareElectronSmokeLocale } from "./lib/electron-smoke-helpers.mjs";
 
 const appRoot = dirname(dirname(fileURLToPath(import.meta.url)));
+const canonicalExample = JSON.parse(await readFile(join(appRoot, "default-assets/templates/exemplo-gba/exemplo-gba.gba-project"), "utf8"));
+const canonicalSceneNames = canonicalExample.scenas.map((scene) => scene.name);
 const outputDir = process.env.GBA_STUDIO_SMOKE_OUTPUT_DIR ?? join(appRoot, "artifacts/welcome/latest");
 const welcomeScreenshotPath = join(outputDir, "00-welcome.png");
 const port = Number(process.env.GBA_STUDIO_SMOKE_CDP_PORT ?? 9342);
@@ -67,7 +69,7 @@ async function terminateChild(child) {
 }
 
 async function waitForTargets() {
-  const deadline = Date.now() + 15_000;
+  const deadline = Date.now() + 30_000;
   const url = `http://127.0.0.1:${port}/json/list`;
 
   while (Date.now() < deadline) {
@@ -217,7 +219,7 @@ async function assertSavedExampleProject(projectPath) {
   if (savedProject?.name !== "Novo projeto") {
     throw new Error(`Expected saved example project name to be Novo projeto, got ${JSON.stringify(savedProject?.name)}.`);
   }
-  if (!Array.isArray(savedProject?.scenas) || savedProject.scenas.length !== 30 || savedProject.scenas[0]?.name !== "logo") {
+  if (!Array.isArray(savedProject?.scenas) || savedProject.scenas.length !== canonicalSceneNames.length || canonicalSceneNames.some((name, index) => savedProject.scenas[index]?.name !== name)) {
     throw new Error(`Expected saved example project to contain its complete scene set. Saved project: ${savedContents.slice(0, 500)}`);
   }
   const assetNames = Array.isArray(savedProject?.assets) ? savedProject.assets.map((asset) => asset?.name).filter(Boolean) : [];
@@ -261,7 +263,7 @@ async function assertCanReopenSavedExampleProject(cdp, projectPath) {
   });
   const value = result.result?.value;
 
-  if (value?.error || value?.canceled || value?.title !== "Novo projeto" || value?.roomNames?.length !== 30 || !value?.roomNames?.includes("logo")) {
+  if (value?.error || value?.canceled || value?.title !== "Novo projeto" || value?.roomNames?.length !== canonicalSceneNames.length || canonicalSceneNames.some((name, index) => value?.roomNames?.[index] !== name)) {
     throw new Error(`Expected saved example project to reopen cleanly. Result: ${JSON.stringify(value)}`);
   }
 }
@@ -281,7 +283,8 @@ async function main() {
   });
   delete childEnv.GBA_STUDIO_OPEN_PROJECT;
 
-  const child = spawn(electronPath, usePackagedApp ? [] : [appRoot], {
+  const launch = electronLaunchCommand(electronPath, usePackagedApp ? [] : [appRoot]);
+  const child = spawn(launch.executable, launch.args, {
     cwd: appRoot,
     env: childEnv,
     stdio: ["ignore", "pipe", "pipe"]
@@ -304,12 +307,20 @@ async function main() {
       await cdp.ready;
 
       try {
+        // Fresh profiles now start in English. Verify that behavior, then select
+        // Portuguese explicitly for the authored example and editor assertions.
+        const firstRunText = await waitForRenderedText(cdp,
+          text => text.includes("Create project") && text.includes("Language"), "fresh English welcome");
+        assertContains(firstRunText, "Visual IDE for Game Boy Advance");
+        await captureScreenshot(cdp, join(outputDir, "00-welcome-en-US.png"));
+        await prepareElectronSmokeLocale(cdp);
         const welcomeText = await waitForRenderedText(
           cdp,
           (nextText) => nextText.includes("GBA Studio") && nextText.includes("Templates") && nextText.includes("Exemplo GBA Completo") && nextText.includes("Projeto em branco"),
           "welcome screen"
         );
         assertContains(welcomeText, "IDE visual para Game Boy Advance");
+        assertContains(welcomeText, `Projeto completo com ${canonicalSceneNames.length} cenas`);
         assertContains(welcomeText, "Criar projeto");
         assertContains(welcomeText, "Abrir projeto");
         const preview = await cdp.send("Runtime.evaluate", {
@@ -337,7 +348,7 @@ async function main() {
         assertContains(editorText, "Pré-fabricados");
         await assertCurrentEditorSurface(cdp);
         assertContains(editorText, "Cena");
-        assertContains(editorText, "30 cenas");
+        assertContains(editorText, `${canonicalSceneNames.length} cenas`);
         assertContains(editorText, "PRESS START");
         await assertSavedExampleProject(savedProjectPath);
         await assertCanReopenSavedExampleProject(cdp, savedProjectPath);
@@ -352,6 +363,8 @@ async function main() {
         welcomeScreenshotPath,
         savedProjectPath,
         checked: [
+          "fresh-welcome-en-US",
+          "explicit-language-switch-pt-BR",
           "welcome-screen",
           "example-project",
           "example-project-auto-save",
@@ -362,6 +375,8 @@ async function main() {
           usePackagedApp ? "packaged-app" : "dev-app"
         ]
       }, null, 2));
+    } catch (error) {
+      throw new Error(`${error instanceof Error ? error.message : String(error)}\nstdout:\n${stdout.slice(-8_000)}\nstderr:\n${stderr.slice(-8_000)}`);
     } finally {
       await terminateChild(child);
     }

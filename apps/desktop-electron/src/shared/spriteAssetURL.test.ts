@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import {
+  assetFetchURL,
   desktopAssetURL,
   isDesktopAssetURL,
   parseDesktopAssetURL,
@@ -117,5 +118,20 @@ describe("resolveSpriteAssetURL", () => {
       "Assets/sprites/point-click-cursor.png",
       "point-click-cursor"
     )).toContain("default-assets/templates/exemplo-gba/Assets/sprites/point-click-cursor.png");
+  });
+});
+describe("assetFetchURL", () => {
+  it.each([
+    ["file:///C%3A/Users/Dev/Meu%20jogo/Assets/views.bin", "C:/Users/Dev/Meu jogo/Assets/views.bin"],
+    ["file:///D:/Projetos/L%C3%BAmen/parede.png", "D:/Projetos/Lúmen/parede.png"],
+    ["file:///Users/dev/Meu%20jogo/views.bin", "/Users/dev/Meu jogo/views.bin"],
+    ["file://server/share/Meu%20jogo/views.bin", "//server/share/Meu jogo/views.bin"]
+  ])("converts %s to a scoped fetch URL without corrupting the native path", (url, expected) => {
+    expect(parseDesktopAssetURL(assetFetchURL(url))).toBe(expected);
+  });
+  it("keeps existing scoped and remote URLs unchanged", () => {
+    for (const url of [desktopAssetURL("C:/Game/wall.png"), "https://example.invalid/wall.png"]) {
+      expect(assetFetchURL(url)).toBe(url);
+    }
   });
 });

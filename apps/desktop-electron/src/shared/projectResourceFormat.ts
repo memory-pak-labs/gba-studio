@@ -286,15 +286,22 @@ function expandCompactValue(value: unknown): unknown {
   return value;
 }
 
+function expandRoomGrid(value: unknown, room: Record<string, unknown>): unknown {
+  if (isMetatileSequence(value) && (value.width !== room.width || value.height !== room.height)) {
+    throw new Error("Dimensões do mapa de metatiles diferem da sala.");
+  }
+  return expandCompactValue(value);
+}
+
 function expandRoom(room: Record<string, unknown>): void {
-  room.tilemap = expandCompactValue(room.tilemap);
+  room.tilemap = expandRoomGrid(room.tilemap, room);
   for (const key of compactRoomArrayKeys) {
-    room[key] = expandCompactValue(room[key]);
+    room[key] = expandRoomGrid(room[key], room);
   }
   if (Array.isArray(room.tileLayers)) {
     for (const layer of room.tileLayers) {
       if (!isRecord(layer)) continue;
-      layer.tilemap = expandCompactValue(layer.tilemap);
+      layer.tilemap = expandRoomGrid(layer.tilemap, room);
       layer.tileSourceAssetNames = expandCompactValue(layer.tileSourceAssetNames);
     }
   }
@@ -322,6 +329,25 @@ export function expandProjectTilemaps(project: GBAProjectData): GBAProjectData {
     }
   }
   return next;
+}
+
+/** Preserve in-memory project identity when its grids are already expanded. */
+export function normalizeProjectTilemaps(project: GBAProjectData): GBAProjectData {
+  const compact = (value: unknown) => isCompactSequence(value) || isMetatileSequence(value);
+  for (const collection of ["rooms", "scenas"]) {
+    const rooms = project[collection];
+    if (!Array.isArray(rooms)) continue;
+    for (const room of rooms) {
+      if (!isRecord(room)) continue;
+      if (compact(room.tilemap) || [...compactRoomArrayKeys].some(key => compact(room[key]))) {
+        return expandProjectTilemaps(project);
+      }
+      if (Array.isArray(room.tileLayers) && room.tileLayers.some(layer => (
+        isRecord(layer) && (compact(layer.tilemap) || compact(layer.tileSourceAssetNames))
+      ))) return expandProjectTilemaps(project);
+    }
+  }
+  return project;
 }
 
 function resourceSlug(value: string): string {

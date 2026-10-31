@@ -1,5 +1,3 @@
-import { deriveIsometricWorldSize } from "./isometricAuthoring.js";
-import { normalizeIsometricSceneConfig } from "./sceneTypeProfiles.js";
 
 export interface SceneMapPosition {
   x: number;
@@ -48,6 +46,8 @@ export function clampSceneMapZoom(zoom: number): number {
 }
 
 export function sceneMapContentSize(room: SceneMapRoomLike): SceneMapSize {
+  // The maze is a logical movement grid; its image is a first-person viewport.
+  if(room.sceneType === "dungeonCrawler")return {width:240,height:160};
   const isometricMinimum = room.sceneType === "isometric";
   const minimumWidth = isometricMinimum ? GBA_SCREEN_TILES.width : 1;
   const minimumHeight = isometricMinimum ? GBA_SCREEN_TILES.height : 1;
@@ -97,32 +97,24 @@ export function integerNearestNeighborPreviewFill(
   };
 }
 
-export function sceneMapPreviewContentSize(room: SceneMapRoomLike): SceneMapSize {
-  let source = sceneMapContentSize(room);
-  if (room.sceneType === "isometric") {
-    const runtime = room.runtime as { config?: unknown } | undefined;
-    const config = normalizeIsometricSceneConfig(runtime?.config);
-    const pages = config.tacticalPresentation?.surfacePages ?? [];
-    const bounds = pages.reduce((size, page) => ({
-      minX: Math.min(size.minX, page.world.x),
-      minY: Math.min(size.minY, page.world.y),
-      maxX: Math.max(size.maxX, page.world.x + page.world.width),
-      maxY: Math.max(size.maxY, page.world.y + page.world.height)
-    }), { minX: 0, minY: 0, maxX: 0, maxY: 0 });
-    const surfaceSize = { width: bounds.maxX - bounds.minX, height: bounds.maxY - bounds.minY };
-    const authoredSize = config.worldMode === "static_composition" && room.gbStudioUseBackgroundLayout
-      && (room.backgroundPixelWidth ?? 0) > 0 && (room.backgroundPixelHeight ?? 0) > 0
-      ? { width: room.backgroundPixelWidth!, height: room.backgroundPixelHeight! } : undefined;
-    source = config.pagedSurface ?? (surfaceSize.width > 0 && surfaceSize.height > 0 ? surfaceSize : authoredSize ?? deriveIsometricWorldSize({
-      config, atlasTileHeight: room.backgroundAtlasTileHeight, height: room.height, width: room.width
-    }));
-  }
-  const scale = Math.min(
-    SCENE_MAP_PREVIEW_MAX_SIZE.width / Math.max(1, source.width),
-    SCENE_MAP_PREVIEW_MAX_SIZE.height / Math.max(1, source.height),
-    Math.max(1, SCENE_MAP_CONTENT_UNIT_SIZE.width / Math.max(1, source.width))
-  );
-  return { width: source.width * scale, height: source.height * scale };
+export function sceneMapPreviewContentSize(_room: SceneMapRoomLike): SceneMapSize {
+  return { ...SCENE_MAP_CONTENT_UNIT_SIZE };
+}
+
+export function sceneMapInitialViewportOrigin(room: SceneMapRoomLike & {
+  cameraMode: string;
+  cameraBounds: { x: number; y: number };
+}, player?: { x: number; y: number }): { left: number; top: number } {
+  const world = { width: room.width * 8, height: room.height * 8 };
+  const center = room.cameraMode === "follow_player" && player
+    ? { left: player.x * 8 - 120, top: player.y * 8 - 80 }
+    : room.cameraMode === "fixed_position" || room.cameraMode === "manual"
+      ? { left: room.cameraBounds.x * 8, top: room.cameraBounds.y * 8 }
+      : { left: (world.width - 240) / 2, top: (world.height - 160) / 2 };
+  return {
+    left: Math.max(0, Math.min(world.width - 240, center.left)),
+    top: Math.max(0, Math.min(world.height - 160, center.top))
+  };
 }
 
 export function sceneMapCardSize(room: SceneMapRoomLike): SceneMapSize {
@@ -134,14 +126,10 @@ export function sceneMapCardSize(room: SceneMapRoomLike): SceneMapSize {
 }
 
 export function sceneMapCardChromeSize(zoom: number): SceneMapCardChromeSize {
-  const normalizedZoom = Math.min(1, Math.max(0, (clampSceneMapZoom(zoom) - SCENE_MAP_MIN_ZOOM) / (2 - SCENE_MAP_MIN_ZOOM)));
-  const interpolate = (minimum: number, maximum: number): number => (
-    Math.round((minimum + (maximum - minimum) * normalizedZoom) * 100) / 100
-  );
-
+  const progress = Math.min(1, Math.max(0, (clampSceneMapZoom(zoom) - 0.5) / 1.5));
   return {
-    footerHeight: zoom <= 0.5 ? 0 : interpolate(24, SCENE_MAP_FOOTER_HEIGHT),
-    headerHeight: interpolate(34, SCENE_MAP_HEADER_HEIGHT)
+    footerHeight: zoom <= 0.5 ? 0 : Math.round((26 + (SCENE_MAP_FOOTER_HEIGHT - 26) * progress) * 100) / 100,
+    headerHeight: zoom <= 0.5 ? 34 : Math.round((40 + (SCENE_MAP_HEADER_HEIGHT - 40) * progress) * 100) / 100
   };
 }
 

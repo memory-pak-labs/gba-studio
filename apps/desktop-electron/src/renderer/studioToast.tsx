@@ -1,3 +1,4 @@
+import { uiText as ui, useStudioUiText } from "./studioUiText";
 import { AlertCircle, CheckCircle2, Info } from "lucide-react";
 import React, { createContext, useCallback, useContext, useRef, useState } from "react";
 
@@ -32,16 +33,17 @@ function StudioToastStack({ toasts, onDismiss }: {
   toasts: StudioToastItem[];
   onDismiss(id: string): void;
 }): React.ReactElement | null {
+  const ui = useStudioUiText();
   if (toasts.length === 0) return null;
 
   return (
-    <div aria-live="polite" className="studio-toast-stack" role="region" aria-label="Notificacoes">
+    <div aria-live="polite" className="studio-toast-stack" role="region" aria-label={ui("Notificacoes")}>
       {toasts.map((toast) => (
         <div className={`studio-toast studio-toast--${toast.kind}`} key={toast.id} role="status">
           <span className="studio-toast-icon">{toastIcons[toast.kind]}</span>
-          <span className="studio-toast-message">{toast.message}</span>
+          <span className="studio-toast-message">{ui(toast.message)}</span>
           <button
-            aria-label="Fechar notificacao"
+            aria-label={ui("Fechar notificacao")}
             className="studio-toast-dismiss"
             onClick={() => onDismiss(toast.id)}
             type="button"
@@ -55,6 +57,7 @@ function StudioToastStack({ toasts, onDismiss }: {
 }
 
 export function StudioToastProvider({ children }: { children: React.ReactNode }): React.ReactElement {
+  const ui = useStudioUiText();
   const [toasts, setToasts] = useState<StudioToastItem[]>([]);
   const timeoutsRef = useRef<Map<string, number>>(new Map());
 

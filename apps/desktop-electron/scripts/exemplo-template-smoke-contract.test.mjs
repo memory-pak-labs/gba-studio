@@ -73,7 +73,7 @@ describe("Exemplo template full-project smoke contract", () => {
     expect(source).toContain('Chave do novo diálogo indisponível');
     expect(source).toContain('"editor-events-focus-inspector"');
     expect(source).not.toContain("editPaletteInWorkspace");
-    expect(source).toContain('const duplicatedAsset = await duplicateAssetInWorkspace(cdp);');
+    expect(source).toContain('const duplicatedAsset = await duplicateAssetInWorkspace(cdp, activeBackground.name);');
     expect(source).not.toContain("runSceneButtonCount !== 17");
     expect(source).not.toContain("saved.counts.scenes !== 17");
     expect(source).not.toContain("saved.materializedAssetCount !== 74");
@@ -105,7 +105,7 @@ describe("Exemplo template full-project smoke contract", () => {
     expect(source).not.toContain('assertWorkspace(cdp, "Dialogos"');
     expect(source).not.toContain('assertWorkspace(cdp, "Audio"');
     expect(source).toContain('text.includes("Informações do jogo")');
-    expect(source).toContain('clickButtonByAriaLabel(cdp, "Compilação seção de ajustes")');
+    expect(source).toContain('clickButtonByAriaLabel(cdp, "Seção de ajustes: Compilação")');
     expect(source).toContain('fillInputNearLabel(cdp, "Título"');
     expect(source).not.toContain('fillInputNearLabel(cdp, "Titulo"');
   });
@@ -113,7 +113,7 @@ describe("Exemplo template full-project smoke contract", () => {
   it("edita a folha e os assets ativos das cenas já produzidas", async () => {
     const source = await readFile(new URL("./smoke-electron-exemplo-template.mjs", import.meta.url), "utf8");
 
-    expect(source).toContain('const editedSpriteSheet = "nara-topdown.png";');
+    expect(source).toContain('const editedSpriteSheet = "nara-topdown-walk-run-v1.png";');
     expect(source).toContain('expectedSceneImage("mapa_rota"');
     expect(source).toContain('expectedSceneImage("mercado_suspenso"');
     expect(source).toContain('farol_tema_principal');

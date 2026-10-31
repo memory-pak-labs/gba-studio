@@ -104,7 +104,7 @@ try {
   checks.push({ name: "reset-preserves-language", ok: true });
   await change('.settings-interface-language select', "pt-BR");
   for (const [name, id] of [["Tradução offline", "translationPacks"], ["Créditos", "credits"], ["Atalhos", "shortcuts"], ["Controles", "controls"], ["Plugins", "plugins"], ["MCP local", "mcp"]]) {
-    await click(`[aria-label="${name} seção de ajustes"]`);
+    await click(`[aria-label="Seção de ajustes: ${name}"]`);
     assert(await evaluate(`Boolean(document.querySelector('#settings-section-${id}'))&&!document.querySelector('#settings-section-interface')`), name);
     assert.equal(await evaluate(`document.querySelectorAll('.settings-nav-item[aria-pressed="true"]').length`), 1);
     await capture(`section-${id}`); checks.push({ name: `navigation-${id}`, ok: true });

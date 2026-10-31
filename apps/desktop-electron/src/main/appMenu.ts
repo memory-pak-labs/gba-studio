@@ -1,7 +1,10 @@
-import { app, BrowserWindow, Menu, type MenuItemConstructorOptions } from "electron";
+import { app, Menu, type BrowserWindow, type MenuItemConstructorOptions, type WebContents } from "electron";
 import { ipcChannels, type AppCommand } from "../shared/ipc.js";
+import { translateStudioMessage } from "../shared/studioUiMessages.js";
+import { DEFAULT_APP_LOCALE } from "../shared/appLocale.js";
 
 interface AppMenuOptions {
+  locale?: string;
   appName?: string;
   isMac?: boolean;
   sendCommand(command: AppCommand): void;
@@ -53,6 +56,7 @@ function fileMenu(sendCommand: (command: AppCommand) => void): MenuItemConstruct
         label: "Exportar ROM .gba"
       },
       { type: "separator" },
+      { label: "Fechar", role: "close", accelerator: "CmdOrCtrl+W" },
       { label: "Sair", role: "quit" }
     ]
   };
@@ -123,14 +127,30 @@ export function createAppMenuTemplate(options: AppMenuOptions): MenuItemConstruc
     ]
   });
 
-  return template;
+  const localize = (items: MenuItemConstructorOptions[]): MenuItemConstructorOptions[] => items.map(item => ({
+    ...item,
+    ...(item.label && item.label !== options.appName ? { label: translateStudioMessage(options.locale ?? DEFAULT_APP_LOCALE, item.label) } : {}),
+    ...(Array.isArray(item.submenu) ? { submenu: localize(item.submenu) } : {})
+  }));
+  return localize(template);
 }
 
-export function installAppMenu(): void {
+type AppMenuTarget = Pick<BrowserWindow, "isDestroyed" | "isMinimized" | "restore" | "show" | "focus"> & {
+  webContents: Pick<WebContents, "send">;
+};
+
+export function dispatchAppMenuCommand(target: AppMenuTarget | undefined, command: AppCommand): void {
+  if (!target || target.isDestroyed()) return;
+  if (target.isMinimized()) target.restore();
+  target.show();
+  target.focus();
+  target.webContents.send(ipcChannels.appCommand, command);
+}
+
+export function installAppMenu(locale: string = DEFAULT_APP_LOCALE, getEditorWindow: () => BrowserWindow | undefined = () => undefined): void {
   const sendCommand = (command: AppCommand): void => {
-    const target = BrowserWindow.getFocusedWindow() ?? BrowserWindow.getAllWindows()[0];
-    target?.webContents.send(ipcChannels.appCommand, command);
+    dispatchAppMenuCommand(getEditorWindow(), command);
   };
 
-  Menu.setApplicationMenu(Menu.buildFromTemplate(createAppMenuTemplate({ sendCommand })));
+  Menu.setApplicationMenu(Menu.buildFromTemplate(createAppMenuTemplate({ sendCommand, locale })));
 }

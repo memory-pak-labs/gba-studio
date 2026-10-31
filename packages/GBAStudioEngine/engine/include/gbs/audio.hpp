@@ -435,14 +435,14 @@ constexpr AudioMixCost add_audio_mix_cost(AudioMixCost lhs, AudioMixCost rhs) {
     };
 }
 
-void audio_init();
+void audio_init(bool preserve_mix = false);
 // GBA playback advances on VBlank, independently of game/render frames.
 // Host tests advance one audio frame by calling audio_update().
 void audio_update();
 void set_audio_channel_muted(AudioChannel channel, bool muted);
 bool audio_is_channel_muted(AudioChannel channel);
 bool set_audio_channel_volume(AudioChannel channel, uint8_t volume);
-bool fade_audio_channel_volume(AudioChannel channel, uint8_t target_volume, uint16_t frames);
+bool fade_audio_channel_volume(AudioChannel channel, uint8_t target_volume, uint16_t frames, uint8_t ceiling = 15);
 uint8_t audio_channel_volume(AudioChannel channel);
 uint16_t audio_channel_fade_remaining(AudioChannel channel);
 bool play_sfx(const SfxAsset& asset);

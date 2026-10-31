@@ -1,4 +1,7 @@
+#include "gbs/profiler.hpp"
+#define GBS_DIALOGUE_UI_RUNTIME_KIND 0
 #include "gbs/animation.hpp"
+#include "gbs/event_animation.hpp"
 #include "gbs/audio.hpp"
 #include "gbs/engine.hpp"
 #include "gbs/dialogue.hpp"
@@ -7,9 +10,11 @@
 #include "gbs/event_interactions.hpp"
 #include "gbs/event_threads.hpp"
 #include "gbs/event_adventure.hpp"
+#include "gbs/topdown_run.hpp"
 #include "gbs/interrupt.hpp"
 #include "gbs/link.hpp"
 #include "gbs/project.hpp"
+#include "gbs/paged_background.hpp"
 #include "gbs/render.hpp"
 #include "gbs/resource_manager.hpp"
 #include "gbs/runtime.hpp"
@@ -17,6 +22,9 @@
 #include "gbs/save.hpp"
 #include "gbs/timer.hpp"
 #include "gbs/topdown.hpp"
+#include "gbs/scripted_movement.hpp"
+#include "gbs/motion_checkpoint.hpp"
+#include "gbs/topdown_motion_catalog.hpp"
 #include "gbs/ui.hpp"
 #include "gbs/visual_effects.hpp"
 #ifndef GBS_TOPDOWN_PROJECT_DATA_HEADER
@@ -50,9 +58,13 @@ namespace {
 const gbs::TopDownProjectData& project = gbastudio_project::project;
 
 int current_room = 0;
+bool restored_room_events_pending = false;
 int configured_dialogue_ui_room = -1;
 bool configured_dialogue_ui_affine = false;
 uint16_t room_backdrop_color = 0;
+gbs::PagedBackgroundCache paged_background __attribute__((section(".ewram_bss")));
+bool paged_background_active = false;
+constexpr uint8_t transparent_bg_tile[32] = {};
 gbs::Room room = gbs::room_from_data(project.rooms[0]);
 gbs::Actor player = gbs::actor_from_data(project.player);
 gbs::EventPlayerRuntimeState player_event_runtime { true, 0, 0, 0 };
@@ -60,13 +72,19 @@ gbs::Camera camera = project.camera;
 gbs::EventState event_state __attribute__((section(".ewram_bss")));
 gbs::EventRunner event_runner;
 gbs::EventThreadPool event_threads{};
+gbs::ScriptedMovementPool scripted_movements __attribute__((section(".ewram_bss")));
 gbs::EventScriptQueue event_queue;
 gbs::VisualEffectsController visual_effects;
 gbs::LinkSession link_session;
 
+bool controlled_player_active() {
+    return gbs::topdown_controlled_player_active(project.rooms[current_room], player_event_runtime.active);
+}
+
 const gbs::TopDownActorSpriteData* selected_player_sprite_data();
 const gbs::MetaSprite* player_runtime_metasprite();
 void apply_player_sprite_variant();
+void refresh_player_runtime_animation(int animation_index, bool continue_walk, bool scripted);
 void refresh_player_directional_animation(bool moving);
 
 bool open_link(gbs::LinkRole role, uint16_t timeout_frames) {
@@ -124,7 +142,6 @@ constexpr size_t max_runtime_projectiles = 8;
 constexpr uint16_t projectile_oam_start = npc_oam_start + max_visible_npc_slots * oam_sprites_per_actor;
 constexpr size_t max_trigger_slots = 8;
 constexpr size_t max_tile_effect_slots = 8;
-constexpr size_t max_mutable_room_tiles = 64 * 64;
 constexpr int adventure_callback_on_interact = 0;
 constexpr int adventure_callback_on_room_enter = 1;
 constexpr int adventure_callback_on_room_exit = 2;
@@ -176,10 +193,14 @@ bool npc_touching_player[max_npc_slots] __attribute__((section(".ewram_bss")));
 bool npc_defeat_pending_despawn[max_npc_slots] __attribute__((section(".ewram_bss")));
 gbs::TopDownTriggerState trigger_states[max_trigger_slots];
 gbs::TopDownTriggerState tile_effect_states[max_tile_effect_slots];
-uint16_t mutable_room_visual_tiles[max_mutable_room_tiles] __attribute__((section(".ewram_bss")));
-bool mutable_room_visual_tiles_ready = false;
+gbs::RoomTileEdits room_tile_edits __attribute__((section(".ewram_bss")));
+gbs::RoomTilemapCache room_layer_cache[4];
 gbs::InputState current_input { 0, 0, 0 };
 bool player_moved_this_frame = false;
+gbs::Vec2i player_animation_travelled_pixels { 0, 0 };
+bool player_walk_clip_active = false;
+bool player_script_animation_active = false;
+int player_animation_speed_percent = 100;
 int topdown_initialization_result = 0;
 
 volatile gbs::RuntimeTelemetryBlock& runtime_telemetry = gbs::runtime_telemetry_block();
@@ -261,6 +282,7 @@ struct RuntimeProjectile {
     int sprite_index = -1;
     gbs::SpriteAnimatorState animator{};
     const gbs::TileAsset* loaded_tiles = nullptr;
+    int source_actor_index = 0; // 0 is the player; NPCs use one-based actor indices.
 };
 
 RuntimeProjectile runtime_projectiles[max_runtime_projectiles];
@@ -381,10 +403,13 @@ int default_save_menu_index() {
     return requested >= 0 && static_cast<size_t>(requested) < active_save_slot_count ? requested : 0;
 }
 
-bool topdown_direction_uses_horizontal_flip(uint8_t direction) {
-    return direction == static_cast<uint8_t>(gbs::TopDownActorDirection::Left) ||
-        direction == static_cast<uint8_t>(gbs::TopDownActorDirection::DownLeft) ||
-        direction == static_cast<uint8_t>(gbs::TopDownActorDirection::UpLeft);
+bool topdown_direction_uses_horizontal_flip(uint8_t direction, size_t animation_count) {
+    // The selected directional metasprite already contains its orientation,
+    // including mirrorLeftFromRight resolved by the exporter. Flipping here
+    // would reverse authored left artwork or undo that exported mirror.
+    (void)direction;
+    (void)animation_count;
+    return false;
 }
 
 void set_actor_metasprite(
@@ -432,7 +457,7 @@ void set_actor_metasprite(
             hflip ? !part.hflip : part.hflip,
             part.vflip,
             true,
-            0,
+            2,
             gbs::SpriteRenderMode::Normal,
             gbs::visual_effect_sprite_mosaic_enabled(visual_effects),
             part.width,
@@ -623,6 +648,21 @@ bool pause_menu_has_shop_items() {
     return project.shop_enabled && project.shop_item_count > 0;
 }
 
+const char* configured_inventory_item_label(size_t item) {
+    for (size_t index = 0; index < project.shop_item_count; ++index) {
+        if (project.shop_items[index].item == static_cast<int>(item)) return project.shop_items[index].label;
+        if (project.shop_items[index].currency_item == static_cast<int>(item)) return "MOEDAS";
+    }
+    return nullptr;
+}
+
+void append_inventory_item_label(char*& out, char* end, int item) {
+    if (item < 0) { append_text(out, end, "VAZIO"); return; }
+    const char* label = configured_inventory_item_label(static_cast<size_t>(item));
+    if (label) append_text(out, end, label);
+    else { append_text(out, end, "ITEM "); append_number(out, end, item + 1); }
+}
+
 void refresh_pause_inventory_items() {
     size_t item_count = 0;
     for (size_t index = 0; index < pause_menu_inventory_capacity; ++index) {
@@ -631,8 +671,7 @@ void refresh_pause_inventory_items() {
         }
         char* out = inventory_item_labels[item_count];
         char* end = out + sizeof(inventory_item_labels[item_count]) - 1;
-        append_text(out, end, "ITEM ");
-        append_number(out, end, static_cast<int>(index + 1));
+        append_inventory_item_label(out, end, static_cast<int>(index));
         append_text(out, end, " x");
         append_number(out, end, event_state.inventory[index]);
         *out = '\0';
@@ -989,6 +1028,12 @@ bool stream_resources_for_room(int room_index) {
 
 void load_active_room_visual_tilemap() {
     const gbs::TopDownRoomData& room_data = project.rooms[current_room];
+    if (paged_background_active && room_data.paged_source_tiles == nullptr) {
+        // Slot zero contains art while paging. Restore the static renderer's
+        // transparent tile before loading the next room's own tiles/map.
+        gbs::load_tiles(gbs::TileAsset {transparent_bg_tile, 1, 0, false});
+        paged_background_active = false;
+    }
     if (!room_data.uses_visual_tilemap ||
         room_data.visual_tilemap == nullptr ||
         room_data.visual_tile_asset == nullptr ||
@@ -996,6 +1041,13 @@ void load_active_room_visual_tilemap() {
         return;
     }
     gbs::load_palette(*room_data.visual_palette, false);
+    if (room_data.paged_source_tiles != nullptr) {
+        paged_background_active = true;
+        paged_background.window = {};
+        for (auto& entry : paged_background.map) entry = 0;
+        return; // The ROM atlas is never loaded through the resident tile path.
+    }
+    gbs::set_bg_screen_base(gbs::BackgroundLayer::BG2, 20);
     gbs::load_tiles(*room_data.visual_tile_asset);
     gbs::load_tilemap(gbs::BackgroundLayer::BG2, *room_data.visual_tilemap);
 }
@@ -1006,6 +1058,43 @@ void apply_active_room_video() {
         ? room_data.video
         : project.video;
     gbs::apply_video_composition(composition);
+    if (room_data.paged_source_tiles != nullptr) {
+        gbs::set_ui_character_base(1);
+        gbs::set_bg_character_base(gbs::BackgroundLayer::BG2, 0);
+        gbs::set_bg_screen_base(gbs::BackgroundLayer::BG2, 27);
+        gbs::set_bg_color_depth(gbs::BackgroundLayer::BG2, gbs::ColorDepth::Bpp8);
+        gbs::set_bg_enabled(gbs::BackgroundLayer::BG1, false);
+        gbs::set_bg_enabled(gbs::BackgroundLayer::BG3, false);
+    } else if (!composition.affine_enabled) {
+        gbs::set_ui_character_base(0);
+        gbs::set_bg_character_base(gbs::BackgroundLayer::BG2, 0);
+        gbs::set_bg_color_depth(gbs::BackgroundLayer::BG2, gbs::ColorDepth::Bpp4);
+        gbs::set_bg_screen_base(gbs::BackgroundLayer::BG2, 20);
+    }
+}
+
+gbs::Vec2i update_paged_room_background(gbs::Vec2i camera_position) {
+    const auto& data = project.rooms[current_room];
+    const auto& atlas = *data.paged_source_tiles;
+    const auto& map = *data.visual_tilemap;
+    const auto bounded = gbs::paged_background_camera(map, camera_position);
+    const int changed = gbs::stage_paged_background(paged_background, map, atlas, bounded, &room_tile_edits);
+    if (changed > 128) {
+        gbs::load_bg_tiles_at_character_base(gbs::TileAsset {paged_background.tiles,
+            gbs::paged_background_slot_count, 0, false, gbs::ColorDepth::Bpp8}, 0);
+    } else {
+        // Coalesce adjacent dirty slots; never exhaust the bounded DMA queue
+        // with one transfer per tile on a diagonal step or camera jump.
+        for (int slot = 0; slot < gbs::paged_background_slot_count;) {
+            if (!paged_background.dirty[slot]) { ++slot; continue; }
+            const int first = slot;
+            while (slot < gbs::paged_background_slot_count && paged_background.dirty[slot]) ++slot;
+            gbs::load_bg_tiles_at_character_base(gbs::TileAsset {paged_background.tiles + first * 64,
+                static_cast<uint16_t>(slot - first), static_cast<uint16_t>(first), false, gbs::ColorDepth::Bpp8}, 0);
+        }
+    }
+    if (changed > 0) gbs::load_tilemap(gbs::BackgroundLayer::BG2, gbs::TileMapAsset {paged_background.map, 32, 32});
+    return bounded;
 }
 
 void configure_dialogue_ui_for_active_room(bool force = false) {
@@ -1142,81 +1231,45 @@ void load_project_assets() {
     apply_active_room_video();
 }
 
-size_t active_room_tile_count() {
-    const gbs::TopDownRoomData& room_data = project.rooms[current_room];
-    if (room_data.width_tiles <= 0 || room_data.height_tiles <= 0) {
-        return 0;
-    }
-    const size_t count = static_cast<size_t>(room_data.width_tiles) *
-        static_cast<size_t>(room_data.height_tiles);
-    return count < max_mutable_room_tiles ? count : max_mutable_room_tiles;
-}
-
 void reset_active_room_visual_tiles() {
-    const gbs::TopDownRoomData& room_data = project.rooms[current_room];
-    const size_t count = active_room_tile_count();
-    for (size_t index = 0; index < count; ++index) {
-        mutable_room_visual_tiles[index] = room_data.visual_tiles[index];
-    }
-    for (size_t index = count; index < max_mutable_room_tiles; ++index) {
-        mutable_room_visual_tiles[index] = 0;
-    }
-    mutable_room_visual_tiles_ready = true;
+    gbs::stop_visibility_effect();
+    room_tile_edits = {};
+    for (auto& cache : room_layer_cache) cache = {};
+    room.collision.edits = &room_tile_edits;
 }
 
 const uint16_t* active_room_visual_tiles() {
-    if (!mutable_room_visual_tiles_ready) {
-        reset_active_room_visual_tiles();
-    }
-    return mutable_room_visual_tiles;
-}
-
-bool background_dimensions_for_layer(int layer, int& width, int& height) {
-    for (size_t index = 0; index < project.background_count; ++index) {
-        const gbs::TopDownBackgroundData& background = project.backgrounds[index];
-        if (static_cast<int>(background.layer) != layer) {
-            continue;
-        }
-        if (background.compressed_tilemap != nullptr) {
-            width = background.compressed_tilemap->width;
-            height = background.compressed_tilemap->height;
-        } else {
-            width = background.tilemap.width;
-            height = background.tilemap.height;
-        }
-        return width > 0 && height > 0;
-    }
-    return false;
+    return project.rooms[current_room].visual_tiles;
 }
 
 bool apply_tile_command(const gbs::EventTileCommand& command) {
+    const auto& data = project.rooms[current_room];
+    // BG0 is the original event alias for the scene floor, rendered on BG2.
+    const int layer = command.layer == 0 ? 2 : command.layer;
     for (int offset = 0; offset < command.count; ++offset) {
-        const int x = command.x + offset;
-        const int y = command.y;
-        gbs::EventTileCommand resolved_command = command;
-        resolved_command.tile += offset;
-        const uint16_t tile = gbs::resolve_event_tile(
-            resolved_command,
-            project.tile_assets,
-            project.tile_asset_count
-        );
-        if (command.layer == 0) {
-            const gbs::TopDownRoomData& room_data = project.rooms[current_room];
-            if (x < 0 || y < 0 || x >= room_data.width_tiles || y >= room_data.height_tiles) {
-                continue;
-            }
-            active_room_visual_tiles();
-            const size_t tile_index = static_cast<size_t>(y * room_data.width_tiles + x);
-            if (tile_index < max_mutable_room_tiles) {
-                mutable_room_visual_tiles[tile_index] = tile;
+        const int x = command.x + offset, y = command.y;
+        if (x < 0 || y < 0 || x >= data.width_tiles || y >= data.height_tiles) continue;
+        auto resolved = command;
+        resolved.tile += offset;
+        const uint16_t tile = gbs::resolve_event_tile(resolved, project.tile_assets, project.tile_asset_count);
+        // BG3 remains a project background, outside the room floor/foreground.
+        if (layer == 3) {
+            for (size_t i = 0; i < project.background_count; ++i) {
+                const auto& background = project.backgrounds[i];
+                if (background.layer != gbs::BackgroundLayer::BG3) continue;
+                const int width = background.compressed_tilemap != nullptr
+                    ? background.compressed_tilemap->width : background.tilemap.width;
+                const int height = background.compressed_tilemap != nullptr
+                    ? background.compressed_tilemap->height : background.tilemap.height;
+                gbs::set_bg_tile(gbs::BackgroundLayer::BG3, x, y, width, height, tile);
+                break;
             }
             continue;
         }
-
-        int width = 0;
-        int height = 0;
-        if (background_dimensions_for_layer(command.layer, width, height)) {
-            gbs::set_bg_tile(static_cast<gbs::BackgroundLayer>(command.layer), x, y, width, height, tile);
+        if (!gbs::set_room_tile_edit(room_tile_edits, layer, x, y,
+            data.width_tiles, data.height_tiles, tile, command.collision_flags)) {
+            gbs::debug_assert(false, "room tile edit cap", 32);
+            return false;
         }
     }
     return true;
@@ -1233,7 +1286,7 @@ size_t current_npc_count();
 size_t collect_npc_blocking_actors(size_t npc_index, gbs::Actor* out, size_t capacity);
 size_t collect_active_npc_actors(gbs::Actor* out, size_t* out_indices, size_t capacity);
 gbs::Vec2i projectile_direction_delta(int direction);
-void refresh_npc_directional_animation(size_t index, bool moving);
+void refresh_npc_directional_animation(size_t index, bool moving, bool force = false);
 void consume_push_actor_commands() {
     for(size_t i=0;i<event_state.actor_command_count;++i) {
         const gbs::EventActorCommand& command=event_state.actor_commands[i];
@@ -1252,19 +1305,56 @@ void consume_push_actor_commands() {
     }
 }
 
+void consume_npc_event_commands() {
+    const size_t npc_count = current_npc_count();
+    for (size_t index = 0; index < event_state.actor_command_count; ++index) {
+        const auto& command = event_state.actor_commands[index];
+        gbs::apply_actor_event_command(npc_runtimes, npc_count, command);
+        if (command.actor_index < 0 || static_cast<size_t>(command.actor_index) >= npc_count) continue;
+        const size_t actor_index = static_cast<size_t>(command.actor_index);
+        if (command.op == gbs::EventActorOp::SetDirection) {
+            refresh_npc_directional_animation(actor_index, false, true);
+            event_state.actor_animation_playing[actor_index] = false;
+        } else if (command.op == gbs::EventActorOp::SetAnimation || command.op == gbs::EventActorOp::SetSprite) {
+            event_state.actor_animation_playing[actor_index] = true;
+        }
+    }
+    gbs::reset_event_actor_commands(event_state);
+}
+
 void consume_player_event_commands() {
-    const int previous_sprite_index = player_event_runtime.sprite_index;
+    gbs::consume_visibility_event_commands(event_state);
+    bool direction_requested = false;
     player_event_runtime.x = player.position_pixels.x;
     player_event_runtime.y = player.position_pixels.y;
     player_event_runtime.direction = player.direction;
     for (size_t index = 0; index < event_state.actor_command_count; ++index) {
-        gbs::apply_event_player_command(player_event_runtime, event_state.actor_commands[index]);
-    }
-    if (player_event_runtime.sprite_index != previous_sprite_index) {
-        apply_player_sprite_variant();
+        const auto& command = event_state.actor_commands[index];
+        const int previous_sprite_index = player_event_runtime.sprite_index;
+        gbs::apply_event_player_command(player_event_runtime, command);
+        if (player_event_runtime.sprite_index != previous_sprite_index) {
+            player.direction = static_cast<uint8_t>(player_event_runtime.direction);
+            apply_player_sprite_variant();
+        }
+        if (command.actor_index == gbs::event_player_actor_index && command.op == gbs::EventActorOp::SetAnimation) {
+            event_state.player_animation_changed = false;
+            refresh_player_runtime_animation(command.a, false, true);
+        }
+        gbs::apply_event_player_animation_command(player_animator, player_animation_speed_percent,
+            command);
+        direction_requested = direction_requested || (command.actor_index == gbs::event_player_actor_index
+            && command.op == gbs::EventActorOp::SetDirection);
     }
     player.position_pixels = gbs::Vec2i { player_event_runtime.x, player_event_runtime.y };
     player.direction = static_cast<uint8_t>(player_event_runtime.direction);
+    if (direction_requested && !player_script_animation_active) {
+        player_walk_clip_active = false;
+        refresh_player_directional_animation(false);
+    }
+    if (event_state.player_animation_changed) {
+        refresh_player_runtime_animation(event_state.player_animation_index, false, true);
+        event_state.player_animation_changed = false;
+    }
     event_state.player_x = player.position_pixels.x;
     event_state.player_y = player.position_pixels.y;
     event_state.player_direction = player.direction;
@@ -1367,8 +1457,10 @@ size_t collect_npc_blocking_actors(size_t npc_index, gbs::Actor* out, size_t cap
         return 0;
     }
     size_t count = 0;
-    out[count] = player;
-    ++count;
+    if (project.rooms[current_room].metadata.player_enabled) {
+        out[count] = player;
+        ++count;
+    }
 
     size_t npc_slots[max_active_npc_slots] = {};
     const size_t slot_capacity = (capacity - count) < max_active_npc_slots
@@ -1390,6 +1482,64 @@ size_t collect_npc_blocking_actors(size_t npc_index, gbs::Actor* out, size_t cap
     return count;
 }
 
+void sync_event_player_actor_state();
+
+void consume_scripted_movement_commands() {
+    for (size_t index = 0; index < event_state.actor_command_count; ++index) {
+        const auto& command = event_state.actor_commands[index];
+        if (command.op == gbs::EventActorOp::MoveTo) {
+            if (command.actor_index != gbs::event_player_actor_index &&
+                (command.actor_index < 0 || static_cast<size_t>(command.actor_index) >= current_npc_count())) {
+                if (command.motion_owner) gbs::complete_event_actor_movement(*command.motion_owner, command.motion_token);
+            } else {
+                const gbs::Actor& source = command.actor_index == gbs::event_player_actor_index
+                    ? player : npc_runtimes[command.actor_index].actor;
+                gbs::EventActorCommand resolved {};
+                if (gbs::resolve_scripted_movement_destination(command, source.position_pixels, resolved))
+                    gbs::start_scripted_movement(scripted_movements, resolved);
+                else if (command.motion_owner) gbs::complete_event_actor_movement(*command.motion_owner, command.motion_token);
+            }
+        } else if (command.op == gbs::EventActorOp::CancelMovement) {
+            gbs::cancel_scripted_movement(scripted_movements, command.actor_index);
+        }
+    }
+}
+
+void tick_scripted_movements() {
+    for (auto& motion : scripted_movements.moves) {
+        if (motion.owner == nullptr) continue;
+        const int index = motion.actor_index;
+        const bool is_player = index == gbs::event_player_actor_index;
+        if ((!is_player && (index < 0 || static_cast<size_t>(index) >= current_npc_count() ||
+            !npc_runtimes[index].active || !npc_runtimes[index].visible)) ||
+            (is_player && !controlled_player_active())) {
+            gbs::finish_scripted_movement(motion);
+            continue;
+        }
+        gbs::Actor* target = is_player ? &player : &npc_runtimes[index].actor;
+        const gbs::Vec2i previous = target->position_pixels;
+        gbs::Actor blockers[max_active_npc_slots + 1]{};
+        size_t count = 0;
+        if (is_player) {
+            size_t indices[max_active_npc_slots]{};
+            count = collect_active_npc_actors(blockers, indices, max_active_npc_slots);
+        } else count = collect_npc_blocking_actors(static_cast<size_t>(index), blockers, max_active_npc_slots + 1);
+        const int speed = is_player ? player_event_runtime.movement_speed_x100 :
+            gbs::actor_runtime_movement_speed_x100(project.rooms[current_room].npcs[index], npc_runtimes[index]);
+        const auto result = gbs::tick_scripted_movement(scripted_movements, index, *target,
+            room.collision, speed, blockers, count);
+        const bool moved = previous.x != target->position_pixels.x || previous.y != target->position_pixels.y;
+        if (is_player) {
+            player_moved_this_frame = player_moved_this_frame || moved;
+            refresh_player_directional_animation(moved);
+            sync_event_player_actor_state();
+        } else {
+            refresh_npc_directional_animation(static_cast<size_t>(index), moved);
+        }
+        (void)result;
+    }
+}
+
 void consume_actor_push_commands() {
     const size_t npc_count = current_npc_count();
     for (size_t command_index = 0; command_index < event_state.actor_command_count; ++command_index) {
@@ -1401,8 +1551,10 @@ void consume_actor_push_commands() {
         }
         const size_t npc_index = static_cast<size_t>(command.actor_index);
         size_t blocker_count = 0;
-        push_blocking_actors[blocker_count] = player;
-        ++blocker_count;
+        if (project.rooms[current_room].metadata.player_enabled) {
+            push_blocking_actors[blocker_count] = player;
+            ++blocker_count;
+        }
         for (size_t index = 0; index < npc_count && blocker_count < max_npc_slots; ++index) {
             if (index == npc_index || !npc_runtimes[index].active || !npc_runtimes[index].visible) {
                 continue;
@@ -1453,6 +1605,16 @@ void init_npc_runtime() {
             event_state.actor_update_script_enabled[index] = gbs::has_event_script(room_data.npcs[index].on_update);
         }
     }
+    if (restored_room_events_pending) {
+        restored_room_events_pending = false;
+        gbs::run_event_script_consuming(event_state, room_data.on_restore, +[](gbs::EventState& state, void*) {
+            consume_player_event_commands();
+            consume_npc_event_commands();
+            gbs::clear_event_actor_commands(state);
+            consume_tile_commands();
+            gbs::clear_event_tile_commands(state);
+        });
+    }
 }
 
 void refresh_npc_runtime_animation(size_t index, bool playing) {
@@ -1471,6 +1633,7 @@ void refresh_npc_runtime_animation(size_t index, bool playing) {
     const gbs::SpriteAnimation* next_animation = actor_sprite != nullptr
         ? gbs::topdown_actor_animation_for_index(*actor_sprite, npc_runtimes[index].animation_index)
         : gbs::topdown_npc_animation_for_index(room_data.npcs[index], npc_runtimes[index].animation_index);
+    if (next_animation == nullptr) next_animation = npc_runtimes[index].animation;
     if (next_animation == npc_runtimes[index].animation) {
         if (next_animation != nullptr && playing && !npc_animators[index].playing) {
             gbs::play_sprite_animation(npc_animators[index], *next_animation);
@@ -1491,20 +1654,32 @@ void refresh_npc_runtime_animation(size_t index, bool playing) {
     }
 }
 
-void refresh_player_runtime_animation(int animation_index) {
+void refresh_player_runtime_animation(int animation_index, bool continue_walk = false, bool scripted = false) {
     const gbs::TopDownActorSpriteData* actor_sprite = selected_player_sprite_data();
     const gbs::SpriteAnimation* next_animation = actor_sprite != nullptr
         ? gbs::topdown_actor_animation_for_index(*actor_sprite, animation_index)
         : gbs::topdown_actor_animation_for_index(project.player, animation_index);
-    if (next_animation == nullptr || next_animation == player_animator.animation) {
+    if (next_animation == nullptr) {
         return;
     }
+    if (!continue_walk) player_walk_clip_active = false;
 
-    gbs::init_sprite_animator(player_animator);
-    gbs::play_sprite_animation(player_animator, *next_animation);
+    if (scripted) {
+        player_script_animation_active = true;
+        if (next_animation != player_animator.animation || !player_animator.playing) {
+            gbs::play_sprite_animation(player_animator, *next_animation);
+        }
+        return;
+    }
+    if (next_animation == player_animator.animation) return;
+
+    if (continue_walk) gbs::continue_sprite_animation(player_animator, *next_animation);
+    else gbs::play_sprite_animation(player_animator, *next_animation);
 }
 
 void refresh_player_directional_animation(bool moving) {
+    if (player_script_animation_active && !moving && player_animator.playing) return;
+    player_script_animation_active = false;
     const gbs::TopDownActorSpriteData* actor_sprite = selected_player_sprite_data();
     const size_t animation_count = actor_sprite != nullptr
         ? actor_sprite->animation_count
@@ -1512,7 +1687,19 @@ void refresh_player_directional_animation(bool moving) {
     if (!topdown_has_idle_directional_animations(animation_count)) {
         return;
     }
-    refresh_player_runtime_animation(topdown_directional_animation_index(animation_count, player.direction, moving));
+    const int run_index = gbs::topdown_run_animation_index(animation_count,player.direction,
+        moving && gbs::topdown_profile_running(event_state,current_input));
+    refresh_player_runtime_animation(run_index >= 0 ? run_index : topdown_directional_animation_index(animation_count, player.direction, moving), moving && player_walk_clip_active);
+    player_walk_clip_active = moving;
+}
+
+void update_player_runtime_animation(bool player_moved_this_frame) {
+    if (player_script_animation_active) {
+        gbs::update_sprite_animator_scaled(player_animator, player_animation_speed_percent);
+    } else if (player_moved_this_frame) {
+        gbs::update_sprite_animator_travel(player_animator, player_animation_travelled_pixels, player_animation_speed_percent);
+    }
+    player_animation_travelled_pixels = gbs::Vec2i { 0, 0 };
 }
 
 const gbs::TopDownActorSpriteData* selected_player_sprite_data() {
@@ -1550,6 +1737,9 @@ bool load_streamed_animation_frame_tiles(
 
 void apply_player_sprite_variant() {
     gbs::init_sprite_animator(player_animator);
+    player_walk_clip_active = false;
+    player_script_animation_active = false;
+    player_animation_speed_percent = project.player.animation_speed_percent;
     player_streamed_tile_asset_loaded = nullptr;
     const gbs::TopDownActorSpriteData* actor_sprite = selected_player_sprite_data();
     const gbs::SpriteAnimation* initial_animation = actor_sprite != nullptr
@@ -1562,10 +1752,10 @@ void apply_player_sprite_variant() {
     load_streamed_animation_frame_tiles(player_animator, player_streamed_tile_asset_loaded);
 }
 
-void refresh_npc_directional_animation(size_t index, bool moving) {
+void refresh_npc_directional_animation(size_t index, bool moving, bool force) {
     const gbs::TopDownRoomData& room_data = project.rooms[current_room];
     if (index >= room_data.npc_count ||
-        room_data.npcs[index].movement.kind == gbs::TopDownNpcMovementKind::None) {
+        (!force && room_data.npcs[index].movement.kind == gbs::TopDownNpcMovementKind::None)) {
         return;
     }
 
@@ -1578,6 +1768,14 @@ void refresh_npc_directional_animation(size_t index, bool moving) {
         : room_data.npcs[index].animation_count;
     if (!topdown_has_idle_directional_animations(animation_count)) return;
 
+    const auto& npc = room_data.npcs[index];
+    const auto& runtime = npc_runtimes[index];
+    // Waiting for a discrete movement tick is still part of the current walk
+    // cycle. Selecting idle here would restart a slow patrol every other frame.
+    if (!force && !moving && runtime.movement_frame_counter != 0 && !runtime.movement_cancelled
+        && runtime.active && runtime.visible
+        && gbs::actor_runtime_movement_speed_x100(npc, runtime) > 0) return;
+
     npc_runtimes[index].animation_index = topdown_directional_animation_index(
         animation_count,
         npc_runtimes[index].actor.direction,
@@ -1587,6 +1785,8 @@ void refresh_npc_directional_animation(size_t index, bool moving) {
 }
 
 void sync_event_actor_animation_state() {
+    gbs::set_event_actor_animation_state(event_state, gbs::event_player_actor_index,
+        player_script_animation_active && player_animator.playing);
     const size_t npc_count = current_npc_count();
     for (size_t index = 0; index < npc_count; ++index) {
         if (index >= gbs::max_event_actor_state_slots) {
@@ -1679,7 +1879,12 @@ void sync_runtime_telemetry() {
     runtime_telemetry.trigger_leave_count = runtime_trigger_leave_count;
     runtime_telemetry.room_change_count = runtime_room_change_count;
     runtime_telemetry.blocked_direction_bits = runtime_blocked_direction_bits;
-    gbs::publish_runtime_physical_telemetry(resources, event_state);
+    auto physical = gbs::capture_runtime_physical_telemetry(resources, event_state);
+    if (project.rooms[current_room].paged_source_tiles != nullptr) {
+        physical.bg_tiles += sizeof(paged_background.tiles) / 32;
+        physical.vram_bytes += sizeof(paged_background.tiles) + sizeof(paged_background.map);
+    }
+    gbs::debug_set_runtime_physical_telemetry(physical);
 }
 
 bool queue_script(gbs::EventScript script, bool trigger_room_enter);
@@ -1820,6 +2025,7 @@ bool spawn_runtime_projectile_from_event(int actor_index, int slot_index, int di
     }
     projectile.step_accumulator = 0;
     projectile.source_collision_group = projectile_source_collision_group(actor_index);
+    projectile.source_actor_index = actor_index;
     projectile.sprite_index = event_state.projectile_slot_loaded[slot] ? event_state.projectile_slot_sprite[slot] : -1;
     projectile.loaded_tiles = nullptr;
     gbs::init_sprite_animator(projectile.animator);
@@ -1853,6 +2059,7 @@ gbs::EventScript hit_group_script_for_projectile(const gbs::TopDownRoomData& roo
 
 bool apply_projectile_hit_to_npc(RuntimeProjectile& projectile, size_t npc_index) {
     if (npc_index >= max_npc_slots ||
+        (projectile.source_actor_index > 0 && static_cast<size_t>(projectile.source_actor_index - 1) == npc_index) ||
         !projectile.active ||
         !npc_runtimes[npc_index].active ||
         !npc_runtimes[npc_index].visible) {
@@ -2043,7 +2250,7 @@ gbs::EventScript room_hit_script_for_collision_group(
 
 void queue_npc_player_hit_script(size_t npc_index) {
     const gbs::TopDownRoomData& room_data = project.rooms[current_room];
-    if (npc_index >= current_npc_count() ||
+    if (!room_data.metadata.player_enabled || npc_index >= current_npc_count() ||
         !npc_runtimes[npc_index].active ||
         !npc_runtimes[npc_index].visible ||
         !gbs::intersects(gbs::actor_rect(npc_runtimes[npc_index].actor), gbs::actor_rect(player))) {
@@ -2094,6 +2301,9 @@ uint16_t room_palette_backdrop_color(const gbs::TopDownRoomData& room_data) {
 }
 
 bool apply_room_metadata(bool use_room_player_start) {
+    player.diagonal_step_remainder = 128;
+    player_script_animation_active = false;
+    player_animation_speed_percent = project.player.animation_speed_percent;
     const gbs::TopDownRoomData& room_data = project.rooms[current_room];
     room_backdrop_color = room_palette_backdrop_color(room_data);
     if (room_data.metadata.has_backdrop_color) {
@@ -2117,6 +2327,59 @@ bool apply_room_metadata(bool use_room_player_start) {
     return false;
 }
 
+constexpr uint32_t topdown_motion_checkpoint_magic = 0x314d4454u; // TDM1
+bool topdown_motion_restore_pending = false;
+gbs::UniversalSaveData topdown_motion_pending_data __attribute__((section(".ewram_bss")));
+struct TopDownMotionContext { gbs::TopDownMotionCatalog catalog; };
+int32_t identify_topdown_motion_script(gbs::EventScript script, void* opaque) {
+    return gbs::topdown_motion_identify(script, &static_cast<TopDownMotionContext*>(opaque)->catalog);
+}
+gbs::EventScript resolve_topdown_motion_script(int32_t id, void* opaque) {
+    return gbs::topdown_motion_resolve(id, &static_cast<TopDownMotionContext*>(opaque)->catalog);
+}
+bool validate_topdown_motion_actor(int index, gbs::Vec2i position, int speed, void* opaque) {
+    const auto& catalog=static_cast<TopDownMotionContext*>(opaque)->catalog;
+    if(!catalog.project || !gbs::is_valid_room_index(*catalog.project,catalog.room) || speed<0 || speed>100000) return false;
+    const auto& saved_room=catalog.project->rooms[catalog.room];
+    gbs::Vec2i size{};
+    if(index==gbs::event_player_actor_index) size=catalog.project->player.size_pixels;
+    else if(index>=0 && saved_room.npcs && static_cast<size_t>(index)<saved_room.npc_count) size=saved_room.npcs[index].size_pixels;
+    else return false;
+    return position.x>=0 && position.y>=0 && static_cast<int64_t>(position.x)+size.x<=saved_room.width_tiles*8 &&
+        static_cast<int64_t>(position.y)+size.y<=saved_room.height_tiles*8;
+}
+bool capture_topdown_motion_actor(int index,gbs::Vec2i& position,int& speed,void*) {
+    if(index==gbs::event_player_actor_index) {position=player.position_pixels;speed=player_event_runtime.movement_speed_x100;return true;}
+    if(index<0 || static_cast<size_t>(index)>=current_npc_count())return false;
+    position=npc_runtimes[index].actor.position_pixels;
+    speed=gbs::actor_runtime_movement_speed_x100(project.rooms[current_room].npcs[index],npc_runtimes[index]);return true;
+}
+void apply_topdown_motion_actor(int index,gbs::Vec2i position,int speed,void*) {
+    if(index==gbs::event_player_actor_index) {player.position_pixels=position;player_event_runtime.movement_speed_x100=speed;return;}
+    npc_runtimes[index].actor.position_pixels=position;npc_runtimes[index].movement_speed_x100=speed;
+}
+gbs::MotionCheckpointAccess topdown_motion_access(TopDownMotionContext& context) {
+    return {identify_topdown_motion_script,resolve_topdown_motion_script,capture_topdown_motion_actor,
+        validate_topdown_motion_actor,apply_topdown_motion_actor,&context};
+}
+bool has_topdown_motion_checkpoint(const gbs::UniversalSaveData& data) {
+    if(data.payload_size<sizeof(uint32_t)) return false;
+    gbs::CheckpointPayloadReader reader(data);uint32_t magic=0;
+    return reader.read(magic) && magic==topdown_motion_checkpoint_magic;
+}
+bool read_topdown_motion_checkpoint(const gbs::UniversalSaveData& data, bool validate_only) {
+    if(!has_topdown_motion_checkpoint(data))return data.payload_size==0;
+    TopDownMotionContext context{{&project,data.room_index}};gbs::CheckpointPayloadReader reader(data);uint32_t magic=0;
+    return reader.read(magic) && magic==topdown_motion_checkpoint_magic &&
+        gbs::read_motion_checkpoint(reader,event_state,event_runner,event_wait_frames,active_script_triggers_room_enter,
+            event_threads,event_queue,scripted_movements,topdown_motion_access(context),validate_only);
+}
+bool apply_pending_topdown_motion_checkpoint() {
+    if(!topdown_motion_restore_pending)return true;
+    if(!read_topdown_motion_checkpoint(topdown_motion_pending_data,false))return false;
+    topdown_motion_restore_pending=false;sync_event_player_actor_state();return true;
+}
+
 bool capture_topdown_runtime_state(gbs::UniversalSaveData& data) {
     if (!gbs::make_universal_save_data(
             data,
@@ -2133,12 +2396,20 @@ bool capture_topdown_runtime_state(gbs::UniversalSaveData& data) {
             event_state.equipped_items,
             gbs::universal_save_equipment_slot_count,
             play_time_frames,
-            0,
+            player.direction,
             nullptr,
             0,
             event_state.text_variables,
             gbs::text_variable_count)) {
         return false;
+    }
+    bool moving=false;for(const auto& move:scripted_movements.moves) moving=moving || gbs::scripted_movement_is_live(move);
+    if(moving) {
+        if(dialogue.visible || event_interaction.active)return false;
+        TopDownMotionContext context{{&project,current_room}};gbs::CheckpointPayloadWriter writer(data);
+        if(!writer.write(topdown_motion_checkpoint_magic) ||
+            !gbs::write_motion_checkpoint(writer,event_state,event_runner,event_wait_frames,active_script_triggers_room_enter,
+                event_threads,event_queue,scripted_movements,topdown_motion_access(context)))return false;
     }
     return true;
 }
@@ -2146,8 +2417,8 @@ bool capture_topdown_runtime_state(gbs::UniversalSaveData& data) {
 void persist_runtime_state(int slot_index = current_save_slot_index) {
     if (slot_index < 0 || static_cast<size_t>(slot_index) >= active_save_slot_count) return;
     gbs::UniversalSaveData data {};
-    if (!capture_topdown_runtime_state(data)) return;
-    ++save_sequence;
+    if (!capture_topdown_runtime_state(data)) {if(pause_menu.visible)gbs::hide_menu(pause_menu);gbs::show_checkpoint_save_failure(dialogue);return;}
+    const uint32_t next_sequence=save_sequence+1;
     char title[16] = {};
     title[0] = 'R';
     title[1] = 'O';
@@ -2158,13 +2429,14 @@ void persist_runtime_state(int slot_index = current_save_slot_index) {
     gbs::SaveMetadata metadata = gbs::make_save_metadata(
         title,
         play_time_frames,
-        save_sequence,
+        next_sequence,
         static_cast<uint16_t>(current_room + 1),
         static_cast<uint16_t>(slot_index + 1)
     );
-    if (gbs::write_save_slot_record(gbastudio_project::save_bank, static_cast<size_t>(slot_index), &data, sizeof(data), metadata, save_sequence) == gbs::SaveStatus::Ok) {
+    if (gbs::write_save_slot_record(gbastudio_project::save_bank, static_cast<size_t>(slot_index), &data, sizeof(data), metadata, next_sequence) == gbs::SaveStatus::Ok) {
+        save_sequence=next_sequence;
         current_save_slot_index = slot_index;
-    }
+    } else {if(pause_menu.visible)gbs::hide_menu(pause_menu);gbs::show_checkpoint_backend_failure(dialogue);}
     refresh_pause_menu_items();
     refresh_hud();
 }
@@ -2192,6 +2464,7 @@ bool restore_runtime_state(int slot_index) {
         data.player_y + player.size_pixels.y > room_height_pixels) {
         return false;
     }
+    if (!read_topdown_motion_checkpoint(data,true)) return false;
     if (!stream_resources_for_room(data.room_index)) {
         return false;
     }
@@ -2208,6 +2481,7 @@ bool restore_runtime_state(int slot_index) {
     configure_dialogue_ui_for_active_room();
     reset_active_room_visual_tiles();
     player.position_pixels = gbs::Vec2i { data.player_x, data.player_y };
+    player.direction = static_cast<uint8_t>(data.flags & 3u);
     camera.position_pixels = gbs::Vec2i { data.camera_x, data.camera_y };
     if (!gbs::read_universal_save_common_state(
             data,
@@ -2221,10 +2495,20 @@ bool restore_runtime_state(int slot_index) {
             gbs::text_variable_count)) {
         return false;
     }
+    gbs::clear_scripted_movements(scripted_movements);
+    gbs::stop_event_runner(event_runner);
+    gbs::clear_event_script_queue(event_queue);
+    event_wait_frames = 0;
+    active_script_triggers_room_enter = false;
     reset_event_threads(event_threads, event_state);
     event_interaction = {};
     gbs::hide_menu(event_interaction_menu);
     init_runtime_projectiles();
+    event_state.current_room = current_room;
+    gbs::clear_event_tile_commands(event_state);
+    restored_room_events_pending = true;
+    topdown_motion_restore_pending=has_topdown_motion_checkpoint(data);
+    if(topdown_motion_restore_pending)topdown_motion_pending_data=data;
     refresh_hud();
     return true;
 }
@@ -2244,6 +2528,7 @@ void refresh_event_save_slot_statuses() {
 }
 
 uint16_t backdrop_color_for_player_effects() {
+    if (!project.rooms[current_room].metadata.player_enabled) return room_backdrop_color;
     uint8_t effects = gbs::tile_effects_for_actor(
         room.collision,
         player,
@@ -2269,9 +2554,14 @@ bool apply_warp(const gbs::WarpResult& warp) {
         return false;
     }
 
+    // A gesture belongs to the room where it was started. A new request in
+    // the same event batch still belongs to the destination room.
+    if (!event_state.actor_gesture_changed) event_state.actor_gesture_frames = 0;
+
     int previous_room = current_room;
     const int selected_player_sprite_index = player_event_runtime.sprite_index;
     current_room = warp.room_index;
+    gbs::clear_scripted_movements(scripted_movements);
     gbs::reset_event_threads(event_threads,event_state);
     for(auto& text:event_state.draw_text) text=gbs::EventDrawText{};
     event_interaction=gbs::EventInteractionState{};gbs::hide_menu(event_interaction_menu);
@@ -2425,7 +2715,7 @@ void refresh_event_interaction_menu() {
         for(int i=0;i<event_interaction.slots;++i) {
             char* out=event_interaction_labels[i];char* end=out+31;
             append_text(out,end,"SLOT ");append_number(out,end,i+1);
-            append_text(out,end," / ");append_number(out,end,event_state.equipped_items[i]+1);*out='\0';
+            append_text(out,end," / ");append_inventory_item_label(out,end,event_state.equipped_items[i]);*out='\0';
             event_interaction_items[count++]={event_interaction_labels[i],i,true};
         }
     } else {
@@ -2433,7 +2723,7 @@ void refresh_event_interaction_menu() {
         for(size_t i=0;i<gbs::max_event_inventory_items;++i) {
             if(event_state.inventory[i]<=0) continue;
             char* out=event_interaction_labels[count];char* end=out+31;
-            append_text(out,end,"ITEM ");append_number(out,end,static_cast<int>(i+1));
+            append_inventory_item_label(out,end,static_cast<int>(i));
             append_text(out,end," x");append_number(out,end,event_state.inventory[i]);*out='\0';
             event_interaction_items[count]={event_interaction_labels[count],static_cast<int>(i),true};++count;
         }
@@ -2461,12 +2751,49 @@ void update_unpaused_event_interaction_world() {
     size_t slots[max_active_npc_slots]{};
     const size_t count=collect_camera_npc_slots(slots,max_active_npc_slots,active_npc_viewport_margin_pixels);
     for(size_t i=0;i<count;++i) {
-        const size_t actor=slots[i];gbs::Actor blockers[max_active_npc_slots+1]{};
+        const size_t actor=slots[i];
+        if (gbs::has_scripted_movement(scripted_movements, static_cast<int>(actor))) continue;
+        gbs::Actor blockers[max_active_npc_slots+1]{};
         const size_t blocker_count=collect_npc_blocking_actors(actor,blockers,max_active_npc_slots+1);
         const bool moved=gbs::update_actor_runtime_ai(data.npcs[actor],npc_runtimes[actor],room.collision,player,blockers,blocker_count);
         refresh_npc_directional_animation(actor,moved);
     }
     update_topdown_quests();
+}
+
+void consume_topdown_actor_gesture() {
+    event_state.actor_gesture_changed = false;
+}
+
+void tick_topdown_actor_gesture() {
+    if (event_state.actor_gesture_frames > 0) --event_state.actor_gesture_frames;
+}
+
+void draw_topdown_actor_gesture(gbs::Vec2i render_camera) {
+    const int index = event_state.actor_gesture_index;
+    const gbs::DialogueEmoteEntry* assets = gbastudio_project::dialogue_emote_assets;
+    if (event_state.actor_gesture_frames <= 0 || index < 0 ||
+        static_cast<size_t>(index) >= gbastudio_project::dialogue_emote_asset_count ||
+        assets == nullptr) return;
+    const gbs::MetaSprite* emote = assets[index].metasprite;
+    if (emote == nullptr || emote->part_count > 128 - gbs::dialogue_emote_oam_index) return;
+    const int target = event_state.actor_gesture_actor;
+    if (!gbs::event_actor_effect_visible(event_state, target)) return;
+    gbs::Vec2i position {};
+    if (target == gbs::event_player_actor_index) {
+        if (!controlled_player_active()) return;
+        position = player.position_pixels;
+    } else {
+        if (target < 0 || static_cast<size_t>(target) >= current_npc_count() ||
+            !npc_runtimes[target].active || !npc_runtimes[target].visible) return;
+        position = npc_runtimes[target].actor.position_pixels;
+    }
+    position.x -= render_camera.x;
+    // Actor coordinates mark the lower part of the character. Raise the
+    // gesture anchor so the emote sits above the character's head.
+    position.y -= render_camera.y + 16;
+    gbs::set_metasprite(gbs::dialogue_emote_oam_index, *emote,
+        gbs::dialogue_emote_position_pixels(position));
 }
 
 void consume_event_outputs(bool trigger_room_enter) {
@@ -2579,17 +2906,13 @@ void consume_event_outputs(bool trigger_room_enter) {
         gbs::fade_audio_channel_volume(
             audio_channel_for_event_value(event_state.audio_fade_channel),
             static_cast<uint8_t>(event_state.audio_fade_target_volume),
-            static_cast<uint16_t>(event_state.audio_fade_frames)
+            static_cast<uint16_t>(event_state.audio_fade_frames), static_cast<uint8_t>(event_state.audio_fade_ceiling_volume)
         );
         event_state.audio_fade_changed = false;
     }
     if (event_state.all_sprites_visible_changed) {
         all_sprites_visible = event_state.all_sprites_visible;
         event_state.all_sprites_visible_changed = false;
-    }
-    if (event_state.player_animation_changed) {
-        refresh_player_runtime_animation(event_state.player_animation_index);
-        event_state.player_animation_changed = false;
     }
     if (event_state.player_bounce_requested) {
         player_bounce_frames = event_state.player_bounce_frames;
@@ -2630,13 +2953,19 @@ void consume_event_outputs(bool trigger_room_enter) {
             if (event_state.save_request == 1) {
                 persist_runtime_state(requested_slot);
             } else if (event_state.save_request == 2) {
+#if GBS_MULTI_RUNTIME
+                const gbs::RuntimeAvailabilityMask available = gbs::active_runtime_availability();
+                gbs::request_universal_save_restore(gbastudio_project::save_bank, requested_slot,
+                    available != 0 ? available : gbs::runtime_availability(gbs::RuntimeKind::TopDown));
+#else
                 if (restore_runtime_state(requested_slot)) {
                     apply_room_metadata(false);
                     init_npc_runtime();
                     init_trigger_states();
                     reset_npc_player_hit_state();
-                    room_changed = true;
+                    if(!apply_pending_topdown_motion_checkpoint()) gbs::show_checkpoint_restore_failure(dialogue);
                 }
+#endif
             } else if (event_state.save_request == 3) {
                 gbs::clear_save_slot(gbastudio_project::save_bank, static_cast<size_t>(requested_slot));
                 refresh_pause_menu_items();
@@ -2719,10 +3048,11 @@ void consume_event_outputs(bool trigger_room_enter) {
     }
 
     const size_t npc_count = current_npc_count();
+    consume_scripted_movement_commands();
     consume_push_actor_commands();
     consume_player_event_commands();
     consume_actor_push_commands();
-    gbs::consume_actor_event_commands(npc_runtimes, npc_count, event_state);
+    consume_npc_event_commands();
     for (size_t index = 0; index < npc_count; ++index) {
         const bool animation_requested = index < gbs::max_event_actor_state_slots
             && event_state.actor_animation_playing[index];
@@ -2744,6 +3074,7 @@ void consume_event_outputs(bool trigger_room_enter) {
         event_state.last_script = -1;
     }
 
+    if (event_state.actor_gesture_changed) consume_topdown_actor_gesture();
     if (room_changed && trigger_room_enter) {
         if (!queue_adventure_callback(adventure_callback_on_room_enter, false)) {
             queue_script(project.rooms[current_room].on_enter, true);
@@ -2887,7 +3218,7 @@ void queue_actor_update_scripts() {
 }
 
 void queue_actor_start_scripts() {
-    queue_script(project.player.on_start, false);
+    if (project.rooms[current_room].metadata.player_enabled) queue_script(project.player.on_start, false);
     const gbs::TopDownRoomData& room_data = project.rooms[current_room];
     const size_t npc_count = current_npc_count();
     for (size_t index = 0; index < npc_count; ++index) {
@@ -2896,7 +3227,7 @@ void queue_actor_start_scripts() {
 }
 
 void queue_player_update_script() {
-    queue_script(project.player.on_update, false);
+    if (project.rooms[current_room].metadata.player_enabled) queue_script(project.player.on_update, false);
 }
 
 void queue_script(gbs::EventScript script) {
@@ -2917,6 +3248,8 @@ int initialize_topdown_runtime() {
     }
 
     gbs::init_event_state(event_state);
+    event_state.supports_temporal_actor_motion = true;
+    gbs::bind_event_scripts(event_state, project.scripts, project.script_count);
     gbs::init_visual_effects(visual_effects);
     bool runtime_entry = false;
     bool restore_entry = false;
@@ -2940,6 +3273,7 @@ int initialize_topdown_runtime() {
         return -1;
     }
     room = gbs::room_from_data(project.rooms[current_room]);
+    reset_active_room_visual_tiles();
     player = gbs::actor_from_data(project.player);
     if (runtime_entry) {
         player.position_pixels = gbs::Vec2i { entry_x, entry_y };
@@ -2948,6 +3282,9 @@ int initialize_topdown_runtime() {
 
     gbs::debug_reset();
     gbs::reset_runtime_telemetry();
+    // Standalone top-down ROMs do not pass through the mixed-runtime dispatcher.
+    // Publish the same runtime identity for the Player and debugger.
+    gbs::debug_set_runtime_kind(static_cast<int32_t>(gbs::RuntimeKind::TopDown));
     runtime_trigger_enter_count = 0;
     runtime_trigger_leave_count = 0;
     runtime_room_change_count = 0;
@@ -2977,11 +3314,16 @@ int initialize_topdown_runtime() {
     if (resumed_pause) {
         camera.position_pixels = gbs::Vec2i { paused_data.camera_x, paused_data.camera_y };
         play_time_frames = paused_data.play_time_frames;
+        restored_room_events_pending = true;
+        topdown_motion_restore_pending=has_topdown_motion_checkpoint(paused_data);
+        if(topdown_motion_restore_pending)topdown_motion_pending_data=paused_data;
     }
     if (!room_handled_music && project.music_asset_count > 0) {
         gbs::play_music(project.music_assets[0]);
     }
     gbs::init_sprite_animator(player_animator);
+    player_walk_clip_active = false;
+    player_script_animation_active = false;
     if (project.player.animation != nullptr) {
         gbs::play_sprite_animation(player_animator, *project.player.animation);
     }
@@ -2990,6 +3332,7 @@ int initialize_topdown_runtime() {
     init_trigger_states();
     reset_npc_player_hit_state();
     gbs::init_event_runner(event_runner);
+    gbs::clear_scripted_movements(scripted_movements);
     gbs::reset_event_threads(event_threads,event_state);
     event_interaction=gbs::EventInteractionState{};
     gbs::init_menu(event_interaction_menu);
@@ -3009,8 +3352,8 @@ int initialize_topdown_runtime() {
         gbastudio_project::dialogue_emote_assets,
         gbastudio_project::dialogue_emote_asset_count
     );
-    configure_dialogue_ui_for_active_room(true);
     gbs::configure_dialogue_font(gbastudio_project::dialogue_font);
+    configure_dialogue_ui_for_active_room(true);
     gbs::init_hud(hud);
     gbs::init_overlay(overlay);
     gbs::init_menu(pause_menu);
@@ -3024,7 +3367,8 @@ int initialize_topdown_runtime() {
         0
     };
     refresh_hud();
-    if (!resumed_pause) {
+    if(!apply_pending_topdown_motion_checkpoint()) return -1;
+    if (!resumed_pause && !restored_save) {
         queue_script(project.rooms[current_room].on_enter, true);
         queue_actor_start_scripts();
     }
@@ -3037,6 +3381,18 @@ int initialize_topdown_runtime() {
     return 0;
 }
 
+#ifdef GBS_MULTI_RUNTIME
+bool topdown_transition_ready() {
+    if (gbs::runtime_transition_target() != gbs::RuntimeKind::Menu || event_state.scene_stack_count == 0) return true;
+    gbs::UniversalSaveData data {};
+    const bool captured = capture_topdown_runtime_state(data);
+    if (gbs::checkpoint_allow_menu_transition(event_state, captured)) return true;
+    gbs::reset_scene_transition_visual_effects();
+    gbs::show_checkpoint_menu_failure(dialogue);
+    return false;
+}
+#endif
+
 gbs::RuntimeAdapterFrameResult update_topdown_runtime(const gbs::RuntimeFrameContext& context) {
     (void)context;
     if (topdown_initialization_result != 0) {
@@ -3047,23 +3403,27 @@ gbs::RuntimeAdapterFrameResult update_topdown_runtime(const gbs::RuntimeFrameCon
         gbs::debug_begin_frame(gbs::frame_count());
         debug_work_units = 0;
         player_moved_this_frame = false;
+        player_animation_travelled_pixels = gbs::Vec2i { 0, 0 };
         current_input = gbs::begin_frame().input;
         const gbs::InputState input = current_input;
 #ifdef GBS_MULTI_RUNTIME
         if (gbs::runtime_transition_pending()) {
-            return gbs::RuntimeAdapterFrameResult::Transition;
+            return topdown_transition_ready() ? gbs::RuntimeAdapterFrameResult::Transition : gbs::RuntimeAdapterFrameResult::Continue;
         }
 #endif
         gbs::tick_event_frame_counter(event_state);
 #if GBS_MULTI_RUNTIME
         if (gbs::runtime_transition_requested()) {
             gbs::consume_scene_transition_visual_effect_event(event_state);
-            return gbs::runtime_transition_pending()
+            return gbs::runtime_transition_pending() && topdown_transition_ready()
                 ? gbs::RuntimeAdapterFrameResult::Transition
                 : gbs::RuntimeAdapterFrameResult::Continue;
         }
 #endif
         gbs::set_event_input_state(event_state, input.held, input.pressed, input.released);
+        if (!pause_menu.visible && !gbs::event_scene_type_is_paused(event_state, scene_type_topdown)) {
+            tick_topdown_actor_gesture();
+        }
     gbs::update_hud_behavior(event_state, hud.visible);
         sync_event_player_actor_state();
         sync_event_actor_animation_state();
@@ -3072,6 +3432,8 @@ gbs::RuntimeAdapterFrameResult update_topdown_runtime(const gbs::RuntimeFrameCon
             gbs::tick_event_threads(event_threads,event_state,project.scripts,project.script_count);
             consume_event_outputs(true);
         }
+        if (!pause_menu.visible && !dialogue.visible && !event_interaction.active &&
+            !gbs::event_scene_type_is_paused(event_state, scene_type_topdown)) tick_scripted_movements();
         queue_runtime_event_bindings(!pause_menu.visible && !dialogue.visible && !event_interaction.active);
         if (event_interaction.active) {
             advance_event_interaction(input);
@@ -3108,12 +3470,20 @@ gbs::RuntimeAdapterFrameResult update_topdown_runtime(const gbs::RuntimeFrameCon
                     show_pause_menu_page(PauseMenuPage::System);
                 } else if (selected_value >= pause_menu_load_base &&
                     selected_value < pause_menu_load_base + static_cast<int>(active_save_slot_count)) {
+#if GBS_MULTI_RUNTIME
+                    const gbs::RuntimeAvailabilityMask available = gbs::active_runtime_availability();
+                    gbs::request_universal_save_restore(gbastudio_project::save_bank,
+                        selected_value - pause_menu_load_base,
+                        available != 0 ? available : gbs::runtime_availability(gbs::RuntimeKind::TopDown));
+#else
                     if (restore_runtime_state(selected_value - pause_menu_load_base)) {
                         apply_room_metadata(false);
                         init_npc_runtime();
                         init_trigger_states();
                         reset_npc_player_hit_state();
+                        if(!apply_pending_topdown_motion_checkpoint()) gbs::show_checkpoint_restore_failure(dialogue);
                     }
+#endif
                     show_pause_menu_page(PauseMenuPage::System);
                 } else if (selected_value >= pause_menu_delete_base &&
                     selected_value < pause_menu_delete_base + static_cast<int>(active_save_slot_count)) {
@@ -3190,8 +3560,9 @@ gbs::RuntimeAdapterFrameResult update_topdown_runtime(const gbs::RuntimeFrameCon
                     max_active_npc_slots
                 );
                 const gbs::Vec2i player_position_before_update = player.position_pixels;
-                const int adventure_speed=gbs::adventure_event_speed_x100(event_state,player_event_runtime.movement_speed_x100);
-                const gbs::InputState player_input = player_event_runtime.active
+                const int profile_speed=gbs::topdown_profile_speed_x100(event_state,input,player_event_runtime.movement_speed_x100);
+                const int adventure_speed=gbs::adventure_event_speed_x100(event_state,profile_speed);
+                const gbs::InputState player_input = controlled_player_active() && !gbs::has_scripted_movement(scripted_movements, gbs::event_player_actor_index)
                     ? gbs::adventure_event_input(event_state,input,player.direction)
                     : gbs::InputState { 0, 0, 0 };
                 const bool player_wants_to_move = runtime_input_direction_bits(player_input) != 0;
@@ -3215,16 +3586,29 @@ gbs::RuntimeAdapterFrameResult update_topdown_runtime(const gbs::RuntimeFrameCon
                 }
                 player_moved_this_frame = player.position_pixels.x != player_position_before_update.x ||
                     player.position_pixels.y != player_position_before_update.y;
+                player_animation_travelled_pixels = gbs::Vec2i {
+                    player.position_pixels.x - player_position_before_update.x,
+                    player.position_pixels.y - player_position_before_update.y
+                };
                 if (player.speed_pixels > 0 && !player_moved_this_frame && player_wants_to_move) {
-                    runtime_blocked_direction_bits |= runtime_input_direction_bits(player_input);
                     gbs::Rect attempted_rect = gbs::actor_rect(player);
                     if (player_input.is_held(gbs::ButtonRight)) ++attempted_rect.x;
                     if (player_input.is_held(gbs::ButtonLeft)) --attempted_rect.x;
                     if (player_input.is_held(gbs::ButtonDown)) ++attempted_rect.y;
                     if (player_input.is_held(gbs::ButtonUp)) --attempted_rect.y;
+                    const gbs::Vec2i attempted_delta {
+                        int(player_input.is_held(gbs::ButtonRight)) - int(player_input.is_held(gbs::ButtonLeft)),
+                        int(player_input.is_held(gbs::ButtonDown)) - int(player_input.is_held(gbs::ButtonUp))
+                    };
+                    // A fractional diagonal step may legitimately travel zero pixels.
+                    // Publish blockage only when the intended foot box meets an obstacle.
+                    if (gbs::rect_hits_blocking_tile(room.collision, attempted_rect, attempted_delta) ||
+                        gbs::rect_hits_any_blocking_actor(attempted_rect, player, player_blockers, player_blocker_count))
+                        runtime_blocked_direction_bits |= runtime_input_direction_bits(player_input);
                     runtime_telemetry.seen_slope_bits |= runtime_slope_bits_in_rect(room.collision, attempted_rect);
                 }
-                refresh_player_directional_animation(player_wants_to_move);
+                refresh_player_directional_animation(player_wants_to_move && (player_moved_this_frame ||
+                    gbs::player_has_walk_path(room.collision, player, player_input, player_blockers, player_blocker_count)));
             }
 
             const gbs::TopDownRoomData& ai_room = project.rooms[current_room];
@@ -3238,6 +3622,7 @@ gbs::RuntimeAdapterFrameResult update_topdown_runtime(const gbs::RuntimeFrameCon
             gbs::debug_set_counter(0, "npc", static_cast<uint32_t>(ai_npc_count));
             for (size_t slot_index = 0; slot_index < ai_npc_count; ++slot_index) {
                 const size_t index = active_npc_slots[slot_index];
+                if (gbs::has_scripted_movement(scripted_movements, static_cast<int>(index))) continue;
                 gbs::Actor npc_blockers[max_active_npc_slots + 1] = {};
                 size_t npc_blocker_count = collect_npc_blocking_actors(index, npc_blockers, max_active_npc_slots + 1);
                 const bool npc_moved = gbs::update_actor_runtime_ai(
@@ -3260,7 +3645,7 @@ gbs::RuntimeAdapterFrameResult update_topdown_runtime(const gbs::RuntimeFrameCon
                 : (trigger_room.trigger_count < max_trigger_slots ? trigger_room.trigger_count : max_trigger_slots);
             debug_work_units += static_cast<uint32_t>(trigger_count);
             gbs::debug_set_counter(1, "trigger", static_cast<uint32_t>(trigger_count));
-            for (size_t index = 0; index < trigger_count; ++index) {
+            for (size_t index = 0; trigger_room.metadata.player_enabled && index < trigger_count; ++index) {
                 gbs::TopDownTriggerResult result = gbs::update_trigger_state(
                     trigger_room.triggers[index],
                     trigger_states[index],
@@ -3280,11 +3665,11 @@ gbs::RuntimeAdapterFrameResult update_topdown_runtime(const gbs::RuntimeFrameCon
                 }
             }
 
-            uint8_t active_effects = gbs::tile_effects_for_actor(
+            uint8_t active_effects = trigger_room.metadata.player_enabled ? gbs::tile_effects_for_actor(
                 room.collision,
                 player,
                 static_cast<uint8_t>(gbs::TileWater | gbs::TileDamage | gbs::TileLadder)
-            );
+            ) : 0;
             const size_t tile_effect_count = trigger_room.tile_effect_events == nullptr
                 ? 0
                 : (trigger_room.tile_effect_event_count < max_tile_effect_slots
@@ -3309,13 +3694,13 @@ gbs::RuntimeAdapterFrameResult update_topdown_runtime(const gbs::RuntimeFrameCon
 
             if (input.was_pressed(gbs::ButtonA)) {
                 if (!queue_adventure_callback(adventure_callback_on_interact, true)) {
-                    gbs::EventScript interaction_script = gbs::actor_runtime_interaction_script_for(
+                    gbs::EventScript interaction_script = trigger_room.metadata.player_enabled ? gbs::actor_runtime_interaction_script_for(
                         project.rooms[current_room],
                         npc_runtimes,
                         current_npc_count(),
                         player
-                    );
-                    if (!gbs::has_event_script(interaction_script)) {
+                    ) : gbs::empty_event_script();
+                    if (trigger_room.metadata.player_enabled && !gbs::has_event_script(interaction_script)) {
                         interaction_script = gbs::interaction_event_script_for(project.rooms[current_room], player);
                     }
                     if (!gbs::has_event_script(interaction_script)) {
@@ -3325,7 +3710,8 @@ gbs::RuntimeAdapterFrameResult update_topdown_runtime(const gbs::RuntimeFrameCon
                 }
             }
 
-            gbs::PortalHit portal_hit = gbs::check_portal_hits(room, player, current_room);
+            gbs::PortalHit portal_hit = trigger_room.metadata.player_enabled
+                ? gbs::check_portal_hits(room, player, current_room) : gbs::PortalHit {};
             if (portal_hit.did_hit) {
                 gbs::EventScript portal_script = gbs::portal_event_script_for(project.rooms[current_room], portal_hit.portal_index);
                 if (gbs::has_event_script(portal_script)) {
@@ -3346,6 +3732,7 @@ gbs::RuntimeAdapterFrameResult update_topdown_runtime(const gbs::RuntimeFrameCon
 }
 
 void render_topdown_runtime(const gbs::RuntimeFrameContext& context) {
+    const gbs::SubsystemProfilerScope profiler_scope(gbs::ProfilerSubsystem::Render);
     (void)context;
         gbs::consume_visual_effect_event(event_state, visual_effects);
         gbs::set_backdrop_color(backdrop_color_for_player_effects());
@@ -3379,17 +3766,19 @@ void render_topdown_runtime(const gbs::RuntimeFrameContext& context) {
         }
         const bool affine_room = active_room_data.video.affine_enabled || project.video.affine_enabled;
         if (!gbs::is_bitmap_display_mode(project.video.display_mode)) {
-            if (!active_room_data.uses_visual_tilemap && !affine_room) {
-                gbs::draw_room_to_bg(gbs::BackgroundLayer::BG2, active_room_visual_tiles(), room.width_tiles, room.height_tiles, render_camera.x, render_camera.y);
-                gbs::draw_room_to_bg(gbs::BackgroundLayer::BG1, project.rooms[current_room].foreground_tiles, room.width_tiles, room.height_tiles, render_camera.x, render_camera.y);
+            if ((!active_room_data.uses_visual_tilemap || room_tile_edits.count > 0) && !affine_room && active_room_data.paged_source_tiles == nullptr) {
+                gbs::draw_room_to_bg_cached(gbs::BackgroundLayer::BG2, active_room_visual_tiles(), room.width_tiles, room.height_tiles, render_camera.x, render_camera.y, room_layer_cache[2], room_tile_edits);
+                gbs::draw_room_to_bg_cached(gbs::BackgroundLayer::BG1, project.rooms[current_room].foreground_tiles, room.width_tiles, room.height_tiles, render_camera.x, render_camera.y, room_layer_cache[1], room_tile_edits);
             }
         }
         gbs::set_bg_enabled(gbs::BackgroundLayer::BG1, !active_room_data.uses_visual_tilemap && !affine_room);
         // A source visual tilemap is already resident as a full hardware map;
         // dynamic room tiles are staged into a 32x32 window and only need the
         // sub-tile scroll remainder.
-        const int bg2_scroll_x = affine_room ? 0 : (active_room_data.uses_visual_tilemap ? render_camera.x : (render_camera.x & 7));
-        const int bg2_scroll_y = affine_room ? 0 : (active_room_data.uses_visual_tilemap ? render_camera.y : (render_camera.y & 7));
+        const bool paged_room = active_room_data.paged_source_tiles != nullptr;
+        const gbs::Vec2i background_camera = paged_room ? update_paged_room_background(render_camera) : render_camera;
+        const int bg2_scroll_x = affine_room ? 0 : (paged_room ? background_camera.x % 256 : (active_room_data.uses_visual_tilemap && room_tile_edits.count == 0 ? render_camera.x : (render_camera.x & 7)));
+        const int bg2_scroll_y = affine_room ? 0 : (paged_room ? background_camera.y % 256 : (active_room_data.uses_visual_tilemap && room_tile_edits.count == 0 ? render_camera.y : (render_camera.y & 7)));
         gbs::set_bg_scroll(gbs::BackgroundLayer::BG1, render_camera.x & 7, render_camera.y & 7);
         gbs::set_bg_scroll(gbs::BackgroundLayer::BG2, bg2_scroll_x, bg2_scroll_y);
         gbs::set_bg_scroll(gbs::BackgroundLayer::BG0, 0, 0);
@@ -3407,12 +3796,26 @@ void render_topdown_runtime(const gbs::RuntimeFrameContext& context) {
             gbs::set_bg_scroll(gbs::BackgroundLayer::BG3, visual_scroll.x, visual_scroll.y);
         }
         gbs::render_visual_effects(visual_effects);
+        if (gbs::visibility_effect().active) {
+            const int target = gbs::visibility_effect().actor;
+            const gbs::Actor* actor = target < 0 ? &player :
+                (static_cast<size_t>(target) < current_npc_count() ? &npc_runtimes[target].actor : nullptr);
+            if (actor == nullptr) gbs::stop_visibility_effect();
+            else gbs::render_visibility_effects({ actor->position_pixels.x + actor->size_pixels.x / 2 - render_camera.x,
+                actor->position_pixels.y + actor->size_pixels.y / 2 - render_camera.y }, visual_effects,
+                screen_fade_active || (screen_fade_direction > 0 && screen_fade_frames_remaining == 0));
+        }
         const bool show_debug_overlay = current_input.is_held(gbs::ButtonSelect);
         if (!show_debug_overlay) {
             gbs::draw_debug_overlay(false);
         }
         gbs::hide_all_sprites();
         gbs::clear_event_text();
+        // Clear the closed menu before drawing the HUD and dialogue that may
+        // occupy the same BG0 tiles. An open menu is drawn last, on top.
+        if (!pause_menu.visible) {
+            gbs::draw_menu(pause_menu);
+        }
         if (!pause_menu.visible) {
             gbs::draw_hud(hud);
 
@@ -3427,9 +3830,10 @@ void render_topdown_runtime(const gbs::RuntimeFrameContext& context) {
         if (show_debug_overlay) {
             gbs::draw_debug_overlay(true);
         }
-        // O overlay de debug limpa uma area que cruza o menu; desenhe o menu por ultimo.
-        // Quando esta oculto, draw_menu tambem limpa apenas a propria caixa.
-        gbs::draw_menu(pause_menu);
+        // The debug overlay overlaps the menu, so draw an open menu last.
+        if (pause_menu.visible) {
+            gbs::draw_menu(pause_menu);
+        }
         if(event_interaction.active) gbs::draw_menu(event_interaction_menu);
 
         const size_t npc_count = current_npc_count();
@@ -3438,7 +3842,7 @@ void render_topdown_runtime(const gbs::RuntimeFrameContext& context) {
             gbs::TopDownActorDrawSlot draw_slots[max_visible_world_actor_slots] = {};
             const size_t draw_slot_count = gbs::collect_visible_topdown_actor_draw_slots(
                 player,
-                player_event_runtime.active,
+                controlled_player_active(),
                 npc_runtimes,
                 npc_count,
                 render_camera,
@@ -3460,6 +3864,7 @@ void render_topdown_runtime(const gbs::RuntimeFrameContext& context) {
                         continue;
                     }
                     const gbs::MetaSprite* player_metasprite = player_runtime_metasprite();
+                    const auto* player_sprite = selected_player_sprite_data();
                     set_actor_metasprite(
                         first_oam_index,
                         *player_metasprite,
@@ -3468,7 +3873,8 @@ void render_topdown_runtime(const gbs::RuntimeFrameContext& context) {
                             player.position_pixels.y - render_camera.y
                         },
                         player.size_pixels,
-                        topdown_direction_uses_horizontal_flip(player.direction),
+                        topdown_direction_uses_horizontal_flip(player.direction,
+                            player_sprite ? player_sprite->animation_count : project.player.animation_count),
                         project.player.affine_obj.enabled ? &project.player.affine_obj : nullptr
                     );
                     continue;
@@ -3487,6 +3893,7 @@ void render_topdown_runtime(const gbs::RuntimeFrameContext& context) {
                     npc_metasprite = npc_runtimes[index].metasprite;
                 }
                 if (npc_metasprite != nullptr) {
+                    const auto* npc_sprite = gbs::topdown_actor_sprite_for_index(project,npc_runtimes[index].sprite_index);
                     set_actor_metasprite(
                         first_oam_index,
                         *npc_metasprite,
@@ -3495,7 +3902,8 @@ void render_topdown_runtime(const gbs::RuntimeFrameContext& context) {
                             npc_runtimes[index].actor.position_pixels.y - render_camera.y
                         },
                         npc_runtimes[index].actor.size_pixels,
-                        topdown_direction_uses_horizontal_flip(npc_runtimes[index].actor.direction),
+                        topdown_direction_uses_horizontal_flip(npc_runtimes[index].actor.direction,
+                            npc_sprite ? npc_sprite->animation_count : project.rooms[current_room].npcs[index].animation_count),
                         npc_runtimes[index].affine_obj.enabled ? &npc_runtimes[index].affine_obj : nullptr
                     );
                 }
@@ -3507,6 +3915,7 @@ void render_topdown_runtime(const gbs::RuntimeFrameContext& context) {
             gbs::draw_event_clock(event_state);
         }
         if (draw_world_sprites) {
+            if (!gbs::dialogue_should_show_emote(dialogue)) draw_topdown_actor_gesture(render_camera);
             draw_active_dialogue_emote(
                 dialogue,
                 gbs::Vec2i {
@@ -3517,9 +3926,7 @@ void render_topdown_runtime(const gbs::RuntimeFrameContext& context) {
             draw_active_dialogue_portrait(dialogue);
         }
 
-        if (player_moved_this_frame) {
-            gbs::update_sprite_animator_scaled(player_animator, project.player.animation_speed_percent);
-        }
+        update_player_runtime_animation(player_moved_this_frame);
         for (size_t index = 0; index < npc_count; ++index) {
             if (npc_runtimes[index].active || npc_defeat_pending_despawn[index]) {
                 gbs::update_sprite_animator_scaled(npc_animators[index], npc_runtimes[index].animation_speed_percent);

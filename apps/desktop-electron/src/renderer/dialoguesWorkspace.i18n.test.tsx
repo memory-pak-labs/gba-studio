@@ -103,12 +103,12 @@ describe("DialoguesWorkspace i18n", () => {
     expect(screen.queryByRole("tab", { name: "Interface" })).not.toBeInTheDocument();
   });
 
-  it("renders dialogue review controls in Latin American Spanish", async () => {
+  it("renders dialogue review controls in Spanish", async () => {
     renderDialoguesWorkspace("es-ES");
 
-    expect(screen.getByRole("region", { name: "Workspace Dialogos" })).toBeInTheDocument();
-    expect(screen.queryByRole("heading", { name: "Estudio de dialogos" })).not.toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "+ Nuevo dialogo" })).not.toBeInTheDocument();
+    expect(screen.getByRole("region", { name: "Workspace Diálogos" })).toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "Estudio de diálogos" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "+ Nuevo diálogo" })).not.toBeInTheDocument();
     expect(screen.getByPlaceholderText("Clave, personaje o texto")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Abrir en el evento" })).toBeInTheDocument();
     expect(screen.queryByRole("tab", { name: "Interfaz" })).not.toBeInTheDocument();

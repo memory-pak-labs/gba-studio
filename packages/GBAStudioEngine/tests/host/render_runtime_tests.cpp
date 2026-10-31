@@ -1,9 +1,11 @@
 #include <cassert>
+#include <cstring>
 #include <stdint.h>
 #include "../../engine/src/gbs_room_tilemap.h"
 #include "gbs/event.hpp"
 #include "gbs/interrupt.hpp"
 #include "gbs/render.hpp"
+#include "gbs/tile_edits.hpp"
 
 namespace {
 
@@ -13,6 +15,12 @@ int bg_mosaic_calls = 0;
 int based_bg_upload_calls = 0;
 uint32_t based_bg_physical_tile = 0;
 int screen_base_calls = 0;
+bool track_decode_dma = false;
+const uint8_t* pending_decode_upload = nullptr;
+const uint8_t* decode_upload_sources[3] {};
+uint8_t drained_decode_bytes[32] {};
+int decode_upload_count = 0;
+int decode_drain_count = 0;
 
 void test_based_bg_upload_respects_tilemap_and_obj_memory() {
     const uint8_t data[32] {};
@@ -76,6 +84,8 @@ int sprite_color_depth_calls = 0;
 int last_sprite_color_depth = -1;
 uint8_t last_bg_tile_byte = 0;
 uint16_t last_tilemap_entry = 0;
+uint16_t captured_tilemaps[4][1024] {};
+int tilemap_upload_calls = 0;
 uint16_t last_palette_colors[16] = {};
 uint16_t display_page_calls = 0;
 int hblank_scroll_calls = 0;
@@ -461,6 +471,51 @@ void test_huffman_assets_reach_hardware() {
     }));
 }
 
+void test_compressed_tile_scratch_waits_before_cross_codec_reuse() {
+    alignas(4) const uint8_t lz[] = {
+        0x10, 0x20, 0, 0,
+        0, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11,
+        0, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11,
+        0, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11,
+        0, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11
+    };
+    alignas(4) const uint8_t huffman[] = {
+        0x28, 0x20, 0, 0, 0x01, 0xC0, 'A', 'B', 0, 0, 0, 0x50,
+        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
+    };
+    track_decode_dma = true;
+    pending_decode_upload = nullptr;
+    decode_upload_count = decode_drain_count = 0;
+    assert(gbs::load_tiles(gbs::Lz77TileAsset {{lz, sizeof(lz), 32}, 1, 0, false}));
+    assert(gbs::load_tiles(gbs::HuffmanTileAsset {{huffman, sizeof(huffman), 32}, 1, 1, true}));
+    assert(decode_upload_count == 2 && decode_upload_sources[0] == decode_upload_sources[1]);
+    assert(decode_drain_count == 1);
+    for (uint8_t byte : drained_decode_bytes) assert(byte == 0x11);
+    assert(pending_decode_upload[0] == 'A' && pending_decode_upload[1] == 'B');
+    assert(gbs::load_tiles(gbs::Lz77TileAsset {{lz, sizeof(lz), 32}, 1, 2, false}));
+    assert(decode_drain_count == 2 && drained_decode_bytes[0] == 'A' && drained_decode_bytes[1] == 'B');
+    track_decode_dma = false;
+    pending_decode_upload = nullptr;
+}
+
+void test_compressed_tilemap_and_palette_scratch_across_codecs() {
+    const uint8_t lz[] = {0x10, 4, 0, 0, 0, 'C', 'D', 'C', 'D'};
+    alignas(4) const uint8_t huffman[] = {0x28, 4, 0, 0, 0x01, 0xC0, 'A', 'B', 0, 0, 0, 0x50};
+    const gbs::Lz77Asset lz_asset {lz, sizeof(lz), 4};
+    const gbs::HuffmanAsset huffman_asset {huffman, sizeof(huffman), 4};
+    assert(gbs::load_tilemap(gbs::BackgroundLayer::BG2, gbs::Lz77TileMapAsset {lz_asset, 2, 1}));
+    assert(captured_tilemaps[2][0] == 0x4443);
+    assert(gbs::load_tilemap(gbs::BackgroundLayer::BG2, gbs::HuffmanTileMapAsset {huffman_asset, 2, 1}));
+    assert(captured_tilemaps[2][0] == 0x4241);
+    assert(gbs::load_palette(gbs::Lz77PaletteAsset {lz_asset, 2, 0}, false));
+    assert(last_palette_colors[0] == 0x4443);
+    assert(gbs::load_palette(gbs::HuffmanPaletteAsset {huffman_asset, 2, 0}, false));
+    assert(last_palette_colors[0] == 0x4241);
+    assert(gbs::load_palette(gbs::Lz77PaletteAsset {lz_asset, 2, 0}, false));
+    assert(last_palette_colors[0] == 0x4443);
+}
+
 void test_primary_assets_consume_selected_compression() {
     reset_spy();
 
@@ -668,11 +723,23 @@ void test_video_composition_applies_affine_and_bitmap_paths() {
 
 } // namespace
 
+namespace gbs {
+bool dma_wait_for_source(const void* source, size_t size) {
+    if (track_decode_dma && pending_decode_upload && source == pending_decode_upload && size >= 32) {
+        std::memcpy(drained_decode_bytes, pending_decode_upload, sizeof(drained_decode_bytes));
+        pending_decode_upload = nullptr;
+        ++decode_drain_count;
+    }
+    return true;
+}
+}
+
 extern "C" {
 
 void gbs_hw_demo_tiles(void) {}
 void gbs_hw_restore_ui_assets(void) {}
 void gbs_hw_hide_all_sprites(void) {}
+void gbs_hw_hide_world_sprites(void) {}
 void gbs_hw_hide_sprites(int, int) {}
 void gbs_hw_draw_text_at(int, int, int, const char*) {}
 void gbs_hw_draw_text_overlay(int, int, int, const char*, int) {}
@@ -718,15 +785,27 @@ void gbs_hw_load_obj_palette(const uint16_t* colors, uint32_t, uint32_t count) {
 void gbs_hw_load_bg_tiles(const uint8_t* data, uint32_t, uint32_t) {
     ++bg4_tile_calls;
     last_bg_tile_byte = data[0];
+    if (track_decode_dma) {
+        decode_upload_sources[decode_upload_count++] = data;
+        pending_decode_upload = data;
+    }
 }
-void gbs_hw_load_obj_tiles(const uint8_t*, uint32_t, uint32_t) {}
+void gbs_hw_load_obj_tiles(const uint8_t* data, uint32_t, uint32_t) {
+    if (track_decode_dma) {
+        decode_upload_sources[decode_upload_count++] = data;
+        pending_decode_upload = data;
+    }
+}
 void gbs_hw_load_obj_tiles_8bpp(const uint8_t*, uint32_t, uint32_t) { ++obj8_tile_calls; }
 void gbs_hw_set_sprite_color_depth(int, int eight_bpp) {
     ++sprite_color_depth_calls;
     last_sprite_color_depth = eight_bpp;
 }
-void gbs_hw_load_bg_tilemap(int, const uint16_t* entries, uint32_t, uint32_t, uint32_t) {
+void gbs_hw_load_bg_tilemap(int layer, const uint16_t* entries, uint32_t width, uint32_t height, uint32_t) {
     last_tilemap_entry = entries[0];
+    ++tilemap_upload_calls;
+    const uint32_t count = width * height < 1024 ? width * height : 1024;
+    for (uint32_t i = 0; i < count; ++i) captured_tilemaps[layer][i] = entries[i];
 }
 void gbs_hw_set_bg_tilemap_entry(int, uint32_t, uint32_t, uint32_t, uint32_t, uint16_t) {}
 void gbs_hw_load_affine_bg_tiles(const uint8_t*, uint32_t, uint32_t) {
@@ -777,6 +856,8 @@ void gbs_hw_start_hblank_bg_scroll(int layer, const int16_t* offsets) {
     first_hblank_scroll = offsets[0];
 }
 void gbs_hw_disable_hblank_effects(void) { ++hblank_disable_calls; }
+void gbs_hw_start_hblank_window1(const uint16_t*) {}
+void gbs_hw_disable_hblank_window1(void) {}
 int gbs_hw_get_vcount(void) { return hblank_vcount; }
 void gbs_hw_apply_affine_bg_raster_line(int, int16_t, int16_t, int32_t, int32_t) {
     ++hblank_affine_calls;
@@ -804,9 +885,10 @@ void gbs_hw_draw_room_to_bg(int layer, const uint8_t*, int, int, int, int) {
     last_room_draw_layer = layer;
 }
 
-void gbs_hw_draw_room16_to_bg(int layer, const uint16_t*, int, int, int, int) {
+void gbs_hw_draw_room16_to_bg(int layer, const uint16_t* source, int width, int height, int x, int y) {
     ++room_draw_calls;
     last_room_draw_layer = layer;
+    gbs_stage_room_tilemap16(captured_tilemaps[layer],source,width,height,x,y);
 }
 
 void gbs_hw_set_bg_mosaic(int layer, int enabled) {
@@ -899,7 +981,47 @@ static void test_room_tilemap_rows_preserve_edges_and_full_entries() {
     for (const auto tile : output) assert(tile == 0);
 }
 
+static void test_room_edits_stage_independent_layers_and_refresh_without_camera_motion() {
+    const uint16_t floor[] {0x1801, 0x2C02, 3, 4, 5, 6, 7, 8};
+    const uint16_t foreground[] {0, 9, 0, 0, 0, 0, 0, 0};
+    gbs::RoomTileEdits edits {};
+    gbs::RoomTilemapCache floor_cache {}, foreground_cache {};
+    assert(gbs::set_room_tile_edit(edits, 2, 1, 0, 4, 2, 99, 0));
+    assert(gbs::set_room_tile_edit(edits, 1, 0, 0, 4, 2, 77));
+    gbs::draw_room_to_bg_cached(gbs::BackgroundLayer::BG2, floor, 4, 2, 0, 0, floor_cache, edits);
+    gbs::draw_room_to_bg_cached(gbs::BackgroundLayer::BG1, foreground, 4, 2, 0, 0, foreground_cache, edits);
+    // A later decompression reuses the scratch; staged layers retain their copies.
+    const gbs::Rle16Run runs[] {{123, 4}};
+    assert(gbs::load_tilemap(gbs::BackgroundLayer::BG3, gbs::Rle16TileMapAsset {{runs, 1, 4}, 2, 2}));
+    assert(captured_tilemaps[2][0] == 0x1801 && captured_tilemaps[2][1] == 99);
+    assert(captured_tilemaps[1][0] == 77 && captured_tilemaps[1][1] == 9);
+    const int uploads = tilemap_upload_calls;
+    gbs::draw_room_to_bg_cached(gbs::BackgroundLayer::BG2, floor, 4, 2, 0, 0, floor_cache, edits);
+    assert(tilemap_upload_calls == uploads);
+    assert(gbs::set_room_tile_edit(edits, 2, 1, 0, 4, 2, 100));
+    gbs::draw_room_to_bg_cached(gbs::BackgroundLayer::BG2, floor, 4, 2, 0, 0, floor_cache, edits);
+    assert(tilemap_upload_calls == uploads + 1 && captured_tilemaps[2][1] == 100);
+    gbs::draw_room_to_bg_cached(gbs::BackgroundLayer::BG2, floor, 4, 2, 8, 0, floor_cache, edits);
+    assert(captured_tilemaps[2][0] == 100 && captured_tilemaps[2][1] == 3);
+}
+
 int main() {
+    {
+        const uint16_t tiles[] {0x1801,0x2C02,3,4};
+        gbs::RoomTileEdits edits {};
+        gbs::RoomTilemapCache cache {};
+        const int draws=room_draw_calls;
+        gbs::draw_room_to_bg_cached(gbs::BackgroundLayer::BG2,tiles,4,1,0,0,cache,edits);
+        assert(room_draw_calls==draws+1); // No intermediate copy without an edited tile.
+        assert(captured_tilemaps[2][1]==0x2C02);
+        assert(gbs::set_room_tile_edit(edits,2,1,0,4,1,99));
+        gbs::draw_room_to_bg_cached(gbs::BackgroundLayer::BG2,tiles,4,1,0,0,cache,edits);
+        assert(captured_tilemaps[2][1]==99);
+        edits={};
+        gbs::draw_room_to_bg_cached(gbs::BackgroundLayer::BG2,tiles,4,1,0,0,cache,edits);
+        assert(captured_tilemaps[2][1]==0x2C02); // Clearing edits restores the source without camera motion.
+    }
+    test_room_edits_stage_independent_layers_and_refresh_without_camera_motion();
     test_room_tilemap_rows_preserve_edges_and_full_entries();
     test_room_tilemap_cache_preserves_scroll_and_invalidates_sources();
     test_based_bg_upload_respects_tilemap_and_obj_memory();
@@ -913,6 +1035,8 @@ int main() {
     test_regular_background_tile_depth_reaches_hardware();
     test_8bpp_object_tiles_and_sprite_depth_reach_hardware();
     test_huffman_assets_reach_hardware();
+    test_compressed_tile_scratch_waits_before_cross_codec_reuse();
+    test_compressed_tilemap_and_palette_scratch_across_codecs();
     test_primary_assets_consume_selected_compression();
     test_mosaic_size_config_reaches_hardware();
     test_draw_room_targets_world_layer_bg1();

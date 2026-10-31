@@ -26,6 +26,7 @@ function mount() {
 
 beforeEach(() => {
   window.localStorage.clear();
+  window.localStorage.setItem("gbaStudio.locale", "pt-BR");
   Object.defineProperty(window, "gbaStudio", { configurable: true, value: { inspectAssetFile: vi.fn().mockResolvedValue({ exists: true, format: "PNG", width: 480, height: 320, byteSize: 8192, pipeline: { preparedStatus: "complete", exportedStatus: "attention", exportedDetail: "source_newer" } }) } });
 });
 afterEach(cleanup);

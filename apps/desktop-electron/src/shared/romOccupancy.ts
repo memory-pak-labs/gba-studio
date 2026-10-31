@@ -105,13 +105,23 @@ const categoryLabels: Record<RomOccupancyCategoryID, string> = {
   other: "Outros"
 };
 
+/** Occupied addresses, counting runtime overlays only once. Excludes holes. */
+export function linkedAddressBytes(entries: readonly LinkerMapEntry[], start: number, end: number): number {
+  const ranges = entries.filter(entry => !entry.discarded)
+    .map(entry => [Math.max(start, entry.address), Math.min(end, entry.address + entry.bytes)] as const)
+    .filter(([left, right]) => right > left)
+    .sort(([left], [right]) => left - right);
+  let total = 0, previousEnd = start;
+  for (const [left, right] of ranges) {
+    total += Math.max(0, right - Math.max(left, previousEnd));
+    previousEnd = Math.max(previousEnd, right);
+  }
+  return total;
+}
+
 export function deriveRomOccupancyReport(entries: readonly LinkerMapEntry[]): RomOccupancyReport {
   const linked = entries.filter((entry) => !entry.discarded);
   const isRom = (entry: LinkerMapEntry) => entry.address >= 0x08000000 && entry.address < 0x0A000000;
-  const isRam = (entry: LinkerMapEntry) => (
-    (entry.address >= 0x02000000 && entry.address < 0x02040000)
-    || (entry.address >= 0x03000000 && entry.address < 0x03008000)
-  );
   const categories = new Map<RomOccupancyCategoryID, LinkerMapEntry[]>();
   for (const entry of linked.filter(isRom)) {
     const id = categoryForEntry(entry);
@@ -120,7 +130,8 @@ export function deriveRomOccupancyReport(entries: readonly LinkerMapEntry[]): Ro
   return {
     schema: 1,
     romBytes: linked.filter(isRom).reduce((total, entry) => total + entry.bytes, 0),
-    ramBytes: linked.filter(isRam).reduce((total, entry) => total + entry.bytes, 0),
+    ramBytes: linkedAddressBytes(linked, 0x02000000, 0x02040000)
+      + linkedAddressBytes(linked, 0x03000000, 0x03008000),
     discardedBytes: entries.filter((entry) => entry.discarded).reduce((total, entry) => total + entry.bytes, 0),
     categories: [...categories.entries()].map(([id, categoryEntries]) => ({
       id,

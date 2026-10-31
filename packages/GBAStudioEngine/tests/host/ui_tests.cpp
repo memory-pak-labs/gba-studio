@@ -31,6 +31,11 @@ int last_hud_layout_component_visible = 0;
 const char* last_hud_layout_text = nullptr;
 const gbs::MetaSprite* last_hud_layout_metasprite = nullptr;
 int hud_tile_upload_calls = 0;
+bool hardware_hud_retained = false;
+int foreground_clear_calls = 0;
+int retained_palette_refreshes = 0;
+int hud_selector_calls = 0, hud_selector_x = 0, hud_selector_y = 0;
+const void* hud_selector_image = nullptr;
 
 }
 
@@ -39,6 +44,9 @@ extern "C" void gbs_hw_draw_hud_bar(const char*, const char*, int) {
 }
 
 extern "C" void gbs_hw_load_obj_tiles(const uint8_t*, uint32_t, uint32_t) { ++hud_tile_upload_calls; }
+
+extern "C" void gbs_hw_set_hud_font(const uint8_t*,int) {}
+extern "C" void gbs_hw_set_hud_font_shadow(int) {}
 
 extern "C" void gbs_hw_begin_hud_layout(int visible) {
     ++hud_layout_begin_calls;
@@ -57,6 +65,9 @@ extern "C" void gbs_hw_draw_hud_layout_component(
     int visible
 ) {
     ++hud_layout_component_calls;
+    if (kind == 7 && visible) {
+        ++hud_selector_calls; hud_selector_x=x; hud_selector_y=y; hud_selector_image=metasprite;
+    }
     last_hud_layout_kind = kind;
     last_hud_layout_x = x;
     last_hud_layout_y = y;
@@ -71,6 +82,9 @@ extern "C" void gbs_hw_draw_hud_layout_component(
 extern "C" void gbs_hw_end_hud_layout(void) {
     ++hud_layout_end_calls;
 }
+extern "C" int gbs_hw_hud_layout_retained(void) { return hardware_hud_retained; }
+extern "C" void gbs_hw_clear_hud_background_rect(int,int,int,int) { ++foreground_clear_calls; }
+extern "C" void gbs_hw_refresh_hud_text_palette(int) { ++retained_palette_refreshes; }
 
 extern "C" void gbs_hw_invalidate_hud_layout(void) {
 }
@@ -359,7 +373,7 @@ void test_menu_paginates_and_jumps_with_shoulders() {
     assert(last_text_box_visible == 1);
     assert(last_text_box_x == 2 && last_text_box_y == 5);
     assert(last_text_box_width == 26 && last_text_box_height == 7);
-    assert(std::strstr(last_text_box_text, "BAG v") != nullptr);
+    assert(std::strstr(last_text_box_text, "BAG 1/2") != nullptr);
     assert(std::strstr(last_text_box_text, "ITEM 1") != nullptr);
     assert(std::strstr(last_text_box_text, "ITEM 5") == nullptr);
 
@@ -370,12 +384,55 @@ void test_menu_paginates_and_jumps_with_shoulders() {
     assert(!gbs::menu_has_next_page(menu));
 
     gbs::draw_menu(menu);
-    assert(std::strstr(last_text_box_text, "BAG ^") != nullptr);
+    assert(std::strstr(last_text_box_text, "BAG 2/2") != nullptr);
     assert(std::strstr(last_text_box_text, "ITEM 1") == nullptr);
     assert(std::strstr(last_text_box_text, "ITEM 5") != nullptr);
 
     assert(gbs::advance_menu(menu, gbs::InputState { gbs::ButtonL, gbs::ButtonL, 0 }));
     assert(menu.selected_index == 0);
+}
+
+void test_menu_rows_fit_the_inner_frame_and_keep_the_last_option_visible() {
+    const gbs::MenuItem items[] = {
+        { "Carregar 1 ROOM 2 05:19 R1", 1, true },
+        { "Carregar 2 ROOM 2 06:10 R1", 2, true },
+        { "Carregar 3 ROOM 2 07:25 R1", 3, true },
+        { "VOLTAR", 4, true }
+    };
+    gbs::MenuState menu {};
+    gbs::show_menu(menu, "Carregamento dos jogos salvos", items, 4);
+    gbs::draw_menu(menu);
+    size_t rows = 0;
+    const char* line = last_text_box_text;
+    while (*line) {
+        const size_t length = std::strcspn(line, "\n");
+        assert(length <= static_cast<size_t>(last_text_box_width - 2));
+        ++rows;
+        line += length;
+        if (*line == '\n') ++line;
+    }
+    assert(rows == 5);
+    assert(std::strstr(last_text_box_text, "...\n") != nullptr);
+    assert(std::strstr(last_text_box_text, "VOLTAR") != nullptr);
+}
+
+void test_menu_limits_utf8_by_complete_visible_glyphs() {
+    const gbs::MenuItem item { "áááááááááááááááááááááááááááááá", 1, true };
+    gbs::MenuState menu {};
+    gbs::show_menu(menu, "Salvar", &item, 1);
+    gbs::draw_menu(menu);
+    assert(std::strcmp(last_text_box_text, "Salvar\n! ááááááááááááááááááá...") == 0);
+}
+
+void test_menu_page_indicator_uses_supported_digits_and_fits_long_titles() {
+    const gbs::MenuItem items[] = { { "1", 1, true }, { "2", 2, true },
+        { "3", 3, true }, { "4", 4, true }, { "5", 5, true } };
+    gbs::MenuState menu {};
+    gbs::show_menu(menu, "Um titulo de menu muito comprido", items, 5);
+    menu.selected_index = 4;
+    gbs::draw_menu(menu);
+    assert(std::strstr(last_text_box_text, " 2/2\n") != nullptr);
+    assert(std::strcspn(last_text_box_text, "\n") <= 24);
 }
 
 void test_menu_rejects_empty_or_disabled_items() {
@@ -468,7 +525,164 @@ void test_hud_gauge_updates_only_when_value_or_layout_changes() {
     assert(hud_tile_upload_calls == 4);
 }
 
+void test_hud_project_values_refresh_and_clear_on_scene_change() {
+    gbs::HudLayoutComponent component {"coins","text","Moedas","000","",204,9,24,8,2,true};
+    component.inventory_item = 0;
+    gbs::HudLayout layout {"wallet","advanced",&component,1};
+    gbs::configure_hud_layouts(&layout,1); assert(gbs::configure_hud_layout("wallet"));
+    gbs::HudState hud {}; gbs::init_hud(hud); gbs::set_hud_text(hud,"","");
+    gbs::EventState events {}; events.inventory[0]=8;
+    gbs::update_hud_behavior(events,true); gbs::draw_hud(hud);
+    assert(std::strcmp(last_hud_layout_text,"008")==0);
+    events.inventory[0]=7;
+    gbs::update_hud_behavior(events,true); gbs::draw_hud(hud);
+    assert(std::strcmp(last_hud_layout_text,"007")==0);
+    component.inventory_item=-1; component.value_variable=2;
+    events.variables[2]=-9;
+    gbs::update_hud_behavior(events,true); gbs::draw_hud(hud);
+    assert(std::strcmp(last_hud_layout_text,"000")==0);
+    assert(gbs::configure_hud_layout("wallet"));
+    gbs::draw_hud(hud); assert(!last_hud_layout_component_visible);
+}
+
+void test_four_independent_fight_gauges() {
+    uint8_t full_pixels[32], empty_pixels[32];
+    std::memset(full_pixels, 0x77, 32); std::memset(empty_pixels, 0x11, 32);
+    gbs::TileAsset full[] = {{full_pixels,1,20,true},{full_pixels,1,21,true},
+                            {full_pixels,1,22,true},{full_pixels,1,23,true}};
+    const gbs::TileAsset empty {empty_pixels,1,24,true};
+    gbs::MetaSpritePart parts[4]{}; gbs::MetaSprite sprites[4]{};
+    gbs::HudLayoutComponent components[4]{};
+    const gbs::HudValueSource sources[] = {gbs::HudValueSource::P1Health, gbs::HudValueSource::P2Health,
+        gbs::HudValueSource::P1Super, gbs::HudValueSource::P2Super};
+    for (int n=0;n<4;++n) {
+        parts[n] = {0,0,static_cast<uint16_t>(20+n),0,false,false,8,8};
+        sprites[n] = {&parts[n],1};
+        components[n] = {"gauge","bar","","","",n*8,0,8,8,0,true,&sprites[n]};
+        components[n].value_source = sources[n];
+        components[n].gauge = {&full[n],&empty,0,0,8,8,false};
+    }
+    const gbs::HudLayout layout {"four","advanced",components,4};
+    gbs::configure_hud_layouts(&layout,1); assert(gbs::configure_hud_layout("four"));
+    gbs::HudState hud{};gbs::init_hud(hud);gbs::set_hud_text(hud,"","");
+    for (int n=0;n<4;++n) gbs::set_hud_value(hud,sources[n],25*n,100);
+    hud_tile_upload_calls=0; gbs::draw_hud(hud); assert(hud_tile_upload_calls==4);
+    gbs::draw_hud(hud); assert(hud_tile_upload_calls==4);
+    gbs::set_hud_value(hud,gbs::HudValueSource::P1Super,100,100);
+    gbs::draw_hud(hud); assert(hud_tile_upload_calls==5);
+}
+
+void test_object_hud_retains_static_frames_and_refreshes_live_values() {
+    const gbs::MetaSpritePart part {0,0,0,0,false,false,8,8};
+    const gbs::MetaSprite image {&part,1};
+    gbs::HudLayoutComponent components[] = {
+        {"frame","frame","","","",16,6,40,16,0,true,&image},
+        {"life","bar","","","",22,10,32,16,1,true,&image},
+        {"coins","text","","00","",204,10,12,8,1,true}
+    };
+    components[2].text_advance=6; components[2].value_variable=2;
+    gbs::HudLayout layout {"object-hud","advanced",components,3};
+    gbs::configure_hud_layouts(&layout,1); assert(gbs::configure_hud_layout(layout.id));
+    gbs::HudState hud{}; gbs::init_hud(hud); gbs::set_hud_text(hud,"","");
+    gbs::EventState events{}; events.variables[2]=8;
+    gbs::update_hud_behavior(events,true); gbs::draw_hud(hud);
+    const int drawn=hud_layout_component_calls;
+    const int palettes=retained_palette_refreshes;
+    const int cleared=foreground_clear_calls;
+    assert(std::strcmp(last_hud_layout_text,"08")==0);
+    hardware_hud_retained=true;
+    gbs::update_hud_behavior(events,true); gbs::draw_hud(hud);
+    assert(hud_layout_component_calls==drawn);
+    assert(retained_palette_refreshes==palettes+1);
+    assert(foreground_clear_calls==cleared+1);
+    events.variables[2]=9;
+    gbs::update_hud_behavior(events,true); gbs::draw_hud(hud);
+    assert(hud_layout_component_calls==drawn+3 && std::strcmp(last_hud_layout_text,"09")==0);
+    hardware_hud_retained=false; // Full sprite clearing or a tile/font upload.
+    gbs::draw_hud(hud); assert(hud_layout_component_calls==drawn+6);
+    hardware_hud_retained=true;
+    hud.visible=false; gbs::draw_hud(hud);
+    assert(hud_layout_component_calls==drawn+9 && !last_hud_layout_component_visible);
+    hud.visible=true; gbs::draw_hud(hud);
+    assert(hud_layout_component_calls==drawn+12 && last_hud_layout_component_visible);
+    assert(gbs::configure_hud_layout(layout.id));
+    gbs::draw_hud(hud); assert(hud_layout_component_calls==drawn+15);
+    // BG-backed layouts continue to redraw, since dialogue can repaint their cells.
+    components[0].metasprite=nullptr;
+    assert(gbs::configure_hud_layout(layout.id));
+    const int fallback=hud_layout_component_calls;
+    gbs::draw_hud(hud); gbs::draw_hud(hud);
+    assert(hud_layout_component_calls==fallback+6);
+    hardware_hud_retained=false;
+}
+
+void test_retained_hud_copies_dynamic_text_and_invalidates() {
+    gbs::MetaSpritePart part {}; part.width=32; part.height=16;
+    const gbs::MetaSprite frame {&part,1};
+    gbs::HudLayoutComponent components[2] {};
+    components[0].kind="frame"; components[0].visible=true;
+    components[0].width=32; components[0].height=16; components[0].metasprite=&frame;
+    components[1].kind="text"; components[1].visible=true;
+    components[1].width=60; components[1].height=8; components[1].text_advance=6;
+    const gbs::HudLayout layout {"race-slots","advanced",components,2};
+    gbs::configure_hud_layouts(&layout,1); assert(gbs::configure_hud_layout(layout.id));
+    gbs::HudState hud {}; gbs::init_hud(hud);
+    char speed[16]="080 KMH";
+    const char* slots[]={speed};
+    gbs::set_hud_text_slots(hud,slots,1);
+    hardware_hud_retained=false; gbs::draw_hud(hud);
+    const int drawn=hud_layout_component_calls;
+    hardware_hud_retained=true; gbs::draw_hud(hud);
+    assert(hud_layout_component_calls==drawn);
+    // Same pointer, different bytes: racing formatters reuse stack storage.
+    speed[1]='9'; gbs::draw_hud(hud);
+    assert(hud_layout_component_calls==drawn+2);
+    hardware_hud_retained=false; gbs::draw_hud(hud);
+    assert(hud_layout_component_calls==drawn+4);
+    hardware_hud_retained=true; gbs::hide_hud(hud); gbs::draw_hud(hud);
+    assert(hud_layout_component_calls==drawn+6);
+    gbs::set_hud_text_slots(hud,slots,1); gbs::draw_hud(hud);
+    assert(hud_layout_component_calls==drawn+8);
+    assert(gbs::configure_hud_layout(layout.id)); gbs::draw_hud(hud);
+    assert(hud_layout_component_calls==drawn+10);
+    hardware_hud_retained=false;
+}
+
+void test_menu_hud_selection_moves_with_identical_labels_and_respects_visibility() {
+    gbs::HudLayoutComponent components[] = {
+        {"one","text","","","",80,64,84,8,2,true},
+        {"two","text","","","",80,80,84,8,2,true}
+    };
+    for (auto& component : components) component.text_advance=7;
+    const gbs::MetaSpritePart part {0,0,0,0,false,false,8,8};
+    const gbs::MetaSprite image {&part,1};
+    gbs::HudLayout layout {"menu-marker","advanced",components,2,nullptr,-1,-1,&image};
+    gbs::configure_hud_layouts(&layout,1); assert(gbs::configure_hud_layout(layout.id));
+    gbs::HudState hud{};gbs::init_hud(hud);
+    const char* slots[]={"  LOW","  HIGH"};gbs::set_hud_text_slots(hud,slots,2);
+    assert(hud.selected_text_slot_plus_one==0); hud.selected_text_slot_plus_one=1;
+    hud_selector_calls=0; hardware_hud_retained=false;
+    gbs::draw_hud(hud);
+    assert(hud_selector_calls==1 && hud_selector_x==80 && hud_selector_y==64 && hud_selector_image==&image);
+    hardware_hud_retained=true;gbs::draw_hud(hud);assert(hud_selector_calls==1);
+    hud.selected_text_slot_plus_one=2;gbs::draw_hud(hud);
+    assert(hud_selector_calls==2 && hud_selector_y==80);
+    gbs::draw_hud_excluding(hud,72,72,104,24);assert(hud_selector_calls==2);
+    hud.visible=false;gbs::draw_hud(hud);assert(hud_selector_calls==2);
+    hud.visible=true;layout.selector_metasprite=nullptr;
+    assert(gbs::configure_hud_layout(layout.id));gbs::draw_hud(hud);
+    assert(hud_selector_calls==3 && hud_selector_image==nullptr);
+    gbs::set_hud_text_slots(hud,slots,2);assert(hud.selected_text_slot_plus_one==0);
+    gbs::draw_hud(hud);assert(hud_selector_calls==3);
+    hardware_hud_retained=false;gbs::configure_hud_layouts(nullptr,0);
+}
+
 int main() {
+    test_menu_hud_selection_moves_with_identical_labels_and_respects_visibility();
+    test_retained_hud_copies_dynamic_text_and_invalidates();
+    test_object_hud_retains_static_frames_and_refreshes_live_values();
+    test_four_independent_fight_gauges();
+    test_hud_project_values_refresh_and_clear_on_scene_change();
     test_hud_gauge_updates_only_when_value_or_layout_changes();
     test_named_hud_values_survive_reordering_and_round_images();
     test_hud_behavior_drives_text_and_visibility_without_remapping_slots();
@@ -483,6 +697,9 @@ int main() {
     test_menu_navigation_wraps_and_skips_disabled_items();
     test_menu_accept_and_cancel();
     test_menu_paginates_and_jumps_with_shoulders();
+    test_menu_rows_fit_the_inner_frame_and_keep_the_last_option_visible();
+    test_menu_limits_utf8_by_complete_visible_glyphs();
+    test_menu_page_indicator_uses_supported_digits_and_fits_long_titles();
     test_menu_rejects_empty_or_disabled_items();
     return 0;
 }

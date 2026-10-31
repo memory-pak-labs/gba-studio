@@ -804,7 +804,7 @@ describe("scene type profiles", () => {
     })).toEqual({
       type: "battleRpg",
       config: {
-        maxPartySize: 6, maxEnemies: 1, turnDelayFrames: 255, escapeEnabled: false,
+        maxPartySize: 4, maxEnemies: 1, turnDelayFrames: 255, escapeEnabled: false,
         experienceMultiplier: 0.1, typeEffectivenessEnabled: true, criticalHitEnabled: false, statusConditionsEnabled: true,
         abilitiesEnabled: false, showExperienceBar: true, showHealthBars: false,
         battleStyle: "double", weatherEffect: "none",

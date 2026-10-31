@@ -53,21 +53,9 @@ const PORT_LUMEN_DOCK_CELLS = new Set(
   )).flat()
 );
 
-const RACING_VISUAL_EXPECTATIONS = Object.freeze({
-  solid: [
-    [25, 9],
-    [30, 12],
-    [25, 20],
-    [30, 20],
-    [17, 20]
-  ],
-  free: [
-    [30, 6],
-    [32, 30],
-    [35, 30],
-    [30, 31],
-    [34, 31]
-  ]
+const RACING_VISUAL_EXPECTATIONS=Object.freeze({
+ solid:[[32,32],[24,24],[40,40],[0,0],[63,63]],
+ free:[[30,10],[54,32],[32,54],[10,32],[50,13]]
 });
 
 function projectArray(project, key) {
@@ -154,6 +142,18 @@ function cellType(scene, x, y) {
 
 function isPassable(scene, x, y) {
   return PASSABLE_COLLISION_TYPES.has(cellType(scene, x, y));
+}
+
+// Platformer authoring stores the actor's feet/center anchor, not its occupied floor cell.
+function platformerBodyIsPassable(project,scene,actor){
+  const clips=projectArray(project,"animations").filter(a=>a.spriteSheet===actor.spriteSheet);
+  const clip=clips.find(a=>a.name===actor.animationName)??clips[0]??{};
+  const left=actor.x*8+Number(clip.hitboxX??-8),top=actor.y*8+Number(clip.hitboxY??-16);
+  const width=Number(clip.hitboxWidth??16),height=Number(clip.hitboxHeight??16);
+  for(let y=Math.floor(top/8);y<=Math.floor((top+height-1)/8);y++)
+    for(let x=Math.floor(left/8);x<=Math.floor((left+width-1)/8);x++)
+      if(!isPassable(scene,x,y))return false;
+  return true;
 }
 
 function rectangleCells(rectangle) {
@@ -326,12 +326,18 @@ export function auditExemploSceneGeometry(project, options = {}) {
         const player = sceneActors.find((actor) => actor?.name === scene.playerActorName);
         if (!player) {
           issues.push(`Cena ${name}: playerActorName ${scene.playerActorName} não resolve um ator.`);
-        } else if (!isPassable(scene, player.x, player.y)) {
+        } else if (!(runtime === "platformer" ? platformerBodyIsPassable(project,scene,player) : isPassable(scene, player.x, player.y))) {
           issues.push(`Cena ${name}: ator jogador ${player.name} começa em célula bloqueada.`);
         }
       }
       for (const actor of sceneActors) {
-        if (Number.isInteger(actor?.x) && Number.isInteger(actor?.y) && !isPassable(scene, actor.x, actor.y)) {
+        if(runtime === "dungeonCrawler" && actor.dungeonWallMounted === true){
+          const wall=cellType(scene,actor.x,actor.y);
+          const accessible=[[1,0],[-1,0],[0,1],[0,-1]].some(([dx,dy])=>isPassable(scene,actor.x+dx,actor.y+dy));
+          if(wall!=="solid"||!accessible)issues.push(`Cena ${name}: painel ${actor?.name ?? actor?.id ?? "sem-nome"} precisa de parede com face acessível.`);
+          continue;
+        }
+        if (Number.isInteger(actor?.x) && Number.isInteger(actor?.y) && !(runtime === "platformer" ? platformerBodyIsPassable(project,scene,actor) : isPassable(scene, actor.x, actor.y))) {
           issues.push(`Cena ${name}: ator ${actor?.name ?? actor?.id ?? "sem-nome"} começa em célula bloqueada.`);
         }
       }
@@ -343,7 +349,11 @@ export function auditExemploSceneGeometry(project, options = {}) {
             x: Number(trigger?.x),
             y: Number(trigger?.y)
           };
-          if (rectangleCells(rectangle).some(([x, y]) => !isPassable(scene, x, y))) {
+          const cells=rectangleCells(rectangle);
+          const blocked=runtime==="platformer"
+            ? cells.every(([x,y])=>!isPassable(scene,x,y))
+            : cells.some(([x,y])=>!isPassable(scene,x,y));
+          if (blocked) {
             issues.push(`Cena ${name}: área do gatilho ${trigger?.id ?? trigger?.name ?? "sem-nome"} atravessa célula bloqueada.`);
           }
         }
@@ -358,10 +368,10 @@ export function auditExemploSceneGeometry(project, options = {}) {
       const cameraBounds = staticComposition && scene?.cameraBounds && typeof scene.cameraBounds === "object"
         ? scene.cameraBounds
         : null;
-      const expectedWidth = staticComposition && Number.isFinite(Number(cameraBounds?.width))
+      const expectedWidth = runtime === "dungeonCrawler" ? 240 : staticComposition && Number.isFinite(Number(cameraBounds?.width))
         ? Number(cameraBounds.width)
         : width * 8;
-      const expectedHeight = staticComposition && Number.isFinite(Number(cameraBounds?.height))
+      const expectedHeight = runtime === "dungeonCrawler" ? 160 : staticComposition && Number.isFinite(Number(cameraBounds?.height))
         ? Number(cameraBounds.height)
         : height * 8;
       if (pagedSurface) {

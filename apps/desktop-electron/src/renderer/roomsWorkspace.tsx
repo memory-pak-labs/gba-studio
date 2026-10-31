@@ -1,3 +1,16 @@
+import { InteractiveObjectsInspector } from "./InteractiveObjectsInspector";
+import { prefabUpdateImpact } from "../shared/projectPrefabs";
+import { MapStatesInspector } from "./MapStatesInspector";
+import { DungeonScenePreview } from "./DungeonScenePreview";
+import { createRoomEntityDragPreview } from "./roomEntityDragPreview";
+import { ActorRuntimeResourcesInspector, SceneRuntimeResourcesInspector } from "./SceneRuntimeResourcesInspector";
+import { DungeonSceneEditor } from "./DungeonSceneEditor";
+import { readStoredLocale } from "./i18n";
+import { uiText as ui, useStudioUiText } from "./studioUiText";
+import { SceneDiagramCard } from "./SceneDiagramCard";
+import { sceneDiagramPositions, SCENE_DIAGRAM_CARD_SIZE } from "./sceneMapDiagram";
+import { readSceneDiagramPositions, writeSceneDiagramPositions, readSceneMapViewMode, writeSceneMapViewMode, type SceneMapViewMode } from "./sceneMapViewPreferences";
+import "./styles/scene-map-diagram.css";
 import { RacingCircuitCamera } from "./RacingCircuitCamera";
 import { RacingSceneInspector } from "./RacingSceneInspector";
 import { LogicNavigator, LogicValueInspector, type LogicSelection } from "./LogicNavigator";
@@ -21,6 +34,7 @@ import {
   Diamond,
   Folder,
   GitFork,
+  Network,
   Grid3X3,
   FolderPlus,
   ListOrdered,
@@ -34,6 +48,7 @@ import {
   Play,
   Plus,
   RefreshCw,
+  Search,
   Shield,
   SquarePlus,
   ScanSearch,
@@ -68,12 +83,13 @@ import type { GBAProjectData } from "../shared/projectFile";
 import { playerArrivalPreview } from "../shared/playerArrivalPreview";
 import { SCENE_TRANSITION_STYLES, type SceneTransitionStyle } from "../shared/sceneTransition";
 import { sceneDisplayName } from "../shared/sceneDisplayName";
-import { deriveHudPresetsWorkspacePresentation, hudPresetBindingSourceLabel, resolveExplicitHudPresetBinding, type HudComponent, type HudPresetBinding, type UpdateHudPresetFields } from "../shared/hudPresets";
+import { deriveHudPresetsWorkspacePresentation, hudPresetBindingSourceLabel, resolveExplicitHudPresetBinding, type HudComponent, type HudPresetPresentation, type HudPresetBinding, type UpdateHudPresetFields } from "../shared/hudPresets";
 import { deriveDialogueCharacterProfiles, deriveDialoguesWorkspacePresentation, deriveDialoguesForScene, type UpdateDialogueFields, type UpdateDialoguesUiFields } from "../shared/dialoguesWorkspace";
 import {
   projectActorPrefabs,
   projectTriggerPrefabs,
   type ProjectPrefabKind,
+  type ProjectPrefabRecord,
   type ProjectPrefabPlacement
 } from "../shared/projectPrefabs";
 import type { HardwareProfilerMetric, HardwareProfilerPresentation } from "../shared/hardwareProfiler";
@@ -114,6 +130,7 @@ import {
   sceneMapCardChromeSize,
   sceneMapCardSize,
   sceneMapContentSize,
+  sceneMapInitialViewportOrigin,
   sceneMapTileGridBackgroundStyle,
   type SceneMapPosition
 } from "../shared/sceneMapLayout";
@@ -177,7 +194,7 @@ import {
 } from "../shared/roomEditorShortcuts";
 import { resolveDungeonCrawlerFeatureRuntime } from "../shared/sceneFeatureModules";
 import { buildScenePreflightReport } from "../shared/scenePreflight";
-import { normalizeDungeonCrawlerSceneConfig, normalizeIsometricSceneConfig, normalizeRacingSceneConfig, normalizeSceneRuntime, normalizeShmupSceneConfig, resolveSceneRuntime, sceneTypeProfile, type DungeonCrawlerSceneConfig, type IsometricSceneConfig, type RacingSceneConfig, type SceneFeatureRuntimeConfig } from "../shared/sceneTypeProfiles";
+import { normalizeBattleRpgSceneConfig, normalizeDungeonCrawlerSceneConfig, normalizeIsometricSceneConfig, normalizeRacingSceneConfig, normalizeSceneRuntime, normalizeShmupSceneConfig, resolveSceneRuntime, sceneTypeProfile, type DungeonCrawlerSceneConfig, type IsometricSceneConfig, type RacingSceneConfig, type SceneFeatureRuntimeConfig } from "../shared/sceneTypeProfiles";
 import {
   affineMatrixForScenePresentation,
   normalizeAffineScenePresentation,
@@ -265,6 +282,13 @@ const actorAnimationDirectionLabels: Record<string, string> = {
   up: "Cima"
 };
 
+function roomEntityCountLabel(kind: "actor" | "trigger", count: number): string {
+  const message = kind === "actor"
+    ? count === 1 ? "{0} ator" : "{0} atores"
+    : count === 1 ? "{0} gatilho" : "{0} gatilhos";
+  return ui(message, { 0: count });
+}
+
 function actorAnimationTokenLabel(value: string, labels: Record<string, string>): string {
   const knownLabel = labels[value.toLowerCase()];
   if (knownLabel) return knownLabel;
@@ -299,6 +323,7 @@ interface RoomEntityPointerDrag {
   startClientY: number;
   previewX: number;
   previewY: number;
+  visual: ReturnType<typeof createRoomEntityDragPreview> | null;
 }
 
 function invokeHistoryAware<Result>(
@@ -406,6 +431,8 @@ interface RoomsWorkspaceProps {
   onSynchronizePrefabs?(): void;
   onCreatePrefabFromEntity?(kind: ProjectPrefabKind, entityID: string): void;
   onInstantiatePrefab?(kind: ProjectPrefabKind, prefabID: string, placement: ProjectPrefabPlacement): void;
+  onResetPrefabOverrides?(kind: ProjectPrefabKind, entityID: string): void;
+  onApplyInteractiveObjects?(data: GBAProjectData): void;
   onUpdatePrefab?(kind: ProjectPrefabKind, prefabID: string, fields: Record<string, unknown>): void;
 }
 
@@ -436,151 +463,148 @@ type MenuTextInputPreviewState = NonNullable<ReturnType<typeof deriveMenuSceneEd
 type MenuTextInputPreviewKeyboard = NonNullable<MenuTextInputPreviewState["keyboard"]>;
 
 function RoomHardwareDebugger({ presentation }: { presentation: HardwareProfilerPresentation }): React.ReactElement {
+  const ui = useStudioUiText();
   const sceneLabel = sceneDisplayName(presentation.activeRoomName);
   const enabledMetrics = presentation.metrics.filter((metric) => metric.enabled);
   return (
-    <details aria-label="Depurador de hardware" className="rooms-debugger" role="group">
+    <details aria-label={ui("Depurador de hardware")} className="rooms-debugger" role="group">
       <summary>
         <span>
           <ChevronRight aria-hidden="true" className="rooms-debugger-chevron" size={15} strokeWidth={2.4} />
-          <strong>Depurador</strong>
-          <em>Hardware · {sceneLabel}</em>
+          <strong>{ui("Depurador")}</strong>
+          <em>{ui("Hardware · ")}{sceneLabel}</em>
         </span>
         <em className={presentation.warningCount > 0 ? "warning" : "ok"}>
-          {presentation.runtime ? "Play conectado" : "Aguardando Play"}
-          {presentation.warningCount > 0 ? ` · ${presentation.warningCount} alerta(s)` : ""}
+          {presentation.runtime ? ui("Play conectado") : ui("Aguardando Play")}
+          {presentation.warningCount > 0 ? ui(" · {0} alerta(s)", { 0: presentation.warningCount }) : ""}
         </em>
       </summary>
       <div className="rooms-debugger-body">
         {presentation.runtime ? (
           <>
-            <div aria-label="Telemetria ao vivo" className="rooms-debugger-live">
-              <span><strong>{presentation.runtime.presentationFps.toFixed(1)} FPS</strong><small>Apresentação do Player</small></span>
-              <span><strong>{presentation.runtime.emulationFps.toFixed(1)} FPS emulados</strong><small>Cadência da ROM</small></span>
-              <span><strong>{(presentation.runtime.droppedFrameRatio * 100).toFixed(1)}% descartados</strong><small>{presentation.runtime.droppedFrames} frame(s) no período</small></span>
-              <span><strong>{presentation.runtime.frameMs.toFixed(2)} ms/frame</strong><small>Tempo total</small></span>
-              <span><strong>{presentation.runtime.emulationMs.toFixed(2)} ms de emulação</strong><small>Custo no host</small></span>
+            <div aria-label={ui("Telemetria ao vivo")} className="rooms-debugger-live">
+              <span><strong>{presentation.runtime.presentationFps.toFixed(1)} {ui(" FPS")}</strong><small>{ui("Apresentação do Player")}</small></span>
+              <span><strong>{presentation.runtime.emulationFps.toFixed(1)} {ui(" FPS emulados")}</strong><small>{ui("Cadência da ROM")}</small></span>
+              <span><strong>{(presentation.runtime.droppedFrameRatio * 100).toFixed(1)}{ui("% descartados")}</strong><small>{presentation.runtime.droppedFrames} {ui(" frame(s) no período")}</small></span>
+              <span><strong>{presentation.runtime.frameMs.toFixed(2)} {ui(" ms/frame")}</strong><small>{ui("Tempo total")}</small></span>
+              <span><strong>{presentation.runtime.emulationMs.toFixed(2)} {ui(" ms de emulação")}</strong><small>{ui("Custo no host")}</small></span>
             </div>
             {presentation.runtime.runtimeState ? (
-              <section aria-label="Estado nativo da ROM" className="rooms-debugger-live" role="region">
+              <section aria-label={ui("Estado nativo da ROM")} className="rooms-debugger-live" role="region">
                 <span>
-                  <strong>Sala {presentation.runtime.runtimeState.currentRoom + 1}</strong>
-                  <small>Frame nativo {presentation.runtime.runtimeState.frame}</small>
+                  <strong>{ui("Sala ")}{presentation.runtime.runtimeState.currentRoom + 1}</strong>
+                  <small>{ui("Frame nativo ")}{presentation.runtime.runtimeState.frame}</small>
                 </span>
                 <span>
                   <strong>
-                    VAR0 {presentation.runtime.runtimeState.variables[0] ?? 0} · FLAGS 0x
-                    {presentation.runtime.runtimeState.flagBits.toString(16).padStart(8, "0").toUpperCase()}
+                    {ui("VAR0 ")}{presentation.runtime.runtimeState.variables[0] ?? 0} {ui(" · FLAGS 0x")}{presentation.runtime.runtimeState.flagBits.toString(16).padStart(8, "0").toUpperCase()}
                   </strong>
-                  <small>Variáveis e flags do runtime</small>
+                  <small>{ui("Variáveis e flags do runtime")}</small>
                 </span>
                 <span>
                   <strong>
-                    Player {presentation.runtime.runtimeState.player.x}, {presentation.runtime.runtimeState.player.y}
-                    {` · dir ${presentation.runtime.runtimeState.player.direction}`}
+                    {ui("Player ")}{presentation.runtime.runtimeState.player.x}, {presentation.runtime.runtimeState.player.y}
+                    {ui(" · dir {0}", { 0: presentation.runtime.runtimeState.player.direction })}
                   </strong>
-                  <small>Posição e direção reais</small>
+                  <small>{ui("Posição e direção reais")}</small>
                 </span>
                 <span>
                   <strong>
-                    Ator {presentation.runtime.runtimeState.firstActor.visible ? 1 : 0}/{presentation.runtime.runtimeState.actorCount}
+                    {ui("Ator ")}{presentation.runtime.runtimeState.firstActor.visible ? 1 : 0}/{presentation.runtime.runtimeState.actorCount}
                     {` · ${presentation.runtime.runtimeState.firstActor.x}, ${presentation.runtime.runtimeState.firstActor.y}`}
-                    {` · dir ${presentation.runtime.runtimeState.firstActor.direction}`}
+                    {ui(" · dir {0}", { 0: presentation.runtime.runtimeState.firstActor.direction })}
                   </strong>
-                  <small>Primeiro NPC e OAM lógico</small>
+                  <small>{ui("Primeiro NPC e OAM lógico")}</small>
                 </span>
                 <span>
                   <strong>
-                    Colisão 0x{presentation.runtime.runtimeState.collision.currentFlags.toString(16).padStart(2, "0").toUpperCase()}
-                    {` · rampa ${presentation.runtime.runtimeState.collision.currentSlope}`}
+                    {ui("Colisão 0x")}{presentation.runtime.runtimeState.collision.currentFlags.toString(16).padStart(2, "0").toUpperCase()}
+                    {ui(" · rampa {0}", { 0: presentation.runtime.runtimeState.collision.currentSlope })}
                   </strong>
                   <small>
-                    Efeitos 0x{presentation.runtime.runtimeState.collision.seenEffectBits.toString(16).toUpperCase()}
-                    {` · rampas 0x${presentation.runtime.runtimeState.collision.seenSlopeBits.toString(16).toUpperCase()}`}
-                    {` · bloqueios 0x${presentation.runtime.runtimeState.collision.blockedDirectionBits.toString(16).toUpperCase()}`}
+                    {ui("Efeitos 0x")}{presentation.runtime.runtimeState.collision.seenEffectBits.toString(16).toUpperCase()}
+                    {ui(" · rampas 0x{0}", { 0: presentation.runtime.runtimeState.collision.seenSlopeBits.toString(16).toUpperCase() })}
+                    {ui(" · bloqueios 0x{0}", { 0: presentation.runtime.runtimeState.collision.blockedDirectionBits.toString(16).toUpperCase() })}
                   </small>
                 </span>
                 <span>
                   <strong>
-                    Triggers {presentation.runtime.runtimeState.triggerEnterCount} enter / {presentation.runtime.runtimeState.triggerLeaveCount} leave
-                    {` · ${presentation.runtime.runtimeState.roomChangeCount} troca(s)`}
+                    {ui("Triggers ")}{presentation.runtime.runtimeState.triggerEnterCount} {ui(" enter / ")}{presentation.runtime.runtimeState.triggerLeaveCount} {ui(" leave")}{ui(" · {0} troca(s)", { 0: presentation.runtime.runtimeState.roomChangeCount })}
                   </strong>
-                  <small>Eventos espaciais observados na ROM</small>
+                  <small>{ui("Eventos espaciais observados na ROM")}</small>
                 </span>
               </section>
             ) : null}
           </>
         ) : (
-          <p>Execute o Play para complementar as estimativas com telemetria ao vivo.</p>
+          <p>{ui("Execute o Play para complementar as estimativas com telemetria ao vivo.")}</p>
         )}
         {presentation.isometric ? (
-          <section aria-label="Métricas isométricas" className="rooms-debugger-isometric" role="region">
-            <span><strong>{presentation.isometric.tilesUpdated} tiles atualizados</strong><small>BG2 + BG1 da cena</small></span>
-            <span><strong>{formatHardwareProfilerBytes(presentation.isometric.vramBytes)} VRAM</strong><small>Superfície, foreground e OBJ</small></span>
-            <span><strong>{presentation.isometric.oamObjects} / 128 OAM</strong><small>Atores isométricos ativos</small></span>
+          <section aria-label={ui("Métricas isométricas")} className="rooms-debugger-isometric" role="region">
+            <span><strong>{presentation.isometric.tilesUpdated} {ui(" tiles atualizados")}</strong><small>{ui("BG2 + BG1 da cena")}</small></span>
+            <span><strong>{formatHardwareProfilerBytes(presentation.isometric.vramBytes)} {ui(" VRAM")}</strong><small>{ui("Superfície, foreground e OBJ")}</small></span>
+            <span><strong>{presentation.isometric.oamObjects} {ui(" / 128 OAM")}</strong><small>{ui("Atores isométricos ativos")}</small></span>
             <span>
               <strong>
-                {presentation.isometric.foregroundTileCount} {presentation.isometric.foregroundTileCount === 1 ? "tile" : "tiles"} BG1
-              </strong>
-              <small>{formatHardwareProfilerBytes(presentation.isometric.foregroundBytes)} de foreground</small>
+                {presentation.isometric.foregroundTileCount} {presentation.isometric.foregroundTileCount === 1 ? ui("tile") : ui("tiles")} {ui(" BG1")}</strong>
+              <small>{formatHardwareProfilerBytes(presentation.isometric.foregroundBytes)} {ui(" de foreground")}</small>
             </span>
           </section>
         ) : null}
-        <section aria-label="Diagnóstico físico da cena" className="rooms-debugger-physical" role="region">
+        <section aria-label={ui("Diagnóstico físico da cena")} className="rooms-debugger-physical" role="region">
           <header>
             <div>
-              <strong>Diagnóstico físico</strong>
-              <small>Estimativa do editor · plano do exportador · medição do runtime · limite seguro</small>
+              <strong>{ui("Diagnóstico físico")}</strong>
+              <small>{ui("Estimativa do editor · plano do exportador · medição do runtime · limite seguro")}</small>
             </div>
             <span className={presentation.physical.criticalOverflow ? "error" : "ok"}>
-              {presentation.physical.criticalOverflow ? "Excedente crítico" : `${presentation.physical.measuredMetricCount}/10 medidos`}
+              {presentation.physical.criticalOverflow ? ui("Excedente crítico") : ui("{0}/10 medidos", { 0: presentation.physical.measuredMetricCount })}
             </span>
           </header>
-          <div aria-label="Matriz de recursos físicos" className="rooms-debugger-physical-table" role="table">
+          <div aria-label={ui("Matriz de recursos físicos")} className="rooms-debugger-physical-table" role="table">
             <div className="rooms-debugger-physical-row is-header" role="row">
-              <span role="columnheader">Recurso</span>
-              <span role="columnheader">Editor</span>
-              <span role="columnheader">Exportador</span>
-              <span role="columnheader">Runtime</span>
-              <span role="columnheader">Limite seguro</span>
-              <span role="columnheader">Crítico</span>
+              <span role="columnheader">{ui("Recurso")}</span>
+              <span role="columnheader">{ui("Editor")}</span>
+              <span role="columnheader">{ui("Exportador")}</span>
+              <span role="columnheader">{ui("Runtime")}</span>
+              <span role="columnheader">{ui("Limite seguro")}</span>
+              <span role="columnheader">{ui("Crítico")}</span>
             </div>
             {presentation.physical.metrics.map((metric) => (
               <div className={`rooms-debugger-physical-row ${metric.tone}`} key={metric.id} role="row">
-                <strong role="rowheader">{metric.label}</strong>
+                <strong role="rowheader">{ui(metric.label)}</strong>
                 <span role="cell">{formatScenePhysicalValue(metric, metric.estimate)}</span>
                 <span role="cell">{formatScenePhysicalValue(metric, metric.planned)}</span>
                 <span role="cell">{formatScenePhysicalValue(metric, metric.measured)}</span>
                 <span role="cell">{formatScenePhysicalValue(metric, metric.safeLimit)}</span>
-                <em role="cell">{metric.criticalOverflow ? `+${formatScenePhysicalValue(metric, metric.overflow)} crítico` : "—"}</em>
+                <em role="cell">{metric.criticalOverflow ? ui("+{0} crítico", { 0: formatScenePhysicalValue(metric, metric.overflow) }) : "—"}</em>
               </div>
             ))}
           </div>
           <small className="rooms-debugger-physical-note">
-            CPU/VBlank aparecem como medidos quando a ROM publica telemetria nativa. As demais colunas só mudam para “Runtime” quando o perfil fornecer amostra física correspondente.
-            {presentation.physical.catalog.bgTiles !== undefined || presentation.physical.resident.bgTiles !== undefined
-              ? ` Catálogo total BG: ${presentation.physical.catalog.bgTiles ?? "—"} · pico residente: ${presentation.physical.resident.bgTiles ?? "—"}.`
+            {ui("CPU/VBlank aparecem como medidos quando a ROM publica telemetria nativa. As demais colunas só mudam para “Runtime” quando o perfil fornecer amostra física correspondente.")}{presentation.physical.catalog.bgTiles !== undefined || presentation.physical.resident.bgTiles !== undefined
+              ? ui(" Catálogo total BG: {0} · pico residente: {1}.", { 0: presentation.physical.catalog.bgTiles ?? "—", 1: presentation.physical.resident.bgTiles ?? "—" })
               : ""}
           </small>
         </section>
         {enabledMetrics.length > 0 ? (
           <div className="rooms-debugger-hardware-grid">
             {enabledMetrics.map((metric) => (
-              <article aria-label={`Métrica ${metric.label}`} className={`rooms-debugger-hardware-card ${metric.tone}`} key={metric.id}>
+              <article aria-label={ui("Métrica {0}", { 0: ui(metric.label) })} className={`rooms-debugger-hardware-card ${metric.tone}`} key={metric.id}>
                 <div>
-                  <strong>{metric.label}</strong>
-                  <span>{metric.source === "measured" ? "Medido" : "Estimado"}</span>
+                  <strong>{ui(metric.label)}</strong>
+                  <span>{metric.source === "measured" ? ui("Medido") : ui("Estimado")}</span>
                 </div>
                 <b>{formatHardwareProfilerMetric(metric)}</b>
                 <div aria-hidden="true" className="rooms-debugger-hardware-meter">
                   <span style={{ width: `${Math.min(100, metric.percent)}%` }} />
                 </div>
-                <small>{metric.detail}</small>
+                <small>{ui(metric.detail)}</small>
               </article>
             ))}
           </div>
         ) : (
-          <p>Ative CPU, VRAM, OAM, paleta, ROM ou RAM em Ajustes → Debug.</p>
+          <p>{ui("Ative CPU, VRAM, OAM, paleta, ROM ou RAM em Ajustes → Debug.")}</p>
         )}
       </div>
     </details>
@@ -588,6 +612,7 @@ function RoomHardwareDebugger({ presentation }: { presentation: HardwareProfiler
 }
 
 function formatProjectBudgetValue(metric: ProjectBudgetMetric): string {
+  if (metric.pending) return `— / ${metric.capacity}`;
   if (metric.unit === "bytes") {
     return `${formatHardwareProfilerBytes(metric.used)} / ${formatHardwareProfilerBytes(metric.capacity)}`;
   }
@@ -598,6 +623,7 @@ function formatProjectBudgetValue(metric: ProjectBudgetMetric): string {
 function projectBudgetStatusLabel(presentation: ProjectBudgetPresentation): string {
   if (!presentation.projectReady || presentation.tone === "error") return "Limite excedido";
   if (presentation.tone === "warning") return "Atenção necessária";
+  if (presentation.sceneMetrics.some(metric => metric.pending)) return "Pendente";
   return "Dentro dos limites";
 }
 
@@ -614,52 +640,53 @@ function RoomProjectBudgetPanel({
   presentation: ProjectBudgetPresentation;
   running?: boolean;
 }): React.ReactElement {
+  const ui = useStudioUiText();
   const sceneLabel = sceneDisplayName(presentation.sceneName);
   return (
     <section
-      aria-label={`Orçamento GBA da cena ${sceneLabel}`}
+      aria-label={ui("Orçamento GBA da cena {0}", { 0: sceneLabel })}
       className={`room-project-budget ${presentation.tone}`}
     >
       <header className="room-project-budget-header">
         <div>
-          <span>{presentation.source === "compiler" ? "Relatório do compilador" : "Estimativa ao vivo"}</span>
-          <strong>{projectBudgetStatusLabel(presentation)}</strong>
+          <span>{presentation.source === "compiler" ? ui("Relatório do compilador") : ui("Estimativa ao vivo")}</span>
+          <strong>{ui(projectBudgetStatusLabel(presentation))}</strong>
           <small>
             {presentation.source === "compiler"
-              ? `Cena ${sceneLabel} · pressão máxima ${presentation.maxScenePressure}%`
-              : "Use a análise para validar compressão, bancos e fragmentação com o assetc."}
+              ? ui("Cena {0} · pressão máxima {1}%", { 0: sceneLabel, 1: presentation.maxScenePressure })
+              : ui("Use a análise para validar compressão, bancos e fragmentação com o assetc.")}
           </small>
         </div>
         <button
-          aria-label="Analisar orçamento agora"
+          aria-label={ui("Analisar orçamento agora")}
           disabled={running || !onAnalyze}
           onClick={onAnalyze}
           type="button"
         >
-          {running ? "Analisando…" : "Analisar agora"}
+          {running ? ui("Analisando…") : ui("Analisar agora")}
         </button>
       </header>
 
-      {analysisError ? <p className="room-project-budget-error">{analysisError}</p> : null}
+      {analysisError ? <p className="room-project-budget-error">{ui(analysisError)}</p> : null}
       {generatedAt && presentation.source === "compiler" ? (
-        <p className="room-project-budget-timestamp">Atualizado em {new Date(generatedAt).toLocaleString("pt-BR")}</p>
+        <p className="room-project-budget-timestamp">{ui("Atualizado em ")}{new Date(generatedAt).toLocaleString(readStoredLocale())}</p>
       ) : null}
 
-      <div aria-label="Pressão de recursos da cena" className="room-project-budget-grid">
+      <div aria-label={ui("Pressão de recursos da cena")} className="room-project-budget-grid">
         {presentation.sceneMetrics.map((metric) => (
-          <article aria-label={`Pressão ${metric.label}`} className={metric.tone} key={metric.id}>
-            <div><strong>{metric.label}</strong><span>{metric.percent}%</span></div>
+          <article aria-label={ui("Pressão {0}", { 0: ui(metric.label) })} className={metric.tone} key={metric.id}>
+            <div><strong>{ui(metric.label)}</strong><span>{metric.pending ? ui("Pendente") : `${metric.percent}%`}</span></div>
             <b>{formatProjectBudgetValue(metric)}</b>
             <div aria-hidden="true" className="room-project-budget-meter">
-              <span style={{ width: `${Math.min(100, metric.percent)}%` }} />
+              <span style={{ width: `${metric.pending ? 0 : Math.min(100, metric.percent)}%` }} />
             </div>
-            <small>{metric.remaining} restante(s)</small>
+            <small>{metric.pending ? ui("Disponível depois da análise do compilador.") : <>{metric.remaining} {ui(" restante(s)")}</>}</small>
           </article>
         ))}
       </div>
 
-      <section aria-label="Compressão sugerida" className="room-project-budget-detail">
-        <h5>Compressão</h5>
+      <section aria-label={ui("Compressão sugerida")} className="room-project-budget-detail">
+        <h5>{ui("Compressão")}</h5>
         {presentation.compression.length > 0 ? (
           <ul>
             {presentation.compression.map((candidate) => (
@@ -670,39 +697,39 @@ function RoomProjectBudgetPanel({
             ))}
           </ul>
         ) : (
-          <p>{presentation.source === "compiler" ? "Nenhum candidato detectado." : "Disponível depois da análise do compilador."}</p>
+          <p>{presentation.source === "compiler" ? ui("Nenhum candidato detectado.") : ui("Disponível depois da análise do compilador.")}</p>
         )}
       </section>
 
-      <section aria-label="Carga DMA por troca de banco" className="room-project-budget-detail">
-        <h5>Carga DMA estimada</h5>
-        <p>
+      <section aria-label={ui("Carga DMA por troca de banco")} className="room-project-budget-detail">
+        <h5>{ui("Carga DMA estimada")}</h5>
+        {presentation.dma.pending ? <p>{ui("Disponível depois da análise do compilador.")}</p> : <><p>
           <strong>{formatHardwareProfilerBytes(presentation.dma.estimatedBytes)} / {formatHardwareProfilerBytes(presentation.dma.budgetBytes)}</strong>
-          {` · ${presentation.dma.percent}% · ${presentation.dma.uploadCount} upload(s)`}
+          {ui(" · {0}% · {1} upload(s)", { 0: presentation.dma.percent, 1: presentation.dma.uploadCount })}
         </p>
-        <p>{presentation.dma.action}</p>
-        <small>Orçamento editorial de prefetch; não representa um limite físico isolado do DMA do GBA.</small>
+        <p>{presentation.dma.action}</p></>}
+        <small>{ui("Orçamento editorial de prefetch; não representa um limite físico isolado do DMA do GBA.")}</small>
       </section>
 
-      <section aria-label="Fragmentação do projeto" className="room-project-budget-detail">
-        <h5>Fragmentação do projeto</h5>
+      <section aria-label={ui("Fragmentação do projeto")} className="room-project-budget-detail">
+        <h5>{ui("Fragmentação do projeto")}</h5>
         {presentation.fragmentation.length > 0 ? (
           <ul>
             {presentation.fragmentation.map((item) => (
               <li key={item.id}>
                 <strong>{item.label}</strong>
-                <span>{item.freeFragments} blocos livres · maior bloco {item.largestFreeBlock}</span>
+                <span>{item.freeFragments} {ui(" blocos livres · maior bloco ")}{item.largestFreeBlock}</span>
               </li>
             ))}
           </ul>
         ) : (
-          <p>{presentation.source === "compiler" ? "Sem fragmentação relevante." : "Disponível depois da análise do compilador."}</p>
+          <p>{presentation.source === "compiler" ? ui("Sem fragmentação relevante.") : ui("Disponível depois da análise do compilador.")}</p>
         )}
       </section>
 
       <footer>
-        <span>Projeto: {presentation.projectReady ? "apto para exportação" : `${presentation.blockingOverflowCount} estouro(s) bloqueante(s)`}</span>
-        <small>A análise roda fora da ROM e não adiciona overlays ao jogo.</small>
+        <span>{ui("Projeto: ")}{presentation.projectReady ? ui("apto para exportação") : ui("{0} estouro(s) bloqueante(s)", { 0: presentation.blockingOverflowCount })}</span>
+        <small>{ui("A análise roda fora da ROM e não adiciona overlays ao jogo.")}</small>
       </footer>
     </section>
   );
@@ -780,16 +807,17 @@ function roomToolUnavailableReason(
   room: RoomsWorkspaceRoom,
   availableTools: readonly string[]
 ): string | null {
+  if (room.sceneType === "dungeonCrawler" && ["paint", "height", "camera", "warp"].includes(mode)) return ui("Dungeon usa células lógicas e câmera em primeira pessoa. Edite paredes, marcadores e início no labirinto.");
   if (mode === "warp" || mode === "hud") return null;
   const isometricConfig = roomIsometricConfig(room);
   if (mode === "paint" && (isometricConfig?.pagedSurface || isometricConfig?.worldMode === "static_composition")) {
-    return "O cenário usa imagens compostas. Edite o fundo na seção Fundo; colisão e altura continuam editáveis.";
+    return ui("O cenário usa imagens compostas. Edite o fundo na seção Fundo; colisão e altura continuam editáveis.");
   }
   if (availableTools.includes(mode)) return null;
-  if (mode === "collision") return "Colisão por tiles não é exportada para este tipo de cena.";
-  if (mode === "trigger") return "Gatilhos de gameplay não são exportados para este tipo de cena.";
-  if (mode === "height") return "Altura está disponível apenas em cenas isométricas.";
-  return `A ferramenta não faz parte do runtime ${sceneTypeLabel(room.sceneType)}.`;
+  if (mode === "collision") return ui("Colisão por tiles não é exportada para este tipo de cena.");
+  if (mode === "trigger") return ui("Gatilhos de gameplay não são exportados para este tipo de cena.");
+  if (mode === "height") return ui("Altura está disponível apenas em cenas isométricas.");
+  return ui("A ferramenta não faz parte do runtime {0}.", { 0: ui(sceneTypeLabel(room.sceneType)) });
 }
 
 function isEditableKeyboardTarget(target: EventTarget | null): boolean {
@@ -987,10 +1015,11 @@ function roomIsometricConfig(room: RoomsWorkspaceRoom): IsometricSceneConfig | u
 
 function roomRuntimeHudAsset(room: RoomsWorkspaceRoom | null): string | undefined {
   if (!room) return undefined;
-  if (room.runtime?.type === "luta") {
+  if (room.runtime?.type === "luta" || room.runtime?.type === "battleRpg") {
     const asset = (room.runtime.config as Record<string, unknown> | undefined)?.hudAssetName;
     return typeof asset === "string" ? asset : undefined;
   }
+  if(room.runtime?.type === "dungeonCrawler")return normalizeDungeonCrawlerSceneConfig(room.runtime.config).presentation?.hudAssetName;
   const config = roomIsometricConfig(room);
   return config?.tacticalCapabilities?.some(capability => capability.id === "tactical_hud" && capability.enabled)
     ? config.tacticalPresentation?.hudLayout : undefined;
@@ -1043,6 +1072,7 @@ function roomTileCenterStyle(room: RoomsWorkspaceRoom, x: number, y: number): CS
 }
 
 function roomSceneResolutionLabel(room: RoomsWorkspaceRoom): string {
+  if(room.sceneType === "dungeonCrawler")return "240 × 160";
   if (room.sceneType !== "isometric") return room.gbaResolution;
   const size = roomIsometricSurfaceSize(room) ?? deriveIsometricWorldSize({
     atlasTileHeight: room.backgroundAtlasTileHeight,
@@ -1057,9 +1087,10 @@ function IsometricPagedForeground({room, projectData, projectPath, assetRefreshT
   room: RoomsWorkspaceRoom; projectData: GBAProjectData | null | undefined; projectPath: string | undefined;
   assetRefreshToken?: number;
 }): React.ReactElement | null {
+  const ui = useStudioUiText();
   const surface = roomIsometricConfig(room)?.pagedSurface;
   const url = refreshedPreviewAssetURL(surface ? resolveProjectAssetURL(projectData, projectPath, surface.foregroundAsset) : null, assetRefreshToken);
-  return url ? <img alt="Corrimãos frontais" className="room-stage-background-layout" data-isometric-paged-foreground
+  return url ? <img alt={ui("Corrimãos frontais")} className="room-stage-background-layout" data-isometric-paged-foreground
     draggable={false} src={url} style={{zIndex: 100}} /> : null;
 }
 
@@ -1102,6 +1133,7 @@ function TacticalSurfacePreviewOverlay({
   projectPath,
   assetRefreshToken = 0
 }: TacticalSurfacePreviewOverlayProps): React.ReactElement | null {
+  const ui = useStudioUiText();
   const [sourceSizes, setSourceSizes] = useState<Record<string, { width: number; height: number }>>({});
   const bounds = pages.reduce(
     (current, page) => ({
@@ -1210,6 +1242,7 @@ interface RoomHudOverlayProps {
   selectedComponentID?: string | null;
   viewportAnchored?: boolean;
   viewportScale: number;
+  dungeonDirection?: number;
 }
 
 export function RoomHudOverlay({
@@ -1227,8 +1260,10 @@ export function RoomHudOverlay({
   room,
   selectedComponentID,
   viewportAnchored = false,
-  viewportScale
+  viewportScale,
+  dungeonDirection
 }: RoomHudOverlayProps): React.ReactElement {
+  const ui = useStudioUiText();
   const [draft, setDraft] = useState<HudComponent | null>(null);
   const gesture = useRef<{ original: HudComponent; draft: HudComponent; x: number; y: number; pointerID: number; resize: boolean } | null>(null);
   useEffect(() => { gesture.current = null; setDraft(null); }, [binding.presetId, editable, canEdit]);
@@ -1278,6 +1313,14 @@ export function RoomHudOverlay({
   };
   const scale = Number.isFinite(viewportScale) && viewportScale > 0 ? viewportScale : 1;
   const assetURL = (assetName: string): string | null => resolveProjectAssetURL(projectData, projectPath, assetName);
+  const battlePresentation = room?.runtime?.type === "battleRpg"
+    ? normalizeBattleRpgSceneConfig(room.runtime.config).presentation : undefined;
+  // The editor freezes the command menu at its initial state. These two icons
+  // are owned by the combat runtime, which controls their visibility in Play.
+  const battleSnapshotPreset = battlePresentation ? { ...preset, components: preset.components.map(component =>
+    component.asset && [battlePresentation.cursorAssetName, battlePresentation.disabledEscapeAssetName].includes(component.asset)
+      ? { ...component, visible: true } : component) } : preset;
+  const snapshotPreset = dungeonDirection === undefined ? battleSnapshotPreset : { ...battleSnapshotPreset, components: battleSnapshotPreset.components.map(component => component.id === "dungeon-direction" ? { ...component, text: "NLSO"[dungeonDirection & 3] } : component) };
   const presetBackgroundURL = assetURL(preset.backgroundImage);
   const componentAssetURL = (component: HudComponent): string | null => (
     assetURL(component.asset) ?? (component.kind === "frame" ? presetBackgroundURL : null)
@@ -1292,7 +1335,7 @@ export function RoomHudOverlay({
 
   return (
     <div
-      aria-label={`${labelPrefix} ${preset.name} · origem ${hudPresetBindingSourceLabel(binding.source)}`}
+      aria-label={ui("{0} {1} · origem {2}", { 0: ui(labelPrefix), 1: preset.name, 2: ui(hudPresetBindingSourceLabel(binding.source)) })}
       className={`room-hud-overlay${editable ? " is-editable" : ""}${viewportAnchored ? " is-viewport-anchored" : ""}${guides ? "" : " without-guides"}`}
       data-hud-binding-source={binding.source}
       data-hud-binding-status={binding.status}
@@ -1307,16 +1350,16 @@ export function RoomHudOverlay({
       }}
     >
       <span aria-hidden="true" className="room-hud-overlay-meta">
-        <strong>HUD · 240×160</strong>
-        <span>{libraryPreview ? "Prévia da biblioteca" : `Origem: ${hudPresetBindingSourceLabel(binding.source)}`}</span>
-        {room?.sceneType === "dungeonCrawler" ? <span>Estado: congelado</span> : null}
+        <strong>{ui("HUD · 240×160")}</strong>
+        <span>{libraryPreview ? ui("Prévia da biblioteca") : ui("Origem: {0}", { 0: ui(hudPresetBindingSourceLabel(binding.source)) })}</span>
+        {room?.sceneType === "dungeonCrawler" ? <span>{ui("Estado: congelado")}</span> : null}
       </span>
       <HudPreviewSnapshot
-        actionLabel="A: confirmar"
+        actionLabel={ui("A: confirmar")}
         backgroundAssetURL={presetBackgroundURL}
         fontAssetURL={assetURL(preset.font || (projectData ? resolveSceneDialogueUiSettings(projectData, room?.id).font : ""))}
         className="room-hud-overlay-rendered"
-        preset={preset}
+        preset={snapshotPreset}
         resolveComponentAssetURL={componentAssetURL}
         transparentBackground
       />
@@ -1336,13 +1379,13 @@ export function RoomHudOverlay({
         />
       ))}
       {binding.status === "missing" ? (
-        <span aria-hidden="true" className="room-hud-overlay-status">Preset não encontrado · fallback do projeto</span>
+        <span aria-hidden="true" className="room-hud-overlay-status">{ui("Preset não encontrado · fallback do projeto")}</span>
       ) : null}
       {preset.mode === "advanced" ? preset.components.filter((component) => component.visible).map((component) => (
         editable ? (
           <Fragment key={`${preset.id}-${component.id}`}>
           <button
-            aria-label={`Editar ${component.label || component.kind}`}
+            aria-label={ui("Editar {0}", { 0: component.label || component.kind })}
             aria-pressed={selectedComponentID === component.id}
             className={`room-hud-overlay-component kind-${component.kind}${selectedComponentID === component.id ? " is-selected" : ""}`}
             data-hud-component-id={component.id}
@@ -1364,7 +1407,7 @@ export function RoomHudOverlay({
             {dungeonHudPreviewText(component, room) ? <span className="studio-visually-hidden">{dungeonHudPreviewText(component, room)}</span> : null}
           </button>
           {canEdit && selectedComponentID === component.id ? <button
-            type="button" className="room-hud-resize-handle" aria-label={`Redimensionar ${component.label || component.kind}`}
+            type="button" className="room-hud-resize-handle" aria-label={ui("Redimensionar {0}", { 0: component.label || component.kind })}
             style={{ left: (component.x + component.width) * scale - 12, top: (component.y + component.height) * scale - 12, zIndex: 24 }}
             onClick={event => event.stopPropagation()}
             onPointerDown={event => startGesture(event, component, true)} onPointerMove={moveGesture}
@@ -1418,6 +1461,7 @@ function AffineScenePreviewOverlay({
   projectPath,
   room
 }: AffineScenePreviewOverlayProps): React.ReactElement | null {
+  const ui = useStudioUiText();
   const normalized = normalizeAffineScenePresentation(presentation);
   if (!normalized.enabled) return null;
   const matrix = affineMatrixForScenePresentation(
@@ -1436,7 +1480,7 @@ function AffineScenePreviewOverlay({
 
   return (
     <div
-      aria-label={`Prévia congelada da camada Affine da cena ${sceneDisplayName(room.name)}`}
+      aria-label={ui("Prévia congelada da camada Affine da cena {0}", { 0: sceneDisplayName(room.name) })}
       className="room-affine-preview-layer"
       data-affine-asset-id={normalized.assetId || undefined}
       data-affine-layer={normalized.layer}
@@ -1451,7 +1495,7 @@ function AffineScenePreviewOverlay({
     >
       {affineURL ? <img alt="" draggable={false} src={affineURL} /> : null}
       <span className="room-affine-preview-label">
-        {normalized.assetId ? `Affine · ${normalized.layer}` : "Affine ativado · selecione um asset"}
+        {normalized.assetId ? ui("Affine · {0}", { 0: normalized.layer }) : ui("Affine ativado · selecione um asset")}
       </span>
     </div>
   );
@@ -1470,6 +1514,7 @@ function SceneCompositionPreviewOverlay({
   projectPath?: string;
   room: RoomsWorkspaceRoom;
 }): React.ReactElement | null {
+  const ui = useStudioUiText();
   if (!composition.enabled) return null;
   if (composition.mode === "affine") {
     return (
@@ -1495,7 +1540,7 @@ function SceneCompositionPreviewOverlay({
   ].filter((entry): entry is string => Boolean(entry));
   return (
     <div
-      aria-label={`Prévia congelada da composição ${composition.mode} da cena ${sceneDisplayName(room.name)}`}
+      aria-label={ui("Prévia congelada da composição {0} da cena {1}", { 0: composition.mode, 1: sceneDisplayName(room.name) })}
       className="room-affine-preview-layer"
       data-composition-effects={effectLabels.join(",") || undefined}
       data-composition-mode={composition.mode}
@@ -1505,7 +1550,7 @@ function SceneCompositionPreviewOverlay({
     >
       {bitmapURL ? <img alt="" draggable={false} src={bitmapURL} /> : null}
       <span className="room-affine-preview-label">
-        {bitmapLayer?.assetId ? `${composition.mode} · ${bitmapLayer.assetId}` : `${composition.mode} ativado · selecione um asset`}
+        {bitmapLayer?.assetId ? `${composition.mode} · ${bitmapLayer.assetId}` : ui("{0} ativado · selecione um asset", { 0: composition.mode })}
       </span>
     </div>
   );
@@ -1527,6 +1572,7 @@ interface RoomMenuCompositionOverlayProps {
 }
 
 function RoomMenuCompositionOverlay({ room, screenID, selectedItemIndex = 0 }: RoomMenuCompositionOverlayProps): React.ReactElement | null {
+  const ui = useStudioUiText();
   if (room.runtime?.type !== "menu") return null;
   const config = normalizeMenuSceneConfig(room.runtime.config);
   const screen = config.screens?.find((candidate) => candidate.id === screenID);
@@ -1537,10 +1583,10 @@ function RoomMenuCompositionOverlay({ room, screenID, selectedItemIndex = 0 }: R
   return (
     <div
       aria-label={isGenderSelection
-        ? "Prévia visual da escolha de gênero"
+        ? ui("Prévia visual da escolha de gênero")
         : textInput
-          ? "Prévia visual da entrada do nome"
-          : `Prévia visual do menu ${preview.title}`}
+          ? ui("Prévia visual da entrada do nome")
+          : ui("Prévia visual do menu {0}", { 0: preview.title })}
       className={`room-menu-composition-overlay is-${preview.screenType} is-${preview.role}`}
       data-menu-preview-role={preview.role}
       data-menu-preview-screen-type={preview.screenType}
@@ -1556,13 +1602,13 @@ function RoomMenuCompositionOverlay({ room, screenID, selectedItemIndex = 0 }: R
           style={menuOverlayBoxStyle(item.clickBox)}
         >
           <strong>{item.label}</strong>
-          <small>{item.id === "male" ? "gênero = 0" : item.id === "female" ? "gênero = 1" : item.action}</small>
+          <small>{item.id === "male" ? ui("gênero = 0") : item.id === "female" ? ui("gênero = 1") : item.action}</small>
         </span>
       ))}
       {isGenderSelection ? (
         <span aria-hidden="true" className="room-menu-profile-status">
-          <strong>Perfil do jogador</strong>
-          <span>Escolha o sprite e a animação antes de confirmar.</span>
+          <strong>{ui("Perfil do jogador")}</strong>
+          <span>{ui("Escolha o sprite e a animação antes de confirmar.")}</span>
         </span>
       ) : null}
       {textInput ? (
@@ -1582,7 +1628,7 @@ function RoomMenuCompositionOverlay({ room, screenID, selectedItemIndex = 0 }: R
                 <span className={index === textInput.cursorIndex ? "is-cursor" : ""} key={`name-slot-${index}`}>{slot}</span>
               ))}
             </strong>
-            <small>{textInput.variableName} · {textInput.maxLength} caracteres</small>
+            <small>{textInput.variableName} · {textInput.maxLength} {ui(" caracteres")}</small>
           </span>
           {textInput.keyboard ? (
             <>
@@ -1605,7 +1651,7 @@ function RoomMenuCompositionOverlay({ room, screenID, selectedItemIndex = 0 }: R
                 </span>
                 <span className="room-menu-keyboard-guide-controls">
                   {textInput.keyboard.controls.map((control) => (
-                    <span className={control.enabled ? "" : "is-disabled"} key={control.id}>{control.label}</span>
+                    <span className={control.enabled ? "" : "is-disabled"} key={control.id}>{ui(control.label)}</span>
                   ))}
                 </span>
               </span>
@@ -1621,7 +1667,7 @@ function RoomMenuCompositionOverlay({ room, screenID, selectedItemIndex = 0 }: R
                   })}
                 >
                   {textInput.keyboard.controls.map((control) => (
-                    <span className={control.enabled ? "" : "is-disabled"} key={`side-${control.id}`}>{control.label}</span>
+                    <span className={control.enabled ? "" : "is-disabled"} key={`side-${control.id}`}>{ui(control.label)}</span>
                   ))}
                 </span>
               ) : null}
@@ -1701,6 +1747,12 @@ function roomEntityStyle(
   const isometricFrameHeight = frame
     ? (frame.frameHeight / Math.max(1, isometricWorldSize?.height ?? (isometricTileHeight / 2) * isometricSpan)) * 100
     : isometricTile?.heightPercent ?? 0;
+  const isometricPivotX = frame && entity.spritePivot
+    ? entity.spritePivot.x / Math.max(1, isometricWorldSize?.width ?? 1) * 100
+    : isometricFrameWidth / 2;
+  const isometricPivotY = frame && entity.spritePivot
+    ? entity.spritePivot.y / Math.max(1, isometricWorldSize?.height ?? 1) * 100
+    : isometricFrameHeight;
   const isometricElevation = entity.z ?? room.heightLevels?.[Math.floor(entity.y) * room.width + Math.floor(entity.x)] ?? 0;
   // The engine anchors sprites at the diamond center, after applying elevation.
   const isometricFeet = isometricTile
@@ -1711,8 +1763,8 @@ function roomEntityStyle(
     backgroundImage: spriteURL ? `url("${spriteURL}")` : undefined,
     clipPath: isometricArea?.clipPath,
     height: isometricArea ? `${isometricArea.heightPercent}%` : isometricTile ? `${isometricFrameHeight}%` : position.height,
-    left: isometricArea ? `${isometricArea.leftPercent}%` : isometricTile ? `${isometricTile.leftPercent + (isometricTile.widthPercent - isometricFrameWidth) / 2}%` : position.left,
-    top: isometricArea ? `${isometricArea.topPercent}%` : isometricTile ? `${isometricFeet - isometricFrameHeight}%` : position.top,
+    left: isometricArea ? `${isometricArea.leftPercent}%` : isometricTile ? `${isometricTile.leftPercent + isometricTile.widthPercent / 2 - isometricPivotX}%` : position.left,
+    top: isometricArea ? `${isometricArea.topPercent}%` : isometricTile ? `${isometricFeet - isometricPivotY}%` : position.top,
     transform: affineObj ? `rotate(${affineObj.rotationDegrees}deg) scale(${affineObj.scaleX}, ${affineObj.scaleY})` : undefined,
     transformOrigin: affineObj ? "center center" : undefined,
     width: isometricArea ? `${isometricArea.widthPercent}%` : isometricTile ? `${isometricFrameWidth}%` : position.width,
@@ -1777,6 +1829,7 @@ interface IsometricGridOverlayProps {
   roomHeight: number;
   roomWidth: number;
   selectedCellIndex?: number | null;
+  selectedEntityCells?: readonly boolean[];
   surfaceSize: IsometricWorldSize;
   showCameraBounds?: boolean;
   showGridCells?: boolean;
@@ -1793,6 +1846,7 @@ function IsometricGridOverlay({
   roomHeight,
   roomWidth,
   selectedCellIndex = null,
+  selectedEntityCells,
   surfaceSize,
   showCameraBounds = false,
   showGridCells = true,
@@ -1800,6 +1854,7 @@ function IsometricGridOverlay({
   useWorldCoordinates = false,
   worldMode = "scrollable_tiled_world"
 }: IsometricGridOverlayProps): React.ReactElement {
+  const ui = useStudioUiText();
   const geometry = useMemo(() => deriveIsometricGeometryContract({
     cameraBounds,
     config,
@@ -1831,7 +1886,7 @@ function IsometricGridOverlay({
 
   return (
     <svg
-      aria-label={`Mundo isométrico ${projectionLabel} · ${roomWidth}×${roomHeight} células · mundo ${worldWidth}×${worldHeight} · viewport ${geometry.cameraBounds.width}×${geometry.cameraBounds.height}`}
+      aria-label={ui("Mundo isométrico {0} · {1}×{2} células · mundo {3}×{4} · viewport {5}×{6}", { 0: projectionLabel, 1: roomWidth, 2: roomHeight, 3: worldWidth, 4: worldHeight, 5: geometry.cameraBounds.width, 6: geometry.cameraBounds.height })}
       className={`room-stage-isometric-grid${worldMode === "static_composition" ? " is-static-composition" : ""}`}
       data-grid-cell-count={cells.length}
       data-grid-bounds={`${geometry.gridBounds.x},${geometry.gridBounds.y},${geometry.gridBounds.width},${geometry.gridBounds.height}`}
@@ -1853,7 +1908,8 @@ function IsometricGridOverlay({
               className={[
                 "room-stage-isometric-grid-cell",
                 cell.index === hoverCellIndex ? "is-hovered" : "",
-                cell.index === selectedCellIndex ? "is-selected" : ""
+                cell.index === selectedCellIndex ? "is-selected" : "",
+                selectedEntityCells?.[cell.index] ? "is-entity-selected" : ""
               ].filter(Boolean).join(" ")}
               data-cell-index={cell.index}
               key={`isometric-grid-cell-${cell.index}`}
@@ -1922,33 +1978,33 @@ function roomCollisionInspector(
   }
 
   return (
-    <section className="room-collision-inspector" aria-label="Inspector Colisão">
+    <section className="room-collision-inspector" aria-label={ui("Inspector Colisão")}>
       <div className="room-collision-inspector-title">
         <div className="room-collision-title-line">
-            <span>Células com colisão</span>
-            <InspectorInfoTip label="Colisão">
+            <span>{ui("Células com colisão")}</span>
+            <InspectorInfoTip label={ui("Colisão")}>
               {collisionPlacementMode === "rectangle"
-                ? "Arraste no canvas para preencher uma área retangular."
+                ? ui("Arraste no canvas para preencher uma área retangular.")
                 : collisionPlacementMode === "fill"
-                  ? "Clique no canvas para preencher a região conectada do mesmo tipo."
+                  ? ui("Clique no canvas para preencher a região conectada do mesmo tipo.")
                   : room.tilemapContract
-                    ? "Clique ou arraste para pintar metatiles de 16×16 (quatro células físicas)."
-                    : "Clique ou arraste para pintar células."}
-              {" Alt+clique captura o tipo da célula; clique direito apaga a colisão."}
-              {collisionHoverPreviewEnabled ? " A prévia ao passar o cursor está ativa." : " A prévia ao passar o cursor está desativada."}
-              {room.sceneType === "platformer" ? " Plataforma: cada célula representa 8×8 px; rampas mostram a área triangular de piso e escadas são regiões verticais acionáveis." : null}
+                    ? ui("Clique ou arraste para pintar metatiles de 16×16 (quatro células físicas).")
+                    : ui("Clique ou arraste para pintar células.")}
+              {ui(" Alt+clique captura o tipo da célula; clique direito apaga a colisão.")}
+              {collisionHoverPreviewEnabled ? ui(" A prévia ao passar o cursor está ativa.") : ui(" A prévia ao passar o cursor está desativada.")}
+              {room.sceneType === "platformer" ? ui(" Plataforma: cada célula representa 8×8 px; rampas mostram a área triangular de piso e escadas são regiões verticais acionáveis.") : null}
             </InspectorInfoTip>
         </div>
         <em>{room.collisionCount}</em>
       </div>
-      <div aria-label="Modo de aplicação da colisão" className="room-collision-placement-mode" role="group">
+      <div aria-label={ui("Modo de aplicação da colisão")} className="room-collision-placement-mode" role="group">
         <button
           aria-pressed={collisionPlacementMode === "brush"}
           className={collisionPlacementMode === "brush" ? "active" : ""}
           onClick={() => setCollisionPlacementMode("brush")}
           type="button"
         >
-          Pincel <small>{room.tilemapContract ? "Metatiles" : "Células"}</small>
+          {ui("Pincel ")}<small>{room.tilemapContract ? ui("Metatiles") : ui("Células")}</small>
         </button>
         <button
           aria-pressed={collisionPlacementMode === "rectangle"}
@@ -1956,7 +2012,7 @@ function roomCollisionInspector(
           onClick={() => setCollisionPlacementMode("rectangle")}
           type="button"
         >
-          Retângulo <small>Área</small>
+          {ui("Retângulo ")}<small>{ui("Área")}</small>
         </button>
         <button
           aria-pressed={collisionPlacementMode === "fill"}
@@ -1964,15 +2020,15 @@ function roomCollisionInspector(
           onClick={() => setCollisionPlacementMode("fill")}
           type="button"
         >
-          Preencher <small>Região</small>
+          {ui("Preencher ")}<small>{ui("Região")}</small>
         </button>
       </div>
       <div className="room-collision-type-group">
-        <span>Tipo aplicado</span>
-        <div aria-label="Tipos de colisão" className="room-collision-type-grid" role="group">
+        <span>{ui("Tipo aplicado")}</span>
+        <div aria-label={ui("Tipos de colisão")} className="room-collision-type-grid" role="group">
           {allowedCollisionTypes.map((collisionType) => (
             <button
-              aria-label={`Tipo de colisão ${roomCollisionTypeLabel(collisionType)}`}
+              aria-label={ui("Tipo de colisão {0}", { 0: roomCollisionTypeLabel(collisionType) })}
               aria-pressed={activeCollisionType === collisionType}
               className={activeCollisionType === collisionType ? "active" : ""}
               key={collisionType}
@@ -1985,37 +2041,37 @@ function roomCollisionInspector(
         </div>
       </div>
       <div className={selectedCellIndex === null ? "room-collision-selected-cell is-empty" : "room-collision-selected-cell"}>
-        <span>{room.tilemapContract ? "Metatile selecionado" : "Célula selecionada"}</span>
-        <strong>{selectedCellIndex === null ? "Nenhuma" : selectedCellIndex + 1}</strong>
+        <span>{room.tilemapContract ? ui("Metatile selecionado") : ui("Célula selecionada")}</span>
+        <strong>{selectedCellIndex === null ? ui("Nenhuma") : selectedCellIndex + 1}</strong>
         {selectedCellIndex !== null ? <div>
-          <button disabled={selectedCellIndex === null} onClick={() => updateSelectedCellCollision("free")} type="button">Livre</button>
-          <button disabled={selectedCellIndex === null} onClick={() => updateSelectedCellCollision("solid")} type="button">Sólido</button>
+          <button disabled={selectedCellIndex === null} onClick={() => updateSelectedCellCollision("free")} type="button">{ui("Livre")}</button>
+          <button disabled={selectedCellIndex === null} onClick={() => updateSelectedCellCollision("solid")} type="button">{ui("Sólido")}</button>
         </div> : null}
         {selectedCellIndex !== null && room.sceneType === "isometric" ? (
           <div className="room-collision-ramp-actions">
             <button
-              aria-label="Rampa subindo à direita"
+              aria-label={ui("Rampa subindo à direita")}
               disabled={selectedCellIndex === null}
               onClick={() => updateSelectedCellCollision("slope_up_right")}
               type="button"
-            >Rampa ↗</button>
+            >{ui("Rampa ↗")}</button>
             <button
-              aria-label="Rampa subindo à esquerda"
+              aria-label={ui("Rampa subindo à esquerda")}
               disabled={selectedCellIndex === null}
               onClick={() => updateSelectedCellCollision("slope_up_left")}
               type="button"
-            >Rampa ↖</button>
+            >{ui("Rampa ↖")}</button>
           </div>
         ) : null}
       </div>
       <div className="room-collision-actions">
         <button onClick={onSetBorderCollision} type="button">
           <Grid3X3 aria-hidden="true" size={16} strokeWidth={2.2} />
-          <span>Borda</span>
+          <span>{ui("Borda")}</span>
         </button>
         <button onClick={onClearCollision} type="button">
           <Trash2 aria-hidden="true" size={16} strokeWidth={2.2} />
-          <span>Limpar</span>
+          <span>{ui("Limpar")}</span>
         </button>
       </div>
     </section>
@@ -2023,18 +2079,19 @@ function roomCollisionInspector(
 }
 
 export function RoomGeometryDiagnosticsPanel({ room }: { room: RoomsWorkspaceRoom }): React.ReactElement {
+  const ui = useStudioUiText();
   const diagnostics = room.geometryDiagnostics;
   if (!diagnostics) {
     return (
-      <section aria-label="Diagnóstico geométrico da cena" className="room-geometry-diagnostics" role="region">
+      <section aria-label={ui("Diagnóstico geométrico da cena")} className="room-geometry-diagnostics" role="region">
         <div className="room-geometry-diagnostics-header">
           <div>
-            <span>Validação</span>
-            <h5>Diagnóstico geométrico</h5>
+            <span>{ui("Validação")}</span>
+            <h5>{ui("Diagnóstico geométrico")}</h5>
           </div>
-          <strong className="unknown">Não verificado</strong>
+          <strong className="unknown">{ui("Não verificado")}</strong>
         </div>
-        <p>Este diagnóstico fica disponível quando a cena é carregada pelo modelo atual do workspace.</p>
+        <p>{ui("Este diagnóstico fica disponível quando a cena é carregada pelo modelo atual do workspace.")}</p>
       </section>
     );
   }
@@ -2058,57 +2115,56 @@ export function RoomGeometryDiagnosticsPanel({ room }: { room: RoomsWorkspaceRoo
   );
 
   return (
-    <section aria-label="Diagnóstico geométrico da cena" className="room-geometry-diagnostics" role="region">
+    <section aria-label={ui("Diagnóstico geométrico da cena")} className="room-geometry-diagnostics" role="region">
       <div className="room-geometry-diagnostics-header">
         <div>
-          <span>Validação</span>
-          <h5>Diagnóstico geométrico</h5>
+          <span>{ui("Validação")}</span>
+          <h5>{ui("Diagnóstico geométrico")}</h5>
         </div>
         <strong className={overallStatus}>
-          {totalIssues > 0 ? `${totalIssues} alerta(s)` : overallStatus === "unknown" ? "Não verificado" : "Pronto"}
+          {totalIssues > 0 ? ui("{0} alerta(s)", { 0: totalIssues }) : overallStatus === "unknown" ? ui("Não verificado") : ui("Pronto")}
         </strong>
       </div>
-      <p>Confere a grade lógica com o fundo e sinaliza posições que podem quebrar a jogabilidade.</p>
+      <p>{ui("Confere a grade lógica com o fundo e sinaliza posições que podem quebrar a jogabilidade.")}</p>
       <div className="room-geometry-diagnostics-grid">
         <div className={`room-geometry-diagnostic-card ${background.status}`}>
-          <span>Grade visual</span>
-          <strong>{backgroundStatusLabels[background.status]}</strong>
+          <span>{ui("Grade visual")}</span>
+          <strong>{ui(backgroundStatusLabels[background.status])}</strong>
           <small>{dimensionSummary}</small>
         </div>
         <div className={`room-geometry-diagnostic-card ${actorIssues > 0 ? "warning" : "ready"}`}>
-          <span>Atores</span>
-          <strong>{actorIssues > 0 ? `${actorIssues} alerta(s)` : "Sem alertas"}</strong>
+          <span>{ui("Atores")}</span>
+          <strong>{actorIssues > 0 ? ui("{0} alerta(s)", { 0: actorIssues }) : ui("Sem alertas")}</strong>
           <small>{placementSummary(diagnostics.actorPlacement.blocked, diagnostics.actorPlacement.outsideBounds)}</small>
         </div>
         <div className={`room-geometry-diagnostic-card ${triggerIssues > 0 ? "warning" : "ready"}`}>
-          <span>Triggers</span>
-          <strong>{triggerIssues > 0 ? `${triggerIssues} alerta(s)` : "Sem alertas"}</strong>
+          <span>{ui("Triggers")}</span>
+          <strong>{triggerIssues > 0 ? ui("{0} alerta(s)", { 0: triggerIssues }) : ui("Sem alertas")}</strong>
           <small>{placementSummary(diagnostics.triggerPlacement.blocked, diagnostics.triggerPlacement.outsideBounds)}</small>
         </div>
       </div>
       {background.status === "mismatch" ? (
         <p className="room-geometry-diagnostic-warning" role="status">
-          O tamanho do asset de fundo não corresponde à grade da cena.
-        </p>
+          {ui("O tamanho do asset de fundo não corresponde à grade da cena.")}</p>
       ) : null}
       {diagnostics.actorPlacement.blocked.map((name) => (
         <p className="room-geometry-diagnostic-warning" key={`actor-blocked-${name}`} role="status">
-          Ator sobre colisão bloqueante: {name}.
+          {ui("Ator sobre colisão bloqueante: ")}{name}.
         </p>
       ))}
       {diagnostics.actorPlacement.outsideBounds.map((name) => (
         <p className="room-geometry-diagnostic-warning" key={`actor-outside-${name}`} role="status">
-          Ator fora da grade: {name}.
+          {ui("Ator fora da grade: ")}{name}.
         </p>
       ))}
       {diagnostics.triggerPlacement.blocked.map((name) => (
         <p className="room-geometry-diagnostic-warning" key={`trigger-blocked-${name}`} role="status">
-          Trigger atravessa colisão bloqueante: {name}.
+          {ui("Trigger atravessa colisão bloqueante: ")}{name}.
         </p>
       ))}
       {diagnostics.triggerPlacement.outsideBounds.map((name) => (
         <p className="room-geometry-diagnostic-warning" key={`trigger-outside-${name}`} role="status">
-          Trigger fora da grade: {name}.
+          {ui("Trigger fora da grade: ")}{name}.
         </p>
       ))}
     </section>
@@ -2117,7 +2173,7 @@ export function RoomGeometryDiagnosticsPanel({ room }: { room: RoomsWorkspaceRoo
 
 function roomVisualFidelityPercent(value: number | null | undefined): string {
   if (!Number.isFinite(value)) return "Não disponível";
-  return new Intl.NumberFormat("pt-BR", {
+  return new Intl.NumberFormat(readStoredLocale(), {
     maximumFractionDigits: 1,
     minimumFractionDigits: 1,
     style: "percent"
@@ -2131,6 +2187,7 @@ function RoomBackgroundFidelityComparison({
   projectPath?: string;
   room: RoomsWorkspaceRoom;
 }): React.ReactElement | null {
+  const ui = useStudioUiText();
   const backgroundURL = resolveRoomBackgroundURL(projectPath, room);
   const [isOpen, setIsOpen] = useState(false);
   const [compiledURL, setCompiledURL] = useState<string | null>(null);
@@ -2166,31 +2223,31 @@ function RoomBackgroundFidelityComparison({
   if (!backgroundURL) return null;
 
   return (
-    <section aria-label="Comparação PNG original e RGB555" className="room-visual-fidelity-comparison" role="region">
+    <section aria-label={ui("Comparação PNG original e RGB555")} className="room-visual-fidelity-comparison" role="region">
       <button
         aria-expanded={isOpen}
-        aria-label="Comparar PNG original e RGB555"
+        aria-label={ui("Comparar PNG original e RGB555")}
         className="room-visual-fidelity-compare-button"
         onClick={() => setIsOpen((current) => !current)}
         type="button"
       >
-        {isOpen ? "Ocultar comparação" : "Comparar PNG original e RGB555"}
+        {isOpen ? ui("Ocultar comparação") : ui("Comparar PNG original e RGB555")}
       </button>
       {isOpen ? (
         <div className="room-visual-fidelity-comparison-grid">
           <figure>
-            <img alt="Background PNG original" crossOrigin={isDesktopAssetURL(backgroundURL) ? "anonymous" : undefined} src={backgroundURL} />
-            <figcaption>PNG original</figcaption>
+            <img alt={ui("Background PNG original")} crossOrigin={isDesktopAssetURL(backgroundURL) ? "anonymous" : undefined} src={backgroundURL} />
+            <figcaption>{ui("PNG original")}</figcaption>
           </figure>
           <figure>
             {compiledURL ? (
-              <img alt="Preview RGB555 compilado" src={compiledURL} />
+              <img alt={ui("Preview RGB555 compilado")} src={compiledURL} />
             ) : (
               <div aria-live="polite" className="room-visual-fidelity-compare-loading" role="status">
-                {compileError ? "Não foi possível compilar o preview." : "Compilando preview RGB555…"}
+                {compileError ? ui("Não foi possível compilar o preview.") : ui("Compilando preview RGB555…")}
               </div>
             )}
-            <figcaption>Preview RGB555 compilado</figcaption>
+            <figcaption>{ui("Preview RGB555 compilado")}</figcaption>
           </figure>
         </div>
       ) : null}
@@ -2207,6 +2264,7 @@ export function RoomVisualFidelityPanel({
   projectPath?: string;
   room: RoomsWorkspaceRoom;
 }): React.ReactElement {
+  const ui = useStudioUiText();
   const background = room.backgroundFidelity ?? null;
   const actors = entities.filter((entity) => entity.kind === "actor");
   const triggers = entities.filter((entity) => entity.kind === "trigger");
@@ -2227,62 +2285,77 @@ export function RoomVisualFidelityPanel({
     : `${background.optimizerEnabled ? "PNG → tiles 4bpp/RGB555" : "Preview RGB555"}${background.tileBudget ? ` · ${background.tileBudget} tiles` : ""}`;
 
   return (
-    <section aria-label="Diagnóstico de fidelidade visual da cena" className="room-visual-fidelity" role="region">
+    <section aria-label={ui("Diagnóstico de fidelidade visual da cena")} className="room-visual-fidelity" role="region">
       <div className="room-geometry-diagnostics-header">
         <div>
-          <span>Render</span>
-          <h5>Fidelidade visual</h5>
+          <span>{ui("Render")}</span>
+          <h5>{ui("Fidelidade visual")}</h5>
         </div>
         <strong className={backgroundStatus}>{backgroundStatusLabel}</strong>
       </div>
-      <p>Compara a origem autorada com o preview compilado e deixa explícitos bounds, hitbox e posição.</p>
+      <p>{ui("Compara a origem autorada com o preview compilado e deixa explícitos bounds, hitbox e posição.")}</p>
       <RoomBackgroundFidelityComparison projectPath={projectPath} room={room} />
       <div className="room-visual-fidelity-grid">
         <div className={`room-visual-fidelity-card ${backgroundStatus}`}>
-          <span>Background</span>
+          <span>{ui("Background")}</span>
           <strong>{background?.maxSourcePixelErrorRatio !== null && background?.maxSourcePixelErrorRatio !== undefined
-            ? `Erro até ${roomVisualFidelityPercent(background.maxSourcePixelErrorRatio)}`
+            ? ui("Erro até {0}", { 0: roomVisualFidelityPercent(background.maxSourcePixelErrorRatio) })
             : backgroundStatusLabel}</strong>
           <small>{backgroundDetail}</small>
         </div>
         <div className="room-visual-fidelity-card ready">
-          <span>Atores</span>
-          <strong>{actorBoundsCount}/{actors.length} com bounds do sprite</strong>
-          <small>{actors.length ? "A posição usa a origem do frame; a hitbox permanece editável." : "Nenhum ator autorado nesta cena."}</small>
+          <span>{ui("Atores")}</span>
+          <strong>{actorBoundsCount}/{actors.length} {ui(" com bounds do sprite")}</strong>
+          <small>{actors.length ? ui("A posição usa a origem do frame; a hitbox permanece editável.") : ui("Nenhum ator autorado nesta cena.")}</small>
         </div>
         <div className="room-visual-fidelity-card ready">
-          <span>Triggers</span>
-          <strong>{triggers.length} área(s) configurada(s)</strong>
-          <small>{triggers.length ? "Posição e área são mostradas em tiles da cena." : "Nenhum trigger autorado nesta cena."}</small>
+          <span>{ui("Triggers")}</span>
+          <strong>{triggers.length} {ui(" área(s) configurada(s)")}</strong>
+          <small>{triggers.length ? ui("Posição e área são mostradas em tiles da cena.") : ui("Nenhum trigger autorado nesta cena.")}</small>
         </div>
       </div>
       {backgroundWarning ? (
         <p className="room-visual-fidelity-warning" role="status">
-          O editor mostra o preview RGB555 compilado; o PNG do background tem perda de quantização declarada de até {roomVisualFidelityPercent(background?.maxSourcePixelErrorRatio)}.
+          {ui("O editor mostra o preview RGB555 compilado; o PNG do background tem perda de quantização declarada de até ")}{roomVisualFidelityPercent(background?.maxSourcePixelErrorRatio)}.
         </p>
       ) : null}
       {actors.length > 0 ? (
         <div className="room-visual-fidelity-entity-list">
-          <strong>Atores autorados</strong>
+          <strong>{ui("Atores autorados")}</strong>
           {actors.map((actor) => (
             <small key={`visual-actor-${actor.id}`}>
-              {actor.name}: posição {actor.x},{actor.y} · hitbox {actor.width}×{actor.height} · sprite {actor.spriteFrame ? `${actor.spriteFrame.frameWidth}×${actor.spriteFrame.frameHeight}px` : "sem bounds"}
+              {actor.name}{ui(": posição ")}{actor.x},{actor.y} {ui(" · hitbox ")}{actor.width}×{actor.height} {ui(" · sprite ")}{actor.spriteFrame ? ui("{0}×{1}px", { 0: actor.spriteFrame.frameWidth, 1: actor.spriteFrame.frameHeight }) : ui("sem bounds")}
             </small>
           ))}
         </div>
       ) : null}
       {triggers.length > 0 ? (
         <div className="room-visual-fidelity-entity-list">
-          <strong>Triggers autorados</strong>
+          <strong>{ui("Triggers autorados")}</strong>
           {triggers.map((trigger) => (
             <small key={`visual-trigger-${trigger.id}`}>
-              {trigger.name}: posição {trigger.x},{trigger.y} · área {trigger.width}×{trigger.height}
+              {trigger.name}{ui(": posição ")}{trigger.x},{trigger.y} {ui(" · área ")}{trigger.width}×{trigger.height}
             </small>
           ))}
         </div>
       ) : null}
     </section>
   );
+}
+
+function SceneDimensionInput({ value, min, onChange }: { value: number; min: number; onChange: (value: number) => void }): React.ReactElement {
+  const [draft, setDraft] = useState(String(value));
+  useEffect(() => setDraft(String(value)), [value]);
+  return <input min={min} type="number" value={draft}
+    onChange={event => setDraft(event.currentTarget.value)}
+    onBlur={() => {
+      const next = draft.trim() ? Number(draft) : NaN;
+      if (Number.isInteger(next) && next >= min) {
+        if (next !== value) onChange(next);
+        setDraft(String(next));
+      } else setDraft(String(value));
+    }}
+    onKeyDown={event => { if (event.key === "Enter") event.currentTarget.blur(); }} />;
 }
 
 function roomHeightInspector(
@@ -2294,18 +2367,18 @@ function roomHeightInspector(
   const cellHeight = selectedCellIndex === null ? null : room.heightLevels?.[selectedCellIndex] ?? 0;
   const elevatedCount = (room.heightLevels ?? []).filter((level) => level > 0).length;
   return (
-    <section aria-label="Pincel de altura" className="room-height-inspector" role="region">
+    <section aria-label={ui("Pincel de altura")} className="room-height-inspector" role="region">
       <div className="room-collision-inspector-title">
         <div>
-          <span>Células elevadas</span>
+          <span>{ui("Células elevadas")}</span>
         </div>
         <em>{elevatedCount}</em>
       </div>
-      <p>Níveis de 0 a 3. Células sem indicação estão no chão (Z0). Use rampas no modo Colisão para conectar elevações.</p>
-      <div aria-label="Níveis de altura" className="room-height-levels" role="group">
+      <p>{ui("Níveis de 0 a 3. Células sem indicação estão no chão (Z0). Use rampas no modo Colisão para conectar elevações.")}</p>
+      <div aria-label={ui("Níveis de altura")} className="room-height-levels" role="group">
         {[0, 1, 2, 3].map((level) => (
           <button
-            aria-label={`Nivel ${level}`}
+            aria-label={ui("Nivel {0}", { 0: level })}
             aria-pressed={selectedHeightLevel === level}
             className={selectedHeightLevel === level ? "active" : ""}
             key={level}
@@ -2313,14 +2386,14 @@ function roomHeightInspector(
             type="button"
           >
             <span>{level}</span>
-            <small>{level === 0 ? "Chão" : `+${level}`}</small>
+            <small>{level === 0 ? ui("Chão") : `+${level}`}</small>
           </button>
         ))}
       </div>
       <dl className="room-height-summary">
-        <div><dt>Célula</dt><dd>{selectedCellIndex === null ? "—" : selectedCellIndex + 1}</dd></div>
-        <div><dt>Altura atual</dt><dd>{cellHeight === null ? "—" : cellHeight}</dd></div>
-        <div><dt>{roomIsometricConfig(room)?.pagedSurface ? "Frente BG3" : "Foreground BG1"}</dt><dd>{roomIsometricConfig(room)?.pagedSurface ? "Imagem" : room.foregroundTileCount ?? 0}</dd></div>
+        <div><dt>{ui("Célula")}</dt><dd>{selectedCellIndex === null ? "—" : selectedCellIndex + 1}</dd></div>
+        <div><dt>{ui("Altura atual")}</dt><dd>{cellHeight === null ? "—" : cellHeight}</dd></div>
+        <div><dt>{roomIsometricConfig(room)?.pagedSurface ? ui("Frente BG3") : ui("Foreground BG1")}</dt><dd>{roomIsometricConfig(room)?.pagedSurface ? ui("Imagem") : room.foregroundTileCount ?? 0}</dd></div>
       </dl>
     </section>
   );
@@ -2506,8 +2579,11 @@ function roomDetailsEditor(
   }
 
   return (
-    <div className="room-detail-editor" aria-label={`Editar ${roomLabel}`}>
+    <div className="room-detail-editor" aria-label={ui("Editar {0}", { 0: roomLabel })}>
       {activeTab === "scene" ? <>
+      {["topdown", "platformer"].includes(room.sceneType) ? <MapStatesInspector value={room.mapStates ?? []}
+        width={room.width} height={room.height} sceneName={room.name}
+        onChange={mapStates => onUpdateRoomFields(room.id, { mapStates })} /> : null}
       {resolvedRuntime.type === "racing" ? <RacingSceneInspector
         config={normalizeRacingSceneConfig(resolvedRuntime.config)} width={room.width} height={room.height}
         background={room.background??""} assets={backgroundOptions}
@@ -2516,18 +2592,26 @@ function roomDetailsEditor(
         onPrepare={track=>onUpdateRoomFields(room.id,{...(normalizeRacingSceneConfig(resolvedRuntime.config).presentation==="pseudo3d"?{width:64,height:64}:{}),
           runtime:{type:"racing",config:{...runtime.config,topdownTrack:track}}})}
       /> : null}
+      {projectData ? <SceneRuntimeResourcesInspector sceneType={room.sceneType} roomName={room.name}
+        background={room.background ?? ""} config={resolvedRuntime.config} data={projectData}
+        onChange={config => onUpdateRoomFields(room.id, {
+          runtime: normalizeSceneRuntime(room.sceneType, { type: room.sceneType, config }),
+          ...(room.sceneType === "isometric" && config.pagedSurface?.backgroundAsset ? {
+            backgroundAssetName: config.pagedSurface.backgroundAsset, cameraMode: "follow_player"
+          } : {})
+        })} /> : null}
       <InspectorSection
-        ariaLabel="Essencial da cena"
+        ariaLabel={ui("Essencial da cena")}
         className="room-detail-editor-span-2 scene-inspector-group scene-inspector-essential"
         defaultOpen
         persistKey="rooms.scene.essential"
         role="region"
-        title="Essencial"
+        title={ui("Essencial")}
       >
         <label>
-          <span>Tipo de cena</span>
+          <span>{ui("Tipo de cena")}</span>
           <select
-            aria-label="Tipo de cena"
+            aria-label={ui("Tipo de cena")}
             onChange={(event) => onUpdateRoomFields(room.id, { sceneType: event.currentTarget.value })}
             value={sceneTypeSelectionValue(room.sceneType, isometricConfig?.gameplayMode)}
           >
@@ -2536,45 +2620,39 @@ function roomDetailsEditor(
                 disabled={Boolean(isometricCompositionMode && (
                   option.value === "isometricAdventure" && isometricCompositionMode !== "adventure"
                   || option.value === "isometricTactical" && isometricCompositionMode !== "tactical"
-                ))}>{option.label}</option>
+                ))}>{ui(option.label)}</option>
             ))}
           </select>
         </label>
-        {isometricCompositionMode ? <p className="room-detail-section-help">Este cenário possui uma composição de {isometricCompositionMode === "adventure" ? "aventura" : "batalha tática"}. Para o outro tipo, crie uma cena usando Modelos.</p> : null}
+        {isometricCompositionMode ? <p className="room-detail-section-help">{ui("Este cenário possui uma composição de ")}{isometricCompositionMode === "adventure" ? ui("aventura") : ui("batalha tática")}{ui(". Para o outro tipo, crie uma cena usando Modelos.")}</p> : null}
         {scenePreflight ? <SceneInspectorHealthSummary onOpenHealth={onOpenProjectHealth} report={scenePreflight} /> : null}
         <div className="scene-inspector-essential-fields">
           <label>
-            <span>{room.sceneType === "isometric" ? "Largura (células)" : "Largura (tiles)"}</span>
-            <input
-              min={room.sceneType === "isometric" ? 1 : 30}
-              onChange={(event) => {
-                const nextValue = event.currentTarget.valueAsNumber;
-                if (Number.isFinite(nextValue)) onUpdateRoomFields(room.id, { width: nextValue });
-              }}
-              type="number"
+            <span>{["isometric", "dungeonCrawler"].includes(room.sceneType) ? ui("Largura (células)") : ui("Largura (tiles)")}</span>
+            <SceneDimensionInput
+              key={`${room.id}-width`}
+              min={["isometric", "dungeonCrawler"].includes(room.sceneType) ? 1 : 30}
+              onChange={width => onUpdateRoomFields(room.id, { width })}
               value={room.width}
             />
           </label>
           <label>
-            <span>{room.sceneType === "isometric" ? "Altura (células)" : "Altura (tiles)"}</span>
-            <input
-              min={room.sceneType === "isometric" ? 1 : 20}
-              onChange={(event) => {
-                const nextValue = event.currentTarget.valueAsNumber;
-                if (Number.isFinite(nextValue)) onUpdateRoomFields(room.id, { height: nextValue });
-              }}
-              type="number"
+            <span>{["isometric", "dungeonCrawler"].includes(room.sceneType) ? ui("Altura (células)") : ui("Altura (tiles)")}</span>
+            <SceneDimensionInput
+              key={`${room.id}-height`}
+              min={["isometric", "dungeonCrawler"].includes(room.sceneType) ? 1 : 20}
+              onChange={height => onUpdateRoomFields(room.id, { height })}
               value={room.height}
             />
           </label>
           <label>
-            <span>Jogador</span>
+            <span>{ui("Jogador")}</span>
             <select
-              aria-label="Ator do jogador"
+              aria-label={ui("Ator do jogador")}
               onChange={(event) => onUpdateRoomFields(room.id, { playerActorName: event.currentTarget.value })}
               value={room.playerActorName ?? ""}
             >
-              <option value="">Sem jogador</option>
+              <option value="">{ui("Sem jogador")}</option>
               {playerOptions.map((option) => (
                 <option key={option.value} value={option.value}>{option.label}</option>
               ))}
@@ -2586,21 +2664,21 @@ function roomDetailsEditor(
       </> : null}
 
       {activeTab === "camera" ? (
-      <section className="room-detail-section room-detail-editor-span-2" aria-label="Câmera">
-        <h5>Câmera</h5>
+      <section className="room-detail-section room-detail-editor-span-2" aria-label={ui("Câmera")}>
+        <h5>{ui("Câmera")}</h5>
         <label>
-          <span>Modo</span>
+          <span>{ui("Modo")}</span>
           <select
-            aria-label="Modo da câmera"
+            aria-label={ui("Modo da câmera")}
             onChange={(event) => onUpdateRoomFields(room.id, { cameraMode: event.currentTarget.value })}
             value={room.cameraMode}
           >
             {cameraModeOptions.map((option) => (
-              <option key={option.value} value={option.value}>{option.label}</option>
+              <option key={option.value} value={option.value}>{ui(option.label)}</option>
             ))}
           </select>
         </label>
-        <p className="room-detail-section-help">{cameraModeDescription(room.cameraMode)}</p>
+        <p className="room-detail-section-help">{ui(cameraModeDescription(room.cameraMode))}</p>
         {cameraBoundsEnabled ? <>
         <div className="room-detail-bounds-grid">
           <InspectorNumber
@@ -2642,14 +2720,13 @@ function roomDetailsEditor(
         </div>
         <div className="room-camera-zones-editor">
           <div className="room-detail-section-actions">
-            <strong>Zonas de câmera</strong>
+            <strong>{ui("Zonas de câmera")}</strong>
             <button onClick={addCameraZone} type="button">
               <Plus aria-hidden="true" size={14} strokeWidth={2.2} />
-              Adicionar zona
-            </button>
+              {ui("Adicionar zona")}</button>
           </div>
           {(room.cameraZones ?? []).length === 0 ? (
-            <p className="room-detail-section-help">Use a ferramenta Câmera e arraste sobre a grade para criar uma zona.</p>
+            <p className="room-detail-section-help">{ui("Use a ferramenta Câmera e arraste sobre a grade para criar uma zona.")}</p>
           ) : (room.cameraZones ?? []).map((zone) => {
             const updateNestedNumber = (
               group: "area" | "bounds" | "offset",
@@ -2665,49 +2742,47 @@ function roomDetailsEditor(
             return (
               <fieldset className="room-camera-zone-fields" key={zone.id}>
                 <legend>{zone.name}</legend>
-                <label><span>Nome</span><input value={zone.name} onChange={(event) => updateCameraZone(zone.id, (current) => ({ ...current, name: event.currentTarget.value }))} /></label>
+                <label><span>{ui("Nome")}</span><input value={zone.name} onChange={(event) => updateCameraZone(zone.id, (current) => ({ ...current, name: event.currentTarget.value }))} /></label>
                 <div className="room-detail-bounds-grid">
                   {(["x", "y", "width", "height"] as const).map((field) => (
-                    <label key={`area-${field}`}><span>Área {field.toUpperCase()}</span><input min={field === "width" || field === "height" ? 1 : 0} type="number" value={zone.area[field]} onChange={(event) => updateNestedNumber("area", field, event.currentTarget.valueAsNumber)} /></label>
+                    <label key={`area-${field}`}><span>{ui("Área ")}{field.toUpperCase()}</span><input min={field === "width" || field === "height" ? 1 : 0} type="number" value={zone.area[field]} onChange={(event) => updateNestedNumber("area", field, event.currentTarget.valueAsNumber)} /></label>
                   ))}
                   {(["x", "y", "width", "height"] as const).map((field) => (
-                    <label key={`bounds-${field}`}><span>Limite {field.toUpperCase()}</span><input min={field === "width" || field === "height" ? 1 : undefined} type="number" value={zone.bounds[field]} onChange={(event) => updateNestedNumber("bounds", field, event.currentTarget.valueAsNumber)} /></label>
+                    <label key={`bounds-${field}`}><span>{ui("Limite ")}{field.toUpperCase()}</span><input min={field === "width" || field === "height" ? 1 : undefined} type="number" value={zone.bounds[field]} onChange={(event) => updateNestedNumber("bounds", field, event.currentTarget.valueAsNumber)} /></label>
                   ))}
                   {(["x", "y"] as const).map((field) => (
-                    <label key={`offset-${field}`}><span>Offset {field.toUpperCase()}</span><input type="number" value={zone.offset[field]} onChange={(event) => updateNestedNumber("offset", field, event.currentTarget.valueAsNumber)} /></label>
+                    <label key={`offset-${field}`}><span>{ui("Offset ")}{field.toUpperCase()}</span><input type="number" value={zone.offset[field]} onChange={(event) => updateNestedNumber("offset", field, event.currentTarget.valueAsNumber)} /></label>
                   ))}
                 </div>
-                <label className="room-detail-section-note"><input type="checkbox" checked={zone.lockX} onChange={(event) => updateCameraZone(zone.id, (current) => ({ ...current, lockX: event.currentTarget.checked }))} /><span>Bloquear eixo X</span></label>
-                <label className="room-detail-section-note"><input type="checkbox" checked={zone.lockY} onChange={(event) => updateCameraZone(zone.id, (current) => ({ ...current, lockY: event.currentTarget.checked }))} /><span>Bloquear eixo Y</span></label>
-                <button type="button" onClick={() => onUpdateRoomFields(room.id, { cameraZones: (room.cameraZones ?? []).filter((candidate) => candidate.id !== zone.id) })}>Remover zona</button>
+                <label className="room-detail-section-note"><input type="checkbox" checked={zone.lockX} onChange={(event) => updateCameraZone(zone.id, (current) => ({ ...current, lockX: event.currentTarget.checked }))} /><span>{ui("Bloquear eixo X")}</span></label>
+                <label className="room-detail-section-note"><input type="checkbox" checked={zone.lockY} onChange={(event) => updateCameraZone(zone.id, (current) => ({ ...current, lockY: event.currentTarget.checked }))} /><span>{ui("Bloquear eixo Y")}</span></label>
+                <button type="button" onClick={() => onUpdateRoomFields(room.id, { cameraZones: (room.cameraZones ?? []).filter((candidate) => candidate.id !== zone.id) })}>{ui("Remover zona")}</button>
               </fieldset>
             );
           })}
         </div>
         </> : (
           <p className="room-detail-section-help">
-            Esta cena já ocupa o viewport GBA completo; limites e zonas só se aplicam a cenas maiores.
-          </p>
+            {ui("Esta cena já ocupa o viewport GBA completo; limites e zonas só se aplicam a cenas maiores.")}</p>
         )}
       </section>
       ) : null}
 
       {activeTab === "background" ? <>
-      <section className="room-detail-section room-detail-editor-span-2" aria-label="Fundo da cena">
+      <section className="room-detail-section room-detail-editor-span-2" aria-label={ui("Fundo da cena")}>
         <div className="room-background-section-heading">
-          <h5>Fundo da cena</h5>
-          <InspectorInfoTip label="Fundo da cena">
-            Selecione, visualize e bloqueie BG1/BG2 na barra CAMADAS do editor.
-            {scenePreflight?.hardware ? ` Viewport ${scenePreflight.hardware.viewport.widthPixels}×${scenePreflight.hardware.viewport.heightPixels} px; mapa BG ${scenePreflight.hardware.effectiveMapSize.id} (${scenePreflight.hardware.screenblocks} screenblock${scenePreflight.hardware.screenblocks === 1 ? "" : "s"}).` : null}
-            {scenePreflight?.hardware?.mapSizeExpandedAutomatically ? ` O exportador amplia automaticamente o mapa ${scenePreflight.hardware.configuredMapSize.id} para ${scenePreflight.hardware.effectiveMapSize.id}.` : null}
+          <h5>{ui("Fundo da cena")}</h5>
+          <InspectorInfoTip label={ui("Fundo da cena")}>
+            {ui("Selecione, visualize e bloqueie BG1/BG2 na barra CAMADAS do editor.")}{scenePreflight?.hardware ? ui(" Viewport {0}×{1} px; mapa BG {2} ({3} screenblock{4}).", { 0: scenePreflight.hardware.viewport.widthPixels, 1: scenePreflight.hardware.viewport.heightPixels, 2: scenePreflight.hardware.effectiveMapSize.id, 3: scenePreflight.hardware.screenblocks, 4: scenePreflight.hardware.screenblocks === 1 ? "" : "s" }) : null}
+            {scenePreflight?.hardware?.mapSizeExpandedAutomatically ? ui(" O exportador amplia automaticamente o mapa {0} para {1}.", { 0: scenePreflight.hardware.configuredMapSize.id, 1: scenePreflight.hardware.effectiveMapSize.id }) : null}
           </InspectorInfoTip>
         </div>
         {isometricConfig?.pagedSurface ? <>
-        <p className="room-detail-section-help">Fundo e frente usam imagens completas. Importe imagens com {isometricConfig.pagedSurface.width} × {isometricConfig.pagedSurface.height} px; a grade lógica permanece editável.</p>
+        <p className="room-detail-section-help">{ui("Fundo e frente usam imagens completas. Importe imagens com ")}{isometricConfig.pagedSurface.width} × {isometricConfig.pagedSurface.height} {ui(" px; a grade lógica permanece editável.")}</p>
         <div className="room-detail-bounds-grid">
           {([ ["backgroundAsset", "Fundo isométrico BG2"], ["foregroundAsset", "Frente isométrica BG3"] ] as const).map(([field, label]) => (
-            <label key={field}><span>{label}</span>
-              <select aria-label={label} value={isometricConfig.pagedSurface![field]}
+            <label key={field}><span>{ui(label)}</span>
+              <select aria-label={ui(label)} value={isometricConfig.pagedSurface![field]}
                 onChange={event => updateIsometricPagedAsset(field, event.currentTarget.value)}>
                 {selectOptionsWithCurrent(options.backgroundAssets, isometricConfig.pagedSurface![field]).map(option => (
                   <option key={option.value} value={option.value}>{option.label}</option>
@@ -2717,11 +2792,11 @@ function roomDetailsEditor(
           ))}
         </div>
         </> : isometricConfig?.tacticalPresentation?.surfacePages?.length ? <>
-        <p className="room-detail-section-help">Cada imagem ocupa a área configurada da superfície tática. Colisão e altura usam a grade lógica.</p>
+        <p className="room-detail-section-help">{ui("Cada imagem ocupa a área configurada da superfície tática. Colisão e altura usam a grade lógica.")}</p>
         <div className="room-detail-bounds-grid">
           {isometricConfig.tacticalPresentation.surfacePages.map((page, index) => (
-            <label key={page.id}><span>Superfície {index + 1} · {page.world.width} × {page.world.height} px</span>
-              <select aria-label={`Superfície isométrica ${index + 1}`} value={page.asset}
+            <label key={page.id}><span>{ui("Superfície ")}{index + 1} · {page.world.width} × {page.world.height} {ui(" px")}</span>
+              <select aria-label={ui("Superfície isométrica {0}", { 0: index + 1 })} value={page.asset}
                 onChange={event => updateIsometricField("tacticalPresentation", {
                   ...isometricConfig.tacticalPresentation!,
                   surfacePages: isometricConfig.tacticalPresentation!.surfacePages!.map((current, pageIndex) => (
@@ -2737,39 +2812,39 @@ function roomDetailsEditor(
         </div>
         </> : <div className="room-detail-bounds-grid">
           <label>
-            <span>Asset</span>
+            <span>{ui("Asset")}</span>
             <select
               onChange={(event) => onUpdateRoomFields(room.id, { backgroundAssetName: event.currentTarget.value })}
               value={room.background ?? ""}
             >
-              <option value="">Sem fundo</option>
+              <option value="">{ui("Sem fundo")}</option>
               {backgroundOptions.map((option) => (
                 <option key={option.value} value={option.value}>{option.label}</option>
               ))}
             </select>
           </label>
           <label>
-            <span>Modo de renderização</span>
+            <span>{ui("Modo de renderização")}</span>
             <select
               onChange={(event) => onUpdateRoomFields(room.id, { backgroundRenderMode: event.currentTarget.value })}
               value={room.backgroundRenderMode}
             >
-              <option value="tilemap">Tilemap</option>
-              <option value="image">Imagem</option>
-              <option value="hybrid">Híbrido</option>
+              <option value="tilemap">{ui("Tilemap")}</option>
+              <option value="image">{ui("Imagem")}</option>
+              <option value="hybrid">{ui("Híbrido")}</option>
             </select>
           </label>
         </div>}
       </section>
-      <section className="room-detail-section room-detail-editor-span-2" aria-label="Paralaxe">
+      <section className="room-detail-section room-detail-editor-span-2" aria-label={ui("Paralaxe")}>
         <div className="room-background-section-heading">
-          <h5>Paralaxe</h5>
-          <InspectorInfoTip label="Paralaxe">{parallaxModeDescription(room.parallax.mode)}</InspectorInfoTip>
+          <h5>{ui("Paralaxe")}</h5>
+          <InspectorInfoTip label={ui("Paralaxe")}>{parallaxModeDescription(room.parallax.mode)}</InspectorInfoTip>
         </div>
         <label>
-          <span>Camadas</span>
+          <span>{ui("Camadas")}</span>
           <select
-            aria-label="Camadas de paralaxe"
+            aria-label={ui("Camadas de paralaxe")}
             onChange={(event) => onUpdateRoomFields(room.id, {
               parallax: {
                 ...room.parallax,
@@ -2779,14 +2854,14 @@ function roomDetailsEditor(
             value={room.parallax.mode}
           >
             {parallaxOptions.map((option) => (
-              <option key={option.value} value={option.value}>{option.label}</option>
+              <option key={option.value} value={option.value}>{ui(option.label)}</option>
             ))}
           </select>
         </label>
         {parallaxEnabled ? (
           <div className="room-detail-bounds-grid">
             <label>
-              <span>Offset X</span>
+              <span>{ui("Offset X")}</span>
               <input
                 onChange={(event) => updateParallaxField("offsetX", event.currentTarget.valueAsNumber)}
                 type="number"
@@ -2794,7 +2869,7 @@ function roomDetailsEditor(
               />
             </label>
             <label>
-              <span>Offset Y</span>
+              <span>{ui("Offset Y")}</span>
               <input
                 onChange={(event) => updateParallaxField("offsetY", event.currentTarget.valueAsNumber)}
                 type="number"
@@ -2802,7 +2877,7 @@ function roomDetailsEditor(
               />
             </label>
             <label>
-              <span>Vel. X</span>
+              <span>{ui("Vel. X")}</span>
               <input
                 min={0}
                 onChange={(event) => updateParallaxField("speedX", event.currentTarget.valueAsNumber)}
@@ -2811,7 +2886,7 @@ function roomDetailsEditor(
               />
             </label>
             <label>
-              <span>Vel. Y</span>
+              <span>{ui("Vel. Y")}</span>
               <input
                 min={0}
                 onChange={(event) => updateParallaxField("speedY", event.currentTarget.valueAsNumber)}
@@ -2822,13 +2897,12 @@ function roomDetailsEditor(
           </div>
         ) : null}
       </section>
-      <section className="room-detail-section room-detail-editor-span-2" aria-label="Composição avançada">
+      <section className="room-detail-section room-detail-editor-span-2" aria-label={ui("Composição avançada")}>
         <details className="room-background-advanced-details">
-          <summary>Composição avançada</summary>
+          <summary>{ui("Composição avançada")}</summary>
           <div className="room-background-advanced-content">
             <p className="room-detail-section-help">
-              Controles técnicos de composição e camadas especiais. Comportamentos, música e efeitos de execução ficam exclusivamente na aba Eventos.
-            </p>
+              {ui("Controles técnicos de composição e camadas especiais. Comportamentos, música e efeitos de execução ficam exclusivamente na aba Eventos.")}</p>
             <SceneCompositionInspector
               assetOptions={sceneCompositionOptions}
               onChange={updateSceneComposition}
@@ -3020,7 +3094,7 @@ function connectionAreaFields(
 
   return (
     <fieldset className="room-connection-area-fields">
-      <legend>{label}</legend>
+      <legend>{ui(label)}</legend>
       <div className="room-connection-area-grid">
         {(["x", "y", "width", "height"] as const).map((field) => (
           <label key={field}>
@@ -3062,11 +3136,10 @@ function roomConnectionInspector(
   const canEditEntry = inspectorRoom.name === connection.to;
 
   return (
-    <div className="room-connection-inspector" aria-label={`Conexao ${connection.from} para ${connection.to}`}>
+    <div className="room-connection-inspector" aria-label={ui("Conexao {0} para {1}", { 0: connection.from, 1: connection.to })}>
       {activeTab === "connection" ? <div className="room-connection-side-toggle">
         <p className="room-connection-advanced-note">
-          Para uma transição comum, selecione um Trigger e use Eventos → Trocar cena. Esta rota explícita é uma configuração avançada.
-        </p>
+          {ui("Para uma transição comum, selecione um Trigger e use Eventos → Trocar cena. Esta rota explícita é uma configuração avançada.")}</p>
         <button
           aria-pressed={selectedZoneSide === "exit"}
           className={selectedZoneSide === "exit" ? "active" : ""}
@@ -3074,8 +3147,7 @@ function roomConnectionInspector(
           onClick={() => setSelectedZoneSide("exit")}
           type="button"
         >
-          Saida
-        </button>
+          {ui("Saida")}</button>
         <button
           aria-pressed={selectedZoneSide === "entry"}
           className={selectedZoneSide === "entry" ? "active" : ""}
@@ -3083,57 +3155,55 @@ function roomConnectionInspector(
           onClick={() => setSelectedZoneSide("entry")}
           type="button"
         >
-          Entrada
-        </button>
+          {ui("Entrada")}</button>
       </div> : null}
       {activeTab === "events" ? <div className="room-reference-field">
-        <span>Evento</span>
+        <span>{ui("Evento")}</span>
         <ProjectReferencePicker
           actions={onCreateEventReference ? [{ label: "Criar evento", run: onCreateEventReference }] : []}
-          ariaLabel="Evento da conexão"
-          emptyLabel="Sem evento"
-          invalidLabel="Evento não encontrado"
+          ariaLabel={ui("Evento da conexão")}
+          emptyLabel={ui("Sem evento")}
+          invalidLabel={ui("Evento não encontrado")}
           onChange={(eventName) => onUpdateRoomConnection(connection.index, { eventName })}
           options={eventOptions}
           value={connection.eventName ?? ""}
         />
       </div> : null}
       {activeTab === "transition" ? (
-        <section aria-label="Configuração da transição" className="room-connection-transition-inspector">
+        <section aria-label={ui("Configuração da transição")} className="room-connection-transition-inspector">
           <div className="room-connection-transition-source" role="status">
-            <span>{connection.transitionSource === "project-default" ? "Padrão do projeto" : "Personalizada nesta conexão"}</span>
+            <span>{connection.transitionSource === "project-default" ? ui("Padrão do projeto") : ui("Personalizada nesta conexão")}</span>
             {connection.transitionSource === "custom" ? (
               <button
-                aria-label="Usar padrão do projeto nesta conexão"
+                aria-label={ui("Usar padrão do projeto nesta conexão")}
                 onClick={() => onUpdateRoomConnection(connection.index, { transition: null })}
                 type="button"
               >
-                Usar padrão do projeto
-              </button>
+                {ui("Usar padrão do projeto")}</button>
             ) : null}
           </div>
           <label>
-            <span>Tipo</span>
+            <span>{ui("Tipo")}</span>
             <select
-              aria-label="Tipo de transição"
+              aria-label={ui("Tipo de transição")}
               onChange={(event) => onUpdateRoomConnection(connection.index, {
                 transition: { style: event.currentTarget.value as SceneTransitionStyle }
               })}
               value={connection.transition.style}
             >
-              <option value={SCENE_TRANSITION_STYLES[0]}>Corte imediato</option>
-              <option value={SCENE_TRANSITION_STYLES[1]}>Fade preto</option>
-              <option value={SCENE_TRANSITION_STYLES[2]}>Fade claro</option>
-              <option value={SCENE_TRANSITION_STYLES[3]}>Máscara lateral</option>
-              <option value={SCENE_TRANSITION_STYLES[4]}>Mosaico</option>
-              <option value={SCENE_TRANSITION_STYLES[5]}>Deslize lateral</option>
-              <option value={SCENE_TRANSITION_STYLES[6]}>Crossfade de paleta</option>
+              <option value={SCENE_TRANSITION_STYLES[0]}>{ui("Corte imediato")}</option>
+              <option value={SCENE_TRANSITION_STYLES[1]}>{ui("Fade preto")}</option>
+              <option value={SCENE_TRANSITION_STYLES[2]}>{ui("Fade claro")}</option>
+              <option value={SCENE_TRANSITION_STYLES[3]}>{ui("Máscara lateral")}</option>
+              <option value={SCENE_TRANSITION_STYLES[4]}>{ui("Mosaico")}</option>
+              <option value={SCENE_TRANSITION_STYLES[5]}>{ui("Deslize lateral")}</option>
+              <option value={SCENE_TRANSITION_STYLES[6]}>{ui("Crossfade de paleta")}</option>
             </select>
           </label>
           <label>
-            <span>Duração (frames)</span>
+            <span>{ui("Duração (frames)")}</span>
             <input
-              aria-label="Duração da transição em frames"
+              aria-label={ui("Duração da transição em frames")}
               disabled={connection.transition.style === "cut"}
               max={600}
               min={0}
@@ -3147,33 +3217,32 @@ function roomConnectionInspector(
           </label>
           <label className="room-connection-transition-toggle">
             <input
-              aria-label="Aplicar fade ao sair"
+              aria-label={ui("Aplicar fade ao sair")}
               checked={connection.transition.fadeOut}
               disabled={connection.transition.style === "cut"}
               onChange={(event) => onUpdateRoomConnection(connection.index, { transition: { fadeOut: event.currentTarget.checked } })}
               type="checkbox"
             />
-            <span>Aplicar ao sair</span>
+            <span>{ui("Aplicar ao sair")}</span>
           </label>
           <label className="room-connection-transition-toggle">
             <input
-              aria-label="Aplicar fade ao entrar"
+              aria-label={ui("Aplicar fade ao entrar")}
               checked={connection.transition.fadeIn}
               disabled={connection.transition.style === "cut"}
               onChange={(event) => onUpdateRoomConnection(connection.index, { transition: { fadeIn: event.currentTarget.checked } })}
               type="checkbox"
             />
-            <span>Aplicar ao entrar</span>
+            <span>{ui("Aplicar ao entrar")}</span>
           </label>
-          <p className="muted room-connection-transition-note">A troca é coberta antes do carregamento da sala e revelada depois. Deslize usa o push nativo; crossfade usa a mistura de paleta compatível com o GBA.</p>
+          <p className="muted room-connection-transition-note">{ui("A troca é coberta antes do carregamento da sala e revelada depois. Deslize usa o push nativo; crossfade usa a mistura de paleta compatível com o GBA.")}</p>
         </section>
       ) : null}
       {activeTab === "exit" ? connectionAreaFields("Saída", exitArea, (area) => onUpdateRoomConnection(connection.index, { exit: area })) : null}
       {activeTab === "entry" ? connectionAreaFields("Entrada", entryArea, (area) => onUpdateRoomConnection(connection.index, { entry: area })) : null}
       {activeTab === "exit" || activeTab === "entry" ? <p className="muted room-connection-placement-hint">
-        Arraste no grid da cena de origem para posicionar a saída; na cena de destino para a entrada.
-      </p> : null}
-      {activeTab === "connection" ? <button onClick={() => onRemoveRoomConnection(connection.index)} type="button">Remover conexão</button> : null}
+        {ui("Arraste no grid da cena de origem para posicionar a saída; na cena de destino para a entrada.")}</p> : null}
+      {activeTab === "connection" ? <button onClick={() => onRemoveRoomConnection(connection.index)} type="button">{ui("Remover conexão")}</button> : null}
     </div>
   );
 }
@@ -3203,37 +3272,36 @@ function roomConnectionsEditor(
   });
 
   return (
-    <div className="room-connections-editor" aria-label={`Conexoes de ${roomLabel}`}>
+    <div className="room-connections-editor" aria-label={ui("Conexoes de {0}", { 0: roomLabel })}>
       <div className="room-connections-header">
-        <strong>Conexoes</strong>
+        <strong>{ui("Conexoes")}</strong>
         <span>{visibleConnections.length}</span>
       </div>
       {warpMode ? (
         <p className="muted room-warp-tool-hint" role="status">
-          Escolha um destino e arraste no grid para criar uma nova saída. Selecione uma conexão abaixo para editar a saída ou a entrada correspondente.
-        </p>
+          {ui("Escolha um destino e arraste no grid para criar uma nova saída. Selecione uma conexão abaixo para editar a saída ou a entrada correspondente.")}</p>
       ) : null}
       <div className="room-connection-form">
         <label>
-          <span>Destino</span>
+          <span>{ui("Destino")}</span>
           <select
             disabled={targetRooms.length === 0}
             onChange={(event) => setSelectedTargetName(event.currentTarget.value)}
             value={resolvedTarget}
           >
-            {targetRooms.length === 0 ? <option value="">Sem destino</option> : null}
+            {targetRooms.length === 0 ? <option value="">{ui("Sem destino")}</option> : null}
             {targetRooms.map((targetRoom) => (
               <option key={targetRoom.id} value={targetRoom.name}>{sceneDisplayName(targetRoom.name)}</option>
             ))}
           </select>
         </label>
         <div className="room-reference-field">
-          <span>Evento</span>
+          <span>{ui("Evento")}</span>
           <ProjectReferencePicker
             actions={onCreateEventReference ? [{ label: "Criar evento", run: onCreateEventReference }] : []}
-            ariaLabel="Evento da nova conexão"
-            emptyLabel="Sem evento"
-            invalidLabel="Evento não encontrado"
+            ariaLabel={ui("Evento da nova conexão")}
+            emptyLabel={ui("Sem evento")}
+            invalidLabel={ui("Evento não encontrado")}
             onChange={setConnectionEventName}
             options={eventOptions}
             value={connectionEventName}
@@ -3247,11 +3315,10 @@ function roomConnectionsEditor(
           }}
           type="button"
         >
-          Conectar
-        </button>
+          {ui("Conectar")}</button>
       </div>
       {visibleConnections.length === 0 ? (
-        <p className="muted">Nenhuma conexão vinculada a esta cena.</p>
+        <p className="muted">{ui("Nenhuma conexão vinculada a esta cena.")}</p>
       ) : (
         <ul className="room-connection-list">
           {visibleConnections.map((connection) => (
@@ -3268,7 +3335,7 @@ function roomConnectionsEditor(
                 <em>{connection.to}</em>
                 {connection.eventName ? <small>{connection.eventName}</small> : null}
               </button>
-              <button type="button" onClick={() => onRemoveRoomConnection(connection.index)}>Remover</button>
+              <button type="button" onClick={() => onRemoveRoomConnection(connection.index)}>{ui("Remover")}</button>
             </li>
           ))}
         </ul>
@@ -3350,6 +3417,7 @@ function RoomEntitiesEditor({
   eventOptions,
   commandSuggestions
 }: RoomEntitiesEditorProps): React.ReactElement {
+  const ui = useStudioUiText();
   const roomLabel = sceneDisplayName(room.name);
   const roomEntities = presentation.entities.filter((entity) => entity.roomName === room.name);
   const visibleEntities = inspectorKind ? roomEntities.filter((entity) => entity.kind === inspectorKind) : roomEntities;
@@ -3424,12 +3492,12 @@ function RoomEntitiesEditor({
   }
 
   return (
-    <div className="room-entities-editor" aria-label={`Atores e triggers de ${roomLabel}`}>
+    <div className="room-entities-editor" aria-label={ui("Atores e triggers de {0}", { 0: roomLabel })}>
       {activeTab !== "events" ? <div className="room-entities-header">
-        {resolvedSelectedKeys.length > 1 || !selectedEntity ? <strong>{inspectorKind === "actor" ? "Atores" : inspectorKind === "trigger" ? "Gatilhos" : "Atores e gatilhos"}</strong> : null}
+        {resolvedSelectedKeys.length > 1 || !selectedEntity ? <strong>{inspectorKind === "actor" ? ui("Atores") : inspectorKind === "trigger" ? ui("Gatilhos") : ui("Atores e gatilhos")}</strong> : null}
         <div className="room-entity-batch-actions">
           {resolvedSelectedKeys.length > 1 || !selectedEntity ? <span>{resolvedSelectedKeys.length > 0 ? `${resolvedSelectedKeys.length}/${visibleEntities.length}` : visibleEntities.length}</span> : null}
-          {isPositionTab ? <div className="room-entity-tool-segment" role="group" aria-label="Ferramenta de entidade">
+          {isPositionTab ? <div className="room-entity-tool-segment" role="group" aria-label={ui("Ferramenta de entidade")}>
             {entityTools.map((tool) => (
               <button
                 aria-pressed={selectedEntityTool === tool.id}
@@ -3439,13 +3507,13 @@ function RoomEntitiesEditor({
                 onClick={() => setSelectedEntityTool(tool.id)}
                 type="button"
               >
-                {tool.label}
+                {ui(tool.label)}
               </button>
             ))}
           </div> : null}
           {activeTab === "movement" && !isTriggerInspector ? (
             <>
-              <div className="room-entity-step-segment" aria-label="Passo do nudge">
+              <div className="room-entity-step-segment" aria-label={ui("Passo do nudge")}>
                 {[1, 8, 16].map((stepSize) => (
                   <button
                     aria-pressed={nudgeStepSize === stepSize}
@@ -3462,30 +3530,30 @@ function RoomEntitiesEditor({
               <button disabled={!canNudgeSelection} onClick={() => onNudgeRoomEntities(room.id, selectedVisibleKeys, 1, 0, nudgeStepSize)} type="button">X+</button>
               <button disabled={!canNudgeSelection} onClick={() => onNudgeRoomEntities(room.id, selectedVisibleKeys, 0, -1, nudgeStepSize)} type="button">Y-</button>
               <button disabled={!canNudgeSelection} onClick={() => onNudgeRoomEntities(room.id, selectedVisibleKeys, 0, 1, nudgeStepSize)} type="button">Y+</button>
-              <button disabled={selectedVisibleKeys.length < 2} onClick={() => onAlignRoomEntities(room.id, selectedVisibleKeys, "x")} type="button">Alinhar X</button>
-              <button disabled={selectedVisibleKeys.length < 2} onClick={() => onAlignRoomEntities(room.id, selectedVisibleKeys, "y")} type="button">Alinhar Y</button>
-              <button disabled={selectedVisibleKeys.length < 3} onClick={() => onDistributeRoomEntities(room.id, selectedVisibleKeys, "x")} type="button">Distribuir X</button>
-              <button disabled={selectedVisibleKeys.length < 3} onClick={() => onDistributeRoomEntities(room.id, selectedVisibleKeys, "y")} type="button">Distribuir Y</button>
+              <button disabled={selectedVisibleKeys.length < 2} onClick={() => onAlignRoomEntities(room.id, selectedVisibleKeys, "x")} type="button">{ui("Alinhar X")}</button>
+              <button disabled={selectedVisibleKeys.length < 2} onClick={() => onAlignRoomEntities(room.id, selectedVisibleKeys, "y")} type="button">{ui("Alinhar Y")}</button>
+              <button disabled={selectedVisibleKeys.length < 3} onClick={() => onDistributeRoomEntities(room.id, selectedVisibleKeys, "x")} type="button">{ui("Distribuir X")}</button>
+              <button disabled={selectedVisibleKeys.length < 3} onClick={() => onDistributeRoomEntities(room.id, selectedVisibleKeys, "y")} type="button">{ui("Distribuir Y")}</button>
             </>
           ) : null}
           {isGeneralTab ? <>
-            <button disabled={!canNudgeSelection || hasLockedSelection} onClick={() => onDuplicateRoomEntities(room.id, selectedVisibleKeys)} type="button">Duplicar</button>
-            <button className="danger-button" disabled={!canNudgeSelection || hasLockedSelection} onClick={() => onRemoveRoomEntities(room.id, selectedVisibleKeys)} type="button">Remover</button>
+            <button disabled={!canNudgeSelection || hasLockedSelection} onClick={() => onDuplicateRoomEntities(room.id, selectedVisibleKeys)} type="button">{ui("Duplicar")}</button>
+            <button className="danger-button" disabled={!canNudgeSelection || hasLockedSelection} onClick={() => onRemoveRoomEntities(room.id, selectedVisibleKeys)} type="button">{ui("Remover")}</button>
           </> : null}
         </div>
       </div> : null}
       {isTriggerInspector && !selectedEntity ? (
-        <p className="room-entity-workflow-hint">Arraste no grid para criar um gatilho.</p>
+        <p className="room-entity-workflow-hint">{ui("Arraste no grid para criar um gatilho.")}</p>
       ) : null}
       {visibleEntities.length === 0 ? (
         inspectorKind === "trigger" ? (
           <div className="room-entity-empty-state">
-            <p className="muted">Nenhum gatilho vinculado a esta cena.</p>
-            <p>Crie uma área no centro ou arraste no canvas para desenhar um gatilho.</p>
-            <button onClick={createTriggerFromInspector} type="button">Criar gatilho</button>
+            <p className="muted">{ui("Nenhum gatilho vinculado a esta cena.")}</p>
+            <p>{ui("Crie uma área no centro ou arraste no canvas para desenhar um gatilho.")}</p>
+            <button onClick={createTriggerFromInspector} type="button">{ui("Criar gatilho")}</button>
           </div>
         ) : (
-          <p className="muted">{inspectorKind === "actor" ? "Nenhum ator vinculado a esta cena." : "Nenhum ator ou gatilho vinculado a esta cena."}</p>
+          <p className="muted">{inspectorKind === "actor" ? ui("Nenhum ator vinculado a esta cena.") : ui("Nenhum ator ou gatilho vinculado a esta cena.")}</p>
         )
       ) : (
         <>
@@ -3495,19 +3563,19 @@ function RoomEntitiesEditor({
                 <div className="room-entity-title">
                   {isMixedGroupEventContext ? (
                     <>
-                      <strong>Grupo misto de {mixedEntitySelectionCount} entidades</strong>
-                      <span>Comportamentos em lote exigem entidades do mesmo tipo</span>
+                      <strong>{ui("Grupo misto de ")}{mixedEntitySelectionCount} {ui(" entidades")}</strong>
+                      <span>{ui("Comportamentos em lote exigem entidades do mesmo tipo")}</span>
                     </>
                   ) : (
                     <>
-                      <strong>Grupo de {selectedEntities.length} {selectedEntity.kind === "actor" ? "atores" : "triggers"}</strong>
-                      <span>Comportamentos independentes por entidade</span>
+                      <strong>{ui("Grupo de ")}{selectedEntities.length} {selectedEntity.kind === "actor" ? ui("atores") : ui("triggers")}</strong>
+                      <span>{ui("Comportamentos independentes por entidade")}</span>
                     </>
                   )}
                 </div>
               ) : null}
               {isGeneralTab ? <label>
-                <span>Cena</span>
+                <span>{ui("Cena")}</span>
                 <select
                   onChange={(event) => onUpdateRoomEntity(selectedEntity.kind, selectedEntity.id, { roomName: event.currentTarget.value })}
                   value={selectedEntity.roomName}
@@ -3527,7 +3595,7 @@ function RoomEntitiesEditor({
               {activeTab === "area" || activeTab === "trigger" ? entityNumberInput("H", selectedEntity.height, (value) => onUpdateRoomEntity(selectedEntity.kind, selectedEntity.id, { height: value }), 1) : null}
               {(activeTab === "sprite" || activeTab === "actor") && selectedEntity.kind === "actor" ? (
                 <label className="room-actor-sprite-sheet-field">
-                  <span>Sprite do ator</span>
+                  <span>{ui("Sprite do ator")}</span>
                   <select
                     onChange={(event) => {
                       const spriteSheet = event.currentTarget.value;
@@ -3539,7 +3607,7 @@ function RoomEntitiesEditor({
                     }}
                     value={selectedEntity.spriteSheet ?? ""}
                   >
-                    <option value="">Sem sprite</option>
+                    <option value="">{ui("Sem sprite")}</option>
                     {selectOptionsWithCurrent(presentation.options.actorSpriteSheets, selectedEntity.spriteSheet ?? null).map((option) => (
                       <option key={option.value} value={option.value}>{option.label}</option>
                     ))}
@@ -3547,8 +3615,8 @@ function RoomEntitiesEditor({
                 </label>
               ) : null}
               {activeTab === "actor" && selectedEntity.kind === "actor" && actorAnimationDirections.length > 0 ? <label>
-                <span>Direção inicial</span>
-                <select aria-label="Direção inicial do ator" value={selectedActorAnimation?.direction ?? ""}
+                <span>{ui("Direção inicial")}</span>
+                <select aria-label={ui("Direção inicial do ator")} value={selectedActorAnimation?.direction ?? ""}
                   onChange={(event) => {
                     if (!selectedActorAnimation) return;
                     const animationName = resolveActorAnimationName(actorAnimationVariants, {
@@ -3562,7 +3630,7 @@ function RoomEntitiesEditor({
               {activeTab === "sprite" && selectedEntity.kind === "actor" ? (
                 <div className="room-actor-animation-selectors">
                   <label>
-                    <span>Conjunto de animação</span>
+                    <span>{ui("Conjunto de animação")}</span>
                     <select
                       disabled={actorAnimationSetOptions.length === 0}
                       onChange={(event) => onUpdateRoomEntity("actor", selectedEntity.id, {
@@ -3570,14 +3638,14 @@ function RoomEntitiesEditor({
                       })}
                       value={selectedEntity.animationStateID ?? actorAnimationSetOptions[0]?.value ?? ""}
                     >
-                      {actorAnimationSetOptions.length === 0 ? <option value="">Sem conjunto</option> : null}
+                      {actorAnimationSetOptions.length === 0 ? <option value="">{ui("Sem conjunto")}</option> : null}
                       {actorAnimationSetOptions.map((state) => (
-                        <option key={state.value} value={state.value}>{state.label}</option>
+                        <option key={state.value} value={state.value}>{ui(state.label)}</option>
                       ))}
                     </select>
                   </label>
                   <label>
-                    <span>Estado inicial</span>
+                    <span>{ui("Estado inicial")}</span>
                     <select
                       disabled={actorAnimationStates.length === 0}
                       onChange={(event) => {
@@ -3590,14 +3658,14 @@ function RoomEntitiesEditor({
                       }}
                       value={selectedActorAnimation?.state ?? ""}
                     >
-                      {actorAnimationStates.length === 0 ? <option value="">Sem animações</option> : null}
+                      {actorAnimationStates.length === 0 ? <option value="">{ui("Sem animações")}</option> : null}
                       {actorAnimationStates.map((state) => (
                         <option key={state} value={state}>{actorAnimationTokenLabel(state, actorAnimationStateLabels)}</option>
                       ))}
                     </select>
                   </label>
                   {actorAnimationDirections.length > 0 ? <label>
-                    <span>Direção inicial</span>
+                    <span>{ui("Direção inicial")}</span>
                     <select
                       onChange={(event) => {
                         if (!selectedActorAnimation) return;
@@ -3618,31 +3686,31 @@ function RoomEntitiesEditor({
                 </div>
               ) : null}
               {isGeneralTab && isMenuVisualActor ? (
-                <section aria-label="Vínculo visual do menu" className="room-menu-actor-summary">
-                  <strong>{selectedMenuItem ? `Parte visual de ${selectedMenuItem.label}` : "Parte visual do menu"}</strong>
-                  <p>{selectedMenuVisualPartCount || 1} parte{selectedMenuVisualPartCount === 1 ? "" : "s"} compartilha{selectedMenuVisualPartCount === 1 ? "" : "m"} o mesmo item lógico.</p>
-                  <small>A montagem visual e a seleção do menu continuam vinculadas ao item lógico; a lógica deste ator é configurada na aba Eventos.</small>
+                <section aria-label={ui("Vínculo visual do menu")} className="room-menu-actor-summary">
+                  <strong>{selectedMenuItem ? ui("Parte visual de {0}", { 0: selectedMenuItem.label }) : ui("Parte visual do menu")}</strong>
+                  <p>{selectedMenuVisualPartCount || 1} {ui(" parte")}{selectedMenuVisualPartCount === 1 ? "" : "s"} {ui(" compartilha")}{selectedMenuVisualPartCount === 1 ? "" : "m"} {ui(" o mesmo item lógico.")}</p>
+                  <small>{ui("A montagem visual e a seleção do menu continuam vinculadas ao item lógico; a lógica deste ator é configurada na aba Eventos.")}</small>
                 </section>
               ) : null}
-              {isGeneralTab && selectedEntity.kind === "actor" && selectedEntity.battle && !isMenuVisualActor ? (
+              {isGeneralTab && selectedEntity.kind === "actor" && selectedEntity.battle && room.sceneType !== "luta" && !isMenuVisualActor ? (
                 <InspectorSection
-                  ariaLabel="Batalha RPG"
+                  ariaLabel={ui("Batalha RPG")}
                   className="room-actor-battle-section"
                   defaultOpen={room.sceneType === "battleRpg"}
                   persistKey={`rooms.entity.${selectedEntity.id}.battle`}
                   role="region"
-                  title="Batalha RPG"
+                  title={ui("Batalha RPG")}
                 >
-                  <div aria-label="Batalha RPG" className="room-actor-battle-fields" role="group">
+                  <div aria-label={ui("Batalha RPG")} className="room-actor-battle-fields" role="group">
                   <label>
-                    <span>Lado</span>
+                    <span>{ui("Lado")}</span>
                     <select
                       onChange={(event) => onUpdateRoomEntity("actor", selectedEntity.id, { battle: { side: event.currentTarget.value as "none" | "party" | "enemy" } })}
                       value={selectedEntity.battle.side}
                     >
-                      <option value="none">Fora da batalha</option>
-                      <option value="party">Grupo</option>
-                      <option value="enemy">Inimigo</option>
+                      <option value="none">{ui("Fora da batalha")}</option>
+                      <option value="party">{ui("Grupo")}</option>
+                      <option value="enemy">{ui("Inimigo")}</option>
                     </select>
                   </label>
                   {entityNumberInput("HP", selectedEntity.battle.maxHp, (value) => onUpdateRoomEntity("actor", selectedEntity.id, { battle: { maxHp: value } }), 1)}
@@ -3651,7 +3719,7 @@ function RoomEntitiesEditor({
                   {entityNumberInput("Velocidade", selectedEntity.battle.speed, (value) => onUpdateRoomEntity("actor", selectedEntity.id, { battle: { speed: value } }), 1)}
                   {entityNumberInput("Escala visual", selectedEntity.battle.spriteScale ?? 1, (value) => onUpdateRoomEntity("actor", selectedEntity.id, { battle: { spriteScale: value } }), 1, 2)}
                   <div className="room-actor-battle-abilities">
-                    <span>Comandos</span>
+                    <span>{ui("Comandos")}</span>
                     {([
                       ["attack", "Ataque"],
                       ["magic", "Magia"],
@@ -3670,28 +3738,32 @@ function RoomEntitiesEditor({
                           }}
                           type="checkbox"
                         />
-                        <span>{label}</span>
+                        <span>{ui(label)}</span>
                       </label>
                     ))}
                   </div>
                   <p className="room-actor-battle-hint">
                     {selectedEntity.battle.side === "enemy"
-                      ? "A IA usa somente estes comandos e prioriza Cura ou Defesa quando estiver em risco."
-                      : "ATACAR abre os golpes configurados; L/R escolhe o membro ativo e Cura permite escolher o aliado."}
+                      ? ui("A IA usa somente estes comandos e prioriza Cura ou Defesa quando estiver em risco.")
+                      : ui("ATACAR abre os golpes configurados; L/R escolhe o membro ativo e Cura permite escolher o aliado.")}
                   </p>
                   </div>
                 </InspectorSection>
               ) : null}
+              {isGeneralTab && selectedEntity.kind === "actor" && !isMenuVisualActor && projectData ? (
+                <ActorRuntimeResourcesInspector sceneType={room.sceneType} actorID={selectedEntity.id} data={projectData}
+                  onChange={fields => onUpdateRoomEntity("actor", selectedEntity.id, fields)} />
+              ) : null}
               {isGeneralTab && selectedEntity.kind === "actor" && !isMenuVisualActor ? (
                 <InspectorSection
-                  ariaLabel="Colisão ator-ator"
+                  ariaLabel={ui("Colisão ator-ator")}
                   className="room-actor-collision-section"
                   defaultOpen={false}
                   persistKey={`rooms.entity.${selectedEntity.id}.collision`}
                   role="region"
-                  title="Colisão ator-ator"
+                  title={ui("Colisão ator-ator")}
                 >
-                  <div aria-label="Colisão ator-ator" className="room-actor-collision-fields" role="group">
+                  <div aria-label={ui("Colisão ator-ator")} className="room-actor-collision-fields" role="group">
                   {entityNumberInput("Máscara", selectedEntity.collisionMask ?? 0xFFFF, (value) => onUpdateRoomEntity("actor", selectedEntity.id, { collisionMask: value }), 0, 0xFFFF)}
                   {entityNumberInput("Prioridade de push", selectedEntity.pushPriority ?? 0, (value) => onUpdateRoomEntity("actor", selectedEntity.id, { pushPriority: value }), 0, 255)}
                   <label className="room-actor-pushable-field">
@@ -3700,16 +3772,16 @@ function RoomEntitiesEditor({
                       onChange={(event) => onUpdateRoomEntity("actor", selectedEntity.id, { pushable: event.currentTarget.checked })}
                       type="checkbox"
                     />
-                    <span>Pode ser empurrado</span>
+                    <span>{ui("Pode ser empurrado")}</span>
                   </label>
-                  <p className="room-actor-battle-hint">A máscara usa bits dos grupos 0–15. Um ator só empurra outro marcado quando sua prioridade é maior.</p>
+                  <p className="room-actor-battle-hint">{ui("A máscara usa bits dos grupos 0–15. Um ator só empurra outro marcado quando sua prioridade é maior.")}</p>
                   </div>
                 </InspectorSection>
               ) : null}
               {isMixedGroupEventContext ? (
-                <section aria-label="Comportamento em grupo indisponível" className="room-mixed-entity-events-inspector">
-                  <strong>Comportamento em grupo indisponível</strong>
-                  <p>Selecione apenas atores ou apenas triggers para criar cópias independentes do mesmo comportamento.</p>
+                <section aria-label={ui("Comportamento em grupo indisponível")} className="room-mixed-entity-events-inspector">
+                  <strong>{ui("Comportamento em grupo indisponível")}</strong>
+                  <p>{ui("Selecione apenas atores ou apenas triggers para criar cópias independentes do mesmo comportamento.")}</p>
                 </section>
               ) : isGroupEventContext ? (
                 <RoomEntityGroupEventsInspector
@@ -3900,13 +3972,13 @@ function roomEntityCanvas(
   }
 
   return (
-    <div className="room-entity-canvas-editor" aria-label={`Canvas de entidades de ${sceneDisplayName(room.name)}`}>
+    <div className="room-entity-canvas-editor" aria-label={ui("Canvas de entidades de {0}", { 0: sceneDisplayName(room.name) })}>
       <div className="room-entities-header">
-        <strong>Canvas</strong>
-        <span>{selectedEntityKeys.length > 1 ? `${selectedEntityKeys.length} selecionados` : selectedEntity ? `${selectedEntity.name} selecionado` : "Sem entidades"}</span>
+        <strong>{ui("Canvas")}</strong>
+        <span>{selectedEntityKeys.length > 1 ? ui("{0} selecionados", { 0: selectedEntityKeys.length }) : selectedEntity ? ui("{0} selecionado", { 0: selectedEntity.name }) : ui("Sem entidades")}</span>
       </div>
       <button
-        aria-label={selectedEntity ? `Reposicionar ${selectedEntity.name}` : "Canvas sem entidades"}
+        aria-label={selectedEntity ? ui("Reposicionar {0}", { 0: selectedEntity.name }) : ui("Canvas sem entidades")}
         className="room-entity-canvas"
         disabled={!selectedEntity}
         onPointerDown={startEntityDrag}
@@ -4022,6 +4094,7 @@ function EditorExplorerContextMenu({
   runRoomDisabled = false,
   isStart = false
 }: EditorExplorerContextMenuProps): React.ReactElement {
+  const ui = useStudioUiText();
   const [moveGroupOpen, setMoveGroupOpen] = useState(false);
 
   useEffect(() => {
@@ -4061,29 +4134,29 @@ function EditorExplorerContextMenu({
       role="presentation"
     >
       <menu
-        aria-label={`Ações para ${roomLabel}`}
+        aria-label={ui("Ações para {0}", { 0: roomLabel })}
         className="editor-explorer-context-menu"
         onMouseDown={(event) => event.stopPropagation()}
         style={{ left: `${menuLeft}px`, top: `${menuTop}px` }}
       >
         {onAddRoomBeside ? (
           <li>
-            <button onClick={onAddRoomBeside} type="button">Adicionar cena ao lado</button>
+            <button onClick={onAddRoomBeside} type="button">{ui("Adicionar cena ao lado")}</button>
           </li>
         ) : null}
         {onConnectNextScene ? (
           <li>
-            <button onClick={onConnectNextScene} type="button">Conectar próxima cena</button>
+            <button onClick={onConnectNextScene} type="button">{ui("Conectar próxima cena")}</button>
           </li>
         ) : null}
         {onRunRoom ? (
           <li>
-            <button disabled={runRoomDisabled} onClick={onRunRoom} type="button">Testar cena</button>
+            <button disabled={runRoomDisabled} onClick={onRunRoom} type="button">{ui("Testar cena")}</button>
           </li>
         ) : null}
         {onSetStartRoom && !isStart ? (
           <li>
-            <button onClick={onSetStartRoom} type="button">Definir como cena inicial</button>
+            <button onClick={onSetStartRoom} type="button">{ui("Definir como cena inicial")}</button>
           </li>
         ) : null}
         {onMoveToGroup ? (
@@ -4096,13 +4169,13 @@ function EditorExplorerContextMenu({
                 onClick={() => setMoveGroupOpen((current) => !current)}
                 type="button"
               >
-                <span>Mover para o grupo</span>
+                <span>{ui("Mover para o grupo")}</span>
                 <ChevronRight aria-hidden="true" className={moveGroupOpen ? "is-open" : ""} size={15} strokeWidth={2.2} />
               </button>
             </li>
             {moveGroupOpen ? (
               <li className="editor-explorer-context-menu-group-options">
-                <div aria-label="Grupos de cenas" role="group">
+                <div aria-label={ui("Grupos de cenas")} role="group">
                   <button
                     aria-pressed={currentGroupID === null}
                     className={currentGroupID === null ? "is-selected" : ""}
@@ -4112,8 +4185,7 @@ function EditorExplorerContextMenu({
                     <span className="editor-explorer-context-menu-group-check">
                       {currentGroupID === null ? <Check aria-hidden="true" size={13} strokeWidth={2.5} /> : null}
                     </span>
-                    Sem grupo
-                  </button>
+                    {ui("Sem grupo")}</button>
                   {groups.map((group) => (
                     <button
                       aria-pressed={currentGroupID === group.id}
@@ -4128,7 +4200,7 @@ function EditorExplorerContextMenu({
                       {group.name}
                     </button>
                   ))}
-                  {groups.length === 0 ? <span className="editor-explorer-context-menu-group-empty">Nenhum grupo criado</span> : null}
+                  {groups.length === 0 ? <span className="editor-explorer-context-menu-group-empty">{ui("Nenhum grupo criado")}</span> : null}
                 </div>
               </li>
             ) : null}
@@ -4136,13 +4208,13 @@ function EditorExplorerContextMenu({
         ) : null}
         {hasContextualActions ? <li aria-hidden="true" className="editor-explorer-context-menu-separator" role="separator" /> : null}
         <li>
-          <button onClick={onRename} type="button">Renomear</button>
+          <button onClick={onRename} type="button">{ui("Renomear")}</button>
         </li>
         <li>
-          <button onClick={onDuplicate} type="button">Duplicar</button>
+          <button onClick={onDuplicate} type="button">{ui("Duplicar")}</button>
         </li>
         <li>
-          <button className="danger" onClick={onDelete} type="button">Excluir</button>
+          <button className="danger" onClick={onDelete} type="button">{ui("Excluir")}</button>
         </li>
       </menu>
     </div>
@@ -4150,6 +4222,7 @@ function EditorExplorerContextMenu({
 }
 
 function RoomNamePromptDialog({ state, onCancel, onConfirm }: RoomNamePromptDialogProps): React.ReactElement {
+  const ui = useStudioUiText();
   const [name, setName] = useState(state.defaultName);
 
   useEffect(() => {
@@ -4164,7 +4237,7 @@ function RoomNamePromptDialog({ state, onCancel, onConfirm }: RoomNamePromptDial
   return (
     <div className="room-name-prompt-backdrop" onMouseDown={onCancel} role="presentation">
       <form
-        aria-label={state.title}
+        aria-label={ui(state.title)}
         aria-modal="true"
         className="room-name-prompt"
         onMouseDown={(event) => event.stopPropagation()}
@@ -4172,22 +4245,22 @@ function RoomNamePromptDialog({ state, onCancel, onConfirm }: RoomNamePromptDial
         role="dialog"
       >
         <header className="room-name-prompt-header">
-          <strong>{state.title}</strong>
-          <button aria-label="Cancelar" onClick={onCancel} type="button">
+          <strong>{ui(state.title)}</strong>
+          <button aria-label={ui("Cancelar")} onClick={onCancel} type="button">
             <X aria-hidden="true" size={14} strokeWidth={2.2} />
           </button>
         </header>
         <label className="room-name-prompt-field">
-          <span>{state.fieldLabel ?? "Nome da cena"}</span>
+          <span>{state.fieldLabel ?? ui("Nome da cena")}</span>
           <input
-            aria-label={state.fieldLabel ?? "Nome da cena"}
+            aria-label={state.fieldLabel ?? ui("Nome da cena")}
             autoFocus
             onChange={(event) => setName(event.currentTarget.value)}
             value={name}
           />
         </label>
         <div className="room-name-prompt-actions">
-          <button onClick={onCancel} type="button">Cancelar</button>
+          <button onClick={onCancel} type="button">{ui("Cancelar")}</button>
           <button disabled={!name.trim()} type="submit">{state.confirmLabel}</button>
         </div>
       </form>
@@ -4232,6 +4305,7 @@ export function RoomSceneEventMarker({
   onSelectArrival,
   onUpdateEventStep
 }: RoomSceneEventMarkerProps): React.ReactElement | null {
+  const ui = useStudioUiText();
   if (link.eventID === null || link.stepIndex === null || link.x === null || link.y === null) return null;
 
   const [position, setPosition] = useState({ x: link.x, y: link.y });
@@ -4347,7 +4421,7 @@ export function RoomSceneEventMarker({
     {previewVisible && arrivalEntity && arrivalURL && arrival ? <>
       <img alt="" aria-hidden="true" className="room-stage-sprite-probe" src={arrivalURL}
         onLoad={event => setImageSizes({ [arrival.sprite.source ?? '']: { width: event.currentTarget.naturalWidth, height: event.currentTarget.naturalHeight } })} />
-      <span aria-label={`Prévia de chegada do player: ${position.x}, ${position.y}, ${direction}`}
+      <span aria-label={ui("Prévia de chegada do player: {0}, {1}, {2}", { 0: position.x, 1: position.y, 2: direction })}
         data-player-arrival-preview="true" data-direction={direction}
         className="room-stage-entity actor has-sprite room-player-arrival-preview"
         style={{ ...arrivalStyle,
@@ -4368,7 +4442,7 @@ export function RoomSceneEventMarker({
       style={{ left: `${markerLeft}%`, top: `${markerTop}%` }}
     >
       <button
-        aria-label={`Destino de ${link.eventName}: ${position.x}, ${position.y}, direção ${direction}`}
+        aria-label={ui("Destino de {0}: {1}, {2}, direção {3}", { 0: link.eventName, 1: position.x, 2: position.y, 3: direction })}
         className="room-scene-event-marker-point"
         ref={markerRef}
         onClick={(event) => {
@@ -4382,8 +4456,8 @@ export function RoomSceneEventMarker({
         }}
         onPointerDown={editable ? startDrag : undefined}
         title={editable
-          ? `Chegada de transição · ${link.from} → ${link.to}. Arrastar altera o evento ${link.eventName}. Direção: ${direction}`
-          : `Destino ${position.x}, ${position.y}, direção ${direction}. Abra a cena para editar.`}
+          ? ui("Chegada de transição · {0} → {1}. Arrastar altera o evento {2}. Direção: {3}", { 0: link.from, 1: link.to, 2: link.eventName, 3: direction })
+          : ui("Destino {0}, {1}, direção {2}. Abra a cena para editar.", { 0: position.x, 1: position.y, 2: direction })}
         type="button"
       >
         <span
@@ -4396,10 +4470,10 @@ export function RoomSceneEventMarker({
       </button>
       {editable ? (
         <button
-          aria-label={`Alterar direção de chegada de ${link.eventName}`}
+          aria-label={ui("Alterar direção de chegada de {0}", { 0: link.eventName })}
           className="room-scene-event-marker-direction"
           onClick={cycleDirection}
-          title="Alterar direção"
+          title={ui("Alterar direção")}
           type="button"
         >
           {direction}
@@ -4407,7 +4481,7 @@ export function RoomSceneEventMarker({
       ) : (
         <span aria-hidden="true" className="room-scene-event-marker-direction is-readonly">{direction}</span>
       )}
-      <span className="room-arrival-source-label" title={`Script ${link.eventName} · evento ${(link.stepIndex ?? 0) + 1}`}>Chegada de {link.from}</span>
+      <span className="room-arrival-source-label" title={ui("Script {0} · evento {1}", { 0: link.eventName, 1: (link.stepIndex ?? 0) + 1 })}>{ui("Chegada de ")}{link.from}</span>
     </span>
     </>
   );
@@ -4418,6 +4492,7 @@ interface RoomSceneMapInactivePreviewProps {
   cardSize: RoomStageCardSize;
   entities: RoomsWorkspaceEntity[];
   showCardChrome?: boolean;
+  useViewportPreview?: boolean;
   isActiveRoom?: boolean;
   projectData?: GBAProjectData | null;
   projectPath?: string;
@@ -4458,7 +4533,8 @@ function paintRoomTilemapPreview(
   tileset: HTMLImageElement,
   outputSize: { height: number; width: number },
   previewFit: { height: number; width: number },
-  palette: readonly number[] = []
+  palette: readonly number[] = [],
+  viewportOrigin?: { left: number; top: number }
 ): void {
   const tileWidth = room.backgroundTileWidth;
   const tileHeight = room.backgroundTileHeight;
@@ -4487,7 +4563,8 @@ function paintRoomTilemapPreview(
   offscreenContext.clearRect(0, 0, previewFit.width, previewFit.height);
   offscreenContext.imageSmoothingEnabled = false;
   if (room.gbStudioUseBackgroundLayout) {
-    offscreenContext.drawImage(tileset, 0, 0, previewFit.width, previewFit.height);
+    if (viewportOrigin) offscreenContext.drawImage(tileset, -viewportOrigin.left, -viewportOrigin.top);
+    else offscreenContext.drawImage(tileset, 0, 0, previewFit.width, previewFit.height);
     canvas.width = outputSize.width;
     canvas.height = outputSize.height;
     const context = canvas.getContext("2d");
@@ -4507,8 +4584,8 @@ function paintRoomTilemapPreview(
       width: room.width
     }))
     : [{ mapping: "BG2" as const, tilemap: room.tileCells }];
-  const previewScaleX = previewFit.width / pixelWidth;
-  const previewScaleY = previewFit.height / pixelHeight;
+  const previewScaleX = viewportOrigin ? 1 : previewFit.width / pixelWidth;
+  const previewScaleY = viewportOrigin ? 1 : previewFit.height / pixelHeight;
   for (const previewLayer of previewLayers) {
     for (let index = 0; index < previewLayer.tilemap.length; index += 1) {
       const tileID = previewLayer.tilemap[index] ?? 0;
@@ -4534,10 +4611,13 @@ function paintRoomTilemapPreview(
       const y = isometricPoint
         ? isometricPoint.y + (room.backgroundAtlasRenderOffsetY ?? 0)
         : cartY * tileHeight;
+      const drawX = x - (viewportOrigin?.left ?? 0);
+      const drawY = y - (viewportOrigin?.top ?? 0);
+      if (viewportOrigin && (drawX + atlasTileWidth <= 0 || drawY + atlasTileHeight <= 0 || drawX >= 240 || drawY >= 160)) continue;
       offscreenContext.drawImage(
         tileset,
         region.x, region.y, region.width, region.height,
-        x * previewScaleX, y * previewScaleY, atlasTileWidth * previewScaleX, atlasTileHeight * previewScaleY
+        drawX * previewScaleX, drawY * previewScaleY, atlasTileWidth * previewScaleX, atlasTileHeight * previewScaleY
       );
     }
   }
@@ -4574,11 +4654,56 @@ function refreshedPreviewAssetURL(url: string | null, revision: number): string 
   return url && revision ? `${url}${url.includes("?") ? "&" : "?"}assetRevision=${revision}` : url;
 }
 
+function roomCardViewportOrigin(room: RoomsWorkspaceRoom, entities: RoomsWorkspaceEntity[], world: { width: number; height: number }): { left: number; top: number } {
+  if (room.sceneType !== "isometric") return sceneMapInitialViewportOrigin(room, entities.find(entity => entity.isPlayer));
+  const config = roomIsometricConfig(room)!;
+  const player = entities.find(entity => entity.isPlayer || entity.name === room.playerActorName);
+  const camera = player ? deriveIsometricCameraPositionForPlayer({ config, player, zones: room.cameraZones ?? [] }) : null;
+  if (camera) {
+    const offset = isometricProjectionCanvasOffset(room.height, config, roomIsometricSurfaceSize(room));
+    return { left: Math.max(0, Math.min(world.width - 240, camera.cameraX - offset.x)),
+      top: Math.max(0, Math.min(world.height - 160, camera.cameraY - offset.y)) };
+  }
+  // Match the focused editor's fallback: center the authored actor bounds.
+  const bounds = entities.filter(entity => entity.kind === "actor").map(entity => {
+    const style = roomEntityStyle(room, entity, null, {});
+    const left = parseFloat(String(style.left)) / 100 * world.width;
+    const top = parseFloat(String(style.top)) / 100 * world.height;
+    return { left, top, right: left + parseFloat(String(style.width)) / 100 * world.width,
+      bottom: top + parseFloat(String(style.height)) / 100 * world.height };
+  });
+  const centerX = bounds.length ? (Math.min(...bounds.map(b => b.left)) + Math.max(...bounds.map(b => b.right))) / 2 : world.width / 2;
+  const centerY = bounds.length ? (Math.min(...bounds.map(b => b.top)) + Math.max(...bounds.map(b => b.bottom))) / 2 : world.height / 2;
+  return { left: Math.max(0, Math.min(world.width - 240, Math.round(centerX - 120))),
+    top: Math.max(0, Math.min(world.height - 160, Math.round(centerY - 80))) };
+}
+
+function RoomTacticalInitialHud({ room, projectData, projectPath }: { room: RoomsWorkspaceRoom; projectData?: GBAProjectData | null; projectPath?: string }): React.ReactElement | null {
+  const config = roomIsometricConfig(room);
+  const art = config?.tacticalCapabilities?.some(capability => capability.id === "tactical_hud" && capability.enabled)
+    ? config.tacticalPresentation?.compactHud : null;
+  if (!art) return null;
+  const locale = readStoredLocale();
+  const phase = config?.tactical?.activeTeam === "enemy" ? locale === "en-US" ? "ENEMY" : locale === "es-ES" ? "ENEMIGO" : "INIMIGO"
+    : locale === "en-US" ? "PLAYER" : locale === "es-ES" ? "TU TURNO" : "SUA VEZ";
+  // Match the runtime's initial turn badge. Unit and action panels are contextual.
+  const preset: HudPresetPresentation = { id: "tactical-initial", name: "Tactical", description: "", backgroundImage: "", selectorImage: "",
+    font: art.font, position: "Superior", width: 240, height: 160, mode: "advanced", builtIn: false, ready: true, warning: null,
+    components: [
+      { id: "turn", kind: "frame", label: "", text: "", asset: art.turnPanel, x: 0, y: 0, width: 96, height: 32, zIndex: 0, visible: true },
+      { id: "phase", kind: "text", label: "", text: phase, textAdvance: 7, asset: "", x: 29, y: 12, width: 56, height: 8, zIndex: 1, visible: true }
+    ] };
+  return <HudPreviewSnapshot preset={preset} className="room-stage-card-tactical-hud" actionLabel=""
+    fontAssetURL={resolveProjectAssetURL(projectData, projectPath, art.font)} transparentBackground
+    resolveComponentAssetURL={component => resolveProjectAssetURL(projectData, projectPath, component.asset)} />;
+}
+
 function RoomSceneMapInactivePreview({
   room,
   cardSize,
   entities,
   showCardChrome = true,
+  useViewportPreview = true,
   isActiveRoom = false,
   projectData,
   projectPath,
@@ -4590,7 +4715,27 @@ function RoomSceneMapInactivePreview({
   onRunRoom,
   runRoomDisabled = false
 }: RoomSceneMapInactivePreviewProps): React.ReactElement {
+  const ui = useStudioUiText();
   const roomLabel = sceneDisplayName(room.name);
+  const isViewportPreview = useViewportPreview;
+  const isPerspectiveViewport = isViewportPreview && isPseudo3dRacingRoom(room);
+  const menu = room.sceneType === "menu" ? normalizeMenuSceneConfig(room.runtime?.config) : null;
+  const runtimeHudAsset = roomRuntimeHudAsset(room);
+  const runtimeHudURL = isViewportPreview && projectData && room.sceneType !== "dungeonCrawler" && runtimeHudAsset
+    ? resolveProjectAssetURL(projectData, projectPath, runtimeHudAsset) : null;
+  const viewportHud = isViewportPreview && projectData && (!runtimeHudAsset || ["battleRpg", "dungeonCrawler"].includes(room.sceneType))
+    && (!menu || (menu.hudMode !== "none" && menu.screenType === "menu"))
+    ? resolveExplicitHudPresetBinding(projectData, { roomID: room.id, roomPresetId: room.hudPresetId, scenePresetId: menu?.hudPresetId }) : null;
+  const visibleEntities = entities.filter(entity => {
+    if (!isViewportPreview) return true;
+    if (entity.kind !== "actor" || (menu && viewportHud)) return false;
+    if (!menu || !projectData) return true;
+    const actor = Array.isArray(projectData.actors) ? projectData.actors.find(actor => actor.id === entity.id) : null;
+    if (actor?.menuActorSelectedOnly && actor.menuItemID !== menu.items[0]?.id) return false;
+    if (!actor?.menuVisibilityVariable) return true;
+    const variable = Array.isArray(projectData.variables) ? projectData.variables.find(variable => variable.name === actor.menuVisibilityVariable) : null;
+    return Number(variable?.initialValue ?? 0) === Number(actor.menuVisibilityValue ?? 0);
+  });
   const sceneComposition = sceneCompositionForRoomPreview(room);
   const affinePresentation = sceneCompositionToAffinePresentation(sceneComposition);
   const backgroundURL = refreshedPreviewAssetURL(resolveRoomBackgroundURL(projectPath, room), assetRefreshToken);
@@ -4627,15 +4772,18 @@ function RoomSceneMapInactivePreview({
         height: room.height * room.backgroundTileHeight,
         width: room.width * room.backgroundTileWidth
       };
+  const viewportOrigin = roomCardViewportOrigin(room, entities, tilemapPixelSize);
   const previewOutputSize = {
     height: cardSize.canvasDisplayHeight,
     width: cardSize.width
   };
   const preserveIsometricCardAspect = !hasTacticalSurfacePreview;
-  const displayScale = Math.min(previewOutputSize.width / tilemapPixelSize.width, previewOutputSize.height / tilemapPixelSize.height);
+  const displayScale = isViewportPreview ? previewOutputSize.width / 240
+    : Math.min(previewOutputSize.width / tilemapPixelSize.width, previewOutputSize.height / tilemapPixelSize.height);
   const previewLayerSize = { width: tilemapPixelSize.width * displayScale, height: tilemapPixelSize.height * displayScale };
   // Keep the composition bitmap independent of zoom; CSS scales it with the card.
-  const previewFit = integerNearestNeighborPreviewFit(tilemapPixelSize, SCENE_MAP_PREVIEW_MAX_SIZE);
+  const previewFit = isViewportPreview ? { width: 240, height: 160 }
+    : integerNearestNeighborPreviewFit(tilemapPixelSize, SCENE_MAP_PREVIEW_MAX_SIZE);
   const cardPreviewMode = hasTacticalSurfacePreview
     ? "tactical-surface"
     : room.sceneType === "isometric"
@@ -4690,7 +4838,7 @@ function RoomSceneMapInactivePreview({
     if (isDesktopAssetURL(backgroundURL)) tileset.crossOrigin = "anonymous";
     tileset.onload = () => {
       if (cancelled) return;
-      paintRoomTilemapPreview(canvas, roomPaintRef.current, tileset, previewFit, previewFit, roomPaintRef.current.backgroundPalette ?? []);
+      paintRoomTilemapPreview(canvas, roomPaintRef.current, tileset, previewFit, previewFit, roomPaintRef.current.backgroundPalette ?? [], isViewportPreview ? viewportOrigin : undefined);
     };
     tileset.src = backgroundURL;
 
@@ -4698,7 +4846,7 @@ function RoomSceneMapInactivePreview({
       cancelled = true;
     };
   }, [backgroundURL, backgroundLayerURLs.map(layer => layer.url).join("|"), previewFit.height, previewFit.width,
-    room.backgroundPalette?.join(",") ?? "", tilemapSignature, useLayeredBackgroundLayout]);
+    room.backgroundPalette?.join(",") ?? "", tilemapSignature, useLayeredBackgroundLayout, isViewportPreview, viewportOrigin.left, viewportOrigin.top]);
 
   function openSceneEditor(event: React.SyntheticEvent<HTMLElement>): void {
     if (!onFocusScene) return;
@@ -4717,8 +4865,8 @@ function RoomSceneMapInactivePreview({
 
   return (
     <article
-      className={`room-stage-card${isActiveRoom ? " is-active-room" : ""}${showCardChrome ? "" : " is-chrome-hidden"}`}
-      aria-label={`Card da cena ${roomLabel} · visão geral somente leitura`}
+      className={`room-stage-card${isViewportPreview ? " is-viewport-card" : ""}${isActiveRoom ? " is-active-room" : ""}${showCardChrome ? "" : " is-chrome-hidden"}`}
+      aria-label={ui("Card da cena {0} · visão geral somente leitura", { 0: roomLabel })}
       data-scene-map-preview="true"
       data-scene-map-mode="overview"
       data-card-preview-state="frozen"
@@ -4737,53 +4885,53 @@ function RoomSceneMapInactivePreview({
             <span
               aria-hidden="true"
               className="room-stage-card-drag room-stage-card-title-drag"
-              title="Mover card da cena"
+              title={ui("Mover card da cena")}
             >
-              <strong>{roomLabel}</strong>
-              {room.isStart ? <em>Início do jogo</em> : null}
+              <strong title={roomLabel}>{roomLabel}</strong>
+              {room.isStart ? <em>{ui("Início do jogo")}</em> : null}
             </span>
           </div>
           <div className="room-stage-card-tags">
             <span className="room-stage-card-type-tag">{sceneTypeLabel(room.sceneType, roomIsometricConfig(room)?.gameplayMode)}</span>
             {affinePresentation.enabled ? (
-              <span className="room-stage-card-affine-tag" title="Esta cena possui uma camada Affine decorativa configurada no Editor.">
-                Affine · {affinePresentation.layer}
+              <span className="room-stage-card-affine-tag" title={ui("Esta cena possui uma camada Affine decorativa configurada no Editor.")}>
+                {ui("Affine · ")}{affinePresentation.layer}
               </span>
             ) : null}
             {room.collisionCount === 0 ? (
-              <span className="room-stage-card-warning warning" title="Sem colisão">
+              <span className="room-stage-card-warning warning" title={ui("Sem colisão")}>
                 <AlertTriangle aria-hidden="true" size={11} strokeWidth={2.5} />
-                Sem colisão
-              </span>
+                {ui("Sem colisão")}</span>
             ) : null}
           </div>
         </div>
         <div className="room-stage-card-actions">
           {onFocusScene ? (
             <button
-              aria-label={`Editar cena ${roomLabel}`}
+              aria-label={ui("Editar cena {0}", { 0: roomLabel })}
               className="room-stage-card-edit-button"
               onClick={(event) => {
                 event.stopPropagation();
                 onFocusScene();
               }}
               onPointerDown={(event) => event.stopPropagation()}
-              title="Editar cena"
+              title={ui("Editar cena")}
               type="button"
             >
               <ScanSearch aria-hidden="true" size={14} strokeWidth={2.3} />
-              <span>Editar cena</span>
+              <span>{ui("Editar cena")}</span>
             </button>
           ) : null}
           {onOpenContextMenu ? (
             <button
-              aria-label={`Mais opções da cena ${roomLabel}`}
+              aria-label={ui("Mais opções da cena {0}", { 0: roomLabel })}
+              className="room-stage-card-more-button"
               onClick={(event) => {
                 event.stopPropagation();
                 onOpenContextMenu(event);
               }}
               onPointerDown={(event) => event.stopPropagation()}
-              title="Mais opções da cena"
+              title={ui("Mais opções da cena")}
               type="button"
             >
               <MoreHorizontal aria-hidden="true" size={14} strokeWidth={2.3} />
@@ -4791,18 +4939,18 @@ function RoomSceneMapInactivePreview({
           ) : null}
           {onRunRoom ? (
             <button
-              aria-label={`Executar somente a cena ${roomLabel}`}
+              aria-label={ui("Executar somente a cena {0}", { 0: roomLabel })}
               disabled={runRoomDisabled}
               onClick={(event) => {
                 event.stopPropagation();
                 onRunRoom();
               }}
               onPointerDown={(event) => event.stopPropagation()}
-              title="Executar somente esta cena"
+              title={ui("Executar somente esta cena")}
               type="button"
             >
               <Zap aria-hidden="true" size={14} strokeWidth={2.2} />
-              <span>Testar</span>
+              <span>{ui("Testar")}</span>
             </button>
           ) : null}
         </div>
@@ -4817,13 +4965,19 @@ function RoomSceneMapInactivePreview({
           height: `${cardSize.canvasDisplayHeight}px`
         }}
       >
-        <div
+        {isPerspectiveViewport ? <RacingPseudo3dCameraPreview room={room} entities={entities} projectPath={projectPath} />
+        : room.sceneType === "dungeonCrawler" ? <div className="dungeon-card-camera"><div style={{ transform: `scale(${cardSize.width / 240})`, transformOrigin: "top left" }}><DungeonScenePreview room={room} entities={entities} projectData={projectData} projectPath={projectPath} assetRefreshToken={assetRefreshToken} hud={projectData ? (() => { const binding = resolveExplicitHudPresetBinding(projectData, { roomID: room.id, roomPresetId: room.hudPresetId }); return binding ? <RoomHudOverlay binding={binding} entities={entities} projectData={projectData} projectPath={projectPath} room={room} viewportScale={1} guides={false} /> : null; })() : null} /></div></div> : <div
           className="room-stage-card-preview-layer"
-          data-card-preview-mode={cardPreviewMode}
+          data-card-preview-mode={isViewportPreview && room.sceneType === "racing" ? "racing-viewport" : cardPreviewMode}
+          data-card-preview-framing={isViewportPreview ? "viewport" : "map"}
+          data-camera-x={isViewportPreview ? viewportOrigin.left : undefined}
+          data-camera-y={isViewportPreview ? viewportOrigin.top : undefined}
           data-card-preview-projection={preserveIsometricCardAspect ? room.sceneType === "isometric" ? "isometric-contain" : "contain" : "fill"}
           style={{
             height: `${previewLayerSize.height}px`,
-            width: `${previewLayerSize.width}px`
+            width: `${previewLayerSize.width}px`,
+            ...(isViewportPreview ? { inset: "auto", margin: 0, left: -viewportOrigin.left * displayScale,
+              top: -viewportOrigin.top * displayScale, transform: "none" } : {})
           }}
         >
           {hasTacticalSurfacePreview ? (
@@ -4857,8 +5011,11 @@ function RoomSceneMapInactivePreview({
             <canvas
               aria-hidden="true"
               className="room-stage-card-preview-canvas"
+              width={isViewportPreview ? 240 : undefined}
+              height={isViewportPreview ? 160 : undefined}
               ref={canvasRef}
-              style={{ height: `${previewLayerSize.height}px`, width: `${previewLayerSize.width}px` }}
+              style={isViewportPreview ? { position: "absolute", left: viewportOrigin.left * displayScale, top: viewportOrigin.top * displayScale, height: 160 * displayScale, width: 240 * displayScale }
+                : { height: `${previewLayerSize.height}px`, width: `${previewLayerSize.width}px` }}
             />
           )}
           <IsometricPagedForeground room={room} projectData={projectData} projectPath={projectPath} assetRefreshToken={assetRefreshToken} />
@@ -4877,7 +5034,7 @@ function RoomSceneMapInactivePreview({
               />
             ) : null;
           })}
-          {connectionZones.map((zone) => (
+          {(isViewportPreview ? [] : connectionZones).map((zone) => (
             <span
               aria-hidden="true"
               className={[
@@ -4892,7 +5049,7 @@ function RoomSceneMapInactivePreview({
               }}
             />
           ))}
-          {entities.map((entity) => {
+          {visibleEntities.map((entity) => {
             const width = Math.max(1, entity.width);
             const height = Math.max(1, entity.height);
             const sourceSpriteURL = entity.kind === "actor"
@@ -4917,14 +5074,25 @@ function RoomSceneMapInactivePreview({
               </span>
             );
           })}
-        </div>
+        </div>}
+        {runtimeHudURL ? <img className="room-stage-card-runtime-hud" src={refreshedPreviewAssetURL(runtimeHudURL, assetRefreshToken)!} alt="" /> : null}
+        {isViewportPreview && room.sceneType === "isometric" ? <div className="room-stage-card-viewport-hud" style={{ transform: `scale(${displayScale})` }}>
+          <RoomTacticalInitialHud room={room} projectData={projectData} projectPath={projectPath} />
+        </div> : null}
+        {viewportHud && room.sceneType !== "dungeonCrawler" ? <div className="room-stage-card-viewport-hud" style={{ transform: `scale(${displayScale})` }}>
+          <RoomHudOverlay binding={viewportHud} entities={entities} projectData={projectData} projectPath={projectPath}
+            room={room} viewportScale={1} guides={false} />
+        </div> : null}
       </div>
       {showCardChrome ? <div className="room-stage-card-footer">
-        <span className="room-stage-card-dimensions">{roomSceneResolutionLabel(room)} px</span>
-        <span>{entities.filter((entity) => entity.kind === "actor" && !entity.isPlayer).length} atores</span>
-        {entities.some((entity) => entity.isPlayer) ? <span className="player-present">Player visível</span> : null}
-        <span>{entities.filter((entity) => entity.kind === "trigger").length} gatilhos</span>
-        {isActiveRoom ? <span className="active">Ativa</span> : null}
+        <span className="room-stage-card-dimensions" title={`${roomSceneResolutionLabel(room)} px`}>{roomSceneResolutionLabel(room).replace(/\s*[x×]\s*/g, " × ")} px</span>
+        <span className="room-stage-card-count" aria-label={roomEntityCountLabel("actor", entities.filter(entity => entity.kind === "actor" && !entity.isPlayer).length)} title={roomEntityCountLabel("actor", entities.filter(entity => entity.kind === "actor" && !entity.isPlayer).length)}>
+          <UsersRound aria-hidden="true" size={12} />{entities.filter(entity => entity.kind === "actor" && !entity.isPlayer).length}
+        </span>
+        <span className="room-stage-card-count" aria-label={roomEntityCountLabel("trigger", entities.filter(entity => entity.kind === "trigger").length)} title={roomEntityCountLabel("trigger", entities.filter(entity => entity.kind === "trigger").length)}>
+          <Diamond aria-hidden="true" size={11} />{entities.filter(entity => entity.kind === "trigger").length}
+        </span>
+        {entities.some(entity => entity.isPlayer) ? <span className="player-present room-stage-card-player" title={ui("Player visível")} aria-label={ui("Player visível")}><UserRound aria-hidden="true" size={12} /></span> : null}
       </div> : null}
     </article>
   );
@@ -4954,8 +5122,9 @@ function RacingPseudo3dCameraPreview({
   room: RoomsWorkspaceRoom;
   entities: RoomsWorkspaceEntity[];
   projectPath?: string;
-  onOpenTechnicalMap(): void;
+  onOpenTechnicalMap?(): void;
 }): React.ReactElement | null {
+  const ui = useStudioUiText();
   const config = racingPseudo3dConfigForRoom(room);
   if (!config || config.presentation !== "pseudo3d") return null;
   const roomLabel = sceneDisplayName(room.name);
@@ -4992,7 +5161,7 @@ function RacingPseudo3dCameraPreview({
 
   return (
     <section
-      aria-label={`Câmera pseudo-3D da cena ${roomLabel}`}
+      aria-label={ui("Câmera pseudo-3D da cena {0}", { 0: roomLabel })}
       className="racing-pseudo3d-camera-preview"
       data-logical-height={preview.logicalHeight}
       data-logical-width={preview.logicalWidth}
@@ -5014,26 +5183,25 @@ function RacingPseudo3dCameraPreview({
       {!config.topdownTrack ? <span aria-hidden="true" className="racing-pseudo3d-vehicle rival" style={backgroundStyle(preview.rivalURL)} /> : null}
       {!config.topdownTrack ? <span aria-hidden="true" className="racing-pseudo3d-vehicle player" style={backgroundStyle(preview.playerURL)} /> : null}
       {!config.topdownTrack ? <span aria-hidden="true" className="racing-pseudo3d-hud">
-        <b>PRÉVIA</b>
-        <i>CURVA</i>
+        <b>{ui("PRÉVIA")}</b>
+        <i>{ui("CURVA")}</i>
       </span> : null}
       {config.topdownTrack ? <RacingCircuitCamera room={room} config={config} floorURL={floorURL} panoramaURL={panoramaURL} player={player} playerURL={playerURL}/> : null}
       {preview.minimapVisible ? (
         <span
-          aria-label={`Minimapa de corrida da cena ${roomLabel}`}
+          aria-label={ui("Minimapa de corrida da cena {0}", { 0: roomLabel })}
           className="racing-pseudo3d-minimap"
           style={backgroundStyle(preview.minimapURL)}
         />
       ) : null}
-      {preview.technicalMapAvailable ? (
+      {preview.technicalMapAvailable && onOpenTechnicalMap ? (
         <button
-          aria-label={`Abrir mapa técnico da cena ${roomLabel}`}
+          aria-label={ui("Abrir mapa técnico da cena {0}", { 0: roomLabel })}
           className="racing-pseudo3d-technical-map-toggle"
           onClick={onOpenTechnicalMap}
           type="button"
         >
-          Editar pista
-        </button>
+          {ui("Editar pista")}</button>
       ) : null}
     </section>
   );
@@ -5069,6 +5237,7 @@ function RoomFocusMinimap({
   worldWidth,
   onNavigate
 }: RoomFocusMinimapProps): React.ReactElement {
+  const ui = useStudioUiText();
   const minimapCardSize = {
     canvasDisplayHeight: 160, canvasHeight: 160, height: 160, width: 240
   };
@@ -5080,7 +5249,7 @@ function RoomFocusMinimap({
   };
   const roomLabel = sceneDisplayName(room.name);
   return (
-    <aside aria-label={`Minimapa da cena ${roomLabel}`} className="room-focus-minimap">
+    <aside aria-label={ui("Minimapa da cena {0}", { 0: roomLabel })} className="room-focus-minimap">
       <div aria-hidden="true" className="room-focus-minimap-preview">
         <RoomSceneMapInactivePreview
           cardSize={minimapCardSize}
@@ -5091,10 +5260,11 @@ function RoomFocusMinimap({
           projectPath={projectPath}
           room={room}
           showCardChrome={false}
+          useViewportPreview={false}
         />
       </div>
       <button
-        aria-label={`Navegar no minimapa da cena ${roomLabel}`}
+        aria-label={ui("Navegar no minimapa da cena {0}", { 0: roomLabel })}
         onClick={(event) => {
           const bounds = event.currentTarget.getBoundingClientRect();
           const x = Math.max(0, Math.min(1, (event.clientX - bounds.left) / Math.max(1, bounds.width)));
@@ -5106,22 +5276,23 @@ function RoomFocusMinimap({
       >
         <span aria-hidden="true" className="room-focus-minimap-viewport" style={viewportStyle} />
       </button>
-      <strong>Minimapa</strong>
+      <strong>{ui("Minimapa")}</strong>
     </aside>
   );
 }
 
 function RoomSceneOverviewButton({ onClick }: { onClick(): void }): React.ReactElement {
+  const ui = useStudioUiText();
   return (
     <button
-      aria-label="Voltar à visão geral"
+      aria-label={ui("Voltar à visão geral")}
       className="rooms-editor-scene-overview-button"
       onClick={onClick}
-      title="Voltar à visão geral do projeto"
+      title={ui("Voltar à visão geral do projeto")}
       type="button"
     >
       <ScanSearch aria-hidden="true" size={14} strokeWidth={2.2} />
-      <span>Visão geral</span>
+      <span>{ui("Visão geral")}</span>
     </button>
   );
 }
@@ -5149,42 +5320,43 @@ function RoomEditorSceneActions({
   onMenuItemStep,
   testStartControl
 }: RoomEditorSceneActionsProps): React.ReactElement {
+  const ui = useStudioUiText();
   const roomLabel = sceneDisplayName(room.name);
   const selectedScreen = menuScreens.find((screen) => screen.id === menuScreenID) ?? menuScreens[0];
 
   return (
     <div
-      aria-label={`Ações da cena ${roomLabel}`}
+      aria-label={ui("Ações da cena {0}", { 0: roomLabel })}
       className="rooms-editor-scene-actions"
       role="group"
     >
       <span className="rooms-editor-scene-actions-title" title={roomLabel}>{roomLabel}</span>
       <div className="rooms-editor-scene-actions-buttons">
         {menuScreens.length > 1 ? (
-          <div className="rooms-editor-menu-preview" role="group" aria-label="Prévia das telas do menu">
-            <select aria-label="Tela do menu na prévia" onChange={(event) => onMenuScreenChange?.(event.currentTarget.value)} value={selectedScreen?.id ?? ""}>
-              {menuScreens.map((screen) => <option key={screen.id} value={screen.id}>{screen.carousel ? "Opções" : screen.screenType === "title" ? "Título" : screen.title || screen.id}</option>)}
+          <div className="rooms-editor-menu-preview" role="group" aria-label={ui("Prévia das telas do menu")}>
+            <select aria-label={ui("Tela do menu na prévia")} onChange={(event) => onMenuScreenChange?.(event.currentTarget.value)} value={selectedScreen?.id ?? ""}>
+              {menuScreens.map((screen) => <option key={screen.id} value={screen.id}>{screen.carousel ? ui("Opções") : screen.screenType === "title" ? ui("Título") : screen.title || screen.id}</option>)}
             </select>
             {selectedScreen?.carousel ? (
               <>
-                <button aria-label="Opção anterior da prévia" onClick={() => onMenuItemStep?.(-1)} type="button">‹</button>
+                <button aria-label={ui("Opção anterior da prévia")} onClick={() => onMenuItemStep?.(-1)} type="button">‹</button>
                 <span aria-live="polite">{selectedScreen.items[menuItemIndex]?.label ?? ""}</span>
-                <button aria-label="Próxima opção da prévia" onClick={() => onMenuItemStep?.(1)} type="button">›</button>
+                <button aria-label={ui("Próxima opção da prévia")} onClick={() => onMenuItemStep?.(1)} type="button">›</button>
               </>
             ) : null}
           </div>
         ) : null}
         {testStartControl}
         <button
-          aria-label={`Testar cena ${roomLabel}`}
+          aria-label={ui("Testar cena {0}", { 0: roomLabel })}
           className="rooms-editor-test-scene-button"
           disabled={runRoomDisabled}
           onClick={onRunRoom}
-          title="Testar cena aberta"
+          title={ui("Testar cena aberta")}
           type="button"
         >
           <Play aria-hidden="true" size={14} strokeWidth={2.2} />
-          <span>Testar cena</span>
+          <span>{ui("Testar cena")}</span>
         </button>
       </div>
     </div>
@@ -5348,6 +5520,7 @@ function RoomTilemapEditor({
   racingMapView,
   onRacingMapViewChange
 }: RoomTilemapEditorProps): React.ReactElement {
+  const ui = useStudioUiText();
   const roomLabel = sceneDisplayName(room.name);
   const isometricConfig = roomIsometricConfig(room);
   const isometricSurfaceSize = roomIsometricSurfaceSize(room);
@@ -5380,7 +5553,6 @@ function RoomTilemapEditor({
   const [connectionZonePlacementEnd, setConnectionZonePlacementEnd] = useState<number | null>(null);
   const [cameraZonePlacementStart, setCameraZonePlacementStart] = useState<number | null>(null);
   const [cameraZonePlacementEnd, setCameraZonePlacementEnd] = useState<number | null>(null);
-  const [entityDragPreview, setEntityDragPreview] = useState<{ entityKey: string; x: number; y: number } | null>(null);
   const collisionPaintTypeRef = useRef<RoomCollisionType | null>(null);
   const entityPointerDrag = useRef<RoomEntityPointerDrag | null>(null);
   const pendingEmptySceneSelection = useRef<{ pointerID: number; startCellIndex: number; moved: boolean } | null>(null);
@@ -5393,14 +5565,7 @@ function RoomTilemapEditor({
   const arrivalPreviewReplacesPlayer = isFocusedSceneEditor
     && activeArrivalPreviewLinkID !== null
     && eventLinks.some((link) => link.id === activeArrivalPreviewLinkID);
-  const canvasRenderEntities = canvasEntities.map((entity) => {
-    if (entityDragPreview?.entityKey !== entityKey(entity)) return entity;
-    return { ...entity, x: entityDragPreview.x, y: entityDragPreview.y,
-      ...(room.sceneType === "isometric" && entity.kind === "actor" ? {
-        z: room.heightLevels?.[entityDragPreview.y * room.width + entityDragPreview.x] ?? 0
-      } : {})
-    };
-  });
+  const canvasRenderEntities = canvasEntities;
   const menuConfig = room.runtime?.type === "menu" ? normalizeMenuSceneConfig(room.runtime.config) : null;
   const menuScreens = menuConfig?.screens ?? [];
   const menuPreviewScreen = menuScreens.find((screen) => screen.id === menuPreviewScreenID) ?? menuScreens[0];
@@ -5704,21 +5869,43 @@ function RoomTilemapEditor({
       const current = entityPointerDrag.current;
       if (!current || current !== drag) return;
       current.frameRequest = null;
-      setEntityDragPreview({
-        entityKey: current.entityKey,
-        x: current.previewX,
-        y: current.previewY
-      });
+      paintEntityDragPreview();
     });
   }
+
+  function paintEntityDragPreview(): void {
+    const drag = entityPointerDrag.current;
+    const entity = drag && canvasEntities.find(candidate => entityKey(candidate) === drag.entityKey);
+    if (!drag || !entity) return;
+    const canvas = drag.captureTarget.closest<HTMLElement>(".room-stage-card-canvas");
+    if (!canvas) return;
+    drag.visual ??= createRoomEntityDragPreview(canvas, drag.entityKey,
+      deriveRoomSelectedEntityCells(room, canvasDisplayEntities.filter(candidate => entityKey(candidate) !== drag.entityKey), selectedEntityKeys));
+    const preview = { ...entity, x: drag.previewX, y: drag.previewY,
+      ...(room.sceneType === "isometric" && entity.kind === "actor" ? {
+        z: room.heightLevels?.[drag.previewY * room.width + drag.previewX] ?? 0
+      } : {}) };
+    drag.visual.paint(roomEntityStyle(room, preview, null, spriteImageSizes), roomEntityHitboxStyle(room, preview),
+      roomEntitySelectionFootprint(preview, room.sceneType), room.width, room.height);
+  }
+
+  // Loading a sprite or changing another control can render during a gesture.
+  useLayoutEffect(() => { if (entityPointerDrag.current?.visual) paintEntityDragPreview(); });
+  useEffect(() => () => {
+    const drag = entityPointerDrag.current;
+    if (drag?.frameRequest !== null && drag?.frameRequest !== undefined) cancelAnimationFrame(drag.frameRequest);
+    drag?.visual?.restore();
+  }, []);
 
   function previewEntityDragAtTile(tile: { x: number; y: number }): void {
     const drag = entityPointerDrag.current;
     if (!drag) return;
     const entity = canvasEntities.find((candidate) => entityKey(candidate) === drag.entityKey);
     if (!entity) return;
-    const nextX = Math.floor(entity.x + tile.x - drag.offsetX - roomEntitySelectionFootprint(entity, room.sceneType).x);
-    const nextY = Math.floor(entity.y + tile.y - drag.offsetY - roomEntitySelectionFootprint(entity, room.sceneType).y);
+    const maxX = Math.max(0, room.width - (entity.kind === "trigger" ? entity.width : 1));
+    const maxY = Math.max(0, room.height - (entity.kind === "trigger" ? entity.height : 1));
+    const nextX = Math.max(0, Math.min(maxX, Math.floor(entity.x + tile.x - drag.offsetX - roomEntitySelectionFootprint(entity, room.sceneType).x)));
+    const nextY = Math.max(0, Math.min(maxY, Math.floor(entity.y + tile.y - drag.offsetY - roomEntitySelectionFootprint(entity, room.sceneType).y)));
     if (nextX === drag.previewX && nextY === drag.previewY) return;
     drag.previewX = nextX;
     drag.previewY = nextY;
@@ -5864,6 +6051,7 @@ function RoomTilemapEditor({
     if (drag && drag.frameRequest !== null) {
       cancelAnimationFrame(drag.frameRequest);
     }
+    drag?.visual?.restore();
     if (drag && commit && (drag.previewX !== drag.originX || drag.previewY !== drag.originY)) {
       const layer = drag.kind === "actor" ? "actors" : "triggers";
       if (!canvasLayerLocks[layer]) {
@@ -5874,11 +6062,10 @@ function RoomTilemapEditor({
         }], canvasHistoryGroupID.current ?? undefined);
       }
     }
+    entityPointerDrag.current = null;
     if (drag?.captureTarget.hasPointerCapture(drag.pointerID)) {
       drag.captureTarget.releasePointerCapture(drag.pointerID);
     }
-    entityPointerDrag.current = null;
-    setEntityDragPreview(null);
     if (pendingSelection) {
       setSelectedEntityKeys(pendingSelection);
     }
@@ -6022,7 +6209,8 @@ function RoomTilemapEditor({
         startClientX: event.clientX,
         startClientY: event.clientY,
         previewX: contextualEntity.x,
-        previewY: contextualEntity.y
+        previewY: contextualEntity.y,
+        visual: null
       };
       pendingEntitySelection.current = null;
       setSelectedEntityKeys(deriveRoomEntitySelection({
@@ -6338,8 +6526,8 @@ function RoomTilemapEditor({
     <article
       className={`room-stage-card${isFocusedSceneEditor ? " is-focused-scene-editor" : ""}`}
       aria-label={isFocusedSceneEditor
-        ? `Editor da cena ${roomLabel}`
-        : `Card da cena ${roomLabel} · visão geral somente leitura`}
+        ? ui("Editor da cena {0}", { 0: roomLabel })
+        : ui("Card da cena {0} · visão geral somente leitura", { 0: roomLabel })}
       data-scene-map-mode={isFocusedSceneEditor ? "scene-editor" : "overview"}
       style={{
         height: `${cardSize.height}px`,
@@ -6352,19 +6540,18 @@ function RoomTilemapEditor({
             <span
               aria-hidden="true"
               className="room-stage-card-drag room-stage-card-title-drag"
-              title="Mover card da cena"
+              title={ui("Mover card da cena")}
             >
               <strong>{roomLabel}</strong>
-              {room.isStart ? <em>Início do jogo</em> : null}
+              {room.isStart ? <em>{ui("Início do jogo")}</em> : null}
             </span>
           </div>
           <div className="room-stage-card-tags">
             <span className="room-stage-card-type-tag">{sceneTypeLabel(room.sceneType, roomIsometricConfig(room)?.gameplayMode)}</span>
             {room.collisionCount === 0 ? (
-              <span className="room-stage-card-warning warning" title="Sem colisão">
+              <span className="room-stage-card-warning warning" title={ui("Sem colisão")}>
                 <AlertTriangle aria-hidden="true" size={11} strokeWidth={2.5} />
-                Sem colisão
-              </span>
+                {ui("Sem colisão")}</span>
             ) : null}
           </div>
         </div>
@@ -6489,6 +6676,11 @@ function RoomTilemapEditor({
           resetCameraZonePlacement();
           endCanvasHistoryGroup();
         }}
+        onLostPointerCapture={(event) => {
+          if (entityPointerDrag.current?.pointerID !== event.pointerId) return;
+          finishEntityPointerInteraction(false);
+          endCanvasHistoryGroup();
+        }}
         onContextMenu={(event) => {
           if (selectedEditMode === "collision") event.preventDefault();
         }}
@@ -6505,9 +6697,8 @@ function RoomTilemapEditor({
         }}
       >
         {isFocusedSceneEditor && selectedEditMode === "collision" && collisionOverlayVisible && room.gbStudioUseBackgroundLayout ? (
-          <div aria-label="Colisão sobre preview RGB555" className="room-collision-overlay-badge" role="status">
-            Colisão sobre preview RGB555
-          </div>
+          <div aria-label={ui("Colisão sobre preview RGB555")} className="room-collision-overlay-badge" role="status">
+            {ui("Colisão sobre preview RGB555")}</div>
         ) : null}
         {isFocusedSceneEditor && canvasLayerVisibility.background ? (
           <SceneCompositionPreviewOverlay
@@ -6527,7 +6718,7 @@ function RoomTilemapEditor({
           />
         ) : canvasLayerVisibility.background && room.gbStudioUseBackgroundLayout ? backgroundLayerURLs.map((layer) => (
           <img
-            alt={layer.mapping === "BG2" && room.background ? `Fundo ${room.background}` : `Fundo ${layer.mapping}`}
+            alt={layer.mapping === "BG2" && room.background ? ui("Fundo {0}", { 0: room.background }) : ui("Fundo {0}", { 0: layer.mapping })}
             className="room-stage-background-layout"
             data-background-layer={layer.mapping}
             draggable={false}
@@ -6570,6 +6761,7 @@ function RoomTilemapEditor({
             roomHeight={room.height}
             roomWidth={room.width}
             selectedCellIndex={selectedCanvasCellIndex}
+            selectedEntityCells={selectedEntityCells}
             surfaceSize={isometricGridSurfaceSize}
             showCameraBounds={isFocusedSceneEditor && canvasLayerVisibility.cameraBounds}
             showGridCells={showGrid && canvasLayerVisibility.grid}
@@ -6580,30 +6772,29 @@ function RoomTilemapEditor({
         ) : null}
         {room.sceneType === "isometric" && hoverCellIndex !== null ? (
           <div className="room-stage-isometric-readout" role="status">
-            <strong>Célula {hoverCellIndex % room.width},{Math.floor(hoverCellIndex / room.width)}</strong>
+            <strong>{ui("Célula ")}{hoverCellIndex % room.width},{Math.floor(hoverCellIndex / room.width)}</strong>
             <span>Z{overlayCells[hoverCellIndex]?.heightLevel ?? 0} · {isometricConfig?.tileWidth ?? 32}×{isometricConfig?.tileHeight ?? 16}</span>
           </div>
         ) : null}
         {room.sceneType === "isometric" && isometricConfig ? (
-          <div aria-label="Modo do mundo isométrico" className="room-stage-isometric-mode-badge">
-            <strong>{isometricConfig.worldMode === "static_composition" ? "Composição estática" : "Mundo navegável"}</strong>
-            <span>Grade {isometricConfig.tileWidth}×{isometricConfig.tileHeight}</span>
+          <div aria-label={ui("Modo do mundo isométrico")} className="room-stage-isometric-mode-badge">
+            <strong>{isometricConfig.worldMode === "static_composition" ? ui("Composição estática") : ui("Mundo navegável")}</strong>
+            <span>{ui("Grade ")}{isometricConfig.tileWidth}×{isometricConfig.tileHeight}</span>
           </div>
         ) : null}
         {isFocusedSceneEditor && (backgroundPreviewError || (Boolean(room.background) && !backgroundURL)) ? (
           <div aria-live="polite" className="room-stage-asset-fallback" role="status">
-            <strong>Fundo não disponível</strong>
-            <span>Selecione ou importe um tileset no Inspetor de Pintura.</span>
+            <strong>{ui("Fundo não disponível")}</strong>
+            <span>{ui("Selecione ou importe um tileset no Inspetor de Pintura.")}</span>
           </div>
         ) : null}
         {isFocusedSceneEditor && backgroundURL && !backgroundPreviewReady && !backgroundPreviewError ? (
           <div aria-live="polite" className="room-stage-preview-loading" role="status">
-            Preparando preview da cena…
-          </div>
+            {ui("Preparando preview da cena…")}</div>
         ) : null}
         {backgroundURL ? (
           <img
-            alt={room.background ? `Tileset ${room.background}` : "Tileset da cena"}
+            alt={room.background ? ui("Tileset {0}", { 0: room.background }) : ui("Tileset da cena")}
             className="room-stage-tileset-probe"
             crossOrigin={isDesktopAssetURL(backgroundURL) ? "anonymous" : undefined}
             onLoad={(event) => {
@@ -6764,7 +6955,7 @@ function RoomTilemapEditor({
         ))}
         {cameraZones.map((zone) => (
           <button
-            aria-label={`Zona de câmera ${zone.name}`}
+            aria-label={ui("Zona de câmera {0}", { 0: zone.name })}
             className={`room-camera-zone${selectedCameraZoneID === zone.id ? " selected" : ""}`}
             key={`${room.id}-camera-zone-${zone.id}`}
             onPointerDown={(event) => {
@@ -6797,7 +6988,7 @@ function RoomTilemapEditor({
         })}
         {connectionZoneInteractionEnabled ? connectionZones.map((zone) => (
           <button
-            aria-label={zone.side === "exit" ? "Zona de saída da conexão" : "Zona de entrada da conexão"}
+            aria-label={zone.side === "exit" ? ui("Zona de saída da conexão") : ui("Zona de entrada da conexão")}
             className={[
               "room-connection-zone",
               zone.side,
@@ -6847,6 +7038,7 @@ function RoomTilemapEditor({
                   aria-hidden="true"
                   className={`room-stage-entity-hitbox${room.sceneType === "isometric" ? " isometric" : ""}`}
                   data-entity-overlay="hitbox"
+                  data-room-entity-key={entityKey(entity)}
                   key={`${entityKey(entity)}-hitbox-overlay`}
                   style={roomEntityHitboxStyle(room, { ...entity, width, height })}
                 />
@@ -6861,6 +7053,7 @@ function RoomTilemapEditor({
                   affineObj ? "has-affine-obj" : ""
                 ].filter(Boolean).join(" ")}
                 data-affine-obj={affineObj ? "true" : undefined}
+                data-room-entity-key={entityKey(entity)}
                 data-affine-obj-double-size={affineObj?.doubleSize ? "true" : undefined}
                 data-affine-obj-matrix={affineObj ? String(affineObj.matrixIndex) : undefined}
                 data-sprite-frame-height={entity.kind === "actor" && entity.spriteFrame ? String(entity.spriteFrame.frameHeight) : undefined}
@@ -6871,10 +7064,10 @@ function RoomTilemapEditor({
                 style={{ ...roomEntityStyle(room, { ...entity, width, height }, spriteURL, spriteImageSizes),
                   ...(menuActor?.menuMirrorX === true ? { transform: "scaleX(-1)" } : {}) }}
                 title={entity.isPlayer
-                  ? `Player · ${entity.name} · posição padrão da cena. As transições usam suas próprias chegadas.`
+                  ? ui("Player · {0} · posição padrão da cena. As transições usam suas próprias chegadas.", { 0: entity.name })
                   : entity.spriteSheet ? `${entity.name}: ${entity.spriteSheet}` : entity.name}
               >
-                <span className={`room-stage-entity-label${isFocusedSceneEditor && entity.isPlayer ? " is-player-default-label" : ""}`}>{isFocusedSceneEditor && entity.isPlayer ? "Player · posição padrão" : entity.name}</span>
+                <span className={`room-stage-entity-label${isFocusedSceneEditor && entity.isPlayer ? " is-player-default-label" : ""}`}>{isFocusedSceneEditor && entity.isPlayer ? ui("Player · posição padrão") : entity.name}</span>
               </span> : null}
               {selectedEntityTool === "resize"
                 && selectedEntityKeys.includes(entityKey(entity))
@@ -6882,7 +7075,7 @@ function RoomTilemapEditor({
                 && !canvasLayerLocks[entity.kind === "actor" ? "actors" : "triggers"]
                 && !replacedByArrivalPreview ? (
                 <span
-                  aria-label={`Redimensionar ${entity.name}`}
+                  aria-label={ui("Redimensionar {0}", { 0: entity.name })}
                   className={`room-stage-entity-resize-handle ${entity.kind}`}
                   onPointerDown={(event) => startEntityResize(event, entity)}
                   onPointerMove={(event) => continueEntityResize(event, entity)}
@@ -6893,8 +7086,8 @@ function RoomTilemapEditor({
             </Fragment>
           );
         })}
-        {isFocusedSceneEditor && room.isStart ? <span className="room-game-start-label" aria-label="Cena de início do jogo">● Início do jogo</span> : null}
-        {isFocusedSceneEditor && testStart ? <span className="room-test-start-marker" aria-label={`Início do teste: ${testStart.x}, ${testStart.y}, ${testStart.direction}`} style={roomTileCenterStyle(room, testStart.x, testStart.y)}>T</span> : null}
+        {isFocusedSceneEditor && room.isStart ? <span className="room-game-start-label" aria-label={ui("Cena de início do jogo")}>{ui("● Início do jogo")}</span> : null}
+        {isFocusedSceneEditor && testStart ? <span className="room-test-start-marker" aria-label={ui("Início do teste: {0}, {1}, {2}", { 0: testStart.x, 1: testStart.y, 2: testStart.direction })} style={roomTileCenterStyle(room, testStart.x, testStart.y)}>T</span> : null}
         {isFocusedSceneEditor ? eventLinks.map((link) => (
           <RoomSceneEventMarker
             editable
@@ -6936,24 +7129,42 @@ function RoomTilemapEditor({
           />
         ) : null}
         {isPseudo3dRacing && racingTechnicalMapOpen && racingPseudo3dConfigForRoom(room)?.topdownTrack ? <svg
-          aria-label="Checkpoints e rota do circuito" viewBox={`0 0 ${room.width*8} ${room.height*8}`}
+          aria-label={ui("Checkpoints e rota do circuito")} viewBox={`0 0 ${room.width*8} ${room.height*8}`}
           style={{position:"absolute",inset:0,width:"100%",height:"100%",pointerEvents:"none",zIndex:4}}>
           <polyline fill="none" stroke="#9b77db" strokeWidth="1" strokeDasharray="4 4" points={(racingPseudo3dConfigForRoom(room)?.topdownTrack?.pathPoints??[]).map(point=>`${point.x},${point.y}`).join(" ")}/>
-          {racingPseudo3dConfigForRoom(room)?.topdownTrack?.checkpoints.map((gate,index)=><g key={gate.id}><rect x={gate.x-gate.width/2} y={gate.y-gate.height/2} width={gate.width} height={gate.height} fill={index===0?"#36bf8060":"#aa73ee50"} stroke={index===0?"#36bf80":"#aa73ee"}/><text x={gate.x} y={gate.y} fontSize="8" textAnchor="middle" fill="#251936">{index===0?'Chegada':index}</text></g>)}
+          {racingPseudo3dConfigForRoom(room)?.topdownTrack?.checkpoints.map((gate,index)=><g key={gate.id}><rect x={gate.x-gate.width/2} y={gate.y-gate.height/2} width={gate.width} height={gate.height} fill={index===0?"#36bf8060":"#aa73ee50"} stroke={index===0?"#36bf80":"#aa73ee"}/><text x={gate.x} y={gate.y} fontSize="8" textAnchor="middle" fill="#251936">{index===0?ui("Chegada"):index}</text></g>)}
         </svg> : null}
         {isPseudo3dRacing && racingTechnicalMapOpen ? <button
           className="racing-pseudo3d-technical-map-toggle" type="button"
-          aria-label={`Voltar à prévia GBA da cena ${sceneDisplayName(room.name)}`}
-          onClick={()=>setRacingTechnicalMapOpen(false)}>Prévia em perspectiva</button> : null}
+          aria-label={ui("Voltar à prévia GBA da cena {0}", { 0: sceneDisplayName(room.name) })}
+          onClick={()=>setRacingTechnicalMapOpen(false)}>{ui("Prévia em perspectiva")}</button> : null}
       </div>
       <div className="room-stage-card-footer">
-        <span>{entities.filter((entity) => entity.kind === "actor" && !entity.isPlayer).length} atores</span>
-        {entities.some((entity) => entity.isPlayer) ? <span className="player-present">Player visível</span> : null}
-        <span>{entities.filter((entity) => entity.kind === "trigger").length} gatilhos</span>
-        {isActiveRoom ? <span className="active">Ativa</span> : null}
+        <span>{roomEntityCountLabel("actor", entities.filter((entity) => entity.kind === "actor" && !entity.isPlayer).length)}</span>
+        {entities.some((entity) => entity.isPlayer) ? <span className="player-present">{ui("Player visível")}</span> : null}
+        <span>{roomEntityCountLabel("trigger", entities.filter((entity) => entity.kind === "trigger").length)}</span>
+        {isActiveRoom ? <span className="active">{ui("Ativa")}</span> : null}
       </div>
     </article>
   );
+}
+
+function PrefabInstanceImpact({ data, kind, prefab, onReset }: { data: GBAProjectData; kind: ProjectPrefabKind; prefab: ProjectPrefabRecord; onReset?: (kind: ProjectPrefabKind, id: string) => void }): React.ReactElement {
+  const ui = useStudioUiText();
+  const fields = Object.keys(prefab).filter(key => !["id", "name", "authoring"].includes(key));
+  const impact = prefabUpdateImpact(data, kind, prefab.id, fields);
+  return <details><summary>{ui("Herança das instâncias")} · {impact.length}</summary>
+    {impact.map(instance => <div key={instance.id}>
+      <strong>{instance.id}</strong><p>{ui("Herdados: {0}", { 0: instance.inherited.join(", ") || "—" })}</p>
+      <p>{ui("Personalizados: {0}", { 0: instance.overridden.join(", ") || "—" })}</p>
+      {instance.overridden.length && onReset ? <button type="button" onClick={() => onReset(kind, instance.id)}>{ui("Restaurar herança")}</button> : null}
+    </div>)}
+  </details>;
+}
+
+function PrefabAuthoringNote({ prefab }: { prefab: ProjectPrefabRecord }): React.ReactElement | null {
+  const note = prefab.authoring as { sourceScene?: string; description?: string } | undefined;
+  return note?.description ? <p><small>{note.sourceScene}: {note.description}</small></p> : null;
 }
 
 export function RoomsWorkspace({
@@ -7033,8 +7244,11 @@ export function RoomsWorkspace({
   onSynchronizePrefabs,
   onCreatePrefabFromEntity,
   onInstantiatePrefab,
-  onUpdatePrefab
+  onUpdatePrefab,
+  onApplyInteractiveObjects,
+  onResetPrefabOverrides
 }: RoomsWorkspaceProps): React.ReactElement {
+  const ui = useStudioUiText();
   const [selectedTileID, setSelectedTileID] = useState(1);
   const [selectedTileStamp, setSelectedTileStamp] = useState<RoomTileStamp>({
     height: 1,
@@ -7068,6 +7282,11 @@ export function RoomsWorkspace({
   const [selectedCameraZoneID, setSelectedCameraZoneID] = useState<string | null>(null);
   const [selectedConnectionZoneSide, setSelectedConnectionZoneSide] = useState<"exit" | "entry">("exit");
   const [selectedSceneMapRoomName, setSelectedSceneMapRoomName] = useState<string | null>(null);
+  const [overviewView, setOverviewView] = useState<{ path?: string; mode: SceneMapViewMode } | null>(null);
+  const overviewMode = overviewView && overviewView.path === projectPath ? overviewView.mode : readSceneMapViewMode(projectPath);
+  const [diagramNavigation, setDiagramNavigation] = useState<{ path?: string; zoom: number; positions: Record<string, SceneMapPosition> } | null>(null);
+  const diagramZoom = diagramNavigation && diagramNavigation.path === projectPath ? diagramNavigation.zoom : 1;
+  const diagramOverrides = useMemo(() => diagramNavigation && diagramNavigation.path === projectPath ? diagramNavigation.positions : readSceneDiagramPositions(projectPath), [diagramNavigation, projectPath]);
   const [selectedCanvasCell, setSelectedCanvasCell] = useState<SelectedRoomCellState | null>(null);
   const canvasStageRef = useRef<HTMLElement | null>(null);
   const canvasScrollRef = useRef<HTMLDivElement | null>(null);
@@ -7111,6 +7330,7 @@ export function RoomsWorkspace({
     () => new Set(presentation?.rooms.filter((room) => room.isActive).map((room) => room.id) ?? [])
   );
   const [navigatorTab, setNavigatorTab] = useState<"project" | "prefabs" | "logic">("project");
+  const [prefabQuery, setPrefabQuery] = useState("");
   const [selectedArrivalID, setSelectedArrivalID] = useState<string | null>(null);
   const [testArrivalID, setTestArrivalID] = useState<string>("");
   useEffect(() => { setSelectedArrivalID(null); setTestArrivalID(""); }, [focusedSceneEditorRoomID]);
@@ -7191,8 +7411,40 @@ export function RoomsWorkspace({
   const focusedEditorRoom = focusedSceneEditorRoomID
     ? presentation?.rooms.find((room) => room.id === focusedSceneEditorRoomID) ?? null
     : null;
+  const isSceneDiagram = !focusedEditorRoom && overviewMode === "diagram";
+  const roomEventSceneLinks = useMemo(() => projectData ? deriveRoomEventSceneLinks(projectData) : [], [projectData]);
+  const diagramPositions = useMemo(() => isSceneDiagram ? {
+    ...sceneDiagramPositions(presentation?.rooms ?? [], [...(presentation?.connections ?? []), ...roomEventSceneLinks]),
+    ...diagramOverrides
+  } : {}, [isSceneDiagram, presentation?.rooms, presentation?.connections, roomEventSceneLinks, diagramOverrides]);
+  const diagramSummaries = useMemo(() => {
+    const counts = new Map<string, { actors: number; triggers: number }>();
+    if (isSceneDiagram) for (const entity of presentation?.entities ?? []) {
+      const count = counts.get(entity.roomName) ?? { actors: 0, triggers: 0 };
+      if (entity.kind === "actor" && !entity.isPlayer) count.actors++;
+      if (entity.kind === "trigger") count.triggers++;
+      counts.set(entity.roomName, count);
+    }
+    return counts;
+  }, [isSceneDiagram, presentation?.entities]);
   const currentCanvasZoom = focusedEditorRoom ? focusViewMode === "viewport" ? 1 : focusSceneZoom
-    : clampSceneMapZoom(sceneMapZoom ?? presentation?.sceneMapZoom ?? 1);
+    : isSceneDiagram ? diagramZoom : clampSceneMapZoom(sceneMapZoom ?? presentation?.sceneMapZoom ?? 1);
+
+  function updateOverviewZoom(zoom: number): void {
+    if (isSceneDiagram) setDiagramNavigation({ path: projectPath, zoom, positions: diagramOverrides });
+    else onUpdateSceneMapZoom(zoom);
+  }
+
+  function updateDiagramPositions(positions: Record<string, SceneMapPosition>): void {
+    setDiagramNavigation({ path: projectPath, zoom: diagramZoom, positions });
+    writeSceneDiagramPositions(projectPath, positions);
+  }
+
+  useLayoutEffect(() => {
+    if (!canvasScrollRef.current) return;
+    canvasScrollRef.current.scrollLeft = 0;
+    canvasScrollRef.current.scrollTop = 0;
+  }, [overviewMode, projectPath]);
   canvasWheelHandlerRef.current = zoomRoomsCanvas;
 
   useEffect(() => {
@@ -7206,7 +7458,7 @@ export function RoomsWorkspace({
   useEffect(() => {
     canvasPointerRef.current = null;
     pendingCanvasZoomRef.current = null;
-  }, [projectPath, focusedSceneEditorRoomID, focusViewMode]);
+  }, [projectPath, focusedSceneEditorRoomID, focusViewMode, overviewMode]);
 
   useLayoutEffect(() => {
     const scroll = canvasScrollRef.current;
@@ -7397,11 +7649,11 @@ export function RoomsWorkspace({
     const frameID = window.requestAnimationFrame(() => {
       const scroll = canvasScrollRef.current;
       if (!scroll) return;
-      const zoom = clampSceneMapZoom(sceneMapZoom ?? presentation.sceneMapZoom);
+      const zoom = currentCanvasZoom;
       const index = presentation.rooms.findIndex((candidate) => candidate.id === room.id);
-      const position = presentation.sceneMapPositions[room.name]
+      const position = (isSceneDiagram ? diagramPositions[room.name] : presentation.sceneMapPositions[room.name])
         ?? defaultSceneMapPosition(index, presentation.rooms);
-      const cardSize = displayedSceneMapCardSize(room, zoom);
+      const cardSize = isSceneDiagram ? { width: SCENE_DIAGRAM_CARD_SIZE.width * zoom, height: SCENE_DIAGRAM_CARD_SIZE.height * zoom } : displayedSceneMapCardSize(room, zoom);
       const padding = 48;
       const cardPosition = displayedSceneMapPosition(position, zoom);
       const cardLeft = cardPosition.x;
@@ -7524,11 +7776,7 @@ export function RoomsWorkspace({
       if (focusSceneRoom.sceneType !== "isometric") {
         const scale = focusViewportScaleRef.current;
         const player = presentation?.entities.find(entity => entity.roomName === focusSceneRoom.name && entity.isPlayer);
-        const center = focusSceneRoom.cameraMode === "follow_player" && player
-          ? { left: player.x * 8 - 120, top: player.y * 8 - 80 }
-          : focusSceneRoom.cameraMode === "fixed_position" || focusSceneRoom.cameraMode === "manual"
-            ? { left: focusSceneRoom.cameraBounds.x * 8, top: focusSceneRoom.cameraBounds.y * 8 }
-            : { left: (focusSceneRoom.width * 8 - 240) / 2, top: (focusSceneRoom.height * 8 - 160) / 2 };
+        const center = sceneMapInitialViewportOrigin(focusSceneRoom, player);
         scroll.scrollLeft = Math.max(0, center.left * scale);
         scroll.scrollTop = Math.max(0, center.top * scale);
         return;
@@ -7627,8 +7875,8 @@ export function RoomsWorkspace({
   if (!presentation) {
     return (
       <WorkspaceEmptyState
-        title="Editor"
-        description="Abra um projeto para editar cenas, tipos de cena e configurações de câmera."
+        title={ui("Editor")}
+        description={ui("Abra um projeto para editar cenas, tipos de cena e configurações de câmera.")}
       />
     );
   }
@@ -7689,41 +7937,41 @@ export function RoomsWorkspace({
     ? selectedCanvasCell
     : null;
   const inspectorTitle = inspectorContext.kind === "paint"
-    ? "Pintura"
+    ? ui("Pintura")
     : inspectorContext.kind === "height"
-      ? "Altura"
+      ? ui("Altura")
     : inspectorContext.kind === "collision"
-      ? "Colisão"
+      ? ui("Colisão")
       : inspectorHasMixedEntityGroup
-        ? `Grupo misto de ${selectedInspectorEntities.length} entidades`
+        ? ui("Grupo misto de {0} entidades", { 0: selectedInspectorEntities.length })
       : inspectorHasEntityGroup
-        ? `Grupo de ${selectedInspectorEntities.length} ${selectedInspectorEntityKind === "actor" ? "atores" : "triggers"}`
+        ? ui("Grupo de {0} {1}", { 0: selectedInspectorEntities.length, 1: ui(selectedInspectorEntityKind === "actor" ? "atores" : "triggers") })
       : inspectorContext.kind === "entity"
         ? inspectorContext.entity.name
         : inspectorContext.kind === "connection"
           ? `${sceneDisplayName(inspectorContext.connection.from)} → ${sceneDisplayName(inspectorContext.connection.to)}`
-          : sceneDisplayName(inspectorRoom?.name) || "Inspector";
+          : sceneDisplayName(inspectorRoom?.name) || ui("Inspector");
   const inspectorSubtitle = inspectorContext.kind === "paint"
-    ? inspectorRoom ? `Cena · ${sceneDisplayName(inspectorRoom.name)}` : ""
+    ? inspectorRoom ? ui("Cena · {0}", { 0: sceneDisplayName(inspectorRoom.name) }) : ""
     : inspectorContext.kind === "height"
-      ? inspectorRoom ? `Isométrico · ${sceneDisplayName(inspectorRoom.name)}` : ""
+      ? inspectorRoom ? ui("Isométrico · {0}", { 0: sceneDisplayName(inspectorRoom.name) }) : ""
     : inspectorContext.kind === "collision"
-      ? inspectorRoom ? `Cena · ${sceneDisplayName(inspectorRoom.name)}` : ""
+      ? inspectorRoom ? ui("Cena · {0}", { 0: sceneDisplayName(inspectorRoom.name) }) : ""
       : inspectorHasMixedEntityGroup
-        ? `Seleção mista · Cena ${sceneDisplayName(inspectorRoom?.name)}`
+        ? ui("Seleção mista · Cena {0}", { 0: sceneDisplayName(inspectorRoom?.name) })
       : inspectorHasEntityGroup
-        ? `${selectedInspectorEntityKind === "actor" ? "Atores" : "Triggers"} · Cena ${sceneDisplayName(inspectorRoom?.name)}`
+        ? ui("{0} · Cena {1}", { 0: ui(selectedInspectorEntityKind === "actor" ? "Atores" : "Triggers"), 1: sceneDisplayName(inspectorRoom?.name) })
       : inspectorContext.kind === "entity"
-        ? `${inspectorContext.entity.kind === "actor" ? "Ator" : "Trigger"} · Cena ${sceneDisplayName(inspectorContext.entity.roomName)}`
+        ? ui("{0} · Cena {1}", { 0: ui(inspectorContext.entity.kind === "actor" ? "Ator" : "Trigger"), 1: sceneDisplayName(inspectorContext.entity.roomName) })
         : inspectorContext.kind === "connection"
-          ? inspectorContext.connection.eventName ?? "Conexão entre cenas"
+          ? inspectorContext.connection.eventName ?? ui("Conexão entre cenas")
           : inspectorRoom
-            ? `Cena · ${sceneTypeLabel(inspectorRoom.sceneType, roomIsometricConfig(inspectorRoom)?.gameplayMode)} · ${inspectorRoom.sceneType === "isometric" ? `${inspectorRoom.width}×${inspectorRoom.height} células · ${roomIsometricConfig(inspectorRoom)?.tileWidth}×${roomIsometricConfig(inspectorRoom)?.tileHeight} px/célula` : inspectorRoom.gbaResolution}`
+            ? ui("Cena · {0} · {1}", { 0: ui(sceneTypeLabel(inspectorRoom.sceneType, roomIsometricConfig(inspectorRoom)?.gameplayMode)), 1: inspectorRoom.sceneType === "dungeonCrawler" ? ui("{0}×{1} células · câmera 240×160", { 0: inspectorRoom.width, 1: inspectorRoom.height }) : inspectorRoom.sceneType === "isometric" ? ui("{0}×{1} células · {2}×{3} px/célula", { 0: inspectorRoom.width, 1: inspectorRoom.height, 2: roomIsometricConfig(inspectorRoom)?.tileWidth, 3: roomIsometricConfig(inspectorRoom)?.tileHeight }) : inspectorRoom.gbaResolution })
             : "";
   const inspectorRoleBadge = !inspectorHasEntityGroup && !inspectorHasMixedEntityGroup && inspectorContext.kind === "entity"
     && inspectorContext.entity.kind === "actor"
     && inspectorRoom?.playerActorName === inspectorContext.entity.name
-    ? "Jogador"
+    ? ui("Jogador")
     : null;
   const projectBudget = projectData && inspectorRoom
     ? deriveProjectBudgetPresentation(projectData, inspectorRoom.name, budgetReport)
@@ -7871,6 +8119,8 @@ export function RoomsWorkspace({
   const actorPrefabCount = actorPrefabs.length;
   const triggerPrefabCount = triggerPrefabs.length;
   const prefabCount = actorPrefabCount + triggerPrefabCount;
+  const normalizePrefabSearch = (value: string): string => value.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+  const matchesPrefab = (prefab: ProjectPrefabRecord): boolean => normalizePrefabSearch(`${prefab.name} ${JSON.stringify(prefab.authoring ?? {})}`).includes(normalizePrefabSearch(prefabQuery.trim()));
   const selectedPrefabSource = presentation.entities.find((entity) => selectedEntityKeys.includes(entityKey(entity))) ?? null;
   const prefabPlacement: ProjectPrefabPlacement | null = activeRoom ? {
     roomID: activeRoom.id,
@@ -7914,7 +8164,7 @@ export function RoomsWorkspace({
   const focusSceneLutaHudAssetURL = projectData && projectPath && typeof focusSceneLutaHudAssetName === "string"
     ? resolveProjectAssetURL(projectData, projectPath, focusSceneLutaHudAssetName)
     : null;
-  const focusSceneHudBinding = !focusSceneLutaHudAssetName && projectData && focusSceneRoom && focusSceneMenuConfig?.hudMode !== "none" && (
+  const focusSceneHudBinding = (!focusSceneLutaHudAssetName || ["battleRpg","dungeonCrawler"].includes(focusSceneRoom?.sceneType ?? "")) && projectData && focusSceneRoom && focusSceneMenuConfig?.hudMode !== "none" && (
     focusSceneRoom.sceneType !== "menu" || focusSceneMenuConfig?.screenType === "menu"
   ) ? resolveExplicitHudPresetBinding(projectData, {
     roomID: focusSceneRoom.id,
@@ -7927,7 +8177,7 @@ export function RoomsWorkspace({
     hudMode: hudSelectedScreen.hudMode ?? (hudSelectedScreen.hudPresetId ? undefined : focusSceneMenuConfig?.hudMode),
     hudPresetId: hudSelectedScreen.hudPresetId ?? focusSceneMenuConfig?.hudPresetId
   } : focusSceneMenuConfig;
-  const hudUnavailableReason = focusSceneLutaHudAssetName ? `Esta cena usa uma HUD ${focusSceneRoom?.sceneType === "isometric" ? "tática" : "de luta"} por imagem. A prévia aparece sobre a cena; a imagem e os recursos são configurados na aba Cena.`
+  const hudUnavailableReason = focusSceneLutaHudAssetName && !["battleRpg","dungeonCrawler"].includes(focusSceneRoom?.sceneType ?? "") ? `Esta cena usa uma HUD ${focusSceneRoom?.sceneType === "isometric" ? "tática" : "de luta"} por imagem. A prévia aparece sobre a cena; a imagem e os recursos são configurados na aba Cena.`
     : focusSceneRoom?.sceneType === "menu" && hudSelectedMenu?.screenType !== "menu" ? "Telas de logo e título usam atores e fundo. Escolha uma tela de menu para editar sua HUD." : undefined;
   const hudAppliedBinding = projectData && focusSceneRoom && !hudUnavailableReason && hudSelectedMenu?.hudMode !== "none"
     ? resolveExplicitHudPresetBinding(projectData, { roomID: focusSceneRoom.id, scenePresetId: hudSelectedMenu?.hudPresetId, roomPresetId: focusSceneRoom.hudPresetId }) : null;
@@ -7979,13 +8229,13 @@ export function RoomsWorkspace({
     const projectRoomIndex = presentation.rooms.findIndex((candidate) => candidate.id === room.id);
     const storedPosition = focusSceneRoom
       ? { x: 72, y: 72 }
-      : presentation.sceneMapPositions[room.name] ?? defaultSceneMapPosition(projectRoomIndex, presentation.rooms);
+      : (isSceneDiagram ? diagramPositions[room.name] : presentation.sceneMapPositions[room.name]) ?? defaultSceneMapPosition(projectRoomIndex, presentation.rooms);
     const connectorPosition = sceneMapDragPreview?.roomName === room.name
       ? sceneMapDragPreview.position
       : storedPosition;
-    const contentSize = sceneMapContentSize(room);
-    const displayedCard = displayedSceneMapCardSize(room, canvasZoom);
-    const displayedContent = displayedSceneMapContentSize(room, canvasZoom);
+    const contentSize = isSceneDiagram ? SCENE_DIAGRAM_CARD_SIZE : sceneMapContentSize(room);
+    const displayedCard = isSceneDiagram ? { width: SCENE_DIAGRAM_CARD_SIZE.width * canvasZoom, height: SCENE_DIAGRAM_CARD_SIZE.height * canvasZoom } : displayedSceneMapCardSize(room, canvasZoom);
+    const displayedContent = isSceneDiagram ? displayedCard : displayedSceneMapContentSize(room, canvasZoom);
     const cardSize: RoomStageCardSize = {
       canvasDisplayHeight: displayedContent.height,
       canvasHeight: contentSize.height,
@@ -8029,7 +8279,7 @@ export function RoomsWorkspace({
     const scroll = canvasScrollRef.current;
     if (!scroll) {
       if (focusSceneRoom) setFocusSceneZoom(nextZoom);
-      else onUpdateSceneMapZoom(nextZoom);
+      else updateOverviewZoom(nextZoom);
       return;
     }
 
@@ -8044,7 +8294,7 @@ export function RoomsWorkspace({
       scrollTop: Math.round(worldY * nextZoom - anchor.y)
     };
     if (focusSceneRoom) setFocusSceneZoom(nextZoom);
-    else onUpdateSceneMapZoom(nextZoom);
+    else updateOverviewZoom(nextZoom);
   }
 
   function setCanvasZoomByStep(delta: number): void {
@@ -8071,16 +8321,16 @@ export function RoomsWorkspace({
     const nextViewport = fitSceneMapViewToCards({
       cards: visibleSceneMapCards.map((item) => ({
         position: item.connectorPosition,
-        size: sceneMapCardSize(item.room)
+        size: isSceneDiagram ? SCENE_DIAGRAM_CARD_SIZE : sceneMapCardSize(item.room)
       })),
-      maxZoom: SCENE_MAP_MAX_ZOOM,
+      maxZoom: isSceneDiagram ? 1 : SCENE_MAP_MAX_ZOOM,
       minZoom: SCENE_MAP_MIN_ZOOM,
       padding: 48,
       viewportHeight: scroll.clientHeight,
       viewportWidth: scroll.clientWidth
     });
     if (focusSceneRoom) setFocusSceneZoom(nextViewport.zoom);
-    else onUpdateSceneMapZoom(nextViewport.zoom);
+    else updateOverviewZoom(nextViewport.zoom);
     window.requestAnimationFrame(() => {
       scroll.scrollLeft = nextViewport.scrollLeft;
       scroll.scrollTop = nextViewport.scrollTop;
@@ -8585,7 +8835,12 @@ export function RoomsWorkspace({
     const roomActors = roomEntities.filter((entity) => entity.kind === "actor" && !entity.isPlayer);
     const roomHasPlayer = roomEntities.some((entity) => entity.isPlayer);
     const roomTriggers = roomEntities.filter((entity) => entity.kind === "trigger");
-    const roomTreeMeta = `${roomTreeSubtitle(room)} · ${roomActors.length} atores${roomHasPlayer ? " · Player visível" : ""} · ${roomTriggers.length} gatilhos`;
+    const roomTreeMeta = [
+      ...roomTreeSubtitle(room).split(" · ").map(part => ui(part)),
+      roomEntityCountLabel("actor", roomActors.length),
+      ...(roomHasPlayer ? [ui("Player visível")] : []),
+      roomEntityCountLabel("trigger", roomTriggers.length)
+    ].join(" · ");
     const isDropTarget = dragOverSceneID === room.id;
     const isSceneSelected = selectedSceneIDs.has(room.id);
     return (
@@ -8605,7 +8860,7 @@ export function RoomsWorkspace({
       >
         <summary
           aria-current={room.isActive ? "true" : undefined}
-          aria-label={`${roomLabel}. ${roomTreeMeta}${isSceneSelected ? " · selecionada" : ""}`}
+          aria-label={`${roomLabel}. ${roomTreeMeta}${isSceneSelected ? ` · ${ui("selecionada")}` : ""}`}
           className={["editor-tree-row", "nested", "scene-tree-row", room.isActive ? "is-selected" : "", isSceneSelected ? "is-multi-selected" : ""].filter(Boolean).join(" ")}
           draggable
           onContextMenu={(event) => openRoomContextMenu(event, room)}
@@ -8629,10 +8884,10 @@ export function RoomsWorkspace({
             event.preventDefault();
             moveDraggedScene(room.id, groupID);
           }}
-          title={`${roomTreeMeta}. Marque a caixa para selecionar cenas para um grupo; Command/Control-clique e Shift-clique também funcionam. Arraste para reordenar ou mover para um grupo.`}
+          title={ui("{0}. Marque a caixa para selecionar cenas para um grupo; Command/Control-clique e Shift-clique também funcionam. Arraste para reordenar ou mover para um grupo.", { 0: roomTreeMeta })}
         >
           {sceneMultiSelectMode ? <input
-            aria-label={`${isSceneSelected ? "Desmarcar" : "Selecionar"} cena ${roomLabel}`}
+            aria-label={ui("{0} cena {1}", { 0: isSceneSelected ? "Desmarcar" : "Selecionar", 1: roomLabel })}
             checked={isSceneSelected}
             className="scene-tree-selection-checkbox"
             onChange={() => toggleSceneSelection(room.id)}
@@ -8648,27 +8903,27 @@ export function RoomsWorkspace({
         <div className="editor-tree-children scene-tree-children">
           {roomPlayer ? (
             <button
-              aria-label={`Player ${roomPlayer.name}`}
+              aria-label={ui("Player {0}", { 0: roomPlayer.name })}
               className={["editor-tree-row", "nested", "leaf", "is-player", selectedEntityKeys.includes(entityKey(roomPlayer)) ? "is-selected" : ""].filter(Boolean).join(" ")}
               key={entityKey(roomPlayer)}
               onClick={() => focusEntityInExplorer(roomPlayer)}
-              title={roomPlayer.spriteSheet ? `Player · ${roomPlayer.spriteSheet}` : "Player"}
+              title={roomPlayer.spriteSheet ? ui("Player · {0}", { 0: roomPlayer.spriteSheet }) : ui("Player")}
               type="button"
             >
               <span aria-hidden="true" className="editor-tree-chevron spacer" />
               <UserRound aria-hidden="true" className="editor-tree-icon" size={17} strokeWidth={2.2} />
               <span>
-                <strong>Player · {roomPlayer.name}</strong>
+                <strong>{ui("Player · ")}{roomPlayer.name}</strong>
               </span>
             </button>
           ) : null}
           {roomActors.map((entity) => (
             <button
-              aria-label={`Ator ${entity.name}${entity.spriteSheet ? ` · ${entity.spriteSheet}` : ""}`}
+              aria-label={ui("Ator {0}{1}", { 0: entity.name, 1: entity.spriteSheet ? ` · ${entity.spriteSheet}` : "" })}
               className={["editor-tree-row", "nested", "leaf", selectedEntityKeys.includes(entityKey(entity)) ? "is-selected" : ""].filter(Boolean).join(" ")}
               key={entityKey(entity)}
               onClick={() => focusEntityInExplorer(entity)}
-              title={entity.spriteSheet ? `Ator · ${entity.spriteSheet}` : "Ator"}
+              title={entity.spriteSheet ? ui("Ator · {0}", { 0: entity.spriteSheet }) : ui("Ator")}
               type="button"
             >
               <span aria-hidden="true" className="editor-tree-chevron spacer" />
@@ -8685,11 +8940,11 @@ export function RoomsWorkspace({
               .filter((name): name is string => typeof name === "string" && Boolean(name.trim())).map(name => name.trim()))];
             return (
             <button
-              aria-label={`Gatilho ${entity.name}${entity.eventName ? ` · ${entity.eventName}` : ""}`}
+              aria-label={ui("Gatilho {0}{1}", { 0: entity.name, 1: entity.eventName ? ` · ${entity.eventName}` : "" })}
               className={["editor-tree-row", "nested", "leaf", selectedEntityKeys.includes(entityKey(entity)) ? "is-selected" : ""].filter(Boolean).join(" ")}
               key={entityKey(entity)}
               onClick={() => focusEntityInExplorer(entity)}
-              title={eventNames.length ? `Gatilho · ${eventNames.join(", ")}` : "Gatilho sem fluxo vinculado"}
+              title={eventNames.length ? ui("Gatilho · {0}", { 0: eventNames.join(", ") }) : ui("Gatilho sem fluxo vinculado")}
               type="button"
             >
               <span aria-hidden="true" className="editor-tree-chevron spacer" />
@@ -8703,7 +8958,7 @@ export function RoomsWorkspace({
           {roomEntities.length === 0 ? (
             <div className="editor-empty-row nested">
               <MapIcon aria-hidden="true" size={17} strokeWidth={2.1} />
-              <strong>Cena sem entidades</strong>
+              <strong>{ui("Cena sem entidades")}</strong>
             </div>
           ) : null}
         </div>
@@ -8731,7 +8986,7 @@ export function RoomsWorkspace({
           }}
         >
           <summary
-            aria-label={`${group.name}, ${groupSceneIDs.length} cenas`}
+            aria-label={ui("{0}, {1} cenas", { 0: group.name, 1: groupSceneIDs.length })}
             className="editor-tree-row scene-tree-group-row"
             onDragOver={(event) => {
               if (!draggedSceneID) return;
@@ -8744,13 +8999,13 @@ export function RoomsWorkspace({
               event.preventDefault();
               moveSceneIntoGroup(draggedSceneID ?? "", group.id);
             }}
-            title="Solte uma cena aqui para movê-la para este grupo."
+            title={ui("Solte uma cena aqui para movê-la para este grupo.")}
           >
             <ChevronRight aria-hidden="true" className="editor-tree-chevron" size={16} strokeWidth={2.4} />
             <Folder aria-hidden="true" className="editor-tree-icon folder" size={17} strokeWidth={2.2} />
             <span>
               <strong>{group.name}</strong>
-              <small>{groupSceneIDs.length} cenas</small>
+              <small>{groupSceneIDs.length} {ui(" cenas")}</small>
             </span>
           </summary>
           <div className="editor-tree-children scene-tree-group-children">
@@ -8759,24 +9014,25 @@ export function RoomsWorkspace({
                   const room = sceneByID.get(sceneID);
                   return room ? renderSceneTreeScene(room, group.id) : null;
                 })
-              : <div className="editor-empty-row nested"><Folder aria-hidden="true" size={16} /><strong>Arraste cenas para cá</strong></div>}
+              : <div className="editor-empty-row nested"><Folder aria-hidden="true" size={16} /><strong>{ui("Arraste cenas para cá")}</strong></div>}
           </div>
         </details>
         <span className="scene-tree-group-actions">
           <button
-            aria-label={`Renomear grupo ${group.name}`}
+            aria-label={ui("Renomear grupo {0}", { 0: group.name })}
             onClick={(event) => {
               event.preventDefault();
               event.stopPropagation();
               openRenameSceneGroupPrompt(group);
             }}
-            title="Renomear grupo"
+            title={ui("Renomear grupo")}
             type="button"
           >
             <Pencil aria-hidden="true" size={13} strokeWidth={2.2} />
           </button>
           <button
-            aria-label={`Remover grupo ${group.name}`}
+            aria-label={ui("Remover grupo {0}", { 0: group.name })}
+            className="scene-tree-group-remove"
             onClick={(event) => {
               event.preventDefault();
               event.stopPropagation();
@@ -8787,7 +9043,7 @@ export function RoomsWorkspace({
                 return next;
               });
             }}
-            title="Remover grupo; as cenas ficam sem grupo"
+            title={ui("Remover grupo; as cenas ficam sem grupo")}
             type="button"
           >
             <Trash2 aria-hidden="true" size={13} strokeWidth={2.2} />
@@ -8865,6 +9121,11 @@ export function RoomsWorkspace({
     const drag = sceneMapCardDrag.current;
     if (!drag || drag.pointerID !== pointerID) return;
 
+    // Pointer-up can arrive before the scheduled preview frame. Commit the
+    // pending coordinates rather than saving the previous preview position.
+    if (sceneMapCardDragFrameRequest !== null) {
+      updateSceneMapCardDrag(sceneMapCardDragPendingPointer.x, sceneMapCardDragPendingPointer.y);
+    }
     const nextPosition = drag.previewPosition;
     sceneMapCardDragActiveRef.current = false;
     document.body.classList.remove("room-scene-map-card-dragging");
@@ -8877,7 +9138,8 @@ export function RoomsWorkspace({
     sceneMapCardDrag.current = null;
     setSceneMapDragPreview(null);
     setSelectedSceneMapRoomName(drag.roomName);
-    onUpdateSceneMapPosition(drag.roomName, nextPosition);
+    if (isSceneDiagram) updateDiagramPositions({ ...diagramOverrides, [drag.roomName]: nextPosition });
+    else onUpdateSceneMapPosition(drag.roomName, nextPosition);
   }
 
   function startSceneMapCardDrag(room: RoomsWorkspaceRoom, event: React.PointerEvent<HTMLElement>): void {
@@ -8891,7 +9153,7 @@ export function RoomsWorkspace({
       // Synthetic pointer events in smoke tests may not register an active pointer.
     }
     sceneMapCardDrag.current?.cleanup?.();
-    const startPosition = resolvedPresentation.sceneMapPositions[room.name]
+    const startPosition = (isSceneDiagram ? diagramPositions[room.name] : resolvedPresentation.sceneMapPositions[room.name])
       ?? defaultSceneMapPosition(resolvedPresentation.rooms.findIndex((candidate) => candidate.id === room.id), resolvedPresentation.rooms);
     const pointerID = event.pointerId;
     const frame = sceneMapCardFrameRefs.current[room.name];
@@ -8963,7 +9225,6 @@ export function RoomsWorkspace({
     }
   });
   const explicitSceneLinkPairs = new Set(presentation.connections.map((connection) => `${connection.from}\u0000${connection.to}`));
-  const roomEventSceneLinks = projectData ? deriveRoomEventSceneLinks(projectData) : [];
   const incomingArrivals = roomEventSceneLinks.filter(link => link.to === focusSceneRoom?.name && link.x !== null && link.y !== null);
   const selectedArrival = incomingArrivals.find(link => link.id === selectedArrivalID);
   const testArrival = incomingArrivals.find(link => link.id === testArrivalID);
@@ -9006,7 +9267,7 @@ export function RoomsWorkspace({
     ?? activeRoom?.name
     ?? null;
   const roomCardConnectors = sceneMapConnections.filter((connection) => (
-    sceneMapSelectionName !== null
+    isSceneDiagram || sceneMapSelectionName !== null
       && (connection.from === sceneMapSelectionName || connection.to === sceneMapSelectionName)
   )).flatMap((connection) => {
     const from = roomCardByName.get(connection.from);
@@ -9034,7 +9295,7 @@ export function RoomsWorkspace({
       label: connection.label,
       labelX: (x1 + x2) / 2,
       labelY: (y1 + y2) / 2 - 8,
-      showLabel: connection.showLabel,
+      showLabel: !isSceneDiagram && connection.showLabel,
       to: connection.to,
       eventLink: connection.eventLink
     }];
@@ -9177,11 +9438,11 @@ export function RoomsWorkspace({
       {projectData && activeInspectorTab === "dialogues" && dialoguePreviewKey ? <DialogueScenePreview
         roomId={focusSceneRoom.id} projectData={projectData} projectPath={projectPath}
         dialogue={contextualDialogues?.dialogues.find(dialogue => dialogue.key === dialoguePreviewKey) ?? dialogueCatalog.find(dialogue => dialogue.key === dialoguePreviewKey)}
-        scale={1} ariaLabel="Diálogo na prévia GBA em tamanho real" /> : null}
+        scale={1} ariaLabel={ui("Diálogo na prévia GBA em tamanho real")} /> : null}
     </div>
   ) : null;
   return (
-    <section className="rooms-workspace" aria-label="Workspace Rooms">
+    <section className="rooms-workspace" aria-label={ui("Workspace Rooms")}>
       {roomNamePrompt ? (
         <RoomNamePromptDialog
           onCancel={() => setRoomNamePrompt(null)}
@@ -9228,10 +9489,10 @@ export function RoomsWorkspace({
       >
         <div className="rooms-event-focus-host" />
         <WorkspaceExplorerRail
-          ariaLabel="Navegador do projeto"
+          ariaLabel={ui("Navegador do projeto")}
           workspaceId="rooms-explorer"
         >
-          <div aria-label="Navegador do projeto" className="editor-project-tabs" role="tablist">
+          <div aria-label={ui("Navegador do projeto")} className="editor-project-tabs" role="tablist">
             <button
               aria-selected={navigatorTab === "project"}
               className={navigatorTab === "project" ? "active" : ""}
@@ -9239,8 +9500,7 @@ export function RoomsWorkspace({
               role="tab"
               type="button"
             >
-              Projeto
-            </button>
+              {ui("Projeto")}</button>
             <button
               aria-selected={navigatorTab === "prefabs"}
               className={navigatorTab === "prefabs" ? "active" : ""}
@@ -9248,35 +9508,34 @@ export function RoomsWorkspace({
               role="tab"
               type="button"
             >
-              Pré-fabricados
-            </button>
-            <button role="tab" type="button" aria-selected={navigatorTab === "logic"} className={navigatorTab === "logic" ? "active" : ""} onClick={() => setNavigatorTab("logic")}>Lógica</button>
+              {ui("Pré-fabricados")}</button>
+            <button role="tab" type="button" aria-selected={navigatorTab === "logic"} className={navigatorTab === "logic" ? "active" : ""} onClick={() => setNavigatorTab("logic")}>{ui("Lógica")}</button>
           </div>
           {navigatorTab === "logic" && projectData ? <LogicNavigator projectData={projectData} events={logicEvents ?? null} selection={logicSelection} onSelect={setLogicSelection} onCreateVariable={onCreateLogicVariable} onCreateScript={onCreateEventReference} /> : null}
           {navigatorTab === "project" ? (
-          <section className="editor-rail-section project-section" aria-label="Projeto">
+          <section className="editor-rail-section project-section" aria-label={ui("Projeto")}>
             <div className="editor-rail-section-header project-tree-toolbar">
               <label className="editor-project-search-field">
                 <ScanSearch aria-hidden="true" size={14} />
-                <span className="sr-only">Buscar cenas</span>
-                <input aria-label="Buscar cenas" onChange={(event) => setSceneSearchQuery(event.currentTarget.value)}
-                  placeholder="Buscar cenas" type="search" value={sceneSearchQuery} />
-                {sceneSearchQuery ? <button aria-label="Limpar busca de cenas" onClick={() => setSceneSearchQuery("")} type="button"><X aria-hidden="true" size={13} /></button> : null}
+                <span className="sr-only">{ui("Buscar cenas")}</span>
+                <input aria-label={ui("Buscar cenas")} onChange={(event) => setSceneSearchQuery(event.currentTarget.value)}
+                  placeholder={ui("Buscar cenas")} type="search" value={sceneSearchQuery} />
+                {sceneSearchQuery ? <button aria-label={ui("Limpar busca de cenas")} onClick={() => setSceneSearchQuery("")} type="button"><X aria-hidden="true" size={13} /></button> : null}
               </label>
               <div className="editor-rail-actions">
-                <button aria-label="Selecionar várias cenas" aria-pressed={sceneMultiSelectMode}
-                  onClick={() => setSceneMultiSelectMode((current) => !current)} title="Seleção múltipla de cenas" type="button">
+                <button aria-label={ui("Selecionar várias cenas")} aria-pressed={sceneMultiSelectMode}
+                  onClick={() => setSceneMultiSelectMode((current) => !current)} title={ui("Seleção múltipla de cenas")} type="button">
                   <Check aria-hidden="true" size={14} />
                 </button>
                 <button
-                  aria-label={selectedSceneIDs.size > 0 ? `Agrupar ${selectedSceneIDs.size} cenas selecionadas` : "Novo grupo de cenas"}
+                  aria-label={selectedSceneIDs.size > 0 ? ui("Agrupar {0} cenas selecionadas", { 0: selectedSceneIDs.size }) : ui("Novo grupo de cenas")}
                   onClick={openCreateSceneGroupPrompt}
-                  title={selectedSceneIDs.size > 0 ? "Criar grupo com as cenas selecionadas" : "Novo grupo de cenas"}
+                  title={selectedSceneIDs.size > 0 ? ui("Criar grupo com as cenas selecionadas") : ui("Novo grupo de cenas")}
                   type="button"
                 >
                   <FolderPlus aria-hidden="true" size={18} strokeWidth={2.2} />
                 </button>
-                <button aria-label="Nova cena" onClick={() => createRoomFromEditor()} title="Nova cena" type="button">
+                <button aria-label={ui("Nova cena")} onClick={() => createRoomFromEditor()} title={ui("Nova cena")} type="button">
                   <SquarePlus aria-hidden="true" size={20} strokeWidth={2.4} />
                 </button>
               </div>
@@ -9292,7 +9551,7 @@ export function RoomsWorkspace({
                 <Folder aria-hidden="true" className="editor-tree-icon folder" size={18} strokeWidth={2.4} />
                 <span>
                   <strong>{projectTreeName}</strong>
-                  <small>{presentation.summary.roomCount} cenas</small>
+                  <small>{presentation.summary.roomCount} {ui(" cenas")}</small>
                 </span>
               </button>
               {railExpanded.project ? (
@@ -9316,17 +9575,17 @@ export function RoomsWorkspace({
                             moveSceneIntoGroup(draggedSceneID ?? "", null);
                           }}
                         >
-                          <summary aria-label={`Sem grupo, ${ungroupedSceneIDs.length} cenas`} className="editor-tree-row scene-tree-group-row">
+                          <summary aria-label={ui("Sem grupo, {0} cenas", { 0: ungroupedSceneIDs.length })} className="editor-tree-row scene-tree-group-row">
                             <ChevronRight aria-hidden="true" className="editor-tree-chevron" size={16} strokeWidth={2.4} />
                             <Folder aria-hidden="true" className="editor-tree-icon folder" size={17} strokeWidth={2.2} />
-                            <span><strong>Sem grupo</strong><small>{ungroupedSceneIDs.length} cenas</small></span>
+                            <span><strong>{ui("Sem grupo")}</strong><small>{ungroupedSceneIDs.length} {ui(" cenas")}</small></span>
                           </summary>
                           <div className="editor-tree-children scene-tree-group-children">
                             {ungroupedSceneIDs.map((sceneID) => {
                               const room = sceneByID.get(sceneID);
                               return room ? renderSceneTreeScene(room, null) : null;
                             })}
-                            {ungroupedSceneIDs.length === 0 ? <div className="editor-empty-row nested"><Folder aria-hidden="true" size={16} /><strong>Arraste cenas para cá</strong></div> : null}
+                            {ungroupedSceneIDs.length === 0 ? <div className="editor-empty-row nested"><Folder aria-hidden="true" size={16} /><strong>{ui("Arraste cenas para cá")}</strong></div> : null}
                           </div>
                         </details>
                       </>
@@ -9337,12 +9596,12 @@ export function RoomsWorkspace({
                   ) : normalizedSceneSearchQuery ? (
                     <div className="editor-empty-row scene-tree-empty-search">
                       <ScanSearch aria-hidden="true" size={17} strokeWidth={2.1} />
-                      <strong>Nenhuma cena encontrada</strong>
+                      <strong>{ui("Nenhuma cena encontrada")}</strong>
                     </div>
                   ) : (
                     <div className="editor-empty-row">
                       <MapIcon aria-hidden="true" size={18} strokeWidth={2.1} />
-                      <strong>Nenhuma cena</strong>
+                      <strong>{ui("Nenhuma cena")}</strong>
                     </div>
                   )}
                 </div>
@@ -9351,27 +9610,32 @@ export function RoomsWorkspace({
           </section>
           ) : null}
           {navigatorTab === "prefabs" ? (
-          <section className="editor-rail-section prefabs-section" aria-label="Pre-fabricados">
+          <section className="editor-rail-section prefabs-section" aria-label={ui("Pre-fabricados")}>
+            {projectData && onApplyInteractiveObjects ? <InteractiveObjectsInspector data={projectData} onApply={onApplyInteractiveObjects} /> : null}
+            <label className="editor-project-search-field">
+              <Search aria-hidden="true" size={16} />
+              <input type="search" aria-label={ui("Buscar")} placeholder={ui("Buscar")} value={prefabQuery} onChange={event => setPrefabQuery(event.currentTarget.value)} />
+            </label>
             <div className="editor-rail-section-header">
-              <h4>Pre-fabricados</h4>
+              <h4>{ui("Pre-fabricados")}</h4>
               <button
-                aria-label="Criar pre-fabricado do selecionado"
+                aria-label={ui("Criar pre-fabricado do selecionado")}
                 className="editor-rail-diamond-action"
                 disabled={!onCreatePrefabFromEntity || !selectedPrefabSource}
                 onClick={() => {
                   if (selectedPrefabSource) onCreatePrefabFromEntity?.(selectedPrefabSource.kind, selectedPrefabSource.id);
                 }}
-                title="Criar um modelo reutilizavel a partir da instancia selecionada"
+                title={ui("Criar um modelo reutilizavel a partir da instancia selecionada")}
                 type="button"
               >
                 <Plus aria-hidden="true" size={18} strokeWidth={2.4} />
               </button>
               <button
-                aria-label="Aplicar pre-fabricados as instancias"
+                aria-label={ui("Aplicar pre-fabricados as instancias")}
                 className="editor-rail-diamond-action"
                 disabled={!onSynchronizePrefabs || prefabCount === 0}
                 onClick={() => onSynchronizePrefabs?.()}
-                title="Aplicar propriedades dos pre-fabricados as instancias vinculadas"
+                title={ui("Aplicar propriedades dos pre-fabricados as instancias vinculadas")}
                 type="button"
               >
                 <RefreshCw aria-hidden="true" size={18} strokeWidth={2.4} />
@@ -9387,84 +9651,88 @@ export function RoomsWorkspace({
                 <ChevronRight aria-hidden="true" className="editor-tree-chevron" size={18} strokeWidth={2.4} />
                 <Box aria-hidden="true" className="editor-tree-icon" size={18} strokeWidth={2.2} />
                 <span>
-                  <strong>Biblioteca</strong>
-                  <small>{prefabCount} prefabs</small>
+                  <strong>{ui("Biblioteca")}</strong>
+                  <small>{prefabCount} {ui(" prefabs")}</small>
                 </span>
               </button>
               {railExpanded.prefabsLibrary ? (
                 <div className="editor-tree-children">
-                  {actorPrefabs.map((prefab) => (
+                  {actorPrefabs.filter(matchesPrefab).map((prefab) => (
                     <details className="editor-prefab-editor" data-prefab-kind="actor" key={`actor-prefab:${prefab.id}`}>
                       <summary className="editor-tree-row nested leaf">
                         <ChevronRight aria-hidden="true" className="editor-tree-chevron" size={17} strokeWidth={2.2} />
                         <Box aria-hidden="true" className="editor-tree-icon" size={17} strokeWidth={2.2} />
-                        <span><strong>{prefab.name}</strong><small>Ator · {prefab.id}</small></span>
+                        <span><strong>{prefab.name}</strong><small>{ui("Ator · ")}{prefab.id}</small></span>
                       </summary>
                       <div className="editor-prefab-fields">
+                        <PrefabAuthoringNote prefab={prefab} />
+                        <PrefabInstanceImpact data={projectData!} kind="actor" prefab={prefab} onReset={onResetPrefabOverrides} />
                         <label>
-                          <span>Nome</span>
+                          <span>{ui("Nome")}</span>
                           <input
-                            aria-label={`Nome do prefab ${prefab.name}`}
+                            aria-label={ui("Nome do prefab {0}", { 0: prefab.name })}
                             onChange={(event) => onUpdatePrefab?.("actor", prefab.id, { name: event.currentTarget.value })}
                             value={String(prefab.name ?? "")}
                           />
                         </label>
                         <label>
-                          <span>Sprite</span>
+                          <span>{ui("Sprite")}</span>
                           <input
-                            aria-label={`Sprite do prefab ${prefab.name}`}
+                            aria-label={ui("Sprite do prefab {0}", { 0: prefab.name })}
                             onChange={(event) => onUpdatePrefab?.("actor", prefab.id, { spriteSheet: event.currentTarget.value })}
                             value={String(prefab.spriteSheet ?? "")}
                           />
                         </label>
                         <label>
-                          <span>Animacao</span>
+                          <span>{ui("Animacao")}</span>
                           <input
-                            aria-label={`Animacao do prefab ${prefab.name}`}
+                            aria-label={ui("Animacao do prefab {0}", { 0: prefab.name })}
                             onChange={(event) => onUpdatePrefab?.("actor", prefab.id, { animationName: event.currentTarget.value })}
                             value={String(prefab.animationName ?? "")}
                           />
                         </label>
                         <label>
                           <input
-                            aria-label={`Colisão do prefab ${prefab.name}`}
+                            aria-label={ui("Colisão do prefab {0}", { 0: prefab.name })}
                             checked={prefab.collisionEnabled !== false}
                             onChange={(event) => onUpdatePrefab?.("actor", prefab.id, { collisionEnabled: event.currentTarget.checked })}
                             type="checkbox"
                           />
-                          <span>Colisão ativa</span>
+                          <span>{ui("Colisão ativa")}</span>
                         </label>
                         <button
-                          aria-label={`Instanciar ${prefab.name}`}
+                          aria-label={ui("Instanciar {0}", { 0: prefab.name })}
                           disabled={!onInstantiatePrefab || !prefabPlacement}
                           onClick={() => {
                             if (prefabPlacement) onInstantiatePrefab?.("actor", prefab.id, prefabPlacement);
                           }}
                           type="button"
-                        >Instanciar na cena ativa</button>
+                        >{ui("Instanciar na cena ativa")}</button>
                       </div>
                     </details>
                   ))}
-                  {triggerPrefabs.map((prefab) => (
+                  {triggerPrefabs.filter(matchesPrefab).map((prefab) => (
                     <details className="editor-prefab-editor" data-prefab-kind="trigger" key={`trigger-prefab:${prefab.id}`}>
                       <summary className="editor-tree-row nested leaf">
                         <ChevronRight aria-hidden="true" className="editor-tree-chevron" size={17} strokeWidth={2.2} />
                         <Diamond aria-hidden="true" className="editor-tree-icon filled" size={17} strokeWidth={2.2} />
-                        <span><strong>{prefab.name}</strong><small>Trigger · {prefab.id}</small></span>
+                        <span><strong>{prefab.name}</strong><small>{ui("Trigger · ")}{prefab.id}</small></span>
                       </summary>
                       <div className="editor-prefab-fields">
+                        <PrefabAuthoringNote prefab={prefab} />
+                        <PrefabInstanceImpact data={projectData!} kind="trigger" prefab={prefab} onReset={onResetPrefabOverrides} />
                         <label>
-                          <span>Nome</span>
+                          <span>{ui("Nome")}</span>
                           <input
-                            aria-label={`Nome do prefab ${prefab.name}`}
+                            aria-label={ui("Nome do prefab {0}", { 0: prefab.name })}
                             onChange={(event) => onUpdatePrefab?.("trigger", prefab.id, { name: event.currentTarget.value })}
                             value={String(prefab.name ?? "")}
                           />
                         </label>
                         <label>
-                          <span>Largura</span>
+                          <span>{ui("Largura")}</span>
                           <input
-                            aria-label={`Largura do prefab ${prefab.name}`}
+                            aria-label={ui("Largura do prefab {0}", { 0: prefab.name })}
                             min={1}
                             onChange={(event) => onUpdatePrefab?.("trigger", prefab.id, { width: Math.max(1, Number(event.currentTarget.value) || 1) })}
                             type="number"
@@ -9472,9 +9740,9 @@ export function RoomsWorkspace({
                           />
                         </label>
                         <label>
-                          <span>Altura</span>
+                          <span>{ui("Altura")}</span>
                           <input
-                            aria-label={`Altura do prefab ${prefab.name}`}
+                            aria-label={ui("Altura do prefab {0}", { 0: prefab.name })}
                             min={1}
                             onChange={(event) => onUpdatePrefab?.("trigger", prefab.id, { height: Math.max(1, Number(event.currentTarget.value) || 1) })}
                             type="number"
@@ -9482,33 +9750,33 @@ export function RoomsWorkspace({
                           />
                         </label>
                         <label>
-                          <span>Evento ao entrar</span>
+                          <span>{ui("Evento ao entrar")}</span>
                           <input
-                            aria-label={`Evento enter do prefab ${prefab.name}`}
+                            aria-label={ui("Evento enter do prefab {0}", { 0: prefab.name })}
                             onChange={(event) => onUpdatePrefab?.("trigger", prefab.id, { onEnterEventName: event.currentTarget.value })}
-                            value={String(prefab.onEnterEventName ?? "")}
+                            value={String((prefab.eventBindings as Record<string, unknown> | undefined)?.onEnter ?? prefab.onEnterEventName ?? "")}
                           />
                         </label>
                         <label>
-                          <span>Evento ao sair</span>
+                          <span>{ui("Evento ao sair")}</span>
                           <input
-                            aria-label={`Evento leave do prefab ${prefab.name}`}
+                            aria-label={ui("Evento leave do prefab {0}", { 0: prefab.name })}
                             onChange={(event) => onUpdatePrefab?.("trigger", prefab.id, { onLeaveEventName: event.currentTarget.value })}
-                            value={String(prefab.onLeaveEventName ?? "")}
+                            value={String((prefab.eventBindings as Record<string, unknown> | undefined)?.onLeave ?? prefab.onLeaveEventName ?? "")}
                           />
                         </label>
                         <button
-                          aria-label={`Instanciar ${prefab.name}`}
+                          aria-label={ui("Instanciar {0}", { 0: prefab.name })}
                           disabled={!onInstantiatePrefab || !prefabPlacement}
                           onClick={() => {
                             if (prefabPlacement) onInstantiatePrefab?.("trigger", prefab.id, prefabPlacement);
                           }}
                           type="button"
-                        >Instanciar na cena ativa</button>
+                        >{ui("Instanciar na cena ativa")}</button>
                       </div>
                     </details>
                   ))}
-                  {prefabCount === 0 ? <div className="editor-empty-row"><strong>Nenhum modelo reutilizável</strong></div> : null}
+                  {prefabCount === 0 ? <div className="editor-empty-row"><strong>{ui("Nenhum modelo reutilizável")}</strong></div> : null}
                   <button
                     aria-expanded={railExpanded.prefabsActors}
                     className={["editor-tree-row", "nested", railExpanded.prefabsActors ? "is-expanded" : ""].filter(Boolean).join(" ")}
@@ -9518,7 +9786,7 @@ export function RoomsWorkspace({
                     <ChevronRight aria-hidden="true" className="editor-tree-chevron" size={18} strokeWidth={2.4} />
                     <UsersRound aria-hidden="true" className="editor-tree-icon" size={18} strokeWidth={2.2} />
                     <span>
-                      <strong>Instâncias de atores</strong>
+                      <strong>{ui("Instâncias de atores")}</strong>
                       <small>{actorEntities.length}</small>
                     </span>
                   </button>
@@ -9547,7 +9815,7 @@ export function RoomsWorkspace({
                       )) : (
                         <div className="editor-empty-row deeper">
                           <UserRound aria-hidden="true" size={18} strokeWidth={2.1} />
-                          <strong>Nenhum ator</strong>
+                          <strong>{ui("Nenhum ator")}</strong>
                         </div>
                       )}
                     </div>
@@ -9561,7 +9829,7 @@ export function RoomsWorkspace({
                     <ChevronRight aria-hidden="true" className="editor-tree-chevron" size={18} strokeWidth={2.4} />
                     <Diamond aria-hidden="true" className="editor-tree-icon filled" size={18} strokeWidth={2.4} />
                     <span>
-                      <strong>Instâncias de triggers</strong>
+                      <strong>{ui("Instâncias de triggers")}</strong>
                       <small>{triggerEntities.length}</small>
                     </span>
                   </button>
@@ -9590,7 +9858,7 @@ export function RoomsWorkspace({
                       )) : (
                         <div className="editor-empty-row deeper">
                           <Diamond aria-hidden="true" className="editor-tree-icon filled" size={18} strokeWidth={2.1} />
-                          <strong>Nenhum trigger</strong>
+                          <strong>{ui("Nenhum trigger")}</strong>
                         </div>
                       )}
                     </div>
@@ -9607,7 +9875,7 @@ export function RoomsWorkspace({
             focusSceneRoom ? "has-scene-actions" : "",
             focusMinimapAvailable && focusMinimapVisible && focusSceneRoom ? "has-focus-minimap" : ""
           ].filter(Boolean).join(" ")}
-          aria-label={focusSceneRoom ? `Editor da cena ${sceneDisplayName(focusSceneRoom.name)}` : "Visão geral do projeto"}
+          aria-label={focusSceneRoom ? ui("Editor da cena {0}", { 0: sceneDisplayName(focusSceneRoom.name) }) : ui("Visão geral do projeto")}
           data-card-density={canvasVisualMetrics.cardDensity}
           data-zoom={`${canvasZoomPercent}%`}
           onPointerMove={continueSceneMapCardDrag}
@@ -9617,36 +9885,36 @@ export function RoomsWorkspace({
           {activeRoom ? (
             <>
               <div
-                aria-label={focusSceneRoom ? "Ferramentas de edição da cena" : "Ferramentas da visão geral do projeto"}
+                aria-label={focusSceneRoom ? ui("Ferramentas de edição da cena") : ui("Ferramentas da visão geral do projeto")}
                 className={`room-editor-tool-rail${focusSceneRoom ? " is-scene-focus" : " is-scene-map"}`}
                 data-editor-mode={focusSceneRoom ? "scene-editor" : "project-overview"}
               >
-                <strong>Ferramentas do Editor</strong>
+                <strong>{ui("Ferramentas do Editor")}</strong>
                 <div className={`room-editor-tool-rail-stack${focusSceneRoom ? " is-scene-focus" : " is-scene-map"}`}>
                   <div className="room-editor-tool-rail-actions">
                     {!focusSceneRoom ? (
-                      <div aria-label="Adicionar cenas" className="room-editor-tool-group room-editor-tool-group-add">
-                        <span className="room-editor-tool-group-label">Adicionar</span>
+                      <div aria-label={ui("Adicionar cenas")} className="room-editor-tool-group room-editor-tool-group-add">
+                        <span className="room-editor-tool-group-label">{ui("Adicionar")}</span>
                         <button
-                          aria-label="Nova cena"
+                          aria-label={ui("Nova cena")}
                           className="room-editor-tool-rail-add"
                           onClick={() => createRoomFromEditor()}
-                          title="Nova cena em branco"
+                          title={ui("Nova cena em branco")}
                           type="button"
                         >
                           <Plus aria-hidden="true" size={16} strokeWidth={2.3} />
-                          <span>Nova cena</span>
-                          <small>Em branco</small>
+                          <span>{ui("Nova cena")}</span>
+                          <small>{ui("Em branco")}</small>
                         </button>
-                        <EditorPopover label="Modelos" ariaLabel="Modelos de cena" closeOnAction>
+                        <EditorPopover label={ui("Modelos")} ariaLabel={ui("Modelos de cena")} closeOnAction>
                           {ROOM_PRESETS.map((preset) => <button key={preset.id} type="button"
-                            onClick={() => createRoomFromPreset(preset.id)} title={preset.description}>{preset.label}</button>)}
+                            onClick={() => createRoomFromPreset(preset.id)} title={ui(preset.description)}>{ui(preset.label)}</button>)}
                         </EditorPopover>
                       </div>
                     ) : null}
                     {focusSceneRoom ? (
-                      <div aria-label="Ferramentas da cena" className="room-editor-tool-group room-editor-tool-group-focus">
-                        <span className="room-editor-tool-group-label">Editar</span>
+                      <div aria-label={ui("Ferramentas da cena")} className="room-editor-tool-group room-editor-tool-group-focus">
+                        <span className="room-editor-tool-group-label">{ui("Editar")}</span>
                         {roomEditorToolModes.map((mode) => {
                           const ToolIcon = mode.Icon;
                           const shortcut = editorToolShortcuts[mode.id] ?? mode.shortcut;
@@ -9657,8 +9925,8 @@ export function RoomsWorkspace({
                           return (
                             <button
                               aria-label={unavailableReason
-                                ? `${mode.label} - indisponível: ${unavailableReason}`
-                                : `${mode.label} - ${mode.hint}`}
+                                ? ui("{0} - indisponível: {1}", { 0: ui(mode.label), 1: unavailableReason })
+                                : `${ui(mode.label)} - ${ui(mode.hint)}`}
                               aria-keyshortcuts={roomEditorShortcutAriaKey(shortcut)}
                               aria-pressed={selectedToolPanelMode === mode.id}
                               className={selectedToolPanelMode === mode.id ? "active" : ""}
@@ -9666,56 +9934,78 @@ export function RoomsWorkspace({
                               disabled={Boolean(unavailableReason)}
                               key={mode.id}
                               onClick={() => setEditorToolPanelMode(mode.id)}
-                              title={unavailableReason ?? `${mode.label}: ${mode.hint} · Atalho ${shortcutLabel}`}
+                              title={unavailableReason ?? ui("{0}: {1} · Atalho {2}", { 0: ui(mode.label), 1: ui(mode.hint), 2: shortcutLabel })}
                               type="button"
                             >
                               <ToolIcon aria-hidden="true" size={16} strokeWidth={2.2} />
-                              <span>{mode.label}</span>
-                              <small>{mode.hint}</small>
+                              <span>{ui(mode.label)}</span>
+                              <small>{ui(mode.hint)}</small>
                             </button>
                           );
                         })}
                       </div>
                     ) : null}
                   </div>
+                  {focusSceneRoom ? <RoomEditorCanvasControls
+                    canvasLayerLocks={canvasLayerLocks} canvasLayerVisibility={canvasLayerVisibility}
+                    room={focusSceneRoom} setCanvasLayerLock={setCanvasLayerLock}
+                    setCanvasLayerVisibility={setCanvasLayerVisibility}
+                  /> : null}
 
                   {!focusSceneRoom ? (
-                  <div className="room-editor-tool-rail-zoom rooms-canvas-zoom" role="group" aria-label="Zoom do canvas">
-                  {!focusSceneRoom && onOrganizeSceneMap ? (
+                  <div className="room-editor-tool-rail-zoom rooms-canvas-zoom" role="group" aria-label={ui("Zoom do canvas")}>
+                  <button
+                    type="button"
+                    aria-label={ui("Alternar visualização em organograma")}
+                    aria-pressed={isSceneDiagram}
+                    title={isSceneDiagram ? ui("Voltar aos cards com imagens") : ui("Cards uniformes sem prévias de imagem")}
+                    onClick={() => {
+                      const mode = overviewMode === "diagram" ? "preview" : "diagram";
+                      setOverviewView({ path: projectPath, mode });
+                      writeSceneMapViewMode(projectPath, mode);
+                    }}
+                  >
+                    <Network aria-hidden="true" size={15} strokeWidth={2.3} />
+                    <span>{ui("Organograma")}</span>
+                  </button>
+                  {!focusSceneRoom && (onOrganizeSceneMap || isSceneDiagram) ? (
                     <button
-                      aria-label="Organizar cards das cenas"
-                      onClick={onOrganizeSceneMap}
-                      title="Organizar cards por ordem e tamanho"
+                      aria-label={ui("Organizar cards das cenas")}
+                      onClick={() => {
+                        if (isSceneDiagram) updateDiagramPositions({});
+                        else onOrganizeSceneMap?.();
+                      }}
+                      title={isSceneDiagram ? ui("Organizar cards por conexões") : ui("Organizar cards por ordem e tamanho")}
                       type="button"
                     >
                       <ListOrdered aria-hidden="true" size={14} strokeWidth={2.3} />
-                      <span>Organizar</span>
+                      <span>{ui("Organizar")}</span>
                     </button>
                   ) : null}
                   <button
-                    aria-label="Ajustar canvas às cenas visíveis"
+                    aria-label={ui("Ajustar canvas às cenas visíveis")}
                     onClick={fitSceneMapView}
-                    title="Ajustar"
+                    title={ui("Ajustar")}
                     type="button"
                   >
                     <ScanSearch aria-hidden="true" size={14} strokeWidth={2.3} />
-                    <span>Ajustar</span>
+                    <span>{ui("Ajustar")}</span>
                   </button>
                   <button
-                    aria-label="Reduzir zoom do canvas"
+                    aria-label={ui("Reduzir zoom do canvas")}
                     disabled={Boolean(focusSceneRoom && focusViewMode === "viewport") || canvasZoomIndex <= 0}
                     onClick={() => setCanvasZoomByStep(-1)}
-                    title="Reduzir zoom"
+                    title={ui("Reduzir zoom")}
                     type="button"
                   >
                     <ZoomOut aria-hidden="true" size={15} strokeWidth={2.3} />
                   </button>
                   <strong>{focusViewMode === "viewport" && focusViewportGeometry ? `${Math.round(focusViewportGeometry.scale * 100)}%` : `${canvasZoomPercent}%`}</strong>
                   <button
-                    aria-label="Aumentar zoom do canvas"
+                    aria-label={ui("Aumentar zoom do canvas")}
                     disabled={Boolean(focusSceneRoom && focusViewMode === "viewport") || canvasZoomIndex >= ROOM_CANVAS_ZOOM_LEVELS.length - 1}
                     onClick={() => setCanvasZoomByStep(1)}
-                    title="Aumentar zoom"
+                    title={ui("Aumentar zoom")}
                     type="button"
                   >
                     <ZoomIn aria-hidden="true" size={15} strokeWidth={2.3} />
@@ -9754,8 +10044,8 @@ export function RoomsWorkspace({
                     sceneActions={focusSceneRoom ? (
                       <>
                         <RoomSceneOverviewButton onClick={exitSceneFocus} />
-                        <div className="room-focus-view-controls" role="group" aria-label="Visualização da cena">
-                          <button type="button" aria-pressed={focusViewMode === "viewport"} onClick={() => setFocusViewMode("viewport")}>Tela ampliada</button>
+                        <div className="room-focus-view-controls" role="group" aria-label={ui("Visualização da cena")}>
+                          <button type="button" aria-pressed={focusViewMode === "viewport"} onClick={() => setFocusViewMode("viewport")}>{ui("Tela ampliada")}</button>
                           <button type="button" aria-pressed={focusViewMode === "map"} disabled={false}
                             onClick={() => {
                               if (focusViewMode === "map") return;
@@ -9765,14 +10055,14 @@ export function RoomsWorkspace({
                               setFocusSceneZoom(fitScale / baseScale);
                               setFocusViewMode("map");
                               window.requestAnimationFrame(() => { const scroll = canvasScrollRef.current; if (scroll) { scroll.scrollLeft = 0; scroll.scrollTop = 0; } });
-                            }}>Mapa</button>
+                            }}>{ui("Mapa")}</button>
                         </div>
-                        <button className="room-focus-preview-toggle" type="button" aria-label={`${focusMinimapVisible ? "Ocultar" : "Mostrar"} painel de prévia`}
-                          aria-pressed={focusMinimapVisible} onClick={() => setFocusMinimapVisible(!focusMinimapVisible)}><Monitor size={14} aria-hidden="true" /><span>Prévia GBA</span></button>
+                        <button className="room-focus-preview-toggle" type="button" aria-label={ui("{0} painel de prévia", { 0: focusMinimapVisible ? "Ocultar" : "Mostrar" })}
+                          aria-pressed={focusMinimapVisible} onClick={() => setFocusMinimapVisible(!focusMinimapVisible)}><Monitor size={14} aria-hidden="true" /><span>{ui("Prévia GBA")}</span></button>
                         <RoomEditorSceneActions
                           onRunRoom={() => testArrival ? onRunRoom(focusSceneRoom.id, focusSceneRoom.name, { x: testArrival.x!, y: testArrival.y!, direction: testArrival.direction ?? "down" }) : onRunRoom(focusSceneRoom.id, focusSceneRoom.name)}
                           room={focusSceneRoom}
-                          testStartControl={<label className="room-test-start-control"><span>Início do teste</span><select aria-label="Início do teste da cena" value={testArrival?.id ?? ""} onChange={event => setTestArrivalID(event.currentTarget.value)}><option value="">{focusSceneRoom.isStart ? "Início do jogo" : "Posição padrão da cena"}</option>{incomingArrivals.map(link => <option key={link.id} value={link.id}>{link.from} · {link.eventName} · {link.x},{link.y}</option>)}</select></label>}
+                          testStartControl={<label className="room-test-start-control"><span>{ui("Início do teste")}</span><select aria-label={ui("Início do teste da cena")} value={testArrival?.id ?? ""} onChange={event => setTestArrivalID(event.currentTarget.value)}><option value="">{focusSceneRoom.isStart ? ui("Início do jogo") : ui("Posição padrão da cena")}</option>{incomingArrivals.map(link => <option key={link.id} value={link.id}>{link.from} · {link.eventName} · {link.x},{link.y}</option>)}</select></label>}
                           runRoomDisabled={runRoomDisabled}
                           menuScreens={sceneMenuScreens}
                           menuScreenID={selectedSceneMenuScreen?.id}
@@ -9799,7 +10089,7 @@ export function RoomsWorkspace({
                 </>
               ) : null}
               <div
-                aria-label={focusSceneRoom ? `Viewport GBA da cena ${sceneDisplayName(focusSceneRoom.name)}` : undefined}
+                aria-label={focusSceneRoom ? ui("Viewport GBA da cena {0}", { 0: sceneDisplayName(focusSceneRoom.name) }) : undefined}
                 className={`rooms-canvas-viewport-host${focusSceneRoom ? ` is-focused-scene is-${focusViewMode}-view` : ""}`}
                 data-view-mode={focusSceneRoom ? focusViewMode : undefined}
                 style={focusSceneRoom && focusViewportGeometry ? { "--focus-camera-left": `${focusCameraOrigin.left * focusViewportGeometry.scale - focusMinimapViewport.left}px`, "--focus-camera-top": `${focusCameraOrigin.top * focusViewportGeometry.scale - focusMinimapViewport.top}px` } as CSSProperties : undefined}
@@ -9808,9 +10098,31 @@ export function RoomsWorkspace({
                 ref={focusViewportHostRef}
                 role={focusSceneRoom ? "region" : undefined}
               >
+              {focusSceneRoom?.sceneType === "dungeonCrawler" ? <DungeonSceneEditor key={focusSceneRoom.id}
+                room={focusSceneRoom} entities={presentation.entities.filter(e => e.roomName === focusSceneRoom.name)}
+                projectData={projectData} projectPath={projectPath} assetRefreshToken={assetRefreshToken}
+                viewMode={focusViewMode} previewVisible={focusMinimapVisible} onClosePreview={() => setFocusMinimapVisible(false)}
+                placementMode={collisionPlacementMode} mode={selectedToolPanelMode} tool={selectedTool} collision={selectedCollisionType}
+                actorsLocked={canvasLayerLocks.actors} triggersLocked={canvasLayerLocks.triggers}
+                showBounds={canvasLayerVisibility.hitboxes} showBackground={canvasLayerVisibility.background} showGrid={canvasLayerVisibility.grid} showActors={canvasLayerVisibility.actors} showTriggers={canvasLayerVisibility.triggers} showHud={canvasLayerVisibility.hud}
+                locked={selectedToolPanelMode === "collision" ? canvasLayerLocks.collision : selectedToolPanelMode === "trigger" ? canvasLayerLocks.triggers : selectedToolPanelMode === "actor" ? canvasLayerLocks.actors : false}
+                selected={selectedEntityKeys} onSelect={selectRoomEntityKeys} onCell={selectCanvasCell}
+                onRectangle={applyCollisionRectangleForRoom} onCollision={onSetCollisionType} onFill={onApplyCollisionFill} onUpdate={onUpdateRoomFields}
+                onBeginHistoryGroup={onBeginHistoryGroup} onEndHistoryGroup={onEndHistoryGroup}
+                onEntity={onUpdateRoomEntity} onCreateActor={onCreateActor} onCreateTrigger={onCreateTrigger}
+                renderHud={(camera, displayScale, readOnly) => {
+                  const binding = selectedToolPanelMode === "hud" ? focusSceneHudAuthoringBinding : focusSceneHudBinding;
+                  return canvasLayerVisibility.hud && binding ? <RoomHudOverlay binding={binding}
+                    entities={presentation.entities.filter(e => e.roomName === focusSceneRoom.name)}
+                    projectData={projectData} projectPath={projectPath} room={focusSceneRoom}
+                    viewportScale={displayScale} viewportAnchored dungeonDirection={camera.direction} guides={!readOnly && selectedToolPanelMode === "hud" && hudViewMode === "edit"}
+                    editable={!readOnly && selectedToolPanelMode === "hud" && hudViewMode === "edit"} canEdit={canEditHudCanvas}
+                    onUpdateHudPreset={onUpdateHudPreset} selectedComponentID={selectedHudComponentID}
+                    onSelectComponent={setSelectedHudComponentID} /> : null;
+                }} /> : <>
               {focusSceneRoom?.sceneType === "isometric" || focusSceneRoom?.sceneType === "dungeonCrawler" ? (
                 <span aria-hidden="true" className="room-isometric-viewport-label">
-                  {focusSceneRoom.sceneType === "dungeonCrawler" ? "Viewport Play · 240×160 · primeira pessoa" : focusSceneZoom === 1 ? "Viewport Play · 240×160" : `Revisão da cena · ${Math.round(focusSceneZoom * 100)}%`}
+                  {focusSceneRoom.sceneType === "dungeonCrawler" ? ui("Viewport Play · 240×160 · primeira pessoa") : focusSceneZoom === 1 ? ui("Viewport Play · 240×160") : ui("Revisão da cena · {0}%", { 0: Math.round(focusSceneZoom * 100) })}
                 </span>
               ) : null}
               <div
@@ -9819,6 +10131,7 @@ export function RoomsWorkspace({
                   isCanvasPanning ? "panning" : "",
                   focusSceneRoom ? "is-focused-scene-viewport" : "",
                   !focusSceneRoom ? "is-scene-map-overview" : "",
+                  isSceneDiagram ? "is-scene-diagram" : "",
                   focusViewportGeometry?.hasOverflow && !focusSceneUsesPseudo3dCamera ? "has-overflow" : ""
                 ].filter(Boolean).join(" ")}
                 onPointerDown={startRoomsCanvasPan}
@@ -9842,6 +10155,7 @@ export function RoomsWorkspace({
                   <div
                     className={`rooms-canvas-world${focusSceneRoom ? " is-focused-scene" : ""}`}
                     data-scene-map-selection={!focusSceneRoom ? (sceneMapSelectionName ?? "") : undefined}
+                    data-scene-map-view={!focusSceneRoom ? overviewMode : undefined}
                     ref={canvasWorldRef}
                     style={{
                       height: `${canvasWorldHeight}px`,
@@ -9850,17 +10164,17 @@ export function RoomsWorkspace({
                     }}
                   >
                     {focusSceneRoom && focusedSceneEditorCardSize ? (
-                      <section aria-label={`Editor focado da cena ${sceneDisplayName(focusSceneRoom.name)}`} className="room-focused-scene-editor-frame">
+                      <section aria-label={ui("Editor focado da cena {0}", { 0: sceneDisplayName(focusSceneRoom.name) })} className="room-focused-scene-editor-frame">
                         {focusedSceneEditorElement}
-                        {focusViewMode === "map" && canvasLayerVisibility.cameraBounds && focusViewportGeometry ? <div aria-label="Recorte da tela GBA no mapa"
+                        {focusViewMode === "map" && canvasLayerVisibility.cameraBounds && focusViewportGeometry ? <div aria-label={ui("Recorte da tela GBA no mapa")}
                           className="room-focus-map-camera" style={{ left: focusCameraOrigin.left * focusViewportGeometry.scale, top: focusCameraOrigin.top * focusViewportGeometry.scale,
-                            width: 240 * focusViewportGeometry.scale, height: 160 * focusViewportGeometry.scale }}><span>Tela GBA · 240 × 160</span></div> : null}
+                            width: 240 * focusViewportGeometry.scale, height: 160 * focusViewportGeometry.scale }}><span>{ui("Tela GBA · 240 × 160")}</span></div> : null}
                       </section>
                     ) : (
                       <>
                     {roomCardConnectors.length ? (
                       <svg
-                        aria-label="Conectores entre cenas"
+                        aria-label={ui("Conectores entre cenas")}
                         className="room-card-connector-layer"
                         height={canvasWorldHeight}
                         role="img"
@@ -9884,11 +10198,12 @@ export function RoomsWorkspace({
                         {roomCardConnectors.map((connector) => (
                           <g key={connector.id}>
                             <path
-                              aria-label={`Abrir transição ${connector.label}`}
+                              aria-label={ui("Abrir transição {0}", { 0: connector.label })}
                               className={[
                                 "room-card-connector-path",
                                 connector.connectionIndex !== null && selectedConnectionIndex === connector.connectionIndex ? "selected" : "",
-                                connector.connectionIndex === null ? "derived" : ""
+                                connector.connectionIndex === null ? "derived" : "",
+                                isSceneDiagram && (connector.from === sceneMapSelectionName || connector.to === sceneMapSelectionName) ? "is-connected-to-selection" : ""
                               ].filter(Boolean).join(" ")}
                               data-connector-from={connector.from}
                               data-connector-to={connector.to}
@@ -9923,12 +10238,13 @@ export function RoomsWorkspace({
                       </svg>
                     ) : null}
                     {visibleSceneMapCards.map(({ cardSize, position, room, z }) => {
-                      const roomEntities = presentation.entities.filter((entity) => entity.roomName === room.name);
+                      const roomEntities = isSceneDiagram ? [] : presentation.entities.filter((entity) => entity.roomName === room.name);
                       const displayedPosition = displayedSceneMapPosition(position, canvasZoom);
                       return (
                         <div
                           className={[
                             "room-stage-card-frame",
+                            isSceneDiagram ? "scene-diagram-frame" : "",
                             selectedSceneMapRoomName === room.name || room.isActive ? "selected" : ""
                           ].filter(Boolean).join(" ")}
                           key={room.id}
@@ -9947,10 +10263,20 @@ export function RoomsWorkspace({
                           style={{
                             left: `${displayedPosition.x}px`,
                             top: `${displayedPosition.y}px`,
+                            ...(isSceneDiagram ? { width: cardSize.width, height: cardSize.height } : {}),
                             zIndex: z
                           }}
                         >
-                          <RoomSceneMapInactivePreview
+                          {isSceneDiagram ? <SceneDiagramCard
+                            name={sceneDisplayName(room.name)}
+                            typeLabel={sceneTypeLabel(room.sceneType)}
+                            summary={`${roomEntityCountLabel("actor", diagramSummaries.get(room.name)?.actors ?? 0)} · ${roomEntityCountLabel("trigger", diagramSummaries.get(room.name)?.triggers ?? 0)}`}
+                            isStart={room.isStart} isActive={room.isActive} zoom={canvasZoom}
+                            runDisabled={runRoomDisabled}
+                            onOpen={() => enterSceneFocus(room)}
+                            onRun={() => onRunRoom(room.id, room.name)}
+                            onContextMenu={event => openRoomContextMenu(event, room)}
+                          /> : <RoomSceneMapInactivePreview
                             cardSize={cardSize}
                             assetRefreshToken={assetRefreshToken}
                             connectionZones={deriveRoomConnectionAreasForRoom(room.name, presentation.connections)}
@@ -9964,7 +10290,7 @@ export function RoomsWorkspace({
                             projectData={projectData}
                             projectPath={projectPath}
                             room={room}
-                          />
+                          />}
                         </div>
                       );
                     })}
@@ -10002,8 +10328,8 @@ export function RoomsWorkspace({
               /> : null}
               {canvasLayerVisibility.hud && focusSceneLutaHudAssetURL && typeof focusSceneLutaHudAssetName === "string" ? (
                 <div
-                  aria-label={`Prévia da HUD ${focusSceneRoom?.sceneType === "isometric" ? "tática" : "de luta"} ${focusSceneLutaHudAssetName}`}
-                  className="room-hud-overlay is-viewport-anchored room-runtime-hud-overlay"
+                  aria-label={ui("Prévia da HUD {0} {1}", { 0: focusSceneRoom?.sceneType === "isometric" ? "tática" : focusSceneRoom?.sceneType === "battleRpg" ? "RPG" : focusSceneRoom?.sceneType === "dungeonCrawler" ? "do labirinto" : "de luta", 1: focusSceneLutaHudAssetName })}
+                  className={`room-hud-overlay is-viewport-anchored room-runtime-hud-overlay${["battleRpg","dungeonCrawler"].includes(focusSceneRoom?.sceneType ?? "") ? " room-runtime-hud-background" : ""}`}
                   role="img"
                   style={{
                     height: `${160 * (focusViewportGeometry?.scale ?? 1)}px`,
@@ -10014,52 +10340,45 @@ export function RoomsWorkspace({
                 </div>
               ) : null}
               {focusSceneRoom ? (
-                <div className="room-scene-navigation" aria-label="Camadas e navegação">
-                  <span className="room-scene-navigation-size">{roomSceneResolutionLabel(focusSceneRoom)} px · {focusSceneRoom.width} × {focusSceneRoom.height} {focusSceneRoom.sceneType === "isometric" ? "células" : "tiles"}</span>
-                    <RoomEditorCanvasControls
-                      canvasLayerLocks={canvasLayerLocks} canvasLayerVisibility={canvasLayerVisibility}
-                      minimapAvailable={focusMinimapAvailable} minimapVisible={focusMinimapVisible}
-                      hideMinimapToggle
-                      room={focusSceneRoom} setCanvasLayerLock={setCanvasLayerLock}
-                      setCanvasLayerVisibility={setCanvasLayerVisibility} setMinimapVisible={setFocusMinimapVisible}
-                    />
-                  <div className="room-scene-navigation-zoom rooms-canvas-zoom" role="group" aria-label="Zoom do canvas">
+                <div className="room-scene-navigation" aria-label={ui("Navegação da cena")}>
+                  <span className="room-scene-navigation-size">{roomSceneResolutionLabel(focusSceneRoom)} {ui(" px · ")}{focusSceneRoom.width} × {focusSceneRoom.height} {focusSceneRoom.sceneType === "isometric" ? ui("células") : ui("tiles")}</span>
+                  <div className="room-scene-navigation-zoom rooms-canvas-zoom" role="group" aria-label={ui("Zoom do canvas")}>
                   {focusViewMode === "viewport" ? <span className="room-focus-display-scale">240 × 160 · {Math.round((focusViewportGeometry?.scale ?? 1) * 100)}%</span> : <>
                   {!focusSceneRoom && onOrganizeSceneMap ? (
                     <button
-                      aria-label="Organizar cards das cenas"
+                      aria-label={ui("Organizar cards das cenas")}
                       onClick={onOrganizeSceneMap}
-                      title="Organizar cards por ordem e tamanho"
+                      title={ui("Organizar cards por ordem e tamanho")}
                       type="button"
                     >
                       <ListOrdered aria-hidden="true" size={14} strokeWidth={2.3} />
-                      <span>Organizar</span>
+                      <span>{ui("Organizar")}</span>
                     </button>
                   ) : null}
                   <button
-                    aria-label="Ajustar canvas às cenas visíveis"
+                    aria-label={ui("Ajustar canvas às cenas visíveis")}
                     onClick={fitSceneMapView}
-                    title="Ajustar"
+                    title={ui("Ajustar")}
                     type="button"
                   >
                     <ScanSearch aria-hidden="true" size={14} strokeWidth={2.3} />
-                    <span>Ajustar</span>
+                    <span>{ui("Ajustar")}</span>
                   </button>
                   <button
-                    aria-label="Reduzir zoom do canvas"
+                    aria-label={ui("Reduzir zoom do canvas")}
                     disabled={canvasZoomIndex <= 0}
                     onClick={() => setCanvasZoomByStep(-1)}
-                    title="Reduzir zoom"
+                    title={ui("Reduzir zoom")}
                     type="button"
                   >
                     <ZoomOut aria-hidden="true" size={15} strokeWidth={2.3} />
                   </button>
                   <strong>{`${canvasZoomPercent}%`}</strong>
                   <button
-                    aria-label="Aumentar zoom do canvas"
+                    aria-label={ui("Aumentar zoom do canvas")}
                     disabled={canvasZoomIndex >= ROOM_CANVAS_ZOOM_LEVELS.length - 1}
                     onClick={() => setCanvasZoomByStep(1)}
-                    title="Aumentar zoom"
+                    title={ui("Aumentar zoom")}
                     type="button"
                   >
                     <ZoomIn aria-hidden="true" size={15} strokeWidth={2.3} />
@@ -10075,21 +10394,20 @@ export function RoomsWorkspace({
                   projectData={projectData} projectPath={projectPath} room={focusSceneRoom}
                   viewport={focusMinimapViewport} worldHeight={canvasWorldHeight} worldWidth={canvasWorldWidth}
                 /></div> : null} /> : null}
+              </>}
               </div>
             </>
           ) : (
-            <p className="muted">Crie uma cena para abrir o editor visual.</p>
+            <p className="muted">{ui("Crie uma cena para abrir o editor visual.")}</p>
           )}
         </section>
 
-        {hardwareProfiler ? <RoomHardwareDebugger presentation={hardwareProfiler} /> : null}
-
         <EditorSideStack
-          ariaLabel="Painel lateral do Editor"
+          ariaLabel={ui("Painel lateral do Editor")}
           className="rooms-side-stack"
           hideProjectPane
           workspaceId="rooms"
-          inspectorPane={navigatorTab === "logic" && projectData ? (logicSelection ? (logicSelection.kind === "script" ? <section className="logic-script-inspector"><div className="rooms-inspector-context"><h4>{logicSelection.name}</h4><p>Script do projeto</p></div>{renderEventInspector?.(logicSelection.name, "Script do projeto")}</section> : <LogicValueInspector key={`${logicSelection.kind}:${logicSelection.name}`} projectData={projectData} selection={logicSelection} onUpdate={(name, kind, patch) => { onUpdateLogicValue?.(name, kind, patch); if (patch.name && !listProjectVariables(projectData).some(item => item.name === patch.name) && patch.name.trim()) setLogicSelection({kind,name:patch.name.trim()}); }} onRemove={onRemoveLogicValue} />) : <section className="logic-value-inspector"><h4>Lógica do projeto</h4><p className="muted">Selecione uma variável, script ou constante no navegador para editar suas propriedades.</p></section>) : inspectorRoom ? (
+          inspectorPane={navigatorTab === "logic" && projectData ? (logicSelection ? (logicSelection.kind === "script" ? <section className="logic-script-inspector"><div className="rooms-inspector-context"><h4>{logicSelection.name}</h4><p>{ui("Script do projeto")}</p></div>{renderEventInspector?.(logicSelection.name, ui("Script do projeto"))}</section> : <LogicValueInspector key={`${logicSelection.kind}:${logicSelection.name}`} projectData={projectData} selection={logicSelection} onUpdate={(name, kind, patch) => { onUpdateLogicValue?.(name, kind, patch); if (patch.name && !listProjectVariables(projectData).some(item => item.name === patch.name) && patch.name.trim()) setLogicSelection({kind,name:patch.name.trim()}); }} onRemove={onRemoveLogicValue} />) : <section className="logic-value-inspector"><h4>{ui("Lógica do projeto")}</h4><p className="muted">{ui("Selecione uma variável, script ou constante no navegador para editar suas propriedades.")}</p></section>) : inspectorRoom ? (
             <>
               <div className="rooms-inspector-context">
                 <div className="rooms-inspector-header">
@@ -10099,9 +10417,9 @@ export function RoomsWorkspace({
                   </div>
                   <div className="rooms-inspector-header-badges">
                     {inspectorRoleBadge ? <em>{inspectorRoleBadge}</em> : null}
-                    {inspectorContext.kind === "room" && markerText(inspectorRoom.isActive, inspectorRoom.isStart) ? <em>{markerText(inspectorRoom.isActive, inspectorRoom.isStart)}</em> : null}
-                    {focusedEditorRoom && inspectorContext.kind !== "room" ? <button className="room-inspector-scene-return" aria-label="Propriedades da cena"
-                      title="Propriedades da cena" onClick={openFocusedSceneInspector} type="button"><MapIcon aria-hidden="true" size={15}/></button> : null}
+                    {inspectorContext.kind === "room" && markerText(inspectorRoom.isActive, inspectorRoom.isStart) ? <em>{markerText(inspectorRoom.isActive, inspectorRoom.isStart)?.split(" · ").map(part => ui(part)).join(" · ")}</em> : null}
+                    {focusedEditorRoom && inspectorContext.kind !== "room" ? <button className="room-inspector-scene-return" aria-label={ui("Propriedades da cena")}
+                      title={ui("Propriedades da cena")} onClick={openFocusedSceneInspector} type="button"><MapIcon aria-hidden="true" size={15}/></button> : null}
                   </div>
                 </div>
                 {visibleInspectorTabs.length ? <RoomInspectorNavigation
@@ -10116,9 +10434,9 @@ export function RoomsWorkspace({
                   }}
                 /> : null}
                 {!focusedEditorRoom && inspectorContext.kind === "room" ? <div className="room-overview-scene-actions">
-                  <button aria-label={`Abrir editor da cena ${sceneDisplayName(inspectorRoom.name)}`} className="primary-action"
-                    onClick={() => enterSceneFocus(inspectorRoom)} type="button"><Pencil aria-hidden="true" size={14} />Editar cena</button>
-                  <button disabled={runRoomDisabled} onClick={() => onRunRoom(inspectorRoom.id, inspectorRoom.name)} type="button"><Play aria-hidden="true" size={14} />Testar cena</button>
+                  <button aria-label={ui("Abrir editor da cena {0}", { 0: sceneDisplayName(inspectorRoom.name) })} className="primary-action"
+                    onClick={() => enterSceneFocus(inspectorRoom)} type="button"><Pencil aria-hidden="true" size={14} />{ui("Editar cena")}</button>
+                  <button disabled={runRoomDisabled} onClick={() => onRunRoom(inspectorRoom.id, inspectorRoom.name)} type="button"><Play aria-hidden="true" size={14} />{ui("Testar cena")}</button>
                 </div> : null}
               </div>
               <div
@@ -10127,17 +10445,17 @@ export function RoomsWorkspace({
                 id={activeInspectorTab ? `rooms-inspector-panel-${activeInspectorTab}` : undefined}
                 role={activeInspectorTab ? "tabpanel" : undefined}
               >
-                  {selectedArrival && activeInspectorTab === "connections" ? <section className="room-arrival-inspector" aria-label="Chegada de transição">
-                <h4>Chegada de transição</h4>
+                  {selectedArrival && activeInspectorTab === "connections" ? <section className="room-arrival-inspector" aria-label={ui("Chegada de transição")}>
+                <h4>{ui("Chegada de transição")}</h4>
                 <p>{selectedArrival.from} → {selectedArrival.to}</p>
-                <p>Script: {selectedArrival.eventName} · evento {(selectedArrival.stepIndex ?? 0) + 1}</p>
-                <p>Esta posição pertence à transição e será usada no jogo exportado.</p>
-                <label>X<input aria-label="X da chegada de transição" type="number" min={0} max={focusSceneRoom!.width - 1} value={selectedArrival.x ?? 0} onChange={event => { const x = Number(event.currentTarget.value); if (Number.isInteger(x) && x >= 0 && x < focusSceneRoom!.width) updateSelectedArrival({ x }); }} /></label>
-                <label>Y<input aria-label="Y da chegada de transição" type="number" min={0} max={focusSceneRoom!.height - 1} value={selectedArrival.y ?? 0} onChange={event => { const y = Number(event.currentTarget.value); if (Number.isInteger(y) && y >= 0 && y < focusSceneRoom!.height) updateSelectedArrival({ y }); }} /></label>
-                <label>Direção<select aria-label="Direção da chegada de transição" value={selectedArrival.direction ?? "down"} onChange={event => updateSelectedArrival({ direction: event.currentTarget.value as RoomEventSceneLink["direction"] })}><option value="down">Baixo</option><option value="up">Cima</option><option value="left">Esquerda</option><option value="right">Direita</option></select></label>
-                <button type="button" onClick={() => onOpenEvent?.(selectedArrival.eventName, selectedArrival.from)}>Editar evento de transição</button>
-                <button type="button" onClick={() => setTestArrivalID(selectedArrival.id)}>Usar como início do teste</button>
-                <button type="button" onClick={() => setSelectedArrivalID(null)}>Fechar chegada</button>
+                <p>{ui("Script: ")}{selectedArrival.eventName} {ui(" · evento ")}{(selectedArrival.stepIndex ?? 0) + 1}</p>
+                <p>{ui("Esta posição pertence à transição e será usada no jogo exportado.")}</p>
+                <label>X<input aria-label={ui("X da chegada de transição")} type="number" min={0} max={focusSceneRoom!.width - 1} value={selectedArrival.x ?? 0} onChange={event => { const x = Number(event.currentTarget.value); if (Number.isInteger(x) && x >= 0 && x < focusSceneRoom!.width) updateSelectedArrival({ x }); }} /></label>
+                <label>Y<input aria-label={ui("Y da chegada de transição")} type="number" min={0} max={focusSceneRoom!.height - 1} value={selectedArrival.y ?? 0} onChange={event => { const y = Number(event.currentTarget.value); if (Number.isInteger(y) && y >= 0 && y < focusSceneRoom!.height) updateSelectedArrival({ y }); }} /></label>
+                <label>{ui("Direção")}<select aria-label={ui("Direção da chegada de transição")} value={selectedArrival.direction ?? "down"} onChange={event => updateSelectedArrival({ direction: event.currentTarget.value as RoomEventSceneLink["direction"] })}><option value="down">{ui("Baixo")}</option><option value="up">{ui("Cima")}</option><option value="left">{ui("Esquerda")}</option><option value="right">{ui("Direita")}</option></select></label>
+                <button type="button" onClick={() => onOpenEvent?.(selectedArrival.eventName, selectedArrival.from)}>{ui("Editar evento de transição")}</button>
+                <button type="button" onClick={() => setTestArrivalID(selectedArrival.id)}>{ui("Usar como início do teste")}</button>
+                <button type="button" onClick={() => setSelectedArrivalID(null)}>{ui("Fechar chegada")}</button>
               </section> : null}
               {activeInspectorTab === "dialogues" && (inspectorContext.kind === "room" || inspectorContext.kind === "entity") ? (
                     <RoomDialoguesInspector
@@ -10252,14 +10570,14 @@ export function RoomsWorkspace({
               ) : (
                 <>
                   {activeInspectorTab === "scene" ? <>
-                  <section className="hud-authoring-section room-scene-hud-summary" aria-label="Resumo da HUD da cena">
-                    <div><strong>HUD da cena</strong><span>{roomRuntimeHudAsset(inspectorRoom) ? `HUD ${inspectorRoom.sceneType === "isometric" ? "tática" : "de luta"} · ${roomRuntimeHudAsset(inspectorRoom)}` : inspectorHudBinding?.preset.name ?? "Sem HUD"}</span></div>
-                    <button type="button" onClick={() => { enterSceneFocus(inspectorRoom); setEditorToolPanelMode("hud"); setCanvasLayerVisibilityState(current => ({ ...current, hud: true })); }}>Editar HUD</button>
+                  <section className="hud-authoring-section room-scene-hud-summary" aria-label={ui("Resumo da HUD da cena")}>
+                    <div><strong>{ui("HUD da cena")}</strong><span>{roomRuntimeHudAsset(inspectorRoom) ? ui("HUD {0} · {1}", { 0: inspectorRoom.sceneType === "isometric" ? "tática" : inspectorRoom.sceneType === "battleRpg" ? "RPG" : inspectorRoom.sceneType === "dungeonCrawler" ? "do labirinto" : "de luta", 1: roomRuntimeHudAsset(inspectorRoom) }) : inspectorHudBinding?.preset.name ?? ui("Sem HUD")}</span></div>
+                    <button type="button" onClick={() => { enterSceneFocus(inspectorRoom); setEditorToolPanelMode("hud"); setCanvasLayerVisibilityState(current => ({ ...current, hud: true })); }}>{ui("Editar HUD")}</button>
                   </section>
                   {inspectorRoom.warnings.length ? (
                     <div className="room-warnings inspector">
                       {inspectorRoom.warnings.map((warning) => (
-                        <p key={`${inspectorRoom.id}-${warning}`}>{warning}</p>
+                        <p key={`${inspectorRoom.id}-${warning}`}>{ui(warning)}</p>
                       ))}
                     </div>
                   ) : null}</> : null}
@@ -10311,7 +10629,7 @@ export function RoomsWorkspace({
                       screenID={hudMenuScreenID || undefined}
                       screens={focusSceneMenuConfig?.screens?.length ? [{ id: "", title: focusSceneMenuConfig.title || "Tela principal" }, ...focusSceneMenuConfig.screens] : undefined}
                       onSelectScreen={id => { setHudMenuScreenID(id); setHudLibraryPresetID(null); setSelectedHudComponentID(null); }}
-                      unavailableReason={hudUnavailableReason}
+                      unavailableReason={hudUnavailableReason ? ui(hudUnavailableReason) : undefined}
                     />
                   ) : null}
                   {activeInspectorTab === "connections" && !selectedArrival ? roomConnectionsEditor(
@@ -10336,10 +10654,11 @@ export function RoomsWorkspace({
               </div>
             </>
           ) : (
-            <p className="muted">Sem cena ativa.</p>
+            <p className="muted">{ui("Sem cena ativa.")}</p>
           )}
         />
       </div>
+      {hardwareProfiler ? <RoomHardwareDebugger presentation={hardwareProfiler} /> : null}
     </section>
   );
 }
