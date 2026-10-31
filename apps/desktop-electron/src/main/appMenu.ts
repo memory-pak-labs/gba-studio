@@ -127,6 +127,11 @@ export function createAppMenuTemplate(options: AppMenuOptions): MenuItemConstruc
     ]
   });
 
+  template.push({
+    label: "Ajuda",
+    submenu: [{ label: "Verificar atualizações...", click: () => options.sendCommand("app:check-updates") }]
+  });
+
   const localize = (items: MenuItemConstructorOptions[]): MenuItemConstructorOptions[] => items.map(item => ({
     ...item,
     ...(item.label && item.label !== options.appName ? { label: translateStudioMessage(options.locale ?? DEFAULT_APP_LOCALE, item.label) } : {}),

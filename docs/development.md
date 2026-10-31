@@ -716,6 +716,21 @@ na candidata exigem nova validação do que foi afetado e novos pacotes quando
 alterarem o aplicativo distribuído. Registre separadamente o estado do código
 integrado, da Release e dos links oferecidos pelo site.
 
+O atualizador verifica novas versões no GitHub e solicita confirmação antes de
+baixar e reiniciar. Projetos com alterações precisam ser salvos; um cancelamento
+ou erro de gravação adia a instalação. A instalação integrada é destinada ao
+macOS, Windows instalado pelo NSIS e Linux AppImage; DEB, TAR.GZ e ZIP portátil
+exigem atualização manual. Instalações antigas que não contêm o atualizador,
+incluindo RC3 e RC4, precisam primeiro instalar manualmente uma versão que o
+inclua.
+
+O workflow manual **Assemble verified release assets** gera `latest.yml`,
+`latest-mac.yml` e `latest-linux.yml` a partir dos arquivos finais verificados e
+envia esses metadados depois dos instaladores para a release ainda em rascunho.
+Os dois ZIPs macOS devem estar assinados e notarizados antes da montagem. A
+geração dos metadados não substitui testar a atualização efetiva em cada
+plataforma e arquitetura antes da publicação.
+
 ## Missão opcional — O sinal perdido
 
 A mecânica do cais leste inicia a missão ao entregar a estrutura. O cartógrafo

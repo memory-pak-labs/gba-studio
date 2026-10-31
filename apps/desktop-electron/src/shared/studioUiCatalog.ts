@@ -1,5 +1,7 @@
 /** Application copy only. Tuple order: pt-BR, en-US, es-ES. Keep project data out of this catalog. */
 export const studioUiMessages: Record<string, readonly [string, string, string]> = {
+  "Ajuda": ["Ajuda", "Help", "Ayuda"],
+  "Verificar atualizações...": ["Verificar atualizações...", "Check for updates...", "Buscar actualizaciones..."],
   "A pasta de destino já contém arquivos. Escolha um novo nome ou uma pasta vazia.": ["A pasta de destino já contém arquivos. Escolha um novo nome ou uma pasta vazia.", "The destination folder already contains files. Choose a new name or an empty folder.", "La carpeta de destino ya contiene archivos. Elige un nombre nuevo o una carpeta vacía."],
   "Cima na tela (isométrico)": ["Cima na tela (isométrico)", "Screen up (isometric)", "Arriba en pantalla (isométrico)"],
   "Baixo na tela (isométrico)": ["Baixo na tela (isométrico)", "Screen down (isometric)", "Abajo en pantalla (isométrico)"],

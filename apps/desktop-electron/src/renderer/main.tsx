@@ -1,4 +1,8 @@
 import { uiText as ui, useStudioUiText } from "./studioUiText";
+import { completeProjectSave } from "./projectSaveCompletion";
+import { AppUpdateNotice } from "./AppUpdateNotice";
+import { appUpdateText } from "./appUpdateText";
+import { restartForUpdate } from "./updateRestartFlow";
 import { resolveExternalProjectOpen } from "./externalProjectOpen.js";
 import { createAudioInstrumentFromChannel, updateAudioInstrumentInProject, removeAudioInstrumentFromProject, type UpdateAudioInstrumentFields } from "../shared/audioInstruments.js";
 import { audioPhysicalChannel } from "../shared/audioContract.js";
@@ -344,10 +348,11 @@ type ToolbarMenuActionID = "save" | "open" | "commands" | "focus" | "diagnostics
 function App(): React.ReactElement {
   const windowFullscreen = useWindowFullscreen();
   const ui = useStudioUiText();
-  const { t } = useStudioI18n();
+  const { t, locale } = useStudioI18n();
   const [session, setSession] = useState<ProjectSession | null>(null);
   const dialogueSessionRef = useRef(session);
   dialogueSessionRef.current = session;
+  const preparingUpdateRef = useRef(false);
   const projectHistoryGroupRef = useRef<{ changed: boolean; id: string } | null>(null);
   const [externalAssetRevision, setExternalAssetRevision] = useState(0);
   const [sceneMapView, setSceneMapView] = useState<{ path?: string; zoom: number } | null>(null);
@@ -484,6 +489,10 @@ function App(): React.ReactElement {
     return window.gbaStudio.onAppCommand((command) => appCommandHandler.current(command));
   }, []);
 
+  useEffect(() => window.gbaStudio.onAppUpdateState((state) => {
+    if (state.status === "error") preparingUpdateRef.current = false;
+  }), []);
+
   useEffect(() => {
     return window.gbaStudio.onRomPlayerTelemetry((telemetry) => {
       setRomPlayerTelemetry((current) => {
@@ -496,6 +505,10 @@ function App(): React.ReactElement {
 
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent): void => {
+      if (preparingUpdateRef.current && !(event.target instanceof Element && event.target.closest(".studio-dialog-backdrop"))) {
+        event.preventDefault();
+        return;
+      }
       const key = event.key.toLowerCase();
       if ((event.metaKey || event.ctrlKey) && !event.altKey && key === "k") {
         event.preventDefault();
@@ -542,6 +555,7 @@ function App(): React.ReactElement {
 
   useEffect(() => {
     return window.gbaStudio.onExternalProjectOpen((result) => {
+      if (preparingUpdateRef.current) return;
       void (async () => {
         const accepted = await resolveExternalProjectOpen(result, confirmDiscard, (path) => window.gbaStudio.openProjectAtPath(path));
         if (accepted) applyOpenProjectResult(accepted);
@@ -846,16 +860,49 @@ function App(): React.ReactElement {
 
   async function saveProject(): Promise<void> {
     if (!session) return;
-    const { result, session: savedSession } = await saveExistingProjectSession(session, window.gbaStudio.saveProject);
+    const { result } = await saveExistingProjectSession(session, window.gbaStudio.saveProject);
     publishFeedback(saveProjectFeedback(result));
-    if (savedSession !== session) setSession(savedSession);
+    setSession((current) => completeProjectSave(current, session, result));
   }
 
   async function saveProjectAs(): Promise<void> {
     if (!session) return;
-    const { result, session: savedSession } = await saveExistingProjectSession(session, window.gbaStudio.saveProject, true);
+    const { result } = await saveExistingProjectSession(session, window.gbaStudio.saveProject, true);
     publishFeedback(saveProjectFeedback(result));
-    if (savedSession !== session) setSession(savedSession);
+    setSession((current) => completeProjectSave(current, session, result));
+  }
+
+  async function restartAndUpdate() {
+    if (preparingUpdateRef.current) return { ok: false };
+    preparingUpdateRef.current = true;
+    let installationStarted = false;
+    const text = appUpdateText(locale);
+    try {
+      const result = await restartForUpdate({
+        currentSession: () => dialogueSessionRef.current,
+        confirm: (needsSave) => confirm(needsSave ? text.saveMessage : text.restartMessage, {
+          title: needsSave ? text.saveTitle : text.title,
+          confirmLabel: needsSave ? text.saveRestart : text.restart,
+          cancelLabel: text.later
+        }),
+        save: (request) => window.gbaStudio.saveProject(request),
+        saved: (snapshot, path) => {
+          const next = { ...snapshot, path, dirty: false };
+          dialogueSessionRef.current = next;
+          setSession(next);
+        },
+        install: async () => {
+          const current = dialogueSessionRef.current;
+          await window.gbaStudio.setWindowDocumentState(deriveWindowDocumentState(current ? {
+            dirty: current.dirty, path: current.path, projectName: current.project.summary.name
+          } : null));
+          if (dialogueSessionRef.current !== current || current?.dirty) return { ok: false, error: text.savingError };
+          return window.gbaStudio.installAppUpdate();
+        }
+      });
+      installationStarted = result.ok;
+      return result;
+    } finally { if (!installationStarted) preparingUpdateRef.current = false; }
   }
 
   async function createBackup(): Promise<void> {
@@ -938,6 +985,10 @@ function App(): React.ReactElement {
   }
 
   appCommandHandler.current = (command: AppCommand) => {
+    if (preparingUpdateRef.current) {
+      if (command === "window:request-close") void window.gbaStudio.confirmWindowClose(false);
+      return;
+    }
     if (command === "project:open") {
       void openProject();
     } else if (command === "project:save") {
@@ -3138,17 +3189,21 @@ function App(): React.ReactElement {
 
   if (!session) {
     return (
-      <WelcomeScreen
-        status={status}
-        onCreateProject={createProject}
-        onOpenProject={() => void openProject()}
-        onOpenRecentProject={(path) => void openRecentProject(path)}
-      />
+      <>
+        <WelcomeScreen
+          status={status}
+          onCreateProject={createProject}
+          onOpenProject={() => void openProject()}
+          onOpenRecentProject={(path) => void openRecentProject(path)}
+        />
+        <AppUpdateNotice onRestart={restartAndUpdate} />
+      </>
     );
   }
 
   return (
     <main className={`app-shell${focusMode ? " focus-mode" : ""}`}>
+      <AppUpdateNotice onRestart={restartAndUpdate} />
       <header className={`app-topbar${window.gbaStudio.platform === "darwin" ? " native-macos-titlebar" : ""}${windowFullscreen ? " is-fullscreen" : ""}`}>
         <div className="topbar-brand">
           <img alt={ui("GBA Studio")} className="topbar-brand-logo" src={studioWordmarkURL} />

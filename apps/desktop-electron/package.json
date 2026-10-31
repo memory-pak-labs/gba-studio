@@ -1,6 +1,6 @@
 {
   "name": "@gbastudio/desktop-electron",
-  "version": "0.1.0-rc.3",
+  "version": "0.1.0-rc.5",
   "private": true,
   "description": "Visual editor and native engine workflow for Game Boy Advance games.",
   "author": "GBA Studio",
@@ -119,6 +119,7 @@
     "dist:mac:x64": "node scripts/package-macos.mjs --arch x64"
   },
   "build": {
+    "publish": [{ "provider": "github", "owner": "memory-pak-labs", "repo": "gba-studio" }],
     "afterPack": "./scripts/after-pack-macos.mjs",
     "appId": "br.com.gbastudio.desktop",
     "productName": "GBA Studio",
@@ -174,7 +175,7 @@
         "\\.(?:pyc|pyo|a|o|whl|lz|gz|zip|asar|png|icns|ico|wasm|pak|dat|bin)$"
       ],
       "bundleShortVersion": "0.1.0",
-      "bundleVersion": "7",
+      "bundleVersion": "9",
       "category": "public.app-category.developer-tools",
       "icon": "build/icon.icns",
       "hardenedRuntime": true,
@@ -231,6 +232,7 @@
   "dependencies": {
     "@browsermt/bergamot-translator": "^0.4.9",
     "@modelcontextprotocol/server": "^2.4.0",
+    "electron-updater": "6.8.9",
     "lucide-react": "^0.468.0",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",

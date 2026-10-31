@@ -1,0 +1,22 @@
+.app-update-notice {
+  position: fixed;
+  right: 16px;
+  top: 72px;
+  z-index: 190;
+  width: min(380px, calc(100vw - 32px));
+  max-height: calc(100vh - 100px);
+  overflow: auto;
+  padding: 18px;
+  border: 1px solid var(--studio-color-border);
+  border-radius: 12px;
+  background: var(--studio-color-surface-raised);
+  color: var(--studio-color-text-primary);
+  box-shadow: 0 8px 32px #0003;
+}
+.app-update-notice h2 { margin: 0 0 8px; }
+.app-update-notice p { line-height: 1.5; overflow-wrap: anywhere; }
+.app-update-version { opacity: 0.75; }
+.app-update-notice progress { width: 100%; accent-color: var(--studio-color-accent); }
+.app-update-actions { display: flex; justify-content: flex-end; gap: 8px; flex-wrap: wrap; margin-top: 14px; }
+.app-update-shield { position: fixed; inset: 0; z-index: 185; background: #0002; }
+body:has(.app-update-shield) .studio-dialog-backdrop { z-index: 200; }

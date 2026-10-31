@@ -1,4 +1,5 @@
 import { contextBridge, ipcRenderer, type IpcRendererEvent } from "electron";
+import type { AppUpdateState } from "../shared/appUpdates.js";
 import {
   ipcChannels,
   type AppCommand,
@@ -20,6 +21,15 @@ import type { WindowDocumentState } from "../shared/windowDocumentState.js";
 const api: GBAStudioDesktopAPI = {
   setAppLocale: (locale: string) => ipcRenderer.invoke(ipcChannels.setAppLocale, locale),
   platform: process.platform,
+  getAppUpdateState: () => ipcRenderer.invoke(ipcChannels.getAppUpdateState),
+  checkAppUpdates: () => ipcRenderer.invoke(ipcChannels.checkAppUpdates),
+  downloadAppUpdate: () => ipcRenderer.invoke(ipcChannels.downloadAppUpdate),
+  installAppUpdate: () => ipcRenderer.invoke(ipcChannels.installAppUpdate),
+  onAppUpdateState: (listener) => {
+    const subscription = (_event: IpcRendererEvent, state: AppUpdateState) => listener(state);
+    ipcRenderer.on(ipcChannels.appUpdateState, subscription);
+    return () => ipcRenderer.removeListener(ipcChannels.appUpdateState, subscription);
+  },
   getWindowFullscreen: () => ipcRenderer.invoke(ipcChannels.getWindowFullscreen),
   onWindowFullscreenChange: (listener: (fullscreen: boolean) => void) => {
     const subscription = (_event: IpcRendererEvent, fullscreen: boolean) => listener(fullscreen);
