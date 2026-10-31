@@ -33,6 +33,65 @@ Credenciais de assinatura e notarização, contexto privado, candidatos e caches
 permanecem locais. Um clone público novo pode seguir este guia sem os arquivos
 privados dos mantenedores.
 
+## Etapas de trabalho e commits
+
+Antes de editar, identifique o checkout, a branch, a base de integração e as
+alterações preexistentes. Defina o resultado observável e a validação de uma
+etapa pequena; separe mudanças independentes em etapas próprias.
+
+Ao concluir uma etapa:
+
+1. Execute a validação proporcional da matriz abaixo e examine o diff.
+2. Faça stage apenas dos arquivos ou hunks daquela etapa e confira
+   `git diff --cached`, `git diff --check` e `git diff --cached --check`.
+3. Crie um commit local com Conventional Commits e informe seu hash. Os agentes
+   têm autorização para esse fechamento quando o escopo está delimitado e
+   validado. PR, merge e publicação mantêm suas autorizações próprias.
+4. Confira `git status --short` e descreva as pendências restantes. Distinga
+   trabalho implementado, validado, commitado, enviado, integrado e publicado.
+
+Feche a etapa antes de iniciar uma frente independente. Se houver falha de
+teste, sobreposição com trabalho anterior ou outro impedimento, registre a
+causa e a próxima ação; não faça um commit misturando mudanças para esvaziar
+o status. A ausência do gate global não impede o commit de uma etapa local
+cuja validação proporcional passou, sem declarar o produto globalmente pronto.
+
+Quando a pasta atual contiver trabalho acumulado, preserve-a e use um worktree
+limpo baseado na `origin/develop` atualizada para tarefas independentes. Registre
+o caminho e a branch de cada tarefa. Compare o conteúdo acumulado com a base
+integrada antes de migrar algo: um status modificado em uma branch antiga pode
+incluir conteúdo já integrado por outra branch. Reconcilie por tarefa e por diff;
+excluir arquivos ou copiar a árvore inteira pode perder trabalho.
+
+### Escolha das verificações
+
+| Escopo | Validação antes do fechamento correspondente |
+| --- | --- |
+| Documentação e regras sem mudança de execução | Revisão do conteúdo, caminhos, links locais e comandos citados; higiene do diff. Sem gate do produto. |
+| Commit local de código ou script | Regressão focada; tipos e build quando aplicáveis. Para código do editor, o build inclui o typecheck. |
+| UI | Testes aplicáveis e verificação da tela e do fluxo renderizado alterado. |
+| Runtime, persistência, contratos ou exportação | Regressão RED/GREEN; testes host/contrato pertinentes e execução do fluxo afetado. Persistência inclui salvar, reabrir e proteger dados existentes. |
+| Contribuição funcional pronta para integrar | `npm run test:all` e `npm run build` para o editor; `make host-test` na engine quando alterada, além das verificações específicas e da CI aplicável. |
+| Fechamento global ou release do produto | `npm run verify:mgba-web` e `npm run gate:complete-project` com o exemplo canônico e a revisão final da candidata. |
+| Distribuição | Smokes dos instaladores finais por sistema/arquitetura, exportação e Play; assinatura/notarização quando aplicáveis e conferência dos hashes. |
+
+Execute npm em `apps/desktop-electron` e make em `packages/GBAStudioEngine`.
+`npm test` é o loop de iteração: exclui testes de promoção e parte da aceitação
+do exemplo. `npm run test:all` inclui esses testes. Uma execução filtrada, como
+`npm run test:all -- scripts/electron-dev-workflow.test.mjs`, prova somente os
+arquivos selecionados, mesmo usando o nome `test:all`.
+
+`npm run build` já chama `npm run typecheck`; não é preciso repetir o typecheck
+se o build dessa mesma revisão passou. O gate completo já chama `test:all` e
+build; verificações aprovadas nessa execução não precisam ser repetidas sem
+mudança relevante ou falha nova. Não execute builds ou outras cargas pesadas em
+paralelo com testes de desempenho. Não há comando dedicado de lint.
+
+Registre comando, revisão testada, escopo, ambiente e resultado. Separe falhas,
+testes ignorados e verificações não executadas; um dry-run apenas lista etapas.
+Testes host, Editor, Play, ROM, instalador, CI e GBA físico comprovam camadas
+distintas. O gate global não substitui a revisão dos cenários de risco alterados.
+
 ## Editor
 
 Use Node.js 22 (a versão principal está em `.nvmrc`). Os comandos npm são
@@ -634,6 +693,28 @@ de distribuir um candidato como versão validada.
 Instaladores oficiais são publicados por mantenedores após validação própria.
 Assinatura e notarização usam credenciais privadas fora do repositório; PRs de
 contribuidores não precisam dessas credenciais.
+
+### Preparação da release
+
+Antes de gerar os instaladores, confira:
+
+- O commit candidato, sua relação com `develop`, o escopo e a revisão dos
+  fluxos alterados. Use um checkout delimitado e registre o commit nos pacotes.
+- As verificações aplicáveis da matriz e o gate global da candidata; confira
+  os resultados reais da CI e as regras de integração, inclusive quem pode
+  realizar a revisão exigida quando há um único mantenedor.
+- A presença do atualizador no aplicativo instalado e na candidata, caso a
+  distribuição prometa atualização automática. Metadados de download, sozinhos,
+  não acrescentam essa funcionalidade. Valide o caminho da versão anterior à
+  nova ou declare a instalação manual nas notas.
+- Origem, licença e aprovação dos assets, versões dos componentes e formatos
+  exigidos em cada sistema. O empacotamento deve partir do commit validado.
+
+Depois do empacotamento, confira os instaladores finais, hashes, metadados,
+assinaturas e evidências por plataforma antes de publicar. Mudanças posteriores
+na candidata exigem nova validação do que foi afetado e novos pacotes quando
+alterarem o aplicativo distribuído. Registre separadamente o estado do código
+integrado, da Release e dos links oferecidos pelo site.
 
 ## Missão opcional — O sinal perdido
 

@@ -7,15 +7,20 @@ que possam ser revisadas e reproduzidas.
    formato de projeto, exportação, runtime ou toolchain em uma Issue.
 2. Faça um fork e crie uma branch de trabalho a partir de `develop`.
 3. Implemente uma alteração por Pull Request. Preserve os projetos e assets
-   que estiverem fora do escopo.
+   que estiverem fora do escopo. Faça commits pequenos das etapas validadas
+   durante o desenvolvimento, sem esperar a próxima release.
 4. Execute as verificações descritas em [Desenvolvimento](docs/development.md)
    e informe exatamente o que passou, falhou ou não foi executado.
 5. Abra um PR para `develop`. A revisão e o merge cabem aos mantenedores.
 
-Para código do editor, execute `npm test`, `npm run typecheck` e
-`npm run build` em `apps/desktop-electron`. Para o motor, execute os testes
+Para código do editor, execute os testes focados ou `npm test` durante a
+iteração. Para fechar a contribuição, execute `npm run test:all` e
+`npm run build` em `apps/desktop-electron`. A suíte completa inclui promoção
+e aceitação; o build já executa o typecheck, que também pode ser executado
+isoladamente com `npm run typecheck`. Para o motor, execute os testes
 host e os testes específicos do runtime alterado. Alterações que atravessam
-editor, exportação e motor exigem a validação completa descrita no guia.
+editor, exportação e motor exigem a validação completa descrita no guia. Consulte
+a matriz do guia para documentação, commits locais e aprovação global.
 Não existe comando dedicado de lint neste pacote.
 
 Bugs de runtime, persistência, contratos ou exportação precisam de um teste
