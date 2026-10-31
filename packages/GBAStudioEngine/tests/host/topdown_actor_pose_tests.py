@@ -86,7 +86,7 @@ with tempfile.TemporaryDirectory() as directory:
 print('Topdown initialization keeps the authored scene font: PASS')
 
 # A slow patrol keeps its walk cycle between discrete movement updates.
-start=source.index('void refresh_npc_directional_animation(size_t index, bool moving) {')
+start=source.index('void refresh_npc_directional_animation(size_t index, bool moving, bool force) {')
 end=source.index('\n}',start)+2
 code='''#include <cassert>
 #include "gbs/project.hpp"
@@ -123,15 +123,18 @@ int main() {
     gbs::init_sprite_animator(animator);
     for(int frame=0;frame<32;++frame) {
         npc_runtimes[0].movement_frame_counter=frame%2==0?0:1;
-        refresh_npc_directional_animation(0,frame%2==0);
+        refresh_npc_directional_animation(0,frame%2==0,false);
         assert(animator.animation==&walk);
         visited|=1u<<animator.frame_index;
         gbs::update_sprite_animator(animator);
     }
     assert(visited==15u);
     npc_runtimes[0].movement_cancelled=true;
-    refresh_npc_directional_animation(0,false);
+    refresh_npc_directional_animation(0,false,false);
     assert(animator.animation==&idle);
+    npc.movement.kind=gbs::TopDownNpcMovementKind::None;
+    refresh_npc_directional_animation(0,true,true);
+    assert(animator.animation==&walk);
 }
 ''';
 with tempfile.TemporaryDirectory() as directory:
