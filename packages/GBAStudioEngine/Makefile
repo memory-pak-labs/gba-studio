@@ -619,7 +619,7 @@ assetc-test:
 	python3 tests/host/make_test_png.py $(HOST_BUILD)/assetc/tiny.png
 	tools/assetc/assetc.py $(HOST_BUILD)/assetc/tiny.png -o $(HOST_BUILD)/assetc/tiny.hpp -n tiny
 	grep -q "gbs::PaletteAsset tiny_palette_asset" $(HOST_BUILD)/assetc/tiny.hpp
-	grep -q "const gbs::TileAsset tiny_tile_asset" $(HOST_BUILD)/assetc/tiny.hpp
+	grep -q "constexpr gbs::TileAsset tiny_tile_asset" $(HOST_BUILD)/assetc/tiny.hpp
 	grep -q "constexpr gbs::TileMapAsset tiny_tilemap_asset" $(HOST_BUILD)/assetc/tiny.hpp
 	printf '#include "tiny.hpp"\nint main() { return tiny_tile_count == 1 && tiny_tilemap_width == 1 && tiny_tilemap_height == 1 && tiny_tilemap_entries[0] == 0 ? 0 : 1; }\n' > $(HOST_BUILD)/assetc/tiny_compile.cpp
 	$(HOST_CXX) $(HOST_CXXFLAGS) -I$(HOST_BUILD)/assetc $(HOST_BUILD)/assetc/tiny_compile.cpp -o $(HOST_BUILD)/assetc/tiny_compile
@@ -629,7 +629,7 @@ assetc-test:
 	grep -q "constexpr int tilemap_tile_count = 1;" $(HOST_BUILD)/assetc/tilemap.hpp
 	grep -q "constexpr uint16_t tilemap_tilemap_entries\\[2\\] = { 0x2007, 0x2007 }" $(HOST_BUILD)/assetc/tilemap.hpp
 	grep -q "constexpr gbs::PaletteAsset tilemap_palette_asset = { tilemap_palette, 16, 32 }" $(HOST_BUILD)/assetc/tilemap.hpp
-	grep -Fq "const gbs::TileAsset tilemap_tile_asset = { reinterpret_cast<const uint8_t*>(tilemap_tiles), tilemap_tile_count, 7, true }" $(HOST_BUILD)/assetc/tilemap.hpp
+	grep -Fq "constexpr gbs::TileAsset tilemap_tile_asset = { &tilemap_tiles[0][0], tilemap_tile_count, 7, true }" $(HOST_BUILD)/assetc/tilemap.hpp
 	printf '#include "tilemap.hpp"\nint main() { return tilemap_tilemap_width == 2 && tilemap_tilemap_height == 1 && tilemap_tile_asset.destination_tile == 7 && tilemap_tile_asset.object_tiles && tilemap_tilemap_entries[1] == 0x2007 ? 0 : 1; }\n' > $(HOST_BUILD)/assetc/tilemap_compile.cpp
 	$(HOST_CXX) $(HOST_CXXFLAGS) -I$(HOST_BUILD)/assetc $(HOST_BUILD)/assetc/tilemap_compile.cpp -o $(HOST_BUILD)/assetc/tilemap_compile
 	$(HOST_BUILD)/assetc/tilemap_compile

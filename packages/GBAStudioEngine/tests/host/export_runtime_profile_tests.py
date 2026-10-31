@@ -1591,7 +1591,8 @@ def assert_mixed_runtime_dispatch_export(repo_root, build_dir):
     assert "struct HudLayoutComponent" not in dialogue_ui_header
     assert "configure_for_scene" in dialogue_ui_header
     assert "gbs::configure_dialogue_font(dialogue_font);" in dialogue_ui_header
-    assert "gbs::configure_dialogue_font(preset->font != nullptr ? preset->font : dialogue_font);" in dialogue_ui_header
+    assert "gbs::configure_dialogue_font(preset->font != nullptr ? preset->font : dialogue_font);" not in dialogue_ui_header
+    assert "HUD glyphs belong to the selected layout; dialogue keeps its complete font." in dialogue_ui_header
 
     runtime_sources = (
         repo_root / "examples" / "topdown_basic" / "src" / "main.cpp",
@@ -1690,7 +1691,7 @@ def assert_mixed_runtime_dispatch_export(repo_root, build_dir):
     assert "gbs::RuntimeAdapterFrameResult update_topdown_runtime(const gbs::RuntimeFrameContext& context)" in topdown_runtime
     assert "void render_topdown_runtime(const gbs::RuntimeFrameContext& context)" in topdown_runtime
     assert "void leave_topdown_runtime()" in topdown_runtime
-    assert "return gbs::RuntimeAdapterFrameResult::Transition;" in topdown_runtime
+    assert "return topdown_transition_ready() ? gbs::RuntimeAdapterFrameResult::Transition : gbs::RuntimeAdapterFrameResult::Continue;" in topdown_runtime
     assert "GBS_TOPDOWN_RUNTIME_UPDATE" in topdown_runtime
     assert 'gbs::ResourceBankReservation project_bank_reservations[max_project_resource_banks] __attribute__((section(".ewram_bss")));' in topdown_runtime
     assert 'gbs::ResourceBankReservation project_bank_scratch_reservations[max_project_resource_banks] __attribute__((section(".ewram_bss")));' in topdown_runtime
@@ -1798,7 +1799,8 @@ def assert_mixed_runtime_dispatch_export(repo_root, build_dir):
                       visible_dialogue_index, visible_map_index, visible_interaction_index)
     assert hidden_dialogue_index < hidden_map_index < hidden_interaction_index < hud_render_index
     assert hud_render_index < visible_dialogue_index < visible_map_index < visible_interaction_index
-    assert "gbs::set_dialogue_frame(interaction_dialogue, gbs::dialogue_frame_default);" in dungeon_runtime
+    assert "gbs::set_dialogue_frame(interaction_dialogue, gbs::active_dialogue_ui_config().full_width_bottom" in dungeon_runtime
+    assert "? gbs::dialogue_frame_full_width : gbs::dialogue_frame_default);" in dungeon_runtime
     assert "gbs::set_dialogue_frame(interaction_dialogue, gbs::dialogue_frame_battle_menu);" in dungeon_runtime
     battle_start_index = dungeon_runtime.find("bool start_dungeon_battle(size_t actor_index)")
     battle_update_index = dungeon_runtime.find("bool update_dungeon_interaction(", battle_start_index)
@@ -1806,7 +1808,8 @@ def assert_mixed_runtime_dispatch_export(repo_root, build_dir):
     battle_start_runtime = dungeon_runtime[battle_start_index:battle_update_index]
     assert "gbs::hide_dialogue(dungeon_dialogue);" in battle_start_runtime
     assert "runtime_script_controls_dialogue = false;" in battle_start_runtime
-    assert "gbs::set_dialogue_frame(dungeon_dialogue, gbs::dialogue_frame_default);" in dungeon_runtime
+    assert "gbs::set_dialogue_frame(dungeon_dialogue, gbs::active_dialogue_ui_config().full_width_bottom" in dungeon_runtime
+    assert "? gbs::dialogue_frame_full_width : gbs::dialogue_frame_default);" in dungeon_runtime
     assert "gbs::update_runtime_trigger" in dungeon_runtime
     assert "const bool assets_are_streamed = project.resource_bank_group_count > 0;" in dungeon_runtime
     assert "stream_resources_for_room" in dungeon_runtime
@@ -2850,12 +2853,12 @@ def assert_topdown_npc_animation_commands_export(repo_root, build_dir):
         repo_root,
         output_dir,
         "gbastudio_project_data.hpp",
-        "gbastudio_project::project.rooms[0].npcs[0].animation == &guide_sprite_animation && "
+        "gbastudio_project::project.rooms[0].npcs[0].animation == gbastudio_project::project.rooms[0].npcs[0].animations[0] && "
         "gbastudio_project::project.rooms[0].npcs[0].animation_count == 2 && "
-        "gbastudio_project::project.rooms[0].npcs[0].animations[1] == &guide_sprite_animation && "
+        "gbastudio_project::project.rooms[0].npcs[0].animations[1]->frames == guide_sprite_animation.frames && "
         "gbastudio_project::project.rooms[0].npcs[0].on_interact.commands[0].op == gbs::EventOp::SetActorAnimation && "
         "gbastudio_project::project.rooms[0].npcs[0].on_interact.commands[0].a == 0 && "
-        "gbastudio_project::project.rooms[0].npcs[0].on_interact.commands[0].b == 1 && "
+        "gbs::sprite_animation_for_reference(gbastudio_project::project.rooms[0].npcs[0].animations, 2, nullptr, gbastudio_project::project.rooms[0].npcs[0].on_interact.commands[0].b) == gbastudio_project::project.rooms[0].npcs[0].animations[1] && "
         "gbastudio_project::project.rooms[0].npcs[0].on_interact.commands[1].op == gbs::EventOp::WaitActorAnimation && "
         "gbastudio_project::project.rooms[0].npcs[0].on_interact.commands[1].a == 0 && "
         "gbastudio_project::project.rooms[0].npcs[0].on_interact.commands[2].op == gbs::EventOp::SetActorAnimationSpeed && "
@@ -2947,11 +2950,11 @@ def assert_topdown_player_animation_commands_export(repo_root, build_dir):
         repo_root,
         output_dir,
         "gbastudio_project_data.hpp",
-        "gbastudio_project::project.player.animation == &hero_sprite_animation && "
+        "gbastudio_project::project.player.animation == gbastudio_project::project.player.animations[0] && "
         "gbastudio_project::project.player.animation_count == 2 && "
-        "gbastudio_project::project.player.animations[1] == &hero_sprite_animation && "
+        "gbastudio_project::project.player.animations[1]->frames == hero_sprite_animation.frames && "
         "gbastudio_project::project.rooms[0].on_enter.commands[0].op == gbs::EventOp::SetPlayerAnimation && "
-        "gbastudio_project::project.rooms[0].on_enter.commands[0].a == 1",
+        "gbs::sprite_animation_for_reference(gbastudio_project::project.player.animations, 2, nullptr, gbastudio_project::project.rooms[0].on_enter.commands[0].a) == gbastudio_project::project.player.animations[1]",
         "topdown_player_animation_commands_compile",
     )
 
@@ -3455,7 +3458,7 @@ def assert_topdown_template_animates_player_only_while_moving(repo_root):
         "const gbs::Vec2i player_position_before_update = player.position_pixels;",
         "player_moved_this_frame = player.position_pixels.x != player_position_before_update.x ||",
         "if (player_moved_this_frame) {",
-        "gbs::update_sprite_animator_travel(player_animator, player_animation_travelled_pixels, project.player.animation_speed_percent);",
+        "gbs::update_sprite_animator_travel(player_animator, player_animation_travelled_pixels, player_animation_speed_percent);",
         "player.position_pixels.x - player_position_before_update.x",
         "player.position_pixels.y - player_position_before_update.y",
         "gbs::continue_sprite_animation(player_animator, *next_animation)",
@@ -3829,7 +3832,8 @@ def assert_player_event_commands_reach_mixed_runtimes(repo_root):
     assert "gbs::InputState { 0, 0, 0 }" in templates["topdown"]
     assert "gbs::InputState { 0, 0, 0 }" in templates["platformer"]
     assert "gbs::collect_visible_topdown_actor_draw_slots(" in templates["topdown"]
-    assert "player_event_runtime.active," in templates["topdown"]
+    assert "gbs::topdown_controlled_player_active(project.rooms[current_room], player_event_runtime.active)" in templates["topdown"]
+    assert "controlled_player_active()," in templates["topdown"]
     assert "if (player_event_active && player_metasprite" in templates["platformer"]
     assert "else if (player_event_active && player_metasprite == nullptr)" in templates["platformer"]
     assert "gbs::set_sprite(0, gbs::Sprite" not in templates["platformer"]
@@ -4213,7 +4217,9 @@ def assert_topdown_template_switches_directional_animations(repo_root):
         assert snippet in template
     assert template.index("gbs::draw_debug_overlay(false);") < template.index("gbs::draw_hud(hud);")
     assert template.index("gbs::draw_hud(hud);") < template.index("gbs::draw_debug_overlay(true);")
-    assert template.index("gbs::draw_debug_overlay(true);") < template.index("gbs::draw_menu(pause_menu);")
+    debug_index = template.index("gbs::draw_debug_overlay(true);")
+    visible_menu_index = template.index("if (pause_menu.visible) {", debug_index)
+    assert debug_index < visible_menu_index < template.index("gbs::draw_menu(pause_menu);", visible_menu_index)
 
 
 def assert_topdown_template_consumes_link_event_outputs(repo_root):
