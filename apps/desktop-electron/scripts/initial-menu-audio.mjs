@@ -47,8 +47,15 @@ export function integrateApprovedInitialMenuAudio(source, manifest) {
   }
   const project = silenceInitialMenuMusic(source);
   for (const [key, rows] of [["assets", manifest.assets], ["audioItems", manifest.audioItems]]) {
-    const ids = new Set(rows.map(row => row.id));
-    project[key] = [...(project[key] ?? []).filter(row => !ids.has(row.id)), ...structuredClone(rows)];
+    const pending = new Map(rows.map(row => [row.id, row]));
+    const known = new Set(pending.keys());
+    project[key] = (project[key] ?? []).flatMap(row => {
+      if (!known.has(row.id)) return [row];
+      const replacement = pending.get(row.id);
+      pending.delete(row.id);
+      return replacement ? [structuredClone(replacement)] : [];
+    });
+    project[key].push(...[...pending.values()].map(row => structuredClone(row)));
   }
   for (const key of ["rooms", "scenas"]) {
     project[key] = (project[key] ?? []).map(scene => {
