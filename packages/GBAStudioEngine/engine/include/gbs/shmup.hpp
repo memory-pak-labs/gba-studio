@@ -280,6 +280,8 @@ struct ShmupWaveData {
     uint8_t player_speed_pixels_per_frame = 0;
     uint8_t fire_cooldown_frames = 0;
     EventScript on_defeat = empty_event_script();
+    // Compiled projectile callback followed by the scene's damage callback.
+    EventScript on_projectile_hit_player = empty_event_script();
 };
 
 constexpr bool shmup_wave_spawn_ready(const ShmupWaveData& wave, uint16_t frame_counter) {
@@ -601,6 +603,13 @@ constexpr EventScript shmup_player_fire_script(const ShmupProjectData& project) 
 
 constexpr bool shmup_player_is_vulnerable(const ShmupRuntimeState& state) {
     return state.invulnerability_frames_remaining == 0 && state.lives > 0;
+}
+
+constexpr bool shmup_apply_player_damage(ShmupRuntimeState& state, uint8_t invulnerability_frames) {
+    if (!shmup_player_is_vulnerable(state)) return false;
+    --state.lives;
+    state.invulnerability_frames_remaining = invulnerability_frames;
+    return true;
 }
 
 constexpr bool is_valid_shmup_save_data(const ShmupProjectData& project, const ShmupSaveData& save_data) {

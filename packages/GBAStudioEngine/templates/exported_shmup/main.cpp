@@ -1,6 +1,7 @@
 #include "gbs/profiler.hpp"
 #define GBS_DIALOGUE_UI_RUNTIME_KIND 4
 #include "gbs/engine.hpp"
+#include "gbs/dialogue_portrait.hpp"
 #include "gbs/audio.hpp"
 #include "gbs/dialogue.hpp"
 #include "gbs/event.hpp"
@@ -127,9 +128,10 @@ bool run_wave_spawn_scripts = true;
 int runtime_last_wave = -1;
 uint32_t runtime_wave_change_count = 0;
 
-#if GBS_MULTI_RUNTIME
 gbs::EventRunner shmup_event_runner {};
 int shmup_event_wait_frames = 0;
+void consume_event_state();
+#if GBS_MULTI_RUNTIME
 int checkpoint_resume_script_index = -1;
 bool checkpoint_resuming_script = false;
 bool wave_start_pending = false;
@@ -248,6 +250,7 @@ gbs::EventScript checkpoint_script_for(int room, int index) {
     if (index == 2) return project.player.on_fire;
     if (index == 3) return project.enemy_projectile.on_hit_player;
     if (index == 4) return wave->on_defeat;
+    if (index == 5) return wave->on_projectile_hit_player;
     if (index >= 100 && index < 100 + static_cast<int>(wave->enemy_count)) return wave->enemies[index - 100].on_spawn;
     if (index >= 1000 && static_cast<size_t>(index - 1000) < project.script_count) return project.scripts[index - 1000];
     for (size_t enemy = 0; enemy < wave->enemy_count; ++enemy)
@@ -257,11 +260,11 @@ gbs::EventScript checkpoint_script_for(int room, int index) {
 int current_checkpoint_script_index() {
     if (!gbs::has_event_script(shmup_event_runner.script)) return -1;
     const auto* wave = gbs::shmup_wave_for(project, shmup_state.wave_index);
-    for (size_t candidate = 0; candidate < 5 + wave->enemy_count * 2 + project.script_count; ++candidate) {
-        const int index = candidate < 5 ? static_cast<int>(candidate)
-            : candidate < 5 + wave->enemy_count ? 100 + static_cast<int>(candidate - 5)
-            : candidate < 5 + wave->enemy_count * 2 ? 200 + static_cast<int>(candidate - 5 - wave->enemy_count)
-            : 1000 + static_cast<int>(candidate - 5 - wave->enemy_count * 2);
+    for (size_t candidate = 0; candidate < 6 + wave->enemy_count * 2 + project.script_count; ++candidate) {
+        const int index = candidate < 6 ? static_cast<int>(candidate)
+            : candidate < 6 + wave->enemy_count ? 100 + static_cast<int>(candidate - 6)
+            : candidate < 6 + wave->enemy_count * 2 ? 200 + static_cast<int>(candidate - 6 - wave->enemy_count)
+            : 1000 + static_cast<int>(candidate - 6 - wave->enemy_count * 2);
         const auto script = checkpoint_script_for(shmup_state.wave_index, index);
         if (script.commands == shmup_event_runner.script.commands && script.command_count == shmup_event_runner.script.command_count) return index;
     }
@@ -320,20 +323,26 @@ void consume_event_state();
 #endif
 
 void run_shmup_event_script(gbs::EventScript script) {
-#if GBS_MULTI_RUNTIME
+    if (!gbs::has_event_script(script)) return;
+    shmup_event_wait_frames = 0;
     gbs::start_event_runner(shmup_event_runner, script);
     // Existing synchronous hooks keep their timing. Split only at Save so its
     // continuation is captured before subsequent rewards/warps.
     const size_t budget = script.command_count * 8 + 8;
     for (size_t step = 0; step < budget && shmup_event_runner.active; ++step) {
         const auto previous_index = shmup_event_runner.command_index;
+#if GBS_MULTI_RUNTIME
         gbs::update_checkpoint_event_runner(shmup_event_runner, event_state);
-        consume_event_state();
-        if (previous_index == shmup_event_runner.command_index || gbs::runtime_transition_requested()) break;
-    }
 #else
-    gbs::run_event_script(event_state, script);
+        gbs::update_event_runner(shmup_event_runner, event_state);
 #endif
+        consume_event_state();
+        if (event_state.wait_frames > 0) {
+            shmup_event_wait_frames = event_state.wait_frames;
+            event_state.wait_frames = 0;
+        }
+        if (shmup_event_wait_frames > 0 || dialogue.visible || previous_index == shmup_event_runner.command_index || gbs::runtime_transition_requested()) break;
+    }
 }
 
 constexpr uint16_t obj_palette_colors[] = {
@@ -1441,12 +1450,10 @@ void update_enemies() {
 }
 
 void damage_player(gbs::EventScript script) {
-    if (!gbs::shmup_player_is_vulnerable(shmup_state)) {
+    if (!gbs::shmup_apply_player_damage(shmup_state, player_hit_invulnerability_frames)) {
         return;
     }
-    --shmup_state.lives;
     player_damaged_this_frame = true;
-    shmup_state.invulnerability_frames_remaining = player_hit_invulnerability_frames;
     run_shmup_event_script(script);
     consume_event_state();
     refresh_hud();
@@ -1523,7 +1530,8 @@ void handle_collisions() {
         };
         if (gbs::intersects(projectile_rect, player_rect)) {
             projectile.active = false;
-            damage_player(project.enemy_projectile.on_hit_player);
+            damage_player(gbs::has_event_script(wave->on_projectile_hit_player)
+                ? wave->on_projectile_hit_player : project.enemy_projectile.on_hit_player);
         }
     }
 
@@ -1640,6 +1648,9 @@ void update_shmup(gbs::InputState input, bool allow_default_fire) {
         { shmup_state.player_position_pixels.x - previous_position.x,
           shmup_state.player_position_pixels.y - previous_position.y },
         player_fired_this_frame, player_damaged_this_frame, shmup_state.lives > 0);
+    // Complete damage callbacks (including waits/dialogue) before clear/defeat
+    // hooks can replace the runner on a lethal or last-enemy collision.
+    if (gbs::event_runner_is_active(shmup_event_runner) || shmup_event_wait_frames > 0 || dialogue.visible) return;
     if (shmup_state.lives == 0 && !defeat_consumed && !player_animator.animator.playing) {
         defeat_consumed = true;
         if (wave != nullptr) run_shmup_event_script(wave->on_defeat);
@@ -1649,6 +1660,29 @@ void update_shmup(gbs::InputState input, bool allow_default_fire) {
     ++shmup_state.frame_counter;
     if ((shmup_state.frame_counter % 60) == 0) {
         persist_shmup_runtime_state();
+    }
+}
+
+void draw_shmup_sprite(int index, gbs::Sprite sprite) {
+    // At equal GBA priority, OBJ covers BG0. The modal dialogue owns BG0;
+    // keep gameplay sprites below it while preserving explicit lower depths.
+    if (dialogue.visible && sprite.priority == 0) sprite.priority = 1;
+    gbs::set_sprite(index, sprite);
+}
+
+void draw_shmup_metasprite(int first_index, const gbs::MetaSprite& metasprite, gbs::Vec2i position) {
+    if (!dialogue.visible) {
+        gbs::set_metasprite(first_index, metasprite, position);
+        return;
+    }
+    for (uint8_t index = 0; index < metasprite.part_count; ++index) {
+        const auto& part = metasprite.parts[index];
+        draw_shmup_sprite(first_index + index, gbs::Sprite {
+            position.x + part.x, position.y + part.y, part.tile_index,
+            part.palette, part.hflip, part.vflip, true, 0,
+            gbs::SpriteRenderMode::Normal, false, part.width, part.height,
+            false, false, 0, part.color_depth
+        });
     }
 }
 
@@ -1670,10 +1704,10 @@ void draw_scene() {
         }
     }
     if (player_visible && player_metasprite != nullptr && gbs::is_valid_metasprite(*player_metasprite)) {
-        gbs::set_metasprite(sprite_index, *player_metasprite, shmup_state.player_position_pixels);
+        draw_shmup_metasprite(sprite_index, *player_metasprite, shmup_state.player_position_pixels);
         sprite_index += player_metasprite->part_count;
     } else if (player_visible) {
-        gbs::set_sprite(sprite_index++, gbs::Sprite {
+        draw_shmup_sprite(sprite_index++, gbs::Sprite {
             shmup_state.player_position_pixels.x,
             shmup_state.player_position_pixels.y,
             static_cast<uint16_t>(builtin_tile_start + player_tile_asset.destination_tile),
@@ -1707,10 +1741,10 @@ void draw_scene() {
             const gbs::MetaSprite* enemy_metasprite = actor_sprite_for_index(runtime_enemy.sprite_index,
                 frame == nullptr ? enemy.metasprite : &frame->metasprite);
             if (enemy_metasprite != nullptr && gbs::is_valid_metasprite(*enemy_metasprite)) {
-                gbs::set_metasprite(sprite_index, *enemy_metasprite, screen_position);
+                draw_shmup_metasprite(sprite_index, *enemy_metasprite, screen_position);
                 sprite_index += enemy_metasprite->part_count;
             } else {
-                gbs::set_sprite(sprite_index++, gbs::Sprite {
+                draw_shmup_sprite(sprite_index++, gbs::Sprite {
                     screen_position.x,
                     screen_position.y,
                     static_cast<uint16_t>(builtin_tile_start + enemy_tile_asset.destination_tile),
@@ -1736,7 +1770,7 @@ void draw_scene() {
         }
         if (emote != nullptr && gbs::is_valid_metasprite(*emote) && sprite_index + emote->part_count <= 64) {
             const gbs::Vec2i emote_position = gbs::dialogue_emote_position_pixels(actor_position);
-            gbs::set_metasprite(sprite_index, *emote, emote_position);
+            draw_shmup_metasprite(sprite_index, *emote, emote_position);
             sprite_index += emote->part_count;
         }
     }
@@ -1747,10 +1781,10 @@ void draw_scene() {
             continue;
         }
         if (project.player_projectile.metasprite != nullptr && gbs::is_valid_metasprite(*project.player_projectile.metasprite)) {
-            gbs::set_metasprite(sprite_index, *project.player_projectile.metasprite, projectile.position_pixels);
+            draw_shmup_metasprite(sprite_index, *project.player_projectile.metasprite, projectile.position_pixels);
             sprite_index += project.player_projectile.metasprite->part_count;
         } else {
-            gbs::set_sprite(sprite_index++, gbs::Sprite {
+            draw_shmup_sprite(sprite_index++, gbs::Sprite {
                 projectile.position_pixels.x,
                 projectile.position_pixels.y,
                 static_cast<uint16_t>(builtin_tile_start + bullet_tile_asset.destination_tile),
@@ -1771,10 +1805,10 @@ void draw_scene() {
         }
         if (project.enemy_projectile.metasprite != nullptr &&
             gbs::is_valid_metasprite(*project.enemy_projectile.metasprite)) {
-            gbs::set_metasprite(sprite_index, *project.enemy_projectile.metasprite, projectile.position_pixels);
+            draw_shmup_metasprite(sprite_index, *project.enemy_projectile.metasprite, projectile.position_pixels);
             sprite_index += project.enemy_projectile.metasprite->part_count;
         } else {
-            gbs::set_sprite(sprite_index++, gbs::Sprite {
+            draw_shmup_sprite(sprite_index++, gbs::Sprite {
                 projectile.position_pixels.x,
                 projectile.position_pixels.y,
                 static_cast<uint16_t>(builtin_tile_start + bullet_tile_asset.destination_tile),
@@ -1797,6 +1831,8 @@ int initialize_shmup_runtime() {
     runtime_last_wave = -1;
     runtime_wave_change_count = 0;
     gbs::init_dialogue(dialogue);
+    gbs::configure_dialogue_portraits(gbastudio_shmup_project::dialogue_portrait_assets,
+        gbastudio_shmup_project::dialogue_portrait_asset_count);
     gbs::init_shmup_player_animator(player_animator);
     player_streamed_tile_asset_loaded = nullptr;
     gbs::configure_dialogue_emotes(project.emote_assets, project.emote_asset_count);
@@ -1864,6 +1900,27 @@ int initialize_shmup_runtime() {
     return 0;
 }
 
+bool update_shmup_event_script() {
+    if (dialogue.visible || !gbs::event_runner_is_active(shmup_event_runner)) return false;
+    if (shmup_event_wait_frames > 0) --shmup_event_wait_frames;
+    else {
+#if GBS_MULTI_RUNTIME
+        gbs::update_checkpoint_event_runner(shmup_event_runner, event_state);
+#else
+        gbs::update_event_runner(shmup_event_runner, event_state);
+#endif
+        if (event_state.wait_frames > 0) {
+            shmup_event_wait_frames = event_state.wait_frames;
+            event_state.wait_frames = 0;
+        }
+        consume_event_state();
+#if GBS_MULTI_RUNTIME
+        finish_restored_shmup_script();
+#endif
+    }
+    return true;
+}
+
 gbs::RuntimeAdapterFrameResult update_shmup_runtime(const gbs::RuntimeFrameContext& context) {
     (void)context;
     gbastudio_dialogue_ui::configure_for_scene(project.waves[shmup_state.wave_index].name);
@@ -1882,28 +1939,15 @@ gbs::RuntimeAdapterFrameResult update_shmup_runtime(const gbs::RuntimeFrameConte
     gbs::set_event_input_state(event_state, input.held, input.pressed, input.released);
     gbs::update_hud_behavior(event_state, hud.visible);
     if (!dialogue.visible
-#if GBS_MULTI_RUNTIME
         && !gbs::event_runner_is_active(shmup_event_runner)
-#endif
     ) {
         run_timer_event_binding();
     }
-#if GBS_MULTI_RUNTIME
-    if (!dialogue.visible && gbs::event_runner_is_active(shmup_event_runner)) {
-        if (shmup_event_wait_frames > 0) --shmup_event_wait_frames;
-        else {
-            gbs::update_checkpoint_event_runner(shmup_event_runner, event_state);
-            if (event_state.wait_frames > 0) {
-                shmup_event_wait_frames = event_state.wait_frames;
-                event_state.wait_frames = 0;
-            }
-            consume_event_state();
-            finish_restored_shmup_script();
-        }
+    if (update_shmup_event_script()) {
+        // A running callback owns this frame until its wait/dialogue completes.
     } else
-#endif
-    if (dialogue.visible && input.was_pressed(gbs::ButtonA)) {
-        gbs::advance_dialogue(dialogue, input);
+    if (dialogue.visible) {
+        if (input.was_pressed(gbs::ButtonA)) gbs::advance_dialogue(dialogue, input);
     } else {
         const bool overrides_default = gbs::button_event_binding_overrides_default(event_state, input.held);
         run_button_event_binding();
@@ -1927,6 +1971,7 @@ void render_shmup_runtime(const gbs::RuntimeFrameContext& context) {
     refresh_hud();
     gbs::draw_hud(hud);
     gbs::draw_dialogue(dialogue);
+    gbs::draw_dialogue_portrait(dialogue);
     sync_runtime_telemetry();
     gbs::wait_vblank();
 }
