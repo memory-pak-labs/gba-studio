@@ -67,7 +67,13 @@ function menuTargetEdges(
       if (edges && !edges.includes(automaticTarget)) edges.push(automaticTarget);
     }
     const screens = Array.isArray(config.screens) ? config.screens : [config];
-    for (const screen of screens.filter(isRecord)) {
+    for (const screen of [config, ...screens.filter(isRecord)]) {
+      const pageNavigation = isRecord(screen.pageNavigation) ? screen.pageNavigation : {};
+      for (const value of [pageNavigation.previousScreenID, pageNavigation.nextScreenID]) {
+        const destination = targetName(text(value) ?? "");
+        const edges = validEdges.get(name);
+        if (destination && edges && !edges.includes(destination)) edges.push(destination);
+      }
       const items = Array.isArray(screen.items) ? screen.items : [];
       for (const item of items.filter(isRecord)) {
         const target = text(item.targetScreenID);

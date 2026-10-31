@@ -2,6 +2,24 @@ import { describe, expect, it } from "vitest";
 import { analyzeConditionalSceneFlow } from "./conditionalFlowAnalyzer.js";
 
 describe("conditional scene flow analyzer", () => {
+  it("recognizes navigation from embedded menu pages to another scene", () => {
+    const report = analyzeConditionalSceneFlow({
+      rooms: [
+        { id: "inventory-id", name: "inventory", runtime: { type: "menu", config: { role: "inventory", screens: [
+          { id: "first", pageNavigation: { nextScreenID: "second" } },
+          { id: "second", pageNavigation: { nextScreenID: "tools-id", previousScreenID: "first" } }
+        ] } } },
+        { id: "tools-id", name: "tools", runtime: { type: "menu", config: { role: "inventory", pageNavigation: { previousScreenID: "inventory" } } } },
+        { id: "unused", name: "unused" }
+      ],
+      settings: { general: { startScene: "inventory" } },
+      editorState: { scenaConnections: [] },
+      events: []
+    });
+    expect(report.reachableScenes).toEqual(["inventory", "tools"]);
+    expect(report.unreachableScenes).toEqual(["unused"]);
+  });
+
   it("treats a Start Menu as a reachable topdown overlay without a dead end", () => {
     const report = analyzeConditionalSceneFlow({
       rooms: [
