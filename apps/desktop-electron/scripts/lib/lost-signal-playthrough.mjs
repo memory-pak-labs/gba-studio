@@ -41,7 +41,10 @@ export async function playLostSignalMission(driver, project, exported, options =
     for (let n = 0; n < 20 && !(await driver.modal()); n++) {
       await tap(await driver.dialogue() ? 2 : 1, 25);
     }
-    assert.ok(await driver.modal(), 'Real code lock opens');
+    if (!(await driver.modal())) {
+      await driver.capture('code-lock-failed');
+      assert.fail(`Real code lock opens: ${JSON.stringify({state: await driver.state(), ui: await driver.ui()})}`);
+    }
   };
   async function axis(target, name) {
     let stalled = 0;
@@ -136,9 +139,14 @@ export async function playLostSignalMission(driver, project, exported, options =
     await tap(1, 160);
   }
   async function saveSlot(slot, label) {
-    await tap(8, 55); await expect(3, 11, `${label}-start-menu`);
+    const screen = name => {
+      const index = exported.menu_project.screens.findIndex(entry => entry.name === name);
+      assert.notEqual(index, -1, `Exported menu ${name} exists`);
+      return index;
+    };
+    await tap(8, 55); await expect(3, screen('menu_start'), `${label}-start-menu`);
     for (let n = 0; n < 3; n++) await tap(128);
-    await tap(1, 55); await expect(3, 10, `${label}-save-menu`);
+    await tap(1, 55); await expect(3, screen('salvar'), `${label}-save-menu`);
     for (let n = 0; n < slot; n++) await tap(128);
     await tap(1); await tap(1); await tap(2); await tap(2); await tap(2, 70);
     assert.equal((await driver.state()).runtimeKind, 0, 'Saving returns to the gameplay family');
@@ -188,11 +196,21 @@ export async function playLostSignalMission(driver, project, exported, options =
   await hotspot('Saída do Armazém'); await chooseFirstDestination(5, 1); await expect(5, 1, 'observatory-arrival');
   await hotspot('Mesa da Maré'); assert.equal(await value('code'), 0); await driver.capture('table-before-telescope'); await close();
   await options.beforeTelescope?.({...controls,hotspot});
+  // The observatory requires two adjustments. Some callers exercise the
+  // first adjustment separately, so only perform it when still needed.
+  const telescopeAlignment = async () => (await driver.state()).variables[indices.var_telescope_alignment];
+  if (await telescopeAlignment() === 0) {
+    await hotspot('Telescópio');
+    assert.equal(await telescopeAlignment(), 1, 'The first interaction adjusts the telescope');
+    assert.equal(await value('observation'), 0, 'The clue is hidden until alignment is complete');
+    await driver.capture('telescope-first-adjustment');
+    await close();
+  }
   await hotspot('Telescópio'); assert.equal(await value('observation'), 1); await driver.capture('telescope-clue'); await close();
   await hotspot('Mesa da Maré'); assert.equal(await value('code'), 1); await driver.capture('code-314'); await close();
   await hotspot('Saída do Observatório'); await chooseFirstDestination(0, 1); await expect(0, 1, 'lighthouse-arrival'); await close();
   if(options.approachRepair)await options.approachRepair(controls);
-  else {await walkTo(17, 16); await driver.run(1, 64); await driver.run(8, 0);}
+  else {await walkTo(29, 13); await driver.run(4, 16); await driver.run(8, 0);}
   // Advance only the help text: the next interaction is the native numeric modal.
   await driver.capture('lens-approach'); await openCodeLock(); await driver.capture('code-lock');
   await tap(1, 90); assert.equal(await value('lock'), 0); assert.equal(await value('stage'), 1); assert.equal(await value('part'), 1);
