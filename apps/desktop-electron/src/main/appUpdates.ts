@@ -43,6 +43,7 @@ export function createAppUpdateService({ updater, currentVersion, canInstall, ch
   let state: AppUpdateState = { status: updater ? "idle" : "disabled", currentVersion };
   let checking = false;
   let checkingStableFirst = false;
+  let stableUpdateAvailable = false;
   const snapshot = (): AppUpdateState => ({ ...state });
   const publish = (next: Omit<AppUpdateState, "currentVersion">) => {
     state = { ...next, currentVersion };
@@ -56,7 +57,10 @@ export function createAppUpdateService({ updater, currentVersion, canInstall, ch
     updater.allowPrerelease = currentVersion.includes("-");
     updater.allowDowngrade = false;
     updater.on("error", (error) => { if (!checkingStableFirst) fail(error); });
-    updater.on("update-available", (info) => publish({ status: "available", version: info.version }));
+    updater.on("update-available", (info) => {
+      if (checkingStableFirst) stableUpdateAvailable = true;
+      publish({ status: "available", version: info.version });
+    });
     updater.on("update-not-available", () => { if (!checkingStableFirst) publish({ status: "not-available" }); });
     updater.on("download-progress", (progress) => {
       if (state.status !== "downloading") return;
@@ -76,10 +80,11 @@ export function createAppUpdateService({ updater, currentVersion, canInstall, ch
         // RC channel. Check stable first, then fall back to the RC feed.
         if (/-rc(?:\.|$)/i.test(currentVersion)) {
           checkingStableFirst = true;
+          stableUpdateAvailable = false;
           updater.allowPrerelease = false;
           try { await updater.checkForUpdates(); } catch { /* An absent stable release is expected before launch. */ }
           finally { checkingStableFirst = false; updater.allowPrerelease = true; }
-          if (snapshot().status === "available") return { ...state };
+          if (stableUpdateAvailable) return { ...state };
         }
         await updater.checkForUpdates();
       } catch (error) { fail(error); }

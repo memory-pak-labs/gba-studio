@@ -87,6 +87,23 @@ describe("application updates", () => {
     }
   });
 
+  it("does not recheck or overwrite a download started while a stable check completes", async () => {
+    const updater = fixture().updater;
+    let finish!: () => void;
+    updater.checkForUpdates.mockImplementationOnce(() => {
+      updater.emit("update-available", { version: "0.1.0" });
+      return new Promise<null>((resolve) => { finish = () => resolve(null); });
+    });
+    const service = createAppUpdateService({ updater, currentVersion: "0.1.0-rc.4", canInstall: () => true, changed: vi.fn() });
+    const checking = service.check();
+    await service.download();
+    updater.emit("update-downloaded", { version: "0.1.0" });
+    finish();
+    await checking;
+    expect(updater.checkForUpdates).toHaveBeenCalledOnce();
+    expect(service.state()).toMatchObject({ status: "downloaded", version: "0.1.0" });
+  });
+
   it("blocks restart before download, with unsaved work, and repeated requests", () => {
     let safe = false;
     const { updater, service } = fixture(() => safe);
