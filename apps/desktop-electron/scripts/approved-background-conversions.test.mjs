@@ -23,15 +23,23 @@ const approved = [
   ['conselho_guardia', 'council-v13-background.png', '5d8ab383b0166bca73fe664dfeea3977fed3a6d7643ddbb224bc9145a8408965', { date:'2026-10-22', contract:'council-porto-lumen-v13', record:'V1.3 approved for integration; native conversion presented before commit' }],
   ['circuito_final', 'racing-approved-topdown.png', 'e1de92b280ebb5210e3a786ab98dc83c8bcb8ccbb053586d654db608148fced6', {date:'2026-10-18',contract:'racing-two-views-approved-2026-10-18'}]
 ];
+let cachedFixture;
+function sharedFixture() {
+  if (!cachedFixture) {
+    const saved = JSON.parse(readFileSync(templateURL, 'utf8'));
+    const project = promoteExemploGBAVerticeCampaign(saved);
+    cachedFixture = { saved, project, pack: buildAssetcTilesetPackGeneration(project) };
+  }
+  return cachedFixture;
+}
 
 describe('conversões de background aprovadas por cena', () => {
   for (const [scene, name, sha256, visualApproval = { date: '2026-10-02', contract: 'play-background-fidelity-v1-approved' }] of approved) {
     it(`${scene}: recompila os pixels aprovados sem nova perda de cor ou tiles`, () => {
-      const saved = JSON.parse(readFileSync(templateURL, 'utf8'));
+      const { saved, project, pack } = sharedFixture();
       const bytes = readFileSync(new URL(`Assets/backgrounds/${name}`, templateURL));
       expect(createHash('sha256').update(bytes).digest('hex')).toBe(sha256);
       const png = decodePngRgba(bytes);
-      const project = promoteExemploGBAVerticeCampaign(saved);
       const asset = project.assets.find(asset => asset.name === name);
       expect(asset.metadata).toMatchObject({
         preparedSha256: sha256,
@@ -40,7 +48,7 @@ describe('conversões de background aprovadas por cena', () => {
         visualApproval
       });
       expect(asset.metadata.backgroundPaletteReferencePlan).toEqual(saved.assets.find(asset => asset.name === name).metadata.backgroundPaletteReferencePlan);
-      const packAsset = buildAssetcTilesetPackGeneration(project).packAssets.find(asset => asset.id === name.replace('.png', '').replaceAll('-', '_'));
+      const packAsset = pack.packAssets.find(asset => asset.id === name.replace('.png', '').replaceAll('-', '_'));
       expect(packAsset).toBeDefined();
       const root = mkdtempSync(join(tmpdir(), 'gba-approved-bg-contract-'));
       try {

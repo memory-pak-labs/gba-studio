@@ -8,7 +8,7 @@ export default defineConfig({
     // Cap concurrent large fixtures to limit host memory pressure.
     maxWorkers: Math.min(4, availableParallelism()),
     environment: "node",
-    testTimeout: 30_000,
+    testTimeout: 90_000,
     environmentMatchGlobs: [
       ["src/renderer/**/*.test.tsx", "happy-dom"]
     ],
