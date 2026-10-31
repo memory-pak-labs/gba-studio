@@ -993,6 +993,7 @@ int initialize_racing_runtime() {
     gbs::init_sprite_animator(vehicle_animator);
     vehicle_loaded_frame=nullptr;
     gbs::init_event_state(event_state);
+    gbs::bind_event_scripts(event_state, project.scripts, project.script_count);
     gbs::init_event_runner(runtime_event_runner);
     gbs::reset_runtime_telemetry();
     gbs::set_backdrop_color(gbs::rgb15(4, 12, 4));

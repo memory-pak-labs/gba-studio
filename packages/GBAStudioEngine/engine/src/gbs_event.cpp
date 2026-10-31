@@ -1650,6 +1650,9 @@ bool consume_runtime_transition(
 }
 
 void init_event_state(EventState& state) {
+    state.project_scripts = nullptr;
+    state.project_script_count = 0;
+    state.script_call_overflow = false;
     state.luta_command_count = 0;
     for (size_t i = 0; i <= max_event_actor_state_slots; ++i) { state.actor_effect_frames[i]=0; state.actor_effect_intensity[i]=0; state.actor_effect_kind[i]=0; }
     state.current_room = 0;
@@ -2032,85 +2035,119 @@ void run_event_script(EventState& state, const EventCommand* commands, size_t co
     run_event_script_consuming(state, EventScript { commands, count }, nullptr);
 }
 
-void run_event_script_consuming(EventState& state, EventScript script, EventCommandConsumer consumer, void* context) {
-    const EventCommand* commands = script.commands;
-    const size_t count = script.command_count;
-    if (commands == nullptr || count == 0) {
-        return;
-    }
-    const SubsystemProfilerScope profiler_scope(ProfilerSubsystem::Scripts);
+namespace {
 
-    size_t index = 0;
+bool advance_event_runner(EventRunner& runner, EventState& state, bool pause_on_wait,
+    EventCommandConsumer consumer = nullptr, void* context = nullptr) {
+    runner.yielded = false;
+    if (!runner.active) return false;
+    const SubsystemProfilerScope profiler_scope(ProfilerSubsystem::Scripts);
+    const size_t budget = runner.step_budget > 0 ? runner.step_budget : runner.script.command_count * 8 + 8;
     size_t steps = 0;
-    const size_t max_steps = count * 8 + 8;
-    while (index < count && steps < max_steps) {
-        ++steps;
-        const EventCommand& command = commands[index];
+    size_t synchronous_steps[max_event_script_call_depth + 1] = {};
+    while (runner.active) {
+        const size_t depth = runner.call_depth;
+        if (depth > max_event_script_call_depth || (depth > 0 &&
+            (state.project_scripts == nullptr || runner.calls[depth - 1].script_index >= state.project_script_count))) {
+            state.script_call_overflow = true;
+            runner.active = false;
+            runner.call_depth = 0;
+            return false;
+        }
+        const EventScript script = depth == 0 ? runner.script
+            : state.project_scripts[runner.calls[depth - 1].script_index];
+        size_t index = depth == 0 ? runner.command_index : runner.calls[depth - 1].command_index;
+        if (!has_event_script(script) || index >= script.command_count) {
+            if (depth > 0) { --runner.call_depth; continue; }
+            runner.active = false;
+            break;
+        }
+        if (pause_on_wait) {
+            if (steps++ >= budget) break;
+        } else if (synchronous_steps[depth]++ >= script.command_count * 8 + 8) {
+            if (depth > 0) { --runner.call_depth; continue; }
+            runner.active = false;
+            break;
+        }
+        const EventCommand& command = script.commands[index];
         const size_t source_index = index;
-        EventStepResult result = execute_event_command(state, command, index, count, false);
-        gbs_debug_record_event(&command, source_index, static_cast<unsigned>(command.op), static_cast<unsigned>(result), state.current_room, state.wait_frames);
+        EventStepResult result;
+        if (command.op == EventOp::CallScript && state.project_scripts != nullptr) {
+            ++index;
+            result = EventStepResult::Continue;
+            if (!event_script_is_locked(state, command.a) && command.a >= 0 &&
+                static_cast<size_t>(command.a) < state.project_script_count &&
+                has_event_script(state.project_scripts[command.a])) {
+                if (depth == max_event_script_call_depth) {
+                    state.script_call_overflow = true;
+                    runner.active = false;
+                    runner.call_depth = 0;
+                    result = EventStepResult::Stop;
+                } else {
+                    runner.calls[runner.call_depth++] = EventScriptCallFrame {
+                        static_cast<uint32_t>(command.a), 0
+                    };
+                    synchronous_steps[runner.call_depth] = 0;
+                }
+            }
+        } else {
+            result = execute_event_command(state, command, index, script.command_count, pause_on_wait);
+        }
+        if (depth == 0) runner.command_index = index;
+        else runner.calls[depth - 1].command_index = static_cast<uint32_t>(index);
+        gbs_debug_record_event(&command, source_index, static_cast<unsigned>(command.op),
+            static_cast<unsigned>(result), state.current_room, state.wait_frames);
         if (consumer) consumer(state, context);
+        if (!runner.active) return false;
+        if (result == EventStepResult::Pause) {
+            runner.yielded = true;
+            return true;
+        }
         if (result == EventStepResult::Stop) {
-            return;
+            if (depth > 0) --runner.call_depth;
+            else runner.active = false;
         }
     }
+    return runner.active;
+}
+
+} // namespace
+
+void bind_event_scripts(EventState& state, const EventScript* scripts, size_t count) {
+    state.project_scripts = scripts;
+    state.project_script_count = scripts == nullptr ? 0 : count;
+}
+
+void run_event_script_consuming(EventState& state, EventScript script, EventCommandConsumer consumer, void* context) {
+    EventRunner runner {};
+    start_event_runner(runner, script);
+    advance_event_runner(runner, state, false, consumer, context);
 }
 
 void init_event_runner(EventRunner& runner) {
-    runner.script = empty_event_script();
-    runner.command_index = 0;
-    runner.active = false;
-    runner.step_budget = 0;
+    stop_event_runner(runner);
 }
 
 void start_event_runner(EventRunner& runner, EventScript script) {
     runner.script = script;
     runner.command_index = 0;
     runner.active = has_event_script(script);
+    runner.yielded = false;
     runner.step_budget = 0;
+    runner.call_depth = 0;
 }
 
 void stop_event_runner(EventRunner& runner) {
     runner.script = empty_event_script();
     runner.command_index = 0;
     runner.active = false;
+    runner.yielded = false;
     runner.step_budget = 0;
+    runner.call_depth = 0;
 }
 
 bool update_event_runner(EventRunner& runner, EventState& state) {
-    if (!runner.active) {
-        return false;
-    }
-    if (!has_event_script(runner.script) || runner.command_index >= runner.script.command_count) {
-        runner.active = false;
-        return false;
-    }
-    const SubsystemProfilerScope profiler_scope(ProfilerSubsystem::Scripts);
-
-    size_t steps = 0;
-    const size_t max_steps = runner.step_budget > 0 ? runner.step_budget : runner.script.command_count * 8 + 8;
-    while (runner.command_index < runner.script.command_count && steps < max_steps) {
-        ++steps;
-        size_t index = runner.command_index;
-        const EventCommand& command = runner.script.commands[index];
-        const size_t source_index = index;
-        EventStepResult result = execute_event_command(state, command, index, runner.script.command_count, true);
-        gbs_debug_record_event(&command, source_index, static_cast<unsigned>(command.op), static_cast<unsigned>(result), state.current_room, state.wait_frames);
-        runner.command_index = index;
-        if (result == EventStepResult::Pause) {
-            return true;
-        }
-        if (result == EventStepResult::Stop) {
-            runner.active = false;
-            return false;
-        }
-    }
-
-    if (runner.command_index >= runner.script.command_count) {
-        runner.active = false;
-        return false;
-    }
-    return true;
+    return advance_event_runner(runner, state, true);
 }
 
 void init_event_script_queue(EventScriptQueue& queue) {

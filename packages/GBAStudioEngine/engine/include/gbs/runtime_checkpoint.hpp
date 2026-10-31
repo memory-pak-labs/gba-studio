@@ -25,12 +25,30 @@ inline void show_checkpoint_save_failure(DialogueState& dialogue) {
 }
 
 // Persist indices and command contents, never addresses from an overlay/ROM.
+struct CheckpointScriptCall {
+    uint32_t script_index;
+    uint32_t command_index;
+    uint32_t script_hash;
+};
+
 struct CheckpointScript {
     int32_t script_index = -1;
     uint32_t command_index = 0;
     uint32_t script_hash = 0;
     bool active = false;
+    uint32_t call_depth = 0;
+    CheckpointScriptCall calls[max_event_script_call_depth] = {};
 };
+
+// Version 1 stored a flat runner. Its final three bytes were padding.
+struct CheckpointScriptV1 {
+    int32_t script_index;
+    uint32_t command_index;
+    uint32_t script_hash;
+    uint8_t active;
+    uint8_t padding[3];
+};
+static_assert(sizeof(CheckpointScriptV1) == 16);
 
 inline uint32_t checkpoint_script_hash(EventScript script) {
     uint32_t hash = 2166136261u;
@@ -47,24 +65,48 @@ inline uint32_t checkpoint_script_hash(EventScript script) {
     return hash;
 }
 
-inline CheckpointScript capture_checkpoint_script(const EventRunner& runner, int script_index) {
-    return { script_index, static_cast<uint32_t>(runner.command_index),
-        has_event_script(runner.script) ? checkpoint_script_hash(runner.script) : 0,
-        runner.active };
+inline CheckpointScript capture_checkpoint_script(const EventRunner& runner, int script_index, const EventState& events) {
+    CheckpointScript saved {};
+    saved.script_index = script_index;
+    saved.command_index = static_cast<uint32_t>(runner.command_index);
+    saved.script_hash = has_event_script(runner.script) ? checkpoint_script_hash(runner.script) : 0;
+    saved.active = runner.active;
+    saved.call_depth = static_cast<uint32_t>(runner.call_depth);
+    for (size_t index = 0; index < runner.call_depth && index < max_event_script_call_depth; ++index) {
+        const auto& call = runner.calls[index];
+        saved.calls[index] = {call.script_index, call.command_index,
+            events.project_scripts != nullptr && call.script_index < events.project_script_count
+                ? checkpoint_script_hash(events.project_scripts[call.script_index]) : 0};
+    }
+    return saved;
 }
 
-inline bool restore_checkpoint_script(const CheckpointScript& saved, EventScript script, EventRunner& runner) {
+inline bool restore_checkpoint_script(const CheckpointScript& saved, EventScript script, EventRunner& runner,
+    const EventState* events = nullptr) {
+    if (saved.call_depth > max_event_script_call_depth || (!saved.active && saved.call_depth != 0)) return false;
     if (saved.script_index < 0) {
         if (saved.active || saved.command_index != 0 || saved.script_hash != 0) return false;
         init_event_runner(runner);
         return true;
     }
     if (!has_event_script(script) || saved.command_index > script.command_count ||
-        (saved.active && saved.command_index >= script.command_count) ||
+        (saved.active && saved.call_depth == 0 && saved.command_index >= script.command_count) ||
         saved.script_hash != checkpoint_script_hash(script)) return false;
-    start_event_runner(runner, script);
-    runner.command_index = saved.command_index;
-    runner.active = saved.active;
+    EventRunner restored {};
+    start_event_runner(restored, script);
+    restored.command_index = saved.command_index;
+    restored.active = saved.active;
+    restored.call_depth = saved.call_depth;
+    for (size_t index = 0; index < saved.call_depth; ++index) {
+        const auto& call = saved.calls[index];
+        if (events == nullptr || events->project_scripts == nullptr ||
+            call.script_index >= events->project_script_count) return false;
+        const EventScript called = events->project_scripts[call.script_index];
+        if (!has_event_script(called) || call.command_index > called.command_count ||
+            call.script_hash != checkpoint_script_hash(called)) return false;
+        restored.calls[index] = {call.script_index, call.command_index};
+    }
+    runner = restored;
     return true;
 }
 
@@ -76,9 +118,13 @@ inline bool update_checkpoint_event_runner(EventRunner& runner, EventState& stat
     runner.step_budget = 1;
     for (size_t step = 0; step < budget && runner.active; ++step) {
         const size_t previous_index = runner.command_index;
+        const size_t previous_depth = runner.call_depth;
+        const uint32_t previous_call_index = previous_depth > 0 ? runner.calls[previous_depth - 1].command_index : 0;
         update_event_runner(runner, state);
-        if (state.save_request != 0 || state.last_dialogue >= 0 || state.last_choice_group >= 0 ||
-            state.wait_frames > 0 || runner.command_index == previous_index) break;
+        const bool unchanged = runner.command_index == previous_index && runner.call_depth == previous_depth &&
+            (previous_depth == 0 || runner.calls[previous_depth - 1].command_index == previous_call_index);
+        if (runner.yielded || state.save_request != 0 || state.last_dialogue >= 0 || state.last_choice_group >= 0 ||
+            state.wait_frames > 0 || unchanged) break;
     }
     runner.step_budget = original_budget;
     return runner.active;
@@ -205,8 +251,74 @@ public:
         return true;
     }
     template<typename T> bool read(T& value) { return read_bytes(&value, sizeof(value)); }
+    bool commit(const CheckpointPayloadReader& cursor) {
+        if (&data != &cursor.data) return false;
+        offset = cursor.offset;
+        return true;
+    }
     bool complete() const { return offset == data.payload_size; }
 };
+
+template<typename Snapshot>
+inline bool read_legacy_checkpoint_record(CheckpointPayloadReader& reader, Snapshot& snapshot) {
+    constexpr size_t prefix = offsetof(Snapshot, script);
+    constexpr size_t suffix = sizeof(Snapshot) - prefix - sizeof(CheckpointScript);
+    static_assert(sizeof(Snapshot) <= universal_save_payload_capacity);
+    Snapshot restored {};
+    CheckpointScriptV1 old {};
+    auto cursor = reader;
+    if (!cursor.read_bytes(&restored, prefix) || !cursor.read(old) || old.active > 1 ||
+        !cursor.read_bytes(reinterpret_cast<uint8_t*>(&restored) + prefix + sizeof(CheckpointScript), suffix))
+        return false;
+    restored.script.script_index = old.script_index;
+    restored.script.command_index = old.command_index;
+    restored.script.script_hash = old.script_hash;
+    restored.script.active = old.active != 0;
+    snapshot = restored;
+    return reader.commit(cursor);
+}
+
+template<typename Snapshot>
+inline bool read_checkpoint_snapshot(const UniversalSaveData& data, UniversalSaveRuntime runtime, Snapshot& snapshot) {
+    if (!is_valid_universal_save_data(data) || data.runtime != runtime || data.payload_size < sizeof(uint32_t))
+        return false;
+    uint32_t version = 0;
+    checkpoint_copy_bytes(&version, data.payload, sizeof(version));
+    Snapshot restored {};
+    if (version == 2) {
+        if (!read_universal_save_payload(data, runtime, &restored, sizeof(restored))) return false;
+    } else if (version == 1) {
+        constexpr size_t old_size = sizeof(Snapshot) - sizeof(CheckpointScript) + sizeof(CheckpointScriptV1);
+        if (data.payload_size != old_size) return false;
+        CheckpointPayloadReader reader(data);
+        if (!read_legacy_checkpoint_record(reader, restored) || !reader.complete()) return false;
+        restored.version = 2;
+    } else {
+        return false;
+    }
+    snapshot = restored;
+    return true;
+}
+
+// Flat scripts retain a small record; serialize only active caller frames.
+inline bool write_checkpoint_script(CheckpointPayloadWriter& writer, const CheckpointScript& script) {
+    if (script.call_depth > max_event_script_call_depth) return false;
+    if (!writer.write(script.script_index) || !writer.write(script.command_index) ||
+        !writer.write(script.script_hash) || !writer.write(static_cast<uint8_t>(script.active)) ||
+        !writer.write(static_cast<uint8_t>(script.call_depth))) return false;
+    return writer.write_bytes(script.calls, script.call_depth * sizeof(CheckpointScriptCall));
+}
+
+inline bool read_checkpoint_script(CheckpointPayloadReader& reader, CheckpointScript& script) {
+    script = CheckpointScript {};
+    uint8_t active = 0, depth = 0;
+    if (!reader.read(script.script_index) || !reader.read(script.command_index) ||
+        !reader.read(script.script_hash) || !reader.read(active) || !reader.read(depth) ||
+        active > 1 || depth > max_event_script_call_depth) return false;
+    script.active = active != 0;
+    script.call_depth = depth;
+    return reader.read_bytes(script.calls, depth * sizeof(CheckpointScriptCall));
+}
 
 // Shmup needs room for moving actors/projectiles. Store only active bindings.
 inline bool write_checkpoint_events(CheckpointPayloadWriter& writer, const CheckpointEvents& events) {

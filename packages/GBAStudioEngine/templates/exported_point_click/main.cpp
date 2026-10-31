@@ -724,6 +724,7 @@ int initialize_point_click_runtime() {
     runtime_scene_change_count = 0;
     gbs::init_dialogue(dialogue);
     gbs::init_event_state(event_state);
+    gbs::bind_event_scripts(event_state, project.scripts, project.script_count);
     gbs::init_hud(hud);
     gbs::init_resource_manager(resource_manager);
     gbs::init_sprite_animator(cursor_animator);

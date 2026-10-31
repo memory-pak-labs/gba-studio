@@ -605,6 +605,9 @@ struct EventState {
     int platform_callback_scripts[max_event_platform_callbacks];
     int adventure_callback_scripts[max_event_adventure_callbacks];
     bool scene_type_paused[max_event_scene_types];
+    const EventScript* project_scripts;
+    size_t project_script_count;
+    bool script_call_overflow;
 };
 
 // Requested includes the cover phase; pending means ready for adapter handoff.
@@ -622,11 +625,21 @@ bool consume_runtime_transition(
     int& player_y
 );
 
+constexpr size_t max_event_script_call_depth = 8;
+
+struct EventScriptCallFrame {
+    uint32_t script_index;
+    uint32_t command_index;
+};
+
 struct EventRunner {
     EventScript script;
     size_t command_index;
     bool active;
+    bool yielded;
     size_t step_budget;
+    EventScriptCallFrame calls[max_event_script_call_depth];
+    size_t call_depth;
 };
 
 void format_event_clock(const EventState& state, char (&display)[6]);
@@ -681,6 +694,7 @@ constexpr void reset_event_tile_commands(EventState& state) {
 }
 
 void init_event_state(EventState& state);
+void bind_event_scripts(EventState& state, const EventScript* scripts, size_t count);
 void set_event_player_actor_state(EventState& state, int x, int y, int direction, int tile_size);
 void set_event_input_state(EventState& state, uint16_t held, uint16_t pressed, uint16_t released);
 void set_event_actor_animation_state(EventState& state, int actor_index, bool playing);

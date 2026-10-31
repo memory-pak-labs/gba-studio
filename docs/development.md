@@ -184,6 +184,37 @@ O editor permite selecionar o Engine Pack nas configurações. Para o layout
 deste monorepo, a saída é `packages/GBAStudioEngine/dist/GBAStudioEnginePack`.
 Não copie caminhos absolutos de outro computador.
 
+## Chamadas de scripts e checkpoints
+
+Os runtimes ligam a tabela de scripts do projeto ao `EventState` após inicializar
+os eventos. `CallScript` usa essa tabela para executar o chamado e retornar ao
+ponto seguinte do chamador. O `EventRunner` mantém até oito níveis de chamada,
+incluindo suas posições durante esperas e diálogos. Chamadas bloqueadas ou sem
+um script válido são ignoradas; exceder a profundidade encerra o executor e
+marca `script_call_overflow`. Threads compartilham esse mecanismo e preservam
+seu orçamento de uma instrução por quadro.
+
+A API síncrona `run_event_script` executa os chamados na mesma ordem, mantendo o
+contrato síncrono de acumular `Wait`; os fluxos que devem aguardar entre quadros
+usam `EventRunner`. Cada nível síncrono conserva seu próprio orçamento de loop,
+para não truncar um chamado maior que o chamador.
+
+Checkpoints que retomam roteiros gravam índices, posições e hashes dos chamados;
+não gravam ponteiros. RPG, Luta, Visual Novel e Shoot 'em Up usam a revisão2 desse
+payload. Os leitores também aceitam a versão1 de checkpoints desses quatro
+perfis e a convertem em memória para uma pilha vazia. Os três bytes de padding
+do antigo registro de script não são interpretados como profundidade. A leitura
+preserva o arquivo e o avanço dos roteiros; o próximo save grava a versão2.
+Shoot 'em Up reconhece separadamente seus cabeçalhos e inimigos da versão1 e
+serializa apenas os níveis ativos no formato novo, preservando o orçamento de
+588bytes. Uma alteração no roteiro chamado invalida a retomada desse checkpoint;
+um save rejeitado não substitui o checkpoint anterior.
+
+`make event-calls-test` e `build/host/runtime_checkpoint_tests`, no diretório do
+motor, exercitam sequência, aninhamento, esperas, limite de profundidade,
+relocação e rejeição de roteiros alterados. Host, ROM e interação no Player
+continuam sendo evidências distintas.
+
 ## Substituição de tiles em Aventura e Plataforma
 
 `replace_tile X Y TILE bg2 COLISAO` altera um tile de 8×8 do piso.

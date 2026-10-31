@@ -231,13 +231,16 @@ gbs::EventScript checkpoint_script_for(int room, int script_index) {
     case 1: return room_data.on_victory;
     case 2: return room_data.on_defeat;
     case 3: return room_data.on_escape;
-    default: return gbs::empty_event_script();
+    // Slot 4 is reserved for the encounter damage callback used by newer data.
+    case 4: return gbs::empty_event_script();
+    default: return script_index >= 5 && static_cast<size_t>(script_index - 5) < project.script_count
+        ? project.scripts[script_index - 5] : gbs::empty_event_script();
     }
 }
 
 int current_checkpoint_script_index() {
     if (!gbs::has_event_script(battle_event_runner.script)) return -1;
-    for (int index = 0; index < 4; ++index) {
+    for (int index = 0; index < 5 + static_cast<int>(project.script_count); ++index) {
         const auto script = checkpoint_script_for(encounter_index, index);
         if (script.commands == battle_event_runner.script.commands && script.command_count == battle_event_runner.script.command_count) return index;
     }
@@ -249,7 +252,7 @@ bool capture_battle_rpg_checkpoint(gbs::UniversalSaveData& data) {
     const int script_index = current_checkpoint_script_index();
     if (battle_event_runner.active && script_index < 0) return false;
     const BattleRpgRuntimeCheckpoint snapshot {
-        1, state, gbs::capture_checkpoint_script(battle_event_runner, script_index),
+        2, state, gbs::capture_checkpoint_script(battle_event_runner, script_index, event_state),
         gbs::capture_checkpoint_dialogue(dialogue), gbs::capture_checkpoint_events(event_state),
         checkpoint_music_index, checkpoint_tracker_index, battle_event_wait_frames,
         battle_script_controls_dialogue, outcome_hook_started, outcome_hook_handled
@@ -263,15 +266,15 @@ bool restore_battle_rpg_checkpoint(int slot) {
     gbs::UniversalSaveData data {};
     BattleRpgRuntimeCheckpoint snapshot {};
     if (service == nullptr || gbs::read_runtime_save(*service, slot, data) != gbs::SaveStatus::Ok ||
-        !gbs::read_universal_save_payload(data, gbs::UniversalSaveRuntime::BattleRpg, &snapshot, sizeof(snapshot)) ||
-        snapshot.version != 1 || data.room_index < 0 || static_cast<size_t>(data.room_index) >= project.encounter_count ||
+        !gbs::read_checkpoint_snapshot(data, gbs::UniversalSaveRuntime::BattleRpg, snapshot) ||
+        snapshot.version != 2 || data.room_index < 0 || static_cast<size_t>(data.room_index) >= project.encounter_count ||
         snapshot.wait_frames < 0 || snapshot.music_index < -1 || snapshot.tracker_index < -1 ||
         (snapshot.music_index >= 0 && static_cast<size_t>(snapshot.music_index) >= project.music_asset_count) ||
         (snapshot.tracker_index >= 0 && static_cast<size_t>(snapshot.tracker_index) >= project.tracker_asset_count) ||
         !gbs::valid_checkpoint_dialogue(snapshot.dialogue, project.dialogue_line_count)) return false;
     gbs::EventRunner restored_runner {};
     if (!gbs::restore_checkpoint_script(snapshot.script,
-            checkpoint_script_for(data.room_index, snapshot.script.script_index), restored_runner)) return false;
+            checkpoint_script_for(data.room_index, snapshot.script.script_index), restored_runner, &event_state)) return false;
     const auto& encounter = project.encounters[data.room_index];
     if (snapshot.state.outcome > gbs::BattleRpgOutcome::Escaped ||
         snapshot.state.selected_party < 0 || snapshot.state.selected_party >= encounter.party_count ||
@@ -1240,6 +1243,7 @@ int initialize_battle_rpg_runtime() {
     gbs::init_dialogue(battle_menu_dialogue);
     gbs::init_hud(battle_hud);
     gbs::init_event_state(event_state);
+    gbs::bind_event_scripts(event_state, project.scripts, project.script_count);
     gbs::init_event_runner(battle_event_runner);
     gbs::init_resource_manager(resource_manager);
     gbs::reset_runtime_telemetry();

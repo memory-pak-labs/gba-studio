@@ -166,6 +166,80 @@ struct ShmupEnemyCheckpoint {
 };
 struct ShmupProjectileCheckpoint { int16_t x; int16_t y; uint8_t pool; uint8_t index; };
 
+bool write_shmup_checkpoint(gbs::CheckpointPayloadWriter& writer, const ShmupRuntimeCheckpoint& saved) {
+    return writer.write(saved.version) &&
+        writer.write(saved.state) &&
+        writer.write(saved.player) &&
+        gbs::write_checkpoint_script(writer, saved.script) &&
+        writer.write(saved.dialogue) &&
+        writer.write(saved.gesture) &&
+        writer.write(saved.player_sprite) &&
+        writer.write(saved.music_index) &&
+        writer.write(saved.tracker_index) &&
+        writer.write(saved.wait_frames) &&
+        writer.write(saved.high_score) &&
+        writer.write(saved.enemy_count) &&
+        writer.write(saved.projectile_count) &&
+        writer.write(saved.clear_consumed) &&
+        writer.write(saved.spawned) &&
+        writer.write(saved.spawn_scripts) &&
+        writer.write(saved.start_pending);
+}
+
+bool read_shmup_checkpoint(gbs::CheckpointPayloadReader& reader, ShmupRuntimeCheckpoint& saved, uint32_t* source_version = nullptr) {
+    auto cursor = reader;
+    uint32_t version = 0;
+    if (!cursor.read(version)) return false;
+    if (source_version != nullptr) *source_version = version;
+    if (version == 1) {
+        if (!gbs::read_legacy_checkpoint_record(reader, saved)) return false;
+        saved.version = 2;
+        return true;
+    }
+    if (version != 2) return false;
+    return reader.read(saved.version) &&
+        reader.read(saved.state) &&
+        reader.read(saved.player) &&
+        gbs::read_checkpoint_script(reader, saved.script) &&
+        reader.read(saved.dialogue) &&
+        reader.read(saved.gesture) &&
+        reader.read(saved.player_sprite) &&
+        reader.read(saved.music_index) &&
+        reader.read(saved.tracker_index) &&
+        reader.read(saved.wait_frames) &&
+        reader.read(saved.high_score) &&
+        reader.read(saved.enemy_count) &&
+        reader.read(saved.projectile_count) &&
+        reader.read(saved.clear_consumed) &&
+        reader.read(saved.spawned) &&
+        reader.read(saved.spawn_scripts) &&
+        reader.read(saved.start_pending);
+}
+
+bool write_shmup_enemy_checkpoint(gbs::CheckpointPayloadWriter& writer, const ShmupEnemyCheckpoint& saved) {
+    return writer.write(saved.position) &&
+        gbs::write_checkpoint_script(writer, saved.script) &&
+        writer.write(saved.sprite) &&
+        writer.write(saved.wait_frames) &&
+        writer.write(saved.health) &&
+        writer.write(saved.cooldown) &&
+        writer.write(saved.active) &&
+        writer.write(saved.destroying);
+}
+
+bool read_shmup_enemy_checkpoint(gbs::CheckpointPayloadReader& reader, ShmupEnemyCheckpoint& saved, uint32_t source_version = 2) {
+    if (source_version == 1) return gbs::read_legacy_checkpoint_record(reader, saved);
+    if (source_version != 2) return false;
+    return reader.read(saved.position) &&
+        gbs::read_checkpoint_script(reader, saved.script) &&
+        reader.read(saved.sprite) &&
+        reader.read(saved.wait_frames) &&
+        reader.read(saved.health) &&
+        reader.read(saved.cooldown) &&
+        reader.read(saved.active) &&
+        reader.read(saved.destroying);
+}
+
 gbs::EventScript checkpoint_script_for(int room, int index) {
     const auto* wave = gbs::shmup_wave_for(project, room);
     if (wave == nullptr) return gbs::empty_event_script();
@@ -204,19 +278,19 @@ bool capture_shmup_checkpoint(gbs::UniversalSaveData& data) {
     for (const auto& projectile : runtime_projectiles) if (projectile.active) ++projectile_count;
     for (const auto& projectile : runtime_enemy_projectiles) if (projectile.active) ++projectile_count;
     const ShmupRuntimeCheckpoint snapshot {
-        1, shmup_state, player_event_runtime, gbs::capture_checkpoint_script(shmup_event_runner, script_index),
+        2, shmup_state, player_event_runtime, gbs::capture_checkpoint_script(shmup_event_runner, script_index, event_state),
         gbs::capture_checkpoint_dialogue(dialogue), runtime_actor_gesture, player_sprite_index,
         checkpoint_music_index, checkpoint_tracker_index, shmup_event_wait_frames, shmup_high_score,
         static_cast<uint16_t>(wave->enemy_count), projectile_count, wave_clear_consumed, wave_spawned, run_wave_spawn_scripts, wave_start_pending
     };
     gbs::CheckpointPayloadWriter writer(data);
-    if (!writer.write(snapshot) || !gbs::write_checkpoint_events(writer, gbs::capture_checkpoint_events(event_state))) return false;
+    if (!write_shmup_checkpoint(writer, snapshot) || !gbs::write_checkpoint_events(writer, gbs::capture_checkpoint_events(event_state))) return false;
     for (size_t index = 0; index < wave->enemy_count; ++index) {
         const auto& enemy = runtime_enemies[index];
-        const auto bookmark = enemy.destroying ? gbs::capture_checkpoint_script(enemy.destroy_runner, static_cast<int>(index)) : gbs::CheckpointScript {};
+        const auto bookmark = enemy.destroying ? gbs::capture_checkpoint_script(enemy.destroy_runner, static_cast<int>(index), event_state) : gbs::CheckpointScript {};
         const ShmupEnemyCheckpoint saved { enemy.position_pixels, bookmark, enemy.sprite_index,
             enemy.destroy_wait_frames, enemy.health, enemy.fire_cooldown_frames, enemy.active, enemy.destroying };
-        if (!writer.write(saved)) return false;
+        if (!write_shmup_enemy_checkpoint(writer, saved)) return false;
     }
     for (uint8_t pool = 0; pool < 2; ++pool) {
         const auto* projectiles = pool == 0 ? runtime_projectiles : runtime_enemy_projectiles;
@@ -1020,9 +1094,10 @@ bool restore_shmup_checkpoint(int slot) {
         data.runtime != gbs::UniversalSaveRuntime::Shmup || !gbs::is_valid_shmup_wave_index(project, data.room_index)) return false;
     gbs::CheckpointPayloadReader reader(data);
     ShmupRuntimeCheckpoint snapshot {};
+    uint32_t source_version = 0;
     gbs::CheckpointEvents saved_events {};
     const auto& wave = project.waves[data.room_index];
-    if (!reader.read(snapshot) || snapshot.version != 1 || snapshot.state.wave_index != data.room_index ||
+    if (!read_shmup_checkpoint(reader, snapshot, &source_version) || snapshot.version != 2 || snapshot.state.wave_index != data.room_index ||
         snapshot.enemy_count != wave.enemy_count || snapshot.enemy_count > max_runtime_enemies ||
         snapshot.projectile_count > max_runtime_projectiles + max_runtime_enemy_projectiles || snapshot.wait_frames < 0 ||
         snapshot.music_index < -1 || snapshot.tracker_index < -1 ||
@@ -1032,15 +1107,15 @@ bool restore_shmup_checkpoint(int slot) {
         !gbs::read_checkpoint_events(reader, saved_events)) return false;
     gbs::EventRunner restored_runner {};
     if (!gbs::restore_checkpoint_script(snapshot.script,
-            checkpoint_script_for(data.room_index, snapshot.script.script_index), restored_runner)) return false;
+            checkpoint_script_for(data.room_index, snapshot.script.script_index), restored_runner, &event_state)) return false;
     // Validate the complete variable-sized payload before touching live actors.
     const auto enemy_reader = reader;
     for (size_t index = 0; index < snapshot.enemy_count; ++index) {
         ShmupEnemyCheckpoint enemy {};
         gbs::EventRunner runner {};
-        if (!reader.read(enemy) || enemy.health > wave.enemies[index].health || enemy.sprite < -1 ||
+        if (!read_shmup_enemy_checkpoint(reader, enemy, source_version) || enemy.health > wave.enemies[index].health || enemy.sprite < -1 ||
             (enemy.sprite >= 0 && static_cast<size_t>(enemy.sprite) >= project.actor_sprite_count) ||
-            !gbs::restore_checkpoint_script(enemy.script, wave.enemies[index].on_destroy, runner)) return false;
+            !gbs::restore_checkpoint_script(enemy.script, wave.enemies[index].on_destroy, runner, &event_state)) return false;
     }
     uint32_t projectile_slots[2] = {};
     for (size_t index = 0; index < snapshot.projectile_count; ++index) {
@@ -1073,7 +1148,7 @@ bool restore_shmup_checkpoint(int slot) {
     auto replay = enemy_reader;
     for (size_t index = 0; index < snapshot.enemy_count; ++index) {
         ShmupEnemyCheckpoint saved {};
-        replay.read(saved);
+        read_shmup_enemy_checkpoint(replay, saved, source_version);
         auto& enemy = runtime_enemies[index];
         enemy.position_pixels = saved.position;
         enemy.health = saved.health;
@@ -1082,7 +1157,7 @@ bool restore_shmup_checkpoint(int slot) {
         enemy.destroying = saved.destroying;
         enemy.sprite_index = saved.sprite;
         enemy.destroy_wait_frames = saved.wait_frames;
-        gbs::restore_checkpoint_script(saved.script, wave.enemies[index].on_destroy, enemy.destroy_runner);
+        gbs::restore_checkpoint_script(saved.script, wave.enemies[index].on_destroy, enemy.destroy_runner, &event_state);
     }
     for (auto& projectile : runtime_projectiles) projectile.active = false;
     for (auto& projectile : runtime_enemy_projectiles) projectile.active = false;
@@ -1727,6 +1802,11 @@ int initialize_shmup_runtime() {
     gbs::configure_dialogue_emotes(project.emote_assets, project.emote_asset_count);
     gbs::init_hud(hud);
     gbs::init_event_state(event_state);
+    gbs::bind_event_scripts(event_state, project.scripts, project.script_count);
+#if GBS_MULTI_RUNTIME
+    shmup_event_runner = {};
+    shmup_event_wait_frames = 0;
+#endif
     player_event_runtime = gbs::EventPlayerRuntimeState {
         true,
         0,

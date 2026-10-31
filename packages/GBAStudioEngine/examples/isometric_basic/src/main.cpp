@@ -2443,6 +2443,7 @@ int initialize_isometric_runtime() {
     }
 
     gbs::init_event_state(event_state);
+    gbs::bind_event_scripts(event_state, project.scripts, project.script_count);
     gbs::init_visual_effects(visual_effects);
     current_room = project.initial_room;
     entry_x = 0;

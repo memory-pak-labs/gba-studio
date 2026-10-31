@@ -135,7 +135,7 @@ bool capture_luta_checkpoint(gbs::UniversalSaveData& data) {
     const int script_index = current_checkpoint_script_index();
     if (luta_event_runner.active && script_index < 0) return false;
     const LutaRuntimeCheckpoint snapshot {
-        1, state, gbs::capture_checkpoint_script(luta_event_runner, script_index),
+        2, state, gbs::capture_checkpoint_script(luta_event_runner, script_index, event_state),
         gbs::capture_checkpoint_dialogue(dialogue), gbs::capture_checkpoint_events(event_state),
         checkpoint_music_index, checkpoint_tracker_index, luta_event_wait_frames,
         luta_cpu_attack_wait_frames,
@@ -150,15 +150,15 @@ bool restore_luta_checkpoint(int slot) {
     gbs::UniversalSaveData data {};
     LutaRuntimeCheckpoint snapshot {};
     if (service == nullptr || gbs::read_runtime_save(*service, slot, data) != gbs::SaveStatus::Ok ||
-        !gbs::read_universal_save_payload(data, gbs::UniversalSaveRuntime::Luta, &snapshot, sizeof(snapshot)) ||
-        snapshot.version != 1 || data.room_index < 0 || static_cast<size_t>(data.room_index) >= project.stage_count ||
+        !gbs::read_checkpoint_snapshot(data, gbs::UniversalSaveRuntime::Luta, snapshot) ||
+        snapshot.version != 2 || data.room_index < 0 || static_cast<size_t>(data.room_index) >= project.stage_count ||
         snapshot.wait_frames < 0 || snapshot.music_index < -1 || snapshot.tracker_index < -1 ||
         (snapshot.music_index >= 0 && static_cast<size_t>(snapshot.music_index) >= project.music_asset_count) ||
         (snapshot.tracker_index >= 0 && static_cast<size_t>(snapshot.tracker_index) >= project.tracker_asset_count) ||
         !gbs::valid_checkpoint_dialogue(snapshot.dialogue, project.dialogue_line_count)) return false;
     gbs::EventRunner restored_runner {};
     if (!gbs::restore_checkpoint_script(snapshot.script,
-            checkpoint_script_for(data.room_index, snapshot.script.script_index), restored_runner)) return false;
+            checkpoint_script_for(data.room_index, snapshot.script.script_index), restored_runner, &event_state)) return false;
     if (snapshot.cpu_wait_frames < 0 || snapshot.state.round_state > gbs::LutaRoundState::Draw ||
         snapshot.state.p1_ism_style > gbs::LutaIsmStyle::VIsm || snapshot.state.p2_ism_style > gbs::LutaIsmStyle::VIsm ||
         snapshot.state.p1_hp > snapshot.state.p1_max_hp || snapshot.state.p2_hp > snapshot.state.p2_max_hp) return false;
@@ -794,6 +794,7 @@ int initialize_luta_runtime() {
     gbs::init();
     gbs::init_dialogue(dialogue);
     gbs::init_event_state(event_state);
+    gbs::bind_event_scripts(event_state, project.scripts, project.script_count);
     gbs::init_event_runner(luta_event_runner);
     gbs::init_resource_manager(resource_manager);
     gbs::reset_runtime_telemetry();

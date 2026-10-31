@@ -152,6 +152,33 @@ host-test: topdown-actor-gesture-test
 topdown-actor-gesture-test:
 	python3 tests/host/topdown_actor_gesture_tests.py
 
+.PHONY: legacy-checkpoint-test
+host-test: legacy-checkpoint-test
+legacy-checkpoint-test:
+	python3 tests/host/legacy_checkpoint_tests.py
+
+.PHONY: topdown-cross-runtime-save-test cutscene-legacy-save-test
+host-test: topdown-cross-runtime-save-test cutscene-legacy-save-test
+topdown-cross-runtime-save-test:
+	python3 tests/host/topdown_cross_runtime_save_tests.py
+cutscene-legacy-save-test:
+	python3 tests/host/cutscene_legacy_save_tests.py
+
+.PHONY: shmup-compile-modes-test
+package: shmup-compile-modes-test
+shmup-compile-modes-test: check-toolchain
+	DEVKITARM="$(DEVKITARM)" python3 tests/host/shmup_compile_modes_tests.py
+
+.PHONY: event-calls-test
+host-test: event-calls-test
+event-calls-test: $(HOST_BUILD)/event_calls_tests
+	$(HOST_BUILD)/event_calls_tests
+	python3 tests/host/checkpoint_script_catalog_tests.py
+
+$(HOST_BUILD)/event_calls_tests: tests/host/event_calls_tests.cpp engine/src/gbs_event.cpp engine/src/gbs_dialogue_locale.cpp $(HOST_EVENT_RUNTIME_SRCS) engine/include/gbs/event.hpp
+	@mkdir -p $(@D)
+	$(HOST_CXX) $(HOST_CXXFLAGS) $(filter %.cpp,$^) -o $@
+
 topdown-backdrop-runtime-test:
 	python3 tests/host/topdown_backdrop_runtime_contract_tests.py
 
@@ -311,6 +338,16 @@ cutscene-animation-test: $(HOST_BUILD)/cutscene_pose_tests
 host-test: cutscene-dialogue-runtime-test
 cutscene-dialogue-runtime-test:
 	python3 tests/host/cutscene_dialogue_runtime_tests.py
+
+.PHONY: cutscene-timing-test
+host-test: cutscene-timing-test
+cutscene-timing-test: $(HOST_BUILD)/cutscene_script_runner_tests
+	$(HOST_BUILD)/cutscene_script_runner_tests
+	python3 tests/host/cutscene_timing_tests.py
+
+$(HOST_BUILD)/cutscene_script_runner_tests: tests/host/cutscene_script_runner_tests.cpp engine/src/gbs_event.cpp engine/src/gbs_dialogue_locale.cpp $(HOST_EVENT_RUNTIME_SRCS) engine/include/gbs/cutscene_script_runner.hpp
+	@mkdir -p $(@D)
+	$(HOST_CXX) $(HOST_CXXFLAGS) $(filter %.cpp,$^) -o $@
 
 $(HOST_BUILD)/cutscene_pose_tests: tests/host/cutscene_pose_tests.cpp engine/include/gbs/cutscene.hpp
 	@mkdir -p $(@D)

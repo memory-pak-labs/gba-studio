@@ -117,6 +117,9 @@ gbs::EventScript checkpoint_script_for(int room, int script_index) {
     const auto* group = gbs::visual_novel_choice_group_for(project, scene->choice_group_index);
     if (group != nullptr && script_index >= 2 && static_cast<size_t>(script_index - 2) < group->choice_count)
         return gbs::visual_novel_choice_script(*group, script_index - 2);
+    const int shared_start = 2 + (group == nullptr ? 0 : static_cast<int>(group->choice_count));
+    if (script_index >= shared_start && static_cast<size_t>(script_index - shared_start) < project.script_count)
+        return project.scripts[script_index - shared_start];
     return gbs::empty_event_script();
 }
 
@@ -124,7 +127,7 @@ int current_checkpoint_script_index() {
     if (!gbs::has_event_script(visual_novel_event_runner.script)) return -1;
     const auto* scene = gbs::visual_novel_scene_for(project, current_scene_index);
     const auto* group = gbs::visual_novel_choice_group_for(project, scene->choice_group_index);
-    const int count = 2 + (group == nullptr ? 0 : static_cast<int>(group->choice_count));
+    const int count = 2 + (group == nullptr ? 0 : static_cast<int>(group->choice_count)) + static_cast<int>(project.script_count);
     for (int index = 0; index < count; ++index) {
         const auto script = checkpoint_script_for(current_scene_index, index);
         if (script.commands == visual_novel_event_runner.script.commands &&
@@ -138,10 +141,10 @@ bool capture_visual_novel_checkpoint(gbs::UniversalSaveData& data) {
     const int script_index = current_checkpoint_script_index();
     if (visual_novel_event_runner.active && script_index < 0) return false;
     VisualNovelRuntimeCheckpoint snapshot {};
-    snapshot.version = 1;
+    snapshot.version = 2;
     for (size_t index = 0; index < history.count; ++index) snapshot.history_lines[index] = history.line_indices[index];
     snapshot.history_count = static_cast<uint32_t>(history.count);
-    snapshot.script = gbs::capture_checkpoint_script(visual_novel_event_runner, script_index);
+    snapshot.script = gbs::capture_checkpoint_script(visual_novel_event_runner, script_index, event_state);
     snapshot.dialogue = gbs::capture_checkpoint_dialogue(dialogue);
     snapshot.events = gbs::capture_checkpoint_events(event_state);
     snapshot.music_index = checkpoint_music_index;
@@ -481,8 +484,8 @@ bool restore_visual_novel_checkpoint(int slot) {
     gbs::UniversalSaveData data {};
     VisualNovelRuntimeCheckpoint snapshot {};
     if (service == nullptr || gbs::read_runtime_save(*service, slot, data) != gbs::SaveStatus::Ok ||
-        !gbs::read_universal_save_payload(data, gbs::UniversalSaveRuntime::VisualNovel, &snapshot, sizeof(snapshot)) ||
-        snapshot.version != 1 || !gbs::is_valid_visual_novel_scene_index(project, data.room_index) ||
+        !gbs::read_checkpoint_snapshot(data, gbs::UniversalSaveRuntime::VisualNovel, snapshot) ||
+        snapshot.version != 2 || !gbs::is_valid_visual_novel_scene_index(project, data.room_index) ||
         snapshot.history_count > gbs::visual_novel_history_capacity || snapshot.wait_frames < 0 ||
         (snapshot.next_scene_index != -1 && !gbs::is_valid_visual_novel_scene_index(project, snapshot.next_scene_index)) ||
         snapshot.music_index < -1 || snapshot.tracker_index < -1 ||
@@ -493,7 +496,7 @@ bool restore_visual_novel_checkpoint(int slot) {
         if (snapshot.history_lines[index] < 0 || static_cast<size_t>(snapshot.history_lines[index]) >= project.dialogue_line_count) return false;
     gbs::EventRunner restored_runner {};
     if (!gbs::restore_checkpoint_script(snapshot.script,
-            checkpoint_script_for(data.room_index, snapshot.script.script_index), restored_runner) ||
+            checkpoint_script_for(data.room_index, snapshot.script.script_index), restored_runner, &event_state) ||
         !gbs::restore_checkpoint_events(snapshot.events, event_state) ||
         !gbs::restore_suspended_common_state(data, event_state)) return false;
     current_scene_index = data.room_index;
@@ -684,6 +687,7 @@ int initialize_visual_novel_runtime() {
     // Match the editor Normal default; authored boot commands may override it.
     gbs::set_dialogue_text_speed(dialogue, 2);
     gbs::init_event_state(event_state);
+    gbs::bind_event_scripts(event_state, project.scripts, project.script_count);
     gbs::init_hud(hud);
     gbs::init_resource_manager(resource_manager);
     gbs::set_backdrop_color(gbs::rgb15(1, 1, 6));

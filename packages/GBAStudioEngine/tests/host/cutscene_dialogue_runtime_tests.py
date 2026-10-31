@@ -45,7 +45,11 @@ gbs::CutsceneProjectData project {};
 const gbs::DialogueLine lines[] = {{"Primeira\nSegunda\nTerceira\nQuarta"}};
 bool entry_frame_pending = false;
 int advances = 0, skips = 0;
-namespace gbs { void run_event_script(EventState&, EventScript) {} }
+namespace gbs { struct CutsceneScriptRunner {}; bool enqueue_cutscene_script(CutsceneScriptRunner&, EventScript) { return true; } }
+gbs::CutsceneScriptRunner cutscene_scripts {};
+int pending_step_line = -1;
+void tick_cutscene_scripts() {}
+void show_pending_step_line() {}
 namespace gbastudio_dialogue_ui {
 void configure_for_scene(const char*, bool = false) {
     gbs::DialogueUiConfig config {};
@@ -136,6 +140,7 @@ int main() {
     // Existing explicit skip and auto-advance behavior stays independent of A pagination.
     for (uint16_t button : {uint16_t(gbs::ButtonB), uint16_t(gbs::ButtonStart)}) {
         boot(); press(button); assert(skips == 1 && advances == 0);
+        boot(true); press(button); assert(skips == 1 && advances == 0);
     }
     boot(false, true);
     for (int i = 0; i < 10; ++i) update_cutscene({});

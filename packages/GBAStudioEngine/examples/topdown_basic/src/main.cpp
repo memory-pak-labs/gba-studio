@@ -2740,6 +2740,11 @@ void consume_event_outputs(bool trigger_room_enter) {
             if (event_state.save_request == 1) {
                 persist_runtime_state(requested_slot);
             } else if (event_state.save_request == 2) {
+#if GBS_MULTI_RUNTIME
+                const gbs::RuntimeAvailabilityMask available = gbs::active_runtime_availability();
+                gbs::request_universal_save_restore(gbastudio_project::save_bank, requested_slot,
+                    available != 0 ? available : gbs::runtime_availability(gbs::RuntimeKind::TopDown));
+#else
                 if (restore_runtime_state(requested_slot)) {
                     apply_room_metadata(false);
                     init_npc_runtime();
@@ -2747,6 +2752,7 @@ void consume_event_outputs(bool trigger_room_enter) {
                     reset_npc_player_hit_state();
                     room_changed = true;
                 }
+#endif
             } else if (event_state.save_request == 3) {
                 gbs::clear_save_slot(gbastudio_project::save_bank, static_cast<size_t>(requested_slot));
                 refresh_pause_menu_items();
@@ -3028,6 +3034,7 @@ int initialize_topdown_runtime() {
     }
 
     gbs::init_event_state(event_state);
+    gbs::bind_event_scripts(event_state, project.scripts, project.script_count);
     gbs::init_visual_effects(visual_effects);
     bool runtime_entry = false;
     bool restore_entry = false;
@@ -3226,12 +3233,19 @@ gbs::RuntimeAdapterFrameResult update_topdown_runtime(const gbs::RuntimeFrameCon
                     show_pause_menu_page(PauseMenuPage::System);
                 } else if (selected_value >= pause_menu_load_base &&
                     selected_value < pause_menu_load_base + static_cast<int>(active_save_slot_count)) {
+#if GBS_MULTI_RUNTIME
+                    const gbs::RuntimeAvailabilityMask available = gbs::active_runtime_availability();
+                    gbs::request_universal_save_restore(gbastudio_project::save_bank,
+                        selected_value - pause_menu_load_base,
+                        available != 0 ? available : gbs::runtime_availability(gbs::RuntimeKind::TopDown));
+#else
                     if (restore_runtime_state(selected_value - pause_menu_load_base)) {
                         apply_room_metadata(false);
                         init_npc_runtime();
                         init_trigger_states();
                         reset_npc_player_hit_state();
                     }
+#endif
                     show_pause_menu_page(PauseMenuPage::System);
                 } else if (selected_value >= pause_menu_delete_base &&
                     selected_value < pause_menu_delete_base + static_cast<int>(active_save_slot_count)) {

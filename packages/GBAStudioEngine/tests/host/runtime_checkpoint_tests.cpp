@@ -48,7 +48,112 @@ void test_failed_save_preserves_the_previous_checkpoint_and_cross_family_load() 
     assert(gbs::consume_runtime_save_restore(gbs::RuntimeKind::Luta, slot) && slot == 0);
 }
 
+void test_legacy_record_read_is_transactional() {
+    struct OldRecord {
+        uint32_t version;
+        int32_t before;
+        gbs::CheckpointScriptV1 script;
+        int32_t after;
+    };
+    struct Record {
+        uint32_t version;
+        int32_t before;
+        gbs::CheckpointScript script;
+        int32_t after;
+    };
+    const OldRecord old {1, 137, {-1, 0, 0, 0, {0x35, 0xA7, 0xFF}}, 9111};
+    gbs::UniversalSaveData data {};
+    gbs::CheckpointPayloadWriter writer(data); assert(writer.write(old));
+    gbs::CheckpointPayloadReader reader(data);
+    Record output {};
+    assert(gbs::read_legacy_checkpoint_record(reader, output));
+    assert(output.before == 137 && output.after == 9111 && output.script.call_depth == 0 && reader.complete());
+    --data.payload_size;
+    gbs::CheckpointPayloadReader truncated(data);
+    output.before = 99;
+    assert(!gbs::read_legacy_checkpoint_record(truncated, output));
+    assert(output.before == 99);
+    uint32_t first = 0;
+    assert(truncated.read(first) && first == 1); // Failed reads do not consume the prefix.
+    auto foreign_data = data;
+    gbs::CheckpointPayloadReader foreign(foreign_data);
+    assert(!truncated.commit(foreign));
+    int32_t second = 0;
+    assert(truncated.read(second) && second == 137);
+}
+
+void test_nested_script_checkpoint_resumes_all_callers_once() {
+    const gbs::EventCommand leaf[] = {
+        {gbs::EventOp::SaveGame, 0, 0, 0}, {gbs::EventOp::AddVariable, 0, 10, 0}
+    };
+    const gbs::EventCommand child[] = {
+        {gbs::EventOp::AddVariable, 0, 1, 0}, {gbs::EventOp::CallScript, 1, 0, 0},
+        {gbs::EventOp::AddVariable, 0, 100, 0}
+    };
+    const gbs::EventScript scripts[] = {{child, 3}, {leaf, 2}};
+    const gbs::EventCommand parent[] = {
+        {gbs::EventOp::CallScript, 0, 0, 0}, {gbs::EventOp::AddVariable, 0, 1000, 0}
+    };
+    gbs::EventState events {}; gbs::init_event_state(events);
+    gbs::bind_event_scripts(events, scripts, 2);
+    gbs::EventRunner runner {}; gbs::start_event_runner(runner, {parent, 2});
+    for (int frame = 0; frame < 20 && events.save_request == 0; ++frame)
+        gbs::update_checkpoint_event_runner(runner, events);
+    assert(events.save_request == 1 && events.variables[0] == 1 && runner.call_depth == 2);
+    const auto bookmark = gbs::capture_checkpoint_script(runner, 7, events);
+    gbs::EventRunner restored {};
+    assert(gbs::restore_checkpoint_script(bookmark, {parent, 2}, restored, &events));
+    events.save_request = 0;
+    for (int frame = 0; frame < 20 && restored.active; ++frame)
+        gbs::update_checkpoint_event_runner(restored, events);
+    assert(!restored.active && events.variables[0] == 1111);
+
+    const auto stable_runner = restored;
+    auto invalid = bookmark;
+    invalid.call_depth = gbs::max_event_script_call_depth + 1;
+    assert(!gbs::restore_checkpoint_script(invalid, {parent, 2}, restored, &events));
+    invalid = bookmark; invalid.calls[0].script_hash ^= 1;
+    assert(!gbs::restore_checkpoint_script(invalid, {parent, 2}, restored, &events));
+    invalid = bookmark; invalid.calls[1].command_index = 999;
+    assert(!gbs::restore_checkpoint_script(invalid, {parent, 2}, restored, &events));
+    invalid = bookmark; invalid.calls[1].script_index = 999;
+    assert(!gbs::restore_checkpoint_script(invalid, {parent, 2}, restored, &events));
+    assert(restored.command_index == stable_runner.command_index && restored.active == stable_runner.active);
+
+    // Relocated tables with the same commands are valid; changed callees are not.
+    gbs::EventCommand relocated_child[3], relocated_leaf[2];
+    std::memcpy(relocated_child, child, sizeof(child));
+    std::memcpy(relocated_leaf, leaf, sizeof(leaf));
+    const gbs::EventScript relocated[] = {{relocated_child, 3}, {relocated_leaf, 2}};
+    gbs::bind_event_scripts(events, relocated, 2);
+    assert(gbs::restore_checkpoint_script(bookmark, {parent, 2}, restored, &events));
+    relocated_leaf[1].b = 20;
+    assert(!gbs::restore_checkpoint_script(bookmark, {parent, 2}, restored, &events));
+
+    gbs::UniversalSaveData data {};
+    gbs::CheckpointPayloadWriter writer(data);
+    assert(gbs::write_checkpoint_script(writer, bookmark));
+    assert(data.payload_size == 14 + 2 * sizeof(gbs::CheckpointScriptCall));
+    const auto nested_size = data.payload_size;
+    for (int index = 0; index < 16; ++index)
+        assert(gbs::write_checkpoint_script(writer, gbs::CheckpointScript {}));
+    assert(data.payload_size == nested_size + 16 * 14);
+    gbs::CheckpointPayloadReader reader(data);
+    gbs::CheckpointScript read {};
+    assert(gbs::read_checkpoint_script(reader, read));
+    assert(read.call_depth == bookmark.call_depth && read.calls[1].script_hash == bookmark.calls[1].script_hash);
+    for (int index = 0; index < 16; ++index) assert(gbs::read_checkpoint_script(reader, read));
+    assert(reader.complete());
+    --data.payload_size;
+    gbs::CheckpointPayloadReader truncated(data);
+    assert(gbs::read_checkpoint_script(truncated, read));
+    for (int index = 0; index < 15; ++index) assert(gbs::read_checkpoint_script(truncated, read));
+    assert(!gbs::read_checkpoint_script(truncated, read));
+}
+
 int main() {
+    test_legacy_record_read_is_transactional();
+    test_nested_script_checkpoint_resumes_all_callers_once();
     const gbs::EventCommand commands[] = {
         { gbs::EventOp::AddVariable, 0, 7, 0 },
         { gbs::EventOp::SaveGame, 0, 0, 0 },
@@ -62,7 +167,7 @@ int main() {
     assert(gbs::update_checkpoint_event_runner(runner, events));
     assert(events.variables[0] == 7);
     assert(events.save_request == 1 && runner.command_index == 2);
-    const auto bookmark = gbs::capture_checkpoint_script(runner, 4);
+    const auto bookmark = gbs::capture_checkpoint_script(runner, 4, events);
     gbs::EventRunner restored {};
     assert(gbs::restore_checkpoint_script(bookmark, script, restored));
     events.save_request = 0;
