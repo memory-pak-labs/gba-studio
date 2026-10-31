@@ -176,7 +176,9 @@ enum class EventOp : uint8_t {
     OpenShop = 160,
     SetAdventureState = 161,
     DrawText = 162,
-    Visibility = 163
+    Visibility = 163,
+    MoveActorTo = 164,
+    MoveActorRelative = 165
 };
 
 enum class VisualEffectKind : uint8_t {
@@ -274,8 +276,11 @@ enum class EventActorOp : uint8_t {
     CancelMovement = 14,
     PushFacing = 15,
     VisibilityLantern = 16,
-    VisibilityReveal = 17
+    VisibilityReveal = 17,
+    MoveTo = 18
 };
+
+struct EventRunner;
 
 struct EventActorCommand {
     EventActorOp op;
@@ -284,6 +289,8 @@ struct EventActorCommand {
     int b;
     int c = 0;
     int d = 0;
+    EventRunner* motion_owner = nullptr;
+    uint32_t motion_token = 0;
 };
 
 struct EventDrawText { int line=-1; int x=0; int y=0; bool overlay=true; };
@@ -413,12 +420,15 @@ struct EventSceneStackEntry {
 };
 
 struct EventState {
+    bool supports_temporal_actor_motion;
+    uint32_t actor_motion_serial;
     EventCommand luta_commands[max_event_luta_commands];
     size_t luta_command_count;
     int current_room;
     int player_x;
     int player_y;
     int player_direction;
+    uint8_t racing_result = 0;
     int actor_condition_tile_size;
     uint16_t input_held;
     uint16_t input_pressed;
@@ -475,10 +485,12 @@ struct EventState {
     int actor_y[max_event_actor_state_slots];
     int actor_direction[max_event_actor_state_slots];
     bool actor_animation_playing[max_event_actor_state_slots];
+    bool player_animation_playing;
     bool actor_update_script_enabled[max_event_actor_state_slots];
     int player_walk_speed;
     int player_run_speed;
     int player_stamina_cost;
+    uint16_t player_run_button;
     int player_movement_state;
     int player_movement_tile_tag;
     bool platformer_state_changed;
@@ -613,6 +625,7 @@ struct EventState {
 // Requested includes the cover phase; pending means ready for adapter handoff.
 bool runtime_transition_requested();
 bool runtime_transition_pending();
+void cancel_runtime_transition();
 RuntimeKind runtime_transition_target();
 bool runtime_transition_route(RuntimeTransitionRoute& route);
 bool request_runtime_save_restore(RuntimeKind runtime, int slot_index);
@@ -637,6 +650,8 @@ struct EventRunner {
     size_t command_index;
     bool active;
     bool yielded;
+    bool actor_motion_pending;
+    uint32_t actor_motion_token;
     size_t step_budget;
     EventScriptCallFrame calls[max_event_script_call_depth];
     size_t call_depth;
@@ -719,6 +734,7 @@ bool adventure_callback_script(const EventState& state, int callback_index, int&
 void init_event_runner(EventRunner& runner);
 void start_event_runner(EventRunner& runner, EventScript script);
 void stop_event_runner(EventRunner& runner);
+void complete_event_actor_movement(EventRunner& runner, uint32_t token);
 bool update_event_runner(EventRunner& runner, EventState& state);
 uint16_t resolve_event_tile(const EventTileCommand& command, const TileAsset* assets, size_t asset_count);
 constexpr bool event_runner_is_active(const EventRunner& runner) {

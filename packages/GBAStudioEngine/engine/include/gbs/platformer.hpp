@@ -350,7 +350,23 @@ struct PlatformerProjectData {
     PlatformerPlayerAnimationSet player_animations {};
     EventScript player_on_start = empty_event_script();
     EventScript player_on_update = empty_event_script();
+    const SpriteAnimation* const* player_script_animations = nullptr;
+    size_t player_script_animation_count = 0;
 };
+
+constexpr const SpriteAnimation* platformer_player_animation_for_index(const PlatformerProjectData& project, int index) {
+    if (project.player_script_animations != nullptr && project.player_script_animation_count > 0) {
+        return sprite_animation_for_reference(project.player_script_animations,
+            project.player_script_animation_count, project.player_animations.idle, index);
+    }
+    const SpriteAnimation* clips[] = {
+        project.player_animations.idle, project.player_animations.walk, project.player_animations.jump,
+        project.player_animations.fall, project.player_animations.climb, project.player_animations.wall_slide,
+        project.player_animations.dash, project.player_animations.glide, project.player_animations.attack,
+        project.player_animations.hurt, project.player_animations.land
+    };
+    return sprite_animation_for_reference(clips, 11, project.player_animations.idle, index);
+}
 
 struct PlatformerRuntimeState {
     Vec2i respawn_position_pixels;
@@ -387,10 +403,7 @@ constexpr PlatformerNpcRuntime platformer_npc_runtime_from_data(const Platformer
 }
 
 constexpr const SpriteAnimation* platformer_npc_animation_for_index(const PlatformerNpcData& npc, int animation_index) {
-    if (npc.animations == nullptr || animation_index < 0 || static_cast<size_t>(animation_index) >= npc.animation_count) {
-        return npc.animation;
-    }
-    return npc.animations[animation_index];
+    return sprite_animation_for_reference(npc.animations, npc.animation_count, npc.animation, animation_index);
 }
 
 constexpr Rect platformer_npc_actor_rect(const PlatformerNpcRuntime& npc) {
@@ -487,6 +500,9 @@ constexpr void apply_platformer_npc_event_command(
         break;
     case EventActorOp::SetActive:
         runtime.active = command.a != 0;
+        break;
+    case EventActorOp::MoveTo:
+        // The scene runtime consumes this asynchronous request before this helper.
         break;
     case EventActorOp::SetPosition:
         runtime.actor.position_pixels = Vec2i { command.a, command.b };
@@ -824,6 +840,7 @@ constexpr EventScript platformer_moving_platform_event_script_for(const Platform
     return empty_event_script();
 }
 
+bool move_platformer_scripted_step(const TileMap& map, Actor& actor, Vec2i delta, const Actor* blockers, size_t blocker_count);
 PlatformerActor platformer_actor_from_rect(Rect anchor_bounds_pixels, Vec2i collision_offset_pixels = Vec2i { 0, 0 });
 PlatformerRuntimeState platformer_state_from_spawn(Vec2i respawn_position_pixels, uint16_t checkpoint_id = 0);
 Rect platformer_actor_rect(const PlatformerActor& actor);

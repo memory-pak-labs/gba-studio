@@ -35,6 +35,21 @@ GBA_LDFLAGS := $(GBA_ARCH) -nostartfiles -Wl,--gc-sections -T engine/startup/gba
 HOST_CXXFLAGS := -std=c++17 -Wall -Wextra -Werror -Iengine/include
 HOST_EVENT_RUNTIME_SRCS := engine/src/gbs_runtime.cpp engine/src/gbs_rtc.cpp engine/src/gbs_link.cpp engine/src/rumble.cpp engine/src/deferred_work.cpp engine/src/gbs_engine_global.cpp tests/host/hw_stubs.cpp
 
+MOTION_HOST_TESTS := actor_move_runner_tests actor_move_threads_tests actor_move_relative_experimental_tests actor_move_sync_compat_experimental_tests iso_event_scheduler_tests iso_checkpoint_catalog_tests iso_checkpoint_scheduler_tests iso_temporal_checkpoint_tests iso_relative_checkpoint_experimental_tests iso_temporal_motion_tests motion_checkpoint_experimental_tests platformer_motion_catalog_experimental_tests platformer_motion_checkpoint_experimental_tests platformer_scripted_motion_tests scripted_motion_manager_tests topdown_motion_catalog_experimental_tests save_failure_feedback_experimental_tests menu_checkpoint_guard_tests isometric_screen_facing_tests
+MOTION_HOST_SRCS := engine/src/gbs_event.cpp engine/src/gbs_dialogue_locale.cpp engine/src/gbs_platformer.cpp engine/src/gbs_isometric.cpp engine/src/gbs_topdown.cpp $(HOST_EVENT_RUNTIME_SRCS) tests/host/motion_render_stubs.cpp
+MOTION_HOST_BINARIES := $(addprefix $(HOST_BUILD)/,$(MOTION_HOST_TESTS))
+
+.PHONY: motion-checkpoint-test
+motion-checkpoint-test: $(MOTION_HOST_BINARIES)
+	@set -e; for test in $(MOTION_HOST_BINARIES); do "$$test"; echo "PASS $$test"; done
+	python3 tests/host/isometric_save_dispatch_tests.py
+
+host-test: motion-checkpoint-test
+
+$(MOTION_HOST_BINARIES): $(HOST_BUILD)/%: tests/host/%.cpp $(MOTION_HOST_SRCS) $(wildcard engine/include/gbs/*.hpp)
+	@mkdir -p $(@D)
+	$(HOST_CXX) $(HOST_CXXFLAGS) $< $(MOTION_HOST_SRCS) -o $@
+
 ENGINE_C_SRCS := engine/src/gbs_hw.c engine/src/gbs_text.c engine/src/gbs_portrait_tab.c
 ENGINE_CPP_SRCS := engine/src/gbs_core.cpp engine/src/gbs_input.cpp engine/src/gbs_render.cpp engine/src/gbs_math.cpp engine/src/gbs_bios.cpp engine/src/gbs_rtc.cpp engine/src/gbs_random.cpp engine/src/gbs_format.cpp engine/src/gbs_info.cpp engine/src/gbs_tween.cpp engine/src/gbs_visual_effects.cpp engine/src/gbs_topdown.cpp engine/src/gbs_platformer.cpp engine/src/gbs_isometric.cpp engine/src/gbs_dungeon_crawler.cpp engine/src/gbs_racing.cpp engine/src/gbs_battle_rpg.cpp engine/src/gbs_luta.cpp engine/src/gbs_event.cpp engine/src/gbs_dialogue.cpp engine/src/gbs_dialogue_locale.cpp engine/src/gbs_ui.cpp engine/src/gbs_audio.cpp engine/src/gbs_animation.cpp engine/src/gbs_compression.cpp engine/src/gbs_dma.cpp engine/src/gbs_timer.cpp engine/src/gbs_interrupt.cpp engine/src/gbs_resource_manager.cpp engine/src/gbs_save.cpp engine/src/gbs_runtime_save_restore.cpp engine/src/gbs_debug.cpp engine/src/gbs_link.cpp engine/src/gbs_runtime.cpp engine/src/hblank_effect.cpp engine/src/action.cpp engine/src/profiler.cpp engine/src/camera.cpp engine/src/palette.cpp engine/src/deferred_work.cpp engine/src/audio_engine.cpp engine/src/containers.cpp engine/src/typewriter.cpp engine/src/input_advanced.cpp engine/src/hbe_presets.cpp engine/src/rumble.cpp engine/src/pseudo_3d.cpp engine/src/gbs_engine_global.cpp
 ENGINE_ASM_SRCS := engine/startup/crt0.S engine/startup/irq.S

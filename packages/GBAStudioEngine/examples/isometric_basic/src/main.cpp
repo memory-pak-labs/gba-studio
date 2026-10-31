@@ -7,6 +7,9 @@
 #include "gbs/input.hpp"
 #include "gbs/link.hpp"
 #include "gbs/isometric.hpp"
+#include "gbs/iso_temporal_motion.hpp"
+#include "gbs/iso_event_scheduler.hpp"
+#include "gbs/iso_temporal_checkpoint.hpp"
 #include "gbs/isometric_paged_surface.hpp"
 #include "gbs/render.hpp"
 #include "gbs/resource_manager.hpp"
@@ -381,6 +384,24 @@ enum IsoTacticalFeedbackKind : uint8_t {
 constexpr uint8_t no_iso_tactical_audio_cue = 0xff;
 
 gbs::EventState event_state __attribute__((section(".ewram_bss")));
+gbs::IsoEventScheduler iso_event_scheduler __attribute__((section(".ewram_bss")));
+gbs::IsoTemporalMotionPool iso_temporal_motions __attribute__((section(".ewram_bss")));
+int iso_temporal_speeds[gbs::max_isometric_save_actors]{};
+uint16_t iso_restored_motion_mask = 0;
+uint16_t iso_restored_relative_mask = 0;
+int32_t iso_restored_target_x[gbs::max_isometric_save_actors]{};
+int32_t iso_restored_target_y[gbs::max_isometric_save_actors]{};
+uint8_t iso_restored_motion_remainders[gbs::max_isometric_save_actors]{};
+gbs::EventRunner* iso_restored_motion_owners[gbs::max_isometric_save_actors]{};
+constexpr uint32_t iso_temporal_checkpoint_magic = 0x31534d49u; // IMS1
+
+bool iso_scheduler_overflow = false;
+struct IsoPendingExit { bool active = false; int target_room = -1; int target_x = 0; int target_y = 0; gbs::EventScript script = gbs::empty_event_script(); };
+IsoPendingExit iso_pending_exit{};
+void run_iso_event_script(gbs::EventState& state, gbs::EventScript script) {
+    if (iso_pending_exit.active) return;
+    if (!gbs::run_iso_scheduled_script(iso_event_scheduler, state, script)) iso_scheduler_overflow = true;
+}
 gbs::VisualEffectsController visual_effects;
 int current_room = 0;
 int entry_x = 0;
@@ -395,6 +416,42 @@ gbs::IsoScriptedMove scripted_actor_moves[max_actor_count] {};
 
 void consume_iso_scene_actor_commands(gbs::IsoActor* scene_actors, size_t count, gbs::EventState& state, bool smooth) {
     if (!smooth) for (auto& move : scripted_actor_moves) move = {};
+    for (size_t i = 0; i < state.actor_command_count; ++i) {
+        const auto& command = state.actor_commands[i];
+        if (command.op == gbs::EventActorOp::MoveTo) {
+            gbs::EventActorCommand resolved = command;
+            const bool actor_valid = command.actor_index >= 0 && static_cast<size_t>(command.actor_index) < count;
+            if (command.c != 0 && actor_valid && (iso_restored_relative_mask & (1u << command.actor_index)) &&
+                iso_restored_motion_owners[command.actor_index] == command.motion_owner) {
+                resolved.a = iso_restored_target_x[command.actor_index];
+                resolved.b = iso_restored_target_y[command.actor_index];
+                resolved.c = 0;
+            } else if (command.c != 0 && actor_valid) {
+                const auto& origin = scene_actors[command.actor_index].tile;
+                const int64_t x = static_cast<int64_t>(origin.x) + command.a;
+                const int64_t y = static_cast<int64_t>(origin.y) + command.b;
+                if (x < 0 || y < 0 || !room_data || x >= room_data->width_tiles || y >= room_data->height_tiles) resolved.a = -1;
+                else { resolved.a = static_cast<int>(x); resolved.b = static_cast<int>(y); resolved.c = 0; }
+            }
+            if (!actor_valid || resolved.a < 0 || resolved.b < 0 || !room_data || resolved.a >= room_data->width_tiles || resolved.b >= room_data->height_tiles) {
+                if (command.motion_owner) gbs::complete_event_actor_movement(*command.motion_owner, command.motion_token);
+            } else if (gbs::begin_iso_temporal_motion(iso_temporal_motions, resolved, count)) {
+                const size_t actor = static_cast<size_t>(command.actor_index);
+                if ((iso_restored_motion_mask & (1u << actor)) && iso_restored_motion_owners[actor] == command.motion_owner) {
+                    iso_temporal_motions.moves[actor].remainder = iso_restored_motion_remainders[actor];
+                    iso_restored_motion_mask &= static_cast<uint16_t>(~(1u << actor));
+                    iso_restored_relative_mask &= static_cast<uint16_t>(~(1u << actor));
+                    iso_restored_motion_owners[actor] = nullptr;
+                }
+            }
+        } else if (command.op == gbs::EventActorOp::SetSpeed && command.actor_index >= 0 &&
+            static_cast<size_t>(command.actor_index) < gbs::max_isometric_save_actors) {
+            iso_temporal_speeds[command.actor_index] = command.a;
+        } else if ((command.op == gbs::EventActorOp::CancelMovement || command.op == gbs::EventActorOp::SetPosition) &&
+            command.actor_index >= 0 && static_cast<size_t>(command.actor_index) < gbs::max_isometric_save_actors) {
+            gbs::finish_iso_temporal_motion(iso_temporal_motions.moves[command.actor_index]);
+        }
+    }
     for (size_t i = 0; smooth && i < state.actor_command_count; ++i) {
         auto& command = state.actor_commands[i];
         if (command.op == gbs::EventActorOp::MoveRelative && command.actor_index > 0 &&
@@ -1876,7 +1933,7 @@ void update_iso_actor_player_hit_scripts(
         }
         if (iso_actor_touching_player[index]) continue;
         iso_actor_touching_player[index] = true;
-        gbs::run_event_script(
+        run_iso_event_script(
             event_state,
             gbs::iso_room_hit_script_for_collision_group(
                 room,
@@ -1991,7 +2048,7 @@ void consume_link_event_outputs(gbs::EventState& event_state) {
                 request == 1 ? gbs::LinkRole::Host : gbs::LinkRole::Join,
                 static_cast<uint16_t>(event_state.link_timeout_frames)
             ) && event_state.link_script >= 0 && static_cast<size_t>(event_state.link_script) < project.script_count) {
-            gbs::run_event_script(event_state, project.scripts[event_state.link_script]);
+            run_iso_event_script(event_state, project.scripts[event_state.link_script]);
         }
         return;
     }
@@ -2108,7 +2165,7 @@ bool run_button_event_binding() {
     event_state.last_script = -1;
     event_state.last_button_binding_overrides_default = false;
     if (script_index >= 0 && static_cast<size_t>(script_index) < project.script_count) {
-        gbs::run_event_script(event_state, project.scripts[script_index]);
+        run_iso_event_script(event_state, project.scripts[script_index]);
         consume_event_state(event_state);
     }
     return overrides_default;
@@ -2180,8 +2237,29 @@ IsometricTacticalSaveData capture_tactical_save(const gbs::IsoActor* saved_actor
     return saved;
 }
 
+bool is_iso_temporal_checkpoint(const gbs::UniversalSaveData& data) {
+    uint32_t magic = 0;
+    gbs::CheckpointPayloadReader reader(data);
+    return reader.read(magic) && magic == iso_temporal_checkpoint_magic;
+}
+
 bool read_isometric_menu_save(const gbs::UniversalSaveData& data, gbs::IsometricSaveData& scene,
     IsometricTacticalSaveData* tactical = nullptr) {
+    if (data.runtime != gbs::UniversalSaveRuntime::Isometric || !gbs::is_valid_universal_save_data(data)) return false;
+    if (is_iso_temporal_checkpoint(data)) {
+        gbs::CheckpointPayloadReader reader(data);
+        uint32_t magic = 0; uint8_t flags = 0;
+        IsometricMenuSaveData saved {};
+        if (!reader.read(magic) || magic != iso_temporal_checkpoint_magic || !reader.read(flags) || flags > 3 ||
+            !reader.read(saved.scene)) return false;
+        if ((flags & 1) && (!reader.read(saved.tactical) || saved.tactical.signature != 0x31544349 ||
+            saved.tactical.turn_number == 0 || saved.tactical.active_team > 1 || saved.tactical.outcome > IsoTacticalOutcomeDefeat ||
+            saved.tactical.path_length > gbs::max_iso_tactical_move_steps || saved.tactical.step_index > saved.tactical.path_length ||
+            saved.tactical.step_delay > 5 || (saved.tactical.moving && saved.tactical.moving_actor_index >= saved.scene.actor_count))) return false;
+        scene = saved.scene;
+        if (tactical != nullptr && (flags & 1)) *tactical = saved.tactical;
+        return true;
+    }
     // Adventure scenes retain their existing native payload.
     if (data.payload_size == sizeof(scene)) {
         return gbs::read_universal_save_payload(data, gbs::UniversalSaveRuntime::Isometric, &scene, sizeof(scene));
@@ -2195,6 +2273,42 @@ bool read_isometric_menu_save(const gbs::UniversalSaveData& data, gbs::Isometric
         (saved.tactical.moving && saved.tactical.moving_actor_index >= saved.scene.actor_count)) return false;
     scene = saved.scene;
     if (tactical != nullptr) *tactical = saved.tactical;
+    return true;
+}
+
+bool restore_iso_temporal_checkpoint(const gbs::UniversalSaveData& data, int room,
+    gbs::IsoActor* saved_actors, size_t count, const gbs::EventState& state, bool validate_only = false) {
+    if (!is_iso_temporal_checkpoint(data)) return true;
+    gbs::CheckpointPayloadReader reader(data);
+    uint32_t magic = 0; uint8_t flags = 0;
+    gbs::IsometricSaveData scene {};
+    IsometricTacticalSaveData tactical {};
+    gbs::IsoTemporalRestore restored {};
+    if (!reader.read(magic) || magic != iso_temporal_checkpoint_magic || !reader.read(flags) || flags > 3 ||
+        !reader.read(scene) || ((flags & 1) && !reader.read(tactical)) ||
+        !gbs::read_iso_temporal_extension(reader, project, room, state, count, iso_event_scheduler, restored, saved_actors, validate_only, (flags & 2) != 0)) return false;
+    if (validate_only) return true;
+    if (restored.exit.active) {
+        const auto exit_script = project.rooms[room].on_exit;
+        if (!gbs::iso_scheduled_script_is_active(iso_event_scheduler, exit_script)) {
+            gbs::clear_iso_event_scheduler(iso_event_scheduler);
+            return false;
+        }
+        iso_pending_exit = {true, restored.exit.target_room, restored.exit.target_x, restored.exit.target_y, exit_script};
+    }
+    iso_restored_motion_mask = restored.motion_mask;
+    iso_restored_relative_mask = restored.relative_mask;
+    for (size_t index = 0; index < count; ++index) {
+        iso_temporal_speeds[index] = restored.speeds[index];
+        if (!(restored.motion_mask & (1u << index))) continue;
+        saved_actors[index].position_x256 = restored.x256[index];
+        saved_actors[index].position_y256 = restored.y256[index];
+        saved_actors[index].position_initialized = true;
+        iso_restored_motion_remainders[index] = restored.remainder[index];
+        iso_restored_target_x[index] = restored.target_x[index];
+        iso_restored_target_y[index] = restored.target_y[index];
+        iso_restored_motion_owners[index] = &iso_event_scheduler.slots[restored.owner_slot[index]].runner;
+    }
     return true;
 }
 
@@ -2271,23 +2385,47 @@ bool capture_isometric_runtime_state(gbs::UniversalSaveData& universal_save, int
             tactical_state.enabled ? sizeof(menu_save) : sizeof(save_data))) {
         return false;
     }
+    bool needs_temporal = iso_pending_exit.active;
+    for (const auto& slot : iso_event_scheduler.slots) needs_temporal = needs_temporal || slot.runner.active;
+    for (size_t index = 0; index < actor_count && index < gbs::max_isometric_save_actors; ++index)
+        needs_temporal = needs_temporal || iso_temporal_speeds[index] != 100 ||
+            gbs::iso_temporal_motion_is_live(iso_temporal_motions.moves[index]);
+    if (needs_temporal) {
+        gbs::CheckpointPayloadWriter writer(universal_save);
+        const uint8_t flags = static_cast<uint8_t>(2 | (tactical_state.enabled ? 1 : 0));
+        const gbs::IsoCheckpointExit exit { iso_pending_exit.active, iso_pending_exit.target_room,
+            iso_pending_exit.target_x, iso_pending_exit.target_y };
+        if (!writer.write(iso_temporal_checkpoint_magic) || !writer.write(flags) || !writer.write(menu_save.scene) ||
+            ((flags & 1) && !writer.write(menu_save.tactical)) ||
+            !gbs::write_iso_temporal_extension(writer, project, current_room, event_state, iso_event_scheduler,
+                iso_temporal_motions, actors, actor_count, iso_temporal_speeds, exit, true)) return false;
+    }
     return true;
 }
 
 void persist_isometric_runtime_state(int current_room, const gbs::IsoActor* actors, size_t actor_count,
-    const gbs::IsoCamera& camera, const gbs::EventState& event_state, const gbs::IsoCursorState& cursor) {
-    if (!gbastudio_isometric_project::save_enabled) return;
+    const gbs::IsoCamera& camera, const gbs::EventState& event_state, const gbs::IsoCursorState& cursor, int slot = 0) {
+    if (!gbastudio_isometric_project::save_enabled || slot < 0 ||
+        static_cast<size_t>(slot) >= gbastudio_isometric_project::save_bank.slot_count) return;
     gbs::UniversalSaveData universal_save {};
-    if (!capture_isometric_runtime_state(universal_save, current_room, actors, actor_count, camera, event_state, cursor)) return;
-    ++isometric_save_sequence;
+    if (!capture_isometric_runtime_state(universal_save, current_room, actors, actor_count, camera, event_state, cursor)) {
+        gbs::show_checkpoint_save_failure(dialogue);
+        return;
+    }
+    const uint32_t sequence = isometric_save_sequence + 1;
     gbs::SaveMetadata metadata = gbs::make_save_metadata(
         "ISOMETRIC",
         gbs::frame_count(),
-        isometric_save_sequence,
+        sequence,
         static_cast<uint16_t>(current_room),
         0
     );
-    gbs::write_save_slot_record(gbastudio_isometric_project::save_bank, 0, &universal_save, sizeof(universal_save), metadata, isometric_save_sequence);
+    if (gbs::write_save_slot_record(gbastudio_isometric_project::save_bank, static_cast<size_t>(slot), &universal_save,
+        sizeof(universal_save), metadata, sequence) != gbs::SaveStatus::Ok) {
+        gbs::show_checkpoint_backend_failure(dialogue);
+        return;
+    }
+    isometric_save_sequence = sequence;
 }
 
 bool restore_isometric_runtime_state(
@@ -2326,8 +2464,23 @@ bool restore_isometric_runtime_state(
         return false;
     }
     gbs::IsometricSaveData save_data {};
-    has_restored_tactical_save = universal_save.payload_size == sizeof(IsometricMenuSaveData);
-    if (!read_isometric_menu_save(universal_save, save_data, &restored_tactical_save)) {
+    IsometricTacticalSaveData tactical_save {};
+    const bool has_tactical_save = is_iso_temporal_checkpoint(universal_save)
+        ? universal_save.payload_size > 4 && (universal_save.payload[4] & 1) != 0
+        : universal_save.payload_size == sizeof(IsometricMenuSaveData);
+    if (!read_isometric_menu_save(universal_save, save_data, &tactical_save) ||
+        !gbs::is_valid_isometric_save_data(project, save_data) || save_data.actor_count > actor_capacity ||
+        save_data.actor_count > max_actor_count ||
+        actors == nullptr) {
+        return false;
+    }
+    gbs::IsoActor validation_actors[max_actor_count] {};
+    for (size_t index = 0; index < save_data.actor_count; ++index) {
+        validation_actors[index].tile = {save_data.actors[index].tile_x, save_data.actors[index].tile_y, save_data.actors[index].tile_z};
+    }
+    if (!restore_iso_temporal_checkpoint(universal_save, save_data.room_index, validation_actors,
+            save_data.actor_count, event_state, true)) return false;
+    if (!stream_resources_for_room(save_data.room_index)) {
         return false;
     }
     if (!gbs::apply_isometric_save_data(project, save_data, actors, actor_capacity, actor_count, camera, event_state, &cursor)) {
@@ -2343,9 +2496,19 @@ bool restore_isometric_runtime_state(
             gbs::universal_save_equipment_slot_count)) {
         return false;
     }
-    if (!stream_resources_for_room(event_state.current_room)) {
-        return false;
+    has_restored_tactical_save = has_tactical_save;
+    restored_tactical_save = tactical_save;
+    gbs::clear_iso_temporal_motions(iso_temporal_motions);
+    gbs::clear_iso_event_scheduler(iso_event_scheduler);
+    iso_pending_exit = IsoPendingExit {};
+    iso_restored_motion_mask = 0;
+    iso_restored_relative_mask = 0;
+    for (size_t index = 0; index < max_actor_count; ++index) {
+        iso_temporal_speeds[index] = 100;
+        iso_restored_motion_owners[index] = nullptr;
+        iso_restored_motion_remainders[index] = 0;
     }
+    if (!restore_iso_temporal_checkpoint(universal_save, event_state.current_room, actors, actor_count, event_state)) return false;
     current_room = event_state.current_room;
     room_data = &project.rooms[current_room];
     gbs::apply_video_composition(room_data->video.affine_enabled ? room_data->video : project.video);
@@ -2365,22 +2528,41 @@ bool apply_iso_event_room_change(
     gbs::EventState& event_state,
     gbs::IsoCursorState& cursor
 ) {
-    if (event_state.current_room == current_room) {
-        return false;
+    int target_room = -1;
+    int target_tile_x = 0;
+    int target_tile_y = 0;
+    if (iso_pending_exit.active) {
+        if (gbs::iso_scheduled_script_is_active(iso_event_scheduler, iso_pending_exit.script)) return false;
+        target_room = iso_pending_exit.target_room;
+        target_tile_x = iso_pending_exit.target_x;
+        target_tile_y = iso_pending_exit.target_y;
+        iso_pending_exit = IsoPendingExit{};
+    } else {
+        if (event_state.current_room == current_room) return false;
+        if (!gbs::is_valid_isometric_room_index(project_data, event_state.current_room)) {
+            event_state.current_room = current_room;
+            return false;
+        }
+        target_room = event_state.current_room;
+        target_tile_x = event_state.player_x;
+        target_tile_y = event_state.player_y;
+        if (!stream_resources_for_room(target_room)) {
+            event_state.current_room = current_room;
+            return false;
+        }
+        gbs::clear_iso_temporal_motions(iso_temporal_motions);
+        gbs::clear_iso_event_scheduler(iso_event_scheduler);
+        const auto exit_script = room_data->on_exit;
+        run_iso_event_script(event_state, exit_script);
+        if (gbs::iso_scheduled_script_is_active(iso_event_scheduler, exit_script)) {
+            iso_pending_exit = {true, target_room, target_tile_x, target_tile_y, exit_script};
+            event_state.current_room = current_room;
+            consume_iso_scene_actor_commands(actors, actor_count, event_state, false);
+            return false;
+        }
     }
-    if (!gbs::is_valid_isometric_room_index(project_data, event_state.current_room)) {
-        event_state.current_room = current_room;
-        return false;
-    }
-
-    int target_room = event_state.current_room;
-    int target_tile_x = event_state.player_x;
-    int target_tile_y = event_state.player_y;
-    if (!stream_resources_for_room(target_room)) {
-        event_state.current_room = current_room;
-        return false;
-    }
-    gbs::run_event_script(event_state, room_data->on_exit);
+    gbs::clear_iso_temporal_motions(iso_temporal_motions);
+    gbs::clear_iso_event_scheduler(iso_event_scheduler);
     current_room = target_room;
     room_data = &project_data.rooms[current_room];
     gbs::apply_video_composition(room_data->video.affine_enabled ? room_data->video : project_data.video);
@@ -2406,11 +2588,11 @@ bool apply_iso_event_room_change(
         cursor.tile = gbs::iso_room_cursor_start(*room_data, actors, actor_count);
         cursor.active = false;
     }
-    gbs::run_event_script(event_state, room_data->on_enter);
+    run_iso_event_script(event_state, room_data->on_enter);
     for (size_t index = 0; index < room_data->actor_count && index < actor_capacity; ++index) {
-        gbs::run_event_script(event_state, gbs::iso_actor_start_event_script_for(*room_data, index));
+        run_iso_event_script(event_state, gbs::iso_actor_start_event_script_for(*room_data, index));
     }
-    gbs::consume_iso_actor_event_commands(actors, actor_count, event_state);
+    consume_iso_scene_actor_commands(actors, actor_count, event_state, false);
     apply_iso_event_camera(camera, event_state);
     return true;
 }
@@ -2442,7 +2624,21 @@ int initialize_isometric_runtime() {
         }
     }
 
+    gbs::clear_iso_temporal_motions(iso_temporal_motions);
+    gbs::clear_iso_event_scheduler(iso_event_scheduler);
+    iso_scheduler_overflow = false;
+    iso_restored_motion_mask = 0;
+    iso_restored_relative_mask = 0;
+    for (auto& owner : iso_restored_motion_owners) owner = nullptr;
+    iso_pending_exit = IsoPendingExit{};
+    for (int& speed : iso_temporal_speeds) speed = 100;
     gbs::init_event_state(event_state);
+    event_state.supports_temporal_actor_motion = true;
+    if (gbastudio_isometric_project::save_enabled) {
+        for (size_t slot = 0; slot < gbastudio_isometric_project::save_bank.slot_count && slot < gbs::max_event_save_slots; ++slot) {
+            event_state.save_slot_exists[slot] = gbs::inspect_save_slot(gbastudio_isometric_project::save_bank, slot).status == gbs::SaveStatus::Ok;
+        }
+    }
     gbs::bind_event_scripts(event_state, project.scripts, project.script_count);
     gbs::init_visual_effects(visual_effects);
     current_room = project.initial_room;
@@ -2558,15 +2754,16 @@ int initialize_isometric_runtime() {
         gbs::IsometricSaveData state {};
         if (!read_isometric_menu_save(paused_data, state) ||
             !gbs::apply_isometric_save_data(project, state, actors, max_actor_count, actor_count, camera, event_state, &cursor) ||
-            !gbs::restore_suspended_common_state(paused_data, event_state)) return -1;
+            !gbs::restore_suspended_common_state(paused_data, event_state) ||
+            !restore_iso_temporal_checkpoint(paused_data, event_state.current_room, actors, actor_count, event_state)) return -1;
     } else if (!restored_save) {
-        gbs::run_event_script(event_state, room_data->on_enter);
+        run_iso_event_script(event_state, room_data->on_enter);
         for (size_t index = 0; index < actor_count; ++index) {
-            gbs::run_event_script(event_state, gbs::iso_actor_start_event_script_for(*room_data, index));
+            run_iso_event_script(event_state, gbs::iso_actor_start_event_script_for(*room_data, index));
         }
     }
-    if (restored_save || resumed_pause) gbs::run_event_script(event_state, room_data->on_restore);
-    gbs::consume_iso_actor_event_commands(actors, actor_count, event_state);
+    if (restored_save || resumed_pause) run_iso_event_script(event_state, room_data->on_restore);
+    consume_iso_scene_actor_commands(actors, actor_count, event_state, false);
     apply_iso_event_camera(camera, event_state);
     initialize_iso_tactical_facing(tactical_state, actors, actor_animation_states, actor_count);
     if (tactical_state.enabled && room_data->tactical_presentation != nullptr) {
@@ -2606,7 +2803,9 @@ gbs::RuntimeAdapterFrameResult update_isometric_runtime(const gbs::RuntimeFrameC
             return gbs::RuntimeAdapterFrameResult::Transition;
         }
 #endif
-        const gbs::InputState input = gbs::begin_frame().input;
+        const gbs::InputState captured_input = gbs::begin_frame().input;
+        const gbs::InputState input = iso_pending_exit.active && !dialogue.visible ? gbs::InputState {0, 0, 0} : captured_input;
+        const bool dialogue_was_visible = dialogue.visible;
         gbs::tick_event_frame_counter(event_state);
 #if GBS_MULTI_RUNTIME
         if (gbs::runtime_transition_requested()) {
@@ -2619,7 +2818,7 @@ gbs::RuntimeAdapterFrameResult update_isometric_runtime(const gbs::RuntimeFrameC
         gbs::set_event_input_state(event_state, input.held, input.pressed, input.released);
     gbs::update_hud_behavior(event_state, hud.visible);
         const bool button_binding_overrides_default =
-            !dialogue.visible &&
+            !dialogue.visible && !iso_pending_exit.active &&
             run_button_event_binding();
 #ifdef GBS_MULTI_RUNTIME
         if (gbs::runtime_transition_pending()) {
@@ -2631,6 +2830,20 @@ gbs::RuntimeAdapterFrameResult update_isometric_runtime(const gbs::RuntimeFrameC
             sync_runtime_telemetry(current_room, actors, actor_count, actor_animation_states, *room_data, event_state, cursor, &tactical_state);
             return gbs::RuntimeAdapterFrameResult::Continue;
         }
+        if (!dialogue.visible) {
+            for (size_t index = 0; index < actor_count; ++index) {
+                gbs::tick_iso_temporal_motion(iso_temporal_motions, index,
+                    gbs::iso_tilemap_from_room(*room_data), actors, actor_animation_states, actor_count,
+                    iso_temporal_speeds[index]);
+                if (index < gbs::max_event_actor_state_slots) {
+                    event_state.actor_x[index] = actors[index].tile.x;
+                    event_state.actor_y[index] = actors[index].tile.y;
+                }
+            }
+            gbs::tick_iso_event_scheduler(iso_event_scheduler, event_state, false);
+            consume_iso_scene_actor_commands(actors, actor_count, event_state, !tactical_state.enabled);
+        }
+        if (iso_scheduler_overflow) return gbs::RuntimeAdapterFrameResult::Error;
         const gbs::Vec2i input_delta = input_to_iso_delta(input);
         const bool movement_pressed = (input.pressed & (
             gbs::ButtonLeft | gbs::ButtonRight | gbs::ButtonUp | gbs::ButtonDown
@@ -2648,7 +2861,7 @@ gbs::RuntimeAdapterFrameResult update_isometric_runtime(const gbs::RuntimeFrameC
             tick_iso_tactical_cursor_visual(tactical_state.cursor_visual, cursor.tile, room_data->grid);
             if (dialogue.visible) tactical_state.cursor_input = {};
         }
-        if (!dialogue.visible) {
+        if (!dialogue.visible && !iso_pending_exit.active) {
         if (tactical_state.enabled) {
             tick_iso_tactical_move(
                 tactical_state, actors, actor_animation_states, actor_count,
@@ -2701,7 +2914,7 @@ gbs::RuntimeAdapterFrameResult update_isometric_runtime(const gbs::RuntimeFrameC
         } else if (actor_count > 0 && (!movement_held || cursor.active)) {
             gbs::set_iso_actor_motion(actor_animation_states[0], input_delta, false);
         }
-        if (!tactical_state.enabled && actor_count > 0) {
+        if (!tactical_state.enabled && actor_count > 0 && !gbs::iso_temporal_motion_is_live(iso_temporal_motions.moves[0])) {
             if (movement_held) cursor.active = false;
             const bool player_moved = room_data->movement_model == gbs::IsoMovementModel::Free
                 ? update_player_free(actors, *room_data, input)
@@ -2711,7 +2924,7 @@ gbs::RuntimeAdapterFrameResult update_isometric_runtime(const gbs::RuntimeFrameC
             if (input.was_pressed(gbs::ButtonB)) cycle_iso_exploration_target(*room_data, actors, actor_count, cursor);
         }
         }
-        gbs::run_event_script(event_state, room_data->on_update);
+        run_iso_event_script(event_state, room_data->on_update);
         update_iso_actor_player_hit_scripts(*room_data, event_state);
         if (actor_count > 0) {
             const gbs::Rect player_tile { actors[0].tile.x, actors[0].tile.y, 1, 1 };
@@ -2721,17 +2934,17 @@ gbs::RuntimeAdapterFrameResult update_isometric_runtime(const gbs::RuntimeFrameC
                     trigger_states[index],
                     player_tile
                 );
-                gbs::run_event_script(
+                run_iso_event_script(
                     event_state,
                     gbs::runtime_trigger_script_for_result(room_data->triggers[index], result)
                 );
             }
         }
         for (size_t index = 0; index < actor_count; ++index) {
-            gbs::run_event_script(event_state, gbs::iso_actor_update_event_script_for(*room_data, index));
+            run_iso_event_script(event_state, gbs::iso_actor_update_event_script_for(*room_data, index));
         }
         if (!dialogue.visible && !tactical_state.enabled && input.was_pressed(gbs::ButtonA)) {
-            gbs::run_event_script(event_state,
+            run_iso_event_script(event_state,
                 iso_exploration_interact_script(*room_data, actors, actor_count, cursor));
         }
         consume_iso_scene_actor_commands(actors, actor_count, event_state, !tactical_state.enabled);
@@ -2777,10 +2990,48 @@ gbs::RuntimeAdapterFrameResult update_isometric_runtime(const gbs::RuntimeFrameC
             initialize_iso_tactical_cursor(tactical_state, actors, actor_count, cursor);
             initialize_iso_tactical_facing(tactical_state, actors, actor_animation_states, actor_count);
         }
-        if (room_changed || input.was_pressed(gbs::ButtonA)) {
+        // An explicit save/load/remove event owns this frame's persistence.
+        // In particular, an interaction that loads slot 0 must not overwrite
+        // that slot with the state immediately before the load.
+        if ((room_changed || input.was_pressed(gbs::ButtonA)) && event_state.save_request == 0) {
             persist_isometric_runtime_state(current_room, actors, actor_count, camera, event_state, cursor);
         }
-        if (!tactical_state.enabled && (gbs::frame_count() & 15u) == 0) {
+        if (event_state.save_request != 0) {
+            const int request = event_state.save_request;
+            const int slot = event_state.save_request_slot;
+            event_state.save_request = 0;
+            event_state.save_request_slot = -1;
+            if (gbastudio_isometric_project::save_enabled && slot >= 0 &&
+                static_cast<size_t>(slot) < gbastudio_isometric_project::save_bank.slot_count) {
+                if (request == 1) {
+                    persist_isometric_runtime_state(current_room, actors, actor_count, camera, event_state, cursor, slot);
+                } else if (request == 2) {
+#if GBS_MULTI_RUNTIME
+                    const gbs::RuntimeAvailabilityMask available = gbs::active_runtime_availability();
+                    gbs::request_universal_save_restore(gbastudio_isometric_project::save_bank, slot,
+                        available != 0 ? available : gbs::runtime_availability(gbs::RuntimeKind::Isometric));
+#else
+                    if (restore_isometric_runtime_state(current_room, room_data, actors, max_actor_count, actor_count,
+                        camera, event_state, cursor, slot)) {
+                        for (auto& move : scripted_actor_moves) move = {};
+                        for (auto& trigger : trigger_states) trigger = gbs::RuntimeTriggerState {};
+                        gbs::hide_dialogue(dialogue);
+                        init_iso_tactical_state(tactical_state, *room_data, actor_count);
+                        if (tactical_state.enabled && has_restored_tactical_save)
+                            apply_tactical_save(restored_tactical_save, actors, actor_count);
+                        run_iso_event_script(event_state, room_data->on_restore);
+                    }
+#endif
+                } else if (request == 3) {
+                    gbs::clear_save_slot(gbastudio_isometric_project::save_bank, static_cast<size_t>(slot));
+                }
+                if (static_cast<size_t>(slot) < gbs::max_event_save_slots) {
+                    event_state.save_slot_exists[slot] = gbs::inspect_save_slot(gbastudio_isometric_project::save_bank,
+                        static_cast<size_t>(slot)).status == gbs::SaveStatus::Ok;
+                }
+            }
+        }
+        if (!iso_pending_exit.active && !tactical_state.enabled && !gbs::iso_temporal_motion_is_live(iso_temporal_motions.moves[1]) && (gbs::frame_count() & 15u) == 0) {
             update_follow_actor(actors, actor_animation_states, *room_data);
         }
         if (room_data->actor_animations != nullptr || room_data->tactical_presentation != nullptr) {

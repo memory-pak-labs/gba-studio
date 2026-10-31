@@ -220,6 +220,21 @@ int move_axis(
 
 namespace gbs {
 
+bool move_platformer_scripted_step(const TileMap& map, Actor& actor, Vec2i delta,
+    const Actor* blockers, size_t blocker_count) {
+    if ((delta.x != 0 && delta.y != 0) || (delta.x == 0 && delta.y == 0) ||
+        delta.x > 1 || delta.x < -1 || delta.y > 1 || delta.y < -1) return false;
+    Rect rect { actor.position_pixels.x + actor.collision_offset_pixels.x,
+        actor.position_pixels.y + actor.collision_offset_pixels.y, actor.size_pixels.x, actor.size_pixels.y };
+    bool hit = false, landed = false;
+    const int amount = delta.x != 0 ? delta.x : delta.y;
+    const int moved = move_axis(map, rect, amount, delta.x != 0, hit, landed);
+    if (hit || moved != amount || rect_hits_any_blocking_actor(rect, actor, blockers, blocker_count)) return false;
+    actor.position_pixels.x += delta.x;
+    actor.position_pixels.y += delta.y;
+    return true;
+}
+
 PlatformerActor platformer_actor_from_rect(Rect anchor_bounds_pixels, Vec2i collision_offset_pixels) {
     return PlatformerActor {
         Rect {

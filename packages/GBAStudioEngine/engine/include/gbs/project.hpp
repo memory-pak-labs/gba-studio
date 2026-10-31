@@ -159,6 +159,7 @@ struct TopDownRoomMetadata {
     uint16_t backdrop_color;
     bool has_camera_bounds = false;
     Rect camera_bounds_pixels = Rect { 0, 0, 0, 0 };
+    bool player_enabled = true;
 };
 
 constexpr TopDownRoomMetadata default_room_metadata() {
@@ -216,6 +217,10 @@ struct TopDownRoomData {
     const TileAsset* paged_source_tiles = nullptr;
     EventScript on_restore = empty_event_script();
 };
+
+constexpr bool topdown_controlled_player_active(const TopDownRoomData& room, bool actor_active) {
+    return room.metadata.player_enabled && actor_active;
+}
 
 struct TopDownActorData {
     Vec2i position_pixels;
@@ -465,23 +470,14 @@ constexpr TopDownActorRuntime actor_runtime_from_data(const TopDownActorData& ac
 }
 
 constexpr const SpriteAnimation* topdown_actor_animation_for_index(const TopDownActorData& actor, int animation_index) {
-    if (actor.animations != nullptr &&
-        animation_index >= 0 &&
-        static_cast<size_t>(animation_index) < actor.animation_count) {
-        return actor.animations[animation_index];
-    }
-    return actor.animation;
+    return sprite_animation_for_reference(actor.animations, actor.animation_count, actor.animation, animation_index);
 }
 
 constexpr const SpriteAnimation* topdown_actor_animation_for_index(
     const TopDownActorSpriteData& actor_sprite,
     int animation_index
 ) {
-    if (actor_sprite.animations != nullptr && animation_index >= 0 &&
-        static_cast<size_t>(animation_index) < actor_sprite.animation_count) {
-        return actor_sprite.animations[animation_index];
-    }
-    return actor_sprite.animation;
+    return sprite_animation_for_reference(actor_sprite.animations, actor_sprite.animation_count, actor_sprite.animation, animation_index);
 }
 
 constexpr Actor actor_from_npc(const TopDownNpcData& npc) {
@@ -702,12 +698,7 @@ inline size_t collect_visible_topdown_actor_draw_slots(
 }
 
 constexpr const SpriteAnimation* topdown_npc_animation_for_index(const TopDownNpcData& npc, int animation_index) {
-    if (npc.animations != nullptr &&
-        animation_index >= 0 &&
-        static_cast<size_t>(animation_index) < npc.animation_count) {
-        return npc.animations[animation_index];
-    }
-    return npc.animation;
+    return sprite_animation_for_reference(npc.animations, npc.animation_count, npc.animation, animation_index);
 }
 
 constexpr int actor_runtime_movement_speed_x100(const TopDownNpcData& npc, const TopDownActorRuntime& runtime) {
@@ -891,6 +882,9 @@ constexpr void apply_actor_event_command(
         break;
     case EventActorOp::SetActive:
         runtime.active = command.a != 0;
+        break;
+    case EventActorOp::MoveTo:
+        // The scene runtime consumes this asynchronous request before this helper.
         break;
     case EventActorOp::SetPosition:
         runtime.actor.position_pixels = Vec2i { command.a, command.b };

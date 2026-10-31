@@ -110,7 +110,19 @@ struct IsoActorAnimationSet {
     const SpriteAnimation* defeat_up = nullptr;
     const SpriteAnimation* defeat_left = nullptr;
     const SpriteAnimation* defeat_right = nullptr;
+    // Optional cardinal screen-facing clips complement the four projected
+    // directions above. Projects without them keep their existing poses.
+    const SpriteAnimation* idle_screen_down = nullptr;
+    const SpriteAnimation* idle_screen_up = nullptr;
+    const SpriteAnimation* idle_screen_left = nullptr;
+    const SpriteAnimation* idle_screen_right = nullptr;
+    const SpriteAnimation* walk_screen_down = nullptr;
+    const SpriteAnimation* walk_screen_up = nullptr;
+    const SpriteAnimation* walk_screen_left = nullptr;
+    const SpriteAnimation* walk_screen_right = nullptr;
 };
+
+enum class IsoScreenFacing : uint8_t { None, Down, Up, Left, Right };
 
 enum class IsoActorAnimationMode : uint8_t {
     Idle = 0,
@@ -127,6 +139,7 @@ struct IsoActorAnimationState {
     uint8_t frame_elapsed = 0;
     IsoActorAnimationMode mode = IsoActorAnimationMode::Idle;
     bool completed = false;
+    IsoScreenFacing screen_facing = IsoScreenFacing::None;
 };
 
 struct IsoScriptedMove {
@@ -942,6 +955,9 @@ constexpr void apply_iso_actor_event_command(
     case EventActorOp::SetVisible:
     case EventActorOp::SetActive:
         actor.visible = command.a != 0;
+        break;
+    case EventActorOp::MoveTo:
+        // The isometric scene consumer owns asynchronous motion.
         break;
     case EventActorOp::SetPosition:
         actor.tile.x = command.a;

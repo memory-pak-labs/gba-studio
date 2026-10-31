@@ -15,12 +15,44 @@ inline constexpr DialogueLine checkpoint_failure_dialogue {
     "FALHA AO SALVAR. CHECKPOINT ANTERIOR MANTIDO.", nullptr, nullptr, nullptr, "gbs:checkpoint:error"
 };
 
+inline constexpr DialogueLine checkpoint_backend_failure_dialogue {
+    "FALHA AO GRAVAR O SAVE.", nullptr, nullptr, nullptr, "gbs:checkpoint:write-error"
+};
+inline constexpr DialogueLine checkpoint_restore_failure_dialogue {
+    "FALHA AO CARREGAR O CHECKPOINT.", nullptr, nullptr, nullptr, "gbs:checkpoint:load-error"
+};
+inline constexpr DialogueLine checkpoint_menu_failure_dialogue {
+    "NAO FOI POSSIVEL ABRIR O MENU.", nullptr, nullptr, nullptr, "gbs:checkpoint:menu-error"
+};
 inline bool checkpoint_dialogue_is_feedback(const DialogueState& dialogue) {
-    return dialogue.visible && dialogue.key == checkpoint_failure_dialogue.key;
+    return dialogue.visible && (dialogue.key == checkpoint_failure_dialogue.key ||
+        dialogue.key == checkpoint_backend_failure_dialogue.key || dialogue.key == checkpoint_restore_failure_dialogue.key ||
+        dialogue.key == checkpoint_menu_failure_dialogue.key);
+}
+
+inline bool checkpoint_allow_menu_transition(EventState& state, bool snapshot_ok) {
+    if (snapshot_ok || !runtime_transition_pending() || runtime_transition_target() != RuntimeKind::Menu ||
+        state.scene_stack_count == 0) return true;
+    --state.scene_stack_count;
+    cancel_runtime_transition();
+    return false;
+}
+
+inline void show_checkpoint_menu_failure(DialogueState& dialogue) {
+    show_dialogue(dialogue, &checkpoint_menu_failure_dialogue, 1, 0);
+    set_dialogue_text_speed(dialogue, 0);
 }
 
 inline void show_checkpoint_save_failure(DialogueState& dialogue) {
     show_dialogue(dialogue, &checkpoint_failure_dialogue, 1, 0);
+    set_dialogue_text_speed(dialogue, 0);
+}
+inline void show_checkpoint_backend_failure(DialogueState& dialogue) {
+    show_dialogue(dialogue, &checkpoint_backend_failure_dialogue, 1, 0);
+    set_dialogue_text_speed(dialogue, 0);
+}
+inline void show_checkpoint_restore_failure(DialogueState& dialogue) {
+    show_dialogue(dialogue, &checkpoint_restore_failure_dialogue, 1, 0);
     set_dialogue_text_speed(dialogue, 0);
 }
 

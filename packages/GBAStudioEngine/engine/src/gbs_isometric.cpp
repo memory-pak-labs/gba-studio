@@ -505,6 +505,18 @@ const SpriteAnimation* iso_actor_animation_for(const IsoActorAnimationSet& anima
     const IsoActorAnimationMode mode = state.mode == IsoActorAnimationMode::Idle && state.walking
         ? IsoActorAnimationMode::Move
         : state.mode;
+    if (mode == IsoActorAnimationMode::Idle || mode == IsoActorAnimationMode::Move) {
+        const bool idle = mode == IsoActorAnimationMode::Idle;
+        const SpriteAnimation* screen_clip = nullptr;
+        switch (state.screen_facing) {
+            case IsoScreenFacing::Down: screen_clip = idle ? animations.idle_screen_down : animations.walk_screen_down; break;
+            case IsoScreenFacing::Up: screen_clip = idle ? animations.idle_screen_up : animations.walk_screen_up; break;
+            case IsoScreenFacing::Left: screen_clip = idle ? animations.idle_screen_left : animations.walk_screen_left; break;
+            case IsoScreenFacing::Right: screen_clip = idle ? animations.idle_screen_right : animations.walk_screen_right; break;
+            case IsoScreenFacing::None: break;
+        }
+        if (screen_clip != nullptr) return screen_clip;
+    }
     const SpriteAnimation* selected = nullptr;
     switch (mode) {
         case IsoActorAnimationMode::Idle:
@@ -576,6 +588,14 @@ void set_iso_actor_animation_mode(IsoActorAnimationState& state, IsoActorAnimati
 
 void set_iso_actor_motion(IsoActorAnimationState& state, Vec2i delta_tile, bool walking) {
     IsoActorDirection direction = state.direction;
+    IsoScreenFacing screen_facing = state.screen_facing;
+    if (delta_tile.x != 0 || delta_tile.y != 0) {
+        screen_facing = IsoScreenFacing::None;
+        if (delta_tile.x < 0 && delta_tile.y < 0) screen_facing = IsoScreenFacing::Up;
+        else if (delta_tile.x > 0 && delta_tile.y > 0) screen_facing = IsoScreenFacing::Down;
+        else if (delta_tile.x < 0 && delta_tile.y > 0) screen_facing = IsoScreenFacing::Left;
+        else if (delta_tile.x > 0 && delta_tile.y < 0) screen_facing = IsoScreenFacing::Right;
+    }
     if (delta_tile.x > 0) {
         direction = IsoActorDirection::Right;
     } else if (delta_tile.x < 0) {
@@ -586,12 +606,13 @@ void set_iso_actor_motion(IsoActorAnimationState& state, Vec2i delta_tile, bool 
         direction = IsoActorDirection::Up;
     }
     const IsoActorAnimationMode mode = walking ? IsoActorAnimationMode::Move : IsoActorAnimationMode::Idle;
-    if (direction != state.direction || walking != state.walking || state.mode != mode) {
+    if (direction != state.direction || screen_facing != state.screen_facing || walking != state.walking || state.mode != mode) {
         state.frame_index = 0;
         state.frame_elapsed = 0;
         state.completed = false;
     }
     state.direction = direction;
+    state.screen_facing = screen_facing;
     state.walking = walking;
     state.mode = mode;
 }
