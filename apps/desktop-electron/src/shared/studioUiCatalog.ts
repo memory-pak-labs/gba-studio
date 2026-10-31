@@ -1,5 +1,10 @@
 /** Application copy only. Tuple order: pt-BR, en-US, es-ES. Keep project data out of this catalog. */
 export const studioUiMessages: Record<string, readonly [string, string, string]> = {
+  "Cima na tela (isométrico)": ["Cima na tela (isométrico)", "Screen up (isometric)", "Arriba en pantalla (isométrico)"],
+  "Baixo na tela (isométrico)": ["Baixo na tela (isométrico)", "Screen down (isometric)", "Abajo en pantalla (isométrico)"],
+  "Esquerda na tela (isométrico)": ["Esquerda na tela (isométrico)", "Screen left (isometric)", "Izquierda en pantalla (isométrico)"],
+  "Direita na tela (isométrico)": ["Direita na tela (isométrico)", "Screen right (isometric)", "Derecha en pantalla (isométrico)"],
+  "Direcional: baixo": ["Baixo", "Down", "Abajo"],
   "Selecione um NPC da cena para criar o objeto interativo.": ["Selecione um NPC da cena para criar o objeto interativo.", "Select a scene NPC to create the interactive object.", "Selecciona un NPC de la escena para crear el objeto interactivo."],
   "Som do objeto": ["Som do objeto", "Object sound", "Sonido del objeto"],
   "Recursos": ["Recursos", "Resources", "Recursos"],

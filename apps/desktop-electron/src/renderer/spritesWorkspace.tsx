@@ -108,7 +108,9 @@ const spriteStateLabels: Record<string, string> = {
   jump: "Pular", fall: "Cair", climb: "Escalar", hit: "Dano", death: "Derrota", dash: "Dash"
 };
 const spriteDirectionLabels: Record<string, string> = {
-  up: "Cima", down: "Baixo", left: "Esquerda", right: "Direita", none: "Fixa"
+  up: "Cima", down: "Direcional: baixo", left: "Esquerda", right: "Direita", none: "Fixa",
+  screen_up: "Cima na tela (isométrico)", screen_down: "Baixo na tela (isométrico)",
+  screen_left: "Esquerda na tela (isométrico)", screen_right: "Direita na tela (isométrico)"
 };
 function spriteStateLabel(state: string): string {
   return spriteStateLabels[state] ?? state.replace(/[_-]+/g, " ");
@@ -1640,7 +1642,10 @@ function animationEditor(
           <div>
             <span>{ui("Direção")}</span>
             <div className="sprite-option-segment" role="group" aria-label={ui("Direções")}>
-              {stateDirectionOptions.directions.map((direction) => (
+              {stateDirectionOptions.directions.filter((direction) => (
+                !direction.startsWith("screen_") || direction === animation.direction ||
+                /^(idle|walk|walking|move|moving|run|running)$/.test(animation.state ?? "")
+              )).map((direction) => (
                 <button
                   aria-pressed={animation.direction === direction}
                   className={animation.direction === direction ? "active" : ""}
@@ -1648,7 +1653,7 @@ function animationEditor(
                   onClick={() => onUpdateAnimationFields(animation.id, { direction })}
                   type="button"
                 >
-                  {direction}
+                  {direction.startsWith("screen_") ? ui(spriteDirectionLabels[direction] ?? direction) : direction}
                 </button>
               ))}
             </div>
@@ -2363,8 +2368,8 @@ export function SpritesWorkspace({
               }).map((animation) => {
                 const direction = animation.direction ?? "none";
                 const label = spriteDirectionLabels[direction] ?? direction;
-                return <button key={animation.id} aria-label={ui("Direção {0}", { 0: ui(label) })} title={label} aria-pressed={animation.id === activePreviewAnimation?.id} className={animation.id === activePreviewAnimation?.id ? "active" : ""} onClick={() => selectAnimation(animation.id)} type="button">
-                  {direction === "up" ? <ArrowUp size={16} /> : direction === "down" ? <ArrowDown size={16} /> : direction === "left" ? <ArrowLeft size={16} /> : direction === "right" ? <ArrowRight size={16} /> : label}
+                return <button key={animation.id} aria-label={ui("Direção {0}", { 0: ui(label) })} title={ui(label)} aria-pressed={animation.id === activePreviewAnimation?.id} className={animation.id === activePreviewAnimation?.id ? "active" : ""} onClick={() => selectAnimation(animation.id)} type="button">
+                  {direction === "up" ? <ArrowUp size={16} /> : direction === "down" ? <ArrowDown size={16} /> : direction === "left" ? <ArrowLeft size={16} /> : direction === "right" ? <ArrowRight size={16} /> : ui(label)}
                 </button>;
               })}
             </div>
@@ -2577,7 +2582,7 @@ export function SpritesWorkspace({
         >
           {activeSelection ? (
             <>
-              <header className="sprites-inspector-heading"><h3>{ui("Animação")}</h3><p>{activeGroup?.label ?? activeSelection.animation.name} · {spriteDirectionLabels[activeSelection.animation.direction ?? "none"] ?? activeSelection.animation.direction}</p></header>
+              <header className="sprites-inspector-heading"><h3>{ui("Animação")}</h3><p>{activeGroup?.label ?? activeSelection.animation.name} · {ui(spriteDirectionLabels[activeSelection.animation.direction ?? "none"] ?? activeSelection.animation.direction)}</p></header>
               <div aria-label={ui("Seções do inspetor de sprite")} className="sprites-inspector-tabs" role="tablist">
                 {spriteInspectorTabs.map((tab) => (
                   <button
