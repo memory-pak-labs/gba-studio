@@ -8463,6 +8463,7 @@
         "frameCount": 28,
         "colorMode": "8bpp",
         "streamFrames": true,
+        "runtimePaletteReviewStatus": "approved",
         "objectPaletteValues": [
           0,
           0,
