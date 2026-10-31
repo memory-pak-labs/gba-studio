@@ -56,6 +56,37 @@ describe("application updates", () => {
     expect(updater.quitAndInstall).not.toHaveBeenCalled();
   });
 
+  it("offers a stable successor to an RC before looking for another RC", async () => {
+    const updater = fixture().updater;
+    const channels: boolean[] = [];
+    updater.checkForUpdates.mockImplementation(async () => {
+      channels.push(updater.allowPrerelease);
+      updater.emit("update-available", { version: "0.1.0" });
+      return null;
+    });
+    const service = createAppUpdateService({ updater, currentVersion: "0.1.0-rc.4", canInstall: () => true, changed: vi.fn() });
+    expect(await service.check()).toMatchObject({ status: "available", version: "0.1.0" });
+    expect(channels).toEqual([false]);
+  });
+
+  it("checks RCs when no newer stable release exists or the stable feed is absent", async () => {
+    for (const missing of [false, true]) {
+      const updater = fixture().updater;
+      const channels: boolean[] = [];
+      updater.checkForUpdates.mockImplementation(async () => {
+        channels.push(updater.allowPrerelease);
+        if (!updater.allowPrerelease) {
+          if (missing) throw new Error("no stable release");
+          updater.emit("update-not-available");
+        } else updater.emit("update-available", { version: "0.1.0-rc.5" });
+        return null;
+      });
+      const service = createAppUpdateService({ updater, currentVersion: "0.1.0-rc.4", canInstall: () => true, changed: vi.fn() });
+      expect(await service.check()).toMatchObject({ status: "available", version: "0.1.0-rc.5" });
+      expect(channels).toEqual([false, true]);
+    }
+  });
+
   it("blocks restart before download, with unsaved work, and repeated requests", () => {
     let safe = false;
     const { updater, service } = fixture(() => safe);

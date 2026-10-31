@@ -42,6 +42,7 @@ interface Options {
 export function createAppUpdateService({ updater, currentVersion, canInstall, changed }: Options) {
   let state: AppUpdateState = { status: updater ? "idle" : "disabled", currentVersion };
   let checking = false;
+  let checkingStableFirst = false;
   const snapshot = (): AppUpdateState => ({ ...state });
   const publish = (next: Omit<AppUpdateState, "currentVersion">) => {
     state = { ...next, currentVersion };
@@ -54,9 +55,9 @@ export function createAppUpdateService({ updater, currentVersion, canInstall, ch
     updater.autoInstallOnAppQuit = false;
     updater.allowPrerelease = currentVersion.includes("-");
     updater.allowDowngrade = false;
-    updater.on("error", fail);
+    updater.on("error", (error) => { if (!checkingStableFirst) fail(error); });
     updater.on("update-available", (info) => publish({ status: "available", version: info.version }));
-    updater.on("update-not-available", () => publish({ status: "not-available" }));
+    updater.on("update-not-available", () => { if (!checkingStableFirst) publish({ status: "not-available" }); });
     updater.on("download-progress", (progress) => {
       if (state.status !== "downloading") return;
       publish({ status: "downloading", version: state.version, progress: Math.max(0, Math.min(100, Math.round(progress.percent))) });
@@ -70,7 +71,18 @@ export function createAppUpdateService({ updater, currentVersion, canInstall, ch
       if (!updater || checking || ["downloading", "downloaded", "installing"].includes(state.status)) return { ...state };
       checking = true;
       publish({ status: "checking" });
-      try { await updater.checkForUpdates(); } catch (error) { fail(error); }
+      try {
+        // The upstream GitHub provider does not select a stable release from an
+        // RC channel. Check stable first, then fall back to the RC feed.
+        if (/-rc(?:\.|$)/i.test(currentVersion)) {
+          checkingStableFirst = true;
+          updater.allowPrerelease = false;
+          try { await updater.checkForUpdates(); } catch { /* An absent stable release is expected before launch. */ }
+          finally { checkingStableFirst = false; updater.allowPrerelease = true; }
+          if (snapshot().status === "available") return { ...state };
+        }
+        await updater.checkForUpdates();
+      } catch (error) { fail(error); }
       finally { checking = false; }
       return { ...state };
     },
