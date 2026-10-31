@@ -28,6 +28,23 @@ void gbs_hw_set_sprite(int index, int, int, uint16_t tile, uint16_t palette, int
 void gbs_hw_set_sprite_color_depth(int, int eight) { assert(!eight); }
 }
 int main() {
+    // OAM order controls OBJ/OBJ overlap; affine parameters stay in their
+    // physical slots even when sprite attributes are reordered.
+    uint16_t source_oam[128 * 4] {}, ordered_oam[128 * 4] {};
+    for (int i = 0; i < 128; ++i) {
+        source_oam[i * 4] = static_cast<uint16_t>(i);
+        source_oam[i * 4 + 1] = static_cast<uint16_t>(1000 + i);
+        source_oam[i * 4 + 2] = static_cast<uint16_t>(2000 + i);
+        source_oam[i * 4 + 3] = static_cast<uint16_t>(3000 + i);
+    }
+    gbs_portrait_tab_order_oam(source_oam, ordered_oam);
+    for (int i = 0; i < 128; ++i) {
+        const int original = i < 12 ? 110 + i : (i < 122 ? i - 12 : i);
+        assert(ordered_oam[i * 4] == original);
+        assert(ordered_oam[i * 4 + 1] == 1000 + original);
+        assert(ordered_oam[i * 4 + 2] == 2000 + original);
+        assert(ordered_oam[i * 4 + 3] == 3000 + i);
+    }
     GbsPortraitTabWorkspace memory {};
     gbs_portrait_tab_set_workspace(&memory,sizeof(memory));
     gbs_portrait_tab_draw("Nara","Restauramos os sinais da\ncosta. Como atravessamos a\ntempestade?",1,1,0,nullptr,nullptr);

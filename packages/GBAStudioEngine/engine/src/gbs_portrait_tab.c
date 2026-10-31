@@ -25,6 +25,18 @@ void gbs_portrait_tab_set_workspace(void* memory, size_t size) {
     if (workspace) memset(workspace,0,sizeof(*workspace));
 }
 
+void gbs_portrait_tab_order_oam(const uint16_t* source, uint16_t* output) {
+    for (int i = 0; i < 128; ++i) {
+        /* Portrait and tab first; retain the relative order of world sprites. */
+        const int original = i < 12 ? 110 + i : (i < 122 ? i - 12 : i);
+        output[i * 4] = source[original * 4];
+        output[i * 4 + 1] = source[original * 4 + 1];
+        output[i * 4 + 2] = source[original * 4 + 2];
+        /* Attribute 3 belongs to affine matrices, not to each sprite. */
+        output[i * 4 + 3] = source[i * 4 + 3];
+    }
+}
+
 /* Roles 1..8: outline, rim, inner edge, fill, header, text, name, selection. */
 #define RGB15(r,g,b) ((r)/8 | ((g)/8 << 5) | ((b)/8 << 10))
 static const uint16_t default_colors[9] = {0, RGB15(7,29,39), RGB15(202,187,137),

@@ -23,6 +23,7 @@ struct GbsPortraitTabWorkspace {
     const uint16_t* palette;
 };
 void gbs_portrait_tab_set_workspace(void* memory, size_t size);
+void gbs_portrait_tab_order_oam(const uint16_t* source, uint16_t* output);
 void gbs_portrait_tab_draw(const char* speaker, const char* text, int visible,
     int portrait, int right, const uint8_t* font, const uint16_t* skin_palette);
 

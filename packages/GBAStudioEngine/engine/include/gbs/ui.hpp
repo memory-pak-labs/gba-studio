@@ -18,6 +18,8 @@ struct HudState {
     uint32_t values[hud_value_source_count] {};
     uint32_t maximums[hud_value_source_count] {};
     uint16_t value_sources = 0;
+    /** One-based text slot for the menu selector; zero keeps globals in BSS. */
+    uint8_t selected_text_slot_plus_one = 0;
 };
 
 struct OverlayState {

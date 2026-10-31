@@ -1,4 +1,6 @@
 #include "gbs_hw.h"
+
+static void gbs_hw_draw_hud_choice_selector(int x, int y);
 #include <string.h>
 #include "gbs_room_tilemap.h"
 #include "gbs/text.h"
@@ -70,6 +72,8 @@
 #define MEM_IRQ_HANDLER (*(void (**)(void))0x03007FFC)
 
 static uint16_t shadow_oam[128 * 4];
+static uint16_t dialogue_ordered_oam[128 * 4] __attribute__((section(".ewram_bss")));
+static int dialogue_oam_front;
 static uint8_t shadow_oam_dirty_first;
 static uint8_t shadow_oam_dirty_last;
 static uint32_t oam_overflow_count;
@@ -156,13 +160,10 @@ enum {
     DIALOGUE_PALETTE_BASE = DIALOGUE_PALETTE * 16,
     HUD_PALETTE = 14,
     HUD_PALETTE_BASE = HUD_PALETTE * 16,
-    /* Bank 4 is authored into the light background and provides a warm,
-     * readable surface with a darker glyph slot, preserving fidelity. OBJ
-     * text keeps the private bank 13 below. */
-    NAME_INPUT_BG_PALETTE = 4,
-    /* The authored keyboard uses bank 4 for its keycaps. Its color index 4
-     * is light, so dynamic glyphs use the dark text slot from bank 11. */
-    NAME_INPUT_TEXT_PALETTE = 11,
+    /* Solid input controls own the reserved UI bank. Authored backgrounds
+     * must not supply their surface or glyph colors. */
+    NAME_INPUT_BG_PALETTE = 15,
+    NAME_INPUT_TEXT_PALETTE = 15,
     NAME_INPUT_OBJ_PALETTE = 13,
     NAME_INPUT_OBJ_PALETTE_BASE = NAME_INPUT_OBJ_PALETTE * 16,
     DIALOGUE_COLOR_BACKGROUND = 1,
@@ -321,11 +322,26 @@ static void commit_shadow_oam(void) {
     if (shadow_oam_dirty_last <= shadow_oam_dirty_first) {
         return;
     }
+    if (dialogue_oam_front) {
+        gbs_portrait_tab_order_oam(shadow_oam, dialogue_ordered_oam);
+        gbs_hw_dma_copy(3, dialogue_ordered_oam, MEM_OAM, 128u * 4u, 0);
+        shadow_oam_dirty_first = 128;
+        shadow_oam_dirty_last = 0;
+        return;
+    }
     const uint32_t first = shadow_oam_dirty_first;
     const uint32_t units = ((uint32_t)shadow_oam_dirty_last - first) * 4u;
     gbs_hw_dma_copy(3, shadow_oam + first * 4u, MEM_OAM + first * 4u, units, 0);
     shadow_oam_dirty_first = 128;
     shadow_oam_dirty_last = 0;
+}
+
+void gbs_hw_set_dialogue_oam_front(int enabled) {
+    enabled = enabled != 0;
+    if (dialogue_oam_front != enabled) {
+        dialogue_oam_front = enabled;
+        mark_shadow_oam_dirty(0, 128);
+    }
 }
 
 static void commit_shadow_oam_full(void) {
@@ -551,8 +567,8 @@ static uint16_t square_frequency_value(uint16_t frequency_hz) {
 }
 
 static uint16_t wave_frequency_value(uint16_t frequency_hz) {
-    if (frequency_hz < 64) {
-        frequency_hz = 64;
+    if (frequency_hz < 32) {
+        frequency_hz = 32;
     }
     if (frequency_hz > 2048) {
         frequency_hz = 2048;
@@ -823,6 +839,14 @@ static void queue_name_input_palette_restore(void) {
     gbs_hw_enqueue_vblank_dma16(
         name_input_palette_colors,
         MEM_PALETTE + 256 + NAME_INPUT_OBJ_PALETTE_BASE,
+        16
+    );
+}
+
+static void queue_name_input_background_palette_restore(void) {
+    gbs_hw_enqueue_vblank_dma16(
+        name_input_palette_colors,
+        MEM_PALETTE + NAME_INPUT_BG_PALETTE * 16,
         16
     );
 }
@@ -2261,6 +2285,7 @@ void gbs_hw_draw_text_input_surface(int box_x, int box_y, int box_w, int box_h, 
         return;
     }
 
+    queue_name_input_background_palette_restore();
     gbs_hw_draw_name_input_surface(box_x, box_y, box_w, box_h, 1);
     previous_x = box_x;
     previous_y = box_y;
@@ -2335,7 +2360,10 @@ void gbs_hw_draw_text_input_keyboard_with_controls(
 
     /* The authoring contract reserves a 22x6 minimum. Side controls use four
      * compact letter rows, matching the reference input screen. */
-    if (!bottom_grid) write_demo_tile(NAME_INPUT_TILE_BORDER, NAME_INPUT_COLOR_BORDER);
+    if (!bottom_grid) {
+        queue_name_input_background_palette_restore();
+        write_demo_tile(NAME_INPUT_TILE_BORDER, NAME_INPUT_COLOR_BORDER);
+    }
     gbs_hw_draw_name_input_surface(box_x, box_y, box_w, box_h, surface_mode == 0);
 
     if (selected_index < 0 || selected_index > 28) {
@@ -2410,7 +2438,7 @@ void gbs_hw_draw_text_input_keyboard_with_controls(
             const int marker_x = box_x + 1 + column * 2;
             const int glyph_x = marker_x + 1;
             const int glyph_y = box_y + 1 + row;
-            screenblock[glyph_y * 32 + marker_x] = letter_index == selected_index ? selector_tile : blank_tile;
+            screenblock[glyph_y * 32 + marker_x] = letter_index < 26 && letter_index == selected_index ? selector_tile : blank_tile;
             if (letter_index < 26) {
                 const uint32_t codepoint = (lowercase ? 'a' : 'A') + (uint32_t)letter_index;
                 gbs_hw_draw_text_input_keyboard_glyph(screenblock, glyph_x, glyph_y, codepoint);
@@ -2759,6 +2787,12 @@ void gbs_hw_draw_hud_layout_component(
     if (box_y + box_h > 32) box_h = 32 - box_y;
     if (box_w <= 0 || box_h <= 0) return;
 
+    if (kind == GBS_HW_HUD_COMPONENT_SELECTOR) {
+        if (!visible) return;
+        if (metasprite != 0 && gbs_hw_draw_hud_icon(metasprite, x, y, 1, 0)) return;
+        gbs_hw_draw_hud_choice_selector(x, y);
+        return;
+    }
     if (kind == GBS_HW_HUD_COMPONENT_SPACED_TEXT) {
         gbs_hw_draw_hud_spaced_text(x,y,width,text,visible);return;
     }
@@ -2814,6 +2848,25 @@ void gbs_hw_end_hud_layout(void) {
     hud_layout_pixels_valid=hud_layout_object_only;
     hud_layout_previous_count = hud_layout_current_count;
     hud_layout_current_count = 0;
+}
+
+static void gbs_hw_draw_hud_choice_selector(int x, int y) {
+    if (hud_pixel_text_obj_count >= 31) return;
+    const int slot = gbs_hw_allocate_hud_compact_slot();
+    if (slot < 0) return;
+    const unsigned group = hud_pixel_text_obj_count++;
+    const unsigned tile = DYNAMIC_TEXT_OBJ_TILE_BASE + group * 4;
+    static const uint8_t rows[8] = {0x40,0x60,0x70,0x78,0x70,0x60,0x40,0};
+    volatile uint16_t* target = MEM_OBJ_TILES + tile * 16u;
+    for (unsigned y = 0; y < 8; ++y) for (unsigned half = 0; half < 2; ++half) {
+        target[y * 2 + half] = pack_font_pixels(rows[y], half * 4, 0, DIALOGUE_COLOR_TEXT);
+    }
+    // The next text group must not mistake this procedural tile for a glyph.
+    for (unsigned i = 0; i < 4; ++i) hud_pixel_text_glyphs[group * 4 + i] = 0xffff;
+    gbs_hw_refresh_hud_text_palette(configured_hud_text_color);
+    hud_icon_obj_write = 1;
+    gbs_hw_set_sprite(slot,x,y,tile,HUD_PALETTE,0,0,1,0,0,0,0,0);
+    hud_icon_obj_write = 0;
 }
 
 void gbs_hw_draw_overlay_rect(int box_x, int box_y, int box_w, int box_h, int visible) {

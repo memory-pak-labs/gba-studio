@@ -16,6 +16,7 @@ enum {
     GBS_HW_HUD_COMPONENT_ICON = 3,
     GBS_HW_HUD_COMPONENT_COMPACT_TEXT = 4,
     GBS_HW_HUD_COMPONENT_SPACED_TEXT = 6,
+    GBS_HW_HUD_COMPONENT_SELECTOR = 7,
     GBS_HW_HUD_COMPONENT_FOREGROUND_BAR = 5
 };
 
@@ -42,6 +43,7 @@ void gbs_hw_set_bg_enabled(int layer, int enabled);
 void gbs_hw_hide_all_sprites(void);
 void gbs_hw_hide_world_sprites(void);
 void gbs_hw_hide_sprites(int first, int count);
+void gbs_hw_set_dialogue_oam_front(int enabled);
 void gbs_hw_set_sprite(int index, int x, int y, uint16_t tile_index, uint16_t palette, int hflip, int vflip, int visible, uint16_t priority, uint16_t mode, int mosaic, uint16_t shape, uint16_t size);
 void gbs_hw_set_sprite_color_depth(int index, int eight_bpp);
 void gbs_hw_set_sprite_affine(int index, int enabled, int double_size, uint16_t matrix_index);

@@ -119,6 +119,8 @@ struct HudLayout {
     const uint8_t* font_tiles = nullptr;
     int32_t font_color = -1;
     int32_t font_shadow_color = -1;
+    const MetaSprite* selector_metasprite = nullptr;
+    const char* text_profile = nullptr;
 };
 
 constexpr HudBoxConfig default_hud_box_config() {

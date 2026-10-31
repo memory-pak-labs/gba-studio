@@ -78,6 +78,7 @@ struct MenuItemConditionData {
     int variable_index;
     int equals_value;
     bool hide_when_unavailable;
+    int8_t runtime = -1;
 };
 
 struct MenuItemValueData {
@@ -92,7 +93,9 @@ enum class MenuItemBindingSource : uint8_t {
     Variable = 1,
     Inventory = 2,
     Stat = 3,
-    Equipped = 4
+    Equipped = 4,
+    Text = 5,
+    Context = 6
 };
 
 enum class MenuItemBindingFormat : uint8_t {
@@ -106,6 +109,19 @@ struct MenuItemBindingData {
     MenuItemBindingSource source = MenuItemBindingSource::None;
     int index = -1;
     MenuItemBindingFormat format = MenuItemBindingFormat::Number;
+};
+
+struct MenuVisibilityConditionData {
+    MenuItemBindingData binding {};
+    int value = 0;
+    bool negate = false;
+};
+
+struct MenuHudBindingData {
+    uint8_t slot = 0;
+    MenuItemBindingData binding {};
+    bool selected_item = false;
+    uint8_t columns = 0;
 };
 
 constexpr MenuItemConditionData menu_item_always_available() {
@@ -178,6 +194,9 @@ struct MenuActorData {
     bool cursor_follows_option = false;
     Vec2i cursor_offset_pixels = {0, 0};
     bool selected_only = false;
+    const MenuVisibilityConditionData* visibility_conditions = nullptr;
+    size_t visibility_condition_count = 0;
+    bool visibility_any = false;
 };
 
 constexpr int menu_text_input_max_length = 16;
@@ -324,6 +343,10 @@ struct MenuAudioFeedback {
     MenuAudioCue unavailable;
 };
 
+struct MenuHeaderData {
+    int8_t x=0,y=0,width=0;
+    uint16_t background_color=0,text_color=32767;
+};
 struct MenuScreenData {
     const char* name;
     int background_index;
@@ -360,6 +383,11 @@ struct MenuScreenData {
     bool hud_transparent_text = false;
     bool hud_feedback_in_details = false;
     MenuAudioFeedback audio_feedback {};
+    MenuHeaderData hud_header {};
+    const MenuHudBindingData* hud_bindings = nullptr;
+    size_t hud_binding_count = 0;
+    int previous_page_screen_index = -1;
+    int next_page_screen_index = -1;
 };
 
 enum class MenuSaveFeedback : uint8_t { None, Confirm, Saved, Failed };
@@ -517,7 +545,7 @@ constexpr bool is_valid_menu_dialogue_line_index(const MenuProjectData& project,
 }
 
 constexpr bool is_valid_menu_item_condition(const MenuItemConditionData& condition) {
-    return condition.variable_index < 0 || is_valid_event_variable(condition.variable_index);
+    return condition.runtime>=-1 && condition.runtime<=12 && (condition.variable_index < 0 || is_valid_event_variable(condition.variable_index));
 }
 
 constexpr bool is_valid_menu_item_value(const MenuItemValueData& value) {
@@ -542,6 +570,8 @@ constexpr bool is_valid_menu_item_binding(const MenuItemBindingData& binding) {
     if (binding.source == MenuItemBindingSource::Stat) {
         return is_valid_event_stat(binding.index);
     }
+    if (binding.source == MenuItemBindingSource::Text) return is_valid_text_variable_index(binding.index);
+    if (binding.source == MenuItemBindingSource::Context) return binding.index >= 0 && binding.index <= 2;
     if (binding.source == MenuItemBindingSource::Equipped) {
         return is_valid_event_equipment_slot(binding.index);
     }
@@ -688,9 +718,11 @@ constexpr MenuRuntimeState menu_runtime_from_project(const MenuProjectData& proj
 }
 
 constexpr bool menu_item_condition_is_met(const EventState& state, const MenuItemData& item) {
-    return item.condition.variable_index < 0 ||
+    const bool runtime_met = item.condition.runtime < 0 || (state.scene_stack_count > 0 &&
+        static_cast<int>(state.scene_stack[state.scene_stack_count-1].runtime) == item.condition.runtime);
+    return runtime_met && (item.condition.variable_index < 0 ||
         (is_valid_event_variable(item.condition.variable_index) &&
-            state.variables[item.condition.variable_index] == item.condition.equals_value);
+            state.variables[item.condition.variable_index] == item.condition.equals_value));
 }
 
 constexpr bool menu_item_is_visible(const EventState& state, const MenuItemData& item) {

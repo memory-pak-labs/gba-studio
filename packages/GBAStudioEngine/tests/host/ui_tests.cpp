@@ -34,6 +34,8 @@ int hud_tile_upload_calls = 0;
 bool hardware_hud_retained = false;
 int foreground_clear_calls = 0;
 int retained_palette_refreshes = 0;
+int hud_selector_calls = 0, hud_selector_x = 0, hud_selector_y = 0;
+const void* hud_selector_image = nullptr;
 
 }
 
@@ -63,6 +65,9 @@ extern "C" void gbs_hw_draw_hud_layout_component(
     int visible
 ) {
     ++hud_layout_component_calls;
+    if (kind == 7 && visible) {
+        ++hud_selector_calls; hud_selector_x=x; hud_selector_y=y; hud_selector_image=metasprite;
+    }
     last_hud_layout_kind = kind;
     last_hud_layout_x = x;
     last_hud_layout_y = y;
@@ -368,7 +373,7 @@ void test_menu_paginates_and_jumps_with_shoulders() {
     assert(last_text_box_visible == 1);
     assert(last_text_box_x == 2 && last_text_box_y == 5);
     assert(last_text_box_width == 26 && last_text_box_height == 7);
-    assert(std::strstr(last_text_box_text, "BAG v") != nullptr);
+    assert(std::strstr(last_text_box_text, "BAG 1/2") != nullptr);
     assert(std::strstr(last_text_box_text, "ITEM 1") != nullptr);
     assert(std::strstr(last_text_box_text, "ITEM 5") == nullptr);
 
@@ -379,12 +384,55 @@ void test_menu_paginates_and_jumps_with_shoulders() {
     assert(!gbs::menu_has_next_page(menu));
 
     gbs::draw_menu(menu);
-    assert(std::strstr(last_text_box_text, "BAG ^") != nullptr);
+    assert(std::strstr(last_text_box_text, "BAG 2/2") != nullptr);
     assert(std::strstr(last_text_box_text, "ITEM 1") == nullptr);
     assert(std::strstr(last_text_box_text, "ITEM 5") != nullptr);
 
     assert(gbs::advance_menu(menu, gbs::InputState { gbs::ButtonL, gbs::ButtonL, 0 }));
     assert(menu.selected_index == 0);
+}
+
+void test_menu_rows_fit_the_inner_frame_and_keep_the_last_option_visible() {
+    const gbs::MenuItem items[] = {
+        { "Carregar 1 ROOM 2 05:19 R1", 1, true },
+        { "Carregar 2 ROOM 2 06:10 R1", 2, true },
+        { "Carregar 3 ROOM 2 07:25 R1", 3, true },
+        { "VOLTAR", 4, true }
+    };
+    gbs::MenuState menu {};
+    gbs::show_menu(menu, "Carregamento dos jogos salvos", items, 4);
+    gbs::draw_menu(menu);
+    size_t rows = 0;
+    const char* line = last_text_box_text;
+    while (*line) {
+        const size_t length = std::strcspn(line, "\n");
+        assert(length <= static_cast<size_t>(last_text_box_width - 2));
+        ++rows;
+        line += length;
+        if (*line == '\n') ++line;
+    }
+    assert(rows == 5);
+    assert(std::strstr(last_text_box_text, "...\n") != nullptr);
+    assert(std::strstr(last_text_box_text, "VOLTAR") != nullptr);
+}
+
+void test_menu_limits_utf8_by_complete_visible_glyphs() {
+    const gbs::MenuItem item { "áááááááááááááááááááááááááááááá", 1, true };
+    gbs::MenuState menu {};
+    gbs::show_menu(menu, "Salvar", &item, 1);
+    gbs::draw_menu(menu);
+    assert(std::strcmp(last_text_box_text, "Salvar\n! ááááááááááááááááááá...") == 0);
+}
+
+void test_menu_page_indicator_uses_supported_digits_and_fits_long_titles() {
+    const gbs::MenuItem items[] = { { "1", 1, true }, { "2", 2, true },
+        { "3", 3, true }, { "4", 4, true }, { "5", 5, true } };
+    gbs::MenuState menu {};
+    gbs::show_menu(menu, "Um titulo de menu muito comprido", items, 5);
+    menu.selected_index = 4;
+    gbs::draw_menu(menu);
+    assert(std::strstr(last_text_box_text, " 2/2\n") != nullptr);
+    assert(std::strcspn(last_text_box_text, "\n") <= 24);
 }
 
 void test_menu_rejects_empty_or_disabled_items() {
@@ -600,7 +648,37 @@ void test_retained_hud_copies_dynamic_text_and_invalidates() {
     hardware_hud_retained=false;
 }
 
+void test_menu_hud_selection_moves_with_identical_labels_and_respects_visibility() {
+    gbs::HudLayoutComponent components[] = {
+        {"one","text","","","",80,64,84,8,2,true},
+        {"two","text","","","",80,80,84,8,2,true}
+    };
+    for (auto& component : components) component.text_advance=7;
+    const gbs::MetaSpritePart part {0,0,0,0,false,false,8,8};
+    const gbs::MetaSprite image {&part,1};
+    gbs::HudLayout layout {"menu-marker","advanced",components,2,nullptr,-1,-1,&image};
+    gbs::configure_hud_layouts(&layout,1); assert(gbs::configure_hud_layout(layout.id));
+    gbs::HudState hud{};gbs::init_hud(hud);
+    const char* slots[]={"  LOW","  HIGH"};gbs::set_hud_text_slots(hud,slots,2);
+    assert(hud.selected_text_slot_plus_one==0); hud.selected_text_slot_plus_one=1;
+    hud_selector_calls=0; hardware_hud_retained=false;
+    gbs::draw_hud(hud);
+    assert(hud_selector_calls==1 && hud_selector_x==80 && hud_selector_y==64 && hud_selector_image==&image);
+    hardware_hud_retained=true;gbs::draw_hud(hud);assert(hud_selector_calls==1);
+    hud.selected_text_slot_plus_one=2;gbs::draw_hud(hud);
+    assert(hud_selector_calls==2 && hud_selector_y==80);
+    gbs::draw_hud_excluding(hud,72,72,104,24);assert(hud_selector_calls==2);
+    hud.visible=false;gbs::draw_hud(hud);assert(hud_selector_calls==2);
+    hud.visible=true;layout.selector_metasprite=nullptr;
+    assert(gbs::configure_hud_layout(layout.id));gbs::draw_hud(hud);
+    assert(hud_selector_calls==3 && hud_selector_image==nullptr);
+    gbs::set_hud_text_slots(hud,slots,2);assert(hud.selected_text_slot_plus_one==0);
+    gbs::draw_hud(hud);assert(hud_selector_calls==3);
+    hardware_hud_retained=false;gbs::configure_hud_layouts(nullptr,0);
+}
+
 int main() {
+    test_menu_hud_selection_moves_with_identical_labels_and_respects_visibility();
     test_retained_hud_copies_dynamic_text_and_invalidates();
     test_object_hud_retains_static_frames_and_refreshes_live_values();
     test_four_independent_fight_gauges();
@@ -619,6 +697,9 @@ int main() {
     test_menu_navigation_wraps_and_skips_disabled_items();
     test_menu_accept_and_cancel();
     test_menu_paginates_and_jumps_with_shoulders();
+    test_menu_rows_fit_the_inner_frame_and_keep_the_last_option_visible();
+    test_menu_limits_utf8_by_complete_visible_glyphs();
+    test_menu_page_indicator_uses_supported_digits_and_fits_long_titles();
     test_menu_rejects_empty_or_disabled_items();
     return 0;
 }
