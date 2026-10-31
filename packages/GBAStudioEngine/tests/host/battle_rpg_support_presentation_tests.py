@@ -31,6 +31,12 @@ int encounter_index=0,effect_animator=0,hurt_sound_delay=0,cue=-1;
 gbs::Visual party_visuals[4],enemy_visuals[8];
 gbs::Vec2i effect_position{};
 void battle_sound(int value) { cue=value; }
+bool status_hud=false;
+bool battle_has_status_hud() { return status_hud; }
+gbs::Vec2i battle_participant_position(const gbs::BattleRpgEncounterData& e,int index,bool enemy) {
+    const auto& participant=enemy?e.enemies[index]:e.party[index];
+    return participant.use_authored_position?participant.position:gbs::Vec2i{160,48};
+}
 ''' + helper + '''
 int main() {
     gbs::Animation fx[4];gbs::AnimationSet clips{};
@@ -53,6 +59,9 @@ int main() {
     assert(effect_position.x==182 && effect_position.y==82 && cue==3 && gbs::played==&fx[1]);
     present_battle_action(true,0,0,gbs::BattleRpgAbilityKind::Defend);
     assert(effect_position.x==166 && effect_position.y==81);
+    status_hud=true; e.enemies[0].use_authored_position=false;
+    present_battle_action(false,0,0,gbs::BattleRpgAbilityKind::Attack);
+    assert(effect_position.x==176 && effect_position.y==64);
 }
 '''
 with tempfile.TemporaryDirectory() as directory:

@@ -33,9 +33,10 @@ int oam_overflow_count;
 unsigned hud_pixel_text_obj_count;
 int hud_layout_current_count, hud_layout_previous_count, background_fallbacks;
 enum { GBS_HW_HUD_COMPONENT_FRAME, GBS_HW_HUD_COMPONENT_BAR, GBS_HW_HUD_COMPONENT_FOREGROUND_BAR,
-    GBS_HW_HUD_COMPONENT_ICON, GBS_HW_HUD_COMPONENT_TEXT, GBS_HW_HUD_COMPONENT_SPACED_TEXT, GBS_HW_HUD_COMPONENT_COMPACT_TEXT };
+    GBS_HW_HUD_COMPONENT_ICON, GBS_HW_HUD_COMPONENT_TEXT, GBS_HW_HUD_COMPONENT_SPACED_TEXT, GBS_HW_HUD_COMPONENT_COMPACT_TEXT, GBS_HW_HUD_COMPONENT_SELECTOR };
 void gbs_hw_clear_hud_layout_rects(void) {}
 void gbs_hw_clear_text_overlay_slots(int a,int b) {}
+void gbs_hw_draw_hud_choice_selector(int a,int b) {}
 void gbs_hw_draw_hud_spaced_text(int a,int b,int c,const char* d,int e) {}
 void gbs_hw_draw_hud_compact_text(int a,int b,int c,const char* d,int e) {}
 void gbs_hw_draw_hud_pixel_text(int a,int b,int c,int d,const char* e,int f) {}

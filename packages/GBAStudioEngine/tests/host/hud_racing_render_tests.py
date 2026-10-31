@@ -10,8 +10,8 @@ code = '''#include <cassert>
 #include "gbs/racing.hpp"
 #include "gbs/profiler.hpp"
 #include "gbs/dialogue.hpp"
-int dialogue_draws=0;
-namespace gbs { struct RuntimeFrameContext {}; void draw_dialogue(const DialogueState&) {++dialogue_draws;} void wait_vblank() {} }
+int dialogue_draws=0, portrait_draws=0;
+namespace gbs { struct RuntimeFrameContext {}; void draw_dialogue(const DialogueState&) {++dialogue_draws;} void draw_dialogue_portrait(const DialogueState&) { assert(dialogue_draws>portrait_draws); ++portrait_draws; } void wait_vblank() {} }
 gbs::DialogueState dialogue {}; gbs::RacingRoomData rooms[1] {}; gbs::RacingProjectData project {};
 struct { bool frame_valid=false; } racing_minimap_cache;
 bool racing_dialogue_was_drawn=true;
@@ -24,8 +24,8 @@ void sync_runtime_telemetry() {}
 ''' + render + '''
 int main() { project.rooms=rooms; rooms[0].config.pseudo3d.presentation=gbs::RacingPresentation::Pseudo3D; render_racing_runtime({}); assert(hud_visible && dialogue_draws==1);
 render_racing_runtime({});assert(dialogue_draws==1);
-dialogue.visible=true;render_racing_runtime({});assert(dialogue_draws==2 && racing_dialogue_was_drawn);
-dialogue.visible=false;render_racing_runtime({});assert(dialogue_draws==3 && !racing_dialogue_was_drawn);
+dialogue.visible=true;render_racing_runtime({});assert(dialogue_draws==2 && portrait_draws==1 && racing_dialogue_was_drawn);
+dialogue.visible=false;render_racing_runtime({});assert(dialogue_draws==3 && portrait_draws==1 && !racing_dialogue_was_drawn);
 render_racing_runtime({});assert(dialogue_draws==3); }
 '''
 with tempfile.TemporaryDirectory() as directory:

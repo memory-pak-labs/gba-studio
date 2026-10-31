@@ -11,12 +11,17 @@ code = r'''
 #include <cassert>
 #include <string>
 std::string calls;
+bool portrait_visible=false;
 namespace gbs {
 struct RuntimeFrameContext {};
 enum class ProfilerSubsystem { Render };
 struct SubsystemProfilerScope { explicit SubsystemProfilerScope(ProfilerSubsystem) {} };
 struct DialogueState { bool visible = false; int frame_index=0; const char* speaker="Nara"; };
 struct HudState {};
+struct Vec2i { int x,y; };
+bool dialogue_should_show_portrait(const DialogueState&) { return portrait_visible; }
+Vec2i dialogue_portrait_position_pixels(const DialogueState&) { return {0,64}; }
+void draw_dialogue_portrait(const DialogueState&) { if(portrait_visible) calls += 'P'; }
 struct DialogueBoxLayout { int x,y,w,h; };
 struct DialogueUiConfig { bool name_label_above=true, show_character_name=true; };
 DialogueBoxLayout dialogue_box_layout_for_frame(int) { return {1,14,28,5}; }
@@ -25,7 +30,7 @@ const DialogueUiConfig& active_dialogue_ui_config() { static DialogueUiConfig va
 void draw_dialogue(const DialogueState& d) { calls += d.visible ? 'D' : 'C'; }
 void draw_hud(HudState&) { calls += 'H'; }
 void draw_hud_excluding(HudState&,int x,int y,int w,int h) {
-  assert(x==0 && y==88 && w==240 && h==72); calls += 'M';
+  assert(x==0 && y==(portrait_visible?56:88) && w==240 && h==(portrait_visible?104:72)); calls += 'M';
 }
 void wait_vblank() {}
 void render_ui_assets() {}
@@ -48,7 +53,9 @@ bool authored_battle_ui() { return true; }
 int main() {
   dialogue.visible=true; render_battle_rpg_runtime({});
   assert(calls == "MD"); // Lower HUD is suppressed; the dialogue owns its band.
-  calls.clear(); dialogue.visible=false; render_battle_rpg_runtime({});
+  calls.clear(); portrait_visible=true; render_battle_rpg_runtime({});
+  assert(calls == "MDP"); // Include the portrait and its margin in the protected area.
+  calls.clear(); portrait_visible=false; dialogue.visible=false; render_battle_rpg_runtime({});
   assert(calls == "CH"); // Clear the old box before restoring the HUD.
   calls.clear(); render_battle_rpg_runtime({});
   assert(calls == "H"); // Do not erase HUD tiles on subsequent frames.

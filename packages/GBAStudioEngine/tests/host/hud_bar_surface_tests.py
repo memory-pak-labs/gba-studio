@@ -9,8 +9,9 @@ start = source.index('void gbs_hw_draw_hud_layout_component(')
 helper = source[start:source.index('\nvoid gbs_hw_end_hud_layout(', start)]
 code = '''#include <assert.h>
 static unsigned char hud_layout_object_only;
-enum { GBS_HW_HUD_COMPONENT_FRAME, GBS_HW_HUD_COMPONENT_BAR, GBS_HW_HUD_COMPONENT_ICON, GBS_HW_HUD_COMPONENT_TEXT, GBS_HW_HUD_COMPONENT_COMPACT_TEXT, GBS_HW_HUD_COMPONENT_FOREGROUND_BAR, GBS_HW_HUD_COMPONENT_SPACED_TEXT };
-int clears, fills, icons, text_calls, compact_calls, spaced_calls, image_priority;
+enum { GBS_HW_HUD_COMPONENT_FRAME, GBS_HW_HUD_COMPONENT_BAR, GBS_HW_HUD_COMPONENT_ICON, GBS_HW_HUD_COMPONENT_TEXT, GBS_HW_HUD_COMPONENT_COMPACT_TEXT, GBS_HW_HUD_COMPONENT_FOREGROUND_BAR, GBS_HW_HUD_COMPONENT_SPACED_TEXT, GBS_HW_HUD_COMPONENT_SELECTOR };
+int clears, fills, icons, text_calls, compact_calls, spaced_calls, selectors, image_priority;
+void gbs_hw_draw_hud_choice_selector(int x,int y) { assert(x==12 && y==20); ++selectors; }
 int gbs_hw_draw_hud_icon(const void* image,int x,int y,int visible,int behind) {
     assert(image); image_priority=behind; ++icons; return 1;
 }
@@ -41,6 +42,8 @@ int main() {
     assert(compact_calls==1 && text_calls==1);
     gbs_hw_draw_hud_layout_component(GBS_HW_HUD_COMPONENT_SPACED_TEXT,180,138,56,8,"ESPERAR",0,0,1);
     assert(spaced_calls==1);
+    gbs_hw_draw_hud_layout_component(GBS_HW_HUD_COMPONENT_SELECTOR,12,20,8,8,"",0,0,1);
+    assert(selectors==1);
 }
 '''
 with tempfile.TemporaryDirectory() as directory:
