@@ -629,8 +629,8 @@ int main(void) {
         self.assertIn("volatile uint16_t* target", obj_body)
         self.assertIn("source[i * 2]", obj_body)
         self.assertIn("source[i * 2 + 1]", obj_body)
-        self.assertIn("low = low == 0 ? (bg_font_transparent ? 0 : DIALOGUE_COLOR_BACKGROUND) : DIALOGUE_COLOR_TEXT", font_byte_body)
-        self.assertIn("high = high == 0 ? (bg_font_transparent ? 0 : DIALOGUE_COLOR_BACKGROUND) : DIALOGUE_COLOR_TEXT", font_byte_body)
+        self.assertIn("low = (low == 0 || low == 5) ? (bg_font_transparent ? 0 : DIALOGUE_COLOR_BACKGROUND) : DIALOGUE_COLOR_TEXT", font_byte_body)
+        self.assertIn("high = (high == 0 || high == 5) ? (bg_font_transparent ? 0 : DIALOGUE_COLOR_BACKGROUND) : DIALOGUE_COLOR_TEXT", font_byte_body)
         self.assertNotIn("volatile uint8_t* target", bg_body)
         self.assertNotIn("volatile uint8_t* target", obj_body)
         self.assertIn("configured_dialogue_font_tiles = tiles;", configure_body)
@@ -649,8 +649,10 @@ int main(void) {
         bg_font_transparent = transparent;
         for (int value = 0; value < 256; ++value) {
             unsigned background = transparent ? 0 : DIALOGUE_COLOR_BACKGROUND;
-            unsigned low = (value & 15) ? DIALOGUE_COLOR_TEXT : background;
-            unsigned high = (value >> 4) ? DIALOGUE_COLOR_TEXT : background;
+            unsigned low_nibble = value & 15;
+            unsigned high_nibble = value >> 4;
+            unsigned low = (low_nibble == 0 || low_nibble == 5) ? background : DIALOGUE_COLOR_TEXT;
+            unsigned high = (high_nibble == 0 || high_nibble == 5) ? background : DIALOGUE_COLOR_TEXT;
             if (dialogue_font_bg_byte((uint8_t)value) != (low | (high << 4))) return 1;
         }
     }
@@ -744,7 +746,14 @@ int main() {
     def test_name_input_glyphs_use_a_dark_palette_slot(self) -> None:
         glyph_body = function_body(self.source, "gbs_hw_draw_text_input_keyboard_glyph")
 
-        self.assertIn("NAME_INPUT_TEXT_PALETTE = 11", self.source)
+        self.assertIn("NAME_INPUT_TEXT_PALETTE = 15", self.source)
+        self.assertIn("NAME_INPUT_BG_PALETTE = 15", self.source)
+        self.assertIn("MEM_PALETTE + NAME_INPUT_BG_PALETTE * 16", function_body(self.source, "queue_name_input_background_palette_restore"))
+        palette = re.search(r"name_input_palette_colors\[16\] = \{([^}]+)\}", self.source)
+        self.assertIsNotNone(palette)
+        colors = [int(value, 16) for value in re.findall(r"0x[0-9A-Fa-f]+", palette.group(1))]
+        self.assertEqual(colors[1], 0x7FFF)  # light surface
+        self.assertEqual(colors[4], 0x1862)  # dark glyph
         self.assertIn("name_input_glyph_tile_entry", glyph_body)
         self.assertNotIn("name_input_tile_entry(dialogue_bg_tile_for_codepoint", glyph_body)
 
@@ -931,9 +940,9 @@ int main(void){dispatch();dispatch();assert(arms==2);assert(irq_ticks==2);REG_IF
     def test_large_render_staging_buffers_are_kept_in_ewram(self) -> None:
         buffers = (
             "tilemap_decode_buffer",
-            "lz77_tilemap_decode_buffer",
-            "lz77_tile_decode_buffer",
-            "lz77_palette_decode_buffer",
+            "compressed_tilemap_decode_buffer",
+            "compressed_tile_decode_buffer",
+            "compressed_palette_decode_buffer",
             "palette_decode_buffer",
             "dynamic_palette_buffer",
         )
@@ -944,6 +953,8 @@ int main(void){dispatch();dispatch();assert(arms==2);assert(irq_ticks==2);REG_IF
         )
         self.assertIn("#if defined(__arm__) || defined(__thumb__)", self.render_source)
         self.assertIn("#else\n#define GBS_RENDER_EWRAM\n#endif", self.render_source)
+        self.assertIn("max_lz77_tile_asset_bytes == max_huffman_tile_asset_bytes", self.render_source)
+        self.assertIn("max_lz77_palette_bytes == max_huffman_palette_bytes", self.render_source)
         for buffer in buffers:
             declaration = next(
                 line for line in self.render_source.splitlines() if buffer in line
