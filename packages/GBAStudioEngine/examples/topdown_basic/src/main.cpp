@@ -3282,6 +3282,9 @@ int initialize_topdown_runtime() {
 
     gbs::debug_reset();
     gbs::reset_runtime_telemetry();
+    // Standalone top-down ROMs do not pass through the mixed-runtime dispatcher.
+    // Publish the same runtime identity for the Player and debugger.
+    gbs::debug_set_runtime_kind(static_cast<int32_t>(gbs::RuntimeKind::TopDown));
     runtime_trigger_enter_count = 0;
     runtime_trigger_leave_count = 0;
     runtime_room_change_count = 0;
