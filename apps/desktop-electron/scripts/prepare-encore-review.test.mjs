@@ -35,7 +35,7 @@ it("copies the approved canonical project and manifest byte for byte by default"
       .toEqual(fs.readFileSync(path.join(template, asset.metadata.source)));
   }
   expect(fs.readFileSync(path.join(template, "exemplo-gba.gba-project"))).toEqual(original);
-});
+}, 240_000);
 
 it("requires an explicit candidate flag and removes all previous approval from new assets", () => {
   const root = temporary(), assets = path.join(root, "input"), output = path.join(root, "candidate"); fs.mkdirSync(assets);

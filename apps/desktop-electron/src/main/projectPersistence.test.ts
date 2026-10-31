@@ -20,8 +20,10 @@ afterEach(async () => {
 
 describe("project persistence", () => {
   it("honors the filename selected by Save As while keeping a self-contained folder", () => {
-    expect(resolveProjectSaveDestination(undefined, "/games/hud_authoring_qa.gba-project", "Dungeon HUD QA"))
-      .toBe("/games/hud_authoring_qa/hud_authoring_qa.gba-project");
+    const gamesDirectory = path.join(path.parse(process.cwd()).root, "games");
+    const chosenFile = path.join(gamesDirectory, "hud_authoring_qa.gba-project");
+    expect(resolveProjectSaveDestination(undefined, chosenFile, "Dungeon HUD QA"))
+      .toBe(path.join(gamesDirectory, "hud_authoring_qa", "hud_authoring_qa.gba-project"));
   });
 
   it("copies imported and modified assets from the current project when saving an independent copy", async () => {
