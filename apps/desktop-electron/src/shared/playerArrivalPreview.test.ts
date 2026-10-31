@@ -39,8 +39,9 @@ describe('player arrival preview', () => {
   });
   it('mirrors the right frame when no left frame is authored', () => {
     const p = project();
-    p.animations = (p.animations as Record<string, unknown>[]).filter(a => a.spriteSheet !== 'porto-nara-animations48.png' || a.name !== 'idle_left');
-    (p.animationStates as Record<string, unknown>[]).find(s => s.id === 'porto-nara-animations48-state')!.mirrorLeftFromRight = true;
+    const actor = (p.actors as Record<string, unknown>[]).find(a => a.name === 'Nara · Farol')!;
+    p.animations = (p.animations as Record<string, unknown>[]).filter(a => a.spriteSheet !== actor.spriteSheet || a.name !== 'idle_left');
+    (p.animationStates as Record<string, unknown>[]).find(s => s.id === actor.animationStateID)!.mirrorLeftFromRight = true;
     const preview = playerArrivalPreview(p, 'farol_interior', 'Nara · Farol', 'left');
     expect(preview?.sprite.animationName).toBe('idle_right');
     expect(preview?.flipX).toBe(true);
