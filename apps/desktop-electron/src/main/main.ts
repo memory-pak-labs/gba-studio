@@ -11,6 +11,7 @@ import { buildProjectRomArtifact } from "./webRomPipeline.js";
 import { launchRomInEmulator } from "./launchRomInEmulator.js";
 import { openRomPlayerWindow } from "./romPlayerWindow.js";
 import { installAppMenu } from "./appMenu.js";
+import { createProjectSaveQueue } from "./projectSaveQueue.js";
 import { writeEngineSchemaExport } from "./engineProjectExport.js";
 import { projectPersistentBuildCacheEnabled } from "./engineBuildCache.js";
 import { PlayRomCache, type PlayRomInputs } from "./playRomCache.js";
@@ -91,6 +92,7 @@ registerTranslationModelProtocolScheme();
 
 let appLocale: string = DEFAULT_APP_LOCALE;
 let editorWindow: BrowserWindow | undefined;
+const projectSaves = createProjectSaveQueue();
 function showLocalizedOpenDialog(options: OpenDialogOptions) {
   return dialog.showOpenDialog(localizeNativeDialog({ buttonLabel: "Abrir", ...options }, appLocale));
 }
@@ -279,7 +281,7 @@ ipcMain.handle(ipcChannels.openProject, async () => {
   return opened;
 });
 
-ipcMain.handle(ipcChannels.saveProject, async (_event, request: SaveProjectRequest) => {
+ipcMain.handle(ipcChannels.saveProject, (_event, request: SaveProjectRequest) => projectSaves.run(async () => {
   const selectedDestination =
     request.path ??
     resolveSmokeProjectSavePath() ??
@@ -316,7 +318,7 @@ ipcMain.handle(ipcChannels.saveProject, async (_event, request: SaveProjectReque
       error: message === occupiedProjectDestinationMessage ? translateStudioMessage(appLocale, message) : message
     };
   }
-});
+}));
 
 ipcMain.handle(ipcChannels.exportDialogue, async (_event, request: ExportDialogueRequest) => {
   const prepared = prepareDialogueExport(request.project.data, request.key);
