@@ -329,7 +329,7 @@ describe("contrato de playtest de Vértice", () => {
       "logo", "abertura", "escolha_genero", "nome_jogador", "carregar_jogo",
       "configuracoes",
       "creditos", "missoes", "inventario", "mapa_menu",
-      "salvar", "menu_start"
+      "salvar", "menu_start", "corrida_preparacao", "corrida_resultados", "inventario_ferramentas"
     ]);
     expect(selectExemploScenePlaytestPlan(project, "logo")).toEqual([
       expect.objectContaining({ name: "logo", runtime: "cutscene" })
@@ -383,12 +383,12 @@ describe("contrato de playtest de Vértice", () => {
     });
 
     expect(consolidated).toMatchObject({
-      audit: { ok: true, counts: { expected: 12, passed: 12, failed: 0 } },
+      audit: { ok: true, counts: { expected: interfacePlan.length, passed: interfacePlan.length, failed: 0 } },
       ok: true
     });
     expect(reusableExemploScenePlaytestRuns(project, runs, {
       plan: exemploInterfaceScenePlaytestPlan
-    })).toHaveLength(12);
+    })).toHaveLength(interfacePlan.length);
   });
 
   it("exige um soak que cubra as dezessete cenas e save/load", () => {
