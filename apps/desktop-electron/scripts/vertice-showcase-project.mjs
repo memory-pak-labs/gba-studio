@@ -9048,6 +9048,10 @@ export function promoteExemploGBAVerticeCampaign(data) {
   }
   result.actors = merge((result.actors ?? []).filter(actor => !APPROVED_ACTOR_SCENES.has(actor?.roomName)),
     (data.actors ?? []).filter(actor => APPROVED_ACTOR_SCENES.has(actor?.roomName)), "id");
+  const approvedFarolPlayer = (data.actors ?? []).find(actor => actor?.id === "farol-nara" && actor?.spriteSheet === "nara-topdown-walk-run-v1.png");
+  if (approvedFarolPlayer && (data.assets ?? []).some(asset => asset?.name === approvedFarolPlayer.spriteSheet && asset?.metadata?.reviewStatus === "approved")) {
+    result.actors = merge(result.actors, [approvedFarolPlayer], "id");
+  }
   result.events = merge(result.events, (data.events ?? []).filter(event => APPROVED_MENU_SCENES.has(event?.roomName)
     || APPROVED_RACE_EVENT_SCENES.has(event?.roomName) || event?.name?.startsWith("race_") || event?.name === "nara_configurar_corrida"), "name");
   const seenEventNames = new Set();
@@ -9071,7 +9075,9 @@ export function promoteExemploGBAVerticeCampaign(data) {
   const sourcePositions = data.editorState?.sceneMapPositions ?? {};
   result.editorState = result.editorState ?? {};
   result.editorState.sceneMapPositions = { ...(result.editorState.sceneMapPositions ?? {}) };
-  for (const scene of extraScenes) if (sourcePositions[scene.name]) result.editorState.sceneMapPositions[scene.name] = structuredClone(sourcePositions[scene.name]);
+  for (const scene of result.scenas ?? []) {
+    if (sourcePositions[scene.name]) result.editorState.sceneMapPositions[scene.name] = structuredClone(sourcePositions[scene.name]);
+  }
   const raceSources = new Set(["arena_arrancada", "mapa_rota", "circuito_final", "circuito_perspectiva"]);
   const preservesConnection = connection => raceSources.has(connection?.from) || APPROVED_EXTRA_MENU_SCENES.has(connection?.from) || APPROVED_EXTRA_MENU_SCENES.has(connection?.to);
   result.editorState.scenaConnections = [
