@@ -1,0 +1,262 @@
+[
+  {
+    "part": "frame",
+    "alphaHistogram": [
+      [
+        0,
+        2320
+      ],
+      [
+        1,
+        55
+      ],
+      [
+        2,
+        5
+      ],
+      [
+        5,
+        1
+      ],
+      [
+        19,
+        1
+      ],
+      [
+        63,
+        1
+      ],
+      [
+        91,
+        1
+      ],
+      [
+        96,
+        1
+      ],
+      [
+        102,
+        1
+      ],
+      [
+        122,
+        1
+      ],
+      [
+        131,
+        1
+      ],
+      [
+        187,
+        2
+      ],
+      [
+        200,
+        1
+      ],
+      [
+        211,
+        1
+      ],
+      [
+        252,
+        6
+      ],
+      [
+        253,
+        204
+      ],
+      [
+        254,
+        7638
+      ]
+    ],
+    "sourceBounds": [
+      5,
+      6,
+      123,
+      73
+    ],
+    "targetBounds": [
+      4,
+      3,
+      124,
+      79
+    ],
+    "alphaThreshold": 128,
+    "alphaJustification": "Solid source alpha is 253/254; threshold measured against near-zero exterior. No fully opaque source pixels exist.",
+    "opaquePixelsKept": 8823,
+    "rgb555PixelsMappedToCanonicalPalette": 1730,
+    "canonicalPalette": [
+      [
+        16,
+        0,
+        24
+      ],
+      [
+        32,
+        16,
+        48
+      ],
+      [
+        64,
+        32,
+        88
+      ],
+      [
+        88,
+        56,
+        120
+      ],
+      [
+        112,
+        72,
+        136
+      ],
+      [
+        144,
+        104,
+        176
+      ],
+      [
+        184,
+        144,
+        200
+      ],
+      [
+        208,
+        184,
+        224
+      ]
+    ],
+    "sha256": "d526cc24479458af5316f7b7c039b6d5dff041890f6388a7c2c1b078ce54b383",
+    "state": "approved",
+    "approved": true,
+    "canvasFitRevision": 2,
+    "reason": "All three 7px text glyph rows retain at least one blank pixel before the lower border.",
+    "approvalDate": "2026-10-29",
+    "runtimeFile": "neutral-hud-menu-frame.png",
+    "originalCanvas": [
+      2158,
+      729
+    ],
+    "originalSourceFile": "frame-source.png",
+    "originalSourceSha256": "3308aab10fab27abfb6c5ab0fddd22af7560e55f8cc7c935ca384d27ea38c6c3",
+    "workingFile": "frame-working.png",
+    "workingSha256": "ffaa08da977a80b76a1ee5a4b05ccff03dbf2e8a8f53a3768ab764ef6c832943",
+    "workingCanvas": [
+      128,
+      80
+    ],
+    "alphaHistogramStage": "working canvas before measured alpha threshold and canvas fit"
+  },
+  {
+    "part": "hint",
+    "alphaHistogram": [
+      [
+        0,
+        1042
+      ],
+      [
+        1,
+        2
+      ],
+      [
+        248,
+        2
+      ],
+      [
+        249,
+        2
+      ],
+      [
+        252,
+        5
+      ],
+      [
+        253,
+        25
+      ],
+      [
+        254,
+        842
+      ]
+    ],
+    "sourceBounds": [
+      3,
+      6,
+      77,
+      18
+    ],
+    "targetBounds": [
+      4,
+      4,
+      76,
+      22
+    ],
+    "alphaThreshold": 128,
+    "alphaJustification": "Solid source alpha is 253/254; threshold measured against near-zero exterior. No fully opaque source pixels exist.",
+    "opaquePixelsKept": 1280,
+    "rgb555PixelsMappedToCanonicalPalette": 701,
+    "canonicalPalette": [
+      [
+        16,
+        0,
+        24
+      ],
+      [
+        32,
+        16,
+        48
+      ],
+      [
+        64,
+        32,
+        88
+      ],
+      [
+        88,
+        56,
+        120
+      ],
+      [
+        112,
+        72,
+        136
+      ],
+      [
+        144,
+        104,
+        176
+      ],
+      [
+        184,
+        144,
+        200
+      ],
+      [
+        208,
+        184,
+        224
+      ]
+    ],
+    "sha256": "7fb80ce4285195d401906876ae322c382f681204e439f8d4388a5275ed9fac33",
+    "state": "approved",
+    "approved": true,
+    "approvalDate": "2026-10-29",
+    "runtimeFile": "neutral-hud-menu-hint.png",
+    "originalCanvas": [
+      1586,
+      992
+    ],
+    "originalSourceFile": "hint-source.png",
+    "originalSourceSha256": "396a3e0cbd42e2547fe30bcce030de09a5ec7561607e33e2217b6c9e9cfaac1a",
+    "workingFile": "hint-working.png",
+    "workingSha256": "3c11118c0591b416d3d8316b4b30b0840b36c5bb09d1a289a5b62e2f96a7ed56",
+    "workingCanvas": [
+      80,
+      24
+    ],
+    "alphaHistogramStage": "working canvas before measured alpha threshold and canvas fit"
+  }
+]
