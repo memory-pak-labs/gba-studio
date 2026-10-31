@@ -1,0 +1,63 @@
+{
+  "version": 1,
+  "generator": "OpenAI Imagegen",
+  "license": "Project-owned",
+  "approval": {
+    "date": "2026-10-29",
+    "decision": "User explicitly approved Menu, Custom and World Map replacements after source, runtime and Player previews."
+  },
+  "preparation": "Nearest-neighbor 240x160 review, then the real assetc 4bpp background planner with 14 palette banks. No tile merging. Sources and preserved reviews retained.",
+  "assets": [
+    {
+      "family": "menu",
+      "file": "neutral-background-menu.png",
+      "sourceSha256": "43632c671c895238566eff5ce656da11a679a5a62fb0121f12143d80bd704d09",
+      "preservedReview": "menu-240x160-preserved.png",
+      "preservedSha256": "9477a9be39303149e9390a82f3ff2dbccd2526b8d5e58a544f8bbf17c39dd504",
+      "preparedSha256": "d73a2c7227bda0516fbbe18be3cd1cdd28af9f7652a9c4b6f14e1557c4550ec3",
+      "width": 240,
+      "height": 160,
+      "paletteBanks": 14,
+      "visibleColors": 47,
+      "tileCount": 291,
+      "totalMappingError": 0,
+      "palettePreparationStatus": "attention",
+      "paletteColorError": 55424,
+      "visualApproval": "approved by user on 2026-10-29; constrained palette reviewed separately from the source"
+    },
+    {
+      "family": "custom",
+      "file": "neutral-background-custom.png",
+      "sourceSha256": "330c2fd4b657776ebc51c1407d7b902002428eed5aae102ff33f2074a90ae686",
+      "preservedReview": "custom-240x160-preserved.png",
+      "preservedSha256": "4c004fe947786657d3885f20a34f08cb29305dcf68cc6b66c6708c235bd66962",
+      "preparedSha256": "cce1401cae07373a42e0e2183f2b3f36b63e2b9c3858006f252f75a4fc104551",
+      "width": 240,
+      "height": 160,
+      "paletteBanks": 14,
+      "visibleColors": 74,
+      "tileCount": 563,
+      "totalMappingError": 0,
+      "palettePreparationStatus": "attention",
+      "paletteColorError": 469568,
+      "visualApproval": "approved by user on 2026-10-29; constrained palette reviewed separately from the source"
+    },
+    {
+      "family": "world-map",
+      "file": "neutral-background-world-map.png",
+      "sourceSha256": "aa8f7851cf96f87b0a8f78ad5ae3c10a20dcd7c071fd13d6916ae7235cf566a2",
+      "preservedReview": "world-map-240x160-preserved.png",
+      "preservedSha256": "1e00a27c1a9aa82e7819e4231c7dc6fb317ebe7fdb9505d311c5570da64cb760",
+      "preparedSha256": "289eefb58d567dcba088ab22796deb0691063f9cbb66fad6598ef93d2c451ed0",
+      "width": 240,
+      "height": 160,
+      "paletteBanks": 14,
+      "visibleColors": 100,
+      "tileCount": 593,
+      "totalMappingError": 0,
+      "palettePreparationStatus": "attention",
+      "paletteColorError": 4799936,
+      "visualApproval": "approved by user on 2026-10-29; constrained palette reviewed separately from the source"
+    }
+  ]
+}

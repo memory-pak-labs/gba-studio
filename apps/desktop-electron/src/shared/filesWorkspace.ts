@@ -1561,10 +1561,21 @@ export function replaceAssetFileInProject(
   const asset = assets.find((item, index) => assetID(item, index) === assetIDToReplace);
   if (!asset) return data;
 
-  asset.kind = replacement.kind || asset.kind;
-  asset.systemImage = replacement.systemImage || asset.systemImage;
+  // Replacing the file preserves its authored role and all name-based uses.
+  asset.kind = asset.kind || replacement.kind;
+  asset.systemImage = asset.systemImage || replacement.systemImage;
+  const metadata = isRecord(asset.metadata) ? { ...asset.metadata } : {};
+  // These describe the old pixels, rather than the asset's runtime settings.
+  for (const field of [
+    "bundledDefaultAsset", "sourceSha256", "preparedSha256", "runtimeSourceSha256",
+    "provenance", "license", "generatedBy", "approved", "reviewStatus", "visualStatus",
+    "palettePreparationVisuallyApproved", "width", "height", "backgroundPaletteReferencePlan"
+  ]) {
+    delete metadata[field];
+  }
   asset.metadata = {
-    ...(isRecord(asset.metadata) ? asset.metadata : {}),
+    ...metadata,
+    ...replacement.metadata,
     source: replacement.relativePath
   };
   next.assets = assets;

@@ -103,6 +103,31 @@ describe("Files workspace presentation", () => {
     }]);
     expect(next.animations[0].spriteSheet).toBe("hero.png");
   });
+  it("replaces background pixels without retaining the old file palette, dimensions or approval", () => {
+    const project = {
+      assets: [{ id: "menu", name: "menu.png", kind: "Background", systemImage: "photo", metadata: {
+        source: "Assets/backgrounds/menu.png", bundledDefaultAsset: "template:blank/Assets/backgrounds/menu.png",
+        width: 240, height: 160, sourceSha256: "old-image", preparedSha256: "old-prepared", runtimeSourceSha256: "old-runtime",
+        provenance: "Old approved image", license: "Old license", generatedBy: "old-generator", approved: true,
+        reviewStatus: "approved", visualStatus: "approved", palettePreparationVisuallyApproved: true,
+        backgroundPaletteReferencePlan: { banks: [[null, [56, 24, 16]]], tile_palette_banks: [0] },
+        colorMode: "4bpp", backgroundPaletteBankBudget: 14, backgroundTileOptimizer: { enabled: true, tileBudget: 640 },
+        note: "menu backdrop"
+      } }],
+      rooms: [{ id: "sound", backgroundAssetName: "menu.png" }]
+    };
+    const next = replaceAssetFileInProject(project, "menu", {
+      id: "replacement", name: "new-menu.png", relativePath: "Assets/backgrounds/menu.png", kind: "Sprite", systemImage: "photo",
+      metadata: { width: 320, height: 160, sourceSha256: "new-image" }
+    });
+    expect(next.assets).toEqual([{ id: "menu", name: "menu.png", kind: "Background", systemImage: "photo", metadata: {
+      source: "Assets/backgrounds/menu.png", width: 320, height: 160, sourceSha256: "new-image",
+      colorMode: "4bpp", backgroundPaletteBankBudget: 14, backgroundTileOptimizer: { enabled: true, tileBudget: 640 }, note: "menu backdrop"
+    } }]);
+    expect(next.rooms).toEqual(project.rooms);
+    expect(project.assets[0]!.metadata.sourceSha256).toBe("old-image");
+  });
+
   it("derives assets, type counts and group membership from current .gba-project fields", () => {
     const presentation = deriveFilesWorkspacePresentation({
       assets: [
