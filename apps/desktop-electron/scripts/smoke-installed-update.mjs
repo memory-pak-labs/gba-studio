@@ -43,7 +43,7 @@ const server = createServer((req, res) => {
   res.writeHead(404); res.end();
 });
 await new Promise((resolve, reject) => { server.once('error', reject); server.listen(fixture.port, '127.0.0.1', resolve); });
-const port = fixture.port + 1;
+let port = fixture.port + 1;
 const env = createElectronSmokeEnv({
   GBA_STUDIO_SMOKE_CDP_PORT: String(port), GBA_STUDIO_SMOKE_USER_DATA_DIR: path.join(root, 'profile'),
   GBA_STUDIO_OPEN_PROJECT: project, APPIMAGE_EXTRACT_AND_RUN: '1', ELECTRON_DISABLE_SANDBOX: '1'
@@ -54,7 +54,12 @@ let logs = '';
 let exited = false;
 let cdp;
 const checks = [];
-function launchForInspection(executable = fixture.sourceExecutable) {
+function launchForInspection(executable = fixture.sourceExecutable, afterUpdate = false) {
+  if (afterUpdate) {
+    // The original debugger can retain its listening port briefly after the update.
+    port = fixture.port + 2;
+    env.GBA_STUDIO_SMOKE_CDP_PORT = String(port);
+  }
   exited = false;
   child = spawn(executable, fixture.platform === 'linux' ? ['--no-sandbox'] : [], { cwd: appRoot, env, stdio: ['ignore', 'pipe', 'pipe'], windowsHide: true });
   child.stdout.on('data', (data) => { logs += data; });
@@ -141,7 +146,7 @@ try {
       const { stdout } = await execFileAsync('powershell.exe', ['-NoProfile', '-Command', `if (Get-Process -Id ${restartedPid} -ErrorAction SilentlyContinue) { 'running' } else { 'exited' }; exit 0`]);
       return stdout.trim() === 'exited';
     }, 'updated instance exits', 30_000);
-    launchForInspection();
+    launchForInspection(fixture.sourceExecutable, true);
   } else {
     const installedImage = path.join(path.dirname(fixture.sourceExecutable), targetName);
     const restarted = await poll(async () => {
@@ -161,7 +166,7 @@ try {
       }
       return true;
     }, 'updated instance exits', 30_000);
-    launchForInspection(installedImage);
+    launchForInspection(installedImage, true);
   }
   cdp = await connect();
   await waitFor("Boolean(document.querySelector('.app-shell'))", 'updated editor', 180_000);
