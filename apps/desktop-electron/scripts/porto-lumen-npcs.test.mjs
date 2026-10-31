@@ -24,7 +24,7 @@ describe('NPCs aprovados de Porto Lumen', () => {
   });
   it('usa os cinco desenhos nativos aprovados e conserva as quatro vistas sem espelhamento', () => {
     const data = project();
-    const palette = data.assets.find(a => a.name === 'porto-nara-animations48.png').metadata.objectPaletteValues;
+    const palette = data.assets.find(a => a.name === 'nara-topdown-walk-run-v1.png').metadata.objectPaletteValues;
     for (const role of roles) {
       const name = `porto-${role}-body48.png`;
       const actor = data.actors.find(a => a.id === `porto-lume-${role}-pilot`);

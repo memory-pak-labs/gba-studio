@@ -618,7 +618,6 @@ describe("projectTemplates", () => {
       "porto-fisherchild-body48.png",
       "porto-lighthousekeeper-body48.png",
       "porto-mechanic-animations48.png",
-      "porto-nara-animations48.png",
       "porto-traveler-body48.png",
       "racing-approved-overhead-nara.png",
       "racing-approved-overhead-rival.png",
