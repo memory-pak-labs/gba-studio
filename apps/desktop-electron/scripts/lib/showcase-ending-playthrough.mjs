@@ -26,14 +26,24 @@ export async function playShowcaseEnding(driver, project, manifest, path, option
     await driver.run(1,1|(Math.abs(error)>.35?(error>0?16:32):0));
   }
   assert.ok(victory,'Three laps through the actual ordered gates');
-  await driver.run(20,0);await driver.capture('ending-race-victory');
-  const key=path===1?'showcase_epilogue_community':'showcase_epilogue_exploration';let seen=false;
+  await driver.capture('ending-race-victory');await driver.run(20,0);
+  const resultScreen=options.exported.menu_project.screens.findIndex(screen=>screen.name==='corrida_resultados');
+  assert.notEqual(resultScreen,-1,'The authored race results screen exists');
+  const continueIndex=options.exported.menu_project.screens[resultScreen].items.findIndex(item=>item.label==='CONTINUAR');
+  assert.notEqual(continueIndex,-1,'The race results screen offers CONTINUAR');
+  const titleScreen=options.exported.menu_project.screens.findIndex(screen=>screen.name==='title');
+  assert.notEqual(titleScreen,-1,'The title screen exists');
+  const key=path===1?'showcase_epilogue_community':'showcase_epilogue_exploration';let seen=false,continued=false;
   for(let n=0;n<160;n++) {
     const ui=await driver.ui();
     if(ui.dialogue?.key===key&&!seen){await driver.run(400,0);await driver.capture('ending-branch-'+path);seen=true;}
-    const state=await driver.state();
+    const state=await driver.telemetry();
+    if(!continued&&state.runtimeKind===3&&state.currentRoom===resultScreen){
+      for(let i=0;i<continueIndex;i++){await driver.run(4,128);await driver.run(24,0);}
+      await driver.run(4,1);await driver.run(40,0);continued=true;continue;
+    }
     if(seen&&state.runtimeKind===0&&options.tour)return options.tour();
-    if(seen&&state.runtimeKind===3){await driver.run(180,0);await driver.capture('ending-title-'+path);return{passed:true,endingPath:path,scope:'Whole canonical ROM; development start at final race with explicit initial council decision. Three laps and ending are driven by buttons.'};}
+    if(seen&&state.runtimeKind===3&&state.currentRoom===titleScreen){await driver.run(180,0);await driver.capture('ending-title-'+path);return{passed:true,endingPath:path,scope:'Whole canonical ROM; development start at final race with explicit initial council decision. Three laps and ending are driven by buttons.'};}
     await driver.run(4,1);await driver.run(35,0);
   }
   assert.fail('Conditional ending appears and returns to title');

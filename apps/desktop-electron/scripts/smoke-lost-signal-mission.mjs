@@ -152,7 +152,7 @@ try {
   else if(process.argv.some(a=>a.startsWith('--encore=')))Object.assign(report,await playExampleEncore(driver,project,exported,process.argv.find(a=>a.startsWith('--encore=')).slice(9)));
   else if(process.argv.some(a=>a.startsWith('--coast=')))Object.assign(report,await playCoastDepth(driver,project,exported,process.argv.find(a=>a.startsWith('--coast=')).slice(8),{projectRoot:path.dirname(projectFile),output}));
   else if(process.argv.includes('--topdown-movement'))Object.assign(report,await playTopdownMovement(driver,project,exported,{projectRoot:path.dirname(projectFile),output,walkAnimation:process.argv.includes('--walk-animation')}));
-  else if(process.argv.some(a=>a.startsWith('--ending=')))Object.assign(report,await playShowcaseEnding(driver,project,JSON.parse(fs.readFileSync(new URL('../fixtures/asset-provenance/racing-approved-manifest.json',import.meta.url))),Number(process.argv.find(a=>a.startsWith('--ending=')).split('=')[1])));
+  else if(process.argv.some(a=>a.startsWith('--ending=')))Object.assign(report,await playShowcaseEnding(driver,project,JSON.parse(fs.readFileSync(new URL('../fixtures/asset-provenance/racing-approved-manifest.json',import.meta.url))),Number(process.argv.find(a=>a.startsWith('--ending=')).split('=')[1]),{exported}));
   else if(process.argv.some(a=>a.startsWith('--evolutions=')))Object.assign(report,await playCampaignEvolutions(driver,project,exported,process.argv.find(a=>a.startsWith('--evolutions=')).slice(13),{projectRoot:path.dirname(projectFile)}));
   else Object.assign(report, await (process.argv.includes('--relay')?playFarolRelay:process.argv.includes('--showcase')?playShowcaseSystems:playLostSignalMission)(driver, project, exported));
 }

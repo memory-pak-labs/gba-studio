@@ -186,7 +186,7 @@ try {
     const nativeRun=spawnSync(process.execPath,[path.join(app,'scripts/smoke-lost-signal-mission.mjs'),romPath,exportDir,traceDir,'--ending='+endingPath],{encoding:'utf8',maxBuffer:8*1024*1024});
     assert.equal(nativeRun.status,0,nativeRun.stdout+nativeRun.stderr);
     const trace=JSON.parse(fs.readFileSync(path.join(traceDir,'report.json')));assert.equal(trace.romSha256,report.romSha256);
-    await driver.reboot();Object.assign(report,await playShowcaseEnding(driver,project,JSON.parse(fs.readFileSync(path.join(app,'fixtures/asset-provenance/racing-approved-manifest.json'))),endingPath),{nativeReport:path.join(traceDir,'report.json')});
+    await driver.reboot();Object.assign(report,await playShowcaseEnding(driver,project,JSON.parse(fs.readFileSync(path.join(app,'fixtures/asset-provenance/racing-approved-manifest.json'))),endingPath,{exported}),{nativeReport:path.join(traceDir,'report.json')});
   }else if(process.argv.some(a=>a.startsWith('--coast=')))Object.assign(report,await playCoastDepth(driver,project,exported,process.argv.find(a=>a.startsWith('--coast=')).slice(8),{projectRoot:copy,output}));
   else if(process.argv.includes('--topdown-movement'))Object.assign(report,await playTopdownMovement(driver,project,exported,{projectRoot:copy,output,walkAnimation:process.argv.includes('--walk-animation')}));
   else if(process.argv.some(a=>a.startsWith('--evolutions=')))Object.assign(report,await playCampaignEvolutions(driver,project,exported,process.argv.find(a=>a.startsWith('--evolutions=')).slice(13),{projectRoot:copy,output}));
