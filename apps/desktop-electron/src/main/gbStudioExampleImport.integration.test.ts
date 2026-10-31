@@ -28,6 +28,14 @@ describe("canonical GB Studio imported project", () => {
       }
     }
     expect(buildEngineExportProjectContract(project).requires.features.filter(feature => !supported.has(feature))).toEqual([]);
+    const withRuntimeCondition = structuredClone(project);
+    for (const key of ["rooms", "scenas"] as const) {
+      const room = (withRuntimeCondition[key] as any[]).find(scene => scene.name === "menu_start");
+      room.runtime.config.items[0].availableRuntime = "racing";
+    }
+    const conditionalFeatures = buildEngineExportProjectContract(withRuntimeCondition).requires.features;
+    expect(conditionalFeatures).toContain("menu_runtime_conditions");
+    expect(conditionalFeatures.filter(feature => !supported.has(feature))).toEqual([]);
   });
 
   it("keeps the current imported Exemplo fixture migration-valid and export-complete", async () => {

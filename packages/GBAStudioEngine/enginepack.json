@@ -1078,6 +1078,7 @@
     "racing_save_resume": true,
     "menu_hud_header": true,
     "menu_text_bindings": true,
+    "menu_runtime_conditions": true,
     "menu_hud_bindings": true,
     "menu_page_navigation": true,
     "menu_actor_visibility_conditions": true,
