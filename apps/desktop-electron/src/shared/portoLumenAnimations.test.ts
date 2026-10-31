@@ -22,21 +22,23 @@ describe("Porto Lumen directional animations", () => {
     expect(() => buildEngineExportProjectContract(project)).toThrow(/topdownMovement/);
   });
 
-  it("exports all eight authored states with independent left artwork and streamed frames", () => {
+  it("exports directional states with independent left artwork and streamed frames", () => {
     const pack = buildAssetcSpritePackGeneration(data)!;
     const contract = buildEngineExportProjectContract(data);
     for (const actor of ["nara", "mechanic"]) {
-      const sheet = "porto-" + actor + "-animations48.png";
+      const sheet = actor === "nara" ? "nara-topdown-walk-run-v1.png" : "porto-mechanic-animations48.png";
       expect(pack.assetsBySheet[sheet]).toMatchObject({ sprite_width: 32, sprite_height: 48, sprite_bpp: 8, stream_frames: true });
       const visual = actor === "nara"
         ? contract.topdown_project!.actor_sprites!.find(visual => visual.name === sheet)!
         : contract.topdown_project!.rooms.find(room => room.name === "porto_lumen")!.npcs!.find(npc => npc.name === "Mecânica de Lúmen")!;
-      expect(visual.animations?.map(animation => animation.name)).toEqual([
+      const expected = [
         "idle_down", "idle_right", "idle_up", "idle_left",
         "walk_down", "walk_right", "walk_up", "walk_left"
-      ]);
+      ];
+      if (actor === "nara") expected.push("run_down", "run_right", "run_up", "run_left");
+      expect(visual.animations?.map(animation => animation.name)).toEqual(expected);
       for (const animation of visual.animations!) {
-        expect(animation.frame_indices).toHaveLength(animation.name.startsWith("walk") ? 4 : 1);
+        expect(animation.frame_indices).toHaveLength(animation.name.startsWith("idle") ? 1 : 4);
         for (const frame of animation.frame_metasprites!) {
           expect(frame.parts).toHaveLength(2);
           expect(frame.parts[0]).toMatchObject({ x: -8, y: -40, width: 32, height: 32, hflip: false });

@@ -8,22 +8,22 @@ const data = parseGBAProjectFile(readFileSync(new URL("../../default-assets/temp
 
 describe("approved Porto Lumen actor and HUD integration", () => {
   it("exports four walk phases with a four-pixel cadence for Nara", () => {
-    const actor = buildEngineExportProjectContract(data).topdown_project!.actor_sprites!.find((a: any) => a.name === 'porto-nara-animations48.png')!;
-    const walks = actor.animations!.filter(a => a.frame_indices.length === 4);
+    const actor = buildEngineExportProjectContract(data).topdown_project!.actor_sprites!.find((a: any) => a.name === 'nara-topdown-walk-run-v1.png')!;
+    const walks = actor.animations!.filter(a => a.name.startsWith('walk_'));
     expect(walks).toHaveLength(4);
     for (const walk of walks) expect(walk.durations).toEqual([4, 4, 4, 4]);
   });
   it("keeps the active 48px four-direction sheets and independent foot collision", () => {
-    for (const name of ["porto-nara-animations48.png", "porto-mechanic-animations48.png"]) {
+    for (const name of ["nara-topdown-walk-run-v1.png", "porto-mechanic-animations48.png"]) {
       const source = (data.assets as any[]).find(asset => asset.name === name);
       expect(source.metadata).toMatchObject({ frameWidth: 32, frameHeight: 48, colorMode: "8bpp", reviewStatus: "approved" });
       const animations = (data.animations as any[]).filter((animation: any) => animation.spriteSheet === name);
-      expect(animations).toHaveLength(8);
+      expect(animations).toHaveLength(name === 'nara-topdown-walk-run-v1.png' ? 12 : 8);
       expect(animations.filter(a => a.name.startsWith("walk_")).every(a => a.frameCount === 4)).toBe(true);
-      const player = name === 'porto-nara-animations48.png';
+      const player = name === 'nara-topdown-walk-run-v1.png';
       expect(animations[0]).toMatchObject({ frameCount: 1, hitboxWidth: 16, hitboxHeight: player ? 8 : 16, hitboxY: player ? 0 : -8, originX: 0, originY: 0 });
     }
-    expect((data.actors as any[]).find(actor => actor.id === "port-nara").spriteSheet).toBe("porto-nara-animations48.png");
+    expect((data.actors as any[]).find(actor => actor.id === "port-nara").spriteSheet).toBe("nara-topdown-walk-run-v1.png");
   });
 
   it("exports the approved HUD pixel layout with live project bindings and compact digits", () => {
@@ -37,8 +37,8 @@ describe("approved Porto Lumen actor and HUD integration", () => {
     expect(layout.components.find(component => component.id === "life-frame")).toMatchObject({ x: 4, y: 4, width: 60, height: 18 });
     expect(layout.components.find(component => component.id === "coins")).toMatchObject({ x: 204, y: 9, text: "000", inventory_item: 0, text_advance: 6 });
     expect(layout.components.find(component => component.id === "hearts")).toMatchObject({ value_variable: (data.variables as any[]).findIndex(variable => variable.name === "porto_player_health"), value_maximum: 3, foreground_image: true, gauge: { width: 48 } });
-    const actor = contract.topdown_project!.actor_sprites!.find((actor: any) => actor.name === "porto-nara-animations48.png")!;
-    expect(actor.animations).toHaveLength(8);
+    const actor = contract.topdown_project!.actor_sprites!.find((actor: any) => actor.name === "nara-topdown-walk-run-v1.png")!;
+    expect(actor.animations).toHaveLength(12);
     expect(actor.animations![0]!.frame_metasprites![0]!.parts).toHaveLength(2);
     expect(actor.animations![0]!.frame_metasprites![0]!.parts[0]).toMatchObject({ x: -8, y: -40 });
   });
