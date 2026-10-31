@@ -1,4 +1,5 @@
 import { uiText as ui, useStudioUiText } from "./studioUiText";
+import { completeProjectSave } from "./projectSaveCompletion";
 import { resolveExternalProjectOpen } from "./externalProjectOpen.js";
 import { createAudioInstrumentFromChannel, updateAudioInstrumentInProject, removeAudioInstrumentFromProject, type UpdateAudioInstrumentFields } from "../shared/audioInstruments.js";
 import { audioPhysicalChannel } from "../shared/audioContract.js";
@@ -846,16 +847,16 @@ function App(): React.ReactElement {
 
   async function saveProject(): Promise<void> {
     if (!session) return;
-    const { result, session: savedSession } = await saveExistingProjectSession(session, window.gbaStudio.saveProject);
+    const { result } = await saveExistingProjectSession(session, window.gbaStudio.saveProject);
     publishFeedback(saveProjectFeedback(result));
-    if (savedSession !== session) setSession(savedSession);
+    setSession((current) => completeProjectSave(current, session, result));
   }
 
   async function saveProjectAs(): Promise<void> {
     if (!session) return;
-    const { result, session: savedSession } = await saveExistingProjectSession(session, window.gbaStudio.saveProject, true);
+    const { result } = await saveExistingProjectSession(session, window.gbaStudio.saveProject, true);
     publishFeedback(saveProjectFeedback(result));
-    if (savedSession !== session) setSession(savedSession);
+    setSession((current) => completeProjectSave(current, session, result));
   }
 
   async function createBackup(): Promise<void> {
