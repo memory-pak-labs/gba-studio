@@ -84,10 +84,12 @@ describe("mGBA direct player framebuffer", () => {
     const bytes = new Uint8Array(2048);
     bytes.fill(0xFF);
     bytes.set([0x47, 0x42, 0x55, 0x53], 0);
-    bytes.set([0x01, 0x00, 0x04, 0x00], 4);
-    bytes.set([0x47, 0x42, 0x53, 0x4D], 16);
+    bytes.set([0x01, 0x00, 0x2C, 0x00], 4);
+    bytes.fill(0, 16, 60);
+    bytes.set([0x47, 0x42, 0x53, 0x4D, 0x01, 0x00, 0x04, 0x00], 16);
+    bytes.set([0x47, 0x42, 0x55, 0x53], 56);
     let checksum = 2166136261;
-    for (const byte of bytes.subarray(16, 20)) {
+    for (const byte of bytes.subarray(16, 60)) {
       checksum = Math.imul(checksum ^ byte, 16777619) >>> 0;
     }
     new DataView(bytes.buffer).setUint32(8, checksum, true);
@@ -100,7 +102,7 @@ describe("mGBA direct player framebuffer", () => {
       slotSignatureOffset: 0,
       slot: {
         checksumValid: true,
-        payloadSize: 4,
+        payloadSize: 44,
         sequence: 7,
         status: "ok",
         version: 1
@@ -112,6 +114,23 @@ describe("mGBA direct player framebuffer", () => {
       checksumValid: false,
       status: "checksum-mismatch"
     });
+  });
+
+  it("does not identify a standalone Cutscene record or a truncated record as universal", () => {
+    const bytes = new Uint8Array(2048);
+    const view = new DataView(bytes.buffer);
+    bytes.set([0x47, 0x42, 0x55, 0x53, 1, 0], 0);
+    view.setUint16(6, 448, true);
+    bytes.set([0x47, 0x42, 0x53, 0x4D, 1, 0, 0x98, 1], 16);
+    view.setUint16(58, 1, true); // standalone Cutscene step, not UniversalSaveData magic
+    let checksum = 2166136261;
+    for (const byte of bytes.subarray(16, 464)) checksum = Math.imul(checksum ^ byte, 16777619) >>> 0;
+    view.setUint32(8, checksum, true);
+    expect(inspectSavedataBytes(bytes)).toMatchObject({ hasUniversalSlotRecord: false, slot: { status: "ok" } });
+
+    view.setUint16(6, 4, true);
+    bytes.set([0x47, 0x42, 0x55, 0x53], 56);
+    expect(inspectSavedataBytes(bytes).hasUniversalSlotRecord).toBe(false);
   });
 
   it("round-trips savedata through the native mGBA adapter", () => {

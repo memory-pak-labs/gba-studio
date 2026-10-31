@@ -671,8 +671,14 @@ export function inspectSavedataBytes(bytes) {
   return Object.freeze({
     bytes: savedata.length,
     contentChecksum: savedataChecksum(savedata),
-    hasUniversalSlotRecord: slotSignatureOffset >= 0
-      && recordMagicOffset === slotSignatureOffset + 16,
+    // GBSM is the common metadata wrapper, also used by standalone saves.
+    // UniversalSaveData has its own GBUS magic after the 40-byte wrapper.
+    hasUniversalSlotRecord: payloadFits
+      && recordMagicOffset === payloadStart
+      && payloadSize >= 44
+      && readLittleEndian(savedata, payloadStart + 4, 2) === 1
+      && readLittleEndian(savedata, payloadStart + 6, 2) + 40 === payloadSize
+      && readLittleEndian(savedata, payloadStart + 40, 4) === 0x53554247,
     recordMagicOffset,
     slot,
     slotSignatureOffset
