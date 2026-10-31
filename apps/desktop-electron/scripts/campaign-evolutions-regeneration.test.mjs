@@ -1,11 +1,32 @@
 import {readFileSync} from 'node:fs';
 import {describe,it,expect} from 'vitest';
 import {isVerticeShowcaseProject,promoteExemploGBAVerticeCampaign} from './vertice-showcase-project.mjs';
+import { validateGBAProjectMigrationContract } from '../../../packages/project-contract/src/index.js';
+import { prepareEngineProjectExport } from '../src/main/exportEngineProject.js';
 
 const source=()=>JSON.parse(readFileSync(new URL('../default-assets/templates/exemplo-gba/exemplo-gba.gba-project',import.meta.url)));
 const manifest=JSON.parse(readFileSync(new URL('../fixtures/asset-provenance/campaign-evolutions-approved.json',import.meta.url)));
 describe('approved campaign extensions survive regeneration',()=>{
  it('recognizes the canonical campaign with its optional Gallery',()=>expect(isVerticeShowcaseProject(source())).toBe(true));
+ it('preserves the three approved menu scenes and their actors during regeneration',()=>{
+  const before=source(),after=promoteExemploGBAVerticeCampaign(before);
+  const names=new Set(['corrida_preparacao','corrida_resultados','inventario_ferramentas','menu_start','inventario']);
+  for(const key of ['rooms','scenas'])for(const scene of before[key].filter(r=>names.has(r.name)))expect(after[key].find(r=>r.name===scene.name)).toEqual(scene);
+  for(const actor of before.actors.filter(a=>names.has(a.roomName)))expect(after.actors.find(a=>a.id===actor.id)).toEqual(actor);
+  for(const event of before.events.filter(e=>names.has(e.roomName)))expect(after.events.find(e=>e.id===event.id)).toEqual(event);
+  const authored=JSON.stringify([...before.scenas.filter(r=>names.has(r.name)),...before.actors.filter(a=>names.has(a.roomName))]);
+  for(const asset of before.assets.filter(a=>a.name && authored.includes(a.name)))expect(after.assets.find(a=>a.id===asset.id)).toEqual(asset);
+  for(const dialogue of before.dialogues.filter(d=>d.key?.startsWith('race_')))expect(after.dialogues.find(d=>d.key===dialogue.key)).toEqual(dialogue);
+  for(const event of before.events.filter(e=>e.name?.startsWith('race_')||e.name==='nara_configurar_corrida'))expect(after.events.find(e=>e.name===event.name)).toEqual(event);
+  for(const key of ['scenas','actors','events','assets','animations','animationStates']) {
+   const ids=new Set(after[key].map(item=>item.id));
+   expect(before[key].filter(item=>!ids.has(item.id))).toEqual([]);
+  }
+  expect(new Set(after.events.map(event=>event.name)).size).toBe(after.events.length);
+  expect(validateGBAProjectMigrationContract(after)).toEqual([]);
+  expect(prepareEngineProjectExport(after).error).toBeUndefined();
+ });
+
  it('retains the four approved extensions, ordinary event IDs and existing save slots',()=>{
   const before=source(),copy=structuredClone(before),after=promoteExemploGBAVerticeCampaign(before);
   expect(before).toEqual(copy);

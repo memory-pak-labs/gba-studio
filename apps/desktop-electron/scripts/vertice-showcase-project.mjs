@@ -8756,6 +8756,10 @@ function verticeOrderedScenes(campaignScenes, supportScenes) {
       .map(([, scene]) => scene));
 }
 
+const APPROVED_EXTRA_MENU_SCENES = new Set(["corrida_preparacao", "corrida_resultados", "inventario_ferramentas"]);
+const APPROVED_MENU_SCENES = new Set([...APPROVED_EXTRA_MENU_SCENES, "menu_start", "inventario"]);
+const APPROVED_RACE_EVENT_SCENES = new Set(["corrida_preparacao", "corrida_resultados", "inventario_ferramentas", "mapa_rota", "mercado_suspenso", "arena_tatica", "circuito_final", "circuito_perspectiva"]);
+
 export function isVerticeShowcaseProject(data) {
   const legacySupportSceneNames = new Set([
     "perfil_equipe",
@@ -8776,7 +8780,7 @@ export function isVerticeShowcaseProject(data) {
     && sceneNames[0] === "logo"
     && requiredCampaignNames.every((name) => sceneNames.includes(name))
     && new Set(sceneNames).size === sceneNames.length
-    && sceneNames.every((name) => expectedSceneNameSet.has(name) || legacySupportSceneNames.has(name) || name === "oficina" || name === "circuito_perspectiva" || name === "galeria_das_mares" || name === "sala_mare_vazante");
+    && sceneNames.every((name) => expectedSceneNameSet.has(name) || legacySupportSceneNames.has(name) || name === "oficina" || name === "circuito_perspectiva" || name === "galeria_das_mares" || name === "sala_mare_vazante" || APPROVED_EXTRA_MENU_SCENES.has(name));
 }
 
 // Regenerating campaign logic must retain the approved illustrated opening,
@@ -8844,7 +8848,10 @@ function buildExemploGBAVerticeCampaign(data) {
         };
       });
     const supportScenes = materializeVerticeSupportScenes(campaignScenes, existingScenes);
-    const allScenes = verticeOrderedScenes(campaignScenes, supportScenes);
+    const allScenes = [
+      ...verticeOrderedScenes(campaignScenes, supportScenes),
+      ...existingScenes.filter(scene => APPROVED_EXTRA_MENU_SCENES.has(scene?.name)).map(scene => structuredClone(scene))
+    ];
     let promoted = finalizeVerticeProject({
       ...existing,
       actors: applyVerticeInitialMenuActorPattern([
@@ -9022,7 +9029,46 @@ function buildExemploGBAVerticeCampaign(data) {
 
 export function promoteExemploGBAVerticeCampaign(data) {
   const generated = silenceInitialMenuMusic(preserveExampleEncore(data, preserveCoastDepthCampaign(data, integrateApprovedPlayerWalk(refineExampleTopdownMovement(preserveApprovedCampaignEvolutions(data, reviewExemploLocalization(promoteFarolRelay(pruneUnusedExampleAssets(promoteApprovedCouncilV13(promoteShowcaseSystems(promoteLostSignalMission(materializeExampleAuthoring(buildExemploGBAVerticeCampaign(data))))))))))))));
-  return preserveApprovedInitialMenuAudio(data, preserveTideAnnex(data, generated));
+  const result = preserveApprovedInitialMenuAudio(data, preserveTideAnnex(data, generated));
+  const extraScenes = (data.scenas ?? []).filter(scene => APPROVED_EXTRA_MENU_SCENES.has(scene?.name));
+  if (!extraScenes.length) return result;
+  const merge = (rows, additions, key) => {
+    const output = [...(rows ?? [])];
+    for (const item of additions ?? []) {
+      const index = output.findIndex(candidate => candidate?.[key] === item?.[key]);
+      if (index < 0) output.push(structuredClone(item));
+      else output[index] = structuredClone(item);
+    }
+    return output;
+  };
+  for (const key of ["rooms", "scenas"]) {
+    const authored = (data[key] ?? extraScenes).filter(scene => APPROVED_MENU_SCENES.has(scene?.name));
+    result[key] = merge(result[key], authored, "name");
+  }
+  result.actors = merge((result.actors ?? []).filter(actor => !APPROVED_MENU_SCENES.has(actor?.roomName)),
+    (data.actors ?? []).filter(actor => APPROVED_MENU_SCENES.has(actor?.roomName)), "id");
+  result.events = merge(result.events, (data.events ?? []).filter(event => APPROVED_MENU_SCENES.has(event?.roomName)
+    || APPROVED_RACE_EVENT_SCENES.has(event?.roomName) || event?.name?.startsWith("race_") || event?.name === "nara_configurar_corrida"), "name");
+  const seenEventNames = new Set();
+  result.events = result.events.filter(event => {
+    if (seenEventNames.has(event.name)) return false;
+    seenEventNames.add(event.name);
+    return true;
+  });
+  result.dialogues = merge(result.dialogues, (data.dialogues ?? []).filter(dialogue => dialogue?.key?.startsWith("race_")), "key");
+  // Keep the reviewed asset metadata, provenance and licenses used by these scenes.
+  const authoredReferences = JSON.stringify([...(data.scenas ?? []).filter(scene => APPROVED_MENU_SCENES.has(scene?.name)), ...(data.actors ?? []).filter(actor => APPROVED_MENU_SCENES.has(actor?.roomName))]);
+  result.assets = merge(result.assets, (data.assets ?? []).filter(asset => asset?.name && authoredReferences.includes(asset.name)), "id");
+  // Retain approved source resources that the restored scenes may reference.
+  for (const key of ["assets", "animations", "animationStates"]) {
+    const known = new Set((result[key] ?? []).map(item => item.id));
+    result[key] = [...(result[key] ?? []), ...(data[key] ?? []).filter(item => !known.has(item.id)).map(item => structuredClone(item))];
+  }
+  const sourcePositions = data.editorState?.sceneMapPositions ?? {};
+  result.editorState = result.editorState ?? {};
+  result.editorState.sceneMapPositions = { ...(result.editorState.sceneMapPositions ?? {}) };
+  for (const scene of extraScenes) if (sourcePositions[scene.name]) result.editorState.sceneMapPositions[scene.name] = structuredClone(sourcePositions[scene.name]);
+  return result;
 }
 
 const invokedPath = process.argv[1] ? fileURLToPath(import.meta.url) === process.argv[1] : false;
