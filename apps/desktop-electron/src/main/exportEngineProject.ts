@@ -1,5 +1,7 @@
+import { actorCommandReferences, sceneChangeCommand, sceneChangeCommandParts } from "../shared/sceneChangeCommand.js";
 import { parseEventInstruction, eventWaitFrames } from "../shared/eventExecutionContract.js";
 import { parseVisibilityPreset } from "../shared/visibilityPresets.js";
+import { normalizePointClickTarget, pointClickInventoryItems, type PointClickInventoryItem } from "../shared/pointClickTargets.js";
 import { roomMapStates, resolveMapState, type MapStateVariant } from "../shared/mapStates.js";
 import { memoizeEngineExport, withEngineExportContext } from "../shared/engineExportContext.js";
 import { dungeonGeometryKey, dungeonPlayerActor } from "../shared/dungeonSceneView.js";
@@ -60,7 +62,7 @@ import {
   dialogueChoiceTranslations,
   dialogueTranslations
 } from "../shared/projectLocalization.js";
-import { expandProjectTilemaps } from "../shared/projectResourceFormat.js";
+import { expandProjectTilemaps, normalizeProjectTilemaps } from "../shared/projectResourceFormat.js";
 import {
   gbaTileSizePx,
   gbaTopdownAreaToPixels,
@@ -84,6 +86,7 @@ import {
 import { normalizeSceneTypeId } from "../shared/sceneTypes.js";
 import { tileReplacementCollisionFields } from "../shared/tileReplacement.js";
 import {
+  resolveBattleRpgInventory,
   resolveDungeonCrawlerFeatureRuntime,
   resolveSceneCapabilityManifest,
   resolveSceneFeatureModules,
@@ -202,6 +205,7 @@ import {
 } from "../shared/sceneResourceContract.js";
 import {
   normalizeMenuSceneConfig,
+  normalizeMenuVisibilityConditions,
   type MenuSceneConfig,
   type MenuSceneItemBinding,
   type MenuSceneRole,
@@ -380,6 +384,7 @@ export interface EngineExportTopdownRoom {
     camera_mode: string;
     camera_position: { x: number; y: number };
     player_start: { x: number; y: number };
+    player_enabled: boolean;
     camera_bounds?: { x: number; y: number; width: number; height: number };
   };
   on_enter?: EngineExportProjectEventCommand[];
@@ -407,6 +412,7 @@ export interface EngineExportTopdownRoom {
   camera_zones?: EngineExportCameraZone[];
   npcs?: Array<{
     name: string;
+    direction?: "up" | "down" | "left" | "right";
     position: { x: number; y: number };
     size: { x: number; y: number };
     collision_offset?: { x: number; y: number };
@@ -414,6 +420,7 @@ export interface EngineExportTopdownRoom {
     collision_mask?: number;
     push_priority?: number;
     pushable?: boolean;
+    health?: number;
     movement?: { kind: "wander_box"; bounds: { x: number; y: number; width: number; height: number }; step_interval_frames?: number };
     affine_obj?: EngineExportAffineObj;
     metasprite?: { asset: string; index: number };
@@ -626,6 +633,7 @@ export interface EngineExportPlatformerProject {
       "idle" | "walk" | "jump" | "fall" | "climb" | "wall_slide" | "dash" | "glide" | "attack" | "hurt" | "land",
       Omit<AssetcSpriteAnimationExportEntry, "name">
     >>;
+    script_animations?: AssetcSpriteAnimationExportEntry[];
     on_start?: EngineExportProjectEventCommand[];
     on_update?: EngineExportProjectEventCommand[];
   };
@@ -677,7 +685,7 @@ function buildPlatformerPlayerAnimations(
   return Object.keys(animations).length > 0 ? animations : undefined;
 }
 
-function buildIsometricActorAnimations(
+export function buildIsometricActorAnimations(
   entries: AssetcSpriteAnimationExportEntry[] | undefined
 ): AssetcSpriteAnimationExportEntry[] | undefined {
   if (!entries || entries.length === 0) return undefined;
@@ -702,6 +710,17 @@ function buildIsometricActorAnimations(
     const hasUp = tokens.includes("up");
     const hasLeft = tokens.includes("left");
     const hasRight = tokens.includes("right");
+    // Optional screen-cardinal views complement the legacy projected views.
+    // Keep them separate so, for example, idle_screen_up cannot replace the
+    // existing idle_up clip used on the isometric tile edge.
+    if (tokens.includes("screen") && (state === "idle" || state === "walk" || state === "move")) {
+      const screenDirections = [hasDown && "down", hasUp && "up", hasLeft && "left", hasRight && "right"].filter(Boolean);
+      if (screenDirections.length === 1) {
+        const name = `${state === "move" ? "walk" : state}_screen_${screenDirections[0]}`;
+        if (!result.has(name)) result.set(name, { ...entry, name });
+      }
+      continue;
+    }
     const direction = hasDown && hasLeft
       ? "left"
       : hasDown && hasRight
@@ -722,6 +741,11 @@ function buildIsometricActorAnimations(
     if (!direction) continue;
     const name = `${state}_${direction}`;
     if (!result.has(name)) result.set(name, { ...entry, name });
+  }
+  // Directional aliases drive movement; scripts and the initial pose also
+  // address the authored names. Keep both in the native animation table.
+  for (const entry of entries) {
+    if (!result.has(entry.name)) result.set(entry.name, entry);
   }
   return result.size > 0 ? Array.from(result.values()) : undefined;
 }
@@ -1424,6 +1448,10 @@ export interface EngineExportRacingRoom {
   action_sounds?: Partial<Record<"accelerate" | "brake" | "collision" | "checkpoint", number>>;
   player?: EngineExportRacingPlayer;
   name: string;
+  challenge?: { boost_variable_index: number; best_time_text_index: number; result_time_text_index: number;
+    result_position_text_index: number; result_rating_text_index: number; result_best_text_index: number;
+    gold_seconds: number; silver_seconds: number };
+
   resource_bank_group?: string;
   width_tiles: number;
   height_tiles: number;
@@ -1485,6 +1513,7 @@ export interface EngineExportRacingProject {
   save?: EngineProjectSaveConfig;
   dialogue_lines?: EngineExportDialogueLine[];
   dialogue_ui?: EngineDialogueUiConfig;
+  portrait_assets?: EngineExportPortraitAsset[];
   scripts?: EngineExportProjectScript[];
   assets?: EngineExportTopdownProject["assets"];
   backgrounds?: Array<{
@@ -1504,6 +1533,7 @@ export interface EngineExportRacingProject {
 }
 
 export interface EngineExportBattleRpgEncounter {
+  inventory_items?: Array<{ label: string; item: number; initial_quantity: number; heal_amount: number }>;
   presentation?: {
     cursor?: {asset:string;index:number};
     victory_label?: string;
@@ -1541,6 +1571,7 @@ export interface EngineExportBattleRpgEncounter {
   on_victory?: EngineExportProjectEventCommand[];
   on_defeat?: EngineExportProjectEventCommand[];
   on_escape?: EngineExportProjectEventCommand[];
+  on_hit_player?: EngineExportProjectEventCommand[];
 }
 
 export interface EngineExportBattleRpgParticipant {
@@ -1560,6 +1591,7 @@ export interface EngineExportBattleRpgProject {
   save?: EngineProjectSaveConfig;
   dialogue_lines?: EngineExportDialogueLine[];
   dialogue_ui?: EngineDialogueUiConfig;
+  portrait_assets?: EngineExportPortraitAsset[];
   scripts?: EngineExportProjectScript[];
   assets?: EngineExportTopdownProject["assets"] & { sprite_assets?: string[] };
   resource_banks?: "asset_pack";
@@ -1640,6 +1672,10 @@ export interface EngineExportPointClickHotspot {
   on_click?: EngineExportProjectEventCommand[];
   line?: number;
   target_scene?: number;
+  required_item?: number;
+  give_item?: number;
+  unavailable_line?: number;
+  on_use_item?: EngineExportProjectEventCommand[];
 }
 
 export interface EngineExportPointClickProp {
@@ -1665,6 +1701,7 @@ export interface EngineExportPointClickScene {
 }
 
 export interface EngineExportPointClickProject {
+  inventory_items?: PointClickInventoryItem[];
   initial_scene: number;
   cursor_start: { x: number; y: number };
   cursor_speed: number;
@@ -1724,6 +1761,7 @@ export interface EngineExportShmupWave {
   on_start?: EngineExportProjectEventCommand[];
   on_clear?: EngineExportProjectEventCommand[];
   on_defeat?: EngineExportProjectEventCommand[];
+  on_hit_player?: EngineExportProjectEventCommand[];
 }
 
 export interface EngineExportShmupProject {
@@ -1799,6 +1837,7 @@ export interface EngineExportShmupProject {
   waves: EngineExportShmupWave[];
   dialogue_lines: EngineExportDialogueLine[];
   dialogue_ui?: EngineDialogueUiConfig;
+  portrait_assets?: EngineExportPortraitAsset[];
   actor_sprites?: EngineExportEmoteAsset[];
   emote_assets?: EngineExportEmoteAsset[];
   composition?: ExportedSceneComposition;
@@ -1889,8 +1928,9 @@ export interface EngineExportMenuItem {
   save_slot?: number;
   value_labels?: string[];
   detail_lines?: string[];
+  available_runtime?: "racing";
   binding?: {
-    source: "variable" | "inventory" | "stat" | "equipped";
+    source: "variable" | "inventory" | "stat" | "equipped" | "text" | "context";
     index: number;
     format: "number" | "count" | "percent" | "on_off";
   };
@@ -1898,6 +1938,8 @@ export interface EngineExportMenuItem {
 }
 
 export interface EngineExportMenuActor {
+  visibility_conditions?: Array<{binding: NonNullable<EngineExportMenuItem['binding']>;value:number;negate?:boolean}>;
+  visibility_any?: boolean;
   name: string;
   position: { x: number; y: number };
   metasprite: { asset: string; index: number };
@@ -1920,12 +1962,16 @@ export interface EngineExportMenuActor {
 }
 
 export interface EngineExportMenuScreen {
+  hud_bindings?: Array<{slot:number;binding?:NonNullable<EngineExportMenuItem['binding']>;selected_item?:boolean;columns?:number}>;
+  previous_page_screen?: number;
+  next_page_screen?: number;
   audio_feedback?: Partial<Record<"navigate" | "confirm" | "back" | "unavailable", { pcm?: number; sfx?: number; volume: number; priority: number }>>;
   name: string;
   resource_bank_group?: string;
   hud_preset_id?: string;
   hud_list_rows?: number;
   hud_text_color?: number;
+  hud_header?: {x:number;y:number;width:number;background_color:number;text_color:number};
   hud_transparent_text?: boolean;
   hud_feedback_in_details?: boolean;
   title_text_variable?: number;
@@ -3331,6 +3377,9 @@ function buildRuntimeContract(data: GBAProjectData, mixedRuntime = false): Engin
 function configuredPlayerActorName(data: GBAProjectData, room?: Record<string, unknown>): string {
   const roomPlayer = room ? nullableStringField(room, "playerActorName") : null;
   if (roomPlayer) return roomPlayer;
+  // Custom scenes opt in to a controlled entity; a global start player must
+  // not turn an ordinary actor into the player in a scene with no selection.
+  if (room && roomSceneType(room) === "custom") return "";
 
   const startPlayer = nullableStringField(child(settings(data), "general"), "startPlayer");
   return startPlayer || "Player";
@@ -3491,6 +3540,20 @@ function firstPlayerPosition(data: GBAProjectData, rooms: Record<string, unknown
   return playerPositionForRoom(data, rooms[initialRoomIndex] ?? rooms[0] ?? {}, initialRoomIndex);
 }
 
+function authoredTopdownActorDirection(
+  data: GBAProjectData,
+  actor: Record<string, unknown>
+): "up" | "down" | "left" | "right" {
+  const animationName = stringField(actor, "animationName", "");
+  const animation = projectArray(data, "animations").find(item => (
+    stringField(item, "spriteSheet", "") === stringField(actor, "spriteSheet", "") &&
+    (stringField(item, "name", "") === animationName || stringField(item, "id", "") === animationName)
+  ));
+  const suffix = animationName.split("_").at(-1) ?? "";
+  const direction = stringField(animation, "direction", suffix || stringField(actor, "direction", "down")).toLowerCase();
+  return direction === "up" || direction === "left" || direction === "right" ? direction : "down";
+}
+
 function initialTopdownPlayerSpawn(
   data: GBAProjectData,
   room: Record<string, unknown>,
@@ -3515,7 +3578,7 @@ function initialTopdownPlayerSpawn(
   if (playerActor) {
     return {
       ...playerPositionForRoom(data, room, roomIndex),
-      direction: "down"
+      direction: authoredTopdownActorDirection(data, playerActor)
     };
   }
   const width = integerField(room, "width", 20);
@@ -3616,6 +3679,17 @@ function eventActorIndex(data: GBAProjectData, rooms: Record<string, unknown>[],
   return npcActorIndex(data, rooms, actorName);
 }
 
+function animationControlActorIndex(data: GBAProjectData, rooms: Record<string, unknown>[], actorName: string): number {
+  const actor = projectArray(data, "actors").find(item => (
+    stringField(item, "name", "") === actorName || stringField(item, "id", "") === actorName
+  ));
+  const targetRoom = rooms.find((room, index) => roomName(room, index) === entitySceneName(actor ?? {}, "actor")) ?? rooms[0];
+  if (targetRoom && (roomSceneType(targetRoom) === "topdown" || roomSceneType(targetRoom) === "platformer")) {
+    return eventActorIndex(data, rooms, actorName);
+  }
+  return npcActorIndex(data, rooms, actorName);
+}
+
 function actorUsesIsometricCoordinates(data: GBAProjectData, rooms: Record<string, unknown>[], actorName: string): boolean {
   const actor = projectArray(data, "actors").find(item => (
     stringField(item, "name", "") === actorName || stringField(item, "id", "") === actorName
@@ -3702,53 +3776,9 @@ function commandParts(command: string): string[] {
   return [instruction.verb, ...instruction.operands];
 }
 
-const ACTOR_COMMAND_VERBS = new Set([
-  "set_actor_position",
-  "move_actor_to",
-  "teleport_actor",
-  "move_actor",
-  "move_actor_relative",
-  "set_actor_relative_position",
-  "set_actor_visible",
-  "set_actor_active",
-  "set_actor_collision_enabled",
-  "launch_projectile",
-  "set_actor_animation_speed",
-  "set_actor_sprite",
-  "change_actor_sprite",
-  "show_actor_gesture",
-  "set_actor_collision_box",
-  "store_actor_position",
-  "store_actor_direction",
-  "set_actor_animation",
-  "set_actor_direction",
-  "turn_actor",
-  "set_actor_movement_speed",
-  "push_actor_away_from_player",
-  "wait_actor_animation",
-  "play_actor_animation",
-  "set_actor_animation_frame"
-]);
-
 function eventCommandParts(data: GBAProjectData, command: string): string[] {
-  const parts = commandParts(command);
-  const verb = parts[0] ?? "noop";
-  if (!ACTOR_COMMAND_VERBS.has(verb)) return parts;
-
-  const remainder = command.slice(verb.length).trim();
-  const actorNames = projectArray(data, "actors")
-    .map((actor) => stringField(actor, "name", ""))
-    .filter(Boolean)
-    .sort((left, right) => right.length - left.length);
-
-  for (const actorName of actorNames) {
-    if (remainder === actorName) return [verb, actorName];
-    if (remainder.startsWith(`${actorName} `)) {
-      return [verb, actorName, ...commandParts(remainder.slice(actorName.length).trim())];
-    }
-  }
-
-  return parts;
+  const actorNames = projectArray(data, "actors").map((actor) => stringField(actor, "name", ""));
+  return sceneChangeCommandParts(command, actorNames);
 }
 
 function integerPart(value: string | undefined, fallback: number): number {
@@ -3879,18 +3909,27 @@ const EVENT_ITEM_KEY_VERBS = new Set(["add_item", "has_item"]);
 const EVENT_VARIABLE_CAPACITY = 64;
 const EVENT_TEXT_VARIABLE_CAPACITY = 8;
 
+function projectInventoryItemKeys(data: GBAProjectData): string[] {
+  return projectArray(data, "rooms").flatMap(room => {
+    if (roomSceneType(room) !== "battleRpg") return [];
+    const inventory = resolveBattleRpgInventory(child(child(room, "runtime"), "config")?.modules);
+    return inventory ? [inventory.itemKey] : [];
+  });
+}
+
 function buildEventValueRegistries(
   events: Record<string, unknown>[],
   pluginRegistry: ProjectPluginRegistry = emptyProjectPluginRegistry(),
   actors: Record<string, unknown>[] = [],
   textInputVariableKeys: readonly string[] = [],
   sceneRouteVariableKeys: readonly string[] = [],
-  declaredVariableKeys: readonly string[] = []
+  declaredVariableKeys: readonly string[] = [],
+  declaredItemKeys: readonly string[] = []
 ): EngineExportEventValueRegistries {
   const variableKeys = new Set<string>();
   const textVariableKeys = new Set<string>(textInputVariableKeys);
   const visibleVariableKeys = new Set<string>();
-  const itemKeys = new Set<string>();
+  const itemKeys = new Set<string>(declaredItemKeys);
 
   sceneRouteVariableKeys.forEach((key) => {
     if (key.trim()) variableKeys.add(key.trim());
@@ -4004,7 +4043,8 @@ function warpPositionForChangeScene(
   rooms: Record<string, unknown>[],
   targetRoomIndex: number,
   parts: string[],
-  targetKind: SceneExportKind
+  targetKind: SceneExportKind,
+  sourceRoom?: Record<string, unknown>
 ): { x: number; y: number } {
   const exportPosition = (position: { x: number; y: number }): { x: number; y: number } => (
     targetKind === "isometric" || targetKind === "dungeon_crawler"
@@ -4021,7 +4061,8 @@ function warpPositionForChangeScene(
   const targetRoomName = roomName(rooms[targetRoomIndex] ?? {}, targetRoomIndex);
   const connections = child(data, "editorState")?.scenaConnections;
   const connection = Array.isArray(connections)
-    ? connections.filter(isRecord).find((entry) => nullableStringField(entry, "to") === targetRoomName)
+    ? connections.filter(isRecord).find((entry) => nullableStringField(entry, "to") === targetRoomName
+      && (!sourceRoom || nullableStringField(entry, "from") === roomName(sourceRoom, 0)))
     : undefined;
   if (connection) {
     const targetRoom = rooms[targetRoomIndex] ?? {};
@@ -4076,7 +4117,8 @@ function compileCampaignAdvance(
     targetRooms,
     targetRoomIndex,
     ["advance_campaign", nextScene],
-    targetKind
+    targetKind,
+    campaignRoom
   );
   commands.push(sceneWarpCommand(data, currentKind, targetKind, targetRooms, targetRoomIndex, position, campaignRoom));
   return commands;
@@ -4187,7 +4229,7 @@ function mapVariantCommands(variant: MapStateVariant): EngineExportProjectEventC
 function mapStateRestoreCommands(data: GBAProjectData, room: Record<string, unknown>): EngineExportProjectEventCommand[] {
   const definitions = roomMapStates(room);
   if (!definitions.length) return [];
-  const registries = buildEventValueRegistries(projectArray(data, "events"), emptyProjectPluginRegistry(), [], [], sceneRouteVariableKeys(data), projectVariableKeys(data));
+  const registries = buildEventValueRegistries(projectArray(data, "events"), emptyProjectPluginRegistry(), [], [], sceneRouteVariableKeys(data), projectVariableKeys(data), projectInventoryItemKeys(data));
   return definitions.flatMap(state => state.variants.flatMap(variant => {
     const edits = mapVariantCommands(variant);
     return [
@@ -4413,7 +4455,7 @@ function compileEventStep(
     return [compilePluginContractEventCommand(parts, pluginMapping)];
   }
 
-  const integrationIssue = eventCommandIntegrationIssue(parts.join(" "), resolveSceneRuntimeExport(roomSceneType(rooms[0] ?? {})).kind);
+  const integrationIssue = eventCommandIntegrationIssue(sceneChangeCommand(parts), resolveSceneRuntimeExport(roomSceneType(rooms[0] ?? {})).kind);
   if (integrationIssue) throw new Error(integrationIssue);
 
   if (isLutaEventVerb(verb)) {
@@ -4534,7 +4576,7 @@ function compileEventStep(
         room = roomIndexByName(targetRooms, operand);
       }
       if (room < 0) throw new Error(`Evento referencia room inexistente no runtime de destino: ${operand}`);
-      const position = warpPositionForChangeScene(data, targetRooms, room, parts, targetKind);
+      const position = warpPositionForChangeScene(data, targetRooms, room, parts, targetKind, campaignRoom);
       const direction = ["up", "down", "left", "right"].includes((parts[4] ?? "").toLowerCase())
         ? parts[4]!.toLowerCase() as "up" | "down" | "left" | "right"
         : null;
@@ -4785,13 +4827,13 @@ function compileEventStep(
       };
       const position = actorUsesIsometricCoordinates(data, rooms, operand)
         ? authored : gbaTopdownTilePointToPixels(authored);
-      return [{ op: "set_actor_position", actor: eventActorIndex(data, rooms, operand), x: position.x, y: position.y }];
+      return [{ op: verb === "move_actor_to" ? "move_actor_to" : "set_actor_position", actor: eventActorIndex(data, rooms, operand), x: position.x, y: position.y }];
     }
     case "move_actor":
     case "move_actor_relative":
     case "set_actor_relative_position":
       return [{
-        op: "move_actor",
+        op: verb === "move_actor_relative" ? "move_actor_relative" : "move_actor",
         actor: eventActorIndex(data, rooms, operand),
         x: actorUsesIsometricCoordinates(data, rooms, operand) ? integerPart(parts[2], 0) : actorTileDeltaToPixels(Number(parts[2] ?? 0)),
         y: actorUsesIsometricCoordinates(data, rooms, operand) ? integerPart(parts[3], 0) : actorTileDeltaToPixels(Number(parts[3] ?? 0))
@@ -4846,7 +4888,7 @@ function compileEventStep(
     case "set_actor_animation_speed":
       return [{
         op: "set_actor_animation_speed",
-        actor: npcActorIndex(data, rooms, operand),
+        actor: animationControlActorIndex(data, rooms, operand),
         percent: Math.max(1, Math.min(400, integerPart(parts[2], 100)))
       }];
     case "set_actor_sprite": {
@@ -4926,8 +4968,9 @@ function compileEventStep(
     case "set_player_speed_profile":
       return [{
         op: "set_player_speed_profile",
-        walk_speed: Math.max(1, integerPart(operand, 100)),
-        run_speed: Math.max(1, integerPart(parts[2], 160)),
+        walk_speed: Math.max(1, Math.min(400,integerPart(operand, 100))),
+        run_speed: Math.max(1, Math.min(400,integerPart(parts[2], 160))),
+        button: parts[3]?.toLowerCase() || "r",
         stamina_cost: Math.max(0, integerPart(parts[4], 0))
       }];
     case "set_player_movement_state":
@@ -4946,7 +4989,7 @@ function compileEventStep(
     case "store_actor_direction":
       return [{
         op: "store_actor_direction",
-        actor: npcActorIndex(data, rooms, operand),
+        actor: eventActorIndex(data, rooms, operand),
         variable: registries.variableIndex(parts[2] ?? "")
       }];
     case "set_random_seed":
@@ -5092,11 +5135,11 @@ function compileEventStep(
         distance: Math.max(1, integerPart(parts[2], 2))
       }];
     case "wait_actor_animation":
-      return [{ op: "wait_actor_animation", actor: npcActorIndex(data, rooms, operand) }];
+      return [{ op: "wait_actor_animation", actor: animationControlActorIndex(data, rooms, operand) }];
     case "play_actor_animation": {
       const animationName = parts[2] ?? "";
       if (!animationName) throw new Error(`Comando incompleto: play_actor_animation requer animacao.`);
-      if (isConfiguredPlayerActor(data, operand)) {
+      if (operand.trim().toLowerCase() === "player" || isConfiguredPlayerActor(data, operand)) {
         return [{ op: "set_player_animation", animation: animationName }];
       }
       return [{
@@ -5108,7 +5151,7 @@ function compileEventStep(
     case "set_actor_animation_frame":
       return [{
         op: "set_actor_animation_frame",
-        actor: npcActorIndex(data, rooms, operand),
+        actor: animationControlActorIndex(data, rooms, operand),
         frame: integerPart(parts[2], 0)
       }];
     case "lock_script":
@@ -5316,7 +5359,7 @@ function compileEvent(
   if (!byPlugin) { byPlugin = new WeakMap(); registryCache.set(events, byPlugin); }
   let registries = byPlugin.get(pluginRegistry);
   if (!registries) {
-    registries = buildEventValueRegistries(events, pluginRegistry, [], [], sceneRouteVariableKeys(data), projectVariableKeys(data));
+    registries = buildEventValueRegistries(events, pluginRegistry, [], [], sceneRouteVariableKeys(data), projectVariableKeys(data), projectInventoryItemKeys(data));
     byPlugin.set(pluginRegistry, registries);
   }
   const resolvedCampaignRoom = campaignRoom ?? campaignRoomForEvent(data, event);
@@ -5327,7 +5370,7 @@ function compileEvent(
     const firstCommand = commands.length;
     const source = { eventID: String(steps[index].sourceEventID ?? event.id ?? event.name ?? ""), stepID: String(steps[index].id ?? index) };
     try {
-    const parts = commandParts(resolveProjectConstantCommand(data, stringField(steps[index], "command", "noop")));
+    const parts = eventCommandParts(data, resolveProjectConstantCommand(data, stringField(steps[index], "command", "noop")));
     if (parts[0] === "loop_begin") {
       const loopID = parts[1] ?? "";
       let cursor = index + 1;
@@ -5723,9 +5766,24 @@ function buildTopdownScripts(
   const materializedEvents = expansion.events;
   const runtimeRoomNames = new Set(rooms.map((room, index) => roomName(room, index)));
   const documents = materializedEvents.map((event, index) => normalizeGBAEventDocument(event, index));
-  const owners = documents.map(document => document.sceneName ? new Set([document.sceneName]) : new Set([
-    ...eventSceneBindings(data, document.name), ...eventSceneBindings(data, document.id)
-  ]));
+  const actors = projectArray(data, "actors");
+  const actorNames = actors.map(actor => stringField(actor, "name", ""));
+  const owners = documents.map((document, index) => {
+    const scenes = document.sceneName ? new Set([document.sceneName]) : new Set([
+      ...eventSceneBindings(data, document.name), ...eventSceneBindings(data, document.id)
+    ]);
+    // An unused actor routine still belongs to its actors' scenes. Compiling it
+    // against Menu/VN rooms would resolve its actor indices in the wrong runtime.
+    if (!scenes.size) for (const step of eventSteps(materializedEvents[index]!)) {
+      if (step.isEnabled === false) continue;
+      for (const reference of actorCommandReferences(stringField(step, "command", "noop"), actorNames)) {
+        const actor = actors.find(actor => [actor.name, actor.id].includes(reference));
+        const sceneName = actor ? entitySceneName(actor, "actor") : "";
+        if (sceneName) scenes.add(sceneName);
+      }
+    }
+    return scenes;
+  });
   // Unbound callees inherit their callers' scenes, including callback and timer
   // targets. Keep empty entries in other runtimes so numeric script IDs stay stable.
   const callees = materializedEvents.map(event => eventSteps(event).flatMap(step =>
@@ -5783,6 +5841,11 @@ function choiceEventBindings(events: Record<string, unknown>[], rooms: Record<st
       const choiceIndex = integerPart(parts[2], -1);
       const targetEventName = parts[3] ?? "";
       if (!dialogueKey || choiceIndex < 0 || !targetEventName) continue;
+      const targetEventIndex = events.findIndex((candidate) => stringField(candidate, "name", "") === targetEventName);
+      const targetOwner = targetEventIndex >= 0
+        ? normalizeGBAEventDocument(events[targetEventIndex]!, targetEventIndex).sceneName
+        : "";
+      if (targetOwner && !roomNames.has(targetOwner)) continue;
       const byChoiceIndex = bindings.get(dialogueKey) ?? new Map<number, string>();
       byChoiceIndex.set(choiceIndex, targetEventName);
       bindings.set(dialogueKey, byChoiceIndex);
@@ -6025,6 +6088,7 @@ function buildTopdownRooms(
         camera_mode: roomCameraMode(room),
         camera_position: roomCameraPosition(room),
         player_start: gbaTopdownTilePointToPixels(roomPlayerPosition),
+        player_enabled: roomSceneType(room) !== "custom" || Boolean(nullableStringField(room, "playerActorName")),
         ...(cameraBounds ? { camera_bounds: gbaTopdownAreaToPixels(cameraBounds) } : {})
       }
     };
@@ -6214,6 +6278,7 @@ function buildTopdownRooms(
         const movement = topdownNpcMovementForExport(actor);
         return {
           name: stringField(actor, "name", "NPC"),
+          direction: authoredTopdownActorDirection(data, actor),
           position: gbaTopdownTilePointToPixels({
             x: position.x,
             y: position.y
@@ -6227,6 +6292,7 @@ function buildTopdownRooms(
           collision_mask: Math.max(0, Math.min(0xFFFF, integerField(actor, "collisionMask", 0xFFFF))),
           push_priority: Math.max(0, Math.min(255, integerField(actor, "pushPriority", 0))),
           pushable: actor.pushable === true,
+          health: Math.max(1, Math.min(999, integerField(actor, "health", 1))),
           ...(movement ? { movement } : {}),
           ...(roomAffineObjForExport(room) ? { affine_obj: roomAffineObjForExport(room) } : {}),
           ...(spriteExport ? {
@@ -6279,7 +6345,16 @@ function buildTopdownProject(
   const playerActor = playerActors.find((item) => {
     const actorRoom = entitySceneName(item, "actor");
     return !actorRoom || actorRoom === roomName(initialRoom, initialRoomIndex);
-  }) ?? playerActors[0];
+  }) ?? playerActors[0] ?? (roomSceneType(initialRoom) === "custom" && !playerName
+    ? rooms.flatMap((candidate, index) => {
+        const name = configuredPlayerActorName(data, candidate);
+        if (!name) return [];
+        return projectArray(data, "actors").filter((actor) => {
+          const actorRoom = entitySceneName(actor, "actor");
+          return actorMatchesPlayerName(actor, name) && (!actorRoom || actorRoom === roomName(candidate, index));
+        });
+      })[0]
+    : undefined);
   const playerSpriteExport = playerActor ? buildActorEngineSpriteExport(data, playerActor, spritePack) : null;
   const textPositions=new Map<string,{layer:string,width:number}>();
   for(const event of events) for(const step of eventSteps(event)) {
@@ -6842,6 +6917,7 @@ function buildPlatformerProject(
           ? { asset: playerSpriteExport.metasprite.asset }
           : playerSpriteExport.animation,
         ...(playerAnimations ? { animations: playerAnimations } : {}),
+        ...(playerSpriteExport.animations?.length ? { script_animations: playerSpriteExport.animations } : {}),
         ...(playerOnStart && playerOnStart.length > 0 ? { on_start: playerOnStart } : {}),
         ...(playerOnUpdate && playerOnUpdate.length > 0 ? { on_update: playerOnUpdate } : {})
       }
@@ -7876,6 +7952,17 @@ function buildRacingRooms(
     return {
       name: currentRoomName,
       ...(Object.keys(actionSounds).length ? {action_sounds:actionSounds} : {}),
+      ...(config?.challenge ? { challenge: {
+        boost_variable_index: config.challenge.boostVariableIndex,
+        best_time_text_index: config.challenge.bestTimeTextIndex,
+        result_time_text_index: config.challenge.resultTimeTextIndex,
+        result_position_text_index: config.challenge.resultPositionTextIndex,
+        result_rating_text_index: config.challenge.resultRatingTextIndex,
+        result_best_text_index: config.challenge.resultBestTextIndex,
+        gold_seconds: config.challenge.goldSeconds,
+        silver_seconds: config.challenge.silverSeconds
+      } } : {}),
+
       ...(hasResourceBankGroup ? { resource_bank_group: resourceBankGroup } : {}),
       width_tiles: width,
       height_tiles: height,
@@ -8005,6 +8092,8 @@ function buildRacingProject(
   const events = projectArray(data, "events");
   const audioPack = buildAssetcAudioPackGeneration(data);
   const spritePack = buildAssetcSpritePackGeneration(data);
+  const portraitPack = buildAssetcPortraitPackGeneration(data, spritePack);
+  const portraitAssets = buildDialoguePortraitAssetsExport(data, portraitPack, spritePack);
   const tilesetPack = buildAssetcTilesetPackGeneration(data);
   const visual = advancedRuntimeBackgrounds(rooms.filter(room=>racingSceneConfigFromRuntime(room.runtime,data.settings)?.presentation!=="pseudo3d" || !racingSceneConfigFromRuntime(room.runtime,data.settings)?.topdownTrack), tilesetPack);
   const pseudo3d = buildRacingPseudo3DVisuals(data, rooms, tilesetPack);
@@ -8029,18 +8118,19 @@ function buildRacingProject(
       ...visual.backgrounds.map((background) => background.tilemap),
       ...pseudo3d.visuals.flatMap((entry) => [entry.panorama, entry.minimap].filter((name): name is string=>Boolean(name)))
     ],
-    racingSpriteAssets,
+    [...racingSpriteAssets, ...portraitAssets.map(entry => entry.metasprite.asset)],
     audioPack,
     pseudo3d.visuals.map((entry) => entry.floor)
   );
   return {
     initial_room: initialRoomIndex,
-    ...((tilesetPack || spritePack) ? { resource_banks: "asset_pack" as const } : {}),
+    ...((tilesetPack || spritePack || portraitPack) ? { resource_banks: "asset_pack" as const } : {}),
     save: buildProjectSaveConfig(data),
     rooms: racingRooms,
     dialogue_lines: buildDialogueLines(data, dialogues, audioItems, audioPack),
     dialogue_ui: buildEngineDialogueUiConfigForExport(data),
-    scripts: buildTopdownScripts(data, events, rooms, dialogues, audioItems, audioPack, pluginRegistry),
+    ...(portraitAssets.length > 0 ? { portrait_assets: portraitAssets } : {}),
+    scripts: buildTopdownScripts(data, events, rooms, dialogues, audioItems, audioPack, pluginRegistry, true, "racing"),
     ...(assetSection ? { assets: assetSection } : {}),
     ...(visual.backgrounds.length > 0 ? { backgrounds: visual.backgrounds } : {}),
     ...(pseudo3d.visuals.length > 0 ? { pseudo3d_visuals: pseudo3d.visuals } : {}),
@@ -8057,6 +8147,8 @@ function buildBattleRpgProject(
   const audioItems = projectArray(data, "audioItems");
   const audioPack = buildAssetcAudioPackGeneration(data);
   const spritePack = buildAssetcSpritePackGeneration(data);
+  const portraitPack = buildAssetcPortraitPackGeneration(data, spritePack);
+  const portraitAssets = buildDialoguePortraitAssetsExport(data, portraitPack, spritePack);
   const tilesetPack = buildAssetcTilesetPackGeneration(data);
   const visual = advancedRuntimeBackgrounds(rooms, tilesetPack);
   const backgrounds: NonNullable<EngineExportBattleRpgProject["backgrounds"]> = [...visual.backgrounds];
@@ -8067,7 +8159,8 @@ function buildBattleRpgProject(
     if(asset){hudIndices.set(roomName(room,0),backgrounds.length); backgrounds.push({layer:"bg1",tilemap:asset.name});}
   });
   const events = projectArray(data, "events");
-  const participantSpriteAssets = new Set<string>();
+  const itemRegistry = buildEventValueRegistries(events, pluginRegistry, [], [], sceneRouteVariableKeys(data), projectVariableKeys(data), projectInventoryItemKeys(data));
+  const participantSpriteAssets = new Set<string>(portraitAssets.map(entry => entry.metasprite.asset));
   const assetSection = advancedRuntimeAssetSection(
     backgrounds.map((background) => background.tilemap),
     spritePack?.assetNames ?? [],
@@ -8078,6 +8171,7 @@ function buildBattleRpgProject(
     save: buildProjectSaveConfig(data),
     dialogue_lines: buildDialogueLines(data, dialogues, audioItems, audioPack),
     dialogue_ui: buildEngineDialogueUiConfigForExport(data),
+    ...(portraitAssets.length > 0 ? { portrait_assets: portraitAssets } : {}),
     scripts: buildTopdownScripts(data, events, rooms, dialogues, audioItems, audioPack, pluginRegistry),
     encounters: rooms.map((room, index) => {
       const config = battleRpgSceneConfigFromRuntime(room.runtime, data.settings);
@@ -8136,6 +8230,8 @@ function buildBattleRpgProject(
       const onVictory = hook("onVictory");
       const onDefeat = hook("onDefeat");
       const onEscape = hook("onEscape");
+      const onHitPlayer = hook("onHitPlayer");
+      const inventory = resolveBattleRpgInventory(config?.modules);
       const party = authoredParty.length > 0 ? authoredParty : Array.from({ length: maxPartySize }, (_item, participantIndex) => ({
         name: `Party ${participantIndex + 1}`,
         unit: { max_hp: 24, attack: 7, defense: 2, speed: 5 },
@@ -8172,6 +8268,8 @@ function buildBattleRpgProject(
       }
       return {
         ...(presentation ? {presentation} : {}),
+        ...(inventory ? { inventory_items: [{ label: inventory.label, item: itemRegistry.itemIndex(inventory.itemKey),
+          initial_quantity: inventory.initialQuantity, heal_amount: inventory.healAmount }] } : {}),
         name: encounterName,
         ...(visual.indexByRoomName.has(encounterName) ? { background: visual.indexByRoomName.get(encounterName) } : {}),
         resource_bank_group: engineSceneResourceBankGroupName(room, index),
@@ -8198,10 +8296,11 @@ function buildBattleRpgProject(
         ...(onEnter && onEnter.length > 0 ? { on_enter: onEnter } : {}),
         ...(onVictory && onVictory.length > 0 ? { on_victory: onVictory } : {}),
         ...(onDefeat && onDefeat.length > 0 ? { on_defeat: onDefeat } : {}),
-        ...(onEscape && onEscape.length > 0 ? { on_escape: onEscape } : {})
+        ...(onEscape && onEscape.length > 0 ? { on_escape: onEscape } : {}),
+        ...(onHitPlayer && onHitPlayer.length > 0 ? { on_hit_player: onHitPlayer } : {})
       };
     }),
-    ...((tilesetPack || spritePack) ? { resource_banks: "asset_pack" as const } : {}),
+    ...((tilesetPack || spritePack || portraitPack) ? { resource_banks: "asset_pack" as const } : {}),
     ...(assetSection ? {
       assets: {
         ...assetSection,
@@ -8474,6 +8573,12 @@ function buildPointClickScenes(
   const audioPack = buildAssetcAudioPackGeneration(data);
   const startIndex = startRoomIndex(data, rooms);
   const dialogueBoot = dialogueUiBootCommands(data, audioItems, audioPack);
+  const inventory = pointClickInventoryItems(data);
+  const itemIndex = (name: string): number => {
+    const index = inventory.findIndex(item => item.name === name);
+    if (index < 0) throw new Error(`Alvo de Point and Click referencia item inexistente: ${name}.`);
+    return index;
+  };
 
   return rooms.map((room, index) => {
     const width = integerField(room, "width", 20);
@@ -8503,6 +8608,7 @@ function buildPointClickScenes(
     });
     if (triggers.length > 0) {
       scene.hotspots = triggers.flatMap((trigger) => {
+        const target = normalizePointClickTarget(trigger.pointClick);
         const onInteractHotspot = scriptForEventName(
           data,
           resolveTriggerInteractEventName(trigger),
@@ -8526,10 +8632,27 @@ function buildPointClickScenes(
         const right = Math.min(roomWidthPixels, baseArea.x + baseArea.width + padding);
         const bottom = Math.min(roomHeightPixels, baseArea.y + baseArea.height + padding);
         const area = { x, y, width: right - x, height: bottom - y };
+        const requiredItem = target.requiredItem ? itemIndex(target.requiredItem) : -1;
+        const unavailableLine = target.unavailableDialogue ? dialogues.findIndex(line => line.key === target.unavailableDialogue) : -1;
+        if (target.unavailableDialogue && unavailableLine < 0) {
+          throw new Error(`Alvo de Point and Click referencia diálogo inexistente: ${target.unavailableDialogue}.`);
+        }
+        const useItemScript = target.useItemEvent
+          ? scriptForEventName(data, target.useItemEvent, events, rooms, dialogues, audioItems, audioPack)
+          : onInteractHotspot;
+        if (target.useItemEvent && !events.some(event => event.name === target.useItemEvent)) {
+          throw new Error(`Alvo de Point and Click referencia evento inexistente: ${target.useItemEvent}.`);
+        }
+        const consume: EngineExportProjectEventCommand[] = requiredItem >= 0 && target.consumeRequiredItem
+          ? [{ op: "set_variable", variable: inventory[requiredItem].variable, value: 0 }] : [];
         return [{
           name: stringField(trigger, "name", "Hotspot"),
           area,
-          ...(onInteractHotspot && onInteractHotspot.length > 0 ? { on_click: onInteractHotspot } : {})
+          ...(onInteractHotspot && onInteractHotspot.length > 0 ? { on_click: onInteractHotspot } : {}),
+          ...(requiredItem >= 0 ? { required_item: requiredItem } : {}),
+          ...(target.giveItem ? { give_item: itemIndex(target.giveItem) } : {}),
+          ...(unavailableLine >= 0 ? { unavailable_line: unavailableLine } : {}),
+          ...(target.useItemEvent || consume.length ? { on_use_item: [...consume, ...(useItemScript ?? [])] } : {})
         }];
       });
     }
@@ -8548,6 +8671,7 @@ function buildPointClickProject(
   const audioPack = buildAssetcAudioPackGeneration(data);
   const events = projectArray(data, "events");
   const pointClickSettings = child(settings(data), "pointAndClick") ?? {};
+  const inventory = pointClickInventoryItems(data);
   const spritePack = buildAssetcSpritePackGeneration(data);
   const tilesetPack = buildAssetcTilesetPackGeneration(data);
   const portraitPack = buildAssetcPortraitPackGeneration(data, spritePack);
@@ -8565,7 +8689,8 @@ function buildPointClickProject(
     projectArray(data, "actors"),
     [],
     sceneRouteVariableKeys(data),
-    projectVariableKeys(data)
+    projectVariableKeys(data),
+    projectInventoryItemKeys(data)
   );
   const visual = buildPointClickVisualExport(data, rooms, spritePack, tilesetPack, eventValueRegistries);
   const pointClickSpriteAssetNames = Array.from(new Set([
@@ -8589,6 +8714,7 @@ function buildPointClickProject(
     initial_scene: startRoomIndex(data, rooms),
     cursor_start: { x: cursorPixels.x, y: cursorPixels.y },
     cursor_speed: cursorSpeedRaw === null ? 2 : Math.max(1, Math.round(cursorSpeedRaw)),
+    ...(inventory.length ? { inventory_items: inventory } : {}),
     ...(cursorSpriteExport ? {
       cursor: {
         metasprite: cursorSpriteExport.metasprite,
@@ -8674,6 +8800,7 @@ function buildShmupProject(
   const spritePack = buildAssetcSpritePackGeneration(data);
   const tilesetPack = buildAssetcTilesetPackGeneration(data);
   const portraitPack = buildAssetcPortraitPackGeneration(data, spritePack);
+  const portraitAssets = buildDialoguePortraitAssetsExport(data, portraitPack, spritePack);
   const emotePack = buildAssetcEmotePackGeneration(data, spritePack, portraitPack);
   const emoteAssets = buildDialogueEmoteAssetsExport(data, emotePack, portraitPack, spritePack);
   const spriteExportForSheet = (spriteSheet: string | null, animationName: string): ReturnType<typeof buildActorEngineSpriteExport> => (
@@ -8914,6 +9041,7 @@ function buildShmupProject(
         fire_cooldown: Math.max(1, Math.round(wavePlan.fireCooldown ?? shmupConfig?.fireCooldown ?? fireRate))
       } : {}),
       on_defeat: scriptForEventName(data, nullableStringField(eventBindings, "onDefeat"), events, rooms, dialogues, audioItems, audioPack, pluginRegistry),
+      on_hit_player: scriptForEventName(data, nullableStringField(eventBindings, "onHitPlayer"), events, rooms, dialogues, audioItems, audioPack, pluginRegistry),
       enemies: roomEnemies.length > 0 ? roomEnemies : [{
         name: "scout",
         position: { x: 184, y: 48 },
@@ -9015,20 +9143,22 @@ function buildShmupProject(
     }],
     dialogue_lines: buildDialogueLines(data, dialogues, audioItems, audioPack),
     dialogue_ui: buildEngineDialogueUiConfigForExport(data),
+    ...(portraitAssets.length > 0 ? { portrait_assets: portraitAssets } : {}),
     ...(actorSprites.length > 0 ? { actor_sprites: actorSprites } : {}),
     ...(emoteAssets.length > 0 ? { emote_assets: emoteAssets } : {}),
     scripts: buildTopdownScripts(data, events, rooms, dialogues, audioItems, audioPack, pluginRegistry),
-    ...((spritePack || tilesetPack || emotePack) ? { resource_banks: "asset_pack" as const } : {}),
-    ...((spritePack || tilesetPack || emotePack || audioPack) ? {
+    ...((spritePack || tilesetPack || portraitPack || emotePack) ? { resource_banks: "asset_pack" as const } : {}),
+    ...((spritePack || tilesetPack || portraitPack || emotePack || audioPack) ? {
       assets: {
         ...(tilesetPack ? { bg_palettes: regularTilesetAssetNames(tilesetPack) } : {}),
-        ...((spritePack || emotePack) ? {
-          obj_palettes: Array.from(new Set([...(spritePack?.assetNames ?? []), ...(emotePack?.assetNames ?? [])])),
+        ...((spritePack || portraitPack || emotePack) ? {
+          obj_palettes: Array.from(new Set([...(spritePack?.assetNames ?? []), ...(portraitPack?.assetNames ?? []), ...(emotePack?.assetNames ?? [])])),
           ...(spritePack ? { sprite_assets: spritePack.assetNames } : {})
         } : {}),
         tile_assets: Array.from(new Set([
           ...regularTilesetAssetNames(tilesetPack),
           ...(spritePack?.assetNames ?? []),
+          ...(portraitPack?.assetNames ?? []),
           ...(emotePack?.assetNames ?? [])
         ])),
         ...(audioPack ? {
@@ -9116,8 +9246,13 @@ function buildVisualNovelScenes(
     if (onEnter) {
       for (const command of onEnter) {
         if (command.op === "show_dialogue" && typeof command.dialogue === "number") {
-          line = command.dialogue;
-          choiceGroup = choiceGroupByLine.get(line) ?? -1;
+          // The entry script already displays plain dialogue. Only retain an
+          // automatic scene group when that line has choices to present next.
+          const group = choiceGroupByLine.get(command.dialogue);
+          if (group !== undefined) {
+            line = command.dialogue;
+            choiceGroup = group;
+          }
           break;
         }
         if (command.op === "show_choice" && typeof command.group === "number") {
@@ -9262,6 +9397,14 @@ function menuScreenSources(rooms: Record<string, unknown>[]): MenuScreenSource[]
           titleOverlayAssetName: screen.titleOverlayAssetName,
           hudMode: screen.hudMode ?? (screen.hudPresetId ? undefined : menuConfig.hudMode),
           hudPresetId: screen.hudPresetId ?? menuConfig.hudPresetId,
+          hudBindings: screen.hudBindings,
+          pageNavigation: screen.pageNavigation,
+          hudListRows: screen.hudListRows,
+          hudTextColor: screen.hudTextColor,
+          hudHeader: screen.hudHeader,
+          hudTransparentText: screen.hudTransparentText,
+          hudFeedbackInDetails: screen.hudFeedbackInDetails,
+          titleTextVariableName: screen.titleTextVariableName,
           backgroundAnimation: screen.backgroundAnimation,
           titleFadeFrames: screen.titleFadeFrames,
           autoAdvanceFrames: screen.autoAdvanceFrames,
@@ -9350,7 +9493,8 @@ function buildMenuScreens(
     [],
     textInputVariableKeys,
     sceneRouteVariableKeys(data),
-    projectVariableKeys(data)
+    projectVariableKeys(data),
+    projectInventoryItemKeys(data)
   );
 
   const allRooms = projectRooms(data);
@@ -9435,6 +9579,7 @@ function buildMenuScreens(
         ...(menuItem.saveSlot !== undefined ? { save_slot: menuItem.saveSlot } : {}),
         ...(menuItem.valueLabels ? { value_labels: menuItem.valueLabels } : {}),
         ...(menuItem.detailLines ? { detail_lines: menuItem.detailLines } : {}),
+        ...(menuItem.availableRuntime ? { available_runtime: menuItem.availableRuntime } : {}),
         click_box: { ...menuItem.clickBox }
       };
       if (globalTarget && targetKind !== "menu" && MIXED_RUNTIME_KINDS.has(targetKind)) {
@@ -9442,7 +9587,7 @@ function buildMenuScreens(
         const targetName = roomName(globalTarget, globalTargetIndex);
         const targetRoom = roomIndexByName(targetRooms, targetName);
         if (targetRoom >= 0) {
-          const position = warpPositionForChangeScene(data, targetRooms, targetRoom, ["change_scene", targetName], targetKind);
+          const position = warpPositionForChangeScene(data, targetRooms, targetRoom, ["change_scene", targetName], targetKind, room);
           onSelect = [
             ...(onSelect ?? []),
             { op: "warp_runtime", runtime: targetKind as MixedRuntimeKind, room: targetRoom, x: position.x, y: position.y }
@@ -9574,6 +9719,7 @@ function buildMenuScreens(
           ? eventValueRegistries.variableIndex(visibilityVariableKey)
           : explicitVisibilityVariableIndex === null ? null : Math.floor(explicitVisibilityVariableIndex);
         const visibilityValue = integerField(actor, "menuVisibilityValue", integerField(actor, "menu_visibility_value", 0));
+        const visibilityConditions = normalizeMenuVisibilityConditions(actor.menuVisibilityConditions);
         const onInit = scriptForEventName(
           data,
           resolveActorInitEventName(actor),
@@ -9620,6 +9766,7 @@ function buildMenuScreens(
             entry_animation_frames: entryAnimationFrames
           } : {}),
           role: normalizedRole,
+          ...(visibilityConditions.length ? {visibility_conditions:visibilityConditions,...(actor.menuVisibilityAny===true?{visibility_any:true}:{})} : {}),
           ...(actor.menuActorSelectedOnly === true ? {selected_only:true} : {}),
           ...(menuItemIndex >= 0 ? { menu_item_index: menuItemIndex } : {}),
           ...(nullableStringField(actor, "cursorForMenu") ? { cursor_for_menu: nullableStringField(actor, "cursorForMenu") } : {}),
@@ -9653,8 +9800,16 @@ function buildMenuScreens(
     if (menuConfig) {
       screen.screen_type = menuConfig.screenType;
       screen.title = menuConfig.title;
+      if(menuConfig.hudBindings) screen.hud_bindings=menuConfig.hudBindings.map(b=>({slot:b.slot,...(b.binding?{binding:b.binding}:{}),...(b.selectedItem?{selected_item:true}:{}),...(b.columns?{columns:b.columns}:{})}));
+      if(menuConfig.pageNavigation) for(const [key,name] of [['previous_page_screen',menuConfig.pageNavigation.previousScreenID],['next_page_screen',menuConfig.pageNavigation.nextScreenID]] as const) {
+        if(!name) continue;
+        const index=sources.findIndex(s=>s.name===name);
+        if(index<0) throw new Error(`Página de menu inexistente: ${name}`);
+        screen[key]=index;
+      }
       if (menuConfig.hudListRows) screen.hud_list_rows = menuConfig.hudListRows;
       if (menuConfig.hudTextColor !== undefined) screen.hud_text_color = menuConfig.hudTextColor;
+      if (menuConfig.hudHeader) { const h=menuConfig.hudHeader; screen.hud_header={x:h.x,y:h.y,width:h.width,background_color:h.backgroundColor,text_color:h.textColor}; }
       if (menuConfig.hudTransparentText) screen.hud_transparent_text = true;
       if (menuConfig.hudFeedbackInDetails) screen.hud_feedback_in_details = true;
       if (menuConfig.titleTextVariableName) screen.title_text_variable = eventValueRegistries.textVariableIndex(menuConfig.titleTextVariableName);
@@ -10641,6 +10796,8 @@ function buildEngineDialogueUiConfigForExportUncached(data: GBAProjectData): Eng
     hud_layouts: hudPresentation.presets.filter(preset => usedHudPresetIDs.has(preset.id)).map((preset) => ({
       id: preset.id,
       mode: preset.mode,
+      ...(preset.selectorImage ? { selector_asset: normalizeHudComponentAsset(preset.selectorImage) } : {}),
+      ...(preset.runtimeTextProfile && preset.runtimeTextProfile !== "standard" ? { text_profile: preset.runtimeTextProfile } : {}),
       components: preset.components.map((component) => ({
         id: component.id,
         kind: component.kind,
@@ -10678,7 +10835,7 @@ export function buildEngineExportProjectContract(
   data: GBAProjectData,
   options: BuildEngineExportProjectContractOptions = {}
 ): EngineExportProjectContract {
-  return withEngineExportContext(() => buildEngineExportProjectContractUncached(data, options));
+  return withEngineExportContext(() => buildEngineExportProjectContractUncached(normalizeProjectTilemaps(data), options));
 }
 
 function buildEngineExportProjectContractUncached(
@@ -10877,6 +11034,12 @@ function buildEngineExportProjectContractUncached(
                       "events.progressive_event_runner"
                     ];
   const cameraZoneFeatures = new Set<string>();
+  rooms.forEach(room => {
+    const runtimeKind = resolveSceneRuntimeExport(roomSceneType(room)).kind;
+    if (["battle_rpg", "shmup"].includes(runtimeKind) && nullableStringField(child(room, "eventBindings"), "onHitPlayer")) {
+      features.push(`${runtimeKind}_runtime.player_damage_event`);
+    }
+  });
   rooms.forEach((room) => {
     if (!Array.isArray(room.cameraZones) || room.cameraZones.length === 0) return;
     const runtimeKind = resolveSceneRuntimeExport(roomSceneType(room)).kind;
@@ -10902,6 +11065,9 @@ function buildEngineExportProjectContractUncached(
   features.push(...runtimeCapabilities.capabilities
     .filter((capability) => capability.enabled)
     .map((capability) => `runtime.capability.${capability.id}`));
+  if (kind === "topdown" || kind === "platformer" || mixedRuntimeKinds.some(runtime => runtime === "topdown" || runtime === "platformer")) {
+    features.push("events.named_animation_keys");
+  }
   if (kind === "topdown" || kind === "platformer" || kind === "isometric" || kind === "mixed") {
     features.push("save.universal_runtime_envelope");
     features.push("audio.runtime_bus_volume");
@@ -10964,7 +11130,24 @@ function buildEngineExportProjectContractUncached(
     if(config?.gameplayMode==="tactical" && config.pagedSurface)features.push("isometric_runtime.paged_tactical_surface");
     if(child(config,"tacticalPresentation")?.compactHud)features.push("isometric_runtime.compact_hud","hud_spaced_text");
   }
+  for(const room of projectRooms(data)) {
+    const runtime=child(room,"runtime"),config=child(runtime,"config");
+    if(runtime?.type === "racing") {
+      if(config?.challenge)features.push("racing_challenge_progress");
+      if(startMenuScreenIndex(data)>=0)features.push("racing_save_resume");
+    }
+    if(runtime?.type === "menu") {
+      if(config?.hudHeader)features.push("menu_hud_header");
+      if(projectArray(config ?? {},"items").some(item=>child(item,"binding")?.source === "text"))features.push("menu_text_bindings");
+      if(projectArray(config ?? {},"items").some(item=>item.availableRuntime))features.push("menu_runtime_conditions");
+    }
+  }
   const hudLayouts = buildEngineDialogueUiConfigForExport(data).hud_layouts ?? [];
+  if (hudLayouts.some(layout => layout.text_profile)) features.push("hud_runtime_text_profiles");
+  if (hudLayouts.some(layout => layout.selector_asset) || projectArray(data, "rooms").some(room =>
+    child(room, "runtime")?.type === "menu" && integerField(child(child(room, "runtime"), "config"), "hudListRows", 0) > 0)) {
+    features.push("hud_menu_selector");
+  }
   if (hudLayouts.some(layout => layout.components.some(component => component.value_variable !== undefined || component.inventory_item !== undefined))) {
     features.push("hud_project_value_bindings");
   }
@@ -10989,6 +11172,12 @@ function buildEngineExportProjectContractUncached(
     const config = normalizeMenuSceneConfig(child(child(room, "runtime"), "config"));
     return config.actionSounds || config.screens?.some(screen => screen.actionSounds);
   })) features.push("menu_audio_feedback");
+  for(const source of menuScreenSources(exportRoomsForKind(data,"menu"))) {
+    if(source.config?.hudBindings?.length)features.push("menu_hud_bindings");
+    if(source.config?.pageNavigation)features.push("menu_page_navigation");
+  }
+  if(projectArray(data,"actors").some(actor=>normalizeMenuVisibilityConditions(actor.menuVisibilityConditions).length))features.push("menu_actor_visibility_conditions");
+  if(projectArray(data,"events").some(event=>JSON.stringify(event).includes("set_player_speed_profile")))features.push("topdown_run_profile");
   features.push("hardware.gba_native_contract");
   features.push("events.native_authoring_v2");
   if (exportRoomsForKind(data, "topdown").some(room => {

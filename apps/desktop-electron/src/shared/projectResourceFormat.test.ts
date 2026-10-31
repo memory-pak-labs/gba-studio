@@ -7,6 +7,7 @@ import {
   encodeMetatileSequence,
   expandProjectTilemaps,
   joinSplitProjectResources,
+  normalizeProjectTilemaps,
   splitProjectResources
 } from "./projectResourceFormat.js";
 
@@ -50,6 +51,10 @@ describe("project resource format", () => {
       length: 8
     });
     expect(expandProjectTilemaps(compact)).toEqual(project);
+    expect(normalizeProjectTilemaps(project)).toBe(project);
+    const normalized = normalizeProjectTilemaps(compact);
+    expect(normalized).toEqual(project);
+    expect(normalizeProjectTilemaps(normalized)).toBe(normalized);
   });
 
   it("uses reusable 2D metatiles when they are smaller than linear RLE", () => {

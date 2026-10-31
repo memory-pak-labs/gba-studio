@@ -676,6 +676,8 @@ export interface EngineDialogueUiConfig {
   hud_layouts?: Array<{
     id: string;
     mode: "standard" | "advanced";
+    selector_asset?: string;
+    text_profile?: "dungeon-status" | "dungeon-sidebar" | "dungeon-sidebar-contextual";
     components: Array<{
       id: string;
       kind: "frame" | "text" | "bar" | "icon";

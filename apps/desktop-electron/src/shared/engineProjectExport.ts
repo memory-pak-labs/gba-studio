@@ -1,4 +1,5 @@
 import { memoizeEngineExport } from "./engineExportContext.js";
+import { sceneChangeCommandParts } from "./sceneChangeCommand.js";
 import { spriteColorModeForSheet } from "./spriteColorDepth.js";
 import { decomposeGbaMetaspriteFrame } from "./gbaMetaspriteLayout.js";
 import { resolveAudioInstrumentComposition } from "./audioInstruments.js";
@@ -30,6 +31,7 @@ import {
   type ScenePaletteBankPolicy
 } from "./paletteContract.js";
 import {
+  isometricScreenFacingDirection,
   isSpriteAnimationType,
   normalizeSpriteStateSlots,
   resolveSpriteStateForActor,
@@ -306,9 +308,9 @@ function hudSceneGroupsByIconUncached(data: GBAProjectData): ReadonlyMap<string,
   );
   const requestedActiveID = nullableStringField(projectSettings, "hudPresetId") || "hud-default";
   const activePreset = presetByID.get(requestedActiveID) ?? presets[0];
-  const iconsByPreset = new Map(presets.map((preset) => [preset, recordArray(preset, "components")
+  const iconsByPreset = new Map(presets.map((preset) => [preset, [nullableStringField(preset, "selectorImage"), ...recordArray(preset, "components")
     .filter((component) => ["icon", "frame", "bar"].includes(nullableStringField(component, "kind")) && nullableStringField(component, "asset"))
-    .flatMap((component) => [nullableStringField(component, "asset"), nullableStringField(child(component,"gauge"),"emptyAsset"), ...(Array.isArray(component.stateAssets) ? component.stateAssets.filter((v):v is string => typeof v === "string") : [])].filter(Boolean))]));
+    .flatMap((component) => [nullableStringField(component, "asset"), nullableStringField(child(component,"gauge"),"emptyAsset"), ...(Array.isArray(component.stateAssets) ? component.stateAssets.filter((v):v is string => typeof v === "string") : [])])].filter(Boolean)]));
   projectRooms(data).forEach((room, index) => {
     const presetIDs = hudPresetIDsInValue(room);
     if (presetIDs.size === 0 && activePreset && !usesBlankPlayerDefaults(data)) presetIDs.add(nullableStringField(activePreset, "id"));
@@ -819,7 +821,7 @@ function eventSteps(event: Record<string, unknown>): Record<string, unknown>[] {
 }
 
 function commandParts(command: string): string[] {
-  return command.split(/\s+/).filter(Boolean);
+  return sceneChangeCommandParts(command);
 }
 
 function integerPart(value: string | undefined, fallback: number): number {
@@ -3884,19 +3886,8 @@ function spriteStateContracts(data: GBAProjectData): SpriteStateContract[] {
   });
 }
 
-const TOPDOWN_IDLE_ANIMATION_ORDER = ["idle_down", "idle_up", "idle_right", "idle_left"] as const;
-const TOPDOWN_WALK_ANIMATION_ORDER = ["walk_down", "walk_up", "walk_right", "walk_left"] as const;
-
 export function sortTopdownSpriteAnimationsForExport(animations: Record<string, unknown>[]): Record<string, unknown>[] {
-  const hasWalk = animations.some((animation) => stringField(animation, "name", "").startsWith("walk_"));
-  const order = hasWalk
-    ? [
-      ...TOPDOWN_IDLE_ANIMATION_ORDER.slice(0, 3),
-      ...TOPDOWN_WALK_ANIMATION_ORDER.slice(0, 3),
-      "idle_left",
-      "walk_left"
-    ]
-    : [...TOPDOWN_IDLE_ANIMATION_ORDER];
+  const order = SPRITE_ANIMATION_SLOT_ORDER.map((slot) => slot.replace("moving_", "walk_"));
   const rank = new Map(order.map((name, index) => [name, index]));
   return [...animations].sort((left, right) => {
     const leftRank = rank.get(stringField(left, "name", "")) ?? 999;
@@ -3992,9 +3983,7 @@ function metaspriteIndexForAnimationFrame(
   const frameHeight = positiveSpriteInteger(animation.frameHeight, spriteHeight);
   const sheetSize = inferSpriteSheetImageSize(data, spriteSheet, frameWidth, frameHeight);
   const frames = Array.isArray(animation.frames) ? animation.frames.filter(isRecord) : [];
-  const normalizedIndex = frames.length > 0
-    ? ((Math.floor(frameIndex) % frames.length) + frames.length) % frames.length
-    : Math.max(0, Math.floor(frameIndex));
+  const normalizedIndex = Math.max(0, Math.floor(frameIndex));
   const frame = isRecord(frames[normalizedIndex]) ? frames[normalizedIndex] : {};
   const tiles = Array.isArray(frame.tiles) ? frame.tiles.filter(isRecord) : [];
   const firstTile = tiles[0];
@@ -4147,7 +4136,7 @@ function buildSpriteAnimationExportEntry(
     const frameWidth = positiveSpriteInteger(animation.frameWidth, spriteWidth);
     const frameHeight = positiveSpriteInteger(animation.frameHeight, spriteHeight);
     const frames = Array.isArray(animation.frames) ? animation.frames.filter(isRecord) : [];
-    const frameCount = frames.length > 0 ? frames.length : positiveSpriteInteger(animation.frameCount, 1);
+    const frameCount = positiveSpriteInteger(animation.frameCount, frames.length || 1);
     const animationOriginX = signedSpriteInteger(animation.originX, 0);
     const animationOriginY = signedSpriteInteger(animation.originY, 0);
     const frameParts = Array.from({ length: frameCount }, (_item, frameIndex) => {
@@ -4259,7 +4248,7 @@ function buildSpriteAnimationExportEntries(
     throw new Error(`SpriteState ${spriteState.name} nao preenche os slots: ${normalized.missingSlots.join(", ")}.`);
   }
 
-  return SPRITE_ANIMATION_SLOT_ORDER.map((slot) => {
+  const directional = SPRITE_ANIMATION_SLOT_ORDER.map((slot) => {
     const resolved = normalized.slots[slot];
     const record = resolved.animationID ? recordsByID.get(resolved.animationID) : undefined;
     if (!record) throw new Error(`SpriteState ${spriteState.name} referencia uma animacao ausente no slot ${slot}.`);
@@ -4275,6 +4264,32 @@ function buildSpriteAnimationExportEntries(
       resolved.flipX
     );
   });
+  if (directionAdapter === "topdown") {
+    const runs = ["down", "right", "up", "left"].map(direction =>
+      animations.find(animation => stringField(animation, "name", "") === `run_${direction}`
+        && spriteState.animationIDs.includes(stringField(animation, "id", ""))));
+    if (runs.some(Boolean)) {
+      if (runs.some(animation => !animation)) throw new Error(`SpriteState ${spriteState.name} precisa das quatro direcoes de corrida.`);
+      directional.push(...runs.map(animation => buildSpriteAnimationExportEntry(
+        data, spriteSheet, spriteWidth, spriteHeight, packAssetName,
+        animation!, animations.indexOf(animation!), stringField(animation!, "name", "")
+      )));
+    }
+  }
+
+  // Native movement uses the leading directional slots. Events also address
+  // authored clip names, including fixed-state clips such as "off" and "on".
+  const exportedNames = new Set(directional.map(animation => animation.name));
+  for (const [index, animation] of animations.entries()) {
+    const id = nullableStringField(animation, "id") || `animation-${index + 1}`;
+    const name = stringField(animation, "name", `animation_${index + 1}`);
+    if (!spriteState.animationIDs.includes(id) || exportedNames.has(name)) continue;
+    directional.push(buildSpriteAnimationExportEntry(
+      data, spriteSheet, spriteWidth, spriteHeight, packAssetName, animation, index, name
+    ));
+    exportedNames.add(name);
+  }
+  return directional;
 }
 
 function buildIsometricTacticalAnimationExportEntries(
@@ -4392,6 +4407,30 @@ export function buildActorEngineSpriteExport(
     options.directionAdapter ?? "topdown",
     options.preserveAuthoredAnimations
   );
+  if (options.directionAdapter === "isometric") {
+    const spriteState = resolveSpriteStateForActor(spriteStateContracts(data), {
+      animationStateID: nullableStringField(actor, "animationStateID"), spriteSheet
+    });
+    const allowed = spriteState ? new Set(spriteState.animationIDs) : null;
+    const records = animationsForSpriteSheet(data, spriteSheet);
+    const names = new Set(baseAnimations.map((entry) => entry.name));
+    for (const [index, animation] of records.entries()) {
+      const id = nullableStringField(animation, "id") || `animation-${index + 1}`;
+      if (allowed && !allowed.has(id)) continue;
+      const direction = isometricScreenFacingDirection({
+        id, name: nullableStringField(animation, "name") ?? undefined, direction: nullableStringField(animation, "direction")
+      });
+      const state = stringField(animation, "state", "").toLowerCase();
+      const name = stringField(animation, "name", "").toLowerCase();
+      const motion = /^(walk|walking|move|moving|run|running)$/.test(state) || /^(walk|move|moving|run)[_-]/.test(name)
+        ? "walk" : state === "idle" || name.startsWith("idle_") ? "idle" : null;
+      if (!direction || !motion) continue;
+      const alias = `${motion}_screen_${direction}`;
+      if (names.has(alias)) continue;
+      baseAnimations.push(buildSpriteAnimationExportEntry(data, spriteSheet, spriteWidth, spriteHeight, packAsset.name, animation, index, alias));
+      names.add(alias);
+    }
+  }
   const tacticalAnimations = options.includeIsometricTacticalAnimations
     ? buildIsometricTacticalAnimationExportEntries(
       data,
@@ -4873,7 +4912,7 @@ export function uniqueDialogueEmoteNames(data: GBAProjectData): string[] {
     steps.forEach((step) => {
       const command = nullableStringField(step, "command");
       if (!command) return;
-      const parts = command.split(/\s+/).filter(Boolean);
+      const parts = commandParts(command);
       if (parts[0] === "show_actor_gesture" && parts[2]) names.add(parts[2]);
     });
   });

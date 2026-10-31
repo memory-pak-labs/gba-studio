@@ -222,6 +222,18 @@ export interface RacingSceneConfig extends SceneFeatureRuntimeConfig {
   pseudo3dVisuals?: RacingPseudo3DVisuals;
   actionSounds?: Partial<Record<"accelerate" | "brake" | "collision" | "checkpoint", string>>;
   perspectiveCamera?: RacingPerspectiveCamera;
+  challenge?: RacingChallengeConfig;
+}
+
+export interface RacingChallengeConfig {
+  boostVariableIndex: number;
+  bestTimeTextIndex: number;
+  resultTimeTextIndex: number;
+  resultPositionTextIndex: number;
+  resultRatingTextIndex: number;
+  resultBestTextIndex: number;
+  goldSeconds: number;
+  silverSeconds: number;
 }
 
 export interface RacingPerspectiveCamera {
@@ -581,7 +593,7 @@ export const DEFAULT_RACING_SCENE_CONFIG: RacingSceneConfig = {
 };
 
 export const DEFAULT_BATTLE_RPG_SCENE_CONFIG: BattleRpgSceneConfig = {
-  maxPartySize: 6,
+  maxPartySize: 4,
   maxEnemies: 1,
   turnDelayFrames: 30,
   escapeEnabled: true,
@@ -863,6 +875,21 @@ export function normalizeDungeonCrawlerSceneConfig(value: unknown): DungeonCrawl
   };
 }
 
+function normalizeRacingChallenge(value: unknown): RacingChallengeConfig | undefined {
+  if (!isRecord(value)) return undefined;
+  const textFields = ["bestTimeTextIndex", "resultTimeTextIndex", "resultPositionTextIndex", "resultRatingTextIndex", "resultBestTextIndex"] as const;
+  const slots = textFields.map(key => value[key]);
+  if (slots.some(slot => !Number.isInteger(slot) || Number(slot) < 0 || Number(slot) > 7) || new Set(slots).size !== slots.length) {
+    throw new Error("Corrida: selecione cinco slots de texto distintos entre 0 e 7, separados do nome do jogador.");
+  }
+  return {
+    boostVariableIndex: Math.round(finiteNumber(value.boostVariableIndex, -1, -1, 63)),
+    ...Object.fromEntries(textFields.map(key => [key, Number(value[key])])) as Pick<RacingChallengeConfig, typeof textFields[number]>,
+    goldSeconds: Math.round(finiteNumber(value.goldSeconds, 80, 1, 5999)),
+    silverSeconds: Math.round(finiteNumber(value.silverSeconds, 120, Math.max(1, Number(value.goldSeconds) || 80), 5999))
+  };
+}
+
 export function normalizeRacingSceneConfig(value: unknown): RacingSceneConfig {
   const config = isRecord(value) ? value : {};
   const cameraInput = isRecord(config.perspectiveCamera) ? config.perspectiveCamera : null;
@@ -945,6 +972,7 @@ export function normalizeRacingSceneConfig(value: unknown): RacingSceneConfig {
     ...(topdownTrack ? { topdownTrack } : {}),
     ...(pseudo3dVisuals ? { pseudo3dVisuals } : {}),
     ...(perspectiveCamera ? { perspectiveCamera } : {}),
+    ...(isRecord(config.challenge) ? { challenge: normalizeRacingChallenge(config.challenge) } : {}),
     ...(isRecord(config.actionSounds) ? {actionSounds:Object.fromEntries(
       ["accelerate","brake","collision","checkpoint"].flatMap(cue=> {
         const value=(config.actionSounds as Record<string,unknown>)[cue];
@@ -970,8 +998,8 @@ export function normalizeBattleRpgSceneConfig(value: unknown): BattleRpgSceneCon
         return typeof name === "string" && name.trim() ? [[key,name.trim()]] : [];
       }))
     }} : {}),
-    maxPartySize: Math.round(finiteNumber(config.maxPartySize, DEFAULT_BATTLE_RPG_SCENE_CONFIG.maxPartySize, 1, 6)),
-    maxEnemies: Math.round(finiteNumber(config.maxEnemies, DEFAULT_BATTLE_RPG_SCENE_CONFIG.maxEnemies, 1, 6)),
+    maxPartySize: Math.round(finiteNumber(config.maxPartySize, DEFAULT_BATTLE_RPG_SCENE_CONFIG.maxPartySize, 1, 4)),
+    maxEnemies: Math.round(finiteNumber(config.maxEnemies, DEFAULT_BATTLE_RPG_SCENE_CONFIG.maxEnemies, 1, 8)),
     turnDelayFrames: frameCount(config.turnDelayFrames, DEFAULT_BATTLE_RPG_SCENE_CONFIG.turnDelayFrames),
     escapeEnabled: typeof config.escapeEnabled === "boolean" ? config.escapeEnabled : DEFAULT_BATTLE_RPG_SCENE_CONFIG.escapeEnabled,
     experienceMultiplier: finiteNumber(config.experienceMultiplier, DEFAULT_BATTLE_RPG_SCENE_CONFIG.experienceMultiplier, 0.1, 10),
@@ -1245,6 +1273,7 @@ function normalizeRacingSceneOverrides(value: unknown): Partial<RacingSceneConfi
     ...(Object.hasOwn(value, "rivalSpeed") ? { rivalSpeed: normalized.rivalSpeed } : {}),
     ...(Object.hasOwn(value, "roadCurve") ? { roadCurve: normalized.roadCurve } : {}),
     ...(Object.hasOwn(value, "showMinimap") ? { showMinimap: normalized.showMinimap } : {}),
+    ...(Object.hasOwn(value, "challenge") ? { challenge: normalized.challenge } : {}),
     ...(Object.hasOwn(value, "perspectiveCamera") && normalized.perspectiveCamera
       ? { perspectiveCamera: normalized.perspectiveCamera } : {}),
     ...(Object.hasOwn(value, "trackSegments") && normalized.trackSegments
