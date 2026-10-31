@@ -564,32 +564,47 @@ describe("campanha canônica O Último Farol", () => {
   it("persiste uma única progressão compartilhada até a corrida final", () => {
     const project = campaignProject();
     let runtime = bootPreviewRuntimeAtRoom(project, "prologo");
+    const finish = state => {
+      for (let i = 0; i < 2000; i++) {
+        if (state.activeDialogue) state = dispatchPreviewRuntimeAction(state, "action");
+        if (!state.activeDialogue && !state.scriptWaitFrames && !state.scriptContinuations.length && !state.scriptQueue.length) return state;
+        state = tickPreviewRuntime(state, 1000 / 60);
+      }
+      throw new Error("Event did not finish");
+    };
+    const run = (state, name) => finish(runPreviewRuntimeEvent(state, name));
 
-    runtime = runPreviewRuntimeEvent(runtime, "titulo_novo_jogo");
-    runtime = runPreviewRuntimeEvent(runtime, "prologo_partir");
-    runtime = runPreviewRuntimeEvent(runtime, "porto_recuperar_estrutura");
-    runtime = runPreviewRuntimeEvent(runtime, "porto_abrir_mapa");
-    runtime = runPreviewRuntimeEvent(runtime, "mapa_escolher_penedos");
-    runtime = runPreviewRuntimeEvent(runtime, "penedos_retornar_armazem");
-    runtime = runPreviewRuntimeEvent(runtime, "armazem_das_mares_saida");
-    runtime = runPreviewRuntimeEvent(runtime, "observatorio_do_farol_saida");
-    runtime = runPreviewRuntimeEvent(runtime, "mercado_ao_entrar");
-    runtime = runPreviewRuntimeEvent(runtime, "mercado_falar_mercador");
-    runtime = runPreviewRuntimeEvent(runtime, "mercado_abrir_atalho");
-    runtime = runPreviewRuntimeEvent(runtime, "mercado_abrir_usina");
-    runtime = runPreviewRuntimeEvent(runtime, "usina_ao_entrar");
-    runtime = runPreviewRuntimeEvent(runtime, "usina_abrir_combate");
-    runtime = runPreviewRuntimeEvent(runtime, "usina_combate_ao_entrar");
-    runtime = runPreviewRuntimeEvent(runtime, "usina_vencer_combate");
-    runtime = runPreviewRuntimeEvent(runtime, "usina_saida_ao_entrar");
-    runtime = runPreviewRuntimeEvent(runtime, "usina_coletar_celula");
-    runtime = runPreviewRuntimeEvent(runtime, "usina_encontrar_guardia");
-    runtime = runPreviewRuntimeEvent(runtime, "conselho_confirmar_alianca");
-    runtime = runPreviewRuntimeEvent(runtime, "tempestade_alcancar_rele");
-    runtime = runPreviewRuntimeEvent(runtime, "guardiao_vitoria");
-    runtime = runPreviewRuntimeEvent(runtime, "arena_vencer_rival");
-    runtime = runPreviewRuntimeEvent(runtime, "circuito_concluir");
-    for(let i=0;i<400;i++)runtime=tickPreviewRuntime(runtime,100);
+    runtime = run(runtime, "titulo_novo_jogo");
+    runtime = run(runtime, "prologo_partir");
+    runtime = run(runtime, "porto_recuperar_estrutura");
+    runtime = run(runtime, "porto_abrir_mapa");
+    runtime = run(runtime, "mapa_escolher_penedos");
+    runtime = run(runtime, "penedos_retornar_armazem");
+    runtime = run(runtime, "armazem_das_mares_saida");
+    runtime = run(runtime, "observatorio_do_farol_saida");
+    runtime = run(runtime, "mercado_ao_entrar");
+    runtime = run(runtime, "mercado_falar_mercador");
+    runtime = run(runtime, "mercado_abrir_atalho");
+    runtime = run(runtime, "mercado_abrir_usina");
+    runtime = run(runtime, "usina_ao_entrar");
+    runtime = run(runtime, "usina_abrir_combate");
+    runtime = run(runtime, "usina_combate_ao_entrar");
+    runtime = run(runtime, "usina_vencer_combate");
+    runtime = run(runtime, "usina_saida_ao_entrar");
+    runtime = run(runtime, "usina_coletar_celula");
+    runtime = run(runtime, "usina_encontrar_guardia");
+    runtime = run(runtime, "conselho_confirmar_alianca");
+    runtime = run(runtime, "tempestade_alcancar_rele");
+    runtime = run(runtime, "guardiao_vitoria");
+    runtime = run(runtime, "arena_vencer_rival");
+    runtime = run(runtime, "race_finish");
+    expect(runtime.currentRoom?.name).toBe("corrida_resultados");
+    runtime = { ...runtime, variables: { ...runtime.variables, racing_result: 1, previous_room: 0 } };
+    runtime = run(runtime, "race_results_continue");
+    for (let i = 0; i < 400; i++) {
+      if (runtime.activeDialogue) runtime = dispatchPreviewRuntimeAction(runtime, "action");
+      runtime = tickPreviewRuntime(runtime, 100);
+    }
 
     expect(runtime.currentRoom?.name).toBe("titulo");
     expect(runtime.variables).toMatchObject({
