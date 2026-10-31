@@ -3,11 +3,11 @@ function tileAsset(header, name) {
     "gbs::TileAsset\\s+" + name + "\\s*=\\s*\\{([^}]+)\\}\\s*;"
   ))?.[1];
   const match = body?.match(
-    /^\s*reinterpret_cast<const\s+uint8_t\s*\*>\s*\((\w+)\)\s*,\s*(\w+)\s*,\s*(0x[0-9a-f]+|\d+)\s*,\s*true(?:\s*,\s*gbs::ColorDepth::Bpp(4|8))?\s*$/i
+    /^\s*(?:reinterpret_cast<const\s+uint8_t\s*\*>\s*\((\w+)\)|&(\w+)\s*\[0\]\s*\[0\])\s*,\s*(\w+)\s*,\s*(0x[0-9a-f]+|\d+)\s*,\s*true(?:\s*,\s*gbs::ColorDepth::Bpp(4|8))?\s*$/i
   );
   return match ? {
-    data: match[1], count: match[2], destination: Number.parseInt(match[3], 0),
-    bitsPerPixel: Number(match[4] ?? 4)
+    data: match[1] ?? match[2], count: match[3], destination: Number.parseInt(match[4], 0),
+    bitsPerPixel: Number(match[5] ?? 4)
   } : null;
 }
 
