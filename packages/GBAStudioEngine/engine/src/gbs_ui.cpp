@@ -160,7 +160,7 @@ void append_limited_text(char*& out, char* end, const char* text, int max_chars)
     }
 }
 
-char menu_buffer[26 * 5 + 5 + 1];
+char menu_buffer[26 * 5 + 5 + 1] GBS_UI_EWRAM;
 
 const char* menu_page_text(const gbs::MenuState& state) {
     char* out = menu_buffer;

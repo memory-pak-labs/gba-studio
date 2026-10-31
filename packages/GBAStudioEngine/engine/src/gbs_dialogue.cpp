@@ -4,6 +4,12 @@
 #include "gbs_hw.h"
 #include "gbs/text.h"
 
+#if defined(__arm__) || defined(__thumb__)
+#define GBS_DIALOGUE_EWRAM __attribute__((section(".ewram_bss")))
+#else
+#define GBS_DIALOGUE_EWRAM
+#endif
+
 namespace gbs {
 
 DialogueUiConfig active_dialogue_ui = default_dialogue_ui_config();
@@ -33,7 +39,7 @@ bool string_equals(const char* left, const char* right) {
     return *left == '\0' && *right == '\0';
 }
 
-char choice_page_buffer[dialogue_page_buffer_capacity];
+char choice_page_buffer[dialogue_page_buffer_capacity] GBS_DIALOGUE_EWRAM;
 constexpr int dialogue_box_text_columns = 26;
 
 DialogueBoxLayout drawn_dialogue_regions[3] = {};

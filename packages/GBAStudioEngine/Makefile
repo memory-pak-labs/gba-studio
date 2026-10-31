@@ -14,6 +14,7 @@ ARM_CXX := $(DEVKITARM)/bin/arm-none-eabi-g++
 ARM_AS := $(DEVKITARM)/bin/arm-none-eabi-gcc
 ARM_AR := $(DEVKITARM)/bin/arm-none-eabi-ar
 ARM_OBJCOPY := $(DEVKITARM)/bin/arm-none-eabi-objcopy
+ARM_OBJDUMP := $(DEVKITARM)/bin/arm-none-eabi-objdump
 GBAFIX := $(TOOLS_BIN)/gbafix
 
 HOST_CXX ?= clang++
@@ -1444,7 +1445,11 @@ gbsdoctor-test:
 	grep -q '"key": "project_build_target"' $(HOST_BUILD)/gbsdoctor/unsupported_build_report.json
 	grep -q '"code": "GBS_DOCTOR_PROJECT_BUILD_TARGET"' $(HOST_BUILD)/gbsdoctor/unsupported_build_report.json
 
-package: test topdown_basic.gba platformer_basic.gba isometric_basic.gba
+.PHONY: iwram-buffer-placement-test
+iwram-buffer-placement-test: check-toolchain
+	GBA_TEST_CXX="$(ARM_CXX)" GBA_TEST_OBJDUMP="$(ARM_OBJDUMP)" python3 tests/host/iwram_buffer_placement_tests.py
+
+package: test topdown_basic.gba platformer_basic.gba isometric_basic.gba iwram-buffer-placement-test
 	rm -rf $(DIST_DIR)
 	mkdir -p $(DIST_DIR)/include $(DIST_DIR)/lib $(DIST_DIR)/templates/topdown_basic $(DIST_DIR)/templates/platformer_basic $(DIST_DIR)/templates/isometric_basic $(DIST_DIR)/templates/exported_topdown $(DIST_DIR)/templates/exported_platformer $(DIST_DIR)/templates/exported_isometric $(DIST_DIR)/templates/exported_dungeon_crawler $(DIST_DIR)/templates/exported_racing $(DIST_DIR)/templates/exported_battle_rpg $(DIST_DIR)/templates/exported_mixed $(DIST_DIR)/templates/exported_point_click $(DIST_DIR)/templates/exported_shmup $(DIST_DIR)/templates/exported_visual_novel $(DIST_DIR)/templates/exported_menu $(DIST_DIR)/templates/exported_cutscene $(DIST_DIR)/templates/exported_world_map $(DIST_DIR)/templates/exported_luta $(DIST_DIR)/schemas $(DIST_DIR)/tools
 	cp -R engine/include/gbs $(DIST_DIR)/include/
