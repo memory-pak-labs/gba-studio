@@ -38,6 +38,19 @@ function menuItemLabels(section: { submenu?: unknown }): string[] {
     .map((item) => item.label);
 }
 
+describe("update menu", () => {
+  it.each([["pt-BR", "Ajuda", "Verificar atualizações..."], ["en-US", "Help", "Check for updates..."], ["es-ES", "Ayuda", "Buscar actualizaciones..."]])(
+    "routes the localized update command for %s", (locale, help, label) => {
+      const sendCommand = vi.fn();
+      const section = createAppMenuTemplate({ isMac: false, locale, sendCommand }).find(item => item.label === help);
+      const item = (section?.submenu as Array<{ label: string; click?: () => void }> | undefined)?.find(entry => entry.label === label);
+      expect(item).toBeDefined();
+      item?.click?.();
+      expect(sendCommand).toHaveBeenCalledWith("app:check-updates");
+    }
+  );
+});
+
 describe("app menu template", () => {
   it("exposes project commands with desktop accelerators", () => {
     const sendCommand = vi.fn();

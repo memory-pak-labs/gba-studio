@@ -2,6 +2,8 @@ import type { OpenDialogOptions, SaveDialogOptions } from "electron";
 import { isAppLocale, localizeNativeDialog } from "./nativeUiLocale.js";
 import { createSceneAnalysisService, JevDecisionProvider } from "./sceneAnalysisService.js";
 import { randomUUID } from "node:crypto";
+import { existsSync } from "node:fs";
+import { canRestartForAppUpdate, createAppUpdateService, supportsIntegratedUpdates } from "./appUpdates.js";
 import { writeFile } from "node:fs/promises";
 import { app, BrowserWindow, dialog, ipcMain, screen, shell } from "electron";
 import { delimiter, dirname, join, resolve } from "node:path";
@@ -108,6 +110,8 @@ ipcMain.handle(ipcChannels.setAppLocale, (_event, locale: unknown) => {
 const mcpServerMode = process.argv.includes("--mcp");
 
 const windowCloseGuards = new WeakMap<BrowserWindow, ReturnType<typeof createWindowCloseGuard>>();
+const windowDocumentStates = new WeakMap<BrowserWindow, WindowDocumentState>();
+let appUpdates: ReturnType<typeof createAppUpdateService> | undefined;
 let pendingExternalProjectOpen: OpenProjectResult | null = null;
 let externalAssetWatcher: ExternalAssetWatcher | null = null;
 const desktopAssetProjectRoots = new Set<string>();
@@ -202,7 +206,7 @@ function createWindow(): BrowserWindow {
   });
 
   window.on("close", (event) => {
-    closeGuard.handleClose(event);
+    if (appUpdates?.state().status !== "installing") closeGuard.handleClose(event);
   });
   windowCloseGuards.set(window, closeGuard);
 
@@ -247,6 +251,8 @@ ipcMain.handle(ipcChannels.confirmWindowClose, (event, confirmed = true) => {
 ipcMain.handle(ipcChannels.setWindowDocumentState, (event, state: WindowDocumentState) => {
   const window = BrowserWindow.fromWebContents(event.sender);
   if (!window) return;
+
+  windowDocumentStates.set(window, state);
 
   window.setTitle(state.title);
   if (process.platform === "darwin") {
@@ -991,6 +997,43 @@ void app.whenReady().then(async () => {
   }
 
   installAppMenu(DEFAULT_APP_LOCALE, () => editorWindow);
+  // MCP and development processes never contact the update provider.
+  const supportedInstallation = supportsIntegratedUpdates({
+    isPackaged: app.isPackaged, platform: process.platform, resourcesPath: process.resourcesPath,
+    executablePath: process.execPath, appImage: process.env.APPIMAGE, exists: existsSync
+  });
+  let updater: (typeof import("electron-updater"))["autoUpdater"] | null = null;
+  if (supportedInstallation) {
+    try { updater = (await import("electron-updater")).default.autoUpdater; }
+    catch (error) { console.error("Não foi possível iniciar o atualizador:", error); }
+  }
+  appUpdates = createAppUpdateService({
+    updater,
+    currentVersion: app.getVersion(),
+    canInstall: () => projectSaves.pending() === 0 && canRestartForAppUpdate(BrowserWindow.getAllWindows()
+      .filter((window) => windowCloseGuards.has(window))
+      .map((window) => windowDocumentStates.get(window))),
+    changed: (state) => {
+      for (const window of BrowserWindow.getAllWindows()) {
+        if (windowCloseGuards.has(window) && !window.webContents.isLoading()) window.webContents.send(ipcChannels.appUpdateState, state);
+      }
+    }
+  });
+  const fromEditor = (event: Electron.IpcMainInvokeEvent) => {
+    const window = BrowserWindow.fromWebContents(event.sender);
+    if (!window || !windowCloseGuards.has(window) || event.senderFrame !== event.sender.mainFrame) throw new Error("Janela não autorizada.");
+    return appUpdates!;
+  };
+  ipcMain.handle(ipcChannels.getAppUpdateState, (event) => fromEditor(event).state());
+  ipcMain.handle(ipcChannels.checkAppUpdates, (event) => fromEditor(event).check());
+  ipcMain.handle(ipcChannels.downloadAppUpdate, (event) => fromEditor(event).download());
+  ipcMain.handle(ipcChannels.installAppUpdate, (event) => fromEditor(event).install());
+  if (updater) {
+    const startupCheck = setTimeout(() => void appUpdates?.check(), 15_000);
+    const periodicCheck = setInterval(() => void appUpdates?.check(), 6 * 60 * 60 * 1_000);
+    startupCheck.unref(); periodicCheck.unref();
+    app.once("will-quit", () => { clearTimeout(startupCheck); clearInterval(periodicCheck); });
+  }
   registerDesktopAssetProtocol(desktopAssetProjectRoots);
   registerTranslationModelProtocol();
   registerTranslationPackIpcHandlers();

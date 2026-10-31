@@ -119,6 +119,7 @@
     "dist:mac:x64": "node scripts/package-macos.mjs --arch x64"
   },
   "build": {
+    "publish": [{ "provider": "github", "owner": "memory-pak-labs", "repo": "gba-studio" }],
     "afterPack": "./scripts/after-pack-macos.mjs",
     "appId": "br.com.gbastudio.desktop",
     "productName": "GBA Studio",

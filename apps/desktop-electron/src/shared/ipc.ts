@@ -8,6 +8,7 @@ import type { ProjectBudgetAnalysisResult } from "./projectBudget.js";
 import type { InputReplay } from "./inputReplay.js";
 import type { GBAKeyboardBindings } from "./gbaControls.js";
 import type { TranslationPackStatus } from "./translationPacks.js";
+import type { AppUpdateResult, AppUpdateState } from "./appUpdates.js";
 
 export type AppCommand =
   | "project:open"
@@ -20,6 +21,7 @@ export type AppCommand =
   | "engine:export"
   | "edit:undo"
   | "edit:redo"
+  | "app:check-updates"
   | "window:request-close";
 
 export interface OpenProjectResult {
@@ -493,6 +495,11 @@ export interface DownloadTranslationPackResult {
 export interface GBAStudioDesktopAPI {
   setAppLocale?(locale: string): Promise<void>;
   platform: NodeJS.Platform;
+  getAppUpdateState(): Promise<AppUpdateState>;
+  checkAppUpdates(): Promise<AppUpdateState>;
+  downloadAppUpdate(): Promise<AppUpdateState>;
+  installAppUpdate(): Promise<AppUpdateResult>;
+  onAppUpdateState(listener: (state: AppUpdateState) => void): () => void;
   getWindowFullscreen(): Promise<boolean>;
   onWindowFullscreenChange(listener: (fullscreen: boolean) => void): () => void;
   onAppCommand(listener: (command: AppCommand) => void): () => void;
@@ -539,6 +546,11 @@ export interface GBAStudioDesktopAPI {
 }
 
 export const ipcChannels = {
+  appUpdateState: "app:update-state",
+  getAppUpdateState: "app:get-update-state",
+  checkAppUpdates: "app:check-updates",
+  downloadAppUpdate: "app:download-update",
+  installAppUpdate: "app:install-update",
   setAppLocale: "app:set-locale",
   appCommand: "app:command",
   confirmWindowClose: "window:confirm-close",
