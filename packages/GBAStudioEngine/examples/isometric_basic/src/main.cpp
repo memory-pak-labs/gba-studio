@@ -2614,6 +2614,8 @@ int initialize_isometric_runtime() {
     authored_background_map_loaded = false;
     iso_paged_window = {};
     gbs::init();
+    // Standalone ROMs bypass the mixed-runtime dispatcher.
+    gbs::debug_set_runtime_kind(GBS_DIALOGUE_UI_RUNTIME_KIND);
     gbs::reset_runtime_telemetry();
     runtime_room_change_count = 0;
     gbs::set_backdrop_color(project.backdrop_color);

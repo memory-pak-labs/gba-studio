@@ -497,6 +497,8 @@ void draw_nodes() {
 
 int initialize_world_map_runtime() {
     gbs::init();
+    // Standalone ROMs bypass the mixed-runtime dispatcher.
+    gbs::debug_set_runtime_kind(GBS_DIALOGUE_UI_RUNTIME_KIND);
     gbs::init_dialogue(dialogue);
     gbs::init_event_state(event_state);
     gbs::bind_event_scripts(event_state, project.scripts, project.script_count);

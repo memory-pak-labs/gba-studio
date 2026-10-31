@@ -1827,6 +1827,8 @@ void draw_scene() {
 
 int initialize_shmup_runtime() {
     gbs::init();
+    // Standalone ROMs bypass the mixed-runtime dispatcher.
+    gbs::debug_set_runtime_kind(GBS_DIALOGUE_UI_RUNTIME_KIND);
     gbs::reset_runtime_telemetry();
     runtime_last_wave = -1;
     runtime_wave_change_count = 0;

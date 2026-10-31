@@ -1639,6 +1639,8 @@ void draw_platformer_room_layers(
 
 int initialize_platformer_runtime() {
     gbs::init();
+    // Standalone ROMs bypass the mixed-runtime dispatcher.
+    gbs::debug_set_runtime_kind(GBS_DIALOGUE_UI_RUNTIME_KIND);
     gbs::reset_runtime_telemetry();
     runtime_trigger_enter_count = 0;
     runtime_trigger_leave_count = 0;

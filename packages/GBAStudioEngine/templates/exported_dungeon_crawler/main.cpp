@@ -1283,6 +1283,8 @@ void perform_action(const gbs::InputState& input) {
 
 int initialize_dungeon_crawler_runtime() {
     gbs::init();
+    // Standalone ROMs bypass the mixed-runtime dispatcher.
+    gbs::debug_set_runtime_kind(GBS_DIALOGUE_UI_RUNTIME_KIND);
     gbs::init_dialogue(dungeon_dialogue);
     gbs::init_dialogue(interaction_dialogue);
     gbs::init_dialogue(map_dialogue);

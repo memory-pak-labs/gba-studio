@@ -1353,6 +1353,8 @@ bool restart_standalone_battle_from_transition() {
 
 int initialize_battle_rpg_runtime() {
     gbs::init();
+    // Standalone ROMs bypass the mixed-runtime dispatcher.
+    gbs::debug_set_runtime_kind(GBS_DIALOGUE_UI_RUNTIME_KIND);
     gbs::configure_dialogue_portraits(gbastudio_battle_rpg_project::dialogue_portrait_assets,
         gbastudio_battle_rpg_project::dialogue_portrait_asset_count);
     gbs::init_dialogue(dialogue);

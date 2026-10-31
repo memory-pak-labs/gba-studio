@@ -675,6 +675,8 @@ void advance_scene_if_ready() {
 
 int initialize_visual_novel_runtime() {
     gbs::init();
+    // Standalone ROMs bypass the mixed-runtime dispatcher.
+    gbs::debug_set_runtime_kind(GBS_DIALOGUE_UI_RUNTIME_KIND);
     /* Visual novel scenes do not render room actors through this runtime;
      * the active dialogue portrait is the only OAM element used here. */
     gbs::hide_all_sprites();

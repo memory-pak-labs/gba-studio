@@ -719,6 +719,8 @@ bool run_button_event_binding() {
 
 int initialize_point_click_runtime() {
     gbs::init();
+    // Standalone ROMs bypass the mixed-runtime dispatcher.
+    gbs::debug_set_runtime_kind(GBS_DIALOGUE_UI_RUNTIME_KIND);
     gbs::reset_runtime_telemetry();
     runtime_last_scene = -1;
     runtime_scene_change_count = 0;

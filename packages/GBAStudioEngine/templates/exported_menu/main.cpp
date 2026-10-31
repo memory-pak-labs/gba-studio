@@ -1840,6 +1840,8 @@ void activate_selection() {
 
 int initialize_menu_runtime() {
     gbs::init();
+    // Standalone ROMs bypass the mixed-runtime dispatcher.
+    gbs::debug_set_runtime_kind(GBS_DIALOGUE_UI_RUNTIME_KIND);
     gbs::init_dialogue(dialogue);
     gbs::init_menu(menu_ui);
     gbs::init_hud(hud);

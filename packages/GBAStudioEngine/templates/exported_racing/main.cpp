@@ -1016,6 +1016,8 @@ gbs::RacingInput racing_input(const gbs::InputState& input) {
 int initialize_racing_runtime() {
     hud_position_cache = {};
     gbs::init();
+    // Standalone ROMs bypass the mixed-runtime dispatcher.
+    gbs::debug_set_runtime_kind(GBS_DIALOGUE_UI_RUNTIME_KIND);
     gbs::init_dialogue(dialogue);
     gbs::configure_dialogue_portraits(gbastudio_racing_project::dialogue_portrait_assets,
         gbastudio_racing_project::dialogue_portrait_asset_count);
