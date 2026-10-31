@@ -22,6 +22,9 @@ describe('approved campaign extensions survive regeneration',()=>{
   const extraConnections=project=>project.editorState.scenaConnections.filter(c=>extraNames.has(c.from)||extraNames.has(c.to));
   expect(extraConnections(before).length).toBeGreaterThan(0);
   expect(extraConnections(after)).toEqual(extraConnections(before));
+  const raceSources=new Set(['arena_arrancada','mapa_rota','circuito_final','circuito_perspectiva']);
+  const raceConnections=project=>project.editorState.scenaConnections.filter(c=>raceSources.has(c.from));
+  expect(raceConnections(after)).toEqual(raceConnections(before));
   for(const key of ['scenas','actors','events','assets','animations','animationStates']) {
    const ids=new Set(after[key].map(item=>item.id));
    expect(before[key].filter(item=>!ids.has(item.id))).toEqual([]);
