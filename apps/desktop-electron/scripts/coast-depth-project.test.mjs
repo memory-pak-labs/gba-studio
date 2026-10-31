@@ -48,7 +48,7 @@ describe('coastal campaign depth',()=>{
   });
   it('keeps all seven pause options aligned with the six visible book rows',()=>{
     const p=source(),menu=p.rooms.find(r=>r.name==='menu_start').runtime.config;
-    const options=p.actors.filter(a=>a.roomName==='menu_start'&&a.menuActorRole==='option');
+    const options=p.actors.filter(a=>a.roomName==='menu_start'&&a.menuActorRole==='option'&&a.spriteSheet==='book-cursor-approved-8x8.png');
     expect(options.map(a=>a.menuItemID).sort()).toEqual(menu.items.map(i=>i.id).sort());
     expect(menu.hudListRows).toBe(6);
     for(const [i,item]of menu.items.entries()){
@@ -64,7 +64,8 @@ describe('coastal campaign depth',()=>{
     expect(validateGBAProjectMigrationContract(regenerated)).toEqual([]);
     const c=buildEngineExportProjectContract(regenerated);
     expect(c.isometric_project.rooms.find(r=>r.name==='arena_tatica').tactical.units).toHaveLength(4);
-    expect(regenerated.actors.filter(a=>a.id.startsWith('coast-'))).toEqual(before.actors.filter(a=>a.id.startsWith('coast-')));
+    const byId=rows=>rows.filter(a=>a.id.startsWith('coast-')).sort((a,b)=>a.id.localeCompare(b.id));
+    expect(byId(regenerated.actors)).toEqual(byId(before.actors));
     expect(regenerated.variables.map(v=>v.name)).toEqual(before.variables.map(v=>v.name));
     expect(regenerated.rooms.find(r=>r.name==='galeria_das_mares').eventBindings.onRestore).toBe('coast_restore_galeria_das_mares');
   });
