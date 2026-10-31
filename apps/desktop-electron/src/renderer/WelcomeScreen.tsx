@@ -1,7 +1,7 @@
 import { uiText as ui, useStudioUiText } from "./studioUiText";
 import React, { useEffect, useRef, useState } from "react";
 import type { RecentProjectEntry } from "../shared/ipc";
-import { projectTemplateDefinitions, type ProjectTemplateID } from "../shared/projectTemplates";
+import { EXEMPLO_GBA_SCENE_COUNT, projectTemplateDefinitions, type ProjectTemplateID } from "../shared/projectTemplates";
 import { welcomeIconURL } from "./brandingAssets";
 import { StudioLanguageSwitcher, useStudioI18n, type StudioTranslationKey } from "./i18n";
 import { StudioThemeToggle } from "./StudioThemeToggle";
@@ -176,7 +176,7 @@ export function WelcomeScreen({
                   <span className="welcome-template-icon" aria-hidden="true">{template.icon}</span>
                 )}
                 <strong>{title}</strong>
-                <small>{t(`template.${template.id}.detail` as StudioTranslationKey)}</small>
+                <small>{t(`template.${template.id}.detail` as StudioTranslationKey, { count: EXEMPLO_GBA_SCENE_COUNT })}</small>
               </button>
             );
           })}

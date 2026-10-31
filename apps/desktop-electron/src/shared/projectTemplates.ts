@@ -9,6 +9,8 @@ import { blankSceneHudContent } from "./blankSceneHudDefaults.js";
 import { blankBackgroundContent, BLANK_BACKGROUND_DEFAULTS_PROFILE } from "./blankBackgroundDefaults.js";
 import exemploGBAProjectRaw from "../../default-assets/templates/exemplo-gba/exemplo-gba.gba-project?raw";
 
+export const EXEMPLO_GBA_SCENE_COUNT = (JSON.parse(exemploGBAProjectRaw) as { scenas: unknown[] }).scenas.length;
+
 export type ProjectTemplateID = "exemplo-gba" | "blank";
 
 export interface ProjectTemplateDefinition {
