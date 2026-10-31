@@ -8758,6 +8758,7 @@ function verticeOrderedScenes(campaignScenes, supportScenes) {
 
 const APPROVED_EXTRA_MENU_SCENES = new Set(["corrida_preparacao", "corrida_resultados", "inventario_ferramentas"]);
 const APPROVED_MENU_SCENES = new Set([...APPROVED_EXTRA_MENU_SCENES, "menu_start", "inventario"]);
+const APPROVED_ACTOR_SCENES = new Set([...APPROVED_MENU_SCENES, "porto_lumen"]);
 const APPROVED_RACE_EVENT_SCENES = new Set(["corrida_preparacao", "corrida_resultados", "inventario_ferramentas", "mapa_rota", "mercado_suspenso", "arena_tatica", "circuito_final", "circuito_perspectiva"]);
 
 export function isVerticeShowcaseProject(data) {
@@ -9045,8 +9046,8 @@ export function promoteExemploGBAVerticeCampaign(data) {
     const authored = (data[key] ?? extraScenes).filter(scene => APPROVED_MENU_SCENES.has(scene?.name));
     result[key] = merge(result[key], authored, "name");
   }
-  result.actors = merge((result.actors ?? []).filter(actor => !APPROVED_MENU_SCENES.has(actor?.roomName)),
-    (data.actors ?? []).filter(actor => APPROVED_MENU_SCENES.has(actor?.roomName)), "id");
+  result.actors = merge((result.actors ?? []).filter(actor => !APPROVED_ACTOR_SCENES.has(actor?.roomName)),
+    (data.actors ?? []).filter(actor => APPROVED_ACTOR_SCENES.has(actor?.roomName)), "id");
   result.events = merge(result.events, (data.events ?? []).filter(event => APPROVED_MENU_SCENES.has(event?.roomName)
     || APPROVED_RACE_EVENT_SCENES.has(event?.roomName) || event?.name?.startsWith("race_") || event?.name === "nara_configurar_corrida"), "name");
   const seenEventNames = new Set();
@@ -9060,9 +9061,12 @@ export function promoteExemploGBAVerticeCampaign(data) {
   const authoredReferences = JSON.stringify([...(data.scenas ?? []).filter(scene => APPROVED_MENU_SCENES.has(scene?.name)), ...(data.actors ?? []).filter(actor => APPROVED_MENU_SCENES.has(actor?.roomName))]);
   result.assets = merge(result.assets, (data.assets ?? []).filter(asset => asset?.name && authoredReferences.includes(asset.name)), "id");
   // Retain approved source resources that the restored scenes may reference.
-  for (const key of ["assets", "animations", "animationStates"]) {
+  const sourceAssets = (data.assets ?? []).filter(asset => typeof asset?.metadata?.source === "string" && asset.metadata.source.length > 0);
+  const sourceAssetNames = new Set(sourceAssets.map(asset => asset.name));
+  for (const [key, additions] of [["assets", sourceAssets], ["animations", data.animations ?? []], ["animationStates", data.animationStates ?? []]]) {
     const known = new Set((result[key] ?? []).map(item => item.id));
-    result[key] = [...(result[key] ?? []), ...(data[key] ?? []).filter(item => !known.has(item.id)).map(item => structuredClone(item))];
+    result[key] = [...(result[key] ?? []), ...additions.filter(item => !known.has(item.id)
+      && (key === "assets" || sourceAssetNames.has(item.spriteSheet))).map(item => structuredClone(item))];
   }
   const sourcePositions = data.editorState?.sceneMapPositions ?? {};
   result.editorState = result.editorState ?? {};
