@@ -134,6 +134,8 @@ export function embeddedRuntimeArchitecture(environment = process.env) {
 }
 
 export function preserveToolchainSymlinks(source) {
+  const symlinkSafeDefinition = "def absolute_path(value):\n    return Path(os.path.abspath(Path(value).expanduser()))\n";
+  if (source.includes(symlinkSafeDefinition)) return source;
   const absolutePathDefinition = "def absolute_path(value):\n    return Path(value).expanduser().resolve()\n";
   if (!source.includes(absolutePathDefinition)) {
     throw new Error("gbsbuild.py nao possui a definicao esperada de absolute_path().");
