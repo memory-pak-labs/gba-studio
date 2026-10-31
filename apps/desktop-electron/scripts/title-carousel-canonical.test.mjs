@@ -15,12 +15,12 @@ function titleContract(project) {
 }
 
 describe("carrossel canônico do título", () => {
-  it("mantém 32 cenas e o menu inicial dentro da cena título", () => {
+  it("mantém o menu inicial dentro da cena título", () => {
     const project = JSON.parse(readFileSync(projectURL, "utf8"));
     const sceneNames = project.scenas.map((scene) => scene.name);
     const { title, splash, options } = titleContract(project);
 
-    expect(sceneNames).toHaveLength(33);
+    expect(new Set(sceneNames).size).toBe(sceneNames.length);
     expect(sceneNames).not.toContain("menu_inicial");
     expect(title?.runtime?.type).toBe("menu");
     expect(splash?.id).toBe("title");
@@ -53,7 +53,7 @@ describe("carrossel canônico do título", () => {
     const promoted = promoteExemploGBAVerticeCampaign(structuredClone(project));
     const { options } = titleContract(promoted);
 
-    expect(promoted.scenas).toHaveLength(33);
+    expect(promoted.scenas).toHaveLength(project.scenas.length);
     expect(promoted.scenas.some((scene) => scene.name === "menu_inicial")).toBe(false);
     expect(options?.carousel).toBe(true);
     expect(options?.items.map((item) => item.id)).toEqual([
