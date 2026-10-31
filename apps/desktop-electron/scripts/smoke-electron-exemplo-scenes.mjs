@@ -3949,9 +3949,9 @@ async function captureBattleMenuRegion(cdp, sceneName, step) {
   const screenshotPath = await capturePlayerScreenshot(cdp, `${sceneName}_battle_${step}`);
   // Compare intrinsic GBA pixels, not screenshot pixels: the Electron window
   // can move its scaled canvas by a physical pixel when input restores focus.
-  const regionWidth = 84;
+  const regionWidth = 240;
   const regionHeight = 44;
-  const regionX = 154;
+  const regionX = 0;
   const regionY = 114;
   const regionBase64 = await evaluate(cdp, `(() => {
     const canvas = window.GBAStudioDirectPlayer?.canvas;
@@ -3969,8 +3969,10 @@ async function captureBattleMenuRegion(cdp, sceneName, step) {
   }
   const region = Buffer.from(regionBase64, "base64");
   let lowerChoiceInk = 0;
-  for (let y = 22; y < 32; y += 1) {
-    for (let x = 0; x < regionWidth; x += 1) {
+  // The current attack submenu has two entries. The third row distinguishes
+  // the four-option root menu without mistaking TECNICA for a root item.
+  for (let y = 27; y < 33; y += 1) {
+    for (let x = 154; x < 238; x += 1) {
       const offset = (y * regionWidth + x) * 4;
       if (region[offset] > 180 && region[offset + 1] > 180 && region[offset + 2] > 180) {
         lowerChoiceInk += 1;
@@ -5694,6 +5696,16 @@ async function main() {
         for(let page=0;page<3;page++) {
           await pressPlayerButton(playerCdp,faceButtons.a.code,faceButtons.a.key,faceButtons.a.windowsVirtualKeyCode,120);
           await wait(200);
+        }
+      }
+      if (scene.name === 'guardiao_rele') {
+        // The opening dialogue nameplate covers Nara. Advance the authored
+        // message before comparing her unobstructed framebuffer pixels.
+        await waitForPlayerPlaybackReady(playerCdp);
+        await wait(750);
+        for (let page = 0; page < 2; page++) {
+          await pressPlayerButton(playerCdp, faceButtons.a.code, faceButtons.a.key, faceButtons.a.windowsVirtualKeyCode, 120);
+          await wait(300);
         }
       }
       // Observe readiness without serializing a framebuffer/save state. CDP
