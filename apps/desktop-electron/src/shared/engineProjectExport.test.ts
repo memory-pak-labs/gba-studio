@@ -1708,8 +1708,8 @@ describe("Engine project export", () => {
 
     expect(sorted.map((animation) => animation.name)).toEqual([
       "idle_down",
-      "idle_up",
       "idle_right",
+      "idle_up",
       "idle_left"
     ]);
   });
@@ -1726,11 +1726,11 @@ describe("Engine project export", () => {
 
     expect(sorted.map((animation) => animation.name)).toEqual([
       "idle_down",
-      "idle_up",
       "idle_right",
+      "idle_up",
       "walk_down",
-      "walk_up",
-      "walk_right"
+      "walk_right",
+      "walk_up"
     ]);
   });
 
@@ -1851,9 +1851,10 @@ describe("Engine project export", () => {
 
     expect(exportFields?.animations?.map((animation) => animation.name)).toEqual([
       "view_down", "view_right", "view_up", "view_left",
-      "moving_view_down", "moving_view_right", "moving_view_up", "moving_view_left"
+      "moving_view_down", "moving_view_right", "moving_view_up", "moving_view_left",
+      "idle_down", "idle_right", "idle_up", "idle_left",
+      "walk_down", "walk_right", "walk_up", "walk_left"
     ]);
-    expect(exportFields?.animations?.map((animation) => animation.name).some((name) => name.startsWith("walk_"))).toBe(false);
   });
 
   it("exports fixed SpriteState names so events can switch an actor between authored states", () => {
