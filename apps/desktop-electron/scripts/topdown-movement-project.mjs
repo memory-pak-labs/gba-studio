@@ -1,4 +1,4 @@
-const playerSheet = 'porto-nara-animations48.png';
+const playerSheets = new Set(['porto-nara-animations48.png', 'nara-topdown-walk-run-v1.png']);
 
 function widenStairLanding(sequence, width) {
   if (!sequence) return sequence;
@@ -21,7 +21,7 @@ function widenStairLanding(sequence, width) {
 export function refineExampleTopdownMovement(source) {
   const p = structuredClone(source);
   p.settings.topdown = { ...p.settings.topdown, movementType: '8 direcoes', allowDiagonal: true, normalizeDiagonal: true, directionalAnimation: '4-way animation' };
-  for (const animation of p.animations) if (animation.spriteSheet === playerSheet)
+  for (const animation of p.animations) if (playerSheets.has(animation.spriteSheet))
     Object.assign(animation, { hitboxX: 0, hitboxY: 0, hitboxWidth: 16, hitboxHeight: 8 });
   const update = r => {
     if (r.name !== 'porto_lumen' || r.width !== 126 || r.height !== 86) return r;

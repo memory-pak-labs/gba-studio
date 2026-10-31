@@ -10,8 +10,8 @@ const source = () => parseGBAProjectFile(readFileSync(new URL('../default-assets
 it('uses an eight-way player with a shallow foot box in the three approved topdown rooms', () => {
   const p = source();
   expect(p.settings.topdown).toMatchObject({ allowDiagonal: true, normalizeDiagonal: true, movementType: '8 direcoes', directionalAnimation: '4-way animation' });
-  const nara = p.animations.filter(a => a.spriteSheet === 'porto-nara-animations48.png');
-  expect(nara).toHaveLength(8);
+  const nara = p.animations.filter(a => a.spriteSheet === 'nara-topdown-walk-run-v1.png');
+  expect(nara).toHaveLength(12);
   for (const a of nara) expect(a).toMatchObject({ hitboxX: 0, hitboxY: 0, hitboxWidth: 16, hitboxHeight: 8 });
   const exported = buildEngineExportProjectContract(expandProjectTilemaps(p)).topdown_project;
   expect(exported.player).toMatchObject({ allow_diagonal: true, size: { x: 16, y: 8 }, collision_offset: { x: 0, y: 0 } });
@@ -31,7 +31,7 @@ it('is idempotent and preserves artwork, actors, HUD, events and unrelated scene
   expect(result.settings.hudPresets).toEqual(p.settings.hudPresets);
   const old = structuredClone(p);
   old.settings.topdown.allowDiagonal = false;
-  for (const a of old.animations) if (a.spriteSheet === 'porto-nara-animations48.png') Object.assign(a, { hitboxY: -8, hitboxHeight: 16 });
+  for (const a of old.animations) if (a.spriteSheet === 'nara-topdown-walk-run-v1.png') Object.assign(a, { hitboxY: -8, hitboxHeight: 16 });
   const revised = refineExampleTopdownMovement(old);
   expect(revised).toEqual(p);
 });
