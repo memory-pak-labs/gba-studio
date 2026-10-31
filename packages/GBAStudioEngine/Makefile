@@ -2046,6 +2046,7 @@ $(HOST_BUILD)/hud_gauge_tests: tests/host/hud_gauge_tests.cpp engine/include/gbs
 luta-authored-hud-test:
 	python3 tests/host/luta_authored_hud_tests.py
 	python3 tests/host/luta_action_audio_export_tests.py
+	python3 tests/host/luta_resource_queue_tests.py
 
 .PHONY: hud-racing-test
 host-test: hud-racing-test

@@ -387,14 +387,33 @@ bool stream_stage_resource_group(const gbs::LutaStageData& stage) {
     if (group.bank_count == 0) {
         return false;
     }
-    return gbs::stream_resource_bank_group_with_uploads(
-        resource_manager,
-        active_resource_bank_group,
-        scratch_resource_bank_group,
-        group,
-        project.resource_bank_upload_sources,
-        project.resource_bank_upload_source_count
-    ).success;
+    bool waited_for_queue = false;
+    for (;;) {
+        const gbs::ResourceStreamResult result = gbs::stream_resource_bank_group_with_uploads(
+            resource_manager,
+            active_resource_bank_group,
+            scratch_resource_bank_group,
+            group,
+            project.resource_bank_upload_sources,
+            project.resource_bank_upload_source_count
+        );
+        if (result.success) {
+            // A drain can finish the previous publication transaction. Keep
+            // the newly queued arena hidden until its uploads also finish.
+            if (waited_for_queue) gbs::begin_render_publication_transaction();
+            return true;
+        }
+        // UI uploads can temporarily fill the queue before the arena is
+        // admitted. Drain them while publication is hidden, then retry.
+        // An oversized group or a stalled DMA must still fail explicitly.
+        if (result.status != gbs::ResourceStreamStatus::DmaQueueFull ||
+            gbs::dma_vblank_queue_count() == 0) return false;
+        const size_t before = gbs::dma_vblank_queue_stats().queued_bytes;
+        gbs::begin_render_publication_transaction();
+        gbs::wait_vblank();
+        waited_for_queue = true;
+        if (gbs::dma_vblank_queue_stats().queued_bytes >= before) return false;
+    }
 }
 
 void write_three_digits(char* text, uint16_t value) {
