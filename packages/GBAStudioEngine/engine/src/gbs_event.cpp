@@ -1671,7 +1671,16 @@ bool consume_runtime_transition(
         runtime_transition.target != runtime) {
         return false;
     }
+    // Script tables and motion support belong to the destination runtime.
+    // They can differ even when both runtimes share the same project, because
+    // exported script tables omit scripts unused by that particular runtime.
+    const EventScript* const destination_scripts = state.project_scripts;
+    const size_t destination_script_count = state.project_script_count;
+    const bool destination_temporal_actor_motion = state.supports_temporal_actor_motion;
     state = runtime_transition.event_state;
+    state.project_scripts = destination_scripts;
+    state.project_script_count = destination_script_count;
+    state.supports_temporal_actor_motion = destination_temporal_actor_motion;
     room = runtime_transition.room;
     player_x = runtime_transition.player_x;
     player_y = runtime_transition.player_y;

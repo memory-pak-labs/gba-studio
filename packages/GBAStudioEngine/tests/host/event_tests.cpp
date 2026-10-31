@@ -1819,6 +1819,13 @@ void test_cross_runtime_warp_preserves_target_position_and_variables() {
         gbs::EventState source_state {};
         gbs::init_event_state(source_state);
         source_state.variables[3] = 42;
+        const bool target_supports_temporal_motion = runtime == gbs::RuntimeKind::Platformer;
+        source_state.supports_temporal_actor_motion = !target_supports_temporal_motion;
+        const gbs::EventCommand source_commands[] = {
+            {gbs::EventOp::SetVariable, 4, 11, 0}
+        };
+        const gbs::EventScript source_scripts[] = {{source_commands, 1}};
+        gbs::bind_event_scripts(source_state, source_scripts, 1);
 
         const int packed_target = (static_cast<int>(runtime) << 12) | room;
         const gbs::EventCommand commands[] = {
@@ -1837,6 +1844,12 @@ void test_cross_runtime_warp_preserves_target_position_and_variables() {
 
         gbs::EventState target_state {};
         gbs::init_event_state(target_state);
+        const gbs::EventCommand target_commands[] = {
+            {gbs::EventOp::SetVariable, 4, 22, 0}
+        };
+        const gbs::EventScript target_scripts[] = {{target_commands, 1}};
+        gbs::bind_event_scripts(target_state, target_scripts, 1);
+        target_state.supports_temporal_actor_motion = target_supports_temporal_motion;
         int target_room = -1;
         int target_x = -1;
         int target_y = -1;
@@ -1845,6 +1858,12 @@ void test_cross_runtime_warp_preserves_target_position_and_variables() {
         assert(target_x == x);
         assert(target_y == y);
         assert(target_state.variables[3] == 42);
+        assert(target_state.supports_temporal_actor_motion == target_supports_temporal_motion);
+        const gbs::EventCommand call_target[] = {
+            {gbs::EventOp::CallScript, 0, 0, 0}, {gbs::EventOp::End, 0, 0, 0}
+        };
+        gbs::run_event_script(target_state, call_target, 2);
+        assert(target_state.variables[4] == 22);
         assert(!gbs::runtime_transition_pending());
     };
 
