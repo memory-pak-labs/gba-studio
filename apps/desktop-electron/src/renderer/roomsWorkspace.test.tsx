@@ -615,7 +615,7 @@ describe("RoomsWorkspace React smoke", () => {
     const sceneEvents = screen.getByLabelText("Eventos da cena arena");
     expect(within(sceneEvents).getByRole("combobox", { name: "Estado do evento" })).toBeInTheDocument();
     expect(sceneEvents).toHaveTextContent("Ao iniciar");
-    expect(sceneEvents).not.toHaveTextContent("Ao acertar Player");
+    expect(sceneEvents).toHaveTextContent("Ao acertar Player");
     expect(sceneEvents).toHaveTextContent("Ao vencer");
     expect(sceneEvents).toHaveTextContent("Ao perder");
     expect(sceneEvents).toHaveTextContent("Ao fugir");

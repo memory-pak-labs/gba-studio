@@ -609,7 +609,7 @@ describe("EventsWorkspace React smoke", () => {
     await user.click(screen.getByRole("tab", { name: "Mapa" }));
     await user.click(screen.getByRole("button", { name: "Contexto Cena: arena" }));
     expect(screen.getByLabelText("Ao iniciar de Cena: arena")).toBeInTheDocument();
-    expect(screen.queryByLabelText("Ao acertar Player de Cena: arena")).not.toBeInTheDocument();
+    expect(screen.getByLabelText("Ao acertar Player de Cena: arena")).toBeInTheDocument();
     expect(screen.getByLabelText("Ao vencer de Cena: arena")).toBeInTheDocument();
     expect(screen.getByLabelText("Ao perder de Cena: arena")).toBeInTheDocument();
     expect(screen.getByLabelText("Ao fugir de Cena: arena")).toBeInTheDocument();

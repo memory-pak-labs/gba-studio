@@ -1517,9 +1517,8 @@ describe("Events workspace presentation", () => {
     const playerNode = presentation.graphNodes.find((node) => node.targetName === "Player");
     expect(roomNode?.contextBindingSlots.map((slot) => slot.bindingKey)).toEqual(["onInit", "onRestore", "onHitPlayer", "onExit", "onInteract"]);
     expect(roomNode?.pendingBindingCount).toBe(6);
-    expect(battleNode?.contextBindingSlots.map((slot) => slot.bindingKey)).toEqual(["onInit", "onVictory", "onDefeat", "onEscape"]);
-    expect(battleNode?.contextBindingSlots.some((slot) => slot.bindingKey === "onHitPlayer")).toBe(false);
-    expect(battleNode?.pendingBindingCount).toBe(4);
+    expect(battleNode?.contextBindingSlots.map((slot) => slot.bindingKey)).toEqual(["onInit", "onVictory", "onDefeat", "onEscape", "onHitPlayer"]);
+    expect(battleNode?.pendingBindingCount).toBe(5);
     expect(presentation.bindingTargets.map((target) => target.id)).not.toContain("room:arena:onHitGroup3");
     expect(presentation.bindingTargets.map((target) => target.id)).not.toContain("room:arena:onHitGroup2");
     expect(playerNode?.contextBindingSlots.find((slot) => slot.bindingKey === "onInteract")?.eventName).toBe("player_start");
