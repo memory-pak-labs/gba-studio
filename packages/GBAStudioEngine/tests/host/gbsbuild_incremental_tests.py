@@ -63,6 +63,19 @@ else:
 FAKE = FAKE.replace("#!/usr/bin/env python3", "#!" + sys.executable, 1)
 
 class IncrementalBuildTests(unittest.TestCase):
+    @unittest.skipIf(os.name == "nt", "directory symlink privileges vary on Windows")
+    def test_absolute_path_preserves_space_free_symlink(self):
+        target = self.root / "disk with spaces"
+        target.mkdir()
+        alias = self.root / "alias"
+        alias.symlink_to(target, target_is_directory=True)
+        spec = importlib.util.spec_from_file_location("gbsbuild_symlink_test", TOOL)
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+        self.assertEqual(module.absolute_path(str(alias)), alias.absolute())
+        self.assertNotIn(" ", str(module.absolute_path(str(alias))))
+        self.assertTrue(module.absolute_path(str(alias)).is_dir())
+
     def test_bundled_shell_with_spaces_is_used_for_make_recipes(self):
         shell = self.root / "GBA Studio shell" / "bash"
         shell.parent.mkdir()

@@ -1,4 +1,4 @@
-import { chmod, mkdir, mkdtemp, readFile, readdir, stat, utimes, writeFile } from "node:fs/promises";
+import { chmod, mkdir, mkdtemp, readFile, readdir, stat, symlink, utimes, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -308,6 +308,25 @@ describe("Engine Pack doctor integration", () => {
     const build = await runGbsbuild({ enginePackPath, gbsbuildPath: buildPath, projectDir });
     expect(build.exitCode).toBe(0);
     expect(build.summary?.romPath).toBe(path.join(projectDir, "build", "space_rom.gba"));
+  });
+
+  it.skipIf(process.platform === "win32")("keeps a space-free temporary alias when the disk path has spaces", async () => {
+    const { enginePackPath, buildPath, root } = await makeSpacingSensitiveBuild();
+    const projectDir = path.join(root, "Project With Spaces");
+    await mkdir(projectDir);
+    await writeFile(path.join(projectDir, "gbastudio_project.json"), JSON.stringify({ build: { target: "alias" } }));
+    const backing = await mkdtemp(path.join(os.tmpdir(), "external disk with spaces "));
+    const aliasParent = await mkdtemp(path.join("/tmp", "gba-staging-alias-"));
+    temporaryRoots.push(backing, aliasParent);
+    const alias = path.join(aliasParent, "cache");
+    await symlink(backing, alias, "dir");
+    const temporarySpy = vi.spyOn(os, "tmpdir").mockReturnValue(alias);
+    try {
+      const result = await runGbsbuild({ enginePackPath, gbsbuildPath: buildPath, projectDir });
+      expect(result.error).toBeUndefined();
+      expect(result.stdout).toContain(`staged-project=${alias}/`);
+      expect(await readFile(path.join(projectDir, "build/alias.gba"), "utf8")).toBe("rom-bytes");
+    } finally { temporarySpy.mockRestore(); }
   });
 
   it("reuses its own staging and keeps timestamps without importing an old project ROM", async () => {

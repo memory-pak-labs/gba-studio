@@ -18,7 +18,7 @@ VARIANT_CACHE_BYTES = 512 * 1024 * 1024
 
 
 def absolute_path(value):
-    return Path(value).expanduser().resolve()
+    return Path(os.path.abspath(Path(value).expanduser()))
 
 
 def require_path(path, description):
