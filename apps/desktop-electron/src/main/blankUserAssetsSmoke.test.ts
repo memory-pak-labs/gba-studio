@@ -39,8 +39,14 @@ const sizes: Record<string, [number, number, number]> = {
   topdown: [8, 8, 3], platformer: [24, 40, 15], fighter: [64, 64, 15],
   "isometric-adventure": [48, 48, 7], "isometric-tactical": [32, 64, 15],
   shmup: [24, 24, 15], "point-click": [16, 32, 5],
-  "racing-topdown": [32, 16, 9], "racing-rear": [64, 32, 12], "shmup-explosion": [8, 16, 4]
+  "racing-topdown": [32, 16, 9], "racing-rear": [64, 32, 12], dungeon: [64, 64, 15], "shmup-explosion": [8, 16, 4]
 };
+
+it("has diagnostic sprite dimensions for every blank player family", () => {
+  for (const asset of [...catalog.players, ...catalog.effects]) {
+    expect(sizes[asset.family], asset.family).toBeDefined();
+  }
+});
 
 describe.skipIf(!process.env.GBA_USER_ASSETS_QA_OUTPUT)("blank user asset native matrix", () => {
   it("imports original patterns, saves/reopens and compiles every supported scene", async () => {
