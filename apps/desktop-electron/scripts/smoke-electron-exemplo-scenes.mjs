@@ -3729,12 +3729,15 @@ async function auditExportedRuntimePlayer(exportPath, exported, runtime, frame, 
   ]);
   const sourceSha256 = createHash("sha256").update(sourceBytes).digest("hex");
   const source = decodePngRgba(sourceBytes);
+  const approvedSource = approvedObjectPaletteSourceRgba(
+    source, canonicalTemplateAssetsByName.get(spec.assetName)?.metadata
+  );
   const sourceRgb555Colors = new Set();
-  for (let offset = 0; offset < source.pixels.length; offset += 4) {
-    if (source.pixels[offset + 3] === 0) continue;
-    const red = source.pixels[offset] >> 3;
-    const green = source.pixels[offset + 1] >> 3;
-    const blue = source.pixels[offset + 2] >> 3;
+  for (let offset = 0; offset < approvedSource.pixels.length; offset += 4) {
+    if (approvedSource.pixels[offset + 3] === 0) continue;
+    const red = approvedSource.pixels[offset] >> 3;
+    const green = approvedSource.pixels[offset + 1] >> 3;
+    const blue = approvedSource.pixels[offset + 2] >> 3;
     sourceRgb555Colors.add(red | (green << 5) | (blue << 10));
   }
   const spriteScale = runtime === "battleRpg"
@@ -3776,11 +3779,11 @@ async function auditExportedRuntimePlayer(exportPath, exported, runtime, frame, 
     frameIndex,
     frameWidth: spec.frameWidth,
     headerSource: header,
-    pixels: source.pixels,
+    pixels: approvedSource.pixels,
     sheetWidth: source.width,
     symbol: playerSymbol,
     transparentPaletteIndex: spec.transparentPaletteIndex ?? 0,
-    allowPaletteRemap: objectPaletteOverride !== null || spec.allowPaletteRemap === true
+    allowPaletteRemap: spec.colorMode !== "8bpp" && (objectPaletteOverride !== null || spec.allowPaletteRemap === true)
   }));
   const framebuffer = auditRgb555FramebufferColors({
     colorHistogram: frame?.colorHistogram,
