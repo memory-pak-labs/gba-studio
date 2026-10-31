@@ -1,13 +1,16 @@
 #include "gbs/profiler.hpp"
 #define GBS_DIALOGUE_UI_RUNTIME_KIND 7
 #include "gbs/engine.hpp"
+#include "gbs/dialogue_portrait.hpp"
 #include "gbs/input.hpp"
 #include "gbs/racing.hpp"
+#include "gbs/racing_challenge.hpp"
 #include "gbs/racing_minimap.hpp"
 #include "gbs/racing_animation.hpp"
 #include "gbs/render.hpp"
 #include "gbs/resource_manager.hpp"
 #include "gbs/runtime.hpp"
+#include "gbs/runtime_save_restore.hpp"
 #include "gbs/runtime_telemetry.hpp"
 #include "gbs/ui.hpp"
 #include "gbs/hud_racing.hpp"
@@ -22,7 +25,6 @@
 #define GBS_RACING_HOT_CODE
 #define GBS_RACING_RENDER_CODE
 #endif
-
 #include "gbs/visual_effects.hpp"
 #ifndef GBS_RACING_PROJECT_DATA_HEADER
 #define GBS_RACING_PROJECT_DATA_HEADER "racing_project_data.hpp"
@@ -57,6 +59,7 @@ namespace {
 const gbs::RacingProjectData& project = gbastudio_racing_project::project;
 int current_room_index = 0;
 gbs::RacingRuntimeState runtime_state {};
+gbs::RacingHudPositionCache hud_position_cache {};
 gbs::RacingInput previous_racing_controls {};
 uint16_t relocated_panorama_map[64*64] __attribute__((section(".ewram_bss"))) {};
 alignas(4) uint8_t racing_minimap_tiles[gbs::racing_minimap_bytes] __attribute__((section(".ewram_bss")));
@@ -65,6 +68,28 @@ gbs::Vec2i minimap_rival_positions[8] {};
 gbs::SpriteAnimatorState vehicle_animator {};
 const gbs::TileAsset* vehicle_loaded_frame = nullptr;
 gbs::DialogueState dialogue __attribute__((section(".ewram_bss")));
+
+void draw_racing_sprite(int index, gbs::Sprite sprite) {
+    if (dialogue.visible && sprite.priority == 0) sprite.priority = 1;
+    gbs::set_sprite(index, sprite);
+}
+
+void draw_racing_metasprite(int first_index, const gbs::MetaSprite& metasprite, gbs::Vec2i position) {
+    if (!dialogue.visible) {
+        gbs::set_metasprite(first_index, metasprite, position);
+        return;
+    }
+    for (uint8_t index = 0; index < metasprite.part_count; ++index) {
+        const auto& part = metasprite.parts[index];
+        draw_racing_sprite(first_index + index, gbs::Sprite {
+            position.x + part.x, position.y + part.y, part.tile_index,
+            part.palette, part.hflip, part.vflip, true, 0,
+            gbs::SpriteRenderMode::Normal, false, part.width, part.height,
+            false, false, 0, part.color_depth
+        });
+    }
+}
+
 gbs::EventState event_state __attribute__((section(".ewram_bss")));
     gbs::EventRunner runtime_event_runner {};
     uint32_t runtime_save_sequence = 0;
@@ -86,7 +111,7 @@ gbs::Vec2i previous_pseudo3d_player_marker { -1, -1 };
     gbs::Vec2i previous_pseudo3d_rival_marker { -1, -1 };
     bool race_result_dispatched = false;
     bool racing_dialogue_was_drawn=false;
-    bool racing_controls_active = false;
+bool racing_controls_active = false;
     gbs::HudState racing_hud {};
 volatile gbs::RuntimeTelemetryBlock& runtime_telemetry = gbs::runtime_telemetry_block();
 constexpr size_t max_resource_bank_reservations = 64;
@@ -709,14 +734,16 @@ GBS_RACING_RENDER_CODE void draw_racing_hud(const gbs::RacingRoomData& room) {
         ? room.config.pseudo3d.laps_to_win
         : 1;
     const unsigned int lap = runtime_state.lap_count >= laps ? laps : runtime_state.lap_count + 1;
-    const unsigned int position = gbs::racing_position_for_hud(runtime_state, room);
+    const unsigned int position = gbs::racing_position_for_hud(runtime_state, room, hud_position_cache);
     const auto* layout = gbs::active_hud_layout();
-    if (layout && std::strcmp(layout->id, "hud-porto-corrida") == 0) {
+    if (layout && (std::strcmp(layout->id, "hud-porto-corrida") == 0 || std::strcmp(layout->id, "hud-porto-corrida-challenge") == 0)) {
         const auto porto = gbs::porto_racing_hud_text(lap, laps, position,
             static_cast<unsigned int>(room.actor_count + 1),
             static_cast<unsigned int>(runtime_state.speed_x256 * 40 / 256), runtime_state.elapsed_frames);
-        const char* slots[] = { porto.position, porto.lap, porto.time, porto.speed };
-        gbs::set_hud_text_slots(racing_hud, slots, 4);
+        char boost[9] {};
+        gbs::racing_boost_hud_text(runtime_state,gbs::racing_challenge_boost_enabled(room,event_state),boost);
+        const char* slots[] = { porto.position, porto.lap, porto.time, porto.speed, boost };
+        gbs::set_hud_text_slots(racing_hud, slots, 5);
         gbs::draw_hud(racing_hud);
         return;
     }
@@ -827,7 +854,7 @@ GBS_RACING_RENDER_CODE void draw_pseudo3d_actors(const gbs::RacingRoomData& room
     const auto camera=gbs::racing_camera_pose({runtime_state.position_x256,runtime_state.position_y256},runtime_state.heading_x256,room.perspective_camera);
     const auto player_point=gbs::racing_camera_project(camera,{runtime_state.position_x256,runtime_state.position_y256},room.perspective_camera,horizon);
     if(player_sprite) {
-        gbs::set_metasprite(0,*player_sprite,{120,gbs::racing_uses_circuit_track(room)?player_point.y:120});
+        draw_racing_metasprite(0,*player_sprite,{120,gbs::racing_uses_circuit_track(room)?player_point.y:120});
         sprite_index+=player_sprite->part_count;
     }
     if(gbs::racing_uses_circuit_track(room)) {
@@ -853,7 +880,7 @@ GBS_RACING_RENDER_CODE void draw_pseudo3d_actors(const gbs::RacingRoomData& room
                 gbs::Sprite object {center_x-part.width/2,center_y-part.height/2,part.tile_index,part.palette,false,false,true,0,gbs::SpriteRenderMode::Normal,false,part.width,part.height};
                 object.color_depth=part.color_depth;object.affine=true;object.affine_matrix=static_cast<uint8_t>(index+1);
                 gbs::set_affine_sprite_transform(object.affine_matrix,{static_cast<int16_t>(65536/scale),0,0,static_cast<int16_t>(65536/scale)});
-                gbs::set_sprite(sprite_index++,object);
+                draw_racing_sprite(sprite_index++,object);
             }
         }
         return;
@@ -863,7 +890,7 @@ GBS_RACING_RENDER_CODE void draw_pseudo3d_actors(const gbs::RacingRoomData& room
     if(relative < -4 || relative > 52) return;
     const int y=clamp_int(118-relative*2,44,118);
     const auto line=gbs::racing_perspective_line(runtime_state,room,y);
-    gbs::set_metasprite(sprite_index,*room.actors[0].metasprite,{line.center_x,y});
+    draw_racing_metasprite(sprite_index,*room.actors[0].metasprite,{line.center_x,y});
 }
 
 bool draw_topdown_vehicle(
@@ -895,7 +922,7 @@ bool draw_topdown_vehicle(
     sprite.affine_matrix = matrix_index;
     if (!gbs::set_affine_sprite_transform(matrix_index,
             gbs::racing_vehicle_sprite_transform(heading))) return false;
-    gbs::set_sprite(sprite_index, sprite);
+    draw_racing_sprite(sprite_index, sprite);
     return true;
 }
 
@@ -905,7 +932,7 @@ void draw_actors(bool controls_active) {
         draw_pseudo3d_actors(room, controls_active);
         return;
     }
-    gbs::hide_all_sprites();
+    gbs::hide_world_sprites();
     const gbs::MetaSprite* player_sprite = current_vehicle_sprite();
     int sprite_index = 0;
     if (player_sprite != nullptr) {
@@ -915,7 +942,7 @@ void draw_actors(bool controls_active) {
         };
         if (!gbs::racing_uses_topdown_track(room) ||
             !draw_topdown_vehicle(sprite_index, *player_sprite, position, gbs::racing_vehicle_sprite_heading(current_vehicle_clips(),runtime_state.heading), 0)) {
-            gbs::set_metasprite(sprite_index, *player_sprite, position);
+            draw_racing_metasprite(sprite_index, *player_sprite, position);
         }
         sprite_index += player_sprite->part_count;
     }
@@ -930,7 +957,7 @@ void draw_actors(bool controls_active) {
         if (!gbs::racing_uses_topdown_track(room) || index >= 31 ||
             !draw_topdown_vehicle(sprite_index, *actor.metasprite, screen_position,
                 rival_pose.heading, static_cast<uint8_t>(index + 1))) {
-            gbs::set_metasprite(sprite_index, *actor.metasprite, screen_position);
+            draw_racing_metasprite(sprite_index, *actor.metasprite, screen_position);
         }
         sprite_index += actor.metasprite->part_count;
     }
@@ -962,6 +989,7 @@ void dispatch_race_result() {
             ? room.on_defeat
             : gbs::empty_event_script();
     if (gbs::has_event_script(script)) {
+        gbs::record_racing_challenge(runtime_state,room,event_state,gbs::active_dialogue_locale_id());
         race_result_dispatched = start_runtime_event_script(script);
     }
 }
@@ -986,8 +1014,11 @@ gbs::RacingInput racing_input(const gbs::InputState& input) {
 } // namespace
 
 int initialize_racing_runtime() {
+    hud_position_cache = {};
     gbs::init();
     gbs::init_dialogue(dialogue);
+    gbs::configure_dialogue_portraits(gbastudio_racing_project::dialogue_portrait_assets,
+        gbastudio_racing_project::dialogue_portrait_asset_count);
     previous_racing_controls = {};
     gbs::init_hud(racing_hud);
     gbs::init_sprite_animator(vehicle_animator);
@@ -1033,8 +1064,14 @@ int initialize_racing_runtime() {
     if (current_room_index < 0 || static_cast<size_t>(current_room_index) >= project.room_count) {
         current_room_index = project.initial_room;
     }
+    gbs::UniversalSaveData paused_data {};
+    if(resumed_from_transition && gbs::consume_suspended_runtime_resume(gbs::UniversalSaveRuntime::Racing,current_room_index,paused_data)) {
+        restored=gbs::apply_racing_save_data(project,paused_data,current_room_index,runtime_state,event_state);
+        if(!restored) return -1;
+    }
     if (!restored) {
         runtime_state = gbs::make_racing_runtime_state(project.rooms[current_room_index]);
+        gbs::initialize_racing_challenge(runtime_state,project.rooms[current_room_index],event_state);
         race_result_dispatched = false;
     }
     if (resumed_from_transition && !restored) {
@@ -1077,6 +1114,12 @@ gbs::RuntimeAdapterFrameResult update_racing_runtime(const gbs::RuntimeFrameCont
 #endif
     gbs::set_event_input_state(event_state, input.held, input.pressed, input.released);
     gbs::update_hud_behavior(event_state, racing_hud.visible);
+#if GBS_MULTI_RUNTIME
+    if(input.was_pressed(gbs::ButtonStart) && !gbs::event_runner_is_active(runtime_event_runner) && !dialogue.visible &&
+        !gbs::button_event_binding_overrides_default(event_state,gbs::ButtonStart) && project.start_menu_script_index>=0) {
+        start_runtime_event_script(project.scripts[project.start_menu_script_index]);
+    }
+#endif
     const bool script_active = update_runtime_event_script(input);
     runtime_telemetry.seen_tile_effects = 110;
     const gbs::RacingInput controls = gbs::racing_runtime_input(
@@ -1092,6 +1135,7 @@ gbs::RuntimeAdapterFrameResult update_racing_runtime(const gbs::RuntimeFrameCont
             const uint32_t extra=gbs::racing_clock_frame_span(timing.cpu_work_ticks,timing.vblank_wait_ticks)-1u;
             runtime_state.elapsed_frames=extra>0xffffffffu-runtime_state.elapsed_frames?0xffffffffu:runtime_state.elapsed_frames+extra;
         }
+        gbs::update_racing_challenge(before,runtime_state,project.rooms[current_room_index],event_state);
         const int sound = gbs::racing_action_sound(before, runtime_state, controls, previous_racing_controls,
             project.rooms[current_room_index].action_sounds);
         if (sound >= 0 && static_cast<size_t>(sound) < project.sfx_asset_count) gbs::play_sfx(project.sfx_assets[sound]);
@@ -1139,12 +1183,20 @@ void render_racing_runtime(const gbs::RuntimeFrameContext& context) {
     sync_runtime_telemetry();
     if (dialogue.visible) {
         gbs::draw_dialogue(dialogue);
+        gbs::draw_dialogue_portrait(dialogue);
         racing_dialogue_was_drawn=true;
     }
     gbs::wait_vblank();
 }
 
 void leave_racing_runtime() {
+#if GBS_MULTI_RUNTIME
+    if(gbs::runtime_transition_target()==gbs::RuntimeKind::Menu && event_state.scene_stack_count>0) {
+        gbs::UniversalSaveData paused {};
+        gbs::clear_suspended_runtime_save();
+        if(gbs::capture_racing_save_data(paused,current_room_index,runtime_state,event_state)) gbs::capture_suspended_runtime_save(paused);
+    }
+#endif
     gbs::release_resource_bank_group(resource_manager, active_resource_banks);
 }
 

@@ -286,6 +286,35 @@ int main() {
     };
     static_assert(gbs::is_valid_racing_topdown_track_data(topdown_track, authored_topdown_room));
     static_assert(gbs::is_valid_racing_room_data(authored_topdown_room));
+    // A circuit authored without rival actors is a solo race. Waiting at the
+    // start cannot lose to an invisible opponent or show position 2 of 1.
+    gbs::RacingRoomData solo_room = authored_topdown_room;
+    solo_room.config.pseudo3d.laps_to_win = 1;
+    solo_room.config.pseudo3d.rival_speed_x256_per_second = 4096;
+    gbs::RacingRuntimeState solo_state = gbs::make_racing_runtime_state(solo_room);
+    for (int frame = 0; frame < 600; ++frame) {
+        assert(gbs::tick_racing_vehicle(solo_state, solo_room, { false, false, 0 }));
+    }
+    assert(gbs::racing_result(solo_state) == gbs::RacingRaceResult::InProgress);
+    assert(solo_state.rival_distance_x256 == 0);
+    assert(gbs::racing_position_for_hud(solo_state, solo_room) == 1);
+    solo_state.rival_distance_x256 = gbs::racing_track_length_x256(solo_room);
+    assert(gbs::racing_position_for_hud(solo_state, solo_room) == 1);
+
+    // Authored opponents still advance and can win; the solo correction must
+    // not disable defeat for circuits that actually contain a rival.
+    const gbs::RacingActorData circuit_rival { "rival", { 32, 72 }, nullptr };
+    gbs::RacingRoomData rival_room = solo_room;
+    rival_room.actors = &circuit_rival;
+    rival_room.actor_count = 1;
+    assert(gbs::is_valid_racing_room_data(rival_room));
+    gbs::RacingRuntimeState rival_state = gbs::make_racing_runtime_state(rival_room);
+    for (int frame = 0; frame < 600; ++frame) {
+        assert(gbs::tick_racing_vehicle(rival_state, rival_room, { false, false, 0 }));
+    }
+    assert(gbs::racing_result(rival_state) == gbs::RacingRaceResult::Defeat);
+    assert(gbs::racing_position_for_hud(rival_state, rival_room) == 2);
+
     gbs::RacingRuntimeState authored_topdown_state = gbs::make_racing_runtime_state(authored_topdown_room);
     authored_topdown_state.position_x256 = 4 * 256;
     authored_topdown_state.position_y256 = 12 * 256;
@@ -371,12 +400,34 @@ int main() {
     gbs::RacingRuntimeState loop_state = gbs::make_racing_runtime_state(loop_room);
     assert(loop_state.heading == 4);
     assert(gbs::racing_topdown_path_progress_x256(loop_track, { 420, 60 }) == 220 * 256);
+    // The final segment wraps back to point zero, including for rival poses.
+    assert(gbs::racing_topdown_path_progress_x256(loop_track, { 130, 60 }) == 1050 * 256);
+    const gbs::RacingTopdownPose closing_segment = gbs::racing_topdown_pose_at_distance(loop_track, 1050 * 256);
+    assert(closing_segment.position_pixels.x == 130 && closing_segment.position_pixels.y == 60);
     const gbs::RacingTopdownPose first_rival = gbs::racing_topdown_rival_pose(loop_state, loop_room, 0);
     const gbs::RacingTopdownPose second_rival = gbs::racing_topdown_rival_pose(loop_state, loop_room, 1);
     assert(first_rival.position_pixels.x == 168 && first_rival.position_pixels.y == 60 && first_rival.heading == 4);
     assert(second_rival.position_pixels.x == 136 && second_rival.position_pixels.y == 60 && second_rival.heading == 4);
     loop_state.rival_distance_x256 = 250 * 256;
     assert(gbs::racing_position_for_hud(loop_state, loop_room) == 3);
+    // The retained track length must not change the exact rank as the player,
+    // rivals, laps and active room change between frames.
+    gbs::RacingHudPositionCache hud_position_cache {};
+    for (int lap = 0; lap < 3; ++lap) {
+        for (int x = 40; x <= 440; x += 7) {
+            gbs::RacingRuntimeState sample = loop_state;
+            sample.lap_count = lap;
+            sample.position_x256 = x * 256;
+            sample.position_y256 = (40 + (x % 230)) * 256;
+            sample.rival_distance_x256 = (lap * 1200 + x * 2) * 256;
+            assert(gbs::racing_position_for_hud(sample, loop_room, hud_position_cache) ==
+                gbs::racing_position_for_hud(sample, loop_room));
+        }
+    }
+    assert(gbs::racing_position_for_hud(rival_state, rival_room, hud_position_cache) ==
+        gbs::racing_position_for_hud(rival_state, rival_room));
+    assert(gbs::racing_position_for_hud(solo_state, solo_room, hud_position_cache) == 1);
+    assert(gbs::racing_position_for_hud(loop_state, loop_room, hud_position_cache) == 3);
     loop_state.rival_distance_x256 = 0;
     const gbs::AffineSpriteTransform east_sprite = gbs::racing_vehicle_sprite_transform(loop_state.heading);
     assert(east_sprite.pa == 0 && east_sprite.pb == 256 && east_sprite.pc == -256 && east_sprite.pd == 0);

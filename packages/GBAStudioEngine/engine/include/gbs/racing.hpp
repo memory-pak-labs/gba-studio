@@ -100,6 +100,18 @@ struct RacingActionSounds {
     int16_t checkpoint = -1;
 };
 
+// Text slots belong to the existing common save envelope; no campaign variable is reused.
+struct RacingChallengeData {
+    int8_t boost_variable_index = -1;
+    int8_t best_time_text_index = -1;
+    int8_t result_time_text_index = -1;
+    int8_t result_position_text_index = -1;
+    int8_t result_rating_text_index = -1;
+    int8_t result_best_text_index = -1;
+    uint16_t gold_seconds = 80;
+    uint16_t silver_seconds = 120;
+};
+
 struct RacingRoomData {
     const char* name;
     const uint8_t* collision_flags;
@@ -126,6 +138,7 @@ struct RacingRoomData {
     int circuit_empty_tile = -1;
     const RacingPlayerVisual* player_visual = nullptr;
     RacingActionSounds action_sounds {};
+    RacingChallengeData challenge {};
 };
 
 struct RacingVehicleDirectionAnimations {
@@ -185,6 +198,7 @@ struct RacingProjectData {
     size_t resource_bank_upload_source_count = 0;
     const EventScript* scripts = nullptr;
     size_t script_count = 0;
+    int start_menu_script_index = -1;
 };
 
 struct RacingInput {
@@ -334,7 +348,7 @@ constexpr int racing_topdown_path_length_pixels(const RacingTopdownTrackData& tr
     int length = 0;
     for (size_t index = 0; index < track.path_point_count; ++index) {
         length += racing_topdown_segment_length_pixels(
-            track.path_points[index], track.path_points[(index + 1) % track.path_point_count]
+            track.path_points[index], track.path_points[index + 1 == track.path_point_count ? 0 : index + 1]
         );
     }
     return length;
@@ -620,7 +634,7 @@ constexpr RacingTopdownPose racing_topdown_pose_at_distance(
     int remaining = racing_positive_mod(distance_x256, path_length_x256);
     for (size_t index = 0; index < track.path_point_count; ++index) {
         const Vec2i from = track.path_points[index];
-        const Vec2i to = track.path_points[(index + 1) % track.path_point_count];
+        const Vec2i to = track.path_points[index + 1 == track.path_point_count ? 0 : index + 1];
         const int segment = racing_topdown_segment_length_pixels(from, to) * 256;
         if (segment <= 0) continue;
         if (remaining < segment) {
@@ -646,7 +660,7 @@ constexpr int racing_topdown_path_progress_x256(
     int64_t best_distance_squared = 0x7fffffffffffffffLL;
     for (size_t index = 0; index < track.path_point_count; ++index) {
         const Vec2i from = track.path_points[index];
-        const Vec2i to = track.path_points[(index + 1) % track.path_point_count];
+        const Vec2i to = track.path_points[index + 1 == track.path_point_count ? 0 : index + 1];
         const int dx = to.x - from.x;
         const int dy = to.y - from.y;
         int64_t denominator=1, bounded=0;
@@ -722,15 +736,18 @@ constexpr RacingTopdownPose racing_topdown_rival_pose(
     );
 }
 
-constexpr unsigned int racing_position_for_hud(
+constexpr unsigned int racing_position_for_hud_with_track_length(
     const RacingRuntimeState& state,
-    const RacingRoomData& room
+    const RacingRoomData& room,
+    int track_length
 ) {
-    if (!racing_uses_circuit_track(room) || room.actor_count == 0) {
+    if (!racing_uses_circuit_track(room)) {
         return racing_position_for_hud(state);
     }
+    if (room.actor_count == 0) {
+        return 1;
+    }
     const bool has_path = room.topdown_track->path_point_count >= 2;
-    const int track_length = racing_track_length_x256(room);
     const int player_progress = has_path
         ? static_cast<int>(state.lap_count) * track_length + racing_topdown_path_progress_x256(
             *room.topdown_track, { state.position_x256 / 256, state.position_y256 / 256 })
@@ -745,6 +762,31 @@ constexpr unsigned int racing_position_for_hud(
         }
     }
     return position;
+}
+
+constexpr unsigned int racing_position_for_hud(const RacingRuntimeState& state, const RacingRoomData& room) {
+    if (!racing_uses_circuit_track(room)) return racing_position_for_hud(state);
+    if (room.actor_count == 0) return 1;
+    return racing_position_for_hud_with_track_length(state, room, racing_track_length_x256(room));
+}
+
+// Exported room data is immutable while a race is active; retain only its
+// geometry-derived length. Position and rival progress remain live each frame.
+struct RacingHudPositionCache {
+    const RacingRoomData* room = nullptr;
+    int track_length = 0;
+};
+
+constexpr unsigned int racing_position_for_hud(
+    const RacingRuntimeState& state, const RacingRoomData& room, RacingHudPositionCache& cache
+) {
+    if (!racing_uses_circuit_track(room)) return racing_position_for_hud(state);
+    if (room.actor_count == 0) return 1;
+    if (cache.room != &room) {
+        cache.room = &room;
+        cache.track_length = racing_track_length_x256(room);
+    }
+    return racing_position_for_hud_with_track_length(state, room, cache.track_length);
 }
 
 constexpr Vec2i racing_follow_camera(
@@ -971,7 +1013,8 @@ constexpr RacingRuntimeState make_racing_runtime_state(const RacingRoomData& roo
         0,
         0,
         0,
-        room.config.pseudo3d.rival_speed_x256_per_second > 0 &&
+        (!racing_uses_circuit_track(room) || room.actor_count > 0) &&
+            room.config.pseudo3d.rival_speed_x256_per_second > 0 &&
             (room.topdown_track == nullptr || room.topdown_track->path_point_count < 2)
             ? racing_track_length_x256(room) / 12
             : 0,
