@@ -9054,6 +9054,9 @@ export function promoteExemploGBAVerticeCampaign(data) {
   }
   result.events = merge(result.events, (data.events ?? []).filter(event => APPROVED_MENU_SCENES.has(event?.roomName)
     || APPROVED_RACE_EVENT_SCENES.has(event?.roomName) || event?.name?.startsWith("race_") || event?.name === "nara_configurar_corrida"), "name");
+  if (approvedFarolPlayer) {
+    result.events = merge(result.events, (data.events ?? []).filter(event => event?.name === "showcase_base_farol_enter"), "name");
+  }
   const seenEventNames = new Set();
   result.events = result.events.filter(event => {
     if (seenEventNames.has(event.name)) return false;
@@ -9084,7 +9087,7 @@ export function promoteExemploGBAVerticeCampaign(data) {
     ...(result.editorState.scenaConnections ?? []).filter(connection => !preservesConnection(connection)),
     ...(data.editorState?.scenaConnections ?? []).filter(preservesConnection).map(connection => structuredClone(connection))
   ];
-  return result;
+  return pruneUnusedExampleAssets(result);
 }
 
 const invokedPath = process.argv[1] ? fileURLToPath(import.meta.url) === process.argv[1] : false;

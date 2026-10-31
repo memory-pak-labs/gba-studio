@@ -14,6 +14,7 @@ describe('approved campaign extensions survive regeneration',()=>{
   for(const key of ['rooms','scenas'])for(const scene of before[key].filter(r=>names.has(r.name)))expect(after[key].find(r=>r.name===scene.name)).toEqual(scene);
   for(const actor of before.actors.filter(a=>names.has(a.roomName)))expect(after.actors.find(a=>a.id===actor.id)).toEqual(actor);
   expect(after.actors.find(a=>a.id==='farol-nara')).toEqual(before.actors.find(a=>a.id==='farol-nara'));
+  expect(after.events.find(e=>e.name==='showcase_base_farol_enter')).toEqual(before.events.find(e=>e.name==='showcase_base_farol_enter'));
   expect(after.editorState.sceneMapPositions).toMatchObject(before.editorState.sceneMapPositions);
   for(const event of before.events.filter(e=>names.has(e.roomName)))expect(after.events.find(e=>e.id===event.id)).toEqual(event);
   const authored=JSON.stringify([...before.scenas.filter(r=>names.has(r.name)),...before.actors.filter(a=>names.has(a.roomName))]);

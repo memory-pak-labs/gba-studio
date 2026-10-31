@@ -6,6 +6,9 @@ const provenance = JSON.parse(readFileSync(new URL('../fixtures/asset-provenance
 /** Reapply only the approved Nara walk contract after template regeneration. */
 export function integrateApprovedPlayerWalk(source) {
   const p = structuredClone(source);
+  const asset = p.assets.find(a => a.name === sheet);
+  // Newer campaigns use the separately approved walk-and-run sheet instead.
+  if (!asset) return p;
   for (const animation of p.animations) {
     if (animation.spriteSheet !== sheet || animation.state !== 'walk') continue;
     const row = ['down', 'up', 'left', 'right'].indexOf(animation.direction);
@@ -20,7 +23,6 @@ export function integrateApprovedPlayerWalk(source) {
       }))
     }));
   }
-  const asset = p.assets.find(a => a.name === sheet);
   Object.assign(asset.metadata, {
     preparedSha256: provenance.sourceSheets.find(a => a.name === sheet).sha256,
     walkRevision: 'v3-lateral-v2-front-back',

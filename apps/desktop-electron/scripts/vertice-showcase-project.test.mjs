@@ -120,13 +120,13 @@ describe("materialização canônica de Vértice", () => {
 
   it("preserva as quatro direções das sheets de 48px ativas do Porto", () => {
     for (const project of [canonicalProject(), verticeProject()]) {
-      for (const sheet of ['porto-nara-animations48.png', 'porto-mechanic-animations48.png']) {
+      for (const sheet of ['nara-topdown-walk-run-v1.png', 'porto-mechanic-animations48.png']) {
         const animations = project.animations.filter(a => a.spriteSheet === sheet);
-        expect(animations).toHaveLength(8);
+        expect(animations).toHaveLength(sheet === 'nara-topdown-walk-run-v1.png' ? 12 : 8);
         for (const direction of ['down', 'up', 'left', 'right']) {
           expect(animations.find(a => a.name === `idle_${direction}`)).toMatchObject({frameWidth:32,frameHeight:48,frameCount:1});
           const walk = animations.find(a => a.name === `walk_${direction}`);
-          expect(walk).toMatchObject({frameWidth:32,frameHeight:48,frameCount:4,hitboxWidth:16,hitboxHeight:sheet==='porto-nara-animations48.png'?8:16,hitboxY:sheet==='porto-nara-animations48.png'?0:-8});
+          expect(walk).toMatchObject({frameWidth:32,frameHeight:48,frameCount:4,hitboxWidth:16,hitboxHeight:sheet==='nara-topdown-walk-run-v1.png'?8:16,hitboxY:sheet==='nara-topdown-walk-run-v1.png'?0:-8});
           expect(new Set(walk.frames.map(f => f.sourceFrameIndex)).size).toBe(4);
         }
       }
@@ -2065,6 +2065,7 @@ describe("materialização canônica de Vértice", () => {
     for (const asset of menuAudioManifest.assets) allowedAssets.add(asset.name);
     for (const asset of JSON.parse(readFileSync(new URL('../fixtures/asset-provenance/approved-menu-scenes-v21.json', import.meta.url))).assets) allowedAssets.add(asset.name);
     allowedAssets.add(JSON.parse(readFileSync(new URL('../fixtures/asset-provenance/nara-topdown-running-v1.json', import.meta.url))).prepared.file.split('/').at(-1));
+    for (const name of ['porto-nara-animations48.png', 'toolcase-commands-128x8.png']) allowedAssets.delete(name);
     expect(new Set(project.assets.map((asset) => asset.name))).toEqual(allowedAssets);
     expect(project.audioItems).toHaveLength(74);
     expect(project.audioItems.filter(item => item.id.startsWith('initial-menu-'))).toEqual(menuAudioManifest.audioItems);
