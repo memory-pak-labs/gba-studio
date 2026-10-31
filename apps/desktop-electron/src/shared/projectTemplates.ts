@@ -6,7 +6,7 @@ import { blankDungeonNpcContent } from "./blankDungeonDefaults.js";
 import { blankHudContent } from "./blankHudDefaults.js";
 import { blankDialogueContent, BLANK_DIALOGUE_SKIN, BLANK_DIALOGUE_PORTRAIT } from "./blankDialogueDefaults.js";
 import { blankSceneHudContent } from "./blankSceneHudDefaults.js";
-import { blankBackgroundContent, applyDefaultRoomBackground, BLANK_BACKGROUND_DEFAULTS_PROFILE } from "./blankBackgroundDefaults.js";
+import { blankBackgroundContent, BLANK_BACKGROUND_DEFAULTS_PROFILE } from "./blankBackgroundDefaults.js";
 import exemploGBAProjectRaw from "../../default-assets/templates/exemplo-gba/exemplo-gba.gba-project?raw";
 
 export type ProjectTemplateID = "exemplo-gba" | "blank";
@@ -28,7 +28,7 @@ export const projectTemplateDefinitions: ProjectTemplateDefinition[] = [
   {
     id: "blank",
     title: "Projeto em branco",
-    detail: "Uma cena com player neutro e animações básicas para criar seu próprio jogo.",
+    detail: "Uma cena vazia e recursos opcionais para criar seu próprio jogo.",
     icon: "+"
   }
 ];
@@ -97,12 +97,7 @@ export function buildProjectFromTemplate(
       { id: "asset-group-neutral-backgrounds", name: "Backgrounds padrão", assetIDs: backgrounds.assets.map(asset => asset.id), children: [] }
     ];
     const room = (project.rooms as Record<string, unknown>[])[0]!;
-    room.playerActorName = "Player";
-    project.actors = [{ id: "actor-player", name: "Player", roomName: room.name,
-      spriteSheet: content.defaultPlayerSprites.topdown, animationStateID: "state-neutral-topdown", animationName: "idle_down",
-      x: 15, y: 10, eventBindings: {} }];
     const settings = project.settings as Record<string, Record<string, unknown>>;
-    settings.general.startPlayer = "Player";
     settings.topdown.playerSprite = content.defaultPlayerSprites.topdown;
     settings.topdown.mirrorLeftFromRight = false;
     settings.pointAndClick.cursorImage = content.defaultPlayerSprites.pointAndClick;
@@ -116,7 +111,6 @@ export function buildProjectFromTemplate(
     settings.sceneTypes.backgroundDefaultsProfile = BLANK_BACKGROUND_DEFAULTS_PROFILE;
     settings.sceneTypes.defaultBackgrounds = backgrounds.defaultBackgrounds;
     settings.backgrounds.defaultMapSize = "";
-    applyDefaultRoomBackground(project, room);
     project.scena = structuredClone(room);
     (project.settings as Record<string, unknown>).hudPresets = [hud.preset,...sceneHuds.presets];
     (project.settings as Record<string, unknown>).hudPresetId = hud.preset.id;

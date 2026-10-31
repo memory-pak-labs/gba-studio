@@ -6345,7 +6345,10 @@ function buildTopdownProject(
   const playerActor = playerActors.find((item) => {
     const actorRoom = entitySceneName(item, "actor");
     return !actorRoom || actorRoom === roomName(initialRoom, initialRoomIndex);
-  }) ?? playerActors[0] ?? (roomSceneType(initialRoom) === "custom" && !playerName
+  }) ?? playerActors.find((actor) => {
+    const actorRoom = entitySceneName(actor, "actor");
+    return rooms.some((room, index) => actorRoom === roomName(room, index));
+  }) ?? (roomSceneType(initialRoom) === "custom" && !playerName
     ? rooms.flatMap((candidate, index) => {
         const name = configuredPlayerActorName(data, candidate);
         if (!name) return [];

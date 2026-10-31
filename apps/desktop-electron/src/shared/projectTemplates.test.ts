@@ -68,12 +68,11 @@ describe("projectTemplates", () => {
     const rooms = deriveRoomsWorkspacePresentation(project);
     expect(rooms.rooms).toHaveLength(1);
     expect(rooms.rooms[0]).toMatchObject({ name: "cena_1", width: 30, height: 20 });
-    expect((project.rooms as Array<Record<string, unknown>>)[0].backgroundAssetName).toBe("neutral-background-topdown.png");
+    expect((project.rooms as Array<Record<string, unknown>>)[0].backgroundAssetName || "").toBe("");
     expect(rooms.rooms[0]?.tileCells).toHaveLength(600);
-    expect(rooms.entities).toHaveLength(1);
-    expect(rooms.entities[0]).toMatchObject({ name: "Player", spriteSheet: "neutral-player-topdown.png" });
+    expect(rooms.entities).toHaveLength(0);
     expect(project.settings).toMatchObject({
-      general: { gameTitle: "Meu jogo", startScene: "cena_1", startPlayer: "Player", exportFolder: "build" },
+      general: { gameTitle: "Meu jogo", startScene: "cena_1", startPlayer: "", exportFolder: "build" },
       build: { romFileName: "meu_jogo.gba" },
       sceneTypes: { defaultPlayerSprites: { topdown: "neutral-player-topdown.png" } },
       topdown: { playerSprite: "neutral-player-topdown.png" },
