@@ -6,7 +6,7 @@ import { describe, expect, it } from "vitest";
 import { validateGBAProjectMigrationContract } from "../../../../packages/project-contract/src/index.js";
 import { deriveEventsWorkspacePresentation } from "../shared/eventsWorkspace.js";
 import { parseGBAProjectFile } from "../shared/projectFile.js";
-import { auditExportEventCommandCoverage } from "./exportEngineProject.js";
+import { auditExportEventCommandCoverage, buildEngineExportProjectContract } from "./exportEngineProject.js";
 
 const canonicalImportedProjectPath = path.join(
   process.cwd(),
@@ -17,6 +17,19 @@ const canonicalImportedProjectPath = path.join(
 );
 
 describe("canonical GB Studio imported project", () => {
+  it("requires only features declared by the current Engine Pack", async () => {
+    const project = parseGBAProjectFile(await readFile(canonicalImportedProjectPath, "utf8")).data;
+    const manifest = JSON.parse(await readFile(path.join(process.cwd(), "../../packages/GBAStudioEngine/enginepack.json"), "utf8"));
+    const supported = new Set<string>();
+    for (const [group, values] of Object.entries(manifest.capabilities as Record<string, unknown>)) {
+      supported.add(group);
+      for (const value of Array.isArray(values) ? values : typeof values === "string" ? [values] : []) {
+        if (typeof value === "string") { supported.add(value); supported.add(`${group}.${value}`); }
+      }
+    }
+    expect(buildEngineExportProjectContract(project).requires.features.filter(feature => !supported.has(feature))).toEqual([]);
+  });
+
   it("keeps the current imported Exemplo fixture migration-valid and export-complete", async () => {
     const project = parseGBAProjectFile(
       await readFile(canonicalImportedProjectPath, "utf8")

@@ -545,6 +545,7 @@
       "point_click_export_template"
     ],
     "shmup_runtime": [
+      "player_damage_event",
       "shmup_project_data_contract",
       "shmup_player_control",
       "shmup_player_projectiles",
@@ -961,6 +962,8 @@
     "dialogue_box_skin": true,
     "dialogue_portrait_tab": true,
     "hud_box_skin": true,
+    "hud_runtime_text_profiles": true,
+    "hud_menu_selector": true,
     "hud_project_value_bindings": true,
     "hud_compact_text": true,
     "hud_spaced_text": true,
@@ -1071,7 +1074,16 @@
       "result_events",
       "racing_export_template"
     ],
+    "racing_challenge_progress": true,
+    "racing_save_resume": true,
+    "menu_hud_header": true,
+    "menu_text_bindings": true,
+    "menu_hud_bindings": true,
+    "menu_page_navigation": true,
+    "menu_actor_visibility_conditions": true,
+    "topdown_run_profile": true,
     "battle_rpg_runtime": [
+      "player_damage_event",
       "battle_rpg_project_data_contract",
       "turn_progression",
       "target_selection",
@@ -1288,6 +1300,7 @@
       "runtime_audio_telemetry"
     ],
     "events": [
+      "named_animation_keys",
       "room_enter",
       "room_exit",
       "portal",
