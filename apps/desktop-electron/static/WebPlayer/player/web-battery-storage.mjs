@@ -22,6 +22,11 @@ function equalBytes(left, right) {
   return left?.length === right?.length && left.every((byte, index) => byte === right[index]);
 }
 
+export function createDesktopBatteryStore(bridge) {
+  if (!bridge || typeof bridge.read !== 'function' || typeof bridge.write !== 'function') throw new Error('Desktop save bridge unavailable.');
+  return { read: () => bridge.read(), write: value => bridge.write(value) };
+}
+
 export function createBatteryPersistence({ romSha256, store, copy, restore, onStatus = () => {} }) {
   let enabled = false, disposed = false, previous = null, pending = null, inFlight = null, writing = null;
   const unavailable = () => { enabled = false; pending = null; onStatus('unavailable'); };

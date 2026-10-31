@@ -93,3 +93,19 @@ const api: GBAStudioDesktopAPI = {
 };
 
 contextBridge.exposeInMainWorld("gbaStudio", api);
+
+// This bridge is bound to the Player window by the main process; it accepts no file paths.
+const playerBatteryCall = (operation: "identity" | "read" | "write", value?: string) => {
+  const result = ipcRenderer.sendSync(ipcChannels.romPlayerBattery, operation, ...(operation === "write" ? [value] : []));
+  if (!result?.ok) throw new Error("Armazenamento do Play indisponível.");
+  return result.value;
+};
+const locationUrl = typeof window === "undefined" ? null : new URL(window.location.href);
+if (locationUrl?.protocol === "http:" && locationUrl.hostname === "127.0.0.1" &&
+    locationUrl.pathname === "/player/runtime.html" && locationUrl.searchParams.get("desktopBattery") === "1") {
+  contextBridge.exposeInMainWorld("gbaStudioPlayerBattery", {
+    identity: () => playerBatteryCall("identity"),
+    read: () => playerBatteryCall("read"),
+    write: (value: string) => playerBatteryCall("write", value)
+  });
+}

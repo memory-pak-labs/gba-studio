@@ -379,6 +379,7 @@ export function useEngineActions({ contractDiagnosticsOK, projectHealthExportRea
       const launch = await window.gbaStudio.openRomPlayerWindow({
         romPath: built.romPath,
         title: currentSession?.project.summary.name ?? "GBA Studio",
+        saveScope: target?.roomID ? `id:${target.roomID}` : target?.roomName ? `name:${target.roomName}` : undefined,
         replay: target?.replay,
         keyboardBindings: deriveGBAKeyboardBindings(currentSession.project.data)
       });

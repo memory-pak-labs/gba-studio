@@ -19,6 +19,7 @@ import type {
 import type { InputReplay } from "../shared/inputReplay.js";
 import type { GBAKeyboardBindings } from "../shared/gbaControls.js";
 import { ipcChannels } from "../shared/ipc.js";
+import { createRomPlayerBattery, registerRomPlayerBattery } from "./romPlayerBattery.js";
 
 export interface ResolveWebPlayerRootOptions {
   appPath: string;
@@ -33,6 +34,7 @@ export interface RomPlayerServerOptions {
   webPlayerRoot: string;
   inputReplay?: InputReplay;
   keyboardBindings?: GBAKeyboardBindings;
+  desktopBattery?: boolean;
 }
 
 export interface RomPlayerServer {
@@ -44,6 +46,7 @@ export interface OpenRomPlayerWindowRequest {
   locale?: string;
   romPath: string;
   title?: string;
+  saveScope?: string;
   replay?: InputReplay;
   keyboardBindings?: GBAKeyboardBindings;
 }
@@ -142,7 +145,7 @@ function safePlayerAssetPath(webPlayerRoot: string, requestPath: string): string
     : null;
 }
 
-function runtimePlayerPath(options: Pick<RomPlayerServerOptions, "romPath" | "title" | "inputReplay" | "keyboardBindings" | "locale">): string {
+function runtimePlayerPath(options: Pick<RomPlayerServerOptions, "romPath" | "title" | "inputReplay" | "keyboardBindings" | "locale" | "desktopBattery">): string {
   const query = new URLSearchParams({
     rom: `../roms/${path.basename(options.romPath)}`,
     title: options.title
@@ -150,6 +153,7 @@ function runtimePlayerPath(options: Pick<RomPlayerServerOptions, "romPath" | "ti
   if (options.inputReplay) query.set("replay", "1");
   if (options.keyboardBindings) query.set("keyboard", "1");
   if (options.locale) query.set("locale", options.locale);
+  if (options.desktopBattery) query.set("desktopBattery", "1");
   return `/player/runtime.html?${query.toString()}`;
 }
 
@@ -495,16 +499,18 @@ export async function openRomPlayerWindow(options: OpenRomPlayerWindowOptions): 
       title,
       webPlayerRoot,
       inputReplay: options.replay,
-      keyboardBindings: options.keyboardBindings
+      keyboardBindings: options.keyboardBindings,
+      desktopBattery: !options.replay
     });
     closeServer = server.close;
-    const { BrowserWindow } = await import("electron");
+    const { BrowserWindow, app } = await import("electron");
     const window = new BrowserWindow({
       ...romPlayerBrowserWindowOptions(options.mainDirectory),
       title: `Play - ${title}`
     });
 
     acquiredWindow = window;
+    if (!options.replay) registerRomPlayerBattery(window.webContents, createRomPlayerBattery(app.getPath("userData"), romPath, options.saveScope), server.url);
     window.webContents.on("ipc-message", (_event, channel, ...args) => {
       if (channel !== ipcChannels.romPlayerTelemetry) return;
       const stats = normalizeRomPlayerFrameStats(args[0]);

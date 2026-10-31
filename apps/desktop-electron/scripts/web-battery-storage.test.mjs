@@ -1,7 +1,23 @@
 import assert from 'node:assert/strict';
 import {test} from 'vitest';
-import {encodeBattery,decodeBattery,createBatteryPersistence,createWebBatteryStore} from '../static/WebPlayer/player/web-battery-storage.mjs';
+import {encodeBattery,decodeBattery,createBatteryPersistence,createWebBatteryStore,createDesktopBatteryStore} from '../static/WebPlayer/player/web-battery-storage.mjs';
 const hash='a'.repeat(64), other='b'.repeat(64);
+test('desktop battery bridge restores and durably writes the game state across player instances',async()=>{
+ let saved=null,bytes=new Uint8Array([1,2]);
+ const bridge={identity:()=>hash,read:()=>saved,write:value=>{saved=value;}};
+ let p=createBatteryPersistence({romSha256:hash,store:createDesktopBatteryStore(bridge),copy:()=>bytes.slice(),restore:value=>{bytes=value;return true;}});
+ await p.initialize();bytes[0]=42;await p.flush();p.destroy();
+ bytes=new Uint8Array([0,0]);
+ p=createBatteryPersistence({romSha256:hash,store:createDesktopBatteryStore(bridge),copy:()=>bytes.slice(),restore:value=>{bytes=value;return true;}});
+ await p.initialize();assert.deepEqual(bytes,new Uint8Array([42,2]));p.destroy();
+});
+test('desktop writes are committed before a player is immediately closed',async()=>{
+ let saved=null,bytes=new Uint8Array([1]);
+ const bridge={read:()=>null,write:value=>{saved=value;}};
+ const p=createBatteryPersistence({romSha256:hash,store:createDesktopBatteryStore(bridge),copy:()=>bytes.slice(),restore:()=>true});
+ await p.initialize();bytes[0]=9;const completion=p.flush();p.destroy();
+ assert.deepEqual(decodeBattery(saved,hash),new Uint8Array([9]));await completion;
+});
 test('battery records preserve bytes and reject another ROM, corrupt base64 and oversized payloads',()=>{
  const bytes=new Uint8Array([1,2,3,255]);const record=encodeBattery(bytes,hash);
  assert.deepEqual(decodeBattery(record,hash),bytes);assert.throws(()=>decodeBattery(record,other));

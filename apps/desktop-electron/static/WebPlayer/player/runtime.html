@@ -20,6 +20,7 @@
     .system-buttons,.action-buttons { display:flex; justify-content:center; flex-wrap:wrap; gap:6px; }
     .action-buttons button { width:48px; height:48px; border-radius:50%; }
     #battery-status { grid-column:1/-1; text-align:center; margin:2px 0; min-height:17px; color:#c9bddf; font-size:11px; }
+    #desktop-battery-warning { position:absolute; bottom:0; left:0; right:0; padding:6px; text-align:center; background:#512b1c; color:#fff; }
     @media(max-width:480px) { #touch-controls { padding:7px; grid-template-columns:126px 1fr 94px; gap:3px; } .action-buttons button { width:42px;height:42px; } .system-buttons { gap:4px; } .system-buttons button { font-size:10px; min-width:36px; padding:2px; } }
     #runtime-game.ejs_parent { width: 100% !important; height: 100% !important; }
     #runtime-game canvas, #runtime-game .ejs_canvas {
@@ -34,6 +35,7 @@
 <body>
   <div id="player-shell">
   <div id="runtime-game" role="status"></div>
+  <div id="desktop-battery-warning" role="alert" hidden></div>
   <div id="touch-controls" aria-label="Controles do Game Boy Advance" hidden>
     <div class="dpad"><button type="button" data-gba-key="64" aria-label="Cima">▲</button><button type="button" data-gba-key="32" aria-label="Esquerda">◀</button><button type="button" data-gba-key="128" aria-label="Baixo">▼</button><button type="button" data-gba-key="16" aria-label="Direita">▶</button></div>
     <div class="system-buttons"><button type="button" data-gba-key="512" aria-label="Botão L">L</button><button type="button" data-gba-key="256" aria-label="Botão R">R</button><button type="button" data-gba-key="4" aria-label="Select">Select</button><button type="button" data-gba-key="8" aria-label="Start">Start</button></div>
@@ -69,7 +71,21 @@
         const { startMGBAPlayer } = await import("./mgba-direct-player.mjs");
         const batteryHash = parameters.get("battery");
         let batteryOptions;
-        if (/^[a-f0-9]{64}$/.test(batteryHash ?? "")) {
+        if (parameters.get("desktopBattery") === "1") {
+          const { createDesktopBatteryStore } = await import("./web-battery-storage.mjs");
+          const warning = document.querySelector("#desktop-battery-warning");
+          const message = language === "en-US" ? "Could not save game progress on this computer." : language === "es-ES" ? "No se pudo guardar el progreso en este equipo." : "Não foi possível salvar o progresso neste computador.";
+          const onStatus = status => {
+            warning.textContent = status === "unavailable" ? message : "";
+            warning.hidden = status !== "unavailable";
+          };
+          try {
+            const bridge = window.gbaStudioPlayerBattery;
+            const identity = bridge?.identity();
+            if (!/^[a-f0-9]{64}$/.test(identity ?? "")) throw new Error("Desktop save bridge unavailable.");
+            batteryOptions = { romSha256: identity, store: createDesktopBatteryStore(bridge), onStatus };
+          } catch { onStatus("unavailable"); }
+        } else if (/^[a-f0-9]{64}$/.test(batteryHash ?? "")) {
           const { createWebBatteryStore } = await import("./web-battery-storage.mjs");
           const labels = language === "en-US" ? {ready:"Progress saved by the game stays in this browser.",restored:"Game data restored in this browser.",saving:"Saving…",saved:"Game data saved in this browser.",unavailable:"Browser saving is unavailable. Keep this page open."} : language === "es-ES" ? {ready:"El progreso guardado queda en este navegador.",restored:"Datos del juego restaurados en este navegador.",saving:"Guardando…",saved:"Datos del juego guardados en este navegador.",unavailable:"No se puede guardar en el navegador. Mantén esta página abierta."} : {ready:"O progresso salvo pelo jogo fica neste navegador.",restored:"Dados do jogo restaurados neste navegador.",saving:"Salvando…",saved:"Dados do jogo salvos neste navegador.",unavailable:"Salvamento no navegador indisponível. Mantenha esta página aberta."};
           batteryOptions = { romSha256: batteryHash, store: createWebBatteryStore({romSha256:batteryHash}), onStatus: status => { document.querySelector("#battery-status").textContent = labels[status]; } };

@@ -26,6 +26,16 @@ afterEach(async () => {
 });
 
 describe("romPlayerWindow", () => {
+  it("enables the desktop battery only for the requested player", async () => {
+    const root = await tempRoot(); const romPath = path.join(root, "game.gba");
+    await writeFile(romPath, new Uint8Array([1, 2, 3]));
+    const player = await createRomPlayerServer({ romPath, webPlayerRoot: root, title: "Game", desktopBattery: true });
+    const plain = await createRomPlayerServer({ romPath, webPlayerRoot: root, title: "Game" });
+    try {
+      expect(new URL(player.url).searchParams.get("desktopBattery")).toBe("1");
+      expect(new URL(plain.url).searchParams.has("desktopBattery")).toBe(false);
+    } finally { await player.close(); await plain.close(); }
+  });
   it("preserves the producer clock across telemetry IPC and rejects invalid timestamps", () => {
     const stats = { cpuPercent: 8, droppedFrameRatio: 0, droppedFrames: 0, emulationFps: 60,
       emulationMs: 1.2, fps: 60, frameMs: 16.67, presentationFps: 60, romBytes: 85000 };

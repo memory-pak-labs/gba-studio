@@ -487,6 +487,7 @@ ipcMain.handle(ipcChannels.openRomPlayerWindow, async (event, request: OpenRomPl
     locale: appLocale,
     romPath: request.romPath,
     title: request.title,
+    saveScope: request.saveScope,
     replay: request.replay,
     keyboardBindings: request.keyboardBindings,
     appPath: app.getAppPath(),

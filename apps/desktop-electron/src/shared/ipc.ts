@@ -82,6 +82,7 @@ export interface LaunchRomInEmulatorResult {
 export interface OpenRomPlayerWindowRequest {
   romPath: string;
   title?: string;
+  saveScope?: string;
   replay?: InputReplay;
   keyboardBindings?: GBAKeyboardBindings;
 }
@@ -553,6 +554,7 @@ export const ipcChannels = {
   launchRomInEmulator: "shell:launch-rom-in-emulator",
   openRomPlayerWindow: "rom-player:open-window",
   romPlayerTelemetry: "rom-player:telemetry",
+  romPlayerBattery: "rom-player:battery",
   selectPath: "shell:select-path",
   validateSettingsPaths: "settings:validate-paths",
   getMcpServerRegistration: "mcp:get-server-registration",
