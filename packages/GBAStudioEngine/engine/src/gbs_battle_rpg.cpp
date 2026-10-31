@@ -199,6 +199,23 @@ bool use_battle_ability(BattleRpgRuntimeState& state, const BattleRpgEncounterDa
     return true;
 }
 
+bool use_battle_inventory_item(BattleRpgRuntimeState& state, const BattleRpgEncounterData& encounter,
+    EventState& event_state, int item_index, int target_index) {
+    if (state.outcome != BattleRpgOutcome::InProgress || state.enemy_turn_pending ||
+        state.selected_party < 0 || state.selected_party >= encounter.party_count || state.party_hp[state.selected_party] <= 0 ||
+        target_index < 0 || target_index >= encounter.party_count || state.party_hp[target_index] <= 0 ||
+        state.party_hp[target_index] >= encounter.party[target_index].unit.max_hp ||
+        encounter.inventory_items == nullptr || item_index < 0 || static_cast<size_t>(item_index) >= encounter.inventory_item_count) return false;
+    const auto& item = encounter.inventory_items[item_index];
+    if (!is_valid_inventory_item_index(item.item_index) || item.heal_amount <= 0 ||
+        event_state.inventory[item.item_index] <= 0) return false;
+    const int missing_hp = encounter.party[target_index].unit.max_hp - state.party_hp[target_index];
+    state.party_hp[target_index] += item.heal_amount < missing_hp ? item.heal_amount : missing_hp;
+    --event_state.inventory[item.item_index];
+    complete_player_action(state, encounter);
+    return true;
+}
+
 bool use_selected_battle_ability(BattleRpgRuntimeState& state, const BattleRpgEncounterData& encounter) {
     normalize_selections(state, encounter);
     if (state.selected_party < 0) return false;
