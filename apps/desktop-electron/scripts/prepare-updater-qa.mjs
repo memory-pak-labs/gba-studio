@@ -3,7 +3,7 @@ import { createRequire } from 'node:module';
 import { chmod, copyFile, mkdir, readFile, readdir, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { copyAppWithQaVersion } from './updater-qa-fixture.mjs';
+import { copyAppWithQaVersion, removeAppImageWrapperIcon } from './updater-qa-fixture.mjs';
 
 const appRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const require = createRequire(import.meta.url);
@@ -68,6 +68,7 @@ if (platform === 'win32') {
   await chmod(appImage, 0o755);
   await run(appImage, ['--appimage-extract'], { cwd: root });
   source = path.join(root, 'squashfs-root');
+  await removeAppImageWrapperIcon(source);
 }
 const archive = path.join(source, 'resources', 'app.asar');
 const metadata = JSON.parse(asar.extractFile(archive, 'package.json').toString());

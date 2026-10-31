@@ -3,12 +3,24 @@ import { mkdtemp, mkdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { copyAppWithQaVersion } from './updater-qa-fixture.mjs';
+import { copyAppWithQaVersion, removeAppImageWrapperIcon } from './updater-qa-fixture.mjs';
 
 const require = createRequire(import.meta.url);
 const asar = require('@electron/asar');
 
 describe('updater QA fixture', () => {
+  it('removes only the extracted AppImage wrapper icon before repacking', async () => {
+    const root = await mkdtemp(path.join(tmpdir(), 'gba-appimage-fixture-'));
+    try {
+      await writeFile(path.join(root, '.DirIcon'), 'wrapper');
+      await writeFile(path.join(root, 'AppRun'), 'launcher');
+      await removeAppImageWrapperIcon(root);
+      await expect(readFile(path.join(root, '.DirIcon'))).rejects.toMatchObject({ code: 'ENOENT' });
+      expect(await readFile(path.join(root, 'AppRun'), 'utf8')).toBe('launcher');
+    } finally {
+      await rm(root, { recursive: true, force: true });
+    }
+  });
   it('changes only the copied application version and leaves the installed source intact', async () => {
     const root = await mkdtemp(path.join(tmpdir(), 'gba-updater-fixture-'));
     try {
