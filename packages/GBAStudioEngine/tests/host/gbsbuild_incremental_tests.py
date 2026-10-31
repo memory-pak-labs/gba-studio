@@ -169,6 +169,17 @@ class IncrementalBuildTests(unittest.TestCase):
         self.assertEqual(len(calls),1)
         args=calls[0]["args"]
         self.assertEqual(Path(args[args.index("-c")+1]).resolve(), (self.project/"npc.cpp").resolve())
+    def test_copied_project_rebuilds_when_its_local_header_changes(self):
+        self.run_build()
+        copied = self.root / "copied project"
+        shutil.copytree(self.project, copied)
+        self.project = copied
+        self.change_same_mtime(self.project / "npc.hpp", "new-npc-in-copy")
+        calls = self.run_build()
+        self.assertEqual(len(calls), 2, "relocated depfiles must be rebuilt for the copied project")
+        incremental = (self.project / "build/game.gba").read_bytes()
+        self.run_build("--clean")
+        self.assertEqual(incremental, (self.project / "build/game.gba").read_bytes())
     def test_shared_header_rebuilds_both_consumers(self):
         self.run_build();self.change_same_mtime(self.project/"shared.hpp","new-shared")
         self.assertEqual(len(self.run_build()),2)

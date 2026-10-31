@@ -287,7 +287,7 @@ def input_state(env, tools):
     # A custom build directory inside the project must never hash its own outputs.
     project_files = {k: v for k, v in project_files.items()
                      if build not in (project / k).parents and lock not in (project / k).parents}
-    return {"project": project_files, "headers": digest_tree(pack / "include"),
+    return {"project": project_files, "project_root": str(project), "headers": digest_tree(pack / "include"),
             "library": digest_file(pack / "lib/libgbastudio_engine.a"),
             "linker": digest_file(pack / "templates/gba.ld"),
             "makefile": digest_file(pack / "templates/Makefile.gba"),
@@ -461,7 +461,9 @@ def locked_build(command, env, build, clean, cache_enabled):
         return 0
 
     authored_inputs = load_project_manifest(Path(env["PROJECT_DIR"])).get("build", {}).get("inputs", [])
-    compile_config = {"authored_inputs": {name: before["project"].get(name) for name in authored_inputs}, "tools": tools, "makefile": before["makefile"], "launcher": before["launcher"],
+    # Depfiles contain absolute project paths. Objects copied from a different
+    # project root would otherwise keep watching the original headers.
+    compile_config = {"project_root": before["project_root"], "authored_inputs": {name: before["project"].get(name) for name in authored_inputs}, "tools": tools, "makefile": before["makefile"], "launcher": before["launcher"],
                       "headers_environment": {k: env.get(k, "") for k in (
                           "CXXFLAGS", "CPPFLAGS", "CPATH", "CPLUS_INCLUDE_PATH", "C_INCLUDE_PATH")}}
     if (cache_enabled and not clean and command[-1] == "all"
