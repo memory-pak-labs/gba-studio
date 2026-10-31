@@ -2,6 +2,11 @@ import { describe, expect, it } from "vitest";
 import { studioUiMessages, translateStudioMessage } from "./studioUiMessages.js";
 
 describe("studio UI messages", () => {
+  it("localizes the occupied project destination warning", () => {
+    const message = "A pasta de destino já contém arquivos. Escolha um novo nome ou uma pasta vazia.";
+    expect(translateStudioMessage("en-US", message)).toBe("The destination folder already contains files. Choose a new name or an empty folder.");
+    expect(translateStudioMessage("es-ES", message)).toBe("La carpeta de destino ya contiene archivos. Elige un nombre nuevo o una carpeta vacía.");
+  });
   it("translates editor, export, audio, menus and diagnostics in the three primary locales", () => {
     expect(translateStudioMessage("pt-BR", "Colisao")).toBe("Colisão");
     expect(translateStudioMessage("en-US", "Buscar cenas")).toBe("Search scenes");

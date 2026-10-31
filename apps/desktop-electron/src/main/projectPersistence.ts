@@ -21,9 +21,11 @@ export interface SaveProjectFileOptions {
   appPath?: string;
   bundledAssetConflictPolicy?: "preserve" | "replace";
   sourceProjectPath?: string;
+  requireEmptyDestination?: boolean;
 }
 
 const ASSETS_FOLDER_NAME = "Assets";
+export const occupiedProjectDestinationMessage = "A pasta de destino já contém arquivos. Escolha um novo nome ou uma pasta vazia.";
 
 const CURRENT_TEMPLATE_ASSET_FILES: Record<string, string> = {
   "topdown-player-4dir": "sprites/nara-topdown.png",
@@ -302,6 +304,25 @@ async function writeProjectFileAtomically(
   let stagingRoot: string | undefined;
   let assetsBackedUp = false;
   let assetsInstalled = false;
+
+  // A Save As/first save can resolve to a folder different from the path
+  // checked by the native dialog. Do not replace any existing user files in
+  // that effective destination, even before preparing split resources.
+  const savingSourceInPlace = options.sourceProjectPath !== undefined &&
+    path.resolve(options.sourceProjectPath) === path.resolve(destination);
+  if ((options.requireEmptyDestination || options.sourceProjectPath) && !savingSourceInPlace) {
+    const entries = await readdir(directory, { withFileTypes: true }).catch((error: NodeJS.ErrnoException) => {
+      if (error.code === "ENOENT") return [];
+      throw error;
+    });
+    // A failed copy can leave the empty Assets folder created below. It is
+    // safe to retry, but do not follow an Assets symlink or discard files.
+    const emptyAssetsOnly = entries.length === 1 && entries[0]!.name === ASSETS_FOLDER_NAME &&
+      entries[0]!.isDirectory() && (await readdir(assetsPath)).length === 0;
+    if (entries.length > 0 && !emptyAssetsOnly) {
+      throw new Error(occupiedProjectDestinationMessage);
+    }
+  }
 
   try {
     await mkdir(directory, { recursive: true });

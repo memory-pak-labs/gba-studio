@@ -32,7 +32,8 @@ import { serializeProjectPluginRegistry } from "../shared/gbaStudioPlugins.js";
 import { loadLaunchProject, resolveLaunchProject, resolveCurrentLaunchProjectPath, resolveLaunchProjectPath } from "./launchProject.js";
 import { preloadScriptPath } from "./mainPaths.js";
 import { projectOpenDialogOptions, projectSaveDialogOptions } from "./projectDialogs.js";
-import { openProjectFile, resolveProjectSaveDestination, saveProjectFileAtomically } from "./projectPersistence.js";
+import { occupiedProjectDestinationMessage, openProjectFile, resolveProjectSaveDestination, saveProjectFileAtomically } from "./projectPersistence.js";
+import { translateStudioMessage } from "../shared/studioUiMessages.js";
 import { createExternalAssetWatcher, type ExternalAssetWatcher } from "./externalAssetWatcher.js";
 import { publishEnginePackRomToProjectRoot } from "./projectRomPublication.js";
 import { analyzePreparedProjectBudget } from "./projectBudgetAnalysis.js";
@@ -300,6 +301,7 @@ ipcMain.handle(ipcChannels.saveProject, async (_event, request: SaveProjectReque
     await saveProjectFileAtomically(destination, request.project, {
       appPath: app.getAppPath(),
       sourceProjectPath: request.sourcePath,
+      requireEmptyDestination: !request.path,
       bundledAssetConflictPolicy: request.path ? "preserve" : "replace"
     });
     desktopAssetProjectRoots.add(resolve(dirname(destination)));
@@ -307,10 +309,11 @@ ipcMain.handle(ipcChannels.saveProject, async (_event, request: SaveProjectReque
     watchProjectAssets(destination);
     return { canceled: false, path: destination };
   } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
     return {
       canceled: false,
       path: destination,
-      error: error instanceof Error ? error.message : String(error)
+      error: message === occupiedProjectDestinationMessage ? translateStudioMessage(appLocale, message) : message
     };
   }
 });

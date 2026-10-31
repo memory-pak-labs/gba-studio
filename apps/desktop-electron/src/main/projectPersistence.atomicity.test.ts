@@ -43,41 +43,45 @@ function project(tile: number, split = true) {
   }));
 }
 
-it("preserves the destination and source if copying the Save As asset snapshot fails", async () => {
+it("preserves the source and leaves no project if copying a Save As asset snapshot fails", async () => {
   const origin = await destination(), target = await destination(), before = project(1, false);
-  await saveProjectFileAtomically(origin, before); await saveProjectFileAtomically(target, before);
+  await saveProjectFileAtomically(origin, before);
   const originAsset = path.join(path.dirname(origin), "Assets/hero.png");
-  const targetAsset = path.join(path.dirname(target), "Assets/hero.png");
-  await writeFile(originAsset, "new custom pixels"); await writeFile(targetAsset, "old destination pixels");
+  await writeFile(originAsset, "new custom pixels");
   failures.copySource = await realpath(originAsset);
   await expect(saveProjectFileAtomically(target, project(9, false), { sourceProjectPath: origin })).rejects.toThrow("asset copy failure");
-  expect((await openProjectFile(target)).project?.data).toEqual(before.data);
-  expect(await readFile(targetAsset, "utf8")).toBe("old destination pixels");
+  await expect(readFile(target)).rejects.toMatchObject({ code: "ENOENT" });
   expect(await readFile(originAsset, "utf8")).toBe("new custom pixels");
-  expect((await readdir(path.dirname(target))).sort()).toEqual(["Assets", "game.gba-project"]);
+  expect((await readdir(path.dirname(target))).sort()).toEqual(["Assets"]);
+  expect(await readdir(path.join(path.dirname(target), "Assets"))).toEqual([]);
+  failures.copySource = "";
+  await saveProjectFileAtomically(target, project(9, false), { sourceProjectPath: origin });
+  expect(await readFile(path.join(path.dirname(target), "Assets/hero.png"), "utf8")).toBe("new custom pixels");
 });
 
-it("restores previous assets if committing a Save As manifest fails", async () => {
+it("rolls back the staged assets if committing a Save As manifest fails", async () => {
   const origin = await destination(), target = await destination(), before = project(1, false);
-  await saveProjectFileAtomically(origin, before); await saveProjectFileAtomically(target, before);
-  const targetAsset = path.join(path.dirname(target), "Assets/hero.png");
+  await saveProjectFileAtomically(origin, before);
   await writeFile(path.join(path.dirname(origin), "Assets/hero.png"), "new custom pixels");
-  await writeFile(targetAsset, "old destination pixels");
   failures.renameDestination = target;
   await expect(saveProjectFileAtomically(target, project(9, false), { sourceProjectPath: origin })).rejects.toThrow("disk failure");
-  expect((await openProjectFile(target)).project?.data).toEqual(before.data);
-  expect(await readFile(targetAsset, "utf8")).toBe("old destination pixels");
-  expect((await readdir(path.dirname(target))).sort()).toEqual(["Assets", "game.gba-project"]);
+  await expect(readFile(target)).rejects.toMatchObject({ code: "ENOENT" });
+  expect(await readFile(path.join(path.dirname(origin), "Assets/hero.png"), "utf8")).toBe("new custom pixels");
+  expect((await readdir(path.dirname(target))).sort()).toEqual(["Assets"]);
+  expect(await readdir(path.join(path.dirname(target), "Assets"))).toEqual([]);
+  failures.renameDestination = "";
+  await saveProjectFileAtomically(target, project(9, false), { sourceProjectPath: origin });
+  expect(await readFile(path.join(path.dirname(target), "Assets/hero.png"), "utf8")).toBe("new custom pixels");
 });
 
 it("rejects a Save As source whose Assets symlink escapes the source project", async () => {
   const origin = await destination(), target = await destination(), before = project(1, false);
-  await saveProjectFileAtomically(origin, before); await saveProjectFileAtomically(target, before);
+  await saveProjectFileAtomically(origin, before);
   const external = await mkdtemp(path.join(os.tmpdir(), "gba-save-as-external-")); roots.push(external);
   await writeFile(path.join(external, "private.txt"), "outside project");
   const assets = path.join(path.dirname(origin), "Assets"); await rm(assets, { recursive: true }); await symlink(external, assets);
   await expect(saveProjectFileAtomically(target, project(9, false), { sourceProjectPath: origin })).rejects.toThrow(/Assets|fora do projeto/);
-  expect((await openProjectFile(target)).project?.data).toEqual(before.data);
+  await expect(readFile(target)).rejects.toMatchObject({ code: "ENOENT" });
   expect(await readdir(path.join(path.dirname(target), "Assets"))).toEqual([]);
 });
 

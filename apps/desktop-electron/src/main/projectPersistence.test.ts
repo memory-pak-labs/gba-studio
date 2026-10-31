@@ -26,6 +26,77 @@ describe("project persistence", () => {
       .toBe(path.join(gamesDirectory, "hud_authoring_qa", "hud_authoring_qa.gba-project"));
   });
 
+  it("does not replace an existing project at the resolved Save As destination", async () => {
+    const root = await makeTemporaryRoot("gbastudio-save-as-existing-project-");
+    const source = path.join(root, "source", "source.gba-project");
+    const selected = path.join(root, "copy.gba-project");
+    const destination = resolveProjectSaveDestination(undefined, selected, "Source");
+    const original = parseGBAProjectFile('{"schemaVersion":2,"name":"Source"}');
+    const existing = parseGBAProjectFile('{"schemaVersion":2,"name":"Existing"}');
+    await saveProjectFileAtomically(source, original);
+    await saveProjectFileAtomically(destination, existing);
+    const existingBytes = await readFile(destination);
+    await expect(saveProjectFileAtomically(destination, original, { sourceProjectPath: source }))
+      .rejects.toThrow(/destino|destination/i);
+    expect(await readFile(destination)).toEqual(existingBytes);
+    expect((await openProjectFile(destination)).project?.data.name).toBe("Existing");
+    expect((await openProjectFile(source)).project?.data.name).toBe("Source");
+  });
+
+  it("does not remove existing destination assets when saving an independent copy", async () => {
+    const root = await makeTemporaryRoot("gbastudio-save-as-existing-assets-");
+    const source = path.join(root, "source", "source.gba-project");
+    const destination = resolveProjectSaveDestination(undefined, path.join(root, "copy.gba-project"), "Source");
+    const project = parseGBAProjectFile(JSON.stringify({
+      schemaVersion: 2, name: "Source", settings: { build: { splitProjectResources: true } },
+      rooms: [{ id: "room", name: "Room", width: 2, height: 2, tilemap: [0, 0, 0, 0] }]
+    }));
+    await saveProjectFileAtomically(source, project);
+    const existingAsset = path.join(path.dirname(destination), "Assets", "existing.txt");
+    await mkdir(path.dirname(existingAsset), { recursive: true });
+    await writeFile(existingAsset, "existing user asset");
+    await expect(saveProjectFileAtomically(destination, project, { sourceProjectPath: source }))
+      .rejects.toThrow(/destino|destination/i);
+    expect(await readFile(existingAsset, "utf8")).toBe("existing user asset");
+    await expect(readFile(destination)).rejects.toMatchObject({ code: "ENOENT" });
+    expect(await readdir(path.dirname(destination))).toEqual(["Assets"]);
+  });
+
+  it("does not overwrite a project when the first save resolves to an occupied folder", async () => {
+    const root = await makeTemporaryRoot("gbastudio-first-save-existing-");
+    const destination = resolveProjectSaveDestination(undefined, path.join(root, "copy.gba-project"), "New");
+    const existing = parseGBAProjectFile('{"schemaVersion":2,"name":"Existing"}');
+    const next = parseGBAProjectFile('{"schemaVersion":2,"name":"New"}');
+    await saveProjectFileAtomically(destination, existing);
+    const bytes = await readFile(destination);
+    await expect(saveProjectFileAtomically(destination, next, { requireEmptyDestination: true }))
+      .rejects.toThrow(/destino|destination/i);
+    expect(await readFile(destination)).toEqual(bytes);
+  });
+
+  it("protects existing assets at the first-save destination even without a project there", async () => {
+    const root = await makeTemporaryRoot("gbastudio-first-save-existing-assets-");
+    const destination = resolveProjectSaveDestination(undefined, path.join(root, "copy.gba-project"), "New");
+    const asset = path.join(path.dirname(destination), "Assets", "existing.txt");
+    const project = parseGBAProjectFile('{"schemaVersion":2,"name":"New"}');
+    await mkdir(path.dirname(asset), { recursive: true });
+    await writeFile(asset, "existing user asset");
+    await expect(saveProjectFileAtomically(destination, project, { requireEmptyDestination: true }))
+      .rejects.toThrow(/destino|destination/i);
+    expect(await readFile(asset, "utf8")).toBe("existing user asset");
+    await expect(readFile(destination)).rejects.toMatchObject({ code: "ENOENT" });
+  });
+
+  it("allows saving in place when Save As resolves to the source project itself", async () => {
+    const root = await makeTemporaryRoot("gbastudio-save-as-same-project-");
+    const source = path.join(root, "source.gba-project");
+    const original = parseGBAProjectFile('{"schemaVersion":2,"name":"Original"}');
+    const updated = parseGBAProjectFile('{"schemaVersion":2,"name":"Updated"}');
+    await saveProjectFileAtomically(source, original);
+    await saveProjectFileAtomically(source, updated, { sourceProjectPath: source, requireEmptyDestination: true });
+    expect((await openProjectFile(source)).project?.data.name).toBe("Updated");
+  });
+
   it("copies imported and modified assets from the current project when saving an independent copy", async () => {
     const root = await makeTemporaryRoot("gbastudio-save-as-assets-");
     const origin = path.join(root, "original/game.gba-project");
