@@ -5,7 +5,7 @@ import { afterEach, expect, it, vi } from "vitest";
 import { openProjectFile, saveProjectFileAtomically } from "./projectPersistence.js";
 import { parseGBAProjectFile } from "../shared/projectFile.js";
 
-const failures = vi.hoisted(() => ({ renameDestination: "", copyDestination: "" }));
+const failures = vi.hoisted(() => ({ renameDestination: "", copyDestination: "", copySource: "" }));
 vi.mock("node:fs/promises", async (importOriginal) => {
   const original = await importOriginal<typeof import("node:fs/promises")>();
   return {
@@ -15,7 +15,7 @@ vi.mock("node:fs/promises", async (importOriginal) => {
       return original.rename(...args);
     },
     copyFile: async (...args: Parameters<typeof original.copyFile>) => {
-      if (String(args[1]) === failures.copyDestination) throw new Error("simulated asset copy failure");
+      if (String(args[1]) === failures.copyDestination || String(args[0]) === failures.copySource) throw new Error("simulated asset copy failure");
       return original.copyFile(...args);
     }
   };
@@ -25,6 +25,7 @@ const roots: string[] = [];
 afterEach(async () => {
   failures.renameDestination = "";
   failures.copyDestination = "";
+  failures.copySource = "";
   vi.restoreAllMocks();
   await Promise.all(roots.splice(0).map(root => rm(root, { recursive: true, force: true })));
 });
@@ -41,6 +42,62 @@ function project(tile: number, split = true) {
     events: [{ id: "boot", name: "Boot", steps: [] }]
   }));
 }
+
+it("preserves the destination and source if copying the Save As asset snapshot fails", async () => {
+  const origin = await destination(), target = await destination(), before = project(1, false);
+  await saveProjectFileAtomically(origin, before); await saveProjectFileAtomically(target, before);
+  const originAsset = path.join(path.dirname(origin), "Assets/hero.png");
+  const targetAsset = path.join(path.dirname(target), "Assets/hero.png");
+  await writeFile(originAsset, "new custom pixels"); await writeFile(targetAsset, "old destination pixels");
+  failures.copySource = await realpath(originAsset);
+  await expect(saveProjectFileAtomically(target, project(9, false), { sourceProjectPath: origin })).rejects.toThrow("asset copy failure");
+  expect((await openProjectFile(target)).project?.data).toEqual(before.data);
+  expect(await readFile(targetAsset, "utf8")).toBe("old destination pixels");
+  expect(await readFile(originAsset, "utf8")).toBe("new custom pixels");
+  expect((await readdir(path.dirname(target))).sort()).toEqual(["Assets", "game.gba-project"]);
+});
+
+it("restores previous assets if committing a Save As manifest fails", async () => {
+  const origin = await destination(), target = await destination(), before = project(1, false);
+  await saveProjectFileAtomically(origin, before); await saveProjectFileAtomically(target, before);
+  const targetAsset = path.join(path.dirname(target), "Assets/hero.png");
+  await writeFile(path.join(path.dirname(origin), "Assets/hero.png"), "new custom pixels");
+  await writeFile(targetAsset, "old destination pixels");
+  failures.renameDestination = target;
+  await expect(saveProjectFileAtomically(target, project(9, false), { sourceProjectPath: origin })).rejects.toThrow("disk failure");
+  expect((await openProjectFile(target)).project?.data).toEqual(before.data);
+  expect(await readFile(targetAsset, "utf8")).toBe("old destination pixels");
+  expect((await readdir(path.dirname(target))).sort()).toEqual(["Assets", "game.gba-project"]);
+});
+
+it("rejects a Save As source whose Assets symlink escapes the source project", async () => {
+  const origin = await destination(), target = await destination(), before = project(1, false);
+  await saveProjectFileAtomically(origin, before); await saveProjectFileAtomically(target, before);
+  const external = await mkdtemp(path.join(os.tmpdir(), "gba-save-as-external-")); roots.push(external);
+  await writeFile(path.join(external, "private.txt"), "outside project");
+  const assets = path.join(path.dirname(origin), "Assets"); await rm(assets, { recursive: true }); await symlink(external, assets);
+  await expect(saveProjectFileAtomically(target, project(9, false), { sourceProjectPath: origin })).rejects.toThrow(/Assets|fora do projeto/);
+  expect((await openProjectFile(target)).project?.data).toEqual(before.data);
+  expect(await readdir(path.join(path.dirname(target), "Assets"))).toEqual([]);
+});
+
+it("rejects a Save As destination inside the source asset tree", async () => {
+  const origin = await destination(), before = project(1, false);
+  await saveProjectFileAtomically(origin, before);
+  const hero = path.join(path.dirname(origin), "Assets/hero.png"); await writeFile(hero, "source pixels");
+  const nested = path.join(path.dirname(origin), "Assets/copy/copy.gba-project");
+  await expect(saveProjectFileAtomically(nested, project(9, false), { sourceProjectPath: origin })).rejects.toThrow(/dentro de Assets/);
+  expect((await openProjectFile(origin)).project?.data).toEqual(before.data);
+  expect(await readFile(hero, "utf8")).toBe("source pixels");
+});
+
+it("rejects cyclic asset directories instead of recursing into the staging tree", async () => {
+  const origin = await destination(), target = await destination(), before = project(1, false);
+  await saveProjectFileAtomically(origin, before);
+  await symlink(path.join(path.dirname(origin), "Assets"), path.join(path.dirname(origin), "Assets/loop"));
+  await expect(saveProjectFileAtomically(target, before, { sourceProjectPath: origin })).rejects.toThrow(/Ciclo/);
+  expect((await readdir(path.dirname(target))).sort()).toEqual(["Assets"]);
+});
 
 it("retains the last complete split save when committing the new manifest fails", async () => {
   const file = await destination(), before = project(1);

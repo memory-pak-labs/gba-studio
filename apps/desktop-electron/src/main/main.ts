@@ -299,6 +299,7 @@ ipcMain.handle(ipcChannels.saveProject, async (_event, request: SaveProjectReque
   try {
     await saveProjectFileAtomically(destination, request.project, {
       appPath: app.getAppPath(),
+      sourceProjectPath: request.sourcePath,
       bundledAssetConflictPolicy: request.path ? "preserve" : "replace"
     });
     desktopAssetProjectRoots.add(resolve(dirname(destination)));

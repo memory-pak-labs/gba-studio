@@ -276,6 +276,7 @@ import {
 } from "../shared/gbaStudioPlugins";
 import { PluginCatalogModal } from "./PluginCatalogModal";
 import { saveNewProjectSession } from "./newProjectCreationFlow";
+import { saveExistingProjectSession } from "./projectSaveFlow";
 import { selectProjectSessionRoom, type ProjectSession } from "./projectSession";
 import { copyName, uniqueDefaultRoomName, droppedFiles, statusText } from "./rendererHelpers";
 import { RoomsWorkspace } from "./roomsWorkspace";
@@ -845,25 +846,21 @@ function App(): React.ReactElement {
 
   async function saveProject(): Promise<void> {
     if (!session) return;
-    const result = await window.gbaStudio.saveProject(session);
+    const { result, session: savedSession } = await saveExistingProjectSession(session, window.gbaStudio.saveProject);
     publishFeedback(saveProjectFeedback(result));
-    if (!result.canceled && result.path) {
-      setSession({ ...session, path: result.path, dirty: false });
-    }
+    if (savedSession !== session) setSession(savedSession);
   }
 
   async function saveProjectAs(): Promise<void> {
     if (!session) return;
-    const result = await window.gbaStudio.saveProject({ project: session.project });
+    const { result, session: savedSession } = await saveExistingProjectSession(session, window.gbaStudio.saveProject, true);
     publishFeedback(saveProjectFeedback(result));
-    if (!result.canceled && result.path) {
-      setSession({ ...session, path: result.path, dirty: false });
-    }
+    if (savedSession !== session) setSession(savedSession);
   }
 
   async function createBackup(): Promise<void> {
     if (!session) return;
-    const result = await window.gbaStudio.saveProject({ project: session.project });
+    const { result } = await saveExistingProjectSession(session, window.gbaStudio.saveProject, true);
     if (result.canceled) {
       setStatus(ui("Criacao de backup cancelada."));
       return;

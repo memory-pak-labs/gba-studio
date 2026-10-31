@@ -53,6 +53,8 @@ export interface RecentProjectEntry {
 
 export interface SaveProjectRequest {
   path?: string;
+  /** Existing project whose asset library must accompany a separate copy. */
+  sourcePath?: string;
   project: ParsedGBAProject;
 }
 

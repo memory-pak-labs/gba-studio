@@ -19,6 +19,35 @@ afterEach(async () => {
 });
 
 describe("project persistence", () => {
+  it("honors the filename selected by Save As while keeping a self-contained folder", () => {
+    expect(resolveProjectSaveDestination(undefined, "/games/hud_authoring_qa.gba-project", "Dungeon HUD QA"))
+      .toBe("/games/hud_authoring_qa/hud_authoring_qa.gba-project");
+  });
+
+  it("copies imported and modified assets from the current project when saving an independent copy", async () => {
+    const root = await makeTemporaryRoot("gbastudio-save-as-assets-");
+    const origin = path.join(root, "original/game.gba-project");
+    const destination = path.join(root, "copy/copy.gba-project");
+    const project = parseGBAProjectFile(JSON.stringify({ schemaVersion: 2, name: "Source", assets: [
+      { id: "sprite", name: "hero.png", kind: "Sprite", metadata: { source: "Assets/sprites/hero.png" } },
+      { id: "skin", name: "skin.png", kind: "UI", metadata: { source: "Assets/ui/skin.png", bundledDefaultAsset: "template:blank/Assets/ui/neutral-hud-skin.png" } }
+    ] }));
+    await saveProjectFileAtomically(origin, project, { appPath: process.cwd() });
+    const assets = { "sprites/hero.png": "imported sprite", "ui/skin.png": "edited default", "sounds/theme.mod": "imported music", "notes/unused.txt": "unreferenced library file" };
+    for (const [name, bytes] of Object.entries(assets)) {
+      const file = path.join(path.dirname(origin), "Assets", name);
+      await mkdir(path.dirname(file), { recursive: true }); await writeFile(file, bytes);
+    }
+    const originBytes = await readFile(origin);
+    await saveProjectFileAtomically(destination, project, { appPath: process.cwd(), sourceProjectPath: origin });
+    for (const [name, bytes] of Object.entries(assets)) {
+      expect(await readFile(path.join(path.dirname(destination), "Assets", name), "utf8")).toBe(bytes);
+      expect(await readFile(path.join(path.dirname(origin), "Assets", name), "utf8")).toBe(bytes);
+    }
+    expect(await readFile(origin)).toEqual(originBytes);
+    expect((await openProjectFile(destination)).project?.data).toEqual(project.data);
+    expect((await readdir(path.dirname(destination))).sort()).toEqual(["Assets", "copy.gba-project"]);
+  });
   it("saves and reopens a blank template without copying example assets or plugins", async () => {
     const root = await makeTemporaryRoot("gbastudio-blank-template-");
     const projectPath = resolveProjectSaveDestination(undefined, path.join(root, "Meu jogo.gba-project"), "Meu jogo");
