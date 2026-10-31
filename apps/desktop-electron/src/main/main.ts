@@ -89,6 +89,7 @@ configureSmokeDevToolsPort();
 registerTranslationModelProtocolScheme();
 
 let appLocale: string = DEFAULT_APP_LOCALE;
+let editorWindow: BrowserWindow | undefined;
 function showLocalizedOpenDialog(options: OpenDialogOptions) {
   return dialog.showOpenDialog(localizeNativeDialog({ buttonLabel: "Abrir", ...options }, appLocale));
 }
@@ -98,7 +99,7 @@ function showLocalizedSaveDialog(options: SaveDialogOptions) {
 ipcMain.handle(ipcChannels.setAppLocale, (_event, locale: unknown) => {
   if (!isAppLocale(locale)) throw new Error("Unsupported application locale.");
   appLocale = locale;
-  installAppMenu(locale);
+  installAppMenu(locale, () => editorWindow);
 });
 
 const mcpServerMode = process.argv.includes("--mcp");
@@ -109,7 +110,7 @@ let externalAssetWatcher: ExternalAssetWatcher | null = null;
 const desktopAssetProjectRoots = new Set<string>();
 
 function targetWindow(): BrowserWindow | undefined {
-  return BrowserWindow.getFocusedWindow() ?? BrowserWindow.getAllWindows()[0];
+  return editorWindow && !editorWindow.isDestroyed() ? editorWindow : undefined;
 }
 
 function deliverExternalProjectOpen(result: OpenProjectResult): void {
@@ -119,6 +120,9 @@ function deliverExternalProjectOpen(result: OpenProjectResult): void {
     return;
   }
 
+  if (window.isMinimized()) window.restore();
+  window.show();
+  window.focus();
   window.webContents.send(ipcChannels.externalProjectOpen, result);
 }
 
@@ -142,7 +146,6 @@ function watchProjectAssets(projectPath: string): void {
 
 async function openExternalProject(projectPath: string): Promise<void> {
   const result = await loadLaunchProject(projectPath);
-  registerRecentProject(result);
   deliverExternalProjectOpen(result);
 }
 
@@ -179,6 +182,10 @@ function createWindow(): BrowserWindow {
       nodeIntegration: false,
       sandbox: false
     }
+  });
+  editorWindow = window;
+  window.on("closed", () => {
+    if (editorWindow === window) editorWindow = undefined;
   });
   const closeGuard = createWindowCloseGuard(() => {
     window.webContents.send(ipcChannels.appCommand, "window:request-close");
@@ -977,7 +984,7 @@ void app.whenReady().then(async () => {
     return;
   }
 
-  installAppMenu();
+  installAppMenu(DEFAULT_APP_LOCALE, () => editorWindow);
   registerDesktopAssetProtocol(desktopAssetProjectRoots);
   registerTranslationModelProtocol();
   registerTranslationPackIpcHandlers();

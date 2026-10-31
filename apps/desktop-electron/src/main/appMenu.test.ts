@@ -1,5 +1,35 @@
 import { describe, expect, it, vi } from "vitest";
-import { createAppMenuTemplate } from "./appMenu.js";
+import { createAppMenuTemplate, dispatchAppMenuCommand } from "./appMenu.js";
+
+describe("app menu command destination", () => {
+  it("sends project commands to the editor even when another window has focus", () => {
+    const editor = {
+      isDestroyed: vi.fn(() => false),
+      isMinimized: vi.fn(() => false),
+      restore: vi.fn(), show: vi.fn(), focus: vi.fn(),
+      webContents: { send: vi.fn() }
+    };
+    dispatchAppMenuCommand(editor, "project:open");
+    expect(editor.focus).toHaveBeenCalledOnce();
+    expect(editor.webContents.send).toHaveBeenCalledWith("app:command", "project:open");
+    expect(editor.restore).not.toHaveBeenCalled();
+  });
+
+  it("restores a minimized editor and ignores a closed editor", () => {
+    const editor = {
+      isDestroyed: vi.fn(() => false),
+      isMinimized: vi.fn(() => true),
+      restore: vi.fn(), show: vi.fn(), focus: vi.fn(),
+      webContents: { send: vi.fn() }
+    };
+    dispatchAppMenuCommand(editor, "project:save");
+    expect(editor.restore).toHaveBeenCalledOnce();
+    editor.isDestroyed.mockReturnValue(true);
+    dispatchAppMenuCommand(editor, "project:open");
+    expect(editor.webContents.send).toHaveBeenCalledTimes(1);
+    expect(() => dispatchAppMenuCommand(undefined, "project:open")).not.toThrow();
+  });
+});
 
 function menuItemLabels(section: { submenu?: unknown }): string[] {
   const submenu = Array.isArray(section.submenu) ? section.submenu : [];

@@ -1,4 +1,5 @@
 import { uiText as ui, useStudioUiText } from "./studioUiText";
+import { resolveExternalProjectOpen } from "./externalProjectOpen.js";
 import { createAudioInstrumentFromChannel, updateAudioInstrumentInProject, removeAudioInstrumentFromProject, type UpdateAudioInstrumentFields } from "../shared/audioInstruments.js";
 import { audioPhysicalChannel } from "../shared/audioContract.js";
 import { listLogicValueUsages, updateLogicValueInProject, type LogicValuePatch } from "../shared/logicWorkspace";
@@ -541,9 +542,8 @@ function App(): React.ReactElement {
   useEffect(() => {
     return window.gbaStudio.onExternalProjectOpen((result) => {
       void (async () => {
-        if (await confirmDiscard()) {
-          applyOpenProjectResult(result);
-        }
+        const accepted = await resolveExternalProjectOpen(result, confirmDiscard, (path) => window.gbaStudio.openProjectAtPath(path));
+        if (accepted) applyOpenProjectResult(accepted);
       })();
     });
   }, [confirmDiscard, session]);

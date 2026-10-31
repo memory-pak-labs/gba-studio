@@ -1,4 +1,4 @@
-import { app, BrowserWindow, Menu, type MenuItemConstructorOptions } from "electron";
+import { app, Menu, type BrowserWindow, type MenuItemConstructorOptions, type WebContents } from "electron";
 import { ipcChannels, type AppCommand } from "../shared/ipc.js";
 import { translateStudioMessage } from "../shared/studioUiMessages.js";
 import { DEFAULT_APP_LOCALE } from "../shared/appLocale.js";
@@ -135,10 +135,21 @@ export function createAppMenuTemplate(options: AppMenuOptions): MenuItemConstruc
   return localize(template);
 }
 
-export function installAppMenu(locale: string = DEFAULT_APP_LOCALE): void {
+type AppMenuTarget = Pick<BrowserWindow, "isDestroyed" | "isMinimized" | "restore" | "show" | "focus"> & {
+  webContents: Pick<WebContents, "send">;
+};
+
+export function dispatchAppMenuCommand(target: AppMenuTarget | undefined, command: AppCommand): void {
+  if (!target || target.isDestroyed()) return;
+  if (target.isMinimized()) target.restore();
+  target.show();
+  target.focus();
+  target.webContents.send(ipcChannels.appCommand, command);
+}
+
+export function installAppMenu(locale: string = DEFAULT_APP_LOCALE, getEditorWindow: () => BrowserWindow | undefined = () => undefined): void {
   const sendCommand = (command: AppCommand): void => {
-    const target = BrowserWindow.getFocusedWindow() ?? BrowserWindow.getAllWindows()[0];
-    target?.webContents.send(ipcChannels.appCommand, command);
+    dispatchAppMenuCommand(getEditorWindow(), command);
   };
 
   Menu.setApplicationMenu(Menu.buildFromTemplate(createAppMenuTemplate({ sendCommand, locale })));
