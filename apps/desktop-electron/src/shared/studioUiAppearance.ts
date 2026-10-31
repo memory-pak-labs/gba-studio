@@ -56,10 +56,6 @@ export function writeStudioUiAppearance(
   storage.setItem(STUDIO_UI_APPEARANCE_STORAGE_KEY, JSON.stringify(normalizeAppearance(value)));
 }
 
-export function studioUiTextContrastTone(value: number): "low" | "standard" | "high" {
-  return value < 34 ? "low" : value > 66 ? "high" : "standard";
-}
-
 export function studioUiBrightness(value: number): number {
   return 0.85 + clampPercentage(value, DEFAULT_STUDIO_UI_APPEARANCE.brightness) * 0.003;
 }
@@ -69,8 +65,9 @@ export function applyStudioUiAppearance(
   root: HTMLElement = document.documentElement
 ): void {
   const appearance = normalizeAppearance(value);
-  root.setAttribute("data-studio-ui-text-contrast", studioUiTextContrastTone(appearance.textContrast));
   root.setAttribute("data-studio-ui-contrast", appearance.contrast);
+  root.style.setProperty("--studio-ui-text-soften", `${Math.max(0, 50 - appearance.textContrast) * 0.28}%`);
+  root.style.setProperty("--studio-ui-text-strengthen", `${Math.max(0, appearance.textContrast - 50) * 0.5}%`);
   root.style.setProperty("--studio-ui-app-gray", `${appearance.appBackgroundGray}%`);
   root.style.setProperty("--studio-ui-canvas-gray", `${appearance.canvasBackgroundGray}%`);
   root.style.setProperty("--studio-ui-brightness", String(studioUiBrightness(appearance.brightness)));

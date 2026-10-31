@@ -1,8 +1,16 @@
 :root {
   --studio-ui-app-gray: 0%;
   --studio-ui-canvas-gray: 0%;
-  --studio-ui-app-neutral: #f0f0f0;
-  --studio-ui-canvas-neutral: #f8f8f8;
+  --studio-ui-app-neutral: #d7d7d7;
+  --studio-ui-canvas-neutral: #dedede;
+  --studio-ui-surface-neutral: #e3e3e3;
+  --studio-ui-surface-muted-neutral: #dddddd;
+  --studio-ui-surface-raised-neutral: #eeeeee;
+  --studio-ui-surface-hover-neutral: #e7e7e7;
+  --studio-ui-text-soften: 0%;
+  --studio-ui-text-strengthen: 0%;
+  --studio-ui-text-low-tone: white;
+  --studio-ui-text-high-tone: black;
   --studio-ui-brightness: 1;
   --studio-color-bg-app: var(--studio-color-bg-app-base);
   --studio-color-bg-canvas: var(--studio-color-bg-canvas-base);
@@ -25,36 +33,28 @@
       var(--studio-color-bg-canvas-base) calc(100% - var(--studio-ui-canvas-gray)),
       var(--studio-ui-canvas-neutral) var(--studio-ui-canvas-gray)
     );
+    --studio-color-surface: color-mix(in srgb, var(--studio-color-surface-base) calc(100% - var(--studio-ui-app-gray)), var(--studio-ui-surface-neutral) var(--studio-ui-app-gray));
+    --studio-color-surface-muted: color-mix(in srgb, var(--studio-color-surface-muted-base) calc(100% - var(--studio-ui-app-gray)), var(--studio-ui-surface-muted-neutral) var(--studio-ui-app-gray));
+    --studio-color-surface-raised: color-mix(in srgb, var(--studio-color-surface-raised-base) calc(100% - var(--studio-ui-app-gray)), var(--studio-ui-surface-raised-neutral) var(--studio-ui-app-gray));
+    --studio-color-surface-hover: color-mix(in srgb, var(--studio-color-surface-hover-base) calc(100% - var(--studio-ui-app-gray)), var(--studio-ui-surface-hover-neutral) var(--studio-ui-app-gray));
+    --studio-ui-text-primary-soft: color-mix(in srgb, var(--studio-color-text-primary-base) calc(100% - var(--studio-ui-text-soften)), var(--studio-ui-text-low-tone) var(--studio-ui-text-soften));
+    --studio-ui-text-secondary-soft: color-mix(in srgb, var(--studio-color-text-secondary-base) calc(100% - var(--studio-ui-text-soften)), var(--studio-ui-text-low-tone) var(--studio-ui-text-soften));
+    --studio-ui-text-muted-soft: color-mix(in srgb, var(--studio-color-text-muted-base) calc(100% - var(--studio-ui-text-soften)), var(--studio-ui-text-low-tone) var(--studio-ui-text-soften));
+    --studio-color-text-primary: color-mix(in srgb, var(--studio-ui-text-primary-soft) calc(100% - var(--studio-ui-text-strengthen)), var(--studio-ui-text-high-tone) var(--studio-ui-text-strengthen));
+    --studio-color-text-secondary: color-mix(in srgb, var(--studio-ui-text-secondary-soft) calc(100% - var(--studio-ui-text-strengthen)), var(--studio-ui-text-high-tone) var(--studio-ui-text-strengthen));
+    --studio-color-text-muted: color-mix(in srgb, var(--studio-ui-text-muted-soft) calc(100% - var(--studio-ui-text-strengthen)), var(--studio-ui-text-high-tone) var(--studio-ui-text-strengthen));
   }
 }
 
 :root[data-studio-theme="dark"] {
-  --studio-ui-app-neutral: #191919;
-  --studio-ui-canvas-neutral: #131313;
-}
-
-:root[data-studio-ui-text-contrast="low"] {
-  --studio-color-text-primary: color-mix(in srgb, var(--studio-color-text-primary-base) 78%, white 22%);
-  --studio-color-text-secondary: color-mix(in srgb, var(--studio-color-text-secondary-base) 78%, white 22%);
-  --studio-color-text-muted: color-mix(in srgb, var(--studio-color-text-muted-base) 70%, white 30%);
-}
-
-:root[data-studio-ui-text-contrast="high"] {
-  --studio-color-text-primary: color-mix(in srgb, var(--studio-color-text-primary-base) 88%, black 12%);
-  --studio-color-text-secondary: color-mix(in srgb, var(--studio-color-text-secondary-base) 88%, black 12%);
-  --studio-color-text-muted: color-mix(in srgb, var(--studio-color-text-muted-base) 88%, black 12%);
-}
-
-:root[data-studio-theme="dark"][data-studio-ui-text-contrast="low"] {
-  --studio-color-text-primary: color-mix(in srgb, var(--studio-color-text-primary-base) 78%, black 22%);
-  --studio-color-text-secondary: color-mix(in srgb, var(--studio-color-text-secondary-base) 78%, black 22%);
-  --studio-color-text-muted: color-mix(in srgb, var(--studio-color-text-muted-base) 70%, black 30%);
-}
-
-:root[data-studio-theme="dark"][data-studio-ui-text-contrast="high"] {
-  --studio-color-text-primary: color-mix(in srgb, var(--studio-color-text-primary-base) 88%, white 12%);
-  --studio-color-text-secondary: color-mix(in srgb, var(--studio-color-text-secondary-base) 88%, white 12%);
-  --studio-color-text-muted: color-mix(in srgb, var(--studio-color-text-muted-base) 88%, white 12%);
+  --studio-ui-app-neutral: #303030;
+  --studio-ui-canvas-neutral: #292929;
+  --studio-ui-surface-neutral: #363636;
+  --studio-ui-surface-muted-neutral: #333333;
+  --studio-ui-surface-raised-neutral: #393939;
+  --studio-ui-surface-hover-neutral: #3c3c3c;
+  --studio-ui-text-low-tone: black;
+  --studio-ui-text-high-tone: white;
 }
 
 :root[data-studio-ui-contrast="high"] {
@@ -69,8 +69,8 @@
 }
 
 :root[data-studio-theme="dark"][data-studio-ui-contrast="high"] {
-  --studio-shadow-soft: 0 8px 22px rgba(0, 0, 0, 0.42);
-  --studio-shadow-control: 0 1px 0 rgba(255, 255, 255, 0.08) inset, 0 8px 20px rgba(0, 0, 0, 0.32);
+  --studio-shadow-soft: 0 1px 0 rgba(255, 255, 255, 0.08) inset;
+  --studio-shadow-control: 0 1px 0 rgba(255, 255, 255, 0.12) inset;
 }
 
 .app-shell,

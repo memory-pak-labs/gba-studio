@@ -6,7 +6,6 @@ import {
   applyStudioUiAppearance,
   readStudioUiAppearance,
   studioUiBrightness,
-  studioUiTextContrastTone,
   writeStudioUiAppearance
 } from "./studioUiAppearance.js";
 
@@ -47,7 +46,8 @@ describe("studioUiAppearance", () => {
       contrast: "high"
     }, root);
 
-    expect(root.getAttribute("data-studio-ui-text-contrast")).toBe("high");
+    expect(root.style.getPropertyValue("--studio-ui-text-strengthen")).toBe("20%");
+    expect(root.style.getPropertyValue("--studio-ui-text-soften")).toBe("0%");
     expect(root.getAttribute("data-studio-ui-contrast")).toBe("high");
     expect(root.style.getPropertyValue("--studio-ui-app-gray")).toBe("24%");
     expect(root.style.getPropertyValue("--studio-ui-canvas-gray")).toBe("68%");
@@ -55,10 +55,25 @@ describe("studioUiAppearance", () => {
   });
 
   it("keeps range semantics stable at the boundaries", () => {
-    expect(studioUiTextContrastTone(0)).toBe("low");
-    expect(studioUiTextContrastTone(50)).toBe("standard");
-    expect(studioUiTextContrastTone(100)).toBe("high");
     expect(studioUiBrightness(0)).toBe(0.85);
     expect(studioUiBrightness(50)).toBe(1);
+    const root = document.createElement("html");
+    applyStudioUiAppearance({ ...DEFAULT_STUDIO_UI_APPEARANCE, textContrast: 0 }, root);
+    expect(parseFloat(root.style.getPropertyValue("--studio-ui-text-soften"))).toBeCloseTo(14);
+    applyStudioUiAppearance({ ...DEFAULT_STUDIO_UI_APPEARANCE, textContrast: 100 }, root);
+    expect(root.style.getPropertyValue("--studio-ui-text-strengthen")).toBe("25%");
+  });
+
+  it("changes text contrast at adjacent slider values without a dead zone", () => {
+    const root = document.createElement("html");
+    applyStudioUiAppearance({ ...DEFAULT_STUDIO_UI_APPEARANCE, textContrast: 45 }, root);
+    const first = root.style.getPropertyValue("--studio-ui-text-soften");
+    applyStudioUiAppearance({ ...DEFAULT_STUDIO_UI_APPEARANCE, textContrast: 46 }, root);
+    expect(root.style.getPropertyValue("--studio-ui-text-soften")).not.toBe(first);
+    applyStudioUiAppearance({ ...DEFAULT_STUDIO_UI_APPEARANCE, textContrast: 50 }, root);
+    expect(root.style.getPropertyValue("--studio-ui-text-soften")).toBe("0%");
+    expect(root.style.getPropertyValue("--studio-ui-text-strengthen")).toBe("0%");
+    applyStudioUiAppearance({ ...DEFAULT_STUDIO_UI_APPEARANCE, textContrast: 51 }, root);
+    expect(parseFloat(root.style.getPropertyValue("--studio-ui-text-strengthen"))).toBeGreaterThan(0);
   });
 });

@@ -423,10 +423,12 @@ describe("Electron design system CSS", () => {
     expect(dark).toContain(".audio-filter-bar");
   });
 
-  it("keeps dark theme text and filled commands readable on their intended surfaces", () => {
-    const darkTokens = cssFile("base.css").split('[data-studio-theme="dark"]')[1];
-    const tokens = Object.fromEntries([...darkTokens.matchAll(/(--[\w-]+):\s*(#[0-9a-f]{6});/gi)]
+  it("keeps dark theme text and filled commands at 7:1 contrast with lighter elevated surfaces", () => {
+    const tokens = Object.fromEntries([...cssFile("base.css").matchAll(/(--[\w-]+):\s*(#[0-9a-f]{6}|var\(--[\w-]+\));/gi)]
       .map((match) => [match[1], match[2]]));
+    for (const [name, value] of Object.entries(tokens)) {
+      if (value.startsWith("var(")) tokens[name] = tokens[value.slice(4, -1)];
+    }
     const luminance = (hex: string): number => {
       const rgb = [1, 3, 5].map((offset) => parseInt(hex.slice(offset, offset + 2), 16) / 255)
         .map((value) => value <= 0.04045 ? value / 12.92 : ((value + 0.055) / 1.055) ** 2.4);
@@ -436,15 +438,40 @@ describe("Electron design system CSS", () => {
       const light = luminance(foreground), dark = luminance(background);
       return (Math.max(light, dark) + 0.05) / (Math.min(light, dark) + 0.05);
     };
-    for (const surface of ["surface", "surface-muted", "surface-raised", "input-bg", "surface-selected"]) {
+    for (const surface of ["bg-app-base", "bg-canvas-base", "surface", "surface-muted", "surface-raised", "surface-hover", "input-bg", "surface-selected"]) {
       for (const text of ["text-primary-base", "text-secondary-base", "text-muted-base", "accent"]) {
         expect(ratio(tokens[`--studio-color-${text}`], tokens[`--studio-color-${surface}`]),
-          `${text} on ${surface}`).toBeGreaterThanOrEqual(4.5);
+          `${text} on ${surface}`).toBeGreaterThanOrEqual(7);
       }
     }
     for (const command of ["accent-solid", "accent-solid-hover", "danger-solid", "danger-solid-hover"]) {
       expect(ratio("#ffffff", tokens[`--studio-color-${command}`]),
-        `white command text on ${command}`).toBeGreaterThanOrEqual(4.5);
+        `white command text on ${command}`).toBeGreaterThanOrEqual(7);
+    }
+    for (const status of ["ok", "warning", "attention", "danger"]) {
+      expect(ratio(tokens[`--studio-color-${status}-text`], tokens[`--studio-color-${status}-bg`]),
+        `${status} status text`).toBeGreaterThanOrEqual(7);
+    }
+    const elevations = ["bg-canvas-base", "bg-app-base", "surface-muted", "surface", "surface-raised", "surface-hover"];
+    for (let index = 1; index < elevations.length; index++) {
+      expect(luminance(tokens[`--studio-color-${elevations[index]}`]), elevations[index])
+        .toBeGreaterThan(luminance(tokens[`--studio-color-${elevations[index - 1]}`]));
+    }
+  });
+
+  it("gives both gray sliders a perceptible range in the dark theme", () => {
+    const base = cssFile("base.css").split('[data-studio-theme="dark"]')[1];
+    const appearance = cssFile("studio-ui-appearance.css").split(':root[data-studio-theme="dark"]')[1].split("}")[0];
+    const hex = (css: string, token: string): number[] => {
+      const value = css.match(new RegExp(`${token}:\\s*(#[0-9a-f]{6})`, "i"))?.[1];
+      expect(value, token).toBeDefined();
+      return [1, 3, 5].map(offset => parseInt(value!.slice(offset, offset + 2), 16));
+    };
+    for (const area of ["app", "canvas"]) {
+      const start = hex(base, `--studio-color-bg-${area}-base`);
+      const end = hex(appearance, `--studio-ui-${area}-neutral`);
+      expect(start.reduce((delta, channel, index) => delta + Math.abs(channel - end[index]), 0), area)
+        .toBeGreaterThanOrEqual(45);
     }
   });
 
