@@ -53,4 +53,9 @@ describe("update notice", () => {
     expect(await screen.findByText("Você está usando a versão mais recente deste canal.")).toBeInTheDocument();
     expect(api.checkAppUpdates).toHaveBeenCalledOnce();
   });
+  it("offers a manual download when installation or verification fails", async () => {
+    const { emit } = setup("idle");
+    emit("error");
+    expect(await screen.findByText(/baixe a versão mais recente no site do GBA Studio/)).toBeInTheDocument();
+  });
 });
