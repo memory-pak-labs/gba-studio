@@ -1,4 +1,5 @@
 import {readFileSync} from 'node:fs';
+import {expandCompactSequence} from './exemplo-template-audit.mjs';
 const manifest=JSON.parse(readFileSync(new URL('../fixtures/asset-provenance/farol-interior-manifest.json',import.meta.url)));
 
 /** Ground collisions are authored on8pxcells; fixture silhouettes and actors remain separate. */
@@ -30,18 +31,25 @@ export function promoteApprovedFarolInterior(source) {
  p.assets.splice(old>=0?old+1:previousIndex>=0?previousIndex:p.assets.length,0,{id:entry.id,name:entry.file,kind:'Background',systemImage:'building.columns.fill',metadata});
  if(old>=0)p.assets[old].metadata={...p.assets[old].metadata,reusableLibraryAsset:true};
  const collision=approvedFarolCollisionTypes();
+ const retainEquivalent=(original,values)=>{
+  const expanded=expandCompactSequence(original);
+  return expanded.length===values.length&&expanded.every((value,index)=>value===values[index])?original:values;
+ };
  const update=r=>{
   if(r.name!==name)return r;
   const result={...r,width,height,backgroundAssetName:entry.file,backgroundRenderMode:'tilemap',gbStudioUseBackgroundLayout:true,
    cameraMode:'follow_player',cameraZoom:100,cameraBounds:{x:0,y:0,width,height},hudPresetId:r.hudPresetId==='hud-farol-trial'?r.hudPresetId:manifest.preservedActors.hudPresetId,
-   tilemap:Array(width*height).fill(0),collisions:[...collision],collisionTypes:[...collision],tileLayers:[],heightLevels:Array(width*height).fill(0),
+   tilemap:retainEquivalent(r.tilemap,Array(width*height).fill(0)),collisions:retainEquivalent(r.collisions,[...collision]),collisionTypes:retainEquivalent(r.collisionTypes,[...collision]),tileLayers:[],heightLevels:Array(width*height).fill(0),
    runtime:{...r.runtime,type:'topdown',config:{...r.runtime?.config,presentation:'topdown',profile:'farol-interior-scale-v2-approved'}}};
   delete result.tilesetAssetName;return result;
  };
  for(const key of ['rooms','scenas'])p[key]=p[key].map(update);
  if(p.scena)p.scena=update(p.scena);
- p.actors=p.actors.map(a=>a.id==='farol-nara'?{...a,...playerStart,spriteSheet:manifest.preservedActors.player,
-  animationName:'idle_up',animationStateID:'porto-nara-animations48-state'}:a.id==='farol-keeper'?{...a,...keeperPosition,
+ const hasApprovedRun=p.assets.some(a=>a.name==='nara-topdown-walk-run-v1.png'&&a.metadata?.reviewStatus==='approved');
+ const playerSheet=hasApprovedRun?'nara-topdown-walk-run-v1.png':manifest.preservedActors.player;
+ const playerState=hasApprovedRun?'nara-topdown-walk-run-v1-state':'porto-nara-animations48-state';
+ p.actors=p.actors.map(a=>a.id==='farol-nara'?{...a,...playerStart,spriteSheet:playerSheet,
+  animationName:'idle_up',animationStateID:playerState}:a.id==='farol-keeper'?{...a,...keeperPosition,
   spriteSheet:manifest.preservedActors.keeper,animationName:'idle_down',animationStateID:'porto-approved-lighthousekeeper-body48-state'}:a);
  const retiredSheets=new Set(['player-pilot-32x32.png','lighthousekeeper-pilot-32x32.png','nara-topdown.png']);
  for(const asset of p.assets)if(retiredSheets.has(asset.name)&&!p.actors.some(a=>a.spriteSheet===asset.name)){
@@ -50,7 +58,7 @@ export function promoteApprovedFarolInterior(source) {
  p.triggers=p.triggers.map(t=>t.id==='trigger-lighthouse-lens'?{...t,...lensTrigger}:t.id==='trigger-lighthouse-exit'?{...t,...exitTrigger}:t);
  for(const event of p.events){
   if(event.name==='farol_interior_ao_entrar')for(const step of event.steps??[]){
-   if(step.command.startsWith('change_player_sprite '))step.command='change_player_sprite '+manifest.preservedActors.player;
+   if(step.command.startsWith('change_player_sprite '))step.command='change_player_sprite '+playerSheet;
    if(step.command.startsWith('set_actor_animation Player '))step.command='set_actor_animation Player idle_up';
   }
   // The optional archive returns beside its own stairs, not at the main door.

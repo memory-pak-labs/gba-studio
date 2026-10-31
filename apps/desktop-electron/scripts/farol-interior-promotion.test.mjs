@@ -30,9 +30,9 @@ it('exports the approved paged Farol, existing48pxactors and HUD B without the o
  const base=p.settings.hudPresets.find(h=>h.id==='hud-porto-lumen-b'),hud=p.settings.hudPresets.find(h=>h.id===room.hudPresetId);
  expect(hud.components.slice(0,base.components.length)).toEqual(base.components);
  expect(hud.components.slice(base.components.length).every(c=>c.behavior.states.hidden.variable==='var_trial_active')).toBe(true);
- expect(p.actors.find(a=>a.id==='farol-nara')).toMatchObject({x:23,y:27,spriteSheet:'porto-nara-animations48.png',animationStateID:'porto-nara-animations48-state'});
+ expect(p.actors.find(a=>a.id==='farol-nara')).toMatchObject({x:23,y:27,spriteSheet:'nara-topdown-walk-run-v1.png',animationStateID:'nara-topdown-walk-run-v1-state'});
  expect(p.actors.find(a=>a.id==='farol-keeper')).toMatchObject({x:17,y:14,spriteSheet:'porto-lighthousekeeper-body48.png',animationStateID:'porto-approved-lighthousekeeper-body48-state'});
- expect(p.events.find(e=>e.name==='showcase_base_farol_enter').steps.map(s=>s.command)).toContain('change_player_sprite porto-nara-animations48.png');
+ expect(p.events.find(e=>e.name==='showcase_base_farol_enter').steps.map(s=>s.command)).toContain('change_player_sprite nara-topdown-walk-run-v1.png');
  expect(p.events.find(e=>e.name==='porto_entrar_farol').steps.map(s=>s.command)).toContain('change_scene farol_interior 23 27 up');
  const c=buildEngineExportProjectContract(p),exported=c.topdown_project.rooms.find(r=>r.name===scene);
  expect(exported).toMatchObject({width_tiles:48,height_tiles:32,paged_source_tiles:'farol_interior_approved_paged_384x256'});
@@ -65,5 +65,16 @@ it('regenerates the approved Farol idempotently without touching other scenes or
  expect(restored.animations).toEqual(p.animations);expect(restored.animationStates).toEqual(p.animationStates);expect(restored.settings).toEqual(p.settings);expect(restored.dialogues).toEqual(p.dialogues);
  const regenerated=promoteExemploGBAVerticeCampaign(input);
  expect(regenerated.rooms.find(r=>r.name===scene).backgroundAssetName).toBe(file);
- expect(regenerated.actors.find(a=>a.id==='farol-nara').spriteSheet).toBe('porto-nara-animations48.png');
+ expect(regenerated.actors.find(a=>a.id==='farol-nara').spriteSheet).toBe('nara-topdown-walk-run-v1.png');
+});
+
+it('keeps the legacy player sheet when the newer approved sheet is unavailable',async()=>{
+ const {promoteApprovedFarolInterior}=await import('./farol-interior-promotion.mjs');
+ const project=canonical();
+ project.assets=project.assets.filter(asset=>asset.name!=='nara-topdown-walk-run-v1.png');
+ project.assets.push({id:'legacy-nara',name:'porto-nara-animations48.png',kind:'Sprite',metadata:{reviewStatus:'approved'}});
+ const restored=promoteApprovedFarolInterior(project);
+ expect(restored.actors.find(actor=>actor.id==='farol-nara')).toMatchObject({
+  spriteSheet:'porto-nara-animations48.png',animationStateID:'porto-nara-animations48-state'
+ });
 });
