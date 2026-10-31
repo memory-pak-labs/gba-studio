@@ -242,8 +242,18 @@ int main() {
 std::vector<std::string> calls;
 namespace gbs {
 struct RuntimeFrameContext {};
-struct DialogueState {bool visible;};
+struct DialogueState {bool visible=false; int frame_index=0; const char* speaker=nullptr;};
+struct DialogueBoxLayout {int x,y,w,h;};
+struct DialogueUiConfig {bool name_label_above=true,show_character_name=true;};
+struct Vec2i {int x,y;};
+DialogueBoxLayout dialogue_box_layout_for_frame(int) {return {1,14,28,5};}
+DialogueBoxLayout dialogue_name_label_layout_for_frame(int,int) {return {1,11,8,3};}
+const DialogueUiConfig& active_dialogue_ui_config() {static DialogueUiConfig config;return config;}
+bool dialogue_should_show_portrait(const DialogueState&) {return false;}
+Vec2i dialogue_portrait_position_pixels(const DialogueState&) {return {0,64};}
+void draw_dialogue_portrait(const DialogueState&) {calls.push_back("portrait");}
 struct HudState {};
+void draw_hud_excluding(const HudState&,int,int,int,int) {calls.push_back("hud");}
 void wait_vblank() {calls.push_back("wait");}
 void render_ui_assets() {calls.push_back("restore");}
 void draw_dialogue(const DialogueState&) {calls.push_back("dialogue");}
@@ -254,6 +264,7 @@ void load_palette(const PaletteAsset&,bool){calls.push_back("palette");}
 gbs::DialogueState dialogue {false}, battle_prompt_dialogue {}, battle_menu_dialogue {};
 gbs::HudState battle_hud;
 bool battle_ui_restore_pending = true;
+bool battle_dialogue_was_drawn = false;
 struct { struct Encounter {struct Presentation {const gbs::PaletteAsset* hud_palette=nullptr;} *presentation=nullptr;} encounters[1];} project;
 int encounter_index=0;
 bool custom_ui=false;
