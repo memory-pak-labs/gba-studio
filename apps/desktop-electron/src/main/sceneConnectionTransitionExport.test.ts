@@ -40,9 +40,12 @@ describe("scene connection transitions on event-driven navigation", () => {
 
   it("defers the final title handoff until the Porto and Farol epilogue finishes",()=>{
     const contract=buildEngineExportProjectContract(canonical);
-    const finish=contract.racing_project!.scripts!.find(s=>s.name==='circuito_concluir')!.script;
-    expect(finish).toContainEqual(expect.objectContaining({op:'warp_runtime',runtime:'topdown',room:0}));
-    expect(finish.some(c=>c.op==='warp_runtime'&&c.runtime==='menu')).toBe(false);
+    const finish=contract.racing_project!.scripts!.find(s=>s.name==='race_finish')!.script;
+    expect(finish).toContainEqual(expect.objectContaining({op:'warp_runtime',runtime:'menu'}));
+    const results=contract.menu_project!.screens.find(s=>s.name==='corrida_resultados')!;
+    const continueStory=results.items.find(item=>item.label==='CONTINUAR')!.on_select!;
+    expect(continueStory).toContainEqual(expect.objectContaining({op:'jump_if_engine_field_equals',field:'racing_result',value:1}));
+    expect(continueStory).toContainEqual(expect.objectContaining({op:'warp_runtime',runtime:'topdown',room:0}));
     const tour=contract.topdown_project!.scripts.find(s=>s.name==='encore_epilogue_2_tick')!.script;
     expect(tour).toContainEqual(expect.objectContaining({op:'warp_runtime',runtime:'menu',room:0}));
   });
