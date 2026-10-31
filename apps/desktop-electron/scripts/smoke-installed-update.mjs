@@ -70,7 +70,7 @@ const poll = async (fn, label, ms = 120_000) => {
 };
 async function connect() {
   const target = await poll(async () => {
-    const response = await fetch(`http://127.0.0.1:${port}/json/list`);
+    const response = await fetch(`http://127.0.0.1:${port}/json/list`, { signal: AbortSignal.timeout(1_500) });
     if (!response.ok) return null;
     return (await response.json()).find((item) => item.type === 'page' && item.url.includes('index.html') && item.webSocketDebuggerUrl);
   }, 'editor DevTools');
@@ -138,8 +138,8 @@ try {
     // Relaunch the isolated instance with QA variables solely to inspect the saved project.
     process.kill(restartedPid);
     await poll(async () => {
-      const { stdout } = await execFileAsync('powershell.exe', ['-NoProfile', '-Command', `Get-Process -Id ${restartedPid} -ErrorAction SilentlyContinue | Select-Object -ExpandProperty Id`]);
-      return !stdout.trim();
+      const { stdout } = await execFileAsync('powershell.exe', ['-NoProfile', '-Command', `if (Get-Process -Id ${restartedPid} -ErrorAction SilentlyContinue) { 'running' } else { 'exited' }; exit 0`]);
+      return stdout.trim() === 'exited';
     }, 'updated instance exits', 30_000);
     launchForInspection();
   }
@@ -155,7 +155,16 @@ try {
   await screenshot('updated-editor.png');
   await writeFile(path.join(evidence, 'result.json'), `${JSON.stringify({ ok: true, platform: fixture.platform, sourceVersion: fixture.version, targetVersion: fixture.targetVersion, localFeed: true, checks, requests }, null, 2)}\n`);
 } catch (error) {
-  await writeFile(path.join(evidence, 'failure.json'), `${JSON.stringify({ error: String(error?.stack ?? error), platform: fixture.platform, checks, requests, logs: logs.slice(-12000) }, null, 2)}\n`);
+  let diagnostics = '';
+  if (fixture.platform === 'linux') {
+    try {
+      const { stdout } = await execFileAsync('ps', ['-eo', 'pid,ppid,stat,args']);
+      diagnostics = stdout.split('\n').filter((line) => line.includes(root) || line.includes('appimage_extracted')).join('\n');
+      const installedImage = path.join(path.dirname(fixture.sourceExecutable), targetName);
+      diagnostics += `\nTarget image SHA-256: ${await hash(installedImage, 'sha256', 'hex')} (expected ${targetHash})`;
+    } catch (diagnosticError) { diagnostics += `\nDiagnostic error: ${diagnosticError}`; }
+  }
+  await writeFile(path.join(evidence, 'failure.json'), `${JSON.stringify({ error: String(error?.stack ?? error), platform: fixture.platform, checks, requests, diagnostics, logs: logs.slice(-12000) }, null, 2)}\n`);
   throw error;
 } finally {
   if (cdp) { try { void cdp.send('Runtime.evaluate', { expression: 'window.close()' }).catch(() => {}); } catch { /* Renderer already closed. */ } cdp.close(); }
