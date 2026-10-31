@@ -131,7 +131,7 @@ function EventStructureDropSlot({
       onDrop={canDrop ? handleDrop : undefined}
       type="button"
     >
-      {buttonLabel}
+      {ui(buttonLabel)}
     </button>
   );
 }
