@@ -11,9 +11,14 @@ e [docs/development.md](docs/development.md) antes de trabalhar.
 - `develop` é a base de integração. Funcionalidades e correções usam uma branch
   de tarefa a partir dela, com prefixo `codex/` para o Codex. Não desenvolva em
   `main` ou `master`; não troque de branch com alterações locais sem informar o usuário.
-- Use Conventional Commits e faça stage seletivo da tarefa validada. Checkpoints
-  locais podem ser enviados a `develop` quando estáveis, revisados e autorizados
-  pelo mantenedor. Não faça force push, reset destrutivo ou limpeza ampla.
+- Divida o trabalho em etapas pequenas com escopo e critérios de aceite. Ao
+  concluir e validar uma etapa, revise o diff e faça stage seletivo e commit local
+  com Conventional Commits; essa ação já está autorizada. Antes de encerrar,
+  informe o commit ou o impedimento concreto. Reserve o gate global ao fechamento
+  global, sem adiar commits independentes até a release.
+- Checkpoints podem ser enviados quando estáveis, revisados e autorizados pelo
+  mantenedor. Integração em `develop` segue as regras do repositório. Não faça
+  force push, reset destrutivo ou limpeza ampla.
 - Não crie PR, faça merge, publique releases ou faça deploy sem autorização
   explícita. Commit e push não autorizam essas ações.
 - Não inclua credenciais, certificados, arquivos `.env`, contexto privado de agentes,
@@ -24,8 +29,10 @@ e [docs/development.md](docs/development.md) antes de trabalhar.
   compartilhados; não trate o projeto como um frontend direto do Butano.
 - Bugs de runtime, persistência e exportação precisam de regressão significativa.
   Use TDD para mudanças de alto risco e verificações proporcionais para documentação.
-- Execute npm em `apps/desktop-electron`. Não existe lint dedicado. Para uma
-  milestone de produto, siga os testes, tipos, build e gates do guia de desenvolvimento.
+- Execute npm em `apps/desktop-electron`. Não existe lint dedicado. Escolha a
+  validação pela matriz do guia de desenvolvimento: `npm test` é uma seleção de
+  iteração; `npm run test:all` inclui promoção e aceitação. Para fechamento global
+  ou release de produto, execute também `npm run gate:complete-project`.
   Testes host, build, Editor, Play, ROM, instalador, CI e GBA físico provam camadas distintas.
 - Mudanças de UI exigem verificar a tela e o fluxo renderizado. Nunca afirme que
   uma verificação passou sem executá-la.
