@@ -94,11 +94,17 @@ export function promoteShowcaseSystems(source) {
   event('showcase_open_shop', 'porto_lumen', ['open_shop porto-lume-traveler-pilot', 'save_game 0']);
   event('showcase_open_equipment', 'porto_lumen', ['show_dialogue showcase_equipment_help', 'open_equip_menu 1 true', 'save_game 0']);
   event('porto_recuperar_estrutura', 'porto_lumen', ['call_procedure showcase_base_mechanic', 'has_item zzz_lumen_tool 1', 'show_dialogue showcase_mechanic_tool', 'condition_end']);
-  event('porto_ao_entrar', 'porto_lumen', ['call_procedure showcase_base_port_enter', 'if_variable var_council_visit 1', 'set_variable var_council_visit 0', 'save_game 0', 'condition_end', 'if_variable var_council_path 1', 'set_actor_animation port-mechanic idle_left', 'else', 'if_variable var_council_path 2', 'set_actor_animation port-mechanic idle_right', 'condition_end', 'condition_end']);
+  const portEntry = p.events.find(e => e.name === 'porto_ao_entrar');
+  if (!portEntry?.steps?.some(step => step.command === 'call_procedure encore_epilogue_1_restore_boot')) {
+    event('porto_ao_entrar', 'porto_lumen', ['call_procedure showcase_base_port_enter', 'if_variable var_council_visit 1', 'set_variable var_council_visit 0', 'save_game 0', 'condition_end', 'if_variable var_council_path 1', 'set_actor_animation port-mechanic idle_left', 'else', 'if_variable var_council_path 2', 'set_actor_animation port-mechanic idle_right', 'condition_end', 'condition_end']);
+  }
   event('porto_conversar_fisherchild', 'porto_lumen', ['if_variable var_trial_result 1', 'show_dialogue showcase_fisher_success', 'else', 'call_procedure showcase_base_fisher', 'condition_end']);
   event('mercado_falar_guarda', 'mercado_suspenso', ['call_procedure showcase_base_market_guard', 'if_variable_greater_than var_council_path 0', 'call_procedure showcase_coast_report', 'condition_end']);
   procedure('showcase_council_epilogue', 'circuito_final', ['if_variable var_council_path 1', 'show_dialogue showcase_epilogue_community', 'else', 'if_variable var_council_path 2', 'show_dialogue showcase_epilogue_exploration', 'condition_end', 'condition_end']);
-  event('circuito_concluir', 'circuito_final', ending.flatMap(command => command === 'show_dialogue epilogo' ? ['call_procedure showcase_council_epilogue', command] : [command]));
+  const currentEnding = p.events.find(e => e.name === 'circuito_concluir');
+  const usesResultsScreen = p.events.some(e => e.name === 'race_results_continue')
+    && currentEnding?.steps?.some(step => step.command === 'call_procedure encore_epilogue_begin');
+  if (!usesResultsScreen) event('circuito_concluir', 'circuito_final', ending.flatMap(command => command === 'show_dialogue epilogo' ? ['call_procedure showcase_council_epilogue', command] : [command]));
 
   event('farol_falar_guardiao', 'farol_interior', ['if_variable var_signal_stage 3', 'choice_event showcase_keeper_menu 0 showcase_begin_trial', 'choice_event showcase_keeper_menu 1 showcase_open_equipment', 'choice_event showcase_keeper_menu 2 showcase_keeper_talk', 'show_choice showcase_keeper_menu', 'else', 'call_procedure showcase_base_keeper', 'condition_end']);
   event('showcase_keeper_talk', 'farol_interior', ['call_procedure showcase_coast_report']);
@@ -119,7 +125,10 @@ export function promoteShowcaseSystems(source) {
   event('farol_sair_porto', 'farol_interior', ['if_variable var_trial_active 1', 'call_procedure showcase_finish_trial', 'condition_end', 'call_procedure showcase_base_exit']);
   procedure('showcase_interrupt_trial', 'farol_interior', ['if_variable var_trial_active 1', 'set_variable var_trial_active 0', 'set_variable var_trial_charge 0', 'set_variable var_trial_result -2', 'condition_end']);
   procedure('showcase_trial_watchdog', 'farol_interior', ['if_variable var_trial_active 1', 'if_engine_field timer_count 0', 'call_procedure showcase_interrupt_trial', 'condition_end', 'condition_end'], 'Carregar sem timer interrompe a tentativa, preserva os equipamentos e permite reiniciar.');
-  event('farol_interior_ao_entrar', 'farol_interior', ['call_procedure showcase_trial_watchdog', 'call_procedure showcase_base_farol_enter']);
+  const lighthouseEntry = p.events.find(e => e.name === 'farol_interior_ao_entrar');
+  if (!lighthouseEntry?.steps?.some(step => step.command === 'call_procedure encore_epilogue_2_restore_boot')) {
+    event('farol_interior_ao_entrar', 'farol_interior', ['call_procedure showcase_trial_watchdog', 'call_procedure showcase_base_farol_enter']);
+  }
   event('menu_start_ao_entrar', 'menu_start', ['call_procedure showcase_interrupt_trial', 'call_procedure showcase_base_start_enter'], 'Abrir Start interrompe o teste antes de salvar; cronômetros transitórios não são persistidos.');
   for (const id of ['port-nara', 'farol-nara']) {
     const actor=p.actors.find(a=>a.id===id);

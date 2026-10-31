@@ -35,6 +35,9 @@ describe('connected showcase systems', () => {
       expect(b).toEqual(a);
     }
     expect(p.events.find(e => e.name === 'signal_finish_repair')).toEqual(before.events.find(e => e.name === 'signal_finish_repair'));
+    for (const name of ['porto_ao_entrar', 'farol_interior_ao_entrar', 'circuito_concluir']) {
+      expect(p.events.find(e => e.name === name)).toEqual(before.events.find(e => e.name === name));
+    }
     expect(p.variables.some(v => v.name === 'var_council_path')).toBe(true);
   });
 
@@ -151,13 +154,17 @@ describe('connected showcase systems', () => {
     const hud = p.settings.hudPresets.find(h => h.id === 'hud-farol-trial');
     expect(hud.components.find(c => c.id === 'trial-charge').behavior.states.hidden).toEqual({ variable: 'var_trial_active', value: 0 });
     for (const path of [1, 2]) {
-      let state = boot(p, 'circuito_final');
-      state = { ...state, variables: { ...state.variables, var_council_path: path } };
-      const final = finish(runPreviewRuntimeEvent(state, 'circuito_concluir'));
+      let state = boot(p, 'corrida_resultados');
+      state = { ...state, variables: { ...state.variables, var_council_path: path, racing_result: 1, previous_room: 0 } };
+      let final = finish(runPreviewRuntimeEvent(state, 'race_results_continue'));
       const shown = final.eventLog.filter(e => e.result === 'dialogue').map(e => e.detail);
       expect(shown).toContain(path === 1 ? 'showcase_epilogue_community' : 'showcase_epilogue_exploration');
       expect(shown).not.toContain(path === 2 ? 'showcase_epilogue_community' : 'showcase_epilogue_exploration');
       expect(final.variables.var_campaign_finished).toBe(1);
+      for (let i = 0; i < 400; i++) {
+        if (final.activeDialogue) final = dispatchPreviewRuntimeAction(final, 'action');
+        final = tickPreviewRuntime(final, 100);
+      }
       expect(final.currentRoom.name).toBe('titulo');
     }
   });
