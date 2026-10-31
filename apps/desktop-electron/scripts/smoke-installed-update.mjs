@@ -149,16 +149,23 @@ try {
     launchForInspection(fixture.sourceExecutable, true);
   } else {
     const installedImage = path.join(path.dirname(fixture.sourceExecutable), targetName);
+    let observedAppPid;
+    let observedSince = 0;
     const restarted = await poll(async () => {
       if (await hash(installedImage, 'sha256', 'hex') !== targetHash) return null;
       const { stdout } = await execFileAsync('ps', ['-eo', 'pid=,ppid=,args=']);
       const processes = stdout.split('\n').map((line) => line.trim().match(/^(\d+)\s+(\d+)\s+(.+)$/)).filter(Boolean)
         .map(([, pid, ppid, args]) => ({ pid: Number(pid), ppid: Number(ppid), args }));
-      return findLinuxUpdatedProcess(processes, installedImage);
+      const match = findLinuxUpdatedProcess(processes, installedImage);
+      if (!match) { observedAppPid = undefined; return null; }
+      if (observedAppPid !== match.appPid) { observedAppPid = match.appPid; observedSince = Date.now(); return null; }
+      return Date.now() - observedSince >= 2_000 ? match : null;
     }, 'Linux installation and automatic restart', 180_000);
     assert(Boolean(restarted), 'Linux installed the target AppImage and automatically restarted it');
     // Inspect a fresh instance with the same QA profile after confirming the automatic restart.
-    process.kill(restarted.appPid, 'SIGTERM');
+    // This is a disposable QA instance and the project has already been saved.
+    // Terminate it even when Electron has not yet installed its SIGTERM handlers.
+    process.kill(restarted.appPid, 'SIGKILL');
     await poll(async () => {
       for (const pid of [restarted.appPid, restarted.launcherPid]) {
         try { process.kill(pid, 0); return false; }
