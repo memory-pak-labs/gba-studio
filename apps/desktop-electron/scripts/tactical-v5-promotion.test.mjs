@@ -6,6 +6,7 @@ import { promoteExemploGBAVerticeCampaign } from './vertice-showcase-project.mjs
 import { buildEngineExportProjectContract } from '../src/main/exportEngineProject.ts';
 import { auditProjectSpriteFrames } from './lib/sprite-canvas-audit.mjs';
 import { decodePngRgba } from './lib/png-icons.mjs';
+import { expandCompactSequence } from './exemplo-template-audit.mjs';
 
 const retired = JSON.parse(readFileSync(new URL("../fixtures/asset-provenance/example-library-cleanup.json", import.meta.url))).retiredAssets;
 const retained = JSON.parse(readFileSync(new URL('../fixtures/asset-provenance/market-approved-manifest.json', import.meta.url))).retainedOriginals;
@@ -101,7 +102,8 @@ describe('approved Arena V5 reconstruction', () => {
     const before = source.rooms.find(r => r.name === 'arena_tatica');
     const after = rebuilt.rooms.find(r => r.name === 'arena_tatica');
     for (const key of ['width','height','backgroundAssetName','tilesetAssetName','tilemap','collisions','collisionTypes','heightLevels','runtime','cameraBounds']) {
-      expect(after[key], key).toEqual(before[key]);
+      const sequence = ['tilemap','collisions','collisionTypes','heightLevels'].includes(key);
+      expect(sequence ? expandCompactSequence(after[key]) : after[key], key).toEqual(sequence ? expandCompactSequence(before[key]) : before[key]);
     }
     expect(actors(rebuilt)).toEqual(actors(source));
     expect(footPlacement(rebuilt)).toEqual(footPlacement(source));

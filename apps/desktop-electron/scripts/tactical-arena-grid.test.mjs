@@ -3,10 +3,14 @@ import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { promoteApprovedTacticalArena } from './tactical-arena-promotion.mjs';
 import { decodePngRgba } from './lib/png-icons.mjs';
+import { expandCompactSequence } from './exemplo-template-audit.mjs';
 
 const root = new URL('../default-assets/templates/exemplo-gba/', import.meta.url);
 const project = JSON.parse(readFileSync(new URL('exemplo-gba.gba-project', root)));
-const arena = value => value.rooms.find(room => room.name === 'arena_tatica');
+const arena = value => {
+  const room = value.rooms.find(room => room.name === 'arena_tatica');
+  return { ...room, ...Object.fromEntries(['heightLevels','rampFlags','collisionTypes','collisions'].map(key => [key, expandCompactSequence(room[key])])) };
+};
 const hash = bytes => createHash('sha256').update(bytes).digest('hex');
 const stairs = [
   [[3, 2, 3, 8], [3, 3, 2, 8], [3, 4, 1, 8], [3, 5, 0, 0]],
@@ -42,7 +46,7 @@ describe('Arena Tática: piso modular aprovado', () => {
   it('registra a mesma geometria, alturas e colisões na reconstrução e no template', () => {
     const current = arena(project), rebuilt = arena(promoteApprovedTacticalArena(project));
     expect(current.runtime.config).toMatchObject({ originX: 384, originY: 68, tileWidth: 48, tileHeight: 24, heightStep: 8 });
-    expect(project.scenas.find(room => room.name === current.name)).toEqual(current);
+    expect(arena({ rooms: project.scenas })).toEqual(current);
     for (const key of ['heightLevels', 'rampFlags', 'collisionTypes']) {
       expect(current[key]).toHaveLength(256);
       expect(rebuilt[key]).toEqual(current[key]);
