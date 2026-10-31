@@ -1,5 +1,8 @@
 import { roomMapStates, type MapStateDefinition } from "../mapStates.js";
+import { actorCommandReferences, sceneChangeCommand, sceneChangeCommandParts } from "../sceneChangeCommand.js";
+import { duplicateSceneContent } from "./duplicateSceneContent.js";
 import type { GBAProjectData } from "../projectFile.js";
+import { normalizePointClickTarget, type PointClickTargetConfig } from "../pointClickTargets.js";
 import { applyDefaultRoomBackground, defaultBackgroundActorPosition, defaultBackgroundForRoom } from "../blankBackgroundDefaults.js";
 import { createBlankProjectData } from "../newProject.js";
 import { buildProjectFromTemplate } from "../projectTemplates.js";
@@ -553,6 +556,7 @@ export interface RoomsWorkspaceEntity {
   collisionMask?: number;
   pushPriority?: number;
   pushable?: boolean;
+  health?: number;
   battle?: RoomsWorkspaceActorBattle;
   isInActiveRoom: boolean;
 }
@@ -728,6 +732,8 @@ export interface UpdateRoomFields {
 }
 
 export interface UpdateRoomEntityFields {
+  name?: string;
+  pointClick?: Partial<PointClickTargetConfig> | null;
   roomName?: string;
   x?: number;
   y?: number;
@@ -751,6 +757,7 @@ export interface UpdateRoomEntityFields {
   collisionMask?: number;
   pushPriority?: number;
   pushable?: boolean;
+  health?: number;
   battle?: Partial<RoomsWorkspaceActorBattle>;
 }
 
@@ -1644,7 +1651,7 @@ export function updateRoomEventSceneLinkCommand(
   command: string,
   fields: { x?: number; y?: number; direction?: RoomEventSceneLink["direction"] }
 ): string {
-  const parts = command.split(/\s+/).filter(Boolean);
+  const parts = sceneChangeCommandParts(command);
   if ((parts[0] ?? "").toLowerCase() !== "change_scene" || !parts[1]) return command;
   const x = Number.isFinite(fields.x) ? Math.max(0, Math.floor(fields.x as number)) : integerField(parts[2], 0);
   const y = Number.isFinite(fields.y) ? Math.max(0, Math.floor(fields.y as number)) : integerField(parts[3], 0);
@@ -1652,7 +1659,7 @@ export function updateRoomEventSceneLinkCommand(
   parts[2] = String(x);
   parts[3] = String(y);
   parts[4] = direction;
-  return parts.slice(0, 5).join(" ");
+  return sceneChangeCommand(parts.slice(0, 5));
 }
 
 export function deriveRoomEventSceneLinks(data: GBAProjectData): RoomEventSceneLink[] {
@@ -1680,7 +1687,7 @@ export function deriveRoomEventSceneLinks(data: GBAProjectData): RoomEventSceneL
 
     for (const [stepIndex, step] of steps.entries()) {
       const command = nullableString(step.command);
-      const parts = command?.split(/\s+/).filter(Boolean) ?? [];
+      const parts = command ? sceneChangeCommandParts(command) : [];
       if ((parts[0] ?? "").toLowerCase() !== "change_scene") continue;
       const to = parts[1] ?? null;
       if (!to || !knownRooms.has(to)) continue;
@@ -1692,7 +1699,7 @@ export function deriveRoomEventSceneLinks(data: GBAProjectData): RoomEventSceneL
         if (seen.has(key)) continue;
         seen.add(key);
         links.push({
-          id: "event-scene-link-" + eventID + "-" + stepIndex,
+          id: "event-scene-link-" + eventID + "-" + stepIndex + "-" + encodeURIComponent(from),
           from,
           to,
           eventName,
@@ -2965,6 +2972,7 @@ function entityPresentation(
       collisionMask: clampInteger(integerField(entity.collisionMask, 0xFFFF), 0, 0xFFFF),
       pushPriority: clampInteger(integerField(entity.pushPriority, 0), 0, 255),
       pushable: entity.pushable === true,
+      health: clampInteger(integerField(entity.health, 1), 1, 999),
       battle: actorBattlePresentation(entity)
     } : {}),
     isInActiveRoom: active === resolvedRoomName
@@ -3482,6 +3490,11 @@ function roomNameSet(data: GBAProjectData): Set<string> {
 
 function renameChangeSceneCommand(command: unknown, oldName: string, nextName: string): unknown {
   if (typeof command !== "string") return command;
+  const parts = sceneChangeCommandParts(command);
+  if (parts[0] === "change_scene" && parts[1] === oldName) {
+    parts[1] = nextName;
+    return sceneChangeCommand(parts);
+  }
   if (command === `change_scene ${oldName}`) {
     return `change_scene ${nextName}`;
   }
@@ -3945,6 +3958,7 @@ export function createRoomInProject(data: GBAProjectData, options: CreateRoomOpt
   if (rooms.length === 0) {
     next.scena = cloneProjectData(room);
     setStartScene(next, stringField(room.name, "Room 1"));
+    ensureSettingsGeneral(next).startPlayer = nullableString(room.playerActorName) ?? "";
   }
 
   return next;
@@ -3960,7 +3974,7 @@ export function duplicateRoomInProject(data: GBAProjectData, options: DuplicateR
   const next = cloneProjectData(data);
   const rooms = projectRooms(next);
   const source = rooms.find((room, index) => roomID(room, index) === options.sourceRoomID);
-  if (!source || rooms.some((room, index) => roomID(room, index) === newRoomID)) {
+  if (!source || rooms.some((room, index) => roomID(room, index) === newRoomID || roomName(room, index).toLowerCase() === newName.toLowerCase())) {
     return data;
   }
 
@@ -3973,6 +3987,7 @@ export function duplicateRoomInProject(data: GBAProjectData, options: DuplicateR
     ...rooms,
     duplicatedRoom
   ]);
+  duplicateSceneContent(next, source, duplicatedRoom, rooms[0] ? roomName(rooms[0], 0) : "");
   setSceneMapPosition(next, newName, nextFreeSceneMapPosition(next, projectRooms(next), duplicatedRoom, {
     anchorRoomID: options.sourceRoomID
   }));
@@ -4660,6 +4675,50 @@ export function removeRoomConnectionFromProject(data: GBAProjectData, connection
   return next;
 }
 
+function renameActorNameReferences(data: GBAProjectData, actor: Record<string, unknown>, name: string): void {
+  const oldName = stringField(actor.name, "");
+  const actors = projectRecords(data, "actors"), rooms = projectRooms(data);
+  const owner = entityRoomName(actor, rooms);
+  const actorNames = actors.flatMap(item => [stringField(item.name, ""), stringField(item.id, "")]).filter(Boolean);
+  // Preserve the compiler's identity resolution, including the scene-local
+  // Player alias. References by stable ID do not change when a label changes.
+  const rewritesNamedTarget = oldName.toLowerCase() !== "player"
+    && actors.find(item => item.name === oldName || item.id === oldName) === actor;
+  if (rewritesNamedTarget) {
+    for (const event of projectRecords(data, "events")) {
+      for (const step of projectRecords(event, "steps")) {
+        const command = stringField(step.command, ""), parts = sceneChangeCommandParts(command, actorNames);
+        let changed = false;
+        actorCommandReferences(command, actorNames).forEach((reference, index) => {
+          if (reference === oldName) { parts[index + 1] = name; changed = true; }
+        });
+        if (changed) step.command = sceneChangeCommand(parts);
+      }
+    }
+    const rewriteProperties = (value: unknown): void => {
+      if (Array.isArray(value)) value.forEach(rewriteProperties);
+      else if (isRecord(value)) for (const [key, field] of Object.entries(value)) {
+        if (key !== "playerActorName" && (key === "actorName" || key.endsWith("ActorName")) && field === oldName) value[key] = name;
+        else rewriteProperties(field);
+      }
+    };
+    rewriteProperties([actors, projectRecords(data, "triggers"), rooms]);
+  }
+  const general = isRecord(data.settings) && isRecord(data.settings.general) ? data.settings.general : null;
+  const defaultPlayer = stringField(general?.startPlayer, "Player");
+  const snapshots = [data.scena, data.room].filter(isRecord);
+  for (const room of [...rooms, ...snapshots]) {
+    if (stringField(room.name, "") === owner && stringField(room.playerActorName, defaultPlayer) === oldName) room.playerActorName = name;
+  }
+  if (general?.startPlayer === oldName && (actors.filter(item => item.name === oldName).length === 1 || stringField(general.startScene, rooms[0] ? roomName(rooms[0], 0) : "") === owner)) {
+    for (const room of [...rooms, ...snapshots]) {
+      const scene = stringField(room.name, "");
+      if (scene !== owner && !nullableString(room.playerActorName) && actors.some(item => entityRoomName(item, rooms) === scene && item.name === oldName)) room.playerActorName = oldName;
+    }
+    general.startPlayer = name;
+  }
+}
+
 export function updateRoomEntityInProject(
   data: GBAProjectData,
   kind: RoomsWorkspaceEntityKind,
@@ -4670,6 +4729,10 @@ export function updateRoomEntityInProject(
   const entities = projectRecords(data, collectionKey);
   const entityIndex = entities.findIndex((entity, index) => (nullableString(entity.id) ?? `${kind}-${index + 1}`) === entityID);
   if (entityIndex < 0) return data;
+  const nextName = fields.name?.trim();
+  if (fields.name !== undefined && nextName !== entities[entityIndex]?.name
+    && (!nextName || entities.some((entity, index) => index !== entityIndex && stringField(entity.name, "").toLowerCase() === nextName.toLowerCase()))) return data;
+  if (nextName === entities[entityIndex]?.name && Object.keys(fields).length === 1) return data;
 
   if (fields.roomName !== undefined) {
     const roomNames = roomNameSet(data);
@@ -4680,6 +4743,10 @@ export function updateRoomEntityInProject(
   const nextEntities = projectRecords(next, collectionKey);
   const entity = nextEntities[entityIndex];
   if (!entity) return data;
+  if (nextName !== undefined && nextName !== entity.name) {
+    if (kind === "actor") renameActorNameReferences(next, entity, nextName);
+    entity.name = nextName;
+  }
 
   if (fields.roomName !== undefined) entity.roomName = fields.roomName.trim();
   if (fields.x !== undefined && Number.isFinite(fields.x)) entity.x = Math.floor(fields.x);
@@ -4721,6 +4788,7 @@ export function updateRoomEntityInProject(
     if (fields.collisionMask !== undefined) entity.collisionMask = clampInteger(fields.collisionMask, 0, 0xFFFF);
     if (fields.pushPriority !== undefined) entity.pushPriority = clampInteger(fields.pushPriority, 0, 255);
     if (fields.pushable !== undefined) entity.pushable = fields.pushable;
+    if (fields.health !== undefined && Number.isFinite(fields.health)) entity.health = clampInteger(fields.health, 1, 999);
     if (fields.battle !== undefined) {
       const current = actorBattlePresentation(entity);
       const requestedAbilities = fields.battle.abilities ?? current.abilities;
@@ -4740,6 +4808,10 @@ export function updateRoomEntityInProject(
     return data;
   }
   if (kind === "trigger") {
+    if (fields.pointClick === null) delete entity.pointClick;
+    else if (fields.pointClick !== undefined) {
+      entity.pointClick = normalizePointClickTarget({ ...(isRecord(entity.pointClick) ? entity.pointClick : {}), ...fields.pointClick });
+    }
     if (fields.width !== undefined) entity.width = positiveInteger(fields.width, positiveInteger(entity.width, 1));
     if (fields.height !== undefined) entity.height = positiveInteger(fields.height, positiveInteger(entity.height, 1));
   }
@@ -5644,7 +5716,7 @@ export function deriveRoomsWorkspaceValidationIssues(
     }
   }
 
-  if (!presentation.summary.startRoomName) {
+  if (presentation.rooms.length > 0 && !presentation.summary.startRoomName) {
     issues.push({
       id: "missing-start-room",
       severity: "error",
