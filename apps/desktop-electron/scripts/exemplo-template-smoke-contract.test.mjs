@@ -113,7 +113,7 @@ describe("Exemplo template full-project smoke contract", () => {
   it("edita a folha e os assets ativos das cenas já produzidas", async () => {
     const source = await readFile(new URL("./smoke-electron-exemplo-template.mjs", import.meta.url), "utf8");
 
-    expect(source).toContain('const editedSpriteSheet = "porto-nara-animations48.png";');
+    expect(source).toContain('const editedSpriteSheet = "nara-topdown-walk-run-v1.png";');
     expect(source).toContain('expectedSceneImage("mapa_rota"');
     expect(source).toContain('expectedSceneImage("mercado_suspenso"');
     expect(source).toContain('farol_tema_principal');

@@ -44,7 +44,7 @@ const editedDialogueText = "EDICAO REAL DO TEMPLATE GBA";
 const editedOriginalSceneName = "porto_lumen";
 const editedSceneName = "porto_lumen_funcional";
 const editedActorName = "Nara";
-const editedSpriteSheet = "porto-nara-animations48.png";
+const editedSpriteSheet = "nara-topdown-walk-run-v1.png";
 const editedEventName = "porto_abrir_mapa";
 const editedTriggerName = "Saída para a rota dos faróis";
 const editedEventDialogue = "conselho";
@@ -1509,7 +1509,7 @@ async function assertWorkspace(cdp, label, expectedText) {
     await wait(250);
   }
   throw new Error(
-    `Workspace ${label} não ficou ativa. Atual=${activeWorkspace ?? "nenhuma"}.\nTexto renderizado:\n${lastText.slice(0, 8_000)}`
+    `Workspace ${label} ou conteúdo esperado indisponível. Atual=${activeWorkspace ?? "nenhuma"}; ausentes=${JSON.stringify(expectedText.filter(item => !lastText.includes(item)))}.\nTexto renderizado:\n${lastText.slice(0, 8_000)}`
   );
 }
 
@@ -1657,7 +1657,7 @@ async function main() {
         || !initialSceneForEdit || initialTilemap.length === 0
         || initialRacingContract.presentation !== "topdown"
         || initialRacingContract.checkpoints.length === 0) {
-        throw new Error("O template inicial não contém os registros escolhidos para o smoke de edição.");
+        throw new Error(`O template inicial não contém os registros escolhidos para o smoke de edição: ${JSON.stringify({ actor: !!initialActor, animation: !!initialAnimation, event: !!initialEvent, racingScene: !!initialRacingScene, scene: !!initialSceneForEdit, tilemapLength: initialTilemap.length, racingPresentation: initialRacingContract.presentation, checkpoints: initialRacingContract.checkpoints.length })}`);
       }
 
       await renameScene(cdp, editedOriginalSceneName, editedSceneName);
@@ -1814,7 +1814,7 @@ async function main() {
         "prologue-clean-frame-1-240x160-4bpp.png",
         "council-v13-background.png",
         "market-approved-surface-768x512.png",
-        "porto-nara-animations48.png",
+        "nara-topdown-walk-run-v1.png",
         "dialogue-selector-gba-v4.png",
         "gba-dialogue-font-v3.png"
       ].map(name => name.replace(/\.png$/, "")));
@@ -1951,17 +1951,8 @@ async function main() {
         throw new Error(`Falha ao reabrir o template: ${JSON.stringify(reopened)}`);
       }
 
-      await assertWorkspace(cdp, "Editor", ["penedos_vento"]);
-      await evaluate(cdp, `
-        (() => {
-          const card = Array.from(document.querySelectorAll(".room-stage-card-frame"))
-            .find((item) => item.querySelector(".room-stage-card-header strong")?.textContent?.trim() === ${JSON.stringify(displaySceneName(editedSceneName))});
-          if (!card) return false;
-          card.dispatchEvent(new PointerEvent("pointerdown", { bubbles: true, button: 0, pointerId: 1 }));
-          card.dispatchEvent(new PointerEvent("pointerup", { bubbles: true, button: 0, pointerId: 1 }));
-          return true;
-        })()
-      `);
+      await assertWorkspace(cdp, "Editor", []);
+      await focusSceneInEditor(cdp, editedSceneName);
       await waitForText(cdp, (text) => text.includes(displaySceneName(editedSceneName)) && text.includes("Cena"), "painel da cena reaberta");
       await openExportHealth(cdp);
       const projectHealth = await evaluate(cdp, `
@@ -1975,6 +1966,9 @@ async function main() {
             scenes: workspace?.querySelectorAll(".project-health-scene-card").length ?? 0,
             hasDiagnostics: Boolean(workspace?.querySelector('[aria-labelledby="project-health-diagnostics-title"]')),
             hasBudget: Boolean(workspace?.querySelector('[aria-label^="Orçamento de "]')),
+            titleBudgetWarning: Array.from(workspace?.querySelectorAll('.project-health-diagnostic-list button') ?? []).some((button) =>
+              button.querySelector('strong')?.textContent?.includes('O orçamento de assets da cena está próximo do limite.')
+              && button.querySelector('small')?.textContent?.split(' · ').includes('titulo')),
             warningCount: Number(Array.from(workspace?.querySelectorAll(".project-health-summary-card") ?? [])
               .find((card) => card.querySelector("span")?.textContent?.trim() === "Avisos")
               ?.querySelector("strong")?.textContent ?? -1)
@@ -1985,7 +1979,10 @@ async function main() {
         || !projectHealth.hasDiagnostics || !projectHealth.hasBudget) {
         throw new Error(`Preflight de exportação não refletiu o template completo: ${JSON.stringify(projectHealth)}`);
       }
-      await assertWorkspace(cdp, "Editor", ["penedos_vento"]);
+      if (projectHealth.titleBudgetWarning) {
+        throw new Error('O orçamento do título ainda está emitindo o aviso antigo.');
+      }
+      await assertWorkspace(cdp, "Editor", []);
       const projectProblemCount = await evaluate(cdp, `
         Number(document.querySelector('button[aria-label="Abrir central de pendências"] span')?.textContent ?? -1)
       `);
@@ -2008,9 +2005,6 @@ async function main() {
           .map((item) => item.textContent?.trim())
           .filter(Boolean)
       `);
-      if (problemMessages.some((message) => message.includes("O orçamento de assets da cena está próximo do limite."))) {
-        throw new Error(`O orçamento do título ainda está emitindo o aviso antigo: ${problemMessages.join("; ")}`);
-      }
       if (!problemMessages.some((message) => message.includes("sem uso no projeto."))) {
         throw new Error(`O aviso de asset sem uso não apareceu na central de pendências: ${problemMessages.join("; ")}`);
       }
@@ -2070,7 +2064,7 @@ async function main() {
       if (!visualComparison?.hasPanel || !visualComparison.hasOriginal || !visualComparison.hasCompiled || !visualComparison.isExpanded) {
         throw new Error(`A comparação PNG → RGB555 do Mapa Menu não foi renderizada na Saúde do projeto: ${JSON.stringify(visualComparison)}`);
       }
-      await assertWorkspace(cdp, "Editor", ["penedos_vento"]);
+      await assertWorkspace(cdp, "Editor", []);
       await focusSceneInEditor(cdp, editedSceneName);
       await clickButtonInSelectorByAriaLabel(cdp, ".room-editor-tool-rail", "Colisão - Sólidos");
       const editorScrollChrome = await inspectEditorScrollChrome(cdp);
