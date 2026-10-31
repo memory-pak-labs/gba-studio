@@ -4,6 +4,26 @@
 
 namespace {
 
+void test_platformer_animation_sync_mask_tracks_only_changed_actors() {
+    gbs::PlatformerNpcRuntime npcs[3] {};
+    gbs::SpriteAnimatorState animators[3] {};
+    gbs::EventState state {};
+    assert(gbs::platformer_npc_animation_sync_mask(npcs, animators, 3, state) == 0);
+    state.actor_command_count = 1;
+    state.actor_commands[0] = {gbs::EventActorOp::MoveTo, 1, 10, 20};
+    assert(gbs::platformer_npc_animation_sync_mask(npcs, animators, 3, state) == 0);
+    state.actor_commands[0] = {gbs::EventActorOp::SetAnimation, 1, 2, 0};
+    assert(gbs::platformer_npc_animation_sync_mask(npcs, animators, 3, state) == 2);
+    state.actor_commands[0] = {gbs::EventActorOp::SetAnimationFrame, 2, 1, 0};
+    assert(gbs::platformer_npc_animation_sync_mask(npcs, animators, 3, state) == 4);
+    state.actor_commands[0] = {gbs::EventActorOp::SetSprite, 0, 1, 0};
+    state.actor_animation_playing[1] = true;
+    npcs[2].animation_frame_changed = true;
+    assert(gbs::platformer_npc_animation_sync_mask(npcs, animators, 3, state) == 7);
+    state.actor_commands[0].actor_index = -1;
+    assert(gbs::platformer_npc_animation_sync_mask(npcs, animators, 3, state) == 6);
+}
+
 void test_event_platform_carries_a_rider_and_respects_solid_tiles() {
     const uint8_t free_tiles[64] = {};
     const gbs::TileMap open {free_tiles, 8, 8};
@@ -1102,6 +1122,7 @@ void test_platformer_walks_off_platform_group_npc() {
 }
 
 int main() {
+    test_platformer_animation_sync_mask_tracks_only_changed_actors();
     test_event_platform_save_restores_position_and_motion_direction();
     test_event_platform_carries_a_rider_and_respects_solid_tiles();
     test_platformer_walks_off_platform_group_npc();

@@ -900,6 +900,17 @@ void consume_platformer_actor_commands(
 ) {
     gbs::consume_visibility_event_commands(event_state);
     consume_platformer_tile_commands(event_state, room_data);
+    const uint32_t animation_sync = gbs::platformer_npc_animation_sync_mask(
+        platformer_npc_runtimes, platformer_npc_animators, platformer_npc_count, event_state);
+    if (event_state.actor_command_count == 0 && !event_state.player_animation_changed && animation_sync == 0) {
+        // Conditions use actor anchors, even when the previous physics step
+        // produced no event commands.
+        const auto anchor = gbs::platformer_actor_anchor_position(player);
+        event_state.player_x = anchor.x;
+        event_state.player_y = anchor.y;
+        event_state.player_direction = player.facing == gbs::PlatformerFacing::Left ? 2 : 3;
+        return;
+    }
     const gbs::TileMap collision = room.collision;
     for (size_t i = 0; i < event_state.actor_command_count; ++i) {
         const auto& command = event_state.actor_commands[i];
@@ -1030,6 +1041,7 @@ void consume_platformer_actor_commands(
     event_state.player_x = carried_anchor.x;
     event_state.player_y = carried_anchor.y;
     for (size_t index = 0; index < platformer_npc_count; ++index) {
+        if ((animation_sync & (1u << index)) == 0) continue;
         const gbs::SpriteAnimation* next_animation = gbs::platformer_npc_animation_for_index(
             room_data.npcs[index],
             platformer_npc_runtimes[index].animation_index

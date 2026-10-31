@@ -2,6 +2,7 @@
 
 #include <stddef.h>
 #include <stdint.h>
+#include "gbs/animation.hpp"
 #include "gbs/audio.hpp"
 #include "gbs/assets.hpp"
 #include "gbs/dialogue.hpp"
@@ -242,6 +243,28 @@ struct PlatformerNpcRuntime {
     int animation_frame_index;
     uint8_t collision_group = 0;
 };
+
+// NPC animation state only needs reconciliation when an animation command or
+// a change in the animator's playing/frame state actually affects that NPC.
+inline uint32_t platformer_npc_animation_sync_mask(const PlatformerNpcRuntime* npcs,
+    const SpriteAnimatorState* animators, size_t count, const EventState& state) {
+    if (npcs == nullptr || animators == nullptr) return 0;
+    if (count > 32) count = 32;
+    uint32_t mask = 0;
+    for (size_t i = 0; i < count; ++i) {
+        if (npcs[i].animation_frame_changed ||
+            (i < max_event_actor_state_slots && state.actor_animation_playing[i] != animators[i].playing))
+            mask |= 1u << i;
+    }
+    for (size_t i = 0; i < state.actor_command_count; ++i) {
+        const auto& command = state.actor_commands[i];
+        if (command.actor_index >= 0 && static_cast<size_t>(command.actor_index) < count &&
+            (command.op == EventActorOp::SetAnimation || command.op == EventActorOp::SetAnimationFrame ||
+             command.op == EventActorOp::SetSprite))
+            mask |= 1u << command.actor_index;
+    }
+    return mask;
+}
 
 struct PlatformerHazardEventData {
     size_t hazard_index;
