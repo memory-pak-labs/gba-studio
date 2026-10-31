@@ -11,13 +11,18 @@ on:
         description: 'Optional successful package run to test installed updates without rebuilding production packages'
         type: string
         default: ''
+      updater_qa_platform:
+        description: 'Platform for the isolated updater test'
+        type: choice
+        options: [both, linux, windows]
+        default: both
 
 permissions:
   contents: read
   actions: read
 
 concurrency:
-  group: desktop-packages-${{ github.ref }}
+  group: desktop-packages-${{ github.ref }}-${{ inputs.updater_qa_source_run_id != '' && github.run_id || 'build' }}
   cancel-in-progress: true
 
 jobs:
@@ -209,11 +214,8 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        include:
-          - platform: windows
-            runner: windows-2022
-          - platform: linux
-            runner: ubuntu-24.04
+        include: >-
+          ${{ fromJSON(inputs.updater_qa_platform == 'linux' && '[{"platform":"linux","runner":"ubuntu-24.04"}]' || inputs.updater_qa_platform == 'windows' && '[{"platform":"windows","runner":"windows-2022"}]' || '[{"platform":"windows","runner":"windows-2022"},{"platform":"linux","runner":"ubuntu-24.04"}]') }}
     defaults:
       run:
         working-directory: apps/desktop-electron

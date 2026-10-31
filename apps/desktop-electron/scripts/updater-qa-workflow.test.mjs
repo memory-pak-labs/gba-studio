@@ -9,7 +9,10 @@ describe('installed updater QA workflow', () => {
   it('keeps installer publication steps on the production job and isolates the QA matrix', () => {
     expect(workflow.jobs.desktop.steps.some((step) => step.name === 'Upload validated installer candidates')).toBe(true);
     const qa = workflow.jobs['installed-updater-qa'];
-    expect(qa.strategy.matrix.include.map((item) => item.platform).sort()).toEqual(['linux', 'windows']);
+    expect(qa.strategy.matrix.include).toContain('updater_qa_platform');
+    expect(qa.strategy.matrix.include).toContain('ubuntu-24.04');
+    expect(qa.strategy.matrix.include).toContain('windows-2022');
+    expect(workflow.concurrency.group).toContain('github.run_id');
     expect(qa.env.GBA_UPDATER_QA_ROOT).toContain('github.workspace');
     expect(qa.env.GBA_UPDATER_QA_ARTIFACTS).toContain('github.workspace');
     expect(qa.steps.some((step) => step.name === 'Upload validated installer candidates')).toBe(false);
