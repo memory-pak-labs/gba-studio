@@ -5,6 +5,14 @@ import path from 'node:path';
 const require = createRequire(import.meta.url);
 const asar = require('@electron/asar');
 
+/** NSIS restarts through the Windows shell, which does not inherit the test's environment. */
+export function findWindowsUpdatedProcess(processes, executable) {
+  const expected = path.win32.normalize(executable).toLowerCase();
+  return processes.find((process) => process.ExecutablePath
+    && path.win32.normalize(process.ExecutablePath).toLowerCase() === expected
+    && /(?:^|\s)--updated(?:\s|$)/.test(process.CommandLine ?? ''))?.ProcessId ?? null;
+}
+
 /** AppImageTarget recreates these wrapper symlinks when repacking the extracted QA copy. */
 export async function removeAppImageWrapperIcon(directory) {
   await rm(path.join(directory, '.DirIcon'), { force: true });

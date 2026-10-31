@@ -3,12 +3,21 @@ import { mkdtemp, mkdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { copyAppWithQaVersion, removeAppImageWrapperIcon } from './updater-qa-fixture.mjs';
+import { copyAppWithQaVersion, findWindowsUpdatedProcess, removeAppImageWrapperIcon } from './updater-qa-fixture.mjs';
 
 const require = createRequire(import.meta.url);
 const asar = require('@electron/asar');
 
 describe('updater QA fixture', () => {
+  it('identifies only the updated instance from the isolated installation', () => {
+    const processes = [
+      { ProcessId: 9, ExecutablePath: 'C:\\other\\gba-studio.exe', CommandLine: 'gba-studio.exe --updated' },
+      { ProcessId: 10, ExecutablePath: 'D:\\qa\\gba-studio.exe', CommandLine: 'gba-studio.exe' },
+      { ProcessId: 11, ExecutablePath: 'D:\\QA\\gba-studio.exe', CommandLine: '"D:\\QA\\gba-studio.exe" --updated' },
+    ];
+    expect(findWindowsUpdatedProcess(processes, 'd:\\qa\\gba-studio.exe')).toBe(11);
+    expect(findWindowsUpdatedProcess(processes.slice(0, 2), 'd:\\qa\\gba-studio.exe')).toBeNull();
+  });
   it('removes only the extracted AppImage wrapper icons before repacking', async () => {
     const root = await mkdtemp(path.join(tmpdir(), 'gba-appimage-fixture-'));
     try {

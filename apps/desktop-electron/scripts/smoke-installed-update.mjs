@@ -1,13 +1,18 @@
-import { spawn } from 'node:child_process';
+import { execFile, spawn } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { createReadStream } from 'node:fs';
 import { cp, mkdir, readFile, stat, writeFile } from 'node:fs/promises';
 import { createServer } from 'node:http';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { createRequire } from 'node:module';
+import { promisify } from 'node:util';
 import { cdpSession, copySmokeProject, createElectronSmokeEnv, prepareElectronSmokeLocale, terminateChild, wait } from './lib/electron-smoke-helpers.mjs';
+import { findWindowsUpdatedProcess } from './updater-qa-fixture.mjs';
 
 const appRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
+const asar = createRequire(import.meta.url)('@electron/asar');
+const execFileAsync = promisify(execFile);
 const root = path.resolve(process.env.GBA_UPDATER_QA_ROOT ?? '');
 if (!process.env.GBA_UPDATER_QA_ROOT) throw new Error('QA root is required');
 const fixture = JSON.parse(await readFile(path.join(root, 'fixture.json'), 'utf8'));
@@ -44,14 +49,19 @@ const env = createElectronSmokeEnv({
   GBA_STUDIO_OPEN_PROJECT: project, APPIMAGE_EXTRACT_AND_RUN: '1', ELECTRON_DISABLE_SANDBOX: '1'
 });
 delete env.GBA_STUDIO_OFFLINE_SMOKE;
-const child = spawn(fixture.sourceExecutable, fixture.platform === 'linux' ? ['--no-sandbox'] : [], { cwd: appRoot, env, stdio: ['ignore', 'pipe', 'pipe'], windowsHide: true });
+let child;
 let logs = '';
 let exited = false;
 let cdp;
 const checks = [];
-child.stdout.on('data', (data) => { logs += data; });
-child.stderr.on('data', (data) => { logs += data; });
-child.once('exit', () => { exited = true; });
+function launchForInspection() {
+  exited = false;
+  child = spawn(fixture.sourceExecutable, fixture.platform === 'linux' ? ['--no-sandbox'] : [], { cwd: appRoot, env, stdio: ['ignore', 'pipe', 'pipe'], windowsHide: true });
+  child.stdout.on('data', (data) => { logs += data; });
+  child.stderr.on('data', (data) => { logs += data; });
+  child.once('exit', () => { exited = true; });
+}
+launchForInspection();
 const assert = (condition, message) => { if (!condition) throw new Error(message); checks.push(message); console.log(`PASS ${message}`); };
 const poll = async (fn, label, ms = 120_000) => {
   const deadline = Date.now() + ms;
@@ -113,7 +123,27 @@ try {
   await poll(() => exited, 'source application exits', 180_000);
   const saved = JSON.parse(await readFile(project, 'utf8'));
   assert(saved.dialogues.some((item) => !dialogueKeys.has(item.key) && item.text === 'Nova fala.'), 'New dialogue is saved before the update completes');
-  cdp.close(); cdp = await connect();
+  cdp.close();
+  if (fixture.platform === 'win32') {
+    // NSIS uses ExecShellAsUser; the restarted process does not inherit the QA CDP environment.
+    const restartedPid = await poll(async () => {
+      asar.uncacheAll();
+      const installed = JSON.parse(asar.extractFile(path.join(path.dirname(fixture.sourceExecutable), 'resources', 'app.asar'), 'package.json').toString());
+      if (installed.version !== fixture.targetVersion) return null;
+      const { stdout } = await execFileAsync('powershell.exe', ['-NoProfile', '-Command', "Get-CimInstance Win32_Process -Filter \"Name='gba-studio.exe'\" | Select-Object ProcessId,ExecutablePath,CommandLine | ConvertTo-Json -Compress"]);
+      const values = JSON.parse(stdout || '[]');
+      return findWindowsUpdatedProcess(Array.isArray(values) ? values : [values], fixture.sourceExecutable);
+    }, 'Windows installation and automatic restart', 180_000);
+    assert(Boolean(restartedPid), 'Windows installed the target version and automatically restarted it');
+    // Relaunch the isolated instance with QA variables solely to inspect the saved project.
+    process.kill(restartedPid);
+    await poll(async () => {
+      const { stdout } = await execFileAsync('powershell.exe', ['-NoProfile', '-Command', `Get-Process -Id ${restartedPid} -ErrorAction SilentlyContinue | Select-Object -ExpandProperty Id`]);
+      return !stdout.trim();
+    }, 'updated instance exits', 30_000);
+    launchForInspection();
+  }
+  cdp = await connect();
   await waitFor("Boolean(document.querySelector('.app-shell'))", 'updated editor', 180_000);
   const updated = await evaluate('window.gbaStudio.getAppUpdateState()');
   assert(updated.currentVersion === fixture.targetVersion, 'Updated application restarted at the target version');
