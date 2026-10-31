@@ -7739,6 +7739,7 @@ function buildDungeonCrawlerRooms(
       },
       ...(config?.presentation ? {presentation:{hud_background:-1,
         player_label: config.presentation.playerLabel || nullableStringField(child(child(data,"settings"),"general"),"startPlayer")
+          || nullableStringField(playerActor, "name")
           || nullableStringField(projectArray(projectArray(child(data,"settings") ?? {},"hudPresets").find(p=>p.id===room.hudPresetId) ?? {},"components").find(c=>c.kind==="text"),"text") || "Player",
         action_sounds:Object.fromEntries(Object.entries(config.presentation.actionSounds).map(([cue,name])=>{
         const audio=resolveAudioPlayback(audioItems,audioPack,name);if(audio?.op!=="play_sfx")throw new Error(`Dungeon cue must reference PSG SFX: ${name}`);return [cue,audio.index];
