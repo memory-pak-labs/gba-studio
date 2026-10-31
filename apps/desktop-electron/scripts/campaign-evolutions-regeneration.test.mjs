@@ -33,6 +33,7 @@ describe('approved campaign extensions survive regeneration',()=>{
    expect(before[key].filter(item=>!ids.has(item.id))).toEqual([]);
   }
   expect(new Set(after.events.map(event=>event.name)).size).toBe(after.events.length);
+  expect(after.events.map(event=>event.name)).toEqual(before.events.map(event=>event.name));
   expect(validateGBAProjectMigrationContract(after)).toEqual([]);
   expect(prepareEngineProjectExport(after).error).toBeUndefined();
  });

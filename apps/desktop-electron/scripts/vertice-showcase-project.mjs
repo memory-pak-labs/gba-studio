@@ -9067,6 +9067,9 @@ export function promoteExemploGBAVerticeCampaign(data) {
     seenEventNames.add(event.name);
     return true;
   });
+  const sourceEventOrder = new Map((data.events ?? []).map((event, index) => [event.name, index]));
+  result.events.sort((left, right) => (sourceEventOrder.get(left.name) ?? Number.MAX_SAFE_INTEGER)
+    - (sourceEventOrder.get(right.name) ?? Number.MAX_SAFE_INTEGER));
   result.dialogues = merge(result.dialogues, (data.dialogues ?? []).filter(dialogue => dialogue?.key?.startsWith("race_")), "key");
   // Keep the reviewed asset metadata, provenance and licenses used by these scenes.
   const authoredReferences = JSON.stringify([...(data.scenas ?? []).filter(scene => APPROVED_MENU_SCENES.has(scene?.name)), ...(data.actors ?? []).filter(actor => APPROVED_MENU_SCENES.has(actor?.roomName))]);
