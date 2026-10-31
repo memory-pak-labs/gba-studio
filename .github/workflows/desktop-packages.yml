@@ -218,8 +218,8 @@ jobs:
       run:
         working-directory: apps/desktop-electron
     env:
-      GBA_UPDATER_QA_ROOT: ${{ runner.temp }}/gba-updater-qa
-      GBA_UPDATER_QA_ARTIFACTS: ${{ runner.temp }}/gba-updater-artifacts
+      GBA_UPDATER_QA_ROOT: ${{ github.workspace }}/.updater-qa
+      GBA_UPDATER_QA_ARTIFACTS: ${{ github.workspace }}/.updater-artifacts
       GBA_UPDATER_QA_HTTP_PORT: '9758'
       CSC_IDENTITY_AUTO_DISCOVERY: 'false'
     steps:
@@ -243,11 +243,11 @@ jobs:
           source_sha=$(printf '%s' "$run" | node -e 'const d=JSON.parse(require("node:fs").readFileSync(0,"utf8")); if(d.conclusion!=="success"||d.path!==".github/workflows/desktop-packages.yml")process.exit(1); process.stdout.write(d.head_sha)')
           git merge-base --is-ancestor "$source_sha" HEAD
           git diff --name-only "$source_sha" HEAD > "$RUNNER_TEMP/updater-qa-changed-files.txt"
-          node -e 'const fs=require("node:fs"),path=require("node:path"); const allowed=new Set([".github/workflows/desktop-packages.yml","apps/desktop-electron/scripts/updater-qa-fixture.mjs","apps/desktop-electron/scripts/updater-qa-fixture.test.mjs","apps/desktop-electron/scripts/prepare-updater-qa.mjs","apps/desktop-electron/scripts/smoke-installed-update.mjs"]); const changed=fs.readFileSync(path.join(process.env.RUNNER_TEMP,"updater-qa-changed-files.txt"),"utf8").split(/\r?\n/).filter(Boolean); const unexpected=changed.filter(f=>!allowed.has(f)); if(unexpected.length)throw new Error("Product sources differ from the packaged candidate: "+unexpected.join(", "))'
+          node -e 'const fs=require("node:fs"),path=require("node:path"); const allowed=new Set([".github/workflows/desktop-packages.yml","apps/desktop-electron/scripts/updater-qa-fixture.mjs","apps/desktop-electron/scripts/updater-qa-fixture.test.mjs","apps/desktop-electron/scripts/updater-qa-workflow.test.mjs","apps/desktop-electron/scripts/prepare-updater-qa.mjs","apps/desktop-electron/scripts/smoke-installed-update.mjs"]); const changed=fs.readFileSync(path.join(process.env.RUNNER_TEMP,"updater-qa-changed-files.txt"),"utf8").split(/\r?\n/).filter(Boolean); const unexpected=changed.filter(f=>!allowed.has(f)); if(unexpected.length)throw new Error("Product sources differ from the packaged candidate: "+unexpected.join(", "))'
       - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
         with:
           name: GBA-Studio-${{ matrix.platform }}-x64
-          path: ${{ runner.temp }}/gba-updater-artifacts
+          path: ${{ github.workspace }}/.updater-artifacts
           run-id: ${{ inputs.updater_qa_source_run_id }}
           github-token: ${{ github.token }}
       - name: Linux desktop dependencies
@@ -269,6 +269,6 @@ jobs:
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: Updater-QA-${{ matrix.platform }}
-          path: ${{ runner.temp }}/gba-updater-qa/evidence/
+          path: ${{ github.workspace }}/.updater-qa/evidence/
           if-no-files-found: ignore
           retention-days: 7
