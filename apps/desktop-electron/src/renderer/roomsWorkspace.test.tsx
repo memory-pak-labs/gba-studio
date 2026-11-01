@@ -2397,6 +2397,29 @@ describe("RoomsWorkspace React smoke", () => {
     expect(namePreview).toHaveTextContent("DONE");
   });
 
+  it("materializes the current name keyboard in the canvas and native preview while guides are hidden", async () => {
+    const user = userEvent.setup();
+    const handlers = roomsWorkspaceHandlers();
+    const project = createBlankProjectData({ name: "Native name keyboard" });
+    const room = (project.scenas as Array<Record<string, unknown>>)[0];
+    room.sceneType = "menu";
+    room.runtime = { type: "menu", config: { role: "name_input", screenType: "menu", hudMode: "none", items: [], textInput: {
+      variableName: "player.name", maxLength: 8, x: 15, y: 5, width: 8,
+      keyboard: { layout: "grid", controlLayout: "bottom_grid", surface: "background", x: 11, y: 8, width: 16, height: 10, allowLowercase: true }
+    } } };
+    render(<RoomsWorkspace presentation={deriveRoomsWorkspacePresentation(project)} projectData={project} {...handlers} />);
+    await focusScene(user, String(room.name));
+    expect(screen.getByRole("img", { name: "Prévia visual da entrada do nome" })).toHaveAttribute("data-native-text-input", "bottom_grid");
+    expect(document.querySelector(".room-focus-native-preview [data-native-text-input='bottom_grid']")).not.toBeNull();
+    expect(screen.getByText("Entrada de nome e teclado")).toBeInTheDocument();
+    expect(document.querySelector(".room-menu-keyboard-guide")).toBeNull();
+    expect(document.querySelector(".room-menu-name-input-guide")).toBeNull();
+    await openCanvasLayers(user);
+    await user.click(screen.getByRole("button", { name: "Ocultar camada HUD" }));
+    expect(screen.queryByRole("img", { name: "Prévia visual da entrada do nome" })).not.toBeInTheDocument();
+    expect(document.querySelector(".room-focus-native-preview [data-native-text-input='bottom_grid']")).not.toBeNull();
+  });
+
   it("shows the compiler budget for the selected scene and runs a fresh analysis", async () => {
     const user = userEvent.setup();
     const project = createBlankProjectData({ name: "Orçamento no inspector" });

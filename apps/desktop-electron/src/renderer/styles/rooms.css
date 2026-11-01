@@ -11752,3 +11752,36 @@ body.room-scene-map-card-dragging .room-stage-card-frame.is-dragging {
 .rooms-inspector .room-paint-tileset-header > button:last-of-type {
   grid-column: 3;
 }
+
+/* Native name input uses the same 240x160 pixel coordinates as the ROM. */
+.room-menu-text-input-preview {
+  height: 100%;
+  image-rendering: pixelated;
+  inset: 0;
+  pointer-events: none;
+  position: absolute;
+  width: 100%;
+  z-index: 9;
+}
+
+.room-menu-text-input-fields {
+  border: 0;
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  min-width: 0;
+  padding: 0;
+}
+
+.room-menu-text-input-fields > label {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.room-menu-text-input-position {
+  display: grid;
+  gap: 8px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  min-width: 0;
+}

@@ -1,3 +1,4 @@
+import { MenuTextInputPreview } from "./MenuTextInputPreview";
 import { InteractiveObjectsInspector } from "./InteractiveObjectsInspector";
 import { prefabUpdateImpact } from "../shared/projectPrefabs";
 import { MapStatesInspector } from "./MapStatesInspector";
@@ -1579,6 +1580,7 @@ function RoomMenuCompositionOverlay({ room, screenID, selectedItemIndex = 0 }: R
   const preview = deriveMenuSceneEditorPreview(screen ? { ...config, ...screen, role: config.role } : config);
   const isGenderSelection = preview.role === "gender_select";
   const textInput = preview.textInput;
+  if (textInput?.keyboard?.controlLayout === "bottom_grid") return null;
 
   return (
     <div
@@ -7107,6 +7109,10 @@ function RoomTilemapEditor({
             room={room}
           />
         )) : null}
+        {isFocusedSceneEditor && canvasLayerVisibility.hud && menuConfig?.textInput?.keyboard?.controlLayout === "bottom_grid" && menuConfig.textInput.keyboard.layout === "grid" ? <MenuTextInputPreview
+          input={menuConfig.textInput} showFieldGuide={selectedToolPanelMode === "hud" && canvasLayerVisibility.composition}
+          fontAssetURL={projectData ? resolveProjectAssetURL(projectData, projectPath, resolveSceneDialogueUiSettings(projectData, room.id).font) : null}
+        /> : null}
         {isFocusedSceneEditor && canvasLayerVisibility.composition ? <RoomMenuCompositionOverlay room={room} screenID={menuPreviewScreen?.id} selectedItemIndex={menuPreviewItemIndex} /> : null}
         {isFocusedSceneEditor && renderHudOverlay && canvasLayerVisibility.hud && hudBinding ? (
           <RoomHudOverlay
@@ -10035,6 +10041,7 @@ export function RoomsWorkspace({
                     selectedTool={selectedTool}
                     selectedToolPanelMode={selectedToolPanelMode}
                     hudTools={<HudCanvasToolbar
+                      nativeTextInput={Boolean(focusSceneMenuConfig?.textInput)}
                       preset={hudEditingPreset} canEdit={canEditHudCanvas} selectedComponentID={selectedHudComponentID}
                       onSelectComponent={setSelectedHudComponentID} onUpdateHudPreset={onUpdateHudPreset}
                       viewMode={hudViewMode} onViewMode={setHudViewMode}
@@ -10571,7 +10578,7 @@ export function RoomsWorkspace({
                 <>
                   {activeInspectorTab === "scene" ? <>
                   <section className="hud-authoring-section room-scene-hud-summary" aria-label={ui("Resumo da HUD da cena")}>
-                    <div><strong>{ui("HUD da cena")}</strong><span>{roomRuntimeHudAsset(inspectorRoom) ? ui("HUD {0} · {1}", { 0: inspectorRoom.sceneType === "isometric" ? "tática" : inspectorRoom.sceneType === "battleRpg" ? "RPG" : inspectorRoom.sceneType === "dungeonCrawler" ? "do labirinto" : "de luta", 1: roomRuntimeHudAsset(inspectorRoom) }) : inspectorHudBinding?.preset.name ?? ui("Sem HUD")}</span></div>
+                    <div><strong>{ui("HUD da cena")}</strong><span>{roomRuntimeHudAsset(inspectorRoom) ? ui("HUD {0} · {1}", { 0: inspectorRoom.sceneType === "isometric" ? "tática" : inspectorRoom.sceneType === "battleRpg" ? "RPG" : inspectorRoom.sceneType === "dungeonCrawler" ? "do labirinto" : "de luta", 1: roomRuntimeHudAsset(inspectorRoom) }) : inspectorHudBinding?.preset.name ?? (inspectorRoom.runtime?.type === "menu" && normalizeMenuSceneConfig(inspectorRoom.runtime.config).textInput ? ui("Entrada de nome e teclado") : ui("Sem HUD"))}</span></div>
                     <button type="button" onClick={() => { enterSceneFocus(inspectorRoom); setEditorToolPanelMode("hud"); setCanvasLayerVisibilityState(current => ({ ...current, hud: true })); }}>{ui("Editar HUD")}</button>
                   </section>
                   {inspectorRoom.warnings.length ? (
@@ -10603,6 +10610,7 @@ export function RoomsWorkspace({
                     : null}
                   {activeInspectorTab === "hud" && selectedToolPanelMode === "hud" && hudInspectorRoom ? (
                     <HudSceneInspector
+                      onUpdateRoomFields={onUpdateRoomFields}
                       readOnly={canvasLayerLocks.hud}
                       onUpdateInterfaceTheme={onUpdateInterfaceTheme}
                       binding={hudAppliedBinding}

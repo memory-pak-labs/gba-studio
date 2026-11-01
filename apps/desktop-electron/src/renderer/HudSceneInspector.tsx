@@ -1,3 +1,6 @@
+import { MenuTextInputFields } from "./MenuTextInputFields";
+import { normalizeMenuSceneConfig } from "../shared/menuScene";
+import type { UpdateRoomFields } from "../shared/roomsWorkspace/core";
 import { uiText as ui, useStudioUiText } from "./studioUiText";
 import { HUD_VALUE_BINDING_LABELS } from "../shared/hudPresets";
 import { HudElementBehaviorInspector } from "./HudElementBehaviorInspector";
@@ -16,6 +19,7 @@ import { DEFAULT_HUD_PRESET, HUD_CORNER_ANCHORS, deriveHudPresetBudget, hudAncho
 import type { RoomsWorkspaceRoom } from "../shared/roomsWorkspace";
 
 export interface HudSceneInspectorProps {
+  onUpdateRoomFields?(roomID: string, fields: UpdateRoomFields): void;
   onUpdateInterfaceTheme?(change: InterfaceThemeChange): void;
   binding: HudPresetBinding | null;
   previewPreset: HudPresetPresentation | null;
@@ -89,6 +93,16 @@ export function HudSceneInspector(props: HudSceneInspectorProps): React.ReactEle
   };
   const create = (sourceID: string) => { onPreviewPreset(null); void props.onCreateHudVariationForRoom?.(room.id, sourceID, props.screenID); };
   const bind = (id: string | null) => { props.onBindHud?.(room.id, id, props.screenID); onPreviewPreset(null); onSelectComponent(null); };
+  const nativeMenu = room.runtime?.type === "menu" ? normalizeMenuSceneConfig(room.runtime.config) : null;
+  if (nativeMenu?.textInput && !previewPreset) return <div className="room-hud-scene-inspector" aria-label={ui("Editor contextual de entrada de nome")}>
+    <section className="hud-authoring-section">
+      <div className="hud-authoring-heading"><h5>{ui("Entrada de nome")}</h5><span>240×160</span></div>
+      <p className="muted">{ui("Campo de nome e teclado desta cena")}</p>
+      <MenuTextInputFields value={nativeMenu.textInput} disabled={props.readOnly || !props.onUpdateRoomFields} onChange={textInput => props.onUpdateRoomFields?.(room.id, {
+        runtime: { type: "menu", config: { ...room.runtime?.config, textInput } }
+      })} />
+    </section>
+  </div>;
   return <div className="room-hud-scene-inspector" aria-label={ui("Editor contextual de HUD")}>
     <section className="hud-authoring-section">
       <div className="hud-authoring-heading"><h5>{ui("HUD da cena")}</h5><span>240×160</span></div>
