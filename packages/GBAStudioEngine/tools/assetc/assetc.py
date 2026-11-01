@@ -894,7 +894,10 @@ def plan_pack_obj_palettes(assets, base_dir):
         master = [0] * OBJ_MASTER_PALETTE_COLORS
         builtin_start = OBJ_BUILTIN_PALETTE_BANK * 16
         master[builtin_start:builtin_start + 16] = OBJ_BUILTIN_PALETTE_VALUES
-        occupied = {0, *range(builtin_start, builtin_start + 16)}
+        # The fallback 4bpp tiles use only indices 1-3; index 0 is transparent.
+        # 8bpp sprites may use the other 13 positions without changing those
+        # pixels. Runtime text/UI banks 13-15 remain outside this master.
+        occupied = {0, *range(builtin_start + 1, builtin_start + 4)}
         first_index = {}
         bank_count = 0
         for bank, clusters in enumerate(banks):
@@ -915,7 +918,7 @@ def plan_pack_obj_palettes(assets, base_dir):
                     continue
                 free = next((i for i in range(1, OBJ_MASTER_PALETTE_COLORS) if i not in occupied), None)
                 if free is None:
-                    raise SystemExit("paleta OBJ compartilhada excede o orcamento de ate 207 cores/slots; sprites 4bpp compartilham esse limite, banco 12 e reservado ao fallback do motor e bancos 13-15 ao texto/UI. Divida as cenas ou revise as paletas; nenhuma cor foi reduzida")
+                    raise SystemExit("paleta OBJ compartilhada excede o orcamento de ate 207 cores/slots; sprites 4bpp compartilham esse limite, cores 1-3 do banco 12 pertencem ao fallback e bancos 13-15 ao texto/UI. Divida as cenas ou revise as paletas; nenhuma cor foi reduzida")
                 master[free] = color
                 occupied.add(free)
                 first_index[color] = free

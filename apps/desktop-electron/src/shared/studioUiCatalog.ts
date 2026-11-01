@@ -756,10 +756,10 @@ export const studioUiMessages: Record<string, readonly [string, string, string]>
     "{0} declares {1} colors for 4bpp without enough palette banks.",
     "{0} declara {1} colores para 4bpp sin suficientes bancos de paleta."
   ],
-  "{0} declara {1} cores visíveis em OBJ 8bpp; o GBA Studio permite até 194 cores visíveis compartilhadas, conforme o orçamento dos sprites 4bpp.": [
-    "{0} declara {1} cores visíveis em OBJ 8bpp; o GBA Studio permite até 194 cores visíveis compartilhadas, conforme o orçamento dos sprites 4bpp.",
-    "{0} declares {1} visible colors in OBJ 8bpp; GBA Studio allows up to 194 shared visible colors, according to the budget of the 4bpp sprites.",
-    "{0} declara los colores visibles de {1} en OBJ 8bpp; GBA Studio permite hasta 194 colores visibles compartidos, según el presupuesto de los sprites 4bpp."
+  "{0} declara {1} cores visíveis em OBJ 8bpp; o GBA Studio permite até 207 cores visíveis compartilhadas, conforme o orçamento dos sprites 4bpp e das três cores do motor.": [
+    "{0} declara {1} cores visíveis em OBJ 8bpp; o GBA Studio permite até 207 cores visíveis compartilhadas, conforme o orçamento dos sprites 4bpp e das três cores do motor.",
+    "{0} declares {1} visible colors in OBJ 8bpp; GBA Studio allows up to 207 shared visible colors, depending on the budget of 4bpp sprites and the three engine colors.",
+    "{0} declara los colores visibles de {1} en OBJ 8bpp; GBA Studio permite hasta 207 colores visibles compartidos, según el presupuesto de los sprites 4bpp y los tres colores del motor."
   ],
   "{0} deve ser uma lista de strings não vazias.": [
     "{0} deve ser uma lista de strings não vazias.",
@@ -3191,10 +3191,10 @@ export const studioUiMessages: Record<string, readonly [string, string, string]>
     "Original appearance",
     "Apariencia original"
   ],
-  "Aplica-se a todas as animações da folha e preserva a imagem original. 4bpp usa até 15 cores visíveis. 8bpp dobra o espaço dos tiles e compartilha até 194 cores visíveis com os sprites da cena, conforme o orçamento. Os bancos do texto e dos elementos internos do motor ficam reservados.": [
-    "Aplica-se a todas as animações da folha e preserva a imagem original. 4bpp usa até 15 cores visíveis. 8bpp dobra o espaço dos tiles e compartilha até 194 cores visíveis com os sprites da cena, conforme o orçamento. Os bancos do texto e dos elementos internos do motor ficam reservados.",
-    "It applies to all animations of the sheet and preserves the original image. 4bpp uses up to 15 visible colors. 8bpp doubles the space of the tiles and shares up to 194 colors visible with the scene sprites, as budget. The banks of the text and internal elements of the engine shall be reserved.",
-    "Se aplica a todas las animaciones de la hoja y conserva la imagen original. 4bpp utiliza hasta 15 colores visibles. 8bpp duplica el espacio de las tiles y comparte hasta 194 colores visibles con los sprites de escena, como presupuesto. Se reservarán los bancos del texto y los elementos internos del motor."
+  "Aplica-se a todas as animações da folha e preserva a imagem original. 4bpp usa até 15 cores visíveis. 8bpp dobra o espaço dos tiles e compartilha até 207 cores visíveis com os sprites da cena, conforme o orçamento, incluindo três cores reservadas ao motor. Os bancos de texto e UI permanecem reservados.": [
+    "Aplica-se a todas as animações da folha e preserva a imagem original. 4bpp usa até 15 cores visíveis. 8bpp dobra o espaço dos tiles e compartilha até 207 cores visíveis com os sprites da cena, conforme o orçamento, incluindo três cores reservadas ao motor. Os bancos de texto e UI permanecem reservados.",
+    "Applies to every animation in the sheet and preserves the original image. 4bpp uses up to 15 visible colors. 8bpp uses twice the tile space and shares up to 207 visible colors with the scene sprites, depending on the budget, including three colors reserved for the engine. Text and UI palette banks remain reserved.",
+    "Se aplica a todas las animaciones de la hoja y conserva la imagen original. 4bpp utiliza hasta 15 colores visibles. 8bpp duplica el espacio de los tiles y comparte hasta 207 colores visibles con los sprites de la escena, según el presupuesto, incluidos tres colores reservados al motor. Los bancos de texto y UI siguen reservados."
   ],
   "Aplicado": [
     "Aplicado",
