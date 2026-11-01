@@ -90,15 +90,20 @@ interface ProjectProblemsDrawerProps {
   onClose(): void;
   onOpenProblem(problem: ProjectProblem): void;
   problems: ProjectProblem[];
+  ignoredCount: number;
+  onIgnoreWarning(problem: ProjectProblem): void;
+  onIgnoreAllWarnings(): void;
+  onRestoreWarnings(): void;
 }
 
 const problemWorkspaceOrder: ProjectProblemWorkspace[] = ["Arquivos", "Editor", "Sprites", "Dialogos", "Audio", "Exportar", "Ajustes"];
 
-export function ProjectProblemsDrawer({ isOpen, onClose, onOpenProblem, problems }: ProjectProblemsDrawerProps): React.ReactElement | null {
+export function ProjectProblemsDrawer({ isOpen, onClose, onOpenProblem, problems, ignoredCount, onIgnoreWarning, onIgnoreAllWarnings, onRestoreWarnings }: ProjectProblemsDrawerProps): React.ReactElement | null {
   const ui = useStudioUiText();
   const { t } = useStudioI18n();
   if (!isOpen) return null;
   const errorCount = problems.filter((problem) => problem.severity === "error").length;
+  const warningCount = problems.length - errorCount;
 
   return (
     <aside aria-label={t("shell.problemsAria")} className="project-problems-drawer">
@@ -109,6 +114,16 @@ export function ProjectProblemsDrawer({ isOpen, onClose, onOpenProblem, problems
         </div>
         <button aria-label={t("shell.closeProblems")} onClick={onClose} type="button"><X aria-hidden="true" size={16} /></button>
       </header>
+      <div className="project-problems-controls">
+        {warningCount > 0 ? <button onClick={onIgnoreAllWarnings} type="button">{t("shell.ignoreWarnings", { count: warningCount })}</button> : null}
+        {ignoredCount > 0 ? (
+          <>
+            <span role="status">{t("shell.ignoredWarnings", { count: ignoredCount })}</span>
+            <button onClick={onRestoreWarnings} type="button">{t("shell.restoreWarnings")}</button>
+          </>
+        ) : null}
+        <small>{t("shell.ignoreWarningsHint")}</small>
+      </div>
       <div className="project-problems-list">
         {problemWorkspaceOrder.map((workspace) => {
           const workspaceProblems = problems.filter((problem) => problem.workspace === workspace);
@@ -117,21 +132,35 @@ export function ProjectProblemsDrawer({ isOpen, onClose, onOpenProblem, problems
             <section aria-label={t("shell.workspaceProblems", { workspace: t(workspaceLabelKey(workspace)) })} key={workspace}>
               <h3>{t(workspaceLabelKey(workspace))}<span>{workspaceProblems.length}</span></h3>
               {workspaceProblems.map((problem) => (
-                <button
-                  aria-label={t("shell.openProblem", { message: problem.message })}
-                  className={problem.severity}
-                  key={problem.id}
-                  onClick={() => onOpenProblem(problem)}
-                  type="button"
-                >
-                  <AlertTriangle aria-hidden="true" size={15} />
-                  <span>{ui(problem.message)}</span>
-                </button>
+                <div className={`project-problem-row ${problem.severity}`} key={problem.id}>
+                  <button
+                    aria-label={t("shell.openProblem", { message: problem.message })}
+                    className={problem.severity}
+                    onClick={() => onOpenProblem(problem)}
+                    type="button"
+                  >
+                    <AlertTriangle aria-hidden="true" size={15} />
+                    <span className="project-problem-content">
+                      {problem.targetName && !problem.message.includes(problem.targetName) ? <strong>{problem.targetName}</strong> : null}
+                      <span>{ui(problem.message)}</span>
+                      {problem.detail ? <small>{ui(problem.detail)}</small> : null}
+                    </span>
+                  </button>
+                  {problem.severity === "warning" ? (
+                    <button
+                      aria-label={t("shell.ignoreWarning", { message: ui(problem.message) })}
+                      className="project-problem-ignore"
+                      onClick={() => onIgnoreWarning(problem)}
+                      title={t("shell.ignoreWarning", { message: ui(problem.message) })}
+                      type="button"
+                    ><X aria-hidden="true" size={14} /></button>
+                  ) : null}
+                </div>
               ))}
             </section>
           );
         })}
-        {problems.length === 0 ? <p>{t("shell.noProblems")}</p> : null}
+        {problems.length === 0 ? <p>{t(ignoredCount > 0 ? "shell.noVisibleProblems" : "shell.noProblems")}</p> : null}
       </div>
     </aside>
   );

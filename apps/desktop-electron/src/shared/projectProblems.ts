@@ -12,6 +12,7 @@ export interface ProjectProblem {
   id: string;
   code?: string;
   message: string;
+  detail?: string;
   severity: ProjectProblemSeverity;
   workspace: ProjectProblemWorkspace;
   targetID?: string;
@@ -32,6 +33,7 @@ export function deriveProjectProblems(data: GBAProjectData): ProjectProblem[] {
       id: diagnostic.id,
       code: diagnostic.code,
       message: diagnostic.message,
+      detail: diagnostic.detail,
       severity: diagnostic.severity,
       workspace: diagnostic.workspace,
       targetID: diagnostic.targetID,
