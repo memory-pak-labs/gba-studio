@@ -1094,6 +1094,9 @@ function menuRuntimeItems(room: Record<string, unknown>): Record<string, unknown
       ];
     });
   }
+  if (runtimeType === "racing") {
+    return runtimeEventStates(room).map(state => ({ label: `${state.group} · ${state.label}`, eventName: state.eventName }));
+  }
   if (runtimeType !== "menu") return [];
   const rootItems = Array.isArray(config.items) ? config.items.filter(isRecord) : [];
   const internalScreens = Array.isArray(config.screens) ? config.screens.filter(isRecord) : [];
@@ -1122,7 +1125,8 @@ function bindingLabelsByEventName(data: GBAProjectData): Map<string, string[]> {
     addEventBindingLabels(room.eventBindings, `Cena: ${roomName}`, labels);
     for (const item of menuRuntimeItems(room)) {
       const itemLabel = stringField(item.label, "Item sem nome");
-      addDirectEventLabel(item.eventName, `Cena: ${roomName} · Menu: ${itemLabel}`, labels);
+      const itemPrefix = isRecord(room.runtime) && room.runtime.type === "racing" ? "" : "Menu: ";
+      addDirectEventLabel(item.eventName, `Cena: ${roomName} · ${itemPrefix}${itemLabel}`, labels);
     }
   }
 

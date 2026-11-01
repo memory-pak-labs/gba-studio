@@ -4,13 +4,14 @@ import {buildEngineExportProjectContract} from './exportEngineProject.js';
 import {normalizeRacingSceneConfig} from '../shared/sceneTypeProfiles.js';
 import {runtimeEventStates} from '../shared/sceneEventStates.js';
 import {resolveEventBindingCapabilities} from '../shared/eventBindingCapabilities.js';
-import {bindEventToTargetInProject,renameEventInProject,removeEventFromProject} from '../shared/eventsWorkspace.js';
+import {bindEventToTargetInProject,renameEventInProject,removeEventFromProject,deriveEventsWorkspacePresentation} from '../shared/eventsWorkspace.js';
 function source(){return JSON.parse(readFileSync(new URL('../../default-assets/templates/exemplo-gba/exemplo-gba.gba-project',import.meta.url),'utf8'));}
 it('preserves checkpoint events through normalization, binding, rename and removal',()=>{
  const p=source();const scene=p.scenas.find((s:any)=>s.name==='circuito_final');scene.runtime.config.topdownTrack.checkpoints[1].eventName='passed';
  expect(normalizeRacingSceneConfig(scene.runtime.config).topdownTrack?.checkpoints[1]).toMatchObject({eventName:'passed'});
  const state=runtimeEventStates(scene).find(s=>s.eventName==='passed')!;expect(state).toBeDefined();
  p.rooms=structuredClone(p.scenas);p.events.push({id:'race-pass-test',name:'passed',category:'Cena',steps:[{command:'set_variable var_stabilizer 1'}]});
+ const view=deriveEventsWorkspacePresentation(p);expect(view.graphNodes.find(e=>e.eventName==='passed')).toMatchObject({isUnlinked:false});
  const renamed=renameEventInProject(p,'race-pass-test','gate_passed');
  for(const key of ['rooms','scenas'])expect(runtimeEventStates((renamed[key] as any[]).find(s=>s.name==='circuito_final')).some(s=>s.eventName==='gate_passed')).toBe(true);
  const removed=removeEventFromProject(renamed,'race-pass-test');expect(runtimeEventStates((removed.scenas as any[]).find(s=>s.name==='circuito_final')).find(s=>s.bindingKey===state.bindingKey)?.eventName).toBeNull();
