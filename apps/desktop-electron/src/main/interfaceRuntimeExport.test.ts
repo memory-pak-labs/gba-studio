@@ -33,3 +33,9 @@ it('rejects packs that would silently hide interfaces authored for Cutscene or V
  await expect(writeEngineSchemaExport({destination:path.join(root,'out'),prepared,assetcPath:path.join(pack,'tools/assetc')})).rejects.toThrow('interfaces de cena');
  }finally{await rm(root,{recursive:true,force:true});}
 });
+
+it('keeps the implicit built-in default layout when the stored catalog contains only custom presets',async()=>{
+ const {engineUsedHudPresetIDs}=await import('../shared/engineProjectExport.js');
+ const data={scenas:[{name:'start'},{name:'standard',hudPresetId:'hud-default'}],settings:{hudPresetId:'hud-default',hudPresets:[{id:'unused',name:'Unused',mode:'advanced',components:[]}]}};
+ expect([...engineUsedHudPresetIDs(data)]).toEqual(['hud-default']);
+});

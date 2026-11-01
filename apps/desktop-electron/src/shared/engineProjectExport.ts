@@ -1,3 +1,4 @@
+import {deriveHudPresetsWorkspacePresentation} from "./hudPresets.js";
 import { memoizeEngineExport } from "./engineExportContext.js";
 import { sceneChangeCommandParts } from "./sceneChangeCommand.js";
 import { spriteColorModeForSheet } from "./spriteColorDepth.js";
@@ -276,17 +277,14 @@ function hudPresetIDsInValue(value: unknown, output = new Set<string>()): Set<st
 
 /** Indexes authored HUD references once per pack, without retaining project data. */
 export function engineUsedHudPresetIDs(data: GBAProjectData): Set<string> {
-  const projectSettings = settings(data);
-  const presets = recordArray(projectSettings ?? {}, "hudPresets");
-  const knownIDs = new Set(presets.map(preset => nullableStringField(preset, "id")));
-  const requestedActiveID = nullableStringField(projectSettings, "hudPresetId") || "hud-default";
-  const activeID = presets.length && !knownIDs.has(requestedActiveID)
-    ? nullableStringField(presets[0], "id") : requestedActiveID;
+  const presentation = deriveHudPresetsWorkspacePresentation(data);
+  const knownIDs = new Set(presentation.presets.map(preset => preset.id));
+  const activeID = presentation.activePresetId;
   const ids = new Set<string>();
   projectRooms(data).forEach(room => {
     const requested = hudPresetIDsInValue(room);
     if (!requested.size && !usesBlankPlayerDefaults(data)) requested.add(activeID);
-    requested.forEach(id => ids.add(presets.length && !knownIDs.has(id) ? activeID : id));
+    requested.forEach(id => ids.add(!knownIDs.has(id) ? activeID : id));
   });
   if (!ids.size && !usesBlankPlayerDefaults(data)) ids.add(activeID);
   return ids;

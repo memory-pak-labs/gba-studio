@@ -244,7 +244,7 @@ async function writeLockedEngineSchemaExport(options: WriteEngineSchemaExportOpt
     projectContract.luta_project?.dialogue_ui,
     projectContract.menu_project?.dialogue_ui
   ].flatMap(ui => ui?.hud_scene_bindings ?? []).map(binding => binding.scene_name));
-  const requiresSceneInterfaces = projectContract.scene_contracts.some(scene =>
+  const requiresSceneInterfaces = projectContract.scene_contracts?.some(scene =>
     ["cutscene", "visualNovel", "isometric", "luta"].includes(scene.scene_type) && interfaceBindings.has(scene.name)) ||
     projectContract.menu_project?.screens.some(screen => screen.screen_type !== "menu" && interfaceBindings.has(screen.name));
   if (requiresSceneInterfaces) {
