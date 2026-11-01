@@ -9,7 +9,7 @@ export function RoomInspectorNavigation({ title, tabs, activeTab, onSelect }: {
   const ui = useStudioUiText();
   const primary = tabs.filter((tab) => tab.id === "events" || tab.id === "hud" || tab.id === "actor"
     || tab.id === "trigger" || tab.id === "connection" || tab.id === "collision"
-    || tab.id === "scene" && !tabs.some((item) => item.id === "actor" || item.id === "trigger" || item.id === "connection"));
+    || tab.id === "height" || tab.id === "scene" && !tabs.some((item) => item.id === "actor" || item.id === "trigger" || item.id === "connection"));
   const secondary = tabs.filter((tab) => !primary.includes(tab));
   const selectedSecondary = secondary.find((tab) => tab.id === activeTab);
   const button = (tab: RoomInspectorTab) => <button

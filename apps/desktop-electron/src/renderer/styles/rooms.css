@@ -10616,7 +10616,7 @@ body.room-scene-map-card-dragging .room-stage-card-frame.is-dragging {
   border-bottom: 1px solid color-mix(in srgb, var(--studio-color-border) 72%, transparent);
   column-gap: 8px;
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 1.35fr);
+  grid-template-columns: minmax(0, 1fr);
   padding: 6px 0;
 }
 
@@ -10692,7 +10692,7 @@ body.room-scene-map-card-dragging .room-stage-card-frame.is-dragging {
   border-bottom: 1px solid color-mix(in srgb, var(--studio-color-border) 72%, transparent);
   column-gap: 8px;
   display: grid;
-  grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.1fr);
+  grid-template-columns: minmax(0, 1fr);
   padding: 7px 0;
 }
 
@@ -10778,7 +10778,7 @@ body.room-scene-map-card-dragging .room-stage-card-frame.is-dragging {
   border-bottom: 1px solid color-mix(in srgb, var(--studio-color-border) 72%, transparent);
   column-gap: 8px;
   display: grid;
-  grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.1fr);
+  grid-template-columns: minmax(0, 1fr);
   padding: 7px 0;
 }
 
@@ -10919,7 +10919,7 @@ body.room-scene-map-card-dragging .room-stage-card-frame.is-dragging {
   align-items: center;
   border-bottom: 1px solid color-mix(in srgb, var(--studio-color-border) 72%, transparent);
   column-gap: 8px;
-  grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.1fr);
+  grid-template-columns: minmax(0, 1fr);
   padding: 7px 0;
 }
 
@@ -11588,3 +11588,167 @@ body.room-scene-map-card-dragging .room-stage-card-frame.is-dragging {
 .room-map-states code { display: block; overflow-wrap: anywhere; }
 .room-map-states input,
 .room-map-states select { min-width: 0; width: 100%; }
+
+/* Editor inspector forms share the rail width, including nested sections.
+   InspectorNumber has a heading, control line and constraints: keep each on
+   its own row rather than inheriting a legacy two-column label layout. */
+.rooms-inspector label.inspector-field:not(.inspector-toggle-field) {
+  align-items: stretch;
+  grid-template-columns: minmax(0, 1fr);
+  row-gap: 4px;
+}
+
+.rooms-inspector label.inspector-field:not(.inspector-toggle-field) > * {
+  grid-column: 1 / -1;
+  min-width: 0;
+}
+
+.rooms-inspector label:has(> input[type="checkbox"]):not(.inspector-toggle-field) {
+  align-items: center;
+  display: flex;
+  gap: 7px;
+  justify-content: flex-start;
+}
+
+.rooms-inspector label > input[type="checkbox"] {
+  flex: 0 0 auto;
+  margin: 0;
+  min-height: 0;
+  width: auto;
+}
+
+.rooms-inspector .room-entities-editor,
+.rooms-inspector .room-connection-inspector,
+.rooms-inspector .room-dialogues-inspector,
+.rooms-inspector .room-hud-scene-inspector {
+  min-width: 0;
+}
+
+.rooms-inspector .rooms-inspector-tab-panel {
+  overscroll-behavior-y: contain;
+}
+
+.rooms-inspector .room-entity-tool-segment {
+  flex: 1 1 100%;
+}
+
+/* Reference searches expand within the scrolling rail so their options and
+   import action remain reachable without a clipped floating panel. */
+.rooms-inspector .project-reference-picker-popover {
+  box-sizing: border-box;
+  margin-top: 6px;
+  min-width: 0;
+  position: static;
+  width: 100%;
+}
+
+.rooms-inspector .project-reference-picker-options {
+  overscroll-behavior: contain;
+}
+
+.rooms-inspector .project-reference-picker-options > button > span {
+  min-width: 0;
+}
+
+.rooms-inspector .project-reference-picker-options :is(strong, small) {
+  overflow-wrap: anywhere;
+  white-space: normal;
+}
+
+/* Nested theme, dialogue and HUD controls use the same surface and sizing as
+   scene/entity controls instead of falling back to native browser styling. */
+.rooms-inspector :is(input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="color"]), select, textarea) {
+  background: var(--studio-color-surface);
+  border: 1px solid var(--studio-color-border);
+  border-radius: var(--studio-radius-control);
+  box-sizing: border-box;
+  color: var(--studio-color-text-primary);
+  max-width: 100%;
+  min-width: 0;
+}
+
+.rooms-inspector textarea {
+  resize: vertical;
+  width: 100%;
+}
+
+.rooms-inspector label.inspector-toggle-field {
+  align-items: center;
+  display: grid;
+  gap: 4px 7px;
+  grid-template-columns: auto minmax(0, 1fr);
+}
+
+.rooms-inspector .inspector-toggle-field > input {
+  grid-column: 1;
+  grid-row: 1;
+}
+
+.rooms-inspector .inspector-toggle-field > .inspector-field-label {
+  grid-column: 2;
+  grid-row: 1;
+}
+
+.rooms-inspector .inspector-toggle-field > .inspector-field-description {
+  grid-column: 2;
+}
+
+/* Give the tileset filename a complete row; import actions stay beside its label. */
+.rooms-inspector .room-paint-tileset-header {
+  grid-template-columns: minmax(0, 1fr) 32px 48px;
+}
+
+.rooms-inspector .room-paint-tileset-header > select {
+  grid-column: 1 / -1;
+  grid-row: 2;
+  width: 100%;
+}
+
+.rooms-inspector .room-paint-tileset-header > button {
+  grid-row: 1;
+}
+
+/* Repeated checkpoint/rival groups must not fall back to beveled native fieldsets. */
+.rooms-inspector fieldset:not([class]) {
+  border: 1px solid var(--studio-color-border);
+  border-radius: var(--studio-radius-control);
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  min-width: 0;
+  padding: 8px;
+}
+
+.rooms-inspector fieldset:not([class]) > legend {
+  padding-inline: 4px;
+}
+
+/* Health status and its action stay aligned even with a longer review status. */
+.rooms-inspector .scene-inspector-health-summary {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+}
+
+.rooms-inspector .scene-inspector-health-heading {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+}
+
+.rooms-inspector .scene-inspector-health-heading > div {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.rooms-inspector .room-paint-tileset-header > span {
+  grid-column: 1;
+  grid-row: 1;
+}
+
+.rooms-inspector .room-paint-tileset-header > button:first-of-type {
+  grid-column: 2;
+}
+
+.rooms-inspector .room-paint-tileset-header > button:last-of-type {
+  grid-column: 3;
+}
