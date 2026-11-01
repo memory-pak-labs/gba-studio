@@ -2213,3 +2213,12 @@ authored-scene-hud-test:
 	python3 tests/host/native_hud_precedence_tests.py
 
 host-test: authored-scene-hud-test
+
+.PHONY: racing-events-test
+host-test: racing-events-test
+racing-events-test: $(HOST_BUILD)/racing_progress_events_tests
+	$(HOST_BUILD)/racing_progress_events_tests
+	python3 tests/host/racing_events_assetc_tests.py
+$(HOST_BUILD)/racing_progress_events_tests: tests/host/racing_progress_events_tests.cpp engine/include/gbs/racing_events.hpp engine/include/gbs/racing.hpp
+	@mkdir -p $(@D)
+	$(HOST_CXX) $(HOST_CXXFLAGS) $< -o $@

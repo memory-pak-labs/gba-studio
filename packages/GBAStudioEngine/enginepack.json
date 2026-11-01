@@ -430,7 +430,8 @@
       "world_map_project_data_contract",
       "luta_project_data_contract",
       "menu_keyboard_geometry",
-      "scene_interface_layouts"
+      "scene_interface_layouts",
+      "racing_progress_events"
     ],
     "runtime_profiles": [
       "point_click_export_contract",

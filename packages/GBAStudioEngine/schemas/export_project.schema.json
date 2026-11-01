@@ -2699,6 +2699,7 @@
                       "required": ["id", "x", "y", "width", "height"],
                       "properties": {
                         "id": { "type": "string", "minLength": 1 },
+                        "on_pass": {"type":"array","items":{"$ref":"#/properties/topdown_project/properties/event_command"}},
                         "x": { "type": "integer", "minimum": 0, "maximum": 4095 },
                         "y": { "type": "integer", "minimum": 0, "maximum": 4095 },
                         "width": { "type": "integer", "minimum": 1, "maximum": 256 },

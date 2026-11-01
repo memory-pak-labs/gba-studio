@@ -17772,6 +17772,7 @@ def emit_racing_project_data_header(racing_project, asset_report=None, base_dir=
             room.get("on_enter"),
             f"racing_project.rooms[{room_index}].on_enter",
         )
+        on_lap_complete = emit_event_script(output, f"racing_room_{room_index}_on_lap_complete", room.get("on_lap_complete"), f"racing_project.rooms[{room_index}].on_lap_complete")
         on_victory = emit_event_script(
             output,
             f"racing_room_{room_index}_on_victory",
@@ -17903,6 +17904,7 @@ def emit_racing_project_data_header(racing_project, asset_report=None, base_dir=
                 raise SystemExit(f"racing_project.rooms[{room_index}].topdown_track aceita no maximo 16 checkpoints")
             checkpoint_name = f"racing_room_{room_index}_topdown_checkpoints"
             checkpoint_entries = []
+            checkpoint_scripts = []
             checkpoint_ids = set()
             for checkpoint_index, checkpoint in enumerate(checkpoints):
                 description = (
@@ -17923,18 +17925,21 @@ def emit_racing_project_data_header(racing_project, asset_report=None, base_dir=
                 checkpoint_height = require_int(checkpoint.get("height", 0), f"{description}.height", 1, 256)
                 if checkpoint_x >= width * 8 or checkpoint_y >= height * 8:
                     raise SystemExit(f"{description} precisa estar dentro das dimensoes da sala")
+                checkpoint_scripts.append(emit_event_script(output, f"racing_room_{room_index}_checkpoint_{checkpoint_index}_on_pass", checkpoint.get("on_pass"), f"{description}.on_pass"))
                 checkpoint_entries.append(
                     f"    gbs::RacingTopdownCheckpoint {{ {cpp_string_literal(checkpoint_id)}, "
                     f"{{ {checkpoint_x}, {checkpoint_y} }}, {checkpoint_width}, {checkpoint_height} }},"
                 )
             if checkpoint_entries:
+                events_name = f"racing_room_{room_index}_checkpoint_events"
+                output.append(f"constexpr gbs::EventScript {events_name}[] = {{ " + ", ".join(checkpoint_scripts) + " };")
                 output.append(f"constexpr gbs::RacingTopdownCheckpoint {checkpoint_name}[] = {{")
                 output.extend(checkpoint_entries)
                 output.append("};")
                 output.append(
                     f"constexpr gbs::RacingTopdownTrackData racing_room_{room_index}_topdown_track "
                     f"{{ {camera_x}, {camera_y}, {checkpoint_name}, {len(checkpoint_entries)}, {start_heading}, "
-                    f"{path_name if path_entries else 'nullptr'}, {len(path_entries)}{', true' if topdown_track.get('finish_at_zero', False) else ''} }};"
+                    f"{path_name if path_entries else 'nullptr'}, {len(path_entries)}, {'true' if topdown_track.get('finish_at_zero', False) else 'false'}, {events_name} }};"
                 )
                 output.append("")
                 topdown_track_expr = f"&racing_room_{room_index}_topdown_track"
@@ -18020,7 +18025,7 @@ def emit_racing_project_data_header(racing_project, asset_report=None, base_dir=
             f"{on_enter}, {triggers_name}, {trigger_count}, {actors_name}, {actor_count}, "
             f"{resource_group_expr}, {on_victory}, {on_defeat}, {pseudo3d_visual_expr}, "
             f"{track_segments_expr}, {track_segment_count}, {topdown_track_expr}, "
-            f"{room_video_literal}, gbs::RacingCameraConfig {{ {camera_height}, {camera_distance}, {camera_focal} }}, {floor_expression}, {empty_floor_expression}, {room_player_expression}, {sounds_expr}, {challenge_expr} "
+            f"{room_video_literal}, gbs::RacingCameraConfig {{ {camera_height}, {camera_distance}, {camera_focal} }}, {floor_expression}, {empty_floor_expression}, {room_player_expression}, {sounds_expr}, {challenge_expr}, {on_lap_complete} "
             "},"
         )
 

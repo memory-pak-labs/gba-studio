@@ -250,6 +250,7 @@ export interface RacingTrackSegmentConfig {
 
 export interface RacingTopdownCheckpointConfig {
   id: string;
+  eventName?: string;
   x: number;
   y: number;
   width: number;
@@ -933,7 +934,8 @@ export function normalizeRacingSceneConfig(value: unknown): RacingSceneConfig {
       x: Math.round(finiteNumber(checkpoint.x, 0, 0, 4095)),
       y: Math.round(finiteNumber(checkpoint.y, 0, 0, 4095)),
       width: Math.round(finiteNumber(checkpoint.width, 1, 1, 256)),
-      height: Math.round(finiteNumber(checkpoint.height, 1, 1, 256))
+      height: Math.round(finiteNumber(checkpoint.height, 1, 1, 256)),
+      ...(typeof checkpoint.eventName === "string" && checkpoint.eventName.trim() ? {eventName:checkpoint.eventName.trim()} : {})
     }];
   });
   const pathPoints = Array.isArray(topdownInput?.pathPoints)

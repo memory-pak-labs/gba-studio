@@ -1488,11 +1488,15 @@ export interface EngineExportRacingRoom {
       y: number;
       width: number;
       height: number;
+      on_pass?: EngineExportProjectEventCommand[];
     }>;
   };
   player_start_pixels: { x: number; y: number };
   background?: number;
   pseudo3d_visual?: number;
+  on_lap_complete?: EngineExportProjectEventCommand[];
+  on_victory?: EngineExportProjectEventCommand[];
+  on_defeat?: EngineExportProjectEventCommand[];
   on_enter?: EngineExportProjectEventCommand[];
   triggers?: Array<{
     area: { x: number; y: number; width: number; height: number };
@@ -7922,6 +7926,7 @@ function buildRacingRooms(
     const currentRoomName = roomName(room, index);
     const eventBindings = child(room, "eventBindings");
     const onEnter = scriptForEventName(data, nullableStringField(eventBindings, "onInit"), events, rooms, dialogues, audioItems, audioPack, pluginRegistry);
+    const onLapComplete = scriptForEventName(data, nullableStringField(eventBindings, "onLapComplete"), events, rooms, dialogues, audioItems, audioPack, pluginRegistry);
     const onVictory = scriptForEventName(data, nullableStringField(eventBindings, "onVictory"), events, rooms, dialogues, audioItems, audioPack, pluginRegistry);
     const onDefeat = scriptForEventName(data, nullableStringField(eventBindings, "onDefeat"), events, rooms, dialogues, audioItems, audioPack, pluginRegistry);
     const actors = npcActorsForRoom(data, room, index).flatMap((actor) => {
@@ -8017,7 +8022,8 @@ function buildRacingRooms(
             x: Math.max(0, Math.min(4095, Math.round(checkpoint.x))),
             y: Math.max(0, Math.min(4095, Math.round(checkpoint.y))),
             width: Math.max(1, Math.min(256, Math.round(checkpoint.width))),
-            height: Math.max(1, Math.min(256, Math.round(checkpoint.height)))
+            height: Math.max(1, Math.min(256, Math.round(checkpoint.height))),
+            ...(checkpoint.eventName ? {on_pass:scriptForEventName(data,checkpoint.eventName,events,rooms,dialogues,audioItems,audioPack,pluginRegistry) ?? []} : {})
           }))
         }
       } : {}),
@@ -8029,6 +8035,7 @@ function buildRacingRooms(
       ...(pseudo3dVisualIndexByRoomName.has(currentRoomName) ? { pseudo3d_visual: pseudo3dVisualIndexByRoomName.get(currentRoomName) } : {}),
       video: buildRoomVideoComposition(data, room, tilesetPack),
       ...(onEnter && onEnter.length > 0 ? { on_enter: onEnter } : {}),
+      ...(onLapComplete && onLapComplete.length > 0 ? {on_lap_complete:onLapComplete} : {}),
       ...(onVictory && onVictory.length > 0 ? { on_victory: onVictory } : {}),
       ...(onDefeat && onDefeat.length > 0 ? { on_defeat: onDefeat } : {}),
       ...(triggers.length > 0 ? { triggers } : {}),

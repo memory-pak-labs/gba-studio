@@ -89,6 +89,7 @@ struct RacingTopdownTrackData {
     const Vec2i* path_points = nullptr;
     size_t path_point_count = 0;
     bool finish_at_zero = false;
+    const EventScript* checkpoint_events = nullptr;
 };
 
 struct RacingPlayerVisual;
@@ -139,6 +140,7 @@ struct RacingRoomData {
     const RacingPlayerVisual* player_visual = nullptr;
     RacingActionSounds action_sounds {};
     RacingChallengeData challenge {};
+    EventScript on_lap_complete = empty_event_script();
 };
 
 struct RacingVehicleDirectionAnimations {

@@ -1,5 +1,6 @@
 /** Application copy only. Tuple order: pt-BR, en-US, es-ES. Keep project data out of this catalog. */
 export const studioUiMessages: Record<string, readonly [string, string, string]> = {
+  "O Engine Pack não oferece eventos de progresso da corrida. Atualize o Engine Pack antes de exportar este projeto.": ["O Engine Pack não oferece eventos de progresso da corrida. Atualize o Engine Pack antes de exportar este projeto.", "The Engine Pack does not support racing progress events. Update it before exporting this project.", "El Engine Pack no admite eventos de progreso de carrera. Actualízalo antes de exportar este proyecto."],
   "Ferramentas da entrada de nome": ["Ferramentas da entrada de nome", "Name entry tools", "Herramientas de entrada de nombre"],
   "Entrada de nome": ["Entrada de nome", "Name entry", "Entrada de nombre"],
   "Editor contextual de entrada de nome": ["Editor contextual de entrada de nome", "Name entry contextual editor", "Editor contextual de entrada de nombre"],

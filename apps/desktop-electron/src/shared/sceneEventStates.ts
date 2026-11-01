@@ -76,6 +76,12 @@ export function runtimeEventStates(entity: unknown): RuntimeEventState[] {
       if (step.skippable !== false) output.push(state(step, path, `Pular quadro ${index + 1}`, "Ao pular", [], "onSkipEventName"));
     });
   }
+  if (runtime.type === "racing") {
+    const track=record(config.topdownTrack);
+    list(track.checkpoints).forEach((gate,index)=>output.push(state(gate,["topdownTrack","checkpoints",String(index)],
+      track.finishAtZero===true && index===0 ? "Ao validar chegada" : `Ao validar checkpoint ${track.finishAtZero===true?index:index+1}`,
+      "Checkpoints da corrida", [{title:"Validar passagem em ordem",fields:[field(gate,"id","Identificador"),field(gate,"x","Centro X",0),field(gate,"y","Centro Y",0)]}])));
+  }
   if (runtime.type === "worldMap") {
     list(config.nodes).forEach((node, index) => output.push(state(node, ["nodes", String(index)], `Viajar · ${text(node.name) || text(node.id)}`, "Destinos", [{ title: "Disponibilidade da rota", fields: [field(node, "unlocked", "Liberada", true), field(node, "requiredVariable", "Variável exigida", -1), field(node, "requiredValue", "Valor exigido", 0)] }])));
   }

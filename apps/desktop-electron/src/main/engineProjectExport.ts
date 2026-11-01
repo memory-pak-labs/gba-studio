@@ -237,6 +237,12 @@ async function writeLockedEngineSchemaExport(options: WriteEngineSchemaExportOpt
     }
   }
   const projectContract = options.prepared.contract;
+  if (projectContract.racing_project?.rooms.some(room=>room.on_lap_complete?.length || room.topdown_track?.checkpoints.some(gate=>gate.on_pass?.length))) {
+    const manifest=await readFile(path.join(enginePackRoot,"enginepack.json"),"utf8").then(text=>JSON.parse(text)).catch(()=>null);
+    if (!manifest?.capabilities?.engine_sdk?.includes("racing_progress_events")) {
+      throw new Error("O Engine Pack não oferece eventos de progresso da corrida. Atualize o Engine Pack antes de exportar este projeto.");
+    }
+  }
   const interfaceBindings = new Set([
     projectContract.cutscene_project?.dialogue_ui,
     projectContract.visual_novel_project?.dialogue_ui,

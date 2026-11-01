@@ -5,6 +5,7 @@
 #include "gbs/input.hpp"
 #include "gbs/racing.hpp"
 #include "gbs/racing_challenge.hpp"
+#include "gbs/racing_events.hpp"
 #include "gbs/racing_minimap.hpp"
 #include "gbs/racing_animation.hpp"
 #include "gbs/render.hpp"
@@ -102,6 +103,7 @@ int screen_fade_total_frames = 1;
 int screen_fade_frames_remaining = 0;
 constexpr size_t max_runtime_triggers = 16;
 gbs::RuntimeTriggerState trigger_states[max_runtime_triggers] {};
+gbs::RacingProgressEvents progress_events {};
 int camera_x = 0;
 int camera_y = 0;
 gbs::HBlankAffineRasterLine pseudo3d_affine_raster[gbs::hblank_affine_raster_line_count] {};
@@ -538,6 +540,7 @@ void consume_event_state() {
         if (request == 1) {
             persist_racing_runtime_state(slot_index);
         } else if (request == 2 && restore_racing_runtime_state(slot_index)) {
+            progress_events = {};
             reset_trigger_states();
             stream_resources_for_room(project.rooms[current_room_index]);
             apply_room_visuals();
@@ -558,6 +561,8 @@ void consume_event_state() {
         event_state.save_request_slot = -1;
     }
 }
+
+void dispatch_race_result();
 
 bool start_runtime_event_script(gbs::EventScript script) {
     runtime_event_wait_frames = 0;
@@ -582,11 +587,19 @@ bool update_runtime_event_script(const gbs::InputState& input) {
         return true;
     }
     if (!gbs::event_runner_is_active(runtime_event_runner)) {
+        gbs::EventScript next {};
+        if (gbs::next_racing_progress_event(progress_events, project.rooms[current_room_index], next)) {
+            start_runtime_event_script(next);
+        } else {
+            dispatch_race_result();
+        }
+        if (!gbs::event_runner_is_active(runtime_event_runner)) {
         if (!gbs::update_button_event_bindings(event_state)) return false;
         const int script_index=event_state.last_script;
         event_state.last_script=-1;
         if (script_index<0 || static_cast<size_t>(script_index)>=project.script_count) return false;
         start_runtime_event_script(project.scripts[script_index]);
+        }
     }
     gbs::update_event_runner(runtime_event_runner, event_state);
     consume_event_state();
@@ -995,6 +1008,7 @@ void dispatch_race_result() {
 }
 
 void reset_trigger_states() {
+    progress_events = {};
     for (size_t index = 0; index < max_runtime_triggers; ++index) {
         trigger_states[index] = gbs::RuntimeTriggerState {};
     }
@@ -1014,6 +1028,7 @@ gbs::RacingInput racing_input(const gbs::InputState& input) {
 } // namespace
 
 int initialize_racing_runtime() {
+    progress_events = {};
     hud_position_cache = {};
     gbs::init();
     // Standalone ROMs bypass the mixed-runtime dispatcher.
@@ -1144,14 +1159,17 @@ gbs::RuntimeAdapterFrameResult update_racing_runtime(const gbs::RuntimeFrameCont
         const auto& room = project.rooms[current_room_index];
         gbs::update_racing_vehicle_animator(vehicle_animator,current_vehicle_clips(),runtime_state.speed_x256,controls,runtime_state.collision_frames>0,
             gbs::racing_uses_pseudo3d(room) ? 0 : runtime_state.heading);
-        dispatch_race_result();
+        gbs::capture_racing_progress_events(progress_events, before, runtime_state);
+        gbs::EventScript next {};
+        if (gbs::next_racing_progress_event(progress_events, room, next)) start_runtime_event_script(next);
+        else dispatch_race_result();
     }
     previous_racing_controls = controls;
     runtime_telemetry.seen_tile_effects = 120;
     update_camera();
     runtime_telemetry.seen_tile_effects = 130;
     gbs::set_event_player_actor_state(event_state, runtime_state.position_x256 / 256, runtime_state.position_y256 / 256, 0, 8);
-    if (!script_active) {
+    if (!script_active && !gbs::event_runner_is_active(runtime_event_runner)) {
         update_triggers();
     }
     runtime_telemetry.seen_tile_effects = 140;
