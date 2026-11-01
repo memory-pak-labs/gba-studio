@@ -3,6 +3,17 @@ import { describe, expect, it } from "vitest";
 import { deriveProjectProblems } from "./projectProblems.js";
 
 describe("deriveProjectProblems", () => {
+  it("preserva cena e contexto do orçamento para distinguir avisos iguais", () => {
+    const problems = deriveProjectProblems({
+      scenas: [{ name: "porto", sceneType: "topdown", width: 50, height: 20,
+        tilemap: Array.from({ length: 1000 }, (_, index) => index + 1), backgroundAssetName: "porto.png" }],
+      assets: [{ name: "porto.png", kind: "Background", metadata: { width: 240, height: 160, tileCount: 1000 } }]
+    });
+    expect(problems).toEqual(expect.arrayContaining([
+      expect.objectContaining({ code: "asset.budget.blocked", targetName: "porto", detail: expect.stringContaining("Tiles BG: 1000/896 (112%)") })
+    ]));
+  });
+
   it("centraliza pendencias navegaveis de todos os workspaces", () => {
     const project = {
       assets: [{ id: "asset-bg", name: "missing.png", kind: "Tileset" }],
