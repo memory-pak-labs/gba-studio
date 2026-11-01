@@ -34,9 +34,12 @@ import {
 } from "../eventStructure.js";
 import type { GBAProjectData } from "../projectFile.js";
 import { sceneRouteTablesFromProject } from "../sceneRouteTables.js";
+import { normalizeSceneTypeId } from "../sceneTypes.js";
+import { shmupProjectileLaunches } from "../shmupProjectileAuthoring.js";
 import {
   normalizeGBAEntityDocument,
-  normalizeGBAEventDocument
+  normalizeGBAEventDocument,
+  normalizeGBASceneDocument
 } from "../../../../../packages/project-contract/src/index.js";
 import {
   normalizeEventProcedureDefinition,
@@ -3302,8 +3305,14 @@ export function deriveEventsWorkspacePresentation(
     return missing;
   };
   const graphEdges = sourceEvents.flatMap((event, index) => graphEdgesForEvent(event, index, eventNames));
-  const bindings = boundEventNames(data);
+  const shmupSceneNames = new Set(projectRooms(data)
+    .map(room => normalizeGBASceneDocument(room))
+    .filter(room => normalizeSceneTypeId(room.sceneType) === "shmup")
+    .map(room => room.name));
+  const projectileEventNames = new Set(shmupProjectileLaunches(sourceEvents, shmupSceneNames).map(launch => launch.eventName));
+  const bindings = [...boundEventNames(data), ...projectileEventNames];
   const bindingLabels = bindingLabelsByEventName(data);
+  for (const eventName of projectileEventNames) addDirectEventLabel(eventName, "Exportação: projéteis Shoot em Up", bindingLabels);
   const commandEventReferences = sourceEvents.flatMap((event) => eventSteps(event).flatMap((step) => commandReferencedEvents(step.command)));
   const referenceNames = [...bindings, ...commandEventReferences];
   const referenceCounts=new Map<string,number>();

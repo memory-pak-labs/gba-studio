@@ -1,5 +1,6 @@
 import { actorCommandReferences, sceneChangeCommand, sceneChangeCommandParts } from "../shared/sceneChangeCommand.js";
 import { parseEventInstruction, eventWaitFrames } from "../shared/eventExecutionContract.js";
+import { shmupProjectileLaunches, type ShmupProjectileLaunch } from "../shared/shmupProjectileAuthoring.js";
 import { parseVisibilityPreset } from "../shared/visibilityPresets.js";
 import { normalizePointClickTarget, pointClickInventoryItems, type PointClickInventoryItem } from "../shared/pointClickTargets.js";
 import { roomMapStates, resolveMapState, type MapStateVariant } from "../shared/mapStates.js";
@@ -8736,33 +8737,6 @@ function buildPointClickProject(
     ...(assetSection.assets ? { assets: assetSection.assets } : {}),
     ...(assetSection.resource_banks ? { resource_banks: assetSection.resource_banks } : {})
   };
-}
-
-interface ShmupProjectileLaunch {
-  actor: string;
-  direction: string;
-  speed: number;
-  spriteSheet?: string;
-}
-
-function shmupProjectileLaunches(
-  events: Record<string, unknown>[],
-  runtimeRoomNames: Set<string>
-): ShmupProjectileLaunch[] {
-  return events.flatMap((event, eventIndex) => {
-    const eventRoomName = normalizeGBAEventDocument(event, eventIndex).sceneName ?? "";
-    if (eventRoomName && !runtimeRoomNames.has(eventRoomName)) return [];
-    return eventSteps(event).flatMap((step) => {
-      const parts = commandParts(stringField(step, "command", "noop"));
-      if ((parts[0] ?? "") !== "launch_projectile" || !parts[1]) return [];
-      return [{
-        actor: parts[1],
-        direction: parts[2] || "right",
-        speed: Math.max(1, Math.round(numberOrNullLocal(parts[3]) ?? 2)),
-        ...(parts[4] ? { spriteSheet: parts[4] } : {})
-      }];
-    });
-  });
 }
 
 function shmupProjectileVelocity(launch: ShmupProjectileLaunch): { x: number; y: number } {
