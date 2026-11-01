@@ -2,6 +2,7 @@
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { normalizeMenuSceneConfig } from "../shared/menuScene";
+import { menuTextInputLayout, useCustomMenuKeyboard } from "../shared/menuTextInputLayout";
 import { StudioI18nProvider } from "./i18n";
 import { MenuTextInputOverlay } from "./MenuTextInputOverlay";
 
@@ -88,4 +89,23 @@ describe("native interface selection and movement", () => {
     expect(screen.getByRole("button", { name: field })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: keyboard })).toBeInTheDocument();
   });
+});
+
+it("resizes the name field with one undoable gesture at the current zoom",()=>{
+ const {change}=setup();const handle=screen.getByRole("button",{name:"Redimensionar campo do nome"});
+ down(handle);move(handle,132,100);expect(change).not.toHaveBeenCalled();up(handle);
+ expect(change).toHaveBeenCalledExactlyOnceWith(expect.objectContaining({width:10,maxLength:8}));
+});
+it("moves individual letters and commands while retaining all other absolute key positions",()=>{
+ const value=useCustomMenuKeyboard(input()),change=vi.fn();const result=render(<MenuTextInputOverlay input={value} editable onChange={change}/>);
+ result.container.firstElementChild!.getBoundingClientRect=vi.fn(()=>({width:480,height:320} as DOMRect));
+ const key=screen.getByRole("button",{name:"Mover tecla A"});key.setPointerCapture=vi.fn();key.hasPointerCapture=vi.fn(()=>true);key.releasePointerCapture=vi.fn();
+ down(key);move(key,84,84);up(key);
+ expect(change).toHaveBeenCalledTimes(1);
+ const layout=menuTextInputLayout(change.mock.lastCall![0])!;
+ expect(layout.keys[0]).toMatchObject({x:80,y:56});
+ expect(layout.keys[1]).toEqual(menuTextInputLayout(value)!.keys[1]);
+ expect(screen.getByRole("button",{name:"Mover tecla DEL"})).toBeInTheDocument();
+ expect(screen.getByRole("button",{name:"Mover tecla Aa"})).toBeInTheDocument();
+ expect(screen.getByRole("button",{name:"Mover tecla OK"})).toBeInTheDocument();
 });

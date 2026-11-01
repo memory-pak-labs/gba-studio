@@ -11831,3 +11831,38 @@ body.room-scene-map-card-dragging .room-stage-card-frame.is-dragging {
   white-space: nowrap;
   width: 1px;
 }
+
+.room-menu-text-input-handle.is-key { z-index: 11; }
+.room-menu-text-input-handle.is-keyboard-group > span {
+  background: var(--studio-color-surface, #fff);
+  border: 1px solid var(--studio-color-accent, #6d2bf1);
+  border-radius: 4px;
+  clip-path: none;
+  color: var(--studio-color-text, #242830);
+  height: auto;
+  left: 0;
+  overflow: visible;
+  padding: 2px 6px;
+  top: -26px;
+  width: max-content;
+}
+.room-menu-text-input-resize {
+  background: var(--studio-color-accent, #6d2bf1);
+  border: 2px solid var(--studio-color-surface, #fff);
+  border-radius: 2px;
+  cursor: ew-resize;
+  height: 12px;
+  min-height: 0;
+  min-width: 0;
+  padding: 0;
+  pointer-events: auto;
+  position: absolute;
+  touch-action: none;
+  transform: translate(-50%, -50%);
+  width: 12px;
+  z-index: 13;
+}
+.room-menu-text-input-resize:focus-visible { outline: 2px solid var(--studio-color-accent, #6d2bf1); }
+
+.room-menu-text-input-choice { display: grid; gap: 4px; min-width: 0; }
+.room-menu-text-input-choice select { min-width: 0; width: 100%; }

@@ -1,3 +1,4 @@
+import type { MenuTextInputPart } from "../shared/menuTextInputLayout";
 import { MenuTextInputOverlay } from "./MenuTextInputOverlay";
 import { InteractiveObjectsInspector } from "./InteractiveObjectsInspector";
 import { prefabUpdateImpact } from "../shared/projectPrefabs";
@@ -7093,7 +7094,7 @@ function RoomTilemapEditor({
         })}
         {isFocusedSceneEditor && room.isStart ? <span className="room-game-start-label" aria-label={ui("Cena de início do jogo")}>{ui("● Início do jogo")}</span> : null}
         {isFocusedSceneEditor && testStart ? <span className="room-test-start-marker" aria-label={ui("Início do teste: {0}, {1}, {2}", { 0: testStart.x, 1: testStart.y, 2: testStart.direction })} style={roomTileCenterStyle(room, testStart.x, testStart.y)}>T</span> : null}
-        {isFocusedSceneEditor ? eventLinks.map((link) => (
+        {isFocusedSceneEditor && selectedToolPanelMode !== "hud" ? eventLinks.map((link) => (
           <RoomSceneEventMarker
             editable
             projectData={projectData}
@@ -7112,7 +7113,9 @@ function RoomTilemapEditor({
             room={room}
           />
         )) : null}
-        {isFocusedSceneEditor && canvasLayerVisibility.hud && menuConfig?.textInput?.keyboard?.controlLayout === "bottom_grid" && menuConfig.textInput.keyboard.layout === "grid" ? <MenuTextInputOverlay key={room.id}
+        {isFocusedSceneEditor && canvasLayerVisibility.hud && menuConfig?.textInput?.keyboard?.controlLayout === "bottom_grid" ? <MenuTextInputOverlay key={room.id}
+          selectedPart={selectedHudComponentID?.startsWith("name-input:") ? selectedHudComponentID.slice(11) as MenuTextInputPart : null}
+          onSelectPart={part => onSelectHudComponent?.(part ? `name-input:${part}` : null)}
           editable={selectedToolPanelMode === "hud"} readOnly={canvasLayerLocks.hud || !onUpdateMenuTextInput} onChange={onUpdateMenuTextInput}
           input={menuConfig.textInput} showFieldGuide={selectedToolPanelMode === "hud" && canvasLayerVisibility.composition}
           fontAssetURL={projectData ? resolveProjectAssetURL(projectData, projectPath, resolveSceneDialogueUiSettings(projectData, room.id).font) : null}

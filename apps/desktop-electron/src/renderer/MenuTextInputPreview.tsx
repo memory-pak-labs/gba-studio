@@ -10,7 +10,9 @@ export function MenuTextInputPreview({ input, fontAssetURL, showFieldGuide = fal
   const ref = useRef<HTMLCanvasElement>(null);
   useEffect(() => {
     const context = ref.current?.getContext("2d"), layout = menuTextInputLayout(input);
-    if (!context || !layout) return;
+    if (!context) return;
+    context.clearRect(0, 0, 240, 160);
+    if (!layout) return;
     let cancelled = false;
     const draw = (font: HTMLImageElement | HTMLCanvasElement | null = null) => {
       if (cancelled) return;

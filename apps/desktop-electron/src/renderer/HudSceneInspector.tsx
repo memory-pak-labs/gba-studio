@@ -1,3 +1,4 @@
+import type { MenuTextInputPart } from "../shared/menuTextInputLayout";
 import { MenuTextInputFields } from "./MenuTextInputFields";
 import { normalizeMenuSceneConfig } from "../shared/menuScene";
 import type { UpdateRoomFields } from "../shared/roomsWorkspace/core";
@@ -98,7 +99,7 @@ export function HudSceneInspector(props: HudSceneInspectorProps): React.ReactEle
     <section className="hud-authoring-section">
       <div className="hud-authoring-heading"><h5>{ui("Entrada de nome")}</h5><span>240×160</span></div>
       <p className="muted">{ui("Campo de nome e teclado desta cena")}</p>
-      <MenuTextInputFields value={nativeMenu.textInput} disabled={props.readOnly || !props.onUpdateRoomFields} onChange={textInput => props.onUpdateRoomFields?.(room.id, {
+      <MenuTextInputFields value={nativeMenu.textInput} selectedPart={selectedComponentID?.startsWith("name-input:") ? selectedComponentID.slice(11) as MenuTextInputPart : null} onSelectPart={part => onSelectComponent(part ? `name-input:${part}` : null)} disabled={props.readOnly || !props.onUpdateRoomFields} onChange={textInput => props.onUpdateRoomFields?.(room.id, {
         runtime: { type: "menu", config: { ...room.runtime?.config, textInput } }
       })} />
     </section>
