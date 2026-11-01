@@ -1,6 +1,8 @@
 import type { GBAProjectData } from "./projectFile.js";
 import {
   deriveProjectHealthReport,
+  type ProjectHealthOptions,
+  type ProjectHealthReport,
   type ProjectDiagnosticSeverity,
   type ProjectDiagnosticWorkspace
 } from "./projectHealth.js";
@@ -25,8 +27,11 @@ function severityRank(severity: ProjectProblemSeverity): number {
   return severity === "error" ? 0 : 1;
 }
 
-export function deriveProjectProblems(data: GBAProjectData): ProjectProblem[] {
-  const report = deriveProjectHealthReport(data);
+export function deriveProjectProblems(data: GBAProjectData, options: ProjectHealthOptions = {}): ProjectProblem[] {
+  return projectProblemsFromHealthReport(deriveProjectHealthReport(data, options));
+}
+
+export function projectProblemsFromHealthReport(report: ProjectHealthReport): ProjectProblem[] {
   return report.diagnostics
     .filter((diagnostic): diagnostic is typeof diagnostic & { severity: ProjectProblemSeverity } => diagnostic.severity !== "info")
     .map((diagnostic) => ({

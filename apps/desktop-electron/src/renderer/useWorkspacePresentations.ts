@@ -3,7 +3,6 @@ import { deriveAudioWorkspacePresentation } from "../shared/audioWorkspace";
 import { deriveDialoguesWorkspacePresentation } from "../shared/dialoguesWorkspace";
 import { deriveFilesWorkspacePresentation } from "../shared/filesWorkspace";
 import { deriveProjectContractDiagnostics } from "../shared/projectContractDiagnostics";
-import { deriveProjectHealthReport } from "../shared/projectHealth";
 import { deriveRoomsWorkspacePresentation } from "../shared/roomsWorkspace";
 import { deriveSettingsWorkspacePresentation } from "../shared/settingsWorkspace";
 import { deriveSpritesWorkspacePresentation } from "../shared/spritesWorkspace";
@@ -68,18 +67,11 @@ export function useWorkspacePresentations(
       : null;
   }, [projectData, selectedWorkspace]);
 
-  const projectHealthReport = useMemo(() => {
-    return projectData && shouldDeriveWorkspace("Exportar", selectedWorkspace)
-      ? deriveProjectHealthReport(projectData)
-      : null;
-  }, [projectData, selectedWorkspace]);
-
   return {
     audioPresentation,
     contractDiagnostics,
     dialoguesPresentation,
     filesPresentation,
-    projectHealthReport,
     projectData: projectData as GBAProjectData | null,
     roomsPresentation,
     settingsPresentation,

@@ -25,6 +25,48 @@ function projectSession(enginePackPath: string): ProjectSession {
 }
 
 describe("useEngineActions", () => {
+  it("invalidates measured budgets when the current project's external assets change", async () => {
+    let changed!: Parameters<GBAStudioDesktopAPI["onExternalAssetChange"]>[0];
+    window.gbaStudio.onExternalAssetChange = listener => { changed = listener; return vi.fn(); };
+    window.gbaStudio.analyzeProjectBudget = vi.fn().mockResolvedValue({ ok: true, report: { schema: 11 } });
+    const session = projectSession("/packs/EnginePack");
+    const { result } = renderHook(() => useEngineActions({ contractDiagnosticsOK: true, session, setStatus: vi.fn() }));
+    await act(() => result.current.analyzeProjectBudget());
+    act(() => changed({ projectPath: "/other.gba-project", relativePaths: ["tile.png"] }));
+    expect(result.current.projectBudgetAnalysis?.ok).toBe(true);
+    act(() => changed({ projectPath: session.path!, relativePaths: ["tile.png"] }));
+    expect(result.current.projectBudgetAnalysis).toBeNull();
+  });
+
+  it.each(["edit", "switch"])("discards a late budget result after a project %s", async change => {
+    let finish!: (result: { ok: boolean; report: { schema: number } }) => void;
+    window.gbaStudio.analyzeProjectBudget = vi.fn().mockReturnValue(new Promise(resolve => { finish = resolve; }));
+    const session = projectSession("/packs/EnginePack");
+    const publishStatus = vi.fn();
+    const { result, rerender } = renderHook(({ session }) => useEngineActions({ contractDiagnosticsOK: true,
+      session, setStatus: vi.fn(), publishStatus }), { initialProps: { session } });
+    let pending!: Promise<void>;
+    act(() => { pending = result.current.analyzeProjectBudget(); });
+    rerender({ session: change === "switch" ? { ...session, path: "/tmp/another.gba-project" }
+      : { ...session, project: { ...session.project, data: { ...session.project.data, name: "Edited" } } } });
+    await act(async () => { finish({ ok: true, report: { schema: 11 } }); await pending; });
+    expect(result.current.projectBudgetAnalysis).toBeNull();
+    expect(result.current.projectBudgetAnalysisRunning).toBe(false);
+    expect(publishStatus).not.toHaveBeenCalledWith("Orçamento GBA atualizado pelo compilador.", "success");
+  });
+
+  it("keeps the latest budget when overlapping analyses finish out of order", async () => {
+    const finishes: Array<(value: { ok: boolean; generatedAt: string; report: { schema: number } }) => void> = [];
+    window.gbaStudio.analyzeProjectBudget = vi.fn().mockImplementation(() => new Promise(resolve => { finishes.push(resolve); }));
+    const session = projectSession("/packs/EnginePack");
+    const { result } = renderHook(() => useEngineActions({ contractDiagnosticsOK: true, session, setStatus: vi.fn() }));
+    let older!: Promise<void>, newer!: Promise<void>;
+    act(() => { older = result.current.analyzeProjectBudget(); newer = result.current.analyzeProjectBudget(); });
+    await act(async () => { finishes[1]!({ ok: true, generatedAt: "new", report: { schema: 11 } }); await newer; });
+    await act(async () => { finishes[0]!({ ok: true, generatedAt: "old", report: { schema: 11 } }); await older; });
+    expect(result.current.projectBudgetAnalysis?.generatedAt).toBe("new");
+  });
+
   it.each([
     ["Engine Pack", "exportEngineProject", "Exportando projeto Engine Pack..."],
     ["Web", "exportWebProject", "Exportando pacote Web / itch.io..."]

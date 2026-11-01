@@ -57,8 +57,16 @@ export function useEngineActions({ contractDiagnosticsOK, projectHealthExportRea
     path: string | undefined;
     data: ProjectSession["project"]["data"];
   } | null>(null);
-  const [projectBudgetAnalysis, setProjectBudgetAnalysis] = useState<ProjectBudgetAnalysisResult | null>(null);
+  const [budgetAnalysisState, setProjectBudgetAnalysis] = useState<{
+    result: ProjectBudgetAnalysisResult;
+    source: { path: string | undefined; data: ProjectSession["project"]["data"] };
+  } | null>(null);
+  const budgetRequestID = useRef(0);
   const [projectBudgetAnalysisRunning, setProjectBudgetAnalysisRunning] = useState(false);
+  const projectBudgetAnalysis = budgetAnalysisState && budgetAnalysisState.source.path === session?.path
+    && budgetAnalysisState?.source.data === session?.project.data ? budgetAnalysisState.result : null;
+  const budgetExportReady = projectHealthExportReady === false
+    || projectBudgetAnalysis?.report?.production_summary?.ready_for_large_project === false ? false : projectHealthExportReady;
 
   const hasEngineAssetc = Boolean(engineStatus?.selected?.hasAssetc);
   const hasEngineBuild = Boolean(engineStatus?.selected?.hasGbsbuild);
@@ -66,12 +74,12 @@ export function useEngineActions({ contractDiagnosticsOK, projectHealthExportRea
     && lastEngineExportSource?.path === session.path
     && lastEngineExportSource?.data === session.project.data);
   const configuredEnginePackPath = session ? readProjectEnginePackPath(session.project.data) : "";
-  const engineExportDisabled = !session || exportRunning || contractDiagnosticsOK === false || projectHealthExportReady === false || !hasEngineAssetc;
+  const engineExportDisabled = !session || exportRunning || contractDiagnosticsOK === false || budgetExportReady === false || !hasEngineAssetc;
   const romPipelineState = {
     hasSession: Boolean(session),
     hasProjectPath: Boolean(session?.path),
     contractDiagnosticsOK,
-    projectHealthExportReady,
+    projectHealthExportReady: budgetExportReady,
     hasEngineAssetc,
     hasEngineBuild,
     buildRunning,
@@ -98,9 +106,18 @@ export function useEngineActions({ contractDiagnosticsOK, projectHealthExportRea
   }, [configuredEnginePackPath, session?.path]);
 
   useEffect(() => {
+    budgetRequestID.current += 1;
     setProjectBudgetAnalysis(null);
+    setProjectBudgetAnalysisRunning(false);
     setBuildDryRunResult(null);
   }, [session?.path, session?.project.data]);
+
+  useEffect(() => window.gbaStudio.onExternalAssetChange?.(change => {
+    if (change.projectPath !== sessionRef.current?.path) return;
+    budgetRequestID.current += 1;
+    setProjectBudgetAnalysis(null);
+    setProjectBudgetAnalysisRunning(false);
+  }), []);
 
   function projectEnginePackPath(): string | undefined {
     const currentSession = sessionRef.current;
@@ -155,13 +172,17 @@ export function useEngineActions({ contractDiagnosticsOK, projectHealthExportRea
     const currentSession = sessionRef.current;
     if (!currentSession) return;
 
+    const requestID = ++budgetRequestID.current;
+    const source = { path: currentSession.path, data: currentSession.project.data };
     setProjectBudgetAnalysisRunning(true);
     try {
       const result = await window.gbaStudio.analyzeProjectBudget({
         project: currentSession.project,
         projectPath: currentSession.path
       });
-      setProjectBudgetAnalysis(result);
+      if (budgetRequestID.current !== requestID || sessionRef.current?.path !== source.path
+        || sessionRef.current?.project.data !== source.data) return;
+      setProjectBudgetAnalysis({ result, source });
       reportStatus(
         result.ok
           ? "Orçamento GBA atualizado pelo compilador."
@@ -169,7 +190,7 @@ export function useEngineActions({ contractDiagnosticsOK, projectHealthExportRea
         result.ok ? "success" : "error"
       );
     } finally {
-      setProjectBudgetAnalysisRunning(false);
+      if (budgetRequestID.current === requestID) setProjectBudgetAnalysisRunning(false);
     }
   }
 
@@ -428,6 +449,8 @@ export function useEngineActions({ contractDiagnosticsOK, projectHealthExportRea
   }
 
   function clearEngineSessionState(): void {
+    budgetRequestID.current += 1;
+    setProjectBudgetAnalysisRunning(false);
     setDoctorResult(null);
     setBuildDryRunResult(null);
     setBuildResult(null);

@@ -324,7 +324,7 @@ import {
   type StudioCommandAction
 } from "./StudioShellOverlays";
 import { StudioLanguageSwitcher, projectActionLabelKey, useStudioI18n, workspaceLabelKey } from "./i18n";
-import { deriveProjectProblems, type ProjectProblem } from "../shared/projectProblems";
+import { projectProblemsFromHealthReport, type ProjectProblem } from "../shared/projectProblems";
 import { useProjectProblemDismissals } from "./useProjectProblemDismissals";
 import { deriveProjectHealthReport } from "../shared/projectHealth";
 import { clampSceneMapZoom } from "../shared/sceneMapLayout";
@@ -610,7 +610,6 @@ function App(): React.ReactElement {
     contractDiagnostics,
     dialoguesPresentation,
     filesPresentation,
-    projectHealthReport,
     projectData,
     roomsPresentation,
     settingsPresentation,
@@ -640,12 +639,6 @@ function App(): React.ReactElement {
   const problemInput = useMemo(() => ({ data: projectData, path: presentationSession?.path }), [projectData, presentationSession?.path]);
   const deferredProblemInput = useDeferredValue(problemInput);
   const deferredProblemData = deferredProblemInput.data;
-  const allProjectProblems = useMemo(
-    () => deferredProblemData ? deriveProjectProblems(deferredProblemData) : [],
-    [deferredProblemData]
-  );
-  const { visibleProblems: projectProblems, ignoredCount, ignoreWarning, ignoreAllWarnings, restoreWarnings } =
-    useProjectProblemDismissals(allProjectProblems, deferredProblemInput.path);
   const projectHealthExportReady = useMemo(
     () => deferredProblemData ? deriveProjectHealthReport(deferredProblemData).exportReady : null,
     [deferredProblemData]
@@ -708,6 +701,18 @@ function App(): React.ReactElement {
     session,
     setStatus
   });
+  const currentBudgetReport = session?.path === deferredProblemInput.path
+    && session?.project.data === deferredProblemData ? projectBudgetAnalysis?.report : undefined;
+  const projectHealthReport = useMemo(
+    () => deferredProblemData ? deriveProjectHealthReport(deferredProblemData, { assetPackReport: currentBudgetReport }) : null,
+    [deferredProblemData, currentBudgetReport]
+  );
+  const allProjectProblems = useMemo(
+    () => projectHealthReport ? projectProblemsFromHealthReport(projectHealthReport) : [],
+    [projectHealthReport]
+  );
+  const { visibleProblems: projectProblems, ignoredCount, ignoreWarning, ignoreAllWarnings, restoreWarnings } =
+    useProjectProblemDismissals(allProjectProblems, deferredProblemInput.path);
   const hardwareProfiler = useMemo(
     () => projectData
       ? deriveHardwareProfilerPresentation(projectData, {

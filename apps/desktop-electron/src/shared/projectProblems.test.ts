@@ -3,6 +3,26 @@ import { describe, expect, it } from "vitest";
 import { deriveProjectProblems } from "./projectProblems.js";
 
 describe("deriveProjectProblems", () => {
+  it("uses measured compiler budgets instead of retaining estimated overflow warnings", () => {
+    const data = { scenas: [{ name: "storm", width: 50, height: 20, sceneType: "topdown",
+      tilemap: Array.from({ length: 1000 }, (_, i) => i + 1) }] };
+    const report = { schema: 11, group_pressure_report: [{ name: "scene_storm", asset_count: 1, assets: ["floor"], resources: {
+      bg_tiles: { requested: 745, capacity: 896, percent_of_pool: 83 }
+    } }], production_summary: { ready_for_large_project: true, blocking_overflow_count: 0 } };
+    expect(deriveProjectProblems(data).some(p => p.code === "asset.budget.blocked")).toBe(true);
+    const measured = deriveProjectProblems(data, { assetPackReport: report });
+    expect(measured.some(p => p.code === "asset.budget.blocked")).toBe(false);
+    expect(measured).toEqual(expect.arrayContaining([expect.objectContaining({ code: "asset.budget.warning",
+      severity: "warning", detail: expect.stringContaining("745/896") })]));
+    report.group_pressure_report[0]!.resources.bg_tiles.requested = 900;
+    report.group_pressure_report[0]!.resources.bg_tiles.percent_of_pool = 101;
+    report.production_summary.ready_for_large_project = false;
+    report.production_summary.blocking_overflow_count = 1;
+    expect(deriveProjectProblems(data, { assetPackReport: report })).toEqual(expect.arrayContaining([
+      expect.objectContaining({ code: "asset.budget.blocked", severity: "error" })
+    ]));
+  });
+
   it("preserva cena e contexto do orçamento para distinguir avisos iguais", () => {
     const problems = deriveProjectProblems({
       scenas: [{ name: "porto", sceneType: "topdown", width: 50, height: 20,
