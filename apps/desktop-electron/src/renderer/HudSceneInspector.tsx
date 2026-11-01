@@ -1,3 +1,4 @@
+import {sceneInterfaceImage, sceneInterfaceImageSupported, updateSceneInterfaceImage} from "../shared/sceneInterfaceImage";
 import type { MenuTextInputPart } from "../shared/menuTextInputLayout";
 import { MenuTextInputFields } from "./MenuTextInputFields";
 import { normalizeMenuSceneConfig } from "../shared/menuScene";
@@ -105,6 +106,11 @@ export function HudSceneInspector(props: HudSceneInspectorProps): React.ReactEle
     </section>
   </div>;
   return <div className="room-hud-scene-inspector" aria-label={ui("Editor contextual de HUD")}>
+    {sceneInterfaceImageSupported(room) ? <section className="hud-authoring-section" aria-label={ui("Interface por imagem")}>
+      <h5>{ui("Interface por imagem")}</h5>
+      <ProjectReferencePicker ariaLabel={ui("Imagem da interface")} disabled={props.readOnly || !props.onUpdateRoomFields} options={assets} emptyLabel={ui("Sem imagem")} value={sceneInterfaceImage(room) ?? ""} onChange={image => props.onUpdateRoomFields?.(room.id, updateSceneInterfaceImage(room, image))} />
+      <p className="muted">{ui(binding ? (["battleRpg", "dungeonCrawler"].includes(room.sceneType) ? "A composição aplicada edita os elementos sobre esta imagem." : "A composição aplicada substitui esta imagem na cena.") : "Esta imagem é uma peça única. Aplique uma composição para editar textos, barras e ícones separadamente.")}</p>
+    </section> : null}
     <section className="hud-authoring-section">
       <div className="hud-authoring-heading"><h5>{ui("HUD da cena")}</h5><span>240×160</span></div>
       {props.screens?.length ? <label>{ui("Tela do menu")}<select aria-label={ui("Tela do menu para editar HUD")} value={props.screenID} onChange={event => props.onSelectScreen?.(event.currentTarget.value)}>{props.screens.map(screen => <option key={screen.id} value={screen.id}>{screen.title || screen.id}</option>)}</select></label> : null}

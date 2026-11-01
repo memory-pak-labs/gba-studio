@@ -962,7 +962,13 @@ describe("RoomsWorkspace React smoke", () => {
       "dungeonCrawler",
       "shmup",
       "battleRpg",
-      "racing"
+      "racing",
+      "pointAndClick",
+      "visualNovel",
+      "cutscene",
+      "menu",
+      "luta",
+      "custom"
     ] as const;
 
     for (const sceneType of sceneProfiles) {
@@ -976,7 +982,9 @@ describe("RoomsWorkspace React smoke", () => {
       const room = (projectWithHud.scenas as Array<Record<string, unknown>>)[0]!;
       room.sceneType = sceneType;
       room.hudPresetId = "hud-all-scene-profiles";
-      room.runtime = { type: sceneType, config: {} };
+      room.runtime = { type: sceneType, config: sceneType === "luta" ? { hudAssetName: "fight-hud.png" } : sceneType === "isometric" ? {
+        gameplayMode: "tactical", tacticalCapabilities: [{id:"tactical_hud",enabled:true}], tacticalPresentation: {hudLayout:"tactical.png"}
+      } : {} };
 
       render(
         <RoomsWorkspace

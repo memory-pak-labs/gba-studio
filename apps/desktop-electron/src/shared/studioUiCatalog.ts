@@ -1,6 +1,11 @@
 /** Application copy only. Tuple order: pt-BR, en-US, es-ES. Keep project data out of this catalog. */
 export const studioUiMessages: Record<string, readonly [string, string, string]> = {
   "O Engine Pack não oferece interfaces de cena. Atualize o Engine Pack antes de exportar este projeto.": ["O Engine Pack não oferece interfaces de cena. Atualize o Engine Pack antes de exportar este projeto.", "The Engine Pack does not support scene interfaces. Update it before exporting this project.", "El Engine Pack no admite interfaces de escena. Actualízalo antes de exportar este proyecto."],
+  "A composição aplicada edita os elementos sobre esta imagem.": ["A composição aplicada edita os elementos sobre esta imagem.", "The applied composition edits the elements over this image.", "La composición aplicada edita los elementos sobre esta imagen."],
+  "Interface por imagem": ["Interface por imagem", "Image interface", "Interfaz por imagen"],
+  "Imagem da interface": ["Imagem da interface", "Interface image", "Imagen de la interfaz"],
+  "A composição aplicada substitui esta imagem na cena.": ["A composição aplicada substitui esta imagem na cena.", "The applied composition replaces this image in the scene.", "La composición aplicada reemplaza esta imagen en la escena."],
+  "Esta imagem é uma peça única. Aplique uma composição para editar textos, barras e ícones separadamente.": ["Esta imagem é uma peça única. Aplique uma composição para editar textos, barras e ícones separadamente.", "This image is a single piece. Apply a composition to edit text, bars and icons separately.", "Esta imagen es una sola pieza. Aplica una composición para editar textos, barras e iconos por separado."],
   "Selecione uma tecla": ["Selecione uma tecla", "Select a key", "Selecciona una tecla"],
   "O Engine Pack não oferece composição de teclado. Atualize o Engine Pack antes de exportar esta cena.": ["O Engine Pack não oferece composição de teclado. Atualize o Engine Pack antes de exportar esta cena.", "The Engine Pack does not support keyboard composition. Update it before exporting this scene.", "El Engine Pack no admite composición de teclado. Actualízalo antes de exportar esta escena."],
   "Composição do teclado": ["Composição do teclado", "Keyboard composition", "Composición del teclado"],

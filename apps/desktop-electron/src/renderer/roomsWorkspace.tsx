@@ -1,3 +1,4 @@
+import {sceneInterfaceImage} from "../shared/sceneInterfaceImage";
 import type { MenuTextInputPart } from "../shared/menuTextInputLayout";
 import { MenuTextInputOverlay } from "./MenuTextInputOverlay";
 import { InteractiveObjectsInspector } from "./InteractiveObjectsInspector";
@@ -1016,15 +1017,7 @@ function roomIsometricConfig(room: RoomsWorkspaceRoom): IsometricSceneConfig | u
 }
 
 function roomRuntimeHudAsset(room: RoomsWorkspaceRoom | null): string | undefined {
-  if (!room) return undefined;
-  if (room.runtime?.type === "luta" || room.runtime?.type === "battleRpg") {
-    const asset = (room.runtime.config as Record<string, unknown> | undefined)?.hudAssetName;
-    return typeof asset === "string" ? asset : undefined;
-  }
-  if(room.runtime?.type === "dungeonCrawler")return normalizeDungeonCrawlerSceneConfig(room.runtime.config).presentation?.hudAssetName;
-  const config = roomIsometricConfig(room);
-  return config?.tacticalCapabilities?.some(capability => capability.id === "tactical_hud" && capability.enabled)
-    ? config.tacticalPresentation?.hudLayout : undefined;
+  return sceneInterfaceImage(room);
 }
 
 function roomIsometricSurfaceSize(room: RoomsWorkspaceRoom): IsometricWorldSize | undefined {
@@ -4724,14 +4717,13 @@ function RoomSceneMapInactivePreview({
   const isPerspectiveViewport = isViewportPreview && isPseudo3dRacingRoom(room);
   const menu = room.sceneType === "menu" ? normalizeMenuSceneConfig(room.runtime?.config) : null;
   const runtimeHudAsset = roomRuntimeHudAsset(room);
-  const runtimeHudURL = isViewportPreview && projectData && room.sceneType !== "dungeonCrawler" && runtimeHudAsset
-    ? resolveProjectAssetURL(projectData, projectPath, runtimeHudAsset) : null;
-  const viewportHud = isViewportPreview && projectData && (!runtimeHudAsset || ["battleRpg", "dungeonCrawler"].includes(room.sceneType))
-    && (!menu || (menu.hudMode !== "none" && menu.screenType === "menu"))
+  const viewportHud = isViewportPreview && projectData && (!menu || menu.hudMode !== "none")
     ? resolveExplicitHudPresetBinding(projectData, { roomID: room.id, roomPresetId: room.hudPresetId, scenePresetId: menu?.hudPresetId }) : null;
+  const runtimeHudURL = isViewportPreview && (!viewportHud || room.sceneType === "battleRpg") && projectData && room.sceneType !== "dungeonCrawler" && runtimeHudAsset
+    ? resolveProjectAssetURL(projectData, projectPath, runtimeHudAsset) : null;
   const visibleEntities = entities.filter(entity => {
     if (!isViewportPreview) return true;
-    if (entity.kind !== "actor" || (menu && viewportHud)) return false;
+    if (entity.kind !== "actor" || (menu?.screenType === "menu" && viewportHud)) return false;
     if (!menu || !projectData) return true;
     const actor = Array.isArray(projectData.actors) ? projectData.actors.find(actor => actor.id === entity.id) : null;
     if (actor?.menuActorSelectedOnly && actor.menuItemID !== menu.items[0]?.id) return false;
@@ -5079,7 +5071,7 @@ function RoomSceneMapInactivePreview({
           })}
         </div>}
         {runtimeHudURL ? <img className="room-stage-card-runtime-hud" src={refreshedPreviewAssetURL(runtimeHudURL, assetRefreshToken)!} alt="" /> : null}
-        {isViewportPreview && room.sceneType === "isometric" ? <div className="room-stage-card-viewport-hud" style={{ transform: `scale(${displayScale})` }}>
+        {isViewportPreview && room.sceneType === "isometric" && !viewportHud ? <div className="room-stage-card-viewport-hud" style={{ transform: `scale(${displayScale})` }}>
           <RoomTacticalInitialHud room={room} projectData={projectData} projectPath={projectPath} />
         </div> : null}
         {viewportHud && room.sceneType !== "dungeonCrawler" ? <div className="room-stage-card-viewport-hud" style={{ transform: `scale(${displayScale})` }}>
@@ -8177,11 +8169,9 @@ export function RoomsWorkspace({
   const focusSceneLutaHudAssetURL = projectData && projectPath && typeof focusSceneLutaHudAssetName === "string"
     ? resolveProjectAssetURL(projectData, projectPath, focusSceneLutaHudAssetName)
     : null;
-  const focusSceneHudBinding = (!focusSceneLutaHudAssetName || ["battleRpg","dungeonCrawler"].includes(focusSceneRoom?.sceneType ?? "")) && projectData && focusSceneRoom && focusSceneMenuConfig?.hudMode !== "none" && (
-    focusSceneRoom.sceneType !== "menu" || focusSceneMenuConfig?.screenType === "menu"
-  ) ? resolveExplicitHudPresetBinding(projectData, {
+  const focusSceneHudBinding = projectData && focusSceneRoom && focusSceneMenuConfig?.hudMode !== "none" ? resolveExplicitHudPresetBinding(projectData, {
     roomID: focusSceneRoom.id,
-    scenePresetId: focusSceneMenuConfig?.screenType === "menu" ? focusSceneMenuConfig.hudPresetId : undefined,
+    scenePresetId: focusSceneMenuConfig?.hudPresetId,
     roomPresetId: focusSceneRoom.hudPresetId
   }) : null;
   const hudPresentation = projectData ? deriveHudPresetsWorkspacePresentation(projectData) : null;
@@ -8190,14 +8180,13 @@ export function RoomsWorkspace({
     hudMode: hudSelectedScreen.hudMode ?? (hudSelectedScreen.hudPresetId ? undefined : focusSceneMenuConfig?.hudMode),
     hudPresetId: hudSelectedScreen.hudPresetId ?? focusSceneMenuConfig?.hudPresetId
   } : focusSceneMenuConfig;
-  const hudUnavailableReason = focusSceneLutaHudAssetName && !["battleRpg","dungeonCrawler"].includes(focusSceneRoom?.sceneType ?? "") ? `Esta cena usa uma HUD ${focusSceneRoom?.sceneType === "isometric" ? "tática" : "de luta"} por imagem. A prévia aparece sobre a cena; a imagem e os recursos são configurados na aba Cena.`
-    : focusSceneRoom?.sceneType === "menu" && hudSelectedMenu?.screenType !== "menu" ? "Telas de logo e título usam atores e fundo. Escolha uma tela de menu para editar sua HUD." : undefined;
-  const hudAppliedBinding = projectData && focusSceneRoom && !hudUnavailableReason && hudSelectedMenu?.hudMode !== "none"
+  const hudAppliedBinding = projectData && focusSceneRoom && hudSelectedMenu?.hudMode !== "none"
     ? resolveExplicitHudPresetBinding(projectData, { roomID: focusSceneRoom.id, scenePresetId: hudSelectedMenu?.hudPresetId, roomPresetId: focusSceneRoom.hudPresetId }) : null;
   const hudLibraryPreset = hudPresentation?.presets.find(preset => preset.id === hudLibraryPresetID) ?? null;
   const focusSceneHudAuthoringBinding: HudPresetBinding | null = hudLibraryPreset
     ? { preset: hudLibraryPreset, presetId: hudLibraryPreset.id, requestedPresetId: hudLibraryPreset.id, source: "room", status: "resolved" }
     : hudAppliedBinding;
+  const focusSceneNativeHudVisible = ["battleRpg", "dungeonCrawler"].includes(focusSceneRoom?.sceneType ?? "") || !focusSceneHudAuthoringBinding;
   const hudEditingPreset = focusSceneHudAuthoringBinding?.preset;
   const canEditHudCanvas = Boolean(hudEditingPreset && !hudEditingPreset.builtIn && onUpdateHudPreset && !canvasLayerLocks.hud
     && (editingSharedHudID === hudEditingPreset.id || (hudEditingPreset.id !== hudPresentation?.activePresetId && projectData && hudPresetUsages(projectData, hudEditingPreset.id).every(use => use.id === focusSceneRoom?.id))));
@@ -9448,7 +9437,7 @@ export function RoomsWorkspace({
       {focusSceneHudBinding ? <RoomHudOverlay binding={focusSceneHudBinding} guides={false} labelPrefix="HUD na prévia GBA"
         entities={presentation.entities.filter(entity => entity.roomName === focusSceneRoom.name)}
         projectData={projectData} projectPath={projectPath} room={focusSceneRoom} viewportScale={1} viewportAnchored /> : null}
-      {focusSceneLutaHudAssetURL ? <img className="room-focus-native-runtime-hud" alt="" src={focusSceneLutaHudAssetURL} /> : null}
+      {focusSceneNativeHudVisible && focusSceneLutaHudAssetURL ? <img className="room-focus-native-runtime-hud" alt="" src={focusSceneLutaHudAssetURL} /> : null}
       {projectData && activeInspectorTab === "dialogues" && dialoguePreviewKey ? <DialogueScenePreview
         roomId={focusSceneRoom.id} projectData={projectData} projectPath={projectPath}
         dialogue={contextualDialogues?.dialogues.find(dialogue => dialogue.key === dialoguePreviewKey) ?? dialogueCatalog.find(dialogue => dialogue.key === dialoguePreviewKey)}
@@ -10341,7 +10330,7 @@ export function RoomsWorkspace({
                 dialogue={contextualDialogues?.dialogues.find(dialogue => dialogue.key === dialoguePreviewKey) ?? dialogueCatalog.find(dialogue => dialogue.key === dialoguePreviewKey)}
                 scale={focusViewportGeometry?.scale ?? 1}
               /> : null}
-              {canvasLayerVisibility.hud && focusSceneLutaHudAssetURL && typeof focusSceneLutaHudAssetName === "string" ? (
+              {canvasLayerVisibility.hud && focusSceneNativeHudVisible && focusSceneLutaHudAssetURL && typeof focusSceneLutaHudAssetName === "string" ? (
                 <div
                   aria-label={ui("Prévia da HUD {0} {1}", { 0: focusSceneRoom?.sceneType === "isometric" ? "tática" : focusSceneRoom?.sceneType === "battleRpg" ? "RPG" : focusSceneRoom?.sceneType === "dungeonCrawler" ? "do labirinto" : "de luta", 1: focusSceneLutaHudAssetName })}
                   className={`room-hud-overlay is-viewport-anchored room-runtime-hud-overlay${["battleRpg","dungeonCrawler"].includes(focusSceneRoom?.sceneType ?? "") ? " room-runtime-hud-background" : ""}`}
@@ -10645,7 +10634,6 @@ export function RoomsWorkspace({
                       screenID={hudMenuScreenID || undefined}
                       screens={focusSceneMenuConfig?.screens?.length ? [{ id: "", title: focusSceneMenuConfig.title || "Tela principal" }, ...focusSceneMenuConfig.screens] : undefined}
                       onSelectScreen={id => { setHudMenuScreenID(id); setHudLibraryPresetID(null); setSelectedHudComponentID(null); }}
-                      unavailableReason={hudUnavailableReason ? ui(hudUnavailableReason) : undefined}
                     />
                   ) : null}
                   {activeInspectorTab === "connections" && !selectedArrival ? roomConnectionsEditor(
