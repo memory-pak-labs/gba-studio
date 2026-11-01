@@ -1,5 +1,17 @@
 /** Application copy only. Tuple order: pt-BR, en-US, es-ES. Keep project data out of this catalog. */
 export const studioUiMessages: Record<string, readonly [string, string, string]> = {
+  "Ferramentas da entrada de nome": ["Ferramentas da entrada de nome", "Name entry tools", "Herramientas de entrada de nombre"],
+  "Entrada de nome": ["Entrada de nome", "Name entry", "Entrada de nombre"],
+  "Editor contextual de entrada de nome": ["Editor contextual de entrada de nome", "Name entry contextual editor", "Editor contextual de entrada de nombre"],
+  "Campo de nome e teclado desta cena": ["Campo de nome e teclado desta cena", "Name field and keyboard for this scene", "Campo de nombre y teclado de esta escena"],
+  "Campo do nome": ["Campo do nome", "Name field", "Campo de nombre"],
+  "Campo X": ["Campo X", "Field X", "Campo X"],
+  "Campo Y": ["Campo Y", "Field Y", "Campo Y"],
+  "Teclado": ["Teclado", "Keyboard", "Teclado"],
+  "Teclado X": ["Teclado X", "Keyboard X", "Teclado X"],
+  "Teclado Y": ["Teclado Y", "Keyboard Y", "Teclado Y"],
+  "A moldura e as teclas vêm do fundo da cena. Estes controles posicionam o campo, as letras e os comandos.": ["A moldura e as teclas vêm do fundo da cena. Estes controles posicionam o campo, as letras e os comandos.", "The frame and keys come from the scene background. These controls position the field, letters and commands.", "El marco y las teclas vienen del fondo de la escena. Estos controles posicionan el campo, las letras y los comandos."],
+  "Entrada de nome e teclado": ["Entrada de nome e teclado", "Name entry and keyboard", "Entrada de nombre y teclado"],
   "O Engine Pack não oferece interfaces de cena. Atualize o Engine Pack antes de exportar este projeto.": ["O Engine Pack não oferece interfaces de cena. Atualize o Engine Pack antes de exportar este projeto.", "The Engine Pack does not support scene interfaces. Update it before exporting this project.", "El Engine Pack no admite interfaces de escena. Actualízalo antes de exportar este proyecto."],
   "A composição aplicada edita os elementos sobre esta imagem.": ["A composição aplicada edita os elementos sobre esta imagem.", "The applied composition edits the elements over this image.", "La composición aplicada edita los elementos sobre esta imagen."],
   "Interface por imagem": ["Interface por imagem", "Image interface", "Interfaz por imagen"],
