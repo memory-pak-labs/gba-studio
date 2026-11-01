@@ -1401,6 +1401,26 @@
 .sprites-workspace .sprite-inspector-advanced > summary,
 .sprites-workspace .sprite-reference-panel > summary { font-size: var(--studio-font-size-sm); font-weight: var(--studio-font-weight-medium); text-transform: none; letter-spacing: normal; }
 
+/* Sprite inspector metrics use the rail's type scale, rather than dashboard totals. */
+.sprites-inspector .sprite-gba-budget-header :is(h4, span),
+.sprites-inspector .sprite-gba-budget-metrics dd {
+  font-size: var(--studio-font-size-sm);
+}
+.sprites-inspector .sprite-gba-budget-metrics dd {
+  font-weight: var(--studio-font-weight-semibold);
+}
+.sprites-inspector .sprite-gba-budget-metrics dt,
+.sprites-inspector .sprite-metric-field .inspector-field-description,
+.sprites-inspector .sprite-metric-group-label,
+.sprites-inspector .inspector-vector2 legend {
+  font-size: var(--studio-font-size-xs);
+}
+.sprites-inspector .sprite-metric-group-label,
+.sprites-inspector .inspector-vector2 legend {
+  font-weight: var(--studio-font-weight-semibold);
+  line-height: 1.4;
+}
+
 /* Compact Editor chrome uses the shared type scale. */
 /* Approved Editor layout. All dimensions describe UI chrome, not game geometry. */
 .rooms-editor-layout,

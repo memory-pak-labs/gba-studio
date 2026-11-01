@@ -1708,6 +1708,16 @@ function animationEditor(
                   onCommit={nextValue => updateActiveMetaspriteTile({ [field]: nextValue })}
                 />
               ))}
+              <label>
+                <span>{ui("Obj pal")}</span>
+                <select
+                  onChange={(event) => updateActiveMetaspriteTile({ objPalette: event.currentTarget.value })}
+                  value={activeMetaspriteTile.objPalette}
+                >
+                  <option value="OBP0">{ui("OBP0")}</option>
+                  <option value="OBP1">{ui("OBP1")}</option>
+                </select>
+              </label>
               <div className="sprite-reference-field">
                 <span>{ui("Source")}</span>
                 <ProjectReferencePicker
@@ -1723,16 +1733,6 @@ function animationEditor(
                   value={activeMetaspriteTile.sourceSheet}
                 />
               </div>
-              <label>
-                <span>{ui("Obj pal")}</span>
-                <select
-                  onChange={(event) => updateActiveMetaspriteTile({ objPalette: event.currentTarget.value })}
-                  value={activeMetaspriteTile.objPalette}
-                >
-                  <option value="OBP0">{ui("OBP0")}</option>
-                  <option value="OBP1">{ui("OBP1")}</option>
-                </select>
-              </label>
               <label className="sprite-tile-toggle">
                 <span>{ui("Flip X")}</span>
                 <input
