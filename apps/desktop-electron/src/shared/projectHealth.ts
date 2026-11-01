@@ -234,7 +234,9 @@ function addSceneDiagnostics(
       workspace: "Arquivos",
       sceneName,
       targetName: sceneName,
-      message: "A contagem de tiles únicos do piso affine depende da análise do compilador.",
+      message: budget.sceneMetrics.some(metric => metric.id === "bg_tiles" && metric.pending)
+        ? "A contagem de tiles únicos do background depende da análise do compilador."
+        : "A contagem de tiles únicos do piso affine depende da análise do compilador.",
       detail: "As posições do mapa não representam a quantidade de padrões residentes em VRAM.",
       fixAction: "open_files"
     });
