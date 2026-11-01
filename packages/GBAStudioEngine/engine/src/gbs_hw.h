@@ -1,6 +1,7 @@
 #pragma once
 
 #include <stddef.h>
+#include "gbs/name_keyboard.h"
 #include <stdbool.h>
 
 #include <stdint.h>
@@ -66,6 +67,7 @@ void gbs_hw_draw_text_overlay_light(int x, int y, int width, const char* text, i
 void gbs_hw_draw_text_input_surface(int x, int y, int width, int height, int visible);
 void gbs_hw_draw_text_input_keyboard(int x, int y, int width, int height, int selected_index, int lowercase, int visible);
 void gbs_hw_draw_text_input_keyboard_with_controls(int x, int y, int width, int height, int selected_index, int lowercase, int visible, int control_layout, int controls_x, int controls_y, int controls_width, int controls_height, int surface);
+void gbs_hw_draw_text_input_keyboard_authored(int x, int y, int width, int height, int selected_index, int lowercase, int visible, int control_layout, int controls_x, int controls_y, int controls_width, int controls_height, int surface, const gbs_name_keyboard_geometry* geometry);
 void gbs_hw_draw_overlay_rect(int x, int y, int width, int height, int visible);
 void gbs_hw_configure_dialogue_box_skin(const uint8_t* tiles, const uint16_t* palette);
 void gbs_hw_configure_hud_box_skin(const uint8_t* tiles, const uint16_t* palette);

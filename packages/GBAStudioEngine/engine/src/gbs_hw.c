@@ -2327,6 +2327,27 @@ void gbs_hw_draw_text_input_keyboard_with_controls(
     int controls_height,
     int surface_mode
 ) {
+    gbs_hw_draw_text_input_keyboard_authored(box_x,box_y,box_w,box_h,selected_index,lowercase,visible,
+        control_layout,controls_x,controls_y,controls_width,controls_height,surface_mode,0);
+}
+
+
+void gbs_hw_draw_text_input_keyboard_authored(
+    int box_x,
+    int box_y,
+    int box_w,
+    int box_h,
+    int selected_index,
+    int lowercase,
+    int visible,
+    int control_layout,
+    int controls_x,
+    int controls_y,
+    int controls_width,
+    int controls_height,
+    int surface_mode,
+    const gbs_name_keyboard_geometry* geometry
+) {
     static int previous_x = 0;
     static int previous_y = 0;
     static int previous_w = 0;
@@ -2346,8 +2367,9 @@ void gbs_hw_draw_text_input_keyboard_with_controls(
 
     const int side_controls = control_layout == 1;
     const int bottom_grid = control_layout == 2;
-    if (!visible || box_x < 0 || box_y < 0 || box_w < (bottom_grid ? 16 : 22) || box_h < (bottom_grid ? 10 : 6) ||
-        box_x + box_w > 32 || box_y + box_h > 20 ||
+    if (!visible || (geometry ? (!bottom_grid || !gbs_name_geometry_valid(geometry,box_x,box_y)) :
+        (box_x < 0 || box_y < 0 || box_w < (bottom_grid ? 16 : 22) || box_h < (bottom_grid ? 10 : 6) ||
+        box_x + box_w > 32 || box_y + box_h > 20)) ||
         (side_controls && (controls_x < box_x + box_w || controls_y < box_y ||
             controls_width < 5 || controls_height < 6 || controls_x + controls_width > 32 ||
             controls_y + controls_height > 20))) {
@@ -2388,12 +2410,10 @@ void gbs_hw_draw_text_input_keyboard_with_controls(
             focus_tile[y * 2 + 1] = pack_font_pixels(focus_corner[y], 4, 0, NAME_INPUT_COLOR_SELECTOR);
         }
         int glyph_slot = 0;
-        for (int row = 0; row < 4; ++row) {
-            for (int column = 0; column < 8; ++column) {
-                const int index = row * 8 + column;
-                if (index >= 26) continue;
-                const int x = box_x + column * 2;
-                const int y = box_y + row * 2;
+        for (int index = 0; index < 26; ++index) {
+                const gbs_name_key_bounds rect = gbs_name_key_rect(geometry,index);
+                const int x = box_x + rect.x;
+                const int y = box_y + rect.y;
                 if (index == selected_index) {
                     const uint16_t corner = ui_tile_entry(NAME_INPUT_TILE_BORDER, 15);
                     screenblock[y * 32 + x] = corner;
@@ -2403,13 +2423,12 @@ void gbs_hw_draw_text_input_keyboard_with_controls(
                 }
                 const unsigned tile = dialogue_obj_tile_for_codepoint((lowercase ? 'a' : 'A') + index, NAME_KEYBOARD_OBJ_GLYPH_OFFSET + glyph_slot);
                 gbs_hw_set_sprite(NAME_KEYBOARD_OBJ_OAM_BASE + glyph_slot++, x * 8 + 4, y * 8 + 4, tile, NAME_INPUT_OBJ_PALETTE, 0, 0, 1, 0, 0, 0, 0, 0);
-            }
         }
-        const int offsets[3] = {0, 6, 12};
         const char* labels[3] = {"DEL", lowercase ? "aA" : "Aa", "OK"};
         for (int control = 0; control < 3; ++control) {
-            const int x = box_x + offsets[control];
-            const int y = box_y + 8;
+            const gbs_name_key_bounds rect = gbs_name_key_rect(geometry,26+control);
+            const int x = box_x + rect.x;
+            const int y = box_y + rect.y;
             if (selected_index == 26 + control) {
                 const uint16_t corner = ui_tile_entry(NAME_INPUT_TILE_BORDER, 15);
                 screenblock[y * 32 + x] = corner;
@@ -2424,7 +2443,16 @@ void gbs_hw_draw_text_input_keyboard_with_controls(
             }
         }
         queue_name_input_palette_restore();
-        previous_x = box_x; previous_y = box_y; previous_w = box_w; previous_h = box_h;
+        previous_x = 30; previous_y = 20;
+        int right = 0, bottom = 0;
+        for (int index=0;index<29;++index) {
+            const gbs_name_key_bounds r=gbs_name_key_rect(geometry,index);
+            if(box_x+r.x<previous_x)previous_x=box_x+r.x;
+            if(box_y+r.y<previous_y)previous_y=box_y+r.y;
+            if(box_x+r.x+r.width>right)right=box_x+r.x+r.width;
+            if(box_y+r.y+r.height>bottom)bottom=box_y+r.y+r.height;
+        }
+        previous_w=right-previous_x;previous_h=bottom-previous_y;
         gbs_hw_mark_ui_tilemap_dirty();
         return;
     }

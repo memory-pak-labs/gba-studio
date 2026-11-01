@@ -11585,6 +11585,37 @@ def emit_menu_actors(output, screen, screen_index, asset_report=None):
     return (actors_name, len(actor_entries))
 
 
+def emit_name_keyboard_geometry(output, value, screen_index, origin_x, origin_y):
+    if not isinstance(value, dict):
+        raise SystemExit("text_input.keyboard_geometry precisa ser objeto")
+    fields = [value.get(key, default) for key, default in (("columns", 8), ("rows", 4), ("columnGap", 0), ("rowGap", 0))]
+    if any(type(number) is not int for number in fields):
+        raise SystemExit("text_input.keyboard_geometry exige inteiros")
+    columns, rows, gap_x, gap_y = fields
+    if not (4 <= columns <= 13 and (26 + columns - 1) // columns <= rows <= 9 and 0 <= gap_x <= 4 and 0 <= gap_y <= 4):
+        raise SystemExit("text_input.keyboard_geometry grade invalida")
+    keys = value.get("keys")
+    if keys is not None and (not isinstance(keys, list) or len(keys) != 29):
+        raise SystemExit("text_input.keyboard_geometry exige 29 teclas")
+    positions = []
+    for index in range(29):
+        position = keys[index] if keys is not None else {
+            "x": index % columns * (2 + gap_x) if index < 26 else (index - 26) * 6,
+            "y": index // columns * (2 + gap_y) if index < 26 else rows * (2 + gap_y),
+        }
+        if not isinstance(position, dict) or any(type(position.get(axis)) is not int for axis in ("x", "y")):
+            raise SystemExit("text_input.keyboard_geometry posicao invalida")
+        x, y = position["x"], position["y"]
+        if origin_x + x < 0 or origin_y + y < 0 or origin_x + x + (2 if index < 26 else 5) > 30 or origin_y + y + 2 > 20:
+            raise SystemExit("text_input.keyboard_geometry tecla fora da tela")
+        positions.append((x, y))
+    name = f"menu_screen_{screen_index}_keyboard_geometry"
+    if keys is not None:
+        output.append(f"constexpr gbs::MenuTextInputKeyPosition {name}_keys[] = {{ " + ", ".join(f"{{ {x}, {y} }}" for x, y in positions) + " };")
+    output.append(f"constexpr gbs::MenuTextInputKeyboardGeometry {name} {{ {columns}, {rows}, {gap_x}, {gap_y}, " + (f"{name}_keys, 29" if keys is not None else "nullptr, 0") + " };")
+    return name
+
+
 def emit_menu_project_data_header(menu_project, asset_report=None):
     if not isinstance(menu_project, dict):
         raise SystemExit("menu_project precisa ser objeto")
@@ -11720,7 +11751,14 @@ def emit_menu_project_data_header(menu_project, asset_report=None):
                     if keyboard_surface == "background"
                     else ""
                 )
-                if (
+                keyboard_geometry = raw_keyboard.get("geometry", text_input.get("keyboard_geometry"))
+                geometry_name = None
+                if keyboard_geometry is not None:
+                    if keyboard_control_layout != "bottom_grid":
+                        raise SystemExit("text_input.keyboard_geometry exige bottom_grid")
+                    geometry_name = emit_name_keyboard_geometry(output, keyboard_geometry, screen_index, keyboard_x, keyboard_y)
+                    keyboard_surface_suffix = f", gbs::MenuTextInputKeyboardSurface::{'Background' if keyboard_surface == 'background' else 'Runtime'}, &{geometry_name}"
+                if keyboard_geometry is None and (
                     keyboard_x < 0 or keyboard_y < 0 or
                     keyboard_width < (16 if keyboard_control_layout == "bottom_grid" else 22) or
                     keyboard_height < (10 if keyboard_control_layout == "bottom_grid" else 6) or

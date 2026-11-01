@@ -467,7 +467,7 @@ int main(void) {
         self.assertNotIn("gbs_hw_draw_text_overlay_slot", component)
 
     def test_text_input_uses_a_dedicated_light_surface_and_text_palette(self) -> None:
-        keyboard = function_body(self.source, "gbs_hw_draw_text_input_keyboard_with_controls")
+        keyboard = function_body(self.source, "gbs_hw_draw_text_input_keyboard_authored")
         surface = function_body(self.source, "gbs_hw_draw_name_input_surface")
         overlay = function_body(self.source, "gbs_hw_draw_text_overlay_at")
 

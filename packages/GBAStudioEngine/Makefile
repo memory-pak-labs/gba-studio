@@ -2193,3 +2193,15 @@ host-test: racing-progress-test
 $(HOST_BUILD)/racing_progress_tests: tests/host/racing_progress_tests.cpp engine/include/gbs/racing.hpp
 	@mkdir -p $(dir $@)
 	$(HOST_CXX) $(HOST_CXXFLAGS) $< -o $@
+
+.PHONY: menu-keyboard-geometry-test
+menu-keyboard-geometry-test: $(HOST_BUILD)/menu_keyboard_geometry_tests
+	$(HOST_BUILD)/menu_keyboard_geometry_tests
+	python3 tests/host/menu_keyboard_assetc_tests.py
+	python3 tests/host/menu_text_input_presentation_tests.py
+
+$(HOST_BUILD)/menu_keyboard_geometry_tests: tests/host/menu_keyboard_geometry_tests.cpp engine/include/gbs/menu.hpp engine/include/gbs/name_keyboard.h
+	@mkdir -p $(@D)
+	$(HOST_CXX) $(HOST_CXXFLAGS) $< -o $@
+
+host-test: menu-keyboard-geometry-test

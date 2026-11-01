@@ -1,3 +1,4 @@
+import { configureMenuKeyboard } from "./menuTextInputLayout.js";
 export type MenuScreenType = "logo" | "title" | "menu";
 export type MenuSceneRole =
   | "logo"
@@ -103,7 +104,13 @@ export interface MenuTextInputConfig {
 
 export type MenuTextInputKeyboardLayout = "hidden" | "grid";
 
+export interface MenuTextInputKeyboardGeometry {
+  columns: number; rows: number; columnGap: number; rowGap: number;
+  keys?: Array<{ x: number; y: number }>;
+}
+
 export interface MenuTextInputKeyboardConfig {
+  geometry?: MenuTextInputKeyboardGeometry;
   layout: MenuTextInputKeyboardLayout;
   x: number;
   y: number;
@@ -471,10 +478,10 @@ function normalizeTextInput(value: unknown, defaultKeyboard = false): MenuTextIn
   if (!variableName) return undefined;
   const keyboardSource = record(source.keyboard);
   const hasKeyboard = Object.prototype.hasOwnProperty.call(source, "keyboard");
-  const keyboardLayout = keyboardSource.layout === "grid" ? "grid" : "hidden";
   const bottomGrid = keyboardSource.controlLayout === "bottom_grid" || keyboardSource.control_layout === "bottom_grid";
-  const minimumWidth = bottomGrid ? 16 : 22;
-  const minimumHeight = bottomGrid ? 10 : 6;
+  const keyboardLayout = keyboardSource.layout === "grid" || (bottomGrid && keyboardSource.layout === "hidden") ? "grid" : "hidden";
+  const minimumWidth = bottomGrid ? (keyboardSource.geometry ? 1 : 16) : 22;
+  const minimumHeight = bottomGrid ? (keyboardSource.geometry ? 1 : 10) : 6;
   const keyboard = keyboardLayout === "grid"
     ? {
         layout: "grid" as const,
@@ -509,7 +516,7 @@ function normalizeTextInput(value: unknown, defaultKeyboard = false): MenuTextIn
             allowLowercase: false
           }
         : undefined;
-  return {
+  const result: MenuTextInputConfig = {
     variableName,
     maxLength: integer(source.maxLength, 8, 1, 16),
     x: integer(source.x, 0, 0, MENU_TILE_COLUMNS - 1),
@@ -517,6 +524,10 @@ function normalizeTextInput(value: unknown, defaultKeyboard = false): MenuTextIn
     width: integer(source.width, 8, 1, MENU_TILE_COLUMNS),
     ...(keyboard ? { keyboard } : {})
   };
+  const normalized = bottomGrid && keyboard && keyboardSource.geometry
+    ? configureMenuKeyboard(result, record(keyboardSource.geometry)) : result;
+  return bottomGrid && keyboardSource.layout === "hidden" && normalized.keyboard
+    ? { ...normalized, keyboard: { ...normalized.keyboard, layout: "hidden" } } : normalized;
 }
 
 function normalizeBackgroundAnimation(value: unknown): MenuBackgroundAnimationConfig | undefined {

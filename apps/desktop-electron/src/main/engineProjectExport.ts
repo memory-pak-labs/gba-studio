@@ -230,6 +230,12 @@ async function writeLockedEngineSchemaExport(options: WriteEngineSchemaExportOpt
   ];
   const templateDirectory = options.prepared.contract.template_dir;
   const enginePackRoot = path.dirname(path.dirname(templateDirectory));
+  if (options.prepared.contract.menu_project?.screens.some(screen => screen.text_input?.keyboard_geometry)) {
+    const manifest = await readFile(path.join(enginePackRoot, "enginepack.json"), "utf8").then(text => JSON.parse(text)).catch(() => null);
+    if (!manifest?.capabilities?.engine_sdk?.includes("menu_keyboard_geometry")) {
+      throw new Error("O Engine Pack não oferece composição de teclado. Atualize o Engine Pack antes de exportar esta cena.");
+    }
+  }
   const cacheEnabled = Boolean(options.projectPath) && options.cacheEnabled === true;
   const contract = options.cacheEnabled === false
     ? {...options.prepared.contract, build: {...options.prepared.contract.build, incremental_cache: false}}

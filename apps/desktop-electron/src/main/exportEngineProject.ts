@@ -2016,6 +2016,7 @@ export interface EngineExportMenuScreen {
     keyboard_controls_y?: number;
     keyboard_controls_width?: number;
     keyboard_controls_height?: number;
+    keyboard_geometry?: import("../shared/menuScene.js").MenuTextInputKeyboardGeometry;
   };
   actors?: EngineExportMenuActor[];
   items: EngineExportMenuItem[];
@@ -9840,7 +9841,8 @@ function buildMenuScreens(
           ...(keyboard?.controlsX !== undefined ? { keyboard_controls_x: keyboard.controlsX } : {}),
           ...(keyboard?.controlsY !== undefined ? { keyboard_controls_y: keyboard.controlsY } : {}),
           ...(keyboard?.controlsWidth !== undefined ? { keyboard_controls_width: keyboard.controlsWidth } : {}),
-          ...(keyboard?.controlsHeight !== undefined ? { keyboard_controls_height: keyboard.controlsHeight } : {})
+          ...(keyboard?.controlsHeight !== undefined ? { keyboard_controls_height: keyboard.controlsHeight } : {}),
+          ...(keyboard?.geometry ? { keyboard_geometry: keyboard.geometry } : {})
         };
       }
     }

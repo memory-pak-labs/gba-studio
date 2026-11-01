@@ -208,6 +208,10 @@ bool menu_text_input_uses_keyboard(const gbs::MenuTextInputData* config) {
 void move_menu_text_input_keyboard(int horizontal, int vertical) {
     const gbs::MenuScreenData* screen = gbs::menu_screen_for(project, menu_state.screen_index);
     const gbs::MenuTextInputData* config = menu_text_input_config(screen);
+    if (config && config->keyboard.geometry) {
+        menu_text_input.keyboard_index = gbs::menu_keyboard_next(config->keyboard,menu_text_input.keyboard_index,horizontal,vertical);
+        return;
+    }
     const bool side_controls = config != nullptr &&
         config->keyboard.control_layout == gbs::MenuTextInputKeyboardControlLayout::Side;
     const bool bottom_grid = config != nullptr &&
@@ -689,7 +693,12 @@ void draw_menu_text_input() {
         config->keyboard.control_layout != gbs::MenuTextInputKeyboardControlLayout::BottomGrid);
     gbs::draw_text_overlay_light(config->x, config->y, config->width, display, true);
     if (menu_text_input_uses_keyboard(config)) {
-        gbs::draw_text_input_keyboard_with_controls(
+        if (config->keyboard.geometry) {
+            gbs::draw_text_input_keyboard_authored(config->keyboard.x,config->keyboard.y,config->keyboard.width,config->keyboard.height,
+                menu_text_input.keyboard_index,menu_text_input.lowercase && config->keyboard.allow_lowercase,true,
+                static_cast<int>(config->keyboard.control_layout),config->keyboard.controls_x,config->keyboard.controls_y,
+                config->keyboard.controls_width,config->keyboard.controls_height,static_cast<int>(config->keyboard.surface),config->keyboard.geometry);
+        } else gbs::draw_text_input_keyboard_with_controls(
             config->keyboard.x,
             config->keyboard.y,
             config->keyboard.width,
