@@ -2211,7 +2211,9 @@ function footprintHasBlockedCollision(
 }
 
 function roomEntityCollisionFootprint(entity: RoomsWorkspaceEntity, room: RoomsWorkspaceRoom): RoomEntitySelectionFootprint {
-  const bounds = room.sceneType === "platformer" && !entity.hasCustomBounds ? entity.collisionBounds : undefined;
+  const usesRuntimeHitbox = room.sceneType === "topdown"
+    || room.sceneType === "platformer" && !entity.hasCustomBounds;
+  const bounds = usesRuntimeHitbox ? entity.collisionBounds : undefined;
   if (!bounds) return roomEntitySelectionFootprint(entity, room.sceneType);
   const left = entity.x * 8 + bounds.x;
   const top = entity.y * 8 + bounds.y;
