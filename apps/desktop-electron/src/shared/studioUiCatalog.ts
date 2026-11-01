@@ -1,5 +1,14 @@
 /** Application copy only. Tuple order: pt-BR, en-US, es-ES. Keep project data out of this catalog. */
 export const studioUiMessages: Record<string, readonly [string, string, string]> = {
+  "Mover campo do nome": ["Mover campo do nome", "Move name field", "Mover campo del nombre"],
+  "Mover teclado": ["Mover teclado", "Move keyboard", "Mover teclado"],
+  "Arraste ou use as setas para mover em passos de 8 px": ["Arraste ou use as setas para mover em passos de 8 px", "Drag or use the arrow keys to move in 8 px steps", "Arrastra o usa las flechas para mover en pasos de 8 px"],
+  "Selecione e arraste o campo ou o teclado · grade de 8 px": ["Selecione e arraste o campo ou o teclado · grade de 8 px", "Select and drag the field or keyboard · 8 px grid", "Selecciona y arrastra el campo o el teclado · cuadrícula de 8 px"],
+  "Ferramentas da interface": ["Ferramentas da interface", "Interface tools", "Herramientas de interfaz"],
+  "Editar interface": ["Editar interface", "Edit interface", "Editar interfaz"],
+  "Resumo da interface da cena": ["Resumo da interface da cena", "Scene interface summary", "Resumen de la interfaz de la escena"],
+  "Interface da cena": ["Interface da cena", "Scene interface", "Interfaz de la escena"],
+  "Editar a interface diretamente no viewport": ["Editar a interface diretamente no viewport", "Edit the interface directly in the viewport", "Editar la interfaz directamente en el viewport"],
   "Ajuda": ["Ajuda", "Help", "Ayuda"],
   "Verificar atualizações...": ["Verificar atualizações...", "Check for updates...", "Buscar actualizaciones..."],
   "A pasta de destino já contém arquivos. Escolha um novo nome ou uma pasta vazia.": ["A pasta de destino já contém arquivos. Escolha um novo nome ou uma pasta vazia.", "The destination folder already contains files. Choose a new name or an empty folder.", "La carpeta de destino ya contiene archivos. Elige un nombre nuevo o una carpeta vacía."],

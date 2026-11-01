@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { normalizeMenuSceneConfig } from "./menuScene.js";
-import { menuTextInputLayout } from "./menuTextInputLayout.js";
+import { menuTextInputLayout, moveMenuTextInput } from "./menuTextInputLayout.js";
 
 const input = normalizeMenuSceneConfig({ role: "name_input", textInput: {
   variableName: "player.name", maxLength: 8, x: 15, y: 5, width: 8,
@@ -29,5 +29,28 @@ describe("native name keyboard geometry", () => {
   it("does not materialize hidden or other keyboard presentations as BottomGrid", () => {
     expect(menuTextInputLayout({ ...input, keyboard: { ...input.keyboard!, layout: "hidden" } })).toBeNull();
     expect(menuTextInputLayout({ ...input, keyboard: { ...input.keyboard!, controlLayout: "side" } })).toBeNull();
+  });
+});
+
+
+describe("native name input movement", () => {
+  it("moves the field independently on the 8px grid and preserves its binding", () => {
+    const moved = moveMenuTextInput(input, "field", -10, 9);
+    expect(moved).toMatchObject({ x: 14, y: 6, width: 8, variableName: "player.name", maxLength: 8 });
+    expect(moved.keyboard).toBe(input.keyboard);
+    expect(input.x).toBe(15);
+  });
+  it("moves the whole keyboard, including wide commands, and keeps it in the viewport", () => {
+    const moved = moveMenuTextInput(input, "keyboard", 999, 999);
+    expect(moved).toMatchObject({ x: 15, y: 5, keyboard: { x: 13, y: 10, controlLayout: "bottom_grid", surface: "background" } });
+    const bounds = menuTextInputLayout(moved)!.keyboardBounds;
+    expect(bounds.x + bounds.width).toBe(240);
+    expect(bounds.y + bounds.height).toBe(160);
+    expect(moveMenuTextInput(input, "field", -999, -999)).toMatchObject({ x: 0, y: 0 });
+  });
+  it("does not create a change for a click or a movement smaller than the grid", () => {
+    expect(moveMenuTextInput(input, "field", 3, -3)).toBe(input);
+    expect(moveMenuTextInput(input, "keyboard", 0, 0)).toBe(input);
+    expect(moveMenuTextInput({ ...input, keyboard: undefined }, "keyboard", 8, 8)).toMatchObject({ keyboard: undefined });
   });
 });

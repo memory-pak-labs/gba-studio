@@ -18,7 +18,7 @@ const roomCanvasLayers: Array<[RoomCanvasLayerID, string, LucideIcon]> = [
   ["actors", "Atores", UserRound],
   ["hitboxes", "Bounds", ScanLine],
   ["triggers", "Triggers", Zap],
-  ["hud", "HUD", Monitor]
+  ["hud", "Interface", Monitor]
 ];
 
 const menuCanvasLayers: Array<[RoomCanvasLayerID, string, LucideIcon]> = [
@@ -101,7 +101,7 @@ export function RoomEditorSecondaryToolbar({
       {selectedToolPanelMode === "paint" || selectedToolPanelMode === "collision" || selectedToolPanelMode === "hud" ? (
         <div className="rooms-editor-secondary-toolbar-tools" aria-label={ui("Opções da ferramenta")}>
           <strong className="room-context-tool-label">
-            {selectedToolPanelMode === "paint" ? ui("Pintura") : selectedToolPanelMode === "collision" ? ui("Colisão") : ui("HUD")}
+            {selectedToolPanelMode === "paint" ? ui("Pintura") : selectedToolPanelMode === "collision" ? ui("Colisão") : ui("Interface")}
           </strong>
           {selectedToolPanelMode === "paint" ? (
             <RoomPaintFloatingToolbar

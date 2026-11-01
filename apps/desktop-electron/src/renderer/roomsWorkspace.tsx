@@ -1,4 +1,4 @@
-import { MenuTextInputPreview } from "./MenuTextInputPreview";
+import { MenuTextInputOverlay } from "./MenuTextInputOverlay";
 import { InteractiveObjectsInspector } from "./InteractiveObjectsInspector";
 import { prefabUpdateImpact } from "../shared/projectPrefabs";
 import { MapStatesInspector } from "./MapStatesInspector";
@@ -236,7 +236,7 @@ import {
   sceneTilemapCellIndexesForCell,
   sceneTilemapCellIndexesForRectangle
 } from "../shared/sceneTilemapContract";
-import { deriveMenuSceneEditorPreview, normalizeMenuSceneConfig, type MenuSceneConfig } from "../shared/menuScene";
+import { deriveMenuSceneEditorPreview, normalizeMenuSceneConfig, type MenuSceneConfig, type MenuTextInputConfig } from "../shared/menuScene";
 import type {
   RoomCanvasAction,
   RoomCanvasEditMode,
@@ -774,7 +774,7 @@ const roomEditorToolModes: Array<{ id: RoomEditorToolPanelMode; label: string; h
   { id: "trigger", label: "Trigger", hint: "Eventos", shortcut: ROOM_EDITOR_TOOL_SHORTCUT_BINDINGS.find((binding) => binding.mode === "trigger")?.defaultKey ?? "t", Icon: Zap },
   { id: "camera", label: "Zonas de câmera", hint: "Áreas", shortcut: ROOM_EDITOR_TOOL_SHORTCUT_BINDINGS.find((binding) => binding.mode === "camera")?.defaultKey ?? "z", Icon: Camera },
   { id: "warp", label: "Chegada avançada", hint: "Portais", shortcut: ROOM_EDITOR_TOOL_SHORTCUT_BINDINGS.find((binding) => binding.mode === "warp")?.defaultKey ?? "p", Icon: GitFork },
-  { id: "hud", label: "HUD", hint: "240×160", shortcut: ROOM_EDITOR_TOOL_SHORTCUT_BINDINGS.find((binding) => binding.mode === "hud")?.defaultKey ?? "u", Icon: Monitor }
+  { id: "hud", label: "Interface", hint: "240×160", shortcut: ROOM_EDITOR_TOOL_SHORTCUT_BINDINGS.find((binding) => binding.mode === "hud")?.defaultKey ?? "u", Icon: Monitor }
 ];
 
 const defaultCanvasLayerVisibility: Record<RoomCanvasLayerID, boolean> = {
@@ -5397,6 +5397,7 @@ interface RoomTilemapEditorProps {
   selectedEntityKeys: string[];
   selectedHudComponentID?: string | null;
   onSelectHudComponent?(componentID: string | null): void;
+  onUpdateMenuTextInput?(input: MenuTextInputConfig): void;
   setSelectedEntityKeys(keys: string[]): void;
   selectedEntityTool: RoomEntityCanvasTool;
   canvasLayerLocks: Record<RoomCanvasLayerID, boolean>;
@@ -5476,6 +5477,7 @@ function RoomTilemapEditor({
   selectedEntityKeys,
   selectedHudComponentID,
   onSelectHudComponent,
+  onUpdateMenuTextInput,
   setSelectedEntityKeys,
   selectedEntityTool,
   canvasLayerLocks,
@@ -6686,7 +6688,8 @@ function RoomTilemapEditor({
         onContextMenu={(event) => {
           if (selectedEditMode === "collision") event.preventDefault();
         }}
-        role={showRacingPseudo3dCamera || showRacingTechnicalMap ? undefined : "grid"}
+        role={showRacingPseudo3dCamera || showRacingTechnicalMap ? undefined : selectedToolPanelMode === "hud" && menuConfig?.textInput ? "group" : "grid"}
+        aria-label={selectedToolPanelMode === "hud" && menuConfig?.textInput ? ui("Interface da cena") : undefined}
         style={{
           ...(showGrid && canvasLayerVisibility.grid && room.sceneType !== "isometric" && !showRacingPseudo3dCamera && !showRacingTechnicalMap
             ? sceneMapTileGridBackgroundStyle(cardSize.width, cardSize.canvasDisplayHeight, room.width, room.height)
@@ -7109,7 +7112,8 @@ function RoomTilemapEditor({
             room={room}
           />
         )) : null}
-        {isFocusedSceneEditor && canvasLayerVisibility.hud && menuConfig?.textInput?.keyboard?.controlLayout === "bottom_grid" && menuConfig.textInput.keyboard.layout === "grid" ? <MenuTextInputPreview
+        {isFocusedSceneEditor && canvasLayerVisibility.hud && menuConfig?.textInput?.keyboard?.controlLayout === "bottom_grid" && menuConfig.textInput.keyboard.layout === "grid" ? <MenuTextInputOverlay key={room.id}
+          editable={selectedToolPanelMode === "hud"} readOnly={canvasLayerLocks.hud || !onUpdateMenuTextInput} onChange={onUpdateMenuTextInput}
           input={menuConfig.textInput} showFieldGuide={selectedToolPanelMode === "hud" && canvasLayerVisibility.composition}
           fontAssetURL={projectData ? resolveProjectAssetURL(projectData, projectPath, resolveSceneDialogueUiSettings(projectData, room.id).font) : null}
         /> : null}
@@ -7926,7 +7930,7 @@ export function RoomsWorkspace({
     ? inspectorContext.entity.kind
     : inspectorContext.kind;
   const inspectorTabs = roomInspectorTabs(inspectorContextKind);
-  const visibleInspectorTabs = selectedToolPanelMode === "hud" ? [{ id: "scene" as const, label: "Cena" }, { id: "hud" as const, label: "HUD" }] : inspectorTabs;
+  const visibleInspectorTabs = selectedToolPanelMode === "hud" ? [{ id: "scene" as const, label: "Cena" }, { id: "hud" as const, label: "Interface" }] : inspectorTabs;
   const activeInspectorTab = selectedToolPanelMode === "hud"
     ? "hud"
     : normalizeRoomInspectorTab(
@@ -9335,6 +9339,7 @@ export function RoomsWorkspace({
       projectPath={projectPath}
       projectData={projectData}
       room={focusSceneRoom}
+      onUpdateMenuTextInput={textInput => onUpdateRoomFields(focusSceneRoom.id, { runtime: { type: "menu", config: { ...focusSceneRoom.runtime?.config, textInput } } })}
       renderHudOverlay={false}
       entities={presentation.entities.filter((entity) => entity.roomName === focusSceneRoom.name)}
       hudBinding={selectedToolPanelMode === "hud" ? focusSceneHudAuthoringBinding : focusSceneHudBinding}
@@ -10577,9 +10582,9 @@ export function RoomsWorkspace({
               ) : (
                 <>
                   {activeInspectorTab === "scene" ? <>
-                  <section className="hud-authoring-section room-scene-hud-summary" aria-label={ui("Resumo da HUD da cena")}>
-                    <div><strong>{ui("HUD da cena")}</strong><span>{roomRuntimeHudAsset(inspectorRoom) ? ui("HUD {0} · {1}", { 0: inspectorRoom.sceneType === "isometric" ? "tática" : inspectorRoom.sceneType === "battleRpg" ? "RPG" : inspectorRoom.sceneType === "dungeonCrawler" ? "do labirinto" : "de luta", 1: roomRuntimeHudAsset(inspectorRoom) }) : inspectorHudBinding?.preset.name ?? (inspectorRoom.runtime?.type === "menu" && normalizeMenuSceneConfig(inspectorRoom.runtime.config).textInput ? ui("Entrada de nome e teclado") : ui("Sem HUD"))}</span></div>
-                    <button type="button" onClick={() => { enterSceneFocus(inspectorRoom); setEditorToolPanelMode("hud"); setCanvasLayerVisibilityState(current => ({ ...current, hud: true })); }}>{ui("Editar HUD")}</button>
+                  <section className="hud-authoring-section room-scene-hud-summary" aria-label={ui("Resumo da interface da cena")}>
+                    <div><strong>{ui("Interface da cena")}</strong><span>{roomRuntimeHudAsset(inspectorRoom) ? ui("HUD {0} · {1}", { 0: inspectorRoom.sceneType === "isometric" ? "tática" : inspectorRoom.sceneType === "battleRpg" ? "RPG" : inspectorRoom.sceneType === "dungeonCrawler" ? "do labirinto" : "de luta", 1: roomRuntimeHudAsset(inspectorRoom) }) : inspectorHudBinding?.preset.name ?? (inspectorRoom.runtime?.type === "menu" && normalizeMenuSceneConfig(inspectorRoom.runtime.config).textInput ? ui("Entrada de nome e teclado") : ui("Sem HUD"))}</span></div>
+                    <button type="button" onClick={() => { enterSceneFocus(inspectorRoom); setEditorToolPanelMode("hud"); setCanvasLayerVisibilityState(current => ({ ...current, hud: true })); }}>{ui("Editar interface")}</button>
                   </section>
                   {inspectorRoom.warnings.length ? (
                     <div className="room-warnings inspector">

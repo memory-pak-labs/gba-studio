@@ -11785,3 +11785,49 @@ body.room-scene-map-card-dragging .room-stage-card-frame.is-dragging {
   grid-template-columns: repeat(2, minmax(0, 1fr));
   min-width: 0;
 }
+
+.room-menu-text-input-editor {
+  height: 100%;
+  inset: 0;
+  pointer-events: none;
+  position: absolute;
+  width: 100%;
+  z-index: 9;
+}
+
+.room-menu-text-input-handle {
+  appearance: none;
+  background: transparent;
+  border: 1px dashed var(--studio-color-accent, #6d2bf1);
+  border-radius: 0;
+  box-shadow: none;
+  box-sizing: border-box;
+  cursor: grab;
+  min-height: 0;
+  min-width: 0;
+  padding: 0;
+  pointer-events: auto;
+  position: absolute;
+  touch-action: none;
+  z-index: 10;
+}
+
+.room-menu-text-input-handle:hover,
+.room-menu-text-input-handle[aria-pressed="true"],
+.room-menu-text-input-handle:focus-visible {
+  background: transparent;
+  box-shadow: 0 0 0 2px var(--studio-color-accent, #6d2bf1);
+  outline: 0;
+}
+
+.room-menu-text-input-handle:active { cursor: grabbing; }
+.room-menu-text-input-handle[aria-disabled="true"] { cursor: not-allowed; }
+
+.room-menu-text-input-handle > span {
+  clip-path: inset(50%);
+  height: 1px;
+  overflow: hidden;
+  position: absolute;
+  white-space: nowrap;
+  width: 1px;
+}
