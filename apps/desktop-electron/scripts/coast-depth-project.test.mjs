@@ -26,6 +26,27 @@ function finish(state) {
 const run=(s,n)=>finish(runPreviewRuntimeEvent(s,n));
 
 describe('coastal campaign depth',()=>{
+  it('moves the enabled freight lift through both stops and pauses it when disabled',()=>{
+    const p=source();
+    // Drive the authored callback explicitly, with no competing update scripts.
+    for(const actor of p.actors)actor.eventBindings={...actor.eventBindings,onUpdate:''};
+    let s=bootPreviewRuntimeAtRoom(p,'penedos_vento',{skipBootEvents:true});
+    s={...s,player:null,variables:{...s.variables,var_coast_lift:1}};
+    s=run(s,'coast_lift_init');
+    const lift=()=>s.actors.find(a=>a.id==='coast-freight-lift');
+    const positions=[lift().y];
+    for(let i=0;i<112;i++){
+      s=run(s,'coast_lift_update');positions.push(lift().y);
+    }
+    expect(Math.min(...positions)).toBe(29);
+    expect(Math.max(...positions)).toBe(36);
+    expect(positions[56]).toBe(29);
+    expect(positions[112]).toBe(36);
+    s={...s,variables:{...s.variables,var_coast_lift:0}};
+    const stopped=lift().y;
+    for(let i=0;i<8;i++)s=run(s,'coast_lift_update');
+    expect(lift().y).toBe(stopped);
+  });
   it('exports every coastal callback safely after renaming its scene',()=>{
     const p=source(),porto=p.rooms.find(r=>r.name==='porto_lumen');
     const renamed=renameRoomInProject(p,porto.id,'porto_costeiro');

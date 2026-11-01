@@ -59,6 +59,7 @@ MOTION_HOST_BINARIES := $(addprefix $(HOST_BUILD)/,$(MOTION_HOST_TESTS))
 .PHONY: motion-checkpoint-test
 motion-checkpoint-test: $(MOTION_HOST_BINARIES)
 	@set -e; for test in $(MOTION_HOST_BINARIES); do "$$test"; echo "PASS $$test"; done
+	python3 tests/host/platformer_scripted_rider_tests.py
 	python3 tests/host/actor_motion_export_tests.py
 	python3 tests/host/isometric_screen_export_tests.py
 	python3 tests/host/isometric_save_dispatch_tests.py

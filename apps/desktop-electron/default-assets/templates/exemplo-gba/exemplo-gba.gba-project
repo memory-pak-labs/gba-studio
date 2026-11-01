@@ -179064,6 +179064,11 @@
           "isEnabled": true
         },
         {
+          "id": "coast_lift_update-resume-left",
+          "command": "set_actor_direction coast-freight-lift left",
+          "isEnabled": true
+        },
+        {
           "id": "coast_lift_update-9",
           "command": "else",
           "isEnabled": true
@@ -179071,6 +179076,11 @@
         {
           "id": "coast_lift_update-10",
           "command": "move_actor_relative coast-freight-lift 0 0.125",
+          "isEnabled": true
+        },
+        {
+          "id": "coast_lift_update-resume-right",
+          "command": "set_actor_direction coast-freight-lift right",
           "isEnabled": true
         },
         {
