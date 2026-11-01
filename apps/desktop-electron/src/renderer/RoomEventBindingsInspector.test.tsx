@@ -353,3 +353,14 @@ describe("RoomEventBindingsInspector", () => {
     expect(screen.getByLabelText("Timeline de Ao iniciar")).toBeInTheDocument();
   });
 });
+
+
+it("does not keep a focused checkpoint script under another scene state", () => {
+  const props = { contextKind: "room" as const, sceneType: "racing", eventOptions: ["gate_a", "boot_b"].map(value => ({value,label:value})), onChangeBinding: vi.fn(), onCreateEvent: vi.fn(), focusedEventName: "gate_a", focusedEventRequestID: 1, renderEventInspector: (name: string) => <div>Script:{name}</div> };
+  const {rerender} = render(<RoomEventBindingsInspector {...props} entity={{id:"a",name:"a",eventBindings:{},runtime:{type:"racing",config:{topdownTrack:{checkpoints:[{id:"east",eventName:"gate_a"}]}}}}} />);
+  expect(screen.getByText("Script:gate_a")).toBeInTheDocument();
+  rerender(<RoomEventBindingsInspector {...props} entity={{id:"b",name:"b",eventBindings:{onInit:"boot_b"}}} />);
+  expect(screen.queryByText("Script:gate_a")).not.toBeInTheDocument();
+  expect(screen.getByText("Script:boot_b")).toBeInTheDocument();
+  cleanup();
+});

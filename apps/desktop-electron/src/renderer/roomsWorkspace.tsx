@@ -1,3 +1,8 @@
+import {RacingTrackOverlay} from "./RacingTrackOverlay";
+import {RacingTrackInspector} from "./RacingTrackInspector";
+import type {RacingTrackSelection} from "../shared/racingTrackEditing";
+import type {RacingTopdownTrackConfig} from "../shared/sceneTypeProfiles";
+import "./styles/racing-track-editor.css";
 import {sceneInterfaceImage} from "../shared/sceneInterfaceImage";
 import type { MenuTextInputPart } from "../shared/menuTextInputLayout";
 import { MenuTextInputOverlay } from "./MenuTextInputOverlay";
@@ -2402,7 +2407,8 @@ function roomDetailsEditor(
   projectData: GBAProjectData | null | undefined,
   activeTab: RoomInspectorTabID,
   scenePreflight: ReturnType<typeof buildScenePreflightReport> | null,
-  onOpenProjectHealth?: RoomsWorkspaceProps["onOpenProjectHealth"]
+  onOpenProjectHealth?: RoomsWorkspaceProps["onOpenProjectHealth"],
+  onEditRacingTrack?: (mode:"gates"|"route")=>void
 ): React.ReactElement {
   const roomLabel = sceneDisplayName(room.name);
   const projectSettings = projectData?.settings;
@@ -2581,6 +2587,7 @@ function roomDetailsEditor(
         width={room.width} height={room.height} sceneName={room.name}
         onChange={mapStates => onUpdateRoomFields(room.id, { mapStates })} /> : null}
       {resolvedRuntime.type === "racing" ? <RacingSceneInspector
+        onEditTrack={onEditRacingTrack}
         config={normalizeRacingSceneConfig(resolvedRuntime.config)} width={room.width} height={room.height}
         background={room.background??""} assets={backgroundOptions}
         onChange={patch=>onUpdateRoomFields(room.id,{runtime:{type:"racing",config:{...runtime.config,...patch}},
@@ -5391,6 +5398,10 @@ interface RoomTilemapEditorProps {
   selectedHudComponentID?: string | null;
   onSelectHudComponent?(componentID: string | null): void;
   onUpdateMenuTextInput?(input: MenuTextInputConfig): void;
+  racingSelection?: RacingTrackSelection | null;
+  racingAreaMode?: "gates"|"events";
+  onSelectRacingElement?(selection:RacingTrackSelection):void;
+  onUpdateRacingTrack?(track:RacingTopdownTrackConfig):void;
   setSelectedEntityKeys(keys: string[]): void;
   selectedEntityTool: RoomEntityCanvasTool;
   canvasLayerLocks: Record<RoomCanvasLayerID, boolean>;
@@ -5471,6 +5482,7 @@ function RoomTilemapEditor({
   selectedHudComponentID,
   onSelectHudComponent,
   onUpdateMenuTextInput,
+  racingSelection, racingAreaMode, onSelectRacingElement, onUpdateRacingTrack,
   setSelectedEntityKeys,
   selectedEntityTool,
   canvasLayerLocks,
@@ -7133,12 +7145,11 @@ function RoomTilemapEditor({
             room={room}
           />
         ) : null}
-        {isPseudo3dRacing && racingTechnicalMapOpen && racingPseudo3dConfigForRoom(room)?.topdownTrack ? <svg
-          aria-label={ui("Checkpoints e rota do circuito")} viewBox={`0 0 ${room.width*8} ${room.height*8}`}
-          style={{position:"absolute",inset:0,width:"100%",height:"100%",pointerEvents:"none",zIndex:4}}>
-          <polyline fill="none" stroke="#9b77db" strokeWidth="1" strokeDasharray="4 4" points={(racingPseudo3dConfigForRoom(room)?.topdownTrack?.pathPoints??[]).map(point=>`${point.x},${point.y}`).join(" ")}/>
-          {racingPseudo3dConfigForRoom(room)?.topdownTrack?.checkpoints.map((gate,index)=><g key={gate.id}><rect x={gate.x-gate.width/2} y={gate.y-gate.height/2} width={gate.width} height={gate.height} fill={index===0?"#36bf8060":"#aa73ee50"} stroke={index===0?"#36bf80":"#aa73ee"}/><text x={gate.x} y={gate.y} fontSize="8" textAnchor="middle" fill="#251936">{index===0?ui("Chegada"):index}</text></g>)}
-        </svg> : null}
+        {isFocusedSceneEditor && room.runtime?.type==="racing" && racingPseudo3dConfigForRoom(room)?.topdownTrack && (racingTechnicalMapOpen || (!isPseudo3dRacing && selectedToolPanelMode==="trigger")) && canvasLayerVisibility.triggers ? <RacingTrackOverlay
+          track={racingPseudo3dConfigForRoom(room)!.topdownTrack!} width={room.width*8} height={room.height*8}
+          mode={selectedToolPanelMode==="trigger" && racingAreaMode!=="events" ? "gates" : racingTechnicalMapOpen && selectedToolPanelMode==="select" ? "route" : "none"}
+          selection={racingSelection??null} readOnly={selectedToolPanelMode==="trigger"?canvasLayerLocks.triggers:canvasLayerLocks.actors}
+          onSelect={item=>onSelectRacingElement?.(item)} onChange={onUpdateRacingTrack}/>:null}
         {isPseudo3dRacing && racingTechnicalMapOpen ? <button
           className="racing-pseudo3d-technical-map-toggle" type="button"
           aria-label={ui("Voltar à prévia GBA da cena {0}", { 0: sceneDisplayName(room.name) })}
@@ -7271,6 +7282,8 @@ export function RoomsWorkspace({
   const [collisionHoverPreviewEnabled, setCollisionHoverPreviewEnabled] = useState(true);
   const [selectedEntityTool, setSelectedEntityTool] = useState<RoomEntityCanvasTool>("move");
   const [selectedHudComponentID, setSelectedHudComponentID] = useState<string | null>(null);
+  const [selectedRacingElement,setSelectedRacingElement]=useState<{roomID:string;selection:RacingTrackSelection}|null>(null);
+  const [racingAreaMode,setRacingAreaMode]=useState<"gates"|"events">("gates");
   const [hudLibraryPresetID, setHudLibraryPresetID] = useState<string | null>(null);
   const [editingSharedHudID, setEditingSharedHudID] = useState<string | null>(null);
   const [hudViewMode, setHudViewMode] = useState<"edit" | "preview">("edit");
@@ -7941,7 +7954,10 @@ export function RoomsWorkspace({
   const activeSelectedCanvasCell = activeRoom && selectedCanvasCell?.roomID === activeRoom.id
     ? selectedCanvasCell
     : null;
-  const inspectorTitle = inspectorContext.kind === "paint"
+  const inspectorRacingConfig=inspectorRoom?.runtime?.type==="racing"?normalizeRacingSceneConfig(inspectorRoom.runtime.config):null;
+  const inspectorRacingSelection=selectedRacingElement && selectedRacingElement.roomID===inspectorRoom?.id?selectedRacingElement.selection:null;
+  const racingTrackContext=Boolean(inspectorRacingConfig?.topdownTrack && ((selectedToolPanelMode==="trigger"&&racingAreaMode==="gates") || (focusViewMode==="map"&&selectedToolPanelMode==="select"&&inspectorRacingSelection?.kind==="point")));
+  const inspectorTitle = racingTrackContext ? ui(selectedToolPanelMode==="trigger"?"Checkpoints da corrida":"Rota dos rivais") : inspectorContext.kind === "paint"
     ? ui("Pintura")
     : inspectorContext.kind === "height"
       ? ui("Altura")
@@ -7990,7 +8006,7 @@ export function RoomsWorkspace({
         }) as Record<string, unknown> | undefined
       : undefined) ?? { id: inspectorRoom.id, name: inspectorRoom.name }
     : null;
-  const sceneEventInspector = inspectorContext.kind === "room" && inspectorRoom && inspectorSceneRecord ? (
+  const sceneEventInspector = (inspectorContext.kind === "room" || racingTrackContext) && inspectorRoom && inspectorSceneRecord ? (
     <RoomEventBindingsInspector
       commandSuggestions={commandSuggestions}
       contextKind="room"
@@ -8494,6 +8510,7 @@ export function RoomsWorkspace({
       return;
     }
     if (mode === "trigger") {
+      if(room?.sceneType==="racing") {setFocusViewMode("map");setRacingAreaMode("gates");}
       setSelectedEntityTool("resize");
       setSelectedEntityKeys([]);
       return;
@@ -9332,6 +9349,10 @@ export function RoomsWorkspace({
       projectData={projectData}
       room={focusSceneRoom}
       onUpdateMenuTextInput={textInput => onUpdateRoomFields(focusSceneRoom.id, { runtime: { type: "menu", config: { ...focusSceneRoom.runtime?.config, textInput } } })}
+      racingSelection={selectedRacingElement?.roomID===focusSceneRoom.id?selectedRacingElement.selection:null}
+      racingAreaMode={racingAreaMode}
+      onSelectRacingElement={selection=>{setSelectedRacingElement({roomID:focusSceneRoom.id,selection});setSelectedEntityKeys([]);setInspectorTabByContext(current=>({...current,[selection.kind==="gate"?"trigger":"room"]:selection.kind==="gate"?"area":"scene"}));}}
+      onUpdateRacingTrack={topdownTrack=>onUpdateRoomFields(focusSceneRoom.id,{runtime:{type:"racing",config:{...focusSceneRoom.runtime?.config,topdownTrack}}})}
       renderHudOverlay={false}
       entities={presentation.entities.filter((entity) => entity.roomName === focusSceneRoom.name)}
       hudBinding={selectedToolPanelMode === "hud" ? focusSceneHudAuthoringBinding : focusSceneHudBinding}
@@ -9361,7 +9382,7 @@ export function RoomsWorkspace({
       setSelectedTileID={setSelectedTileID}
       setSelectedTileStamp={setSelectedTileStamp}
       setSelectedTool={setSelectedTool}
-      triggerPlacementEnabled={selectedToolPanelMode === "trigger"}
+      triggerPlacementEnabled={selectedToolPanelMode === "trigger" && (focusSceneRoom.sceneType!=="racing" || racingAreaMode==="events")}
       cameraZones={focusSceneRoom.cameraZones ?? []}
       cameraZonePlacementEnabled={selectedToolPanelMode === "camera"}
       selectedCameraZoneID={selectedCameraZoneID}
@@ -9427,7 +9448,7 @@ export function RoomsWorkspace({
           canvasGridVisible: false, ghostPreviewEnabled: false, collisionHoverPreviewEnabled: false,
           canvasLayerVisibility: { ...defaultCanvasLayerVisibility, background: true, actors: true, hud: true, grid: false,
             composition: false, collision: false, hitboxes: false, triggers: false, cameraBounds: false, worldBounds: false },
-          selectedToolPanelMode: "select", selectedEditMode: "select", selectedEntityKeys: [],
+          selectedToolPanelMode: "select", selectedEditMode: "select", selectedEntityKeys: [], racingSelection:null,
           selectedCanvasCellIndex: null, selectedCameraZoneID: null, selectedConnectionIndex: null,
           cameraZones: [], connectionZones: [], eventLinks: [], testStart: undefined,
           triggerPlacementEnabled: false, cameraZonePlacementEnabled: false, connectionZonePlacementEnabled: false,
@@ -10484,7 +10505,21 @@ export function RoomsWorkspace({
                       sfxOptions={dialogueSfxOptions}
                     />
                   ) : null}
-              {activeInspectorTab === "dialogues" ? null : inspectorContext.kind === "height" ? (
+              {inspectorRacingConfig?.topdownTrack && selectedToolPanelMode==="trigger" ? <div className="racing-track-actions" role="group" aria-label={ui("Tipos de área")}>
+                <button type="button" aria-pressed={racingAreaMode==="gates"} onClick={()=>{setRacingAreaMode("gates");setSelectedEntityKeys([]);setFocusViewMode("map");}}>{ui("Checkpoints e chegada")}</button>
+                <button type="button" aria-pressed={racingAreaMode==="events"} onClick={()=>{setRacingAreaMode("events");setSelectedRacingElement(null);}}>{ui("Áreas de evento")}</button>
+              </div>:null}
+              {activeInspectorTab === "dialogues" ? null : racingTrackContext && inspectorRoom && inspectorRacingConfig?.topdownTrack ? (
+                activeInspectorTab==="events" ? sceneEventInspector : <RacingTrackInspector track={inspectorRacingConfig.topdownTrack}
+                  mode={selectedToolPanelMode==="trigger"?"gates":"route"} width={inspectorRoom.width*8} height={inspectorRoom.height*8}
+                  selection={inspectorRacingSelection} readOnly={selectedToolPanelMode==="trigger"?canvasLayerLocks.triggers:canvasLayerLocks.actors}
+                  eventOptions={eventReferenceOptions}
+                  onSelect={selection=>setSelectedRacingElement(selection?{roomID:inspectorRoom.id,selection}:null)}
+                  onChange={topdownTrack=>onUpdateRoomFields(inspectorRoom.id,{runtime:{type:"racing",config:{...inspectorRoom.runtime?.config,topdownTrack}}})}
+                  onOpenEvents={()=>setInspectorTabByContext(current=>({...current,[inspectorContextKind]:"events"}))}
+                  onOpenEvent={name=>onOpenEvent?.(name,inspectorRoom.name)}
+                  onCreateEvent={bindingKey=>onCreateBoundEventsForTargets?.({initialCommands:[],targets:[{targetKind:"room",targetName:inspectorRoom.name,bindingKey}]})}/>
+              ) : inspectorContext.kind === "height" ? (
                 roomHeightInspector(
                   inspectorRoom,
                   inspectorSelectedCanvasCell?.cellIndex ?? null,
@@ -10602,7 +10637,8 @@ export function RoomsWorkspace({
                       projectData,
                       activeInspectorTab,
                       inspectorScenePreflight,
-                      onOpenProjectHealth
+                      onOpenProjectHealth,
+                      mode=>{enterSceneFocus(inspectorRoom);setFocusViewMode("map");setEditorToolPanelMode(mode==="gates"?"trigger":"select");setRacingAreaMode("gates");setSelectedEntityKeys([]);setSelectedRacingElement({roomID:inspectorRoom.id,selection:mode==="gates"?{kind:"gate",id:normalizeRacingSceneConfig(inspectorRoom.runtime?.config).topdownTrack!.checkpoints[0].id}:{kind:"point",index:0}});}
                     )
                     : null}
                   {activeInspectorTab === "hud" && selectedToolPanelMode === "hud" && hudInspectorRoom ? (
