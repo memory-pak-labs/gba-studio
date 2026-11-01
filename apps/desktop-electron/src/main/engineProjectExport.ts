@@ -236,6 +236,23 @@ async function writeLockedEngineSchemaExport(options: WriteEngineSchemaExportOpt
       throw new Error("O Engine Pack não oferece composição de teclado. Atualize o Engine Pack antes de exportar esta cena.");
     }
   }
+  const projectContract = options.prepared.contract;
+  const interfaceBindings = new Set([
+    projectContract.cutscene_project?.dialogue_ui,
+    projectContract.visual_novel_project?.dialogue_ui,
+    projectContract.isometric_project?.dialogue_ui,
+    projectContract.luta_project?.dialogue_ui,
+    projectContract.menu_project?.dialogue_ui
+  ].flatMap(ui => ui?.hud_scene_bindings ?? []).map(binding => binding.scene_name));
+  const requiresSceneInterfaces = projectContract.scene_contracts.some(scene =>
+    ["cutscene", "visualNovel", "isometric", "luta"].includes(scene.scene_type) && interfaceBindings.has(scene.name)) ||
+    projectContract.menu_project?.screens.some(screen => screen.screen_type !== "menu" && interfaceBindings.has(screen.name));
+  if (requiresSceneInterfaces) {
+    const manifest = await readFile(path.join(enginePackRoot, "enginepack.json"), "utf8").then(text => JSON.parse(text)).catch(() => null);
+    if (!manifest?.capabilities?.engine_sdk?.includes("scene_interface_layouts")) {
+      throw new Error("O Engine Pack não oferece interfaces de cena. Atualize o Engine Pack antes de exportar este projeto.");
+    }
+  }
   const cacheEnabled = Boolean(options.projectPath) && options.cacheEnabled === true;
   const contract = options.cacheEnabled === false
     ? {...options.prepared.contract, build: {...options.prepared.contract.build, incremental_cache: false}}

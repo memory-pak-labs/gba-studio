@@ -2205,3 +2205,11 @@ $(HOST_BUILD)/menu_keyboard_geometry_tests: tests/host/menu_keyboard_geometry_te
 	$(HOST_CXX) $(HOST_CXXFLAGS) $< -o $@
 
 host-test: menu-keyboard-geometry-test
+
+.PHONY: authored-scene-hud-test
+authored-scene-hud-test:
+	python3 tests/host/authored_scene_hud_tests.py
+	python3 tests/host/menu_interface_policy_tests.py
+	python3 tests/host/native_hud_precedence_tests.py
+
+host-test: authored-scene-hud-test

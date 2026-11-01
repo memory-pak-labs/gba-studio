@@ -1707,6 +1707,10 @@ void load_assets(const gbs::VideoComposition& video) {
     gbs::apply_video_composition(video);
 }
 
+bool iso_scene_uses_native_tactical_hud() {
+    return !gbastudio_dialogue_ui::has_hud_scene_binding(project.rooms[current_room].name);
+}
+
 bool load_iso_tactical_presentation_layers(
     const gbs::IsoTacticalPresentationData& presentation,
     const gbs::TileMapAsset* surface_override = nullptr
@@ -1720,7 +1724,7 @@ bool load_iso_tactical_presentation_layers(
         loaded = presentation.grid != nullptr &&
             gbs::load_tilemap(gbs::BackgroundLayer::BG1, *presentation.grid) && loaded;
     }
-    if (gbs::iso_tactical_capability_enabled(presentation, gbs::IsoTacticalCapability::Hud)) {
+    if (iso_scene_uses_native_tactical_hud() && gbs::iso_tactical_capability_enabled(presentation, gbs::IsoTacticalCapability::Hud)) {
         loaded = presentation.hud != nullptr &&
             gbs::load_tilemap(gbs::BackgroundLayer::BG0, *presentation.hud) && loaded;
     }
@@ -3459,9 +3463,9 @@ void render_isometric_runtime(const gbs::RuntimeFrameContext& context) {
             const bool grid_enabled = !tactical_presentation_load_failed &&
                 gbs::iso_tactical_capability_enabled(*tactical_presentation, gbs::IsoTacticalCapability::GridOverlay) &&
                 tactical_presentation->grid != nullptr;
-            const bool hud_enabled = !tactical_presentation_load_failed &&
+            const bool hud_enabled = !iso_scene_uses_native_tactical_hud() || (!tactical_presentation_load_failed &&
                 gbs::iso_tactical_capability_enabled(*tactical_presentation, gbs::IsoTacticalCapability::Hud) &&
-                tactical_presentation->hud != nullptr;
+                tactical_presentation->hud != nullptr);
             const bool authored_background_fallback = !tactical_presentation_load_failed &&
                 gbs::uses_authored_isometric_background_as_tactical_surface_fallback(
                     *room_data,
@@ -3816,9 +3820,9 @@ void render_isometric_runtime(const gbs::RuntimeFrameContext& context) {
         }
         gbs::draw_dialogue(dialogue);
         gbs::draw_event_clock(event_state);
-        if(tactical_presentation_active && tactical_presentation->compact_hud && !dialogue.visible) {
+        if(iso_scene_uses_native_tactical_hud() && tactical_presentation_active && tactical_presentation->compact_hud && !dialogue.visible) {
             draw_iso_tactical_compact_hud(tactical_state,*tactical_presentation,cursor,actors,actor_count);
-        } else if (tactical_presentation_active && tactical_presentation->hud != nullptr && !dialogue.visible) {
+        } else if (iso_scene_uses_native_tactical_hud() && tactical_presentation_active && tactical_presentation->hud != nullptr && !dialogue.visible) {
             // Hiding a dialogue clears its rectangle on BG0. Restore the
             // authored panel afterwards so the lower status keeps its backing.
             gbs::load_tilemap(gbs::BackgroundLayer::BG0, *tactical_presentation->hud);

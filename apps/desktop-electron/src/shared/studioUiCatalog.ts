@@ -1,5 +1,6 @@
 /** Application copy only. Tuple order: pt-BR, en-US, es-ES. Keep project data out of this catalog. */
 export const studioUiMessages: Record<string, readonly [string, string, string]> = {
+  "O Engine Pack não oferece interfaces de cena. Atualize o Engine Pack antes de exportar este projeto.": ["O Engine Pack não oferece interfaces de cena. Atualize o Engine Pack antes de exportar este projeto.", "The Engine Pack does not support scene interfaces. Update it before exporting this project.", "El Engine Pack no admite interfaces de escena. Actualízalo antes de exportar este proyecto."],
   "Selecione uma tecla": ["Selecione uma tecla", "Select a key", "Selecciona una tecla"],
   "O Engine Pack não oferece composição de teclado. Atualize o Engine Pack antes de exportar esta cena.": ["O Engine Pack não oferece composição de teclado. Atualize o Engine Pack antes de exportar esta cena.", "The Engine Pack does not support keyboard composition. Update it before exporting this scene.", "El Engine Pack no admite composición de teclado. Actualízalo antes de exportar esta escena."],
   "Composição do teclado": ["Composição do teclado", "Keyboard composition", "Composición del teclado"],

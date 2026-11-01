@@ -469,7 +469,7 @@ void apply_luta_visuals(const gbs::LutaStageData& stage) {
     gbs::set_bg_enabled(gbs::BackgroundLayer::BG1, false);
     gbs::set_bg_enabled(gbs::BackgroundLayer::BG2, false);
     gbs::set_bg_enabled(gbs::BackgroundLayer::BG3, false);
-    if (project.hud != nullptr) {
+    if (project.hud != nullptr && !gbastudio_dialogue_ui::has_hud_scene_binding(project.stages[stage_index].id)) {
         gbs::load_tilemap(project.hud->layer, project.hud->tilemap);
         gbs::set_bg_enabled(project.hud->layer, true);
         gbs::set_bg_scroll(project.hud->layer, 0, 0);

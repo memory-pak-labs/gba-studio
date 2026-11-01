@@ -201,6 +201,11 @@ void append_uint(char*& cursor, const char* end, uint16_t value) {
 }
 
 void refresh_hud() {
+    const char* authored_scene = gbs::visual_novel_scene_name(project, current_scene_index);
+    if (!authored_scene || !gbastudio_dialogue_ui::has_hud_scene_binding(authored_scene)) {
+        gbs::hide_hud(hud);
+        return;
+    }
     char* left = hud_left_buffer;
     const char* left_end = hud_left_buffer + sizeof(hud_left_buffer) - 1;
     hud_left_buffer[0] = '\0';
@@ -262,7 +267,6 @@ void apply_background(const gbs::VisualNovelSceneData& scene) {
 }
 
 void draw_dialogue_portrait() {
-    gbs::hide_all_sprites();
     if (!gbs::dialogue_should_show_portrait(dialogue)) {
         return;
     }
@@ -806,10 +810,10 @@ void render_visual_novel_runtime(const gbs::RuntimeFrameContext& context) {
             static_cast<size_t>(dialogue.text_sfx_index) < project.sfx_asset_count) {
             gbs::play_sfx(project.sfx_assets[dialogue.text_sfx_index]);
         }
-        /* The scene title/history bar is runtime diagnostics, not authored
-         * scene content. Keep the UI layer clear so a mixed-runtime handoff
-         * cannot leak a HUD from the previous scene. */
-        gbs::hide_hud(hud);
+        // Clear the previous portrait before drawing the scene's authored HUD.
+        // Portraits are restored after the HUD, which owns dynamic OBJ slots.
+        gbs::hide_all_sprites();
+        refresh_hud();
         gbs::draw_hud(hud);
         /* Advanced HUD text uses OAM 96-127. Draw fixed dialogue portraits
          * after it so the HUD cleanup cannot hide the active portrait.
