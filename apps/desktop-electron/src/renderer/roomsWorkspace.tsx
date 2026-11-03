@@ -3775,6 +3775,12 @@ function RoomEntitiesEditor({
                     <span>{ui("Pode ser empurrado")}</span>
                   </label>
                   <p className="room-actor-battle-hint">{ui("A máscara usa bits dos grupos 0–15. Um ator só empurra outro marcado quando sua prioridade é maior.")}</p>
+                  {!selectedEntity.isPlayer ? <label className="room-actor-pushable-field">
+                    <input type="checkbox" checked={selectedEntity.collisionPlacement === "intentional"}
+                      onChange={event => onUpdateRoomEntity("actor", selectedEntity.id, { collisionPlacement: event.currentTarget.checked ? "intentional" : null })} />
+                    <span>{ui("Sobreposição intencional no mapa")}</span>
+                  </label> : null}
+                  {!selectedEntity.isPlayer ? <p className="room-actor-battle-hint">{ui("Use para mecanismos e objetos fixos sobre paredes ou plataformas. Altera apenas o diagnóstico; a colisão do jogo permanece igual.")}</p> : null}
                   </div>
                 </InspectorSection>
               ) : null}

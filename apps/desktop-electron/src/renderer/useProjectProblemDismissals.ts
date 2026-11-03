@@ -1,12 +1,7 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type { ProjectProblem } from "../shared/projectProblems";
-
-function warningKey(problem: ProjectProblem): string {
-  // Scene indices in diagnostic IDs change on reorder. Follow the target and
-  // content instead; changed warnings must become visible again.
-  return JSON.stringify([problem.workspace, problem.code ?? problem.id,
-    problem.targetID ?? problem.targetName ?? null, problem.message, problem.detail ?? null]);
-}
+import type { GBAProjectData } from "../shared/projectFile";
+import { projectWarningKey as warningKey, readProjectWarningDismissals } from "../shared/projectWarningDismissals";
 
 function readDismissals(storageKey: string | null): string[] {
   if (!storageKey) return [];
@@ -18,16 +13,31 @@ function readDismissals(storageKey: string | null): string[] {
   }
 }
 
-export function useProjectProblemDismissals(problems: ProjectProblem[], projectPath: string | undefined) {
+export function useProjectProblemDismissals(problems: ProjectProblem[], projectPath: string | undefined,
+  project?: { data: GBAProjectData | undefined; onChange(keys: string[]): void }) {
   const storageKey = projectPath ? `gbaStudio.ignoredWarnings.v1:${projectPath}` : null;
   const initialKeys = useMemo(() => readDismissals(storageKey), [storageKey]);
   const [overrides, setOverrides] = useState<Record<string, string[]>>({});
   const stateKey = storageKey ?? "unsaved";
-  const keys = overrides[stateKey] ?? initialKeys;
+  const persistedKeys = readProjectWarningDismissals(project?.data);
+  const keys = project ? persistedKeys ?? initialKeys : overrides[stateKey] ?? initialKeys;
+  const onChange = project?.onChange;
+  useEffect(() => {
+    // Bring existing local choices into the project once. An explicit [] must
+    // never be replaced by an older cache after restoring warnings.
+    if (project?.data && persistedKeys === null && initialKeys.length > 0) onChange?.(initialKeys);
+  }, [project?.data, persistedKeys, initialKeys, onChange]);
+  const keysRef = useRef(keys);
+  keysRef.current = keys;
   const dismissed = new Set(keys);
   const visibleProblems = problems.filter(problem => problem.severity === "error" || !dismissed.has(warningKey(problem)));
 
   function updateKeys(nextKeys: string[]): void {
+    keysRef.current = nextKeys;
+    if (project) {
+      project.onChange(nextKeys);
+      return;
+    }
     setOverrides(previous => ({ ...previous, [stateKey]: nextKeys }));
     if (!storageKey) return;
     try {
@@ -39,11 +49,11 @@ export function useProjectProblemDismissals(problems: ProjectProblem[], projectP
 
   function ignoreWarning(problem: ProjectProblem): void {
     if (problem.severity !== "warning") return;
-    updateKeys([...new Set([...keys, warningKey(problem)])]);
+    updateKeys([...new Set([...keysRef.current, warningKey(problem)])]);
   }
 
   function ignoreAllWarnings(): void {
-    updateKeys([...new Set([...keys, ...problems.filter(problem => problem.severity === "warning").map(warningKey)])]);
+    updateKeys([...new Set([...keysRef.current, ...problems.filter(problem => problem.severity === "warning").map(warningKey)])]);
   }
 
   return {

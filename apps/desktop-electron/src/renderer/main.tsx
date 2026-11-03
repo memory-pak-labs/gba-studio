@@ -326,6 +326,7 @@ import {
 import { StudioLanguageSwitcher, projectActionLabelKey, useStudioI18n, workspaceLabelKey } from "./i18n";
 import { deriveProjectProblems, type ProjectProblem } from "../shared/projectProblems";
 import { useProjectProblemDismissals } from "./useProjectProblemDismissals";
+import { updateProjectWarningDismissals } from "../shared/projectWarningDismissals";
 import { deriveProjectHealthReport } from "../shared/projectHealth";
 import { clampSceneMapZoom } from "../shared/sceneMapLayout";
 import { readSceneMapViewZoom, writeSceneMapViewZoom } from "./sceneMapViewPreferences";
@@ -637,7 +638,7 @@ function App(): React.ReactElement {
     const sceneType = (activeScene as Record<string, unknown>).sceneType;
     return typeof sceneType === "string" ? sceneType : null;
   }, [projectData, roomsPresentation]);
-  const problemInput = useMemo(() => ({ data: projectData, path: presentationSession?.path }), [projectData, presentationSession?.path]);
+  const problemInput = useMemo(() => ({ data: projectData, path: presentationSession?.path, identity: presentationSession?.identity }), [projectData, presentationSession?.path, presentationSession?.identity]);
   const deferredProblemInput = useDeferredValue(problemInput);
   const deferredProblemData = deferredProblemInput.data;
   const allProjectProblems = useMemo(
@@ -645,7 +646,12 @@ function App(): React.ReactElement {
     [deferredProblemData]
   );
   const { visibleProblems: projectProblems, ignoredCount, ignoreWarning, ignoreAllWarnings, restoreWarnings } =
-    useProjectProblemDismissals(allProjectProblems, deferredProblemInput.path);
+    useProjectProblemDismissals(session?.path === deferredProblemInput.path && session?.identity === deferredProblemInput.identity ? allProjectProblems : [], session?.path, {
+      data: session?.project.data,
+      onChange(keys) {
+        if (session && session.path === deferredProblemInput.path && session.identity === deferredProblemInput.identity) updateProjectData(updateProjectWarningDismissals(session.project.data, keys));
+      }
+    });
   const projectHealthExportReady = useMemo(
     () => deferredProblemData ? deriveProjectHealthReport(deferredProblemData).exportReady : null,
     [deferredProblemData]
