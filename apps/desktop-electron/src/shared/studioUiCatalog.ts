@@ -1,5 +1,18 @@
 /** Application copy only. Tuple order: pt-BR, en-US, es-ES. Keep project data out of this catalog. */
 export const studioUiMessages: Record<string, readonly [string, string, string]> = {
+  "Vídeo compilado da cena {0}": ["Vídeo compilado da cena {0}", "Compiled video for scene {0}", "Vídeo compilado de la escena {0}"],
+  "Vídeo compilado": ["Vídeo compilado", "Compiled video", "Vídeo compilado"],
+  "Faça a análise para carregar as reservas de vídeo desta cena.": ["Faça a análise para carregar as reservas de vídeo desta cena.", "Run the analysis to load this scene's video reservations.", "Ejecuta el análisis para cargar las reservas de vídeo de esta escena."],
+  "Modo de vídeo {0}": ["Modo de vídeo {0}", "Video mode {0}", "Modo de vídeo {0}"],
+  "Reservas e alocações; cobertura parcial.": ["Reservas e alocações; cobertura parcial.", "Reservations and allocations; partial coverage.", "Reservas y asignaciones; cobertura parcial."],
+  "Reserva BG": ["Reserva BG", "BG reservation", "Reserva BG"],
+  "Screenblocks": ["Screenblocks", "Screenblocks", "Bloques de mapa"],
+  "Reserva nativa": ["Reserva nativa", "Native reservation", "Reserva nativa"],
+  "Assets compilados": ["Assets compilados", "Compiled assets", "Assets compilados"],
+  "ROM total medida": ["ROM total medida", "Measured total ROM", "ROM total medida"],
+  "Gere a ROM para medir o arquivo final.": ["Gere a ROM para medir o arquivo final.", "Build the ROM to measure the final file.", "Genera la ROM para medir el archivo final."],
+  "ROM por cena e uso dinâmico de OBJ/OAM ainda pendentes.": ["ROM por cena e uso dinâmico de OBJ/OAM ainda pendentes.", "Per-scene ROM and dynamic OBJ/OAM usage are still pending.", "La ROM por escena y el uso dinámico de OBJ/OAM siguen pendientes."],
+  "Análise parcial": ["Análise parcial", "Partial analysis", "Análisis parcial"],
   "Ajuda": ["Ajuda", "Help", "Ayuda"],
   "Verificar atualizações...": ["Verificar atualizações...", "Check for updates...", "Buscar actualizaciones..."],
   "A pasta de destino já contém arquivos. Escolha um novo nome ou uma pasta vazia.": ["A pasta de destino já contém arquivos. Escolha um novo nome ou uma pasta vazia.", "The destination folder already contains files. Choose a new name or an empty folder.", "La carpeta de destino ya contiene archivos. Elige un nombre nuevo o una carpeta vacía."],

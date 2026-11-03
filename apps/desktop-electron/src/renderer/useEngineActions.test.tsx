@@ -6,8 +6,9 @@ import { createBlankProjectData } from "../shared/newProject";
 import { summarizeGBAProject } from "../shared/projectFile";
 import { createInputReplay } from "../shared/inputReplay";
 import type { EnginePackStatus, GBAStudioDesktopAPI } from "../shared/ipc";
-import type { ProjectSession } from "./projectSession";
+import { selectProjectSessionRoom, type ProjectSession } from "./projectSession";
 import { useEngineActions } from "./useEngineActions";
+import { buildAssetPackVideoBudget } from "../shared/assetPackVideoBudget.js";
 
 const inspectEnginePack = vi.fn<(preferredPath?: string) => Promise<EnginePackStatus>>();
 
@@ -25,6 +26,100 @@ function projectSession(enginePackPath: string): ProjectSession {
 }
 
 describe("useEngineActions", () => {
+  it.each(["analysis", "build"])("accepts a late %s budget after navigation to another unchanged scene", async operation => {
+    const session = projectSession("/packs/EnginePack");
+    const scenes = [{ id: "a", name: "A" }, { id: "b", name: "B" }];
+    session.project.data.scenas = scenes;
+    session.project.data.scena = scenes[0];
+    let finish!: (value: unknown) => void;
+    const request = vi.fn().mockReturnValue(new Promise(resolve => { finish = resolve; }));
+    if (operation === "analysis") window.gbaStudio.analyzeProjectBudget = request;
+    else window.gbaStudio.runEnginePackBuild = request;
+    const { result, rerender } = renderHook(({ session }) => useEngineActions({ contractDiagnosticsOK: true, session, setStatus: vi.fn() }), { initialProps: { session } });
+    let pending!: Promise<void>;
+    act(() => { pending = operation === "analysis" ? result.current.analyzeProjectBudget() : result.current.runBuildRom("/tmp/export"); });
+    rerender({ session: selectProjectSessionRoom(session, "b") });
+    const videoBudget = buildAssetPackVideoBudget([], { schema: 11, ok: true, allocations: [] });
+    videoBudget.linkedRomBytes = 12345;
+    await act(async () => { finish(operation === "analysis" ? { ok: true, videoBudget }
+      : { ran: true, exitCode: 0, summary: { romPath: "/tmp/export/build/test.gba", videoBudget } }); await pending; });
+    expect(result.current.projectBudgetAnalysis?.videoBudget?.linkedRomBytes).toBe(12345);
+    rerender({ session });
+    expect(result.current.projectBudgetAnalysis?.videoBudget?.linkedRomBytes).toBe(12345);
+    expect(request).toHaveBeenCalledTimes(1);
+  });
+
+  it("invalidates measured budgets when the current project's external assets change", async () => {
+    let changed!: Parameters<GBAStudioDesktopAPI["onExternalAssetChange"]>[0];
+    window.gbaStudio.onExternalAssetChange = listener => { changed = listener; return vi.fn(); };
+    window.gbaStudio.analyzeProjectBudget = vi.fn().mockResolvedValue({ ok: true, report: { schema: 11 } });
+    const session = projectSession("/packs/EnginePack");
+    const { result } = renderHook(() => useEngineActions({ contractDiagnosticsOK: true, session, setStatus: vi.fn() }));
+    await act(() => result.current.analyzeProjectBudget());
+    act(() => changed({ projectPath: "/other.gba-project", relativePaths: ["tile.png"] }));
+    expect(result.current.projectBudgetAnalysis?.ok).toBe(true);
+    act(() => changed({ projectPath: session.path!, relativePaths: ["tile.png"] }));
+    expect(result.current.projectBudgetAnalysis).toBeNull();
+  });
+
+  it.each(["edit", "switch"])("discards a late budget result after a project %s", async change => {
+    let finish!: (result: { ok: boolean; report: { schema: number } }) => void;
+    window.gbaStudio.analyzeProjectBudget = vi.fn().mockReturnValue(new Promise(resolve => { finish = resolve; }));
+    const session = projectSession("/packs/EnginePack");
+    const publishStatus = vi.fn();
+    const { result, rerender } = renderHook(({ session }) => useEngineActions({ contractDiagnosticsOK: true,
+      session, setStatus: vi.fn(), publishStatus }), { initialProps: { session } });
+    let pending!: Promise<void>;
+    act(() => { pending = result.current.analyzeProjectBudget(); });
+    rerender({ session: change === "switch" ? { ...session, path: "/tmp/another.gba-project" }
+      : { ...session, project: { ...session.project, data: { ...session.project.data, name: "Edited" } } } });
+    await act(async () => { finish({ ok: true, report: { schema: 11 } }); await pending; });
+    expect(result.current.projectBudgetAnalysis).toBeNull();
+    expect(result.current.projectBudgetAnalysisRunning).toBe(false);
+    expect(publishStatus).not.toHaveBeenCalledWith("Orçamento GBA atualizado pelo compilador.", "success");
+  });
+
+  it("keeps the latest budget when overlapping analyses finish out of order", async () => {
+    const finishes: Array<(value: { ok: boolean; generatedAt: string; report: { schema: number } }) => void> = [];
+    window.gbaStudio.analyzeProjectBudget = vi.fn().mockImplementation(() => new Promise(resolve => { finishes.push(resolve); }));
+    const session = projectSession("/packs/EnginePack");
+    const { result } = renderHook(() => useEngineActions({ contractDiagnosticsOK: true, session, setStatus: vi.fn() }));
+    let older!: Promise<void>, newer!: Promise<void>;
+    act(() => { older = result.current.analyzeProjectBudget(); newer = result.current.analyzeProjectBudget(); });
+    await act(async () => { finishes[1]!({ ok: true, generatedAt: "new", report: { schema: 11 } }); await newer; });
+    await act(async () => { finishes[0]!({ ok: true, generatedAt: "old", report: { schema: 11 } }); await older; });
+    expect(result.current.projectBudgetAnalysis?.generatedAt).toBe("new");
+  });
+
+  it.each(["saved", "unsaved"])("publishes the measured ROM budget after building the current %s project", async saved => {
+    const session = projectSession("/packs/EnginePack");
+    if (saved === "unsaved") session.path = undefined;
+    const videoBudget = buildAssetPackVideoBudget([], { schema: 11, ok: true, allocations: [] });
+    videoBudget.linkedRomBytes = 12345;
+    window.gbaStudio.runEnginePackBuild = vi.fn().mockResolvedValue({ ran: true, exitCode: 0,
+      summary: { projectDir: "/tmp/export", buildDir: "/tmp/export/build", target: "test", romPath: "/tmp/export/build/test.gba", videoBudget } });
+    const { result } = renderHook(() => useEngineActions({ contractDiagnosticsOK: true, session, setStatus: vi.fn() }));
+    await act(() => result.current.runBuildRom("/tmp/export"));
+    expect(result.current.projectBudgetAnalysis?.videoBudget?.linkedRomBytes).toBe(12345);
+  });
+
+  it.each(["edit", "switch", "assets"])("does not publish a late ROM budget after a project %s", async change => {
+    const session = projectSession("/packs/EnginePack");
+    let assetChanged!: Parameters<GBAStudioDesktopAPI["onExternalAssetChange"]>[0];
+    window.gbaStudio.onExternalAssetChange = listener => { assetChanged = listener; return vi.fn(); };
+    let finish!: (result: unknown) => void;
+    window.gbaStudio.runEnginePackBuild = vi.fn().mockReturnValue(new Promise(resolve => { finish = resolve; }));
+    const { result, rerender } = renderHook(({ session }) => useEngineActions({ contractDiagnosticsOK: true, session, setStatus: vi.fn() }), { initialProps: { session } });
+    let pending!: Promise<void>;
+    act(() => { pending = result.current.runBuildRom("/tmp/export"); });
+    if (change === "assets") act(() => assetChanged({ projectPath: session.path!, relativePaths: ["tile.png"] }));
+    else rerender({ session: change === "switch" ? { ...session, path: "/tmp/other.gba-project" }
+      : { ...session, project: { ...session.project, data: { ...session.project.data, name: "edited" } } } });
+    const videoBudget = buildAssetPackVideoBudget([], { schema: 11, ok: true, allocations: [] });
+    videoBudget.linkedRomBytes = 12345;
+    await act(async () => { finish({ ran: true, exitCode: 0, summary: { romPath: "/tmp/export/build/test.gba", videoBudget } }); await pending; });
+    expect(result.current.projectBudgetAnalysis).toBeNull();
+  });
   it.each([
     ["Engine Pack", "exportEngineProject", "Exportando projeto Engine Pack..."],
     ["Web", "exportWebProject", "Exportando pacote Web / itch.io..."]

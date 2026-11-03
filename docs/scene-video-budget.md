@@ -105,10 +105,22 @@ pendente, sem aplicar recomendações de pressão sobre um modo presumido.
 O bloqueio de pools que já existia no assetc continua ativo. Esta etapa acrescenta
 um contrato comum testado; não substitui o planejamento residente dos runtimes.
 
-As próximas etapas são emitir o planejamento físico no compilador e apresentar
-os campos no Editor. O painel atual não
-foi redesenhado. A conversão de assets aprovados para 4bpp, a ampliação da matriz
-CI e novos testes visuais de ROM não fazem parte deste commit.
+## Leitura no Editor
+
+No inspetor da cena, abra **Mais → Orçamento → Analisar orçamento agora**.
+A seção **Vídeo compilado** mostra o modo nativo, as reservas de BG e mapas,
+as alocações de OBJ, paletas e OAM e a cobertura parcial. Dados ausentes ficam
+pendentes. Os cartões distinguem **Reserva nativa** de **Assets compilados**.
+
+Após **Gerar ROM**, a mesma seção apresenta o tamanho total medido do arquivo
+final. O resultado só é associado à versão do projeto que iniciou a operação;
+trocar de projeto, editar dados ou alterar assets invalida resultados atrasados.
+Navegar entre cenas preserva o relatório, pois não altera o conteúdo compilado.
+O tamanho total não é apresentado como tamanho individual de cada cena.
+
+As próximas etapas são completar as reservas dinâmicas de OBJ/OAM, atribuir
+o payload ROM por cena e ampliar a cobertura dos caminhos avançados. A conversão
+de assets aprovados para 4bpp e a ampliação da matriz CI permanecem fora desta etapa.
 
 ## Validação focada
 

@@ -3448,6 +3448,7 @@ function App(): React.ReactElement {
               budgetAnalysisGeneratedAt={projectBudgetAnalysis?.generatedAt ?? null}
               budgetAnalysisRunning={projectBudgetAnalysisRunning}
               budgetReport={projectBudgetAnalysis?.report ?? null}
+              videoBudget={projectBudgetAnalysis?.videoBudget ?? null}
               commandSuggestions={eventsPresentation?.commandPalette ?? []}
               hardwareProfiler={hardwareProfiler}
               projectData={projectData}
