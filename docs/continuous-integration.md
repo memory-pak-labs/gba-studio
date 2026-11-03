@@ -34,8 +34,12 @@ A medição de abertura roda separada dos demais testes e antes do build, sem
 outra carga pesada no mesmo job. O build já inclui typecheck. Não existe lint
 dedicado do aplicativo.
 
-No Linux, o último comando usa `xvfb-run -a`. O fluxo abre uma instância isolada,
-confere o primeiro uso em inglês, muda para português, cria/salva o exemplo e
+No Linux, o último comando usa `xvfb-run -a`. Antes do teste, o runner prepara
+o helper `chrome-sandbox` da cópia de Electron baixada como
+`root:root`, modo `4755`, conforme exigido pelo Chromium. Isso fica restrito ao
+checkout descartável do CI e não desliga o sandbox.
+O fluxo abre uma instância isolada, confere o primeiro uso em inglês, muda para
+português, cria/salva o exemplo e
 confere a leitura do projeto salvo pela ponte do aplicativo. Não é um teste
 dos diálogos nativos de arquivo ou da instalação final. A instância e seu
 perfil temporário são encerrados ao terminar.

@@ -56,6 +56,11 @@ jobs:
       - run: npm ci
       - name: Install the pinned Electron binary
         run: node node_modules/electron/install.js
+      - name: Configure Linux Electron sandbox
+        if: runner.os == 'Linux'
+        run: |
+          sudo chown root:root node_modules/electron/dist/chrome-sandbox
+          sudo chmod 4755 node_modules/electron/dist/chrome-sandbox
       - run: npm run test:all -- --exclude src/shared/projectOpenPerf.test.ts --reporter=default --reporter=json --outputFile=artifacts/ci-tests/results.json
       # Measure the existing performance budget without competing test workers.
       - run: npm run test:perf:project-open

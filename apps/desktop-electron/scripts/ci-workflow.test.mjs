@@ -15,6 +15,11 @@ describe('CI platform coverage and evidence', () => {
     const runs = steps(job).filter(s => s.run).map(s => s.run);
     expect(runs.indexOf('node node_modules/electron/install.js')).toBeGreaterThan(runs.indexOf('npm ci'));
     expect(runs.indexOf('node node_modules/electron/install.js')).toBeLessThan(runs.findIndex(s => s.includes('smoke-electron-welcome.mjs')));
+    const sandbox = steps(job).find(s => s.name === 'Configure Linux Electron sandbox');
+    expect(sandbox?.if).toBe("runner.os == 'Linux'");
+    expect(sandbox?.run).toContain('sudo chown root:root node_modules/electron/dist/chrome-sandbox');
+    expect(sandbox?.run).toContain('sudo chmod 4755 node_modules/electron/dist/chrome-sandbox');
+    expect(commands(job)).not.toContain('--no-sandbox');
     expect(runs.findIndex(s => s.includes('npm run build'))).toBeLessThan(runs.findIndex(s => s.includes('smoke-electron-welcome.mjs')));
     expect(commands(job)).toContain('xvfb-run -a node scripts/smoke-electron-welcome.mjs');
     expect(steps(job).some(s => s.if === "runner.os != 'Linux'" && s.run?.includes('node scripts/smoke-electron-welcome.mjs'))).toBe(true);
