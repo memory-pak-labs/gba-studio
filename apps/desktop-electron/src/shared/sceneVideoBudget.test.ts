@@ -12,6 +12,12 @@ function scene(overrides: Partial<CompiledSceneVideoPlan> = {}): CompiledSceneVi
 }
 
 describe("compiled scene video budget", () => {
+  it("uses occupied bytes for pressure while validating the end address separately", () => {
+    const result = analyzeSceneVideoBudget(scene({ resources: { bgVram: [{ start: 63488, count: 2048 }], screenblocks: [{ start: 31, count: 1 }] } }));
+    expect(result.metrics.find(m => m.resource === "bgVram")).toMatchObject({ used: 2048, addressEnd: 65536, status: "ok" });
+    expect(result.metrics.find(m => m.resource === "screenblocks")).toMatchObject({ used: 1, addressEnd: 32, status: "ok" });
+    expect(result.blocked).toBe(false);
+  });
   it("accepts exact hardware limits and reports recommendation separately from blocking", () => {
     const result = analyzeSceneVideoBudget(scene({ resources: {
       bgVram: [{ start: 0, count: 65536 }], objVram: [{ start: 0, count: 32768 }],

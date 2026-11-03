@@ -1022,6 +1022,7 @@ assetc-test:
 	$(HOST_CXX) $(HOST_CXXFLAGS) -I$(HOST_BUILD)/assetc $(HOST_BUILD)/assetc/audio_wav_compile.cpp -o $(HOST_BUILD)/assetc/audio_wav_compile
 	$(HOST_BUILD)/assetc/audio_wav_compile
 	python3 tests/host/assetc_production_contract_tests.py
+	python3 tests/host/assetc_scene_video_layout_tests.py
 	python3 tests/host/assetc_audio_quality_tests.py
 	python3 tests/host/assetc_sprite_dedup_tests.py
 	python3 tests/host/assetc_obj_palette_tests.py

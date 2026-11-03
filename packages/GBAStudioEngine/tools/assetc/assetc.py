@@ -19842,6 +19842,175 @@ def emit_advanced_tools_data_header(advanced_tools):
 
 @background_cache_scope()
 @obj_lookup_cache_scope()
+def compiled_scene_video_layouts(project_data, asset_report):
+    """Reservation envelopes of the stock native renderers, in byte addresses.
+
+    This models declared scene states, not per-frame telemetry. In particular,
+    paging reserves the viewport cache, never the entire source atlas in ROM.
+    Unmodelled paths deliberately omit resources rather than approving zero.
+    Keep renderer constants covered by assetc_scene_video_layout_tests.py.
+    """
+    scenes = project_data.get("scene_contracts")
+    if not isinstance(scenes, list):
+        return None
+    allocations = asset_report.get("allocations", [])
+    plans = []
+    collections = {"menu": "screens", "cutscene": "scenes", "visual_novel": "scenes",
+                   "point_click": "scenes", "battle_rpg": "encounters", "luta": "stages", "shmup": "waves"}
+    fixed_mode = {"menu", "cutscene", "visual_novel", "point_click", "battle_rpg", "luta", "world_map"}
+    screen_bases = {0: 24, 1: 28, 2: 20, 3: 16}
+
+    def regular_blocks(width, height):
+        if not 0 < width <= 64 or not 0 < height <= 64:
+            return None
+        return (2 if width > 32 else 1) * (2 if height > 32 else 1)
+
+    for scene in scenes:
+        if not isinstance(scene, dict) or not isinstance(scene.get("name"), str):
+            continue
+        runtime = RUNTIME_PROFILE_ALIASES.get(scene.get("runtime_profile"), scene.get("runtime_profile"))
+        block = project_data.get(str(runtime) + "_project", {})
+        name = scene["name"]
+        normalized = re.sub(r"[\u0300-\u036f]", "", unicodedata.normalize("NFD", name.lower()))
+        group = "scene_" + (re.sub(r"[^a-z0-9]+", "_", normalized).strip("_") or "room")
+        rows = [block] if runtime == "world_map" else block.get(collections.get(runtime, "rooms"), [])
+        row = next((r for r in rows if r.get("resource_bank_group") == group or r.get("name", r.get("scene_name")) == name), None)
+        notes = []
+        plan = {"scene": name, "bank_group": group, "bank_groups": [group], "runtime": runtime,
+                "display_mode": None, "scope": "reservation_envelope", "resources": {}, "notes": notes}
+        plans.append(plan)
+        if row is None:
+            notes.append("native_scene_not_resolved")
+            continue
+        group = row.get("resource_bank_group", group)
+        plan["bank_group"] = group
+        groups = {group}
+        if runtime == "cutscene":
+            groups.update(step["resource_bank_group"] for step in row.get("steps", []) if step.get("resource_bank_group"))
+        plan["bank_groups"] = sorted(groups)
+        selected = [a for a in allocations if not a.get("omitted") and
+                    (groups.intersection(a.get("bank_groups", [a.get("bank_group", "global")])) or
+                     "global" in a.get("bank_groups", [a.get("bank_group", "global")]))]
+        all_by_name = {a.get("name", a.get("id")): a for a in allocations if not a.get("omitted")}
+        video = row.get("video", {})
+        if runtime in ("topdown", "isometric") and not video.get("affine"):
+            video = block.get("video", {})
+        if runtime == "shmup":
+            composition = block.get("composition", {})
+            video = composition.get("video", {}) if composition.get("enabled") else {}
+            overrides = [bg.get("video", {}) for bg in block.get("backgrounds", []) if bg.get("video", {}).get("affine")]
+            if overrides:
+                notes.append("changing_background_video_not_modelled")
+                continue
+        mode = 0 if runtime in fixed_mode else video.get("display_mode", 0)
+        visual = None
+        pseudo = runtime == "racing" and row.get("config", {}).get("presentation") == "pseudo3d"
+        if pseudo:
+            index = row.get("pseudo3d_visual", -1)
+            visuals = block.get("pseudo3d_visuals", [])
+            visual = visuals[index] if isinstance(index, int) and 0 <= index < len(visuals) else None
+            if visual is not None or row.get("background", -1) < 0:
+                mode = 1
+            else:
+                pseudo = False
+        plan["display_mode"] = mode
+        if mode != 0 and not pseudo:
+            notes.append("advanced_video_layout_not_modelled")
+            continue
+        if runtime == "isometric" and not row.get("paged_surface"):
+            notes.append("isometric_surface_not_modelled")
+            continue
+
+        bg = []
+        maps = {24: 1, 28: 1}  # BG0 UI and the native bootstrap BG1 map.
+        ui_base = 0
+        for asset in selected:
+            placement = asset.get("allocations", {}).get("bg_tiles")
+            if placement:
+                bg.append({"start": placement["start"] * 32, "count": placement["count"] * 32})
+        def reserve_map(layer, width=32, height=32, base=None):
+            count = regular_blocks(width, height)
+            if count is None:
+                notes.append("native_map_dimensions_not_modelled")
+                return
+            start = screen_bases[layer] if base is None else base
+            maps[start] = max(maps.get(start, 0), count)
+
+        backgrounds = block.get("backgrounds", [])
+        if runtime == "topdown":
+            if row.get("paged_source_tiles"):
+                bg.append({"start": 0, "count": 31 * 21 * 64})
+                ui_base = 1
+                reserve_map(2, base=27)
+            else:
+                asset = all_by_name.get(row.get("visual_tilemap"), {})
+                size = asset.get("resources", {})
+                reserve_map(2, size.get("tilemap_width", 32), size.get("tilemap_height", 32))
+            for layer in row.get("background_layers", []):
+                reserve_map(int(str(layer.get("layer", "bg3"))[-1]))
+        elif runtime == "platformer":
+            reserve_map(2)  # draw_room_to_bg_cached streams a 32x32 map.
+            for layer in row.get("background_layers", []):
+                reserve_map(int(str(layer.get("layer", "bg3"))[-1]))
+        elif runtime == "isometric":
+            surface = row["paged_surface"]
+            front = all_by_name.get(surface.get("foreground"))
+            if surface.get("foreground") and front is None:
+                notes.append("paged_foreground_not_resolved")
+            else:
+                front_bytes = front.get("resources", {}).get("resident_foreground_bytes", 0) if front else 64
+                bg.append({"start": 0, "count": 31 * 21 * 64 + front_bytes})
+            ui_base = 2
+            reserve_map(2, base=26)
+            reserve_map(3, base=27)
+        elif pseudo:
+            if visual is None:
+                notes.append("builtin_perspective_visual_not_modelled")
+            else:
+                floor = all_by_name.get(visual.get("floor"), {}).get("resources", {})
+                source_map_bytes = floor.get("tilemap_width", 0) * floor.get("tilemap_height", 0)
+                map_bytes = row.get("width_tiles", 0) * row.get("height_tiles", 0) if "floor_tilemap" in row else source_map_bytes
+                maps[0] = max(1, (map_bytes + 2047) // 2048)
+                bg.append({"start": 32768, "count": 16384})  # Dedicated affine CBB2, including cleared-floor tile.
+                panorama = all_by_name.get(visual.get("panorama"), {}).get("resources", {})
+                if panorama:
+                    start = (source_map_bytes + 63) // 64 * 64
+                    if map_bytes > start:
+                        notes.append("affine_panorama_layout_overlap")
+                    bg.append({"start": start, "count": panorama.get("isometric_source_bytes", 0)})
+                    reserve_map(1, panorama.get("tilemap_width", 32), panorama.get("tilemap_height", 32))
+                ui_base = 2
+        elif runtime == "shmup":
+            for background in backgrounds:
+                for layer in background.get("layers", []):
+                    reserve_map(int(str(layer.get("layer", "bg2"))[-1]))
+        else:
+            candidates = backgrounds if runtime in ("cutscene", "menu", "visual_novel") else [backgrounds[row.get("background", 0)]] if backgrounds else []
+            for background in candidates:
+                asset = all_by_name.get(background.get("tilemap"), {})
+                # Other scenes' backgrounds do not belong to this bank group.
+                if asset and asset not in selected:
+                    continue
+                layer = int(str(background.get("layer", "bg2"))[-1])
+                if runtime == "world_map" and background.get("source_tiles"):
+                    ui_base = 1
+                    bg.append({"start": 0, "count": 31 * 21 * 64})
+                    reserve_map(layer, base=27)
+                else:
+                    size = asset.get("resources", {})
+                    reserve_map(layer, size.get("tilemap_width", 32), size.get("tilemap_height", 32))
+            if runtime == "dungeon_crawler":
+                bg.extend([{"start": 0, "count": 512 * 32}, {"start": 800 * 32, "count": 4 * 32}])
+                reserve_map(2)
+        if notes:
+            continue
+        bg.append({"start": (ui_base * 512 + 896) * 32, "count": 128 * 32})
+        screenblocks = [{"start": start, "count": count} for start, count in sorted(maps.items())]
+        bg.extend({"start": item["start"] * 2048, "count": item["count"] * 2048} for item in screenblocks)
+        plan["resources"] = {"bgVram": bg, "screenblocks": screenblocks}
+    return {"schema": 1, "plans": plans}
+
+
 def emit_export_project(project_data, base_dir, output_dir):
     if not isinstance(project_data, dict):
         raise SystemExit("export project json precisa ser objeto")
@@ -19890,6 +20059,9 @@ def emit_export_project(project_data, base_dir, output_dir):
     asset_report = None
     if asset_pack is not None:
         asset_report = emit_pack_report(asset_pack, base_dir, previous_asset_report)
+        layouts = compiled_scene_video_layouts(project_data, asset_report) if asset_report["ok"] else None
+        if layouts is not None:
+            asset_report["scene_video_layouts"] = layouts
         write_text_if_changed(output_dir / "asset_pack_report.json",
             json.dumps(asset_report, indent=2, sort_keys=True) + "\n",
             encoding="utf-8",

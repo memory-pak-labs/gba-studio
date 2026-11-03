@@ -31,6 +31,9 @@ conhecidos recebem `ok`, `attention` (80%), `not_recommended` (95%) ou `blocked`
 (acima do limite). Recursos sem dados suficientes recebem `unknown`.
 Chegar exatamente ao limite é permitido, com recomendação de reduzir pressão.
 Os diagnósticos estruturados identificam cena, recurso, consumo, limite e excesso.
+Os avisos de pressão usam o total ocupado; o fim do endereço é verificado
+separadamente para bloquear um intervalo fora da região. Colocar um mapa no
+último screenblock não significa que todos os blocos anteriores estejam ocupados.
 
 ## Integração com o compilador atual
 
@@ -59,17 +62,38 @@ Esses campos são globais: o tamanho vinculado não é distribuído entre cenas
 que podem compartilhar assets. O hash vem do arquivo materializado, incluindo
 quando o build usa um diretório temporário por causa de espaços no caminho.
 
-### Cobertura desta etapa
+### Plano dos runtimes nativos
 
-O assetc atual não fornece o modo **efetivo** de todos os runtimes, a colocação
-residente de todos os mapas/screenblocks, nem a atribuição do payload ROM por cena.
-O modo solicitado na composição do Editor pode diferir do modo nativo.
-Por isso, o adaptador marca:
+O assetc emite `scene_video_layouts` junto ao relatório de alocações. O plano
+resolve o modo efetivo do renderer e as reservas de BG e screenblocks nos
+caminhos descritos. Ele distingue o modo 1 da corrida com perspectiva, o modo 0
+dos runtimes comuns, o cache de viewport dos mapas paginados e as reservas
+de interface, mapa e piso afim. As fases de uma cutscene podem compartilhar
+os mesmos endereços; o envelope de reservas une esses endereços uma vez.
 
-- VRAM BG, screenblocks e payload ROM por cena como pendentes;
+`nativeLayout.scope` é `reservation_envelope`. As métricas de BG recebem
+`basis: native_reservation`; os demais recursos continuam identificados como
+alocações de assets (`compiled_allocation`). Isso não é telemetria por frame
+nem contagem de todo o atlas ROM como VRAM. A reserva fixa da interface e,
+quando aplicável, do bloco afim ou do cache de visão do dungeon também conta.
+Reservas adicionais de OBJ/OAM criadas dinamicamente pela interface ainda não
+são adicionadas às métricas de assets; o relatório mantém cobertura parcial.
+
+### Cobertura restante
+
+O modo solicitado na composição do Editor pode diferir do modo nativo. O plano
+é emitido pelo compilador que conhece o caminho de renderização, em vez de o
+Editor presumir que sejam iguais. Caminhos avançados não modelados, como uma
+superfície isométrica sem paginação ou certas composições bitmap/afins, mantêm
+as reservas correspondentes pendentes e informam a razão em `nativeLayout.notes`.
+Nesses casos, o modo efetivo ainda pode ser conhecido, sem aprovar o layout.
+O adaptador marca:
+
+- VRAM BG/screenblocks pendentes quando falta plano nativo para aquele caminho;
+- payload ROM por cena pendente, sem atribuir cópias ou dados compartilhados;
 - ROM vinculada pendente durante a exportação de fontes e medida após o build;
-- bytes OBJ alocados como conhecidos, mas seu limite dependente do modo como
-  pendente;
+- bytes OBJ de assets conhecidos, com limite dependente do modo nativo quando
+  informado; slots bitmap são relativos à metade superior acessível da VRAM OBJ;
 - paletas e OAM como alocações verificáveis do grupo, sem equivaler a uma medição
   de execução de cada frame.
 

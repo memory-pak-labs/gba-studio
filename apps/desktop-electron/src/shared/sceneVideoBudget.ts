@@ -30,6 +30,7 @@ export interface SceneVideoBudgetMetric {
   /** Hardware ceiling across all modes; not a substitute for the effective mode's limit. */
   maximumCapacity: number;
   status: SceneVideoBudgetStatus;
+  basis?: "compiled_allocation" | "native_reservation";
 }
 export interface SceneVideoBudget {
   scene: string;
@@ -39,6 +40,7 @@ export interface SceneVideoBudget {
   metrics: SceneVideoBudgetMetric[];
   romAssetBytes: number | null;
   diagnostics: SceneVideoBudgetDiagnostic[];
+  nativeLayout?: { runtime: string; scope: "reservation_envelope"; notes: string[] };
 }
 
 const resources: SceneVideoResource[] = ["bgVram", "objVram", "screenblocks", "bgPalette", "objPalette", "oam", "romAssets"];
@@ -91,8 +93,8 @@ export function analyzeSceneVideoBudget(plan: CompiledSceneVideoPlan): SceneVide
       : occupied === null ? "unknown"
       : occupied > checkedCapacity ? "blocked"
       : capacity === null ? "unknown"
-      : occupied > 0 && occupied >= capacity * 0.95 ? "not_recommended"
-      : occupied > 0 && occupied >= capacity * 0.8 ? "attention" : "ok";
+      : usage!.used > 0 && usage!.used >= capacity * 0.95 ? "not_recommended"
+      : usage!.used > 0 && usage!.used >= capacity * 0.8 ? "attention" : "ok";
     if (status === "blocked" && occupied !== null) diagnostics.push({
       scene: plan.name, resource, code: "capacity_exceeded", status, used: occupied, capacity: checkedCapacity, excess: occupied - checkedCapacity
     });

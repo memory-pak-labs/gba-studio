@@ -8,6 +8,45 @@ function asset(id: string, bank_groups: string[], allocations: Record<string, { 
 const report = (allocations: unknown[]) => ({ schema: 11, ok: true, allocations });
 
 describe("asset pack video budget adapter", () => {
+  it("uses native renderer reservations and the effective mode emitted by assetc", () => {
+    const raw = { ...report([asset("floor", ["scene_alpha"], { obj_tiles: { start: 0, count: 128 } })]), scene_video_layouts: { schema: 1, plans: [{
+      scene: "alpha", bank_group: "scene_alpha", bank_groups: ["scene_alpha"], runtime: "racing", display_mode: 1,
+      scope: "reservation_envelope", notes: [], resources: { bgVram: [{ start: 32768, count: 16384 }], screenblocks: [{ start: 0, count: 2 }] }
+    }] } };
+    const result = buildAssetPackVideoBudget(scenes, raw);
+    expect(result.scenes[0].displayMode).toBe(1);
+    expect(result.scenes[0].metrics.find(m => m.resource === "bgVram")).toMatchObject({ used: 16384, capacity: 65536, status: "ok" });
+    expect(result.scenes[0].metrics.find(m => m.resource === "objVram")).toMatchObject({ capacity: 32768, used: 4096, status: "ok" });
+    expect(result.scenes[0].nativeLayout).toMatchObject({ runtime: "racing", scope: "reservation_envelope" });
+    expect(result.scenes[1].displayMode).toBeNull();
+  });
+
+  it("checks alternate timeline bank groups without summing reused addresses twice", () => {
+    const raw = { ...report([
+      asset("a", ["scene_alpha"], { oam_sprites: { start: 0, count: 5 } }),
+      asset("b", ["scene_alpha_step_1"], { oam_sprites: { start: 0, count: 10 } })
+    ]), scene_video_layouts: { schema: 1, plans: [{ scene: "alpha", bank_group: "scene_alpha", bank_groups: ["scene_alpha", "scene_alpha_step_1"], runtime: "cutscene",
+      display_mode: 0, scope: "reservation_envelope", resources: {}, notes: [] }] } };
+    expect(buildAssetPackVideoBudget(scenes, raw).scenes[0].metrics.find(m => m.resource === "oam")?.used).toBe(10);
+  });
+
+  it("rejects malformed or duplicated native layout evidence", () => {
+    for (const layouts of [{ schema: 0, plans: [] }, { schema: 1, plans: [null] }, { schema: 1, plans: [{ scene: "alpha", display_mode: 7 }] }]) {
+      expect(() => buildAssetPackVideoBudget(scenes, { ...report([]), scene_video_layouts: layouts })).toThrow(/layout/i);
+    }
+  });
+
+  it("interprets bitmap OBJ slots relative to the accessible upper half of OBJ VRAM", () => {
+    const slots = { obj_tiles: { start: 512, count: 512 } };
+    const raw = { ...report([asset("bitmap", ["scene_alpha"], slots)]),
+      scene_video_layouts: { schema: 1, plans: [{ scene: "alpha", bank_group: "scene_alpha", bank_groups: ["scene_alpha"], runtime: "platformer",
+        display_mode: 3, scope: "reservation_envelope", resources: {}, notes: ["advanced_video_layout_not_modelled"] }] } };
+    const metric = buildAssetPackVideoBudget(scenes, raw).scenes[0].metrics.find(m => m.resource === "objVram");
+    expect(metric).toMatchObject({ used: 16384, addressEnd: 16384, capacity: 16384, status: "not_recommended" });
+    slots.obj_tiles.start = 0;
+    expect(buildAssetPackVideoBudget(scenes, raw).scenes[0].blocked).toBe(true);
+  });
+
   it("keeps scenes separate, includes global and shared groups and excludes omitted assets", () => {
     const result = buildAssetPackVideoBudget(scenes, report([
       asset("global", ["global"], { oam_sprites: { start: 0, count: 1 } }),
