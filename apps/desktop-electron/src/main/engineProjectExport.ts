@@ -17,6 +17,8 @@ import {
 import { acquireBuildLock, copyTreeIfChanged, exportedFileHashes, writeFileIfChanged } from "./stableBuildFiles.js";
 import { touchDiskCacheEntry } from "./diskCacheRetention.js";
 import { resolveEngineToolInvocation as toolInvocation } from "./engineToolInvocation.js";
+import { writeSceneVideoBudgetReport } from "./sceneVideoBudgetExport.js";
+import type { AssetPackVideoBudgetReport } from "../shared/assetPackVideoBudget.js";
 
 const execFileAsync = promisify(execFile);
 // Cold exports of the complete showcase can exceed five minutes while assetc
@@ -34,6 +36,7 @@ export interface WriteEngineProjectExportResult {
   destination: string;
   files: string[];
   warnings?: string[];
+  videoBudget?: AssetPackVideoBudgetReport;
   cache?: {
     hit: boolean;
     fingerprint: string;
@@ -284,12 +287,16 @@ async function writeLockedEngineSchemaExport(options: WriteEngineSchemaExportOpt
     if (fingerprintOptions && await buildEngineCacheFingerprint(fingerprintOptions) !== fingerprint) {
       throw new Error("Assets ou Engine Pack mudaram durante a exportação. Execute Play novamente.");
     }
+    const videoBudget = options.prepared.contract.asset_pack
+      ? await writeSceneVideoBudgetReport(options.destination, options.prepared.contract.scene_contracts)
+      : undefined;
     if (options.projectPath && latestCache?.fingerprint !== fingerprint) {
       await writeLatestEngineBuildCache(options.projectPath, matchingCache);
     }
     return {
       destination: options.destination,
       files: await listExportedFiles(options.destination),
+      videoBudget,
       cache: {
         hit: true,
         fingerprint,
@@ -356,6 +363,9 @@ async function writeLockedEngineSchemaExport(options: WriteEngineSchemaExportOpt
   }
 
   const assetPackReportPath = safeDestinationPath(options.destination, "asset_pack_report.json");
+  const videoBudget = options.prepared.contract.asset_pack
+    ? await writeSceneVideoBudgetReport(options.destination, options.prepared.contract.scene_contracts)
+    : undefined;
   let rebuildPlan: unknown;
   try {
     const assetPackReport = JSON.parse(await readFile(assetPackReportPath, "utf8")) as {
@@ -403,6 +413,7 @@ async function writeLockedEngineSchemaExport(options: WriteEngineSchemaExportOpt
     destination: options.destination,
     files: await listExportedFiles(options.destination),
     warnings: parseAssetcWarnings(stderr),
+    videoBudget,
     ...(fingerprint
       ? {
           cache: {

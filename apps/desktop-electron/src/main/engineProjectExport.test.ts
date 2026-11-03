@@ -349,7 +349,7 @@ describe("Engine project export writer", () => {
       "writeFileSync(join(output, 'main.cpp'), 'int main() { return 0; }\\n');",
       "writeFileSync(join(output, 'gbastudio_project.json'), '{}\\n');",
       "writeFileSync(join(output, 'gbastudio_project_data.hpp'), '#pragma once\\n');",
-      "writeFileSync(join(output, 'asset_pack_report.json'), JSON.stringify({ rebuild_plan: { changed: ['player'], reused: ['tiles'] } }, null, 2));",
+      "writeFileSync(join(output, 'asset_pack_report.json'), JSON.stringify({ schema: 11, ok: true, allocations: [], rebuild_plan: { changed: ['player'], reused: ['tiles'] } }, null, 2));",
       ""
     ].join("\n"), "utf8");
     await writeFile(
@@ -445,7 +445,7 @@ describe("Engine project export writer", () => {
       "writeFileSync(join(output, 'gbastudio_project.json'), '{}\\n');",
       "writeFileSync(join(output, 'gbastudio_project_data.hpp'), '#pragma once\\n');",
       "writeFileSync(join(output, 'required.hpp'), '#pragma once\\n');",
-      "writeFileSync(join(output, 'asset_pack_report.json'), JSON.stringify({ rebuild_plan: { changed: ['player'], reused: ['tiles'] } }, null, 2));",
+      "writeFileSync(join(output, 'asset_pack_report.json'), JSON.stringify({ schema: 11, ok: true, allocations: [], rebuild_plan: { changed: ['player'], reused: ['tiles'] } }, null, 2));",
       ""
     ].join("\n"), "utf8");
     await writeFile(
