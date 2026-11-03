@@ -62,6 +62,24 @@ Esses campos são globais: o tamanho vinculado não é distribuído entre cenas
 que podem compartilhar assets. O hash vem do arquivo materializado, incluindo
 quando o build usa um diretório temporário por causa de espaços no caminho.
 
+### Assets de ROM atribuídos à cena
+
+Após o link, gbsbuild lê os objetos do ELF com readelf e associa símbolos dos
+assets aos grupos de cena e ao módulo nativo que os contém. Símbolos locais
+iguais em módulos diferentes são cópias distintas; objetos inline compartilhados
+não pertencem ao último módulo listado no ELF. Aliases e endereços compartilhados
+contam uma vez. Tamanhos decimais e hexadecimais do readelf são aceitos.
+
+O recibo inclui sceneRom, com bytes exclusivos/compartilhados por cena, união
+atribuída e restante da ROM. O aplicativo confere os hashes da ROM, ELF e
+asset_pack_report.json antes de anexar romAssetBytes/romAssets e
+romAssetsSummary. A soma de todas as cenas não é o tamanho do jogo.
+
+O escopo é linked_asset_symbols: somente objetos reconhecidos dos assets.
+Código, tabelas geradas, padding e cópias sem associação comprovada continuam
+no restante não atribuído; não são distribuídos arbitrariamente. A atribuição
+fica pendente antes do link e não transforma a cobertura física em completa.
+
 ### Plano dos runtimes nativos
 
 O assetc emite `scene_video_layouts` junto ao relatório de alocações. O plano
@@ -90,7 +108,7 @@ Nesses casos, o modo efetivo ainda pode ser conhecido, sem aprovar o layout.
 O adaptador marca:
 
 - VRAM BG/screenblocks pendentes quando falta plano nativo para aquele caminho;
-- payload ROM por cena pendente, sem atribuir cópias ou dados compartilhados;
+- assets ROM por cena pendentes antes do link e medidos por símbolos após o build;
 - ROM vinculada pendente durante a exportação de fontes e medida após o build;
 - bytes OBJ de assets conhecidos, com limite dependente do modo nativo quando
   informado; slots bitmap são relativos à metade superior acessível da VRAM OBJ;
@@ -118,8 +136,8 @@ trocar de projeto, editar dados ou alterar assets invalida resultados atrasados.
 Navegar entre cenas preserva o relatório, pois não altera o conteúdo compilado.
 O tamanho total não é apresentado como tamanho individual de cada cena.
 
-As próximas etapas são completar as reservas dinâmicas de OBJ/OAM, atribuir
-o payload ROM por cena e ampliar a cobertura dos caminhos avançados. A conversão
+As próximas etapas são completar as reservas dinâmicas de OBJ/OAM, ampliar
+a atribuição de tabelas geradas e a cobertura dos caminhos avançados. A conversão
 de assets aprovados para 4bpp e a ampliação da matriz CI permanecem fora desta etapa.
 
 ## Validação focada

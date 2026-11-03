@@ -23,6 +23,26 @@ async function fixture(oam: number) {
 const scenes = [{ name: "test" }];
 
 describe("scene video budget export", () => {
+  it.each(["valid", "rom", "assets", "elf"])("validates %s linked scene attribution against materialized inputs", async changed => {
+    const root = await fixture(5);
+    await writeFile(path.join(root, "export_project.json"), JSON.stringify({ asset_pack: {}, scene_contracts: scenes }));
+    const romPath = path.join(root, "test.gba");
+    await writeFile(romPath, "linked-ROM");
+    await writeFile(path.join(root, "test.elf"), "ELF");
+    const digest = (data: Uint8Array | string) => createHash("sha256").update(data).digest("hex");
+    const receipt = { schema: 1, romBytes: 10, romSha256: digest("linked-ROM"), sceneRom: {
+      schema: 1, source: "linked_asset_symbols", attributedBytes: 5, otherBytes: 5,
+      assetReportSha256: digest(await readFile(path.join(root, "asset_pack_report.json"))), elfSha256: digest("ELF"),
+      scenes: [{ scene: "test", bytes: 5, exclusiveBytes: 5, sharedBytes: 0, assetCount: 1 }] } };
+    if (changed === "rom") receipt.romSha256 = "stale";
+    if (changed === "assets") receipt.sceneRom.assetReportSha256 = "stale";
+    if (changed === "elf") receipt.sceneRom.elfSha256 = "stale";
+    await writeFile(path.join(root, "rom_build_report.json"), JSON.stringify(receipt));
+    const pending = finalizeSceneVideoBudgetReport({ projectDir: root, romPath });
+    if (changed === "valid") expect((await pending)?.scenes[0].romAssetBytes).toBe(5);
+    else await expect(pending).rejects.toThrow(/Recibo/);
+  });
+
   it("attaches measured linked ROM data without inventing per-scene attribution", async () => {
     const root = await fixture(5);
     await writeFile(path.join(root, "export_project.json"), JSON.stringify({ asset_pack: {}, scene_contracts: scenes }));

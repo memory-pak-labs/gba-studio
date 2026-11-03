@@ -180,6 +180,91 @@ def digest_file(file):
         return None
 
 
+def parse_linked_rom_objects(text, rom_bytes):
+    """readelf retains STT_FILE ownership even for duplicate local asset names."""
+    owner = None
+    objects = []
+    for line in text.splitlines():
+        match = re.match(r"^\s*\d+:\s+([0-9a-fA-F]+)\s+(0x[0-9a-fA-F]+|\d+)\s+(\w+)\s+(\w+)\s+\w+\s+\S+\s+(.*)$", line)
+        if not match:
+            continue
+        address, size, kind, binding, name = match.groups()
+        if kind == "FILE":
+            owner = name
+            continue
+        start, count = int(address, 16) - 0x08000000, int(size, 16 if size.startswith("0x") else 10)
+        if kind != "OBJECT" or count == 0 or start < 0 or start >= GBA_ROM_CAPACITY_BYTES:
+            continue
+        if start + count > rom_bytes:
+            raise ValueError("Objeto ELF fora da ROM materializada: " + name)
+        objects.append({"file": owner if binding == "LOCAL" else None, "name": name, "start": start, "count": count})
+    return objects
+
+
+def linked_scene_rom_usage(asset_report, objects, rom_bytes):
+    plans = asset_report["scene_video_layouts"]["plans"]
+    allocations = {a["id"]: a for a in asset_report["allocations"] if not a.get("omitted")}
+    headers = sorted((h for h in asset_report["export_plan"]["headers"] if not h.get("omitted") and h["id"] in allocations),
+                     key=lambda h: len(h["symbol"]), reverse=True)
+    spans = []
+    for obj in objects:
+        name = obj["name"].rsplit("::", 1)[-1]
+        asset = next((h for h in headers if name == h["symbol"] or name.startswith(h["symbol"] + "_")), None)
+        if asset is None:
+            continue
+        a = allocations[asset["id"]]
+        groups = a.get("bank_groups", [a.get("bank_group", "global")])
+        owners = {plan["scene"] for plan in plans if
+                  (obj["file"] in (None, "main.cpp", plan["runtime"] + "_runtime.cpp")) and
+                  ("global" in groups or set(groups).intersection(plan["bank_groups"]))}
+        if owners:
+            spans.append((obj["start"], obj["start"] + obj["count"], owners, asset["id"]))
+    # Sweep addresses: aliases, overlapping symbols and shared scenes count once.
+    events = {}
+    for start, end, owners, _ in spans:
+        for position, delta in ((start, 1), (end, -1)):
+            at = events.setdefault(position, {})
+            for owner in owners:
+                at[owner] = at.get(owner, 0) + delta
+    totals = {p["scene"]: {"scene": p["scene"], "bytes": 0, "exclusiveBytes": 0, "sharedBytes": 0,
+                           "assetCount": len({asset for _,_,owners,asset in spans if p["scene"] in owners})} for p in plans}
+    attributed, previous = 0, 0
+    active = {}
+    for position, changes in sorted(events.items()):
+        owners = [owner for owner, count in active.items() if count > 0]
+        if owners:
+            count = position - previous
+            attributed += count
+            for owner in owners:
+                totals[owner]["bytes"] += count
+                totals[owner]["sharedBytes" if len(owners) > 1 else "exclusiveBytes"] += count
+        for owner, delta in changes.items():
+            active[owner] = active.get(owner, 0) + delta
+        previous = position
+    return {"schema": 1, "source": "linked_asset_symbols", "attributedBytes": attributed,
+            "otherBytes": rom_bytes - attributed, "scenes": list(totals.values())}
+
+
+def measure_scene_rom(env, build, rom_bytes):
+    project = Path(env["PROJECT_DIR"])
+    report_file = project / "asset_pack_report.json"
+    if not report_file.is_file():
+        return None
+    report = json.loads(report_file.read_text(encoding="utf-8"))
+    if "scene_video_layouts" not in report:
+        return None
+    readelf = Path(env["DEVKITARM"]) / "bin/arm-none-eabi-readelf"
+    if not readelf.is_file():
+        readelf = readelf.with_suffix(".exe")
+    elf = build / (env["TARGET"] + ".elf")
+    result = subprocess.run([str(readelf), "--demangle", "--wide", "--symbols", str(elf)], capture_output=True, text=True, check=True)
+    objects = parse_linked_rom_objects(result.stdout, rom_bytes)
+    if not objects:
+        raise ValueError("ELF sem símbolos de assets para o orçamento de ROM por cena.")
+    return {**linked_scene_rom_usage(report, objects, rom_bytes), "assetReportSha256": digest_file(report_file),
+            "elfSha256": digest_file(elf)}
+
+
 def write_linked_rom_report(env, build):
     """Measure the final, header-fixed ROM, including on verified cache hits.
 
@@ -203,6 +288,9 @@ def write_linked_rom_report(env, build):
         "remaining": GBA_ROM_CAPACITY_BYTES - size,
         "blocked": size > GBA_ROM_CAPACITY_BYTES,
     }
+    scene_rom = measure_scene_rom(env, build, size)
+    if scene_rom is not None:
+        report["sceneRom"] = scene_rom
     destination = build / "rom_build_report.json"
     pending = destination.with_suffix(".tmp")
     try:

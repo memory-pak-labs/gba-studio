@@ -17,6 +17,7 @@ export interface AssetPackVideoBudgetReport {
   /** Available only after linking, never inferred from PNG size or compression recommendations. */
   linkedRomBytes: number | null;
   linkedRom?: LinkedRomVideoBudget;
+  romAssetsSummary?: { attributedBytes: number; otherBytes: number };
 }
 
 function record(value: unknown): value is Record<string, unknown> {

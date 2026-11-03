@@ -30,7 +30,7 @@ export interface SceneVideoBudgetMetric {
   /** Hardware ceiling across all modes; not a substitute for the effective mode's limit. */
   maximumCapacity: number;
   status: SceneVideoBudgetStatus;
-  basis?: "compiled_allocation" | "native_reservation";
+  basis?: "compiled_allocation" | "native_reservation" | "linked_elf";
 }
 export interface SceneVideoBudget {
   scene: string;
@@ -39,6 +39,7 @@ export interface SceneVideoBudget {
   blocked: boolean;
   metrics: SceneVideoBudgetMetric[];
   romAssetBytes: number | null;
+  romAssets?: { source: "linked_asset_symbols"; bytes: number; exclusiveBytes: number; sharedBytes: number; assetCount: number };
   diagnostics: SceneVideoBudgetDiagnostic[];
   nativeLayout?: { runtime: string; scope: "reservation_envelope"; notes: string[] };
 }

@@ -1029,6 +1029,7 @@ assetc-test:
 
 gbsbuild-host-test:
 	$(HOST_POSIX_FIXTURE_PYTHON) tests/host/gbsbuild_incremental_tests.py
+	python3 tests/host/gbsbuild_scene_rom_tests.py
 	grep -q 'MAP := $$(BUILD_DIR_ESC)/$$(TARGET).map' templates/Makefile.gba
 	grep -q -- '-Wl,-Map,$$(BUILD_DIR)/$$(TARGET).map' templates/Makefile.gba
 	@mkdir -p $(HOST_BUILD)/gbsbuild/pack/templates $(HOST_BUILD)/gbsbuild/pack/lib "$(HOST_BUILD)/gbsbuild/project with space" "$(HOST_BUILD)/gbsbuild/output dir"

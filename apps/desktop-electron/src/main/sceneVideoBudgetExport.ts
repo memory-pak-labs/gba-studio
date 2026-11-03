@@ -1,3 +1,4 @@
+import { attachLinkedSceneRomBudget } from "../shared/linkedSceneRomBudget.js";
 import { readFile } from "node:fs/promises";
 import { createHash } from "node:crypto";
 import path from "node:path";
@@ -48,7 +49,7 @@ export async function finalizeSceneVideoBudgetReport(options: {
     throw new Error("Cenas ausentes no contrato de exportação da ROM.");
   }
   // Recompute the compiler verdict; a previous derived report is not evidence.
-  const report = await writeSceneVideoBudgetReport(options.projectDir, exported.scene_contracts);
+  let report = await writeSceneVideoBudgetReport(options.projectDir, exported.scene_contracts);
   const rom = await readFile(options.romPath);
   const bytes = rom.byteLength;
   const capacity = 32 * 1024 * 1024;
@@ -56,6 +57,19 @@ export async function finalizeSceneVideoBudgetReport(options: {
   report.linkedRomBytes = bytes;
   report.linkedRom = { bytes, sha256: createHash("sha256").update(rom).digest("hex"), capacity, status,
     engineVersion: options.engineVersion ?? null };
+  let receipt: { schema?: number; romBytes?: number; romSha256?: string; sceneRom?: Record<string, unknown> } | undefined;
+  try { receipt = JSON.parse(await readFile(path.join(path.dirname(options.romPath), "rom_build_report.json"), "utf8")); }
+  catch (error) { if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error; }
+  if (receipt?.sceneRom) {
+    const digest = (data: Uint8Array) => createHash("sha256").update(data).digest("hex");
+    const assetReport = await readFile(path.join(options.projectDir, "asset_pack_report.json"));
+    const elf = await readFile(options.romPath.replace(/\.gba$/i, ".elf"));
+    if (receipt.schema !== 1 || receipt.romBytes !== bytes || receipt.romSha256 !== report.linkedRom.sha256 ||
+      receipt.sceneRom.assetReportSha256 !== digest(assetReport) || receipt.sceneRom.elfSha256 !== digest(elf)) {
+      throw new Error("Recibo de ROM por cena não corresponde ao build atual.");
+    }
+    report = attachLinkedSceneRomBudget(report, receipt.sceneRom);
+  }
   report.blocked ||= status === "blocked";
   await writeFileIfChanged(path.join(options.projectDir, "scene_video_budget.json"), `${JSON.stringify(report, null, 2)}\n`);
   if (report.blocked) throw new SceneVideoBudgetExportError(report);
