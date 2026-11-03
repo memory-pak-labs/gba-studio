@@ -20025,6 +20025,8 @@ def compiled_scene_video_layouts(project_data, asset_report):
         groups = {group}
         if runtime == "cutscene":
             groups.update(step["resource_bank_group"] for step in row.get("steps", []) if step.get("resource_bank_group"))
+        if runtime == "isometric" and row.get("gameplay_mode") == "tactical":
+            groups.update(page["bank_group"] for page in row.get("tactical_presentation", {}).get("surface_pages", []) if page.get("bank_group"))
         plan["bank_groups"] = sorted(groups)
         selected = [a for a in allocations if not a.get("omitted") and
                     (groups.intersection(a.get("bank_groups", [a.get("bank_group", "global")])) or
@@ -20053,13 +20055,6 @@ def compiled_scene_video_layouts(project_data, asset_report):
             else:
                 pseudo = False
         plan["display_mode"] = mode
-        if mode != 0 and not pseudo:
-            notes.append("advanced_video_layout_not_modelled")
-            continue
-        if runtime == "isometric" and not row.get("paged_surface"):
-            notes.append("isometric_surface_not_modelled")
-            continue
-
         bg = []
         maps = {24: 1, 28: 1}  # BG0 UI and the native bootstrap BG1 map.
         ui_base = 0
@@ -20076,7 +20071,73 @@ def compiled_scene_video_layouts(project_data, asset_report):
             maps[start] = max(maps.get(start, 0), count)
 
         backgrounds = block.get("backgrounds", [])
-        if runtime == "topdown":
+        if mode in (3, 4, 5):
+            bitmap = video.get("bitmap", {})
+            asset = all_by_name.get(bitmap.get("asset"), {})
+            if asset.get("kind") != "bitmap" + str(mode):
+                notes.append("bitmap_asset_not_resolved")
+                continue
+            # The renderer uses the hardware frame stride, even for a cropped
+            # source. Page 1 starts at 0xA000, not after the source image.
+            page = max(0, min(1, int(bitmap.get("page", 0)))) if mode != 3 else 0
+            bg.append({"start": page * 40960, "count": {3: 76800, 4: 38400, 5: 40960}[mode]})
+            maps = {}  # Bitmap modes do not interpret screenblocks.
+        elif mode in (1, 2) and not pseudo:
+            affine = video.get("affine", {})
+            asset = all_by_name.get(affine.get("asset"), {})
+            size = asset.get("resources", {})
+            width, height = size.get("tilemap_width"), size.get("tilemap_height")
+            placement = asset.get("allocations", {}).get("affine_bg_tiles")
+            if asset.get("kind") != "affine_bg" or not placement:
+                notes.append("affine_asset_not_resolved")
+                continue
+            if width != height or width not in (16, 32, 64, 128):
+                notes.append("affine_map_dimensions_not_resolved")
+                continue
+            bg.append({"start": 32768 + placement["start"] * 64, "count": placement["count"] * 64})
+            maps[0] = max(1, (width * height + 2047) // 2048)
+        elif runtime == "isometric" and not row.get("paged_surface"):
+            authored = row.get("authored_background") if row.get("world_mode") == "static_composition" else None
+            tactical = row.get("tactical_presentation") if row.get("gameplay_mode") == "tactical" else None
+            if authored or tactical:
+                # Tactical pages occupy exclusive banks at the same addresses.
+                # Include all possible map sizes, not their sum in ROM.
+                names = [(2, authored)] if authored else []
+                if tactical:
+                    capabilities = tactical.get("capabilities", [])
+                    if "tactical_surface" in capabilities:
+                        names.append((2, tactical.get("surface_asset")))
+                        names += [(2, page.get("asset")) for page in tactical.get("surface_pages", [])]
+                    if "tactical_grid_overlay" in capabilities:
+                        names.append((1, tactical.get("grid_asset")))
+                    if "tactical_hud" in capabilities:
+                        names.append((0, tactical.get("hud_layout")))
+                for layer, asset_name in names:
+                    if not asset_name:
+                        continue
+                    size = all_by_name.get(asset_name, {}).get("resources", {})
+                    if not size:
+                        notes.append("isometric_map_asset_not_resolved")
+                    else:
+                        reserve_map(layer, size.get("tilemap_width", 32), size.get("tilemap_height", 32))
+            elif row.get("tileset_render_offset_y_pixels"):
+                # bake_indexed_isometric rejects more than 768 unique tiles.
+                # Reserve its whole bounded arena, not the source PNG/atlas.
+                bg.append({"start": 0, "count": 768 * 64})
+                ui_base = 2
+                reserve_map(2, base=26)
+                reserve_map(3, base=27)
+            else:
+                # 40x24 4bpp raster: two 40x12 halves at CBB0/CBB2.
+                # The foreground compactor is bounded to 211 tiles at 513.
+                bg.extend([{"start": 32, "count": 480 * 32},
+                           {"start": 32768, "count": 481 * 32},
+                           {"start": 512 * 32, "count": 32},
+                           {"start": 513 * 32, "count": 211 * 32}])
+                reserve_map(1, 40, 12)
+                reserve_map(2, 40, 12, base=26)
+                reserve_map(3, 40, 24, base=30)
+        elif runtime == "topdown":
             if row.get("paged_source_tiles"):
                 bg.append({"start": 0, "count": 31 * 21 * 64})
                 ui_base = 1
@@ -20103,9 +20164,7 @@ def compiled_scene_video_layouts(project_data, asset_report):
             reserve_map(2, base=26)
             reserve_map(3, base=27)
         elif pseudo:
-            if visual is None:
-                notes.append("builtin_perspective_visual_not_modelled")
-            else:
+            if visual is not None:
                 floor = all_by_name.get(visual.get("floor"), {}).get("resources", {})
                 source_map_bytes = floor.get("tilemap_width", 0) * floor.get("tilemap_height", 0)
                 map_bytes = row.get("width_tiles", 0) * row.get("height_tiles", 0) if "floor_tilemap" in row else source_map_bytes

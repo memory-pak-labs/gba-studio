@@ -128,10 +128,18 @@ O recorte é reconhecido sem mover, converter ou redesenhar a arte.
 
 O modo solicitado na composição do Editor pode diferir do modo nativo. O plano
 é emitido pelo compilador que conhece o caminho de renderização, em vez de o
-Editor presumir que sejam iguais. Caminhos avançados não modelados, como uma
-superfície isométrica sem paginação ou certas composições bitmap/afins, mantêm
-as reservas correspondentes pendentes e informam a razão em `nativeLayout.notes`.
-Nesses casos, o modo efetivo ainda pode ser conhecido, sem aprovar o layout.
+Editor presumir que sejam iguais. O plano também cobre composições afins dos modos 1/2, páginas bitmap 3/4/5,
+superfícies isométricas 4bpp, composições isométricas compiladas, fundos
+estáticos e páginas táticas exclusivas. Mapas afins usam entradas de um byte
+no screenblock 0 e tiles no CBB2; bitmaps usam o stride nativo e a página em
+0xA000, sem screenblocks. A composição isométrica compilada reserva a arena
+limitada a 768 tiles, não o atlas de origem inteiro. São envelopes conservadores,
+não contagens de tiles visíveis.
+
+Assets avançados não resolvidos ou dimensões sem contrato continuam pendentes.
+Trocas de vídeo por background do Shmup ainda exigem planos por estado e não
+são aprovadas como se tivessem um modo único. O relatório registra a razão em
+`nativeLayout.notes`, sem substituir dados ausentes por zero.
 O adaptador marca:
 
 - VRAM BG/screenblocks pendentes quando falta plano nativo para aquele caminho;

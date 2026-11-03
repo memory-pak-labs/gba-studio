@@ -68,11 +68,70 @@ class NativeSceneVideoLayoutTests(unittest.TestCase):
         self.assertIn({"start": 32768, "count": 16384}, layout["resources"]["bgVram"])
         self.assertIn({"start": 0, "count": 2}, layout["resources"]["screenblocks"])
 
-    def test_unmodelled_isometric_surface_stays_unknown_instead_of_zero(self):
+    def test_dynamic_4bpp_isometric_surface_counts_both_halves_and_foreground(self):
         layout = self.layout(project("isometric"))
-        self.assertEqual(layout["display_mode"], 0)
+        self.assertEqual(layout["notes"], [])
+        self.assertIn({"start": 32, "count": 480 * 32}, layout["resources"]["bgVram"])
+        self.assertIn({"start": 32768, "count": 481 * 32}, layout["resources"]["bgVram"])
+        self.assertIn({"start": 513 * 32, "count": 211 * 32}, layout["resources"]["bgVram"])
+        for start in [26, 28, 30]:
+            self.assertIn({"start": start, "count": 2}, layout["resources"]["screenblocks"])
+
+    def test_baked_isometric_reserves_the_bounded_arena_not_the_source_atlas(self):
+        layout = self.layout(project("isometric", {"tileset": "modules", "tileset_render_offset_y_pixels": -16}))
+        self.assertIn({"start": 0, "count": 768 * 64}, layout["resources"]["bgVram"])
+        self.assertIn({"start": 61440, "count": 4096}, layout["resources"]["bgVram"])
+        self.assertIn({"start": 26, "count": 1}, layout["resources"]["screenblocks"])
+        self.assertIn({"start": 27, "count": 1}, layout["resources"]["screenblocks"])
+
+    def test_authored_isometric_background_uses_its_map_dimensions(self):
+        a = compiled(name="art", resources={"tilemap_width": 64, "tilemap_height": 64})
+        layout = self.layout(project("isometric", {"world_mode": "static_composition", "authored_background": "art"}), [a])
+        self.assertEqual(layout["notes"], [])
+        self.assertIn({"start": 20, "count": 4}, layout["resources"]["screenblocks"])
+
+    def test_affine_composition_uses_byte_map_at_zero_and_cbb2(self):
+        for mode in [1, 2]:
+            p = project("topdown", block={"video": {"display_mode": mode, "affine": {"asset": "floor", "layer": "bg2"}}})
+            a = compiled("affine_bg", "floor", {"affine_bg_tiles": 100, "tilemap_width": 128, "tilemap_height": 128})
+            a["allocations"]["affine_bg_tiles"] = {"start": 2, "count": 100}
+            layout = self.layout(p, [a])
+            self.assertEqual(layout["notes"], [])
+            self.assertIn({"start": 32768 + 128, "count": 6400}, layout["resources"]["bgVram"])
+            self.assertIn({"start": 0, "count": 8}, layout["resources"]["screenblocks"])
+
+    def test_bitmap_pages_reserve_full_frame_stride_and_no_screenblocks(self):
+        for mode, size in [(3, 76800), (4, 38400), (5, 40960)]:
+            for page in ([0] if mode == 3 else [0, 1]):
+                p = project("topdown", block={"video": {"display_mode": mode, "bitmap": {"asset": "photo", "page": page}}})
+                layout = self.layout(p, [compiled("bitmap" + str(mode), "photo", {"bitmap_pixels": 128})])
+                self.assertEqual(layout["notes"], [])
+                self.assertIn({"start": page * 40960, "count": size}, layout["resources"]["bgVram"])
+                self.assertEqual(layout["resources"]["screenblocks"], [])
+
+    def test_unresolved_advanced_asset_stays_unknown(self):
+        layout = self.layout(project("topdown", block={"video": {"display_mode": 1, "affine": {"asset": "absent"}}}))
         self.assertNotIn("bgVram", layout["resources"])
-        self.assertIn("isometric_surface_not_modelled", layout["notes"])
+        self.assertIn("affine_asset_not_resolved", layout["notes"])
+
+    def test_builtin_perspective_has_no_affine_floor_reservation(self):
+        layout = self.layout(project("racing", {"config": {"presentation": "pseudo3d"}, "background": -1}))
+        self.assertEqual(layout["display_mode"], 1)
+        self.assertEqual(layout["notes"], [])
+        self.assertNotIn({"start": 32768, "count": 16384}, layout["resources"]["bgVram"])
+
+    def test_tactical_pages_use_exclusive_groups_and_real_map_layers(self):
+        p = project("isometric", {"gameplay_mode": "tactical", "tactical_presentation": {
+            "capabilities": ["tactical_surface", "tactical_grid_overlay", "tactical_hud"],
+            "surface_pages": [{"asset": "page", "bank_group": "page_bank"}],
+            "grid_asset": "grid", "hud_layout": "hud"}})
+        layout = self.layout(p, [compiled(name="page", group="page_bank", resources={"tilemap_width": 64, "tilemap_height": 64}),
+                               compiled(name="grid", resources={"tilemap_width": 64, "tilemap_height": 32}),
+                               compiled(name="hud", resources={"tilemap_width": 32, "tilemap_height": 32})])
+        self.assertIn("page_bank", layout["bank_groups"])
+        self.assertIn({"start": 20, "count": 4}, layout["resources"]["screenblocks"])
+        self.assertIn({"start": 28, "count": 2}, layout["resources"]["screenblocks"])
+        self.assertEqual(layout["notes"], [])
 
     def test_runtime_layout_contract_matches_renderer_reservations(self):
         hw = (ROOT / "engine/src/gbs_hw.c").read_text()
