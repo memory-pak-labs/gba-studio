@@ -66,10 +66,24 @@ somente a esta suíte técnica, nunca ao produto inteiro.
 sem modificá-la. `--engine-pack` seleciona o Pack; o padrão é o `dist` da engine
 no mesmo checkout. `--output` escolhe apenas a pasta pai de novas execuções.
 
-O job existente `rom-regressions` do CI Linux usa o mesmo comando e preserva
-seus artefatos inclusive em falhas. A ampliação do CI para macOS e a paridade de
-execução nas três plataformas são etapas separadas. Uma execução local não
-comprova que o workflow remoto passou.
+O job `rom-regressions` compila e executa a suíte no CI Linux. Depois, os jobs
+`rom-replay` recebem as mesmas ROMs e o mesmo Pack da execução e comparam os
+frames no Linux, Windows e macOS. O replay exige o SHA exato do commit, relatório
+completo aprovado, hashes da biblioteca/conversores, recibos e baseline do
+mesmo core. Não recompila nem repete os roteiros funcionais nesse segundo host.
+Os relatórios distinguem essa camada com `functionalReplay: false`.
+
+Para reproduzir um artefato sem toolchain ou dependências npm, na raiz do app:
+
+```sh
+node scripts/replay-rom-regressions.mjs --input /caminho/artefato-roms --engine-pack /caminho/pack --expected-revision SHA_DO_PRODUTOR --output artifacts/rom-replay
+```
+
+A pasta de entrada precisa conter exatamente um `run-*` produzido pelo runner.
+O comando não segue caminhos arbitrários declarados no JSON. Um artefato de
+outro commit, alterado ou incompleto falha; tentativas anteriores e os artefatos
+de entrada são preservados. Veja [a matriz de CI](continuous-integration.md).
+Uma execução local não comprova que o workflow remoto passou.
 
 O comando é uma suíte de desenvolvimento/CI. Ele não adiciona execução de
 emulador a todas as exportações do usuário nem altera a experiência de exportar.
