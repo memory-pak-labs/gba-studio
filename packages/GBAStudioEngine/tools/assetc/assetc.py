@@ -20025,7 +20025,7 @@ def compiled_scene_video_layouts(project_data, asset_report):
         groups = {group}
         if runtime == "cutscene":
             groups.update(step["resource_bank_group"] for step in row.get("steps", []) if step.get("resource_bank_group"))
-        if runtime == "isometric" and row.get("gameplay_mode") == "tactical":
+        if runtime == "isometric" and row.get("grid", block.get("grid", {})).get("gameplay_mode") == "tactical":
             groups.update(page["bank_group"] for page in row.get("tactical_presentation", {}).get("surface_pages", []) if page.get("bank_group"))
         plan["bank_groups"] = sorted(groups)
         selected = [a for a in allocations if not a.get("omitted") and
@@ -20098,7 +20098,7 @@ def compiled_scene_video_layouts(project_data, asset_report):
             maps[0] = max(1, (width * height + 2047) // 2048)
         elif runtime == "isometric" and not row.get("paged_surface"):
             authored = row.get("authored_background") if row.get("world_mode") == "static_composition" else None
-            tactical = row.get("tactical_presentation") if row.get("gameplay_mode") == "tactical" else None
+            tactical = row.get("tactical_presentation") if row.get("grid", block.get("grid", {})).get("gameplay_mode") == "tactical" else None
             if authored or tactical:
                 # Tactical pages occupy exclusive banks at the same addresses.
                 # Include all possible map sizes, not their sum in ROM.

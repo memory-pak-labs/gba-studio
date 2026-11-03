@@ -121,7 +121,7 @@ class NativeSceneVideoLayoutTests(unittest.TestCase):
         self.assertNotIn({"start": 32768, "count": 16384}, layout["resources"]["bgVram"])
 
     def test_tactical_pages_use_exclusive_groups_and_real_map_layers(self):
-        p = project("isometric", {"gameplay_mode": "tactical", "tactical_presentation": {
+        p = project("isometric", {"grid": {"gameplay_mode": "tactical"}, "tactical_presentation": {
             "capabilities": ["tactical_surface", "tactical_grid_overlay", "tactical_hud"],
             "surface_pages": [{"asset": "page", "bank_group": "page_bank"}],
             "grid_asset": "grid", "hud_layout": "hud"}})
