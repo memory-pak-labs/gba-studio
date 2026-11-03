@@ -2,7 +2,8 @@ import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
-import { writeSceneVideoBudgetReport, SceneVideoBudgetExportError } from "./sceneVideoBudgetExport.js";
+import { finalizeSceneVideoBudgetReport, writeSceneVideoBudgetReport, SceneVideoBudgetExportError } from "./sceneVideoBudgetExport.js";
+import { createHash } from "node:crypto";
 import { buildEngineExportProjectContract } from "./exportEngineProject.js";
 import { writeEngineSchemaExport } from "./engineProjectExport.js";
 import { engineBuildCachePaths, writeEngineBuildCacheSnapshot, writeLatestEngineBuildCache } from "./engineBuildCache.js";
@@ -22,6 +23,42 @@ async function fixture(oam: number) {
 const scenes = [{ name: "test" }];
 
 describe("scene video budget export", () => {
+  it("attaches measured linked ROM data without inventing per-scene attribution", async () => {
+    const root = await fixture(5);
+    await writeFile(path.join(root, "export_project.json"), JSON.stringify({ asset_pack: {}, scene_contracts: scenes }));
+    const romPath = path.join(root, "test.gba");
+    await writeFile(romPath, "linked-ROM");
+    const result = await finalizeSceneVideoBudgetReport({ projectDir: root, romPath, engineVersion: "test-engine" });
+    expect(result).toMatchObject({ complete: false, blocked: false, linkedRomBytes: 10,
+      linkedRom: { bytes: 10, capacity: 33554432, sha256: createHash("sha256").update("linked-ROM").digest("hex"), engineVersion: "test-engine", status: "ok" } });
+    expect(result!.scenes[0].romAssetBytes).toBeNull();
+    await writeFile(romPath, "replaced-ROM");
+    const updated = await finalizeSceneVideoBudgetReport({ projectDir: root, romPath });
+    expect(updated!.linkedRom!.sha256).not.toBe(result!.linkedRom!.sha256);
+    expect(updated!.linkedRomBytes).toBe(12);
+    expect(JSON.parse(await readFile(path.join(root, "scene_video_budget.json"), "utf8"))).toEqual(updated);
+  });
+
+  it("accepts an exact-limit ROM and blocks one byte above it with a structured report", async () => {
+    const root = await fixture(5);
+    await writeFile(path.join(root, "export_project.json"), JSON.stringify({ asset_pack: {}, scene_contracts: scenes }));
+    const romPath = path.join(root, "test.gba");
+    await writeFile(romPath, Buffer.alloc(33554432));
+    expect((await finalizeSceneVideoBudgetReport({ projectDir: root, romPath }))!.blocked).toBe(false);
+    await writeFile(romPath, Buffer.alloc(33554433));
+    await expect(finalizeSceneVideoBudgetReport({ projectDir: root, romPath })).rejects.toThrow(/ROM.*33554433\/33554432/);
+    expect(JSON.parse(await readFile(path.join(root, "scene_video_budget.json"), "utf8"))).toMatchObject({ blocked: true, linkedRomBytes: 33554433 });
+  });
+
+  it("does not reuse a linked verdict when the compiled scene data is invalid", async () => {
+    const root = await fixture(129);
+    await writeFile(path.join(root, "export_project.json"), JSON.stringify({ asset_pack: {}, scene_contracts: scenes }));
+    const romPath = path.join(root, "test.gba");
+    await writeFile(romPath, "ROM");
+    await writeFile(path.join(root, "scene_video_budget.json"), '{"blocked":false,"linkedRomBytes":3}');
+    await expect(finalizeSceneVideoBudgetReport({ projectDir: root, romPath })).rejects.toThrow(/OAM/);
+  });
+
   it("writes a structured scene report at the limit", async () => {
     const root = await fixture(128);
     const result = await writeSceneVideoBudgetReport(root, scenes);

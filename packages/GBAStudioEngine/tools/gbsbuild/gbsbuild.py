@@ -15,6 +15,7 @@ from pathlib import Path
 VERSION = "gbsbuild 2.25.0"
 VARIANT_CACHE_ENTRIES = 8
 VARIANT_CACHE_BYTES = 512 * 1024 * 1024
+GBA_ROM_CAPACITY_BYTES = 32 * 1024 * 1024
 
 
 def absolute_path(value):
@@ -177,6 +178,41 @@ def digest_file(file):
         return hashlib.sha256(file.read_bytes()).hexdigest()
     except FileNotFoundError:
         return None
+
+
+def write_linked_rom_report(env, build):
+    """Measure the final, header-fixed ROM, including on verified cache hits.
+
+    This is project-wide linked data, not a sum of source assets per scene.
+    Reports are outputs and must never become inputs to the compile graph.
+    """
+    rom = build / (env["TARGET"] + ".gba")
+    size = rom.stat().st_size
+    pack = Path(env["ENGINE_PACK"])
+    try:
+        manifest = json.loads((pack / "enginepack.json").read_text(encoding="utf-8"))
+        version = manifest.get("version") if isinstance(manifest, dict) else None
+    except (OSError, ValueError):
+        version = None
+    report = {
+        "schema": 1, "source": "linked_rom", "target": env["TARGET"],
+        "romFile": rom.name, "romBytes": size, "romSha256": digest_file(rom),
+        "engineVersion": version if isinstance(version, str) else None,
+        "engineLibrarySha256": digest_file(pack / "lib/libgbastudio_engine.a"),
+        "capacity": GBA_ROM_CAPACITY_BYTES,
+        "remaining": GBA_ROM_CAPACITY_BYTES - size,
+        "blocked": size > GBA_ROM_CAPACITY_BYTES,
+    }
+    destination = build / "rom_build_report.json"
+    pending = destination.with_suffix(".tmp")
+    try:
+        pending.write_text(json.dumps(report, indent=2) + "\n", encoding="utf-8")
+        pending.replace(destination)
+    finally:
+        pending.unlink(missing_ok=True)
+    if report["blocked"]:
+        print(f"ROM excede o limite de {GBA_ROM_CAPACITY_BYTES} bytes: {size} bytes ({rom.name}).", file=sys.stderr)
+    return not report["blocked"]
 
 
 def digest_tree(root):
@@ -434,6 +470,8 @@ def incremental_build(command, env, clean, cache_enabled=True):
 
 
 def locked_build(command, env, build, clean, cache_enabled):
+    # A failed or interrupted attempt cannot advertise a previous ROM as current.
+    (build / "rom_build_report.json").unlink(missing_ok=True)
     completion = build / ".gbsbuild-success.json"
     try:
         previous = json.loads(completion.read_text())
@@ -456,6 +494,8 @@ def locked_build(command, env, build, clean, cache_enabled):
             and previous.get("dependencies") == dependency_hashes
             and all(artifact_hashes.values()) and all(dependency_hashes.values())):
         write_event_sources(env, build)
+        if not write_linked_rom_report(env, build):
+            return 1
         write_build_decisions(build, "reused", before, previous)
         print(f"ROM reutilizada (conteudo e dependencias verificados): {build / output_names[1]}")
         return 0
@@ -471,6 +511,8 @@ def locked_build(command, env, build, clean, cache_enabled):
         restored = restore_variant(env, before, compile_config, artifacts, objects, output_names)
         if restored is not None:
             write_event_sources(env, build)
+            if not write_linked_rom_report(env, build):
+                return 1
             write_build_decisions(build, "variant-reused", before, previous)
             return restored
     completion.unlink(missing_ok=True)
@@ -512,6 +554,8 @@ def locked_build(command, env, build, clean, cache_enabled):
         deps_after = {str(d): digest_file(d) for p in objects for d in dependencies(p.with_suffix(".d"))}
         if not all(artifacts_after.values()) or not all(deps_after.values()):
             print("Build incompleto; nao foi gravado cache de ROM.", file=sys.stderr)
+            return 1
+        if not write_linked_rom_report(env, build):
             return 1
         if cache_enabled:
             record = {"schema": 1, "inputs": after, "compile_config": compile_config,

@@ -1,6 +1,13 @@
 import { analyzeSceneVideoBudget, type CompiledSceneVideoPlan, type CompiledVideoRange, type SceneVideoBudget, type SceneVideoResource } from "./sceneVideoBudget.js";
 
 export interface AssetPackVideoBudgetScene { name: string; bankGroup: string }
+export interface LinkedRomVideoBudget {
+  bytes: number;
+  sha256: string;
+  capacity: number;
+  engineVersion: string | null;
+  status: "ok" | "attention" | "not_recommended" | "blocked";
+}
 export interface AssetPackVideoBudgetReport {
   schema: 1;
   source: "compiled_allocations";
@@ -9,6 +16,7 @@ export interface AssetPackVideoBudgetReport {
   scenes: SceneVideoBudget[];
   /** Available only after linking, never inferred from PNG size or compression recommendations. */
   linkedRomBytes: number | null;
+  linkedRom?: LinkedRomVideoBudget;
 }
 
 function record(value: unknown): value is Record<string, unknown> {

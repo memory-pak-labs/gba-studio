@@ -47,14 +47,27 @@ comprovado de paleta ou OAM bloqueia a exportação com
 Relatórios compilados ausentes, malformados ou com alocações inválidas falham
 explicitamente. O veredito derivado de um cache antigo não é aceito como prova.
 
+Após o linker, `gbsbuild` grava `build/rom_build_report.json` com bytes reais,
+SHA-256 da ROM, versão do Engine Pack e hash da biblioteca usada. Essa medição
+é refeita nas reutilizações verificadas de ROM e de variantes, sem relinkar.
+ROMs acima de 32 MiB falham antes da promoção para cache; o relatório registra
+o excesso. Um build que falha não mantém um recibo de sucesso anterior.
+
+O aplicativo refaz a análise das alocações compiladas após o build e anexa
+`linkedRomBytes` e `linkedRom` ao relatório por cena e ao resumo do build.
+Esses campos são globais: o tamanho vinculado não é distribuído entre cenas
+que podem compartilhar assets. O hash vem do arquivo materializado, incluindo
+quando o build usa um diretório temporário por causa de espaços no caminho.
+
 ### Cobertura desta etapa
 
 O assetc atual não fornece o modo **efetivo** de todos os runtimes, a colocação
-residente de todos os mapas/screenblocks, nem o tamanho final da ROM vinculada.
+residente de todos os mapas/screenblocks, nem a atribuição do payload ROM por cena.
 O modo solicitado na composição do Editor pode diferir do modo nativo.
 Por isso, o adaptador marca:
 
-- VRAM BG, screenblocks, payload ROM por cena e ROM vinculada como pendentes;
+- VRAM BG, screenblocks e payload ROM por cena como pendentes;
+- ROM vinculada pendente durante a exportação de fontes e medida após o build;
 - bytes OBJ alocados como conhecidos, mas seu limite dependente do modo como
   pendente;
 - paletas e OAM como alocações verificáveis do grupo, sem equivaler a uma medição
@@ -68,8 +81,8 @@ pendente, sem aplicar recomendações de pressão sobre um modo presumido.
 O bloqueio de pools que já existia no assetc continua ativo. Esta etapa acrescenta
 um contrato comum testado; não substitui o planejamento residente dos runtimes.
 
-As próximas etapas são emitir esse planejamento no compilador, ligar os bytes
-finais da ROM após o linker e apresentar os campos no Editor. O painel atual não
+As próximas etapas são emitir o planejamento físico no compilador e apresentar
+os campos no Editor. O painel atual não
 foi redesenhado. A conversão de assets aprovados para 4bpp, a ampliação da matriz
 CI e novos testes visuais de ROM não fazem parte deste commit.
 
