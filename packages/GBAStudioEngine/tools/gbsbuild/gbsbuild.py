@@ -210,15 +210,18 @@ def linked_scene_rom_usage(asset_report, objects, rom_bytes):
     for obj in objects:
         name = obj["name"].rsplit("::", 1)[-1]
         asset = next((h for h in headers if name == h["symbol"] or name.startswith(h["symbol"] + "_")), None)
-        if asset is None:
-            continue
-        a = allocations[asset["id"]]
-        groups = a.get("bank_groups", [a.get("bank_group", "global")])
-        owners = {plan["scene"] for plan in plans if
-                  (obj["file"] in (None, "main.cpp", plan["runtime"] + "_runtime.cpp")) and
-                  ("global" in groups or set(groups).intersection(plan["bank_groups"]))}
+        groups = allocations[asset["id"]].get("bank_groups", [allocations[asset["id"]].get("bank_group", "global")]) if asset else []
+        owners = set()
+        for plan in plans:
+            if obj["file"] not in (None, "main.cpp", plan["runtime"] + "_runtime.cpp"):
+                continue
+            generated = any(obj["name"].startswith(prefix) if prefix.endswith(("::", "_")) else
+                            obj["name"] == prefix or obj["name"].startswith(prefix + "_")
+                            for prefix in plan.get("rom_symbol_prefixes", []))
+            if generated or "global" in groups or set(groups).intersection(plan["bank_groups"]):
+                owners.add(plan["scene"])
         if owners:
-            spans.append((obj["start"], obj["start"] + obj["count"], owners, asset["id"]))
+            spans.append((obj["start"], obj["start"] + obj["count"], owners, asset["id"] if asset else "native:" + obj["name"]))
     # Sweep addresses: aliases, overlapping symbols and shared scenes count once.
     events = {}
     for start, end, owners, _ in spans:

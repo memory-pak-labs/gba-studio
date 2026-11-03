@@ -15,7 +15,8 @@ export interface CompiledSceneVideoPlan {
 export interface SceneVideoBudgetDiagnostic {
   scene: string;
   resource?: SceneVideoResource;
-  code: "capacity_exceeded" | "invalid_plan" | "incomplete_plan";
+  feature?: string;
+  code: "capacity_exceeded" | "invalid_plan" | "incomplete_plan" | "reservation_overlap";
   status: "blocked" | "unknown";
   used?: number;
   capacity?: number;
@@ -30,8 +31,9 @@ export interface SceneVideoBudgetMetric {
   /** Hardware ceiling across all modes; not a substitute for the effective mode's limit. */
   maximumCapacity: number;
   status: SceneVideoBudgetStatus;
-  basis?: "compiled_allocation" | "native_reservation" | "linked_elf";
+  basis?: "compiled_allocation" | "native_reservation" | "compiled_and_native" | "linked_elf";
 }
+export interface NativeInterfaceReservation { feature: string; resources: CompiledSceneVideoPlan["resources"] }
 export interface SceneVideoBudget {
   scene: string;
   displayMode: CompiledSceneVideoPlan["displayMode"];
@@ -41,7 +43,7 @@ export interface SceneVideoBudget {
   romAssetBytes: number | null;
   romAssets?: { source: "linked_asset_symbols"; bytes: number; exclusiveBytes: number; sharedBytes: number; assetCount: number };
   diagnostics: SceneVideoBudgetDiagnostic[];
-  nativeLayout?: { runtime: string; scope: "reservation_envelope"; notes: string[] };
+  nativeLayout?: { runtime: string; scope: "reservation_envelope"; notes: string[]; dynamicReservations?: NativeInterfaceReservation[] };
 }
 
 const resources: SceneVideoResource[] = ["bgVram", "objVram", "screenblocks", "bgPalette", "objPalette", "oam", "romAssets"];

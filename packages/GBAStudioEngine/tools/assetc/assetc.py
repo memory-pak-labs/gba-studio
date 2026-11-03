@@ -19840,6 +19840,137 @@ def emit_advanced_tools_data_header(advanced_tools):
     ])
 
 
+
+def compiled_nonvisible_hud_obj_ranges(project_data, block, row, scene_name, asset_report):
+    """Only static single-frame OBJ frames with no other scene consumer qualify.
+
+    The renderer uses the metasprite size, while GBA scanout clips at 240x160.
+    Loaded but completely offscreen tiles may be overwritten by UI glyphs.
+    This exempts overlap checks, never removes bytes from allocation totals.
+    """
+    def strings(value):
+        if isinstance(value, str):
+            return {value}
+        if isinstance(value, list):
+            return set().union(*(strings(v) for v in value))
+        if isinstance(value, dict):
+            return set().union(*(strings(v) for v in value.values()))
+        return set()
+    ui = block.get("dialogue_ui", {})
+    layout_id = next((b.get("preset_id") for b in ui.get("hud_scene_bindings", [])
+                      if b.get("scene_name") in (scene_name, row.get("name"))), ui.get("hud_active_layout_id"))
+    layout = next((h for h in ui.get("hud_layouts", []) if h.get("id") == layout_id), {})
+    components = layout.get("components", []) if layout.get("mode") == "advanced" else []
+    definitions = {a.get("name"): a for a in project_data.get("asset_pack", {}).get("assets", [])}
+    output = []
+    row_references = strings(row)
+    for allocation in asset_report.get("allocations", []):
+        if allocation.get("omitted"):
+            continue
+        name = allocation.get("name")
+        definition = definitions.get(name, {})
+        resource = allocation.get("resources", {})
+        placement = allocation.get("allocations", {}).get("obj_tiles")
+        uses = [c for c in components if name in strings(c)]
+        if not placement or not uses or name in row_references or layout.get("selector_asset") == name or \
+           resource.get("oam_sprites") != 1 or resource.get("sprite_frames") != 1 or definition.get("sprite_bpp", 4) != 4 or \
+           any(c.get("kind") != "frame" or c.get("asset") != name or c.get("behavior") for c in uses):
+            continue
+        width, height = definition.get("sprite_width", 0), definition.get("sprite_height", 0)
+        if not width or not height or width % 8 or height % 8 or width * height // 64 != placement["count"]:
+            continue
+        visible = [c for c in uses if c.get("visible", True)]
+        if not visible:
+            continue
+        for tile in range(placement["count"]):
+            tx, ty = tile % (width // 8) * 8, tile // (width // 8) * 8
+            if all(c.get("x", 0) + tx >= 240 or c.get("y", 0) + ty >= 160 or
+                   c.get("x", 0) + tx + 8 <= 0 or c.get("y", 0) + ty + 8 <= 0 for c in visible):
+                start = (placement["start"] + tile) * 32
+                others = [a.get("allocations", {}).get("obj_tiles") for a in asset_report.get("allocations", []) if a is not allocation and not a.get("omitted")]
+                if not any(r and r["start"] * 32 < start + 32 and (r["start"] + r["count"]) * 32 > start for r in others):
+                    output.append({"start": start, "count": 32})
+    return output
+
+
+def compiled_video_commands(value):
+    pending = [value]
+    while pending:
+        item = pending.pop()
+        if isinstance(item, list):
+            pending.extend(item)
+        elif isinstance(item, dict):
+            if "op" in item:
+                yield item
+            pending.extend(v for v in item.values() if isinstance(v, (dict, list)))
+
+
+def compiled_dynamic_interface_reservations(block, row, scene_name, runtime=None, clock=False):
+    """Address envelopes of native UI arenas; these are not per-frame peaks.
+
+    Reserve full private arenas because clear/hide calls also touch their unused
+    slots. Aligned BG text does not use OBJ; six/seven-pixel text uses icon OAM.
+    """
+    ui = block.get("dialogue_ui", {})
+    reservations = [{"feature": "ui_palettes", "resources": {
+        "bgPalette": [{"start": 448, "count": 64}], "objPalette": [{"start": 480, "count": 32}]}}]
+    def reserve(feature, **resources):
+        reservations.append({"feature": feature, "resources": resources})
+    text_tiles = [{"start": 900 * 32, "count": 124 * 32}]
+    icon_oam = [{"start": 64, "count": 32}]
+    hud_palette = [{"start": 448, "count": 32}]
+    layout_id = next((b.get("preset_id") for b in ui.get("hud_scene_bindings", [])
+                      if b.get("scene_name") in (scene_name, row.get("name"))), ui.get("hud_active_layout_id"))
+    layout = next((h for h in ui.get("hud_layouts", []) if h.get("id") == layout_id), {})
+    if layout.get("mode") == "advanced":
+        # begin_hud_layout clears the full text OAM arena, even for BG-only text.
+        reserve("hud_oam", oam=[{"start": 96, "count": 32}])
+    components = [c for c in layout.get("components", [])[:64] if c.get("visible", True)] if layout.get("mode") == "advanced" else []
+    text = [c for c in components if c.get("kind") == "text" or (c.get("kind") == "icon" and not c.get("asset"))]
+    if any(c.get("text_advance", 8) not in (6, 7) and (c.get("x", 0) % 8 or c.get("y", 0) % 8) for c in text):
+        reserve("hud_text", objVram=text_tiles, oam=[{"start": 96, "count": 32}], objPalette=hud_palette)
+    if any(c.get("text_advance", 8) in (6, 7) for c in text):
+        reserve("hud_compact_text", objVram=text_tiles, oam=icon_oam, objPalette=hud_palette)
+    if layout.get("selector_asset") or any(c.get("asset") for c in components):
+        # Image tile payloads are already in asset allocations; only OAM moves.
+        reserve("hud_icons", oam=icon_oam)
+    if block.get("portrait_assets") and ui.get("show_portrait", True):
+        reserve("dialogue_portrait", oam=[{"start": 110, "count": 4}])
+    if ui.get("portrait_layout") == "portrait_tab":
+        reserve("portrait_tab", objVram=[{"start": 512 * 32, "count": 384 * 32}],
+                oam=[{"start": 114, "count": 8}], objPalette=[{"start": 480, "count": 32}])
+    if runtime == "luta" and layout.get("mode") != "advanced":
+        reserve("status_text", objVram=[{"start": 28800, "count": 1024}], oam=[{"start": 96, "count": 32}], objPalette=[{"start": 480, "count": 32}])
+    if clock:
+        reserve("clock", objVram=[{"start": 927 * 32, "count": 5 * 32}], oam=[{"start": 123, "count": 5}], objPalette=[{"start": 480, "count": 32}])
+    pending, called = [row], set()
+    overlay = False
+    text_input = isinstance(row.get("text_input"), dict)
+    while pending:
+        item = pending.pop()
+        if isinstance(item, list):
+            pending.extend(item)
+        elif isinstance(item, dict):
+            text_input |= item.get("op") == "open_text_input"
+            overlay |= item.get("op") == "draw_text" and item.get("layer") == "overlay"
+            if item.get("op") == "call_script":
+                index = item.get("script", -1)
+                scripts = block.get("scripts", [])
+                if isinstance(index, int) and 0 <= index < len(scripts) and index not in called:
+                    called.add(index)
+                    pending.append(scripts[index])
+            pending.extend(value for value in item.values() if isinstance(value, (dict, list)))
+    if overlay:
+        reserve("event_text", objVram=[{"start": 28800, "count": 27 * 32}], oam=[{"start": 96, "count": 27}], objPalette=[{"start": 480, "count": 32}])
+    if text_input:
+        reserve("name_input", objVram=[{"start": 900 * 32, "count": 32 * 32}],
+                oam=[{"start": 96, "count": 32}], objPalette=[{"start": 416, "count": 32}])
+        if row.get("text_input", {}).get("keyboard_control_layout") == "bottom_grid":
+            reserve("name_keyboard", objVram=[{"start": (900 + 36) * 32, "count": 40 * 32}],
+                    oam=[{"start": 40, "count": 40}], objPalette=[{"start": 416, "count": 32}])
+    return reservations
+
+
 @background_cache_scope()
 @obj_lookup_cache_scope()
 def compiled_scene_video_layouts(project_data, asset_report):
@@ -19855,6 +19986,7 @@ def compiled_scene_video_layouts(project_data, asset_report):
         return None
     allocations = asset_report.get("allocations", [])
     plans = []
+    clock = any(c.get("op") == "start_game_clock" and c.get("hud", c.get("hud_enabled", True)) for c in compiled_video_commands(project_data))
     collections = {"menu": "screens", "cutscene": "scenes", "visual_novel": "scenes",
                    "point_click": "scenes", "battle_rpg": "encounters", "luta": "stages", "shmup": "waves"}
     fixed_mode = {"menu", "cutscene", "visual_novel", "point_click", "battle_rpg", "luta", "world_map"}
@@ -19882,6 +20014,12 @@ def compiled_scene_video_layouts(project_data, asset_report):
         if row is None:
             notes.append("native_scene_not_resolved")
             continue
+        plan["dynamic_reservations"] = compiled_dynamic_interface_reservations(block, row, name, runtime, clock)
+        plan["rom_symbol_prefixes"] = ["gbastudio_dialogue_ui::"]
+        if runtime == "isometric" and row.get("paged_surface"):
+            plan["rom_symbol_prefixes"].append("gbastudio_isometric_project::" + pack_safe_identifier(row.get("name", name)) + "_paged")
+        if runtime == "dungeon_crawler":
+            plan["rom_symbol_prefixes"].append("gbastudio_dungeon_crawler_project::dungeon_view_")
         group = row.get("resource_bank_group", group)
         plan["bank_group"] = group
         groups = {group}
@@ -19891,6 +20029,7 @@ def compiled_scene_video_layouts(project_data, asset_report):
         selected = [a for a in allocations if not a.get("omitted") and
                     (groups.intersection(a.get("bank_groups", [a.get("bank_group", "global")])) or
                      "global" in a.get("bank_groups", [a.get("bank_group", "global")]))]
+        plan["nonvisible_obj_ranges"] = compiled_nonvisible_hud_obj_ranges(project_data, block, row, name, {"allocations": selected})
         all_by_name = {a.get("name", a.get("id")): a for a in allocations if not a.get("omitted")}
         video = row.get("video", {})
         if runtime in ("topdown", "isometric") and not video.get("affine"):

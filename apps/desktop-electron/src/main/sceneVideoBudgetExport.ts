@@ -11,7 +11,7 @@ const labels = { bgVram: "VRAM BG", objVram: "VRAM OBJ", screenblocks: "screenbl
 export class SceneVideoBudgetExportError extends Error {
   constructor(readonly report: AssetPackVideoBudgetReport) {
     const errors = report.scenes.flatMap(scene => scene.diagnostics.filter(d => d.status === "blocked").map(d =>
-      `${scene.scene}: ${d.resource ? labels[d.resource] : d.code}${d.used !== undefined ? ` ${d.used}/${d.capacity}` : ""}`));
+      `${scene.scene}: ${d.resource ? labels[d.resource] : d.code}${d.code === "reservation_overlap" ? " em conflito com reserva de interface" : ""}${d.used !== undefined ? ` ${d.used}/${d.capacity}` : ""}`));
     if (report.linkedRom?.status === "blocked") errors.push(`ROM ${report.linkedRom.bytes}/${report.linkedRom.capacity} bytes`);
     super(`Exportação bloqueada pelo orçamento de vídeo. ${errors.join("; ")}`);
     this.name = "SceneVideoBudgetExportError";

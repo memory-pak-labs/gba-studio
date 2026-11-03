@@ -43,6 +43,17 @@ class LinkedSceneRomTests(unittest.TestCase):
         rows = tool.parse_linked_rom_objects("1: 00000000 0 FILE LOCAL DEFAULT ABS last.cpp\n2: 08000100 16 OBJECT WEAK DEFAULT 3 audio_samples", 1024)
         self.assertIsNone(rows[0]["file"])
 
+    def test_compiler_declared_native_payloads_include_shared_ui_and_baked_surfaces(self):
+        plans = [{"scene": n, "runtime": "isometric", "bank_groups": ["scene_"+n],
+                  "rom_symbol_prefixes": ["ui::", "iso::"+n+"_paged"]} for n in ("a", "b")]
+        report = {"scene_video_layouts": {"plans": plans}, "allocations": [], "export_plan": {"headers": []}}
+        rows = [{"file": "isometric_runtime.cpp", "name": name, "start": start, "count": size} for name,start,size in [
+            ("ui::font", 0, 10), ("iso::a_paged_tiles", 10, 30), ("iso::b_paged_tiles", 40, 60)]]
+        result = tool.linked_scene_rom_usage(report, rows, 120)
+        self.assertEqual(result["attributedBytes"], 100)
+        self.assertEqual([s["bytes"] for s in result["scenes"]], [40, 70])
+        self.assertEqual([s["sharedBytes"] for s in result["scenes"]], [10, 10])
+
     def test_out_of_rom_object_is_rejected(self):
         with self.assertRaisesRegex(ValueError, "ROM"):
             tool.parse_linked_rom_objects("1: 080003f0 32 OBJECT LOCAL DEFAULT 3 a", 1024)

@@ -1,4 +1,4 @@
-import { analyzeSceneVideoBudget, type CompiledSceneVideoPlan, type CompiledVideoRange, type SceneVideoBudget, type SceneVideoResource } from "./sceneVideoBudget.js";
+import { analyzeSceneVideoBudget, type CompiledSceneVideoPlan, type CompiledVideoRange, type SceneVideoBudget, type SceneVideoResource, type NativeInterfaceReservation } from "./sceneVideoBudget.js";
 
 export interface AssetPackVideoBudgetScene { name: string; bankGroup: string }
 export interface LinkedRomVideoBudget {
@@ -39,6 +39,8 @@ interface NativeVideoLayout {
   display_mode: CompiledSceneVideoPlan["displayMode"];
   resources: CompiledSceneVideoPlan["resources"];
   notes: string[];
+  dynamic_reservations?: NativeInterfaceReservation[];
+  nonvisible_obj_ranges?: CompiledVideoRange[];
 }
 
 function parseNativeLayouts(value: unknown): NativeVideoLayout[] {
@@ -59,6 +61,16 @@ function parseNativeLayouts(value: unknown): NativeVideoLayout[] {
         !record(range) || typeof range.start !== "number" || typeof range.count !== "number")) {
         throw new Error("Intervalos inválidos no layout de vídeo compilado.");
       }
+    }
+    if (plan.dynamic_reservations !== undefined && (!Array.isArray(plan.dynamic_reservations) || plan.dynamic_reservations.some(entry =>
+      !record(entry) || typeof entry.feature !== "string" || !entry.feature || !record(entry.resources) ||
+      Object.entries(entry.resources).some(([resource, ranges]) => !["objVram", "oam", "objPalette", "bgPalette"].includes(resource) ||
+        !Array.isArray(ranges) || ranges.some(range => !record(range) || typeof range.start !== "number" || typeof range.count !== "number"))))) {
+      throw new Error("Reservas dinâmicas de vídeo inválidas.");
+    }
+    if (plan.nonvisible_obj_ranges !== undefined && (!Array.isArray(plan.nonvisible_obj_ranges) || plan.nonvisible_obj_ranges.some(range =>
+      !record(range) || !Number.isSafeInteger(range.start) || !Number.isSafeInteger(range.count) || (range.start as number) < 0 || (range.count as number) < 0))) {
+      throw new Error("Recorte compilado de OBJ inválido.");
     }
     seen.add(plan.scene);
     return plan as unknown as NativeVideoLayout;
@@ -110,12 +122,36 @@ export function buildAssetPackVideoBudget(scenes: readonly AssetPackVideoBudgetS
     // A native plan supplies physical reservations, not source map dimensions.
     // Without that evidence the resource remains unknown, never zero.
     Object.assign(resources, layout?.resources);
+    const allocatedObj = resources.objVram ?? [];
+    const overlaps: string[] = [];
+    const dynamic = layout?.dynamic_reservations ?? [];
+    for (const reservation of dynamic) for (const [name, ranges] of Object.entries(reservation.resources)) {
+      const resource = name as SceneVideoResource;
+      const offset = resource === "objVram" && layout?.display_mode != null && layout.display_mode >= 3 ? 16384 : 0;
+      const relative = ranges.map(range => ({ start: range.start - offset, count: range.count }));
+      if (resource === "objVram" && relative.some(range => allocatedObj.some(asset => {
+        let start = Math.max(range.start, asset.start);
+        const end = Math.min(range.start + range.count, asset.start + asset.count);
+        if (start >= end) return false;
+        for (const clipped of [...(layout?.nonvisible_obj_ranges ?? [])].sort((a, b) => a.start - b.start)) {
+          if (clipped.start - offset <= start && clipped.start - offset + clipped.count > start) start = clipped.start - offset + clipped.count;
+        }
+        return start < end;
+      }))) overlaps.push(reservation.feature);
+      resources[resource] = [...(resources[resource] ?? []), ...relative];
+    }
     const result = analyzeSceneVideoBudget({ name: scene.name, displayMode: layout?.display_mode ?? null, resources });
+    if (overlaps.length) {
+      result.blocked = true;
+      result.complete = false;
+      for (const feature of overlaps) result.diagnostics.push({ scene: scene.name, resource: "objVram", feature, code: "reservation_overlap", status: "blocked" });
+      result.metrics = result.metrics.map(metric => metric.resource === "objVram" ? { ...metric, status: "blocked" } : metric);
+    }
     return {
       ...result,
       metrics: result.metrics.map(metric => ({ ...metric,
-        ...(metric.used === null ? {} : { basis: layout?.resources[metric.resource] ? "native_reservation" as const : "compiled_allocation" as const }) })),
-      ...(layout ? { nativeLayout: { runtime: layout.runtime, scope: "reservation_envelope" as const, notes: layout.notes } } : {})
+        ...(metric.used === null ? {} : { basis: dynamic.some(r => r.resources[metric.resource]) ? "compiled_and_native" as const : layout?.resources[metric.resource] ? "native_reservation" as const : "compiled_allocation" as const }) })),
+      ...(layout ? { nativeLayout: { runtime: layout.runtime, scope: "reservation_envelope" as const, notes: layout.notes, ...(layout.dynamic_reservations ? { dynamicReservations: layout.dynamic_reservations } : {}) } } : {})
     };
   });
   return { schema: 1, source: "compiled_allocations", complete: false,

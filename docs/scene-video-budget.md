@@ -75,8 +75,9 @@ atribuída e restante da ROM. O aplicativo confere os hashes da ROM, ELF e
 asset_pack_report.json antes de anexar romAssetBytes/romAssets e
 romAssetsSummary. A soma de todas as cenas não é o tamanho do jogo.
 
-O escopo é linked_asset_symbols: somente objetos reconhecidos dos assets.
-Código, tabelas geradas, padding e cópias sem associação comprovada continuam
+O escopo é linked_asset_symbols: objetos reconhecidos dos assets e prefixos
+nativos declarados pelo compilador (interface, superfícies paginadas e atlas do
+dungeon). Código, dados sem associação comprovada e padding continuam
 no restante não atribuído; não são distribuídos arbitrariamente. A atribuição
 fica pendente antes do link e não transforma a cobertura física em completa.
 
@@ -90,12 +91,38 @@ de interface, mapa e piso afim. As fases de uma cutscene podem compartilhar
 os mesmos endereços; o envelope de reservas une esses endereços uma vez.
 
 `nativeLayout.scope` é `reservation_envelope`. As métricas de BG recebem
-`basis: native_reservation`; os demais recursos continuam identificados como
-alocações de assets (`compiled_allocation`). Isso não é telemetria por frame
+`basis: native_reservation`. Recursos que unem alocações de assets às reservas
+da interface recebem `compiled_and_native`; os demais mantêm
+`compiled_allocation`. Isso não é telemetria por frame
 nem contagem de todo o atlas ROM como VRAM. A reserva fixa da interface e,
 quando aplicável, do bloco afim ou do cache de visão do dungeon também conta.
-Reservas adicionais de OBJ/OAM criadas dinamicamente pela interface ainda não
-são adicionadas às métricas de assets; o relatório mantém cobertura parcial.
+
+### Reservas dinâmicas da interface
+
+`dynamic_reservations` descreve arenas nativas de endereços, incluindo paletas,
+texto em pixels/compacto, imagens de HUD, campo de nome, teclado, retratos,
+relógio e textos de eventos em sobreposição. O HUD padrão de luta também conta.
+Texto alinhado que usa BG não recebe tiles de texto OBJ. O HUD avançado ainda
+reserva OAM 96..127 porque sua rotina de início limpa toda essa faixa, inclusive
+quando só desenha em BG. Scripts chamados
+pela cena são percorridos; o relógio habilitado por scripts é tratado como estado
+compartilhado. A faixa completa conta quando as rotinas limpam/ocultam seus slots.
+
+Os intervalos são unidos aos assets sem duplicar os mesmos endereços. O modelo
+reserva a arena de glyphs 900..1023, as faixas OAM 64..95/96..127 conforme o
+renderer e a faixa própria do teclado 40..79. Ícones usam tiles já alocados;
+sua reserva dinâmica acrescenta o intervalo OAM. A aba de retrato opt-in ocupa
+12 KiB de OBJ e oito entradas OAM. Isso não é um pico de sprites por frame.
+
+Uma sobreposição entre payload OBJ e glyphs privados bloqueia a exportação.
+A exceção exige prova compilada de tiles integralmente fora da tela: frame
+estático 4bpp, um quadro/OBJ, geometria confirmada pela alocação e sem outro
+consumidor na cena. `nonvisible_obj_ranges` não reduz o total alocado; só permite
+compartilhar endereços sem pixels visíveis. Reuso visível, outro asset sobreposto,
+frames omitidos ou formatos sem essa prova não recebem a exceção. Esse caso
+ocorre no canto fora da tela da imagem de chegada em corrida_resultados.
+O recorte é reconhecido sem mover, converter ou redesenhar a arte.
+
 
 ### Cobertura restante
 
@@ -136,8 +163,8 @@ trocar de projeto, editar dados ou alterar assets invalida resultados atrasados.
 Navegar entre cenas preserva o relatório, pois não altera o conteúdo compilado.
 O tamanho total não é apresentado como tamanho individual de cada cena.
 
-As próximas etapas são completar as reservas dinâmicas de OBJ/OAM, ampliar
-a atribuição de tabelas geradas e a cobertura dos caminhos avançados. A conversão
+As próximas etapas são ampliar a atribuição de código/dados ainda não associados,
+a cobertura dos caminhos avançados e a comparação com picos medidos por frame. A conversão
 de assets aprovados para 4bpp e a ampliação da matriz CI permanecem fora desta etapa.
 
 ## Validação focada

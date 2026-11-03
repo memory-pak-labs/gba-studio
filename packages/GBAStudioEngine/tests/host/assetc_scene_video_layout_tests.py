@@ -82,6 +82,101 @@ class NativeSceneVideoLayoutTests(unittest.TestCase):
         paged = (ROOT / "engine/include/gbs/paged_background.hpp").read_text()
         self.assertIn("paged_background_slot_count = 31 * 21", paged)
 
+    def test_aligned_bg_hud_text_does_not_reserve_obj_text(self):
+        ui = {"hud_active_layout_id": "hud", "hud_layouts": [{"id": "hud", "mode": "advanced", "components": [
+            {"kind": "text", "x": 8, "y": 8, "width": 80, "height": 8, "visible": True}]}]}
+        layout = self.layout(project("menu", block={"dialogue_ui": ui}))
+        self.assertNotIn("hud_text", [r["feature"] for r in layout["dynamic_reservations"]])
+        self.assertEqual(next(r for r in layout["dynamic_reservations"] if r["feature"] == "hud_oam")["resources"]["oam"], [{"start": 96, "count": 32}])
+
+    def test_pixel_hud_reserves_full_private_text_arena_and_oam(self):
+        ui = {"hud_active_layout_id": "hud", "hud_layouts": [{"id": "hud", "mode": "advanced", "components": [
+            {"kind": "text", "x": 9, "y": 8, "visible": True}]}]}
+        layout = self.layout(project("menu", block={"dialogue_ui": ui}))
+        text = next(r for r in layout["dynamic_reservations"] if r["feature"] == "hud_text")
+        self.assertEqual(text["resources"]["objVram"], [{"start": 28800, "count": 3968}])
+        self.assertEqual(text["resources"]["oam"], [{"start": 96, "count": 32}])
+
+    def test_compact_text_and_icons_share_the_descending_hud_oam_arena(self):
+        ui = {"hud_scene_bindings": [{"scene_name": "test", "preset_id": "hud"}], "hud_layouts": [
+            {"id": "hud", "mode": "advanced", "components": [{"kind": "text", "text_advance": 6}, {"kind": "icon", "asset": "icon"}]}]}
+        layout = self.layout(project("topdown", block={"dialogue_ui": ui}))
+        entries = {r["feature"]: r["resources"] for r in layout["dynamic_reservations"]}
+        self.assertEqual(entries["hud_compact_text"]["oam"], [{"start": 64, "count": 32}])
+        self.assertEqual(entries["hud_icons"]["oam"], [{"start": 64, "count": 32}])
+
+    def test_name_keyboard_reserves_glyphs_outside_asset_allocations(self):
+        layout = self.layout(project("menu", {"text_input": {"keyboard_control_layout": "bottom_grid"}}))
+        entries = {r["feature"]: r["resources"] for r in layout["dynamic_reservations"]}
+        self.assertEqual(entries["name_keyboard"]["objVram"], [{"start": 29952, "count": 1280}])
+        self.assertEqual(entries["name_keyboard"]["oam"], [{"start": 40, "count": 40}])
+        self.assertEqual(entries["name_input"]["objPalette"], [{"start": 416, "count": 32}])
+
+    def test_reachable_text_input_script_reserves_the_field_without_keyboard_obj(self):
+        p = project("menu", {"on_select": [{"op": "call_script", "script": 0}]},
+                    {"scripts": [{"script": [{"op": "open_text_input"}]}]})
+        entries = self.layout(p)["dynamic_reservations"]
+        self.assertIn("name_input", [r["feature"] for r in entries])
+        self.assertNotIn("name_keyboard", [r["feature"] for r in entries])
+
+    def test_portrait_tab_is_opt_in_and_reserves_actual_raster(self):
+        layout = self.layout(project("topdown", block={"dialogue_ui": {"portrait_layout": "portrait_tab"}}))
+        tab = next(r for r in layout["dynamic_reservations"] if r["feature"] == "portrait_tab")
+        self.assertEqual(tab["resources"]["objVram"], [{"start": 16384, "count": 12288}])
+        self.assertEqual(tab["resources"]["oam"], [{"start": 114, "count": 8}])
+
+    def test_default_text_input_object_and_generated_payload_ownership(self):
+        entries = self.layout(project("menu", {"text_input": {}}))["dynamic_reservations"]
+        self.assertIn("name_input", [r["feature"] for r in entries])
+        layout = self.layout(project("isometric", {"paged_surface": {}}))
+        self.assertIn("gbastudio_dialogue_ui::", layout["rom_symbol_prefixes"])
+
+    def test_shared_clock_and_screen_event_text_have_separate_reserved_slots(self):
+        layout = self.layout(project("menu", {"on_enter": [{"op": "start_game_clock"}, {"op": "draw_text", "layer": "overlay"}]}))
+        entries = {r["feature"]: r["resources"] for r in layout["dynamic_reservations"]}
+        self.assertEqual(entries["clock"]["oam"], [{"start": 123, "count": 5}])
+        self.assertEqual(entries["event_text"]["oam"], [{"start": 96, "count": 27}])
+        bg = self.layout(project("menu", {"on_enter": [{"op": "draw_text", "layer": "background"}]}))
+        self.assertNotIn("event_text", [r["feature"] for r in bg["dynamic_reservations"]])
+
+    def test_builtin_fighting_hud_reserves_status_obj_without_custom_layout(self):
+        features = [r["feature"] for r in self.layout(project("luta"))["dynamic_reservations"]]
+        self.assertIn("status_text", features)
+
+    def test_clipped_frame_tiles_may_share_obj_space_but_visible_reuse_cannot(self):
+        c = {"kind": "frame", "asset": "image", "x": 192, "y": 128, "visible": True}
+        ui = {"hud_active_layout_id": "hud", "hud_layouts": [{"id": "hud", "mode": "advanced", "components": [c]}]}
+        p = project("menu", block={"dialogue_ui": ui})
+        p["asset_pack"] = {"assets": [{"name": "image", "sprite_width": 64, "sprite_height": 64, "sprite_bpp": 4}]}
+        a = compiled("obj", "image", {"sprite_frames": 1, "oam_sprites": 1})
+        a["allocations"] = {"obj_tiles": {"start": 837, "count": 64}}
+        ranges = self.layout(p, [a])["nonvisible_obj_ranges"]
+        self.assertIn({"start": 900 * 32, "count": 32}, ranges)
+        self.assertNotIn({"start": 837 * 32, "count": 32}, ranges)
+        ui["hud_layouts"][0]["components"].append({**c, "x": 0, "y": 0})
+        self.assertEqual(self.layout(p, [a])["nonvisible_obj_ranges"], [])
+
+    def test_offscreen_proof_does_not_exempt_another_asset_or_an_omitted_payload(self):
+        ui = {"hud_active_layout_id": "hud", "hud_layouts": [{"id": "hud", "mode": "advanced", "components": [
+            {"kind": "frame", "asset": "image", "x": 192, "y": 128}]}]}
+        p = project("menu", block={"dialogue_ui": ui})
+        p["asset_pack"] = {"assets": [{"name": "image", "sprite_width": 64, "sprite_height": 64}]}
+        a = compiled("obj", "image", {"sprite_frames": 1, "oam_sprites": 1})
+        a["allocations"] = {"obj_tiles": {"start": 837, "count": 64}}
+        other = compiled("obj", "visible")
+        other["allocations"] = {"obj_tiles": {"start": 900, "count": 1}}
+        self.assertNotIn({"start": 28800, "count": 32}, self.layout(p, [a, other])["nonvisible_obj_ranges"])
+        a["omitted"] = True
+        self.assertEqual(self.layout(p, [a])["nonvisible_obj_ranges"], [])
+
+    def test_dynamic_arena_constants_match_native_renderer(self):
+        source = (ROOT / "engine/src/gbs_hw.c").read_text()
+        for text in ["DYNAMIC_TEXT_OBJ_TILE_BASE = 900", "NAME_KEYBOARD_OBJ_OAM_BASE = 40",
+                     "NAME_KEYBOARD_OBJ_OAM_COUNT = 40", "NAME_KEYBOARD_OBJ_GLYPH_OFFSET = 36",
+                     "DYNAMIC_TEXT_OBJ_OAM_BASE = 96", "DYNAMIC_TEXT_OBJ_OAM_COUNT = 32",
+                     "HUD_ICON_OBJ_OAM_BASE = 88", "HUD_ICON_OBJ_OAM_COUNT = 32"]:
+            self.assertIn(text, source)
+
     def test_scene_group_uses_editor_normalization_for_accents_and_numeric_names(self):
         p = project("world_map")
         p["scene_contracts"][0]["name"] = "123 - Ação"
