@@ -4629,6 +4629,33 @@ def pack_asset_kind(asset):
     return kind
 
 
+def pack_asset_color_policy(asset, base_dir):
+    """Explain the selected format; never quantize or rewrite an asset for policy.
+
+    Count used RGB555 colors, not PNG palette entries, shared master padding,
+    or RGB888 aliases. A review candidate still needs bank/scene validation.
+    """
+    kind = asset.get("kind", "bg")
+    if kind not in ("obj", "bg", "affine_bg", "indexed_bg", "paged_bg", "bitmap3", "bitmap4", "bitmap5") or not asset.get("png"):
+        return None
+    _, _, colors, indices, transparent = read_png(base_dir / asset["png"], max_colors=None, include_transparency=True)
+    if kind == "obj":
+        colors, indices = normalize_obj_transparency(colors, indices, asset.get("transparent_color_index"))
+        if asset.get("transparent_color_index") is not None:
+            transparent = 0
+    visible = len({rgb15(colors[index]) for index in indices if index != transparent})
+    reason = {"affine_bg": "affine_renderer", "indexed_bg": "indexed_renderer", "paged_bg": "paged_renderer",
+              "bitmap3": "bitmap_mode", "bitmap4": "bitmap_mode", "bitmap5": "bitmap_mode"}.get(kind)
+    if reason:
+        fmt = "rgb555" if kind in ("bitmap3", "bitmap5") else "8bpp"
+    else:
+        bpp = int(asset.get("sprite_bpp" if kind == "obj" else "background_bpp", 4))
+        fmt = str(bpp) + "bpp"
+        reason = "default_4bpp" if bpp == 4 else "obj_color_count" if kind == "obj" and visible > 15 else "explicit_8bpp"
+    return {"default_bpp": 4, "format": fmt, "reason": reason,
+            "source_visible_colors": visible, "review_4bpp": reason == "explicit_8bpp" and visible <= 15}
+
+
 def pack_png_resources(asset, base_dir):
     kind = pack_asset_kind(asset)
     png_name = asset.get("png")
@@ -6583,6 +6610,8 @@ def emit_pack_report(pack_data, base_dir, previous_report=None):
             "ok": not asset_errors,
             "errors": asset_errors,
             "diagnostics": asset_diagnostics,
+            **({"color_policy": pack_asset_color_policy(asset, base_dir)} if asset.get("png") and asset.get("kind", "bg") in
+               ("obj", "bg", "affine_bg", "indexed_bg", "paged_bg", "bitmap3", "bitmap4", "bitmap5") else {}),
             **({"object_palette_plan": obj_plan} if obj_plan is not None else {}),
         }
         allocations.append(allocation)

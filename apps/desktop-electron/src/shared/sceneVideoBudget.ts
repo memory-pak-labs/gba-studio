@@ -34,6 +34,14 @@ export interface SceneVideoBudgetMetric {
   basis?: "compiled_allocation" | "native_reservation" | "compiled_and_native" | "linked_elf";
 }
 export interface NativeInterfaceReservation { feature: string; resources: CompiledSceneVideoPlan["resources"] }
+export interface CompiledAssetColorPolicy {
+  asset: string;
+  kind: string;
+  format: "4bpp" | "8bpp" | "rgb555";
+  reason: "default_4bpp" | "obj_color_count" | "explicit_8bpp" | "affine_renderer" | "indexed_renderer" | "paged_renderer" | "bitmap_mode";
+  sourceVisibleColors: number;
+  review4bpp: boolean;
+}
 export interface SceneVideoBudget {
   scene: string;
   displayMode: CompiledSceneVideoPlan["displayMode"];
@@ -41,6 +49,7 @@ export interface SceneVideoBudget {
   blocked: boolean;
   metrics: SceneVideoBudgetMetric[];
   romAssetBytes: number | null;
+  colorPolicy?: { defaultBpp: 4; complete: boolean; assets: CompiledAssetColorPolicy[] };
   romAssets?: { source: "linked_asset_symbols"; bytes: number; exclusiveBytes: number; sharedBytes: number; assetCount: number };
   diagnostics: SceneVideoBudgetDiagnostic[];
   nativeLayout?: { runtime: string; scope: "reservation_envelope"; notes: string[]; dynamicReservations?: NativeInterfaceReservation[] };

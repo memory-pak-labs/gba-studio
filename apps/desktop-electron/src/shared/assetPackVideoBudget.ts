@@ -1,4 +1,4 @@
-import { analyzeSceneVideoBudget, type CompiledSceneVideoPlan, type CompiledVideoRange, type SceneVideoBudget, type SceneVideoResource, type NativeInterfaceReservation } from "./sceneVideoBudget.js";
+import { analyzeSceneVideoBudget, type CompiledSceneVideoPlan, type CompiledVideoRange, type SceneVideoBudget, type SceneVideoResource, type NativeInterfaceReservation, type CompiledAssetColorPolicy } from "./sceneVideoBudget.js";
 
 export interface AssetPackVideoBudgetScene { name: string; bankGroup: string }
 export interface LinkedRomVideoBudget {
@@ -22,6 +22,23 @@ export interface AssetPackVideoBudgetReport {
 
 function record(value: unknown): value is Record<string, unknown> {
   return value !== null && typeof value === "object" && !Array.isArray(value);
+}
+
+const graphicsKinds = new Set(["obj", "bg", "affine_bg", "indexed_bg", "paged_bg", "bitmap3", "bitmap4", "bitmap5"]);
+function parseColorPolicy(entry: Record<string, unknown>): CompiledAssetColorPolicy | undefined {
+  const policy = entry.color_policy;
+  if (policy === undefined) return undefined;
+  const name = entry.name ?? entry.id;
+  if (typeof name !== "string" || !name || typeof entry.kind !== "string" || !graphicsKinds.has(entry.kind) ||
+    !record(policy) || policy.default_bpp !== 4 || (typeof policy.format !== "string" || !["4bpp", "8bpp", "rgb555"].includes(policy.format)) ||
+    (typeof policy.reason !== "string" || !["default_4bpp", "obj_color_count", "explicit_8bpp", "affine_renderer", "indexed_renderer", "paged_renderer", "bitmap_mode"].includes(policy.reason)) ||
+    !Number.isSafeInteger(policy.source_visible_colors) || (policy.source_visible_colors as number) < 0 || (policy.source_visible_colors as number) > 32768 ||
+    typeof policy.review_4bpp !== "boolean" || (policy.review_4bpp && (policy.format !== "8bpp" || policy.reason !== "explicit_8bpp" || (policy.source_visible_colors as number) > 15))) {
+    throw new Error("Política de cores inválida no relatório do compilador.");
+  }
+  return { asset: name, kind: entry.kind, format: policy.format as CompiledAssetColorPolicy["format"],
+    reason: policy.reason as CompiledAssetColorPolicy["reason"], sourceVisibleColors: policy.source_visible_colors as number,
+    review4bpp: policy.review_4bpp };
 }
 
 /** assetc OBJ tile slots are 32-byte units, including 8bpp (already doubled by
@@ -104,7 +121,8 @@ export function buildAssetPackVideoBudget(scenes: readonly AssetPackVideoBudgetS
         throw new Error(`Alocação ${resource} inválida no relatório do compilador.`);
       }
     }
-    return { groups: groups as string[], omitted: entry.omitted === true, allocations: entry.allocations };
+    return { groups: groups as string[], omitted: entry.omitted === true, allocations: entry.allocations,
+      graphics: typeof entry.kind === "string" && graphicsKinds.has(entry.kind), colorPolicy: parseColorPolicy(entry) };
   });
   const results = scenes.map(scene => {
     const layout = layouts.find(layout => layout.scene === scene.name);
@@ -149,6 +167,8 @@ export function buildAssetPackVideoBudget(scenes: readonly AssetPackVideoBudgetS
     }
     return {
       ...result,
+      colorPolicy: { defaultBpp: 4 as const, complete: matched.some(asset => asset.graphics) && matched.every(asset => !asset.graphics || asset.colorPolicy !== undefined),
+        assets: matched.flatMap(asset => asset.colorPolicy ? [asset.colorPolicy] : []) },
       metrics: result.metrics.map(metric => ({ ...metric,
         ...(metric.used === null ? {} : { basis: dynamic.some(r => r.resources[metric.resource]) ? "compiled_and_native" as const : layout?.resources[metric.resource] ? "native_reservation" as const : "compiled_allocation" as const }) })),
       ...(layout ? { nativeLayout: { runtime: layout.runtime, scope: "reservation_envelope" as const, notes: layout.notes, ...(layout.dynamic_reservations ? { dynamicReservations: layout.dynamic_reservations } : {}) } } : {})

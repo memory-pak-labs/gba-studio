@@ -47,6 +47,20 @@ describe("scene video budget panel", () => {
     expect(screen.getByText("Faixas compartilhadas contam uma vez; reservas não são picos medidos por frame.")).toBeInTheDocument();
     expect(screen.queryByText("ROM por cena e uso dinâmico de OBJ/OAM ainda pendentes.")).not.toBeInTheDocument();
   });
+  it("explains 8bpp exceptions and requests review without offering automatic conversion", () => {
+    const report = buildAssetPackVideoBudget([{ name: "track", bankGroup: "scene_track" }], { schema: 11, ok: true, allocations: [
+      { id: "hero", kind: "obj", bank_groups: ["scene_track"], allocations: {}, color_policy: {
+        default_bpp: 4, format: "8bpp", reason: "obj_color_count", source_visible_colors: 32, review_4bpp: false } },
+      { id: "icon", kind: "obj", bank_groups: ["scene_track"], allocations: {}, color_policy: {
+        default_bpp: 4, format: "8bpp", reason: "explicit_8bpp", source_visible_colors: 3, review_4bpp: true } }
+    ] });
+    render(<SceneVideoBudgetPanel report={report} sceneName="track" />);
+    expect(screen.getByText("Política de cores")).toBeInTheDocument();
+    expect(screen.getByText("Mais de 15 cores visíveis no sprite.")).toBeInTheDocument();
+    expect(screen.getByText("Revisar uso de 4bpp")).toBeInTheDocument();
+    expect(screen.getByText("Formatos existentes são preservados; nenhuma cor é reduzida automaticamente.")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /converter/i })).not.toBeInTheDocument();
+  });
   it("translates the added copy in English", () => {
     window.localStorage.setItem("gbaStudio.locale", "en-US");
     render(<StudioI18nProvider><SceneVideoBudgetPanel sceneName="track" /></StudioI18nProvider>);

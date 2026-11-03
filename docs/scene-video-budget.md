@@ -176,9 +176,34 @@ trocar de projeto, editar dados ou alterar assets invalida resultados atrasados.
 Navegar entre cenas preserva o relatório, pois não altera o conteúdo compilado.
 O tamanho total não é apresentado como tamanho individual de cada cena.
 
-As próximas etapas são ampliar a atribuição de código/dados ainda não associados,
-a cobertura dos caminhos avançados e a comparação com picos medidos por frame. A conversão
-de assets aprovados para 4bpp e a ampliação da matriz CI permanecem fora desta etapa.
+## Política de cores e preservação visual
+
+Novos sprites/portraits e backgrounds regulares usam 4bpp por padrão. Um OBJ
+4bpp usa uma paleta de 16 entradas, com índice zero transparente. Backgrounds
+regulares podem usar vários bancos: a regra de 15 cores de OBJ não limita o
+background inteiro a 15 cores. O `assetc` continua validando bancos compartilhados,
+reservas da interface e os limites reais de cada grupo de cena.
+
+Cada alocação gráfica agora inclui `color_policy`: formato, razão e quantidade
+de cores usadas na fonte em RGB555. A contagem ignora entradas não usadas da
+paleta PNG e variantes RGB888 que viram a mesma cor no GBA. Não é o consumo de
+paleta RAM: esse consumo vem dos intervalos compilados e das reservas nativas.
+
+8bpp tem razões distintas: OBJ com mais de 15 cores, seleção explícita do autor,
+background afim, superfície indexada, cache paginado ou modo bitmap. A política
+marca um OBJ 8bpp com até 15 cores como **Revisar uso de 4bpp**. Isso é uma
+indicação de revisão, não prova de conversão segura: é preciso conferir bancos,
+transparência, variantes de paleta, animações e a cena inteira na ROM.
+
+O inspetor mostra a política e os formatos dos assets em uma lista expansível.
+Dados antigos sem política ficam pendentes até nova análise. A política é
+recalculada também quando alocações compiladas vêm de cache; uma decisão antiga
+não muda a classificação atual. O relatório não converte arquivos, não muda o
+formato selecionado, não reduz cores e não retira avisos de memória.
+
+Continuam separados do envelope: picos por frame, ciclos de DMA e atribuição
+do código/dados sem símbolos de assets. O CI entre três sistemas está descrito
+em [Integração contínua](continuous-integration.md).
 
 ## Validação focada
 

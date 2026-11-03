@@ -8,6 +8,29 @@ function asset(id: string, bank_groups: string[], allocations: Record<string, { 
 const report = (allocations: unknown[]) => ({ schema: 11, ok: true, allocations });
 
 describe("asset pack video budget adapter", () => {
+  it("keeps color decisions scoped to the scene and never converts formats", () => {
+    const policy = { default_bpp: 4, format: "8bpp", reason: "explicit_8bpp", source_visible_colors: 4, review_4bpp: true };
+    const raw = report([asset("icon", ["scene_alpha"], {}, { color_policy: policy }),
+      asset("other", ["scene_beta"], {}, { color_policy: { ...policy, source_visible_colors: 30, reason: "obj_color_count", review_4bpp: false } }),
+      asset("omitted", ["scene_alpha"], {}, { omitted: true, color_policy: policy })]);
+    const before = JSON.stringify(raw);
+    const result = buildAssetPackVideoBudget(scenes, raw);
+    expect(result.scenes[0].colorPolicy).toEqual({ defaultBpp: 4, complete: true, assets: [
+      { asset: "icon", kind: "obj", format: "8bpp", reason: "explicit_8bpp", sourceVisibleColors: 4, review4bpp: true }
+    ] });
+    expect(result.scenes[1].colorPolicy?.assets[0].reason).toBe("obj_color_count");
+    expect(JSON.stringify(raw)).toBe(before);
+  });
+
+  it("keeps missing color decisions pending and rejects malformed policy evidence", () => {
+    expect(buildAssetPackVideoBudget(scenes, report([asset("icon", ["scene_alpha"], {})])).scenes[0].colorPolicy?.complete).toBe(false);
+    for (const color_policy of [{}, { default_bpp: 4, format: "8bpp", reason: "explicit_8bpp", source_visible_colors: -1, review_4bpp: true },
+      { default_bpp: 4, format: ["4bpp"], reason: "default_4bpp", source_visible_colors: 1, review_4bpp: false },
+      { default_bpp: 4, format: "4bpp", reason: ["default_4bpp"], source_visible_colors: 1, review_4bpp: false }]) {
+      expect(() => buildAssetPackVideoBudget(scenes, report([asset("bad", ["scene_alpha"], {}, { color_policy })]))).toThrow(/política/i);
+    }
+  });
+
   it("uses native renderer reservations and the effective mode emitted by assetc", () => {
     const raw = { ...report([asset("floor", ["scene_alpha"], { obj_tiles: { start: 0, count: 128 } })]), scene_video_layouts: { schema: 1, plans: [{
       scene: "alpha", bank_group: "scene_alpha", bank_groups: ["scene_alpha"], runtime: "racing", display_mode: 1,

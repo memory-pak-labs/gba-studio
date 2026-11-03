@@ -6,6 +6,19 @@ import "./styles/scene-video-budget.css";
 
 const labels = { bgVram: "Reserva BG", objVram: "VRAM OBJ", screenblocks: "Screenblocks", bgPalette: "Paleta BG", objPalette: "Paleta OBJ", oam: "OAM", romAssets: "ROM" };
 const featureLabels: Record<string, string> = { ui_palettes: "Paletas da interface", hud_oam: "Área OAM do HUD", hud_text: "Texto do HUD em OBJ", hud_compact_text: "Texto compacto do HUD", hud_icons: "Imagens do HUD", dialogue_portrait: "Retratos de diálogo", portrait_tab: "Aba de retrato", name_input: "Campo do nome", name_keyboard: "Teclado do nome", event_text: "Texto de eventos", clock: "Relógio do jogo", status_text: "HUD padrão de luta" };
+const colorReasons = {
+  default_4bpp: "Formato padrão de 4bpp.", obj_color_count: "Mais de 15 cores visíveis no sprite.",
+  explicit_8bpp: "8bpp selecionado explicitamente.", affine_renderer: "O background afim exige 8bpp.",
+  indexed_renderer: "A superfície indexada usa 8bpp.", paged_renderer: "O cache de background paginado usa 8bpp.",
+  bitmap_mode: "Formato exigido pelo modo bitmap."
+};
+const layoutNotes: Record<string, string> = {
+  native_scene_not_resolved: "Cena nativa não resolvida.", changing_background_video_not_modelled: "As trocas de modo dos backgrounds ainda precisam de reservas por estado.",
+  native_map_dimensions_not_modelled: "Dimensões do mapa sem reserva verificada.", paged_foreground_not_resolved: "Foreground paginado não resolvido.",
+  affine_panorama_layout_overlap: "O mapa afim invade a região do panorama.", bitmap_asset_not_resolved: "Imagem bitmap não resolvida.",
+  affine_asset_not_resolved: "Asset afim não resolvido.", affine_map_dimensions_not_resolved: "Dimensões do mapa afim sem reserva verificada.",
+  isometric_map_asset_not_resolved: "Mapa isométrico não resolvido."
+};
 function bytes(value: number): string {
   const unit = value >= 1048576 ? "MiB" : value >= 1024 ? "KiB" : "B";
   const amount = value / (unit === "MiB" ? 1048576 : unit === "KiB" ? 1024 : 1);
@@ -23,6 +36,7 @@ export function SceneVideoBudgetPanel({ report, sceneName }: {
     {!scene ? <p>{ui("Faça a análise para carregar as reservas de vídeo desta cena.")}</p> : <>
       <p>{scene.displayMode === null ? ui("Pendente") : ui("Modo de vídeo {0}", { 0: scene.displayMode })}</p>
       <p>{ui("Reservas e alocações; cobertura parcial.")}</p>
+      {scene.nativeLayout?.notes.length ? <ul>{scene.nativeLayout.notes.map(note => <li key={note}>{ui(layoutNotes[note] ?? "Um caminho nativo ainda não tem reservas verificadas.")}</li>)}</ul> : null}
       <div className="room-project-budget-grid">
         {scene.metrics.filter(metric => metric.resource !== "romAssets").map(metric => {
           const tone = metric.status === "blocked" ? "error" : ["attention", "not_recommended"].includes(metric.status) ? "warning" : "";
@@ -42,6 +56,22 @@ export function SceneVideoBudgetPanel({ report, sceneName }: {
         {scene.romAssets ? <p>{ui("Exclusivos: {0} · Compartilhados: {1}", { 0: bytes(scene.romAssets.exclusiveBytes), 1: bytes(scene.romAssets.sharedBytes) })}</p> : null}
         <small>{ui("Assets e dados nativos identificados no ELF; não some cenas com dados compartilhados.")}</small>
         {report?.romAssetsSummary ? <p>{ui("Código e demais dados não atribuídos: {0} (projeto).", { 0: bytes(report.romAssetsSummary.otherBytes) })}</p> : null}
+      </div>
+      <div className="scene-video-budget-colors">
+        <h5>{ui("Política de cores")}</h5>
+        <p>{ui("4bpp é o padrão; 8bpp depende das cores e do renderizador da cena.")}</p>
+        <small>{ui("Paletas BG e OBJ são separadas por cena. A ocupação inclui bancos e reservas, não só cores diferentes.")}</small>
+        {!scene.colorPolicy?.complete ? <p>{ui("Análise dos formatos de cor pendente.")}</p> : null}
+        {scene.colorPolicy?.assets.length ? <details>
+          <summary>{ui("Formatos dos assets ({0})", { 0: scene.colorPolicy.assets.length })}</summary>
+          <ul>{scene.colorPolicy.assets.map(asset => <li key={asset.asset}>
+            <strong>{asset.asset} · {asset.format === "rgb555" ? "RGB555" : asset.format}</strong>
+            <small>{ui(colorReasons[asset.reason])}</small>
+            <small>{ui("Cores usadas na fonte (RGB555): {0}", { 0: asset.sourceVisibleColors })}</small>
+            {asset.review4bpp ? <strong>{ui("Revisar uso de 4bpp")}</strong> : null}
+          </li>)}</ul>
+        </details> : null}
+        <small>{ui("Formatos existentes são preservados; nenhuma cor é reduzida automaticamente.")}</small>
       </div>
       <div className="scene-video-budget-reservations">
         <h5>{ui("Reservas dinâmicas da interface")}</h5>

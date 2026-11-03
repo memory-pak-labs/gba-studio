@@ -1023,6 +1023,7 @@ assetc-test:
 	$(HOST_BUILD)/assetc/audio_wav_compile
 	python3 tests/host/assetc_production_contract_tests.py
 	python3 tests/host/assetc_scene_video_layout_tests.py
+	python3 tests/host/assetc_color_policy_tests.py
 	python3 tests/host/assetc_audio_quality_tests.py
 	python3 tests/host/assetc_sprite_dedup_tests.py
 	python3 tests/host/assetc_obj_palette_tests.py
