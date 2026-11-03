@@ -182,6 +182,12 @@ jobs:
               cd /work/apps/desktop-electron
               node scripts/verify-rom-regressions.mjs --engine-pack /work/packages/GBAStudioEngine/dist/GBAStudioEnginePack --output /qa
             ' 2>&1 | tee "$RUNNER_TEMP/rom-regressions/producer.log"
+      - name: Restore ownership of ROM evidence
+        if: always()
+        run: |
+          if [ -d "$RUNNER_TEMP/rom-regressions" ]; then
+            sudo chown -R "$(id -u):$(id -g)" "$RUNNER_TEMP/rom-regressions"
+          fi
       - name: Preserve the exact Engine Pack for cross-host replay
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:

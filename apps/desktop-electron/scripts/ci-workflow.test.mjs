@@ -43,6 +43,13 @@ describe('CI platform coverage and evidence', () => {
     expect(artifacts(replay).some(s => s.if === 'always()')).toBe(true);
     expect(commands(producer)).toContain('git config --global --add safe.directory /work');
     expect(commands(producer)).toContain('tee "$RUNNER_TEMP/rom-regressions/producer.log"');
+    const producerSteps = steps(producer);
+    const restore = producerSteps.findIndex(s => s.name === 'Restore ownership of ROM evidence');
+    const upload = producerSteps.findIndex(s => s.with?.name === 'ARM-ROM-regressions');
+    expect(restore).toBeGreaterThan(producerSteps.findIndex(s => s.name === 'Compile ARM and replay native regressions'));
+    expect(restore).toBeLessThan(upload);
+    expect(producerSteps[restore].if).toBe('always()');
+    expect(producerSteps[restore].run).toContain('"$RUNNER_TEMP/rom-regressions"');
   });
   it('keeps actions pinned and grants no publishing permissions', () => {
     const w = workflow(); expect(w.permissions).toEqual({ contents: 'read' });
