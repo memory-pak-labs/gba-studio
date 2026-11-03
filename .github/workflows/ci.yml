@@ -119,11 +119,7 @@ jobs:
               apt-get update && apt-get install -y --no-install-recommends clang python3-pil
               make -j2 package
               cd /work/apps/desktop-electron
-              node scripts/smoke-replace-tile.mjs /work/packages/GBAStudioEngine/dist/GBAStudioEnginePack /qa/replace-tile
-              node scripts/smoke-event-replay.mjs /work/packages/GBAStudioEngine/dist/GBAStudioEnginePack /qa/event-replay
-              node scripts/smoke-hardware-diagnostic.mjs /work/packages/GBAStudioEngine/dist/GBAStudioEnginePack /qa/hardware-diagnostic
-              node scripts/smoke-map-states.mjs /work/packages/GBAStudioEngine/dist/GBAStudioEnginePack /qa/map-states
-              node scripts/smoke-visibility-graphics.mjs /work/packages/GBAStudioEngine/dist/GBAStudioEnginePack /qa/graphics
+              node scripts/verify-rom-regressions.mjs --engine-pack /work/packages/GBAStudioEngine/dist/GBAStudioEnginePack --output /qa
             '
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         if: always()
