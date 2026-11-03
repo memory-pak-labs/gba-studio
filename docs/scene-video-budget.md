@@ -1,6 +1,6 @@
 # Orçamento de vídeo compilado por cena
 
-Primeira etapa do radar técnico: núcleo puro e relatório de exportação. O visual,
+Radar técnico: núcleo puro, relatório de exportação e leitura no Editor. O visual,
 os assets e os formatos 4bpp/8bpp existentes permanecem iguais.
 
 ## Núcleo independente da UI
@@ -157,8 +157,13 @@ A seção **Vídeo compilado** mostra o modo nativo, as reservas de BG e mapas,
 as alocações de OBJ, paletas e OAM e a cobertura parcial. Dados ausentes ficam
 pendentes. Os cartões distinguem **Reserva nativa** de **Assets compilados**.
 
-Após **Gerar ROM**, a mesma seção apresenta o tamanho total medido do arquivo
-final. O resultado só é associado à versão do projeto que iniciou a operação;
+Após **Gerar ROM**, a mesma seção apresenta o tamanho total medido, a **ROM
+atribuída à cena**, bytes exclusivos/compartilhados e o restante não atribuído
+do projeto. A lista **Reservas dinâmicas da interface** identifica as arenas
+que contribuíram para o orçamento. Faixas compartilhadas contam uma vez, e as
+reservas não são apresentadas como picos medidos por frame.
+
+O resultado só é associado à versão do projeto que iniciou a operação;
 trocar de projeto, editar dados ou alterar assets invalida resultados atrasados.
 Navegar entre cenas preserva o relatório, pois não altera o conteúdo compilado.
 O tamanho total não é apresentado como tamanho individual de cada cena.

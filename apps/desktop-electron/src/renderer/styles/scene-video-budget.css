@@ -13,3 +13,19 @@
 .scene-video-budget .room-project-budget-grid article small {
   display: block;
 }
+
+.scene-video-budget-rom,
+.scene-video-budget-reservations {
+  border-top: 1px solid var(--studio-color-border);
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+  padding-top: 8px;
+}
+
+.scene-video-budget-reservations li {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
