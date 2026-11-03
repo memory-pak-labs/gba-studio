@@ -30,7 +30,11 @@ npm run verify:mgba-web
 node scripts/smoke-electron-welcome.mjs
 ```
 
-A medição de abertura roda separada dos demais testes e antes do build, sem
+A auditoria funcional das 36 cenas roda em `project-integration`, com um worker,
+depois dos testes unitários. Seu limite de 60 segundos e as verificações de
+todas as cenas permanecem iguais; a separação evita concorrência de fixtures
+grandes no Windows. A medição de abertura roda separada dos demais testes e
+antes do build, sem
 outra carga pesada no mesmo job. O build já inclui typecheck. Não existe lint
 dedicado do aplicativo.
 
