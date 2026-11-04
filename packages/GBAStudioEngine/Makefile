@@ -2196,3 +2196,4 @@ $(HOST_BUILD)/racing_progress_tests: tests/host/racing_progress_tests.cpp engine
 .PHONY: event-scale-background-test
 event-scale-background-test:
 	python3 tests/host/platformer_affine_background_tests.py
+	python3 tests/host/affine_tilemap_publication_tests.py
