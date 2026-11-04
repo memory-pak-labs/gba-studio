@@ -750,6 +750,8 @@ export interface PreviewRuntimeState {
   dialogueLocale: ProjectLocale;
   startMenu: PreviewRuntimeStartMenu;
   sceneMenu: PreviewRuntimeSceneMenu;
+  /** Event history is global; menu navigation may reset when a gameplay scene opens. */
+  eventSceneStack: string[];
   textInput: PreviewRuntimeTextInputState;
   battleMenu: PreviewBattleMenu;
   dungeonInteraction: PreviewDungeonInteraction;
@@ -3167,12 +3169,13 @@ function scalarEquals(left: PreviewRuntimeScalar | undefined, right: PreviewRunt
   return String(left ?? "") === String(right ?? "");
 }
 
-function previousGameplayRoom(state: PreviewRuntimeState): PreviewRuntimeRoom | undefined {
-  return [...state.sceneMenu.stack].reverse().map(id=>state.rooms.find(room=>room.id===id || room.name===id)).find(room=>room && room.sceneType!=="menu");
+function previousSceneRoom(state: PreviewRuntimeState): PreviewRuntimeRoom | undefined {
+  const stack = state.eventSceneStack.length ? state.eventSceneStack : state.sceneMenu.stack;
+  return [...stack].reverse().map(id=>state.rooms.find(room=>room.id===id || room.name===id)).find(room=>room && (state.eventSceneStack.length > 0 || room.sceneType!=="menu"));
 }
 function engineFieldValue(state: PreviewRuntimeState, field: string): PreviewRuntimeScalar {
   if(field === "previous_runtime" || field === "previous_room") {
-    const previous=previousGameplayRoom(state);
+    const previous=previousSceneRoom(state);
     if(!previous)return -1;
     if(field === "previous_runtime") return ({topdown:0,platformer:1,isometric:2,menu:3,shmup:4,pointclick:5,pointClick:5,point_click:5,dungeon:6,dungeonCrawler:6,dungeon_crawler:6,racing:7,cutscene:8,visualnovel:9,visualNovel:9,visual_novel:9,worldmap:10,worldMap:10,world_map:10,battlerpg:11,battleRpg:11,battle_rpg:11,luta:12} as Record<string,number>)[previous.sceneType] ?? -1;
     return state.rooms.filter(room=>room.sceneType===previous.sceneType).findIndex(room=>room.id===previous.id);
@@ -4755,6 +4758,17 @@ function runScriptFrameCommands(state: PreviewRuntimeState, frame: PreviewRuntim
       break doCommand;
     }
 
+    if (verb === "scene_stack_push" || verb === "scene_stack_clear") {
+      // The engine retains eight entries, discarding the oldest on overflow.
+      const stack = verb === "scene_stack_clear" ? [] : currentState.currentRoom
+        ? [...currentState.eventSceneStack, currentState.currentRoom.id].slice(-8)
+        : currentState.eventSceneStack;
+      currentState = updateDebug(appendLog({ ...currentState, eventSceneStack: stack,
+        ...(verb === "scene_stack_clear" ? { sceneMenu: { ...currentState.sceneMenu, stack: [] } } : {}) },
+        resolvedEventName, command, "script", parts[0] ?? null));
+      break doCommand;
+    }
+
     if (verb === "change_scene") {
       const roomTarget = parts[0] ?? "";
       const nextRoom = roomTarget ? roomByName(currentState.rooms, roomTarget) : null;
@@ -6323,6 +6337,7 @@ export function bootPreviewRuntimeAtRoom(
     actorUpdateElapsedMs: 0,
     previewFrame: 0,
     previewFrameElapsedMs: 0,
+    eventSceneStack: [],
     nativeEvents: initialNativeEvents(),
     scriptWaitFrames: 0,
     scriptContinuations: [],
@@ -7747,7 +7762,7 @@ function playSceneMenuActionSound(state: PreviewRuntimeState, action: "navigate"
 }
 
 function sceneMenuItemAvailable(state: PreviewRuntimeState, item: MenuSceneItem): boolean {
-  return item.enabled && (!item.availableRuntime || previousGameplayRoom(state)?.sceneType===item.availableRuntime) && (!item.requiresSave || (typeof item.saveSlot === "number" && item.saveSlot >= 0
+  return item.enabled && (!item.availableRuntime || previousSceneRoom(state)?.sceneType===item.availableRuntime) && (!item.requiresSave || (typeof item.saveSlot === "number" && item.saveSlot >= 0
     ? !!state.saveSlots[item.saveSlot] : Object.values(state.saveSlots).some(Boolean)));
 }
 
