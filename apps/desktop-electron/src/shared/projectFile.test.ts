@@ -193,20 +193,42 @@ describe("GBA project file contract", () => {
     })).toEqual([]);
   });
 
-  it("validates compact metatile maps without accepting corrupt dictionaries or indices", () => {
-    const map = { encoding: "metatile-v1", width: 4, height: 2, blockWidth: 2, blockHeight: 2,
-      dictionary: [[0, 1, 2, 3], [4, 5, 6, 7]], indices: [0, 1] };
-    const room = (tilemap: unknown) => ({ scenas: [{ name: "map", width: 4, height: 2, tilemap }] });
-    expect(validateRoomSchemaCoverage(room(map))).toEqual([]);
-    for (const corrupt of [
-      { ...map, width: 2, height: 4 },
-      { ...map, blockWidth: 3 },
-      { ...map, dictionary: [[0, 1, 2]] },
-      { ...map, dictionary: [[0, 1, 2, "bad"]] },
-      { ...map, indices: [0, 2] },
-      { ...map, indices: [0] }
-    ]) expect(validateRoomSchemaCoverage(room(corrupt))).toEqual([
-      { roomIndex: 0, roomName: "map", missingFields: [], invalidFields: ["tilemap"] }
+  function metatileRoom() {
+    return {
+      name: "compact", width: 4, height: 2,
+      tilemap: { encoding: "metatile-v1", width: 4, height: 2, blockWidth: 2, blockHeight: 2,
+        dictionary: [[0, 1, 2, 3]], indices: [0, 0] },
+      collisionTypes: { encoding: "metatile-v1", width: 4, height: 2, blockWidth: 2, blockHeight: 2,
+        dictionary: [["free", "solid", "free", "solid"]], indices: [0, 0] }
+    };
+  }
+
+  it("accepts the metatile storage format produced by desktop saves", () => {
+    expect(validateRoomSchemaCoverage({ scenas: [metatileRoom()] })).toEqual([]);
+  });
+
+  it.each([
+    ["different grid shape", { width: 2, height: 4 }, "tilemap.dimensions"],
+    ["zero block width", { blockWidth: 0 }, "tilemap.dimensions"],
+    ["non-divisible grid", { blockWidth: 3 }, "tilemap.dimensions"],
+    ["short dictionary block", { dictionary: [[0, 1]] }, "tilemap.dictionary"],
+    ["non-numeric tile", { dictionary: [[0, "bad", 2, 3]] }, "tilemap.dictionary"],
+    ["out-of-range index", { indices: [0, 1] }, "tilemap.indices"],
+    ["fractional index", { indices: [0, 0.5] }, "tilemap.indices"],
+    ["missing map block", { indices: [0] }, "tilemap.indices"]
+  ])("rejects metatile resources with %s", (_name, patch, field) => {
+    const room = metatileRoom();
+    Object.assign(room.tilemap, patch);
+    expect(validateRoomSchemaCoverage({ scenas: [room] })).toEqual([
+      expect.objectContaining({ invalidFields: expect.arrayContaining([field]) })
+    ]);
+  });
+
+  it("rejects unknown collision types inside compact metatiles", () => {
+    const room = metatileRoom();
+    room.collisionTypes.dictionary[0][0] = "unknown";
+    expect(validateRoomSchemaCoverage({ scenas: [room] })).toEqual([
+      expect.objectContaining({ invalidFields: ["collisionTypes.dictionary"] })
     ]);
   });
 

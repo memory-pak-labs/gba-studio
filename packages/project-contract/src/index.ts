@@ -4,6 +4,7 @@ import {
   type ControlledEntitySceneType
 } from "../../scene-contracts/src/index.js";
 import { migrateLegacyEventBindings } from "./eventBindingMigration.js";
+import { sceneChangeCommandParts } from "./sceneChangeCommand.js";
 
 export { migrateLegacyEventBindings } from "./eventBindingMigration.js";
 
@@ -466,24 +467,44 @@ function roomCellCount(width: unknown, height: unknown): number | null {
   return positiveNumberIsValid(width) && positiveNumberIsValid(height) ? width * height : null;
 }
 
-function validateRoomTilemap(value: unknown, roomWidth: unknown, roomHeight: unknown, expectedCellCount: number | null, invalidFields: string[]): void {
+interface RoomGridDimensions { width: unknown; height: unknown }
+
+function validateCompactMetatile(
+  value: Record<string, unknown>, dimensions: RoomGridDimensions, field: string,
+  isEntryValid: (entry: unknown) => boolean, invalidFields: string[]
+): void {
+  const sizes = [value.width, value.height, value.blockWidth, value.blockHeight];
+  if (!sizes.every(size => typeof size === "number" && Number.isSafeInteger(size) && size > 0)) {
+    invalidFields.push(`${field}.dimensions`);
+    return;
+  }
+  const [width, height, blockWidth, blockHeight] = sizes as number[];
+  if (width !== dimensions.width || height !== dimensions.height
+    || !Number.isSafeInteger(width * height)
+    || width % blockWidth !== 0 || height % blockHeight !== 0) {
+    invalidFields.push(`${field}.dimensions`);
+    return;
+  }
+  const dictionary = value.dictionary;
+  if (!Array.isArray(dictionary) || dictionary.length === 0 || dictionary.some(block => (
+    !Array.isArray(block) || block.length !== blockWidth * blockHeight || !block.every(isEntryValid)
+  ))) {
+    invalidFields.push(`${field}.dictionary`);
+    return;
+  }
+  const indices = value.indices;
+  if (!Array.isArray(indices) || indices.length !== (width / blockWidth) * (height / blockHeight)
+    || indices.some(index => !Number.isInteger(index) || index < 0 || index >= dictionary.length)) {
+    invalidFields.push(`${field}.indices`);
+  }
+}
+
+function validateRoomTilemap(value: unknown, dimensions: RoomGridDimensions, invalidFields: string[]): void {
   if (value === undefined) return;
+  const expectedCellCount = roomCellCount(dimensions.width, dimensions.height);
 
   if (isRecord(value) && value.encoding === "metatile-v1") {
-    const { width, height, blockWidth, blockHeight, dictionary, indices } = value;
-    const positiveInteger = (entry: unknown): entry is number =>
-      typeof entry === "number" && Number.isSafeInteger(entry) && entry > 0;
-    const validDimensions = positiveInteger(width) && positiveInteger(height)
-      && positiveInteger(blockWidth) && positiveInteger(blockHeight)
-      && width === roomWidth && height === roomHeight
-      && width % blockWidth === 0 && height % blockHeight === 0;
-    const validDictionary = validDimensions && Array.isArray(dictionary) && dictionary.length > 0
-      && dictionary.every(block => Array.isArray(block) && block.length === blockWidth * blockHeight
-        && block.every(entry => typeof entry === "number" && Number.isFinite(entry)));
-    const validIndices = validDictionary && Array.isArray(indices)
-      && indices.length === (width / blockWidth) * (height / blockHeight)
-      && indices.every(index => Number.isSafeInteger(index) && index >= 0 && index < dictionary.length);
-    if (!validIndices) invalidFields.push("tilemap");
+    validateCompactMetatile(value, dimensions, "tilemap", entry => typeof entry === "number" && Number.isFinite(entry), invalidFields);
     return;
   }
 
@@ -510,14 +531,20 @@ function validateRoomTilemap(value: unknown, roomWidth: unknown, roomHeight: unk
   }
 }
 
-function validateRoomCollisionTypes(value: unknown, expectedCellCount: number | null, invalidFields: string[]): void {
+function validateRoomCollisionTypes(value: unknown, dimensions: RoomGridDimensions, invalidFields: string[]): void {
   if (value === undefined) return;
+  const expectedCellCount = roomCellCount(dimensions.width, dimensions.height);
+  const allowed = new Set([
+    "free", "solid", "down", "up", "left", "right", "water", "damage", "ladder", "event",
+    "slope_up_right", "slope_up_left"
+  ]);
+
+  if (isRecord(value) && value.encoding === "metatile-v1") {
+    validateCompactMetatile(value, dimensions, "collisionTypes", entry => typeof entry === "string" && allowed.has(entry), invalidFields);
+    return;
+  }
 
   if (isCompactRoomSequence(value)) {
-    const allowed = new Set([
-      "free", "solid", "down", "up", "left", "right", "water", "damage", "ladder", "event",
-      "slope_up_right", "slope_up_left"
-    ]);
     validateCompactRoomSequence(value, expectedCellCount, "collisionTypes", (entry) => (
       typeof entry === "string" && allowed.has(entry)
     ), invalidFields);
@@ -529,10 +556,6 @@ function validateRoomCollisionTypes(value: unknown, expectedCellCount: number | 
     return;
   }
 
-  const allowed = new Set([
-    "free", "solid", "down", "up", "left", "right", "water", "damage", "ladder", "event",
-    "slope_up_right", "slope_up_left"
-  ]);
   for (const [cellIndex, cell] of value.entries()) {
     if (typeof cell !== "string" || !allowed.has(cell)) {
       invalidFields.push(`collisionTypes[${cellIndex}]`);
@@ -634,9 +657,9 @@ export function validateRoomSchemaCoverage(data: GBAProjectData): GBAProjectRoom
       invalidFields.push("height");
     }
 
-    const expectedCellCount = roomCellCount(width, height);
-    validateRoomTilemap(room.tilemap, width, height, expectedCellCount, invalidFields);
-    validateRoomCollisionTypes(room.collisionTypes, expectedCellCount, invalidFields);
+    const dimensions = { width, height };
+    validateRoomTilemap(room.tilemap, dimensions, invalidFields);
+    validateRoomCollisionTypes(room.collisionTypes, dimensions, invalidFields);
 
     if (missingFields.length === 0 && invalidFields.length === 0) return [];
 
@@ -1209,7 +1232,7 @@ function commandReferenceIsValid(
   events: Set<string>,
   dialogues: Set<string>
 ): boolean {
-  const parts = command.trim().split(/\s+/);
+  const parts = sceneChangeCommandParts(command);
   const opcode = parts[0];
   const operand = parts[1] ?? "";
 
@@ -1331,6 +1354,7 @@ function collectInvalidEventBindingFields(
 
   for (const field of fields) {
     const value = item[field];
+    if (field === "eventName" && value === "") continue;
     if (value !== undefined && (typeof value !== "string" || value.trim().length === 0 || !events.has(value.trim()))) {
       invalidFields.push(field);
     }
@@ -1719,6 +1743,7 @@ function numberInRangeIsValid(value: unknown, minimum: number, maximum: number):
 export function validateSettingsSchemaCoverage(data: GBAProjectData): GBAProjectSettingsSchemaIssue[] {
   const settings = settingsRecord(data);
   const roomNames = projectRoomNames(data);
+  const hasScenes = projectRoomRecords(data).length > 0;
 
   return PROJECT_SETTINGS_SECTIONS.flatMap((section): GBAProjectSettingsSchemaIssue[] => {
     const sectionValue = settings?.[section];
@@ -1741,9 +1766,11 @@ export function validateSettingsSchemaCoverage(data: GBAProjectData): GBAProject
 
     for (const field of PROJECT_SETTINGS_FIELD_SCHEMAS[section]) {
       const value = sectionValue[field.key];
+      const emptyProjectStart = section === "general" && field.key === "startScene"
+        && !hasScenes && typeof value === "string" && value.trim().length === 0;
       if (value === undefined) {
         missingFields.push(field.key);
-      } else if (!settingsFieldIsValid(value, field.type)) {
+      } else if (!emptyProjectStart && !settingsFieldIsValid(value, field.type)) {
         pushInvalidField(field.key);
       }
     }
