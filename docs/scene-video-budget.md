@@ -231,7 +231,9 @@ outro frame/cena ficam pendentes, em vez de aparecerem como zero medido.
 A extensão de telemetria ocupa 96 bytes após os 400 bytes existentes, sem mudar
 o ABI anterior. A ponte mGBA lê os 24 words em um único snapshot, sem avançar a
 simulação. A ocupação de OAM usa um mapa de 128 bits atualizado pelo renderer,
-sem varrer a memória de vídeo a cada frame. Inclui fallback nativo e OBJ afim de
+sem varrer a memória de vídeo a cada frame. Apenas os trechos de OAM usam
+`-O2` no GCC nativo, para preservar a cadência de Penedos sem ampliar a RAM estática;
+a ROM continua sujeita ao mínimo existente de 55 Hz. Inclui fallback nativo e OBJ afim de
 tamanho duplo; objetos desligados e shapes inválidos não entram na conta.
 
 O escopo é DMA imediato programado pela engine, sem repetições automáticas de

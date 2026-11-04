@@ -326,6 +326,11 @@ static void gbs_hw_dma_wait(int channel) {
     }
 }
 
+// OAM tracking must preserve the platformer frame budget without extra RAM.
+#if defined(__GNUC__) && !defined(__clang__)
+#pragma GCC push_options
+#pragma GCC optimize("O2")
+#endif
 static void commit_shadow_oam(void) {
     if (hblank_dma_active_mask & (1u << 3)) return;
     if (shadow_oam_dirty_last <= shadow_oam_dirty_first) {
@@ -361,6 +366,11 @@ static void commit_shadow_oam_full(void) {
     shadow_oam_dirty_first = 128;
     shadow_oam_dirty_last = 0;
 }
+
+
+#if defined(__GNUC__) && !defined(__clang__)
+#pragma GCC pop_options
+#endif
 
 static void commit_shadow_bg_tilemaps(void) {
     for (int layer = 0; layer < 4; ++layer) {
@@ -1432,6 +1442,11 @@ static int gbs_hw_hud_icon_owns_slot(int index) {
     return ordinal < hud_icon_obj_count || ordinal >= HUD_ICON_OBJ_OAM_COUNT - hud_compact_obj_count;
 }
 
+// OAM tracking must preserve the platformer frame budget without extra RAM.
+#if defined(__GNUC__) && !defined(__clang__)
+#pragma GCC push_options
+#pragma GCC optimize("O2")
+#endif
 void gbs_hw_hide_sprites(int first, int count) {
     if (first < 0) first = 0;
     if (first >= 128 || count <= 0) return;
@@ -1528,6 +1543,11 @@ void gbs_hw_set_sprite_affine(int index, int enabled, int double_size, uint16_t 
     shadow_oam[index * 4 + 1] = attr1;
     mark_shadow_oam_dirty(index, 1);
 }
+
+
+#if defined(__GNUC__) && !defined(__clang__)
+#pragma GCC pop_options
+#endif
 
 void gbs_hw_set_sprite_affine_matrix(uint16_t matrix_index, int16_t pa, int16_t pb, int16_t pc, int16_t pd) {
     if (matrix_index >= 32) {
