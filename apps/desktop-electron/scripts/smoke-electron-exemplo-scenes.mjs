@@ -1,9 +1,9 @@
 import { platformerCameraPosition, composePlatformerViewport } from './platformer-viewport-contract.mjs';
+import { findIsometricRoute, isometricDirectionButtons } from "./exemplo-isometric-route.mjs";
 import { execFile, spawn } from "node:child_process";
 import { createHash } from "node:crypto";
 import { existsSync, readFileSync } from "node:fs";
-import { mkdir, mkdtemp, readFile, readdir, stat, writeFile } from "node:fs/promises";
-import { tmpdir } from "node:os";
+import { mkdir, readFile, readdir, stat, writeFile } from "node:fs/promises";
 import { basename, dirname, extname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { promisify } from "node:util";
@@ -50,7 +50,8 @@ import {
   selectExemploScenePlaytestPlan,
   selectExemploScenePlaytestProjectPath,
   steadyFrameSamples,
-  selectSceneCadenceWindow
+  selectSceneCadenceWindow,
+  selectTransitionCadenceWindow
 } from "./exemplo-scene-playtest-contract.mjs";
 import {
   decodePngRgba
@@ -93,6 +94,7 @@ import { classifyP0ProjectPath, resolveCanonicalP0Source } from "./p0-source-cat
 import { activeBuildRomPaths } from "./exemplo-template-smoke-contract.mjs";
 import { defaultWelcomeSavedProjectPath } from "./smoke-electron-welcome-paths.mjs";
 import { readPlayerPlaybackReadiness } from "./player-playback-readiness.mjs";
+import { createTemporarySmokeWorkspace } from "./lib/temporary-smoke-workspace.mjs";
 
 const appRoot = dirname(dirname(fileURLToPath(import.meta.url)));
 const canonicalTemplatePath = join(appRoot, "default-assets", "templates", "exemplo-gba", "exemplo-gba.gba-project");
@@ -984,13 +986,19 @@ async function waitForPerformance(mainCdp, knownWindowIDs, scope = null) {
   `, true);
   if (!value?.ok) throw new Error(`Telemetria de cadencia insuficiente: ${JSON.stringify(value)}.`);
   let observedSamples;
+  let cadenceWindowSource = "after-observation";
   try {
     observedSamples = scope ? selectSceneCadenceWindow(value.samples, scope) : value.samples;
   } catch (error) {
-    // Preserve the actual rejected sequence before the smoke closes its Player.
-    await writeFile(join(evidenceRoot, `cadence-rejected-${value.windowID}.json`),
-      JSON.stringify({ scope, ...value }, null, 2));
-    throw error;
+    try {
+      observedSamples = selectTransitionCadenceWindow(value.excludedBeforeScope, value.samples, scope);
+      cadenceWindowSource = "before-observation-automatic-transition";
+    } catch {
+      // Preserve the actual rejected sequence before the smoke closes its Player.
+      await writeFile(join(evidenceRoot, `cadence-rejected-${value.windowID}.json`),
+        JSON.stringify({ scope, ...value }, null, 2));
+      throw error;
+    }
   }
   const samples = steadyFrameSamples(observedSamples);
   return {
@@ -999,7 +1007,8 @@ async function waitForPerformance(mainCdp, knownWindowIDs, scope = null) {
     emulationFps: Math.round(average(samples, "emulationFps") * 100) / 100,
     emulationMs: Math.round(average(samples, "emulationMs") * 100) / 100,
     presentationFps: Math.round(average(samples, "presentationFps") * 100) / 100,
-    ...(scope ? { scope, observedSamples, excludedBeforeScope: value.excludedBeforeScope } : {}),
+    ...(scope ? { scope, cadenceWindowSource, observedSamples, excludedBeforeScope: value.excludedBeforeScope,
+      ...(cadenceWindowSource === "before-observation-automatic-transition" ? { transitionSamples: value.samples } : {}) } : {}),
     samples,
     windowID: value.windowID
   };
@@ -4866,207 +4875,122 @@ function assertCanonicalTransitionProbe(probe) {
 }
 
 async function runIsometricInputExercise(cdp, sceneName, expectedEntry, project) {
-  if (sceneName !== "mercado_suspenso") {
-    throw new Error(`O exercício de input isométrico foi solicitado para uma cena não suportada: ${sceneName}.`);
+  if (sceneName !== "mercado_suspenso") throw new Error(`Cena isométrica não suportada: ${sceneName}.`);
+  const room = project.rooms?.find((item) => item.name === sceneName);
+  const player = project.actors?.find((item) => item.id === "market-nara" && item.roomName === sceneName);
+  const trader = project.actors?.find((item) => item.id === "market-trader-v2" && item.roomName === sceneName);
+  const bridge = project.triggers?.find((item) => item.id === "trigger-market-bridge" && item.roomName === sceneName);
+  const exit = project.triggers?.find((item) => item.id === "trigger-market-exit" && item.roomName === sceneName);
+  const variableIndex = project.variables?.findIndex((item) => item.name === "var_market_shortcut") ?? -1;
+  if (!room || !player || !trader || !bridge || !exit || variableIndex < 0) {
+    throw new Error("O Mercado não possui os atores, gatilhos e variável esperados.");
   }
-
-  const marketShortcutVariableIndex = Array.isArray(project?.variables)
-    ? project.variables.findIndex((variable) => variable?.name === "var_market_shortcut")
-    : -1;
-  if (marketShortcutVariableIndex < 0) {
-    throw new Error("O projeto exemplo não expõe a variável persistente var_market_shortcut.");
-  }
-
-  const readRuntimeState = () => evaluate(cdp, "window.GBAStudioDirectPlayer?.inspectRuntime?.()?.state ?? null");
-  const buttons = {
-    right: { code: "ArrowRight", key: "ArrowRight", windowsVirtualKeyCode: 39 },
-    left: { code: "ArrowLeft", key: "ArrowLeft", windowsVirtualKeyCode: 37 },
-    up: { code: "ArrowUp", key: "ArrowUp", windowsVirtualKeyCode: 38 },
-    down: { code: "ArrowDown", key: "ArrowDown", windowsVirtualKeyCode: 40 },
-    a: { code: "KeyX", key: "x", windowsVirtualKeyCode: 88 }
+  const obstacles = project.actors.filter((item) => item.roomName === sceneName && item.id !== player.id);
+  const buttons = Object.fromEntries([
+    ["ArrowRight", 39], ["ArrowLeft", 37], ["ArrowUp", 38], ["ArrowDown", 40]
+  ].map(([code, windowsVirtualKeyCode]) => [code, { code, key: code, windowsVirtualKeyCode }]));
+  const a = resolveExemploSmokeFaceButton(project.settings?.controls, "a");
+  const readState = () => evaluate(cdp, "window.GBAStudioDirectPlayer?.inspectRuntime?.()?.state ?? null");
+  const pressA = () => pressPlayerButton(cdp, a.code, a.key, a.windowsVirtualKeyCode, 80);
+  const position = (state) => ({ x: Math.floor(Number(state?.player?.x)), y: Math.floor(Number(state?.player?.y)) });
+  const samePosition = (left, right) => left.x === right.x && left.y === right.y;
+  const directionFor = (current, next) => {
+    const names = isometricDirectionButtons(next.x - current.x, next.y - current.y);
+    if (!names) throw new Error(`Passo isométrico inválido: ${JSON.stringify({ current, next })}.`);
+    return names.map((name) => buttons[name]);
   };
-  const moveTo = async (targetX, targetY, label, acceptedPositions = [{ x: targetX, y: targetY }]) => {
-    const isAcceptedPosition = (state) => acceptedPositions.some((position) =>
-      Math.floor(Number(state?.player?.x)) === position.x && Math.floor(Number(state?.player?.y)) === position.y
-    );
-    const directions = [
-      { button: buttons.down, dx: -1, dy: 0 },
-      { button: buttons.right, dx: 1, dy: 0 },
-      { button: buttons.up, dx: 0, dy: -1 },
-      { button: buttons.left, dx: 0, dy: 1 }
-    ];
-    for (let step = 0; step < 180; step += 1) {
-      const state = await readRuntimeState();
-      const currentX = Math.floor(Number(state?.player?.x));
-      const currentY = Math.floor(Number(state?.player?.y));
-      if (isAcceptedPosition(state)) return state;
-      const target = acceptedPositions.reduce((closest, position) => {
-        const distance = Math.abs(currentX - position.x) + Math.abs(currentY - position.y);
-        return distance < closest.distance ? { distance, position } : closest;
-      }, { distance: Number.POSITIVE_INFINITY, position: { x: targetX, y: targetY } }).position;
-      const direction = currentX !== target.x
-        ? directions.find((candidate) => candidate.dx === Math.sign(target.x - currentX) && candidate.dy === 0)
-        : directions.find((candidate) => candidate.dy === Math.sign(target.y - currentY) && candidate.dx === 0);
-      if (!direction) {
-        throw new Error(`Movimento isométrico sem direção para ${label}: esperado=${JSON.stringify(acceptedPositions)}; observado=${JSON.stringify(state?.player)}.`);
-      }
-      // Mercado Suspenso uses continuous adventure movement. Keep the hold
-      // long enough to cross a logical cell: the public runtime telemetry
-      // intentionally reports the actor's logical tile, not its sub-cell
-      // remainder.
-      // Continuous isometric movement keeps a sub-tile remainder, while the
-      // public telemetry intentionally reports only the logical tile. A
-      // single 360 ms hold can therefore advance the actor without crossing
-      // a tile boundary yet. Give the current direction enough samples to
-      // cross that boundary before treating it as an actual collision.
-      let heldState = null;
-      let nextState = state;
-      let changedLogicalTile = false;
-      for (let sample = 0; sample < 4 && !changedLogicalTile; sample += 1) {
-        heldState = await pressPlayerButton(
-          cdp,
-          direction.button.code,
-          direction.button.key,
-          direction.button.windowsVirtualKeyCode,
-          360
-        );
-        nextState = await readRuntimeState();
-        changedLogicalTile = Number(nextState?.player?.x) !== Number(state?.player?.x)
-          || Number(nextState?.player?.y) !== Number(state?.player?.y);
-      }
-      if (!changedLogicalTile) {
-        throw new Error(`Movimento isométrico bloqueado antes de ${label}: observado=${JSON.stringify({
-          player: state?.player,
-          nextPlayer: nextState?.player,
-          inputWhileHeld: heldState?.input,
-          inputAfterSettle: nextState?.input,
-          directPlayerInput: heldState?.directPlayerInput,
-          presentedRuntime: heldState?.presentedRuntime,
-          collision: heldState?.collision,
-          nextCollision: nextState?.collision,
-          frame: heldState?.frame
-        })}.`);
-      }
+  const moveTo = async (target, label) => {
+    let last = "", unchanged = 0;
+    for (let attempt = 0; attempt < 500; attempt += 1) {
+      const state = await readState();
+      const current = position(state);
+      if (samePosition(current, target)) return state;
+      const path = findIsometricRoute(room, current, target, obstacles);
+      if (!path || path.length < 2) throw new Error(`Sem rota até ${label}: ${JSON.stringify(current)}.`);
+      const key = `${current.x},${current.y}`;
+      unchanged = key === last ? unchanged + 1 : 0;
+      if (unchanged > 20) throw new Error(`Movimento bloqueado antes de ${label}: ${JSON.stringify({ current, next: path[1], state })}.`);
+      last = key;
+      await holdPlayerButtons(cdp, directionFor(current, path[1]), 180);
     }
-    const state = await readRuntimeState();
-    throw new Error(`Movimento isométrico não alcançou ${label}: esperado=${JSON.stringify(acceptedPositions)}; observado=${JSON.stringify(state?.player)}.`);
+    throw new Error(`Movimento não alcançou ${label}: ${JSON.stringify(position(await readState()))}.`);
   };
-  const assertPosition = (state, x, y, label) => {
-    if (Math.floor(Number(state?.player?.x)) !== x || Math.floor(Number(state?.player?.y)) !== y) {
-      throw new Error(`Movimento isométrico divergente em ${label}: esperado=${x},${y}; observado=${JSON.stringify(state?.player)}.`);
+  const dismissDialogueAndMove = async (target, label) => {
+    for (let presses = 1; presses <= 6; presses += 1) {
+      await pressA();
+      const before = await readState();
+      const current = position(before);
+      const path = findIsometricRoute(room, current, target, obstacles);
+      if (!path || path.length < 2) throw new Error(`Sem saída após ${label}: ${JSON.stringify(current)}.`);
+      // A long movement crosses at least one cell once the dialogue is closed.
+      // Probe movement before another A so a closed dialogue is not reopened.
+      await holdPlayerButtons(cdp, directionFor(current, path[1]), 700);
+      const after = await readState();
+      if (!samePosition(position(before), position(after))) return { presses, probe: after };
     }
-  };
-  const dismissBridgeDialogue = async () => {
-    // The bridge connects back to the deck through (16,14); probing Up from
-    // (17,14) enters the authored water gap and is expected to be blocked.
-    const probe = buttons.down;
-    for (let dismissals = 1; dismissals <= 4; dismissals += 1) {
-      await pressPlayerButton(cdp, buttons.a.code, buttons.a.key, buttons.a.windowsVirtualKeyCode, 80);
-      const beforeProbe = await readRuntimeState();
-      await pressPlayerButton(cdp, probe.code, probe.key, probe.windowsVirtualKeyCode, 80);
-      const afterProbe = await readRuntimeState();
-      const moved = Number(afterProbe?.player?.x) !== Number(beforeProbe?.player?.x)
-        || Number(afterProbe?.player?.y) !== Number(beforeProbe?.player?.y);
-      if (moved) return { dismissals, probe: afterProbe };
-    }
-    throw new Error("O diálogo da ponte não foi fechado após quatro confirmações e a movimentação de prova.");
+    throw new Error(`O diálogo de ${label} não fechou após seis confirmações.`);
   };
 
   await wait(1_200);
-  const initial = await readRuntimeState();
-  const expectedInitialX = Number(expectedEntry?.x);
-  const expectedInitialY = Number(expectedEntry?.y);
-  if (!Number.isInteger(expectedInitialX) || !Number.isInteger(expectedInitialY)) {
-    throw new Error(`A posição inicial autorada da cena isométrica não está disponível: ${JSON.stringify(expectedEntry)}.`);
+  const initial = await readState();
+  if (!samePosition(position(initial), { x: Number(expectedEntry?.x), y: Number(expectedEntry?.y) })) {
+    throw new Error(`Entrada divergente no Mercado: ${JSON.stringify({ expectedEntry, player: initial?.player })}.`);
   }
-  assertPosition(initial, expectedInitialX, expectedInitialY, "início");
+  const traderGoal = { x: trader.x, y: trader.y + 1 };
+  const routeToExit = findIsometricRoute(room, bridge, exit, obstacles);
+  const slopePoints = routeToExit?.filter(({ x, y }) => room.rampFlags?.[y * room.width + x] && room.heightLevels?.[y * room.width + x] > 0) ?? [];
+  const firstRampTarget = slopePoints.find(({ x, y }) => room.heightLevels[y * room.width + x] === 1);
+  const secondRampTarget = slopePoints.find(({ x, y }) => room.heightLevels[y * room.width + x] === 2);
+  if (!firstRampTarget || !secondRampTarget) throw new Error("A rota para a Usina não possui as duas alturas de rampa esperadas.");
 
-  // Rota de teste da composição atual: mercador -> deck central -> rampa
-  // dupla -> ponte de carga -> terraço superior.
-  const traderApproach = await moveTo(9, 9, "aproximação do mercador");
-  assertPosition(traderApproach, 9, 9, "aproximação do mercador");
+  const traderApproach = await moveTo(traderGoal, "mercador");
   const beforeTraderDialogue = await capturePlayerScreenshot(cdp, `${sceneName}_before_trader`);
-  await pressPlayerButton(cdp, buttons.a.code, buttons.a.key, buttons.a.windowsVirtualKeyCode, 80);
+  await pressA();
+  const traderDialogueState = await readState();
   const afterTraderDialogue = await capturePlayerScreenshot(cdp, `${sceneName}_trader_dialogue`);
-  const [beforeTraderPixels, afterTraderPixels] = await Promise.all([
-    readFile(beforeTraderDialogue),
-    readFile(afterTraderDialogue)
-  ]);
-  if (beforeTraderPixels.equals(afterTraderPixels)) {
-    throw new Error("A interação com o mercador não alterou o Play para apresentar o diálogo.");
+  const [beforePixels, afterPixels] = await Promise.all([readFile(beforeTraderDialogue), readFile(afterTraderDialogue)]);
+  if (beforePixels.equals(afterPixels) || Number(traderDialogueState?.eventTrace?.sequence) <= Number(traderApproach?.eventTrace?.sequence)) {
+    throw new Error("A interação com o mercador não executou o diálogo no Player.");
   }
-  await pressPlayerButton(cdp, buttons.a.code, buttons.a.key, buttons.a.windowsVirtualKeyCode, 80);
-  await pressPlayerButton(cdp, buttons.a.code, buttons.a.key, buttons.a.windowsVirtualKeyCode, 80);
-
-  await moveTo(10, 12, "retorno ao deck central");
-  const rampApproach = await moveTo(15, 7, "aproximação da rampa");
-  assertPosition(rampApproach, 15, 7, "aproximação da rampa");
-  const firstRamp = await moveTo(16, 7, "primeira rampa", [{ x: 16, y: 7 }]);
-  const secondRamp = await moveTo(17, 7, "segunda rampa", [{ x: 17, y: 7 }]);
-  if ((Number(secondRamp?.collision?.seenSlopeBits) & 2) === 0) {
-    throw new Error(`A travessia não registrou a rampa isométrica: ${JSON.stringify(secondRamp?.collision)}.`);
+  const traderDialogue = await dismissDialogueAndMove(firstRampTarget, "mercador");
+  const firstRamp = await moveTo(firstRampTarget, "primeira rampa");
+  const secondRamp = await moveTo(secondRampTarget, "segunda rampa");
+  if (!Number(secondRamp?.collision?.seenSlopeBits)) throw new Error("A travessia não registrou a rampa isométrica.");
+  const rampReturn = await moveTo({ x: player.x, y: player.y }, "retorno ao deck");
+  const deckReturn = rampReturn;
+  const bridgePath = findIsometricRoute(room, position(deckReturn), bridge, obstacles);
+  if (!bridgePath || bridgePath.length < 2) throw new Error("Sem caminho até a ponte.");
+  const bridgeLane = await moveTo(bridgePath.at(-2), "aproximação da ponte");
+  const bridgeApproach = await moveTo({ x: bridge.x, y: bridge.y }, "ponte de carga");
+  const beforeBridgeSave = await evaluate(cdp, "window.GBAStudioDirectPlayer?.inspectSaveData?.() ?? null");
+  await pressA();
+  const afterBridge = await readState();
+  const afterBridgeSave = await evaluate(cdp, "window.GBAStudioDirectPlayer?.inspectSaveData?.() ?? null");
+  if (Number(afterBridge?.variables?.[variableIndex]) !== 1 || afterBridgeSave?.slot?.status !== "ok" ||
+      !afterBridgeSave?.hasUniversalSlotRecord || Number(afterBridgeSave.slot.sequence) <= Number(beforeBridgeSave?.slot?.sequence ?? 0)) {
+    throw new Error(`A ponte não ativou e salvou o atalho: ${JSON.stringify({ afterBridge, beforeBridgeSave, afterBridgeSave })}.`);
   }
-
-  // A ponte está ligada ao deck pela plataforma de madeira inferior.
-  const rampReturn = await moveTo(15, 7, "retorno da rampa");
-  assertPosition(rampReturn, 15, 7, "retorno da rampa");
-  const deckReturn = await moveTo(15, 14, "retorno ao deck inferior");
-  assertPosition(deckReturn, 15, 14, "retorno ao deck inferior");
-  const bridgeLane = await moveTo(16, 14, "faixa de madeira");
-  assertPosition(bridgeLane, 16, 14, "faixa de madeira");
-  const bridgeApproach = await moveTo(17, 14, "ponte de carga");
-  assertPosition(bridgeApproach, 17, 14, "ponte de carga");
-  const beforeBridge = await readRuntimeState();
-  await pressPlayerButton(cdp, buttons.a.code, buttons.a.key, buttons.a.windowsVirtualKeyCode, 80);
-  const afterBridge = await readRuntimeState();
-  if (Number(afterBridge?.variables?.[marketShortcutVariableIndex]) !== 1) {
-    throw new Error(`A ponte não ativou var_market_shortcut: antes=${JSON.stringify(beforeBridge?.variables)} depois=${JSON.stringify(afterBridge?.variables)}.`);
-  }
-  const bridgeDialogue = await dismissBridgeDialogue();
-
-  // O terraço superior é acessado pela mesma rampa, mantendo a câmera e o
-  // nível lógico coerentes com a composição de 24x24 células.
-  const upperRampApproach = await moveTo(15, 7, "aproximação da rampa superior");
-  assertPosition(upperRampApproach, 15, 7, "aproximação da rampa superior");
-  const upperRamp = await moveTo(17, 7, "rampa do deck superior");
-  assertPosition(upperRamp, 17, 7, "rampa do deck superior");
-  const upperExitLane = await moveTo(21, 7, "faixa superior da saída");
-  assertPosition(upperExitLane, 21, 7, "faixa superior da saída");
-  const exitApproach = await moveTo(21, 6, "saída para a usina");
-  assertPosition(exitApproach, 21, 6, "saída para a usina");
+  const bridgeDialogueScreenshot = await capturePlayerScreenshot(cdp, `${sceneName}_bridge_dialogue`);
+  const bridgeDialogue = await dismissDialogueAndMove(secondRampTarget, "ponte");
+  const upperRampApproach = await moveTo(firstRampTarget, "aproximação da rampa superior");
+  const upperRamp = await moveTo(secondRampTarget, "rampa superior");
+  const upperPath = findIsometricRoute(room, position(upperRamp), exit, obstacles);
+  if (!upperPath || upperPath.length < 2) throw new Error("Sem caminho até a saída.");
+  const upperExitLane = await moveTo(upperPath.at(-2), "faixa superior");
+  const exitApproach = await moveTo({ x: exit.x, y: exit.y }, "saída para a Usina");
   const transitionProbePromise = transitionProbeStyle
     ? sampleCanonicalTransitionBoundary(cdp, transitionProbeStyle, runtimeKindByName.dungeonCrawler, 0)
     : null;
-  await pressPlayerButton(cdp, buttons.a.code, buttons.a.key, buttons.a.windowsVirtualKeyCode, 80);
+  await pressA();
   const exitResult = await waitForRuntimeScene(cdp, "dungeonCrawler", 0, 0, 8_000);
-  if (!exitResult.ok) {
-    throw new Error(`A saída do Mercado não abriu a Usina Submersa: ${JSON.stringify(exitResult.runtimeState)}.`);
-  }
-  const transitionProbe = transitionProbePromise
-    ? assertCanonicalTransitionProbe(await transitionProbePromise)
-    : null;
-
+  if (!exitResult.ok) throw new Error(`A saída do Mercado não abriu a Usina: ${JSON.stringify(exitResult.runtimeState)}.`);
+  const transitionProbe = transitionProbePromise ? assertCanonicalTransitionProbe(await transitionProbePromise) : null;
   return {
-    ok: true,
-    route: ["trader", "deck", "ramp_0_to_1", "ramp_1_to_2", "bridge", "upper_route", "usina"],
-    initial,
-    firstRamp,
-    secondRamp,
-    traderApproach,
-    rampReturn,
-    deckReturn,
-    bridgeLane,
-    bridgeApproach,
-    afterBridge,
-    bridgeDialogue,
-    bridgeDismissals: bridgeDialogue.dismissals,
-    bridgeProbe: bridgeDialogue.probe,
-    upperRampApproach,
-    upperRamp,
-    upperExitLane,
-    exitApproach,
-    exitResult: exitResult.runtimeState,
-    transitionProbe
+    ok: true, route: ["trader", "deck", "ramp_0_to_1", "ramp_1_to_2", "bridge", "upper_route", "usina"],
+    initial, traderApproach, traderDialogue, firstRamp, secondRamp, rampReturn, deckReturn, bridgeLane,
+    bridgeApproach, afterBridge, beforeBridgeSave, afterBridgeSave, bridgeDialogueScreenshot,
+    bridgeDialogue, bridgeDismissals: bridgeDialogue.presses, bridgeProbe: bridgeDialogue.probe,
+    upperRampApproach, upperRamp, upperExitLane, exitApproach, exitResult: exitResult.runtimeState, transitionProbe
   };
 }
 
@@ -5587,30 +5511,43 @@ async function main() {
   const expectedSceneLabels = expectedSceneNames.map(displaySceneName);
   const interfaceSceneNames = new Set(exemploInterfaceScenePlaytestPlan(template).map((scene) => scene.name));
   const isolatedInterfaceScene = requestedSceneName !== null && interfaceSceneNames.has(requestedSceneName);
-  const tempRoot = await mkdtemp(join(tmpdir(), "gba-studio-exemplo-scenes-"));
-  const projectPath = defaultWelcomeSavedProjectPath(tempRoot);
-  const engineExportRoot = join(tempRoot, "EngineExport");
-  const childEnv = createElectronSmokeEnv({
-    GBA_STUDIO_SMOKE_CDP_PORT: String(port),
-    GBA_STUDIO_SMOKE_ENGINE_EXPORT_ROOT: engineExportRoot,
-    GBA_STUDIO_SMOKE_PROJECT_SAVE_PATH: projectPath,
-    GBA_STUDIO_SMOKE_USER_DATA_DIR: join(tempRoot, "UserData")
-  });
-  if (useExplicitProject) childEnv.GBA_STUDIO_OPEN_PROJECT = templatePath;
-  else delete childEnv.GBA_STUDIO_OPEN_PROJECT;
-  const launch = electronLaunchCommand(executable, usePackagedApp ? [] : [appRoot]);
-  const child = spawn(launch.executable, launch.args, {
-    cwd: appRoot,
-    env: childEnv,
-    stdio: ["ignore", "pipe", "pipe"]
-  });
+  let child;
+  let mainCdp;
   let stdout = "";
   let stderr = "";
-  child.stdout.on("data", (chunk) => { stdout += String(chunk); });
-  child.stderr.on("data", (chunk) => { stderr += String(chunk); });
-  let mainCdp;
+  const workspace = await createTemporarySmokeWorkspace("gba-studio-exemplo-scenes-", async () => {
+    try {
+      mainCdp?.close();
+    } finally {
+      if (child) await terminateChild(child);
+    }
+  });
 
   try {
+    const tempRoot = workspace.path;
+    const projectPath = defaultWelcomeSavedProjectPath(tempRoot);
+    const engineExportRoot = join(tempRoot, "EngineExport");
+    const childEnv = createElectronSmokeEnv({
+      ...workspace.env,
+      GBA_STUDIO_SMOKE_CDP_PORT: String(port),
+      GBA_STUDIO_SMOKE_ENGINE_EXPORT_ROOT: engineExportRoot,
+      GBA_STUDIO_SMOKE_PROJECT_SAVE_PATH: projectPath,
+      GBA_STUDIO_SMOKE_USER_DATA_DIR: join(tempRoot, "UserData")
+    });
+    if (useExplicitProject) childEnv.GBA_STUDIO_OPEN_PROJECT = templatePath;
+    else delete childEnv.GBA_STUDIO_OPEN_PROJECT;
+    const launch = electronLaunchCommand(executable, usePackagedApp ? [] : [appRoot]);
+    child = spawn(launch.executable, launch.args, {
+      cwd: appRoot,
+      env: childEnv,
+      stdio: ["ignore", "pipe", "pipe"]
+    });
+    child.stdout.on("data", (chunk) => { stdout += String(chunk); });
+    child.stderr.on("data", (chunk) => { stderr += String(chunk); });
+    await new Promise((resolve, reject) => {
+      child.once("spawn", resolve);
+      child.once("error", reject);
+    });
     const targets = await waitForTargets();
     const mainTarget = targets.find((target) => target.type === "page" && target.webSocketDebuggerUrl) ?? targets[0];
     mainCdp = cdpSession(mainTarget.webSocketDebuggerUrl);
@@ -5755,6 +5692,14 @@ async function main() {
       knownWindowIDs.add(performance.windowID);
       const playbackAudio = await evaluate(playerCdp, "window.GBAStudioDirectPlayer.inspectAudio()");
       // Every visual proof remains required, after the uninterrupted window.
+      if (scene.name === "guardiao_rele") {
+        // The authored intro's speaker plaque covers the party sprite. Close
+        // the dialogue using the normal game input before comparing pixels.
+        for (let page = 0; page < 2; page++) {
+          await pressPlayerButton(playerCdp, faceButtons.a.code, faceButtons.a.key, faceButtons.a.windowsVirtualKeyCode, 120);
+          await wait(200);
+        }
+      }
       playerEvidence = await waitForPlayerEvidence(playerCdp, captureInitialFramebuffer);
       if (scene.runtime === "isometric" && templateRoomForScene(template, scene.name)?.runtime?.config?.pagedSurface) {
         playerEvidence = await waitForIsometricCameraRest(playerCdp, playerEvidence);
@@ -6436,8 +6381,7 @@ async function main() {
   } catch (error) {
     throw new Error(`${error instanceof Error ? error.message : String(error)}\nstdout:\n${stdout.slice(-8_000)}\nstderr:\n${stderr.slice(-8_000)}`);
   } finally {
-    mainCdp?.close();
-    await terminateChild(child);
+    await workspace.dispose();
   }
 }
 

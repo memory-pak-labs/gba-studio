@@ -7,16 +7,18 @@ import { fileURLToPath } from 'node:url';
 import createMGBA from '../static/WebPlayer/player/mgba-core.mjs';
 import { copyModuleSavedata, inspectSavedataBytes, readRuntimeTelemetry, restoreModuleSavedata } from '../static/WebPlayer/player/mgba-direct-player.mjs';
 import { encodePngRgba } from './lib/png-icons.mjs';
-import { nativeLayoutSource, parseNativeLayouts, readNativeUI, readNativePlayerAnimation, readNativeCoastState, readNativeAudio, runtimeNativeSymbols, nativeEventStatesByRuntime } from './lib/native-ui-diagnostics.mjs';
+import { nativeLayoutSource, parseNativeLayouts, readNativePausedRace, readNativeRacing, readNativeSceneMenu, readNativeUI, readNativeTopdownPlayer, readNativePlayerAnimation, readNativeCoastState, readNativeAudio, runtimeNativeSymbols, nativeEventStatesByRuntime } from './lib/native-ui-diagnostics.mjs';
 import { playShowcaseEnding } from './lib/showcase-ending-playthrough.mjs';
 import { playShowcaseSystems } from './lib/showcase-systems-playthrough.mjs';
 import { playFarolRelay } from './lib/farol-relay-playthrough.mjs';
 import { playLostSignalMission, lostSignalInventoryIndices } from './lib/lost-signal-playthrough.mjs';
 import { playCampaignEvolutions } from './lib/campaign-evolutions-playthrough.mjs';
 import { playTopdownMovement } from './lib/topdown-movement-playthrough.mjs';
+import { playTopdownRunning } from './lib/topdown-running-playthrough.mjs';
 import { playCoastDepth } from './lib/coast-depth-playthrough.mjs';
 import { playBattleDialogue, playDungeonDialogue } from './lib/battle-dialogue-playthrough.mjs';
 import { playExampleEncore } from './lib/encore-playthrough.mjs';
+import {playRacingMenus} from './lib/racing-menu-playthrough.mjs';
 import {playTideAnnex} from './lib/tide-annex-playthrough.mjs';
 import { createMovementRecorder } from './lib/movement-video-recorder.mjs';
 import { decodeMGBAHardwareVideoState } from './native-scene-framebuffer-contract.mjs';
@@ -78,6 +80,8 @@ function boot(savedata) {
   if (savedata) assert.ok(restoreModuleSavedata(core, savedata));
 }
 const driver = {
+  actualPlayer(){return readNativeTopdownPlayer(symbols,layouts,a=>read16(a&~1)>>(a%2*8)&255,read32);},
+  logicTick(){return read32(eventAddress(readRuntimeTelemetry(core))+e.event_frame_counter);},
   timers(){const a=eventAddress(readRuntimeTelemetry(core));return Array.from({length:read32(a+e.timer_binding_count)},(_,i)=>({script:read32(a+e.timer_bindings+i*12),frames:read32(a+e.timer_bindings+i*12+4),remaining:read32(a+e.timer_bindings+i*12+8)}));},
   recordAudio:label=>audioRecorder.select(label),
   stopAudio:()=>audioRecorder.stop(),
@@ -98,7 +102,10 @@ const driver = {
   modal: () => (read16(modal.address) & 255) === 1,
   ui() { return readNativeUI(runtimeNativeSymbols(symbols,readRuntimeTelemetry(core).runtimeKind),layouts,a=>read16(a&~1)>>(a%2*8)&255,read32,a=>{let s='';for(let n=0;n<2048&&a;n++){const v=read16((a+n)&~1)>>((a+n)%2*8)&255;if(!v)break;s+=String.fromCharCode(v);}return s;}); },
   equipped(slot=0) { return read32(eventAddress(readRuntimeTelemetry(core))+layout.equipped+slot*4); },
-  race() { const a=symbols.find(s=>s.name.endsWith('::runtime_state')&&s.size===48).address;return {x:read32(a)/256,y:read32(a+4)/256,laps:read32(a+16),gates:read32(a+24),result:read16(a+32)&255,heading:read16(a+36)&255}; },
+  race() { return readNativeRacing(symbols,layouts,a=>read16(a&~1)>>(a%2*8)&255,read32); },
+  pausedRace() { return readNativePausedRace(symbols,layouts,a=>read16(a&~1)>>(a%2*8)&255,read32); },
+  sceneMenu() { return readNativeSceneMenu(symbols,layouts,read32); },
+  textSlot(index) { const a=eventAddress(readRuntimeTelemetry(core))+layouts.event.text_variables+17*index;let text='';for(let n=0;n<16;n++){const c=read16((a+n)&~1)>>((a+n)%2*8)&255;if(!c)break;text+=String.fromCharCode(c);}return text; },
   currency() { return read32(eventAddress(readRuntimeTelemetry(core)) + layout.inventory); },
   item(key) { assert.ok(Number.isInteger(inventoryIndices[key]));return read32(eventAddress(readRuntimeTelemetry(core)) + layout.inventory + inventoryIndices[key]*4); },
   saveInfo: () => inspectSavedataBytes(copyModuleSavedata(core)),
@@ -148,9 +155,13 @@ try {
   } else if (process.argv.includes('--diagnostics-only')) { driver.run(180,0); driver.capture('title'); report.passed=true; }
   else if (process.argv.includes('--battle-dialogue')) Object.assign(report, await playBattleDialogue(driver));
   else if (process.argv.includes('--dungeon-dialogue')) Object.assign(report, await playDungeonDialogue(driver));
+  else if(process.argv.includes('--racing-campaign'))Object.assign(report,await playRacingMenus(driver,project,exported,{campaignEntry:true}));
+  else if(process.argv.includes('--perspective-flow'))Object.assign(report,await playRacingMenus(driver,project,exported,{perspectiveOnly:true}));
+  else if(process.argv.includes('--racing-menus'))Object.assign(report,await playRacingMenus(driver,project,exported));
   else if(process.argv.some(a=>a.startsWith('--tide=')))Object.assign(report,await playTideAnnex(driver,project,exported,process.argv.find(a=>a.startsWith('--tide=')).slice(7),{projectRoot:path.dirname(projectFile)}));
   else if(process.argv.some(a=>a.startsWith('--encore=')))Object.assign(report,await playExampleEncore(driver,project,exported,process.argv.find(a=>a.startsWith('--encore=')).slice(9)));
   else if(process.argv.some(a=>a.startsWith('--coast=')))Object.assign(report,await playCoastDepth(driver,project,exported,process.argv.find(a=>a.startsWith('--coast=')).slice(8),{projectRoot:path.dirname(projectFile),output}));
+  else if(process.argv.includes('--topdown-running'))Object.assign(report,await playTopdownRunning(driver,project,exported,{projectRoot:path.dirname(projectFile),output}));
   else if(process.argv.includes('--topdown-movement'))Object.assign(report,await playTopdownMovement(driver,project,exported,{projectRoot:path.dirname(projectFile),output,walkAnimation:process.argv.includes('--walk-animation')}));
   else if(process.argv.some(a=>a.startsWith('--ending=')))Object.assign(report,await playShowcaseEnding(driver,project,JSON.parse(fs.readFileSync(new URL('../fixtures/asset-provenance/racing-approved-manifest.json',import.meta.url))),Number(process.argv.find(a=>a.startsWith('--ending=')).split('=')[1]),{exported}));
   else if(process.argv.some(a=>a.startsWith('--evolutions=')))Object.assign(report,await playCampaignEvolutions(driver,project,exported,process.argv.find(a=>a.startsWith('--evolutions=')).slice(13),{projectRoot:path.dirname(projectFile)}));

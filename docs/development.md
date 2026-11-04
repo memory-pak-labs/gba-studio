@@ -124,6 +124,13 @@ ordem preserva o orçamento de 750 ms sem disputar CPU com os demais testes.
 Para executar apenas essa medição, use `npm run test:perf:project-open`.
 Evite executar builds ou outras verificações pesadas ao mesmo tempo que ela.
 
+O smoke de cenas isola os temporários dos subprocessos e remove seu projeto de
+teste, perfil do Electron, exportações e cache de staging ao terminar, inclusive
+em falhas e interrupções por SIGINT/SIGTERM. Projetos fonte
+e evidências fora desse diretório permanecem preservados. Para investigar os
+arquivos temporários, execute com `GBA_STUDIO_KEEP_SMOKE_TEMP=1`; nesse caso o
+smoke informa o caminho retido, cuja remoção posterior fica a cargo de quem o executou.
+
 O npm instala as dependências declaradas e o Electron. Nenhuma senha Apple é
 necessária para desenvolver, testar ou compilar o editor.
 
@@ -407,6 +414,9 @@ npm run gate:complete-project
 ```
 
 O gate completo agrega verificações do editor, Pack, exportação e Play.
+Para incluir a sessão integrada de estabilidade na mesma execução, use
+`npm run gate:complete-project -- --soak-minutes=20`. O argumento aceita entre
+20 e 30 minutos inteiros e mantém todas as etapas do gate.
 Fixtures e testes host não substituem esse gate. Para QA visual, confira a tela
 e o fluxo real; para uma ROM, confira a execução no emulador. Validação física
 do GBA permanece uma etapa separada.
@@ -1014,6 +1024,7 @@ O verificador compara o framebuffer com o fundo aprovado e com os pixels do
 relé na paleta compilada, incluindo a região da escada. Play e ROM direta usam
 o núcleo mGBA, mas exercitam caminhos de integração distintos. O teste em GBA
 físico permanece uma verificação separada.
+
 
 ## Animações autoradas por eventos
 

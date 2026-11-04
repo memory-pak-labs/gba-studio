@@ -665,10 +665,16 @@ describe("exemplo scenes smoke wiring", () => {
       /async function runIsometricInputExercise[\s\S]*?\n}\n\nasync function runBattleInputExercise/
     )?.[0] ?? "";
 
-    expect(exerciseBody).toContain("const dismissBridgeDialogue = async () => {");
-    expect(exerciseBody).toContain("const probe = buttons.down;");
-    expect(exerciseBody).toContain("const bridgeDialogue = await dismissBridgeDialogue();");
-    expect(exerciseBody).toContain("bridgeDismissals: bridgeDialogue.dismissals");
+    const dismissBody = exerciseBody.match(
+      /const dismissDialogueAndMove = async \(target, label\) => \{[\s\S]*?\n  };\n/
+    )?.[0] ?? "";
+    expect(dismissBody).toContain("presses <= 6");
+    expect(dismissBody).toContain("await pressA();");
+    expect(dismissBody).toContain("await holdPlayerButtons(cdp, directionFor(current, path[1]), 700);");
+    expect(dismissBody).toContain("if (!samePosition(position(before), position(after))) return { presses, probe: after };");
+    expect(dismissBody).toContain("não fechou após seis confirmações");
+    expect(exerciseBody).toContain('const bridgeDialogue = await dismissDialogueAndMove(secondRampTarget, "ponte");');
+    expect(exerciseBody).toContain("bridgeDismissals: bridgeDialogue.presses");
     expect(exerciseBody).toContain("bridgeProbe: bridgeDialogue.probe");
   });
 });

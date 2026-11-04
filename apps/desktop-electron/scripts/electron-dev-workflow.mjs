@@ -7,6 +7,7 @@ import {
   inspectGbaToolchain,
   resolveToolchainEnvironment
 } from "./check-gba-toolchain.mjs";
+import { parseExemploSceneSoakMinutes } from "./exemplo-scene-playtest-contract.mjs";
 
 const scriptPath = fileURLToPath(import.meta.url);
 const appRoot = path.resolve(path.dirname(scriptPath), "..");
@@ -219,12 +220,24 @@ export function createElectronDevWorkflowPlan(options = {}) {
     throw new Error(`Perfil desconhecido '${profile}'. Use ${supportedProfilesLabel}.`);
   }
 
+  const requestedSoak = options.soakMinutes ?? 0;
+  const soakMinutes = requestedSoak === 0
+    ? 0 : parseExemploSceneSoakMinutes([`--soak-minutes=${requestedSoak}`]);
+  if (soakMinutes > 0 && profile !== "complete-project") {
+    throw new Error("O soak integrado exige o perfil complete-project.");
+  }
+  const plannedSteps = steps.map(cloneStep);
+  if (soakMinutes > 0) {
+    const sceneStep = plannedSteps.find(step => step.args.includes("smoke:exemplo-scenes"));
+    sceneStep.args.push("--", `--soak-minutes=${soakMinutes}`);
+  }
+
   return {
     profile,
     appRoot,
     engineRoot,
     repoRoot,
-    steps: steps.map(cloneStep)
+    steps: plannedSteps
   };
 }
 
@@ -233,7 +246,7 @@ function formatCommand(step) {
 }
 
 export async function runElectronDevWorkflow(options = {}) {
-  const plan = createElectronDevWorkflowPlan({ profile: options.profile });
+  const plan = createElectronDevWorkflowPlan({ profile: options.profile, soakMinutes: options.soakMinutes });
   const dryRun = options.dryRun ?? false;
   const runner = options.runner ?? runStep;
 
@@ -287,7 +300,8 @@ function runStep(step, env = process.env) {
 async function main() {
   const profile = readArgValue("--profile", process.argv.includes("--readiness") ? "readiness" : "quick");
   const dryRun = process.argv.includes("--dry-run");
-  await runElectronDevWorkflow({ profile, dryRun });
+  const soakMinutes = parseExemploSceneSoakMinutes(process.argv.slice(2));
+  await runElectronDevWorkflow({ profile, dryRun, soakMinutes });
 }
 
 const invokedPath = process.argv[1] ? pathToFileURL(path.resolve(process.argv[1])).href : "";

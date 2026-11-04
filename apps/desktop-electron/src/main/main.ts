@@ -43,7 +43,7 @@ import { publishEnginePackRomToProjectRoot } from "./projectRomPublication.js";
 import { analyzePreparedProjectBudget } from "./projectBudgetAnalysis.js";
 import { listRecentProjects } from "./recentProjects.js";
 import { configureSmokeDevToolsPort, isPreviewVisualSmokeMode, previewVisualSmokeUrl } from "./smoke.js";
-import { resolveSmokeProjectSavePath } from "./smokePaths.js";
+import { registerRecentProjectDocument, resolveSmokeProjectSavePath } from "./smokePaths.js";
 import { validateSettingsPathTargets } from "./settingsPathValidation.js";
 import { resolveMainWindowBounds, resolveMainWindowChrome } from "./windowOptions.js";
 import { createWindowCloseGuard } from "./windowCloseGuard.js";
@@ -161,7 +161,7 @@ async function openExternalProject(projectPath: string): Promise<void> {
 function registerRecentProject(result: OpenProjectResult): void {
   if (!result.error && !result.canceled && result.path && result.project) {
     desktopAssetProjectRoots.add(resolve(dirname(result.path)));
-    app.addRecentDocument(result.path);
+    registerRecentProjectDocument(result.path, path => app.addRecentDocument(path));
     watchProjectAssets(result.path);
   }
 }
@@ -319,7 +319,7 @@ ipcMain.handle(ipcChannels.saveProject, (_event, request: SaveProjectRequest) =>
       bundledAssetConflictPolicy: request.path ? "preserve" : "replace"
     });
     desktopAssetProjectRoots.add(resolve(dirname(destination)));
-    app.addRecentDocument(destination);
+    registerRecentProjectDocument(destination, path => app.addRecentDocument(path));
     watchProjectAssets(destination);
     return { canceled: false, path: destination };
   } catch (error) {

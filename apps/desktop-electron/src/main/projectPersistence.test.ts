@@ -5,6 +5,7 @@ import { afterEach, describe, expect, it } from "vitest";
 import { openProjectFile, resolveProjectSaveDestination, saveProjectFileAtomically } from "./projectPersistence.js";
 import { parseGBAProjectFile, summarizeGBAProject } from "../shared/projectFile.js";
 import { buildProjectFromTemplate } from "../shared/projectTemplates.js";
+import { normalizeProjectTilemaps } from "../shared/projectResourceFormat.js";
 
 const temporaryRoots: string[] = [];
 
@@ -128,7 +129,7 @@ describe("project persistence", () => {
     await saveProjectFileAtomically(projectPath, { data, summary: summarizeGBAProject(data) }, { appPath: process.cwd() });
     const opened = await openProjectFile(projectPath);
     expect(opened.project?.data).toEqual(data);
-    expect(opened.project?.summary).toMatchObject({ rooms: 1, assets: (data.assets as unknown[]).length });
+    expect(opened.project?.summary).toMatchObject({ rooms: 0, assets: (data.assets as unknown[]).length });
     expect(await readdir(path.dirname(projectPath))).toEqual(["Assets", "meu_jogo.gba-project"]);
     expect(await readdir(path.join(path.dirname(projectPath), "Assets"))).toEqual(["backgrounds", "portraits", "sprites", "ui"]);
     for (const asset of data.assets as Record<string, any>[]) {
@@ -296,6 +297,26 @@ describe("project persistence", () => {
     await expect(readFile(projectPath, "utf8")).resolves.toContain("\"encoding\": \"rle-v1\"");
     const opened = await openProjectFile(projectPath);
     expect(opened.project?.data).toEqual(project.data);
+  });
+
+  it("keeps metatile saves identical through both readers and a second save", async () => {
+    const root = await makeTemporaryRoot("gbastudio-project-metatiles-");
+    const projectPath = path.join(root, "Track.gba-project");
+    const tilemap = Array.from({ length: 64 }, (_, index) => index % 2 + Math.floor(index / 8) % 2 * 2);
+    const project = parseGBAProjectFile(JSON.stringify({
+      name: "Track", rooms: [{ name: "track", width: 8, height: 8, tilemap }],
+      editorState: { customLayout: { x: 15, y: 20 } }
+    }));
+    await saveProjectFileAtomically(projectPath, project);
+    const firstSave = await readFile(projectPath, "utf8");
+    expect(JSON.parse(firstSave).rooms[0].tilemap.encoding).toBe("metatile-v1");
+    const opened = await openProjectFile(projectPath);
+    expect(opened.error).toBeUndefined();
+    expect(opened.project?.data).toEqual(project.data);
+    expect(normalizeProjectTilemaps(parseGBAProjectFile(firstSave).data)).toEqual(opened.project!.data);
+    await saveProjectFileAtomically(projectPath, opened.project!);
+    expect(await readFile(projectPath, "utf8")).toBe(firstSave);
+    expect((await openProjectFile(projectPath)).project?.data).toEqual(project.data);
   });
 
   it("keeps expanded tilemaps when compaction is explicitly disabled", async () => {

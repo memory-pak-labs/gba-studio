@@ -33,10 +33,10 @@ export async function verifyElectronInstanceIsolation({ order, output }) {
   await mkdir(sharedUserData);
   const env = createElectronSmokeEnv({
     GBA_STUDIO_OPEN_PROJECT: "", ELECTRON_RENDERER_URL: "",
+    GBA_STUDIO_SMOKE_USER_DATA_DIR: sharedUserData,
     GBA_STUDIO_ENGINE_PACK_SOURCE: join(appRoot, "../../packages/GBAStudioEngine/dist/GBAStudioEnginePack")
   });
   delete env.GBA_STUDIO_SMOKE_CDP_PORT;
-  delete env.GBA_STUDIO_SMOKE_USER_DATA_DIR;
   delete env.GBA_STUDIO_PREVIEW_VISUAL_URL;
   delete env.GBA_STUDIO_PREVIEW_VISUAL_CDP_PORT;
   const children = [];
@@ -92,7 +92,7 @@ export async function verifyElectronInstanceIsolation({ order, output }) {
     });
     errorObserver.send(JSON.stringify({ id: 1, method: "Runtime.enable" }));
     // Query the real window, rather than treating an alive headless process as a launched editor.
-    await waitForRenderedText(cdp, text => text.includes("Criar projeto") && text.includes("Projeto em branco"), "Welcome alongside MCP");
+    await waitForRenderedText(cdp, text => /Criar projeto|Create project/.test(text) && /Projeto em branco|Blank project/.test(text), "Welcome alongside MCP");
     const screenshot = await cdp.send("Page.captureScreenshot", { format: "png" });
     await writeFile(join(output, "welcome.png"), Buffer.from(screenshot.data, "base64"));
     return port;
@@ -101,6 +101,25 @@ export async function verifyElectronInstanceIsolation({ order, output }) {
     let mcp, port;
     if (order === "mcp-first") { mcp = await startMcp("mcp-1"); port = await startEditor(); }
     else { port = await startEditor(); mcp = await startMcp("mcp-1"); }
+    // Opening this unique disposable project must not add it to the macOS-wide
+    // recent documents list, even though the editor uses its normal open path.
+    const recentResult = await cdp.send("Runtime.evaluate", {
+      expression: `(async () => {
+        const path = ${JSON.stringify(projectPath)};
+        const before = await window.gbaStudio.getRecentProjects();
+        const opened = await window.gbaStudio.openProjectAtPath(path);
+        const saved = opened.project ? await window.gbaStudio.saveProject({ path, project: opened.project }) : null;
+        const after = await window.gbaStudio.getRecentProjects();
+        return { opened: !opened.error && !opened.canceled && opened.path === path,
+          saved: Boolean(saved && !saved.error && !saved.canceled && saved.path === path),
+          before: before.some(entry => entry.path === path), after: after.some(entry => entry.path === path) };
+      })()`,
+      awaitPromise: true,
+      returnByValue: true
+    });
+    assert(!recentResult.exceptionDetails, "A consulta de projetos recentes deve funcionar");
+    assert.deepEqual(recentResult.result.value, { opened: true, saved: true, before: false, after: false },
+      "Um projeto temporário de smoke não deve entrar na lista de recentes do sistema");
     const secondMcp = await startMcp("mcp-2");
     assertMcpToolNames((await mcp.request(4, "tools/list", {})).tools.map(tool => tool.name));
     assertMcpToolNames((await secondMcp.request(4, "tools/list", {})).tools.map(tool => tool.name));
@@ -110,9 +129,9 @@ export async function verifyElectronInstanceIsolation({ order, output }) {
     assert.equal(editor.exitCode, null, "A janela principal deve continuar aberta");
     const pages = await (await fetch(`http://127.0.0.1:${port}/json/list`)).json();
     assert.equal(pages.filter(t => t.type === "page").length, 1);
-    await waitForRenderedText(cdp, text => text.includes("Criar projeto"), "original editor stays usable");
+    await waitForRenderedText(cdp, text => /Criar projeto|Create project/.test(text), "original editor stays usable");
     const evalResult = await cdp.send("Runtime.evaluate", {
-      expression: "Array.from(document.querySelectorAll('button')).some(button => button.textContent.includes('Projeto em branco') && !button.disabled)",
+      expression: "Array.from(document.querySelectorAll('button.welcome-template-card')).some(button => /Projeto em branco|Blank project/.test(button.textContent) && !button.disabled)",
       returnByValue: true
     });
     if (evalResult.exceptionDetails) rendererErrors.push(evalResult.exceptionDetails);

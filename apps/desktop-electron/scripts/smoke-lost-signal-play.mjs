@@ -6,18 +6,20 @@ import { fileURLToPath } from 'node:url';
 import { createHash } from 'node:crypto';
 import { copySmokeProject, cdpSession, createElectronSmokeEnv, electronExecutablePath, terminateChild, wait } from './lib/electron-smoke-helpers.mjs';
 import { resolveExemploSmokeFaceButton } from './exemplo-scene-playtest-contract.mjs';
-import {playRacingCadence} from './lib/racing-cadence-playthrough.mjs';
 import { playShowcaseEnding } from './lib/showcase-ending-playthrough.mjs';
-import { readNativeUI, readNativePlayerAnimation, readNativeCoastState, readNativeAudio, runtimeNativeSymbols } from './lib/native-ui-diagnostics.mjs';
+import { readNativeUI, readNativeTopdownPlayer, readNativePlayerAnimation, readNativeRacing, readNativePausedRace, readNativeSceneMenu, readNativeCoastState, readNativeAudio, runtimeNativeSymbols } from './lib/native-ui-diagnostics.mjs';
 import { playShowcaseSystems } from './lib/showcase-systems-playthrough.mjs';
 import { playFarolRelay } from './lib/farol-relay-playthrough.mjs';
 import { playLostSignalMission, lostSignalInventoryIndices } from './lib/lost-signal-playthrough.mjs';
 import { playCampaignEvolutions } from './lib/campaign-evolutions-playthrough.mjs';
 import { playTopdownMovement } from './lib/topdown-movement-playthrough.mjs';
+import { playTopdownRunning } from './lib/topdown-running-playthrough.mjs';
 import { playCoastDepth } from './lib/coast-depth-playthrough.mjs';
 import { playExampleEncore } from './lib/encore-playthrough.mjs';
 import { encoreEndingFixture } from './lib/encore-test-fixture.mjs';
 import {tideAnnexTestFixture} from './lib/tide-annex-test-fixture.mjs';
+import {playRacingCadence} from './lib/racing-cadence-playthrough.mjs';
+import {playRacingMenus} from './lib/racing-menu-playthrough.mjs';
 import {playTideAnnex} from './lib/tide-annex-playthrough.mjs';
 import { createMovementRecorder } from './lib/movement-video-recorder.mjs';
 import { playInitialMenuAudio } from './lib/initial-menu-audio-playthrough.mjs';
@@ -64,7 +66,18 @@ try {
   const selector=`button[aria-label*="${startScene}"]`;
   await until(()=>evaluate(main,`Array.from(document.querySelectorAll(${JSON.stringify(selector)})).some(b=>!b.disabled && /Run only|Executar somente|Ejecutar solo/.test(b.getAttribute('aria-label')))`),'title scene Play button',60000);
   await evaluate(main,`Array.from(document.querySelectorAll(${JSON.stringify(selector)})).find(b=>!b.disabled && /Run only|Executar somente|Ejecutar solo/.test(b.getAttribute('aria-label'))).click()`);
-  const playTarget=await until(async()=> (await targets()).find(t=>t.id!==target.id&&/runtime\.html/.test(t.url)),'Play window',Number(process.env.GBA_STUDIO_SMOKE_PLAY_BUILD_TIMEOUT_MS??300000));
+  const playTarget=await until(async()=> {
+    const opened=(await targets()).find(t=>t.id!==target.id&&/runtime\.html/.test(t.url));
+    if(opened)return opened;
+    // Asset discovery may finish after the initial scene button becomes ready.
+    // Honor the editor's stale-build guard and launch a fresh build, retaining
+    // the retry count as evidence. Never bypass the guard or inject a ROM.
+    if((report.launchRetries??0)<2&&await evaluate(main,'document.body.innerText.includes("The project changed during the build. Run Play again to use the current version.")')){
+      report.launchRetries=(report.launchRetries??0)+1;
+      await evaluate(main,`Array.from(document.querySelectorAll(${JSON.stringify(selector)})).find(b=>!b.disabled && /Run only|Executar somente|Ejecutar solo/.test(b.getAttribute('aria-label')))?.click()`);
+    }
+    return undefined;
+  },'Play window',Number(process.env.GBA_STUDIO_SMOKE_PLAY_BUILD_TIMEOUT_MS??300000));
   player=cdpSession(playTarget.webSocketDebuggerUrl);await player.ready;
   await until(()=>evaluate(player,'Boolean(window.GBAStudioDirectPlayer?.inspectRuntime()?.state)'),'native Play framebuffer',60000);
   await player.send('Page.bringToFront');
@@ -119,6 +132,8 @@ try {
     audioOutput:()=>evaluate(player,'window.GBAStudioDirectPlayer.inspectAudio()'),
     async videoFrame(){return (await snapshot()).bytes.readUInt32LE(0x1fc);},
     async liveCadence(ms){cached=null;const result=await evaluate(player,`window.__missionClock.live(${ms})`);cached=null;return result;},
+    async actualPlayer(){const s=await snapshot();return readNativeTopdownPlayer(d.symbols,d.layouts,a=>word(s.bytes,a)&255,a=>word(s.bytes,a));},
+    async logicTick(){const s=await snapshot();return word(s.bytes,addressFor(s)+d.layouts.event.event_frame_counter);},
     async timers(){const s=await snapshot(),a=addressFor(s),e=d.layouts.event;return Array.from({length:word(s.bytes,a+e.timer_binding_count)},(_,i)=>({script:word(s.bytes,a+e.timer_bindings+i*12),frames:word(s.bytes,a+e.timer_bindings+i*12+4),remaining:word(s.bytes,a+e.timer_bindings+i*12+8)}));},
     async animation(){const s=await snapshot();const byte=a=>a>=0x08000000?romBytes[a-0x08000000]:s.bytes[(a>=0x03000000?d.iwramOffset+a-0x03000000:d.ewramOffset+a-0x02000000)];return readNativePlayerAnimation(runtimeNativeSymbols(d.symbols,s.state.runtimeKind),d.layouts,byte,a=>word(s.bytes,a));},
     recordMovement:label=>movementRecorder.select(label),
@@ -150,14 +165,10 @@ try {
     async modal(){const {bytes}=await snapshot();return (word(bytes,d.modal.address)&255)===1;},
     async ui(){const {bytes}=await snapshot();const byte=a=>a>=0x08000000?romBytes[a-0x08000000]:bytes[(a>=0x03000000?d.iwramOffset+a-0x03000000:d.ewramOffset+a-0x02000000)];const string=a=>{let s='';for(let n=0;n<2048&&a;n++){const v=byte(a+n);if(!v)break;s+=String.fromCharCode(v);}return s;};return readNativeUI(runtimeNativeSymbols(d.symbols,(await snapshot()).state.runtimeKind),d.layouts,byte,a=>byte(a)|byte(a+1)<<8|byte(a+2)<<16|byte(a+3)<<24,string);},
     async equipped(slot=0){const s=await snapshot();return word(s.bytes,addressFor(s)+d.layout.equipped+slot*4);},
-    async race(){
-      const addr=d.symbols.find(s=>s.name.endsWith('::runtime_state')&&s.size===48).address,offset=addr>=0x03000000?d.iwramOffset+addr-0x03000000:d.ewramOffset+addr-0x02000000;
-      return evaluate(player,`(() => {
-        const p=window.GBAStudioDirectPlayer,previous=new Map(Object.keys(localStorage).map(k=>[k,localStorage.getItem(k)]));
-        try{p.save();const encoded=Object.keys(localStorage).filter(k=>localStorage.getItem(k)!==previous.get(k)).map(k=>localStorage.getItem(k))[0]||[...previous.values()].find(v=>v?.length>100000);const bytes=atob(encoded),o=${offset};const word=n=>bytes.charCodeAt(o+n)|bytes.charCodeAt(o+n+1)<<8|bytes.charCodeAt(o+n+2)<<16|bytes.charCodeAt(o+n+3)<<24;return{x:word(0)/256,y:word(4)/256,laps:word(16),gates:word(24),result:bytes.charCodeAt(o+32),heading:bytes.charCodeAt(o+36)};}
-        finally{for(const k of Object.keys(localStorage)){if(!previous.has(k))localStorage.removeItem(k);else if(localStorage.getItem(k)!==previous.get(k))localStorage.setItem(k,previous.get(k));}}
-      })()`);
-    },
+    async race(){const s=await snapshot();const byte=a=>s.bytes[(a>=0x03000000?d.iwramOffset+a-0x03000000:d.ewramOffset+a-0x02000000)];return readNativeRacing(d.symbols,d.layouts,byte,a=>word(s.bytes,a));},
+    async pausedRace(){const s=await snapshot();const byte=a=>s.bytes[(a>=0x03000000?d.iwramOffset+a-0x03000000:d.ewramOffset+a-0x02000000)];return readNativePausedRace(d.symbols,d.layouts,byte,a=>word(s.bytes,a));},
+    async sceneMenu(){const s=await snapshot();return readNativeSceneMenu(d.symbols,d.layouts,a=>word(s.bytes,a));},
+    async textSlot(index){const s=await snapshot(),a=addressFor(s)+d.layouts.event.text_variables+17*index;let text='';for(let n=0;n<16;n++){const c=word(s.bytes,(a+n)&~3)>>>(((a+n)&3)*8)&255;if(!c)break;text+=String.fromCharCode(c);}return text;},
     async currency(){const s=await snapshot();return word(s.bytes,addressFor(s)+d.layout.inventory);},
     async item(key){assert.ok(Number.isInteger(inventoryIndices[key]));const s=await snapshot();return word(s.bytes,addressFor(s)+d.layout.inventory+inventoryIndices[key]*4);},
     async saveInfo(){return evaluate(player,'window.GBAStudioDirectPlayer.inspectSaveData()');},
@@ -179,6 +190,9 @@ try {
     Object.assign(report,await playInitialMenuAudio(driver));
   }
   else if(process.argv.includes('--racing-cadence'))Object.assign(report,await playRacingCadence(driver));
+  else if(process.argv.includes('--racing-campaign'))Object.assign(report,await playRacingMenus(driver,project,exported,{campaignEntry:true}));
+  else if(process.argv.includes('--perspective-flow'))Object.assign(report,await playRacingMenus(driver,project,exported,{perspectiveOnly:true}));
+  else if(process.argv.includes('--racing-menus'))Object.assign(report,await playRacingMenus(driver,project,exported));
   else if(process.argv.some(a=>a.startsWith('--tide=')))Object.assign(report,await playTideAnnex(driver,project,exported,process.argv.find(a=>a.startsWith('--tide=')).slice(7),{projectRoot:copy}));
   else if(process.argv.some(a=>a.startsWith('--encore=')))Object.assign(report,await playExampleEncore(driver,project,exported,process.argv.find(a=>a.startsWith('--encore=')).slice(9)));
   else if(endingPath){
@@ -188,6 +202,7 @@ try {
     const trace=JSON.parse(fs.readFileSync(path.join(traceDir,'report.json')));assert.equal(trace.romSha256,report.romSha256);
     await driver.reboot();Object.assign(report,await playShowcaseEnding(driver,project,JSON.parse(fs.readFileSync(path.join(app,'fixtures/asset-provenance/racing-approved-manifest.json'))),endingPath,{exported}),{nativeReport:path.join(traceDir,'report.json')});
   }else if(process.argv.some(a=>a.startsWith('--coast=')))Object.assign(report,await playCoastDepth(driver,project,exported,process.argv.find(a=>a.startsWith('--coast=')).slice(8),{projectRoot:copy,output}));
+  else if(process.argv.includes('--topdown-running'))Object.assign(report,await playTopdownRunning(driver,project,exported,{projectRoot:copy,output}));
   else if(process.argv.includes('--topdown-movement'))Object.assign(report,await playTopdownMovement(driver,project,exported,{projectRoot:copy,output,walkAnimation:process.argv.includes('--walk-animation')}));
   else if(process.argv.some(a=>a.startsWith('--evolutions=')))Object.assign(report,await playCampaignEvolutions(driver,project,exported,process.argv.find(a=>a.startsWith('--evolutions=')).slice(13),{projectRoot:copy,output}));
   else Object.assign(report,await (process.argv.includes('--relay')?playFarolRelay:process.argv.includes('--showcase')?playShowcaseSystems:playLostSignalMission)(driver,project,exported));

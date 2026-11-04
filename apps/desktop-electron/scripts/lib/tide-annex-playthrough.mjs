@@ -34,10 +34,13 @@ export async function playTideAnnex(driver,project,exported,mode='all',context={
   assert.ok(pixels>2000);assert.equal(mismatch,0,'The exposed floor keeps the exact RGB555 pixels of the current Gallery texture');floorProof.push({label,pixels,mismatch,camera});
  }
  return playLostSignalMission(driver,project,exported,{journey:async c=>{
+  if(context.runningChecks)await context.runningChecks('porto_lumen',c);
   await c.close();await c.walkTo(17,16);await driver.run(90,64);await driver.run(8,0);await c.tap(1,120);await c.close();
   assert.equal((await driver.state()).currentRoom,1,'Enter the Lighthouse through ordinary controls');
+  if(context.runningChecks)await context.runningChecks('farol_interior',c);
   await c.walkTo(27,20);await driver.run(1,16);await driver.run(8,0);await c.tap(1,100);await c.close();
   assert.equal((await driver.state()).currentRoom,gallery);assert.equal(await value('var_gallery_gate'),0);
+  if(context.runningChecks)await context.runningChecks('galeria_das_mares',c);
   await capture('gallery-before');await c.walkTo(10,20);await driver.run(1,16);await driver.run(8,0);
   for(let n=0;n<8;n++){
    await c.tap(1,60);await driver.run(120,0);
@@ -67,9 +70,15 @@ export async function playTideAnnex(driver,project,exported,mode='all',context={
   const enter=async()=>{
    // A one-video-frame direction press can fall between native simulation ticks.
    // Hold it across a complete tick before interacting with the lamp.
-   await c.walkTo(41,11);await c.tap(16,6);
+   await c.close();await c.walkTo(41,11);await c.tap(16,6);
    assert.equal((await driver.telemetry()).player.direction,3,'Face the maintenance lamp before pressing A');
-   await c.tap(1,80);await c.close();
+   // Room-entry dialogue can still be queued behind a native transition. Wait
+   // for it, then make a fresh controller interaction rather than consuming A
+   // while that entry script owns the UI.
+   for(let n=0;n<4&&(await driver.state()).currentRoom!==tide;n++){
+    await c.close();await driver.run(8,16);await driver.run(8,0);
+    await c.tap(1,80);await c.close();await driver.run(24,0);
+   }
    assert.equal((await driver.state()).currentRoom,tide,'The maintenance lamp leads into the annex');
    if(await value('var_tide_state')===0){
     await driver.run(180,0);await c.close();
@@ -77,6 +86,7 @@ export async function playTideAnnex(driver,project,exported,mode='all',context={
    await capture('arrival');
   };
   await enter();assert.equal(await value('var_tide_state'),0);assert.equal(await value('var_stabilizer'),0);
+  if(context.runningChecks)await context.runningChecks('sala_mare_vazante',c);
   await c.walkTo(23,21);await driver.run(80,64);assert.ok((await driver.telemetry()).player.y>=144,'Full canal blocks the crossing');await capture('water-blocks');
   await c.walkTo(16,26);await driver.run(1,32);await driver.run(6,0);driver.recordMovement?.('tide_drain');await c.tap(1,16);await capture('draining');
   for(let n=0;n<100&&await value('var_tide_state')!==2;n++)await driver.run(12,0);
@@ -95,9 +105,9 @@ export async function playTideAnnex(driver,project,exported,mode='all',context={
   await c.walkTo(23,10);await c.walkTo(33,10);await driver.run(1,16);await driver.run(8,0);await c.tap(1,60);await c.close();assert.equal(await value('var_stabilizer'),1,'The upgrade is never collected twice');
   await c.saveSlot(2,'tide-after-item-manual');await driver.reboot();await driver.run(180,0);await c.loadSlot(2,'tide-after-item-load');await c.close();assert.equal(await value('var_stabilizer'),1);assert.equal(await value('var_tide_state'),2);await capture('manual-restored');
   await c.tap(8,60);await c.tap(128,20);await c.tap(1,80);assert.equal((await driver.state()).runtimeKind,3);await capture('inventory');
-  const inventoryRoom=exported.menu_project.screens.find(s=>s.name==='inventario');
+  const inventoryRoom=exported.menu_project.screens.find(s=>s.name==='inventario_modulos_2');
   assert.ok(inventoryRoom.items.some(i=>i.binding?.source==='variable'&&i.binding.index===vi.var_stabilizer),'The inventory exposes the optional upgrade');
-  for(let n=0;n<5;n++)await c.tap(16,12);await c.tap(1,60);assert.equal((await driver.ui()).dialogue?.key,'tide_owned');await capture('inventory-description');await c.close();await c.tap(2);await c.tap(2);await c.tap(2,80);
+  await c.tap(256,24);assert.equal((await driver.sceneMenu()).screen,exported.menu_project.screens.indexOf(inventoryRoom));await c.tap(1,60);assert.equal((await driver.ui()).dialogue?.key,'tide_owned');await capture('inventory-description');await c.close();await c.tap(2);await c.tap(2);await c.tap(2,80);
   await c.walkTo(23,27);await driver.run(64,128);await driver.run(100,0);await c.close();assert.equal((await driver.state()).currentRoom,gallery);
   let withModule;
   if(mode!=='room'){

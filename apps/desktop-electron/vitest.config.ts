@@ -2,7 +2,12 @@ import { configDefaults, defineConfig } from "vitest/config";
 import react from "@vitejs/plugin-react";
 import { availableParallelism } from "node:os";
 
-const projectFixtureTests = ["src/shared/sceneAnalysis.test.ts"];
+const projectFixtureTests = [
+  "src/renderer/roomsWorkspace.test.tsx",
+  "src/shared/sceneAnalysis.test.ts",
+  "src/shared/projectCompactOpen.test.ts",
+  "scripts/opening-medium-shot-promotion.test.mjs"
+];
 
 export default defineConfig({
   plugins: [react()],
@@ -32,7 +37,7 @@ export default defineConfig({
           pool: "threads",
           maxWorkers: 1,
           fileParallelism: false,
-          // The 36-scene audit must not compete with parallel fixture workers.
+          // Full-project fixtures need a quiet CPU and heap after parallel unit work.
           sequence: { groupOrder: 1 }
         }
       },
