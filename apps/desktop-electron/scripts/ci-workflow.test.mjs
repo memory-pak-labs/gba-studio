@@ -26,6 +26,15 @@ describe('CI platform coverage and evidence', () => {
     expect(commands(job)).toContain('--reporter=json');
     expect(artifacts(job).some(s => s.if === 'always()' && s.with.path.includes('artifacts/ci-editor'))).toBe(true);
   });
+  it('preserves the branch protection check names after expanding the matrix', () => {
+    const { editor, engine } = workflow().jobs;
+    for (const [job, required] of [[editor, 'Editor tests, types and build'], [engine, 'Engine host tests']]) {
+      expect(job.name).toBe('${{ matrix.name }}');
+      expect(job.strategy.matrix.include.find(entry => entry.platform === 'linux').name).toBe(required);
+      const names = job.strategy.matrix.include.map(entry => entry.name);
+      expect(new Set(names).size).toBe(names.length);
+    }
+  });
   it('covers macOS host engine tests while preserving the native MSYS Windows suite', () => {
     const jobs = workflow().jobs;
     expect(jobs.engine.strategy.matrix.include.map(e => e.runner)).toContain('macos-15');

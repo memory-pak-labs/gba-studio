@@ -52,7 +52,7 @@ jobs:
         if: runner.os == 'Linux'
         run: |
           sudo apt-get update
-          sudo apt-get install -y --no-install-recommends xvfb libgtk-3-0 libnss3 libasound2t64 libgbm1
+          sudo apt-get install -y --no-install-recommends xvfb libgtk-3-0 libnss3 libasound2t64 libgbm1 libudev-dev
       - run: npm ci
       - name: Install the pinned Electron binary
         run: node node_modules/electron/install.js
@@ -90,7 +90,7 @@ jobs:
           retention-days: 7
 
   engine:
-    name: Engine host tests (${{ matrix.platform }})
+    name: ${{ matrix.name }}
     runs-on: ${{ matrix.runner }}
     timeout-minutes: 30
     strategy:
@@ -99,8 +99,10 @@ jobs:
         include:
           - runner: ubuntu-24.04
             platform: linux
+            name: Engine host tests
           - runner: macos-15
             platform: macos
+            name: Engine host tests (macOS)
     defaults:
       run:
         working-directory: packages/GBAStudioEngine

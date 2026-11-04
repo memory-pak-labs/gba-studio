@@ -112,7 +112,7 @@ jobs:
         if: matrix.platform == 'linux'
         run: |
           sudo apt-get update
-          sudo apt-get install -y --no-install-recommends xvfb libgtk-3-0 libnss3 libasound2t64 libgbm1
+          sudo apt-get install -y --no-install-recommends xvfb libgtk-3-0 libnss3 libasound2t64 libgbm1 libudev-dev
       - uses: msys2/setup-msys2@ec48f7c5447b3140e2b088413ae3a55687bccb6e # v2
         id: msys
         if: matrix.platform == 'windows'
@@ -256,7 +256,7 @@ jobs:
         if: matrix.platform == 'linux'
         run: |
           sudo apt-get update
-          sudo apt-get install -y --no-install-recommends xvfb libgtk-3-0 libnss3 libasound2t64 libgbm1 libfuse2t64
+          sudo apt-get install -y --no-install-recommends xvfb libgtk-3-0 libnss3 libasound2t64 libgbm1 libudev-dev libfuse2t64
       - run: npm ci
       - name: Prepare isolated installed application and simulated successor
         run: node scripts/prepare-updater-qa.mjs
