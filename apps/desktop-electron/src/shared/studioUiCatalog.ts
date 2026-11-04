@@ -76,6 +76,8 @@ export const studioUiMessages: Record<string, readonly [string, string, string]>
   "Resumo da interface da cena": ["Resumo da interface da cena", "Scene interface summary", "Resumen de la interfaz de la escena"],
   "Interface da cena": ["Interface da cena", "Scene interface", "Interfaz de la escena"],
   "Editar a interface diretamente no viewport": ["Editar a interface diretamente no viewport", "Edit the interface directly in the viewport", "Editar la interfaz directamente en el viewport"],
+  "Sobreposição intencional no mapa": ["Sobreposição intencional no mapa", "Intentional overlap on the map", "Superposición intencional en el mapa"],
+  "Use para mecanismos e objetos fixos sobre paredes ou plataformas. Altera apenas o diagnóstico; a colisão do jogo permanece igual.": ["Use para mecanismos e objetos fixos sobre paredes ou plataformas. Altera apenas o diagnóstico; a colisão do jogo permanece igual.", "Use for mechanisms and fixed props on walls or platforms. Only the diagnostic changes; game collisions stay the same.", "Úsalo para mecanismos y objetos fijos sobre paredes o plataformas. Solo cambia el diagnóstico; las colisiones del juego permanecen iguales."],
   "Ajuda": ["Ajuda", "Help", "Ayuda"],
   "Verificar atualizações...": ["Verificar atualizações...", "Check for updates...", "Buscar actualizaciones..."],
   "A pasta de destino já contém arquivos. Escolha um novo nome ou uma pasta vazia.": ["A pasta de destino já contém arquivos. Escolha um novo nome ou uma pasta vazia.", "The destination folder already contains files. Choose a new name or an empty folder.", "La carpeta de destino ya contiene archivos. Elige un nombre nuevo o una carpeta vacía."],

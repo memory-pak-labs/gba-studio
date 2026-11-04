@@ -326,6 +326,7 @@ import {
 import { StudioLanguageSwitcher, projectActionLabelKey, useStudioI18n, workspaceLabelKey } from "./i18n";
 import { projectProblemsFromHealthReport, type ProjectProblem } from "../shared/projectProblems";
 import { useProjectProblemDismissals } from "./useProjectProblemDismissals";
+import { updateProjectWarningDismissals } from "../shared/projectWarningDismissals";
 import { deriveProjectHealthReport } from "../shared/projectHealth";
 import { clampSceneMapZoom } from "../shared/sceneMapLayout";
 import { readSceneMapViewZoom, writeSceneMapViewZoom } from "./sceneMapViewPreferences";
@@ -712,7 +713,12 @@ function App(): React.ReactElement {
     [projectHealthReport]
   );
   const { visibleProblems: projectProblems, ignoredCount, ignoreWarning, ignoreAllWarnings, restoreWarnings } =
-    useProjectProblemDismissals(allProjectProblems, deferredProblemInput.path);
+    useProjectProblemDismissals(session?.path === deferredProblemInput.path && session?.project.data === deferredProblemData ? allProjectProblems : [], session?.path, {
+      data: session?.project.data,
+      onChange(keys) {
+        if (session && session.path === deferredProblemInput.path && session.project.data === deferredProblemData) updateProjectData(updateProjectWarningDismissals(session.project.data, keys));
+      }
+    });
   const hardwareProfiler = useMemo(
     () => projectData
       ? deriveHardwareProfilerPresentation(projectData, {
