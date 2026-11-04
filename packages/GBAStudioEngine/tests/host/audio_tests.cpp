@@ -1050,6 +1050,11 @@ void test_audio_mix_cost_estimates_assets_and_mix_budget() {
 
 } // namespace
 
+static_assert(gbs::is_valid_tracker_step(gbs::TrackerStep {3, 49, 1, 8, 0}), "Wave supports the default bass G1");
+static_assert(gbs::is_valid_tracker_step(gbs::TrackerStep {3, 32, 1, 8, 0}), "Wave lower frequency boundary");
+static_assert(!gbs::is_valid_tracker_step(gbs::TrackerStep {3, 31, 1, 8, 0}), "Wave frequency below hardware range");
+static_assert(!gbs::is_valid_tracker_step(gbs::TrackerStep {1, 49, 1, 8, 0}), "Square retains its own frequency range");
+
 int main() {
     test_equal_priority_pcm_effect_age_survives_counter_rollover();
     test_stopping_pcm_effect_or_music_keeps_sample_tracker_stream_running();
