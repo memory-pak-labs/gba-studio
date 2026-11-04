@@ -328,7 +328,7 @@ describe("Settings workspace presentation", () => {
       exportScope: "both",
       detail: expect.not.stringContaining("So preview"),
       items: expect.arrayContaining([
-        expect.objectContaining({ label: "Máximo no grupo", value: "6" }),
+        expect.objectContaining({ label: "Máximo no grupo", value: "4" }),
         expect.objectContaining({ label: "Máximo de inimigos", value: "1" }),
         expect.objectContaining({ label: "Intervalo entre turnos", value: "30" }),
         expect.objectContaining({ label: "Multiplicador de XP", value: "1" }),

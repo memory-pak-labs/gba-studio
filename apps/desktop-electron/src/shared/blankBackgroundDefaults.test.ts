@@ -1,3 +1,4 @@
+import { createBlankProjectWithScene } from "../testFixtures/blankProject.js";
 import { describe, expect, it } from "vitest";
 import { buildProjectFromTemplate } from "./projectTemplates.js";
 import { createRoomInProject, updateRoomFieldsInProject } from "./roomsWorkspace.js";
@@ -16,7 +17,7 @@ const cases = [
 const image=(family:string)=>`neutral-background-${family}.png`;
 describe("approved orange backgrounds in blank scenes",()=>{
  it("exports the reviewed tile palettes without quantizing the colors a second time",()=>{
-  const p=createRoomInProject(buildProjectFromTemplate("blank",{name:"Palette"}),{id:"palette",name:"palette",width:30,height:20,sceneType:"topdown"});
+  const p=createBlankProjectWithScene({name:"Palette"});
   const asset=assets(p).find(a=>a.name===image("topdown"))!;
   const plan=asset.metadata.backgroundPaletteReferencePlan;
   expect(plan.banks).toHaveLength(14);
@@ -31,9 +32,9 @@ describe("approved orange backgrounds in blank scenes",()=>{
   expect(actors.find(a=>a.name==="Player")).toMatchObject({x:4,y:4});
   if(scene==="isometricTactical") expect(actors.find(a=>a.name==="Enemy")).toMatchObject({x:5,y:3});
  });
- it("starts empty and offers all sixteen background families",()=>{
-  const p=buildProjectFromTemplate("blank",{name:"Orange"});
-  expect(rooms(p)[0].backgroundAssetName).toBe("");
+ it("creates the first scene with an editable topdown background and owns all sixteen families",()=>{
+  const p=createBlankProjectWithScene({name:"Orange"});
+  expect(rooms(p)[0]).toMatchObject({backgroundAssetName:image("topdown"),gbStudioUseBackgroundLayout:true});
   const backgrounds=assets(p).filter(a=>a.kind==="Background");
   expect(backgrounds.filter(a=>!a.metadata.dungeonMaterial)).toHaveLength(16);
   expect(backgrounds.filter(a=>a.metadata.dungeonMaterial)).toHaveLength(4);

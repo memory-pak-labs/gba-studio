@@ -26,7 +26,7 @@ import type { GBAProjectData } from "../shared/projectFile.js";
 
 const temporaryRoots: string[] = [];
 const execFileAsync = promisify(execFile);
-const localEnginePackPath = path.join(process.cwd(), "../../packages/GBAStudioEngine/dist/GBAStudioEnginePack");
+const localEnginePackPath = process.env.GBA_STUDIO_ENGINE_PACK_SOURCE || path.join(process.cwd(), "../../packages/GBAStudioEngine/dist/GBAStudioEnginePack");
 const localAssetcPath = path.join(localEnginePackPath, "tools", process.platform === "win32" ? "assetc.exe" : "assetc");
 const localGbsdoctorPath = path.join(localEnginePackPath, "tools", process.platform === "win32" ? "gbsdoctor.exe" : "gbsdoctor");
 const localGbsbuildPath = path.join(localEnginePackPath, "tools", process.platform === "win32" ? "gbsbuild.exe" : "gbsbuild");

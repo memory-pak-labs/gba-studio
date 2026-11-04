@@ -1,4 +1,5 @@
 import { eventExecutionContract } from "../shared/eventExecutionContract";
+import { sceneChangeCommand, sceneChangeCommandParts } from "../shared/sceneChangeCommand";
 import { uiText as ui, useStudioUiText } from "./studioUiText";
 import { EventEditingContext } from "./EventEditingContext";
 import { EventBlockLibrary } from "./EventBlockLibrary";
@@ -152,14 +153,20 @@ function commandSuggestionsByCategory(suggestions: EventsWorkspaceCommandSuggest
     .sort((lhs, rhs) => lhs[0].localeCompare(rhs[0], "pt-BR"));
 }
 
-function commandWithParameterValue(command: string, parameter: EventsWorkspaceCommandParameter, value: string): string {
-  const parts = command.split(/\s+/).filter(Boolean);
+function commandWithParameterValue(command: string, parameter: EventsWorkspaceCommandParameter, value: string, parameters: EventsWorkspaceCommandParameter[]): string {
+  const actorNames = parameters.find((candidate) => candidate.kind === "actor")?.options ?? [];
+  const parts = sceneChangeCommandParts(command, actorNames);
   const safeValue = value.trim();
   while (parts.length <= parameter.tokenIndex) {
     parts.push("");
   }
   parts[parameter.tokenIndex] = safeValue || parameter.defaultValue || parameter.value;
-  return parts.join(" ").trim() || "noop";
+  if (parts[0] === "change_scene" && (parameter.tokenIndex === 2 || parameter.tokenIndex === 3) && safeValue) {
+    while (parts.length < 4) parts.push("");
+    if (!parts[2]) parts[2] = "0";
+    if (!parts[3]) parts[3] = "0";
+  }
+  return sceneChangeCommand(parts) || "noop";
 }
 
 function inlineCommandParameterLabel(parameter: EventsWorkspaceCommandParameter): string {
@@ -847,7 +854,7 @@ function eventEditor(
                       <Fragment key={`${event.id}-${step.index}-${parameter.id}`}>
                         {commandParameterInput(parameter, (value) => {
                           props.onUpdateEventStep(event.id, step.index, {
-                            command: commandWithParameterValue(step.command, parameter, value)
+                            command: commandWithParameterValue(step.command, parameter, value, step.commandParameters)
                           });
                         })}
                       </Fragment>
@@ -949,7 +956,7 @@ function EventBlockInspector({
           {selectedStep.commandParameters.map((parameter) => (
             <Fragment key={`${event.id}-${selectedStep.index}-${parameter.id}`}>
               {commandParameterInput(parameter, (value) => editorProps.onUpdateEventStep(event.id, selectedStep.index, {
-                command: commandWithParameterValue(selectedStep.command, parameter, value)
+                command: commandWithParameterValue(selectedStep.command, parameter, value, selectedStep.commandParameters)
               }))}
             </Fragment>
           ))}
@@ -1138,7 +1145,8 @@ export function EventInspectorPanel({
         ? `call_event ${preferredEventTargetName}`
         : command
     ));
-    safeCommands.forEach((command) => onAddEventStep(event.id, event.name, command));
+    if (safeCommands.length > 1 && onInsertEventSteps) onInsertEventSteps(event.id, { kind: "root" }, safeCommands);
+    else safeCommands.forEach((command) => onAddEventStep(event.id, event.name, command));
   };
   const dropPaletteBlock = (target: EventStructureInsertionTarget, command: string): void => {
     if (!event) return;
@@ -1160,6 +1168,7 @@ export function EventInspectorPanel({
     onRemoveVariable,
     onUpdateEventFields,
     onAddEventStep,
+    onInsertEventSteps,
     onUpdateEventStep,
     onUpdateSceneRouteTable,
     onUpdateMenuSliderItem,
@@ -1243,7 +1252,7 @@ export function EventInspectorPanel({
                 ? `call_event ${preferredEventTargetName}`
                 : command
             ));
-            if (commandMenuStepIndex === null && commandMenuInsertionTarget.kind !== "root" && onInsertEventSteps) {
+            if (commandMenuStepIndex === null && onInsertEventSteps && (commandMenuInsertionTarget.kind !== "root" || safeCommands.length > 1)) {
               onInsertEventSteps(event.id, commandMenuInsertionTarget, safeCommands);
             } else if (commandMenuStepIndex === null) {
               safeCommands.forEach((command) => onAddEventStep(event.id, event.name, command));
@@ -1343,7 +1352,7 @@ function EventBuildPanel({
     const parameter = step?.commandParameters.find((candidate) => candidate.id === parameterID);
     if (!step || !parameter) return;
     editorProps.onUpdateEventStep(event.id, stepIndex, {
-      command: commandWithParameterValue(step.command, parameter, value)
+      command: commandWithParameterValue(step.command, parameter, value, step.commandParameters)
     });
   };
   const toggleStepSelection = (stepIndex: number): void => {
@@ -1390,16 +1399,19 @@ function EventBuildPanel({
         {stepSelectionMode && selectedStepCount > 0 ? (
           <>
             <button
-              onClick={() => selectedStepIndexes.forEach((stepIndex) => editorProps.onUpdateEventStep(event.id, stepIndex, { isEnabled: false }))}
+              onClick={() => editorProps.onUpdateEventFields(event.id, {
+                stepUpdates: selectedStepIndexes.map(index => ({ index, fields: { isEnabled: false } }))
+              })}
               type="button"
             >
               {ui("Desativar ")}{selectedStepLabel}
             </button>
             <button
-              onClick={() => selectedStepIndexes.forEach((stepIndex) => {
-                const step = event.steps[stepIndex];
-                if (step) editorProps.onAddEventStep(event.id, event.name, step.command);
-              })}
+              onClick={() => {
+                const commands = selectedStepIndexes.map(index => event.steps[index]?.command).filter((command): command is string => Boolean(command));
+                if (editorProps.onInsertEventSteps) editorProps.onInsertEventSteps(event.id, { kind: "root" }, commands);
+                else commands.forEach(command => editorProps.onAddEventStep(event.id, event.name, command));
+              }}
               type="button"
             >
               {ui("Duplicar ")}{selectedStepLabel}
@@ -2410,7 +2422,7 @@ function EventGraphCanvas({
                                 <select
                                     aria-label={ui("{0} do evento no card", { 0: inlineCommandParameterLabel(parameter) })}
                                   onChange={(event) => onUpdateEventStep(node.id, step.index, {
-                                    command: commandWithParameterValue(step.command, parameter, event.currentTarget.value)
+                                    command: commandWithParameterValue(step.command, parameter, event.currentTarget.value, step.commandParameters)
                                   })}
                                   onPointerDown={(event) => event.stopPropagation()}
                                   value={parameter.value}
@@ -2422,7 +2434,7 @@ function EventGraphCanvas({
                                 <input
                                   aria-label={ui("{0} do evento no card", { 0: inlineCommandParameterLabel(parameter) })}
                                   onChange={(event) => onUpdateEventStep(node.id, step.index, {
-                                    command: commandWithParameterValue(step.command, parameter, event.currentTarget.value)
+                                    command: commandWithParameterValue(step.command, parameter, event.currentTarget.value, step.commandParameters)
                                   })}
                                   onPointerDown={(event) => event.stopPropagation()}
                                   value={parameter.value}
@@ -2520,6 +2532,7 @@ export function EventsWorkspace({
   onRemoveVariable,
   onUpdateEventFields,
   onAddEventStep,
+  onInsertEventSteps,
   onUpdateEventStep,
   onUpdateSceneRouteTable,
   onUpdateMenuSliderItem,
@@ -2792,6 +2805,7 @@ export function EventsWorkspace({
     onCreateEvent,
     onUpdateEventFields,
     onAddEventStep,
+    onInsertEventSteps,
     onUpdateEventStep,
     onUpdateSceneRouteTable,
     onUpdateMenuSliderItem,
@@ -3226,7 +3240,7 @@ export function EventsWorkspace({
                   {selectedStep.commandParameters.map((parameter) => (
                     <div className="event-command-parameter-row" key={`${selectedStepEvent.id}-${selectedStep.index}-${parameter.id}`}>
                       {commandParameterInput(parameter, (value) => onUpdateEventStep(selectedStepEvent.id, selectedStep.index, {
-                        command: commandWithParameterValue(selectedStep.command, parameter, value)
+                        command: commandWithParameterValue(selectedStep.command, parameter, value, selectedStep.commandParameters)
                       }))}
                       {!parameter.isKnownValue && parameter.options.length ? (
                         <small>{ui("Valor fora dos recursos atuais.")}</small>
@@ -3656,9 +3670,8 @@ export function EventsWorkspace({
               ? suggestion.steps.map((step) => step.command)
               : [suggestion.command];
             if (commandMenuStepIndex === null) {
-              for (const command of commands) {
-                onAddEventStep(commandMenuEvent.id, commandMenuEvent.name, command);
-              }
+              if (commands.length > 1 && onInsertEventSteps) onInsertEventSteps(commandMenuEvent.id, { kind: "root" }, commands);
+              else for (const command of commands) onAddEventStep(commandMenuEvent.id, commandMenuEvent.name, command);
             } else {
               onUpdateEventStep(commandMenuEvent.id, commandMenuStepIndex, { command: commands[0] ?? suggestion.command });
             }

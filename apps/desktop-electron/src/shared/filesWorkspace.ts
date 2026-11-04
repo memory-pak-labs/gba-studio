@@ -350,9 +350,15 @@ function collectRoomUsages(data: GBAProjectData, usages: AssetUsageMap): void {
     const tileLayers = Array.isArray(room.tileLayers) ? room.tileLayers.filter(isRecord) : [];
     for (const layer of tileLayers) {
       const mapping = stringField(layer.mapping, "BG");
-      const sourceNames = Array.isArray(layer.tileSourceAssetNames)
-        ? new Set(layer.tileSourceAssetNames.map(nullableString).filter((name): name is string => Boolean(name)))
-        : new Set<string>();
+      const sourceData = layer.tileSourceAssetNames;
+      // Saved projects can store this layer as RLE. Inspect each run directly:
+      // expanding a full tilemap just to find its distinct sources is costly.
+      const sourceValues = Array.isArray(sourceData)
+        ? sourceData
+        : isRecord(sourceData) && sourceData.encoding === "rle-v1" && Array.isArray(sourceData.runs)
+          ? sourceData.runs.filter(Array.isArray).map((run) => run[0])
+          : [];
+      const sourceNames = new Set(sourceValues.map(nullableString).filter((name): name is string => Boolean(name)));
       for (const sourceName of sourceNames) {
         addUsage(usages, sourceName, {
           label: `Camada ${mapping}: ${roomName}`,
@@ -748,7 +754,10 @@ export function deriveFilesWorkspacePresentation(data: GBAProjectData): FilesWor
   const assets = sourceAssets.map((asset, index) => {
     const id = assetID(asset, index);
     const name = stringField(asset.name, "Asset sem nome");
-    const kind = stringField(asset.kind, "Arquivo");
+    const rawKind = stringField(asset.kind, "Arquivo");
+    // Legacy projects use both "Font" and "FONT" for the same category.
+    // Normalize only the presentation so filtering groups them together.
+    const kind = normalizedKind(rawKind) === "font" ? "Font" : rawKind;
     const metadata = isRecord(asset.metadata) ? asset.metadata : undefined;
     const source = metadata ? nullableString(metadata.source) : null;
     const bundledDefaultAsset = metadata ? nullableString(metadata.bundledDefaultAsset) : null;
@@ -1106,6 +1115,8 @@ function makeSpriteAnimationForImportedAsset(asset: ImportedAssetFile, animation
     spriteSheet,
     frameWidth: 16,
     frameHeight: 32,
+    originX: 0,
+    originY: 0,
     fps: 8,
     loops: true,
     frameCount: 1,

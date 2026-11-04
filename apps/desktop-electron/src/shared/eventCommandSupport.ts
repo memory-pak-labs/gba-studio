@@ -1,4 +1,5 @@
 import { isScaleEvent, parseScaleEvent, scaleEventTokens } from "./eventTransforms.js";
+import { sceneChangeCommandParts } from "./sceneChangeCommand.js";
 import { parseVisibilityPreset, visibilityPresetVerbs } from "./visibilityPresets.js";
 import { nativeEventCommandExportHandling, type NativeEventCommandExportHandling } from "./eventCommandRegistry.js";
 import { eventCommandCatalog } from "./eventCommandLibrary.js";
@@ -20,6 +21,7 @@ const scoped: Record<string, string[]> = {
   replace_tile_sequence: ["topdown", "platformer"],
   replace_tile_animation: ["topdown", "platformer"],
   draw_text:["topdown"],
+  set_player_speed_profile:["topdown"],
   start_segment:["topdown"], stop_segment:["topdown"], set_adventure_state:["topdown"], push_actor:["topdown"],
   open_menu: ["topdown"], open_shop: ["topdown"], open_equip_menu: ["topdown"], open_code_lock: ["topdown"],
   actor_effects: ["topdown"], set_actor_animation_state: ["topdown"], cancel_actor_movement: ["topdown"],
@@ -66,12 +68,12 @@ const platformCallbacks = new Set([
   "knockbackstart", "knockback_start", "knockbackend", "knockback_end", "blankstart", "blank_start", "blankend", "blank_end",
   "runstart", "run_start", "runend", "run_end", "floatstart", "float_start", "floatend", "float_end"
 ]);
-export const nativeEngineReadFields = new Set(["current_scene_index", "current_room", "scene", "room", "camera_x", "camera_y", "player_x", "player_y", "plat_blank_grav", "platformer_blank_gravity", ...Array.from({ length: 8 }, (_, slot) => `equipped_item_${slot}`), "timer_count"]);
+export const nativeEngineReadFields = new Set(["current_scene_index", "current_room", "scene", "room", "camera_x", "camera_y", "player_x", "player_y", "plat_blank_grav", "platformer_blank_gravity", ...Array.from({ length: 8 }, (_, slot) => `equipped_item_${slot}`), "timer_count", "previous_runtime", "previous_room", "racing_result"]);
 export const nativePlatformStates = new Set(["fall", "ground", "jump", "dash", "ladder", "wall", "knockback", "blank", "run", "float"]);
 
 /** Validate the newly integrated paths; existing native commands retain their own validators. */
 export function eventCommandIntegrationIssue(command: string, runtime?: string): string | null {
-  const parts = command.trim().split(/\s+/);
+  const parts = sceneChangeCommandParts(command);
   const verb = parts[0] || "noop";
   if (isScaleEvent(verb)) { try { parseScaleEvent(scaleEventTokens(command)); } catch (error) { return (error as Error).message; } }
   const support = eventCommandSupport(verb);
@@ -87,6 +89,7 @@ export function eventCommandIntegrationIssue(command: string, runtime?: string):
     try { parseLutaEventCommand(command); } catch (error) { return error instanceof Error ? error.message : "Evento de Luta inválido."; }
   }
   const integer = (value: string | undefined, max: number) => value !== undefined && /^\d+$/.test(value) && Number(value) <= max;
+  if (verb === "set_player_speed_profile" && (parts.length !== 5 || !integer(parts[1],400) || Number(parts[1])<1 || !integer(parts[2],400) || Number(parts[2])<Number(parts[1]) || !["a","b","l","r"].includes(parts[3] ?? "") || !integer(parts[4],32767))) return "Perfil requer caminhada e corrida entre 1 e 400%, corrida igual ou maior, botão A/B/L/R e custo não negativo.";
   if(verb === "draw_text") {
     const text=parts.slice(4).join(" ");
     const width=Array.from(text).length;

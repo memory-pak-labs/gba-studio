@@ -18,6 +18,19 @@ function fixture() {
   data.scenas = [{ id:"port", name:"Porto", sceneType:"topdown", width:30, height:20, hudPresetId:"shared" }, { id:"cave", name:"Caverna", sceneType:"topdown", width:30, height:20, hudPresetId:"shared" }];
   return data;
 }
+
+it("lets a Dungeon author choose the text contract independently from the preset ID", () => {
+  const data = fixture();
+  const room = { ...deriveRoomsWorkspacePresentation(data).rooms.find(r => r.id === "port")!, sceneType: "dungeonCrawler" };
+  const hud = deriveHudPresetsWorkspacePresentation(data), onUpdate = vi.fn();
+  render(<HudSceneInspector room={room} projectData={data} binding={resolveExplicitHudPresetBinding(data, { roomPresetId: "shared" })}
+    presets={hud.presets} activePresetID={hud.activePresetId} previewPreset={null} onPreviewPreset={vi.fn()}
+    selectedComponentID={null} onSelectComponent={vi.fn()} onUpdateHudPreset={onUpdate}
+    editingSharedPresetID="shared" onEditSharedPreset={vi.fn()} viewMode="edit" onViewMode={vi.fn()} />);
+  fireEvent.click(screen.getByRole("tab", { name: "Aparência" }));
+  fireEvent.change(screen.getByRole("combobox", { name: "Conteúdo dos textos" }), { target: { value: "dungeon-status" } });
+  expect(onUpdate).toHaveBeenCalledWith("shared", { runtimeTextProfile: "dungeon-status" });
+});
 function Harness({ onChange = vi.fn() }: { onChange?: (...args: any[]) => void }) {
   const [data, setData] = useState(fixture);
   const [previewID, setPreviewID] = useState<string|null>(null);

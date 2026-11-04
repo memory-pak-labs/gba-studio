@@ -13,6 +13,16 @@ function project(commands: string[]) {
  }); return data;
 }
 describe("actor resources authored in events", () => {
+ it("resolves a gesture resource with quoted actor and asset names", () => {
+ const data=project(['show_actor_gesture "Hero Guide" "speech bubble.png" 30']);
+ (data.actors as Record<string,unknown>[])[0]!.name="Hero Guide";
+ (data.assets as Record<string,unknown>[]).push({id:"bubble",name:"speech bubble.png",kind:"Emote",metadata:{source:"Assets/emotes/speech bubble.png"}});
+ const result=prepareEngineProjectExport(data);
+ expect(result.error).toBeUndefined();
+ expect(result.generated!.contract.topdown_project!.scripts[0]!.script).toEqual([
+ {op:"show_actor_gesture",actor:0,index:0,frames:30}
+ ]);
+ });
  it("exports a per-actor effect rather than an emote or whole-screen effect", () => {
  const result=prepareEngineProjectExport(project(["actor_effects Hero flash 30 50"]));
  expect(result.error).toBeUndefined();

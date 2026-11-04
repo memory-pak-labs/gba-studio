@@ -47,7 +47,8 @@ const parameterLabels: Record<string, string[]> = {
   move_actor_to: ["Ator", "X", "Y"], move_actor_relative: ["Ator", "Deslocamento X", "Deslocamento Y"],
   set_actor_direction: ["Ator", "Direção"], if_actor_direction: ["Ator", "Direção"],
   if_actor_at_position: ["Ator", "X", "Y"], if_actor_distance: ["Ator", "Outro ator", "Distância"],
-  set_actor_animation: ["Ator", "Animação"], set_actor_sprite: ["Ator", "Sprite"],
+  if_actor_relative: ["Ator", "Outro ator", "Posição relativa"],
+  set_actor_animation: ["Ator", "Animação"], play_actor_animation: ["Ator", "Animação"], set_actor_sprite: ["Ator", "Sprite"],
   set_camera_position: ["X", "Y"], camera_move_to: ["X", "Y", "Duração (quadros)"],
   set_engine_field: ["Campo", "Valor"], set_engine_field_variable: ["Campo", "Variável"],
   if_engine_field: ["Campo", "Valor"], if_engine_field_variable: ["Campo", "Variável"],
@@ -74,6 +75,7 @@ const descriptions: Record<string, string> = {
   open_equip_menu: "Permite escolher o slot, equipar um item do inventário ou removê-lo. A pausa controla o avanço do mundo.",
   cancel_actor_movement: "Interrompe a trajetória automática do ator. No jogador, cancela o passo atual; uma nova entrada permite movimentar novamente.",
   set_actor_animation_state: "Troca o conjunto completo de animações do ator pelo estado cadastrado em Sprites.",
+  play_actor_animation: "Reproduz o clipe selecionado. Configure a repetição na animação em Sprites.",
   projectile_load_slot: "Liga um sprite do projeto, dano e velocidade ao slot de projétil 0–7.",
   launch_projectile_slot: "Lança o projétil configurado no slot a partir do ator, com colisão e dano.",
   actor_effects: "Pisca (flash) ou desloca visualmente (shake) apenas o ator durante a duração configurada.",
@@ -142,7 +144,7 @@ export function eventCommandParameterChoices(verb: string, tokenIndex: number): 
   if (tokenIndex === 1 && ["pause_scene_type", "resume_scene_type"].includes(verb)) return ["topdown", "platformer"];
   if (tokenIndex === 1 && verb === "set_platform_state") return ["fall", "ground", "jump", "dash", "ladder", "wall", "knockback", "blank", "run", "float"];
   if (tokenIndex === 1 && ["attach_adventure_callback", "remove_adventure_callback"].includes(verb)) return ["on_interact", "on_room_enter", "on_room_exit"];
-  return parameterLabels[verb]?.[tokenIndex - 1] === "Direção" ? ["up", "down", "left", "right"] : null;
+  return parameterLabels[verb]?.[tokenIndex - 1] === "Direção" || (verb === "if_actor_relative" && tokenIndex === 3) ? ["up", "down", "left", "right"] : null;
 }
 
 export function eventCommandDescription(verb: string): string | null { return descriptions[verb] ?? null; }

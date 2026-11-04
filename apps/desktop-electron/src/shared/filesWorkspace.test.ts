@@ -316,6 +316,40 @@ describe("Files workspace presentation", () => {
     }
   });
 
+  it("marks assets in compacted background layers as used without expanding the map", () => {
+    const presentation = deriveFilesWorkspacePresentation({
+      assets: [
+        { id: "sky", name: "sky.png", kind: "Background" },
+        { id: "clouds", name: "clouds.png", kind: "Background" },
+        { id: "unused", name: "unused.png", kind: "Background" }
+      ],
+      rooms: [{
+        id: "compact-room", name: "Compact room",
+        tileLayers: [{ mapping: "BG3", tileSourceAssetNames: {
+          encoding: "rle-v1", length: 6, runs: [["sky.png", 4], ["clouds.png", 2]]
+        }}]
+      }]
+    });
+
+    expect(presentation.assets.find((asset) => asset.name === "sky.png")).toMatchObject({
+      isUsed: true, usageLabels: ["Camada BG3: Compact room"]
+    });
+    expect(presentation.assets.find((asset) => asset.name === "clouds.png")?.isUsed).toBe(true);
+    expect(presentation.assets.find((asset) => asset.name === "unused.png")?.isUsed).toBe(false);
+  });
+
+  it("groups font kinds consistently regardless of capitalization", () => {
+    const presentation = deriveFilesWorkspacePresentation({
+      assets: [
+        { id: "a", name: "first.png", kind: "FONT" },
+        { id: "b", name: "second.png", kind: "Font" }
+      ]
+    });
+
+    expect(presentation.kindCounts).toEqual([{ kind: "Font", count: 2 }]);
+    expect(presentation.assets.map((asset) => asset.kind)).toEqual(["Font", "Font"]);
+  });
+
   it("marks an enabled Affine background as used by its scene", () => {
     const presentation = deriveFilesWorkspacePresentation({
       assets: [{ id: "affine-bg", name: "affine-bg.png", kind: "Background" }],
@@ -1202,6 +1236,8 @@ describe("Files workspace presentation", () => {
         spriteSheet: "enemy.png",
         frameWidth: 16,
         frameHeight: 32,
+        originX: 0,
+        originY: 0,
         fps: 8,
         loops: true,
         frameCount: 1,

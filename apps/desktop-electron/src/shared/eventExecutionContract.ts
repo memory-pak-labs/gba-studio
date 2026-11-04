@@ -1,5 +1,6 @@
 import { isScaleEvent } from "./eventTransforms.js";
 import { nativeEventCommandExportHandling } from "./eventCommandRegistry.js";
+import { sceneChangeCommandParts } from "./sceneChangeCommand.js";
 
 export type EventTiming = "immediate" | "frames" | "input" | "dialogue" | "restore" | "transition" | "runtime-defined";
 export interface EventSourceLocation { eventID: string; stepID: string }
@@ -11,7 +12,7 @@ export interface EventInstruction {
 }
 /** Shared instruction boundary. Scene-specific references are resolved by each runtime. */
 export function parseEventInstruction(command: string, source?: EventSourceLocation, validate = true): EventInstruction {
-  const [verb = "noop", ...operands] = command.split(/\s+/).filter(Boolean);
+  const [verb = "noop", ...operands] = sceneChangeCommandParts(command);
   const numeric: EventInstruction["numeric"] = {};
   const integer = (name: "frames" | "slot", fallback: number, max: number) => {
     const value = operands[0] === undefined ? fallback : Number(operands[0]);

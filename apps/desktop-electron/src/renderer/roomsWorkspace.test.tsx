@@ -1,6 +1,7 @@
+import { createBlankProjectWithScene } from "../testFixtures/blankProject.js";
 /** @vitest-environment happy-dom */
 import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
-import { Profiler } from "react";
+import { Profiler, useState } from "react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
@@ -104,9 +105,40 @@ async function openCanvasLayers(user: ReturnType<typeof userEvent.setup>): Promi
 }
 
 describe("RoomsWorkspace React smoke", () => {
+  it("commits an entity name from the Object inspector", async () => {
+    const user=userEvent.setup();
+    const project=createBlankProjectWithScene({name:"Entity names"});
+    const room=deriveRoomsWorkspacePresentation(project).rooms[0]!;
+    project.actors=[{id:"p",name:"Player",roomName:room.name,x:1,y:1},{id:"g",name:"Guard",roomName:room.name,x:2,y:2}];
+    const handlers=roomsWorkspaceHandlers();
+    render(<RoomsWorkspace projectData={project} presentation={deriveRoomsWorkspacePresentation(project)} {...handlers} />);
+    await focusActiveScene(user);
+    await user.click(screen.getByRole("button",{name:"Ator Guard"}));
+    const name=screen.getByRole("textbox",{name:"Nome do ator"});
+    await user.clear(name); await user.type(name,"Vigia Norte");
+    expect(handlers.onUpdateRoomEntity).not.toHaveBeenCalled();
+    await user.tab();
+    expect(handlers.onUpdateRoomEntity).toHaveBeenCalledWith("actor","g",{name:"Vigia Norte"});
+    await user.clear(name); await user.type(name,"Player"); await user.tab();
+    expect(screen.getByRole("alert")).toHaveTextContent("Use um nome único e não vazio.");
+  });
+  it("commits an entity name without flagging an unchanged shared Player label", async () => {
+    const user=userEvent.setup();
+    const project=createRoomInProject(createBlankProjectWithScene({name:"Existing Player labels"}),{id:"second",name:"Second",sceneType:"topdown",width:30,height:20});
+    const room=deriveRoomsWorkspacePresentation(project).rooms[0]!;
+    project.actors=[{id:"p",name:"Player",roomName:room.name,x:1,y:1},{id:"p2",name:"Player",roomName:"Second",x:1,y:1}];
+    const handlers=roomsWorkspaceHandlers();
+    render(<RoomsWorkspace projectData={project} presentation={deriveRoomsWorkspacePresentation(project)} {...handlers} />);
+    await focusActiveScene(user);
+    await user.click(screen.getAllByRole("button",{name:"Player Player"})[0]!);
+    await user.click(screen.getByRole("textbox",{name:"Nome do ator"}));
+    await user.tab();
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+    expect(handlers.onUpdateRoomEntity).not.toHaveBeenCalled();
+  });
   it("lets authors type scene dimensions before applying the minimum", async () => {
     const user = userEvent.setup();
-    const project = buildProjectFromTemplate("blank", { name: "Dimension entry" });
+    const project = createBlankProjectWithScene({ name: "Dimension entry" });
     const handlers = roomsWorkspaceHandlers();
     render(<RoomsWorkspace projectData={project} presentation={deriveRoomsWorkspacePresentation(project)} {...handlers} />);
     const width = screen.getByLabelText("Largura (tiles)");
@@ -119,7 +151,7 @@ describe("RoomsWorkspace React smoke", () => {
   });
 
   it("offers logical cell dimensions for Dungeon Crawler authoring", () => {
-    const project = buildProjectFromTemplate("blank", { name: "Dungeon grid" });
+    const project = createBlankProjectWithScene({ name: "Dungeon grid" });
     const room = (project.rooms as Record<string, unknown>[])[0]!;
     room.sceneType = "dungeonCrawler";
     room.runtime = { type: "dungeonCrawler", config: {} };
@@ -615,7 +647,7 @@ describe("RoomsWorkspace React smoke", () => {
     const sceneEvents = screen.getByLabelText("Eventos da cena arena");
     expect(within(sceneEvents).getByRole("combobox", { name: "Estado do evento" })).toBeInTheDocument();
     expect(sceneEvents).toHaveTextContent("Ao iniciar");
-    expect(sceneEvents).toHaveTextContent("Ao acertar Player");
+    expect(sceneEvents).toHaveTextContent("Ao receber dano");
     expect(sceneEvents).toHaveTextContent("Ao vencer");
     expect(sceneEvents).toHaveTextContent("Ao perder");
     expect(sceneEvents).toHaveTextContent("Ao fugir");
@@ -3843,6 +3875,20 @@ describe("RoomsWorkspace React smoke", () => {
     expect(inactiveCard?.querySelector(".room-stage-card-canvas > .room-stage-card-grid-toggle")).toBeNull();
   });
 
+  it("localizes the new scene confirmation in an empty English project", async () => {
+    localStorage.setItem("gbaStudio.locale", "en-US");
+    const user = userEvent.setup();
+    const project = buildProjectFromTemplate("blank", { name: "Empty QA" });
+    render(<StudioI18nProvider><RoomsWorkspace
+      presentation={deriveRoomsWorkspacePresentation(project)} projectData={project}
+      {...roomsWorkspaceHandlers()}
+    /></StudioI18nProvider>);
+    await user.click(screen.getAllByRole("button", { name: "New scene" })[0]!);
+    expect(screen.getByRole("button", { name: "Create scene" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Criar cena" })).not.toBeInTheDocument();
+    localStorage.clear();
+  });
+
   it("renders the rooms workspace and creates a room from Nova room", async () => {
     const user = userEvent.setup();
     const project = createBlankProjectData({ name: "Smoke Rooms" });
@@ -3866,6 +3912,49 @@ describe("RoomsWorkspace React smoke", () => {
 
     expect(onCreateRoom).toHaveBeenCalled();
     expect(onCreateRoom.mock.calls[0]?.[1]).toEqual(expect.any(String));
+  });
+
+  it("opens a newly created scene in the focused editor instead of keeping the previous canvas", async () => {
+    const user = userEvent.setup();
+    function ProjectHarness() {
+      const [project, setProject] = useState(() => createBlankProjectData({ name: "Troca de cena" }));
+      return <RoomsWorkspace
+        presentation={deriveRoomsWorkspacePresentation(project)}
+        projectData={project}
+        {...roomsWorkspaceHandlers({
+          onCreateRoom: (_anchorRoomID: string | undefined, name: string) => {
+            window.setTimeout(() => setProject(current => setActiveRoomInProject(createRoomInProject(current, {
+              id: "room-new", name, width: 30, height: 20, sceneType: "topdown"
+            }), "room-new")), 40);
+            return "room-new";
+          },
+          onSetActiveRoom: (id: string) => setProject(current => setActiveRoomInProject(current, id))
+        })}
+      />;
+    }
+    render(<ProjectHarness />);
+    await focusActiveScene(user);
+    await user.click(screen.getByRole("button", { name: /Gatilho - Eventos/ }));
+    await user.click(screen.getByRole("button", { name: "Nova cena" }));
+    const input = screen.getByRole("textbox", { name: "Nome da cena" });
+    await user.clear(input);
+    await user.type(input, "Nova cena QA");
+    await user.click(screen.getByRole("button", { name: "Criar cena" }));
+    expect(await screen.findByRole("region", { name: "Editor focado da cena Nova cena QA" })).toBeInTheDocument();
+    expect(screen.getByRole("region", { name: "Viewport GBA da cena Nova cena QA" })).toBeInTheDocument();
+  });
+
+  it("allows choosing a menu type before creating a blank scene", async () => {
+    const user = userEvent.setup();
+    const project = createBlankProjectData({ name: "Menu em branco" });
+    const onCreateRoom = vi.fn(() => "room-menu");
+    render(<RoomsWorkspace presentation={deriveRoomsWorkspacePresentation(project)} projectData={project}
+      {...roomsWorkspaceHandlers({ onCreateRoom })} />);
+    await user.click(screen.getAllByRole("button", { name: "Nova cena" })[0]!);
+    const dialog = screen.getByRole("dialog", { name: "Nova cena" });
+    await user.selectOptions(within(dialog).getByRole("combobox", { name: "Tipo de cena" }), "menu");
+    await user.click(screen.getByRole("button", { name: "Criar cena" }));
+    expect(onCreateRoom).toHaveBeenCalledWith(undefined, expect.any(String), undefined, "menu");
   });
 
   it("escolhe o evento de uma conexao pelo nome do projeto", async () => {

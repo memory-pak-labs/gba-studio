@@ -1549,3 +1549,8 @@
   font-size: var(--studio-font-size-lg);
   font-weight: var(--studio-font-weight-bold);
 }
+
+.project-problems-controls small,
+.project-problems-controls > span {
+  font-weight: var(--studio-font-weight-regular);
+}

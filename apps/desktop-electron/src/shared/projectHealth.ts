@@ -515,7 +515,7 @@ export function deriveProjectHealthReport(
     scenes,
     counts,
     contract,
-    exportReady: counts.error === 0
+    exportReady: scenes.length > 0 && counts.error === 0
   };
 }
 

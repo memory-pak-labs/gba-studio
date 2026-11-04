@@ -175,8 +175,8 @@ function EventStructureSequenceView({
       ))}
       <li className="event-structure-add">
         <EventStructureDropSlot
-          buttonLabel="Adicionar evento"
-          label={target.kind === "root" ? ui("Adicionar evento ao fluxo principal") : ui("Adicionar evento em {0}", { 0: target.kind === "trueBranch" ? "Se sim" : "Se não" })}
+          buttonLabel={ui("Adicionar evento")}
+          label={target.kind === "root" ? ui("Adicionar evento ao fluxo principal") : ui("Adicionar evento em {0}", { 0: ui(target.kind === "trueBranch" ? "Se sim" : "Se não") })}
           onDropBlock={onDropBlock}
           onOpenCommandMenu={onOpenCommandMenu}
           target={target}

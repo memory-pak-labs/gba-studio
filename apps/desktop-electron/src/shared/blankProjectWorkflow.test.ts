@@ -1,3 +1,4 @@
+import { createBlankProjectWithScene } from "../testFixtures/blankProject.js";
 import { describe, expect, it } from "vitest";
 import { buildProjectFromTemplate } from "./projectTemplates.js";
 import { createActorInProject, createRoomInProject, setRoomTileCellInProject, updateRoomFieldsInProject } from "./roomsWorkspace.js";
@@ -8,8 +9,27 @@ import { deriveSettingsWorkspacePresentation } from "./settingsWorkspace.js";
 
 const rooms = (data: GBAProjectData) => data.rooms as Record<string, any>[];
 const blank = () => buildProjectFromTemplate("blank", { name: "Meu jogo" });
+const blankWithScene = () => createBlankProjectWithScene({ name: "Meu jogo" });
 
 describe("blank project authoring workflow", () => {
+  it("gives the default menu title and toggle feedback room within the panel", () => {
+    const presets = (blank().settings as Record<string, any>).hudPresets as Record<string, any>[];
+    const menu = presets.find(preset => preset.id === "hud-neutral-menu")!;
+    const component = (id: string) => menu.components.find((entry: Record<string, unknown>) => entry.id === id);
+    const title = component("Título");
+    expect(title.width).toBeGreaterThanOrEqual("Menu principal".length * 8);
+    for (const id of ["Opção 1", "Opção 2", "Opção 3"]) {
+      const option = component(id);
+      // The selector is an image; runtime reserves a blank before toggle labels.
+      // Include the last 8px glyph, which can be wider than its advance.
+      for (const label of [" Alternar OFF", " Alternar ON"]) {
+        expect((label.length - 1) * (option.textAdvance ?? 8) + 8).toBeLessThanOrEqual(option.width);
+      }
+      expect(option.x).toBeGreaterThanOrEqual(76);
+      expect(option.x + option.width).toBeLessThanOrEqual(168);
+    }
+  });
+
   it.each(["topdown", "platformer", "shmup", "luta", "racing", "isometricAdventure", "isometricTactical", "dungeonCrawler", "pointAndClick", "battleRpg"])(
     "creates a %s actor from the available blank library with a valid animation", sceneType => {
       const base = createRoomInProject(blank(), { id: "actor-room", name: "actor-room", sceneType, width: 30, height: 20 });
@@ -33,7 +53,7 @@ describe("blank project authoring workflow", () => {
   });
 
   it("follows the default HUD when changing scene types and saves the same HUD used by export", () => {
-    let data = blank();
+    let data = blankWithScene();
     const id = String(rooms(data)[0].id);
     for (const [sceneType, hudPresetId] of [["platformer", "hud-neutral-plataforma"], ["racing", "hud-neutral-corrida"],
       ["dungeonCrawler", "hud-neutral-dungeon-crawler"], ["menu", "hud-neutral-menu"], ["topdown", undefined]] as const) {
@@ -50,11 +70,11 @@ describe("blank project authoring workflow", () => {
   });
 
   it.each([null, "my-custom-hud"])("preserves an explicitly selected HUD %s across type changes", hudPresetId => {
-    const data = blank();
+    const data = blankWithScene();
     rooms(data)[0].hudPresetId = hudPresetId;
     const changed = updateRoomFieldsInProject(data, String(rooms(data)[0].id), { sceneType: "platformer" });
     expect(rooms(changed)[0].hudPresetId).toBe(hudPresetId);
-    const explicit = updateRoomFieldsInProject(blank(), String(rooms(blank())[0].id), { sceneType: "platformer", hudPresetId });
+    const explicit = updateRoomFieldsInProject(blankWithScene(), String(rooms(blankWithScene())[0].id), { sceneType: "platformer", hudPresetId });
     expect(rooms(explicit)[0].hudPresetId).toBe(hudPresetId ?? undefined);
   });
 
@@ -94,7 +114,7 @@ describe("blank project authoring workflow", () => {
   });
 
   it("preserves custom camera bounds and respects explicit bounds during resize", () => {
-    let data = updateRoomFieldsInProject(blank(), String(rooms(blank())[0].id), { width: 40, height: 30,
+    let data = updateRoomFieldsInProject(blankWithScene(), String(rooms(blankWithScene())[0].id), { width: 40, height: 30,
       cameraBounds: { x: 2, y: 3, width: 32, height: 22 } });
     const id = String(rooms(data)[0].id);
     data = updateRoomFieldsInProject(data, id, { width: 60, height: 40 });
@@ -126,7 +146,7 @@ describe("blank project authoring workflow", () => {
   });
 
   it("uses the native RPG party capacity when converting the initial scene", () => {
-    const data = blank();
+    const data = blankWithScene();
     const changed = updateRoomFieldsInProject(data, String(rooms(data)[0].id), { sceneType: "battleRpg" });
     expect(buildEngineExportProjectContract(changed).battle_rpg_project?.encounters[0]?.config.max_party_size).toBe(4);
   });
@@ -154,7 +174,7 @@ describe("blank project authoring workflow", () => {
   });
 
   it("persists the editor tile numbering in both the room and its active copy after painting", () => {
-    const data = blank();
+    const data = blankWithScene();
     delete rooms(data)[0].tilemapIndexBase;
     delete (data.scena as Record<string, unknown>).tilemapIndexBase;
     const painted = setRoomTileCellInProject(data, String(rooms(data)[0].id), 599, 600);

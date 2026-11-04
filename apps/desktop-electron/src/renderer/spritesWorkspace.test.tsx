@@ -6,6 +6,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { createBlankProjectData } from "../shared/newProject.js";
 import { deriveSpritesWorkspacePresentation } from "../shared/spritesWorkspace.js";
 import { SpritesWorkspace } from "./spritesWorkspace.js";
+import { StudioI18nProvider } from "./i18n";
 
 function spritesWorkspaceHandlers(overrides: Record<string, unknown> = {}) {
   return {
@@ -43,6 +44,21 @@ describe("SpritesWorkspace React smoke", () => {
     await user.click(screen.getByRole("button", { name: "player_topdown_4dir.png" }));
     expect(screen.queryByRole("slider", { name: "Escala X do sprite" })).not.toBeInTheDocument();
     expect(screen.queryByRole("slider", { name: "Escala Y do sprite" })).not.toBeInTheDocument();
+  });
+
+  it("localizes the inspector direction and tooltip without changing authored animation data", () => {
+    window.localStorage.setItem("gbaStudio.locale", "en-US");
+    try {
+      const project = createBlankProjectData({ name: "Directions" });
+      const before = JSON.stringify(project);
+      const handlers = spritesWorkspaceHandlers();
+      const { container } = render(<StudioI18nProvider><SpritesWorkspace presentation={deriveSpritesWorkspacePresentation(project)} {...handlers} /></StudioI18nProvider>);
+      fireEvent.click(screen.getByRole("button", { name: "player_topdown_4dir.png" }));
+      expect(container.querySelector(".sprites-inspector-heading")).toHaveTextContent("Stopped · Down");
+      expect(screen.getByRole("button", { name: "Direction Down" })).toHaveAttribute("title", "Down");
+      expect(JSON.stringify(project)).toBe(before);
+      expect(handlers.onUpdateAnimationFields).not.toHaveBeenCalled();
+    } finally { window.localStorage.removeItem("gbaStudio.locale"); }
   });
 
   it("oferece 8bpp como escolha avançada da folha sem alterar a imagem", async () => {

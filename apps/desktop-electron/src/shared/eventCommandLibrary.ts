@@ -401,7 +401,7 @@ const historicalEventCommandDefinitions: EventCommandDefinition[] = [
     "category": "Ator",
     "section": "Propriedades",
     "isFavorite": false,
-    "commandTemplate": "play_actor_animation {actor} {animation} true"
+    "commandTemplate": "play_actor_animation {actor} {animation}"
   },
   {
     "id": "actor.wait_animation",
@@ -505,7 +505,7 @@ const historicalEventCommandDefinitions: EventCommandDefinition[] = [
     "category": "Campos do motor",
     "section": "Movimento",
     "isFavorite": false,
-    "commandTemplate": "set_player_speed_profile 100 160 a 0"
+    "commandTemplate": "set_player_speed_profile 100 170 r 0"
   },
   {
     "id": "engine.player_movement_state",

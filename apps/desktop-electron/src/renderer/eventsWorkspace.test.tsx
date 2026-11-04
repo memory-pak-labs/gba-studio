@@ -392,7 +392,7 @@ describe("EventsWorkspace React smoke", () => {
 
   it("selects concrete steps before applying a batch editor action", async () => {
     const user = userEvent.setup();
-    const onUpdateEventStep = vi.fn();
+    const onUpdateEventFields = vi.fn();
     const projectData = {
       events: [{ id: "event-boot", name: "room_boot", category: "Cena", steps: [{ command: "noop", isEnabled: true }] }]
     };
@@ -404,9 +404,9 @@ describe("EventsWorkspace React smoke", () => {
         presentation={deriveEventsWorkspacePresentation(projectData)}
         projectData={projectData}
         onCreateEvent={vi.fn()}
-        onUpdateEventFields={vi.fn()}
+        onUpdateEventFields={onUpdateEventFields}
         onAddEventStep={vi.fn()}
-        onUpdateEventStep={onUpdateEventStep}
+        onUpdateEventStep={vi.fn()}
         onUpdateEventGraphNodePosition={vi.fn()}
         onRetargetEventGraphEdge={vi.fn()}
         onConnectEventGraphNodes={vi.fn()}
@@ -428,7 +428,9 @@ describe("EventsWorkspace React smoke", () => {
     expect(screen.getByRole("button", { name: "Desativar 1 passo" })).toBeInTheDocument();
 
     await user.click(screen.getByRole("button", { name: "Desativar 1 passo" }));
-    expect(onUpdateEventStep).toHaveBeenCalledWith("event-boot", 0, { isEnabled: false });
+    expect(onUpdateEventFields).toHaveBeenCalledWith("event-boot", {
+      stepUpdates: [{ index: 0, fields: { isEnabled: false } }]
+    });
   });
 
   it("evita criar uma chamada recursiva quando há outro evento disponível", async () => {
@@ -609,7 +611,7 @@ describe("EventsWorkspace React smoke", () => {
     await user.click(screen.getByRole("tab", { name: "Mapa" }));
     await user.click(screen.getByRole("button", { name: "Contexto Cena: arena" }));
     expect(screen.getByLabelText("Ao iniciar de Cena: arena")).toBeInTheDocument();
-    expect(screen.getByLabelText("Ao acertar Player de Cena: arena")).toBeInTheDocument();
+    expect(screen.getByLabelText("Ao receber dano de Cena: arena")).toBeInTheDocument();
     expect(screen.getByLabelText("Ao vencer de Cena: arena")).toBeInTheDocument();
     expect(screen.getByLabelText("Ao perder de Cena: arena")).toBeInTheDocument();
     expect(screen.getByLabelText("Ao fugir de Cena: arena")).toBeInTheDocument();

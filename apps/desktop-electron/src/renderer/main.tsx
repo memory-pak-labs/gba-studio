@@ -1622,7 +1622,7 @@ function App(): React.ReactElement {
     setStatus(result.ok ? `Revelando asset: ${resolvedPath}` : result.error ?? "Falha ao revelar asset.");
   }
 
-  async function createRoom(anchorRoomID?: string, roomName?: string, presetID?: RoomPresetID): Promise<string | void> {
+  async function createRoom(anchorRoomID?: string, roomName?: string, presetID?: RoomPresetID, sceneType?: string): Promise<string | void> {
     if (!session) return;
     const currentRooms = roomsPresentation?.rooms ?? [];
     const anchorRoom = anchorRoomID
@@ -1646,7 +1646,7 @@ function App(): React.ReactElement {
       name: trimmedName,
       width: 30,
       height: 20,
-      sceneType: "topdown",
+      sceneType: sceneType ?? "topdown",
       anchorRoomID,
       presetID
     });
@@ -2281,8 +2281,8 @@ function App(): React.ReactElement {
     valueType: "number" | "text" = "number"
   ): Promise<string | void> {
     if (!session) return;
-    const label = kind === "constant" ? "constante" : valueType === "text" ? "variável textual" : "variável";
-    const nextName = await prompt(`Nome da nova ${label}`, kind === "constant" ? "max_score" : valueType === "text" ? "player.name" : "score");
+    const promptLabel = kind === "constant" ? "Nome da nova constante" : valueType === "text" ? "Nome da nova variável textual" : "Nome da nova variável";
+    const nextName = await prompt(ui(promptLabel), kind === "constant" ? "max_score" : valueType === "text" ? "player.name" : "score");
     if (nextName === null) return;
     const trimmedName = nextName.trim();
     if (!trimmedName) return;
@@ -2292,11 +2292,11 @@ function App(): React.ReactElement {
       valueType
     });
     if (nextData === session.project.data) {
-      setStatus(ui("{0}{1} ja existe ou nome invalido.", { 0: label[0]!.toUpperCase(), 1: label.slice(1) }));
+      setStatus(ui(kind === "constant" ? "Constante já existe ou nome inválido." : "Variável já existe ou nome inválido."));
       return;
     }
     updateProjectData(nextData);
-    setStatus(ui("{0}{1} criada: {2}.", { 0: label[0]!.toUpperCase(), 1: label.slice(1), 2: trimmedName }));
+    setStatus(ui(kind === "constant" ? "Constante criada: {0}." : "Variável criada: {0}.", { 0: trimmedName }));
     return trimmedName;
   }
 
@@ -2308,13 +2308,12 @@ function App(): React.ReactElement {
 
   async function removeVariable(name: string, kind: ProjectVariableKind): Promise<void> {
     if (!session) return;
-    const label = kind === "constant" ? "constante" : "variavel";
     if (listLogicValueUsages(session.project.data, name).length) { setStatus(ui("Este item possui referências. Remova os vínculos antes de excluir.")); return; }
-    if (!await confirm(`Remover ${label} "${name}"?`)) return;
+    if (!await confirm(ui(kind === "constant" ? 'Remover constante "{0}"?' : 'Remover variável "{0}"?', { 0: name }))) return;
     const nextData = removeProjectVariableFromProject(session.project.data, { name, kind });
     if (nextData !== session.project.data) {
       updateProjectData(nextData);
-      setStatus(ui("{0}{1} removida: {2}.", { 0: label[0]!.toUpperCase(), 1: label.slice(1), 2: name }));
+      setStatus(ui(kind === "constant" ? "Constante removida: {0}." : "Variável removida: {0}.", { 0: name }));
     }
   }
 
@@ -3645,6 +3644,7 @@ function App(): React.ReactElement {
               focusedDialogueKey={focusedAssetRequest?.workspace === selectedWorkspace ? focusedAssetRequest.targetName ?? null : null}
               focusRequestID={focusedAssetRequest?.workspace === selectedWorkspace ? focusedAssetRequest.requestID : 0}
               onEditDialogue={openDialogueInEditor}
+              onCreateDialogue={async () => { const key = await createDialogue(); if (key) openDialogueInEditor(key); return key; }}
 
 
 

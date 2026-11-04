@@ -49,6 +49,11 @@ const actorHitCapability: EventBindingCapability = {
   requiresFrequency: false
 };
 
+const topdownActorDamageCapabilities: EventBindingCapability[] = [
+  { bindingKey: "onHitActor", label: "Ao receber projétil", section: null, requiresFrequency: false },
+  { bindingKey: "onDefeated", label: "Ao ser derrotado", section: null, requiresFrequency: false }
+];
+
 const standardRoomCapabilities: EventBindingCapability[] = [
   { bindingKey: "onInit", label: "Ao iniciar", section: null, requiresFrequency: false },
   {
@@ -76,16 +81,17 @@ export function resolveEventBindingCapabilities(input: EventBindingCapabilityInp
     return runtime === "pointandclick" ? pointClickTriggerCapabilities : triggerCapabilities;
   }
   if (input.targetKind === "actor") {
-    // A selected actor always owns the same event lifecycle, regardless of the
-    // scene runtime. Menu metadata describes visual composition and selection;
-    // it must not remove the actor's editable event states.
+    // All actors own the base lifecycle. Extra damage events follow the native
+    // runtime; menu composition metadata must not remove the base states.
     if (input.actorRole === "player") return playerCapabilities;
-    return Number.isFinite(input.collisionGroup) && Number(input.collisionGroup) > 0
-      ? [...standardActorCapabilities, actorHitCapability]
-      : standardActorCapabilities;
+    const lifecycle = [...standardActorCapabilities];
+    if (runtime === "topdown") lifecycle.push(...topdownActorDamageCapabilities);
+    if (Number.isFinite(input.collisionGroup) && Number(input.collisionGroup) > 0) lifecycle.push(actorHitCapability);
+    return lifecycle;
   }
 
   const lifecycle = [standardRoomCapabilities[0]!];
+  if (["battlerpg", "shmup"].includes(runtime)) lifecycle.push({ bindingKey: "onHitPlayer", label: "Ao receber dano", section: null, requiresFrequency: false });
   if (["topdown", "platformer", "isometric", "dungeoncrawler"].includes(runtime)) lifecycle.push({ bindingKey: "onRestore", label: "Ao restaurar", section: null, requiresFrequency: false });
   if (["topdown", "platformer", "isometric"].includes(runtime)) {
     lifecycle.push(standardRoomCapabilities[1]!);
@@ -105,9 +111,6 @@ export function resolveEventBindingCapabilities(input: EventBindingCapabilityInp
   if (runtime === "shmup") lifecycle.push(
     { bindingKey: "onClear", label: "Ao concluir ondas", section: null, requiresFrequency: false },
     { bindingKey: "onDefeat", label: "Ao perder", section: null, requiresFrequency: false }
-  );
-  if (["battlerpg", "shmup"].includes(runtime)) lifecycle.push(
-    { bindingKey: "onHitPlayer", label: "Ao acertar Player", section: null, requiresFrequency: false }
   );
   return lifecycle;
 }

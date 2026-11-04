@@ -1461,6 +1461,19 @@ describe("Engine project export", () => {
     });
   });
 
+  it("exports every declared frame when only the first frame has stored geometry", () => {
+    const data = exportableProject({
+      assets: [{ id: "hero", name: "hero.png", kind: "Sprite", metadata: { source: "Assets/sprites/hero.png", width: 128, height: 48 } }],
+      actors: [{ id: "player", name: "Player", roomName: "start", x: 1, y: 1, spriteSheet: "hero.png", animationName: "walk_down" }],
+      animations: [{ id: "walk", name: "walk_down", spriteSheet: "hero.png", frameWidth: 32, frameHeight: 48, frameCount: 4, frames: [{ width: 32, height: 48, originX: 0, originY: 0, tiles: [] }] }]
+    });
+    const pack = buildAssetcSpritePackGeneration(data);
+    const exported = buildActorEngineSpriteExport(data, (data.actors as Record<string, unknown>[])[0], pack);
+    const walk = exported?.animations?.find((animation) => animation.name === "walk_down");
+    expect(walk?.frame_indices).toEqual([0, 1, 2, 3]);
+    expect(walk?.frame_metasprites?.map((frame) => frame.parts[0]?.slice_x)).toEqual([0, 32, 64, 96]);
+  });
+
   it("exports multi-tile animation frames as frame_metasprites for assetc", () => {
     const contract = buildEngineExportProjectContract(exportableProject({
       assets: [
@@ -1714,7 +1727,7 @@ describe("Engine project export", () => {
     ]);
   });
 
-  it("places walk animations after idle right when walk states exist", () => {
+  it("keeps authored animations in runtime direction order when walk states exist", () => {
     const sorted = sortTopdownSpriteAnimationsForExport([
       { name: "walk_right", spriteSheet: "hero.png" },
       { name: "idle_down", spriteSheet: "hero.png" },
@@ -1732,6 +1745,40 @@ describe("Engine project export", () => {
       "walk_right",
       "walk_up"
     ]);
+  });
+
+  it("exports manually authored idle and walk frames to the same slots as a Top-down SpriteState", () => {
+    const animations = ["idle_down", "walk_down", "walk_up", "walk_left", "walk_right", "idle_right", "idle_left", "idle_up"]
+      .map((name, index) => ({
+        id: name,
+        name,
+        spriteSheet: "hero.png",
+        frameWidth: 32,
+        frameHeight: 48,
+        frameCount: name.startsWith("walk_") ? 2 : 1,
+        state: name.split("_")[0],
+        direction: name.split("_")[1],
+        frames: Array.from({ length: name.startsWith("walk_") ? 2 : 1 }, (_, frame) => ({
+          tiles: [{ x: 0, y: 0, sliceX: frame * 32, sliceY: index * 48, tileWidth: 32, tileHeight: 48 }]
+        }))
+      }));
+    const actor = { id: "player", name: "Player", spriteSheet: "hero.png", animationName: "idle_down" };
+    const data = exportableProject({
+      assets: [{ id: "hero", name: "hero.png", kind: "Sprite", metadata: { source: "Assets/sprites/hero.png" } }],
+      actors: [actor],
+      animations,
+      animationStates: []
+    });
+    const exported = buildActorEngineSpriteExport(data, actor, buildAssetcSpritePackGeneration(data));
+    expect(exported?.animations?.map(animation => animation.name)).toEqual([
+      "idle_down", "idle_right", "idle_up", "idle_left",
+      "walk_down", "walk_right", "walk_up", "walk_left"
+    ]);
+    for (const animation of exported!.animations!) {
+      const authored = animations.find(candidate => candidate.name === animation.name)!;
+      expect(animation.frame_metasprites?.[0]?.parts[0]?.slice_y).toBe(authored.frames[0]!.tiles[0]!.sliceY);
+      expect(animation.frame_metasprites).toHaveLength(authored.frameCount);
+    }
   });
 
   it("exports P0 player with canonical idle+walk 4 dirs prefix", () => {
@@ -1855,6 +1902,11 @@ describe("Engine project export", () => {
       "idle_down", "idle_right", "idle_up", "idle_left",
       "walk_down", "walk_right", "walk_up", "walk_left"
     ]);
+    expect(exportFields?.animations?.slice(0, 8).some((animation) => animation.name.startsWith("walk_"))).toBe(false);
+    for (const authored of animations) {
+      const original = exportFields?.animations?.find(animation => animation.name === authored.name);
+      expect(original?.frame_metasprites?.[0]?.parts[0]?.slice_x).toBe(authored.frames[0]!.tiles[0]!.sliceX);
+    }
   });
 
   it("exports fixed SpriteState names so events can switch an actor between authored states", () => {

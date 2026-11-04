@@ -178,7 +178,6 @@
 .project-problems-controls small,
 .project-problems-controls > span {
   color: var(--studio-color-text-muted);
-  font-weight: normal;
 }
 
 .project-problems-controls {

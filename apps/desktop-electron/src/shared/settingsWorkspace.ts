@@ -383,7 +383,7 @@ const SETTINGS_FIELD_DEFINITIONS: Record<SettingsSectionID, SettingsFieldDefinit
     { key: "steeringSpeed", label: "Velocidade de direção", type: "number", defaultValue: 2 }
   ],
   battleRpg: [
-    { key: "maxPartySize", label: "Máximo no grupo", type: "number", defaultValue: 6 },
+    { key: "maxPartySize", label: "Máximo no grupo", type: "number", defaultValue: 4 },
     { key: "maxEnemies", label: "Máximo de inimigos", type: "number", defaultValue: 1 },
     { key: "turnDelayFrames", label: "Intervalo entre turnos", type: "number", defaultValue: 30 },
     { key: "escapeEnabled", label: "Permitir fuga", type: "boolean", defaultValue: true },
@@ -634,8 +634,8 @@ const SCENE_FIELD_METADATA: Record<string, SceneFieldMetadata> = {
   "racing.acceleration": { description: "Força de aceleração.", maximum: 32, minimum: 0, range: true, step: 0.05, unit: "px/frame²" },
   "racing.brakePower": { description: "Força de frenagem.", maximum: 32, minimum: 0, range: true, step: 0.05, unit: "px/frame²" },
   "racing.steeringSpeed": { description: "Velocidade de resposta da direção.", maximum: 16, minimum: 0.125, range: true, step: 0.05, unit: "graus/frame" },
-  "battleRpg.maxPartySize": { description: "Quantidade máxima de personagens aliados.", maximum: 6, minimum: 1, range: true, step: 1, unit: "atores" },
-  "battleRpg.maxEnemies": { description: "Quantidade máxima de inimigos simultâneos.", maximum: 6, minimum: 1, range: true, step: 1, unit: "atores" },
+  "battleRpg.maxPartySize": { description: "Quantidade máxima de personagens aliados.", maximum: 4, minimum: 1, range: true, step: 1, unit: "atores" },
+  "battleRpg.maxEnemies": { description: "Quantidade máxima de inimigos simultâneos.", maximum: 8, minimum: 1, range: true, step: 1, unit: "atores" },
   "battleRpg.turnDelayFrames": { description: "Espera entre turnos.", maximum: 255, minimum: 0, range: true, step: 1, unit: "frames" },
   "battleRpg.experienceMultiplier": { description: "Multiplicador aplicado à experiência.", maximum: 10, minimum: 0.1, range: true, step: 0.1, unit: "×" },
   "battleRpg.rewardGold": { description: "Ouro entregue ao vencer.", maximum: 65535, minimum: 0, range: true, step: 1, unit: "pontos" },
@@ -1439,12 +1439,17 @@ function settingsDiagnostics(options: {
   const roomNames = new Set(projectRooms(options.data).map((room) => stringField(room, "name", "")));
   const diagnostics: SettingsWorkspaceDiagnostic[] = [];
 
-  if (!options.startScene || options.startScene === "Nao definida") {
-    diagnostics.push(diagnostic("start-scene", "Cena inicial", "Cena inicial nao definida.", "warning"));
-  } else if (roomNames.size > 0 && !roomNames.has(options.startScene)) {
-    diagnostics.push(diagnostic("start-scene", "Cena inicial", `Cena inicial não existe no projeto: ${options.startScene}.`, "warning"));
-  } else {
-    diagnostics.push(diagnostic("start-scene", "Cena inicial", `Cena inicial pronta: ${options.startScene}.`, "ok"));
+  const emptyProjectStart = projectRooms(options.data).length === 0
+    && isRecord(options.data.settings) && isRecord(options.data.settings.general)
+    && options.data.settings.general.startScene === "";
+  if (!emptyProjectStart) {
+    if (!options.startScene || options.startScene === "Nao definida") {
+      diagnostics.push(diagnostic("start-scene", "Cena inicial", "Cena inicial nao definida.", "warning"));
+    } else if (roomNames.size > 0 && !roomNames.has(options.startScene)) {
+      diagnostics.push(diagnostic("start-scene", "Cena inicial", `Cena inicial não existe no projeto: ${options.startScene}.`, "warning"));
+    } else {
+      diagnostics.push(diagnostic("start-scene", "Cena inicial", `Cena inicial pronta: ${options.startScene}.`, "ok"));
+    }
   }
 
   if (options.engineBackend.includes("engine")) {
@@ -1785,7 +1790,7 @@ export function deriveSettingsWorkspacePresentation(data: GBAProjectData): Setti
       item("Velocidade de direção", numberField(racing, "steeringSpeed") ?? 2)
     ]),
     makeSection("battleRpg", "Cenas", "Batalha RPG", "Grupo, inimigos e ritmo dos turnos", battleRpg, [
-      item("Máximo no grupo", numberField(battleRpg, "maxPartySize") ?? 6),
+      item("Máximo no grupo", numberField(battleRpg, "maxPartySize") ?? 4),
       item("Máximo de inimigos", numberField(battleRpg, "maxEnemies") ?? 1),
       item("Intervalo entre turnos", numberField(battleRpg, "turnDelayFrames") ?? 30),
       item("Multiplicador de XP", numberField(battleRpg, "experienceMultiplier") ?? 1),

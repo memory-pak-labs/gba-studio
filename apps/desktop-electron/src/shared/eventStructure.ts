@@ -79,6 +79,13 @@ function enabledStep(command: string): EventStructureStep {
   return { command: command.trim() || "noop", isEnabled: true };
 }
 
+/** Give a newly inserted standalone condition an editable, closed branch. */
+export function completeStandaloneCondition(commands: string[]): string[] {
+  return commands.length === 1 && conditionVerbs.has(commandVerb(commands[0] ?? ""))
+    ? [...commands, "condition_end"]
+    : commands;
+}
+
 function positiveInteger(value: string | undefined, fallback: number): number {
   const parsed = Number.parseInt(value ?? "", 10);
   return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
@@ -231,7 +238,7 @@ export function insertEventStructureCommands(
   target: EventStructureInsertionTarget,
   commands: string[]
 ): EventStructureStep[] {
-  const inserted = commands.map(enabledStep);
+  const inserted = completeStandaloneCondition(commands).map(enabledStep);
   if (inserted.length === 0) return steps;
   if (target.kind === "root") return [...steps, ...inserted];
 

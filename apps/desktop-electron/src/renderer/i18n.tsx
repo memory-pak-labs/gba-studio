@@ -151,7 +151,7 @@ const ptBRTranslations = {
   "theme.dark": "Tema escuro",
   "theme.light": "Tema claro",
   "template.blank.title": "Projeto em branco",
-  "template.blank.detail": "Uma cena vazia e recursos opcionais para criar seu próprio jogo.",
+  "template.blank.detail": "Sem cenas de demonstração, com todos os tipos de cena e recursos de criação disponíveis.",
   "template.exemplo-gba.detail": "Projeto completo com {count} cenas e 13 runtimes nativos para Game Boy Advance.",
   "template.exemplo-gba.previewAlt": "Preview do template Exemplo GBA Completo",
   "template.exemplo-gba.title": "Exemplo GBA Completo",
@@ -317,7 +317,7 @@ const ptBRTranslations = {
   "welcome.learningTitle": "Primeiro caminho",
   "welcome.learningSubtitle": "Uma sequência curta para começar sem esconder as ferramentas avançadas.",
   "welcome.learningStep1Title": "1. Abra o projeto completo",
-  "welcome.learningStep1Detail": "Explore as 31 cenas, os diferentes runtimes e os assets já preparados para GBA.",
+  "welcome.learningStep1Detail": "Explore as 36 cenas, os diferentes runtimes e os assets já preparados para GBA.",
   "welcome.learningStep2Title": "2. Execute e observe",
   "welcome.learningStep2Detail": "Use Executar ROM para conferir o resultado no Play Window antes de editar.",
   "welcome.learningStep3Title": "3. Edite, salve e exporte",
@@ -754,7 +754,7 @@ const additionalLocaleTranslationsBase: Record<Exclude<StudioLocale, "pt-BR" | "
     "theme.dark": "Thème sombre",
     "theme.light": "Thème clair",
     "template.blank.title": "Projet vierge",
-    "template.blank.detail": "Une scène vide et des ressources facultatives pour créer votre jeu.",
+    "template.blank.detail": "Sans scènes de démonstration, avec tous les types de scènes et les outils de création disponibles.",
     "template.exemplo-gba.detail": "Projet complet avec {count} scènes et 13 runtimes natifs pour Game Boy Advance.",
     "template.exemplo-gba.previewAlt": "Aperçu du modèle Exemple GBA complet",
     "template.exemplo-gba.title": "Exemple GBA complet",
@@ -790,7 +790,7 @@ const additionalLocaleTranslationsBase: Record<Exclude<StudioLocale, "pt-BR" | "
     ,"welcome.noRecent": "Aucun projet récent"
     ,"welcome.learningSubtitle": "Une courte séquence pour commencer sans masquer les outils avancés."
     ,"welcome.learningStep1Title": "1. Ouvrez le projet complet"
-    ,"welcome.learningStep1Detail": "Explorez les 30 scènes, les différents runtimes et les assets déjà préparés pour GBA."
+    ,"welcome.learningStep1Detail": "Explorez les 36 scènes, les différents runtimes et les assets déjà préparés pour GBA."
     ,"welcome.learningStep2Title": "2. Exécutez et observez"
     ,"welcome.learningStep2Detail": "Utilisez Exécuter la ROM pour vérifier le résultat dans la fenêtre Play avant de modifier."
     ,"welcome.learningStep3Title": "3. Modifiez, enregistrez et exportez"
@@ -831,7 +831,7 @@ const additionalLocaleTranslationsBase: Record<Exclude<StudioLocale, "pt-BR" | "
     "theme.dark": "डार्क थीम",
     "theme.light": "लाइट थीम",
     "template.blank.title": "खाली प्रोजेक्ट",
-    "template.blank.detail": "अपना गेम बनाने के लिए एक खाली दृश्य और वैकल्पिक संसाधन।",
+    "template.blank.detail": "डेमो दृश्यों के बिना, सभी दृश्य प्रकार और निर्माण संसाधन उपलब्ध हैं।",
     "template.exemplo-gba.detail": "Game Boy Advance के लिए {count} दृश्यों और 13 नेटिव रनटाइम वाला पूरा प्रोजेक्ट।",
     "template.exemplo-gba.previewAlt": "Exemplo GBA Complete टेम्पलेट का प्रीव्यू",
     "template.exemplo-gba.title": "Exemplo GBA Complete",
@@ -867,7 +867,7 @@ const additionalLocaleTranslationsBase: Record<Exclude<StudioLocale, "pt-BR" | "
     ,"welcome.noRecent": "कोई हाल का प्रोजेक्ट नहीं"
     ,"welcome.learningSubtitle": "उन्नत टूल छिपाए बिना शुरुआत करने के लिए एक छोटा क्रम।"
     ,"welcome.learningStep1Title": "1. पूरा प्रोजेक्ट खोलें"
-    ,"welcome.learningStep1Detail": "30 दृश्यों, अलग-अलग रनटाइम और GBA के लिए तैयार assets को देखें।"
+    ,"welcome.learningStep1Detail": "36 दृश्यों, अलग-अलग रनटाइम और GBA के लिए तैयार assets को देखें।"
     ,"welcome.learningStep2Title": "2. चलाएँ और देखें"
     ,"welcome.learningStep2Detail": "एडिट करने से पहले Play Window में परिणाम देखने के लिए ROM चलाएँ।"
     ,"welcome.learningStep3Title": "3. एडिट, सेव और निर्यात करें"
@@ -908,7 +908,7 @@ const additionalLocaleTranslationsBase: Record<Exclude<StudioLocale, "pt-BR" | "
     "theme.dark": "深色主题",
     "theme.light": "浅色主题",
     "template.blank.title": "空白项目",
-    "template.blank.detail": "一个空场景和可选资源，用于创建自己的游戏。",
+    "template.blank.detail": "不含演示场景，提供所有场景类型和创作资源。",
     "template.exemplo-gba.detail": "包含 {count} 个场景和 13 个 Game Boy Advance 原生运行时的完整项目。",
     "template.exemplo-gba.previewAlt": "Exemplo GBA Complete 模板预览",
     "template.exemplo-gba.title": "Exemplo GBA Complete",
@@ -944,7 +944,7 @@ const additionalLocaleTranslationsBase: Record<Exclude<StudioLocale, "pt-BR" | "
     ,"welcome.noRecent": "没有最近的项目"
     ,"welcome.learningSubtitle": "用简短流程开始，同时保留高级工具。"
     ,"welcome.learningStep1Title": "1. 打开完整项目"
-    ,"welcome.learningStep1Detail": "探索 30 个场景、不同的运行时以及为 GBA 准备好的资源。"
+    ,"welcome.learningStep1Detail": "探索 36 个场景、不同的运行时以及为 GBA 准备好的资源。"
     ,"welcome.learningStep2Title": "2. 运行并观察"
     ,"welcome.learningStep2Detail": "编辑前使用运行 ROM，在 Play Window 中查看结果。"
     ,"welcome.learningStep3Title": "3. 编辑、保存并导出"
@@ -985,7 +985,7 @@ const additionalLocaleTranslationsBase: Record<Exclude<StudioLocale, "pt-BR" | "
     "theme.dark": "السمة الداكنة",
     "theme.light": "السمة الفاتحة",
     "template.blank.title": "مشروع فارغ",
-    "template.blank.detail": "مشهد فارغ وموارد اختيارية لإنشاء لعبتك الخاصة.",
+    "template.blank.detail": "بدون مشاهد تجريبية، مع إتاحة جميع أنواع المشاهد وموارد الإنشاء.",
     "template.exemplo-gba.detail": "مشروع كامل يضم {count} مشهداً و13 بيئة تشغيل أصلية لـ Game Boy Advance.",
     "template.exemplo-gba.previewAlt": "معاينة قالب Exemplo GBA Complete",
     "template.exemplo-gba.title": "Exemplo GBA Complete",
@@ -1021,7 +1021,7 @@ const additionalLocaleTranslationsBase: Record<Exclude<StudioLocale, "pt-BR" | "
     ,"welcome.noRecent": "لا توجد مشاريع حديثة"
     ,"welcome.learningSubtitle": "تسلسل قصير للبدء من دون إخفاء الأدوات المتقدمة."
     ,"welcome.learningStep1Title": "1. افتح المشروع الكامل"
-    ,"welcome.learningStep1Detail": "استكشف 30 مشهداً وبيئات التشغيل المختلفة والأصول المُعدّة لـ GBA."
+    ,"welcome.learningStep1Detail": "استكشف 36 مشهداً وبيئات التشغيل المختلفة والأصول المُعدّة لـ GBA."
     ,"welcome.learningStep2Title": "2. شغّل وراقب"
     ,"welcome.learningStep2Detail": "استخدم تشغيل ROM للتحقق من النتيجة في نافذة Play قبل التحرير."
     ,"welcome.learningStep3Title": "3. حرّر واحفظ وصدّر"
@@ -1062,7 +1062,7 @@ const additionalLocaleTranslationsBase: Record<Exclude<StudioLocale, "pt-BR" | "
     "theme.dark": "Тёмная тема",
     "theme.light": "Светлая тема",
     "template.blank.title": "Пустой проект",
-    "template.blank.detail": "Пустая сцена и дополнительные ресурсы для создания своей игры.",
+    "template.blank.detail": "Без демонстрационных сцен, со всеми типами сцен и ресурсами для создания игры.",
     "template.exemplo-gba.detail": "Полный проект с {count} сценами и 13 нативными средами выполнения для Game Boy Advance.",
     "template.exemplo-gba.previewAlt": "Предпросмотр шаблона Exemplo GBA Complete",
     "template.exemplo-gba.title": "Exemplo GBA Complete",
@@ -1098,7 +1098,7 @@ const additionalLocaleTranslationsBase: Record<Exclude<StudioLocale, "pt-BR" | "
     ,"welcome.noRecent": "Нет недавних проектов"
     ,"welcome.learningSubtitle": "Короткая последовательность для начала без скрытия расширенных инструментов."
     ,"welcome.learningStep1Title": "1. Откройте полный проект"
-    ,"welcome.learningStep1Detail": "Изучите 30 сцен, разные среды выполнения и подготовленные для GBA ресурсы."
+    ,"welcome.learningStep1Detail": "Изучите 36 сцен, разные среды выполнения и подготовленные для GBA ресурсы."
     ,"welcome.learningStep2Title": "2. Запустите и наблюдайте"
     ,"welcome.learningStep2Detail": "Запустите ROM, чтобы проверить результат в окне Play перед редактированием."
     ,"welcome.learningStep3Title": "3. Редактируйте, сохраняйте и экспортируйте"
@@ -1139,7 +1139,7 @@ const additionalLocaleTranslationsBase: Record<Exclude<StudioLocale, "pt-BR" | "
     "theme.dark": "Dunkles Design",
     "theme.light": "Helles Design",
     "template.blank.title": "Leeres Projekt",
-    "template.blank.detail": "Eine leere Szene und optionale Ressourcen für dein eigenes Spiel.",
+    "template.blank.detail": "Ohne Demoszenen, mit allen Szenentypen und verfügbaren Ressourcen zur Spieleerstellung.",
     "template.exemplo-gba.detail": "Vollständiges Projekt mit {count} Szenen und 13 nativen Laufzeiten für den Game Boy Advance.",
     "template.exemplo-gba.previewAlt": "Vorschau der Vorlage Exemplo GBA Complete",
     "template.exemplo-gba.title": "Exemplo GBA Complete",
@@ -1175,7 +1175,7 @@ const additionalLocaleTranslationsBase: Record<Exclude<StudioLocale, "pt-BR" | "
     ,"welcome.noRecent": "Kein aktuelles Projekt"
     ,"welcome.learningSubtitle": "Eine kurze Folge zum Einstieg, ohne die erweiterten Werkzeuge auszublenden."
     ,"welcome.learningStep1Title": "1. Vollständiges Projekt öffnen"
-    ,"welcome.learningStep1Detail": "Erkunde 30 Szenen, verschiedene Laufzeiten und für GBA vorbereitete Assets."
+    ,"welcome.learningStep1Detail": "Erkunde 36 Szenen, verschiedene Laufzeiten und für GBA vorbereitete Assets."
     ,"welcome.learningStep2Title": "2. Ausführen und beobachten"
     ,"welcome.learningStep2Detail": "Führe die ROM aus, um das Ergebnis vor der Bearbeitung im Play-Fenster zu prüfen."
     ,"welcome.learningStep3Title": "3. Bearbeiten, speichern und exportieren"
@@ -1216,7 +1216,7 @@ const additionalLocaleTranslationsBase: Record<Exclude<StudioLocale, "pt-BR" | "
     "theme.dark": "ダークテーマ",
     "theme.light": "ライトテーマ",
     "template.blank.title": "空のプロジェクト",
-    "template.blank.detail": "空のシーンと任意のリソースで、自分のゲームを作れます。",
+    "template.blank.detail": "デモシーンなしで、すべてのシーンタイプと制作リソースを利用できます。",
     "template.exemplo-gba.detail": "{count} シーンと 13 個の Game Boy Advance ネイティブランタイムを含む完全なプロジェクト。",
     "template.exemplo-gba.previewAlt": "Exemplo GBA Complete テンプレートのプレビュー",
     "template.exemplo-gba.title": "Exemplo GBA Complete",
@@ -1252,7 +1252,7 @@ const additionalLocaleTranslationsBase: Record<Exclude<StudioLocale, "pt-BR" | "
     ,"welcome.noRecent": "最近のプロジェクトはありません"
     ,"welcome.learningSubtitle": "高度なツールを隠さずに始めるための短い手順です。"
     ,"welcome.learningStep1Title": "1. 完全なプロジェクトを開く"
-    ,"welcome.learningStep1Detail": "30 のシーン、さまざまなランタイム、GBA 用に準備されたアセットを確認します。"
+    ,"welcome.learningStep1Detail": "36 のシーン、さまざまなランタイム、GBA 用に準備されたアセットを確認します。"
     ,"welcome.learningStep2Title": "2. 実行して確認する"
     ,"welcome.learningStep2Detail": "編集前に ROM を実行して、Play ウィンドウで結果を確認します。"
     ,"welcome.learningStep3Title": "3. 編集、保存、書き出し"
@@ -1293,7 +1293,7 @@ const additionalLocaleTranslationsBase: Record<Exclude<StudioLocale, "pt-BR" | "
     "theme.dark": "어두운 테마",
     "theme.light": "밝은 테마",
     "template.blank.title": "빈 프로젝트",
-    "template.blank.detail": "빈 장면과 선택적 리소스로 나만의 게임을 만드세요.",
+    "template.blank.detail": "데모 장면 없이 모든 장면 유형과 제작 리소스를 사용할 수 있습니다.",
     "template.exemplo-gba.detail": "Game Boy Advance용 {count}개 장면과 13개 네이티브 런타임이 포함된 전체 프로젝트입니다.",
     "template.exemplo-gba.previewAlt": "Exemplo GBA Complete 템플릿 미리보기",
     "template.exemplo-gba.title": "Exemplo GBA Complete",
@@ -1370,7 +1370,7 @@ const additionalLocaleTranslationsBase: Record<Exclude<StudioLocale, "pt-BR" | "
     "theme.dark": "Tema scuro",
     "theme.light": "Tema chiaro",
     "template.blank.title": "Progetto vuoto",
-    "template.blank.detail": "Una scena vuota e risorse opzionali per creare il tuo gioco.",
+    "template.blank.detail": "Senza scene dimostrative, con tutti i tipi di scena e le risorse di creazione disponibili.",
     "template.exemplo-gba.detail": "Progetto completo con {count} scene e 13 runtime nativi per Game Boy Advance.",
     "template.exemplo-gba.previewAlt": "Anteprima del modello Exemplo GBA Complete",
     "template.exemplo-gba.title": "Exemplo GBA Complete",
@@ -1406,7 +1406,7 @@ const additionalLocaleTranslationsBase: Record<Exclude<StudioLocale, "pt-BR" | "
     ,"welcome.noRecent": "Nessun progetto recente"
     ,"welcome.learningSubtitle": "Una breve sequenza per iniziare senza nascondere gli strumenti avanzati."
     ,"welcome.learningStep1Title": "1. Apri il progetto completo"
-    ,"welcome.learningStep1Detail": "Esplora 30 scene, diversi runtime e gli asset già preparati per GBA."
+    ,"welcome.learningStep1Detail": "Esplora 36 scene, diversi runtime e gli asset già preparati per GBA."
     ,"welcome.learningStep2Title": "2. Esegui e osserva"
     ,"welcome.learningStep2Detail": "Esegui la ROM per controllare il risultato nella finestra Play prima di modificare."
     ,"welcome.learningStep3Title": "3. Modifica, salva ed esporta"
@@ -1447,7 +1447,7 @@ const additionalLocaleTranslationsBase: Record<Exclude<StudioLocale, "pt-BR" | "
     "theme.dark": "Ciemny motyw",
     "theme.light": "Jasny motyw",
     "template.blank.title": "Pusty projekt",
-    "template.blank.detail": "Pusta scena i opcjonalne zasoby do tworzenia własnej gry.",
+    "template.blank.detail": "Bez scen demonstracyjnych, ze wszystkimi typami scen i zasobami do tworzenia gry.",
     "template.exemplo-gba.detail": "Kompletny projekt z {count} scenami i 13 natywnymi środowiskami Game Boy Advance.",
     "template.exemplo-gba.previewAlt": "Podgląd szablonu Exemplo GBA Complete",
     "template.exemplo-gba.title": "Exemplo GBA Complete",
@@ -1483,7 +1483,7 @@ const additionalLocaleTranslationsBase: Record<Exclude<StudioLocale, "pt-BR" | "
     ,"welcome.noRecent": "Brak ostatnich projektów"
     ,"welcome.learningSubtitle": "Krótka sekwencja na start bez ukrywania zaawansowanych narzędzi."
     ,"welcome.learningStep1Title": "1. Otwórz kompletny projekt"
-    ,"welcome.learningStep1Detail": "Poznaj 30 scen, różne środowiska uruchomieniowe i zasoby przygotowane dla GBA."
+    ,"welcome.learningStep1Detail": "Poznaj 36 scen, różne środowiska uruchomieniowe i zasoby przygotowane dla GBA."
     ,"welcome.learningStep2Title": "2. Uruchom i obserwuj"
     ,"welcome.learningStep2Detail": "Uruchom ROM, aby sprawdzić wynik w oknie Play przed edycją."
     ,"welcome.learningStep3Title": "3. Edytuj, zapisz i eksportuj"
@@ -1524,7 +1524,7 @@ const additionalLocaleTranslationsBase: Record<Exclude<StudioLocale, "pt-BR" | "
     "theme.dark": "Donker thema",
     "theme.light": "Licht thema",
     "template.blank.title": "Leeg project",
-    "template.blank.detail": "Een lege scène en optionele middelen om je eigen spel te maken.",
+    "template.blank.detail": "Zonder demoscènes, met alle scènetypen en beschikbare hulpmiddelen om spellen te maken.",
     "template.exemplo-gba.detail": "Volledig project met {count} scènes en 13 native runtimes voor Game Boy Advance.",
     "template.exemplo-gba.previewAlt": "Voorbeeld van de sjabloon Exemplo GBA Complete",
     "template.exemplo-gba.title": "Exemplo GBA Complete",
@@ -1560,7 +1560,7 @@ const additionalLocaleTranslationsBase: Record<Exclude<StudioLocale, "pt-BR" | "
     ,"welcome.noRecent": "Geen recente projecten"
     ,"welcome.learningSubtitle": "Een korte reeks om te beginnen zonder geavanceerde tools te verbergen."
     ,"welcome.learningStep1Title": "1. Open het volledige project"
-    ,"welcome.learningStep1Detail": "Verken 30 scènes, verschillende runtimes en assets die voor GBA zijn voorbereid."
+    ,"welcome.learningStep1Detail": "Verken 36 scènes, verschillende runtimes en assets die voor GBA zijn voorbereid."
     ,"welcome.learningStep2Title": "2. Voer uit en bekijk"
     ,"welcome.learningStep2Detail": "Gebruik ROM uitvoeren om het resultaat in het Play-venster te controleren voordat je bewerkt."
     ,"welcome.learningStep3Title": "3. Bewerk, sla op en exporteer"
@@ -1712,7 +1712,7 @@ const translations: Record<StudioLocale, StudioTranslations> = {
     "theme.dark": "Dark theme",
     "theme.light": "Light theme",
   "template.blank.title": "Blank project",
-  "template.blank.detail": "An empty scene and optional resources to create your own game.",
+  "template.blank.detail": "No demo scenes, with all scene types and authoring resources available.",
   "template.exemplo-gba.detail": "Complete project with {count} scenes and 13 native runtimes for Game Boy Advance.",
   "template.exemplo-gba.previewAlt": "Exemplo GBA Complete template preview",
   "template.exemplo-gba.title": "Exemplo GBA Complete",
@@ -1878,7 +1878,7 @@ const translations: Record<StudioLocale, StudioTranslations> = {
     "welcome.learningTitle": "First path",
     "welcome.learningSubtitle": "A short sequence to get started without hiding the advanced tools.",
     "welcome.learningStep1Title": "1. Open the complete project",
-    "welcome.learningStep1Detail": "Explore all 31 scenes, the different runtimes and the assets prepared for GBA.",
+    "welcome.learningStep1Detail": "Explore all 36 scenes, the different runtimes and the assets prepared for GBA.",
     "welcome.learningStep2Title": "2. Run and observe",
     "welcome.learningStep2Detail": "Use Run ROM to check the result in Play Window before editing.",
     "welcome.learningStep3Title": "3. Edit, save and export",
@@ -2372,7 +2372,7 @@ const translations: Record<StudioLocale, StudioTranslations> = {
     "theme.dark": "Tema oscuro",
     "theme.light": "Tema claro",
   "template.blank.title": "Proyecto en blanco",
-  "template.blank.detail": "Una escena vacía y recursos opcionales para crear tu propio juego.",
+  "template.blank.detail": "Sin escenas de demostración, con todos los tipos de escena y recursos de creación disponibles.",
   "template.exemplo-gba.detail": "Proyecto completo con {count} escenas y 13 runtimes nativos para Game Boy Advance.",
   "template.exemplo-gba.previewAlt": "Preview de la plantilla Exemplo GBA Completo",
   "template.exemplo-gba.title": "Exemplo GBA Completo",
@@ -2537,7 +2537,7 @@ const translations: Record<StudioLocale, StudioTranslations> = {
     "welcome.learningTitle": "Primer camino",
     "welcome.learningSubtitle": "Una secuencia corta para empezar sin ocultar las herramientas avanzadas.",
     "welcome.learningStep1Title": "1. Abre el proyecto completo",
-    "welcome.learningStep1Detail": "Explora las 31 escenas, los distintos runtimes y los assets preparados para GBA.",
+    "welcome.learningStep1Detail": "Explora las 36 escenas, los distintos runtimes y los assets preparados para GBA.",
     "welcome.learningStep2Title": "2. Ejecuta y observa",
     "welcome.learningStep2Detail": "Usa Ejecutar ROM para comprobar el resultado en Play Window antes de editar.",
     "welcome.learningStep3Title": "3. Edita, guarda y exporta",

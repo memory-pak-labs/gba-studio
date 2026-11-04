@@ -436,12 +436,17 @@ function sceneAdvancedSummary(sectionID: SettingsSectionID): { title: string; de
   };
 }
 
+function settingFieldLabel(sectionID: SettingsSectionID, field: SettingsEditableField): string {
+  return polishSettingsText(sectionID === "controls" && field.key === "down" ? "Direcional: baixo" : field.label);
+}
+
 function settingControl(
   sectionID: SettingsSectionID,
   field: SettingsEditableField,
   onUpdateSetting: SettingsWorkspaceProps["onUpdateSetting"],
   onSelectPath: SettingsWorkspaceProps["onSelectPath"]
 ): React.ReactElement {
+  field = { ...field, label: settingFieldLabel(sectionID, field) };
   if (field.readOnly) {
     return (
       <div className="settings-edit-row" key={field.key} data-setting-key={field.key} data-setting-section={sectionID}>
@@ -1423,7 +1428,7 @@ export function SettingsWorkspace({
       ...presentation,
       sections: (isExportWorkspace ? visibleSections : presentation.sections).map(section => ({
         ...section, title: ui(section.title), detail: ui(section.detail),
-        editableFields: section.editableFields.map(field => ({ ...field, label: ui(field.label), description: ui(field.description) })),
+        editableFields: section.editableFields.map(field => ({ ...field, label: settingFieldLabel(section.id, field), description: ui(field.description) })),
         intentGroups: section.intentGroups.map(group => ({ ...group, title: ui(group.title),
           options: group.options.map(option => ({ ...option, title: ui(option.title), detail: ui(option.detail) })) }))
       }))

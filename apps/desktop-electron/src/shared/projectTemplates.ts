@@ -7,6 +7,7 @@ import { blankHudContent } from "./blankHudDefaults.js";
 import { blankDialogueContent, BLANK_DIALOGUE_SKIN, BLANK_DIALOGUE_PORTRAIT } from "./blankDialogueDefaults.js";
 import { blankSceneHudContent } from "./blankSceneHudDefaults.js";
 import { blankBackgroundContent, BLANK_BACKGROUND_DEFAULTS_PROFILE } from "./blankBackgroundDefaults.js";
+import { SCENE_TYPE_OPTIONS } from "./sceneTypes.js";
 import exemploGBAProjectRaw from "../../default-assets/templates/exemplo-gba/exemplo-gba.gba-project?raw";
 
 export const EXEMPLO_GBA_SCENE_COUNT = (JSON.parse(exemploGBAProjectRaw) as { scenas: unknown[] }).scenas.length;
@@ -30,7 +31,7 @@ export const projectTemplateDefinitions: ProjectTemplateDefinition[] = [
   {
     id: "blank",
     title: "Projeto em branco",
-    detail: "Uma cena vazia e recursos opcionais para criar seu próprio jogo.",
+    detail: "Sem cenas de demonstração, com todos os tipos de cena e recursos de criação disponíveis.",
     icon: "+"
   }
 ];
@@ -78,6 +79,13 @@ export function buildProjectFromTemplate(
 ): GBAProjectData {
   if (templateID === "blank") {
     const project = createBlankProjectData({ name: options.name, includeStarterContent: false });
+    project.rooms = [];
+    project.scenas = [];
+    project.actors = [];
+    delete project.scena;
+    delete project.room;
+    const editorState = project.editorState as Record<string, unknown>;
+    for (const key of ["activeScenaID", "activeScenaName", "startScenaID"]) delete editorState[key];
     const content = blankPlayerContent();
     const dungeonNpcs = blankDungeonNpcContent();
     const hud = blankHudContent();
@@ -98,8 +106,10 @@ export function buildProjectFromTemplate(
       { id: "asset-group-neutral-dialogue", name: "Diálogo padrão", assetIDs: dialogueAssets.map(asset => asset.id), children: [] },
       { id: "asset-group-neutral-backgrounds", name: "Backgrounds padrão", assetIDs: backgrounds.assets.map(asset => asset.id), children: [] }
     ];
-    const room = (project.rooms as Record<string, unknown>[])[0]!;
     const settings = project.settings as Record<string, Record<string, unknown>>;
+    settings.general.startScene = "";
+    settings.general.startPlayer = "";
+    settings.sceneTypes.enabled = Object.fromEntries(SCENE_TYPE_OPTIONS.map(({ id }) => [id, true]));
     settings.topdown.playerSprite = content.defaultPlayerSprites.topdown;
     settings.topdown.mirrorLeftFromRight = false;
     settings.pointAndClick.cursorImage = content.defaultPlayerSprites.pointAndClick;
@@ -113,7 +123,6 @@ export function buildProjectFromTemplate(
     settings.sceneTypes.backgroundDefaultsProfile = BLANK_BACKGROUND_DEFAULTS_PROFILE;
     settings.sceneTypes.defaultBackgrounds = backgrounds.defaultBackgrounds;
     settings.backgrounds.defaultMapSize = "";
-    project.scena = structuredClone(room);
     (project.settings as Record<string, unknown>).hudPresets = [hud.preset,...sceneHuds.presets];
     (project.settings as Record<string, unknown>).hudPresetId = hud.preset.id;
     settings.uiDialogs = {

@@ -1,3 +1,4 @@
+import { createBlankProjectWithScene } from "../testFixtures/blankProject.js";
 import path from "node:path";
 import { copyFile, mkdir, readFile, writeFile } from "node:fs/promises";
 import { describe, expect, it } from "vitest";
@@ -33,7 +34,7 @@ describe.skipIf(!process.env.GBA_BACKGROUND_QA_OUTPUT)("approved blank backgroun
     const output = path.resolve(process.env.GBA_BACKGROUND_QA_OUTPUT!);
     const projectPath = path.join(output, "project", "orange_backgrounds_qa.gba-project");
     await mkdir(path.dirname(projectPath), { recursive: true });
-    let data = buildProjectFromTemplate("blank", { name: "QA Backgrounds laranja" });
+    let data = createBlankProjectWithScene({ name: "QA Backgrounds laranja" });
     for (const sceneType of ["platformer", "isometricAdventure", "isometricTactical", "shmup", "racing",
       "luta", "pointAndClick", "visualNovel", "cutscene", "battleRpg", "dungeonCrawler", "menu", "worldMap", "custom"]) {
       data = createRoomInProject(data, { id: sceneType, name: `qa_${sceneType}`, sceneType, width: 30, height: 20 });
@@ -73,7 +74,7 @@ describe.skipIf(!process.env.GBA_BLANK_WORKFLOW_QA_OUTPUT)("edited blank map nat
   it("saves, reopens and builds enlarged topdown and platformer maps with empty and last-source tiles", async () => {
     const output = path.resolve(process.env.GBA_BLANK_WORKFLOW_QA_OUTPUT!);
     const projectPath = path.join(output, "project", "blank_workflow.gba-project");
-    let data = buildProjectFromTemplate("blank", { name: "QA Blank workflow" });
+    let data = createBlankProjectWithScene({ name: "QA Blank workflow" });
     data = createRoomInProject(data, { id: "platform", name: "platform", sceneType: "platformer", width: 30, height: 20 });
     const rooms = data.rooms as Record<string, any>[];
     for (const room of rooms) {

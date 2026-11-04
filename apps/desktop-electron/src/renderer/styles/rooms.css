@@ -9038,7 +9038,8 @@ body.room-scene-map-card-dragging .room-stage-card-frame.is-dragging {
   font-size: calc(12px * var(--studio-font-scale));
 }
 
-.room-name-prompt-field input {
+.room-name-prompt-field input,
+.room-name-prompt-field select {
   background: var(--studio-color-bg-app);
   border: 1px solid var(--studio-color-border);
   border-radius: 8px;

@@ -36,6 +36,22 @@ function settingsHandlers(overrides: Record<string, unknown> = {}) {
 }
 
 describe("SettingsWorkspace React", () => {
+  it("allows eight RPG enemies and limits the party to four engine slots", async () => {
+    const user = userEvent.setup();
+    const onUpdateSetting = vi.fn();
+    render(<SettingsWorkspace scope="scene" presentation={deriveSettingsWorkspacePresentation({ settings: {} })} {...settingsHandlers({ onUpdateSetting })} />);
+    await user.click(screen.getByRole("button", { name: "Seção de ajustes: Batalha RPG" }));
+    const battle = screen.getByRole("region", { name: "Editar Batalha RPG" });
+    await user.click(within(battle).getByText("Valores técnicos"));
+    const party = within(battle).getByRole("spinbutton", { name: "Máximo no grupo valor exato" });
+    const enemies = within(battle).getByRole("spinbutton", { name: "Máximo de inimigos valor exato" });
+    expect(party).toHaveAttribute("max", "4");
+    expect(party).toHaveValue(4);
+    expect(enemies).toHaveAttribute("max", "8");
+    fireEvent.change(enemies, { target: { value: "8" } });
+    expect(onUpdateSetting).toHaveBeenLastCalledWith("battleRpg", "maxEnemies", 8);
+  });
+
   it("applies an external export focus request once without pulling the user back after edits", async () => {
     const user = userEvent.setup();
     const handlers = settingsHandlers();
@@ -74,7 +90,7 @@ describe("SettingsWorkspace React", () => {
 
   it("keeps primary actions disabled during a build and displays real path status", () => {
     render(<SettingsWorkspace scope="export" presentation={deriveSettingsWorkspacePresentation({ settings: {} })} {...settingsHandlers({ onGenerateRom: vi.fn(), onPlayProject: vi.fn() })} pathValidation={{ ok: false, items: [] }} romRunning generateRomDisabled playProjectDisabled />);
-    expect(screen.getByRole("status")).toHaveTextContent("Caminhos com pendências");
+    expect(screen.getByRole("status", { name: "Status dos caminhos" })).toHaveTextContent("Caminhos com pendências");
     expect(screen.getByRole("button", { name: "Gerando ROM..." })).toBeDisabled();
     expect(screen.getByRole("button", { name: "Executar ROM" })).toBeDisabled();
     expect(screen.getByRole("button", { name: "Verificar caminhos" })).toBeDisabled();

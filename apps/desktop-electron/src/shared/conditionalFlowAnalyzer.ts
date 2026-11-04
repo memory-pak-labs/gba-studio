@@ -49,7 +49,16 @@ function menuTargetEdges(
   validEdges: Map<string, string[]>
 ): Set<string> {
   const menuNames = new Set(rooms.map((room) => text(room.name) ?? text(room.id)).filter((name): name is string => Boolean(name)));
+  const embeddedOwners=new Map<string,string>();
+  for(const room of rooms) {
+    const name=text(room.name)??text(room.id),runtime=isRecord(room.runtime)?room.runtime:{},config=isRecord(runtime.config)?runtime.config:{};
+    if(!name||runtime.type!=="menu")continue;
+    for(const screen of (Array.isArray(config.screens)?config.screens:[]).filter(isRecord)) {
+      const id=text(screen.id);if(id)embeddedOwners.set(id,name);
+    }
+  }
   const targetName = (target: string): string | null => {
+    if(embeddedOwners.has(target))return embeddedOwners.get(target)!;
     const targetRoom = rooms.find((room) => (text(room.name) ?? text(room.id)) === target || text(room.id) === target);
     const name = targetRoom ? text(targetRoom.name) ?? text(targetRoom.id) : null;
     return name && sceneSet.has(name) ? name : null;

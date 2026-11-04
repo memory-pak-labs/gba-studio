@@ -4,7 +4,7 @@ import { MenuTextInputFields } from "./MenuTextInputFields";
 import { normalizeMenuSceneConfig } from "../shared/menuScene";
 import type { UpdateRoomFields } from "../shared/roomsWorkspace/core";
 import { uiText as ui, useStudioUiText } from "./studioUiText";
-import { HUD_VALUE_BINDING_LABELS } from "../shared/hudPresets";
+import { HUD_VALUE_BINDING_LABELS, type HudRuntimeTextProfile } from "../shared/hudPresets";
 import { HudElementBehaviorInspector } from "./HudElementBehaviorInspector";
 import { InterfaceThemeInspector } from "./InterfaceThemeInspector";
 import type { InterfaceThemeChange } from "../shared/interfaceThemes";
@@ -158,6 +158,7 @@ export function HudSceneInspector(props: HudSceneInspectorProps): React.ReactEle
         <label>{ui("Nome da HUD")}<input disabled={!canEdit} value={preset.name} onChange={event => updatePreset({ name: event.currentTarget.value })} /></label>
         <label>{ui("Descrição")}<input disabled={!canEdit} value={preset.description} onChange={event => updatePreset({ description: event.currentTarget.value })} /></label>
         <label>{ui("Modo")}<select disabled={!canEdit} value={preset.mode} onChange={event => updatePreset({ mode: event.currentTarget.value as "standard" | "advanced" })}><option value="standard">{ui("Padrão")}</option><option value="advanced">{ui("Composição avançada")}</option></select></label>
+        {room.sceneType === "dungeonCrawler" ? <><label>{ui("Conteúdo dos textos")}<select disabled={!canEdit} value={preset.runtimeTextProfile ?? "standard"} onChange={event => updatePreset({ runtimeTextProfile: event.currentTarget.value as HudRuntimeTextProfile })}><option value="standard">{ui("Padrão da cena")}</option><option value="dungeon-status">{ui("Vida, direção, itens e controles (4 campos)")}</option><option value="dungeon-sidebar">{ui("Mapa e status lateral (8 campos)")}</option><option value="dungeon-sidebar-contextual">{ui("Mapa e status lateral ao interagir (8 campos)")}</option></select></label><small>{ui("Os textos dinâmicos seguem a ordem dos elementos na composição. Textos fixos mantêm o conteúdo informado.")}</small></> : null}
         <div className="room-hud-component-size-grid"><InspectorNumber disabled={!canEdit} label={ui("Largura da HUD")} min={24} max={240} step={8} value={preset.width} onChange={width => updatePreset({ width })} /><InspectorNumber disabled={!canEdit} label={ui("Altura da HUD")} min={8} max={160} step={8} value={preset.height} onChange={height => updatePreset({ height })} /></div>
         <label>{ui("Posição da HUD")}<select disabled={!canEdit} value={preset.position} onChange={event => updatePreset({ position: event.currentTarget.value as "Superior" | "Inferior" })}><option value="Superior">{ui("Superior")}</option><option value="Inferior">{ui("Inferior")}</option></select></label>
         <label>{ui("Imagem própria do preset")}<ProjectReferencePicker ariaLabel={ui("Fundo da HUD")} disabled={!canEdit} options={assets} value={presets.find(item => item.id === preset.id)?.backgroundImage ?? ""} emptyLabel={ui("Usar moldura do tema")} onChange={backgroundImage => updatePreset({ backgroundImage })} actions={props.onImportAssets ? [{label:"Importar imagem",run:() => props.onImportAssets?.()}] : []} /></label>

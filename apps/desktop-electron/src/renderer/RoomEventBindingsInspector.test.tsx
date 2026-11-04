@@ -32,6 +32,18 @@ function selectState(label: string): void {
 describe("RoomEventBindingsInspector", () => {
   afterEach(cleanup);
 
+  it("starts a new bound script with a complete condition block", () => {
+    const onCreateBehavior = vi.fn(() => "room_init");
+    const condition = { ...greetingRecipe, id: "condition", label: "Se valor", command: "if_variable value 10", isRecipe: false, steps: null };
+    render(<RoomEventBindingsInspector contextKind="room" entity={{ id: "room", name: "Room", eventBindings: {} }}
+      commandSuggestions={[condition]} eventOptions={[]} onChangeBinding={vi.fn()} onCreateBehavior={onCreateBehavior}
+      onCreateEvent={vi.fn()} sceneType="topdown" />);
+    fireEvent.click(screen.getByRole("button", { name: "Começar script em Ao iniciar" }));
+    fireEvent.click(screen.getByRole("button", { name: "Se valor" }));
+    fireEvent.click(screen.getByRole("button", { name: "Adicionar evento selecionado" }));
+    expect(onCreateBehavior).toHaveBeenCalledWith(expect.objectContaining({ initialCommands: ["if_variable value 10", "condition_end"] }));
+  });
+
   it("exposes the scene authoring guide without adding artificial timeline steps", () => {
     render(<RoomEventBindingsInspector
       contextKind="room"

@@ -1,5 +1,6 @@
 import { isScaleEvent, parseScaleEvent } from "./eventTransforms.js";
 import { parseEventInstruction, sceneEntryPlan, eventWaitFrames, type SceneEntryReason } from "./eventExecutionContract.js";
+import { sceneChangeCommand, sceneChangeCommandParts } from "./sceneChangeCommand.js";
 import { parseVisibilityPreset, visibilityPresetVerbs, type VisibilityPreset } from "./visibilityPresets.js";
 import { roomMapStates, resolveMapState, mapStateTileCommands } from "./mapStates.js";
 import { resolveProjectConstantCommand } from "./projectConstants.js";
@@ -729,6 +730,8 @@ function previewRuntimeRtcFieldValue(state: PreviewRuntimeState, field: string):
 export const PREVIEW_ACTOR_UPDATE_INTERVAL_MS = 1000 / 60;
 
 export interface PreviewRuntimeState {
+  /** Native text slots when a runtime preview supplies them; racing Play uses the ROM. */
+  nativeTextSlots?: string[];
   sceneLifecycle?: ReturnType<typeof sceneEntryPlan>;
   ready: boolean;
   error: string | null;
@@ -1987,7 +1990,9 @@ function sceneMenuItemDetail(state: PreviewRuntimeState, item: MenuSceneItem): s
   if (item.action === "toggle_variable") return sceneMenuItemValue(state, item) === item.checkedValue ? "ON" : "OFF";
   const binding = item.binding;
   if (!binding) return undefined;
+  if(binding.source === "text") return state.nativeTextSlots?.[binding.index] || "--:--.--";
   const value = sceneMenuBindingValue(state, binding);
+  if(binding.source === "equipped" && item.valueLabels) return item.valueLabels[(value ?? -1)+1] ?? "?";
   if (value === null) return undefined;
   if (binding.format === "count") return `x${Math.max(0, value)}`;
   if (binding.format === "percent") return `${Math.max(0, value)}%`;
@@ -2003,15 +2008,14 @@ function sceneMenuBindingValue(state: PreviewRuntimeState, binding: MenuSceneIte
     return key ? Number(state.variables[key] ?? 0) : 0;
   }
   if (binding.source === "inventory") {
-    return Number(Object.values(state.inventory)[binding.index] ?? 0);
+    return Number(state.inventory[eventInventoryKeys(state)[binding.index] ?? ""] ?? 0);
   }
   if (binding.source === "stat") {
     return Number(Object.values(state.stats)[binding.index]?.value ?? 0);
   }
   if (binding.source === "equipped") {
-    const value = Object.values(state.equippedItems)[binding.index];
-    const numericValue = Number(value);
-    return Number.isFinite(numericValue) ? numericValue : (value ? 1 : 0);
+    const value = state.equippedItems[String(binding.index)];
+    return value ? eventInventoryKeys(state).indexOf(value) : -1;
   }
   return null;
 }
@@ -2023,7 +2027,7 @@ export function previewRuntimeSceneMenuItems(state: PreviewRuntimeState): Previe
     id: item.id,
     label: item.label,
     detail: sceneMenuItemDetail(state, item),
-    enabled: item.enabled,
+    enabled: sceneMenuItemAvailable(state,item),
     action: item.action
   }));
 }
@@ -3163,7 +3167,16 @@ function scalarEquals(left: PreviewRuntimeScalar | undefined, right: PreviewRunt
   return String(left ?? "") === String(right ?? "");
 }
 
+function previousGameplayRoom(state: PreviewRuntimeState): PreviewRuntimeRoom | undefined {
+  return [...state.sceneMenu.stack].reverse().map(id=>state.rooms.find(room=>room.id===id || room.name===id)).find(room=>room && room.sceneType!=="menu");
+}
 function engineFieldValue(state: PreviewRuntimeState, field: string): PreviewRuntimeScalar {
+  if(field === "previous_runtime" || field === "previous_room") {
+    const previous=previousGameplayRoom(state);
+    if(!previous)return -1;
+    if(field === "previous_runtime") return ({topdown:0,platformer:1,isometric:2,menu:3,shmup:4,pointclick:5,pointClick:5,point_click:5,dungeon:6,dungeonCrawler:6,dungeon_crawler:6,racing:7,cutscene:8,visualnovel:9,visualNovel:9,visual_novel:9,worldmap:10,worldMap:10,world_map:10,battlerpg:11,battleRpg:11,battle_rpg:11,luta:12} as Record<string,number>)[previous.sceneType] ?? -1;
+    return state.rooms.filter(room=>room.sceneType===previous.sceneType).findIndex(room=>room.id===previous.id);
+  }
   const equipment = /^equipped_item_([0-7])$/.exec(field);
   if (equipment) {
     const item = state.equippedItems[equipment[1]!];
@@ -4007,7 +4020,7 @@ function appendRecognizedScript(
   verb: string,
   operand: string
 ): PreviewRuntimeState {
-  const parts = commandTokens(command);
+  const parts = sceneChangeCommandParts(command, state.actors.map(actor => actor.name));
   if (verb === "advance_campaign") {
     return advancePreviewCampaign(state, eventName, command);
   }
@@ -4503,9 +4516,9 @@ function runScriptFrameCommands(state: PreviewRuntimeState, frame: PreviewRuntim
     }
     if(integratedNativeSimulationVerbs.has(verb)) {
       try {
-        const issue=eventCommandIntegrationIssue(command,currentState.currentRoom?.sceneType);
+        const issue=eventCommandIntegrationIssue(sceneChangeCommand([verb, ...parts]),currentState.currentRoom?.sceneType);
         if(issue) throw new Error(issue);
-        const result=applyIntegratedNativeSimulation(currentState,commandTokens(command));
+        const result=applyIntegratedNativeSimulation(currentState,[verb, ...parts]);
         currentState=runtimeScriptLog(result,resolvedEventName,command,verb);
         if(result.nativeEvents.modal) return {...currentState,scriptContinuations:[{...scriptFrameBase(),commandIndex:commandIndex+2},...currentState.scriptContinuations]};
       } catch(error) { currentState=appendUnsupported(currentState,resolvedEventName,command,error instanceof Error ? error.message : "Evento inválido."); }
@@ -6060,7 +6073,12 @@ function selectBattleMenuItem(state: PreviewRuntimeState): PreviewRuntimeState {
       return eventName ? runEvent(nextState, eventName) : nextState;
     }
     if (state.battleTurnPending) {
-      const afterEnemyTurn = applyPreviewEnemyTurn(state);
+      let afterEnemyTurn = applyPreviewEnemyTurn(state);
+      if (afterEnemyTurn.battlePartyHp.some((hp, index) => hp < (state.battlePartyHp[index] ?? hp))) {
+        const room = roomRecordByRuntimeRoom(state.project, state.currentRoom);
+        const damageEvent = room ? eventBinding(room, "onHitPlayer") : null;
+        if (damageEvent) afterEnemyTurn = runEvent(afterEnemyTurn, damageEvent);
+      }
       if (afterEnemyTurn.battleOutcome !== "inProgress") {
         return updateDebug({
           ...afterEnemyTurn,
@@ -6153,7 +6171,7 @@ function resolvePreviewCommand(
   state: PreviewRuntimeState,
   command: string
 ): { command: string; verb: string; parts: string[]; operand: string } {
-  const initialParts = command.trim().split(/\s+/).filter(Boolean);
+  const initialParts = sceneChangeCommandParts(command, state.actors.map(actor => actor.name));
   let verb = initialParts[0] ?? "";
   let parts = initialParts.slice(1);
   let effectiveCommand = command;
@@ -6162,7 +6180,7 @@ function resolvePreviewCommand(
     const rewritten = rewritePluginPreviewCommand(command, state.pluginRegistry);
     if (rewritten) {
       effectiveCommand = rewritten;
-      const rewrittenParts = rewritten.trim().split(/\s+/).filter(Boolean);
+      const rewrittenParts = commandTokens(rewritten);
       verb = rewrittenParts[0] ?? verb;
       parts = rewrittenParts.slice(1);
     }
@@ -6572,7 +6590,7 @@ function runTopdownPortalOverlap(state: PreviewRuntimeState): PreviewRuntimeStat
     const transition = Object.hasOwn(connection, "transition") ? normalizeSceneTransition(connection.transition)
       : sceneTransitionFromProjectSettings(settings.transitions);
     const visual = sceneTransitionUsesVisualEffect(transition);
-    const warp = `change_scene ${target.name} ${arrival.x} ${arrival.y} ${arrival.direction}`;
+    const warp = sceneChangeCommand(["change_scene", target.name, String(arrival.x), String(arrival.y), arrival.direction]);
     const crossesRuntime = target.sceneType !== "topdown";
     const hasRuntimeWarp = commands.some(command => {
       const [verb, destination] = commandTokens(command);
@@ -7729,7 +7747,7 @@ function playSceneMenuActionSound(state: PreviewRuntimeState, action: "navigate"
 }
 
 function sceneMenuItemAvailable(state: PreviewRuntimeState, item: MenuSceneItem): boolean {
-  return item.enabled && (!item.requiresSave || (typeof item.saveSlot === "number" && item.saveSlot >= 0
+  return item.enabled && (!item.availableRuntime || previousGameplayRoom(state)?.sceneType===item.availableRuntime) && (!item.requiresSave || (typeof item.saveSlot === "number" && item.saveSlot >= 0
     ? !!state.saveSlots[item.saveSlot] : Object.values(state.saveSlots).some(Boolean)));
 }
 

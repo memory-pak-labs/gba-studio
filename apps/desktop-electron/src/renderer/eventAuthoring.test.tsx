@@ -30,6 +30,17 @@ const callbacks = () => ({
 describe("event authoring flows", () => {
   afterEach(() => { cleanup(); localStorage.clear(); });
 
+  it("edits an optional scene arrival without shifting coordinates", async () => {
+    const data = { scenas: [{ name: "Caverna" }], events: [{ id: "go", name: "go", category: "Cena", steps: [{ command: "change_scene Caverna" }] }] };
+    const props = callbacks();
+    render(<EventInspectorPanel {...props} projectData={data} presentation={deriveEventsWorkspacePresentation(data)} eventName="go" triggerLabel="Ao interagir" />);
+    await userEvent.setup().click(screen.getByRole("button", { name: "Passo 1: Trocar cena" }));
+    fireEvent.change(screen.getByLabelText("X (tiles) do evento"), { target: { value: "15" } });
+    expect(props.onUpdateEventStep).toHaveBeenLastCalledWith("go", 0, { command: "change_scene Caverna 15 0" });
+    fireEvent.change(screen.getByLabelText("Y (tiles) do evento"), { target: { value: "10" } });
+    expect(props.onUpdateEventStep).toHaveBeenLastCalledWith("go", 0, { command: "change_scene Caverna 0 10" });
+  });
+
   it("requires confirmation, supports keyboard search, favorites and recent blocks", async () => {
     const user = userEvent.setup();
     const choose = vi.fn();

@@ -1,5 +1,6 @@
 import { uiText as ui, useStudioUiText } from "./studioUiText";
 import { EventEditingContext } from "./EventEditingContext";
+import { completeStandaloneCondition } from "../shared/eventStructure";
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { ArrowLeft, Maximize2, Plus } from "lucide-react";
@@ -264,10 +265,11 @@ export function RoomEventBindingsInspector({
   }
 
   function createBehavior(slot: BehaviorPickerSlot, commands: string[]): void {
+    const completeCommands = completeStandaloneCondition(commands);
     const frequency = slot.requiresFrequency ? frequencyFor(slot) : null;
     const initialCommands = frequency === null
-      ? commands
-      : [`rate_limit ${frequency} 0`, ...commands, "rate_limit_end"];
+      ? completeCommands
+      : [`rate_limit ${frequency} 0`, ...completeCommands, "rate_limit_end"];
     const bindCreatedEvent = (eventName: string | void): void => {
       if (!eventName) return;
       if (!onCreateBehavior) {
@@ -484,7 +486,7 @@ export function RoomEventBindingsInspector({
       {behaviorPickerSlot ? (
         <EventCommandMenu
           allowRecipes
-          contextLabel={behaviorPickerSlot.label}
+          contextLabel={ui(behaviorPickerSlot.label)}
           onChangeQuery={setBehaviorPickerQuery}
           onChangeTab={setBehaviorPickerTab}
           onChooseSuggestion={(suggestion) => {

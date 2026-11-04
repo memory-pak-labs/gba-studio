@@ -117,7 +117,11 @@ describe("functionalIsometricProject", () => {
               expect.objectContaining({ name: "walk_down" }),
               expect.objectContaining({ name: "walk_up" }),
               expect.objectContaining({ name: "walk_left" }),
-              expect.objectContaining({ name: "walk_right" })
+              expect.objectContaining({ name: "walk_right" }),
+              expect.objectContaining({ name: "idle_down_left" }),
+              expect.objectContaining({ name: "idle_down_right" }),
+              expect.objectContaining({ name: "idle_up_left" }),
+              expect.objectContaining({ name: "idle_up_right" })
             ])
           })
         ])
