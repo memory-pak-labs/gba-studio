@@ -8762,8 +8762,9 @@ function verticeOrderedScenes(campaignScenes, supportScenes) {
 
 const APPROVED_EXTRA_MENU_SCENES = new Set(["corrida_preparacao", "corrida_resultados", "inventario_ferramentas"]);
 const APPROVED_MENU_SCENES = new Set([...APPROVED_EXTRA_MENU_SCENES, "menu_start", "inventario"]);
-const APPROVED_ACTOR_SCENES = new Set([...APPROVED_MENU_SCENES, "porto_lumen"]);
-const APPROVED_RACE_EVENT_SCENES = new Set(["corrida_preparacao", "corrida_resultados", "inventario_ferramentas", "mapa_rota", "mercado_suspenso", "arena_tatica", "circuito_final", "circuito_perspectiva"]);
+const APPROVED_PRESENTATION_SCENES = new Set([...APPROVED_MENU_SCENES, "arena_arrancada", "circuito_final", "circuito_perspectiva"]);
+const APPROVED_ACTOR_SCENES = new Set([...APPROVED_PRESENTATION_SCENES, "porto_lumen"]);
+const APPROVED_RACE_EVENT_SCENES = new Set(["corrida_preparacao", "corrida_resultados", "inventario_ferramentas", "mapa_rota", "mercado_suspenso", "arena_tatica", "arena_arrancada", "circuito_final", "circuito_perspectiva"]);
 
 export function isVerticeShowcaseProject(data) {
   const legacySupportSceneNames = new Set([
@@ -9047,9 +9048,15 @@ export function promoteExemploGBAVerticeCampaign(data) {
     return output;
   };
   for (const key of ["rooms", "scenas"]) {
-    const authored = (data[key] ?? extraScenes).filter(scene => APPROVED_MENU_SCENES.has(scene?.name));
+    const authored = (data[key] ?? extraScenes).filter(scene => APPROVED_PRESENTATION_SCENES.has(scene?.name));
     result[key] = merge(result[key], authored, "name");
   }
+  const preservedHudIDs = new Set((data.scenas ?? []).filter(scene => APPROVED_PRESENTATION_SCENES.has(scene?.name))
+    .flatMap(scene => [scene.hudPresetId, scene.runtime?.config?.hudPresetId,
+      ...(scene.runtime?.config?.screens ?? []).map(screen => screen.hudPresetId)]));
+  result.settings.hudPresets = merge(result.settings.hudPresets,
+    (data.settings?.hudPresets ?? []).filter(hud => preservedHudIDs.has(hud.id)), "id");
+  if (APPROVED_PRESENTATION_SCENES.has(data.scena?.name)) result.scena = structuredClone(data.scena);
   result.actors = merge((result.actors ?? []).filter(actor => !APPROVED_ACTOR_SCENES.has(actor?.roomName)),
     (data.actors ?? []).filter(actor => APPROVED_ACTOR_SCENES.has(actor?.roomName)), "id");
   const approvedFarolPlayer = (data.actors ?? []).find(actor => actor?.id === "farol-nara" && actor?.spriteSheet === "nara-topdown-walk-run-v1.png");
@@ -9072,7 +9079,7 @@ export function promoteExemploGBAVerticeCampaign(data) {
     - (sourceEventOrder.get(right.name) ?? Number.MAX_SAFE_INTEGER));
   result.dialogues = merge(result.dialogues, (data.dialogues ?? []).filter(dialogue => dialogue?.key?.startsWith("race_")), "key");
   // Keep the reviewed asset metadata, provenance and licenses used by these scenes.
-  const authoredReferences = JSON.stringify([...(data.scenas ?? []).filter(scene => APPROVED_MENU_SCENES.has(scene?.name)), ...(data.actors ?? []).filter(actor => APPROVED_MENU_SCENES.has(actor?.roomName))]);
+  const authoredReferences = JSON.stringify([...(data.scenas ?? []).filter(scene => APPROVED_PRESENTATION_SCENES.has(scene?.name)), ...(data.actors ?? []).filter(actor => APPROVED_MENU_SCENES.has(actor?.roomName))]);
   result.assets = merge(result.assets, (data.assets ?? []).filter(asset => asset?.name && authoredReferences.includes(asset.name)), "id");
   // Retain approved source resources that the restored scenes may reference.
   const sourceAssets = (data.assets ?? []).filter(asset => typeof asset?.metadata?.source === "string" && asset.metadata.source.length > 0);
@@ -9088,6 +9095,7 @@ export function promoteExemploGBAVerticeCampaign(data) {
   for (const scene of result.scenas ?? []) {
     if (sourcePositions[scene.name]) result.editorState.sceneMapPositions[scene.name] = structuredClone(sourcePositions[scene.name]);
   }
+  if (data.editorState?.sceneExplorer) result.editorState.sceneExplorer = structuredClone(data.editorState.sceneExplorer);
   const raceSources = new Set(["arena_arrancada", "mapa_rota", "circuito_final", "circuito_perspectiva"]);
   const preservesConnection = connection => raceSources.has(connection?.from) || APPROVED_EXTRA_MENU_SCENES.has(connection?.from) || APPROVED_EXTRA_MENU_SCENES.has(connection?.to);
   result.editorState.scenaConnections = [

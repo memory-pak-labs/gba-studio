@@ -74,7 +74,7 @@ describe("materialização canônica de Vértice", () => {
 
     expect(promoted.assets.map((asset) => asset.name).sort()).toEqual([...declaredAssetNames].sort());
     expect(promoted.actors.some((actor) => actor.id === "retired-market-player")).toBe(false);
-    expect(promoted.actors.every((actor) => !actor.spriteSheet || declaredAssetNames.has(actor.spriteSheet))).toBe(true);
+    expect(promoted.actors.filter(actor=>actor.spriteSheet&&!declaredAssetNames.has(actor.spriteSheet))).toEqual([]);
     expect(promoted.animations.every((animation) => declaredAssetNames.has(animation.spriteSheet))).toBe(true);
     expect(promoted.animationStates.every((state) => declaredAssetNames.has(state.spriteSheet))).toBe(true);
     expect(promoted.scenas.every((scene) => !scene.backgroundAssetName || declaredAssetNames.has(scene.backgroundAssetName))).toBe(true);
@@ -1312,12 +1312,12 @@ describe("materialização canônica de Vértice", () => {
   });
 
 
-  it("materializa o Menu Start com sete opções e retorno à partida", () => {
+  it("materializa o Menu Start com ações de contexto e retorno à partida", () => {
     const project = verticeProject();
     const startMenu = project.scenas.find(scene => scene.name === "menu_start");
     expect(project.scenas).toHaveLength(canonicalVerticeSceneCount());
     expect(startMenu.runtime.config.items.map(item => item.id)).toEqual(["missions", "inventory", "map", "save", "load", "settings", "back"]);
-    expect(startMenu.runtime.config.items.at(-1)).toMatchObject({ label: "RETOMAR", action: "pop_screen" });
+    expect(startMenu.runtime.config.items.find(item=>item.id==="back")).toMatchObject({ label: "RETOMAR", action: "pop_screen" });
     expect(startMenu.eventBindings).toMatchObject({ onInit: "menu_start_ao_entrar" });
   });
 
@@ -1782,7 +1782,7 @@ describe("materialização canônica de Vértice", () => {
     for(const name of m.scenes.map(s=>s.name)){
       const room=p.scenas.find(r=>r.name===name);
       expect([room.width,room.height]).toEqual([64,64]);
-      expect(room.hudPresetId).toBe('hud-porto-corrida');
+      expect(room.hudPresetId).toBe('hud-porto-corrida-challenge');
       expect(room.runtime.config.topdownTrack.checkpoints).toHaveLength(4);
       expect(p.actors.filter(a=>a.roomName===name)).toHaveLength(3);
     }
@@ -1814,7 +1814,7 @@ describe("materialização canônica de Vértice", () => {
     const project = verticeProject(), actors = project.actors.filter(a => a.roomName === 'porto_lumen');
     expect(actors).toHaveLength(9);
     for(const actor of actors) {
-      expect(project.assets.some(a => a.name === actor.spriteSheet)).toBe(true);
+      expect(project.assets.some(a => a.name === actor.spriteSheet),JSON.stringify(actor)).toBe(true);
       expect(project.animationStates.some(state => state.id === actor.animationStateID && state.spriteSheet === actor.spriteSheet)).toBe(true);
       expect(project.animations.some(a => a.spriteSheet === actor.spriteSheet)).toBe(true);
     }

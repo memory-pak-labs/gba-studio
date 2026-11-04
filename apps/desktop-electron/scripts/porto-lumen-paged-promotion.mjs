@@ -52,7 +52,7 @@ export function promoteApprovedPortoLumenPaged(project) {
       const trigger = canonical.triggers.find(trigger => trigger.id === (connection.to === "farol_interior" ? "trigger-porto-lighthouse" : "trigger-porto-exit"));
       if (trigger) connection.exit = { x: trigger.x, y: trigger.y, width: trigger.width, height: trigger.height };
     }
-    if (connection.to === "porto_lumen") Object.assign(connection.entry, {
+    if (connection.to === "porto_lumen") Object.assign(connection.entry ??= {}, {
       x: connection.from === "farol_interior" ? 23 : 88,
       y: connection.from === "farol_interior" ? 20 : 50
     });

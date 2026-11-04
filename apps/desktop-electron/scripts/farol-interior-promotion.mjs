@@ -19,6 +19,9 @@ export function approvedFarolCollisionTypes() {
 export function promoteApprovedFarolInterior(source) {
  if(!manifest.approval.approved||!manifest.approval.visual||!manifest.approval.palette)throw Error('Farol requires explicit visual and palette approval.');
  const p=structuredClone(source),name=manifest.scene,entry=manifest.asset,{width,height,playerStart,keeperPosition,lensTrigger,exitTrigger}=manifest.layout;
+ const running=p.assets.some(a=>a.name==='nara-topdown-walk-run-v1.png'&&a.metadata?.reviewStatus==='approved');
+ const playerSheet=running?'nara-topdown-walk-run-v1.png':manifest.preservedActors.player;
+ const playerState=running?'nara-topdown-walk-run-v1-state':'porto-nara-animations48-state';
  if(!p.rooms.some(r=>r.name===name))throw Error('Farol Interior scene missing.');
  const metadata={source:entry.source,kind:'paged_bg',colorMode:'8bpp-indexed',backgroundBpp:8,width:384,height:256,tileCount:entry.uniqueTiles,
   visibleColors:entry.visibleColors,sourceSha256:entry.sourceSha256,preparedSha256:entry.sha256,generatedBy:'approved-farol-interior-scale-v2',
@@ -45,9 +48,6 @@ export function promoteApprovedFarolInterior(source) {
  };
  for(const key of ['rooms','scenas'])p[key]=p[key].map(update);
  if(p.scena)p.scena=update(p.scena);
- const hasApprovedRun=p.assets.some(a=>a.name==='nara-topdown-walk-run-v1.png'&&a.metadata?.reviewStatus==='approved');
- const playerSheet=hasApprovedRun?'nara-topdown-walk-run-v1.png':manifest.preservedActors.player;
- const playerState=hasApprovedRun?'nara-topdown-walk-run-v1-state':'porto-nara-animations48-state';
  p.actors=p.actors.map(a=>a.id==='farol-nara'?{...a,...playerStart,spriteSheet:playerSheet,
   animationName:'idle_up',animationStateID:playerState}:a.id==='farol-keeper'?{...a,...keeperPosition,
   spriteSheet:manifest.preservedActors.keeper,animationName:'idle_down',animationStateID:'porto-approved-lighthousekeeper-body48-state'}:a);

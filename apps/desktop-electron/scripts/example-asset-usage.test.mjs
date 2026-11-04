@@ -19,6 +19,11 @@ const fixture = () => ({
 });
 
 describe('example library cleanup', () => {
+  it('preserves sources explicitly retained in the reusable asset library',()=>{
+    const p=fixture();p.assets.find(a=>a.name==='old.png').metadata.retainSourceInLibrary=true;
+    expect(analyzeExampleAssetUsage(p).unusedAssets.map(a=>a.name)).not.toContain('old.png');
+    expect(pruneUnusedExampleAssets(p).assets.some(a=>a.name==='old.png')).toBe(true);
+  });
   it('keeps explicit runtime sidecars, including cycles, without retaining provenance-only assets',()=>{
     const p=fixture();p.assets.find(a=>a.name==='map.png').metadata.runtimeDependencies=['cache.bin'];
     p.assets.push({...asset('cache.bin'),kind:'Data',metadata:{source:'Assets/cache.bin',runtimeDependencies:['map.png'],sourceReview:'old.png'}});

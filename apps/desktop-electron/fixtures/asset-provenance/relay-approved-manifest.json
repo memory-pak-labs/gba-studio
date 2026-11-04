@@ -5729,7 +5729,7 @@
       },
       {
         "id": "battle-shadow-party",
-        "kind": "icon",
+        "kind": "frame",
         "label": "battle-shadow-party",
         "text": "",
         "asset": "relay-approved-shadow-party.png",
@@ -5743,7 +5743,7 @@
       },
       {
         "id": "battle-shadow-enemy",
-        "kind": "icon",
+        "kind": "frame",
         "label": "battle-shadow-enemy",
         "text": "",
         "asset": "relay-approved-shadow-enemy.png",

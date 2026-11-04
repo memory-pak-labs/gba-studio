@@ -1,3 +1,4 @@
+import {expandProjectTilemaps} from '../src/shared/projectResourceFormat.ts';
 import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';

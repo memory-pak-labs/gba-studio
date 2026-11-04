@@ -7,6 +7,15 @@ import {normalizeSceneRuntime} from '../src/shared/sceneTypeProfiles.js';
 const source=()=>JSON.parse(readFileSync('default-assets/templates/exemplo-gba/exemplo-gba.gba-project'));
 const manifest=()=>JSON.parse(readFileSync('fixtures/asset-provenance/relay-approved-manifest.json'));
 describe('approved relay battle integration',()=>{
+ it('keeps the approved battle shadows behind the participants after promotion and export',()=>{
+  const p=promoteApprovedRelay(source());
+  const authored=p.settings.hudPresets.find(h=>h.id==='hud-guardiao-rele');
+  const exported=buildEngineExportProjectContract(p).battle_rpg_project.dialogue_ui.hud_layouts.find(h=>h.id==='hud-guardiao-rele');
+  for(const id of ['battle-shadow-party','battle-shadow-enemy']){
+   expect(authored.components.find(c=>c.id===id)).toMatchObject({kind:'frame',zIndex:0,visible:true});
+   expect(exported.components.find(c=>c.id===id)).toMatchObject({kind:'frame',visible:true});
+  }
+ });
  it('preserves other scenes and approved source pixels, and is idempotent',()=>{
   const before=source(),p=promoteApprovedRelay(before);
   expect(promoteApprovedRelay(p)).toEqual(p);
