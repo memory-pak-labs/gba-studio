@@ -20,6 +20,15 @@ beforeAll(async () => {
 });
 
 describe("preload asset bridge", () => {
+  it("exposes cartridge transactions without arbitrary commands or executable paths", async () => {
+    const api = exposeInMainWorld.mock.calls.find(([name]) => name === "gbaStudio")?.[1];
+    const request = { projectPath: "/tmp/demo.gba-project", port: "usb-one", project: { data: {} } };
+    await api.cartridgeWriter.prepare(request);
+    expect(invoke).toHaveBeenLastCalledWith("cartridge:prepare", request);
+    await api.cartridgeWriter.write("review-1");
+    expect(invoke).toHaveBeenLastCalledWith("cartridge:write", "review-1");
+    expect(Object.keys(api.cartridgeWriter).sort()).toEqual(["detect", "discard", "install", "onProgress", "prepare", "status", "write"]);
+  });
   it("queries the current native fullscreen state and cleans up its subscription", async () => {
     const api = exposeInMainWorld.mock.calls.find(([name]) => name === "gbaStudio")?.[1];
     await api.getWindowFullscreen();

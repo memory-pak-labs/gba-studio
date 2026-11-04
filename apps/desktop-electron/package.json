@@ -10,7 +10,7 @@
   "scripts": {
     "dev": "electron-vite dev",
     "dev:real-project": "GBA_STUDIO_OPEN_PROJECT=default-assets/templates/exemplo-gba/exemplo-gba.gba-project electron-vite dev",
-    "build": "npm run typecheck && electron-vite build",
+    "build": "npm run prepare:cartridge-tools && npm run typecheck && electron-vite build",
     "build:mgba-web": "node scripts/build-mgba-web-core.mjs",
     "build:menu-flow-canary": "node scripts/build-menu-flow-canary.mjs",
     "check:dev": "node scripts/electron-dev-workflow.mjs --profile quick",
@@ -118,7 +118,11 @@
     "package:mac:arm64": "node scripts/package-macos.mjs --arch arm64 --dir",
     "package:mac:x64": "node scripts/package-macos.mjs --arch x64 --dir",
     "dist:mac:arm64": "node scripts/package-macos.mjs --arch arm64",
-    "dist:mac:x64": "node scripts/package-macos.mjs --arch x64"
+    "dist:mac:x64": "node scripts/package-macos.mjs --arch x64",
+    "prepare:cartridge-tools": "node scripts/prepare-cartridge-tools.mjs",
+    "predev": "npm run prepare:cartridge-tools",
+    "prepreview": "npm run prepare:cartridge-tools",
+    "predev:real-project": "npm run prepare:cartridge-tools"
   },
   "build": {
     "publish": [{ "provider": "github", "owner": "memory-pak-labs", "repo": "gba-studio" }],
@@ -190,12 +194,20 @@
           "filter": [
             "**/*"
           ]
+        },
+        {
+          "from": "build/cartridge-tools",
+          "to": "cartridge-tools",
+          "filter": [
+            "darwin-*/**"
+          ]
         }
       ],
       "target": [
         "dmg",
         "zip"
-      ]
+      ],
+      "sign": "./scripts/sign-cartridge-tools.mjs"
     },
     "dmg": {
       "sign": true
@@ -205,6 +217,13 @@
         {
           "from": "build/embedded-runtime",
           "to": "."
+        },
+        {
+          "from": "build/cartridge-tools",
+          "to": "cartridge-tools",
+          "filter": [
+            "win32-x64/**"
+          ]
         }
       ],
       "icon": "build/icon.ico",
@@ -218,6 +237,13 @@
         {
           "from": "build/embedded-runtime",
           "to": "."
+        },
+        {
+          "from": "build/cartridge-tools",
+          "to": "cartridge-tools",
+          "filter": [
+            "linux-x64/**"
+          ]
         }
       ],
       "category": "Development",
@@ -229,7 +255,8 @@
         "deb",
         "tar.gz"
       ]
-    }
+    },
+    "beforePack": "./scripts/before-pack-cartridge-tools.mjs"
   },
   "dependencies": {
     "@browsermt/bergamot-translator": "^0.4.9",

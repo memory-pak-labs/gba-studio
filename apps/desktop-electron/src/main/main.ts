@@ -46,6 +46,7 @@ import { resolveSmokeProjectSavePath } from "./smokePaths.js";
 import { validateSettingsPathTargets } from "./settingsPathValidation.js";
 import { resolveMainWindowBounds, resolveMainWindowChrome } from "./windowOptions.js";
 import { createWindowCloseGuard } from "./windowCloseGuard.js";
+import { cartridgeWriteInProgress, registerCartridgeWriterIpc } from "./cartridgeWriterIpc.js";
 import { registerDesktopAssetProtocol } from "./desktopAssetProtocol.js";
 import {
   registerTranslationModelProtocol,
@@ -206,6 +207,10 @@ function createWindow(): BrowserWindow {
   });
 
   window.on("close", (event) => {
+    if (cartridgeWriteInProgress()) {
+      event.preventDefault();
+      return;
+    }
     if (appUpdates?.state().status !== "installing") closeGuard.handleClose(event);
   });
   windowCloseGuards.set(window, closeGuard);
@@ -1010,7 +1015,7 @@ void app.whenReady().then(async () => {
   appUpdates = createAppUpdateService({
     updater,
     currentVersion: app.getVersion(),
-    canInstall: () => projectSaves.pending() === 0 && canRestartForAppUpdate(BrowserWindow.getAllWindows()
+    canInstall: () => projectSaves.pending() === 0 && !cartridgeWriteInProgress() && canRestartForAppUpdate(BrowserWindow.getAllWindows()
       .filter((window) => windowCloseGuards.has(window))
       .map((window) => windowDocumentStates.get(window))),
     changed: (state) => {
@@ -1037,6 +1042,7 @@ void app.whenReady().then(async () => {
   registerDesktopAssetProtocol(desktopAssetProjectRoots);
   registerTranslationModelProtocol();
   registerTranslationPackIpcHandlers();
+  registerCartridgeWriterIpc();
   const previewUrl = previewVisualSmokeUrl();
   if (isPreviewVisualSmokeMode() && previewUrl) {
     const previewWindow = new BrowserWindow({
@@ -1062,7 +1068,8 @@ void app.whenReady().then(async () => {
   });
 });
 
-app.on("before-quit", () => {
+app.on("before-quit", (event) => {
+  if (cartridgeWriteInProgress()) { event.preventDefault(); return; }
   for (const window of BrowserWindow.getAllWindows()) {
     windowCloseGuards.get(window)?.requestAppQuit();
   }

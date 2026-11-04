@@ -1,0 +1,8 @@
+{
+  "version": "0.5.2-gbastudio.1",
+  "repository": "https://github.com/eyenobig/chis-burner-cmd.git",
+  "commit": "8b3eb46d639221f3093ae2b5646fdf9d91fa7999",
+  "submoduleCommit": "77836dd40abd1bf5e9751f5c3e27dbe77703915e",
+  "patchSha256": "89cd878ec5e9f3b9b075f8e65041a522cdbb56b9c01d36cee1bf2c7780fee936",
+  "license": "GPL-3.0-only"
+}

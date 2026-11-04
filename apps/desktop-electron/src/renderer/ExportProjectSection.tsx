@@ -27,7 +27,7 @@ export function ExportRomActions({ pathValidation, validating, running, onValida
   const ui = useStudioUiText();
   const StatusIcon = pathValidation?.ok ? CircleCheck : CircleAlert;
   return <div className="export-rom-footer">
-    <div className={`export-path-status ${pathValidation?.ok ? "ok" : "warning"}`} role="status"><StatusIcon size={21} aria-hidden="true" /><span>{validating ? ui("Verificando caminhos...") : pathValidation ? pathValidation.ok ? ui("Caminhos verificados") : ui("Caminhos com pendências") : ui("Caminhos ainda não verificados")}</span>{pathValidation && onShowPaths ? <button onClick={onShowPaths} type="button">{ui("Ver detalhes")}</button> : null}</div>
+    <div className={`export-path-status ${pathValidation?.ok ? "ok" : "warning"}`} role="status" aria-label={ui("Status dos caminhos")}><StatusIcon size={21} aria-hidden="true" /><span>{validating ? ui("Verificando caminhos...") : pathValidation ? pathValidation.ok ? ui("Caminhos verificados") : ui("Caminhos com pendências") : ui("Caminhos ainda não verificados")}</span>{pathValidation && onShowPaths ? <button onClick={onShowPaths} type="button">{ui("Ver detalhes")}</button> : null}</div>
     <div className="export-rom-actions" aria-label={ui("Exportação da ROM")}>
       <button disabled={validating || running} onClick={onValidatePaths} type="button"><FolderOpen size={20} aria-hidden="true" />{validating ? ui("Verificando...") : ui("Verificar caminhos")}</button>
       <button disabled={!onPlayProject || playDisabled} title={ui("Compila a versão atual do projeto e abre a ROM no Play integrado.")} onClick={onPlayProject} type="button"><Play size={19} aria-hidden="true" />{ui("Executar ROM")}</button>
@@ -36,8 +36,8 @@ export function ExportRomActions({ pathValidation, validating, running, onValida
   </div>;
 }
 
-export function ExportProjectSection({ section, projectData, renderField, header, footer }: {
-  section: SettingsWorkspaceSection; projectData: GBAProjectData | null; renderField(field: SettingsEditableField): ReactNode; header: ReactNode; footer: ReactNode;
+export function ExportProjectSection({ section, projectData, renderField, header, footer, cartridgeWriter }: {
+  section: SettingsWorkspaceSection; projectData: GBAProjectData | null; renderField(field: SettingsEditableField): ReactNode; header: ReactNode; footer: ReactNode; cartridgeWriter?: ReactNode;
 }) {
   const ui = useStudioUiText();
   const field = (key: string, label?: string) => { const found = section.editableFields.find(field => field.key === key); return found ? renderField(label ? { ...found, label } : found) : null; };
@@ -47,6 +47,7 @@ export function ExportProjectSection({ section, projectData, renderField, header
     <section className="export-settings-block"><h3>{ui("Início do jogo")}</h3><p>{ui("Escolha a cena que abre a ROM.")}</p><div className="export-project-fields">{field("startScene")}{field("startPlayer")}</div></section>
     <section className="export-settings-block export-output-block"><h3>{ui("Arquivo de saída")}</h3><p>{ui("Defina o nome e o destino da ROM.")}</p><div className="export-project-fields">{field("romFileName", "Nome da ROM")}<div>{field("exportFolder", "Pasta de exportação")}<small className="export-output-hint">{exportRomOutputPath(projectData)}</small></div></div></section>
     <details className="export-rom-advanced"><summary><Settings size={24} aria-hidden="true" /><span><strong>{ui("Dados avançados da ROM")}</strong><small>{ui("Código do jogo, fabricante e revisão")}</small></span><ChevronRight className="export-advanced-chevron" size={20} aria-hidden="true" /></summary><div className="settings-edit-list">{["gameCode", "makerCode", "romVersion"].map(key => field(key))}</div></details>
+    {cartridgeWriter}
     {footer}
   </section>;
 }

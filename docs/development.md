@@ -127,6 +127,14 @@ Evite executar builds ou outras verificações pesadas ao mesmo tempo que ela.
 O npm instala as dependências declaradas e o Electron. Nenhuma senha Apple é
 necessária para desenvolver, testar ou compilar o editor.
 
+O build também prepara o auxiliar externo de gravação de cartuchos, incluindo a
+correção para gravadores STM. Essa etapa exige Git, Rust/Cargo e `tar` no ambiente
+de desenvolvimento (Linux: também `libudev-dev`). A receita usa fontes e patch
+fixados, executa os testes Rust e preserva a licença e as fontes junto ao binário.
+O resultado verificado é reutilizado nos próximos builds. Usuários do aplicativo
+instalado recebem o componente pronto e não precisam instalar Rust nem usar um
+atalho especial. Consulte [Gravação de cartuchos](development/cartridge-writer.md).
+
 ## Instaladores macOS por arquitetura
 
 Em um Mac Apple Silicon com Rosetta 2, Xcode e Node.js 22, depois de compilar

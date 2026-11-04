@@ -494,6 +494,7 @@ export interface DownloadTranslationPackResult {
 }
 
 export interface GBAStudioDesktopAPI {
+  cartridgeWriter?: import("./cartridgeWriter.js").CartridgeWriterAPI;
   setAppLocale?(locale: string): Promise<void>;
   platform: NodeJS.Platform;
   getAppUpdateState(): Promise<AppUpdateState>;

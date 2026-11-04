@@ -3688,6 +3688,7 @@ function App(): React.ReactElement {
             />
           ) : selectedWorkspace === "Ajustes" || selectedWorkspace === "Cenas" || selectedWorkspace === "Exportar" ? (
             <SettingsWorkspace
+              cartridgeProject={session?.project ?? null}
               scope={selectedWorkspace === "Cenas" ? "scene" : selectedWorkspace === "Exportar" ? "export" : "global"}
               title={selectedWorkspace === "Cenas" ? ui("Cenas") : selectedWorkspace === "Exportar" ? ui("Exportar") : ui("Ajustes")}
               onOpenPluginCatalog={selectedWorkspace === "Ajustes" ? () => setPluginCatalogOpen(true) : undefined}

@@ -17,8 +17,22 @@ import {
 } from "../shared/ipc.js";
 import type { RomPlayerFrameStats, RomPlayerTelemetryEvent } from "../shared/hardwareProfiler.js";
 import type { WindowDocumentState } from "../shared/windowDocumentState.js";
+import { cartridgeWriterChannels, type CartridgeProgress } from "../shared/cartridgeWriter.js";
 
 const api: GBAStudioDesktopAPI = {
+  cartridgeWriter: {
+    status: () => ipcRenderer.invoke(cartridgeWriterChannels.status),
+    install: () => ipcRenderer.invoke(cartridgeWriterChannels.install),
+    detect: () => ipcRenderer.invoke(cartridgeWriterChannels.detect),
+    prepare: request => ipcRenderer.invoke(cartridgeWriterChannels.prepare, request),
+    write: token => ipcRenderer.invoke(cartridgeWriterChannels.write, token),
+    discard: () => ipcRenderer.invoke(cartridgeWriterChannels.discard),
+    onProgress: listener => {
+      const subscription = (_event: IpcRendererEvent, progress: CartridgeProgress) => listener(progress);
+      ipcRenderer.on(cartridgeWriterChannels.progress, subscription);
+      return () => ipcRenderer.removeListener(cartridgeWriterChannels.progress, subscription);
+    }
+  },
   setAppLocale: (locale: string) => ipcRenderer.invoke(ipcChannels.setAppLocale, locale),
   platform: process.platform,
   getAppUpdateState: () => ipcRenderer.invoke(ipcChannels.getAppUpdateState),
