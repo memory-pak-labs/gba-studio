@@ -172,9 +172,45 @@ int main() {
     assert(!gbs_hw_hud_layout_retained());
 }
 '''
+# Pass a real C++ descriptor to the C allocator: single-part C fixtures cannot
+# detect a stride mismatch after presentation fields are added to MetaSpritePart.
+code = code.replace('int main() {', 'void run_hw_fixture(void) {')
+code += r'''
+void verify_cpp_hud_metasprite(const void* image) {
+    gbs_hw_hide_all_sprites(); gbs_hw_clear_hud_icon_slots();
+    assert(gbs_hw_draw_hud_icon(image,8,8,1,0));
+    assert(hud_icon_obj_count==2);
+    assert((shadow_oam[88*4+2]&1023)==11 && (shadow_oam[89*4+2]&1023)==22);
+    assert((shadow_oam[88*4+1]&511)==8 && (shadow_oam[89*4+1]&511)==16);
+}
+'''
+cpp = r'''
+#include "gbs/assets.hpp"
+extern "C" void run_hw_fixture(void);
+extern "C" void verify_cpp_hud_metasprite(const void*);
+int main() {
+    run_hw_fixture();
+    const gbs::MetaSpritePart parts[] = {
+        {0,0,11,0,false,false,8,8}, {8,0,22,0,false,false,8,8}
+    };
+    const gbs::MetaSprite image {parts,2};
+    verify_cpp_hud_metasprite(&image);
+}
+'''
+cpp = '#include "gbs/assets.hpp"\n' + structs + '\n' + cpp
+for native, hardware, fields in [
+    ('MetaSpritePart', 'gbs_hw_metasprite_part', ['x','y','tile_index','palette','hflip','vflip','width','height','color_depth','scale_x256','scale_y256']),
+    ('MetaSprite', 'gbs_hw_metasprite', ['parts','part_count','scale_x256','scale_y256'])
+]:
+    cpp += f'\nstatic_assert(sizeof(gbs::{native}) == sizeof({hardware}));\n'
+    cpp += f'static_assert(alignof(gbs::{native}) == alignof({hardware}));\n'
+    for field in fields:
+        cpp += f'static_assert(offsetof(gbs::{native}, {field}) == offsetof({hardware}, {field}));\n'
 with tempfile.TemporaryDirectory() as directory:
     directory=Path(directory)
     (directory/'test.c').write_text(code)
-    subprocess.run(['cc','-std=c11',str(directory/'test.c'),'-o',str(directory/'test')],check=True)
+    (directory/'test.cpp').write_text(cpp)
+    subprocess.run(['cc','-std=c11','-c',str(directory/'test.c'),'-o',str(directory/'test.o')],check=True)
+    subprocess.run(['c++','-std=c++17','-I'+str(ROOT/'engine/include'),str(directory/'test.cpp'),str(directory/'test.o'),'-o',str(directory/'test')],check=True)
     subprocess.run([str(directory/'test')],check=True)
 print('HUD simultaneous image slots and world isolation: PASS')

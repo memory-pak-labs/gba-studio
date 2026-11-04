@@ -746,11 +746,15 @@ struct gbs_hw_metasprite_part {
     uint8_t width;
     uint8_t height;
     uint8_t color_depth;
+    uint16_t scale_x256;
+    uint16_t scale_y256;
 };
 
 struct gbs_hw_metasprite {
     const struct gbs_hw_metasprite_part* parts;
     uint8_t part_count;
+    uint16_t scale_x256;
+    uint16_t scale_y256;
 };
 
 void gbs_hw_configure_dialogue_box_skin(const uint8_t* tiles, const uint16_t* palette) {
