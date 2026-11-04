@@ -7,6 +7,16 @@ describe("studio UI messages", () => {
     expect(translateStudioMessage("en-US", message)).toBe("The destination folder already contains files. Choose a new name or an empty folder.");
     expect(translateStudioMessage("es-ES", message)).toBe("La carpeta de destino ya contiene archivos. Elige un nombre nuevo o una carpeta vacía.");
   });
+
+  it("separates directional down from audio bass and translates compass modules", () => {
+    expect(translateStudioMessage("en-US", "Direcional: baixo")).toBe("Down");
+    expect(translateStudioMessage("es-ES", "Direcional: baixo")).toBe("Abajo");
+    expect(translateStudioMessage("pt-BR", "Direcional: baixo")).toBe("Baixo");
+    expect(translateStudioMessage("en-US", "Baixo")).toBe("Bass");
+    expect(translateStudioMessage("en-US", "Bússola")).toBe("Compass");
+    expect(translateStudioMessage("es-ES", "Bússola")).toBe("Brújula");
+    expect(translateStudioMessage("en-US", "Play Window aberto: /QA/Assets/Cenas.gba")).toBe("Play Window opened: /QA/Assets/Cenas.gba");
+  });
   it("translates editor, export, audio, menus and diagnostics in the three primary locales", () => {
     expect(translateStudioMessage("pt-BR", "Colisao")).toBe("Colisão");
     expect(translateStudioMessage("en-US", "Buscar cenas")).toBe("Search scenes");
