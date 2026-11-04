@@ -11,7 +11,7 @@ afterEach(() => { for (const root of roots.splice(0)) rmSync(root, { recursive: 
 const appRoot = path.resolve('.');
 const baseline = () => ({ schema: 1, emulator: { sourceRevision: '0.10.5', wasmSha256: 'a'.repeat(64) },
   roms: Object.fromEntries(regressionCases.flatMap(c => c.roms.map(r => [c.id + '/' + r.id,
-    [{ label: 'boot', frame: 180, rgbaSha256: 'b'.repeat(64) }, { label: 'idle', frame: 240, rgbaSha256: 'c'.repeat(64) }]]))) });
+    [{ label: 'boot', frame: c.id === 'visibility-graphics' && r.id === 'resident' ? 181 : 180, rgbaSha256: 'b'.repeat(64) }, { label: 'idle', frame: c.id === 'visibility-graphics' && r.id === 'resident' ? 241 : 240, rgbaSha256: 'c'.repeat(64) }]]))) });
 
 function environment(script) {
   const root = mkdtempSync(path.join(tmpdir(), 'gbs-rom-runner-')); roots.push(root);
@@ -43,6 +43,10 @@ describe('ROM regression suite', () => {
     expect(() => validateBaseline(missing)).toThrow();
     const bad = baseline(); bad.roms['map-states/resident'][0].rgbaSha256 = 'unknown';
     expect(() => validateBaseline(bad)).toThrow();
+    for (const id of ['map-states/resident', 'visibility-graphics/resident']) {
+      const shifted = baseline(); shifted.roms[id][0].frame++;
+      expect(() => validateBaseline(shifted)).toThrow(/fixed display frames/);
+    }
   });
   it('writes a fresh failing report on preflight errors, preserving earlier evidence', async () => {
     const outputRoot = mkdtempSync(path.join(tmpdir(), 'gbs-rom-suite-')); roots.push(outputRoot);

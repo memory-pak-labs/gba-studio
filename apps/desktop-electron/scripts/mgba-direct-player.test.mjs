@@ -634,6 +634,24 @@ describe("bulk native telemetry snapshot", () => {
     expect(forbidden).not.toHaveBeenCalled();
   });
 
+  it("reads the optional frame budget in one additional bulk call and owns its values", () => {
+    const { module, forbidden } = fixture();
+    const budget = new Uint32Array(module.HEAPU8.buffer, 600, 24);
+    budget.set([0x47534642, 1, 24, 42, 0xffffffff, 0, 262144, 7, 512, 2, 0, 0, 30, 12, 8192, 4, 120, 3, 20, 5, 42, 9900, 0, 0]);
+    module._gba_frame_budget_snapshot = vi.fn(() => 600);
+    const state = readRuntimeTelemetry(module);
+    expect(state.frameBudget).toMatchObject({ dmaBytes: 512, oamEnabled: 12, peaks: { dma: { value: 8192, frame: 4 } } });
+    budget.fill(0);
+    expect(state.frameBudget.peaks.dma.value).toBe(8192);
+    expect(module._gba_frame_budget_snapshot).toHaveBeenCalledTimes(1);
+    expect(module._gba_runtime_telemetry_snapshot).toHaveBeenCalledTimes(1);
+    expect(forbidden).not.toHaveBeenCalled();
+    for (const pointer of [0, 601, 1000]) {
+      module._gba_frame_budget_snapshot.mockReturnValue(pointer);
+      expect(readRuntimeTelemetry(module)).toMatchObject({ frame: 42, frameBudget: null });
+    }
+  });
+
   it("rejects stale profiler data without discarding gameplay telemetry", () => {
     const { module, words } = fixture();
     words[67] = 41;

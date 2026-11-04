@@ -1,4 +1,8 @@
 #include "gbs_hw.h"
+#include "frame_video_stats.h"
+
+static volatile uint32_t frame_dma_bytes, frame_dma_transfers;
+static uint32_t frame_vblank_irq_ticks, frame_vblank_work_ticks;
 
 static void gbs_hw_draw_hud_choice_selector(int x, int y);
 #include <string.h>
@@ -72,6 +76,8 @@ static void gbs_hw_draw_hud_choice_selector(int x, int y);
 #define MEM_IRQ_HANDLER (*(void (**)(void))0x03007FFC)
 
 static uint16_t shadow_oam[128 * 4];
+static uint32_t published_oam_enabled;
+static GbsOamOccupancy staged_oam = {{0xffffffffu,0xffffffffu,0xffffffffu,0xffffffffu}};
 static uint16_t dialogue_ordered_oam[128 * 4] __attribute__((section(".ewram_bss")));
 static int dialogue_oam_front;
 static uint8_t shadow_oam_dirty_first;
@@ -278,7 +284,9 @@ void gbs_hw_irq_dispatch(void) {
         gbs_audio_vblank_update();
     }
     gbs_dispatch_hardware_interrupts(pending);
-    if (gbs_profiler_record_irq) gbs_profiler_record_irq(gbs_hw_frame_counter_ticks() - profiler_start);
+    const uint32_t irq_ticks = gbs_hw_frame_counter_ticks() - profiler_start;
+    if (pending & 1u) frame_vblank_irq_ticks = irq_ticks;
+    if (gbs_profiler_record_irq) gbs_profiler_record_irq(irq_ticks);
 }
 
 static volatile uint16_t* bg_control_register(int layer) {
@@ -322,6 +330,7 @@ static void commit_shadow_oam(void) {
     if (shadow_oam_dirty_last <= shadow_oam_dirty_first) {
         return;
     }
+    published_oam_enabled = gbs_oam_occupancy_count(&staged_oam);
     if (dialogue_oam_front) {
         gbs_portrait_tab_order_oam(shadow_oam, dialogue_ordered_oam);
         gbs_hw_dma_copy(3, dialogue_ordered_oam, MEM_OAM, 128u * 4u, 0);
@@ -345,6 +354,7 @@ void gbs_hw_set_dialogue_oam_front(int enabled) {
 }
 
 static void commit_shadow_oam_full(void) {
+    published_oam_enabled = gbs_oam_occupancy_count(&staged_oam);
     gbs_hw_dma_copy(3, shadow_oam, MEM_OAM, 128u * 4u, 0);
     shadow_oam_dirty_first = 128;
     shadow_oam_dirty_last = 0;
@@ -1052,6 +1062,7 @@ void gbs_hw_init(void) {
 }
 
 void gbs_hw_wait_vblank(void) {
+    frame_vblank_irq_ticks = 0;
     if ((REG_IE & (1u << 0)) != 0 && (REG_DISPSTAT & (1u << 3)) != 0) {
         gbs_bios_vblank_intr_wait();
     } else {
@@ -1060,6 +1071,7 @@ void gbs_hw_wait_vblank(void) {
         while (REG_VCOUNT < 160) {
         }
     }
+    const uint32_t publication_start = gbs_hw_frame_counter_ticks();
     if (!render_publication_blocked) {
         commit_shadow_bg_controls();
         commit_shadow_oam();
@@ -1080,6 +1092,19 @@ void gbs_hw_wait_vblank(void) {
         gbs_audio_vblank_update();
         gbs_emit_vblank_interrupt();
     }
+    frame_vblank_work_ticks = gbs_hw_frame_counter_ticks() - publication_start + frame_vblank_irq_ticks;
+}
+
+int gbs_hw_frame_video_stats(GbsHwFrameVideoStats* out) {
+    if (!out) return 0;
+    const uint16_t ime = REG_IME;
+    REG_IME = 0;
+    out->dma_bytes = frame_dma_bytes;
+    out->dma_transfers = frame_dma_transfers;
+    REG_IME = ime;
+    out->vblank_work_ticks = frame_vblank_work_ticks;
+    out->oam_enabled = (REG_DISPCNT & (1u << 12)) ? published_oam_enabled : 0;
+    return 1;
 }
 
 void gbs_hw_set_render_publication_blocked(int blocked) {
@@ -1105,6 +1130,8 @@ void gbs_hw_flush_vram_writes(void) {
 }
 
 void gbs_hw_frame_counter_init(void) {
+    frame_dma_bytes = frame_dma_transfers = 0;
+    frame_vblank_irq_ticks = frame_vblank_work_ticks = 0;
     volatile uint16_t* timer2 = (volatile uint16_t*)(TIMER_BASE + 2 * 4);
     volatile uint16_t* timer3 = (volatile uint16_t*)(TIMER_BASE + 3 * 4);
     timer2[1] = 0;
@@ -1407,8 +1434,13 @@ void gbs_hw_hide_sprites(int first, int count) {
     if (first < 0) first = 0;
     if (first >= 128 || count <= 0) return;
     if (first + count > 128) count = 128 - first;
+    const GbsOamOccupancy previous = staged_oam;
+    gbs_oam_occupancy_clear(&staged_oam, (unsigned)first, (unsigned)count);
     for (int index = first; index < first + count; ++index) {
-        if (gbs_hw_hud_icon_owns_slot(index)) continue;
+        if (gbs_hw_hud_icon_owns_slot(index)) {
+            staged_oam.words[index >> 5] |= previous.words[index >> 5] & (1u << (index & 31));
+            continue;
+        }
         /* ATTR0 bits 8-9 = 2 explicitly disable the OBJ entry. */
         shadow_oam[index * 4 + 0] = (2u << 8);
         shadow_oam[index * 4 + 1] = 0;
@@ -1443,6 +1475,7 @@ void gbs_hw_set_sprite(int index, int x, int y, uint16_t tile_index, uint16_t pa
     if (gbs_hw_hud_icon_owns_slot(index)) return;
 
     if (!visible) {
+        gbs_oam_occupancy_set(&staged_oam, (unsigned)index, 0);
         shadow_oam[index * 4 + 0] = (2u << 8);
         shadow_oam[index * 4 + 1] = 0;
         shadow_oam[index * 4 + 2] = 0;
@@ -1451,6 +1484,7 @@ void gbs_hw_set_sprite(int index, int x, int y, uint16_t tile_index, uint16_t pa
         return;
     }
 
+    gbs_oam_occupancy_set(&staged_oam, (unsigned)index, (shape & 3u) != 3u);
     shadow_oam[index * 4 + 0] = (uint16_t)((y & 0x00FF) | ((mode & 3u) << 10) | (mosaic ? (1u << 12) : 0) | ((shape & 3u) << 14));
     shadow_oam[index * 4 + 1] = (uint16_t)((x & 0x01FF) | (hflip ? (1u << 12) : 0) | (vflip ? (1u << 13) : 0) | ((size & 3u) << 14));
     shadow_oam[index * 4 + 2] = (uint16_t)(tile_index | ((priority & 3u) << 10) | ((palette & 15u) << 12));
@@ -1487,6 +1521,7 @@ void gbs_hw_set_sprite_affine(int index, int enabled, int double_size, uint16_t 
     } else {
         attr0 = (uint16_t)(attr0 & ~(1u << 8));
     }
+    gbs_oam_occupancy_set(&staged_oam, (unsigned)index, gbs_oam_entry_enabled(attr0));
     shadow_oam[index * 4 + 0] = attr0;
     shadow_oam[index * 4 + 1] = attr1;
     mark_shadow_oam_dirty(index, 1);
@@ -3229,6 +3264,11 @@ void gbs_hw_dma_copy(int channel, const void* source, volatile void* destination
     dma[0] = (uint32_t)source;
     dma[1] = (uint32_t)destination;
     dma[2] = units | DMA_ENABLE | (word_sized ? DMA_32BIT : 0);
+    const uint16_t ime = REG_IME;
+    REG_IME = 0;
+    frame_dma_bytes += units * (word_sized ? 4u : 2u);
+    ++frame_dma_transfers;
+    REG_IME = ime;
 }
 
 void gbs_hw_hdma_start(int channel, const void* source, volatile void* destination, uint32_t units, int word_sized) {

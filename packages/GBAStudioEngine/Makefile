@@ -403,9 +403,9 @@ $(HOST_BUILD)/world_map_tests: tests/host/world_map_tests.cpp
 	@mkdir -p $(@D)
 	$(HOST_CXX) $(HOST_CXXFLAGS) $^ -o $@
 
-$(HOST_BUILD)/hardware_core_tests: tests/host/hardware_core_tests.cpp engine/src/profiler.cpp engine/src/gbs_core.cpp engine/src/gbs_runtime.cpp engine/src/gbs_rtc.cpp engine/src/gbs_input.cpp engine/src/gbs_interrupt.cpp engine/src/gbs_dma.cpp engine/src/gbs_debug.cpp engine/src/gbs_timer.cpp engine/src/rumble.cpp engine/src/deferred_work.cpp engine/src/gbs_engine_global.cpp engine/src/input_advanced.cpp tests/host/hw_stubs.cpp
+$(HOST_BUILD)/hardware_core_tests: engine/src/frame_video_stats.h engine/src/gbs_hw.h engine/include/gbs/debug.hpp tests/host/hardware_core_tests.cpp engine/src/profiler.cpp engine/src/gbs_core.cpp engine/src/gbs_runtime.cpp engine/src/gbs_rtc.cpp engine/src/gbs_input.cpp engine/src/gbs_interrupt.cpp engine/src/gbs_dma.cpp engine/src/gbs_debug.cpp engine/src/gbs_timer.cpp engine/src/rumble.cpp engine/src/deferred_work.cpp engine/src/gbs_engine_global.cpp engine/src/input_advanced.cpp tests/host/hw_stubs.cpp
 	@mkdir -p $(@D)
-	$(HOST_CXX) $(HOST_CXXFLAGS) -DGBS_ENABLE_PROFILER_SCOPES $^ -o $@
+	$(HOST_CXX) $(HOST_CXXFLAGS) -DGBS_ENABLE_PROFILER_SCOPES $(filter %.cpp,$^) -o $@
 
 $(HOST_BUILD)/link_tests: tests/host/link_tests.cpp engine/src/gbs_link.cpp
 	@mkdir -p $(@D)

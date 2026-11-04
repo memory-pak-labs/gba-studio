@@ -103,6 +103,16 @@ for (const mode of modeArg ? [modeArg] : ['resident', 'paged', 'platformer']) {
     assert.equal(core._gba_init(), 1);
     const pointer = core._malloc(rom.length); core.HEAPU8.set(rom,pointer); assert.equal(core._gba_load_rom(pointer,rom.length),1); core._free(pointer);
     run(180); const initial=capture('initial'); assertProbe(initial,[255,0,0]);
+    if (mode !== 'platformer') {
+      const before = state().frame; run(60); const after = state();
+      report.cadence = { displayFrames: 60, nativeFrames: after.frame - before };
+      assert.equal(report.cadence.nativeFrames, 60, 'native video observer preserves one update per display frame');
+      assert.ok(after.frameBudget, 'native frame budget is present');
+      const enabled = Array.from({ length: 128 }, (_, i) => read16(0x07000000 + i * 8))
+        .filter(a => (a & 0xc000) !== 0xc000 && ((a & 0x100) || !(a & 0x200))).length;
+      assert.equal(after.frameBudget.oamEnabled, enabled, 'compact OAM occupancy matches hardware attributes');
+      assert.ok(after.frameBudget.dmaBytes > 0 && after.frameBudget.peaks.dma.value >= after.frameBudget.dmaBytes);
+    }
     press(1); const playerLight=light('lantern-player','player',80,64);
     until(() => state().player.x >= playerLight.state.player.x+16,'player moves with lantern',240,16); run(2); const moved=light('lantern-moved','player',80,64); assert.ok(moved.expectedRect.left > playerLight.expectedRect.left);
     press(4); const npcLight=light('lantern-guide','guide',64,48);

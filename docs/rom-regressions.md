@@ -31,7 +31,11 @@ a biblioteca do Pack selecionado. Recibo ausente, bloqueado ou divergente não
 vale como sucesso. A verificação funcional deve ter observado o mesmo hash.
 
 Depois de cada fixture compilada, um boot novo sem save ou injeção de estado
-captura o framebuffer nos frames **180 e 240 de emulação**, sem botões. Esses
+captura o framebuffer nos frames **180 e 240 de emulação**, sem botões. A fixture
+`visibility-graphics/resident` usa **181 e 241**: a instrumentação nativa acrescenta
+um frame à carga inicial, preservando os mesmos pixels de referência e a cadência
+posterior. Esses timestamps são fixos; não há espera adaptativa nem tolerância
+para divergências. Os 28 hashes RGBA aprovados continuam iguais. Esses
 frames não equivalem a ticks de simulação ou a uma medição de desempenho. A
 comparação exata usa SHA-256 dos pixels RGBA 240×160 com alpha opaco, não dos
 bytes comprimidos do PNG. A referência fica em

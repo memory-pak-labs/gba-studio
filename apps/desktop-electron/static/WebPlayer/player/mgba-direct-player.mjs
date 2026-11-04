@@ -419,6 +419,33 @@ export function readRuntimeTelemetryFromHeap(module) {
 
 const PROFILER_SUBSYSTEMS = ["scripts", "audio", "render", "streaming", "interrupts"];
 
+export function decodeFrameBudgetTelemetry(words, runtime) {
+  if (!words || words.length < 24 || runtime?.schema !== 4 ||
+      words[0] !== 0x47534642 || words[1] !== 1 || words[2] !== 24 || words[3] !== runtime.frame ||
+      signedWord(words[4]) !== runtime.runtimeKind || signedWord(words[5]) !== runtime.currentRoom ||
+      words[6] !== 262144 || (words[7] & ~7) !== 0 || !words[20]) return null;
+  const valid = words[7];
+  if (((valid & 1) && (words[14] < words[8] || words[15] > words[3])) ||
+      ((valid & 2) && (words[16] < words[12] || words[17] > words[3])) ||
+      ((valid & 4) && (words[13] > 128 || words[18] > 128 || words[18] < words[13] || words[19] > words[3]))) return null;
+  return Object.freeze({ frame: words[3], runtimeKind: signedWord(words[4]), room: signedWord(words[5]), ticksPerSecond: words[6],
+    dmaBytes: valid & 1 ? words[8] : null, dmaTransfers: valid & 1 ? words[9] : null,
+    dmaQueuedBytes: words[10], dmaDroppedTotal: words[11],
+    vblankWorkTicks: valid & 2 ? words[12] : null, oamEnabled: valid & 4 ? words[13] : null,
+    sceneFrameCount: words[20], sceneDmaBytes: valid & 1 ? words[21] : null,
+    peaks: Object.freeze({ dma: valid & 1 ? Object.freeze({value:words[14],frame:words[15]}) : null,
+      vblank: valid & 2 ? Object.freeze({value:words[16],frame:words[17]}) : null,
+      oam: valid & 4 ? Object.freeze({value:words[18],frame:words[19]}) : null }) });
+}
+
+function readFrameBudgetTelemetry(module, runtime) {
+  if (typeof module._gba_frame_budget_snapshot !== "function") return null;
+  const pointer = module._gba_frame_budget_snapshot();
+  const heap = module.HEAPU8;
+  if (!Number.isInteger(pointer) || pointer <= 0 || pointer % 4 || !heap || pointer + 96 > heap.byteLength) return null;
+  return decodeFrameBudgetTelemetry(new Uint32Array(heap.buffer, heap.byteOffset + pointer, 24), runtime);
+}
+
 function readProfilerTelemetry(module, address, runtime) {
   if (runtime.schema !== 4 || address < 0x02000000 || address + 320 > 0x02040000 ||
       typeof module._gba_audio_register !== "function") return null;
@@ -498,7 +525,9 @@ export function readRuntimeTelemetry(module) {
     if (!Number.isInteger(pointer) || pointer <= 0 || pointer % 4 !== 0 ||
         !heap || pointer + 400 > heap.byteLength) return null;
     const words = new Uint32Array(heap.buffer, heap.byteOffset + pointer, 100);
-    return decodeRuntimeDiagnostics(words);
+    const decoded = decodeRuntimeDiagnostics(words);
+    if (!decoded) return null;
+    return Object.freeze({...decoded, frameBudget: readFrameBudgetTelemetry(module, decoded)});
   }
   const hasNativeBridge = typeof module._gba_find_runtime_telemetry === "function" &&
     typeof module._gba_runtime_telemetry_word === "function";
@@ -512,7 +541,7 @@ export function readRuntimeTelemetry(module) {
           (_, index) => module._gba_runtime_telemetry_word(index) >>> 0
         );
         const decoded = decodeRuntimeTelemetryWords(words);
-        if (decoded) return Object.freeze({ ...decoded, subsystems: readProfilerTelemetry(module, address, decoded), eventTrace: readEventTraceTelemetry(module, address) });
+        if (decoded) return Object.freeze({ ...decoded, subsystems: readProfilerTelemetry(module, address, decoded), eventTrace: readEventTraceTelemetry(module, address), frameBudget: readFrameBudgetTelemetry(module,decoded) });
       }
     }
     return null;

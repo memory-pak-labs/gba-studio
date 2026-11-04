@@ -26,7 +26,9 @@ code += '\nenum { ' + constants + ', DIALOGUE_PALETTE = 15, DYNAMIC_TEXT_OBJ_TIL
 cache_start=source.index('static uint32_t hud_layout_old_icons;')
 cache_end=source.index('static int gbs_hw_draw_hud_icon(',cache_start)
 code += source[cache_start:cache_end].replace('__attribute__((section(".ewram_bss")))','')
+code += '\n' + (ROOT / 'engine/src/frame_video_stats.h').read_text().replace('#pragma once', '')
 code += r'''
+GbsOamOccupancy staged_oam = {{0xffffffffu,0xffffffffu,0xffffffffu,0xffffffffu}};
 uint16_t shadow_oam[512];
 uint16_t hud_pixel_text_glyphs[124];
 int oam_overflow_count;

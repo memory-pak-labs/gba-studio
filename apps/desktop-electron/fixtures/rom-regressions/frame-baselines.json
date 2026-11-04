@@ -4,11 +4,12 @@
     "kind": "technical_fixtures",
     "fixtureRevision": "2527f1db2651e221e23ceee8b5a1a2531cd18fb6",
     "review": "Existing functional pixel, collision, audio and save assertions passed; all 14 fixed-frame captures inspected. No game artwork.",
-    "frameUnits": "emulated_display_frames"
+    "frameUnits": "emulated_display_frames",
+    "telemetryReview": "Native frame observer adds one cold-load display frame to visibility-graphics/resident (181/241); all 28 approved RGBA hashes remain unchanged and steady cadence is preserved."
   },
   "emulator": {
     "sourceRevision": "0.10.5",
-    "wasmSha256": "d641f0a2bfa66dbaef5818e418f2cccbd00710214337fc259a08ebc66deeeed1"
+    "wasmSha256": "85770e7b5868d68eb6aff9954b27ff4ac0219ab158c86cce676450963cd7b16f"
   },
   "roms": {
     "replace-tile/tiled": [
@@ -146,12 +147,12 @@
     "visibility-graphics/resident": [
       {
         "label": "boot",
-        "frame": 180,
+        "frame": 181,
         "rgbaSha256": "944273c22a1215460114e472f0c7ec88747767790b48110b28c9ff66365e77cf"
       },
       {
         "label": "idle",
-        "frame": 240,
+        "frame": 241,
         "rgbaSha256": "48115f08ad291245f2ceb5d6128db15adec0cce929da0e280ba22c7f8046cad1"
       }
     ],

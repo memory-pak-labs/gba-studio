@@ -73,7 +73,8 @@ registrar seu SHA sem alterar a configuração Git do host.
 
 O consumidor não instala npm, Python ou compilador. Ele verifica o catálogo
 completo, recibos contra os arquivos, hashes do Pack, core e baseline, e
-executa as mesmas 14 ROMs nos frames de emulação 180 e 240. Os 28 PNGs e o
+executa as mesmas 14 ROMs nos frames de emulação fixados na referência
+(180/240; 181/241 na fixture `visibility-graphics/resident`). Os 28 PNGs e o
 relatório ficam em `CI-ROM-replay-<plataforma>`, também em falhas.
 
 Essa comparação verifica a reprodução do mesmo binário/core em hosts

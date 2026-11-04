@@ -21,7 +21,7 @@ async function fixture() {
   const captured = await captureRomFrames({ rom, playerRoot: path.resolve('static/WebPlayer/player'), checkpoints: [{ label: 'boot', frame: 180 }, { label: 'idle', frame: 240 }] });
   const frames = captured.frames.map(({ pixels, ...frame }) => frame);
   const baseline = { schema: 1, emulator: { sourceRevision: captured.emulator.sourceRevision, wasmSha256: captured.emulator.wasmSha256 },
-    roms: Object.fromEntries(regressionCases.flatMap(c => c.roms.map(r => [c.id + '/' + r.id, frames]))) };
+    roms: Object.fromEntries(regressionCases.flatMap(c => c.roms.map(r => [c.id + '/' + r.id, frames.map(f => ({ ...f, frame: f.frame + (c.id === 'visibility-graphics' && r.id === 'resident' ? 1 : 0) }))]))) };
   const source = { schema: 1, kind: 'rom_regressions', passed: true, complete: true, scope: 'full_catalogue',
     sourceRevision: revision, trackedSourceDirty: false, emulator: captured.emulator, baselineSha256: sha256(JSON.stringify(baseline)),
     engine: { version: 'test', librarySha256: sha256('engine'), assetcSha256: sha256('assetc'), gbsbuildSha256: sha256('gbsbuild') }, cases: [] };
