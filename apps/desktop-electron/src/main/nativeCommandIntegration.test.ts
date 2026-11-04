@@ -124,7 +124,7 @@ describe("native command integration", () => {
 
   it("classifies every catalog entry without mistaking pending handlers for native support", () => {
     const matrix = buildEventCommandSupportMatrix();
-    expect(matrix).toHaveLength(204);
+    expect(matrix).toHaveLength(210);
     expect(matrix.filter(entry => entry.status === "unknown")).toEqual([]);
     expect(matrix.filter(entry => entry.status === "pending")).toHaveLength(0);
     expect(matrix.filter(entry => entry.status === "not-applicable")).toHaveLength(2);
@@ -134,7 +134,7 @@ describe("native command integration", () => {
 
   it("offers the newly integrated commands in the normal command palette", () => {
     const palette = deriveEventsWorkspacePresentation(project([])).commandPalette;
-    for (const id of ["engine.store_field", "engine.attach_adventure_callback", "engine.remove_adventure_callback", "engine.remove_platform_callback", "save.store_variable", "visual.apply_effect", "timer.idle", "audio.routine", "scene.pause_type", "scene.resume_type"]) {
+    for (const id of ["engine.store_field", "engine.attach_adventure_callback", "engine.remove_adventure_callback", "engine.remove_platform_callback", "save.store_variable", "visual.apply_effect", "timer.idle", "audio.routine", "scene.pause_type", "scene.resume_type", "actor.set_scale", "actor.animate_scale", "actor.reset_scale", "background.set_scale", "background.animate_scale", "background.reset_scale"]) {
       expect(palette.find(entry => entry.id === `command:${id}`)?.runtimeStatus, id).toBe("ok-rom");
     }
   });
