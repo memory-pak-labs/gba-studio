@@ -212,9 +212,34 @@ recalculada também quando alocações compiladas vêm de cache; uma decisão an
 não muda a classificação atual. O relatório não converte arquivos, não muda o
 formato selecionado, não reduz cores e não retira avisos de memória.
 
-Continuam separados do envelope: picos por frame, ciclos de DMA e atribuição
-do código/dados sem símbolos de assets. O CI entre três sistemas está descrito
-em [Integração contínua](continuous-integration.md).
+## Medição durante a ROM
+
+O painel **Testes e diagnóstico → Medição nativa por frame** complementa o
+orçamento compilado. A engine publica, a cada frame concluído, bytes e chamadas
+de DMA imediato, bytes ainda na fila, transferências descartadas, trabalho de
+publicação em VBlank e entradas de OAM habilitadas. DMA transferido e fila pendente
+são medidas distintas; a espera ociosa pela interrupção não conta como trabalho.
+O tempo de publicação/flush pode exceder a janela de VBlank e não prova, por si só,
+a ausência de tearing. O relógio tem 262.144 ticks por segundo.
+
+Picos de DMA, trabalho de VBlank e OAM guardam o valor e o frame de origem na
+engine. Reiniciam ao entrar em outra cena/runtime; o Editor pode consultá-los com
+menos frequência sem perder um pico. O contador de frames desse trecho nativo é
+separado da quantidade de amostras coletadas pelo Editor. Dados ausentes ou de
+outro frame/cena ficam pendentes, em vez de aparecerem como zero medido.
+
+A extensão de telemetria ocupa 96 bytes após os 400 bytes existentes, sem mudar
+o ABI anterior. A ponte mGBA lê os 24 words em um único snapshot, sem avançar a
+simulação. A ocupação de OAM usa um mapa de 128 bits atualizado pelo renderer,
+sem varrer a memória de vídeo a cada frame. Inclui fallback nativo e OBJ afim de
+tamanho duplo; objetos desligados e shapes inválidos não entram na conta.
+
+O escopo é DMA imediato programado pela engine, sem repetições automáticas de
+FIFO de áudio/HDMA e sem duração por canal. OAM habilitados não medem o limite
+por scanline. A atribuição de código/dados sem símbolos de assets também continua
+fora do orçamento por cena. Essas fronteiras não são valores estimados ou
+medições de GBA físico. O CI entre três sistemas está descrito em
+[Integração contínua](continuous-integration.md).
 
 ## Validação focada
 

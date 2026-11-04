@@ -719,7 +719,7 @@ function App(): React.ReactElement {
     lastProfiledFrame.current = runtime.frame;
     const physicalMetric = (id: "vramBytes" | "oam" | "dmaBytes") => {
       const metric = hardwareProfiler.physical.metrics.find((entry) => entry.id === id);
-      return metric?.measured ?? metric?.planned ?? metric?.estimate ?? 0;
+      return metric?.measured ?? null;
     };
     setHardwareProfilerSession((current) => appendHardwareProfilerFrame(current, {
       frame: runtime.frame,
@@ -727,9 +727,10 @@ function App(): React.ReactElement {
       runtime: hardwareProfiler.activeRoomType,
       sceneName: hardwareProfiler.activeRoomName,
       cpu: romPlayerTelemetry?.stats?.cpuPercent ?? 0,
-      dma: physicalMetric("dmaBytes"),
+      dma: runtime.frameBudget?.dmaBytes ?? null,
       vram: physicalMetric("vramBytes"),
-      oam: physicalMetric("oam"),
+      oam: runtime.frameBudget?.oamEnabled ?? null,
+      nativeVideo: runtime.frameBudget ?? undefined,
       scanline: runtime.timing.renderSkipCount,
       subsystems: runtime.subsystems?.scenePeakTicks
     }));
@@ -3767,6 +3768,8 @@ function App(): React.ReactElement {
           openSourceEvent(String(event?.name ?? eventID), typeof event?.roomName === "string" ? event.roomName : typeof event?.sceneName === "string" ? event.sceneName : undefined);
         }}
         runtimeAudio={romPlayerTelemetry?.state === "running" ? romPlayerTelemetry.stats?.runtimeState?.audio : null}
+        frameBudget={romPlayerTelemetry?.state === "running" ? romPlayerTelemetry.stats?.runtimeState?.frameBudget : null}
+        activeSceneName={hardwareProfiler?.activeRoomName}
       />
       <StudioStatusBar message={status} workspace={selectedWorkspace} isBusy={statusBusy} />
       {pluginCatalogOpen && session?.path ? (

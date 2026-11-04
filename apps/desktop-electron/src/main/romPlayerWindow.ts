@@ -8,6 +8,7 @@ import { preloadScriptPath } from "./mainPaths.js";
 import { profilerSubsystems } from "../shared/hardwareProfiler.js";
 import type {
   RomPlayerFrameStats,
+  RomPlayerFrameBudgetTelemetry,
   RomPlayerEventTrace,
   RomPlayerHardwareTelemetry,
   RomPlayerAudioTelemetry,
@@ -247,6 +248,23 @@ function normalizeEventTrace(value: unknown): RomPlayerEventTrace | null {
   return entries.every(entry => entry !== null) ? { sequence: candidate.sequence, entries } : null;
 }
 
+function normalizeFrameBudget(value: unknown, runtime: Partial<RomPlayerRuntimeState>): RomPlayerFrameBudgetTelemetry | null {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return null;
+  const b = value as RomPlayerFrameBudgetTelemetry;
+  const uint = (n: unknown): n is number => nonnegativeInteger(n) && (n as number) <= 0xffffffff;
+  if (b.frame !== runtime.frame || b.room !== runtime.currentRoom || b.runtimeKind !== runtime.runtimeKind || b.ticksPerSecond !== 262144 ||
+    ![b.frame,b.dmaQueuedBytes,b.dmaDroppedTotal,b.sceneFrameCount].every(uint) || !b.sceneFrameCount ||
+    ![b.dmaBytes,b.dmaTransfers,b.vblankWorkTicks,b.oamEnabled,b.sceneDmaBytes].every(n => n === null || uint(n)) ||
+    !b.peaks || typeof b.peaks !== "object" || (b.oamEnabled !== null && b.oamEnabled > 128)) return null;
+  for (const [key,current] of [["dma",b.dmaBytes],["vblank",b.vblankWorkTicks],["oam",b.oamEnabled]] as const) {
+    const peak = b.peaks[key];
+    if (current === null ? peak !== null : !peak || !uint(peak.value) || !uint(peak.frame) || peak.frame > b.frame || peak.value < current || (key === "oam" && peak.value > 128)) return null;
+  }
+  return {frame:b.frame,room:b.room,runtimeKind:b.runtimeKind,ticksPerSecond:b.ticksPerSecond,dmaBytes:b.dmaBytes,dmaTransfers:b.dmaTransfers,
+    dmaQueuedBytes:b.dmaQueuedBytes,dmaDroppedTotal:b.dmaDroppedTotal,vblankWorkTicks:b.vblankWorkTicks,oamEnabled:b.oamEnabled,
+    sceneFrameCount:b.sceneFrameCount,sceneDmaBytes:b.sceneDmaBytes,peaks:{dma:b.peaks.dma ? {...b.peaks.dma} : null,vblank:b.peaks.vblank ? {...b.peaks.vblank} : null,oam:b.peaks.oam ? {...b.peaks.oam} : null}};
+}
+
 function normalizeRuntimeState(value: unknown): RomPlayerRuntimeState | null {
   if (!value || typeof value !== "object") return null;
   const candidate = value as Partial<RomPlayerRuntimeState>;
@@ -286,6 +304,8 @@ function normalizeRuntimeState(value: unknown): RomPlayerRuntimeState | null {
       input?.released
     ].every(nonnegativeInteger)
   ) return null;
+  const frameBudget = candidate.frameBudget == null ? null : normalizeFrameBudget(candidate.frameBudget,candidate);
+  if (candidate.frameBudget != null && !frameBudget) return null;
   const audio = normalizeAudioTelemetry(candidate.audio);
   if (candidate.audio != null && !audio) return null;
   const subsystems = normalizeSubsystemTelemetry(candidate.subsystems);
@@ -326,6 +346,7 @@ function normalizeRuntimeState(value: unknown): RomPlayerRuntimeState | null {
       pressed: input!.pressed,
       released: input!.released
     },
+    ...(frameBudget ? {frameBudget} : {}),
     ...(schema === 4 ? { audio } : {}),
     ...(subsystems ? { subsystems } : {}),
     ...(candidate.eventTrace ? { eventTrace: normalizeEventTrace(candidate.eventTrace) } : {})

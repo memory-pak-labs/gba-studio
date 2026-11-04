@@ -1,4 +1,6 @@
 import type { RomPlayerEventTrace } from "../shared/hardwareProfiler";
+import { RuntimeFrameBudgetPanel } from "./RuntimeFrameBudgetPanel";
+import type { RomPlayerFrameBudgetTelemetry } from "../shared/hardwareProfiler";
 import { BuildDiagnosticReportPanel } from "./BuildDiagnosticReportPanel";
 import type { EnginePackBuildResult, EnginePackDoctorSummary } from "../shared/ipc";
 import { readStoredLocale } from "./i18n";
@@ -43,6 +45,8 @@ interface TestingDiagnosticsDrawerProps {
   eventTrace?: RomPlayerEventTrace | null;
   onOpenEvent?(eventID: string): void;
   runtimeAudio?: RomPlayerAudioTelemetry | null;
+  frameBudget?: RomPlayerFrameBudgetTelemetry | null;
+  activeSceneName?: string | null;
 }
 
 function DiagnosticToolCard({
@@ -88,11 +92,16 @@ export function TestingDiagnosticsDrawer({
   projectData,
   romOccupancy,
   runtimeAudio,
+  frameBudget,
+  activeSceneName,
   eventTrace,
   onOpenEvent
 }: TestingDiagnosticsDrawerProps): React.ReactElement | null {
   const ui = useStudioUiText();
   if (!isOpen) return null;
+  const metricNumber = (n: number | null | undefined, decimals = 0) => n == null ? ui("Pendente") : n.toLocaleString(readStoredLocale(), {maximumFractionDigits:decimals});
+  const metricBytes = (n: number | null) => n == null ? ui("Pendente") : `${metricNumber(n)} B`;
+  const deltaNumber = (n: number | null, decimals = 0) => n == null ? ui("Pendente") : (n >= 0 ? "+" : "") + n.toFixed(decimals);
   const lastComparison = profilerHistory.length >= 2
     ? compareHardwareProfilerSessions(profilerHistory.at(-2)!, profilerHistory.at(-1)!)
     : null;
@@ -117,17 +126,16 @@ export function TestingDiagnosticsDrawer({
           <X aria-hidden="true" />
         </button>
       </header>
-      <section className="testing-diagnostics-section" aria-label={ui("Rastro de eventos da ROM")}>
-        <h3>{ui("Rastro de eventos da ROM")}</h3>
-        <label><input type="checkbox" checked={projectData.eventDiagnostics === true} onChange={e => onChangeProjectData({ ...projectData, eventDiagnostics: e.target.checked })} />{ui("Incluir origem dos eventos no próximo build")}</label>
-        {eventTrace?.entries.map((entry, index) => <p key={`${eventTrace.sequence}-${index}`}>
-          {entry.eventID ? <button type="button" onClick={() => onOpenEvent?.(entry.eventID!)}>{entry.eventID} / {entry.stepID}</button> : <code>0x{entry.commandAddress.toString(16)}</code>}
-          {` · frame ${entry.frame} · op ${entry.op} · ${entry.status === 2 ? "pause" : entry.status === 1 ? "stop" : "continue"} · wait ${entry.waitFrames}`}
-        </p>)}
-      </section>
-
-
       <div className="testing-diagnostics-content">
+        <section className="testing-diagnostics-section" aria-label={ui("Rastro de eventos da ROM")}>
+          <h3>{ui("Rastro de eventos da ROM")}</h3>
+          <label><input type="checkbox" checked={projectData.eventDiagnostics === true} onChange={e => onChangeProjectData({ ...projectData, eventDiagnostics: e.target.checked })} />{ui("Incluir origem dos eventos no próximo build")}</label>
+          {eventTrace?.entries.map((entry, index) => <p key={`${eventTrace.sequence}-${index}`}>
+            {entry.eventID ? <button type="button" onClick={() => onOpenEvent?.(entry.eventID!)}>{entry.eventID} / {entry.stepID}</button> : <code>0x{entry.commandAddress.toString(16)}</code>}
+            {` · frame ${entry.frame} · op ${entry.op} · ${entry.status === 2 ? "pause" : entry.status === 1 ? "stop" : "continue"} · wait ${entry.waitFrames}`}
+          </p>)}
+        </section>
+
         <div className="advanced-tools-grid">
           {tools.map((tool) => (
             <DiagnosticToolCard key={tool.id} onEnable={onEnableTool} tool={tool} />
@@ -166,13 +174,14 @@ export function TestingDiagnosticsDrawer({
         </section>
 
         <BuildDiagnosticReportPanel result={buildResult} doctor={doctorSummary} />
+        <RuntimeFrameBudgetPanel sample={frameBudget} sceneName={activeSceneName} />
 
         <section className="advanced-flow-report" aria-label={ui("Sessões do perfil de hardware")}>
           <h3>{ui("Sessões do perfil de hardware")}</h3>
-          <p>{profilerHistory.length} {ui(" execução(ões) concluída(s) · ")}{profilerSession?.frames.length ?? 0} {ui(" frames na sessão atual.")}</p>
+          <p>{profilerHistory.length} {ui(" execução(ões) concluída(s) · ")}{profilerSession?.frames.length ?? 0} {ui("amostras na sessão atual.")}</p>
           {lastComparison ? (
             <p>
-              {ui("Comparação mais recente: CPU ")}<strong>{lastComparison.deltas.cpu >= 0 ? "+" : ""}{lastComparison.deltas.cpu.toFixed(1)}</strong> {ui(" · DMA ")}<strong>{lastComparison.deltas.dma >= 0 ? "+" : ""}{lastComparison.deltas.dma.toFixed(0)}</strong> {ui(" · VRAM ")}<strong>{lastComparison.deltas.vram >= 0 ? "+" : ""}{lastComparison.deltas.vram.toFixed(0)}</strong> {ui(" · OAM ")}<strong>{lastComparison.deltas.oam >= 0 ? "+" : ""}{lastComparison.deltas.oam.toFixed(0)}</strong>
+              {ui("Comparação mais recente: CPU ")}<strong>{deltaNumber(lastComparison.deltas.cpu,1)}</strong> {ui(" · DMA ")}<strong>{deltaNumber(lastComparison.deltas.dma,0)}</strong> {ui(" · VRAM ")}<strong>{deltaNumber(lastComparison.deltas.vram,0)}</strong> {ui(" · OAM ")}<strong>{deltaNumber(lastComparison.deltas.oam,0)}</strong>
             </p>
           ) : <p>{ui("Conclua duas sessões de Play para comparar os frames de pico.")}</p>}
           <p>{ui("Subsistemas: tempos inclusivos em µs. Escopos sobrepostos não devem ser somados. Picos nativos reiniciam ao entrar em outra cena.")}</p>
@@ -180,10 +189,10 @@ export function TestingDiagnosticsDrawer({
             <article className="hardware-profiler-scene-peak" key={`${scene.runtime}:${scene.roomIndex}`}>
               <strong>{sceneDisplayName(scene.sceneName)}</strong>
               <small>
-                {scene.runtime} · {scene.frameCount} {scene.frameCount === 1 ? ui("frame medido") : ui("frames medidos")}
+                {scene.runtime} · {scene.frameCount} {ui("amostras do Editor")}
               </small>
               <span>
-                {ui("CPU ")}{scene.peaks.cpu.value.toLocaleString(readStoredLocale(), { maximumFractionDigits: 1 })}{ui("% · VRAM ")}{scene.peaks.vram.value.toLocaleString(readStoredLocale())} {ui(" B · OAM ")}{scene.peaks.oam.value.toLocaleString(readStoredLocale())} {ui(" · DMA ")}{scene.peaks.dma.value.toLocaleString(readStoredLocale())} {ui(" ticks")}</span>
+                {ui("CPU {0}% · VRAM {1} · OAM {2} · DMA {3}", {0:metricNumber(scene.peaks.cpu.value,1),1:metricBytes(scene.peaks.vram.value),2:metricNumber(scene.peaks.oam.value),3:metricBytes(scene.peaks.dma.value)})}</span>
               {scene.subsystems ? (
                 <span aria-label={ui("Picos por subsistema")}>
                   {Object.entries(scene.subsystems).map(([label, peak]) => `${label}: ${((peak?.value ?? 0) * 1_000_000 / 262144).toLocaleString(readStoredLocale(), { maximumFractionDigits: 1 })} µs`).join(" · ")}
