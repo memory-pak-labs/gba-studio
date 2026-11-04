@@ -122,15 +122,16 @@ struct Sprite {
     uint16_t scale_y256 = 256;
 };
 
+inline int scaled_metasprite_part_offset(int position, int extent, int scale) {
+    const int value = (position * 2 + extent) * scale + 256;
+    return (value >= 0 ? value / 512 : -((-value + 511) / 512)) - extent / 2 - position;
+}
+
 inline void apply_metasprite_part_scale(Sprite& sprite, const MetaSpritePart& part, const MetaSprite* metasprite = nullptr, bool mirror_x = false, int mirror_width = 0) {
     const int sx = metasprite ? metasprite->scale_x256 : 256;
     const int sy = metasprite ? metasprite->scale_y256 : 256;
-    const auto offset = [](int position, int extent, int scale) {
-        const int value = (position * 2 + extent) * scale + 256;
-        return (value >= 0 ? value / 512 : -((-value + 511) / 512)) - extent / 2 - position;
-    };
-    sprite.x += offset(mirror_x ? mirror_width - part.x - part.width : part.x, part.width, sx);
-    sprite.y += offset(part.y, part.height, sy);
+    sprite.x += scaled_metasprite_part_offset(mirror_x ? mirror_width - part.x - part.width : part.x, part.width, sx);
+    sprite.y += scaled_metasprite_part_offset(part.y, part.height, sy);
     sprite.scale_x256 = static_cast<uint16_t>(part.scale_x256 * sx / 256);
     sprite.scale_y256 = static_cast<uint16_t>(part.scale_y256 * sy / 256);
 }

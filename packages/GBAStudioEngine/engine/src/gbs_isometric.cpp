@@ -1750,10 +1750,10 @@ size_t build_iso_draw_list(
                 part.vflip,
                 part.color_depth, part.scale_x256, part.scale_y256
             };
-            MetaSpritePart relative = part; relative.x -= first_part->x; relative.y -= first_part->y;
-            Sprite sprite {}; sprite.x = item.screen_pixels.x; sprite.y = item.screen_pixels.y;
-            apply_metasprite_part_scale(sprite, relative, metasprite);
-            item.screen_pixels = {sprite.x,sprite.y}; item.scale_x256 = sprite.scale_x256; item.scale_y256 = sprite.scale_y256;
+            item.screen_pixels.x += scaled_metasprite_part_offset(static_cast<int>(part.x)-first_part->x, part.width, metasprite->scale_x256);
+            item.screen_pixels.y += scaled_metasprite_part_offset(static_cast<int>(part.y)-first_part->y, part.height, metasprite->scale_y256);
+            item.scale_x256 = part.scale_x256 * metasprite->scale_x256 / 256;
+            item.scale_y256 = part.scale_y256 * metasprite->scale_y256 / 256;
             if (iso_draw_item_intersects_viewport(item)) { out_items[count++] = item; }
         }
     }

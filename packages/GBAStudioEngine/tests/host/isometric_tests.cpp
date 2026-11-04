@@ -1444,7 +1444,19 @@ void test_tactical_stairs_support_negative_axes_without_crossing_other_edges() {
     assert(gbs::move_iso_actor_by_delta(map,a,{0,1}));assert(a.tile.z==0);
 }
 
+void test_event_scale_keeps_wide_part_offsets_signed_before_culling() {
+    const gbs::MetaSpritePart parts[] = {{-120,0,0,0,false,false,8,8},{120,0,2,0,false,false,8,8}};
+    const gbs::MetaSprite sprite {parts,2};
+    gbs::IsoActor actor {}; actor.screen_offset_pixels={-420,0}; actor.visible=true;actor.metasprite=&sprite;
+    gbs::EventState state {}; state.actor_scales[1].x256=384;
+    const gbs::IsoCamera camera {{0,0},{0,0,0,0},false};
+    gbs::IsoDrawItem items[2]{};
+    const auto count=gbs::build_iso_draw_list(&actor,1,camera,items,2,grid,&state);
+    assert(count==1 && items[0].tile_index==2 && items[0].screen_pixels.x==62);
+}
+
 int main() {
+    test_event_scale_keeps_wide_part_offsets_signed_before_culling();
     test_tactical_allies_are_selectable_and_enemy_turns_rotate();
     test_scripted_step_interpolates_and_finishes_without_drift();
     {
