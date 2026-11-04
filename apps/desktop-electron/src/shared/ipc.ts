@@ -315,6 +315,7 @@ export interface EnginePackBuildSummary {
   buildDir: string;
   romPath: string;
   romBytes?: number;
+  videoBudget?: import("./assetPackVideoBudget.js").AssetPackVideoBudgetReport;
   romOccupancyPath?: string;
   romOccupancy?: import("./romOccupancy.js").RomOccupancyReport;
   memoryReportPath?: string;

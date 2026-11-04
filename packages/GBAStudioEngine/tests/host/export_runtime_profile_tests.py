@@ -5325,9 +5325,12 @@ def assert_racing_pseudo3d_visual_asset_export(repo_root, build_dir):
     sky_palette = pack_report["asset_reports"]["track_sky"]["allocations"]["bg_palette_colors"]
     floor_palette = pack_report["asset_reports"]["track_floor"]["allocations"]["bg_palette_colors"]
     minimap_palette = pack_report["asset_reports"]["track_minimap"]["allocations"]["bg_palette_colors"]
-    assert sky_palette["start"] == floor_palette["start"] == minimap_palette["start"]
+    assert sky_palette["start"] == floor_palette["start"]
     assert floor_palette["shared_with"] == "track_sky"
-    assert minimap_palette["shared_with"] == "track_sky"
+    # The regular minimap moves source color 2 to visible index 1, whereas
+    # the affine floor keeps index 1 blue. It needs its own palette bank.
+    assert "shared_with" not in minimap_palette
+    assert minimap_palette["start"] >= sky_palette["start"] + sky_palette["count"]
     compile_generated_header(
         repo_root,
         output_dir,

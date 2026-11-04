@@ -103,7 +103,7 @@ describe("TestingDiagnosticsDrawer", () => {
 
     const sessions = screen.getByLabelText("Sessões do perfil de hardware");
     expect(within(sessions).getByText("falésias")).toBeInTheDocument();
-    expect(within(sessions).getByText(/platformer · 1 frame/)).toBeInTheDocument();
+    expect(within(sessions).getByText(/platformer · 1 amostras do Editor/)).toBeInTheDocument();
     expect(within(sessions).getByText(/CPU 72,4%/)).toBeInTheDocument();
     expect(within(sessions).getByText(/VRAM 72.000 B/)).toBeInTheDocument();
   });

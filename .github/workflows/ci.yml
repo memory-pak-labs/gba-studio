@@ -18,15 +18,20 @@ jobs:
   editor:
     name: ${{ matrix.name }}
     runs-on: ${{ matrix.runner }}
-    timeout-minutes: 20
+    timeout-minutes: 30
     strategy:
       fail-fast: false
       matrix:
         include:
           - runner: ubuntu-24.04
+            platform: linux
             name: Editor tests, types and build
           - runner: windows-2022
+            platform: windows
             name: Editor tests, types and build (Windows)
+          - runner: macos-15
+            platform: macos
+            name: Editor tests, types and build (macOS)
     defaults:
       run:
         working-directory: apps/desktop-electron
@@ -43,17 +48,59 @@ jobs:
         with:
           python-version: '3.11'
       - run: python -m pip install Pillow
+      - name: Linux display dependencies
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends xvfb libgtk-3-0 libnss3 libasound2t64 libgbm1
       - run: npm ci
-      - run: npm run test:all -- --exclude src/shared/projectOpenPerf.test.ts
+      - name: Install the pinned Electron binary
+        run: node node_modules/electron/install.js
+      - name: Configure Linux Electron sandbox
+        if: runner.os == 'Linux'
+        run: |
+          sudo chown root:root node_modules/electron/dist/chrome-sandbox
+          sudo chmod 4755 node_modules/electron/dist/chrome-sandbox
+      - run: npm run test:all -- --exclude src/shared/projectOpenPerf.test.ts --reporter=default --reporter=json --outputFile=artifacts/ci-tests/results.json
       # Measure the existing performance budget without competing test workers.
       - run: npm run test:perf:project-open
       - run: npm run typecheck
       - run: npm run build
+      - run: npm run verify:mgba-web
+      - name: Editor create, save and reopen (Linux)
+        if: runner.os == 'Linux'
+        env:
+          GBA_STUDIO_SMOKE_OUTPUT_DIR: artifacts/ci-editor
+        run: xvfb-run -a node scripts/smoke-electron-welcome.mjs
+      - name: Editor create, save and reopen (Windows/macOS)
+        if: runner.os != 'Linux'
+        env:
+          GBA_STUDIO_SMOKE_OUTPUT_DIR: artifacts/ci-editor
+        run: node scripts/smoke-electron-welcome.mjs
+      - name: Preserve editor evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: CI-editor-${{ matrix.platform }}
+          path: |
+            apps/desktop-electron/artifacts/ci-tests
+            apps/desktop-electron/artifacts/ci-editor
+            apps/desktop-electron/dist
+          if-no-files-found: warn
+          retention-days: 7
 
   engine:
-    name: Engine host tests
-    runs-on: ubuntu-24.04
-    timeout-minutes: 20
+    name: Engine host tests (${{ matrix.platform }})
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: ubuntu-24.04
+            platform: linux
+          - runner: macos-15
+            platform: macos
     defaults:
       run:
         working-directory: packages/GBAStudioEngine
@@ -65,7 +112,15 @@ jobs:
         with:
           python-version: '3.11'
       - run: python -m pip install Pillow
-      - run: make host-test
+      - run: make host-test > host-test.log 2>&1
+      - name: Preserve engine host logs
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: CI-engine-${{ matrix.platform }}
+          path: packages/GBAStudioEngine/host-test.log
+          if-no-files-found: warn
+          retention-days: 7
 
   engine-windows:
     name: Engine host tests (Windows)
@@ -89,7 +144,15 @@ jobs:
             mingw-w64-ucrt-x86_64-clang
       - name: Test engine on Windows
         shell: msys2 {0}
-        run: make -k -C packages/GBAStudioEngine host-test HOST_POSIX_FIXTURE_PYTHON=/usr/bin/python3
+        run: make -k -C packages/GBAStudioEngine host-test HOST_POSIX_FIXTURE_PYTHON=/usr/bin/python3 > packages/GBAStudioEngine/host-test.log 2>&1
+      - name: Preserve Windows engine logs
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: CI-engine-windows
+          path: packages/GBAStudioEngine/host-test.log
+          if-no-files-found: warn
+          retention-days: 7
 
   rom-regressions:
     name: ARM ROM regressions (mGBA)
@@ -107,7 +170,9 @@ jobs:
       - run: npm ci
         working-directory: apps/desktop-electron
       - name: Compile ARM and replay native regressions
+        shell: bash
         run: |
+          set -euo pipefail
           mkdir -p "$RUNNER_TEMP/rom-regressions"
           docker run --rm -v "$GITHUB_WORKSPACE:/work" \
             -v "$RUNNER_TEMP/rom-regressions:/qa" \
@@ -116,19 +181,73 @@ jobs:
             devkitpro/devkitarm@sha256:15b79ce75822c289538d8153da5fa7aafe5e6adc32ad8a575a197beca0f0761b \
             bash -eu -c '
               export PATH=/node/bin:$PATH
+              git config --global --add safe.directory /work
               apt-get update && apt-get install -y --no-install-recommends clang python3-pil
               make -j2 package
               cd /work/apps/desktop-electron
-              node scripts/smoke-replace-tile.mjs /work/packages/GBAStudioEngine/dist/GBAStudioEnginePack /qa/replace-tile
-              node scripts/smoke-event-replay.mjs /work/packages/GBAStudioEngine/dist/GBAStudioEnginePack /qa/event-replay
-              node scripts/smoke-hardware-diagnostic.mjs /work/packages/GBAStudioEngine/dist/GBAStudioEnginePack /qa/hardware-diagnostic
-              node scripts/smoke-map-states.mjs /work/packages/GBAStudioEngine/dist/GBAStudioEnginePack /qa/map-states
-              node scripts/smoke-visibility-graphics.mjs /work/packages/GBAStudioEngine/dist/GBAStudioEnginePack /qa/graphics
-            '
+              node scripts/verify-rom-regressions.mjs --engine-pack /work/packages/GBAStudioEngine/dist/GBAStudioEnginePack --output /qa
+            ' 2>&1 | tee "$RUNNER_TEMP/rom-regressions/producer.log"
+      - name: Restore ownership of ROM evidence
+        if: always()
+        run: |
+          if [ -d "$RUNNER_TEMP/rom-regressions" ]; then
+            sudo chown -R "$(id -u):$(id -g)" "$RUNNER_TEMP/rom-regressions"
+          fi
+      - name: Preserve the exact Engine Pack for cross-host replay
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: CI-ROM-Engine-Pack
+          path: packages/GBAStudioEngine/dist/GBAStudioEnginePack
+          if-no-files-found: error
+          retention-days: 7
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         if: always()
         with:
           name: ARM-ROM-regressions
           path: ${{ runner.temp }}/rom-regressions
           if-no-files-found: error
+          retention-days: 7
+
+  rom-replay:
+    name: Replay identical ARM ROMs (${{ matrix.platform }})
+    needs: rom-regressions
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: ubuntu-24.04
+            platform: linux
+          - runner: windows-2022
+            platform: windows
+          - runner: macos-15
+            platform: macos
+    defaults:
+      run:
+        working-directory: apps/desktop-electron
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version-file: .nvmrc
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: ARM-ROM-regressions
+          path: apps/desktop-electron/artifacts/ci-rom-input
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: CI-ROM-Engine-Pack
+          path: packages/GBAStudioEngine/dist/GBAStudioEnginePack
+      - name: Replay the producer cartridges and compare fixed frames
+        run: node scripts/replay-rom-regressions.mjs --input artifacts/ci-rom-input --output artifacts/ci-rom-replay --expected-revision "${{ github.sha }}"
+      - name: Preserve cross-host replay evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: CI-ROM-replay-${{ matrix.platform }}
+          path: apps/desktop-electron/artifacts/ci-rom-replay
+          if-no-files-found: warn
           retention-days: 7

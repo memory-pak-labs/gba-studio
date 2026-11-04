@@ -23,6 +23,13 @@ enum {
 
 void gbs_hw_init(void);
 void gbs_hw_wait_vblank(void);
+typedef struct {
+    uint32_t dma_bytes;
+    uint32_t dma_transfers;
+    uint32_t vblank_work_ticks;
+    uint32_t oam_enabled;
+} GbsHwFrameVideoStats;
+int gbs_hw_frame_video_stats(GbsHwFrameVideoStats* out);
 void gbs_hw_set_render_publication_blocked(int blocked);
 void gbs_hw_set_render_handoff_fallback(void);
 void gbs_hw_frame_counter_init(void);

@@ -95,6 +95,8 @@
 }
 
 .testing-diagnostics-content {
+  align-content: start;
+  min-height: 0;
   display: grid;
   gap: 14px;
   overflow-y: auto;
@@ -418,4 +420,33 @@
   .advanced-resource-list article {
     grid-template-columns: 1fr 1fr;
   }
+}
+
+.runtime-frame-budget-metrics {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  margin: 16px 0;
+}
+
+.runtime-frame-budget-metrics > div {
+  display: grid;
+  align-content: start;
+  gap: 4px;
+  min-width: 0;
+  padding: 10px 12px;
+  border: 1px solid var(--studio-color-border);
+  border-radius: 8px;
+  background: var(--studio-color-surface-raised);
+}
+
+.runtime-frame-budget-metrics dt {
+  color: var(--studio-color-text-muted);
+  text-transform: none;
+  overflow-wrap: anywhere;
+}
+
+.runtime-frame-budget-metrics dd {
+  margin: 0;
+  overflow-wrap: anywhere;
 }

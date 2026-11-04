@@ -23,6 +23,7 @@ import { resolveEnginePackCandidatePaths } from "../shared/enginePackPaths.js";
 import { resolveEngineToolInvocation as toolInvocation } from "./engineToolInvocation.js";
 import { acquireBuildLock, copyTreeIfChanged, exportedFileHashes } from "./stableBuildFiles.js";
 import { pruneDiskCache, stagingCachePolicy, touchDiskCacheEntry, withDiskCacheLock } from "./diskCacheRetention.js";
+import { finalizeSceneVideoBudgetReport } from "./sceneVideoBudgetExport.js";
 
 const execFileAsync = promisify(execFile);
 const doctorTimeoutMs = 20_000;
@@ -480,12 +481,17 @@ async function buildSummary(options: RunGbsbuildOptions): Promise<EnginePackBuil
   } catch {
     romBytes = undefined;
   }
+  const videoBudget = romBytes === undefined ? undefined : await finalizeSceneVideoBudgetReport({
+    projectDir: options.projectDir, romPath,
+    engineVersion: await readEnginePackVersion(options.enginePackPath)
+  });
   return {
     target,
     projectDir: options.projectDir,
     buildDir,
     romPath,
-    ...(romBytes === undefined ? {} : { romBytes })
+    ...(romBytes === undefined ? {} : { romBytes }),
+    ...(videoBudget ? { videoBudget } : {})
   };
 }
 

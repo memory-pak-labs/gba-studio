@@ -1,4 +1,7 @@
 #include <cassert>
+#include <initializer_list>
+#include "../../engine/src/gbs_hw.h"
+#include "../../engine/src/frame_video_stats.h"
 #include "gbs/dma.hpp"
 #include "gbs/audio.hpp"
 #include "gbs/engine.hpp"
@@ -15,6 +18,8 @@ int hblank_hits = 0;
 int internal_affine_hblank_hits = 0;
 int internal_hbe_hblank_hits = 0;
 int dma_copy_calls = 0;
+bool frame_video_enabled = false;
+GbsHwFrameVideoStats frame_video_stats {};
 int hdma_start_calls = 0;
 int hdma_stop_calls = 0;
 int last_dma_channel = -1;
@@ -147,6 +152,7 @@ AudioRuntimeUsage audio_runtime_usage() {
 namespace {
 
 extern "C" void gbs_hw_dma_copy(int channel, const void*, volatile void* destination, uint32_t units, int word_sized) {
+    if (frame_video_enabled) { frame_video_stats.dma_bytes += units * (word_sized ? 4 : 2); ++frame_video_stats.dma_transfers; }
     ++dma_copy_calls;
     dma_copy_sequence = ++call_sequence;
     last_dma_channel = channel;
@@ -960,7 +966,59 @@ static void test_dma_fences_hold_sources_until_the_last_partial_transfer() {
     assert(gbs::dma_fence_status(canceled) == gbs::DmaFenceStatus::Canceled);
 }
 
+
+extern "C" int gbs_hw_frame_video_stats(GbsHwFrameVideoStats* out) {
+    if (!frame_video_enabled) return 0;
+    *out = frame_video_stats;
+    return 1;
+}
+
+void test_completed_frame_video_uses_transferred_bytes_and_real_oam() {
+    frame_video_enabled = true;
+    frame_video_stats = {};
+    gbs::init();
+    gbs::debug_set_runtime_kind(0);
+    gbs::runtime_telemetry_block().current_room = 2;
+    frame_video_stats.vblank_work_ticks = 3;
+    frame_video_stats.oam_enabled = 7;
+    static uint16_t data[5000] {}, destination[5000] {};
+    assert(gbs::dma_enqueue_vblank({data, destination, 4500, gbs::DmaWidth::Halfword}));
+    gbs::begin_frame();
+    gbs::wait_vblank();
+    const auto& first = gbs::runtime_frame_budget_telemetry_block();
+    assert(first.magic == 0x47534642u && first.word_count == 24 && first.valid_bits == 7);
+    assert(first.dma_bytes == 8192 && first.dma_queued_bytes == 808);
+    assert(first.oam_enabled == 7 && first.vblank_work_ticks == 3);
+    assert(first.peak_dma_bytes == 8192 && first.scene_frame_count == 1);
+    gbs::begin_frame(); gbs::wait_vblank();
+    assert(first.dma_bytes == 808 && first.dma_queued_bytes == 0);
+    assert(first.peak_dma_bytes == 8192 && first.scene_frame_count == 2);
+    gbs::runtime_telemetry_block().current_room = 3;
+    gbs::begin_frame(); gbs::wait_vblank();
+    assert(first.peak_dma_bytes == 0 && first.scene_frame_count == 1);
+    frame_video_enabled = false;
+}
+
+void test_oam_enabled_count_handles_affine_double_size_and_hidden_entries() {
+    uint16_t oam[128 * 4] {};
+    for (int i = 0; i < 128; ++i) oam[i * 4] = 0x0200;
+    oam[0] = 0; oam[4] = 0x0300; oam[8] = 0xc000;
+    assert(gbs_count_enabled_oam(oam, 1) == 2);
+    assert(gbs_count_enabled_oam(oam, 0) == 0);
+    GbsOamOccupancy occupied {{0xffffffffu,0xffffffffu,0xffffffffu,0xffffffffu}};
+    assert(gbs_oam_occupancy_count(&occupied)==128);
+    gbs_oam_occupancy_clear(&occupied,17,64); assert(gbs_oam_occupancy_count(&occupied)==64);
+    gbs_oam_occupancy_clear(&occupied,0,128); assert(gbs_oam_occupancy_count(&occupied)==0);
+    for (unsigned i : {0u,31u,32u,127u}) gbs_oam_occupancy_set(&occupied,i,1);
+    assert(gbs_oam_occupancy_count(&occupied)==4);
+    gbs_oam_occupancy_clear(&occupied,31,2); assert(gbs_oam_occupancy_count(&occupied)==2);
+
+
+}
+
 int main() {
+    test_completed_frame_video_uses_transferred_bytes_and_real_oam();
+    test_oam_enabled_count_handles_affine_double_size_and_hidden_entries();
     test_dma_fences_hold_sources_until_the_last_partial_transfer();
     test_dma_validation();
     test_unaligned_affine_map_upload_preserves_byte_pairs_and_budget();

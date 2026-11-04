@@ -651,9 +651,13 @@ Preparação técnica não substitui revisão visual nem licença de redistribui
 
 ## CI e releases
 
-A CI executa `npm run test:all`, tipos e build no Linux e Windows, além dos
-testes host do motor nos dois sistemas. Confira o resultado da execução;
-ter um job configurado não significa que os testes passaram.
+A CI configura `npm run test:all`, tipos, build e o fluxo renderizado de criar,
+salvar e reabrir o exemplo no Linux, Windows e macOS. Os testes host do motor
+cobrem os três sistemas. O job ARM compila e testa as fixtures no Linux; os
+jobs de replay conferem e executam as mesmas ROMs nos três hosts. Veja a
+[matriz de CI](continuous-integration.md) para comandos, artefatos e limites.
+Confira o resultado da execução: ter um job configurado não significa que
+os testes passaram.
 
 O workflow manual **Desktop packages** compila a biblioteca ARM em uma imagem
 devkitPro identificada pelo digest e gera candidatos x64: NSIS/ZIP no Windows,

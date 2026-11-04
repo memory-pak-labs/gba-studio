@@ -1,0 +1,58 @@
+.room-project-budget:has(> .scene-video-budget) > * {
+  min-width: 0;
+  max-width: 100%;
+  overflow-wrap: anywhere;
+}
+
+.room-project-budget:has(> .scene-video-budget),
+.scene-video-budget {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.scene-video-budget,
+.scene-video-budget > *,
+.scene-video-budget-colors details,
+.scene-video-budget-states details {
+  min-width: 0;
+  max-width: 100%;
+  overflow-wrap: anywhere;
+}
+
+.scene-video-budget-colors li {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.scene-video-budget .room-project-budget-grid article > div:first-child {
+  align-items: start;
+  flex-wrap: wrap;
+}
+
+.scene-video-budget .room-project-budget-grid article b {
+  grid-column: 1 / -1;
+  overflow: visible;
+  overflow-wrap: anywhere;
+  white-space: normal;
+}
+
+.scene-video-budget .room-project-budget-grid article small {
+  display: block;
+}
+
+.scene-video-budget-rom,
+.scene-video-budget-colors,
+.scene-video-budget-states,
+.scene-video-budget-reservations {
+  border-top: 1px solid var(--studio-color-border);
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+  padding-top: 8px;
+}
+
+.scene-video-budget-colors li,
+.scene-video-budget-reservations li {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}

@@ -352,6 +352,19 @@ async function main() {
         assertContains(editorText, "PRESS START");
         await assertSavedExampleProject(savedProjectPath);
         await assertCanReopenSavedExampleProject(cdp, savedProjectPath);
+        await captureScreenshot(cdp, join(outputDir, "01-editor.png"));
+      } catch (error) {
+        // Preserve the last rendered state before closing CDP. A dead renderer
+        // must not keep a failed CI job waiting indefinitely for a screenshot.
+        let timeout;
+        try {
+          await Promise.race([
+            captureScreenshot(cdp, join(outputDir, "failure.png")),
+            new Promise((_, reject) => { timeout = setTimeout(() => reject(new Error("Failure screenshot timed out")), 2_000); })
+          ]);
+        } catch (captureError) { console.error(String(captureError)); }
+        finally { clearTimeout(timeout); }
+        throw error;
       } finally {
         cdp.close();
       }
@@ -381,7 +394,13 @@ async function main() {
       await terminateChild(child);
     }
   } finally {
-    await rm(tempRoot, { force: true, recursive: true });
+    try {
+      await mkdir(outputDir, { recursive: true });
+      await Promise.all([
+        writeFile(join(outputDir, "electron-stdout.log"), stdout),
+        writeFile(join(outputDir, "electron-stderr.log"), stderr)
+      ]);
+    } finally { await rm(tempRoot, { force: true, recursive: true }); }
     if (stdout.includes("Unhandled") || stderr.includes("Unhandled")) {
       throw new Error(`Electron emitted an unhandled error.\nstdout:\n${stdout}\nstderr:\n${stderr}`);
     }

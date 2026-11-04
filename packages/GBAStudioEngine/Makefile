@@ -404,9 +404,9 @@ $(HOST_BUILD)/world_map_tests: tests/host/world_map_tests.cpp
 	@mkdir -p $(@D)
 	$(HOST_CXX) $(HOST_CXXFLAGS) $^ -o $@
 
-$(HOST_BUILD)/hardware_core_tests: tests/host/hardware_core_tests.cpp engine/src/profiler.cpp engine/src/gbs_core.cpp engine/src/gbs_runtime.cpp engine/src/gbs_rtc.cpp engine/src/gbs_input.cpp engine/src/gbs_interrupt.cpp engine/src/gbs_dma.cpp engine/src/gbs_debug.cpp engine/src/gbs_timer.cpp engine/src/rumble.cpp engine/src/deferred_work.cpp engine/src/gbs_engine_global.cpp engine/src/input_advanced.cpp tests/host/hw_stubs.cpp
+$(HOST_BUILD)/hardware_core_tests: engine/src/frame_video_stats.h engine/src/gbs_hw.h engine/include/gbs/debug.hpp tests/host/hardware_core_tests.cpp engine/src/profiler.cpp engine/src/gbs_core.cpp engine/src/gbs_runtime.cpp engine/src/gbs_rtc.cpp engine/src/gbs_input.cpp engine/src/gbs_interrupt.cpp engine/src/gbs_dma.cpp engine/src/gbs_debug.cpp engine/src/gbs_timer.cpp engine/src/rumble.cpp engine/src/deferred_work.cpp engine/src/gbs_engine_global.cpp engine/src/input_advanced.cpp tests/host/hw_stubs.cpp
 	@mkdir -p $(@D)
-	$(HOST_CXX) $(HOST_CXXFLAGS) -DGBS_ENABLE_PROFILER_SCOPES $^ -o $@
+	$(HOST_CXX) $(HOST_CXXFLAGS) -DGBS_ENABLE_PROFILER_SCOPES $(filter %.cpp,$^) -o $@
 
 $(HOST_BUILD)/link_tests: tests/host/link_tests.cpp engine/src/gbs_link.cpp
 	@mkdir -p $(@D)
@@ -1023,12 +1023,15 @@ assetc-test:
 	$(HOST_CXX) $(HOST_CXXFLAGS) -I$(HOST_BUILD)/assetc $(HOST_BUILD)/assetc/audio_wav_compile.cpp -o $(HOST_BUILD)/assetc/audio_wav_compile
 	$(HOST_BUILD)/assetc/audio_wav_compile
 	python3 tests/host/assetc_production_contract_tests.py
+	python3 tests/host/assetc_scene_video_layout_tests.py
+	python3 tests/host/assetc_color_policy_tests.py
 	python3 tests/host/assetc_audio_quality_tests.py
 	python3 tests/host/assetc_sprite_dedup_tests.py
 	python3 tests/host/assetc_obj_palette_tests.py
 
 gbsbuild-host-test:
 	$(HOST_POSIX_FIXTURE_PYTHON) tests/host/gbsbuild_incremental_tests.py
+	python3 tests/host/gbsbuild_scene_rom_tests.py
 	grep -q 'MAP := $$(BUILD_DIR_ESC)/$$(TARGET).map' templates/Makefile.gba
 	grep -q -- '-Wl,-Map,$$(BUILD_DIR)/$$(TARGET).map' templates/Makefile.gba
 	@mkdir -p $(HOST_BUILD)/gbsbuild/pack/templates $(HOST_BUILD)/gbsbuild/pack/lib "$(HOST_BUILD)/gbsbuild/project with space" "$(HOST_BUILD)/gbsbuild/output dir"

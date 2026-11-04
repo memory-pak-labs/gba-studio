@@ -108,6 +108,8 @@ import {
   type ProjectBudgetMetric,
   type ProjectBudgetPresentation
 } from "../shared/projectBudget";
+import type { AssetPackVideoBudgetReport } from "../shared/assetPackVideoBudget.js";
+import { SceneVideoBudgetPanel } from "./SceneVideoBudgetPanel.js";
 import { projectEventReferenceOptions, type ProjectReferenceOption } from "../shared/projectReferenceOptions";
 import { normalizeRoomInspectorTab, roomInspectorTabs, type RoomInspectorContextKind, type RoomInspectorTabID } from "../shared/roomInspectorTabs";
 import { gbaActorSpriteRoomPlacementFromFrame, gbaActorSpriteRoomPlacementPercent } from "../shared/gbaRendering";
@@ -355,6 +357,7 @@ interface RoomsWorkspaceProps {
   budgetAnalysisGeneratedAt?: string | null;
   budgetAnalysisRunning?: boolean;
   budgetReport?: AssetPackBudgetReport | null;
+  videoBudget?: AssetPackVideoBudgetReport | null;
   projectPath?: string;
   sceneMapZoom?: number;
   assetRefreshToken?: number;
@@ -640,12 +643,14 @@ function RoomProjectBudgetPanel({
   generatedAt,
   onAnalyze,
   presentation,
+  videoBudget,
   running
 }: {
   analysisError?: string | null;
   generatedAt?: string | null;
   onAnalyze?(): void;
   presentation: ProjectBudgetPresentation;
+  videoBudget?: AssetPackVideoBudgetReport | null;
   running?: boolean;
 }): React.ReactElement {
   const ui = useStudioUiText();
@@ -658,7 +663,7 @@ function RoomProjectBudgetPanel({
       <header className="room-project-budget-header">
         <div>
           <span>{presentation.source === "compiler" ? ui("Relatório do compilador") : ui("Estimativa ao vivo")}</span>
-          <strong>{ui(projectBudgetStatusLabel(presentation))}</strong>
+          <strong>{ui(videoBudget?.blocked ? "Limite excedido" : videoBudget && !videoBudget.complete && presentation.projectReady && presentation.tone === "ok" ? "Análise parcial" : projectBudgetStatusLabel(presentation))}</strong>
           <small>
             {presentation.source === "compiler"
               ? ui("Cena {0} · pressão máxima {1}%", { 0: sceneLabel, 1: presentation.maxScenePressure })
@@ -692,6 +697,8 @@ function RoomProjectBudgetPanel({
           </article>
         ))}
       </div>
+
+      <SceneVideoBudgetPanel report={videoBudget} sceneName={presentation.sceneName} />
 
       <section aria-label={ui("Compressão sugerida")} className="room-project-budget-detail">
         <h5>{ui("Compressão")}</h5>
@@ -7198,6 +7205,7 @@ export function RoomsWorkspace({
   budgetAnalysisGeneratedAt,
   budgetAnalysisRunning,
   budgetReport,
+  videoBudget,
   projectPath,
   sceneMapZoom,
   assetRefreshToken = 0,
@@ -10632,6 +10640,7 @@ export function RoomsWorkspace({
                       generatedAt={budgetAnalysisGeneratedAt}
                       onAnalyze={onAnalyzeProjectBudget}
                       presentation={projectBudget}
+                      videoBudget={videoBudget}
                       running={budgetAnalysisRunning}
                     />
                   ) : null}

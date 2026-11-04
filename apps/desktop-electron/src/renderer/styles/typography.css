@@ -1540,3 +1540,12 @@
 .rooms-editor-layout .is-viewport-card .room-stage-card-player {
   font-size: var(--studio-font-size-2xs);
 }
+
+.runtime-frame-budget-metrics dt {
+  font-size: var(--studio-font-size-xs);
+}
+
+.runtime-frame-budget-metrics dd {
+  font-size: var(--studio-font-size-lg);
+  font-weight: var(--studio-font-weight-bold);
+}

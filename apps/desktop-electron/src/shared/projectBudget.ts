@@ -1,5 +1,6 @@
 import type { GBAProjectData } from "./projectFile.js";
 import { gbaSpriteOamEntriesForPixels } from "./gbaRendering.js";
+import type { AssetPackVideoBudgetReport } from "./assetPackVideoBudget.js";
 
 export type ProjectBudgetTone = "ok" | "warning" | "error";
 export type ProjectBudgetSource = "compiler" | "estimate";
@@ -94,6 +95,7 @@ export interface ProjectBudgetAnalysisResult {
   ok: boolean;
   generatedAt?: string;
   report?: AssetPackBudgetReport;
+  videoBudget?: AssetPackVideoBudgetReport;
   target?: string;
   error?: string;
 }

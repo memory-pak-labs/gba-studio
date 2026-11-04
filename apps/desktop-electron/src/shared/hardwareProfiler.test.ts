@@ -197,6 +197,17 @@ describe("hardware profiler", () => {
     expect(presentation.activeRoomName).toBe("caverna");
     expect(presentation.activeRoomType).toBe("platformer");
     expect(presentation.metrics.find((metric) => metric.id === "oam")?.used).toBe(2);
+    const withNative = deriveHardwareProfilerPresentation(project, {telemetry: {...telemetry,
+      hardware: {oam: 3, dmaBytes: 4096},
+      runtimeState: {...telemetry.runtimeState, frameBudget: {
+        frame:120,room:0,runtimeKind:1,ticksPerSecond:262144,dmaBytes:512,dmaTransfers:2,dmaQueuedBytes:4096,dmaDroppedTotal:0,
+        vblankWorkTicks:30,oamEnabled:12,sceneFrameCount:100,sceneDmaBytes:9900,
+        peaks:{dma:{value:8192,frame:4},vblank:{value:120,frame:3},oam:{value:20,frame:5}}
+      }}
+    }});
+    expect(withNative.physical.metrics.find(metric => metric.id === "oam")?.measured).toBe(12);
+    expect(withNative.physical.metrics.find(metric => metric.id === "dmaBytes")?.measured).toBe(512);
+    expect(withNative.physical.metrics.find(metric => metric.id === "vblankTicks")?.measured).toBe(30);
   });
 
   it("resolve o runtime luta e preserva as métricas físicas medidas da arena", () => {
@@ -274,6 +285,8 @@ describe("hardware profiler", () => {
       }
     });
 
+    expect(presentation.physical.metrics.find((metric) => metric.id === "vblankTicks")?.measured).toBeNull();
+    expect(presentation.physical.metrics.find((metric) => metric.id === "dmaBytes")?.measured).toBeNull();
     expect(presentation.activeRoomName).toBe("arena_arrancada");
     expect(presentation.activeRoomType).toBe("luta");
     expect(presentation.physical.metrics.find((metric) => metric.id === "bgTiles")).toMatchObject({

@@ -182,6 +182,22 @@ struct RuntimeEventTraceBlock {
 };
 static_assert(sizeof(RuntimeEventTraceBlock) == 80, "event trace RAM budget");
 volatile RuntimeEventTraceBlock& runtime_event_trace_block();
+// Optional extension after the existing 400 bytes. Base/profiler/event ABI stays fixed.
+struct RuntimeFrameBudgetTelemetryBlock {
+    uint32_t magic, schema, word_count, frame;
+    int32_t runtime_kind, room;
+    uint32_t ticks_per_second, valid_bits;
+    uint32_t dma_bytes, dma_transfers, dma_queued_bytes, dma_dropped_total;
+    uint32_t vblank_work_ticks, oam_enabled;
+    uint32_t peak_dma_bytes, peak_dma_frame, peak_vblank_work_ticks, peak_vblank_frame;
+    uint32_t peak_oam_enabled, peak_oam_frame, scene_frame_count, scene_dma_bytes;
+    uint32_t reserved[2];
+};
+static_assert(sizeof(RuntimeFrameBudgetTelemetryBlock) == 96, "frame budget telemetry layout");
+volatile RuntimeFrameBudgetTelemetryBlock& runtime_frame_budget_telemetry_block();
+void debug_publish_frame_budget(uint32_t frame, uint32_t valid_bits, uint32_t dma_bytes,
+    uint32_t dma_transfers, uint32_t queued_bytes, uint32_t dropped_total,
+    uint32_t vblank_work_ticks, uint32_t oam_enabled);
 void debug_set_event_trace_enabled(bool enabled);
 
 void debug_reset();

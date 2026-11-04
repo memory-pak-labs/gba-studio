@@ -361,3 +361,11 @@ describe("romPlayerWindow", () => {
     await expect(server.close()).resolves.toBeUndefined();
   });
 });
+
+it("preserves native frame peaks across IPC and rejects stale or forged measurements",()=>{
+ const budget={frame:30,runtimeKind:2,room:1,ticksPerSecond:262144,dmaBytes:512,dmaTransfers:2,dmaQueuedBytes:4096,dmaDroppedTotal:0,vblankWorkTicks:30,oamEnabled:12,sceneFrameCount:30,sceneDmaBytes:9900,peaks:{dma:{value:8192,frame:4},vblank:{value:120,frame:3},oam:{value:20,frame:5}}};
+ const runtimeState={schema:4,frame:30,currentRoom:1,runtimeKind:2,variables:Array(16).fill(0),flagBits:0,player:{x:0,y:0,direction:0},actorCount:0,firstActor:{x:0,y:0,direction:0,visible:false},lastMusic:-1,lastSfx:-1,collision:{currentFlags:0,currentSlope:0,seenEffectBits:0,seenSlopeBits:0,blockedDirectionBits:0},triggerEnterCount:0,triggerLeaveCount:0,roomChangeCount:0,timing:{cpuWorkTicks:1,vblankWaitTicks:2000,peakCpuWorkTicks:1,peakVblankWaitTicks:2000,missedFrameCount:0,renderSkipCount:0,frameSkipPolicy:0},input:{held:0,pressed:0,released:0},frameBudget:budget};
+ const stats={cpuPercent:1,droppedFrameRatio:0,droppedFrames:0,emulationFps:60,presentationFps:60,emulationMs:1,fps:60,frameMs:16.67,romBytes:1000,runtimeState};
+ expect(normalizeRomPlayerFrameStats(stats)?.runtimeState?.frameBudget).toEqual(budget);
+ for (const change of [{frame:29},{room:2},{runtimeKind:3},{oamEnabled:129},{dmaBytes:"512"},{peaks:{...budget.peaks,dma:{value:512,frame:31}}}]) expect(normalizeRomPlayerFrameStats({...stats,runtimeState:{...runtimeState,frameBudget:{...budget,...change}}})).toBeNull();
+});

@@ -57,6 +57,8 @@ elif name=='arm-none-eabi-objcopy':
  Path(args[-1]).write_bytes(Path(args[-2]).read_bytes())
 else:
  rom=Path(args[0]);rom.write_bytes(rom.read_bytes()+('|'.join(args[1:])).encode())
+ if os.environ.get('FAKE_ROM_BYTES'):
+  with rom.open('r+b') as stream:stream.truncate(int(os.environ['FAKE_ROM_BYTES']))
 '''
 # The fixture must use the same POSIX interpreter as the build harness, even
 # when the Windows runner also exposes a native Python/Pillow earlier in PATH.
@@ -133,6 +135,44 @@ class IncrementalBuildTests(unittest.TestCase):
         self.assertEqual(self.log.read_text(), "", "reports must not cause relinking")
         report=json.loads((self.project/"build/build_decisions.json").read_text())
         self.assertEqual(report["result"], "reused")
+
+    def test_linked_rom_report_is_measured_and_regenerated_on_warm_build(self):
+        (self.pack/"enginepack.json").write_text(json.dumps({"version": "test-engine"}))
+        self.run_build()
+        rom = self.project/"build/game.gba"
+        report_path = self.project/"build/rom_build_report.json"
+        report = json.loads(report_path.read_text())
+        self.assertEqual(report["romBytes"], rom.stat().st_size)
+        self.assertEqual(report["romSha256"], hashlib.sha256(rom.read_bytes()).hexdigest())
+        self.assertEqual(report["engineVersion"], "test-engine")
+        self.assertEqual(report["engineLibrarySha256"], hashlib.sha256(b"library").hexdigest())
+        self.assertFalse(report["blocked"])
+        report_path.write_text('{"romBytes":0}')
+        self.assertEqual(self.run_build(), [])
+        self.assertEqual(json.loads(report_path.read_text()), report)
+        self.assertEqual(self.log.read_text(), "", "Regenerating metadata must not relink")
+
+    def test_failed_build_does_not_keep_a_previous_linked_rom_report(self):
+        self.run_build()
+        report_path = self.project/"build/rom_build_report.json"
+        self.assertTrue(report_path.exists())
+        self.env["FAKE_FAIL_SOURCE"] = "main.cpp"
+        (self.project/"main.hpp").write_text("force-recompile")
+        self.run_build(success=False)
+        self.assertFalse(report_path.exists())
+
+    def test_linked_rom_limit_is_enforced_before_cache_promotion(self):
+        self.env["FAKE_ROM_BYTES"] = str(32 * 1024 * 1024)
+        self.run_build()
+        report_path = self.project/"build/rom_build_report.json"
+        self.assertFalse(json.loads(report_path.read_text())["blocked"])
+        self.env["FAKE_ROM_BYTES"] = str(32 * 1024 * 1024 + 1)
+        (self.project/"main.hpp").write_text("force-oversized-recompile")
+        self.run_build(success=False)
+        report = json.loads(report_path.read_text())
+        self.assertTrue(report["blocked"])
+        self.assertEqual(report["remaining"], -1)
+        self.assertFalse((self.project/"build/.gbsbuild-success.json").exists())
 
     def test_explicit_inputs_invalidate_on_binary_data_change(self):
         (self.project/"palette.bin").write_bytes(b"one")

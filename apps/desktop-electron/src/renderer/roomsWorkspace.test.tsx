@@ -2064,10 +2064,11 @@ describe("RoomsWorkspace React smoke", () => {
     expect(screen.getByText("6.87 ms de emulação")).toBeInTheDocument();
     const physical = screen.getByRole("region", { name: "Diagnóstico físico da cena" });
     expect(physical).toHaveTextContent("Estimativa do editor · plano do exportador · medição do runtime · limite seguro");
-    expect(physical).toHaveTextContent("2/10 medidos");
+    expect(physical).toHaveTextContent("1/10 medidos");
     expect(within(physical).getByRole("table", { name: "Matriz de recursos físicos" })).toBeInTheDocument();
     expect(within(physical).getByRole("row", { name: /Tiles BG/ })).toHaveTextContent("0 tiles");
-    expect(within(physical).getByRole("row", { name: /VBlank/ })).toHaveTextContent("320 ticks");
+    // A legacy VBlank wait is not a measurement of publication work.
+    expect(within(within(physical).getByRole("row", { name: /VBlank/ })).getAllByRole("cell")[2]).toHaveTextContent("—");
     expect(within(physical).getByRole("row", { name: /CPU/ })).toHaveTextContent("1600 ticks");
     expect(screen.getByRole("region", { name: "Estado nativo da ROM" })).toHaveTextContent("Sala 1");
     expect(screen.getByRole("region", { name: "Estado nativo da ROM" })).toHaveTextContent("VAR0 3 · FLAGS 0x00000003");
