@@ -29,7 +29,16 @@ code += source[cache_start:cache_end].replace('__attribute__((section(".ewram_bs
 code += '\n' + (ROOT / 'engine/src/frame_video_stats.h').read_text().replace('#pragma once', '')
 code += r'''
 GbsOamOccupancy staged_oam = {{0xffffffffu,0xffffffffu,0xffffffffu,0xffffffffu}};
-uint16_t shadow_oam[512];
+uint16_t shadow_oam[512], test_oam[512], dialogue_ordered_oam[512];
+#define MEM_OAM test_oam
+uint8_t shadow_oam_dirty_first, shadow_oam_dirty_last, hblank_dma_active_mask;
+uint32_t published_oam_enabled;
+int dialogue_oam_front, dma_copies;
+void gbs_portrait_tab_order_oam(const uint16_t* from,uint16_t* to) { memcpy(to,from,1024); }
+void gbs_hw_dma_copy(int channel,const void* from,volatile void* to,uint32_t units,int word) {
+    if(hblank_dma_active_mask & (1u<<channel)) return;
+    ++dma_copies; memcpy((void*)to,from,units*(word?4:2));
+}
 uint16_t hud_pixel_text_glyphs[124];
 int oam_overflow_count;
 unsigned hud_pixel_text_obj_count;
@@ -53,12 +62,28 @@ code += '\n'.join(function(name) for name in (
     'invalidate_hud_pixel_text_tiles','gbs_hw_set_sprite','gbs_hw_set_sprite_color_depth',
     'gbs_hw_set_sprite_affine','gbs_hw_clear_hud_icon_slots',
     'gbs_hw_hud_icon_shape','gbs_hw_hud_icon_size','gbs_hw_draw_hud_icon'))
+code += '\n'+function('commit_shadow_oam')
+code += '\n'+function('commit_shadow_oam_full')
 code += '\n'+function('gbs_hw_allocate_hud_compact_slot')
 code += '\n'+function('gbs_hw_begin_hud_layout')
 code += '\n'+function('gbs_hw_draw_hud_layout_component')
 code += '\n'+function('gbs_hw_end_hud_layout')
 code += r'''
 int main() {
+    gbs_hw_hide_all_sprites();
+    staged_oam.words[0]=8; shadow_oam[3*4]=0;
+    for(int full=0;full<2;++full) {
+        published_oam_enabled=0; dma_copies=0;
+        shadow_oam_dirty_first=0; shadow_oam_dirty_last=128; hblank_dma_active_mask=8;
+        if(full) commit_shadow_oam_full(); else commit_shadow_oam();
+        assert(published_oam_enabled==0 && dma_copies==0);
+        assert(shadow_oam_dirty_first==0 && shadow_oam_dirty_last==128);
+        hblank_dma_active_mask=0;
+        if(full) commit_shadow_oam_full(); else commit_shadow_oam();
+        assert(published_oam_enabled==1 && dma_copies==1);
+        assert(shadow_oam_dirty_first==128 && shadow_oam_dirty_last==0);
+    }
+
     struct gbs_hw_metasprite_part a = {0}, b = {0};
     a.width=a.height=b.width=b.height=8; a.tile_index=11; b.tile_index=22;
     struct gbs_hw_metasprite first={&a,1}, second={&b,1};

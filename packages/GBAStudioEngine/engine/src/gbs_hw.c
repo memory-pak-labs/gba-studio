@@ -327,6 +327,7 @@ static void gbs_hw_dma_wait(int channel) {
 }
 
 static void commit_shadow_oam(void) {
+    if (hblank_dma_active_mask & (1u << 3)) return;
     if (shadow_oam_dirty_last <= shadow_oam_dirty_first) {
         return;
     }
@@ -354,6 +355,7 @@ void gbs_hw_set_dialogue_oam_front(int enabled) {
 }
 
 static void commit_shadow_oam_full(void) {
+    if (hblank_dma_active_mask & (1u << 3)) return;
     published_oam_enabled = gbs_oam_occupancy_count(&staged_oam);
     gbs_hw_dma_copy(3, shadow_oam, MEM_OAM, 128u * 4u, 0);
     shadow_oam_dirty_first = 128;
