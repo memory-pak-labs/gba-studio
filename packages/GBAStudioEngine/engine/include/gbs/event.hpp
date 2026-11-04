@@ -443,9 +443,6 @@ inline bool set_event_scale(EventScale& scale, int x, int y, int frames, int max
 }
 
 struct EventState {
-    EventScale actor_scales[max_event_actor_state_slots + 1];
-    EventScale background_scales[2];
-    int transform_room = -1;
     bool supports_temporal_actor_motion;
     uint32_t actor_motion_serial;
     EventCommand luta_commands[max_event_luta_commands];
@@ -646,6 +643,10 @@ struct EventState {
     const EventScript* project_scripts;
     size_t project_script_count;
     bool script_call_overflow;
+    // Append transient presentation state; keep the existing field offsets stable.
+    EventScale actor_scales[max_event_actor_state_slots + 1];
+    EventScale background_scales[2];
+    int transform_room = -1;
 };
 
 // Requested includes the cover phase; pending means ready for adapter handoff.

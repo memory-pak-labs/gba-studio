@@ -1,4 +1,5 @@
 #include <cassert>
+#include <cstddef>
 #include <type_traits>
 #include "gbs/assets.hpp"
 #include "gbs/event.hpp"
@@ -11,6 +12,7 @@
 #include "gbs/rumble.hpp"
 #include "gbs/save.hpp"
 
+static_assert(offsetof(gbs::EventState, variables) == (sizeof(void*) == 8 ? 208 : 192), "new visual state must preserve existing event field offsets");
 static_assert(gbs::event_variable_count == 64, "Event runtime must expose 64 variables");
 static_assert(std::extent<decltype(gbs::EventState::variables)>::value == gbs::event_variable_count, "EventState variable storage must follow the shared capacity");
 static_assert(gbs::universal_save_variable_count == gbs::event_variable_count, "Universal saves must preserve every event variable");
