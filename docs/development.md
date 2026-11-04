@@ -911,6 +911,26 @@ as instâncias afetadas. Edições de instância registram `prefabOverrides`, qu
 prevalecem durante sincronização. Plataforma ativada move o ator por evento;
 transporte automático do jogador não é uma capacidade adicionada por esse preset.
 
+Em Testes e diagnóstico, a gravação de entradas captura o estado completo do
+Player em uma fronteira de frame: CPU, RAM (incluindo variáveis, flags,
+inventário e geradores aleatórios) e SRAM. Pode ser armada antes de abrir o
+Play ou iniciada durante uma partida. A captura e as entradas ficam no
+`.gba-project`; não são um formato de save do cartucho. Fechar o Player envia
+o último lote e incorpora a rota ao projeto; salve o projeto para persistir
+essa edição. Abrir ou fechar um projeto encerra a gravação antes da confirmação
+de descarte.
+
+A reprodução restaura essa captura antes da primeira entrada e exige a mesma
+ROM e o mesmo core, identificados por SHA-256. A SRAM do replay fica isolada;
+reproduzir uma rota não lê nem sobrescreve o save normal do Player.
+Uma cena testada com posição ou
+direção especial conserva essa configuração de build, mesmo que a gravação
+comece depois de uma transição. Rotas antigas que continham apenas teclas e
+metadados de seed permanecem visíveis e precisam ser gravadas novamente; esses
+metadados não reconstituem uma partida. Lotes ausentes interrompem a gravação
+com aviso e preservam o prefixo recebido. A prova de gameplay não certifica
+áudio bit a bit, outra revisão do jogo ou execução no GBA físico.
+
 Em Testes e diagnóstico, habilite a origem dos eventos antes de compilar. O build
 escreve `event_source_map.json` com endereços nativos, IDs dos passos e hash da
 ROM. Ao copiar a ROM para a raiz do projeto, preserva o mapa em

@@ -46,14 +46,17 @@ interface RomBuildOutcome {
 }
 
 interface UseEngineActionsOptions {
+  recordingID?: string;
+  recordInput?: boolean;
   contractDiagnosticsOK: boolean | null;
   projectHealthExportReady?: boolean | null;
+  hasScenes?: boolean;
   publishStatus?(message: string, tone?: StatusTone): void;
   session: ProjectSession | null;
   setStatus: (status: string) => void;
 }
 
-export function useEngineActions({ contractDiagnosticsOK, projectHealthExportReady = null, publishStatus, session, setStatus }: UseEngineActionsOptions) {
+export function useEngineActions({ contractDiagnosticsOK, projectHealthExportReady = null, hasScenes, publishStatus, session, setStatus, recordInput = false, recordingID }: UseEngineActionsOptions) {
   const sessionRef = useRef<ProjectSession | null>(session);
   const [engineStatus, setEngineStatus] = useState<EnginePackStatus | null>(null);
   const [doctorResult, setDoctorResult] = useState<EnginePackDoctorResult | null>(null);
@@ -93,6 +96,7 @@ export function useEngineActions({ contractDiagnosticsOK, projectHealthExportRea
   const romPipelineState = {
     hasSession: Boolean(session),
     hasProjectPath: Boolean(session?.path),
+    hasScenes,
     contractDiagnosticsOK,
     projectHealthExportReady: budgetExportReady,
     hasEngineAssetc,
@@ -429,6 +433,12 @@ export function useEngineActions({ contractDiagnosticsOK, projectHealthExportRea
         title: currentSession?.project.summary.name ?? "GBA Studio",
         saveScope: target?.roomID ? `id:${target.roomID}` : target?.roomName ? `name:${target.roomName}` : undefined,
         replay: target?.replay,
+        recordInput: recordInput && !target?.replay,
+        recordingID: recordInput && !target?.replay ? recordingID : undefined,
+        recordingLaunch: developmentStartScene ? {
+          roomID: target?.roomID, roomName: target?.roomName,
+          startX: target?.startX, startY: target?.startY, startDirection: target?.startDirection
+        } : undefined,
         keyboardBindings: deriveGBAKeyboardBindings(currentSession.project.data)
       });
       if (!launch.ok) {

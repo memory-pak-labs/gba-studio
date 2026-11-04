@@ -14,7 +14,7 @@ import {
   duplicateSaveLabSnapshot,
   type SaveLabSnapshot
 } from "../shared/optionalProductionTools";
-import { isInputReplay } from "../shared/inputReplay";
+import { isInputReplay, inputReplayPlaybackIssue } from "../shared/inputReplay";
 
 export type AdvancedToolEditorID =
   | "autotile"
@@ -209,15 +209,16 @@ function ReplayEditor({ projectData, onRunReplay }: AdvancedToolEditorsProps): R
   return (
     <section className="advanced-editor-card">
       <h3>{ui("Replays de teste")}</h3>
-      <div className="advanced-resource-list">
+      <div className="advanced-resource-list replay-resource-list">
         {replays.map((replay) => (
           <article key={resourceID(replay)}>
             <strong>{resourceID(replay)}</strong>
             <span>{number(replay.frameCount)} {ui(" frames")}</span>
-            <span>{ui("seed ")}{number(replay.seed)}</span>
-            <span>{ui("slot ")}{replay.initialSaveSlot === null ? ui("novo") : number(replay.initialSaveSlot)}</span>
+            <span>{ui(replay.initialState ? "Estado inicial capturado" : "Sem estado inicial completo")}</span>
+            {isInputReplay(replay) && inputReplayPlaybackIssue(replay) ? <small>{ui(inputReplayPlaybackIssue(replay)!)}</small> : null}
             {onRunReplay && isInputReplay(replay) ? (
               <button
+                disabled={Boolean(inputReplayPlaybackIssue(replay))}
                 onClick={() => onRunReplay(replay)}
                 type="button"
               >

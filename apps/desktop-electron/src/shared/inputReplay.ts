@@ -3,6 +3,11 @@ export interface InputReplayFrame {
   pressed: string[];
 }
 
+export interface InputReplayFrameBatch {
+  firstFrame: number;
+  masks: number[];
+}
+
 export interface InputReplayCheckpoint {
   room?: string;
   position?: { x: number; y: number };
@@ -17,16 +22,47 @@ export interface InputReplayRun {
   frames: number;
 }
 
+export interface InputReplayInitialState {
+  format: "mgba-state-v1";
+  romSha256: string;
+  coreSha256: string;
+  stateBase64: string;
+  savedataBase64: string;
+  launch?: { roomID?: string; roomName?: string; startX?: number; startY?: number; startDirection?: string };
+}
+
 export interface InputReplay {
-  schema: 1;
+  schema: 1 | 2;
   id: string;
   seed: number;
   initialSaveSlot: number | null;
   initialVariables: Record<string, boolean | number | string>;
   initialInventory: Record<string, number>;
+  initialState?: InputReplayInitialState;
   runs: InputReplayRun[];
   checkpoints: Record<number, InputReplayCheckpoint>;
   frameCount: number;
+}
+
+export function isInputReplayInitialState(value: unknown): value is InputReplayInitialState {
+  if (!isObject(value) || value.format !== "mgba-state-v1") return false;
+  const sha = (field: unknown) => typeof field === "string" && /^[a-f0-9]{64}$/.test(field);
+  const base64 = (field: unknown, max: number) => typeof field === "string" && field.length <= max
+    && field.length % 4 === 0 && /^[A-Za-z0-9+/]*={0,2}$/.test(field);
+  const launch = value.launch;
+  const validLaunch = launch === undefined || isObject(launch)
+    && ["roomID", "roomName", "startDirection"].every(key => launch[key] === undefined || typeof launch[key] === "string" && String(launch[key]).length <= 512)
+    && ["startX", "startY"].every(key => launch[key] === undefined || isNumber(launch[key]));
+  return sha(value.romSha256) && sha(value.coreSha256)
+    && base64(value.stateBase64, 2_800_000) && Boolean(value.stateBase64)
+    && base64(value.savedataBase64, 1_400_000)
+    && validLaunch;
+}
+
+export function inputReplayPlaybackIssue(replay: InputReplay): string | null {
+  if (replay.schema !== 2 || !isInputReplayInitialState(replay.initialState)) return "Este replay não contém o estado inicial completo. Grave novamente no Player.";
+  if (replay.frameCount <= 0 || replay.runs.reduce((total, run) => total + run.frames, 0) !== replay.frameCount) return "Este replay não contém uma sequência completa de entradas.";
+  return null;
 }
 
 function isObject(value: unknown): value is Record<string, unknown> {
@@ -51,7 +87,8 @@ function frameFromUnknown(value: unknown): InputReplayFrame {
 
 export function isInputReplay(value: unknown): value is InputReplay {
   if (!isObject(value)) return false;
-  if (value.schema !== 1 || typeof value.id !== "string") return false;
+  if ((value.schema !== 1 && value.schema !== 2) || typeof value.id !== "string") return false;
+  if (value.schema === 2 && !isInputReplayInitialState(value.initialState)) return false;
   if (!Number.isInteger(Number(value.seed)) || Number(value.seed) < 0) return false;
   const frameCount = value.frameCount;
   if (!isNumber(frameCount) || frameCount < 0) return false;
@@ -78,7 +115,8 @@ function normalizeReplayRuns(value: unknown): Array<{ frames: number; frame: Inp
 
 export function normalizeInputReplay(value: unknown): InputReplay | null {
   if (!isObject(value)) return null;
-  if (value.schema !== 1 || typeof value.id !== "string") return null;
+  if ((value.schema !== 1 && value.schema !== 2) || typeof value.id !== "string") return null;
+  if (value.schema === 2 && !isInputReplayInitialState(value.initialState)) return null;
   const seed = Number(value.seed);
   if (!Number.isFinite(seed) || seed < 0) return null;
   const runFrames = normalizeReplayRuns(value.runs);
@@ -99,7 +137,7 @@ export function normalizeInputReplay(value: unknown): InputReplay | null {
   }
 
   return {
-    schema: 1,
+    schema: value.schema,
     id: String(value.id),
     seed: Math.max(0, Math.floor(seed)),
     initialSaveSlot: value.initialSaveSlot === null
@@ -109,6 +147,7 @@ export function normalizeInputReplay(value: unknown): InputReplay | null {
         : null,
     initialVariables: isObject(value.initialVariables) ? { ...value.initialVariables as Record<string, boolean | number | string> } : {},
     initialInventory: isObject(value.initialInventory) ? { ...value.initialInventory as Record<string, number> } : {},
+    ...(isInputReplayInitialState(value.initialState) ? { initialState: { ...value.initialState } } : {}),
     runs: runFrames,
     checkpoints,
     frameCount: Math.max(0, Math.floor(Number(value.frameCount) || 0))
@@ -181,6 +220,31 @@ export function appendInputReplayFrame(
   return { ...replay, runs, checkpoints, frameCount: replay.frameCount + 1 };
 }
 
+export function appendInputReplayMasks(
+  replay: InputReplay,
+  masks: readonly number[],
+  checkpoint?: InputReplayCheckpoint
+): InputReplay {
+  if (masks.length === 0) return replay;
+  const runs = structuredClone(replay.runs);
+  let previousMask = gbaInputBits.reduce((mask, [bit, name]) => (
+    replay.runs.at(-1)?.frame.held.includes(name) ? mask | bit : mask
+  ), 0);
+  for (const mask of masks) {
+    const frame = inputFrameFromBitmasks(mask, mask & ~previousMask);
+    const previous = runs.at(-1);
+    if (previous && framesEqual(previous.frame, frame)) previous.frames += 1;
+    else runs.push({ frame, frames: 1 });
+    previousMask = mask;
+  }
+  const checkpoints = { ...replay.checkpoints };
+  if (checkpoint) {
+    if (replay.frameCount === 0 && checkpoint.room) checkpoints[0] = { room: checkpoint.room };
+    checkpoints[replay.frameCount + masks.length - 1] = structuredClone(checkpoint);
+  }
+  return { ...replay, runs, checkpoints, frameCount: replay.frameCount + masks.length };
+}
+
 export function inputReplayFrameAt(replay: InputReplay, frameIndex: number): InputReplayFrame | null {
   if (!Number.isInteger(frameIndex) || frameIndex < 0 || frameIndex >= replay.frameCount) return null;
   let offset = 0;
@@ -192,6 +256,7 @@ export function inputReplayFrameAt(replay: InputReplay, frameIndex: number): Inp
 }
 
 export function inputReplayStartRoom(replay: InputReplay): string | undefined {
+  if (replay.initialState) return replay.initialState.launch?.roomName?.trim() || undefined;
   return Object.entries(replay.checkpoints)
     .map(([frameIndex, checkpoint]) => ({
       checkpoint,

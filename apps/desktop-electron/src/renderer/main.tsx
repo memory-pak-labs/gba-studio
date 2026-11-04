@@ -1,5 +1,4 @@
 import { uiText as ui, useStudioUiText } from "./studioUiText";
-import { completeProjectSave } from "./projectSaveCompletion";
 import { AppUpdateNotice } from "./AppUpdateNotice";
 import { appUpdateText } from "./appUpdateText";
 import { restartForUpdate } from "./updateRestartFlow";
@@ -135,9 +134,7 @@ import {
 } from "../shared/projectPrefabs";
 import {
   pushProjectHistory,
-  redoProjectHistory,
-  updateProjectHistoryPresent,
-  undoProjectHistory
+  updateProjectHistoryPresent
 } from "../shared/projectHistory";
 import { canDiscardUnsavedChangesAsync } from "../shared/unsavedChanges";
 import {
@@ -281,7 +278,7 @@ import {
 import { PluginCatalogModal } from "./PluginCatalogModal";
 import { saveNewProjectSession } from "./newProjectCreationFlow";
 import { saveExistingProjectSession } from "./projectSaveFlow";
-import { selectProjectSessionRoom, type ProjectSession } from "./projectSession";
+import { markProjectSessionSaved, reconcileProjectSessionSaved, restoreProjectSessionHistory, selectProjectSessionRoom, type ProjectSession } from "./projectSession";
 import { copyName, uniqueDefaultRoomName, droppedFiles, statusText } from "./rendererHelpers";
 import { RoomsWorkspace } from "./roomsWorkspace";
 import { SettingsWorkspace } from "./settingsWorkspace";
@@ -290,6 +287,7 @@ import { TestingDiagnosticsDrawer } from "./testingDiagnosticsDrawer";
 import { StudioThemeToggle } from "./StudioThemeToggle";
 import { WelcomeScreen } from "./WelcomeScreen";
 import { useEngineActions } from "./useEngineActions";
+import { useInputRecording } from "./useInputRecording";
 import { resetExportSettingsPageInProject } from "../shared/exportSettingsLayout";
 import { useWorkspacePresentations } from "./useWorkspacePresentations";
 import { workspaceIcons, workspaceNames, type WorkspaceName } from "./workspaceNavigation";
@@ -302,10 +300,8 @@ import {
   type AdvancedToolID
 } from "../shared/advancedTools";
 import {
-  appendInputReplayFrame,
   createInputReplay,
-  inputFrameFromBitmasks,
-  inputReplayStartRoom,
+  inputReplayPlaybackIssue,
   type InputReplay
 } from "../shared/inputReplay";
 import {
@@ -356,6 +352,7 @@ function App(): React.ReactElement {
   dialogueSessionRef.current = session;
   const preparingUpdateRef = useRef(false);
   const projectHistoryGroupRef = useRef<{ changed: boolean; id: string } | null>(null);
+  const finishInputRecordingRef = useRef<() => Promise<void>>(async () => {});
   const [externalAssetRevision, setExternalAssetRevision] = useState(0);
   const [sceneMapView, setSceneMapView] = useState<{ path?: string; zoom: number } | null>(null);
   const [pluginRegistry, setPluginRegistry] = useState<ProjectPluginRegistry | null>(null);
@@ -367,7 +364,8 @@ function App(): React.ReactElement {
   const workspaceListRef = useRef<HTMLElement | null>(null);
 
   const confirmDiscard = useCallback(async (): Promise<boolean> => {
-    return canDiscardUnsavedChangesAsync(session, (message) =>
+    await finishInputRecordingRef.current();
+    return canDiscardUnsavedChangesAsync(dialogueSessionRef.current, (message) =>
       confirm(message, {
         title: "Alteracoes nao salvas",
         confirmLabel: "Continuar sem salvar",
@@ -421,9 +419,37 @@ function App(): React.ReactElement {
   const [hardwareProfilerHistory, setHardwareProfilerHistory] = useState<HardwareProfilerSession[]>([]);
   const lastProfiledFrame = useRef(-1);
   const archivedProfilerWindow = useRef<number | null>(null);
-  const [inputRecording, setInputRecording] = useState(false);
-  const [inputReplaySession, setInputReplaySession] = useState<InputReplay | null>(null);
-  const lastRecordedInputFrame = useRef(-1);
+  const {
+    recording: inputRecording,
+    replay: inputReplaySession,
+    startRecording,
+    stopRecording,
+    consumeTelemetry
+  } = useInputRecording({
+    onComplete(replay, reason) {
+      const current = dialogueSessionRef.current;
+      if (!current) return;
+      if (reason === "unavailable") { notifyError(ui("Não foi possível capturar o estado inicial do Player. Grave novamente.")); return; }
+      if (replay.frameCount === 0) { setStatus(ui("Gravação encerrada sem entradas. Nenhum replay foi criado.")); return; }
+      const history = pushProjectHistory({ present: current.project.data, undoStack: current.undoStack, redoStack: current.redoStack }, saveInputReplayInProject(current.project.data, replay));
+      const nextSession = { ...current, dirty: true, undoStack: history.undoStack, redoStack: history.redoStack,
+        project: { data: history.present, summary: summarizeGBAProject(history.present) } };
+      projectHistoryGroupRef.current = null;
+      dialogueSessionRef.current = nextSession;
+      setSession(nextSession);
+      if (reason === "gap") notifyError(ui("Gravação interrompida: faltam entradas do Player. Replay parcial salvo com {0} frames.", { 0: replay.frameCount }));
+      else notifySuccess(ui("Replay salvo com {0} frames.", { 0: replay.frameCount }));
+    },
+    getCheckpoint(telemetry) {
+      const data = dialogueSessionRef.current?.project.data;
+      if (!data || !telemetry.stats) return undefined;
+      const runtime = telemetry.stats.runtimeState;
+      return {
+        room: deriveHardwareProfilerPresentation(data, { telemetry: telemetry.stats }).activeRoomName,
+        ...(runtime ? { variables: Object.fromEntries(runtime.variables.map((value, index) => [`v${index}`, value])) } : {})
+      };
+    }
+  });
   const [focusMode, setFocusMode] = useState(false);
   const [navigationTrail, setNavigationTrail] = useState<{
     currentLabel: string;
@@ -497,13 +523,14 @@ function App(): React.ReactElement {
 
   useEffect(() => {
     return window.gbaStudio.onRomPlayerTelemetry((telemetry) => {
+      consumeTelemetry(telemetry);
       setRomPlayerTelemetry((current) => {
         if (telemetry.state === "running" && telemetry.stats) return telemetry;
         if (telemetry.state === "closed" && current?.windowID === telemetry.windowID) return telemetry;
         return current;
       });
     });
-  }, []);
+  }, [consumeTelemetry]);
 
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent): void => {
@@ -611,6 +638,7 @@ function App(): React.ReactElement {
     contractDiagnostics,
     dialoguesPresentation,
     filesPresentation,
+    projectHasScenes,
     projectData,
     roomsPresentation,
     settingsPresentation,
@@ -637,7 +665,7 @@ function App(): React.ReactElement {
     const sceneType = (activeScene as Record<string, unknown>).sceneType;
     return typeof sceneType === "string" ? sceneType : null;
   }, [projectData, roomsPresentation]);
-  const problemInput = useMemo(() => ({ data: projectData, path: presentationSession?.path }), [projectData, presentationSession?.path]);
+  const problemInput = useMemo(() => ({ data: projectData, path: presentationSession?.path, identity: presentationSession?.identity }), [projectData, presentationSession?.path, presentationSession?.identity]);
   const deferredProblemInput = useDeferredValue(problemInput);
   const deferredProblemData = deferredProblemInput.data;
   const projectHealthExportReady = useMemo(
@@ -696,8 +724,11 @@ function App(): React.ReactElement {
     runBuildRom,
     runDoctor,
   } = useEngineActions({
+    recordInput: inputRecording,
+    recordingID: inputRecording ? inputReplaySession?.id : undefined,
     contractDiagnosticsOK: contractDiagnostics?.ok ?? null,
     projectHealthExportReady,
+    hasScenes: projectHasScenes,
     publishStatus,
     session,
     setStatus
@@ -713,10 +744,10 @@ function App(): React.ReactElement {
     [projectHealthReport]
   );
   const { visibleProblems: projectProblems, ignoredCount, ignoreWarning, ignoreAllWarnings, restoreWarnings } =
-    useProjectProblemDismissals(session?.path === deferredProblemInput.path && session?.project.data === deferredProblemData ? allProjectProblems : [], session?.path, {
+    useProjectProblemDismissals(session?.path === deferredProblemInput.path && session?.identity === deferredProblemInput.identity ? allProjectProblems : [], session?.path, {
       data: session?.project.data,
       onChange(keys) {
-        if (session && session.path === deferredProblemInput.path && session.project.data === deferredProblemData) updateProjectData(updateProjectWarningDismissals(session.project.data, keys));
+        if (session && session.path === deferredProblemInput.path && session.identity === deferredProblemInput.identity) updateProjectData(updateProjectWarningDismissals(session.project.data, keys));
       }
     });
   const hardwareProfiler = useMemo(
@@ -762,32 +793,17 @@ function App(): React.ReactElement {
     setHardwareProfilerSession(createHardwareProfilerSession(`play-${Date.now()}`));
     lastProfiledFrame.current = -1;
   }, [hardwareProfilerSession, romPlayerTelemetry]);
-  useEffect(() => {
-    const runtime = romPlayerTelemetry?.stats?.runtimeState;
-    if (!inputRecording || !runtime || runtime.frame === lastRecordedInputFrame.current) return;
-    lastRecordedInputFrame.current = runtime.frame;
-    setInputReplaySession((current) => current
-      ? appendInputReplayFrame(
-        current,
-        inputFrameFromBitmasks(runtime.input.held, runtime.input.pressed),
-        {
-          room: String(runtime.currentRoom),
-          variables: Object.fromEntries(runtime.variables.map((value, index) => [`v${index}`, value]))
-        }
-      )
-      : current);
-  }, [inputRecording, romPlayerTelemetry]);
-
   const projectActionItems = useMemo(() => deriveProjectActionMenuItems({
     hasSession: session !== null,
     hasProjectPath: Boolean(session?.path),
+    hasScenes: projectHasScenes,
     hasEngineAssetc,
     hasEngineBuild,
     contractDiagnosticsOK: contractDiagnostics?.ok ?? null,
     projectHealthExportReady,
     buildRunning,
     exportRunning
-  }), [buildRunning, contractDiagnostics?.ok, exportRunning, hasEngineAssetc, hasEngineBuild, projectHealthExportReady, session]);
+  }), [buildRunning, contractDiagnostics?.ok, exportRunning, hasEngineAssetc, hasEngineBuild, projectHealthExportReady, projectHasScenes, session]);
   const localizedProjectActionItems = useMemo(
     () => projectActionItems.map((item) => ({ ...item, label: t(projectActionLabelKey(item.id)) })),
     [projectActionItems, t]
@@ -801,7 +817,8 @@ function App(): React.ReactElement {
       const openedProject = result.project;
       startTransition(() => {
         projectHistoryGroupRef.current = null;
-        setSession({ path: result.path, project: openedProject, dirty: false, redoStack: [], undoStack: [] });
+        const openedSession: ProjectSession = { identity: {}, path: result.path, project: openedProject, dirty: false, redoStack: [], undoStack: [] };
+        setSession(result.path ? markProjectSessionSaved(openedSession, result.path, openedProject.data) : openedSession);
         setSceneActionHistory([]);
         setPendingFocusInspectorTab(null);
         setSettingsPathValidation(null);
@@ -877,16 +894,18 @@ function App(): React.ReactElement {
 
   async function saveProject(): Promise<void> {
     if (!session) return;
-    const { result } = await saveExistingProjectSession(session, window.gbaStudio.saveProject);
+    const savedData = structuredClone(session.project.data);
+    const { result, session: savedSession } = await saveExistingProjectSession(session, window.gbaStudio.saveProject);
     publishFeedback(saveProjectFeedback(result));
-    setSession((current) => completeProjectSave(current, session, result));
+    if (savedSession !== session && result.path) setSession(current => reconcileProjectSessionSaved(current, session, result.path!, savedData));
   }
 
   async function saveProjectAs(): Promise<void> {
     if (!session) return;
-    const { result } = await saveExistingProjectSession(session, window.gbaStudio.saveProject, true);
+    const savedData = structuredClone(session.project.data);
+    const { result, session: savedSession } = await saveExistingProjectSession(session, window.gbaStudio.saveProject, true);
     publishFeedback(saveProjectFeedback(result));
-    setSession((current) => completeProjectSave(current, session, result));
+    if (savedSession !== session && result.path) setSession(current => reconcileProjectSessionSaved(current, session, result.path!, savedData));
   }
 
   async function restartAndUpdate() {
@@ -904,7 +923,7 @@ function App(): React.ReactElement {
         }),
         save: (request) => window.gbaStudio.saveProject(request),
         saved: (snapshot, path) => {
-          const next = { ...snapshot, path, dirty: false };
+          const next = markProjectSessionSaved(snapshot, path, snapshot.project.data);
           dialogueSessionRef.current = next;
           setSession(next);
         },
@@ -1039,7 +1058,7 @@ function App(): React.ReactElement {
 
   function commitProjectData(
     nextData: ParsedGBAProject["data"],
-    options?: { dirty?: boolean; historyGroupID?: string; path?: string }
+    options?: { dirty?: boolean; externalAssetMutation?: boolean; historyGroupID?: string; path?: string }
   ): void {
     if (!session) return;
     const activeHistoryGroup = options?.historyGroupID
@@ -1063,6 +1082,7 @@ function App(): React.ReactElement {
     setSession({
       ...session,
       dirty: options?.dirty ?? true,
+      externalRevision: (session.externalRevision ?? 0) + (options?.externalAssetMutation ? 1 : 0),
       path: resolveProjectSessionPathAfterDataCommit(session.path, options?.path),
       project: {
         data: history.present,
@@ -1105,77 +1125,60 @@ function App(): React.ReactElement {
     setStatus(ui("Ferramenta adicionada ao projeto."));
   }
 
-  function toggleInputRecording(): void {
+  async function finishInputRecording(): Promise<void> {
+    if (!inputRecording) return;
+    let incomplete = false;
+    if (romPlayerTelemetry?.state === "running") {
+      const result = await window.gbaStudio.controlRomPlayerRecording({ windowID: romPlayerTelemetry.windowID, action: "flush" });
+      if (result.telemetry) consumeTelemetry(result.telemetry);
+      incomplete = !result.ok;
+    }
+    stopRecording(incomplete ? "gap" : "manual");
+  }
+  finishInputRecordingRef.current = finishInputRecording;
+
+  async function toggleInputRecording(): Promise<void> {
     if (inputRecording) {
-      if (session && inputReplaySession) {
-        commitProjectData(saveInputReplayInProject(session.project.data, inputReplaySession));
-        notifySuccess(ui("Replay salvo com {0} frames.", { 0: inputReplaySession.frameCount }));
-      }
-      setInputRecording(false);
+      await finishInputRecording();
       return;
     }
     if (!session) return;
     const nextData = enableAdvancedToolInProject(session.project.data, "inputReplay");
     if (nextData !== session.project.data) commitProjectData(nextData);
-    const runtime = romPlayerTelemetry?.stats?.runtimeState;
-    setInputReplaySession(createInputReplay({
-      id: `replay-${Date.now()}`,
-      seed: Date.now() >>> 0,
-      initialVariables: Object.fromEntries((runtime?.variables ?? []).map((value, index) => [`v${index}`, value]))
-    }));
-    lastRecordedInputFrame.current = -1;
-    setInputRecording(true);
+    const replay = createInputReplay({ id: `replay-${crypto.randomUUID()}`, seed: 0 });
+    startRecording(replay, romPlayerTelemetry, true);
     setStatus(ui("Gravação de inputs iniciada."));
+    if (romPlayerTelemetry?.state === "running") {
+      const result = await window.gbaStudio.controlRomPlayerRecording({ windowID: romPlayerTelemetry.windowID, action: "begin", recordingID: replay.id });
+      if (result.telemetry) consumeTelemetry(result.telemetry);
+      if (!result.ok) stopRecording();
+    }
   }
 
   function runReplay(replay: InputReplay): void {
+    const issue = inputReplayPlaybackIssue(replay);
+    if (issue) { notifyError(ui(issue)); return; }
     void playProject({
       replay,
-      roomName: inputReplayStartRoom(replay)
+      ...replay.initialState?.launch
     });
   }
 
   function undoProjectEdit(): void {
     if (!session) return;
     projectHistoryGroupRef.current = null;
-    const history = undoProjectHistory({
-      present: session.project.data,
-      redoStack: session.redoStack,
-      undoStack: session.undoStack
-    });
-    if (history.present === session.project.data) return;
-    setSession({
-      ...session,
-      dirty: true,
-      project: {
-        data: history.present,
-        summary: summarizeGBAProject(history.present)
-      },
-      redoStack: history.redoStack,
-      undoStack: history.undoStack
-    });
+    const restored = restoreProjectSessionHistory(session, "undo");
+    if (restored === session) return;
+    setSession(restored);
     setStatus(ui("Alteracao desfeita."));
   }
 
   function redoProjectEdit(): void {
     if (!session) return;
     projectHistoryGroupRef.current = null;
-    const history = redoProjectHistory({
-      present: session.project.data,
-      redoStack: session.redoStack,
-      undoStack: session.undoStack
-    });
-    if (history.present === session.project.data) return;
-    setSession({
-      ...session,
-      dirty: true,
-      project: {
-        data: history.present,
-        summary: summarizeGBAProject(history.present)
-      },
-      redoStack: history.redoStack,
-      undoStack: history.undoStack
-    });
+    const restored = restoreProjectSessionHistory(session, "redo");
+    if (restored === session) return;
+    setSession(restored);
     setStatus(ui("Alteracao refeita."));
   }
 
@@ -1190,7 +1193,7 @@ function App(): React.ReactElement {
       return;
     }
 
-    setSession(createdSession);
+    setSession(markProjectSessionSaved({ ...createdSession, identity: {} }, createdSession.path, createdSession.project.data));
     setSceneActionHistory([]);
     setPendingFocusInspectorTab(null);
     setSettingsPathValidation(null);
@@ -1292,6 +1295,7 @@ function App(): React.ReactElement {
 
   async function replaceAssetFile(assetID: string, currentName: string): Promise<void> {
     if (!session) return;
+    const savedData = structuredClone(session.project.data);
     const currentAsset = (Array.isArray(session.project.data.assets) ? session.project.data.assets : [])
       .find((asset) => (
         asset && typeof asset === "object" && !Array.isArray(asset)
@@ -1309,7 +1313,7 @@ function App(): React.ReactElement {
         publishFeedback(saveProjectFeedback(saveResult));
         if (saveResult.canceled) pushToast(ui("Salvamento cancelado."), { kind: "info" });
         if (!saveResult.canceled && !saveResult.error && saveResult.path) {
-          setSession({ ...session, path: saveResult.path, dirty: false });
+          setSession(current => reconcileProjectSessionSaved(current, session, saveResult.path!, savedData));
         }
       }
     });
@@ -1331,12 +1335,13 @@ function App(): React.ReactElement {
     }
     const nextData = replaceAssetFileInProject(session.project.data, assetID, replacements[0]);
     if (nextData === session.project.data) return;
-    commitProjectData(nextData, { path: projectPath });
+    commitProjectData(nextData, { path: projectPath, externalAssetMutation: true });
     notifySuccess(ui("Arquivo de {0} substituído sem quebrar referências.", { 0: currentName }));
   }
 
   async function importAssets(): Promise<void> {
     if (!session) return;
+    const savedData = structuredClone(session.project.data);
     const flow = await runFilesImportFlow({
       projectPath: session.path,
       saveProject: () => window.gbaStudio.saveProject(session),
@@ -1345,7 +1350,7 @@ function App(): React.ReactElement {
         publishFeedback(saveProjectFeedback(saveResult));
         if (saveResult.canceled) pushToast(ui("Salvamento cancelado."), { kind: "info" });
         if (!saveResult.canceled && !saveResult.error && saveResult.path) {
-          setSession({ ...session, path: saveResult.path, dirty: false });
+          setSession(current => reconcileProjectSessionSaved(current, session, saveResult.path!, savedData));
         }
       }
     });
@@ -1375,6 +1380,7 @@ function App(): React.ReactElement {
 
   async function importGifAnimation(): Promise<void> {
     if (!session) return;
+    const savedData = structuredClone(session.project.data);
     const activeScene = session.project.data.scena;
     if (!activeScene || typeof activeScene !== "object" || Array.isArray(activeScene)) {
       notifyError(ui("Abra uma cena Cutscene antes de importar uma animação GIF."));
@@ -1401,7 +1407,7 @@ function App(): React.ReactElement {
         publishFeedback(saveProjectFeedback(saveResult));
         if (saveResult.canceled) pushToast(ui("Salvamento cancelado."), { kind: "info" });
         if (!saveResult.canceled && !saveResult.error && saveResult.path) {
-          setSession({ ...session, path: saveResult.path, dirty: false });
+          setSession(current => reconcileProjectSessionSaved(current, session, saveResult.path!, savedData));
         }
       }
     });
@@ -1472,11 +1478,12 @@ function App(): React.ReactElement {
 
     let projectPath = session.path;
     if (!projectPath) {
+      const savedData = structuredClone(session.project.data);
       const saveResult = await window.gbaStudio.saveProject({ project: session.project });
       publishFeedback(saveProjectFeedback(saveResult));
-      if (saveResult.canceled || !saveResult.path) return;
+      if (saveResult.canceled || saveResult.error || !saveResult.path) return;
       projectPath = saveResult.path;
-      setSession({ ...session, path: projectPath, dirty: false });
+      setSession(current => reconcileProjectSessionSaved(current, session, saveResult.path!, savedData));
     }
 
     const result = await window.gbaStudio.importAssets({ projectPath, scope: "sprite" });

@@ -1,11 +1,13 @@
 import { describe, expect, it, vi } from "vitest";
 import { readFile } from "node:fs/promises";
+import { appendInputReplayMasks, createInputReplay } from "../src/shared/inputReplay.ts";
 
 import {
   analyzeRgbaFrame,
   analyzePcmSamples,
   copyModuleSavedata,
   createKeyboardInputLatch,
+  createInputFrameRecorder,
   createReplayDriver,
   decodeRuntimeTelemetryWords,
   inputMasksForEmulatedFrames,
@@ -33,6 +35,26 @@ function solidFrame(red, green, blue, width = 4, height = 4) {
 }
 
 describe("mGBA direct player framebuffer", () => {
+  it("records every emulated input frame, including a tap between telemetry samples", () => {
+    const recorder = createInputFrameRecorder();
+    const keyboard = createKeyboardInputLatch();
+    const frames = [];
+    for (let index = 0; index < 30; index += 1) {
+      if (index === 4) { keyboard.press(1); keyboard.release(1); }
+      const mask = keyboard.sample(1);
+      recorder.record(mask);
+      frames.push(mask);
+    }
+    expect(recorder.drain()).toEqual({ firstFrame: 0, masks: frames });
+    expect(frames.slice(4, 7)).toEqual([1, 1, 0]);
+    expect(recorder.drain()).toEqual({ firstFrame: 30, masks: [] });
+    recorder.record(16); recorder.record(32);
+    expect(recorder.drain()).toEqual({ firstFrame: 30, masks: [16, 32] });
+    const replay = appendInputReplayMasks(createInputReplay({ id: "recorded", seed: 1 }), frames);
+    const driver = createReplayDriver(replay);
+    expect(frames.map(() => driver.next())).toEqual(frames);
+    expect(driver.inspect()).toMatchObject({ complete: true, consumedFrames: 30 });
+  });
   it("preserves a short tap across both VBlanks of a 30 FPS runtime update", () => {
     const keyboard = createKeyboardInputLatch();
     keyboard.press(1 << 0);

@@ -153,14 +153,16 @@ describe("useEngineActions", () => {
     window.gbaStudio.openRomPlayerWindow = vi.fn().mockResolvedValue({ ok: true });
     const publishStatus = vi.fn();
     const { result } = renderHook(() => useEngineActions({ contractDiagnosticsOK: true,
-      session: projectSession("/packs/EnginePack"), setStatus: vi.fn(), publishStatus }));
+      session: projectSession("/packs/EnginePack"), setStatus: vi.fn(), publishStatus,
+      recordInput: true, recordingID: "record-1" }));
     await waitFor(() => expect(result.current.playProjectDisabled).toBe(false));
     vi.mocked(window.gbaStudio.runEnginePackDoctor).mockClear();
-    await act(() => result.current.playProject({ roomName: "porto_lumen" }));
+    await act(() => result.current.playProject({ roomName: "porto_lumen", startX: 12, startY: 8, startDirection: "left" }));
     expect(window.gbaStudio.exportEngineProject).toHaveBeenCalledWith(expect.objectContaining({ reusePlayRom: true }));
     expect(window.gbaStudio.runEnginePackDoctor).not.toHaveBeenCalled();
     expect(window.gbaStudio.runEnginePackBuild).not.toHaveBeenCalled();
-    expect(window.gbaStudio.openRomPlayerWindow).toHaveBeenCalledWith(expect.objectContaining({ romPath: "/tmp/verified.gba" }));
+    expect(window.gbaStudio.openRomPlayerWindow).toHaveBeenCalledWith(expect.objectContaining({ romPath: "/tmp/verified.gba", saveScope: "name:porto_lumen" }));
+    expect(window.gbaStudio.openRomPlayerWindow).toHaveBeenCalledWith(expect.objectContaining({ recordInput: true, recordingID: "record-1", recordingLaunch: { roomName: "porto_lumen", startX: 12, startY: 8, startDirection: "left" } }));
     expect(result.current.buildResult?.summary?.romBytes).toBe(4096);
     expect(result.current.doctorResult?.exitCode).toBe(0);
     expect(publishStatus).toHaveBeenLastCalledWith(expect.stringContaining("asset warning"), "success");
@@ -392,6 +394,7 @@ describe("useEngineActions", () => {
     expect(exportEngineProject).toHaveBeenCalledWith(expect.objectContaining({
       developmentStartScene: { id: "room-1", name: "overworld", x: 7, y: 9, direction: "left" }
     }));
+    expect(window.gbaStudio.openRomPlayerWindow).toHaveBeenCalledWith(expect.objectContaining({ saveScope: "id:room-1" }));
   });
 
   it("não abre uma ROM antiga quando o projeto muda durante o build", async () => {

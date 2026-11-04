@@ -190,6 +190,22 @@ export function createReplayDriver(replay) {
   };
 }
 
+export function createInputFrameRecorder() {
+  let frameCount = 0;
+  let masks = [];
+  return {
+    record(mask) {
+      masks.push((Number(mask) >>> 0) & 1023);
+      frameCount += 1;
+    },
+    drain() {
+      const batch = { firstFrame: frameCount - masks.length, masks };
+      masks = [];
+      return batch;
+    }
+  };
+}
+
 export function inputMasksForEmulatedFrames({
   framesToRun,
   manualKeys,
@@ -760,6 +776,38 @@ function base64ToBytes(value) {
   return Uint8Array.from(text, (character) => character.charCodeAt(0));
 }
 
+export function captureReplayInitialState(module, identity) {
+  const size = module._gba_state_size();
+  if (!Number.isInteger(size) || size <= 0 || size > 2_000_000) throw new Error("Replay state unavailable.");
+  const pointer = module._malloc(size);
+  try {
+    if (!pointer || module._gba_save_state(pointer, size) !== 1) throw new Error("Replay state capture failed.");
+    return {
+      format: "mgba-state-v1",
+      ...identity,
+      stateBase64: bytesToBase64(module.HEAPU8.slice(pointer, pointer + size)),
+      savedataBase64: bytesToBase64(copyModuleSavedata(module))
+    };
+  } finally { if (pointer) module._free(pointer); }
+}
+
+export function restoreReplayInitialState(module, state, identity) {
+  if (state?.format !== "mgba-state-v1") throw Object.assign(new Error("Replay initial state missing."), { code: "replay-state" });
+  if (state.romSha256 !== identity.romSha256) throw Object.assign(new Error("Replay ROM mismatch."), { code: "replay-rom" });
+  if (state.coreSha256 !== identity.coreSha256) throw Object.assign(new Error("Replay core mismatch."), { code: "replay-core" });
+  const validBase64 = (value, max) => typeof value === "string" && value.length <= max && value.length % 4 === 0 && /^[A-Za-z0-9+/]*={0,2}$/.test(value);
+  if (!validBase64(state.stateBase64, 2_800_000) || !validBase64(state.savedataBase64, 1_400_000)) throw Object.assign(new Error("Invalid replay state."), { code: "replay-state" });
+  const bytes = base64ToBytes(state.stateBase64), savedata = base64ToBytes(state.savedataBase64);
+  if (bytes.length !== module._gba_state_size()) throw Object.assign(new Error("Invalid replay state size."), { code: "replay-state" });
+  const pointer = module._malloc(bytes.length);
+  try {
+    if (!pointer) throw new Error("Replay state memory unavailable.");
+    module.HEAPU8.set(bytes, pointer);
+    if (savedata.length && !restoreModuleSavedata(module, savedata)) throw new Error("Replay savedata restore failed.");
+    if (module._gba_load_state(pointer, bytes.length) !== 1) throw Object.assign(new Error("Invalid replay state."), { code: "replay-state" });
+  } finally { if (pointer) module._free(pointer); }
+}
+
 export function gamepadKeys(navigatorObject = navigator) {
   let gamepads;
   try { gamepads = navigatorObject.getGamepads?.() ?? []; }
@@ -781,7 +829,7 @@ export function gamepadKeys(navigatorObject = navigator) {
   return keys;
 }
 
-export async function startMGBAPlayer({ container, romUrl, storageKey, onFrameStats, replay, keyboardBindings, batteryOptions, touchControls }) {
+export async function startMGBAPlayer({ container, romUrl, storageKey, onFrameStats, replay, keyboardBindings, batteryOptions, touchControls, recordInput = false, recordingLaunch, recordingID }) {
   if (!(container instanceof HTMLElement)) throw new Error("Container do GBA Studio Player invalido.");
   const keyboardKeys = keyboardKeyMapForBindings(keyboardBindings);
   const [{ default: createMGBA }, response] = await Promise.all([
@@ -790,6 +838,17 @@ export async function startMGBAPlayer({ container, romUrl, storageKey, onFrameSt
   ]);
   if (!response.ok) throw new Error(`ROM nao carregada: HTTP ${response.status}.`);
   const rom = new Uint8Array(await response.arrayBuffer());
+  const romHash = async () => [...new Uint8Array(await crypto.subtle.digest("SHA-256", rom))].map(byte => byte.toString(16).padStart(2, "0")).join("");
+  let identityPromise;
+  const replayIdentity = () => identityPromise ??= (async () => {
+    const romSha256 = await romHash();
+    if (replay?.initialState && replay.initialState.romSha256 !== romSha256) throw Object.assign(new Error("Replay ROM mismatch."), { code: "replay-rom" });
+    const manifestResponse = await fetch(new URL("./mgba-core.manifest.json", import.meta.url));
+    const manifest = manifestResponse.ok ? await manifestResponse.json() : null;
+    const coreSha256 = manifest?.wasm?.sha256;
+    if (!/^[a-f0-9]{64}$/.test(coreSha256 ?? "")) throw new Error("Replay core identity unavailable.");
+    return { romSha256, coreSha256, ...(recordingLaunch ? { launch: recordingLaunch } : {}) };
+  })();
   const module = await createMGBA({ noInitialRun: true, locateFile: (file) => new URL(file, import.meta.url).toString() });
   let active = true;
   const cleanup = [() => module._gba_destroy()];
@@ -846,7 +905,8 @@ export async function startMGBAPlayer({ container, romUrl, storageKey, onFrameSt
     const image = context.createImageData(WIDTH, HEIGHT);
     const keyboardInput = createKeyboardInputLatch();
     const touchInput = createPointerInput();
-    const battery = batteryOptions ? createBatteryPersistence({
+    // A replay owns its captured SRAM; it must never roll back the normal save.
+    const battery = batteryOptions && !replay ? createBatteryPersistence({
       ...batteryOptions,
       copy: () => copyModuleSavedata(module),
       restore: bytes => restoreModuleSavedata(module, bytes),
@@ -855,6 +915,10 @@ export async function startMGBAPlayer({ container, romUrl, storageKey, onFrameSt
     if (battery) {
       cleanup.push(() => battery.destroy());
       await battery.initialize();
+    }
+    if (replay) {
+      if (replay.schema !== 2 || !replay.initialState) throw Object.assign(new Error("Replay initial state missing. Record it again."), { code: "replay-state" });
+      restoreReplayInitialState(module, replay.initialState, await replayIdentity());
     }
     const replayDriver = replay ? createReplayDriver(replay) : null;
     const AudioContext = window.AudioContext ?? window.webkitAudioContext;
@@ -1013,6 +1077,52 @@ export async function startMGBAPlayer({ container, romUrl, storageKey, onFrameSt
     let sampleEmulationMs = 0;
     let samplePresentationFrames = 0;
     let sampleStartedAt = performance.now();
+    let inputRecorder = createInputFrameRecorder();
+    let recordingStart;
+    let activeRecordingID;
+    const collectTelemetry = () => {
+      if (!active) return null;
+      const now = performance.now();
+      const cadence = measureFrameCadence({
+        droppedFrames: sampleDroppedFrames,
+        elapsedMs: Math.max(1, now - sampleStartedAt),
+        emulatedFrames: sampleEmulatedFrames,
+        presentationFrames: samplePresentationFrames,
+        totalEmulationMs: sampleEmulationMs
+      });
+      const nativeTelemetry = readRuntimeTelemetry(module);
+      const stats = {
+        sampledAtUnixMs: performance.timeOrigin + now,
+        ...cadence,
+        romBytes: rom.length,
+        inputFrames: inputRecorder.drain(),
+        ...(activeRecordingID ? { recordingID: activeRecordingID } : {}),
+        ...(recordingStart ? { recordingStart } : {}),
+        runtimeState: nativeTelemetry,
+        hardware: nativeTelemetry?.hardware ?? null
+      };
+      recordingStart = undefined;
+      sampleDroppedFrames = 0;
+      sampleEmulatedFrames = 0;
+      sampleEmulationMs = 0;
+      samplePresentationFrames = 0;
+      sampleStartedAt = now;
+      return stats;
+    };
+    const flushInputRecording = () => {
+      const stats = collectTelemetry();
+      if (stats) onFrameStats?.(stats);
+      return stats;
+    };
+    const beginInputRecording = async (id = recordingID || crypto.randomUUID()) => {
+      if (!/^[A-Za-z0-9_-]{1,100}$/.test(id)) throw new Error("Invalid recording identity.");
+      const identity = await replayIdentity();
+      if (!active) return null;
+      recordingStart = captureReplayInitialState(module, identity);
+      activeRecordingID = id;
+      inputRecorder = createInputFrameRecorder();
+      return flushInputRecording();
+    };
     const render = (animationFrameAt) => {
       if (!active) return;
       const elapsedSinceAnimationFrame = Math.min(250, Math.max(0, animationFrameAt - lastAnimationFrameAt));
@@ -1033,6 +1143,7 @@ export async function startMGBAPlayer({ container, romUrl, storageKey, onFrameSt
         previousPresentedRuntimeState = presentedRuntimeState;
         module._gba_run_frame();
         presentedRuntimeState = readRuntimeTelemetry(module);
+        inputRecorder.record(inputMasks[frame]);
         queueNativeAudio();
         sampleEmulationMs += performance.now() - emulationStartedAt;
         sampleEmulatedFrames += 1;
@@ -1049,30 +1160,11 @@ export async function startMGBAPlayer({ container, romUrl, storageKey, onFrameSt
 
       const now = performance.now();
       if (now - sampleStartedAt >= 500) {
-        const elapsed = Math.max(1, now - sampleStartedAt);
-        const cadence = measureFrameCadence({
-          droppedFrames: sampleDroppedFrames,
-          elapsedMs: elapsed,
-          emulatedFrames: sampleEmulatedFrames,
-          presentationFrames: samplePresentationFrames,
-          totalEmulationMs: sampleEmulationMs
-        });
-        const nativeTelemetry = readRuntimeTelemetry(module);
-        onFrameStats?.({
-          sampledAtUnixMs: performance.timeOrigin + now,
-          ...cadence,
-          romBytes: rom.length,
-          runtimeState: nativeTelemetry,
-          hardware: nativeTelemetry?.hardware ?? null
-        });
-        sampleDroppedFrames = 0;
-        sampleEmulatedFrames = 0;
-        sampleEmulationMs = 0;
-        samplePresentationFrames = 0;
-        sampleStartedAt = now;
+        flushInputRecording();
       }
       frameHandle = requestAnimationFrame(render);
     };
+    if (recordInput) await beginInputRecording();
     frameHandle = requestAnimationFrame(render);
 
     const save = () => {
@@ -1118,6 +1210,8 @@ export async function startMGBAPlayer({ container, romUrl, storageKey, onFrameSt
 
     return Object.freeze({
       canvas,
+      beginInputRecording,
+      flushInputRecording,
       inspectRuntime: () => Object.freeze({
         address: typeof module._gba_find_runtime_telemetry === "function"
           ? module._gba_find_runtime_telemetry()

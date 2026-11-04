@@ -127,7 +127,7 @@ export function TestingDiagnosticsDrawer({
         </button>
       </header>
       <div className="testing-diagnostics-content">
-        <section className="testing-diagnostics-section" aria-label={ui("Rastro de eventos da ROM")}>
+        <section className="testing-diagnostics-section advanced-flow-report" aria-label={ui("Rastro de eventos da ROM")}>
           <h3>{ui("Rastro de eventos da ROM")}</h3>
           <label><input type="checkbox" checked={projectData.eventDiagnostics === true} onChange={e => onChangeProjectData({ ...projectData, eventDiagnostics: e.target.checked })} />{ui("Incluir origem dos eventos no próximo build")}</label>
           {eventTrace?.entries.map((entry, index) => <p key={`${eventTrace.sequence}-${index}`}>
@@ -146,8 +146,8 @@ export function TestingDiagnosticsDrawer({
           <h3>{ui("Replay determinístico")}</h3>
           <p>
             {inputReplay
-              ? ui("{0} frames · {1} blocos comprimidos · seed {2}", { 0: inputReplay.frameCount, 1: inputReplay.runs.length, 2: inputReplay.seed })
-              : ui("A gravação captura seed, estado inicial, inputs e checkpoints do runtime.")}
+              ? <>{ui("{0} frames · {1} blocos de entradas", { 0: inputReplay.frameCount, 1: inputReplay.runs.length })} · {ui(inputReplay.initialState ? "Estado inicial capturado" : "Aguardando captura do Player")}</>
+              : ui("A gravação captura o estado completo do Player e as entradas de cada frame.")}
           </p>
           {onToggleInputRecording ? (
             <button className={inputRecording ? "danger" : ""} onClick={onToggleInputRecording} type="button">

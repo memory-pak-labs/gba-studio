@@ -83,6 +83,7 @@ const api: GBAStudioDesktopAPI = {
   revealPath: (path: string) => ipcRenderer.invoke(ipcChannels.revealPath, path),
   launchRomInEmulator: (request) => ipcRenderer.invoke(ipcChannels.launchRomInEmulator, request),
   openRomPlayerWindow: (request) => ipcRenderer.invoke(ipcChannels.openRomPlayerWindow, request),
+  controlRomPlayerRecording: (request) => ipcRenderer.invoke(ipcChannels.controlRomPlayerRecording, request),
   selectPath: (request: SelectPathRequest) => ipcRenderer.invoke(ipcChannels.selectPath, request),
   validateSettingsPaths: (request: ValidateSettingsPathsRequest) => ipcRenderer.invoke(ipcChannels.validateSettingsPaths, request),
   getMcpServerRegistration: (request: McpServerRegistrationRequest) => ipcRenderer.invoke(ipcChannels.getMcpServerRegistration, request),

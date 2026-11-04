@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   appendInputReplayFrame,
+  appendInputReplayMasks,
   createInputReplay,
   inputFrameFromBitmasks,
   isInputReplay,
@@ -11,6 +12,31 @@ import {
 } from "./inputReplay.js";
 
 describe("deterministic input replay", () => {
+  it("retains a captured core state through normalization and uses its launch scene instead of its later room", () => {
+    const initialState = { format: "mgba-state-v1", romSha256: "a".repeat(64), coreSha256: "b".repeat(64), stateBase64: "AQIDBA==", savedataBase64: "", launch: { roomName: "Dungeon" } };
+    const source = { ...createInputReplay({ id: "captured", seed: 0 }), schema: 2, initialState, checkpoints: { 0: { room: "Final" } } };
+    const normalized = normalizeInputReplay(JSON.parse(JSON.stringify(source)));
+    expect(normalized?.initialState).toEqual(initialState);
+    expect(inputReplayStartRoom(normalized!)).toBe("Dungeon");
+    expect(normalizeInputReplay({ ...source, initialState: { ...initialState, stateBase64: "bad!" } })).toBeNull();
+  });
+  it("preserves the duration and short taps of a full input batch instead of one telemetry sample", () => {
+    const initial = createInputReplay({ id: "native-frames", seed: 1 });
+    const masks = [...Array(4).fill(0), 1, 1, ...Array(24).fill(0)];
+    const first = appendInputReplayMasks(initial, masks, { room: "cena_1", variables: { v0: 0 } });
+    const second = appendInputReplayMasks(first, [16, 16, 0], { room: "Caverna", variables: { v0: 1 } });
+    expect(initial.frameCount).toBe(0);
+    expect(first.frameCount).toBe(30);
+    expect(second.frameCount).toBe(33);
+    expect(inputReplayFrameAt(second, 4)).toEqual({ held: ["A"], pressed: ["A"] });
+    expect(inputReplayFrameAt(second, 5)).toEqual({ held: ["A"], pressed: [] });
+    expect(inputReplayFrameAt(second, 30)).toEqual({ held: ["RIGHT"], pressed: ["RIGHT"] });
+    expect(inputReplayStartRoom(second)).toBe("cena_1");
+    expect(verifyInputReplayCheckpoint(second, 32, { room: "Caverna", variables: { v0: 1 } }).ok).toBe(true);
+    expect(second.runs.reduce((sum, run) => sum + run.frames, 0)).toBe(second.frameCount);
+    expect(appendInputReplayMasks(second, [])).toBe(second);
+  });
+
   it("validates well-formed replay payloads", () => {
     expect(isInputReplay({
       schema: 1,

@@ -101,6 +101,9 @@
           romUrl,
           storageKey: `gba-studio:${parameters.get("title") || "game"}:state`,
           replay,
+          recordInput: parameters.get("recordInput") === "1",
+          recordingID: parameters.get("recordingID") || undefined,
+          recordingLaunch: parameters.has("recordingLaunch") ? JSON.parse(parameters.get("recordingLaunch")) : undefined,
           keyboardBindings,
           batteryOptions,
           touchControls,
@@ -109,7 +112,12 @@
       } catch (error) {
         container.dataset.directError = error instanceof Error ? `${error.message}\n${error.stack || ""}` : String(error);
         console.error("Core mGBA direto indisponivel.", error);
-        container.textContent = messages[2];
+        const replayErrors = {
+          "en-US": { "replay-rom": "This replay uses a different ROM. Record it again after changing the game.", "replay-core": "This replay uses a different Player version. Record it again.", "replay-state": "This replay has no valid initial state. Record it again in the Player." },
+          "pt-BR": { "replay-rom": "Este replay usa outra ROM. Grave novamente depois de alterar o jogo.", "replay-core": "Este replay usa outra versão do Player. Grave novamente.", "replay-state": "Este replay não contém um estado inicial válido. Grave novamente no Player." },
+          "es-ES": { "replay-rom": "Este replay usa otra ROM. Graba de nuevo después de cambiar el juego.", "replay-core": "Este replay usa otra versión del Player. Graba de nuevo.", "replay-state": "Este replay no contiene un estado inicial válido. Graba de nuevo en el Player." }
+        };
+        container.textContent = replayErrors[language][error?.code] || messages[2];
       }
     }
   </script>

@@ -61,7 +61,7 @@ const toolDefinitions: Array<{
   title: string;
   detail: string;
 }> = [
-  { id: "inputReplay", key: "inputReplays", title: "Gravação e reprodução de inputs", detail: "Rotas determinísticas com seed, save, variáveis e checkpoints." },
+  { id: "inputReplay", key: "inputReplays", title: "Gravação e reprodução de inputs", detail: "Rotas reproduzíveis com o estado completo do Player e entradas por frame." },
   { id: "autotile", key: "autotileSets", title: "Terreno e autotile", detail: "Máscaras de vizinhança para caminhos, paredes, bordas e colisões." },
   { id: "asepriteTsx", key: "externalAssetSources", title: "Aseprite e Tiled TSX", detail: "Fontes externas reimportáveis com tags, slices e tilesets compartilhados." },
   { id: "particles", key: "particleEmitters", title: "Partículas", detail: "Emitters com orçamento explícito de OAM e scanline." },

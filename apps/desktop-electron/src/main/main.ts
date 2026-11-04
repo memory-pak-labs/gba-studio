@@ -12,6 +12,7 @@ import { prepareWebProjectExport, resolveSmokeWebExportRoot, writeWebProjectExpo
 import { buildProjectRomArtifact } from "./webRomPipeline.js";
 import { launchRomInEmulator } from "./launchRomInEmulator.js";
 import { openRomPlayerWindow } from "./romPlayerWindow.js";
+import { controlRomPlayerRecording } from "./romPlayerRecording.js";
 import { installAppMenu } from "./appMenu.js";
 import { createProjectSaveQueue } from "./projectSaveQueue.js";
 import { writeEngineSchemaExport } from "./engineProjectExport.js";
@@ -514,6 +515,9 @@ ipcMain.handle(ipcChannels.openRomPlayerWindow, async (event, request: OpenRomPl
     saveScope: request.saveScope,
     replay: request.replay,
     keyboardBindings: request.keyboardBindings,
+    recordInput: request.recordInput,
+    recordingID: request.recordingID,
+    recordingLaunch: request.recordingLaunch,
     appPath: app.getAppPath(),
     resourcesPath: process.resourcesPath,
     packaged: app.isPackaged,
@@ -525,6 +529,8 @@ ipcMain.handle(ipcChannels.openRomPlayerWindow, async (event, request: OpenRomPl
     }
   });
 });
+
+ipcMain.handle(ipcChannels.controlRomPlayerRecording, (event, request: { windowID: number; action: "begin" | "flush"; recordingID?: string }) => controlRomPlayerRecording(event.sender.id, request));
 
 ipcMain.handle(ipcChannels.selectPath, async (_event, request: SelectPathRequest) => {
   const properties = request.mode === "directory"

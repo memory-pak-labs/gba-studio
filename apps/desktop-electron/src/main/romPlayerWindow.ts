@@ -17,10 +17,11 @@ import type {
   RomPlayerSubsystemTelemetry,
   RomPlayerTelemetryEvent
 } from "../shared/hardwareProfiler.js";
-import type { InputReplay } from "../shared/inputReplay.js";
+import { isInputReplayInitialState, type InputReplay, type InputReplayInitialState } from "../shared/inputReplay.js";
 import type { GBAKeyboardBindings } from "../shared/gbaControls.js";
 import { ipcChannels } from "../shared/ipc.js";
 import { createRomPlayerBattery, registerRomPlayerBattery } from "./romPlayerBattery.js";
+import { registerRomPlayerRecording } from "./romPlayerRecording.js";
 
 export interface ResolveWebPlayerRootOptions {
   appPath: string;
@@ -29,6 +30,9 @@ export interface ResolveWebPlayerRootOptions {
 }
 
 export interface RomPlayerServerOptions {
+  recordingID?: string;
+  recordInput?: boolean;
+  recordingLaunch?: InputReplayInitialState["launch"];
   locale?: string;
   romPath: string;
   title: string;
@@ -44,6 +48,9 @@ export interface RomPlayerServer {
 }
 
 export interface OpenRomPlayerWindowRequest {
+  recordingID?: string;
+  recordInput?: boolean;
+  recordingLaunch?: InputReplayInitialState["launch"];
   locale?: string;
   romPath: string;
   title?: string;
@@ -146,7 +153,7 @@ function safePlayerAssetPath(webPlayerRoot: string, requestPath: string): string
     : null;
 }
 
-function runtimePlayerPath(options: Pick<RomPlayerServerOptions, "romPath" | "title" | "inputReplay" | "keyboardBindings" | "locale" | "desktopBattery">): string {
+function runtimePlayerPath(options: Pick<RomPlayerServerOptions, "romPath" | "title" | "inputReplay" | "keyboardBindings" | "locale" | "desktopBattery" | "recordInput" | "recordingLaunch" | "recordingID">): string {
   const query = new URLSearchParams({
     rom: `../roms/${path.basename(options.romPath)}`,
     title: options.title
@@ -155,6 +162,9 @@ function runtimePlayerPath(options: Pick<RomPlayerServerOptions, "romPath" | "ti
   if (options.keyboardBindings) query.set("keyboard", "1");
   if (options.locale) query.set("locale", options.locale);
   if (options.desktopBattery) query.set("desktopBattery", "1");
+  if (options.recordInput) query.set("recordInput", "1");
+  if (options.recordingID) query.set("recordingID", options.recordingID);
+  if (options.recordingLaunch) query.set("recordingLaunch", JSON.stringify(options.recordingLaunch));
   return `/player/runtime.html?${query.toString()}`;
 }
 
@@ -374,8 +384,18 @@ export function normalizeRomPlayerFrameStats(value: unknown): RomPlayerFrameStat
   if (candidate.runtimeState != null && !runtimeState) return null;
   const hardware = normalizeHardwareTelemetry(candidate.hardware);
   if (candidate.hardware != null && !hardware) return null;
+  const inputFrames = candidate.inputFrames;
+  const recordingStart = candidate.recordingStart;
+  if (candidate.recordingID !== undefined && (typeof candidate.recordingID !== "string" || !/^[A-Za-z0-9_-]{1,100}$/.test(candidate.recordingID))) return null;
+  if (recordingStart !== undefined && !isInputReplayInitialState(recordingStart)) return null;
+  if (inputFrames !== undefined && (!inputFrames || !Number.isSafeInteger(inputFrames.firstFrame)
+      || inputFrames.firstFrame < 0 || !Array.isArray(inputFrames.masks) || inputFrames.masks.length > 600
+      || !inputFrames.masks.every(mask => Number.isInteger(mask) && mask >= 0 && mask <= 1023))) return null;
   return {
+    ...(candidate.recordingID ? { recordingID: candidate.recordingID } : {}),
+    ...(isInputReplayInitialState(recordingStart) ? { recordingStart: { ...recordingStart } } : {}),
     ...(candidate.sampledAtUnixMs !== undefined ? { sampledAtUnixMs: candidate.sampledAtUnixMs } : {}),
+    ...(inputFrames ? { inputFrames: { firstFrame: inputFrames.firstFrame, masks: [...inputFrames.masks] } } : {}),
     cpuPercent: candidate.cpuPercent!,
     droppedFrameRatio: candidate.droppedFrameRatio!,
     droppedFrames: candidate.droppedFrames!,
@@ -521,7 +541,10 @@ export async function openRomPlayerWindow(options: OpenRomPlayerWindowOptions): 
       webPlayerRoot,
       inputReplay: options.replay,
       keyboardBindings: options.keyboardBindings,
-      desktopBattery: !options.replay
+      desktopBattery: !options.replay,
+      recordInput: options.recordInput,
+      recordingID: options.recordingID,
+      recordingLaunch: options.recordingLaunch
     });
     closeServer = server.close;
     const { BrowserWindow, app } = await import("electron");
@@ -531,6 +554,8 @@ export async function openRomPlayerWindow(options: OpenRomPlayerWindowOptions): 
     });
 
     acquiredWindow = window;
+    registerRomPlayerRecording({ window, ownerID: options.parent?.webContents.id ?? -1,
+      normalize: normalizeRomPlayerFrameStats, onTelemetry: options.onTelemetry });
     if (!options.replay) registerRomPlayerBattery(window.webContents, createRomPlayerBattery(app.getPath("userData"), romPath, options.saveScope), server.url);
     window.webContents.on("ipc-message", (_event, channel, ...args) => {
       if (channel !== ipcChannels.romPlayerTelemetry) return;

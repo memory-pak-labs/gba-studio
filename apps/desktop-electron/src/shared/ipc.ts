@@ -5,7 +5,7 @@ import type { SerializableProjectPluginRegistry } from "./gbaStudioPlugins.js";
 import type { PluginRepository, PluginRepositoryEntry } from "./gbaStudioPluginRepository.js";
 import type { RomPlayerFrameStats, RomPlayerTelemetryEvent } from "./hardwareProfiler.js";
 import type { ProjectBudgetAnalysisResult } from "./projectBudget.js";
-import type { InputReplay } from "./inputReplay.js";
+import type { InputReplay, InputReplayInitialState } from "./inputReplay.js";
 import type { GBAKeyboardBindings } from "./gbaControls.js";
 import type { TranslationPackStatus } from "./translationPacks.js";
 import type { AppUpdateResult, AppUpdateState } from "./appUpdates.js";
@@ -84,6 +84,9 @@ export interface LaunchRomInEmulatorResult {
 }
 
 export interface OpenRomPlayerWindowRequest {
+  recordingID?: string;
+  recordInput?: boolean;
+  recordingLaunch?: InputReplayInitialState["launch"];
   romPath: string;
   title?: string;
   saveScope?: string;
@@ -519,6 +522,7 @@ export interface GBAStudioDesktopAPI {
   revealPath(path: string): Promise<RevealPathResult>;
   launchRomInEmulator(request: LaunchRomInEmulatorRequest): Promise<LaunchRomInEmulatorResult>;
   openRomPlayerWindow(request: OpenRomPlayerWindowRequest): Promise<OpenRomPlayerWindowResult>;
+  controlRomPlayerRecording(request: { windowID: number; action: "begin" | "flush"; recordingID?: string }): Promise<{ ok: boolean; telemetry?: RomPlayerTelemetryEvent; error?: string }>;
   selectPath(request: SelectPathRequest): Promise<SelectPathResult>;
   validateSettingsPaths(request: ValidateSettingsPathsRequest): Promise<ValidateSettingsPathsResult>;
   getMcpServerRegistration(request: McpServerRegistrationRequest): Promise<string>;
@@ -569,6 +573,7 @@ export const ipcChannels = {
   revealPath: "shell:reveal-path",
   launchRomInEmulator: "shell:launch-rom-in-emulator",
   openRomPlayerWindow: "rom-player:open-window",
+  controlRomPlayerRecording: "rom-player:recording",
   romPlayerTelemetry: "rom-player:telemetry",
   romPlayerBattery: "rom-player:battery",
   selectPath: "shell:select-path",

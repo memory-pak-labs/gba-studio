@@ -18,7 +18,7 @@ vi.mock("node:http", async (original) => {
     return server;
   } };
 });
-vi.mock("electron", () => ({ BrowserWindow: class extends EventEmitter {
+vi.mock("electron", () => ({ app: { getPath: () => tmpdir() }, BrowserWindow: class extends EventEmitter {
   id = 1;
   webContents = new EventEmitter();
   destroyed = false;

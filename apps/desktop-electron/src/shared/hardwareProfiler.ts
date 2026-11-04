@@ -1,5 +1,6 @@
 import type { GBAProjectData } from "./projectFile.js";
 import type { AssetPackBudgetReport } from "./projectBudget.js";
+import type { InputReplayFrameBatch, InputReplayInitialState } from "./inputReplay.js";
 import {
   resolveSceneRuntimeExport,
   type SceneExportKind
@@ -103,7 +104,10 @@ export interface RomPlayerRuntimeState {
 export type RomPlayerHardwareTelemetry = Partial<Record<ScenePhysicalMetricID, number>>;
 
 export interface RomPlayerFrameStats {
+  recordingID?: string;
+  recordingStart?: InputReplayInitialState;
   sampledAtUnixMs?: number;
+  inputFrames?: InputReplayFrameBatch;
   cpuPercent: number;
   droppedFrameRatio: number;
   droppedFrames: number;
@@ -118,6 +122,7 @@ export interface RomPlayerFrameStats {
 }
 
 export interface RomPlayerTelemetryEvent {
+  recordingError?: string;
   state: "running" | "closed";
   windowID: number;
   stats?: RomPlayerFrameStats;

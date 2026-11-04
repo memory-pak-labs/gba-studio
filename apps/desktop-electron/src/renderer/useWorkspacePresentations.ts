@@ -3,6 +3,7 @@ import { deriveAudioWorkspacePresentation } from "../shared/audioWorkspace";
 import { deriveDialoguesWorkspacePresentation } from "../shared/dialoguesWorkspace";
 import { deriveFilesWorkspacePresentation } from "../shared/filesWorkspace";
 import { deriveProjectContractDiagnostics } from "../shared/projectContractDiagnostics";
+import { projectRoomReferenceOptions } from "../shared/projectReferenceOptions";
 import { deriveRoomsWorkspacePresentation } from "../shared/roomsWorkspace";
 import { deriveSettingsWorkspacePresentation } from "../shared/settingsWorkspace";
 import { deriveSpritesWorkspacePresentation } from "../shared/spritesWorkspace";
@@ -22,6 +23,7 @@ export function useWorkspacePresentations(
 ) {
   const projectData = session?.project.data ?? null;
   const deferredProjectData = useDeferredValue(projectData);
+  const projectHasScenes = useMemo(() => projectData !== null && projectRoomReferenceOptions(projectData).length > 0, [projectData]);
 
   const contractDiagnostics = useMemo(() => {
     return deferredProjectData ? deriveProjectContractDiagnostics(deferredProjectData) : null;
@@ -72,6 +74,7 @@ export function useWorkspacePresentations(
     contractDiagnostics,
     dialoguesPresentation,
     filesPresentation,
+    projectHasScenes,
     projectData: projectData as GBAProjectData | null,
     roomsPresentation,
     settingsPresentation,
