@@ -3,6 +3,7 @@ import tempfile
 import unittest
 from pathlib import Path
 from assetc_production_contract_tests import load_assetc_module, write_indexed_png
+from assetc_palette_quantization_tests import write_rgba_png
 
 
 class ColorPolicyTests(unittest.TestCase):
@@ -62,6 +63,16 @@ class ColorPolicyTests(unittest.TestCase):
         cached = self.c.emit_pack_report({"assets": [a]}, self.root, first)
         self.assertTrue(cached["allocations"][0]["color_policy"]["review_4bpp"])
         self.assertEqual(header, self.c.emit_asset_header_from_pack_entry(a, self.root, "icon", cached["allocations"][0]))
+
+    def test_regular_banks_do_not_alias_an_affine_palette_from_the_same_rgba_png(self):
+        write_rgba_png(self.root / "mixed.png", 128, 128, [(80, 160, 240, 255), (240, 80, 16, 255)] * 8192)
+        entries = [{"id": kind, "name": kind, "kind": kind, "png": "mixed.png", "bank_group": "scene_test"}
+                   for kind in ["affine_bg", "bg"]]
+        report = self.c.emit_pack_report({"assets": entries}, self.root)
+        affine, regular = [a["allocations"]["bg_palette_colors"] for a in report["allocations"]]
+        self.assertNotIn("shared_with", regular)
+        self.assertGreaterEqual(regular["start"], affine["start"] + affine["count"])
+        self.assertEqual(regular["start"] % 16, 0)
 
 
 if __name__ == "__main__":

@@ -4903,8 +4903,24 @@ def pack_global_bg_palette_key(asset, base_dir):
         )
     if base_dir is None or asset.get("kind", "bg") not in ("bg", "affine_bg", "indexed_bg", "paged_bg") or not asset.get("png"):
         return None
-    _width, _height, colors, _indices = read_png(base_dir / asset["png"], max_colors=224 if asset.get("kind") == "paged_bg" else 256)
-    return tuple(rgb15(color) for color in colors)
+    width, height, colors, indices, transparent = read_png(base_dir / asset["png"],
+        max_colors=224 if asset.get("kind") == "paged_bg" else 256, include_transparency=True)
+    values = [rgb15(color) for color in colors]
+    if asset.get("kind", "bg") == "bg":
+        budget = pack_background_tile_budget(asset)
+        palette, tiles, entries = build_cached_4bpp_background(width, height, colors, indices, transparent,
+            optimize_tile_budget=budget, return_optimization=budget is not None,
+            max_palette_banks=pack_background_palette_banks(asset),
+            reference_plan=background_palette_reference_plan(asset, base_dir))[:3]
+        # Preserve compatible indexed sharing, including unused source entries.
+        # RGBA quantization may reindex visible colors around transparent zero.
+        for tile, bank in {(entry & 1023, (entry >> 12) * 16) for entry in entries}:
+            used = {nibble for byte in tiles[tile] for nibble in (byte & 15, byte >> 4) if nibble}
+            for index in used:
+                target = bank + index
+                if target >= len(values): values.extend([0] * (target + 1 - len(values)))
+                values[target] = rgb15(palette[target])
+    return tuple(values)
 
 
 def palette_cache_tool_signature():
