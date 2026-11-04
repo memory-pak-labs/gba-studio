@@ -693,7 +693,7 @@ void apply_room_visuals() {
     } else {
         gbs::set_bg_enabled(gbs::BackgroundLayer::BG0, true);
     }
-    gbs::apply_video_composition(room.video);
+    gbs::apply_scene_background_video(room.video);
     if(room.presentation && room.presentation->hud_background_index>=0 && size_t(room.presentation->hud_background_index)<project.background_count){
         const auto& chrome=project.backgrounds[room.presentation->hud_background_index];
         gbs::set_bg_character_base(chrome.layer,0);gbs::load_tilemap(chrome.layer,chrome.tilemap);
@@ -701,7 +701,7 @@ void apply_room_visuals() {
     }
     if(room.presentation){dungeon_set_pose(gbs::DungeonPose::Idle);dungeon_step_at=0;dungeon_cell_interacting=false;dungeon_cell_collected_at=0;}
 
-    if (room.background_index < 0 || static_cast<size_t>(room.background_index) >= project.background_count) {
+    if (!room.video.affine_enabled && (room.background_index < 0 || static_cast<size_t>(room.background_index) >= project.background_count)) {
         // The procedural view uses the world plane; BG0 stays above the
         // image HUD for text and dungeon_dialogue instead of covering its bottom.
         gbs::set_bg_enabled(gbs::BackgroundLayer::BG1, !room.presentation || room.presentation->hud_background_index>=0);
@@ -1458,7 +1458,7 @@ void render_dungeon_crawler_runtime(const gbs::RuntimeFrameContext& context) {
     const gbs::SubsystemProfilerScope profiler_scope(gbs::ProfilerSubsystem::Render);
     (void)context;
     if(dungeon_presentation() && dungeon_presentation()->hud_palette)gbs::load_palette(*dungeon_presentation()->hud_palette,false);
-    draw_view();
+    if (!project.rooms[current_room_index].video.affine_enabled) draw_view();
     if(dungeon_presentation())gbs::set_bg_scroll(gbs::BackgroundLayer::BG2,0,-gbs::dungeon_camera_bob(gbs::frame_count()-dungeon_step_at));
     draw_actors();
     sync_runtime_telemetry();
@@ -1518,6 +1518,7 @@ void render_dungeon_crawler_runtime(const gbs::RuntimeFrameContext& context) {
     if (dungeon_dialogue.visible) gbs::draw_dialogue(dungeon_dialogue);
     if (map_dialogue.visible) gbs::draw_dialogue(map_dialogue);
     if (interaction_dialogue.visible) gbs::draw_dialogue(interaction_dialogue);
+    gbs::render_event_background_scale(event_state);
     gbs::wait_vblank();
 }
 

@@ -519,7 +519,14 @@ void set_affine_bg_transform(BackgroundLayer layer, const AffineBgTransform& tra
 bool load_bitmap16(DisplayMode mode, const Bitmap16Asset& asset, uint8_t page = 0);
 bool load_bitmap8(DisplayMode mode, const Bitmap8Asset& asset, uint8_t page = 0);
 bool render_event_background_scale(const EventState& state);
+// Project map decorations through the same image transform; icons keep their size.
+bool project_event_background_point(const EventState& state, BackgroundLayer layer, Vec2i source, Vec2i& screen);
+// Compose into the runtime's own raster, retaining its horizon and HBlank channel.
+bool scale_perspective_background(HBlankAffineRasterLine* lines, size_t count, uint16_t x256, uint16_t y256, int horizon);
+
 bool apply_video_composition(const VideoComposition& composition);
+// Select a prepared single-plane backdrop while keeping BG0 fixed for UI.
+bool apply_scene_background_video(const VideoComposition& composition);
 void fill_bitmap16(DisplayMode mode, uint16_t color, uint8_t page = 0);
 bool update_bitmap16_rect(DisplayMode mode, uint8_t page, uint16_t x, uint16_t y, uint16_t width, uint16_t height, const uint16_t* pixels, uint16_t stride);
 bool update_bitmap8_rect(uint8_t page, uint16_t x, uint16_t y, uint16_t width, uint16_t height, const uint8_t* pixels, uint16_t stride);

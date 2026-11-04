@@ -1,31 +1,14 @@
 #pragma once
 
 #include "gbs/cutscene.hpp"
-#include "gbs/runtime_checkpoint.hpp"
+#include "gbs/scene_script_runner.hpp"
 
 namespace gbs {
 
-// Transient event execution for a cutscene; callers own checkpoint persistence.
-struct CutsceneScriptRunner {
-    EventRunner runner {};
-    EventScriptQueue queue {};
-    int wait_frames = 0;
-};
-
-inline void init_cutscene_script_runner(CutsceneScriptRunner& state) {
-    init_event_runner(state.runner);
-    init_event_script_queue(state.queue);
-    state.wait_frames = 0;
-}
-
-inline bool enqueue_cutscene_script(CutsceneScriptRunner& state, EventScript script) {
-    return !has_event_script(script) || enqueue_event_script(state.queue, script);
-}
-
-inline bool cutscene_script_runner_active(const CutsceneScriptRunner& state) {
-    return state.wait_frames > 0 || event_runner_is_active(state.runner) ||
-        !event_script_queue_is_empty(state.queue);
-}
+using CutsceneScriptRunner = SceneScriptRunner;
+inline void init_cutscene_script_runner(CutsceneScriptRunner& state) { init_scene_script_runner(state); }
+inline bool enqueue_cutscene_script(CutsceneScriptRunner& state, EventScript script) { return enqueue_scene_script(state,script); }
+inline bool cutscene_script_runner_active(const CutsceneScriptRunner& state) { return scene_script_runner_active(state); }
 
 struct CutsceneQueuedScriptCheckpoint {
     int32_t index = -1;
@@ -104,19 +87,7 @@ inline bool restore_cutscene_script_checkpoint(const CutsceneProjectData& projec
 
 inline void tick_cutscene_script_runner(CutsceneScriptRunner& state, EventState& events,
     bool paused, EventCommandConsumer consumer, void* context) {
-    if (paused) return;
-    if (state.wait_frames > 0 && --state.wait_frames > 0) return;
-    if (!event_runner_is_active(state.runner)) {
-        EventScriptQueueEntry next {};
-        if (!dequeue_event_script(state.queue, next)) return;
-        start_event_runner(state.runner, next.script);
-    }
-    update_checkpoint_event_runner(state.runner, events);
-    if (events.wait_frames > 0) {
-        state.wait_frames = events.wait_frames;
-        events.wait_frames = 0;
-    }
-    if (consumer != nullptr) consumer(events, context);
+    tick_scene_script_runner(state,events,paused,consumer,context);
 }
 
 } // namespace gbs

@@ -94,6 +94,8 @@ static uint16_t shadow_bg_enabled_bits;
 static uint8_t shadow_bg_enabled_pending;
 static uint8_t render_publication_blocked;
 static uint8_t render_handoff_fallback_active;
+static uint16_t shadow_display_mode;
+static uint16_t shadow_backdrop_color;
 static uint8_t shadow_bg_character_base[4];
 static uint8_t shadow_bg_character_base_pending_mask;
 static uint8_t shadow_bg_depth_mask;
@@ -138,6 +140,7 @@ static uint8_t shadow_bg_screen_base_pending_mask;
  * character base 2 (screenblocks 16-23), while the UI's high-index 4bpp
  * assets remain in character base 1 and the UI/world maps remain at 24/28. */
 static const uint16_t affine_screenblock_base = 0u;
+static uint16_t affine_upload_screenblock_base = 0u;
 
 enum {
     /* BG0 = UI (menu/dialogue/HUD). BG1 = dynamic room tilemap. BG2/BG3 = optional parallax. */
@@ -977,6 +980,9 @@ static void write_obj_square_tiles(void) {
 }
 
 void gbs_hw_init(void) {
+    affine_upload_screenblock_base = affine_screenblock_base;
+    shadow_display_mode = 0;
+    shadow_backdrop_color = 0;
     invalidate_hud_pixel_text_tiles();
     for (unsigned i = 0; i < GBS_TEXT_RESIDENT_GLYPHS; ++i) resident_font_glyphs[i] = (uint16_t)i;
     rebuild_resident_font_slots();
@@ -1070,10 +1076,12 @@ void gbs_hw_wait_vblank(void) {
         commit_hblank_bg_scroll();
         if (render_handoff_fallback_active) {
             REG_DISPCNT = (uint16_t)(
-                (REG_DISPCNT & ~0x0F00u)
+                (REG_DISPCNT & ~(0x0F00u | 0x0007u))
+                | shadow_display_mode
                 | (shadow_bg_enabled_bits & 0x0F00u)
                 | (1u << 12)
             );
+            MEM_PALETTE[0] = shadow_backdrop_color;
             render_handoff_fallback_active = 0;
         }
     }
@@ -1264,6 +1272,7 @@ void gbs_hw_sio_close(void) {
 }
 
 void gbs_hw_set_backdrop(uint16_t color) {
+    shadow_backdrop_color = color;
     MEM_PALETTE[0] = color;
 }
 
@@ -1563,6 +1572,7 @@ void gbs_hw_load_bg_palette(const uint16_t* colors, uint32_t start_index, uint32
     if (colors == 0 || color_count == 0 || start_index + color_count > 256) {
         return;
     }
+    if (start_index == 0) shadow_backdrop_color = colors[0];
     gbs_hw_enqueue_vblank_dma16(colors, MEM_PALETTE + start_index, color_count);
 }
 
@@ -1689,10 +1699,18 @@ void gbs_hw_set_bg_tilemap_entry(int layer, uint32_t x, uint32_t y, uint32_t wid
     }
 }
 
+bool gbs_hw_set_affine_map_screen_base(uint16_t base) {
+    if (base != affine_screenblock_base && base != 28u) return false;
+    affine_upload_screenblock_base = base;
+    return true;
+}
+
 void gbs_hw_load_affine_bg_tilemap(int layer, const uint8_t* entries, uint32_t width, uint32_t height, uint32_t map_size) {
+    const uint16_t affine_screenblock_base = affine_upload_screenblock_base;
     uint32_t screenblock_count = affine_screenblock_count_for_map_size(map_size);
     if ((layer != 2 && layer != 3) || entries == 0 || width == 0 || height == 0 || width != height ||
-        (width != 16 && width != 32 && width != 64 && width != 128) || map_size > 3 || screenblock_count == 0) {
+        (width != 16 && width != 32 && width != 64 && width != 128) || map_size > 3 || screenblock_count == 0 ||
+        affine_screenblock_base + screenblock_count > 32u) {
         return;
     }
 
@@ -1735,6 +1753,7 @@ void gbs_hw_set_display_mode(uint16_t mode) {
         affine_ui_blank_alias_active = use_affine_blank;
         gbs_hw_mark_ui_tilemap_dirty();
     }
+    shadow_display_mode = mode & 0x0007u;
     REG_DISPCNT = (uint16_t)((REG_DISPCNT & ~0x0007u) | (mode & 0x0007u));
 }
 

@@ -389,6 +389,7 @@ struct MenuScreenData {
     size_t hud_binding_count = 0;
     int previous_page_screen_index = -1;
     int next_page_screen_index = -1;
+    VideoComposition video = default_video_composition();
 };
 
 enum class MenuSaveFeedback : uint8_t { None, Confirm, Saved, Failed };

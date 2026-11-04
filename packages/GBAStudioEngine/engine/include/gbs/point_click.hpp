@@ -65,6 +65,7 @@ struct PointClickSceneData {
     const SpriteAnimation* cursor_idle_animation = nullptr;
     const SpriteAnimation* cursor_hover_animation = nullptr;
     const SpriteAnimation* cursor_click_animation = nullptr;
+    VideoComposition video = default_video_composition();
 };
 
 struct PointClickProjectData {

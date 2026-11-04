@@ -168,6 +168,7 @@ struct LutaStageData {
     int background_index = -1;
     const char* resource_bank_group_name = nullptr;
     LutaActionSounds action_sounds {};
+    VideoComposition video = default_video_composition();
 };
 
 struct LutaProjectData {

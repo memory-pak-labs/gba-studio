@@ -56,7 +56,7 @@ const parameterLabels: Record<string, string[]> = {
 };
 
 const descriptions: Record<string, string> = {
-  ...Object.fromEntries(scaleEventVerbs.map(verb => [verb, verb.includes("actor") ? "Aplica escala visual apenas à instância do ator (50–200%), preservando a colisão e a escala ao trocar a animação. A transição segue em paralelo; use Aguardar para encadear." : "Aplica escala relativa à composição inicial de uma camada affine preparada (50–400%). Não transforma tilemaps regulares nem a colisão. A transição segue em paralelo; use Aguardar para encadear."])),
+  ...Object.fromEntries(scaleEventVerbs.map(verb => [verb, verb.includes("actor") ? "Aplica escala visual apenas à instância do ator (50–200%), preservando a colisão e a escala ao trocar a animação. A transição segue em paralelo; use Aguardar para encadear." : "Aplica escala relativa à composição affine inicial (50–400%) ou ao piso nativo da Corrida em perspectiva. A colisão permanece igual. A transição segue em paralelo; use Aguardar para encadear."])),
   lantern: "Ilumina uma área ao redor do ator e escurece o exterior. Acrescente circle após a duração para luz circular, com largura e altura iguais. Fades e máscaras têm prioridade; o círculo compartilha DMA0 com efeitos raster.",
   reveal_area: "Expande a área ao redor do ator até revelar a tela. Acrescente circle após a duração para uma abertura circular, com largura e altura iniciais iguais. Ao terminar, remove o escurecimento.",
   clear_visibility: "Remove a lanterna ou a revelação e restaura a visibilidade da cena.",

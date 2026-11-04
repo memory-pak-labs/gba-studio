@@ -387,7 +387,7 @@ cutscene-timing-test: $(HOST_BUILD)/cutscene_script_runner_tests
 	$(HOST_BUILD)/cutscene_script_runner_tests
 	python3 tests/host/cutscene_timing_tests.py
 
-$(HOST_BUILD)/cutscene_script_runner_tests: tests/host/cutscene_script_runner_tests.cpp engine/src/gbs_event.cpp engine/src/gbs_dialogue_locale.cpp $(HOST_EVENT_RUNTIME_SRCS) engine/include/gbs/cutscene_script_runner.hpp
+$(HOST_BUILD)/cutscene_script_runner_tests: tests/host/cutscene_script_runner_tests.cpp engine/src/gbs_event.cpp engine/src/gbs_dialogue_locale.cpp $(HOST_EVENT_RUNTIME_SRCS) engine/include/gbs/cutscene_script_runner.hpp engine/include/gbs/scene_script_runner.hpp
 	@mkdir -p $(@D)
 	$(HOST_CXX) $(HOST_CXXFLAGS) $(filter %.cpp,$^) -o $@
 
@@ -2194,6 +2194,17 @@ $(HOST_BUILD)/racing_progress_tests: tests/host/racing_progress_tests.cpp engine
 	$(HOST_CXX) $(HOST_CXXFLAGS) $< -o $@
 
 .PHONY: event-scale-background-test
-event-scale-background-test:
+event-scale-background-test: $(HOST_BUILD)/scene_background_runner_tests
+	$(HOST_BUILD)/scene_background_runner_tests
+	@mkdir -p $(HOST_BUILD)
+	$(HOST_CXX) $(HOST_CXXFLAGS) tests/host/background_scale_profiles_tests.cpp -o $(HOST_BUILD)/background_scale_profiles_tests
+	$(HOST_BUILD)/background_scale_profiles_tests
+	python3 tests/host/background_video_export_tests.py
+	python3 tests/host/background_scene_cache_tests.py
+	python3 tests/host/background_profile_consumers_tests.py
 	python3 tests/host/platformer_affine_background_tests.py
 	python3 tests/host/affine_tilemap_publication_tests.py
+
+$(HOST_BUILD)/scene_background_runner_tests: tests/host/scene_background_runner_tests.cpp engine/src/gbs_event.cpp engine/src/gbs_dialogue_locale.cpp $(HOST_EVENT_RUNTIME_SRCS) engine/include/gbs/scene_script_runner.hpp engine/include/gbs/iso_event_scheduler.hpp
+	@mkdir -p $(@D)
+	$(HOST_CXX) $(HOST_CXXFLAGS) $(filter %.cpp,$^) -o $@

@@ -235,6 +235,7 @@ void apply_room_visuals() {
         && (pseudo3d_visual(room) != nullptr || !has_authored_background(room))) {
         const gbs::RacingPseudo3DVisualData* visual = pseudo3d_visual(room);
         gbs::set_backdrop_color(gbs::rgb15(4, 10, 18));
+        gbs::apply_video_composition(gbs::default_video_composition());
         gbs::set_display_mode(gbs::DisplayMode::Mode1TextAffine);
         previous_pseudo3d_player_marker = gbs::Vec2i { -1, -1 };
         previous_pseudo3d_rival_marker = gbs::Vec2i { -1, -1 };
@@ -269,6 +270,7 @@ void apply_room_visuals() {
         }
         if (visual->minimap_tilemap) gbs::load_tilemap(gbs::BackgroundLayer::BG0, *visual->minimap_tilemap);
         gbs::load_affine_tilemap(gbs::BackgroundLayer::BG2, room.circuit_floor ? *room.circuit_floor : *visual->floor_tilemap);
+        gbs::set_affine_bg_wrap(gbs::BackgroundLayer::BG2, !gbs::racing_uses_circuit_track(room));
         gbs::set_bg_priority(gbs::BackgroundLayer::BG0, 0);
         gbs::set_bg_priority(gbs::BackgroundLayer::BG1, 3);
         gbs::set_bg_priority(gbs::BackgroundLayer::BG2, 2);
@@ -290,7 +292,7 @@ void apply_room_visuals() {
         gbs::set_bg_priority(gbs::BackgroundLayer::BG1, 2);
         gbs::set_bg_enabled(gbs::BackgroundLayer::BG1, true);
         gbs::set_bg_enabled(gbs::BackgroundLayer::BG0, true);
-        gbs::apply_video_composition(room.video);
+        gbs::apply_scene_background_video(room.video);
         return;
     }
     const gbs::RacingBackgroundData& background = project.backgrounds[room.background_index];
@@ -308,7 +310,7 @@ void apply_room_visuals() {
     }
     gbs::load_tilemap(background.layer, background.tilemap);
     gbs::set_bg_scroll(background.layer, 0, 0);
-    gbs::apply_video_composition(room.video);
+    gbs::apply_scene_background_video(room.video);
 }
 
 void update_camera() {
@@ -702,6 +704,9 @@ GBS_RACING_HOT_CODE void draw_pseudo3d_track(const gbs::RacingRoomData& room) {
     }
     }
     runtime_telemetry.seen_tile_effects = 152;
+    const auto& scale = event_state.background_scales[0];
+    gbs::scale_perspective_background(pseudo3d_affine_raster,gbs::hblank_affine_raster_line_count,
+        scale.x256,scale.y256,visual->horizon_y);
     gbs::set_hblank_affine_raster(gbs::BackgroundLayer::BG2, pseudo3d_affine_raster, gbs::hblank_affine_raster_line_count);
     runtime_telemetry.seen_tile_effects = 153;
     runtime_telemetry.seen_tile_effects = 154;
@@ -800,6 +805,7 @@ GBS_RACING_RENDER_CODE void draw_racing_hud(const gbs::RacingRoomData& room) {
 }
 
 void draw_track() {
+    if (!gbs::racing_uses_pseudo3d(project.rooms[current_room_index]) && project.rooms[current_room_index].video.affine_enabled) return;
     const gbs::RacingRoomData& room = project.rooms[current_room_index];
     if (gbs::racing_uses_pseudo3d(room)) {
         if (pseudo3d_visual(room) == nullptr && has_authored_background(room)) return;
@@ -1195,6 +1201,7 @@ void render_racing_runtime(const gbs::RuntimeFrameContext& context) {
         gbs::draw_dialogue_portrait(dialogue);
         racing_dialogue_was_drawn=true;
     }
+    if (!gbs::racing_uses_pseudo3d(project.rooms[current_room_index])) gbs::render_event_background_scale(event_state);
     gbs::wait_vblank();
 }
 

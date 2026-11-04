@@ -12,8 +12,8 @@ describe("event-driven scale", () => {
   it.each(['set_actor_scale Player 0 100', 'set_actor_scale Player 201 100', 'animate_actor_scale Player 100 100 -1', 'set_background_scale BG0 100 100', 'set_background_scale BG2 Infinity 100', 'animate_background_scale BG2 100 100 32768'])('rejects invalid %s', command => {
     expect(eventCommandIntegrationIssue(command, 'topdown')).toBeTruthy();
   });
-  it("does not advertise background commands in renderers without integration",()=>{
-    expect(eventCommandIntegrationIssue("set_background_scale BG2 100 100","isometric")).toContain("não possui consumidor");
+  it("does not advertise background commands in an unknown runtime",()=>{
+    expect(eventCommandIntegrationIssue("set_background_scale BG2 100 100","unknown_profile")).toContain("não possui consumidor");
   });
   it("offers six blocks with Player and independent percentage fields", () => {
     const p = deriveEventsWorkspacePresentation({ events: [{ name: 'scale', steps: [{ command: 'animate_actor_scale Player 150 75 12' }] }] });

@@ -84,6 +84,7 @@ struct WorldMapProjectData {
     bool cursor_affine = false;
     bool embedded_nodes = false;
     WorldMapHudLabels hud_labels {};
+    VideoComposition video = default_video_composition();
 };
 
 struct WorldMapRuntimeState {

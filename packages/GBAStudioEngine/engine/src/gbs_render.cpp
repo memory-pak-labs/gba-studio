@@ -10,7 +10,10 @@
 #if !defined(__arm__) && !defined(__thumb__)
 // Pure render host fixtures omit the DMA transport. Full queue tests link the
 // strong implementation, which replaces this no-queue host stub.
-namespace gbs { __attribute__((weak)) bool dma_wait_for_source(const void*, size_t) { return true; } }
+namespace gbs {
+__attribute__((weak)) bool dma_wait_for_source(const void*, size_t) { return true; }
+__attribute__((weak)) bool dma_wait_for_destination(const volatile void*, size_t) { return true; }
+}
 #endif
 
 namespace gbs {
@@ -604,25 +607,80 @@ bool load_bitmap8(DisplayMode mode, const Bitmap8Asset& asset, uint8_t page) {
     return true;
 }
 
+namespace {
+bool event_background_transform(const EventState& state, int index, AffineBgTransform& result) {
+    if (index < 0 || index > 1 || !(event_affine_background_mask & (1u << index))) return false;
+    if (background_display_mode != DisplayMode::Mode2Affine &&
+        !(background_display_mode == DisplayMode::Mode1TextAffine && index == 0)) return false;
+    const auto& scale = state.background_scales[index];
+    if (scale.x256 < 128 || scale.y256 < 128 || scale.x256 > 1024 || scale.y256 > 1024) return false;
+    const auto& base = event_affine_background_base[index];
+    const int a = base.pa * 256 / scale.x256, b = base.pb * 256 / scale.y256;
+    const int c = base.pc * 256 / scale.x256, d = base.pd * 256 / scale.y256;
+    if (a < -32768 || a > 32767 || b < -32768 || b > 32767 || c < -32768 || c > 32767 || d < -32768 || d > 32767) return false;
+    result = {static_cast<int16_t>(a),static_cast<int16_t>(b),static_cast<int16_t>(c),static_cast<int16_t>(d),
+        base.reference_x_8 + (base.pa-a)*120 + (base.pb-b)*80,
+        base.reference_y_8 + (base.pc-c)*120 + (base.pd-d)*80};
+    return true;
+}
+}
+
 bool render_event_background_scale(const EventState& state) {
     bool applied = false;
     for (int index = 0; index < 2; ++index) {
-        if (!(event_affine_background_mask & (1u << index))) continue;
-        if (background_display_mode != DisplayMode::Mode2Affine &&
-            !(background_display_mode == DisplayMode::Mode1TextAffine && index == 0)) continue;
-        const auto& scale = state.background_scales[index];
-        if (scale.x256 < 128 || scale.y256 < 128 || scale.x256 > 1024 || scale.y256 > 1024) continue;
-        const auto& base = event_affine_background_base[index];
-        const int a = base.pa * 256 / scale.x256, b = base.pb * 256 / scale.y256;
-        const int c = base.pc * 256 / scale.x256, d = base.pd * 256 / scale.y256;
-        if (a < -32768 || a > 32767 || b < -32768 || b > 32767 || c < -32768 || c > 32767 || d < -32768 || d > 32767) continue;
-        // Scale relative to the authored transform; keep the viewport center fixed.
-        const int32_t x = base.reference_x_8 + (base.pa-a)*120 + (base.pb-b)*80;
-        const int32_t y = base.reference_y_8 + (base.pc-c)*120 + (base.pd-d)*80;
-        gbs_hw_set_affine_bg_transform(index+2,a,b,c,d,x,y);
+        AffineBgTransform transform {};
+        if (!event_background_transform(state,index,transform)) continue;
+        gbs_hw_set_affine_bg_transform(index+2,transform.pa,transform.pb,transform.pc,transform.pd,
+            transform.reference_x_8,transform.reference_y_8);
         applied = true;
     }
     return applied;
+}
+
+bool project_event_background_point(const EventState& state, BackgroundLayer layer, Vec2i source, Vec2i& screen) {
+    AffineBgTransform matrix {};
+    if (!event_background_transform(state,static_cast<int>(layer)-2,matrix)) return false;
+    const int64_t determinant = int64_t(matrix.pa)*matrix.pd - int64_t(matrix.pb)*matrix.pc;
+    if (!determinant) return false;
+    const int64_t x = int64_t(source.x)*256 - matrix.reference_x_8;
+    const int64_t y = int64_t(source.y)*256 - matrix.reference_y_8;
+    const int64_t screen_x = (x*matrix.pd-y*matrix.pb)/determinant;
+    const int64_t screen_y = (y*matrix.pa-x*matrix.pc)/determinant;
+    if (screen_x < -32768 || screen_x > 32767 || screen_y < -32768 || screen_y > 32767) return false;
+    screen = {static_cast<int>(screen_x),static_cast<int>(screen_y)};
+    return true;
+}
+
+bool scale_perspective_background(HBlankAffineRasterLine* lines, size_t count, uint16_t x256, uint16_t y256, int horizon) {
+    if (lines == nullptr || count != hblank_affine_raster_line_count || horizon < 0 || horizon >= 160 ||
+        x256 < 128 || x256 > 1024 || y256 < 128 || y256 > 1024) return false;
+    if (x256 == 256 && y256 == 256) return true;
+    // Read before writing in the direction that keeps the source rows intact.
+    const int begin = y256 >= 256 ? 159 : horizon;
+    const int end = y256 >= 256 ? horizon-1 : 160;
+    const int step = y256 >= 256 ? -1 : 1;
+    for (int y=begin; y!=end; y+=step) {
+        const int source8 = horizon*256 + (y-horizon)*65536/y256;
+        const int row = source8/256, fraction = source8%256;
+        if (row >= 160) { lines[y] = {0,0,-256,-256,false}; continue; }
+        auto line = lines[row];
+        if (fraction && row+1 < 160) {
+            const auto& next = lines[row+1];
+            line.pa = static_cast<int16_t>(line.pa + (int(next.pa)-line.pa)*fraction/256);
+            line.pc = static_cast<int16_t>(line.pc + (int(next.pc)-line.pc)*fraction/256);
+            line.reference_x_8 += static_cast<int32_t>((int64_t(next.reference_x_8)-line.reference_x_8)*fraction/256);
+            line.reference_y_8 += static_cast<int32_t>((int64_t(next.reference_y_8)-line.reference_y_8)*fraction/256);
+            line.visible = line.visible && next.visible;
+        }
+        const int pa = int(line.pa)*256/x256, pc = int(line.pc)*256/x256;
+        if (pa < -32768 || pa > 32767 || pc < -32768 || pc > 32767) { lines[y] = {0,0,-256,-256,false}; continue; }
+        line.reference_x_8 += (int(line.pa)-pa)*120;
+        line.reference_y_8 += (int(line.pc)-pc)*120;
+        line.pa = static_cast<int16_t>(pa); line.pc = static_cast<int16_t>(pc);
+        lines[y] = line;
+    }
+    lines[160] = lines[0];
+    return true;
 }
 
 bool apply_video_composition(const VideoComposition& composition) {
@@ -670,6 +728,38 @@ bool apply_video_composition(const VideoComposition& composition) {
         set_display_frame_page(composition.bitmap_page);
     }
     return bitmap_loaded;
+}
+
+bool apply_scene_background_video(const VideoComposition& composition) {
+    if (composition.display_mode != DisplayMode::Mode0Text && composition.display_mode != DisplayMode::Mode1TextAffine) return false;
+    if (composition.affine_enabled && (composition.display_mode != DisplayMode::Mode1TextAffine ||
+        composition.affine_layer != BackgroundLayer::BG2)) return false;
+    if (composition.affine_enabled && composition.affine_tilemap != nullptr &&
+        (composition.affine_tilemap->width > 64 || composition.affine_tilemap->height > 64)) return false;
+    if (composition.affine_enabled) {
+        // Finish resident art uploads before reserving transfers for the plane.
+        // A full 32-entry queue must not silently drop the affine map.
+        if (!dma_wait_for_destination(reinterpret_cast<volatile void*>(0x06000000u), 0x18000u) ||
+            !dma_wait_for_destination(reinterpret_cast<volatile void*>(0x05000000u), 0x400u)) return false;
+        // Keep low-index UI image tiles intact: affine maps use SBB28-29,
+        // regular UI overlays use SBB26-27, and BG0 keeps SBB24-25/CBB0.
+        set_ui_character_base(0);
+        set_bg_screen_base(BackgroundLayer::BG1,26);
+        gbs_hw_set_affine_map_screen_base(28);
+    }
+    const bool loaded = apply_video_composition(composition);
+    gbs_hw_set_affine_map_screen_base(0);
+    if (!loaded) return false;
+    if (composition.affine_enabled) {
+        for (int layer = 1; layer < 4; ++layer) {
+            set_bg_enabled(static_cast<BackgroundLayer>(layer), layer == static_cast<int>(composition.affine_layer));
+        }
+        set_bg_enabled(BackgroundLayer::BG0, true);
+        set_bg_priority(BackgroundLayer::BG0, 0);
+        set_bg_priority(composition.affine_layer, 2);
+        render_ui_assets();
+    }
+    return true;
 }
 
 void fill_bitmap16(DisplayMode mode, uint16_t color, uint8_t page) {

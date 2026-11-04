@@ -2929,6 +2929,7 @@ function roomDetailsEditor(
               width={room.width}
             />
             <AffineSceneInspector
+              sceneType={room.sceneType}
               assetOptions={affineOptions}
               onChange={updateAffinePresentation}
               value={affinePresentation}

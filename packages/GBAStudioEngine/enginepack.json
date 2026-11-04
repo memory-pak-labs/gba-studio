@@ -692,6 +692,7 @@
       "affine_obj_transform",
       "sprite_animation_scale",
       "events.visual_scale",
+    "events.background_scale_profiles",
       "affine_obj_keyframes",
       "dynamic_palette_cycle",
       "dynamic_palette_blend",

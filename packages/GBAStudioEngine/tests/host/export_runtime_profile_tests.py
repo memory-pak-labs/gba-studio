@@ -1875,7 +1875,9 @@ def assert_mixed_runtime_dispatch_export(repo_root, build_dir):
     assert "gbs::runtime_transition_pending()" in world_map_runtime
     assert "const auto focus = journey.active ? journey.position : selected->position_pixels;" in world_map_runtime
     assert "camera_x = gbs::world_map_clamp(focus.x - 120" in world_map_runtime
-    assert "node.position_pixels.x-camera_x" in world_map_runtime
+    assert "const auto screen = map_screen_position(node.position_pixels);" in world_map_runtime
+    assert "project_event_background_point(event_state,project.video.affine_layer,point,screen)" in world_map_runtime
+    assert "return {point.x-camera_x,point.y-camera_y};" in world_map_runtime
     assert "gbs::set_bg_scroll(background->layer,camera_x % 256,camera_y % 256)" in world_map_runtime
     assert "gbs_run_visual_novel" in mixed_runtime
     assert "gbs_run_world_map" in mixed_runtime
@@ -4371,10 +4373,12 @@ def assert_isometric_template_updates_surfaces_inside_vblank(repo_root):
 
 def assert_isometric_template_restores_backdrop_after_palette_upload(repo_root):
     template = (repo_root / "examples" / "isometric_basic" / "src" / "main.cpp").read_text(encoding="utf-8")
-    palette_upload = "load_assets(room_data->video.affine_enabled ? room_data->video : project.video);\n    // load_assets uploads the room palettes, including palette entry 0. The\n    // backdrop must be applied after that upload to remain visible through\n    // transparent atlas corners.\n    gbs::set_backdrop_color(project.backdrop_color);"
-    assert palette_upload in template
-    palette_changes = "    gbs::consume_event_palette_changes(\n        event_state,\n        project.bg_palettes,\n        project.bg_palette_count,\n        project.obj_palettes,\n        project.obj_palette_count\n    );\n    // Palette uploads may replace BG palette entry 0. Restore the isometric\n    // backdrop afterwards so transparent diamond corners do not become black.\n    gbs::set_backdrop_color(project.backdrop_color);"
-    assert palette_changes in template
+    initial = template.split("    load_assets(room_data->video.affine_enabled ? room_data->video : project.video);", 1)[1].split("    for (size_t index = 0; index < max_actor_count", 1)[0]
+    changes = template.split("void consume_event_state(gbs::EventState& event_state) {", 1)[1].split("    consume_link_event_outputs(event_state);", 1)[0]
+    assert "gbs::consume_event_palette_changes(" in changes
+    for region in (initial, changes):
+        assert "if (!room_data->video.affine_enabled && !project.video.affine_enabled) {" in region
+        assert "gbs::set_backdrop_color(project.backdrop_color);" in region
 
 
 def assert_native_template_consumes_audio_outputs(output_dir, project_header, prefix):
@@ -4421,7 +4425,7 @@ def assert_point_click_profile_output(repo_root, output_dir):
     assert "constexpr gbs::PointClickInventoryItemData point_click_inventory_items" in header
     assert "point_click_scene_0_hotspot_1_on_use_item" in header
     assert 'gbs::PointClickSceneData { "room", -1, point_click_scene_0_hotspots, 2' in header
-    assert 'nullptr, 4, nullptr, 0, nullptr, 0, nullptr, nullptr, nullptr, nullptr },' in header
+    assert 'nullptr, 4, nullptr, 0, nullptr, 0, nullptr, nullptr, nullptr, nullptr , gbs::VideoComposition {' in header
     assert "scene->cursor_speed_pixels > 0" in main_cpp
     assert "gbs::EventOp::ShowDialogue" in header
     assert "gbs::EventOp::SetVariable" in header
@@ -4436,7 +4440,7 @@ def assert_point_click_profile_output(repo_root, output_dir):
     assert "gbs::set_bg_scroll(background.layer, 0, 0);" in main_cpp
     assert "gbs::set_event_input_state(event_state, input.held, input.pressed, input.released)" in main_cpp
     assert "gbs::update_button_event_bindings(event_state)" in main_cpp
-    assert "gbs::run_event_script(event_state, project.scripts[script_index])" in main_cpp
+    assert "run_scene_script(project.scripts[script_index])" in main_cpp
     assert "gbastudio_point_click_project::resource_bank_upload_sources" in main_cpp
     assert_native_template_consumes_audio_outputs(output_dir, "point_click_project_data.hpp", "point_click_project")
     compile_generated_header(

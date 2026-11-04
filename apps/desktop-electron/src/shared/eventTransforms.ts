@@ -17,3 +17,8 @@ export function parseScaleEvent(parts: string[]): { target: string; x256: number
   if (animate && (!/^\d+$/.test(parts[4] ?? "") || frames < 1 || frames > 32767)) throw new Error("Duração da escala requer 1–32767 quadros.");
   return { target, x256: reset ? 256 : percent(parts[2]), y256: reset ? 256 : percent(parts[3]), frames, background };
 }
+
+/** These scene renderers retain a fixed BG0 UI and select one prepared world image. */
+export function usesSinglePlaneBackground(profile: string): boolean {
+  return ["menu","cutscene","visualnovel","pointandclick","pointclick","worldmap","battlerpg","luta","dungeoncrawler","racing","isometric","isometricadventure"].includes(profile.replace(/[_-]/g, "").toLowerCase());
+}

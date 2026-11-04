@@ -1,3 +1,4 @@
+import { usesSinglePlaneBackground } from "./eventTransforms.js";
 import { assertSpriteScaleBudget } from "./spriteScale.js";
 import { memoizeEngineExport } from "./engineExportContext.js";
 import { sceneChangeCommandParts } from "./sceneChangeCommand.js";
@@ -5131,13 +5132,19 @@ function affineBackgroundAssetReference(room: Record<string, unknown>): string {
   return nullableStringField(affine, "assetId");
 }
 
+/** A prepared flat plane replaces the primary regular scene image in these renderers. */
+export function roomUsesFlatAffineBackground(room: Record<string, unknown>): boolean {
+  const profile=nullableStringField(child(room,"runtime"),"type") || nullableStringField(room,"sceneType");
+  return usesSinglePlaneBackground(profile) && !!affineBackgroundAssetReference(room);
+}
+
 function uniqueTilesetsFromRooms(data: GBAProjectData): string[] {
   const tilesets = new Set<string>();
   projectRooms(data).forEach((room) => {
     const authoredIsometricBackground = roomUsesAuthoredIsometricBackground(room);
     const pagedTacticalSurface = roomUsesPagedTacticalSurface(room);
     const background = nullableStringField(room, "backgroundAssetName") || nullableStringField(room, "background");
-    if (background && !pagedTacticalSurface) tilesets.add(background);
+    if (background && !pagedTacticalSurface && !roomUsesFlatAffineBackground(room)) tilesets.add(background);
     const authoredTileset = nullableStringField(room, "tilesetAssetName");
     if (authoredTileset && !authoredIsometricBackground && !pagedTacticalSurface) tilesets.add(authoredTileset);
     const runtimeBase = nullableStringField(room, "runtimeBaseBackgroundAssetName");

@@ -470,22 +470,22 @@ void apply_luta_visuals(const gbs::LutaStageData& stage) {
     gbs::set_bg_enabled(gbs::BackgroundLayer::BG1, false);
     gbs::set_bg_enabled(gbs::BackgroundLayer::BG2, false);
     gbs::set_bg_enabled(gbs::BackgroundLayer::BG3, false);
+    const gbs::LutaBackgroundData* background = gbs::luta_background_for(
+        project,
+        stage
+    );
+    if (background != nullptr) {
+        gbs::set_backdrop_color(background->backdrop_color);
+        gbs::load_tilemap(background->layer, background->tilemap);
+        gbs::set_bg_enabled(background->layer, true);
+        gbs::set_bg_scroll(background->layer, 0, 0);
+    }
+    gbs::apply_scene_background_video(stage.video);
     if (project.hud != nullptr) {
         gbs::load_tilemap(project.hud->layer, project.hud->tilemap);
         gbs::set_bg_enabled(project.hud->layer, true);
         gbs::set_bg_scroll(project.hud->layer, 0, 0);
     }
-    const gbs::LutaBackgroundData* background = gbs::luta_background_for(
-        project,
-        stage
-    );
-    if (background == nullptr) {
-        return;
-    }
-    gbs::set_backdrop_color(background->backdrop_color);
-    gbs::load_tilemap(background->layer, background->tilemap);
-    gbs::set_bg_enabled(background->layer, true);
-    gbs::set_bg_scroll(background->layer, 0, 0);
 }
 
 const gbs::LutaCharacter* luta_stage_fighter(const gbs::LutaStageData& stage, bool player_one) {
@@ -971,6 +971,7 @@ void render_luta_runtime(const gbs::RuntimeFrameContext& context) {
     draw_luta();
     sync_runtime_telemetry();
     gbs::draw_dialogue(dialogue);
+    gbs::render_event_background_scale(event_state);
     gbs::wait_vblank();
 }
 

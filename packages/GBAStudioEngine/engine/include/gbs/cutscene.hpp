@@ -78,6 +78,7 @@ struct CutsceneSceneData {
     const char* resource_bank_group_name;
     const CutsceneActorData* actors = nullptr;
     size_t actor_count = 0;
+    VideoComposition video = default_video_composition();
 };
 
 struct CutsceneProjectData {

@@ -45,14 +45,42 @@ regular nem aumenta o mundo/colisão. A exportação rejeita uma camada que não
 esteja preparada para affine, inclusive quando o comando está em um evento
 chamado por outro roteiro. HBlank autorado não pode disputar esse controle.
 
-O caminho nativo destes blocos está disponível em Aventura, Plataforma e SHMUP,
-sempre sujeito à composição exportável do perfil. Os demais perfis não anunciam
-este controle: seus renderizadores de fundo ainda precisam de integração
-específica, independentemente de o hardware permitir affine.
-A interface de composição explica a diferença entre preparação inicial e efeito
-em execução. O GBA permite BG2 affine no modo 1 e BG2/BG3 no modo 2; BG0/BG1
-regulares não recebem escala. O asset precisa passar pelo pipeline affine_bg,
-com seu próprio formato de tiles, mapa e paleta, e pelas validações do Engine Pack.
+O caminho nativo atende os 13 tipos de cena. O fluxo é preparar o fundo no
+inspetor da cena, escolher sua pose inicial e aplicar os blocos nos eventos de
+entrada, interação ou estado. Os renderizadores mantêm suas responsabilidades:
+
+| Tipo de cena | Aplicação e limite de uso |
+| --- | --- |
+| Aventura, Plataforma e SHMUP | Composição affine já suportada pelo perfil; movimento, atores e colisão continuam independentes. |
+| Menu, Cutscene e Visual Novel | Imagem de fundo transformada; escolhas, diálogo, retratos e interface ficam fixos. |
+| Batalha RPG e Luta | Imagem de fundo transformada; combatentes, HUD e regras de combate mantêm suas coordenadas. |
+| Point and Click | Só a imagem de fundo muda. Props, cursor e hotspots mantêm suas coordenadas. Para um efeito temporário, use Aguardar e Restaurar antes de devolver o controle. |
+| Mapa-múndi | O mapa e a posição dos marcadores seguem a mesma matriz e a câmera. Ícones mantêm o tamanho; navegação pelo grafo, textos e botões continuam próprios do perfil. |
+| Corrida vista de cima | Imagem affine preparada substitui o desenho visual da pista; física e checkpoints permanecem no espaço do circuito. |
+| Corrida em perspectiva | BG2 é o piso affine nativo, preparado em `pseudo3dVisuals.floorTilemapId`; não adicione outra camada BG2. A escala compõe com o raster existente, preservando o horizonte. A pista linear repete o piso; circuitos conservam suas bordas finitas. |
+| Isométrico e Dungeon Crawler | Modo opcional de **imagem plana**: a camada affine substitui a vista do terreno e sua oclusão. Grade, colisão, atores e lógica permanecem nativos. Não amplia a projeção do terreno ou a geometria de paredes. |
+
+Nos dez perfis ampliados, o fundo de imagem plana usa **BG2 no Modo 1**, com
+asset `affine_bg` de até **512×512 pixels e 224 cores**, para preservar BG0/BG1 e
+a paleta da interface. BG3 e bitmap são recusados nessa composição. O piso
+nativo da Corrida em perspectiva conserva seu próprio orçamento e raster;
+o limite de imagem plana não o redefine. Não é possível disputar BG2 ou
+adicionar um segundo consumidor HBlank.
+
+O asset precisa passar pelo pipeline `affine_bg`, com seu próprio formato de
+tiles, mapa e paleta, e pelas validações do Engine Pack. O pack anuncia a
+capacidade `events.background_scale_profiles`; um pack anterior não recebe
+silenciosamente comandos sem consumidor. O GBA permite BG2 affine no Modo 1 e
+BG2/BG3 no Modo 2; BG0/BG1 regulares não recebem escala, e o Modo 2 remove os
+planos regulares usados pela interface desses perfis.
+
+Point and Click e Mapa-múndi agora encadeiam os roteiros em quadros: Aguardar
+mantém a animação visual ativa e suspende a interação normal até o roteiro
+terminar. Isométrico agenda também os roteiros de escala, além dos movimentos.
+Visual Novel usa o mesmo avanço em quadros na exportação isolada e mista.
+O efeito continua transitório; não há novo formato de save ou persistência de
+um roteiro em execução nesses perfis. Reaplique a pose desejada ao restaurar
+uma cena usando as variáveis salvas do jogo.
 
 ## Limites
 

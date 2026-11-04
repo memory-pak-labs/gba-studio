@@ -13,7 +13,7 @@ const excluded: Record<string, string> = {
 
 const scoped: Record<string, string[]> = {
   ...Object.fromEntries(["set_actor_scale","animate_actor_scale","reset_actor_scale"].map(verb=>[verb,["topdown","platformer","isometric","menu","cutscene","point_click","dungeon_crawler","racing","shmup","battle_rpg","luta"]])),
-  ...Object.fromEntries(["set_background_scale","animate_background_scale","reset_background_scale"].map(verb=>[verb,["topdown","platformer","shmup"]])),
+  ...Object.fromEntries(["set_background_scale","animate_background_scale","reset_background_scale"].map(verb=>[verb,["topdown","platformer","shmup","menu","cutscene","visual_novel","point_click","world_map","battle_rpg","luta","dungeon_crawler","racing","isometric"]])),
   ...Object.fromEntries(visibilityPresetVerbs.map(verb => [verb, ["topdown", "platformer"]])),
   set_map_state: ["topdown", "platformer"],
   replace_tile: ["topdown", "platformer"],

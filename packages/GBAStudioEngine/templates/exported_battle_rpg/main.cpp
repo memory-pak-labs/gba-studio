@@ -1051,13 +1051,13 @@ void apply_battle_visuals(const gbs::BattleRpgEncounterData& encounter) {
         project,
         encounter
     );
-    if (background == nullptr) {
-        return;
+    if (background != nullptr) {
+        gbs::set_backdrop_color(background->backdrop_color);
+        gbs::load_tilemap(background->layer, background->tilemap);
+        gbs::set_bg_enabled(background->layer, true);
+        gbs::set_bg_scroll(background->layer, 0, 0);
     }
-    gbs::set_backdrop_color(background->backdrop_color);
-    gbs::load_tilemap(background->layer, background->tilemap);
-    gbs::set_bg_enabled(background->layer, true);
-    gbs::set_bg_scroll(background->layer, 0, 0);
+    gbs::apply_scene_background_video(encounter.video);
     if(encounter.presentation && encounter.presentation->hud_background_index>=0 && static_cast<size_t>(encounter.presentation->hud_background_index)<project.background_count){
         const auto& hud=project.backgrounds[encounter.presentation->hud_background_index];
         gbs::load_tilemap(hud.layer,hud.tilemap);gbs::set_bg_enabled(hud.layer,true);gbs::set_bg_scroll(hud.layer,0,0);
@@ -1583,6 +1583,7 @@ void render_battle_rpg_runtime(const gbs::RuntimeFrameContext& context) {
     // The authored BG1 frame owns bank 14; the generic HUD skin also uses it.
     // Restore only the encounter's 16-color frame bank after native UI writes.
     if(presentation && presentation->hud_palette)gbs::load_palette(*presentation->hud_palette,false);
+    gbs::render_event_background_scale(event_state);
     gbs::wait_vblank();
 }
 

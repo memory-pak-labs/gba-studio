@@ -1,3 +1,4 @@
+import { SceneBackgroundEffectsHelp } from "./SceneBackgroundEffectsHelp";
 import { uiText as ui, useStudioUiText } from "./studioUiText";
 import { useMemo, type ReactElement } from "react";
 
@@ -262,6 +263,7 @@ export function SceneCompositionInspector({
         options={MODE_OPTIONS}
         value={normalized.mode}
       />
+      <SceneBackgroundEffectsHelp sceneType={sceneType} />
       <InspectorSelect
         ariaLabel={ui("Fallback de incompatibilidade da composição")}
         label={ui("Fallback")}
