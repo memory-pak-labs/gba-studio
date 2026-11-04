@@ -1145,7 +1145,7 @@ int draw_dungeon_foreground_sprite(int first, const gbs::MetaSprite& metasprite,
         const auto& part=metasprite.parts[i];
         // BG0 text stays above the first-person sprite; BG2 world stays below.
         gbs::Sprite sprite {anchor.x+part.x,anchor.y+part.y,part.tile_index,part.palette,part.hflip,part.vflip,true,1,gbs::SpriteRenderMode::Normal,false,part.width,part.height};
-        sprite.color_depth=part.color_depth;
+        sprite.color_depth=part.color_depth; gbs::apply_metasprite_part_scale(sprite, part);
         gbs::set_sprite(first+count++,sprite);
     }
     return count;

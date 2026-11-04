@@ -397,7 +397,12 @@ void draw_scene_actors() {
         const gbs::Vec2i position = step != nullptr
             ? gbs::cutscene_actor_position_at(*scene, *step, actor_index, cutscene_state.frame_counter)
             : actor.position_pixels;
-        gbs::set_metasprite(sprite_index, *metasprite, position);
+        gbs::MetaSprite rendered = *metasprite;
+        if (actor.metasprite != nullptr) {
+            rendered.scale_x256 = actor.metasprite->scale_x256;
+            rendered.scale_y256 = actor.metasprite->scale_y256;
+        }
+        gbs::set_metasprite(sprite_index, rendered, position);
         sprite_index += metasprite->part_count;
     }
 }

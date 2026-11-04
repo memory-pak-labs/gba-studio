@@ -582,7 +582,7 @@ void draw_luta_fighter(int first_index, const gbs::MetaSprite& metasprite, gbs::
         sprite.priority = 1;
         sprite.width = part.width;
         sprite.height = part.height;
-        sprite.color_depth = part.color_depth;
+        sprite.color_depth = part.color_depth; gbs::apply_metasprite_part_scale(sprite, part);
         gbs::set_sprite(first_index + index, sprite);
     }
 }

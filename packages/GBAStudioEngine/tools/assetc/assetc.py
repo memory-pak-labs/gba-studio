@@ -2314,6 +2314,11 @@ def emit_custom_metasprite_part(part, tile_lookup, default_palette, sprite_bpp=4
     combined_hflip = (part.get("hflip") is True) != optimized_hflip
     hflip = "true" if combined_hflip else "false"
     color_depth = ", gbs::ColorDepth::Bpp8" if sprite_bpp == 8 else ""
+    scale_x = require_int(part.get("scale_x256", 256), "escala X", 128, 512)
+    scale_y = require_int(part.get("scale_y256", 256), "escala Y", 128, 512)
+    if scale_x != 256 or scale_y != 256:
+        color_depth = ", gbs::ColorDepth::Bpp8" if sprite_bpp == 8 else ", gbs::ColorDepth::Bpp4"
+        color_depth += f", {scale_x}, {scale_y}"
     return f"{{ {x}, {y}, {tile_index}, {palette}, {hflip}, {vflip}, {width}, {height}{color_depth} }}"
 
 
@@ -7700,7 +7705,15 @@ def resolve_project_metasprite_symbol(value, fallback, asset_report, description
     if value is None:
         return fallback
     if isinstance(value, dict):
-        return resolve_project_asset_symbol(value, "metasprite", asset_report, description)
+        symbol = resolve_project_asset_symbol(value, "metasprite", asset_report, description)
+        sx = require_int(value.get("scale_x256", 256), f"{description}.scale_x256", 128, 512)
+        sy = require_int(value.get("scale_y256", 256), f"{description}.scale_y256", 128, 512)
+        if sx != 256 or sy != 256:
+            match = re.fullmatch(r"([A-Za-z_][A-Za-z0-9_:]*)\[(\d+)\]", symbol)
+            if not match:
+                raise SystemExit(f"{description}: escala requer uma referencia de metasprite do asset pack")
+            return f"gbs::ScaledMetaSpriteReference<{match.group(1)}, {match.group(2)}, {sx}, {sy}>::value"
+        return symbol
     if isinstance(value, str) and value:
         symbol = asset_pack_member_symbol(asset_report, value, "metasprite")
         return symbol if symbol is not None else value

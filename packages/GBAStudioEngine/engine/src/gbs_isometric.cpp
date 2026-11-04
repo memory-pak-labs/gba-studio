@@ -218,10 +218,13 @@ bool iso_draw_item_less(const gbs::IsoDrawItem& left, const gbs::IsoDrawItem& ri
 }
 
 bool iso_draw_item_intersects_viewport(const gbs::IsoDrawItem& item) {
-    const int right = item.screen_pixels.x + static_cast<int>(item.width);
-    const int bottom = item.screen_pixels.y + static_cast<int>(item.height);
-    return item.screen_pixels.x < gbs::gba_screen_width &&
-        item.screen_pixels.y < gbs::gba_screen_height &&
+    const bool scaled = item.scale_x256 != 256 || item.scale_y256 != 256;
+    const int margin_x = scaled ? item.width / 2 : 0;
+    const int margin_y = scaled ? item.height / 2 : 0;
+    const int right = item.screen_pixels.x + static_cast<int>(item.width) + margin_x;
+    const int bottom = item.screen_pixels.y + static_cast<int>(item.height) + margin_y;
+    return item.screen_pixels.x - margin_x < gbs::gba_screen_width &&
+        item.screen_pixels.y - margin_y < gbs::gba_screen_height &&
         right > 0 &&
         bottom > 0;
 }
@@ -1741,7 +1744,7 @@ size_t build_iso_draw_list(
                 part.width,
                 part.height,
                 part.vflip,
-                part.color_depth
+                part.color_depth, part.scale_x256, part.scale_y256
             };
             if (iso_draw_item_intersects_viewport(item)) {
                 out_items[count++] = item;
@@ -1841,7 +1844,7 @@ void draw_iso_sprites(const IsoDrawItem* items, size_t item_count, int first_oam
             false,
             false,
             0,
-            item.color_depth
+            item.color_depth, item.scale_x256, item.scale_y256
         });
     }
 }

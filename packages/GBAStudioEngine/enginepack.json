@@ -690,6 +690,7 @@
       "bitmap_mode3_mode5_rect_update",
       "bitmap_page_flip",
       "affine_obj_transform",
+      "sprite_animation_scale",
       "affine_obj_keyframes",
       "dynamic_palette_cycle",
       "dynamic_palette_blend",

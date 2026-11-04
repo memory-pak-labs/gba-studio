@@ -85,7 +85,7 @@ void draw_racing_metasprite(int first_index, const gbs::MetaSprite& metasprite, 
             position.x + part.x, position.y + part.y, part.tile_index,
             part.palette, part.hflip, part.vflip, true, 0,
             gbs::SpriteRenderMode::Normal, false, part.width, part.height,
-            false, false, 0, part.color_depth
+            false, false, 0, part.color_depth, part.scale_x256, part.scale_y256
         });
     }
 }
@@ -878,7 +878,7 @@ GBS_RACING_RENDER_CODE void draw_pseudo3d_actors(const gbs::RacingRoomData& room
                 const int center_x=point.x+(part.x+part.width/2)*scale/256;
                 const int center_y=point.y+(part.y+part.height/2)*scale/256;
                 gbs::Sprite object {center_x-part.width/2,center_y-part.height/2,part.tile_index,part.palette,false,false,true,0,gbs::SpriteRenderMode::Normal,false,part.width,part.height};
-                object.color_depth=part.color_depth;object.affine=true;object.affine_matrix=static_cast<uint8_t>(index+1);
+                object.color_depth=part.color_depth; gbs::apply_metasprite_part_scale(object, part);object.affine=true;object.affine_matrix=static_cast<uint8_t>(index+1);
                 gbs::set_affine_sprite_transform(object.affine_matrix,{static_cast<int16_t>(65536/scale),0,0,static_cast<int16_t>(65536/scale)});
                 draw_racing_sprite(sprite_index++,object);
             }
@@ -917,7 +917,7 @@ bool draw_topdown_vehicle(
         part.width,
         part.height
     };
-    sprite.color_depth = part.color_depth;
+    sprite.color_depth = part.color_depth; gbs::apply_metasprite_part_scale(sprite, part);
     sprite.affine = true;
     sprite.affine_matrix = matrix_index;
     if (!gbs::set_affine_sprite_transform(matrix_index,

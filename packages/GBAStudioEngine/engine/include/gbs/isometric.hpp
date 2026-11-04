@@ -448,6 +448,8 @@ struct IsoDrawItem {
     uint8_t height = 16;
     bool vflip = false;
     ColorDepth color_depth = ColorDepth::Bpp4;
+    uint16_t scale_x256 = 256;
+    uint16_t scale_y256 = 256;
 };
 
 // The adventure renderer keeps a 320x192 circular surface so the hardware

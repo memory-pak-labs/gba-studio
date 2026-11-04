@@ -465,7 +465,7 @@ void set_actor_metasprite(
             use_affine,
             use_affine && affine_object->double_size,
             static_cast<uint8_t>(use_affine ? affine_object->matrix_index : 0),
-            part.color_depth
+            part.color_depth, part.scale_x256, part.scale_y256
         });
     }
 }

@@ -348,7 +348,7 @@ void set_platformer_metasprite(
             false,
             false,
             0,
-            part.color_depth
+            part.color_depth, part.scale_x256, part.scale_y256
         });
     }
 }

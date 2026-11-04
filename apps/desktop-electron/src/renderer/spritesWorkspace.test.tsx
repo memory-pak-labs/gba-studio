@@ -37,6 +37,16 @@ function spritesWorkspaceHandlers(overrides: Record<string, unknown> = {}) {
 describe("SpritesWorkspace React smoke", () => {
   afterEach(cleanup);
 
+  it("edita a escala de jogo em eixos independentes", async () => {
+    const user = userEvent.setup(), handlers = spritesWorkspaceHandlers();
+    render(<SpritesWorkspace presentation={deriveSpritesWorkspacePresentation(createBlankProjectData({ name: "Escala" }))} {...handlers} />);
+    await user.click(screen.getByRole("button", { name: "player_topdown_4dir.png" }));
+    fireEvent.change(screen.getByRole("slider", { name: "Escala X do sprite" }), { target: { value: "1.5" } });
+    fireEvent.change(screen.getByRole("slider", { name: "Escala Y do sprite" }), { target: { value: "0.75" } });
+    expect(handlers.onUpdateAnimationFields).toHaveBeenCalledWith(expect.any(String), { scaleX: 1.5 });
+    expect(handlers.onUpdateAnimationFields).toHaveBeenCalledWith(expect.any(String), { scaleY: 0.75 });
+  });
+
   it("oferece 8bpp como escolha avançada da folha sem alterar a imagem", async () => {
     const user = userEvent.setup(), handlers = spritesWorkspaceHandlers();
     render(<SpritesWorkspace presentation={deriveSpritesWorkspacePresentation(createBlankProjectData({ name: "Cores" }))} {...handlers} />);

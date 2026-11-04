@@ -63,6 +63,8 @@ export interface GbaRoomRenderLayers {
 }
 
 export interface GbaActorSpriteFrame {
+  scaleX?: number;
+  scaleY?: number;
   animationID: string;
   animationName: string;
   frameHeight: number;
@@ -574,6 +576,10 @@ function gbaActorSpriteFrameFromAnimation(
 
   const frame = {
     animationID: animationID(animation, animationIndex),
+    ...((animation.scaleX ?? 1) !== 1 || (animation.scaleY ?? 1) !== 1 ? {
+      scaleX: typeof animation.scaleX === "number" ? animation.scaleX : 1,
+      scaleY: typeof animation.scaleY === "number" ? animation.scaleY : 1
+    } : {}),
     animationName: stringField(animation.name, animationName ?? `animation-${animationIndex + 1}`),
     frameHeight: runtimeFrameHeight,
     frameIndex: nonNegativeInteger(selectedFrame.frameIndex, Math.max(0, Math.floor(frameIndex))),

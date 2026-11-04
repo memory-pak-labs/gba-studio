@@ -11182,6 +11182,9 @@ function buildEngineExportProjectContractUncached(
   }
   if(projectArray(data,"actors").some(actor=>normalizeMenuVisibilityConditions(actor.menuVisibilityConditions).length))features.push("menu_actor_visibility_conditions");
   if(projectArray(data,"events").some(event=>JSON.stringify(event).includes("set_player_speed_profile")))features.push("topdown_run_profile");
+  if (projectArray(data, "animations").some(animation => (animation.scaleX ?? 1) !== 1 || (animation.scaleY ?? 1) !== 1)) {
+    features.push("sprite_animation_scale");
+  }
   features.push("hardware.gba_native_contract");
   features.push("events.native_authoring_v2");
   if (exportRoomsForKind(data, "topdown").some(room => {

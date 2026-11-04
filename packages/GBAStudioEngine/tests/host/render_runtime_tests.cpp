@@ -286,6 +286,54 @@ void test_affine_sprite_matrix_and_flags_reach_hardware() {
     assert(last_affine_double_size == 1);
 }
 
+constexpr gbs::MetaSpritePart scaled_reference_parts[] = {{-8, 0, 0, 0, false, false}, {8, 0, 4, 0, false, false}};
+constexpr gbs::MetaSprite scaled_reference_sources[] = {{scaled_reference_parts, 2}};
+using ScaledReference = gbs::ScaledMetaSpriteReference<scaled_reference_sources, 0, 384, 192>;
+static_assert(ScaledReference::value.scale_x256 == 384, "static references retain authored scaling");
+
+void test_scaled_static_metasprite_reference_reaches_hardware() {
+    gbs::hide_all_sprites(); reset_spy();
+    gbs::set_metasprite(0, ScaledReference::value, {40, 10});
+    assert(sprite_calls == 2);
+    assert(last_affine_sprite_transform.pa == 171 && last_affine_sprite_transform.pd == 341);
+    gbs::hide_all_sprites();
+}
+
+void test_authored_sprite_scale_uses_bounded_shared_matrices() {
+    gbs::hide_all_sprites();
+    reset_spy();
+    gbs::Sprite sprite { 40, 50, 0, 0, false, false, true };
+    sprite.scale_x256 = 384;
+    sprite.scale_y256 = 128;
+    gbs::set_sprite(0, sprite);
+    assert(last_affine_matrix_index == 16);
+    assert(last_affine_sprite_transform.pa == 171);
+    assert(last_affine_sprite_transform.pd == 512);
+    assert(last_affine_double_size == 1);
+    const int writes = affine_sprite_matrix_calls;
+    gbs::set_sprite(1, sprite);
+    assert(affine_sprite_matrix_calls == writes); // Share matrices across parts/actors.
+    sprite.hflip = true;
+    gbs::set_sprite(2, sprite);
+    assert(last_affine_sprite_transform.pa == -171);
+    assert(!gbs::set_affine_sprite_transform(16, {256,0,0,256})); // Never overwrite a live automatic matrix.
+    gbs::hide_all_sprites();
+    sprite.hflip = false;
+    for (int i = 0; i < 16; ++i) {
+        sprite.scale_x256 = 128 + i * 8;
+        gbs::set_sprite(i, sprite);
+    }
+    const int submitted = sprite_calls;
+    sprite.scale_x256 = 384;
+    gbs::set_sprite(17, sprite);
+    assert(sprite_calls == submitted); // A seventeenth matrix cannot corrupt earlier sprites.
+    gbs::hide_world_sprites();
+    gbs::set_sprite(17, sprite);
+    assert(sprite_calls == submitted + 1);
+    gbs::hide_all_sprites();
+    assert(gbs::set_affine_sprite_transform(16, {256,0,0,256}));
+}
+
 void test_affine_keyframes_apply_at_runtime_frame() {
     reset_spy();
     const gbs::AffineMatrixKeyframe sprite_keyframes[] = {
@@ -1029,6 +1077,8 @@ int main() {
     test_sprite_mosaic_and_priority_reach_hardware();
     test_native_sprite_dimensions_reach_hardware();
     test_affine_sprite_matrix_and_flags_reach_hardware();
+    test_scaled_static_metasprite_reference_reaches_hardware();
+    test_authored_sprite_scale_uses_bounded_shared_matrices();
     test_affine_keyframes_apply_at_runtime_frame();
     test_dynamic_palette_and_bitmap_rect_updates();
     test_event_palette_commands_load_valid_assets_once();

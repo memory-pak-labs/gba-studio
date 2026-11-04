@@ -465,7 +465,7 @@ void draw_nodes() {
                 gbs::set_affine_sprite_transform(0,matrix);
                 gbs::Sprite sprite {x-part.width,y-part.height,part.tile_index,part.palette,false,false,true};
                 sprite.width=part.width; sprite.height=part.height; sprite.affine=true; sprite.double_size=true;
-                sprite.affine_matrix=0; sprite.color_depth=part.color_depth;
+                sprite.affine_matrix=0; sprite.color_depth=part.color_depth; gbs::apply_metasprite_part_scale(sprite, part, vehicle);
                 gbs::set_sprite(sprite_index++,sprite);
             } else {
                 gbs::set_metasprite(sprite_index,*vehicle,{x,y}); sprite_index += vehicle->part_count;

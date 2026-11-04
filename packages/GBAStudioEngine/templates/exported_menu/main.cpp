@@ -1114,7 +1114,7 @@ void draw_screen_actors() {
                     part.width,
                     part.height
                 };
-                sprite.color_depth = part.color_depth;
+                sprite.color_depth = part.color_depth; gbs::apply_metasprite_part_scale(sprite, part, metasprite);
                 gbs::set_sprite(sprite_index + part_index, sprite);
             }
         } else {

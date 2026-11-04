@@ -1681,7 +1681,7 @@ void draw_shmup_metasprite(int first_index, const gbs::MetaSprite& metasprite, g
             position.x + part.x, position.y + part.y, part.tile_index,
             part.palette, part.hflip, part.vflip, true, 0,
             gbs::SpriteRenderMode::Normal, false, part.width, part.height,
-            false, false, 0, part.color_depth
+            false, false, 0, part.color_depth, part.scale_x256, part.scale_y256
         });
     }
 }

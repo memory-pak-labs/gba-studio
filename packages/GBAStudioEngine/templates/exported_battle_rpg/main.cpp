@@ -1110,7 +1110,7 @@ void draw_battle_participant_metasprite(
                 position.x + part.x, position.y + part.y, part.tile_index,
                 part.palette, part.hflip, part.vflip, true, 1,
                 gbs::SpriteRenderMode::Normal, false, part.width, part.height,
-                false, false, 0, part.color_depth
+                false, false, 0, part.color_depth, part.scale_x256, part.scale_y256
             });
         }
         return;
@@ -1138,7 +1138,7 @@ void draw_battle_participant_metasprite(
             true,
             true,
             0,
-            part.color_depth
+            part.color_depth, part.scale_x256, part.scale_y256
         });
     }
 }

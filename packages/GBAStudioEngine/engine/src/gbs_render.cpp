@@ -34,6 +34,49 @@ alignas(4) uint8_t compressed_palette_decode_buffer[max_lz77_palette_bytes] GBS_
 uint16_t palette_decode_buffer[max_lz77_palette_colors] GBS_RENDER_EWRAM;
 uint16_t dynamic_palette_buffer[256] GBS_RENDER_EWRAM;
 int background_scroll_x[4] {};
+AffineSpriteTransform explicit_sprite_matrices[32] GBS_RENDER_EWRAM {};
+AffineSpriteTransform scaled_sprite_matrices[16] GBS_RENDER_EWRAM {};
+uint8_t scaled_sprite_matrix_slots[16] GBS_RENDER_EWRAM {};
+uint8_t scaled_sprite_matrix_count = 0;
+uint32_t explicit_sprite_matrix_mask = 0;
+
+void reset_scaled_sprite_matrices() {
+    scaled_sprite_matrix_count = 0;
+    explicit_sprite_matrix_mask = 0;
+}
+
+int scaled_sprite_matrix(const Sprite& sprite) {
+    const AffineSpriteTransform base = sprite.affine && sprite.affine_matrix < 32
+        ? explicit_sprite_matrices[sprite.affine_matrix] : AffineSpriteTransform {256, 0, 0, 256};
+    const int x = sprite.hflip ? -1 : 1, y = sprite.vflip ? -1 : 1;
+    const auto scale = [](int coefficient, int factor, int sign) {
+        const int value = coefficient * 256;
+        return sign * ((value >= 0 ? value + factor / 2 : value - factor / 2) / factor);
+    };
+    const int values[] = {scale(base.pa, sprite.scale_x256, x), scale(base.pb, sprite.scale_x256, x),
+        scale(base.pc, sprite.scale_y256, y), scale(base.pd, sprite.scale_y256, y)};
+    for (int value : values) if (value < -32768 || value > 32767) return -1;
+    const AffineSpriteTransform matrix {static_cast<int16_t>(values[0]), static_cast<int16_t>(values[1]),
+        static_cast<int16_t>(values[2]), static_cast<int16_t>(values[3])};
+    for (uint8_t i = 0; i < scaled_sprite_matrix_count; ++i) {
+        const auto& candidate = scaled_sprite_matrices[i];
+        if (candidate.pa == matrix.pa && candidate.pb == matrix.pb && candidate.pc == matrix.pc && candidate.pd == matrix.pd)
+            return scaled_sprite_matrix_slots[i];
+    }
+    if (scaled_sprite_matrix_count == 16) return -1;
+    int slot = 16;
+    for (; slot < 32; ++slot) {
+        bool occupied = (explicit_sprite_matrix_mask & (1u << slot)) != 0;
+        for (uint8_t i = 0; i < scaled_sprite_matrix_count; ++i) occupied = occupied || scaled_sprite_matrix_slots[i] == slot;
+        if (!occupied) break;
+    }
+    if (slot == 32) return -1;
+    scaled_sprite_matrices[scaled_sprite_matrix_count] = matrix;
+    scaled_sprite_matrix_slots[scaled_sprite_matrix_count++] = static_cast<uint8_t>(slot);
+    gbs_hw_set_sprite_affine_matrix(slot, matrix.pa, matrix.pb, matrix.pc, matrix.pd);
+    return slot;
+}
+
 int16_t hblank_composed_scroll[160] {};
 #undef GBS_RENDER_EWRAM
 
@@ -817,7 +860,16 @@ void draw_text_input_keyboard_with_controls(int x, int y, int width, int height,
     gbs_hw_draw_text_input_keyboard_with_controls(x, y, width, height, selected_index, lowercase ? 1 : 0, visible ? 1 : 0, control_layout, controls_x, controls_y, controls_width, controls_height, surface);
 }
 
-void set_sprite(int index, const Sprite& sprite) {
+void set_sprite(int index, const Sprite& source) {
+    Sprite sprite = source;
+    if (sprite.scale_x256 != 256 || sprite.scale_y256 != 256) {
+        if (sprite.scale_x256 < 128 || sprite.scale_x256 > 512 || sprite.scale_y256 < 128 || sprite.scale_y256 > 512) return;
+        const int matrix = scaled_sprite_matrix(sprite);
+        if (matrix < 0) { gbs_hw_hide_sprites(index, 1); return; }
+        if (!sprite.double_size) { sprite.x -= sprite.width / 2; sprite.y -= sprite.height / 2; }
+        sprite.affine = true; sprite.double_size = true; sprite.affine_matrix = static_cast<uint8_t>(matrix);
+        sprite.hflip = false; sprite.vflip = false;
+    }
     if (!is_valid_render_priority(sprite.priority) ||
         !is_valid_sprite_render_mode(sprite.mode) ||
         !is_valid_sprite_dimensions(sprite.width, sprite.height) ||
@@ -852,6 +904,10 @@ bool set_affine_sprite_transform(uint8_t matrix_index, const AffineSpriteTransfo
     if (matrix_index >= 32) {
         return false;
     }
+    for (uint8_t i = 0; i < scaled_sprite_matrix_count; ++i)
+        if (scaled_sprite_matrix_slots[i] == matrix_index) return false;
+    explicit_sprite_matrices[matrix_index] = transform;
+    explicit_sprite_matrix_mask |= 1u << matrix_index;
     gbs_hw_set_sprite_affine_matrix(matrix_index, transform.pa, transform.pb, transform.pc, transform.pd);
     return true;
 }
@@ -915,19 +971,23 @@ void set_metasprite(int first_index, const MetaSprite& metasprite, Vec2i positio
             part.height
         };
         sprite.color_depth = part.color_depth;
+        apply_metasprite_part_scale(sprite, part, &metasprite);
         set_sprite(first_index + part_index, sprite);
     }
 }
 
 void hide_all_sprites() {
+    reset_scaled_sprite_matrices();
     gbs_hw_hide_all_sprites();
 }
 
 void hide_world_sprites() {
+    reset_scaled_sprite_matrices();
     gbs_hw_hide_world_sprites();
 }
 
 void hide_sprites(int first_index, int count) {
+    if (first_index == 0 && count >= 64) reset_scaled_sprite_matrices();
     gbs_hw_hide_sprites(first_index, count);
 }
 
