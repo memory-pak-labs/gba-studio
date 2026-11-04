@@ -10,7 +10,7 @@ import sys
 from pathlib import Path
 
 
-VERSION = "gbsdoctor 2.25.0"
+VERSION = "gbsdoctor 2.27.0"
 
 KIND_ALIASES = {
     "top_down": "topdown",

@@ -874,6 +874,7 @@ size_t format_dialogue_display_text(const DialogueState& state, char* out, size_
 }
 
 void draw_dialogue(const DialogueState& state) {
+    gbs_hw_set_dialogue_oam_front(state.visible ? 1 : 0);
     if (active_dialogue_ui.portrait_tab) {
         clear_drawn_dialogue_regions();
         char display_buffer[dialogue_page_buffer_capacity];
@@ -883,6 +884,13 @@ void draw_dialogue(const DialogueState& state) {
             : active_dialogue_ui.portrait_on_right;
         gbs_hw_draw_portrait_tab(active_dialogue_ui.show_character_name ? state.speaker : nullptr,
             display_buffer, state.visible, dialogue_should_show_portrait(state), right);
+        return;
+    }
+    if (!state.visible) {
+        // Only erase regions actually owned by the last visible dialogue.
+        // Re-clearing the empty UI plane on every frame forces an unnecessary
+        // tilemap upload and can also erase unrelated HUD content.
+        clear_drawn_dialogue_regions();
         return;
     }
     const DialogueBoxLayout layout = dialogue_box_layout_for_frame(state.frame_index);
@@ -910,25 +918,6 @@ void draw_dialogue(const DialogueState& state) {
             dimensions.width, dimensions.height);
     }
     replace_drawn_dialogue_regions(regions, region_count);
-    DialogueBoxLayout label_clear_layout = dialogue_name_label_layout_for_frame(
-        state.frame_index,
-        layout.w,
-        active_dialogue_ui.fixed_portrait_slots,
-        portrait_on_right,
-        dialogue_should_show_portrait(state),
-        dimensions.width,
-        dimensions.height
-    );
-    label_clear_layout.x = layout.x;
-    label_clear_layout.w = layout.w;
-    gbs_hw_draw_text_box(
-        label_clear_layout.x,
-        label_clear_layout.y,
-        label_clear_layout.w,
-        label_clear_layout.h,
-        nullptr,
-        0
-    );
     if (active_dialogue_ui.fixed_portrait_slots && portrait_visible) {
         const DialogueBoxLayout portrait_box = dialogue_portrait_slot_layout_for_frame(
             state.frame_index, portrait_on_right, dimensions.width, dimensions.height);

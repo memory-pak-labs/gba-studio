@@ -23,7 +23,7 @@ struct HudState {};
 struct Vec2i { int x,y; };
 bool dialogue_should_show_portrait(const DialogueState&) { return portrait_visible; }
 Vec2i dialogue_portrait_position_pixels(const DialogueState&) { return {0,64}; }
-void draw_dialogue_portrait(const DialogueState&) { if(portrait_visible) calls += 'P'; }
+void draw_dialogue_portrait(const DialogueState& state) { assert(state.visible); if(portrait_visible) calls += 'P'; }
 struct DialogueBoxLayout { int x,y,w,h; };
 struct DialogueUiConfig { bool name_label_above=true, show_character_name=true; };
 DialogueBoxLayout dialogue_box_layout_for_frame(int) { return {1,14,28,5}; }

@@ -10,6 +10,7 @@
 #include "gbs/runtime_telemetry.hpp"
 #include "gbs/ui.hpp"
 #include "gbs/visual_effects.hpp"
+#include <cstring>
 #ifndef GBS_DUNGEON_CRAWLER_PROJECT_DATA_HEADER
 #define GBS_DUNGEON_CRAWLER_PROJECT_DATA_HEADER "dungeon_crawler_project_data.hpp"
 #endif
@@ -266,10 +267,8 @@ gbs::DungeonDirection dungeon_direction_from_event(int direction) {
 bool dungeon_lateral_hud_active() {
     const gbs::HudLayout* layout = gbs::active_hud_layout();
     return layout != nullptr && (
-        dungeon_string_equals(layout->id, "hud-usina-lateral") ||
-        dungeon_string_equals(layout->id, "hud-usina-exploration-v3") ||
-        dungeon_string_equals(layout->id, "hud-usina-combat-v3") ||
-        dungeon_string_equals(layout->id, "hud-usina-exit-v3")
+        dungeon_string_equals(layout->text_profile, "dungeon-sidebar-contextual") ||
+        dungeon_string_equals(layout->text_profile, "dungeon-sidebar")
     );
 }
 
@@ -491,6 +490,7 @@ bool update_dungeon_map(const gbs::InputState& input) {
             interaction_mode=DungeonInteractionMode::None;
             for(int y=0;y<13;++y)for(int x=0;x<13;++x)gbs::set_bg_tile(gbs::BackgroundLayer::BG0,x,y,32,32,0);
             gbs::render_ui_assets();
+            gbastudio_dialogue_ui::configure_for_scene(room.name, true);
         }
         return true;
     }
@@ -1064,6 +1064,10 @@ bool update_dungeon_interaction(const gbs::InputState& input) {
             show_dungeon_notice("SEM CELULA.", false);
             return true;
         }
+        if (dungeon_player_hp() >= 3) {
+            show_dungeon_notice("VIDA CHEIA.", false);
+            return true;
+        }
         --event_state.inventory[item.item_index];
         exploration_player_hp = exploration_player_hp + item.heal_amount > 3
             ? 3
@@ -1440,13 +1444,33 @@ gbs::RuntimeAdapterFrameResult update_dungeon_crawler_runtime(const gbs::Runtime
 
 void draw_presented_dungeon_map() {
     if(!dungeon_presentation() || interaction_mode!=DungeonInteractionMode::Map)return;
-    const uint16_t neutral_colors[16]={0,gbs::rgb15(1,4,6),gbs::rgb15(6,10,11),gbs::rgb15(25,24,20),gbs::rgb15(30,22,7)};
-    const gbs::PaletteAsset neutral_palette {neutral_colors,16,224};
+    static const uint16_t neutral_colors[16]={0,gbs::rgb15(1,4,6),gbs::rgb15(6,10,11),gbs::rgb15(25,24,20),gbs::rgb15(30,22,7)};
+    static const gbs::PaletteAsset neutral_palette {neutral_colors,16,224};
     const auto* palette=dungeon_presentation()->hud_palette;
-    if(!palette){palette=&neutral_palette;gbs::load_palette(neutral_palette,false);}
+    const auto* skin=gbs::active_hud_box_skin();
+    const uint16_t* palette_colors=palette?palette->colors:skin && skin->palette?skin->palette:neutral_colors;
+    // The modular HUD uses this same BG bank. Its authored colors stay active
+    // while the map chooses the nearest existing colors for its four cells.
+    if(!palette && (!skin || !skin->palette))gbs::load_palette(neutral_palette,false);
     const uint16_t wanted[4]={gbs::rgb15(1,4,6),gbs::rgb15(6,10,11),gbs::rgb15(25,24,20),gbs::rgb15(30,22,7)};
-    uint8_t colors[4] {};for(int n=0;n<4;++n){int best=99999;for(int i=1;i<16;++i){const auto c=palette->colors[i];const int dr=int(c&31)-int(wanted[n]&31),dg=int((c>>5)&31)-int((wanted[n]>>5)&31),db=int((c>>10)&31)-int((wanted[n]>>10)&31);const int d=dr*dr+dg*dg+db*db;if(d<best){best=d;colors[n]=i;}}}
-    uint8_t tiles[128] {};for(int n=0;n<4;++n)for(int y=0;y<8;++y)for(int x=0;x<8;++x){const auto color=colors[x==7||y==7?0:n];tiles[n*32+y*4+x/2]|=color<<((x%2)*4);}
+    uint8_t colors[4] {};
+    for(int n=0;n<4;++n) {
+        int best=99999;
+        // Keep walls, passages and the player distinct in a monochrome skin.
+        // A skin with fewer than four colors may reuse its closest color.
+        for(int pass=0;pass<2 && best==99999;++pass)for(int i=1;i<16;++i) {
+            const auto c=palette_colors[i];
+            bool used=false;
+            for(int previous=0;previous<n;++previous)if(palette_colors[colors[previous]]==c)used=true;
+            if(pass==0 && used)continue;
+            const int dr=int(c&31)-int(wanted[n]&31),dg=int((c>>5)&31)-int((wanted[n]>>5)&31),db=int((c>>10)&31)-int((wanted[n]>>10)&31);
+            const int distance=dr*dr+dg*dg+db*db;
+            if(distance<best){best=distance;colors[n]=i;}
+        }
+    }
+    // Uploads are deferred until VBlank, after this function has returned.
+    static uint8_t tiles[128] {};std::memset(tiles,0,sizeof(tiles));
+    for(int n=0;n<4;++n)for(int y=0;y<8;++y)for(int x=0;x<8;++x){const auto color=colors[x==7||y==7?0:n];tiles[n*32+y*4+x/2]|=color<<((x%2)*4);}
     gbs::load_tiles(gbs::TileAsset{tiles,4,800,false});
     const auto& room=project.rooms[current_room_index];
     const int max_x=room.width_tiles>11?room.width_tiles-11:0,max_y=room.height_tiles>11?room.height_tiles-11:0;
@@ -1465,15 +1489,25 @@ void render_dungeon_crawler_runtime(const gbs::RuntimeFrameContext& context) {
     // The dungeon HUD is fixed chrome. Reassert its authored state after
     // room/camera rendering so a scene update cannot leave the top bar
     // hidden while dungeon_dialogue remains visible.
-    if(dungeon_presentation()) {
+    const bool neutral_hud=gbs::active_hud_layout() && dungeon_string_equals(gbs::active_hud_layout()->text_profile,"dungeon-status");
+    if(!gbastudio_dialogue_ui::has_hud_scene_binding(project.rooms[current_room_index].name)) {
+        gbs::hide_hud(hud);
+    } else if(neutral_hud || (!dungeon_lateral_hud_active() && dungeon_presentation())) {
         dungeon_direction_text[0]="NLSO"[int(runtime_state.direction)];
         int quantity=0;if(project.inventory_items && project.inventory_item_count)quantity=event_state.inventory[project.inventory_items[0].item_index];
         quantity=quantity<0?0:quantity>99?99:quantity;dungeon_quantity_text[0]='0'+quantity/10;dungeon_quantity_text[1]='0'+quantity%10;
-        const char* slots[]={dungeon_presentation()->player_label,dungeon_direction_text,"MAPA",dungeon_quantity_text,"A",project.rooms[current_room_index].battle_enabled?"ATACAR":project.rooms[current_room_index].actor_count?"COLETAR":"EXAMINAR"};gbs::set_hud_text_slots(hud,slots,6);
+        if(neutral_hud) {
+            const char* controls=interaction_mode==DungeonInteractionMode::Map?"A/B: FECHAR":battle_state.active && !dungeon_enemy_defeated?"A: ATACAR":"A: INTERACT";
+            const char* slots[]={dungeon_hp_text(dungeon_player_hp()),dungeon_direction_text,dungeon_quantity_text,controls};
+            gbs::set_hud_text_slots(hud,slots,4);
+        } else {
+            const char* slots[]={dungeon_presentation()->player_label,dungeon_direction_text,"MAPA",dungeon_quantity_text,"A",project.rooms[current_room_index].battle_enabled?"ATACAR":project.rooms[current_room_index].actor_count?"COLETAR":"EXAMINAR"};
+            gbs::set_hud_text_slots(hud,slots,6);
+        }
         gbs::set_hud_value(hud,gbs::HudValueSource::P1Health,dungeon_player_hp(),3);
         gbs::set_hud_value(hud,gbs::HudValueSource::P2Health,battle_state.active?battle_state.enemy_hp:project.battle.max_hp,project.battle.max_hp);
     } else if (dungeon_lateral_hud_active()) {
-        if (dungeon_lateral_hud_visible || !dungeon_string_equals(gbs::active_hud_layout()->id, "hud-usina-lateral")) {
+        if (dungeon_lateral_hud_visible || !dungeon_string_equals(gbs::active_hud_layout()->text_profile, "dungeon-sidebar-contextual")) {
             rebuild_dungeon_sidebar_text();
             const char* text_slots[] = {
                 dungeon_sidebar_map_rows[0],

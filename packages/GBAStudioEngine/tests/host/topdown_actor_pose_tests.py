@@ -111,6 +111,7 @@ void refresh_npc_runtime_animation(size_t index,bool playing) {
     if (animator.animation!=&next) gbs::play_sprite_animation(animator,next);
     if(!playing) gbs::stop_sprite_animation(animator);
 }
+void refresh_npc_directional_animation(size_t index, bool moving, bool force = false);
 ''' + source[start:end] + '''
 int main() {
     gbs::TopDownNpcData npc {};

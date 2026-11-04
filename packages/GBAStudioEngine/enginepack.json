@@ -619,7 +619,14 @@
       "menu_text_input_keyboard",
       "menu_resource_bank_groups",
       "template_menu_screen_resource_bank_streaming",
-      "menu_export_template"
+      "menu_export_template",
+      "menu_text_bindings",
+      "menu_runtime_conditions",
+      "menu_hud_header",
+      "menu_hud_bindings",
+      "topdown_run_profile",
+      "menu_page_navigation",
+      "menu_actor_visibility_conditions"
     ],
     "cutscene_runtime": [
       "cutscene_project_data_contract",
@@ -973,6 +980,8 @@
     "hud_project_value_bindings": true,
     "hud_compact_text": true,
     "hud_spaced_text": true,
+    "hud_menu_selector": true,
+    "hud_runtime_text_profiles": true,
     "hud_foreground_images": true,
     "dialogue_font": true,
     "dialogue_choice_selector": true,
@@ -1078,7 +1087,9 @@
       "checkpoint_pickup_progression",
       "minimap_hud",
       "result_events",
-      "racing_export_template"
+      "racing_export_template",
+      "racing_challenge_progress",
+      "racing_save_resume"
     ],
     "racing_challenge_progress": true,
     "racing_save_resume": true,
@@ -1479,7 +1490,8 @@
       "wait_actor_animation",
       "wait_button_pressed",
       "ready_system_ops",
-      "native_authoring_v2"
+      "native_authoring_v2",
+      "named_animation_keys"
     ],
     "desktop_hosts": [
       "macos",

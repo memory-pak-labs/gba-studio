@@ -9,6 +9,21 @@ import assetc
 
 
 class ShmupEventBindingsTests(unittest.TestCase):
+    def test_room_damage_hook_chains_after_contact_and_projectile_hooks(self):
+        header = assetc.emit_shmup_project_data_header({
+            'enemy_projectile': {'on_hit_player': [{'op': 'wait', 'frames': 2}]},
+            'waves': [{'name': 'wind', 'on_hit_player': [{'op': 'rumble_on_for', 'frames': 12}],
+                       'enemies': [{'on_hit_player': [{'op': 'end'}, {'op': 'set_variable', 'variable': 0, 'value': 99}]}]},
+                      {'name': 'quiet', 'enemies': []}]
+        })
+        self.assertIn('shmup_wave_0_projectile_on_hit_player_commands', header)
+        contact = header.split('shmup_wave_0_enemy_0_on_hit_player_commands[] = {')[1].split('};')[0]
+        self.assertIn('EventOp::Jump, 2, 0, 0', contact)
+        self.assertIn('EventOp::RumbleOnFor, 12, 0, 0', contact)
+        projectile = header.split('shmup_wave_0_projectile_on_hit_player_commands[] = {')[1].split('};')[0]
+        self.assertLess(projectile.index('EventOp::Wait'), projectile.index('EventOp::RumbleOnFor'))
+        self.assertNotIn('shmup_wave_1_projectile_on_hit_player_commands', header)
+
     def test_indexed_timer_callback_is_exported_including_empty_slots(self):
         header = assetc.emit_shmup_project_data_header({
             'waves': [{'name': 'wind', 'enemies': [], 'on_start': [

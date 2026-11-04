@@ -349,6 +349,15 @@ bool snap_platformer_actor_to_slope_floor(const TileMap& map, PlatformerActor& a
         if (candidate_delta_y < -max_snap_pixels || candidate_delta_y > max_snap_pixels) {
             continue;
         }
+        Rect candidate_bounds = actor.bounds_pixels;
+        candidate_bounds.y += candidate_delta_y;
+        // The center foot can be over a slope while another part of a wide
+        // collider is above the adjacent cliff. Never snap the body into that
+        // solid tile; ordinary vertical movement will land on its higher top.
+        if (rect_hits_platformer_horizontal(map, candidate_bounds, 1) ||
+            rect_hits_platformer_horizontal(map, candidate_bounds, -1)) {
+            continue;
+        }
         if (!found_slope || abs_int(candidate_delta_y) < abs_int(best_delta_y)) {
             best_delta_y = candidate_delta_y;
             found_slope = true;

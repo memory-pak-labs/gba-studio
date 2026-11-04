@@ -55,7 +55,7 @@ int battle_menu_parent_choice=0;
 gbs::DialogueState battle_menu_dialogue;
 gbs::DialogueLine battle_menu_notice_line { "ACAO EXECUTADA." };
 gbs::DialogueChoice battle_root_choices[]={{"ATACAR",0},{"EQUIPE",1},{"ITENS",2},{"FUGIR",3}};
-char authored_prompt[64],authored_commands[64],authored_cursor[16];
+char authored_prompt[64],authored_commands[128],authored_cursor[16];
 ''' + helper + prompt + '''
 int main() {
     auto& encounter = project.encounters[0]; encounter.party_count = encounter.enemy_count = 2;

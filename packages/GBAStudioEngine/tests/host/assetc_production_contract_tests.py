@@ -1461,6 +1461,46 @@ def test_scene_fade_preserves_optional_channel_and_master_preferences():
     assert assetc.event_command_from_json({**base, "variable": 16, "other_variable": 17}, "fade") == ("FadeAudioVolume", 0, 11, 30, 4625)
 
 
+def test_generated_tile_assets_are_constant_initializable():
+    assetc = load_assetc_module()
+    with tempfile.TemporaryDirectory() as tmp:
+        root = Path(tmp)
+        colors = [(0, 0, 0), (255, 255, 255)]
+        pixels = [1] * (32 * 16)
+        write_indexed_png(root / "sheet.png", 32, 16, colors, pixels)
+        for name, flags in (
+            ("bg", []),
+            ("compressed", ["--lz77-tiles"]),
+            ("sprite", ["--sprite-width", "16", "--sprite-height", "16", "--stream-frames"]),
+            ("sprite8", ["--sprite-width", "16", "--sprite-height", "16", "--sprite-bpp", "8"]),
+        ):
+            result = subprocess.run(
+                [sys.executable, str(ASSETC), str(root / "sheet.png"), "-o", str(root / f"{name}.hpp"), "-n", name, *flags],
+                cwd=REPO, text=True, capture_output=True, check=False,
+            )
+            assert result.returncode == 0, result.stderr
+        (root / "indexed.hpp").write_text(assetc.emit_indexed_background_header("indexed", 32, 16, colors, pixels), encoding="utf-8")
+        source = root / "constant_assets.cpp"
+        source.write_text('''#include "bg.hpp"
+#include "compressed.hpp"
+#include "sprite.hpp"
+#include "sprite8.hpp"
+#include "indexed.hpp"
+constexpr gbs::TileAsset assets[] = { bg_tile_asset, compressed_tile_asset, sprite_tile_asset, sprite_frame_1_tile_asset, indexed_tile_asset, sprite8_tile_asset };
+static_assert(assets[0].data == &bg_tiles[0][0]);
+static_assert(assets[1].compression == gbs::AssetCompression::Lz77);
+static_assert(assets[3].data == &sprite_frame_1_tiles[0][0]);
+static_assert(assets[4].color_depth == gbs::ColorDepth::Bpp8);
+static_assert(assets[5].color_depth == gbs::ColorDepth::Bpp8);
+int main() { return 0; }
+''', encoding="utf-8")
+        result = subprocess.run(
+            ["clang++", "-std=c++17", "-I", str(REPO / "engine" / "include"), "-I", str(root), "-c", str(source), "-o", str(root / "constant_assets.o")],
+            text=True, capture_output=True, check=False,
+        )
+        assert result.returncode == 0, result.stderr
+
+
 def main():
     test_scene_fade_preserves_optional_channel_and_master_preferences()
     test_referenced_asset_ids_cover_nested_references_and_raw_cpp_symbols()
@@ -1501,6 +1541,7 @@ def main():
     test_set_player_direction_emits_native_event_command()
     test_streaming_sprite_reserves_only_largest_frame_and_emits_frame_assets()
     test_streamed_custom_animation_uses_resident_frame_tiles()
+    test_generated_tile_assets_are_constant_initializable()
 
 
 if __name__ == "__main__":

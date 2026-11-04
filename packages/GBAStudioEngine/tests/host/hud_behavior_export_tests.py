@@ -9,6 +9,38 @@ spec=importlib.util.spec_from_file_location('hud_assetc',root/'tools/assetc/asse
 assetc=importlib.util.module_from_spec(spec)
 spec.loader.exec_module(assetc)
 class HudBehaviorExport(unittest.TestCase):
+ def test_mixed_runtimes_reject_divergent_text_profiles_and_selectors(self):
+  for field,first,second in [('text_profile','dungeon-status','dungeon-sidebar'),('selector_asset','arrow','other-arrow')]:
+   with self.subTest(field=field):
+    def ui(value):return dict(hud_layouts=[dict(id='copy',mode='advanced',components=[],**{field:value})])
+    project=dict(topdown_project=dict(dialogue_ui=ui(first)),dungeon_crawler_project=dict(dialogue_ui=ui(second)))
+    with self.assertRaisesRegex(SystemExit,'mesmos presets de HUD'):assetc.shared_dialogue_ui_assets_from_project(project,Path('.'))
+    project['dungeon_crawler_project']['dialogue_ui']=ui(first)
+    assetc.shared_dialogue_ui_assets_from_project(project,Path('.'))
+ def test_text_profile_is_validated_and_emitted_independently_from_layout_id(self):
+  for profile in ['dungeon-status','dungeon-sidebar','dungeon-sidebar-contextual']:
+   layout=assetc.hud_layouts_from_json([dict(id='custom-copy',mode='advanced',text_profile=profile,components=[self.component()])],'hud')[0]
+   self.assertEqual(layout.get('text_profile'),profile)
+   header=assetc.emit_shared_dialogue_ui_assets_header(None,None,None,None,assetc.dialogue_ui_from_json({},'ui'),assetc.hud_box_config_from_json({}),hud_layouts=[layout])
+   self.assertIn('"'+profile+'"',header)
+   with tempfile.TemporaryDirectory() as directory:
+    directory=Path(directory);(directory/'hud.hpp').write_text(header)
+    (directory/'test.cpp').write_text('#include "hud.hpp"\n#include <cstring>\nint main(){return std::strcmp(gbastudio_dialogue_ui::hud_layouts[0].text_profile,"'+profile+'");}\n')
+    subprocess.run(['c++','-std=c++17','-Wall','-Wextra','-Werror','-I'+str(root/'engine/include'),str(directory/'test.cpp'),'-o',str(directory/'test')],check=True)
+    subprocess.run([str(directory/'test')],check=True)
+  with self.assertRaises(SystemExit):assetc.hud_layouts_from_json([dict(id='hud',mode='advanced',text_profile='unknown',components=[])],'hud')
+  with self.assertRaises(SystemExit):assetc.hud_layouts_from_json([dict(id='hud',mode='advanced',text_profile=7,components=[])],'hud')
+ def test_menu_selector_is_validated_resolved_and_loaded_with_its_layout(self):
+  layout=assetc.hud_layouts_from_json([dict(id='hud',mode='advanced',selector_asset='arrow',components=[self.component()])],'hud')[0]
+  self.assertEqual(layout.get('selector_asset'),'arrow')
+  report={'export_plan':{'headers':[{'id':'arrow','header':'arrow.hpp','symbol':'arrow'}]}}
+  header=assetc.emit_shared_dialogue_ui_assets_header(None,None,None,None,assetc.dialogue_ui_from_json({},'ui'),assetc.hud_box_config_from_json({}),hud_layouts=[layout],asset_report=report)
+  self.assertIn('#include "arrow.hpp"',header)
+  self.assertIn('&arrow_metasprites[0]',header)
+  self.assertIn('gbs::load_tiles(arrow_tile_asset)',header)
+  self.assertIn('gbs::load_palette(arrow_palette_asset, true)',header)
+  with self.assertRaises(SystemExit):assetc.hud_layouts_from_json([dict(id='hud',mode='advanced',selector_asset=7,components=[])],'hud')
+  with self.assertRaises(SystemExit):assetc.emit_shared_dialogue_ui_assets_header(None,None,None,None,assetc.dialogue_ui_from_json({},'ui'),assetc.hud_box_config_from_json({}),hud_layouts=[layout],asset_report={})
  def test_project_value_bindings_are_validated_and_emitted(self):
   component=self.component();component.update(value_variable=3,value_maximum=3)
   layout=assetc.hud_layouts_from_json([dict(id='hud',mode='advanced',components=[component])],'hud')[0]

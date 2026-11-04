@@ -426,6 +426,17 @@ void test_invalid_project_rejected() {
 } // namespace
 
 int main() {
+    auto damage = gbs::shmup_runtime_from_project(valid_project);
+    damage.lives = 2;
+    assert(gbs::shmup_apply_player_damage(damage, 45));
+    assert(damage.lives == 1 && damage.invulnerability_frames_remaining == 45);
+    assert(!gbs::shmup_apply_player_damage(damage, 45));
+    assert(damage.lives == 1);
+    damage.invulnerability_frames_remaining = 0;
+    assert(gbs::shmup_apply_player_damage(damage, 45));
+    assert(damage.lives == 0);
+    damage.invulnerability_frames_remaining = 0;
+    assert(!gbs::shmup_apply_player_damage(damage, 45));
     test_valid_project_contract();
     test_wide_background_uses_streaming_contract();
     test_affine_background_owns_video_and_collision_data();

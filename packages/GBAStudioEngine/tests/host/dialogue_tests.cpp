@@ -1,9 +1,23 @@
 #include <cassert>
 #include <cstring>
 #include "gbs/dialogue.hpp"
+#include "gbs/dialogue_portrait.hpp"
 #include "gbs/runtime_checkpoint.hpp"
 
 extern "C" void gbs_hw_draw_portrait_tab(const char*, const char*, int, int, int) {}
+int dialogue_oam_front = -1;
+extern "C" void gbs_hw_set_dialogue_oam_front(int enabled) { dialogue_oam_front = enabled; }
+
+int portrait_draw_calls = 0;
+int portrait_draw_index = -1;
+gbs::Vec2i portrait_draw_position {};
+namespace gbs {
+void set_metasprite(int index, const MetaSprite&, Vec2i position) {
+    ++portrait_draw_calls;
+    portrait_draw_index = index;
+    portrait_draw_position = position;
+}
+}
 
 extern "C" void gbs_hw_draw_dialogue_box(const char*, int) {
 }
@@ -604,24 +618,18 @@ void test_dialogue_name_label_mode_draws_speaker_above_box() {
 
     reset_draw_calls();
     gbs::draw_dialogue(state);
-    assert(draw_call_count == 3);
+    assert(draw_call_count == 2);
     assert(draw_calls[0].x == 1);
     assert(draw_calls[0].y == 11);
-    assert(draw_calls[0].width == 28);
+    assert(draw_calls[0].width == 6);
     assert(draw_calls[0].height == gbs::dialogue_name_label_height);
-    assert(draw_calls[0].text[0] == '\0');
-    assert(draw_calls[0].visible == 0);
+    assert(std::strcmp(draw_calls[0].text, "Guia") == 0);
+    assert(draw_calls[0].visible == 1);
     assert(draw_calls[1].x == 1);
-    assert(draw_calls[1].y == 11);
-    assert(draw_calls[1].width == 6);
-    assert(draw_calls[1].height == gbs::dialogue_name_label_height);
-    assert(std::strcmp(draw_calls[1].text, "Guia") == 0);
-    assert(draw_calls[1].visible == 1);
-    assert(draw_calls[2].x == 1);
-    assert(draw_calls[2].y == 14);
-    assert(draw_calls[2].width == 28);
-    assert(draw_calls[2].height == 5);
-    assert(std::strcmp(draw_calls[2].text, "Ola mundo") == 0);
+    assert(draw_calls[1].y == 14);
+    assert(draw_calls[1].width == 28);
+    assert(draw_calls[1].height == 5);
+    assert(std::strcmp(draw_calls[1].text, "Ola mundo") == 0);
 
     gbs::configure_dialogue_ui(gbs::default_dialogue_ui_config());
 }
@@ -642,26 +650,22 @@ void test_dialogue_separate_portrait_box_uses_dialogue_skin_frame() {
 
     reset_draw_calls();
     gbs::draw_dialogue(state);
-    assert(draw_call_count == 4);
+    assert(draw_call_count == 3);
     assert(draw_calls[0].x == 1);
     assert(draw_calls[0].y == 11);
-    assert(draw_calls[0].width == 28);
-    assert(draw_calls[0].visible == 0);
-    assert(draw_calls[1].x == 1);
+    assert(draw_calls[0].width == 3);
+    assert(draw_calls[0].height == 3);
+    assert(std::strcmp(draw_calls[0].text, "") == 0);
+    assert(draw_calls[0].visible == 1);
+    assert(draw_calls[1].x == 4);
     assert(draw_calls[1].y == 11);
-    assert(draw_calls[1].width == 3);
-    assert(draw_calls[1].height == 3);
-    assert(std::strcmp(draw_calls[1].text, "") == 0);
-    assert(draw_calls[1].visible == 1);
-    assert(draw_calls[2].x == 4);
-    assert(draw_calls[2].y == 11);
-    assert(draw_calls[2].width == 6);
-    assert(draw_calls[2].height == gbs::dialogue_name_label_height);
-    assert(std::strcmp(draw_calls[2].text, "Guia") == 0);
-    assert(draw_calls[3].x == 1);
-    assert(draw_calls[3].y == 14);
-    assert(draw_calls[3].width == 28);
-    assert(draw_calls[3].height == 5);
+    assert(draw_calls[1].width == 6);
+    assert(draw_calls[1].height == gbs::dialogue_name_label_height);
+    assert(std::strcmp(draw_calls[1].text, "Guia") == 0);
+    assert(draw_calls[2].x == 1);
+    assert(draw_calls[2].y == 14);
+    assert(draw_calls[2].width == 28);
+    assert(draw_calls[2].height == 5);
 
     gbs::configure_dialogue_portraits(nullptr, 0);
     gbs::configure_dialogue_ui(gbs::default_dialogue_ui_config());
@@ -857,22 +861,22 @@ void test_dialogue_fixed_frame_fits_portrait_and_name() {
     assert(gbs::show_dialogue(state, &line, 1, 0));
     reset_draw_calls();
     gbs::draw_dialogue(state);
-    assert(draw_calls[1].width == 4);
-    assert(draw_calls[1].height == 4);
-    assert(draw_calls[1].x == 1 && draw_calls[1].y == 10);
-    assert(draw_calls[2].x == 5);
+    assert(draw_calls[0].width == 4);
+    assert(draw_calls[0].height == 4);
+    assert(draw_calls[0].x == 1 && draw_calls[0].y == 10);
+    assert(draw_calls[1].x == 5);
     const gbs::Vec2i left = gbs::dialogue_portrait_position_pixels(state);
     assert(left.x == 8 && left.y == 80);
     state.portrait_slot = "right";
     reset_draw_calls();
     gbs::draw_dialogue(state);
-    const int current_draw = draw_call_count - 4;
+    const int current_draw = draw_call_count - 3;
     assert(current_draw == 3);
     assert(draw_calls[1].visible == 0 && draw_calls[1].x == 1 && draw_calls[1].y == 10);
-    assert(draw_calls[current_draw + 1].x == 25 && draw_calls[current_draw + 1].y == 10);
+    assert(draw_calls[current_draw].x == 25 && draw_calls[current_draw].y == 10);
     const gbs::Vec2i right = gbs::dialogue_portrait_position_pixels(state);
     assert(right.x == 200 && right.y == 80);
-    assert(draw_calls[current_draw + 2].x + draw_calls[current_draw + 2].width == draw_calls[current_draw + 1].x);
+    assert(draw_calls[current_draw + 1].x + draw_calls[current_draw + 1].width == draw_calls[current_draw].x);
     const gbs::DialogueBoxLayout portrait48 = gbs::dialogue_portrait_slot_layout_for_frame(0, true, 48, 48);
     const gbs::DialogueBoxLayout guardian48 = gbs::dialogue_name_label_layout_for_frame(0, 9, true, true, true, 48, 48);
     assert(portrait48.w == 6 && portrait48.h == 6);
@@ -903,16 +907,16 @@ void test_dialogue_missing_portrait_does_not_reserve_slot_and_aligns_name() {
 
     reset_draw_calls();
     gbs::draw_dialogue(state);
-    assert(draw_call_count == 3);
-    assert(draw_calls[1].x == 23);
-    assert(draw_calls[1].y == 11);
-    assert(draw_calls[1].width == 6);
-    assert(draw_calls[1].height == gbs::dialogue_name_label_height);
-    assert(std::strcmp(draw_calls[1].text, "Guia") == 0);
-    assert(draw_calls[2].x == 1);
-    assert(draw_calls[2].y == 14);
-    assert(draw_calls[2].width == 28);
-    assert(draw_calls[2].height == 5);
+    assert(draw_call_count == 2);
+    assert(draw_calls[0].x == 23);
+    assert(draw_calls[0].y == 11);
+    assert(draw_calls[0].width == 6);
+    assert(draw_calls[0].height == gbs::dialogue_name_label_height);
+    assert(std::strcmp(draw_calls[0].text, "Guia") == 0);
+    assert(draw_calls[1].x == 1);
+    assert(draw_calls[1].y == 14);
+    assert(draw_calls[1].width == 28);
+    assert(draw_calls[1].height == 5);
 
     gbs::configure_dialogue_portraits(nullptr, 0);
     gbs::configure_dialogue_ui(gbs::default_dialogue_ui_config());
@@ -1037,6 +1041,7 @@ void test_dialogue_frame_transitions_erase_previous_owned_regions() {
     gbs::init_dialogue(state);
     assert(gbs::show_dialogue(state, lines, 1, 0));
     gbs::draw_dialogue(state);
+    assert(dialogue_oam_front == 1);
     assert(painted_dialogue_tiles[18 * 32 + 28]);
     painted_dialogue_tiles[19 * 32 + 29] = true; // An unrelated HUD tile.
     gbs::set_dialogue_frame(state, gbs::dialogue_frame_top);
@@ -1051,6 +1056,7 @@ void test_dialogue_frame_transitions_erase_previous_owned_regions() {
     assert(!painted_dialogue_tiles[0 * 32 + 1]);
     gbs::hide_dialogue(state);
     gbs::draw_dialogue(state);
+    assert(dialogue_oam_front == 0);
     for (int index = 0; index < 32 * 32; ++index)
         assert(painted_dialogue_tiles[index] == (index == 19 * 32 + 29));
     gbs::configure_dialogue_ui(gbs::default_dialogue_ui_config());
@@ -1069,7 +1075,95 @@ void test_full_width_dialogue_frame_and_scene_config() {
     assert(!gbs::active_dialogue_ui_config().full_width_bottom);
 }
 
+void test_runtime_portrait_drawing_respects_visibility_and_registry() {
+    const gbs::MetaSpritePart parts[] = {{0, 0, 7, 2, false, false, 16, 16}};
+    const gbs::MetaSprite portrait {parts, 1};
+    const gbs::DialoguePortraitEntry entries[] = {{"guide.png", &portrait}};
+    const gbs::DialogueLine lines[] = {{"Hello", "Guide", "guide.png"}};
+    gbs::DialogueState state {};
+    gbs::init_dialogue(state);
+    gbs::configure_dialogue_ui(gbs::default_dialogue_ui_config());
+    gbs::configure_dialogue_portraits(entries, 1);
+    gbs::show_dialogue(state, lines, 1, 0);
+    portrait_draw_calls = 0;
+    gbs::draw_dialogue_portrait(state);
+    assert(portrait_draw_calls == 1 && portrait_draw_index == gbs::dialogue_portrait_oam_index);
+    const auto expected = gbs::dialogue_portrait_position_pixels(state);
+    assert(portrait_draw_position.x == expected.x && portrait_draw_position.y == expected.y);
+    state.visible = false;
+    gbs::draw_dialogue_portrait(state);
+    state.visible = true;
+    state.portrait = "missing.png";
+    gbs::draw_dialogue_portrait(state);
+    state.portrait = "guide.png";
+    auto config = gbs::default_dialogue_ui_config();
+    config.show_portrait = false;
+    gbs::configure_dialogue_ui(config);
+    gbs::draw_dialogue_portrait(state);
+    assert(portrait_draw_calls == 1);
+    gbs::configure_dialogue_ui(gbs::default_dialogue_ui_config());
+    gbs::configure_dialogue_portraits(nullptr, 0);
+}
+
+void test_hidden_dialogue_only_clears_its_old_regions_once() {
+    gbs::configure_dialogue_ui(gbs::DialogueUiConfig { 0, 28, 3, true, true, false, true, true });
+    gbs::DialogueState state {};
+    gbs::init_dialogue(state);
+    const gbs::DialogueLine line[] = {{"Test", "QA", "guide.png", "qa"}};
+    assert(gbs::show_dialogue(state, line, 1, 0));
+    gbs::draw_dialogue(state);
+    gbs::hide_dialogue(state);
+    reset_draw_calls();
+    gbs::draw_dialogue(state);
+    assert(draw_call_count > 0); // Existing dialogue regions are erased.
+    reset_draw_calls();
+    gbs::draw_dialogue(state);
+    assert(draw_call_count == 0); // No repeated writes on later hidden frames.
+    assert(dialogue_oam_front == 0);
+    gbs::configure_dialogue_ui(gbs::default_dialogue_ui_config());
+}
+
+void test_visible_dialogue_does_not_clear_stable_name_region() {
+    gbs::configure_dialogue_ui(gbs::DialogueUiConfig { 0, 28, 3, true, true, false, true, true });
+    gbs::DialogueState state {};
+    gbs::init_dialogue(state);
+    const gbs::DialogueLine line[] = {{"Test", "QA", "guide.png", "qa"}};
+    assert(gbs::show_dialogue(state, line, 1, 0));
+    gbs::draw_dialogue(state);
+    reset_draw_calls();
+    gbs::draw_dialogue(state);
+    for (int i = 0; i < draw_call_count; ++i) assert(draw_calls[i].visible != 0);
+    gbs::hide_dialogue(state);
+    gbs::draw_dialogue(state);
+    gbs::configure_dialogue_ui(gbs::default_dialogue_ui_config());
+}
+
+void test_shorter_speaker_name_clears_old_label() {
+    gbs::configure_dialogue_ui(gbs::DialogueUiConfig { 0, 28, 3, true, true, false, false, true });
+    std::memset(painted_dialogue_tiles, 0, sizeof(painted_dialogue_tiles));
+    const gbs::DialogueLine line[] = {{"Text", "Long Speaker", nullptr, "qa"}};
+    gbs::DialogueState state {};
+    gbs::init_dialogue(state);
+    assert(gbs::show_dialogue(state, line, 1, 0));
+    const auto old_label = gbs::dialogue_name_label_layout_for_frame(
+        state.frame_index, 14); // Twelve characters plus the frame edges.
+    gbs::draw_dialogue(state);
+    const int old_tail = old_label.y * 32 + old_label.x + old_label.w - 1;
+    assert(painted_dialogue_tiles[old_tail]);
+    state.speaker = "A";
+    gbs::draw_dialogue(state);
+    assert(!painted_dialogue_tiles[old_tail]);
+    assert(painted_dialogue_tiles[old_label.y * 32 + old_label.x]);
+    gbs::hide_dialogue(state);
+    gbs::draw_dialogue(state);
+    gbs::configure_dialogue_ui(gbs::default_dialogue_ui_config());
+}
+
 int main() {
+    test_shorter_speaker_name_clears_old_label();
+    test_visible_dialogue_does_not_clear_stable_name_region();
+    test_hidden_dialogue_only_clears_its_old_regions_once();
+    test_runtime_portrait_drawing_respects_visibility_and_registry();
     test_full_width_dialogue_frame_and_scene_config();
     test_dialogue_frame_transitions_erase_previous_owned_regions();
     test_portrait_tab_preserves_text_rows_and_uses_approved_portrait_insets();

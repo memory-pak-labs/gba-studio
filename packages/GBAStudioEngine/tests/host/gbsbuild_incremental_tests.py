@@ -196,6 +196,17 @@ class IncrementalBuildTests(unittest.TestCase):
         self.project.rename(spaced); self.project = spaced
         self.assertEqual(len(self.run_build()),2)
         self.assertEqual(len(self.run_build()),0)
+    def test_copied_build_does_not_reuse_dependencies_from_old_project(self):
+        self.run_build()
+        old_project = self.project
+        self.project = self.root / "project-copy"
+        shutil.copytree(old_project, self.project)
+        (self.project / "main.hpp").write_text("new-main")
+        calls = self.run_build()
+        self.assertEqual(len(calls), 2, "copied depfiles point to the old project and must be rebuilt")
+        rebuilt = (self.project / "build/game.gba").read_bytes()
+        self.run_build("--clean")
+        self.assertEqual((self.project / "build/game.gba").read_bytes(), rebuilt)
     def test_disabled_cache_rebuilds_every_time_and_does_not_record_a_rom_hit(self):
         self.manifest["build"]["incremental_cache"] = False
         self.save()

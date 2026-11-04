@@ -3,6 +3,7 @@
 #include "gbs/profiler.hpp"
 #define GBS_DIALOGUE_UI_RUNTIME_KIND 5
 #include "gbs/engine.hpp"
+#include "gbs/dialogue_portrait.hpp"
 #include "gbs/animation.hpp"
 #include "gbs/audio.hpp"
 #include "gbs/dialogue.hpp"
@@ -442,6 +443,9 @@ void draw_point_click_props(const gbs::PointClickSceneData& scene) {
 }
 
 void consume_event_state() {
+    if (gbs::point_click_refresh_selected_item(project, event_state, cursor)) {
+        refresh_hud();
+    }
     gbs::consume_scene_transition_visual_effect_event(event_state);
     gbs::consume_event_palette_changes(
         event_state,
@@ -742,6 +746,8 @@ int initialize_point_click_runtime() {
     runtime_last_scene = -1;
     runtime_scene_change_count = 0;
     gbs::init_dialogue(dialogue);
+    gbs::configure_dialogue_portraits(gbastudio_point_click_project::dialogue_portrait_assets,
+        gbastudio_point_click_project::dialogue_portrait_asset_count);
     gbs::init_event_state(event_state);
     gbs::init_scene_script_runner(scene_scripts);
     gbs::bind_event_scripts(event_state, project.scripts, project.script_count);
@@ -874,9 +880,23 @@ void render_point_click_runtime(const gbs::RuntimeFrameContext& context) {
     if (scene != nullptr) {
         draw_point_click_props(*scene);
     }
-    draw_cursor();
-    gbs::draw_hud(hud);
-    gbs::draw_dialogue(dialogue);
+    if (!dialogue.visible) {
+        // Clear the previous dialogue before restoring HUD text and sprites.
+        gbs::draw_dialogue(dialogue);
+        draw_cursor();
+        gbs::draw_hud(hud);
+    } else {
+        const auto box = gbs::dialogue_box_layout_for_frame(dialogue.frame_index);
+        int top = box.y;
+        const auto& config = gbs::active_dialogue_ui_config();
+        if (config.name_label_above && config.show_character_name && dialogue.speaker && dialogue.speaker[0]) {
+            top = gbs::dialogue_name_label_layout_for_frame(dialogue.frame_index, box.w).y;
+        }
+        if (top < 0) top = 0;
+        gbs::draw_hud_excluding(hud, 0, top * 8, 240, 160 - top * 8);
+        gbs::draw_dialogue(dialogue);
+        gbs::draw_dialogue_portrait(dialogue);
+    }
     sync_runtime_telemetry();
     gbs::render_event_background_scale(event_state);
     gbs::wait_vblank();

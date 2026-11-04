@@ -1014,3 +1014,64 @@ O verificador compara o framebuffer com o fundo aprovado e com os pixels do
 relé na paleta compilada, incluindo a região da escada. Play e ROM direta usam
 o núcleo mGBA, mas exercitam caminhos de integração distintos. O teste em GBA
 físico permanece uma verificação separada.
+
+## Animações autoradas por eventos
+
+`play_actor_animation <ator> <animação>` seleciona um clipe autorado. O alvo
+aceita o alias reservado `Player` sem distinguir maiúsculas e minúsculas, além
+do nome configurado para o jogador. A repetição pertence ao campo `loops` da
+animação em Sprites; o comando não configura um terceiro parâmetro de repetição.
+Nomes de atores e recursos com espaços usam aspas JSON nos comandos técnicos,
+por exemplo `show_actor_gesture "Guarda do Porto" "balão de fala.png" 60`.
+Os campos do inspetor preservam esses nomes ao montar o comando.
+
+No perfil Plataforma, `set_actor_animation Player <nome>` usa a tabela completa
+`player.script_animations`, preservando os nomes e quadros autorados, inclusive
+clipes fora dos estados automáticos. Os relógios do clipe do Player e dos NPCs
+continuam durante Wait e diálogos; menu de pausa e pausa do perfil os suspendem.
+O comando avança pelo tempo enquanto o
+personagem está parado; um nome ausente conserva o clipe atual. Repetir o mesmo
+clipe em reprodução preserva sua fase. Movimento/comandos de ação ou dano
+retomam a apresentação automática; um clipe sem loop volta a ela ao terminar.
+Inicialização, troca de sala e restauração de save limpam a apresentação
+transitória antes de executar os eventos de restauração. O formato do save
+permanece igual. `make platformer-player-script-animation-test` cobre o
+consumidor, exportação e lookup compilado, além das regressões do editor.
+
+Top-down e Plataforma aceitam o Player como alvo de `set_actor_animation_frame`
+e `set_actor_animation_speed`, incluindo o nome do ator configurado como Player.
+O quadro usa índice a partir de zero e preserva a reprodução; um índice fora do
+clipe atual é ignorado. A velocidade aceita1–400% e se aplica aos relógios de
+animação, sem alterar a velocidade de movimento. Troca de sala/restauração
+reinicia esse controle transitório no valor autorado (100% em Plataforma), sem
+alterar o formato do save. `make player-animation-controls-test` exercita os
+loops e relógios de produção dos dois perfis, isolamento do NPC e limites.
+
+A direção inicial de um ator Top-down acompanha a animação escolhida no
+inspetor, usando seu campo de direção ou o sufixo cardinal do nome. Player e
+NPC exportam essa orientação para os eventos, além de mostrar a pose correta.
+Coordenadas e direção de início explícitas nas configurações do projeto
+continuam tendo prioridade para o Player. `set_actor_direction` também troca
+a pose direcional de um NPC parado quando sua folha contém os slots; a
+apresentação automática não substitui um clipe manual a cada quadro.
+`make topdown-direction-commands-test` cobre o consumidor e a apresentação.
+Definir e consultar a direção no mesmo roteiro não exige inserir uma espera:
+a engine atualiza o estado lógico quando aceita o comando, e o consumidor
+aplica a pose. Se a fila estiver cheia, não publica uma direção descartada.
+Armazenar direção também aceita o Player pelo slot reservado, como as condições.
+O comando de direção do Player atualiza a pose automática mesmo durante uma
+espera da cena. Um clipe manual explicitamente escolhido conserva sua
+prioridade; a direção lógica muda, e movimento/dano continuam retomando a
+apresentação automática conforme o contrato do clipe.
+
+Pedidos de animação do Player usam a mesma fila ordenada dos comandos de ator.
+Top-down e Plataforma aplicam clipe, quadro e velocidade na sequência do roteiro.
+No Top-down, trocar o sprite ou conjunto antes de escolher o clipe resolve a
+animação na nova tabela; inverter esses comandos deixa a pose inicial do novo
+sprite. Uma troca intermediária também reinicia os controles do sprite, mesmo
+quando o roteiro volta à tabela anterior no mesmo lote. Pedidos de clipe
+ausente preservam a animação válida atual. A fila continua com oito posições;
+um pedido descartado por falta de espaço não publica o sinal escalar de animação.
+O layout de save/checkpoint permanece igual. `make player-command-order-test`
+executa scripts reais e os consumidores dos dois perfis, incluindo ordem
+inversa, fase, quadro, velocidade e ausência de clipe.

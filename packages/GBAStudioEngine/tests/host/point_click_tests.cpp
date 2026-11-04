@@ -365,6 +365,40 @@ void test_point_click_supports_layered_backgrounds_and_conditional_props() {
     assert(gbs::point_click_prop_is_visible(props[0], state));
 }
 
+void test_point_click_restore_clears_consumed_selection() {
+    const gbs::PointClickInventoryItemData items[] = { { "key", 20, -1 }, { "coin", 21, -1 } };
+    const gbs::PointClickSceneData scenes[] = {
+        { "room", -1, nullptr, 0, gbs::empty_event_script(), gbs::empty_event_script(), nullptr }
+    };
+    gbs::PointClickProjectData project {};
+    project.scenes = scenes;
+    project.scene_count = 1;
+    project.inventory_items = items;
+    project.inventory_item_count = 2;
+    gbs::PointClickSaveData save {};
+    save.selected_item_index = 0;
+    save.variables[21] = 1;
+    gbs::PointClickCursorState cursor {};
+    gbs::EventState state {};
+    int scene = -1;
+    assert(gbs::apply_point_click_save_data(project, save, scene, cursor, state));
+    assert(cursor.selected_item_index == -1);
+    assert(gbs::point_click_selected_item_name(project, cursor) == nullptr);
+    assert(gbs::point_click_next_owned_item_index(project, state, cursor.selected_item_index) == 1);
+    save.variables[20] = 2;
+    assert(gbs::apply_point_click_save_data(project, save, scene, cursor, state));
+    assert(cursor.selected_item_index == 0);
+    assert(gbs::point_click_selected_item_name(project, cursor)[0] == 'k');
+    assert(!gbs::point_click_refresh_selected_item(project, state, cursor));
+    state.variables[20] = 0;
+    assert(gbs::point_click_refresh_selected_item(project, state, cursor));
+    assert(cursor.selected_item_index == -1);
+    assert(!gbs::point_click_refresh_selected_item(project, state, cursor));
+    cursor.selected_item_index = 99;
+    assert(gbs::point_click_refresh_selected_item(project, state, cursor));
+    assert(cursor.selected_item_index == -1);
+}
+
 } // namespace
 
 int main() {
@@ -372,5 +406,6 @@ int main() {
     test_point_click_save_data_roundtrip();
     test_point_click_project_rejects_invalid_refs();
     test_point_click_supports_layered_backgrounds_and_conditional_props();
+    test_point_click_restore_clears_consumed_selection();
     return 0;
 }

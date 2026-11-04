@@ -24,3 +24,4 @@ extern "C" void __attribute__((weak)) gbs_hw_start_hblank_affine(int,const uint3
 extern "C" uint32_t* __attribute__((weak)) gbs_hw_hblank_affine_buffer() { static uint32_t words[644];return words; }
 
 extern "C" void __attribute__((weak)) gbs_hw_draw_portrait_tab(const char*,const char*,int,int,int) {}
+extern "C" void __attribute__((weak)) gbs_hw_set_dialogue_oam_front(int) {}

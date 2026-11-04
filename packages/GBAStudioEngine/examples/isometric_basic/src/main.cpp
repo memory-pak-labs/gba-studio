@@ -2,6 +2,8 @@
 #include "gbs/profiler.hpp"
 #define GBS_DIALOGUE_UI_RUNTIME_KIND 2
 #include "gbs/engine.hpp"
+#include "gbs/runtime_checkpoint.hpp"
+#include "gbs/dialogue_portrait.hpp"
 #include "gbs/event_ui.hpp"
 #include "gbs/audio.hpp"
 #include "gbs/dialogue.hpp"
@@ -2719,6 +2721,8 @@ int initialize_isometric_runtime() {
         trigger_states[index] = gbs::RuntimeTriggerState {};
     }
     gbs::init_dialogue(dialogue);
+    gbs::configure_dialogue_portraits(gbastudio_isometric_project::dialogue_portrait_assets,
+        gbastudio_isometric_project::dialogue_portrait_asset_count);
     gbastudio_dialogue_ui::configure();
     gbastudio_dialogue_ui::configure_for_scene(project.rooms[current_room].name, true);
     init_iso_surface_map();
@@ -3080,7 +3084,9 @@ gbs::RuntimeAdapterFrameResult update_isometric_runtime(const gbs::RuntimeFrameC
         consume_event_state(event_state);
         gbs::consume_visual_effect_event(event_state, visual_effects);
         gbs::update_dialogue(dialogue);
-        gbs::advance_dialogue(dialogue, input);
+        // The press that opens an actor's dialogue belongs to the world action.
+        // Only an already visible dialogue may consume this frame's input.
+        if (dialogue_was_visible) gbs::advance_dialogue(dialogue, input);
         if (room_data->tileset_tilemap != nullptr) {
             camera.smoothing_x256 = 256;
         }
@@ -3830,6 +3836,7 @@ void render_isometric_runtime(const gbs::RuntimeFrameContext& context) {
             gbs::draw_hud(hud);
         }
         gbs::draw_dialogue(dialogue);
+        gbs::draw_dialogue_portrait(dialogue);
         gbs::draw_event_clock(event_state);
         if(iso_scene_uses_native_tactical_hud() && tactical_presentation_active && tactical_presentation->compact_hud && !dialogue.visible) {
             draw_iso_tactical_compact_hud(tactical_state,*tactical_presentation,cursor,actors,actor_count);
