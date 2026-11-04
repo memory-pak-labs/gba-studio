@@ -1,5 +1,11 @@
 /** Application copy only. Tuple order: pt-BR, en-US, es-ES. Keep project data out of this catalog. */
 export const studioUiMessages: Record<string, readonly [string, string, string]> = {
+  "Banco do projeto: {0} instrumentos disponíveis ao criar uma música.": ["Banco do projeto: {0} instrumentos disponíveis ao criar uma música.", "Project bank: {0} instruments available when creating a song.", "Banco del proyecto: {0} instrumentos disponibles al crear una canción."],
+  "Importar MOD/WAV/SF2": ["Importar MOD/WAV/SF2", "Import MOD/WAV/SF2", "Importar MOD/WAV/SF2"],
+  "{0} instrumentos adicionados ao banco do projeto.": ["{0} instrumentos adicionados ao banco do projeto.", "{0} instruments added to the project bank.", "{0} instrumentos añadidos al banco del proyecto."],
+  "Use um MOD, WAV ou SoundFont SF2 como fonte.": ["Use um MOD, WAV ou SoundFont SF2 como fonte.", "Use a MOD, WAV or SF2 SoundFont as a source.", "Usa un MOD, WAV o SoundFont SF2 como fuente."],
+  "Importar áudio MOD/WAV/SF2": ["Importar áudio MOD/WAV/SF2", "Import MOD/WAV/SF2 audio", "Importar audio MOD/WAV/SF2"],
+  "Áudio MOD/WAV/SF2": ["Áudio MOD/WAV/SF2", "MOD/WAV/SF2 audio", "Audio MOD/WAV/SF2"],
   "Ajuda": ["Ajuda", "Help", "Ayuda"],
   "Verificar atualizações...": ["Verificar atualizações...", "Check for updates...", "Buscar actualizaciones..."],
   "A pasta de destino já contém arquivos. Escolha um novo nome ou uma pasta vazia.": ["A pasta de destino já contém arquivos. Escolha um novo nome ou uma pasta vazia.", "The destination folder already contains files. Choose a new name or an empty folder.", "La carpeta de destino ya contiene archivos. Elige un nombre nuevo o una carpeta vacía."],

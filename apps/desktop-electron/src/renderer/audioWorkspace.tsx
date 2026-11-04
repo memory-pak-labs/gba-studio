@@ -579,7 +579,7 @@ export function AudioWorkspace({
         </button>
         <button aria-label={ui("Importar arquivo")} onClick={() => { onImportAudio(); setCreationAssistantOpen(false); }} type="button">
           <strong>{ui("Importar arquivo")}</strong>
-          <span>{ui("Use um MOD ou WAV existente como fonte.")}</span>
+          <span>{ui("Use um MOD, WAV ou SoundFont SF2 como fonte.")}</span>
         </button>
       </section>
     );
