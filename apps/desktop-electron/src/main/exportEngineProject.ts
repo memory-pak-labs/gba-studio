@@ -1,3 +1,4 @@
+import { isScaleEvent, parseScaleEvent, usesSinglePlaneBackground } from "../shared/eventTransforms.js";
 import { actorCommandReferences, sceneChangeCommand, sceneChangeCommandParts } from "../shared/sceneChangeCommand.js";
 import { parseEventInstruction, eventWaitFrames } from "../shared/eventExecutionContract.js";
 import { shmupProjectileLaunches, type ShmupProjectileLaunch } from "../shared/shmupProjectileAuthoring.js";
@@ -32,6 +33,7 @@ import {
   buildAssetcSpritePackGeneration,
   engineUsedHudPresetIDs,
   buildAssetcTilesetPackGeneration,
+  roomUsesFlatAffineBackground,
   buildAssetcPortraitPackGeneration,
   buildAssetcEmotePackGeneration,
   applySceneResourceCompressionPolicies,
@@ -1538,6 +1540,7 @@ export interface EngineExportRacingProject {
 }
 
 export interface EngineExportBattleRpgEncounter {
+  video?: ExportedAdvancedVideoComposition;
   inventory_items?: Array<{ label: string; item: number; initial_quantity: number; heal_amount: number }>;
   presentation?: {
     cursor?: {asset:string;index:number};
@@ -1617,6 +1620,7 @@ export interface EngineExportLutaFighter {
 }
 
 export interface EngineExportLutaStage {
+  video?: ExportedAdvancedVideoComposition;
   action_sounds?: Partial<Record<"hit" | "guard" | "special" | "miss", number>>;
   name: string;
   background?: number;
@@ -1694,6 +1698,7 @@ export interface EngineExportPointClickProp {
 }
 
 export interface EngineExportPointClickScene {
+  video?: ExportedAdvancedVideoComposition;
   name: string;
   background?: number;
   backgrounds?: number[];
@@ -1869,6 +1874,7 @@ export interface EngineExportVisualNovelChoiceGroup {
 }
 
 export interface EngineExportVisualNovelScene {
+  video?: ExportedAdvancedVideoComposition;
   name: string;
   resource_bank_group?: string;
   background?: number;
@@ -1943,6 +1949,7 @@ export interface EngineExportMenuItem {
 }
 
 export interface EngineExportMenuActor {
+  scale_actor_index?: number;
   visibility_conditions?: Array<{binding: NonNullable<EngineExportMenuItem['binding']>;value:number;negate?:boolean}>;
   visibility_any?: boolean;
   name: string;
@@ -1967,6 +1974,7 @@ export interface EngineExportMenuActor {
 }
 
 export interface EngineExportMenuScreen {
+  video?: ExportedAdvancedVideoComposition;
   hud_bindings?: Array<{slot:number;binding?:NonNullable<EngineExportMenuItem['binding']>;selected_item?:boolean;columns?:number}>;
   previous_page_screen?: number;
   next_page_screen?: number;
@@ -2095,6 +2103,7 @@ export interface EngineExportCutsceneActor {
 }
 
 export interface EngineExportCutsceneScene {
+  video?: ExportedAdvancedVideoComposition;
   on_enter?: EngineExportProjectEventCommand[];
   on_exit?: EngineExportProjectEventCommand[];
   name: string;
@@ -2154,6 +2163,7 @@ export interface EngineExportWorldMapNode {
 }
 
 export interface EngineExportWorldMapProject {
+  video?: ExportedAdvancedVideoComposition;
   initial_node: number;
   scene_name?: string;
   on_enter?: EngineExportProjectEventCommand[];
@@ -2710,12 +2720,23 @@ function affineSourceSize(asset: Record<string, unknown> | undefined): AffineSce
   return width > 0 && height > 0 ? { width, height } : undefined;
 }
 
+function assertFixedUiAffineSource(room: Record<string, unknown>, asset: Record<string, unknown> | undefined): void {
+  const size = affineSourceSize(asset);
+  if (usesSinglePlaneBackground(roomSceneType(room)) && size && (size.width > 512 || size.height > 512))
+    throw new Error(`Cena ${roomName(room,0)}: fundo affine com interface fixa permite no máximo 512x512 pixels.`);
+}
+
 function buildRoomVideoComposition(
   data: GBAProjectData,
   room: Record<string, unknown>,
   tilesetPack: AssetcTilesetPackGeneration | null
 ): ExportedAdvancedVideoComposition {
   const sceneComposition = roomSceneComposition(room);
+  const affineRequested = sceneComposition.enabled
+    ? sceneComposition.layers.some(layer => layer.enabled && layer.kind === "affine_bg")
+    : roomAffinePresentation(room).enabled;
+  if (affineRequested && roomSceneType(room) === "racing" && racingSceneConfigFromRuntime(room.runtime,data.settings)?.presentation === "pseudo3d")
+    throw new Error(`Cena ${roomName(room,0)}: o piso em perspectiva já ocupa BG2; remova a segunda camada affine.`);
   if (sceneComposition.enabled) {
     const issues = sceneCompositionIssues(roomSceneCompositionSource(room), roomSceneType(room));
     if (issues.length > 0) {
@@ -2725,7 +2746,10 @@ function buildRoomVideoComposition(
     const affineLayer = sceneComposition.layers.find((layer) => layer.enabled && layer.kind === "affine_bg");
     const bitmapLayer = sceneComposition.layers.find((layer) => layer.enabled && layer.kind === "bitmap");
     if (affineLayer) {
+      if (usesSinglePlaneBackground(roomSceneType(room)) && affineLayer.layer !== "BG2")
+        throw new Error("Este perfil usa BG2 no Modo 1 para preservar a interface fixa.");
       const sourceAsset = roomAffineAssetRecord(data, affineLayer.assetId);
+      assertFixedUiAffineSource(room, sourceAsset);
       const sourceName = sourceAsset ? stringField(sourceAsset, "name", affineLayer.assetId) : affineLayer.assetId;
       const packedAsset = tilesetPack?.assetsBySheet[sourceName] ?? tilesetPack?.assetsBySheet[affineLayer.assetId];
       if (!packedAsset || packedAsset.kind !== "affine_bg") {
@@ -2769,10 +2793,14 @@ function buildRoomVideoComposition(
   const presentation = roomAffinePresentation(room);
   if (!presentation.enabled) return exportedDefaultRoomVideoComposition();
 
+  if (usesSinglePlaneBackground(roomSceneType(room)) && presentation.layer !== "BG2")
+    throw new Error("Este perfil usa BG2 no Modo 1 para preservar a interface fixa.");
+
   if (!presentation.assetId) {
     throw new Error(`A cena ${roomName(room, 0)} habilita Affine sem declarar assetId.`);
   }
   const sourceAsset = roomAffineAssetRecord(data, presentation.assetId);
+  assertFixedUiAffineSource(room, sourceAsset);
   const sourceName = sourceAsset ? stringField(sourceAsset, "name", presentation.assetId) : presentation.assetId;
   const packedAsset = tilesetPack?.assetsBySheet[sourceName]
     ?? tilesetPack?.assetsBySheet[presentation.assetId];
@@ -3685,6 +3713,62 @@ function eventActorIndex(data: GBAProjectData, rooms: Record<string, unknown>[],
   return npcActorIndex(data, rooms, actorName);
 }
 
+function scaleActorIndex(data: GBAProjectData, rooms: Record<string, unknown>[], target: string): number {
+  const actor = projectArray(data,"actors").find(row => (row.name===target || row.id===target) && rooms.some((room,index)=>roomName(room,index)===entitySceneName(row,"actor")));
+  const room = rooms.find((row,index) => roomName(row,index)===entitySceneName(actor ?? {},"actor")) ?? rooms[0] ?? {};
+  const kind = resolveSceneRuntimeExport(roomSceneType(room)).kind;
+  const locals = projectArray(data,"actors").filter(row => entitySceneName(row,"actor")===roomName(room,0));
+  let index: number;
+  if (["topdown","platformer","isometric","racing","point_click","shmup","dungeon_crawler"].includes(kind)) {
+    if (kind==="dungeon_crawler" && actor && child(actor,"dungeonViewAnchor")) return -1;
+    if (kind==="shmup" && actor && !isConfiguredPlayerActor(data,target)) {
+      index=npcActorsForRoom(data,room,rooms.indexOf(room)).filter(row=>integerField(row,"waveIndex",0)===integerField(actor,"waveIndex",0)).indexOf(actor);
+      if (index < 0) throw new Error(`Ator ausente da onda SHMUP: ${target}`);
+    } else if (kind==="point_click" && actor && !isConfiguredPlayerActor(data,target)) {
+      const pack=buildAssetcSpritePackGeneration(data);
+      index=npcActorsForRoom(data,room,rooms.indexOf(room)).filter(row=>Boolean(buildActorEngineSpriteExport(data,row,pack))).slice(0,6).indexOf(actor);
+      if (index < 0) throw new Error(`Ator sem objeto visual exportável: ${target}`);
+    } else index=eventActorIndex(data,rooms,target);
+  } else if (kind==="luta") {
+    const side = target.toLowerCase()==="player" ? "player1" : child(actor,"battle")?.side;
+    index=side==="player1" ? 0 : side==="player2" ? 1 : -2;
+  } else if (kind==="battle_rpg") {
+    const config=battleRpgSceneConfigFromRuntime(room.runtime,data.settings);
+    const party=locals.filter(row=>child(row,"battle")?.side==="party").slice(0,config?.maxPartySize ?? 4);
+    const enemies=locals.filter(row=>child(row,"battle")?.side==="enemy").slice(0,config?.maxEnemies ?? 4);
+    const partyCount=party.length || (config?.maxPartySize ?? 4);
+    index=actor && party.includes(actor) ? party.indexOf(actor) : actor && enemies.includes(actor) ? partyCount+enemies.indexOf(actor) : -2;
+  } else if (kind==="menu" || kind==="cutscene") {
+    const pack=buildAssetcSpritePackGeneration(data);
+    index=locals.filter(row=>Boolean(buildActorEngineSpriteExport(data,row,pack))).indexOf(actor!);
+    if(index<0)index=-2;
+  } else throw new Error(`Escala de ator não possui alvo renderizável em ${kind}.`);
+  if(index < -1 || index>=96) throw new Error(`Ator sem slot de escala exportável: ${target}`);
+  return index;
+}
+
+function assertBackgroundScaleLayer(data: GBAProjectData, room: Record<string, unknown>, target: string): void {
+  const composition = roomSceneComposition(room);
+  if (composition.enabled && composition.effects.hblank.enabled)
+    throw new Error(`Cena ${roomName(room,0)}: escala de fundo por evento não pode disputar a camada com HBlank autorado.`);
+  const presentation = roomAffinePresentation(room);
+  const racing = roomSceneType(room) === "racing" ? racingSceneConfigFromRuntime(room.runtime,data.settings) : null;
+  if (racing?.presentation === "pseudo3d") {
+    const floor = racing.pseudo3dVisuals?.floorTilemapId;
+    const prepared = floor ? buildAssetcTilesetPackGeneration(data)?.assetsBySheet[floor] : undefined;
+    if (target !== "BG2" || prepared?.kind !== "affine_bg")
+      throw new Error(`Cena ${roomName(room,0)}: a perspectiva usa BG2 e precisa de um piso affine preparado.`);
+    if (composition.enabled ? composition.layers.some(layer => layer.enabled && layer.kind === "affine_bg") : presentation.enabled)
+      throw new Error(`Cena ${roomName(room,0)}: o piso em perspectiva já ocupa BG2; remova a segunda camada affine.`);
+    return;
+  }
+  const layer = composition.layers.find(row=>row.enabled && row.kind==="affine_bg" && row.layer===target);
+  if (!(composition.enabled ? Boolean(layer) : presentation.enabled && presentation.assetId && presentation.layer===target))
+    throw new Error(`Cena ${roomName(room,0)}: ${target} precisa de uma camada affine preparada na composição antes de aplicar escala por eventos.`);
+  if (usesSinglePlaneBackground(roomSceneType(room)) && target !== "BG2")
+    throw new Error("Este perfil usa BG2 no Modo 1 para preservar a interface fixa.");
+}
+
 function animationControlActorIndex(data: GBAProjectData, rooms: Record<string, unknown>[], actorName: string): number {
   const actor = projectArray(data, "actors").find(item => (
     stringField(item, "name", "") === actorName || stringField(item, "id", "") === actorName
@@ -4463,6 +4547,11 @@ function compileEventStep(
 
   const integrationIssue = eventCommandIntegrationIssue(sceneChangeCommand(parts), resolveSceneRuntimeExport(roomSceneType(rooms[0] ?? {})).kind);
   if (integrationIssue) throw new Error(integrationIssue);
+
+  if (isScaleEvent(verb)) {
+    const scale = parseScaleEvent(parts);
+    return [{ op: scale.background ? "set_background_scale" : "set_actor_scale", actor: scale.background ? Number(scale.target.slice(2)) : scaleActorIndex(data, rooms, scale.target), x: scale.x256, y: scale.y256, frames: scale.frames }];
+  }
 
   if (isLutaEventVerb(verb)) {
     const control = parseLutaEventCommand(parts.join(" "));
@@ -5810,6 +5899,14 @@ function buildTopdownScripts(
     const boundSceneNames = owners[index]!;
     const belongsToAnotherRuntime = boundSceneNames.size > 0
       && !Array.from(boundSceneNames).some((sceneName) => runtimeRoomNames.has(sceneName));
+    if (!belongsToAnotherRuntime) for (const step of eventSteps(event)) {
+      if (step.isEnabled === false) continue;
+      const parts=eventCommandParts(data,resolveProjectConstantCommand(data,stringField(step,"command","noop")));
+      if (!isScaleEvent(parts[0] ?? "") || !parts[0]!.includes("background")) continue;
+      const scale=parseScaleEvent(parts);
+      const targets=rooms.filter((room,index)=>!boundSceneNames.size || boundSceneNames.has(roomName(room,index)));
+      for(const room of targets) assertBackgroundScaleLayer(data,room,scale.target);
+    }
     return {
       name: eventDocument.name,
       script: belongsToAnotherRuntime
@@ -6003,6 +6100,7 @@ function roomBackgroundAssetName(room: Record<string, unknown>): string {
 }
 
 function roomBackgroundAssetNameUncached(room: Record<string, unknown>): string {
+  if (roomUsesFlatAffineBackground(room)) return "";
   return normalizeGBASceneDocument(room).background.assetName ?? "";
 }
 
@@ -8284,6 +8382,7 @@ function buildBattleRpgProject(
         ...(inventory ? { inventory_items: [{ label: inventory.label, item: itemRegistry.itemIndex(inventory.itemKey),
           initial_quantity: inventory.initialQuantity, heal_amount: inventory.healAmount }] } : {}),
         name: encounterName,
+        video: buildRoomVideoComposition(data, room, tilesetPack),
         ...(visual.indexByRoomName.has(encounterName) ? { background: visual.indexByRoomName.get(encounterName) } : {}),
         resource_bank_group: engineSceneResourceBankGroupName(room, index),
         config: {
@@ -8420,6 +8519,7 @@ function buildLutaProject(
       }];
       return {
         name: stageName,
+        video: buildRoomVideoComposition(data, room, tilesetPack),
         ...(Object.keys(actionSounds).length ? { action_sounds: actionSounds } : {}),
         ...(visual.indexByRoomName.has(stageName) ? { background: visual.indexByRoomName.get(stageName) } : {}),
         resource_bank_group: engineSceneResourceBankGroupName(room, index),
@@ -8580,6 +8680,7 @@ function buildPointClickScenes(
   sceneVisualsByRoomName: ReadonlyMap<string, PointClickSceneVisualExport> = new Map()
 ): EngineExportPointClickScene[] {
   const rooms = exportRoomsForKind(data, "point_click");
+  const tilesetPack = buildAssetcTilesetPackGeneration(data);
   const events = projectArray(data, "events");
   const dialogues = projectArray(data, "dialogues");
   const audioItems = projectArray(data, "audioItems");
@@ -8604,6 +8705,7 @@ function buildPointClickScenes(
     const visual = sceneVisualsByRoomName.get(sceneName);
     const scene: EngineExportPointClickScene = {
       name: sceneName,
+      video: buildRoomVideoComposition(data, room, tilesetPack),
       ...(visual?.backgrounds ? { backgrounds: visual.backgrounds } : { background: visual?.background ?? -1 }),
       resource_bank_group: engineSceneResourceBankGroupName(room, index),
       ...(pointClickConfig ? { cursor_speed: Math.max(1, Math.round(pointClickConfig.cursorSpeed)) } : {}),
@@ -9252,6 +9354,7 @@ function buildVisualNovelScenes(
 
     const scene: EngineExportVisualNovelScene = {
       name: roomName(room, index),
+      video: buildRoomVideoComposition(data, room, tilesetPack),
       resource_bank_group: engineSceneResourceBankGroupName(room, index),
       background: -1,
       line,
@@ -9640,6 +9743,7 @@ function buildMenuScreens(
     });
     const screen: EngineExportMenuScreen = {
       name: source.name,
+      video: buildRoomVideoComposition(data, room, tilesetPack),
       resource_bank_group: engineSceneResourceBankGroupName(room, roomIndex),
       background: -1,
       title_line: titleLine,
@@ -9745,6 +9849,7 @@ function buildMenuScreens(
             y: position.y
           }),
           metasprite: spriteExport.metasprite,
+          scale_actor_index: scaleActorIndex(data, [room], stringField(actor,"id",stringField(actor,"name",""))),
           ...(selectedSpriteExport ? { selected_metasprite: selectedSpriteExport.metasprite } : {}),
           ...(entryAnimation === "slide_down" ? {
             entry_animation: "slide_down" as const,
@@ -10175,6 +10280,7 @@ function buildCutsceneScenes(
     if (explicitSteps.length > 0) {
       return {
         name: roomName(room, index),
+        video: buildRoomVideoComposition(data, room, tilesetPack),
         resource_bank_group: engineSceneResourceBankGroupName(room, index),
         background,
         next_scene: (sceneConfig?.nextSceneIndex ?? -1) >= 0 ? sceneConfig!.nextSceneIndex : index + 1 < rooms.length ? index + 1 : -1,
@@ -10217,6 +10323,7 @@ function buildCutsceneScenes(
 
     return {
       name: roomName(room, index),
+        video: buildRoomVideoComposition(data, room, tilesetPack),
       resource_bank_group: engineSceneResourceBankGroupName(room, index),
       background,
       next_scene: (sceneConfig?.nextSceneIndex ?? -1) >= 0 ? sceneConfig!.nextSceneIndex : index + 1 < rooms.length ? index + 1 : -1,
@@ -10460,6 +10567,7 @@ function buildWorldMapProject(
   const startScreen = startMenuScreenIndex(data);
   return {
     initial_node: startRoomIndex(data, rooms),
+    video: scene ? buildRoomVideoComposition(data, scene, tilesetPack) : exportedDefaultRoomVideoComposition(),
     scene_name: roomName(scene, 0),
     on_enter: onEnter ?? [],
     on_cancel: nodes[0]?.on_select ?? [],
@@ -11165,6 +11273,14 @@ function buildEngineExportProjectContractUncached(
   }
   if(projectArray(data,"actors").some(actor=>normalizeMenuVisibilityConditions(actor.menuVisibilityConditions).length))features.push("menu_actor_visibility_conditions");
   if(projectArray(data,"events").some(event=>JSON.stringify(event).includes("set_player_speed_profile")))features.push("topdown_run_profile");
+  if (projectArray(data, "animations").some(animation => (animation.scaleX ?? 1) !== 1 || (animation.scaleY ?? 1) !== 1)) {
+    features.push("sprite_animation_scale");
+  }
+  if (projectArray(data, "events").some(event => eventSteps(event).some(step => isScaleEvent(commandParts(stringField(step, "command", ""))[0] ?? "")))) features.push("events.visual_scale");
+  const extendedBackgroundRooms = projectRooms(data).filter(room => usesSinglePlaneBackground(roomSceneType(room)));
+  if (extendedBackgroundRooms.some(room => roomAffinePresentation(room).enabled || roomSceneComposition(room).layers.some(layer => layer.enabled && layer.kind === "affine_bg")) ||
+      extendedBackgroundRooms.length > 0 && projectArray(data,"events").some(event => eventSteps(event).some(step => /^(set|animate|reset)_background_scale\b/.test(stringField(step,"command","")))))
+    features.push("events.background_scale_profiles");
   features.push("hardware.gba_native_contract");
   features.push("events.native_authoring_v2");
   if (exportRoomsForKind(data, "topdown").some(room => {

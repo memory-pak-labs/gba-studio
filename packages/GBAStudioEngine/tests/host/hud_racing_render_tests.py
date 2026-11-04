@@ -10,8 +10,10 @@ code = '''#include <cassert>
 #include "gbs/racing.hpp"
 #include "gbs/profiler.hpp"
 #include "gbs/dialogue.hpp"
+#include "gbs/event.hpp"
 int dialogue_draws=0, portrait_draws=0;
-namespace gbs { struct RuntimeFrameContext {}; void draw_dialogue(const DialogueState&) {++dialogue_draws;} void draw_dialogue_portrait(const DialogueState&) { assert(dialogue_draws>portrait_draws); ++portrait_draws; } void wait_vblank() {} }
+gbs::EventState event_state{};
+namespace gbs { bool render_event_background_scale(const EventState&) { return true; } struct RuntimeFrameContext {}; void draw_dialogue(const DialogueState&) {++dialogue_draws;} void draw_dialogue_portrait(const DialogueState&) { assert(dialogue_draws>portrait_draws); ++portrait_draws; } void wait_vblank() {} }
 gbs::DialogueState dialogue {}; gbs::RacingRoomData rooms[1] {}; gbs::RacingProjectData project {};
 struct { bool frame_valid=false; } racing_minimap_cache;
 bool racing_dialogue_was_drawn=true;

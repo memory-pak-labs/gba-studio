@@ -1456,7 +1456,15 @@ function App(): React.ReactElement {
 
     updateProjectData(appendImportedAssetsToProject(session.project.data, importedAssets));
     const plural = importedAssets.length === 1 ? "" : "s";
-    notifySuccess(ui("{0} áudio{1} importado{2}.", { 0: importedAssets.length, 1: plural, 2: plural }));
+    const instrumentCount = importedAssets.filter(asset => asset.metadata?.soundFontInstrument).length;
+    notifySuccess(instrumentCount === importedAssets.length
+      ? ui("{0} instrumentos adicionados ao banco do projeto.", { 0: instrumentCount })
+      : ui("{0} áudio{1} importado{2}.", { 0: importedAssets.length, 1: plural, 2: plural }));
+    const soundFontNotes = Array.from(new Set(importedAssets.flatMap(asset => {
+      const source = asset.metadata?.soundFont as { warnings?: string[] } | undefined;
+      return source?.warnings ?? [];
+    })));
+    if (soundFontNotes.length) setStatus(soundFontNotes.join(" "));
   }
 
   async function importSpriteSheets(): Promise<void> {

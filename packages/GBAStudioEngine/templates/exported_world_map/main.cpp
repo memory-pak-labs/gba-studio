@@ -1,3 +1,4 @@
+#include "gbs/scene_script_runner.hpp"
 #include "gbs/profiler.hpp"
 #define GBS_DIALOGUE_UI_RUNTIME_KIND 10
 #include "gbs/engine.hpp"
@@ -52,6 +53,7 @@ const gbs::WorldMapProjectData& project = gbastudio_world_map_project::project;
 
 gbs::DialogueState dialogue __attribute__((section(".ewram_bss")));
 gbs::EventState event_state __attribute__((section(".ewram_bss")));
+gbs::SceneScriptRunner scene_scripts __attribute__((section(".ewram_bss")));
 gbs::HudState hud;
 gbs::WorldMapRuntimeState world_map_state;
 gbs::EngineResourceManager resource_manager __attribute__((section(".ewram_bss")));
@@ -67,6 +69,18 @@ constexpr uint8_t empty_background_tile[64] = {};
 int world_map_initialization_result = -1;
 char hud_left_buffer[40] = {};
 
+
+void consume_event_state();
+void consume_scene_script(gbs::EventState&, void*) { consume_event_state(); }
+void tick_scene_scripts() {
+    gbs::tick_scene_script_runner(scene_scripts,event_state,dialogue.visible,consume_scene_script,nullptr);
+}
+bool run_scene_script(gbs::EventScript script) {
+    const bool was_active = gbs::scene_script_runner_active(scene_scripts);
+    if (!gbs::enqueue_scene_script(scene_scripts,script)) return false;
+    if (!was_active) tick_scene_scripts();
+    return true;
+}
 
 constexpr size_t max_resource_bank_reservations = 16;
 gbs::ResourceBankReservation active_resource_bank_reservations[max_resource_bank_reservations] = {};
@@ -150,6 +164,7 @@ const char* hud_scene_name() {
 }
 
 void update_background_window() {
+    if (project.video.affine_enabled) return;
     const auto* background = gbs::world_map_background_for(project);
     if (background == nullptr) return;
     if (background->source_tiles != nullptr) {
@@ -239,6 +254,12 @@ void apply_background() {
     for (size_t index = 0; index < project.tile_asset_count; ++index) {
         gbs::load_tiles(project.tile_assets[index]);
     }
+    if (project.video.affine_enabled) {
+        gbs::set_ui_character_base(0);
+        gbs::apply_scene_background_video(project.video);
+        return;
+    }
+    gbs::apply_scene_background_video(project.video);
     if (background == nullptr) {
         return;
     }
@@ -369,12 +390,20 @@ void show_node_line() {
 
 void update_camera() {
     const auto* background = gbs::world_map_background_for(project);
-    if (background == nullptr) return;
     const auto* selected = gbs::world_map_node_for(project,world_map_state.node_index);
+    if (selected == nullptr) return;
     const auto focus = journey.active ? journey.position : selected->position_pixels;
-    camera_x = gbs::world_map_clamp(focus.x - 120,0,background->tilemap.width*8 > 240 ? background->tilemap.width*8-240 : 0);
-    camera_y = gbs::world_map_clamp(focus.y - 80,0,background->tilemap.height*8 > 160 ? background->tilemap.height*8-160 : 0);
-    update_background_window();
+    const auto* affine_map = project.video.affine_tilemap;
+    const int width = project.video.affine_enabled && affine_map ? affine_map->width*8 : background ? background->tilemap.width*8 : 240;
+    const int height = project.video.affine_enabled && affine_map ? affine_map->height*8 : background ? background->tilemap.height*8 : 160;
+    camera_x = gbs::world_map_clamp(focus.x - 120,0,width > 240 ? width-240 : 0);
+    camera_y = gbs::world_map_clamp(focus.y - 80,0,height > 160 ? height-160 : 0);
+    if (project.video.affine_enabled) {
+        auto base = project.video.affine_transform;
+        base.reference_x_8 += camera_x*256;
+        base.reference_y_8 += camera_y*256;
+        gbs::set_affine_bg_transform(project.video.affine_layer,base);
+    } else update_background_window();
 }
 
 void focus_node(int node_index) {
@@ -389,7 +418,7 @@ void focus_node(int node_index) {
     event_state.current_room = current_scene_index();
     update_camera();
     if (gbs::world_map_node_is_available(*node, event_state)) {
-        gbs::run_event_script(event_state, node->on_focus);
+        run_scene_script(node->on_focus);
         consume_event_state();
     }
     if (!dialogue.visible && gbs::world_map_node_is_available(*node, event_state)) {
@@ -412,7 +441,7 @@ void select_node() {
     }
     if (!gbs::world_map_node_is_available(*node, event_state)) {
         if (gbs::has_event_script(node->on_locked)) {
-            gbs::run_event_script(event_state, node->on_locked);
+            run_scene_script(node->on_locked);
             consume_event_state();
         }
         if (!dialogue.visible && node->locked_line_index >= 0) {
@@ -423,7 +452,7 @@ void select_node() {
     }
     world_map_state.selected_level_index = node->target_level_index;
     vehicle_node = world_map_state.node_index;
-    gbs::run_event_script(event_state, node->on_select);
+    run_scene_script(node->on_select);
     consume_event_state();
     if (!dialogue.visible) {
         show_node_line();
@@ -446,14 +475,24 @@ void begin_journey() {
     refresh_hud();
 }
 
+gbs::Vec2i map_screen_position(gbs::Vec2i point) {
+    if (project.video.affine_enabled) {
+        gbs::Vec2i screen {};
+        if (gbs::project_event_background_point(event_state,project.video.affine_layer,point,screen)) return screen;
+        return {-32768,-32768};
+    }
+    return {point.x-camera_x,point.y-camera_y};
+}
+
 void draw_nodes() {
     gbs::hide_all_sprites();
     int sprite_index = 0;
     const auto* vehicle = project.cursor_metasprite;
     if (vehicle != nullptr) {
         const auto position = journey.active ? journey.position : project.nodes[vehicle_node].position_pixels;
-        const int x = position.x-camera_x;
-        const int y = position.y-camera_y-20;
+        const auto screen = map_screen_position(position);
+        const int x = screen.x;
+        const int y = screen.y-20;
         if (x > -32 && x < 272 && y > -32 && y < 192) {
             if (project.cursor_affine && vehicle->part_count == 1) {
                 const auto& part = vehicle->parts[0];
@@ -465,7 +504,7 @@ void draw_nodes() {
                 gbs::set_affine_sprite_transform(0,matrix);
                 gbs::Sprite sprite {x-part.width,y-part.height,part.tile_index,part.palette,false,false,true};
                 sprite.width=part.width; sprite.height=part.height; sprite.affine=true; sprite.double_size=true;
-                sprite.affine_matrix=0; sprite.color_depth=part.color_depth;
+                sprite.affine_matrix=0; sprite.color_depth=part.color_depth; gbs::apply_metasprite_part_scale(sprite, part, vehicle);
                 gbs::set_sprite(sprite_index++,sprite);
             } else {
                 gbs::set_metasprite(sprite_index,*vehicle,{x,y}); sprite_index += vehicle->part_count;
@@ -475,7 +514,8 @@ void draw_nodes() {
     for (size_t index=0;index<project.node_count && sprite_index<120;++index) {
         const auto& node=project.nodes[index];
         if (!gbs::world_map_node_is_visible(node,event_state)) continue;
-        const int x=node.position_pixels.x-camera_x-4, y=node.position_pixels.y-camera_y-4;
+        const auto screen = map_screen_position(node.position_pixels);
+        const int x=screen.x-4, y=screen.y-4;
         if (x < -8 || x > 240 || y < -8 || y > 160) continue;
         const bool available=gbs::world_map_node_is_available(node,event_state);
         if (project.marker_metasprite != nullptr && available) {
@@ -501,6 +541,7 @@ int initialize_world_map_runtime() {
     gbs::debug_set_runtime_kind(GBS_DIALOGUE_UI_RUNTIME_KIND);
     gbs::init_dialogue(dialogue);
     gbs::init_event_state(event_state);
+    gbs::init_scene_script_runner(scene_scripts);
     gbs::bind_event_scripts(event_state, project.scripts, project.script_count);
     gbs::init_hud(hud);
     gbs::init_resource_manager(resource_manager);
@@ -538,7 +579,7 @@ int initialize_world_map_runtime() {
     apply_background(); load_marker_assets(); update_camera();
     gbastudio_dialogue_ui::configure();
     gbastudio_dialogue_ui::configure_for_scene(hud_scene_name(),true);
-    if (!restored) { gbs::run_event_script(event_state,project.on_enter); consume_event_state(); }
+    if (!restored) { run_scene_script(project.on_enter); consume_event_state(); }
     refresh_hud();
 
     return 0;
@@ -563,10 +604,13 @@ gbs::RuntimeAdapterFrameResult update_world_map_runtime(const gbs::RuntimeFrameC
                 : gbs::RuntimeAdapterFrameResult::Continue;
         }
 #endif
+        tick_scene_scripts();
         if (dialogue.visible) {
             gbs::advance_dialogue(dialogue, input);
+        } else if (gbs::scene_script_runner_active(scene_scripts)) {
+            // A queued event owns input while it waits; image interpolation keeps ticking.
         } else if (input.was_pressed(gbs::ButtonStart)) {
-            gbs::run_event_script(event_state,project.on_start); consume_event_state();
+            run_scene_script(project.on_start); consume_event_state();
         } else if (journey.active && input.was_pressed(gbs::ButtonB)) {
             journey.active=false; journey.position=journey.origin;
             focus_node(vehicle_node); refresh_hud();
@@ -574,7 +618,7 @@ gbs::RuntimeAdapterFrameResult update_world_map_runtime(const gbs::RuntimeFrameC
             if (gbs::tick_world_map_journey(journey)) select_node();
             update_camera(); refresh_hud();
         } else if (input.was_pressed(gbs::ButtonB)) {
-            gbs::run_event_script(event_state,project.on_cancel); consume_event_state();
+            run_scene_script(project.on_cancel); consume_event_state();
         } else {
             if (input.was_pressed(gbs::ButtonLeft)) {
                 move_focus(-1, 0);
@@ -607,6 +651,7 @@ void render_world_map_runtime(const gbs::RuntimeFrameContext& context) {
         telemetry.player_x=journey.position.x; telemetry.player_y=journey.position.y;
         telemetry.actor_count=1;
         for(size_t i=0;i<gbs::runtime_telemetry_variable_count;++i) telemetry.variables[i]=event_state.variables[i];
+        gbs::render_event_background_scale(event_state);
         draw_nodes();
         gbs::draw_dialogue(dialogue);
         gbs::draw_hud(hud);

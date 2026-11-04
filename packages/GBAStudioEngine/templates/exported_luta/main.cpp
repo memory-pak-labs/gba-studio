@@ -1,3 +1,4 @@
+#include "gbs/event_render.hpp"
 #include "gbs/profiler.hpp"
 #define GBS_DIALOGUE_UI_RUNTIME_KIND 12
 #include "gbs/engine.hpp"
@@ -469,22 +470,22 @@ void apply_luta_visuals(const gbs::LutaStageData& stage) {
     gbs::set_bg_enabled(gbs::BackgroundLayer::BG1, false);
     gbs::set_bg_enabled(gbs::BackgroundLayer::BG2, false);
     gbs::set_bg_enabled(gbs::BackgroundLayer::BG3, false);
+    const gbs::LutaBackgroundData* background = gbs::luta_background_for(
+        project,
+        stage
+    );
+    if (background != nullptr) {
+        gbs::set_backdrop_color(background->backdrop_color);
+        gbs::load_tilemap(background->layer, background->tilemap);
+        gbs::set_bg_enabled(background->layer, true);
+        gbs::set_bg_scroll(background->layer, 0, 0);
+    }
+    gbs::apply_scene_background_video(stage.video);
     if (project.hud != nullptr && !gbastudio_dialogue_ui::has_hud_scene_binding(project.stages[stage_index].id)) {
         gbs::load_tilemap(project.hud->layer, project.hud->tilemap);
         gbs::set_bg_enabled(project.hud->layer, true);
         gbs::set_bg_scroll(project.hud->layer, 0, 0);
     }
-    const gbs::LutaBackgroundData* background = gbs::luta_background_for(
-        project,
-        stage
-    );
-    if (background == nullptr) {
-        return;
-    }
-    gbs::set_backdrop_color(background->backdrop_color);
-    gbs::load_tilemap(background->layer, background->tilemap);
-    gbs::set_bg_enabled(background->layer, true);
-    gbs::set_bg_scroll(background->layer, 0, 0);
 }
 
 const gbs::LutaCharacter* luta_stage_fighter(const gbs::LutaStageData& stage, bool player_one) {
@@ -582,7 +583,7 @@ void draw_luta_fighter(int first_index, const gbs::MetaSprite& metasprite, gbs::
         sprite.priority = 1;
         sprite.width = part.width;
         sprite.height = part.height;
-        sprite.color_depth = part.color_depth;
+        sprite.color_depth = part.color_depth; gbs::apply_metasprite_part_scale(sprite, part, &metasprite);
         gbs::set_sprite(first_index + index, sprite);
     }
 }
@@ -632,12 +633,12 @@ void draw_luta() {
         : nullptr;
     if (p1_metasprite && state.p1_hp > 0 && sprite_index < 128) {
         if (!gbs::sync_sprite_animation_tiles(p1_visual_state.animator, p1_streamed_tile_asset_loaded)) return;
-        draw_luta_fighter(sprite_index, *p1_metasprite, gbs::Vec2i { state.p1_x, state.p1_y });
+        draw_luta_fighter(sprite_index, gbs::event_scaled_metasprite(event_state, 0, *p1_metasprite), gbs::Vec2i { state.p1_x, state.p1_y });
         sprite_index += p1_metasprite->part_count;
     }
     if (p2_metasprite && state.p2_hp > 0 && sprite_index < 128) {
         if (!gbs::sync_sprite_animation_tiles(p2_visual_state.animator, p2_streamed_tile_asset_loaded)) return;
-        draw_luta_fighter(sprite_index, *p2_metasprite, gbs::Vec2i { state.p2_x, state.p2_y });
+        draw_luta_fighter(sprite_index, gbs::event_scaled_metasprite(event_state, 1, *p2_metasprite), gbs::Vec2i { state.p2_x, state.p2_y });
         sprite_index += p2_metasprite->part_count;
     }
     if (layout && layout->mode && layout->mode[0] == 'a') {
@@ -970,6 +971,7 @@ void render_luta_runtime(const gbs::RuntimeFrameContext& context) {
     draw_luta();
     sync_runtime_telemetry();
     gbs::draw_dialogue(dialogue);
+    gbs::render_event_background_scale(event_state);
     gbs::wait_vblank();
 }
 

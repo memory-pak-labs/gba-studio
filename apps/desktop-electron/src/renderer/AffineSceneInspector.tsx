@@ -1,3 +1,5 @@
+import { usesSinglePlaneBackground } from "../shared/eventTransforms";
+import { SceneBackgroundEffectsHelp } from "./SceneBackgroundEffectsHelp";
 import { uiText as ui, useStudioUiText } from "./studioUiText";
 import {
   AFFINE_SCENE_LIMITS,
@@ -13,6 +15,7 @@ import {
 } from "./InspectorControls";
 
 export interface AffineSceneInspectorProps {
+  sceneType?: string;
   assetOptions: Array<{ label: string; value: string }>;
   onChange: (value: AffineScenePresentation) => void;
   value: AffineScenePresentation;
@@ -26,7 +29,7 @@ function optionsWithCurrent(
   return [{ label: `${currentValue} · não catalogado`, value: currentValue }, ...options];
 }
 
-export function AffineSceneInspector({ assetOptions, onChange, value }: AffineSceneInspectorProps): React.ReactElement {
+export function AffineSceneInspector({ assetOptions, onChange, value, sceneType = "topdown" }: AffineSceneInspectorProps): React.ReactElement {
   const ui = useStudioUiText();
   const normalized = normalizeAffineScenePresentation(value);
   const availableAssets = optionsWithCurrent(assetOptions, normalized.assetId);
@@ -40,21 +43,24 @@ export function AffineSceneInspector({ assetOptions, onChange, value }: AffineSc
   return (
     <InspectorSection
       className="affine-scene-inspector room-detail-editor-span-2"
-      description={ui("Prévia decorativa opcional para rotação e escala. O tilemap e a colisão da cena continuam sendo a fonte de gameplay.")}
+      description={ui("Prepara a imagem e sua transformação inicial. Os eventos aplicam a escala durante o jogo.")}
       title={ui("Camada Affine")}
     >
       <InspectorToggle
         checked={normalized.enabled}
-        description={ui("Renderiza uma camada congelada no modo Foco e no Preview quando houver um asset configurado.")}
+        description={ui("Mantém o fundo preparado para os eventos da cena.")}
         label={ui("Ativar camada Affine")}
         onChange={(enabled) => update({ enabled })}
       />
+      <SceneBackgroundEffectsHelp sceneType={sceneType} />
+      {normalized.enabled && normalized.layer === "BG3" && usesSinglePlaneBackground(sceneType) ?
+        <p className="inspector-field-description" role="alert">{ui("Este perfil usa BG2 no Modo 1 para preservar a interface fixa.")}</p> : null}
       {normalized.enabled ? (
         <>
           <InspectorSelect
             ariaLabel={ui("Asset Affine")}
             description={availableAssets.length > 0
-              ? ui("Use um asset preparado como affine_bg; ele não substitui o fundo jogável.")
+              ? ui("Use um asset preparado como affine_bg. A composição controla quais camadas ficam visíveis.")
               : ui("Importe ou prepare um asset com kind affine_bg para visualizar esta camada.")}
             disabled={availableAssets.length === 0}
             label={ui("Asset Affine")}
@@ -125,7 +131,7 @@ export function AffineSceneInspector({ assetOptions, onChange, value }: AffineSc
             />
           </fieldset>
           <p className="affine-scene-inspector-note" role="status">
-            {ui("Camada decorativa · não altera colisão ou tilemap")}</p>
+            {ui("Configure a transformação inicial aqui. Durante o jogo, use Eventos → Cena → Fundo para definir, animar ou restaurar a escala. A colisão não muda.")}</p>
         </>
       ) : null}
     </InspectorSection>

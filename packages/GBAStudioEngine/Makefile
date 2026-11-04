@@ -118,7 +118,7 @@ isometric-turn-flow-test:
 	python3 tests/host/isometric_cursor_tests.py
 	python3 tests/host/isometric_exploration_tests.py
 
-host-test: tile-edits-test portrait-tab-test dungeon-presentation-test battle-rpg-presentation-test platformer-presentation-test hud-gauge-test luta-authored-hud-test point-click-animation-test shmup-animation-test $(HOST_BUILD)/topdown_tests $(HOST_BUILD)/topdown_fixture_tests $(HOST_BUILD)/platformer_tests $(HOST_BUILD)/isometric_tests $(HOST_BUILD)/dungeon_crawler_tests $(HOST_BUILD)/racing_tests $(HOST_BUILD)/battle_rpg_tests $(HOST_BUILD)/luta_tests $(HOST_BUILD)/visual_novel_tests $(HOST_BUILD)/point_click_tests $(HOST_BUILD)/shmup_tests $(HOST_BUILD)/menu_tests $(HOST_BUILD)/menu_audio_feedback_tests $(HOST_BUILD)/cutscene_tests $(HOST_BUILD)/world_map_tests $(HOST_BUILD)/world_map_journey_tests $(HOST_BUILD)/hardware_core_tests $(HOST_BUILD)/link_tests $(HOST_BUILD)/hblank_effect_tests $(HOST_BUILD)/action_tests $(HOST_BUILD)/profiler_tests $(HOST_BUILD)/camera_tests $(HOST_BUILD)/audio_engine_tests $(HOST_BUILD)/containers_tests $(HOST_BUILD)/typewriter_tests $(HOST_BUILD)/input_advanced_tests $(HOST_BUILD)/oam_overflow_tests $(HOST_BUILD)/deferred_work_tests $(HOST_BUILD)/hbe_presets_tests $(HOST_BUILD)/rumble_tests $(HOST_BUILD)/multiplayer_tests $(HOST_BUILD)/pseudo_3d_tests $(HOST_BUILD)/palette_tests $(HOST_BUILD)/render_asset_tests $(HOST_BUILD)/render_runtime_tests $(HOST_BUILD)/runtime_orchestration_tests $(HOST_BUILD)/runtime_capability_tests $(HOST_BUILD)/visual_effects_tests $(HOST_BUILD)/project_data_tests $(HOST_BUILD)/event_tests $(HOST_BUILD)/dialogue_tests $(HOST_BUILD)/text_tests $(HOST_BUILD)/ui_tests $(HOST_BUILD)/hud_behavior_tests $(HOST_BUILD)/audio_tests $(HOST_BUILD)/animation_tests $(HOST_BUILD)/resource_manager_tests $(HOST_BUILD)/save_tests $(HOST_BUILD)/runtime_save_restore_tests $(HOST_BUILD)/runtime_checkpoint_tests $(HOST_BUILD)/debug_tests $(HOST_BUILD)/math_tests $(HOST_BUILD)/bios_tests $(HOST_BUILD)/rtc_tests $(HOST_BUILD)/utility_tests $(HOST_BUILD)/tween_tests assetc-test gbsbuild-host-test gbsdoctor-test verify-cross-platform-test hardware-source-test stress-projects-contract-test topdown-backdrop-runtime-test topdown-hud-runtime-test
+host-test: event-scale-background-test tile-edits-test portrait-tab-test dungeon-presentation-test battle-rpg-presentation-test platformer-presentation-test hud-gauge-test luta-authored-hud-test point-click-animation-test shmup-animation-test $(HOST_BUILD)/topdown_tests $(HOST_BUILD)/topdown_fixture_tests $(HOST_BUILD)/platformer_tests $(HOST_BUILD)/isometric_tests $(HOST_BUILD)/dungeon_crawler_tests $(HOST_BUILD)/racing_tests $(HOST_BUILD)/battle_rpg_tests $(HOST_BUILD)/luta_tests $(HOST_BUILD)/visual_novel_tests $(HOST_BUILD)/point_click_tests $(HOST_BUILD)/shmup_tests $(HOST_BUILD)/menu_tests $(HOST_BUILD)/menu_audio_feedback_tests $(HOST_BUILD)/cutscene_tests $(HOST_BUILD)/world_map_tests $(HOST_BUILD)/world_map_journey_tests $(HOST_BUILD)/hardware_core_tests $(HOST_BUILD)/link_tests $(HOST_BUILD)/hblank_effect_tests $(HOST_BUILD)/action_tests $(HOST_BUILD)/profiler_tests $(HOST_BUILD)/camera_tests $(HOST_BUILD)/audio_engine_tests $(HOST_BUILD)/containers_tests $(HOST_BUILD)/typewriter_tests $(HOST_BUILD)/input_advanced_tests $(HOST_BUILD)/oam_overflow_tests $(HOST_BUILD)/deferred_work_tests $(HOST_BUILD)/hbe_presets_tests $(HOST_BUILD)/rumble_tests $(HOST_BUILD)/multiplayer_tests $(HOST_BUILD)/pseudo_3d_tests $(HOST_BUILD)/palette_tests $(HOST_BUILD)/render_asset_tests $(HOST_BUILD)/render_runtime_tests $(HOST_BUILD)/runtime_orchestration_tests $(HOST_BUILD)/runtime_capability_tests $(HOST_BUILD)/visual_effects_tests $(HOST_BUILD)/project_data_tests $(HOST_BUILD)/event_tests $(HOST_BUILD)/dialogue_tests $(HOST_BUILD)/text_tests $(HOST_BUILD)/ui_tests $(HOST_BUILD)/hud_behavior_tests $(HOST_BUILD)/audio_tests $(HOST_BUILD)/animation_tests $(HOST_BUILD)/resource_manager_tests $(HOST_BUILD)/save_tests $(HOST_BUILD)/runtime_save_restore_tests $(HOST_BUILD)/runtime_checkpoint_tests $(HOST_BUILD)/debug_tests $(HOST_BUILD)/math_tests $(HOST_BUILD)/bios_tests $(HOST_BUILD)/rtc_tests $(HOST_BUILD)/utility_tests $(HOST_BUILD)/tween_tests assetc-test gbsbuild-host-test gbsdoctor-test verify-cross-platform-test hardware-source-test stress-projects-contract-test topdown-backdrop-runtime-test topdown-hud-runtime-test
 	$(HOST_BUILD)/topdown_tests
 	$(HOST_BUILD)/topdown_fixture_tests
 	$(HOST_BUILD)/platformer_tests
@@ -388,7 +388,7 @@ cutscene-timing-test: $(HOST_BUILD)/cutscene_script_runner_tests
 	$(HOST_BUILD)/cutscene_script_runner_tests
 	python3 tests/host/cutscene_timing_tests.py
 
-$(HOST_BUILD)/cutscene_script_runner_tests: tests/host/cutscene_script_runner_tests.cpp engine/src/gbs_event.cpp engine/src/gbs_dialogue_locale.cpp $(HOST_EVENT_RUNTIME_SRCS) engine/include/gbs/cutscene_script_runner.hpp
+$(HOST_BUILD)/cutscene_script_runner_tests: tests/host/cutscene_script_runner_tests.cpp engine/src/gbs_event.cpp engine/src/gbs_dialogue_locale.cpp $(HOST_EVENT_RUNTIME_SRCS) engine/include/gbs/cutscene_script_runner.hpp engine/include/gbs/scene_script_runner.hpp
 	@mkdir -p $(@D)
 	$(HOST_CXX) $(HOST_CXXFLAGS) $(filter %.cpp,$^) -o $@
 
@@ -2225,3 +2225,18 @@ racing-events-test: $(HOST_BUILD)/racing_progress_events_tests
 $(HOST_BUILD)/racing_progress_events_tests: tests/host/racing_progress_events_tests.cpp engine/include/gbs/racing_events.hpp engine/include/gbs/racing.hpp
 	@mkdir -p $(@D)
 	$(HOST_CXX) $(HOST_CXXFLAGS) $< -o $@
+.PHONY: event-scale-background-test
+event-scale-background-test: $(HOST_BUILD)/scene_background_runner_tests
+	$(HOST_BUILD)/scene_background_runner_tests
+	@mkdir -p $(HOST_BUILD)
+	$(HOST_CXX) $(HOST_CXXFLAGS) tests/host/background_scale_profiles_tests.cpp -o $(HOST_BUILD)/background_scale_profiles_tests
+	$(HOST_BUILD)/background_scale_profiles_tests
+	python3 tests/host/background_video_export_tests.py
+	python3 tests/host/background_scene_cache_tests.py
+	python3 tests/host/background_profile_consumers_tests.py
+	python3 tests/host/platformer_affine_background_tests.py
+	python3 tests/host/affine_tilemap_publication_tests.py
+
+$(HOST_BUILD)/scene_background_runner_tests: tests/host/scene_background_runner_tests.cpp engine/src/gbs_event.cpp engine/src/gbs_dialogue_locale.cpp $(HOST_EVENT_RUNTIME_SRCS) engine/include/gbs/scene_script_runner.hpp engine/include/gbs/iso_event_scheduler.hpp
+	@mkdir -p $(@D)
+	$(HOST_CXX) $(HOST_CXXFLAGS) $(filter %.cpp,$^) -o $@

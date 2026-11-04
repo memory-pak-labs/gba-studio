@@ -91,11 +91,20 @@ struct MetaSpritePart {
     uint8_t width = 16;
     uint8_t height = 16;
     ColorDepth color_depth = ColorDepth::Bpp4;
+    uint16_t scale_x256 = 256;
+    uint16_t scale_y256 = 256;
 };
 
 struct MetaSprite {
     const MetaSpritePart* parts;
     uint8_t part_count;
+    uint16_t scale_x256 = 256;
+    uint16_t scale_y256 = 256;
+};
+
+template <auto& Sprites, size_t Index, uint16_t ScaleX, uint16_t ScaleY>
+struct ScaledMetaSpriteReference {
+    inline static constexpr MetaSprite value { Sprites[Index].parts, Sprites[Index].part_count, ScaleX, ScaleY };
 };
 
 struct SpriteAnimationFrame {
@@ -263,11 +272,14 @@ constexpr bool is_valid_gba_obj_dimensions(int width, int height) {
 }
 
 constexpr bool is_valid_metasprite(const MetaSprite& metasprite) {
-    if (metasprite.parts == nullptr || metasprite.part_count == 0 || metasprite.part_count > 32) {
+    if (metasprite.parts == nullptr || metasprite.part_count == 0 || metasprite.part_count > 32 ||
+        metasprite.scale_x256 < 128 || metasprite.scale_x256 > 512 || metasprite.scale_y256 < 128 || metasprite.scale_y256 > 512) {
         return false;
     }
     for (uint8_t index = 0; index < metasprite.part_count; ++index) {
-        if (!is_valid_gba_obj_dimensions(metasprite.parts[index].width, metasprite.parts[index].height) ||
+        if (metasprite.parts[index].scale_x256 < 128 || metasprite.parts[index].scale_x256 > 512 ||
+            metasprite.parts[index].scale_y256 < 128 || metasprite.parts[index].scale_y256 > 512 ||
+            !is_valid_gba_obj_dimensions(metasprite.parts[index].width, metasprite.parts[index].height) ||
             !is_valid_color_depth(metasprite.parts[index].color_depth) ||
             (metasprite.parts[index].color_depth == ColorDepth::Bpp8 && (metasprite.parts[index].tile_index % 2u) != 0)) {
             return false;

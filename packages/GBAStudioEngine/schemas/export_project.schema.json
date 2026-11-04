@@ -971,6 +971,8 @@
                 "scene_stack_push",
                 "set_actor_animation",
                 "set_actor_animation_frame",
+                "set_actor_scale",
+                "set_background_scale",
                 "set_actor_animation_speed",
                 "set_actor_sprite",
                 "set_actor_active",
@@ -1415,7 +1417,8 @@
                   "miss": { "type": "integer", "minimum": 0 }
                 },
                 "additionalProperties": false
-              }
+              },
+              "video": {"$ref": "#/$defs/video_composition"}
             },
             "additionalProperties": true
           }
@@ -1649,7 +1652,8 @@
                   },
                   "additionalProperties": true
                 }
-              }
+              },
+              "video": {"$ref": "#/$defs/video_composition"}
             },
             "additionalProperties": true
           }
@@ -1866,7 +1870,8 @@
                 "items": {
                   "$ref": "#/properties/topdown_project/properties/event_command"
                 }
-              }
+              },
+              "video": {"$ref": "#/$defs/video_composition"}
             },
             "additionalProperties": true
           }
@@ -1976,7 +1981,8 @@
                   },
                   "additionalProperties": true
                 }
-              }
+              },
+              "video": {"$ref": "#/$defs/video_composition"}
             },
             "additionalProperties": true
           }
@@ -2049,7 +2055,8 @@
                   },
                   "additionalProperties": true
                 }
-              }
+              },
+              "video": {"$ref": "#/$defs/video_composition"}
             },
             "additionalProperties": true
           }
@@ -2058,7 +2065,8 @@
     },
     "world_map_project": {
       "type": "object",
-      "description": "Native world map contract with map nodes, directional connections, conditional unlock variables, hidden/locked nodes, save config, scripts, dialogue lines, optional backgrounds and resource bank groups."
+      "description": "Native world map contract with map nodes, directional connections, conditional unlock variables, hidden/locked nodes, save config, scripts, dialogue lines, optional backgrounds and resource bank groups.",
+      "properties": {"video": {"$ref": "#/$defs/video_composition"}}
     },
     "platformer_project": {
       "type": "object",
@@ -2732,7 +2740,8 @@
           "items": {
             "type": "object",
             "required": ["name", "config", "party_count", "enemy_count", "party", "enemy", "rewards"],
-            "additionalProperties": true
+            "additionalProperties": true,
+            "properties": {"video": {"$ref": "#/$defs/video_composition"}}
           }
         }
       },

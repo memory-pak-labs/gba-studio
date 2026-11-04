@@ -2317,6 +2317,11 @@ def emit_custom_metasprite_part(part, tile_lookup, default_palette, sprite_bpp=4
     combined_hflip = (part.get("hflip") is True) != optimized_hflip
     hflip = "true" if combined_hflip else "false"
     color_depth = ", gbs::ColorDepth::Bpp8" if sprite_bpp == 8 else ""
+    scale_x = require_int(part.get("scale_x256", 256), "escala X", 128, 512)
+    scale_y = require_int(part.get("scale_y256", 256), "escala Y", 128, 512)
+    if scale_x != 256 or scale_y != 256:
+        color_depth = ", gbs::ColorDepth::Bpp8" if sprite_bpp == 8 else ", gbs::ColorDepth::Bpp4"
+        color_depth += f", {scale_x}, {scale_y}"
     return f"{{ {x}, {y}, {tile_index}, {palette}, {hflip}, {vflip}, {width}, {height}{color_depth} }}"
 
 
@@ -3146,7 +3151,32 @@ def convert_wav_to_pcm8(path, target_sample_rate=None):
     if len(samples) > 0xFFFF:
         raise SystemExit("PCM gerado excede 65535 samples; divida ou reduza o asset")
 
-    return samples, output_rate, 0, 0
+    # WAV smpl uses an inclusive loop end; the engine uses an exclusive end.
+    loop_start, loop_end = 0, 0
+    raw = Path(path).read_bytes()
+    offset = 12
+    while offset + 8 <= len(raw):
+        chunk_id = raw[offset:offset + 4]
+        size = struct.unpack_from("<I", raw, offset + 4)[0]
+        payload = offset + 8
+        if payload + size > len(raw):
+            raise SystemExit("WAV possui chunk truncado")
+        if chunk_id == b"smpl":
+            if size < 36:
+                raise SystemExit("WAV smpl truncado")
+            loop_count = struct.unpack_from("<I", raw, payload + 28)[0]
+            if loop_count:
+                if loop_count != 1 or size < 60:
+                    raise SystemExit("WAV suporta um loop smpl")
+                _, loop_type, start, end, fraction, plays = struct.unpack_from("<6I", raw, payload + 36)
+                if loop_type != 0 or fraction != 0 or plays != 0 or start > end or end >= frame_count:
+                    raise SystemExit("WAV smpl precisa de loop forward continuo valido")
+                loop_start = round(start * output_rate / source_rate)
+                loop_end = min(len(samples), round((end + 1) * output_rate / source_rate))
+                if loop_start >= loop_end:
+                    raise SystemExit("WAV loop vazio apos conversao")
+        offset = payload + size + size % 2
+    return samples, output_rate, loop_start, loop_end
 
 
 MOD_SIGNATURE_CHANNELS = {
@@ -7723,7 +7753,15 @@ def resolve_project_metasprite_symbol(value, fallback, asset_report, description
     if value is None:
         return fallback
     if isinstance(value, dict):
-        return resolve_project_asset_symbol(value, "metasprite", asset_report, description)
+        symbol = resolve_project_asset_symbol(value, "metasprite", asset_report, description)
+        sx = require_int(value.get("scale_x256", 256), f"{description}.scale_x256", 128, 512)
+        sy = require_int(value.get("scale_y256", 256), f"{description}.scale_y256", 128, 512)
+        if sx != 256 or sy != 256:
+            match = re.fullmatch(r"([A-Za-z_][A-Za-z0-9_:]*)\[(\d+)\]", symbol)
+            if not match:
+                raise SystemExit(f"{description}: escala requer uma referencia de metasprite do asset pack")
+            return f"gbs::ScaledMetaSpriteReference<{match.group(1)}, {match.group(2)}, {sx}, {sy}>::value"
+        return symbol
     if isinstance(value, str) and value:
         symbol = asset_pack_member_symbol(asset_report, value, "metasprite")
         return symbol if symbol is not None else value
@@ -8607,6 +8645,15 @@ def project_semantic_asset_ids(project, asset_report):
                 for entry in animation_entries:
                     add_ref(entry)
 
+    for collection in ("scenes", "screens", "encounters", "stages"):
+        for scene in project.get(collection, []) or []:
+            if not isinstance(scene, dict) or not isinstance(scene.get("video"), dict):
+                continue
+            for kind in ("affine", "bitmap"):
+                plane = scene["video"].get(kind)
+                if isinstance(plane, dict):
+                    add_ref(plane.get("asset"))
+
     rooms = project.get("rooms", [])
     if isinstance(rooms, list):
         for room in rooms:
@@ -8842,6 +8889,8 @@ def event_op_from_json(value):
         "store_save_exists": "StoreSaveExists",
         "projectile_load_slot": "ProjectileLoadSlot",
         "cancel_actor_movement": "CancelActorMovement",
+        "set_actor_scale": "SetActorScale",
+        "set_background_scale": "SetBackgroundScale",
         "actor_effects": "ActorEffects",
         "visibility": "Visibility",
         "open_menu": "OpenMenu",
@@ -10146,6 +10195,16 @@ def event_command_from_json(command, description, animation_lookup=None, actor_a
             max(1, min(120, event_int(command, ["frames", "duration"], 20))),
             0,
         )
+    if op in ("SetActorScale", "SetBackgroundScale"):
+        actor = event_int(command, ["actor"], 0)
+        x, y = event_int(command, ["x"], 256), event_int(command, ["y"], 256)
+        frames = event_int(command, ["frames"], 0)
+        maximum = 1024 if op == "SetBackgroundScale" else 512
+        if not (128 <= x <= maximum and 128 <= y <= maximum and 0 <= frames <= 32767):
+            raise ValueError(f"{description}: invalid visual scale")
+        if (op == "SetBackgroundScale" and actor not in (2, 3)) or (op == "SetActorScale" and not -1 <= actor < 96):
+            raise ValueError(f"{description}: invalid scale target")
+        return (op, actor, x, y, frames)
     if op == "SetActorAnimationSpeed":
         return (
             op,
@@ -10714,6 +10773,7 @@ def emit_visual_novel_project_data_header(visual_novel_project, asset_report=Non
             f"{on_exit}, "
             f"{auto_advance}, "
             f"{resource_group_expr} "
+            f", {room_video_composition_literal(scene, f'visual_novel_project.scenes[{scene_index}]', asset_report)} "
             "},"
         )
     output.append("constexpr gbs::VisualNovelSceneData scenes[] = {")
@@ -11174,6 +11234,7 @@ def emit_point_click_project_data_header(point_click_project, asset_report=None,
             f"{props_name}, "
             f"{prop_count}, "
             f"{', '.join(scene_cursor)} "
+            f", {room_video_composition_literal(scene, f'point_click_project.scenes[{scene_index}]', asset_report)} "
             "},"
         )
     output.append("constexpr gbs::PointClickSceneData scenes[] = {")
@@ -11618,7 +11679,7 @@ def emit_menu_actors(output, screen, screen_index, asset_report=None):
             f"{'true' if actor.get('cursor_follows_option', False) else 'false'}, "
             f"gbs::Vec2i {{ {cursor_offset[0]}, {cursor_offset[1]} }}, "
             f"{'true' if actor.get('selected_only', False) else 'false'}, "
-            f"{condition_name}, {len(conditions)}, {'true' if actor.get('visibility_any', False) else 'false'} "
+            f"{condition_name}, {len(conditions)}, {'true' if actor.get('visibility_any', False) else 'false'}, {int(actor.get('scale_actor_index', -1))} "
             "},"
         )
 
@@ -11968,6 +12029,7 @@ def emit_menu_project_data_header(menu_project, asset_report=None):
             f"{'true' if screen.get('hud_feedback_in_details', False) else 'false'}, "
             f"{emit_menu_audio_feedback(screen, screen_index)}{header_suffix}, "
             f"{fields_name}, {len(fields)}, {previous_page}, {next_page} "
+            f", {room_video_composition_literal(screen, f'menu_project.screens[{screen_index}]', asset_report)} "
             "},"
         )
     output.append("constexpr gbs::MenuScreenData screens[] = {")
@@ -12327,6 +12389,7 @@ def emit_cutscene_project_data_header(cutscene_project, asset_report=None):
             f"{resource_group_expr}, "
             f"{actors_name}, "
             f"{actor_count} "
+            f", {room_video_composition_literal(scene, f'cutscene_project.scenes[{scene_index}]', asset_report)} "
             "},"
         )
     output.append("constexpr gbs::CutsceneSceneData scenes[] = {")
@@ -12633,6 +12696,7 @@ def emit_world_map_project_data_header(world_map_project, asset_report=None):
         f"    {'true' if world_map_project.get('cursor_affine', False) else 'false'},",
         f"    {'true' if world_map_project.get('embedded_nodes', False) else 'false'},",
         "    gbs::WorldMapHudLabels { " + ", ".join(cpp_string_literal(world_map_project.get('hud_labels', {}).get(key, default)) for key, default in [('available', 'A VIAJAR'), ('journey', 'EM VOO'), ('locked', 'BLOQUEADO')]) + " }",
+        f", {room_video_composition_literal(world_map_project, 'world_map_project', asset_report)}",
         "};",
         "",
         "} // namespace gbastudio_world_map_project",
@@ -13738,6 +13802,33 @@ def room_video_composition_literal(room, description, asset_report=None):
         return video_composition_literal({}, f"{description}.video", asset_report)
     if not isinstance(video, dict):
         raise SystemExit(f"{description}.video precisa ser objeto")
+    fixed_ui_profiles = ("menu_project", "cutscene_project", "point_click_project", "visual_novel_project",
+                         "world_map_project", "battle_rpg_project", "luta_project", "isometric_project",
+                         "dungeon_crawler_project", "racing_project")
+    affine = video.get("affine")
+    if description.startswith(fixed_ui_profiles) and (video.get("bitmap") is not None or
+            video.get("display_mode", 0) not in (0, 1) or isinstance(affine, dict) and
+            (video.get("display_mode", 0) != 1 or str(affine.get("layer", "bg2")).lower() != "bg2")):
+        raise SystemExit(f"{description}: fundo com UI fixa requer BG2 affine no Modo 1")
+    if description.startswith(fixed_ui_profiles) and isinstance(affine, dict):
+        for entry in (asset_report or {}).get("export_plan", {}).get("headers", []):
+            if entry.get("id") != affine.get("asset"):
+                continue
+            resources = entry.get("resources", {})
+            if resources.get("tilemap_width", 0) > 64 or resources.get("tilemap_height", 0) > 64:
+                raise SystemExit(f"{description}: fundo affine com UI fixa permite no máximo 512x512 pixels")
+            palette = entry.get("allocations", {}).get("bg_palette_colors", {})
+            if palette.get("start", 0) + palette.get("count", 0) > 224:
+                raise SystemExit(f"{description}: a imagem affine ocupa as cores 224..255 reservadas à UI")
+        if description.startswith("menu_project") and room.get("hud_header"):
+            group = room.get("resource_bank_group")
+            for entry in (asset_report or {}).get("allocations", []):
+                groups = entry.get("bank_groups", [entry.get("bank_group", "global")])
+                if "global" not in groups and group not in groups:
+                    continue
+                tiles = entry.get("allocations", {}).get("bg_tiles", {})
+                if tiles.get("count", 0) and tiles.get("start", 0) < 896 and tiles.get("end", tiles.get("start", 0)+tiles.get("count", 0)) > 863:
+                    raise SystemExit(f"{description}: o cabeçalho reserva os tiles BG 863..895; reduza as imagens de UI residentes")
     return video_composition_literal({"video": video}, description, asset_report)
 
 
@@ -18409,6 +18500,7 @@ def emit_battle_rpg_project_data_header(battle_project, asset_report=None, base_
             f"{on_enter}, {on_victory}, {on_defeat}, {on_escape}, "
             f"{int(encounter.get('background', encounter.get('background_index', -1)))}, "
             f"{resource_group_expr}, {presentation}, {on_hit_player}, {inventory_name}, {len(inventory)} "
+            f", {room_video_composition_literal(encounter, f'battle_rpg_project.encounters[{index}]', asset_report)} "
             "},"
         )
     output.append("constexpr gbs::BattleRpgEncounterData encounters[] = {")
@@ -18807,6 +18899,7 @@ def emit_luta_project_data_header(luta_project, asset_report=None, base_dir=None
             f"{characters_name}, {character_count}, {player1_name}, {player1_count}, {player2_name}, {player2_count}, "
             f"nullptr, 0, {backgrounds_name}, {background_count}, {on_enter}, {on_victory}, {on_defeat}, "
             f"{int(stage.get('background', stage.get('background_index', -1)))}, {resource_group_expr}, {sounds_expr} "
+            f", {room_video_composition_literal(stage, f'luta_project.stages[{stage_index}]', asset_report)} "
             "},"
         )
 
@@ -19051,7 +19144,7 @@ def emit_isometric_project_data_header(isometric_project, asset_report=None, bas
 
     initial_room = int(isometric_project.get("initial_room", 0))
     backdrop_color = int(isometric_project.get("backdrop_color", 0))
-    video_literal = video_composition_literal(isometric_project, "isometric_project", asset_report)
+    video_literal = room_video_composition_literal(isometric_project, "isometric_project", asset_report)
     project_grid = isometric_project.get("grid", {})
     project_camera = isometric_project.get("camera", {})
     includes = merge_includes(
@@ -19499,7 +19592,9 @@ def emit_isometric_project_data_header(isometric_project, asset_report=None, bas
             )
             tileset_tiles_expr = f"&{tileset_tiles_symbol}"
         authored_background = room.get("authored_background", None)
-        if world_mode == "static_composition" and not authored_background:
+        room_video = room.get("video")
+        flat_affine = isinstance(room_video, dict) and isinstance(room_video.get("affine"), dict) and room_video["affine"].get("asset")
+        if world_mode == "static_composition" and not authored_background and not flat_affine:
             raise SystemExit(
                 f"isometric_project.rooms[{room_index}] estática precisa declarar authored_background"
             )

@@ -14,6 +14,8 @@ std::string calls;
 bool portrait_visible=false;
 namespace gbs {
 struct RuntimeFrameContext {};
+struct EventState {};
+bool render_event_background_scale(const EventState&) { return true; }
 enum class ProfilerSubsystem { Render };
 struct SubsystemProfilerScope { explicit SubsystemProfilerScope(ProfilerSubsystem) {} };
 struct DialogueState { bool visible = false; int frame_index=0; const char* speaker="Nara"; };
@@ -38,6 +40,7 @@ void load_palette(int, bool) {}
 }
 gbs::DialogueState dialogue {}, battle_prompt_dialogue {}, battle_menu_dialogue {};
 gbs::HudState battle_hud {};
+gbs::EventState event_state {};
 bool battle_ui_restore_pending = false;
 bool battle_dialogue_was_drawn = false;
 struct Presentation { int* hud_palette = nullptr; } presentation;

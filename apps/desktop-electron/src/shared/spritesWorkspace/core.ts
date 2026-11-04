@@ -36,6 +36,8 @@ export interface SpritesWorkspaceSheet {
 }
 
 export interface SpritesWorkspaceAnimation {
+  scaleX?: number;
+  scaleY?: number;
   id: string;
   name: string;
   spriteSheet: string;
@@ -215,6 +217,8 @@ export interface GenerateSpriteFromReferenceOptions {
 }
 
 export interface UpdateSpriteAnimationFields {
+  scaleX?: number;
+  scaleY?: number;
   spriteSheet?: string;
   frameWidth?: number;
   frameHeight?: number;
@@ -756,6 +760,12 @@ function applyAnimationFields(animation: Record<string, unknown>, fields: Update
     animation.colorMode = spriteColorMode(fields.colorMode);
   }
 
+  for (const axis of ["scaleX", "scaleY"] as const) {
+    if (fields[axis] !== undefined && Number.isFinite(fields[axis])) {
+      animation[axis] = Math.round(Math.max(0.5, Math.min(2, fields[axis]!)) * 256) / 256;
+    }
+  }
+
   const geometryFieldNames = ["originX", "originY", "hitboxX", "hitboxY", "hitboxWidth", "hitboxHeight"] as const;
   const shouldPersistGeometry = geometryFieldNames.some((key) => fields[key] !== undefined || animation[key] !== undefined);
   if (shouldPersistGeometry) {
@@ -1007,6 +1017,8 @@ function makeAnimation(animation: Record<string, unknown>, index: number, fallba
     name,
     spriteSheet,
     frameSize: `${frameWidth} x ${frameHeight}`,
+    scaleX: typeof animation.scaleX === "number" ? animation.scaleX : 1,
+    scaleY: typeof animation.scaleY === "number" ? animation.scaleY : 1,
     frameWidth,
     frameHeight,
     fps: positiveInteger(animation.fps, 1),

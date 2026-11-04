@@ -1,3 +1,4 @@
+import { SceneBackgroundEffectsHelp } from "./SceneBackgroundEffectsHelp";
 import { uiText as ui, useStudioUiText } from "./studioUiText";
 import { useMemo, type ReactElement } from "react";
 
@@ -262,6 +263,7 @@ export function SceneCompositionInspector({
         options={MODE_OPTIONS}
         value={normalized.mode}
       />
+      <SceneBackgroundEffectsHelp sceneType={sceneType} />
       <InspectorSelect
         ariaLabel={ui("Fallback de incompatibilidade da composição")}
         label={ui("Fallback")}
@@ -348,6 +350,7 @@ export function SceneCompositionInspector({
             {layer.kind === "affine_bg" && layer.affine ? (
               <div className="scene-composition-affine-controls">
                 <InspectorRange ariaLabel={ui("Rotação da camada {0}", { 0: layer.id })} label={ui("Rotação")} max={360} min={-360} onChange={(rotationDegrees) => onChange(updateLayer(normalized, layer.id, { affine: { ...layer.affine!, rotationDegrees } }))} unit="°" value={layer.affine.rotationDegrees} />
+                <p>{ui("A composição define o estado inicial. Use os eventos de escala do fundo para aplicar o efeito durante o jogo.")}</p>
                 <InspectorRange ariaLabel={ui("Escala X da camada {0}", { 0: layer.id })} label={ui("Escala X")} max={16} min={0.0625} onChange={(scaleX) => onChange(updateLayer(normalized, layer.id, { affine: { ...layer.affine!, scaleX } }))} step={0.0625} value={layer.affine.scaleX} />
                 <InspectorRange ariaLabel={ui("Escala Y da camada {0}", { 0: layer.id })} label={ui("Escala Y")} max={16} min={0.0625} onChange={(scaleY) => onChange(updateLayer(normalized, layer.id, { affine: { ...layer.affine!, scaleY } }))} step={0.0625} value={layer.affine.scaleY} />
                 <InspectorToggle checked={layer.affine.wrap} label={ui("Wrap affine")} onChange={(wrap) => onChange(updateLayer(normalized, layer.id, { affine: { ...layer.affine!, wrap } }))} />

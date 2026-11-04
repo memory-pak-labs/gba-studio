@@ -198,6 +198,7 @@ struct MenuActorData {
     const MenuVisibilityConditionData* visibility_conditions = nullptr;
     size_t visibility_condition_count = 0;
     bool visibility_any = false;
+    int scale_actor_index = -1;
 };
 
 constexpr int menu_text_input_max_length = 16;
@@ -399,6 +400,7 @@ struct MenuScreenData {
     size_t hud_binding_count = 0;
     int previous_page_screen_index = -1;
     int next_page_screen_index = -1;
+    VideoComposition video = default_video_composition();
 };
 
 enum class MenuSaveFeedback : uint8_t { None, Confirm, Saved, Failed };

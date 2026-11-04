@@ -37,6 +37,14 @@ function spritesWorkspaceHandlers(overrides: Record<string, unknown> = {}) {
 describe("SpritesWorkspace React smoke", () => {
   afterEach(cleanup);
 
+  it("reserva escala de jogo aos eventos do ator", async () => {
+    const user = userEvent.setup();
+    render(<SpritesWorkspace presentation={deriveSpritesWorkspacePresentation(createBlankProjectData({ name: "Escala" }))} {...spritesWorkspaceHandlers()} />);
+    await user.click(screen.getByRole("button", { name: "player_topdown_4dir.png" }));
+    expect(screen.queryByRole("slider", { name: "Escala X do sprite" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("slider", { name: "Escala Y do sprite" })).not.toBeInTheDocument();
+  });
+
   it("oferece 8bpp como escolha avançada da folha sem alterar a imagem", async () => {
     const user = userEvent.setup(), handlers = spritesWorkspaceHandlers();
     render(<SpritesWorkspace presentation={deriveSpritesWorkspacePresentation(createBlankProjectData({ name: "Cores" }))} {...handlers} />);

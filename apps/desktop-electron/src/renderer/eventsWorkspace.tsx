@@ -1500,6 +1500,7 @@ function EventRuntimeStatus({ result }: { result: PreviewRuntimeState }): React.
 function useEventRuntimeClock(result: PreviewRuntimeState | null, setResult: React.Dispatch<React.SetStateAction<PreviewRuntimeState | null>>): void {
   const advancing = Boolean(result && !result.debugger.paused && (
     result.sceneTransition || result.visualEffect || result.visibility || result.scriptWaitFrames > 0
+    || Object.values(result.nativeEvents.scales).some(scale=>scale.elapsed<scale.duration)
     || result.scriptContinuations.length || result.scriptQueue.length
     || result.lutaCombat?.roundState === "active" || (result.hud.gameClock?.frames ?? 0) > 0 || Object.keys(result.nativeEvents.threads).length
     || Object.keys(result.nativeEvents.actorEffects).length || result.nativeEvents.projectiles.length || result.nativeEvents.adventure.frames > 0

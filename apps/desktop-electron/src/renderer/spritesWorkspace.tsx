@@ -1567,6 +1567,7 @@ function animationEditor(
       {activeTab === "animation" ? (
         <section className="sprite-animation-settings" aria-label={ui("Configurações de animação")}>
         <InspectorRange label={ui("Velocidade")} ariaLabel={ui("FPS")} unit="FPS" max={60} min={1} onChange={(value) => onUpdateAnimationFields(animation.id, { fps: value })} value={animation.fps} />
+
         <InspectorToggle checked={animation.loops} label={ui("Repetir")} onChange={(checked) => onUpdateAnimationFields(animation.id, { loops: checked })} />
         <InspectorToggle checked={animation.pingPong} label={ui("Ping-pong")} onChange={(checked) => onUpdateAnimationFields(animation.id, { pingPong: checked })} />
         {animationState ? (

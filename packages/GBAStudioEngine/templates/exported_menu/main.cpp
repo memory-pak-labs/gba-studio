@@ -1,3 +1,4 @@
+#include "gbs/event_render.hpp"
 #include <cstring>
 #include "gbs/profiler.hpp"
 #define GBS_DIALOGUE_UI_RUNTIME_KIND 3
@@ -77,6 +78,7 @@ bool menu_actor_init_pending = false;
 bool menu_actor_update_pending = false;
 uint32_t screen_elapsed_frames = 0;
 int active_background_index = -1;
+const gbs::VideoComposition* active_background_video = nullptr;
 bool active_background_applied = false;
 uint32_t menu_save_sequence = 0;
 int menu_initialization_result = -1;
@@ -1010,16 +1012,18 @@ void load_screen_actor_resources(const gbs::MenuScreenData& screen) {
 
 void apply_background(const gbs::MenuScreenData& screen) {
     const int background_index = gbs::menu_screen_background_index(screen, screen_elapsed_frames);
-    if (active_background_applied && background_index == active_background_index) {
+    if (active_background_applied && background_index == active_background_index && active_background_video == &screen.video) {
         return;
     }
     active_background_index = background_index;
+    active_background_video = &screen.video;
     active_background_applied = true;
     gbs::set_bg_enabled(gbs::BackgroundLayer::BG0, false);
     gbs::disable_blending();
     gbs::set_bg_priority(gbs::BackgroundLayer::BG0, 0);
     gbs::set_bg_enabled(gbs::BackgroundLayer::BG0, menu_screen_uses_ui(&screen));
     if (!gbs::is_valid_menu_background_index(project, background_index) || background_index < 0) {
+        gbs::apply_scene_background_video(screen.video);
         return;
     }
 
@@ -1034,6 +1038,7 @@ void apply_background(const gbs::MenuScreenData& screen) {
     gbs::load_tilemap(background.layer, background.tilemap);
     gbs::set_bg_enabled(background.layer, true);
 
+    gbs::apply_scene_background_video(screen.video);
     if (!gbs::is_valid_menu_background_index(project, screen.title_overlay_background_index) ||
         screen.title_overlay_background_index < 0) {
         return;
@@ -1080,6 +1085,8 @@ void draw_screen_actors() {
             continue;
         }
         const gbs::MetaSprite* metasprite = gbs::menu_actor_metasprite_at(actor, menu_state.selected_item_index);
+        gbs::MetaSprite scaled {};
+        if (metasprite) { scaled=gbs::event_scaled_metasprite(event_state,actor.scale_actor_index >= 0 ? actor.scale_actor_index : static_cast<int>(actor_index),*metasprite); metasprite=&scaled; }
         if (metasprite == nullptr || !gbs::is_valid_metasprite(*metasprite)) {
             continue;
         }
@@ -1119,7 +1126,7 @@ void draw_screen_actors() {
                     part.width,
                     part.height
                 };
-                sprite.color_depth = part.color_depth;
+                sprite.color_depth = part.color_depth; gbs::apply_metasprite_part_scale(sprite, part, metasprite, actor.flip_horizontal, left + right);
                 gbs::set_sprite(sprite_index + part_index, sprite);
             }
         } else {
@@ -1356,8 +1363,8 @@ void start_screen(int screen_index, bool reset_selection = true, int target_item
     } else {
         ensure_selected_visible_item(*screen);
     }
-    gbs::set_ui_character_base(screen->hud_header.width>0?2:0);
-    gbs::set_bg_character_base(gbs::BackgroundLayer::BG0,screen->hud_header.width>0?2:0);
+    gbs::set_ui_character_base(screen->hud_header.width>0 && !screen->video.affine_enabled?2:0);
+    gbs::set_bg_character_base(gbs::BackgroundLayer::BG0,screen->hud_header.width>0 && !screen->video.affine_enabled?2:0);
     stream_screen_resource_group(*screen);
     load_screen_actor_resources(*screen);
     // Reapply the native dialogue/HUD tiles and palettes after the staged
@@ -2047,10 +2054,13 @@ void render_menu_runtime(const gbs::RuntimeFrameContext& context) {
         gbs::rasterize_menu_header(menu_header_tiles,screen->title,header.width,layout?layout->font_tiles:nullptr);
         gbs::load_palette(gbs::PaletteAsset{&header.background_color,1,14*16+6},false);
         gbs::load_palette(gbs::PaletteAsset{&header.text_color,1,14*16+7},false);
-        gbs::load_bg_tiles_at_character_base(gbs::TileAsset{menu_header_tiles,static_cast<uint16_t>(header.width+1),0,false},2);
-        for(int i=0;i<header.width;++i)gbs::set_bg_tile(gbs::BackgroundLayer::BG0,header.x+i,header.y,32,32,static_cast<uint16_t>((14u<<12)+1+i));
+        const uint16_t first_tile = screen->video.affine_enabled ? 863 : 0;
+        const uint8_t character_base = screen->video.affine_enabled ? 0 : 2;
+        gbs::load_bg_tiles_at_character_base(gbs::TileAsset{menu_header_tiles,static_cast<uint16_t>(header.width+1),first_tile,false},character_base);
+        for(int i=0;i<header.width;++i)gbs::set_bg_tile(gbs::BackgroundLayer::BG0,header.x+i,header.y,32,32,static_cast<uint16_t>((14u<<12)+first_tile+1+i));
     }
     publish_menu_screen_telemetry();
+    gbs::render_event_background_scale(event_state);
     gbs::wait_vblank();
     if (menu_ui_assets_restore_pending && !gbs::render_publication_transaction_active()) {
         // Font/skin restoration queues more VRAM uploads after the screen

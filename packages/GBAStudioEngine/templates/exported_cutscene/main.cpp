@@ -1,3 +1,4 @@
+#include "gbs/event_render.hpp"
 #include "gbs/profiler.hpp"
 #define GBS_DIALOGUE_UI_RUNTIME_KIND 8
 #include "gbs/engine.hpp"
@@ -65,6 +66,7 @@ int cutscene_initialization_result = -1;
 constexpr size_t max_cutscene_animated_actors = 128;
 const gbs::TileAsset* loaded_actor_frames[max_cutscene_animated_actors] = {};
 int applied_background_index = -1;
+const gbs::VideoComposition* applied_background_video = nullptr;
 bool entry_frame_pending = true;
 int resident_background_scene = -1;
 int resident_background_group = -1;
@@ -321,12 +323,14 @@ void stream_current_step_resource_group() {
 void apply_background(const gbs::CutsceneSceneData& scene, int background_index = -1) {
     const int resolved_background_index = background_index >= 0 ? background_index : scene.background_index;
     if (!gbs::is_valid_cutscene_background_index(project, resolved_background_index) || resolved_background_index < 0) {
+        gbs::apply_scene_background_video(scene.video);
         return;
     }
-    if (applied_background_index == resolved_background_index) return;
+    if (applied_background_index == resolved_background_index && applied_background_video == &scene.video) return;
     const bool reuse_background_plane = resident_background_group >= 0 && applied_background_index >= 0 &&
         project.backgrounds[applied_background_index].layer == project.backgrounds[resolved_background_index].layer;
     applied_background_index = resolved_background_index;
+    applied_background_video = &scene.video;
 
     const gbs::CutsceneBackgroundData& background = project.backgrounds[resolved_background_index];
     gbs::set_backdrop_color(background.backdrop_color);
@@ -369,6 +373,7 @@ void apply_background(const gbs::CutsceneSceneData& scene, int background_index 
         }
     }
     gbs::load_tilemap(background.layer, background.tilemap);
+    gbs::apply_scene_background_video(scene.video);
 }
 
 void draw_scene_actors() {
@@ -402,7 +407,12 @@ void draw_scene_actors() {
         const gbs::Vec2i position = step != nullptr
             ? gbs::cutscene_actor_position_at(*scene, *step, actor_index, cutscene_state.frame_counter)
             : actor.position_pixels;
-        gbs::set_metasprite(sprite_index, *metasprite, position);
+        gbs::MetaSprite rendered = *metasprite;
+        if (actor.metasprite != nullptr) {
+            rendered.scale_x256 = actor.metasprite->scale_x256;
+            rendered.scale_y256 = actor.metasprite->scale_y256;
+        }
+        gbs::set_metasprite(sprite_index, gbs::event_scaled_metasprite(event_state, static_cast<int>(actor_index), rendered), position);
         sprite_index += metasprite->part_count;
     }
 }
@@ -948,6 +958,7 @@ void render_cutscene_runtime(const gbs::RuntimeFrameContext& context) {
         /* Advanced HUD text uses OAM 96-127. Draw fixed dialogue portraits
          * after it so the HUD cleanup cannot hide the active portrait. */
         draw_dialogue_portrait();
+        gbs::render_event_background_scale(event_state);
         gbs::wait_vblank();
         // Illustrated poses may use four native objects (128x96 at 8bpp).
         // Finish their 12 KiB upload in this VBlank, before the next visible

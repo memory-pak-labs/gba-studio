@@ -100,11 +100,14 @@ static uint16_t shadow_bg_enabled_bits;
 static uint8_t shadow_bg_enabled_pending;
 static uint8_t render_publication_blocked;
 static uint8_t render_handoff_fallback_active;
+static uint16_t shadow_display_mode;
+static uint16_t shadow_backdrop_color;
 static uint8_t shadow_bg_character_base[4];
 static uint8_t shadow_bg_character_base_pending_mask;
 static uint8_t shadow_bg_depth_mask;
 static uint8_t shadow_bg_depth[4];
 static uint16_t ui_character_base;
+static uint8_t affine_ui_blank_alias_active;
 static uint8_t shadow_bg_priority[4];
 static uint8_t shadow_bg_priority_pending_mask;
 static const int16_t* pending_hblank_scroll_offsets;
@@ -143,6 +146,7 @@ static uint8_t shadow_bg_screen_base_pending_mask;
  * character base 2 (screenblocks 16-23), while the UI's high-index 4bpp
  * assets remain in character base 1 and the UI/world maps remain at 24/28. */
 static const uint16_t affine_screenblock_base = 0u;
+static uint16_t affine_upload_screenblock_base = 0u;
 
 enum {
     /* BG0 = UI (menu/dialogue/HUD). BG1 = dynamic room tilemap. BG2/BG3 = optional parallax. */
@@ -377,7 +381,7 @@ static void commit_shadow_bg_tilemaps(void) {
         if ((shadow_bg_tilemap_pending_mask & (1u << layer)) == 0) {
             continue;
         }
-        if (layer == 0 && ui_character_base != 0) {
+        if (layer == 0 && (ui_character_base != 0 || affine_ui_blank_alias_active)) {
             for (unsigned i = 0; i < 1024; ++i) {
                 if (shadow_bg_tilemaps[layer][i] == 0) shadow_bg_tilemaps[layer][i] = 1023;
             }
@@ -998,6 +1002,9 @@ static void write_obj_square_tiles(void) {
 }
 
 void gbs_hw_init(void) {
+    affine_upload_screenblock_base = affine_screenblock_base;
+    shadow_display_mode = 0;
+    shadow_backdrop_color = 0;
     invalidate_hud_pixel_text_tiles();
     for (unsigned i = 0; i < GBS_TEXT_RESIDENT_GLYPHS; ++i) resident_font_glyphs[i] = (uint16_t)i;
     rebuild_resident_font_slots();
@@ -1028,6 +1035,7 @@ void gbs_hw_init(void) {
     shadow_bg_priority_pending_mask = 0;
     /* Priority 0 draws in front. UI on BG0, world room on BG1. */
     ui_character_base = 0;
+    affine_ui_blank_alias_active = 0;
     shadow_bg_depth_mask = 0;
     REG_BG0CNT = (uint16_t)((bg_screenblocks[UI_BACKGROUND_LAYER] << 8) | 0);
     REG_BG1CNT = (uint16_t)((bg_screenblocks[WORLD_BACKGROUND_LAYER] << 8) | 1);
@@ -1092,10 +1100,12 @@ void gbs_hw_wait_vblank(void) {
         commit_hblank_bg_scroll();
         if (render_handoff_fallback_active) {
             REG_DISPCNT = (uint16_t)(
-                (REG_DISPCNT & ~0x0F00u)
+                (REG_DISPCNT & ~(0x0F00u | 0x0007u))
+                | shadow_display_mode
                 | (shadow_bg_enabled_bits & 0x0F00u)
                 | (1u << 12)
             );
+            MEM_PALETTE[0] = shadow_backdrop_color;
             render_handoff_fallback_active = 0;
         }
     }
@@ -1301,6 +1311,7 @@ void gbs_hw_sio_close(void) {
 }
 
 void gbs_hw_set_backdrop(uint16_t color) {
+    shadow_backdrop_color = color;
     MEM_PALETTE[0] = color;
 }
 
@@ -1618,6 +1629,7 @@ void gbs_hw_load_bg_palette(const uint16_t* colors, uint32_t start_index, uint32
     if (colors == 0 || color_count == 0 || start_index + color_count > 256) {
         return;
     }
+    if (start_index == 0) shadow_backdrop_color = colors[0];
     gbs_hw_enqueue_vblank_dma16(colors, MEM_PALETTE + start_index, color_count);
 }
 
@@ -1744,12 +1756,24 @@ void gbs_hw_set_bg_tilemap_entry(int layer, uint32_t x, uint32_t y, uint32_t wid
     }
 }
 
+bool gbs_hw_set_affine_map_screen_base(uint16_t base) {
+    if (base != affine_screenblock_base && base != 28u) return false;
+    affine_upload_screenblock_base = base;
+    return true;
+}
+
 void gbs_hw_load_affine_bg_tilemap(int layer, const uint8_t* entries, uint32_t width, uint32_t height, uint32_t map_size) {
+    const uint16_t affine_screenblock_base = affine_upload_screenblock_base;
     uint32_t screenblock_count = affine_screenblock_count_for_map_size(map_size);
     if ((layer != 2 && layer != 3) || entries == 0 || width == 0 || height == 0 || width != height ||
-        (width != 16 && width != 32 && width != 64 && width != 128) || map_size > 3 || screenblock_count == 0) {
+        (width != 16 && width != 32 && width != 64 && width != 128) || map_size > 3 || screenblock_count == 0 ||
+        affine_screenblock_base + screenblock_count > 32u) {
         return;
     }
+
+    /* This layer now owns byte-sized affine entries. A pending regular
+     * screenblock would publish 16-bit entries over the new affine map. */
+    shadow_bg_tilemap_pending_mask = (uint8_t)(shadow_bg_tilemap_pending_mask & ~(1u << layer));
 
     shadow_bg_map_size[layer] = (uint8_t)(map_size & 3u);
     shadow_bg_map_size_pending_mask = (uint8_t)(shadow_bg_map_size_pending_mask | (1u << layer));
@@ -1771,6 +1795,22 @@ void gbs_hw_set_display_mode(uint16_t mode) {
     if (mode > 5u) {
         return;
     }
+    const uint8_t use_affine_blank = mode == 1u || mode == 2u;
+    if (use_affine_blank != affine_ui_blank_alias_active) {
+        if (!use_affine_blank) {
+            for (unsigned i = 0; i < 1024; ++i)
+                if (shadow_bg_tilemaps[0][i] == 1023) shadow_bg_tilemaps[0][i] = 0;
+        }
+        if (use_affine_blank) {
+            /* Tile zero belongs to the affine map. Keep empty UI cells on
+             * the reserved transparent tile, outside the map and character data. */
+            for (unsigned i = 0; i < 16; ++i)
+                MEM_VRAM[(ui_character_base * 512u + 1023u) * 16u + i] = 0;
+        }
+        affine_ui_blank_alias_active = use_affine_blank;
+        gbs_hw_mark_ui_tilemap_dirty();
+    }
+    shadow_display_mode = mode & 0x0007u;
     REG_DISPCNT = (uint16_t)((REG_DISPCNT & ~0x0007u) | (mode & 0x0007u));
 }
 

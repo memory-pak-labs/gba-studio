@@ -612,7 +612,7 @@ ipcMain.handle(ipcChannels.importAssets, async (_event, request: ImportAssetsReq
   const tilesetScope = request.scope === "tileset";
   const spriteScope = request.scope === "sprite";
   const result = await showLocalizedOpenDialog({
-    title: animationScope ? "Importar animação GIF" : audioScope ? "Importar audio MOD/WAV" : tilesetScope ? "Importar tileset PNG" : spriteScope ? "Importar sprite PNG" : "Importar assets",
+    title: animationScope ? "Importar animação GIF" : audioScope ? "Importar áudio MOD/WAV/SF2" : tilesetScope ? "Importar tileset PNG" : spriteScope ? "Importar sprite PNG" : "Importar assets",
     properties: request.replaceRelativePath ? ["openFile"] : ["openFile", "multiSelections"],
     filters: animationScope
       ? [
@@ -621,7 +621,7 @@ ipcMain.handle(ipcChannels.importAssets, async (_event, request: ImportAssetsReq
       ]
       : audioScope
       ? [
-        { name: "Audio MOD/WAV", extensions: ["mod", "xm", "s3m", "it", "wav", "mp3", "ogg"] },
+        { name: "Áudio MOD/WAV/SF2", extensions: ["sf2", "mod", "xm", "s3m", "it", "wav", "mp3", "ogg"] },
         { name: "Todos os arquivos", extensions: ["*"] }
       ]
       : tilesetScope || spriteScope
@@ -632,7 +632,7 @@ ipcMain.handle(ipcChannels.importAssets, async (_event, request: ImportAssetsReq
       : [
         {
           name: "Assets comuns",
-          extensions: ["png", "jpg", "jpeg", "webp", "bmp", "gif", "mod", "xm", "s3m", "it", "wav", "mp3", "ogg"]
+          extensions: ["png", "jpg", "jpeg", "webp", "bmp", "gif", "sf2", "mod", "xm", "s3m", "it", "wav", "mp3", "ogg"]
         },
         { name: "Todos os arquivos", extensions: ["*"] }
       ]

@@ -124,6 +124,8 @@ void gbs_hw_load_bg_tilemap(int layer, const uint16_t* entries, uint32_t width, 
 void gbs_hw_set_bg_tilemap_entry(int layer, uint32_t x, uint32_t y, uint32_t width, uint32_t height, uint16_t tile);
 void gbs_hw_load_affine_bg_tiles(const uint8_t* data, uint32_t destination_tile, uint32_t tile_count);
 void gbs_hw_load_affine_bg_tiles_for_layer(int layer, const uint8_t* data, uint32_t destination_tile, uint32_t tile_count);
+/* Select the next affine upload layout; callers restore base zero afterwards. */
+bool gbs_hw_set_affine_map_screen_base(uint16_t base);
 void gbs_hw_load_affine_bg_tilemap(int layer, const uint8_t* entries, uint32_t width, uint32_t height, uint32_t map_size);
 void gbs_hw_set_display_mode(uint16_t mode);
 void gbs_hw_set_affine_bg_wrap(int layer, int enabled);

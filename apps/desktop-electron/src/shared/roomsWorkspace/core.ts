@@ -566,6 +566,8 @@ export interface RoomsWorkspaceEntity {
 }
 
 export interface RoomsWorkspaceSpriteFrame {
+  scaleX?: number;
+  scaleY?: number;
   frameHeight: number;
   frameWidth: number;
   heightTiles: number;

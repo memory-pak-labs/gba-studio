@@ -1695,6 +1695,9 @@ function roomEntityStyle(
 ): CSSProperties {
   const frame = entity.kind === "actor" ? entity.spriteFrame ?? null : null;
   const affineObj = entity.kind === "actor" ? roomAffineObjPreview(room) : null;
+  const scaleX = (frame?.scaleX ?? 1) * (affineObj?.scaleX ?? 1);
+  const scaleY = (frame?.scaleY ?? 1) * (affineObj?.scaleY ?? 1);
+  const hasScale = scaleX !== 1 || scaleY !== 1;
   const imageSize = entity.spriteSource ? spriteImageSizes[entity.spriteSource] : undefined;
   const basePlacement = frame
     ? gbaActorSpriteRoomPlacementFromFrame(entity.x, entity.y, frame)
@@ -1773,8 +1776,8 @@ function roomEntityStyle(
     height: isometricArea ? `${isometricArea.heightPercent}%` : isometricTile ? `${isometricFrameHeight}%` : position.height,
     left: isometricArea ? `${isometricArea.leftPercent}%` : isometricTile ? `${isometricTile.leftPercent + isometricTile.widthPercent / 2 - isometricPivotX}%` : position.left,
     top: isometricArea ? `${isometricArea.topPercent}%` : isometricTile ? `${isometricFeet - isometricPivotY}%` : position.top,
-    transform: affineObj ? `rotate(${affineObj.rotationDegrees}deg) scale(${affineObj.scaleX}, ${affineObj.scaleY})` : undefined,
-    transformOrigin: affineObj ? "center center" : undefined,
+    transform: affineObj || hasScale ? `rotate(${affineObj?.rotationDegrees ?? 0}deg) scale(${scaleX}, ${scaleY})` : undefined,
+    transformOrigin: affineObj ? "center center" : hasScale && frame ? `${frame.originX / frame.frameWidth * 100}% ${frame.originY / frame.frameHeight * 100}%` : undefined,
     width: isometricArea ? `${isometricArea.widthPercent}%` : isometricTile ? `${isometricFrameWidth}%` : position.width,
     overflow: affineObj ? "visible" : undefined,
     zIndex: isometricTile ? 10 + isometricTile.depth : undefined
@@ -2936,6 +2939,7 @@ function roomDetailsEditor(
               width={room.width}
             />
             <AffineSceneInspector
+              sceneType={room.sceneType}
               assetOptions={affineOptions}
               onChange={updateAffinePresentation}
               value={affinePresentation}

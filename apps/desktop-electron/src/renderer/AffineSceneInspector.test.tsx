@@ -50,6 +50,6 @@ describe("AffineSceneInspector", () => {
       rotationDegrees: 45,
       scaleX: 1.5
     }));
-    expect(screen.getByText("Camada decorativa · não altera colisão ou tilemap")).toBeInTheDocument();
+    expect(screen.getByText(/Durante o jogo, use Eventos/)).toBeInTheDocument();
   });
 });

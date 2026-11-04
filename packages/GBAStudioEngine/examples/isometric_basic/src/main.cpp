@@ -1,3 +1,4 @@
+#include "gbs/event_render.hpp"
 #include "gbs/profiler.hpp"
 #define GBS_DIALOGUE_UI_RUNTIME_KIND 2
 #include "gbs/engine.hpp"
@@ -1704,7 +1705,7 @@ void load_assets(const gbs::VideoComposition& video) {
             gbs::load_tiles(project.tile_assets[index]);
         }
     }
-    gbs::apply_video_composition(video);
+    gbs::apply_scene_background_video(video);
 }
 
 bool iso_scene_uses_native_tactical_hud() {
@@ -2077,9 +2078,11 @@ void consume_event_state(gbs::EventState& event_state) {
         project.obj_palettes,
         project.obj_palette_count
     );
-    // Palette uploads may replace BG palette entry 0. Restore the isometric
-    // backdrop afterwards so transparent diamond corners do not become black.
-    gbs::set_backdrop_color(project.backdrop_color);
+    // Native diamond corners use the scene backdrop. A flat affine image
+    // owns palette entry 0 and must retain its source color.
+    if (!room_data->video.affine_enabled && !project.video.affine_enabled) {
+        gbs::set_backdrop_color(project.backdrop_color);
+    }
     consume_link_event_outputs(event_state);
     if (event_state.last_dialogue >= 0) {
         gbs::show_dialogue(dialogue, project.dialogue_lines, project.dialogue_line_count, event_state.last_dialogue);
@@ -2515,7 +2518,7 @@ bool restore_isometric_runtime_state(
     if (!restore_iso_temporal_checkpoint(universal_save, event_state.current_room, actors, actor_count, event_state)) return false;
     current_room = event_state.current_room;
     room_data = &project.rooms[current_room];
-    gbs::apply_video_composition(room_data->video.affine_enabled ? room_data->video : project.video);
+    gbs::apply_scene_background_video(room_data->video.affine_enabled ? room_data->video : project.video);
     gbs::SaveInfo info = gbs::inspect_save_slot(gbastudio_isometric_project::save_bank, static_cast<size_t>(slot_index));
     isometric_save_sequence = info.sequence;
     return true;
@@ -2569,7 +2572,7 @@ bool apply_iso_event_room_change(
     gbs::clear_iso_event_scheduler(iso_event_scheduler);
     current_room = target_room;
     room_data = &project_data.rooms[current_room];
-    gbs::apply_video_composition(room_data->video.affine_enabled ? room_data->video : project_data.video);
+    gbs::apply_scene_background_video(room_data->video.affine_enabled ? room_data->video : project_data.video);
     for (size_t index = 0; index < actor_capacity; ++index) {
         actors[index] = gbs::IsoActor {};
         iso_actor_touching_player[index] = false;
@@ -2679,10 +2682,10 @@ int initialize_isometric_runtime() {
     }
 
     load_assets(room_data->video.affine_enabled ? room_data->video : project.video);
-    // load_assets uploads the room palettes, including palette entry 0. The
-    // backdrop must be applied after that upload to remain visible through
-    // transparent atlas corners.
-    gbs::set_backdrop_color(project.backdrop_color);
+    // Restore native transparent corners, but preserve an affine image palette.
+    if (!room_data->video.affine_enabled && !project.video.affine_enabled) {
+        gbs::set_backdrop_color(project.backdrop_color);
+    }
     for (size_t index = 0; index < max_actor_count; ++index) {
         actors[index] = gbs::IsoActor {};
         actor_animation_states[index] = gbs::IsoActorAnimationState {};
@@ -3248,6 +3251,11 @@ void render_isometric_runtime(const gbs::RuntimeFrameContext& context) {
         const bool authored_background = gbs::uses_authored_isometric_background(*room_data);
         const gbs::IsoTacticalPresentationData* tactical_presentation = room_data->tactical_presentation;
         const bool tactical_presentation_active = tactical_state.enabled && tactical_presentation != nullptr;
+        const bool affine_backdrop = room_data->video.affine_enabled || project.video.affine_enabled;
+        if (affine_backdrop) {
+            gbs::set_ui_character_base(0);
+            iso_foreground_valid = false;
+        } else {
         // The dynamic surface uses CBB2. Keep all maps above its last tile;
         // authored/tactical paths retain the shared engine's default layout.
         const bool dynamic_surface = !authored_background && (!tactical_presentation_active || room_data->baked_composition != nullptr);
@@ -3651,6 +3659,8 @@ void render_isometric_runtime(const gbs::RuntimeFrameContext& context) {
                 : (layer == 0 || !rendered_iso_surface ? 0 : camera.position_pixels.y & 7));
             gbs::set_bg_scroll(background, base_x + visual_scroll.x, base_y + visual_scroll.y);
         }
+        }
+        gbs::render_event_background_scale(event_state);
         gbs::render_visual_effects(visual_effects);
         gbs::hide_all_sprites();
         size_t draw_count = gbs::build_iso_draw_list(
@@ -3659,7 +3669,8 @@ void render_isometric_runtime(const gbs::RuntimeFrameContext& context) {
             camera,
             draw_items,
             max_draw_count,
-            room_data->grid
+            room_data->grid,
+            &event_state
         );
         if (iso_foreground_valid) {
             for (size_t index = 0; index < draw_count; ++index) {

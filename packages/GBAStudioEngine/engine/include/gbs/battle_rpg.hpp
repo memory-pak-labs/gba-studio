@@ -112,6 +112,7 @@ struct BattleRpgEncounterData {
     EventScript on_hit_player = empty_event_script();
     const BattleRpgInventoryItemData* inventory_items = nullptr;
     size_t inventory_item_count = 0;
+    VideoComposition video = default_video_composition();
 };
 
 struct BattleRpgProjectData {

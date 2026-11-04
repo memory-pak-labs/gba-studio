@@ -1400,6 +1400,16 @@ EventStepResult execute_event_command(
             }
         }
         break;
+    case EventOp::SetActorScale:
+        if (state.transform_room != state.current_room) reset_event_transforms(state);
+        if (command.a >= -1 && command.a < static_cast<int>(max_event_actor_state_slots))
+            set_event_scale(state.actor_scales[command.a + 1], command.b, command.c, command.d, 512);
+        break;
+    case EventOp::SetBackgroundScale:
+        if (state.transform_room != state.current_room) reset_event_transforms(state);
+        if (command.a == 2 || command.a == 3)
+            set_event_scale(state.background_scales[command.a - 2], command.b, command.c, command.d, 1024);
+        break;
     case EventOp::SetActorAnimationSpeed:
         push_actor_command(state, EventActorOp::SetAnimationSpeed, command.a, command.b, 0);
         break;
@@ -1707,6 +1717,12 @@ bool consume_runtime_transition(
     return true;
 }
 
+void reset_event_transforms(EventState& state) {
+    for (auto& scale : state.actor_scales) scale = EventScale {};
+    for (auto& scale : state.background_scales) scale = EventScale {};
+    state.transform_room = state.current_room;
+}
+
 void init_event_state(EventState& state) {
     state.supports_temporal_actor_motion = false;
     state.actor_motion_serial = 0;
@@ -1718,6 +1734,7 @@ void init_event_state(EventState& state) {
     state.luta_command_count = 0;
     for (size_t i = 0; i <= max_event_actor_state_slots; ++i) { state.actor_effect_frames[i]=0; state.actor_effect_intensity[i]=0; state.actor_effect_kind[i]=0; }
     state.current_room = 0;
+    reset_event_transforms(state);
     state.player_x = 0;
     state.player_y = 0;
     state.player_direction = 0;
@@ -1955,6 +1972,9 @@ void set_event_actor_animation_state(EventState& state, int actor_index, bool pl
 }
 
 void tick_event_frame_counter(EventState& state) {
+    if (state.transform_room != state.current_room) reset_event_transforms(state);
+    for (auto& scale : state.actor_scales) tick_event_scale(scale);
+    for (auto& scale : state.background_scales) tick_event_scale(scale);
     for (size_t i = 0; i <= max_event_actor_state_slots; ++i) if (state.actor_effect_frames[i] > 0) --state.actor_effect_frames[i];
     if (state.clock_frames_per_tick > 0 && state.clock_minutes_per_tick > 0) {
         if (++state.clock_frame_accumulator >= state.clock_frames_per_tick) {

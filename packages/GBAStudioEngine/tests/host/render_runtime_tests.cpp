@@ -3,12 +3,17 @@
 #include <stdint.h>
 #include "../../engine/src/gbs_room_tilemap.h"
 #include "gbs/event.hpp"
+#include "gbs/event_render.hpp"
 #include "gbs/interrupt.hpp"
 #include "gbs/render.hpp"
 #include "gbs/tile_edits.hpp"
 
 namespace {
 
+int bg_layer_enabled[4] {};
+int bg_layer_priority[4] {};
+int affine_map_screen_base = 0;
+int loaded_affine_map_screen_base = -1;
 int affine_dma_layer=-1;
 uint32_t affine_dma_words[644]{};
 int bg_mosaic_calls = 0;
@@ -23,6 +28,7 @@ int decode_upload_count = 0;
 int decode_drain_count = 0;
 
 void test_based_bg_upload_respects_tilemap_and_obj_memory() {
+    screen_base_calls = 0;
     const uint8_t data[32] {};
     assert(gbs::load_bg_tiles_at_character_base(gbs::TileAsset { data, 1, 511, false }, 2));
     assert(based_bg_upload_calls == 1 && based_bg_physical_tile == 1535);
@@ -60,6 +66,7 @@ int last_scroll_y = 0;
 int display_mode_calls = 0;
 uint16_t last_display_mode = 0;
 int affine_transform_calls = 0;
+gbs::AffineBgTransform last_background_transform {};
 int affine_wrap_calls = 0;
 int last_affine_wrap_layer = -1;
 int last_affine_wrap_enabled = -1;
@@ -284,6 +291,54 @@ void test_affine_sprite_matrix_and_flags_reach_hardware() {
     assert(affine_sprite_calls == 1);
     assert(last_affine_sprite_index == 7);
     assert(last_affine_double_size == 1);
+}
+
+constexpr gbs::MetaSpritePart scaled_reference_parts[] = {{-8, 0, 0, 0, false, false}, {8, 0, 4, 0, false, false}};
+constexpr gbs::MetaSprite scaled_reference_sources[] = {{scaled_reference_parts, 2}};
+using ScaledReference = gbs::ScaledMetaSpriteReference<scaled_reference_sources, 0, 384, 192>;
+static_assert(ScaledReference::value.scale_x256 == 384, "static references retain authored scaling");
+
+void test_scaled_static_metasprite_reference_reaches_hardware() {
+    gbs::hide_all_sprites(); reset_spy();
+    gbs::set_metasprite(0, ScaledReference::value, {40, 10});
+    assert(sprite_calls == 2);
+    assert(last_affine_sprite_transform.pa == 171 && last_affine_sprite_transform.pd == 341);
+    gbs::hide_all_sprites();
+}
+
+void test_authored_sprite_scale_uses_bounded_shared_matrices() {
+    gbs::hide_all_sprites();
+    reset_spy();
+    gbs::Sprite sprite { 40, 50, 0, 0, false, false, true };
+    sprite.scale_x256 = 384;
+    sprite.scale_y256 = 128;
+    gbs::set_sprite(0, sprite);
+    assert(last_affine_matrix_index == 16);
+    assert(last_affine_sprite_transform.pa == 171);
+    assert(last_affine_sprite_transform.pd == 512);
+    assert(last_affine_double_size == 1);
+    const int writes = affine_sprite_matrix_calls;
+    gbs::set_sprite(1, sprite);
+    assert(affine_sprite_matrix_calls == writes); // Share matrices across parts/actors.
+    sprite.hflip = true;
+    gbs::set_sprite(2, sprite);
+    assert(last_affine_sprite_transform.pa == -171);
+    assert(!gbs::set_affine_sprite_transform(16, {256,0,0,256})); // Never overwrite a live automatic matrix.
+    gbs::hide_all_sprites();
+    sprite.hflip = false;
+    for (int i = 0; i < 16; ++i) {
+        sprite.scale_x256 = 128 + i * 8;
+        gbs::set_sprite(i, sprite);
+    }
+    const int submitted = sprite_calls;
+    sprite.scale_x256 = 384;
+    gbs::set_sprite(17, sprite);
+    assert(sprite_calls == submitted); // A seventeenth matrix cannot corrupt earlier sprites.
+    gbs::hide_world_sprites();
+    gbs::set_sprite(17, sprite);
+    assert(sprite_calls == submitted + 1);
+    gbs::hide_all_sprites();
+    assert(gbs::set_affine_sprite_transform(16, {256,0,0,256}));
 }
 
 void test_affine_keyframes_apply_at_runtime_frame() {
@@ -724,6 +779,8 @@ void test_video_composition_applies_affine_and_bitmap_paths() {
 } // namespace
 
 namespace gbs {
+int backdrop_destination_waits = 0;
+bool dma_wait_for_destination(const volatile void*, size_t) { ++backdrop_destination_waits; return true; }
 bool dma_wait_for_source(const void* source, size_t size) {
     if (track_decode_dma && pending_decode_upload && source == pending_decode_upload && size >= 32) {
         std::memcpy(drained_decode_bytes, pending_decode_upload, sizeof(drained_decode_bytes));
@@ -820,21 +877,22 @@ void gbs_hw_load_affine_bg_tiles_for_layer(int layer, const uint8_t*, uint32_t, 
     ++affine_tile_calls;
     last_affine_tile_layer = layer;
 }
-void gbs_hw_load_affine_bg_tilemap(int, const uint8_t*, uint32_t, uint32_t, uint32_t) { ++affine_tilemap_calls; }
+bool gbs_hw_set_affine_map_screen_base(uint16_t base) { affine_map_screen_base = base; return true; }
+void gbs_hw_load_affine_bg_tilemap(int, const uint8_t*, uint32_t, uint32_t, uint32_t) { ++affine_tilemap_calls; loaded_affine_map_screen_base = affine_map_screen_base; }
 void gbs_hw_set_display_mode(uint16_t mode) { ++display_mode_calls; last_display_mode = mode; }
 void gbs_hw_set_affine_bg_wrap(int layer, int enabled) {
     ++affine_wrap_calls;
     last_affine_wrap_layer = layer;
     last_affine_wrap_enabled = enabled;
 }
-void gbs_hw_set_affine_bg_transform(int, int16_t, int16_t, int16_t, int16_t, int32_t, int32_t) { ++affine_transform_calls; }
+void gbs_hw_set_affine_bg_transform(int, int16_t a, int16_t b, int16_t c, int16_t d, int32_t x, int32_t y) { ++affine_transform_calls; last_background_transform = {a,b,c,d,x,y}; }
 void gbs_hw_load_bitmap16(uint16_t, const uint16_t*, uint16_t, uint16_t, uint16_t) { ++bitmap16_calls; }
 void gbs_hw_load_bitmap8(const uint8_t*, uint16_t, uint16_t, uint16_t) {}
 void gbs_hw_fill_bitmap16(uint16_t, uint16_t, uint16_t) {}
 void gbs_hw_update_bitmap16_rect(uint16_t, uint16_t, uint16_t, uint16_t, uint16_t, uint16_t, const uint16_t*, uint16_t) { ++bitmap16_rect_calls; }
 void gbs_hw_update_bitmap8_rect(uint16_t, uint16_t, uint16_t, uint16_t, uint16_t, const uint8_t*, uint16_t) { ++bitmap8_rect_calls; }
 void gbs_hw_set_display_frame_page(uint16_t) { ++display_page_calls; }
-void gbs_hw_set_bg_priority(int, uint16_t) {}
+void gbs_hw_set_bg_priority(int layer, uint16_t priority) { bg_layer_priority[layer] = priority; }
 void gbs_hw_set_bg_character_base(int, uint16_t) {}
 void gbs_hw_set_bg_color_depth(int, int) {}
 void gbs_hw_set_ui_character_base(uint16_t) {}
@@ -847,7 +905,7 @@ void gbs_hw_load_bg_tiles_at_character_base(const uint8_t*, uint32_t tile, uint3
     ++based_bg_upload_calls;
     based_bg_physical_tile = base * 512u + tile;
 }
-void gbs_hw_set_bg_enabled(int, int) {}
+void gbs_hw_set_bg_enabled(int layer, int enabled) { bg_layer_enabled[layer] = enabled; }
 void gbs_hw_set_blending(uint16_t, uint16_t, uint16_t, uint16_t, uint16_t, uint16_t) {}
 void gbs_hw_disable_blending(void) {}
 void gbs_hw_disable_mosaic(void) {}
@@ -1009,7 +1067,126 @@ static void test_room_edits_stage_independent_layers_and_refresh_without_camera_
     assert(captured_tilemaps[2][0] == 100 && captured_tilemaps[2][1] == 3);
 }
 
+void test_background_event_scale_composes_around_viewport_center() {
+    gbs::EventState state {};
+    gbs::VideoComposition composition {};
+    composition.display_mode = gbs::DisplayMode::Mode1TextAffine;
+    composition.affine_enabled = true; composition.affine_layer = gbs::BackgroundLayer::BG2;
+    composition.affine_transform = {256,0,0,256,0,0};
+    assert(gbs::apply_video_composition(composition));
+    state.background_scales[0].x256 = 512; state.background_scales[0].y256 = 128;
+    assert(gbs::render_event_background_scale(state));
+    assert(last_background_transform.pa == 128 && last_background_transform.pd == 512);
+    assert(last_background_transform.reference_x_8 == 15360 && last_background_transform.reference_y_8 == -20480);
+    assert(gbs::render_event_background_scale(state));
+    assert(last_background_transform.pa == 128); // repeated render must never compound
+    state.background_scales[0] = gbs::EventScale {};
+    assert(gbs::render_event_background_scale(state));
+    assert(last_background_transform.pa == 256 && last_background_transform.reference_x_8 == 0);
+    composition.affine_enabled = false; composition.display_mode = gbs::DisplayMode::Mode0Text;
+    assert(gbs::apply_video_composition(composition));
+    const int calls = affine_transform_calls;
+    assert(!gbs::render_event_background_scale(state));
+    assert(affine_transform_calls == calls);
+}
+
+void test_event_metasprite_scale_keeps_shared_art_and_actor_origin() {
+    gbs::EventState state {};
+    const gbs::MetaSpritePart part {-8,-32,0,0,false,false,16,32};
+    const gbs::MetaSprite source {&part,1};
+    state.actor_scales[0].x256=384; state.actor_scales[0].y256=192;
+    const auto scaled=gbs::event_scaled_metasprite(state,-1,source);
+    assert(source.scale_x256==256 && source.parts[0].y==-32);
+    assert(gbs::event_scaled_metasprite(state,0,source).scale_x256==256);
+    gbs::Sprite sprite {}; sprite.x=100+part.x; sprite.y=100+part.y;
+    gbs::apply_metasprite_part_scale(sprite,part,&scaled);
+    assert(sprite.x==92 && sprite.y==72 && sprite.scale_x256==384 && sprite.scale_y256==192);
+    sprite.x=108; sprite.y=68;
+    gbs::apply_metasprite_part_scale(sprite,part,&scaled,true,16);
+    assert(sprite.x==116 && sprite.y==72); // mirroring also changes the center of each part
+
+}
+
+void test_scene_background_video_keeps_the_fixed_ui_plane() {
+    auto video = gbs::default_video_composition();
+    video.display_mode = gbs::DisplayMode::Mode1TextAffine;
+    video.affine_enabled = true;
+    video.affine_layer = gbs::BackgroundLayer::BG2;
+    const uint8_t map_data[256] {};
+    const gbs::AffineTileMapAsset map {map_data,16,16};
+    video.affine_tilemap = &map;
+    gbs::backdrop_destination_waits = 0;
+    assert(gbs::apply_scene_background_video(video));
+    assert(gbs::backdrop_destination_waits == 2);
+    assert(loaded_affine_map_screen_base == 28 && affine_map_screen_base == 0);
+    assert(bg_layer_enabled[0] && bg_layer_enabled[2]);
+    assert(!bg_layer_enabled[1] && !bg_layer_enabled[3]);
+    assert(bg_layer_priority[0] == 0 && bg_layer_priority[2] == 2);
+    gbs::EventState state {};
+    state.background_scales[0].x256 = 512;
+    assert(gbs::render_event_background_scale(state));
+    assert(last_background_transform.pa == 128);
+    auto invalid = video; invalid.affine_layer = gbs::BackgroundLayer::BG3;
+    invalid.display_mode = gbs::DisplayMode::Mode2Affine;
+    assert(!gbs::apply_scene_background_video(invalid));
+    invalid = gbs::default_video_composition(); invalid.display_mode = gbs::DisplayMode::Mode4Bitmap;
+    assert(!gbs::apply_scene_background_video(invalid));
+    assert(gbs::apply_scene_background_video(gbs::default_video_composition()));
+    assert(last_display_mode == 0);
+    assert(!gbs::render_event_background_scale(state));
+    const gbs::AffineTileMapAsset oversized {map_data,128,128};
+    video.affine_tilemap = &oversized;
+    assert(!gbs::apply_scene_background_video(video));
+}
+
+void test_map_markers_follow_the_scaled_image_and_camera() {
+    auto video = gbs::default_video_composition();
+    video.affine_enabled = true; video.display_mode = gbs::DisplayMode::Mode1TextAffine;
+    video.affine_transform = {256,0,0,256,20*256,10*256};
+    assert(gbs::apply_scene_background_video(video));
+    gbs::EventState state {}; state.background_scales[0].x256 = 512;
+    gbs::Vec2i screen {};
+    assert(gbs::project_event_background_point(state,gbs::BackgroundLayer::BG2,{140,90},screen));
+    assert(screen.x == 120 && screen.y == 80);
+    assert(gbs::project_event_background_point(state,gbs::BackgroundLayer::BG2,{160,90},screen));
+    assert(screen.x == 160 && screen.y == 80);
+    state.background_scales[0].x256 = 256;
+    gbs::set_affine_bg_transform(gbs::BackgroundLayer::BG2,{0,-256,256,0,80*256,0});
+    assert(gbs::project_event_background_point(state,gbs::BackgroundLayer::BG2,{40,60},screen));
+    assert(screen.x == 60 && screen.y == 40);
+    assert(gbs::apply_video_composition(gbs::default_video_composition()));
+    assert(!gbs::project_event_background_point(state,gbs::BackgroundLayer::BG2,{0,0},screen));
+}
+
+void test_perspective_scale_keeps_the_horizon_and_dma_reset_line() {
+    gbs::HBlankAffineRasterLine lines[161] {};
+    for (int y=0; y<160; ++y) lines[y] = {256,64,y*256,y*512,y>40};
+    lines[160] = lines[0];
+    gbs::HBlankAffineRasterLine original[161]; std::memcpy(original,lines,sizeof(lines));
+    assert(gbs::scale_perspective_background(lines,161,256,256,40));
+    assert(std::memcmp(original,lines,sizeof(lines)) == 0);
+    assert(gbs::scale_perspective_background(lines,161,512,512,40));
+    assert(!lines[40].visible && lines[80].visible);
+    assert(lines[80].pa == 128 && lines[80].pc == 32);
+    assert(lines[80].reference_x_8 == 60*256 + 128*120);
+    assert(lines[80].reference_y_8 == 60*512 + 32*120);
+    assert(lines[160].pa == lines[0].pa && lines[160].reference_x_8 == lines[0].reference_x_8);
+    assert(!gbs::scale_perspective_background(lines,160,512,512,40));
+    assert(!gbs::scale_perspective_background(lines,161,0,512,40));
+    std::memcpy(lines,original,sizeof(lines));
+    assert(gbs::scale_perspective_background(lines,161,128,128,40));
+    assert(lines[70].pa == 512 && lines[70].pc == 128);
+    assert(lines[70].reference_x_8 == 100*256 - 256*120);
+    assert(!lines[159].visible);
+    assert(lines[159].reference_x_8 == -256 && lines[159].reference_y_8 == -256);
+}
+
 int main() {
+    test_map_markers_follow_the_scaled_image_and_camera();
+    test_perspective_scale_keeps_the_horizon_and_dma_reset_line();
+    test_scene_background_video_keeps_the_fixed_ui_plane();
+    test_event_metasprite_scale_keeps_shared_art_and_actor_origin();
+    test_background_event_scale_composes_around_viewport_center();
     {
         const uint16_t tiles[] {0x1801,0x2C02,3,4};
         gbs::RoomTileEdits edits {};
@@ -1033,6 +1210,8 @@ int main() {
     test_sprite_mosaic_and_priority_reach_hardware();
     test_native_sprite_dimensions_reach_hardware();
     test_affine_sprite_matrix_and_flags_reach_hardware();
+    test_scaled_static_metasprite_reference_reaches_hardware();
+    test_authored_sprite_scale_uses_bounded_shared_matrices();
     test_affine_keyframes_apply_at_runtime_frame();
     test_dynamic_palette_and_bitmap_rect_updates();
     test_event_palette_commands_load_valid_assets_once();

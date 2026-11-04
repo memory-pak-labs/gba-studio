@@ -1,3 +1,4 @@
+#include "gbs/event_render.hpp"
 #include "gbs/profiler.hpp"
 #define GBS_DIALOGUE_UI_RUNTIME_KIND 0
 #include "gbs/animation.hpp"
@@ -449,7 +450,7 @@ void set_actor_metasprite(
             ? position.x + size.x - static_cast<int>(part.x) - part.width
             : position.x + part.x;
         const int part_y = position.y + part.y;
-        gbs::set_sprite(first_index + part_index, gbs::Sprite {
+        gbs::Sprite sprite {
             part_x,
             part_y,
             part.tile_index,
@@ -465,8 +466,10 @@ void set_actor_metasprite(
             use_affine,
             use_affine && affine_object->double_size,
             static_cast<uint8_t>(use_affine ? affine_object->matrix_index : 0),
-            part.color_depth
-        });
+            part.color_depth, part.scale_x256, part.scale_y256
+        };
+        gbs::apply_metasprite_part_scale(sprite, part, &metasprite, hflip, size.x);
+        gbs::set_sprite(first_index + part_index, sprite);
     }
 }
 
@@ -3867,7 +3870,7 @@ void render_topdown_runtime(const gbs::RuntimeFrameContext& context) {
                     const auto* player_sprite = selected_player_sprite_data();
                     set_actor_metasprite(
                         first_oam_index,
-                        *player_metasprite,
+                        gbs::event_scaled_metasprite(event_state, -1, *player_metasprite),
                         gbs::Vec2i {
                             player.position_pixels.x - render_camera.x + gbs::event_actor_effect_offset_x(event_state, -1),
                             player.position_pixels.y - render_camera.y
@@ -3896,7 +3899,7 @@ void render_topdown_runtime(const gbs::RuntimeFrameContext& context) {
                     const auto* npc_sprite = gbs::topdown_actor_sprite_for_index(project,npc_runtimes[index].sprite_index);
                     set_actor_metasprite(
                         first_oam_index,
-                        *npc_metasprite,
+                        gbs::event_scaled_metasprite(event_state, static_cast<int>(index), *npc_metasprite),
                         gbs::Vec2i {
                             npc_runtimes[index].actor.position_pixels.x - render_camera.x + gbs::event_actor_effect_offset_x(event_state, static_cast<int>(index)),
                             npc_runtimes[index].actor.position_pixels.y - render_camera.y
@@ -3948,6 +3951,7 @@ void render_topdown_runtime(const gbs::RuntimeFrameContext& context) {
         gbs::debug_end_frame(debug_work_units);
         gbs::tick_visual_effects(visual_effects);
 
+        gbs::render_event_background_scale(event_state);
         gbs::wait_vblank();
 }
 

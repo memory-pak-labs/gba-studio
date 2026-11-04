@@ -23,6 +23,28 @@ def write_pcm16(path, samples, sample_rate):
         output.writeframes(b"".join(struct.pack("<h", sample) for sample in samples))
 
 
+def test_wav_smpl_loop_is_preserved_and_resampled():
+    with tempfile.TemporaryDirectory() as directory:
+        source = Path(directory) / "loop.wav"
+        write_pcm16(source, [12000] * 128, 16000)
+        raw = bytearray(source.read_bytes())
+        smpl = bytearray(60)
+        struct.pack_into("<I", smpl, 28, 1)
+        struct.pack_into("<II", smpl, 44, 16, 111)
+        raw += b"smpl" + struct.pack("<I", len(smpl)) + smpl
+        struct.pack_into("<I", raw, 4, len(raw) - 8)
+        source.write_bytes(raw)
+        _, rate, start, end = ASSETC.convert_wav_to_pcm8(source, 8000)
+        assert (rate, start, end) == (8000, 8, 56), (rate, start, end)
+        struct.pack_into("<I", raw, len(raw) - 16, 200)
+        source.write_bytes(raw)
+        try:
+            ASSETC.convert_wav_to_pcm8(source)
+            assert False, "invalid loop must be rejected"
+        except SystemExit:
+            pass
+
+
 def test_filtered_downsampling_rejects_aliasing():
     with tempfile.TemporaryDirectory() as directory:
         source = Path(directory) / "alias.wav"

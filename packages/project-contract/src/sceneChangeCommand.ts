@@ -1,4 +1,5 @@
 const actorReferenceCommands = new Set([
+  "set_actor_scale", "animate_actor_scale", "reset_actor_scale",
   "set_actor_position", "move_actor_to", "teleport_actor", "move_actor", "move_actor_relative",
   "set_actor_relative_position", "set_actor_visible", "set_actor_active", "set_actor_collision_enabled",
   "launch_projectile", "set_actor_animation_speed", "set_actor_sprite", "change_actor_sprite",

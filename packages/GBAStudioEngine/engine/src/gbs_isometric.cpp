@@ -1,3 +1,4 @@
+#include "gbs/event_render.hpp"
 #include "gbs/isometric.hpp"
 
 namespace {
@@ -218,10 +219,13 @@ bool iso_draw_item_less(const gbs::IsoDrawItem& left, const gbs::IsoDrawItem& ri
 }
 
 bool iso_draw_item_intersects_viewport(const gbs::IsoDrawItem& item) {
-    const int right = item.screen_pixels.x + static_cast<int>(item.width);
-    const int bottom = item.screen_pixels.y + static_cast<int>(item.height);
-    return item.screen_pixels.x < gbs::gba_screen_width &&
-        item.screen_pixels.y < gbs::gba_screen_height &&
+    const bool scaled = item.scale_x256 != 256 || item.scale_y256 != 256;
+    const int margin_x = scaled ? item.width / 2 : 0;
+    const int margin_y = scaled ? item.height / 2 : 0;
+    const int right = item.screen_pixels.x + static_cast<int>(item.width) + margin_x;
+    const int bottom = item.screen_pixels.y + static_cast<int>(item.height) + margin_y;
+    return item.screen_pixels.x - margin_x < gbs::gba_screen_width &&
+        item.screen_pixels.y - margin_y < gbs::gba_screen_height &&
         right > 0 &&
         bottom > 0;
 }
@@ -1684,7 +1688,8 @@ size_t build_iso_draw_list(
     const IsoCamera& camera,
     IsoDrawItem* out_items,
     size_t out_capacity,
-    const IsoGridConfig& config
+    const IsoGridConfig& config,
+    const EventState* event_state
 ) {
     if (actors == nullptr || out_items == nullptr || out_capacity == 0) {
         return 0;
@@ -1698,7 +1703,9 @@ size_t build_iso_draw_list(
         actor_screen.y += actor.screen_offset_pixels.y;
         actor_screen = iso_camera_world_to_screen(camera, actor_screen);
 
+        MetaSprite scaled {};
         const MetaSprite* metasprite = actor.metasprite;
+        if (metasprite && event_state) { scaled = event_scaled_metasprite(*event_state, static_cast<int>(actor_index), *metasprite); metasprite = &scaled; }
         const bool has_metasprite = metasprite != nullptr && is_valid_metasprite(*metasprite);
         const MetaSpritePart* first_part = has_metasprite ? &metasprite->parts[0] : nullptr;
         const size_t part_count = has_metasprite ? metasprite->part_count : 1;
@@ -1729,7 +1736,7 @@ size_t build_iso_draw_list(
                 actor_screen.x + part.x - first_part->x,
                 actor_screen.y + part.y - first_part->y
             };
-            const IsoDrawItem item {
+            IsoDrawItem item {
                 part_screen,
                 part.tile_index,
                 part.palette,
@@ -1741,11 +1748,13 @@ size_t build_iso_draw_list(
                 part.width,
                 part.height,
                 part.vflip,
-                part.color_depth
+                part.color_depth, part.scale_x256, part.scale_y256
             };
-            if (iso_draw_item_intersects_viewport(item)) {
-                out_items[count++] = item;
-            }
+            item.screen_pixels.x += scaled_metasprite_part_offset(static_cast<int>(part.x)-first_part->x, part.width, metasprite->scale_x256);
+            item.screen_pixels.y += scaled_metasprite_part_offset(static_cast<int>(part.y)-first_part->y, part.height, metasprite->scale_y256);
+            item.scale_x256 = part.scale_x256 * metasprite->scale_x256 / 256;
+            item.scale_y256 = part.scale_y256 * metasprite->scale_y256 / 256;
+            if (iso_draw_item_intersects_viewport(item)) { out_items[count++] = item; }
         }
     }
     return count;
@@ -1841,7 +1850,7 @@ void draw_iso_sprites(const IsoDrawItem* items, size_t item_count, int first_oam
             false,
             false,
             0,
-            item.color_depth
+            item.color_depth, item.scale_x256, item.scale_y256
         });
     }
 }

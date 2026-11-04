@@ -1,3 +1,4 @@
+#include "gbs/event_render.hpp"
 #include "gbs/profiler.hpp"
 #define GBS_DIALOGUE_UI_RUNTIME_KIND 6
 #include "gbs/dungeon_crawler.hpp"
@@ -692,7 +693,7 @@ void apply_room_visuals() {
     } else {
         gbs::set_bg_enabled(gbs::BackgroundLayer::BG0, true);
     }
-    gbs::apply_video_composition(room.video);
+    gbs::apply_scene_background_video(room.video);
     if(room.presentation && room.presentation->hud_background_index>=0 && size_t(room.presentation->hud_background_index)<project.background_count){
         const auto& chrome=project.backgrounds[room.presentation->hud_background_index];
         gbs::set_bg_character_base(chrome.layer,0);gbs::load_tilemap(chrome.layer,chrome.tilemap);
@@ -700,7 +701,7 @@ void apply_room_visuals() {
     }
     if(room.presentation){dungeon_set_pose(gbs::DungeonPose::Idle);dungeon_step_at=0;dungeon_cell_interacting=false;dungeon_cell_collected_at=0;}
 
-    if (room.background_index < 0 || static_cast<size_t>(room.background_index) >= project.background_count) {
+    if (!room.video.affine_enabled && (room.background_index < 0 || static_cast<size_t>(room.background_index) >= project.background_count)) {
         // The procedural view uses the world plane; BG0 stays above the
         // image HUD for text and dungeon_dialogue instead of covering its bottom.
         gbs::set_bg_enabled(gbs::BackgroundLayer::BG1, !room.presentation || room.presentation->hud_background_index>=0);
@@ -1145,7 +1146,7 @@ int draw_dungeon_foreground_sprite(int first, const gbs::MetaSprite& metasprite,
         const auto& part=metasprite.parts[i];
         // BG0 text stays above the first-person sprite; BG2 world stays below.
         gbs::Sprite sprite {anchor.x+part.x,anchor.y+part.y,part.tile_index,part.palette,part.hflip,part.vflip,true,1,gbs::SpriteRenderMode::Normal,false,part.width,part.height};
-        sprite.color_depth=part.color_depth;
+        sprite.color_depth=part.color_depth; gbs::apply_metasprite_part_scale(sprite, part, &metasprite);
         gbs::set_sprite(first+count++,sprite);
     }
     return count;
@@ -1164,7 +1165,7 @@ void draw_actors() {
             dungeon_player_uploaded_tiles=frame->streamed_tile_asset;
         }
         // Reserve the lowest OAM indices so a world actor cannot cover the hands.
-        if(sprite)sprite_index=draw_dungeon_foreground_sprite(0,*sprite,view.anchor);
+        if(sprite)sprite_index=draw_dungeon_foreground_sprite(0,gbs::event_scaled_metasprite(event_state,-1,*sprite),view.anchor);
     }
     for (int distance = room.config.view_distance; distance >= 1 && sprite_index < 128; --distance) {
         for (size_t index = 0; index < room.actor_count && sprite_index < 128; ++index) {
@@ -1203,8 +1204,8 @@ void draw_actors() {
                 const uint8_t frame=gbs::dungeon_pose_frame(pose,pose_age);
                 if(clip && clip->frame_count){const auto& f=clip->frames[frame<clip->frame_count?frame:0];if(f.streamed_tile_asset)gbs::load_tiles(*f.streamed_tile_asset);metasprite=&f.metasprite;}
             }
-            if(room.player_view)draw_dungeon_foreground_sprite(sprite_index,*metasprite,{projection.x,projection.y});
-            else gbs::set_metasprite(sprite_index, *metasprite, gbs::Vec2i { projection.x, projection.y });
+            if(room.player_view)draw_dungeon_foreground_sprite(sprite_index,gbs::event_scaled_metasprite(event_state,static_cast<int>(index),*metasprite),{projection.x,projection.y});
+            else gbs::set_metasprite(sprite_index, gbs::event_scaled_metasprite(event_state,static_cast<int>(index),*metasprite), gbs::Vec2i { projection.x, projection.y });
             sprite_index += metasprite->part_count;
         }
     }
@@ -1457,7 +1458,7 @@ void render_dungeon_crawler_runtime(const gbs::RuntimeFrameContext& context) {
     const gbs::SubsystemProfilerScope profiler_scope(gbs::ProfilerSubsystem::Render);
     (void)context;
     if(dungeon_presentation() && dungeon_presentation()->hud_palette)gbs::load_palette(*dungeon_presentation()->hud_palette,false);
-    draw_view();
+    if (!project.rooms[current_room_index].video.affine_enabled) draw_view();
     if(dungeon_presentation())gbs::set_bg_scroll(gbs::BackgroundLayer::BG2,0,-gbs::dungeon_camera_bob(gbs::frame_count()-dungeon_step_at));
     draw_actors();
     sync_runtime_telemetry();
@@ -1517,6 +1518,7 @@ void render_dungeon_crawler_runtime(const gbs::RuntimeFrameContext& context) {
     if (dungeon_dialogue.visible) gbs::draw_dialogue(dungeon_dialogue);
     if (map_dialogue.visible) gbs::draw_dialogue(map_dialogue);
     if (interaction_dialogue.visible) gbs::draw_dialogue(interaction_dialogue);
+    gbs::render_event_background_scale(event_state);
     gbs::wait_vblank();
 }
 

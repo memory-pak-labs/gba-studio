@@ -1587,6 +1587,10 @@ export function validateSpriteSchemaCoverage(data: GBAProjectData): GBAProjectSp
       }
     }
 
+    for (const axis of ["scaleX", "scaleY"]) {
+      const value = animation[axis];
+      if (value !== undefined && (typeof value !== "number" || !Number.isFinite(value) || value < 0.5 || value > 2)) invalidFields.push(axis);
+    }
     validateSpriteFrameSchema(animation, assetNames, invalidFields);
     validateSpriteFrameEventSchema(animation, invalidFields);
 

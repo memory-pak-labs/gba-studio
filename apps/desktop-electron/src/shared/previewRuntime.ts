@@ -1,3 +1,4 @@
+import { isScaleEvent, parseScaleEvent } from "./eventTransforms.js";
 import { parseEventInstruction, sceneEntryPlan, eventWaitFrames, type SceneEntryReason } from "./eventExecutionContract.js";
 import { parseVisibilityPreset, visibilityPresetVerbs, type VisibilityPreset } from "./visibilityPresets.js";
 import { roomMapStates, resolveMapState, mapStateTileCommands } from "./mapStates.js";
@@ -525,7 +526,11 @@ export interface PreviewNativeModal {
 }
 export interface PreviewNativeThread { frame: PreviewRuntimeScriptFrame; wait: number; continuations: PreviewRuntimeScriptFrame[]; }
 export interface PreviewActorMotion { token:number; actorID:string; targetX:number; targetY:number; remainder:number; owner:string|null; }
+export interface PreviewEventScale {
+ x256:number; y256:number; fromX:number; fromY:number; toX:number; toY:number; elapsed:number; duration:number;
+}
 export interface PreviewNativeEvents {
+ scales: Record<string,PreviewEventScale>;
  buttons: Record<string, { event: string; override: boolean }>;
  pressedButtons: string[];
  modal: PreviewNativeModal | null;
@@ -543,7 +548,7 @@ export interface PreviewNativeEvents {
  adventure: {state:string,frames:number};
 }
 function initialNativeEvents(): PreviewNativeEvents {
- return {buttons:{},pressedButtons:[],modal:null,timers:{},threads:{},executingSegment:null,actorMotions:{},actorMotionSerial:0,actorStates:{},actorEffects:{},cancelledMovement:{},projectileSlots:{},projectiles:[],texts:[],adventure:{state:"ground",frames:0}};
+ return {scales:{},buttons:{},pressedButtons:[],modal:null,timers:{},threads:{},executingSegment:null,actorMotions:{},actorMotionSerial:0,actorStates:{},actorEffects:{},cancelledMovement:{},projectileSlots:{},projectiles:[],texts:[],adventure:{state:"ground",frames:0}};
 }
 const integratedNativeSimulationVerbs=new Set(["attach_button","remove_button","open_menu","open_shop","open_code_lock","open_equip_menu","draw_text","start_segment","stop_segment","timer_attach","timer_restart","timer_remove","set_adventure_state","push_actor","cancel_actor_movement","set_actor_animation_state","actor_effects","projectile_load_slot","launch_projectile_slot"]);
 
@@ -3645,6 +3650,19 @@ function handleFlagCommand(state: PreviewRuntimeState, parts: string[]): Preview
 function handleActorCommand(state: PreviewRuntimeState, parts: string[]): PreviewRuntimeState | null {
   const verb = parts[0] ?? "noop";
   const actorName = parts[1] ?? "";
+  if (isScaleEvent(verb)) {
+    const scale=parseScaleEvent(parts);
+    const actor=scale.background ? null : actorByName(state,scale.target);
+    if (!scale.background && !actor) return null;
+    if (scale.background && !state.currentRoom?.composition.layers.some(layer=>layer.enabled && layer.kind==="affine_bg" && layer.layer===scale.target)) return null;
+    const key=scale.background ? scale.target : 'actor:'+actor!.id;
+    const before=state.nativeEvents.scales[key];
+    const x=before?.x256 ?? 256,y=before?.y256 ?? 256;
+    return {...state,nativeEvents:{...state.nativeEvents,scales:{...state.nativeEvents.scales,[key]:{
+      x256:scale.frames ? x : scale.x256,y256:scale.frames ? y : scale.y256,
+      fromX:x,fromY:y,toX:scale.x256,toY:scale.y256,elapsed:0,duration:scale.frames
+    }}}};
+  }
   if (verb === "set_player_direction") {
     return updateRuntimeActor(state, "player", (actor) => ({ ...actor, direction: parts[1] ?? actor.direction }));
   }
@@ -5142,6 +5160,12 @@ function tickPreviewActorMotions(state: PreviewRuntimeState): PreviewRuntimeStat
 function tickIntegratedNativeSimulation(state:PreviewRuntimeState,frames:number):PreviewRuntimeState {
  for(let frame=0;frame<frames;++frame) {
   state = tickPreviewActorMotions(state);
+  const scales={...state.nativeEvents.scales};
+  for(const [key,scale] of Object.entries(scales)) if(scale.elapsed<scale.duration) {
+    const elapsed=scale.elapsed+1;
+    scales[key]={...scale,elapsed,x256:scale.fromX+Math.trunc((scale.toX-scale.fromX)*elapsed/scale.duration),y256:scale.fromY+Math.trunc((scale.toY-scale.fromY)*elapsed/scale.duration)};
+  }
+  state={...state,nativeEvents:{...state.nativeEvents,scales}};
   for (const name of Object.keys(state.nativeEvents.timers)) {
    const timer = state.nativeEvents.timers[name]; if (!timer) continue;
    const due = timer.remaining <= 1;

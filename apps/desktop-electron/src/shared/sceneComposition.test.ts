@@ -213,4 +213,12 @@ describe("scene composition contract", () => {
 
     expect(issues.map((issue) => issue.code)).toContain("INVALID_HBLANK_TIMELINE");
   });
+  it.each([["BG2", "BG3"], ["BG3", "BG0"], ["BG3", "BG1"]])("rejects regular %s video conflicts with affine %s", (affine, regular) => {
+    const composition = normalizeSceneComposition({ enabled:true, mode:"affine", layers:[
+      {id:"image",kind:"affine_bg",role:"decorative",layer:affine,assetId:"image.png"},
+      {id:"regular",kind:"regular_bg",role:"decorative",layer:regular,assetId:"tiles.png"}
+    ]});
+    expect(sceneCompositionIssues(composition).some(issue => issue.code === "MODE_LAYER_INCOMPATIBLE")).toBe(true);
+  });
+
 });
