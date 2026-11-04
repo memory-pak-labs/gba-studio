@@ -1,3 +1,4 @@
+#include "gbs/event_render.hpp"
 #include "gbs/profiler.hpp"
 #define GBS_DIALOGUE_UI_RUNTIME_KIND 6
 #include "gbs/dungeon_crawler.hpp"
@@ -1145,7 +1146,7 @@ int draw_dungeon_foreground_sprite(int first, const gbs::MetaSprite& metasprite,
         const auto& part=metasprite.parts[i];
         // BG0 text stays above the first-person sprite; BG2 world stays below.
         gbs::Sprite sprite {anchor.x+part.x,anchor.y+part.y,part.tile_index,part.palette,part.hflip,part.vflip,true,1,gbs::SpriteRenderMode::Normal,false,part.width,part.height};
-        sprite.color_depth=part.color_depth; gbs::apply_metasprite_part_scale(sprite, part);
+        sprite.color_depth=part.color_depth; gbs::apply_metasprite_part_scale(sprite, part, &metasprite);
         gbs::set_sprite(first+count++,sprite);
     }
     return count;
@@ -1164,7 +1165,7 @@ void draw_actors() {
             dungeon_player_uploaded_tiles=frame->streamed_tile_asset;
         }
         // Reserve the lowest OAM indices so a world actor cannot cover the hands.
-        if(sprite)sprite_index=draw_dungeon_foreground_sprite(0,*sprite,view.anchor);
+        if(sprite)sprite_index=draw_dungeon_foreground_sprite(0,gbs::event_scaled_metasprite(event_state,-1,*sprite),view.anchor);
     }
     for (int distance = room.config.view_distance; distance >= 1 && sprite_index < 128; --distance) {
         for (size_t index = 0; index < room.actor_count && sprite_index < 128; ++index) {
@@ -1203,8 +1204,8 @@ void draw_actors() {
                 const uint8_t frame=gbs::dungeon_pose_frame(pose,pose_age);
                 if(clip && clip->frame_count){const auto& f=clip->frames[frame<clip->frame_count?frame:0];if(f.streamed_tile_asset)gbs::load_tiles(*f.streamed_tile_asset);metasprite=&f.metasprite;}
             }
-            if(room.player_view)draw_dungeon_foreground_sprite(sprite_index,*metasprite,{projection.x,projection.y});
-            else gbs::set_metasprite(sprite_index, *metasprite, gbs::Vec2i { projection.x, projection.y });
+            if(room.player_view)draw_dungeon_foreground_sprite(sprite_index,gbs::event_scaled_metasprite(event_state,static_cast<int>(index),*metasprite),{projection.x,projection.y});
+            else gbs::set_metasprite(sprite_index, gbs::event_scaled_metasprite(event_state,static_cast<int>(index),*metasprite), gbs::Vec2i { projection.x, projection.y });
             sprite_index += metasprite->part_count;
         }
     }

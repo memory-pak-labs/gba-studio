@@ -8,6 +8,7 @@ struct EventThreadContext {
 };
 struct EventThreadPool { EventThreadContext threads[max_event_segments]{}; size_t cursor=0; };
 inline void reset_event_threads(EventThreadPool& pool, EventState& state) {
+ reset_event_transforms(state);
  pool.cursor=0;
  for(size_t i=0;i<max_event_segments;++i) { pool.threads[i]=EventThreadContext{};state.segment_active[i]=false;state.segment_script[i]=-1; }
 }

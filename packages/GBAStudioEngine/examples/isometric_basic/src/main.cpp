@@ -1,3 +1,4 @@
+#include "gbs/event_render.hpp"
 #include "gbs/profiler.hpp"
 #define GBS_DIALOGUE_UI_RUNTIME_KIND 2
 #include "gbs/engine.hpp"
@@ -3655,7 +3656,8 @@ void render_isometric_runtime(const gbs::RuntimeFrameContext& context) {
             camera,
             draw_items,
             max_draw_count,
-            room_data->grid
+            room_data->grid,
+            &event_state
         );
         if (iso_foreground_valid) {
             for (size_t index = 0; index < draw_count; ++index) {

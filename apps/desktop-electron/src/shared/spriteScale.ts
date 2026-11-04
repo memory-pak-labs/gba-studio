@@ -16,7 +16,8 @@ export function assertSpriteScaleBudget(data: GBAProjectData): void {
     }
     // Four flip combinations per pair; 16 automatic slots, 16 for native effects.
     if (scales.size > 4) throw new Error(`Cena ${room.name}: use até quatro pares de escala de sprites; as matrizes OBJ também atendem espelhamentos e efeitos nativos.`);
-    if (scales.size) {
+    const dynamic = records(data.events).some(event => records(event.steps).some(step => /^(set|animate)_actor_scale\b/.test(String(step.command))));
+    if (scales.size || dynamic) {
       const runtime = room.runtime as { config?: { capabilities?: Array<{ id: string; enabled?: boolean; settings?: { matrixIndex?: number } }> } } | undefined;
       const affine = runtime?.config?.capabilities?.find(row => row.id === "affine_obj" && row.enabled);
       if ((affine?.settings?.matrixIndex ?? 0) >= 16) throw new Error(`Cena ${room.name}: reserve as matrizes OBJ 16–31 para a escala das animações; use 0–15 no Affine OBJ da cena.`);

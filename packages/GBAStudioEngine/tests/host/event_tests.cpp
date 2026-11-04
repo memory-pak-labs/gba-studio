@@ -2071,7 +2071,32 @@ static void test_restore_consumer_does_not_drop_commands_beyond_the_queue_capaci
     assert(state.actor_command_count == 0);
 }
 
+void test_actor_scale_events_are_per_instance_and_interruptible() {
+    gbs::EventState state {}; gbs::init_event_state(state);
+    const gbs::EventCommand commands[] = {{gbs::EventOp::SetActorScale,-1,384,192,4}, {gbs::EventOp::SetActorScale,0,128,512,0}};
+    gbs::run_event_script(state,{commands,2});
+    assert(state.actor_scales[0].x256 == 256 && state.actor_scales[1].x256 == 128);
+    gbs::tick_event_frame_counter(state);
+    assert(state.actor_scales[0].x256 == 288 && state.actor_scales[0].y256 == 240);
+    gbs::tick_event_frame_counter(state);gbs::tick_event_frame_counter(state);gbs::tick_event_frame_counter(state);
+    assert(state.actor_scales[0].x256 == 384 && state.actor_scales[0].y256 == 192);
+    const gbs::EventCommand reset[] = {{gbs::EventOp::SetActorScale,-1,256,256,2}};
+    gbs::run_event_script(state,{reset,1});gbs::tick_event_frame_counter(state);
+    assert(state.actor_scales[0].x256 == 320);
+    const gbs::EventCommand invalid[] = {{gbs::EventOp::SetActorScale,97,384,384,0}, {gbs::EventOp::SetActorScale,0,0,512,0}};
+    gbs::run_event_script(state,{invalid,2});
+    assert(state.actor_scales[1].x256 == 128);
+    const gbs::EventCommand background[] = {{gbs::EventOp::SetBackgroundScale,2,512,128,2}};
+    gbs::run_event_script(state,{background,1}); gbs::tick_event_frame_counter(state);
+    assert(state.background_scales[0].x256 == 384 && state.background_scales[1].x256 == 256);
+    state.current_room=2; gbs::tick_event_frame_counter(state);
+    assert(state.background_scales[0].x256 == 256 && state.actor_scales[1].x256 == 256);
+    gbs::reset_event_transforms(state);
+    assert(state.actor_scales[0].x256 == 256 && state.actor_scales[1].x256 == 256);
+}
+
 int main() {
+    test_actor_scale_events_are_per_instance_and_interruptible();
     test_scene_fades_respect_saved_music_volume_and_mute();
     test_bound_clock_restores_and_updates_saved_minutes();
     test_restore_consumer_does_not_drop_commands_beyond_the_queue_capacity();

@@ -1,3 +1,4 @@
+import { isScaleEvent, parseScaleEvent } from "../shared/eventTransforms.js";
 import { actorCommandReferences, sceneChangeCommand, sceneChangeCommandParts } from "../shared/sceneChangeCommand.js";
 import { parseEventInstruction, eventWaitFrames } from "../shared/eventExecutionContract.js";
 import { parseVisibilityPreset } from "../shared/visibilityPresets.js";
@@ -1938,6 +1939,7 @@ export interface EngineExportMenuItem {
 }
 
 export interface EngineExportMenuActor {
+  scale_actor_index?: number;
   visibility_conditions?: Array<{binding: NonNullable<EngineExportMenuItem['binding']>;value:number;negate?:boolean}>;
   visibility_any?: boolean;
   name: string;
@@ -3679,6 +3681,51 @@ function eventActorIndex(data: GBAProjectData, rooms: Record<string, unknown>[],
   return npcActorIndex(data, rooms, actorName);
 }
 
+function scaleActorIndex(data: GBAProjectData, rooms: Record<string, unknown>[], target: string): number {
+  const actor = projectArray(data,"actors").find(row => (row.name===target || row.id===target) && rooms.some((room,index)=>roomName(room,index)===entitySceneName(row,"actor")));
+  const room = rooms.find((row,index) => roomName(row,index)===entitySceneName(actor ?? {},"actor")) ?? rooms[0] ?? {};
+  const kind = resolveSceneRuntimeExport(roomSceneType(room)).kind;
+  const locals = projectArray(data,"actors").filter(row => entitySceneName(row,"actor")===roomName(room,0));
+  let index: number;
+  if (["topdown","platformer","isometric","racing","point_click","shmup","dungeon_crawler"].includes(kind)) {
+    if (kind==="dungeon_crawler" && actor && child(actor,"dungeonViewAnchor")) return -1;
+    if (kind==="shmup" && actor && !isConfiguredPlayerActor(data,target)) {
+      index=npcActorsForRoom(data,room,rooms.indexOf(room)).filter(row=>integerField(row,"waveIndex",0)===integerField(actor,"waveIndex",0)).indexOf(actor);
+      if (index < 0) throw new Error(`Ator ausente da onda SHMUP: ${target}`);
+    } else if (kind==="point_click" && actor && !isConfiguredPlayerActor(data,target)) {
+      const pack=buildAssetcSpritePackGeneration(data);
+      index=npcActorsForRoom(data,room,rooms.indexOf(room)).filter(row=>Boolean(buildActorEngineSpriteExport(data,row,pack))).slice(0,6).indexOf(actor);
+      if (index < 0) throw new Error(`Ator sem objeto visual exportável: ${target}`);
+    } else index=eventActorIndex(data,rooms,target);
+  } else if (kind==="luta") {
+    const side = target.toLowerCase()==="player" ? "player1" : child(actor,"battle")?.side;
+    index=side==="player1" ? 0 : side==="player2" ? 1 : -2;
+  } else if (kind==="battle_rpg") {
+    const config=battleRpgSceneConfigFromRuntime(room.runtime,data.settings);
+    const party=locals.filter(row=>child(row,"battle")?.side==="party").slice(0,config?.maxPartySize ?? 4);
+    const enemies=locals.filter(row=>child(row,"battle")?.side==="enemy").slice(0,config?.maxEnemies ?? 4);
+    const partyCount=party.length || (config?.maxPartySize ?? 4);
+    index=actor && party.includes(actor) ? party.indexOf(actor) : actor && enemies.includes(actor) ? partyCount+enemies.indexOf(actor) : -2;
+  } else if (kind==="menu" || kind==="cutscene") {
+    const pack=buildAssetcSpritePackGeneration(data);
+    index=locals.filter(row=>Boolean(buildActorEngineSpriteExport(data,row,pack))).indexOf(actor!);
+    if(index<0)index=-2;
+  } else throw new Error(`Escala de ator não possui alvo renderizável em ${kind}.`);
+  if(index < -1 || index>=96) throw new Error(`Ator sem slot de escala exportável: ${target}`);
+  return index;
+}
+
+function assertBackgroundScaleLayer(room: Record<string, unknown>, target: string): void {
+  const composition = roomSceneComposition(room);
+  const layer = composition.layers.find(row=>row.enabled && row.kind==="affine_bg" && row.layer===target);
+  const presentation = roomAffinePresentation(room);
+  const hasComposition = composition.enabled;
+  if (!(hasComposition ? Boolean(layer) : presentation.enabled && presentation.assetId && presentation.layer===target))
+    throw new Error(`Cena ${roomName(room,0)}: ${target} precisa de uma camada affine preparada na composição antes de aplicar escala por eventos.`);
+  if(hasComposition && composition.effects.hblank.enabled)
+    throw new Error(`Cena ${roomName(room,0)}: escala de fundo por evento não pode disputar a camada com HBlank autorado.`);
+}
+
 function animationControlActorIndex(data: GBAProjectData, rooms: Record<string, unknown>[], actorName: string): number {
   const actor = projectArray(data, "actors").find(item => (
     stringField(item, "name", "") === actorName || stringField(item, "id", "") === actorName
@@ -4457,6 +4504,11 @@ function compileEventStep(
 
   const integrationIssue = eventCommandIntegrationIssue(sceneChangeCommand(parts), resolveSceneRuntimeExport(roomSceneType(rooms[0] ?? {})).kind);
   if (integrationIssue) throw new Error(integrationIssue);
+
+  if (isScaleEvent(verb)) {
+    const scale = parseScaleEvent(parts);
+    return [{ op: scale.background ? "set_background_scale" : "set_actor_scale", actor: scale.background ? Number(scale.target.slice(2)) : scaleActorIndex(data, rooms, scale.target), x: scale.x256, y: scale.y256, frames: scale.frames }];
+  }
 
   if (isLutaEventVerb(verb)) {
     const control = parseLutaEventCommand(parts.join(" "));
@@ -5804,6 +5856,14 @@ function buildTopdownScripts(
     const boundSceneNames = owners[index]!;
     const belongsToAnotherRuntime = boundSceneNames.size > 0
       && !Array.from(boundSceneNames).some((sceneName) => runtimeRoomNames.has(sceneName));
+    if (!belongsToAnotherRuntime) for (const step of eventSteps(event)) {
+      if (step.isEnabled === false) continue;
+      const parts=eventCommandParts(data,resolveProjectConstantCommand(data,stringField(step,"command","noop")));
+      if (!isScaleEvent(parts[0] ?? "") || !parts[0]!.includes("background")) continue;
+      const scale=parseScaleEvent(parts);
+      const targets=rooms.filter((room,index)=>!boundSceneNames.size || boundSceneNames.has(roomName(room,index)));
+      for(const room of targets) assertBackgroundScaleLayer(room,scale.target);
+    }
     return {
       name: eventDocument.name,
       script: belongsToAnotherRuntime
@@ -9763,6 +9823,7 @@ function buildMenuScreens(
             y: position.y
           }),
           metasprite: spriteExport.metasprite,
+          scale_actor_index: scaleActorIndex(data, [room], stringField(actor,"id",stringField(actor,"name",""))),
           ...(selectedSpriteExport ? { selected_metasprite: selectedSpriteExport.metasprite } : {}),
           ...(entryAnimation === "slide_down" ? {
             entry_animation: "slide_down" as const,
@@ -11185,6 +11246,7 @@ function buildEngineExportProjectContractUncached(
   if (projectArray(data, "animations").some(animation => (animation.scaleX ?? 1) !== 1 || (animation.scaleY ?? 1) !== 1)) {
     features.push("sprite_animation_scale");
   }
+  if (projectArray(data, "events").some(event => eventSteps(event).some(step => isScaleEvent(commandParts(stringField(step, "command", ""))[0] ?? "")))) features.push("events.visual_scale");
   features.push("hardware.gba_native_contract");
   features.push("events.native_authoring_v2");
   if (exportRoomsForKind(data, "topdown").some(room => {

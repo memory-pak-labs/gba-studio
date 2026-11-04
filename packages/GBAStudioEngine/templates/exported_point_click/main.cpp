@@ -1,3 +1,4 @@
+#include "gbs/event_render.hpp"
 #include "gbs/profiler.hpp"
 #define GBS_DIALOGUE_UI_RUNTIME_KIND 5
 #include "gbs/engine.hpp"
@@ -337,7 +338,7 @@ void draw_cursor() {
         if (cursor_metasprite == nullptr) {
             cursor_metasprite = scene_cursor;
         }
-        gbs::set_metasprite(0, *cursor_metasprite, cursor.position_pixels);
+        gbs::set_metasprite(0, gbs::event_scaled_metasprite(event_state, -1, *cursor_metasprite), cursor.position_pixels);
         return;
     }
     gbs::set_sprite(0, gbs::Sprite {
@@ -420,7 +421,7 @@ void draw_point_click_props(const gbs::PointClickSceneData& scene) {
             next_sprite + metasprite->part_count > point_click_oam_sprite_count) {
             continue;
         }
-        gbs::set_metasprite(next_sprite, *metasprite, prop.position_pixels);
+        gbs::set_metasprite(next_sprite, gbs::event_scaled_metasprite(event_state, static_cast<int>(index), *metasprite), prop.position_pixels);
         next_sprite += metasprite->part_count;
     }
 }

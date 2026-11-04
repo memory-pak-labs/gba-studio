@@ -1,3 +1,4 @@
+#include "gbs/event_render.hpp"
 #include "gbs/profiler.hpp"
 #define GBS_DIALOGUE_UI_RUNTIME_KIND 12
 #include "gbs/engine.hpp"
@@ -582,7 +583,7 @@ void draw_luta_fighter(int first_index, const gbs::MetaSprite& metasprite, gbs::
         sprite.priority = 1;
         sprite.width = part.width;
         sprite.height = part.height;
-        sprite.color_depth = part.color_depth; gbs::apply_metasprite_part_scale(sprite, part);
+        sprite.color_depth = part.color_depth; gbs::apply_metasprite_part_scale(sprite, part, &metasprite);
         gbs::set_sprite(first_index + index, sprite);
     }
 }
@@ -632,12 +633,12 @@ void draw_luta() {
         : nullptr;
     if (p1_metasprite && state.p1_hp > 0 && sprite_index < 128) {
         if (!gbs::sync_sprite_animation_tiles(p1_visual_state.animator, p1_streamed_tile_asset_loaded)) return;
-        draw_luta_fighter(sprite_index, *p1_metasprite, gbs::Vec2i { state.p1_x, state.p1_y });
+        draw_luta_fighter(sprite_index, gbs::event_scaled_metasprite(event_state, 0, *p1_metasprite), gbs::Vec2i { state.p1_x, state.p1_y });
         sprite_index += p1_metasprite->part_count;
     }
     if (p2_metasprite && state.p2_hp > 0 && sprite_index < 128) {
         if (!gbs::sync_sprite_animation_tiles(p2_visual_state.animator, p2_streamed_tile_asset_loaded)) return;
-        draw_luta_fighter(sprite_index, *p2_metasprite, gbs::Vec2i { state.p2_x, state.p2_y });
+        draw_luta_fighter(sprite_index, gbs::event_scaled_metasprite(event_state, 1, *p2_metasprite), gbs::Vec2i { state.p2_x, state.p2_y });
         sprite_index += p2_metasprite->part_count;
     }
     if (layout && layout->mode && layout->mode[0] == 'a') {

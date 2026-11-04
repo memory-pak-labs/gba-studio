@@ -1,3 +1,4 @@
+#include "gbs/event_render.hpp"
 #include <cstring>
 #include "gbs/profiler.hpp"
 #define GBS_DIALOGUE_UI_RUNTIME_KIND 3
@@ -1075,6 +1076,8 @@ void draw_screen_actors() {
             continue;
         }
         const gbs::MetaSprite* metasprite = gbs::menu_actor_metasprite_at(actor, menu_state.selected_item_index);
+        gbs::MetaSprite scaled {};
+        if (metasprite) { scaled=gbs::event_scaled_metasprite(event_state,actor.scale_actor_index >= 0 ? actor.scale_actor_index : static_cast<int>(actor_index),*metasprite); metasprite=&scaled; }
         if (metasprite == nullptr || !gbs::is_valid_metasprite(*metasprite)) {
             continue;
         }
@@ -1114,7 +1117,7 @@ void draw_screen_actors() {
                     part.width,
                     part.height
                 };
-                sprite.color_depth = part.color_depth; gbs::apply_metasprite_part_scale(sprite, part, metasprite);
+                sprite.color_depth = part.color_depth; gbs::apply_metasprite_part_scale(sprite, part, metasprite, actor.flip_horizontal, left + right);
                 gbs::set_sprite(sprite_index + part_index, sprite);
             }
         } else {

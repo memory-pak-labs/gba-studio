@@ -1,3 +1,4 @@
+#include "gbs/event_render.hpp"
 #include "gbs/profiler.hpp"
 #define GBS_DIALOGUE_UI_RUNTIME_KIND 4
 #include "gbs/engine.hpp"
@@ -1677,12 +1678,14 @@ void draw_shmup_metasprite(int first_index, const gbs::MetaSprite& metasprite, g
     }
     for (uint8_t index = 0; index < metasprite.part_count; ++index) {
         const auto& part = metasprite.parts[index];
-        draw_shmup_sprite(first_index + index, gbs::Sprite {
+        gbs::Sprite sprite {
             position.x + part.x, position.y + part.y, part.tile_index,
             part.palette, part.hflip, part.vflip, true, 0,
             gbs::SpriteRenderMode::Normal, false, part.width, part.height,
             false, false, 0, part.color_depth, part.scale_x256, part.scale_y256
-        });
+        };
+        gbs::apply_metasprite_part_scale(sprite, part, &metasprite);
+        draw_shmup_sprite(first_index + index, sprite);
     }
 }
 
@@ -1704,7 +1707,7 @@ void draw_scene() {
         }
     }
     if (player_visible && player_metasprite != nullptr && gbs::is_valid_metasprite(*player_metasprite)) {
-        draw_shmup_metasprite(sprite_index, *player_metasprite, shmup_state.player_position_pixels);
+        draw_shmup_metasprite(sprite_index, gbs::event_scaled_metasprite(event_state,-1,*player_metasprite), shmup_state.player_position_pixels);
         sprite_index += player_metasprite->part_count;
     } else if (player_visible) {
         draw_shmup_sprite(sprite_index++, gbs::Sprite {
@@ -1741,7 +1744,7 @@ void draw_scene() {
             const gbs::MetaSprite* enemy_metasprite = actor_sprite_for_index(runtime_enemy.sprite_index,
                 frame == nullptr ? enemy.metasprite : &frame->metasprite);
             if (enemy_metasprite != nullptr && gbs::is_valid_metasprite(*enemy_metasprite)) {
-                draw_shmup_metasprite(sprite_index, *enemy_metasprite, screen_position);
+                draw_shmup_metasprite(sprite_index, gbs::event_scaled_metasprite(event_state,static_cast<int>(index),*enemy_metasprite), screen_position);
                 sprite_index += enemy_metasprite->part_count;
             } else {
                 draw_shmup_sprite(sprite_index++, gbs::Sprite {
@@ -1975,6 +1978,7 @@ void render_shmup_runtime(const gbs::RuntimeFrameContext& context) {
     gbs::draw_dialogue(dialogue);
     gbs::draw_dialogue_portrait(dialogue);
     sync_runtime_telemetry();
+    gbs::render_event_background_scale(event_state);
     gbs::wait_vblank();
 }
 

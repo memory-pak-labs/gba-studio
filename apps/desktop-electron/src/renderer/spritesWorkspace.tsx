@@ -1567,14 +1567,7 @@ function animationEditor(
       {activeTab === "animation" ? (
         <section className="sprite-animation-settings" aria-label={ui("Configurações de animação")}>
         <InspectorRange label={ui("Velocidade")} ariaLabel={ui("FPS")} unit="FPS" max={60} min={1} onChange={(value) => onUpdateAnimationFields(animation.id, { fps: value })} value={animation.fps} />
-        <InspectorSection title={ui("Escala no jogo")}>
-          <InspectorRange label={ui("Escala X")} ariaLabel={ui("Escala X do sprite")} min={0.5} max={2} step={0.0625}
-            value={animation.scaleX ?? 1} onChange={scaleX => onUpdateAnimationFields(animation.id, { scaleX })} />
-          <InspectorRange label={ui("Escala Y")} ariaLabel={ui("Escala Y do sprite")} min={0.5} max={2} step={0.0625}
-            value={animation.scaleY ?? 1} onChange={scaleY => onUpdateAnimationFields(animation.id, { scaleY })} />
-          <p>{ui("A escala acompanha esta animação em todos os tipos de cena. A imagem de origem e a colisão mantêm suas dimensões.")}</p>
-          <p>{ui("O GBA usa matrizes OBJ compartilhadas e recorta a imagem no canvas duplo. Combinações com zoom ou rotação da cena podem atingir esse limite.")}</p>
-        </InspectorSection>
+
         <InspectorToggle checked={animation.loops} label={ui("Repetir")} onChange={(checked) => onUpdateAnimationFields(animation.id, { loops: checked })} />
         <InspectorToggle checked={animation.pingPong} label={ui("Ping-pong")} onChange={(checked) => onUpdateAnimationFields(animation.id, { pingPong: checked })} />
         {animationState ? (

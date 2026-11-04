@@ -1,3 +1,4 @@
+#include "gbs/event_render.hpp"
 #include "gbs/profiler.hpp"
 #define GBS_DIALOGUE_UI_RUNTIME_KIND 8
 #include "gbs/engine.hpp"
@@ -402,7 +403,7 @@ void draw_scene_actors() {
             rendered.scale_x256 = actor.metasprite->scale_x256;
             rendered.scale_y256 = actor.metasprite->scale_y256;
         }
-        gbs::set_metasprite(sprite_index, rendered, position);
+        gbs::set_metasprite(sprite_index, gbs::event_scaled_metasprite(event_state, static_cast<int>(actor_index), rendered), position);
         sprite_index += metasprite->part_count;
     }
 }

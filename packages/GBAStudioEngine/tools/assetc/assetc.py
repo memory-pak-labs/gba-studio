@@ -8832,6 +8832,8 @@ def event_op_from_json(value):
         "store_save_exists": "StoreSaveExists",
         "projectile_load_slot": "ProjectileLoadSlot",
         "cancel_actor_movement": "CancelActorMovement",
+        "set_actor_scale": "SetActorScale",
+        "set_background_scale": "SetBackgroundScale",
         "actor_effects": "ActorEffects",
         "visibility": "Visibility",
         "open_menu": "OpenMenu",
@@ -10136,6 +10138,16 @@ def event_command_from_json(command, description, animation_lookup=None, actor_a
             max(1, min(120, event_int(command, ["frames", "duration"], 20))),
             0,
         )
+    if op in ("SetActorScale", "SetBackgroundScale"):
+        actor = event_int(command, ["actor"], 0)
+        x, y = event_int(command, ["x"], 256), event_int(command, ["y"], 256)
+        frames = event_int(command, ["frames"], 0)
+        maximum = 1024 if op == "SetBackgroundScale" else 512
+        if not (128 <= x <= maximum and 128 <= y <= maximum and 0 <= frames <= 32767):
+            raise ValueError(f"{description}: invalid visual scale")
+        if (op == "SetBackgroundScale" and actor not in (2, 3)) or (op == "SetActorScale" and not -1 <= actor < 96):
+            raise ValueError(f"{description}: invalid scale target")
+        return (op, actor, x, y, frames)
     if op == "SetActorAnimationSpeed":
         return (
             op,
@@ -11608,7 +11620,7 @@ def emit_menu_actors(output, screen, screen_index, asset_report=None):
             f"{'true' if actor.get('cursor_follows_option', False) else 'false'}, "
             f"gbs::Vec2i {{ {cursor_offset[0]}, {cursor_offset[1]} }}, "
             f"{'true' if actor.get('selected_only', False) else 'false'}, "
-            f"{condition_name}, {len(conditions)}, {'true' if actor.get('visibility_any', False) else 'false'} "
+            f"{condition_name}, {len(conditions)}, {'true' if actor.get('visibility_any', False) else 'false'}, {int(actor.get('scale_actor_index', -1))} "
             "},"
         )
 

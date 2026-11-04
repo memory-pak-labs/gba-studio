@@ -34,6 +34,9 @@ alignas(4) uint8_t compressed_palette_decode_buffer[max_lz77_palette_bytes] GBS_
 uint16_t palette_decode_buffer[max_lz77_palette_colors] GBS_RENDER_EWRAM;
 uint16_t dynamic_palette_buffer[256] GBS_RENDER_EWRAM;
 int background_scroll_x[4] {};
+DisplayMode background_display_mode = DisplayMode::Mode0Text;
+uint8_t event_affine_background_mask = 0;
+AffineBgTransform event_affine_background_base[2] {};
 AffineSpriteTransform explicit_sprite_matrices[32] GBS_RENDER_EWRAM {};
 AffineSpriteTransform scaled_sprite_matrices[16] GBS_RENDER_EWRAM {};
 uint8_t scaled_sprite_matrix_slots[16] GBS_RENDER_EWRAM {};
@@ -559,6 +562,7 @@ void set_display_mode(DisplayMode mode) {
     if (!is_valid_display_mode(mode)) {
         return;
     }
+    background_display_mode = mode;
     gbs_hw_set_display_mode(static_cast<uint16_t>(mode));
 }
 
@@ -573,6 +577,7 @@ void set_affine_bg_transform(BackgroundLayer layer, const AffineBgTransform& tra
     if (!is_valid_affine_background_layer(layer)) {
         return;
     }
+    event_affine_background_base[static_cast<int>(layer)-2] = transform;
     gbs_hw_set_affine_bg_transform(
         static_cast<int>(layer),
         transform.pa,
@@ -599,6 +604,27 @@ bool load_bitmap8(DisplayMode mode, const Bitmap8Asset& asset, uint8_t page) {
     return true;
 }
 
+bool render_event_background_scale(const EventState& state) {
+    bool applied = false;
+    for (int index = 0; index < 2; ++index) {
+        if (!(event_affine_background_mask & (1u << index))) continue;
+        if (background_display_mode != DisplayMode::Mode2Affine &&
+            !(background_display_mode == DisplayMode::Mode1TextAffine && index == 0)) continue;
+        const auto& scale = state.background_scales[index];
+        if (scale.x256 < 128 || scale.y256 < 128 || scale.x256 > 1024 || scale.y256 > 1024) continue;
+        const auto& base = event_affine_background_base[index];
+        const int a = base.pa * 256 / scale.x256, b = base.pb * 256 / scale.y256;
+        const int c = base.pc * 256 / scale.x256, d = base.pd * 256 / scale.y256;
+        if (a < -32768 || a > 32767 || b < -32768 || b > 32767 || c < -32768 || c > 32767 || d < -32768 || d > 32767) continue;
+        // Scale relative to the authored transform; keep the viewport center fixed.
+        const int32_t x = base.reference_x_8 + (base.pa-a)*120 + (base.pb-b)*80;
+        const int32_t y = base.reference_y_8 + (base.pc-c)*120 + (base.pd-d)*80;
+        gbs_hw_set_affine_bg_transform(index+2,a,b,c,d,x,y);
+        applied = true;
+    }
+    return applied;
+}
+
 bool apply_video_composition(const VideoComposition& composition) {
     if (!is_valid_display_mode(composition.display_mode)) {
         return false;
@@ -622,6 +648,7 @@ bool apply_video_composition(const VideoComposition& composition) {
         }
     }
 
+    event_affine_background_mask = composition.affine_enabled ? static_cast<uint8_t>(1u << (static_cast<int>(composition.affine_layer)-2)) : 0;
     set_display_mode(composition.display_mode);
     if (composition.affine_enabled) {
         set_affine_bg_wrap(composition.affine_layer, composition.affine_wrap);

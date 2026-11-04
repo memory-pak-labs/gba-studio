@@ -971,6 +971,8 @@
                 "scene_stack_push",
                 "set_actor_animation",
                 "set_actor_animation_frame",
+                "set_actor_scale",
+                "set_background_scale",
                 "set_actor_animation_speed",
                 "set_actor_sprite",
                 "set_actor_active",

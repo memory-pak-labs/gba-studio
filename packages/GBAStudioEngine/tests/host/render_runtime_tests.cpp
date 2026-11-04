@@ -3,6 +3,7 @@
 #include <stdint.h>
 #include "../../engine/src/gbs_room_tilemap.h"
 #include "gbs/event.hpp"
+#include "gbs/event_render.hpp"
 #include "gbs/interrupt.hpp"
 #include "gbs/render.hpp"
 #include "gbs/tile_edits.hpp"
@@ -60,6 +61,7 @@ int last_scroll_y = 0;
 int display_mode_calls = 0;
 uint16_t last_display_mode = 0;
 int affine_transform_calls = 0;
+gbs::AffineBgTransform last_background_transform {};
 int affine_wrap_calls = 0;
 int last_affine_wrap_layer = -1;
 int last_affine_wrap_enabled = -1;
@@ -871,7 +873,7 @@ void gbs_hw_set_affine_bg_wrap(int layer, int enabled) {
     last_affine_wrap_layer = layer;
     last_affine_wrap_enabled = enabled;
 }
-void gbs_hw_set_affine_bg_transform(int, int16_t, int16_t, int16_t, int16_t, int32_t, int32_t) { ++affine_transform_calls; }
+void gbs_hw_set_affine_bg_transform(int, int16_t a, int16_t b, int16_t c, int16_t d, int32_t x, int32_t y) { ++affine_transform_calls; last_background_transform = {a,b,c,d,x,y}; }
 void gbs_hw_load_bitmap16(uint16_t, const uint16_t*, uint16_t, uint16_t, uint16_t) { ++bitmap16_calls; }
 void gbs_hw_load_bitmap8(const uint8_t*, uint16_t, uint16_t, uint16_t) {}
 void gbs_hw_fill_bitmap16(uint16_t, uint16_t, uint16_t) {}
@@ -1053,7 +1055,49 @@ static void test_room_edits_stage_independent_layers_and_refresh_without_camera_
     assert(captured_tilemaps[2][0] == 100 && captured_tilemaps[2][1] == 3);
 }
 
+void test_background_event_scale_composes_around_viewport_center() {
+    gbs::EventState state {};
+    gbs::VideoComposition composition {};
+    composition.display_mode = gbs::DisplayMode::Mode1TextAffine;
+    composition.affine_enabled = true; composition.affine_layer = gbs::BackgroundLayer::BG2;
+    composition.affine_transform = {256,0,0,256,0,0};
+    assert(gbs::apply_video_composition(composition));
+    state.background_scales[0].x256 = 512; state.background_scales[0].y256 = 128;
+    assert(gbs::render_event_background_scale(state));
+    assert(last_background_transform.pa == 128 && last_background_transform.pd == 512);
+    assert(last_background_transform.reference_x_8 == 15360 && last_background_transform.reference_y_8 == -20480);
+    assert(gbs::render_event_background_scale(state));
+    assert(last_background_transform.pa == 128); // repeated render must never compound
+    state.background_scales[0] = gbs::EventScale {};
+    assert(gbs::render_event_background_scale(state));
+    assert(last_background_transform.pa == 256 && last_background_transform.reference_x_8 == 0);
+    composition.affine_enabled = false; composition.display_mode = gbs::DisplayMode::Mode0Text;
+    assert(gbs::apply_video_composition(composition));
+    const int calls = affine_transform_calls;
+    assert(!gbs::render_event_background_scale(state));
+    assert(affine_transform_calls == calls);
+}
+
+void test_event_metasprite_scale_keeps_shared_art_and_actor_origin() {
+    gbs::EventState state {};
+    const gbs::MetaSpritePart part {-8,-32,0,0,false,false,16,32};
+    const gbs::MetaSprite source {&part,1};
+    state.actor_scales[0].x256=384; state.actor_scales[0].y256=192;
+    const auto scaled=gbs::event_scaled_metasprite(state,-1,source);
+    assert(source.scale_x256==256 && source.parts[0].y==-32);
+    assert(gbs::event_scaled_metasprite(state,0,source).scale_x256==256);
+    gbs::Sprite sprite {}; sprite.x=100+part.x; sprite.y=100+part.y;
+    gbs::apply_metasprite_part_scale(sprite,part,&scaled);
+    assert(sprite.x==92 && sprite.y==72 && sprite.scale_x256==384 && sprite.scale_y256==192);
+    sprite.x=108; sprite.y=68;
+    gbs::apply_metasprite_part_scale(sprite,part,&scaled,true,16);
+    assert(sprite.x==116 && sprite.y==72); // mirroring also changes the center of each part
+
+}
+
 int main() {
+    test_event_metasprite_scale_keeps_shared_art_and_actor_origin();
+    test_background_event_scale_composes_around_viewport_center();
     {
         const uint16_t tiles[] {0x1801,0x2C02,3,4};
         gbs::RoomTileEdits edits {};

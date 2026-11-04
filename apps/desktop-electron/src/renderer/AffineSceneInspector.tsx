@@ -125,7 +125,7 @@ export function AffineSceneInspector({ assetOptions, onChange, value }: AffineSc
             />
           </fieldset>
           <p className="affine-scene-inspector-note" role="status">
-            {ui("Camada decorativa · não altera colisão ou tilemap")}</p>
+            {ui("Configure a transformação inicial aqui. Durante o jogo, use Eventos → Cena → Fundo para definir, animar ou restaurar a escala. A colisão não muda.")}</p>
         </>
       ) : null}
     </InspectorSection>

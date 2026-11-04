@@ -1,3 +1,4 @@
+import { isScaleEvent, parseScaleEvent, scaleEventTokens } from "./eventTransforms.js";
 import { parseVisibilityPreset, visibilityPresetVerbs } from "./visibilityPresets.js";
 import { nativeEventCommandExportHandling, type NativeEventCommandExportHandling } from "./eventCommandRegistry.js";
 import { eventCommandCatalog } from "./eventCommandLibrary.js";
@@ -11,6 +12,8 @@ const excluded: Record<string, string> = {
 };
 
 const scoped: Record<string, string[]> = {
+  ...Object.fromEntries(["set_actor_scale","animate_actor_scale","reset_actor_scale"].map(verb=>[verb,["topdown","platformer","isometric","menu","cutscene","point_click","dungeon_crawler","racing","shmup","battle_rpg","luta"]])),
+  ...Object.fromEntries(["set_background_scale","animate_background_scale","reset_background_scale"].map(verb=>[verb,["topdown","platformer","shmup"]])),
   ...Object.fromEntries(visibilityPresetVerbs.map(verb => [verb, ["topdown", "platformer"]])),
   set_map_state: ["topdown", "platformer"],
   replace_tile: ["topdown", "platformer"],
@@ -70,6 +73,7 @@ export const nativePlatformStates = new Set(["fall", "ground", "jump", "dash", "
 export function eventCommandIntegrationIssue(command: string, runtime?: string): string | null {
   const parts = command.trim().split(/\s+/);
   const verb = parts[0] || "noop";
+  if (isScaleEvent(verb)) { try { parseScaleEvent(scaleEventTokens(command)); } catch (error) { return (error as Error).message; } }
   const support = eventCommandSupport(verb);
   if (!support.handling) return `Comando ${verb} nao compila para a ROM: ${support.reason}`;
   const transitionEffect = verb === "visual_effect" && ["cover", "reveal"].includes(parts[5] ?? "");

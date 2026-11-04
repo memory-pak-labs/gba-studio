@@ -1,3 +1,4 @@
+#include "gbs/event_render.hpp"
 #include "gbs/isometric.hpp"
 
 namespace {
@@ -1687,7 +1688,8 @@ size_t build_iso_draw_list(
     const IsoCamera& camera,
     IsoDrawItem* out_items,
     size_t out_capacity,
-    const IsoGridConfig& config
+    const IsoGridConfig& config,
+    const EventState* event_state
 ) {
     if (actors == nullptr || out_items == nullptr || out_capacity == 0) {
         return 0;
@@ -1701,7 +1703,9 @@ size_t build_iso_draw_list(
         actor_screen.y += actor.screen_offset_pixels.y;
         actor_screen = iso_camera_world_to_screen(camera, actor_screen);
 
+        MetaSprite scaled {};
         const MetaSprite* metasprite = actor.metasprite;
+        if (metasprite && event_state) { scaled = event_scaled_metasprite(*event_state, static_cast<int>(actor_index), *metasprite); metasprite = &scaled; }
         const bool has_metasprite = metasprite != nullptr && is_valid_metasprite(*metasprite);
         const MetaSpritePart* first_part = has_metasprite ? &metasprite->parts[0] : nullptr;
         const size_t part_count = has_metasprite ? metasprite->part_count : 1;
@@ -1732,7 +1736,7 @@ size_t build_iso_draw_list(
                 actor_screen.x + part.x - first_part->x,
                 actor_screen.y + part.y - first_part->y
             };
-            const IsoDrawItem item {
+            IsoDrawItem item {
                 part_screen,
                 part.tile_index,
                 part.palette,
@@ -1746,9 +1750,11 @@ size_t build_iso_draw_list(
                 part.vflip,
                 part.color_depth, part.scale_x256, part.scale_y256
             };
-            if (iso_draw_item_intersects_viewport(item)) {
-                out_items[count++] = item;
-            }
+            MetaSpritePart relative = part; relative.x -= first_part->x; relative.y -= first_part->y;
+            Sprite sprite {}; sprite.x = item.screen_pixels.x; sprite.y = item.screen_pixels.y;
+            apply_metasprite_part_scale(sprite, relative, metasprite);
+            item.screen_pixels = {sprite.x,sprite.y}; item.scale_x256 = sprite.scale_x256; item.scale_y256 = sprite.scale_y256;
+            if (iso_draw_item_intersects_viewport(item)) { out_items[count++] = item; }
         }
     }
     return count;

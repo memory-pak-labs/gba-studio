@@ -197,6 +197,7 @@ struct MenuActorData {
     const MenuVisibilityConditionData* visibility_conditions = nullptr;
     size_t visibility_condition_count = 0;
     bool visibility_any = false;
+    int scale_actor_index = -1;
 };
 
 constexpr int menu_text_input_max_length = 16;

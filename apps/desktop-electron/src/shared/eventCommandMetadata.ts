@@ -1,7 +1,9 @@
+import { scaleEventVerbs } from "./eventTransforms.js";
 import { TILE_REPLACEMENT_COLLISIONS } from "./tileReplacement.js";
 
 /** Authoring metadata only. Never rewrites a command or its serialized arguments. */
 const parameterLabels: Record<string, string[]> = {
+  ...Object.fromEntries(scaleEventVerbs.map(verb => [verb, [verb.includes("actor") ? "Ator" : "Camada affine", ...(verb.startsWith("reset_") ? [] : ["Escala X (%)", "Escala Y (%)"]), ...(verb.startsWith("animate_") ? ["Duração (quadros)"] : [])]])),
   lantern: ["Ator", "Largura (pixels, 8–240)", "Altura (pixels, 8–160)", "Escuridão (0–100%)", "Duração (quadros, 1–3600)", "Formato opcional (circle)"],
   reveal_area: ["Ator", "Largura inicial (pixels, 8–240)", "Altura inicial (pixels, 8–160)", "Escuridão (0–100%)", "Duração (quadros, 1–3600)", "Formato opcional (circle)"],
   set_map_state: ["Estado de mapa (ID)", "Variante (ID)"],
@@ -54,6 +56,7 @@ const parameterLabels: Record<string, string[]> = {
 };
 
 const descriptions: Record<string, string> = {
+  ...Object.fromEntries(scaleEventVerbs.map(verb => [verb, verb.includes("actor") ? "Aplica escala visual apenas à instância do ator (50–200%), preservando a colisão e a escala ao trocar a animação. A transição segue em paralelo; use Aguardar para encadear." : "Aplica escala relativa à composição inicial de uma camada affine preparada (50–400%). Não transforma tilemaps regulares nem a colisão. A transição segue em paralelo; use Aguardar para encadear."])),
   lantern: "Ilumina uma área ao redor do ator e escurece o exterior. Acrescente circle após a duração para luz circular, com largura e altura iguais. Fades e máscaras têm prioridade; o círculo compartilha DMA0 com efeitos raster.",
   reveal_area: "Expande a área ao redor do ator até revelar a tela. Acrescente circle após a duração para uma abertura circular, com largura e altura iniciais iguais. Ao terminar, remove o escurecimento.",
   clear_visibility: "Remove a lanterna ou a revelação e restaura a visibilidade da cena.",
@@ -125,6 +128,7 @@ export function eventCommandParameterLabel(verb: string, tokenIndex: number, fal
 }
 
 export function eventCommandParameterChoices(verb: string, tokenIndex: number): string[] | null {
+  if (scaleEventVerbs.some(v => v === verb && v.includes("background")) && tokenIndex === 1) return ["BG2", "BG3"];
   if ((verb === "replace_tile" && tokenIndex === 5) || (verb === "replace_tile_sequence" && tokenIndex === 6)) return TILE_REPLACEMENT_COLLISIONS;
   if(verb==="set_adventure_state" && tokenIndex===1) return ["ground","dash","knockback","blank","run","push"];
   if(verb==="actor_effects" && tokenIndex===2) return ["flash","shake"];
