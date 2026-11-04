@@ -9102,7 +9102,8 @@ export function promoteExemploGBAVerticeCampaign(data) {
     ...(result.editorState.scenaConnections ?? []).filter(connection => !preservesConnection(connection)),
     ...(data.editorState?.scenaConnections ?? []).filter(preservesConnection).map(connection => structuredClone(connection))
   ];
-  return pruneUnusedExampleAssets(result);
+  // Restore authored campaign routes first, then enforce the reviewed arena presentation.
+  return pruneUnusedExampleAssets(promoteApprovedArena(result));
 }
 
 const invokedPath = process.argv[1] ? fileURLToPath(import.meta.url) === process.argv[1] : false;

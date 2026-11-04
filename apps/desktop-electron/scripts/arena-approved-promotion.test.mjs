@@ -84,9 +84,13 @@ it('restores approved presentation idempotently while preserving other scenes, e
 it('retains the approved arena when the complete example is regenerated',async()=>{
  const {promoteExemploGBAVerticeCampaign}=await import('./vertice-showcase-project.mjs');
  const p=canonical();
+ const campaign=structuredClone(p.rooms.find(r=>r.name===scene).campaign);
+ p.actors.find(a=>a.id==='rival-fighter').spriteSheet='old.png';
  p.rooms.find(r=>r.name===scene).backgroundAssetName='old.png';
  p.scenas.find(r=>r.name===scene).backgroundAssetName='old.png';
  const result=promoteExemploGBAVerticeCampaign(p);
  expect(result.rooms.find(r=>r.name===scene).backgroundAssetName).toBe('arena-coastal-240x160.png');
+ expect(result.scenas.find(r=>r.name===scene).backgroundAssetName).toBe('arena-coastal-240x160.png');
+ expect(result.rooms.find(r=>r.name===scene).campaign).toEqual(campaign);
  expect(result.actors.find(a=>a.id==='rival-fighter').spriteSheet).toBe('arena-rival-complete-64x64.png');
 });
