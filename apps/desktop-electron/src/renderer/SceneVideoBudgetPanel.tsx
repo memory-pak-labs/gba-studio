@@ -34,9 +34,22 @@ export function SceneVideoBudgetPanel({ report, sceneName }: {
   return <section aria-label={ui("Vídeo compilado da cena {0}", { 0: sceneName })} className="room-project-budget-detail scene-video-budget">
     <h5>{ui("Vídeo compilado")}</h5>
     {!scene ? <p>{ui("Faça a análise para carregar as reservas de vídeo desta cena.")}</p> : <>
-      <p>{scene.displayMode === null ? ui("Pendente") : ui("Modo de vídeo {0}", { 0: scene.displayMode })}</p>
+      <p>{scene.displayMode === null ? ui(scene.videoStates?.length ? "Múltiplos modos de vídeo; confira cada estado." : "Pendente") : ui("Modo de vídeo {0}", { 0: scene.displayMode })}</p>
       <p>{ui("Reservas e alocações; cobertura parcial.")}</p>
       {scene.nativeLayout?.notes.length ? <ul>{scene.nativeLayout.notes.map(note => <li key={note}>{ui(layoutNotes[note] ?? "Um caminho nativo ainda não tem reservas verificadas.")}</li>)}</ul> : null}
+      {scene.videoStates?.length ? <div className="scene-video-budget-states">
+        <h5>{ui("Reservas por estado")}</h5>
+        <small>{ui("Os limites são verificados separadamente em cada estado.")}</small>
+        {scene.videoStates.map(state => <details key={state.id}>
+          <summary>{`${state.id === "composition" ? ui("Composição da cena") : ui("Background {0}", { 0: state.label })} · ${state.budget.displayMode === null ? ui("Pendente") : ui("Modo de vídeo {0}", { 0: state.budget.displayMode })}`}</summary>
+          {state.budget.blocked ? <strong>{ui("Exportação bloqueada")}</strong> : null}
+          <ul>{state.budget.metrics.filter(m => m.resource !== "romAssets").map(metric => {
+            const format = metric.unit === "bytes" ? bytes : String;
+            return <li key={metric.resource}>{ui(labels[metric.resource])}: {metric.used === null ? ui("Pendente") : format(metric.used)} / {metric.capacity === null ? "—" : format(metric.capacity)}</li>;
+          })}</ul>
+          {state.budget.nativeLayout?.notes.map(note => <p key={note}>{ui(layoutNotes[note] ?? "Um caminho nativo ainda não tem reservas verificadas.")}</p>)}
+        </details>)}
+      </div> : null}
       <div className="room-project-budget-grid">
         {scene.metrics.filter(metric => metric.resource !== "romAssets").map(metric => {
           const tone = metric.status === "blocked" ? "error" : ["attention", "not_recommended"].includes(metric.status) ? "warning" : "";

@@ -31,6 +31,30 @@ describe("asset pack video budget adapter", () => {
     }
   });
 
+  it("validates each native video state with its own OBJ addressing rules", () => {
+    const base = { scene: "alpha", bank_group: "scene_alpha", bank_groups: ["scene_alpha"], runtime: "shmup",
+      scope: "reservation_envelope", resources: {}, notes: [] };
+    const raw = { ...report([asset("obj", ["scene_alpha"], { obj_tiles: { start: 0, count: 1 } })]),
+      scene_video_layouts: { schema: 1, plans: [{ ...base, display_mode: null, video_states: [
+        { id: "regular", label: "Regular", plan: { ...base, display_mode: 0 } },
+        { id: "bitmap", label: "Bitmap", plan: { ...base, display_mode: 5 } }
+      ] }] } };
+    const result = buildAssetPackVideoBudget(scenes, raw).scenes[0];
+    expect(result.blocked).toBe(true);
+    expect(result.videoStates?.map(state => state.budget.blocked)).toEqual([false, true]);
+    expect(result.diagnostics).toEqual(expect.arrayContaining([expect.objectContaining({ resource: "objVram", feature: "bitmap", status: "blocked" })]));
+    expect(result.videoStates?.[1].budget.metrics.find(m => m.resource === "objVram")?.capacity).toBe(16384);
+  });
+
+  it("rejects nested or foreign video states instead of bypassing validation", () => {
+    const base = { scene: "alpha", bank_group: "scene_alpha", bank_groups: ["scene_alpha"], runtime: "shmup", display_mode: 0,
+      scope: "reservation_envelope", resources: {}, notes: [] };
+    for (const state of [{ id: "a", label: "A", plan: { ...base, scene: "beta" } },
+      { id: "a", label: "A", plan: { ...base, video_states: [] } }]) {
+      expect(() => buildAssetPackVideoBudget(scenes, { ...report([]), scene_video_layouts: { schema: 1, plans: [{ ...base, video_states: [state] }] } })).toThrow(/estado/i);
+    }
+  });
+
   it("uses native renderer reservations and the effective mode emitted by assetc", () => {
     const raw = { ...report([asset("floor", ["scene_alpha"], { obj_tiles: { start: 0, count: 128 } })]), scene_video_layouts: { schema: 1, plans: [{
       scene: "alpha", bank_group: "scene_alpha", bank_groups: ["scene_alpha"], runtime: "racing", display_mode: 1,

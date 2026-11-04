@@ -133,6 +133,53 @@ class NativeSceneVideoLayoutTests(unittest.TestCase):
         self.assertIn({"start": 28, "count": 2}, layout["resources"]["screenblocks"])
         self.assertEqual(layout["notes"], [])
 
+    def test_shmup_background_changes_have_separate_effective_modes(self):
+        p = project("shmup", block={"backgrounds": [
+            {"name": "affine", "video": {"display_mode": 1, "affine": {"asset": "floor"}}, "layers": []},
+            {"name": "regular", "layers": [{"layer": "bg2"}]}]})
+        a = compiled("affine_bg", "floor", {"affine_bg_tiles": 2, "tilemap_width": 16, "tilemap_height": 16})
+        a["allocations"]["affine_bg_tiles"] = {"start": 0, "count": 2}
+        p["shmup_project"]["waves"].append({"name": "next", "resource_bank_group": "scene_test"})
+        layout = self.layout(p, [a])
+        self.assertIsNone(layout["display_mode"])
+        self.assertEqual(layout["notes"], [])
+        states = layout["video_states"]
+        self.assertEqual([s["id"] for s in states], ["background_0", "background_1"])
+        self.assertEqual([s["plan"]["display_mode"] for s in states], [1, 0])
+        self.assertIn({"start": 32768, "count": 128}, states[0]["plan"]["resources"]["bgVram"])
+        self.assertIn({"start": 20, "count": 1}, states[1]["plan"]["resources"]["screenblocks"])
+
+    def test_shmup_bitmap_composition_keeps_its_own_page_state(self):
+        p = project("shmup", block={"composition": {"enabled": True}, "video": {"display_mode": 5, "bitmap": {"asset": "photo", "page": 1}},
+            "backgrounds": [{"video": {"display_mode": 1, "affine": {"asset": "floor"}}}]})
+        a = compiled("affine_bg", "floor", {"affine_bg_tiles": 2, "tilemap_width": 16, "tilemap_height": 16})
+        a["allocations"]["affine_bg_tiles"] = {"start": 0, "count": 2}
+        p["shmup_project"]["waves"].append({"name": "next", "resource_bank_group": "scene_test"})
+        layout = self.layout(p, [a, compiled("bitmap5", "photo", {"bitmap_pixels": 256})])
+        self.assertEqual(len(layout["video_states"]), 1)  # No active background: only the composition runs.
+        states = {s["id"]: s["plan"] for s in layout["video_states"]}
+        self.assertEqual(states["composition"]["display_mode"], 5)
+        self.assertEqual(states["composition"]["resources"]["screenblocks"], [])
+        self.assertIn({"start": 40960, "count": 40960}, states["composition"]["resources"]["bgVram"])
+
+    def test_shmup_composition_uses_the_top_level_video_contract(self):
+        p = project("shmup", block={"composition": {"enabled": True}, "video": {"display_mode": 2, "affine": {"asset": "floor"}}})
+        a = compiled("affine_bg", "floor", {"affine_bg_tiles": 2, "tilemap_width": 16, "tilemap_height": 16})
+        a["allocations"]["affine_bg_tiles"] = {"start": 0, "count": 2}
+        layout = self.layout(p, [a])
+        self.assertEqual(layout["display_mode"], 2)
+        self.assertEqual(layout["notes"], [])
+
+    def test_fixed_shmup_background_does_not_apply_an_inactive_bitmap_limit(self):
+        p = project("shmup", block={"background": 0, "composition": {"enabled": True},
+            "video": {"display_mode": 5, "bitmap": {"asset": "unused"}}, "backgrounds": [
+                {"video": {"display_mode": 1, "affine": {"asset": "floor"}}}, {"layers": []}]})
+        a = compiled("affine_bg", "floor", {"affine_bg_tiles": 2, "tilemap_width": 16, "tilemap_height": 16})
+        a["allocations"]["affine_bg_tiles"] = {"start": 0, "count": 2}
+        layout = self.layout(p, [a])
+        self.assertEqual(layout["display_mode"], 1)
+        self.assertEqual([s["id"] for s in layout["video_states"]], ["background_0"])
+
     def test_runtime_layout_contract_matches_renderer_reservations(self):
         hw = (ROOT / "engine/src/gbs_hw.c").read_text()
         self.assertIn("bg_screenblocks[] = { 24, 28, 20, 16 }", hw)

@@ -42,6 +42,7 @@
     "smoke:visual": "npm run smoke:visual:responsive",
     "smoke:visual:responsive": "npm run build && node scripts/smoke-responsive-visual.mjs",
     "smoke:engine-rom": "node scripts/smoke-engine-rom.mjs",
+    "smoke:video-budget-states": "node scripts/smoke-video-budget-states.mjs",
     "verify:rom-regressions": "node scripts/verify-rom-regressions.mjs",
     "smoke:play-window": "node scripts/smoke-play-window.mjs",
     "smoke:author-stress-rom": "node scripts/smoke-author-stress-rom.mjs",

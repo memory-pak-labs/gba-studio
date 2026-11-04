@@ -61,6 +61,20 @@ describe("scene video budget panel", () => {
     expect(screen.getByText("Formatos existentes são preservados; nenhuma cor é reduzida automaticamente.")).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /converter/i })).not.toBeInTheDocument();
   });
+  it("shows video limits separately for changing native states", () => {
+    const base = { scene: "track", bank_group: "scene_track", bank_groups: ["scene_track"], runtime: "shmup",
+      scope: "reservation_envelope", resources: { bgVram: [], screenblocks: [] }, notes: [] };
+    const report = buildAssetPackVideoBudget([{ name: "track", bankGroup: "scene_track" }], { schema: 11, ok: true, allocations: [],
+      scene_video_layouts: { schema: 1, plans: [{ ...base, display_mode: null, video_states: [
+        { id: "background_0", label: "Mar", plan: { ...base, display_mode: 1 } },
+        { id: "composition", label: "", plan: { ...base, display_mode: 5 } }
+      ] }] } });
+    render(<SceneVideoBudgetPanel report={report} sceneName="track" />);
+    expect(screen.getByText("Reservas por estado")).toBeInTheDocument();
+    expect(screen.getByText("Background Mar · Modo de vídeo 1")).toBeInTheDocument();
+    expect(screen.getByText("Composição da cena · Modo de vídeo 5")).toBeInTheDocument();
+    expect(screen.getByText("Os limites são verificados separadamente em cada estado.")).toBeInTheDocument();
+  });
   it("translates the added copy in English", () => {
     window.localStorage.setItem("gbaStudio.locale", "en-US");
     render(<StudioI18nProvider><SceneVideoBudgetPanel sceneName="track" /></StudioI18nProvider>);

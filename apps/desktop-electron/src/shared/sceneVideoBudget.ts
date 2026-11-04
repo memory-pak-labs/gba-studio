@@ -49,6 +49,7 @@ export interface SceneVideoBudget {
   blocked: boolean;
   metrics: SceneVideoBudgetMetric[];
   romAssetBytes: number | null;
+  videoStates?: { id: string; label: string; budget: SceneVideoBudget }[];
   colorPolicy?: { defaultBpp: 4; complete: boolean; assets: CompiledAssetColorPolicy[] };
   romAssets?: { source: "linked_asset_symbols"; bytes: number; exclusiveBytes: number; sharedBytes: number; assetCount: number };
   diagnostics: SceneVideoBudgetDiagnostic[];

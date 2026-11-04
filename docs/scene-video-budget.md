@@ -137,9 +137,15 @@ limitada a 768 tiles, não o atlas de origem inteiro. São envelopes conservador
 não contagens de tiles visíveis.
 
 Assets avançados não resolvidos ou dimensões sem contrato continuam pendentes.
-Trocas de vídeo por background do Shmup ainda exigem planos por estado e não
-são aprovadas como se tivessem um modo único. O relatório registra a razão em
-`nativeLayout.notes`, sem substituir dados ausentes por zero.
+Trocas de vídeo por background do Shmup emitem `video_states`. Cada background
+selecionável pelo runtime é verificado com modo e endereçamento OBJ próprios;
+sem background ativo, vale a composição da cena. A seleção respeita o vínculo
+por onda ou o índice fixo, sem atribuir estados de backgrounds não utilizados.
+Um estado inválido bloqueia a cena inteira e identifica seu ID no diagnóstico. A união de endereços permanece um envelope conservador; quando os
+modos variam, o Editor mostra os limites de cada estado em **Reservas por estado**.
+O vídeo global do Shmup vem de `shmup_project.video`, conforme o consumidor nativo;
+`composition.enabled` controla sua ativação. O relatório registra razões pendentes
+em `nativeLayout.notes`, sem substituir dados ausentes por zero.
 O adaptador marca:
 
 - VRAM BG/screenblocks pendentes quando falta plano nativo para aquele caminho;
@@ -189,6 +195,11 @@ de cores usadas na fonte em RGB555. A contagem ignora entradas não usadas da
 paleta PNG e variantes RGB888 que viram a mesma cor no GBA. Não é o consumo de
 paleta RAM: esse consumo vem dos intervalos compilados e das reservas nativas.
 
+O compartilhamento de paletas BG também verifica os índices visíveis compilados.
+As mesmas cores no PNG não bastam: o 4bpp pode realocar uma cor para reservar
+índice zero transparente. Bancos incompatíveis recebem faixas distintas;
+compartilhamentos compatíveis com fundos afins/indexados continuam permitidos.
+
 8bpp tem razões distintas: OBJ com mais de 15 cores, seleção explícita do autor,
 background afim, superfície indexada, cache paginado ou modo bitmap. A política
 marca um OBJ 8bpp com até 15 cores como **Revisar uso de 4bpp**. Isso é uma
@@ -218,3 +229,17 @@ Os testes cobrem limites exatos e excedidos, bitmap, união de intervalos,
 compartilhamento de paletas, grupos por cena, entradas inválidas, campos pendentes,
 exportação com subprocesso, não promoção de falhas para cache e revalidação de
 snapshot íntegro produzido antes da nova checagem.
+
+Para verificar a troca Shmup afim → regular em uma ROM técnica gerada, com
+Python, toolchain ARM e Engine Pack atualizados:
+
+```sh
+npm run smoke:video-budget-states -- /caminho/GBAStudioEnginePack /caminho/evidencias
+```
+
+O teste derrota o inimigo pelo botão de disparo e avança a onda. Confere no
+mGBA o modo, CBB, screenblock e 4bpp restaurados antes do mapa regular, além
+dos dois planos compilados e do recibo da ROM. Compara os pixels dentro e fora
+do mapa com uma ROM que entra diretamente no estado regular, cobrindo também
+a recarga de tiles, paletas e tile zero após o mapa afim. A arte procedural do teste
+não faz parte do projeto do usuário. Não substitui teste em GBA físico.

@@ -20042,6 +20042,9 @@ def compiled_scene_video_layouts(project_data, asset_report):
             return None
         return (2 if width > 32 else 1) * (2 if height > 32 else 1)
 
+    def affine_enabled(video):
+        return video.get("display_mode", 0) in (1, 2) and isinstance(video.get("affine"), dict)
+
     for scene in scenes:
         if not isinstance(scene, dict) or not isinstance(scene.get("name"), str):
             continue
@@ -20078,15 +20081,40 @@ def compiled_scene_video_layouts(project_data, asset_report):
                      "global" in a.get("bank_groups", [a.get("bank_group", "global")]))]
         plan["nonvisible_obj_ranges"] = compiled_nonvisible_hud_obj_ranges(project_data, block, row, name, {"allocations": selected})
         all_by_name = {a.get("name", a.get("id")): a for a in allocations if not a.get("omitted")}
-        video = row.get("video", {})
-        if runtime in ("topdown", "isometric") and not video.get("affine"):
-            video = block.get("video", {})
+        video = row.get("video") or {}
+        if runtime in ("topdown", "isometric") and not affine_enabled(video):
+            video = block.get("video") or {}
         if runtime == "shmup":
             composition = block.get("composition", {})
-            video = composition.get("video", {}) if composition.get("enabled") else {}
-            overrides = [bg.get("video", {}) for bg in block.get("backgrounds", []) if bg.get("video", {}).get("affine")]
-            if overrides:
-                notes.append("changing_background_video_not_modelled")
+            video = (block.get("video") or {}) if composition.get("enabled") else {}
+            backgrounds = block.get("backgrounds", [])
+            if any(affine_enabled(bg.get("video") or {}) for bg in backgrounds):
+                # Background overrides can change the hardware mode. Validate
+                # each reachable renderer state with its own physical limits,
+                # rather than checking a union against an assumed single mode.
+                if len(backgrounds) == len(block.get("waves", [])):
+                    active = list(enumerate(backgrounds))
+                else:
+                    index = block.get("background", block.get("background_index", -1))
+                    active = [(index, backgrounds[index])] if isinstance(index, int) and 0 <= index < len(backgrounds) else []
+                cases = [("background_" + str(i), str(bg.get("name") or i + 1),
+                          bg.get("video") if affine_enabled(bg.get("video") or {}) else video,
+                          [{**bg, "video": {}}]) for i, bg in active]
+                if not cases:
+                    cases = [("composition", "", video, [])]
+                states = []
+                for state_id, label, state_video, state_backgrounds in cases:
+                    state_block = {**block, "video": state_video, "composition": {**composition, "enabled": True},
+                                   "backgrounds": state_backgrounds}
+                    state_project = {**project_data, "scene_contracts": [scene], "shmup_project": state_block}
+                    state = compiled_scene_video_layouts(state_project, asset_report)["plans"][0]
+                    states.append({"id": state_id, "label": label, "plan": state})
+                plan["video_states"] = states
+                modes = {state["plan"]["display_mode"] for state in states}
+                plan["display_mode"] = next(iter(modes)) if len(modes) == 1 else None
+                for resource in ("bgVram", "screenblocks"):
+                    if all(resource in state["plan"]["resources"] for state in states):
+                        plan["resources"][resource] = [r for state in states for r in state["plan"]["resources"][resource]]
                 continue
         mode = 0 if runtime in fixed_mode else video.get("display_mode", 0)
         visual = None
@@ -20107,6 +20135,9 @@ def compiled_scene_video_layouts(project_data, asset_report):
             placement = asset.get("allocations", {}).get("bg_tiles")
             if placement:
                 bg.append({"start": placement["start"] * 32, "count": placement["count"] * 32})
+            affine_tiles = asset.get("allocations", {}).get("affine_bg_tiles")
+            if affine_tiles:
+                bg.append({"start": 32768 + affine_tiles["start"] * 64, "count": affine_tiles["count"] * 64})
         def reserve_map(layer, width=32, height=32, base=None):
             count = regular_blocks(width, height)
             if count is None:

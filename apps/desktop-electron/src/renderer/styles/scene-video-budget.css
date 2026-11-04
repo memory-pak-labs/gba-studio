@@ -11,7 +11,8 @@
 
 .scene-video-budget,
 .scene-video-budget > *,
-.scene-video-budget-colors details {
+.scene-video-budget-colors details,
+.scene-video-budget-states details {
   min-width: 0;
   max-width: 100%;
   overflow-wrap: anywhere;
@@ -39,6 +40,7 @@
 
 .scene-video-budget-rom,
 .scene-video-budget-colors,
+.scene-video-budget-states,
 .scene-video-budget-reservations {
   border-top: 1px solid var(--studio-color-border);
   display: grid;

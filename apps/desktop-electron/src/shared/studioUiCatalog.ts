@@ -1,5 +1,10 @@
 /** Application copy only. Tuple order: pt-BR, en-US, es-ES. Keep project data out of this catalog. */
 export const studioUiMessages: Record<string, readonly [string, string, string]> = {
+  "Reservas por estado": ["Reservas por estado", "Reservations per state", "Reservas por estado"],
+  "Múltiplos modos de vídeo; confira cada estado.": ["Múltiplos modos de vídeo; confira cada estado.", "Multiple video modes; check each state.", "Varios modos de vídeo; compruebe cada estado."],
+  "Os limites são verificados separadamente em cada estado.": ["Os limites são verificados separadamente em cada estado.", "Limits are checked separately in each state.", "Los límites se verifican por separado en cada estado."],
+  "Composição da cena": ["Composição da cena", "Scene composition", "Composición de la escena"],
+  "Background {0}": ["Background {0}", "Background {0}", "Fondo {0}"],
   "Política de cores": ["Política de cores", "Color policy", "Política de colores"],
   "4bpp é o padrão; 8bpp depende das cores e do renderizador da cena.": ["4bpp é o padrão; 8bpp depende das cores e do renderizador da cena.", "4bpp is the default; 8bpp depends on colors and the scene renderer.", "4bpp es el formato predeterminado; 8bpp depende de los colores y del renderizador de la escena."],
   "Paletas BG e OBJ são separadas por cena. A ocupação inclui bancos e reservas, não só cores diferentes.": ["Paletas BG e OBJ são separadas por cena. A ocupação inclui bancos e reservas, não só cores diferentes.", "BG and OBJ palettes are separate per scene. Usage includes banks and reservations, not just distinct colors.", "Las paletas BG y OBJ están separadas por escena. El uso incluye bancos y reservas, además de colores distintos."],

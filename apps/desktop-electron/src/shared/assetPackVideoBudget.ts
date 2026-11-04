@@ -58,6 +58,7 @@ interface NativeVideoLayout {
   notes: string[];
   dynamic_reservations?: NativeInterfaceReservation[];
   nonvisible_obj_ranges?: CompiledVideoRange[];
+  video_states?: { id: string; label: string; plan: NativeVideoLayout }[];
 }
 
 function parseNativeLayouts(value: unknown): NativeVideoLayout[] {
@@ -88,6 +89,17 @@ function parseNativeLayouts(value: unknown): NativeVideoLayout[] {
     if (plan.nonvisible_obj_ranges !== undefined && (!Array.isArray(plan.nonvisible_obj_ranges) || plan.nonvisible_obj_ranges.some(range =>
       !record(range) || !Number.isSafeInteger(range.start) || !Number.isSafeInteger(range.count) || (range.start as number) < 0 || (range.count as number) < 0))) {
       throw new Error("Recorte compilado de OBJ inválido.");
+    }
+    if (plan.video_states !== undefined) {
+      if (!Array.isArray(plan.video_states) || !plan.video_states.length || plan.video_states.length > 128) throw new Error("Estados de vídeo inválidos.");
+      const ids = new Set<string>();
+      for (const state of plan.video_states) {
+        if (!record(state) || typeof state.id !== "string" || !state.id || ids.has(state.id) || typeof state.label !== "string" ||
+          !record(state.plan) || state.plan.video_states !== undefined || state.plan.scene !== plan.scene ||
+          state.plan.bank_group !== plan.bank_group || state.plan.runtime !== plan.runtime) throw new Error("Estado de vídeo inválido, aninhado ou de outra cena.");
+        parseNativeLayouts({ schema: 1, plans: [state.plan] });
+        ids.add(state.id);
+      }
     }
     seen.add(plan.scene);
     return plan as unknown as NativeVideoLayout;
@@ -165,8 +177,18 @@ export function buildAssetPackVideoBudget(scenes: readonly AssetPackVideoBudgetS
       for (const feature of overlaps) result.diagnostics.push({ scene: scene.name, resource: "objVram", feature, code: "reservation_overlap", status: "blocked" });
       result.metrics = result.metrics.map(metric => metric.resource === "objVram" ? { ...metric, status: "blocked" } : metric);
     }
+    const videoStates = layout?.video_states?.map(state => ({ id: state.id, label: state.label,
+      budget: buildAssetPackVideoBudget([scene], { ...raw, scene_video_layouts: { schema: 1, plans: [state.plan] } }).scenes[0]! }));
+    for (const state of videoStates ?? []) if (state.budget.blocked) {
+      result.blocked = true;
+      result.complete = false;
+      const blocked = state.budget.diagnostics.filter(d => d.status === "blocked");
+      result.diagnostics.push(...blocked.map(d => ({ ...d, feature: state.id + (d.feature ? ":" + d.feature : "") })));
+      result.metrics = result.metrics.map(metric => blocked.some(d => d.resource === metric.resource) ? { ...metric, status: "blocked" } : metric);
+    }
     return {
       ...result,
+      ...(videoStates ? { videoStates } : {}),
       colorPolicy: { defaultBpp: 4 as const, complete: matched.some(asset => asset.graphics) && matched.every(asset => !asset.graphics || asset.colorPolicy !== undefined),
         assets: matched.flatMap(asset => asset.colorPolicy ? [asset.colorPolicy] : []) },
       metrics: result.metrics.map(metric => ({ ...metric,
