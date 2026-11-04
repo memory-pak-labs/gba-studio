@@ -16,9 +16,10 @@ Definir aplica imediatamente. Animar faz uma transição linear em 1–32767 qua
 sem bloquear o roteiro. Use Aguardar para encadear efeitos; um novo comando
 interrompe a transição anterior e começa no valor visual atual. Restaurar volta
 imediatamente a 100/100. Escala persiste ao trocar o clipe ou estado de animação,
-mas reinicia ao entrar em outra cena ou restaurar a cena pelo save. Reaplique um
-efeito persistente usando suas variáveis e o evento de restauração. Não há mudança
-no formato do save. PNGs, tiles e caixas de colisão mantêm suas dimensões.
+mas reinicia ao entrar em outra cena. A escala não é gravada no save: defina o
+estado visual desejado nos eventos de restauração, conforme as variáveis do jogo.
+Não há mudança no formato do save. PNGs, tiles e caixas de colisão mantêm suas
+dimensões.
 
 O consumidor nativo de atores está ligado a Aventura, Plataforma, Isométrico,
 Dungeon Crawler, Corrida, SHMUP, Point and Click, Menu, Cutscene, Batalha RPG e
