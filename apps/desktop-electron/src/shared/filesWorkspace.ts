@@ -1056,6 +1056,7 @@ function audioFormatForFileName(fileName: string, kind: "Musica" | "SFX"): strin
 }
 
 function makeAudioItemForImportedAsset(asset: ImportedAssetFile): Record<string, unknown> | null {
+  if (asset.metadata?.soundFontInstrument) return null;
   const assetKind = asset.kind || assetKindForFileName(asset.name);
   if (assetKind !== "Audio" && assetKind !== "Musica" && assetKind !== "SFX") {
     return null;
@@ -1208,6 +1209,14 @@ export function appendImportedAssetsToProject(
     ...existingAssets,
     ...importedAssets.map((asset) => makeImportedAssetRecord(asset))
   ];
+  const soundFontInstruments = importedAssets.flatMap((asset) => {
+    const definition = asset.metadata?.soundFontInstrument;
+    if (!definition || typeof definition !== "object" || Array.isArray(definition)) return [];
+    const fields = definition as Record<string, unknown>;
+    return [{ id: `sf2-${asset.id}`, name: String(fields.name), sampleAssetID: asset.id,
+      sampleRootNote: String(fields.sampleRootNote), sampleLoop: fields.sampleLoop === true, envelope: "Soft ADSR" }];
+  });
+  if (soundFontInstruments.length) next.audioInstruments = [...projectArray(next, "audioInstruments"), ...soundFontInstruments];
   if (importedAudioItems.length > 0) {
     next.audioItems = [...existingAudioItems, ...importedAudioItems];
   }

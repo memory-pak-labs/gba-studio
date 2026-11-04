@@ -1,7 +1,8 @@
-import { access, copyFile, mkdir } from "node:fs/promises";
+import { access, copyFile, mkdir, mkdtemp, readFile, rm, stat, writeFile } from "node:fs/promises";
 import path from "node:path";
 import type { ImportedAssetFile } from "../shared/ipc.js";
 import { assetKindForFileName, systemImageForAssetKind } from "../shared/filesWorkspace.js";
+import { convertSoundFont } from "./soundFont.js";
 
 const ASSETS_FOLDER_NAME = "Assets";
 const IMAGE_EXTENSIONS = ["apng", "bmp", "gif", "jpg", "jpeg", "png", "webp"];
@@ -144,6 +145,31 @@ export async function copyFilesIntoProjectAssets(
 
   const importedAssets: ImportedAssetFile[] = [];
   for (const sourcePath of sourcePaths) {
+    if (fileExtension(sourcePath) === "sf2") {
+      if ((await stat(sourcePath)).size > 128 * 1024 * 1024) throw new Error("SoundFont: banco maior que 128 MiB.");
+      const converted = convertSoundFont(await readFile(sourcePath), path.basename(sourcePath));
+      const audioDirectory = path.join(projectDirectory, ASSETS_FOLDER_NAME, "audio");
+      await mkdir(audioDirectory, { recursive: true });
+      const directory = await mkdtemp(path.join(audioDirectory, "sf2-"));
+      const generated: ImportedAssetFile[] = [];
+      try {
+        for (const [index, instrument] of converted.instruments.entries()) {
+          const fileName = `zone-${index + 1}.wav`;
+          await writeFile(path.join(directory, fileName), instrument.wav, { flag: "wx" });
+          generated.push({ id: makeAssetID(), name: `${path.basename(directory)}-${fileName}`,
+            relativePath: `${ASSETS_FOLDER_NAME}/audio/${path.basename(directory)}/${fileName}`, kind: "Audio", systemImage: "music.note",
+            metadata: { soundFontInstrument: { name: instrument.name, sampleRootNote: instrument.rootNote, sampleLoop: instrument.loop, envelope: "Soft ADSR" },
+              soundFont: { sourceName: path.basename(sourcePath), sourceSha256: converted.sourceSha256, copyright: converted.copyright,
+                preset: instrument.preset, bank: instrument.bank, keyRange: instrument.keyRange, velocityRange: instrument.velocityRange,
+                warnings: converted.warnings } } });
+        }
+      } catch (error) {
+        await rm(directory, { recursive: true, force: true });
+        throw error;
+      }
+      importedAssets.push(...generated);
+      continue;
+    }
     const kind = options.forcedKind ?? importedAssetKindForSourcePath(sourcePath);
     const assetFolder = assetFolderForKind(kind);
     const assetsDirectory = path.join(projectDirectory, ASSETS_FOLDER_NAME, assetFolder);

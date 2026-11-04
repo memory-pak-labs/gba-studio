@@ -3143,7 +3143,32 @@ def convert_wav_to_pcm8(path, target_sample_rate=None):
     if len(samples) > 0xFFFF:
         raise SystemExit("PCM gerado excede 65535 samples; divida ou reduza o asset")
 
-    return samples, output_rate, 0, 0
+    # WAV smpl uses an inclusive loop end; the engine uses an exclusive end.
+    loop_start, loop_end = 0, 0
+    raw = Path(path).read_bytes()
+    offset = 12
+    while offset + 8 <= len(raw):
+        chunk_id = raw[offset:offset + 4]
+        size = struct.unpack_from("<I", raw, offset + 4)[0]
+        payload = offset + 8
+        if payload + size > len(raw):
+            raise SystemExit("WAV possui chunk truncado")
+        if chunk_id == b"smpl":
+            if size < 36:
+                raise SystemExit("WAV smpl truncado")
+            loop_count = struct.unpack_from("<I", raw, payload + 28)[0]
+            if loop_count:
+                if loop_count != 1 or size < 60:
+                    raise SystemExit("WAV suporta um loop smpl")
+                _, loop_type, start, end, fraction, plays = struct.unpack_from("<6I", raw, payload + 36)
+                if loop_type != 0 or fraction != 0 or plays != 0 or start > end or end >= frame_count:
+                    raise SystemExit("WAV smpl precisa de loop forward continuo valido")
+                loop_start = round(start * output_rate / source_rate)
+                loop_end = min(len(samples), round((end + 1) * output_rate / source_rate))
+                if loop_start >= loop_end:
+                    raise SystemExit("WAV loop vazio apos conversao")
+        offset = payload + size + size % 2
+    return samples, output_rate, loop_start, loop_end
 
 
 MOD_SIGNATURE_CHANNELS = {

@@ -1,4 +1,5 @@
 import { uiText as ui, useStudioUiText } from "./studioUiText";
+import { wavSampleLoop } from "../shared/wavSampleLoop";
 import { Play, Square, Plus, Minus, Search, Upload, Music2, AudioLines, ListFilter, AlertTriangle, SlidersHorizontal, X } from "lucide-react";
 import { AudioGroovePiano, grooveTrackName, grooveHardwareLabel, grooveTrackTone } from "./AudioGroovePiano";
 import type { UpdateAudioInstrumentFields } from "../shared/audioInstruments.js";
@@ -608,10 +609,11 @@ export function AudioWorkspace({
             <section className="audio-rail-empty">
               <strong>{ui("A biblioteca de áudio está vazia.")}</strong>
               <p>{ui("Crie uma música ou SFX para começar a compor.")}</p>
+              {presentation.instruments?.length ? <p>{ui("Banco do projeto: {0} instrumentos disponíveis ao criar uma música.", { 0: presentation.instruments.length })}</p> : null}
               <div>
                 <button onClick={() => setCreationAssistantOpen(true)} type="button">{ui("Criar música")}</button>
                 <button onClick={() => setCreationAssistantOpen(true)} type="button">{ui("Criar SFX")}</button>
-                <button onClick={onImportAudio} type="button">{ui("Importar MOD/WAV")}</button>
+                <button onClick={onImportAudio} type="button">{ui("Importar MOD/WAV/SF2")}</button>
               </div>
               {audioCreationAssistant()}
             </section>
@@ -782,12 +784,16 @@ export function AudioWorkspace({
         const plan = deriveAudioPreviewPlaybackPlan(item, { scope: previewScope });
         if (plan.steps.every(step => step.notes.length === 0)) { stopAudioPreview("Sem notas audíveis nesta seleção."); return; }
         const sampleBuffers = new Map<string, AudioBuffer>();
+        const sampleLoops = new Map<string, { start: number; end: number }>();
         for (const source of new Set(plan.steps.flatMap(step => step.notes.flatMap(note => note.sample ? [note.sample.source] : [])))) {
           const url = resolveAudioPreviewSourceURL(projectPath, source);
           if (!url) throw new Error("Salve o projeto para ouvir o sample.");
           const response = await fetch(url, { signal: abort.signal });
           if (!response.ok) throw new Error("Não foi possível abrir o sample WAV.");
-          sampleBuffers.set(source, await context.decodeAudioData(await response.arrayBuffer()));
+          const bytes = await response.arrayBuffer();
+          const loop = wavSampleLoop(bytes);
+          if (loop) sampleLoops.set(source, loop);
+          sampleBuffers.set(source, await context.decodeAudioData(bytes));
         }
         if (request !== playbackRequest.current) return;
         const stop = startComposedAudioPreview(context, plan, {
@@ -796,6 +802,8 @@ export function AudioWorkspace({
             if (note.sample) {
               const source = context.createBufferSource(); const gain = context.createGain();
               source.buffer = sampleBuffers.get(note.sample.source)!; source.loop = note.sample.loop;
+              const loop = sampleLoops.get(note.sample.source);
+              if (loop) { source.loopStart = loop.start; source.loopEnd = loop.end; }
               source.playbackRate.setValueAtTime(note.sample.pitchRatio, when);
               const peak = 0.3 * note.volume / 15;
               const attack = Math.min(duration, note.attackFrames / 60);
