@@ -150,6 +150,12 @@ export function RoomEventBindingsInspector({
   const [expandedHost, setExpandedHost] = useState<HTMLElement | null>(null);
   const expandButtonRef = useRef<HTMLButtonElement>(null);
   const appliedFocusedEventRequestID = useRef<number | null>(null);
+  const focusedTargetKey = `${contextKind}:${String(sourceTarget.id ?? sourceTarget.name ?? "")}`;
+  const focusedRequestTarget = useRef({ requestID: focusedEventRequestID, targetKey: focusedTargetKey });
+  if (focusedRequestTarget.current.requestID !== focusedEventRequestID) {
+    focusedRequestTarget.current = { requestID: focusedEventRequestID, targetKey: focusedTargetKey };
+  }
+
   const capabilityContext: EventsWorkspaceContextBindingCapabilityContext = {
     actorRole: contextKind === "actor" ? (isPlayer ? "player" : "actor") : null,
     collisionGroup: resolvedCollisionGroup,
@@ -289,7 +295,7 @@ export function RoomEventBindingsInspector({
     setBehaviorPickerTab("all");
   }
 
-  const focusedEventInspector = focusedEventName && focusedEventRequestID && !focusedEventIsBoundToTarget && renderEventInspector
+  const focusedEventInspector = focusedEventName && focusedEventRequestID && focusedRequestTarget.current.targetKey === focusedTargetKey && !focusedEventIsBoundToTarget && renderEventInspector
     ? (
       <div className="room-event-editor-shell" aria-label={ui("Script de {0}", { 0: focusedEventName })}>
         {renderEventInspector(focusedEventName, "Evento selecionado")}

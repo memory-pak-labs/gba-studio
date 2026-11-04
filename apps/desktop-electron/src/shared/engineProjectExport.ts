@@ -1,3 +1,4 @@
+import {deriveHudPresetsWorkspacePresentation} from "./hudPresets.js";
 import { memoizeEngineExport } from "./engineExportContext.js";
 import { sceneChangeCommandParts } from "./sceneChangeCommand.js";
 import { spriteColorModeForSheet } from "./spriteColorDepth.js";
@@ -276,18 +277,14 @@ function hudPresetIDsInValue(value: unknown, output = new Set<string>()): Set<st
 
 /** Indexes authored HUD references once per pack, without retaining project data. */
 export function engineUsedHudPresetIDs(data: GBAProjectData): Set<string> {
-  const projectSettings = settings(data);
-  const presets = recordArray(projectSettings ?? {}, "hudPresets");
-  const knownIDs = new Set(presets.map(preset => nullableStringField(preset, "id")));
-  const requestedActiveID = nullableStringField(projectSettings, "hudPresetId") || "hud-default";
-  const activeID = presets.length && !knownIDs.has(requestedActiveID)
-    ? nullableStringField(presets[0], "id") : requestedActiveID;
-  if (!usesBlankPlayerDefaults(data)) return new Set([...knownIDs, "hud-default"]);
+  const presentation = deriveHudPresetsWorkspacePresentation(data);
+  const knownIDs = new Set(presentation.presets.map(preset => preset.id));
+  const activeID = presentation.activePresetId;
   const ids = new Set<string>();
   projectRooms(data).forEach(room => {
     const requested = hudPresetIDsInValue(room);
     if (!requested.size && !usesBlankPlayerDefaults(data)) requested.add(activeID);
-    requested.forEach(id => ids.add(presets.length && !knownIDs.has(id) ? activeID : id));
+    requested.forEach(id => ids.add(!knownIDs.has(id) ? activeID : id));
   });
   if (!ids.size && !usesBlankPlayerDefaults(data)) ids.add(activeID);
   return ids;
@@ -301,7 +298,6 @@ function hudSceneGroupsByIconUncached(data: GBAProjectData): ReadonlyMap<string,
   const projectSettings = settings(data);
   const presets = recordArray(projectSettings ?? {}, "hudPresets");
   const groupsByIcon = new Map<string, string[]>();
-  if (presets.length === 0) return groupsByIcon;
   const presetByID = new Map(
     presets.map((preset) => [nullableStringField(preset, "id"), preset] as const)
       .filter(([id]) => id.length > 0)
@@ -315,6 +311,16 @@ function hudSceneGroupsByIconUncached(data: GBAProjectData): ReadonlyMap<string,
     const presetIDs = hudPresetIDsInValue(room);
     if (presetIDs.size === 0 && activePreset && !usesBlankPlayerDefaults(data)) presetIDs.add(nullableStringField(activePreset, "id"));
     const icons = new Set<string>();
+    // Native battle controls remain resources of the encounter even when the
+    // author replaces its HUD composition or removes the corresponding icon.
+    const runtime = child(room, "runtime");
+    if (nullableStringField(runtime, "type") === "battleRpg") {
+      const presentation = child(child(runtime, "config"), "presentation");
+      for (const field of ["cursorAssetName", "disabledEscapeAssetName"]) {
+        const image = nullableStringField(presentation, field);
+        if (image) icons.add(image);
+      }
+    }
     presetIDs.forEach((id) => {
       const preset = presetByID.get(id) ?? activePreset;
       if (preset) (iconsByPreset.get(preset) ?? []).forEach((icon) => icons.add(icon));

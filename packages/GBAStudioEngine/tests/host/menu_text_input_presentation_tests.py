@@ -38,6 +38,8 @@ void draw_text_overlay_light(int, int, int, const char*, bool) { ++fields; }
 void draw_text_input_keyboard(int, int, int, int, int, bool, bool) {}
 void draw_text_input_keyboard_with_controls(int, int, int, int, int, bool, bool,
     int, int, int, int, int, int) { ++keyboards; }
+void draw_text_input_keyboard_authored(int, int, int, int, int, bool, bool,
+    int, int, int, int, int, int, const gbs_name_keyboard_geometry*) { ++keyboards; }
 }
 ''' + function("const gbs::MenuTextInputData* menu_text_input_config(const gbs::MenuScreenData* screen)")
 if policy + " {" in source:

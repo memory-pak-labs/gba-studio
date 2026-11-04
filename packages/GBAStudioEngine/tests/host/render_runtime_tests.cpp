@@ -772,6 +772,10 @@ void gbs_hw_draw_text_input_keyboard_with_controls(int x, int y, int width, int 
     (void)controls_height;
     (void)surface;
 }
+void gbs_hw_draw_text_input_keyboard_authored(int x,int y,int w,int h,int selected,int lower,int visible,int control,int cx,int cy,int cw,int ch,int surface,const gbs_name_keyboard_geometry*) {
+    gbs_hw_draw_text_input_keyboard_with_controls(x,y,w,h,selected,lower,visible,control,cx,cy,cw,ch,surface);
+}
+
 void gbs_hw_load_bg_palette(const uint16_t* colors, uint32_t, uint32_t count) {
     ++palette_calls;
     ++bg_palette_calls;

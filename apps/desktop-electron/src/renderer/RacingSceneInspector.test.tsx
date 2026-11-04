@@ -29,3 +29,12 @@ it("describes the preserved checkpoint order of older racing scenes", () => {
   expect(screen.getByRole("group",{name:"Checkpoint 1"})).toBeTruthy();
   expect(screen.getByText(/O último completa a volta/)).toBeTruthy();
 });
+
+it('shows the native circuit rival speed unchanged and links geometry to the map',()=>{
+ const onChange=vi.fn(),onEditTrack=vi.fn();
+ render(<RacingSceneInspector config={normalizeRacingSceneConfig({presentation:'topdown',rivalSpeed:105,topdownTrack:createRacingCircuitTrack(64,64)})} width={64} height={64} background="" assets={[]} onChange={onChange} onPrepare={vi.fn()} onEditTrack={onEditTrack}/>);
+ expect(screen.getByRole('spinbutton',{name:'Velocidade dos rivais'})).toHaveValue(105);
+ expect(onChange).not.toHaveBeenCalled();fireEvent.click(screen.getByRole('button',{name:'Editar checkpoints no mapa'}));expect(onEditTrack).toHaveBeenLastCalledWith('gates');
+ fireEvent.click(screen.getByRole('button',{name:'Editar rota no mapa'}));expect(onEditTrack).toHaveBeenLastCalledWith('route');
+ fireEvent.change(screen.getByRole('spinbutton',{name:'Velocidade dos rivais'}),{target:{value:'106'}});expect(onChange).toHaveBeenCalledWith({rivalSpeed:106});
+});

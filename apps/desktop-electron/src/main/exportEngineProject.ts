@@ -1,5 +1,6 @@
 import { actorCommandReferences, sceneChangeCommand, sceneChangeCommandParts } from "../shared/sceneChangeCommand.js";
 import { parseEventInstruction, eventWaitFrames } from "../shared/eventExecutionContract.js";
+import { shmupProjectileLaunches, type ShmupProjectileLaunch } from "../shared/shmupProjectileAuthoring.js";
 import { parseVisibilityPreset } from "../shared/visibilityPresets.js";
 import { normalizePointClickTarget, pointClickInventoryItems, type PointClickInventoryItem } from "../shared/pointClickTargets.js";
 import { roomMapStates, resolveMapState, type MapStateVariant } from "../shared/mapStates.js";
@@ -1487,11 +1488,15 @@ export interface EngineExportRacingRoom {
       y: number;
       width: number;
       height: number;
+      on_pass?: EngineExportProjectEventCommand[];
     }>;
   };
   player_start_pixels: { x: number; y: number };
   background?: number;
   pseudo3d_visual?: number;
+  on_lap_complete?: EngineExportProjectEventCommand[];
+  on_victory?: EngineExportProjectEventCommand[];
+  on_defeat?: EngineExportProjectEventCommand[];
   on_enter?: EngineExportProjectEventCommand[];
   triggers?: Array<{
     area: { x: number; y: number; width: number; height: number };
@@ -2015,6 +2020,7 @@ export interface EngineExportMenuScreen {
     keyboard_controls_y?: number;
     keyboard_controls_width?: number;
     keyboard_controls_height?: number;
+    keyboard_geometry?: import("../shared/menuScene.js").MenuTextInputKeyboardGeometry;
   };
   actors?: EngineExportMenuActor[];
   items: EngineExportMenuItem[];
@@ -7920,6 +7926,7 @@ function buildRacingRooms(
     const currentRoomName = roomName(room, index);
     const eventBindings = child(room, "eventBindings");
     const onEnter = scriptForEventName(data, nullableStringField(eventBindings, "onInit"), events, rooms, dialogues, audioItems, audioPack, pluginRegistry);
+    const onLapComplete = scriptForEventName(data, nullableStringField(eventBindings, "onLapComplete"), events, rooms, dialogues, audioItems, audioPack, pluginRegistry);
     const onVictory = scriptForEventName(data, nullableStringField(eventBindings, "onVictory"), events, rooms, dialogues, audioItems, audioPack, pluginRegistry);
     const onDefeat = scriptForEventName(data, nullableStringField(eventBindings, "onDefeat"), events, rooms, dialogues, audioItems, audioPack, pluginRegistry);
     const actors = npcActorsForRoom(data, room, index).flatMap((actor) => {
@@ -8015,7 +8022,8 @@ function buildRacingRooms(
             x: Math.max(0, Math.min(4095, Math.round(checkpoint.x))),
             y: Math.max(0, Math.min(4095, Math.round(checkpoint.y))),
             width: Math.max(1, Math.min(256, Math.round(checkpoint.width))),
-            height: Math.max(1, Math.min(256, Math.round(checkpoint.height)))
+            height: Math.max(1, Math.min(256, Math.round(checkpoint.height))),
+            ...(checkpoint.eventName ? {on_pass:scriptForEventName(data,checkpoint.eventName,events,rooms,dialogues,audioItems,audioPack,pluginRegistry) ?? []} : {})
           }))
         }
       } : {}),
@@ -8027,6 +8035,7 @@ function buildRacingRooms(
       ...(pseudo3dVisualIndexByRoomName.has(currentRoomName) ? { pseudo3d_visual: pseudo3dVisualIndexByRoomName.get(currentRoomName) } : {}),
       video: buildRoomVideoComposition(data, room, tilesetPack),
       ...(onEnter && onEnter.length > 0 ? { on_enter: onEnter } : {}),
+      ...(onLapComplete && onLapComplete.length > 0 ? {on_lap_complete:onLapComplete} : {}),
       ...(onVictory && onVictory.length > 0 ? { on_victory: onVictory } : {}),
       ...(onDefeat && onDefeat.length > 0 ? { on_defeat: onDefeat } : {}),
       ...(triggers.length > 0 ? { triggers } : {}),
@@ -8736,33 +8745,6 @@ function buildPointClickProject(
     ...(assetSection.assets ? { assets: assetSection.assets } : {}),
     ...(assetSection.resource_banks ? { resource_banks: assetSection.resource_banks } : {})
   };
-}
-
-interface ShmupProjectileLaunch {
-  actor: string;
-  direction: string;
-  speed: number;
-  spriteSheet?: string;
-}
-
-function shmupProjectileLaunches(
-  events: Record<string, unknown>[],
-  runtimeRoomNames: Set<string>
-): ShmupProjectileLaunch[] {
-  return events.flatMap((event, eventIndex) => {
-    const eventRoomName = normalizeGBAEventDocument(event, eventIndex).sceneName ?? "";
-    if (eventRoomName && !runtimeRoomNames.has(eventRoomName)) return [];
-    return eventSteps(event).flatMap((step) => {
-      const parts = commandParts(stringField(step, "command", "noop"));
-      if ((parts[0] ?? "") !== "launch_projectile" || !parts[1]) return [];
-      return [{
-        actor: parts[1],
-        direction: parts[2] || "right",
-        speed: Math.max(1, Math.round(numberOrNullLocal(parts[3]) ?? 2)),
-        ...(parts[4] ? { spriteSheet: parts[4] } : {})
-      }];
-    });
-  });
 }
 
 function shmupProjectileVelocity(launch: ShmupProjectileLaunch): { x: number; y: number } {
@@ -9866,7 +9848,8 @@ function buildMenuScreens(
           ...(keyboard?.controlsX !== undefined ? { keyboard_controls_x: keyboard.controlsX } : {}),
           ...(keyboard?.controlsY !== undefined ? { keyboard_controls_y: keyboard.controlsY } : {}),
           ...(keyboard?.controlsWidth !== undefined ? { keyboard_controls_width: keyboard.controlsWidth } : {}),
-          ...(keyboard?.controlsHeight !== undefined ? { keyboard_controls_height: keyboard.controlsHeight } : {})
+          ...(keyboard?.controlsHeight !== undefined ? { keyboard_controls_height: keyboard.controlsHeight } : {}),
+          ...(keyboard?.geometry ? { keyboard_geometry: keyboard.geometry } : {})
         };
       }
     }

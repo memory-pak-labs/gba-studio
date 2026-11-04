@@ -34,9 +34,12 @@ import {
 } from "../eventStructure.js";
 import type { GBAProjectData } from "../projectFile.js";
 import { sceneRouteTablesFromProject } from "../sceneRouteTables.js";
+import { normalizeSceneTypeId } from "../sceneTypes.js";
+import { shmupProjectileLaunches } from "../shmupProjectileAuthoring.js";
 import {
   normalizeGBAEntityDocument,
-  normalizeGBAEventDocument
+  normalizeGBAEventDocument,
+  normalizeGBASceneDocument
 } from "../../../../../packages/project-contract/src/index.js";
 import {
   normalizeEventProcedureDefinition,
@@ -1091,6 +1094,9 @@ function menuRuntimeItems(room: Record<string, unknown>): Record<string, unknown
       ];
     });
   }
+  if (runtimeType === "racing") {
+    return runtimeEventStates(room).map(state => ({ label: `${state.group} · ${state.label}`, eventName: state.eventName }));
+  }
   if (runtimeType !== "menu") return [];
   const rootItems = Array.isArray(config.items) ? config.items.filter(isRecord) : [];
   const internalScreens = Array.isArray(config.screens) ? config.screens.filter(isRecord) : [];
@@ -1119,7 +1125,8 @@ function bindingLabelsByEventName(data: GBAProjectData): Map<string, string[]> {
     addEventBindingLabels(room.eventBindings, `Cena: ${roomName}`, labels);
     for (const item of menuRuntimeItems(room)) {
       const itemLabel = stringField(item.label, "Item sem nome");
-      addDirectEventLabel(item.eventName, `Cena: ${roomName} · Menu: ${itemLabel}`, labels);
+      const itemPrefix = isRecord(room.runtime) && room.runtime.type === "racing" ? "" : "Menu: ";
+      addDirectEventLabel(item.eventName, `Cena: ${roomName} · ${itemPrefix}${itemLabel}`, labels);
     }
   }
 
@@ -3302,8 +3309,14 @@ export function deriveEventsWorkspacePresentation(
     return missing;
   };
   const graphEdges = sourceEvents.flatMap((event, index) => graphEdgesForEvent(event, index, eventNames));
-  const bindings = boundEventNames(data);
+  const shmupSceneNames = new Set(projectRooms(data)
+    .map(room => normalizeGBASceneDocument(room))
+    .filter(room => normalizeSceneTypeId(room.sceneType) === "shmup")
+    .map(room => room.name));
+  const projectileEventNames = new Set(shmupProjectileLaunches(sourceEvents, shmupSceneNames).map(launch => launch.eventName));
+  const bindings = [...boundEventNames(data), ...projectileEventNames];
   const bindingLabels = bindingLabelsByEventName(data);
+  for (const eventName of projectileEventNames) addDirectEventLabel(eventName, "Exportação: projéteis Shoot em Up", bindingLabels);
   const commandEventReferences = sourceEvents.flatMap((event) => eventSteps(event).flatMap((step) => commandReferencedEvents(step.command)));
   const referenceNames = [...bindings, ...commandEventReferences];
   const referenceCounts=new Map<string,number>();

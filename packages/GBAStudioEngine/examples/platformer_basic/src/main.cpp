@@ -869,9 +869,18 @@ void tick_platformer_scripted_movements() {
         gbs::Actor player_proxy { anchor, { player.bounds_pixels.width, player.bounds_pixels.height }, 1 };
         player_proxy.collision_offset_pixels = player.collision_offset_pixels;
         gbs::Actor* target = is_player ? &player_proxy : &platformer_npc_runtimes[index].actor;
+        const bool is_platform = !is_player && target->collision_mask != 0 &&
+            project.rooms[current_room].config.platform_actor_collision_group != 0 &&
+            platformer_npc_runtimes[index].collision_group == project.rooms[current_room].config.platform_actor_collision_group;
+        const gbs::Rect previous_platform = is_platform
+            ? gbs::platformer_npc_actor_rect(platformer_npc_runtimes[index]) : gbs::Rect{};
+        const bool carries_player = is_platform && player_event_active && player.velocity_x256.y >= 0 &&
+            player.bounds_pixels.bottom() == previous_platform.y &&
+            player.bounds_pixels.right() > previous_platform.x && player.bounds_pixels.x < previous_platform.right();
         gbs::Actor blockers[max_room_npcs + 1]{};
         size_t count = 0;
-        if (!is_player && player_event_active) blockers[count++] = player_proxy;
+        // A supported rider moves with its platform instead of blocking its next upward step.
+        if (!is_player && player_event_active && !carries_player) blockers[count++] = player_proxy;
         for (size_t i = 0; i < platformer_npc_count && count < max_room_npcs + 1; ++i) {
             if (static_cast<int>(i) == index || !platformer_npc_runtimes[i].active || !platformer_npc_runtimes[i].visible) continue;
             blockers[count++] = platformer_npc_runtimes[i].actor;
@@ -879,6 +888,10 @@ void tick_platformer_scripted_movements() {
         const int speed = is_player ? platformer_player_script_speed : platformer_npc_script_speeds[index];
         const auto result = gbs::tick_scripted_movement(platformer_scripted_movements, index, *target,
             room.collision, speed, blockers, count, gbs::move_platformer_scripted_step);
+        if (carries_player) {
+            gbs::carry_platformer_actor_with_npc(room.collision, player, previous_platform,
+                gbs::platformer_npc_actor_rect(platformer_npc_runtimes[index]));
+        }
         if (is_player) {
             gbs::set_platformer_actor_anchor_position(player, player_proxy.position_pixels);
             if (player_proxy.direction == 2) player.facing = gbs::PlatformerFacing::Left;

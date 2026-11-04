@@ -100,6 +100,7 @@ export function resolveEventBindingCapabilities(input: EventBindingCapabilityInp
       { bindingKey: "onDefeat", label: "Ao perder", section: null, requiresFrequency: false }
     );
   }
+  if (runtime === "racing") lifecycle.push({bindingKey:"onLapComplete",label:"Ao completar volta",section:null,requiresFrequency:false});
   if (runtime === "battlerpg") lifecycle.push({ bindingKey: "onEscape", label: "Ao fugir", section: null, requiresFrequency: false });
   if (runtime === "shmup") lifecycle.push(
     { bindingKey: "onClear", label: "Ao concluir ondas", section: null, requiresFrequency: false },

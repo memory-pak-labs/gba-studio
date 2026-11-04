@@ -231,7 +231,12 @@ void consume_cutscene_save_request() {
 #endif
 
 void refresh_hud() {
-    gbs::hide_hud(hud);
+    const char* scene_name = gbs::cutscene_scene_name(project, cutscene_state.scene_index);
+    if (scene_name && gbastudio_dialogue_ui::has_hud_scene_binding(scene_name)) {
+        gbs::set_hud_text(hud, scene_name, "");
+    } else {
+        gbs::hide_hud(hud);
+    }
 }
 
 void publish_runtime_telemetry() {

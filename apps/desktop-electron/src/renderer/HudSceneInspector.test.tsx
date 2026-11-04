@@ -155,3 +155,25 @@ describe("HUD canvas gestures", () => {
     expect(update.mock.lastCall?.[1].components.find((c:any)=>c.id===component.id)).toMatchObject({height:component.height+8});
   });
 });
+
+it("edits the native name keyboard from HUD without creating a preset or losing menu events", async () => {
+  const room = { ...deriveRoomsWorkspacePresentation(fixture()).rooms.find(room => room.id === "port")!,
+    sceneType: "menu", runtime: { type: "menu", config: { role: "name_input", screenType: "menu", hudMode: "none",
+      items: [{ id: "confirm", label: "Confirmar", eventName: "name_confirm", action: "select" }],
+      textInput: { variableName: "player.name", maxLength: 8, x: 15, y: 5, width: 8,
+        keyboard: { layout: "grid", controlLayout: "bottom_grid", surface: "background", x: 11, y: 8, width: 16, height: 10, allowLowercase: true } } } } };
+  const updateRoom = vi.fn();
+  render(<StudioI18nProvider><HudSceneInspector room={room} projectData={fixture()} binding={null} previewPreset={null}
+    presets={[]} activePresetID="" onPreviewPreset={vi.fn()} onSelectComponent={vi.fn()} selectedComponentID={null}
+    editingSharedPresetID={null} onEditSharedPreset={vi.fn()} viewMode="edit" onViewMode={vi.fn()}
+    onUpdateRoomFields={updateRoom} /></StudioI18nProvider>);
+  expect(screen.getByRole("heading", { name: "Entrada de nome" })).toBeInTheDocument();
+  expect(screen.queryByText("Nenhuma HUD aplicada. Escolha uma na biblioteca ou crie uma nova.")).not.toBeInTheDocument();
+  fireEvent.blur(screen.getByRole("spinbutton", { name: "Teclado X" }));
+  expect(updateRoom).not.toHaveBeenCalled();
+  fireEvent.change(screen.getByRole("spinbutton", { name: "Teclado X" }), { target: { value: "10" } });
+  expect(updateRoom).toHaveBeenCalledWith("port", { runtime: { type: "menu", config: expect.objectContaining({
+    items: expect.arrayContaining([expect.objectContaining({ eventName: "name_confirm" })]),
+    textInput: expect.objectContaining({ x: 15, y: 5, keyboard: expect.objectContaining({ x: 10, y: 8, controlLayout: "bottom_grid", surface: "background" }) })
+  }) } });
+});

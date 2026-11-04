@@ -479,7 +479,7 @@ export function resolveSceneRuntimeExport(sceneType: string | null | undefined):
     sceneType: normalized,
     kind: "topdown",
     runtimeProfile: "topdown",
-    roomRuntimeProfile: normalized,
+    roomRuntimeProfile: "topdown",
     adapter: "topdown_project",
     adapterStatus: normalized === "topdown" ? "native" : "preview_profile_with_topdown_rom_adapter",
     templateDirName: "exported_topdown",

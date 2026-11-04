@@ -817,6 +817,11 @@ void draw_text_input_keyboard_with_controls(int x, int y, int width, int height,
     gbs_hw_draw_text_input_keyboard_with_controls(x, y, width, height, selected_index, lowercase ? 1 : 0, visible ? 1 : 0, control_layout, controls_x, controls_y, controls_width, controls_height, surface);
 }
 
+void draw_text_input_keyboard_authored(int x, int y, int width, int height, int selected_index, bool lowercase, bool visible, int control_layout, int controls_x, int controls_y, int controls_width, int controls_height, int surface, const gbs_name_keyboard_geometry* geometry) {
+    gbs_hw_draw_text_input_keyboard_authored(x,y,width,height,selected_index,lowercase?1:0,visible?1:0,
+        control_layout,controls_x,controls_y,controls_width,controls_height,surface,geometry);
+}
+
 void set_sprite(int index, const Sprite& sprite) {
     if (!is_valid_render_priority(sprite.priority) ||
         !is_valid_sprite_render_mode(sprite.mode) ||

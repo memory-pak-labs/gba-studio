@@ -208,6 +208,10 @@ bool menu_text_input_uses_keyboard(const gbs::MenuTextInputData* config) {
 void move_menu_text_input_keyboard(int horizontal, int vertical) {
     const gbs::MenuScreenData* screen = gbs::menu_screen_for(project, menu_state.screen_index);
     const gbs::MenuTextInputData* config = menu_text_input_config(screen);
+    if (config && config->keyboard.geometry) {
+        menu_text_input.keyboard_index = gbs::menu_keyboard_next(config->keyboard,menu_text_input.keyboard_index,horizontal,vertical);
+        return;
+    }
     const bool side_controls = config != nullptr &&
         config->keyboard.control_layout == gbs::MenuTextInputKeyboardControlLayout::Side;
     const bool bottom_grid = config != nullptr &&
@@ -487,11 +491,9 @@ void apply_menu_audio_binding(const gbs::MenuItemData& item, int value) {
 }
 
 bool menu_screen_uses_ui(const gbs::MenuScreenData* screen) {
-    if (screen == nullptr ||
-        screen->screen_type == gbs::MenuScreenType::Logo ||
-        screen->screen_type == gbs::MenuScreenType::Title) {
-        return false;
-    }
+    if (screen == nullptr) return false;
+    if (screen->screen_type == gbs::MenuScreenType::Logo ||
+        screen->screen_type == gbs::MenuScreenType::Title) return menu_scene_has_hud_binding;
     if (screen->screen_type != gbs::MenuScreenType::Menu || screen->actors == nullptr) {
         return true;
     }
@@ -533,9 +535,7 @@ bool menu_screen_uses_actor_options(const gbs::MenuScreenData* screen) {
 }
 
 bool menu_screen_uses_hud_layout(const gbs::MenuScreenData* screen) {
-    return screen != nullptr &&
-        screen->screen_type == gbs::MenuScreenType::Menu &&
-        menu_scene_has_hud_binding;
+    return screen != nullptr && menu_scene_has_hud_binding;
 }
 
 bool menu_screen_uses_generic_menu(const gbs::MenuScreenData* screen) {
@@ -689,7 +689,12 @@ void draw_menu_text_input() {
         config->keyboard.control_layout != gbs::MenuTextInputKeyboardControlLayout::BottomGrid);
     gbs::draw_text_overlay_light(config->x, config->y, config->width, display, true);
     if (menu_text_input_uses_keyboard(config)) {
-        gbs::draw_text_input_keyboard_with_controls(
+        if (config->keyboard.geometry) {
+            gbs::draw_text_input_keyboard_authored(config->keyboard.x,config->keyboard.y,config->keyboard.width,config->keyboard.height,
+                menu_text_input.keyboard_index,menu_text_input.lowercase && config->keyboard.allow_lowercase,true,
+                static_cast<int>(config->keyboard.control_layout),config->keyboard.controls_x,config->keyboard.controls_y,
+                config->keyboard.controls_width,config->keyboard.controls_height,static_cast<int>(config->keyboard.surface),config->keyboard.geometry);
+        } else gbs::draw_text_input_keyboard_with_controls(
             config->keyboard.x,
             config->keyboard.y,
             config->keyboard.width,
@@ -809,7 +814,7 @@ void refresh_hud() {
         gbs::hide_hud(hud);
         return;
     }
-    if (!menu_screen_uses_ui(screen) || screen->screen_type == gbs::MenuScreenType::Title) {
+    if (!menu_screen_uses_ui(screen)) {
         gbs::hide_hud(hud);
         return;
     }
@@ -1359,9 +1364,11 @@ void start_screen(int screen_index, bool reset_selection = true, int target_item
     // screen resources finish uploading. Hide the display while shared VRAM
     // is replaced; the previous tilemap cannot safely remain visible.
     menu_ui_assets_restore_pending = true;
-    if (screen->screen_type != gbs::MenuScreenType::Logo &&
-        screen->screen_type != gbs::MenuScreenType::Title) {
-        const char* scene_name = gbs::menu_screen_name(project, menu_state.screen_index);
+    const char* interface_scene_name = gbs::menu_screen_name(project, menu_state.screen_index);
+    menu_scene_has_hud_binding = gbastudio_dialogue_ui::has_hud_scene_binding(interface_scene_name);
+    if ((screen->screen_type != gbs::MenuScreenType::Logo &&
+        screen->screen_type != gbs::MenuScreenType::Title) || menu_scene_has_hud_binding) {
+        const char* scene_name = interface_scene_name;
         gbastudio_dialogue_ui::configure_for_scene(scene_name, true);
         menu_scene_has_hud_binding = gbastudio_dialogue_ui::has_hud_scene_binding(scene_name);
     } else {
@@ -1889,10 +1896,11 @@ int initialize_menu_runtime() {
 gbs::RuntimeAdapterFrameResult update_menu_runtime(const gbs::RuntimeFrameContext& context) {
     (void)context;
     const gbs::MenuScreenData* screen = gbs::menu_screen_for(project, menu_state.screen_index);
-    if (screen != nullptr &&
-        screen->screen_type != gbs::MenuScreenType::Logo &&
-        screen->screen_type != gbs::MenuScreenType::Title) {
-        const char* scene_name = gbs::menu_screen_name(project, menu_state.screen_index);
+    const char* interface_scene_name = gbs::menu_screen_name(project, menu_state.screen_index);
+    menu_scene_has_hud_binding = gbastudio_dialogue_ui::has_hud_scene_binding(interface_scene_name);
+    if (screen != nullptr && ((screen->screen_type != gbs::MenuScreenType::Logo &&
+        screen->screen_type != gbs::MenuScreenType::Title) || menu_scene_has_hud_binding)) {
+        const char* scene_name = interface_scene_name;
         gbastudio_dialogue_ui::configure_for_scene(scene_name);
         menu_scene_has_hud_binding = gbastudio_dialogue_ui::has_hud_scene_binding(scene_name);
     } else {
@@ -2060,9 +2068,8 @@ void render_menu_runtime(const gbs::RuntimeFrameContext& context) {
             active_background_index >= 0 && active_background_index < static_cast<int>(project.bg_palette_count)) {
             gbs::load_palette(project.bg_palettes[active_background_index], false);
         }
-        if (published_screen != nullptr &&
-            published_screen->screen_type != gbs::MenuScreenType::Logo &&
-            published_screen->screen_type != gbs::MenuScreenType::Title) {
+        if (published_screen != nullptr && ((published_screen->screen_type != gbs::MenuScreenType::Logo &&
+            published_screen->screen_type != gbs::MenuScreenType::Title) || menu_scene_has_hud_binding)) {
             const char* scene_name = gbs::menu_screen_name(project, menu_state.screen_index);
             gbastudio_dialogue_ui::configure_for_scene(scene_name);
         }

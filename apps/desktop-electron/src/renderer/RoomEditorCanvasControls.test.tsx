@@ -50,12 +50,12 @@ describe("scene layers side panel", () => {
     render(<><div className="room-editor-tool-rail"><CanvasControls /></div><button type="button">Canvas</button></>);
     const trigger = screen.getByRole("button", { name: "Camadas" });
     await user.click(trigger);
-    await user.click(screen.getByRole("button", { name: "Ocultar camada HUD" }));
+    await user.click(screen.getByRole("button", { name: "Ocultar camada Interface" }));
     await user.click(screen.getByRole("button", { name: "Canvas" }));
     expect(trigger).toHaveAttribute("aria-expanded", "false");
     expect(screen.getByRole("button", { name: "Canvas" })).toHaveFocus();
     await user.click(trigger);
-    expect(screen.getByRole("button", { name: "Mostrar camada HUD" })).toHaveAttribute("aria-pressed", "false");
+    expect(screen.getByRole("button", { name: "Mostrar camada Interface" })).toHaveAttribute("aria-pressed", "false");
     await user.click(screen.getByRole("button", { name: "Fechar painel de camadas" }));
     expect(trigger).toHaveFocus();
     expect(trigger).toHaveAttribute("aria-expanded", "false");

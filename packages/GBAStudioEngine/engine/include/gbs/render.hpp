@@ -1,6 +1,7 @@
 #pragma once
 
 #include <stddef.h>
+#include "gbs/name_keyboard.h"
 #include <stdint.h>
 #include "gbs/assets.hpp"
 #include "gbs/compression.hpp"
@@ -545,6 +546,7 @@ void draw_text_overlay_light(int x, int y, int width, const char* text, bool vis
 void draw_text_input_surface(int x, int y, int width, int height, bool visible = true);
 void draw_text_input_keyboard(int x, int y, int width, int height, int selected_index, bool lowercase, bool visible = true);
 void draw_text_input_keyboard_with_controls(int x, int y, int width, int height, int selected_index, bool lowercase, bool visible, int control_layout, int controls_x, int controls_y, int controls_width, int controls_height, int surface = 0);
+void draw_text_input_keyboard_authored(int x, int y, int width, int height, int selected_index, bool lowercase, bool visible, int control_layout, int controls_x, int controls_y, int controls_width, int controls_height, int surface, const gbs_name_keyboard_geometry* geometry);
 void set_sprite(int index, const Sprite& sprite);
 bool set_affine_sprite_transform(uint8_t matrix_index, const AffineSpriteTransform& transform);
 bool set_affine_sprite_transform_at_frame(

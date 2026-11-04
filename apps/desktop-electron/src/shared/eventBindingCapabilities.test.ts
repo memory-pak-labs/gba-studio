@@ -68,7 +68,7 @@ describe("resolveEventBindingCapabilities", () => {
         .map((slot) => slot.bindingKey), sceneType).toEqual(["onInit"]);
     }
     expect(resolveEventBindingCapabilities({ targetKind: "room", sceneType: "battleRpg" }).map((slot) => slot.bindingKey)).toEqual(["onInit", "onVictory", "onDefeat", "onEscape", "onHitPlayer"]);
-    expect(resolveEventBindingCapabilities({ targetKind: "room", sceneType: "racing" }).map((slot) => slot.bindingKey)).toEqual(["onInit", "onVictory", "onDefeat"]);
+    expect(resolveEventBindingCapabilities({ targetKind: "room", sceneType: "racing" }).map((slot) => slot.bindingKey)).toEqual(["onInit", "onVictory", "onDefeat", "onLapComplete"]);
     expect(resolveEventBindingCapabilities({ targetKind: "room", sceneType: "shmup" }).map((slot) => slot.bindingKey)).toEqual(["onInit", "onClear", "onDefeat", "onHitPlayer"]);
   });
 

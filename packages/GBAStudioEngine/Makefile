@@ -59,6 +59,7 @@ MOTION_HOST_BINARIES := $(addprefix $(HOST_BUILD)/,$(MOTION_HOST_TESTS))
 .PHONY: motion-checkpoint-test
 motion-checkpoint-test: $(MOTION_HOST_BINARIES)
 	@set -e; for test in $(MOTION_HOST_BINARIES); do "$$test"; echo "PASS $$test"; done
+	python3 tests/host/platformer_scripted_rider_tests.py
 	python3 tests/host/actor_motion_export_tests.py
 	python3 tests/host/isometric_screen_export_tests.py
 	python3 tests/host/isometric_save_dispatch_tests.py
@@ -2191,4 +2192,33 @@ racing-progress-test: $(HOST_BUILD)/racing_progress_tests
 host-test: racing-progress-test
 $(HOST_BUILD)/racing_progress_tests: tests/host/racing_progress_tests.cpp engine/include/gbs/racing.hpp
 	@mkdir -p $(dir $@)
+	$(HOST_CXX) $(HOST_CXXFLAGS) $< -o $@
+
+.PHONY: menu-keyboard-geometry-test
+menu-keyboard-geometry-test: $(HOST_BUILD)/menu_keyboard_geometry_tests
+	$(HOST_BUILD)/menu_keyboard_geometry_tests
+	python3 tests/host/menu_keyboard_assetc_tests.py
+	python3 tests/host/menu_text_input_presentation_tests.py
+
+$(HOST_BUILD)/menu_keyboard_geometry_tests: tests/host/menu_keyboard_geometry_tests.cpp engine/include/gbs/menu.hpp engine/include/gbs/name_keyboard.h
+	@mkdir -p $(@D)
+	$(HOST_CXX) $(HOST_CXXFLAGS) $< -o $@
+
+host-test: menu-keyboard-geometry-test
+
+.PHONY: authored-scene-hud-test
+authored-scene-hud-test:
+	python3 tests/host/authored_scene_hud_tests.py
+	python3 tests/host/menu_interface_policy_tests.py
+	python3 tests/host/native_hud_precedence_tests.py
+
+host-test: authored-scene-hud-test
+
+.PHONY: racing-events-test
+host-test: racing-events-test
+racing-events-test: $(HOST_BUILD)/racing_progress_events_tests
+	$(HOST_BUILD)/racing_progress_events_tests
+	python3 tests/host/racing_events_assetc_tests.py
+$(HOST_BUILD)/racing_progress_events_tests: tests/host/racing_progress_events_tests.cpp engine/include/gbs/racing_events.hpp engine/include/gbs/racing.hpp
+	@mkdir -p $(@D)
 	$(HOST_CXX) $(HOST_CXXFLAGS) $< -o $@

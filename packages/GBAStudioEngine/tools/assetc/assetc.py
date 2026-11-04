@@ -894,7 +894,10 @@ def plan_pack_obj_palettes(assets, base_dir):
         master = [0] * OBJ_MASTER_PALETTE_COLORS
         builtin_start = OBJ_BUILTIN_PALETTE_BANK * 16
         master[builtin_start:builtin_start + 16] = OBJ_BUILTIN_PALETTE_VALUES
-        occupied = {0, *range(builtin_start, builtin_start + 16)}
+        # The fallback 4bpp tiles use only indices 1-3; index 0 is transparent.
+        # 8bpp sprites may use the other 13 positions without changing those
+        # pixels. Runtime text/UI banks 13-15 remain outside this master.
+        occupied = {0, *range(builtin_start + 1, builtin_start + 4)}
         first_index = {}
         bank_count = 0
         for bank, clusters in enumerate(banks):
@@ -915,7 +918,7 @@ def plan_pack_obj_palettes(assets, base_dir):
                     continue
                 free = next((i for i in range(1, OBJ_MASTER_PALETTE_COLORS) if i not in occupied), None)
                 if free is None:
-                    raise SystemExit("paleta OBJ compartilhada excede o orcamento de ate 207 cores/slots; sprites 4bpp compartilham esse limite, banco 12 e reservado ao fallback do motor e bancos 13-15 ao texto/UI. Divida as cenas ou revise as paletas; nenhuma cor foi reduzida")
+                    raise SystemExit("paleta OBJ compartilhada excede o orcamento de ate 207 cores/slots; sprites 4bpp compartilham esse limite, cores 1-3 do banco 12 pertencem ao fallback e bancos 13-15 ao texto/UI. Divida as cenas ou revise as paletas; nenhuma cor foi reduzida")
                 master[free] = color
                 occupied.add(free)
                 first_index[color] = free
@@ -11582,6 +11585,37 @@ def emit_menu_actors(output, screen, screen_index, asset_report=None):
     return (actors_name, len(actor_entries))
 
 
+def emit_name_keyboard_geometry(output, value, screen_index, origin_x, origin_y):
+    if not isinstance(value, dict):
+        raise SystemExit("text_input.keyboard_geometry precisa ser objeto")
+    fields = [value.get(key, default) for key, default in (("columns", 8), ("rows", 4), ("columnGap", 0), ("rowGap", 0))]
+    if any(type(number) is not int for number in fields):
+        raise SystemExit("text_input.keyboard_geometry exige inteiros")
+    columns, rows, gap_x, gap_y = fields
+    if not (4 <= columns <= 13 and (26 + columns - 1) // columns <= rows <= 9 and 0 <= gap_x <= 4 and 0 <= gap_y <= 4):
+        raise SystemExit("text_input.keyboard_geometry grade invalida")
+    keys = value.get("keys")
+    if keys is not None and (not isinstance(keys, list) or len(keys) != 29):
+        raise SystemExit("text_input.keyboard_geometry exige 29 teclas")
+    positions = []
+    for index in range(29):
+        position = keys[index] if keys is not None else {
+            "x": index % columns * (2 + gap_x) if index < 26 else (index - 26) * 6,
+            "y": index // columns * (2 + gap_y) if index < 26 else rows * (2 + gap_y),
+        }
+        if not isinstance(position, dict) or any(type(position.get(axis)) is not int for axis in ("x", "y")):
+            raise SystemExit("text_input.keyboard_geometry posicao invalida")
+        x, y = position["x"], position["y"]
+        if origin_x + x < 0 or origin_y + y < 0 or origin_x + x + (2 if index < 26 else 5) > 30 or origin_y + y + 2 > 20:
+            raise SystemExit("text_input.keyboard_geometry tecla fora da tela")
+        positions.append((x, y))
+    name = f"menu_screen_{screen_index}_keyboard_geometry"
+    if keys is not None:
+        output.append(f"constexpr gbs::MenuTextInputKeyPosition {name}_keys[] = {{ " + ", ".join(f"{{ {x}, {y} }}" for x, y in positions) + " };")
+    output.append(f"constexpr gbs::MenuTextInputKeyboardGeometry {name} {{ {columns}, {rows}, {gap_x}, {gap_y}, " + (f"{name}_keys, 29" if keys is not None else "nullptr, 0") + " };")
+    return name
+
+
 def emit_menu_project_data_header(menu_project, asset_report=None):
     if not isinstance(menu_project, dict):
         raise SystemExit("menu_project precisa ser objeto")
@@ -11717,7 +11751,14 @@ def emit_menu_project_data_header(menu_project, asset_report=None):
                     if keyboard_surface == "background"
                     else ""
                 )
-                if (
+                keyboard_geometry = raw_keyboard.get("geometry", text_input.get("keyboard_geometry"))
+                geometry_name = None
+                if keyboard_geometry is not None:
+                    if keyboard_control_layout != "bottom_grid":
+                        raise SystemExit("text_input.keyboard_geometry exige bottom_grid")
+                    geometry_name = emit_name_keyboard_geometry(output, keyboard_geometry, screen_index, keyboard_x, keyboard_y)
+                    keyboard_surface_suffix = f", gbs::MenuTextInputKeyboardSurface::{'Background' if keyboard_surface == 'background' else 'Runtime'}, &{geometry_name}"
+                if keyboard_geometry is None and (
                     keyboard_x < 0 or keyboard_y < 0 or
                     keyboard_width < (16 if keyboard_control_layout == "bottom_grid" else 22) or
                     keyboard_height < (10 if keyboard_control_layout == "bottom_grid" else 6) or
@@ -17731,6 +17772,7 @@ def emit_racing_project_data_header(racing_project, asset_report=None, base_dir=
             room.get("on_enter"),
             f"racing_project.rooms[{room_index}].on_enter",
         )
+        on_lap_complete = emit_event_script(output, f"racing_room_{room_index}_on_lap_complete", room.get("on_lap_complete"), f"racing_project.rooms[{room_index}].on_lap_complete")
         on_victory = emit_event_script(
             output,
             f"racing_room_{room_index}_on_victory",
@@ -17862,6 +17904,7 @@ def emit_racing_project_data_header(racing_project, asset_report=None, base_dir=
                 raise SystemExit(f"racing_project.rooms[{room_index}].topdown_track aceita no maximo 16 checkpoints")
             checkpoint_name = f"racing_room_{room_index}_topdown_checkpoints"
             checkpoint_entries = []
+            checkpoint_scripts = []
             checkpoint_ids = set()
             for checkpoint_index, checkpoint in enumerate(checkpoints):
                 description = (
@@ -17882,18 +17925,21 @@ def emit_racing_project_data_header(racing_project, asset_report=None, base_dir=
                 checkpoint_height = require_int(checkpoint.get("height", 0), f"{description}.height", 1, 256)
                 if checkpoint_x >= width * 8 or checkpoint_y >= height * 8:
                     raise SystemExit(f"{description} precisa estar dentro das dimensoes da sala")
+                checkpoint_scripts.append(emit_event_script(output, f"racing_room_{room_index}_checkpoint_{checkpoint_index}_on_pass", checkpoint.get("on_pass"), f"{description}.on_pass"))
                 checkpoint_entries.append(
                     f"    gbs::RacingTopdownCheckpoint {{ {cpp_string_literal(checkpoint_id)}, "
                     f"{{ {checkpoint_x}, {checkpoint_y} }}, {checkpoint_width}, {checkpoint_height} }},"
                 )
             if checkpoint_entries:
+                events_name = f"racing_room_{room_index}_checkpoint_events"
+                output.append(f"constexpr gbs::EventScript {events_name}[] = {{ " + ", ".join(checkpoint_scripts) + " };")
                 output.append(f"constexpr gbs::RacingTopdownCheckpoint {checkpoint_name}[] = {{")
                 output.extend(checkpoint_entries)
                 output.append("};")
                 output.append(
                     f"constexpr gbs::RacingTopdownTrackData racing_room_{room_index}_topdown_track "
                     f"{{ {camera_x}, {camera_y}, {checkpoint_name}, {len(checkpoint_entries)}, {start_heading}, "
-                    f"{path_name if path_entries else 'nullptr'}, {len(path_entries)}{', true' if topdown_track.get('finish_at_zero', False) else ''} }};"
+                    f"{path_name if path_entries else 'nullptr'}, {len(path_entries)}, {'true' if topdown_track.get('finish_at_zero', False) else 'false'}, {events_name} }};"
                 )
                 output.append("")
                 topdown_track_expr = f"&racing_room_{room_index}_topdown_track"
@@ -17979,7 +18025,7 @@ def emit_racing_project_data_header(racing_project, asset_report=None, base_dir=
             f"{on_enter}, {triggers_name}, {trigger_count}, {actors_name}, {actor_count}, "
             f"{resource_group_expr}, {on_victory}, {on_defeat}, {pseudo3d_visual_expr}, "
             f"{track_segments_expr}, {track_segment_count}, {topdown_track_expr}, "
-            f"{room_video_literal}, gbs::RacingCameraConfig {{ {camera_height}, {camera_distance}, {camera_focal} }}, {floor_expression}, {empty_floor_expression}, {room_player_expression}, {sounds_expr}, {challenge_expr} "
+            f"{room_video_literal}, gbs::RacingCameraConfig {{ {camera_height}, {camera_distance}, {camera_focal} }}, {floor_expression}, {empty_floor_expression}, {room_player_expression}, {sounds_expr}, {challenge_expr}, {on_lap_complete} "
             "},"
         )
 

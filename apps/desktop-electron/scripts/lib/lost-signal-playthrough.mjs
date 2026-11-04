@@ -132,10 +132,36 @@ export async function playLostSignalMission(driver, project, exported, options =
     await axis(Math.floor(h.area.y + h.area.height / 2), 'y');
     await driver.run(6, 0); await tap(keys, 100);
   }
+  async function waitForOpening() {
+    for(let n=0;n<300;n++){
+      const s=await telemetry();
+      if(s.runtimeKind===3&&s.currentRoom===0)return;
+      assert.ok(s.runtimeKind===8&&[0,1].includes(s.currentRoom),'Opening stays on its authored route to the title');
+      await driver.run(12,0);
+    }
+    assert.fail('The authored opening reaches the title within its bounded duration');
+  }
+  async function openTitleOptions() {
+    await waitForOpening();
+    // The title can be observable before its entry transition accepts input.
+    // Send fresh edges only while it is still the title; never continue into
+    // a different screen or treat an unavailable menu as a successful load.
+    for(let attempt=0;attempt<4;attempt++){
+      await tap(8,45);
+      const s=await telemetry();
+      if(s.runtimeKind===3&&s.currentRoom===1)return;
+      assert.ok(s.runtimeKind===3&&s.currentRoom===0,'Start stays on the title until options open');
+    }
+    assert.fail('Fresh Start input opens the title options within four attempts');
+  }
   async function loadSlot(slot, label) {
-    await tap(8, 45); await expect(3, 1, `${label}-title-menu`);
+    await openTitleOptions(); await expect(3, 1, `${label}-title-menu`);
     await tap(16); await tap(1, 70); await expect(3, 4, `${label}-slots`);
-    for (let i = 0; i < slot; i++) await tap(128);
+    const loadScreen=exported.menu_project.screens.find(s=>s.name==='carregar_jogo');
+    const target=loadScreen.items.findIndex(item=>item.save_slot===slot);
+    assert.ok(target>=0,'The requested save slot has an authored load action');
+    for(let n=0;n<loadScreen.items.length*2&&(await driver.sceneMenu()).selected!==target;n++)await tap(128);
+    assert.equal((await driver.sceneMenu()).selected,target,'Reach the saved slot while skipping empty disabled entries');
     await tap(1, 160);
   }
   async function saveSlot(slot, label) {
@@ -154,8 +180,8 @@ export async function playLostSignalMission(driver, project, exported, options =
   }
   const controls={tap,close,walkTo,expect,loadSlot,saveSlot,mechanic};
   if(options.resume)return controls;
-  await driver.run(180, 0); await expect(3, 0, 'title');
-  await tap(8); await tap(1); await expect(3, 2, 'new-game-gender');
+  await driver.run(180, 0); await waitForOpening(); await expect(3, 0, 'title');
+  await openTitleOptions(); await tap(1); await expect(3, 2, 'new-game-gender');
   await tap(1); await expect(3, 3, 'new-game-name');
   await tap(1); await tap(2); await tap(128); await tap(1, 100);
   await expect(8, 2, 'prologue'); await tap(8, 120);

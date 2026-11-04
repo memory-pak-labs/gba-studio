@@ -10616,7 +10616,7 @@ body.room-scene-map-card-dragging .room-stage-card-frame.is-dragging {
   border-bottom: 1px solid color-mix(in srgb, var(--studio-color-border) 72%, transparent);
   column-gap: 8px;
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 1.35fr);
+  grid-template-columns: minmax(0, 1fr);
   padding: 6px 0;
 }
 
@@ -10692,7 +10692,7 @@ body.room-scene-map-card-dragging .room-stage-card-frame.is-dragging {
   border-bottom: 1px solid color-mix(in srgb, var(--studio-color-border) 72%, transparent);
   column-gap: 8px;
   display: grid;
-  grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.1fr);
+  grid-template-columns: minmax(0, 1fr);
   padding: 7px 0;
 }
 
@@ -10778,7 +10778,7 @@ body.room-scene-map-card-dragging .room-stage-card-frame.is-dragging {
   border-bottom: 1px solid color-mix(in srgb, var(--studio-color-border) 72%, transparent);
   column-gap: 8px;
   display: grid;
-  grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.1fr);
+  grid-template-columns: minmax(0, 1fr);
   padding: 7px 0;
 }
 
@@ -10919,7 +10919,7 @@ body.room-scene-map-card-dragging .room-stage-card-frame.is-dragging {
   align-items: center;
   border-bottom: 1px solid color-mix(in srgb, var(--studio-color-border) 72%, transparent);
   column-gap: 8px;
-  grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.1fr);
+  grid-template-columns: minmax(0, 1fr);
   padding: 7px 0;
 }
 
@@ -11588,3 +11588,281 @@ body.room-scene-map-card-dragging .room-stage-card-frame.is-dragging {
 .room-map-states code { display: block; overflow-wrap: anywhere; }
 .room-map-states input,
 .room-map-states select { min-width: 0; width: 100%; }
+
+/* Editor inspector forms share the rail width, including nested sections.
+   InspectorNumber has a heading, control line and constraints: keep each on
+   its own row rather than inheriting a legacy two-column label layout. */
+.rooms-inspector label.inspector-field:not(.inspector-toggle-field) {
+  align-items: stretch;
+  grid-template-columns: minmax(0, 1fr);
+  row-gap: 4px;
+}
+
+.rooms-inspector label.inspector-field:not(.inspector-toggle-field) > * {
+  grid-column: 1 / -1;
+  min-width: 0;
+}
+
+.rooms-inspector label:has(> input[type="checkbox"]):not(.inspector-toggle-field) {
+  align-items: center;
+  display: flex;
+  gap: 7px;
+  justify-content: flex-start;
+}
+
+.rooms-inspector label > input[type="checkbox"] {
+  flex: 0 0 auto;
+  margin: 0;
+  min-height: 0;
+  width: auto;
+}
+
+.rooms-inspector .room-entities-editor,
+.rooms-inspector .room-connection-inspector,
+.rooms-inspector .room-dialogues-inspector,
+.rooms-inspector .room-hud-scene-inspector {
+  min-width: 0;
+}
+
+.rooms-inspector .rooms-inspector-tab-panel {
+  overscroll-behavior-y: contain;
+}
+
+.rooms-inspector .room-entity-tool-segment {
+  flex: 1 1 100%;
+}
+
+/* Reference searches expand within the scrolling rail so their options and
+   import action remain reachable without a clipped floating panel. */
+.rooms-inspector .project-reference-picker-popover {
+  box-sizing: border-box;
+  margin-top: 6px;
+  min-width: 0;
+  position: static;
+  width: 100%;
+}
+
+.rooms-inspector .project-reference-picker-options {
+  overscroll-behavior: contain;
+}
+
+.rooms-inspector .project-reference-picker-options > button > span {
+  min-width: 0;
+}
+
+.rooms-inspector .project-reference-picker-options :is(strong, small) {
+  overflow-wrap: anywhere;
+  white-space: normal;
+}
+
+/* Nested theme, dialogue and HUD controls use the same surface and sizing as
+   scene/entity controls instead of falling back to native browser styling. */
+.rooms-inspector :is(input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="color"]), select, textarea) {
+  background: var(--studio-color-surface);
+  border: 1px solid var(--studio-color-border);
+  border-radius: var(--studio-radius-control);
+  box-sizing: border-box;
+  color: var(--studio-color-text-primary);
+  max-width: 100%;
+  min-width: 0;
+}
+
+.rooms-inspector textarea {
+  resize: vertical;
+  width: 100%;
+}
+
+.rooms-inspector label.inspector-toggle-field {
+  align-items: center;
+  display: grid;
+  gap: 4px 7px;
+  grid-template-columns: auto minmax(0, 1fr);
+}
+
+.rooms-inspector .inspector-toggle-field > input {
+  grid-column: 1;
+  grid-row: 1;
+}
+
+.rooms-inspector .inspector-toggle-field > .inspector-field-label {
+  grid-column: 2;
+  grid-row: 1;
+}
+
+.rooms-inspector .inspector-toggle-field > .inspector-field-description {
+  grid-column: 2;
+}
+
+/* Give the tileset filename a complete row; import actions stay beside its label. */
+.rooms-inspector .room-paint-tileset-header {
+  grid-template-columns: minmax(0, 1fr) 32px 48px;
+}
+
+.rooms-inspector .room-paint-tileset-header > select {
+  grid-column: 1 / -1;
+  grid-row: 2;
+  width: 100%;
+}
+
+.rooms-inspector .room-paint-tileset-header > button {
+  grid-row: 1;
+}
+
+/* Repeated checkpoint/rival groups must not fall back to beveled native fieldsets. */
+.rooms-inspector fieldset:not([class]) {
+  border: 1px solid var(--studio-color-border);
+  border-radius: var(--studio-radius-control);
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  min-width: 0;
+  padding: 8px;
+}
+
+.rooms-inspector fieldset:not([class]) > legend {
+  padding-inline: 4px;
+}
+
+/* Health status and its action stay aligned even with a longer review status. */
+.rooms-inspector .scene-inspector-health-summary {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+}
+
+.rooms-inspector .scene-inspector-health-heading {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+}
+
+.rooms-inspector .scene-inspector-health-heading > div {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.rooms-inspector .room-paint-tileset-header > span {
+  grid-column: 1;
+  grid-row: 1;
+}
+
+.rooms-inspector .room-paint-tileset-header > button:first-of-type {
+  grid-column: 2;
+}
+
+.rooms-inspector .room-paint-tileset-header > button:last-of-type {
+  grid-column: 3;
+}
+
+/* Native name input uses the same 240x160 pixel coordinates as the ROM. */
+.room-menu-text-input-preview {
+  height: 100%;
+  image-rendering: pixelated;
+  inset: 0;
+  pointer-events: none;
+  position: absolute;
+  width: 100%;
+  z-index: 9;
+}
+
+.room-menu-text-input-fields {
+  border: 0;
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  min-width: 0;
+  padding: 0;
+}
+
+.room-menu-text-input-fields > label {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.room-menu-text-input-position {
+  display: grid;
+  gap: 8px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  min-width: 0;
+}
+
+.room-menu-text-input-editor {
+  height: 100%;
+  inset: 0;
+  pointer-events: none;
+  position: absolute;
+  width: 100%;
+  z-index: 9;
+}
+
+.room-menu-text-input-handle {
+  appearance: none;
+  background: transparent;
+  border: 1px dashed var(--studio-color-accent, #6d2bf1);
+  border-radius: 0;
+  box-shadow: none;
+  box-sizing: border-box;
+  cursor: grab;
+  min-height: 0;
+  min-width: 0;
+  padding: 0;
+  pointer-events: auto;
+  position: absolute;
+  touch-action: none;
+  z-index: 10;
+}
+
+.room-menu-text-input-handle:hover,
+.room-menu-text-input-handle[aria-pressed="true"],
+.room-menu-text-input-handle:focus-visible {
+  background: transparent;
+  box-shadow: 0 0 0 2px var(--studio-color-accent, #6d2bf1);
+  outline: 0;
+}
+
+.room-menu-text-input-handle:active { cursor: grabbing; }
+.room-menu-text-input-handle[aria-disabled="true"] { cursor: not-allowed; }
+
+.room-menu-text-input-handle > span {
+  clip-path: inset(50%);
+  height: 1px;
+  overflow: hidden;
+  position: absolute;
+  white-space: nowrap;
+  width: 1px;
+}
+
+.room-menu-text-input-handle.is-key { z-index: 11; }
+.room-menu-text-input-handle.is-keyboard-group > span {
+  background: var(--studio-color-surface, #fff);
+  border: 1px solid var(--studio-color-accent, #6d2bf1);
+  border-radius: 4px;
+  clip-path: none;
+  color: var(--studio-color-text, #242830);
+  height: auto;
+  left: 0;
+  overflow: visible;
+  padding: 2px 6px;
+  top: -26px;
+  width: max-content;
+}
+.room-menu-text-input-resize {
+  background: var(--studio-color-accent, #6d2bf1);
+  border: 2px solid var(--studio-color-surface, #fff);
+  border-radius: 2px;
+  cursor: ew-resize;
+  height: 12px;
+  min-height: 0;
+  min-width: 0;
+  padding: 0;
+  pointer-events: auto;
+  position: absolute;
+  touch-action: none;
+  transform: translate(-50%, -50%);
+  width: 12px;
+  z-index: 13;
+}
+.room-menu-text-input-resize:focus-visible { outline: 2px solid var(--studio-color-accent, #6d2bf1); }
+
+.room-menu-text-input-choice { display: grid; gap: 4px; min-width: 0; }
+.room-menu-text-input-choice select { min-width: 0; width: 100%; }

@@ -550,6 +550,7 @@ export interface RoomsWorkspaceEntity {
   animationStateID?: string | null;
   z?: number;
   hasCustomBounds?: boolean;
+  dungeonWallMounted?: boolean;
   /** Authored animation hitbox, in pixels relative to the actor anchor. */
   collisionBounds?: { x: number; y: number; width: number; height: number };
   collisionGroup?: number;
@@ -2211,7 +2212,9 @@ function footprintHasBlockedCollision(
 }
 
 function roomEntityCollisionFootprint(entity: RoomsWorkspaceEntity, room: RoomsWorkspaceRoom): RoomEntitySelectionFootprint {
-  const bounds = room.sceneType === "platformer" && !entity.hasCustomBounds ? entity.collisionBounds : undefined;
+  const usesRuntimeHitbox = room.sceneType === "topdown"
+    || room.sceneType === "platformer" && !entity.hasCustomBounds;
+  const bounds = usesRuntimeHitbox ? entity.collisionBounds : undefined;
   if (!bounds) return roomEntitySelectionFootprint(entity, room.sceneType);
   const left = entity.x * 8 + bounds.x;
   const top = entity.y * 8 + bounds.y;
@@ -2315,7 +2318,8 @@ export function deriveRoomGeometryDiagnostics(
     // unreachable only when every cell is blocked. Actor diagnostics use the
     // authored runtime hitbox rather than padding in the sprite frame.
     const requireEveryCell = room.sceneType === "platformer" && entity.kind === "trigger";
-    const blocked = collisionChecksEnabled && !outsideBounds
+    const wallMountedProp = room.sceneType === "dungeonCrawler" && entity.kind === "actor" && entity.dungeonWallMounted;
+    const blocked = collisionChecksEnabled && !outsideBounds && !wallMountedProp
       && footprintHasBlockedCollision(roomEntityCollisionFootprint(entity, room), room, requireEveryCell);
     const target = entity.kind === "actor" ? actorPlacement : triggerPlacement;
     const actorIndex = entity.kind === "actor"
@@ -2966,6 +2970,7 @@ function entityPresentation(
       : {}),
     ...(hasCustomBounds ? { hasCustomBounds: true } : {}),
     ...(collisionBounds ? { collisionBounds } : {}),
+    ...(kind === "actor" && entity.dungeonWallMounted === true ? { dungeonWallMounted: true } : {}),
     ...(kind === "actor" ? {
       ...(animationStateID ? { animationStateID } : {}),
       collisionGroup: clampInteger(integerField(entity.collisionGroup, 0), 0, 15),

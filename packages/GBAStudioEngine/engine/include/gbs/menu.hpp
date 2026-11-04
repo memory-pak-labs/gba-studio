@@ -1,6 +1,7 @@
 #pragma once
 
 #include <stddef.h>
+#include "gbs/name_keyboard.h"
 #include <stdint.h>
 #include "gbs/audio.hpp"
 #include "gbs/assets.hpp"
@@ -217,6 +218,9 @@ enum class MenuTextInputKeyboardSurface : uint8_t {
     Background = 1
 };
 
+using MenuTextInputKeyboardGeometry = gbs_name_keyboard_geometry;
+using MenuTextInputKeyPosition = gbs_name_key_position;
+
 struct MenuTextInputKeyboardData {
     MenuTextInputKeyboardLayout layout = MenuTextInputKeyboardLayout::Hidden;
     int x = 0;
@@ -230,7 +234,12 @@ struct MenuTextInputKeyboardData {
     int controls_width = 0;
     int controls_height = 0;
     MenuTextInputKeyboardSurface surface = MenuTextInputKeyboardSurface::Runtime;
+    const MenuTextInputKeyboardGeometry* geometry = nullptr;
 };
+
+inline int menu_keyboard_next(const MenuTextInputKeyboardData& keyboard, int selected, int horizontal, int vertical) {
+    return gbs_name_key_next(keyboard.geometry, selected, horizontal, vertical);
+}
 
 constexpr MenuTextInputKeyboardData menu_no_text_input_keyboard() {
     return MenuTextInputKeyboardData {
@@ -254,6 +263,8 @@ constexpr bool is_valid_menu_text_input_keyboard(const MenuTextInputKeyboardData
         keyboard.surface != MenuTextInputKeyboardSurface::Background) {
         return false;
     }
+    if (keyboard.geometry) return keyboard.control_layout == MenuTextInputKeyboardControlLayout::BottomGrid &&
+        gbs_name_geometry_valid(keyboard.geometry, keyboard.x, keyboard.y);
     const bool base_valid = keyboard.x >= 0 &&
         keyboard.y >= 0 &&
         keyboard.width >= (keyboard.control_layout == MenuTextInputKeyboardControlLayout::BottomGrid ? 16 : 22) &&

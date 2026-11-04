@@ -1621,7 +1621,7 @@ function animationEditor(
             value={animation.colorMode}
           />
         </div>
-        <p className="muted">{ui("Aplica-se a todas as animações da folha e preserva a imagem original. 4bpp usa até 15 cores visíveis. 8bpp dobra o espaço dos tiles e compartilha até 194 cores visíveis com os sprites da cena, conforme o orçamento. Os bancos do texto e dos elementos internos do motor ficam reservados.")}</p>
+        <p className="muted">{ui("Aplica-se a todas as animações da folha e preserva a imagem original. 4bpp usa até 15 cores visíveis. 8bpp dobra o espaço dos tiles e compartilha até 207 cores visíveis com os sprites da cena, conforme o orçamento, incluindo três cores reservadas ao motor. Os bancos de texto e UI permanecem reservados.")}</p>
         <div className="sprite-state-direction-panel sprite-state-direction-panel-compact" aria-label={ui("Estado e direção da animação")}>
           <div>
             <span>{ui("Estado")}</span>
@@ -1708,6 +1708,16 @@ function animationEditor(
                   onCommit={nextValue => updateActiveMetaspriteTile({ [field]: nextValue })}
                 />
               ))}
+              <label>
+                <span>{ui("Obj pal")}</span>
+                <select
+                  onChange={(event) => updateActiveMetaspriteTile({ objPalette: event.currentTarget.value })}
+                  value={activeMetaspriteTile.objPalette}
+                >
+                  <option value="OBP0">{ui("OBP0")}</option>
+                  <option value="OBP1">{ui("OBP1")}</option>
+                </select>
+              </label>
               <div className="sprite-reference-field">
                 <span>{ui("Source")}</span>
                 <ProjectReferencePicker
@@ -1723,16 +1733,6 @@ function animationEditor(
                   value={activeMetaspriteTile.sourceSheet}
                 />
               </div>
-              <label>
-                <span>{ui("Obj pal")}</span>
-                <select
-                  onChange={(event) => updateActiveMetaspriteTile({ objPalette: event.currentTarget.value })}
-                  value={activeMetaspriteTile.objPalette}
-                >
-                  <option value="OBP0">{ui("OBP0")}</option>
-                  <option value="OBP1">{ui("OBP1")}</option>
-                </select>
-              </label>
               <label className="sprite-tile-toggle">
                 <span>{ui("Flip X")}</span>
                 <input

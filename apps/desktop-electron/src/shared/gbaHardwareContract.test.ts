@@ -7,6 +7,12 @@ import {
 } from "./gbaHardwareContract.js";
 
 describe("gbaHardwareContract", () => {
+  it.each([200, 207, 208])("validates the expanded exact 8bpp palette capacity for %i visible colors", maxVisibleColors => {
+    const contract = buildGbaHardwareContract({ assets: [{ name: "hero.png", kind: "Sprite", metadata: {
+      colorMode: "8bpp", width: 16, height: 16, maxVisibleColors
+    } }] });
+    expect(contract.issues.some(issue => issue.code === "OBJ_SHARED_PALETTE_LIMIT_EXCEEDED")).toBe(maxVisibleColors > 207);
+  });
   it("accepts a large top-down source only when an explicit paged background supplies the viewport", () => {
     const scene = { name: "porto", sceneType: "topdown", width: 126, height: 86, backgroundAssetName: "porto.png", gbStudioUseBackgroundLayout: true };
     const asset = { name: "porto.png", kind: "Background", metadata: { kind: "paged_bg", width: 1008, height: 688 } };
