@@ -119,7 +119,7 @@ describe("EventsWorkspace React smoke", () => {
     await user.click(screen.getByText("Propriedades do script"));
     expect(screen.getByLabelText("Tipo de room_boot")).toBeInTheDocument();
 
-    await user.click(screen.getByRole("button", { name: "Começar com modelo de script" }));
+    await user.click(screen.getByRole("button", { name: "Modelos de script" }));
     expect(screen.getByRole("dialog", { name: "Adicionar evento em room_boot" })).toBeInTheDocument();
   });
 

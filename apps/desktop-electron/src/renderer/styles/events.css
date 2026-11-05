@@ -1122,6 +1122,34 @@
   gap: 7px;
 }
 
+.event-build-actions {
+  min-width: 0;
+  align-items: center;
+}
+
+.event-build-actions button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  min-width: 0;
+  max-width: 100%;
+  min-height: 32px;
+  padding: 5px 8px;
+}
+
+.event-build-actions .event-select-steps {
+  flex: 0 0 32px;
+  width: 32px;
+  padding: 5px;
+}
+
+.event-build-actions button[aria-pressed="true"] {
+  background: var(--studio-color-accent-soft);
+  border-color: var(--studio-color-accent);
+  color: var(--studio-color-accent);
+}
+
 .event-build-actions button:first-child,
 .event-debug-actions button:first-child,
 .event-build-panel-empty button {
@@ -1178,6 +1206,20 @@
   padding: 0;
 }
 
+/* Nested grids must shrink to the inspector before wrapping identifiers. */
+.event-structure-editor,
+.event-structure-sequence,
+.event-structure-step,
+.event-structure-step-card,
+.event-structure-condition,
+.event-structure-condition > section,
+.event-structure-rate-limit > section,
+.event-structure-branch {
+  min-width: 0;
+  max-width: 100%;
+  box-sizing: border-box;
+}
+
 .event-structure-step-card {
   display: grid;
   gap: 6px;
@@ -1196,6 +1238,10 @@
   padding: 6px;
   text-align: left;
   width: 100%;
+  min-width: 0;
+  max-width: 100%;
+  box-sizing: border-box;
+  white-space: normal;
 }
 
 .event-structure-step.is-disabled .event-structure-step-main {
@@ -1221,6 +1267,7 @@
 .event-structure-condition-content > strong {
   color: var(--studio-color-text-primary);
   overflow-wrap: anywhere;
+  white-space: normal;
 }
 
 .event-structure-step-content > small,
@@ -1234,6 +1281,8 @@
   display: flex;
   flex-wrap: wrap;
   gap: 4px;
+  min-width: 0;
+  max-width: 100%;
 }
 
 .event-structure-step-meta > span,
@@ -1281,6 +1330,9 @@
   border: 0;
   color: var(--studio-color-text-secondary);
   padding: 2px 4px;
+  min-width: 0;
+  white-space: normal;
+  overflow-wrap: anywhere;
 }
 
 .event-structure-branch {
@@ -4156,8 +4208,8 @@
 .is-expanded .event-build-panel > .event-structure-actions { align-self: center; }
 .is-event-authoring .event-build-panel-header { padding: 8px 0; }
 .is-event-authoring .event-build-actions { display: flex; flex-wrap: wrap; gap: 6px; }
-.is-event-authoring .event-build-actions button { min-width: 0; flex: 0 1 auto; }
-.is-event-authoring .event-build-actions button:first-child { order: 2; background: var(--studio-color-surface-muted); color: var(--studio-color-text-primary); border-color: var(--studio-color-border); }
+.is-event-authoring .event-build-actions button { min-width: 0; min-height: 32px; padding: 5px 8px; flex: 0 1 auto; }
+.is-event-authoring .event-build-actions .event-select-steps { flex: 0 0 32px; padding: 5px; }
 .is-event-authoring .event-build-actions button.primary-button,
 .event-library-footer button.primary-button { background: var(--studio-color-accent-solid); color: #ffffff; border-color: var(--studio-color-accent); }
 .is-event-authoring .event-build-actions button[aria-label="Abrir biblioteca de blocos"] { display: none; }
@@ -4171,7 +4223,7 @@
 .is-event-authoring .event-structure-step-content > small { display: none; }
 .is-event-authoring .event-structure-step-content strong { color: var(--studio-color-text-primary);  }
 .is-event-authoring .event-structure-step-meta { color: var(--studio-color-text-secondary);  }
-.is-event-authoring .event-structure-step-meta > span { background: transparent; border: 0; padding: 0; }
+.is-event-authoring .event-structure-step-meta > span { background: transparent; border: 0; padding: 0; min-width: 0; white-space: normal; overflow: visible; overflow-wrap: anywhere; }
 .is-event-authoring .event-structure-branch { padding: 6px; margin: 4px 0; border: 0; border-left: 2px solid var(--studio-color-border); background: transparent; }
 .is-event-authoring .event-structure-branch > summary { padding: 4px; color: var(--studio-color-text-secondary); cursor: pointer;  }
 .is-event-authoring .event-structure-condition > section { padding-left: 6px; }
