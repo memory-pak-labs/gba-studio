@@ -1104,6 +1104,13 @@ void test_event_metasprite_scale_keeps_shared_art_and_actor_origin() {
     sprite.x=108; sprite.y=68;
     gbs::apply_metasprite_part_scale(sprite,part,&scaled,true,16);
     assert(sprite.x==116 && sprite.y==72); // mirroring also changes the center of each part
+    const gbs::MetaSpritePart authored {-8,-32,0,0,false,false,16,32,gbs::ColorDepth::Bpp4,384,192};
+    const gbs::MetaSprite identity {&authored,1};
+    const auto unchanged = gbs::event_scaled_metasprite(state,0,identity);
+    assert(unchanged.parts == identity.parts && unchanged.scale_x256 == 256 && unchanged.scale_y256 == 256);
+    sprite.x=108; sprite.y=68;
+    gbs::apply_metasprite_part_scale(sprite,authored,&unchanged,true,16);
+    assert(sprite.x==108 && sprite.y==68 && sprite.scale_x256==384 && sprite.scale_y256==192);
 
 }
 

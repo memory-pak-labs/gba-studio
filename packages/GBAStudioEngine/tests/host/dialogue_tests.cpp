@@ -1041,7 +1041,7 @@ void test_dialogue_frame_transitions_erase_previous_owned_regions() {
     gbs::init_dialogue(state);
     assert(gbs::show_dialogue(state, lines, 1, 0));
     gbs::draw_dialogue(state);
-    assert(dialogue_oam_front == 1);
+    assert(dialogue_oam_front == 0); // The unregistered portrait uses only BG regions.
     assert(painted_dialogue_tiles[18 * 32 + 28]);
     painted_dialogue_tiles[19 * 32 + 29] = true; // An unrelated HUD tile.
     gbs::set_dialogue_frame(state, gbs::dialogue_frame_top);
@@ -1159,7 +1159,40 @@ void test_shorter_speaker_name_clears_old_label() {
     gbs::configure_dialogue_ui(gbs::default_dialogue_ui_config());
 }
 
+void test_dialogue_only_reorders_oam_for_visible_sprite_ui() {
+    auto config = gbs::default_dialogue_ui_config();
+    gbs::configure_dialogue_ui(config);
+    gbs::configure_dialogue_portraits(nullptr, 0);
+    const gbs::DialogueLine lines[] = {{"Text", "QA", "guide.png"}};
+    gbs::DialogueState state {};
+    gbs::init_dialogue(state);
+    assert(gbs::show_dialogue(state, lines, 1, 0));
+    gbs::draw_dialogue(state);
+    assert(dialogue_oam_front == 0); // No registered portrait: only BG pixels.
+    const gbs::MetaSpritePart part {0, 0, 0, 0, false, false, 8, 8};
+    const gbs::MetaSprite portrait {&part, 1};
+    const gbs::DialoguePortraitEntry entries[] = {{"guide.png", &portrait}};
+    gbs::configure_dialogue_portraits(entries, 1);
+    gbs::draw_dialogue(state);
+    assert(dialogue_oam_front == 1);
+    config.show_portrait = false;
+    gbs::configure_dialogue_ui(config);
+    gbs::draw_dialogue(state);
+    assert(dialogue_oam_front == 0);
+    config.portrait_tab = true;
+    gbs::configure_dialogue_portraits(nullptr, 0);
+    gbs::configure_dialogue_ui(config);
+    gbs::draw_dialogue(state);
+    assert(dialogue_oam_front == 1); // The tab itself uses OBJ, even without a portrait.
+    gbs::hide_dialogue(state);
+    gbs::draw_dialogue(state);
+    assert(dialogue_oam_front == 0);
+    gbs::configure_dialogue_ui(gbs::default_dialogue_ui_config());
+    gbs::configure_dialogue_portraits(nullptr, 0);
+}
+
 int main() {
+    test_dialogue_only_reorders_oam_for_visible_sprite_ui();
     test_shorter_speaker_name_clears_old_label();
     test_visible_dialogue_does_not_clear_stable_name_region();
     test_hidden_dialogue_only_clears_its_old_regions_once();

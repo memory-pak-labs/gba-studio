@@ -874,7 +874,9 @@ size_t format_dialogue_display_text(const DialogueState& state, char* out, size_
 }
 
 void draw_dialogue(const DialogueState& state) {
-    gbs_hw_set_dialogue_oam_front(state.visible ? 1 : 0);
+    // BG-only dialogue needs no OAM permutation during the VBlank publication.
+    gbs_hw_set_dialogue_oam_front(state.visible &&
+        (active_dialogue_ui.portrait_tab || dialogue_should_show_portrait(state)) ? 1 : 0);
     if (active_dialogue_ui.portrait_tab) {
         clear_drawn_dialogue_regions();
         char display_buffer[dialogue_page_buffer_capacity];

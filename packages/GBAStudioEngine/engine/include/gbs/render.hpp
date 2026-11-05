@@ -131,6 +131,11 @@ inline int scaled_metasprite_part_offset(int position, int extent, int scale) {
 inline void apply_metasprite_part_scale(Sprite& sprite, const MetaSpritePart& part, const MetaSprite* metasprite = nullptr, bool mirror_x = false, int mirror_width = 0) {
     const int sx = metasprite ? metasprite->scale_x256 : 256;
     const int sy = metasprite ? metasprite->scale_y256 : 256;
+    if (sx == 256 && sy == 256) {
+        sprite.scale_x256 = part.scale_x256;
+        sprite.scale_y256 = part.scale_y256;
+        return;
+    }
     sprite.x += scaled_metasprite_part_offset(mirror_x ? mirror_width - part.x - part.width : part.x, part.width, sx);
     sprite.y += scaled_metasprite_part_offset(part.y, part.height, sy);
     sprite.scale_x256 = static_cast<uint16_t>(part.scale_x256 * sx / 256);
