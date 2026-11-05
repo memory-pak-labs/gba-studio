@@ -1,8 +1,9 @@
+import { authoredEventCommandRecords } from "./authoredEventCommands.js";
 import { sceneChangeCommand, sceneChangeCommandParts } from "./sceneChangeCommand.js";
 import type { FilesWorkspaceUsageLink } from "./filesWorkspace.js";
 import { audioInstrumentBank, audioInstrumentUsageCount, resolveAudioInstrumentComposition } from "./audioInstruments.js";
 import type { GBAProjectData } from "./projectFile.js";
-import { audioContractIssues, audioSampleAssets, audioPhysicalChannel, audioSourceAsset, audioSourceFormat } from "./audioContract.js";
+import { audioComposed, audioContractIssues, audioSampleAssets, audioPhysicalChannel, audioSourceAsset, audioSourceFormat } from "./audioContract.js";
 import {
   compileComposedMusicaToTracker,
   compileComposedSfxToAssetc,
@@ -746,21 +747,42 @@ function visitAudioReferences(data: GBAProjectData, visit: (reference: AudioRefe
     }
   }
 
+  const authored = new Set(authoredEventCommandRecords(data));
+  const visitCommand = (step: Record<string, unknown>, usage: FilesWorkspaceUsageLink): void => {
+    authored.delete(step);
+    function commandReference(command: string, write: (command: string) => void): void {
+      const parts = sceneChangeCommandParts(command);
+      if (!["play_music", "play_sfx", "run_audio_routine", "set_text_sfx"].includes(parts[0] ?? "") || !parts[1]) return;
+      visit({ name: parts[1], usage, update(nextName) {
+        parts[1] = nextName;
+        write(nextName ? sceneChangeCommand(parts) : "noop");
+      } });
+    }
+    if (typeof step.command === "string") commandReference(step.command, command => { step.command = command; });
+    if (typeof step.commands === "string") {
+      const lines = step.commands.split(/(\r?\n)/);
+      lines.forEach((line, index) => commandReference(line, command => {
+        lines[index] = command;
+        step.commands = lines.join("");
+      }));
+    }
+  };
   for (const event of projectArray(data, "events")) {
     const targetName = stringField(event.name, "Evento sem nome");
     const usage = { workspace: "Eventos" as const, targetID: nullableString(event.id) ?? undefined,
       targetName, label: `Evento: ${targetName}`, usageKind: "event-audio-command" };
-    for (const step of [event, ...projectArray(event, "steps")]) {
-      if (typeof step.command !== "string") continue;
-      const parts = sceneChangeCommandParts(step.command);
-      if (!["play_music", "play_sfx", "run_audio_routine", "set_text_sfx"].includes(parts[0] ?? "") || !parts[1]) continue;
-      visit({ name: parts[1], usage, update(nextName) {
-        parts[1] = nextName;
-        step.command = nextName ? sceneChangeCommand(parts) : "noop";
-      } });
-    }
+    for (const step of [event, ...projectArray(event, "steps")]) visitCommand(step, usage);
+  }
+  for (const frame of authored) {
+    visitCommand(frame, { workspace: "Eventos", label: `Timeline: ${String(frame.command)}`, usageKind: "event-audio-command" });
   }
 
+  const settings = isRecord(data.settings) ? data.settings : {};
+  if (isRecord(settings.uiDialogs)) {
+    field(settings.uiDialogs, "characterSound", {
+      workspace: "Ajustes", label: "Ajustes: som de texto dos diálogos", targetName: "uiDialogs", usageKind: "dialogue-audio"
+    });
+  }
   for (const [index, dialogue] of projectArray(data, "dialogues").entries()) {
     const targetName = stringField(dialogue.key ?? dialogue.id ?? dialogue.name, `Dialogo ${index + 1}`);
     for (const [key, detail] of [["textSound", "texto"], ["confirmSound", "confirmacao"]] as const) {
@@ -2158,15 +2180,37 @@ export function normalizeAudioInProject(
   return next;
 }
 
-export function removeAudioItemFromProject(data: GBAProjectData, audioIDToRemove: string): GBAProjectData {
+function audioPlaybackFamily(data: GBAProjectData, audio: Record<string, unknown>): string {
+  if (audioComposed(audio)) return "psg";
+  const format = audioSourceFormat(data, audio);
+  if (format === "MOD" || format === "S3M") return "tracker";
+  return format;
+}
+
+export function audioReplacementChoices(data: GBAProjectData, audioIDToRemove: string): { value: string; label: string }[] {
+  const items = projectArray(data, "audioItems");
+  const source = items.find((item, index) => audioID(item, index) === audioIDToRemove);
+  if (!source) return [];
+  const family = audioPlaybackFamily(data, source);
+  return items.flatMap((item, index) => item !== source && item.kind === source.kind
+    && audioPlaybackFamily(data, item) === family
+    && !audioContractIssues(item, data).some(issue => issue.level === "error")
+    ? [{ value: audioID(item, index), label: audioName(item, index) }] : []);
+}
+
+export function removeAudioItemFromProject(data: GBAProjectData, audioIDToRemove: string, replacementID?: string): GBAProjectData {
   const next = cloneProjectData(data);
   const audioItems = projectArray(next, "audioItems");
   const audioIndex = audioItems.findIndex((item, index) => audioID(item, index) === audioIDToRemove);
   if (audioIndex < 0) return data;
 
+  if (replacementID && !audioReplacementChoices(data, audioIDToRemove).some(choice => choice.value === replacementID)) return data;
+  const replacementIndex = audioItems.findIndex((item, index) => audioID(item, index) === replacementID);
+  const replacementName = replacementIndex >= 0 ? audioName(audioItems[replacementIndex], replacementIndex) : "";
+  const replacementAlias = replacementIndex >= 0 ? nullableString(audioItems[replacementIndex].exportID) : null;
   const removedName = audioName(audioItems[audioIndex], audioIndex);
   next.audioItems = audioItems.filter((_, index) => index !== audioIndex);
-  updateAudioReferences(next, removedName, "", nullableString(audioItems[audioIndex].exportID), "");
+  updateAudioReferences(next, removedName, replacementName, nullableString(audioItems[audioIndex].exportID), replacementAlias ?? replacementName);
   return next;
 }
 

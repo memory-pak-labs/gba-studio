@@ -9,7 +9,7 @@ import { buildProjectPluginRegistry } from "../shared/gbaStudioPlugins.js";
 import { defaultSceneComposition } from "../shared/sceneComposition.js";
 import { defaultSceneResourceManifest } from "../shared/sceneResourceContract.js";
 import { createBlankProjectData } from "../shared/newProject.js";
-import { createRoomInProject } from "../shared/roomsWorkspace.js";
+import { createRoomInProject, removeRoomFromProject } from "../shared/roomsWorkspace.js";
 
 function project(overrides: GBAProjectData): GBAProjectData {
   return {
@@ -90,6 +90,41 @@ describe("prepareEngineProjectExport", () => {
     const contract = buildEngineExportProjectContract(parseGBAProjectFile(source).data);
     expect(contract.requires.features.length).toBe(new Set(contract.requires.features).size);
   });
+
+  it("exports an edited example after removing abertura and redirecting the logo to titulo", async () => {
+    const source = await readFile(path.join(process.cwd(), "default-assets/templates/exemplo-gba/exemplo-gba.gba-project"), "utf8");
+    const { data } = parseGBAProjectFile(source);
+    const rooms = data.scenas as Record<string, unknown>[];
+    const opening = rooms.find(room => room.name === "abertura")!;
+    const title = rooms.find(room => room.name === "titulo")!;
+    const next = removeRoomFromProject(data, String(opening.id), String(title.id));
+
+    expect(next.scenas).toHaveLength(rooms.length - 1);
+    const logo = (next.events as Record<string, unknown>[]).find(event => event.name === "logo_concluir");
+    expect(logo).toMatchObject({
+      steps: expect.arrayContaining([expect.objectContaining({ command: "change_scene titulo 0 0 down" })])
+    });
+    expect((next.actors as Record<string, unknown>[]).some(actor => actor.roomName === "abertura")).toBe(false);
+    expect(data.scenas).toContain(opening);
+    const contract = buildEngineExportProjectContract(next);
+    const steps = contract.cutscene_project!.scenes.find(scene => scene.name === "logo")!.steps!;
+    expect(steps.at(-2)).toMatchObject({ duration_frames: 10, target_scene: -1 });
+    expect(steps.at(-1)?.script).toContainEqual(expect.objectContaining({
+      op: "warp_runtime", runtime: "menu", room: 0
+    }));
+  });
+
+  it.each(["inventario", "inventario_ferramentas", "farol_interior"])(
+    "exports the example after removing %s and clearing its menu or timeline references",
+    async (name) => {
+      const source = await readFile(path.join(process.cwd(), "default-assets/templates/exemplo-gba/exemplo-gba.gba-project"), "utf8");
+      const { data } = parseGBAProjectFile(source);
+      const room = (data.scenas as Record<string, unknown>[]).find(scene => scene.name === name)!;
+      const edited = removeRoomFromProject(data, String(room.id));
+      expect(edited.scenas).toHaveLength(35);
+      expect(() => buildEngineExportProjectContract(edited)).not.toThrow();
+    }
+  );
   it("keeps a paged top-down atlas in ROM and binds a full source map to the room", () => {
     const contract = buildEngineExportProjectContract(project({
       assets: [{ id: "harbor", name: "harbor.png", kind: "Background", metadata: {

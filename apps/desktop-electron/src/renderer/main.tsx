@@ -43,6 +43,7 @@ import {
   nextAudioChannelTypePreset,
   normalizeAudioInProject,
   removeAudioChannelFromProject,
+  audioReplacementChoices,
   removeAudioItemFromProject,
   removeAudioPatternFromProject,
   renameAudioPatternInProject,
@@ -100,6 +101,7 @@ import {
   createDialogueInProject,
   duplicateDialogueInProject,
   normalizeDialogueInProject,
+  dialogueReplacementChoices,
   removeDialogueFromProject,
   updateDialogueInProject,
   updateDialoguesUiInProject,
@@ -151,8 +153,9 @@ import {
   duplicateRoomInProject,
   nudgeRoomEntitiesInProject,
   placeRoomEntityInRoomInProject,
+  planRoomRemoval,
   removeRoomEntitiesInProject,
-  roomActorRemovalReferences,
+  planRoomActorDeletion,
   removeRoomFromProject,
   removeRoomConnectionFromProject,
   updateRoomConnectionInProject,
@@ -311,7 +314,8 @@ import {
   type HardwareProfilerSession
 } from "../shared/hardwareProfilerSessions";
 import { StudioProviders } from "./studioProviders";
-import { useStudioDialog } from "./studioDialog";
+import { useStudioDialog, type StudioDeletionChoice, type StudioDeletionOptions } from "./studioDialog";
+import { planEventDeletion } from "../shared/eventDeletion";
 import { useStudioToast } from "./studioToast";
 import { StudioStatusBar, WorkspaceEmptyState } from "./studioUi";
 import {
@@ -359,7 +363,7 @@ function App(): React.ReactElement {
   const [pluginRegistry, setPluginRegistry] = useState<ProjectPluginRegistry | null>(null);
   const [pluginCatalogOpen, setPluginCatalogOpen] = useState(false);
   const [status, setStatus] = useState(() => t("app.readyToOpen"));
-  const { confirm, prompt } = useStudioDialog();
+  const { confirm, prompt, resolveDeletion } = useStudioDialog();
   const { pushToast } = useStudioToast();
   const readyStatusRef = useRef(t("app.readyToOpen"));
   const workspaceListRef = useRef<HTMLElement | null>(null);
@@ -385,11 +389,29 @@ function App(): React.ReactElement {
     pushToast(message, { kind: "error" });
   }
 
-  function blockReferencedDeletion(target: ProjectReferenceTarget): boolean {
+  async function confirmProjectDeletion(
+    data: ParsedGBAProject["data"],
+    message: string,
+    options: Pick<StudioDeletionOptions, "title" | "canUnlink" | "replacements" | "suggestedReplacement"> & { usages: readonly string[] }
+  ): Promise<StudioDeletionChoice | null> {
+    const path = dialogueSessionRef.current?.path;
+    const confirmOptions = { title: options.title, confirmLabel: "Remover", variant: "danger" as const };
+    const choice = options.usages.length
+      ? await resolveDeletion(message, { ...options, ...confirmOptions })
+      : await confirm(message, confirmOptions) ? { kind: "unlink" as const } : null;
+    const latest = dialogueSessionRef.current;
+    if (latest?.path !== path || latest?.project.data !== data) return null;
+    return choice;
+  }
+
+  async function blockReferencedDeletion(target: ProjectReferenceTarget): Promise<boolean> {
     if (!session) return true;
     const guard = projectReferenceDeletionGuard(session.project.data, target);
     if (guard.canDelete) return false;
-    notifyError(guard.message ?? `Nao foi possivel remover ${target.name}.`);
+    await resolveDeletion(ui("Remover “{0}”?", { 0: target.name }), {
+      title: "Item em uso", cancelLabel: "Fechar", usages: guard.usages.map(usage => usage.label),
+      replacements: [], canUnlink: false
+    });
     return true;
   }
 
@@ -1218,7 +1240,7 @@ function App(): React.ReactElement {
 
   async function removeAsset(assetID: string, currentName: string): Promise<void> {
     if (!session) return;
-    if (blockReferencedDeletion({ kind: "asset", id: assetID, name: currentName })) return;
+    if (await blockReferencedDeletion({ kind: "asset", id: assetID, name: currentName })) return;
     if (!(await confirm(`Remover o asset "${currentName}" do projeto?`, { variant: "danger", title: "Remover asset" }))) return;
     const nextData = removeAssetFromProject(session.project.data, assetID);
     if (nextData !== session.project.data) {
@@ -1277,7 +1299,7 @@ function App(): React.ReactElement {
       .filter((asset): asset is Record<string, unknown> => Boolean(asset) && typeof asset === "object" && !Array.isArray(asset))
       .filter((asset) => assetIDs.includes(String(asset.id ?? "")));
     for (const asset of selectedAssets) {
-      if (blockReferencedDeletion({ kind: "asset", id: String(asset.id ?? ""), name: String(asset.name ?? "Asset") })) return;
+      if (await blockReferencedDeletion({ kind: "asset", id: String(asset.id ?? ""), name: String(asset.name ?? "Asset") })) return;
     }
     if (!(await confirm(`Remover ${selectedAssets.length} assets selecionados do projeto?`, { variant: "danger", title: "Remover assets" }))) return;
     const nextData = removeAssetsFromProject(session.project.data, assetIDs);
@@ -1711,12 +1733,19 @@ function App(): React.ReactElement {
 
   async function removeRoom(roomID: string, currentName: string): Promise<void> {
     if (!session) return;
-    if (blockReferencedDeletion({ kind: "room", id: roomID, name: currentName })) return;
-    if (!await confirm(`Remover a cena "${currentName}" do projeto?`)) return;
-    const nextData = removeRoomFromProject(session.project.data, roomID);
-    if (nextData !== session.project.data) {
+    const data = session.project.data;
+    const plan = planRoomRemoval(data, roomID);
+    if (!plan) return;
+    const guard = projectReferenceDeletionGuard(data, { kind: "room", id: roomID, name: currentName });
+    const usages = [...new Set([...guard.usages.map(usage => usage.label), ...plan.usages])];
+    const choice = await confirmProjectDeletion(data,
+      ui("Remover a cena “{0}”? Os atores e gatilhos da cena também serão removidos.", { 0: plan.name }),
+      { title: "Remover cena", usages, replacements: plan.choices, suggestedReplacement: plan.suggestedID, canUnlink: plan.canUnlink });
+    if (!choice) return;
+    const nextData = removeRoomFromProject(data, roomID, choice.kind === "replace" ? choice.value : null);
+    if (nextData !== data) {
       updateProjectData(nextData);
-      setStatus(ui("Cena removida: {0}.", { 0: currentName }));
+      notifySuccess(ui("Item removido. Use Desfazer para restaurar."));
     }
   }
 
@@ -2036,18 +2065,15 @@ function App(): React.ReactElement {
     if (!session || selectedKeys.length === 0) return;
     const data = session.project.data;
     const options = { roomID, selectedKeys };
-    const references = roomActorRemovalReferences(data, options);
-    if (references.length) {
-      notifyError(ui("Remova primeiro os vínculos dos atores em: {0}.", { 0: references.join(", ") }));
-      return;
-    }
-    const confirmed = await confirm(`Remover ${selectedKeys.length} entidades selecionadas desta cena?`);
-    if (!confirmed || dialogueSessionRef.current?.project.data !== data) return;
-
-    const nextData = removeRoomEntitiesInProject(data, options);
+    const plan = planRoomActorDeletion(data, options);
+    const choice = await confirmProjectDeletion(data,
+      ui("Remover {0} entidades selecionadas desta cena?", { 0: selectedKeys.length }),
+      { title: "Remover entidades", ...plan });
+    if (!choice) return;
+    const nextData = removeRoomEntitiesInProject(data, options, choice.kind === "replace" ? choice.value : null);
     if (nextData !== data) {
       updateProjectData(nextData);
-      setStatus(ui("Selecao removida: {0} entidades.", { 0: selectedKeys.length }));
+      notifySuccess(ui("Item removido. Use Desfazer para restaurar."));
     }
   }
 
@@ -2258,7 +2284,7 @@ function App(): React.ReactElement {
 
   async function removeSpriteAnimation(animationID: string, currentName: string): Promise<void> {
     if (!session) return;
-    if (blockReferencedDeletion({ kind: "spriteAnimation", id: animationID, name: currentName })) return;
+    if (await blockReferencedDeletion({ kind: "spriteAnimation", id: animationID, name: currentName })) return;
     if (!await confirm(`Remover a animacao "${currentName}" do projeto?`)) return;
     const nextData = removeSpriteAnimationFromProject(session.project.data, animationID);
     if (nextData !== session.project.data) {
@@ -2361,12 +2387,17 @@ function App(): React.ReactElement {
 
   async function removeEvent(eventID: string, currentName: string): Promise<void> {
     if (!session) return;
-    if (blockReferencedDeletion({ kind: "event", id: eventID, name: currentName })) return;
-    if (!await confirm(`Remover o evento "${currentName}" do projeto?`)) return;
-    const nextData = removeEventFromProject(session.project.data, eventID);
-    if (nextData !== session.project.data) {
+    const data = session.project.data;
+    const target = { kind: "event" as const, id: eventID, name: currentName };
+    const guard = projectReferenceDeletionGuard(data, target);
+    const plan = guard.canDelete ? { replacements: [], canUnlink: true } : planEventDeletion(data, eventID, currentName);
+    const choice = await confirmProjectDeletion(data, ui("Remover “{0}”?", { 0: currentName }),
+      { title: "Remover evento", usages: guard.usages.map(usage => usage.label), ...plan });
+    if (!choice) return;
+    const nextData = removeEventFromProject(data, eventID, { replacementName: choice.kind === "replace" ? choice.value : null });
+    if (nextData !== data && projectReferenceDeletionGuard(nextData, target).canDelete) {
       updateProjectData(nextData);
-      notifySuccess(ui("Evento removido: {0}.", { 0: currentName }));
+      notifySuccess(ui("Item removido. Use Desfazer para restaurar."));
     }
   }
 
@@ -2863,12 +2894,17 @@ function App(): React.ReactElement {
 
   async function removeAudio(audioID: string, currentName: string): Promise<void> {
     if (!session) return;
-    if (blockReferencedDeletion({ kind: "audio", id: audioID, name: currentName })) return;
-    if (!await confirm(`Remover o audio "${currentName}" do projeto?`)) return;
-    const nextData = removeAudioItemFromProject(session.project.data, audioID);
-    if (nextData !== session.project.data) {
+    const data = session.project.data;
+    const guard = projectReferenceDeletionGuard(data, { kind: "audio", id: audioID, name: currentName });
+    const choice = await confirmProjectDeletion(data, ui("Remover “{0}”?", { 0: currentName }), {
+      title: "Remover áudio", usages: guard.usages.map(usage => usage.label),
+      replacements: guard.canDelete ? [] : audioReplacementChoices(data, audioID), canUnlink: true
+    });
+    if (!choice) return;
+    const nextData = removeAudioItemFromProject(data, audioID, choice.kind === "replace" ? choice.value : undefined);
+    if (nextData !== data) {
       updateProjectData(nextData);
-      setStatus(ui("Áudio removido: {0}.", { 0: currentName }));
+      notifySuccess(ui("Item removido. Use Desfazer para restaurar."));
     }
   }
 
@@ -3061,12 +3097,17 @@ function App(): React.ReactElement {
 
   async function removeDialogue(key: string): Promise<void> {
     if (!session) return;
-    if (blockReferencedDeletion({ kind: "dialogue", name: key })) return;
-    if (!await confirm(`Remover o dialogo "${key}" do projeto?`)) return;
-    const nextData = removeDialogueFromProject(session.project.data, key);
-    if (nextData !== session.project.data) {
+    const data = session.project.data;
+    const guard = projectReferenceDeletionGuard(data, { kind: "dialogue", name: key });
+    const choice = await confirmProjectDeletion(data, ui("Remover “{0}”?", { 0: key }), {
+      title: "Remover diálogo", usages: guard.usages.map(usage => usage.label),
+      replacements: guard.canDelete ? [] : dialogueReplacementChoices(data, key), canUnlink: true
+    });
+    if (!choice) return;
+    const nextData = removeDialogueFromProject(data, key, { replacementKey: choice.kind === "replace" ? choice.value : null });
+    if (nextData !== data) {
       updateProjectData(nextData);
-      notifySuccess(ui("Dialogo removido: {0}.", { 0: key }));
+      notifySuccess(ui("Item removido. Use Desfazer para restaurar."));
     }
   }
 

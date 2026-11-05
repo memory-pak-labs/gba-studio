@@ -1,3 +1,4 @@
+import { sceneChangeCommandParts } from "./sceneChangeCommand.js";
 import { projectWithCompiledAdvancedTools } from "./advancedTools.js";
 import { audioReferenceUsages } from "./audioWorkspace.js";
 import { nativeEventCommandReferencedEvents } from "./eventCommandRegistry.js";
@@ -46,6 +47,9 @@ function commandsForEvent(event: Record<string, unknown>): Array<{ command: stri
   const commands: Array<{ command: string; stepIndex: number | null }> = [];
   const command = optionalString(event.command);
   if (command) commands.push({ command, stepIndex: null });
+  if (typeof event.commands === "string") {
+    for (const line of event.commands.split(/\r?\n/)) if (line.trim()) commands.push({ command: line, stepIndex: null });
+  }
   if (Array.isArray(event.steps)) {
     event.steps.filter(isRecord).forEach((step, stepIndex) => {
       const stepCommand = optionalString(step.command);
@@ -53,10 +57,6 @@ function commandsForEvent(event: Record<string, unknown>): Array<{ command: stri
     });
   }
   return commands;
-}
-
-function commandParts(command: string): string[] {
-  return command.split(/\s+/).filter(Boolean);
 }
 
 function addUsage(usages: Map<string, ProjectReferenceUsage>, usage: ProjectReferenceUsage): void {
@@ -101,7 +101,7 @@ function listRoomUsages(data: GBAProjectData, target: ProjectReferenceTarget): P
   }
   const settings = isRecord(data.settings) ? data.settings : null;
   const general = settings && isRecord(settings.general) ? settings.general : null;
-  if (general?.startScene === target.name) {
+  if (general?.startScene === target.name || (target.id && general?.startScene === target.id)) {
     addUsage(usages, { label: "Cena inicial do projeto", workspace: "Ajustes", targetName: "general", usageKind: "settings-start-scene" });
   }
   for (const connection of editorConnections(data)) {
@@ -128,17 +128,18 @@ function listRoomUsages(data: GBAProjectData, target: ProjectReferenceTarget): P
   }
   for (const event of projectArray(data, "events")) {
     const eventName = stringValue(event.name, "Evento sem nome");
-    if (!commandsForEvent(event).some(({ command }) => {
-      const parts = commandParts(command);
-      return parts[0] === "change_scene" && parts[1] === target.name;
-    })) continue;
-    addUsage(usages, {
-      label: `Evento ${eventName}: change_scene`,
-      workspace: "Eventos",
-      targetID: optionalString(event.id) ?? undefined,
-      targetName: eventName,
-      usageKind: "event-change-scene"
-    });
+    for (const { command } of commandsForEvent(event)) {
+      const [verb, reference] = sceneChangeCommandParts(command);
+      if (!["change_scene", "if_scene", "luta_start_match"].includes(verb ?? "")
+        || (reference !== target.name && (!target.id || reference !== target.id))) continue;
+      addUsage(usages, {
+        label: `Evento ${eventName}: ${verb}`,
+        workspace: "Eventos",
+        targetID: optionalString(event.id) ?? undefined,
+        targetName: eventName,
+        usageKind: "event-change-scene"
+      });
+    }
   }
   return sortedUsages(usages);
 }
@@ -257,8 +258,9 @@ function listSpriteAnimationUsages(data: GBAProjectData, target: ProjectReferenc
 function listDialogueUsages(data: GBAProjectData, target: ProjectReferenceTarget): ProjectReferenceUsage[] {
   const dialogue = deriveDialoguesWorkspacePresentation(data).dialogues.find((item) => item.key === target.name);
   return (dialogue?.usages ?? []).map((usage) => ({
-    label: `Evento: ${usage.eventName}${usage.stepIndex === null ? "" : `, passo ${usage.stepIndex + 1}`}`,
-    workspace: "Eventos",
+    label: usage.verb === "scene_dialogue" ? usage.eventName
+      : `Evento: ${usage.eventName}${usage.stepIndex === null ? "" : `, passo ${usage.stepIndex + 1}`}`,
+    workspace: usage.verb === "scene_dialogue" ? "Editor" : "Eventos",
     targetID: usage.eventID,
     targetName: usage.eventName,
     usageKind: "event-dialogue-command"

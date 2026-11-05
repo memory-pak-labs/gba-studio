@@ -21,7 +21,19 @@ export interface StudioPromptOptions {
   placeholder?: string;
 }
 
+export interface StudioDeletionOptions extends StudioConfirmOptions {
+  usages: readonly string[];
+  replacements: readonly { value: string; label: string }[];
+  canUnlink: boolean;
+  suggestedReplacement?: string;
+}
+
+export type StudioDeletionChoice =
+  | { kind: "unlink" }
+  | { kind: "replace"; value: string };
+
 interface StudioDialogContextValue {
+  resolveDeletion(message: string, options: StudioDeletionOptions): Promise<StudioDeletionChoice | null>;
   confirm(message: string, options?: StudioConfirmOptions): Promise<boolean>;
   prompt(message: string, defaultValue?: string, options?: StudioPromptOptions): Promise<string | null>;
 }
@@ -29,6 +41,12 @@ interface StudioDialogContextValue {
 const StudioDialogContext = createContext<StudioDialogContextValue | null>(null);
 
 type DialogState =
+  | {
+      kind: "deletion";
+      message: string;
+      options: StudioDeletionOptions;
+      resolve: (value: StudioDeletionChoice | null) => void;
+    }
   | {
       kind: "confirm";
       message: string;
@@ -53,6 +71,16 @@ function StudioDialogSurface({
   const ui = useStudioUiText();
   const [promptValue, setPromptValue] = useState(state.kind === "prompt" ? state.defaultValue : "");
   const inputRef = useRef<HTMLInputElement>(null);
+  const cancelRef = useRef<HTMLButtonElement>(null);
+  const [resolution, setResolution] = useState<"replace" | "unlink" | "">("");
+  const [replacement, setReplacement] = useState("");
+
+  useEffect(() => {
+    if (state.kind !== "deletion") return;
+    setResolution("");
+    setReplacement(state.options.suggestedReplacement ?? "");
+    cancelRef.current?.focus();
+  }, [state]);
 
   useEffect(() => {
     if (state.kind !== "prompt") return;
@@ -81,13 +109,24 @@ function StudioDialogSurface({
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [onClose, state]);
 
-  const title = state.kind === "confirm"
-    ? state.options.title ?? "Confirmar acao"
-    : state.options.title ?? "Informe o valor";
+  const title = state.options.title ?? (state.kind === "prompt" ? "Informe o valor" : "Confirmar acao");
+  const canResolveDeletion = state.kind === "deletion" && (
+    (resolution === "unlink" && state.options.canUnlink)
+    || (resolution === "replace" && state.options.replacements.some(option => option.value === replacement))
+  );
+  const canChooseResolution = state.kind === "deletion"
+    && (state.options.canUnlink || state.options.replacements.length > 0);
 
   function handleConfirm(): void {
     if (state.kind === "confirm") {
       state.resolve(true);
+      onClose();
+      return;
+    }
+
+    if (state.kind === "deletion") {
+      if (!canResolveDeletion) return;
+      state.resolve(resolution === "replace" ? { kind: "replace", value: replacement } : { kind: "unlink" });
       onClose();
       return;
     }
@@ -144,18 +183,54 @@ function StudioDialogSurface({
           </label>
         ) : null}
 
+        {state.kind === "deletion" ? (
+          <>
+            <section className="studio-deletion-usages" aria-labelledby="studio-deletion-usages-title">
+              <h3 id="studio-deletion-usages-title">{ui("Onde é usado")}</h3>
+              <ul tabIndex={0}>{state.options.usages.map((usage, index) => <li key={index}>{ui(usage)}</li>)}</ul>
+            </section>
+            {canChooseResolution ? (
+              <fieldset className="studio-deletion-choices">
+                <legend>{ui("O que fazer com os vínculos?")}</legend>
+                {state.options.replacements.length ? (
+                  <label>
+                    <input type="radio" name="deletion-resolution" checked={resolution === "replace"} onChange={() => setResolution("replace")} />
+                    {ui("Substituir")}
+                  </label>
+                ) : null}
+                {resolution === "replace" ? (
+                  <label className="studio-field studio-deletion-replacement">
+                    <span>{ui("Substituir por")}</span>
+                    <select value={replacement} onChange={event => setReplacement(event.currentTarget.value)}>
+                      <option value="">{ui("Escolha um item")}</option>
+                      {state.options.replacements.map(option => <option key={option.value} value={option.value}>{option.label}</option>)}
+                    </select>
+                  </label>
+                ) : null}
+                {state.options.canUnlink ? (
+                  <label>
+                    <input type="radio" name="deletion-resolution" checked={resolution === "unlink"} onChange={() => setResolution("unlink")} />
+                    {ui("Desvincular")}
+                  </label>
+                ) : null}
+                <p>{ui("Você pode desfazer a exclusão e restaurar os vínculos de uma vez.")}</p>
+              </fieldset>
+            ) : <p>{ui("Edite os vínculos acima para liberar a exclusão.")}</p>}
+          </>
+        ) : null}
+
         <div className="studio-dialog-actions">
-          <StudioButton onClick={handleCancel} type="button" variant="secondary">
+          <button className="ui-button" ref={cancelRef} onClick={handleCancel} type="button">
             {ui(state.options.cancelLabel ?? "Cancelar")}
-          </StudioButton>
-          <StudioButton
-            disabled={state.kind === "prompt" && !promptValue.trim()}
+          </button>
+          {state.kind !== "deletion" || canChooseResolution ? <StudioButton
+            disabled={state.kind === "deletion" ? !canResolveDeletion : state.kind === "prompt" && !promptValue.trim()}
             onClick={handleConfirm}
             type="button"
-            variant={state.kind === "confirm" && state.options.variant === "danger" ? "danger" : "primary"}
+            variant={state.kind !== "prompt" && state.options.variant === "danger" ? "danger" : "primary"}
           >
-            {ui(state.options.confirmLabel ?? (state.kind === "confirm" ? "Confirmar" : "OK"))}
-          </StudioButton>
+            {ui(state.options.confirmLabel ?? (state.kind === "prompt" ? "OK" : "Confirmar"))}
+          </StudioButton> : null}
         </div>
       </section>
     </div>
@@ -196,8 +271,14 @@ export function StudioDialogProvider({ children }: { children: React.ReactNode }
     });
   }, [enqueueDialog]);
 
-  const value = useRef<StudioDialogContextValue>({ confirm, prompt });
-  value.current = { confirm, prompt };
+  const resolveDeletion = useCallback((message: string, options: StudioDeletionOptions) => {
+    return new Promise<StudioDeletionChoice | null>((resolve) => {
+      enqueueDialog({ kind: "deletion", message, options, resolve });
+    });
+  }, [enqueueDialog]);
+
+  const value = useRef<StudioDialogContextValue>({ confirm, prompt, resolveDeletion });
+  value.current = { confirm, prompt, resolveDeletion };
 
   return (
     <StudioDialogContext.Provider value={value.current}>

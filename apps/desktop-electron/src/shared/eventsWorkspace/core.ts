@@ -1,3 +1,5 @@
+import { mapAuthoredEventCommands } from "../authoredEventCommands.js";
+import { retargetNativeEventCommand } from "../eventCommandRegistry.js";
 import { eventCommandCategory, eventCommandDescription, eventCommandParameterChoices, eventCommandParameterLabel, normalizeEventSearch } from "../eventCommandMetadata.js";
 import { sceneChangeCommand, sceneChangeCommandParts } from "../sceneChangeCommand.js";
 import { constantOperandIndices, projectNumericConstants, resolveProjectConstantCommand } from "../projectConstants.js";
@@ -933,7 +935,7 @@ function clearEventBindings(value: unknown, eventNameToRemove: string): void {
 }
 
 function renameEventReferences(data: GBAProjectData, oldName: string, nextName: string): void {
-  for (const room of [...projectArray(data, "rooms"), ...projectArray(data, "scenas")]) {
+  for (const room of [...projectArray(data, "rooms"), ...projectArray(data, "scenas"), ...[data.scena, data.room].filter(isRecord)]) {
     for (const state of runtimeEventStates(room)) {
       if (state.eventName === oldName) Object.assign(room, updateRuntimeEventState(room, state.bindingKey, "eventName", nextName));
     }
@@ -981,8 +983,8 @@ function renameEventReferences(data: GBAProjectData, oldName: string, nextName: 
   }
 }
 
-function clearDirectEventReferences(data: GBAProjectData, eventNameToRemove: string): void {
-  for (const room of [...projectArray(data, "rooms"), ...projectArray(data, "scenas")]) {
+function clearDirectEventReferences(data: GBAProjectData, eventNameToRemove: string, keepConnections: boolean): void {
+  for (const room of [...projectArray(data, "rooms"), ...projectArray(data, "scenas"), ...[data.scena, data.room].filter(isRecord)]) {
     for (const state of runtimeEventStates(room)) {
       if (state.eventName === eventNameToRemove) Object.assign(room, updateRuntimeEventState(room, state.bindingKey, "eventName", ""));
     }
@@ -1000,7 +1002,9 @@ function clearDirectEventReferences(data: GBAProjectData, eventNameToRemove: str
   if (editorState && Array.isArray(editorState.scenaConnections)) {
     editorState.scenaConnections = editorState.scenaConnections.filter((connection) => {
       if (!isRecord(connection)) return true;
-      return !["eventName", "onExitEventName", "onEnterEventName"].some((key) => connection[key] === eventNameToRemove);
+      const keys = ["eventName", "onExitEventName", "onEnterEventName"].filter(key => connection[key] === eventNameToRemove);
+      if (keepConnections) for (const key of keys) delete connection[key];
+      return keepConnections || keys.length === 0;
     });
   }
 
@@ -3024,7 +3028,11 @@ export function removeEventGraphEdgeInProject(
   return next;
 }
 
-export function removeEventFromProject(data: GBAProjectData, eventIDToRemove: string): GBAProjectData {
+export function removeEventFromProject(
+  data: GBAProjectData,
+  eventIDToRemove: string,
+  resolution?: { replacementName: string | null }
+): GBAProjectData {
   const next = cloneProjectData(data);
   const events = projectArray(next, "events");
   const eventIndex = events.findIndex((event, index) => eventID(event, index) === eventIDToRemove);
@@ -3032,7 +3040,14 @@ export function removeEventFromProject(data: GBAProjectData, eventIDToRemove: st
 
   const removedName = eventName(events[eventIndex], eventIndex);
   next.events = events.filter((_, index) => index !== eventIndex);
-  clearDirectEventReferences(next, removedName);
+  if (resolution?.replacementName) {
+    renameEventReferences(next, removedName, resolution.replacementName);
+  } else {
+    clearDirectEventReferences(next, removedName, resolution !== undefined);
+  }
+  if (resolution) {
+    mapAuthoredEventCommands(next, command => retargetNativeEventCommand(command, removedName, resolution.replacementName));
+  }
   return next;
 }
 
