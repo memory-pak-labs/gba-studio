@@ -1,8 +1,15 @@
-import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, readdir, rm, symlink, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import { copyFilesIntoProjectAssets, copyReferenceImageIntoProjectAssets, reimportFileIntoProjectAsset } from "./importAssets.js";
+
+import { encodeRgbaPng } from "./gifAnimationImport.js";
+import { openProjectFile, saveProjectFileAtomically } from "./projectPersistence.js";
+import { summarizeGBAProject } from "../shared/projectFile.js";
+import { commitProjectAssetReplacement, markProjectSessionSaved, restoreProjectSessionHistory } from "../renderer/projectSession.js";
+
+const testPng = (red: number) => encodeRgbaPng(1, 1, Uint8Array.of(red, 0, 0, 255));
 
 const temporaryRoots: string[] = [];
 
@@ -116,35 +123,97 @@ describe("asset import filesystem integration", () => {
     await expect(readFile(path.join(projectRoot, "Assets", "sprites", "hero 2.png"), "utf8")).resolves.toBe("new");
   });
 
-  it("reimports over the existing physical asset without creating a duplicate", async () => {
+  it("keeps both physical versions and follows undo, redo, save, reopen and Save As", async () => {
     const projectRoot = await makeTemporaryRoot("gbastudio-electron-project-");
     const sourceRoot = await makeTemporaryRoot("gbastudio-electron-source-");
     const projectPath = path.join(projectRoot, "Demo.gba-project");
     const sourcePath = path.join(sourceRoot, "hero-updated.png");
     const relativePath = "Assets/sprites/hero.png";
-    await mkdir(path.join(projectRoot, "Assets", "sprites"), { recursive: true });
-    await writeFile(projectPath, "{}", "utf8");
-    await writeFile(path.join(projectRoot, relativePath), "old", "utf8");
-    await writeFile(sourcePath, "updated", "utf8");
+    await mkdir(path.dirname(path.join(projectRoot, relativePath)), { recursive: true });
+    const oldPixels = testPng(0);
+    const newPixels = testPng(255);
+    await writeFile(path.join(projectRoot, relativePath), oldPixels);
+    await writeFile(sourcePath, newPixels);
+    const data = {
+      name: "Demo", assets: [{ id: "hero", name: "hero.png", kind: "Sprite", metadata: { source: relativePath } }],
+      animations: [{ name: "idle", spriteSheet: "hero.png" }]
+    };
+    const project = { data, summary: summarizeGBAProject(data) };
+    await saveProjectFileAtomically(projectPath, project);
 
-    const result = await reimportFileIntoProjectAsset(projectPath, sourcePath, relativePath, () => "replacement");
+    const replacement = await reimportFileIntoProjectAsset(projectPath, sourcePath, relativePath, () => "replacement");
+    expect(replacement.relativePath).not.toBe(relativePath);
+    await expect(readFile(path.join(projectRoot, relativePath))).resolves.toEqual(oldPixels);
+    await expect(readFile(path.join(projectRoot, replacement.relativePath))).resolves.toEqual(newPixels);
+    const stillSaved = await openProjectFile(projectPath);
+    expect(stillSaved.project?.data).toMatchObject({ assets: [{ metadata: { source: relativePath } }] });
 
-    expect(result).toMatchObject({ name: "hero.png", relativePath, kind: "Sprite" });
-    await expect(readFile(path.join(projectRoot, relativePath), "utf8")).resolves.toBe("updated");
+    const initial = markProjectSessionSaved({ identity: {}, project, path: projectPath, dirty: false, undoStack: [], redoStack: [] }, projectPath, data);
+    const applied = commitProjectAssetReplacement(initial, initial, projectPath, "hero", relativePath, replacement)!;
+    expect(applied.project.data).toMatchObject({ assets: [{ id: "hero", name: "hero.png", metadata: { source: replacement.relativePath } }] });
+    expect(applied.project.data.animations).toEqual(data.animations);
+    const undone = restoreProjectSessionHistory(applied, "undo");
+    expect(undone.dirty).toBe(false);
+    expect(undone.project.data).toMatchObject({ assets: [{ metadata: { source: relativePath } }] });
+    const redone = restoreProjectSessionHistory(undone, "redo");
+    expect(redone.dirty).toBe(true);
+    await saveProjectFileAtomically(projectPath, redone.project);
+    const reopened = await openProjectFile(projectPath);
+    expect(reopened.project?.data).toMatchObject({ assets: [{ metadata: { source: replacement.relativePath } }] });
+
+    const secondCopy = path.join(await makeTemporaryRoot("gbastudio-save-as-"), "Copy.gba-project");
+    await saveProjectFileAtomically(secondCopy, redone.project, { sourceProjectPath: projectPath });
+    await expect(readFile(path.join(path.dirname(secondCopy), replacement.relativePath))).resolves.toEqual(newPixels);
   });
 
-  it("keeps backgrounds in their category when importing and replacing a PNG", async () => {
-    const projectRoot = await makeTemporaryRoot("gbastudio-background-project-");
-    const sourceRoot = await makeTemporaryRoot("gbastudio-background-source-");
+  it("rejects an incompatible or invalid replacement before writing into the project", async () => {
+    const projectRoot = await makeTemporaryRoot("gbastudio-replacement-");
+    const sourceRoot = await makeTemporaryRoot("gbastudio-source-");
     const projectPath = path.join(projectRoot, "Demo.gba-project");
-    const sourcePath = path.join(sourceRoot, "backgrounds", "menu.png");
-    await mkdir(path.dirname(sourcePath), { recursive: true });
-    await writeFile(sourcePath, "new-background", "utf8");
-    const imported = await copyFilesIntoProjectAssets(projectPath, [sourcePath], () => "background");
-    expect(imported[0]).toMatchObject({ kind: "Background", relativePath: "Assets/backgrounds/menu.png" });
-    const replaced = await reimportFileIntoProjectAsset(projectPath, sourcePath, "Assets/backgrounds/menu.png", () => "replacement");
-    expect(replaced.kind).toBe("Background");
-    await expect(readFile(path.join(projectRoot, replaced.relativePath), "utf8")).resolves.toBe("new-background");
+    const sourcePath = path.join(sourceRoot, "different.mp3");
+    const invalidPngPath = path.join(sourceRoot, "invalid.png");
+    const relativePath = "Assets/backgrounds/menu.png";
+    const oldPixels = testPng(0);
+    await mkdir(path.dirname(path.join(projectRoot, relativePath)), { recursive: true });
+    await writeFile(path.join(projectRoot, relativePath), oldPixels);
+    await writeFile(sourcePath, "ID3");
+    await writeFile(invalidPngPath, testPng(255).subarray(0, 30));
+
+    await expect(reimportFileIntoProjectAsset(projectPath, sourcePath, relativePath, () => "replacement")).rejects.toThrow(/formato/);
+    await expect(reimportFileIntoProjectAsset(projectPath, invalidPngPath, relativePath, () => "replacement")).rejects.toThrow(/conteúdo/);
+    await expect(readFile(path.join(projectRoot, relativePath))).resolves.toEqual(oldPixels);
+    await expect(readdir(path.join(projectRoot, "Assets"))).resolves.toEqual(["backgrounds"]);
+  });
+
+  it("keeps the previous audio and rejects a different file masquerading as WAV", async () => {
+    const projectRoot = await makeTemporaryRoot("gbastudio-wav-project-");
+    const sourceRoot = await makeTemporaryRoot("gbastudio-wav-source-");
+    const relativePath = "Assets/audio/menu-navegar-v1.wav";
+    const projectPath = path.join(projectRoot, "Demo.gba-project");
+    const sourcePath = path.join(process.cwd(), "default-assets/templates/exemplo-gba/Assets/audio/menu-confirmar-v1.wav");
+    const original = await readFile(path.join(process.cwd(), "default-assets/templates/exemplo-gba", relativePath));
+    const target = path.join(projectRoot, relativePath);
+    await mkdir(path.dirname(target), { recursive: true });
+    await writeFile(target, original);
+    const fakeWav = path.join(sourceRoot, "broken.wav");
+    await writeFile(fakeWav, "Not a WAV");
+
+    await expect(reimportFileIntoProjectAsset(projectPath, fakeWav, relativePath, () => "invalid")).rejects.toThrow(/conteúdo/);
+    const replacement = await reimportFileIntoProjectAsset(projectPath, sourcePath, relativePath, () => "wav");
+    expect(replacement).toMatchObject({ name: "menu-navegar-v1.wav", kind: "SFX" });
+    await expect(readFile(target)).resolves.toEqual(original);
+    await expect(readFile(path.join(projectRoot, replacement.relativePath))).resolves.toEqual(await readFile(sourcePath));
+  });
+
+  it("rejects writing replacements outside the project through a linked Assets folder", async () => {
+    const projectRoot = await makeTemporaryRoot("gbastudio-replacement-");
+    const otherRoot = await makeTemporaryRoot("gbastudio-outside-");
+    const sourcePath = path.join(otherRoot, "updated.png");
+    await writeFile(sourcePath, testPng(255));
+    await symlink(otherRoot, path.join(projectRoot, "Assets"), "junction");
+
+    await expect(reimportFileIntoProjectAsset(path.join(projectRoot, "Demo.gba-project"), sourcePath, "Assets/menu.png", () => "replacement")).rejects.toThrow(/pasta do projeto/);
+    await expect(readdir(otherRoot)).resolves.toEqual(["updated.png"]);
   });
 
   it("copies a project reference image into Assets using the requested sprite file name", async () => {

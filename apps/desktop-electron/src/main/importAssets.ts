@@ -3,6 +3,8 @@ import path from "node:path";
 import type { ImportedAssetFile } from "../shared/ipc.js";
 import { assetKindForFileName, systemImageForAssetKind } from "../shared/filesWorkspace.js";
 import { convertSoundFont } from "./soundFont.js";
+import { validateAssetReplacement } from "./assetReplacementFormat.js";
+import { resolvePluginPathWithinRoot } from "../shared/pluginPathContainment.js";
 
 const ASSETS_FOLDER_NAME = "Assets";
 const IMAGE_EXTENSIONS = ["apng", "bmp", "gif", "jpg", "jpeg", "png", "webp"];
@@ -198,18 +200,31 @@ export async function reimportFileIntoProjectAsset(
   makeAssetID: AssetIDFactory
 ): Promise<ImportedAssetFile> {
   const projectDirectory = path.resolve(path.dirname(projectPath));
-  const destination = path.resolve(projectDirectory, relativePath);
-  if (!destination.startsWith(`${projectDirectory}${path.sep}`)) {
-    throw new Error("O destino de reimportacao precisa permanecer dentro da pasta do projeto.");
+  const currentSource = relativePath.replaceAll("\\", "/");
+  const name = path.posix.basename(currentSource);
+  if (!name || name === "." || name === "..") throw new Error("O destino de reimportacao precisa permanecer dentro da pasta do projeto.");
+  const bytes = await readFile(sourcePath);
+  validateAssetReplacement(bytes, sourcePath, name);
+  const revisionsPath = `${ASSETS_FOLDER_NAME}/revisions`;
+  const revisionsDirectory = await resolvePluginPathWithinRoot(projectDirectory, revisionsPath);
+  if (!revisionsDirectory) throw new Error("O destino de reimportacao precisa permanecer dentro da pasta do projeto.");
+
+  const id = makeAssetID();
+  await mkdir(revisionsDirectory, { recursive: true });
+  const revisionDirectory = await mkdtemp(path.join(revisionsDirectory, "asset-"));
+  try {
+    // The previous file can still be used by the saved project or an undo entry.
+    await writeFile(path.join(revisionDirectory, name), bytes, { flag: "wx" });
+  } catch (error) {
+    await rm(revisionDirectory, { recursive: true, force: true });
+    throw error;
   }
-  await mkdir(path.dirname(destination), { recursive: true });
-  await copyFile(sourcePath, destination);
-  const name = path.basename(destination);
-  const kind = importedAssetKindForSourcePath(relativePath);
+
+  const kind = importedAssetKindForSourcePath(currentSource);
   return {
-    id: makeAssetID(),
+    id,
     name,
-    relativePath: relativePath.replaceAll(path.sep, "/"),
+    relativePath: `${revisionsPath}/${path.basename(revisionDirectory)}/${name}`,
     kind,
     systemImage: systemImageForAssetKind(kind)
   };

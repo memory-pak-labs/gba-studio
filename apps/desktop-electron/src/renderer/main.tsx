@@ -21,7 +21,7 @@ import {
   renameAssetsWithPatternInProject,
   renameAssetInProject,
   repairAssetGroupReferencesInProject,
-  replaceAssetFileInProject,
+  assetFileSourceInProject,
   resolveAssetSourcePath,
   updateAssetKindsInProject
 } from "../shared/filesWorkspace";
@@ -277,7 +277,7 @@ import {
 import { PluginCatalogModal } from "./PluginCatalogModal";
 import { saveNewProjectSession } from "./newProjectCreationFlow";
 import { saveExistingProjectSession } from "./projectSaveFlow";
-import { markProjectSessionSaved, reconcileProjectSessionSaved, restoreProjectSessionHistory, selectProjectSessionRoom, type ProjectSession } from "./projectSession";
+import { commitProjectAssetReplacement, markProjectSessionSaved, reconcileProjectSessionSaved, restoreProjectSessionHistory, selectProjectSessionRoom, type ProjectSession } from "./projectSession";
 import { copyName, uniqueDefaultRoomName, droppedFiles, statusText } from "./rendererHelpers";
 import { RoomsWorkspace } from "./roomsWorkspace";
 import { SettingsWorkspace } from "./settingsWorkspace";
@@ -1065,7 +1065,7 @@ function App(): React.ReactElement {
 
   function commitProjectData(
     nextData: ParsedGBAProject["data"],
-    options?: { dirty?: boolean; externalAssetMutation?: boolean; historyGroupID?: string; path?: string }
+    options?: { dirty?: boolean; historyGroupID?: string; path?: string }
   ): void {
     if (!session) return;
     const activeHistoryGroup = options?.historyGroupID
@@ -1089,7 +1089,6 @@ function App(): React.ReactElement {
     setSession({
       ...session,
       dirty: options?.dirty ?? true,
-      externalRevision: (session.externalRevision ?? 0) + (options?.externalAssetMutation ? 1 : 0),
       path: resolveProjectSessionPathAfterDataCommit(session.path, options?.path),
       project: {
         data: history.present,
@@ -1296,16 +1295,9 @@ function App(): React.ReactElement {
 
   async function replaceAssetFile(assetID: string, currentName: string): Promise<void> {
     if (!session) return;
+    const replaceRelativePath = assetFileSourceInProject(session.project.data, assetID);
+    if (!replaceRelativePath) return;
     const savedData = structuredClone(session.project.data);
-    const currentAsset = (Array.isArray(session.project.data.assets) ? session.project.data.assets : [])
-      .find((asset) => (
-        asset && typeof asset === "object" && !Array.isArray(asset)
-        && String((asset as Record<string, unknown>).id ?? "") === assetID
-      )) as Record<string, unknown> | undefined;
-    const metadata = currentAsset?.metadata && typeof currentAsset.metadata === "object" && !Array.isArray(currentAsset.metadata)
-      ? currentAsset.metadata as Record<string, unknown>
-      : {};
-    const replaceRelativePath = typeof metadata.source === "string" ? metadata.source : undefined;
     const flow = await runFilesImportFlow({
       projectPath: session.path,
       saveProject: () => window.gbaStudio.saveProject(session),
@@ -1326,7 +1318,7 @@ function App(): React.ReactElement {
       return;
     }
     if (result.error) {
-      notifyError(result.error);
+      notifyError(ui(result.error));
       return;
     }
     const replacements = result.assets ?? [];
@@ -1334,9 +1326,14 @@ function App(): React.ReactElement {
       notifyError(ui("Selecione exatamente um arquivo para substituir o asset."));
       return;
     }
-    const nextData = replaceAssetFileInProject(session.project.data, assetID, replacements[0]);
-    if (nextData === session.project.data) return;
-    commitProjectData(nextData, { path: projectPath, externalAssetMutation: true });
+    const latest = dialogueSessionRef.current;
+    if (latest?.identity !== session.identity || latest?.path !== projectPath
+      || assetFileSourceInProject(latest.project.data, assetID) !== replaceRelativePath) {
+      notifyError(ui("O projeto ou o asset mudou durante a substituição. Tente novamente."));
+      return;
+    }
+    projectHistoryGroupRef.current = null;
+    setSession(current => commitProjectAssetReplacement(current, session, projectPath, assetID, replaceRelativePath, replacements[0]!));
     notifySuccess(ui("Arquivo de {0} substituído sem quebrar referências.", { 0: currentName }));
   }
 

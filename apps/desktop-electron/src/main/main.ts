@@ -606,7 +606,7 @@ ipcMain.handle(ipcChannels.importAssets, async (_event, request: ImportAssetsReq
   }
 
   const smokeAssetPaths = smokeImportAssetPaths();
-  if (smokeAssetPaths.length > 0) {
+  if (smokeAssetPaths.length > 0 && !request.replaceRelativePath) {
     try {
       const assets = await copyFilesIntoProjectAssets(request.projectPath, smokeAssetPaths, randomUUID);
       return { canceled: false, assets };
@@ -623,7 +623,7 @@ ipcMain.handle(ipcChannels.importAssets, async (_event, request: ImportAssetsReq
   const tilesetScope = request.scope === "tileset";
   const spriteScope = request.scope === "sprite";
   const result = await showLocalizedOpenDialog({
-    title: animationScope ? "Importar animação GIF" : audioScope ? "Importar áudio MOD/WAV/SF2" : tilesetScope ? "Importar tileset PNG" : spriteScope ? "Importar sprite PNG" : "Importar assets",
+    title: request.replaceRelativePath ? "Substituir arquivo" : animationScope ? "Importar animação GIF" : audioScope ? "Importar áudio MOD/WAV/SF2" : tilesetScope ? "Importar tileset PNG" : spriteScope ? "Importar sprite PNG" : "Importar assets",
     properties: request.replaceRelativePath ? ["openFile"] : ["openFile", "multiSelections"],
     filters: animationScope
       ? [

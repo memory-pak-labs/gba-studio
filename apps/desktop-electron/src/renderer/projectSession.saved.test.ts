@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { createBlankProjectData } from "../shared/newProject.js";
 import { summarizeGBAProject } from "../shared/projectFile.js";
 import { createRoomInProject, setActiveRoomInProject } from "../shared/roomsWorkspace.js";
-import { markProjectSessionSaved, reconcileProjectSessionSaved, restoreProjectSessionHistory, selectProjectSessionRoom, type ProjectSession } from "./projectSession.js";
+import { commitProjectAssetReplacement, markProjectSessionSaved, reconcileProjectSessionSaved, restoreProjectSessionHistory, selectProjectSessionRoom, type ProjectSession } from "./projectSession.js";
 
 function saved(): ProjectSession {
   const data = setActiveRoomInProject(createRoomInProject(createBlankProjectData({ name: "Saved" }), {
@@ -54,20 +54,20 @@ describe("saved project history", () => {
     const other = saved();
     expect(reconcileProjectSessionSaved(other, start, "/new.gba-project", savedData)).toBe(other);
   });
-  it("does not treat an overwritten asset as restored when undo only restores project metadata", () => {
+  it("applies a finished replacement to the current session without dropping edits or a newer asset version", () => {
     const initial = saved();
-    const replaced = { ...edit(initial, "Asset replaced"), externalRevision: 1 };
-    expect(restoreProjectSessionHistory(replaced, "undo").dirty).toBe(true);
-    const committed = markProjectSessionSaved(replaced, replaced.path!, replaced.project.data);
-    expect(committed.dirty).toBe(false);
-    const undo = restoreProjectSessionHistory(committed, "undo");
-    expect(undo.dirty).toBe(true);
-    expect(restoreProjectSessionHistory(undo, "redo").dirty).toBe(false);
-  });
-  it("keeps a file replacement made during an in-flight save marked dirty", () => {
-    const requested = saved();
-    const later = { ...requested, dirty: true, externalRevision: 1 };
-    const reconciled = reconcileProjectSessionSaved(later, requested, requested.path!, requested.project.data);
-    expect(reconciled?.dirty).toBe(true);
+    const source = "Assets/sprites/player.png";
+    const data = { ...initial.project.data, assets: [{ id: "player", name: "player.png", kind: "Sprite", metadata: { source } }] };
+    const requested = markProjectSessionSaved({ ...initial, project: { data, summary: summarizeGBAProject(data) } }, initial.path!, data);
+    const later = edit(requested, "A later project edit");
+    const replacement = { id: "revision", name: "player.png", relativePath: "Assets/revisions/asset-a/player.png", kind: "Sprite", systemImage: "photo" };
+    const applied = commitProjectAssetReplacement(later, requested, requested.path!, "player", source, replacement)!;
+    expect(applied.project.data.name).toBe("A later project edit");
+    expect(applied.project.data).toMatchObject({ assets: [{ metadata: { source: replacement.relativePath } }] });
+    expect(restoreProjectSessionHistory(applied, "undo").project.data).toEqual(later.project.data);
+    expect(reconcileProjectSessionSaved(applied, later, later.path!, later.project.data)?.dirty).toBe(true);
+    expect(commitProjectAssetReplacement(applied, requested, requested.path!, "player", source, replacement)).toBe(applied);
+    const other = { ...later, identity: {} };
+    expect(commitProjectAssetReplacement(other, requested, requested.path!, "player", source, replacement)).toBe(other);
   });
 });

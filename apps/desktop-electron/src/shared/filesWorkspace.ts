@@ -1598,6 +1598,14 @@ export function repairAssetGroupReferencesInProject(data: GBAProjectData): GBAPr
   return next;
 }
 
+export function assetFileSourceInProject(data: GBAProjectData, id: string): string | undefined {
+  const asset = projectArray(data, "assets").find((item, index) => assetID(item, index) === id);
+  if (!asset) return undefined;
+  const metadata = isRecord(asset.metadata) ? asset.metadata : {};
+  return nullableString(metadata.source) ?? nullableString(asset.relativePath)
+    ?? nullableString(asset.source) ?? nullableString(asset.name) ?? undefined;
+}
+
 export function replaceAssetFileInProject(
   data: GBAProjectData,
   assetIDToReplace: string,
@@ -1615,7 +1623,8 @@ export function replaceAssetFileInProject(
   // These describe the old pixels, rather than the asset's runtime settings.
   for (const field of [
     "bundledDefaultAsset", "sourceSha256", "preparedSha256", "runtimeSourceSha256",
-    "provenance", "license", "generatedBy", "approved", "reviewStatus", "visualStatus",
+    "sourceOriginal", "provenance", "license", "generatedBy", "approved", "reviewStatus", "visualStatus",
+    "assetcStatus", "assetcReviewed",
     "palettePreparationVisuallyApproved", "width", "height", "backgroundPaletteReferencePlan"
   ]) {
     delete metadata[field];

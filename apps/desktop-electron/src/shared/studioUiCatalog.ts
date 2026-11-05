@@ -17981,6 +17981,21 @@ export const studioUiMessages: Record<string, readonly [string, string, string]>
     "Select only actors or only triggers to create independent copies of the same behavior.",
     "Selecciona solo actores o solo activadores para crear copias independientes del mismo comportamiento."
   ],
+  "Escolha um arquivo no mesmo formato do asset atual.": [
+    "Escolha um arquivo no mesmo formato do asset atual.",
+    "Choose a file in the same format as the current asset.",
+    "Elige un archivo en el mismo formato que el recurso actual."
+  ],
+  "O conteúdo do arquivo é inválido para o formato do asset.": [
+    "O conteúdo do arquivo é inválido para o formato do asset.",
+    "The file contents are invalid for the asset format.",
+    "El contenido del archivo no es válido para el formato del recurso."
+  ],
+  "O projeto ou o asset mudou durante a substituição. Tente novamente.": [
+    "O projeto ou o asset mudou durante a substituição. Tente novamente.",
+    "The project or asset changed during replacement. Try again.",
+    "El proyecto o el recurso cambió durante la sustitución. Inténtalo de nuevo."
+  ],
   "Selecione exatamente um arquivo para substituir o asset.": [
     "Selecione exatamente um arquivo para substituir o asset.",
     "Select exactly one file to replace the asset.",

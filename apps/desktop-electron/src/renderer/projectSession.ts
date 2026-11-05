@@ -1,6 +1,8 @@
+import { assetFileSourceInProject, replaceAssetFileInProject } from "../shared/filesWorkspace.js";
+import type { ImportedAssetFile } from "../shared/ipc.js";
 import { summarizeGBAProject, type ParsedGBAProject } from "../shared/projectFile.js";
 import { setActiveRoomInProject } from "../shared/roomsWorkspace.js";
-import { redoProjectHistory, undoProjectHistory } from "../shared/projectHistory.js";
+import { pushProjectHistory, redoProjectHistory, undoProjectHistory } from "../shared/projectHistory.js";
 
 export interface ProjectSession {
   /** Identity is local to this open session and is never written to the project. */
@@ -9,9 +11,6 @@ export interface ProjectSession {
   project: ParsedGBAProject;
   dirty: boolean;
   savedData?: ParsedGBAProject["data"];
-  /** File replacement cannot be undone by restoring project metadata. */
-  externalRevision?: number;
-  savedExternalRevision?: number;
   redoStack: ParsedGBAProject["data"][];
   undoStack: ParsedGBAProject["data"][];
 }
@@ -31,25 +30,47 @@ function hasUnsavedProjectData(data: ParsedGBAProject["data"], savedData?: Parse
 }
 
 /** Record the exact data sent to a successful save, preserving later edits. */
-export function markProjectSessionSaved(session: ProjectSession, path: string, savedData: ParsedGBAProject["data"], savedExternalRevision = session.externalRevision ?? 0): ProjectSession {
+export function markProjectSessionSaved(session: ProjectSession, path: string, savedData: ParsedGBAProject["data"]): ProjectSession {
   const snapshot = structuredClone(savedData);
-  return { ...session, path, savedData: snapshot, savedExternalRevision,
-    dirty: (session.externalRevision ?? 0) !== savedExternalRevision || hasUnsavedProjectData(session.project.data, snapshot) };
+  return { ...session, path, savedData: snapshot, dirty: hasUnsavedProjectData(session.project.data, snapshot) };
 }
 
 /** A late save must not change a different project opened in the meantime. */
 export function reconcileProjectSessionSaved(current: ProjectSession | null, requested: ProjectSession, path: string, savedData: ParsedGBAProject["data"]): ProjectSession | null {
   if (!current || !requested.identity || current.identity !== requested.identity) return current;
-  return markProjectSessionSaved(current, path, savedData, requested.externalRevision ?? 0);
+  return markProjectSessionSaved(current, path, savedData);
 }
 
 export function restoreProjectSessionHistory(session: ProjectSession, direction: "undo" | "redo"): ProjectSession {
   const state = { present: session.project.data, undoStack: session.undoStack, redoStack: session.redoStack };
   const history = direction === "undo" ? undoProjectHistory(state) : redoProjectHistory(state);
   if (history.present === state.present) return session;
-  return { ...session, dirty: (session.externalRevision ?? 0) !== (session.savedExternalRevision ?? 0) || hasUnsavedProjectData(history.present, session.savedData),
+  return { ...session, dirty: hasUnsavedProjectData(history.present, session.savedData),
     project: { data: history.present, summary: summarizeGBAProject(history.present) },
     undoStack: history.undoStack, redoStack: history.redoStack };
+}
+
+/** Apply a completed file selection only if its project and asset version are still current. */
+export function commitProjectAssetReplacement(
+  current: ProjectSession | null,
+  requested: ProjectSession,
+  projectPath: string,
+  assetID: string,
+  previousSource: string,
+  replacement: ImportedAssetFile
+): ProjectSession | null {
+  if (!current || !requested.identity || current.identity !== requested.identity || current.path !== projectPath
+    || assetFileSourceInProject(current.project.data, assetID) !== previousSource) return current;
+
+  const data = replaceAssetFileInProject(current.project.data, assetID, replacement);
+  const history = pushProjectHistory({ present: current.project.data, undoStack: current.undoStack, redoStack: current.redoStack }, data);
+  return {
+    ...current,
+    project: { data: history.present, summary: summarizeGBAProject(history.present) },
+    dirty: hasUnsavedProjectData(history.present, current.savedData),
+    undoStack: history.undoStack,
+    redoStack: history.redoStack
+  };
 }
 
 /** Keep the active scene mirror for editor consumers without recording navigation as an edit. */
