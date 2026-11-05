@@ -2750,7 +2750,7 @@ describe("Preview Runtime", () => {
       ...runtime.project,
       audioItems: [
         ...(Array.isArray(runtime.project.audioItems) ? runtime.project.audioItems : []),
-        { id: "audio-battle", name: "battle.mod", kind: "Musica" }
+        { id: "audio-battle", name: "Tema da batalha", kind: "Musica", sourceAssetID: "asset-battle" }
       ],
       assets: [
         ...(Array.isArray(runtime.project.assets) ? runtime.project.assets : []),
@@ -2762,7 +2762,7 @@ describe("Preview Runtime", () => {
           name: "room_boot",
           category: "Cena",
           steps: [
-            { command: "play_music battle.mod" },
+            { command: 'play_music "Tema da batalha"' },
             { command: "show_dialogue intro_001" }
           ]
         }
@@ -2772,12 +2772,12 @@ describe("Preview Runtime", () => {
     const synced = syncPreviewRuntimeProject(runtime, nextProject);
 
     expect(synced.player).toMatchObject({ x: 15, y: 10 });
-    expect(synced.activeMusic).toBe("battle.mod");
+    expect(synced.activeMusic).toBe("Tema da batalha");
     expect(synced.activeMusicAsset).toMatchObject({
       source: "Assets/audio/battle.mod"
     });
     expect(synced.eventLog.map((item) => item.command)).toEqual([
-      "play_music battle.mod",
+      'play_music "Tema da batalha"',
       "show_dialogue intro_001"
     ]);
   });

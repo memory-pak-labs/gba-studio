@@ -1,3 +1,7 @@
+import { projectWithCompiledAdvancedTools } from "./advancedTools.js";
+import { audioReferenceUsages } from "./audioWorkspace.js";
+import { nativeEventCommandReferencedEvents } from "./eventCommandRegistry.js";
+import { runtimeEventStates } from "./sceneEventStates.js";
 import { deriveDialoguesWorkspacePresentation } from "./dialoguesWorkspace.js";
 import { deriveFilesWorkspacePresentation } from "./filesWorkspace.js";
 import type { FilesWorkspaceName, FilesWorkspaceUsageLink } from "./filesWorkspace.js";
@@ -55,14 +59,6 @@ function commandParts(command: string): string[] {
   return command.split(/\s+/).filter(Boolean);
 }
 
-function eventReferenceIndex(parts: string[]): number | null {
-  const verb = parts[0] ?? "noop";
-  if (["call_event", "lock_script", "unlock_script", "timer_restart", "timer_remove"].includes(verb)) return 1;
-  if (verb === "choice_event") return 3;
-  if (["attach_button", "timer_attach"].includes(verb)) return 2;
-  return null;
-}
-
 function addUsage(usages: Map<string, ProjectReferenceUsage>, usage: ProjectReferenceUsage): void {
   const key = [usage.workspace, usage.targetID ?? "", usage.targetName ?? "", usage.usageKind, usage.label].join(":");
   usages.set(key, usage);
@@ -80,38 +76,14 @@ function listAssetUsages(data: GBAProjectData, target: ProjectReferenceTarget): 
 }
 
 function listAudioUsages(data: GBAProjectData, target: ProjectReferenceTarget): ProjectReferenceUsage[] {
-  const usages = new Map<string, ProjectReferenceUsage>();
-  for (const room of projectArray(data, "rooms")) {
-    if (optionalString(room.music) !== target.name) continue;
-    const roomName = stringValue(room.name, "Room sem nome");
-    addUsage(usages, {
-      label: `Room: ${roomName}`,
-      workspace: "Editor",
-      targetID: optionalString(room.id) ?? undefined,
-      targetName: roomName,
-      usageKind: "room-music"
-    });
-  }
-  for (const event of projectArray(data, "events")) {
-    const eventName = stringValue(event.name, "Evento sem nome");
-    if (!commandsForEvent(event).some(({ command }) => {
-      const parts = commandParts(command);
-      return ["play_music", "play_sfx"].includes(parts[0] ?? "") && parts[1] === target.name;
-    })) continue;
-    addUsage(usages, {
-      label: `Evento: ${eventName}`,
-      workspace: "Eventos",
-      targetID: optionalString(event.id) ?? undefined,
-      targetName: eventName,
-      usageKind: "event-audio-command"
-    });
-  }
-  return sortedUsages(usages);
+  const usages = audioReferenceUsages(data, target.name);
+  return sortedUsages(new Map(usages.map(usage => [usage.label, usage.usageKind === "room-music"
+    ? { ...usage, label: `Room: ${usage.targetName}` } : usage])));
 }
 
 function projectRooms(data: GBAProjectData): Record<string, unknown>[] {
-  const rooms = projectArray(data, "rooms");
-  return rooms.length > 0 ? rooms : projectArray(data, "scenas");
+  const scenes = projectArray(data, "scenas");
+  return scenes.length > 0 ? scenes : projectArray(data, "rooms");
 }
 
 function editorConnections(data: GBAProjectData): Record<string, unknown>[] {
@@ -202,7 +174,8 @@ function listEventUsages(data: GBAProjectData, target: ProjectReferenceTarget): 
   ] as const;
   for (const [kind, entities] of entityGroups) {
     for (const entity of entities) {
-      if (!recordHasEventReference(entity, target.name)) continue;
+      const runtimeUses = runtimeEventStates(entity).filter(state => state.eventName === target.name);
+      if (!recordHasEventReference(entity, target.name) && !runtimeUses.length) continue;
       const name = stringValue(entity.name, entityLabel(kind, entity));
       addUsage(usages, {
         label: entityLabel(kind, entity),
@@ -222,13 +195,11 @@ function listEventUsages(data: GBAProjectData, target: ProjectReferenceTarget): 
       usageKind: "connection-event"
     });
   }
-  for (const event of projectArray(data, "events")) {
+  const compiled = projectWithCompiledAdvancedTools(data).data;
+  for (const event of projectArray(compiled, "events")) {
     const eventName = stringValue(event.name, "Evento sem nome");
-    if (!commandsForEvent(event).some(({ command }) => {
-      const parts = commandParts(command);
-      const index = eventReferenceIndex(parts);
-      return index !== null && parts[index] === target.name;
-    })) continue;
+    if (target.id ? event.id === target.id : eventName === target.name) continue;
+    if (!commandsForEvent(event).some(({ command }) => nativeEventCommandReferencedEvents(command).includes(target.name))) continue;
     addUsage(usages, {
       label: `Evento: ${eventName}`,
       workspace: "Eventos",

@@ -152,6 +152,7 @@ import {
   nudgeRoomEntitiesInProject,
   placeRoomEntityInRoomInProject,
   removeRoomEntitiesInProject,
+  roomActorRemovalReferences,
   removeRoomFromProject,
   removeRoomConnectionFromProject,
   updateRoomConnectionInProject,
@@ -1697,6 +1698,10 @@ function App(): React.ReactElement {
       setStatus(ui("Não foi possível renomear a cena. Verifique o nome informado."));
       return;
     }
+    if (roomsPresentation?.rooms.some(room => room.id !== roomID && room.name.toLowerCase() === trimmedName.toLowerCase())) {
+      notifyError(ui("Já existe uma cena com esse nome."));
+      return;
+    }
     const nextData = renameRoomInProject(session.project.data, roomID, trimmedName);
     if (nextData !== session.project.data) {
       updateProjectData(nextData);
@@ -2029,14 +2034,18 @@ function App(): React.ReactElement {
 
   async function removeRoomEntities(roomID: string, selectedKeys: string[]): Promise<void> {
     if (!session || selectedKeys.length === 0) return;
+    const data = session.project.data;
+    const options = { roomID, selectedKeys };
+    const references = roomActorRemovalReferences(data, options);
+    if (references.length) {
+      notifyError(ui("Remova primeiro os vínculos dos atores em: {0}.", { 0: references.join(", ") }));
+      return;
+    }
     const confirmed = await confirm(`Remover ${selectedKeys.length} entidades selecionadas desta cena?`);
-    if (!confirmed) return;
+    if (!confirmed || dialogueSessionRef.current?.project.data !== data) return;
 
-    const nextData = removeRoomEntitiesInProject(session.project.data, {
-      roomID,
-      selectedKeys
-    });
-    if (nextData !== session.project.data) {
+    const nextData = removeRoomEntitiesInProject(data, options);
+    if (nextData !== data) {
       updateProjectData(nextData);
       setStatus(ui("Selecao removida: {0} entidades.", { 0: selectedKeys.length }));
     }

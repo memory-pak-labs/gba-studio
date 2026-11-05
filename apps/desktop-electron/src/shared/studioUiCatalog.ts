@@ -13120,6 +13120,16 @@ export const studioUiMessages: Record<string, readonly [string, string, string]>
     "Unable to start MCP server: {0}",
     "No se puede iniciar el servidor MCP: {0}"
   ],
+  "Remova primeiro os vínculos dos atores em: {0}.": [
+    "Remova primeiro os vínculos dos atores em: {0}.",
+    "Remove the actor references in {0} first.",
+    "Primero elimina las referencias de los actores en {0}."
+  ],
+  "Já existe uma cena com esse nome.": [
+    "Já existe uma cena com esse nome.",
+    "A scene with this name already exists.",
+    "Ya existe una escena con este nombre."
+  ],
   "Não foi possível renomear a cena. Verifique o nome informado.": [
     "Não foi possível renomear a cena. Verifique o nome informado.",
     "It was not possible to rename the scene. Please check the name provided.",

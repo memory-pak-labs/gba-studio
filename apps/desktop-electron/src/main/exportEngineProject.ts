@@ -4554,7 +4554,7 @@ function compileEventStep(
   }
 
   if (isLutaEventVerb(verb)) {
-    const control = parseLutaEventCommand(parts.join(" "));
+    const control = parseLutaEventCommand(sceneChangeCommand(parts));
     if (verb === "luta_start_match") {
       const index = roomIndexByName(rooms, control.target ?? "");
       if (index < 0) throw new Error(`Partida referencia cena de Luta inexistente: ${control.target}`);

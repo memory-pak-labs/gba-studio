@@ -21,7 +21,9 @@ export function actorCommandReferences(command: string, actorNames: readonly str
 }
 
 function hasQuotedFirstReference(verb: string): boolean {
-  return verb === "change_scene" || actorReferenceCommands.has(verb);
+  return verb === "change_scene" || verb === "luta_start_match" || verb === "if_scene"
+    || verb === "play_music" || verb === "play_sfx" || verb === "run_audio_routine" || verb === "set_text_sfx"
+    || actorReferenceCommands.has(verb);
 }
 
 function quotedOperands(value: string): string[] {

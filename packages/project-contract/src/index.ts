@@ -1109,6 +1109,7 @@ function validateAudioTrackerSchema(audio: Record<string, unknown>, invalidField
 
 export function validateAudioSchemaCoverage(data: GBAProjectData): GBAProjectAudioSchemaIssue[] {
   const knownAudioAssetNames = audioAssetNames(data);
+  const audioAssetIDs = new Set(projectArray(data, "assets").filter(asset => isAudioAssetKind(asset.kind)).map(asset => asset.id));
 
   const bankInvalid: string[] = [];
   const bankIDs = new Set<string>();
@@ -1137,8 +1138,11 @@ export function validateAudioSchemaCoverage(data: GBAProjectData): GBAProjectAud
       missingFields.push("name");
     } else if (typeof name !== "string" || name.trim().length === 0) {
       invalidFields.push("name");
-    } else if (!hasComposedSource && knownAudioAssetNames.size > 0 && !knownAudioAssetNames.has(name.trim())) {
+    } else if (!hasComposedSource && !audio.sourceAssetID && knownAudioAssetNames.size > 0 && !knownAudioAssetNames.has(name.trim())) {
       invalidFields.push("name");
+    }
+    if (audio.sourceAssetID !== undefined && (typeof audio.sourceAssetID !== "string" || !audioAssetIDs.has(audio.sourceAssetID))) {
+      invalidFields.push("sourceAssetID");
     }
 
     if (kind === undefined) {

@@ -1,3 +1,5 @@
+import { sceneChangeCommandParts } from "./sceneChangeCommand.js";
+
 /** Authorable Luta controls. Operand order matches EventOp::LutaControl. */
 export const lutaEventVerbs = [
   "luta_start_match", "luta_end_match", "luta_set_super_gauge", "luta_add_super_gauge",
@@ -14,7 +16,7 @@ export function isLutaEventVerb(verb: string): verb is LutaEventVerb {
   return (lutaEventVerbs as readonly string[]).includes(verb);
 }
 export function parseLutaEventCommand(command: string): LutaEventCommand {
-  const [verb = "", ...args] = command.trim().split(/\s+/);
+  const [verb = "", ...args] = sceneChangeCommandParts(command);
   if (!isLutaEventVerb(verb)) throw new Error("Evento de Luta desconhecido.");
   const targeted = !["luta_set_round_timer", "luta_set_rounds_to_win"].includes(verb);
   const expected = ["luta_start_match", "luta_end_match", "luta_set_round_timer", "luta_set_rounds_to_win"].includes(verb) ? 1 : 2;

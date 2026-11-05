@@ -1,3 +1,5 @@
+import { projectWithCompiledAdvancedTools } from "../advancedTools.js";
+import { expandEventProcedures } from "../eventProcedures.js";
 import { roomMapStates, type MapStateDefinition } from "../mapStates.js";
 import { actorInitialCollisionBounds } from "../actorPlacementDiagnostics.js";
 import { actorCommandReferences, sceneChangeCommand, sceneChangeCommandParts } from "../sceneChangeCommand.js";
@@ -12,6 +14,7 @@ import {
   GBA_MIN_SCENE_WIDTH_TILES,
   normalizeGBAAssetDocument,
   normalizeGBAEntityDocument,
+  normalizeGBAEventDocument,
   type GBASceneCampaignDocument
 } from "../../../../../packages/project-contract/src/index.js";
 import { normalizeGBASceneDocument } from "../../../../../packages/project-contract/src/index.js";
@@ -71,6 +74,7 @@ import {
   resolveSceneControlledEntityContract,
   DEFAULT_ISOMETRIC_SCENE_CONFIG,
   sceneTypeProfile,
+  cutsceneSceneConfigFromRuntime,
   type CutsceneSceneConfig,
   type IsometricSceneConfig,
   type SceneRuntimeConfig
@@ -3505,24 +3509,16 @@ function roomNameSet(data: GBAProjectData): Set<string> {
 function renameChangeSceneCommand(command: unknown, oldName: string, nextName: string): unknown {
   if (typeof command !== "string") return command;
   const parts = sceneChangeCommandParts(command);
-  if (parts[0] === "change_scene" && parts[1] === oldName) {
+  if (["change_scene", "if_scene", "luta_start_match"].includes(parts[0] ?? "") && parts[1] === oldName) {
     parts[1] = nextName;
     return sceneChangeCommand(parts);
   }
-  if (command === `change_scene ${oldName}`) {
-    return `change_scene ${nextName}`;
-  }
-
-  if (command.startsWith(`change_scene ${oldName} `)) {
-    return `change_scene ${nextName}${command.slice(`change_scene ${oldName}`.length)}`;
-  }
-
-  if (command === `if_scene ${oldName}`) {
-    return `if_scene ${nextName}`;
-  }
-
-  if (command.startsWith(`if_scene ${oldName} `)) {
-    return `if_scene ${nextName}${command.slice(`if_scene ${oldName}`.length)}`;
+  // Older authored commands may still contain an unquoted scene name with spaces.
+  for (const verb of ["change_scene", "if_scene", "luta_start_match"]) {
+    const prefix = `${verb} ${oldName}`;
+    if (command === prefix || command.startsWith(`${prefix} `)) {
+      return sceneChangeCommand([verb, nextName, ...command.slice(prefix.length).trim().split(/\s+/).filter(Boolean)]);
+    }
   }
 
   return command;
@@ -3546,6 +3542,29 @@ function renameChangeSceneCommands(data: GBAProjectData, oldName: string, nextNa
         command: renameChangeSceneCommand(step.command, oldName, nextName)
       };
     });
+  }
+}
+
+function renameMenuSceneDestinations(rooms: Record<string, unknown>[], oldName: string, newName: string): void {
+  const configs = rooms.flatMap(room => {
+    const runtime = isRecord(room.runtime) ? room.runtime : null;
+    return runtime?.type === "menu" && isRecord(runtime.config) ? [runtime.config] : [];
+  });
+  const screens = configs.flatMap(config => projectRecords(config, "screens"));
+  // An explicitly authored screen keeps its own ID when its scene is renamed.
+  if (screens.some(screen => screen.id === oldName)) return;
+  for (const config of [...configs, ...screens]) {
+    if (config.nextScreenID === oldName) config.nextScreenID = newName;
+    if (isRecord(config.pageNavigation)) {
+      for (const key of ["previousScreenID", "nextScreenID"]) {
+        if (config.pageNavigation[key] === oldName) config.pageNavigation[key] = newName;
+      }
+    }
+    for (const item of projectRecords(config, "items")) {
+      for (const key of ["targetScreenID", "targetSceneID"]) {
+        if (item[key] === oldName) item[key] = newName;
+      }
+    }
   }
 }
 
@@ -4483,7 +4502,8 @@ export function renameRoomInProject(data: GBAProjectData, roomIDToRename: string
   if (roomIndex < 0) return data;
 
   const oldName = roomName(rooms[roomIndex], roomIndex);
-  if (oldName === trimmedName) return data;
+  if (oldName === trimmedName
+    || rooms.some((room, index) => index !== roomIndex && roomName(room, index).toLowerCase() === trimmedName.toLowerCase())) return data;
 
   rooms[roomIndex].name = trimmedName;
   setProjectRooms(next, rooms);
@@ -4493,6 +4513,7 @@ export function renameRoomInProject(data: GBAProjectData, roomIDToRename: string
   renameSceneConnections(next, oldName, trimmedName);
   renameSceneMapPosition(next, oldName, trimmedName);
   renameChangeSceneCommands(next, oldName, trimmedName);
+  renameMenuSceneDestinations(rooms, oldName, trimmedName);
   renameSceneRouteTableReferences(next, oldName, trimmedName);
   renameSceneScopedRecords(next, oldName, trimmedName);
   return next;
@@ -4892,9 +4913,60 @@ export function nudgeRoomEntitiesInProject(data: GBAProjectData, options: NudgeR
   return changed ? next : data;
 }
 
+export function roomActorRemovalReferences(data: GBAProjectData, options: RemoveRoomEntitiesOptions): string[] {
+  const selectedKeys = new Set(options.selectedKeys);
+  if (![...selectedKeys].some(key => key.startsWith("actor:"))) return [];
+  const rooms = projectRooms(data);
+  const roomIndex = rooms.findIndex((room, index) => roomID(room, index) === options.roomID);
+  const room = rooms[roomIndex];
+  if (!room) return [];
+  const name = roomName(room, roomIndex);
+  const actors = projectRecords(data, "actors");
+  const removed = new Set(actors.filter((actor, index) =>
+    selectedKeys.has(roomEntityRecordKey("actor", actor, index)) && entityRoomName(actor, rooms) === name));
+  if (!removed.size) return [];
+
+  // The compiler resolves actor operands by the first matching ID or name.
+  const actorsByReference = new Map<string, Record<string, unknown>>();
+  for (const actor of actors) {
+    for (const reference of [actor.id, actor.name]) {
+      if (typeof reference === "string" && !actorsByReference.has(reference)) actorsByReference.set(reference, actor);
+    }
+  }
+  const actorNames = [...actorsByReference.keys()];
+  const references = new Set<string>();
+  const compiled = projectWithCompiledAdvancedTools(data).data;
+  const expanded = expandEventProcedures(projectRecords(compiled, "events")).events;
+  for (const event of expanded.map(normalizeGBAEventDocument)) {
+    if (event.steps.some(step => step.isEnabled && actorCommandReferences(step.command, actorNames).some(reference => {
+      const actor = actorsByReference.get(reference);
+      return reference.toLowerCase() !== "player" && actor !== undefined && removed.has(actor);
+    }))) references.add(event.name);
+  }
+
+  // Removing an earlier actor also shifts any later numeric index.
+  const cutscene = cutsceneSceneConfigFromRuntime(room.runtime, data.settings);
+  const isometric = isometricSceneConfigFromRuntime(room.runtime, data.settings);
+  const tactical = isometric?.gameplayMode === "tactical" ? isometric.tactical : undefined;
+  const authoredActors = actors.filter(actor => {
+    const owner = normalizeGBAEntityDocument(actor, "actor").sceneName;
+    return owner === name || (Boolean(tactical) && !owner);
+  });
+  const firstRemoved = authoredActors.findIndex(actor => removed.has(actor));
+  const indexedReferences = [
+    ...cutscene?.steps?.flatMap(step => [...step.actorFrames ?? [], ...step.actorMotions ?? []].map(pose => pose.actorIndex)) ?? [],
+    ...tactical?.units.map(unit => unit.actorIndex) ?? []
+  ];
+  if (firstRemoved >= 0 && indexedReferences.some(index => index >= firstRemoved)) references.add(name);
+  const player = actors.find(actor => actor.name === room.playerActorName && entityRoomName(actor, rooms) === name);
+  if (player && removed.has(player)) references.add(name);
+
+  return [...references];
+}
+
 export function removeRoomEntitiesInProject(data: GBAProjectData, options: RemoveRoomEntitiesOptions): GBAProjectData {
   const selectedKeys = new Set(options.selectedKeys);
-  if (selectedKeys.size === 0) return data;
+  if (selectedKeys.size === 0 || roomActorRemovalReferences(data, options).length) return data;
 
   const rooms = projectRooms(data);
   const roomIndex = rooms.findIndex((room, index) => roomID(room, index) === options.roomID);
