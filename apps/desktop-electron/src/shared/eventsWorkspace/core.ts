@@ -2428,9 +2428,35 @@ function commandSuggestionRank(suggestion: EventsWorkspaceCommandSuggestion, com
   return rank;
 }
 
+interface CommandInsightPalette {
+  suggestions: EventsWorkspaceCommandSuggestion[];
+  verbs: Map<EventsWorkspaceCommandSuggestion, string>;
+  byVerb: Map<string, EventsWorkspaceCommandSuggestion[]>;
+  definitions: Map<string, EventCommandDefinition>;
+}
+
+function indexCommandInsightPalette(palette: EventsWorkspaceCommandSuggestion[]): CommandInsightPalette {
+  const suggestions = palette.filter((suggestion) => !suggestion.isRecipe);
+  const verbs = new Map<EventsWorkspaceCommandSuggestion, string>();
+  const byVerb = new Map<string, EventsWorkspaceCommandSuggestion[]>();
+  for (const suggestion of suggestions) {
+    const verb = commandVerb(suggestion.command);
+    verbs.set(suggestion, verb);
+    const group = byVerb.get(verb) ?? [];
+    group.push(suggestion);
+    byVerb.set(verb, group);
+  }
+  const definitions = new Map<string, EventCommandDefinition>();
+  for (const definition of eventCommandCatalog) {
+    const verb = commandVerb(definition.commandTemplate);
+    if (!definitions.has(verb)) definitions.set(verb, definition);
+  }
+  return { suggestions, verbs, byVerb, definitions };
+}
+
 function commandInsightForStep(
   command: string,
-  palette: EventsWorkspaceCommandSuggestion[],
+  palette: CommandInsightPalette,
   resourceOptions: EventCommandResourceOptions
 ): Pick<
   EventsWorkspaceStep,
@@ -2449,13 +2475,12 @@ function commandInsightForStep(
   command = sceneChangeCommand(sceneChangeCommandParts(command, resourceOptions.actor));
   const verb = commandVerb(command);
   const review = eventCommandReview(verb);
-  const definition = eventCommandCatalog.find(item => commandVerb(item.commandTemplate) === verb);
+  const definition = palette.definitions.get(verb);
   const support = eventCommandSupport(verb);
   const integrationIssue = support.status === "native" ? eventCommandIntegrationIssue(command) : null;
   const unavailable = Boolean(integrationIssue) || support.status === "pending" || support.status === "not-applicable";
-  const commandSuggestions = palette.filter((suggestion) => !suggestion.isRecipe);
-  const sameVerbSuggestions = commandSuggestions
-    .filter((suggestion) => commandVerb(suggestion.command) === verb)
+  const commandSuggestions = palette.suggestions;
+  const sameVerbSuggestions = (palette.byVerb.get(verb) ?? []).slice()
     .sort((lhs, rhs) => (
       commandSuggestionRank(lhs, command, verb) - commandSuggestionRank(rhs, command, verb) ||
       lhs.label.localeCompare(rhs.label, "pt-BR")
@@ -2464,13 +2489,13 @@ function commandInsightForStep(
   const verbSuggestion = sameVerbSuggestions[0] ?? null;
   const primarySuggestion = exactSuggestion ?? verbSuggestion;
   const relatedSuggestions = [
-    ...commandSuggestions.filter(suggestion => review?.alternatives.includes(commandVerb(suggestion.command))),
+    ...commandSuggestions.filter(suggestion => review?.alternatives.includes(palette.verbs.get(suggestion)!)),
     ...sameVerbSuggestions.filter((suggestion) => suggestion.command === command),
     ...sameVerbSuggestions.filter((suggestion) => suggestion.command !== command),
     ...commandSuggestions.filter((suggestion) => (
       primarySuggestion &&
       suggestion.command !== command &&
-      commandVerb(suggestion.command) !== verb &&
+      palette.verbs.get(suggestion)! !== verb &&
       suggestion.category === primarySuggestion.category
     ))
   ];
@@ -3327,13 +3352,14 @@ export function deriveEventsWorkspacePresentation(
   const eventNames = new Set(eventDocuments.map((event) => event.name));
   const resourceOptions = commandResourceOptions(data, sourceEvents);
   const palette = commandPalette(data, sourceEvents, pluginRegistry);
+  const insightPalette = indexCommandInsightPalette(palette);
   // Commands recur across scene entries and actor callbacks. Analyze each once
   // per derivation; a new project edit always receives fresh resource context.
   const insightCache=new Map<string,ReturnType<typeof commandInsightForStep>>();
   const missingReferenceCache=new Map<string,string[]>();
   const insightForCommand=(command:string)=>{
     let insight=insightCache.get(command);
-    if(!insight){insight=commandInsightForStep(command,palette,resourceOptions);insightCache.set(command,insight);}
+    if(!insight){insight=commandInsightForStep(command,insightPalette,resourceOptions);insightCache.set(command,insight);}
     return insight;
   };
   const missingReferencesForCommand=(command:string)=>{

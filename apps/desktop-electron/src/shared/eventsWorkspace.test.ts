@@ -2722,3 +2722,22 @@ describe("Events graph layout", () => {
     expect(graphNodesOverlap(presentation.graphNodes)).toBe(false);
   });
 });
+
+
+it("refreshes command suggestions and diagnostics after project resources change", () => {
+  const events = [{ id: "audio-event", name: "audio_event", steps: [
+    { command: "play_music theme_a.mod" }, { command: "play_sfx confirm.wav" }
+  ] }];
+  const first = deriveEventsWorkspacePresentation({ events, audioItems: [
+    { name: "theme_a.mod", kind: "Musica" }, { name: "confirm.wav", kind: "SFX" }
+  ] }).groups.flatMap((group) => group.events)[0]!;
+  expect(first.steps[0]!.missingReferences).toEqual([]);
+  expect(first.steps[0]!.paletteSuggestions.some((item) => item.command === "play_music theme_a.mod")).toBe(true);
+  const second = deriveEventsWorkspacePresentation({ events, audioItems: [
+    { name: "theme_b.mod", kind: "Musica" }, { name: "confirm.wav", kind: "SFX" }
+  ] }).groups.flatMap((group) => group.events)[0]!;
+  expect(second.steps[0]!.missingReferences).toContain("Audio nao encontrado: theme_a.mod");
+  expect(second.steps[0]!.paletteSuggestions.some((item) => item.command === "play_music theme_b.mod")).toBe(true);
+  expect(second.steps[1]!.missingReferences).toEqual([]);
+  expect(first.steps[0]!.paletteSuggestions.some((item) => item.command === "play_music theme_a.mod")).toBe(true);
+});
