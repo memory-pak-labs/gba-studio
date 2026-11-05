@@ -207,7 +207,36 @@ describe("Web project export", () => {
     await expect(readFile(copiedRom, "utf8")).resolves.toBe("gba-rom-bytes");
   });
 
-  it("ensureWebExportRomSource falls back to buildRom when no ROM is discovered", async () => {
+  it("builds the current project even when an older ROM exists", async () => {
+    const root = await mkdtemp(path.join(os.tmpdir(), "gbastudio-web-export-stale-"));
+    temporaryRoots.push(root);
+    const projectPath = path.join(root, "demo.gbastudio");
+    const staleRomPath = path.join(root, "build", "web_demo.gba");
+    const builtRomPath = path.join(root, "fresh.gba");
+    await mkdir(path.dirname(staleRomPath), { recursive: true });
+    await writeFile(staleRomPath, "test-scene-rom");
+    await writeFile(builtRomPath, "current-project-rom");
+    const resolution = await ensureWebExportRomSource({
+      data: await exportableProject(), romFileName: "web_demo.gba", projectPath,
+      buildRom: async () => builtRomPath
+    });
+    expect(resolution).toEqual({ romSourcePath: builtRomPath, source: "built" });
+  });
+
+  it("does not silently use an older ROM when the current build fails", async () => {
+    const root = await mkdtemp(path.join(os.tmpdir(), "gbastudio-web-export-failed-build-"));
+    temporaryRoots.push(root);
+    const staleRomPath = path.join(root, "build", "web_demo.gba");
+    await mkdir(path.dirname(staleRomPath), { recursive: true });
+    await writeFile(staleRomPath, "stale-rom");
+    const resolution = await ensureWebExportRomSource({
+      data: await exportableProject(), romFileName: "web_demo.gba", projectPath: path.join(root, "demo.gbastudio"),
+      buildRom: async () => { throw new Error("build failed"); }
+    });
+    expect(resolution).toEqual({ romSourcePath: null, source: "none", buildError: "build failed" });
+  });
+
+  it("builds a ROM when none is discovered", async () => {
     const root = await mkdtemp(path.join(os.tmpdir(), "gbastudio-web-export-buildrom-"));
     temporaryRoots.push(root);
     const projectPath = path.join(root, "Game", "demo.gbastudio");

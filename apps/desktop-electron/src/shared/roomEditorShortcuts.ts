@@ -39,7 +39,7 @@ export const ROOM_EDITOR_TOOL_SHORTCUT_BINDINGS: readonly RoomEditorShortcutBind
   { defaultKey: "t", description: "Criar e editar triggers", fieldKey: "trigger", label: "Trigger", mode: "trigger" },
   { defaultKey: "z", description: "Editar zonas de câmera", fieldKey: "camera", label: "Zonas de câmera", mode: "camera" },
   { defaultKey: "p", description: "Criar zonas de entrada e saída entre cenas", fieldKey: "warp", label: "Warp", mode: "warp" },
-  { defaultKey: "u", description: "Editar a HUD diretamente no viewport", fieldKey: "hud", label: "HUD", mode: "hud" },
+  { defaultKey: "u", description: "Editar a interface diretamente no viewport", fieldKey: "hud", label: "Interface", mode: "hud" },
   { defaultKey: "r", description: "Abrir configurações da cena no Inspetor", fieldKey: "room", label: "Cena", mode: "room" }
 ];
 

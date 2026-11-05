@@ -34,6 +34,16 @@ describe("entity and event projection validation", () => {
     })).toEqual([]);
   });
 
+  it("accepts empty optional event references while rejecting invalid reference types", () => {
+    const actor = { id: "guide", name: "Guide", roomName: "port", x: 1, y: 1, eventName: "" };
+    const trigger = { id: "exit", name: "Exit", roomName: "port", x: 2, y: 2, width: 1, height: 1, eventName: "" };
+    const project = { scenas: [{ name: "port", width: 20, height: 18 }], actors: [actor], triggers: [trigger] };
+    expect(validateGBAEntityEventProjection(project)).toEqual([]);
+    expect(validateGBAEntityEventProjection({ ...project, actors: [{ ...actor, eventName: 42 }] })).toEqual([
+      expect.objectContaining({ source: "actors", invalidFields: ["eventName"] })
+    ]);
+  });
+
   it("reports fields that the projection would discard or make ambiguous", () => {
     const issues = validateGBAEntityEventProjection({
       scenas: [

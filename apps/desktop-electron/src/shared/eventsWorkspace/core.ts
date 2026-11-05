@@ -1,4 +1,5 @@
 import { eventCommandCategory, eventCommandDescription, eventCommandParameterChoices, eventCommandParameterLabel, normalizeEventSearch } from "../eventCommandMetadata.js";
+import { sceneChangeCommand, sceneChangeCommandParts } from "../sceneChangeCommand.js";
 import { constantOperandIndices, projectNumericConstants, resolveProjectConstantCommand } from "../projectConstants.js";
 import { eventCommandCatalog, eventCommandLibrary, eventCommandRuntimeVerbs, type EventCommandDefinition } from "../eventCommandLibrary.js";
 import { eventCommandIntegrationIssue, eventCommandSupport } from "../eventCommandSupport.js";
@@ -27,6 +28,7 @@ import {
   type EventBindingCapabilityActorRole
 } from "../eventBindingCapabilities.js";
 import {
+  completeStandaloneCondition,
   insertEventStructureCommands,
   setEventUpdateFrequency,
   type EventStructureInsertionTarget,
@@ -34,9 +36,12 @@ import {
 } from "../eventStructure.js";
 import type { GBAProjectData } from "../projectFile.js";
 import { sceneRouteTablesFromProject } from "../sceneRouteTables.js";
+import { normalizeSceneTypeId } from "../sceneTypes.js";
+import { shmupProjectileLaunches } from "../shmupProjectileAuthoring.js";
 import {
   normalizeGBAEntityDocument,
-  normalizeGBAEventDocument
+  normalizeGBAEventDocument,
+  normalizeGBASceneDocument
 } from "../../../../../packages/project-contract/src/index.js";
 import {
   normalizeEventProcedureDefinition,
@@ -365,6 +370,7 @@ export interface UpdateEventFields {
   command?: string;
   eventKind?: "event" | "procedure";
   procedure?: EventProcedureDefinition;
+  stepUpdates?: Array<{ index: number; fields: UpdateEventStepFields }>;
 }
 
 export interface UpdateEventStepFields {
@@ -709,7 +715,7 @@ function commandVerb(command: string): string {
 }
 
 function commandParts(command: string): string[] {
-  const parts = command.split(/\s+/).filter(Boolean);
+  const parts = sceneChangeCommandParts(command);
   if(parts[0] === "draw_text" && parts.length>4) return [...parts.slice(0,4),parts.slice(4).join(" ")];
   return parts[0] === "set_background" && parts.length > 1 ? [parts[0], parts.slice(1).join(" ")] : parts;
 }
@@ -817,7 +823,7 @@ function commandParametersForCommand(
 ): EventsWorkspaceCommandParameter[] {
   const parts = commandParts(command);
   const templateParts = commandTemplate ? commandParts(commandTemplate) : [];
-  const parameterCount = Math.max(parts.length, templateParts.length) - 1;
+  const parameterCount = Math.max(parts.length, templateParts.length, parts[0] === "change_scene" ? 4 : 0) - 1;
   if (parameterCount <= 0) return [];
 
   const seenIDs = new Map<string, number>();
@@ -825,15 +831,16 @@ function commandParametersForCommand(
     const tokenIndex = parameterIndex + 1;
     const templatePart = templateParts[tokenIndex];
     const placeholder = commandParameterPlaceholder(templatePart);
-    const kind = commandParameterKind(placeholder);
+    const isOtherActor = tokenIndex === 2 && (parts[0] === "if_actor_distance" || parts[0] === "if_actor_relative");
+    const kind = isOtherActor ? "actor" : commandParameterKind(placeholder);
     const baseID = placeholder ?? `arg${tokenIndex}`;
     const occurrence = seenIDs.get(baseID) ?? 0;
     seenIDs.set(baseID, occurrence + 1);
     const id = occurrence === 0 ? baseID : `${baseID}${occurrence + 1}`;
     const value = parts[tokenIndex] ?? "";
     const defaultValue = placeholder ? "" : templatePart ?? "";
-    const resourceOptions = kind === "actor" && (parts[0] === "lantern" || parts[0] === "reveal_area")
-      ? [...new Set(["player", ...options.actor])]
+    const resourceOptions = kind === "actor" && (isOtherActor || parts[0] === "lantern" || parts[0] === "reveal_area" || /^(set|animate|reset)_actor_scale$/.test(parts[0] ?? ""))
+      ? [...new Set([/_actor_scale$/.test(parts[0] ?? "") ? "Player" : "player", ...options.actor])]
       : commandParameterOptions(kind, options);
     const parameterOptions = eventCommandParameterChoices(parts[0] ?? "", tokenIndex) ?? (constantOperandIndices(parts[0] ?? "").includes(tokenIndex)
       ? options.constant ?? [] : resourceOptions);
@@ -1091,6 +1098,9 @@ function menuRuntimeItems(room: Record<string, unknown>): Record<string, unknown
       ];
     });
   }
+  if (runtimeType === "racing") {
+    return runtimeEventStates(room).map(state => ({ label: `${state.group} · ${state.label}`, eventName: state.eventName }));
+  }
   if (runtimeType !== "menu") return [];
   const rootItems = Array.isArray(config.items) ? config.items.filter(isRecord) : [];
   const internalScreens = Array.isArray(config.screens) ? config.screens.filter(isRecord) : [];
@@ -1119,7 +1129,8 @@ function bindingLabelsByEventName(data: GBAProjectData): Map<string, string[]> {
     addEventBindingLabels(room.eventBindings, `Cena: ${roomName}`, labels);
     for (const item of menuRuntimeItems(room)) {
       const itemLabel = stringField(item.label, "Item sem nome");
-      addDirectEventLabel(item.eventName, `Cena: ${roomName} · Menu: ${itemLabel}`, labels);
+      const itemPrefix = isRecord(room.runtime) && room.runtime.type === "racing" ? "" : "Menu: ";
+      addDirectEventLabel(item.eventName, `Cena: ${roomName} · ${itemPrefix}${itemLabel}`, labels);
     }
   }
 
@@ -2085,6 +2096,8 @@ export function relayoutEventsGraphInProject(data: GBAProjectData): GBAProjectDa
 }
 
 function missingResourceReferences(command: string, data: GBAProjectData, eventNames: Set<string>): string[] {
+  const actorNames = projectArray(data, "actors").map((actor) => String(actor.name ?? ""));
+  command = sceneChangeCommand(sceneChangeCommandParts(command, actorNames));
   const parts = commandParts(command);
   const verb = parts[0] ?? "noop";
   const missing: string[] = [];
@@ -2359,9 +2372,13 @@ function resolveCommandTemplate(template: string, context: EventCommandTemplateC
     stage: context.currentRoom, winner: "player1", amount: "0", style: "a-ism",
     move_id: "super", enabled: "true", seconds: "60", count: "2"
   };
-  return template.replace(/\{([a-zA-Z_]+)\}/g, (_match, key: keyof EventCommandTemplateContext) => (
-    context[key] ?? defaults[key] ?? _match
-  ));
+  return template.replace(/\{([a-zA-Z_]+)\}/g, (_match, key: keyof EventCommandTemplateContext) => {
+    const value = context[key] ?? defaults[key] ?? _match;
+    const verb = template.split(/\s+/)[0] ?? "";
+    return (verb === "change_scene" && key === "room") || key === "actor"
+      ? sceneChangeCommand([verb, value]).slice(verb.length + 1)
+      : value;
+  });
 }
 
 function commandTargetName(command: string): string | null {
@@ -2397,13 +2414,49 @@ function commandSuggestionRank(suggestion: EventsWorkspaceCommandSuggestion, com
   let rank = 0;
   if (suggestion.id === preferredStepSuggestionIDsByVerb.get(verb)) rank -= 100;
   if (suggestion.command === command) rank -= 50;
+  if (verb === "set_actor_visible" || verb === "set_flag") {
+    const expected = commandParts(suggestion.commandTemplate ?? "")[2];
+    const actual = commandParts(command)[2];
+    if (expected === actual && (expected === "true" || expected === "false")) rank -= 25;
+  }
+  if (verb === "add_variable") {
+    const expected = commandParts(suggestion.commandTemplate ?? "")[2];
+    const actual = commandParts(command)[2];
+    if ((actual === "1" || actual === "-1") && expected === actual) rank -= 25;
+  }
   if (suggestion.isFavorite) rank -= 5;
   return rank;
 }
 
+interface CommandInsightPalette {
+  suggestions: EventsWorkspaceCommandSuggestion[];
+  verbs: Map<EventsWorkspaceCommandSuggestion, string>;
+  byVerb: Map<string, EventsWorkspaceCommandSuggestion[]>;
+  definitions: Map<string, EventCommandDefinition>;
+}
+
+function indexCommandInsightPalette(palette: EventsWorkspaceCommandSuggestion[]): CommandInsightPalette {
+  const suggestions = palette.filter((suggestion) => !suggestion.isRecipe);
+  const verbs = new Map<EventsWorkspaceCommandSuggestion, string>();
+  const byVerb = new Map<string, EventsWorkspaceCommandSuggestion[]>();
+  for (const suggestion of suggestions) {
+    const verb = commandVerb(suggestion.command);
+    verbs.set(suggestion, verb);
+    const group = byVerb.get(verb) ?? [];
+    group.push(suggestion);
+    byVerb.set(verb, group);
+  }
+  const definitions = new Map<string, EventCommandDefinition>();
+  for (const definition of eventCommandCatalog) {
+    const verb = commandVerb(definition.commandTemplate);
+    if (!definitions.has(verb)) definitions.set(verb, definition);
+  }
+  return { suggestions, verbs, byVerb, definitions };
+}
+
 function commandInsightForStep(
   command: string,
-  palette: EventsWorkspaceCommandSuggestion[],
+  palette: CommandInsightPalette,
   resourceOptions: EventCommandResourceOptions
 ): Pick<
   EventsWorkspaceStep,
@@ -2419,15 +2472,15 @@ function commandInsightForStep(
   | "commandParameters"
   | "paletteSuggestions"
 > {
+  command = sceneChangeCommand(sceneChangeCommandParts(command, resourceOptions.actor));
   const verb = commandVerb(command);
   const review = eventCommandReview(verb);
-  const definition = eventCommandCatalog.find(item => commandVerb(item.commandTemplate) === verb);
+  const definition = palette.definitions.get(verb);
   const support = eventCommandSupport(verb);
   const integrationIssue = support.status === "native" ? eventCommandIntegrationIssue(command) : null;
   const unavailable = Boolean(integrationIssue) || support.status === "pending" || support.status === "not-applicable";
-  const commandSuggestions = palette.filter((suggestion) => !suggestion.isRecipe);
-  const sameVerbSuggestions = commandSuggestions
-    .filter((suggestion) => commandVerb(suggestion.command) === verb)
+  const commandSuggestions = palette.suggestions;
+  const sameVerbSuggestions = (palette.byVerb.get(verb) ?? []).slice()
     .sort((lhs, rhs) => (
       commandSuggestionRank(lhs, command, verb) - commandSuggestionRank(rhs, command, verb) ||
       lhs.label.localeCompare(rhs.label, "pt-BR")
@@ -2436,13 +2489,13 @@ function commandInsightForStep(
   const verbSuggestion = sameVerbSuggestions[0] ?? null;
   const primarySuggestion = exactSuggestion ?? verbSuggestion;
   const relatedSuggestions = [
-    ...commandSuggestions.filter(suggestion => review?.alternatives.includes(commandVerb(suggestion.command))),
+    ...commandSuggestions.filter(suggestion => review?.alternatives.includes(palette.verbs.get(suggestion)!)),
     ...sameVerbSuggestions.filter((suggestion) => suggestion.command === command),
     ...sameVerbSuggestions.filter((suggestion) => suggestion.command !== command),
     ...commandSuggestions.filter((suggestion) => (
       primarySuggestion &&
       suggestion.command !== command &&
-      commandVerb(suggestion.command) !== verb &&
+      palette.verbs.get(suggestion)! !== verb &&
       suggestion.category === primarySuggestion.category
     ))
   ];
@@ -2458,7 +2511,9 @@ function commandInsightForStep(
 
   return {
     commandVerb: verb,
-    commandLabel: primarySuggestion?.label ?? definition?.title ?? review?.title ?? commandVerbLabel(verb),
+    commandLabel: verb === "add_variable" && !["1", "-1"].includes(commandParts(command)[2] ?? "")
+      ? "Alterar variável"
+      : primarySuggestion?.label ?? definition?.title ?? review?.title ?? commandVerbLabel(verb),
     commandCategory: primarySuggestion?.category ?? definition?.category ?? "Comando custom",
     commandSection: primarySuggestion?.section ?? definition?.section ?? null,
     commandBadge: integrationIssue && support.status === "native" ? "Parâmetros incompletos" : commandSuggestionBadge(command),
@@ -2728,6 +2783,18 @@ export function updateEventFieldsInProject(data: GBAProjectData, eventIDToUpdate
     event.procedure = normalizeEventProcedureDefinition(fields.procedure);
   }
 
+  if (fields.stepUpdates !== undefined) {
+    const steps = eventStructureSteps(event);
+    for (const update of fields.stepUpdates) {
+      if (!Number.isInteger(update.index)) continue;
+      const step = steps[update.index];
+      if (!step) continue;
+      if (update.fields.command !== undefined) step.command = normalizedCommand(update.fields.command);
+      if (update.fields.isEnabled !== undefined) step.isEnabled = update.fields.isEnabled;
+    }
+    event.steps = steps;
+  }
+
   next.events = events;
   return next;
 }
@@ -2740,19 +2807,17 @@ export function addEventStepInProject(data: GBAProjectData, eventIDToUpdate: str
 
   const event = events[eventIndex];
   const steps = Array.isArray(event.steps) ? event.steps.filter(isRecord) : [];
-  event.steps = [
-    ...steps,
-    {
-      command: normalizedCommand(command),
-      isEnabled: true
-    }
-  ];
+  event.steps = [...steps, ...completeStandaloneCondition([normalizedCommand(command)]).map((value) => ({
+    command: value, isEnabled: true
+  }))];
   next.events = events;
   return next;
 }
 
 function eventStructureSteps(event: Record<string, unknown>): EventStructureStep[] {
-  return eventSteps(event).map((step) => ({ ...step }));
+  const normalized = eventSteps(event);
+  const original = Array.isArray(event.steps) ? event.steps.filter(isRecord) : [];
+  return normalized.map((step, index) => ({ ...(original.length === normalized.length ? original[index] : {}), ...step }));
 }
 
 export function insertEventStepsInProject(
@@ -2810,7 +2875,7 @@ export function updateEventStepInProject(
   if (eventIndex < 0) return data;
 
   const event = events[eventIndex];
-  const steps = Array.isArray(event.steps) ? event.steps.filter(isRecord) : [];
+  const steps = eventStructureSteps(event);
   const step = steps[stepIndex];
   if (!step) return data;
 
@@ -3287,13 +3352,14 @@ export function deriveEventsWorkspacePresentation(
   const eventNames = new Set(eventDocuments.map((event) => event.name));
   const resourceOptions = commandResourceOptions(data, sourceEvents);
   const palette = commandPalette(data, sourceEvents, pluginRegistry);
+  const insightPalette = indexCommandInsightPalette(palette);
   // Commands recur across scene entries and actor callbacks. Analyze each once
   // per derivation; a new project edit always receives fresh resource context.
   const insightCache=new Map<string,ReturnType<typeof commandInsightForStep>>();
   const missingReferenceCache=new Map<string,string[]>();
   const insightForCommand=(command:string)=>{
     let insight=insightCache.get(command);
-    if(!insight){insight=commandInsightForStep(command,palette,resourceOptions);insightCache.set(command,insight);}
+    if(!insight){insight=commandInsightForStep(command,insightPalette,resourceOptions);insightCache.set(command,insight);}
     return insight;
   };
   const missingReferencesForCommand=(command:string)=>{
@@ -3302,8 +3368,14 @@ export function deriveEventsWorkspacePresentation(
     return missing;
   };
   const graphEdges = sourceEvents.flatMap((event, index) => graphEdgesForEvent(event, index, eventNames));
-  const bindings = boundEventNames(data);
+  const shmupSceneNames = new Set(projectRooms(data)
+    .map(room => normalizeGBASceneDocument(room))
+    .filter(room => normalizeSceneTypeId(room.sceneType) === "shmup")
+    .map(room => room.name));
+  const projectileEventNames = new Set(shmupProjectileLaunches(sourceEvents, shmupSceneNames).map(launch => launch.eventName));
+  const bindings = [...boundEventNames(data), ...projectileEventNames];
   const bindingLabels = bindingLabelsByEventName(data);
+  for (const eventName of projectileEventNames) addDirectEventLabel(eventName, "Exportação: projéteis Shoot em Up", bindingLabels);
   const commandEventReferences = sourceEvents.flatMap((event) => eventSteps(event).flatMap((step) => commandReferencedEvents(step.command)));
   const referenceNames = [...bindings, ...commandEventReferences];
   const referenceCounts=new Map<string,number>();

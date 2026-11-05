@@ -1,0 +1,17 @@
+.racing-track-editor { position:absolute; inset:0; z-index:6; pointer-events:none; }
+.racing-track-guides { position:absolute; inset:0; width:100%; height:100%; overflow:visible; }
+.racing-track-route { fill:none; stroke:#8153cd; stroke-width:1.5; stroke-dasharray:5 3; vector-effect:non-scaling-stroke; }
+.racing-track-direction { fill:none; stroke:#5d2f99; stroke-width:1.5; vector-effect:non-scaling-stroke; }
+.racing-track-gate rect { fill:#9c6bde38; stroke:#8153cd; stroke-width:1.5; vector-effect:non-scaling-stroke; }
+.racing-track-gate.is-finish rect { fill:#28a66b38; stroke:#168456; }
+.racing-track-gate text { fill:#251936; paint-order:stroke; stroke:#fff; stroke-width:2; font-family:monospace; }
+.racing-track-gate-handle { position:absolute; pointer-events:auto; padding:0; min-width:0; min-height:0; border:1px dashed transparent; background:transparent; touch-action:none; cursor:move; }
+.racing-track-gate-handle.is-selected { border-color:var(--studio-color-accent); outline:2px solid var(--studio-color-accent); outline-offset:1px; }
+.racing-track-point,.racing-track-resize { position:absolute; pointer-events:auto; transform:translate(-50%,-50%); padding:0; min-width:18px; min-height:18px; width:18px; height:18px; border:1px solid #fff; border-radius:50%; background:#7135bd; color:#fff; touch-action:none; cursor:move; }
+.racing-track-resize { min-width:12px; min-height:12px; width:12px; height:12px; border-radius:2px; cursor:nwse-resize; }
+.racing-track-point[aria-pressed="true"] { outline:3px solid var(--studio-color-accent); outline-offset:2px; }
+.racing-track-point:focus-visible,.racing-track-resize:focus-visible,.racing-track-gate-handle:focus-visible { outline:3px solid var(--studio-color-accent); outline-offset:2px; }
+.racing-track-actions { display:flex; flex-wrap:wrap; gap:var(--studio-space-2); margin-block:var(--studio-space-2); }
+.racing-track-actions>button,.racing-track-list>button { min-width:0; white-space:normal; }
+.racing-track-list { display:flex; flex-direction:column; gap:var(--studio-space-2); margin-block:var(--studio-space-2); }
+.racing-track-inspector .inspector-field-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:var(--studio-space-2); }

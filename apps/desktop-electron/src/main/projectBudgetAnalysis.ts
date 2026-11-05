@@ -7,6 +7,7 @@ import type { GBAProjectData } from "../shared/projectFile.js";
 import type { AssetPackBudgetReport, ProjectBudgetAnalysisResult } from "../shared/projectBudget.js";
 import { prepareEngineProjectExport } from "./exportEngineProject.js";
 import { writeEngineSchemaExport } from "./engineProjectExport.js";
+import { SceneVideoBudgetExportError } from "./sceneVideoBudgetExport.js";
 
 export interface AnalyzePreparedProjectBudgetOptions {
   assetcPath: string;
@@ -41,7 +42,7 @@ export async function analyzePreparedProjectBudget(
   const temporaryRoot = await mkdtemp(path.join(os.tmpdir(), "gba-studio-budget-"));
   const destination = path.join(temporaryRoot, prepared.generated.target);
   try {
-    await writeEngineSchemaExport({
+    const exported = await writeEngineSchemaExport({
       destination,
       prepared: prepared.generated,
       assetcPath: options.assetcPath,
@@ -56,12 +57,14 @@ export async function analyzePreparedProjectBudget(
       ok: true,
       generatedAt: new Date().toISOString(),
       report,
+      videoBudget: exported.videoBudget,
       target: prepared.generated.target
     };
   } catch (error) {
     return {
       ok: false,
       target: prepared.generated.target,
+      ...(error instanceof SceneVideoBudgetExportError ? { videoBudget: error.report } : {}),
       error: error instanceof Error ? error.message : String(error)
     };
   } finally {

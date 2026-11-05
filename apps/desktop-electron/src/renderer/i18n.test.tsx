@@ -143,7 +143,7 @@ describe("renderer i18n", () => {
       expect(Object.keys(files), `${locale}:files`).toHaveLength(106);
       expect(Object.keys(dialogues), `${locale}:dialogues`).toHaveLength(130);
       expect(Object.keys(hud), `${locale}:hud`).toHaveLength(93);
-      expect(Object.keys(shellCredits), `${locale}:shell-credits`).toHaveLength(43);
+      expect(Object.keys(shellCredits), `${locale}:shell-credits`).toHaveLength(49);
       expect(Object.keys(workspaceUi), `${locale}:workspace-ui`).toHaveLength(73);
 
       for (const [key, value] of Object.entries({ ...files, ...dialogues, ...shellCredits, ...workspaceUi, ...hud }) as Array<[string, string]>) {

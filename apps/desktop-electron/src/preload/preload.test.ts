@@ -4,6 +4,7 @@ const invoke = vi.fn();
 const exposeInMainWorld = vi.fn();
 const on = vi.fn();
 const removeListener = vi.fn();
+const sendSync = vi.fn();
 
 vi.mock("electron", () => ({
   contextBridge: { exposeInMainWorld },
@@ -11,15 +12,40 @@ vi.mock("electron", () => ({
     invoke,
     on,
     removeListener,
-    send: vi.fn()
+    send: vi.fn(),
+    sendSync
   }
 }));
 
 beforeAll(async () => {
+  vi.stubGlobal("window", { location: { href: "http://127.0.0.1:4321/player/runtime.html?desktopBattery=1" } });
   await import("./preload.js");
 });
 
 describe("preload asset bridge", () => {
+  it("forwards bounded recording operations without exposing renderer execution", async () => {
+    const api = exposeInMainWorld.mock.calls.find(([name]) => name === "gbaStudio")?.[1];
+    const request = { windowID: 111, action: "begin", recordingID: "record-1" };
+    await api.controlRomPlayerRecording(request);
+    expect(invoke).toHaveBeenLastCalledWith("rom-player:recording", request);
+    expect(api).not.toHaveProperty("executeJavaScript");
+  });
+  it("exposes only the scoped Play battery operations", () => {
+    const battery = exposeInMainWorld.mock.calls.find(([name]) => name === "gbaStudioPlayerBattery")?.[1];
+    expect(Object.keys(battery).sort()).toEqual(["identity", "read", "write"]);
+    sendSync.mockReturnValue({ ok: true, value: null });
+    battery.write("record");
+    expect(sendSync).toHaveBeenLastCalledWith("rom-player:battery", "write", "record");
+  });
+  it("exposes cartridge transactions without arbitrary commands or executable paths", async () => {
+    const api = exposeInMainWorld.mock.calls.find(([name]) => name === "gbaStudio")?.[1];
+    const request = { projectPath: "/tmp/demo.gba-project", port: "usb-one", project: { data: {} } };
+    await api.cartridgeWriter.prepare(request);
+    expect(invoke).toHaveBeenLastCalledWith("cartridge:prepare", request);
+    await api.cartridgeWriter.write("review-1");
+    expect(invoke).toHaveBeenLastCalledWith("cartridge:write", "review-1");
+    expect(Object.keys(api.cartridgeWriter).sort()).toEqual(["detect", "discard", "install", "onProgress", "prepare", "status", "write"]);
+  });
   it("queries the current native fullscreen state and cleans up its subscription", async () => {
     const api = exposeInMainWorld.mock.calls.find(([name]) => name === "gbaStudio")?.[1];
     await api.getWindowFullscreen();

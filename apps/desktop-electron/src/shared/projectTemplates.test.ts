@@ -1,3 +1,4 @@
+import { createBlankProjectWithScene } from "../testFixtures/blankProject.js";
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { auditExportEventCommandCoverage, buildEngineExportProjectContract, prepareEngineProjectExport } from "../main/exportEngineProject.js";
@@ -30,7 +31,7 @@ function exemploGBAPluginRegistry() {
 
 describe("projectTemplates", () => {
   it("includes the approved modular purple HUD without enabling it on blank scenes", () => {
-    const project = buildProjectFromTemplate("blank", { name: "HUD roxa" });
+    const project = createBlankProjectWithScene({ name: "HUD roxa" });
     const hud = deriveHudPresetsWorkspacePresentation(project).activePreset;
     expect(hud).toMatchObject({ id: "hud-default", mode: "advanced", backgroundImage: "neutral-hud-skin.png" });
     expect(hud.components.filter(c => c.kind === "frame")).toHaveLength(2);
@@ -66,21 +67,18 @@ describe("projectTemplates", () => {
     }
     expect((project.assets as Record<string, any>[]).every(asset => asset.metadata.bundledDefaultAsset.startsWith("template:blank/"))).toBe(true);
     const rooms = deriveRoomsWorkspacePresentation(project);
-    expect(rooms.rooms).toHaveLength(1);
-    expect(rooms.rooms[0]).toMatchObject({ name: "cena_1", width: 30, height: 20 });
-    expect((project.rooms as Array<Record<string, unknown>>)[0].backgroundAssetName || "").toBe("");
-    expect(rooms.rooms[0]?.tileCells).toHaveLength(600);
-    expect(rooms.entities).toHaveLength(0);
+    expect(rooms.rooms).toEqual([]);
+    expect(rooms.entities).toEqual([]);
     expect(project.settings).toMatchObject({
-      general: { gameTitle: "Meu jogo", startScene: "cena_1", startPlayer: "", exportFolder: "build" },
+      general: { gameTitle: "Meu jogo", startScene: "", startPlayer: "", exportFolder: "build" },
       build: { romFileName: "meu_jogo.gba" },
       sceneTypes: { defaultPlayerSprites: { topdown: "neutral-player-topdown.png" } },
       topdown: { playerSprite: "neutral-player-topdown.png" },
       pointAndClick: { font: "", cursorImage: "neutral-cursor-hand.png" },
       uiDialogs: { boxImage: "neutral-dialogue-skin.png", font: "", selectorImage: "neutral-dialogue-selector.png", defaultPortrait: "neutral-portrait.png", portraitLayout: "fixed_slots" }
     });
-    (created.rooms as Array<Record<string, unknown>>)[0].name = "Editada";
-    expect((buildProjectFromTemplate("blank", { name: "Outro" }).rooms as Array<Record<string, unknown>>)[0].name).toBe("cena_1");
+    (created.rooms as Array<Record<string, unknown>>).push({ id: "authored", name: "Editada" });
+    expect(buildProjectFromTemplate("blank", { name: "Outro" }).rooms).toEqual([]);
   });
 
   it("apresenta O Último Farol como identidade do template", () => {

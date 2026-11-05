@@ -1,3 +1,4 @@
+#include "gbs/event_render.hpp"
 #include "gbs/profiler.hpp"
 #define GBS_DIALOGUE_UI_RUNTIME_KIND 11
 #include "gbs/engine.hpp"
@@ -1050,13 +1051,13 @@ void apply_battle_visuals(const gbs::BattleRpgEncounterData& encounter) {
         project,
         encounter
     );
-    if (background == nullptr) {
-        return;
+    if (background != nullptr) {
+        gbs::set_backdrop_color(background->backdrop_color);
+        gbs::load_tilemap(background->layer, background->tilemap);
+        gbs::set_bg_enabled(background->layer, true);
+        gbs::set_bg_scroll(background->layer, 0, 0);
     }
-    gbs::set_backdrop_color(background->backdrop_color);
-    gbs::load_tilemap(background->layer, background->tilemap);
-    gbs::set_bg_enabled(background->layer, true);
-    gbs::set_bg_scroll(background->layer, 0, 0);
+    gbs::apply_scene_background_video(encounter.video);
     if(encounter.presentation && encounter.presentation->hud_background_index>=0 && static_cast<size_t>(encounter.presentation->hud_background_index)<project.background_count){
         const auto& hud=project.backgrounds[encounter.presentation->hud_background_index];
         gbs::load_tilemap(hud.layer,hud.tilemap);gbs::set_bg_enabled(hud.layer,true);gbs::set_bg_scroll(hud.layer,0,0);
@@ -1106,12 +1107,14 @@ void draw_battle_participant_metasprite(
         // World combatants stay behind the BG0 HUD and dialogue surfaces.
         for (uint8_t i = 0; i < metasprite.part_count; ++i) {
             const auto& part = metasprite.parts[i];
-            gbs::set_sprite(first_index + i, gbs::Sprite {
+            gbs::Sprite sprite {
                 position.x + part.x, position.y + part.y, part.tile_index,
                 part.palette, part.hflip, part.vflip, true, 1,
                 gbs::SpriteRenderMode::Normal, false, part.width, part.height,
-                false, false, 0, part.color_depth
-            });
+                false, false, 0, part.color_depth, part.scale_x256, part.scale_y256
+            };
+            gbs::apply_metasprite_part_scale(sprite, part, &metasprite);
+            gbs::set_sprite(first_index + i, sprite);
         }
         return;
     }
@@ -1122,7 +1125,7 @@ void draw_battle_participant_metasprite(
             draw_battle_participant_metasprite(first_index, metasprite, position, 1);
             return;
         }
-        gbs::set_sprite(first_index + part_index, gbs::Sprite {
+        gbs::Sprite sprite {
             position.x + part.x * 2 - part.width / 2,
             position.y + part.y * 2 - part.height / 2,
             part.tile_index,
@@ -1138,8 +1141,10 @@ void draw_battle_participant_metasprite(
             true,
             true,
             0,
-            part.color_depth
-        });
+            part.color_depth, part.scale_x256, part.scale_y256
+        };
+        gbs::apply_metasprite_part_scale(sprite, part, &metasprite);
+        gbs::set_sprite(first_index + part_index, sprite);
     }
 }
 
@@ -1208,7 +1213,7 @@ void draw_battle() {
         }
         draw_battle_participant_metasprite(
             sprite_index,
-            *metasprite,
+            gbs::event_scaled_metasprite(event_state,index,*metasprite),
             battle_participant_position(encounter,index,false),
             encounter.party[index].sprite_scale
         );
@@ -1224,7 +1229,7 @@ void draw_battle() {
         }
         draw_battle_participant_metasprite(
             sprite_index,
-            *metasprite,
+            gbs::event_scaled_metasprite(event_state,static_cast<int>(encounter.party_count)+index,*metasprite),
             battle_participant_position(encounter,index,true),
             encounter.enemies[index].sprite_scale
         );
@@ -1578,6 +1583,7 @@ void render_battle_rpg_runtime(const gbs::RuntimeFrameContext& context) {
     // The authored BG1 frame owns bank 14; the generic HUD skin also uses it.
     // Restore only the encounter's 16-color frame bank after native UI writes.
     if(presentation && presentation->hud_palette)gbs::load_palette(*presentation->hud_palette,false);
+    gbs::render_event_background_scale(event_state);
     gbs::wait_vblank();
 }
 

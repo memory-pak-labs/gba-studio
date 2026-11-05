@@ -511,7 +511,7 @@ function roomStageCardExpression(roomTitle) {
 async function focusSceneInEditor(cdp, roomTitle) {
   const focusedScene = await evaluate(cdp, `
     (() => {
-      const back = document.querySelector('.rooms-editor-secondary-toolbar button[aria-label="Voltar à visão geral"]');
+      const back = document.querySelector('.rooms-editor-scene-overview-button[aria-label="Voltar à visão geral"]');
       if (!back) return false;
       back.click();
       return true;
@@ -1513,6 +1513,14 @@ async function assertWorkspace(cdp, label, expectedText) {
   );
 }
 
+async function assertRoomsOverview(cdp) {
+  await assertWorkspace(cdp, "Editor", []);
+  // Reopening may legitimately restore a focused scene. Navigate through the
+  // rendered overview control before asserting cards outside that scene.
+  await evaluate(cdp, `document.querySelector('.rooms-editor-scene-overview-button')?.click()`);
+  await waitForText(cdp, text => text.includes("penedos_vento"), "cards da visão geral do projeto");
+}
+
 async function assertSpritesWorkspace(cdp, expectedSheetName, expectedSheetCount) {
   await assertWorkspace(cdp, "Sprites", []);
   const deadline = Date.now() + 15_000;
@@ -1631,7 +1639,7 @@ async function main() {
           return {
             hasFocusedEditor: Boolean(document.querySelector('[aria-label="Viewport GBA da cena titulo"]')),
             hasOverviewButton: Boolean(document.querySelector(
-              '.rooms-editor-secondary-toolbar button[aria-label="Voltar à visão geral"]'
+              '.rooms-editor-scene-overview-button[aria-label="Voltar à visão geral"]'
             )),
             hasRetiredCampaignEditor: Boolean(document.querySelector('[aria-label="Editar continuidade da campanha"]'))
           };

@@ -26,6 +26,14 @@ import {
 } from "./sceneFeatureModules.js";
 
 describe("scene type profiles", () => {
+  it("keeps the RPG participant capacity within the engine's four allies and eight enemies", () => {
+    expect(resolveSceneRuntime("battleRpg", defaultSceneRuntime("battleRpg"))?.config).toMatchObject({ maxPartySize: 4 });
+    expect(resolveSceneRuntime("battleRpg", { type: "battleRpg", config: { maxPartySize: 9, maxEnemies: 8 } })?.config)
+      .toMatchObject({ maxPartySize: 4, maxEnemies: 8 });
+    expect(resolveSceneRuntime("battleRpg", undefined, { battleRpg: { maxPartySize: 6, maxEnemies: 99 } })?.config)
+      .toMatchObject({ maxPartySize: 4, maxEnemies: 8 });
+  });
+
   it.each([
     ["topdown", "character", true],
     ["platformer", "character", true],

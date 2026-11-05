@@ -124,8 +124,23 @@ ordem preserva o orçamento de 750 ms sem disputar CPU com os demais testes.
 Para executar apenas essa medição, use `npm run test:perf:project-open`.
 Evite executar builds ou outras verificações pesadas ao mesmo tempo que ela.
 
+O smoke de cenas isola os temporários dos subprocessos e remove seu projeto de
+teste, perfil do Electron, exportações e cache de staging ao terminar, inclusive
+em falhas e interrupções por SIGINT/SIGTERM. Projetos fonte
+e evidências fora desse diretório permanecem preservados. Para investigar os
+arquivos temporários, execute com `GBA_STUDIO_KEEP_SMOKE_TEMP=1`; nesse caso o
+smoke informa o caminho retido, cuja remoção posterior fica a cargo de quem o executou.
+
 O npm instala as dependências declaradas e o Electron. Nenhuma senha Apple é
 necessária para desenvolver, testar ou compilar o editor.
+
+O build também prepara o auxiliar externo de gravação de cartuchos, incluindo a
+correção para gravadores STM. Essa etapa exige Git, Rust/Cargo e `tar` no ambiente
+de desenvolvimento (Linux: também `libudev-dev`). A receita usa fontes e patch
+fixados, executa os testes Rust e preserva a licença e as fontes junto ao binário.
+O resultado verificado é reutilizado nos próximos builds. Usuários do aplicativo
+instalado recebem o componente pronto e não precisam instalar Rust nem usar um
+atalho especial. Consulte [Gravação de cartuchos](development/cartridge-writer.md).
 
 ## Instaladores macOS por arquitetura
 
@@ -399,6 +414,9 @@ npm run gate:complete-project
 ```
 
 O gate completo agrega verificações do editor, Pack, exportação e Play.
+Para incluir a sessão integrada de estabilidade na mesma execução, use
+`npm run gate:complete-project -- --soak-minutes=20`. O argumento aceita entre
+20 e 30 minutos inteiros e mantém todas as etapas do gate.
 Fixtures e testes host não substituem esse gate. Para QA visual, confira a tela
 e o fluxo real; para uma ROM, confira a execução no emulador. Validação física
 do GBA permanece uma etapa separada.
@@ -651,9 +669,13 @@ Preparação técnica não substitui revisão visual nem licença de redistribui
 
 ## CI e releases
 
-A CI executa `npm run test:all`, tipos e build no Linux e Windows, além dos
-testes host do motor nos dois sistemas. Confira o resultado da execução;
-ter um job configurado não significa que os testes passaram.
+A CI configura `npm run test:all`, tipos, build e o fluxo renderizado de criar,
+salvar e reabrir o exemplo no Linux, Windows e macOS. Os testes host do motor
+cobrem os três sistemas. O job ARM compila e testa as fixtures no Linux; os
+jobs de replay conferem e executam as mesmas ROMs nos três hosts. Veja a
+[matriz de CI](continuous-integration.md) para comandos, artefatos e limites.
+Confira o resultado da execução: ter um job configurado não significa que
+os testes passaram.
 
 O workflow manual **Desktop packages** compila a biblioteca ARM em uma imagem
 devkitPro identificada pelo digest e gera candidatos x64: NSIS/ZIP no Windows,
@@ -899,6 +921,26 @@ as instâncias afetadas. Edições de instância registram `prefabOverrides`, qu
 prevalecem durante sincronização. Plataforma ativada move o ator por evento;
 transporte automático do jogador não é uma capacidade adicionada por esse preset.
 
+Em Testes e diagnóstico, a gravação de entradas captura o estado completo do
+Player em uma fronteira de frame: CPU, RAM (incluindo variáveis, flags,
+inventário e geradores aleatórios) e SRAM. Pode ser armada antes de abrir o
+Play ou iniciada durante uma partida. A captura e as entradas ficam no
+`.gba-project`; não são um formato de save do cartucho. Fechar o Player envia
+o último lote e incorpora a rota ao projeto; salve o projeto para persistir
+essa edição. Abrir ou fechar um projeto encerra a gravação antes da confirmação
+de descarte.
+
+A reprodução restaura essa captura antes da primeira entrada e exige a mesma
+ROM e o mesmo core, identificados por SHA-256. A SRAM do replay fica isolada;
+reproduzir uma rota não lê nem sobrescreve o save normal do Player.
+Uma cena testada com posição ou
+direção especial conserva essa configuração de build, mesmo que a gravação
+comece depois de uma transição. Rotas antigas que continham apenas teclas e
+metadados de seed permanecem visíveis e precisam ser gravadas novamente; esses
+metadados não reconstituem uma partida. Lotes ausentes interrompem a gravação
+com aviso e preservam o prefixo recebido. A prova de gameplay não certifica
+áudio bit a bit, outra revisão do jogo ou execução no GBA físico.
+
 Em Testes e diagnóstico, habilite a origem dos eventos antes de compilar. O build
 escreve `event_source_map.json` com endereços nativos, IDs dos passos e hash da
 ROM. Ao copiar a ROM para a raiz do projeto, preserva o mapa em
@@ -982,3 +1024,65 @@ O verificador compara o framebuffer com o fundo aprovado e com os pixels do
 relé na paleta compilada, incluindo a região da escada. Play e ROM direta usam
 o núcleo mGBA, mas exercitam caminhos de integração distintos. O teste em GBA
 físico permanece uma verificação separada.
+
+
+## Animações autoradas por eventos
+
+`play_actor_animation <ator> <animação>` seleciona um clipe autorado. O alvo
+aceita o alias reservado `Player` sem distinguir maiúsculas e minúsculas, além
+do nome configurado para o jogador. A repetição pertence ao campo `loops` da
+animação em Sprites; o comando não configura um terceiro parâmetro de repetição.
+Nomes de atores e recursos com espaços usam aspas JSON nos comandos técnicos,
+por exemplo `show_actor_gesture "Guarda do Porto" "balão de fala.png" 60`.
+Os campos do inspetor preservam esses nomes ao montar o comando.
+
+No perfil Plataforma, `set_actor_animation Player <nome>` usa a tabela completa
+`player.script_animations`, preservando os nomes e quadros autorados, inclusive
+clipes fora dos estados automáticos. Os relógios do clipe do Player e dos NPCs
+continuam durante Wait e diálogos; menu de pausa e pausa do perfil os suspendem.
+O comando avança pelo tempo enquanto o
+personagem está parado; um nome ausente conserva o clipe atual. Repetir o mesmo
+clipe em reprodução preserva sua fase. Movimento/comandos de ação ou dano
+retomam a apresentação automática; um clipe sem loop volta a ela ao terminar.
+Inicialização, troca de sala e restauração de save limpam a apresentação
+transitória antes de executar os eventos de restauração. O formato do save
+permanece igual. `make platformer-player-script-animation-test` cobre o
+consumidor, exportação e lookup compilado, além das regressões do editor.
+
+Top-down e Plataforma aceitam o Player como alvo de `set_actor_animation_frame`
+e `set_actor_animation_speed`, incluindo o nome do ator configurado como Player.
+O quadro usa índice a partir de zero e preserva a reprodução; um índice fora do
+clipe atual é ignorado. A velocidade aceita1–400% e se aplica aos relógios de
+animação, sem alterar a velocidade de movimento. Troca de sala/restauração
+reinicia esse controle transitório no valor autorado (100% em Plataforma), sem
+alterar o formato do save. `make player-animation-controls-test` exercita os
+loops e relógios de produção dos dois perfis, isolamento do NPC e limites.
+
+A direção inicial de um ator Top-down acompanha a animação escolhida no
+inspetor, usando seu campo de direção ou o sufixo cardinal do nome. Player e
+NPC exportam essa orientação para os eventos, além de mostrar a pose correta.
+Coordenadas e direção de início explícitas nas configurações do projeto
+continuam tendo prioridade para o Player. `set_actor_direction` também troca
+a pose direcional de um NPC parado quando sua folha contém os slots; a
+apresentação automática não substitui um clipe manual a cada quadro.
+`make topdown-direction-commands-test` cobre o consumidor e a apresentação.
+Definir e consultar a direção no mesmo roteiro não exige inserir uma espera:
+a engine atualiza o estado lógico quando aceita o comando, e o consumidor
+aplica a pose. Se a fila estiver cheia, não publica uma direção descartada.
+Armazenar direção também aceita o Player pelo slot reservado, como as condições.
+O comando de direção do Player atualiza a pose automática mesmo durante uma
+espera da cena. Um clipe manual explicitamente escolhido conserva sua
+prioridade; a direção lógica muda, e movimento/dano continuam retomando a
+apresentação automática conforme o contrato do clipe.
+
+Pedidos de animação do Player usam a mesma fila ordenada dos comandos de ator.
+Top-down e Plataforma aplicam clipe, quadro e velocidade na sequência do roteiro.
+No Top-down, trocar o sprite ou conjunto antes de escolher o clipe resolve a
+animação na nova tabela; inverter esses comandos deixa a pose inicial do novo
+sprite. Uma troca intermediária também reinicia os controles do sprite, mesmo
+quando o roteiro volta à tabela anterior no mesmo lote. Pedidos de clipe
+ausente preservam a animação válida atual. A fila continua com oito posições;
+um pedido descartado por falta de espaço não publica o sinal escalar de animação.
+O layout de save/checkpoint permanece igual. `make player-command-order-test`
+executa scripts reais e os consumidores dos dois perfis, incluindo ordem
+inversa, fase, quadro, velocidade e ausência de clipe.

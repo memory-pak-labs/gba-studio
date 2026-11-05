@@ -1,5 +1,6 @@
 import type { GBAProjectData } from "./projectFile.js";
 import { gbaSpriteOamEntriesForPixels } from "./gbaRendering.js";
+import type { AssetPackVideoBudgetReport } from "./assetPackVideoBudget.js";
 
 export type ProjectBudgetTone = "ok" | "warning" | "error";
 export type ProjectBudgetSource = "compiler" | "estimate";
@@ -94,6 +95,7 @@ export interface ProjectBudgetAnalysisResult {
   ok: boolean;
   generatedAt?: string;
   report?: AssetPackBudgetReport;
+  videoBudget?: AssetPackVideoBudgetReport;
   target?: string;
   error?: string;
 }
@@ -310,6 +312,10 @@ function estimateSceneMetrics(data: GBAProjectData, sceneName: string): ProjectB
   const config = isRecord(runtime.config) ? runtime.config : {};
   const visuals = isRecord(config.pseudo3dVisuals) ? config.pseudo3dVisuals : {};
   const affineFloor = (runtime.type === "racing" || room.sceneType === "racing") && config.presentation === "pseudo3d";
+  // Imported image layouts use source positions as tile IDs. Only assetc can
+  // determine how many physical patterns remain after pixel deduplication.
+  const imageBackground = !affineFloor && room.gbStudioUseBackgroundLayout === true
+    && Boolean(stringValue(room.backgroundAssetName));
   const floorName = stringValue(visuals.floorTilemapId) || stringValue(room.backgroundAssetName);
   const floorAsset = records(data, "assets").find(asset => asset.name === floorName || asset.id === floorName);
   const floorMetadata = floorAsset && isRecord(floorAsset.metadata) ? floorAsset.metadata : {};
@@ -345,7 +351,7 @@ function estimateSceneMetrics(data: GBAProjectData, sceneName: string): ProjectB
   }
 
   const estimates: Record<string, number> = {
-    bg_tiles: affineFloor ? 0 : uniqueTiles.size,
+    bg_tiles: affineFloor || imageBackground ? 0 : uniqueTiles.size,
     affine_bg_tiles: affineFloor ? measuredFloorTiles ?? 0 : 0,
     obj_tiles: actorTiles.reduce((total, count) => total + count, 0),
     oam_sprites: actors.reduce((total, actor) => total + actorOamCount(data, actor), 0),
@@ -355,6 +361,7 @@ function estimateSceneMetrics(data: GBAProjectData, sceneName: string): ProjectB
   };
   return resourceOrder.map((id) => ({
     ...metricFromValues(id, estimates[id] ?? 0, resourceMetadata[id].capacity),
+    ...(id === "bg_tiles" && imageBackground ? { pending: true } : {}),
     ...(id === "affine_bg_tiles" && affineFloor && measuredFloorTiles === null ? { pending: true } : {})
   }));
 }

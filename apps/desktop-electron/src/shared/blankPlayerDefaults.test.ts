@@ -1,3 +1,4 @@
+import { createBlankProjectWithScene } from "../testFixtures/blankProject.js";
 import { describe, expect, it } from "vitest";
 import { buildProjectFromTemplate } from "./projectTemplates.js";
 import { createRoomInProject, updateRoomFieldsInProject } from "./roomsWorkspace.js";
@@ -11,11 +12,12 @@ function records(data: GBAProjectData, key: string): Record<string, any>[] {
 }
 
 describe("approved players in blank projects", () => {
-  it("starts with an empty scene and offers approved player animations", () => {
-    const project = buildProjectFromTemplate("blank", { name: "Meu jogo" });
-    expect(records(project, "actors")).toEqual([]);
-    expect(records(project, "rooms")[0]).toMatchObject({ backgroundAssetName: "" });
-    expect(project.settings).toMatchObject({ general: { startPlayer: "" } });
+  it("creates the first scene with the approved topdown player and fixed idle, without example content", () => {
+    const project = createBlankProjectWithScene({ name: "Meu jogo" });
+    const actor = records(project, "actors")[0]!;
+    expect(actor).toMatchObject({ name: "Player", spriteSheet: "neutral-player-topdown.png", animationName: "idle_down" });
+    expect(records(project, "rooms")[0]).toMatchObject({ playerActorName: "Player", backgroundAssetName: "neutral-background-topdown.png" });
+    expect(project.settings).toMatchObject({ general: { startPlayer: "Player" } });
     expect(records(project, "assets").every(asset => asset.metadata.bundledDefaultAsset.startsWith("template:blank/"))).toBe(true);
     for (const key of ["events", "triggers", "dialogues", "audioItems"]) expect(project[key]).toEqual([]);
     const animations = records(project, "animations");
@@ -74,7 +76,7 @@ describe("approved players in blank projects", () => {
       expect(gbaActorSpriteRoomPlacementFromFrame(ship.x, ship.y, frame)).toMatchObject({ leftTiles: ship.x, topTiles: ship.y });
       expect(resolveGbaActorSprite(next, { ...ship, originY: 8 })!.frame!.originY).toBe(8);
     }
-    expect(records(base, "rooms")).toHaveLength(1);
+    expect(records(base, "rooms")).toHaveLength(0);
   });
 
   it("changes default players between isometric modes and preserves a custom sprite", () => {
@@ -124,7 +126,7 @@ describe("approved players in blank projects", () => {
   it.each([
     ["racing", "neutral-player-racing-topdown.png"]
   ])("uses the approved purple default for %s", (sceneType, spriteSheet) => {
-    const base = buildProjectFromTemplate("blank", { name: "Existing defaults" });
+    const base = createBlankProjectWithScene({ name: "Existing defaults" });
     const initialRoom = records(base, "rooms")[0]!;
     const changed = updateRoomFieldsInProject(base, String(initialRoom.id), { sceneType });
     const changedPlayer = records(changed, "actors")[0]!;
@@ -142,7 +144,7 @@ describe("approved players in blank projects", () => {
   });
 
   it("uses the approved hand as the blank point-and-click player, with a fixed pointer and complete click", () => {
-    const base = buildProjectFromTemplate("blank", { name: "Hand cursor" });
+    const base = createBlankProjectWithScene({ name: "Hand cursor" });
     const initialRoom = records(base, "rooms")[0]!;
     const project = updateRoomFieldsInProject(base, initialRoom.id, { sceneType: "pointAndClick" });
     const player = records(project, "actors")[0]!;
@@ -174,14 +176,14 @@ describe("approved players in blank projects", () => {
   });
 
   it("switches the initial blank room to the horizontal ship and preserves custom artwork", () => {
-    const base = buildProjectFromTemplate("blank", { name: "Horizontal ship" });
+    const base = createBlankProjectWithScene({ name: "Horizontal ship" });
     const room = records(base, "rooms")[0]!;
     const changed = updateRoomFieldsInProject(base, room.id, { sceneType: "shmup" });
     const player = records(changed, "actors")[0]!;
     expect(player).toMatchObject({ spriteSheet: "neutral-player-shmup-horizontal.png", animationName: "idle", animationStateID: "state-neutral-shmup" });
     player.spriteSheet = "custom-ship.png";
     expect(records(updateRoomFieldsInProject(changed, room.id, { sceneType: "topdown" }), "actors")[0]!.spriteSheet).toBe("custom-ship.png");
-    expect(records(base, "actors")).toEqual([]);
+    expect(records(base, "actors")[0]!.spriteSheet).toBe("neutral-player-topdown.png");
   });
 
   it("binds the prepared ship's twelve frames and keeps explosion separate from the player", () => {

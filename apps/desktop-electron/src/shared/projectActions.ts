@@ -10,6 +10,7 @@ export interface ProjectActionMenuItem {
 export interface ProjectActionMenuState {
   hasSession: boolean;
   hasProjectPath: boolean;
+  hasScenes?: boolean;
   hasEngineAssetc: boolean;
   hasEngineBuild: boolean;
   contractDiagnosticsOK: boolean | null;
@@ -24,6 +25,7 @@ export function deriveProjectActionMenuItems(state: ProjectActionMenuState): Pro
   const generateRomReason = generateRomBlockedReason({
     hasSession: state.hasSession,
     hasProjectPath: state.hasProjectPath,
+    hasScenes: state.hasScenes,
     contractDiagnosticsOK: state.contractDiagnosticsOK,
     projectHealthExportReady: state.projectHealthExportReady,
     hasEngineAssetc: state.hasEngineAssetc,
@@ -45,6 +47,7 @@ export function deriveProjectActionMenuItems(state: ProjectActionMenuState): Pro
       disabled: !canGenerateRom({
         hasSession: state.hasSession,
         hasProjectPath: state.hasProjectPath,
+        hasScenes: state.hasScenes,
         contractDiagnosticsOK: state.contractDiagnosticsOK,
         projectHealthExportReady: state.projectHealthExportReady,
         hasEngineAssetc: state.hasEngineAssetc,

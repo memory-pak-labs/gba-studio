@@ -106,6 +106,7 @@ export function projectDataForPlay(
 export interface GenerateRomPrerequisites {
   hasSession: boolean;
   hasProjectPath: boolean;
+  hasScenes?: boolean;
   contractDiagnosticsOK: boolean | null;
   hasEngineAssetc: boolean;
   hasEngineBuild: boolean;
@@ -117,6 +118,7 @@ export interface GenerateRomPrerequisites {
 export function generateRomBlockedReason(state: GenerateRomPrerequisites): string | undefined {
   if (!state.hasSession) return "Abra ou crie um projeto antes de gerar a ROM.";
   if (!state.hasProjectPath) return "Salve o projeto antes de gerar a ROM.";
+  if (state.hasScenes === false) return "Crie uma cena antes de gerar a ROM.";
   if (state.contractDiagnosticsOK === false) return "Corrija os diagnosticos do contrato antes de gerar a ROM.";
   if (state.projectHealthExportReady === false) return "Corrija os bloqueios de saude do projeto antes de gerar a ROM.";
   if (!state.hasEngineAssetc) return "GBAStudio Engine Pack com assetc nao localizado.";

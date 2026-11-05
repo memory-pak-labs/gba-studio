@@ -971,6 +971,8 @@
                 "scene_stack_push",
                 "set_actor_animation",
                 "set_actor_animation_frame",
+                "set_actor_scale",
+                "set_background_scale",
                 "set_actor_animation_speed",
                 "set_actor_sprite",
                 "set_actor_active",
@@ -1415,7 +1417,8 @@
                   "miss": { "type": "integer", "minimum": 0 }
                 },
                 "additionalProperties": false
-              }
+              },
+              "video": {"$ref": "#/$defs/video_composition"}
             },
             "additionalProperties": true
           }
@@ -1649,7 +1652,8 @@
                   },
                   "additionalProperties": true
                 }
-              }
+              },
+              "video": {"$ref": "#/$defs/video_composition"}
             },
             "additionalProperties": true
           }
@@ -1866,7 +1870,8 @@
                 "items": {
                   "$ref": "#/properties/topdown_project/properties/event_command"
                 }
-              }
+              },
+              "video": {"$ref": "#/$defs/video_composition"}
             },
             "additionalProperties": true
           }
@@ -1913,6 +1918,14 @@
               "menu_profile": { "type": "string", "enum": ["initial", "in_game"] },
               "presentation_mode": { "type": "string", "enum": ["scene", "hud", "both"] },
               "hud_list_rows": { "type": "integer", "minimum": 0, "maximum": 6 },
+              "previous_page_screen": { "type": "integer", "minimum": -1 },
+              "next_page_screen": { "type": "integer", "minimum": -1 },
+              "hud_bindings": { "type": "array", "maxItems": 8, "items": { "type": "object", "required": ["slot"], "properties": {
+                "slot": { "type": "integer", "minimum": 0, "maximum": 7 },
+                "binding": { "$ref": "#/$defs/menu_item_binding" },
+                "selected_item": { "type": "boolean" },
+                "columns": { "type": "integer", "minimum": 0, "maximum": 31 }
+              } } },
               "audio_feedback": {
                 "type": "object",
                 "properties": {
@@ -1960,6 +1973,12 @@
                     "menu_item_index": { "type": "integer", "minimum": -1 },
                     "selected_metasprite": { "type": ["object", "string"] },
                     "visibility_variable": { "type": "integer", "minimum": -1, "maximum": 63 },
+                    "visibility_any": { "type": "boolean" },
+                    "visibility_conditions": { "type": "array", "maxItems": 8, "items": { "type": "object", "required": ["binding", "value"], "properties": {
+                      "binding": { "$ref": "#/$defs/menu_item_binding" },
+                      "value": { "type": "integer" },
+                      "negate": { "type": "boolean" }
+                    } } },
                     "visibility_value": { "type": "integer", "minimum": 0 },
                     "on_init": {
                       "type": "array",
@@ -1976,7 +1995,8 @@
                   },
                   "additionalProperties": true
                 }
-              }
+              },
+              "video": {"$ref": "#/$defs/video_composition"}
             },
             "additionalProperties": true
           }
@@ -2049,7 +2069,8 @@
                   },
                   "additionalProperties": true
                 }
-              }
+              },
+              "video": {"$ref": "#/$defs/video_composition"}
             },
             "additionalProperties": true
           }
@@ -2058,7 +2079,8 @@
     },
     "world_map_project": {
       "type": "object",
-      "description": "Native world map contract with map nodes, directional connections, conditional unlock variables, hidden/locked nodes, save config, scripts, dialogue lines, optional backgrounds and resource bank groups."
+      "description": "Native world map contract with map nodes, directional connections, conditional unlock variables, hidden/locked nodes, save config, scripts, dialogue lines, optional backgrounds and resource bank groups.",
+      "properties": {"video": {"$ref": "#/$defs/video_composition"}}
     },
     "platformer_project": {
       "type": "object",
@@ -2699,6 +2721,7 @@
                       "required": ["id", "x", "y", "width", "height"],
                       "properties": {
                         "id": { "type": "string", "minLength": 1 },
+                        "on_pass": {"type":"array","items":{"$ref":"#/properties/topdown_project/properties/event_command"}},
                         "x": { "type": "integer", "minimum": 0, "maximum": 4095 },
                         "y": { "type": "integer", "minimum": 0, "maximum": 4095 },
                         "width": { "type": "integer", "minimum": 1, "maximum": 256 },
@@ -2731,6 +2754,23 @@
           "items": {
             "type": "object",
             "required": ["name", "config", "party_count", "enemy_count", "party", "enemy", "rewards"],
+            "properties": {
+              "video": {"$ref": "#/$defs/video_composition"},
+              "inventory_items": {
+                "type": "array", "maxItems": 16,
+                "items": {
+                  "type": "object",
+                  "required": ["label", "item", "initial_quantity", "heal_amount"],
+                  "properties": {
+                    "label": { "type": "string", "minLength": 1 },
+                    "item": { "type": "integer", "minimum": 0, "maximum": 15 },
+                    "initial_quantity": { "type": "integer", "minimum": 0, "maximum": 999 },
+                    "heal_amount": { "type": "integer", "minimum": 1, "maximum": 999 }
+                  },
+                  "additionalProperties": false
+                }
+              }
+            },
             "additionalProperties": true
           }
         }
@@ -4110,7 +4150,7 @@
       "type": "object",
       "required": ["source", "index", "format"],
       "properties": {
-        "source": { "type": "string", "enum": ["variable", "inventory", "stat", "equipped"] },
+        "source": { "type": "string", "enum": ["variable", "inventory", "stat", "equipped", "text", "context"] },
         "index": { "type": "integer", "minimum": 0 },
         "format": { "type": "string", "enum": ["number", "count", "percent", "on_off"] }
       },

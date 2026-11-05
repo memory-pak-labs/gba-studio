@@ -1,7 +1,38 @@
 #include <cassert>
 #include "gbs/animation.hpp"
+#include "gbs/project.hpp"
+#include "gbs/platformer.hpp"
 
 namespace {
+
+void test_named_animation_follows_the_active_actor_table() {
+    const gbs::SpriteAnimation idle { nullptr, 0, true, 1 };
+    const gbs::SpriteAnimation wave_a { nullptr, 0, true, 2 };
+    const gbs::SpriteAnimation wave_b { nullptr, 0, false, 2 };
+    const gbs::SpriteAnimation other { nullptr, 0, true, 3 };
+    const gbs::SpriteAnimation* bank_a[] = { &idle, &wave_a };
+    const gbs::SpriteAnimation* bank_b[] = { &wave_b, &other, &idle };
+    gbs::TopDownActorData player {};
+    player.animation = &idle; player.animations = bank_a; player.animation_count = 2;
+    gbs::TopDownNpcData npc {};
+    npc.animation = &idle; npc.animations = bank_a; npc.animation_count = 2;
+    gbs::TopDownActorSpriteData swapped {};
+    swapped.animation = &idle; swapped.animations = bank_b; swapped.animation_count = 3;
+    gbs::PlatformerNpcData platformer {};
+    platformer.animation = &idle; platformer.animations = bank_b; platformer.animation_count = 3;
+    assert(gbs::topdown_actor_animation_for_index(player, -2) == &wave_a);
+    assert(gbs::topdown_npc_animation_for_index(npc, -2) == &wave_a);
+    assert(gbs::topdown_actor_animation_for_index(swapped, -2) == &wave_b);
+    assert(gbs::platformer_npc_animation_for_index(platformer, -2) == &wave_b);
+    assert(gbs::topdown_npc_animation_for_index(npc, 1) == &wave_a);
+    assert(gbs::topdown_actor_animation_for_index(swapped, 1) == &other);
+    assert(gbs::topdown_actor_animation_for_index(player, -4) == nullptr);
+    assert(gbs::topdown_npc_animation_for_index(npc, -4) == nullptr);
+    assert(gbs::topdown_actor_animation_for_index(swapped, -4) == nullptr);
+    assert(gbs::platformer_npc_animation_for_index(platformer, -4) == nullptr);
+    assert(gbs::platformer_npc_animation_for_index(platformer, -32768) == nullptr);
+    assert(gbs::topdown_npc_animation_for_index(npc, -40000) == &idle);
+}
 
 void test_sprite_animation_validation() {
     const gbs::MetaSpritePart parts[] = {
@@ -207,6 +238,7 @@ void test_continuing_walk_keeps_phase_when_facing_changes() {
 }
 
 int main() {
+    test_named_animation_follows_the_active_actor_table();
     test_distance_animation_matches_cardinal_and_fractional_diagonal_travel();
     test_continuing_walk_keeps_phase_when_facing_changes();
     test_sprite_animation_validation();

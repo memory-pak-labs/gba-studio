@@ -12,8 +12,7 @@ describe("approved scene HUD defaults", () => {
     const original = buildProjectFromTemplate("blank", {name:"HUD QA"});
     const next = createRoomInProject(original, {id:"qa",name:"QA",sceneType,width:30,height:20});
     expect((next.rooms as any[]).find(room => room.id === "qa").hudPresetId).toBe(presetID);
-    expect((original.rooms as any[])).toHaveLength(1);
-    expect((original.rooms as any[])[0].hudPresetId).toBeUndefined();
+    expect(original.rooms).toEqual([]);
     const reopened = parseGBAProjectFile(serializeGBAProjectFile({data:next,summary:summarizeGBAProject(next)})).data;
     const preset = deriveHudPresetsWorkspacePresentation(reopened).presets.find(p => p.id === presetID)!;
     expect(preset?.components.some((c:any) => c.valueBinding)).toBe(true);

@@ -1,5 +1,5 @@
 import { uiText as ui } from "./studioUiText";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type {
   DevelopmentSceneLaunch,
   EnginePackBuildDryRunResult,
@@ -20,6 +20,18 @@ import {
 } from "../shared/engineRomPipeline";
 import type { ProjectSession } from "./projectSession";
 
+/** A matching active-scene mirror is editor navigation, not a compilation input change. */
+function budgetContentKey(data: ProjectSession["project"]["data"] | undefined): string | undefined {
+  if (!data) return undefined;
+  const scene = data.scena;
+  if (scene && typeof scene === "object" && Array.isArray(data.scenas)
+    && data.scenas.some(candidate => JSON.stringify(candidate) === JSON.stringify(scene))) {
+    const { scena: _activeScene, ...content } = data;
+    return JSON.stringify(content);
+  }
+  return JSON.stringify(data);
+}
+
 export type StatusTone = "info" | "success" | "error";
 
 interface EngineExportOutcome {
@@ -34,14 +46,17 @@ interface RomBuildOutcome {
 }
 
 interface UseEngineActionsOptions {
+  recordingID?: string;
+  recordInput?: boolean;
   contractDiagnosticsOK: boolean | null;
   projectHealthExportReady?: boolean | null;
+  hasScenes?: boolean;
   publishStatus?(message: string, tone?: StatusTone): void;
   session: ProjectSession | null;
   setStatus: (status: string) => void;
 }
 
-export function useEngineActions({ contractDiagnosticsOK, projectHealthExportReady = null, publishStatus, session, setStatus }: UseEngineActionsOptions) {
+export function useEngineActions({ contractDiagnosticsOK, projectHealthExportReady = null, hasScenes, publishStatus, session, setStatus, recordInput = false, recordingID }: UseEngineActionsOptions) {
   const sessionRef = useRef<ProjectSession | null>(session);
   const [engineStatus, setEngineStatus] = useState<EnginePackStatus | null>(null);
   const [doctorResult, setDoctorResult] = useState<EnginePackDoctorResult | null>(null);
@@ -57,8 +72,19 @@ export function useEngineActions({ contractDiagnosticsOK, projectHealthExportRea
     path: string | undefined;
     data: ProjectSession["project"]["data"];
   } | null>(null);
-  const [projectBudgetAnalysis, setProjectBudgetAnalysis] = useState<ProjectBudgetAnalysisResult | null>(null);
+  const [budgetAnalysisState, setProjectBudgetAnalysis] = useState<{
+    result: ProjectBudgetAnalysisResult;
+    source: { path: string | undefined; key: string | undefined };
+  } | null>(null);
+  const budgetContent = useMemo(() => budgetContentKey(session?.project.data), [session?.project.data]);
+  const budgetContentRef = useRef(budgetContent);
+  budgetContentRef.current = budgetContent;
+  const budgetRequestID = useRef(0);
   const [projectBudgetAnalysisRunning, setProjectBudgetAnalysisRunning] = useState(false);
+  const projectBudgetAnalysis = budgetAnalysisState && budgetAnalysisState.source.path === session?.path
+    && budgetAnalysisState.source.key === budgetContent ? budgetAnalysisState.result : null;
+  const budgetExportReady = projectHealthExportReady === false
+    || projectBudgetAnalysis?.report?.production_summary?.ready_for_large_project === false ? false : projectHealthExportReady;
 
   const hasEngineAssetc = Boolean(engineStatus?.selected?.hasAssetc);
   const hasEngineBuild = Boolean(engineStatus?.selected?.hasGbsbuild);
@@ -66,12 +92,13 @@ export function useEngineActions({ contractDiagnosticsOK, projectHealthExportRea
     && lastEngineExportSource?.path === session.path
     && lastEngineExportSource?.data === session.project.data);
   const configuredEnginePackPath = session ? readProjectEnginePackPath(session.project.data) : "";
-  const engineExportDisabled = !session || exportRunning || contractDiagnosticsOK === false || projectHealthExportReady === false || !hasEngineAssetc;
+  const engineExportDisabled = !session || exportRunning || contractDiagnosticsOK === false || budgetExportReady === false || !hasEngineAssetc;
   const romPipelineState = {
     hasSession: Boolean(session),
     hasProjectPath: Boolean(session?.path),
+    hasScenes,
     contractDiagnosticsOK,
-    projectHealthExportReady,
+    projectHealthExportReady: budgetExportReady,
     hasEngineAssetc,
     hasEngineBuild,
     buildRunning,
@@ -98,9 +125,25 @@ export function useEngineActions({ contractDiagnosticsOK, projectHealthExportRea
   }, [configuredEnginePackPath, session?.path]);
 
   useEffect(() => {
+    budgetRequestID.current += 1;
     setProjectBudgetAnalysis(null);
+    setProjectBudgetAnalysisRunning(false);
     setBuildDryRunResult(null);
-  }, [session?.path, session?.project.data]);
+  }, [session?.path, budgetContent]);
+
+  useEffect(() => window.gbaStudio.onExternalAssetChange?.(change => {
+    if (change.projectPath !== sessionRef.current?.path) return;
+    budgetRequestID.current += 1;
+    setProjectBudgetAnalysis(null);
+    setProjectBudgetAnalysisRunning(false);
+  }), []);
+
+  useEffect(() => window.gbaStudio.onExternalAssetChange?.(change => {
+    if (change.projectPath !== sessionRef.current?.path) return;
+    budgetRequestID.current += 1;
+    setProjectBudgetAnalysis(null);
+    setProjectBudgetAnalysisRunning(false);
+  }), []);
 
   function projectEnginePackPath(): string | undefined {
     const currentSession = sessionRef.current;
@@ -154,14 +197,17 @@ export function useEngineActions({ contractDiagnosticsOK, projectHealthExportRea
   async function analyzeProjectBudget(): Promise<void> {
     const currentSession = sessionRef.current;
     if (!currentSession) return;
-
+    const requestID = ++budgetRequestID.current;
+    const source = { path: currentSession.path, key: budgetContentRef.current };
     setProjectBudgetAnalysisRunning(true);
     try {
       const result = await window.gbaStudio.analyzeProjectBudget({
         project: currentSession.project,
         projectPath: currentSession.path
       });
-      setProjectBudgetAnalysis(result);
+      if (budgetRequestID.current !== requestID || sessionRef.current?.path !== source.path
+        || budgetContentRef.current !== source.key) return;
+      setProjectBudgetAnalysis({ result, source });
       reportStatus(
         result.ok
           ? "Orçamento GBA atualizado pelo compilador."
@@ -169,12 +215,13 @@ export function useEngineActions({ contractDiagnosticsOK, projectHealthExportRea
         result.ok ? "success" : "error"
       );
     } finally {
-      setProjectBudgetAnalysisRunning(false);
+      if (budgetRequestID.current === requestID) setProjectBudgetAnalysisRunning(false);
     }
   }
 
   async function runBuildRom(projectDir?: string): Promise<void> {
     const currentSession = sessionRef.current;
+    const budgetEpoch = budgetRequestID.current;
     const resolvedProjectDir = projectDir ?? (hasCurrentEngineExport ? lastEngineExportPath : null);
     if (!resolvedProjectDir) {
       setStatus(ui("Exporte, salve ou abra um projeto antes de gerar a ROM."));
@@ -190,6 +237,7 @@ export function useEngineActions({ contractDiagnosticsOK, projectHealthExportRea
         currentSession?.path
       );
       setBuildResult(result);
+      publishBuiltVideoBudget(result, currentSession, budgetEpoch);
       reportStatus(
         result.summary && !result.error ? `ROM gerada: ${result.summary.romPath}` : result.error ?? "Build de ROM concluido.",
         result.summary && !result.error ? "success" : "error"
@@ -272,6 +320,7 @@ export function useEngineActions({ contractDiagnosticsOK, projectHealthExportRea
     reusePlayRom = false
   ): Promise<RomBuildOutcome | null> {
     const currentSession = sessionRef.current;
+    const budgetEpoch = budgetRequestID.current;
     if (!currentSession?.path) return null;
 
     const enginePackPath = readProjectEnginePackPath(projectData ?? currentSession.project.data);
@@ -306,6 +355,9 @@ export function useEngineActions({ contractDiagnosticsOK, projectHealthExportRea
       currentSession.path
     );
     setBuildResult(result);
+    if (!developmentStartScene && (!projectData || projectData === currentSession.project.data)) {
+      publishBuiltVideoBudget(result, currentSession, budgetEpoch);
+    }
     if (result.error || !result.summary?.romPath) {
       reportStatus(result.error ?? "Falha ao gerar ROM.", "error");
       return null;
@@ -381,6 +433,12 @@ export function useEngineActions({ contractDiagnosticsOK, projectHealthExportRea
         title: currentSession?.project.summary.name ?? "GBA Studio",
         saveScope: target?.roomID ? `id:${target.roomID}` : target?.roomName ? `name:${target.roomName}` : undefined,
         replay: target?.replay,
+        recordInput: recordInput && !target?.replay,
+        recordingID: recordInput && !target?.replay ? recordingID : undefined,
+        recordingLaunch: developmentStartScene ? {
+          roomID: target?.roomID, roomName: target?.roomName,
+          startX: target?.startX, startY: target?.startY, startDirection: target?.startDirection
+        } : undefined,
         keyboardBindings: deriveGBAKeyboardBindings(currentSession.project.data)
       });
       if (!launch.ok) {
@@ -427,7 +485,21 @@ export function useEngineActions({ contractDiagnosticsOK, projectHealthExportRea
     }
   }
 
+  function publishBuiltVideoBudget(result: EnginePackBuildResult, sourceSession: ProjectSession | null, epoch: number): void {
+    const videoBudget = result.summary?.videoBudget;
+    if (!sourceSession || result.error || result.exitCode !== 0 || !videoBudget || videoBudget.blocked ||
+      budgetRequestID.current !== epoch || sessionRef.current?.path !== sourceSession.path ||
+      budgetContentRef.current !== budgetContentKey(sourceSession.project.data)) return;
+    const source = { path: sourceSession.path, key: budgetContentKey(sourceSession.project.data) };
+    setProjectBudgetAnalysis(current => ({ source, result: {
+      ...(current && current.source.path === source.path && current.source.key === source.key ? current.result : {}),
+      ok: true, error: undefined, generatedAt: new Date().toISOString(), videoBudget
+    } }));
+  }
+
   function clearEngineSessionState(): void {
+    budgetRequestID.current += 1;
+    setProjectBudgetAnalysisRunning(false);
     setDoctorResult(null);
     setBuildDryRunResult(null);
     setBuildResult(null);

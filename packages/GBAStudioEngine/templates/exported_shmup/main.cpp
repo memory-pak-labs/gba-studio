@@ -1,3 +1,4 @@
+#include "gbs/event_render.hpp"
 #include "gbs/profiler.hpp"
 #define GBS_DIALOGUE_UI_RUNTIME_KIND 4
 #include "gbs/engine.hpp"
@@ -59,6 +60,7 @@ gbs::HudState hud;
 gbs::EventState event_state __attribute__((section(".ewram_bss")));
 gbs::ShmupRuntimeState shmup_state;
 gbs::RoomTilemapCache background_layer_cache[4] {};
+bool background_affine_loaded = false;
 gbs::ShmupPlayerAnimator player_animator;
 const gbs::TileAsset* player_streamed_tile_asset_loaded = nullptr;
 bool player_fired_this_frame = false;
@@ -782,6 +784,35 @@ void apply_scene_composition() {
     configure_scene_composition_effects();
 }
 
+bool restore_regular_background_assets() {
+    // The regular viewport uses tile zero outside the source map.
+    static constexpr uint8_t blank[32] = {};
+    if (!gbs::load_tiles(gbs::TileAsset { blank, 1, 0, false })) return false;
+    if (project.resource_bank_group_count == 0) {
+        for (size_t index = 0; index < project.bg_palette_count; ++index) {
+            if (!gbs::load_palette(project.bg_palettes[index], false)) return false;
+        }
+        for (size_t index = 0; index < project.tile_asset_count; ++index) {
+            if (!project.tile_assets[index].object_tiles && !gbs::load_tiles(project.tile_assets[index])) return false;
+        }
+        return true;
+    }
+    // The group can remain resident across waves, although the affine map at
+    // SBB0 has overwritten its CBB0 payload. Restore only the active BG banks.
+    for (size_t index = 0; index < active_resource_bank_group.reservation_count; ++index) {
+        const auto& bank = active_resource_bank_group.reservations[index];
+        if (bank.kind != gbs::ResourcePoolKind::BgTiles && bank.kind != gbs::ResourcePoolKind::BgPalette) continue;
+        const void* source = gbs::resource_bank_upload_source_by_name(
+            gbastudio_shmup_project::resource_bank_upload_sources,
+            gbastudio_shmup_project::resource_bank_upload_source_count, bank.name);
+        gbs::DmaTransfer transfer {};
+        if (!gbs::resource_bank_upload_transfer(bank, source, transfer) ||
+            !gbs::dma_wait_for_destination(transfer.destination, transfer.units * sizeof(uint16_t)) ||
+            !gbs::dma_copy(gbs::DmaChannel::Channel3, transfer)) return false;
+    }
+    return true;
+}
+
 void apply_background() {
     for (auto& cache : background_layer_cache) cache = {};
     gbs::set_bg_enabled(gbs::BackgroundLayer::BG0, true);
@@ -813,6 +844,22 @@ void apply_background() {
             gbs::load_palette(project.bg_palettes[index], false);
         }
     }
+    // Affine uploads relocate the layer to CBB2/SBB0 and enable 8bpp.
+    // Restore regular controls before streaming the next wave's map.
+    if (!background->video.affine_enabled && (!project.composition.enabled ||
+        project.composition.video.display_mode == gbs::DisplayMode::Mode0Text)) {
+        if (background_affine_loaded && !restore_regular_background_assets()) {
+            gbs::set_backdrop_color(gbs::rgb15(31, 0, 0));
+            return;
+        }
+        background_affine_loaded = false;
+        for (int layer = 2; layer <= 3; ++layer) {
+            const auto bg = static_cast<gbs::BackgroundLayer>(layer);
+            gbs::set_bg_character_base(bg, 0);
+            gbs::set_bg_screen_base(bg, layer == 2 ? 20 : 16);
+            gbs::set_bg_color_depth(bg, gbs::ColorDepth::Bpp4);
+        }
+    }
     stream_background();
     if (background->video.affine_enabled) {
         gbs::set_bg_enabled(background->video.affine_layer, true);
@@ -824,8 +871,10 @@ void apply_background() {
         }
         configure_scene_composition_effects();
         refresh_affine_background();
+        background_affine_loaded = true;
     } else {
         apply_scene_composition();
+        background_affine_loaded = project.composition.enabled && project.composition.video.affine_enabled;
     }
 }
 
@@ -1677,12 +1726,14 @@ void draw_shmup_metasprite(int first_index, const gbs::MetaSprite& metasprite, g
     }
     for (uint8_t index = 0; index < metasprite.part_count; ++index) {
         const auto& part = metasprite.parts[index];
-        draw_shmup_sprite(first_index + index, gbs::Sprite {
+        gbs::Sprite sprite {
             position.x + part.x, position.y + part.y, part.tile_index,
             part.palette, part.hflip, part.vflip, true, 0,
             gbs::SpriteRenderMode::Normal, false, part.width, part.height,
-            false, false, 0, part.color_depth
-        });
+            false, false, 0, part.color_depth, part.scale_x256, part.scale_y256
+        };
+        gbs::apply_metasprite_part_scale(sprite, part, &metasprite);
+        draw_shmup_sprite(first_index + index, sprite);
     }
 }
 
@@ -1704,7 +1755,7 @@ void draw_scene() {
         }
     }
     if (player_visible && player_metasprite != nullptr && gbs::is_valid_metasprite(*player_metasprite)) {
-        draw_shmup_metasprite(sprite_index, *player_metasprite, shmup_state.player_position_pixels);
+        draw_shmup_metasprite(sprite_index, gbs::event_scaled_metasprite(event_state,-1,*player_metasprite), shmup_state.player_position_pixels);
         sprite_index += player_metasprite->part_count;
     } else if (player_visible) {
         draw_shmup_sprite(sprite_index++, gbs::Sprite {
@@ -1741,7 +1792,7 @@ void draw_scene() {
             const gbs::MetaSprite* enemy_metasprite = actor_sprite_for_index(runtime_enemy.sprite_index,
                 frame == nullptr ? enemy.metasprite : &frame->metasprite);
             if (enemy_metasprite != nullptr && gbs::is_valid_metasprite(*enemy_metasprite)) {
-                draw_shmup_metasprite(sprite_index, *enemy_metasprite, screen_position);
+                draw_shmup_metasprite(sprite_index, gbs::event_scaled_metasprite(event_state,static_cast<int>(index),*enemy_metasprite), screen_position);
                 sprite_index += enemy_metasprite->part_count;
             } else {
                 draw_shmup_sprite(sprite_index++, gbs::Sprite {
@@ -1827,6 +1878,7 @@ void draw_scene() {
 
 int initialize_shmup_runtime() {
     gbs::init();
+    background_affine_loaded = false;
     // Standalone ROMs bypass the mixed-runtime dispatcher.
     gbs::debug_set_runtime_kind(GBS_DIALOGUE_UI_RUNTIME_KIND);
     gbs::reset_runtime_telemetry();
@@ -1975,6 +2027,7 @@ void render_shmup_runtime(const gbs::RuntimeFrameContext& context) {
     gbs::draw_dialogue(dialogue);
     gbs::draw_dialogue_portrait(dialogue);
     sync_runtime_telemetry();
+    gbs::render_event_background_scale(event_state);
     gbs::wait_vblank();
 }
 

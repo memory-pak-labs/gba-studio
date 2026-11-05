@@ -1,4 +1,8 @@
 #include "gbs_hw.h"
+#include "frame_video_stats.h"
+
+static volatile uint32_t frame_dma_bytes, frame_dma_transfers;
+static uint32_t frame_vblank_irq_ticks, frame_vblank_work_ticks;
 
 static void gbs_hw_draw_hud_choice_selector(int x, int y);
 #include <string.h>
@@ -72,6 +76,8 @@ static void gbs_hw_draw_hud_choice_selector(int x, int y);
 #define MEM_IRQ_HANDLER (*(void (**)(void))0x03007FFC)
 
 static uint16_t shadow_oam[128 * 4];
+static uint32_t published_oam_enabled;
+static GbsOamOccupancy staged_oam = {{0xffffffffu,0xffffffffu,0xffffffffu,0xffffffffu}};
 static uint16_t dialogue_ordered_oam[128 * 4] __attribute__((section(".ewram_bss")));
 static int dialogue_oam_front;
 static uint8_t shadow_oam_dirty_first;
@@ -94,11 +100,14 @@ static uint16_t shadow_bg_enabled_bits;
 static uint8_t shadow_bg_enabled_pending;
 static uint8_t render_publication_blocked;
 static uint8_t render_handoff_fallback_active;
+static uint16_t shadow_display_mode;
+static uint16_t shadow_backdrop_color;
 static uint8_t shadow_bg_character_base[4];
 static uint8_t shadow_bg_character_base_pending_mask;
 static uint8_t shadow_bg_depth_mask;
 static uint8_t shadow_bg_depth[4];
 static uint16_t ui_character_base;
+static uint8_t affine_ui_blank_alias_active;
 static uint8_t shadow_bg_priority[4];
 static uint8_t shadow_bg_priority_pending_mask;
 static const int16_t* pending_hblank_scroll_offsets;
@@ -137,6 +146,7 @@ static uint8_t shadow_bg_screen_base_pending_mask;
  * character base 2 (screenblocks 16-23), while the UI's high-index 4bpp
  * assets remain in character base 1 and the UI/world maps remain at 24/28. */
 static const uint16_t affine_screenblock_base = 0u;
+static uint16_t affine_upload_screenblock_base = 0u;
 
 enum {
     /* BG0 = UI (menu/dialogue/HUD). BG1 = dynamic room tilemap. BG2/BG3 = optional parallax. */
@@ -278,7 +288,9 @@ void gbs_hw_irq_dispatch(void) {
         gbs_audio_vblank_update();
     }
     gbs_dispatch_hardware_interrupts(pending);
-    if (gbs_profiler_record_irq) gbs_profiler_record_irq(gbs_hw_frame_counter_ticks() - profiler_start);
+    const uint32_t irq_ticks = gbs_hw_frame_counter_ticks() - profiler_start;
+    if (pending & 1u) frame_vblank_irq_ticks = irq_ticks;
+    if (gbs_profiler_record_irq) gbs_profiler_record_irq(irq_ticks);
 }
 
 static volatile uint16_t* bg_control_register(int layer) {
@@ -318,10 +330,17 @@ static void gbs_hw_dma_wait(int channel) {
     }
 }
 
+// OAM tracking must preserve the platformer frame budget without extra RAM.
+#if defined(__GNUC__) && !defined(__clang__)
+#pragma GCC push_options
+#pragma GCC optimize("O2")
+#endif
 static void commit_shadow_oam(void) {
+    if (hblank_dma_active_mask & (1u << 3)) return;
     if (shadow_oam_dirty_last <= shadow_oam_dirty_first) {
         return;
     }
+    published_oam_enabled = gbs_oam_occupancy_count(&staged_oam);
     if (dialogue_oam_front) {
         gbs_portrait_tab_order_oam(shadow_oam, dialogue_ordered_oam);
         gbs_hw_dma_copy(3, dialogue_ordered_oam, MEM_OAM, 128u * 4u, 0);
@@ -345,17 +364,24 @@ void gbs_hw_set_dialogue_oam_front(int enabled) {
 }
 
 static void commit_shadow_oam_full(void) {
+    if (hblank_dma_active_mask & (1u << 3)) return;
+    published_oam_enabled = gbs_oam_occupancy_count(&staged_oam);
     gbs_hw_dma_copy(3, shadow_oam, MEM_OAM, 128u * 4u, 0);
     shadow_oam_dirty_first = 128;
     shadow_oam_dirty_last = 0;
 }
+
+
+#if defined(__GNUC__) && !defined(__clang__)
+#pragma GCC pop_options
+#endif
 
 static void commit_shadow_bg_tilemaps(void) {
     for (int layer = 0; layer < 4; ++layer) {
         if ((shadow_bg_tilemap_pending_mask & (1u << layer)) == 0) {
             continue;
         }
-        if (layer == 0 && ui_character_base != 0) {
+        if (layer == 0 && (ui_character_base != 0 || affine_ui_blank_alias_active)) {
             for (unsigned i = 0; i < 1024; ++i) {
                 if (shadow_bg_tilemaps[layer][i] == 0) shadow_bg_tilemaps[layer][i] = 1023;
             }
@@ -720,11 +746,15 @@ struct gbs_hw_metasprite_part {
     uint8_t width;
     uint8_t height;
     uint8_t color_depth;
+    uint16_t scale_x256;
+    uint16_t scale_y256;
 };
 
 struct gbs_hw_metasprite {
     const struct gbs_hw_metasprite_part* parts;
     uint8_t part_count;
+    uint16_t scale_x256;
+    uint16_t scale_y256;
 };
 
 void gbs_hw_configure_dialogue_box_skin(const uint8_t* tiles, const uint16_t* palette) {
@@ -976,6 +1006,9 @@ static void write_obj_square_tiles(void) {
 }
 
 void gbs_hw_init(void) {
+    affine_upload_screenblock_base = affine_screenblock_base;
+    shadow_display_mode = 0;
+    shadow_backdrop_color = 0;
     invalidate_hud_pixel_text_tiles();
     for (unsigned i = 0; i < GBS_TEXT_RESIDENT_GLYPHS; ++i) resident_font_glyphs[i] = (uint16_t)i;
     rebuild_resident_font_slots();
@@ -1006,6 +1039,7 @@ void gbs_hw_init(void) {
     shadow_bg_priority_pending_mask = 0;
     /* Priority 0 draws in front. UI on BG0, world room on BG1. */
     ui_character_base = 0;
+    affine_ui_blank_alias_active = 0;
     shadow_bg_depth_mask = 0;
     REG_BG0CNT = (uint16_t)((bg_screenblocks[UI_BACKGROUND_LAYER] << 8) | 0);
     REG_BG1CNT = (uint16_t)((bg_screenblocks[WORLD_BACKGROUND_LAYER] << 8) | 1);
@@ -1052,6 +1086,7 @@ void gbs_hw_init(void) {
 }
 
 void gbs_hw_wait_vblank(void) {
+    frame_vblank_irq_ticks = 0;
     if ((REG_IE & (1u << 0)) != 0 && (REG_DISPSTAT & (1u << 3)) != 0) {
         gbs_bios_vblank_intr_wait();
     } else {
@@ -1060,6 +1095,7 @@ void gbs_hw_wait_vblank(void) {
         while (REG_VCOUNT < 160) {
         }
     }
+    const uint32_t publication_start = gbs_hw_frame_counter_ticks();
     if (!render_publication_blocked) {
         commit_shadow_bg_controls();
         commit_shadow_oam();
@@ -1068,10 +1104,12 @@ void gbs_hw_wait_vblank(void) {
         commit_hblank_bg_scroll();
         if (render_handoff_fallback_active) {
             REG_DISPCNT = (uint16_t)(
-                (REG_DISPCNT & ~0x0F00u)
+                (REG_DISPCNT & ~(0x0F00u | 0x0007u))
+                | shadow_display_mode
                 | (shadow_bg_enabled_bits & 0x0F00u)
                 | (1u << 12)
             );
+            MEM_PALETTE[0] = shadow_backdrop_color;
             render_handoff_fallback_active = 0;
         }
     }
@@ -1080,6 +1118,19 @@ void gbs_hw_wait_vblank(void) {
         gbs_audio_vblank_update();
         gbs_emit_vblank_interrupt();
     }
+    frame_vblank_work_ticks = gbs_hw_frame_counter_ticks() - publication_start + frame_vblank_irq_ticks;
+}
+
+int gbs_hw_frame_video_stats(GbsHwFrameVideoStats* out) {
+    if (!out) return 0;
+    const uint16_t ime = REG_IME;
+    REG_IME = 0;
+    out->dma_bytes = frame_dma_bytes;
+    out->dma_transfers = frame_dma_transfers;
+    REG_IME = ime;
+    out->vblank_work_ticks = frame_vblank_work_ticks;
+    out->oam_enabled = (REG_DISPCNT & (1u << 12)) ? published_oam_enabled : 0;
+    return 1;
 }
 
 void gbs_hw_set_render_publication_blocked(int blocked) {
@@ -1105,6 +1156,8 @@ void gbs_hw_flush_vram_writes(void) {
 }
 
 void gbs_hw_frame_counter_init(void) {
+    frame_dma_bytes = frame_dma_transfers = 0;
+    frame_vblank_irq_ticks = frame_vblank_work_ticks = 0;
     volatile uint16_t* timer2 = (volatile uint16_t*)(TIMER_BASE + 2 * 4);
     volatile uint16_t* timer3 = (volatile uint16_t*)(TIMER_BASE + 3 * 4);
     timer2[1] = 0;
@@ -1262,6 +1315,7 @@ void gbs_hw_sio_close(void) {
 }
 
 void gbs_hw_set_backdrop(uint16_t color) {
+    shadow_backdrop_color = color;
     MEM_PALETTE[0] = color;
 }
 
@@ -1403,12 +1457,22 @@ static int gbs_hw_hud_icon_owns_slot(int index) {
     return ordinal < hud_icon_obj_count || ordinal >= HUD_ICON_OBJ_OAM_COUNT - hud_compact_obj_count;
 }
 
+// OAM tracking must preserve the platformer frame budget without extra RAM.
+#if defined(__GNUC__) && !defined(__clang__)
+#pragma GCC push_options
+#pragma GCC optimize("O2")
+#endif
 void gbs_hw_hide_sprites(int first, int count) {
     if (first < 0) first = 0;
     if (first >= 128 || count <= 0) return;
     if (first + count > 128) count = 128 - first;
+    const GbsOamOccupancy previous = staged_oam;
+    gbs_oam_occupancy_clear(&staged_oam, (unsigned)first, (unsigned)count);
     for (int index = first; index < first + count; ++index) {
-        if (gbs_hw_hud_icon_owns_slot(index)) continue;
+        if (gbs_hw_hud_icon_owns_slot(index)) {
+            staged_oam.words[index >> 5] |= previous.words[index >> 5] & (1u << (index & 31));
+            continue;
+        }
         /* ATTR0 bits 8-9 = 2 explicitly disable the OBJ entry. */
         shadow_oam[index * 4 + 0] = (2u << 8);
         shadow_oam[index * 4 + 1] = 0;
@@ -1443,6 +1507,7 @@ void gbs_hw_set_sprite(int index, int x, int y, uint16_t tile_index, uint16_t pa
     if (gbs_hw_hud_icon_owns_slot(index)) return;
 
     if (!visible) {
+        gbs_oam_occupancy_set(&staged_oam, (unsigned)index, 0);
         shadow_oam[index * 4 + 0] = (2u << 8);
         shadow_oam[index * 4 + 1] = 0;
         shadow_oam[index * 4 + 2] = 0;
@@ -1451,6 +1516,7 @@ void gbs_hw_set_sprite(int index, int x, int y, uint16_t tile_index, uint16_t pa
         return;
     }
 
+    gbs_oam_occupancy_set(&staged_oam, (unsigned)index, (shape & 3u) != 3u);
     shadow_oam[index * 4 + 0] = (uint16_t)((y & 0x00FF) | ((mode & 3u) << 10) | (mosaic ? (1u << 12) : 0) | ((shape & 3u) << 14));
     shadow_oam[index * 4 + 1] = (uint16_t)((x & 0x01FF) | (hflip ? (1u << 12) : 0) | (vflip ? (1u << 13) : 0) | ((size & 3u) << 14));
     shadow_oam[index * 4 + 2] = (uint16_t)(tile_index | ((priority & 3u) << 10) | ((palette & 15u) << 12));
@@ -1487,10 +1553,16 @@ void gbs_hw_set_sprite_affine(int index, int enabled, int double_size, uint16_t 
     } else {
         attr0 = (uint16_t)(attr0 & ~(1u << 8));
     }
+    gbs_oam_occupancy_set(&staged_oam, (unsigned)index, gbs_oam_entry_enabled(attr0));
     shadow_oam[index * 4 + 0] = attr0;
     shadow_oam[index * 4 + 1] = attr1;
     mark_shadow_oam_dirty(index, 1);
 }
+
+
+#if defined(__GNUC__) && !defined(__clang__)
+#pragma GCC pop_options
+#endif
 
 void gbs_hw_set_sprite_affine_matrix(uint16_t matrix_index, int16_t pa, int16_t pb, int16_t pc, int16_t pd) {
     if (matrix_index >= 32) {
@@ -1561,6 +1633,7 @@ void gbs_hw_load_bg_palette(const uint16_t* colors, uint32_t start_index, uint32
     if (colors == 0 || color_count == 0 || start_index + color_count > 256) {
         return;
     }
+    if (start_index == 0) shadow_backdrop_color = colors[0];
     gbs_hw_enqueue_vblank_dma16(colors, MEM_PALETTE + start_index, color_count);
 }
 
@@ -1687,12 +1760,24 @@ void gbs_hw_set_bg_tilemap_entry(int layer, uint32_t x, uint32_t y, uint32_t wid
     }
 }
 
+bool gbs_hw_set_affine_map_screen_base(uint16_t base) {
+    if (base != affine_screenblock_base && base != 28u) return false;
+    affine_upload_screenblock_base = base;
+    return true;
+}
+
 void gbs_hw_load_affine_bg_tilemap(int layer, const uint8_t* entries, uint32_t width, uint32_t height, uint32_t map_size) {
+    const uint16_t affine_screenblock_base = affine_upload_screenblock_base;
     uint32_t screenblock_count = affine_screenblock_count_for_map_size(map_size);
     if ((layer != 2 && layer != 3) || entries == 0 || width == 0 || height == 0 || width != height ||
-        (width != 16 && width != 32 && width != 64 && width != 128) || map_size > 3 || screenblock_count == 0) {
+        (width != 16 && width != 32 && width != 64 && width != 128) || map_size > 3 || screenblock_count == 0 ||
+        affine_screenblock_base + screenblock_count > 32u) {
         return;
     }
+
+    /* This layer now owns byte-sized affine entries. A pending regular
+     * screenblock would publish 16-bit entries over the new affine map. */
+    shadow_bg_tilemap_pending_mask = (uint8_t)(shadow_bg_tilemap_pending_mask & ~(1u << layer));
 
     shadow_bg_map_size[layer] = (uint8_t)(map_size & 3u);
     shadow_bg_map_size_pending_mask = (uint8_t)(shadow_bg_map_size_pending_mask | (1u << layer));
@@ -1714,6 +1799,22 @@ void gbs_hw_set_display_mode(uint16_t mode) {
     if (mode > 5u) {
         return;
     }
+    const uint8_t use_affine_blank = mode == 1u || mode == 2u;
+    if (use_affine_blank != affine_ui_blank_alias_active) {
+        if (!use_affine_blank) {
+            for (unsigned i = 0; i < 1024; ++i)
+                if (shadow_bg_tilemaps[0][i] == 1023) shadow_bg_tilemaps[0][i] = 0;
+        }
+        if (use_affine_blank) {
+            /* Tile zero belongs to the affine map. Keep empty UI cells on
+             * the reserved transparent tile, outside the map and character data. */
+            for (unsigned i = 0; i < 16; ++i)
+                MEM_VRAM[(ui_character_base * 512u + 1023u) * 16u + i] = 0;
+        }
+        affine_ui_blank_alias_active = use_affine_blank;
+        gbs_hw_mark_ui_tilemap_dirty();
+    }
+    shadow_display_mode = mode & 0x0007u;
     REG_DISPCNT = (uint16_t)((REG_DISPCNT & ~0x0007u) | (mode & 0x0007u));
 }
 
@@ -2327,6 +2428,27 @@ void gbs_hw_draw_text_input_keyboard_with_controls(
     int controls_height,
     int surface_mode
 ) {
+    gbs_hw_draw_text_input_keyboard_authored(box_x,box_y,box_w,box_h,selected_index,lowercase,visible,
+        control_layout,controls_x,controls_y,controls_width,controls_height,surface_mode,0);
+}
+
+
+void gbs_hw_draw_text_input_keyboard_authored(
+    int box_x,
+    int box_y,
+    int box_w,
+    int box_h,
+    int selected_index,
+    int lowercase,
+    int visible,
+    int control_layout,
+    int controls_x,
+    int controls_y,
+    int controls_width,
+    int controls_height,
+    int surface_mode,
+    const gbs_name_keyboard_geometry* geometry
+) {
     static int previous_x = 0;
     static int previous_y = 0;
     static int previous_w = 0;
@@ -2346,8 +2468,9 @@ void gbs_hw_draw_text_input_keyboard_with_controls(
 
     const int side_controls = control_layout == 1;
     const int bottom_grid = control_layout == 2;
-    if (!visible || box_x < 0 || box_y < 0 || box_w < (bottom_grid ? 16 : 22) || box_h < (bottom_grid ? 10 : 6) ||
-        box_x + box_w > 32 || box_y + box_h > 20 ||
+    if (!visible || (geometry ? (!bottom_grid || !gbs_name_geometry_valid(geometry,box_x,box_y)) :
+        (box_x < 0 || box_y < 0 || box_w < (bottom_grid ? 16 : 22) || box_h < (bottom_grid ? 10 : 6) ||
+        box_x + box_w > 32 || box_y + box_h > 20)) ||
         (side_controls && (controls_x < box_x + box_w || controls_y < box_y ||
             controls_width < 5 || controls_height < 6 || controls_x + controls_width > 32 ||
             controls_y + controls_height > 20))) {
@@ -2388,12 +2511,10 @@ void gbs_hw_draw_text_input_keyboard_with_controls(
             focus_tile[y * 2 + 1] = pack_font_pixels(focus_corner[y], 4, 0, NAME_INPUT_COLOR_SELECTOR);
         }
         int glyph_slot = 0;
-        for (int row = 0; row < 4; ++row) {
-            for (int column = 0; column < 8; ++column) {
-                const int index = row * 8 + column;
-                if (index >= 26) continue;
-                const int x = box_x + column * 2;
-                const int y = box_y + row * 2;
+        for (int index = 0; index < 26; ++index) {
+                const gbs_name_key_bounds rect = gbs_name_key_rect(geometry,index);
+                const int x = box_x + rect.x;
+                const int y = box_y + rect.y;
                 if (index == selected_index) {
                     const uint16_t corner = ui_tile_entry(NAME_INPUT_TILE_BORDER, 15);
                     screenblock[y * 32 + x] = corner;
@@ -2403,13 +2524,12 @@ void gbs_hw_draw_text_input_keyboard_with_controls(
                 }
                 const unsigned tile = dialogue_obj_tile_for_codepoint((lowercase ? 'a' : 'A') + index, NAME_KEYBOARD_OBJ_GLYPH_OFFSET + glyph_slot);
                 gbs_hw_set_sprite(NAME_KEYBOARD_OBJ_OAM_BASE + glyph_slot++, x * 8 + 4, y * 8 + 4, tile, NAME_INPUT_OBJ_PALETTE, 0, 0, 1, 0, 0, 0, 0, 0);
-            }
         }
-        const int offsets[3] = {0, 6, 12};
         const char* labels[3] = {"DEL", lowercase ? "aA" : "Aa", "OK"};
         for (int control = 0; control < 3; ++control) {
-            const int x = box_x + offsets[control];
-            const int y = box_y + 8;
+            const gbs_name_key_bounds rect = gbs_name_key_rect(geometry,26+control);
+            const int x = box_x + rect.x;
+            const int y = box_y + rect.y;
             if (selected_index == 26 + control) {
                 const uint16_t corner = ui_tile_entry(NAME_INPUT_TILE_BORDER, 15);
                 screenblock[y * 32 + x] = corner;
@@ -2424,7 +2544,16 @@ void gbs_hw_draw_text_input_keyboard_with_controls(
             }
         }
         queue_name_input_palette_restore();
-        previous_x = box_x; previous_y = box_y; previous_w = box_w; previous_h = box_h;
+        previous_x = 30; previous_y = 20;
+        int right = 0, bottom = 0;
+        for (int index=0;index<29;++index) {
+            const gbs_name_key_bounds r=gbs_name_key_rect(geometry,index);
+            if(box_x+r.x<previous_x)previous_x=box_x+r.x;
+            if(box_y+r.y<previous_y)previous_y=box_y+r.y;
+            if(box_x+r.x+r.width>right)right=box_x+r.x+r.width;
+            if(box_y+r.y+r.height>bottom)bottom=box_y+r.y+r.height;
+        }
+        previous_w=right-previous_x;previous_h=bottom-previous_y;
         gbs_hw_mark_ui_tilemap_dirty();
         return;
     }
@@ -3229,6 +3358,11 @@ void gbs_hw_dma_copy(int channel, const void* source, volatile void* destination
     dma[0] = (uint32_t)source;
     dma[1] = (uint32_t)destination;
     dma[2] = units | DMA_ENABLE | (word_sized ? DMA_32BIT : 0);
+    const uint16_t ime = REG_IME;
+    REG_IME = 0;
+    frame_dma_bytes += units * (word_sized ? 4u : 2u);
+    ++frame_dma_transfers;
+    REG_IME = ime;
 }
 
 void gbs_hw_hdma_start(int channel, const void* source, volatile void* destination, uint32_t units, int word_sized) {

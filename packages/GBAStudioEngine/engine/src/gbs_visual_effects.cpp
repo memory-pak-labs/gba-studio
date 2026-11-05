@@ -9,7 +9,12 @@ gbs::VisibilityEffectController visibility_controller {};
 bool visibility_rendered = false;
 bool visibility_raster_rendered = false;
 uint16_t visibility_window_rows[161] {};
+// This is CPU-only scratch; the HBlank DMA reads visibility_window_rows instead.
+#if defined(__arm__) || defined(__thumb__)
+uint16_t circle_half_width[241] __attribute__((section(".ewram_bss"))) {};
+#else
 uint16_t circle_half_width[241] {};
+#endif
 int cached_circle_radius = -1;
 int clamp_value(int value, int minimum, int maximum);
 

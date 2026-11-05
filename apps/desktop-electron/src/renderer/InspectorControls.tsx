@@ -106,6 +106,7 @@ export function InspectorNumber({
   const ui = useStudioUiText();
   const inputID = useId();
   const descriptionID = useId();
+  const [draft, setDraft] = useState<string | null>(null);
   const normalizedValue = clampInspectorValue(value, min, max);
   const constraintText = inspectorConstraintText(min, max, step);
   const helpText = [constraintText, ui(description)].filter(Boolean).join(" · ");
@@ -137,16 +138,14 @@ export function InspectorNumber({
           max={max}
           min={min}
           onChange={(event) => {
+            setDraft(event.currentTarget.value);
             const nextValue = event.currentTarget.valueAsNumber;
             if (Number.isFinite(nextValue)) applyValue(nextValue);
           }}
-          onBlur={(event) => {
-            const nextValue = event.currentTarget.valueAsNumber;
-            if (Number.isFinite(nextValue)) applyValue(nextValue);
-          }}
+          onBlur={() => setDraft(null)}
           step={step}
           type="number"
-          value={normalizedValue}
+          value={draft ?? normalizedValue}
         />
         {unit ? <span className="inspector-field-unit">{unit}</span> : null}
       </span>

@@ -1,6 +1,7 @@
+import { createBlankProjectWithScene } from "../testFixtures/blankProject.js";
 /** @vitest-environment happy-dom */
 import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
-import { Profiler } from "react";
+import { Profiler, useState } from "react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
@@ -104,9 +105,40 @@ async function openCanvasLayers(user: ReturnType<typeof userEvent.setup>): Promi
 }
 
 describe("RoomsWorkspace React smoke", () => {
+  it("commits an entity name from the Object inspector", async () => {
+    const user=userEvent.setup();
+    const project=createBlankProjectWithScene({name:"Entity names"});
+    const room=deriveRoomsWorkspacePresentation(project).rooms[0]!;
+    project.actors=[{id:"p",name:"Player",roomName:room.name,x:1,y:1},{id:"g",name:"Guard",roomName:room.name,x:2,y:2}];
+    const handlers=roomsWorkspaceHandlers();
+    render(<RoomsWorkspace projectData={project} presentation={deriveRoomsWorkspacePresentation(project)} {...handlers} />);
+    await focusActiveScene(user);
+    await user.click(screen.getByRole("button",{name:"Ator Guard"}));
+    const name=screen.getByRole("textbox",{name:"Nome do ator"});
+    await user.clear(name); await user.type(name,"Vigia Norte");
+    expect(handlers.onUpdateRoomEntity).not.toHaveBeenCalled();
+    await user.tab();
+    expect(handlers.onUpdateRoomEntity).toHaveBeenCalledWith("actor","g",{name:"Vigia Norte"});
+    await user.clear(name); await user.type(name,"Player"); await user.tab();
+    expect(screen.getByRole("alert")).toHaveTextContent("Use um nome único e não vazio.");
+  });
+  it("commits an entity name without flagging an unchanged shared Player label", async () => {
+    const user=userEvent.setup();
+    const project=createRoomInProject(createBlankProjectWithScene({name:"Existing Player labels"}),{id:"second",name:"Second",sceneType:"topdown",width:30,height:20});
+    const room=deriveRoomsWorkspacePresentation(project).rooms[0]!;
+    project.actors=[{id:"p",name:"Player",roomName:room.name,x:1,y:1},{id:"p2",name:"Player",roomName:"Second",x:1,y:1}];
+    const handlers=roomsWorkspaceHandlers();
+    render(<RoomsWorkspace projectData={project} presentation={deriveRoomsWorkspacePresentation(project)} {...handlers} />);
+    await focusActiveScene(user);
+    await user.click(screen.getAllByRole("button",{name:"Player Player"})[0]!);
+    await user.click(screen.getByRole("textbox",{name:"Nome do ator"}));
+    await user.tab();
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+    expect(handlers.onUpdateRoomEntity).not.toHaveBeenCalled();
+  });
   it("lets authors type scene dimensions before applying the minimum", async () => {
     const user = userEvent.setup();
-    const project = buildProjectFromTemplate("blank", { name: "Dimension entry" });
+    const project = createBlankProjectWithScene({ name: "Dimension entry" });
     const handlers = roomsWorkspaceHandlers();
     render(<RoomsWorkspace projectData={project} presentation={deriveRoomsWorkspacePresentation(project)} {...handlers} />);
     const width = screen.getByLabelText("Largura (tiles)");
@@ -119,7 +151,7 @@ describe("RoomsWorkspace React smoke", () => {
   });
 
   it("offers logical cell dimensions for Dungeon Crawler authoring", () => {
-    const project = buildProjectFromTemplate("blank", { name: "Dungeon grid" });
+    const project = createBlankProjectWithScene({ name: "Dungeon grid" });
     const room = (project.rooms as Record<string, unknown>[])[0]!;
     room.sceneType = "dungeonCrawler";
     room.runtime = { type: "dungeonCrawler", config: {} };
@@ -615,7 +647,7 @@ describe("RoomsWorkspace React smoke", () => {
     const sceneEvents = screen.getByLabelText("Eventos da cena arena");
     expect(within(sceneEvents).getByRole("combobox", { name: "Estado do evento" })).toBeInTheDocument();
     expect(sceneEvents).toHaveTextContent("Ao iniciar");
-    expect(sceneEvents).toHaveTextContent("Ao acertar Player");
+    expect(sceneEvents).toHaveTextContent("Ao receber dano");
     expect(sceneEvents).toHaveTextContent("Ao vencer");
     expect(sceneEvents).toHaveTextContent("Ao perder");
     expect(sceneEvents).toHaveTextContent("Ao fugir");
@@ -899,11 +931,11 @@ describe("RoomsWorkspace React smoke", () => {
     expect(hudOverlay.querySelector('[data-hud-component-id="hud-status"]')).not.toBeNull();
 
     await openCanvasLayers(user);
-    await user.click(screen.getByRole("button", { name: "Ocultar camada HUD" }));
+    await user.click(screen.getByRole("button", { name: "Ocultar camada Interface" }));
     expect(screen.queryByRole("img", { name: "Preview da HUD HUD Dungeon · origem Sala" })).not.toBeInTheDocument();
 
     await openCanvasLayers(user);
-    await user.click(screen.getByRole("button", { name: "Mostrar camada HUD" }));
+    await user.click(screen.getByRole("button", { name: "Mostrar camada Interface" }));
     expect(screen.getByRole("img", { name: "Preview da HUD HUD Dungeon · origem Sala" })).toBeInTheDocument();
   });
 
@@ -949,7 +981,7 @@ describe("RoomsWorkspace React smoke", () => {
     expect(screen.queryByRole("img", { name: /^Preview da HUD .*origem/ })).not.toBeInTheDocument();
 
     await openCanvasLayers(user);
-    await user.click(screen.getByRole("button", { name: "Ocultar camada HUD" }));
+    await user.click(screen.getByRole("button", { name: "Ocultar camada Interface" }));
     expect(screen.queryByRole("img", { name: "Prévia da HUD de luta fight-hud.png" })).not.toBeInTheDocument();
   });
 
@@ -962,7 +994,13 @@ describe("RoomsWorkspace React smoke", () => {
       "dungeonCrawler",
       "shmup",
       "battleRpg",
-      "racing"
+      "racing",
+      "pointAndClick",
+      "visualNovel",
+      "cutscene",
+      "menu",
+      "luta",
+      "custom"
     ] as const;
 
     for (const sceneType of sceneProfiles) {
@@ -976,7 +1014,9 @@ describe("RoomsWorkspace React smoke", () => {
       const room = (projectWithHud.scenas as Array<Record<string, unknown>>)[0]!;
       room.sceneType = sceneType;
       room.hudPresetId = "hud-all-scene-profiles";
-      room.runtime = { type: sceneType, config: {} };
+      room.runtime = { type: sceneType, config: sceneType === "luta" ? { hudAssetName: "fight-hud.png" } : sceneType === "isometric" ? {
+        gameplayMode: "tactical", tacticalCapabilities: [{id:"tactical_hud",enabled:true}], tacticalPresentation: {hudLayout:"tactical.png"}
+      } : {} };
 
       render(
         <RoomsWorkspace
@@ -992,7 +1032,7 @@ describe("RoomsWorkspace React smoke", () => {
       expect(hudOverlay).toHaveClass("is-viewport-anchored");
       expect(hudOverlay.parentElement).toHaveClass(sceneType === "dungeonCrawler" ? "dungeon-camera" : "rooms-canvas-viewport-host");
 
-      await user.click(screen.getByRole("button", { name: "HUD - 240×160" }));
+      await user.click(screen.getByRole("button", { name: "Interface - 240×160" }));
       await user.click(screen.getByRole("button", { name: "Editar Status" }));
       expect(screen.getByRole("textbox", { name: "Nome" })).toHaveValue("Status");
 
@@ -1063,7 +1103,7 @@ describe("RoomsWorkspace React smoke", () => {
       expect(hudOverlay.parentElement).toHaveClass(scene.sceneType === "dungeonCrawler" ? "dungeon-camera" : "rooms-canvas-viewport-host");
       expect(hudOverlay.querySelector('canvas[data-hud-preview-renderer="native-contract"]')).toBeInTheDocument();
 
-      await user.click(screen.getByRole("button", { name: "HUD - 240×160" }));
+      await user.click(screen.getByRole("button", { name: "Interface - 240×160" }));
       const editButtons = screen.getAllByRole("button", { name: /^Editar / });
       expect(editButtons.length).toBeGreaterThan(0);
       await user.click(editButtons[0]!);
@@ -1087,7 +1127,7 @@ describe("RoomsWorkspace React smoke", () => {
     );
 
     await focusScene(user, "mercado_suspenso");
-    await user.click(screen.getByRole("button", { name: "HUD - 240×160" }));
+    await user.click(screen.getByRole("button", { name: "Interface - 240×160" }));
 
     const hudOverlay = screen.getByLabelText(/^Preview da HUD /);
     expect(hudOverlay.querySelector('canvas[data-hud-preview-renderer="native-contract"]')).toBeInTheDocument();
@@ -1127,7 +1167,7 @@ describe("RoomsWorkspace React smoke", () => {
     await openCanvasLayers(user);
     expect(screen.getByRole("button", { name: "Mostrar camada Guias da composição" })).toBeInTheDocument();
     await openCanvasLayers(user);
-    expect(screen.getByRole("button", { name: "Ocultar camada HUD" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Ocultar camada Interface" })).toBeInTheDocument();
     expect(screen.queryByRole("img", { name: /Preview da HUD/ })).not.toBeInTheDocument();
 
     await openCanvasLayers(user);
@@ -1252,7 +1292,7 @@ describe("RoomsWorkspace React smoke", () => {
     />
     );
 
-    fireEvent.click(screen.getByRole("button", { name: "Editar HUD" }));
+    fireEvent.click(screen.getByRole("button", { name: "Editar interface" }));
     expect(screen.queryByRole("tab", { name: "HUDs" })).not.toBeInTheDocument();
     expect(screen.getByRole("combobox", { name: "Preset de HUD desta cena" })).toHaveValue("hud-removida");
     expect(screen.getByRole("alert")).toHaveTextContent("hud-removida");
@@ -1279,9 +1319,9 @@ describe("RoomsWorkspace React smoke", () => {
       />
     );
 
-    await user.click(screen.getByRole("button", { name: "Editar HUD" }));
+    await user.click(screen.getByRole("button", { name: "Editar interface" }));
 
-    expect(screen.getByRole("tabpanel", { name: "HUD" })).toHaveTextContent("HUD da cena");
+    expect(screen.getByRole("tabpanel", { name: "Interface" })).toHaveTextContent("HUD da cena");
     const hudSelect = screen.getByLabelText("Preset de HUD desta cena");
     expect(hudSelect).toHaveValue("");
     expect(screen.getByRole("option", { name: "Sem HUD" })).toBeInTheDocument();
@@ -1313,11 +1353,11 @@ describe("RoomsWorkspace React smoke", () => {
       />
     );
 
-    expect(screen.queryByRole("button", { name: "HUD - 240×160" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Interface - 240×160" })).not.toBeInTheDocument();
     await focusActiveScene(user);
-    await user.click(screen.getByRole("button", { name: "HUD - 240×160" }));
+    await user.click(screen.getByRole("button", { name: "Interface - 240×160" }));
 
-    expect(screen.getByRole("button", { name: "HUD - 240×160" })).toHaveAttribute("aria-pressed", "true");
+    expect(screen.getByRole("button", { name: "Interface - 240×160" })).toHaveAttribute("aria-pressed", "true");
     expect(screen.getByRole("heading", { name: "HUD da cena" })).toBeInTheDocument();
     expect(screen.getByText("HUD aplicada")).toBeInTheDocument();
     expect(screen.queryByText("HUD efetiva")).not.toBeInTheDocument();
@@ -1344,7 +1384,7 @@ describe("RoomsWorkspace React smoke", () => {
     project.scenas = [first, { ...first, id: "second", name: "second", hudPresetId: "hud-second" }];
     render(<RoomsWorkspace projectData={project} presentation={deriveRoomsWorkspacePresentation(project)} {...roomsWorkspaceHandlers()} />);
     await focusActiveScene(user);
-    await user.click(screen.getByRole("button", { name: "HUD - 240×160" }));
+    await user.click(screen.getByRole("button", { name: "Interface - 240×160" }));
     fireEvent.click(screen.getByLabelText(/^second\. topdown/));
     expect(screen.getByLabelText("Viewport GBA da cena second")).toBeInTheDocument();
     expect(screen.getByLabelText("Preset de HUD desta cena")).toHaveValue("hud-second");
@@ -2056,10 +2096,11 @@ describe("RoomsWorkspace React smoke", () => {
     expect(screen.getByText("6.87 ms de emulação")).toBeInTheDocument();
     const physical = screen.getByRole("region", { name: "Diagnóstico físico da cena" });
     expect(physical).toHaveTextContent("Estimativa do editor · plano do exportador · medição do runtime · limite seguro");
-    expect(physical).toHaveTextContent("2/10 medidos");
+    expect(physical).toHaveTextContent("1/10 medidos");
     expect(within(physical).getByRole("table", { name: "Matriz de recursos físicos" })).toBeInTheDocument();
     expect(within(physical).getByRole("row", { name: /Tiles BG/ })).toHaveTextContent("0 tiles");
-    expect(within(physical).getByRole("row", { name: /VBlank/ })).toHaveTextContent("320 ticks");
+    // A legacy VBlank wait is not a measurement of publication work.
+    expect(within(within(physical).getByRole("row", { name: /VBlank/ })).getAllByRole("cell")[2]).toHaveTextContent("—");
     expect(within(physical).getByRole("row", { name: /CPU/ })).toHaveTextContent("1600 ticks");
     expect(screen.getByRole("region", { name: "Estado nativo da ROM" })).toHaveTextContent("Sala 1");
     expect(screen.getByRole("region", { name: "Estado nativo da ROM" })).toHaveTextContent("VAR0 3 · FLAGS 0x00000003");
@@ -2395,6 +2436,36 @@ describe("RoomsWorkspace React smoke", () => {
     expect(namePreview).toHaveTextContent("player.name · 8 caracteres");
     expect(namePreview).toHaveTextContent("BACK");
     expect(namePreview).toHaveTextContent("DONE");
+  });
+
+  it("materializes the current name keyboard in the canvas and native preview while guides are hidden", async () => {
+    const user = userEvent.setup();
+    const handlers = roomsWorkspaceHandlers();
+    const project = createBlankProjectData({ name: "Native name keyboard" });
+    const room = (project.scenas as Array<Record<string, unknown>>)[0];
+    room.sceneType = "menu";
+    room.runtime = { type: "menu", config: { role: "name_input", screenType: "menu", hudMode: "none", items: [], textInput: {
+      variableName: "player.name", maxLength: 8, x: 15, y: 5, width: 8,
+      keyboard: { layout: "grid", controlLayout: "bottom_grid", surface: "background", x: 11, y: 8, width: 16, height: 10, allowLowercase: true }
+    } } };
+    render(<RoomsWorkspace presentation={deriveRoomsWorkspacePresentation(project)} projectData={project} {...handlers} />);
+    await focusScene(user, String(room.name));
+    expect(screen.getByRole("img", { name: "Prévia visual da entrada do nome" })).toHaveAttribute("data-native-text-input", "bottom_grid");
+    expect(document.querySelector(".room-focus-native-preview [data-native-text-input='bottom_grid']")).not.toBeNull();
+    expect(screen.getByText("Entrada de nome e teclado")).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Interface - 240×160" }));
+    expect(screen.getByRole("tab", { name: "Interface" })).toHaveAttribute("aria-selected", "true");
+    const keyboard = screen.getByRole("button", { name: "Mover teclado" });
+    fireEvent.keyDown(keyboard, { key: "ArrowLeft" });
+    expect(handlers.onUpdateRoomFields).toHaveBeenCalledWith(String(room.id), { runtime: { type: "menu", config: expect.objectContaining({
+      textInput: expect.objectContaining({ x: 15, y: 5, keyboard: expect.objectContaining({ x: 10, y: 8, controlLayout: "bottom_grid" }) })
+    }) } });
+    expect(document.querySelector(".room-menu-keyboard-guide")).toBeNull();
+    expect(document.querySelector(".room-menu-name-input-guide")).toBeNull();
+    await openCanvasLayers(user);
+    await user.click(screen.getByRole("button", { name: "Ocultar camada Interface" }));
+    expect(screen.queryByRole("img", { name: "Prévia visual da entrada do nome" })).not.toBeInTheDocument();
+    expect(document.querySelector(".room-focus-native-preview [data-native-text-input='bottom_grid']")).not.toBeNull();
   });
 
   it("shows the compiler budget for the selected scene and runs a fresh analysis", async () => {
@@ -3804,6 +3875,20 @@ describe("RoomsWorkspace React smoke", () => {
     expect(inactiveCard?.querySelector(".room-stage-card-canvas > .room-stage-card-grid-toggle")).toBeNull();
   });
 
+  it("localizes the new scene confirmation in an empty English project", async () => {
+    localStorage.setItem("gbaStudio.locale", "en-US");
+    const user = userEvent.setup();
+    const project = buildProjectFromTemplate("blank", { name: "Empty QA" });
+    render(<StudioI18nProvider><RoomsWorkspace
+      presentation={deriveRoomsWorkspacePresentation(project)} projectData={project}
+      {...roomsWorkspaceHandlers()}
+    /></StudioI18nProvider>);
+    await user.click(screen.getAllByRole("button", { name: "New scene" })[0]!);
+    expect(screen.getByRole("button", { name: "Create scene" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Criar cena" })).not.toBeInTheDocument();
+    localStorage.clear();
+  });
+
   it("renders the rooms workspace and creates a room from Nova room", async () => {
     const user = userEvent.setup();
     const project = createBlankProjectData({ name: "Smoke Rooms" });
@@ -3827,6 +3912,49 @@ describe("RoomsWorkspace React smoke", () => {
 
     expect(onCreateRoom).toHaveBeenCalled();
     expect(onCreateRoom.mock.calls[0]?.[1]).toEqual(expect.any(String));
+  });
+
+  it("opens a newly created scene in the focused editor instead of keeping the previous canvas", async () => {
+    const user = userEvent.setup();
+    function ProjectHarness() {
+      const [project, setProject] = useState(() => createBlankProjectData({ name: "Troca de cena" }));
+      return <RoomsWorkspace
+        presentation={deriveRoomsWorkspacePresentation(project)}
+        projectData={project}
+        {...roomsWorkspaceHandlers({
+          onCreateRoom: (_anchorRoomID: string | undefined, name: string) => {
+            window.setTimeout(() => setProject(current => setActiveRoomInProject(createRoomInProject(current, {
+              id: "room-new", name, width: 30, height: 20, sceneType: "topdown"
+            }), "room-new")), 40);
+            return "room-new";
+          },
+          onSetActiveRoom: (id: string) => setProject(current => setActiveRoomInProject(current, id))
+        })}
+      />;
+    }
+    render(<ProjectHarness />);
+    await focusActiveScene(user);
+    await user.click(screen.getByRole("button", { name: /Gatilho - Eventos/ }));
+    await user.click(screen.getByRole("button", { name: "Nova cena" }));
+    const input = screen.getByRole("textbox", { name: "Nome da cena" });
+    await user.clear(input);
+    await user.type(input, "Nova cena QA");
+    await user.click(screen.getByRole("button", { name: "Criar cena" }));
+    expect(await screen.findByRole("region", { name: "Editor focado da cena Nova cena QA" })).toBeInTheDocument();
+    expect(screen.getByRole("region", { name: "Viewport GBA da cena Nova cena QA" })).toBeInTheDocument();
+  });
+
+  it("allows choosing a menu type before creating a blank scene", async () => {
+    const user = userEvent.setup();
+    const project = createBlankProjectData({ name: "Menu em branco" });
+    const onCreateRoom = vi.fn(() => "room-menu");
+    render(<RoomsWorkspace presentation={deriveRoomsWorkspacePresentation(project)} projectData={project}
+      {...roomsWorkspaceHandlers({ onCreateRoom })} />);
+    await user.click(screen.getAllByRole("button", { name: "Nova cena" })[0]!);
+    const dialog = screen.getByRole("dialog", { name: "Nova cena" });
+    await user.selectOptions(within(dialog).getByRole("combobox", { name: "Tipo de cena" }), "menu");
+    await user.click(screen.getByRole("button", { name: "Criar cena" }));
+    expect(onCreateRoom).toHaveBeenCalledWith(undefined, expect.any(String), undefined, "menu");
   });
 
   it("escolhe o evento de uma conexao pelo nome do projeto", async () => {
@@ -4135,8 +4263,8 @@ describe("RoomsWorkspace React smoke", () => {
     expect(layers).toHaveAttribute("aria-expanded", "false");
     expect(layers).toHaveFocus();
 
-    await user.click(within(focusToolRail as HTMLElement).getByRole("button", { name: /^HUD -/ }));
-    const hudToolbar = screen.getByRole("toolbar", { name: "Ferramentas da HUD" });
+    await user.click(within(focusToolRail as HTMLElement).getByRole("button", { name: /^Interface -/ }));
+    const hudToolbar = screen.getByRole("toolbar", { name: "Ferramentas da interface" });
     expect(hudToolbar).toBeVisible();
     expect(within(hudToolbar).getByRole("button", { name: "+ Texto" })).toBeVisible();
     expect(within(hudToolbar).getByRole("button", { name: "+ Ícone" })).toBeVisible();

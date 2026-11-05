@@ -13,8 +13,10 @@ struct SharedRuntimeTelemetry {
     gbs::RuntimeTelemetryBlock base;
     gbs::RuntimeProfilerTelemetryBlock profiler;
     gbs::RuntimeEventTraceBlock events;
+    gbs::RuntimeFrameBudgetTelemetryBlock frame_budget;
 };
 static_assert(offsetof(SharedRuntimeTelemetry, profiler) == 256, "profiler extension must follow base telemetry");
+static_assert(offsetof(SharedRuntimeTelemetry, frame_budget) == 400, "frame budget follows existing extensions");
 #if defined(__arm__) || defined(__thumb__)
 volatile SharedRuntimeTelemetry shared_runtime_telemetry __attribute__((section(".ewram_bss"), used));
 volatile gbs::RuntimeTelemetryLegacyBlock shared_runtime_telemetry_legacy __attribute__((section(".ewram_bss"), used));
@@ -107,6 +109,13 @@ int32_t debug_runtime_kind() {
 }
 
 void reset_runtime_telemetry() {
+    volatile auto& budget = runtime_frame_budget_telemetry_block();
+    // Invalidate immediately; initialize payload on first publish. Avoid an
+    // extra EWRAM sweep during runtime handoff and startup.
+    budget.magic = 0;
+    budget.scene_frame_count = 0;
+    budget.runtime_kind = -1;
+    budget.room = -1;
     volatile RuntimeTelemetryBlock& telemetry = runtime_telemetry_block();
     uint32_t* words = const_cast<uint32_t*>(reinterpret_cast<const volatile uint32_t*>(&telemetry));
     for (size_t index = 0; index < sizeof(RuntimeTelemetryBlock) / sizeof(uint32_t); ++index) {
@@ -187,6 +196,34 @@ void debug_set_runtime_physical_telemetry(const RuntimePhysicalTelemetry& sample
 }
 
 volatile RuntimeEventTraceBlock& runtime_event_trace_block() { return shared_runtime_telemetry.events; }
+volatile RuntimeFrameBudgetTelemetryBlock& runtime_frame_budget_telemetry_block() { return shared_runtime_telemetry.frame_budget; }
+
+void debug_publish_frame_budget(uint32_t frame, uint32_t valid_bits, uint32_t dma_bytes,
+    uint32_t transfers, uint32_t queued, uint32_t dropped, uint32_t vblank, uint32_t oam) {
+    auto& b = runtime_frame_budget_telemetry_block();
+    b.magic = 0; // Commit marker: readers reject incomplete/stale samples.
+    valid_bits &= 7u;
+    const int32_t room = runtime_telemetry_block().current_room;
+    const int32_t kind = debug_runtime_kind();
+    if (!b.scene_frame_count || b.room != room || b.runtime_kind != kind) {
+        b.peak_dma_bytes = b.peak_vblank_work_ticks = b.peak_oam_enabled = 0;
+        b.peak_dma_frame = b.peak_vblank_frame = b.peak_oam_frame = frame;
+        b.scene_frame_count = b.scene_dma_bytes = 0;
+    }
+    b.schema = 1; b.word_count = 24; b.frame = frame;
+    b.runtime_kind = kind; b.room = room; b.ticks_per_second = 262144; b.valid_bits = valid_bits;
+    b.dma_bytes = dma_bytes; b.dma_transfers = transfers;
+    b.dma_queued_bytes = queued; b.dma_dropped_total = dropped;
+    b.vblank_work_ticks = vblank; b.oam_enabled = oam;
+    if (valid_bits & 1u) {
+        b.scene_dma_bytes += dma_bytes;
+        if (dma_bytes > b.peak_dma_bytes) { b.peak_dma_bytes = dma_bytes; b.peak_dma_frame = frame; }
+    }
+    if ((valid_bits & 2u) && vblank > b.peak_vblank_work_ticks) { b.peak_vblank_work_ticks = vblank; b.peak_vblank_frame = frame; }
+    if ((valid_bits & 4u) && oam > b.peak_oam_enabled) { b.peak_oam_enabled = oam; b.peak_oam_frame = frame; }
+    ++b.scene_frame_count;
+    b.magic = 0x47534642u;
+}
 void debug_set_event_trace_enabled(bool enabled) { event_trace_enabled = enabled; }
 
 void debug_reset() {

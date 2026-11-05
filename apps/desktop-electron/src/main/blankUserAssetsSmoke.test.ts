@@ -1,9 +1,9 @@
+import { createBlankProjectWithScene } from "../testFixtures/blankProject.js";
 import path from "node:path";
 import { createHash } from "node:crypto";
 import { mkdir, readFile, writeFile, copyFile } from "node:fs/promises";
 import { deflateSync } from "node:zlib";
 import { describe, expect, it } from "vitest";
-import { buildProjectFromTemplate } from "../shared/projectTemplates.js";
 import { createActorInProject, createRoomInProject, createTriggerInProject, removeRoomFromProject, updateRoomFieldsInProject } from "../shared/roomsWorkspace.js";
 import { updateSpriteAnimationFieldsInProject } from "../shared/spritesWorkspace.js";
 import { replaceAssetFileInProject, appendImportedAssetsToProject } from "../shared/filesWorkspace.js";
@@ -54,7 +54,7 @@ describe.skipIf(!process.env.GBA_USER_ASSETS_QA_OUTPUT)("blank user asset native
     const projectPath = path.join(output, "project", "user_assets_qa.gba-project");
     await mkdir(path.dirname(projectPath), { recursive: true });
     await mkdir(path.join(output, "sources"), { recursive: true });
-    let data = buildProjectFromTemplate("blank", { name: "QA assets autorais" });
+    let data = createBlankProjectWithScene({ name: "QA assets autorais" });
     for (const sceneType of ["platformer", "isometricAdventure", "isometricTactical", "shmup", "racing", "luta", "pointAndClick", "visualNovel", "cutscene", "battleRpg", "dungeonCrawler", "menu", "worldMap", "custom"]) {
       data = createRoomInProject(data, { id: sceneType, name: `qa_${sceneType}`, sceneType, width: 30, height: 20 });
     }
@@ -62,6 +62,7 @@ describe.skipIf(!process.env.GBA_USER_ASSETS_QA_OUTPUT)("blank user asset native
     data = updateRoomFieldsInProject(data, "racingPerspective", { runtime: { type: "racing", config: { presentation: "pseudo3d" } } });
     const evidence = [];
     for (const [index, player] of [...catalog.players, ...catalog.effects].entries()) {
+      expect(sizes[player.family], `QA dimensions for ${player.family}`).toBeDefined();
       const [width, height, defaultColors] = sizes[player.family]!;
       const opaque = Boolean(process.env.GBA_USER_ASSETS_QA_OPAQUE) && player.family === "topdown";
       const colorMode = process.env.GBA_USER_ASSETS_QA_8BPP && player.family !== "shmup-explosion" ? "8bpp" : "4bpp";

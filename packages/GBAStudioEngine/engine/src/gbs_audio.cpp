@@ -170,6 +170,12 @@ void update_sfx_tone_volume(const gbs::SfxTone& tone, uint8_t envelope_gain) {
     }
 }
 
+void stop_previous_sfx_channel_if_changed(const gbs::SfxTone& previous, const gbs::SfxTone& next) {
+    if (previous.noise == next.noise) return;
+    if (previous.noise) gbs_hw_audio_stop_noise();
+    else gbs_hw_audio_stop_square(1);
+}
+
 void start_sfx_tone(const gbs::SfxTone& tone) {
     sfx.elapsed_frames = 0;
     sfx.frames_remaining = tone.duration_frames;
@@ -418,12 +424,14 @@ void update_sfx() {
         return;
     }
 
+    const gbs::SfxTone& previous = sfx.tones[sfx.index];
     ++sfx.index;
     if (sfx.index >= sfx.tone_count) {
         gbs::stop_sfx();
         return;
     }
 
+    stop_previous_sfx_channel_if_changed(previous, sfx.tones[sfx.index]);
     start_sfx_tone(sfx.tones[sfx.index]);
 }
 
@@ -1099,6 +1107,7 @@ bool play_sfx(const SfxAsset& asset) {
     }
 
     [[maybe_unused]] const AudioStateLock lock;
+    if (sfx.playing) stop_previous_sfx_channel_if_changed(sfx.tones[sfx.index], asset.tones[0]);
     sfx.tones = asset.tones;
     sfx.tone_count = asset.tone_count;
     sfx.index = 0;

@@ -86,7 +86,7 @@
   bottom: 0;
   box-shadow: var(--studio-shadow-raised);
   display: grid;
-  grid-template-rows: auto minmax(0, 1fr);
+  grid-template-rows: auto auto minmax(0, 1fr);
   position: fixed;
   right: 0;
   top: 52px;
@@ -112,6 +112,7 @@
 }
 
 .project-problems-list {
+  align-content: start;
   display: grid;
   gap: var(--studio-space-4);
   overflow-y: auto;
@@ -137,25 +138,70 @@
   padding: 2px 7px;
 }
 
-.project-problems-list section > button {
+.project-problem-row {
+  align-items: start;
+  border: 1px solid var(--studio-color-border);
+  border-radius: var(--studio-radius-control);
+  display: flex;
+  overflow-wrap: anywhere;
+}
+
+.project-problem-row > button:first-child {
   align-items: start;
   background: var(--studio-color-surface);
-  border-color: var(--studio-color-border);
+  border: 0;
   color: var(--studio-color-text-primary);
   display: grid;
   gap: var(--studio-space-2);
   grid-template-columns: auto minmax(0, 1fr);
+  flex: 1;
+  min-width: 0;
   min-height: 42px;
   padding: 8px 10px;
   text-align: left;
 }
 
-.project-problems-list section > button.error > svg {
+.project-problem-row > button.error > svg {
   color: var(--studio-color-danger);
 }
 
-.project-problems-list section > button.warning > svg {
+.project-problem-row > button.warning > svg {
   color: var(--studio-color-warning-text);
+}
+
+.project-problem-content {
+  display: grid;
+  gap: 4px;
+}
+
+.project-problem-content small,
+.project-problems-controls small,
+.project-problems-controls > span {
+  color: var(--studio-color-text-muted);
+}
+
+.project-problems-controls {
+  align-items: center;
+  border-bottom: 1px solid var(--studio-color-border);
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--studio-space-2);
+  padding: 10px var(--studio-space-4);
+}
+
+.project-problems-controls small {
+  flex-basis: 100%;
+}
+
+.project-problem-ignore {
+  background: transparent;
+  border: 0;
+  color: var(--studio-color-text-muted);
+  flex-shrink: 0;
+  margin: 4px;
+  min-height: 30px;
+  min-width: 30px;
+  padding: 5px;
 }
 
 .workspace-navigation-trail {

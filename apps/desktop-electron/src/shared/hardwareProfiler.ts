@@ -1,5 +1,6 @@
 import type { GBAProjectData } from "./projectFile.js";
 import type { AssetPackBudgetReport } from "./projectBudget.js";
+import type { InputReplayFrameBatch, InputReplayInitialState } from "./inputReplay.js";
 import {
   resolveSceneRuntimeExport,
   type SceneExportKind
@@ -63,6 +64,13 @@ export interface RomPlayerSubsystemTelemetry {
   scenePeakTicks: ProfilerSubsystemTicks;
 }
 
+export interface RomPlayerFrameBudgetTelemetry {
+  frame: number; runtimeKind: number; room: number; ticksPerSecond: number;
+  dmaBytes: number | null; dmaTransfers: number | null; dmaQueuedBytes: number; dmaDroppedTotal: number;
+  vblankWorkTicks: number | null; oamEnabled: number | null; sceneFrameCount: number; sceneDmaBytes: number | null;
+  peaks: { dma: { value: number; frame: number } | null; vblank: { value: number; frame: number } | null; oam: { value: number; frame: number } | null };
+}
+
 export interface RomPlayerEventTraceEntry {
   commandAddress: number; frame: number; step: number; op: number; status: number; room: number; waitFrames: number;
   eventID?: string; stepID?: string;
@@ -90,12 +98,16 @@ export interface RomPlayerRuntimeState {
   audio?: RomPlayerAudioTelemetry | null;
   subsystems?: RomPlayerSubsystemTelemetry | null;
   eventTrace?: RomPlayerEventTrace | null;
+  frameBudget?: RomPlayerFrameBudgetTelemetry | null;
 }
 
 export type RomPlayerHardwareTelemetry = Partial<Record<ScenePhysicalMetricID, number>>;
 
 export interface RomPlayerFrameStats {
+  recordingID?: string;
+  recordingStart?: InputReplayInitialState;
   sampledAtUnixMs?: number;
+  inputFrames?: InputReplayFrameBatch;
   cpuPercent: number;
   droppedFrameRatio: number;
   droppedFrames: number;
@@ -110,6 +122,7 @@ export interface RomPlayerFrameStats {
 }
 
 export interface RomPlayerTelemetryEvent {
+  recordingError?: string;
   state: "running" | "closed";
   windowID: number;
   stats?: RomPlayerFrameStats;
@@ -392,7 +405,11 @@ export function deriveHardwareProfilerPresentation(
       ...(telemetry?.hardware ?? {}),
       ...(runtimeState ? {
         cpuWorkTicks: telemetry?.hardware?.cpuWorkTicks ?? runtimeState.timing.peakCpuWorkTicks,
-        vblankTicks: telemetry?.hardware?.vblankTicks ?? runtimeState.timing.peakVblankWaitTicks
+        // Legacy physical DMA is pending queue size; VBlank timing is idle
+        // wait. Neither is a completed-frame workload measurement.
+        dmaBytes: runtimeState.frameBudget?.dmaBytes ?? null,
+        oam: runtimeState.frameBudget?.oamEnabled ?? null,
+        vblankTicks: runtimeState.frameBudget?.vblankWorkTicks ?? null
       } : {})
     }
   });

@@ -80,7 +80,7 @@ export function promoteApprovedBookMenus(source) {
   project.actors=project.actors.filter(a=>!affected.has(a.roomName));
   for(const entry of Object.values(manifest.assets)) {
     const id=`book-menu-${entry.id}`;
-    const metadata={source:entry.source,license:entry.license,generatedBy:'approved-book-menus-v5-toolcase-v3',reviewStatus:'approved',visualStatus:'approved',preparedSha256:entry.sha256,sourceSha256:entry.sha256,provenance:entry.preparedBy,width:entry.width,height:entry.height};
+    const metadata={source:entry.source,license:entry.license,...(entry.author?{author:entry.author}:{}),generatedBy:'approved-book-menus-v5-toolcase-v3',reviewStatus:'approved',visualStatus:'approved',preparedSha256:entry.sha256,sourceSha256:entry.sha256,provenance:entry.preparedBy,width:entry.width,height:entry.height};
     if(entry.kind==='bg')Object.assign(metadata,{colorMode:'4bpp',backgroundPaletteBankBudget:14,backgroundPaletteReferencePlan:entry.palettePlan,backgroundTileOptimizer:{enabled:true,tileBudget:895},titleBakedIntoBackground:true,titleLanguage:'pt-BR',assetcStatus:'attention',palettePreparationVisuallyApproved:true});
     else Object.assign(metadata,{frameWidth:entry.width,frameHeight:entry.height,frameCount:entry.frames,colorMode:`${entry.bpp}bpp`});
     const beforePlatformer=project.assets.findIndex(asset=>asset.id.startsWith('penedos-v7-'));

@@ -59,11 +59,11 @@ describe("sprite color depth through authoring and export", () => {
   it("blocks declared 8bpp OBJ colors that would overwrite runtime text palettes", () => {
     const data = updateSpriteAnimationFieldsInProject(fixture(), "idle", { colorMode: "8bpp" });
     const metadata = (data.assets as Record<string, any>[])[0].metadata;
-    metadata.maxVisibleColors = 195;
+    metadata.maxVisibleColors = 208;
     expect(auditGbaHardwareBlockingErrors(data)).toEqual(expect.arrayContaining([
       expect.stringContaining("OBJ_SHARED_PALETTE_LIMIT_EXCEEDED")
     ]));
-    metadata.maxVisibleColors = 194;
+    metadata.maxVisibleColors = 207;
     expect(auditGbaHardwareBlockingErrors(data)).toEqual([]);
   });
 });

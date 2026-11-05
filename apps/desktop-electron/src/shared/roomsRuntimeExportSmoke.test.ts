@@ -164,7 +164,7 @@ describe("Rooms runtime/export smoke", () => {
       activeRoomName: "field",
       startRoomName: "field",
       totalTiles: 2032,
-      warningCount: 4
+      warningCount: 3
     });
     expect(rooms.rooms.find((room) => room.name === "field")).toMatchObject({
       width: 40,

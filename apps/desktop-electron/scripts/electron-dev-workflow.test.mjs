@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { createElectronDevWorkflowPlan } from "./electron-dev-workflow.mjs";
+import { createElectronDevWorkflowPlan, runElectronDevWorkflow } from "./electron-dev-workflow.mjs";
 
 describe("electron dev workflow", () => {
   it("creates a quick local loop with typecheck, tests and diff hygiene", () => {
@@ -131,6 +131,30 @@ describe("electron dev workflow", () => {
     expect(plan.steps.map((step) => step.args)).toContainEqual(["run", "gate:audio-acoustic"]);
     expect(plan.steps.flatMap((step) => step.args)).not.toContain("smoke:functional-p0");
     expect(plan.steps.flatMap((step) => step.args)).not.toContain("smoke:preview-p0");
+  });
+
+  it("includes the requested soak in the executed complete-project scene step without changing the default plan", async () => {
+    const executed = [];
+    await runElectronDevWorkflow({
+      profile: "complete-project",
+      soakMinutes: 20,
+      runner: async (step) => { executed.push(step); }
+    });
+    expect(executed.find(step => step.args.includes("smoke:exemplo-scenes"))?.args)
+      .toEqual(["run", "smoke:exemplo-scenes", "--", "--soak-minutes=20"]);
+    expect(createElectronDevWorkflowPlan({ profile: "complete-project" }).steps
+      .find(step => step.args.includes("smoke:exemplo-scenes"))?.args)
+      .toEqual(["run", "smoke:exemplo-scenes"]);
+  });
+
+  it.each([1, 19, 31, 20.5, NaN])("rejects an invalid soak duration %s before executing the gate", (soakMinutes) => {
+    expect(() => createElectronDevWorkflowPlan({ profile: "complete-project", soakMinutes }))
+      .toThrow("O soak integrado precisa durar entre 20 e 30 minutos inteiros.");
+  });
+
+  it("rejects a soak on a workflow without the integrated scene test", () => {
+    expect(() => createElectronDevWorkflowPlan({ profile: "quick", soakMinutes: 20 }))
+      .toThrow("O soak integrado exige o perfil complete-project.");
   });
 
   it("rejects unknown profiles with the supported options in the message", () => {

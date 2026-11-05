@@ -83,6 +83,14 @@ describe("engineRomPipeline", () => {
     ).toBe(true);
   });
 
+  it("explains that an empty saved project needs its first scene", () => {
+    expect(generateRomBlockedReason({
+      hasSession: true, hasProjectPath: true, hasScenes: false,
+      contractDiagnosticsOK: true, projectHealthExportReady: false,
+      hasEngineAssetc: true, hasEngineBuild: true, buildRunning: false, exportRunning: false
+    })).toBe("Crie uma cena antes de gerar a ROM.");
+  });
+
   it("blocks ROM generation only when the shared project health report is blocked", () => {
     const prerequisites = {
       hasSession: true,

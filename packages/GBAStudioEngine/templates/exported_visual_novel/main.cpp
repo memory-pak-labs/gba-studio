@@ -87,11 +87,11 @@ gbs::DialogueChoice runtime_choices[max_runtime_choices];
 int runtime_choice_source_indices[max_runtime_choices];
 size_t runtime_choice_count = 0;
 
+gbs::EventRunner visual_novel_event_runner {};
+int visual_novel_event_wait_frames = 0;
 #if GBS_MULTI_RUNTIME
 int checkpoint_music_index = -1;
 int checkpoint_tracker_index = -1;
-gbs::EventRunner visual_novel_event_runner {};
-int visual_novel_event_wait_frames = 0;
 struct VisualNovelRuntimeCheckpoint {
     uint32_t version;
     int32_t history_lines[gbs::visual_novel_history_capacity];
@@ -201,6 +201,11 @@ void append_uint(char*& cursor, const char* end, uint16_t value) {
 }
 
 void refresh_hud() {
+    const char* authored_scene = gbs::visual_novel_scene_name(project, current_scene_index);
+    if (!authored_scene || !gbastudio_dialogue_ui::has_hud_scene_binding(authored_scene)) {
+        gbs::hide_hud(hud);
+        return;
+    }
     char* left = hud_left_buffer;
     const char* left_end = hud_left_buffer + sizeof(hud_left_buffer) - 1;
     hud_left_buffer[0] = '\0';
@@ -243,6 +248,7 @@ void stream_scene_resource_group(const gbs::VisualNovelSceneData& scene) {
 
 void apply_background(const gbs::VisualNovelSceneData& scene) {
     if (!gbs::is_valid_visual_novel_background_index(project, scene.background_index) || scene.background_index < 0) {
+        gbs::apply_scene_background_video(scene.video);
         return;
     }
 
@@ -259,10 +265,10 @@ void apply_background(const gbs::VisualNovelSceneData& scene) {
         gbs::load_tiles(project.tile_assets[index]);
     }
     gbs::load_tilemap(background.layer, background.tilemap);
+    gbs::apply_scene_background_video(scene.video);
 }
 
 void draw_dialogue_portrait() {
-    gbs::hide_all_sprites();
     if (!gbs::dialogue_should_show_portrait(dialogue)) {
         return;
     }
@@ -365,11 +371,11 @@ void consume_event_state() {
         checkpoint_music_index = checkpoint_tracker_index = -1;
 #endif
     }
-#if GBS_MULTI_RUNTIME
     if (event_state.wait_frames > 0) {
         visual_novel_event_wait_frames = event_state.wait_frames;
         event_state.wait_frames = 0;
     }
+#if GBS_MULTI_RUNTIME
     consume_visual_novel_checkpoint_request();
 #endif
 }
@@ -526,20 +532,14 @@ bool restore_visual_novel_checkpoint(int slot) {
 #endif
 
 void run_visual_novel_event_script(gbs::EventScript script) {
-#if GBS_MULTI_RUNTIME
     gbs::start_event_runner(visual_novel_event_runner, script);
     visual_novel_event_wait_frames = 0;
     gbs::update_checkpoint_event_runner(visual_novel_event_runner, event_state);
-#else
-    gbs::run_event_script(event_state, script);
-#endif
 }
 
 void show_scene_content_if_ready() {
     if (!scene_content_pending || dialogue.visible
-#if GBS_MULTI_RUNTIME
         || gbs::event_runner_is_active(visual_novel_event_runner)
-#endif
     ) {
         return;
     }
@@ -643,9 +643,7 @@ void finish_scene_choice_if_needed(bool was_choice_mode) {
 void advance_scene_if_ready() {
     const gbs::VisualNovelSceneData* scene = gbs::visual_novel_scene_for(project, current_scene_index);
     if (scene == nullptr || dialogue.visible
-#if GBS_MULTI_RUNTIME
         || gbs::event_runner_is_active(visual_novel_event_runner)
-#endif
     ) {
         return;
     }
@@ -664,9 +662,7 @@ void advance_scene_if_ready() {
             return;
         }
     }
-#if GBS_MULTI_RUNTIME
     if (gbs::event_runner_is_active(visual_novel_event_runner)) return;
-#endif
     start_scene(next_scene);
     persist_visual_novel_runtime_state();
 }
@@ -689,6 +685,8 @@ int initialize_visual_novel_runtime() {
     // Match the editor Normal default; authored boot commands may override it.
     gbs::set_dialogue_text_speed(dialogue, 2);
     gbs::init_event_state(event_state);
+    gbs::init_event_runner(visual_novel_event_runner);
+    visual_novel_event_wait_frames = 0;
     gbs::bind_event_scripts(event_state, project.scripts, project.script_count);
     gbs::init_hud(hud);
     gbs::init_resource_manager(resource_manager);
@@ -753,7 +751,6 @@ gbs::RuntimeAdapterFrameResult update_visual_novel_runtime(const gbs::RuntimeFra
                 : gbs::RuntimeAdapterFrameResult::Continue;
         }
 #endif
-#if GBS_MULTI_RUNTIME
         if (!dialogue.visible && gbs::event_runner_is_active(visual_novel_event_runner)) {
             if (visual_novel_event_wait_frames > 0) --visual_novel_event_wait_frames;
             else {
@@ -762,7 +759,6 @@ gbs::RuntimeAdapterFrameResult update_visual_novel_runtime(const gbs::RuntimeFra
             }
             show_scene_content_if_ready();
         } else
-#endif
         if (dialogue.visible) {
             bool was_choice_mode = dialogue.choice_mode;
             const int confirm_sfx = dialogue.confirm_sfx_index;
@@ -806,10 +802,10 @@ void render_visual_novel_runtime(const gbs::RuntimeFrameContext& context) {
             static_cast<size_t>(dialogue.text_sfx_index) < project.sfx_asset_count) {
             gbs::play_sfx(project.sfx_assets[dialogue.text_sfx_index]);
         }
-        /* The scene title/history bar is runtime diagnostics, not authored
-         * scene content. Keep the UI layer clear so a mixed-runtime handoff
-         * cannot leak a HUD from the previous scene. */
-        gbs::hide_hud(hud);
+        // Clear the previous portrait before drawing the scene's authored HUD.
+        // Portraits are restored after the HUD, which owns dynamic OBJ slots.
+        gbs::hide_all_sprites();
+        refresh_hud();
         gbs::draw_hud(hud);
         /* Advanced HUD text uses OAM 96-127. Draw fixed dialogue portraits
          * after it so the HUD cleanup cannot hide the active portrait.
@@ -821,7 +817,8 @@ void render_visual_novel_runtime(const gbs::RuntimeFrameContext& context) {
         for (size_t index = 0; index < gbs::runtime_telemetry_variable_count; ++index)
             gbs::runtime_telemetry_block().variables[index] = event_state.variables[index];
         gbs::publish_runtime_physical_telemetry(resource_manager, event_state);
-        gbs::wait_vblank();
+        gbs::render_event_background_scale(event_state);
+    gbs::wait_vblank();
 }
 
 void leave_visual_novel_runtime() {

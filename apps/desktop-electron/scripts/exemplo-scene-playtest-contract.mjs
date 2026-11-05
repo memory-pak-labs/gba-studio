@@ -512,6 +512,54 @@ export function selectSceneCadenceWindow(samples, scope) {
   return selected;
 }
 
+// A short, automatically advancing scene may finish while its post-observation
+// window is collected. Accept its first four earlier samples only when they
+// reach the observed frame continuously and the later telemetry proves a room
+// transition, without discarding slow samples or accepting a ROM reset.
+export function selectTransitionCadenceWindow(before, after, scope) {
+  const fail = () => { throw new Error("Janela anterior de cadencia nao comprova uma transicao continua."); };
+  if (!Array.isArray(before) || !Array.isArray(after) || after.length < 4
+      || !Number.isFinite(scope?.notBeforeUnixMs) || scope.notBeforeUnixMs < 0
+      || !Number.isInteger(scope?.initialFrame) || scope.initialFrame < 8
+      || !Number.isInteger(scope?.runtimeKind) || !Number.isInteger(scope?.currentRoom) || scope.currentRoom < 0) fail();
+  const isTarget = state => state?.runtimeKind === scope.runtimeKind && state?.currentRoom === scope.currentRoom;
+  const first = before.findIndex(sample => isTarget(sample?.runtimeState) && sample.runtimeState.frame >= 8);
+  if (first < 0 || before.slice(0, first).some(sample => sample?.runtimeState?.runtimeKind !== -1 || sample?.runtimeState?.frame !== 0)) fail();
+  const earlier = before.slice(first);
+  if (earlier.length < 4) fail();
+  let lastTime = -1, lastFrame = -1;
+  for (const sample of earlier) {
+    const state = sample?.runtimeState;
+    if (!Number.isFinite(sample?.sampledAtUnixMs) || sample.sampledAtUnixMs < lastTime
+        || sample.sampledAtUnixMs >= scope.notBeforeUnixMs || !isTarget(state)
+        || !Number.isInteger(state.frame) || state.frame < lastFrame || state.frame > scope.initialFrame) fail();
+    lastTime = sample.sampledAtUnixMs;
+    lastFrame = state.frame;
+  }
+  if (scope.initialFrame - lastFrame > 45) fail();
+  const selected = selectSceneCadenceWindow(earlier, { runtimeKind: scope.runtimeKind, currentRoom: scope.currentRoom });
+  let previousChanges = earlier.at(-1).runtimeState.roomChangeCount;
+  let previousFrame = scope.initialFrame, transitionedRoom = null;
+  if (!Number.isInteger(previousChanges)) fail();
+  for (const sample of after.slice(0, 4)) {
+    const state = sample?.runtimeState;
+    if (!Number.isFinite(sample?.sampledAtUnixMs) || sample.sampledAtUnixMs < scope.notBeforeUnixMs
+        || sample.sampledAtUnixMs < lastTime || state?.runtimeKind !== scope.runtimeKind
+        || !Number.isInteger(state.currentRoom) || state.currentRoom < 0
+        || !Number.isInteger(state.frame) || state.frame < previousFrame || !Number.isInteger(state.roomChangeCount)
+        || state.roomChangeCount < previousChanges) fail();
+    if (state.currentRoom !== scope.currentRoom && transitionedRoom === null) {
+      if (state.roomChangeCount <= previousChanges) fail();
+      transitionedRoom = state.currentRoom;
+    } else if (transitionedRoom !== null && state.currentRoom !== transitionedRoom) fail();
+    previousChanges = state.roomChangeCount;
+    previousFrame = state.frame;
+    lastTime = sample.sampledAtUnixMs;
+  }
+  if (transitionedRoom === null) fail();
+  return selected;
+}
+
 export function steadyFrameSamples(samples, sampleCount = 3) {
   if (!Array.isArray(samples) || samples.length < sampleCount) return [];
   return samples.slice(-sampleCount);

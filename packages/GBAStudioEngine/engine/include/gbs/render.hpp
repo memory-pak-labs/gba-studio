@@ -1,6 +1,7 @@
 #pragma once
 
 #include <stddef.h>
+#include "gbs/name_keyboard.h"
 #include <stdint.h>
 #include "gbs/assets.hpp"
 #include "gbs/compression.hpp"
@@ -118,7 +119,28 @@ struct Sprite {
     bool double_size = false;
     uint8_t affine_matrix = 0;
     ColorDepth color_depth = ColorDepth::Bpp4;
+    uint16_t scale_x256 = 256;
+    uint16_t scale_y256 = 256;
 };
+
+inline int scaled_metasprite_part_offset(int position, int extent, int scale) {
+    const int value = (position * 2 + extent) * scale + 256;
+    return (value >= 0 ? value / 512 : -((-value + 511) / 512)) - extent / 2 - position;
+}
+
+inline void apply_metasprite_part_scale(Sprite& sprite, const MetaSpritePart& part, const MetaSprite* metasprite = nullptr, bool mirror_x = false, int mirror_width = 0) {
+    const int sx = metasprite ? metasprite->scale_x256 : 256;
+    const int sy = metasprite ? metasprite->scale_y256 : 256;
+    if (sx == 256 && sy == 256) {
+        sprite.scale_x256 = part.scale_x256;
+        sprite.scale_y256 = part.scale_y256;
+        return;
+    }
+    sprite.x += scaled_metasprite_part_offset(mirror_x ? mirror_width - part.x - part.width : part.x, part.width, sx);
+    sprite.y += scaled_metasprite_part_offset(part.y, part.height, sy);
+    sprite.scale_x256 = static_cast<uint16_t>(part.scale_x256 * sx / 256);
+    sprite.scale_y256 = static_cast<uint16_t>(part.scale_y256 * sy / 256);
+}
 
 using AffineSpriteTransform = AffineMatrix;
 
@@ -502,7 +524,15 @@ void set_affine_bg_wrap(BackgroundLayer layer, bool enabled);
 void set_affine_bg_transform(BackgroundLayer layer, const AffineBgTransform& transform);
 bool load_bitmap16(DisplayMode mode, const Bitmap16Asset& asset, uint8_t page = 0);
 bool load_bitmap8(DisplayMode mode, const Bitmap8Asset& asset, uint8_t page = 0);
+bool render_event_background_scale(const EventState& state);
+// Project map decorations through the same image transform; icons keep their size.
+bool project_event_background_point(const EventState& state, BackgroundLayer layer, Vec2i source, Vec2i& screen);
+// Compose into the runtime's own raster, retaining its horizon and HBlank channel.
+bool scale_perspective_background(HBlankAffineRasterLine* lines, size_t count, uint16_t x256, uint16_t y256, int horizon);
+
 bool apply_video_composition(const VideoComposition& composition);
+// Select a prepared single-plane backdrop while keeping BG0 fixed for UI.
+bool apply_scene_background_video(const VideoComposition& composition);
 void fill_bitmap16(DisplayMode mode, uint16_t color, uint8_t page = 0);
 bool update_bitmap16_rect(DisplayMode mode, uint8_t page, uint16_t x, uint16_t y, uint16_t width, uint16_t height, const uint16_t* pixels, uint16_t stride);
 bool update_bitmap8_rect(uint8_t page, uint16_t x, uint16_t y, uint16_t width, uint16_t height, const uint8_t* pixels, uint16_t stride);
@@ -545,6 +575,7 @@ void draw_text_overlay_light(int x, int y, int width, const char* text, bool vis
 void draw_text_input_surface(int x, int y, int width, int height, bool visible = true);
 void draw_text_input_keyboard(int x, int y, int width, int height, int selected_index, bool lowercase, bool visible = true);
 void draw_text_input_keyboard_with_controls(int x, int y, int width, int height, int selected_index, bool lowercase, bool visible, int control_layout, int controls_x, int controls_y, int controls_width, int controls_height, int surface = 0);
+void draw_text_input_keyboard_authored(int x, int y, int width, int height, int selected_index, bool lowercase, bool visible, int control_layout, int controls_x, int controls_y, int controls_width, int controls_height, int surface, const gbs_name_keyboard_geometry* geometry);
 void set_sprite(int index, const Sprite& sprite);
 bool set_affine_sprite_transform(uint8_t matrix_index, const AffineSpriteTransform& transform);
 bool set_affine_sprite_transform_at_frame(

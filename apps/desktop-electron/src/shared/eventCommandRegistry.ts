@@ -5,6 +5,8 @@ export type NativeEventCommandExportHandling = "runtime" | "structural" | "edito
 const nativeEventCommandExportHandlingByVerb = new Map<string, NativeEventCommandExportHandling>([
   ...lutaEventVerbs.map(verb => [verb, "runtime"] as const),
   ...([
+    "set_actor_scale", "animate_actor_scale", "reset_actor_scale",
+    "set_background_scale", "animate_background_scale", "reset_background_scale",
     "noop",
     "set_actor_animation_state",
     "cancel_actor_movement",

@@ -178,7 +178,9 @@ enum class EventOp : uint8_t {
     DrawText = 162,
     Visibility = 163,
     MoveActorTo = 164,
-    MoveActorRelative = 165
+    MoveActorRelative = 165,
+    SetActorScale = 166,
+    SetBackgroundScale = 167
 };
 
 enum class VisualEffectKind : uint8_t {
@@ -419,6 +421,27 @@ struct EventSceneStackEntry {
     int player_direction;
 };
 
+struct EventScale {
+    uint16_t x256 = 256, y256 = 256;
+    uint16_t from_x256 = 256, from_y256 = 256;
+    uint16_t to_x256 = 256, to_y256 = 256;
+    uint16_t elapsed = 0, duration = 0;
+};
+inline void tick_event_scale(EventScale& scale) {
+    if (scale.elapsed >= scale.duration) return;
+    ++scale.elapsed;
+    scale.x256 = scale.from_x256 + (static_cast<int>(scale.to_x256) - scale.from_x256) * scale.elapsed / scale.duration;
+    scale.y256 = scale.from_y256 + (static_cast<int>(scale.to_y256) - scale.from_y256) * scale.elapsed / scale.duration;
+}
+inline bool set_event_scale(EventScale& scale, int x, int y, int frames, int maximum) {
+    if (x < 128 || y < 128 || x > maximum || y > maximum || frames < 0 || frames > 32767) return false;
+    scale.from_x256 = scale.x256; scale.from_y256 = scale.y256;
+    scale.to_x256 = x; scale.to_y256 = y;
+    scale.elapsed = 0; scale.duration = frames;
+    if (!frames) { scale.x256 = x; scale.y256 = y; }
+    return true;
+}
+
 struct EventState {
     bool supports_temporal_actor_motion;
     uint32_t actor_motion_serial;
@@ -620,6 +643,10 @@ struct EventState {
     const EventScript* project_scripts;
     size_t project_script_count;
     bool script_call_overflow;
+    // Append transient presentation state; keep the existing field offsets stable.
+    EventScale actor_scales[max_event_actor_state_slots + 1];
+    EventScale background_scales[2];
+    int transform_room = -1;
 };
 
 // Requested includes the cover phase; pending means ready for adapter handoff.
@@ -709,6 +736,7 @@ constexpr void reset_event_tile_commands(EventState& state) {
 }
 
 void init_event_state(EventState& state);
+void reset_event_transforms(EventState& state);
 void bind_event_scripts(EventState& state, const EventScript* scripts, size_t count);
 void set_event_player_actor_state(EventState& state, int x, int y, int direction, int tile_size);
 void set_event_input_state(EventState& state, uint16_t held, uint16_t pressed, uint16_t released);

@@ -153,9 +153,10 @@ describe('connected showcase systems', () => {
     expect(exit.findIndex(c=>c.op==='warp_runtime')).toBeGreaterThan(finishIndex);
     const hud = p.settings.hudPresets.find(h => h.id === 'hud-farol-trial');
     expect(hud.components.find(c => c.id === 'trial-charge').behavior.states.hidden).toEqual({ variable: 'var_trial_active', value: 0 });
+    p.events.push({name:'preview_finish_race',steps:[{command:'call_procedure circuito_concluir',isEnabled:true}]});
     for (const path of [1, 2]) {
       let state = boot(p, 'corrida_resultados');
-      state = { ...state, variables: { ...state.variables, var_council_path: path, racing_result: 1, previous_room: 0 } };
+      state = { ...state, sceneMenu: { ...state.sceneMenu, stack: [state.rooms.find(room => room.name === "circuito_final").id] }, variables: { ...state.variables, var_council_path: path, racing_result: 1 } };
       let final = finish(runPreviewRuntimeEvent(state, 'race_results_continue'));
       const shown = final.eventLog.filter(e => e.result === 'dialogue').map(e => e.detail);
       expect(shown).toContain(path === 1 ? 'showcase_epilogue_community' : 'showcase_epilogue_exploration');

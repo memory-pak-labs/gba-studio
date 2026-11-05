@@ -194,7 +194,7 @@ constexpr bool is_valid_tracker_channel(uint8_t channel) {
 
 constexpr bool is_valid_tracker_step(const TrackerStep& step) {
     return is_valid_tracker_channel(step.channel) &&
-           is_valid_audio_frequency(step.frequency_hz) &&
+           (step.channel == 3 ? step.frequency_hz >= 32 && step.frequency_hz <= 4095 : is_valid_audio_frequency(step.frequency_hz)) &&
            is_valid_audio_volume(step.volume) &&
            is_valid_audio_duty(step.duty) &&
            is_valid_pcm_pan(step.pan);

@@ -12,6 +12,7 @@ import { prepareWebProjectExport, resolveSmokeWebExportRoot, writeWebProjectExpo
 import { buildProjectRomArtifact } from "./webRomPipeline.js";
 import { launchRomInEmulator } from "./launchRomInEmulator.js";
 import { openRomPlayerWindow } from "./romPlayerWindow.js";
+import { controlRomPlayerRecording } from "./romPlayerRecording.js";
 import { installAppMenu } from "./appMenu.js";
 import { createProjectSaveQueue } from "./projectSaveQueue.js";
 import { writeEngineSchemaExport } from "./engineProjectExport.js";
@@ -42,10 +43,11 @@ import { publishEnginePackRomToProjectRoot } from "./projectRomPublication.js";
 import { analyzePreparedProjectBudget } from "./projectBudgetAnalysis.js";
 import { listRecentProjects } from "./recentProjects.js";
 import { configureSmokeDevToolsPort, isPreviewVisualSmokeMode, previewVisualSmokeUrl } from "./smoke.js";
-import { resolveSmokeProjectSavePath } from "./smokePaths.js";
+import { registerRecentProjectDocument, resolveSmokeProjectSavePath } from "./smokePaths.js";
 import { validateSettingsPathTargets } from "./settingsPathValidation.js";
 import { resolveMainWindowBounds, resolveMainWindowChrome } from "./windowOptions.js";
 import { createWindowCloseGuard } from "./windowCloseGuard.js";
+import { cartridgeWriteInProgress, registerCartridgeWriterIpc } from "./cartridgeWriterIpc.js";
 import { registerDesktopAssetProtocol } from "./desktopAssetProtocol.js";
 import {
   registerTranslationModelProtocol,
@@ -159,7 +161,7 @@ async function openExternalProject(projectPath: string): Promise<void> {
 function registerRecentProject(result: OpenProjectResult): void {
   if (!result.error && !result.canceled && result.path && result.project) {
     desktopAssetProjectRoots.add(resolve(dirname(result.path)));
-    app.addRecentDocument(result.path);
+    registerRecentProjectDocument(result.path, path => app.addRecentDocument(path));
     watchProjectAssets(result.path);
   }
 }
@@ -206,6 +208,10 @@ function createWindow(): BrowserWindow {
   });
 
   window.on("close", (event) => {
+    if (cartridgeWriteInProgress()) {
+      event.preventDefault();
+      return;
+    }
     if (appUpdates?.state().status !== "installing") closeGuard.handleClose(event);
   });
   windowCloseGuards.set(window, closeGuard);
@@ -313,7 +319,7 @@ ipcMain.handle(ipcChannels.saveProject, (_event, request: SaveProjectRequest) =>
       bundledAssetConflictPolicy: request.path ? "preserve" : "replace"
     });
     desktopAssetProjectRoots.add(resolve(dirname(destination)));
-    app.addRecentDocument(destination);
+    registerRecentProjectDocument(destination, path => app.addRecentDocument(path));
     watchProjectAssets(destination);
     return { canceled: false, path: destination };
   } catch (error) {
@@ -509,6 +515,9 @@ ipcMain.handle(ipcChannels.openRomPlayerWindow, async (event, request: OpenRomPl
     saveScope: request.saveScope,
     replay: request.replay,
     keyboardBindings: request.keyboardBindings,
+    recordInput: request.recordInput,
+    recordingID: request.recordingID,
+    recordingLaunch: request.recordingLaunch,
     appPath: app.getAppPath(),
     resourcesPath: process.resourcesPath,
     packaged: app.isPackaged,
@@ -520,6 +529,8 @@ ipcMain.handle(ipcChannels.openRomPlayerWindow, async (event, request: OpenRomPl
     }
   });
 });
+
+ipcMain.handle(ipcChannels.controlRomPlayerRecording, (event, request: { windowID: number; action: "begin" | "flush"; recordingID?: string }) => controlRomPlayerRecording(event.sender.id, request));
 
 ipcMain.handle(ipcChannels.selectPath, async (_event, request: SelectPathRequest) => {
   const properties = request.mode === "directory"
@@ -612,7 +623,7 @@ ipcMain.handle(ipcChannels.importAssets, async (_event, request: ImportAssetsReq
   const tilesetScope = request.scope === "tileset";
   const spriteScope = request.scope === "sprite";
   const result = await showLocalizedOpenDialog({
-    title: animationScope ? "Importar animação GIF" : audioScope ? "Importar audio MOD/WAV" : tilesetScope ? "Importar tileset PNG" : spriteScope ? "Importar sprite PNG" : "Importar assets",
+    title: animationScope ? "Importar animação GIF" : audioScope ? "Importar áudio MOD/WAV/SF2" : tilesetScope ? "Importar tileset PNG" : spriteScope ? "Importar sprite PNG" : "Importar assets",
     properties: request.replaceRelativePath ? ["openFile"] : ["openFile", "multiSelections"],
     filters: animationScope
       ? [
@@ -621,7 +632,7 @@ ipcMain.handle(ipcChannels.importAssets, async (_event, request: ImportAssetsReq
       ]
       : audioScope
       ? [
-        { name: "Audio MOD/WAV", extensions: ["mod", "xm", "s3m", "it", "wav", "mp3", "ogg"] },
+        { name: "Áudio MOD/WAV/SF2", extensions: ["sf2", "mod", "xm", "s3m", "it", "wav", "mp3", "ogg"] },
         { name: "Todos os arquivos", extensions: ["*"] }
       ]
       : tilesetScope || spriteScope
@@ -632,7 +643,7 @@ ipcMain.handle(ipcChannels.importAssets, async (_event, request: ImportAssetsReq
       : [
         {
           name: "Assets comuns",
-          extensions: ["png", "jpg", "jpeg", "webp", "bmp", "gif", "mod", "xm", "s3m", "it", "wav", "mp3", "ogg"]
+          extensions: ["png", "jpg", "jpeg", "webp", "bmp", "gif", "sf2", "mod", "xm", "s3m", "it", "wav", "mp3", "ogg"]
         },
         { name: "Todos os arquivos", extensions: ["*"] }
       ]
@@ -1010,7 +1021,7 @@ void app.whenReady().then(async () => {
   appUpdates = createAppUpdateService({
     updater,
     currentVersion: app.getVersion(),
-    canInstall: () => projectSaves.pending() === 0 && canRestartForAppUpdate(BrowserWindow.getAllWindows()
+    canInstall: () => projectSaves.pending() === 0 && !cartridgeWriteInProgress() && canRestartForAppUpdate(BrowserWindow.getAllWindows()
       .filter((window) => windowCloseGuards.has(window))
       .map((window) => windowDocumentStates.get(window))),
     changed: (state) => {
@@ -1037,6 +1048,7 @@ void app.whenReady().then(async () => {
   registerDesktopAssetProtocol(desktopAssetProjectRoots);
   registerTranslationModelProtocol();
   registerTranslationPackIpcHandlers();
+  registerCartridgeWriterIpc();
   const previewUrl = previewVisualSmokeUrl();
   if (isPreviewVisualSmokeMode() && previewUrl) {
     const previewWindow = new BrowserWindow({
@@ -1062,7 +1074,8 @@ void app.whenReady().then(async () => {
   });
 });
 
-app.on("before-quit", () => {
+app.on("before-quit", (event) => {
+  if (cartridgeWriteInProgress()) { event.preventDefault(); return; }
   for (const window of BrowserWindow.getAllWindows()) {
     windowCloseGuards.get(window)?.requestAppQuit();
   }

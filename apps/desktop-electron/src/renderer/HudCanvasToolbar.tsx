@@ -9,6 +9,7 @@ const hudToolKinds: HudComponentKind[] = ["text", "icon", "bar", "frame"];
 const hudToolIcons: Record<HudComponentKind, LucideIcon> = { text: Type, icon: Image, bar: RectangleHorizontal, frame: Frame };
 
 export interface HudCanvasToolbarProps {
+  nativeTextInput?: boolean;
   preset?: HudPresetPresentation | null;
   canEdit: boolean;
   selectedComponentID: string | null;
@@ -39,6 +40,11 @@ export function HudCanvasToolbar(props: HudCanvasToolbarProps): React.ReactEleme
     window.addEventListener("keydown", keydown);
     return () => window.removeEventListener("keydown", keydown);
   }, [preset, canEdit, selectedComponentID, props.viewMode, onUpdateHudPreset, onSelectComponent]);
+  if (props.nativeTextInput) return <div className="hud-canvas-toolbar" role="toolbar" aria-label={ui("Ferramentas da entrada de nome")}>
+    <strong>{ui("Entrada de nome")}</strong>
+    <span>{ui("Selecione e arraste o campo ou o teclado · grade de 8 px")}</span>
+    {props.onToggleGrid ? <button type="button" aria-pressed={props.gridVisible} onClick={props.onToggleGrid}><Grid3X3 aria-hidden="true" size={16}/><span>{ui("Grade")}</span></button> : null}
+  </div>;
   const add = (kind: HudComponentKind) => {
     if (!preset || !canEdit || preset.components.length >= 64) return;
     const id = `hud-${kind}-${crypto.randomUUID()}`;
@@ -46,7 +52,7 @@ export function HudCanvasToolbar(props: HudCanvasToolbarProps): React.ReactEleme
     onSelectComponent(id);
     props.onViewMode("edit");
   };
-  return <div className="hud-canvas-toolbar" role="toolbar" aria-label={ui("Ferramentas da HUD")}>
+  return <div className="hud-canvas-toolbar" role="toolbar" aria-label={ui("Ferramentas da interface")}>
     <button type="button" aria-pressed={props.viewMode === "edit"} onClick={() => props.onViewMode("edit")}><MousePointer2 aria-hidden="true" size={16}/><span>{ui("Selecionar")}</span></button>
     {hudToolKinds.map(kind => {
       const Icon = hudToolIcons[kind];

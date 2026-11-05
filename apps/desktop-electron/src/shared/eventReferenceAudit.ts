@@ -1,4 +1,5 @@
 import type { GBAProjectData } from "./projectFile.js";
+import { sceneChangeCommandParts } from "./sceneChangeCommand.js";
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return Boolean(value) && typeof value === "object" && !Array.isArray(value);
@@ -15,7 +16,7 @@ function stringField(source: Record<string, unknown>, key: string, fallback = ""
 }
 
 function commandParts(command: string): string[] {
-  return command.split(/\s+/).filter(Boolean);
+  return sceneChangeCommandParts(command);
 }
 
 function projectRooms(data: GBAProjectData): Record<string, unknown>[] {

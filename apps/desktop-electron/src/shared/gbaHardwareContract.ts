@@ -306,11 +306,11 @@ function assetContract(asset: RecordValue, index: number, frame?: {width: number
       ));
     }
     const visibleColors = integerValue(metadata.maxVisibleColors);
-    if (colorMode?.toLowerCase() === "8bpp" && visibleColors !== null && visibleColors > 194) {
+    if (colorMode?.toLowerCase() === "8bpp" && visibleColors !== null && visibleColors > 207) {
       issues.push(issue(
         "OBJ_SHARED_PALETTE_LIMIT_EXCEEDED",
         "error",
-        `${name} declara ${visibleColors} cores visíveis em OBJ 8bpp; o GBA Studio permite até 194 cores visíveis compartilhadas, conforme o orçamento dos sprites 4bpp.`,
+        `${name} declara ${visibleColors} cores visíveis em OBJ 8bpp; o GBA Studio permite até 207 cores visíveis compartilhadas, conforme o orçamento dos sprites 4bpp e das três cores do motor.`,
         `assets.${name}.metadata.maxVisibleColors`,
         "Revise a paleta ou divida as cenas. O banco 12 conserva três cores do motor e os bancos 13–15 atendem texto/UI; o assetc verifica a união real de cores na exportação."
       ));

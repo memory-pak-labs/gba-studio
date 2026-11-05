@@ -1,6 +1,9 @@
+#include "gbs/scene_script_runner.hpp"
+#include "gbs/event_render.hpp"
 #include "gbs/profiler.hpp"
 #define GBS_DIALOGUE_UI_RUNTIME_KIND 5
 #include "gbs/engine.hpp"
+#include "gbs/dialogue_portrait.hpp"
 #include "gbs/animation.hpp"
 #include "gbs/audio.hpp"
 #include "gbs/dialogue.hpp"
@@ -48,6 +51,7 @@ const gbs::PointClickProjectData& project = gbastudio_point_click_project::proje
 
 gbs::DialogueState dialogue __attribute__((section(".ewram_bss")));
 gbs::EventState event_state __attribute__((section(".ewram_bss")));
+gbs::SceneScriptRunner scene_scripts __attribute__((section(".ewram_bss")));
 gbs::HudState hud;
 gbs::EngineResourceManager resource_manager __attribute__((section(".ewram_bss")));
 gbs::PointClickCursorState cursor;
@@ -140,6 +144,18 @@ void consume_point_click_save_request() {
     }
 }
 #endif
+
+void consume_event_state();
+void consume_scene_script(gbs::EventState&, void*) { consume_event_state(); }
+void tick_scene_scripts() {
+    gbs::tick_scene_script_runner(scene_scripts,event_state,dialogue.visible,consume_scene_script,nullptr);
+}
+bool run_scene_script(gbs::EventScript script) {
+    const bool was_active = gbs::scene_script_runner_active(scene_scripts);
+    if (!gbs::enqueue_scene_script(scene_scripts,script)) return false;
+    if (!was_active) tick_scene_scripts();
+    return true;
+}
 
 constexpr size_t max_resource_bank_reservations = 64;
 gbs::ResourceBankReservation active_resource_bank_reservations[max_resource_bank_reservations] __attribute__((section(".ewram_bss"))) = {};
@@ -337,7 +353,7 @@ void draw_cursor() {
         if (cursor_metasprite == nullptr) {
             cursor_metasprite = scene_cursor;
         }
-        gbs::set_metasprite(0, *cursor_metasprite, cursor.position_pixels);
+        gbs::set_metasprite(0, gbs::event_scaled_metasprite(event_state, -1, *cursor_metasprite), cursor.position_pixels);
         return;
     }
     gbs::set_sprite(0, gbs::Sprite {
@@ -394,6 +410,7 @@ void apply_backgrounds(const gbs::PointClickSceneData& scene) {
         gbs::load_tilemap(background.layer, background.tilemap);
         gbs::set_bg_enabled(background.layer, true);
     }
+    gbs::apply_scene_background_video(scene.video);
 }
 
 void draw_point_click_props(const gbs::PointClickSceneData& scene) {
@@ -420,12 +437,15 @@ void draw_point_click_props(const gbs::PointClickSceneData& scene) {
             next_sprite + metasprite->part_count > point_click_oam_sprite_count) {
             continue;
         }
-        gbs::set_metasprite(next_sprite, *metasprite, prop.position_pixels);
+        gbs::set_metasprite(next_sprite, gbs::event_scaled_metasprite(event_state, static_cast<int>(index), *metasprite), prop.position_pixels);
         next_sprite += metasprite->part_count;
     }
 }
 
 void consume_event_state() {
+    if (gbs::point_click_refresh_selected_item(project, event_state, cursor)) {
+        refresh_hud();
+    }
     gbs::consume_scene_transition_visual_effect_event(event_state);
     gbs::consume_event_palette_changes(
         event_state,
@@ -594,13 +614,14 @@ void start_scene(int scene_index) {
     pending_scene_index = -1;
     stream_scene_resource_group(*scene);
     apply_backgrounds(*scene);
-    gbs::run_event_script(event_state, scene->on_enter);
+    gbs::init_scene_script_runner(scene_scripts);
+    run_scene_script(scene->on_enter);
     consume_event_state();
     refresh_hud();
 }
 
 void start_pending_scene_if_ready() {
-    if (!dialogue.visible && pending_scene_index >= 0) {
+    if (!dialogue.visible && !gbs::scene_script_runner_active(scene_scripts) && pending_scene_index >= 0) {
         start_scene(pending_scene_index);
         persist_point_click_runtime_state();
     }
@@ -645,9 +666,9 @@ void queue_scene_transition(const gbs::PointClickSceneData& scene, int target_sc
     if (!gbs::is_valid_point_click_scene_index(project, target_scene_index)) {
         return;
     }
-    gbs::run_event_script(event_state, scene.on_exit);
+    run_scene_script(scene.on_exit);
     consume_event_state();
-    if (dialogue.visible) {
+    if (dialogue.visible || gbs::scene_script_runner_active(scene_scripts)) {
         pending_scene_index = target_scene_index;
         return;
     }
@@ -674,7 +695,7 @@ void activate_hotspot() {
     if (hotspot->give_item_index >= 0 && cursor.selected_item_index < 0) {
         cursor.selected_item_index = hotspot->give_item_index;
     }
-    gbs::run_event_script(event_state, gbs::point_click_hotspot_success_script(*hotspot, used_required_item));
+    run_scene_script(gbs::point_click_hotspot_success_script(*hotspot, used_required_item));
     consume_event_state();
     const int scripted_scene_index = gbs::point_click_scripted_scene_destination(
         project, current_scene_index, event_state
@@ -709,7 +730,7 @@ bool run_button_event_binding() {
     if (project.scripts != nullptr &&
         script_index >= 0 &&
         static_cast<size_t>(script_index) < project.script_count) {
-        gbs::run_event_script(event_state, project.scripts[script_index]);
+        run_scene_script(project.scripts[script_index]);
         consume_event_state();
     }
     return overrides_default;
@@ -725,7 +746,10 @@ int initialize_point_click_runtime() {
     runtime_last_scene = -1;
     runtime_scene_change_count = 0;
     gbs::init_dialogue(dialogue);
+    gbs::configure_dialogue_portraits(gbastudio_point_click_project::dialogue_portrait_assets,
+        gbastudio_point_click_project::dialogue_portrait_asset_count);
     gbs::init_event_state(event_state);
+    gbs::init_scene_script_runner(scene_scripts);
     gbs::bind_event_scripts(event_state, project.scripts, project.script_count);
     gbs::init_hud(hud);
     gbs::init_resource_manager(resource_manager);
@@ -813,11 +837,13 @@ gbs::RuntimeAdapterFrameResult update_point_click_runtime(const gbs::RuntimeFram
     event_state.current_room = current_scene_index;
     event_state.player_x = cursor.position_pixels.x;
     event_state.player_y = cursor.position_pixels.y;
+    tick_scene_scripts();
+    start_pending_scene_if_ready();
     bool cursor_clicked = false;
     if (dialogue.visible) {
         gbs::advance_dialogue(dialogue, input);
         start_pending_scene_if_ready();
-    } else {
+    } else if (!gbs::scene_script_runner_active(scene_scripts)) {
         const bool overrides_default = gbs::button_event_binding_overrides_default(event_state, input.held);
         run_button_event_binding();
         if (!overrides_default) {
@@ -854,10 +880,25 @@ void render_point_click_runtime(const gbs::RuntimeFrameContext& context) {
     if (scene != nullptr) {
         draw_point_click_props(*scene);
     }
-    draw_cursor();
-    gbs::draw_hud(hud);
-    gbs::draw_dialogue(dialogue);
+    if (!dialogue.visible) {
+        // Clear the previous dialogue before restoring HUD text and sprites.
+        gbs::draw_dialogue(dialogue);
+        draw_cursor();
+        gbs::draw_hud(hud);
+    } else {
+        const auto box = gbs::dialogue_box_layout_for_frame(dialogue.frame_index);
+        int top = box.y;
+        const auto& config = gbs::active_dialogue_ui_config();
+        if (config.name_label_above && config.show_character_name && dialogue.speaker && dialogue.speaker[0]) {
+            top = gbs::dialogue_name_label_layout_for_frame(dialogue.frame_index, box.w).y;
+        }
+        if (top < 0) top = 0;
+        gbs::draw_hud_excluding(hud, 0, top * 8, 240, 160 - top * 8);
+        gbs::draw_dialogue(dialogue);
+        gbs::draw_dialogue_portrait(dialogue);
+    }
     sync_runtime_telemetry();
+    gbs::render_event_background_scale(event_state);
     gbs::wait_vblank();
 }
 

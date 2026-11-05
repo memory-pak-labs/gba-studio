@@ -1,3 +1,6 @@
+import {deriveHudPresetsWorkspacePresentation} from "./hudPresets.js";
+import { usesSinglePlaneBackground } from "./eventTransforms.js";
+import { assertSpriteScaleBudget } from "./spriteScale.js";
 import { memoizeEngineExport } from "./engineExportContext.js";
 import { sceneChangeCommandParts } from "./sceneChangeCommand.js";
 import { spriteColorModeForSheet } from "./spriteColorDepth.js";
@@ -276,18 +279,14 @@ function hudPresetIDsInValue(value: unknown, output = new Set<string>()): Set<st
 
 /** Indexes authored HUD references once per pack, without retaining project data. */
 export function engineUsedHudPresetIDs(data: GBAProjectData): Set<string> {
-  const projectSettings = settings(data);
-  const presets = recordArray(projectSettings ?? {}, "hudPresets");
-  const knownIDs = new Set(presets.map(preset => nullableStringField(preset, "id")));
-  const requestedActiveID = nullableStringField(projectSettings, "hudPresetId") || "hud-default";
-  const activeID = presets.length && !knownIDs.has(requestedActiveID)
-    ? nullableStringField(presets[0], "id") : requestedActiveID;
-  if (!usesBlankPlayerDefaults(data)) return new Set([...knownIDs, "hud-default"]);
+  const presentation = deriveHudPresetsWorkspacePresentation(data);
+  const knownIDs = new Set(presentation.presets.map(preset => preset.id));
+  const activeID = presentation.activePresetId;
   const ids = new Set<string>();
   projectRooms(data).forEach(room => {
     const requested = hudPresetIDsInValue(room);
     if (!requested.size && !usesBlankPlayerDefaults(data)) requested.add(activeID);
-    requested.forEach(id => ids.add(presets.length && !knownIDs.has(id) ? activeID : id));
+    requested.forEach(id => ids.add(!knownIDs.has(id) ? activeID : id));
   });
   if (!ids.size && !usesBlankPlayerDefaults(data)) ids.add(activeID);
   return ids;
@@ -301,7 +300,6 @@ function hudSceneGroupsByIconUncached(data: GBAProjectData): ReadonlyMap<string,
   const projectSettings = settings(data);
   const presets = recordArray(projectSettings ?? {}, "hudPresets");
   const groupsByIcon = new Map<string, string[]>();
-  if (presets.length === 0) return groupsByIcon;
   const presetByID = new Map(
     presets.map((preset) => [nullableStringField(preset, "id"), preset] as const)
       .filter(([id]) => id.length > 0)
@@ -315,6 +313,16 @@ function hudSceneGroupsByIconUncached(data: GBAProjectData): ReadonlyMap<string,
     const presetIDs = hudPresetIDsInValue(room);
     if (presetIDs.size === 0 && activePreset && !usesBlankPlayerDefaults(data)) presetIDs.add(nullableStringField(activePreset, "id"));
     const icons = new Set<string>();
+    // Native battle controls remain resources of the encounter even when the
+    // author replaces its HUD composition or removes the corresponding icon.
+    const runtime = child(room, "runtime");
+    if (nullableStringField(runtime, "type") === "battleRpg") {
+      const presentation = child(child(runtime, "config"), "presentation");
+      for (const field of ["cursorAssetName", "disabledEscapeAssetName"]) {
+        const image = nullableStringField(presentation, field);
+        if (image) icons.add(image);
+      }
+    }
     presetIDs.forEach((id) => {
       const preset = presetByID.get(id) ?? activePreset;
       if (preset) (iconsByPreset.get(preset) ?? []).forEach((icon) => icons.add(icon));
@@ -3740,6 +3748,8 @@ export interface AssetcLutaAnimationSetExport {
 }
 
 export interface AssetcMetaspritePartExport {
+  scale_x256?: number;
+  scale_y256?: number;
   x: number;
   y: number;
   slice_x: number;
@@ -3756,7 +3766,7 @@ export interface AssetcFrameMetaspriteExport {
 }
 
 export interface AssetcActorSpriteExportFields {
-  metasprite: { asset: string; index: number };
+  metasprite: { asset: string; index: number; scale_x256?: number; scale_y256?: number };
   animation: string | { asset: string };
   animations?: AssetcSpriteAnimationExportEntry[];
   luta_animation_set?: AssetcLutaAnimationSetExport;
@@ -4153,6 +4163,21 @@ function buildSpriteAnimationExportEntry(
         throw new Error(`Metasprite ${spriteSheet} / ${String(animation.id ?? name)}: ${error instanceof Error ? error.message : String(error)}`, { cause: error });
       }
     });
+    const scale = (axis: "scaleX" | "scaleY") => {
+      const value = animation[axis] ?? 1;
+      if (typeof value !== "number" || !Number.isFinite(value) || value < 0.5 || value > 2) {
+        throw new Error(`Escala ${axis} de ${name} precisa estar entre 0,5 e 2.`);
+      }
+      return Math.round(value * 256);
+    };
+    const sx = scale("scaleX"), sy = scale("scaleY");
+    const scaled = sx !== 256 || sy !== 256;
+    if (scaled) for (const parts of frameParts) for (const part of parts) {
+      part.x = Math.round((part.x + part.width / 2) * sx / 256 - part.width / 2);
+      part.y = Math.round((part.y + part.height / 2) * sy / 256 - part.height / 2);
+      if (part.x < -128 || part.x > 127 || part.y < -128 || part.y > 127) throw new Error(`Escala de ${name} excede o deslocamento do metasprite (-128 a 127).`);
+      part.scale_x256 = sx; part.scale_y256 = sy;
+    }
     const exportedFrameParts = flipX
       ? frameParts.map((parts) => parts.map((part) => ({
         ...part,
@@ -4160,7 +4185,7 @@ function buildSpriteAnimationExportEntry(
         hflip: !Boolean(part.hflip)
       })))
       : frameParts;
-    const usesCustomMetasprites = flipX || exportedFrameParts.some((parts) => frameNeedsCustomMetasprite(parts));
+    const usesCustomMetasprites = scaled || flipX || exportedFrameParts.some((parts) => frameNeedsCustomMetasprite(parts));
     const frame_indices = usesCustomMetasprites
       ? Array.from({ length: frameCount }, (_item, frameIndex) => frameIndex)
       : Array.from({ length: frameCount }, (_item, frameIndex) => (
@@ -4467,7 +4492,9 @@ export function buildActorEngineSpriteExport(
     : animations[0]?.name;
 
   const fields: AssetcActorSpriteExportFields = {
-    metasprite: { asset: packAsset.name, index: metaspriteIndex },
+    metasprite: { asset: packAsset.name, index: metaspriteIndex,
+      ...(matchedAnimation && ((matchedAnimation.scaleX ?? 1) !== 1 || (matchedAnimation.scaleY ?? 1) !== 1)
+        ? { scale_x256: Math.round(Number(matchedAnimation.scaleX ?? 1) * 256), scale_y256: Math.round(Number(matchedAnimation.scaleY ?? 1) * 256) } : {}) },
     animation: selectedAnimationName
       ? selectedAnimationName
       : { asset: packAsset.name },
@@ -4599,6 +4626,7 @@ export function buildAssetcSpritePackGeneration(data: GBAProjectData): AssetcSpr
 }
 
 function buildAssetcSpritePackGenerationUncached(data: GBAProjectData): AssetcSpritePackGeneration | null {
+  assertSpriteScaleBudget(data);
   const hudGroups = hudSceneGroupsByIcon(data);
   const spriteSheets = uniqueSpriteSheetsFromActors(data, hudGroups);
   if (spriteSheets.length === 0) return null;
@@ -4743,7 +4771,7 @@ export interface AssetcPortraitPackGeneration {
 
 export interface EngineExportPortraitAsset {
   name: string;
-  metasprite: { asset: string; index: number };
+  metasprite: { asset: string; index: number; scale_x256?: number; scale_y256?: number };
 }
 
 function portraitPackAssetId(portraitName: string): string {
@@ -4819,7 +4847,14 @@ export function buildDialoguePortraitAssetsExport(
     if (!packAsset) return [];
     return [{
       name: portraitName,
-      metasprite: { asset: packAsset.name, index: 0 }
+      metasprite: { asset: packAsset.name, index: 0,
+        ...(() => {
+          const animation = projectArray(data, "animations").find(row => row.spriteSheet === portraitName);
+          if (!animation || (animation.scaleX ?? 1) === 1 && (animation.scaleY ?? 1) === 1) return {};
+          for (const value of [animation.scaleX ?? 1, animation.scaleY ?? 1])
+            if (typeof value !== "number" || !Number.isFinite(value) || value < 0.5 || value > 2) throw new Error(`Escala do retrato ${portraitName} precisa estar entre 0,5 e 2.`);
+          return { scale_x256: Math.round(Number(animation.scaleX ?? 1) * 256), scale_y256: Math.round(Number(animation.scaleY ?? 1) * 256) };
+        })() }
     }];
   });
 }
@@ -4844,7 +4879,7 @@ export interface AssetcEmotePackGeneration {
 
 export interface EngineExportEmoteAsset {
   name: string;
-  metasprite: { asset: string; index: number };
+  metasprite: { asset: string; index: number; scale_x256?: number; scale_y256?: number };
 }
 
 function emotePackAssetId(emoteName: string): string {
@@ -5103,13 +5138,19 @@ function affineBackgroundAssetReference(room: Record<string, unknown>): string {
   return nullableStringField(affine, "assetId");
 }
 
+/** A prepared flat plane replaces the primary regular scene image in these renderers. */
+export function roomUsesFlatAffineBackground(room: Record<string, unknown>): boolean {
+  const profile=nullableStringField(child(room,"runtime"),"type") || nullableStringField(room,"sceneType");
+  return usesSinglePlaneBackground(profile) && !!affineBackgroundAssetReference(room);
+}
+
 function uniqueTilesetsFromRooms(data: GBAProjectData): string[] {
   const tilesets = new Set<string>();
   projectRooms(data).forEach((room) => {
     const authoredIsometricBackground = roomUsesAuthoredIsometricBackground(room);
     const pagedTacticalSurface = roomUsesPagedTacticalSurface(room);
     const background = nullableStringField(room, "backgroundAssetName") || nullableStringField(room, "background");
-    if (background && !pagedTacticalSurface) tilesets.add(background);
+    if (background && !pagedTacticalSurface && !roomUsesFlatAffineBackground(room)) tilesets.add(background);
     const authoredTileset = nullableStringField(room, "tilesetAssetName");
     if (authoredTileset && !authoredIsometricBackground && !pagedTacticalSurface) tilesets.add(authoredTileset);
     const runtimeBase = nullableStringField(room, "runtimeBaseBackgroundAssetName");

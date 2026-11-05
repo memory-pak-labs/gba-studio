@@ -23,6 +23,7 @@ static uint32_t runtime_telemetry_address = 0;
 // Host-side bridge memory only; this does not consume emulated GBA RAM.
 enum { RUNTIME_SNAPSHOT_WORD_COUNT = 100 };
 static uint32_t runtime_snapshot[RUNTIME_SNAPSHOT_WORD_COUNT];
+static uint32_t frame_budget_snapshot[24];
 enum { AUDIO_SAMPLE_RATE = 32768, AUDIO_SAMPLE_CAPACITY = 2048 };
 static int16_t audio_buffer[AUDIO_SAMPLE_CAPACITY * 2];
 static size_t audio_sample_count = 0;
@@ -288,6 +289,13 @@ EMSCRIPTEN_KEEPALIVE uintptr_t gba_runtime_telemetry_snapshot(void) {
 
 EMSCRIPTEN_KEEPALIVE uintptr_t gba_framebuffer(void) {
 	return (uintptr_t) video_buffer;
+}
+
+EMSCRIPTEN_KEEPALIVE uintptr_t gba_frame_budget_snapshot(void) {
+    const uint32_t address = (uint32_t) gba_find_runtime_telemetry();
+    if (!address || address + 496 > GBA_EWRAM_END) return 0;
+    for (uint32_t i = 0; i < 24; ++i) frame_budget_snapshot[i] = core->busRead32(core, address + 400 + i * 4);
+    return (uintptr_t) frame_budget_snapshot;
 }
 
 // Debug inspection uses host Wasm storage, never emulated GBA RAM. Keep the

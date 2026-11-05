@@ -29,6 +29,10 @@ describe("complete structural project fixture", () => {
     expect(JSON.stringify(source)).toBe(sourceSnapshot);
     expect(fixture.data).not.toBe(source);
     expect(fixture.data.assets).toEqual(source.assets);
+    for(const actor of fixture.data.actors as Array<Record<string,unknown>>)if(actor.fixture) {
+      expect(actor.eventBindings??{}).toEqual({});
+      expect(actor.prefabID).toBeUndefined();
+    }
     expect(fixture.data.fixture).toMatchObject({
       schema: 1,
       registry: COMPLETE_PROJECT_FIXTURE_REGISTRY,

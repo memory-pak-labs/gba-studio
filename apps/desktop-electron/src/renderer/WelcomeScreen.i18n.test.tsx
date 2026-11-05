@@ -53,11 +53,12 @@ describe("WelcomeScreen i18n", () => {
     expect(screen.getByRole("heading", { name: "Create project" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Start from example" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /Blank project/ })).toBeInTheDocument();
+    expect(screen.getByText("No demo scenes, with all scene types and authoring resources available.")).toBeInTheDocument();
     expect(screen.getByDisplayValue("Choose when creating")).toBeInTheDocument();
     expect(screen.getByText("A folder named after the project will be created at the selected destination.")).toBeInTheDocument();
     expect(screen.getByText("Complete project with 36 scenes and 13 native runtimes for Game Boy Advance.")).toBeInTheDocument();
     expect(screen.queryByRole("heading", { name: "First path" })).not.toBeInTheDocument();
-    expect(screen.queryByText("Explore all 31 scenes, the different runtimes and the assets prepared for GBA.")).not.toBeInTheDocument();
+    expect(screen.queryByText("Explore all 36 scenes, the different runtimes and the assets prepared for GBA.")).not.toBeInTheDocument();
 
     await user.selectOptions(screen.getByLabelText("App language"), "es-ES");
 
@@ -65,6 +66,7 @@ describe("WelcomeScreen i18n", () => {
     expect(screen.getByRole("heading", { name: "Crear proyecto" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Empezar con el ejemplo" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /Proyecto en blanco/ })).toBeInTheDocument();
+    expect(screen.getByText("Sin escenas de demostración, con todos los tipos de escena y recursos de creación disponibles.")).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "Plantillas" })).toBeInTheDocument();
     expect(screen.getByText("Proyecto completo con 36 escenas y 13 runtimes nativos para Game Boy Advance.")).toBeInTheDocument();
   });

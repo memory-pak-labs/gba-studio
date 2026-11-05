@@ -7,3 +7,12 @@ export function resolveSmokeUserDataPath(env: NodeJS.ProcessEnv = process.env): 
   const value = env.GBA_STUDIO_SMOKE_USER_DATA_DIR?.trim();
   return value ? value : null;
 }
+
+/** Disposable smoke profiles must not modify the OS-wide recent-document list. */
+export function registerRecentProjectDocument(
+  projectPath: string,
+  addRecentDocument: (path: string) => void,
+  env: NodeJS.ProcessEnv = process.env
+): void {
+  if (!resolveSmokeUserDataPath(env)) addRecentDocument(projectPath);
+}

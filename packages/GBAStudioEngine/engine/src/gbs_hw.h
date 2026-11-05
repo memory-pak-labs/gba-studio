@@ -1,6 +1,7 @@
 #pragma once
 
 #include <stddef.h>
+#include "gbs/name_keyboard.h"
 #include <stdbool.h>
 
 #include <stdint.h>
@@ -22,6 +23,13 @@ enum {
 
 void gbs_hw_init(void);
 void gbs_hw_wait_vblank(void);
+typedef struct {
+    uint32_t dma_bytes;
+    uint32_t dma_transfers;
+    uint32_t vblank_work_ticks;
+    uint32_t oam_enabled;
+} GbsHwFrameVideoStats;
+int gbs_hw_frame_video_stats(GbsHwFrameVideoStats* out);
 void gbs_hw_set_render_publication_blocked(int blocked);
 void gbs_hw_set_render_handoff_fallback(void);
 void gbs_hw_frame_counter_init(void);
@@ -66,6 +74,7 @@ void gbs_hw_draw_text_overlay_light(int x, int y, int width, const char* text, i
 void gbs_hw_draw_text_input_surface(int x, int y, int width, int height, int visible);
 void gbs_hw_draw_text_input_keyboard(int x, int y, int width, int height, int selected_index, int lowercase, int visible);
 void gbs_hw_draw_text_input_keyboard_with_controls(int x, int y, int width, int height, int selected_index, int lowercase, int visible, int control_layout, int controls_x, int controls_y, int controls_width, int controls_height, int surface);
+void gbs_hw_draw_text_input_keyboard_authored(int x, int y, int width, int height, int selected_index, int lowercase, int visible, int control_layout, int controls_x, int controls_y, int controls_width, int controls_height, int surface, const gbs_name_keyboard_geometry* geometry);
 void gbs_hw_draw_overlay_rect(int x, int y, int width, int height, int visible);
 void gbs_hw_configure_dialogue_box_skin(const uint8_t* tiles, const uint16_t* palette);
 void gbs_hw_configure_hud_box_skin(const uint8_t* tiles, const uint16_t* palette);
@@ -115,6 +124,8 @@ void gbs_hw_load_bg_tilemap(int layer, const uint16_t* entries, uint32_t width, 
 void gbs_hw_set_bg_tilemap_entry(int layer, uint32_t x, uint32_t y, uint32_t width, uint32_t height, uint16_t tile);
 void gbs_hw_load_affine_bg_tiles(const uint8_t* data, uint32_t destination_tile, uint32_t tile_count);
 void gbs_hw_load_affine_bg_tiles_for_layer(int layer, const uint8_t* data, uint32_t destination_tile, uint32_t tile_count);
+/* Select the next affine upload layout; callers restore base zero afterwards. */
+bool gbs_hw_set_affine_map_screen_base(uint16_t base);
 void gbs_hw_load_affine_bg_tilemap(int layer, const uint8_t* entries, uint32_t width, uint32_t height, uint32_t map_size);
 void gbs_hw_set_display_mode(uint16_t mode);
 void gbs_hw_set_affine_bg_wrap(int layer, int enabled);

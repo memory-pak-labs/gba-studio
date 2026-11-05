@@ -1,6 +1,7 @@
 #pragma once
 
 #include <stddef.h>
+#include "gbs/name_keyboard.h"
 #include <stdint.h>
 #include "gbs/audio.hpp"
 #include "gbs/assets.hpp"
@@ -197,6 +198,7 @@ struct MenuActorData {
     const MenuVisibilityConditionData* visibility_conditions = nullptr;
     size_t visibility_condition_count = 0;
     bool visibility_any = false;
+    int scale_actor_index = -1;
 };
 
 constexpr int menu_text_input_max_length = 16;
@@ -217,6 +219,9 @@ enum class MenuTextInputKeyboardSurface : uint8_t {
     Background = 1
 };
 
+using MenuTextInputKeyboardGeometry = gbs_name_keyboard_geometry;
+using MenuTextInputKeyPosition = gbs_name_key_position;
+
 struct MenuTextInputKeyboardData {
     MenuTextInputKeyboardLayout layout = MenuTextInputKeyboardLayout::Hidden;
     int x = 0;
@@ -230,7 +235,12 @@ struct MenuTextInputKeyboardData {
     int controls_width = 0;
     int controls_height = 0;
     MenuTextInputKeyboardSurface surface = MenuTextInputKeyboardSurface::Runtime;
+    const MenuTextInputKeyboardGeometry* geometry = nullptr;
 };
+
+inline int menu_keyboard_next(const MenuTextInputKeyboardData& keyboard, int selected, int horizontal, int vertical) {
+    return gbs_name_key_next(keyboard.geometry, selected, horizontal, vertical);
+}
 
 constexpr MenuTextInputKeyboardData menu_no_text_input_keyboard() {
     return MenuTextInputKeyboardData {
@@ -254,6 +264,8 @@ constexpr bool is_valid_menu_text_input_keyboard(const MenuTextInputKeyboardData
         keyboard.surface != MenuTextInputKeyboardSurface::Background) {
         return false;
     }
+    if (keyboard.geometry) return keyboard.control_layout == MenuTextInputKeyboardControlLayout::BottomGrid &&
+        gbs_name_geometry_valid(keyboard.geometry, keyboard.x, keyboard.y);
     const bool base_valid = keyboard.x >= 0 &&
         keyboard.y >= 0 &&
         keyboard.width >= (keyboard.control_layout == MenuTextInputKeyboardControlLayout::BottomGrid ? 16 : 22) &&
@@ -388,6 +400,7 @@ struct MenuScreenData {
     size_t hud_binding_count = 0;
     int previous_page_screen_index = -1;
     int next_page_screen_index = -1;
+    VideoComposition video = default_video_composition();
 };
 
 enum class MenuSaveFeedback : uint8_t { None, Confirm, Saved, Failed };

@@ -1,0 +1,184 @@
+{
+  "schema": 1,
+  "provenance": {
+    "kind": "technical_fixtures",
+    "fixtureRevision": "2527f1db2651e221e23ceee8b5a1a2531cd18fb6",
+    "review": "Existing functional pixel, collision, audio and save assertions passed; all 14 fixed-frame captures inspected. No game artwork.",
+    "frameUnits": "emulated_display_frames",
+    "telemetryReview": "Native frame observer adds one cold-load display frame to visibility-graphics/resident (181/241); all 28 approved RGBA hashes remain unchanged and steady cadence is preserved."
+  },
+  "emulator": {
+    "sourceRevision": "0.10.5",
+    "wasmSha256": "85770e7b5868d68eb6aff9954b27ff4ac0219ab158c86cce676450963cd7b16f"
+  },
+  "roms": {
+    "replace-tile/tiled": [
+      {
+        "label": "boot",
+        "frame": 180,
+        "rgbaSha256": "3c376c7b952f0f80578f9306a70a8151bd5347e1519f4d325c44288e657f8d03"
+      },
+      {
+        "label": "idle",
+        "frame": 240,
+        "rgbaSha256": "3c376c7b952f0f80578f9306a70a8151bd5347e1519f4d325c44288e657f8d03"
+      }
+    ],
+    "replace-tile/resident": [
+      {
+        "label": "boot",
+        "frame": 180,
+        "rgbaSha256": "3c376c7b952f0f80578f9306a70a8151bd5347e1519f4d325c44288e657f8d03"
+      },
+      {
+        "label": "idle",
+        "frame": 240,
+        "rgbaSha256": "3c376c7b952f0f80578f9306a70a8151bd5347e1519f4d325c44288e657f8d03"
+      }
+    ],
+    "replace-tile/paged": [
+      {
+        "label": "boot",
+        "frame": 180,
+        "rgbaSha256": "3c376c7b952f0f80578f9306a70a8151bd5347e1519f4d325c44288e657f8d03"
+      },
+      {
+        "label": "idle",
+        "frame": 240,
+        "rgbaSha256": "3c376c7b952f0f80578f9306a70a8151bd5347e1519f4d325c44288e657f8d03"
+      }
+    ],
+    "replace-tile/paged-large": [
+      {
+        "label": "boot",
+        "frame": 180,
+        "rgbaSha256": "5d3a00c232075b50232b79a8fe18d5231fbcfc33125d2169f75664a9367f475a"
+      },
+      {
+        "label": "idle",
+        "frame": 240,
+        "rgbaSha256": "5d3a00c232075b50232b79a8fe18d5231fbcfc33125d2169f75664a9367f475a"
+      }
+    ],
+    "replace-tile/platformer": [
+      {
+        "label": "boot",
+        "frame": 180,
+        "rgbaSha256": "a72e3344a7d3c49692479bacd663e7a39abef9fb2982b3a440665216c1df8101"
+      },
+      {
+        "label": "idle",
+        "frame": 240,
+        "rgbaSha256": "a72e3344a7d3c49692479bacd663e7a39abef9fb2982b3a440665216c1df8101"
+      }
+    ],
+    "replace-tile/resident-keep": [
+      {
+        "label": "boot",
+        "frame": 180,
+        "rgbaSha256": "3c376c7b952f0f80578f9306a70a8151bd5347e1519f4d325c44288e657f8d03"
+      },
+      {
+        "label": "idle",
+        "frame": 240,
+        "rgbaSha256": "3c376c7b952f0f80578f9306a70a8151bd5347e1519f4d325c44288e657f8d03"
+      }
+    ],
+    "event-replay/rom": [
+      {
+        "label": "boot",
+        "frame": 180,
+        "rgbaSha256": "dc84846c92944fab254ccd1d883cdcd54fcc044d33c0ec18daec66c0f5c6a982"
+      },
+      {
+        "label": "idle",
+        "frame": 240,
+        "rgbaSha256": "dc84846c92944fab254ccd1d883cdcd54fcc044d33c0ec18daec66c0f5c6a982"
+      }
+    ],
+    "hardware-diagnostic/project": [
+      {
+        "label": "boot",
+        "frame": 180,
+        "rgbaSha256": "90fa9672329fb014ad429aa59d073256ae87a588d1f66667b9c6be0acc7adbdb"
+      },
+      {
+        "label": "idle",
+        "frame": 240,
+        "rgbaSha256": "90fa9672329fb014ad429aa59d073256ae87a588d1f66667b9c6be0acc7adbdb"
+      }
+    ],
+    "map-states/resident": [
+      {
+        "label": "boot",
+        "frame": 180,
+        "rgbaSha256": "3c376c7b952f0f80578f9306a70a8151bd5347e1519f4d325c44288e657f8d03"
+      },
+      {
+        "label": "idle",
+        "frame": 240,
+        "rgbaSha256": "3c376c7b952f0f80578f9306a70a8151bd5347e1519f4d325c44288e657f8d03"
+      }
+    ],
+    "map-states/paged": [
+      {
+        "label": "boot",
+        "frame": 180,
+        "rgbaSha256": "3c376c7b952f0f80578f9306a70a8151bd5347e1519f4d325c44288e657f8d03"
+      },
+      {
+        "label": "idle",
+        "frame": 240,
+        "rgbaSha256": "3c376c7b952f0f80578f9306a70a8151bd5347e1519f4d325c44288e657f8d03"
+      }
+    ],
+    "map-states/platformer": [
+      {
+        "label": "boot",
+        "frame": 180,
+        "rgbaSha256": "a72e3344a7d3c49692479bacd663e7a39abef9fb2982b3a440665216c1df8101"
+      },
+      {
+        "label": "idle",
+        "frame": 240,
+        "rgbaSha256": "a72e3344a7d3c49692479bacd663e7a39abef9fb2982b3a440665216c1df8101"
+      }
+    ],
+    "visibility-graphics/resident": [
+      {
+        "label": "boot",
+        "frame": 181,
+        "rgbaSha256": "944273c22a1215460114e472f0c7ec88747767790b48110b28c9ff66365e77cf"
+      },
+      {
+        "label": "idle",
+        "frame": 241,
+        "rgbaSha256": "48115f08ad291245f2ceb5d6128db15adec0cce929da0e280ba22c7f8046cad1"
+      }
+    ],
+    "visibility-graphics/paged": [
+      {
+        "label": "boot",
+        "frame": 180,
+        "rgbaSha256": "c25ac1ddbad79ee4e77fc4c4cfce049cc896c20c7a451e25ea173cf2f8292c61"
+      },
+      {
+        "label": "idle",
+        "frame": 240,
+        "rgbaSha256": "5d3048ac6c6f77f7f26118cc5d3c737653133514b671e49812b66f9f02a34c9e"
+      }
+    ],
+    "visibility-graphics/platformer": [
+      {
+        "label": "boot",
+        "frame": 180,
+        "rgbaSha256": "c2d9d6422d80ec131368e8759a99174964834c5084396f6085850711f4c9bacd"
+      },
+      {
+        "label": "idle",
+        "frame": 240,
+        "rgbaSha256": "2236a5d433f988c3aff6df0d69e07f250573d30017e6b6510d5ac9313024bf7a"
+      }
+    ]
+  }
+}

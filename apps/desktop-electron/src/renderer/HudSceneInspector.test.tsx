@@ -18,6 +18,19 @@ function fixture() {
   data.scenas = [{ id:"port", name:"Porto", sceneType:"topdown", width:30, height:20, hudPresetId:"shared" }, { id:"cave", name:"Caverna", sceneType:"topdown", width:30, height:20, hudPresetId:"shared" }];
   return data;
 }
+
+it("lets a Dungeon author choose the text contract independently from the preset ID", () => {
+  const data = fixture();
+  const room = { ...deriveRoomsWorkspacePresentation(data).rooms.find(r => r.id === "port")!, sceneType: "dungeonCrawler" };
+  const hud = deriveHudPresetsWorkspacePresentation(data), onUpdate = vi.fn();
+  render(<HudSceneInspector room={room} projectData={data} binding={resolveExplicitHudPresetBinding(data, { roomPresetId: "shared" })}
+    presets={hud.presets} activePresetID={hud.activePresetId} previewPreset={null} onPreviewPreset={vi.fn()}
+    selectedComponentID={null} onSelectComponent={vi.fn()} onUpdateHudPreset={onUpdate}
+    editingSharedPresetID="shared" onEditSharedPreset={vi.fn()} viewMode="edit" onViewMode={vi.fn()} />);
+  fireEvent.click(screen.getByRole("tab", { name: "Aparência" }));
+  fireEvent.change(screen.getByRole("combobox", { name: "Conteúdo dos textos" }), { target: { value: "dungeon-status" } });
+  expect(onUpdate).toHaveBeenCalledWith("shared", { runtimeTextProfile: "dungeon-status" });
+});
 function Harness({ onChange = vi.fn() }: { onChange?: (...args: any[]) => void }) {
   const [data, setData] = useState(fixture);
   const [previewID, setPreviewID] = useState<string|null>(null);
@@ -154,4 +167,26 @@ describe("HUD canvas gestures", () => {
     fireEvent.keyDown(screen.getByRole("button",{name:`Redimensionar ${component.label}`}),{key:"ArrowDown"});
     expect(update.mock.lastCall?.[1].components.find((c:any)=>c.id===component.id)).toMatchObject({height:component.height+8});
   });
+});
+
+it("edits the native name keyboard from HUD without creating a preset or losing menu events", async () => {
+  const room = { ...deriveRoomsWorkspacePresentation(fixture()).rooms.find(room => room.id === "port")!,
+    sceneType: "menu", runtime: { type: "menu", config: { role: "name_input", screenType: "menu", hudMode: "none",
+      items: [{ id: "confirm", label: "Confirmar", eventName: "name_confirm", action: "select" }],
+      textInput: { variableName: "player.name", maxLength: 8, x: 15, y: 5, width: 8,
+        keyboard: { layout: "grid", controlLayout: "bottom_grid", surface: "background", x: 11, y: 8, width: 16, height: 10, allowLowercase: true } } } } };
+  const updateRoom = vi.fn();
+  render(<StudioI18nProvider><HudSceneInspector room={room} projectData={fixture()} binding={null} previewPreset={null}
+    presets={[]} activePresetID="" onPreviewPreset={vi.fn()} onSelectComponent={vi.fn()} selectedComponentID={null}
+    editingSharedPresetID={null} onEditSharedPreset={vi.fn()} viewMode="edit" onViewMode={vi.fn()}
+    onUpdateRoomFields={updateRoom} /></StudioI18nProvider>);
+  expect(screen.getByRole("heading", { name: "Entrada de nome" })).toBeInTheDocument();
+  expect(screen.queryByText("Nenhuma HUD aplicada. Escolha uma na biblioteca ou crie uma nova.")).not.toBeInTheDocument();
+  fireEvent.blur(screen.getByRole("spinbutton", { name: "Teclado X" }));
+  expect(updateRoom).not.toHaveBeenCalled();
+  fireEvent.change(screen.getByRole("spinbutton", { name: "Teclado X" }), { target: { value: "10" } });
+  expect(updateRoom).toHaveBeenCalledWith("port", { runtime: { type: "menu", config: expect.objectContaining({
+    items: expect.arrayContaining([expect.objectContaining({ eventName: "name_confirm" })]),
+    textInput: expect.objectContaining({ x: 15, y: 5, keyboard: expect.objectContaining({ x: 10, y: 8, controlLayout: "bottom_grid", surface: "background" }) })
+  }) } });
 });

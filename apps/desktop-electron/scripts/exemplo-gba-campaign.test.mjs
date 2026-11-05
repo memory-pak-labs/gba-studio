@@ -64,7 +64,7 @@ describe("campanha canônica O Último Farol", () => {
           chapter,
           title: definition.title,
           objective: definition.objective,
-          nextScene: definition.name === "titulo" ? "escolha_genero" : definition.nextScene,
+          nextScene: definition.name === "titulo" ? "escolha_genero" : definition.name === "arena_arrancada" ? "corrida_preparacao" : definition.nextScene,
           completionVariable: definition.completionVariable ?? "",
           completedValue: definition.completedValue ?? 1
         }
@@ -131,7 +131,7 @@ describe("campanha canônica O Último Farol", () => {
 
     for (const scene of VERTICE_CAMPAIGN_SCENES) {
       const pointClickExit = ["armazem_das_mares", "observatorio_do_farol"].includes(scene.name);
-      const expectedTransition = scene.name === "circuito_final" ? "change_scene porto_lumen 37 68 up" : scene.transitionEvent === "mapa_viajar_penedos"
+      const expectedTransition = scene.name === "circuito_final" ? "change_scene porto_lumen 37 68 up" : scene.name === "arena_arrancada" ? "advance_campaign" : scene.transitionEvent === "mapa_viajar_penedos"
         ? "change_scene penedos_vento 8 34 right"
         : pointClickExit
           ? "advance_campaign"
@@ -191,7 +191,7 @@ describe("campanha canônica O Último Farol", () => {
     expect(JSON.stringify(options)).not.toContain("Ir às falésias");
   });
 
-  it("mantém sete entradas do Menu Start paginadas nas seis linhas da HUD", () => {
+  it("mantém as entradas contextuais do Menu Start paginadas nas seis linhas da HUD", () => {
     const project = campaignProject();
     const items = project.scenas.find(scene => scene.name === "menu_start").runtime.config.items;
     expect(items.map(item => item.id)).toEqual(["missions", "inventory", "map", "save", "load", "settings", "back"]);
@@ -563,6 +563,7 @@ describe("campanha canônica O Último Farol", () => {
 
   it("persiste uma única progressão compartilhada até a corrida final", () => {
     const project = campaignProject();
+    // Follow the authored preparation/results route; the victory itself is supplied by this host fixture.
     let runtime = bootPreviewRuntimeAtRoom(project, "prologo");
     const finish = state => {
       for (let i = 0; i < 2000; i++) {
@@ -597,9 +598,11 @@ describe("campanha canônica O Último Farol", () => {
     runtime = run(runtime, "tempestade_alcancar_rele");
     runtime = run(runtime, "guardiao_vitoria");
     runtime = run(runtime, "arena_vencer_rival");
+    runtime = run(runtime, "race_enter_topdown");
+    expect(runtime.currentRoom?.name).toBe("circuito_final");
     runtime = run(runtime, "race_finish");
     expect(runtime.currentRoom?.name).toBe("corrida_resultados");
-    runtime = { ...runtime, variables: { ...runtime.variables, racing_result: 1, previous_room: 0 } };
+    runtime = { ...runtime, variables: { ...runtime.variables, racing_result: 1 } };
     runtime = run(runtime, "race_results_continue");
     for (let i = 0; i < 400; i++) {
       if (runtime.activeDialogue) runtime = dispatchPreviewRuntimeAction(runtime, "action");

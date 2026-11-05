@@ -22,7 +22,15 @@ try {
   core.HEAPU8.set(rom, pointer);
   assert.equal(core._gba_load_rom(pointer, rom.length), 1);
   core._free(pointer);
-  for (let frame = 0; frame < 240; ++frame) core._gba_run_frame();
+  // Asset loading spans a variable number of video frames as the project grows.
+  // Align the NPC/timer phase on the gameplay clock before measuring against
+  // the independent video clock; unrelated menu art must not shift the probe.
+  let bootVideoFrames = 0;
+  for (; bootVideoFrames < 2000; ++bootVideoFrames) {
+    const state = readRuntimeTelemetry(core);
+    if (state?.runtimeKind === 1 && state.frame >= 240) break;
+    core._gba_run_frame();
+  }
   const stateSize = core._gba_state_size();
   assert.equal(stateSize, 0x61000, "Recalibre o relógio para o novo formato de savestate mGBA.");
   statePointer = core._malloc(stateSize);
@@ -32,6 +40,7 @@ try {
   };
   const initial = readRuntimeTelemetry(core);
   assert.equal(initial?.runtimeKind, 1, "A ROM deve iniciar no runtime de plataforma.");
+  assert.equal(initial.frame, 240, "A medição deve começar na mesma fase de gameplay.");
   const windows = [];
   for (const [name, keys, frames] of [
     ["idle", 0, 120], ["right", 16, 60], ["left", 32, 60],
@@ -58,7 +67,8 @@ try {
       peakCpuWorkTicks: after.timing.peakCpuWorkTicks
     });
   }
-  console.log(JSON.stringify({ runtimeKind: initial.runtimeKind, currentRoom: initial.currentRoom, windows }));
+  console.log(JSON.stringify({ runtimeKind: initial.runtimeKind, currentRoom: initial.currentRoom,
+    initialGameplayFrame: initial.frame, bootVideoFrames, windows }));
   for (const window of windows) {
     assert.equal(window.emulatedFrames, window.bridgeCalls, "A ponte deve executar um quadro de vídeo por chamada.");
     assert.ok(window.updates >= window.minimumUpdates,

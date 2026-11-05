@@ -1206,7 +1206,7 @@ export const eventCommandRecipeLibrary: EventCommandRecipeDefinition[] = [
         "detail": "Segurar para correr"
       },
       {
-        "commandTemplate": "set_player_speed_profile 100 160 a 0",
+        "commandTemplate": "set_player_speed_profile 100 170 r 0",
         "category": "Movimento",
         "detail": ""
       }

@@ -1,3 +1,4 @@
+import {preserveExampleEncore} from './encore-project.mjs';
 export const SHOWCASE_ITEMS = Object.freeze({ tool: 'zzz_lumen_tool', compass: 'zzz_guardian_compass' });
 export const SHOWCASE_VARIABLES = Object.freeze([
   'var_council_path', 'var_council_visit',
@@ -162,5 +163,5 @@ export function promoteShowcaseSystems(source) {
   const transition = retained.findIndex(s => s.command.startsWith('change_scene '));
   retained.splice(transition < 0 ? retained.length : transition, 0, ...reset.map((command, i) => ({ id: `showcase-new-game-${i}`, command, isEnabled: true })));
   newGame.steps = retained;
-  return p;
+  return source.events.some(e=>e.name==='race_finish')?preserveExampleEncore(source,p):p;
 }

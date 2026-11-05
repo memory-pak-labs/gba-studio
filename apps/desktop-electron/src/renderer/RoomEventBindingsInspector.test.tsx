@@ -32,6 +32,18 @@ function selectState(label: string): void {
 describe("RoomEventBindingsInspector", () => {
   afterEach(cleanup);
 
+  it("starts a new bound script with a complete condition block", () => {
+    const onCreateBehavior = vi.fn(() => "room_init");
+    const condition = { ...greetingRecipe, id: "condition", label: "Se valor", command: "if_variable value 10", isRecipe: false, steps: null };
+    render(<RoomEventBindingsInspector contextKind="room" entity={{ id: "room", name: "Room", eventBindings: {} }}
+      commandSuggestions={[condition]} eventOptions={[]} onChangeBinding={vi.fn()} onCreateBehavior={onCreateBehavior}
+      onCreateEvent={vi.fn()} sceneType="topdown" />);
+    fireEvent.click(screen.getByRole("button", { name: "Começar script em Ao iniciar" }));
+    fireEvent.click(screen.getByRole("button", { name: "Se valor" }));
+    fireEvent.click(screen.getByRole("button", { name: "Adicionar evento selecionado" }));
+    expect(onCreateBehavior).toHaveBeenCalledWith(expect.objectContaining({ initialCommands: ["if_variable value 10", "condition_end"] }));
+  });
+
   it("exposes the scene authoring guide without adding artificial timeline steps", () => {
     render(<RoomEventBindingsInspector
       contextKind="room"
@@ -352,4 +364,15 @@ describe("RoomEventBindingsInspector", () => {
     expect(screen.getByRole("region", { name: "Editor de player_boot" })).toBeInTheDocument();
     expect(screen.getByLabelText("Timeline de Ao iniciar")).toBeInTheDocument();
   });
+});
+
+
+it("does not keep a focused checkpoint script under another scene state", () => {
+  const props = { contextKind: "room" as const, sceneType: "racing", eventOptions: ["gate_a", "boot_b"].map(value => ({value,label:value})), onChangeBinding: vi.fn(), onCreateEvent: vi.fn(), focusedEventName: "gate_a", focusedEventRequestID: 1, renderEventInspector: (name: string) => <div>Script:{name}</div> };
+  const {rerender} = render(<RoomEventBindingsInspector {...props} entity={{id:"a",name:"a",eventBindings:{},runtime:{type:"racing",config:{topdownTrack:{checkpoints:[{id:"east",eventName:"gate_a"}]}}}}} />);
+  expect(screen.getByText("Script:gate_a")).toBeInTheDocument();
+  rerender(<RoomEventBindingsInspector {...props} entity={{id:"b",name:"b",eventBindings:{onInit:"boot_b"}}} />);
+  expect(screen.queryByText("Script:gate_a")).not.toBeInTheDocument();
+  expect(screen.getByText("Script:boot_b")).toBeInTheDocument();
+  cleanup();
 });

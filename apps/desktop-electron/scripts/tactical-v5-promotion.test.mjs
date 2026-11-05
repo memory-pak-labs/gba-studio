@@ -1,3 +1,4 @@
+import {expandProjectTilemaps} from '../src/shared/projectResourceFormat.ts';
 import { readFileSync } from 'node:fs';
 import { createHash } from 'node:crypto';
 import { describe, expect, it } from 'vitest';
@@ -10,7 +11,7 @@ import { expandCompactSequence } from './exemplo-template-audit.mjs';
 
 const retired = JSON.parse(readFileSync(new URL("../fixtures/asset-provenance/example-library-cleanup.json", import.meta.url))).retiredAssets;
 const retained = JSON.parse(readFileSync(new URL('../fixtures/asset-provenance/market-approved-manifest.json', import.meta.url))).retainedOriginals;
-const source = JSON.parse(readFileSync(new URL('../default-assets/templates/exemplo-gba/exemplo-gba.gba-project', import.meta.url)));
+const source = expandProjectTilemaps(JSON.parse(readFileSync(new URL('../default-assets/templates/exemplo-gba/exemplo-gba.gba-project', import.meta.url))));
 const approved = buildArenaV5(source);
 approved.actors=approved.actors.filter(a=>a.roomName!=="arena_tatica"||!a.id.startsWith("coast-"));
 // Keep the legacy compiler regression independent of the current promoted Arena.

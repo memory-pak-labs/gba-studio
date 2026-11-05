@@ -1,4 +1,5 @@
 import { roomMapStates, type MapStateDefinition } from "../mapStates.js";
+import { actorInitialCollisionBounds } from "../actorPlacementDiagnostics.js";
 import { actorCommandReferences, sceneChangeCommand, sceneChangeCommandParts } from "../sceneChangeCommand.js";
 import { duplicateSceneContent } from "./duplicateSceneContent.js";
 import type { GBAProjectData } from "../projectFile.js";
@@ -550,6 +551,9 @@ export interface RoomsWorkspaceEntity {
   animationStateID?: string | null;
   z?: number;
   hasCustomBounds?: boolean;
+  dungeonWallMounted?: boolean;
+  /** Authoring intent only; never changes the ROM's collision behavior. */
+  collisionPlacement?: "intentional";
   /** Authored animation hitbox, in pixels relative to the actor anchor. */
   collisionBounds?: { x: number; y: number; width: number; height: number };
   collisionGroup?: number;
@@ -562,6 +566,8 @@ export interface RoomsWorkspaceEntity {
 }
 
 export interface RoomsWorkspaceSpriteFrame {
+  scaleX?: number;
+  scaleY?: number;
   frameHeight: number;
   frameWidth: number;
   heightTiles: number;
@@ -732,6 +738,7 @@ export interface UpdateRoomFields {
 }
 
 export interface UpdateRoomEntityFields {
+  collisionPlacement?: "intentional" | null;
   name?: string;
   pointClick?: Partial<PointClickTargetConfig> | null;
   roomName?: string;
@@ -2211,7 +2218,9 @@ function footprintHasBlockedCollision(
 }
 
 function roomEntityCollisionFootprint(entity: RoomsWorkspaceEntity, room: RoomsWorkspaceRoom): RoomEntitySelectionFootprint {
-  const bounds = room.sceneType === "platformer" && !entity.hasCustomBounds ? entity.collisionBounds : undefined;
+  const usesRuntimeHitbox = room.sceneType === "topdown"
+    || room.sceneType === "platformer" && !entity.hasCustomBounds;
+  const bounds = usesRuntimeHitbox ? entity.collisionBounds : undefined;
   if (!bounds) return roomEntitySelectionFootprint(entity, room.sceneType);
   const left = entity.x * 8 + bounds.x;
   const top = entity.y * 8 + bounds.y;
@@ -2315,7 +2324,9 @@ export function deriveRoomGeometryDiagnostics(
     // unreachable only when every cell is blocked. Actor diagnostics use the
     // authored runtime hitbox rather than padding in the sprite frame.
     const requireEveryCell = room.sceneType === "platformer" && entity.kind === "trigger";
-    const blocked = collisionChecksEnabled && !outsideBounds
+    const wallMountedProp = room.sceneType === "dungeonCrawler" && entity.kind === "actor" && entity.dungeonWallMounted;
+    const intentionalOverlap = entity.kind === "actor" && !entity.isPlayer && entity.collisionPlacement === "intentional";
+    const blocked = collisionChecksEnabled && !outsideBounds && !wallMountedProp && !intentionalOverlap
       && footprintHasBlockedCollision(roomEntityCollisionFootprint(entity, room), room, requireEveryCell);
     const target = entity.kind === "actor" ? actorPlacement : triggerPlacement;
     const actorIndex = entity.kind === "actor"
@@ -2944,6 +2955,7 @@ function entityPresentation(
   )) && Number(collisionAnimation.hitboxWidth) > 0 && Number(collisionAnimation.hitboxHeight) > 0
     ? { x: Number(collisionAnimation.hitboxX), y: Number(collisionAnimation.hitboxY), width: Number(collisionAnimation.hitboxWidth), height: Number(collisionAnimation.hitboxHeight) }
     : undefined;
+  const effectiveCollisionBounds = (kind === "actor" ? actorInitialCollisionBounds(data, entity) : undefined) || collisionBounds;
   return {
     kind,
     id: entityDocument.id,
@@ -2965,7 +2977,9 @@ function entityPresentation(
       ? { z: Math.floor(entity.z) }
       : {}),
     ...(hasCustomBounds ? { hasCustomBounds: true } : {}),
-    ...(collisionBounds ? { collisionBounds } : {}),
+    ...(effectiveCollisionBounds ? { collisionBounds: effectiveCollisionBounds } : {}),
+    ...(kind === "actor" && entity.dungeonWallMounted === true ? { dungeonWallMounted: true } : {}),
+    ...(kind === "actor" && entity.collisionPlacement === "intentional" ? { collisionPlacement: "intentional" as const } : {}),
     ...(kind === "actor" ? {
       ...(animationStateID ? { animationStateID } : {}),
       collisionGroup: clampInteger(integerField(entity.collisionGroup, 0), 0, 15),
@@ -4761,6 +4775,10 @@ export function updateRoomEntityInProject(
     entity.eventBindings = eventBindings;
   }
   if (kind === "actor") {
+    if (fields.collisionPlacement !== undefined) {
+      if (fields.collisionPlacement === "intentional") entity.collisionPlacement = "intentional";
+      else delete entity.collisionPlacement;
+    }
     if (fields.x !== undefined || fields.y !== undefined || fields.roomName !== undefined) {
       const rooms = projectRooms(next);
       const name = entityRoomName(entity, rooms);

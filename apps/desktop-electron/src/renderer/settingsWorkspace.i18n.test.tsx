@@ -16,6 +16,21 @@ afterEach(() => { cleanup(); window.localStorage.clear(); vi.clearAllMocks(); })
 
 describe("settings presentation localization", () => {
   it.each([
+    ["pt-BR", "Controles", "Baixo", "Teclado do Play integrado"],
+    ["en-US", "Controls", "Down", "Built-in Play keyboard"],
+    ["es-ES", "Controles", "Abajo", "Teclado del Play integrado"]
+  ])("localizes keyboard directions and the section summary in %s", (locale, title, down, summary) => {
+    window.localStorage.setItem("gbaStudio.locale", locale);
+    render(<StudioI18nProvider><SettingsWorkspace presentation={deriveSettingsWorkspacePresentation({ settings: {} })} {...handlers} /></StudioI18nProvider>);
+    fireEvent.click(screen.getByRole("button", { name: new RegExp(`${title}(?: |$)`) }));
+    expect(screen.getByLabelText(down)).toHaveValue("ArrowDown,s");
+    expect(document.getElementById("settings-section-controls")).toHaveTextContent(summary);
+    expect(screen.queryByLabelText("Bass")).not.toBeInTheDocument();
+    fireEvent.change(screen.getByRole("searchbox"), { target: { value: down } });
+    expect(screen.getByRole("button", { name: new RegExp(`^(?:Open|Abrir) ${title}`) })).toBeInTheDocument();
+    expect(handlers.onUpdateSetting).not.toHaveBeenCalled();
+  });
+  it.each([
     ["pt-BR", "Top-down", "Calmo", "Sem jogador automático"],
     ["en-US", "Top-down", "Calm", "No automatic player"],
     ["es-ES", "Vista cenital", "Tranquilo", "Sin jugador automático"]

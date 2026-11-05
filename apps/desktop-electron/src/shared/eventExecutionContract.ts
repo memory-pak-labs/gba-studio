@@ -1,4 +1,6 @@
+import { isScaleEvent } from "./eventTransforms.js";
 import { nativeEventCommandExportHandling } from "./eventCommandRegistry.js";
+import { sceneChangeCommandParts } from "./sceneChangeCommand.js";
 
 export type EventTiming = "immediate" | "frames" | "input" | "dialogue" | "restore" | "transition" | "runtime-defined";
 export interface EventSourceLocation { eventID: string; stepID: string }
@@ -10,7 +12,7 @@ export interface EventInstruction {
 }
 /** Shared instruction boundary. Scene-specific references are resolved by each runtime. */
 export function parseEventInstruction(command: string, source?: EventSourceLocation, validate = true): EventInstruction {
-  const [verb = "noop", ...operands] = command.split(/\s+/).filter(Boolean);
+  const [verb = "noop", ...operands] = sceneChangeCommandParts(command);
   const numeric: EventInstruction["numeric"] = {};
   const integer = (name: "frames" | "slot", fallback: number, max: number) => {
     const value = operands[0] === undefined ? fallback : Number(operands[0]);
@@ -25,14 +27,14 @@ export function eventExecutionContract(verb: string): {
   handling: ReturnType<typeof nativeEventCommandExportHandling>;
   timing: EventTiming; blocks: boolean; resetsSceneResources: boolean; resources: string[];
 } {
-  const timing: EventTiming = verb === "wait" ? "frames" : verb === "wait_button" ? "input"
+  const timing: EventTiming = isScaleEvent(verb) ? "immediate" : verb === "wait" ? "frames" : verb === "wait_button" ? "input"
     : ["show_dialogue", "show_choice", "open_text_input"].includes(verb) ? "dialogue"
     : verb === "load_game" ? "restore" : /^(change_scene|scene_stack_|advance_campaign)/.test(verb) ? "transition"
     : ["noop", "set_variable", "add_variable", "set_flag", "save_game", "remove_save_game", "set_map_state", "replace_tile", "clear_visibility", "lantern", "reveal_area"].includes(verb) ? "immediate" : "runtime-defined";
   return { handling: nativeEventCommandExportHandling(verb), timing,
     blocks: ["frames", "input", "dialogue", "restore", "transition"].includes(timing),
     resetsSceneResources: timing === "restore" || timing === "transition",
-    resources: ["lantern", "reveal_area", "clear_visibility"].includes(verb) ? ["window1", "brightness"]
+    resources: isScaleEvent(verb) ? [verb.includes("actor") ? "obj-affine-matrices" : "affine-background"] : ["lantern", "reveal_area", "clear_visibility"].includes(verb) ? ["window1", "brightness"]
       : ["replace_tile", "set_map_state"].includes(verb) ? ["tile-command-queue", "background", "collision"] : [] };
 }
 export type SceneEntryReason = "first-entry" | "return" | "load" | "resume" | "restart";

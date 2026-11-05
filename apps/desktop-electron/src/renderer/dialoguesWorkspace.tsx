@@ -31,6 +31,7 @@ interface DialoguesWorkspaceProps {
   projectPath?: string;
   focusedDialogueKey?: string | null;
   focusRequestID?: number | null;
+  onCreateDialogue?(): Promise<string | null>;
   onEditDialogue?(key: string, sceneID?: string): void;
   onOpenDialogueEvent(eventName: string): void;
   onExportDialogue(key: string): void;
@@ -135,6 +136,7 @@ export function DialoguesWorkspace({
   projectPath,
   focusedDialogueKey,
   focusRequestID,
+  onCreateDialogue,
   onOpenDialogueEvent,
   onEditDialogue,
   onExportDialogue,
@@ -338,7 +340,7 @@ export function DialoguesWorkspace({
     <section aria-label={t("dialogues.workspaceAria")} className="dialogues-workspace">
       <div className="dialogues-layout dialogues-review-layout">
         <aside className="dialogues-rail" aria-label={t("dialogues.library")}>
-          <div className="dialogues-panel-title"><h3>{t("workspace.dialogues")}</h3><span>{presentation.dialogues.length}</span></div>
+          <div className="dialogues-panel-title"><h3>{t("workspace.dialogues")}</h3><span>{presentation.dialogues.length}</span>{onCreateDialogue ? <button type="button" onClick={() => void onCreateDialogue()}>{t("dialogues.actions.create")}</button> : null}</div>
           <label className="dialogues-search dialogues-review-search"><Search aria-hidden="true" size={16}/><input aria-label={t("dialogues.search")} onChange={event => setSearchQuery(event.currentTarget.value)} placeholder={t("dialogues.searchPlaceholder")} type="search" value={searchQuery}/></label>
           <select className="dialogues-character-filter" aria-label={t("dialogues.filter.character")} onChange={event => setCharacterFilter(event.currentTarget.value)} value={characterFilter}>
             <option value="">{t("dialogues.filter.allCharacters")}</option>

@@ -1799,8 +1799,16 @@ def assert_mixed_runtime_dispatch_export(repo_root, build_dir):
                       visible_dialogue_index, visible_map_index, visible_interaction_index)
     assert hidden_dialogue_index < hidden_map_index < hidden_interaction_index < hud_render_index
     assert hud_render_index < visible_dialogue_index < visible_map_index < visible_interaction_index
-    assert "gbs::set_dialogue_frame(interaction_dialogue, gbs::active_dialogue_ui_config().full_width_bottom" in dungeon_runtime
-    assert "? gbs::dialogue_frame_full_width : gbs::dialogue_frame_default);" in dungeon_runtime
+    configured_frame = (
+        "gbs::set_dialogue_frame(interaction_dialogue, gbs::active_dialogue_ui_config().full_width_bottom\n"
+        "        ? gbs::dialogue_frame_full_width : gbs::dialogue_frame_default);"
+    )
+    notice_start = dungeon_runtime.find("void show_dungeon_notice(")
+    inventory_start = dungeon_runtime.find("void show_dungeon_inventory(", notice_start)
+    inventory_end = dungeon_runtime.find("int dungeon_map_width(", inventory_start)
+    assert 0 <= notice_start < inventory_start < inventory_end
+    assert configured_frame in dungeon_runtime[notice_start:inventory_start]
+    assert configured_frame in dungeon_runtime[inventory_start:inventory_end]
     assert "gbs::set_dialogue_frame(interaction_dialogue, gbs::dialogue_frame_battle_menu);" in dungeon_runtime
     battle_start_index = dungeon_runtime.find("bool start_dungeon_battle(size_t actor_index)")
     battle_update_index = dungeon_runtime.find("bool update_dungeon_interaction(", battle_start_index)
@@ -1808,8 +1816,10 @@ def assert_mixed_runtime_dispatch_export(repo_root, build_dir):
     battle_start_runtime = dungeon_runtime[battle_start_index:battle_update_index]
     assert "gbs::hide_dialogue(dungeon_dialogue);" in battle_start_runtime
     assert "runtime_script_controls_dialogue = false;" in battle_start_runtime
-    assert "gbs::set_dialogue_frame(dungeon_dialogue, gbs::active_dialogue_ui_config().full_width_bottom" in dungeon_runtime
-    assert "? gbs::dialogue_frame_full_width : gbs::dialogue_frame_default);" in dungeon_runtime
+    assert (
+        "gbs::set_dialogue_frame(dungeon_dialogue, gbs::active_dialogue_ui_config().full_width_bottom\n"
+        "            ? gbs::dialogue_frame_full_width : gbs::dialogue_frame_default);"
+    ) in dungeon_runtime
     assert "gbs::update_runtime_trigger" in dungeon_runtime
     assert "const bool assets_are_streamed = project.resource_bank_group_count > 0;" in dungeon_runtime
     assert "stream_resources_for_room" in dungeon_runtime
@@ -1870,12 +1880,15 @@ def assert_mixed_runtime_dispatch_export(repo_root, build_dir):
     world_map_runtime = (repo_root / "templates" / "exported_world_map" / "main.cpp").read_text(encoding="utf-8")
     assert "GBS_VISUAL_NOVEL_RUNTIME_ENTRY" in visual_novel_runtime
     assert "gbs::runtime_transition_pending()" in visual_novel_runtime
-    assert "gbs::hide_hud(hud);\n        gbs::draw_hud(hud);" in visual_novel_runtime
+    assert "gbs::hide_hud(hud);\n        return;" in visual_novel_runtime
+    assert "refresh_hud();\n        gbs::draw_hud(hud);" in visual_novel_runtime
     assert "GBS_WORLD_MAP_RUNTIME_ENTRY" in world_map_runtime
     assert "gbs::runtime_transition_pending()" in world_map_runtime
     assert "const auto focus = journey.active ? journey.position : selected->position_pixels;" in world_map_runtime
     assert "camera_x = gbs::world_map_clamp(focus.x - 120" in world_map_runtime
-    assert "node.position_pixels.x-camera_x" in world_map_runtime
+    assert "const auto screen = map_screen_position(node.position_pixels);" in world_map_runtime
+    assert "project_event_background_point(event_state,project.video.affine_layer,point,screen)" in world_map_runtime
+    assert "return {point.x-camera_x,point.y-camera_y};" in world_map_runtime
     assert "gbs::set_bg_scroll(background->layer,camera_x % 256,camera_y % 256)" in world_map_runtime
     assert "gbs_run_visual_novel" in mixed_runtime
     assert "gbs_run_world_map" in mixed_runtime
@@ -2807,6 +2820,13 @@ def assert_topdown_npc_animation_commands_export(repo_root, build_dir):
             ]
         },
         "topdown_project": {
+            "scripts": [{"name": "shared_wave", "script": [
+                {"op": "set_actor_animation", "actor": 0, "animation": "wave"},
+                {"op": "set_actor_animation", "actor": 1, "animation": "wave"},
+            ]}],
+            "actor_sprites": [{"name": "swapped_guide", "metasprite": {"asset": "guide_sprite", "index": 0},
+                               "animations": [{"name": "wave", "asset": "guide_sprite"},
+                                              {"name": "idle", "asset": "guide_sprite"}]}],
             "rooms": [
                 {
                     "name": "animation_room",
@@ -2814,6 +2834,17 @@ def assert_topdown_npc_animation_commands_export(repo_root, build_dir):
                     "height_tiles": 2,
                     "visual_tiles": [0, 1, 1, 0],
                     "collision_flags": [0, 0, 0, 0],
+                    "on_enter": [
+                        {"op": "set_actor_animation", "actor": 0, "animation": "wave"},
+                        {"op": "set_actor_animation", "actor": 1, "animation": "wave"},
+                    ],
+                    "on_restore": [{"op": "set_actor_animation", "actor": 1, "animation": "wave"}],
+                    "on_exit": [{"op": "set_actor_animation", "actor": 1, "animation": "wave"}],
+                    "on_interact": [{"op": "set_actor_animation", "actor": 1, "animation": "wave"}],
+                    "on_hit_group1": [{"op": "set_actor_animation", "actor": 1, "animation": "wave"}],
+                    "triggers": [{"area": {"x": 0, "y": 0, "width": 8, "height": 8},
+                                  "on_enter": [{"op": "set_actor_animation", "actor": 1, "animation": "wave"}],
+                                  "on_leave": [{"op": "set_actor_animation", "actor": 1, "animation": "wave"}]}],
                     "npcs": [
                         {
                             "name": "Guide",
@@ -2829,9 +2860,20 @@ def assert_topdown_npc_animation_commands_export(repo_root, build_dir):
                                 {"op": "wait_actor_animation", "actor": 0},
                                 {"op": "set_actor_animation_speed", "actor": 0, "percent": 175},
                                 {"op": "set_actor_animation_frame", "actor": 0, "frame": 1},
+                                {"op": "set_actor_animation", "actor": 1, "animation": "wave"},
                             ],
                             "on_update": [
                                 {"op": "add_variable", "variable": 0, "amount": 1},
+                            ],
+                        },
+                        {
+                            "name": "Other",
+                            "position": {"x": 8, "y": 8},
+                            "size": {"x": 16, "y": 16},
+                            "animations": [
+                                {"name": "idle", "asset": "guide_sprite"},
+                                {"name": "other", "asset": "guide_sprite"},
+                                {"name": "wave", "asset": "guide_sprite"},
                             ],
                         }
                     ],
@@ -2855,6 +2897,14 @@ def assert_topdown_npc_animation_commands_export(repo_root, build_dir):
         "gbastudio_project_data.hpp",
         "gbastudio_project::project.rooms[0].npcs[0].animation == gbastudio_project::project.rooms[0].npcs[0].animations[0] && "
         "gbastudio_project::project.rooms[0].npcs[0].animation_count == 2 && "
+        "gbastudio_project::project.rooms[0].on_enter.commands[0].b == gbastudio_project::project.scripts[0].commands[0].b && "
+        "gbastudio_project::project.rooms[0].on_enter.commands[1].b == gbastudio_project::project.scripts[0].commands[0].b && "
+        "gbastudio_project::project.rooms[0].on_restore.commands[0].b == gbastudio_project::project.scripts[0].commands[0].b && "
+        "gbastudio_project::project.rooms[0].on_exit.commands[0].b == gbastudio_project::project.scripts[0].commands[0].b && "
+        "gbastudio_project::project.rooms[0].on_interact.commands[0].b == gbastudio_project::project.scripts[0].commands[0].b && "
+        "gbastudio_project::project.rooms[0].on_hit_group1.commands[0].b == gbastudio_project::project.scripts[0].commands[0].b && "
+        "gbastudio_project::project.rooms[0].triggers[0].on_enter.commands[0].b == gbastudio_project::project.scripts[0].commands[0].b && "
+        "gbastudio_project::project.rooms[0].triggers[0].on_leave.commands[0].b == gbastudio_project::project.scripts[0].commands[0].b && "
         "gbastudio_project::project.rooms[0].npcs[0].animations[1]->frames == guide_sprite_animation.frames && "
         "gbastudio_project::project.rooms[0].npcs[0].on_interact.commands[0].op == gbs::EventOp::SetActorAnimation && "
         "gbastudio_project::project.rooms[0].npcs[0].on_interact.commands[0].a == 0 && "
@@ -2867,12 +2917,62 @@ def assert_topdown_npc_animation_commands_export(repo_root, build_dir):
         "gbastudio_project::project.rooms[0].npcs[0].on_interact.commands[3].op == gbs::EventOp::SetActorAnimationFrame && "
         "gbastudio_project::project.rooms[0].npcs[0].on_interact.commands[3].a == 0 && "
         "gbastudio_project::project.rooms[0].npcs[0].on_interact.commands[3].b == 1 && "
+        "gbastudio_project::project.rooms[0].npcs[0].on_interact.commands[4].a == 1 && "
+        "gbastudio_project::project.rooms[0].npcs[0].on_interact.commands[4].b == gbastudio_project::project.scripts[0].commands[0].b && "
         "gbastudio_project::project.rooms[0].npcs[0].on_update.command_count == 2 && "
         "gbastudio_project::project.rooms[0].npcs[0].on_update.commands[0].op == gbs::EventOp::AddVariable && "
         "gbastudio_project::project.rooms[0].npcs[0].on_update.commands[0].a == 0 && "
         "gbastudio_project::project.rooms[0].npcs[0].on_update.commands[0].b == 1",
         "topdown_npc_animation_commands_compile",
     )
+
+    compile_generated_header(
+        repo_root, output_dir, "gbastudio_project_data.hpp",
+        "gbastudio_project::project.scripts[0].commands[0].b < 0 && "
+        "gbastudio_project::project.scripts[0].commands[0].b == gbastudio_project::project.scripts[0].commands[1].b && "
+        "gbs::topdown_npc_animation_for_index(gbastudio_project::project.rooms[0].npcs[0], "
+        "gbastudio_project::project.scripts[0].commands[0].b) == gbastudio_project::project.rooms[0].npcs[0].animations[1] && "
+        "gbs::topdown_npc_animation_for_index(gbastudio_project::project.rooms[0].npcs[1], "
+        "gbastudio_project::project.scripts[0].commands[1].b) == gbastudio_project::project.rooms[0].npcs[1].animations[2] && "
+        "gbs::topdown_actor_animation_for_index(gbastudio_project::project.actor_sprites[0], "
+        "gbastudio_project::project.scripts[0].commands[0].b) == gbastudio_project::project.actor_sprites[0].animations[0]",
+        "topdown_shared_named_animation_commands_compile",
+    )
+
+    platformer_manifest = json.loads(json.dumps(manifest))
+    platformer_manifest["kind"] = "platformer"
+    platformer_manifest["template_dir"] = str(repo_root / "templates" / "exported_platformer")
+    platformer_manifest["requires"]["features"] = ["platformer_project_data"]
+    platformer_project = platformer_manifest.pop("topdown_project")
+    platformer_project.pop("actor_sprites")
+    platformer_project["player"]["metasprite"] = {"asset": "guide_sprite", "index": 0}
+    for npc in platformer_project["rooms"][0]["npcs"]:
+        npc["metasprite"] = {"asset": "guide_sprite", "index": 0}
+    platformer_project["rooms"][0]["npcs"][0]["animations"].append({"name": "clip_platform", "asset": "guide_sprite"})
+    platformer_manifest["platformer_project"] = platformer_project
+    platformer_manifest_path = source_dir / "platformer_project.json"
+    platformer_manifest_path.write_text(json.dumps(platformer_manifest, indent=2) + "\n", encoding="utf-8")
+    platformer_output = output_dir.parent / "platformer-exported"
+    run_assetc(repo_root, platformer_manifest_path, platformer_output)
+    compile_generated_header(
+        repo_root, platformer_output, "gbastudio_project_data.hpp",
+        "gbastudio_platformer_project::project.scripts[0].commands[0].b < 0 && "
+        "gbs::platformer_npc_animation_for_index(gbastudio_platformer_project::project.rooms[0].npcs[0], "
+        "gbastudio_platformer_project::project.scripts[0].commands[0].b) == gbastudio_platformer_project::project.rooms[0].npcs[0].animations[1] && "
+        "gbs::platformer_npc_animation_for_index(gbastudio_platformer_project::project.rooms[0].npcs[1], "
+        "gbastudio_platformer_project::project.scripts[0].commands[1].b) == gbastudio_platformer_project::project.rooms[0].npcs[1].animations[2] && "
+        "gbastudio_platformer_project::project.rooms[0].npcs[0].on_interact.commands[4].b == gbastudio_platformer_project::project.scripts[0].commands[1].b",
+        "platformer_shared_named_animation_commands_compile",
+    )
+    platformer_project["scripts"][0]["script"][0]["animation"] = "missing_clip"
+    missing_path = source_dir / "missing_animation.json"
+    missing_path.write_text(json.dumps(platformer_manifest, indent=2) + "\n", encoding="utf-8")
+    try:
+        run_assetc(repo_root, missing_path, output_dir.parent / "missing-export", capture_output=True)
+    except subprocess.CalledProcessError as error:
+        assert "animacao inexistente: missing_clip" in error.stderr, error.stderr
+    else:
+        raise AssertionError("unknown named animation was silently exported")
 
 
 def assert_topdown_player_animation_commands_export(repo_root, build_dir):
@@ -3459,6 +3559,7 @@ def assert_topdown_template_animates_player_only_while_moving(repo_root):
         "player_moved_this_frame = player.position_pixels.x != player_position_before_update.x ||",
         "if (player_moved_this_frame) {",
         "gbs::update_sprite_animator_travel(player_animator, player_animation_travelled_pixels, player_animation_speed_percent);",
+        "player_animation_speed_percent = project.player.animation_speed_percent;",
         "player.position_pixels.x - player_position_before_update.x",
         "player.position_pixels.y - player_position_before_update.y",
         "gbs::continue_sprite_animation(player_animator, *next_animation)",
@@ -3673,7 +3774,8 @@ def assert_menu_runtime_loads_only_the_active_screen_background(repo_root):
     assert "gbs::set_bg_enabled(gbs::BackgroundLayer::BG0, menu_screen_uses_ui(&screen));" in apply_background
     refresh_hud_start = runtime.index("void refresh_hud")
     refresh_hud = runtime[refresh_hud_start:runtime.index("void stream_screen_resource_group", refresh_hud_start)]
-    assert "screen->screen_type == gbs::MenuScreenType::Title" in refresh_hud
+    assert "if (!menu_screen_uses_ui(screen))" in refresh_hud
+    assert "if (menu_screen_uses_hud_layout(screen))" in refresh_hud
     refresh_menu_text_start = runtime.index("void refresh_menu_text")
     refresh_menu_text = runtime[refresh_menu_text_start:runtime.index("void move_selection", refresh_menu_text_start)]
     assert "screen->screen_type == gbs::MenuScreenType::Title" in refresh_menu_text
@@ -3730,7 +3832,8 @@ def assert_cutscene_runtime_loads_only_the_active_background(repo_root):
     refresh_hud_start = runtime.index("void refresh_hud")
     refresh_hud = runtime[refresh_hud_start:runtime.index("void stream_current_step_resource_group", refresh_hud_start)]
     assert "gbs::hide_hud(hud);" in refresh_hud
-    assert "gbs::set_hud_text(hud" not in refresh_hud
+    assert "gbastudio_dialogue_ui::has_hud_scene_binding(scene_name)" in refresh_hud
+    assert "gbs::set_hud_text(hud, scene_name" in refresh_hud
     assert "gbs::configure_dialogue_portraits(" in runtime
     assert "gbastudio_cutscene_project::dialogue_portrait_assets" in runtime
     assert "void draw_dialogue_portrait()" in runtime
@@ -4371,10 +4474,12 @@ def assert_isometric_template_updates_surfaces_inside_vblank(repo_root):
 
 def assert_isometric_template_restores_backdrop_after_palette_upload(repo_root):
     template = (repo_root / "examples" / "isometric_basic" / "src" / "main.cpp").read_text(encoding="utf-8")
-    palette_upload = "load_assets(room_data->video.affine_enabled ? room_data->video : project.video);\n    // load_assets uploads the room palettes, including palette entry 0. The\n    // backdrop must be applied after that upload to remain visible through\n    // transparent atlas corners.\n    gbs::set_backdrop_color(project.backdrop_color);"
-    assert palette_upload in template
-    palette_changes = "    gbs::consume_event_palette_changes(\n        event_state,\n        project.bg_palettes,\n        project.bg_palette_count,\n        project.obj_palettes,\n        project.obj_palette_count\n    );\n    // Palette uploads may replace BG palette entry 0. Restore the isometric\n    // backdrop afterwards so transparent diamond corners do not become black.\n    gbs::set_backdrop_color(project.backdrop_color);"
-    assert palette_changes in template
+    initial = template.split("    load_assets(room_data->video.affine_enabled ? room_data->video : project.video);", 1)[1].split("    for (size_t index = 0; index < max_actor_count", 1)[0]
+    changes = template.split("void consume_event_state(gbs::EventState& event_state) {", 1)[1].split("    consume_link_event_outputs(event_state);", 1)[0]
+    assert "gbs::consume_event_palette_changes(" in changes
+    for region in (initial, changes):
+        assert "if (!room_data->video.affine_enabled && !project.video.affine_enabled) {" in region
+        assert "gbs::set_backdrop_color(project.backdrop_color);" in region
 
 
 def assert_native_template_consumes_audio_outputs(output_dir, project_header, prefix):
@@ -4421,7 +4526,7 @@ def assert_point_click_profile_output(repo_root, output_dir):
     assert "constexpr gbs::PointClickInventoryItemData point_click_inventory_items" in header
     assert "point_click_scene_0_hotspot_1_on_use_item" in header
     assert 'gbs::PointClickSceneData { "room", -1, point_click_scene_0_hotspots, 2' in header
-    assert 'nullptr, 4, nullptr, 0, nullptr, 0, nullptr, nullptr, nullptr, nullptr },' in header
+    assert 'nullptr, 4, nullptr, 0, nullptr, 0, nullptr, nullptr, nullptr, nullptr , gbs::VideoComposition {' in header
     assert "scene->cursor_speed_pixels > 0" in main_cpp
     assert "gbs::EventOp::ShowDialogue" in header
     assert "gbs::EventOp::SetVariable" in header
@@ -4436,7 +4541,7 @@ def assert_point_click_profile_output(repo_root, output_dir):
     assert "gbs::set_bg_scroll(background.layer, 0, 0);" in main_cpp
     assert "gbs::set_event_input_state(event_state, input.held, input.pressed, input.released)" in main_cpp
     assert "gbs::update_button_event_bindings(event_state)" in main_cpp
-    assert "gbs::run_event_script(event_state, project.scripts[script_index])" in main_cpp
+    assert "run_scene_script(project.scripts[script_index])" in main_cpp
     assert "gbastudio_point_click_project::resource_bank_upload_sources" in main_cpp
     assert_native_template_consumes_audio_outputs(output_dir, "point_click_project_data.hpp", "point_click_project")
     compile_generated_header(
@@ -5249,7 +5354,7 @@ def assert_racing_native_export(repo_root, build_dir):
     assert "racing_room_0_track_segments, 3" in header
     assert "constexpr gbs::RacingTopdownCheckpoint racing_room_0_topdown_checkpoints[]" in header
     assert "constexpr gbs::Vec2i racing_room_0_topdown_path[]" in header
-    assert "racing_room_0_topdown_track { 16, 24, racing_room_0_topdown_checkpoints, 2, 4, racing_room_0_topdown_path, 4 }" in header
+    assert "racing_room_0_topdown_track { 16, 24, racing_room_0_topdown_checkpoints, 2, 4, racing_room_0_topdown_path, 4, false, racing_room_0_checkpoint_events }" in header
     assert "racing_room_0_track_segments, 3, &racing_room_0_topdown_track" in header
     assert "gbs::Vec2i { 32, 80 }" in header
     compile_generated_header(
@@ -5325,9 +5430,12 @@ def assert_racing_pseudo3d_visual_asset_export(repo_root, build_dir):
     sky_palette = pack_report["asset_reports"]["track_sky"]["allocations"]["bg_palette_colors"]
     floor_palette = pack_report["asset_reports"]["track_floor"]["allocations"]["bg_palette_colors"]
     minimap_palette = pack_report["asset_reports"]["track_minimap"]["allocations"]["bg_palette_colors"]
-    assert sky_palette["start"] == floor_palette["start"] == minimap_palette["start"]
+    assert sky_palette["start"] == floor_palette["start"]
     assert floor_palette["shared_with"] == "track_sky"
-    assert minimap_palette["shared_with"] == "track_sky"
+    # The regular minimap moves source color 2 to visible index 1, whereas
+    # the affine floor keeps index 1 blue. It needs its own palette bank.
+    assert "shared_with" not in minimap_palette
+    assert minimap_palette["start"] >= sky_palette["start"] + sky_palette["count"]
     compile_generated_header(
         repo_root,
         output_dir,

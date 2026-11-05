@@ -20,10 +20,14 @@ function audit(headerSource = header(), options = {}) {
 }
 
 describe("streamed OBJ residency", () => {
-  it("accepts typed 2D tile arrays emitted by the current asset compiler", () => {
-    const source = header().replaceAll(/reinterpret_cast<const uint8_t\*>\((hero(?:_frame_\d+)?_tiles)\)/g, "&$1[0][0]");
-    expect(audit(source).ok).toBe(true);
+  it("checks constant-initialized tile descriptors without weakening residency validation", () => {
+    const source = header()
+      .replaceAll("const gbs::TileAsset", "constexpr gbs::TileAsset")
+      .replace(/reinterpret_cast<const uint8_t\*>\((\w+)\)/g, "&$1[0][0]");
+    expect(audit(source)).toMatchObject({ ok: true, residentTileCount: 16, destinationTile: 32 });
     expect(audit(source.replace("&hero_frame_1_tiles[0][0]", "&hero_frame_0_tiles[0][0]")).ok).toBe(false);
+    expect(audit(source.replace("&hero_frame_1_tiles[0][0], 16, 32", "&hero_frame_1_tiles[0][0], 15, 32")).ok).toBe(false);
+    expect(audit(source.replace("&hero_frame_1_tiles[0][0]", "&hero_frame_1_tiles[1][0]")).ok).toBe(false);
   });
   it("accepts 8bpp uploads and enforces their shared depth and hardware range", () => {
     const source=header().replaceAll("32, true", "32, true, gbs::ColorDepth::Bpp8");

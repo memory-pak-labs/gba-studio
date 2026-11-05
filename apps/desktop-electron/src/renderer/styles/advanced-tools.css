@@ -95,8 +95,11 @@
 }
 
 .testing-diagnostics-content {
+  align-content: start;
+  min-height: 0;
   display: grid;
   gap: 14px;
+  min-width: 0;
   overflow-y: auto;
   padding: 16px;
 }
@@ -304,6 +307,22 @@
   padding: 9px;
 }
 
+.replay-resource-list article {
+  grid-template-columns: minmax(0, 1fr) auto;
+  min-width: 0;
+}
+
+.replay-resource-list article > strong,
+.replay-resource-list article > small,
+.replay-resource-list article > button {
+  grid-column: 1 / -1;
+  overflow-wrap: anywhere;
+}
+
+.replay-resource-list article > button {
+  justify-self: start;
+}
+
 .advanced-editor-actions,
 .gameplay-component-grid,
 .glyph-preview {
@@ -418,4 +437,33 @@
   .advanced-resource-list article {
     grid-template-columns: 1fr 1fr;
   }
+}
+
+.runtime-frame-budget-metrics {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  margin: 16px 0;
+}
+
+.runtime-frame-budget-metrics > div {
+  display: grid;
+  align-content: start;
+  gap: 4px;
+  min-width: 0;
+  padding: 10px 12px;
+  border: 1px solid var(--studio-color-border);
+  border-radius: 8px;
+  background: var(--studio-color-surface-raised);
+}
+
+.runtime-frame-budget-metrics dt {
+  color: var(--studio-color-text-muted);
+  text-transform: none;
+  overflow-wrap: anywhere;
+}
+
+.runtime-frame-budget-metrics dd {
+  margin: 0;
+  overflow-wrap: anywhere;
 }

@@ -26,13 +26,36 @@ afterEach(async () => {
 });
 
 describe("romPlayerWindow", () => {
-  it("enables the desktop battery only for the requested player", async () => {
+  it("retains the complete recording state across IPC and rejects malformed snapshots", () => {
+    const stats = { cpuPercent: 8, droppedFrameRatio: 0, droppedFrames: 0, emulationFps: 60,
+      emulationMs: 1.2, fps: 60, frameMs: 16.67, presentationFps: 60, romBytes: 85000 };
+    const recordingStart = { format: "mgba-state-v1", romSha256: "a".repeat(64), coreSha256: "b".repeat(64), stateBase64: "AQIDBA==", savedataBase64: "", launch: { roomName: "Room" } };
+    expect(normalizeRomPlayerFrameStats({ ...stats, recordingStart })).toMatchObject({ recordingStart });
+    for (const invalid of [{ ...recordingStart, coreSha256: "bad" }, { ...recordingStart, stateBase64: "?" }, { ...recordingStart, savedataBase64: "A".repeat(1_400_004) }]) {
+      expect(normalizeRomPlayerFrameStats({ ...stats, recordingStart: invalid })).toBeNull();
+    }
+  });
+  it("preserves bounded per-frame input batches across the telemetry bridge", () => {
+    const stats = { cpuPercent: 8, droppedFrameRatio: 0, droppedFrames: 0, emulationFps: 60,
+      emulationMs: 1.2, fps: 60, frameMs: 16.67, presentationFps: 60, romBytes: 85000 };
+    const inputFrames = { firstFrame: 30, masks: [0, 1, 1, 0, 16] };
+    expect(normalizeRomPlayerFrameStats({ ...stats, inputFrames })).toMatchObject({ inputFrames });
+    for (const invalid of [
+      { firstFrame: -1, masks: [0] }, { firstFrame: 0.5, masks: [0] },
+      { firstFrame: 0, masks: [1024] }, { firstFrame: 0, masks: [-1] },
+      { firstFrame: 0, masks: [1.5] }, { firstFrame: 0, masks: Array(601).fill(0) }
+    ]) expect(normalizeRomPlayerFrameStats({ ...stats, inputFrames: invalid })).toBeNull();
+  });
+  it("enables desktop battery persistence only when requested", async () => {
     const root = await tempRoot(); const romPath = path.join(root, "game.gba");
     await writeFile(romPath, new Uint8Array([1, 2, 3]));
-    const player = await createRomPlayerServer({ romPath, webPlayerRoot: root, title: "Game", desktopBattery: true });
+    const player = await createRomPlayerServer({ romPath, webPlayerRoot: root, title: "Game", desktopBattery: true, recordInput: true, recordingID: "record-1", recordingLaunch: { roomID: "room-1", startX: 12 } });
     const plain = await createRomPlayerServer({ romPath, webPlayerRoot: root, title: "Game" });
     try {
       expect(new URL(player.url).searchParams.get("desktopBattery")).toBe("1");
+      expect(new URL(player.url).searchParams.get("recordingID")).toBe("record-1");
+      expect(new URL(player.url).searchParams.get("recordInput")).toBe("1");
+      expect(JSON.parse(new URL(player.url).searchParams.get("recordingLaunch")!)).toEqual({ roomID: "room-1", startX: 12 });
       expect(new URL(plain.url).searchParams.has("desktopBattery")).toBe(false);
     } finally { await player.close(); await plain.close(); }
   });
@@ -360,4 +383,12 @@ describe("romPlayerWindow", () => {
     await expect(firstClose).resolves.toBeUndefined();
     await expect(server.close()).resolves.toBeUndefined();
   });
+});
+
+it("preserves native frame peaks across IPC and rejects stale or forged measurements",()=>{
+ const budget={frame:30,runtimeKind:2,room:1,ticksPerSecond:262144,dmaBytes:512,dmaTransfers:2,dmaQueuedBytes:4096,dmaDroppedTotal:0,vblankWorkTicks:30,oamEnabled:12,sceneFrameCount:30,sceneDmaBytes:9900,peaks:{dma:{value:8192,frame:4},vblank:{value:120,frame:3},oam:{value:20,frame:5}}};
+ const runtimeState={schema:4,frame:30,currentRoom:1,runtimeKind:2,variables:Array(16).fill(0),flagBits:0,player:{x:0,y:0,direction:0},actorCount:0,firstActor:{x:0,y:0,direction:0,visible:false},lastMusic:-1,lastSfx:-1,collision:{currentFlags:0,currentSlope:0,seenEffectBits:0,seenSlopeBits:0,blockedDirectionBits:0},triggerEnterCount:0,triggerLeaveCount:0,roomChangeCount:0,timing:{cpuWorkTicks:1,vblankWaitTicks:2000,peakCpuWorkTicks:1,peakVblankWaitTicks:2000,missedFrameCount:0,renderSkipCount:0,frameSkipPolicy:0},input:{held:0,pressed:0,released:0},frameBudget:budget};
+ const stats={cpuPercent:1,droppedFrameRatio:0,droppedFrames:0,emulationFps:60,presentationFps:60,emulationMs:1,fps:60,frameMs:16.67,romBytes:1000,runtimeState};
+ expect(normalizeRomPlayerFrameStats(stats)?.runtimeState?.frameBudget).toEqual(budget);
+ for (const change of [{frame:29},{room:2},{runtimeKind:3},{oamEnabled:129},{dmaBytes:"512"},{peaks:{...budget.peaks,dma:{value:512,frame:31}}}]) expect(normalizeRomPlayerFrameStats({...stats,runtimeState:{...runtimeState,frameBudget:{...budget,...change}}})).toBeNull();
 });

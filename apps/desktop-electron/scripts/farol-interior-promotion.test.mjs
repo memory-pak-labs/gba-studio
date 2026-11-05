@@ -1,3 +1,4 @@
+import {expandProjectTilemaps} from '../src/shared/projectResourceFormat.ts';
 import {readFileSync,mkdtempSync,rmSync} from 'node:fs';
 import {execFileSync} from 'node:child_process';
 import {tmpdir} from 'node:os';
@@ -10,7 +11,7 @@ import {expandCompactSequence} from './exemplo-template-audit.mjs';
 import {decodePngRgba} from './lib/png-icons.mjs';
 import {auditRgbaAgainstExportedTilemap} from './rgb555-framebuffer-contract.mjs';
 const root=new URL('../default-assets/templates/exemplo-gba/',import.meta.url);
-const canonical=()=>JSON.parse(readFileSync(new URL('exemplo-gba.gba-project',root)));
+const canonical=()=>expandProjectTilemaps(JSON.parse(readFileSync(new URL('exemplo-gba.gba-project',root))));
 const scene='farol_interior',file='farol-interior-approved-paged-384x256.png';
 
 it('compiles every approved background pixel without tile merging or additional color loss',()=>{

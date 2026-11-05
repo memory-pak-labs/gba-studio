@@ -482,6 +482,31 @@ void test_platformer_snaps_to_diagonal_slope_in_adjacent_tile_row() {
     assert(actor.bounds_pixels.y == 7);
 }
 
+// The Penedos bridge has a diagonal handoff beside a full-height cliff.
+// A wide collider's center can lie over the slope while its right foot is
+// already above the solid tile. Snapping down to the center must not embed it.
+void test_wide_platformer_lands_on_slope_beside_solid_cliff() {
+    uint8_t flags[6 * 7] = {};
+    gbs::TileSlope slopes[6 * 7] = {};
+    slopes[4 * 6] = gbs::TileSlope::BlockBelowRising;
+    slopes[4 * 6 + 1] = gbs::TileSlope::BlockBelowFalling;
+    for (int y = 4; y < 7; ++y) {
+        for (int x = 2; x < 6; ++x) flags[y * 6 + x] = gbs::TileSolid;
+    }
+    const gbs::TileMap map { flags, 6, 7, slopes };
+    auto actor = gbs::platformer_actor_from_rect({6, 0, 16, 24});
+    update_frames(map, actor, 20);
+    assert(actor.on_ground);
+    assert(actor.bounds_pixels.y == 8);
+    assert(actor.bounds_pixels.bottom() <= 32);
+
+    update_frames(map, actor, 1, {gbs::ButtonA, gbs::ButtonA, 0});
+    assert(actor.bounds_pixels.y < 8);
+    assert(!actor.hit_ceiling);
+    update_frames(map, actor, 4, {gbs::ButtonLeft, gbs::ButtonLeft, 0});
+    assert(actor.bounds_pixels.x < 6);
+}
+
 void test_platformer_enters_ladder_approach_lane_before_wall() {
     uint8_t flags[80 * 30] = {};
     for (int y = 11; y <= 23; ++y) {
@@ -1143,6 +1168,7 @@ int main() {
     test_platformer_snaps_to_sloped_floor();
     test_platformer_update_accepts_eight_pixel_slope_handoff();
     test_platformer_snaps_to_diagonal_slope_in_adjacent_tile_row();
+    test_wide_platformer_lands_on_slope_beside_solid_cliff();
     test_platformer_enters_ladder_approach_lane_before_wall();
     test_platformer_derives_animation_state();
     test_platformer_climbs_ladder_without_gravity();

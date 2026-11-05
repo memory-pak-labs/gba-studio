@@ -440,14 +440,11 @@ export async function ensureWebExportRomSource(
     return { romSourcePath: options.explicitRomSourcePath, source: "explicit" };
   }
 
-  const discovered = options.projectPath
-    ? resolveWebExportRomSource(options.data, safeRomFileName, options.projectPath)
-    : null;
-  if (discovered) {
-    return { romSourcePath: discovered, source: "discovered" };
-  }
-
   if (!options.buildRom) {
+    const discovered = options.projectPath
+      ? resolveWebExportRomSource(options.data, safeRomFileName, options.projectPath)
+      : null;
+    if (discovered) return { romSourcePath: discovered, source: "discovered" };
     return { romSourcePath: null, source: "none" };
   }
 

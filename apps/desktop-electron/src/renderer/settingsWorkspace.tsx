@@ -81,6 +81,7 @@ import { WorkspaceEmptyState } from "./studioUi";
 import { SettingsInterfaceSection } from "./SettingsInterfaceSection";
 import { SceneDefaultsSection } from "./SceneDefaultsSection";
 import { ExportProjectSection, ExportRomActions, ExportSettingsHeader } from "./ExportProjectSection";
+import { CartridgeWriterPanel } from "./CartridgeWriterPanel";
 import { deriveExportSettingsSections, exportSettingsFieldSection, exportStartReferenceOptions } from "../shared/exportSettingsLayout";
 import { ProjectHealthWorkspace } from "./projectHealthWorkspace";
 import { TranslationPacksPanel } from "./TranslationPacksPanel";
@@ -89,6 +90,7 @@ import { mcpRegistrationEnginePackPath } from "../shared/mcpSettings";
 import { readStoredLocale } from "./i18n";
 
 interface SettingsWorkspaceProps {
+  cartridgeProject?: import("../shared/projectFile").ParsedGBAProject | null;
   scope?: Exclude<SettingsWorkspaceScope, "all">;
   title?: string;
   advancedTools?: ReactNode;
@@ -434,12 +436,17 @@ function sceneAdvancedSummary(sectionID: SettingsSectionID): { title: string; de
   };
 }
 
+function settingFieldLabel(sectionID: SettingsSectionID, field: SettingsEditableField): string {
+  return polishSettingsText(sectionID === "controls" && field.key === "down" ? "Direcional: baixo" : field.label);
+}
+
 function settingControl(
   sectionID: SettingsSectionID,
   field: SettingsEditableField,
   onUpdateSetting: SettingsWorkspaceProps["onUpdateSetting"],
   onSelectPath: SettingsWorkspaceProps["onSelectPath"]
 ): React.ReactElement {
+  field = { ...field, label: settingFieldLabel(sectionID, field) };
   if (field.readOnly) {
     return (
       <div className="settings-edit-row" key={field.key} data-setting-key={field.key} data-setting-section={sectionID}>
@@ -1355,6 +1362,7 @@ function SettingsSectionPanel({
 }
 
 export function SettingsWorkspace({
+  cartridgeProject = null,
   scope = "global",
   title,
   advancedTools,
@@ -1420,7 +1428,7 @@ export function SettingsWorkspace({
       ...presentation,
       sections: (isExportWorkspace ? visibleSections : presentation.sections).map(section => ({
         ...section, title: ui(section.title), detail: ui(section.detail),
-        editableFields: section.editableFields.map(field => ({ ...field, label: ui(field.label), description: ui(field.description) })),
+        editableFields: section.editableFields.map(field => ({ ...field, label: settingFieldLabel(section.id, field), description: ui(field.description) })),
         intentGroups: section.intentGroups.map(group => ({ ...group, title: ui(group.title),
           options: group.options.map(option => ({ ...option, title: ui(option.title), detail: ui(option.detail) })) }))
       }))
@@ -1679,6 +1687,7 @@ export function SettingsWorkspace({
                   header={<ExportSettingsHeader section={section} resetPending={resetConfirmationSectionID === "general"} onRequestReset={() => setResetConfirmationSectionID("general")} onCancelReset={() => setResetConfirmationSectionID(null)} onConfirmReset={() => { onResetSection("general"); setResetConfirmationSectionID(null); }} />}
                   renderField={field => settingControl(exportSettingsFieldSection("general", field.key), field.key === "startScene" ? { ...field, options: options.scenes } : field.key === "startPlayer" ? { ...field, options: options.players } : field, onUpdateSetting, onSelectPath)}
                   footer={<ExportRomActions onShowPaths={() => navigateToSection("build")} pathValidation={pathValidation} validating={pathValidationRunning} running={romRunning} onValidatePaths={onValidatePaths} onGenerateRom={onGenerateRom} onPlayProject={onPlayProject} generateDisabled={generateRomDisabled} playDisabled={playProjectDisabled} />}
+                  cartridgeWriter={<CartridgeWriterPanel project={cartridgeProject} projectPath={projectPath} disabled={generateRomDisabled || romRunning} />}
                 />;
               })() : null}
               {visibleSections.filter(section => (!isDiscreteWorkspace || section.id === selectedSectionID) && !(isExportWorkspace && section.id === "general")).map((section) => (

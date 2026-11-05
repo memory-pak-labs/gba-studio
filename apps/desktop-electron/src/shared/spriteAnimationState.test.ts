@@ -65,6 +65,15 @@ describe("SpriteState directional normalization", () => {
     ]);
   });
 
+  it("does not let optional screen-facing isometric clips replace the legacy four views", () => {
+    const screen = { id: "screen-up", name: "idle_screen_up", state: "idle", direction: "screen_up" };
+    const authored = [screen, ...fourDirectionAnimations];
+    const result = normalizeSpriteStateSlots(spriteState("four_direction_movement", authored.map((entry) => entry.id)), authored, "isometric");
+    expect(result.slots.idle_up.animationID).toBe("idle-up");
+    expect(Object.values(result.slots).every((slot) => slot.animationID !== "screen-up")).toBe(true);
+    expect(result.missingSlots).toEqual([]);
+  });
+
   it("reutiliza direita espelhada quando a esquerda nao foi autorada", () => {
     const authored = fourDirectionAnimations.filter((entry) => !entry.id.endsWith("left"));
     const result = normalizeSpriteStateSlots(

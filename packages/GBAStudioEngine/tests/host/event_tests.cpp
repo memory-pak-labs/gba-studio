@@ -1,4 +1,5 @@
 #include <cassert>
+#include <cstddef>
 #include <type_traits>
 #include "gbs/assets.hpp"
 #include "gbs/event.hpp"
@@ -11,6 +12,7 @@
 #include "gbs/rumble.hpp"
 #include "gbs/save.hpp"
 
+static_assert(offsetof(gbs::EventState, variables) == (sizeof(void*) == 8 ? 208 : 192), "new visual state must preserve existing event field offsets");
 static_assert(gbs::event_variable_count == 64, "Event runtime must expose 64 variables");
 static_assert(std::extent<decltype(gbs::EventState::variables)>::value == gbs::event_variable_count, "EventState variable storage must follow the shared capacity");
 static_assert(gbs::universal_save_variable_count == gbs::event_variable_count, "Universal saves must preserve every event variable");
@@ -441,9 +443,10 @@ void test_rtc_commands_read_fields_and_branch() {
     gbs::init_event_state(state);
     const gbs::EventCommand commands[] = {
         { gbs::EventOp::ReadRtc, 4, 3, 0 },
-        { gbs::EventOp::JumpIfRtcEquals, 2, 1, 2 },
-        { gbs::EventOp::SetVariable, 4, 0, 0 },
-        { gbs::EventOp::SetVariable, 4, 1, 0 },
+        { gbs::EventOp::JumpIfRtcEquals, 2, 1, 3 },
+        { gbs::EventOp::SetVariable, 4, 22, 0 },
+        { gbs::EventOp::Jump, 2, 0, 0 },
+        { gbs::EventOp::SetVariable, 4, 11, 0 },
         { gbs::EventOp::End, 0, 0, 0 }
     };
 
@@ -451,7 +454,18 @@ void test_rtc_commands_read_fields_and_branch() {
 
     assert(state.rtc_read_ok);
     assert(state.variables[3] == 14);
-    assert(state.variables[4] == 1);
+    assert(state.variables[4] == 11);
+
+    const gbs::EventCommand nonmatching_commands[] = {
+        { gbs::EventOp::JumpIfRtcEquals, 2, 2, 3 },
+        { gbs::EventOp::SetVariable, 4, 22, 0 },
+        { gbs::EventOp::Jump, 2, 0, 0 },
+        { gbs::EventOp::SetVariable, 4, 11, 0 },
+        { gbs::EventOp::End, 0, 0, 0 }
+    };
+    gbs::run_event_script(state, nonmatching_commands, sizeof(nonmatching_commands) / sizeof(nonmatching_commands[0]));
+    assert(state.rtc_read_ok);
+    assert(state.variables[4] == 22);
 }
 
 void test_wallet_and_stat_commands_clamp_to_valid_ranges() {
@@ -989,6 +1003,58 @@ void test_store_actor_state_commands_copy_actor_state_to_variables() {
     assert(state.variables[2] == 4);
     assert(state.variables[3] == 5);
     assert(state.variables[4] == 3);
+}
+
+void test_actor_direction_reads_follow_writes_without_waiting() {
+    gbs::EventState state {};
+    gbs::init_event_state(state);
+    state.actor_direction[1] = 2;
+    const gbs::EventCommand npc_commands[] = {
+        { gbs::EventOp::SetActorDirection, 1, 3, 0 },
+        { gbs::EventOp::StoreActorDirection, 1, 0, 0 },
+        { gbs::EventOp::JumpIfActorDirection, 1, 3, 2 },
+        { gbs::EventOp::SetVariable, 1, -999, 0 },
+        { gbs::EventOp::SetVariable, 2, 123, 0 },
+        { gbs::EventOp::End, 0, 0, 0 }
+    };
+    gbs::run_event_script(state, npc_commands, sizeof(npc_commands) / sizeof(npc_commands[0]));
+    assert(state.variables[0] == 3);
+    assert(state.variables[1] == 0 && state.variables[2] == 123);
+    assert(state.actor_command_count == 1 && state.actor_commands[0].a == 3);
+
+    gbs::reset_event_actor_commands(state);
+    const gbs::EventCommand player_commands[] = {
+        { gbs::EventOp::SetActorDirection, -1, 2, 0 },
+        { gbs::EventOp::StoreActorDirection, -1, 3, 0 },
+        { gbs::EventOp::JumpIfActorDirection, -1, 2, 2 },
+        { gbs::EventOp::SetVariable, 4, -999, 0 },
+        { gbs::EventOp::SetVariable, 5, 456, 0 },
+        { gbs::EventOp::End, 0, 0, 0 }
+    };
+    gbs::run_event_script(state, player_commands, sizeof(player_commands) / sizeof(player_commands[0]));
+    assert(state.variables[3] == 2);
+    assert(state.variables[4] == 0 && state.variables[5] == 456);
+
+    // A dropped command must not publish a direction that the runtime cannot consume.
+    state.actor_command_count = gbs::max_event_actor_commands;
+    state.actor_direction[1] = 3;
+    const gbs::EventCommand full_queue_commands[] = {
+        { gbs::EventOp::SetActorDirection, 1, 2, 0 },
+        { gbs::EventOp::StoreActorDirection, 1, 7, 0 },
+        { gbs::EventOp::End, 0, 0, 0 }
+    };
+    gbs::run_event_script(state, full_queue_commands, sizeof(full_queue_commands) / sizeof(full_queue_commands[0]));
+    assert(state.variables[7] == 3 && state.actor_command_count == gbs::max_event_actor_commands);
+
+    gbs::reset_event_actor_commands(state);
+    state.variables[6] = 77;
+    const gbs::EventCommand invalid_actor_commands[] = {
+        { gbs::EventOp::SetActorDirection, 999, 2, 0 },
+        { gbs::EventOp::StoreActorDirection, 999, 6, 0 },
+        { gbs::EventOp::End, 0, 0, 0 }
+    };
+    gbs::run_event_script(state, invalid_actor_commands, sizeof(invalid_actor_commands) / sizeof(invalid_actor_commands[0]));
+    assert(state.variables[6] == 77);
 }
 
 void test_button_pressed_jump_gates_next_command() {
@@ -1540,6 +1606,43 @@ void test_manual_save_commands_update_runtime_requests_and_cached_status() {
     assert(state.variables[4] == 0);
 }
 
+void test_save_requests_yield_before_following_commands() {
+    gbs::EventState state {};
+    gbs::init_event_state(state);
+    const gbs::EventCommand commands[] = {
+        { gbs::EventOp::SetVariable, 0, 10, 0 },
+        { gbs::EventOp::SaveGame, 0, 0, 0 },
+        { gbs::EventOp::SetVariable, 0, 3, 0 },
+        { gbs::EventOp::LoadGame, 0, 0, 0 },
+        { gbs::EventOp::AddVariable, 0, 1, 0 },
+        { gbs::EventOp::RemoveSaveGame, 0, 0, 0 },
+        { gbs::EventOp::End, 0, 0, 0 }
+    };
+    gbs::EventRunner runner {};
+    gbs::start_event_runner(runner, { commands, sizeof(commands) / sizeof(commands[0]) });
+    assert(gbs::update_event_runner(runner, state));
+    assert(state.save_request == 1 && state.variables[0] == 10 && runner.command_index == 2);
+    const int saved_value = state.variables[0];
+    state.save_request = 0;
+    assert(gbs::update_event_runner(runner, state));
+    assert(state.save_request == 2 && state.variables[0] == 3 && runner.command_index == 4);
+    state.variables[0] = saved_value;
+    state.save_request = 0;
+    assert(gbs::update_event_runner(runner, state));
+    assert(state.save_request == 3 && state.variables[0] == 11 && runner.command_index == 6);
+    state.save_request = 0;
+    assert(!gbs::update_event_runner(runner, state));
+
+    const gbs::EventCommand invalid[] = {
+        { gbs::EventOp::SaveGame, -1, 0, 0 },
+        { gbs::EventOp::SetVariable, 0, 42, 0 },
+        { gbs::EventOp::End, 0, 0, 0 }
+    };
+    gbs::start_event_runner(runner, { invalid, sizeof(invalid) / sizeof(invalid[0]) });
+    assert(!gbs::update_event_runner(runner, state));
+    assert(state.save_request == 0 && state.variables[0] == 42);
+}
+
 void test_dialogue_language_command_switches_runtime_locale() {
     gbs::configure_dialogue_locale(nullptr);
     gbs::EventState state {};
@@ -1597,6 +1700,67 @@ void test_set_player_animation_updates_runtime_state() {
 
     assert(state.player_animation_changed);
     assert(state.player_animation_index == 2);
+    assert(state.actor_command_count == 1);
+    assert(state.actor_commands[0].op == gbs::EventActorOp::SetAnimation);
+    assert(state.actor_commands[0].actor_index == gbs::event_player_actor_index);
+    assert(state.actor_commands[0].a == 2);
+
+    gbs::EventState named_state {};
+    gbs::init_event_state(named_state);
+    const gbs::EventCommand named_commands[] = {
+        { gbs::EventOp::SetPlayerAnimation, -3, 0, 0 },
+        { gbs::EventOp::SetActorAnimation, 1, -3, 0 },
+        { gbs::EventOp::End, 0, 0, 0 }
+    };
+    gbs::run_event_script(named_state, named_commands, 3);
+    assert(named_state.player_animation_index == -3);
+    assert(named_state.actor_command_count == 2);
+    assert(named_state.actor_commands[0].actor_index == gbs::event_player_actor_index);
+    assert(named_state.actor_commands[1].actor_index == 1);
+    assert(named_state.actor_commands[1].a == -3);
+}
+
+void test_player_animation_preserves_order_with_sprite_and_frame_commands() {
+    gbs::EventState state {};
+    gbs::init_event_state(state);
+    const gbs::EventCommand commands[] = {
+        {gbs::EventOp::SetActorSprite, -1, 1, 0},
+        {gbs::EventOp::SetPlayerAnimation, -99, 0, 0},
+        {gbs::EventOp::SetActorAnimationFrame, -1, 2, 0},
+        {gbs::EventOp::End, 0, 0, 0}
+    };
+    gbs::run_event_script(state, commands, 4);
+    assert(state.actor_command_count == 3);
+    assert(state.actor_commands[0].op == gbs::EventActorOp::SetSprite);
+    assert(state.actor_commands[1].op == gbs::EventActorOp::SetAnimation);
+    assert(state.actor_commands[1].a == -99);
+    assert(state.actor_commands[2].op == gbs::EventActorOp::SetAnimationFrame);
+
+    gbs::EventState reversed {};
+    gbs::init_event_state(reversed);
+    const gbs::EventCommand reverse_commands[] = {
+        {gbs::EventOp::SetPlayerAnimation, -99, 0, 0},
+        {gbs::EventOp::SetActorSprite, -1, 1, 0},
+        {gbs::EventOp::End, 0, 0, 0}
+    };
+    gbs::run_event_script(reversed, reverse_commands, 3);
+    assert(reversed.actor_command_count == 2);
+    assert(reversed.actor_commands[0].op == gbs::EventActorOp::SetAnimation);
+    assert(reversed.actor_commands[1].op == gbs::EventActorOp::SetSprite);
+
+    gbs::EventState full {};
+    gbs::init_event_state(full);
+    full.player_animation_index = 17;
+    gbs::EventCommand full_commands[gbs::max_event_actor_commands + 2] {};
+    for (size_t i = 0; i < gbs::max_event_actor_commands; ++i) {
+        full_commands[i] = {gbs::EventOp::SetActorSpeed, 0, 100, 0};
+    }
+    full_commands[gbs::max_event_actor_commands] = {gbs::EventOp::SetPlayerAnimation, -99, 0, 0};
+    full_commands[gbs::max_event_actor_commands + 1] = {gbs::EventOp::End, 0, 0, 0};
+    gbs::run_event_script(full, full_commands, gbs::max_event_actor_commands + 2);
+    assert(full.actor_command_count == gbs::max_event_actor_commands);
+    assert(!full.player_animation_changed);
+    assert(full.player_animation_index == 17);
 }
 
 void test_show_actor_gesture_updates_runtime_state() {
@@ -2071,7 +2235,122 @@ static void test_restore_consumer_does_not_drop_commands_beyond_the_queue_capaci
     assert(state.actor_command_count == 0);
 }
 
+void test_actor_scale_events_are_per_instance_and_interruptible() {
+    gbs::EventState state {}; gbs::init_event_state(state);
+    const gbs::EventCommand commands[] = {{gbs::EventOp::SetActorScale,-1,384,192,4}, {gbs::EventOp::SetActorScale,0,128,512,0}};
+    gbs::run_event_script(state,{commands,2});
+    assert(state.actor_scales[0].x256 == 256 && state.actor_scales[1].x256 == 128);
+    gbs::tick_event_frame_counter(state);
+    assert(state.actor_scales[0].x256 == 288 && state.actor_scales[0].y256 == 240);
+    gbs::tick_event_frame_counter(state);gbs::tick_event_frame_counter(state);gbs::tick_event_frame_counter(state);
+    assert(state.actor_scales[0].x256 == 384 && state.actor_scales[0].y256 == 192);
+    const gbs::EventCommand reset[] = {{gbs::EventOp::SetActorScale,-1,256,256,2}};
+    gbs::run_event_script(state,{reset,1});gbs::tick_event_frame_counter(state);
+    assert(state.actor_scales[0].x256 == 320);
+    const gbs::EventCommand invalid[] = {{gbs::EventOp::SetActorScale,97,384,384,0}, {gbs::EventOp::SetActorScale,0,0,512,0}};
+    gbs::run_event_script(state,{invalid,2});
+    assert(state.actor_scales[1].x256 == 128);
+    const gbs::EventCommand background[] = {{gbs::EventOp::SetBackgroundScale,2,512,128,2}};
+    gbs::run_event_script(state,{background,1}); gbs::tick_event_frame_counter(state);
+    assert(state.background_scales[0].x256 == 384 && state.background_scales[1].x256 == 256);
+    state.current_room=2; gbs::tick_event_frame_counter(state);
+    assert(state.background_scales[0].x256 == 256 && state.actor_scales[1].x256 == 256);
+    gbs::reset_event_transforms(state);
+    assert(state.actor_scales[0].x256 == 256 && state.actor_scales[1].x256 == 256);
+}
+
+void test_legacy_projectile_request_is_observable_before_another_launch() {
+    gbs::EventState state {};
+    gbs::init_event_state(state);
+    const gbs::EventCommand launch[] = {{gbs::EventOp::LaunchProjectile, 1, 0, 3}};
+    gbs::run_event_script(state, launch, 1);
+    assert(state.projectile_launch_requested);
+    assert(state.projectile_launch_actor == 1);
+    assert(state.projectile_launch_slot == 0);
+    assert(state.projectile_launch_direction == 3);
+
+    state.projectile_launch_requested = false;
+    const gbs::EventCommand invalid[] = {{gbs::EventOp::LaunchProjectile, 1, 99, 3}};
+    gbs::run_event_script(state, invalid, 1);
+    assert(!state.projectile_launch_requested);
+}
+
+void test_actor_activation_reenables_a_disabled_player() {
+    gbs::EventState state {};
+    gbs::init_event_state(state);
+    gbs::EventPlayerRuntimeState player {false, 8, 16, 0};
+    const gbs::EventCommand enable[] = {{gbs::EventOp::SetActorActive, gbs::event_player_actor_index, 1, 0}};
+    const gbs::EventCommand disable[] = {{gbs::EventOp::SetActorActive, gbs::event_player_actor_index, 0, 0}};
+    gbs::run_event_script(state, enable, 1);
+    assert(state.actor_command_count == 1);
+    assert(gbs::apply_event_player_command(player, state.actor_commands[0]));
+    assert(player.active);
+    gbs::run_event_script(state, disable, 1);
+    assert(state.actor_command_count == 2);
+    assert(gbs::apply_event_player_command(player, state.actor_commands[1]));
+    assert(!player.active);
+    gbs::run_event_script(state, enable, 1);
+    assert(state.actor_command_count == 3);
+    assert(gbs::apply_event_player_command(player, state.actor_commands[2]));
+    assert(player.active);
+    assert(player.x == 8 && player.y == 16);
+}
+
+void test_show_all_sprites_reverses_a_previous_hide_request() {
+    gbs::EventState state {};
+    gbs::init_event_state(state);
+    const gbs::EventCommand hide[] = {{gbs::EventOp::SetAllSpritesVisible, 0, 0, 0}};
+    const gbs::EventCommand show[] = {{gbs::EventOp::SetAllSpritesVisible, 1, 0, 0}};
+    gbs::run_event_script(state, hide, 1);
+    assert(state.all_sprites_visible_changed);
+    assert(!state.all_sprites_visible);
+    state.all_sprites_visible_changed = false;
+    gbs::run_event_script(state, show, 1);
+    assert(state.all_sprites_visible_changed);
+    assert(state.all_sprites_visible);
+}
+
+void test_scene_stack_clear_prevents_return_to_a_different_room() {
+    gbs::EventState state {};
+    gbs::init_event_state(state);
+    const auto kind = static_cast<int>(gbs::RuntimeKind::TopDown);
+    const gbs::EventCommand prepare[] = {
+        {gbs::EventOp::Warp, 2, 24, 40},
+        {gbs::EventOp::SceneStackPush, kind, 0, 0},
+        {gbs::EventOp::Warp, 5, 64, 72}
+    };
+    gbs::run_event_script(state, prepare, 3);
+    assert(state.scene_stack_count == 1);
+    assert(state.current_room == 5);
+    const gbs::EventCommand clear[] = {{gbs::EventOp::SceneStackClear, 0, 0, 0}};
+    gbs::run_event_script(state, clear, 1);
+    assert(state.scene_stack_count == 0);
+    const gbs::EventCommand previous[] = {{gbs::EventOp::SceneStackPrevious, kind, 0, 0}};
+    gbs::run_event_script(state, previous, 1);
+    assert(state.current_room == 5);
+    assert(state.player_x == 64 && state.player_y == 72);
+}
+
+void test_decrement_one_crosses_zero_without_changing_other_variables() {
+    gbs::EventState state {};
+    gbs::init_event_state(state);
+    state.variables[3] = 1;
+    state.variables[4] = 18;
+    const gbs::EventCommand decrement[] = {{gbs::EventOp::AddVariable, 3, -1, 0}};
+    gbs::run_event_script(state, decrement, 1);
+    assert(state.variables[3] == 0);
+    gbs::run_event_script(state, decrement, 1);
+    assert(state.variables[3] == -1);
+    assert(state.variables[4] == 18);
+}
+
 int main() {
+    test_actor_scale_events_are_per_instance_and_interruptible();
+    test_legacy_projectile_request_is_observable_before_another_launch();
+    test_actor_activation_reenables_a_disabled_player();
+    test_show_all_sprites_reverses_a_previous_hide_request();
+    test_scene_stack_clear_prevents_return_to_a_different_room();
+    test_decrement_one_crosses_zero_without_changing_other_variables();
     test_scene_fades_respect_saved_music_volume_and_mute();
     test_bound_clock_restores_and_updates_saved_minutes();
     test_restore_consumer_does_not_drop_commands_beyond_the_queue_capacity();
@@ -2115,6 +2394,7 @@ int main() {
     test_engine_field_commands_store_and_gate_runtime_state();
     test_equipment_and_timer_fields_follow_native_state();
     test_store_actor_state_commands_copy_actor_state_to_variables();
+    test_actor_direction_reads_follow_writes_without_waiting();
     test_button_pressed_jump_gates_next_command();
     test_wait_button_pressed_pauses_runner_until_matching_input();
     test_wait_actor_animation_pauses_runner_until_animation_finishes();
@@ -2135,9 +2415,11 @@ int main() {
     test_timer_event_bindings_route_elapsed_frames_to_script();
     test_rate_limit_gates_next_command_until_enough_frames_pass();
     test_manual_save_commands_update_runtime_requests_and_cached_status();
+    test_save_requests_yield_before_following_commands();
     test_dialogue_language_command_switches_runtime_locale();
     test_projectile_commands_update_runtime_launch_requests_and_slots();
     test_set_player_animation_updates_runtime_state();
+    test_player_animation_preserves_order_with_sprite_and_frame_commands();
     test_show_actor_gesture_updates_runtime_state();
     test_set_actor_sprite_queues_runtime_command();
     test_script_lock_commands_update_runtime_state();

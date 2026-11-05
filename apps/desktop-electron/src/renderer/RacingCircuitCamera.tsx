@@ -2,6 +2,7 @@ import { uiText as ui, useStudioUiText } from "./studioUiText";
 import { useEffect, useRef, useState } from "react";
 import { racingCameraFloorLine } from "../shared/racingCameraProjection";
 import { racingFloorSourceTileIndex } from "../shared/racingAuthoring";
+import { assetFetchURL, isDesktopAssetURL } from "../shared/spriteAssetURL";
 import type { RacingSceneConfig } from "../shared/sceneTypeProfiles";
 import type { RoomsWorkspaceEntity, RoomsWorkspaceRoom } from "../shared/roomsWorkspace";
 
@@ -13,14 +14,21 @@ export function RacingCircuitCamera({room,config,floorURL,panoramaURL,player,pla
   useEffect(()=>{
     if(!canvas.current||!config.topdownTrack)return;
     let cancelled=false;
-    const load=(url:string|null)=>new Promise<HTMLImageElement|null>((resolve,reject)=>{if(!url){resolve(null);return;}const image=new Image();image.onload=()=>resolve(image);image.onerror=()=>reject(new Error("Não foi possível carregar o piso da prévia."));image.src=url;});
+    const load=(url:string|null)=>new Promise<HTMLImageElement|null>((resolve,reject)=>{if(!url){resolve(null);return;}const image=new Image();const source=assetFetchURL(url);if(isDesktopAssetURL(source))image.crossOrigin="anonymous";image.onload=()=>resolve(image);image.onerror=()=>reject(new Error("Não foi possível carregar o piso da prévia."));image.src=source;});
     Promise.all([load(floorURL),load(panoramaURL),load(playerURL)]).then(([floor,panorama,vehicle])=>{
       if(cancelled||!canvas.current)return;
+      // Reset the surface as well as its origin state when a preview is redrawn.
+      canvas.current.width=240;canvas.current.height=160;
       const context=canvas.current.getContext("2d");if(!context)return;
       context.imageSmoothingEnabled=false;context.fillStyle="#231737";context.fillRect(0,0,240,160);
       const horizon=config.pseudo3dVisuals?.horizonY??48;
       if(panorama)context.drawImage(panorama,0,0,panorama.width,panorama.height,0,0,240,horizon);
       const image=context.getImageData(0,0,240,160);
+      if(panorama && horizon>0) {
+        const edge=(horizon-1)*240*4;
+        const backdrop=image.data.slice(edge,edge+4);
+        for(let offset=horizon*240*4;offset<image.data.length;offset+=4)image.data.set(backdrop,offset);
+      }
       const camera=config.perspectiveCamera??{height:48,distance:64,focalLength:96};
       const position={x:(player?.x??room.width/2)*8+4,y:(player?.y??room.height/2)*8+4};
       const heading=(config.topdownTrack?.startHeading??0)*256;

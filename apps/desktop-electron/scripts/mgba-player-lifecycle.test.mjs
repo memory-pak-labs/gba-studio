@@ -1,5 +1,6 @@
 // @vitest-environment happy-dom
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { createHash, webcrypto } from "node:crypto";
 
 const harness = vi.hoisted(() => ({ core: null }));
 vi.mock("../static/WebPlayer/player/mgba-core.mjs", () => ({ default: async () => harness.core }));
@@ -10,11 +11,12 @@ let frames;
 let audioCreated;
 let audioClosed;
 beforeEach(() => {
+  vi.stubGlobal("crypto", webcrypto);
   container = document.createElement("div");
   document.body.append(container);
-  frames = new Set();
+  frames = new Map();
   let frameID = 0;
-  vi.stubGlobal("requestAnimationFrame", vi.fn(() => { frames.add(++frameID); return frameID; }));
+  vi.stubGlobal("requestAnimationFrame", vi.fn(callback => { frames.set(++frameID, callback); return frameID; }));
   vi.stubGlobal("cancelAnimationFrame", vi.fn((id) => frames.delete(id)));
   vi.stubGlobal("fetch", vi.fn(async () => ({ ok: true, arrayBuffer: async () => new ArrayBuffer(16) })));
   vi.spyOn(HTMLCanvasElement.prototype, "getContext").mockReturnValue({
@@ -39,6 +41,8 @@ beforeEach(() => {
     _gba_load_rom: vi.fn(() => 1),
     _gba_destroy: vi.fn(),
     _gba_run_frame: vi.fn(),
+    _gba_set_keys: vi.fn(),
+    _gba_framebuffer: vi.fn(() => 128),
     _gba_state_size: vi.fn(() => 8),
     _gba_save_state: vi.fn(() => 1),
     _gba_load_state: vi.fn(() => 1)
@@ -53,6 +57,59 @@ afterEach(() => {
 const start = () => startMGBAPlayer({ container, romUrl: "test.gba", storageKey: "test-state" });
 
 describe("Play resource ownership", () => {
+  it("keeps replay SRAM isolated from the user's normal battery store", async () => {
+    const fetchRom = fetch.getMockImplementation();
+    fetch.mockImplementation(url => String(url).endsWith("mgba-core.manifest.json")
+      ? Promise.resolve({ ok: true, json: async () => ({ wasm: { sha256: "1".repeat(64) } }) }) : fetchRom(url));
+    const store = { read: vi.fn(async () => null), write: vi.fn(async () => {}), destroy: vi.fn() };
+    harness.core._gba_savedata_size = vi.fn(() => 4);
+    harness.core._gba_savedata_copy = vi.fn(pointer => { harness.core.HEAPU8.set([9, 8, 7, 6], pointer); return 4; });
+    harness.core._gba_savedata_restore = vi.fn(() => 1);
+    const replay = { schema: 2, initialState: {
+      format: "mgba-state-v1", romSha256: createHash("sha256").update(Buffer.alloc(16)).digest("hex"),
+      coreSha256: "1".repeat(64), stateBase64: btoa("12345678"), savedataBase64: btoa("abcd")
+    }, runs: [{ frame: { held: [], pressed: [] }, frames: 2 }] };
+    const player = await startMGBAPlayer({ container, romUrl: "test.gba", replay,
+      batteryOptions: { romSha256: "2".repeat(64), store } });
+    try {
+      harness.core._gba_savedata_copy.mockImplementation(pointer => { harness.core.HEAPU8.set([1, 2, 3, 4], pointer); return 4; });
+      frames.values().next().value(performance.now() + 20);
+      window.dispatchEvent(new Event("pagehide"));
+      expect(harness.core._gba_load_state).toHaveBeenCalledOnce();
+      expect(harness.core._gba_savedata_restore).toHaveBeenCalledOnce();
+      expect(store.write).not.toHaveBeenCalled();
+      expect(store.read).not.toHaveBeenCalled();
+    } finally { player.destroy(); }
+    expect(store.destroy).not.toHaveBeenCalled();
+  });
+
+  it("captures at frame zero and flushes a short input before the next telemetry interval", async () => {
+    const fetchRom = fetch.getMockImplementation();
+    fetch.mockImplementation(url => String(url).endsWith("mgba-core.manifest.json")
+      ? Promise.resolve({ ok: true, json: async () => ({ wasm: { sha256: "1".repeat(64) } }) }) : fetchRom(url));
+    const stats = vi.fn();
+    const player = await startMGBAPlayer({ container, romUrl: "test.gba", recordInput: true, recordingLaunch: { roomName: "Lab" }, onFrameStats: stats });
+    try {
+      expect(harness.core._gba_run_frame).not.toHaveBeenCalled();
+      expect(stats.mock.calls.at(-1)[0]).toMatchObject({ recordingStart: { format: "mgba-state-v1", launch: { roomName: "Lab" } }, inputFrames: { firstFrame: 0, masks: [] } });
+      stats.mockClear();
+      window.dispatchEvent(new KeyboardEvent("keydown", { code: "KeyX" }));
+      frames.values().next().value(performance.now() + 1);
+      window.dispatchEvent(new KeyboardEvent("keyup", { code: "KeyX" }));
+      expect(stats).not.toHaveBeenCalled();
+      const tail = player.flushInputRecording();
+      expect(tail.inputFrames.firstFrame).toBe(0);
+      expect(tail.inputFrames.masks).toContain(1);
+      expect(player.flushInputRecording().inputFrames.masks).toEqual([]);
+    } finally { player.destroy(); }
+  });
+
+  it("restores a recorded initial state before scheduling the first replay frame", async () => {
+    const replay = { schema: 2, initialState: { format: "mgba-state-v1", romSha256: "0".repeat(64), coreSha256: "1".repeat(64), stateBase64: btoa("12345678"), savedataBase64: "" }, runs: [{ frame: { held: ["A"], pressed: ["A"] }, frames: 1 }] };
+    await expect(startMGBAPlayer({ container, romUrl: "test.gba", storageKey: "test-state", replay })).rejects.toThrow(/ROM|core/);
+    expect(frames.size).toBe(0);
+  });
+
   it("starts at frame zero without publishing preparation data or persisting state", async () => {
     const stats = vi.fn();
     const player = await startMGBAPlayer({ container, romUrl: "test.gba", storageKey: "test-state", onFrameStats: stats });

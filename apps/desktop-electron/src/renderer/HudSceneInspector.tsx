@@ -1,5 +1,10 @@
+import {sceneInterfaceImage, sceneInterfaceImageSupported, updateSceneInterfaceImage} from "../shared/sceneInterfaceImage";
+import type { MenuTextInputPart } from "../shared/menuTextInputLayout";
+import { MenuTextInputFields } from "./MenuTextInputFields";
+import { normalizeMenuSceneConfig } from "../shared/menuScene";
+import type { UpdateRoomFields } from "../shared/roomsWorkspace/core";
 import { uiText as ui, useStudioUiText } from "./studioUiText";
-import { HUD_VALUE_BINDING_LABELS } from "../shared/hudPresets";
+import { HUD_VALUE_BINDING_LABELS, type HudRuntimeTextProfile } from "../shared/hudPresets";
 import { HudElementBehaviorInspector } from "./HudElementBehaviorInspector";
 import { InterfaceThemeInspector } from "./InterfaceThemeInspector";
 import type { InterfaceThemeChange } from "../shared/interfaceThemes";
@@ -16,6 +21,7 @@ import { DEFAULT_HUD_PRESET, HUD_CORNER_ANCHORS, deriveHudPresetBudget, hudAncho
 import type { RoomsWorkspaceRoom } from "../shared/roomsWorkspace";
 
 export interface HudSceneInspectorProps {
+  onUpdateRoomFields?(roomID: string, fields: UpdateRoomFields): void;
   onUpdateInterfaceTheme?(change: InterfaceThemeChange): void;
   binding: HudPresetBinding | null;
   previewPreset: HudPresetPresentation | null;
@@ -89,7 +95,22 @@ export function HudSceneInspector(props: HudSceneInspectorProps): React.ReactEle
   };
   const create = (sourceID: string) => { onPreviewPreset(null); void props.onCreateHudVariationForRoom?.(room.id, sourceID, props.screenID); };
   const bind = (id: string | null) => { props.onBindHud?.(room.id, id, props.screenID); onPreviewPreset(null); onSelectComponent(null); };
+  const nativeMenu = room.runtime?.type === "menu" ? normalizeMenuSceneConfig(room.runtime.config) : null;
+  if (nativeMenu?.textInput && !previewPreset) return <div className="room-hud-scene-inspector" aria-label={ui("Editor contextual de entrada de nome")}>
+    <section className="hud-authoring-section">
+      <div className="hud-authoring-heading"><h5>{ui("Entrada de nome")}</h5><span>240×160</span></div>
+      <p className="muted">{ui("Campo de nome e teclado desta cena")}</p>
+      <MenuTextInputFields value={nativeMenu.textInput} selectedPart={selectedComponentID?.startsWith("name-input:") ? selectedComponentID.slice(11) as MenuTextInputPart : null} onSelectPart={part => onSelectComponent(part ? `name-input:${part}` : null)} disabled={props.readOnly || !props.onUpdateRoomFields} onChange={textInput => props.onUpdateRoomFields?.(room.id, {
+        runtime: { type: "menu", config: { ...room.runtime?.config, textInput } }
+      })} />
+    </section>
+  </div>;
   return <div className="room-hud-scene-inspector" aria-label={ui("Editor contextual de HUD")}>
+    {sceneInterfaceImageSupported(room) ? <section className="hud-authoring-section" aria-label={ui("Interface por imagem")}>
+      <h5>{ui("Interface por imagem")}</h5>
+      <ProjectReferencePicker ariaLabel={ui("Imagem da interface")} disabled={props.readOnly || !props.onUpdateRoomFields} options={assets} emptyLabel={ui("Sem imagem")} value={sceneInterfaceImage(room) ?? ""} onChange={image => props.onUpdateRoomFields?.(room.id, updateSceneInterfaceImage(room, image))} />
+      <p className="muted">{ui(binding ? (["battleRpg", "dungeonCrawler"].includes(room.sceneType) ? "A composição aplicada edita os elementos sobre esta imagem." : "A composição aplicada substitui esta imagem na cena.") : "Esta imagem é uma peça única. Aplique uma composição para editar textos, barras e ícones separadamente.")}</p>
+    </section> : null}
     <section className="hud-authoring-section">
       <div className="hud-authoring-heading"><h5>{ui("HUD da cena")}</h5><span>240×160</span></div>
       {props.screens?.length ? <label>{ui("Tela do menu")}<select aria-label={ui("Tela do menu para editar HUD")} value={props.screenID} onChange={event => props.onSelectScreen?.(event.currentTarget.value)}>{props.screens.map(screen => <option key={screen.id} value={screen.id}>{screen.title || screen.id}</option>)}</select></label> : null}
@@ -137,6 +158,7 @@ export function HudSceneInspector(props: HudSceneInspectorProps): React.ReactEle
         <label>{ui("Nome da HUD")}<input disabled={!canEdit} value={preset.name} onChange={event => updatePreset({ name: event.currentTarget.value })} /></label>
         <label>{ui("Descrição")}<input disabled={!canEdit} value={preset.description} onChange={event => updatePreset({ description: event.currentTarget.value })} /></label>
         <label>{ui("Modo")}<select disabled={!canEdit} value={preset.mode} onChange={event => updatePreset({ mode: event.currentTarget.value as "standard" | "advanced" })}><option value="standard">{ui("Padrão")}</option><option value="advanced">{ui("Composição avançada")}</option></select></label>
+        {room.sceneType === "dungeonCrawler" ? <><label>{ui("Conteúdo dos textos")}<select disabled={!canEdit} value={preset.runtimeTextProfile ?? "standard"} onChange={event => updatePreset({ runtimeTextProfile: event.currentTarget.value as HudRuntimeTextProfile })}><option value="standard">{ui("Padrão da cena")}</option><option value="dungeon-status">{ui("Vida, direção, itens e controles (4 campos)")}</option><option value="dungeon-sidebar">{ui("Mapa e status lateral (8 campos)")}</option><option value="dungeon-sidebar-contextual">{ui("Mapa e status lateral ao interagir (8 campos)")}</option></select></label><small>{ui("Os textos dinâmicos seguem a ordem dos elementos na composição. Textos fixos mantêm o conteúdo informado.")}</small></> : null}
         <div className="room-hud-component-size-grid"><InspectorNumber disabled={!canEdit} label={ui("Largura da HUD")} min={24} max={240} step={8} value={preset.width} onChange={width => updatePreset({ width })} /><InspectorNumber disabled={!canEdit} label={ui("Altura da HUD")} min={8} max={160} step={8} value={preset.height} onChange={height => updatePreset({ height })} /></div>
         <label>{ui("Posição da HUD")}<select disabled={!canEdit} value={preset.position} onChange={event => updatePreset({ position: event.currentTarget.value as "Superior" | "Inferior" })}><option value="Superior">{ui("Superior")}</option><option value="Inferior">{ui("Inferior")}</option></select></label>
         <label>{ui("Imagem própria do preset")}<ProjectReferencePicker ariaLabel={ui("Fundo da HUD")} disabled={!canEdit} options={assets} value={presets.find(item => item.id === preset.id)?.backgroundImage ?? ""} emptyLabel={ui("Usar moldura do tema")} onChange={backgroundImage => updatePreset({ backgroundImage })} actions={props.onImportAssets ? [{label:"Importar imagem",run:() => props.onImportAssets?.()}] : []} /></label>

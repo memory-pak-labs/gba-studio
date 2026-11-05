@@ -1,7 +1,9 @@
 import type { GBAProjectData } from "../shared/projectFile";
 import type { UpdateRoomEntityFields } from "../shared/roomsWorkspace";
+import { battleRpgSceneConfigFromRuntime } from "../shared/sceneTypeProfiles";
 import { InspectorNumber, InspectorSection } from "./InspectorControls";
 import { useStudioUiText } from "./studioUiText";
+import { MenuSceneInspector } from "./MenuSceneInspector";
 
 type RecordValue = Record<string, any>;
 const record = (v: unknown): RecordValue => v && typeof v === "object" ? v as RecordValue : {};
@@ -22,6 +24,7 @@ export function SceneRuntimeResourcesInspector({ sceneType, roomName, background
   onChange(config: RecordValue): void;
 }) {
   const ui = useStudioUiText();
+  if (sceneType === "menu") return <MenuSceneInspector value={config} data={data} onChange={onChange} />;
   if (!["dungeonCrawler", "isometric", "luta", "racing", "battleRpg", "shmup"].includes(sceneType)) return null;
   if (sceneType === "isometric" && config.gameplayMode === "tactical") return null;
   const assets = list(data.assets), actors = list(data.actors).filter(a => a.roomName === roomName);
@@ -33,6 +36,7 @@ export function SceneRuntimeResourcesInspector({ sceneType, roomName, background
   const sfx = options(audio.filter(a => !/music|m[uú]sica/i.test(a.kind)));
   const change = (patch: RecordValue) => onChange({ ...config, ...patch });
   const presentation = record(config.presentation);
+  const battleConfig = sceneType === "battleRpg" ? battleRpgSceneConfigFromRuntime({ type: "battleRpg", config }, data.settings) : null;
   const changePresentation = (patch: RecordValue) => change({ presentation: { ...presentation, ...patch } });
   const sounds = sceneType === "dungeonCrawler" || sceneType === "battleRpg" ? record(presentation.actionSounds) : record(config.actionSounds);
   const cues = sceneType === "dungeonCrawler" ? ["step", "turn", "blocked", "hit", "defeat"] : sceneType === "battleRpg" ? ["cursor", "confirm", "attack", "magic", "hurt", "defend", "defeat"]
@@ -94,6 +98,15 @@ export function SceneRuntimeResourcesInspector({ sceneType, roomName, background
       </> : null}
     </> : null}
     {sceneType === "battleRpg" ? <>
+      <InspectorNumber label={ui("Máximo no grupo")} value={battleConfig?.maxPartySize ?? 4} min={1} max={4} onChange={maxPartySize => change({ maxPartySize })} />
+      <InspectorNumber label={ui("Máximo de inimigos")} value={battleConfig?.maxEnemies ?? 1} min={1} max={8} onChange={maxEnemies => change({ maxEnemies })} />
+      {moduleToggle("inventory", "Inventário da batalha")}
+      {module("inventory").enabled ? <>
+        <label><span>{ui("Chave do item")}</span><input aria-label={ui("Chave do item")} defaultValue={module("inventory").settings.itemKey ?? "potion"} key={module("inventory").settings.itemKey ?? "potion"} onBlur={e => moduleSetting("inventory", "itemKey", e.currentTarget.value.trim() || "potion")} /></label>
+        <label><span>{ui("Rótulo do item")}</span><input aria-label={ui("Rótulo do item")} defaultValue={module("inventory").settings.label ?? "ITEM"} key={module("inventory").settings.label ?? "ITEM"} maxLength={16} onBlur={e => moduleSetting("inventory", "label", e.currentTarget.value)} /></label>
+        <InspectorNumber label={ui("Quantidade inicial")} value={module("inventory").settings.initialQuantity ?? 0} min={0} max={999} onChange={v => moduleSetting("inventory", "initialQuantity", v)} />
+        <InspectorNumber label={ui("Cura por item")} value={module("inventory").settings.healAmount ?? 1} min={1} max={999} onChange={v => moduleSetting("inventory", "healAmount", v)} />
+      </> : null}
       <ResourceSelect label="Moldura da HUD RPG" value={config.hudAssetName} options={backgrounds} onChange={hudAssetName => change({ hudAssetName })} />
       <ResourceSelect label="Cursor da batalha" value={presentation.cursorAssetName} options={sprites} onChange={cursorAssetName => changePresentation({ cursorAssetName })} />
       <ResourceSelect label="Ator de efeitos da batalha" value={presentation.effectsActorId} options={options(actors, "id")} onChange={effectsActorId => changePresentation({ effectsActorId })} />

@@ -1,4 +1,5 @@
 SHELL := /bin/bash
+.DEFAULT_GOAL := all
 
 DEVKITPRO ?= /opt/devkitpro
 DEVKITARM ?= $(DEVKITPRO)/devkitARM
@@ -59,6 +60,7 @@ MOTION_HOST_BINARIES := $(addprefix $(HOST_BUILD)/,$(MOTION_HOST_TESTS))
 .PHONY: motion-checkpoint-test
 motion-checkpoint-test: $(MOTION_HOST_BINARIES)
 	@set -e; for test in $(MOTION_HOST_BINARIES); do "$$test"; echo "PASS $$test"; done
+	python3 tests/host/platformer_scripted_rider_tests.py
 	python3 tests/host/actor_motion_export_tests.py
 	python3 tests/host/isometric_screen_export_tests.py
 	python3 tests/host/isometric_save_dispatch_tests.py
@@ -116,8 +118,9 @@ isometric-turn-flow-test:
 	python3 tests/host/isometric_turn_flow_tests.py
 	python3 tests/host/isometric_cursor_tests.py
 	python3 tests/host/isometric_exploration_tests.py
+	python3 tests/host/isometric_save_dispatch_tests.py
 
-host-test: tile-edits-test portrait-tab-test dungeon-presentation-test battle-rpg-presentation-test platformer-presentation-test hud-gauge-test luta-authored-hud-test point-click-animation-test shmup-animation-test $(HOST_BUILD)/topdown_tests $(HOST_BUILD)/topdown_fixture_tests $(HOST_BUILD)/platformer_tests $(HOST_BUILD)/isometric_tests $(HOST_BUILD)/dungeon_crawler_tests $(HOST_BUILD)/racing_tests $(HOST_BUILD)/battle_rpg_tests $(HOST_BUILD)/luta_tests $(HOST_BUILD)/visual_novel_tests $(HOST_BUILD)/point_click_tests $(HOST_BUILD)/shmup_tests $(HOST_BUILD)/menu_tests $(HOST_BUILD)/menu_audio_feedback_tests $(HOST_BUILD)/cutscene_tests $(HOST_BUILD)/world_map_tests $(HOST_BUILD)/world_map_journey_tests $(HOST_BUILD)/hardware_core_tests $(HOST_BUILD)/link_tests $(HOST_BUILD)/hblank_effect_tests $(HOST_BUILD)/action_tests $(HOST_BUILD)/profiler_tests $(HOST_BUILD)/camera_tests $(HOST_BUILD)/audio_engine_tests $(HOST_BUILD)/containers_tests $(HOST_BUILD)/typewriter_tests $(HOST_BUILD)/input_advanced_tests $(HOST_BUILD)/oam_overflow_tests $(HOST_BUILD)/deferred_work_tests $(HOST_BUILD)/hbe_presets_tests $(HOST_BUILD)/rumble_tests $(HOST_BUILD)/multiplayer_tests $(HOST_BUILD)/pseudo_3d_tests $(HOST_BUILD)/palette_tests $(HOST_BUILD)/render_asset_tests $(HOST_BUILD)/render_runtime_tests $(HOST_BUILD)/runtime_orchestration_tests $(HOST_BUILD)/runtime_capability_tests $(HOST_BUILD)/visual_effects_tests $(HOST_BUILD)/project_data_tests $(HOST_BUILD)/event_tests $(HOST_BUILD)/dialogue_tests $(HOST_BUILD)/text_tests $(HOST_BUILD)/ui_tests $(HOST_BUILD)/hud_behavior_tests $(HOST_BUILD)/audio_tests $(HOST_BUILD)/animation_tests $(HOST_BUILD)/resource_manager_tests $(HOST_BUILD)/save_tests $(HOST_BUILD)/runtime_save_restore_tests $(HOST_BUILD)/runtime_checkpoint_tests $(HOST_BUILD)/debug_tests $(HOST_BUILD)/math_tests $(HOST_BUILD)/bios_tests $(HOST_BUILD)/rtc_tests $(HOST_BUILD)/utility_tests $(HOST_BUILD)/tween_tests assetc-test gbsbuild-host-test gbsdoctor-test verify-cross-platform-test hardware-source-test stress-projects-contract-test topdown-backdrop-runtime-test topdown-hud-runtime-test
+host-test: event-scale-background-test battle-rpg-inventory-test tile-edits-test portrait-tab-test dungeon-presentation-test battle-rpg-presentation-test platformer-presentation-test hud-gauge-test luta-authored-hud-test point-click-animation-test shmup-animation-test $(HOST_BUILD)/topdown_tests $(HOST_BUILD)/topdown_fixture_tests $(HOST_BUILD)/platformer_tests $(HOST_BUILD)/isometric_tests $(HOST_BUILD)/dungeon_crawler_tests $(HOST_BUILD)/racing_tests $(HOST_BUILD)/battle_rpg_tests $(HOST_BUILD)/luta_tests $(HOST_BUILD)/visual_novel_tests $(HOST_BUILD)/point_click_tests $(HOST_BUILD)/shmup_tests $(HOST_BUILD)/menu_tests $(HOST_BUILD)/menu_audio_feedback_tests $(HOST_BUILD)/cutscene_tests $(HOST_BUILD)/world_map_tests $(HOST_BUILD)/world_map_journey_tests $(HOST_BUILD)/hardware_core_tests $(HOST_BUILD)/link_tests $(HOST_BUILD)/hblank_effect_tests $(HOST_BUILD)/action_tests $(HOST_BUILD)/profiler_tests $(HOST_BUILD)/camera_tests $(HOST_BUILD)/audio_engine_tests $(HOST_BUILD)/containers_tests $(HOST_BUILD)/typewriter_tests $(HOST_BUILD)/input_advanced_tests $(HOST_BUILD)/oam_overflow_tests $(HOST_BUILD)/deferred_work_tests $(HOST_BUILD)/hbe_presets_tests $(HOST_BUILD)/rumble_tests $(HOST_BUILD)/multiplayer_tests $(HOST_BUILD)/pseudo_3d_tests $(HOST_BUILD)/palette_tests $(HOST_BUILD)/render_asset_tests $(HOST_BUILD)/render_runtime_tests $(HOST_BUILD)/runtime_orchestration_tests $(HOST_BUILD)/runtime_capability_tests $(HOST_BUILD)/visual_effects_tests $(HOST_BUILD)/project_data_tests $(HOST_BUILD)/event_tests $(HOST_BUILD)/dialogue_tests $(HOST_BUILD)/text_tests $(HOST_BUILD)/ui_tests $(HOST_BUILD)/hud_behavior_tests $(HOST_BUILD)/audio_tests $(HOST_BUILD)/animation_tests $(HOST_BUILD)/resource_manager_tests $(HOST_BUILD)/save_tests $(HOST_BUILD)/runtime_save_restore_tests $(HOST_BUILD)/runtime_checkpoint_tests $(HOST_BUILD)/debug_tests $(HOST_BUILD)/math_tests $(HOST_BUILD)/bios_tests $(HOST_BUILD)/rtc_tests $(HOST_BUILD)/utility_tests $(HOST_BUILD)/tween_tests assetc-test gbsbuild-host-test gbsdoctor-test verify-cross-platform-test hardware-source-test stress-projects-contract-test topdown-backdrop-runtime-test topdown-hud-runtime-test
 	$(HOST_BUILD)/topdown_tests
 	$(HOST_BUILD)/topdown_fixture_tests
 	$(HOST_BUILD)/platformer_tests
@@ -221,14 +224,38 @@ topdown-hud-runtime-test:
 	python3 tests/host/topdown_hud_runtime_tests.py
 	python3 tests/host/topdown_actor_pose_tests.py
 
+.PHONY: topdown-projectile-runtime-test
+host-test: topdown-projectile-runtime-test
+topdown-projectile-runtime-test:
+	python3 tests/host/topdown_projectile_runtime_tests.py
+
+.PHONY: topdown-cross-runtime-save-test
+host-test: topdown-cross-runtime-save-test
+
+.PHONY: topdown-controlled-player-test
+host-test: topdown-controlled-player-test
+topdown-controlled-player-test:
+	python3 tests/host/topdown_controlled_player_tests.py
+
 platformer-runtime-wait-test: check-toolchain
 	python3 tests/host/platformer_runtime_wait_tests.py
+	python3 tests/host/platformer_shared_scripts_tests.py
+	python3 tests/host/platformer_idle_lifecycle_tests.py
 	python3 tests/host/runtime_frame_boundary_tests.py
 
 resource-manager-stack-test: check-toolchain
 	DEVKITARM="$(DEVKITARM)" python3 tests/host/resource_manager_stack_tests.py
 
 .PHONY: runtime-save-memory-test
+host-test: topdown-run-test
+.PHONY: topdown-run-test
+topdown-run-test: $(HOST_BUILD)/topdown_run_tests
+	$(HOST_BUILD)/topdown_run_tests
+
+$(HOST_BUILD)/topdown_run_tests: tests/host/topdown_run_tests.cpp engine/src/gbs_topdown.cpp engine/src/gbs_event.cpp engine/src/gbs_dialogue_locale.cpp $(HOST_EVENT_RUNTIME_SRCS) engine/include/gbs/topdown_run.hpp
+	@mkdir -p $(@D)
+	$(HOST_CXX) $(HOST_CXXFLAGS) tests/host/topdown_run_tests.cpp engine/src/gbs_topdown.cpp engine/src/gbs_event.cpp engine/src/gbs_dialogue_locale.cpp $(HOST_EVENT_RUNTIME_SRCS) -o $@
+
 runtime-save-memory-test: check-toolchain
 	DEVKITARM="$(DEVKITARM)" python3 tests/host/runtime_save_memory_tests.py
 
@@ -382,12 +409,20 @@ cutscene-dialogue-runtime-test:
 	python3 tests/host/cutscene_dialogue_runtime_tests.py
 
 .PHONY: cutscene-timing-test
+host-test: tool-version-test
+.PHONY: tool-version-test
+tool-version-test:
+	python3 tests/host/tool_version_tests.py
+
 host-test: cutscene-timing-test
 cutscene-timing-test: $(HOST_BUILD)/cutscene_script_runner_tests
 	$(HOST_BUILD)/cutscene_script_runner_tests
 	python3 tests/host/cutscene_timing_tests.py
 
-$(HOST_BUILD)/cutscene_script_runner_tests: tests/host/cutscene_script_runner_tests.cpp engine/src/gbs_event.cpp engine/src/gbs_dialogue_locale.cpp $(HOST_EVENT_RUNTIME_SRCS) engine/include/gbs/cutscene_script_runner.hpp
+.PHONY: cutscene-legacy-save-test
+host-test: cutscene-legacy-save-test
+
+$(HOST_BUILD)/cutscene_script_runner_tests: tests/host/cutscene_script_runner_tests.cpp engine/src/gbs_event.cpp engine/src/gbs_dialogue_locale.cpp $(HOST_EVENT_RUNTIME_SRCS) engine/include/gbs/cutscene_script_runner.hpp engine/include/gbs/scene_script_runner.hpp
 	@mkdir -p $(@D)
 	$(HOST_CXX) $(HOST_CXXFLAGS) $(filter %.cpp,$^) -o $@
 
@@ -403,9 +438,9 @@ $(HOST_BUILD)/world_map_tests: tests/host/world_map_tests.cpp
 	@mkdir -p $(@D)
 	$(HOST_CXX) $(HOST_CXXFLAGS) $^ -o $@
 
-$(HOST_BUILD)/hardware_core_tests: tests/host/hardware_core_tests.cpp engine/src/profiler.cpp engine/src/gbs_core.cpp engine/src/gbs_runtime.cpp engine/src/gbs_rtc.cpp engine/src/gbs_input.cpp engine/src/gbs_interrupt.cpp engine/src/gbs_dma.cpp engine/src/gbs_debug.cpp engine/src/gbs_timer.cpp engine/src/rumble.cpp engine/src/deferred_work.cpp engine/src/gbs_engine_global.cpp engine/src/input_advanced.cpp tests/host/hw_stubs.cpp
+$(HOST_BUILD)/hardware_core_tests: engine/src/frame_video_stats.h engine/src/gbs_hw.h engine/include/gbs/debug.hpp tests/host/hardware_core_tests.cpp engine/src/profiler.cpp engine/src/gbs_core.cpp engine/src/gbs_runtime.cpp engine/src/gbs_rtc.cpp engine/src/gbs_input.cpp engine/src/gbs_interrupt.cpp engine/src/gbs_dma.cpp engine/src/gbs_debug.cpp engine/src/gbs_timer.cpp engine/src/rumble.cpp engine/src/deferred_work.cpp engine/src/gbs_engine_global.cpp engine/src/input_advanced.cpp tests/host/hw_stubs.cpp
 	@mkdir -p $(@D)
-	$(HOST_CXX) $(HOST_CXXFLAGS) -DGBS_ENABLE_PROFILER_SCOPES $^ -o $@
+	$(HOST_CXX) $(HOST_CXXFLAGS) -DGBS_ENABLE_PROFILER_SCOPES $(filter %.cpp,$^) -o $@
 
 $(HOST_BUILD)/link_tests: tests/host/link_tests.cpp engine/src/gbs_link.cpp
 	@mkdir -p $(@D)
@@ -468,9 +503,9 @@ $(HOST_BUILD)/visual_effects_tests: tests/host/visual_effects_tests.cpp engine/s
 	@mkdir -p $(@D)
 	$(HOST_CXX) $(HOST_CXXFLAGS) $^ -o $@
 
-$(HOST_BUILD)/dialogue_tests: tests/host/dialogue_tests.cpp engine/src/gbs_dialogue.cpp engine/src/gbs_dialogue_locale.cpp engine/src/gbs_text.c
+$(HOST_BUILD)/dialogue_tests: tests/host/dialogue_tests.cpp engine/src/gbs_dialogue.cpp engine/src/gbs_dialogue_locale.cpp engine/src/gbs_text.c engine/include/gbs/dialogue_portrait.hpp
 	@mkdir -p $(@D)
-	$(HOST_CXX) $(HOST_CXXFLAGS) -Iengine/src -x c++ $^ -o $@
+	$(HOST_CXX) $(HOST_CXXFLAGS) -Iengine/src -x c++ $(filter %.cpp %.c,$^) -o $@
 
 $(HOST_BUILD)/text_tests: tests/host/text_tests.cpp engine/src/gbs_text.c
 	@mkdir -p $(@D)
@@ -564,9 +599,58 @@ tween-test: $(HOST_BUILD)/tween_tests
 math-test: $(HOST_BUILD)/math_tests
 	$(HOST_BUILD)/math_tests
 
-$(HOST_BUILD)/animation_tests: tests/host/animation_tests.cpp engine/src/gbs_animation.cpp engine/include/gbs/animation.hpp
+$(HOST_BUILD)/animation_tests: tests/host/animation_tests.cpp engine/src/gbs_animation.cpp engine/include/gbs/animation.hpp engine/include/gbs/assets.hpp engine/include/gbs/project.hpp engine/include/gbs/platformer.hpp
 	@mkdir -p $(@D)
 	$(HOST_CXX) $(HOST_CXXFLAGS) $(filter %.cpp,$^) -o $@
+
+.PHONY: event-calls-test
+.PHONY: legacy-checkpoint-test
+host-test: legacy-checkpoint-test
+
+host-test: event-calls-test
+
+.PHONY: player-wait-animation-test
+host-test: player-wait-animation-test
+player-wait-animation-test: $(HOST_BUILD)/player_wait_animation_tests
+	$(HOST_BUILD)/player_wait_animation_tests
+
+$(HOST_BUILD)/player_wait_animation_tests: tests/host/player_wait_animation_tests.cpp engine/src/gbs_event.cpp engine/src/gbs_dialogue_locale.cpp $(HOST_EVENT_RUNTIME_SRCS) engine/include/gbs/event.hpp
+	@mkdir -p $(@D)
+	$(HOST_CXX) $(HOST_CXXFLAGS) $(filter %.cpp,$^) -o $@
+
+
+.PHONY: topdown-player-script-animation-test
+host-test: topdown-player-script-animation-test
+topdown-player-script-animation-test:
+	python3 tests/host/topdown_player_script_animation_tests.py
+
+.PHONY: platformer-player-script-animation-test
+host-test: platformer-player-script-animation-test
+platformer-player-script-animation-test:
+	python3 tests/host/platformer_player_script_animation_tests.py
+
+.PHONY: player-animation-controls-test
+host-test: player-animation-controls-test
+player-animation-controls-test:
+	python3 tests/host/player_animation_controls_tests.py
+
+.PHONY: player-command-order-test
+host-test: player-command-order-test
+player-command-order-test:
+	python3 tests/host/player_command_order_tests.py
+
+.PHONY: topdown-actor-gesture-test
+host-test: topdown-actor-gesture-test
+
+.PHONY: topdown-direction-commands-test
+host-test: topdown-direction-commands-test
+topdown-direction-commands-test:
+	python3 tests/host/topdown_direction_commands_tests.py
+
+.PHONY: npc-missing-animation-test
+host-test: npc-missing-animation-test
+npc-missing-animation-test:
+	python3 tests/host/npc_missing_animation_tests.py
 
 .PHONY: animation-streaming-test
 host-test: animation-streaming-test paged-background-test
@@ -1022,12 +1106,15 @@ assetc-test:
 	$(HOST_CXX) $(HOST_CXXFLAGS) -I$(HOST_BUILD)/assetc $(HOST_BUILD)/assetc/audio_wav_compile.cpp -o $(HOST_BUILD)/assetc/audio_wav_compile
 	$(HOST_BUILD)/assetc/audio_wav_compile
 	python3 tests/host/assetc_production_contract_tests.py
+	python3 tests/host/assetc_scene_video_layout_tests.py
+	python3 tests/host/assetc_color_policy_tests.py
 	python3 tests/host/assetc_audio_quality_tests.py
 	python3 tests/host/assetc_sprite_dedup_tests.py
 	python3 tests/host/assetc_obj_palette_tests.py
 
 gbsbuild-host-test:
 	$(HOST_POSIX_FIXTURE_PYTHON) tests/host/gbsbuild_incremental_tests.py
+	python3 tests/host/gbsbuild_scene_rom_tests.py
 	grep -q 'MAP := $$(BUILD_DIR_ESC)/$$(TARGET).map' templates/Makefile.gba
 	grep -q -- '-Wl,-Map,$$(BUILD_DIR)/$$(TARGET).map' templates/Makefile.gba
 	@mkdir -p $(HOST_BUILD)/gbsbuild/pack/templates $(HOST_BUILD)/gbsbuild/pack/lib "$(HOST_BUILD)/gbsbuild/project with space" "$(HOST_BUILD)/gbsbuild/output dir"
@@ -1613,7 +1700,7 @@ package: test topdown_basic.gba platformer_basic.gba isometric_basic.gba iwram-b
 
 verify-export-fixture: package
 	rm -rf $(BUILD_DIR)/verify-export-fixture
-	mkdir -p $(BUILD_DIR)/verify-export-fixture/topdown $(BUILD_DIR)/verify-export-fixture/platformer $(BUILD_DIR)/verify-export-fixture/isometric $(BUILD_DIR)/verify-export-fixture/shmup $(BUILD_DIR)/verify-export-fixture/menu $(BUILD_DIR)/verify-export-fixture/cutscene $(BUILD_DIR)/verify-export-fixture/world_map
+	mkdir -p $(BUILD_DIR)/verify-export-fixture/topdown $(BUILD_DIR)/verify-export-fixture/platformer $(BUILD_DIR)/verify-export-fixture/isometric $(BUILD_DIR)/verify-export-fixture/shmup $(BUILD_DIR)/verify-export-fixture/racing $(BUILD_DIR)/verify-export-fixture/menu $(BUILD_DIR)/verify-export-fixture/cutscene $(BUILD_DIR)/verify-export-fixture/world_map
 	cp $(DIST_DIR)/templates/exported_topdown/main.cpp $(BUILD_DIR)/verify-export-fixture/topdown/main.cpp
 	cp $(DIST_DIR)/templates/exported_topdown/gbastudio_project_data.hpp $(BUILD_DIR)/verify-export-fixture/topdown/gbastudio_project_data.hpp
 	cp $(DIST_DIR)/templates/exported_topdown/player_sprite_asset.hpp $(BUILD_DIR)/verify-export-fixture/topdown/player_sprite_asset.hpp
@@ -1666,6 +1753,13 @@ verify-export-fixture: package
 	grep -q '"TARGET=exported_shmup"' $(BUILD_DIR)/verify-export-fixture/shmup_build_dry_run.json
 	$(DIST_DIR)/tools/gbsbuild --engine-pack "$(abspath $(DIST_DIR))" --project-dir "$(abspath $(BUILD_DIR)/verify-export-fixture/shmup)"
 	test -f $(BUILD_DIR)/verify-export-fixture/shmup/build/exported_shmup.gba
+	cp $(DIST_DIR)/templates/exported_racing/main.cpp $(BUILD_DIR)/verify-export-fixture/racing/main.cpp
+	cp $(DIST_DIR)/templates/exported_racing/racing_project_data.hpp $(BUILD_DIR)/verify-export-fixture/racing/racing_project_data.hpp
+	cp $(DIST_DIR)/templates/exported_racing/gbastudio_project.json $(BUILD_DIR)/verify-export-fixture/racing/gbastudio_project.json
+	$(DIST_DIR)/tools/gbsdoctor --engine-pack "$(abspath $(DIST_DIR))" --project-dir "$(abspath $(BUILD_DIR)/verify-export-fixture/racing)" --json > $(BUILD_DIR)/verify-export-fixture/racing_doctor.json
+	grep -q '"ok": true' $(BUILD_DIR)/verify-export-fixture/racing_doctor.json
+	$(DIST_DIR)/tools/gbsbuild --engine-pack "$(abspath $(DIST_DIR))" --project-dir "$(abspath $(BUILD_DIR)/verify-export-fixture/racing)"
+	test -f $(BUILD_DIR)/verify-export-fixture/racing/build/exported_racing.gba
 	cp $(DIST_DIR)/templates/exported_menu/main.cpp $(BUILD_DIR)/verify-export-fixture/menu/main.cpp
 	cp $(DIST_DIR)/templates/exported_menu/menu_project_data.hpp $(BUILD_DIR)/verify-export-fixture/menu/menu_project_data.hpp
 	cp $(DIST_DIR)/templates/exported_menu/gbastudio_project.json $(BUILD_DIR)/verify-export-fixture/menu/gbastudio_project.json
@@ -1705,6 +1799,7 @@ verify-export-fixture: package
 	@echo "Fixture exportado verificado em $(BUILD_DIR)/verify-export-fixture"
 
 verify-package: package verify-export-fixture
+	python3 tests/host/tool_version_tests.py "$(DIST_DIR)"
 	rm -rf $(BUILD_DIR)/verify-package
 	mkdir -p $(BUILD_DIR)/verify-package/project $(BUILD_DIR)/verify-package/assets
 	cp $(DIST_DIR)/templates/topdown_basic/main.cpp $(BUILD_DIR)/verify-package/project/main.cpp
@@ -2070,6 +2165,7 @@ clean:
 point-click-animation-test: $(HOST_BUILD)/point_click_animation_tests
 	$(HOST_BUILD)/point_click_animation_tests
 	python3 tests/host/point_click_animation_export_tests.py
+	python3 tests/host/point_click_dialogue_render_tests.py
 
 $(HOST_BUILD)/point_click_animation_tests: tests/host/point_click_animation_tests.cpp engine/src/gbs_animation.cpp engine/include/gbs/point_click.hpp
 	@mkdir -p $(@D)
@@ -2109,6 +2205,7 @@ hud-racing-test: $(HOST_BUILD)/hud_racing_tests
 	python3 tests/host/hud_battle_status_tests.py
 	python3 tests/host/hud_battle_dialogue_render_tests.py
 	python3 tests/host/battle_dialogue_actor_priority_tests.py
+	python3 tests/host/battle_rpg_ui_layout_tests.py
 	python3 tests/host/hud_dialogue_occlusion_tests.py
 	python3 tests/host/dialogue_colored_font_tests.py
 	python3 tests/host/battle_rpg_support_presentation_tests.py
@@ -2177,13 +2274,26 @@ $(HOST_BUILD)/tile_edits_tests: tests/host/tile_edits_tests.cpp engine/src/gbs_t
 	@mkdir -p $(@D)
 	$(HOST_CXX) $(HOST_CXXFLAGS) tests/host/tile_edits_tests.cpp engine/src/gbs_topdown.cpp -o $@
 
-.PHONY: racing-minimap-test
-host-test: racing-minimap-test
+.PHONY: racing-challenge-test
+host-test: racing-challenge-test
+
 racing-minimap-test: $(HOST_BUILD)/racing_minimap_tests
 	$(HOST_BUILD)/racing_minimap_tests
-$(HOST_BUILD)/racing_minimap_tests: tests/host/racing_minimap_tests.cpp engine/include/gbs/racing_minimap.hpp engine/include/gbs/racing.hpp
+racing-challenge-test: racing-minimap-test
+$(HOST_BUILD)/racing_minimap_tests: tests/host/racing_minimap_tests.cpp
 	@mkdir -p $(@D)
-	$(HOST_CXX) $(HOST_CXXFLAGS) $< -o $@
+	$(HOST_CXX) $(HOST_CXXFLAGS) $^ -o $@
+
+.PHONY: menu-header-test
+.PHONY: menu-presentation-test
+host-test: menu-presentation-test
+
+racing-challenge-test: menu-header-test
+menu-header-test: $(HOST_BUILD)/menu_header_tests
+	$(HOST_BUILD)/menu_header_tests
+$(HOST_BUILD)/menu_header_tests: tests/host/menu_header_tests.cpp engine/src/gbs_text.c
+	@mkdir -p $(@D)
+	$(HOST_CXX) $(HOST_CXXFLAGS) -x c++ $^ -o $@
 
 .PHONY: racing-progress-test
 racing-progress-test: $(HOST_BUILD)/racing_progress_tests
@@ -2192,3 +2302,57 @@ host-test: racing-progress-test
 $(HOST_BUILD)/racing_progress_tests: tests/host/racing_progress_tests.cpp engine/include/gbs/racing.hpp
 	@mkdir -p $(dir $@)
 	$(HOST_CXX) $(HOST_CXXFLAGS) $< -o $@
+
+.PHONY: battle-rpg-inventory-test
+battle-rpg-inventory-test:
+	python3 tests/host/battle_rpg_inventory_tests.py
+
+.PHONY: runtime-dialogue-portrait-test
+runtime-dialogue-portrait-test:
+	python3 tests/host/runtime_dialogue_portrait_tests.py
+
+host-test: runtime-dialogue-portrait-test
+
+.PHONY: menu-keyboard-geometry-test
+menu-keyboard-geometry-test: $(HOST_BUILD)/menu_keyboard_geometry_tests
+	$(HOST_BUILD)/menu_keyboard_geometry_tests
+	python3 tests/host/menu_keyboard_assetc_tests.py
+	python3 tests/host/menu_text_input_presentation_tests.py
+
+$(HOST_BUILD)/menu_keyboard_geometry_tests: tests/host/menu_keyboard_geometry_tests.cpp engine/include/gbs/menu.hpp engine/include/gbs/name_keyboard.h
+	@mkdir -p $(@D)
+	$(HOST_CXX) $(HOST_CXXFLAGS) $< -o $@
+
+host-test: menu-keyboard-geometry-test
+
+.PHONY: authored-scene-hud-test
+authored-scene-hud-test:
+	python3 tests/host/authored_scene_hud_tests.py
+	python3 tests/host/menu_interface_policy_tests.py
+	python3 tests/host/native_hud_precedence_tests.py
+
+host-test: authored-scene-hud-test
+
+.PHONY: racing-events-test
+host-test: racing-events-test
+racing-events-test: $(HOST_BUILD)/racing_progress_events_tests
+	$(HOST_BUILD)/racing_progress_events_tests
+	python3 tests/host/racing_events_assetc_tests.py
+$(HOST_BUILD)/racing_progress_events_tests: tests/host/racing_progress_events_tests.cpp engine/include/gbs/racing_events.hpp engine/include/gbs/racing.hpp
+	@mkdir -p $(@D)
+	$(HOST_CXX) $(HOST_CXXFLAGS) $< -o $@
+.PHONY: event-scale-background-test
+event-scale-background-test: $(HOST_BUILD)/scene_background_runner_tests
+	$(HOST_BUILD)/scene_background_runner_tests
+	@mkdir -p $(HOST_BUILD)
+	$(HOST_CXX) $(HOST_CXXFLAGS) tests/host/background_scale_profiles_tests.cpp -o $(HOST_BUILD)/background_scale_profiles_tests
+	$(HOST_BUILD)/background_scale_profiles_tests
+	python3 tests/host/background_video_export_tests.py
+	python3 tests/host/background_scene_cache_tests.py
+	python3 tests/host/background_profile_consumers_tests.py
+	python3 tests/host/platformer_affine_background_tests.py
+	python3 tests/host/affine_tilemap_publication_tests.py
+
+$(HOST_BUILD)/scene_background_runner_tests: tests/host/scene_background_runner_tests.cpp engine/src/gbs_event.cpp engine/src/gbs_dialogue_locale.cpp $(HOST_EVENT_RUNTIME_SRCS) engine/include/gbs/scene_script_runner.hpp engine/include/gbs/iso_event_scheduler.hpp
+	@mkdir -p $(@D)
+	$(HOST_CXX) $(HOST_CXXFLAGS) $(filter %.cpp,$^) -o $@

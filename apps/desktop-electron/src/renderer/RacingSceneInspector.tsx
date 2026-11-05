@@ -3,11 +3,12 @@ import { InspectorNumber, InspectorSection } from "./InspectorControls";
 import { createRacingCircuitTrack } from "../shared/racingAuthoring";
 import type { RacingSceneConfig, RacingTopdownTrackConfig } from "../shared/sceneTypeProfiles";
 
-export function RacingSceneInspector({config,width,height,background,assets,onChange,onPrepare}: {
+export function RacingSceneInspector({config,width,height,background,assets,onChange,onPrepare,onEditTrack}: {
   config:RacingSceneConfig; width:number; height:number; background:string;
   assets:Array<{label:string;value:string}>;
   onChange(patch:Partial<RacingSceneConfig>):void;
   onPrepare(track:RacingTopdownTrackConfig):void;
+  onEditTrack?(mode:"gates"|"route"):void;
 }) {
   const ui = useStudioUiText();
   const track=config.topdownTrack;
@@ -24,7 +25,7 @@ export function RacingSceneInspector({config,width,height,background,assets,onCh
     <InspectorNumber label={ui("Força do freio")} value={config.brakePower} min={0.125} max={32} step={0.125} onChange={brakePower=>onChange({brakePower})}/>
     <InspectorNumber label={ui("Velocidade de curva")} value={config.steeringSpeed} min={0.125} max={16} step={0.125} onChange={steeringSpeed=>onChange({steeringSpeed})}/>
     <InspectorNumber label={ui("Voltas para vencer")} value={config.lapsToWin} min={1} max={9} onChange={lapsToWin=>onChange({lapsToWin})}/>
-    <InspectorNumber label={ui("Velocidade dos rivais")} value={config.rivalSpeed} min={0.125} max={16} step={0.125} onChange={rivalSpeed=>onChange({rivalSpeed})}/>
+    <InspectorNumber label={ui("Velocidade dos rivais")} value={config.rivalSpeed} min={0.125} max={config.presentation==="pseudo3d"&&!track?16:127} unit="px/s" step={0.125} onChange={rivalSpeed=>onChange({rivalSpeed})}/>
     <p>{ui("A acelera, B freia e as setas viram. Os atores comuns percorrem a rota dos rivais. ")}{config.presentation === "pseudo3d"
       ? ui("Animações: idle, drive, steer_left, steer_right, brake, brake_left, brake_right e hurt.")
       : ui("Animações: idle, drive e hurt nas direções up, right, down e left.")}</p>
@@ -37,6 +38,7 @@ export function RacingSceneInspector({config,width,height,background,assets,onCh
     </>:null}
     {!track ? <button type="button" onClick={()=>onPrepare(createRacingCircuitTrack(config.presentation==="pseudo3d"?64:width,config.presentation==="pseudo3d"?64:height))}>{config.presentation==="pseudo3d"?ui("Preparar circuito 512 × 512"):ui("Criar checkpoints e rota")}</button> : <>
       <label><span>{ui("Direção na largada")}</span><select aria-label={ui("Direção na largada")} value={track.startHeading??0} onChange={event=>changeTrack({startHeading:Number(event.currentTarget.value)})}>{Array.from({length:16},(_,index)=><option key={index} value={index}>{index*22.5}°{index===0?ui(" · Norte"):index===4?ui(" · Leste"):index===8?ui(" · Sul"):index===12?ui(" · Oeste"):''}</option>)}</select></label>
+      {onEditTrack?<div className="racing-track-actions"><button type="button" onClick={()=>onEditTrack("gates")}>{ui("Editar checkpoints no mapa")}</button><button type="button" onClick={()=>onEditTrack("route")}>{ui("Editar rota no mapa")}</button></div>:null}
       <InspectorSection title={ui("Checkpoints em ordem")} defaultOpen>
         <p>{track.finishAtZero===true ? ui("O primeiro é a chegada. Cruze os demais em ordem e volte à chegada para contar uma volta.") : ui("Cruze os checkpoints em ordem. O último completa a volta.")} {ui(" Posições em pixels no mapa.")}</p>
         {track.checkpoints.map((gate,index)=><fieldset key={gate.id}><legend>{gateLabel(index)}</legend>

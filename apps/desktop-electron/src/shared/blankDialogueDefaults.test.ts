@@ -1,3 +1,4 @@
+import { createBlankProjectWithScene } from "../testFixtures/blankProject.js";
 import { describe, expect, it } from "vitest";
 import { buildProjectFromTemplate } from "./projectTemplates.js";
 import { createBlankProjectData } from "./newProject.js";
@@ -31,7 +32,7 @@ describe("approved blank dialogue assets", () => {
     expect(blank.dialogues).toEqual([]);
   });
   it("exports the existing dialogue consumer with a single 64x64 OBJ portrait", () => {
-    const data = createDialogueInProject(buildProjectFromTemplate("blank",{name:"Export"}),{key:"intro",text:"Exemplo"});
+    const data = createDialogueInProject(createBlankProjectWithScene({name:"Export"}),{key:"intro",text:"Exemplo"});
     const portrait = buildAssetcPortraitPackGeneration(data,null)!;
     expect(portrait.assetsByPortraitName["neutral-portrait.png"]).toMatchObject({sprite_width:64,sprite_height:64,kind:"obj"});
     const prepared = prepareEngineProjectExport(data);

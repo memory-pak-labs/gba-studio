@@ -22,16 +22,19 @@ export async function playCoastDepth(driver, project, exported, feature, context
     assert.equal((await driver.state()).runtimeKind,kind,'Save returns to the same runtime');
     await shot(label);return await driver.coast();
   }
-  async function reload(label,kind){
+  async function reload(label,kind,slot=1){
     await driver.reboot();await driver.run(240,0);await close();
     if(feature==='clock_boot')await shot(label+'-fresh');
     await tap(kind===6?256:8,55);
     assert.equal((await driver.state()).runtimeKind,3,'Fresh boot can reopen the authored menu');
     for(let i=0;i<4;i++)await tap(128);
-    await tap(1,55);assert.equal((await driver.state()).currentRoom,4,'The existing load screen opens');
-    // A direct scene boot has no autosave: the load screen already selects
-    // the only occupied slot (slot 2), skipping the empty slot 1.
-    if(feature!=='clock_boot')await tap(128);
+    await tap(1,55);assert.equal((await driver.state()).currentRoom,screen('carregar_jogo'),'The existing load screen opens');
+    const loadScreen=exported.menu_project.screens.find(screen=>screen.name==='carregar_jogo');
+    const target=loadScreen.items.findIndex(item=>item.save_slot===slot);
+    assert.ok(target>=0,'The requested manual slot has an authored load action');
+    // Empty slots are skipped, and the initial selection depends on occupancy.
+    for(let n=0;n<loadScreen.items.length*2&&(await driver.sceneMenu()).selected!==target;n++)await tap(128);
+    assert.equal((await driver.sceneMenu()).selected,target,'Select the exact saved slot before loading');
     if(feature==='clock_boot')await shot(label+'-selected-slot');
     await tap(1,160);if(feature==='clock_boot')await shot(label+'-after-load');await close();
     assert.equal((await driver.state()).runtimeKind,kind,'Fresh boot loads the actual battery slot');
@@ -46,7 +49,7 @@ export async function playCoastDepth(driver, project, exported, feature, context
     await c.close();await driver.run(60,0);
     const music=async()=>(await driver.audioMixer()).find(s=>s.channel==='music');
     assert.equal((await music()).current,12,'Default 80% preference applies to outdoor music');
-    async function settings(){await tap(8,55);for(let i=0;i<5;i++)await tap(128);await tap(1,55);assert.equal((await driver.state()).currentRoom,5);}
+    async function settings(){await tap(8,55);for(let i=0;i<5;i++)await tap(128);await tap(1,55);assert.equal((await driver.state()).currentRoom,screen('configuracoes'));}
     async function returnToGame(){
       await tap(2,55);await driver.run(6,2);await driver.run(1,0);
       for(let i=0;i<240&&(await driver.telemetry()).runtimeKind!==0;i++)await driver.run(1,0);
@@ -152,7 +155,17 @@ export async function playCoastDepth(driver, project, exported, feature, context
     await driver.run(25,0);await shot('lift-operator-approach');await driver.run(6,1);await shot('lift-operator-action');await driver.run(80,0);await close();
     assert.equal(await value('var_coast_lift'),1,'Operator starts the optional lift');await shot('lift-running');
     const before=await driver.coast(),lift=s=>s.actors.find(a=>a.group===2);assert.ok(lift(before));
-    await driver.run(30,0);assert.notEqual(lift(await driver.coast()).y,lift(before).y,'The separate platform actor moves through its event');
+    // One changed pixel can be an oscillation. Require the complete authored
+    // route and reversal before attempting to board the native platform.
+    const route=[];
+    for(let n=0;n<400;n++){
+      await driver.run(6,0);route.push(lift(await driver.coast()).y);
+      if(route.some(y=>Math.floor(y/8)===29)&&route.at(-1)===36*8)break;
+    }
+    // Native at-position conditions match the occupied tile, not a subpixel.
+    assert.equal(Math.floor(Math.min(...route)/8),29,'The lift reaches its upper stop tile');
+    assert.equal(Math.max(...route),36*8,'The lift returns to its lower stop');
+    await shot('lift-complete-route');
     // Jump before entering the operator's interaction radius, then board the
     // separate lift. The approved bridge and its existing collision stay intact.
     for(let i=0;i<80&&(await driver.coast()).platform.x>276;i++)await driver.run(1,32);
@@ -171,7 +184,7 @@ export async function playCoastDepth(driver, project, exported, feature, context
     assert.equal(await value('var_coast_lift'),1);assert.equal(loaded.platform.x,saved.platform.x);
     assert.equal(loaded.platform.y+loaded.platform.height,lift(loaded).y-16,'Loading preserves the rider on the running lift');
     await shot('lift-ride-restored');
-    return{passed:true,feature,operatorToggle:true,rideRestored:true,ride,carried};
+    return{passed:true,feature,operatorToggle:true,rideRestored:true,route,ride,carried};
   }
   if(feature==='market'){
     assert.equal((await driver.state()).runtimeKind,2);

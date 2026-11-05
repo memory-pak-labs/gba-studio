@@ -45,15 +45,16 @@ export function LogicValueInspector({projectData,selection,onUpdate,onRemove}:Lo
   if(!entry) return <p className="muted">{ui("Este item foi removido. Selecione outro item na aba Lógica.")}</p>;
   const text=selection.kind!=="constant" && entry.valueType==="text";
   const valueKey=selection.kind==="constant"?"value":"initialValue";
-  const label=selection.kind==="constant"?"Constante":"Variável";
-  return <section className="logic-value-inspector" aria-label={`${label} ${selection.name}`}>
-    <div className="rooms-inspector-context"><h4>{selection.name}</h4><p>{ui(label)} {ui(" · Projeto")}</p></div>
+  const label=ui(selection.kind==="constant"?"constante":"variavel");
+  const titleLabel=label.charAt(0).toLocaleUpperCase()+label.slice(1);
+  return <section className="logic-value-inspector" aria-label={`${titleLabel} ${selection.name}`}>
+    <div className="rooms-inspector-context"><h4>{selection.name}</h4><p>{titleLabel} {ui(" · Projeto")}</p></div>
     <label><span>{ui("Nome")}</span><input aria-label={ui("Nome do item de lógica")} defaultValue={selection.name} readOnly={usages.length>0} onBlur={event=>{const name=event.currentTarget.value.trim();if(name!==selection.name)onUpdate?.(selection.name,selection.kind,{name});}}/></label>
     {usages.length>0?<p className="muted">{ui("O nome está vinculado aos usos abaixo. Remova os vínculos para renomear.")}</p>:null}
     {selection.kind!=="constant" ? <label><span>{ui("Tipo")}</span><select aria-label={ui("Tipo do item de lógica")} value={text?"text":"number"} onChange={event=>onUpdate?.(selection.name,selection.kind,{valueType:event.currentTarget.value==="text"?"text":"number",[valueKey]:event.currentTarget.value==="text"?"":0})}><option value="number">{ui("Número")}</option><option value="text">{ui("Texto")}</option></select></label> : <p className="muted">{ui("Valor fixo numérico do projeto. Use const(")}{selection.name}{ui(") nos valores de eventos de variável, comparação e espera. Configurações da engine ficam em Ajustes.")}</p>}
     {text?<label><span>{ui("Máximo de caracteres")}</span><input aria-label={ui("Máximo de caracteres")} type="number" min={1} max={16} value={Number(entry.maxLength)||16} onChange={event=>onUpdate?.(selection.name,selection.kind,{maxLength:event.currentTarget.valueAsNumber})}/></label>:null}
     <label><span>{selection.kind==="constant"?ui("Valor fixo"):ui("Valor inicial")}</span><input aria-label={selection.kind==="constant"?ui("Valor fixo"):ui("Valor inicial")} type={text?"text":"number"} step={1} maxLength={text?Number(entry.maxLength)||16:undefined} value={String(text ? (typeof entry[valueKey] === "string" ? entry[valueKey] : "") : (entry[valueKey] ?? 0))} onChange={event=>{const value=text?event.currentTarget.value:event.currentTarget.valueAsNumber;if(typeof value==="number" && !Number.isFinite(value))return;onUpdate?.(selection.name,selection.kind,{[valueKey]:value});}}/></label>
     <section aria-label={ui("Onde é utilizado")}><h4>{ui("Onde é utilizado")}</h4>{usages.length?<ul>{usages.map(usage=><li key={usage.path}><strong>{ui(usage.label)}</strong><small>{usage.path.startsWith("events") ? ui("Evento{0}", { 0: usage.path.includes("steps[") ? ` · Passo ${Number(usage.path.match(/steps\[(\d+)\]/)?.[1] ?? 0)+1}` : "" }) : usage.path.startsWith("rooms") ? ui("Cena") : ui("Configuração do projeto")}</small></li>)}</ul>:<p className="muted">{ui("Nenhuma referência encontrada.")}</p>}</section>
-    <button type="button" className="danger" disabled={usages.length>0 || !onRemove} onClick={()=>onRemove?.(selection.name,selection.kind)}>{ui("Excluir ")}{label.toLocaleLowerCase()}</button>
+    <button type="button" className="danger" disabled={usages.length>0 || !onRemove} onClick={()=>onRemove?.(selection.name,selection.kind)}>{ui(selection.kind==="constant"?"Excluir constante":"Excluir variável")}</button>
   </section>;
 }

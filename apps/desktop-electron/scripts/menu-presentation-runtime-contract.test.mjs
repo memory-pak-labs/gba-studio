@@ -3,7 +3,7 @@ import { readFile } from "node:fs/promises";
 import { describe, expect, it } from "vitest";
 
 describe("runtime de telas de apresentação do menu", () => {
-  it("mantém telas Logo sem HUD, diálogo ou configuração de paleta da UI", async () => {
+  it("mantém Logo/Título sem UI implícita e habilita composições explícitas", async () => {
     const source = await readFile(
       new URL("../../../packages/GBAStudioEngine/templates/exported_menu/main.cpp", import.meta.url),
       "utf8"
@@ -16,6 +16,7 @@ describe("runtime de telas de apresentação do menu", () => {
     expect(menuScreenUsesUi).toMatch(
       /screen->screen_type == gbs::MenuScreenType::Logo[\s\S]*?screen->screen_type == gbs::MenuScreenType::Title/
     );
+    expect(menuScreenUsesUi).toMatch(/Title\) return menu_scene_has_hud_binding;/);
     expect(source).toMatch(
       /void refresh_hud\(\) \{[\s\S]*?if \(!menu_screen_uses_ui\(screen\)[\s\S]*?gbs::hide_hud\(hud\)/
     );
@@ -28,13 +29,13 @@ describe("runtime de telas de apresentação do menu", () => {
       /void start_screen\(int screen_index, bool reset_selection = true, int target_item_index = -1\) \{[\s\S]*?\n\}/
     )?.[0] ?? "";
     expect(startScreen).toMatch(
-      /screen->screen_type != gbs::MenuScreenType::Logo &&\s*screen->screen_type != gbs::MenuScreenType::Title\) \{[\s\S]*?gbastudio_dialogue_ui::configure_for_scene\(scene_name, true\);[\s\S]*?\} else \{\s*menu_scene_has_hud_binding = false;\s*gbs::hide_hud\(hud\);\s*gbs::hide_dialogue\(dialogue\);/
+      /screen->screen_type != gbs::MenuScreenType::Logo &&\s*screen->screen_type != gbs::MenuScreenType::Title\) \|\| menu_scene_has_hud_binding\){1,2} \{[\s\S]*?gbastudio_dialogue_ui::configure_for_scene\(scene_name, true\);[\s\S]*?\} else \{\s*menu_scene_has_hud_binding = false;\s*gbs::hide_hud\(hud\);\s*gbs::hide_dialogue\(dialogue\);/
     );
     const updateMenuRuntime = source.match(
       /gbs::RuntimeAdapterFrameResult update_menu_runtime\([\s\S]*?\n\}/
     )?.[0] ?? "";
     expect(updateMenuRuntime).toMatch(
-      /screen->screen_type != gbs::MenuScreenType::Logo &&\s*screen->screen_type != gbs::MenuScreenType::Title\) \{[\s\S]*?gbastudio_dialogue_ui::configure_for_scene\(scene_name\);[\s\S]*?\} else \{\s*menu_scene_has_hud_binding = false;/
+      /screen->screen_type != gbs::MenuScreenType::Logo &&\s*screen->screen_type != gbs::MenuScreenType::Title\) \|\| menu_scene_has_hud_binding\){1,2} \{[\s\S]*?gbastudio_dialogue_ui::configure_for_scene\(scene_name\);[\s\S]*?\} else \{\s*menu_scene_has_hud_binding = false;/
     );
     expect(source).not.toMatch(
       /refresh_menu_save_slot_statuses\(\);\s*gbastudio_dialogue_ui::configure\(\);/

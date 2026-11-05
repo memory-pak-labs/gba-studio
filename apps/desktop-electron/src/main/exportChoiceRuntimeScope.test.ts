@@ -3,6 +3,19 @@ import { describe, expect, it } from 'vitest';
 import { buildEngineExportProjectContract } from './exportEngineProject.js';
 
 describe('choice callbacks in mixed runtime projects', () => {
+  it('does not compile a scene-scoped callback into another runtime when its binding is global', () => {
+    const p = JSON.parse(readFileSync(new URL('../../default-assets/templates/exemplo-gba/exemplo-gba.gba-project', import.meta.url), 'utf8'));
+    p.dialogues.push({ key: 'scope_actor', text: 'Escolha', choices: ['Ocultar'] });
+    p.events.push(
+      { id: 'actor-choice-binding', name: 'actor_choice_binding', category: 'Test', detail: 'Choice', command: 'noop', steps: [{ command: 'choice_event scope_actor 0 actor_choice_hide' }] },
+      { id: 'actor-choice-hide', name: 'actor_choice_hide', roomName: 'porto_lumen', category: 'Test', detail: 'Hide', command: 'noop', steps: [{ command: 'set_actor_visible "Mecânica de Lúmen" false' }] }
+    );
+    const c = buildEngineExportProjectContract(p);
+    const line = p.dialogues.findIndex((d: { key: string }) => d.key === 'scope_actor');
+    expect(c.topdown_project!.choice_groups!.find(g => g.line === line)!.choices[0]!.script).toContainEqual(expect.objectContaining({ op: 'set_actor_visible' }));
+    expect(c.visual_novel_project!.choice_groups!.find(g => g.line === line)!.choices[0]!.script).toBeUndefined();
+  });
+
   it('keeps a topdown shop callback out of visual novel groups without changing dialogue indices', () => {
     const p = JSON.parse(readFileSync(new URL('../../default-assets/templates/exemplo-gba/exemplo-gba.gba-project', import.meta.url), 'utf8'));
     p.dialogues.push({ key: 'scope_shop', text: 'Workshop', choices: ['Scoped shop'] });

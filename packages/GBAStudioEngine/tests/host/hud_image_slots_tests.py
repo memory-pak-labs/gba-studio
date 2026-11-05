@@ -26,8 +26,19 @@ code += '\nenum { ' + constants + ', DIALOGUE_PALETTE = 15, DYNAMIC_TEXT_OBJ_TIL
 cache_start=source.index('static uint32_t hud_layout_old_icons;')
 cache_end=source.index('static int gbs_hw_draw_hud_icon(',cache_start)
 code += source[cache_start:cache_end].replace('__attribute__((section(".ewram_bss")))','')
+code += '\n' + (ROOT / 'engine/src/frame_video_stats.h').read_text().replace('#pragma once', '')
 code += r'''
-uint16_t shadow_oam[512];
+GbsOamOccupancy staged_oam = {{0xffffffffu,0xffffffffu,0xffffffffu,0xffffffffu}};
+uint16_t shadow_oam[512], test_oam[512], dialogue_ordered_oam[512];
+#define MEM_OAM test_oam
+uint8_t shadow_oam_dirty_first, shadow_oam_dirty_last, hblank_dma_active_mask;
+uint32_t published_oam_enabled;
+int dialogue_oam_front, dma_copies;
+void gbs_portrait_tab_order_oam(const uint16_t* from,uint16_t* to) { memcpy(to,from,1024); }
+void gbs_hw_dma_copy(int channel,const void* from,volatile void* to,uint32_t units,int word) {
+    if(hblank_dma_active_mask & (1u<<channel)) return;
+    ++dma_copies; memcpy((void*)to,from,units*(word?4:2));
+}
 uint16_t hud_pixel_text_glyphs[124];
 int oam_overflow_count;
 unsigned hud_pixel_text_obj_count;
@@ -51,12 +62,28 @@ code += '\n'.join(function(name) for name in (
     'invalidate_hud_pixel_text_tiles','gbs_hw_set_sprite','gbs_hw_set_sprite_color_depth',
     'gbs_hw_set_sprite_affine','gbs_hw_clear_hud_icon_slots',
     'gbs_hw_hud_icon_shape','gbs_hw_hud_icon_size','gbs_hw_draw_hud_icon'))
+code += '\n'+function('commit_shadow_oam')
+code += '\n'+function('commit_shadow_oam_full')
 code += '\n'+function('gbs_hw_allocate_hud_compact_slot')
 code += '\n'+function('gbs_hw_begin_hud_layout')
 code += '\n'+function('gbs_hw_draw_hud_layout_component')
 code += '\n'+function('gbs_hw_end_hud_layout')
 code += r'''
 int main() {
+    gbs_hw_hide_all_sprites();
+    staged_oam.words[0]=8; shadow_oam[3*4]=0;
+    for(int full=0;full<2;++full) {
+        published_oam_enabled=0; dma_copies=0;
+        shadow_oam_dirty_first=0; shadow_oam_dirty_last=128; hblank_dma_active_mask=8;
+        if(full) commit_shadow_oam_full(); else commit_shadow_oam();
+        assert(published_oam_enabled==0 && dma_copies==0);
+        assert(shadow_oam_dirty_first==0 && shadow_oam_dirty_last==128);
+        hblank_dma_active_mask=0;
+        if(full) commit_shadow_oam_full(); else commit_shadow_oam();
+        assert(published_oam_enabled==1 && dma_copies==1);
+        assert(shadow_oam_dirty_first==128 && shadow_oam_dirty_last==0);
+    }
+
     struct gbs_hw_metasprite_part a = {0}, b = {0};
     a.width=a.height=b.width=b.height=8; a.tile_index=11; b.tile_index=22;
     struct gbs_hw_metasprite first={&a,1}, second={&b,1};
@@ -145,9 +172,45 @@ int main() {
     assert(!gbs_hw_hud_layout_retained());
 }
 '''
+# Pass a real C++ descriptor to the C allocator: single-part C fixtures cannot
+# detect a stride mismatch after presentation fields are added to MetaSpritePart.
+code = code.replace('int main() {', 'void run_hw_fixture(void) {')
+code += r'''
+void verify_cpp_hud_metasprite(const void* image) {
+    gbs_hw_hide_all_sprites(); gbs_hw_clear_hud_icon_slots();
+    assert(gbs_hw_draw_hud_icon(image,8,8,1,0));
+    assert(hud_icon_obj_count==2);
+    assert((shadow_oam[88*4+2]&1023)==11 && (shadow_oam[89*4+2]&1023)==22);
+    assert((shadow_oam[88*4+1]&511)==8 && (shadow_oam[89*4+1]&511)==16);
+}
+'''
+cpp = r'''
+#include "gbs/assets.hpp"
+extern "C" void run_hw_fixture(void);
+extern "C" void verify_cpp_hud_metasprite(const void*);
+int main() {
+    run_hw_fixture();
+    const gbs::MetaSpritePart parts[] = {
+        {0,0,11,0,false,false,8,8}, {8,0,22,0,false,false,8,8}
+    };
+    const gbs::MetaSprite image {parts,2};
+    verify_cpp_hud_metasprite(&image);
+}
+'''
+cpp = '#include "gbs/assets.hpp"\n' + structs + '\n' + cpp
+for native, hardware, fields in [
+    ('MetaSpritePart', 'gbs_hw_metasprite_part', ['x','y','tile_index','palette','hflip','vflip','width','height','color_depth','scale_x256','scale_y256']),
+    ('MetaSprite', 'gbs_hw_metasprite', ['parts','part_count','scale_x256','scale_y256'])
+]:
+    cpp += f'\nstatic_assert(sizeof(gbs::{native}) == sizeof({hardware}));\n'
+    cpp += f'static_assert(alignof(gbs::{native}) == alignof({hardware}));\n'
+    for field in fields:
+        cpp += f'static_assert(offsetof(gbs::{native}, {field}) == offsetof({hardware}, {field}));\n'
 with tempfile.TemporaryDirectory() as directory:
     directory=Path(directory)
     (directory/'test.c').write_text(code)
-    subprocess.run(['cc','-std=c11',str(directory/'test.c'),'-o',str(directory/'test')],check=True)
+    (directory/'test.cpp').write_text(cpp)
+    subprocess.run(['cc','-std=c11','-c',str(directory/'test.c'),'-o',str(directory/'test.o')],check=True)
+    subprocess.run(['c++','-std=c++17','-I'+str(ROOT/'engine/include'),str(directory/'test.cpp'),str(directory/'test.o'),'-o',str(directory/'test')],check=True)
     subprocess.run([str(directory/'test')],check=True)
 print('HUD simultaneous image slots and world isolation: PASS')

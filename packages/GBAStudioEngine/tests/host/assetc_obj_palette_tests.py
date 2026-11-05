@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 """Mixed OBJ palettes must remain exact and leave runtime text banks untouched."""
+import re
 import tempfile
 from pathlib import Path
 from assetc_production_contract_tests import load_assetc_module, write_indexed_png
@@ -195,7 +196,78 @@ def test_palette_families_remain_compile_time_tables():
         assert next(a for a in report["allocations"] if a["id"] == "family")["allocations"] == {}
 
 
+def test_builtin_padding_accepts_more_colors_without_recoloring_or_using_text_banks():
+    c = load_assetc_module()
+    with tempfile.TemporaryDirectory() as tmp:
+        root = Path(tmp)
+        # None of these colors is one of the three built-in fallback colors.
+        colors = [(0, 0, 0)] + [(i % 32 * 8, i // 32 * 8, 64) for i in range(1, 201)]
+        write_indexed_png(root / "hero.png", 16, 16, colors, [1 + i % 200 for i in range(256)])
+        entry = asset("hero", 8)
+        report = c.emit_pack_report({"assets": [entry]}, root)
+        assert report["ok"], report["errors"]
+        allocation = report["allocations"][0]
+        master = allocation["object_palette_plan"]["values"]
+        assert len(master) == 208
+        assert master[193:196] == c.OBJ_BUILTIN_PALETTE_VALUES[1:4]
+        assert master[192] != 0 and any(master[196:208]), "8bpp may reuse the fallback's unused positions"
+        resolved = c.pack_asset_with_allocations(entry, allocation)
+        _, _, source, indices, transparent = c.read_png(root / "hero.png", max_colors=None, include_transparency=True)
+        target, remapped = c.prepare_obj_asset_pixels(source, indices, transparent, resolved)
+        assert [c.rgb15(target[i]) for i in remapped] == [c.rgb15(source[i]) for i in indices]
+        assert max(remapped) < 208, "banks 13-15 remain private to runtime text/UI"
+        # A cached report must preserve the new capacity and exact indices too.
+        cached = c.emit_pack_report({"assets": [entry]}, root, report)
+        assert cached["ok"] and cached["allocations"][0]["object_palette_plan"] == allocation["object_palette_plan"]
+
+
+def test_reclaimed_capacity_still_rejects_overflow_without_quantization():
+    c = load_assetc_module()
+    with tempfile.TemporaryDirectory() as tmp:
+        root = Path(tmp)
+        colors = [(0, 0, 0)] + [(i % 32 * 8, i // 32 * 8, 64) for i in range(1, 206)]
+        write_indexed_png(root / "hero.png", 16, 16, colors, [1 + i % 205 for i in range(256)])
+        try:
+            c.emit_pack_report({"assets": [asset("hero", 8)]}, root)
+        except SystemExit as error:
+            assert "paleta OBJ compartilhada" in str(error)
+        else:
+            raise AssertionError("205 unrelated colors cannot fit beside the three fixed fallback colors")
+
+
+def test_full_capacity_accepts_204_extra_colors_and_207_including_fallback():
+    c = load_assetc_module()
+    with tempfile.TemporaryDirectory() as tmp:
+        root = Path(tmp)
+        extra = [(i % 32 * 8, i // 32 * 8, 64) for i in range(1, 205)]
+        fallback = [(48, 160, 248), (248, 56, 40), (248, 248, 248)]
+        for visible in (extra, extra + fallback):
+            write_indexed_png(root / "hero.png", 16, 16, [(0, 0, 0)] + visible,
+                              [1 + i % len(visible) for i in range(256)])
+            report = c.emit_pack_report({"assets": [asset("hero", 8)]}, root)
+            assert report["ok"], report["errors"]
+            plan = report["allocations"][0]["object_palette_plan"]
+            assert len(plan["indices"]) == 207
+            assert set(plan["indices"].values()) == set(range(1, 208))
+
+
+def test_runtime_fallback_tiles_use_only_the_three_protected_colors():
+    source = (Path(__file__).resolve().parents[2] / "templates/exported_shmup/main.cpp").read_text()
+    used = set()
+    for name in ("player_tile_data", "enemy_tile_data", "bullet_tile_data"):
+        match = re.search(r"constexpr uint8_t " + name + r"\[\] = \{(.*?)\};", source, re.S)
+        assert match, name
+        for value in re.findall(r"0x([0-9a-fA-F]+)", match.group(1)):
+            byte = int(value, 16)
+            used.update((byte & 15, byte >> 4))
+    assert used == {0, 1, 2, 3}, "update the planner's protected colors if fallback artwork changes"
+
+
 if __name__ == "__main__":
+    test_builtin_padding_accepts_more_colors_without_recoloring_or_using_text_banks()
+    test_reclaimed_capacity_still_rejects_overflow_without_quantization()
+    test_full_capacity_accepts_204_extra_colors_and_207_including_fallback()
+    test_runtime_fallback_tiles_use_only_the_three_protected_colors()
     test_mixed_palette_is_exact_shared_even_and_preserves_text()
     test_disjoint_scenes_do_not_spend_each_others_palette()
     test_scoped_four_bpp_banks_do_not_consume_disjoint_scene_masters()

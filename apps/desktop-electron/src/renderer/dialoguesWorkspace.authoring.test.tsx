@@ -15,6 +15,16 @@ vi.mock("./offlineTranslator.js", () => ({
 describe("DialoguesWorkspace authoring modes", () => {
   afterEach(cleanup);
 
+  it("offers creation directly in an empty dialogue library", async () => {
+    const create = vi.fn(async () => "new_dialogue");
+    render(<StudioI18nProvider><DialoguesWorkspace
+      presentation={deriveDialoguesWorkspacePresentation({ dialogues: [] })}
+      onCreateDialogue={create} onUpdateDialogue={vi.fn()} onExportDialogue={vi.fn()} onOpenDialogueEvent={vi.fn()}
+    /></StudioI18nProvider>);
+    await userEvent.setup().click(screen.getByRole("button", { name: "Novo diálogo" }));
+    expect(create).toHaveBeenCalledOnce();
+  });
+
   it("preserves review filters and writes text into the selected translation locale", () => {
     let projectData = {
       localization: { sourceLocale: "en", defaultLocale: "pt-BR", enabledLocales: ["pt-BR", "en", "es"] },

@@ -114,7 +114,9 @@ describe("createBlankProjectData", () => {
       bundledDefaultAsset: "dialogue-portrait",
       previewKind: "image"
     });
-    expect(files.assets.filter((asset) => asset.kind === "FONT")).toEqual([
+    expect((project.assets as Record<string, unknown>[]).filter((asset) => asset.kind === "FONT").map((asset) => asset.name))
+      .toEqual(["gba-dialogue-font-v3.png", "gba-variable-font.png"]);
+    expect(files.assets.filter((asset) => asset.kind === "Font")).toEqual([
       expect.objectContaining({
         name: "gba-dialogue-font-v3.png",
         source: "Assets/fonts/gba-dialogue-font-v3.png",

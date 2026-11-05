@@ -10,3 +10,6 @@
 *.xm binary
 *.s3m binary
 *.wasm binary
+
+# Preserve the exact context bytes of the pinned upstream patch.
+tools/cartridge-writer/cfb-stm.patch -whitespace

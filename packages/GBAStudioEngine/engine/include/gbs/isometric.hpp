@@ -448,6 +448,8 @@ struct IsoDrawItem {
     uint8_t height = 16;
     bool vflip = false;
     ColorDepth color_depth = ColorDepth::Bpp4;
+    uint16_t scale_x256 = 256;
+    uint16_t scale_y256 = 256;
 };
 
 // The adventure renderer keeps a 320x192 circular surface so the hardware
@@ -1275,7 +1277,8 @@ size_t build_iso_draw_list(
     const IsoCamera& camera,
     IsoDrawItem* out_items,
     size_t out_capacity,
-    const IsoGridConfig& config = default_iso_grid_config()
+    const IsoGridConfig& config = default_iso_grid_config(),
+    const EventState* event_state = nullptr
 );
 Vec2i iso_metasprite_center_offset(const MetaSprite& metasprite);
 Vec2i iso_metasprite_diamond_center_offset(const MetaSprite& metasprite, const IsoGridConfig& grid);

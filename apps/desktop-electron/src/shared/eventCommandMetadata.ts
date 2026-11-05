@@ -1,7 +1,9 @@
+import { scaleEventVerbs } from "./eventTransforms.js";
 import { TILE_REPLACEMENT_COLLISIONS } from "./tileReplacement.js";
 
 /** Authoring metadata only. Never rewrites a command or its serialized arguments. */
 const parameterLabels: Record<string, string[]> = {
+  ...Object.fromEntries(scaleEventVerbs.map(verb => [verb, [verb.includes("actor") ? "Ator" : "Camada affine", ...(verb.startsWith("reset_") ? [] : ["Escala X (%)", "Escala Y (%)"]), ...(verb.startsWith("animate_") ? ["Duração (quadros)"] : [])]])),
   lantern: ["Ator", "Largura (pixels, 8–240)", "Altura (pixels, 8–160)", "Escuridão (0–100%)", "Duração (quadros, 1–3600)", "Formato opcional (circle)"],
   reveal_area: ["Ator", "Largura inicial (pixels, 8–240)", "Altura inicial (pixels, 8–160)", "Escuridão (0–100%)", "Duração (quadros, 1–3600)", "Formato opcional (circle)"],
   set_map_state: ["Estado de mapa (ID)", "Variante (ID)"],
@@ -45,7 +47,8 @@ const parameterLabels: Record<string, string[]> = {
   move_actor_to: ["Ator", "X", "Y"], move_actor_relative: ["Ator", "Deslocamento X", "Deslocamento Y"],
   set_actor_direction: ["Ator", "Direção"], if_actor_direction: ["Ator", "Direção"],
   if_actor_at_position: ["Ator", "X", "Y"], if_actor_distance: ["Ator", "Outro ator", "Distância"],
-  set_actor_animation: ["Ator", "Animação"], set_actor_sprite: ["Ator", "Sprite"],
+  if_actor_relative: ["Ator", "Outro ator", "Posição relativa"],
+  set_actor_animation: ["Ator", "Animação"], play_actor_animation: ["Ator", "Animação"], set_actor_sprite: ["Ator", "Sprite"],
   set_camera_position: ["X", "Y"], camera_move_to: ["X", "Y", "Duração (quadros)"],
   set_engine_field: ["Campo", "Valor"], set_engine_field_variable: ["Campo", "Variável"],
   if_engine_field: ["Campo", "Valor"], if_engine_field_variable: ["Campo", "Variável"],
@@ -54,6 +57,7 @@ const parameterLabels: Record<string, string[]> = {
 };
 
 const descriptions: Record<string, string> = {
+  ...Object.fromEntries(scaleEventVerbs.map(verb => [verb, verb.includes("actor") ? "Aplica escala visual apenas à instância do ator (50–200%), preservando a colisão e a escala ao trocar a animação. A transição segue em paralelo; use Aguardar para encadear." : "Aplica escala relativa à composição affine inicial (50–400%) ou ao piso nativo da Corrida em perspectiva. A colisão permanece igual. A transição segue em paralelo; use Aguardar para encadear."])),
   lantern: "Ilumina uma área ao redor do ator e escurece o exterior. Acrescente circle após a duração para luz circular, com largura e altura iguais. Fades e máscaras têm prioridade; o círculo compartilha DMA0 com efeitos raster.",
   reveal_area: "Expande a área ao redor do ator até revelar a tela. Acrescente circle após a duração para uma abertura circular, com largura e altura iniciais iguais. Ao terminar, remove o escurecimento.",
   clear_visibility: "Remove a lanterna ou a revelação e restaura a visibilidade da cena.",
@@ -71,6 +75,7 @@ const descriptions: Record<string, string> = {
   open_equip_menu: "Permite escolher o slot, equipar um item do inventário ou removê-lo. A pausa controla o avanço do mundo.",
   cancel_actor_movement: "Interrompe a trajetória automática do ator. No jogador, cancela o passo atual; uma nova entrada permite movimentar novamente.",
   set_actor_animation_state: "Troca o conjunto completo de animações do ator pelo estado cadastrado em Sprites.",
+  play_actor_animation: "Reproduz o clipe selecionado. Configure a repetição na animação em Sprites.",
   projectile_load_slot: "Liga um sprite do projeto, dano e velocidade ao slot de projétil 0–7.",
   launch_projectile_slot: "Lança o projétil configurado no slot a partir do ator, com colisão e dano.",
   actor_effects: "Pisca (flash) ou desloca visualmente (shake) apenas o ator durante a duração configurada.",
@@ -125,6 +130,7 @@ export function eventCommandParameterLabel(verb: string, tokenIndex: number, fal
 }
 
 export function eventCommandParameterChoices(verb: string, tokenIndex: number): string[] | null {
+  if (scaleEventVerbs.some(v => v === verb && v.includes("background")) && tokenIndex === 1) return ["BG2", "BG3"];
   if ((verb === "replace_tile" && tokenIndex === 5) || (verb === "replace_tile_sequence" && tokenIndex === 6)) return TILE_REPLACEMENT_COLLISIONS;
   if(verb==="set_adventure_state" && tokenIndex===1) return ["ground","dash","knockback","blank","run","push"];
   if(verb==="actor_effects" && tokenIndex===2) return ["flash","shake"];
@@ -138,7 +144,7 @@ export function eventCommandParameterChoices(verb: string, tokenIndex: number): 
   if (tokenIndex === 1 && ["pause_scene_type", "resume_scene_type"].includes(verb)) return ["topdown", "platformer"];
   if (tokenIndex === 1 && verb === "set_platform_state") return ["fall", "ground", "jump", "dash", "ladder", "wall", "knockback", "blank", "run", "float"];
   if (tokenIndex === 1 && ["attach_adventure_callback", "remove_adventure_callback"].includes(verb)) return ["on_interact", "on_room_enter", "on_room_exit"];
-  return parameterLabels[verb]?.[tokenIndex - 1] === "Direção" ? ["up", "down", "left", "right"] : null;
+  return parameterLabels[verb]?.[tokenIndex - 1] === "Direção" || (verb === "if_actor_relative" && tokenIndex === 3) ? ["up", "down", "left", "right"] : null;
 }
 
 export function eventCommandDescription(verb: string): string | null { return descriptions[verb] ?? null; }

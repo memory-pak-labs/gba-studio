@@ -1,3 +1,4 @@
+#include "gbs/event_render.hpp"
 #include "gbs/profiler.hpp"
 #define GBS_DIALOGUE_UI_RUNTIME_KIND 7
 #include "gbs/engine.hpp"
@@ -5,6 +6,7 @@
 #include "gbs/input.hpp"
 #include "gbs/racing.hpp"
 #include "gbs/racing_challenge.hpp"
+#include "gbs/racing_events.hpp"
 #include "gbs/racing_minimap.hpp"
 #include "gbs/racing_animation.hpp"
 #include "gbs/render.hpp"
@@ -81,12 +83,14 @@ void draw_racing_metasprite(int first_index, const gbs::MetaSprite& metasprite, 
     }
     for (uint8_t index = 0; index < metasprite.part_count; ++index) {
         const auto& part = metasprite.parts[index];
-        draw_racing_sprite(first_index + index, gbs::Sprite {
+        gbs::Sprite sprite {
             position.x + part.x, position.y + part.y, part.tile_index,
             part.palette, part.hflip, part.vflip, true, 0,
             gbs::SpriteRenderMode::Normal, false, part.width, part.height,
-            false, false, 0, part.color_depth
-        });
+            false, false, 0, part.color_depth, part.scale_x256, part.scale_y256
+        };
+        gbs::apply_metasprite_part_scale(sprite, part, &metasprite);
+        draw_racing_sprite(first_index + index, sprite);
     }
 }
 
@@ -102,6 +106,7 @@ int screen_fade_total_frames = 1;
 int screen_fade_frames_remaining = 0;
 constexpr size_t max_runtime_triggers = 16;
 gbs::RuntimeTriggerState trigger_states[max_runtime_triggers] {};
+gbs::RacingProgressEvents progress_events {};
 int camera_x = 0;
 int camera_y = 0;
 gbs::HBlankAffineRasterLine pseudo3d_affine_raster[gbs::hblank_affine_raster_line_count] {};
@@ -232,6 +237,7 @@ void apply_room_visuals() {
         && (pseudo3d_visual(room) != nullptr || !has_authored_background(room))) {
         const gbs::RacingPseudo3DVisualData* visual = pseudo3d_visual(room);
         gbs::set_backdrop_color(gbs::rgb15(4, 10, 18));
+        gbs::apply_video_composition(gbs::default_video_composition());
         gbs::set_display_mode(gbs::DisplayMode::Mode1TextAffine);
         previous_pseudo3d_player_marker = gbs::Vec2i { -1, -1 };
         previous_pseudo3d_rival_marker = gbs::Vec2i { -1, -1 };
@@ -266,6 +272,7 @@ void apply_room_visuals() {
         }
         if (visual->minimap_tilemap) gbs::load_tilemap(gbs::BackgroundLayer::BG0, *visual->minimap_tilemap);
         gbs::load_affine_tilemap(gbs::BackgroundLayer::BG2, room.circuit_floor ? *room.circuit_floor : *visual->floor_tilemap);
+        gbs::set_affine_bg_wrap(gbs::BackgroundLayer::BG2, !gbs::racing_uses_circuit_track(room));
         gbs::set_bg_priority(gbs::BackgroundLayer::BG0, 0);
         gbs::set_bg_priority(gbs::BackgroundLayer::BG1, 3);
         gbs::set_bg_priority(gbs::BackgroundLayer::BG2, 2);
@@ -287,7 +294,7 @@ void apply_room_visuals() {
         gbs::set_bg_priority(gbs::BackgroundLayer::BG1, 2);
         gbs::set_bg_enabled(gbs::BackgroundLayer::BG1, true);
         gbs::set_bg_enabled(gbs::BackgroundLayer::BG0, true);
-        gbs::apply_video_composition(room.video);
+        gbs::apply_scene_background_video(room.video);
         return;
     }
     const gbs::RacingBackgroundData& background = project.backgrounds[room.background_index];
@@ -305,7 +312,7 @@ void apply_room_visuals() {
     }
     gbs::load_tilemap(background.layer, background.tilemap);
     gbs::set_bg_scroll(background.layer, 0, 0);
-    gbs::apply_video_composition(room.video);
+    gbs::apply_scene_background_video(room.video);
 }
 
 void update_camera() {
@@ -538,6 +545,7 @@ void consume_event_state() {
         if (request == 1) {
             persist_racing_runtime_state(slot_index);
         } else if (request == 2 && restore_racing_runtime_state(slot_index)) {
+            progress_events = {};
             reset_trigger_states();
             stream_resources_for_room(project.rooms[current_room_index]);
             apply_room_visuals();
@@ -558,6 +566,8 @@ void consume_event_state() {
         event_state.save_request_slot = -1;
     }
 }
+
+void dispatch_race_result();
 
 bool start_runtime_event_script(gbs::EventScript script) {
     runtime_event_wait_frames = 0;
@@ -582,11 +592,19 @@ bool update_runtime_event_script(const gbs::InputState& input) {
         return true;
     }
     if (!gbs::event_runner_is_active(runtime_event_runner)) {
+        gbs::EventScript next {};
+        if (gbs::next_racing_progress_event(progress_events, project.rooms[current_room_index], next)) {
+            start_runtime_event_script(next);
+        } else {
+            dispatch_race_result();
+        }
+        if (!gbs::event_runner_is_active(runtime_event_runner)) {
         if (!gbs::update_button_event_bindings(event_state)) return false;
         const int script_index=event_state.last_script;
         event_state.last_script=-1;
         if (script_index<0 || static_cast<size_t>(script_index)>=project.script_count) return false;
         start_runtime_event_script(project.scripts[script_index]);
+        }
     }
     gbs::update_event_runner(runtime_event_runner, event_state);
     consume_event_state();
@@ -699,6 +717,9 @@ GBS_RACING_HOT_CODE void draw_pseudo3d_track(const gbs::RacingRoomData& room) {
     }
     }
     runtime_telemetry.seen_tile_effects = 152;
+    const auto& scale = event_state.background_scales[0];
+    gbs::scale_perspective_background(pseudo3d_affine_raster,gbs::hblank_affine_raster_line_count,
+        scale.x256,scale.y256,visual->horizon_y);
     gbs::set_hblank_affine_raster(gbs::BackgroundLayer::BG2, pseudo3d_affine_raster, gbs::hblank_affine_raster_line_count);
     runtime_telemetry.seen_tile_effects = 153;
     runtime_telemetry.seen_tile_effects = 154;
@@ -797,6 +818,7 @@ GBS_RACING_RENDER_CODE void draw_racing_hud(const gbs::RacingRoomData& room) {
 }
 
 void draw_track() {
+    if (!gbs::racing_uses_pseudo3d(project.rooms[current_room_index]) && project.rooms[current_room_index].video.affine_enabled) return;
     const gbs::RacingRoomData& room = project.rooms[current_room_index];
     if (gbs::racing_uses_pseudo3d(room)) {
         if (pseudo3d_visual(room) == nullptr && has_authored_background(room)) return;
@@ -854,7 +876,7 @@ GBS_RACING_RENDER_CODE void draw_pseudo3d_actors(const gbs::RacingRoomData& room
     const auto camera=gbs::racing_camera_pose({runtime_state.position_x256,runtime_state.position_y256},runtime_state.heading_x256,room.perspective_camera);
     const auto player_point=gbs::racing_camera_project(camera,{runtime_state.position_x256,runtime_state.position_y256},room.perspective_camera,horizon);
     if(player_sprite) {
-        draw_racing_metasprite(0,*player_sprite,{120,gbs::racing_uses_circuit_track(room)?player_point.y:120});
+        draw_racing_metasprite(0,gbs::event_scaled_metasprite(event_state,-1,*player_sprite),{120,gbs::racing_uses_circuit_track(room)?player_point.y:120});
         sprite_index+=player_sprite->part_count;
     }
     if(gbs::racing_uses_circuit_track(room)) {
@@ -871,14 +893,15 @@ GBS_RACING_RENDER_CODE void draw_pseudo3d_actors(const gbs::RacingRoomData& room
         }
         for(int i=1;i<count;++i) {const int value=order[i];int j=i;while(j>0&&points[order[j-1]].depth_x256>points[value].depth_x256){order[j]=order[j-1];--j;}order[j]=value;}
         for(int i=0;i<count&&sprite_index<64;++i) {
-            const int index=order[i];const auto& point=points[index];const auto& sprite=*room.actors[index].metasprite;
+            const int index=order[i];const auto& point=points[index];const auto sprite=gbs::event_scaled_metasprite(event_state,index,*room.actors[index].metasprite);
             const int scale=clamp_int(point.scale_x256,24,256);
             for(size_t part_index=0;part_index<sprite.part_count && sprite_index<64;++part_index) {
                 const auto& part=sprite.parts[part_index];
-                const int center_x=point.x+(part.x+part.width/2)*scale/256;
-                const int center_y=point.y+(part.y+part.height/2)*scale/256;
+                const int center_x=point.x+(part.x+part.width/2)*scale*sprite.scale_x256/65536;
+                const int center_y=point.y+(part.y+part.height/2)*scale*sprite.scale_y256/65536;
                 gbs::Sprite object {center_x-part.width/2,center_y-part.height/2,part.tile_index,part.palette,false,false,true,0,gbs::SpriteRenderMode::Normal,false,part.width,part.height};
-                object.color_depth=part.color_depth;object.affine=true;object.affine_matrix=static_cast<uint8_t>(index+1);
+                object.color_depth=part.color_depth; gbs::apply_metasprite_part_scale(object, part);
+                object.scale_x256=part.scale_x256*sprite.scale_x256/256;object.scale_y256=part.scale_y256*sprite.scale_y256/256;object.affine=true;object.affine_matrix=static_cast<uint8_t>(index+1);
                 gbs::set_affine_sprite_transform(object.affine_matrix,{static_cast<int16_t>(65536/scale),0,0,static_cast<int16_t>(65536/scale)});
                 draw_racing_sprite(sprite_index++,object);
             }
@@ -890,7 +913,7 @@ GBS_RACING_RENDER_CODE void draw_pseudo3d_actors(const gbs::RacingRoomData& room
     if(relative < -4 || relative > 52) return;
     const int y=clamp_int(118-relative*2,44,118);
     const auto line=gbs::racing_perspective_line(runtime_state,room,y);
-    draw_racing_metasprite(sprite_index,*room.actors[0].metasprite,{line.center_x,y});
+    draw_racing_metasprite(sprite_index,gbs::event_scaled_metasprite(event_state,0,*room.actors[0].metasprite),{line.center_x,y});
 }
 
 bool draw_topdown_vehicle(
@@ -917,7 +940,7 @@ bool draw_topdown_vehicle(
         part.width,
         part.height
     };
-    sprite.color_depth = part.color_depth;
+    sprite.color_depth = part.color_depth; gbs::apply_metasprite_part_scale(sprite, part, &metasprite);
     sprite.affine = true;
     sprite.affine_matrix = matrix_index;
     if (!gbs::set_affine_sprite_transform(matrix_index,
@@ -935,6 +958,8 @@ void draw_actors(bool controls_active) {
     gbs::hide_world_sprites();
     const gbs::MetaSprite* player_sprite = current_vehicle_sprite();
     int sprite_index = 0;
+    gbs::MetaSprite scaled_player {};
+    if (player_sprite) { scaled_player=gbs::event_scaled_metasprite(event_state,-1,*player_sprite); player_sprite=&scaled_player; }
     if (player_sprite != nullptr) {
         const gbs::Vec2i position {
             runtime_state.position_x256 / 256 - camera_x,
@@ -949,15 +974,16 @@ void draw_actors(bool controls_active) {
     for (size_t index = 0; index < room.actor_count && sprite_index < 128; ++index) {
         const gbs::RacingActorData& actor = room.actors[index];
         if (actor.metasprite == nullptr) continue;
+        const auto scaled_actor=gbs::event_scaled_metasprite(event_state,static_cast<int>(index),*actor.metasprite);
         const gbs::RacingTopdownPose rival_pose = gbs::racing_topdown_rival_pose(runtime_state, room, index);
         const gbs::Vec2i actor_position = gbs::racing_uses_topdown_track(room)
             ? rival_pose.position_pixels : actor.position_pixels;
         const gbs::Vec2i screen_position { actor_position.x - camera_x, actor_position.y - camera_y };
         if (screen_position.x < -32 || screen_position.x > 272 || screen_position.y < -32 || screen_position.y > 192) continue;
         if (!gbs::racing_uses_topdown_track(room) || index >= 31 ||
-            !draw_topdown_vehicle(sprite_index, *actor.metasprite, screen_position,
+            !draw_topdown_vehicle(sprite_index, scaled_actor, screen_position,
                 rival_pose.heading, static_cast<uint8_t>(index + 1))) {
-            draw_racing_metasprite(sprite_index, *actor.metasprite, screen_position);
+            draw_racing_metasprite(sprite_index, scaled_actor, screen_position);
         }
         sprite_index += actor.metasprite->part_count;
     }
@@ -995,6 +1021,7 @@ void dispatch_race_result() {
 }
 
 void reset_trigger_states() {
+    progress_events = {};
     for (size_t index = 0; index < max_runtime_triggers; ++index) {
         trigger_states[index] = gbs::RuntimeTriggerState {};
     }
@@ -1014,6 +1041,7 @@ gbs::RacingInput racing_input(const gbs::InputState& input) {
 } // namespace
 
 int initialize_racing_runtime() {
+    progress_events = {};
     hud_position_cache = {};
     gbs::init();
     // Standalone ROMs bypass the mixed-runtime dispatcher.
@@ -1144,14 +1172,17 @@ gbs::RuntimeAdapterFrameResult update_racing_runtime(const gbs::RuntimeFrameCont
         const auto& room = project.rooms[current_room_index];
         gbs::update_racing_vehicle_animator(vehicle_animator,current_vehicle_clips(),runtime_state.speed_x256,controls,runtime_state.collision_frames>0,
             gbs::racing_uses_pseudo3d(room) ? 0 : runtime_state.heading);
-        dispatch_race_result();
+        gbs::capture_racing_progress_events(progress_events, before, runtime_state);
+        gbs::EventScript next {};
+        if (gbs::next_racing_progress_event(progress_events, room, next)) start_runtime_event_script(next);
+        else dispatch_race_result();
     }
     previous_racing_controls = controls;
     runtime_telemetry.seen_tile_effects = 120;
     update_camera();
     runtime_telemetry.seen_tile_effects = 130;
     gbs::set_event_player_actor_state(event_state, runtime_state.position_x256 / 256, runtime_state.position_y256 / 256, 0, 8);
-    if (!script_active) {
+    if (!script_active && !gbs::event_runner_is_active(runtime_event_runner)) {
         update_triggers();
     }
     runtime_telemetry.seen_tile_effects = 140;
@@ -1188,6 +1219,7 @@ void render_racing_runtime(const gbs::RuntimeFrameContext& context) {
         gbs::draw_dialogue_portrait(dialogue);
         racing_dialogue_was_drawn=true;
     }
+    if (!gbs::racing_uses_pseudo3d(project.rooms[current_room_index])) gbs::render_event_background_scale(event_state);
     gbs::wait_vblank();
 }
 

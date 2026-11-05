@@ -44,6 +44,7 @@ struct VisualNovelSceneData {
     EventScript on_exit;
     bool auto_advance;
     const char* resource_bank_group_name;
+    VideoComposition video = default_video_composition();
 };
 
 struct VisualNovelProjectData {

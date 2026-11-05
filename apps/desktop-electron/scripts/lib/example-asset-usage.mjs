@@ -44,6 +44,7 @@ export function analyzeExampleAssetUsage(project) {
       if (byID.has(token)) pending.push(byID.get(token));
     }
   };
+  for(const asset of assets.filter(asset=>asset.metadata?.retainSourceInLibrary===true))visit(asset.name,'retainedAssetLibrary');
   for (const [key, value] of Object.entries(project)) {
     // `scena` is an editor snapshot, not an additional scene. Its old contents
     // must not keep a replaced background alive after rooms/scenas were updated.

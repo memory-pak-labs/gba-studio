@@ -17,6 +17,8 @@ import {
 import { acquireBuildLock, copyTreeIfChanged, exportedFileHashes, writeFileIfChanged } from "./stableBuildFiles.js";
 import { touchDiskCacheEntry } from "./diskCacheRetention.js";
 import { resolveEngineToolInvocation as toolInvocation } from "./engineToolInvocation.js";
+import { writeSceneVideoBudgetReport } from "./sceneVideoBudgetExport.js";
+import type { AssetPackVideoBudgetReport } from "../shared/assetPackVideoBudget.js";
 
 const execFileAsync = promisify(execFile);
 // Cold exports of the complete showcase can exceed five minutes while assetc
@@ -34,6 +36,7 @@ export interface WriteEngineProjectExportResult {
   destination: string;
   files: string[];
   warnings?: string[];
+  videoBudget?: AssetPackVideoBudgetReport;
   cache?: {
     hit: boolean;
     fingerprint: string;
@@ -230,6 +233,35 @@ async function writeLockedEngineSchemaExport(options: WriteEngineSchemaExportOpt
   ];
   const templateDirectory = options.prepared.contract.template_dir;
   const enginePackRoot = path.dirname(path.dirname(templateDirectory));
+  if (options.prepared.contract.menu_project?.screens.some(screen => screen.text_input?.keyboard_geometry)) {
+    const manifest = await readFile(path.join(enginePackRoot, "enginepack.json"), "utf8").then(text => JSON.parse(text)).catch(() => null);
+    if (!manifest?.capabilities?.engine_sdk?.includes("menu_keyboard_geometry")) {
+      throw new Error("O Engine Pack não oferece composição de teclado. Atualize o Engine Pack antes de exportar esta cena.");
+    }
+  }
+  const projectContract = options.prepared.contract;
+  if (projectContract.racing_project?.rooms.some(room=>room.on_lap_complete?.length || room.topdown_track?.checkpoints.some(gate=>gate.on_pass?.length))) {
+    const manifest=await readFile(path.join(enginePackRoot,"enginepack.json"),"utf8").then(text=>JSON.parse(text)).catch(()=>null);
+    if (!manifest?.capabilities?.engine_sdk?.includes("racing_progress_events")) {
+      throw new Error("O Engine Pack não oferece eventos de progresso da corrida. Atualize o Engine Pack antes de exportar este projeto.");
+    }
+  }
+  const interfaceBindings = new Set([
+    projectContract.cutscene_project?.dialogue_ui,
+    projectContract.visual_novel_project?.dialogue_ui,
+    projectContract.isometric_project?.dialogue_ui,
+    projectContract.luta_project?.dialogue_ui,
+    projectContract.menu_project?.dialogue_ui
+  ].flatMap(ui => ui?.hud_scene_bindings ?? []).map(binding => binding.scene_name));
+  const requiresSceneInterfaces = projectContract.scene_contracts?.some(scene =>
+    ["cutscene", "visualNovel", "isometric", "luta"].includes(scene.scene_type) && interfaceBindings.has(scene.name)) ||
+    projectContract.menu_project?.screens.some(screen => screen.screen_type !== "menu" && interfaceBindings.has(screen.name));
+  if (requiresSceneInterfaces) {
+    const manifest = await readFile(path.join(enginePackRoot, "enginepack.json"), "utf8").then(text => JSON.parse(text)).catch(() => null);
+    if (!manifest?.capabilities?.engine_sdk?.includes("scene_interface_layouts")) {
+      throw new Error("O Engine Pack não oferece interfaces de cena. Atualize o Engine Pack antes de exportar este projeto.");
+    }
+  }
   const cacheEnabled = Boolean(options.projectPath) && options.cacheEnabled === true;
   const contract = options.cacheEnabled === false
     ? {...options.prepared.contract, build: {...options.prepared.contract.build, incremental_cache: false}}
@@ -284,12 +316,16 @@ async function writeLockedEngineSchemaExport(options: WriteEngineSchemaExportOpt
     if (fingerprintOptions && await buildEngineCacheFingerprint(fingerprintOptions) !== fingerprint) {
       throw new Error("Assets ou Engine Pack mudaram durante a exportação. Execute Play novamente.");
     }
+    const videoBudget = options.prepared.contract.asset_pack
+      ? await writeSceneVideoBudgetReport(options.destination, options.prepared.contract.scene_contracts)
+      : undefined;
     if (options.projectPath && latestCache?.fingerprint !== fingerprint) {
       await writeLatestEngineBuildCache(options.projectPath, matchingCache);
     }
     return {
       destination: options.destination,
       files: await listExportedFiles(options.destination),
+      videoBudget,
       cache: {
         hit: true,
         fingerprint,
@@ -356,6 +392,9 @@ async function writeLockedEngineSchemaExport(options: WriteEngineSchemaExportOpt
   }
 
   const assetPackReportPath = safeDestinationPath(options.destination, "asset_pack_report.json");
+  const videoBudget = options.prepared.contract.asset_pack
+    ? await writeSceneVideoBudgetReport(options.destination, options.prepared.contract.scene_contracts)
+    : undefined;
   let rebuildPlan: unknown;
   try {
     const assetPackReport = JSON.parse(await readFile(assetPackReportPath, "utf8")) as {
@@ -403,6 +442,7 @@ async function writeLockedEngineSchemaExport(options: WriteEngineSchemaExportOpt
     destination: options.destination,
     files: await listExportedFiles(options.destination),
     warnings: parseAssetcWarnings(stderr),
+    videoBudget,
     ...(fingerprint
       ? {
           cache: {

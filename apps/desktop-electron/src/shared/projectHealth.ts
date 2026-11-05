@@ -218,6 +218,13 @@ function addSceneDiagnostics(
   }
 
   const budget = deriveProjectBudgetPresentation(data, sceneName, assetPackReport);
+  const budgetPressure = budget.sceneMetrics
+    .filter(metric => metric.tone === "warning" || metric.tone === "error")
+    .map(metric => `${metric.label}: ${metric.used}/${metric.capacity} (${metric.percent}%)`)
+    .join(" · ");
+  const budgetDetail = `${budgetPressure || `Pressão máxima: ${budget.maxScenePressure}%`}. ${budget.source === "compiler"
+    ? "Análise do compilador."
+    : "Estimativa do editor; confirme na análise do compilador."}`;
   if (budget.sceneMetrics.some(metric => metric.pending)) {
     addDiagnostic(diagnostics, {
       id: `scene-${sceneIndex}-asset-budget-pending`,
@@ -227,7 +234,9 @@ function addSceneDiagnostics(
       workspace: "Arquivos",
       sceneName,
       targetName: sceneName,
-      message: "A contagem de tiles únicos do piso affine depende da análise do compilador.",
+      message: budget.sceneMetrics.some(metric => metric.id === "bg_tiles" && metric.pending)
+        ? "A contagem de tiles únicos do background depende da análise do compilador."
+        : "A contagem de tiles únicos do piso affine depende da análise do compilador.",
       detail: "As posições do mapa não representam a quantidade de padrões residentes em VRAM.",
       fixAction: "open_files"
     });
@@ -245,7 +254,7 @@ function addSceneDiagnostics(
       message: compilerConfirmed
         ? "O orçamento de assets da cena excede um limite de exportação."
         : "A estimativa de assets da cena excede um limite; confirme no preflight do compilador.",
-      detail: `${budget.blockingOverflowCount} overflow(s) bloqueante(s); fonte: ${budget.source}.`,
+      detail: budgetDetail,
       fixAction: "open_files"
     });
   } else if (budget.tone === "warning") {
@@ -258,7 +267,7 @@ function addSceneDiagnostics(
       sceneName,
       targetName: sceneName,
       message: "O orçamento de assets da cena está próximo do limite.",
-      detail: `Pressão máxima estimada: ${budget.maxScenePressure}%; fonte: ${budget.source}.`,
+      detail: budgetDetail,
       fixAction: "open_files"
     });
   }
@@ -506,7 +515,7 @@ export function deriveProjectHealthReport(
     scenes,
     counts,
     contract,
-    exportReady: counts.error === 0
+    exportReady: scenes.length > 0 && counts.error === 0
   };
 }
 

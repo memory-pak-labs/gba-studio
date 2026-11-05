@@ -65,3 +65,15 @@ it("keeps native subsystem peaks per scene with the measured frame", () => {
   expect(session.scenePeaks[0].subsystems).toEqual({ scripts: { frame: 5, value: 20 }, render: { frame: 7, value: 55 } });
   expect(session.scenePeaks[1].subsystems?.scripts).toEqual({ frame: 6, value: 3 });
 });
+
+it("keeps absent measurements pending and preserves native peaks between polls", () => {
+ let s=createHardwareProfilerSession("native");
+ s=appendHardwareProfilerFrame(s,{frame:30,roomIndex:1,sceneName:"one",runtime:"topdown",cpu:1,dma:null,vram:null,oam:null,scanline:0});
+ expect(s.peaks.dma.value).toBeNull();
+ expect(compareHardwareProfilerSessions(s,createHardwareProfilerSession("missing")).deltas.dma).toBeNull();
+ const nativeVideo={frame:40,room:1,sceneFrameCount:40,peaks:{dma:{value:8192,frame:4},oam:{value:28,frame:6},vblank:{value:100,frame:7}}};
+ s=appendHardwareProfilerFrame(s,{frame:40,roomIndex:1,sceneName:"one",runtime:"topdown",cpu:1,dma:512,vram:null,oam:2,scanline:0,nativeVideo});
+ expect(s.peaks.dma).toMatchObject({value:8192,frame:4});
+ expect(s.scenePeaks[0].peaks.oam).toEqual({value:28,frame:6});
+ expect(s.scenePeaks[0].nativeFrameCount).toBe(40);
+});

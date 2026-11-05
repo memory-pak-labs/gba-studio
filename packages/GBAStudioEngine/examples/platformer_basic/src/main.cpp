@@ -1,3 +1,4 @@
+#include "gbs/event_render.hpp"
 #include "gbs/profiler.hpp"
 #define GBS_DIALOGUE_UI_RUNTIME_KIND 1
 #include "gbs/engine.hpp"
@@ -332,7 +333,7 @@ void set_platformer_metasprite(
         const int part_x = hflip
             ? anchor_position.x + mirror_width - static_cast<int>(part.x) - part.width
             : anchor_position.x + part.x;
-        gbs::set_sprite(first_index + part_index, gbs::Sprite {
+        gbs::Sprite sprite {
             part_x,
             anchor_position.y + part.y,
             part.tile_index,
@@ -348,8 +349,10 @@ void set_platformer_metasprite(
             false,
             false,
             0,
-            part.color_depth
-        });
+            part.color_depth, part.scale_x256, part.scale_y256
+        };
+        gbs::apply_metasprite_part_scale(sprite, part, &metasprite, hflip, mirror_width);
+        gbs::set_sprite(first_index + part_index, sprite);
     }
 }
 
@@ -869,9 +872,18 @@ void tick_platformer_scripted_movements() {
         gbs::Actor player_proxy { anchor, { player.bounds_pixels.width, player.bounds_pixels.height }, 1 };
         player_proxy.collision_offset_pixels = player.collision_offset_pixels;
         gbs::Actor* target = is_player ? &player_proxy : &platformer_npc_runtimes[index].actor;
+        const bool is_platform = !is_player && target->collision_mask != 0 &&
+            project.rooms[current_room].config.platform_actor_collision_group != 0 &&
+            platformer_npc_runtimes[index].collision_group == project.rooms[current_room].config.platform_actor_collision_group;
+        const gbs::Rect previous_platform = is_platform
+            ? gbs::platformer_npc_actor_rect(platformer_npc_runtimes[index]) : gbs::Rect{};
+        const bool carries_player = is_platform && player_event_active && player.velocity_x256.y >= 0 &&
+            player.bounds_pixels.bottom() == previous_platform.y &&
+            player.bounds_pixels.right() > previous_platform.x && player.bounds_pixels.x < previous_platform.right();
         gbs::Actor blockers[max_room_npcs + 1]{};
         size_t count = 0;
-        if (!is_player && player_event_active) blockers[count++] = player_proxy;
+        // A supported rider moves with its platform instead of blocking its next upward step.
+        if (!is_player && player_event_active && !carries_player) blockers[count++] = player_proxy;
         for (size_t i = 0; i < platformer_npc_count && count < max_room_npcs + 1; ++i) {
             if (static_cast<int>(i) == index || !platformer_npc_runtimes[i].active || !platformer_npc_runtimes[i].visible) continue;
             blockers[count++] = platformer_npc_runtimes[i].actor;
@@ -879,6 +891,10 @@ void tick_platformer_scripted_movements() {
         const int speed = is_player ? platformer_player_script_speed : platformer_npc_script_speeds[index];
         const auto result = gbs::tick_scripted_movement(platformer_scripted_movements, index, *target,
             room.collision, speed, blockers, count, gbs::move_platformer_scripted_step);
+        if (carries_player) {
+            gbs::carry_platformer_actor_with_npc(room.collision, player, previous_platform,
+                gbs::platformer_npc_actor_rect(platformer_npc_runtimes[index]));
+        }
         if (is_player) {
             gbs::set_platformer_actor_anchor_position(player, player_proxy.position_pixels);
             if (player_proxy.direction == 2) player.facing = gbs::PlatformerFacing::Left;
@@ -1562,6 +1578,17 @@ void draw_platformer_room_layers(
     const gbs::Camera& camera,
     const gbs::VisualEffectsController& visual_effects
 ) {
+    if (room.video.affine_enabled) {
+        const bool text_layers = room.video.display_mode == gbs::DisplayMode::Mode1TextAffine;
+        gbs::set_bg_enabled(gbs::BackgroundLayer::BG0, text_layers);
+        gbs::set_bg_enabled(gbs::BackgroundLayer::BG1, text_layers && room.bg1_tiles != nullptr);
+        gbs::set_bg_enabled(gbs::BackgroundLayer::BG2, room.video.affine_layer == gbs::BackgroundLayer::BG2);
+        gbs::set_bg_enabled(gbs::BackgroundLayer::BG3, room.video.affine_layer == gbs::BackgroundLayer::BG3);
+        if (text_layers && room.bg1_tiles) gbs::draw_room_to_bg_cached(
+            gbs::BackgroundLayer::BG1, room.bg1_tiles, room.width_tiles, room.height_tiles,
+            camera.position_pixels.x, camera.position_pixels.y, room_layer_cache[1], room_tile_edits);
+        return; // The affine map uses a different layout; never upload regular room tiles over it.
+    }
     const gbs::Vec2i visual_scroll = gbs::visual_effect_scroll_offset(visual_effects);
     const bool legacy_world_effect = gbs::visual_effect_targets_background(
         visual_effects,
@@ -2192,7 +2219,7 @@ void render_platformer_runtime(const gbs::RuntimeFrameContext& context) {
             const gbs::Vec2i player_anchor = gbs::platformer_actor_anchor_position(player);
             set_platformer_metasprite(
                 0,
-                *player_metasprite,
+                gbs::event_scaled_metasprite(event_state, -1, *player_metasprite),
                 gbs::Vec2i {
                     player_anchor.x - camera.position_pixels.x,
                     player_anchor.y - camera.position_pixels.y
@@ -2250,7 +2277,7 @@ void render_platformer_runtime(const gbs::RuntimeFrameContext& context) {
             }
             set_platformer_metasprite(
                 next_world_sprite_index,
-                *npc_metasprite,
+                gbs::event_scaled_metasprite(event_state, static_cast<int>(index), *npc_metasprite),
                 gbs::Vec2i {
                     platformer_npc_runtimes[index].actor.position_pixels.x - camera.position_pixels.x,
                     platformer_npc_runtimes[index].actor.position_pixels.y - camera.position_pixels.y
@@ -2296,6 +2323,7 @@ void render_platformer_runtime(const gbs::RuntimeFrameContext& context) {
         gbs::draw_event_clock(event_state);
         gbs::tick_visual_effects(visual_effects);
         sync_runtime_telemetry(player, room, event_state);
+        gbs::render_event_background_scale(event_state);
         gbs::wait_vblank();
 }
 

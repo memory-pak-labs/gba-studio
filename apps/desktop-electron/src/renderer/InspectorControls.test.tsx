@@ -34,6 +34,43 @@ describe("InspectorControls", () => {
     expect(onChange).toHaveBeenNthCalledWith(2, 64);
   });
 
+  it("keeps a typed coordinate when focus leaves before its project update commits", () => {
+    const onChange = vi.fn();
+    const { rerender } = render(<InspectorNumber label="X" onChange={onChange} value={15} />);
+    const input = screen.getByLabelText("X");
+
+    fireEvent.focus(input);
+    fireEvent.change(input, { target: { value: "9" } });
+    // The project is still rendering its previous value when the user presses Tab.
+    rerender(<InspectorNumber label="X" onChange={onChange} value={15} />);
+    fireEvent.blur(input);
+
+    expect(onChange.mock.calls).toEqual([[9]]);
+    rerender(<InspectorNumber label="X" onChange={onChange} value={9} />);
+    expect(input).toHaveValue(9);
+  });
+
+  it("keeps consecutive digits through pending project renders and accepts later external values", () => {
+    const onChange = vi.fn();
+    const { rerender } = render(<InspectorNumber label="X" onChange={onChange} value={15} />);
+    const input = screen.getByLabelText("X");
+
+    fireEvent.focus(input);
+    fireEvent.change(input, { target: { value: "1" } });
+    rerender(<InspectorNumber label="X" onChange={onChange} value={15} />);
+    expect(input).toHaveValue(1);
+    fireEvent.change(input, { target: { value: "12" } });
+    rerender(<InspectorNumber label="X" onChange={onChange} value={15} />);
+    expect(input).toHaveValue(12);
+    fireEvent.blur(input);
+
+    expect(onChange.mock.calls).toEqual([[1], [12]]);
+    rerender(<InspectorNumber label="X" onChange={onChange} value={12} />);
+    expect(input).toHaveValue(12);
+    rerender(<InspectorNumber label="X" onChange={onChange} value={20} />);
+    expect(input).toHaveValue(20);
+  });
+
   it("renders range endpoints, presets and a reset action", () => {
     const onChange = vi.fn();
     render(

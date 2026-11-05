@@ -325,6 +325,9 @@ function addFixtureActor(
   const width = Math.max(1, integerValue(scene.width, 30));
   const height = Math.max(1, integerValue(scene.height, 20));
   const actor = clone(source);
+  // Structural placeholders reuse a visual, never the source actor's gameplay.
+  actor.eventBindings = {};
+  for(const key of ["prefabID","eventName","scriptName","onStartEventName","onUpdateEventName","onInteractEventName","topdownMovement"])delete actor[key];
   actor.id = identity.id;
   actor.name = identity.name;
   actor.roomName = sceneNameValue;

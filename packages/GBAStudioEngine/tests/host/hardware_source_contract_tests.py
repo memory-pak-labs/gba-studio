@@ -467,7 +467,7 @@ int main(void) {
         self.assertNotIn("gbs_hw_draw_text_overlay_slot", component)
 
     def test_text_input_uses_a_dedicated_light_surface_and_text_palette(self) -> None:
-        keyboard = function_body(self.source, "gbs_hw_draw_text_input_keyboard_with_controls")
+        keyboard = function_body(self.source, "gbs_hw_draw_text_input_keyboard_authored")
         surface = function_body(self.source, "gbs_hw_draw_name_input_surface")
         overlay = function_body(self.source, "gbs_hw_draw_text_overlay_at")
 
@@ -783,14 +783,14 @@ static int affine_hblank_enabled=1;
 static int window1_hblank_active=0;
 static int window_arms;
 static void rearm_active_window1_hblank(void){++window_arms;}
-static uint32_t ticks,irq_ticks;
+static uint32_t ticks,irq_ticks,frame_vblank_irq_ticks;
 uint32_t gbs_hw_frame_counter_ticks(void){return ticks++;}
 void record_irq(uint32_t elapsed){irq_ticks+=elapsed;}
 void (*gbs_profiler_record_irq)(uint32_t)=record_irq;
 static void rearm_active_affine_hblank(void){++arms;}
 void commit_pcm_stream_block(void){} void gbs_audio_vblank_update(void){} void gbs_dispatch_hardware_interrupts(uint16_t flags){}
 void dispatch(void) {"""+irq+"""}
-int main(void){dispatch();dispatch();assert(arms==2);assert(irq_ticks==2);REG_IF=0;dispatch();assert(arms==2);assert(irq_ticks==2);REG_IF=1;window1_hblank_active=1;dispatch();dispatch();assert(window_arms==2 && arms==2);}
+int main(void){dispatch();dispatch();assert(arms==2);assert(irq_ticks==2);assert(frame_vblank_irq_ticks==1);REG_IF=0;dispatch();assert(arms==2);assert(irq_ticks==2);REG_IF=1;window1_hblank_active=1;dispatch();dispatch();assert(window_arms==2 && arms==2);}
 """
         with tempfile.TemporaryDirectory() as directory:
             source=Path(directory)/"irq.c";source.write_text(code);binary=Path(directory)/"irq"

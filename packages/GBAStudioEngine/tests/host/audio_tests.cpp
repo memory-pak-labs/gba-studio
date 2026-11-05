@@ -237,6 +237,56 @@ void test_noise_sfx_uses_noise_channel() {
     assert(noise_starts == 1);
 }
 
+void test_tracker_wave_bass_notes_play_without_rejecting_the_song() {
+    gbs::audio_init();
+    const gbs::TrackerStep steps[] = {
+        { 3, 49, 1, 12, 0 },
+        { 3, 55, 1, 12, 0 }
+    };
+    const gbs::TrackerPattern patterns[] = { { steps, 2 } };
+    const uint8_t order[] = { 0 };
+    const gbs::TrackerAsset asset { patterns, 1, order, 1, true };
+    assert(gbs::is_valid_tracker_asset(asset));
+    assert(gbs::play_tracker_music(asset));
+    assert(wave_starts == 1);
+    gbs::audio_update();
+    assert(wave_starts == 2);
+    assert(!gbs::is_valid_tracker_step(gbs::TrackerStep { 3, 31, 1, 12, 0 }));
+    assert(!gbs::is_valid_tracker_step(gbs::TrackerStep { 1, 49, 1, 12, 0 }));
+}
+
+void test_sfx_channel_changes_stop_only_previous_channel() {
+    gbs::audio_init();
+    const gbs::SfxTone tones[] = {
+        { 1000, 1, 9, 0, true },
+        { 440, 1, 0, 0, false },
+        { 440, 1, 10, 0, false },
+        { 1000, 1, 9, 0, true }
+    };
+    assert(gbs::play_sfx(gbs::SfxAsset { tones, 4 }));
+    gbs::audio_update();
+    assert(noise_stops == 1);
+    assert(square_stops == 0);
+    gbs::audio_update();
+    assert(square_stops == 0);
+    gbs::audio_update();
+    assert(square_stops == 1);
+    assert(noise_stops == 1);
+}
+
+void test_replacing_sfx_stops_previous_channel_when_it_changes() {
+    gbs::audio_init();
+    const gbs::SfxTone noise[] = { { 1000, 4, 9, 0, true } };
+    const gbs::SfxTone square[] = { { 440, 4, 9, 0, false } };
+    assert(gbs::play_sfx(gbs::SfxAsset { noise, 1 }));
+    assert(gbs::play_sfx(gbs::SfxAsset { square, 1 }));
+    assert(noise_stops == 1);
+    assert(square_stops == 0);
+    assert(gbs::play_sfx(gbs::SfxAsset { noise, 1 }));
+    assert(square_stops == 1);
+    assert(noise_stops == 1);
+}
+
 void test_sfx_envelope_and_noise_duty_are_rendered() {
     gbs::audio_init();
     const gbs::SfxTone tones[] = {
@@ -1050,6 +1100,11 @@ void test_audio_mix_cost_estimates_assets_and_mix_budget() {
 
 } // namespace
 
+static_assert(gbs::is_valid_tracker_step(gbs::TrackerStep {3, 49, 1, 8, 0}), "Wave supports the default bass G1");
+static_assert(gbs::is_valid_tracker_step(gbs::TrackerStep {3, 32, 1, 8, 0}), "Wave lower frequency boundary");
+static_assert(!gbs::is_valid_tracker_step(gbs::TrackerStep {3, 31, 1, 8, 0}), "Wave frequency below hardware range");
+static_assert(!gbs::is_valid_tracker_step(gbs::TrackerStep {1, 49, 1, 8, 0}), "Square retains its own frequency range");
+
 int main() {
     test_equal_priority_pcm_effect_age_survives_counter_rollover();
     test_stopping_pcm_effect_or_music_keeps_sample_tracker_stream_running();
@@ -1059,6 +1114,9 @@ int main() {
     test_psg_pan_is_forwarded_to_hardware();
     test_sfx_playback_lifetime();
     test_noise_sfx_uses_noise_channel();
+    test_tracker_wave_bass_notes_play_without_rejecting_the_song();
+    test_sfx_channel_changes_stop_only_previous_channel();
+    test_replacing_sfx_stops_previous_channel_when_it_changes();
     test_sfx_envelope_and_noise_duty_are_rendered();
     test_square_sfx_attack_keeps_the_dac_enabled();
     test_invalid_assets_are_silent();

@@ -117,7 +117,9 @@ function entityProjectionFields(
     if (value !== undefined && !positiveNumber(value)) pushUnique(fields, dimension);
   }
 
-  if (record.eventName !== undefined && !stringValue(record.eventName)) {
+  // The authoring tools use an empty string for an optional, unbound legacy
+  // event name. It carries no reference and safely normalizes to null.
+  if (record.eventName !== undefined && record.eventName !== "" && !stringValue(record.eventName)) {
     pushUnique(fields, "eventName");
   }
   if (record.eventBindings !== undefined && !isRecord(record.eventBindings)) {

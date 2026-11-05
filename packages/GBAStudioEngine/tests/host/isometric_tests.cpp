@@ -360,6 +360,16 @@ void test_build_iso_draw_list_expands_composite_actor_metasprite() {
     assert(items[0].source_index == 0 && items[1].source_index == 0 && items[2].source_index == 0);
 }
 
+void test_scaled_iso_sprite_remains_visible_at_viewport_edge() {
+    const gbs::MetaSpritePart part {0, 0, 0, 0, false, false, 16, 16, gbs::ColorDepth::Bpp4, 512, 256};
+    const gbs::MetaSprite sprite {&part, 1};
+    gbs::IsoActor actor {}; actor.screen_offset_pixels = {-140, 0}; actor.visible = true; actor.metasprite = &sprite;
+    gbs::IsoDrawItem item {};
+    const gbs::IsoCamera camera { {0, 0}, {0, 0, 0, 0}, false };
+    assert(gbs::build_iso_draw_list(&actor, 1, camera, &item, 1, grid) == 1);
+    assert(item.scale_x256 == 512);
+}
+
 void test_build_iso_draw_list_culls_fully_offscreen_sprites() {
     const gbs::IsoActor actors[] = {
         { gbs::IsoCoord { 0, 0, 0 }, gbs::Vec2i { -152, -32 }, 4, 1, true, false, 2, 32, 32 }
@@ -1434,7 +1444,19 @@ void test_tactical_stairs_support_negative_axes_without_crossing_other_edges() {
     assert(gbs::move_iso_actor_by_delta(map,a,{0,1}));assert(a.tile.z==0);
 }
 
+void test_event_scale_keeps_wide_part_offsets_signed_before_culling() {
+    const gbs::MetaSpritePart parts[] = {{-120,0,0,0,false,false,8,8},{120,0,2,0,false,false,8,8}};
+    const gbs::MetaSprite sprite {parts,2};
+    gbs::IsoActor actor {}; actor.screen_offset_pixels={-420,0}; actor.visible=true;actor.metasprite=&sprite;
+    gbs::EventState state {}; state.actor_scales[1].x256=384;
+    const gbs::IsoCamera camera {{0,0},{0,0,0,0},false};
+    gbs::IsoDrawItem items[2]{};
+    const auto count=gbs::build_iso_draw_list(&actor,1,camera,items,2,grid,&state);
+    assert(count==1 && items[0].tile_index==2 && items[0].screen_pixels.x==62);
+}
+
 int main() {
+    test_event_scale_keeps_wide_part_offsets_signed_before_culling();
     test_tactical_allies_are_selectable_and_enemy_turns_rotate();
     test_scripted_step_interpolates_and_finishes_without_drift();
     {
@@ -1554,6 +1576,7 @@ int main() {
     test_iso_camera_tick_supports_dead_zone_smoothing_pan_and_shake();
     test_build_iso_draw_list_applies_camera_and_offsets();
     test_build_iso_draw_list_expands_composite_actor_metasprite();
+    test_scaled_iso_sprite_remains_visible_at_viewport_edge();
     test_build_iso_draw_list_culls_fully_offscreen_sprites();
     test_iso_surface_camera_snaps_only_at_native_scale_without_offsets();
     test_authored_isometric_background_mode_is_explicit();

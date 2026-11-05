@@ -1,4 +1,13 @@
+import {RacingTrackOverlay} from "./RacingTrackOverlay";
+import {RacingTrackInspector} from "./RacingTrackInspector";
+import type {RacingTrackSelection} from "../shared/racingTrackEditing";
+import type {RacingTopdownTrackConfig} from "../shared/sceneTypeProfiles";
+import "./styles/racing-track-editor.css";
+import {sceneInterfaceImage} from "../shared/sceneInterfaceImage";
+import type { MenuTextInputPart } from "../shared/menuTextInputLayout";
+import { MenuTextInputOverlay } from "./MenuTextInputOverlay";
 import { InteractiveObjectsInspector } from "./InteractiveObjectsInspector";
+import { PointClickTargetInspector } from "./PointClickTargetInspector";
 import { prefabUpdateImpact } from "../shared/projectPrefabs";
 import { MapStatesInspector } from "./MapStatesInspector";
 import { DungeonScenePreview } from "./DungeonScenePreview";
@@ -12,6 +21,7 @@ import { sceneDiagramPositions, SCENE_DIAGRAM_CARD_SIZE } from "./sceneMapDiagra
 import { readSceneDiagramPositions, writeSceneDiagramPositions, readSceneMapViewMode, writeSceneMapViewMode, type SceneMapViewMode } from "./sceneMapViewPreferences";
 import "./styles/scene-map-diagram.css";
 import { RacingCircuitCamera } from "./RacingCircuitCamera";
+import { RacingGeneratedMinimap } from "./RacingGeneratedMinimap";
 import { RacingSceneInspector } from "./RacingSceneInspector";
 import { LogicNavigator, LogicValueInspector, type LogicSelection } from "./LogicNavigator";
 import type { LogicValuePatch } from "../shared/logicWorkspace";
@@ -100,6 +110,8 @@ import {
   type ProjectBudgetMetric,
   type ProjectBudgetPresentation
 } from "../shared/projectBudget";
+import type { AssetPackVideoBudgetReport } from "../shared/assetPackVideoBudget.js";
+import { SceneVideoBudgetPanel } from "./SceneVideoBudgetPanel.js";
 import { projectEventReferenceOptions, type ProjectReferenceOption } from "../shared/projectReferenceOptions";
 import { normalizeRoomInspectorTab, roomInspectorTabs, type RoomInspectorContextKind, type RoomInspectorTabID } from "../shared/roomInspectorTabs";
 import { gbaActorSpriteRoomPlacementFromFrame, gbaActorSpriteRoomPlacementPercent } from "../shared/gbaRendering";
@@ -235,7 +247,7 @@ import {
   sceneTilemapCellIndexesForCell,
   sceneTilemapCellIndexesForRectangle
 } from "../shared/sceneTilemapContract";
-import { deriveMenuSceneEditorPreview, normalizeMenuSceneConfig, type MenuSceneConfig } from "../shared/menuScene";
+import { deriveMenuSceneEditorPreview, normalizeMenuSceneConfig, menuActorVisibleForEditor, type MenuSceneConfig, type MenuTextInputConfig } from "../shared/menuScene";
 import type {
   RoomCanvasAction,
   RoomCanvasEditMode,
@@ -347,6 +359,7 @@ interface RoomsWorkspaceProps {
   budgetAnalysisGeneratedAt?: string | null;
   budgetAnalysisRunning?: boolean;
   budgetReport?: AssetPackBudgetReport | null;
+  videoBudget?: AssetPackVideoBudgetReport | null;
   projectPath?: string;
   sceneMapZoom?: number;
   assetRefreshToken?: number;
@@ -356,7 +369,7 @@ interface RoomsWorkspaceProps {
   focusInspectorTab?: RoomInspectorTabID | null;
   focusedEventName?: string | null;
   focusedEventRequestID?: number;
-  onCreateRoom(anchorRoomID?: string, roomName?: string, presetID?: RoomPresetID): string | void | Promise<string | void>;
+  onCreateRoom(anchorRoomID?: string, roomName?: string, presetID?: RoomPresetID, sceneType?: string): string | void | Promise<string | void>;
   onSetActiveRoom(roomID: string, currentName: string): void;
   onUpdateRoomFields(roomID: string, fields: UpdateRoomFields, historyGroupID?: string): void;
   onUpdateRoomBackgroundTilesetGrid(roomID: string, fields: UpdateRoomBackgroundTilesetGridFields): void;
@@ -632,12 +645,14 @@ function RoomProjectBudgetPanel({
   generatedAt,
   onAnalyze,
   presentation,
+  videoBudget,
   running
 }: {
   analysisError?: string | null;
   generatedAt?: string | null;
   onAnalyze?(): void;
   presentation: ProjectBudgetPresentation;
+  videoBudget?: AssetPackVideoBudgetReport | null;
   running?: boolean;
 }): React.ReactElement {
   const ui = useStudioUiText();
@@ -650,7 +665,7 @@ function RoomProjectBudgetPanel({
       <header className="room-project-budget-header">
         <div>
           <span>{presentation.source === "compiler" ? ui("Relatório do compilador") : ui("Estimativa ao vivo")}</span>
-          <strong>{ui(projectBudgetStatusLabel(presentation))}</strong>
+          <strong>{ui(videoBudget?.blocked ? "Limite excedido" : videoBudget && !videoBudget.complete && presentation.projectReady && presentation.tone === "ok" ? "Análise parcial" : projectBudgetStatusLabel(presentation))}</strong>
           <small>
             {presentation.source === "compiler"
               ? ui("Cena {0} · pressão máxima {1}%", { 0: sceneLabel, 1: presentation.maxScenePressure })
@@ -684,6 +699,8 @@ function RoomProjectBudgetPanel({
           </article>
         ))}
       </div>
+
+      <SceneVideoBudgetPanel report={videoBudget} sceneName={presentation.sceneName} />
 
       <section aria-label={ui("Compressão sugerida")} className="room-project-budget-detail">
         <h5>{ui("Compressão")}</h5>
@@ -773,7 +790,7 @@ const roomEditorToolModes: Array<{ id: RoomEditorToolPanelMode; label: string; h
   { id: "trigger", label: "Trigger", hint: "Eventos", shortcut: ROOM_EDITOR_TOOL_SHORTCUT_BINDINGS.find((binding) => binding.mode === "trigger")?.defaultKey ?? "t", Icon: Zap },
   { id: "camera", label: "Zonas de câmera", hint: "Áreas", shortcut: ROOM_EDITOR_TOOL_SHORTCUT_BINDINGS.find((binding) => binding.mode === "camera")?.defaultKey ?? "z", Icon: Camera },
   { id: "warp", label: "Chegada avançada", hint: "Portais", shortcut: ROOM_EDITOR_TOOL_SHORTCUT_BINDINGS.find((binding) => binding.mode === "warp")?.defaultKey ?? "p", Icon: GitFork },
-  { id: "hud", label: "HUD", hint: "240×160", shortcut: ROOM_EDITOR_TOOL_SHORTCUT_BINDINGS.find((binding) => binding.mode === "hud")?.defaultKey ?? "u", Icon: Monitor }
+  { id: "hud", label: "Interface", hint: "240×160", shortcut: ROOM_EDITOR_TOOL_SHORTCUT_BINDINGS.find((binding) => binding.mode === "hud")?.defaultKey ?? "u", Icon: Monitor }
 ];
 
 const defaultCanvasLayerVisibility: Record<RoomCanvasLayerID, boolean> = {
@@ -1014,15 +1031,7 @@ function roomIsometricConfig(room: RoomsWorkspaceRoom): IsometricSceneConfig | u
 }
 
 function roomRuntimeHudAsset(room: RoomsWorkspaceRoom | null): string | undefined {
-  if (!room) return undefined;
-  if (room.runtime?.type === "luta" || room.runtime?.type === "battleRpg") {
-    const asset = (room.runtime.config as Record<string, unknown> | undefined)?.hudAssetName;
-    return typeof asset === "string" ? asset : undefined;
-  }
-  if(room.runtime?.type === "dungeonCrawler")return normalizeDungeonCrawlerSceneConfig(room.runtime.config).presentation?.hudAssetName;
-  const config = roomIsometricConfig(room);
-  return config?.tacticalCapabilities?.some(capability => capability.id === "tactical_hud" && capability.enabled)
-    ? config.tacticalPresentation?.hudLayout : undefined;
+  return sceneInterfaceImage(room);
 }
 
 function roomIsometricSurfaceSize(room: RoomsWorkspaceRoom): IsometricWorldSize | undefined {
@@ -1366,6 +1375,9 @@ export function RoomHudOverlay({
       {room?.sceneType === "menu" && entities.filter(entity => {
         if (entity.kind !== "actor") return false;
         const actor = Array.isArray(projectData?.actors) ? projectData.actors.find(actor => actor.id === entity.id) : null;
+        if(!menuActorVisibleForEditor(actor??undefined,Array.isArray(projectData?.variables)?projectData.variables:[]))return false;
+        const firstScreen=normalizeMenuSceneConfig(room.runtime?.config).screens?.[0]?.id??room.name;
+        if(Array.isArray(actor?.menuScreenIDs)&&!actor.menuScreenIDs.includes(firstScreen))return false;
         if (actor?.menuActorSelectedOnly === true && actor.menuItemID !== normalizeMenuSceneConfig(room.runtime?.config).items[0]?.id) return false;
         if (!actor?.menuVisibilityVariable) return true;
         const variable = Array.isArray(projectData?.variables) ? projectData.variables.find(variable => variable.name === actor.menuVisibilityVariable) : null;
@@ -1579,6 +1591,7 @@ function RoomMenuCompositionOverlay({ room, screenID, selectedItemIndex = 0 }: R
   const preview = deriveMenuSceneEditorPreview(screen ? { ...config, ...screen, role: config.role } : config);
   const isGenderSelection = preview.role === "gender_select";
   const textInput = preview.textInput;
+  if (textInput?.keyboard?.controlLayout === "bottom_grid") return null;
 
   return (
     <div
@@ -1687,6 +1700,9 @@ function roomEntityStyle(
 ): CSSProperties {
   const frame = entity.kind === "actor" ? entity.spriteFrame ?? null : null;
   const affineObj = entity.kind === "actor" ? roomAffineObjPreview(room) : null;
+  const scaleX = (frame?.scaleX ?? 1) * (affineObj?.scaleX ?? 1);
+  const scaleY = (frame?.scaleY ?? 1) * (affineObj?.scaleY ?? 1);
+  const hasScale = scaleX !== 1 || scaleY !== 1;
   const imageSize = entity.spriteSource ? spriteImageSizes[entity.spriteSource] : undefined;
   const basePlacement = frame
     ? gbaActorSpriteRoomPlacementFromFrame(entity.x, entity.y, frame)
@@ -1765,8 +1781,8 @@ function roomEntityStyle(
     height: isometricArea ? `${isometricArea.heightPercent}%` : isometricTile ? `${isometricFrameHeight}%` : position.height,
     left: isometricArea ? `${isometricArea.leftPercent}%` : isometricTile ? `${isometricTile.leftPercent + isometricTile.widthPercent / 2 - isometricPivotX}%` : position.left,
     top: isometricArea ? `${isometricArea.topPercent}%` : isometricTile ? `${isometricFeet - isometricPivotY}%` : position.top,
-    transform: affineObj ? `rotate(${affineObj.rotationDegrees}deg) scale(${affineObj.scaleX}, ${affineObj.scaleY})` : undefined,
-    transformOrigin: affineObj ? "center center" : undefined,
+    transform: affineObj || hasScale ? `rotate(${affineObj?.rotationDegrees ?? 0}deg) scale(${scaleX}, ${scaleY})` : undefined,
+    transformOrigin: affineObj ? "center center" : hasScale && frame ? `${frame.originX / frame.frameWidth * 100}% ${frame.originY / frame.frameHeight * 100}%` : undefined,
     width: isometricArea ? `${isometricArea.widthPercent}%` : isometricTile ? `${isometricFrameWidth}%` : position.width,
     overflow: affineObj ? "visible" : undefined,
     zIndex: isometricTile ? 10 + isometricTile.depth : undefined
@@ -2406,7 +2422,8 @@ function roomDetailsEditor(
   projectData: GBAProjectData | null | undefined,
   activeTab: RoomInspectorTabID,
   scenePreflight: ReturnType<typeof buildScenePreflightReport> | null,
-  onOpenProjectHealth?: RoomsWorkspaceProps["onOpenProjectHealth"]
+  onOpenProjectHealth?: RoomsWorkspaceProps["onOpenProjectHealth"],
+  onEditRacingTrack?: (mode:"gates"|"route")=>void
 ): React.ReactElement {
   const roomLabel = sceneDisplayName(room.name);
   const projectSettings = projectData?.settings;
@@ -2585,6 +2602,7 @@ function roomDetailsEditor(
         width={room.width} height={room.height} sceneName={room.name}
         onChange={mapStates => onUpdateRoomFields(room.id, { mapStates })} /> : null}
       {resolvedRuntime.type === "racing" ? <RacingSceneInspector
+        onEditTrack={onEditRacingTrack}
         config={normalizeRacingSceneConfig(resolvedRuntime.config)} width={room.width} height={room.height}
         background={room.background??""} assets={backgroundOptions}
         onChange={patch=>onUpdateRoomFields(room.id,{runtime:{type:"racing",config:{...runtime.config,...patch}},
@@ -2926,6 +2944,7 @@ function roomDetailsEditor(
               width={room.width}
             />
             <AffineSceneInspector
+              sceneType={room.sceneType}
               assetOptions={affineOptions}
               onChange={updateAffinePresentation}
               value={affinePresentation}
@@ -3459,6 +3478,8 @@ function RoomEntitiesEditor({
     { id: "resize", label: "Tamanho" }
   ];
   const [nudgeStepSize, setNudgeStepSize] = useState(1);
+  const [entityNameError, setEntityNameError] = useState<string | null>(null);
+  useEffect(() => setEntityNameError(null), [selectedEntity?.id]);
   const isGeneralTab = activeTab === "actor" || activeTab === "trigger";
   const isPositionTab = activeTab === "movement" || activeTab === "area" || activeTab === "actor" || activeTab === "trigger";
   const actorAnimationVariants = selectedEntity?.kind === "actor"
@@ -3574,6 +3595,36 @@ function RoomEntitiesEditor({
                   )}
                 </div>
               ) : null}
+              {isGeneralTab ? <>
+                <label><span>{ui("Nome")}</span><input
+                  aria-label={ui(selectedEntity.kind === "actor" ? "Nome do ator" : "Nome do gatilho")}
+                  aria-invalid={Boolean(entityNameError)}
+                  key={`${selectedEntity.id}:${selectedEntity.name}`}
+                  defaultValue={selectedEntity.name}
+                  disabled={hasLockedSelection || selectedEntities.length > 1}
+                  onChange={() => setEntityNameError(null)}
+                  onBlur={event => {
+                    const name = event.currentTarget.value.trim();
+                    if (name === selectedEntity.name) {
+                      event.currentTarget.value = selectedEntity.name;
+                      setEntityNameError(null);
+                      return;
+                    }
+                    if (!name || presentation.entities.some(entity => entity.kind === selectedEntity.kind && entity.id !== selectedEntity.id && entity.name.toLowerCase() === name.toLowerCase())) {
+                      event.currentTarget.value = selectedEntity.name;
+                      setEntityNameError(ui("Use um nome único e não vazio."));
+                      return;
+                    }
+                    setEntityNameError(null);
+                    if (name !== selectedEntity.name) onUpdateRoomEntity(selectedEntity.kind, selectedEntity.id, { name });
+                  }}
+                  onKeyDown={event => {
+                    if (event.key === "Enter") { event.preventDefault(); event.currentTarget.blur(); }
+                    if (event.key === "Escape") { event.currentTarget.value = selectedEntity.name; setEntityNameError(null); event.currentTarget.blur(); }
+                  }}
+                /></label>
+                {entityNameError ? <p role="alert">{entityNameError}</p> : null}
+              </> : null}
               {isGeneralTab ? <label>
                 <span>{ui("Cena")}</span>
                 <select
@@ -3593,6 +3644,10 @@ function RoomEntitiesEditor({
               ) : null}
               {activeTab === "area" || activeTab === "trigger" ? entityNumberInput("W", selectedEntity.width, (value) => onUpdateRoomEntity(selectedEntity.kind, selectedEntity.id, { width: value }), 1) : null}
               {activeTab === "area" || activeTab === "trigger" ? entityNumberInput("H", selectedEntity.height, (value) => onUpdateRoomEntity(selectedEntity.kind, selectedEntity.id, { height: value }), 1) : null}
+              {activeTab === "trigger" && selectedEntity.kind === "trigger" && room.sceneType === "pointAndClick" && projectData ? (
+                <PointClickTargetInspector key={selectedEntity.id} data={projectData} value={selectedEntitySource?.pointClick}
+                  onChange={pointClick => onUpdateRoomEntity("trigger", selectedEntity.id, { pointClick })} />
+              ) : null}
               {(activeTab === "sprite" || activeTab === "actor") && selectedEntity.kind === "actor" ? (
                 <label className="room-actor-sprite-sheet-field">
                   <span>{ui("Sprite do ator")}</span>
@@ -3692,6 +3747,18 @@ function RoomEntitiesEditor({
                   <small>{ui("A montagem visual e a seleção do menu continuam vinculadas ao item lógico; a lógica deste ator é configurada na aba Eventos.")}</small>
                 </section>
               ) : null}
+              {isGeneralTab && selectedEntity.kind === "actor" && !selectedEntity.isPlayer && room.sceneType === "topdown" ? (
+                <InspectorSection
+                  ariaLabel={ui("Vida do ator")}
+                  className="room-actor-battle-section"
+                  defaultOpen
+                  persistKey={`rooms.entity.${selectedEntity.id}.health`}
+                  title={ui("Vida do ator")}
+                >
+                  {entityNumberInput("HP do ator", selectedEntity.health ?? 1, (value) => onUpdateRoomEntity("actor", selectedEntity.id, { health: value }), 1, 999)}
+                  <small className="muted">{ui("O dano de projéteis reduz este HP; zero ou menos dispara o evento de derrota.")}</small>
+                </InspectorSection>
+              ) : null}
               {isGeneralTab && selectedEntity.kind === "actor" && selectedEntity.battle && room.sceneType !== "luta" && !isMenuVisualActor ? (
                 <InspectorSection
                   ariaLabel={ui("Batalha RPG")}
@@ -3775,6 +3842,12 @@ function RoomEntitiesEditor({
                     <span>{ui("Pode ser empurrado")}</span>
                   </label>
                   <p className="room-actor-battle-hint">{ui("A máscara usa bits dos grupos 0–15. Um ator só empurra outro marcado quando sua prioridade é maior.")}</p>
+                  {!selectedEntity.isPlayer ? <label className="room-actor-pushable-field">
+                    <input type="checkbox" checked={selectedEntity.collisionPlacement === "intentional"}
+                      onChange={event => onUpdateRoomEntity("actor", selectedEntity.id, { collisionPlacement: event.currentTarget.checked ? "intentional" : null })} />
+                    <span>{ui("Sobreposição intencional no mapa")}</span>
+                  </label> : null}
+                  {!selectedEntity.isPlayer ? <p className="room-actor-battle-hint">{ui("Use para mecanismos e objetos fixos sobre paredes ou plataformas. Altera apenas o diagnóstico; a colisão do jogo permanece igual.")}</p> : null}
                   </div>
                 </InspectorSection>
               ) : null}
@@ -4052,7 +4125,7 @@ interface RoomNamePromptState {
 interface RoomNamePromptDialogProps {
   state: RoomNamePromptState;
   onCancel(): void;
-  onConfirm(name: string): void;
+  onConfirm(name: string, sceneType?: string): void;
 }
 
 interface ExplorerContextMenuState {
@@ -4224,14 +4297,17 @@ function EditorExplorerContextMenu({
 function RoomNamePromptDialog({ state, onCancel, onConfirm }: RoomNamePromptDialogProps): React.ReactElement {
   const ui = useStudioUiText();
   const [name, setName] = useState(state.defaultName);
+  const [sceneType, setSceneType] = useState("topdown");
+  const chooseSceneType = !state.renameRoomID && !state.sceneGroupAction && !state.presetID;
 
   useEffect(() => {
     setName(state.defaultName);
+    setSceneType("topdown");
   }, [state.defaultName, state.title]);
 
   function handleSubmit(event: FormEvent<HTMLFormElement>): void {
     event.preventDefault();
-    onConfirm(name.trim());
+    onConfirm(name.trim(), chooseSceneType && sceneType !== "topdown" ? sceneType : undefined);
   }
 
   return (
@@ -4259,9 +4335,15 @@ function RoomNamePromptDialog({ state, onCancel, onConfirm }: RoomNamePromptDial
             value={name}
           />
         </label>
+        {chooseSceneType ? <label className="room-name-prompt-field">
+          <span>{ui("Tipo de cena")}</span>
+          <select aria-label={ui("Tipo de cena")} value={sceneType} onChange={(event) => setSceneType(event.currentTarget.value)}>
+            {roomInspectorSceneTypeOptions("topdown").map((option) => <option key={option.value} value={option.value}>{ui(option.label)}</option>)}
+          </select>
+        </label> : null}
         <div className="room-name-prompt-actions">
           <button onClick={onCancel} type="button">{ui("Cancelar")}</button>
-          <button disabled={!name.trim()} type="submit">{state.confirmLabel}</button>
+          <button disabled={!name.trim()} type="submit">{ui(state.confirmLabel)}</button>
         </div>
       </form>
     </div>
@@ -4721,16 +4803,16 @@ function RoomSceneMapInactivePreview({
   const isPerspectiveViewport = isViewportPreview && isPseudo3dRacingRoom(room);
   const menu = room.sceneType === "menu" ? normalizeMenuSceneConfig(room.runtime?.config) : null;
   const runtimeHudAsset = roomRuntimeHudAsset(room);
-  const runtimeHudURL = isViewportPreview && projectData && room.sceneType !== "dungeonCrawler" && runtimeHudAsset
-    ? resolveProjectAssetURL(projectData, projectPath, runtimeHudAsset) : null;
-  const viewportHud = isViewportPreview && projectData && (!runtimeHudAsset || ["battleRpg", "dungeonCrawler"].includes(room.sceneType))
-    && (!menu || (menu.hudMode !== "none" && menu.screenType === "menu"))
+  const viewportHud = isViewportPreview && projectData && (!menu || menu.hudMode !== "none")
     ? resolveExplicitHudPresetBinding(projectData, { roomID: room.id, roomPresetId: room.hudPresetId, scenePresetId: menu?.hudPresetId }) : null;
+  const runtimeHudURL = isViewportPreview && (!viewportHud || room.sceneType === "battleRpg") && projectData && room.sceneType !== "dungeonCrawler" && runtimeHudAsset
+    ? resolveProjectAssetURL(projectData, projectPath, runtimeHudAsset) : null;
   const visibleEntities = entities.filter(entity => {
     if (!isViewportPreview) return true;
-    if (entity.kind !== "actor" || (menu && viewportHud)) return false;
+    if (entity.kind !== "actor" || (menu?.screenType === "menu" && viewportHud)) return false;
     if (!menu || !projectData) return true;
     const actor = Array.isArray(projectData.actors) ? projectData.actors.find(actor => actor.id === entity.id) : null;
+    if(!menuActorVisibleForEditor(actor??undefined,Array.isArray(projectData.variables)?projectData.variables:[]))return false;
     if (actor?.menuActorSelectedOnly && actor.menuItemID !== menu.items[0]?.id) return false;
     if (!actor?.menuVisibilityVariable) return true;
     const variable = Array.isArray(projectData.variables) ? projectData.variables.find(variable => variable.name === actor.menuVisibilityVariable) : null;
@@ -5076,7 +5158,7 @@ function RoomSceneMapInactivePreview({
           })}
         </div>}
         {runtimeHudURL ? <img className="room-stage-card-runtime-hud" src={refreshedPreviewAssetURL(runtimeHudURL, assetRefreshToken)!} alt="" /> : null}
-        {isViewportPreview && room.sceneType === "isometric" ? <div className="room-stage-card-viewport-hud" style={{ transform: `scale(${displayScale})` }}>
+        {isViewportPreview && room.sceneType === "isometric" && !viewportHud ? <div className="room-stage-card-viewport-hud" style={{ transform: `scale(${displayScale})` }}>
           <RoomTacticalInitialHud room={room} projectData={projectData} projectPath={projectPath} />
         </div> : null}
         {viewportHud && room.sceneType !== "dungeonCrawler" ? <div className="room-stage-card-viewport-hud" style={{ transform: `scale(${displayScale})` }}>
@@ -5187,7 +5269,12 @@ function RacingPseudo3dCameraPreview({
         <i>{ui("CURVA")}</i>
       </span> : null}
       {config.topdownTrack ? <RacingCircuitCamera room={room} config={config} floorURL={floorURL} panoramaURL={panoramaURL} player={player} playerURL={playerURL}/> : null}
-      {preview.minimapVisible ? (
+      {preview.minimapVisible && config.topdownTrack && !minimapURL ? (
+        <RacingGeneratedMinimap label={ui("Minimapa de corrida da cena {0}", { 0: roomLabel })}
+          width={room.width * 8} height={room.height * 8} track={config.topdownTrack}
+          player={{ x: (player?.x ?? room.width / 2) * 8 + 4, y: (player?.y ?? room.height / 2) * 8 + 4 }}
+          rivalCount={entities.filter(entity => entity.kind === "actor" && entity !== player).length} />
+      ) : preview.minimapVisible ? (
         <span
           aria-label={ui("Minimapa de corrida da cena {0}", { 0: roomLabel })}
           className="racing-pseudo3d-minimap"
@@ -5395,6 +5482,11 @@ interface RoomTilemapEditorProps {
   selectedEntityKeys: string[];
   selectedHudComponentID?: string | null;
   onSelectHudComponent?(componentID: string | null): void;
+  onUpdateMenuTextInput?(input: MenuTextInputConfig): void;
+  racingSelection?: RacingTrackSelection | null;
+  racingAreaMode?: "gates"|"events";
+  onSelectRacingElement?(selection:RacingTrackSelection):void;
+  onUpdateRacingTrack?(track:RacingTopdownTrackConfig):void;
   setSelectedEntityKeys(keys: string[]): void;
   selectedEntityTool: RoomEntityCanvasTool;
   canvasLayerLocks: Record<RoomCanvasLayerID, boolean>;
@@ -5474,6 +5566,8 @@ function RoomTilemapEditor({
   selectedEntityKeys,
   selectedHudComponentID,
   onSelectHudComponent,
+  onUpdateMenuTextInput,
+  racingSelection, racingAreaMode, onSelectRacingElement, onUpdateRacingTrack,
   setSelectedEntityKeys,
   selectedEntityTool,
   canvasLayerLocks,
@@ -5575,6 +5669,7 @@ function RoomTilemapEditor({
     if (arrivalPreviewReplacesPlayer && entity.isPlayer === true) return false;
     if (entity.kind !== "actor" || !menuConfig) return true;
     const actor = projectMenuActors.find((candidate) => candidate.id === entity.id);
+    if(!menuActorVisibleForEditor(actor,Array.isArray(projectData?.variables)?projectData.variables:[]))return false;
     if (menuPreviewScreen && Array.isArray(actor?.menuScreenIDs) && !actor.menuScreenIDs.includes(menuPreviewScreen.id)) return false;
     if (actor?.menuVisibilityVariable) {
       const variable = Array.isArray(projectData?.variables) ? projectData.variables.find(v => v.name === actor.menuVisibilityVariable) : null;
@@ -6684,7 +6779,8 @@ function RoomTilemapEditor({
         onContextMenu={(event) => {
           if (selectedEditMode === "collision") event.preventDefault();
         }}
-        role={showRacingPseudo3dCamera || showRacingTechnicalMap ? undefined : "grid"}
+        role={showRacingPseudo3dCamera || showRacingTechnicalMap ? undefined : selectedToolPanelMode === "hud" && menuConfig?.textInput ? "group" : "grid"}
+        aria-label={selectedToolPanelMode === "hud" && menuConfig?.textInput ? ui("Interface da cena") : undefined}
         style={{
           ...(showGrid && canvasLayerVisibility.grid && room.sceneType !== "isometric" && !showRacingPseudo3dCamera && !showRacingTechnicalMap
             ? sceneMapTileGridBackgroundStyle(cardSize.width, cardSize.canvasDisplayHeight, room.width, room.height)
@@ -7088,7 +7184,7 @@ function RoomTilemapEditor({
         })}
         {isFocusedSceneEditor && room.isStart ? <span className="room-game-start-label" aria-label={ui("Cena de início do jogo")}>{ui("● Início do jogo")}</span> : null}
         {isFocusedSceneEditor && testStart ? <span className="room-test-start-marker" aria-label={ui("Início do teste: {0}, {1}, {2}", { 0: testStart.x, 1: testStart.y, 2: testStart.direction })} style={roomTileCenterStyle(room, testStart.x, testStart.y)}>T</span> : null}
-        {isFocusedSceneEditor ? eventLinks.map((link) => (
+        {isFocusedSceneEditor && selectedToolPanelMode !== "hud" ? eventLinks.map((link) => (
           <RoomSceneEventMarker
             editable
             projectData={projectData}
@@ -7107,6 +7203,13 @@ function RoomTilemapEditor({
             room={room}
           />
         )) : null}
+        {isFocusedSceneEditor && canvasLayerVisibility.hud && menuConfig?.textInput?.keyboard?.controlLayout === "bottom_grid" ? <MenuTextInputOverlay key={room.id}
+          selectedPart={selectedHudComponentID?.startsWith("name-input:") ? selectedHudComponentID.slice(11) as MenuTextInputPart : null}
+          onSelectPart={part => onSelectHudComponent?.(part ? `name-input:${part}` : null)}
+          editable={selectedToolPanelMode === "hud"} readOnly={canvasLayerLocks.hud || !onUpdateMenuTextInput} onChange={onUpdateMenuTextInput}
+          input={menuConfig.textInput} showFieldGuide={selectedToolPanelMode === "hud" && canvasLayerVisibility.composition}
+          fontAssetURL={projectData ? resolveProjectAssetURL(projectData, projectPath, resolveSceneDialogueUiSettings(projectData, room.id).font) : null}
+        /> : null}
         {isFocusedSceneEditor && canvasLayerVisibility.composition ? <RoomMenuCompositionOverlay room={room} screenID={menuPreviewScreen?.id} selectedItemIndex={menuPreviewItemIndex} /> : null}
         {isFocusedSceneEditor && renderHudOverlay && canvasLayerVisibility.hud && hudBinding ? (
           <RoomHudOverlay
@@ -7128,12 +7231,11 @@ function RoomTilemapEditor({
             room={room}
           />
         ) : null}
-        {isPseudo3dRacing && racingTechnicalMapOpen && racingPseudo3dConfigForRoom(room)?.topdownTrack ? <svg
-          aria-label={ui("Checkpoints e rota do circuito")} viewBox={`0 0 ${room.width*8} ${room.height*8}`}
-          style={{position:"absolute",inset:0,width:"100%",height:"100%",pointerEvents:"none",zIndex:4}}>
-          <polyline fill="none" stroke="#9b77db" strokeWidth="1" strokeDasharray="4 4" points={(racingPseudo3dConfigForRoom(room)?.topdownTrack?.pathPoints??[]).map(point=>`${point.x},${point.y}`).join(" ")}/>
-          {racingPseudo3dConfigForRoom(room)?.topdownTrack?.checkpoints.map((gate,index)=><g key={gate.id}><rect x={gate.x-gate.width/2} y={gate.y-gate.height/2} width={gate.width} height={gate.height} fill={index===0?"#36bf8060":"#aa73ee50"} stroke={index===0?"#36bf80":"#aa73ee"}/><text x={gate.x} y={gate.y} fontSize="8" textAnchor="middle" fill="#251936">{index===0?ui("Chegada"):index}</text></g>)}
-        </svg> : null}
+        {isFocusedSceneEditor && room.runtime?.type==="racing" && racingPseudo3dConfigForRoom(room)?.topdownTrack && (racingTechnicalMapOpen || (!isPseudo3dRacing && selectedToolPanelMode==="trigger")) && canvasLayerVisibility.triggers ? <RacingTrackOverlay
+          track={racingPseudo3dConfigForRoom(room)!.topdownTrack!} width={room.width*8} height={room.height*8}
+          mode={selectedToolPanelMode==="trigger" && racingAreaMode!=="events" ? "gates" : racingTechnicalMapOpen && selectedToolPanelMode==="select" ? "route" : "none"}
+          selection={racingSelection??null} readOnly={selectedToolPanelMode==="trigger"?canvasLayerLocks.triggers:canvasLayerLocks.actors}
+          onSelect={item=>onSelectRacingElement?.(item)} onChange={onUpdateRacingTrack}/>:null}
         {isPseudo3dRacing && racingTechnicalMapOpen ? <button
           className="racing-pseudo3d-technical-map-toggle" type="button"
           aria-label={ui("Voltar à prévia GBA da cena {0}", { 0: sceneDisplayName(room.name) })}
@@ -7176,6 +7278,7 @@ export function RoomsWorkspace({
   budgetAnalysisGeneratedAt,
   budgetAnalysisRunning,
   budgetReport,
+  videoBudget,
   projectPath,
   sceneMapZoom,
   assetRefreshToken = 0,
@@ -7266,6 +7369,8 @@ export function RoomsWorkspace({
   const [collisionHoverPreviewEnabled, setCollisionHoverPreviewEnabled] = useState(true);
   const [selectedEntityTool, setSelectedEntityTool] = useState<RoomEntityCanvasTool>("move");
   const [selectedHudComponentID, setSelectedHudComponentID] = useState<string | null>(null);
+  const [selectedRacingElement,setSelectedRacingElement]=useState<{roomID:string;selection:RacingTrackSelection}|null>(null);
+  const [racingAreaMode,setRacingAreaMode]=useState<"gates"|"events">("gates");
   const [hudLibraryPresetID, setHudLibraryPresetID] = useState<string | null>(null);
   const [editingSharedHudID, setEditingSharedHudID] = useState<string | null>(null);
   const [hudViewMode, setHudViewMode] = useState<"edit" | "preview">("edit");
@@ -7296,6 +7401,7 @@ export function RoomsWorkspace({
   const focusViewportHostRef = useRef<HTMLDivElement | null>(null);
   const [focusSceneMapRoomID, setFocusSceneMapRoomID] = useState<string | null>(null);
   const [focusedSceneEditorRoomID, setFocusedSceneEditorRoomID] = useState<string | null>(null);
+  const [pendingCreatedSceneFocusID, setPendingCreatedSceneFocusID] = useState<string | null>(null);
   const [focusSceneZoom, setFocusSceneZoom] = useState(1);
   useEffect(() => { setFocusSceneZoom(1); }, [focusedSceneEditorRoomID]);
   const [focusViewportAvailableSize, setFocusViewportAvailableSize] = useState<{ height: number; width: number }>({
@@ -7688,6 +7794,12 @@ export function RoomsWorkspace({
   }, [focusSceneMapRoomID]);
 
   useEffect(() => {
+    if (!pendingCreatedSceneFocusID || !presentation?.rooms.some((room) => room.id === pendingCreatedSceneFocusID)) return;
+    setFocusedSceneEditorRoomID(pendingCreatedSceneFocusID);
+    setPendingCreatedSceneFocusID(null);
+  }, [pendingCreatedSceneFocusID, presentation?.rooms]);
+
+  useEffect(() => {
     if (!focusedSceneEditorRoomID) return;
     if (!presentation?.rooms.some((room) => room.id === focusedSceneEditorRoomID)) {
       setFocusedSceneEditorRoomID(null);
@@ -7920,7 +8032,7 @@ export function RoomsWorkspace({
     ? inspectorContext.entity.kind
     : inspectorContext.kind;
   const inspectorTabs = roomInspectorTabs(inspectorContextKind);
-  const visibleInspectorTabs = selectedToolPanelMode === "hud" ? [{ id: "scene" as const, label: "Cena" }, { id: "hud" as const, label: "HUD" }] : inspectorTabs;
+  const visibleInspectorTabs = selectedToolPanelMode === "hud" ? [{ id: "scene" as const, label: "Cena" }, { id: "hud" as const, label: "Interface" }] : inspectorTabs;
   const activeInspectorTab = selectedToolPanelMode === "hud"
     ? "hud"
     : normalizeRoomInspectorTab(
@@ -7936,7 +8048,10 @@ export function RoomsWorkspace({
   const activeSelectedCanvasCell = activeRoom && selectedCanvasCell?.roomID === activeRoom.id
     ? selectedCanvasCell
     : null;
-  const inspectorTitle = inspectorContext.kind === "paint"
+  const inspectorRacingConfig=inspectorRoom?.runtime?.type==="racing"?normalizeRacingSceneConfig(inspectorRoom.runtime.config):null;
+  const inspectorRacingSelection=selectedRacingElement && selectedRacingElement.roomID===inspectorRoom?.id?selectedRacingElement.selection:null;
+  const racingTrackContext=Boolean(inspectorRacingConfig?.topdownTrack && ((selectedToolPanelMode==="trigger"&&racingAreaMode==="gates") || (focusViewMode==="map"&&selectedToolPanelMode==="select"&&inspectorRacingSelection?.kind==="point")));
+  const inspectorTitle = racingTrackContext ? ui(selectedToolPanelMode==="trigger"?"Checkpoints da corrida":"Rota dos rivais") : inspectorContext.kind === "paint"
     ? ui("Pintura")
     : inspectorContext.kind === "height"
       ? ui("Altura")
@@ -7985,7 +8100,7 @@ export function RoomsWorkspace({
         }) as Record<string, unknown> | undefined
       : undefined) ?? { id: inspectorRoom.id, name: inspectorRoom.name }
     : null;
-  const sceneEventInspector = inspectorContext.kind === "room" && inspectorRoom && inspectorSceneRecord ? (
+  const sceneEventInspector = (inspectorContext.kind === "room" || racingTrackContext) && inspectorRoom && inspectorSceneRecord ? (
     <RoomEventBindingsInspector
       commandSuggestions={commandSuggestions}
       contextKind="room"
@@ -8164,11 +8279,9 @@ export function RoomsWorkspace({
   const focusSceneLutaHudAssetURL = projectData && projectPath && typeof focusSceneLutaHudAssetName === "string"
     ? resolveProjectAssetURL(projectData, projectPath, focusSceneLutaHudAssetName)
     : null;
-  const focusSceneHudBinding = (!focusSceneLutaHudAssetName || ["battleRpg","dungeonCrawler"].includes(focusSceneRoom?.sceneType ?? "")) && projectData && focusSceneRoom && focusSceneMenuConfig?.hudMode !== "none" && (
-    focusSceneRoom.sceneType !== "menu" || focusSceneMenuConfig?.screenType === "menu"
-  ) ? resolveExplicitHudPresetBinding(projectData, {
+  const focusSceneHudBinding = projectData && focusSceneRoom && focusSceneMenuConfig?.hudMode !== "none" ? resolveExplicitHudPresetBinding(projectData, {
     roomID: focusSceneRoom.id,
-    scenePresetId: focusSceneMenuConfig?.screenType === "menu" ? focusSceneMenuConfig.hudPresetId : undefined,
+    scenePresetId: focusSceneMenuConfig?.hudPresetId,
     roomPresetId: focusSceneRoom.hudPresetId
   }) : null;
   const hudPresentation = projectData ? deriveHudPresetsWorkspacePresentation(projectData) : null;
@@ -8177,14 +8290,13 @@ export function RoomsWorkspace({
     hudMode: hudSelectedScreen.hudMode ?? (hudSelectedScreen.hudPresetId ? undefined : focusSceneMenuConfig?.hudMode),
     hudPresetId: hudSelectedScreen.hudPresetId ?? focusSceneMenuConfig?.hudPresetId
   } : focusSceneMenuConfig;
-  const hudUnavailableReason = focusSceneLutaHudAssetName && !["battleRpg","dungeonCrawler"].includes(focusSceneRoom?.sceneType ?? "") ? `Esta cena usa uma HUD ${focusSceneRoom?.sceneType === "isometric" ? "tática" : "de luta"} por imagem. A prévia aparece sobre a cena; a imagem e os recursos são configurados na aba Cena.`
-    : focusSceneRoom?.sceneType === "menu" && hudSelectedMenu?.screenType !== "menu" ? "Telas de logo e título usam atores e fundo. Escolha uma tela de menu para editar sua HUD." : undefined;
-  const hudAppliedBinding = projectData && focusSceneRoom && !hudUnavailableReason && hudSelectedMenu?.hudMode !== "none"
+  const hudAppliedBinding = projectData && focusSceneRoom && hudSelectedMenu?.hudMode !== "none"
     ? resolveExplicitHudPresetBinding(projectData, { roomID: focusSceneRoom.id, scenePresetId: hudSelectedMenu?.hudPresetId, roomPresetId: focusSceneRoom.hudPresetId }) : null;
   const hudLibraryPreset = hudPresentation?.presets.find(preset => preset.id === hudLibraryPresetID) ?? null;
   const focusSceneHudAuthoringBinding: HudPresetBinding | null = hudLibraryPreset
     ? { preset: hudLibraryPreset, presetId: hudLibraryPreset.id, requestedPresetId: hudLibraryPreset.id, source: "room", status: "resolved" }
     : hudAppliedBinding;
+  const focusSceneNativeHudVisible = ["battleRpg", "dungeonCrawler"].includes(focusSceneRoom?.sceneType ?? "") || !focusSceneHudAuthoringBinding;
   const hudEditingPreset = focusSceneHudAuthoringBinding?.preset;
   const canEditHudCanvas = Boolean(hudEditingPreset && !hudEditingPreset.builtIn && onUpdateHudPreset && !canvasLayerLocks.hud
     && (editingSharedHudID === hudEditingPreset.id || (hudEditingPreset.id !== hudPresentation?.activePresetId && projectData && hudPresetUsages(projectData, hudEditingPreset.id).every(use => use.id === focusSceneRoom?.id))));
@@ -8338,6 +8450,7 @@ export function RoomsWorkspace({
   }
 
   function enterSceneFocus(room: RoomsWorkspaceRoom): void {
+    setPendingCreatedSceneFocusID(null);
     setFocusViewMode("viewport");
     setFocusCameraOrigin({ left: 0, top: 0 });
     focusCameraOriginRef.current = { left: 0, top: 0 };
@@ -8362,6 +8475,7 @@ export function RoomsWorkspace({
   }
 
   function exitSceneFocus(): void {
+    setPendingCreatedSceneFocusID(null);
     setFocusedSceneEditorRoomID(null);
     window.requestAnimationFrame(() => fitSceneMapView());
   }
@@ -8492,6 +8606,7 @@ export function RoomsWorkspace({
       return;
     }
     if (mode === "trigger") {
+      if(room?.sceneType==="racing") {setFocusViewMode("map");setRacingAreaMode("gates");}
       setSelectedEntityTool("resize");
       setSelectedEntityKeys([]);
       return;
@@ -8613,6 +8728,7 @@ export function RoomsWorkspace({
   }
 
   function focusRoomInExplorer(room: RoomsWorkspaceRoom): void {
+    setPendingCreatedSceneFocusID(null);
     if (focusedSceneEditorRoomID) setFocusedSceneEditorRoomID(room.id);
     onSetActiveRoom(room.id, room.name);
     setSelectedSceneMapRoomName(room.name);
@@ -8621,6 +8737,7 @@ export function RoomsWorkspace({
   }
 
   function focusEntityInExplorer(entity: RoomsWorkspaceEntity): void {
+    setPendingCreatedSceneFocusID(null);
     const room = resolvedPresentation.rooms.find((item) => item.name === entity.roomName);
     if (room) {
       if (focusedSceneEditorRoomID) setFocusedSceneEditorRoomID(room.id);
@@ -8675,7 +8792,7 @@ export function RoomsWorkspace({
     });
   }
 
-  async function confirmRoomNamePrompt(name: string): Promise<void> {
+  async function confirmRoomNamePrompt(name: string, sceneType?: string): Promise<void> {
     const promptState = roomNamePrompt;
     setRoomNamePrompt(null);
     if (!name || !promptState) return;
@@ -8705,9 +8822,24 @@ export function RoomsWorkspace({
     }
 
     const anchorRoomID = promptState.anchorRoomID;
-    const newRoomID = await onCreateRoom(anchorRoomID, name, promptState.presetID);
+    const newRoomID = sceneType
+      ? await onCreateRoom(anchorRoomID, name, promptState.presetID, sceneType)
+      : await onCreateRoom(anchorRoomID, name, promptState.presetID);
     if (typeof newRoomID === "string" && newRoomID.trim()) {
       onSetActiveRoom(newRoomID, name);
+      if (focusedSceneEditorRoomID) {
+        setPendingCreatedSceneFocusID(newRoomID);
+        setSelectedSceneMapRoomName(name);
+        setSelectedEntityKeys([]);
+        setSelectedConnectionIndex(null);
+        setSelectedCanvasCell(null);
+        setSelectedToolPanelMode("select");
+        setSelectedEditMode("select");
+        setInspectorTabByContext((current) => ({ ...current, room: "scene" }));
+        setFocusCameraOrigin({ left: 0, top: 0 });
+        focusCameraOriginRef.current = { left: 0, top: 0 };
+        focusInitialCameraRoomRef.current = null;
+      }
       setFocusSceneMapRoomID(newRoomID);
     }
   }
@@ -9329,6 +9461,11 @@ export function RoomsWorkspace({
       projectPath={projectPath}
       projectData={projectData}
       room={focusSceneRoom}
+      onUpdateMenuTextInput={textInput => onUpdateRoomFields(focusSceneRoom.id, { runtime: { type: "menu", config: { ...focusSceneRoom.runtime?.config, textInput } } })}
+      racingSelection={selectedRacingElement?.roomID===focusSceneRoom.id?selectedRacingElement.selection:null}
+      racingAreaMode={racingAreaMode}
+      onSelectRacingElement={selection=>{setSelectedRacingElement({roomID:focusSceneRoom.id,selection});setSelectedEntityKeys([]);setInspectorTabByContext(current=>({...current,[selection.kind==="gate"?"trigger":"room"]:selection.kind==="gate"?"area":"scene"}));}}
+      onUpdateRacingTrack={topdownTrack=>onUpdateRoomFields(focusSceneRoom.id,{runtime:{type:"racing",config:{...focusSceneRoom.runtime?.config,topdownTrack}}})}
       renderHudOverlay={false}
       entities={presentation.entities.filter((entity) => entity.roomName === focusSceneRoom.name)}
       hudBinding={selectedToolPanelMode === "hud" ? focusSceneHudAuthoringBinding : focusSceneHudBinding}
@@ -9358,7 +9495,7 @@ export function RoomsWorkspace({
       setSelectedTileID={setSelectedTileID}
       setSelectedTileStamp={setSelectedTileStamp}
       setSelectedTool={setSelectedTool}
-      triggerPlacementEnabled={selectedToolPanelMode === "trigger"}
+      triggerPlacementEnabled={selectedToolPanelMode === "trigger" && (focusSceneRoom.sceneType!=="racing" || racingAreaMode==="events")}
       cameraZones={focusSceneRoom.cameraZones ?? []}
       cameraZonePlacementEnabled={selectedToolPanelMode === "camera"}
       selectedCameraZoneID={selectedCameraZoneID}
@@ -9424,7 +9561,7 @@ export function RoomsWorkspace({
           canvasGridVisible: false, ghostPreviewEnabled: false, collisionHoverPreviewEnabled: false,
           canvasLayerVisibility: { ...defaultCanvasLayerVisibility, background: true, actors: true, hud: true, grid: false,
             composition: false, collision: false, hitboxes: false, triggers: false, cameraBounds: false, worldBounds: false },
-          selectedToolPanelMode: "select", selectedEditMode: "select", selectedEntityKeys: [],
+          selectedToolPanelMode: "select", selectedEditMode: "select", selectedEntityKeys: [], racingSelection:null,
           selectedCanvasCellIndex: null, selectedCameraZoneID: null, selectedConnectionIndex: null,
           cameraZones: [], connectionZones: [], eventLinks: [], testStart: undefined,
           triggerPlacementEnabled: false, cameraZonePlacementEnabled: false, connectionZonePlacementEnabled: false,
@@ -9434,7 +9571,7 @@ export function RoomsWorkspace({
       {focusSceneHudBinding ? <RoomHudOverlay binding={focusSceneHudBinding} guides={false} labelPrefix="HUD na prévia GBA"
         entities={presentation.entities.filter(entity => entity.roomName === focusSceneRoom.name)}
         projectData={projectData} projectPath={projectPath} room={focusSceneRoom} viewportScale={1} viewportAnchored /> : null}
-      {focusSceneLutaHudAssetURL ? <img className="room-focus-native-runtime-hud" alt="" src={focusSceneLutaHudAssetURL} /> : null}
+      {focusSceneNativeHudVisible && focusSceneLutaHudAssetURL ? <img className="room-focus-native-runtime-hud" alt="" src={focusSceneLutaHudAssetURL} /> : null}
       {projectData && activeInspectorTab === "dialogues" && dialoguePreviewKey ? <DialogueScenePreview
         roomId={focusSceneRoom.id} projectData={projectData} projectPath={projectPath}
         dialogue={contextualDialogues?.dialogues.find(dialogue => dialogue.key === dialoguePreviewKey) ?? dialogueCatalog.find(dialogue => dialogue.key === dialoguePreviewKey)}
@@ -10035,6 +10172,7 @@ export function RoomsWorkspace({
                     selectedTool={selectedTool}
                     selectedToolPanelMode={selectedToolPanelMode}
                     hudTools={<HudCanvasToolbar
+                      nativeTextInput={Boolean(focusSceneMenuConfig?.textInput)}
                       preset={hudEditingPreset} canEdit={canEditHudCanvas} selectedComponentID={selectedHudComponentID}
                       onSelectComponent={setSelectedHudComponentID} onUpdateHudPreset={onUpdateHudPreset}
                       viewMode={hudViewMode} onViewMode={setHudViewMode}
@@ -10326,7 +10464,7 @@ export function RoomsWorkspace({
                 dialogue={contextualDialogues?.dialogues.find(dialogue => dialogue.key === dialoguePreviewKey) ?? dialogueCatalog.find(dialogue => dialogue.key === dialoguePreviewKey)}
                 scale={focusViewportGeometry?.scale ?? 1}
               /> : null}
-              {canvasLayerVisibility.hud && focusSceneLutaHudAssetURL && typeof focusSceneLutaHudAssetName === "string" ? (
+              {canvasLayerVisibility.hud && focusSceneNativeHudVisible && focusSceneLutaHudAssetURL && typeof focusSceneLutaHudAssetName === "string" ? (
                 <div
                   aria-label={ui("Prévia da HUD {0} {1}", { 0: focusSceneRoom?.sceneType === "isometric" ? "tática" : focusSceneRoom?.sceneType === "battleRpg" ? "RPG" : focusSceneRoom?.sceneType === "dungeonCrawler" ? "do labirinto" : "de luta", 1: focusSceneLutaHudAssetName })}
                   className={`room-hud-overlay is-viewport-anchored room-runtime-hud-overlay${["battleRpg","dungeonCrawler"].includes(focusSceneRoom?.sceneType ?? "") ? " room-runtime-hud-background" : ""}`}
@@ -10480,7 +10618,21 @@ export function RoomsWorkspace({
                       sfxOptions={dialogueSfxOptions}
                     />
                   ) : null}
-              {activeInspectorTab === "dialogues" ? null : inspectorContext.kind === "height" ? (
+              {inspectorRacingConfig?.topdownTrack && selectedToolPanelMode==="trigger" ? <div className="racing-track-actions" role="group" aria-label={ui("Tipos de área")}>
+                <button type="button" aria-pressed={racingAreaMode==="gates"} onClick={()=>{setRacingAreaMode("gates");setSelectedEntityKeys([]);setFocusViewMode("map");}}>{ui("Checkpoints e chegada")}</button>
+                <button type="button" aria-pressed={racingAreaMode==="events"} onClick={()=>{setRacingAreaMode("events");setSelectedRacingElement(null);}}>{ui("Áreas de evento")}</button>
+              </div>:null}
+              {activeInspectorTab === "dialogues" ? null : racingTrackContext && inspectorRoom && inspectorRacingConfig?.topdownTrack ? (
+                activeInspectorTab==="events" ? sceneEventInspector : <RacingTrackInspector track={inspectorRacingConfig.topdownTrack}
+                  mode={selectedToolPanelMode==="trigger"?"gates":"route"} width={inspectorRoom.width*8} height={inspectorRoom.height*8}
+                  selection={inspectorRacingSelection} readOnly={selectedToolPanelMode==="trigger"?canvasLayerLocks.triggers:canvasLayerLocks.actors}
+                  eventOptions={eventReferenceOptions}
+                  onSelect={selection=>setSelectedRacingElement(selection?{roomID:inspectorRoom.id,selection}:null)}
+                  onChange={topdownTrack=>onUpdateRoomFields(inspectorRoom.id,{runtime:{type:"racing",config:{...inspectorRoom.runtime?.config,topdownTrack}}})}
+                  onOpenEvents={()=>setInspectorTabByContext(current=>({...current,[inspectorContextKind]:"events"}))}
+                  onOpenEvent={name=>onOpenEvent?.(name,inspectorRoom.name)}
+                  onCreateEvent={bindingKey=>onCreateBoundEventsForTargets?.({initialCommands:[],targets:[{targetKind:"room",targetName:inspectorRoom.name,bindingKey}]})}/>
+              ) : inspectorContext.kind === "height" ? (
                 roomHeightInspector(
                   inspectorRoom,
                   inspectorSelectedCanvasCell?.cellIndex ?? null,
@@ -10570,9 +10722,9 @@ export function RoomsWorkspace({
               ) : (
                 <>
                   {activeInspectorTab === "scene" ? <>
-                  <section className="hud-authoring-section room-scene-hud-summary" aria-label={ui("Resumo da HUD da cena")}>
-                    <div><strong>{ui("HUD da cena")}</strong><span>{roomRuntimeHudAsset(inspectorRoom) ? ui("HUD {0} · {1}", { 0: inspectorRoom.sceneType === "isometric" ? "tática" : inspectorRoom.sceneType === "battleRpg" ? "RPG" : inspectorRoom.sceneType === "dungeonCrawler" ? "do labirinto" : "de luta", 1: roomRuntimeHudAsset(inspectorRoom) }) : inspectorHudBinding?.preset.name ?? ui("Sem HUD")}</span></div>
-                    <button type="button" onClick={() => { enterSceneFocus(inspectorRoom); setEditorToolPanelMode("hud"); setCanvasLayerVisibilityState(current => ({ ...current, hud: true })); }}>{ui("Editar HUD")}</button>
+                  <section className="hud-authoring-section room-scene-hud-summary" aria-label={ui("Resumo da interface da cena")}>
+                    <div><strong>{ui("Interface da cena")}</strong><span>{roomRuntimeHudAsset(inspectorRoom) ? ui("HUD {0} · {1}", { 0: inspectorRoom.sceneType === "isometric" ? "tática" : inspectorRoom.sceneType === "battleRpg" ? "RPG" : inspectorRoom.sceneType === "dungeonCrawler" ? "do labirinto" : "de luta", 1: roomRuntimeHudAsset(inspectorRoom) }) : inspectorHudBinding?.preset.name ?? (inspectorRoom.runtime?.type === "menu" && normalizeMenuSceneConfig(inspectorRoom.runtime.config).textInput ? ui("Entrada de nome e teclado") : ui("Sem HUD"))}</span></div>
+                    <button type="button" onClick={() => { enterSceneFocus(inspectorRoom); setEditorToolPanelMode("hud"); setCanvasLayerVisibilityState(current => ({ ...current, hud: true })); }}>{ui("Editar interface")}</button>
                   </section>
                   {inspectorRoom.warnings.length ? (
                     <div className="room-warnings inspector">
@@ -10587,6 +10739,7 @@ export function RoomsWorkspace({
                       generatedAt={budgetAnalysisGeneratedAt}
                       onAnalyze={onAnalyzeProjectBudget}
                       presentation={projectBudget}
+                      videoBudget={videoBudget}
                       running={budgetAnalysisRunning}
                     />
                   ) : null}
@@ -10598,11 +10751,13 @@ export function RoomsWorkspace({
                       projectData,
                       activeInspectorTab,
                       inspectorScenePreflight,
-                      onOpenProjectHealth
+                      onOpenProjectHealth,
+                      mode=>{enterSceneFocus(inspectorRoom);setFocusViewMode("map");setEditorToolPanelMode(mode==="gates"?"trigger":"select");setRacingAreaMode("gates");setSelectedEntityKeys([]);setSelectedRacingElement({roomID:inspectorRoom.id,selection:mode==="gates"?{kind:"gate",id:normalizeRacingSceneConfig(inspectorRoom.runtime?.config).topdownTrack!.checkpoints[0].id}:{kind:"point",index:0}});}
                     )
                     : null}
                   {activeInspectorTab === "hud" && selectedToolPanelMode === "hud" && hudInspectorRoom ? (
                     <HudSceneInspector
+                      onUpdateRoomFields={onUpdateRoomFields}
                       readOnly={canvasLayerLocks.hud}
                       onUpdateInterfaceTheme={onUpdateInterfaceTheme}
                       binding={hudAppliedBinding}
@@ -10629,7 +10784,6 @@ export function RoomsWorkspace({
                       screenID={hudMenuScreenID || undefined}
                       screens={focusSceneMenuConfig?.screens?.length ? [{ id: "", title: focusSceneMenuConfig.title || "Tela principal" }, ...focusSceneMenuConfig.screens] : undefined}
                       onSelectScreen={id => { setHudMenuScreenID(id); setHudLibraryPresetID(null); setSelectedHudComponentID(null); }}
-                      unavailableReason={hudUnavailableReason ? ui(hudUnavailableReason) : undefined}
                     />
                   ) : null}
                   {activeInspectorTab === "connections" && !selectedArrival ? roomConnectionsEditor(

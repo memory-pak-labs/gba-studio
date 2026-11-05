@@ -101,6 +101,56 @@ async function makeSpacingSensitiveBuild(): Promise<{ enginePackPath: string; bu
   return { enginePackPath, buildPath, root };
 }
 
+async function makeStagingBuild(): Promise<{ enginePackPath: string; buildPath: string; root: string }> {
+  const root = await mkdtemp(path.join(os.tmpdir(), "gbastudio electron build-"));
+  temporaryRoots.push(root);
+  const enginePackPath = path.join(root, "EnginePack");
+  const toolsPath = path.join(enginePackPath, "tools");
+  await mkdir(toolsPath, { recursive: true });
+  const buildPath = path.join(toolsPath, process.platform === "win32" ? "gbsbuild.cmd" : "gbsbuild");
+  const script =
+    process.platform === "win32"
+      ? [
+          "@echo off",
+          'node "%~dp0\\gbsbuild-spaces.js" %*',
+          "exit /b %ERRORLEVEL%",
+          ""
+        ].join("\r\n")
+      : [
+          "#!/bin/sh",
+          "node \"$(dirname \"$0\")/gbsbuild-spaces.js\" \"$@\"",
+          ""
+        ].join("\n");
+  const helper = [
+    "const { mkdirSync, readFileSync, writeFileSync } = require('node:fs');",
+    "const { join, resolve, sep } = require('node:path');",
+    "const originalRoot = " + JSON.stringify(root) + ";",
+    "const args = process.argv.slice(2);",
+    "const valueAfter = (flag) => { const index = args.indexOf(flag); return index >= 0 ? args[index + 1] : undefined; };",
+    "const projectDir = valueAfter('--project-dir');",
+    "const buildDir = valueAfter('--build-dir') ?? join(projectDir, 'build');",
+    // Current Make supports spaces. Verify isolation from the original project,
+    // including when the operating system temporary directory has spaces too.
+    "if (!projectDir || resolve(projectDir).startsWith(resolve(originalRoot) + sep)) process.exit(64);",
+    "const manifest = JSON.parse(readFileSync(join(projectDir, 'gbastudio_project.json'), 'utf8'));",
+    "const target = manifest.build.target;",
+    "if (args.includes('--dry-run')) {",
+    "  process.stdout.write(JSON.stringify({ command: ['make', `PROJECT_DIR=${projectDir}`, `TARGET=${target}`, `BUILD_DIR=${buildDir}`, 'all'] }));",
+    "  process.exit(0);",
+    "}",
+    "mkdirSync(buildDir, { recursive: true });",
+    "writeFileSync(join(buildDir, `${target}.gba`), 'rom-bytes');",
+    "process.stdout.write('staged-project='+projectDir);",
+    ""
+  ].join("\n");
+  await writeFile(buildPath, script, "utf8");
+  await writeFile(path.join(toolsPath, "gbsbuild-spaces.js"), helper, "utf8");
+  if (process.platform !== "win32") {
+    await chmod(buildPath, 0o755);
+  }
+  return { enginePackPath, buildPath, root };
+}
+
 afterEach(async () => {
   const fs = await import("node:fs/promises");
   await Promise.all(temporaryRoots.splice(0).map((root) => fs.rm(root, { recursive: true, force: true })));
@@ -293,7 +343,7 @@ describe("Engine Pack doctor integration", () => {
   });
 
   it("stages gbsbuild dry-run and real build when the exported project path contains spaces", async () => {
-    const { enginePackPath, buildPath, root } = await makeSpacingSensitiveBuild();
+    const { enginePackPath, buildPath, root } = await makeStagingBuild();
     const projectDir = path.join(root, "Project With Spaces");
     await mkdir(projectDir, { recursive: true });
     await writeFile(path.join(projectDir, "gbastudio_project.json"), JSON.stringify({
@@ -330,7 +380,7 @@ describe("Engine Pack doctor integration", () => {
   });
 
   it("reuses its own staging and keeps timestamps without importing an old project ROM", async () => {
-    const { enginePackPath, buildPath, root } = await makeSpacingSensitiveBuild();
+    const { enginePackPath, buildPath, root } = await makeStagingBuild();
     const projectDir = path.join(root, "Project With Spaces");
     await mkdir(projectDir);
     await writeFile(path.join(projectDir, "gbastudio_project.json"), JSON.stringify({build:{target:"reuse"}}));
@@ -347,7 +397,7 @@ describe("Engine Pack doctor integration", () => {
   });
 
   it("remaps equivalent staged paths reported by a POSIX make launcher", async () => {
-    const { enginePackPath, buildPath, root } = await makeSpacingSensitiveBuild();
+    const { enginePackPath, buildPath, root } = await makeStagingBuild();
     const projectDir = path.join(root, "Project With Spaces");
     await mkdir(projectDir);
     await writeFile(path.join(projectDir, "gbastudio_project.json"), JSON.stringify({ build: { target: "paths" } }));
@@ -365,7 +415,7 @@ describe("Engine Pack doctor integration", () => {
   });
 
   it("reports concurrent staging as a build error without sharing output", async () => {
-    const {enginePackPath,buildPath,root}=await makeSpacingSensitiveBuild();
+    const {enginePackPath,buildPath,root}=await makeStagingBuild();
     const projectDir=path.join(root,"Shared Project"); await mkdir(projectDir);
     await writeFile(path.join(projectDir,"gbastudio_project.json"),JSON.stringify({build:{target:"shared"}}));
     const helper=path.join(enginePackPath,"tools/gbsbuild-spaces.js");
@@ -378,7 +428,7 @@ describe("Engine Pack doctor integration", () => {
   });
 
   it("automatically bounds staging while preserving active builds and the original project", async () => {
-    const { enginePackPath, buildPath, root } = await makeSpacingSensitiveBuild();
+    const { enginePackPath, buildPath, root } = await makeStagingBuild();
     const projectDir = path.join(root, "Project With Spaces");
     await mkdir(projectDir);
     await writeFile(path.join(projectDir, "gbastudio_project.json"), JSON.stringify({ build: { target: "retained" } }));

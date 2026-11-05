@@ -26,7 +26,7 @@ import type { GBAProjectData } from "../shared/projectFile.js";
 
 const temporaryRoots: string[] = [];
 const execFileAsync = promisify(execFile);
-const localEnginePackPath = path.join(process.cwd(), "../../packages/GBAStudioEngine/dist/GBAStudioEnginePack");
+const localEnginePackPath = process.env.GBA_STUDIO_ENGINE_PACK_SOURCE || path.join(process.cwd(), "../../packages/GBAStudioEngine/dist/GBAStudioEnginePack");
 const localAssetcPath = path.join(localEnginePackPath, "tools", process.platform === "win32" ? "assetc.exe" : "assetc");
 const localGbsdoctorPath = path.join(localEnginePackPath, "tools", process.platform === "win32" ? "gbsdoctor.exe" : "gbsdoctor");
 const localGbsbuildPath = path.join(localEnginePackPath, "tools", process.platform === "win32" ? "gbsbuild.exe" : "gbsbuild");
@@ -349,7 +349,7 @@ describe("Engine project export writer", () => {
       "writeFileSync(join(output, 'main.cpp'), 'int main() { return 0; }\\n');",
       "writeFileSync(join(output, 'gbastudio_project.json'), '{}\\n');",
       "writeFileSync(join(output, 'gbastudio_project_data.hpp'), '#pragma once\\n');",
-      "writeFileSync(join(output, 'asset_pack_report.json'), JSON.stringify({ rebuild_plan: { changed: ['player'], reused: ['tiles'] } }, null, 2));",
+      "writeFileSync(join(output, 'asset_pack_report.json'), JSON.stringify({ schema: 11, ok: true, allocations: [], rebuild_plan: { changed: ['player'], reused: ['tiles'] } }, null, 2));",
       ""
     ].join("\n"), "utf8");
     await writeFile(
@@ -445,7 +445,7 @@ describe("Engine project export writer", () => {
       "writeFileSync(join(output, 'gbastudio_project.json'), '{}\\n');",
       "writeFileSync(join(output, 'gbastudio_project_data.hpp'), '#pragma once\\n');",
       "writeFileSync(join(output, 'required.hpp'), '#pragma once\\n');",
-      "writeFileSync(join(output, 'asset_pack_report.json'), JSON.stringify({ rebuild_plan: { changed: ['player'], reused: ['tiles'] } }, null, 2));",
+      "writeFileSync(join(output, 'asset_pack_report.json'), JSON.stringify({ schema: 11, ok: true, allocations: [], rebuild_plan: { changed: ['player'], reused: ['tiles'] } }, null, 2));",
       ""
     ].join("\n"), "utf8");
     await writeFile(
@@ -1079,7 +1079,7 @@ describe("Engine project export writer", () => {
     expect(contract).toContain('"on_click"');
     expect(contract).toContain('"cursor_speed": 4');
     expect(header).toContain('gbs::PointClickSceneData { "office"');
-    expect(header).toContain('"scene_office", 4, nullptr, 0, nullptr, 0, nullptr, nullptr, nullptr, nullptr }');
+    expect(header).toContain('"scene_office", 4, nullptr, 0, nullptr, 0, nullptr, nullptr, nullptr, nullptr , gbs::VideoComposition {');
 
     const build = await runGbsbuild({
       enginePackPath: localEnginePackPath,

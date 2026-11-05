@@ -1,7 +1,7 @@
 import { execFile } from "node:child_process";
 import { existsSync } from "node:fs";
 import { readFile } from "node:fs/promises";
-import { sign } from "@electron/osx-sign";
+import { signWithCartridgeManifest } from "./sign-cartridge-tools.mjs";
 import { dirname, join, resolve } from "node:path";
 import { promisify } from "node:util";
 import { fileURLToPath } from "node:url";
@@ -23,7 +23,7 @@ export function localSigningOptions(filePath) {
 }
 
 export async function signMacosAppAdHoc(appPath) {
-  await sign({
+  await signWithCartridgeManifest({
     app: appPath,
     identity: "-",
     identityValidation: false,

@@ -118,7 +118,7 @@ function StudioDialogSurface({
       >
         <header className="modal-card-header studio-dialog-header">
           <div>
-            <h2 id="studio-dialog-title">{title}</h2>
+            <h2 id="studio-dialog-title">{ui(title)}</h2>
             <p>{ui(state.message)}</p>
           </div>
           <StudioButton aria-label={ui("Fechar")} className="ghost-button" onClick={handleCancel} type="button" variant="ghost">
@@ -128,7 +128,7 @@ function StudioDialogSurface({
 
         {state.kind === "prompt" ? (
           <label className="studio-field ui-field">
-            <span>{state.options.label ?? ui("Valor")}</span>
+            <span>{ui(state.options.label ?? "Valor")}</span>
             <input
               ref={inputRef}
               placeholder={state.options.placeholder}
@@ -146,9 +146,7 @@ function StudioDialogSurface({
 
         <div className="studio-dialog-actions">
           <StudioButton onClick={handleCancel} type="button" variant="secondary">
-            {state.kind === "confirm"
-              ? state.options.cancelLabel ?? ui("Cancelar")
-              : state.options.cancelLabel ?? ui("Cancelar")}
+            {ui(state.options.cancelLabel ?? "Cancelar")}
           </StudioButton>
           <StudioButton
             disabled={state.kind === "prompt" && !promptValue.trim()}
@@ -156,9 +154,7 @@ function StudioDialogSurface({
             type="button"
             variant={state.kind === "confirm" && state.options.variant === "danger" ? "danger" : "primary"}
           >
-            {state.kind === "confirm"
-              ? state.options.confirmLabel ?? ui("Confirmar")
-              : state.options.confirmLabel ?? ui("OK")}
+            {ui(state.options.confirmLabel ?? (state.kind === "confirm" ? "Confirmar" : "OK"))}
           </StudioButton>
         </div>
       </section>

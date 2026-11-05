@@ -1,11 +1,13 @@
 import { describe, expect, it, vi } from "vitest";
 import { readFile } from "node:fs/promises";
+import { appendInputReplayMasks, createInputReplay } from "../src/shared/inputReplay.ts";
 
 import {
   analyzeRgbaFrame,
   analyzePcmSamples,
   copyModuleSavedata,
   createKeyboardInputLatch,
+  createInputFrameRecorder,
   createReplayDriver,
   decodeRuntimeTelemetryWords,
   inputMasksForEmulatedFrames,
@@ -33,6 +35,26 @@ function solidFrame(red, green, blue, width = 4, height = 4) {
 }
 
 describe("mGBA direct player framebuffer", () => {
+  it("records every emulated input frame, including a tap between telemetry samples", () => {
+    const recorder = createInputFrameRecorder();
+    const keyboard = createKeyboardInputLatch();
+    const frames = [];
+    for (let index = 0; index < 30; index += 1) {
+      if (index === 4) { keyboard.press(1); keyboard.release(1); }
+      const mask = keyboard.sample(1);
+      recorder.record(mask);
+      frames.push(mask);
+    }
+    expect(recorder.drain()).toEqual({ firstFrame: 0, masks: frames });
+    expect(frames.slice(4, 7)).toEqual([1, 1, 0]);
+    expect(recorder.drain()).toEqual({ firstFrame: 30, masks: [] });
+    recorder.record(16); recorder.record(32);
+    expect(recorder.drain()).toEqual({ firstFrame: 30, masks: [16, 32] });
+    const replay = appendInputReplayMasks(createInputReplay({ id: "recorded", seed: 1 }), frames);
+    const driver = createReplayDriver(replay);
+    expect(frames.map(() => driver.next())).toEqual(frames);
+    expect(driver.inspect()).toMatchObject({ complete: true, consumedFrames: 30 });
+  });
   it("preserves a short tap across both VBlanks of a 30 FPS runtime update", () => {
     const keyboard = createKeyboardInputLatch();
     keyboard.press(1 << 0);
@@ -632,6 +654,24 @@ describe("bulk native telemetry snapshot", () => {
     module._gba_runtime_telemetry_snapshot.mockReturnValue(pointer);
     expect(readRuntimeTelemetry(module)).toBeNull();
     expect(forbidden).not.toHaveBeenCalled();
+  });
+
+  it("reads the optional frame budget in one additional bulk call and owns its values", () => {
+    const { module, forbidden } = fixture();
+    const budget = new Uint32Array(module.HEAPU8.buffer, 600, 24);
+    budget.set([0x47534642, 1, 24, 42, 0xffffffff, 0, 262144, 7, 512, 2, 0, 0, 30, 12, 8192, 4, 120, 3, 20, 5, 42, 9900, 0, 0]);
+    module._gba_frame_budget_snapshot = vi.fn(() => 600);
+    const state = readRuntimeTelemetry(module);
+    expect(state.frameBudget).toMatchObject({ dmaBytes: 512, oamEnabled: 12, peaks: { dma: { value: 8192, frame: 4 } } });
+    budget.fill(0);
+    expect(state.frameBudget.peaks.dma.value).toBe(8192);
+    expect(module._gba_frame_budget_snapshot).toHaveBeenCalledTimes(1);
+    expect(module._gba_runtime_telemetry_snapshot).toHaveBeenCalledTimes(1);
+    expect(forbidden).not.toHaveBeenCalled();
+    for (const pointer of [0, 601, 1000]) {
+      module._gba_frame_budget_snapshot.mockReturnValue(pointer);
+      expect(readRuntimeTelemetry(module)).toMatchObject({ frame: 42, frameBudget: null });
+    }
   });
 
   it("rejects stale profiler data without discarding gameplay telemetry", () => {

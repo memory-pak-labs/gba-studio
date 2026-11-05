@@ -26,7 +26,7 @@ it("copies the approved canonical project and manifest byte for byte by default"
   const result = run(output); expect(result.status, result.stderr).toBe(0);
   const report = JSON.parse(result.stdout);
   expect(report.mode).toBe("approved"); expect(report.sourceSha256).toBe(digest(original));
-  expect(fs.readFileSync(path.join(report.projectRoot, "exemplo-gba.gba-project"))).toEqual(original);
+  expect(fs.readFileSync(path.join(report.projectRoot, "exemplo-gba.gba-project")).equals(original)).toBe(true);
   expect(fs.readFileSync(path.join(output, "assets/manifest.json"))).toEqual(fs.readFileSync(approvalFile));
   const manifest = JSON.parse(fs.readFileSync(approvalFile));
   for (const asset of manifest.assets) {
@@ -60,7 +60,7 @@ it("requires an explicit candidate flag and removes all previous approval from n
   }
   const before = JSON.parse(original);
   expect({ ...project, assets: before.assets }).toEqual(before);
-  expect(fs.readFileSync(path.join(template, "exemplo-gba.gba-project"))).toEqual(original);
+  expect(fs.readFileSync(path.join(template, "exemplo-gba.gba-project")).equals(original)).toBe(true);
 });
 
 it("refuses to refresh an existing review or write into the checkout through a symlink", () => {

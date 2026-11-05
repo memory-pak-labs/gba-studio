@@ -918,15 +918,11 @@
 }
 
 .sprite-metric-field {
-  align-items: center;
-  background: var(--studio-color-input-bg);
-  border: 1px solid var(--studio-color-border);
-  border-radius: 4px;
-  display: flex;
-  gap: 6px;
-  min-height: 30px;
+  align-items: start;
+  display: grid;
+  gap: 4px;
+  grid-template-columns: minmax(0, 1fr);
   min-width: 0;
-  padding: 0 8px;
 }
 
 .sprite-metric-field-prefix {
@@ -939,19 +935,13 @@
 }
 
 .sprite-metric-field input {
-  background: transparent;
-  border: 0;
-  box-shadow: none;
-  color: var(--studio-color-text-primary);
-  font-size: calc(12px * var(--studio-font-scale));
-  min-height: 28px;
   min-width: 0;
-  padding: 0;
   width: 100%;
 }
 
-.sprite-metric-field input:focus {
-  outline: none;
+.sprite-metric-field .inspector-field-description {
+  overflow-wrap: normal;
+  word-break: normal;
 }
 
 .sprite-animation-settings {
@@ -1130,7 +1120,7 @@
 }
 
 .sprite-animation-editor-compact .sprite-metric-field {
-  display: flex;
+  display: grid;
 }
 
 .sprite-state-direction-panel {
@@ -1446,7 +1436,7 @@
   border-radius: 6px;
   display: grid;
   gap: 8px;
-  min-width: 260px;
+  min-width: 0;
   padding: 12px;
 }
 
@@ -2399,8 +2389,8 @@
 }
 
 .sprite-state-direction-preview-section[open] .sprite-state-direction-preview-grid {
-  max-height: 160px;
-  overflow: auto;
+  max-height: none;
+  overflow: visible;
 }
 
 .sprite-state-direction-preview-toggle {
@@ -3142,6 +3132,8 @@
 .sprite-gba-budget-header {
   align-items: center;
   display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
   justify-content: space-between;
 }
 
@@ -3151,29 +3143,39 @@
 }
 
 .sprite-gba-budget-header span {
-  color: #66717f;
+  color: var(--studio-color-text-secondary);
 }
 
 .sprite-gba-budget-metrics {
   display: grid;
   gap: 8px;
+  grid-template-columns: minmax(0, 1fr);
   margin: 0;
 }
 
-.sprite-gba-budget-metrics div {
-  align-items: baseline;
+.sprite-gba-budget-metrics > div {
+  align-items: start;
   display: grid;
-  gap: 4px;
-  grid-template-columns: 1fr auto;
+  gap: 10px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
 .sprite-gba-budget-metrics dt {
-  color: #66717f;
+  color: var(--studio-color-text-secondary);
+  line-height: 1.4;
+  text-transform: none;
 }
 
 .sprite-gba-budget-metrics dd {
-  color: #1f2933;
+  color: var(--studio-color-text-primary);
+  line-height: 1.4;
   margin: 0;
+  text-align: right;
+}
+
+.sprites-inspector .sprite-gba-budget-metrics :is(dt, dd) {
+  overflow-wrap: normal;
+  word-break: normal;
 }
 
 .sprite-gba-budget-warnings,
@@ -3325,10 +3327,9 @@
 
 .sprites-inspector .sprite-animation-editor > .sprite-metric-group,
 .sprites-inspector .sprite-inspector-geometry-grid .sprite-metric-group {
-  background: var(--studio-color-surface);
-  border: 1px solid var(--studio-color-border);
-  border-radius: 8px;
-  padding: var(--studio-space-3);
+  background: transparent;
+  border: 0;
+  padding: 0;
 }
 
 .sprites-inspector .sprite-animation-settings {
@@ -3428,7 +3429,8 @@
 }
 
 .sprites-inspector .sprite-animation-editor {
-  padding-block: 0 10px;
+  border-bottom: 0;
+  padding-block: 0;
 }
 
 .sprites-inspector .sprite-metric-group,
@@ -3439,7 +3441,6 @@
   padding-block: 10px;
 }
 
-.sprites-inspector .sprite-metric-group:first-child,
 .sprites-inspector .sprite-reference-panel:first-of-type {
   border-top: 1px solid var(--studio-color-border);
 }
@@ -3560,6 +3561,134 @@
 .sprites-workspace .sprite-canvas-view-strip .ui-chip span { min-width: 0; }
 .sprites-workspace .sprites-inspector .workspace-inspector-rail-body { display: flex; flex-direction: column; }
 .sprites-workspace .sprites-inspector .workspace-inspector-rail-body > * { flex-shrink: 0; }
+.sprites-inspector .sprites-inspector-tab-panel,
+.sprites-inspector .sprite-animation-editor > section {
+  min-width: 0;
+}
+
+.sprites-inspector .sprite-gba-budget-panel {
+  border-bottom: 0;
+}
+
+/* Keep long sheet lists inside the scrolling rail, including when opened near
+   its lower edge. The search and import action remain reachable. */
+.sprites-inspector .project-reference-picker-popover {
+  box-sizing: border-box;
+  margin-top: 6px;
+  min-width: 0;
+  position: static;
+  width: 100%;
+}
+
+.sprites-inspector .project-reference-picker-options {
+  overscroll-behavior: contain;
+}
+
+.sprites-inspector .project-reference-picker-options > button > span {
+  min-width: 0;
+}
+
+.sprites-inspector .project-reference-picker-options :is(strong, small) {
+  overflow-wrap: anywhere;
+  white-space: normal;
+}
+
+.sprites-inspector .sprite-metric-field .inspector-control-line {
+  min-width: 0;
+  width: 100%;
+}
+
+.sprites-inspector .sprite-metric-field .inspector-field-description {
+  line-height: 1.4;
+}
+
+.sprites-inspector .sprite-metasprite-tile-editor > .sprite-reference-field,
+.sprites-inspector .sprite-metasprite-tile-editor > .sprite-tile-toggle {
+  grid-column: 1 / -1;
+}
+
+.sprites-inspector .sprite-metasprite-tile-editor > .sprite-tile-toggle {
+  align-items: center;
+  display: flex;
+  gap: 8px;
+  justify-content: space-between;
+  min-height: 28px;
+}
+
+.sprites-inspector .sprite-metasprite-tile-editor > .sprite-tile-toggle input {
+  flex: 0 0 auto;
+  margin: 0;
+}
+
+.sprites-inspector .sprite-inspector-icon-bar {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+}
+
+.sprites-inspector .sprite-inspector-icon-bar button {
+  min-width: 0;
+  padding-inline: 4px;
+}
+
+.sprites-inspector .sprite-inspector-icon-bar button:nth-last-child(-n + 3) {
+  grid-column: span 2;
+}
+
+.sprites-inspector :is(.sprite-inspector-advanced, .sprite-reference-panel) > summary {
+  align-items: center;
+  display: flex;
+  gap: 8px;
+  justify-content: space-between;
+}
+
+.sprites-inspector :is(.sprite-inspector-advanced, .sprite-reference-panel) > summary::after {
+  border-bottom: 1.5px solid currentColor;
+  border-right: 1.5px solid currentColor;
+  content: "";
+  flex: 0 0 6px;
+  height: 6px;
+  margin-right: 3px;
+  transform: rotate(-45deg);
+}
+
+.sprites-inspector :is(.sprite-inspector-advanced, .sprite-reference-panel)[open] > summary::after {
+  transform: rotate(45deg);
+}
+
+.sprites-inspector .sprite-state-direction-preview-grid {
+  grid-template-columns: minmax(0, 1fr);
+  padding: 0;
+  border: 0;
+  background: transparent;
+}
+
+.sprites-inspector .sprite-state-direction-select :is(span, strong, small) {
+  overflow-wrap: normal;
+  white-space: normal;
+}
+
+.sprites-inspector .sprite-reference-row {
+  align-items: start;
+  flex-wrap: wrap;
+}
+
+.sprites-inspector .sprite-reference-row > div:first-child {
+  flex: 1 1 140px;
+}
+
+.sprites-inspector .sprite-reference-actions {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+}
+
+.sprites-inspector .sprite-reference-actions strong {
+  color: var(--studio-color-text-secondary);
+}
+
+.sprites-inspector .sprite-reference-row :is(span, small) {
+  white-space: normal;
+}
 .sprites-workspace .sprites-verify-button { margin-top: auto; }
 .sprites-workspace .sprite-inspector-geometry-shortcut { display: flex; align-items: center; justify-content: space-between; background: transparent; border: 0; border-top: 1px solid var(--studio-color-border); border-radius: 0; color: var(--studio-color-text-secondary); padding: 12px 0; width: 100%; }
 .sprites-workspace .sprite-animation-settings .inspector-range-field { display: grid; grid-template-columns: 1fr auto; grid-template-areas: "label exact" "slider slider" "endpoints endpoints"; gap: 8px; }

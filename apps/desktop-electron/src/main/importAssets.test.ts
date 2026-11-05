@@ -168,3 +168,24 @@ describe("asset import filesystem integration", () => {
     await expect(readFile(path.join(projectRoot, "Assets", "sprites", "hero.png"), "utf8")).resolves.toBe("reference-image");
   });
 });
+
+
+describe("SoundFont project import", () => {
+  it("converts SF2 into portable samples and a persistent instrument bank", async () => {
+    const { soundFontFixture } = await import("../testFixtures/soundFont.js");
+    const { appendImportedAssetsToProject } = await import("../shared/filesWorkspace.js");
+    const { createBlankProjectData } = await import("../shared/newProject.js");
+    const { splitProjectResources, joinSplitProjectResources } = await import("../shared/projectResourceFormat.js");
+    const root = await makeTemporaryRoot("sf2-import-");
+    const source = path.join(root, "bank.sf2"); await writeFile(source, soundFontFixture({ loop: true }));
+    const imported = await copyFilesIntoProjectAssets(path.join(root, "Game.gba-project"), [source], () => "sample-a");
+    expect(imported).toHaveLength(1);
+    expect(imported[0]).toMatchObject({ kind: "Audio", metadata: { soundFontInstrument: { sampleRootNote: "C4", sampleLoop: true } } });
+    const wav = await readFile(path.join(root, imported[0].relativePath)); expect(wav.includes(Buffer.from("smpl"))).toBe(true);
+    const data = appendImportedAssetsToProject(createBlankProjectData({ name: "SF2" }), imported);
+    expect(data.audioInstruments).toEqual([expect.objectContaining({ id: "sf2-sample-a", sampleAssetID: "sample-a", sampleRootNote: "C4", sampleLoop: true })]);
+    expect(data.audioItems).toEqual([]);
+    const split = splitProjectResources(data);
+    expect(joinSplitProjectResources(split.manifest, split.resources).audioInstruments).toEqual(data.audioInstruments);
+  });
+});

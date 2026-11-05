@@ -6,15 +6,16 @@ namespace gbs {
 constexpr size_t max_iso_scheduled_scripts = 32;
 struct IsoScheduledScript { EventRunner runner{}; int wait_frames = 0; };
 struct IsoEventScheduler { IsoScheduledScript slots[max_iso_scheduled_scripts]{}; };
-inline bool iso_script_contains_motion(EventScript script, const EventState& state, size_t depth = 0) {
+inline bool iso_script_requires_frame_runner(EventScript script, const EventState& state, size_t depth = 0) {
     if (!has_event_script(script)) return false;
     if (depth >= max_event_script_call_depth) return true;
     for (size_t i = 0; i < script.command_count; ++i) {
         const auto& command = script.commands[i];
-        if ((command.op == EventOp::MoveActorTo || command.op == EventOp::MoveActorRelative)) return true;
+        if (command.op == EventOp::MoveActorTo || command.op == EventOp::MoveActorRelative ||
+            command.op == EventOp::SetActorScale || command.op == EventOp::SetBackgroundScale) return true;
         if (command.op == EventOp::CallScript && command.a >= 0 && state.project_scripts &&
             static_cast<size_t>(command.a) < state.project_script_count &&
-            iso_script_contains_motion(state.project_scripts[command.a], state, depth + 1)) return true;
+            iso_script_requires_frame_runner(state.project_scripts[command.a], state, depth + 1)) return true;
     }
     return false;
 }
@@ -27,7 +28,7 @@ inline void advance_iso_scheduled_script(IsoScheduledScript& slot, EventState& s
 }
 inline bool run_iso_scheduled_script(IsoEventScheduler& scheduler, EventState& state, EventScript script) {
     if (!has_event_script(script)) return true;
-    if (!iso_script_contains_motion(script, state)) { run_event_script(state, script); return true; }
+    if (!iso_script_requires_frame_runner(script, state)) { run_event_script(state, script); return true; }
     for (const auto& slot : scheduler.slots)
         if (slot.runner.active && slot.runner.script.commands == script.commands &&
             slot.runner.script.command_count == script.command_count) return true;

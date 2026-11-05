@@ -5,9 +5,9 @@ import { resolveEventBindingCapabilities } from "./eventBindingCapabilities.js";
 describe("resolveEventBindingCapabilities", () => {
   it("expõe o ciclo de vida padrão para atores em todas as cenas", () => {
     expect(resolveEventBindingCapabilities({ targetKind: "actor", sceneType: "topdown" })
-      .map((slot) => slot.bindingKey)).toEqual(["onInit", "onInteract", "onUpdate"]);
+      .map((slot) => slot.bindingKey)).toEqual(["onInit", "onInteract", "onUpdate", "onHitActor", "onDefeated"]);
     expect(resolveEventBindingCapabilities({ targetKind: "actor", sceneType: "topdown", collisionGroup: 1 })
-      .map((slot) => slot.bindingKey)).toEqual(["onInit", "onInteract", "onUpdate", "onHit"]);
+      .map((slot) => slot.bindingKey)).toEqual(["onInit", "onInteract", "onUpdate", "onHitActor", "onDefeated", "onHit"]);
 
     expect(resolveEventBindingCapabilities({ targetKind: "actor", sceneType: "racing" })
       .map((slot) => slot.bindingKey)).toEqual(["onInit", "onInteract", "onUpdate"]);
@@ -67,9 +67,9 @@ describe("resolveEventBindingCapabilities", () => {
       expect(resolveEventBindingCapabilities({ targetKind: "room", sceneType })
         .map((slot) => slot.bindingKey), sceneType).toEqual(["onInit"]);
     }
-    expect(resolveEventBindingCapabilities({ targetKind: "room", sceneType: "battleRpg" }).map((slot) => slot.bindingKey)).toEqual(["onInit", "onVictory", "onDefeat", "onEscape", "onHitPlayer"]);
-    expect(resolveEventBindingCapabilities({ targetKind: "room", sceneType: "racing" }).map((slot) => slot.bindingKey)).toEqual(["onInit", "onVictory", "onDefeat"]);
-    expect(resolveEventBindingCapabilities({ targetKind: "room", sceneType: "shmup" }).map((slot) => slot.bindingKey)).toEqual(["onInit", "onClear", "onDefeat", "onHitPlayer"]);
+    expect(resolveEventBindingCapabilities({ targetKind: "room", sceneType: "battleRpg" }).map((slot) => slot.bindingKey)).toEqual(["onInit", "onHitPlayer", "onVictory", "onDefeat", "onEscape"]);
+    expect(resolveEventBindingCapabilities({ targetKind: "room", sceneType: "racing" }).map((slot) => slot.bindingKey)).toEqual(["onInit", "onVictory", "onDefeat", "onLapComplete"]);
+    expect(resolveEventBindingCapabilities({ targetKind: "room", sceneType: "shmup" }).map((slot) => slot.bindingKey)).toEqual(["onInit", "onHitPlayer", "onClear", "onDefeat"]);
   });
 
   it("mantém gatilhos com entrada e saída em qualquer perfil", () => {

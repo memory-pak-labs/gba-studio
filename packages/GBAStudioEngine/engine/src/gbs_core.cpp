@@ -10,6 +10,9 @@
 #include "gbs/visual_effects.hpp"
 #include "gbs_hw.h"
 
+// Focused host consumers may not provide the native hardware sampler.
+extern "C" int __attribute__((weak)) gbs_hw_frame_video_stats(GbsHwFrameVideoStats*) { return 0; }
+
 namespace {
 uint32_t g_frame_count = 0;
 int32_t profiler_room = -1;
@@ -25,6 +28,7 @@ uint8_t pending_render_skips = 0;
 bool frame_active = false;
 bool render_publication_transaction = false;
 bool runtime_handoff_active = false;
+uint32_t previous_dma_bytes = 0, previous_dma_transfers = 0;
 
 uint32_t elapsed_ticks(uint32_t start, uint32_t end) {
     return end - start;
@@ -97,6 +101,7 @@ void __attribute__((weak)) render_scene_transition_visual_effects() {}
 void __attribute__((weak)) tick_scene_transition_visual_effects() {}
 
 void init() {
+    previous_dma_bytes = previous_dma_transfers = 0;
     const bool preserve_runtime_handoff = runtime_handoff_active;
     dma_reset_vblank_queue();
     gbs_hw_init();
@@ -183,6 +188,15 @@ void wait_vblank() {
 
     subsystem_profiler_frame_end();
     publish_frame_telemetry();
+    GbsHwFrameVideoStats video {};
+    const bool measured = gbs_hw_frame_video_stats(&video) != 0;
+    const DmaQueueStats dma = dma_vblank_queue_stats();
+    debug_publish_frame_budget(g_frame_count, measured ? 7u : 0u,
+        video.dma_bytes - previous_dma_bytes, video.dma_transfers - previous_dma_transfers,
+        static_cast<uint32_t>(dma.queued_bytes), dma.dropped,
+        video.vblank_work_ticks + elapsed_ticks(after_vblank_wait, frame_end_ticks), video.oam_enabled);
+    previous_dma_bytes = video.dma_bytes;
+    previous_dma_transfers = video.dma_transfers;
     runtime_frame_tick(g_frame_count, current_context);
     frame_active = false;
     frame_start_ticks = frame_end_ticks;

@@ -52,6 +52,35 @@ function graphNodesOverlap(nodes: Array<Pick<EventsWorkspaceGraphNode, "x" | "y"
 }
 
 describe("Events workspace presentation", () => {
+  it("keeps true and false flag labels correct after changing the authored flag name", () => {
+    const commands = ["set_flag chave_coletada true", "set_flag chave_coletada false"];
+    const data: GBAProjectData = { events: [{ name: "key", steps: commands.map(command => ({ command, isEnabled: true })) }] };
+    const steps = deriveEventsWorkspacePresentation(data).groups.flatMap(group => group.events)[0]!.steps;
+    expect(steps.map(step => step.commandPaletteID)).toEqual(["command:variables.true", "command:variables.false"]);
+    expect(steps.map(step => step.command)).toEqual(commands);
+  });
+
+  it("labels variable additions by their actual amount without changing the command", () => {
+    const data: GBAProjectData = { events: [{ name: "counter", steps: [
+      { command: "add_variable audit.score 1", isEnabled: true },
+      { command: "add_variable audit.score -1", isEnabled: true },
+      { command: "add_variable audit.score 5", isEnabled: true }
+    ] }] };
+    const steps = deriveEventsWorkspacePresentation(data).groups.flatMap((group) => group.events)[0]!.steps;
+    expect(steps.map((step) => step.commandLabel)).toEqual([
+      "Incremento de 1 à variável", "Decréscimo de 1 à variável", "Alterar variável"
+    ]);
+    expect(steps.map((step) => step.command)).toEqual([
+      "add_variable audit.score 1", "add_variable audit.score -1", "add_variable audit.score 5"
+    ]);
+  });
+  it("adds an editable closed condition and permits adding its true branch", () => {
+    const project = { events: [{ id: "evt-condition", name: "on_start", command: "noop", steps: [{ id: "existing", command: "set_variable keep 1", isEnabled: true }] }] };
+    const withCondition = addEventStepInProject(project, "evt-condition", "if_variable value 10");
+    const withBranch = insertEventStepsInProject(withCondition, "evt-condition", { kind: "trueBranch", conditionIndex: 1 }, ["show_dialogue intro"]);
+    expect((withBranch.events as any[])[0].steps.map((step: any) => step.command)).toEqual(["set_variable keep 1", "if_variable value 10", "show_dialogue intro", "condition_end"]);
+    expect((withBranch.events as any[])[0].steps[0]).toMatchObject({ id: "existing", command: "set_variable keep 1" });
+  });
   it("keeps repeated command rows independent and refreshes their resource diagnostics after edits",()=>{
     const data:GBAProjectData={events:[{name:"repeated",steps:[{command:"show_dialogue intro",isEnabled:true},{command:"show_dialogue intro",isEnabled:true}]}],dialogues:[]};
     const steps=deriveEventsWorkspacePresentation(data).groups.flatMap(g=>g.events)[0]!.steps;
@@ -139,7 +168,9 @@ describe("Events workspace presentation", () => {
     expect(slots).toMatchObject([
       { bindingKey: "onInit", eventName: "guide_spawn" },
       { bindingKey: "onInteract", eventName: "guide_talk" },
-      { bindingKey: "onUpdate", eventName: "guide_tick", requiresFrequency: true }
+      { bindingKey: "onUpdate", eventName: "guide_tick", requiresFrequency: true },
+      { bindingKey: "onHitActor", eventName: null, isPending: true },
+      { bindingKey: "onDefeated", eventName: null, isPending: true }
     ]);
   });
 
@@ -1490,7 +1521,7 @@ describe("Events workspace presentation", () => {
         currentEventName: null
       }
     ]));
-    expect(presentation.bindingTargets.filter((target) => target.targetKind === "actor" && target.targetName === "Guide")).toHaveLength(3);
+    expect(presentation.bindingTargets.filter((target) => target.targetKind === "actor" && target.targetName === "Guide")).toHaveLength(5);
     expect(presentation.bindingTargets.filter((target) => target.targetKind === "trigger" && target.targetName === "Door")).toHaveLength(3);
   });
 
@@ -1517,13 +1548,15 @@ describe("Events workspace presentation", () => {
     const playerNode = presentation.graphNodes.find((node) => node.targetName === "Player");
     expect(roomNode?.contextBindingSlots.map((slot) => slot.bindingKey)).toEqual(["onInit", "onRestore", "onHitPlayer", "onExit", "onInteract"]);
     expect(roomNode?.pendingBindingCount).toBe(6);
-    expect(battleNode?.contextBindingSlots.map((slot) => slot.bindingKey)).toEqual(["onInit", "onVictory", "onDefeat", "onEscape", "onHitPlayer"]);
+    expect(battleNode?.contextBindingSlots.map((slot) => slot.bindingKey)).toEqual(["onInit", "onHitPlayer", "onVictory", "onDefeat", "onEscape"]);
+    expect(battleNode?.contextBindingSlots.find((slot) => slot.bindingKey === "onHitPlayer")?.label).toBe("Ao receber dano");
     expect(battleNode?.pendingBindingCount).toBe(5);
     expect(presentation.bindingTargets.map((target) => target.id)).not.toContain("room:arena:onHitGroup3");
     expect(presentation.bindingTargets.map((target) => target.id)).not.toContain("room:arena:onHitGroup2");
     expect(playerNode?.contextBindingSlots.find((slot) => slot.bindingKey === "onInteract")?.eventName).toBe("player_start");
     expect(playerNode?.contextBindingSlots.find((slot) => slot.bindingKey === "onUpdate")?.requiresFrequency).toBe(true);
-    expect(playerNode?.pendingBindingCount).toBe(2);
+    expect(playerNode?.pendingBindingCount).toBe(4);
+    expect(playerNode?.contextBindingSlots.map(slot => slot.bindingKey)).toEqual(["onInit", "onInteract", "onUpdate", "onHitActor", "onDefeated"]);
   });
 
   it("materializa o Player como contexto visual com estados próprios no grafo", () => {
@@ -1854,7 +1887,7 @@ describe("Events workspace presentation", () => {
         category: "Ator",
         bindingKeys: ["onInteract"],
         boundEventNames: ["player_talk"],
-        pendingBindingCount: 2
+        pendingBindingCount: 4
       }),
       expect.objectContaining({
         id: "context-trigger-door",
@@ -2688,4 +2721,23 @@ describe("Events graph layout", () => {
     const presentation = deriveEventsWorkspacePresentation(next);
     expect(graphNodesOverlap(presentation.graphNodes)).toBe(false);
   });
+});
+
+
+it("refreshes command suggestions and diagnostics after project resources change", () => {
+  const events = [{ id: "audio-event", name: "audio_event", steps: [
+    { command: "play_music theme_a.mod" }, { command: "play_sfx confirm.wav" }
+  ] }];
+  const first = deriveEventsWorkspacePresentation({ events, audioItems: [
+    { name: "theme_a.mod", kind: "Musica" }, { name: "confirm.wav", kind: "SFX" }
+  ] }).groups.flatMap((group) => group.events)[0]!;
+  expect(first.steps[0]!.missingReferences).toEqual([]);
+  expect(first.steps[0]!.paletteSuggestions.some((item) => item.command === "play_music theme_a.mod")).toBe(true);
+  const second = deriveEventsWorkspacePresentation({ events, audioItems: [
+    { name: "theme_b.mod", kind: "Musica" }, { name: "confirm.wav", kind: "SFX" }
+  ] }).groups.flatMap((group) => group.events)[0]!;
+  expect(second.steps[0]!.missingReferences).toContain("Audio nao encontrado: theme_a.mod");
+  expect(second.steps[0]!.paletteSuggestions.some((item) => item.command === "play_music theme_b.mod")).toBe(true);
+  expect(second.steps[1]!.missingReferences).toEqual([]);
+  expect(first.steps[0]!.paletteSuggestions.some((item) => item.command === "play_music theme_a.mod")).toBe(true);
 });

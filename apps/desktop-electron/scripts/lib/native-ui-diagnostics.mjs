@@ -1,7 +1,10 @@
 import { readFileSync } from 'node:fs';
 // Read-only ABI diagnostics for controller-driven ROM/Play tests.
 export const nativeLayoutFields = {
-  event: ['variables', 'inventory', 'current_room', 'player_x', 'player_y', 'equipped_items', 'audio_fade_target_volume', 'audio_fade_frames', 'timer_bindings', 'timer_binding_count'],
+  universal: ["payload"],
+  racing: ['position_x256','position_y256','speed_x256','distance_x256','lap_count','rival_distance_x256','checkpoint_count','pickup_count','race_result','boost_charges','boost_frames','heading','heading_x256','collision_frames','elapsed_frames'],
+  sceneMenu: ['screen_index','selected_item_index'],
+  event: ['text_variables','racing_result','variables', 'inventory', 'current_room', 'player_x', 'player_y', 'equipped_items', 'audio_fade_target_volume', 'audio_fade_frames', 'timer_bindings', 'timer_binding_count','event_frame_counter'],
   dialogue: ['visible', 'key', 'text', 'has_next_page', 'page_complete', 'choice_count', 'selected_choice', 'choice_mode'],
   menu: ['visible', 'title', 'items', 'item_count', 'selected_index'],
   item: ['text', 'value', 'enabled'],
@@ -18,7 +21,7 @@ export const nativeLayoutFields = {
   audioVolume: ['current','start','target','total_frames','remaining_frames']
 };
 export function nativeLayoutSource() {
-  const types = {event:'gbs::EventState', dialogue:'gbs::DialogueState', menu:'gbs::MenuState', item:'gbs::MenuItem',battle:'gbs::BattleRpgRuntimeState',camera:'gbs::Camera',animator:'gbs::SpriteAnimatorState',animation:'gbs::SpriteAnimation',actor:'gbs::Actor',platform:'gbs::PlatformerActor',platformNpc:'gbs::PlatformerNpcRuntime',isoActor:'gbs::IsoActor',tactical:'IsoTacticalRuntimeState',tacticalUnit:'IsoTacticalRuntimeUnit',audioVolume:'AudioVolumeState'};
+  const types = {universal:'gbs::UniversalSaveData',racing:'gbs::RacingRuntimeState',sceneMenu:'gbs::MenuRuntimeState',event:'gbs::EventState', dialogue:'gbs::DialogueState', menu:'gbs::MenuState', item:'gbs::MenuItem',battle:'gbs::BattleRpgRuntimeState',camera:'gbs::Camera',animator:'gbs::SpriteAnimatorState',animation:'gbs::SpriteAnimation',actor:'gbs::Actor',platform:'gbs::PlatformerActor',platformNpc:'gbs::PlatformerNpcRuntime',isoActor:'gbs::IsoActor',tactical:'IsoTacticalRuntimeState',tacticalUnit:'IsoTacticalRuntimeUnit',audioVolume:'AudioVolumeState'};
   const source=readFileSync(new URL('../../../../packages/GBAStudioEngine/examples/isometric_basic/src/main.cpp',import.meta.url),'utf8');
   const declaration=(name,sourceText=source)=>{
     const start=sourceText.indexOf('struct '+name+' {');if(start<0)throw Error('Missing native diagnostic type '+name);
@@ -27,7 +30,7 @@ export function nativeLayoutSource() {
     throw Error('Unclosed diagnostic type '+name);
   };
   const privateTypes='constexpr size_t max_actor_count=gbs::max_isometric_save_actors;\nconstexpr size_t no_tactical_unit_index=static_cast<size_t>(-1);\n'+['IsoTacticalRuntimeUnit','IsoTacticalCursorInput','IsoTacticalCursorVisual','IsoTacticalRuntimeState'].map(name=>declaration(name)).join('\n')+'\n'+declaration('AudioVolumeState',readFileSync(new URL('../../../../packages/GBAStudioEngine/engine/src/gbs_audio.cpp',import.meta.url),'utf8'));
-  return '#include <stddef.h>\n#include "gbs/event.hpp"\n#include "gbs/dialogue.hpp"\n#include "gbs/ui.hpp"\n#include "gbs/battle_rpg.hpp"\n#include "gbs/topdown.hpp"\n#include "gbs/animation.hpp"\n#include "gbs/platformer.hpp"\n#include "gbs/isometric.hpp"\n'+privateTypes+'\nextern "C" const unsigned mission_layout[] = {' + Object.entries(nativeLayoutFields).flatMap(([key,fields])=>[`sizeof(${types[key]})`,...fields.map(f=>`offsetof(${types[key]}, ${f})`)]).join(',') + '};\n';
+  return '#include <stddef.h>\n#include "gbs/racing.hpp"\n#include "gbs/menu.hpp"\n#include "gbs/event.hpp"\n#include "gbs/dialogue.hpp"\n#include "gbs/ui.hpp"\n#include "gbs/battle_rpg.hpp"\n#include "gbs/topdown.hpp"\n#include "gbs/animation.hpp"\n#include "gbs/platformer.hpp"\n#include "gbs/isometric.hpp"\n'+privateTypes+'\nextern "C" const unsigned mission_layout[] = {' + Object.entries(nativeLayoutFields).flatMap(([key,fields])=>[`sizeof(${types[key]})`,...fields.map(f=>`offsetof(${types[key]}, ${f})`)]).join(',') + '};\n';
 }
 export function parseNativeLayouts(buffer) {
   let at=0;return Object.fromEntries(Object.entries(nativeLayoutFields).map(([key,fields])=>[key,Object.fromEntries(['size',...fields].map(f=>{const v=buffer.readUInt32LE(at);at+=4;return[f,v];}))]));
@@ -46,6 +49,12 @@ export function readNativeUI(symbols, layouts, read8, read32, string) {
   return {dialogue:dialogues[0]??null,menu:menus[0]??null};
 }
 const runtimeNames=['topdown','platformer','isometric','menu','shmup','point_click','dungeon_crawler','racing','cutscene','visual_novel','world_map','battle_rpg','luta'];
+export function readNativeTopdownPlayer(symbols,layouts,read8,read32) {
+ const actor=layouts.actor,candidates=symbols.filter(s=>s.name.endsWith('::player')&&s.size===actor.size);
+ if(candidates.length!==1)throw Error('Exact top-down actor layout is required');
+ const symbol=candidates[0];
+ return {x:read32(symbol.address+actor.position_pixels),y:read32(symbol.address+actor.position_pixels+4),direction:read8(symbol.address+actor.direction)};
+}
 export function readNativePlayerAnimation(symbols, layouts, read8, read32) {
   const symbol = symbols.find(s => s.name.endsWith('::player_animator') && s.size === layouts.animator.size);
   if (!symbol) throw Error('Matching native player animator is required');
@@ -84,4 +93,28 @@ export function readNativeAudio(symbols,layouts,read8){
  if(!volume)throw Error('Matching native audio envelope state is required');
  return Array.from({length:4},(_,i)=>{const a=volume.address+i*l.size,name=['music','sfx','pcm_music','pcm_sfx'][i],muted=symbols.find(s=>s.name.endsWith('::'+name+'_muted')&&s.size===1);
  return {channel:name,current:read8(a+l.current),target:read8(a+l.target),remaining:read8(a+l.remaining_frames)|(read8(a+l.remaining_frames+1)<<8),muted:muted?!!read8(muted.address):null};});
+}
+
+export function readNativeRacing(symbols,layouts,read8,read32,address) {
+  const fields=layouts.racing;
+  const candidates=symbols.filter(s=>s.name.endsWith('::runtime_state')&&s.size===fields.size);
+  const symbol=runtimeNativeSymbols(symbols,7).find(s=>candidates.includes(s))??(candidates.length===1?candidates[0]:undefined);
+  if(address===undefined&&!symbol)throw Error('Matching racing runtime is required.');
+  const a=address??symbol.address;
+  return {x:read32(a+fields.position_x256)/256,y:read32(a+fields.position_y256)/256,speed:read32(a+fields.speed_x256)/256,
+    distance:read32(a+fields.distance_x256)/256,laps:read32(a+fields.lap_count),gates:read32(a+fields.checkpoint_count),
+    result:read8(a+fields.race_result),charges:read8(a+fields.boost_charges),boost:read8(a+fields.boost_frames)|(read8(a+fields.boost_frames+1)<<8),
+    heading:read8(a+fields.heading),angle:read8(a+fields.heading_x256)|(read8(a+fields.heading_x256+1)<<8),elapsed:read32(a+fields.elapsed_frames)};
+}
+export function readNativeSceneMenu(symbols,layouts,read32) {
+  const l=layouts.sceneMenu;
+  const symbol=runtimeNativeSymbols(symbols,3).find(s=>s.name.endsWith('::menu_state')&&s.size===l.size);
+  if(!symbol)throw Error('Matching scene menu state is required.');
+  return {screen:read32(symbol.address+l.screen_index),selected:read32(symbol.address+l.selected_item_index)};
+}
+
+export function readNativePausedRace(symbols,layouts,read8,read32) {
+ const saved=symbols.find(s=>s.name.endsWith('::suspended_save')&&s.size===layouts.universal.size);
+ if(!saved)throw Error('Matching suspended save is required.');
+ return readNativeRacing(symbols,layouts,read8,read32,saved.address+layouts.universal.payload);
 }

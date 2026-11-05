@@ -12,7 +12,8 @@ import { TestingDiagnosticsDrawer } from "./testingDiagnosticsDrawer.js";
 afterEach(cleanup);
 
 const replay = {
-  schema: 1 as const,
+  schema: 2 as const,
+  initialState: { format: "mgba-state-v1" as const, romSha256: "a".repeat(64), coreSha256: "b".repeat(64), stateBase64: "AQIDBA==", savedataBase64: "" },
   id: "run-1",
   seed: 42,
   initialSaveSlot: null,
@@ -24,6 +25,14 @@ const replay = {
 };
 
 describe("TestingDiagnosticsDrawer", () => {
+  it("keeps old routes visible but requires a new complete capture before running them", () => {
+    const { initialState: _state, ...legacy } = replay;
+    const projectData = { advancedTools: { inputReplays: [{ ...legacy, schema: 1 }] } };
+    render(<TestingDiagnosticsDrawer isOpen onChangeProjectData={vi.fn()} onClose={vi.fn()} onEnableTool={vi.fn()}
+      onRunReplay={vi.fn()} presentation={deriveAdvancedToolsPresentation(projectData)} projectData={projectData} />);
+    expect(screen.getByRole("button", { name: "Executar replay" })).toBeDisabled();
+    expect(screen.getByText("Este replay não contém o estado inicial completo. Grave novamente no Player.")).toBeInTheDocument();
+  });
   it("nao ocupa a interface quando esta fechado", () => {
     const projectData = {};
     const { container } = render(
@@ -103,7 +112,7 @@ describe("TestingDiagnosticsDrawer", () => {
 
     const sessions = screen.getByLabelText("Sessões do perfil de hardware");
     expect(within(sessions).getByText("falésias")).toBeInTheDocument();
-    expect(within(sessions).getByText(/platformer · 1 frame/)).toBeInTheDocument();
+    expect(within(sessions).getByText(/platformer · 1 amostras do Editor/)).toBeInTheDocument();
     expect(within(sessions).getByText(/CPU 72,4%/)).toBeInTheDocument();
     expect(within(sessions).getByText(/VRAM 72.000 B/)).toBeInTheDocument();
   });

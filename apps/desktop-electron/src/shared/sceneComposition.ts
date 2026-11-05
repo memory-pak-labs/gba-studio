@@ -1,3 +1,4 @@
+import { usesSinglePlaneBackground } from "./eventTransforms.js";
 import type { GbaVideoModeId } from "./gbaVideoModes.js";
 import {
   normalizeAffineScenePresentation,
@@ -449,6 +450,11 @@ export function sceneCompositionIssues(value: unknown, profile = "shmup"): Scene
   if (!validBudget(value.budget)) {
     issues.push(issue("INVALID_BUDGET", "A composição habilitada deve declarar os dez custos físicos no budget.", undefined, "budget"));
   }
+  const videoMode = sceneCompositionVideoMode(composition);
+  if (usesSinglePlaneBackground(profile) && (composition.mode.startsWith("bitmap") ||
+      composition.layers.some(layer => layer.enabled && layer.kind === "affine_bg" && layer.layer === "BG3"))) {
+    issues.push(issue("MODE_LAYER_INCOMPATIBLE", "Este perfil usa BG2 no Modo 1 para preservar a interface fixa."));
+  }
   const seenIDs = new Set<string>();
   const seenLayers = new Set<string>();
   for (const layer of composition.layers.filter((entry) => entry.enabled)) {
@@ -456,6 +462,10 @@ export function sceneCompositionIssues(value: unknown, profile = "shmup"): Scene
     seenIDs.add(layer.id);
     if (layer.layer !== "BITMAP" && seenLayers.has(layer.layer)) issues.push(issue("DUPLICATE_LAYER", `A camada física ${layer.layer} foi declarada mais de uma vez.`, layer.id, "layer"));
     if (layer.layer !== "BITMAP") seenLayers.add(layer.layer);
+    if (composition.mode === "affine" && layer.kind === "regular_bg" &&
+        (videoMode === 2 || layer.layer === "BG3")) {
+      issues.push(issue("MODE_LAYER_INCOMPATIBLE", `A camada regular ${layer.layer} não está disponível no Modo ${videoMode}.`, layer.id, "layer"));
+    }
     if (!modeAllowsLayer(composition.mode, layer)) issues.push(issue("MODE_LAYER_INCOMPATIBLE", `A camada ${layer.id} não é compatível com o modo ${composition.mode} no perfil ${profile}.`, layer.id, "kind"));
     if (!layer.assetId) issues.push(issue("MISSING_LAYER_ASSET", `A camada ${layer.id} precisa declarar assetId.`, layer.id, "assetId"));
     if (layer.kind !== "regular_bg" && layer.role === "gameplay") issues.push(issue("GAMEPLAY_LAYER_UNSUPPORTED", `A camada ${layer.id} deve ser decorativa; gameplay usa o tilemap regular e a colisão da cena.`, layer.id, "role"));

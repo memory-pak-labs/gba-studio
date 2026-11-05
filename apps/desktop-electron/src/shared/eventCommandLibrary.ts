@@ -220,6 +220,54 @@ const historicalEventCommandDefinitions: EventCommandDefinition[] = [
     "commandTemplate": "set_actor_animation_frame {actor} 0"
   },
   {
+    "id": "actor.set_scale",
+    "title": "Definir escala do ator",
+    "category": "Ator",
+    "section": "Aparência",
+    "isFavorite": false,
+    "commandTemplate": "set_actor_scale {actor} 100 100"
+},
+  {
+    "id": "actor.animate_scale",
+    "title": "Animar escala do ator",
+    "category": "Ator",
+    "section": "Aparência",
+    "isFavorite": false,
+    "commandTemplate": "animate_actor_scale {actor} 100 100 30"
+},
+  {
+    "id": "actor.reset_scale",
+    "title": "Restaurar escala do ator",
+    "category": "Ator",
+    "section": "Aparência",
+    "isFavorite": false,
+    "commandTemplate": "reset_actor_scale {actor}"
+},
+  {
+    "id": "background.set_scale",
+    "title": "Definir escala do fundo",
+    "category": "Cena",
+    "section": "Fundo",
+    "isFavorite": false,
+    "commandTemplate": "set_background_scale BG2 100 100"
+},
+  {
+    "id": "background.animate_scale",
+    "title": "Animar escala do fundo",
+    "category": "Cena",
+    "section": "Fundo",
+    "isFavorite": false,
+    "commandTemplate": "animate_background_scale BG2 100 100 30"
+},
+  {
+    "id": "background.reset_scale",
+    "title": "Restaurar escala do fundo",
+    "category": "Cena",
+    "section": "Fundo",
+    "isFavorite": false,
+    "commandTemplate": "reset_background_scale BG2"
+},
+  {
     "id": "actor.animation_speed",
     "title": "Definir velocidade da animacao do ator",
     "category": "Ator",
@@ -353,7 +401,7 @@ const historicalEventCommandDefinitions: EventCommandDefinition[] = [
     "category": "Ator",
     "section": "Propriedades",
     "isFavorite": false,
-    "commandTemplate": "play_actor_animation {actor} {animation} true"
+    "commandTemplate": "play_actor_animation {actor} {animation}"
   },
   {
     "id": "actor.wait_animation",
@@ -457,7 +505,7 @@ const historicalEventCommandDefinitions: EventCommandDefinition[] = [
     "category": "Campos do motor",
     "section": "Movimento",
     "isFavorite": false,
-    "commandTemplate": "set_player_speed_profile 100 160 a 0"
+    "commandTemplate": "set_player_speed_profile 100 170 r 0"
   },
   {
     "id": "engine.player_movement_state",

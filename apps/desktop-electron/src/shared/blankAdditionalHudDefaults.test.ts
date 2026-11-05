@@ -1,3 +1,4 @@
+import { createBlankProjectWithScene } from "../testFixtures/blankProject.js";
 import { describe, expect, it } from "vitest";
 import { buildProjectFromTemplate } from "./projectTemplates.js";
 import { createRoomInProject } from "./roomsWorkspace.js";
@@ -7,6 +8,37 @@ import { buildAssetcSpritePackGeneration } from "./engineProjectExport.js";
 import { parseGBAProjectFile, serializeGBAProjectFile, summarizeGBAProject } from "./projectFile.js";
 
 describe("remaining approved scene HUDs", () => {
+  it("keeps menu text and its selector inside the option frames", () => {
+    const data = createRoomInProject(buildProjectFromTemplate("blank", { name: "Safe menu" }),
+      { id: "qa", name: "QA", sceneType: "menu", width: 30, height: 20 });
+    const hud = deriveHudPresetsWorkspacePresentation(data).presets.find(p => p.id === "hud-neutral-menu")!;
+    const options = hud.components.filter(c => c.id.startsWith("Opção"));
+    expect(options).toHaveLength(3);
+    for (const option of options) {
+      expect(option.x + option.width).toBeLessThanOrEqual(168);
+      expect(option.x).toBeGreaterThanOrEqual(76);
+      expect(option.textAdvance).toBeGreaterThanOrEqual(7); // preserve the default font's strokes
+      const toggleLabel = " Alternar OFF";
+      expect((toggleLabel.length - 1) * (option.textAdvance ?? 8) + 8).toBeLessThanOrEqual(option.width);
+      expect(option.text).not.toContain(">");
+    }
+  });
+  it("binds the neutral Dungeon HUD to live health, direction, item count and controls", () => {
+    const data = createRoomInProject(buildProjectFromTemplate("blank", { name: "Live dungeon" }),
+      { id: "qa", name: "QA", sceneType: "dungeonCrawler", width: 30, height: 20 });
+    const hud = deriveHudPresetsWorkspacePresentation(data).presets.find(p => p.id === "hud-neutral-dungeon-crawler")!;
+    expect(hud.components.filter(c => c.runtimeText).map(c => c.id)).toEqual([
+      "Status", "Direção", "Quantidade de itens", "Controles"
+    ]);
+    expect(hud.components.some(c => c.label.includes("de exemplo"))).toBe(false);
+    expect(hud.components.find(c => c.kind === "bar")).toMatchObject({
+      valueBinding: "p1-health", gauge: { emptyAsset: "neutral-hud-bar-empty.png" }
+    });
+    expect(hud.components.find(c => c.id === "health")?.asset).toBe("");
+    const contract = buildEngineExportProjectContract(data);
+    const nativeHud = contract.dungeon_crawler_project!.dialogue_ui!.hud_layouts!.find((p: any) => p.id === hud.id)!;
+    expect(nativeHud.components.find((c: any) => c.kind === "bar")?.value_binding).toBe("p1-health");
+  });
   it("keeps compact RPG status separate from the live battle dialogue and binds both health bars", () => {
     const data = createRoomInProject(buildProjectFromTemplate("blank", { name: "Compact battle" }),
       { id: "qa", name: "QA", sceneType: "battleRpg", width: 30, height: 20 });
@@ -39,9 +71,10 @@ describe("remaining approved scene HUDs", () => {
     expect(nativeHud.components.filter((c: any) => c.kind === "bar").map((c: any) => c.value_binding)).toEqual(["p1-health", "p2-health"]);
   });
   it("exports dialogue-only blank scenes without unrelated HUD and ship reservations", () => {
-    const data=buildProjectFromTemplate("blank",{name:"Budget"});
-    const pack=buildAssetcSpritePackGeneration(data);
-    expect(pack).toBeNull();
+    const data=createBlankProjectWithScene({name:"Budget"});
+    const pack=buildAssetcSpritePackGeneration(data)!;
+    expect(pack.assetsBySheet["neutral-hud-frame-wide.png"]).toBeUndefined();
+    expect(pack.assetsBySheet["neutral-player-shmup-horizontal.png"]).toBeUndefined();
   });
   it("exports empty menu, world map and RPG defaults within the native scene contracts", () => {
     for(const sceneType of ["menu","worldMap","battleRpg"]){

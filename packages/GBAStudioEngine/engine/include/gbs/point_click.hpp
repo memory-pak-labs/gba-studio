@@ -65,6 +65,7 @@ struct PointClickSceneData {
     const SpriteAnimation* cursor_idle_animation = nullptr;
     const SpriteAnimation* cursor_hover_animation = nullptr;
     const SpriteAnimation* cursor_click_animation = nullptr;
+    VideoComposition video = default_video_composition();
 };
 
 struct PointClickProjectData {
@@ -314,6 +315,19 @@ constexpr bool point_click_hotspot_requires_selected_item(
     return hotspot.required_item_index >= 0;
 }
 
+constexpr bool point_click_refresh_selected_item(
+    const PointClickProjectData& project,
+    const EventState& state,
+    PointClickCursorState& cursor
+) {
+    if (cursor.selected_item_index != -1 &&
+        !point_click_item_is_owned(project, state, cursor.selected_item_index)) {
+        cursor.selected_item_index = -1;
+        return true;
+    }
+    return false;
+}
+
 constexpr bool point_click_hotspot_can_activate(
     const PointClickProjectData& project,
     const EventState& state,
@@ -423,6 +437,7 @@ inline bool apply_point_click_save_data(
     for (size_t index = 0; index < event_variable_count; ++index) {
         event_state.variables[index] = save_data.variables[index];
     }
+    point_click_refresh_selected_item(project, event_state, cursor);
     return true;
 }
 
