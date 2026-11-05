@@ -17,6 +17,8 @@ import { DungeonSceneEditor } from "./DungeonSceneEditor";
 import { readStoredLocale } from "./i18n";
 import { uiText as ui, useStudioUiText } from "./studioUiText";
 import { SceneDiagramCard } from "./SceneDiagramCard";
+import { SceneNotesLayer } from "./SceneNotesLayer";
+import { readSceneNotes, type SceneNotePatch } from "../shared/sceneNotes";
 import { sceneDiagramPositions, SCENE_DIAGRAM_CARD_SIZE } from "./sceneMapDiagram";
 import { readSceneDiagramPositions, writeSceneDiagramPositions, readSceneMapViewMode, writeSceneMapViewMode, type SceneMapViewMode } from "./sceneMapViewPreferences";
 import "./styles/scene-map-diagram.css";
@@ -401,6 +403,9 @@ interface RoomsWorkspaceProps {
   onDuplicateRoomEntities(roomID: string, selectedKeys: string[]): void;
   onRemoveRoomEntities(roomID: string, selectedKeys: string[]): void;
   onUpdateSceneMapPosition(sceneName: string, position: SceneMapPosition): void;
+  onCreateSceneNote?(position: { id: string; x: number; y: number }): void;
+  onUpdateSceneNote?(id: string, patch: SceneNotePatch, historyGroupID?: string): void;
+  onRemoveSceneNote?(id: string): void;
   onOrganizeSceneMap?(): void;
   onUpdateSceneMapZoom(zoom: number): void;
   onUpdateSceneOrganization(organization: EditorSceneOrganization): void;
@@ -7311,6 +7316,9 @@ export function RoomsWorkspace({
   onDuplicateRoomEntities,
   onRemoveRoomEntities,
   onUpdateSceneMapPosition,
+  onCreateSceneNote,
+  onUpdateSceneNote,
+  onRemoveSceneNote,
   onOrganizeSceneMap,
   onUpdateSceneMapZoom,
   onUpdateSceneOrganization,
@@ -7387,6 +7395,15 @@ export function RoomsWorkspace({
   const [selectedCameraZoneID, setSelectedCameraZoneID] = useState<string | null>(null);
   const [selectedConnectionZoneSide, setSelectedConnectionZoneSide] = useState<"exit" | "entry">("exit");
   const [selectedSceneMapRoomName, setSelectedSceneMapRoomName] = useState<string | null>(null);
+  const [newNoteFocusID, setNewNoteFocusID] = useState<string | null>(null);
+  const [noteMenu, setNoteMenu] = useState<{ left: number; top: number; x: number; y: number } | null>(null);
+  const sceneNotes = useMemo(() => projectData ? readSceneNotes(projectData) : [], [projectData]);
+  useEffect(() => {
+    if (!noteMenu) return;
+    const close = (event: KeyboardEvent) => { if (event.key === "Escape") setNoteMenu(null); };
+    window.addEventListener("keydown", close);
+    return () => window.removeEventListener("keydown", close);
+  }, [noteMenu]);
   const [overviewView, setOverviewView] = useState<{ path?: string; mode: SceneMapViewMode } | null>(null);
   const overviewMode = overviewView && overviewView.path === projectPath ? overviewView.mode : readSceneMapViewMode(projectPath);
   const [diagramNavigation, setDiagramNavigation] = useState<{ path?: string; zoom: number; positions: Record<string, SceneMapPosition> } | null>(null);
@@ -8366,6 +8383,7 @@ export function RoomsWorkspace({
     ? focusSceneUsesPseudo3dCamera ? focusViewportGeometry.viewportWidth : focusViewportGeometry.worldWidth
     : Math.max(
       ROOM_CANVAS_WORLD_MIN_WIDTH,
+      ...sceneNotes.map(note => (note.x + note.width) * canvasZoom + 160),
       ...visibleSceneMapCards.map((item) => {
         const position = displayedSceneMapPosition(item.connectorPosition, canvasZoom);
         return position.x + item.cardSize.width + 160;
@@ -8375,6 +8393,7 @@ export function RoomsWorkspace({
     ? focusSceneUsesPseudo3dCamera ? focusViewportGeometry.viewportHeight : focusViewportGeometry.worldHeight
     : Math.max(
       ROOM_CANVAS_WORLD_MIN_HEIGHT,
+      ...sceneNotes.map(note => (note.y + note.height) * canvasZoom + 160),
       ...visibleSceneMapCards.map((item) => {
         const position = displayedSceneMapPosition(item.connectorPosition, canvasZoom);
         return position.y + item.cardSize.height + 160;
@@ -8417,7 +8436,7 @@ export function RoomsWorkspace({
 
   function fitSceneMapView(): void {
     const scroll = canvasScrollRef.current;
-    if (!scroll || visibleSceneMapCards.length === 0) return;
+    if (!scroll || (visibleSceneMapCards.length === 0 && sceneNotes.length === 0)) return;
 
     if (focusSceneRoom && focusViewportGeometry) {
       if (focusViewMode === "viewport") return;
@@ -8431,10 +8450,10 @@ export function RoomsWorkspace({
     }
 
     const nextViewport = fitSceneMapViewToCards({
-      cards: visibleSceneMapCards.map((item) => ({
+      cards: [...visibleSceneMapCards.map((item) => ({
         position: item.connectorPosition,
         size: isSceneDiagram ? SCENE_DIAGRAM_CARD_SIZE : sceneMapCardSize(item.room)
-      })),
+      })), ...sceneNotes.map(note => ({ position: { x: note.x, y: note.y }, size: { width: note.width, height: note.height } }))],
       maxZoom: isSceneDiagram ? 1 : SCENE_MAP_MAX_ZOOM,
       minZoom: SCENE_MAP_MIN_ZOOM,
       padding: 48,
@@ -8447,6 +8466,19 @@ export function RoomsWorkspace({
       scroll.scrollLeft = nextViewport.scrollLeft;
       scroll.scrollTop = nextViewport.scrollTop;
     });
+  }
+
+  function createNoteAt(position?: { x: number; y: number }): void {
+    const scroll = canvasScrollRef.current;
+    const id = crypto.randomUUID();
+    onCreateSceneNote?.({ id, ...(position ?? {
+      x: Math.round(((scroll?.scrollLeft ?? 0) + 64 + sceneNotes.length % 4 * 20) / canvasZoom),
+      y: Math.round(((scroll?.scrollTop ?? 0) + 48 + sceneNotes.length % 4 * 20) / canvasZoom)
+    }) });
+    setNewNoteFocusID(id);
+    setSelectedSceneMapRoomName(null);
+    setSelectedEntityKeys([]);
+    setNoteMenu(null);
   }
 
   function enterSceneFocus(room: RoomsWorkspaceRoom): void {
@@ -10091,6 +10123,9 @@ export function RoomsWorkspace({
 
                   {!focusSceneRoom ? (
                   <div className="room-editor-tool-rail-zoom rooms-canvas-zoom" role="group" aria-label={ui("Zoom do canvas")}>
+                  {onCreateSceneNote ? <button type="button" aria-label={ui("Adicionar post-it")}
+                    title={ui("Adicionar um lembrete ao mapa de cenas")}
+                    onClick={() => createNoteAt()}><Plus aria-hidden="true" size={15} /><span>{ui("Post-it")}</span></button> : null}
                   <button
                     type="button"
                     aria-label={ui("Alternar visualização em organograma")}
@@ -10295,6 +10330,13 @@ export function RoomsWorkspace({
                     data-scene-map-selection={!focusSceneRoom ? (sceneMapSelectionName ?? "") : undefined}
                     data-scene-map-view={!focusSceneRoom ? overviewMode : undefined}
                     ref={canvasWorldRef}
+                    onContextMenu={event => {
+                      if (focusSceneRoom || !onCreateSceneNote || (event.target as HTMLElement).closest(".room-stage-card-frame, .scene-diagram-card, .scene-note, button")) return;
+                      event.preventDefault();
+                      const rect = event.currentTarget.getBoundingClientRect();
+                      setNoteMenu({ left: Math.min(event.clientX, window.innerWidth - 220), top: Math.min(event.clientY, window.innerHeight - 60),
+                        x: Math.round((event.clientX - rect.left) / canvasZoom), y: Math.round((event.clientY - rect.top) / canvasZoom) });
+                    }}
                     style={{
                       height: `${canvasWorldHeight}px`,
                       width: `${canvasWorldWidth}px`,
@@ -10310,6 +10352,16 @@ export function RoomsWorkspace({
                       </section>
                     ) : (
                       <>
+                    {noteMenu ? <>
+                      <div className="scene-note-menu-backdrop" onPointerDown={event => { event.stopPropagation(); setNoteMenu(null); }} onContextMenu={event => { event.preventDefault(); event.stopPropagation(); setNoteMenu(null); }} />
+                      <div className="scene-note-menu" role="menu" aria-label={ui("Mapa de cenas")} style={{ left: noteMenu.left, top: noteMenu.top }}>
+                        <button type="button" role="menuitem" autoFocus onClick={() => createNoteAt({ x: noteMenu.x, y: noteMenu.y })}>{ui("Adicionar post-it")}</button>
+                      </div>
+                    </> : null}
+                    {onUpdateSceneNote && onRemoveSceneNote ? <SceneNotesLayer key={projectPath ?? "unsaved"}
+                      notes={sceneNotes} zoom={canvasZoom} focusID={newNoteFocusID}
+                      onSelect={() => { setSelectedSceneMapRoomName(null); setSelectedEntityKeys([]); }}
+                      onUpdate={onUpdateSceneNote} onRemove={onRemoveSceneNote} /> : null}
                     {roomCardConnectors.length ? (
                       <svg
                         aria-label={ui("Conectores entre cenas")}
