@@ -1,5 +1,9 @@
 /** Application copy only. Tuple order: pt-BR, en-US, es-ES. Keep project data out of this catalog. */
 export const studioUiMessages: Record<string, readonly [string, string, string]> = {
+  "Remover arquivo": ["Remover arquivo", "Remove file", "Eliminar archivo"],
+  "Remover arquivos": ["Remover arquivos", "Remove files", "Eliminar archivos"],
+  "Remover {0} arquivos selecionados?": ["Remover {0} arquivos selecionados?", "Remove {0} selected files?", "¿Eliminar {0} archivos seleccionados?"],
+  "Remover animação": ["Remover animação", "Remove animation", "Eliminar animación"],
   "O que fazer com os vínculos?": ["O que fazer com os vínculos?", "What should happen to these references?", "¿Qué quieres hacer con las referencias?"],
   "Substituir": ["Substituir", "Replace", "Reemplazar"],
   "Substituir por": ["Substituir por", "Replace with", "Reemplazar por"],

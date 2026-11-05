@@ -1397,21 +1397,22 @@ function pruneAssetIDFromGroups(groups: unknown, assetIDToRemove: string): unkno
   });
 }
 
-export function removeAssetFromProject(data: GBAProjectData, assetIDToRemove: string): GBAProjectData {
+export function removeAssetRecordsFromProject(data: GBAProjectData, ids: readonly string[]): GBAProjectData {
   const next = cloneProjectData(data);
   const assets = projectArray(next, "assets");
-  const removedAsset = assets.find((item, index) => assetID(item, index) === assetIDToRemove);
-  const filteredAssets = assets.filter((item, index) => assetID(item, index) !== assetIDToRemove);
-  if (filteredAssets.length === assets.length) {
-    return data;
-  }
-
+  const selected = new Set(ids);
+  const filteredAssets = assets.filter((item, index) => !selected.has(assetID(item, index)));
+  if (filteredAssets.length === assets.length) return data;
   next.assets = filteredAssets;
-  next.assetGroups = pruneAssetIDFromGroups(next.assetGroups, assetIDToRemove);
+  for (const id of selected) next.assetGroups = pruneAssetIDFromGroups(next.assetGroups, id);
+  return next;
+}
+
+export function removeAssetFromProject(data: GBAProjectData, assetIDToRemove: string): GBAProjectData {
+  const removedAsset = projectArray(data, "assets").find((item, index) => assetID(item, index) === assetIDToRemove);
+  const next = removeAssetRecordsFromProject(data, [assetIDToRemove]);
   const removedAssetName = nullableString(removedAsset?.name);
-  if (removedAssetName) {
-    updateAssetReferences(next, removedAssetName, "");
-  }
+  if (next !== data && removedAssetName) updateAssetReferences(next, removedAssetName, "");
   return next;
 }
 

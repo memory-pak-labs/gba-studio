@@ -5,6 +5,8 @@ import { restartForUpdate } from "./updateRestartFlow";
 import { resolveExternalProjectOpen } from "./externalProjectOpen.js";
 import { createAudioInstrumentFromChannel, updateAudioInstrumentInProject, removeAudioInstrumentFromProject, type UpdateAudioInstrumentFields } from "../shared/audioInstruments.js";
 import { audioPhysicalChannel } from "../shared/audioContract.js";
+import { planAssetDeletion, resolveAssetDeletion } from "../shared/assetDeletion";
+import { planAnimationDeletion, resolveAnimationDeletion } from "../shared/animationDeletion";
 import { listLogicValueUsages, updateLogicValueInProject, type LogicValuePatch } from "../shared/logicWorkspace";
 import { updateInterfaceThemeInProject, type InterfaceThemeChange } from "../shared/interfaceThemes";
 import { dialogueEditorScene } from "../shared/dialogueSceneAuthoring";
@@ -16,8 +18,6 @@ import {
   appendImportedAssetsToProject,
   duplicateAssetInProject,
   moveAssetsToGroupInProject,
-  removeAssetsFromProject,
-  removeAssetFromProject,
   renameAssetsWithPatternInProject,
   renameAssetInProject,
   repairAssetGroupReferencesInProject,
@@ -209,7 +209,6 @@ import {
   moveSpriteMetaspriteTilesInProject,
   removeSpriteMetaspriteTilesInProject,
   removeSpriteMetaspriteTileInProject,
-  removeSpriteAnimationFromProject,
   renameSpriteAnimationInProject,
   reorderSpriteMetaspriteTilesInProject,
   toggleSpriteMetaspriteTilesFlipInProject,
@@ -234,10 +233,7 @@ import {
   projectAudioReferenceOptions,
   projectRoomReferenceOptions
 } from "../shared/projectReferenceOptions";
-import {
-  projectReferenceDeletionGuard,
-  type ProjectReferenceTarget
-} from "../shared/projectReferenceUsages";
+import { projectReferenceDeletionGuard } from "../shared/projectReferenceUsages";
 import {
   AlertTriangle,
   Activity,
@@ -402,17 +398,6 @@ function App(): React.ReactElement {
     const latest = dialogueSessionRef.current;
     if (latest?.path !== path || latest?.project.data !== data) return null;
     return choice;
-  }
-
-  async function blockReferencedDeletion(target: ProjectReferenceTarget): Promise<boolean> {
-    if (!session) return true;
-    const guard = projectReferenceDeletionGuard(session.project.data, target);
-    if (guard.canDelete) return false;
-    await resolveDeletion(ui("Remover “{0}”?", { 0: target.name }), {
-      title: "Item em uso", cancelLabel: "Fechar", usages: guard.usages.map(usage => usage.label),
-      replacements: [], canUnlink: false
-    });
-    return true;
   }
 
   function publishStatus(message: string, tone: "info" | "success" | "error" = "info"): void {
@@ -1239,14 +1224,19 @@ function App(): React.ReactElement {
   }
 
   async function removeAsset(assetID: string, currentName: string): Promise<void> {
-    if (!session) return;
-    if (await blockReferencedDeletion({ kind: "asset", id: assetID, name: currentName })) return;
-    if (!(await confirm(`Remover o asset "${currentName}" do projeto?`, { variant: "danger", title: "Remover asset" }))) return;
-    const nextData = removeAssetFromProject(session.project.data, assetID);
-    if (nextData !== session.project.data) {
-      updateProjectData(nextData);
-      notifySuccess(ui("Asset removido: {0}.", { 0: currentName }));
-    }
+    await removeFiles([assetID], ui("Remover “{0}”?", { 0: currentName }), "Remover arquivo");
+  }
+
+  async function removeFiles(assetIDs: string[], message: string, title: string): Promise<void> {
+    if (!session || assetIDs.length === 0) return;
+    const data = session.project.data;
+    const plan = planAssetDeletion(data, assetIDs);
+    const choice = await confirmProjectDeletion(data, message, { title, ...plan });
+    if (!choice) return;
+    const nextData = resolveAssetDeletion(data, assetIDs, choice.kind === "replace" ? choice.value : null);
+    if (nextData === data) return;
+    updateProjectData(nextData);
+    notifySuccess(ui("Item removido. Use Desfazer para restaurar."));
   }
 
   async function duplicateAsset(assetID: string, currentName: string): Promise<void> {
@@ -1294,18 +1284,7 @@ function App(): React.ReactElement {
   }
 
   async function removeAssetsInBatch(assetIDs: string[]): Promise<void> {
-    if (!session || assetIDs.length === 0) return;
-    const selectedAssets = (Array.isArray(session.project.data.assets) ? session.project.data.assets : [])
-      .filter((asset): asset is Record<string, unknown> => Boolean(asset) && typeof asset === "object" && !Array.isArray(asset))
-      .filter((asset) => assetIDs.includes(String(asset.id ?? "")));
-    for (const asset of selectedAssets) {
-      if (await blockReferencedDeletion({ kind: "asset", id: String(asset.id ?? ""), name: String(asset.name ?? "Asset") })) return;
-    }
-    if (!(await confirm(`Remover ${selectedAssets.length} assets selecionados do projeto?`, { variant: "danger", title: "Remover assets" }))) return;
-    const nextData = removeAssetsFromProject(session.project.data, assetIDs);
-    if (nextData === session.project.data) return;
-    updateProjectData(nextData);
-    notifySuccess(ui("{0} assets removidos.", { 0: selectedAssets.length }));
+    await removeFiles(assetIDs, ui("Remover {0} arquivos selecionados?", { 0: assetIDs.length }), "Remover arquivos");
   }
 
   function repairAssetReferences(): void {
@@ -2284,13 +2263,16 @@ function App(): React.ReactElement {
 
   async function removeSpriteAnimation(animationID: string, currentName: string): Promise<void> {
     if (!session) return;
-    if (await blockReferencedDeletion({ kind: "spriteAnimation", id: animationID, name: currentName })) return;
-    if (!await confirm(`Remover a animacao "${currentName}" do projeto?`)) return;
-    const nextData = removeSpriteAnimationFromProject(session.project.data, animationID);
-    if (nextData !== session.project.data) {
-      updateProjectData(nextData);
-      setStatus(ui("Animacao removida: {0}.", { 0: currentName }));
-    }
+    const data = session.project.data;
+    const plan = planAnimationDeletion(data, animationID);
+    const choice = await confirmProjectDeletion(data, ui("Remover “{0}”?", { 0: currentName }), {
+      title: "Remover animação", ...plan
+    });
+    if (!choice) return;
+    const nextData = resolveAnimationDeletion(data, animationID, choice.kind === "replace" ? choice.value : null);
+    if (nextData === data) return;
+    updateProjectData(nextData);
+    notifySuccess(ui("Item removido. Use Desfazer para restaurar."));
   }
 
   async function createEvent(): Promise<string | void> {
