@@ -2,7 +2,8 @@ import { useStudioUiText } from "./studioUiText";
 import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import type { GBAProjectData } from "../shared/projectFile";
 import type { RoomsWorkspaceRoom, RoomsWorkspaceEntity, UpdateRoomFields, UpdateRoomEntityFields, CreateActorInProjectOptions, CreateTriggerInProjectOptions, RoomTilePaintTool } from "../shared/roomsWorkspace/core";
-import type { RoomCollisionType } from "../shared/roomsWorkspace";
+import { roomCellLineIndexes, type RoomCollisionType } from "../shared/roomsWorkspace";
+import { isBlockedCollisionType } from "../shared/roomCollisionTypes";
 import { dungeonBlocked, DUNGEON_DIRECTIONS, type DungeonCamera } from "../shared/dungeonSceneView";
 import { deriveFocusSceneViewportGeometry } from "../shared/focusSceneViewport";
 import { DungeonViewportEditor } from "./DungeonViewportEditor";
@@ -13,7 +14,7 @@ interface Props {
   room: RoomsWorkspaceRoom; entities: RoomsWorkspaceEntity[]; projectData?: GBAProjectData | null; projectPath?: string; assetRefreshToken?: number;
   placementMode?: "brush" | "rectangle" | "fill"; mode: string; tool: RoomTilePaintTool; collision: RoomCollisionType; locked: boolean; selected: string[];
   onSelect: (keys: string[]) => void; onCell: (roomID: string, index: number) => void;
-  onCollision: (roomID: string, index: number, type: RoomCollisionType, historyGroupID?: string) => void;
+  onCollision: (roomID: string, cells: number | readonly number[], type: RoomCollisionType, historyGroupID?: string) => void;
   onRectangle?: (roomID: string, start: number, end: number, type: RoomCollisionType, historyGroupID?: string) => void;
   onFill?: (roomID: string, index: number, type: RoomCollisionType, historyGroupID?: string) => void;
   onBeginHistoryGroup?: (id: string) => void; onEndHistoryGroup?: (id: string) => void;
@@ -45,10 +46,19 @@ export function DungeonSceneEditor(p: Props): React.ReactElement {
   const [focusedCell, setFocusedCell] = useState(() => dungeonStart(room).y * room.width + dungeonStart(room).x);
   const latest = useRef(p); latest.current = p;
   const drag = useRef<{ start:number; end:number; kind:"trigger"|"wall" } | null>(null);
+  const brush = useRef<{ last: number; cells: Set<number>; type: RoomCollisionType } | null>(null);
+  const [brushPreview, setBrushPreview] = useState<ReadonlySet<number> | null>(null);
   const suppressClick = useRef(false);
   const [draftArea, setDraftArea] = useState<{start:number;end:number}|null>(null);
   const endStroke = (cancel = false) => {
     const current = latest.current, area = drag.current;
+    const painted = brush.current;
+    if (painted && !cancel && !current.locked && current.mode === "collision") {
+      current.onCell(current.room.id, painted.last);
+      current.onCollision(current.room.id, [...painted.cells], painted.type, stroke.current);
+    }
+    brush.current = null;
+    if (painted) setBrushPreview(null);
     if (area && !cancel && !current.locked) {
       if (area.kind === "wall") current.onRectangle?.(current.room.id, area.start, area.end, current.tool === "eraser" ? "free" : current.collision, stroke.current);
       else {
@@ -57,14 +67,32 @@ export function DungeonSceneEditor(p: Props): React.ReactElement {
         if (typeof id === "string") current.onSelect([`trigger:${id}`]);
       }
     }
+    if (cancel) suppressClick.current = false;
     drag.current = null; setDraftArea(null);
     if (stroke.current) current.onEndHistoryGroup?.(stroke.current); stroke.current = undefined;
   };
   useEffect(() => {
     const up = () => endStroke(), cancel = () => endStroke(true);
-    window.addEventListener("pointerup", up); window.addEventListener("pointercancel", cancel);
-    return () => { window.removeEventListener("pointerup", up); window.removeEventListener("pointercancel", cancel); if (stroke.current) latest.current.onEndHistoryGroup?.(stroke.current); };
+    const escape = (event: KeyboardEvent) => {
+      if (event.key !== "Escape" || !stroke.current) return;
+      event.preventDefault();
+      event.stopImmediatePropagation();
+      endStroke(true);
+    };
+    window.addEventListener("pointerup", up);
+    window.addEventListener("pointercancel", cancel);
+    window.addEventListener("keydown", escape, true);
+    return () => {
+      window.removeEventListener("pointerup", up);
+      window.removeEventListener("pointercancel", cancel);
+      window.removeEventListener("keydown", escape, true);
+      if (stroke.current) latest.current.onEndHistoryGroup?.(stroke.current);
+    };
   }, []);
+  useEffect(() => {
+    if (stroke.current) endStroke(true);
+  }, [p.mode, p.locked, p.placementMode, p.viewMode]);
+
   const start = dungeonStart(room), arrows = ["↑", "→", "↓", "←"];
   const move = (step: number) => { const [dx, dy] = DUNGEON_DIRECTIONS[camera.direction]; const x = camera.x + dx * step, y = camera.y + dy * step; if (!dungeonBlocked(grid, x, y)) setCamera({ ...camera, x, y }); };
   function createEntity(kind: "actor" | "trigger", x: number, y: number) {
@@ -106,21 +134,33 @@ export function DungeonSceneEditor(p: Props): React.ReactElement {
         setFocusedCell(next); event.currentTarget.querySelector<HTMLButtonElement>(`[data-cell-index="${next}"]`)?.focus();
       }} style={{ gridTemplateColumns: `repeat(${room.width}, ${cellSize}px)` }}>
         {Array.from({ length: room.width * room.height }, (_, i) => {
-          const x = i % room.width, y = Math.floor(i / room.width), wall = room.collisionCells[i];
+          const x = i % room.width, y = Math.floor(i / room.width);
+          const wall = brushPreview?.has(i) && brush.current ? isBlockedCollisionType(brush.current.type) : room.collisionCells[i];
           const markers = entities.filter(e => x >= e.x && x < e.x + e.width && y >= e.y && y < e.y + e.height);
           const current = x === camera.x && y === camera.y, initial = x === start.x && y === start.y;
           return <button role="gridcell" key={i} type="button" data-cell-index={i} tabIndex={i === focusedCell ? 0 : -1} onFocus={() => setFocusedCell(i)} className={[wall ? "wall" : "passage", current ? "camera" : "", initial ? "start" : "", draftArea && x>=Math.min(draftArea.start%room.width,draftArea.end%room.width) && x<=Math.max(draftArea.start%room.width,draftArea.end%room.width) && y>=Math.floor(Math.min(draftArea.start,draftArea.end)/room.width) && y<=Math.floor(Math.max(draftArea.start,draftArea.end)/room.width) ? "draft" : "", markers.some(e => p.selected.includes(`${e.kind}:${e.id}`)) ? "selected" : ""].join(" ")} style={{ width: cellSize, height: cellSize }} aria-label={ui("Célula {0}, {1} · {2}",{0:x,1:y,2:ui(wall ? "parede" : "passagem")})+(initial ? ` · ${ui("início")}` : "")+markers.map(e => ` · ${e.name}`).join("")} onPointerDown={event => {
               if (event.button !== 0 || p.locked) return;
+              suppressClick.current = false;
               const createTrigger = p.mode === "trigger" && !p.selected.length && !markers.some(e => e.kind === "trigger");
               if (p.mode !== "collision" && !createTrigger) return;
               stroke.current = `dungeon-paint-${Date.now()}`; p.onBeginHistoryGroup?.(stroke.current);
               if (createTrigger || p.placementMode === "rectangle") { drag.current = {start:i,end:i,kind:createTrigger?"trigger":"wall"}; setDraftArea(drag.current); suppressClick.current = true; }
-              else cell(i);
+              else if (p.tool === "fill" || p.placementMode === "fill") cell(i);
+              else {
+                brush.current = { last: i, cells: new Set([i]), type: p.tool === "eraser" ? "free" : p.collision };
+                setBrushPreview(brush.current.cells);
+              }
             }}
             onPointerEnter={event => {
               if (event.buttons !== 1 || !stroke.current) return;
               if (drag.current) { drag.current.end = i; setDraftArea({...drag.current}); }
-              else if (p.mode === "collision" && p.tool !== "fill" && p.placementMode !== "fill") cell(i);
+              else if (brush.current && brush.current.last !== i) {
+                const cells = new Set(brush.current.cells);
+                for (const index of roomCellLineIndexes(room.width, brush.current.last, i)) cells.add(index);
+                brush.current.last = i;
+                brush.current.cells = cells;
+                setBrushPreview(cells);
+              }
             }}
             onClick={event => { if (suppressClick.current) { suppressClick.current = false; return; } if (p.mode !== "collision" || event.detail === 0) cell(i); }}>
             {current ? arrows[camera.direction] : markers.length ? markers[0].kind === "actor" ? "●" : "◆" : initial ? "I" : ""}

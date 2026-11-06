@@ -1,10 +1,10 @@
-.room-project-budget:has(> .scene-video-budget) > * {
+.room-project-budget > * {
   min-width: 0;
   max-width: 100%;
   overflow-wrap: anywhere;
 }
 
-.room-project-budget:has(> .scene-video-budget),
+.room-project-budget,
 .scene-video-budget {
   grid-template-columns: minmax(0, 1fr);
 }

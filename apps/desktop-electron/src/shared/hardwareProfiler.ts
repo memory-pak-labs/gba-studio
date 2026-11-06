@@ -163,6 +163,7 @@ export interface IsometricHardwareMetrics {
 
 export interface DeriveHardwareProfilerOptions {
   romBytes?: number;
+  estimatedRomBytes?: number;
   telemetry?: RomPlayerFrameStats | null;
   assetPackReport?: AssetPackBudgetReport | null;
 }
@@ -296,7 +297,7 @@ function eventCommandCount(data: GBAProjectData): number {
   }, 0);
 }
 
-function estimateRomBytes(data: GBAProjectData): number {
+export function estimateRomBytes(data: GBAProjectData): number {
   const contractBytes = new TextEncoder().encode(JSON.stringify(data)).byteLength;
   const animationBytes = records(data, "animations").reduce((total, animation) => {
     const width = positiveInteger(animation.frameWidth, 8);
@@ -461,7 +462,7 @@ export function deriveHardwareProfilerPresentation(
       id: "rom",
       label: "ROM",
       enabled: debugFlag(data, "showRomUsage"),
-      used: measuredRomBytes ?? estimateRomBytes(data),
+      used: measuredRomBytes ?? options.estimatedRomBytes ?? estimateRomBytes(data),
       limit: GBA_ROM_BYTES,
       source: measuredRomBytes === null ? "estimate" : "measured",
       unit: "bytes",
