@@ -26,7 +26,7 @@ describe('installed updater QA workflow', () => {
     ]);
     expect(workflow.permissions.contents).toBe('read');
     expect(workflow.jobs['engine-pack'].if).toContain('!inputs.updater_qa_published');
-    expect(qa.env.GBA_UPDATER_QA_ROOT).toContain('runner.temp');
+    expect(qa.env.GBA_UPDATER_QA_ROOT).toContain('github.workspace');
     expect(qa.steps.map(step => step.run).filter(Boolean).join('\n')).toContain('scripts/prepare-published-updater-qa.mjs');
     expect(qa.steps.find(step => step.name === 'Upload updater evidence').with.path).toMatch(/\/evidence\/$/);
   });
