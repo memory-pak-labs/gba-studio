@@ -318,6 +318,8 @@ jobs:
       - run: npm ci
       - name: Verify and prepare the published packages
         shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: node scripts/prepare-published-updater-qa.mjs
       - name: Exercise installed update and project persistence
         shell: bash

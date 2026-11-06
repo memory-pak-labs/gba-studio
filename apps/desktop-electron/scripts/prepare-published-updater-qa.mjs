@@ -21,7 +21,11 @@ async function hashFile(file, algorithm, encoding) {
 }
 
 async function releaseMetadata(tag) {
-  const response = await fetch(`https://api.github.com/repos/${repo}/releases/tags/v${tag}`);
+  const token = process.env.GH_TOKEN;
+  const response = await fetch(`https://api.github.com/repos/${repo}/releases/tags/v${tag}`, {
+    redirect: 'error',
+    headers: token ? { Authorization: `Bearer ${token}` } : {}
+  });
   if (!response.ok) throw new Error(`GitHub release v${tag} returned ${response.status}`);
   const release = await response.json();
   if (release.draft || release.tag_name !== `v${tag}`) throw new Error(`Expected published v${tag}`);
