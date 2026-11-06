@@ -1,5 +1,7 @@
 /** Application copy only. Tuple order: pt-BR, en-US, es-ES. Keep project data out of this catalog. */
 export const studioUiMessages: Record<string, readonly [string, string, string]> = {
+  "Remover preset de HUD": ["Remover preset de HUD", "Remove HUD preset", "Eliminar preajuste de HUD"],
+  "HUD ativa do projeto": ["HUD ativa do projeto", "Active project HUD", "HUD activa del proyecto"],
   "Remover arquivo": ["Remover arquivo", "Remove file", "Eliminar archivo"],
   "Remover arquivos": ["Remover arquivos", "Remove files", "Eliminar archivos"],
   "Remover {0} arquivos selecionados?": ["Remover {0} arquivos selecionados?", "Remove {0} selected files?", "¿Eliminar {0} archivos seleccionados?"],

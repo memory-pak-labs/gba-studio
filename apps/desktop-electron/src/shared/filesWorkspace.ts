@@ -1258,6 +1258,7 @@ export function renameAssetInProject(data: GBAProjectData, assetIDToRename: stri
   next.assets = assets;
   if (previousName && previousName !== trimmedName) {
     updateAssetReferences(next, previousName, trimmedName);
+    updateTemplateDefaultAssetReferences(next, previousName, trimmedName);
   }
   return next;
 }
@@ -1265,6 +1266,31 @@ export function renameAssetInProject(data: GBAProjectData, assetIDToRename: stri
 function updateExactAssetField(record: Record<string, unknown>, field: string, oldName: string, nextName: string): void {
   if (record[field] === oldName) {
     record[field] = nextName;
+  }
+}
+
+function updateTemplateDefaultAssetReferences(data: GBAProjectData, oldName: string, nextName: string): void {
+  const settings = isRecord(data.settings) ? data.settings : {};
+  const sceneTypes = isRecord(settings.sceneTypes) ? settings.sceneTypes : {};
+  for (const mapping of [sceneTypes.defaultPlayerSprites, sceneTypes.defaultBackgrounds]) {
+    if (!isRecord(mapping)) continue;
+    for (const key of Object.keys(mapping)) updateExactAssetField(mapping, key, oldName, nextName);
+  }
+  if (isRecord(settings.topdown)) updateExactAssetField(settings.topdown, "playerSprite", oldName, nextName);
+  if (isRecord(settings.shmup)) {
+    for (const key of ["playerSprite", "playerExplosionSprite"]) updateExactAssetField(settings.shmup, key, oldName, nextName);
+  }
+  if (isRecord(settings.pointAndClick)) updateExactAssetField(settings.pointAndClick, "cursorImage", oldName, nextName);
+  if (isRecord(settings.uiDialogs)) updateExactAssetField(settings.uiDialogs, "defaultPortrait", oldName, nextName);
+  function retargetMaterials(owner: unknown, key: string): void {
+    if (isRecord(owner) && Array.isArray(owner[key])) owner[key] = owner[key].map(value => value === oldName ? nextName : value);
+  }
+  for (const asset of projectArray(data, "assets")) retargetMaterials(asset.metadata, "dungeonMaterialAssets");
+  for (const room of [...projectArray(data, "scenas"), ...projectArray(data, "rooms"), ...[data.scena, data.room].filter(isRecord)]) {
+    const runtime = isRecord(room.runtime) ? room.runtime : {};
+    const config = isRecord(runtime.config) ? runtime.config : {};
+    retargetMaterials(config.presentation, "materialAssets");
+    updateExactAssetField(room, "backgroundAssetName", oldName, nextName);
   }
 }
 

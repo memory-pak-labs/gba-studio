@@ -10,7 +10,7 @@ import { planAnimationDeletion, resolveAnimationDeletion } from "../shared/anima
 import { listLogicValueUsages, updateLogicValueInProject, type LogicValuePatch } from "../shared/logicWorkspace";
 import { updateInterfaceThemeInProject, type InterfaceThemeChange } from "../shared/interfaceThemes";
 import { dialogueEditorScene } from "../shared/dialogueSceneAuthoring";
-import { bindSceneHudInProject, createSceneHudVariationInProject, hudPresetUsages } from "../shared/hudSceneAuthoring";
+import { bindSceneHudInProject, createSceneHudVariationInProject, planHudPresetDeletion, resolveHudPresetDeletion } from "../shared/hudSceneAuthoring";
 import { executeSceneReviewAction, type SceneActionRequest, type SceneActionOutcome, type SceneActionAuditEntry } from "../shared/sceneActionRouting.js";
 import React, { startTransition, useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
@@ -112,7 +112,6 @@ import {
   createAdvancedHudPresetInProject,
   deriveHudPresetsWorkspacePresentation,
   duplicateHudPresetInProject,
-  removeHudPresetInProject,
   setActiveHudPresetInProject,
   updateHudPresetInProject,
   type UpdateHudPresetFields
@@ -3032,19 +3031,17 @@ function App(): React.ReactElement {
 
   async function removeHudPreset(presetID: string): Promise<void> {
     if (!session) return;
-    const preset = deriveHudPresetsWorkspacePresentation(session.project.data).presets.find((item) => item.id === presetID);
-    if (!preset || preset.builtIn) return;
-    const usages = hudPresetUsages(session.project.data, presetID);
-    if (usages.length) {
-      setStatus(ui("Substitua a HUD nas cenas antes de remover: {0}.", { 0: usages.map(scene => scene.name).join(", ") }));
-      return;
-    }
-    if (!await confirm(`Remover o preset de HUD "${preset.name}" do projeto?`)) return;
-    const nextData = removeHudPresetInProject(session.project.data, presetID);
-    if (nextData !== session.project.data) {
-      updateProjectData(nextData);
-      setStatus(ui("Preset de HUD removido: {0}.", { 0: preset.name }));
-    }
+    const data = session.project.data;
+    const plan = planHudPresetDeletion(data, presetID);
+    if (!plan) return;
+    const choice = await confirmProjectDeletion(data, ui("Remover “{0}”?", { 0: plan.name }), {
+      title: "Remover preset de HUD", ...plan
+    });
+    if (!choice) return;
+    const nextData = resolveHudPresetDeletion(data, presetID, choice.kind === "replace" ? choice.value : null);
+    if (nextData === data) return;
+    updateProjectData(nextData);
+    notifySuccess(ui("Item removido. Use Desfazer para restaurar."));
   }
 
   async function duplicateDialogue(key: string): Promise<string | null> {

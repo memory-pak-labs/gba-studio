@@ -3702,10 +3702,14 @@ function defaultPlayerSpriteForScene(data: GBAProjectData, sceneType: string, ro
     : sceneType === "isometric" && isometricSceneConfigFromRuntime(room?.runtime)?.gameplayMode === "tactical"
     ? "isometricTactical" : sceneType;
   const spriteSheet = defaults[key];
-  if(sceneType==="dungeonCrawler" && typeof spriteSheet==="string" && !spriteSheet.trim())return "";
-  return typeof spriteSheet === "string" && spriteSheet.trim().length > 0
-    ? spriteSheet.trim()
-    : usesBlankPlayerDefaults(data) ? blankPlayerSpriteForRoom(room ?? { sceneType }) : defaultPlayerSpriteForSceneType(sceneType);
+  const hasStarterLibrary = usesBlankPlayerDefaults(data);
+  if (typeof spriteSheet === "string") {
+    const name = spriteSheet.trim();
+    return !hasStarterLibrary || projectRecords(data, "assets").some(asset => asset.name === name) ? name : "";
+  }
+  if (!hasStarterLibrary) return defaultPlayerSpriteForSceneType(sceneType);
+  const fallback = blankPlayerSpriteForRoom(room ?? { sceneType });
+  return projectRecords(data, "assets").some(asset => asset.name === fallback) ? fallback : "";
 }
 
 function ensureDefaultControlledEntityContent(data: GBAProjectData, spriteSheet: string): void {

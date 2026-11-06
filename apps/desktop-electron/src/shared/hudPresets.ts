@@ -1,3 +1,4 @@
+import { usesBlankPlayerDefaults } from "./blankPlayerDefaults.js";
 import { normalizeHudBehavior, type HudElementBehavior } from "./hudBehavior.js";
 import type { GBAProjectData } from "./projectFile.js";
 import { applyInterfaceThemeToHudPreset } from "./interfaceThemes.js";
@@ -351,7 +352,8 @@ function persistedHudPresets(data: GBAProjectData): HudPresetPresentation[] {
     .filter((value): value is HudPresetPresentation => Boolean(value));
   const hasDefault = presets.some((preset) => preset.id === HUD_DEFAULT_PRESET_ID);
   if (hasDefault) {
-    return presets.map((preset) => preset.id === HUD_DEFAULT_PRESET_ID ? { ...preset, builtIn: true } : preset);
+    return usesBlankPlayerDefaults(data) ? presets
+      : presets.map((preset) => preset.id === HUD_DEFAULT_PRESET_ID ? { ...preset, builtIn: true } : preset);
   }
   return [normalizeHudPreset(DEFAULT_HUD_PRESET, 0, true)!, ...presets];
 }
@@ -457,7 +459,7 @@ export function resolveHudPresetForRoom(data: GBAProjectData, room: Record<strin
 function ensurePersistedHudPresets(data: GBAProjectData): Record<string, unknown>[] {
   const settings = ensureProjectSettings(data);
   const current = Array.isArray(settings.hudPresets) ? settings.hudPresets.filter(isRecord) : [];
-  if (!current.some((preset) => stringField(preset.id, "") === HUD_DEFAULT_PRESET_ID)) {
+  if (!usesBlankPlayerDefaults(data) && !current.some((preset) => stringField(preset.id, "") === HUD_DEFAULT_PRESET_ID)) {
     settings.hudPresets = [DEFAULT_HUD_PRESET, ...current];
   } else {
     settings.hudPresets = current;
@@ -477,7 +479,7 @@ export function updateHudPresetInProject(data: GBAProjectData, presetID: string,
   const next = cloneProjectData(data);
   const presets = ensurePersistedHudPresets(next);
   const preset = presets.find((candidate) => stringField(candidate.id, "") === presetID);
-  if (!preset || presetID === HUD_DEFAULT_PRESET_ID) return data;
+  if (!preset || (presetID === HUD_DEFAULT_PRESET_ID && !usesBlankPlayerDefaults(data))) return data;
   if (fields.name !== undefined) preset.name = fields.name.trim();
   if (fields.description !== undefined) preset.description = fields.description.trim();
   if (fields.backgroundImage !== undefined) preset.backgroundImage = fields.backgroundImage.trim();
@@ -570,7 +572,7 @@ export function duplicateHudPresetInProject(data: GBAProjectData, sourceID: stri
 }
 
 export function removeHudPresetInProject(data: GBAProjectData, presetID: string): GBAProjectData {
-  if (!presetID || presetID === HUD_DEFAULT_PRESET_ID) return data;
+  if (!presetID || (presetID === HUD_DEFAULT_PRESET_ID && !usesBlankPlayerDefaults(data))) return data;
   const next = cloneProjectData(data);
   const settings = ensureProjectSettings(next);
   const current = Array.isArray(settings.hudPresets) ? settings.hudPresets.filter(isRecord) : [];

@@ -1,3 +1,4 @@
+import { planAnimationDeletion } from "./animationDeletion.js";
 import { audioSourceAsset } from "./audioContract.js";
 import { authoredEventCommandRecords } from "./authoredEventCommands.js";
 import { removeAssetRecordsFromProject } from "./filesWorkspace.js";
@@ -23,7 +24,7 @@ const optionalFields = new Set([
   "backgroundAssetName", "titleOverlayAssetName", "portrait", "portraitAssetName", "defaultPortrait",
   "emote", "emoteAssetName", "assetName", "hudAssetName", "cursorAssetName", "disabledEscapeAssetName",
   "selectorImage", "boxImage", "backgroundImage", "hudImage", "font", "cursorImage",
-  "music", "textSound", "confirmSound", "characterSound", "generatedSpriteAssetName"
+  "music", "textSound", "confirmSound", "characterSound", "generatedSpriteAssetName", "playerExplosionSprite"
 ]);
 const requiredFields = new Set([
   "runtimeCompositeBackgroundAssetName", "runtimeBaseBackgroundAssetName", "tilesetAssetName",
@@ -34,7 +35,9 @@ const requiredFields = new Set([
 ]);
 const audioFields = new Set(["music", "textSound", "confirmSound", "characterSound", "victoryMusic"]);
 const audioMaps = new Set(["actionSounds", "cues"]);
-const fieldMaps = new Set(["defaultPlayerSprites", "defaultBackgrounds", "dungeonDepthSheets", "compactHud"]);
+const defaultMaps = new Set(["defaultPlayerSprites", "defaultBackgrounds"]);
+const fieldMaps = new Set(["dungeonDepthSheets", "compactHud"]);
+const dungeonMaterialArrays = new Set(["materialAssets", "dungeonMaterialAssets"]);
 const positionalArrays = new Set(["tileSourceAssetNames", "stateAssets"]);
 const optionalArrays = new Set(["frameAssetNames"]);
 
@@ -77,11 +80,41 @@ function assetSlots(data: GBAProjectData, source: RecordValue): Slot[] {
     return kind === "path" ? record(asset.metadata).source : asset[kind];
   }
 
-  function slot(owner: RecordValue, key: string, label: string, canUnlink: boolean): void {
+  const authoredCommands = authoredEventCommandRecords(data);
+  const actors = records(data.actors);
+  const actorNames = actors.flatMap(actor => [actor.id, actor.name]).filter((name): name is string => typeof name === "string");
+  const bundledSource = record(source.metadata).bundledDefaultAsset;
+  const isStarterSheet = source.kind === "Sprite" && typeof bundledSource === "string" && bundledSource.startsWith("template:blank/");
+  const clips = records(data.animations);
+  const sheetClips = isStarterSheet ? clips.filter(clip => clip.spriteSheet === source.name) : [];
+  const sheetStates = isStarterSheet ? records(data.animationStates).filter(state => state.spriteSheet === source.name) : [];
+  const ownsAllClips = sheetClips.every(clip => {
+    if (typeof clip.id !== "string") return false;
+    const plan = planAnimationDeletion(data, clip.id);
+    return plan.canUnlink && plan.usages.every(usage => usage.startsWith("Estado de animação:"));
+  });
+  const ownIDs = new Set(sheetClips.map(clip => clip.id));
+  const stateIsUsed = (state: RecordValue): boolean => {
+    if ([...actors, ...records(data.actorPrefabs)].some(actor => state.id && actor.animationStateID === state.id)) return true;
+    return authoredCommands.some(owner => [owner.command, ...(typeof owner.commands === "string" ? owner.commands.split(/\r?\n/) : [])]
+      .some(command => {
+        if (typeof command !== "string") return false;
+        const [verb, , id] = sceneChangeCommandParts(command, actorNames);
+        return verb === "set_actor_animation_state" && Boolean(id) && (id === state.name || id === state.id);
+      }));
+  };
+  const ownsAllStates = sheetStates.every(state => !stateIsUsed(state)
+    && (!Array.isArray(state.animationIDs) || state.animationIDs.every(id => ownIDs.has(id))));
+  const canDetachLibrarySheet = isStarterSheet && ownsAllClips && ownsAllStates;
+
+  function slot(owner: RecordValue, key: string, label: string, canUnlink: boolean, emptyValue = false): void {
     const kind = referenceKind(owner[key]);
     if (!kind) return;
     slots.push({ label, compatible: asset => Boolean(assetValue(asset, kind)), replace(asset) { owner[key] = assetValue(asset, kind); },
-      ...(canUnlink ? { unlink() { delete owner[key]; } } : {}) });
+      ...(canUnlink ? { unlink() {
+        if (emptyValue) owner[key] = "";
+        else delete owner[key];
+      } } : {}) });
   }
 
   function visit(value: unknown, label: string, context = ""): void {
@@ -106,16 +139,31 @@ function assetSlots(data: GBAProjectData, source: RecordValue): Slot[] {
       const isAudio = audioFields.has(key) || audioMaps.has(context);
       if (kind && isAudio && soundNames.has(field)) continue;
       if (kind) {
-        const optional = optionalFields.has(key) || isAudio;
+        const optionalSetting = defaultMaps.has(context)
+          || (key === "playerSprite" && ["topdown", "shmup"].includes(context));
+        const optional = optionalFields.has(key) || isAudio || optionalSetting
+          || (key === "asset" && context === "components");
         if (optional || requiredFields.has(key) || fieldMaps.has(context)
           || (["path", "id"].includes(key) && ("consumer" in owner || "required" in owner))) {
-          slot(owner, key, label, optional && !(key === "assetName" && context === "referenceImages"));
+          slot(owner, key, label, optional && !(key === "assetName" && context === "referenceImages"), optionalSetting);
         } else if (/asset|sprite|sheet|portrait|background|texture|image|font|sample|tilemap/i.test(key)) {
           slots.push({ label: `${label} · ${key}` });
         }
         continue;
       }
-      if (Array.isArray(field) && (optionalArrays.has(key) || positionalArrays.has(key))) {
+      if (Array.isArray(field) && dungeonMaterialArrays.has(key)) {
+        if (field.some(referenceKind)) {
+          slots.push({ label: `${label} · conjunto de materiais do Dungeon`, replace(asset) {
+            owner[key] = field.map(entry => {
+              const type = referenceKind(entry);
+              return type ? assetValue(asset, type) : entry;
+            });
+          }, unlink() {
+            // The runtime accepts the complete material set or its procedural fallback.
+            delete owner[key];
+          } });
+        }
+      } else if (Array.isArray(field) && (optionalArrays.has(key) || positionalArrays.has(key))) {
         if (field.some(entry => referenceKind(entry))) {
           slots.push({
             label,
@@ -159,7 +207,15 @@ function assetSlots(data: GBAProjectData, source: RecordValue): Slot[] {
     ["audioInstruments", "Instrumento"], ["audioItems", "Áudio"], ["events", "Evento"]
   ]) {
     for (const entry of records(data[collection!])) {
-      visit(entry, `${label}: ${String(entry.name ?? entry.key ?? entry.title ?? entry.id ?? "sem nome")}`, collection!);
+      const attachedRecord = canDetachLibrarySheet && (sheetClips.includes(entry) || sheetStates.includes(entry));
+      const name = `${label}: ${String(entry.name ?? entry.key ?? entry.title ?? entry.id ?? "sem nome")}`;
+      const before = slots.length;
+      visit(entry, attachedRecord ? `${name} · será removido junto com a folha ao desvincular` : name, collection!);
+      if (attachedRecord) {
+        for (const link of slots.slice(before)) link.unlink = () => {
+          data[collection!] = records(data[collection!]).filter(item => item !== entry);
+        };
+      }
     }
   }
   for (const key of ["scena", "room"]) visit(data[key], `Cena: ${String(record(data[key]).name ?? "ativa")}`);
@@ -175,7 +231,11 @@ function assetSlots(data: GBAProjectData, source: RecordValue): Slot[] {
 
   for (const asset of assets) {
     if (asset === source) continue;
-    const dependencies = record(asset.metadata).runtimeDependencies;
+    const metadata = record(asset.metadata);
+    if (Array.isArray(metadata.dungeonMaterialAssets) && metadata.dungeonMaterialAssets.some(referenceKind)) {
+      visit(metadata, `Arquivo: ${String(asset.name)}`);
+    }
+    const dependencies = metadata.runtimeDependencies;
     if (Array.isArray(dependencies) && dependencies.some(referenceKind)) {
       slots.push({ label: `Dependência do arquivo: ${String(asset.name)}` });
     }
@@ -189,8 +249,7 @@ function assetSlots(data: GBAProjectData, source: RecordValue): Slot[] {
   for (const event of records(data.events)) {
     for (const owner of [event, ...records(event.steps)]) commandOwners.set(owner, `Evento: ${String(event.name ?? event.id)}`);
   }
-  const actorNames = records(data.actors).flatMap(actor => [actor.id, actor.name]).filter((name): name is string => typeof name === "string");
-  for (const owner of authoredEventCommandRecords(data)) {
+  for (const owner of authoredCommands) {
     for (const key of ["command", "commands"]) {
       const raw = owner[key];
       if (typeof raw !== "string") continue;
