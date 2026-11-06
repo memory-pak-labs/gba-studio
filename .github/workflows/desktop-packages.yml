@@ -16,19 +16,23 @@ on:
         type: choice
         options: [both, linux, windows]
         default: both
+      updater_qa_published:
+        description: 'Test the published RC5 to RC6 update on Windows, Linux and both Mac architectures'
+        type: boolean
+        default: false
 
 permissions:
   contents: read
   actions: read
 
 concurrency:
-  group: desktop-packages-${{ github.ref }}-${{ inputs.updater_qa_source_run_id != '' && github.run_id || 'build' }}
+  group: desktop-packages-${{ github.ref }}-${{ (inputs.updater_qa_published || inputs.updater_qa_source_run_id != '') && github.run_id || 'build' }}
   cancel-in-progress: true
 
 jobs:
   engine-pack:
     name: Compile ARM Engine Pack
-    if: inputs.updater_qa_source_run_id == ''
+    if: inputs.updater_qa_source_run_id == '' && !inputs.updater_qa_published
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     steps:
@@ -208,7 +212,7 @@ jobs:
 
   installed-updater-qa:
     name: Installed updater QA (${{ matrix.platform }})
-    if: inputs.updater_qa_source_run_id != ''
+    if: inputs.updater_qa_source_run_id != '' && !inputs.updater_qa_published
     runs-on: ${{ matrix.runner }}
     timeout-minutes: 45
     strategy:
@@ -272,5 +276,62 @@ jobs:
         with:
           name: Updater-QA-${{ matrix.platform }}
           path: ${{ github.workspace }}/.updater-qa/evidence/
+          if-no-files-found: ignore
+          retention-days: 7
+
+  published-updater-qa:
+    name: Published updater QA (${{ matrix.platform }})
+    if: inputs.updater_qa_published
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 35
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: windows
+            runner: windows-2022
+          - platform: linux
+            runner: ubuntu-24.04
+          - platform: macos-intel
+            runner: macos-15-intel
+          - platform: macos-arm64
+            runner: macos-15
+    defaults:
+      run:
+        working-directory: apps/desktop-electron
+    env:
+      GBA_UPDATER_QA_ROOT: ${{ runner.temp }}/published-updater-qa
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+          cache-dependency-path: apps/desktop-electron/package-lock.json
+      - name: Linux desktop dependencies
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends xvfb libgtk-3-0 libnss3 libasound2t64 libgbm1 libudev-dev libfuse2t64
+      - run: npm ci
+      - name: Verify and prepare the published packages
+        shell: bash
+        run: node scripts/prepare-published-updater-qa.mjs
+      - name: Exercise installed update and project persistence
+        shell: bash
+        run: |
+          if [ "$RUNNER_OS" = Linux ]; then
+            xvfb-run -a node scripts/smoke-installed-update.mjs
+          else
+            node scripts/smoke-installed-update.mjs
+          fi
+      - name: Upload updater evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: Published-updater-QA-${{ matrix.platform }}
+          path: ${{ runner.temp }}/published-updater-qa/evidence/
           if-no-files-found: ignore
           retention-days: 7
