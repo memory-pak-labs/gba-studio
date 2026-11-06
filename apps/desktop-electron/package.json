@@ -1,6 +1,6 @@
 {
   "name": "@gbastudio/desktop-electron",
-  "version": "0.1.0-rc.5",
+  "version": "0.1.0-rc.6",
   "private": true,
   "description": "Visual editor and native engine workflow for Game Boy Advance games.",
   "author": "GBA Studio",
