@@ -31,4 +31,22 @@ describe("room entity drag preview", () => {
     expect(cells[9]!.classList.contains("selected-entity-cell")).toBe(false);
     expect(cells[15]!.classList.contains("selected-entity-cell")).toBe(true);
   });
+  it("previews a trigger resize and restores the handle with its overlay", () => {
+    const canvas = document.createElement("div");
+    canvas.innerHTML = '<span data-room-entity-key="trigger:a" style="width:25%;height:25%"></span>'
+      + '<span class="resize-handle" style="left:25%;top:25%"></span>';
+    const handle = canvas.querySelector<HTMLElement>(".resize-handle")!;
+    const trigger = canvas.querySelector<HTMLElement>("[data-room-entity-key]")!;
+    const visual = createRoomEntityDragPreview(canvas, "trigger:a", [], handle);
+    visual.paint({ width: "75%", height: "50%" }, {}, { x: 0, y: 0, width: 3, height: 2 }, 4, 4,
+      { left: "75%", top: "50%" });
+    expect(trigger.style.width).toBe("75%");
+    expect(handle.style.left).toBe("75%");
+    expect(handle.style.top).toBe("50%");
+    visual.restore();
+    expect(trigger.style.width).toBe("25%");
+    expect(handle.style.left).toBe("25%");
+    expect(handle.style.top).toBe("25%");
+  });
+
 });

@@ -8,6 +8,7 @@ import {
   createElectronSmokeEnv,
   cdpSession,
   electronExecutablePath,
+  prepareElectronSmokeLocale,
   renderedText,
   terminateChild,
   wait,
@@ -38,7 +39,7 @@ const responsiveWorkspaces = [
   {
     label: "Cenas",
     fileSlug: "cenas",
-    expectedText: ["Cenas", "Padrões do projeto", "Players Padrão", "Transições"]
+    expectedText: ["Cenas", "Padrões do projeto", "Jogadores e fundos", "Transições"]
   },
   {
     label: "Dialogos",
@@ -48,7 +49,7 @@ const responsiveWorkspaces = [
   {
     label: "Sprites",
     fileSlug: "sprites",
-    expectedText: ["Sprites", "Folha · Quadros", "Tipo de animação"],
+    expectedText: ["Sprites", "Folha de quadros", "Tipo de animação"],
     requiredAriaLabels: ["Configurações de animação"]
   },
   {
@@ -453,6 +454,7 @@ async function runElectronSession(openProjectPath, callback) {
 
     try {
       await cdp.send("Page.enable");
+      await prepareElectronSmokeLocale(cdp);
       return await callback(cdp);
     } finally {
       cdp.close();

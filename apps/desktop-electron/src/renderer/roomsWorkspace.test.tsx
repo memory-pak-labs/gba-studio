@@ -1998,6 +1998,7 @@ describe("RoomsWorkspace React smoke", () => {
     await user.click(container.querySelector<HTMLButtonElement>(".room-editor-tool-rail button[aria-label='Colisão - Sólidos']")!);
     const cell = container.querySelector<HTMLButtonElement>(".rooms-canvas-stage .room-stage-cell")!;
     fireEvent.pointerDown(cell, { button: 0, pointerId: 8 });
+    fireEvent.pointerUp(cell, { button: 0, pointerId: 8 });
     await user.click(screen.getByRole("button", { name: "Rampa subindo à direita" }));
 
     expect(handlers.onSetCollisionType).toHaveBeenLastCalledWith("room-iso-ramp", 0, "slope_up_right");
@@ -3144,7 +3145,37 @@ describe("RoomsWorkspace React smoke", () => {
     await openCanvasLayers(user);
     await user.click(screen.getByRole("button", { name: "Desbloquear camada Colisão" }));
     fireEvent.pointerDown(collisionCell!, { button: 0, buttons: 1, pointerId: 52 });
-    expect(handlers.onSetCollisionType).toHaveBeenCalledWith(initialRoom.id, 0, "solid", expect.any(String));
+    expect(handlers.onSetCollisionType).not.toHaveBeenCalled();
+    fireEvent.pointerUp(collisionCell!, { button: 0, buttons: 0, pointerId: 52 });
+    expect(handlers.onSetCollisionType).toHaveBeenCalledExactlyOnceWith(initialRoom.id, [0, 1, 30, 31], "solid", expect.any(String));
+  });
+
+  it("previews skipped collision cells and commits the stroke only on release", async () => {
+    const user = userEvent.setup();
+    const project = createBlankProjectData({ name: "Collision stroke" });
+    const handlers = roomsWorkspaceHandlers();
+    const { container } = render(
+      <RoomsWorkspace presentation={deriveRoomsWorkspacePresentation(project)} projectData={project} {...handlers} />
+    );
+
+    await focusActiveScene(user);
+    await user.click(screen.getByRole("button", { name: "Colisão - Sólidos" }));
+    const cells = container.querySelectorAll(".room-focused-scene-editor-frame .room-stage-cell");
+    fireEvent.pointerDown(cells[0]!, { button: 0, buttons: 1, pointerId: 21 });
+    fireEvent.pointerEnter(cells[5]!, { buttons: 1, pointerId: 21 });
+    expect(container.querySelectorAll(".room-stage-collision-gesture")).toHaveLength(12);
+    expect(handlers.onSetCollisionType).not.toHaveBeenCalled();
+
+    fireEvent.keyDown(window, { key: "Escape" });
+    fireEvent.pointerUp(cells[5]!, { button: 0, pointerId: 21 });
+    expect(container.querySelectorAll(".room-stage-collision-gesture")).toHaveLength(0);
+    expect(handlers.onSetCollisionType).not.toHaveBeenCalled();
+
+    fireEvent.pointerDown(cells[0]!, { button: 0, buttons: 1, pointerId: 22 });
+    fireEvent.pointerUp(cells[5]!, { button: 0, pointerId: 22 });
+    expect(handlers.onSetCollisionType).toHaveBeenCalledExactlyOnceWith(
+      "room-1", [0, 1, 30, 31, 2, 3, 32, 33, 4, 5, 34, 35], "solid", expect.any(String)
+    );
   });
 
   it("apaga colisão com o botão direito sem abrir o menu contextual", async () => {
@@ -3166,7 +3197,7 @@ describe("RoomsWorkspace React smoke", () => {
     fireEvent.pointerDown(cell, { button: 2, buttons: 2, pointerId: 81 });
     fireEvent.pointerUp(cell, { button: 2, buttons: 0, pointerId: 81 });
 
-    expect(handlers.onSetCollisionType).toHaveBeenCalledWith("room-1", 0, "free", expect.any(String));
+    expect(handlers.onSetCollisionType).toHaveBeenCalledExactlyOnceWith("room-1", [0, 1, 30, 31], "free", expect.any(String));
   });
 
   it("preenche uma região de colisão pelo modo Preencher", async () => {
@@ -4515,12 +4546,12 @@ describe("RoomsWorkspace React smoke", () => {
 
     const cells = Array.from(container.querySelectorAll<HTMLButtonElement>(".room-stage-cell"));
     fireEvent.pointerDown(cells[1]!, { button: 0, buttons: 1, pointerId: 91 });
-    expect(container.querySelectorAll(".room-stage-cell.collision-rectangle-preview")).not.toHaveLength(0);
+    expect(container.querySelectorAll(".room-stage-collision-rectangle-gesture")).not.toHaveLength(0);
 
     await user.click(container.querySelector<HTMLButtonElement>(
       ".room-editor-tool-rail button[aria-label='Selecionar - Mover']"
     )!);
-    expect(container.querySelectorAll(".room-stage-cell.collision-rectangle-preview")).toHaveLength(0);
+    expect(container.querySelectorAll(".room-stage-collision-rectangle-gesture")).toHaveLength(0);
   });
 
   it("remove a prévia de gatilho ao sair do modo de gatilhos", async () => {
@@ -4541,12 +4572,12 @@ describe("RoomsWorkspace React smoke", () => {
 
     const cells = Array.from(container.querySelectorAll<HTMLButtonElement>(".room-stage-cell"));
     fireEvent.pointerDown(cells[1]!, { button: 0, buttons: 1, pointerId: 92 });
-    expect(container.querySelectorAll(".room-stage-cell.trigger-placement-preview")).not.toHaveLength(0);
+    expect(container.querySelectorAll(".room-stage-trigger-gesture")).not.toHaveLength(0);
 
     await user.click(container.querySelector<HTMLButtonElement>(
       ".room-editor-tool-rail button[aria-label='Selecionar - Mover']"
     )!);
-    expect(container.querySelectorAll(".room-stage-cell.trigger-placement-preview")).toHaveLength(0);
+    expect(container.querySelectorAll(".room-stage-trigger-gesture")).toHaveLength(0);
   });
 
   it("mantém colisão e gatilho por arraste disponíveis no Dungeon Crawler", async () => {

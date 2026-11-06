@@ -63,6 +63,7 @@ import {
   setActiveTileLayerMappingInProject,
   setStartRoomInProject,
   setRoomCollisionCellInProject,
+  setRoomCollisionTypesInProject,
   setRoomHeightLevelInProject,
   setRoomTileCellInProject,
   toggleRoomCollisionCellInProject,
@@ -3847,6 +3848,27 @@ describe("Rooms workspace presentation", () => {
 
     const unblocked = setRoomCollisionCellInProject(blocked, "room-overworld", 1, false);
     expect((unblocked.scenas as Record<string, unknown>[])[0].collisionTypes).toEqual(["free", "free", "solid", "free", "free", "free"]);
+  });
+
+  it("applies a collision stroke in one change, expanding metatiles and preserving the previous project", () => {
+    const room = { id: "target", name: "Target", sceneType: "topdown", width: 6, height: 4 };
+    const untouched = { id: "other", name: "Other", width: 6, height: 4 };
+    const rooms = [room, untouched];
+    const project = { scena: room, scenas: rooms, rooms };
+
+    const changed = setRoomCollisionTypesInProject(project, room.id, [0, 3, 3, 24, -1, NaN], "solid");
+    const expected = [0, 1, 2, 3, 6, 7, 8, 9];
+    const changedRooms = changed.scenas as Array<typeof room & { collisionTypes: RoomCollisionType[] }>;
+    const collision = changedRooms[0].collisionTypes;
+
+    expect(collision.flatMap((type, index) => type === "solid" ? [index] : [])).toEqual(expected);
+    expect(changed.scena).toEqual(changedRooms[0]);
+    expect(changed.rooms).toBe(changed.scenas);
+    expect(changedRooms[1]).toBe(untouched);
+    expect(project.scena).toBe(room);
+    expect(project.scenas[0]).toBe(room);
+    expect(room).not.toHaveProperty("collisionTypes");
+    expect(setRoomCollisionTypesInProject(changed, room.id, [0, 3], "solid")).toBe(changed);
   });
 
   it("preenche a região de colisão sem atravessar blocos e preserva metatiles", () => {

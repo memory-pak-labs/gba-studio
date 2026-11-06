@@ -164,7 +164,7 @@ import {
   setActiveTileLayerMappingInProject,
   setStartRoomInProject,
   setRoomCollisionCellInProject,
-  setRoomCollisionTypeInProject,
+  setRoomCollisionTypesInProject,
   setRoomHeightLevelInProject,
   toggleRoomCollisionCellInProject,
   updateRoomBackgroundTilesetGridInProject,
@@ -188,6 +188,7 @@ import {
 } from "../shared/roomsWorkspace";
 import { importTiledMapIntoProject } from "../shared/tiledImport";
 import type { SceneMapPosition } from "../shared/sceneMapLayout";
+import { addSceneNote, updateSceneNote, removeSceneNote, type SceneNotePatch } from "../shared/sceneNotes";
 import {
   deriveSettingsPathValidationTargets,
   resetSettingsSectionInProject,
@@ -321,6 +322,7 @@ import {
 } from "./StudioShellOverlays";
 import { StudioLanguageSwitcher, projectActionLabelKey, useStudioI18n, workspaceLabelKey } from "./i18n";
 import { projectProblemsFromHealthReport, type ProjectProblem } from "../shared/projectProblems";
+import { useProjectHealthReport } from "./useProjectHealthReport";
 import { useProjectProblemDismissals } from "./useProjectProblemDismissals";
 import { updateProjectWarningDismissals } from "../shared/projectWarningDismissals";
 import { deriveProjectHealthReport } from "../shared/projectHealth";
@@ -638,7 +640,9 @@ function App(): React.ReactElement {
     };
   }, [confirmDiscard, session]);
 
-  const presentationSession = useDeferredValue(session);
+  const deferredSession = useDeferredValue(session);
+  // The editor commits the new grid and its selection in the same render.
+  const presentationSession = selectedWorkspace === "Editor" ? session : deferredSession;
 
   const {
     audioPresentation,
@@ -651,10 +655,10 @@ function App(): React.ReactElement {
     settingsPresentation,
     spritesPresentation
   } = useWorkspacePresentations(presentationSession, selectedWorkspace, pluginRegistry);
-  const eventsPresentation = useMemo(
-    () => projectData ? deriveEventsWorkspacePresentation(projectData) : null,
-    [projectData]
-  );
+  const getEventsPresentation = useMemo(() => {
+    let presentation: ReturnType<typeof deriveEventsWorkspacePresentation> | undefined;
+    return () => projectData ? (presentation ??= deriveEventsWorkspacePresentation(projectData)) : null;
+  }, [projectData]);
   const authoringReferenceOptions = useMemo(() => projectData ? {
     assets: projectAssetReferenceOptions(projectData),
     audio: projectAudioReferenceOptions(projectData),
@@ -675,10 +679,10 @@ function App(): React.ReactElement {
   const problemInput = useMemo(() => ({ data: projectData, path: presentationSession?.path, identity: presentationSession?.identity }), [projectData, presentationSession?.path, presentationSession?.identity]);
   const deferredProblemInput = useDeferredValue(problemInput);
   const deferredProblemData = deferredProblemInput.data;
-  const projectHealthExportReady = useMemo(
-    () => deferredProblemData ? deriveProjectHealthReport(deferredProblemData).exportReady : null,
-    [deferredProblemData]
-  );
+  const { report: baseProjectHealthReport, estimatedRomBytes, pending: reportPending } =
+    useProjectHealthReport(deferredProblemData, deferredProblemInput.identity);
+  const projectHealthPending = reportPending || Boolean(session && deferredProblemData !== session.project.data);
+  const projectHealthExportReady = projectHealthPending ? false : baseProjectHealthReport?.exportReady ?? null;
 
   async function refreshProjectPlugins(projectPath: string | undefined): Promise<void> {
     if (!projectPath) {
@@ -743,8 +747,10 @@ function App(): React.ReactElement {
   const currentBudgetReport = session?.path === deferredProblemInput.path
     && session?.project.data === deferredProblemData ? projectBudgetAnalysis?.report : undefined;
   const projectHealthReport = useMemo(
-    () => deferredProblemData ? deriveProjectHealthReport(deferredProblemData, { assetPackReport: currentBudgetReport }) : null,
-    [deferredProblemData, currentBudgetReport]
+    () => deferredProblemData && currentBudgetReport
+      ? deriveProjectHealthReport(deferredProblemData, { assetPackReport: currentBudgetReport })
+      : baseProjectHealthReport,
+    [baseProjectHealthReport, deferredProblemData, currentBudgetReport]
   );
   const allProjectProblems = useMemo(
     () => projectHealthReport ? projectProblemsFromHealthReport(projectHealthReport) : [],
@@ -761,11 +767,12 @@ function App(): React.ReactElement {
     () => projectData
       ? deriveHardwareProfilerPresentation(projectData, {
         romBytes: buildResult?.summary?.romBytes,
+        estimatedRomBytes: session?.identity === deferredProblemInput.identity ? estimatedRomBytes : undefined,
         assetPackReport: projectBudgetAnalysis?.report,
         telemetry: romPlayerTelemetry?.state === "running" ? romPlayerTelemetry.stats : null
       })
       : null,
-    [buildResult?.summary?.romBytes, projectBudgetAnalysis?.report, projectData, romPlayerTelemetry]
+    [buildResult?.summary?.romBytes, deferredProblemInput.identity, estimatedRomBytes, projectBudgetAnalysis?.report, projectData, romPlayerTelemetry, session?.identity]
   );
   useEffect(() => {
     const runtime = romPlayerTelemetry?.stats?.runtimeState;
@@ -1780,9 +1787,9 @@ function App(): React.ReactElement {
     }
   }
 
-  function setRoomCollisionType(roomID: string, cellIndex: number, collisionType: RoomCollisionType, historyGroupID?: string): void {
+  function setRoomCollisionType(roomID: string, cells: number | readonly number[], collisionType: RoomCollisionType, historyGroupID?: string): void {
     if (!session) return;
-    const nextData = setRoomCollisionTypeInProject(session.project.data, roomID, cellIndex, collisionType);
+    const nextData = setRoomCollisionTypesInProject(session.project.data, roomID, typeof cells === "number" ? [cells] : cells, collisionType);
     if (nextData !== session.project.data) {
       updateProjectData(nextData, { historyGroupID });
       setStatus(ui("Colisao atualizada no canvas."));
@@ -1867,6 +1874,24 @@ function App(): React.ReactElement {
       updateProjectData(nextData);
       setStatus(ui("Posicao da cena {0} atualizada.", { 0: sceneName }));
     }
+  }
+
+  function createSceneNote(position: { id: string; x: number; y: number }): void {
+    if (!session) return;
+    updateProjectData(addSceneNote(session.project.data, position));
+    setStatus(ui("Post-it criado. Escreva um lembrete e salve o projeto."));
+  }
+
+  function editSceneNote(id: string, patch: SceneNotePatch, historyGroupID?: string): void {
+    if (!session) return;
+    if (historyGroupID && projectHistoryGroupRef.current?.id !== historyGroupID) beginProjectHistoryGroup(historyGroupID);
+    updateProjectData(updateSceneNote(session.project.data, id, patch), { historyGroupID });
+  }
+
+  function deleteSceneNote(id: string): void {
+    if (!session) return;
+    updateProjectData(removeSceneNote(session.project.data, id));
+    setStatus(ui("Post-it excluído. Use Desfazer para restaurar."));
   }
 
   function organizeSceneMapPositions(): void {
@@ -2408,7 +2433,7 @@ function App(): React.ReactElement {
 
   function updateEventFrequency(eventName: string, frames: number): void {
     if (!session || !Number.isFinite(frames)) return;
-    const event = eventsPresentation?.groups.flatMap((group) => group.events).find((candidate) => candidate.name === eventName);
+    const event = getEventsPresentation()?.groups.flatMap((group) => group.events).find((candidate) => candidate.name === eventName);
     if (!event) return;
     const nextData = setEventUpdateFrequencyInProject(session.project.data, event.id, frames, 0);
     if (nextData !== session.project.data) {
@@ -3353,7 +3378,7 @@ function App(): React.ReactElement {
             className="run-button"
             type="button"
             aria-label={t("shell.play")}
-            title={playProjectDisabled ? ui(playProjectBlockedReasonText) ?? t("shell.playDisabledTitle") : t("shell.playTitle")}
+            title={playProjectDisabled ? ui(projectHealthPending ? "Analisando…" : playProjectBlockedReasonText) ?? t("shell.playDisabledTitle") : t("shell.playTitle")}
             onClick={() => void playProject()}
             disabled={playProjectDisabled}
           >
@@ -3497,7 +3522,7 @@ function App(): React.ReactElement {
             />
           ) : selectedWorkspace === "Editor" ? (
             <RoomsWorkspace
-              logicEvents={eventsPresentation}
+              getEventsPresentation={getEventsPresentation}
               onCreateLogicVariable={createVariable}
               onUpdateLogicValue={updateLogicValue}
               onRemoveLogicValue={removeVariable}
@@ -3506,7 +3531,6 @@ function App(): React.ReactElement {
               budgetAnalysisRunning={projectBudgetAnalysisRunning}
               budgetReport={projectBudgetAnalysis?.report ?? null}
               videoBudget={projectBudgetAnalysis?.videoBudget ?? null}
-              commandSuggestions={eventsPresentation?.commandPalette ?? []}
               hardwareProfiler={hardwareProfiler}
               projectData={projectData}
               presentation={roomsPresentation}
@@ -3557,6 +3581,9 @@ function App(): React.ReactElement {
               onDuplicateRoomEntities={duplicateRoomEntities}
               onRemoveRoomEntities={removeRoomEntities}
               onUpdateSceneMapPosition={updateSceneMapPosition}
+              onCreateSceneNote={createSceneNote}
+              onUpdateSceneNote={editSceneNote}
+              onRemoveSceneNote={deleteSceneNote}
               onOrganizeSceneMap={organizeSceneMapPositions}
               onUpdateSceneMapZoom={updateSceneMapZoom}
               sceneMapZoom={sceneMapView && sceneMapView.path === session?.path
@@ -3625,7 +3652,7 @@ function App(): React.ReactElement {
                   onUpdateEventStep={updateEventStep}
                   onUpdateSceneRouteTable={updateSceneRouteTable}
                   onUpdateMenuSliderItem={updateMenuSliderItem}
-                  presentation={eventsPresentation}
+                  presentation={getEventsPresentation()}
                   projectData={projectData ?? {}}
                   variables={session ? listProjectVariables(session.project.data) : []}
                   triggerLabel={triggerLabel}

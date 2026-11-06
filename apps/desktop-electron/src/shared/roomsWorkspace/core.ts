@@ -58,7 +58,6 @@ import {
 } from "../sceneTilemapContract.js";
 import { gbaVideoModeFromProject } from "../gbaVideoModes.js";
 import {
-  blockedCollisionCellsFromRoom,
   collisionTypeCellsFromRoom,
   isBlockedCollisionType,
   isRoomCollisionType,
@@ -2431,14 +2430,6 @@ export function selectRoomEntityAtTile(
   return null;
 }
 
-function collisionCount(room: Record<string, unknown>, width: number, height: number): number {
-  return collisionTypeCellsFromRoom(room, width, height).filter(isBlockedCollisionType).length;
-}
-
-function collisionCells(room: Record<string, unknown>, width: number, height: number): boolean[] {
-  return blockedCollisionCellsFromRoom(room, width, height);
-}
-
 function collisionTypes(room: Record<string, unknown>, width: number, height: number): RoomCollisionType[] {
   const sceneDocument = normalizeGBASceneDocument(room);
   return collisionTypeCellsFromRoom({ ...room, collisionTypes: sceneDocument.collisionTypes }, width, height);
@@ -2461,15 +2452,15 @@ function tileCells(room: Record<string, unknown>, width: number, height: number)
   });
 }
 
-function explicitTileIDs(room: Record<string, unknown>): number[] {
-  const tilemap = Array.isArray(room.tilemap) ? room.tilemap : [];
-  return tilemap.flatMap((value) => {
-    return typeof value === "number" && Number.isFinite(value) && value >= 0 ? [Math.floor(value)] : [];
-  });
-}
-
 function deriveTilePalette(rooms: Record<string, unknown>[]): number[] {
-  return Array.from(new Set([0, ...rooms.flatMap(explicitTileIDs)])).sort((lhs, rhs) => lhs - rhs);
+  const ids = new Set([0]);
+  for (const room of rooms) {
+    if (!Array.isArray(room.tilemap)) continue;
+    for (const value of room.tilemap) {
+      if (typeof value === "number" && Number.isFinite(value) && value >= 0) ids.add(Math.floor(value));
+    }
+  }
+  return [...ids].sort((lhs, rhs) => lhs - rhs);
 }
 
 function filledTileCells(cells: number[], width: number, startIndex: number, nextTileID: number): number[] {
@@ -2940,8 +2931,9 @@ function entityPresentation(
     && nullableString(room.playerActorName) === entityDocument.name
   ));
   const ownerRoom = rooms.find((room, roomIndex) => roomName(room, roomIndex) === resolvedRoomName);
-  const menuPixels = kind === "actor" && ownerRoom && normalizeGBASceneDocument(ownerRoom, 0).sceneType === "menu"
-    && isRecord(entity.menuPositionPixels) && Number.isFinite(entity.menuPositionPixels.x) && Number.isFinite(entity.menuPositionPixels.y)
+  const menuPixels = kind === "actor" && isRecord(entity.menuPositionPixels)
+    && Number.isFinite(entity.menuPositionPixels.x) && Number.isFinite(entity.menuPositionPixels.y)
+    && ownerRoom && normalizeGBASceneDocument(ownerRoom, 0).sceneType === "menu"
     ? entity.menuPositionPixels : null;
   const resolvedSpriteFrame = kind === "actor" ? spriteFrameForEntity(data, entity) : null;
   // Authored menu pixels locate the source frame's top-left, unlike a gameplay foot pivot.
@@ -4283,10 +4275,18 @@ export function setRoomCollisionTypeInProject(
   cellIndex: number,
   collisionType: RoomCollisionType
 ): GBAProjectData {
-  if (!isRoomCollisionType(collisionType)) return data;
+  return setRoomCollisionTypesInProject(data, roomIDToUpdate, [cellIndex], collisionType);
+}
 
-  const next = cloneProjectData(data);
-  const rooms = projectRooms(next);
+export function setRoomCollisionTypesInProject(
+  data: GBAProjectData,
+  roomIDToUpdate: string,
+  cellIndexes: readonly number[],
+  collisionType: RoomCollisionType
+): GBAProjectData {
+  if (!isRoomCollisionType(collisionType) || cellIndexes.length === 0) return data;
+
+  const rooms = projectRooms(data);
   const roomIndex = rooms.findIndex((room, index) => roomID(room, index) === roomIDToUpdate);
   if (roomIndex < 0) return data;
 
@@ -4294,25 +4294,26 @@ export function setRoomCollisionTypeInProject(
   const width = positiveInteger(room.width, 1);
   const height = positiveInteger(room.height, 1);
   const totalTiles = roomTileCount(width, height);
-  if (!Number.isInteger(cellIndex) || cellIndex < 0 || cellIndex >= totalTiles) {
-    return data;
-  }
-
   const types = collisionTypes(room, width, height);
-  const tilemapContract = resolveSceneTilemapContract(
-    typeof room.sceneType === "string" ? room.sceneType : null,
-    width,
-    height
-  );
-  const targetIndexes = sceneTilemapCellIndexesForCell(width, height, cellIndex, tilemapContract);
-  if (targetIndexes.every((index) => types[index] === collisionType)) return data;
+  const contract = resolveSceneTilemapContract(typeof room.sceneType === "string" ? room.sceneType : null, width, height);
+  let changed = false;
+  for (const cellIndex of cellIndexes) {
+    if (!Number.isInteger(cellIndex) || cellIndex < 0 || cellIndex >= totalTiles) continue;
+    for (const index of sceneTilemapCellIndexesForCell(width, height, cellIndex, contract)) {
+      if (types[index] === collisionType) continue;
+      types[index] = collisionType;
+      changed = true;
+    }
+  }
+  if (!changed) return data;
 
-  targetIndexes.forEach((index) => {
-    types[index] = collisionType;
-  });
-  room.collisionTypes = types;
+  const next = { ...data };
+  const nextRoom = { ...room, collisionTypes: types };
+  rooms[roomIndex] = nextRoom;
   setProjectRooms(next, rooms);
-  syncActiveRoomCollision(next, room, roomIndex);
+  if (roomMatchesKnownRoom(next.scena, nextRoom, roomIndex)) {
+    next.scena = { ...next.scena, collisionTypes: [...types] };
+  }
   return next;
 }
 
@@ -5180,10 +5181,12 @@ export function updateRoomEntityInProject(
     if (!roomNames.has(fields.roomName.trim())) return data;
   }
 
-  const next = cloneProjectData(data);
-  const nextEntities = projectRecords(next, collectionKey);
-  const entity = nextEntities[entityIndex];
-  if (!entity) return data;
+  // Actor renames can rewrite references elsewhere in the project.
+  const rewritesReferences = kind === "actor" && nextName !== undefined && nextName !== entities[entityIndex].name;
+  const next = rewritesReferences ? cloneProjectData(data) : { ...data };
+  const nextEntities = rewritesReferences ? projectRecords(next, collectionKey) : entities;
+  const entity = rewritesReferences ? nextEntities[entityIndex] : { ...nextEntities[entityIndex] };
+  nextEntities[entityIndex] = entity;
   if (nextName !== undefined && nextName !== entity.name) {
     if (kind === "actor") renameActorNameReferences(next, entity, nextName);
     entity.name = nextName;
@@ -5832,13 +5835,12 @@ export function createTriggerInProject(data: GBAProjectData, options: CreateTrig
   const id = options.id?.trim() || identity.id;
   const name = options.name?.trim() || identity.name;
 
-  const next = cloneProjectData(data);
-  const triggers = projectRecords(next, "triggers");
+  const triggers = projectRecords(data, "triggers");
   if (triggers.some((trigger, index) => (nullableString(trigger.id) ?? `trigger-${index + 1}`) === id)) {
     return data;
   }
 
-  next.triggers = [
+  return { ...data, triggers: [
     ...triggers,
     {
       eventName: options.eventName ?? "",
@@ -5850,8 +5852,7 @@ export function createTriggerInProject(data: GBAProjectData, options: CreateTrig
       x,
       y
     }
-  ];
-  return next;
+  ] };
 }
 
 export function resizeRoomTriggerToTileInProject(
@@ -5939,12 +5940,13 @@ export function deriveRoomsWorkspacePresentation(data: GBAProjectData): RoomsWor
       : projectActiveLayerMapping;
     const layeredPaintingEnabled = sceneTileLayerSupportsLayers(sceneType, videoMode.id);
     const fallbackTilemap = tileCells(sceneProjection, width, height);
+    const authoredTileLayers = layeredPaintingEnabled ? readSceneTileLayersFromRoom(sceneProjection) : [];
     const tileLayers = layeredPaintingEnabled
-      ? (readSceneTileLayersFromRoom(sceneProjection).length > 0
+      ? (authoredTileLayers.length > 0
         ? normalizeSceneTileLayers({
           fallbackTilemap,
           height,
-          layers: readSceneTileLayersFromRoom(sceneProjection),
+          layers: authoredTileLayers,
           sceneType,
           width
         })
@@ -5953,6 +5955,8 @@ export function deriveRoomsWorkspacePresentation(data: GBAProjectData): RoomsWor
     const composedTilemap = layeredPaintingEnabled
       ? composeSceneTilemap(tileLayers, width, height)
       : tileCells(room, width, height);
+    const roomCollisionTypes = collisionTypeCellsFromRoom(sceneProjection, width, height);
+    const roomCollisionCells = roomCollisionTypes.map(isBlockedCollisionType);
     const heightLevels = roomHeightLevels(room, width, height);
     const foregroundTileCount = tileLayers
       .find((layer) => layer.mapping === "BG1")
@@ -6076,9 +6080,9 @@ export function deriveRoomsWorkspacePresentation(data: GBAProjectData): RoomsWor
         paintedTileCount: layer.tilemap.filter((value) => value >= 0).length
       })),
       ...(isRecord(room.layerEditing) ? { layerEditing: normalizeRoomLayerEditing(room.layerEditing) } : {}),
-      collisionCount: collisionCount(sceneProjection, width, height),
-      collisionCells: collisionCells(sceneProjection, width, height),
-      collisionTypes: collisionTypes(sceneProjection, width, height),
+      collisionCount: roomCollisionCells.filter(Boolean).length,
+      collisionCells: roomCollisionCells,
+      collisionTypes: roomCollisionTypes,
       mapStates: roomMapStates(room),
       eventBindings: sceneDocument.eventBindings,
       heightLevels,

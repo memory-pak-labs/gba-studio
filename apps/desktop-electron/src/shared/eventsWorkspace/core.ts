@@ -2414,6 +2414,20 @@ const preferredStepSuggestionIDsByVerb = new Map<string, string>([
   ["set_variable", "command:variables.set_value"]
 ]);
 
+// Card titles describe the operation; the parameter summary carries its target,
+// amount or state. Library suggestions keep their specific choosing labels.
+const commandCardTitlesByVerb = new Map<string, string>([
+  ["call_procedure", "Chamar procedimento"],
+  ["add_variable", "Alterar variável"],
+  ["set_actor_active", "Definir ativação do ator"],
+  ["set_actor_collision_enabled", "Definir colisão do ator"],
+  ["set_actor_visible", "Definir visibilidade do ator"],
+  ["set_all_sprites_visible", "Definir visibilidade dos sprites"],
+  ["set_flag", "Definir flag"],
+  ["mute_audio_channel", "Definir silêncio do canal"],
+  ["luta_enable_alpha_counter", "Definir Alpha Counter"]
+]);
+
 function commandSuggestionRank(suggestion: EventsWorkspaceCommandSuggestion, command: string, verb: string): number {
   let rank = 0;
   if (suggestion.id === preferredStepSuggestionIDsByVerb.get(verb)) rank -= 100;
@@ -2515,9 +2529,8 @@ function commandInsightForStep(
 
   return {
     commandVerb: verb,
-    commandLabel: verb === "add_variable" && !["1", "-1"].includes(commandParts(command)[2] ?? "")
-      ? "Alterar variável"
-      : primarySuggestion?.label ?? definition?.title ?? review?.title ?? commandVerbLabel(verb),
+    commandLabel: commandCardTitlesByVerb.get(verb)
+      ?? primarySuggestion?.label ?? definition?.title ?? review?.title ?? commandVerbLabel(verb),
     commandCategory: primarySuggestion?.category ?? definition?.category ?? "Comando custom",
     commandSection: primarySuggestion?.section ?? definition?.section ?? null,
     commandBadge: integrationIssue && support.status === "native" ? "Parâmetros incompletos" : commandSuggestionBadge(command),

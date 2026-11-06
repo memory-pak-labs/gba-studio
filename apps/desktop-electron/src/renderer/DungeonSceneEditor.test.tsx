@@ -47,6 +47,19 @@ describe("Dungeon follows the scene editor view contract",()=>{
     p.onCollision.mockClear();v.rerender(<DungeonSceneEditor {...p} viewMode="map" mode="collision" locked/>);
     fireEvent.click(screen.getByRole("gridcell",{name:"Célula 2, 1 · passagem"}));expect(p.onCollision).not.toHaveBeenCalled();
   });
+  it("previews a continuous wall stroke and commits it as one edit", () => {
+    const p = props();
+    const room = { ...p.room, collisionCells: Array(9).fill(false) };
+    render(<DungeonSceneEditor {...p} room={room} viewMode="map" mode="collision" />);
+    const cells = screen.getAllByRole("gridcell");
+    fireEvent.pointerDown(cells[0]!, { button: 0, buttons: 1 });
+    fireEvent.pointerEnter(cells[2]!, { buttons: 1 });
+    expect(cells.slice(0, 3).every(cell => cell.classList.contains("wall"))).toBe(true);
+    expect(p.onCollision).not.toHaveBeenCalled();
+    fireEvent.pointerUp(window, { button: 0 });
+    expect(p.onCollision).toHaveBeenCalledExactlyOnceWith("dungeon", [0, 1, 2], "solid", expect.any(String));
+  });
+
   it("selects a newly drawn trigger so the next map click can move it",()=>{
     const p=props(),onCreateTrigger=vi.fn(()=>"new-area");
     const room={...p.room,collisionCells:Array(9).fill(false)};

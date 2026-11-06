@@ -1,5 +1,5 @@
 /** @vitest-environment happy-dom */
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, expect, it, vi } from "vitest";
 import { deriveEventsWorkspacePresentation, insertEventStepsInProject, updateEventFieldsInProject } from "../shared/eventsWorkspace.js";
@@ -27,7 +27,14 @@ it.each(["inspector", "workspace"])("persists bulk deactivation and duplication 
     onCreateBoundEventForTarget={vi.fn(() => null)} onRemoveEventTargetBinding={vi.fn()}
     onRemoveEventStep={vi.fn()} onRenameEvent={vi.fn()} onDuplicateEvent={vi.fn()}
     onExportEvent={vi.fn()} onRemoveEvent={vi.fn()} onRelayoutEventsGraph={vi.fn()}/>);
-  await user.click(screen.getByRole("button", { name: "Selecionar passos" }));
+  const toolbar = within(screen.getByRole("toolbar", { name: "Ações de passos" }));
+  expect(toolbar.getByRole("button", { name: "Adicionar evento" }).textContent).toBe("Adicionar");
+  expect(toolbar.getByRole("button", { name: "Modelos de script" }).textContent).toBe("Modelos");
+  const selectSteps = toolbar.getByRole("button", { name: "Selecionar passos" });
+  expect(selectSteps.textContent).toBe("");
+  expect(selectSteps.getAttribute("aria-pressed")).toBe("false");
+  await user.click(selectSteps);
+  expect(selectSteps.getAttribute("aria-pressed")).toBe("true");
   await user.click(screen.getByRole("checkbox", { name: "Selecionar passo 1" }));
   await user.click(screen.getByRole("checkbox", { name: "Selecionar passo 2" }));
   await user.click(screen.getByRole("button", { name: "Desativar 2 passos" }));

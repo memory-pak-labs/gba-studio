@@ -1,4 +1,15 @@
 /* Preserve authored canvas marker sizes and the existing typography cascade. */
+.scene-note input,
+.scene-note textarea,
+.scene-note select {
+  font-size: var(--studio-font-size-md);
+  font-weight: var(--studio-font-weight-regular);
+}
+
+.scene-note header input {
+  font-weight: var(--studio-font-weight-semibold);
+}
+
 .room-focus-map-camera > span,
 .room-focus-preview-drag > span,
 .room-focus-preview-tabs > button {

@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { readFileSync } from "node:fs";
 import {
   bindEventToTargetInProject,
   boundEventNameForTarget,
@@ -52,6 +53,73 @@ function graphNodesOverlap(nodes: Array<Pick<EventsWorkspaceGraphNode, "x" | "y"
 }
 
 describe("Events workspace presentation", () => {
+  it("does not repeat resource identifiers in titles across the library and canonical events", () => {
+    const project = JSON.parse(readFileSync("default-assets/templates/exemplo-gba/exemplo-gba.gba-project", "utf8")) as GBAProjectData;
+    const original = JSON.stringify(project);
+    const base = deriveEventsWorkspacePresentation(project);
+    const commands = base.commandPalette.filter(item => !item.isRecipe).map(item => item.command);
+    const presentation = deriveEventsWorkspacePresentation({ ...project, events: [
+      ...(project.events as Record<string, unknown>[]),
+      { name: "catalog_audit", steps: commands.map(command => ({ command, isEnabled: true })) }
+    ] });
+    const duplicates: string[] = [];
+    for (const event of presentation.groups.flatMap(group => group.events)) {
+      for (const step of event.steps) {
+        for (const parameter of step.commandParameters.filter(item => item.kind !== "value")) {
+          if (parameter.value.length >= 3 && step.commandLabel.includes(parameter.value)) {
+            duplicates.push(`${event.name}: ${step.command}: ${parameter.value}`);
+          }
+        }
+      }
+    }
+    expect(commands.length).toBeGreaterThan(200);
+    expect(duplicates).toEqual([]);
+    expect(JSON.stringify(project)).toBe(original);
+  });
+
+  it.each([
+    ["set_actor_active", "Nara", "Definir ativação do ator"],
+    ["set_actor_collision_enabled", "Nara", "Definir colisão do ator"],
+    ["set_actor_visible", "Nara", "Definir visibilidade do ator"],
+    ["set_all_sprites_visible", "", "Definir visibilidade dos sprites"],
+    ["set_flag", "quest_ready", "Definir flag"],
+    ["mute_audio_channel", "music", "Definir silêncio do canal"],
+    ["luta_enable_alpha_counter", "Nara", "Definir Alpha Counter"]
+  ])("keeps %s state only in the parameter summary", (verb, target, title) => {
+    const commands = [true, false].map(value => [verb, target, String(value)].filter(Boolean).join(" "));
+    const data = { events: [{ name: "states", steps: commands.map(command => ({ command, isEnabled: true })) }] };
+    const steps = deriveEventsWorkspacePresentation(data).groups.flatMap(group => group.events)[0]!.steps;
+    expect(steps.map(step => step.commandLabel)).toEqual([title, title]);
+    expect(steps.map(step => step.commandParameters.at(-1)?.value)).toEqual(["true", "false"]);
+    expect(steps.map(step => step.command)).toEqual(commands);
+  });
+
+  it("keeps resource names in parameters instead of repeating them in command titles", () => {
+    const routineName = "encore_epilogue_1_restore_boot";
+    const commands = [`call_procedure ${routineName} score 5`, "call_event restore_scene", "show_dialogue welcome_dialogue"];
+    const data: GBAProjectData = {
+      dialogues: [{ name: "welcome_dialogue", text: "Welcome" }],
+      events: [
+        { name: "room_boot", steps: commands.map(command => ({ command, isEnabled: true })) },
+        { name: "restore_scene", steps: [{ command: "noop", isEnabled: true }] },
+        { name: routineName, eventKind: "procedure", procedure: { parameters: [
+          { name: "target", type: "variable", defaultValue: "score" },
+          { name: "amount", type: "number", defaultValue: "5" }
+        ] }, steps: [{ command: "noop", isEnabled: true }] }
+      ]
+    };
+    const presentation = deriveEventsWorkspacePresentation(data);
+    const steps = presentation.groups.flatMap(group => group.events).find(event => event.name === "room_boot")!.steps;
+    expect(steps[0]!.commandLabel).toBe("Chamar procedimento");
+    for (const [index, resource] of [routineName, "restore_scene", "welcome_dialogue"].entries()) {
+      expect(steps[index]!.commandLabel).not.toContain(resource);
+      expect(steps[index]!.commandParameters.filter(parameter => parameter.value === resource)).toHaveLength(1);
+    }
+    expect(steps.map(step => step.command)).toEqual(commands);
+    // The library still distinguishes individual routines when choosing a call.
+    expect(presentation.commandPalette.find(item => item.id === `procedure:${routineName}`)?.label).toContain(routineName);
+  });
+
   it("keeps true and false flag labels correct after changing the authored flag name", () => {
     const commands = ["set_flag chave_coletada true", "set_flag chave_coletada false"];
     const data: GBAProjectData = { events: [{ name: "key", steps: commands.map(command => ({ command, isEnabled: true })) }] };
@@ -60,7 +128,7 @@ describe("Events workspace presentation", () => {
     expect(steps.map(step => step.command)).toEqual(commands);
   });
 
-  it("labels variable additions by their actual amount without changing the command", () => {
+  it("shows variable addition amounts only in parameters without changing the command", () => {
     const data: GBAProjectData = { events: [{ name: "counter", steps: [
       { command: "add_variable audit.score 1", isEnabled: true },
       { command: "add_variable audit.score -1", isEnabled: true },
@@ -68,8 +136,10 @@ describe("Events workspace presentation", () => {
     ] }] };
     const steps = deriveEventsWorkspacePresentation(data).groups.flatMap((group) => group.events)[0]!.steps;
     expect(steps.map((step) => step.commandLabel)).toEqual([
-      "Incremento de 1 à variável", "Decréscimo de 1 à variável", "Alterar variável"
+      "Alterar variável", "Alterar variável", "Alterar variável"
     ]);
+    expect(steps.map(step => step.commandParameters.find(parameter => parameter.tokenIndex === 2)?.value))
+      .toEqual(["1", "-1", "5"]);
     expect(steps.map((step) => step.command)).toEqual([
       "add_variable audit.score 1", "add_variable audit.score -1", "add_variable audit.score 5"
     ]);

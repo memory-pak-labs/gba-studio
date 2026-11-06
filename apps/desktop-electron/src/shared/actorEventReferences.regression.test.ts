@@ -29,7 +29,7 @@ describe("actor event references with spaces", () => {
     expect(parseEventInstruction(command).operands).toEqual(["Actor 2", "false"]);
     const step = deriveEventsWorkspacePresentation(data).groups.flatMap(group => group.events).find(event => event.name === "ev")!.steps[0]!;
     expect(step.commandParameters.map(p => p.value)).toEqual(["Actor 2", "false"]);
-    expect(step.commandLabel).toBe("Ocultar ator");
+    expect(step.commandLabel).toBe("Definir visibilidade do ator");
     const preview = runPreviewRuntimeEvent(createPreviewRuntime(data), "ev");
     expect(preview.actors.find(actor => actor.name === "Actor 2")?.visible).toBe(false);
     expect(preview.actors.find(actor => actor.name === "Outro")?.visible).toBe(true);
@@ -43,7 +43,7 @@ describe("actor event references with spaces", () => {
     const data = project("set_actor_visible Actor 2 false");
     const step = deriveEventsWorkspacePresentation(data).groups.flatMap(group => group.events).find(event => event.name === "ev")!.steps[0]!;
     expect(step.commandParameters.map(p => p.value)).toEqual(["Actor 2", "false"]);
-    expect(step.commandLabel).toBe("Ocultar ator");
+    expect(step.commandLabel).toBe("Definir visibilidade do ator");
     const preview = runPreviewRuntimeEvent(createPreviewRuntime(data), "ev");
     expect(preview.actors.find(actor => actor.name === "Actor 2")?.visible).toBe(false);
     expect(preview.actors.find(actor => actor.name === "Outro")?.visible).toBe(true);

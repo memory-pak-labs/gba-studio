@@ -22,7 +22,9 @@ it("preserves the actor name and hide action when choosing a name with spaces", 
     onCreateBoundEventForTarget={vi.fn(() => null)} onRemoveEventTargetBinding={vi.fn()} onRemoveEventStep={vi.fn()}
     onRenameEvent={vi.fn()} onDuplicateEvent={vi.fn()} onExportEvent={vi.fn()} onRemoveEvent={vi.fn()} onRelayoutEventsGraph={vi.fn()}
   />);
-  await user.click(screen.getByRole("button", { name: "Passo 1: Ocultar ator" }));
+  const card = screen.getByRole("button", { name: "Passo 1: Definir visibilidade do ator" });
+  expect(card).toHaveTextContent("Visível: false");
+  await user.click(card);
   await user.selectOptions(screen.getByLabelText("Ator do evento"), "Actor 2");
   expect(onUpdateEventStep).toHaveBeenCalledWith("ev", 0, { command: 'set_actor_visible "Actor 2" false' });
 });
@@ -43,7 +45,9 @@ it("preserves a legacy actor reference when editing another parameter", async ()
     onCreateBoundEventForTarget={vi.fn(() => null)} onRemoveEventTargetBinding={vi.fn()} onRemoveEventStep={vi.fn()}
     onRenameEvent={vi.fn()} onDuplicateEvent={vi.fn()} onExportEvent={vi.fn()} onRemoveEvent={vi.fn()} onRelayoutEventsGraph={vi.fn()}
   />);
-  await user.click(screen.getByRole("button", { name: "Passo 1: Ocultar ator" }));
+  const card = screen.getByRole("button", { name: "Passo 1: Definir visibilidade do ator" });
+  expect(card).toHaveTextContent("Visível: false");
+  await user.click(card);
   fireEvent.change(screen.getByDisplayValue("false"), { target: { value: "true" } });
   expect(onUpdateEventStep).toHaveBeenCalledWith("ev", 0, { command: 'set_actor_visible "Actor 2" true' });
 });
