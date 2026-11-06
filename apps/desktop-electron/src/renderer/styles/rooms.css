@@ -6248,10 +6248,9 @@ body.room-scene-map-card-dragging .room-stage-card-frame.is-dragging {
   padding: 7px 8px;
 }
 
-.room-stage-cell.collision-rectangle-preview::after {
+.room-stage-collision-rectangle-gesture {
   border: 2px solid var(--studio-color-accent);
   box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.7);
-  content: "";
   inset: 1px;
   pointer-events: none;
   position: absolute;
@@ -6463,6 +6462,23 @@ body.room-scene-map-card-dragging .room-stage-card-frame.is-dragging {
   box-shadow: inset 0 0 0 2px rgba(255, 196, 64, 0.85);
   pointer-events: none;
   z-index: 4;
+}
+
+.room-stage-trigger-gesture {
+  position: absolute;
+}
+
+.room-stage-collision-hover {
+  display: none;
+}
+
+.room-stage-cell:hover > .room-stage-collision-hover {
+  display: block;
+}
+
+.room-stage-cell:hover:has(> .room-stage-collision-hover) > [data-collision-overlay],
+.room-stage-cell:has(> .room-stage-collision-gesture) > :is([data-collision-overlay], .room-stage-collision-hover) {
+  display: none;
 }
 
 .connection-zone-placement-preview {

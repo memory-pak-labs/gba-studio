@@ -4256,10 +4256,18 @@ export function setRoomCollisionTypeInProject(
   cellIndex: number,
   collisionType: RoomCollisionType
 ): GBAProjectData {
-  if (!isRoomCollisionType(collisionType)) return data;
+  return setRoomCollisionTypesInProject(data, roomIDToUpdate, [cellIndex], collisionType);
+}
 
-  const next = cloneProjectData(data);
-  const rooms = projectRooms(next);
+export function setRoomCollisionTypesInProject(
+  data: GBAProjectData,
+  roomIDToUpdate: string,
+  cellIndexes: readonly number[],
+  collisionType: RoomCollisionType
+): GBAProjectData {
+  if (!isRoomCollisionType(collisionType) || cellIndexes.length === 0) return data;
+
+  const rooms = projectRooms(data);
   const roomIndex = rooms.findIndex((room, index) => roomID(room, index) === roomIDToUpdate);
   if (roomIndex < 0) return data;
 
@@ -4267,25 +4275,26 @@ export function setRoomCollisionTypeInProject(
   const width = positiveInteger(room.width, 1);
   const height = positiveInteger(room.height, 1);
   const totalTiles = roomTileCount(width, height);
-  if (!Number.isInteger(cellIndex) || cellIndex < 0 || cellIndex >= totalTiles) {
-    return data;
-  }
-
   const types = collisionTypes(room, width, height);
-  const tilemapContract = resolveSceneTilemapContract(
-    typeof room.sceneType === "string" ? room.sceneType : null,
-    width,
-    height
-  );
-  const targetIndexes = sceneTilemapCellIndexesForCell(width, height, cellIndex, tilemapContract);
-  if (targetIndexes.every((index) => types[index] === collisionType)) return data;
+  const contract = resolveSceneTilemapContract(typeof room.sceneType === "string" ? room.sceneType : null, width, height);
+  let changed = false;
+  for (const cellIndex of cellIndexes) {
+    if (!Number.isInteger(cellIndex) || cellIndex < 0 || cellIndex >= totalTiles) continue;
+    for (const index of sceneTilemapCellIndexesForCell(width, height, cellIndex, contract)) {
+      if (types[index] === collisionType) continue;
+      types[index] = collisionType;
+      changed = true;
+    }
+  }
+  if (!changed) return data;
 
-  targetIndexes.forEach((index) => {
-    types[index] = collisionType;
-  });
-  room.collisionTypes = types;
+  const next = { ...data };
+  const nextRoom = { ...room, collisionTypes: types };
+  rooms[roomIndex] = nextRoom;
   setProjectRooms(next, rooms);
-  syncActiveRoomCollision(next, room, roomIndex);
+  if (roomMatchesKnownRoom(next.scena, nextRoom, roomIndex)) {
+    next.scena = { ...next.scena, collisionTypes: [...types] };
+  }
   return next;
 }
 
@@ -4753,10 +4762,12 @@ export function updateRoomEntityInProject(
     if (!roomNames.has(fields.roomName.trim())) return data;
   }
 
-  const next = cloneProjectData(data);
-  const nextEntities = projectRecords(next, collectionKey);
-  const entity = nextEntities[entityIndex];
-  if (!entity) return data;
+  // Actor renames can rewrite references elsewhere in the project.
+  const rewritesReferences = kind === "actor" && nextName !== undefined && nextName !== entities[entityIndex].name;
+  const next = rewritesReferences ? cloneProjectData(data) : { ...data };
+  const nextEntities = rewritesReferences ? projectRecords(next, collectionKey) : entities;
+  const entity = rewritesReferences ? nextEntities[entityIndex] : { ...nextEntities[entityIndex] };
+  nextEntities[entityIndex] = entity;
   if (nextName !== undefined && nextName !== entity.name) {
     if (kind === "actor") renameActorNameReferences(next, entity, nextName);
     entity.name = nextName;
@@ -5276,13 +5287,12 @@ export function createTriggerInProject(data: GBAProjectData, options: CreateTrig
   const id = options.id?.trim() || identity.id;
   const name = options.name?.trim() || identity.name;
 
-  const next = cloneProjectData(data);
-  const triggers = projectRecords(next, "triggers");
+  const triggers = projectRecords(data, "triggers");
   if (triggers.some((trigger, index) => (nullableString(trigger.id) ?? `trigger-${index + 1}`) === id)) {
     return data;
   }
 
-  next.triggers = [
+  return { ...data, triggers: [
     ...triggers,
     {
       eventName: options.eventName ?? "",
@@ -5294,8 +5304,7 @@ export function createTriggerInProject(data: GBAProjectData, options: CreateTrig
       x,
       y
     }
-  ];
-  return next;
+  ] };
 }
 
 export function resizeRoomTriggerToTileInProject(

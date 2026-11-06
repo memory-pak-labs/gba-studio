@@ -177,6 +177,7 @@ import {
   composeVisibleRoomTileCells,
   roomEntitySelectionFootprint,
   selectRoomEntityAtTile,
+  roomCellLineIndexes,
   isometricRoomAreaPlacement,
   isometricRoomTilePlacement,
   defaultRoomConnectionEntryArea,
@@ -321,7 +322,9 @@ let sceneMapCardDragPendingPointer = { x: 0, y: 0 };
 let roomCanvasHistorySequence = 0;
 
 interface RoomEntityPointerDrag {
-  captureTarget: HTMLButtonElement;
+  captureTarget: HTMLElement;
+  startCellIndex: number | null;
+  size?: { width: number; height: number };
   entityID: string;
   entityKey: string;
   frameRequest: number | null;
@@ -336,6 +339,20 @@ interface RoomEntityPointerDrag {
   previewX: number;
   previewY: number;
   visual: ReturnType<typeof createRoomEntityDragPreview> | null;
+}
+
+interface RoomGridGesture {
+  kind: "brush" | "rectangle" | "trigger";
+  canvas: HTMLElement;
+  pointerID: number;
+  button: number;
+  start: number;
+  last: number;
+  startClientX: number;
+  startClientY: number;
+  collisionType: RoomCollisionType;
+  cells: NodeListOf<HTMLElement>;
+  preview: Map<number, HTMLElement | null>;
 }
 
 function invokeHistoryAware<Result>(
@@ -376,7 +393,7 @@ interface RoomsWorkspaceProps {
   onApplyTileBrush(roomID: string, options: RoomTileBrushOptions, historyGroupID?: string): void;
   onSetActiveTileLayerMapping(mapping: string): void;
   onToggleCollisionCell(roomID: string, cellIndex: number): void;
-  onSetCollisionType(roomID: string, cellIndex: number, collisionType: RoomCollisionType, historyGroupID?: string): void;
+  onSetCollisionType(roomID: string, cells: number | readonly number[], collisionType: RoomCollisionType, historyGroupID?: string): void;
   onApplyCollisionFill(roomID: string, cellIndex: number, collisionType: RoomCollisionType, historyGroupID?: string): void;
   onSetHeightLevel(roomID: string, cellIndex: number, heightLevel: number, historyGroupID?: string): void;
   onCreateRoomConnection(fromName: string, toName: string, eventName: string): number | null | void;
@@ -5530,6 +5547,7 @@ interface RoomTilemapEditorProps {
   canvasGridVisible?: boolean;
   selectedCanvasCellIndex?: number | null;
   visibleTileCells?: number[];
+  readOnlyPreview?: boolean;
   racingMapView?: boolean;
   onRacingMapViewChange?: (open:boolean)=>void;
 }
@@ -5611,6 +5629,7 @@ function RoomTilemapEditor({
   canvasGridVisible,
   selectedCanvasCellIndex = null,
   visibleTileCells,
+  readOnlyPreview = false,
   racingMapView,
   onRacingMapViewChange
 }: RoomTilemapEditorProps): React.ReactElement {
@@ -5636,25 +5655,19 @@ function RoomTilemapEditor({
   const [localRacingMapOpen, setLocalRacingMapOpen] = useState(false);
   const racingTechnicalMapOpen = racingMapView ?? localRacingMapOpen;
   const setRacingTechnicalMapOpen = onRacingMapViewChange ?? setLocalRacingMapOpen;
-  const [collisionPaintType, setCollisionPaintType] = useState<RoomCollisionType | null>(null);
-  const [collisionPlacementStart, setCollisionPlacementStart] = useState<number | null>(null);
-  const [collisionPlacementEnd, setCollisionPlacementEnd] = useState<number | null>(null);
   const [backgroundPreviewError, setBackgroundPreviewError] = useState(false);
   const [hoverCellIndex, setHoverCellIndex] = useState<number | null>(null);
-  const [triggerPlacementStart, setTriggerPlacementStart] = useState<number | null>(null);
-  const [triggerPlacementEnd, setTriggerPlacementEnd] = useState<number | null>(null);
   const [connectionZonePlacementStart, setConnectionZonePlacementStart] = useState<number | null>(null);
   const [connectionZonePlacementEnd, setConnectionZonePlacementEnd] = useState<number | null>(null);
   const [cameraZonePlacementStart, setCameraZonePlacementStart] = useState<number | null>(null);
   const [cameraZonePlacementEnd, setCameraZonePlacementEnd] = useState<number | null>(null);
-  const collisionPaintTypeRef = useRef<RoomCollisionType | null>(null);
+  const gridGesture = useRef<RoomGridGesture | null>(null);
+  const collisionHover = useRef<HTMLElement | null>(null);
   const entityPointerDrag = useRef<RoomEntityPointerDrag | null>(null);
   const pendingEmptySceneSelection = useRef<{ pointerID: number; startCellIndex: number; moved: boolean } | null>(null);
-  const entityResizePointer = useRef<string | null>(null);
   const pendingEntitySelection = useRef<string[] | null>(null);
   const lastPaintCellIndex = useRef<number | null>(null);
   const canvasHistoryGroupID = useRef<string | null>(null);
-  const collisionErasePointer = useRef(false);
   const canvasEntities = entities.filter((entity) => canvasLayerVisibility[entity.kind === "actor" ? "actors" : "triggers"]);
   const arrivalPreviewReplacesPlayer = isFocusedSceneEditor
     && activeArrivalPreviewLinkID !== null
@@ -5678,8 +5691,10 @@ function RoomTilemapEditor({
     return !(menuPreviewScreen?.carousel || menuConfig.carousel || actor?.menuActorSelectedOnly === true) || actor?.menuActorRole !== "option" || actor.menuItemID === menuPreviewItemID;
   });
   const canvasVisibleEntityKeys = new Set(canvasDisplayEntities.map((entity) => entityKey(entity)));
-  const overlayCells = deriveRoomTileOverlayCells(room, canvasDisplayEntities);
-  const selectedEntityCells = deriveRoomSelectedEntityCells(room, canvasDisplayEntities, selectedEntityKeys);
+  // Full-image backgrounds are already rendered as one layer in the inert GBA preview.
+  const skipPreviewGrid = readOnlyPreview && room.gbStudioUseBackgroundLayout && room.sceneType !== "isometric";
+  const overlayCells = skipPreviewGrid ? [] : deriveRoomTileOverlayCells(room, canvasDisplayEntities);
+  const selectedEntityCells = skipPreviewGrid ? [] : deriveRoomSelectedEntityCells(room, canvasDisplayEntities, selectedEntityKeys);
   const selectedEntityKey = selectedEntityKeys.at(-1) ?? null;
   const selectedEntity = entities.find((entity) => entityKey(entity) === selectedEntityKey) ?? null;
   const selectedTrigger = selectedEntity?.kind === "trigger" ? selectedEntity : null;
@@ -5799,54 +5814,97 @@ function RoomTilemapEditor({
     setSelectedTileStamp(stamp);
   }
 
-  function resetTriggerPlacement(): void {
-    setTriggerPlacementStart(null);
-    setTriggerPlacementEnd(null);
+  function updateGridGesture(cellIndex: number): void {
+    const gesture = gridGesture.current;
+    if (!gesture) return;
+
+    const { start, last, kind, collisionType, preview, cells } = gesture;
+    gesture.last = cellIndex;
+    if (kind === "trigger") {
+      const rect = deriveTriggerPlacementFromCells(room.width, start, cellIndex);
+      const overlay = preview.get(start) ?? gesture.canvas.appendChild(document.createElement("span"));
+      overlay.className = "room-stage-trigger-gesture trigger-placement-preview";
+      overlay.setAttribute("aria-hidden", "true");
+      Object.assign(overlay.style, roomConnectionAreaStyle(room, rect));
+      preview.set(start, overlay);
+      return;
+    }
+
+    const indexes = kind === "brush"
+      ? roomCellLineIndexes(room.width, last, cellIndex).flatMap(index =>
+        sceneTilemapCellIndexesForCell(room.width, room.height, index, room.tilemapContract)
+      )
+      : sceneTilemapCellIndexesForRectangle(room.width, room.height, start, cellIndex, room.tilemapContract);
+    if (kind === "rectangle") {
+      const next = new Set(indexes);
+      for (const [index, overlay] of preview) {
+        if (next.has(index)) continue;
+        overlay?.remove();
+        preview.delete(index);
+      }
+    }
+
+    for (const index of indexes) {
+      if (preview.has(index) || !cells[index]) continue;
+      if (kind === "brush" && (!collisionOverlayVisible || (overlayCells[index]?.collisionType ?? "free") === collisionType)) {
+        preview.set(index, null);
+        continue;
+      }
+      const overlay = document.createElement("span");
+      overlay.setAttribute("aria-hidden", "true");
+      overlay.className = kind === "brush"
+        ? `room-stage-collision-gesture ${collisionOverlayClass(collisionType)}`
+        : "room-stage-collision-rectangle-gesture collision-rectangle-preview";
+      cells[index].append(overlay);
+      preview.set(index, overlay);
+    }
   }
 
-  function resetCollisionPlacement(): void {
-    setCollisionPlacementStart(null);
-    setCollisionPlacementEnd(null);
+  function finishGridGesture(commit: boolean): void {
+    const gesture = gridGesture.current;
+    if (!gesture) return;
+    gridGesture.current = null;
+    for (const overlay of gesture.preview.values()) overlay?.remove();
+    if (gesture.canvas.hasPointerCapture(gesture.pointerID)) gesture.canvas.releasePointerCapture(gesture.pointerID);
+    if (!commit) return;
+    onSelectCanvasCell(room.id, gesture.start);
+    const historyGroupID = canvasHistoryGroupID.current ?? undefined;
+    if (gesture.kind === "trigger") {
+      const rect = deriveTriggerPlacementFromCells(room.width, gesture.start, gesture.last);
+      const created = invokeHistoryAware(onCreateTrigger, [{ ...rect, roomID: room.id }], historyGroupID);
+      if (created) setSelectedEntityKeys([`trigger:${created}`]);
+    } else if (gesture.kind === "rectangle") {
+      invokeHistoryAware(onApplyCollisionRectangle, [room.id, gesture.start, gesture.last, gesture.collisionType], historyGroupID);
+    } else {
+      invokeHistoryAware(onSetCollisionType, [room.id, [...gesture.preview.keys()], gesture.collisionType], historyGroupID);
+    }
+  }
+
+  function beginGridGesture(event: React.PointerEvent<HTMLButtonElement>, cellIndex: number, kind: RoomGridGesture["kind"]): void {
+    const canvas = event.currentTarget.closest<HTMLElement>(".room-stage-card-canvas");
+    if (!canvas) return;
+    gridGesture.current = {
+      kind, canvas, pointerID: event.pointerId, button: event.button, start: cellIndex, last: cellIndex,
+      startClientX: event.clientX, startClientY: event.clientY,
+      collisionType: event.button === 2 ? "free" : selectedCollisionType,
+      cells: canvas.querySelectorAll(".room-stage-cell"), preview: new Map()
+    };
+    collisionHover.current?.remove();
+    canvas.setPointerCapture(event.pointerId);
+    updateGridGesture(cellIndex);
   }
 
   useEffect(() => {
-    if (!collisionRectanglePlacementActive) resetCollisionPlacement();
-    if (!triggerPlacementActive || canvasLayerLocks.triggers) resetTriggerPlacement();
+    const gesture = gridGesture.current;
+    if (gesture && (gesture.kind === "trigger" ? !triggerPlacementActive || canvasLayerLocks.triggers
+      : selectedEditMode !== "collision" || canvasLayerLocks.collision)) {
+      finishGridGesture(false);
+      endCanvasHistoryGroup();
+    }
     if (!connectionZonePlacementActive) resetConnectionZonePlacement();
     if (!cameraZonePlacementActive) resetCameraZonePlacement();
-  }, [
-    cameraZonePlacementActive,
-    canvasLayerLocks.triggers,
-    collisionRectanglePlacementActive,
-    connectionZonePlacementActive,
-    triggerPlacementActive
-  ]);
-
-  function isCollisionPlacementCell(index: number): boolean {
-    if (collisionPlacementStart === null || collisionPlacementEnd === null) return false;
-    return sceneTilemapCellIndexesForRectangle(
-      room.width,
-      room.height,
-      collisionPlacementStart,
-      collisionPlacementEnd,
-      room.tilemapContract
-    ).includes(index);
-  }
-
-  function finalizeCollisionPlacement(endCellIndex: number): void {
-    if (collisionPlacementStart === null || canvasLayerLocks.collision) return;
-    invokeHistoryAware(
-      onApplyCollisionRectangle,
-      [
-        room.id,
-        collisionPlacementStart,
-        endCellIndex,
-        collisionErasePointer.current ? "free" : selectedCollisionType
-      ],
-      canvasHistoryGroupID.current ?? undefined
-    );
-    resetCollisionPlacement();
-  }
+  }, [cameraZonePlacementActive, canvasLayerLocks.collision, canvasLayerLocks.triggers,
+    connectionZonePlacementActive, selectedEditMode, triggerPlacementActive]);
 
   function resetConnectionZonePlacement(): void {
     setConnectionZonePlacementStart(null);
@@ -5914,30 +5972,6 @@ function RoomTilemapEditor({
     resetConnectionZonePlacement();
   }
 
-  function isTriggerPlacementCell(index: number): boolean {
-    if (triggerPlacementStart === null || triggerPlacementEnd === null) return false;
-    const rect = deriveTriggerPlacementFromCells(room.width, triggerPlacementStart, triggerPlacementEnd);
-    const x = index % room.width;
-    const y = Math.floor(index / room.width);
-    return x >= rect.x && x < rect.x + rect.width && y >= rect.y && y < rect.y + rect.height;
-  }
-
-  function finalizeTriggerPlacement(endCellIndex: number): void {
-    if (triggerPlacementStart === null || canvasLayerLocks.triggers) return;
-    const rect = deriveTriggerPlacementFromCells(room.width, triggerPlacementStart, endCellIndex);
-    const createdTriggerID = invokeHistoryAware(onCreateTrigger, [{
-      height: rect.height,
-      roomID: room.id,
-      width: rect.width,
-      x: rect.x,
-      y: rect.y
-    }], canvasHistoryGroupID.current ?? undefined);
-    resetTriggerPlacement();
-    if (createdTriggerID) {
-      setSelectedEntityKeys([`trigger:${createdTriggerID}`]);
-    }
-  }
-
   function roomTileFromStagePointer(event: React.PointerEvent<HTMLElement>): { x: number; y: number } | null {
     const canvas = event.currentTarget.closest(".room-stage-card-canvas");
     if (!(canvas instanceof HTMLElement)) return null;
@@ -5975,13 +6009,15 @@ function RoomTilemapEditor({
     const canvas = drag.captureTarget.closest<HTMLElement>(".room-stage-card-canvas");
     if (!canvas) return;
     drag.visual ??= createRoomEntityDragPreview(canvas, drag.entityKey,
-      deriveRoomSelectedEntityCells(room, canvasDisplayEntities.filter(candidate => entityKey(candidate) !== drag.entityKey), selectedEntityKeys));
-    const preview = { ...entity, x: drag.previewX, y: drag.previewY,
+      deriveRoomSelectedEntityCells(room, canvasDisplayEntities.filter(candidate => entityKey(candidate) !== drag.entityKey), pendingEntitySelection.current ?? selectedEntityKeys),
+      drag.size ? drag.captureTarget : undefined);
+    const preview = { ...entity, ...drag.size, x: drag.previewX, y: drag.previewY,
       ...(room.sceneType === "isometric" && entity.kind === "actor" ? {
         z: room.heightLevels?.[drag.previewY * room.width + drag.previewX] ?? 0
       } : {}) };
     drag.visual.paint(roomEntityStyle(room, preview, null, spriteImageSizes), roomEntityHitboxStyle(room, preview),
-      roomEntitySelectionFootprint(preview, room.sceneType), room.width, room.height);
+      roomEntitySelectionFootprint(preview, room.sceneType), room.width, room.height,
+      drag.size ? entityResizeHandleStyle(preview) : undefined);
   }
 
   // Loading a sprite or changing another control can render during a gesture.
@@ -5990,6 +6026,8 @@ function RoomTilemapEditor({
     const drag = entityPointerDrag.current;
     if (drag?.frameRequest !== null && drag?.frameRequest !== undefined) cancelAnimationFrame(drag.frameRequest);
     drag?.visual?.restore();
+    for (const overlay of gridGesture.current?.preview.values() ?? []) overlay?.remove();
+    endCanvasHistoryGroup();
   }, []);
 
   function previewEntityDragAtTile(tile: { x: number; y: number }): void {
@@ -5997,10 +6035,19 @@ function RoomTilemapEditor({
     if (!drag) return;
     const entity = canvasEntities.find((candidate) => entityKey(candidate) === drag.entityKey);
     if (!entity) return;
+    const footprint = roomEntitySelectionFootprint(entity, room.sceneType);
+    if (drag.size) {
+      const width = Math.max(1, Math.min(room.width - footprint.x, entity.width + tile.x - drag.offsetX));
+      const height = Math.max(1, Math.min(room.height - footprint.y, entity.height + tile.y - drag.offsetY));
+      if (width === drag.size.width && height === drag.size.height) return;
+      drag.size = { width, height };
+      scheduleEntityDragPreview();
+      return;
+    }
     const maxX = Math.max(0, room.width - (entity.kind === "trigger" ? entity.width : 1));
     const maxY = Math.max(0, room.height - (entity.kind === "trigger" ? entity.height : 1));
-    const nextX = Math.max(0, Math.min(maxX, Math.floor(entity.x + tile.x - drag.offsetX - roomEntitySelectionFootprint(entity, room.sceneType).x)));
-    const nextY = Math.max(0, Math.min(maxY, Math.floor(entity.y + tile.y - drag.offsetY - roomEntitySelectionFootprint(entity, room.sceneType).y)));
+    const nextX = Math.max(0, Math.min(maxX, Math.floor(entity.x + tile.x - drag.offsetX - footprint.x)));
+    const nextY = Math.max(0, Math.min(maxY, Math.floor(entity.y + tile.y - drag.offsetY - footprint.y)));
     if (nextX === drag.previewX && nextY === drag.previewY) return;
     drag.previewX = nextX;
     drag.previewY = nextY;
@@ -6033,42 +6080,32 @@ function RoomTilemapEditor({
 
   function startEntityResize(event: React.PointerEvent<HTMLSpanElement>, entity: RoomsWorkspaceEntity): void {
     const layer = entity.kind === "actor" ? "actors" : "triggers";
-    if (canvasLayerLocks[layer] || !canvasLayerVisibility[layer]) return;
+    if (event.button !== 0 || entityPointerDrag.current || canvasLayerLocks[layer] || !canvasLayerVisibility[layer]) return;
+    const tile = roomTileFromStagePointer(event);
+    if (!tile) return;
     event.preventDefault();
     event.stopPropagation();
     beginCanvasHistoryGroup();
-    setSelectedEntityKeys([entityKey(entity)]);
-    entityResizePointer.current = entityKey(entity);
+    entityPointerDrag.current = {
+      captureTarget: event.currentTarget,
+      entityID: entity.id,
+      entityKey: entityKey(entity),
+      frameRequest: null,
+      kind: entity.kind,
+      offsetX: tile.x,
+      offsetY: tile.y,
+      originX: entity.x,
+      originY: entity.y,
+      pointerID: event.pointerId,
+      previewX: entity.x,
+      previewY: entity.y,
+      size: { width: entity.width, height: entity.height },
+      startCellIndex: null,
+      startClientX: event.clientX,
+      startClientY: event.clientY,
+      visual: null
+    };
     event.currentTarget.setPointerCapture(event.pointerId);
-    const tile = roomTileFromStagePointer(event);
-    if (tile) {
-      const footprint = roomEntitySelectionFootprint(entity, room.sceneType);
-      invokeHistoryAware(onUpdateRoomEntity, [entity.kind, entity.id, {
-        height: Math.max(1, tile.y - footprint.y + 1),
-        width: Math.max(1, tile.x - footprint.x + 1)
-      }], canvasHistoryGroupID.current ?? undefined);
-    }
-  }
-
-  function continueEntityResize(event: React.PointerEvent<HTMLSpanElement>, entity: RoomsWorkspaceEntity): void {
-    if (entityResizePointer.current !== entityKey(entity) || event.buttons !== 1) return;
-    event.preventDefault();
-    event.stopPropagation();
-    const tile = roomTileFromStagePointer(event);
-    if (!tile || canvasLayerLocks[entity.kind === "actor" ? "actors" : "triggers"]) return;
-    const footprint = roomEntitySelectionFootprint(entity, room.sceneType);
-    invokeHistoryAware(onUpdateRoomEntity, [entity.kind, entity.id, {
-      height: Math.max(1, tile.y - footprint.y + 1),
-      width: Math.max(1, tile.x - footprint.x + 1)
-    }], canvasHistoryGroupID.current ?? undefined);
-  }
-
-  function endEntityResize(event: React.PointerEvent<HTMLSpanElement>): void {
-    event.preventDefault();
-    event.stopPropagation();
-    entityResizePointer.current = null;
-    if (event.currentTarget.hasPointerCapture(event.pointerId)) event.currentTarget.releasePointerCapture(event.pointerId);
-    endCanvasHistoryGroup();
   }
 
   function executeCanvasAction(action: RoomCanvasAction, historyGroupID = canvasHistoryGroupID.current ?? undefined): void {
@@ -6134,11 +6171,6 @@ function RoomTilemapEditor({
     invokeHistoryAware(onPlaceRoomEntity, [action.kind, action.entityID, action.options], historyGroupID);
   }
 
-  function setActiveCollisionPaintType(value: RoomCollisionType | null): void {
-    collisionPaintTypeRef.current = value;
-    setCollisionPaintType(value);
-  }
-
   function finishEntityPointerInteraction(commit = false): void {
     const drag = entityPointerDrag.current;
     const pendingSelection = pendingEntitySelection.current;
@@ -6147,21 +6179,28 @@ function RoomTilemapEditor({
       cancelAnimationFrame(drag.frameRequest);
     }
     drag?.visual?.restore();
-    if (drag && commit && (drag.previewX !== drag.originX || drag.previewY !== drag.originY)) {
+    if (drag && commit) {
       const layer = drag.kind === "actor" ? "actors" : "triggers";
+      const historyGroupID = canvasHistoryGroupID.current ?? undefined;
+      if (drag.startCellIndex !== null) onSelectCanvasCell(room.id, drag.startCellIndex);
       if (!canvasLayerLocks[layer]) {
-        invokeHistoryAware(onPlaceRoomEntity, [drag.kind, drag.entityID, {
-          roomID: room.id,
-          x: drag.previewX,
-          y: drag.previewY
-        }], canvasHistoryGroupID.current ?? undefined);
+        const entity = canvasEntities.find(candidate => entityKey(candidate) === drag.entityKey);
+        if (drag.size && entity && (entity.width !== drag.size.width || entity.height !== drag.size.height)) {
+          invokeHistoryAware(onUpdateRoomEntity, [drag.kind, drag.entityID, drag.size], historyGroupID);
+        } else if (!drag.size && (drag.previewX !== drag.originX || drag.previewY !== drag.originY)) {
+          invokeHistoryAware(onPlaceRoomEntity, [drag.kind, drag.entityID, {
+            roomID: room.id,
+            x: drag.previewX,
+            y: drag.previewY
+          }], historyGroupID);
+        }
       }
     }
     entityPointerDrag.current = null;
     if (drag?.captureTarget.hasPointerCapture(drag.pointerID)) {
       drag.captureTarget.releasePointerCapture(drag.pointerID);
     }
-    if (pendingSelection) {
+    if (commit && pendingSelection) {
       setSelectedEntityKeys(pendingSelection);
     }
   }
@@ -6172,9 +6211,7 @@ function RoomTilemapEditor({
       const target = event.target;
       if (target instanceof HTMLElement && target.closest("input, textarea, select, [contenteditable='true']")) return;
       const hasActiveGesture = entityPointerDrag.current !== null
-        || entityResizePointer.current !== null
-        || collisionPlacementStart !== null
-        || triggerPlacementStart !== null
+        || gridGesture.current !== null
         || connectionZonePlacementStart !== null
         || cameraZonePlacementStart !== null
         || canvasHistoryGroupID.current !== null;
@@ -6182,12 +6219,8 @@ function RoomTilemapEditor({
       event.preventDefault();
       event.stopImmediatePropagation();
       finishEntityPointerInteraction(false);
-      entityResizePointer.current = null;
-      collisionErasePointer.current = false;
-      setActiveCollisionPaintType(null);
+      finishGridGesture(false);
       lastPaintCellIndex.current = null;
-      resetCollisionPlacement();
-      resetTriggerPlacement();
       resetConnectionZonePlacement();
       resetCameraZonePlacement();
       endCanvasHistoryGroup();
@@ -6195,7 +6228,7 @@ function RoomTilemapEditor({
 
     window.addEventListener("keydown", handleCanvasEscape, true);
     return () => window.removeEventListener("keydown", handleCanvasEscape, true);
-  }, [cameraZonePlacementStart, collisionPlacementStart, connectionZonePlacementStart, triggerPlacementStart]);
+  }, [cameraZonePlacementStart, connectionZonePlacementStart]);
 
   function applyCanvasActions(
     cellIndex: number,
@@ -6213,9 +6246,7 @@ function RoomTilemapEditor({
     const result = deriveRoomCanvasActions({
       additive,
       cellIndex,
-      collisionPaintType: selectedEditMode === "collision"
-        ? collisionPaintTypeOverride ?? collisionPaintTypeRef.current ?? collisionPaintType ?? selectedCollisionType
-        : collisionPaintTypeRef.current ?? collisionPaintType,
+      collisionPaintType: collisionPaintTypeOverride ?? selectedCollisionType,
       entities: canvasEntities,
       entityGrabOffset: entityDrag ? { x: entityDrag.offsetX, y: entityDrag.offsetY } : null,
       previousCellIndex,
@@ -6231,52 +6262,45 @@ function RoomTilemapEditor({
       selectedToolPanelMode,
       visibleEntityKeys: canvasVisibleEntityKeys
     });
-    setActiveCollisionPaintType(result.collisionPaintType);
     lastPaintCellIndex.current = result.lastPaintCellIndex;
     result.actions.forEach((action) => executeCanvasAction(action));
   }
 
   function handleGridPointerDown(event: React.PointerEvent<HTMLButtonElement>, cellIndex: number): void {
-    if (sceneMapCardDragActiveRef.current) return;
+    if (sceneMapCardDragActiveRef.current || entityPointerDrag.current || gridGesture.current) return;
     const collisionErase = event.button === 2
       && selectedEditMode === "collision"
       && !canvasLayerLocks.collision;
     if (event.button !== 0 && !collisionErase) return;
     event.preventDefault();
-    collisionErasePointer.current = collisionErase;
     beginCanvasHistoryGroup();
     if (!isActiveRoom) {
       onActivateRoom?.();
     }
-    onSelectCanvasCell(room.id, cellIndex);
-
     if (event.button === 0 && selectedEditMode === "collision" && event.altKey) {
       const capturedCollisionType = overlayCells[cellIndex]?.collisionType
         ?? room.collisionTypes?.[cellIndex]
         ?? "free";
       setSelectedCollisionType(capturedCollisionType);
-      setActiveCollisionPaintType(capturedCollisionType);
-      collisionErasePointer.current = false;
+      onSelectCanvasCell(room.id, cellIndex);
       endCanvasHistoryGroup();
+      return;
+    }
+
+    if (selectedEditMode === "collision" && !canvasLayerLocks.collision && collisionPlacementMode !== "fill") {
+      beginGridGesture(event, cellIndex, collisionRectanglePlacementActive ? "rectangle" : "brush");
       return;
     }
 
     const tileX = cellIndex % room.width;
     const tileY = Math.floor(cellIndex / room.width);
-    if (collisionRectanglePlacementActive) {
-      entityPointerDrag.current = null;
-      pendingEntitySelection.current = null;
-      setCollisionPlacementStart(cellIndex);
-      setCollisionPlacementEnd(cellIndex);
-      event.currentTarget.setPointerCapture(event.pointerId);
-      return;
-    }
     const contextualEntity = selectedEditMode === "select" || selectedEditMode === "entities"
       ? selectRoomEntityAtTile(canvasEntities, {
         roomName: room.name,
         sceneType: room.sceneType,
         tileX,
-        tileY
+        tileY,
+        visibleEntityKeys: canvasVisibleEntityKeys
       })
       : null;
     const canStartEntityDrag = Boolean(contextualEntity)
@@ -6292,6 +6316,7 @@ function RoomTilemapEditor({
       const footprint = roomEntitySelectionFootprint(contextualEntity, room.sceneType);
       entityPointerDrag.current = {
         captureTarget: event.currentTarget,
+        startCellIndex: cellIndex,
         entityID: contextualEntity.id,
         entityKey: entityKey(contextualEntity),
         frameRequest: null,
@@ -6307,14 +6332,13 @@ function RoomTilemapEditor({
         previewY: contextualEntity.y,
         visual: null
       };
-      pendingEntitySelection.current = null;
-      setSelectedEntityKeys(deriveRoomEntitySelection({
+      pendingEntitySelection.current = deriveRoomEntitySelection({
         additive: event.shiftKey || event.metaKey || event.ctrlKey,
         currentKeys: selectedEntityKeys,
         entities: canvasEntities,
         roomName: room.name,
         targetKey: entityKey(contextualEntity)
-      }));
+      });
       event.currentTarget.setPointerCapture(event.pointerId);
       return;
     } else {
@@ -6347,7 +6371,7 @@ function RoomTilemapEditor({
       const result = deriveRoomCanvasActions({
         additive: event.shiftKey || event.metaKey || event.ctrlKey,
         cellIndex,
-        collisionPaintType: collisionPaintTypeRef.current ?? collisionPaintType,
+        collisionPaintType: selectedCollisionType,
         entities: canvasEntities,
         previousCellIndex: null,
         room,
@@ -6363,17 +6387,16 @@ function RoomTilemapEditor({
         visibleEntityKeys: canvasVisibleEntityKeys
       });
       if (result.actions.some((action) => action.type === "select_entity")) {
-        resetTriggerPlacement();
+        onSelectCanvasCell(room.id, cellIndex);
         result.actions.forEach((action) => executeCanvasAction(action));
         return;
       }
 
-      setTriggerPlacementStart(cellIndex);
-      setTriggerPlacementEnd(cellIndex);
-      event.currentTarget.setPointerCapture(event.pointerId);
+      beginGridGesture(event, cellIndex, "trigger");
       return;
     }
 
+    onSelectCanvasCell(room.id, cellIndex);
     const shouldSelectSceneContext = !contextualEntity
       && (selectedEditMode === "select" || selectedEditMode === "entities")
       && (selectedToolPanelMode === "select" || Boolean(selectedEntity));
@@ -6389,16 +6412,31 @@ function RoomTilemapEditor({
     );
   }
 
+  useEffect(() => () => collisionHover.current?.remove(), [collisionHoverPreviewEnabled, selectedEditMode,
+    selectedCollisionType, canvasLayerVisibility.collision]);
+
   function handleGridPointerEnter(event: React.PointerEvent<HTMLButtonElement>, cellIndex: number): void {
     if (sceneMapCardDragActiveRef.current) return;
-    if (entityPointerDrag.current && event.buttons === 1) {
+    if (entityPointerDrag.current?.pointerID === event.pointerId && event.buttons === 1) {
       previewEntityDragAtTile({
         x: cellIndex % room.width,
         y: Math.floor(cellIndex / room.width)
       });
       return;
     }
-    setHoverCellIndex(cellIndex);
+    if (gridGesture.current) {
+      const gesture = gridGesture.current;
+      if (gesture.pointerID === event.pointerId && cellIndex !== gesture.last) updateGridGesture(cellIndex);
+      return;
+    }
+    if (selectedEditMode === "collision" && collisionHoverPreviewEnabled && collisionOverlayVisible) {
+      const overlay = collisionHover.current ?? document.createElement("span");
+      overlay.className = `room-stage-collision-hover ${collisionOverlayClass(selectedCollisionType)}`;
+      overlay.setAttribute("aria-hidden", "true");
+      event.currentTarget.append(overlay);
+      collisionHover.current = overlay;
+    }
+    if (room.sceneType === "isometric" || selectedEditMode === "tiles" && ghostPreviewEnabled) setHoverCellIndex(cellIndex);
 
     if (connectionZonePlacementStart !== null) {
       if (event.buttons === 1) {
@@ -6411,62 +6449,29 @@ function RoomTilemapEditor({
       pendingEmptySceneSelection.current.moved = true;
     }
 
-    if (collisionErasePointer.current && selectedEditMode === "collision") {
-      if (collisionPlacementStart !== null) {
-        if (event.buttons === 2) setCollisionPlacementEnd(cellIndex);
-      } else if (event.buttons === 2) {
-        const previousCellIndex = lastPaintCellIndex.current ?? cellIndex;
-        applyCanvasActions(cellIndex, previousCellIndex, false, "free");
-      }
-      return;
-    }
-
-    if (collisionPlacementStart !== null) {
-      if (event.buttons === 1) setCollisionPlacementEnd(cellIndex);
-      return;
-    }
-
-    if (triggerPlacementStart !== null) {
-      if (event.buttons === 1) {
-        setTriggerPlacementEnd(cellIndex);
-      }
-      return;
-    }
-
-
     if (cameraZonePlacementStart !== null) {
       if (event.buttons === 1) setCameraZonePlacementEnd(cellIndex);
       return;
     }
 
-    if (event.buttons !== 1) return;
+    if (event.buttons !== 1 || selectedEditMode === "collision") return;
     const previousCellIndex = lastPaintCellIndex.current ?? cellIndex;
     applyCanvasActions(cellIndex, previousCellIndex);
   }
 
   function handleGridPointerUp(event: React.PointerEvent<HTMLButtonElement>, cellIndex: number): void {
     if (sceneMapCardDragActiveRef.current) return;
-    const collisionErase = collisionErasePointer.current;
-    if (event.button !== 0 && !(event.button === 2 && collisionErase)) return;
-    if (collisionErase) {
-      if (collisionPlacementStart !== null) finalizeCollisionPlacement(cellIndex);
-      collisionErasePointer.current = false;
-      setActiveCollisionPaintType(null);
-      lastPaintCellIndex.current = null;
-      if (event.currentTarget.hasPointerCapture(event.pointerId)) {
-        event.currentTarget.releasePointerCapture(event.pointerId);
+    if (gridGesture.current) {
+      const gesture = gridGesture.current;
+      if (gesture.pointerID === event.pointerId && gesture.button === event.button) {
+        if (cellIndex !== gesture.last) updateGridGesture(cellIndex);
+        finishGridGesture(true);
+        endCanvasHistoryGroup();
+        event.stopPropagation();
       }
-      endCanvasHistoryGroup();
       return;
     }
-    if (collisionPlacementStart !== null) {
-      finalizeCollisionPlacement(cellIndex);
-      if (event.currentTarget.hasPointerCapture(event.pointerId)) {
-        event.currentTarget.releasePointerCapture(event.pointerId);
-      }
-      endCanvasHistoryGroup();
-      return;
-    }
+    if (event.button !== 0 && event.button !== 2) return;
     if (entityPointerDrag.current) {
       const drag = entityPointerDrag.current;
       if (event.clientX !== drag.startClientX || event.clientY !== drag.startClientY) {
@@ -6492,22 +6497,12 @@ function RoomTilemapEditor({
       return;
     }
 
-    if (triggerPlacementStart !== null) {
-      finalizeTriggerPlacement(cellIndex);
-      if (event.currentTarget.hasPointerCapture(event.pointerId)) {
-        event.currentTarget.releasePointerCapture(event.pointerId);
-      }
-      endCanvasHistoryGroup();
-      return;
-    }
     if (cameraZonePlacementStart !== null) {
       finalizeCameraZonePlacement(cellIndex);
       if (event.currentTarget.hasPointerCapture(event.pointerId)) event.currentTarget.releasePointerCapture(event.pointerId);
       endCanvasHistoryGroup();
       return;
     }
-    collisionErasePointer.current = false;
-    setActiveCollisionPaintType(null);
     lastPaintCellIndex.current = null;
     endCanvasHistoryGroup();
   }
@@ -6666,28 +6661,27 @@ function RoomTilemapEditor({
         onPointerLeave={(event) => {
           if (sceneMapCardDragActiveRef.current) return;
           if (event.buttons !== 0) return;
-          collisionErasePointer.current = false;
-          entityResizePointer.current = null;
-          setActiveCollisionPaintType(null);
+          if (gridGesture.current || entityPointerDrag.current) return;
           setHoverCellIndex(null);
-          finishEntityPointerInteraction();
           lastPaintCellIndex.current = null;
-          resetCollisionPlacement();
-          resetTriggerPlacement();
           resetConnectionZonePlacement();
           resetCameraZonePlacement();
           endCanvasHistoryGroup();
         }}
         onPointerMove={(event) => {
           if (sceneMapCardDragActiveRef.current) return;
-          if (entityPointerDrag.current && event.buttons === 1) {
+          const gesture = gridGesture.current;
+          if (gesture?.pointerID === event.pointerId) {
+            const tile = roomTileFromStagePointer(event);
+            if (tile) {
+              const index = tile.y * room.width + tile.x;
+              if (index !== gesture.last) updateGridGesture(index);
+            }
+          } else if (entityPointerDrag.current?.pointerID === event.pointerId && event.buttons === 1) {
             previewEntityDragFromPointer(event);
           } else if (connectionZonePlacementStart !== null && event.buttons === 1) {
             const cellIndex = cellIndexFromCanvasPointer(event, event.currentTarget, room.width, room.height, room.sceneType, isometricConfig, isometricSurfaceSize, room.backgroundAtlasTileHeight, room.heightLevels);
             setConnectionZonePlacementEnd(cellIndex);
-          } else if (triggerPlacementStart !== null && event.buttons === 1) {
-            const cellIndex = cellIndexFromCanvasPointer(event, event.currentTarget, room.width, room.height, room.sceneType, isometricConfig, isometricSurfaceSize, room.backgroundAtlasTileHeight, room.heightLevels);
-            setTriggerPlacementEnd(cellIndex);
           } else if (cameraZonePlacementStart !== null && event.buttons === 1) {
             const cellIndex = cellIndexFromCanvasPointer(event, event.currentTarget, room.width, room.height, room.sceneType, isometricConfig, isometricSurfaceSize, room.backgroundAtlasTileHeight, room.heightLevels);
             setCameraZonePlacementEnd(cellIndex);
@@ -6695,23 +6689,18 @@ function RoomTilemapEditor({
         }}
         onPointerUp={(event) => {
           if (sceneMapCardDragActiveRef.current) return;
-          const collisionErase = collisionErasePointer.current;
-          if (event.button !== 0 && !(event.button === 2 && collisionErase)) return;
-          if (collisionErase) {
-            collisionErasePointer.current = false;
-            entityResizePointer.current = null;
-            setActiveCollisionPaintType(null);
-            setHoverCellIndex(null);
-            finishEntityPointerInteraction();
-            lastPaintCellIndex.current = null;
-            resetCollisionPlacement();
-            resetTriggerPlacement();
-            resetConnectionZonePlacement();
-            resetCameraZonePlacement();
+          const gesture = gridGesture.current;
+          if (gesture?.pointerID === event.pointerId && gesture.button === event.button) {
+            if (event.clientX !== gesture.startClientX || event.clientY !== gesture.startClientY || gesture.last !== gesture.start) {
+              const tile = roomTileFromStagePointer(event);
+              if (tile && tile.y * room.width + tile.x !== gesture.last) updateGridGesture(tile.y * room.width + tile.x);
+            }
+            finishGridGesture(true);
             endCanvasHistoryGroup();
             return;
           }
-          if (entityPointerDrag.current) {
+          if (event.button !== 0 && event.button !== 2) return;
+          if (entityPointerDrag.current?.pointerID === event.pointerId) {
             const drag = entityPointerDrag.current;
             if (event.clientX !== drag.startClientX || event.clientY !== drag.startClientY) {
               previewEntityDragFromPointer(event);
@@ -6731,16 +6720,6 @@ function RoomTilemapEditor({
             endCanvasHistoryGroup();
             return;
           }
-          if (triggerPlacementStart !== null) {
-            const cellIndex = cellIndexFromCanvasPointer(event, event.currentTarget, room.width, room.height, room.sceneType, isometricConfig, isometricSurfaceSize, room.backgroundAtlasTileHeight, room.heightLevels);
-            finalizeTriggerPlacement(cellIndex);
-            resetTriggerPlacement();
-            if (event.currentTarget.hasPointerCapture(event.pointerId)) {
-              event.currentTarget.releasePointerCapture(event.pointerId);
-            }
-            endCanvasHistoryGroup();
-            return;
-          }
           if (cameraZonePlacementStart !== null) {
             const cellIndex = cellIndexFromCanvasPointer(event, event.currentTarget, room.width, room.height, room.sceneType, isometricConfig, isometricSurfaceSize, room.backgroundAtlasTileHeight, room.heightLevels);
             finalizeCameraZonePlacement(cellIndex);
@@ -6749,31 +6728,23 @@ function RoomTilemapEditor({
             endCanvasHistoryGroup();
             return;
           }
-          collisionErasePointer.current = false;
-          entityResizePointer.current = null;
-          setActiveCollisionPaintType(null);
           setHoverCellIndex(null);
-          finishEntityPointerInteraction(false);
           lastPaintCellIndex.current = null;
-          resetCollisionPlacement();
           endCanvasHistoryGroup();
         }}
         onPointerCancel={() => {
-          collisionErasePointer.current = false;
-          entityResizePointer.current = null;
-          setActiveCollisionPaintType(null);
           setHoverCellIndex(null);
+          finishGridGesture(false);
           finishEntityPointerInteraction(false);
           lastPaintCellIndex.current = null;
-          resetCollisionPlacement();
-          resetTriggerPlacement();
           resetConnectionZonePlacement();
           resetCameraZonePlacement();
           endCanvasHistoryGroup();
         }}
         onLostPointerCapture={(event) => {
-          if (entityPointerDrag.current?.pointerID !== event.pointerId) return;
-          finishEntityPointerInteraction(false);
+          if (entityPointerDrag.current?.pointerID === event.pointerId) finishEntityPointerInteraction(false);
+          else if (gridGesture.current?.pointerID === event.pointerId) finishGridGesture(false);
+          else return;
           endCanvasHistoryGroup();
         }}
         onContextMenu={(event) => {
@@ -6913,7 +6884,7 @@ function RoomTilemapEditor({
             src={backgroundURL}
           />
         ) : null}
-        {displayCells.map((tileID, index) => (
+        {!skipPreviewGrid && displayCells.map((tileID, index) => (
           (() => {
             const overlay = overlayCells[index];
             const collisionType = overlay?.collisionType ?? "free";
@@ -6922,10 +6893,8 @@ function RoomTilemapEditor({
             const triggerCount = canvasLayerVisibility.triggers ? (overlay?.triggerCount ?? 0) : 0;
             const heightLevel = overlay?.heightLevel ?? 0;
             const isSelectedEntityCell = selectedEntityCells[index] === true;
-            const isTriggerPlacementPreview = triggerPlacementActive && isTriggerPlacementCell(index);
             const isConnectionZonePlacementPreview = connectionZonePlacementActive && isConnectionZonePlacementCell(index);
             const isCameraZonePlacementPreview = cameraZonePlacementActive && isCameraZonePlacementCell(index);
-            const isCollisionPlacementPreview = collisionRectanglePlacementActive && isCollisionPlacementCell(index);
             const underlayTileID = paintLayerMode ? (visibleTileCells ?? editorComposedTiles)[index] ?? 0 : 0;
             const displayTileID = tileID ?? 0;
             const visibleIsometricOverlayLayers = room.sceneType === "isometric" && !paintLayerMode
@@ -6939,21 +6908,13 @@ function RoomTilemapEditor({
                 .filter(({ tileID: overlayTileID }) => overlayTileID > 0)
               : [];
             const ghostTileID = paintGhostTileID(index);
-            const showHoverPreview = selectedEditMode === "collision"
-              && collisionHoverPreviewEnabled
-              && canvasLayerVisibility.collision
-              && hoverCellIndex === index;
             const showPaintGhost = selectedEditMode === "tiles"
               && ghostPreviewEnabled
               && selectedTool === "brush"
               && ghostTileID !== null
               && backgroundURL
               && tilesetSize;
-            const overlayClass = showHoverPreview
-              ? collisionOverlayClass(selectedCollisionType)
-              : collisionOverlayVisible
-                ? collisionOverlayClass(collisionType)
-                : "";
+            const overlayClass = collisionOverlayVisible ? collisionOverlayClass(collisionType) : "";
             return (
               <button
                 aria-label={gridCellAriaLabel(index)}
@@ -6962,10 +6923,8 @@ function RoomTilemapEditor({
                   hasCollision ? "has-collision" : "",
                   hasCollision ? `has-collision-${collisionType}` : "",
                   isSelectedEntityCell ? "selected-entity-cell" : "",
-                  isTriggerPlacementPreview ? "trigger-placement-preview" : "",
                   isConnectionZonePlacementPreview ? "connection-zone-placement-preview" : "",
                   isCameraZonePlacementPreview ? "camera-zone-placement-preview" : "",
-                  isCollisionPlacementPreview ? "collision-rectangle-preview" : "",
                   selectedEditMode === "collision" ? "collision-mode" : "",
                   selectedEditMode === "height" ? "height-mode" : "",
                   overlay?.ramp ? "has-isometric-ramp" : "",
@@ -7035,7 +6994,7 @@ function RoomTilemapEditor({
                     aria-hidden="true"
                     className={overlayClass}
                     data-collision-overlay="true"
-                    data-collision-type={showHoverPreview ? selectedCollisionType : collisionType}
+                    data-collision-type={collisionType}
                   />
                 ) : null}
                 {room.sceneType === "isometric" && ((heightLevel > 0 && (selectedEditMode === "height" || canvasLayerVisibility.grid))
@@ -7174,8 +7133,6 @@ function RoomTilemapEditor({
                   aria-label={ui("Redimensionar {0}", { 0: entity.name })}
                   className={`room-stage-entity-resize-handle ${entity.kind}`}
                   onPointerDown={(event) => startEntityResize(event, entity)}
-                  onPointerMove={(event) => continueEntityResize(event, entity)}
-                  onPointerUp={endEntityResize}
                   style={entityResizeHandleStyle(entity)}
                 />
               ) : null}
@@ -8206,11 +8163,8 @@ export function RoomsWorkspace({
     if (!activeRoom) return;
     const collisionTypes = activeRoom.collisionTypes
       ?? activeRoom.collisionCells.map((blocked) => (blocked ? "solid" : "free"));
-    collisionTypes.forEach((collisionType, index) => {
-      if (collisionType !== "free") {
-        onSetCollisionType(activeRoom.id, index, "free");
-      }
-    });
+    const blocked = collisionTypes.flatMap((collisionType, index) => collisionType !== "free" ? [index] : []);
+    onSetCollisionType(activeRoom.id, blocked, "free");
   }
   function createTriggerAtSelectedCell(width = 1, height = 1): void {
     if (!activeRoom || activeSelectedCanvasCell?.roomID !== activeRoom.id) return;
@@ -9434,6 +9388,7 @@ export function RoomsWorkspace({
   });
   const focusedSceneEditorElement = focusSceneRoom && focusedSceneEditorCardSize ? (
     <RoomTilemapEditor
+      key={focusSceneRoom.id}
       cardSize={focusedSceneEditorCardSize}
       ghostOpacity={ghostOpacity}
       ghostPreviewEnabled={ghostPreviewEnabled}
@@ -9558,7 +9513,7 @@ export function RoomsWorkspace({
             canvasHeight: isPseudo3dRacingRoom(focusSceneRoom) ? 160 : focusedSceneEditorElement.props.cardSize.canvasHeight / (focusViewportGeometry?.scale ?? 1),
             canvasDisplayHeight: isPseudo3dRacingRoom(focusSceneRoom) ? 160 : focusedSceneEditorElement.props.cardSize.canvasDisplayHeight / (focusViewportGeometry?.scale ?? 1)
           },
-          canvasGridVisible: false, ghostPreviewEnabled: false, collisionHoverPreviewEnabled: false,
+          readOnlyPreview: true, canvasGridVisible: false, ghostPreviewEnabled: false, collisionHoverPreviewEnabled: false,
           canvasLayerVisibility: { ...defaultCanvasLayerVisibility, background: true, actors: true, hud: true, grid: false,
             composition: false, collision: false, hitboxes: false, triggers: false, cameraBounds: false, worldBounds: false },
           selectedToolPanelMode: "select", selectedEditMode: "select", selectedEntityKeys: [], racingSelection:null,

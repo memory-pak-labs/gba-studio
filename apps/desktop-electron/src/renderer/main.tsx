@@ -161,7 +161,7 @@ import {
   setActiveTileLayerMappingInProject,
   setStartRoomInProject,
   setRoomCollisionCellInProject,
-  setRoomCollisionTypeInProject,
+  setRoomCollisionTypesInProject,
   setRoomHeightLevelInProject,
   toggleRoomCollisionCellInProject,
   updateRoomBackgroundTilesetGridInProject,
@@ -668,10 +668,11 @@ function App(): React.ReactElement {
   const problemInput = useMemo(() => ({ data: projectData, path: presentationSession?.path, identity: presentationSession?.identity }), [projectData, presentationSession?.path, presentationSession?.identity]);
   const deferredProblemInput = useDeferredValue(problemInput);
   const deferredProblemData = deferredProblemInput.data;
-  const projectHealthExportReady = useMemo(
-    () => deferredProblemData ? deriveProjectHealthReport(deferredProblemData).exportReady : null,
+  const baseProjectHealthReport = useMemo(
+    () => deferredProblemData ? deriveProjectHealthReport(deferredProblemData) : null,
     [deferredProblemData]
   );
+  const projectHealthExportReady = baseProjectHealthReport?.exportReady ?? null;
 
   async function refreshProjectPlugins(projectPath: string | undefined): Promise<void> {
     if (!projectPath) {
@@ -736,8 +737,10 @@ function App(): React.ReactElement {
   const currentBudgetReport = session?.path === deferredProblemInput.path
     && session?.project.data === deferredProblemData ? projectBudgetAnalysis?.report : undefined;
   const projectHealthReport = useMemo(
-    () => deferredProblemData ? deriveProjectHealthReport(deferredProblemData, { assetPackReport: currentBudgetReport }) : null,
-    [deferredProblemData, currentBudgetReport]
+    () => deferredProblemData && currentBudgetReport
+      ? deriveProjectHealthReport(deferredProblemData, { assetPackReport: currentBudgetReport })
+      : baseProjectHealthReport,
+    [baseProjectHealthReport, deferredProblemData, currentBudgetReport]
   );
   const allProjectProblems = useMemo(
     () => projectHealthReport ? projectProblemsFromHealthReport(projectHealthReport) : [],
@@ -1771,9 +1774,9 @@ function App(): React.ReactElement {
     }
   }
 
-  function setRoomCollisionType(roomID: string, cellIndex: number, collisionType: RoomCollisionType, historyGroupID?: string): void {
+  function setRoomCollisionType(roomID: string, cells: number | readonly number[], collisionType: RoomCollisionType, historyGroupID?: string): void {
     if (!session) return;
-    const nextData = setRoomCollisionTypeInProject(session.project.data, roomID, cellIndex, collisionType);
+    const nextData = setRoomCollisionTypesInProject(session.project.data, roomID, typeof cells === "number" ? [cells] : cells, collisionType);
     if (nextData !== session.project.data) {
       updateProjectData(nextData, { historyGroupID });
       setStatus(ui("Colisao atualizada no canvas."));
