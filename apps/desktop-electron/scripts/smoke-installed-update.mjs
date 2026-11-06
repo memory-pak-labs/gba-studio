@@ -9,7 +9,7 @@ import { createRequire } from 'node:module';
 import { promisify } from 'node:util';
 import { cdpSession, copySmokeProject, createElectronSmokeEnv, prepareElectronSmokeLocale, terminateChild, wait } from './lib/electron-smoke-helpers.mjs';
 import { findLinuxUpdatedProcess, findWindowsUpdatedProcess } from './updater-qa-fixture.mjs';
-import { startPublishedUpdaterFixture } from './prepare-published-updater-qa.mjs';
+import { macBundleFiles, startPublishedUpdaterFixture, verifyPublishedMacBundle } from './prepare-published-updater-qa.mjs';
 
 const appRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const asar = createRequire(import.meta.url)('@electron/asar');
@@ -172,9 +172,8 @@ try {
       return null;
     }, 'macOS installation and automatic restart', 240_000);
     assert(Boolean(restartedPid), 'macOS installed and automatically restarted the updated bundle');
-    await execFileAsync('/usr/bin/codesign', ['--verify', '--deep', '--strict', bundle]);
-    await execFileAsync('/usr/bin/xcrun', ['stapler', 'validate', bundle]);
-    const actualHashes = await Promise.all(['MacOS/gba-studio', 'Resources/app.asar']
+    checks.push(await verifyPublishedMacBundle(bundle));
+    const actualHashes = await Promise.all(macBundleFiles
       .map(file => hash(path.join(contents, file), 'sha256', 'hex')));
     assert(JSON.stringify(actualHashes) === JSON.stringify(fixture.targetBundleHashes), 'Installed app matches the signed and notarized RC6 bundle');
     process.kill(restartedPid);

@@ -4,6 +4,7 @@ import { createReadStream } from 'node:fs';
 import { chmod, mkdir, readFile, stat, writeFile } from 'node:fs/promises';
 import { createServer } from 'node:https';
 import path from 'node:path';
+import { setTimeout as wait } from 'node:timers/promises';
 import { fileURLToPath } from 'node:url';
 import { promisify } from 'node:util';
 
@@ -13,6 +14,24 @@ const github = `https://github.com/${repo}/releases`;
 const releasePath = `/${repo}/releases`;
 const version = '0.1.0-rc.5';
 const targetVersion = '0.1.0-rc.6';
+export const macBundleFiles = ['MacOS/gba-studio', 'Resources/app.asar', 'CodeResources'];
+
+export async function verifyPublishedMacBundle(app) {
+  await run('/usr/bin/codesign', ['--verify', '--deep', '--strict', app]);
+  if (!(await stat(path.join(app, 'Contents', 'CodeResources'))).size) throw new Error('Stapled macOS ticket is empty');
+  for (let attempt = 1; attempt <= 3; attempt++) {
+    try {
+      await run('/usr/bin/xcrun', ['stapler', 'validate', app]);
+      return 'Verified the notarization ticket with stapler';
+    } catch (error) {
+      if (!/NSURLErrorDomain Code=-(?:1001|1005|1009)\b/.test(`${error.stdout}\n${error.stderr}`)) throw error;
+      if (attempt < 3) await wait(1500 * attempt);
+    }
+  }
+  const note = 'Apple ticket lookup unavailable on this runner. Verified the bundle signature and presence of its stapled ticket.';
+  console.log(note);
+  return note;
+}
 
 async function hashFile(file, algorithm, encoding) {
   const hash = createHash(algorithm);
@@ -92,14 +111,12 @@ async function prepare() {
     for (const [index, archive] of [source, targetInstaller].entries()) {
       await run('/usr/bin/ditto', ['-x', '-k', archive, bundles[index]]);
       const app = path.join(bundles[index], 'gba-studio.app');
-      await run('/usr/bin/codesign', ['--verify', '--deep', '--strict', app]);
-      await run('/usr/bin/xcrun', ['stapler', 'validate', app]);
+      checks.push(`${index === 0 ? 'RC5' : 'RC6'}: ${await verifyPublishedMacBundle(app)}`);
     }
     sourceExecutable = path.join(bundles[0], 'gba-studio.app', 'Contents', 'MacOS', 'gba-studio');
     const contents = path.join(bundles[1], 'gba-studio.app', 'Contents');
-    targetBundleHashes = await Promise.all(['MacOS/gba-studio', 'Resources/app.asar']
+    targetBundleHashes = await Promise.all(macBundleFiles
       .map(file => hashFile(path.join(contents, file), 'sha256', 'hex')));
-    checks.push('Verified Developer ID signatures and notarization tickets for both macOS apps');
   }
   const atom = await fetch(`${github}.atom`);
   if (!atom.ok) throw new Error(`Published GitHub Atom feed returned ${atom.status}`);
