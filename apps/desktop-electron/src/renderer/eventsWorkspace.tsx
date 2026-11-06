@@ -12,6 +12,7 @@ import {
   AudioLines,
   ArrowRight,
   Hash,
+  ListChecks,
   Map as MapIcon,
   MessageSquare,
   Plus,
@@ -1374,9 +1375,21 @@ function EventBuildPanel({
             <p>{describeEventFlow(event)}</p>
           </div>
         ) : null}
-        <div className="event-build-actions">
-          <button onClick={() => onOpenRecipeMenu(event.id)} type="button">{ui("Começar com modelo de script")}</button>
-          <button className="primary-button" onClick={() => onOpenCommandMenu(event.id)} type="button">{ui("Adicionar evento")}</button>
+        <div className="event-build-actions" role="toolbar" aria-label={ui("Ações de passos")}>
+          <button aria-label={ui("Adicionar evento")} className="primary-button" onClick={() => onOpenCommandMenu(event.id)} type="button">
+            <Plus aria-hidden="true" size={16}/>{ui("Adicionar")}
+          </button>
+          <button aria-label={ui("Modelos de script")} onClick={() => onOpenRecipeMenu(event.id)} type="button">{ui("Modelos")}</button>
+          <button
+            aria-label={ui("Selecionar passos")}
+            aria-pressed={stepSelectionMode}
+            className="event-select-steps"
+            onClick={() => setStepSelectionMode((current) => !current)}
+            title={ui("Selecionar passos")}
+            type="button"
+          >
+            <ListChecks aria-hidden="true" size={18}/>
+          </button>
           {!unifiedEditing && floatingPalette && onChoosePaletteSuggestion && paletteSuggestions.length ? (
             <button
               aria-expanded={paletteOpen}
@@ -1389,15 +1402,8 @@ function EventBuildPanel({
           ) : null}
         </div>
       </header>
-      <div className="event-structure-actions" role="toolbar" aria-label={ui("Ações de passos")}>
-        <button
-          aria-pressed={stepSelectionMode}
-          onClick={() => setStepSelectionMode((current) => !current)}
-          type="button"
-        >
-          {ui("Selecionar passos")}</button>
-        {stepSelectionMode && selectedStepCount > 0 ? (
-          <>
+      {stepSelectionMode && selectedStepCount > 0 ? (
+        <div className="event-structure-actions" role="group" aria-label={ui("Ações de passos")}>
             <button
               onClick={() => editorProps.onUpdateEventFields(event.id, {
                 stepUpdates: selectedStepIndexes.map(index => ({ index, fields: { isEnabled: false } }))
@@ -1422,9 +1428,8 @@ function EventBuildPanel({
             >
               {ui("Comentar ")}{selectedStepLabel}
             </button>
-          </>
-        ) : null}
-      </div>
+        </div>
+      ) : null}
       <EventStructureEditor
         renderStepEditor={unifiedEditing && !separateInspector ? stepIndex => <EventBlockInspector event={event} editorProps={editorProps} selectedStepIndex={stepIndex}/> : undefined}
         eventName={event.name}
