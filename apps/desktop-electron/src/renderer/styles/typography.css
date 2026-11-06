@@ -1554,3 +1554,12 @@
 .project-problems-controls > span {
   font-weight: var(--studio-font-weight-regular);
 }
+
+.studio-deletion-usages h3,
+.studio-deletion-usages ul {
+  font-size: var(--studio-font-size-sm);
+}
+
+.studio-deletion-choices legend {
+  font-weight: var(--studio-font-weight-semibold);
+}

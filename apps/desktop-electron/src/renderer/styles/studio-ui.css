@@ -586,14 +586,12 @@
 }
 
 .studio-deletion-usages h3 {
-  font-size: var(--studio-font-size-sm);
   margin: 0;
 }
 
 .studio-deletion-usages ul {
   border: 1px solid var(--studio-color-border);
   border-radius: var(--studio-radius-control);
-  font-size: var(--studio-font-size-sm);
   margin: var(--studio-space-2) 0 0;
   max-height: min(160px, 24vh);
   overflow: auto;
@@ -615,7 +613,6 @@
 }
 
 .studio-deletion-choices legend {
-  font-weight: var(--studio-font-weight-semibold);
   margin-bottom: var(--studio-space-2);
 }
 
