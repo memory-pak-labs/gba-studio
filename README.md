@@ -1,84 +1,61 @@
 # GBA Studio
 
-Editor visual e motor próprio para criar jogos de Game Boy Advance.
-O projeto pertence à [Memory Pak Labs](https://github.com/memory-pak-labs).
+[![CI da branch develop](https://github.com/memory-pak-labs/gba-studio/actions/workflows/ci.yml/badge.svg?branch=develop)](https://github.com/memory-pak-labs/gba-studio/actions/workflows/ci.yml)
 
-**Beta em desenvolvimento.** Este código está na candidata `0.1.0-rc.3` e usa
-GBAStudioEngine Pack `2.27.0`; a candidata ainda depende das verificações finais
-de distribuição. APIs e formato de projeto ainda podem mudar. A experiência
-lembra o GB Studio; o alvo é GBA e os limites do hardware fazem parte do
-desenvolvimento.
+GBA Studio é um editor visual de código aberto para criar jogos de Game Boy
+Advance. No editor, você pode montar cenas, posicionar atores e gatilhos, criar
+eventos, importar gráficos e áudio e exportar uma ROM `.gba`.
 
-## Baixar a beta
+O aplicativo desktop usa Electron e o motor próprio GBAStudioEngine, escrito
+em C/C++. É um projeto da Memory Pak Labs.
 
-Os instaladores da [beta.3](https://github.com/memory-pak-labs/gba-studio/releases/tag/v0.1.0-beta.3)
-incluem Python, compilador ARM e Engine Pack para gerar ROMs sem instalar
-Python ou devkitPro separadamente.
+[Site oficial](https://gbastudio.dev.br/) · [Guia de uso](https://gbastudio.dev.br/guia) · [Memory Pak Labs](https://github.com/memory-pak-labs)
 
-A [RC2](https://github.com/memory-pak-labs/gba-studio/releases/tag/v0.1.0-rc.2)
-também está disponível como pré-lançamento, com pacotes para macOS, Windows e
-Linux. Seus detalhes e limitações estão na própria página da versão.
+## Instalação
 
-| Sistema | Download recomendado |
-| --- | --- |
-| macOS 12+, Apple Silicon | [DMG assinado e notarizado](https://github.com/memory-pak-labs/gba-studio/releases/download/v0.1.0-beta.3/GBA-Studio-0.1.0-beta.3-macOS-arm64.dmg) |
-| Windows x64 | [Instalador EXE](https://github.com/memory-pak-labs/gba-studio/releases/download/v0.1.0-beta.3/GBA.Studio.Setup.0.1.0-beta.3.exe) |
-| Linux x86_64, testado no Ubuntu 24.04 | [Pacote DEB](https://github.com/memory-pak-labs/gba-studio/releases/download/v0.1.0-beta.3/GBA-Studio-0.1.0-beta.3-linux-amd64.deb) |
+Escolha o pacote para seu sistema operacional na página oficial de downloads.
+Consulte as notas de cada versão para ver os requisitos e as instruções do pacote.
 
-A [página da Release](https://github.com/memory-pak-labs/gba-studio/releases/tag/v0.1.0-beta.3)
-também oferece ZIP, AppImage, TAR.GZ, checksums, licenças, acesso às fontes e
-instruções de instalação. O Windows ainda não tem assinatura Authenticode e
-pode exibir aviso do SmartScreen. Esta beta macOS é para Apple Silicon.
-Faça uma cópia dos seus projetos antes de testar.
+[Downloads do GBA Studio](https://gbastudio.dev.br/download) · [Releases no GitHub](https://github.com/memory-pak-labs/gba-studio/releases)
 
-## Estrutura
+## Desenvolvimento
 
-| Diretório | Conteúdo |
-| --- | --- |
-| `apps/desktop-electron` | Editor Electron, interfaces, exportadores e Play |
-| `packages/GBAStudioEngine` | Motor C/C++, compilador de assets, templates e ferramentas |
-| `packages/project-contract` | Leitura, escrita e contrato de `.gba-project` |
-| `packages/scene-contracts` | Contratos compartilhados dos tipos de cena |
-| `tools/gba-sprite-prep` | Preparação e validação de sprites e backgrounds |
-| `docs` | Arquitetura e desenvolvimento |
-
-## Executar o editor
-
-Requisitos: Git, Node.js 22 e npm. Na raiz, `nvm use` seleciona a versão
-indicada em `.nvmrc` quando o nvm estiver instalado.
+Use Git, npm e a versão do Node.js indicada em [`.nvmrc`](.nvmrc).
 
 ```sh
-git clone https://github.com/memory-pak-labs/gba-studio.git
+git clone --branch develop https://github.com/memory-pak-labs/gba-studio.git
 cd gba-studio/apps/desktop-electron
 npm ci
 npm run dev
 ```
 
-O motor e a toolchain são necessários para exportar e jogar uma ROM real.
-Leia [Desenvolvimento](docs/development.md) para compilar o Engine Pack,
-configurar devkitARM e executar as verificações.
+O guia de desenvolvimento explica como configurar a toolchain, compilar o
+Engine Pack e executar as verificações. [Guia de desenvolvimento](docs/development.md)
 
-## Contribuir
+| Diretório | Conteúdo |
+| --- | --- |
+| [`apps/desktop-electron`](apps/desktop-electron) | Editor, exportação e Play |
+| [`packages/GBAStudioEngine`](packages/GBAStudioEngine) | Motor, compilador de assets e ferramentas |
+| [`packages/project-contract`](packages/project-contract) | Contrato e operações de leitura e escrita de `.gba-project` |
+| [`packages/scene-contracts`](packages/scene-contracts) | Contratos compartilhados dos tipos de cena |
+| [`tools/gba-sprite-prep`](tools/gba-sprite-prep) | Preparação e validação de sprites e fundos |
 
-Comece por uma Issue, faça um fork e envie um Pull Request pequeno com a
-explicação e as verificações executadas. Contribuições passam por revisão dos
-mantenedores. [Guia de contribuição](CONTRIBUTING.md).
+## Contribuição e suporte
 
-A CI verifica a suíte completa de testes, tipos e build do editor, além dos testes
-host do motor. O gate completo continua sendo uma verificação distinta de
-Editor, exportação e Play; CI, hardware físico e outros sistemas não devem ser
-inferidos a partir de uma compilação local.
+Use as Discussions para dúvidas e ideias e as Issues para relatar bugs ou propor
+melhorias específicas. O guia de contribuição descreve o fluxo de revisão para
+`develop`.
+
+[Discussions](https://github.com/memory-pak-labs/gba-studio/discussions) · [Issues](https://github.com/memory-pak-labs/gba-studio/issues) · [Contribuir](CONTRIBUTING.md) · [Suporte](SUPPORT.md)
 
 ## Licenças e créditos
 
-O código de autoria do projeto, incluindo editor e motor, usa a
-[licença MIT](LICENSE). Dependências e recursos de terceiros mantêm seus próprios
-termos: [Avisos de terceiros](THIRD_PARTY_NOTICES.md).
+O código do editor e do motor usa a licença MIT. Os recursos visuais e as
+dependências de terceiros têm seus termos registrados separadamente.
 
-Os assets têm registro separado em [Licenças dos assets](ASSET_LICENSES.md).
-A licença do código não altera os direitos sobre assets importados pelos
-usuários. Quem cria um jogo escolhe os termos de seu conteúdo e deve respeitar
-as licenças de componentes e recursos que distribuir.
+[Licença MIT](LICENSE) · [Licenças dos assets](ASSET_LICENSES.md) · [Avisos de terceiros](THIRD_PARTY_NOTICES.md)
 
-GB Studio, mGBA, devkitPro/devkitARM, Tonc e Butano são projetos independentes.
-Este repositório não implica afiliação ou endosso desses projetos ou da Nintendo.
+O fluxo do editor tem como referência o GB Studio. Tonc e Butano são
+referências técnicas para o desenvolvimento no Game Boy Advance.
+
+[GB Studio](https://github.com/chrismaltby/gb-studio) · [Tonc](https://github.com/gbadev-org/tonc) · [Butano](https://github.com/gvaliente/butano)
