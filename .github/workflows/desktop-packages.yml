@@ -73,7 +73,8 @@ jobs:
     name: Package and smoke (${{ matrix.platform }})
     needs: engine-pack
     runs-on: ${{ matrix.runner }}
-    timeout-minutes: 45
+    # Both installer creation and 18 separate scene ROM builds run in this job.
+    timeout-minutes: 70
     strategy:
       fail-fast: false
       matrix:
