@@ -1,3 +1,4 @@
+import { mapAuthoredEventCommands } from "./authoredEventCommands.js";
 import { unsupportedDialogueCharacters } from "./dialogueFont.js";
 import type { GBAProjectData } from "./projectFile.js";
 import {
@@ -1398,10 +1399,50 @@ export function prepareDialogueExport(data: GBAProjectData, key: string): Prepar
   };
 }
 
-export function removeDialogueFromProject(data: GBAProjectData, key: string): GBAProjectData {
+export function dialogueReplacementChoices(data: GBAProjectData, key: string): { value: string; label: string }[] {
+  const dialogues = deriveDialoguesWorkspacePresentation(data).dialogues;
+  const source = dialogues.find(dialogue => dialogue.key === key);
+  if (!source) return [];
+  return dialogues.flatMap(dialogue => dialogue !== source && !/\s/.test(dialogue.key)
+    && dialogue.choices.length === source.choices.length
+    ? [{ value: dialogue.key, label: dialogue.key }] : []);
+}
+
+export function removeDialogueFromProject(
+  data: GBAProjectData, key: string, resolution?: { replacementKey: string | null }
+): GBAProjectData {
+  if (resolution?.replacementKey && !dialogueReplacementChoices(data, key).some(choice => choice.value === resolution.replacementKey)) return data;
   const next = cloneProjectData(data);
   const dialogues = Array.isArray(next.dialogues) ? next.dialogues : [];
-  next.dialogues = dialogues.filter((dialogue, index) => !isRecord(dialogue) || dialogueKey(dialogue, index) !== key);
+  const remaining = dialogues.filter((dialogue, index) => !isRecord(dialogue) || dialogueKey(dialogue, index) !== key);
+  if (dialogues.length === remaining.length) return data;
+  next.dialogues = remaining;
+  if (!resolution) return next;
+
+  mapAuthoredEventCommands(next, command => {
+    if (dialogueUsage(command)?.key !== key) return command;
+    if (!resolution.replacementKey) return "noop";
+    const parts = command.trim().split(/\s+/);
+    parts[1] = resolution.replacementKey;
+    return parts.join(" ");
+  });
+
+  function retarget(value: unknown): void {
+    if (Array.isArray(value)) {
+      value.forEach(retarget);
+      return;
+    }
+    if (!isRecord(value)) return;
+    if (value.dialogueKey === key) {
+      if (resolution?.replacementKey) value.dialogueKey = resolution.replacementKey;
+      else delete value.dialogueKey;
+    }
+    Object.values(value).forEach(retarget);
+  }
+  for (const scene of [...projectArray(next, "scenas"), ...projectArray(next, "rooms"), ...[next.scena, next.room].filter(isRecord)]) {
+    retarget(scene.runtime);
+    retarget(scene.config);
+  }
   return next;
 }
 

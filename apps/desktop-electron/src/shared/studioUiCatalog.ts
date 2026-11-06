@@ -50,6 +50,27 @@ export const studioUiMessages: Record<string, readonly [string, string, string]>
   "Formatos dos assets ({0})": ["Formatos dos assets ({0})", "Asset formats ({0})", "Formatos de assets ({0})"],
   "Cores usadas na fonte (RGB555): {0}": ["Cores usadas na fonte (RGB555): {0}", "Used source colors (RGB555): {0}", "Colores usados en la fuente (RGB555): {0}"],
   "Revisar uso de 4bpp": ["Revisar uso de 4bpp", "Review 4bpp usage", "Revisar uso de 4bpp"],
+  "Remover preset de HUD": ["Remover preset de HUD", "Remove HUD preset", "Eliminar preajuste de HUD"],
+  "HUD ativa do projeto": ["HUD ativa do projeto", "Active project HUD", "HUD activa del proyecto"],
+  "Remover arquivo": ["Remover arquivo", "Remove file", "Eliminar archivo"],
+  "Remover arquivos": ["Remover arquivos", "Remove files", "Eliminar archivos"],
+  "Remover {0} arquivos selecionados?": ["Remover {0} arquivos selecionados?", "Remove {0} selected files?", "¿Eliminar {0} archivos seleccionados?"],
+  "Remover animação": ["Remover animação", "Remove animation", "Eliminar animación"],
+  "O que fazer com os vínculos?": ["O que fazer com os vínculos?", "What should happen to these references?", "¿Qué quieres hacer con las referencias?"],
+  "Substituir": ["Substituir", "Replace", "Reemplazar"],
+  "Substituir por": ["Substituir por", "Replace with", "Reemplazar por"],
+  "Escolha um item": ["Escolha um item", "Choose an item", "Elige un elemento"],
+  "Desvincular": ["Desvincular", "Unlink", "Desvincular"],
+  "Você pode desfazer a exclusão e restaurar os vínculos de uma vez.": ["Você pode desfazer a exclusão e restaurar os vínculos de uma vez.", "Undo restores the deleted item and its references together.", "Puedes deshacer la eliminación y restaurar todas las referencias a la vez."],
+  "Edite os vínculos acima para liberar a exclusão.": ["Edite os vínculos acima para liberar a exclusão.", "Edit the references above before removing this item.", "Edita las referencias anteriores antes de eliminar el elemento."],
+  "Item em uso": ["Item em uso", "Item in use", "Elemento en uso"],
+  "Remover “{0}”?": ["Remover “{0}”?", "Remove “{0}”?", "¿Eliminar «{0}»?"],
+  "Remover cena": ["Remover cena", "Remove scene", "Eliminar escena"],
+  "Remover a cena “{0}”? Os atores e gatilhos da cena também serão removidos.": ["Remover a cena “{0}”? Os atores e gatilhos da cena também serão removidos.", "Remove scene “{0}”? Its actors and triggers will also be removed.", "¿Eliminar la escena «{0}»? También se eliminarán sus actores y disparadores."],
+  "Item removido. Use Desfazer para restaurar.": ["Item removido. Use Desfazer para restaurar.", "Item removed. Use Undo to restore it.", "Elemento eliminado. Usa Deshacer para restaurarlo."],
+  "Remover entidades": ["Remover entidades", "Remove entities", "Eliminar entidades"],
+  "Remover áudio": ["Remover áudio", "Remove audio", "Eliminar audio"],
+  "Remover diálogo": ["Remover diálogo", "Remove dialogue", "Eliminar diálogo"],
   "Formatos existentes são preservados; nenhuma cor é reduzida automaticamente.": ["Formatos existentes são preservados; nenhuma cor é reduzida automaticamente.", "Existing formats are preserved; no colors are reduced automatically.", "Se conservan los formatos existentes; ningún color se reduce automáticamente."],
   "Formato padrão de 4bpp.": ["Formato padrão de 4bpp.", "Default 4bpp format.", "Formato predeterminado de 4bpp."],
   "Mais de 15 cores visíveis no sprite.": ["Mais de 15 cores visíveis no sprite.", "More than 15 visible sprite colors.", "Más de 15 colores visibles en el sprite."],
@@ -13142,6 +13163,16 @@ export const studioUiMessages: Record<string, readonly [string, string, string]>
     "Unable to start MCP server: {0}",
     "No se puede iniciar el servidor MCP: {0}"
   ],
+  "Remova primeiro os vínculos dos atores em: {0}.": [
+    "Remova primeiro os vínculos dos atores em: {0}.",
+    "Remove the actor references in {0} first.",
+    "Primero elimina las referencias de los actores en {0}."
+  ],
+  "Já existe uma cena com esse nome.": [
+    "Já existe uma cena com esse nome.",
+    "A scene with this name already exists.",
+    "Ya existe una escena con este nombre."
+  ],
   "Não foi possível renomear a cena. Verifique o nome informado.": [
     "Não foi possível renomear a cena. Verifique o nome informado.",
     "It was not possible to rename the scene. Please check the name provided.",
@@ -17971,6 +18002,21 @@ export const studioUiMessages: Record<string, readonly [string, string, string]>
     "Selecione apenas atores ou apenas triggers para criar cópias independentes do mesmo comportamento.",
     "Select only actors or only triggers to create independent copies of the same behavior.",
     "Selecciona solo actores o solo activadores para crear copias independientes del mismo comportamiento."
+  ],
+  "Escolha um arquivo no mesmo formato do asset atual.": [
+    "Escolha um arquivo no mesmo formato do asset atual.",
+    "Choose a file in the same format as the current asset.",
+    "Elige un archivo en el mismo formato que el recurso actual."
+  ],
+  "O conteúdo do arquivo é inválido para o formato do asset.": [
+    "O conteúdo do arquivo é inválido para o formato do asset.",
+    "The file contents are invalid for the asset format.",
+    "El contenido del archivo no es válido para el formato del recurso."
+  ],
+  "O projeto ou o asset mudou durante a substituição. Tente novamente.": [
+    "O projeto ou o asset mudou durante a substituição. Tente novamente.",
+    "The project or asset changed during replacement. Try again.",
+    "El proyecto o el recurso cambió durante la sustitución. Inténtalo de nuevo."
   ],
   "Selecione exatamente um arquivo para substituir o asset.": [
     "Selecione exatamente um arquivo para substituir o asset.",

@@ -2085,6 +2085,13 @@ function assetByReference(data: GBAProjectData, reference: string | null): Previ
   return assetByName(data, nullableString(asset?.name));
 }
 
+function audioAssetByReference(data: GBAProjectData, reference: string | null): PreviewRuntimeAssetRef | null {
+  if (!reference) return null;
+  const audio = projectArray(data, "audioItems").find(item => item.name === reference || item.exportID === reference);
+  const source = audio ? audioSourceAsset(data, audio) : null;
+  return assetByReference(data, nullableString(source?.id) ?? reference);
+}
+
 function tacticalPresentationForRuntime(
   data: GBAProjectData,
   sceneType: string,
@@ -2142,10 +2149,10 @@ function tacticalPresentationForRuntime(
   const audio = hasCapability("tactical_audio") && presentation.audio
     ? {
       music: presentation.audio.music || null,
-      musicAsset: assetByReference(data, presentation.audio.music || null),
+      musicAsset: audioAssetByReference(data, presentation.audio.music || null),
       cues: presentation.audio.cues,
       cueAssets: Object.fromEntries(
-        ISO_TACTICAL_AUDIO_CUES.map((cue) => [cue, assetByReference(data, presentation.audio?.cues[cue] ?? null)])
+        ISO_TACTICAL_AUDIO_CUES.map((cue) => [cue, audioAssetByReference(data, presentation.audio?.cues[cue] ?? null)])
       ) as Partial<Record<IsoTacticalAudioCue, PreviewRuntimeAssetRef | null>>
     }
     : null;
@@ -2588,9 +2595,9 @@ function dialogueByKey(data: GBAProjectData, key: string, mode: PreviewRuntimeDi
     emote: stringField(dialogue.emote, ""),
     emoteAsset: assetByName(data, nullableString(dialogue.emote)),
     textSound: stringField(dialogue.textSound, ""),
-    textSoundAsset: assetByName(data, nullableString(dialogue.textSound)),
+    textSoundAsset: audioAssetByReference(data, nullableString(dialogue.textSound)),
     confirmSound: stringField(dialogue.confirmSound, ""),
-    confirmSoundAsset: assetByName(data, nullableString(dialogue.confirmSound)),
+    confirmSoundAsset: audioAssetByReference(data, nullableString(dialogue.confirmSound)),
     text: localizedDialogueText(dialogue, localization, locale),
     choices: localizedDialogueChoices(dialogue, localization, locale).filter((choice) => choice.trim()),
     selectedChoiceIndex: 0
@@ -3015,7 +3022,7 @@ function setCurrentRoom(state: PreviewRuntimeState, room: PreviewRuntimeRoom, tr
     isometricTacticalPresentation: tacticalPresentation,
     ...(tacticalMusic ? {
       activeMusic: tacticalMusic,
-      activeMusicAsset: assetByReference(state.project, tacticalMusic)
+      activeMusicAsset: audioAssetByReference(state.project, tacticalMusic)
     } : {}),
     ...battleStateForRoom(state.project, room),
     battleTurnIndex: 0,
@@ -4209,7 +4216,7 @@ function appendRecognizedScript(
     return updateDebug(appendLog({
       ...state,
       activeSfx,
-      activeSfxAsset: assetByName(state.project, activeSfx)
+      activeSfxAsset: audioAssetByReference(state.project, activeSfx)
     }, eventName, command, "audio", activeSfx));
   }
 
@@ -4701,7 +4708,7 @@ function runScriptFrameCommands(state: PreviewRuntimeState, frame: PreviewRuntim
 
     if (verb === "play_music") {
       const activeMusic = operand || null;
-      const activeMusicAsset = assetByName(currentState.project, activeMusic);
+      const activeMusicAsset = audioAssetByReference(currentState.project, activeMusic);
       const nextState = appendLog({ ...currentState, activeMusic, activeMusicAsset }, resolvedEventName, command, "audio", activeMusic);
       currentState = updateDebug(activeMusic && !activeMusicAsset
         ? appendDiagnostic(nextState, `Musica nao encontrada nos assets: ${activeMusic}.`)
@@ -4711,7 +4718,7 @@ function runScriptFrameCommands(state: PreviewRuntimeState, frame: PreviewRuntim
 
     if (verb === "play_sfx") {
       const activeSfx = parts[0] || null;
-      const activeSfxAsset = assetByName(currentState.project, activeSfx);
+      const activeSfxAsset = audioAssetByReference(currentState.project, activeSfx);
       const hasPlaybackOptions = parts[1] !== undefined || parts[2] !== undefined;
       const audioMix = hasPlaybackOptions
         ? {
@@ -5536,7 +5543,7 @@ function applyPreviewTacticalAudio(
   return {
     ...state,
     activeSfx: cueName,
-    activeSfxAsset: presentation.audio.cueAssets[cue] ?? assetByReference(state.project, cueName)
+    activeSfxAsset: presentation.audio.cueAssets[cue] ?? audioAssetByReference(state.project, cueName)
   };
 }
 
@@ -5649,7 +5656,7 @@ function closeActiveDialogue(state: PreviewRuntimeState): PreviewRuntimeState {
     ...state,
     activeDialogue: null,
     activeSfx: confirmSound ?? state.activeSfx,
-    activeSfxAsset: confirmSound ? assetByName(state.project, confirmSound) : state.activeSfxAsset
+    activeSfxAsset: confirmSound ? audioAssetByReference(state.project, confirmSound) : state.activeSfxAsset
   });
 }
 
@@ -6295,7 +6302,7 @@ export function bootPreviewRuntimeAtRoom(
     isometricTactical: defaultIsometricTacticalState(currentRoom, actors),
     isometricTacticalPresentation: initialTacticalPresentation,
     activeMusic: initialTacticalMusic,
-    activeMusicAsset: assetByReference(project, initialTacticalMusic),
+    activeMusicAsset: audioAssetByReference(project, initialTacticalMusic),
     activeSfx: null,
     activeSfxAsset: null,
     audioMix: defaultRuntimeAudioMixState(),
@@ -6450,9 +6457,9 @@ function refreshRuntimeProjectSnapshot(state: PreviewRuntimeState, project: GBAP
     activeDialogue,
     dialogueUi: dialogueUiSettings(project, fallbackRoom?.id),
     ...(tacticalMusic ? { activeMusic: tacticalMusic } : {}),
-    activeMusicAsset: assetByReference(project, tacticalMusic ?? state.activeMusic),
+    activeMusicAsset: audioAssetByReference(project, tacticalMusic ?? state.activeMusic),
     activeSfx,
-    activeSfxAsset: assetByName(project, activeSfx),
+    activeSfxAsset: audioAssetByReference(project, activeSfx),
     diagnostics: renderingDiagnostics(rooms, actors)
   });
 }
@@ -7758,7 +7765,7 @@ function playSceneMenuActionSound(state: PreviewRuntimeState, action: "navigate"
   if (!name) return state;
   const audio = projectArray(state.project, "audioItems").find(item => item.name === name || item.exportID === name);
   const volume = Math.max(0, Math.min(100, Number(audio?.volume ?? 100)));
-  return runEvent(state, "menu_audio_feedback", [], false, [`play_sfx ${name} ${volume} 8`]);
+  return runEvent(state, "menu_audio_feedback", [], false, [sceneChangeCommand(["play_sfx", name, String(volume), "8"])]);
 }
 
 function sceneMenuItemAvailable(state: PreviewRuntimeState, item: MenuSceneItem): boolean {

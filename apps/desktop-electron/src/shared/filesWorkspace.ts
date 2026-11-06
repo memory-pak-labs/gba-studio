@@ -1258,6 +1258,7 @@ export function renameAssetInProject(data: GBAProjectData, assetIDToRename: stri
   next.assets = assets;
   if (previousName && previousName !== trimmedName) {
     updateAssetReferences(next, previousName, trimmedName);
+    updateTemplateDefaultAssetReferences(next, previousName, trimmedName);
   }
   return next;
 }
@@ -1265,6 +1266,31 @@ export function renameAssetInProject(data: GBAProjectData, assetIDToRename: stri
 function updateExactAssetField(record: Record<string, unknown>, field: string, oldName: string, nextName: string): void {
   if (record[field] === oldName) {
     record[field] = nextName;
+  }
+}
+
+function updateTemplateDefaultAssetReferences(data: GBAProjectData, oldName: string, nextName: string): void {
+  const settings = isRecord(data.settings) ? data.settings : {};
+  const sceneTypes = isRecord(settings.sceneTypes) ? settings.sceneTypes : {};
+  for (const mapping of [sceneTypes.defaultPlayerSprites, sceneTypes.defaultBackgrounds]) {
+    if (!isRecord(mapping)) continue;
+    for (const key of Object.keys(mapping)) updateExactAssetField(mapping, key, oldName, nextName);
+  }
+  if (isRecord(settings.topdown)) updateExactAssetField(settings.topdown, "playerSprite", oldName, nextName);
+  if (isRecord(settings.shmup)) {
+    for (const key of ["playerSprite", "playerExplosionSprite"]) updateExactAssetField(settings.shmup, key, oldName, nextName);
+  }
+  if (isRecord(settings.pointAndClick)) updateExactAssetField(settings.pointAndClick, "cursorImage", oldName, nextName);
+  if (isRecord(settings.uiDialogs)) updateExactAssetField(settings.uiDialogs, "defaultPortrait", oldName, nextName);
+  function retargetMaterials(owner: unknown, key: string): void {
+    if (isRecord(owner) && Array.isArray(owner[key])) owner[key] = owner[key].map(value => value === oldName ? nextName : value);
+  }
+  for (const asset of projectArray(data, "assets")) retargetMaterials(asset.metadata, "dungeonMaterialAssets");
+  for (const room of [...projectArray(data, "scenas"), ...projectArray(data, "rooms"), ...[data.scena, data.room].filter(isRecord)]) {
+    const runtime = isRecord(room.runtime) ? room.runtime : {};
+    const config = isRecord(runtime.config) ? runtime.config : {};
+    retargetMaterials(config.presentation, "materialAssets");
+    updateExactAssetField(room, "backgroundAssetName", oldName, nextName);
   }
 }
 
@@ -1397,21 +1423,22 @@ function pruneAssetIDFromGroups(groups: unknown, assetIDToRemove: string): unkno
   });
 }
 
-export function removeAssetFromProject(data: GBAProjectData, assetIDToRemove: string): GBAProjectData {
+export function removeAssetRecordsFromProject(data: GBAProjectData, ids: readonly string[]): GBAProjectData {
   const next = cloneProjectData(data);
   const assets = projectArray(next, "assets");
-  const removedAsset = assets.find((item, index) => assetID(item, index) === assetIDToRemove);
-  const filteredAssets = assets.filter((item, index) => assetID(item, index) !== assetIDToRemove);
-  if (filteredAssets.length === assets.length) {
-    return data;
-  }
-
+  const selected = new Set(ids);
+  const filteredAssets = assets.filter((item, index) => !selected.has(assetID(item, index)));
+  if (filteredAssets.length === assets.length) return data;
   next.assets = filteredAssets;
-  next.assetGroups = pruneAssetIDFromGroups(next.assetGroups, assetIDToRemove);
+  for (const id of selected) next.assetGroups = pruneAssetIDFromGroups(next.assetGroups, id);
+  return next;
+}
+
+export function removeAssetFromProject(data: GBAProjectData, assetIDToRemove: string): GBAProjectData {
+  const removedAsset = projectArray(data, "assets").find((item, index) => assetID(item, index) === assetIDToRemove);
+  const next = removeAssetRecordsFromProject(data, [assetIDToRemove]);
   const removedAssetName = nullableString(removedAsset?.name);
-  if (removedAssetName) {
-    updateAssetReferences(next, removedAssetName, "");
-  }
+  if (next !== data && removedAssetName) updateAssetReferences(next, removedAssetName, "");
   return next;
 }
 
@@ -1571,6 +1598,14 @@ export function repairAssetGroupReferencesInProject(data: GBAProjectData): GBAPr
   return next;
 }
 
+export function assetFileSourceInProject(data: GBAProjectData, id: string): string | undefined {
+  const asset = projectArray(data, "assets").find((item, index) => assetID(item, index) === id);
+  if (!asset) return undefined;
+  const metadata = isRecord(asset.metadata) ? asset.metadata : {};
+  return nullableString(metadata.source) ?? nullableString(asset.relativePath)
+    ?? nullableString(asset.source) ?? nullableString(asset.name) ?? undefined;
+}
+
 export function replaceAssetFileInProject(
   data: GBAProjectData,
   assetIDToReplace: string,
@@ -1588,7 +1623,8 @@ export function replaceAssetFileInProject(
   // These describe the old pixels, rather than the asset's runtime settings.
   for (const field of [
     "bundledDefaultAsset", "sourceSha256", "preparedSha256", "runtimeSourceSha256",
-    "provenance", "license", "generatedBy", "approved", "reviewStatus", "visualStatus",
+    "sourceOriginal", "provenance", "license", "generatedBy", "approved", "reviewStatus", "visualStatus",
+    "assetcStatus", "assetcReviewed",
     "palettePreparationVisuallyApproved", "width", "height", "backgroundPaletteReferencePlan"
   ]) {
     delete metadata[field];

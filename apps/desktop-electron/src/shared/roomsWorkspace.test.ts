@@ -45,6 +45,7 @@ import {
   duplicateRoomEntitiesInProject,
   filterRoomsWorkspaceRooms,
   removeRoomFromProject,
+  planRoomRemoval,
   removeRoomEntitiesInProject,
   removeRoomConnectionFromProject,
   renameRoomInProject,
@@ -1716,6 +1717,99 @@ describe("Rooms workspace presentation", () => {
       sceneMapPositions: { overworld: { x: 36, y: 36 } },
       scenaConnections: []
     });
+  });
+
+  it("redirects only the deleted scene's transitions and keeps the false branch of its conditions", () => {
+    const project = {
+      scenas: [
+        { id: "start", name: "Start", campaign: { nextScene: "Opening", title: "Keep" } },
+        { id: "opening", name: "Opening" },
+        { id: "title", name: "Title Screen", width: 10, height: 8 }
+      ],
+      settings: { general: { startScene: "opening" } },
+      sceneRouteTables: [{ id: "route", routes: [{ value: 1, scene: "Opening", x: 2, y: 3 }], fallback: { scene: "Start", x: 4 } }],
+      events: [
+        { name: "opening_done", roomName: "Opening", command: 'change_scene "Title Screen"' },
+        { name: "boot", roomName: "Start", steps: [
+          { command: "if_variable check 1" },
+          { command: "if_scene Opening" },
+          { command: "wait 5" },
+          { command: "else" },
+          { id: "keep", command: "change_scene opening 40 20 up", custom: true },
+          { command: "condition_end" },
+          { command: "condition_end" },
+          { command: "change_scene Start" }
+        ] }
+      ],
+      actors: [{ id: "gone", roomName: "Opening" }, { id: "keep", roomName: "Start" }],
+      triggers: [{ id: "gone", sceneName: "Opening" }],
+      audioItems: [{ name: "theme", assignedScene: "Opening", volume: 90 }]
+    };
+    expect(planRoomRemoval(project, "opening")).toMatchObject({ needsDestination: true, suggestedID: "title" });
+    expect(removeRoomFromProject(project, "opening", "opening")).toBe(project);
+    expect(removeRoomFromProject(project, "opening", "missing")).toBe(project);
+    const next = removeRoomFromProject(project, "opening", "title");
+    expect(next.settings).toEqual({ general: { startScene: "Title Screen" } });
+    expect((next.scenas as Record<string, unknown>[])[0]?.campaign).toEqual({ nextScene: "Title Screen", title: "Keep" });
+    expect(next.sceneRouteTables).toEqual([{ id: "route", routes: [{ value: 1, scene: "Title Screen", x: 2, y: 3 }], fallback: { scene: "Start", x: 4 } }]);
+    expect(next.actors).toEqual([{ id: "keep", roomName: "Start" }]);
+    expect(next.triggers).toEqual([]);
+    expect(next.audioItems).toEqual([{ name: "theme", volume: 90 }]);
+    expect(next.events).toEqual([
+      project.events[0],
+      { name: "boot", roomName: "Start", steps: [
+        { command: "if_variable check 1" },
+        { command: 'if_scene "Title Screen"' },
+        { command: "wait 5" },
+        { command: "else" },
+        { id: "keep", command: 'change_scene "Title Screen" 9 7 up', custom: true },
+        { command: "condition_end" },
+        { command: "condition_end" },
+        { command: "change_scene Start" }
+      ] }
+    ]);
+    expect(project.scenas).toHaveLength(3);
+    expect(project.actors).toHaveLength(2);
+  });
+
+  it("keeps cutscene indexes pointing to the intended scenes after deletion", () => {
+    const project = {
+      scenas: [
+        { id: "logo", name: "Logo", sceneType: "cutscene", runtime: { type: "cutscene", config: {
+          nextSceneIndex: 2,
+          steps: [{ targetSceneIndex: 1, branchVariable: 0, branchTargetSceneIndex: 2, branchTargetStepIndex: 1 }]
+        } } },
+        { id: "menu", name: "Menu", sceneType: "menu" },
+        { id: "opening", name: "Opening", sceneType: "cutscene" },
+        { id: "ending", name: "Ending", sceneType: "cutscene" }
+      ],
+      settings: { cutscene: { nextSceneIndex: 2 } }
+    };
+    expect(planRoomRemoval(project, "opening")).toMatchObject({ needsDestination: true });
+    const next = removeRoomFromProject(project, "opening", "ending");
+    expect(next.scenas).toHaveLength(3);
+    expect((next.scenas as typeof project.scenas)[0]?.runtime?.config).toMatchObject({
+      nextSceneIndex: 1,
+      steps: [{ targetSceneIndex: 1, branchTargetSceneIndex: 1, branchTargetStepIndex: 1 }]
+    });
+    expect(next.settings).toEqual({ cutscene: { nextSceneIndex: 1 } });
+    expect(project.scenas[0]?.runtime?.config.nextSceneIndex).toBe(2);
+  });
+
+  it("permits removing the last scene and leaves an editable project", () => {
+    const project = {
+      scena: { id: "solo", name: "Solo" },
+      scenas: [{ id: "solo", name: "Solo" }],
+      settings: { general: { startScene: "Solo" } },
+      events: [{ name: "jump", steps: [{ command: "change_scene Solo" }] }],
+      sceneRouteTables: [{ id: "route", routes: [{ value: 1, scene: "Solo" }], fallback: { scene: "Solo" } }]
+    };
+    const next = removeRoomFromProject(project, "solo");
+    expect(next.scenas).toEqual([]);
+    expect(next.scena).toBeUndefined();
+    expect(next.settings).toEqual({ general: {} });
+    expect(next.events).toEqual([{ name: "jump", steps: [{ command: "noop" }] }]);
+    expect(next.sceneRouteTables).toEqual([{ id: "route", routes: [], fallback: null }]);
   });
 
   it("sets the start room from a scene map card action", () => {

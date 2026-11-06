@@ -1,6 +1,6 @@
 import type { GBAProjectData } from "./projectFile.js";
 import { updateRoomFieldsInProject } from "./roomsWorkspace.js";
-import { createAdvancedHudPresetInProject, deriveHudPresetsWorkspacePresentation, HUD_PROJECT_PRESET_ID, hudAnchorOffsetsForComponent, type HudComponent } from "./hudPresets.js";
+import { createAdvancedHudPresetInProject, deriveHudPresetsWorkspacePresentation, HUD_PROJECT_PRESET_ID, removeHudPresetInProject, hudAnchorOffsetsForComponent, type HudComponent } from "./hudPresets.js";
 export { HUD_PROJECT_PRESET_ID } from "./hudPresets.js";
 
 function record(value: unknown): Record<string, unknown> {
@@ -20,6 +20,53 @@ export function hudPresetUsages(data: GBAProjectData, presetID: string): Array<{
       : typeof item === "object" && contains(item));
   };
   return scenes(data).filter(contains).map(scene => ({ id: String(scene.id ?? scene.name), name: String(scene.name ?? scene.id) }));
+}
+
+export function planHudPresetDeletion(data: GBAProjectData, presetID: string) {
+  const presentation = deriveHudPresetsWorkspacePresentation(data);
+  const preset = presentation.presets.find(item => item.id === presetID && !item.builtIn);
+  if (!preset) return null;
+  const usages = hudPresetUsages(data, presetID).map(scene => `Cena: ${scene.name}`);
+  if (presentation.activePresetId === presetID) usages.unshift("HUD ativa do projeto");
+  return {
+    name: preset.name,
+    usages,
+    canUnlink: true,
+    replacements: presentation.presets.filter(item => item.id !== presetID).map(item => ({ value: item.id, label: item.name }))
+  };
+}
+
+export function resolveHudPresetDeletion(data: GBAProjectData, presetID: string, replacementID: string | null): GBAProjectData {
+  const plan = planHudPresetDeletion(data, presetID);
+  if (!plan || (replacementID && !plan.replacements.some(choice => choice.value === replacementID))) return data;
+  const active = deriveHudPresetsWorkspacePresentation(data).activePresetId === presetID;
+  const next = removeHudPresetInProject(data, presetID);
+  if (next === data) return data;
+
+  function visit(value: unknown, isScene = false): void {
+    if (Array.isArray(value)) {
+      value.forEach(item => visit(item));
+      return;
+    }
+    const owner = record(value);
+    if (owner.hudPresetId === presetID || (active && owner.hudPresetId === HUD_PROJECT_PRESET_ID)) {
+      if (replacementID) owner.hudPresetId = replacementID;
+      else if (isScene) owner.hudPresetId = null;
+      else {
+        delete owner.hudPresetId;
+        if (typeof owner.screenType === "string") owner.hudMode = "none";
+      }
+    }
+    Object.values(owner).forEach(item => visit(item));
+  }
+  for (const key of ["scenas", "rooms"]) {
+    const rooms = next[key];
+    if (Array.isArray(rooms)) rooms.forEach(scene => visit(scene, true));
+  }
+  visit(next.scena, true);
+  visit(next.room, true);
+  if (active && replacementID) record(next.settings).hudPresetId = replacementID;
+  return next;
 }
 
 /** Commit a scene binding and its menu override as one undoable project change. */

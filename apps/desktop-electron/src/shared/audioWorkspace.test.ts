@@ -128,6 +128,25 @@ describe("Audio workspace presentation", () => {
     });
   });
 
+  it("lista usos pelo nome ou alias em ordem, sem repetir um evento", () => {
+    const presentation = deriveAudioWorkspacePresentation({
+      scenas: [{ name: "Entrada", music: "tema_abertura" }],
+      events: [{
+        name: "Início",
+        steps: [{ command: "play_music tema.mod" }, { command: "play_music tema_abertura" }]
+      }, { name: "Confirmação", command: "play_sfx confirmar.wav" }],
+      audioItems: [
+        { id: "theme", name: "tema.mod", exportID: "tema_abertura", kind: "Musica" },
+        { id: "confirm", name: "confirmar.wav", kind: "SFX" }
+      ]
+    });
+
+    expect(presentation.items.map(({ name, usageLabels, usageCount }) => ({ name, usageLabels, usageCount }))).toEqual([
+      { name: "confirmar.wav", usageLabels: ["Evento: Confirmação"], usageCount: 1 },
+      { name: "tema.mod", usageLabels: ["Cena: Entrada", "Evento: Início"], usageCount: 2 }
+    ]);
+  });
+
   it("contabiliza a trilha e os cues da apresentação tática", () => {
     const presentation = deriveAudioWorkspacePresentation({
       scenas: [{

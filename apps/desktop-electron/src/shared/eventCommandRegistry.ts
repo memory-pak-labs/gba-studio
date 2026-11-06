@@ -216,27 +216,40 @@ export function isNativeEventCommandSupportedInRom(verb: string): boolean {
   return handling === "runtime" || handling === "structural";
 }
 
-export function nativeEventCommandReferencedEvents(command: string): string[] {
-  const parts = command.split(/\s+/).filter(Boolean);
-  const verb = parts[0] ?? "noop";
-  const references: string[] = [];
-
-  if (["call_event", "call_procedure", "lock_script", "unlock_script", "timer_restart", "timer_remove"].includes(verb) && parts[1]) {
-    references.push(parts[1]);
-  } else if (verb === "choice_event" && parts[3]) {
-    references.push(parts[3]);
-  } else if (["attach_button", "timer_attach", "attach_platform_callback", "attach_adventure_callback", "start_segment"].includes(verb) && parts[2]) {
-    references.push(parts[2]);
-  } else if (verb === "repeat_expression" && parts[4]) {
-    references.push(parts[4]);
-  } else if (verb === "switch_variable") {
+function eventOperandIndexes(parts: string[]): number[] {
+  const verb = parts[0];
+  if (["call_event", "call_procedure", "lock_script", "unlock_script", "timer_restart", "timer_remove"].includes(verb ?? "")) return [1];
+  if (verb === "choice_event") return [3];
+  if (["attach_button", "timer_attach", "attach_platform_callback", "attach_adventure_callback", "start_segment"].includes(verb ?? "")) return [2];
+  if (verb === "repeat_expression") return [4];
+  const indexes: number[] = [];
+  if (verb === "switch_variable") {
     for (let index = 2; index + 1 < parts.length; index += 2) {
-      references.push(parts[index + 1]);
-      if ((parts[index] ?? "").toLowerCase() === "else") break;
+      indexes.push(index + 1);
+      if (parts[index]?.toLowerCase() === "else") break;
     }
   }
+  return indexes;
+}
 
-  return Array.from(new Set(references.filter(Boolean)));
+export function nativeEventCommandReferencedEvents(command: string): string[] {
+  const parts = command.trim().split(/\s+/);
+  return [...new Set(eventOperandIndexes(parts).map(index => parts[index]).filter((part): part is string => Boolean(part)))];
+}
+
+export function retargetNativeEventCommand(command: string, oldName: string, nextName: string | null): string {
+  const parts = command.trim().split(/\s+/);
+  const matches = eventOperandIndexes(parts).filter(index => parts[index] === oldName);
+  if (!matches.length) return command;
+  if (nextName !== null) {
+    for (const index of matches) parts[index] = nextName;
+  } else if (parts[0] === "switch_variable") {
+    for (const index of matches.reverse()) parts.splice(index - 1, 2);
+    if (parts.length < 4) return "noop";
+  } else {
+    return "noop";
+  }
+  return parts.join(" ");
 }
 
 export function unsupportedNativeEventCommandVerbs(commands: Iterable<string>): string[] {

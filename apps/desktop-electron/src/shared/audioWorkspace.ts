@@ -1,6 +1,9 @@
+import { authoredEventCommandRecords } from "./authoredEventCommands.js";
+import { sceneChangeCommand, sceneChangeCommandParts } from "./sceneChangeCommand.js";
+import type { FilesWorkspaceUsageLink } from "./filesWorkspace.js";
 import { audioInstrumentBank, audioInstrumentUsageCount, resolveAudioInstrumentComposition } from "./audioInstruments.js";
 import type { GBAProjectData } from "./projectFile.js";
-import { audioContractIssues, audioSampleAssets, audioPhysicalChannel, audioSourceAsset, audioSourceFormat } from "./audioContract.js";
+import { audioComposed, audioContractIssues, audioSampleAssets, audioPhysicalChannel, audioSourceAsset, audioSourceFormat } from "./audioContract.js";
 import {
   compileComposedMusicaToTracker,
   compileComposedSfxToAssetc,
@@ -696,178 +699,146 @@ function makeAudioItem(options: CreateAudioItemOptions): Record<string, unknown>
   return audio;
 }
 
-function replaceAudioCommand(command: unknown, oldName: string, nextName: string): unknown {
-  if (typeof command !== "string") return command;
-  const parts = commandParts(command);
-  if (!["play_music", "play_sfx"].includes(parts[0] ?? "") || parts[1] !== oldName) {
-    return command;
+type AudioReference = {
+  name: string;
+  usage: FilesWorkspaceUsageLink;
+  update(nextName: string): void;
+};
+
+function visitAudioReferences(data: GBAProjectData, visit: (reference: AudioReference) => void, includeSceneMirrors = false): void {
+  function field(owner: Record<string, unknown>, key: string, usage: FilesWorkspaceUsageLink): void {
+    const name = nullableString(owner[key]);
+    if (name) visit({ name, usage, update(nextName) {
+      if (nextName) owner[key] = nextName;
+      else delete owner[key];
+    } });
   }
 
-  parts[1] = nextName;
-  return parts.join(" ");
-}
-
-function clearAudioCommand(command: unknown, audioNameToRemove: string): unknown {
-  if (typeof command !== "string") return command;
-  const parts = commandParts(command);
-  if (!["play_music", "play_sfx"].includes(parts[0] ?? "") || parts[1] !== audioNameToRemove) {
-    return command;
-  }
-
-  return "noop";
-}
-
-function updateAudioCommands(data: GBAProjectData, updater: (command: unknown) => unknown): void {
-  for (const event of projectArray(data, "events")) {
-    event.command = updater(event.command);
-    if (!Array.isArray(event.steps)) continue;
-
-    event.steps = event.steps.map((step) => {
-      if (!isRecord(step)) return step;
-      return {
-        ...step,
-        command: updater(step.command)
-      };
-    });
-  }
-}
-
-function updateAudioReferences(data: GBAProjectData, oldName: string, nextName: string): void {
-  const replace = (record: Record<string, unknown>, key: string): void => {
-    if (record[key] !== oldName) return;
-    if (nextName) record[key] = nextName;
-    else delete record[key];
-  };
-  for (const room of [...projectArray(data, "scenas"), ...projectArray(data, "rooms")]) {
-    replace(room, "music");
+  const rooms = includeSceneMirrors
+    ? [...projectArray(data, "scenas"), ...projectArray(data, "rooms"), ...[data.scena, data.room].filter(isRecord)]
+    : projectRooms(data);
+  for (const room of rooms) {
+    const targetName = stringField(room.name, "Cena sem nome");
+    const usage = { workspace: "Editor" as const, targetID: nullableString(room.id) ?? undefined, targetName };
+    const label = `Cena: ${targetName}`;
+    field(room, "music", { ...usage, label, usageKind: "room-music" });
     const runtime = isRecord(room.runtime) ? room.runtime : null;
     const config = runtime && isRecord(runtime.config) ? runtime.config : null;
-    if (config && isRecord(config.actionSounds)) for (const cue of Object.keys(config.actionSounds)) replace(config.actionSounds, cue);
-    const rpg = config && isRecord(config.presentation) ? config.presentation : null;
-    if(rpg){
-      replace(rpg,"victoryMusic");
-      if(isRecord(rpg.actionSounds))for(const cue of Object.keys(rpg.actionSounds))replace(rpg.actionSounds,cue);
+    if (!config) continue;
+    const cues = (owner: unknown, cueLabel: string, usageKind: string): void => {
+      if (!isRecord(owner)) return;
+      for (const cue of Object.keys(owner)) field(owner, cue, { ...usage, label: `${label} (${cueLabel} ${cue})`, usageKind });
+    };
+    const runtimeType = runtime?.type;
+    cues(config.actionSounds, runtimeType === "menu" ? "menu" : runtimeType === "racing" ? "corrida" : "luta", "scene-audio-cue");
+    for (const screen of projectArray(config, "screens")) {
+      cues(screen.actionSounds, `menu ${stringField(screen.id, "")}`.trim(), "menu-screen-audio-cue");
     }
-    const presentation = config && isRecord(config.tacticalPresentation) ? config.tacticalPresentation : null;
-    const audio = presentation && isRecord(presentation.audio) ? presentation.audio : null;
+    const presentation = isRecord(config.presentation) ? config.presentation : null;
+    if (presentation) {
+      field(presentation, "victoryMusic", { ...usage, label: `${label} (RPG vitória)`, usageKind: "scene-audio-cue" });
+      cues(presentation.actionSounds, runtimeType === "dungeonCrawler" ? "dungeon" : "RPG", "scene-audio-cue");
+    }
+    const tactical = isRecord(config.tacticalPresentation) ? config.tacticalPresentation : null;
+    const audio = tactical && isRecord(tactical.audio) ? tactical.audio : null;
     if (audio) {
-      replace(audio, "music");
-      if (isRecord(audio.cues)) for (const cue of Object.keys(audio.cues)) replace(audio.cues, cue);
+      field(audio, "music", { ...usage, label: `${label} (trilha tática)`, usageKind: "scene-audio-cue" });
+      cues(audio.cues, "cue", "scene-audio-cue");
     }
   }
-  for (const dialogue of projectArray(data, "dialogues")) {
-    replace(dialogue, "textSound");
-    replace(dialogue, "confirmSound");
+
+  const authored = new Set(authoredEventCommandRecords(data));
+  const visitCommand = (step: Record<string, unknown>, usage: FilesWorkspaceUsageLink): void => {
+    authored.delete(step);
+    function commandReference(command: string, write: (command: string) => void): void {
+      const parts = sceneChangeCommandParts(command);
+      if (!["play_music", "play_sfx", "run_audio_routine", "set_text_sfx"].includes(parts[0] ?? "") || !parts[1]) return;
+      visit({ name: parts[1], usage, update(nextName) {
+        parts[1] = nextName;
+        write(nextName ? sceneChangeCommand(parts) : "noop");
+      } });
+    }
+    if (typeof step.command === "string") commandReference(step.command, command => { step.command = command; });
+    if (typeof step.commands === "string") {
+      const lines = step.commands.split(/(\r?\n)/);
+      lines.forEach((line, index) => commandReference(line, command => {
+        lines[index] = command;
+        step.commands = lines.join("");
+      }));
+    }
+  };
+  for (const event of projectArray(data, "events")) {
+    const targetName = stringField(event.name, "Evento sem nome");
+    const usage = { workspace: "Eventos" as const, targetID: nullableString(event.id) ?? undefined,
+      targetName, label: `Evento: ${targetName}`, usageKind: "event-audio-command" };
+    for (const step of [event, ...projectArray(event, "steps")]) visitCommand(step, usage);
   }
-  updateAudioCommands(data, command => nextName ? replaceAudioCommand(command, oldName, nextName) : clearAudioCommand(command, oldName));
-}
-
-function renameAudioReferences(data: GBAProjectData, oldName: string, nextName: string): void {
-  updateAudioReferences(data, oldName, nextName);
-}
-
-function clearAudioReferences(data: GBAProjectData, name: string): void {
-  updateAudioReferences(data, name, "");
-}
-
-function commandParts(command: string): string[] {
-  return command.split(/\s+/).filter(Boolean);
-}
-
-function eventSteps(event: Record<string, unknown>): string[] {
-  const steps = Array.isArray(event.steps) ? event.steps.filter(isRecord) : [];
-  if (steps.length === 0) {
-    return [stringField(event.command, "noop")];
+  for (const frame of authored) {
+    visitCommand(frame, { workspace: "Eventos", label: `Timeline: ${String(frame.command)}`, usageKind: "event-audio-command" });
   }
 
-  return steps
-    .filter((step) => step.isEnabled !== false)
-    .map((step) => stringField(step.command, "noop"));
-}
-
-function roomUsageLabels(data: GBAProjectData, audioName: string): string[] {
-  return projectRooms(data)
-    .filter((room) => nullableString(room.music) === audioName)
-    .map((room) => `Cena: ${stringField(room.name, "Cena sem nome")}`);
-}
-
-function eventUsageLabels(data: GBAProjectData, audioName: string, kind: string): string[] {
-  const expectedVerb = kind === "SFX" ? "play_sfx" : kind === "Musica" ? "play_music" : null;
-  if (!expectedVerb) return [];
-
-  return projectArray(data, "events").flatMap((event) => {
-    const hasUsage = eventSteps(event).some((command) => {
-      const parts = commandParts(command);
-      return parts[0] === expectedVerb && parts[1] === audioName;
+  const settings = isRecord(data.settings) ? data.settings : {};
+  if (isRecord(settings.uiDialogs)) {
+    field(settings.uiDialogs, "characterSound", {
+      workspace: "Ajustes", label: "Ajustes: som de texto dos diálogos", targetName: "uiDialogs", usageKind: "dialogue-audio"
     });
-    return hasUsage ? [`Evento: ${stringField(event.name, "Evento sem nome")}`] : [];
-  });
+  }
+  for (const [index, dialogue] of projectArray(data, "dialogues").entries()) {
+    const targetName = stringField(dialogue.key ?? dialogue.id ?? dialogue.name, `Dialogo ${index + 1}`);
+    for (const [key, detail] of [["textSound", "texto"], ["confirmSound", "confirmacao"]] as const) {
+      field(dialogue, key, {
+        workspace: "Dialogos", targetName, label: `Dialogo: ${targetName} (${detail})`, usageKind: "dialogue-audio"
+      });
+    }
+  }
 }
 
-function dialogueUsageLabels(data: GBAProjectData, audioName: string): string[] {
-  return projectArray(data, "dialogues").flatMap((dialogue, index) => {
-    const dialogueLabel = stringField(
-      dialogue.key ?? dialogue.id ?? dialogue.name,
-      `Dialogo ${index + 1}`
-    );
-    const usages: string[] = [];
-    if (nullableString(dialogue.textSound) === audioName) {
-      usages.push(`Dialogo: ${dialogueLabel} (texto)`);
-    }
-    if (nullableString(dialogue.confirmSound) === audioName) {
-      usages.push(`Dialogo: ${dialogueLabel} (confirmacao)`);
-    }
-    return usages;
+export function audioReferenceUsages(data: GBAProjectData, name: string): FilesWorkspaceUsageLink[] {
+  const audio = projectArray(data, "audioItems").find(item => item.name === name);
+  const alias = nullableString(audio?.exportID);
+  const usages = new Map<string, FilesWorkspaceUsageLink>();
+  visitAudioReferences(data, reference => {
+    if (reference.name === name || reference.name === alias) usages.set(reference.usage.label, reference.usage);
   });
+  return [...usages.values()];
 }
 
-function lutaUsageLabels(data: GBAProjectData, audioName: string): string[] {
-  return projectArray(data, "scenas").flatMap(scene => {
-    const runtime = isRecord(scene.runtime) ? scene.runtime : null;
-    const config = runtime && isRecord(runtime.config) ? runtime.config : null;
-    return config && isRecord(config.actionSounds) ? Object.entries(config.actionSounds)
-      .filter(([, reference]) => reference === audioName)
-      .map(([cue]) => `Cena: ${stringField(scene.name, "Cena sem nome")} (luta ${cue})`) : [];
-  });
+function indexAudioUsageLabels(data: GBAProjectData, audioItems: Record<string, unknown>[]): Map<string, Set<string>> {
+  const labelsByName = new Map<string, Set<string>>();
+  const labelsByReference = new Map<string, Set<string>[]>();
+  const aliasesByName = new Map<string, string | null>();
+  for (const item of audioItems) {
+    if (typeof item.name === "string" && !aliasesByName.has(item.name)) {
+      aliasesByName.set(item.name, nullableString(item.exportID));
+    }
+  }
+
+  for (const item of audioItems) {
+    const name = stringField(item.name, "Audio sem nome");
+    if (labelsByName.has(name)) continue;
+    const labels = new Set<string>();
+    labelsByName.set(name, labels);
+    const alias = aliasesByName.get(name);
+    for (const reference of alias && alias !== name ? [name, alias] : [name]) {
+      const targets = labelsByReference.get(reference);
+      if (targets) targets.push(labels);
+      else labelsByReference.set(reference, [labels]);
+    }
+  }
+
+  if (labelsByName.size > 0) {
+    visitAudioReferences(data, ({ name, usage }) => {
+      for (const labels of labelsByReference.get(name) ?? []) labels.add(usage.label);
+    });
+  }
+  return labelsByName;
 }
 
-function battleRpgUsageLabels(data: GBAProjectData, audioName: string): string[] {
-  return projectArray(data,"scenas").flatMap(scene=>{
-    const runtime=isRecord(scene.runtime)?scene.runtime:null;
-    const config=runtime&&isRecord(runtime.config)?runtime.config:null;
-    const p=config&&isRecord(config.presentation)?config.presentation:null;
-    if(!p)return [];
-    const label=stringField(scene.name,"Cena sem nome"),labels:string[]=[];
-    if(p.victoryMusic===audioName)labels.push(`Cena: ${label} (RPG vitória)`);
-    if(isRecord(p.actionSounds))for(const [cue,ref]of Object.entries(p.actionSounds))if(ref===audioName)labels.push(`Cena: ${label} (RPG ${cue})`);
-    return labels;
-  });
-}
-
-function tacticalUsageLabels(data: GBAProjectData, audioName: string): string[] {
-  return projectArray(data, "scenas").flatMap((scene) => {
-    const runtime = isRecord(scene.runtime) ? scene.runtime : null;
-    const config = runtime && isRecord(runtime.config) ? runtime.config : null;
-    const presentation = config && isRecord(config.tacticalPresentation)
-      ? config.tacticalPresentation
-      : null;
-    const audio = presentation && isRecord(presentation.audio) ? presentation.audio : null;
-    if (!audio) return [];
-
-    const sceneName = stringField(scene.name, "Cena sem nome");
-    const usages: string[] = [];
-    if (nullableString(audio.music) === audioName) {
-      usages.push(`Cena: ${sceneName} (trilha tática)`);
-    }
-    if (isRecord(audio.cues)) {
-      for (const [cue, reference] of Object.entries(audio.cues)) {
-        if (nullableString(reference) === audioName) {
-          usages.push(`Cena: ${sceneName} (cue ${cue})`);
-        }
-      }
-    }
-    return usages;
-  });
+function updateAudioReferences(data: GBAProjectData, oldName: string, nextName: string, oldAlias: string | null, nextAlias: string): void {
+  visitAudioReferences(data, reference => {
+    if (reference.name === oldName) reference.update(nextName);
+    else if (reference.name === oldAlias) reference.update(nextAlias);
+  }, true);
 }
 
 function itemPatterns(audio: Record<string, unknown>): Record<string, unknown>[] {
@@ -1222,10 +1193,11 @@ export function renameAudioItemInProject(data: GBAProjectData, audioIDToRename: 
   const sourceAsset = audioSourceAsset(next, audioItems[audioIndex]);
   if (sourceAsset?.id) audioItems[audioIndex].sourceAssetID = sourceAsset.id;
 
+  const oldAlias = nullableString(audioItems[audioIndex].exportID);
   audioItems[audioIndex].name = trimmedName;
   audioItems[audioIndex].exportID = defaultExportID(trimmedName);
   next.audioItems = audioItems;
-  renameAudioReferences(next, oldName, trimmedName);
+  updateAudioReferences(next, oldName, trimmedName, oldAlias, String(audioItems[audioIndex].exportID));
   return next;
 }
 
@@ -2239,20 +2211,44 @@ export function normalizeAudioInProject(
   return next;
 }
 
-export function removeAudioItemFromProject(data: GBAProjectData, audioIDToRemove: string): GBAProjectData {
+function audioPlaybackFamily(data: GBAProjectData, audio: Record<string, unknown>): string {
+  if (audioComposed(audio)) return "psg";
+  const format = audioSourceFormat(data, audio);
+  if (format === "MOD" || format === "S3M") return "tracker";
+  return format;
+}
+
+export function audioReplacementChoices(data: GBAProjectData, audioIDToRemove: string): { value: string; label: string }[] {
+  const items = projectArray(data, "audioItems");
+  const source = items.find((item, index) => audioID(item, index) === audioIDToRemove);
+  if (!source) return [];
+  const family = audioPlaybackFamily(data, source);
+  return items.flatMap((item, index) => item !== source && item.kind === source.kind
+    && audioPlaybackFamily(data, item) === family
+    && !audioContractIssues(item, data).some(issue => issue.level === "error")
+    ? [{ value: audioID(item, index), label: audioName(item, index) }] : []);
+}
+
+export function removeAudioItemFromProject(data: GBAProjectData, audioIDToRemove: string, replacementID?: string): GBAProjectData {
   const next = cloneProjectData(data);
   const audioItems = projectArray(next, "audioItems");
   const audioIndex = audioItems.findIndex((item, index) => audioID(item, index) === audioIDToRemove);
   if (audioIndex < 0) return data;
 
+  if (replacementID && !audioReplacementChoices(data, audioIDToRemove).some(choice => choice.value === replacementID)) return data;
+  const replacementIndex = audioItems.findIndex((item, index) => audioID(item, index) === replacementID);
+  const replacementName = replacementIndex >= 0 ? audioName(audioItems[replacementIndex], replacementIndex) : "";
+  const replacementAlias = replacementIndex >= 0 ? nullableString(audioItems[replacementIndex].exportID) : null;
   const removedName = audioName(audioItems[audioIndex], audioIndex);
   next.audioItems = audioItems.filter((_, index) => index !== audioIndex);
-  clearAudioReferences(next, removedName);
+  updateAudioReferences(next, removedName, replacementName, nullableString(audioItems[audioIndex].exportID), replacementAlias ?? replacementName);
   return next;
 }
 
 export function deriveAudioWorkspacePresentation(data: GBAProjectData): AudioWorkspacePresentation {
-  const items = projectArray(data, "audioItems")
+  const audioItems = projectArray(data, "audioItems");
+  const usageLabelsByName = indexAudioUsageLabels(data, audioItems);
+  const items = audioItems
     .map((rawAudio, index): AudioWorkspaceItem => {
       const audio = resolveAudioInstrumentComposition(data, rawAudio);
       const name = stringField(audio.name, "Audio sem nome");
@@ -2265,12 +2261,7 @@ export function deriveAudioWorkspacePresentation(data: GBAProjectData): AudioWor
       const preview = previewChannelsForAudio(audio);
       const previewChannels = preview.channels;
       const activePattern = activePatternPresentation(audio, patterns);
-      const usages = [
-        ...roomUsageLabels(data, name),
-        ...eventUsageLabels(data, name, kind),
-        ...dialogueUsageLabels(data, name),
-        ...tacticalUsageLabels(data, name), ...lutaUsageLabels(data, name), ...battleRpgUsageLabels(data,name)
-      ];
+      const usages = [...(usageLabelsByName.get(name) ?? [])];
       const bpm = integerField(audio.bpm);
       const normalizedBPM = bpm && bpm > 0 ? bpm : null;
       const patternSequence = derivePatternSequence(audio, patterns);
@@ -2353,7 +2344,7 @@ export function deriveAudioWorkspacePresentation(data: GBAProjectData): AudioWor
     kindCounts: countBy(items.map((item) => item.kind), "kind"),
     formatCounts: countBy(items.map((item) => item.format), "format"),
     summary,
-    exportDiagnostics: deriveAudioEngineExportDiagnostics(projectArray(data, "audioItems"), data),
+    exportDiagnostics: deriveAudioEngineExportDiagnostics(audioItems, data),
     summaryCards: [
       { id: "total", label: "Total", value: String(summary.audioCount) },
       { id: "music", label: "Músicas", value: String(summary.musicCount) },
