@@ -367,7 +367,7 @@ function invokeHistoryAware<Result>(
 }
 
 interface RoomsWorkspaceProps {
-  logicEvents?: EventsWorkspacePresentation | null;
+  getEventsPresentation?(): EventsWorkspacePresentation | null;
   onCreateLogicVariable?(kind: ProjectVariableKind, valueType?: "number" | "text"): Promise<string | void> | string | void;
   onUpdateLogicValue?(name: string, kind: ProjectVariableKind, patch: LogicValuePatch): void;
   onRemoveLogicValue?(name: string, kind: ProjectVariableKind): void;
@@ -3607,12 +3607,12 @@ function RoomEntitiesEditor({
                   {isMixedGroupEventContext ? (
                     <>
                       <strong>{ui("Grupo misto de ")}{mixedEntitySelectionCount} {ui(" entidades")}</strong>
-                      <span>{ui("Comportamentos em lote exigem entidades do mesmo tipo")}</span>
+                      <span className="room-entity-group-description">{ui("Comportamentos em lote exigem entidades do mesmo tipo")}</span>
                     </>
                   ) : (
                     <>
                       <strong>{ui("Grupo de ")}{selectedEntities.length} {selectedEntity.kind === "actor" ? ui("atores") : ui("triggers")}</strong>
-                      <span>{ui("Comportamentos independentes por entidade")}</span>
+                      <span className="room-entity-group-description">{ui("Comportamentos independentes por entidade")}</span>
                     </>
                   )}
                 </div>
@@ -5401,7 +5401,7 @@ function RoomSceneOverviewButton({ onClick }: { onClick(): void }): React.ReactE
       type="button"
     >
       <ScanSearch aria-hidden="true" size={14} strokeWidth={2.2} />
-      <span>{ui("Visão geral")}</span>
+      <span className="room-scene-action-label">{ui("Visão geral")}</span>
     </button>
   );
 }
@@ -5465,7 +5465,7 @@ function RoomEditorSceneActions({
           type="button"
         >
           <Play aria-hidden="true" size={14} strokeWidth={2.2} />
-          <span>{ui("Testar cena")}</span>
+          <span className="room-scene-action-label">{ui("Testar cena")}</span>
         </button>
       </div>
     </div>
@@ -5860,7 +5860,7 @@ function RoomTilemapEditor({
       overlay.className = kind === "brush"
         ? `room-stage-collision-gesture ${collisionOverlayClass(collisionType)}`
         : "room-stage-collision-rectangle-gesture collision-rectangle-preview";
-      cells[index].append(overlay);
+      cells[index].prepend(overlay);
       preview.set(index, overlay);
     }
   }
@@ -6438,7 +6438,7 @@ function RoomTilemapEditor({
       const overlay = collisionHover.current ?? document.createElement("span");
       overlay.className = `room-stage-collision-hover ${collisionOverlayClass(selectedCollisionType)}`;
       overlay.setAttribute("aria-hidden", "true");
-      event.currentTarget.append(overlay);
+      event.currentTarget.prepend(overlay);
       collisionHover.current = overlay;
     }
     if (room.sceneType === "isometric" || selectedEditMode === "tiles" && ghostPreviewEnabled) setHoverCellIndex(cellIndex);
@@ -6530,13 +6530,7 @@ function RoomTilemapEditor({
       return `Pintar altura ${index + 1}${location}`;
     }
 
-    if (selectedEditMode === "entities") {
-      return selectedEntity
-        ? `Editar ${selectedEntity.name} no tile ${index + 1}${location}`
-        : `Tile ${index + 1} sem entidade selecionada${location}`;
-    }
-
-    return `Pintar tile ${index + 1}${location}`;
+    return selectedEditMode === "tiles" ? `Pintar tile ${index + 1}${location}` : `Tile ${index + 1}${location}`;
   }
 
   function tileCellStyle(tileID: number, opacity = 1): React.CSSProperties | undefined {
@@ -6756,7 +6750,9 @@ function RoomTilemapEditor({
           if (selectedEditMode === "collision") event.preventDefault();
         }}
         role={showRacingPseudo3dCamera || showRacingTechnicalMap ? undefined : selectedToolPanelMode === "hud" && menuConfig?.textInput ? "group" : "grid"}
-        aria-label={selectedToolPanelMode === "hud" && menuConfig?.textInput ? ui("Interface da cena") : undefined}
+        aria-label={selectedToolPanelMode === "hud" && menuConfig?.textInput
+          ? ui("Interface da cena")
+          : selectedEditMode === "entities" && selectedEntity ? ui("Editar {0}", { 0: selectedEntity.name }) : undefined}
         style={{
           ...(showGrid && canvasLayerVisibility.grid && room.sceneType !== "isometric" && !showRacingPseudo3dCamera && !showRacingTechnicalMap
             ? sceneMapTileGridBackgroundStyle(cardSize.width, cardSize.canvasDisplayHeight, room.width, room.height)
@@ -7232,7 +7228,7 @@ function PrefabAuthoringNote({ prefab }: { prefab: ProjectPrefabRecord }): React
 }
 
 export function RoomsWorkspace({
-  logicEvents, onCreateLogicVariable, onUpdateLogicValue, onRemoveLogicValue,
+  getEventsPresentation, onCreateLogicVariable, onUpdateLogicValue, onRemoveLogicValue,
   projectData,
   presentation,
   hardwareProfiler,
@@ -7485,9 +7481,13 @@ export function RoomsWorkspace({
   }, [focusRequestID, focusedTargetID, focusedTargetName, focusInspectorTab, presentation]);
 
   const activeRoom = presentation?.rooms.find((room) => room.isActive) ?? presentation?.rooms[0] ?? null;
-  const preflightRoom = presentation?.rooms.find(room => room.name === selectedSceneMapRoomName) ?? activeRoom;
-  const inspectorScenePreflight = useMemo(() => projectData && preflightRoom
-    ? buildScenePreflightReport(projectData, preflightRoom.name) : null, [projectData, preflightRoom]);
+  const preflightSceneName = presentation?.rooms.find(room => room.name === selectedSceneMapRoomName)?.name ?? activeRoom?.name;
+  const getInspectorScenePreflight = useMemo(() => {
+    let report: ReturnType<typeof buildScenePreflightReport> | undefined;
+    return () => projectData && preflightSceneName
+      ? (report ??= buildScenePreflightReport(projectData, preflightSceneName))
+      : null;
+  }, [projectData, preflightSceneName]);
   const focusedEditorRoom = focusedSceneEditorRoomID
     ? presentation?.rooms.find((room) => room.id === focusedSceneEditorRoomID) ?? null
     : null;
@@ -7569,12 +7569,16 @@ export function RoomsWorkspace({
   const dialogueCatalog = useMemo(() => projectData ? deriveDialoguesWorkspacePresentation(projectData).dialogues : [], [projectData]);
   const dialogueProfiles = useMemo(() => deriveDialogueCharacterProfiles(dialogueCatalog), [dialogueCatalog]);
   const dialogueUsages = useMemo(() => Object.fromEntries(dialogueCatalog.map(item => [item.key, item.usages])), [dialogueCatalog]);
-  const dialogueSceneNames = useMemo(() => {
-    const result: Record<string, string[]> = {};
-    if (projectData && presentation) for (const room of presentation.rooms) {
-      for (const item of deriveDialoguesForScene(projectData, room).dialogues) (result[item.key] ??= []).push(room.name);
-    }
-    return result;
+  const getDialogueSceneNames = useMemo(() => {
+    let names: Record<string, string[]> | undefined;
+    return () => {
+      if (names) return names;
+      names = {};
+      if (projectData && presentation) for (const room of presentation.rooms) {
+        for (const item of deriveDialoguesForScene(projectData, room).dialogues) (names[item.key] ??= []).push(room.name);
+      }
+      return names;
+    };
   }, [projectData, presentation]);
   const dialogueAssetOptions = useMemo(() => {
     if (!Array.isArray(projectData?.assets)) return [];
@@ -8013,6 +8017,9 @@ export function RoomsWorkspace({
       inspectorContextKind,
       inspectorTabByContext[inspectorContextKind] ?? null
     );
+  const inspectorCommandSuggestions = activeInspectorTab === "events"
+    ? getEventsPresentation?.()?.commandPalette ?? commandSuggestions
+    : commandSuggestions;
   const selectedConnection = selectedConnectionIndex !== null
     ? resolvedPresentation.connections.find((connection) => connection.index === selectedConnectionIndex) ?? null
     : null;
@@ -8062,7 +8069,7 @@ export function RoomsWorkspace({
     && inspectorRoom?.playerActorName === inspectorContext.entity.name
     ? ui("Jogador")
     : null;
-  const projectBudget = projectData && inspectorRoom
+  const projectBudget = activeInspectorTab === "budget" && projectData && inspectorRoom
     ? deriveProjectBudgetPresentation(projectData, inspectorRoom.name, budgetReport)
     : null;
   const inspectorSceneRecord = inspectorRoom
@@ -8076,7 +8083,7 @@ export function RoomsWorkspace({
     : null;
   const sceneEventInspector = (inspectorContext.kind === "room" || racingTrackContext) && inspectorRoom && inspectorSceneRecord ? (
     <RoomEventBindingsInspector
-      commandSuggestions={commandSuggestions}
+      commandSuggestions={inspectorCommandSuggestions}
       contextKind="room"
       entity={inspectorSceneRecord}
       eventOptions={eventReferenceOptions}
@@ -9635,7 +9642,7 @@ export function RoomsWorkspace({
               {ui("Pré-fabricados")}</button>
             <button role="tab" type="button" aria-selected={navigatorTab === "logic"} className={navigatorTab === "logic" ? "active" : ""} onClick={() => setNavigatorTab("logic")}>{ui("Lógica")}</button>
           </div>
-          {navigatorTab === "logic" && projectData ? <LogicNavigator projectData={projectData} events={logicEvents ?? null} selection={logicSelection} onSelect={setLogicSelection} onCreateVariable={onCreateLogicVariable} onCreateScript={onCreateEventReference} /> : null}
+          {navigatorTab === "logic" && projectData ? <LogicNavigator projectData={projectData} events={getEventsPresentation?.() ?? null} selection={logicSelection} onSelect={setLogicSelection} onCreateVariable={onCreateLogicVariable} onCreateScript={onCreateEventReference} /> : null}
           {navigatorTab === "project" ? (
           <section className="editor-rail-section project-section" aria-label={ui("Projeto")}>
             <div className="editor-rail-section-header project-tree-toolbar">
@@ -10614,7 +10621,7 @@ export function RoomsWorkspace({
                       onCreateDialogue={onCreateDialogue} onDuplicateDialogue={onDuplicateDialogue}
                       onRemoveDialogue={onRemoveDialogue} onNormalizeDialogue={onNormalizeDialogue}
                       onImportAssets={onImportAssets} onOpenDialogueEvent={name => onOpenEvent?.(name, inspectorRoom.name)}
-                      usages={dialogueUsages} sceneUsageNames={dialogueSceneNames} characterProfiles={dialogueProfiles}
+                      usages={dialogueUsages} sceneUsageNames={getDialogueSceneNames()} characterProfiles={dialogueProfiles}
                       variables={projectData ? listProjectVariables(projectData).map(option => option.name) : []}
                       actorOptions={contextualDialogues?.actors ?? []}
                       assetOptions={dialogueAssetOptions}
@@ -10662,7 +10669,7 @@ export function RoomsWorkspace({
               ) : inspectorContext.kind === "entity" ? (
                 <RoomEntitiesEditor
                   activeTab={activeInspectorTab ?? (inspectorContext.entity.kind === "actor" ? "actor" : "trigger")}
-                  commandSuggestions={commandSuggestions}
+                  commandSuggestions={inspectorCommandSuggestions}
                   eventOptions={eventReferenceOptions}
                   hasMixedEntitySelection={inspectorHasMixedEntityGroup}
                   inspectorKind={inspectorContext.entity.kind}
@@ -10757,7 +10764,7 @@ export function RoomsWorkspace({
                       onUpdateRoomFields,
                       projectData,
                       activeInspectorTab,
-                      inspectorScenePreflight,
+                      activeInspectorTab === "scene" || activeInspectorTab === "background" ? getInspectorScenePreflight() : null,
                       onOpenProjectHealth,
                       mode=>{enterSceneFocus(inspectorRoom);setFocusViewMode("map");setEditorToolPanelMode(mode==="gates"?"trigger":"select");setRacingAreaMode("gates");setSelectedEntityKeys([]);setSelectedRacingElement({roomID:inspectorRoom.id,selection:mode==="gates"?{kind:"gate",id:normalizeRacingSceneConfig(inspectorRoom.runtime?.config).topdownTrack!.checkpoints[0].id}:{kind:"point",index:0}});}
                     )

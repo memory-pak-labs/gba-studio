@@ -6476,8 +6476,8 @@ body.room-scene-map-card-dragging .room-stage-card-frame.is-dragging {
   display: block;
 }
 
-.room-stage-cell:hover:has(> .room-stage-collision-hover) > [data-collision-overlay],
-.room-stage-cell:has(> .room-stage-collision-gesture) > :is([data-collision-overlay], .room-stage-collision-hover) {
+.room-stage-cell:hover > .room-stage-collision-hover ~ [data-collision-overlay],
+.room-stage-collision-gesture ~ :is([data-collision-overlay], .room-stage-collision-hover) {
   display: none;
 }
 
@@ -10840,7 +10840,7 @@ body.room-scene-map-card-dragging .room-stage-card-frame.is-dragging {
   padding: 0 0 10px;
 }
 
-.room-entities-editor:has(.room-event-editor-shell) > .room-selected-entity-inspector > .room-entity-title span {
+.room-entities-editor:has(.room-event-editor-shell) > .room-selected-entity-inspector > .room-entity-title .room-entity-group-description {
   flex: 0 0 auto;
 }
 
@@ -11543,8 +11543,8 @@ body.room-scene-map-card-dragging .room-stage-card-frame.is-dragging {
 .rooms-editor-layout .room-focus-preview-panel .room-focus-minimap-preview .room-stage-card { border-radius: 0; }
 .rooms-editor-layout .room-focus-preview-panel .room-focus-minimap { padding: 0; border: 0; overflow: hidden; }
 /* Expanded project navigation leaves the context actions compact. */
-.rooms-editor-layout:has(.workspace-explorer-rail:not(.is-collapsed)) .rooms-editor-scene-overview-button > span,
-.rooms-editor-layout:has(.workspace-explorer-rail:not(.is-collapsed)) .rooms-editor-test-scene-button > span {
+.rooms-editor-layout:has(.workspace-explorer-rail:not(.is-collapsed)) .rooms-editor-scene-overview-button > .room-scene-action-label,
+.rooms-editor-layout:has(.workspace-explorer-rail:not(.is-collapsed)) .rooms-editor-test-scene-button > .room-scene-action-label {
   display: none;
 }
 

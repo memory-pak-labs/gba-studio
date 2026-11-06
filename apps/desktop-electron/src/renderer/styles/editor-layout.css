@@ -78,8 +78,8 @@
 .rooms-editor-layout .room-test-start-control select { width: 180px; min-width: 0; max-width: 220px; border-radius: 5px; }
 .rooms-editor-layout .rooms-editor-scene-overview-button,
 .rooms-editor-layout .rooms-editor-test-scene-button { width: auto; min-width: 28px; padding-inline: 8px; flex: 0 0 auto; }
-.rooms-editor-layout .rooms-editor-scene-overview-button > span,
-.rooms-editor-layout .rooms-editor-test-scene-button > span { display: inline; }
+.rooms-editor-layout .rooms-editor-scene-overview-button > .room-scene-action-label,
+.rooms-editor-layout .rooms-editor-test-scene-button > .room-scene-action-label { display: inline; }
 .rooms-editor-layout .rooms-editor-test-scene-button { background: var(--studio-color-accent); color: var(--studio-color-accent-contrast, #fff); border-color: var(--studio-color-accent); }
 .rooms-editor-layout .rooms-canvas-stage.has-scene-actions .room-editor-tool-rail.is-scene-focus {
   position: relative; left: auto; top: auto; grid-column: 1; grid-row: 2;
@@ -178,8 +178,8 @@
   .rooms-editor-layout:has(.workspace-explorer-rail:not(.is-collapsed)):has(.rooms-side-stack:not(.is-collapsed)) { grid-template-columns: 190px minmax(0, 1fr) 270px; }
   .rooms-editor-layout .rooms-editor-scene-actions-title { display: none !important; }
   .rooms-editor-layout .room-test-start-control select { width: 130px; }
-  .rooms-editor-layout .rooms-editor-scene-overview-button > span,
-  .rooms-editor-layout .rooms-editor-test-scene-button > span,
+  .rooms-editor-layout .rooms-editor-scene-overview-button > .room-scene-action-label,
+  .rooms-editor-layout .rooms-editor-test-scene-button > .room-scene-action-label,
   .rooms-editor-layout .room-canvas-minimap-toggle > span,
   .rooms-editor-layout .room-scene-navigation-size { display: none; }
   .rooms-editor-layout .rooms-inspector-tabs > button { padding-inline: 6px; }
@@ -192,11 +192,11 @@
 .rooms-editor-layout:has(.workspace-explorer-rail.is-collapsed):has(.rooms-side-stack.is-collapsed) { grid-template-columns: var(--workspace-explorer-rail-collapsed-width) minmax(0, 1fr) var(--workspace-editor-side-stack-collapsed-width); }
 .rooms-editor-layout:has(.workspace-explorer-rail:not(.is-collapsed)) .rooms-editor-scene-overview-button,
 .rooms-editor-layout:has(.workspace-explorer-rail:not(.is-collapsed)) .rooms-editor-test-scene-button { width: auto; padding-inline: 8px; gap: 5px; }
-.rooms-editor-layout:has(.workspace-explorer-rail:not(.is-collapsed)) .rooms-editor-scene-overview-button > span,
-.rooms-editor-layout:has(.workspace-explorer-rail:not(.is-collapsed)) .rooms-editor-test-scene-button > span { display: inline; }
+.rooms-editor-layout:has(.workspace-explorer-rail:not(.is-collapsed)) .rooms-editor-scene-overview-button > .room-scene-action-label,
+.rooms-editor-layout:has(.workspace-explorer-rail:not(.is-collapsed)) .rooms-editor-test-scene-button > .room-scene-action-label { display: inline; }
 @media (max-width: 1200px) {
- .rooms-editor-layout:has(.workspace-explorer-rail:not(.is-collapsed)) .rooms-editor-scene-overview-button > span,
- .rooms-editor-layout:has(.workspace-explorer-rail:not(.is-collapsed)) .rooms-editor-test-scene-button > span { display: none; }
+ .rooms-editor-layout:has(.workspace-explorer-rail:not(.is-collapsed)) .rooms-editor-scene-overview-button > .room-scene-action-label,
+ .rooms-editor-layout:has(.workspace-explorer-rail:not(.is-collapsed)) .rooms-editor-test-scene-button > .room-scene-action-label { display: none; }
  .rooms-editor-layout:has(.workspace-explorer-rail:not(.is-collapsed)):has(.rooms-side-stack.is-collapsed) { grid-template-columns: 190px minmax(0, 1fr) var(--workspace-editor-side-stack-collapsed-width); }
 }
 

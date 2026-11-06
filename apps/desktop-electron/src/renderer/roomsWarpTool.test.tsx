@@ -83,7 +83,7 @@ describe("RoomsWorkspace warp tool", () => {
     expect(screen.getByRole("status")).toHaveTextContent("arraste no grid");
     expect(screen.getByRole("tab", { name: "Conexões" })).toHaveAttribute("aria-selected", "true");
 
-    const firstCell = screen.getByRole("gridcell", { name: "Pintar tile 1" });
+    const firstCell = screen.getByRole("gridcell", { name: "Tile 1" });
     fireEvent.pointerDown(firstCell, { button: 0, buttons: 1, pointerId: 9 });
     fireEvent.pointerUp(firstCell, { button: 0, buttons: 0, pointerId: 9 });
 

@@ -53,7 +53,6 @@ import {
 } from "../sceneTilemapContract.js";
 import { gbaVideoModeFromProject } from "../gbaVideoModes.js";
 import {
-  blockedCollisionCellsFromRoom,
   collisionTypeCellsFromRoom,
   isBlockedCollisionType,
   isRoomCollisionType,
@@ -2425,14 +2424,6 @@ export function selectRoomEntityAtTile(
   return null;
 }
 
-function collisionCount(room: Record<string, unknown>, width: number, height: number): number {
-  return collisionTypeCellsFromRoom(room, width, height).filter(isBlockedCollisionType).length;
-}
-
-function collisionCells(room: Record<string, unknown>, width: number, height: number): boolean[] {
-  return blockedCollisionCellsFromRoom(room, width, height);
-}
-
 function collisionTypes(room: Record<string, unknown>, width: number, height: number): RoomCollisionType[] {
   const sceneDocument = normalizeGBASceneDocument(room);
   return collisionTypeCellsFromRoom({ ...room, collisionTypes: sceneDocument.collisionTypes }, width, height);
@@ -2455,15 +2446,15 @@ function tileCells(room: Record<string, unknown>, width: number, height: number)
   });
 }
 
-function explicitTileIDs(room: Record<string, unknown>): number[] {
-  const tilemap = Array.isArray(room.tilemap) ? room.tilemap : [];
-  return tilemap.flatMap((value) => {
-    return typeof value === "number" && Number.isFinite(value) && value >= 0 ? [Math.floor(value)] : [];
-  });
-}
-
 function deriveTilePalette(rooms: Record<string, unknown>[]): number[] {
-  return Array.from(new Set([0, ...rooms.flatMap(explicitTileIDs)])).sort((lhs, rhs) => lhs - rhs);
+  const ids = new Set([0]);
+  for (const room of rooms) {
+    if (!Array.isArray(room.tilemap)) continue;
+    for (const value of room.tilemap) {
+      if (typeof value === "number" && Number.isFinite(value) && value >= 0) ids.add(Math.floor(value));
+    }
+  }
+  return [...ids].sort((lhs, rhs) => lhs - rhs);
 }
 
 function filledTileCells(cells: number[], width: number, startIndex: number, nextTileID: number): number[] {
@@ -2934,8 +2925,9 @@ function entityPresentation(
     && nullableString(room.playerActorName) === entityDocument.name
   ));
   const ownerRoom = rooms.find((room, roomIndex) => roomName(room, roomIndex) === resolvedRoomName);
-  const menuPixels = kind === "actor" && ownerRoom && normalizeGBASceneDocument(ownerRoom, 0).sceneType === "menu"
-    && isRecord(entity.menuPositionPixels) && Number.isFinite(entity.menuPositionPixels.x) && Number.isFinite(entity.menuPositionPixels.y)
+  const menuPixels = kind === "actor" && isRecord(entity.menuPositionPixels)
+    && Number.isFinite(entity.menuPositionPixels.x) && Number.isFinite(entity.menuPositionPixels.y)
+    && ownerRoom && normalizeGBASceneDocument(ownerRoom, 0).sceneType === "menu"
     ? entity.menuPositionPixels : null;
   const resolvedSpriteFrame = kind === "actor" ? spriteFrameForEntity(data, entity) : null;
   // Authored menu pixels locate the source frame's top-left, unlike a gameplay foot pivot.
@@ -5392,12 +5384,13 @@ export function deriveRoomsWorkspacePresentation(data: GBAProjectData): RoomsWor
       : projectActiveLayerMapping;
     const layeredPaintingEnabled = sceneTileLayerSupportsLayers(sceneType, videoMode.id);
     const fallbackTilemap = tileCells(sceneProjection, width, height);
+    const authoredTileLayers = layeredPaintingEnabled ? readSceneTileLayersFromRoom(sceneProjection) : [];
     const tileLayers = layeredPaintingEnabled
-      ? (readSceneTileLayersFromRoom(sceneProjection).length > 0
+      ? (authoredTileLayers.length > 0
         ? normalizeSceneTileLayers({
           fallbackTilemap,
           height,
-          layers: readSceneTileLayersFromRoom(sceneProjection),
+          layers: authoredTileLayers,
           sceneType,
           width
         })
@@ -5406,6 +5399,8 @@ export function deriveRoomsWorkspacePresentation(data: GBAProjectData): RoomsWor
     const composedTilemap = layeredPaintingEnabled
       ? composeSceneTilemap(tileLayers, width, height)
       : tileCells(room, width, height);
+    const roomCollisionTypes = collisionTypeCellsFromRoom(sceneProjection, width, height);
+    const roomCollisionCells = roomCollisionTypes.map(isBlockedCollisionType);
     const heightLevels = roomHeightLevels(room, width, height);
     const foregroundTileCount = tileLayers
       .find((layer) => layer.mapping === "BG1")
@@ -5529,9 +5524,9 @@ export function deriveRoomsWorkspacePresentation(data: GBAProjectData): RoomsWor
         paintedTileCount: layer.tilemap.filter((value) => value >= 0).length
       })),
       ...(isRecord(room.layerEditing) ? { layerEditing: normalizeRoomLayerEditing(room.layerEditing) } : {}),
-      collisionCount: collisionCount(sceneProjection, width, height),
-      collisionCells: collisionCells(sceneProjection, width, height),
-      collisionTypes: collisionTypes(sceneProjection, width, height),
+      collisionCount: roomCollisionCells.filter(Boolean).length,
+      collisionCells: roomCollisionCells,
+      collisionTypes: roomCollisionTypes,
       mapStates: roomMapStates(room),
       eventBindings: sceneDocument.eventBindings,
       heightLevels,
