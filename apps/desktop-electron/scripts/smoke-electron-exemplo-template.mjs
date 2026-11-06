@@ -270,21 +270,26 @@ async function clickButtonByText(cdp, label) {
   }
 }
 
-async function clickButtonByAriaLabel(cdp, ariaLabel) {
-  const result = await evaluate(cdp, `
-    (() => {
-      const ariaLabel = ${JSON.stringify(ariaLabel)};
-      const buttons = Array.from(document.querySelectorAll("button[aria-label]"));
-      const button = buttons.find((item) => item.getAttribute("aria-label") === ariaLabel);
-      if (!button) return { ok: false, available: buttons.map((item) => item.getAttribute("aria-label")).filter(Boolean) };
-      if (button.disabled) return { ok: false, reason: "disabled" };
-      button.click();
-      return { ok: true };
-    })()
-  `);
-  if (!result?.ok) {
-    throw new Error(`Botão aria-label ${JSON.stringify(ariaLabel)} indisponível: ${JSON.stringify(result)}`);
-  }
+async function clickButtonByAriaLabel(cdp, ariaLabel, waitForEnabledMs = 0) {
+  const deadline = Date.now() + waitForEnabledMs;
+  let result;
+  do {
+    result = await evaluate(cdp, `
+      (() => {
+        const ariaLabel = ${JSON.stringify(ariaLabel)};
+        const buttons = Array.from(document.querySelectorAll("button[aria-label]"));
+        const button = buttons.find((item) => item.getAttribute("aria-label") === ariaLabel);
+        if (!button) return { ok: false, available: buttons.map((item) => item.getAttribute("aria-label")).filter(Boolean) };
+        if (button.disabled) return { ok: false, reason: "disabled", title: button.title };
+        button.click();
+        return { ok: true };
+      })()
+    `);
+    if (result?.ok) return;
+    if (result?.reason !== "disabled" || Date.now() >= deadline) break;
+    await wait(100);
+  } while (Date.now() < deadline);
+  throw new Error(`Botão aria-label ${JSON.stringify(ariaLabel)} indisponível: ${JSON.stringify(result)}`);
 }
 
 async function waitForSceneEditor(cdp, roomTitle, timeoutMs = 15_000) {
@@ -2108,7 +2113,7 @@ async function main() {
       await clickButtonByAriaLabel(cdp, "Voltar à visão geral");
 
       console.log("[smoke:exemplo-template] Edição, reabertura e previews verificados; compilando a ROM completa.");
-      await clickButtonByAriaLabel(cdp, "Executar ROM");
+      await clickButtonByAriaLabel(cdp, "Executar ROM", 15_000);
       await waitForText(cdp, (text) => text.includes("Compilando ROM..."), "compilação do projeto completo", 30_000);
       await waitForUniqueRom(engineExportRoot, cdp);
       await waitForText(cdp, (text) => text.includes("Play Window aberto:"), "Play Window do projeto completo", completeProjectTimeoutMs);
