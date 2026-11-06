@@ -185,6 +185,7 @@ import {
 } from "../shared/roomsWorkspace";
 import { importTiledMapIntoProject } from "../shared/tiledImport";
 import type { SceneMapPosition } from "../shared/sceneMapLayout";
+import { addSceneNote, updateSceneNote, removeSceneNote, type SceneNotePatch } from "../shared/sceneNotes";
 import {
   deriveSettingsPathValidationTargets,
   resetSettingsSectionInProject,
@@ -1863,6 +1864,24 @@ function App(): React.ReactElement {
     }
   }
 
+  function createSceneNote(position: { id: string; x: number; y: number }): void {
+    if (!session) return;
+    updateProjectData(addSceneNote(session.project.data, position));
+    setStatus(ui("Post-it criado. Escreva um lembrete e salve o projeto."));
+  }
+
+  function editSceneNote(id: string, patch: SceneNotePatch, historyGroupID?: string): void {
+    if (!session) return;
+    if (historyGroupID && projectHistoryGroupRef.current?.id !== historyGroupID) beginProjectHistoryGroup(historyGroupID);
+    updateProjectData(updateSceneNote(session.project.data, id, patch), { historyGroupID });
+  }
+
+  function deleteSceneNote(id: string): void {
+    if (!session) return;
+    updateProjectData(removeSceneNote(session.project.data, id));
+    setStatus(ui("Post-it excluído. Use Desfazer para restaurar."));
+  }
+
   function organizeSceneMapPositions(): void {
     if (!session) return;
     const nextData = organizeSceneMapPositionsInProject(session.project.data);
@@ -3534,6 +3553,9 @@ function App(): React.ReactElement {
               onDuplicateRoomEntities={duplicateRoomEntities}
               onRemoveRoomEntities={removeRoomEntities}
               onUpdateSceneMapPosition={updateSceneMapPosition}
+              onCreateSceneNote={createSceneNote}
+              onUpdateSceneNote={editSceneNote}
+              onRemoveSceneNote={deleteSceneNote}
               onOrganizeSceneMap={organizeSceneMapPositions}
               onUpdateSceneMapZoom={updateSceneMapZoom}
               sceneMapZoom={sceneMapView && sceneMapView.path === session?.path
