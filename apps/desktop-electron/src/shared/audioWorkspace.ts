@@ -803,6 +803,37 @@ export function audioReferenceUsages(data: GBAProjectData, name: string): FilesW
   return [...usages.values()];
 }
 
+function indexAudioUsageLabels(data: GBAProjectData, audioItems: Record<string, unknown>[]): Map<string, Set<string>> {
+  const labelsByName = new Map<string, Set<string>>();
+  const labelsByReference = new Map<string, Set<string>[]>();
+  const aliasesByName = new Map<string, string | null>();
+  for (const item of audioItems) {
+    if (typeof item.name === "string" && !aliasesByName.has(item.name)) {
+      aliasesByName.set(item.name, nullableString(item.exportID));
+    }
+  }
+
+  for (const item of audioItems) {
+    const name = stringField(item.name, "Audio sem nome");
+    if (labelsByName.has(name)) continue;
+    const labels = new Set<string>();
+    labelsByName.set(name, labels);
+    const alias = aliasesByName.get(name);
+    for (const reference of alias && alias !== name ? [name, alias] : [name]) {
+      const targets = labelsByReference.get(reference);
+      if (targets) targets.push(labels);
+      else labelsByReference.set(reference, [labels]);
+    }
+  }
+
+  if (labelsByName.size > 0) {
+    visitAudioReferences(data, ({ name, usage }) => {
+      for (const labels of labelsByReference.get(name) ?? []) labels.add(usage.label);
+    });
+  }
+  return labelsByName;
+}
+
 function updateAudioReferences(data: GBAProjectData, oldName: string, nextName: string, oldAlias: string | null, nextAlias: string): void {
   visitAudioReferences(data, reference => {
     if (reference.name === oldName) reference.update(nextName);
@@ -2215,7 +2246,9 @@ export function removeAudioItemFromProject(data: GBAProjectData, audioIDToRemove
 }
 
 export function deriveAudioWorkspacePresentation(data: GBAProjectData): AudioWorkspacePresentation {
-  const items = projectArray(data, "audioItems")
+  const audioItems = projectArray(data, "audioItems");
+  const usageLabelsByName = indexAudioUsageLabels(data, audioItems);
+  const items = audioItems
     .map((rawAudio, index): AudioWorkspaceItem => {
       const audio = resolveAudioInstrumentComposition(data, rawAudio);
       const name = stringField(audio.name, "Audio sem nome");
@@ -2228,7 +2261,7 @@ export function deriveAudioWorkspacePresentation(data: GBAProjectData): AudioWor
       const preview = previewChannelsForAudio(audio);
       const previewChannels = preview.channels;
       const activePattern = activePatternPresentation(audio, patterns);
-      const usages = audioReferenceUsages(data, name).map(usage => usage.label);
+      const usages = [...(usageLabelsByName.get(name) ?? [])];
       const bpm = integerField(audio.bpm);
       const normalizedBPM = bpm && bpm > 0 ? bpm : null;
       const patternSequence = derivePatternSequence(audio, patterns);
@@ -2311,7 +2344,7 @@ export function deriveAudioWorkspacePresentation(data: GBAProjectData): AudioWor
     kindCounts: countBy(items.map((item) => item.kind), "kind"),
     formatCounts: countBy(items.map((item) => item.format), "format"),
     summary,
-    exportDiagnostics: deriveAudioEngineExportDiagnostics(projectArray(data, "audioItems"), data),
+    exportDiagnostics: deriveAudioEngineExportDiagnostics(audioItems, data),
     summaryCards: [
       { id: "total", label: "Total", value: String(summary.audioCount) },
       { id: "music", label: "Músicas", value: String(summary.musicCount) },
