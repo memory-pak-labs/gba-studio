@@ -4370,6 +4370,81 @@ describe("RoomsWorkspace React smoke", () => {
     expect(comfortableMarkerWidth).toBeGreaterThan(compactMarkerWidth);
   });
 
+  describe("scene map zoom controls", () => {
+    it.each(["topdown", "isometric", "dungeonCrawler"] as const)("zooms the %s map from buttons below Layers without editing the project", async sceneType => {
+      const user = userEvent.setup();
+      const project = createRoomInProject(createBlankProjectData({ name: "Map zoom" }), {
+        anchorRoomID: "room-1", id: "zoom-room", name: "zoom_map", sceneType, width: 30, height: 20
+      });
+      const original = JSON.stringify(project);
+      const handlers = roomsWorkspaceHandlers();
+      const { container } = render(<RoomsWorkspace presentation={deriveRoomsWorkspacePresentation(project)} projectData={project} {...handlers} />);
+      await focusScene(user, "zoom_map");
+      const rail = within(screen.getByLabelText("Ferramentas de edição da cena"));
+      expect(rail.queryByRole("button", { name: "Aumentar zoom do canvas" })).not.toBeInTheDocument();
+      await user.click(screen.getByRole("button", { name: "Mapa" }));
+      const increase = rail.getByRole("button", { name: "Aumentar zoom do canvas" });
+      const decrease = rail.getByRole("button", { name: "Reduzir zoom do canvas" });
+      const stage = container.querySelector<HTMLElement>(".rooms-canvas-stage")!;
+      const initial = Number.parseFloat(stage.dataset.zoom!);
+      expect(rail.getByRole("button", { name: "Camadas" }).compareDocumentPosition(increase) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+      increase.focus();
+      await user.keyboard("{Enter}");
+      const increased = Number.parseFloat(stage.dataset.zoom!);
+      expect(increased).toBeGreaterThan(initial);
+      if (sceneType === "dungeonCrawler") expect(container.querySelector('.dungeon-grid [role="gridcell"]')).toHaveStyle({ width: "35px" });
+      decrease.focus();
+      await user.keyboard(" ");
+      expect(Number.parseFloat(stage.dataset.zoom!)).toBeLessThan(increased);
+      if (sceneType === "topdown") {
+        for (let i = 0; i < 16; i++) await user.click(increase);
+        expect(stage).toHaveAttribute("data-zoom", "400%");
+        expect(increase).toBeDisabled();
+        for (let i = 0; i < 16; i++) await user.click(decrease);
+        expect(stage).toHaveAttribute("data-zoom", "25%");
+        expect(decrease).toBeDisabled();
+      }
+      if (sceneType === "dungeonCrawler") {
+        await user.selectOptions(screen.getByRole("combobox", { name: "Zoom do labirinto" }), "36");
+        expect(stage).toHaveAttribute("data-zoom", "129%");
+        expect(container.querySelector('.dungeon-grid [role="gridcell"]')).toHaveStyle({ width: "36px" });
+      }
+      expect(JSON.stringify(project)).toBe(original);
+      expect(handlers.onUpdateSceneMapZoom).not.toHaveBeenCalled();
+      expect(handlers.onUpdateRoomFields).not.toHaveBeenCalled();
+    });
+
+    it.each(["topdown", "dungeonCrawler"] as const)("supports Command+mouse wheel and Ctrl+trackpad pinch in the %s map", async sceneType => {
+      const user = userEvent.setup();
+      const project = createRoomInProject(createBlankProjectData({ name: "Wheel zoom" }), {
+        anchorRoomID: "room-1", id: "zoom-room", name: "zoom_map", sceneType, width: 30, height: 20
+      });
+      const { container } = render(<RoomsWorkspace presentation={deriveRoomsWorkspacePresentation(project)} projectData={project} {...roomsWorkspaceHandlers()} />);
+      await focusScene(user, "zoom_map");
+      await user.click(screen.getByRole("button", { name: "Mapa" }));
+      const scroll = container.querySelector<HTMLDivElement>(sceneType === "dungeonCrawler" ? ".dungeon-grid-scroll" : ".rooms-canvas-world-scroll")!;
+      Object.defineProperties(scroll, { clientWidth: { value: 600 }, clientHeight: { value: 400 } });
+      vi.spyOn(scroll, "getBoundingClientRect").mockReturnValue({ left: 100, top: 40, width: 600, height: 400 } as DOMRect);
+      const wheel = (options: WheelEventInit) => {
+        const event = Object.assign(new Event("wheel", { bubbles: true, cancelable: true }), {
+          clientX: 280, clientY: 150, deltaX: 0, deltaY: 0, ctrlKey: false, metaKey: false, ...options
+        });
+        fireEvent(scroll, event);
+        return event;
+      };
+      expect(wheel({ deltaY: -100 }).defaultPrevented).toBe(false);
+      expect(container.querySelector(".rooms-canvas-stage")).toHaveAttribute("data-zoom", "100%");
+      expect(wheel({ metaKey: true, deltaY: -100 }).defaultPrevented).toBe(true);
+      expect(container.querySelector(".rooms-canvas-stage")).toHaveAttribute("data-zoom", "110%");
+      expect(wheel({ ctrlKey: true, deltaY: 120 }).defaultPrevented).toBe(true);
+      expect(container.querySelector(".rooms-canvas-stage")).toHaveAttribute("data-zoom", "100%");
+      wheel({ metaKey: true, deltaX: 120, deltaY: 0 });
+      expect(container.querySelector(".rooms-canvas-stage")).toHaveAttribute("data-zoom", "100%");
+      await user.click(screen.getByRole("button", { name: "Tela ampliada" }));
+      expect(container.querySelector(".rooms-canvas-stage")).toHaveAttribute("data-zoom", "100%");
+    });
+  });
+
   it("anchors button and wheel zoom at the pointer after the new map geometry is rendered", async () => {
     const user = userEvent.setup();
     const project = createBlankProjectData({ name: "Pointer zoom" });

@@ -21103,6 +21103,11 @@ export const studioUiMessages: Record<string, readonly [string, string, string]>
     "Canvas zoom",
     "Zoom del lienzo"
   ],
+  "⌘/Ctrl + rolagem": [
+    "⌘/Ctrl + rolagem",
+    "⌘/Ctrl + scroll",
+    "⌘/Ctrl + desplazamiento"
+  ],
   "Zoom do canvas de eventos": [
     "Zoom do canvas de eventos",
     "Zoom of the event canvas",

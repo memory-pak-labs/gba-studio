@@ -7533,7 +7533,7 @@ export function RoomsWorkspace({
     const onWheel = (event: WheelEvent): void => canvasWheelHandlerRef.current(event);
     scroll.addEventListener("wheel", onWheel, { passive: false });
     return () => scroll.removeEventListener("wheel", onWheel);
-  }, [Boolean(presentation), focusedSceneEditorRoomID]);
+  }, [Boolean(presentation), focusedSceneEditorRoomID, focusViewMode]);
 
   useEffect(() => {
     canvasPointerRef.current = null;
@@ -8390,9 +8390,10 @@ export function RoomsWorkspace({
   }
 
   function setCanvasZoomByStep(delta: number): void {
-    const currentIndex = canvasZoomIndex;
-    const nextIndex = Math.min(ROOM_CANVAS_ZOOM_LEVELS.length - 1, Math.max(0, currentIndex + delta));
-    applySceneMapZoom(ROOM_CANVAS_ZOOM_LEVELS[nextIndex]);
+    const current = pendingCanvasZoomRef.current?.zoom ?? canvasZoom;
+    const levels = delta > 0 ? ROOM_CANVAS_ZOOM_LEVELS : [...ROOM_CANVAS_ZOOM_LEVELS].reverse();
+    const next = levels.find(zoom => delta > 0 ? zoom > current + 0.000001 : zoom < current - 0.000001);
+    if (next !== undefined) applySceneMapZoom(next);
   }
 
   function fitSceneMapView(): void {
@@ -8493,7 +8494,7 @@ export function RoomsWorkspace({
   }
 
   function zoomRoomsCanvas(event: WheelEvent): void {
-    if (!event.ctrlKey && !event.metaKey) return;
+    if ((!event.ctrlKey && !event.metaKey) || event.deltaY === 0) return;
     const scroll = canvasScrollRef.current;
     if (!scroll) return;
     event.preventDefault();
@@ -10083,6 +10084,24 @@ export function RoomsWorkspace({
                     setCanvasLayerVisibility={setCanvasLayerVisibility}
                   /> : null}
 
+                  {focusSceneRoom && focusViewMode === "map" ? (
+                    <div className="room-editor-tool-rail-zoom rooms-canvas-zoom" role="group" aria-label={ui("Zoom do canvas")}>
+                      <button type="button" aria-label={ui("Aumentar zoom do canvas")}
+                        title={`${ui("Aumentar zoom")} · ${ui("⌘/Ctrl + rolagem")}`}
+                        disabled={canvasZoom >= ROOM_CANVAS_ZOOM_LEVELS[ROOM_CANVAS_ZOOM_LEVELS.length - 1]}
+                        onClick={() => setCanvasZoomByStep(1)}>
+                        <ZoomIn aria-hidden="true" size={16} strokeWidth={2.2} />
+                      </button>
+                      <button type="button" aria-label={ui("Reduzir zoom do canvas")}
+                        title={`${ui("Reduzir zoom")} · ${ui("⌘/Ctrl + rolagem")}`}
+                        disabled={canvasZoom <= ROOM_CANVAS_ZOOM_LEVELS[0]}
+                        onClick={() => setCanvasZoomByStep(-1)}>
+                        <ZoomOut aria-hidden="true" size={16} strokeWidth={2.2} />
+                      </button>
+                      <strong>{canvasZoomPercent}%</strong>
+                    </div>
+                  ) : null}
+
                   {!focusSceneRoom ? (
                   <div className="room-editor-tool-rail-zoom rooms-canvas-zoom" role="group" aria-label={ui("Zoom do canvas")}>
                   {onCreateSceneNote ? <button type="button" aria-label={ui("Adicionar post-it")}
@@ -10237,6 +10256,7 @@ export function RoomsWorkspace({
                 room={focusSceneRoom} entities={presentation.entities.filter(e => e.roomName === focusSceneRoom.name)}
                 projectData={projectData} projectPath={projectPath} assetRefreshToken={assetRefreshToken}
                 viewMode={focusViewMode} previewVisible={focusMinimapVisible} onClosePreview={() => setFocusMinimapVisible(false)}
+                mapZoom={focusSceneZoom} onMapZoom={setFocusSceneZoom} mapScrollRef={canvasScrollRef}
                 placementMode={collisionPlacementMode} mode={selectedToolPanelMode} tool={selectedTool} collision={selectedCollisionType}
                 actorsLocked={canvasLayerLocks.actors} triggersLocked={canvasLayerLocks.triggers}
                 showBounds={canvasLayerVisibility.hitboxes} showBackground={canvasLayerVisibility.background} showGrid={canvasLayerVisibility.grid} showActors={canvasLayerVisibility.actors} showTriggers={canvasLayerVisibility.triggers} showHud={canvasLayerVisibility.hud}

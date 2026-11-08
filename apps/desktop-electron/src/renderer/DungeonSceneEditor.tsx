@@ -1,5 +1,5 @@
 import { useStudioUiText } from "./studioUiText";
-import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
+import { useEffect, useLayoutEffect, useRef, useState, type ReactNode, type RefObject } from "react";
 import type { GBAProjectData } from "../shared/projectFile";
 import type { RoomsWorkspaceRoom, RoomsWorkspaceEntity, UpdateRoomFields, UpdateRoomEntityFields, CreateActorInProjectOptions, CreateTriggerInProjectOptions, RoomTilePaintTool } from "../shared/roomsWorkspace/core";
 import { roomCellLineIndexes, type RoomCollisionType } from "../shared/roomsWorkspace";
@@ -24,6 +24,7 @@ interface Props {
   actorsLocked?: boolean; triggersLocked?: boolean;
   showBounds?: boolean; showBackground?: boolean; showGrid?: boolean; showActors?: boolean; showTriggers?: boolean; showHud?: boolean;
   viewMode: "map" | "viewport"; previewVisible: boolean; onClosePreview: () => void;
+  mapZoom?: number; onMapZoom?: (zoom: number) => void; mapScrollRef?: RefObject<HTMLDivElement>;
   renderHud: (camera: DungeonCamera, scale: number, readOnly?: boolean) => ReactNode;
 }
 export function DungeonSceneEditor(p: Props): React.ReactElement {
@@ -31,7 +32,9 @@ export function DungeonSceneEditor(p: Props): React.ReactElement {
   const { room, entities } = p;
   const [camera, setCamera] = useState(() => dungeonStart(room));
   const host = useRef<HTMLDivElement>(null), cameraPane = useRef<HTMLElement>(null);
-  const [manualScale, setScale] = useState(0), [autoScale, setAutoScale] = useState(2), [cellSize, setCellSize] = useState(28);
+  const [manualScale, setScale] = useState(0), [autoScale, setAutoScale] = useState(2), [localCellSize, setLocalCellSize] = useState(28);
+  const cellSize = p.mapZoom === undefined ? localCellSize : 28 * p.mapZoom;
+  const cellSizes = [...new Set([20, 28, 36, cellSize])].sort((a, b) => a - b);
   const scale = manualScale || autoScale;
   useLayoutEffect(() => {
     const element = cameraPane.current;
@@ -125,14 +128,18 @@ export function DungeonSceneEditor(p: Props): React.ReactElement {
   const preview = previewAtScale(previewScale);
   return <div ref={host} className={`dungeon-scene-editor is-${p.viewMode}`} aria-label={ui("Editor Dungeon Crawler")}>
     {p.viewMode === "map" ? <section className="dungeon-maze-pane" aria-label={ui("Labirinto lógico")}>
-      <header><strong>{ui("Labirinto · {0} × {1} células",{0:room.width,1:room.height})}</strong><label>{ui("Célula")} <select aria-label={ui("Zoom do labirinto")} value={cellSize} onChange={e => setCellSize(Number(e.target.value))}>{[20, 28, 36].map(n => <option key={n} value={n}>{n} px</option>)}</select></label></header>
+      <header><strong>{ui("Labirinto · {0} × {1} células",{0:room.width,1:room.height})}</strong><label>{ui("Célula")} <select aria-label={ui("Zoom do labirinto")} value={cellSize} onChange={e => {
+        const size = Number(e.target.value);
+        if (p.onMapZoom) p.onMapZoom(size / 28);
+        else setLocalCellSize(size);
+      }}>{cellSizes.map(n => <option key={n} value={n}>{Math.round(n * 10) / 10} px</option>)}</select></label></header>
       <p>{p.mode === "collision" ? ui("Pinte paredes; borracha abre passagens. Preenchimento atua na região conectada.") : p.mode === "actor" || p.mode === "trigger" ? ui("Selecione um marcador e clique no destino. Sem seleção, clique ou arraste para adicionar.") : ui("Clique numa passagem para posicionar a prévia. O início do jogo só muda ao confirmar.")}</p>
-      <div className="dungeon-grid-scroll"><div className="dungeon-grid" role="grid" aria-label={ui("Células do labirinto")} onKeyDown={event => {
+      <div className="dungeon-grid-scroll" ref={p.mapScrollRef}><div className="dungeon-grid" role="grid" aria-label={ui("Células do labirinto")} onKeyDown={event => {
         const step = ({ ArrowLeft: -1, ArrowRight: 1, ArrowUp: -room.width, ArrowDown: room.width } as Record<string, number>)[event.key];
         if (step === undefined) return; event.preventDefault(); event.stopPropagation();
         const next = Math.max(0, Math.min(room.width * room.height - 1, focusedCell + step));
         setFocusedCell(next); event.currentTarget.querySelector<HTMLButtonElement>(`[data-cell-index="${next}"]`)?.focus();
-      }} style={{ gridTemplateColumns: `repeat(${room.width}, ${cellSize}px)` }}>
+      }} style={{ gridTemplateColumns: `repeat(${room.width}, ${cellSize}px)`, gap: p.mapZoom ?? 1, borderWidth: p.mapZoom ?? 1 }}>
         {Array.from({ length: room.width * room.height }, (_, i) => {
           const x = i % room.width, y = Math.floor(i / room.width);
           const wall = brushPreview?.has(i) && brush.current ? isBlockedCollisionType(brush.current.type) : room.collisionCells[i];
