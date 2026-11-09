@@ -22,21 +22,27 @@ for(const item of [...manifest.music,...manifest.sfx]){
 }
 fs.writeFileSync(path.join(dir,'audio.json'),JSON.stringify(document));
 execFileSync('python3',[path.join(pack,'tools/assetc'),path.join(dir,'audio.json'),'--audio-json','-o',path.join(dir,'bank.hpp'),'--name','coastal'],{stdio:'pipe',maxBuffer:16*1024*1024});
-const segments=[...manifest.music.map((item,index)=>({id:item.exportID,kind:'music',index,frames:item.rows*item.row_frames+65,loop:item.loop})),...manifest.sfx.map((item,index)=>({id:item.exportID,kind:'sfx',index,frames:Math.ceil(item.duration*59.7275)+18})),{id:'music-and-all-effects',kind:'mixed',index:0,frames:90*manifest.sfx.length}];
+const segments=[...manifest.music.map((item,index)=>({id:item.exportID,kind:'music',index,frames:item.rows*item.row_frames+65,loop:item.loop})),...manifest.sfx.map((item,index)=>({id:item.exportID,kind:'sfx',index,frames:Math.ceil(item.duration*59.7275)+18})),{id:'music-and-all-effects',kind:'mixed',index:0,frames:90*manifest.sfx.length},{id:'legacy-psg-and-pcm',kind:'legacy',index:0,frames:180}];
 fs.writeFileSync(path.join(dir,'main.cpp'),`#include "gbs/engine.hpp"
 #include "bank.hpp"
-extern "C" { volatile unsigned witness[7] = {}; }
+extern "C" { volatile unsigned witness[8] = {}; }
+constexpr gbs::TrackerStep legacy_steps[] = { {1,440,0,10,2}, {4,100,30,10,2} };
+constexpr gbs::TrackerPattern legacy_patterns[] = { {legacy_steps,2} };
+constexpr uint8_t legacy_order[] = {0};
+constexpr gbs::TrackerAsset legacy_song = {legacy_patterns,1,legacy_order,1,true};
 struct Segment { unsigned kind,index,frames; };
-constexpr Segment segments[] = { ${segments.map(x=>`{${{music:0,sfx:1,mixed:2}[x.kind]},${x.index},${x.frames}}`).join(',')} };
+constexpr Segment segments[] = { ${segments.map(x=>`{${{music:0,sfx:1,mixed:2,legacy:3}[x.kind]},${x.index},${x.frames}}`).join(',')} };
 extern "C" int gbs_main() {
  gbs::init(); gbs::set_audio_channel_volume(gbs::AudioChannel::Music,12); witness[5]=1;
  for(unsigned segment=0;segment<${segments.length};++segment){
   gbs::stop_tracker_music();gbs::stop_sfx();gbs::stop_all_pcm_sfx();
   const auto entry=segments[segment];witness[4]=0;
-  bool accepted=entry.kind==0 ? gbs::play_tracker_music(coastal_tracker_assets[entry.index]) : entry.kind==1 ? gbs::play_sfx(coastal_sfx_assets[entry.index]) : gbs::play_tracker_music(coastal_tracker_assets[5]);
+  bool accepted=entry.kind==0 ? gbs::play_tracker_music(coastal_tracker_assets[entry.index]) : entry.kind==1 ? gbs::play_sfx(coastal_sfx_assets[entry.index]) : entry.kind==2 ? gbs::play_tracker_music(coastal_tracker_assets[5]) : gbs::play_tracker_music(legacy_song);
   if(!accepted)witness[5]=0;
   for(unsigned frame=0;frame<entry.frames;++frame){
    if(entry.kind==2 && frame%90==0 && !gbs::play_sfx(coastal_sfx_assets[frame/90]))witness[5]=0;
+   if(entry.kind==3 && frame%60==0 && !gbs::play_sfx(coastal_sfx_assets[0]))witness[5]=0;
+   if(entry.kind==3 && frame>1 && ((*reinterpret_cast<volatile uint16_t*>(0x04000084)&9)!=9))witness[7]=1;
    gbs::wait_vblank();auto usage=gbs::audio_runtime_usage();
    witness[0]++;witness[1]=segment;witness[2]=frame+1;witness[3]=usage.pcm_underrun_count;
    if(usage.active_voice_count>witness[4])witness[4]=usage.active_voice_count;
@@ -73,7 +79,7 @@ try{
  for(let frame=0;frame<maximum;frame++){
   core._gba_run_frame();if(!read(0))continue;
   const game=read(0);stalled=game===previousGame?stalled+1:0;previousGame=game;
-  assert.ok(stalled<5,'audio processing keeps up with VBlank');assert.equal(read(3),0,'no FIFO underruns');assert.equal(read(5),1,'all native playback requests accepted');
+  assert.ok(stalled<5,'audio processing keeps up with VBlank');assert.equal(read(3),0,'no FIFO underruns');assert.equal(read(5),1,'all native playback requests accepted');assert.equal(read(7),0,'PCM cues preserve PSG square and noise hardware channels');
   if(read(1)!==current){finish();current=read(1);peakVoices=peak=squares=samples=clipped=frames=0;recorder.select(segments[current].id);}
   recorder.frame();frames++;peakVoices=Math.max(peakVoices,read(4));
   const count=core._gba_audio_sample_count()*2;const data=core._gba_audio_samples();
@@ -82,5 +88,5 @@ try{
   if(read(6)){finish();break;}
   if(frame%240===0)await new Promise(resolve=>setImmediate(resolve));
  }
- assert.equal(read(6),1,'bank suite completes');assert.equal(evidence.cases.length,75);evidence.passed=true;
+ assert.equal(read(6),1,'bank suite completes');assert.equal(evidence.cases.length,76);evidence.passed=true;
 }finally{core._gba_destroy();fs.writeFileSync(path.join(output,'bank-rom-evidence.json'),JSON.stringify(evidence,null,2));}

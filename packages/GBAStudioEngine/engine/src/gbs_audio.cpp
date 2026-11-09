@@ -1180,9 +1180,9 @@ bool play_sfx(const SfxAsset& asset) {
     [[maybe_unused]] const AudioStateLock lock;
     if (asset.pcm != nullptr) {
         if (pcm_sfx_muted) return false;
-        stop_sfx();
         PcmPlayback* slot = find_pcm_sfx_slot(8);
         if (slot == nullptr) return false;
+        stop_sfx();
         start_pcm_playback(*slot, *asset.pcm, 8, asset.pcm_volume);
         slot->native_sfx = true;
         return true;
@@ -1200,9 +1200,12 @@ bool play_sfx(const SfxAsset& asset) {
 void stop_sfx() {
     [[maybe_unused]] const AudioStateLock lock;
     for (auto& voice : pcm_sfx) if (voice.native_sfx) reset_pcm_playback(voice);
+    const bool had_psg_sfx = sfx.playing;
     reset_sfx_state();
-    gbs_hw_audio_stop_square(1);
-    gbs_hw_audio_stop_noise();
+    if (had_psg_sfx) {
+        gbs_hw_audio_stop_square(1);
+        gbs_hw_audio_stop_noise();
+    }
 }
 
 bool play_music(const MusicAsset& asset) {

@@ -1275,7 +1275,37 @@ void test_pcm_backed_native_cues_keep_stop_and_validation_contract() {
     gbs::audio_init();
 }
 
+void test_pcm_native_cues_preserve_psg_tracker_channels() {
+    const int8_t samples[1056] = { 70, -70, 30, -30 };
+    const gbs::PcmAsset pcm = { samples, 1056, 31536, true };
+    const gbs::SfxAsset cue = { nullptr, 0, &pcm, 11 };
+    const gbs::TrackerStep steps[] = { { 1, 440, 0, 10, 2 }, { 4, 100, 20, 10, 2 } };
+    const gbs::TrackerPattern patterns[] = { { steps, 2 } };
+    const uint8_t order[] = { 0 };
+    const gbs::TrackerAsset song = { patterns, 1, order, 1, true };
+    gbs::audio_init();
+    assert(gbs::play_tracker_music(song));
+    reset_hw_counts();
+    assert(gbs::play_sfx(cue));
+    assert(gbs::audio_is_tracker_music_playing());
+    assert(square_stops == 0 && noise_stops == 0 && wave_stops == 0);
+    gbs::stop_sfx();
+    assert(!gbs::audio_is_sfx_playing());
+    assert(square_stops == 0 && noise_stops == 0 && wave_stops == 0);
+    // A rejected lower-priority PCM cue must leave a currently playing PSG SFX intact.
+    const gbs::SfxTone tone = { 330, 10, 10, 2, false };
+    const gbs::SfxAsset psg = { &tone, 1 };
+    for (int i = 0; i < 4; ++i) assert(gbs::play_pcm_sfx(pcm, 12, 15));
+    assert(gbs::play_sfx(psg));
+    reset_hw_counts();
+    assert(!gbs::play_sfx(cue));
+    assert(gbs::audio_is_sfx_playing());
+    assert(square_stops == 0 && noise_stops == 0);
+    gbs::audio_init();
+}
+
 int main() {
+    test_pcm_native_cues_preserve_psg_tracker_channels();
     test_pcm_backed_native_cues_keep_stop_and_validation_contract();
     test_imported_sample_notes_sustain_between_rows();
     test_prepared_gain_matches_live_mixing_and_falls_back_exactly();
