@@ -1,6 +1,6 @@
 /** @vitest-environment happy-dom */
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { ComponentProps } from "react";
 import { createBlankProjectData } from "../shared/newProject.js";
@@ -57,6 +57,21 @@ describe("visual PCM composer", () => {
     expect(update).toHaveBeenCalledOnce(); expect(update).toHaveBeenCalledWith("fx", expect.objectContaining({ durationMs: 500 }));
     fireEvent.change(screen.getByRole("combobox", { name: "Fonte do efeito" }), { target: { value: "sample" } });
     expect(update).toHaveBeenLastCalledWith("fx", expect.objectContaining({ source: "sample", sampleAssetID: "wav" }));
+  });
+  it("labels PCM lanes with their shared instrument or WAV sample", () => {
+    const data = createAudioItemInProject(blank(), { id: "song", name: "Tema", kind: "Musica", synthesis: "PCM" });
+    data.assets = [...data.assets as any[], { id: "wav", name: "Sino.wav", kind: "Audio", metadata: { source: "Assets/Sino.wav" } }];
+    data.audioInstruments = [{ id: "bell", name: "Sino do farol", sampleAssetID: "wav", sampleRootNote: "C4", sampleLoop: false, envelope: "Soft ADSR" }];
+    const rows = (data.audioItems as any[])[0].patterns[0].channels;
+    rows[0].instrumentID = "bell"; rows[1].sampleAssetID = "wav";
+    const props = handlers();
+    const { rerender } = render(<AudioWorkspace presentation={deriveAudioWorkspacePresentation(data)} {...props} />);
+    const lane = () => screen.getByRole("button", { name: `Selecionar canal ${rows[0].name}` });
+    expect(within(lane()).getByText("Sino do farol")).toBeInTheDocument();
+    expect(within(screen.getByRole("button", { name: `Selecionar canal ${rows[1].name}` })).getByText("Sino.wav")).toBeInTheDocument();
+    (data.audioInstruments as any[])[0].name = "Sino renovado";
+    rerender(<AudioWorkspace presentation={deriveAudioWorkspacePresentation(data)} {...props} />);
+    expect(within(lane()).getByText("Sino renovado")).toBeInTheDocument();
   });
   it("routes transport to the engine and stops it when the user stops playback", async () => {
     const data = createAudioItemInProject(blank(), { id: "song", name: "Tema", kind: "Musica", synthesis: "PCM" });

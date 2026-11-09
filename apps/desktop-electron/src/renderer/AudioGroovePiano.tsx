@@ -31,6 +31,8 @@ export function groovePitchRows(type: string, notes: Array<string | null>): stri
 
 interface Props {
   item: AudioWorkspaceItem;
+  instruments?: Array<{ id: string; name: string }>;
+  samples?: Array<{ id: string; name: string }>;
   selectedCell: GrooveCell | null;
   selectedChannelID: string | null;
   playbackStep: number | null;
@@ -39,7 +41,7 @@ interface Props {
   onCreateChannel?(): void;
   onSetNote(channelID: string, stepIndex: number, note: string): void;
 }
-export function AudioGroovePiano({ item, selectedCell, selectedChannelID, playbackStep, onSelectCell, onUpdateChannel, onSetNote, onCreateChannel }: Props): React.ReactElement {
+export function AudioGroovePiano({ item, instruments, samples, selectedCell, selectedChannelID, playbackStep, onSelectCell, onUpdateChannel, onSetNote, onCreateChannel }: Props): React.ReactElement {
   const ui = useStudioUiText();
   const [page, setPage] = useState(0);
   useEffect(() => setPage(0), [item.id, item.activePatternID]);
@@ -58,7 +60,8 @@ export function AudioGroovePiano({ item, selectedCell, selectedChannelID, playba
       <header><strong>{item.previewRows.length}/16 {ui("faixas")}</strong><button type="button" aria-label={ui("Adicionar faixa")} title={ui("Adicionar faixa")} disabled={item.previewRows.length >= 16} onClick={onCreateChannel}><Plus size={16} /></button></header>
       <div>{item.previewRows.map((row, index) => <div key={row.id} className={row.id === selectedChannelID ? "pcm-track selected" : "pcm-track"}>
         <button type="button" aria-label={ui("Selecionar canal {0}", { 0: row.label })} aria-pressed={row.id === selectedChannelID} onClick={() => onSelectCell({ audioID: item.id, channelID: row.id, stepIndex: selectedStep ?? firstStep })}>
-          <span>{index + 1}</span><strong>{row.label}</strong><small>{row.instrument ?? "PCM"}</small>
+          <span>{index + 1}</span><strong>{row.label}</strong><small>{instruments?.find(instrument => instrument.id === row.instrumentID)?.name
+            ?? samples?.find(sample => sample.id === row.sampleAssetID)?.name ?? row.instrument ?? "PCM"}</small>
         </button>
         <div><button type="button" aria-label={ui("Silenciar {0}", { 0: row.label })} aria-pressed={row.isMuted} onClick={() => onUpdateChannel(row.id, { muted: !row.isMuted })}>M</button>
           <button type="button" aria-label={ui("Solo de {0}", { 0: row.label })} title={ui("Solo afeta apenas a prévia")} aria-pressed={row.isSolo} onClick={() => onUpdateChannel(row.id, { solo: !row.isSolo })}>S</button></div>
