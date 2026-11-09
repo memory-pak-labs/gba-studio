@@ -1,3 +1,4 @@
+import type { PrepareAudioPreviewRequest, EngineAudioPreviewResult } from "./audioPreview.js";
 import type { AnalyzeSceneRequest, SceneAnalysisResult } from "./sceneAnalysis.js";
 import type { ParsedGBAProject } from "./projectFile.js";
 import type { WindowDocumentState } from "./windowDocumentState.js";
@@ -521,6 +522,8 @@ export interface GBAStudioDesktopAPI {
   saveProject(request: SaveProjectRequest): Promise<SaveProjectResult>;
   revealPath(path: string): Promise<RevealPathResult>;
   launchRomInEmulator(request: LaunchRomInEmulatorRequest): Promise<LaunchRomInEmulatorResult>;
+  prepareAudioPreview(request: PrepareAudioPreviewRequest): Promise<EngineAudioPreviewResult>;
+  stopAudioPreview(requestID: string): Promise<void>;
   openRomPlayerWindow(request: OpenRomPlayerWindowRequest): Promise<OpenRomPlayerWindowResult>;
   controlRomPlayerRecording(request: { windowID: number; action: "begin" | "flush"; recordingID?: string }): Promise<{ ok: boolean; telemetry?: RomPlayerTelemetryEvent; error?: string }>;
   selectPath(request: SelectPathRequest): Promise<SelectPathResult>;
@@ -572,6 +575,8 @@ export const ipcChannels = {
   saveProject: "project:save",
   revealPath: "shell:reveal-path",
   launchRomInEmulator: "shell:launch-rom-in-emulator",
+  prepareAudioPreview: "audio:prepare-engine-preview",
+  stopAudioPreview: "audio:stop-engine-preview",
   openRomPlayerWindow: "rom-player:open-window",
   controlRomPlayerRecording: "rom-player:recording",
   romPlayerTelemetry: "rom-player:telemetry",

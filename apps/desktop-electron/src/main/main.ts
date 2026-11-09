@@ -1,3 +1,5 @@
+import { AudioPreviewSession } from "./engineAudioPreview.js";
+import type { PrepareAudioPreviewRequest } from "../shared/audioPreview.js";
 import type { OpenDialogOptions, SaveDialogOptions } from "electron";
 import { isAppLocale, localizeNativeDialog } from "./nativeUiLocale.js";
 import { createSceneAnalysisService, JevDecisionProvider } from "./sceneAnalysisService.js";
@@ -11,7 +13,7 @@ import { prepareEngineProjectExport, resolveSmokeEngineExportRoot } from "./expo
 import { prepareWebProjectExport, resolveSmokeWebExportRoot, writeWebProjectExport } from "./exportWebProject.js";
 import { buildProjectRomArtifact } from "./webRomPipeline.js";
 import { launchRomInEmulator } from "./launchRomInEmulator.js";
-import { openRomPlayerWindow } from "./romPlayerWindow.js";
+import { openRomPlayerWindow, resolveWebPlayerRoot } from "./romPlayerWindow.js";
 import { controlRomPlayerRecording } from "./romPlayerRecording.js";
 import { installAppMenu } from "./appMenu.js";
 import { createProjectSaveQueue } from "./projectSaveQueue.js";
@@ -803,6 +805,28 @@ ipcMain.handle(ipcChannels.analyzeScene, async (event, request) => {
   }
   return analyzeScene(request);
 });
+const audioPreviewSessions = new Map<number, AudioPreviewSession>();
+ipcMain.handle(ipcChannels.prepareAudioPreview, async (event, request: PrepareAudioPreviewRequest) => {
+  if (!BrowserWindow.fromWebContents(event.sender) || event.senderFrame !== event.sender.mainFrame) throw new Error("Origem de prévia inválida.");
+  if (!request || typeof request.requestID !== "string" || !request.requestID || request.requestID.length > 100 || !request.data || typeof request.audioID !== "string" || !["pattern", "sequence"].includes(request.scope)) throw new Error("Seleção de áudio inválida.");
+  let session = audioPreviewSessions.get(event.sender.id);
+  if (!session) {
+    session = new AudioPreviewSession(); audioPreviewSessions.set(event.sender.id, session);
+    const ownerID = event.sender.id; const owned = session;
+    event.sender.once("destroyed", () => { audioPreviewSessions.delete(ownerID); void owned.dispose(); });
+  }
+  const selected = inspectEnginePack({ preferredPath: readProjectEnginePackPath(request.data) }).selected;
+  if (!selected?.hasAssetc || !selected.hasGbsbuild || !selected.assetcPath || !selected.gbsbuildPath) return { requestID: request.requestID, error: "Configure um Engine Pack com assetc e compilador para ouvir a prévia." };
+  try {
+    return await session.prepare(request, { enginePackPath: selected.path, assetcPath: selected.assetcPath, gbsbuildPath: selected.gbsbuildPath,
+      webPlayerRoot: resolveWebPlayerRoot({ appPath: app.getAppPath(), resourcesPath: process.resourcesPath, packaged: app.isPackaged }) });
+  } catch (error) { return { requestID: request.requestID, error: error instanceof Error ? error.message : String(error) }; }
+});
+ipcMain.handle(ipcChannels.stopAudioPreview, async (event, requestID: string) => {
+  if (!BrowserWindow.fromWebContents(event.sender) || event.senderFrame !== event.sender.mainFrame) return;
+  await audioPreviewSessions.get(event.sender.id)?.stop(requestID);
+});
+
 ipcMain.handle(ipcChannels.analyzeProjectBudget, async (_event, request: AnalyzeProjectBudgetRequest) => {
   const preferredEnginePackPath = readProjectEnginePackPath(request.project.data);
   const enginePackStatus = inspectEnginePack({ preferredPath: preferredEnginePackPath });

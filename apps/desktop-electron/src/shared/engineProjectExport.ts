@@ -3683,6 +3683,7 @@ function buildAssetcAudioPackGenerationUncached(data: GBAProjectData): AssetcAud
       if (kind === "Musica") {
         const compiled = compileComposedMusicaToTracker(audio, exportID, data);
         if (compiled) {
+          if (isPcmAudio(audio)) compiled.native_primary_volume = trackerVolumeFromAudioVolume(integerField(child(settings(data), "audio"), "musicVolume", 100));
           tracker.push(compiled);
           if (!compiled.samples?.length) registerPhysicalAudioBytes(audio, index, physicalBytesForCompiledTracker(compiled));
           for (const sample of compiled.samples ?? []) {
