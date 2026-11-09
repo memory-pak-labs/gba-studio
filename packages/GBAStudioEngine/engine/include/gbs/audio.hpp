@@ -96,6 +96,14 @@ struct TrackerAsset {
     bool sustain_sample_channels = false;
 };
 
+#if defined(__arm__) || defined(__thumb__)
+// Shared with the editor's GBA_AUDIO_ROM_LAYOUT. An ABI change must update
+// its physical estimates rather than silently undercounting ROM descriptors.
+static_assert(sizeof(SfxTone) == 14 && sizeof(SfxAsset) == 16, "Update SFX ROM layout estimates");
+static_assert(sizeof(TrackerStep) == 24 && sizeof(TrackerPattern) == 8 && sizeof(TrackerAsset) == 32,
+              "Update tracker ROM layout estimates");
+#endif
+
 // 532 timer ticks * 528 samples = 280896 GBA cycles per video frame.
 // The block is also a multiple of the FIFO DMA's 16-byte burst.
 constexpr uint32_t PCM_MIXER_SAMPLE_RATE_HZ = 31536;

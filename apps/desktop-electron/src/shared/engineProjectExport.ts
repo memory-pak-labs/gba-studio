@@ -2892,9 +2892,9 @@ export interface AssetcAudioJsonDocument {
  * pack layout, while the generated element counts are deterministic here.
  */
 export const GBA_AUDIO_ROM_LAYOUT = {
-  sfxToneBytes: 10,
+  sfxToneBytes: 14,
   sfxAssetBytes: 16,
-  trackerStepBytes: 16,
+  trackerStepBytes: 24,
   trackerPatternBytes: 8,
   trackerOrderEntryBytes: 1,
   trackerAssetBytes: 32

@@ -10,9 +10,9 @@ import {
 describe("composed audio physical budget", () => {
   it("uses the target ARM audio structure layout", () => {
     expect(GBA_AUDIO_ROM_LAYOUT).toEqual({
-      sfxToneBytes: 10,
+      sfxToneBytes: 14,
       sfxAssetBytes: 16,
-      trackerStepBytes: 16,
+      trackerStepBytes: 24,
       trackerPatternBytes: 8,
       trackerOrderEntryBytes: 1,
       trackerAssetBytes: 32
@@ -25,13 +25,13 @@ describe("composed audio physical budget", () => {
       name: "theme",
       patterns: [{ id: "intro", steps: 1, channels: [{ type: "pulse1", notes: ["C4"] }] }],
       patternOrder: ["intro"]
-    })).toBe(57);
+    })).toBe(65);
 
     expect(estimateComposedAudioPhysicalBytes({
       kind: "SFX",
       name: "hit",
       channels: [{ type: "noise", notes: ["K"] }]
-    })).toBe(26);
+    })).toBe(30);
   });
 
   it("does not claim a physical size for audio without composed content", () => {
