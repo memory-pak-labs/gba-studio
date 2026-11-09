@@ -24,7 +24,10 @@ def song(export, title, channels, bars, frames, chords, line, mood, lead=1, driv
     melody=phrase(line)
     # Four distinct phrases, an answering section, and a final tonic cadence.
     if len(melody)<bars:
-        answer=[[(pos,p.note(n)+(7 if j%4==0 and pos>=8 else 0)) for pos,n in bar] for j,bar in enumerate(melody)]
+        def answering_pitch(n, lift):
+            pitch=p.note(n)+lift
+            return pitch-12 if pitch>83 else pitch
+        answer=[[(pos,answering_pitch(n,7 if j%4==0 and pos>=8 else 0)) for pos,n in bar] for j,bar in enumerate(melody)]
         melody=(melody+answer)*4
         melody=melody[:bars]
         tonic=p.note(chords[0][1][0])+24

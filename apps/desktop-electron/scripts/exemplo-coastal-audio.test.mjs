@@ -23,6 +23,17 @@ describe('approved coastal audio bank',()=>{
    if(item.kind==='Musica')expect(asset.metadata.moduleChannels).toBeGreaterThan(4);
   }
  });
+ it('keeps every MOD note inside the sample playback range without pitch clamping',()=>{
+  const manifest=load(bank+'manifest.json');
+  for(const item of manifest.music){
+   const bytes=fs.readFileSync(new URL(bank+item.source,base));
+   const end=1084+bytes[950]*64*item.channels*4;
+   for(let offset=1084;offset<end;offset+=4){
+    const period=((bytes[offset]&15)<<8)|bytes[offset+1];
+    if(period)expect(7093789/(period*2),`${item.exportID} row ${Math.floor((offset-1084)/(item.channels*4))}`).toBeLessThanOrEqual(32768);
+   }
+  }
+ });
  it('restores approved audio after legacy regeneration without reverting new event or scene edits',()=>{
   const source=project(),before=JSON.stringify(source);
   const generated=promoteExemploGBAAudio(source);

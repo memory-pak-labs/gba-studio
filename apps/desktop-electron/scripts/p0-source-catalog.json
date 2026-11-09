@@ -2456,7 +2456,7 @@
         },
         {
           "path": "Assets/audio/coastal-v1/sources/corrida_circuito_dos_farois.mod",
-          "sha256": "dfb072b7fd745c1786714e8df7c2134576336a27a29f174f94f6e358c8a94b67",
+          "sha256": "b8faa16f2a151d8844adae3ab4b9a8ae52af9b0b20dfcdaa54e6ede895646eff",
           "contract": "coastal-palette-approved-full-bank-renewal-authorized-2026-11-09"
         },
         {
@@ -2486,7 +2486,7 @@
         },
         {
           "path": "Assets/audio/coastal-v1/sources/corrida_rota_da_mare.mod",
-          "sha256": "bc3ffa2025fbda51f5f59c8de9626fff6fe69c144207a2e445ac7c0a6ce1e4da",
+          "sha256": "1d294b28e96da3a34273e664a2122d6a796961ae1a99f97851c0ab0a381d745b",
           "contract": "coastal-palette-approved-full-bank-renewal-authorized-2026-11-09"
         },
         {
@@ -2536,7 +2536,7 @@
         },
         {
           "path": "Assets/audio/coastal-v1/sources/farol_arena_mare.mod",
-          "sha256": "9c30b10a88dcb06d057c77b848f7ae78bfd7cc00f4148a1fdaa5bfe5158af99c",
+          "sha256": "8261fb7ce9e7bc55e3636cd19534885471516b440f478f39489aa362d688763c",
           "contract": "coastal-palette-approved-full-bank-renewal-authorized-2026-11-09"
         },
         {
@@ -2631,7 +2631,7 @@
         },
         {
           "path": "Assets/audio/coastal-v1/sources/farol_tema_principal.mod",
-          "sha256": "f3aaa4581ef8ddffbf72b4fae251e043e47bee0609c77778a1d7e0be64e3b6a6",
+          "sha256": "2762822d38fdc876f282095b726e995b832df982457b088145470b6944a92a7d",
           "contract": "coastal-palette-approved-full-bank-renewal-authorized-2026-11-09"
         },
         {
@@ -2701,7 +2701,7 @@
         },
         {
           "path": "Assets/audio/coastal-v1/sources/penedos_vento_de_lumen_candidato.mod",
-          "sha256": "ec393a853c09baf50ef931218b9dec1c8043d128433585e4b7a491f7cb6bb2e9",
+          "sha256": "ce81a5ba75e6cd7136bb0dd85c1f7c9b22ddd98b4fd254becee034582593a9dc",
           "contract": "coastal-palette-approved-full-bank-renewal-authorized-2026-11-09"
         },
         {
@@ -2776,7 +2776,7 @@
         },
         {
           "path": "Assets/audio/coastal-v1/sources/tempestade_farol.mod",
-          "sha256": "f2c9aa5e40918e15f94e6ca1d25eaafe932e34bfb5c1dce0dfab3defe8c79b7d",
+          "sha256": "c51eab7e1461f71a716bde7d0bee75c6cd495d607ce1d4e6b38fa0006a721096",
           "contract": "coastal-palette-approved-full-bank-renewal-authorized-2026-11-09"
         },
         {
@@ -2786,7 +2786,7 @@
         },
         {
           "path": "Assets/audio/coastal-v1/sources/tempestade_travessia.mod",
-          "sha256": "21f4bae89afc4a02a5c13747dee3898274a0e2282bf63c1228519c413315f27f",
+          "sha256": "6d8d34111c2f4d8477e05d3aec010034b2c1bd9a6c5ef93fd467e7d5d755b3de",
           "contract": "coastal-palette-approved-full-bank-renewal-authorized-2026-11-09"
         },
         {
@@ -2806,12 +2806,12 @@
         },
         {
           "path": "Assets/audio/coastal-v1/generate.py",
-          "sha256": "c3f774a41c0623ecf0c656be7b6a197799e595ac214f1f2e32109c7a9b50424d",
+          "sha256": "bf2538efea6c6234cabd689e0f1f4ed1d5265c7e2ea25aa06e235706b920f743",
           "contract": "coastal-bank-source-and-provenance-2026-11-09"
         },
         {
           "path": "Assets/audio/coastal-v1/manifest.json",
-          "sha256": "3cc1aca6b10c903f7da8e9a12b680d744c7485cf0f0bbb61518cd1ba8fb3a449",
+          "sha256": "2d91ecaec30b4a09b5ab544f11ef0c84bf988e3e0db7e61bf67271fcdc48f3ed",
           "contract": "coastal-bank-source-and-provenance-2026-11-09"
         },
         {
