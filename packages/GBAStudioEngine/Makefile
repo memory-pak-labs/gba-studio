@@ -190,6 +190,11 @@ host-test: topdown-actor-gesture-test
 topdown-actor-gesture-test:
 	python3 tests/host/topdown_actor_gesture_tests.py
 
+.PHONY: telemetry-actor-publication-test
+host-test: telemetry-actor-publication-test
+telemetry-actor-publication-test:
+	python3 tests/host/telemetry_actor_publication_tests.py
+
 .PHONY: legacy-checkpoint-test
 host-test: legacy-checkpoint-test
 legacy-checkpoint-test:

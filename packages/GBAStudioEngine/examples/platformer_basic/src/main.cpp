@@ -274,10 +274,8 @@ void sync_runtime_telemetry(
     runtime_telemetry.player_y = player.bounds_pixels.y;
     runtime_telemetry.player_direction = player.facing == gbs::PlatformerFacing::Left ? 2 : 3;
     runtime_telemetry.actor_count = static_cast<uint32_t>(platformer_npc_count + active_enemy_count);
-    runtime_telemetry.first_actor_x = -1;
-    runtime_telemetry.first_actor_y = -1;
-    runtime_telemetry.first_actor_direction = -1;
-    runtime_telemetry.first_actor_visible = 0;
+    // Publish visibility once so a frame-boundary observer cannot read a
+    // temporary hidden value while a visible NPC or enemy is being filled.
     if (platformer_npc_count > 0) {
         runtime_telemetry.first_actor_x = platformer_npc_runtimes[0].actor.position_pixels.x;
         runtime_telemetry.first_actor_y = platformer_npc_runtimes[0].actor.position_pixels.y;
@@ -288,6 +286,11 @@ void sync_runtime_telemetry(
         runtime_telemetry.first_actor_y = active_enemies[0].bounds_pixels.y;
         runtime_telemetry.first_actor_direction = active_enemies[0].facing_right ? 3 : 2;
         runtime_telemetry.first_actor_visible = active_enemies[0].active ? 1u : 0u;
+    } else {
+        runtime_telemetry.first_actor_x = -1;
+        runtime_telemetry.first_actor_y = -1;
+        runtime_telemetry.first_actor_direction = -1;
+        runtime_telemetry.first_actor_visible = 0;
     }
     runtime_telemetry.last_music = event_state.last_music;
     runtime_telemetry.last_sfx = event_state.last_sfx >= 0 ? event_state.last_sfx : event_state.last_pcm_sfx;
