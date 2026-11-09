@@ -1834,7 +1834,15 @@ async function main() {
       await waitForText(cdp, (text) => text.includes("Piano Roll") && text.includes("Prévia"), "compositor da música nova");
       uiP0Checked.push("workspace-audio-imported-mod", "workspace-audio-wav-audition", "workspace-audio-create-music");
       await evaluate(cdp, `document.querySelector('.audio-groove-details-button').click()`);
-      await waitForText(cdp, (text) => text.includes("Validação GBA · OK"), "validação do áudio canônico");
+      await waitForText(cdp, text => text.includes("Validação GBA · Atenção"), "aviso de uso da composição nova");
+      const compositionWarnings = await evaluate(cdp, `(() => {
+        const section = Array.from(document.querySelectorAll('.audio-groove-details details'))
+          .find(item => item.querySelector('summary')?.textContent?.includes('Validação GBA'));
+        return Array.from(section?.querySelectorAll('li') ?? []).map(item => item.textContent?.trim());
+      })()`);
+      if (JSON.stringify(compositionWarnings) !== JSON.stringify(["Áudio sem uso em cenas ou eventos."])) {
+        throw new Error(`A composição nova apresentou bloqueios ou avisos inesperados: ${JSON.stringify(compositionWarnings)}`);
+      }
       const audioEdit = await editAudioInWorkspace(cdp);
       uiP0Checked.push("workspace-audio", "workspace-audio-edit-bpm", "workspace-audio-edit-note");
       await assertWorkspace(cdp, "Arquivos", [
