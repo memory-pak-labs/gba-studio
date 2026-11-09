@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 import { createBlankProjectData } from "../shared/newProject.js";
 import { createAudioItemInProject } from "../shared/audioWorkspace.js";
 import { buildAssetcAudioPackGeneration } from "../shared/engineProjectExport.js";
-import { selectAudioPreviewData, AudioPreviewSession } from "./engineAudioPreview.js";
+import { audioPreviewPlayback, selectAudioPreviewData, AudioPreviewSession } from "./engineAudioPreview.js";
 
 function fixture() {
   const data = createAudioItemInProject(createBlankProjectData({ name: "Prévia", includeStarterContent: false }), { id: "song", name: "Tema", kind: "Musica", synthesis: "PCM" });
@@ -14,6 +14,12 @@ function fixture() {
 }
 
 describe("engine audio preview", () => {
+  it("matches normal event playback for native PCM effects and imported WAVs", () => {
+    const composed = createAudioItemInProject(createBlankProjectData({ name: "FX", includeStarterContent: false }), { id: "hit", name: "Hit", kind: "SFX", synthesis: "PCM" });
+    expect(audioPreviewPlayback(composed).call).toBe("gbs::play_sfx(preview_sfx_assets[0])");
+    const imported = { assets: [{ id: "wav", name: "bell.wav", kind: "SFX", metadata: { source: "Assets/bell.wav" } }], audioItems: [{ id: "hit", name: "Bell", kind: "SFX", sourceAssetID: "wav", volume: 20 }] };
+    expect(audioPreviewPlayback(imported).call).toBe("gbs::play_pcm_sfx(preview_pcm_assets[0])");
+  });
   it("uses the full export recipe for sequence previews and preserves unsaved project data", () => {
     const data = fixture(); const before = JSON.stringify(data);
     const selected = selectAudioPreviewData({ requestID: "a", data, audioID: "song", scope: "sequence" });

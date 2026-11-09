@@ -1,3 +1,4 @@
+import { resolveAudioPlayback } from "./exportEngineProject.js";
 import { createHash } from "node:crypto";
 import { execFile } from "node:child_process";
 import { mkdtemp, readFile, rm, stat } from "node:fs/promises";
@@ -32,6 +33,18 @@ export function selectAudioPreviewData(request: PrepareAudioPreviewRequest): GBA
   return { ...request.data, audioItems: [audio] };
 }
 
+export function audioPreviewPlayback(data: GBAProjectData) {
+  const audio = audioRecords(data.audioItems)[0];
+  const pack = buildAssetcAudioPackGeneration(data);
+  const playback = pack && audio ? resolveAudioPlayback([audio], pack, String(audio.name ?? "")) : null;
+  if (!pack || !playback) throw new Error("Esse áudio não possui uma fonte reproduzível pela engine.");
+  const music = playback.op === "run_audio_routine";
+  const call = music ? `gbs::play_tracker_music(preview_tracker_assets[${playback.index}])`
+    : playback.op === "play_sfx" ? `gbs::play_sfx(preview_sfx_assets[${playback.index}])`
+    : `gbs::play_pcm_sfx(preview_pcm_assets[${playback.index}])`;
+  return { pack, music, call };
+}
+
 export interface AudioPreviewBuildOptions {
   enginePackPath: string;
   assetcPath: string;
@@ -54,9 +67,7 @@ export async function buildAudioPreviewRom(request: PrepareAudioPreviewRequest, 
   const audio = audioRecords(data.audioItems)[0];
   const errors = audioContractIssues(audio, data).filter(issue => issue.level === "error");
   if (errors.length) throw new Error(errors.map(issue => issue.message).join("\n"));
-  const pack = buildAssetcAudioPackGeneration(data);
-  if (!pack) throw new Error("Esse áudio não possui uma fonte reproduzível pela engine.");
-  const music = pack.document.tracker.length > 0;
+  const { pack, music, call } = audioPreviewPlayback(data);
   const settings = request.data.settings as Record<string, unknown> | undefined;
   const audioSettings = settings?.audio as Record<string, unknown> | undefined;
   const gain = (key: string) => {
@@ -74,7 +85,7 @@ extern "C" int gbs_main() {
  gbs::set_audio_channel_volume(gbs::AudioChannel::PcmSfx,${gain("sfxVolume")});
  audio_preview[6]=2; // Pending: large tracker validation can cross a video frame.
  audio_preview[0]=0x41555043;audio_preview[1]=0x50434d31;
- audio_preview[6]=${music ? "gbs::play_tracker_music(preview_tracker_assets[0])" : "gbs::play_sfx(preview_sfx_assets[0])"};
+ audio_preview[6]=${call};
  unsigned tail=0;
  for(;;) {
   audio_preview[2]++;

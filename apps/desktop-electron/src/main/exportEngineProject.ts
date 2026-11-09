@@ -3914,21 +3914,19 @@ function audioIndexByName(audioItems: Record<string, unknown>[], value: string):
   });
 }
 
-// O motor real so toca audio do projeto (arquivos .mod/.wav importados) atraves de
-// EventOp::RunAudioRoutine (project.tracker_assets) e EventOp::PlayPcmSfx (project.pcm_assets) -
-// ver GBAStudioEngine/engine/src/gbs_event.cpp. EventOp::PlayMusic/PlaySfx apontam para uma tabela
-// "sintetizada" (music_assets/sfx_assets) que buildAssetcAudioPackGeneration nunca preenche, entao
-// compilar "play_music"/"play_sfx" para esses ops nunca toca nada no ROM. Resolvemos aqui o audio
-// item para o indice real dentro do audio pack (tracker[]/pcm[]) ja gerado para o projeto.
+// Resolve indices in the compiled audio pack. Authored PCM effects use the
+// native SFX alias to preserve their gain and stop/wait SFX behavior. Explicit
+// per-event gain/priority operands retain the raw PCM playback path.
 interface EngineExportAudioPlaybackResolution {
   op: "run_audio_routine" | "play_pcm_sfx" | "play_sfx";
   index: number;
 }
 
-function resolveAudioPlayback(
+export function resolveAudioPlayback(
   audioItems: Record<string, unknown>[],
   audioPack: AssetcAudioPackGeneration | null,
-  value: string
+  value: string,
+  preferNativeSfx = true
 ): EngineExportAudioPlaybackResolution | null {
   const audioItemIndex = audioIndexByName(audioItems, value);
   if (audioItemIndex < 0 || !audioPack) return null;
@@ -3939,6 +3937,8 @@ function resolveAudioPlayback(
   const trackerIndex = audioPack.document.tracker.findIndex((entry) => entry.name === exportID);
   if (trackerIndex >= 0) return { op: "run_audio_routine", index: trackerIndex };
 
+  const nativeSfxIndex = audioPack.document.sfx.findIndex((entry) => entry.name === exportID);
+  if (preferNativeSfx && isPcmAudio(audio) && audio.kind === "SFX" && nativeSfxIndex >= 0) return { op: "play_sfx", index: nativeSfxIndex };
   const pcmIndex = audioPack.document.pcm.findIndex((entry) => entry.name === exportID);
   if (pcmIndex >= 0) return { op: "play_pcm_sfx", index: pcmIndex };
 
@@ -4708,7 +4708,7 @@ function compileEventStep(
     }
     case "play_music":
     case "play_sfx": {
-      const resolved = resolveAudioPlayback(audioItems, audioPack, operand);
+      const resolved = resolveAudioPlayback(audioItems, audioPack, operand, parts[2] === undefined && parts[3] === undefined);
       if (resolved) {
         if (resolved.op === "play_pcm_sfx" && (parts[2] !== undefined || parts[3] !== undefined)) {
           return [{
