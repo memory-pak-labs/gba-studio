@@ -389,6 +389,9 @@ void start_pcm_playback(PcmPlayback& playback, const gbs::PcmAsset& asset, uint8
 }
 
 void start_tracker_sample(const gbs::TrackerStep& step) {
+    // assetc represents an empty imported pattern with a silent timing step.
+    if (step.sample_index < 0 && step.volume == 0 && tracker.asset != nullptr &&
+        tracker.asset->sustain_sample_channels) return;
     PcmPlayback& playback = pcm_tracker[step.channel - 1u];
     if (step.sample_index < 0 || tracker.asset == nullptr || tracker.asset->samples == nullptr ||
         static_cast<size_t>(step.sample_index) >= tracker.asset->sample_count) {
@@ -514,7 +517,7 @@ void start_tracker_row() {
             for (size_t channel_index = 0; channel_index < gbs::TRACKER_MAX_SAMPLE_CHANNELS; ++channel_index) {
                 if ((active_channels & (1u << channel_index)) != 0) {
                     tracker_channels[channel_index].duration_frames = tracker.frames_remaining;
-                } else {
+                } else if (!tracker.asset->sustain_sample_channels) {
                     reset_pcm_playback(pcm_tracker[channel_index]);
                 }
             }

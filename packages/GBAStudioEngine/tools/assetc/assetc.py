@@ -4498,10 +4498,11 @@ def emit_audio_header(name, data, base_dir):
             pattern_index = require_int(order_entry, "order", 0, len(pattern_symbols) - 1)
             lines.append(f"    {pattern_index},")
         loop = "true" if bool(asset.get("loop", False)) else "false"
+        sustain = "true" if "mod" in asset or "s3m" in asset else "false"
         lines.extend([
             "};",
             f"inline constexpr gbs::TrackerAsset {symbol}_asset = {{ {symbol}_patterns, {len(pattern_symbols)}, {symbol}_order, {len(order)}, {loop}, "
-            f"{symbol}_sample_assets, {len(tracker_samples)} }};" if tracker_samples else
+            f"{symbol}_sample_assets, {len(tracker_samples)}, {sustain} }};" if tracker_samples else
             f"inline constexpr gbs::TrackerAsset {symbol}_asset = {{ {symbol}_patterns, {len(pattern_symbols)}, {symbol}_order, {len(order)}, {loop} }};",
             "",
         ])

@@ -27,6 +27,7 @@ class TrackerMultichannelTests(unittest.TestCase):
                     self.assertEqual([step["channel"] for step in steps[:channels]], list(range(1, channels + 1)))
                     header = ASSETC.emit_audio_header("channels", {"tracker": [{"name": "song", "mod": path.name}]}, path.parent)
                     self.assertIn(f"{{ {channels},", header)
+                    self.assertIn("_sample_assets, 16, true };" if channels == 16 else "_sample_assets, 8, true };", header)
                     self.assertTrue(all(step.get("sample_only") for step in steps[:channels]), "imported samples must not be doubled by PSG voices")
 
     def test_sparse_s3m_channels_do_not_collide_or_enable_disabled_tracks(self):

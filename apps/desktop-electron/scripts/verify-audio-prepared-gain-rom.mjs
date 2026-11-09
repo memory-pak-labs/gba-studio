@@ -48,7 +48,7 @@ extern "C" int gbs_main() {
     }
 }
 `);
-    fs.writeFileSync(path.join(dir, 'gbastudio_project.json'), JSON.stringify({ schema: 1, backend: 'gbastudio_engine', kind: 'topdown', entry: 'main.cpp', build: { target: 'gain', make_target: 'all' }, requires: { engine_pack: '>=2.27.0', features: ['audio.tracker_pcm_16_channels', 'audio.pcm_prepared_gain'] } }));
+    fs.writeFileSync(path.join(dir, 'gbastudio_project.json'), JSON.stringify({ schema: 1, backend: 'gbastudio_engine', kind: 'topdown', entry: 'main.cpp', build: { target: 'gain', make_target: 'all' }, requires: { engine_pack: '>=2.27.0', features: ['audio.tracker_pcm_16_channels', 'audio.pcm_prepared_gain', 'audio.tracker_sample_sustain'] } }));
     execFileSync(python, [path.join(pack, 'tools/gbsbuild'), '--engine-pack', pack, '--project-dir', dir], { stdio: 'pipe' });
     const rom = fs.readFileSync(path.join(dir, 'build/gain.gba'));
     const symbols = execFileSync(path.join(arm, 'arm-none-eabi-nm'), ['-C', path.join(dir, 'build/gain.elf')], { encoding: 'utf8', maxBuffer: 16 * 1024 * 1024 });

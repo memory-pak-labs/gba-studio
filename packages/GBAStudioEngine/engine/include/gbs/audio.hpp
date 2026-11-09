@@ -87,6 +87,8 @@ struct TrackerAsset {
     bool loop;
     const PcmAsset* samples = nullptr;
     size_t sample_count = 0;
+    // Imported module rests keep sample tails until a new note replaces them.
+    bool sustain_sample_channels = false;
 };
 
 // 532 timer ticks * 528 samples = 280896 GBA cycles per video frame.

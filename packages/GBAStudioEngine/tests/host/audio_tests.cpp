@@ -1205,7 +1205,42 @@ void test_sixteen_sample_channels_mix_without_psg_or_aliasing() {
     assert(!gbs::is_valid_tracker_step(invalid));
 }
 
+void test_imported_sample_notes_sustain_between_rows() {
+    const int8_t data[] = { 1, 2, 3, 4, 5 };
+    const gbs::PcmAsset sample { data, 5, gbs::PCM_MIXER_SAMPLE_RATE_HZ, true };
+    const uint8_t order[] = { 0 };
+    gbs::TrackerStep steps[18] {};
+    for (uint8_t channel = 1; channel <= 16; ++channel) {
+        auto& step = steps[channel - 1];
+        step = { channel, 262, static_cast<uint8_t>(channel == 16 ? 2 : 0), 15, 2 };
+        step.sample_only = true; step.sample_index = 0;
+    }
+    steps[16] = steps[15];
+    steps[16].duration_frames = 2;
+    steps[17] = { 2, 64, 8, 0, 2 }; // assetc placeholder for an empty module pattern
+    const gbs::TrackerPattern pattern { steps, 18 };
+    gbs::TrackerAsset song { &pattern, 1, order, 1, true, &sample, 1, true };
+    gbs::audio_init(); assert(gbs::play_tracker_music(song));
+    assert(gbs::audio_runtime_usage().active_voice_count == 16);
+    gbs::audio_update(); gbs::audio_update();
+    assert(gbs::audio_runtime_usage().active_voice_count == 16);
+    // The first fifteen voices retain their phase (528 % 5 == 3),
+    // while channel sixteen's explicit new note restarts at sample zero.
+    assert(last_pcm_first_sample == 15 * 4 + 1);
+    gbs::audio_update(); gbs::audio_update();
+    assert(gbs::audio_runtime_usage().active_voice_count == 16);
+    assert(last_pcm_first_sample == 15 * 5 + 2);
+    gbs::stop_tracker_music();
+    assert(gbs::audio_runtime_usage().active_voice_count == 0);
+    song.sustain_sample_channels = false;
+    gbs::audio_init(); assert(gbs::play_tracker_music(song));
+    gbs::audio_update(); gbs::audio_update();
+    assert(gbs::audio_runtime_usage().active_voice_count == 1);
+    gbs::audio_init();
+}
+
 int main() {
+    test_imported_sample_notes_sustain_between_rows();
     test_prepared_gain_matches_live_mixing_and_falls_back_exactly();
     test_native_word_mixer_preserves_unaligned_samples_and_short_loops();
     test_sixteen_sample_channels_mix_without_psg_or_aliasing();

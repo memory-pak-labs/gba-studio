@@ -71,6 +71,7 @@ describe("Audio runtime/export smoke", () => {
     const contract = buildEngineExportProjectContract(project);
     expect(contract.requires.features).toContain("audio.tracker_pcm_16_channels");
     expect(contract.requires.features).toContain("audio.pcm_prepared_gain");
+    expect(contract.requires.features).toContain("audio.tracker_sample_sustain");
     const generated = buildAssetcAudioPackGeneration(project)!;
     expect(generated.document.tracker).toContainEqual(expect.objectContaining({ [format.toLowerCase()]: expect.any(String), native_primary_volume: 12 }));
     expect(JSON.stringify(project)).toBe(before);

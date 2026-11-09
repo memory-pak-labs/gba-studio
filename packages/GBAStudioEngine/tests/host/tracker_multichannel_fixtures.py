@@ -4,7 +4,7 @@ import struct
 import sys
 from pathlib import Path
 
-def write_mod(path, channels=16, varied_volume=False):
+def write_mod(path, channels=16, varied_volume=False, sparse_change=False):
     data = bytearray(1084)
     data[:20] = b"Channel identity".ljust(20, b"\0")
     struct.pack_into(">H", data, 42, 32)
@@ -16,11 +16,14 @@ def write_mod(path, channels=16, varied_volume=False):
     for channel in range(channels):
         period = 428 + channel * 8
         pattern[channel * 4:channel * 4 + 4] = bytes([period >> 8, period & 255, 0x1c if varied_volume else 0x10, 16 + channel * 3 if varied_volume else 0])
+    if sparse_change:
+        offset = (16 * channels + channels - 1) * 4
+        pattern[offset:offset + 4] = pattern[(channels - 1) * 4:channels * 4]
     data += pattern + bytes([4] * 32 + [252] * 32)
     path.write_bytes(data)
 
 
-def write_s3m(path, channels=tuple(range(16)), disabled=(), varied_volume=False):
+def write_s3m(path, channels=tuple(range(16)), disabled=(), varied_volume=False, sparse_change=False):
     data = bytearray(0x100)
     data[0x1c:0x1e] = b"\x1a\x10"
     struct.pack_into("<HHH", data, 0x20, 1, 1, 1)
@@ -44,7 +47,14 @@ def write_s3m(path, channels=tuple(range(16)), disabled=(), varied_volume=False)
     packed = bytearray()
     for index, channel in enumerate((*channels, *disabled)):
         packed += bytes([0x60 | channel, ((4 + index // 12) << 4) | (index % 12), 1, 16 + index * 3 if varied_volume else 32])
-    packed += bytes(64)
+    if sparse_change:
+        index = len(channels) - 1
+        packed += bytes(16)  # terminate row zero and skip through row 15
+        packed += bytes([0x60 | channels[-1], ((4 + index // 12) << 4) | (index % 12), 1,
+                         16 + index * 3 if varied_volume else 32])
+        packed += bytes(48)
+    else:
+        packed += bytes(64)
     data += struct.pack("<H", len(packed)) + packed
     data += bytes(0x200 - len(data))
     data += bytes([4] * 32 + [252] * 32)
@@ -54,5 +64,5 @@ def write_s3m(path, channels=tuple(range(16)), disabled=(), varied_volume=False)
 if __name__ == "__main__":
     root = Path(sys.argv[1])
     root.mkdir(parents=True, exist_ok=True)
-    write_mod(root / "channels.mod", varied_volume=True)
-    write_s3m(root / "channels.s3m", varied_volume=True)
+    write_mod(root / "channels.mod", varied_volume=True, sparse_change="--sparse-change" in sys.argv)
+    write_s3m(root / "channels.s3m", varied_volume=True, sparse_change="--sparse-change" in sys.argv)

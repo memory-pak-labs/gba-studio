@@ -256,6 +256,13 @@ O mixer reserva até 17 vozes simultâneas: com os 16 canais de música ativos,
 resta uma voz de efeito; composições menores conservam o orçamento anterior.
 A quantidade ampliada de estado dos canais reside em EWRAM.
 
+`audio.tracker_sample_sustain` identifica descritores `TrackerAsset` com
+`sustain_sample_channels`. O `assetc` ativa esse campo em MOD/S3M: uma linha
+sem nota para um canal conserva o sample e sua posição, até terminar, receber
+uma nova nota ou parar a música. Tracks do compositor mantêm o contrato de
+pausa por linha, com o campo falso por padrão. Recompile todo o projeto junto
+com o SDK ao atualizar esse descritor.
+
 Para importações com mais de quatro canais, a exportação antecipa a
 reamostragem linear e o ganho estático de cada combinação instrumento/nota
 para 31536 Hz. Loops

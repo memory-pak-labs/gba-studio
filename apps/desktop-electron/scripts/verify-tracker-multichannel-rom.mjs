@@ -16,7 +16,7 @@ const engineRoot = fileURLToPath(new URL('../../../packages/GBAStudioEngine/', i
 const python = process.env.PYTHON ?? 'python3';
 const devkitArm = process.env.DEVKITARM ?? '/opt/devkitpro/devkitARM';
 fs.mkdirSync(output, { recursive: true });
-execFileSync(python, [path.join(engineRoot, 'tests/host/tracker_multichannel_fixtures.py'), output]);
+execFileSync(python, [path.join(engineRoot, 'tests/host/tracker_multichannel_fixtures.py'), output, '--sparse-change']);
 const wasm = new WebAssembly.Module(fs.readFileSync(new URL('../static/WebPlayer/player/mgba-core.wasm', import.meta.url)));
 const evidence = { passed: false, engineLibrarySha256: hash(fs.readFileSync(path.join(enginePack, 'lib/libgbastudio_engine.a'))), assetcSha256: hash(fs.readFileSync(path.join(enginePack, 'tools/assetc'))), wasmSha256: hash(fs.readFileSync(new URL('../static/WebPlayer/player/mgba-core.wasm', import.meta.url))), cases: [] };
 function hash(bytes) { return createHash('sha256').update(bytes).digest('hex'); }
@@ -68,7 +68,7 @@ extern "C" int gbs_main() {
     }
 }
 `);
-    fs.writeFileSync(path.join(project, 'gbastudio_project.json'), JSON.stringify({ schema: 1, backend: 'gbastudio_engine', kind: 'topdown', entry: 'main.cpp', build: { target: `tracker_${format}`, make_target: 'all' }, requires: { engine_pack: '>=2.27.0', features: ['audio.tracker_pcm_16_channels'] } }));
+    fs.writeFileSync(path.join(project, 'gbastudio_project.json'), JSON.stringify({ schema: 1, backend: 'gbastudio_engine', kind: 'topdown', entry: 'main.cpp', build: { target: `tracker_${format}`, make_target: 'all' }, requires: { engine_pack: '>=2.27.0', features: ['audio.tracker_pcm_16_channels', 'audio.tracker_sample_sustain'] } }));
     execFileSync(python, [path.join(enginePack, 'tools/gbsbuild'), '--engine-pack', enginePack, '--project-dir', project, '--devkitarm', devkitArm], { stdio: 'pipe' });
     const romPath = path.join(project, 'build', `tracker_${format}.gba`), rom = fs.readFileSync(romPath);
     const symbols = execFileSync(path.join(devkitArm, 'bin/arm-none-eabi-nm'), [path.join(project, 'build', `tracker_${format}.elf`)], { encoding: 'utf8' });
@@ -121,5 +121,5 @@ extern "C" int gbs_main() {
     } finally { core._gba_destroy(); }
   }
   evidence.passed = true;
-  console.log('PASS: MOD/S3M -> assetc -> ARM ROM -> mGBA; sixteen independent voices and PCM frequency checks');
+  console.log('PASS: MOD/S3M -> assetc -> ARM ROM -> mGBA; sixteen independent sustained voices, sparse note changes and PCM frequency checks');
 } finally { fs.writeFileSync(path.join(output, 'evidence.json'), JSON.stringify(evidence, null, 2) + '\n'); }

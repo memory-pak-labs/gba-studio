@@ -11144,7 +11144,7 @@ function buildEngineExportProjectContractUncached(
   });
   features.push(...cameraZoneFeatures);
   if (audioPack?.document.tracker.some(asset => asset.mod || asset.s3m)) {
-    features.push("audio.tracker_pcm_16_channels", "audio.pcm_prepared_gain");
+    features.push("audio.tracker_pcm_16_channels", "audio.pcm_prepared_gain", "audio.tracker_sample_sustain");
   }
   if (audioPack?.document.tracker.some(tracker => tracker.samples?.length)) features.push("audio.tracker_sample_instruments");
   const hasTacticalIsometricRoom = rooms.some((room) => (
