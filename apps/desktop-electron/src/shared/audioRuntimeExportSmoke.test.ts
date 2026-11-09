@@ -65,11 +65,14 @@ describe("Audio runtime/export smoke", () => {
     project.audioItems = (project.audioItems as Record<string, unknown>[]).map(item => item.id === "audio-theme"
       ? { id: "audio-theme", name: "intro_theme.mod", kind: "Musica", format,
           sourceAssetID: "asset-theme", loops: true } : item);
+    const currentSettings = project.settings as Record<string, unknown>;
+    project.settings = { ...currentSettings, audio: { ...(currentSettings.audio as Record<string, unknown>), musicVolume: 80 } };
     const before = JSON.stringify(project);
     const contract = buildEngineExportProjectContract(project);
     expect(contract.requires.features).toContain("audio.tracker_pcm_16_channels");
+    expect(contract.requires.features).toContain("audio.pcm_prepared_gain");
     const generated = buildAssetcAudioPackGeneration(project)!;
-    expect(generated.document.tracker).toContainEqual(expect.objectContaining({ [format.toLowerCase()]: expect.any(String) }));
+    expect(generated.document.tracker).toContainEqual(expect.objectContaining({ [format.toLowerCase()]: expect.any(String), native_primary_volume: 12 }));
     expect(JSON.stringify(project)).toBe(before);
   });
 

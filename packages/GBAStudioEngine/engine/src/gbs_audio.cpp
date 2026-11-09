@@ -701,9 +701,9 @@ GBS_AUDIO_HOT_CODE void mix_pcm_interpolated_run(const int8_t* samples, const in
     }
 }
 
-GBS_AUDIO_HOT_CODE void mix_pcm_voice_samples(PcmPlayback& playback, const int8_t* gains) {
+GBS_AUDIO_HOT_CODE void mix_pcm_voice_samples(PcmPlayback& playback, const int8_t* gains, const int8_t* prepared_samples = nullptr) {
     const gbs::PcmAsset& asset = *playback.asset;
-    const int8_t* const samples = asset.samples;
+    const int8_t* const samples = prepared_samples != nullptr ? prepared_samples : asset.samples;
     const uint32_t count = static_cast<uint32_t>(asset.sample_count);
     const uint32_t loop_start = static_cast<uint32_t>(asset.loop_start_sample);
     const uint32_t loop_end = static_cast<uint32_t>(gbs::pcm_loop_end_sample(asset));
@@ -711,6 +711,22 @@ GBS_AUDIO_HOT_CODE void mix_pcm_voice_samples(PcmPlayback& playback, const int8_
     const uint32_t step = playback.step_fp;
     uint32_t position = playback.position_fp;
     size_t output = 0;
+    // At 1:1 rate every input sample maps to one output sample, including the
+    // terminal sample. Avoid general resampling division and 64-bit carries.
+    if (step == 65536u && (position & 0xFFFFu) == 0) {
+        uint32_t index = position >> 16;
+        while (output < gbs::PCM_MIXER_SAMPLES_PER_FRAME) {
+            if (index >= count) { playback.playing = false; break; }
+            const size_t remaining = gbs::PCM_MIXER_SAMPLES_PER_FRAME - output;
+            const size_t run = boundary - index < remaining ? boundary - index : remaining;
+            mix_pcm_native_run(samples + index, gains, pcm_mix_accumulator + output, run);
+            index += run;
+            output += run;
+            if (asset.loop && index == loop_end) index = loop_start;
+        }
+        playback.position_fp = index << 16;
+        return;
+    }
     while (output < gbs::PCM_MIXER_SAMPLES_PER_FRAME) {
         if ((position >> 16) >= count) { playback.playing = false; break; }
         const bool terminal = (position >> 16) == boundary - 1u;
@@ -759,6 +775,11 @@ void mix_pcm_voice_block(const MixVoice& voice, bool right) {
     const uint8_t pan = right ? voice.pan.right : voice.pan.left;
     if (playback.volume == 15 && primary_gain == 15 && pcm_gain == 15 && pan == 15) {
         mix_pcm_voice_samples(playback, nullptr);
+    } else if (playback.volume == 15 && pcm_gain == 15 && pan == 15 &&
+        playback.step_fp == 65536u && (playback.position_fp & 0xFFFFu) == 0 &&
+        playback.asset->native_gain_samples != nullptr &&
+        playback.asset->native_gain_primary_volume == primary_gain) {
+        mix_pcm_voice_samples(playback, nullptr, playback.asset->native_gain_samples);
     } else {
         prepare_pcm_gain_table(playback.volume, primary_gain, pcm_gain, pan);
         mix_pcm_voice_samples(playback, pcm_gain_left);
@@ -980,11 +1001,7 @@ bool is_valid_tracker_asset(const TrackerAsset& asset) {
 }
 
 bool is_valid_pcm_asset(const PcmAsset& asset) {
-    return asset.samples != nullptr &&
-           asset.sample_count > 0 &&
-           asset.sample_count <= 0xFFFFu &&
-           is_valid_pcm_sample_rate(asset.sample_rate_hz) &&
-           is_valid_pcm_loop(asset);
+    return is_valid_pcm_asset_constexpr(asset);
 }
 
 void audio_init(bool preserve_mix) {
@@ -1372,7 +1389,7 @@ AudioRuntimeUsage audio_runtime_usage() {
         if (active_asset_count < sizeof(active_assets) / sizeof(active_assets[0])) {
             active_assets[active_asset_count++] = playback.asset;
         }
-        const uint64_t next_bytes = static_cast<uint64_t>(pcm_source_bytes) + playback.asset->sample_count;
+        const uint64_t next_bytes = static_cast<uint64_t>(pcm_source_bytes) + pcm_asset_source_bytes(*playback.asset);
         pcm_source_bytes = next_bytes > 0xFFFFFFFFu ? 0xFFFFFFFFu : static_cast<uint32_t>(next_bytes);
     };
 

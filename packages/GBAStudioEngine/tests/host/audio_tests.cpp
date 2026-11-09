@@ -1110,6 +1110,49 @@ static_assert(gbs::is_valid_tracker_step(gbs::TrackerStep {3, 32, 1, 8, 0}), "Wa
 static_assert(!gbs::is_valid_tracker_step(gbs::TrackerStep {3, 31, 1, 8, 0}), "Wave frequency below hardware range");
 static_assert(!gbs::is_valid_tracker_step(gbs::TrackerStep {1, 49, 1, 8, 0}), "Square retains its own frequency range");
 
+void test_prepared_gain_matches_live_mixing_and_falls_back_exactly() {
+    alignas(4) int8_t samples[33], prepared[33];
+    for (size_t i = 0; i < 33; ++i) {
+        samples[i] = static_cast<int8_t>((i * 37) % 255 - 127);
+        prepared[i] = static_cast<int8_t>(samples[i] * 12 / 15);
+    }
+    const gbs::PcmAsset raw { samples, 33, gbs::PCM_MIXER_SAMPLE_RATE_HZ, true, 2, 31 };
+    const gbs::PcmAsset optimized { samples, 33, gbs::PCM_MIXER_SAMPLE_RATE_HZ, true, 2, 31, prepared, 12 };
+    const int pans[] = { -127, 0, 63, 127 };
+    const uint32_t rates[] = { 12000, gbs::PCM_MIXER_SAMPLE_RATE_HZ };
+    int8_t reference[2][gbs::PCM_MIXER_SAMPLES_PER_FRAME];
+    for (uint8_t primary = 0; primary <= 15; ++primary) {
+        for (uint8_t pcm = 8; pcm <= 15; pcm += 7) for (uint8_t volume = 7; volume <= 15; volume += 8) {
+            for (int pan : pans) for (uint32_t rate : rates) {
+                gbs::audio_init();
+                gbs::set_audio_channel_volume(gbs::AudioChannel::Sfx, primary);
+                gbs::set_audio_channel_volume(gbs::AudioChannel::PcmSfx, pcm);
+                assert(gbs::play_pcm_sfx(raw, gbs::PcmSfxOptions { volume, 8, rate, static_cast<int8_t>(pan) }));
+                gbs::audio_update(); gbs::audio_update();
+                for (size_t i = 0; i < gbs::PCM_MIXER_SAMPLES_PER_FRAME; ++i) {
+                    reference[0][i] = last_pcm_samples[i];
+                    reference[1][i] = last_pcm_right_samples[i];
+                }
+                gbs::audio_init();
+                gbs::set_audio_channel_volume(gbs::AudioChannel::Sfx, primary);
+                gbs::set_audio_channel_volume(gbs::AudioChannel::PcmSfx, pcm);
+                assert(gbs::play_pcm_sfx(optimized, gbs::PcmSfxOptions { volume, 8, rate, static_cast<int8_t>(pan) }));
+                gbs::audio_update(); gbs::audio_update();
+                for (size_t i = 0; i < gbs::PCM_MIXER_SAMPLES_PER_FRAME; ++i) {
+                    assert(reference[0][i] == last_pcm_samples[i]);
+                    assert(reference[1][i] == last_pcm_right_samples[i]);
+                }
+            }
+        }
+    }
+    assert(gbs::estimate_pcm_asset_cost(optimized).pcm_bytes == 66);
+    assert(gbs::pcm_asset_source_bytes(raw) == 33);
+    auto invalid = optimized;
+    invalid.native_gain_primary_volume = 16;
+    assert(!gbs::is_valid_pcm_asset(invalid));
+    gbs::audio_init();
+}
+
 void test_native_word_mixer_preserves_unaligned_samples_and_short_loops() {
     alignas(4) int8_t samples[16];
     for (int i = 0; i < 16; ++i) samples[i] = static_cast<int8_t>((i * 19) % 101 - 50);
@@ -1163,6 +1206,7 @@ void test_sixteen_sample_channels_mix_without_psg_or_aliasing() {
 }
 
 int main() {
+    test_prepared_gain_matches_live_mixing_and_falls_back_exactly();
     test_native_word_mixer_preserves_unaligned_samples_and_short_loops();
     test_sixteen_sample_channels_mix_without_psg_or_aliasing();
     test_equal_priority_pcm_effect_age_survives_counter_rollover();

@@ -2853,6 +2853,7 @@ export interface AssetcAudioJsonDocument {
     s3m?: string;
     loop?: boolean;
     row_duration_frames?: number;
+    native_primary_volume?: number;
     samples?: Array<{ asset_id: string; wav: string; loop: boolean }>;
     patterns?: Array<{
       steps: Array<{
@@ -3666,7 +3667,8 @@ function buildAssetcAudioPackGenerationUncached(data: GBAProjectData): AssetcAud
         name: exportID,
         [trackerKey]: audioReference,
         loop: loops,
-        row_duration_frames: 4
+        row_duration_frames: 4,
+        native_primary_volume: trackerVolumeFromAudioVolume(integerField(child(settings(data), "audio"), "musicVolume", 100))
       });
       return;
     }

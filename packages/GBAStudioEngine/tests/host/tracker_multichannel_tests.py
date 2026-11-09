@@ -92,6 +92,23 @@ class TrackerMultichannelTests(unittest.TestCase):
                 self.assertGreaterEqual(cycles, 1)
                 self.assertAlmostEqual((31536 * cycles / loop_size) / (source_rate / source_size), 1, delta=0.0001)
 
+    def test_prepared_gain_variant_is_exact_and_in_the_exported_descriptor(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "channels.mod"
+            write_mod(path)
+            song = ASSETC.parse_mod_tracker(path)
+            patterns, samples = ASSETC.prepare_multichannel_tracker_samples(song["patterns"], song["samples"], 12)
+            for sample in samples:
+                self.assertEqual(sample["native_gain_primary_volume"], 12)
+                self.assertEqual(sample["native_gain_samples"], [int(value * 12 / 15) for value in sample["samples"]])
+            header = ASSETC.emit_audio_header("channels", {"tracker": [{"name": "song", "mod": path.name,
+                "native_primary_volume": 12}]}, path.parent)
+            self.assertIn("_native_gain", header)
+            self.assertIn(", 12 }", header)
+            with self.assertRaisesRegex(SystemExit, "native_primary_volume"):
+                ASSETC.emit_audio_header("channels", {"tracker": [{"name": "song", "mod": path.name,
+                    "native_primary_volume": 16}]}, path.parent)
+
     def test_over_budget_import_fails_instead_of_folding_channels(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)

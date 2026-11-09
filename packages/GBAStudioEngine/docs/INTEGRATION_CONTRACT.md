@@ -263,6 +263,18 @@ podem repetir ciclos para limitar a diferença de afinação a 0,01%. A saída
 continua sujeita ao limite de 65535 amostras por instrumento convertido e ao
 orçamento de ROM; ultrapassar esses limites gera um erro, sem descartar canais.
 Isso pode aumentar o tamanho da ROM em troca de reduzir o trabalho por frame.
+`audio.pcm_prepared_gain` acrescenta uma variante opcional de PCM com o volume
+primário configurado no projeto. O descritor `PcmAsset` conserva os samples
+originais; a variante só é usada na taxa nativa, com os demais ganhos unitários.
+Fades, panorama e mudanças de volume continuam pelo cálculo original. O ganho
+inteiro é idêntico, incluindo o arredondamento de samples negativos, e ambas as
+variantes entram no diagnóstico de bytes de origem. Esse descritor exige
+recompilar todo o código exportado junto com o SDK atualizado.
+
+O startup configura `WAITCNT=0x4317` antes de copiar dados da ROM: WS0 3/1,
+SRAM 8, WS2 8/8 e prefetch habilitado, conforme os tempos de cartucho descritos
+no [GBATEK](https://mgba-emu.github.io/gbatek/#gbasystemcontrol).
+Isso não altera a frequência do áudio nem a quantidade de canais.
 Dezesseis canais não garantem a cadência de qualquer cena: o orçamento de CPU
 deve ser medido com gameplay, efeitos e renderização do projeto real.
 
@@ -271,7 +283,17 @@ A regressão sintética usa fontes MOD/S3M geradas pelo próprio teste. Depois d
 
 ```sh
 node scripts/verify-tracker-multichannel-rom.mjs ../../packages/GBAStudioEngine/dist/GBAStudioEnginePack /caminho/qa/tracker
+node scripts/verify-audio-prepared-gain-rom.mjs ../../packages/GBAStudioEngine/dist/GBAStudioEnginePack /caminho/qa/gain
+node scripts/verify-scene-tracker-cadence.mjs /caminho/qa/porto/build/exemplo.gba /caminho/qa/cadence
 ```
+
+A regressão de ganho compara byte a byte 360 blocos PCM estéreo por formato,
+alternando entre a variante e o cálculo original na mesma ROM ARM, e verifica
+o registrador de wait states. A regressão de cena requer uma cópia exportada
+com início em Porto Lúmen e música sustentada de 16 canais; mede 240 quadros
+parado, andando à direita e após soltar o comando, com mínimo de 117 atualizações
+do jogo em cada janela (cadência de 30 Hz). Os resultados não provam execução
+em um GBA físico.
 
 Ela importa os arquivos pelo `assetc`, compila com `gbsbuild`, executa as ROMs
 no mGBA embarcado, verifica cada canal individualmente e todos juntos no PCM,

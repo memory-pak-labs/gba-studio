@@ -4212,13 +4212,14 @@ def parse_vgm_tracker(path, duty=2):
     }
 
 
-def prepare_multichannel_tracker_samples(patterns, source_samples):
+def prepare_multichannel_tracker_samples(patterns, source_samples, native_primary_volume=15):
     """Move pitched linear resampling to export time, retaining every voice.
 
     Loop repetition keeps pitch error below 0.01% without lowering the mixer
     rate or using nearest-neighbour sampling. Generated PCM still obeys the
     runtime's 65535-sample address limit and the normal ROM asset budget.
     """
+    native_primary_volume = require_int(native_primary_volume, "native_primary_volume", 0, 15)
     native_rate = 31536
     prepared_samples = []
     prepared_patterns = []
@@ -4267,8 +4268,12 @@ def prepare_multichannel_tracker_samples(patterns, source_samples):
                         output.append(int(interpolated * volume / 15))
                         position += step_fp
                     cache[key] = len(prepared_samples)
-                    prepared_samples.append({"samples": output, "sample_rate_hz": native_rate,
-                        "loop_start_sample": prefix if looping else 0, "loop_end_sample": count if looping else 0})
+                    prepared_sample = {"samples": output, "sample_rate_hz": native_rate,
+                        "loop_start_sample": prefix if looping else 0, "loop_end_sample": count if looping else 0}
+                    if native_primary_volume != 15:
+                        prepared_sample["native_gain_samples"] = [int(value * native_primary_volume / 15) for value in output]
+                        prepared_sample["native_gain_primary_volume"] = native_primary_volume
+                    prepared_samples.append(prepared_sample)
                 step["sample_index"] = cache[key]
                 step["sample_rate_hz"] = native_rate
                 step["volume"] = 15
@@ -4394,7 +4399,7 @@ def emit_audio_header(name, data, base_dir):
                     "loop_end_sample": (auto_end if auto_end > auto_start else len(samples)) if loop else 0})
         if ("mod" in asset or "s3m" in asset) and any(
                 step["channel"] > 4 for pattern in patterns for step in pattern["steps"]):
-            patterns, tracker_samples = prepare_multichannel_tracker_samples(patterns, tracker_samples)
+            patterns, tracker_samples = prepare_multichannel_tracker_samples(patterns, tracker_samples, asset.get("native_primary_volume", 15))
         if not isinstance(patterns, list) or not patterns:
             raise SystemExit("cada tracker precisa conter ao menos um pattern")
         if not isinstance(order, list) or not order:
@@ -4404,6 +4409,7 @@ def emit_audio_header(name, data, base_dir):
         tracker_asset_names.append(symbol)
         if tracker_samples:
             sample_data_symbols = []
+            gain_data_symbols = []
             for sample_index, sample_asset in enumerate(tracker_samples):
                 sample_data = sample_asset["samples"]
                 data_key = tuple(sample_data)
@@ -4416,15 +4422,29 @@ def emit_audio_header(name, data, base_dir):
                         lines.append("    " + ", ".join(str(value) for value in sample_data[offset:offset + 16]) + ",")
                     lines.append("};")
                 sample_data_symbols.append(data_symbol)
+                gain_symbol = None
+                if "native_gain_samples" in sample_asset:
+                    gain_data = sample_asset["native_gain_samples"]
+                    gain_key = tuple(gain_data)
+                    gain_symbol = pcm_data_symbols.get(gain_key)
+                    if gain_symbol is None:
+                        gain_symbol = f"{symbol}_sample_{sample_index}_native_gain"
+                        pcm_data_symbols[gain_key] = gain_symbol
+                        lines.append(f"inline constexpr int8_t {gain_symbol}[{len(gain_data)}] = {{")
+                        for offset in range(0, len(gain_data), 16):
+                            lines.append("    " + ", ".join(str(value) for value in gain_data[offset:offset + 16]) + ",")
+                        lines.append("};")
+                gain_data_symbols.append(gain_symbol)
             lines.append(f"inline constexpr gbs::PcmAsset {symbol}_sample_assets[{len(tracker_samples)}] = {{")
             for sample_index, sample_asset in enumerate(tracker_samples):
                 sample_data = sample_asset["samples"]
                 loop_start = sample_asset.get("loop_start_sample", 0)
                 loop_end = sample_asset.get("loop_end_sample", 0)
                 loop_literal = "true" if loop_end > loop_start else "false"
+                gain_suffix = f", {gain_data_symbols[sample_index]}, {sample_asset['native_gain_primary_volume']}" if gain_data_symbols[sample_index] else ""
                 lines.append(
                     f"    {{ {sample_data_symbols[sample_index]}, {len(sample_data)}, {sample_asset['sample_rate_hz']}, "
-                    f"{loop_literal}, {loop_start}, {loop_end} }},"
+                    f"{loop_literal}, {loop_start}, {loop_end}{gain_suffix} }},"
                 )
             lines.extend(["};", ""])
         pattern_symbols = []

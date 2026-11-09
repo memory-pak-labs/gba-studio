@@ -1250,6 +1250,7 @@
     ],
     "audio": [
       "tracker_pcm_16_channels",
+      "pcm_prepared_gain",
       "psg_square_sfx",
       "psg_noise_sfx",
       "psg_square_music",

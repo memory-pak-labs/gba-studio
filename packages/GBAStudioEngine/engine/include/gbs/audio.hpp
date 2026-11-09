@@ -51,6 +51,9 @@ struct PcmAsset {
     bool loop;
     size_t loop_start_sample = 0;
     size_t loop_end_sample = 0;
+    // Optional ROM variant, identical to applying this primary gain at 1:1 rate.
+    const int8_t* native_gain_samples = nullptr;
+    uint8_t native_gain_primary_volume = 15;
 };
 
 struct TrackerStep {
@@ -228,7 +231,8 @@ constexpr bool is_valid_pcm_asset_constexpr(const PcmAsset& asset) {
            asset.sample_count > 0 &&
            asset.sample_count <= 0xFFFFu &&
            is_valid_pcm_sample_rate(asset.sample_rate_hz) &&
-           is_valid_pcm_loop(asset);
+           is_valid_pcm_loop(asset) &&
+           (asset.native_gain_samples == nullptr || is_valid_pcm_volume(asset.native_gain_primary_volume));
 }
 
 bool is_valid_sfx_asset(const SfxAsset& asset);
@@ -368,6 +372,11 @@ constexpr AudioMixCost estimate_tracker_asset_cost(const TrackerAsset& asset) {
     };
 }
 
+constexpr uint32_t pcm_asset_source_bytes(const PcmAsset& asset) {
+    const bool separate_gain_data = asset.native_gain_samples != nullptr && asset.native_gain_samples != asset.samples;
+    return static_cast<uint32_t>(asset.sample_count) * (separate_gain_data ? 2u : 1u);
+}
+
 constexpr uint32_t estimate_pcm_output_sample_count(const PcmAsset& asset) {
     return static_cast<uint32_t>(
         (static_cast<uint64_t>(asset.sample_count) * PCM_MIXER_SAMPLE_RATE_HZ + asset.sample_rate_hz - 1u) /
@@ -385,8 +394,8 @@ constexpr AudioMixCost estimate_pcm_asset_cost(const PcmAsset& asset) {
         ? invalid_audio_mix_cost()
         : AudioMixCost {
             true,
-            static_cast<uint32_t>(asset.sample_count),
-            static_cast<uint32_t>(asset.sample_count),
+            pcm_asset_source_bytes(asset),
+            pcm_asset_source_bytes(asset),
             0,
             estimate_pcm_mixer_frame_count(asset),
             0,
