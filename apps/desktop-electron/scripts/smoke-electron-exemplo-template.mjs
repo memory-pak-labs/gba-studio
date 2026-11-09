@@ -1817,7 +1817,22 @@ async function main() {
       uiP0Checked.push("editor-cena-dialogos-edit-text");
       await assertWorkspace(cdp, "Áudio", [`${canonicalAudioCount} de ${canonicalAudioCount} visíveis`, "Músicas", "Efeitos sonoros", "farol_tema_principal", "farol_sfx_texto"]);
       await selectAudioLibraryItem(cdp, "farol_tema_principal");
-      await waitForText(cdp, (text) => text.includes("Piano Roll") && text.includes("Prévia"), "compositor de áudio canônico");
+      await waitForText(cdp, text => text.includes("Áudio importado"), "módulo original no workspace de Áudio");
+      await clickButtonByAriaLabel(cdp, "Ouvir farol_tema_principal");
+      await waitForText(cdp, text => text.includes("Ouça este formato no Play do jogo."), "orientação para ouvir o módulo no Play");
+      await captureScreenshot(cdp, join(evidenceRoot, "exemplo_template_audio_imported.png"));
+      await selectAudioLibraryItem(cdp, "farol_sfx_vitoria");
+      await clickButtonByAriaLabel(cdp, "Ouvir farol_sfx_vitoria");
+      await waitForText(cdp, text => text.includes("Tocando farol_sfx_vitoria"), "reprodução do WAV renovado na cópia salva");
+      await clickButtonByAriaLabel(cdp, "Parar áudio");
+      // Imported modules keep their source. Exercise the composer on a new item
+      // created through the real UI, instead of replacing the approved soundtrack.
+      await clickButtonByAriaLabel(cdp, "Criar áudio");
+      await clickButtonByAriaLabel(cdp, "Música em loop");
+      await waitForText(cdp, text => text.includes("Áudio criado:"), "criação de música na cópia do projeto");
+      await selectAudioLibraryItem(cdp, "nova_musica.mod");
+      await waitForText(cdp, (text) => text.includes("Piano Roll") && text.includes("Prévia"), "compositor da música nova");
+      uiP0Checked.push("workspace-audio-imported-mod", "workspace-audio-wav-audition", "workspace-audio-create-music");
       await evaluate(cdp, `document.querySelector('.audio-groove-details-button').click()`);
       await waitForText(cdp, (text) => text.includes("Validação GBA · OK"), "validação do áudio canônico");
       const audioEdit = await editAudioInWorkspace(cdp);
