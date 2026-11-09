@@ -157675,7 +157675,7 @@
       "format": "MOD",
       "exportID": "farol_tema_principal",
       "loops": true,
-      "bpm": 160,
+      "bpm": 112,
       "volume": 90,
       "sourceAssetID": "coastal-gba-audio-farol_tema_principal"
     },
@@ -157686,7 +157686,7 @@
       "format": "MOD",
       "exportID": "farol_enseada",
       "loops": true,
-      "bpm": 184,
+      "bpm": 112,
       "volume": 86,
       "sourceAssetID": "coastal-gba-audio-farol_enseada"
     },
@@ -157697,7 +157697,7 @@
       "format": "MOD",
       "exportID": "farol_falesias",
       "loops": true,
-      "bpm": 96,
+      "bpm": 129,
       "volume": 78,
       "sourceAssetID": "coastal-gba-audio-farol_falesias"
     },
@@ -157708,7 +157708,7 @@
       "format": "MOD",
       "exportID": "farol_memorias",
       "loops": true,
-      "bpm": 112,
+      "bpm": 90,
       "volume": 80,
       "sourceAssetID": "coastal-gba-audio-farol_memorias"
     },
@@ -157796,7 +157796,7 @@
       "kind": "Musica",
       "format": "MOD",
       "loops": true,
-      "bpm": 112,
+      "bpm": 100,
       "volume": 82,
       "sourceAssetID": "coastal-music-farol-arena-tatica"
     },
@@ -157906,7 +157906,7 @@
       "kind": "Musica",
       "format": "MOD",
       "loops": true,
-      "bpm": 144,
+      "bpm": 150,
       "volume": 74,
       "sourceAssetID": "coastal-farol_arena_mare"
     },
@@ -157961,7 +157961,7 @@
       "kind": "Musica",
       "format": "MOD",
       "loops": true,
-      "bpm": 132,
+      "bpm": 129,
       "volume": 68,
       "displayName": "Vento de Lumen · candidato",
       "sourceAssetID": "coastal-penedos_vento_de_lumen_candidato"
@@ -158051,7 +158051,7 @@
       "kind": "Musica",
       "format": "MOD",
       "loops": true,
-      "bpm": 144,
+      "bpm": 180,
       "volume": 66,
       "sourceAssetID": "coastal-corrida_circuito_dos_farois"
     },
@@ -158062,7 +158062,7 @@
       "kind": "Musica",
       "format": "MOD",
       "loops": true,
-      "bpm": 156,
+      "bpm": 150,
       "volume": 66,
       "sourceAssetID": "coastal-corrida_rota_da_mare"
     },
@@ -158150,7 +158150,7 @@
       "kind": "Musica",
       "format": "MOD",
       "loops": true,
-      "bpm": 168,
+      "bpm": 150,
       "volume": 68,
       "sourceAssetID": "coastal-tempestade_travessia"
     },
@@ -158227,7 +158227,7 @@
       "kind": "Musica",
       "format": "MOD",
       "loops": true,
-      "bpm": 144,
+      "bpm": 129,
       "volume": 64,
       "displayName": "Pulso do Relé",
       "sourceAssetID": "coastal-relay_pulse"
@@ -158239,7 +158239,7 @@
       "kind": "Musica",
       "format": "MOD",
       "loops": false,
-      "bpm": 132,
+      "bpm": 112,
       "volume": 64,
       "displayName": "Luz Reacesa",
       "sourceAssetID": "coastal-relay_light"
@@ -158335,7 +158335,7 @@
       "kind": "Musica",
       "format": "MOD",
       "loops": true,
-      "bpm": 92,
+      "bpm": 90,
       "volume": 56,
       "displayName": "Marés sob Pedra",
       "sourceAssetID": "coastal-dungeon_tide"
@@ -158347,7 +158347,7 @@
       "kind": "Musica",
       "format": "MOD",
       "loops": true,
-      "bpm": 132,
+      "bpm": 112,
       "volume": 56,
       "displayName": "Ronda da Usina",
       "sourceAssetID": "coastal-dungeon_patrol"
@@ -158443,7 +158443,7 @@
       "format": "MOD",
       "exportID": "mapa_mar_aberto",
       "loops": true,
-      "bpm": 84,
+      "bpm": 100,
       "volume": 65,
       "sourceAssetID": "coastal-audio-mapa-mar-aberto"
     },

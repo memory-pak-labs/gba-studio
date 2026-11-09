@@ -103,7 +103,7 @@ describe("Exemplo GBA audio content", () => {
       kind: "Musica",
       format: "MOD",
       loops: true,
-      bpm: 112,
+      bpm: 100,
       volume: 82
     });
     expect(audioByName.get("farol_sfx_tatica_cursor")).toMatchObject({

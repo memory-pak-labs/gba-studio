@@ -2811,12 +2811,12 @@
         },
         {
           "path": "Assets/audio/coastal-v1/manifest.json",
-          "sha256": "2d91ecaec30b4a09b5ab544f11ef0c84bf988e3e0db7e61bf67271fcdc48f3ed",
+          "sha256": "f539ce53569648f8517dd32b1da11bf9b100c6c546c1605a967840b4bbff0038",
           "contract": "coastal-bank-source-and-provenance-2026-11-09"
         },
         {
           "path": "Assets/audio/coastal-v1/palette.py",
-          "sha256": "f46dcc2b0d0f8e8fd4eca38853a84123023f41e305ed1e6da096c316518e6272",
+          "sha256": "07d66010f5e22ed0a0c1495be3198f912adf621636748453a8e415e84ef49a5e",
           "contract": "coastal-bank-source-and-provenance-2026-11-09"
         }
       ],

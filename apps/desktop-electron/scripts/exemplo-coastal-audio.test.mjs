@@ -20,7 +20,12 @@ describe('approved coastal audio bank',()=>{
    expect(createHash('sha256').update(bytes).digest('hex')).toBe(asset.metadata.preparedSha256);
    expect(item.format).toBe(item.kind==='Musica'?'MOD':'WAV');
    expect(item.patterns).toBeUndefined();
-   if(item.kind==='Musica')expect(asset.metadata.moduleChannels).toBeGreaterThan(4);
+   if(item.kind==='Musica'){
+    expect(asset.metadata.moduleChannels).toBeGreaterThan(4);
+    const score=manifest.music.find(score=>score.exportID===item.exportID);
+    expect(item.bpm).toBe(score.tempo_bpm);
+    expect(bytes[1091]).toBe(item.bpm); // first row Fxx in MOD channel two
+   }
   }
  });
  it('keeps every MOD note inside the sample playback range without pitch clamping',()=>{

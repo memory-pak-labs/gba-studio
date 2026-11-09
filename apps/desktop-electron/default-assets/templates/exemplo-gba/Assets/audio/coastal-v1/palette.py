@@ -139,7 +139,7 @@ def write_module(name, channels, bars, chords, melody, mystery=False, row_frames
     data+=pattern_data
     for values in samples:data+=bytes(x&255 for x in values)
     path=OUT/'sources'/f'{name}.mod';path.write_bytes(data)
-    return {'id':name,'source':str(path.relative_to(OUT)),'channels':channels,'bars':bars,'rows':rows,'row_frames':round(900/tempo),'expected_seconds':rows*round(900/tempo)/59.7275,'loop':True,'instruments':[x[0] for x in INSTRUMENTS]}
+    return {'id':name,'source':str(path.relative_to(OUT)),'channels':channels,'bars':bars,'rows':rows,'tempo_bpm':tempo,'row_frames':round(900/tempo),'expected_seconds':rows*round(900/tempo)/59.7275,'loop':True,'instruments':[x[0] for x in INSTRUMENTS]}
 
 def sfx(name,duration,layers,noise=0):
     rng=random.Random(7069); values=[]; filtered=0

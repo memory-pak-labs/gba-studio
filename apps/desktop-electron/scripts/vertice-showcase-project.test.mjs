@@ -2076,7 +2076,7 @@ describe("materialização canônica de Vértice", () => {
     expect(new Set(project.assets.map((asset) => asset.name))).toEqual(allowedAssets);
     expect(project.audioItems).toHaveLength(74);
     expect(project.audioItems.filter(item => item.id.startsWith('initial-menu-'))).toEqual(canonical.audioItems.filter(item => item.id.startsWith('initial-menu-')));
-    expect(project.audioItems.find(a=>a.name==='mapa_mar_aberto')).toMatchObject({bpm:84,format:'MOD',loops:true});
+    expect(project.audioItems.find(a=>a.name==='mapa_mar_aberto')).toMatchObject({bpm:100,format:'MOD',loops:true});
     expect(project.events.flatMap((event) => event.steps ?? []).some((step) => /play_(music|sfx) /.test(step.command))).toBe(true);
     expect(project.scenas.filter((scene) => pendingSceneNames.includes(scene.name)))
       .toEqual(expect.arrayContaining([
