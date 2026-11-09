@@ -1895,11 +1895,20 @@ async function main() {
       await waitForText(cdp, (text) => text.includes("Salvo") && !text.includes("Alterado"), "projeto salvo");
 
       const saved = await inspectSavedTemplate(projectPath);
-      const expectedCounts = { ...initial.counts, assets: initial.counts.assets + 1 };
+      const expectedCounts = { ...initial.counts, assets: initial.counts.assets + 1, audioItems: initial.counts.audioItems + 1 };
       if (JSON.stringify(saved.counts) !== JSON.stringify(expectedCounts)) {
         throw new Error(
           `Contagens do projeto divergiram durante save/reopen: esperado=${JSON.stringify(expectedCounts)} salvo=${JSON.stringify(saved.counts)}`
         );
+      }
+      const originalAudioIDs = new Set(initial.project.audioItems.map(item => item.id));
+      const retainedAudio = saved.project.audioItems.filter(item => originalAudioIDs.has(item.id));
+      if (JSON.stringify(retainedAudio) !== JSON.stringify(initial.project.audioItems)) {
+        throw new Error("A edição de uma composição nova alterou a trilha importada original.");
+      }
+      const savedComposition = saved.project.audioItems.find(item => item.name === "nova_musica.mod");
+      if (savedComposition?.format !== "COMPOSED" || savedComposition.bpm !== audioEdit.afterBpm) {
+        throw new Error("A composição criada/editada no workspace não foi persistida.");
       }
       if (saved.project.settings?.debug?.developerMode !== true) {
         throw new Error("O template salvo não preservou developerMode=true.");
