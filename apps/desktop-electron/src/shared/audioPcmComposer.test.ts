@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { createBlankProjectData } from "./newProject.js";
 import { audioContractIssues } from "./audioContract.js";
-import { createAudioItemInProject, createAudioChannelInProject, updateAudioChannelFieldsInProject, deriveAudioWorkspacePresentation } from "./audioWorkspace.js";
+import { suggestAudioItemName, createAudioPatternInProject, createAudioItemInProject, createAudioChannelInProject, updateAudioChannelFieldsInProject, deriveAudioWorkspacePresentation } from "./audioWorkspace.js";
 import { buildAssetcAudioPackGeneration, compileComposedMusicaToTracker } from "./engineProjectExport.js";
 import { defaultPcmSfx, renderPcmSfx, updatePcmSfxInProject } from "./audioPcm.js";
 import { planAssetDeletion, resolveAssetDeletion } from "./assetDeletion.js";
@@ -12,6 +12,15 @@ function song() {
 }
 
 describe("PCM authored audio", () => {
+  it("seeds an audible PCM song, leaves new patterns empty and suggests unique source-free names", () => {
+    let data = createAudioItemInProject(blank(), { id: "first", name: "nova_musica", kind: "Musica", synthesis: "PCM" });
+    expect(suggestAudioItemName(data, "Musica", "PCM")).toBe("nova_musica_2");
+    expect(((data.audioItems as any[])[0]).patterns[0].channels[0].notes).toHaveLength(64);
+    expect(((data.audioItems as any[])[0]).patterns[0].channels.some((lane: any) => lane.notes.includes("C4"))).toBe(true);
+    data = createAudioPatternInProject(data, "first", { id: "second", name: "Variação" });
+    expect(((data.audioItems as any[])[0]).patterns[1].channels.every((lane: any) => lane.notes.length === 0)).toBe(true);
+    expect(suggestAudioItemName(data, "Musica")).toBe("nova_musica.mod");
+  });
   it("creates sixteen independent PCM lanes and refuses a seventeenth without altering the project", () => {
     let data = song();
     const audio = () => (data.audioItems as any[])[0];

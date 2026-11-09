@@ -806,6 +806,7 @@ ipcMain.handle(ipcChannels.analyzeScene, async (event, request) => {
   return analyzeScene(request);
 });
 const audioPreviewSessions = new Map<number, AudioPreviewSession>();
+const audioPreviewIdleThrottling = new Map<number, boolean>();
 ipcMain.handle(ipcChannels.prepareAudioPreview, async (event, request: PrepareAudioPreviewRequest) => {
   if (!BrowserWindow.fromWebContents(event.sender) || event.senderFrame !== event.sender.mainFrame) throw new Error("Origem de prévia inválida.");
   if (!request || typeof request.requestID !== "string" || !request.requestID || request.requestID.length > 100 || !request.data || typeof request.audioID !== "string" || !["pattern", "sequence"].includes(request.scope)) throw new Error("Seleção de áudio inválida.");
@@ -813,10 +814,12 @@ ipcMain.handle(ipcChannels.prepareAudioPreview, async (event, request: PrepareAu
   if (!session) {
     session = new AudioPreviewSession(); audioPreviewSessions.set(event.sender.id, session);
     const ownerID = event.sender.id; const owned = session;
-    event.sender.once("destroyed", () => { audioPreviewSessions.delete(ownerID); void owned.dispose(); });
+    event.sender.once("destroyed", () => { audioPreviewSessions.delete(ownerID); audioPreviewIdleThrottling.delete(ownerID); void owned.dispose(); });
   }
   const selected = inspectEnginePack({ preferredPath: readProjectEnginePackPath(request.data) }).selected;
   if (!selected?.hasAssetc || !selected.hasGbsbuild || !selected.assetcPath || !selected.gbsbuildPath) return { requestID: request.requestID, error: "Configure um Engine Pack com assetc e compilador para ouvir a prévia." };
+  if (!audioPreviewIdleThrottling.has(event.sender.id)) audioPreviewIdleThrottling.set(event.sender.id, event.sender.getBackgroundThrottling());
+  event.sender.setBackgroundThrottling(false);
   try {
     return await session.prepare(request, { enginePackPath: selected.path, assetcPath: selected.assetcPath, gbsbuildPath: selected.gbsbuildPath,
       webPlayerRoot: resolveWebPlayerRoot({ appPath: app.getAppPath(), resourcesPath: process.resourcesPath, packaged: app.isPackaged }) });
@@ -824,7 +827,12 @@ ipcMain.handle(ipcChannels.prepareAudioPreview, async (event, request: PrepareAu
 });
 ipcMain.handle(ipcChannels.stopAudioPreview, async (event, requestID: string) => {
   if (!BrowserWindow.fromWebContents(event.sender) || event.senderFrame !== event.sender.mainFrame) return;
-  await audioPreviewSessions.get(event.sender.id)?.stop(requestID);
+  const session = audioPreviewSessions.get(event.sender.id);
+  const stopped = await session?.stop(requestID);
+  if (stopped && !session?.active && !event.sender.isDestroyed()) {
+    event.sender.setBackgroundThrottling(audioPreviewIdleThrottling.get(event.sender.id) ?? true);
+    audioPreviewIdleThrottling.delete(event.sender.id);
+  }
 });
 
 ipcMain.handle(ipcChannels.analyzeProjectBudget, async (_event, request: AnalyzeProjectBudgetRequest) => {

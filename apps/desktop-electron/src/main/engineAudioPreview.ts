@@ -147,10 +147,12 @@ export class AudioPreviewSession {
     url.searchParams.set("rom", `/roms/${path.basename(built.romPath)}`); url.searchParams.set("id", request.requestID);
     return { requestID: request.requestID, ok: true, url: url.href, romBytes: built.romBytes, rowFrames: built.rowFrames, stepCount: built.stepCount };
   }
-  async stop(id: string): Promise<void> {
-    if (id !== this.currentID) return;
+  get active(): boolean { return this.currentID !== null; }
+  async stop(id: string): Promise<boolean> {
+    if (id !== this.currentID) return false;
     ++this.generation; this.currentID = null;
     const server = this.server; this.server = null; await server?.close();
+    return true;
   }
   async dispose(): Promise<void> {
     ++this.generation; this.currentID = null;

@@ -83,9 +83,14 @@ export function pcmInstrumentSource(instrument: string): { samples: number[]; sa
   return { samples: Array.from({ length: count }, (_, i) => Math.round(waveAt(waveform, i / 64, random()) * 64 * (noise ? 1 - i / count : 1))),
     sample_rate_hz: noise ? PCM_SAMPLE_RATE : 262 * 64, loop: !noise };
 }
-export function createPcmPatternChannels(patternID: string): Record<string, unknown>[] {
+export function createPcmPatternChannels(patternID: string, seed = false): Record<string, unknown>[] {
   return ["PCM Sine", "PCM Triangle", "PCM Square", "PCM Noise"].map((instrument, index) => ({
     id: `${patternID}-pcm-${index + 1}`, name: `Faixa ${index + 1}`, type: "pcm", instrument,
-    envelope: "Soft ADSR", volume: 65, pan: 0, notes: []
+    envelope: "Soft ADSR", volume: 65, pan: 0, notes: seed ? Array.from({ length: 64 }, (_, step) => [
+      ["C4", "---", "E4", "---", "G4", "---", "E4", "---"],
+      ["C3", "---", "---", "---", "G3", "---", "---", "---"],
+      ["---", "---", "G3", "---", "---", "---", "C4", "---"],
+      ["C4", "---", "---", "---", "C4", "---", "---", "---"]
+    ][index][step % 8]) : []
   }));
 }

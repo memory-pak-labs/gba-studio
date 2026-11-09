@@ -51,9 +51,9 @@ describe("engine audio preview", () => {
     const session = new AudioPreviewSession({ build, serve, remove });
     await session.prepare({ requestID: "a", data: fixture(), audioID: "song", scope: "sequence" }, {} as any);
     const result = await session.prepare({ requestID: "b", data: fixture(), audioID: "song", scope: "sequence" }, {} as any);
-    expect(result.url).toContain("audio-preview.html"); expect(closeA).toHaveBeenCalledOnce();
-    await session.stop("a"); expect(closeB).not.toHaveBeenCalled();
-    await session.stop("b"); expect(closeB).toHaveBeenCalledOnce();
+    expect(session.active).toBe(true); expect(result.url).toContain("audio-preview.html"); expect(closeA).toHaveBeenCalledOnce();
+    expect(await session.stop("a")).toBe(false); expect(closeB).not.toHaveBeenCalled();
+    expect(await session.stop("b")).toBe(true); expect(closeB).toHaveBeenCalledOnce(); expect(session.active).toBe(false);
     await session.dispose(); expect(remove).toHaveBeenCalledWith("/owned-b");
   });
   it("publishes the current cache before cleaning up an older build", async () => {

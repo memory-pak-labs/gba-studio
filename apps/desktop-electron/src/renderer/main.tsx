@@ -1,3 +1,4 @@
+import { updatePcmSfxInProject } from "../shared/audioPcm.js";
 import { uiText as ui, useStudioUiText } from "./studioUiText";
 import { AppUpdateNotice } from "./AppUpdateNotice";
 import { appUpdateText } from "./appUpdateText";
@@ -2577,9 +2578,9 @@ function App(): React.ReactElement {
     }
   }
 
-  async function createAudio(kind: "Musica" | "SFX" | "Audio" = "SFX"): Promise<void> {
+  async function createAudio(kind: "Musica" | "SFX" | "Audio" = "SFX", synthesis: "PCM" | "PSG" = "PSG"): Promise<void> {
     if (!session) return;
-    const defaultName = suggestAudioItemName(session.project.data, kind);
+    const defaultName = suggestAudioItemName(session.project.data, kind, synthesis);
     const prompted = window.gbaStudio
       ? defaultName
       : await prompt(`Nome do novo ${kind}`, defaultName);
@@ -2589,10 +2590,12 @@ function App(): React.ReactElement {
     const nextData = createAudioItemInProject(session.project.data, {
       id: globalThis.crypto.randomUUID(),
       name: trimmedName,
-      kind
+      kind, synthesis
     });
     if (nextData !== session.project.data) {
       updateProjectData(nextData);
+      setFocusedAssetRequest({ assetID: "", assetName: trimmedName, kind, label: trimmedName,
+        targetName: trimmedName, workspace: "Audio", requestID: Date.now() });
       setStatus(ui("Áudio criado: {0}.", { 0: trimmedName }));
     }
   }
@@ -2740,6 +2743,18 @@ function App(): React.ReactElement {
   async function createAudioChannel(audioID: string, patternID: string | null): Promise<void> {
     if (!session) return;
     const item = audioPresentation?.items.find(candidate => candidate.id === audioID);
+    if (item?.synthesis === "PCM" && item.kind === "Musica") {
+      const source = (session.project.data.audioItems as Record<string, unknown>[]).find(audio => audio.id === audioID);
+      const pattern = (source?.patterns as Record<string, unknown>[] | undefined)?.find(pattern => pattern.id === patternID);
+      const channels = (pattern?.channels ?? []) as Record<string, unknown>[];
+      if (channels.length >= 16) return;
+      let index = 1;
+      while (channels.some(channel => channel.name === `Faixa ${index}`)) index++;
+      updateProjectData(createAudioChannelInProject(session.project.data, audioID, {
+        id: globalThis.crypto.randomUUID(), name: `Faixa ${index}`, type: "pcm", patternID: patternID ?? undefined
+      }));
+      return;
+    }
     const available = (item?.kind === "SFX" ? ["pulse1", "noise"] : ["pulse1", "pulse2", "wave", "noise"]).filter(type => !item?.previewRows.some(row => audioPhysicalChannel(row.type) === audioPhysicalChannel(type)));
     if (!item || item.previewRows.length >= (item.kind === "SFX" ? 1 : 4) || !available.length) { setStatus(ui("O pattern já usa todas as vozes disponíveis.")); return; }
     const channelName = await prompt("Nome do canal", "Novo canal");
@@ -3718,6 +3733,17 @@ function App(): React.ReactElement {
               onCreateAudioInstrument={createAudioInstrument}
               onUpdateAudioInstrument={updateAudioInstrument}
               onRemoveAudioInstrument={removeAudioInstrument}
+              onPrepareEnginePreview={async request => {
+                if (!session || !window.gbaStudio) return { requestID: request.requestID, error: "Abra o projeto no aplicativo desktop para ouvir a engine." };
+                const data = session.project.data;
+                return window.gbaStudio.prepareAudioPreview({ ...request, projectPath: session.path, data: {
+                  settings: data.settings, audioInstruments: data.audioInstruments,
+                  audioItems: (data.audioItems as Record<string, unknown>[]).filter(item => item.id === request.audioID),
+                  assets: (data.assets as Record<string, unknown>[]).filter(asset => ["Audio", "Musica", "SFX"].includes(String(asset.kind)))
+                } });
+              }}
+              onStopEnginePreview={id => window.gbaStudio?.stopAudioPreview(id)}
+              onUpdatePcmSfx={(id, fields) => { if (session) updateProjectData(updatePcmSfxInProject(session.project.data, id, fields)); }}
               onCreateAudio={createAudio}
               onUpdateAudioFields={updateAudioFields}
               onUpdateAudioChannelFields={updateAudioChannelFields}

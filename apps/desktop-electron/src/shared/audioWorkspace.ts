@@ -703,7 +703,7 @@ function makeAudioItem(options: CreateAudioItemOptions): Record<string, unknown>
   if (options.synthesis === "PCM" && ["Musica", "SFX"].includes(kind)) {
     audio.synthesis = "PCM";
     if (kind === "SFX") { audio.pcmSfx = defaultPcmSfx(); audio.patterns = []; audio.patternOrder = []; }
-    else for (const pattern of itemPatterns(audio)) pattern.channels = createPcmPatternChannels(String(pattern.id));
+    else for (const pattern of itemPatterns(audio)) pattern.channels = createPcmPatternChannels(String(pattern.id), true);
   }
   return audio;
 }
@@ -1149,10 +1149,10 @@ function countBy<T extends string>(values: T[], key: "kind" | "format"): Array<{
     .sort((lhs, rhs) => lhs[key].localeCompare(rhs[key], "pt-BR"));
 }
 
-export function suggestAudioItemName(data: GBAProjectData, kind: string): string {
+export function suggestAudioItemName(data: GBAProjectData, kind: string, synthesis: "PCM" | "PSG" = "PSG"): string {
   const normalized = normalizedKind(kind);
   const stem = normalized === "Musica" ? "nova_musica" : normalized === "SFX" ? "novo_sfx" : "novo_audio";
-  const extension = normalized === "Musica" ? ".mod" : ".wav";
+  const extension = synthesis === "PCM" ? "" : normalized === "Musica" ? ".mod" : ".wav";
   const existing = new Set(
     projectArray(data, "audioItems").map((item, index) => audioName(item, index).toLocaleLowerCase("pt-BR"))
   );

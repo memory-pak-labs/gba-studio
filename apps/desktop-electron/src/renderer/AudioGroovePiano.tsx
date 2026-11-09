@@ -1,6 +1,6 @@
 import { uiText as ui, useStudioUiText } from "./studioUiText";
 import { useEffect, useState, type CSSProperties } from "react";
-import { ChevronLeft, ChevronRight } from "lucide-react";
+import { ChevronLeft, ChevronRight, Plus } from "lucide-react";
 import { deriveAudioPianoPitchRows, type AudioWorkspaceItem } from "../shared/audioWorkspace.js";
 
 export interface GrooveCell { audioID: string; channelID: string; stepIndex: number }
@@ -9,7 +9,7 @@ export const grooveTrackName = (label: string, type: string): string => {
   return /pulse2/i.test(type) ? "Harmonia" : /wave/i.test(type) ? "Baixo" : /noise/i.test(type) ? "Ritmo" : "Melodia";
 };
 export const grooveTrackTone = (type: string): string => /noise|sfx/i.test(type) ? "noise" : /wave/i.test(type) ? "wave" : /pulse2/i.test(type) ? "pulse2" : "pulse1";
-export const grooveHardwareLabel = (type: string): string => /noise|sfx/i.test(type) ? "Noise" : /wave/i.test(type) ? "Wave" : /pulse2/i.test(type) ? "Pulse 2" : "Pulse 1";
+export const grooveHardwareLabel = (type: string): string => type === "pcm" ? "PCM" : /noise|sfx/i.test(type) ? "Noise" : /wave/i.test(type) ? "Wave" : /pulse2/i.test(type) ? "Pulse 2" : "Pulse 1";
 const percussionLabel = (pitch: string): string => pitch === "H" ? "Chimbal" : pitch === "S" ? "Caixa" : pitch === "K" ? "Bumbo" : pitch;
 
 const pitchNames = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"];
@@ -36,9 +36,10 @@ interface Props {
   playbackStep: number | null;
   onSelectCell(cell: GrooveCell): void;
   onUpdateChannel(channelID: string, fields: { muted?: boolean; solo?: boolean }): void;
+  onCreateChannel?(): void;
   onSetNote(channelID: string, stepIndex: number, note: string): void;
 }
-export function AudioGroovePiano({ item, selectedCell, selectedChannelID, playbackStep, onSelectCell, onUpdateChannel, onSetNote }: Props): React.ReactElement {
+export function AudioGroovePiano({ item, selectedCell, selectedChannelID, playbackStep, onSelectCell, onUpdateChannel, onSetNote, onCreateChannel }: Props): React.ReactElement {
   const ui = useStudioUiText();
   const [page, setPage] = useState(0);
   useEffect(() => setPage(0), [item.id, item.activePatternID]);
@@ -49,8 +50,21 @@ export function AudioGroovePiano({ item, selectedCell, selectedChannelID, playba
   const count = Math.max(1, Math.min(pageSize, item.stepCount - firstStep));
   const steps = Array.from({ length: count }, (_, i) => firstStep + i);
   const selectedStep = selectedCell?.audioID === item.id ? selectedCell.stepIndex : null;
-  const timelineStyle = { "--groove-steps": count, "--groove-lanes": Math.max(1, item.previewRows.length) } as CSSProperties;
-  return <div className="audio-groove-piano" aria-label={ui("Piano roll de {0}", { 0: item.name })} style={timelineStyle}>
+  const pcm = item.synthesis === "PCM";
+  const rows = pcm ? [item.previewRows.find(row => row.id === selectedChannelID) ?? item.previewRows[0]].filter(Boolean) : item.previewRows;
+  const timelineStyle = { "--groove-steps": count, "--groove-lanes": Math.max(1, rows.length) } as CSSProperties;
+  return <div className={pcm ? "pcm-composer" : "audio-legacy-piano"}>
+    {pcm ? <aside className="pcm-track-list" aria-label={ui("Faixas PCM")}>
+      <header><strong>{item.previewRows.length}/16 {ui("faixas")}</strong><button type="button" aria-label={ui("Adicionar faixa")} title={ui("Adicionar faixa")} disabled={item.previewRows.length >= 16} onClick={onCreateChannel}><Plus size={16} /></button></header>
+      <div>{item.previewRows.map((row, index) => <div key={row.id} className={row.id === selectedChannelID ? "pcm-track selected" : "pcm-track"}>
+        <button type="button" aria-label={ui("Selecionar canal {0}", { 0: row.label })} aria-pressed={row.id === selectedChannelID} onClick={() => onSelectCell({ audioID: item.id, channelID: row.id, stepIndex: selectedStep ?? firstStep })}>
+          <span>{index + 1}</span><strong>{row.label}</strong><small>{row.instrument ?? "PCM"}</small>
+        </button>
+        <div><button type="button" aria-label={ui("Silenciar {0}", { 0: row.label })} aria-pressed={row.isMuted} onClick={() => onUpdateChannel(row.id, { muted: !row.isMuted })}>M</button>
+          <button type="button" aria-label={ui("Solo de {0}", { 0: row.label })} title={ui("Solo afeta apenas a prévia")} aria-pressed={row.isSolo} onClick={() => onUpdateChannel(row.id, { solo: !row.isSolo })}>S</button></div>
+      </div>)}</div>
+    </aside> : null}
+    <div className={pcm ? "audio-groove-piano pcm-piano" : "audio-groove-piano"} aria-label={ui("Piano roll de {0}", { 0: item.name })} style={timelineStyle}>
     <div className="audio-groove-ruler">
       <div className="audio-groove-page-controls">
         <button aria-label={ui("Passos anteriores")} title={ui("Passos anteriores")} disabled={currentPage === 0} onClick={() => setPage(currentPage - 1)} type="button"><ChevronLeft size={16} /></button>
@@ -64,7 +78,7 @@ export function AudioGroovePiano({ item, selectedCell, selectedChannelID, playba
       </div>
     </div>
     <div className="audio-groove-lanes">
-      {item.previewRows.map(row => {
+      {rows.map(row => {
         const pitches = groovePitchRows(row.type, row.cells.map(cell => cell.note));
         const cells = row.cells.slice(firstStep, firstStep + count);
         const selected = selectedChannelID === row.id;
@@ -72,7 +86,7 @@ export function AudioGroovePiano({ item, selectedCell, selectedChannelID, playba
         const name = grooveTrackName(row.label, row.type);
         return <section key={row.id} style={style} aria-label={ui("Faixa {0}", { 0: name })}
           className={`audio-groove-lane groove-${grooveTrackTone(row.type)} ${selected ? "selected" : ""} ${row.isMuted ? "muted" : ""}`}>
-          <div className="audio-groove-track">
+          {!pcm ? <div className="audio-groove-track">
             <button className="audio-groove-track-select" aria-label={ui("Selecionar canal {0}", { 0: row.label })} aria-pressed={selected}
               onClick={() => onSelectCell({ audioID: item.id, channelID: row.id, stepIndex: selectedStep ?? firstStep })} type="button">
               <span className="audio-groove-track-dot" aria-hidden="true" /><span><strong>{name}</strong><small>{grooveHardwareLabel(row.type)}</small></span>
@@ -81,7 +95,7 @@ export function AudioGroovePiano({ item, selectedCell, selectedChannelID, playba
               <button aria-label={ui("Silenciar {0}", { 0: row.label })} title={ui("Silenciar {0}", { 0: row.label })} aria-pressed={row.isMuted} onClick={() => onUpdateChannel(row.id, { muted: !row.isMuted })} type="button">M</button>
               <button aria-label={ui("Solo de {0}", { 0: row.label })} title={ui("Solo afeta apenas a prévia")} aria-pressed={row.isSolo} onClick={() => onUpdateChannel(row.id, { solo: !row.isSolo })} type="button">S</button>
             </div>
-          </div>
+          </div> : null}
           <div className="audio-groove-keys" aria-hidden="true">
             {pitches.map(pitch => <span key={pitch} className={pitch.includes("#") ? "black" : "white"}>{/noise|sfx/i.test(row.type) ? ui(percussionLabel(pitch)) : pitch.startsWith("C") && !pitch.includes("#") ? pitch : ""}</span>)}
           </div>
@@ -104,5 +118,5 @@ export function AudioGroovePiano({ item, selectedCell, selectedChannelID, playba
       })}
     </div>
     {pages > 1 ? <span className="audio-groove-page-hint">{ui("Página ")}{currentPage + 1} {ui(" de ")}{pages} · {item.stepCount} {ui(" passos")}</span> : null}
-  </div>;
+  </div></div>;
 }
