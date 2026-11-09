@@ -261,7 +261,10 @@ A quantidade ampliada de estado dos canais reside em EWRAM.
 sem nota para um canal conserva o sample e sua posição, até terminar, receber
 uma nova nota ou parar a música. Tracks do compositor mantêm o contrato de
 pausa por linha, com o campo falso por padrão. Recompile todo o projeto junto
-com o SDK ao atualizar esse descritor.
+com o SDK ao atualizar esse descritor. Cortes imediatos MOD `C00`/`EC0` e S3M
+nota 254/`SC0` substituem o canal por silêncio de uma amostra, liberando a voz;
+a ausência de nota continua sem cortar os outros canais. Isso não amplia o
+suporte dos demais efeitos de tracker.
 
 Para importações com mais de quatro canais, a exportação antecipa a
 reamostragem linear e o ganho estático de cada combinação instrumento/nota

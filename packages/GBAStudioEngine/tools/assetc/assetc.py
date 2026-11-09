@@ -3727,6 +3727,18 @@ def set_imported_tracker_sample(step, note):
     step["sample_only"] = note["sample_index"] >= 0
 
 
+def tracker_sample_cut_note(samples, channel, row, row_duration):
+    # An owned one-sample silence replaces the channel and releases its voice
+    # after the block. This distinguishes an explicit cut from an empty row.
+    index = next((i for i, sample in enumerate(samples) if sample.get("note_cut")), None)
+    if index is None:
+        index = len(samples)
+        samples.append({"samples": [0], "sample_rate_hz": 31536,
+                        "loop_start_sample": 0, "loop_end_sample": 0, "note_cut": True})
+    return {"row": row, "channel": channel, "frequency_hz": 64, "volume": 0,
+            "row_duration": row_duration, "sample_index": index, "sample_rate_hz": 31536}
+
+
 def parse_mod_tracker(path, row_duration_frames=4, volume=8, duty=2):
     info = read_mod_header(path)
     data = info["data"]
@@ -3804,6 +3816,9 @@ def parse_mod_tracker(path, row_duration_frames=4, volume=8, duty=2):
                         row_duration = tracker_speed
                     else:
                         row_duration = tracker_row_duration_from_tempo(tracker_speed, parameter)
+                if (effect == 0xC and parameter == 0) or (effect == 0xE and parameter == 0xC0):
+                    note_rows.append(tracker_sample_cut_note(tracker_samples, channel + 1, row, row_duration))
+                    continue
                 if period == 0:
                     continue
                 frequency = mod_period_to_frequency(period)
@@ -3990,6 +4005,9 @@ def parse_s3m_tracker(path, row_duration_frames=4, volume=8, duty=2):
             elif command == 20 and info > 0:
                 row_duration = tracker_row_duration_from_tempo(tracker_speed, info)
 
+            if note == 254 or (command == 19 and info == 0xC0) or (note == 255 and volume_column == 0):
+                note_rows.append(tracker_sample_cut_note(tracker_samples, channel_map[channel], row, row_duration))
+                continue
             frequency = s3m_note_to_frequency(note)
             if frequency == 0:
                 continue

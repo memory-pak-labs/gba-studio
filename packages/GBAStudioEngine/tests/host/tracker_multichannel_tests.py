@@ -110,6 +110,40 @@ class TrackerMultichannelTests(unittest.TestCase):
                 ASSETC.emit_audio_header("channels", {"tracker": [{"name": "song", "mod": path.name,
                     "native_primary_volume": 16}]}, path.parent)
 
+    def test_mod_explicit_cuts_stop_sustained_channels(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "cuts.mod"
+            write_mod(path)
+            data = bytearray(path.read_bytes())
+            for channel, effect, parameter in [(0, 0xC, 0), (5, 0xE, 0xC0)]:
+                offset = 1084 + (16 * 16 + channel) * 4
+                data[offset:offset+4] = bytes([0, 0, effect, parameter])
+            path.write_bytes(data)
+            song = ASSETC.parse_mod_tracker(path)
+            cuts = song["patterns"][0]["steps"][16:]
+            self.assertEqual([step["channel"] for step in cuts], [1, 6])
+            for step in cuts:
+                self.assertTrue(step["sample_only"])
+                self.assertEqual(step["volume"], 0)
+                self.assertEqual(song["samples"][step["sample_index"]]["samples"], [0])
+
+    def test_s3m_explicit_cuts_stop_sustained_channels(self):
+        import struct
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "cuts.s3m"
+            write_s3m(path)
+            data = path.read_bytes()
+            packed = data[0x102:0x142] + bytes(16) + bytes([0x20, 254, 0, 0x85, 19, 0xC0]) + bytes(48)
+            pattern = struct.pack("<H", len(packed)) + packed
+            path.write_bytes(data[:0x100] + pattern + bytes(0x100-len(pattern)) + data[0x200:])
+            song = ASSETC.parse_s3m_tracker(path)
+            cuts = song["patterns"][0]["steps"][16:]
+            self.assertEqual([step["channel"] for step in cuts], [1, 6])
+            for step in cuts:
+                self.assertTrue(step["sample_only"])
+                self.assertEqual(step["volume"], 0)
+                self.assertEqual(song["samples"][step["sample_index"]]["samples"], [0])
+
     def test_over_budget_import_fails_instead_of_folding_channels(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
