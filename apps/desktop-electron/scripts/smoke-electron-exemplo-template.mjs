@@ -1819,8 +1819,11 @@ async function main() {
       await selectAudioLibraryItem(cdp, "farol_tema_principal");
       await waitForText(cdp, text => text.includes("Áudio importado"), "módulo original no workspace de Áudio");
       await clickButtonByAriaLabel(cdp, "Ouvir farol_tema_principal");
-      await waitForText(cdp, text => text.includes("Ouça este formato no Play do jogo."), "orientação para ouvir o módulo no Play");
+      await waitForText(cdp, text => text.includes("Tocando farol_tema_principal")
+        && /Prévia da engine · Pico [1-9]\d*%/.test(text), "reprodução do módulo pela engine", 60_000);
       await captureScreenshot(cdp, join(evidenceRoot, "exemplo_template_audio_imported.png"));
+      await clickButtonByAriaLabel(cdp, "Parar áudio");
+      await waitForText(cdp, text => text.includes("Parado") && !text.includes("Tocando farol_tema_principal"), "parada do módulo importado");
       await selectAudioLibraryItem(cdp, "farol_sfx_vitoria");
       await clickButtonByAriaLabel(cdp, "Ouvir farol_sfx_vitoria");
       await waitForText(cdp, text => text.includes("Tocando farol_sfx_vitoria"), "reprodução do WAV renovado na cópia salva");
