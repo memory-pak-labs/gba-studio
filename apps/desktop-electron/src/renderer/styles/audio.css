@@ -2966,25 +2966,25 @@
 .pcm-track.selected { background: var(--studio-color-accent-soft); }
 .pcm-track > button { display: grid; grid-template-columns: 18px minmax(0, 1fr); gap: 2px 4px; text-align: left; min-width: 0; padding: 5px; border: 0; background: transparent; }
 .pcm-track strong, .pcm-track small { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.pcm-track small { grid-column: 2; font-size: 10px; opacity: .7; }
+.pcm-track small { grid-column: 2; opacity: .7; }
 .pcm-track > div { display: flex; flex-direction: column; gap: 2px; }
-.pcm-track > div button { font-size: 10px; padding: 2px 4px; min-height: 23px; }
+.pcm-track > div button { padding: 2px 4px; min-height: 23px; }
 .pcm-track button[aria-pressed="true"] { color: var(--studio-color-accent); }
 .pcm-piano { --groove-track-width: 0px; min-height: 280px; }
 .pcm-piano .audio-groove-lane { grid-template-columns: var(--groove-key-width) minmax(0, 1fr); }
-.pcm-piano .audio-groove-page-controls { gap: 0; font-size: 9px; }
+.pcm-piano .audio-groove-page-controls { gap: 0; }
 .pcm-piano .audio-groove-page-controls button { padding: 0; width: 17px; }
 .pcm-piano .audio-groove-keys { min-height: 260px; }
 .pcm-sfx-editor { flex: 1; overflow-y: auto; padding: 18px; min-height: 200px; }
 .pcm-sfx-editor header { display: flex; justify-content: space-between; flex-wrap: wrap; gap: 16px; align-items: start; }
 .pcm-sfx-editor h4 { margin: 0 0 6px; }
-.pcm-sfx-editor p { font-size: 12px; opacity: .75; margin: 0 0 12px; }
-.pcm-sfx-editor label { display: flex; flex-direction: column; gap: 6px; font-size: 12px; min-width: 0; }
+.pcm-sfx-editor p { opacity: .75; margin: 0 0 12px; }
+.pcm-sfx-editor label { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
 .pcm-sfx-editor select { width: 100%; }
 .pcm-sfx-waveform { margin: 16px 0; border: 1px solid var(--studio-color-border); border-radius: 10px; padding: 12px; background: var(--studio-color-surface-muted); }
 .pcm-sfx-waveform svg { display: block; width: 100%; height: 120px; fill: none; stroke: var(--studio-color-accent); stroke-width: 1; }
 .pcm-sfx-waveform .pcm-wave-axis { stroke: var(--studio-color-border); }
-.pcm-sfx-waveform figcaption { font-size: 11px; opacity: .7; margin-top: 8px; }
+.pcm-sfx-waveform figcaption { opacity: .7; margin-top: 8px; }
 .pcm-sfx-controls { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 18px; }
 .pcm-sfx-control { display: grid !important; grid-template-columns: minmax(0, 1fr) 72px; align-items: center; }
 .pcm-sfx-control > span { grid-column: 1 / -1; display: flex; justify-content: space-between; gap: 8px; }

@@ -1574,3 +1574,19 @@
 .studio-deletion-choices legend {
   font-weight: var(--studio-font-weight-semibold);
 }
+
+/* PCM authoring follows the application font scale. */
+.pcm-track small,
+.pcm-track > div button,
+.pcm-piano .audio-groove-page-controls {
+  font-size: var(--studio-font-size-2xs);
+}
+
+.pcm-sfx-editor p,
+.pcm-sfx-editor label {
+  font-size: var(--studio-font-size-sm);
+}
+
+.pcm-sfx-waveform figcaption {
+  font-size: var(--studio-font-size-xs);
+}
