@@ -11143,6 +11143,7 @@ function buildEngineExportProjectContractUncached(
     if (runtimeKind === "platformer") cameraZoneFeatures.add("platformer_runtime.platformer_camera_zones");
   });
   features.push(...cameraZoneFeatures);
+  if (audioPack?.document.tracker.some(asset => asset.mod || asset.s3m)) features.push("audio.tracker_pcm_16_channels");
   if (audioPack?.document.tracker.some(tracker => tracker.samples?.length)) features.push("audio.tracker_sample_instruments");
   const hasTacticalIsometricRoom = rooms.some((room) => (
     resolveSceneRuntimeExport(roomSceneType(room)).kind === "isometric" &&

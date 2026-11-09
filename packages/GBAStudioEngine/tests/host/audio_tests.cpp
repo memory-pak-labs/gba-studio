@@ -398,7 +398,8 @@ void test_tracker_music_order_loop_and_stop() {
     };
     const uint8_t order[] = { 0, 1 };
 
-    assert(gbs::play_tracker_music(gbs::TrackerAsset { patterns, 2, order, 2, true }));
+    const gbs::TrackerAsset tracker_asset_1 { patterns, 2, order, 2, true };
+    assert(gbs::play_tracker_music(tracker_asset_1));
     assert(gbs::audio_is_tracker_music_playing());
     assert(square_starts == 1);
 
@@ -432,7 +433,8 @@ void test_tracker_row_starts_all_channels_before_waiting() {
 
     assert(gbs::is_valid_tracker_step(steps[0]));
     assert(gbs::is_valid_tracker_asset(gbs::TrackerAsset { patterns, 1, order, 1, true }));
-    assert(gbs::play_tracker_music(gbs::TrackerAsset { patterns, 1, order, 1, true }));
+    const gbs::TrackerAsset tracker_asset_2 { patterns, 1, order, 1, true };
+    assert(gbs::play_tracker_music(tracker_asset_2));
     assert(square_starts == 2);
     assert(wave_starts == 1);
     assert(noise_starts == 1);
@@ -594,7 +596,8 @@ void test_tracker_music_without_loop_finishes() {
     };
     const uint8_t order[] = { 0 };
 
-    assert(gbs::play_tracker_music(gbs::TrackerAsset { patterns, 1, order, 1, false }));
+    const gbs::TrackerAsset tracker_asset_3 { patterns, 1, order, 1, false };
+    assert(gbs::play_tracker_music(tracker_asset_3));
     gbs::audio_update();
     assert(!gbs::audio_is_tracker_music_playing());
 }
@@ -612,7 +615,8 @@ void test_simple_music_stops_tracker_music() {
         { 440, 1, 4, 1 }
     };
 
-    assert(gbs::play_tracker_music(gbs::TrackerAsset { patterns, 1, order, 1, true }));
+    const gbs::TrackerAsset tracker_asset_4 { patterns, 1, order, 1, true };
+    assert(gbs::play_tracker_music(tracker_asset_4));
     assert(gbs::audio_is_tracker_music_playing());
     assert(gbs::play_music(gbs::MusicAsset { music_steps, 1, false }));
     assert(!gbs::audio_is_tracker_music_playing());
@@ -672,7 +676,8 @@ void test_audio_bus_volume_and_timed_fade_apply_to_psg_and_pcm() {
     const int8_t pcm_samples[400] = { 120 };
     assert(gbs::set_audio_channel_volume(gbs::AudioChannel::Music, 15));
     assert(gbs::set_audio_channel_volume(gbs::AudioChannel::PcmMusic, 8));
-    assert(gbs::play_pcm_music(gbs::PcmAsset { pcm_samples, 400, 12000, true }, 15));
+    const gbs::PcmAsset pcm_asset { pcm_samples, 400, 12000, true };
+    assert(gbs::play_pcm_music(pcm_asset, 15));
     gbs::audio_update();
     assert(last_pcm_first_sample == 64);
 
@@ -1024,8 +1029,8 @@ void test_audio_runtime_usage_reports_active_pcm_memory() {
     assert(empty.active_voice_count == 0);
     assert(empty.bytes == empty.mixer_buffer_bytes);
     assert(empty.pcm_underrun_count == 0);
-    // Keep mixer scratch below 3.8 KB on both the ARM and 64-bit host ABI.
-    assert(empty.mixer_buffer_bytes <= 3800);
+    // Keep expanded mixer scratch below 4.3 KB on ARM and the 64-bit host ABI.
+    assert(empty.mixer_buffer_bytes <= 4300);
 
     assert(gbs::play_pcm_music(asset));
     assert(gbs::play_pcm_sfx(asset));
@@ -1105,7 +1110,61 @@ static_assert(gbs::is_valid_tracker_step(gbs::TrackerStep {3, 32, 1, 8, 0}), "Wa
 static_assert(!gbs::is_valid_tracker_step(gbs::TrackerStep {3, 31, 1, 8, 0}), "Wave frequency below hardware range");
 static_assert(!gbs::is_valid_tracker_step(gbs::TrackerStep {1, 49, 1, 8, 0}), "Square retains its own frequency range");
 
+void test_native_word_mixer_preserves_unaligned_samples_and_short_loops() {
+    alignas(4) int8_t samples[16];
+    for (int i = 0; i < 16; ++i) samples[i] = static_cast<int8_t>((i * 19) % 101 - 50);
+    for (size_t offset = 0; offset < 4; ++offset) for (size_t length = 1; length < 10; ++length) {
+        for (uint8_t volume = 11; volume <= 15; volume += 4) {
+            gbs::audio_init();
+            const gbs::PcmAsset asset { samples + offset, length, gbs::PCM_MIXER_SAMPLE_RATE_HZ, true };
+            assert(gbs::play_pcm_sfx(asset, 8, volume));
+            gbs::audio_update();
+            for (size_t index = 0; index < gbs::PCM_MIXER_SAMPLES_PER_FRAME; ++index) {
+                assert(last_pcm_samples[index] == samples[offset + index % length] * volume / 15);
+            }
+        }
+    }
+}
+
+void test_sixteen_sample_channels_mix_without_psg_or_aliasing() {
+    const int8_t samples[] = { 1, 1, 1, 1 };
+    const gbs::PcmAsset sample { samples, 4, 8000, true };
+    const uint8_t order[] = { 0 };
+    gbs::TrackerStep steps[16] {};
+    for (uint8_t channel = 1; channel <= 16; ++channel) {
+        steps[channel - 1] = { channel, 262, static_cast<uint8_t>(channel == 16 ? 4 : 0), 15, 2 };
+        steps[channel - 1].sample_index = 0;
+        steps[channel - 1].sample_only = true;
+        steps[channel - 1].sample_rate_hz = 8000;
+    }
+    const gbs::TrackerPattern patterns[] = { { steps, 16 } };
+    const gbs::TrackerAsset asset { patterns, 1, order, 1, true, &sample, 1 };
+    assert(gbs::is_valid_tracker_asset(asset));
+    gbs::audio_init();
+    reset_hw_counts();
+    assert(gbs::play_tracker_music(asset));
+    gbs::audio_update();
+    assert(gbs::audio_runtime_usage().active_voice_count == 16);
+    assert(last_pcm_first_sample == 16);
+    assert(square_starts == 0 && wave_starts == 0 && noise_starts == 0);
+    assert(gbs::play_pcm_sfx(sample, 8, 15));
+    assert(gbs::audio_runtime_usage().active_voice_count == 17);
+    assert(!gbs::play_pcm_sfx(sample, 7, 15));
+    gbs::stop_tracker_music();
+    assert(gbs::audio_runtime_usage().active_voice_count == 1);
+    gbs::stop_pcm_sfx();
+    assert(gbs::audio_runtime_usage().active_voice_count == 0);
+    auto invalid = steps[15];
+    invalid.channel = 17;
+    assert(!gbs::is_valid_tracker_step(invalid));
+    invalid.channel = 5;
+    invalid.sample_only = false;
+    assert(!gbs::is_valid_tracker_step(invalid));
+}
+
 int main() {
+    test_native_word_mixer_preserves_unaligned_samples_and_short_loops();
+    test_sixteen_sample_channels_mix_without_psg_or_aliasing();
     test_equal_priority_pcm_effect_age_survives_counter_rollover();
     test_stopping_pcm_effect_or_music_keeps_sample_tracker_stream_running();
     test_shared_pcm_budget_preserves_music_and_prioritizes_effects();

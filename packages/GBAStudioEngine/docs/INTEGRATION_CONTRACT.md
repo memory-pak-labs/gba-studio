@@ -236,3 +236,45 @@ GBA Studio conseguir, no mesmo fluxo:
 
 Uma room top-down ou ROM isolada continua util como teste de componente, mas
 nao comprova mais paridade do produto completo.
+
+
+## Importação de música com múltiplos canais PCM
+
+`audio.tracker_pcm_16_channels` identifica o importador e runtime que conservam
+até 16 canais de samples em MOD (`nCHN`/`nnCH`, além das assinaturas de quatro
+canais existentes) e S3M. Canais PCM são independentes das quatro vozes PSG;
+o compositor PSG mantém seu contrato de quatro vozes de hardware.
+
+O S3M usa um mapeamento estável dos canais PCM habilitados, inclusive quando
+existem lacunas entre seus índices. Canais desabilitados não geram notas.
+Mais de 16 canais habilitados é um erro explícito: nunca há redução por `% 4`.
+O MOD também rejeita explicitamente assinaturas com mais de 16 canais.
+
+Os passos importados com instrumento usam `sample_only`, conservam o índice
+do sample e sua taxa de reprodução e não adicionam uma voz PSG sobre o PCM.
+O mixer reserva até 17 vozes simultâneas: com os 16 canais de música ativos,
+resta uma voz de efeito; composições menores conservam o orçamento anterior.
+A quantidade ampliada de estado dos canais reside em EWRAM.
+
+Para importações com mais de quatro canais, a exportação antecipa a
+reamostragem linear e o ganho estático de cada combinação instrumento/nota
+para 31536 Hz. Loops
+podem repetir ciclos para limitar a diferença de afinação a 0,01%. A saída
+continua sujeita ao limite de 65535 amostras por instrumento convertido e ao
+orçamento de ROM; ultrapassar esses limites gera um erro, sem descartar canais.
+Isso pode aumentar o tamanho da ROM em troca de reduzir o trabalho por frame.
+Dezesseis canais não garantem a cadência de qualquer cena: o orçamento de CPU
+deve ser medido com gameplay, efeitos e renderização do projeto real.
+
+A regressão sintética usa fontes MOD/S3M geradas pelo próprio teste. Depois de
+`make package`, em `apps/desktop-electron`, execute:
+
+```sh
+node scripts/verify-tracker-multichannel-rom.mjs ../../packages/GBAStudioEngine/dist/GBAStudioEnginePack /caminho/qa/tracker
+```
+
+Ela importa os arquivos pelo `assetc`, compila com `gbsbuild`, executa as ROMs
+no mGBA embarcado, verifica cada canal individualmente e todos juntos no PCM,
+e registra WAVs, hashes e contadores de avanço e underruns. É uma validação
+focada da preservação dos canais, não uma declaração de compatibilidade total
+com todos os efeitos de tracker ou de validação em GBA físico.

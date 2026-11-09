@@ -91,8 +91,11 @@ struct TrackerAsset {
 constexpr uint32_t PCM_MIXER_SAMPLE_RATE_HZ = 31536;
 constexpr uint16_t PCM_MIXER_SAMPLES_PER_FRAME = 528;
 constexpr size_t PCM_MIXER_MAX_SFX_VOICES = 4;
-// Music keeps its channels; SFX share the remaining measured mixer budget.
-constexpr size_t PCM_MIXER_MAX_ACTIVE_VOICES = 5;
+constexpr size_t TRACKER_MAX_SAMPLE_CHANNELS = 16;
+// Up to sixteen independent sample channels and one effect at full music load.
+// The existing five-voice budget remains in effect for smaller arrangements.
+constexpr size_t PCM_MIXER_BASE_VOICE_BUDGET = 5;
+constexpr size_t PCM_MIXER_MAX_ACTIVE_VOICES = TRACKER_MAX_SAMPLE_CHANNELS + 1;
 
 struct PcmSfxOptions {
     uint8_t volume = 15;
@@ -193,8 +196,10 @@ constexpr bool is_valid_tracker_channel(uint8_t channel) {
 }
 
 constexpr bool is_valid_tracker_step(const TrackerStep& step) {
-    return is_valid_tracker_channel(step.channel) &&
-           (step.channel == 3 ? step.frequency_hz >= 32 && step.frequency_hz <= 4095 : is_valid_audio_frequency(step.frequency_hz)) &&
+    return (step.sample_only ? step.channel >= 1 && step.channel <= TRACKER_MAX_SAMPLE_CHANNELS
+                                    && step.frequency_hz >= 16 && step.frequency_hz <= 32767
+                             : is_valid_tracker_channel(step.channel) &&
+                               (step.channel == 3 ? step.frequency_hz >= 32 && step.frequency_hz <= 4095 : is_valid_audio_frequency(step.frequency_hz))) &&
            is_valid_audio_volume(step.volume) &&
            is_valid_audio_duty(step.duty) &&
            is_valid_pcm_pan(step.pan);

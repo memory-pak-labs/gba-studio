@@ -1249,6 +1249,7 @@
       "emote_assets"
     ],
     "audio": [
+      "tracker_pcm_16_channels",
       "psg_square_sfx",
       "psg_noise_sfx",
       "psg_square_music",

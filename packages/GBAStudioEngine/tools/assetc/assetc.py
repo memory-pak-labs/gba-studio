@@ -3179,11 +3179,15 @@ def convert_wav_to_pcm8(path, target_sample_rate=None):
     return samples, output_rate, loop_start, loop_end
 
 
+TRACKER_MAX_SAMPLE_CHANNELS = 16
+
 MOD_SIGNATURE_CHANNELS = {
     b"M.K.": 4,
     b"M!K!": 4,
     b"4CHN": 4,
     b"FLT4": 4,
+    **{f"{count}CHN".encode(): count for count in range(1, 10)},
+    **{f"{count}CH".encode(): count for count in range(10, 33)},
 }
 
 
@@ -3194,7 +3198,9 @@ def read_mod_header(path):
 
     signature = data[1080:1084]
     if signature not in MOD_SIGNATURE_CHANNELS:
-        raise SystemExit(f"{path}: MOD ProTracker 4 canais nao suportado ou assinatura ausente")
+        raise SystemExit(f"{path}: assinatura MOD nao suportada")
+    if MOD_SIGNATURE_CHANNELS[signature] > TRACKER_MAX_SAMPLE_CHANNELS:
+        raise SystemExit(f"{path}: importacao MOD suporta ate 16 canais PCM independentes")
 
     sample_headers = []
     for sample_index in range(31):
@@ -3715,6 +3721,12 @@ def append_vgm_note(notes, frame, channel, frequency, volume):
         notes.append(note)
 
 
+def set_imported_tracker_sample(step, note):
+    step["sample_index"] = note["sample_index"]
+    step["sample_rate_hz"] = note["sample_rate_hz"]
+    step["sample_only"] = note["sample_index"] >= 0
+
+
 def parse_mod_tracker(path, row_duration_frames=4, volume=8, duty=2):
     info = read_mod_header(path)
     data = info["data"]
@@ -3754,6 +3766,7 @@ def parse_mod_tracker(path, row_duration_frames=4, volume=8, duty=2):
 
     for pattern_index in range(pattern_count):
         pattern_offset = pattern_data_offset + pattern_index * pattern_size
+        channel_instruments = [0] * channel_count
         channel_last_frequencies = [0] * channel_count
         note_rows = []
         pattern_end_row = 64
@@ -3766,6 +3779,10 @@ def parse_mod_tracker(path, row_duration_frames=4, volume=8, duty=2):
                 period = ((b0 & 0x0F) << 8) | b1
                 effect = b2 & 0x0F
                 parameter = b3
+                if sample_number:
+                    channel_instruments[channel] = sample_number
+                else:
+                    sample_number = channel_instruments[channel]
                 if effect == 0xB:
                     if pattern_index not in pattern_controls:
                         pattern_controls[pattern_index] = {
@@ -3801,7 +3818,7 @@ def parse_mod_tracker(path, row_duration_frames=4, volume=8, duty=2):
                     tuned_frequency = apply_mod_finetune(frequency, note_finetune)
                     note_rows.append({
                         "row": row,
-                        "channel": 1 + (channel % 4),
+                        "channel": channel + 1,
                         "frequency_hz": tuned_frequency,
                         "previous_frequency_hz": channel_last_frequencies[channel],
                         "volume": note_volume,
@@ -3832,16 +3849,15 @@ def parse_mod_tracker(path, row_duration_frames=4, volume=8, duty=2):
                 if len(row_notes) == 1:
                     start_index = len(steps)
                     append_mod_effect_steps(steps, row_notes[0], duration, step_duty)
-                    steps[start_index]["sample_index"] = row_notes[0]["sample_index"]
-                    steps[start_index]["sample_rate_hz"] = row_notes[0]["sample_rate_hz"]
+                    for generated_step in steps[start_index:]:
+                        set_imported_tracker_sample(generated_step, row_notes[0])
                     continue
                 for note_index, note in enumerate(row_notes):
                     note_steps = []
                     append_mod_effect_steps(note_steps, note, duration, step_duty)
                     simultaneous = note_steps[0]
                     simultaneous["duration_frames"] = duration if note_index == len(row_notes) - 1 else 0
-                    simultaneous["sample_index"] = note["sample_index"]
-                    simultaneous["sample_rate_hz"] = note["sample_rate_hz"]
+                    set_imported_tracker_sample(simultaneous, note)
                     steps.append(simultaneous)
         patterns.append({ "steps": steps })
 
@@ -3881,6 +3897,10 @@ def parse_s3m_tracker(path, row_duration_frames=4, volume=8, duty=2):
             "loop_start_sample": loop_start,
             "loop_end_sample": loop_end,
         })
+    channel_map = {channel: index + 1 for index, channel in enumerate(
+        channel for channel in range(32) if data[0x40 + channel] < 16)}
+    if len(channel_map) > TRACKER_MAX_SAMPLE_CHANNELS:
+        raise SystemExit(f"{path}: importacao S3M suporta ate 16 canais PCM independentes")
     step_duty = require_int(duty, "duty", 0, 3)
     patterns = []
     pattern_controls = {}
@@ -3909,6 +3929,7 @@ def parse_s3m_tracker(path, row_duration_frames=4, volume=8, duty=2):
         cursor = 0
         tracker_speed = base_row_duration
         row_duration = tracker_speed
+        channel_instruments = [0] * 32
         channel_last_frequencies = [0] * 32
         note_rows = []
         pattern_end_row = 64
@@ -3943,6 +3964,13 @@ def parse_s3m_tracker(path, row_duration_frames=4, volume=8, duty=2):
                 info = packed[cursor + 1]
                 cursor += 2
 
+            if channel not in channel_map:
+                continue
+            if instrument:
+                channel_instruments[channel] = instrument
+            else:
+                instrument = channel_instruments[channel]
+
             if command == 1 and info > 0:
                 tracker_speed = max(1, min(255, info))
                 row_duration = tracker_speed
@@ -3974,7 +4002,7 @@ def parse_s3m_tracker(path, row_duration_frames=4, volume=8, duty=2):
 
             note_rows.append({
                 "row": row,
-                "channel": 1 + (channel % 4),
+                "channel": channel_map[channel],
                 "frequency_hz": frequency,
                 "previous_frequency_hz": channel_last_frequencies[channel] if channel < len(channel_last_frequencies) else 0,
                 "volume": note_volume,
@@ -4009,16 +4037,15 @@ def parse_s3m_tracker(path, row_duration_frames=4, volume=8, duty=2):
                 if len(row_notes) == 1:
                     start_index = len(steps)
                     append_s3m_effect_steps(steps, row_notes[0], duration, step_duty)
-                    steps[start_index]["sample_index"] = row_notes[0]["sample_index"]
-                    steps[start_index]["sample_rate_hz"] = row_notes[0]["sample_rate_hz"]
+                    for generated_step in steps[start_index:]:
+                        set_imported_tracker_sample(generated_step, row_notes[0])
                     continue
                 for note_index, note in enumerate(row_notes):
                     note_steps = []
                     append_s3m_effect_steps(note_steps, note, duration, step_duty)
                     simultaneous = note_steps[0]
                     simultaneous["duration_frames"] = duration if note_index == len(row_notes) - 1 else 0
-                    simultaneous["sample_index"] = note["sample_index"]
-                    simultaneous["sample_rate_hz"] = note["sample_rate_hz"]
+                    set_imported_tracker_sample(simultaneous, note)
                     steps.append(simultaneous)
         patterns.append({ "steps": steps })
 
@@ -4185,6 +4212,71 @@ def parse_vgm_tracker(path, duty=2):
     }
 
 
+def prepare_multichannel_tracker_samples(patterns, source_samples):
+    """Move pitched linear resampling to export time, retaining every voice.
+
+    Loop repetition keeps pitch error below 0.01% without lowering the mixer
+    rate or using nearest-neighbour sampling. Generated PCM still obeys the
+    runtime's 65535-sample address limit and the normal ROM asset budget.
+    """
+    native_rate = 31536
+    prepared_samples = []
+    prepared_patterns = []
+    cache = {}
+    for pattern in patterns:
+        prepared_steps = []
+        for original in pattern["steps"]:
+            step = dict(original)
+            sample_index = step.get("sample_index", -1)
+            if step.get("sample_only") and 0 <= sample_index < len(source_samples):
+                source = source_samples[sample_index]
+                rate = step.get("sample_rate_hz", 0) or source["sample_rate_hz"]
+                volume = step["volume"]
+                key = (sample_index, rate, volume)
+                if key not in cache:
+                    data = source["samples"]
+                    loop_start = source.get("loop_start_sample", 0)
+                    loop_end = source.get("loop_end_sample", 0)
+                    looping = loop_end > loop_start
+                    prefix = math.ceil(loop_start * native_rate / rate) if looping else 0
+                    if looping:
+                        ideal = (loop_end - loop_start) * native_rate / rate
+                        max_repeats = min(64, int((65535 - prefix) / ideal))
+                        candidates = [(abs(round(ideal * repeats) / (ideal * repeats) - 1), repeats,
+                                       max(1, round(ideal * repeats))) for repeats in range(1, max_repeats + 1)]
+                        acceptable = [candidate for candidate in candidates if candidate[0] <= 0.0001]
+                        choice = min(acceptable, key=lambda candidate: candidate[1]) if acceptable else None
+                        if choice is None:
+                            raise SystemExit("sample multicanal nao cabe em 65535 amostras com precisao de pitch de 0.01%; reduza o instrumento ou seu loop")
+                        count = prefix + choice[2]
+                    else:
+                        count = math.ceil(len(data) * native_rate / rate)
+                    if count < 1 or count > 65535:
+                        raise SystemExit("sample multicanal convertido excede 65535 amostras; reduza a duracao do instrumento")
+                    step_fp = max(1, int(rate * 65536 / native_rate))
+                    output = []
+                    position = 0
+                    for _ in range(count):
+                        index = position >> 16
+                        if looping and index >= loop_end:
+                            position = ((loop_start + (index - loop_end) % (loop_end - loop_start)) << 16) | (position & 65535)
+                            index = position >> 16
+                        index = min(index, len(data) - 1)
+                        following = loop_start if looping and index + 1 >= loop_end else min(index + 1, len(data) - 1)
+                        interpolated = data[index] + (((data[following] - data[index]) * (position & 65535)) >> 16)
+                        output.append(int(interpolated * volume / 15))
+                        position += step_fp
+                    cache[key] = len(prepared_samples)
+                    prepared_samples.append({"samples": output, "sample_rate_hz": native_rate,
+                        "loop_start_sample": prefix if looping else 0, "loop_end_sample": count if looping else 0})
+                step["sample_index"] = cache[key]
+                step["sample_rate_hz"] = native_rate
+                step["volume"] = 15
+            prepared_steps.append(step)
+        prepared_patterns.append({**pattern, "steps": prepared_steps})
+    return prepared_patterns, prepared_samples
+
+
 def emit_audio_header(name, data, base_dir):
     sfx_assets = data.get("sfx", [])
     music_assets = data.get("music", [])
@@ -4300,6 +4392,9 @@ def emit_audio_header(name, data, base_dir):
                 tracker_samples.append({"samples": samples, "sample_rate_hz": rate,
                     "loop_start_sample": auto_start if loop and auto_end > auto_start else 0,
                     "loop_end_sample": (auto_end if auto_end > auto_start else len(samples)) if loop else 0})
+        if ("mod" in asset or "s3m" in asset) and any(
+                step["channel"] > 4 for pattern in patterns for step in pattern["steps"]):
+            patterns, tracker_samples = prepare_multichannel_tracker_samples(patterns, tracker_samples)
         if not isinstance(patterns, list) or not patterns:
             raise SystemExit("cada tracker precisa conter ao menos um pattern")
         if not isinstance(order, list) or not order:
@@ -4341,7 +4436,8 @@ def emit_audio_header(name, data, base_dir):
             pattern_symbols.append(pattern_symbol)
             lines.append(f"inline constexpr gbs::TrackerStep {pattern_symbol}_steps[{len(steps)}] = {{")
             for step in steps:
-                channel = require_int(step.get("channel", 2), "channel", 1, 4)
+                sample_only = bool(step.get("sample_only", False))
+                channel = require_int(step.get("channel", 2), "channel", 1, TRACKER_MAX_SAMPLE_CHANNELS if sample_only else 4)
                 frequency = require_int(step.get("frequency_hz"), "frequency_hz", 16, 32767)
                 duration = require_int(step.get("duration_frames"), "duration_frames", 0, 255)
                 volume = require_int(step.get("volume"), "volume", 0, 15)
@@ -4350,7 +4446,7 @@ def emit_audio_header(name, data, base_dir):
                 release = require_int(step.get("release_frames", 0), "release_frames", 0, 255)
                 waveform = require_int(step.get("waveform", 0), "waveform", 0, 3)
                 sample_index = require_int(step.get("sample_index", -1), "sample_index", -1, len(tracker_samples) - 1 if tracker_samples else -1)
-                sample_rate = require_int(step.get("sample_rate_hz", 0), "sample_rate_hz", 0, 32768)
+                sample_rate = require_int(step.get("sample_rate_hz", 0), "sample_rate_hz", 0, 2097152)
                 sample_only = bool(step.get("sample_only", False))
                 if sample_only:
                     if sample_index < 0:
@@ -4358,7 +4454,8 @@ def emit_audio_header(name, data, base_dir):
                     ratio = step.get("sample_pitch_ratio", 1)
                     if not isinstance(ratio, (int, float)) or not math.isfinite(ratio) or not 1 / 64 <= ratio <= 64:
                         raise SystemExit("sample_pitch_ratio precisa estar entre 1/64 e 64")
-                    sample_rate = max(1, round(tracker_samples[sample_index]["sample_rate_hz"] * ratio))
+                    if sample_rate == 0:
+                        sample_rate = max(1, round(tracker_samples[sample_index]["sample_rate_hz"] * ratio))
                 pan = require_int(step.get("pan", 0), "pan", -127, 127)
                 suffix = ", 0, 0, false, true" if sample_only else ""
                 lines.append(
