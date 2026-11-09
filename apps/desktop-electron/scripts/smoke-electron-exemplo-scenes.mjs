@@ -635,6 +635,7 @@ async function samplePlayerVisualStability(cdp, sampleCount = 36, actorRegions =
     new Promise((resolve) => {
       const actorRegions = ${JSON.stringify(actorRegions)};
       const samples = [];
+      let diagnosticImages = 0;
       const resolveActorRegion = (region, runtimeState) => {
         if (region.followFirstActor !== true) return region;
         const actor = runtimeState?.firstActor;
@@ -787,12 +788,15 @@ async function samplePlayerVisualStability(cdp, sampleCount = 36, actorRegions =
               ? Number(runtimeState.actorCount)
               : null,
             firstActor: typeof runtimeState?.firstActor?.visible === "boolean"
-              ? { visible: runtimeState.firstActor.visible }
+              ? { ...runtimeState.firstActor }
               : null,
             frame: Number.isFinite(Number(runtimeState?.frame))
               ? Number(runtimeState.frame)
               : null
-          }
+          },
+          diagnosticImage: runtimeState?.firstActor?.visible === false && canvas && diagnosticImages++ < 3
+            ? canvas.toDataURL("image/png")
+            : null
         });
         if (samples.length >= ${JSON.stringify(sampleCount)}) {
           resolve({ ok: true, samples });
@@ -5741,10 +5745,11 @@ async function main() {
       const temporalVisualFidelity = auditTemporalVisualStability(visualStabilitySamples.samples, {
         enforceSignatureContinuity: scene.runtime === "isometric"
       });
+      await writeFile(join(evidenceRoot, `${scene.name}_temporal_samples.json`), `${JSON.stringify(visualStabilitySamples, null, 2)}\n`, "utf8");
+      const screenshotPath = await capturePlayerScreenshot(playerCdp, scene.name);
       if (!temporalVisualFidelity.ok) {
         throw new Error(`${scene.name} apresentou instabilidade visual temporal: ${JSON.stringify(temporalVisualFidelity)}.`);
       }
-      const screenshotPath = await capturePlayerScreenshot(playerCdp, scene.name);
       const battleInput = exerciseBattleInputRequested
         ? await runBattleInputExercise(playerCdp, scene.name, faceButtons)
         : null;
