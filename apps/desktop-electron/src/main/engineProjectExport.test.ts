@@ -206,7 +206,7 @@ async function assertNativeVisualExportArtifacts(destination: string, expectedTa
       tracker?: unknown[];
     };
     expect(audioPack.pcm).toHaveLength(1);
-    expect(audioPack.sfx).toHaveLength(0);
+    expect(audioPack.sfx).toEqual([expect.objectContaining({ name: "confirm", pcm: "confirm" })]);
     expect(audioPack.tracker).toHaveLength(1);
     const generatedExport = JSON.parse(await readFile(path.join(destination, "export_project.json"), "utf8")) as {
       topdown_project?: { scripts?: Array<{ name?: string; script?: Array<{ op?: string }> }> };

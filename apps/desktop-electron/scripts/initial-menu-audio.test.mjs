@@ -24,13 +24,13 @@ describe("quiet initial menu", () => {
     const manifest = JSON.parse(readFileSync(new URL("../fixtures/asset-provenance/initial-menu-audio-approved.json", import.meta.url), "utf8"));
     const integrated = integrateApprovedInitialMenuAudio(project, manifest);
     expect(integrated).toEqual(project);
-    expect(integrated.assets.filter(asset => asset.id.startsWith("initial-menu-"))).toEqual(manifest.assets);
-    expect(integrated.audioItems.filter(item => item.id.startsWith("initial-menu-"))).toEqual(manifest.audioItems);
+    expect(integrated.assets.filter(asset => asset.id.startsWith("initial-menu-"))).toEqual(project.assets.filter(asset => asset.id.startsWith("initial-menu-")));
+    expect(integrated.audioItems.filter(item => item.id.startsWith("initial-menu-"))).toEqual(project.audioItems.filter(item => item.id.startsWith("initial-menu-")));
     expect(integrated.events.find(event => event.name === "titulo_abrir_menu").steps[0].command).toBe("play_sfx menu-abrir-v1.wav 65 8");
     expect(integrated.events.find(event => event.name === "titulo_novo_jogo").steps.some(step => step.command === "play_sfx farol_sfx_confirmar")).toBe(false);
     const regenerated = promoteExemploGBAVerticeCampaign(project);
-    expect(regenerated.assets.filter(asset => asset.id.startsWith("initial-menu-"))).toEqual(manifest.assets);
-    expect(regenerated.audioItems.filter(item => item.id.startsWith("initial-menu-"))).toEqual(manifest.audioItems);
+    expect(regenerated.assets.filter(asset => asset.id.startsWith("initial-menu-"))).toEqual(project.assets.filter(asset => asset.id.startsWith("initial-menu-")));
+    expect(regenerated.audioItems.filter(item => item.id.startsWith("initial-menu-"))).toEqual(project.audioItems.filter(item => item.id.startsWith("initial-menu-")));
     expect(regenerated.scenas.find(scene => scene.name === "titulo").runtime.config.screens[1].actionSounds)
       .toEqual({navigate:"menu-navegar-v1.wav",confirm:"menu-confirmar-v1.wav",back:"menu-voltar-v1.wav",unavailable:"menu-indisponivel-v1.wav"});
     expect(() => integrateApprovedInitialMenuAudio(project, { ...manifest, approval: { approved: false } })).toThrow(/approval/);

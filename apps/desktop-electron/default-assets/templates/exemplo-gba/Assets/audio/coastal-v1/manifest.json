@@ -1,0 +1,936 @@
+{
+  "schema": 1,
+  "bank": "coastal-v1",
+  "direction": "Aventura costeira e fantasia — O Último Farol",
+  "license": "MIT",
+  "provenance": "Original compositions and deterministic synthesis by Memory Pak Labs; no third-party melodies, samples, recordings or model-generated recordings. Seed 7069.",
+  "approval": "User approved the pilot palette and authorized renewal of all remaining music and SFX on 2026-11-09. Technical ROM validation precedes integration.",
+  "music": [
+    {
+      "id": "brisa_do_porto",
+      "source": "sources/brisa_do_porto.mod",
+      "channels": 12,
+      "bars": 16,
+      "rows": 256,
+      "row_frames": 8,
+      "expected_seconds": 34.289062827005985,
+      "loop": true,
+      "instruments": [
+        "Flauta de brisa",
+        "Cordas de cais",
+        "Baixo de madeira",
+        "Cordas de neblina",
+        "Vidro marinho",
+        "Bumbo de lona",
+        "Caixa de escova",
+        "Areia chocalho",
+        "Pele de viagem"
+      ],
+      "exportID": "farol_enseada",
+      "title": "Brisa do Porto",
+      "context": "Porto Lúmen e enseada"
+    },
+    {
+      "id": "memorias_sob_agua",
+      "source": "sources/memorias_sob_agua.mod",
+      "channels": 8,
+      "bars": 8,
+      "rows": 128,
+      "row_frames": 10,
+      "expected_seconds": 21.43066426687874,
+      "loop": true,
+      "instruments": [
+        "Flauta de brisa",
+        "Cordas de cais",
+        "Baixo de madeira",
+        "Cordas de neblina",
+        "Vidro marinho",
+        "Bumbo de lona",
+        "Caixa de escova",
+        "Areia chocalho",
+        "Pele de viagem"
+      ],
+      "exportID": "farol_memorias",
+      "title": "Memórias sob Água",
+      "context": "Prólogo, interior e lembranças"
+    },
+    {
+      "id": "farol_tema_principal",
+      "source": "sources/farol_tema_principal.mod",
+      "channels": 12,
+      "bars": 16,
+      "rows": 256,
+      "row_frames": 8,
+      "expected_seconds": 34.289062827005985,
+      "loop": true,
+      "instruments": [
+        "Flauta de brisa",
+        "Cordas de cais",
+        "Baixo de madeira",
+        "Cordas de neblina",
+        "Vidro marinho",
+        "Bumbo de lona",
+        "Caixa de escova",
+        "Areia chocalho",
+        "Pele de viagem"
+      ],
+      "exportID": "farol_tema_principal",
+      "title": "O Último Farol",
+      "context": "Abertura heroica, frase do farol"
+    },
+    {
+      "id": "farol_falesias",
+      "source": "sources/farol_falesias.mod",
+      "channels": 10,
+      "bars": 16,
+      "rows": 256,
+      "row_frames": 7,
+      "expected_seconds": 30.002929973630238,
+      "loop": true,
+      "instruments": [
+        "Flauta de brisa",
+        "Cordas de cais",
+        "Baixo de madeira",
+        "Cordas de neblina",
+        "Vidro marinho",
+        "Bumbo de lona",
+        "Caixa de escova",
+        "Areia chocalho",
+        "Pele de viagem"
+      ],
+      "exportID": "farol_falesias",
+      "title": "Pedra e Espuma",
+      "context": "Falésias, travessia e horizonte"
+    },
+    {
+      "id": "farol_arena_tatica",
+      "source": "sources/farol_arena_tatica.mod",
+      "channels": 10,
+      "bars": 16,
+      "rows": 256,
+      "row_frames": 9,
+      "expected_seconds": 38.57519568038173,
+      "loop": true,
+      "instruments": [
+        "Flauta de brisa",
+        "Cordas de cais",
+        "Baixo de madeira",
+        "Cordas de neblina",
+        "Vidro marinho",
+        "Bumbo de lona",
+        "Caixa de escova",
+        "Areia chocalho",
+        "Pele de viagem"
+      ],
+      "exportID": "farol_arena_tatica",
+      "title": "Marés em Tabuleiro",
+      "context": "Estratégia: ostinato contido"
+    },
+    {
+      "id": "farol_arena_mare",
+      "source": "sources/farol_arena_mare.mod",
+      "channels": 12,
+      "bars": 16,
+      "rows": 256,
+      "row_frames": 6,
+      "expected_seconds": 25.71679712025449,
+      "loop": true,
+      "instruments": [
+        "Flauta de brisa",
+        "Cordas de cais",
+        "Baixo de madeira",
+        "Cordas de neblina",
+        "Vidro marinho",
+        "Bumbo de lona",
+        "Caixa de escova",
+        "Areia chocalho",
+        "Pele de viagem"
+      ],
+      "exportID": "farol_arena_mare",
+      "title": "Guardiões da Maré",
+      "context": "Arena: golpes e defesa"
+    },
+    {
+      "id": "penedos_vento_de_lumen_candidato",
+      "source": "sources/penedos_vento_de_lumen_candidato.mod",
+      "channels": 10,
+      "bars": 16,
+      "rows": 256,
+      "row_frames": 7,
+      "expected_seconds": 30.002929973630238,
+      "loop": true,
+      "instruments": [
+        "Flauta de brisa",
+        "Cordas de cais",
+        "Baixo de madeira",
+        "Cordas de neblina",
+        "Vidro marinho",
+        "Bumbo de lona",
+        "Caixa de escova",
+        "Areia chocalho",
+        "Pele de viagem"
+      ],
+      "exportID": "penedos_vento_de_lumen_candidato",
+      "title": "Vento de Lúmen",
+      "context": "Plataforma: arpejos e saltos"
+    },
+    {
+      "id": "corrida_circuito_dos_farois",
+      "source": "sources/corrida_circuito_dos_farois.mod",
+      "channels": 12,
+      "bars": 16,
+      "rows": 256,
+      "row_frames": 5,
+      "expected_seconds": 21.43066426687874,
+      "loop": true,
+      "instruments": [
+        "Flauta de brisa",
+        "Cordas de cais",
+        "Baixo de madeira",
+        "Cordas de neblina",
+        "Vidro marinho",
+        "Bumbo de lona",
+        "Caixa de escova",
+        "Areia chocalho",
+        "Pele de viagem"
+      ],
+      "exportID": "corrida_circuito_dos_farois",
+      "title": "Circuito dos Faróis",
+      "context": "Corrida: impulso e marcação"
+    },
+    {
+      "id": "corrida_rota_da_mare",
+      "source": "sources/corrida_rota_da_mare.mod",
+      "channels": 12,
+      "bars": 16,
+      "rows": 256,
+      "row_frames": 6,
+      "expected_seconds": 25.71679712025449,
+      "loop": true,
+      "instruments": [
+        "Flauta de brisa",
+        "Cordas de cais",
+        "Baixo de madeira",
+        "Cordas de neblina",
+        "Vidro marinho",
+        "Bumbo de lona",
+        "Caixa de escova",
+        "Areia chocalho",
+        "Pele de viagem"
+      ],
+      "exportID": "corrida_rota_da_mare",
+      "title": "Rota da Maré",
+      "context": "Corrida: rota alternativa"
+    },
+    {
+      "id": "tempestade_travessia",
+      "source": "sources/tempestade_travessia.mod",
+      "channels": 12,
+      "bars": 16,
+      "rows": 256,
+      "row_frames": 6,
+      "expected_seconds": 25.71679712025449,
+      "loop": true,
+      "instruments": [
+        "Flauta de brisa",
+        "Cordas de cais",
+        "Baixo de madeira",
+        "Cordas de neblina",
+        "Vidro marinho",
+        "Bumbo de lona",
+        "Caixa de escova",
+        "Areia chocalho",
+        "Pele de viagem"
+      ],
+      "exportID": "tempestade_travessia",
+      "title": "Velas na Tempestade",
+      "context": "Voo: tensão crescente"
+    },
+    {
+      "id": "tempestade_farol",
+      "source": "sources/tempestade_farol.mod",
+      "channels": 12,
+      "bars": 16,
+      "rows": 256,
+      "row_frames": 5,
+      "expected_seconds": 21.43066426687874,
+      "loop": true,
+      "instruments": [
+        "Flauta de brisa",
+        "Cordas de cais",
+        "Baixo de madeira",
+        "Cordas de neblina",
+        "Vidro marinho",
+        "Bumbo de lona",
+        "Caixa de escova",
+        "Areia chocalho",
+        "Pele de viagem"
+      ],
+      "exportID": "tempestade_farol",
+      "title": "Luz Contra o Temporal",
+      "context": "Clímax aéreo"
+    },
+    {
+      "id": "relay_pulse",
+      "source": "sources/relay_pulse.mod",
+      "channels": 12,
+      "bars": 16,
+      "rows": 256,
+      "row_frames": 7,
+      "expected_seconds": 30.002929973630238,
+      "loop": true,
+      "instruments": [
+        "Flauta de brisa",
+        "Cordas de cais",
+        "Baixo de madeira",
+        "Cordas de neblina",
+        "Vidro marinho",
+        "Bumbo de lona",
+        "Caixa de escova",
+        "Areia chocalho",
+        "Pele de viagem"
+      ],
+      "exportID": "relay_pulse",
+      "title": "Coração do Relé",
+      "context": "Chefe: pulso, cobre e vidro"
+    },
+    {
+      "id": "relay_light",
+      "source": "sources/relay_light.mod",
+      "channels": 8,
+      "bars": 4,
+      "rows": 64,
+      "row_frames": 8,
+      "expected_seconds": 8.572265706751496,
+      "loop": false,
+      "instruments": [
+        "Flauta de brisa",
+        "Cordas de cais",
+        "Baixo de madeira",
+        "Cordas de neblina",
+        "Vidro marinho",
+        "Bumbo de lona",
+        "Caixa de escova",
+        "Areia chocalho",
+        "Pele de viagem"
+      ],
+      "exportID": "relay_light",
+      "title": "O Farol Acende",
+      "context": "Resolução do relé, sem loop"
+    },
+    {
+      "id": "dungeon_tide",
+      "source": "sources/dungeon_tide.mod",
+      "channels": 8,
+      "bars": 16,
+      "rows": 256,
+      "row_frames": 10,
+      "expected_seconds": 42.86132853375748,
+      "loop": true,
+      "instruments": [
+        "Flauta de brisa",
+        "Cordas de cais",
+        "Baixo de madeira",
+        "Cordas de neblina",
+        "Vidro marinho",
+        "Bumbo de lona",
+        "Caixa de escova",
+        "Areia chocalho",
+        "Pele de viagem"
+      ],
+      "exportID": "dungeon_tide",
+      "title": "Galerias da Maré",
+      "context": "Dungeon: silêncio entre gotas"
+    },
+    {
+      "id": "dungeon_patrol",
+      "source": "sources/dungeon_patrol.mod",
+      "channels": 10,
+      "bars": 16,
+      "rows": 256,
+      "row_frames": 8,
+      "expected_seconds": 34.289062827005985,
+      "loop": true,
+      "instruments": [
+        "Flauta de brisa",
+        "Cordas de cais",
+        "Baixo de madeira",
+        "Cordas de neblina",
+        "Vidro marinho",
+        "Bumbo de lona",
+        "Caixa de escova",
+        "Areia chocalho",
+        "Pele de viagem"
+      ],
+      "exportID": "dungeon_patrol",
+      "title": "Sentinela de Cobre",
+      "context": "Dungeon: máquina em patrulha"
+    },
+    {
+      "id": "mapa_mar_aberto",
+      "source": "sources/mapa_mar_aberto.mod",
+      "channels": 8,
+      "bars": 16,
+      "rows": 256,
+      "row_frames": 9,
+      "expected_seconds": 38.57519568038173,
+      "loop": true,
+      "instruments": [
+        "Flauta de brisa",
+        "Cordas de cais",
+        "Baixo de madeira",
+        "Cordas de neblina",
+        "Vidro marinho",
+        "Bumbo de lona",
+        "Caixa de escova",
+        "Areia chocalho",
+        "Pele de viagem"
+      ],
+      "exportID": "mapa_mar_aberto",
+      "title": "Cartas de Mar Aberto",
+      "context": "Mapa: navegação e descoberta"
+    }
+  ],
+  "sfx": [
+    {
+      "id": "farol_sfx_texto",
+      "source": "sources/farol_sfx_texto.wav",
+      "duration": 0.045,
+      "rate": 31536,
+      "peak_dbfs": -25.86386687643037,
+      "exportID": "farol_sfx_texto"
+    },
+    {
+      "id": "farol_sfx_dialogo",
+      "source": "sources/farol_sfx_dialogo.wav",
+      "duration": 0.18,
+      "rate": 31536,
+      "peak_dbfs": -16.958239044527836,
+      "exportID": "farol_sfx_dialogo"
+    },
+    {
+      "id": "farol_sfx_confirmar",
+      "source": "sources/farol_sfx_confirmar.wav",
+      "duration": 0.28,
+      "rate": 31536,
+      "peak_dbfs": -12.758242577234846,
+      "exportID": "farol_sfx_confirmar"
+    },
+    {
+      "id": "farol_sfx_sinal",
+      "source": "sources/farol_sfx_sinal.wav",
+      "duration": 0.58,
+      "rate": 31536,
+      "peak_dbfs": -15.126108922780492,
+      "exportID": "farol_sfx_sinal"
+    },
+    {
+      "id": "farol_sfx_porta",
+      "source": "sources/farol_sfx_porta.wav",
+      "duration": 0.48,
+      "rate": 31536,
+      "peak_dbfs": -14.816509450411385,
+      "exportID": "farol_sfx_porta"
+    },
+    {
+      "id": "farol_sfx_alarme",
+      "source": "sources/farol_sfx_alarme.wav",
+      "duration": 0.65,
+      "rate": 31536,
+      "peak_dbfs": -14.252447358624437,
+      "exportID": "farol_sfx_alarme"
+    },
+    {
+      "id": "farol_sfx_vitoria",
+      "source": "sources/farol_sfx_vitoria.wav",
+      "duration": 1.05,
+      "rate": 31536,
+      "peak_dbfs": -13.326486104462813,
+      "exportID": "farol_sfx_vitoria"
+    },
+    {
+      "id": "farol_sfx_tatica_cursor",
+      "source": "sources/farol_sfx_tatica_cursor.wav",
+      "duration": 0.08,
+      "rate": 31536,
+      "peak_dbfs": -21.323985668358606,
+      "exportID": "farol_sfx_tatica_cursor"
+    },
+    {
+      "id": "farol_sfx_tatica_selecionar",
+      "source": "sources/farol_sfx_tatica_selecionar.wav",
+      "duration": 0.23,
+      "rate": 31536,
+      "peak_dbfs": -15.670670443352371,
+      "exportID": "farol_sfx_tatica_selecionar"
+    },
+    {
+      "id": "farol_sfx_tatica_cancelar",
+      "source": "sources/farol_sfx_tatica_cancelar.wav",
+      "duration": 0.22,
+      "rate": 31536,
+      "peak_dbfs": -15.484012536308175,
+      "exportID": "farol_sfx_tatica_cancelar"
+    },
+    {
+      "id": "farol_sfx_tatica_mover",
+      "source": "sources/farol_sfx_tatica_mover.wav",
+      "duration": 0.17,
+      "rate": 31536,
+      "peak_dbfs": -19.61946166377684,
+      "exportID": "farol_sfx_tatica_mover"
+    },
+    {
+      "id": "farol_sfx_tatica_ataque",
+      "source": "sources/farol_sfx_tatica_ataque.wav",
+      "duration": 0.25,
+      "rate": 31536,
+      "peak_dbfs": -14.154064800351062,
+      "exportID": "farol_sfx_tatica_ataque"
+    },
+    {
+      "id": "farol_sfx_tatica_impacto",
+      "source": "sources/farol_sfx_tatica_impacto.wav",
+      "duration": 0.3,
+      "rate": 31536,
+      "peak_dbfs": -10.095176685583777,
+      "exportID": "farol_sfx_tatica_impacto"
+    },
+    {
+      "id": "farol_sfx_tatica_turno",
+      "source": "sources/farol_sfx_tatica_turno.wav",
+      "duration": 0.48,
+      "rate": 31536,
+      "peak_dbfs": -15.32408275488936,
+      "exportID": "farol_sfx_tatica_turno"
+    },
+    {
+      "id": "farol_sfx_tatica_vitoria",
+      "source": "sources/farol_sfx_tatica_vitoria.wav",
+      "duration": 0.95,
+      "rate": 31536,
+      "peak_dbfs": -14.594602011419829,
+      "exportID": "farol_sfx_tatica_vitoria"
+    },
+    {
+      "id": "farol_sfx_tatica_derrota",
+      "source": "sources/farol_sfx_tatica_derrota.wav",
+      "duration": 0.88,
+      "rate": 31536,
+      "peak_dbfs": -13.41454714961314,
+      "exportID": "farol_sfx_tatica_derrota"
+    },
+    {
+      "id": "arena_impacto",
+      "source": "sources/arena_impacto.wav",
+      "duration": 0.22,
+      "rate": 31536,
+      "peak_dbfs": -10.931126261172277,
+      "exportID": "arena_impacto"
+    },
+    {
+      "id": "arena_defesa",
+      "source": "sources/arena_defesa.wav",
+      "duration": 0.32,
+      "rate": 31536,
+      "peak_dbfs": -9.55185575481963,
+      "exportID": "arena_defesa"
+    },
+    {
+      "id": "arena_especial",
+      "source": "sources/arena_especial.wav",
+      "duration": 0.6,
+      "rate": 31536,
+      "peak_dbfs": -14.533464300353705,
+      "exportID": "arena_especial"
+    },
+    {
+      "id": "arena_golpe_ar",
+      "source": "sources/arena_golpe_ar.wav",
+      "duration": 0.16,
+      "rate": 31536,
+      "peak_dbfs": -18.527832560987612,
+      "exportID": "arena_golpe_ar"
+    },
+    {
+      "id": "penedos_salto_candidato",
+      "source": "sources/penedos_salto_candidato.wav",
+      "duration": 0.24,
+      "rate": 31536,
+      "peak_dbfs": -13.881975612880716,
+      "exportID": "penedos_salto_candidato"
+    },
+    {
+      "id": "penedos_pouso_candidato",
+      "source": "sources/penedos_pouso_candidato.wav",
+      "duration": 0.13,
+      "rate": 31536,
+      "peak_dbfs": -16.902812530782533,
+      "exportID": "penedos_pouso_candidato"
+    },
+    {
+      "id": "penedos_impulso_candidato",
+      "source": "sources/penedos_impulso_candidato.wav",
+      "duration": 0.38,
+      "rate": 31536,
+      "peak_dbfs": -14.235223646832814,
+      "exportID": "penedos_impulso_candidato"
+    },
+    {
+      "id": "penedos_impacto_candidato",
+      "source": "sources/penedos_impacto_candidato.wav",
+      "duration": 0.26,
+      "rate": 31536,
+      "peak_dbfs": -13.464542714914087,
+      "exportID": "penedos_impacto_candidato"
+    },
+    {
+      "id": "penedos_item_candidato",
+      "source": "sources/penedos_item_candidato.wav",
+      "duration": 0.75,
+      "rate": 31536,
+      "peak_dbfs": -13.698051719719757,
+      "exportID": "penedos_item_candidato"
+    },
+    {
+      "id": "penedos_checkpoint_candidato",
+      "source": "sources/penedos_checkpoint_candidato.wav",
+      "duration": 0.63,
+      "rate": 31536,
+      "peak_dbfs": -15.07436251714667,
+      "exportID": "penedos_checkpoint_candidato"
+    },
+    {
+      "id": "corrida_contagem",
+      "source": "sources/corrida_contagem.wav",
+      "duration": 0.2,
+      "rate": 31536,
+      "peak_dbfs": -13.556657381365154,
+      "exportID": "corrida_contagem"
+    },
+    {
+      "id": "corrida_largada",
+      "source": "sources/corrida_largada.wav",
+      "duration": 0.52,
+      "rate": 31536,
+      "peak_dbfs": -13.579358346431857,
+      "exportID": "corrida_largada"
+    },
+    {
+      "id": "corrida_motor",
+      "source": "sources/corrida_motor.wav",
+      "duration": 0.19,
+      "rate": 31536,
+      "peak_dbfs": -16.410150768372745,
+      "exportID": "corrida_motor"
+    },
+    {
+      "id": "corrida_freio",
+      "source": "sources/corrida_freio.wav",
+      "duration": 0.21,
+      "rate": 31536,
+      "peak_dbfs": -16.157252925032406,
+      "exportID": "corrida_freio"
+    },
+    {
+      "id": "corrida_impacto",
+      "source": "sources/corrida_impacto.wav",
+      "duration": 0.27,
+      "rate": 31536,
+      "peak_dbfs": -10.892002295058468,
+      "exportID": "corrida_impacto"
+    },
+    {
+      "id": "corrida_checkpoint",
+      "source": "sources/corrida_checkpoint.wav",
+      "duration": 0.38,
+      "rate": 31536,
+      "peak_dbfs": -15.961402896499468,
+      "exportID": "corrida_checkpoint"
+    },
+    {
+      "id": "corrida_chegada",
+      "source": "sources/corrida_chegada.wav",
+      "duration": 0.92,
+      "rate": 31536,
+      "peak_dbfs": -14.513179062559992,
+      "exportID": "corrida_chegada"
+    },
+    {
+      "id": "tempestade_disparo",
+      "source": "sources/tempestade_disparo.wav",
+      "duration": 0.14,
+      "rate": 31536,
+      "peak_dbfs": -16.42102532280394,
+      "exportID": "tempestade_disparo"
+    },
+    {
+      "id": "tempestade_dano",
+      "source": "sources/tempestade_dano.wav",
+      "duration": 0.33,
+      "rate": 31536,
+      "peak_dbfs": -12.425418173012943,
+      "exportID": "tempestade_dano"
+    },
+    {
+      "id": "tempestade_explosao",
+      "source": "sources/tempestade_explosao.wav",
+      "duration": 0.48,
+      "rate": 31536,
+      "peak_dbfs": -9.219713680565793,
+      "exportID": "tempestade_explosao"
+    },
+    {
+      "id": "tempestade_alerta",
+      "source": "sources/tempestade_alerta.wav",
+      "duration": 0.54,
+      "rate": 31536,
+      "peak_dbfs": -16.405447053978055,
+      "exportID": "tempestade_alerta"
+    },
+    {
+      "id": "tempestade_modulo",
+      "source": "sources/tempestade_modulo.wav",
+      "duration": 0.58,
+      "rate": 31536,
+      "peak_dbfs": -16.054621844350283,
+      "exportID": "tempestade_modulo"
+    },
+    {
+      "id": "relay_cursor",
+      "source": "sources/relay_cursor.wav",
+      "duration": 0.095,
+      "rate": 31536,
+      "peak_dbfs": -18.65834649940576,
+      "exportID": "relay_cursor"
+    },
+    {
+      "id": "relay_confirmar",
+      "source": "sources/relay_confirmar.wav",
+      "duration": 0.27,
+      "rate": 31536,
+      "peak_dbfs": -15.424730525749624,
+      "exportID": "relay_confirmar"
+    },
+    {
+      "id": "relay_chave",
+      "source": "sources/relay_chave.wav",
+      "duration": 0.44,
+      "rate": 31536,
+      "peak_dbfs": -16.952898870097094,
+      "exportID": "relay_chave"
+    },
+    {
+      "id": "relay_energia",
+      "source": "sources/relay_energia.wav",
+      "duration": 0.56,
+      "rate": 31536,
+      "peak_dbfs": -15.84948371525134,
+      "exportID": "relay_energia"
+    },
+    {
+      "id": "relay_dano",
+      "source": "sources/relay_dano.wav",
+      "duration": 0.29,
+      "rate": 31536,
+      "peak_dbfs": -11.328735249579395,
+      "exportID": "relay_dano"
+    },
+    {
+      "id": "relay_defesa",
+      "source": "sources/relay_defesa.wav",
+      "duration": 0.32,
+      "rate": 31536,
+      "peak_dbfs": -11.250706265660547,
+      "exportID": "relay_defesa"
+    },
+    {
+      "id": "relay_desativar",
+      "source": "sources/relay_desativar.wav",
+      "duration": 0.85,
+      "rate": 31536,
+      "peak_dbfs": -13.578988678521736,
+      "exportID": "relay_desativar"
+    },
+    {
+      "id": "dungeon_passo",
+      "source": "sources/dungeon_passo.wav",
+      "duration": 0.1,
+      "rate": 31536,
+      "peak_dbfs": -18.91911774501136,
+      "exportID": "dungeon_passo"
+    },
+    {
+      "id": "dungeon_giro",
+      "source": "sources/dungeon_giro.wav",
+      "duration": 0.14,
+      "rate": 31536,
+      "peak_dbfs": -20.196427880375847,
+      "exportID": "dungeon_giro"
+    },
+    {
+      "id": "dungeon_impacto",
+      "source": "sources/dungeon_impacto.wav",
+      "duration": 0.28,
+      "rate": 31536,
+      "peak_dbfs": -11.567175340936931,
+      "exportID": "dungeon_impacto"
+    },
+    {
+      "id": "dungeon_celula",
+      "source": "sources/dungeon_celula.wav",
+      "duration": 0.52,
+      "rate": 31536,
+      "peak_dbfs": -16.22893295657541,
+      "exportID": "dungeon_celula"
+    },
+    {
+      "id": "dungeon_porta",
+      "source": "sources/dungeon_porta.wav",
+      "duration": 0.47,
+      "rate": 31536,
+      "peak_dbfs": -14.454520204584817,
+      "exportID": "dungeon_porta"
+    },
+    {
+      "id": "dungeon_bloqueio",
+      "source": "sources/dungeon_bloqueio.wav",
+      "duration": 0.19,
+      "rate": 31536,
+      "peak_dbfs": -16.253722534848173,
+      "exportID": "dungeon_bloqueio"
+    },
+    {
+      "id": "dungeon_desativar",
+      "source": "sources/dungeon_desativar.wav",
+      "duration": 0.7,
+      "rate": 31536,
+      "peak_dbfs": -14.153208782940165,
+      "exportID": "dungeon_desativar"
+    },
+    {
+      "id": "radio_lume_pcm",
+      "source": "sources/radio_lume_pcm.wav",
+      "duration": 1.45,
+      "rate": 31536,
+      "peak_dbfs": -17.879926379819523,
+      "exportID": "radio_lume_pcm"
+    },
+    {
+      "id": "menu_abrir_v1",
+      "source": "sources/menu_abrir_v1.wav",
+      "duration": 0.34,
+      "rate": 31536,
+      "peak_dbfs": -16.865574759822106,
+      "exportID": "menu_abrir_v1"
+    },
+    {
+      "id": "menu_navegar_v1",
+      "source": "sources/menu_navegar_v1.wav",
+      "duration": 0.08,
+      "rate": 31536,
+      "peak_dbfs": -22.330490472161536,
+      "exportID": "menu_navegar_v1"
+    },
+    {
+      "id": "menu_confirmar_v1",
+      "source": "sources/menu_confirmar_v1.wav",
+      "duration": 0.27,
+      "rate": 31536,
+      "peak_dbfs": -15.030683135339999,
+      "exportID": "menu_confirmar_v1"
+    },
+    {
+      "id": "menu_voltar_v1",
+      "source": "sources/menu_voltar_v1.wav",
+      "duration": 0.23,
+      "rate": 31536,
+      "peak_dbfs": -13.387683465368323,
+      "exportID": "menu_voltar_v1"
+    },
+    {
+      "id": "menu_indisponivel_v1",
+      "source": "sources/menu_indisponivel_v1.wav",
+      "duration": 0.24,
+      "rate": 31536,
+      "peak_dbfs": -18.973249314395353,
+      "exportID": "menu_indisponivel_v1"
+    }
+  ],
+  "files": {
+    "sources/arena_defesa.wav": "22bedd79e9ad0ce3911ad442ea503d2eb45eabc8baafc00c3c130a469ed8344d",
+    "sources/arena_especial.wav": "04356f78a9876024c6864bacdd120b51c1dfa001d0f223a241c23898661d1d0a",
+    "sources/arena_golpe_ar.wav": "a34b0b3e56a9dec5d3e3f0b8d1a4668338eeff3709b7476ef5843856ab072602",
+    "sources/arena_impacto.wav": "ce8952337d6c9fc3b501b8096e248e784ae7090eec6a098b02dbb9121c37b99f",
+    "sources/brisa_do_porto.mod": "3600f12ad52ab09f48dbec2ec7c2ed4ee58d4c251fc7992e8a9c0e814a69a0cf",
+    "sources/corrida_checkpoint.wav": "514f947accfbbd9659f64ebfd0b4dabcd3279c282adb98a5702fb763e42b363d",
+    "sources/corrida_chegada.wav": "6a21f4ac83cffdfd24f4f185e5388c0b9849fc7ac5d9e8def42c55a259e2eb4f",
+    "sources/corrida_circuito_dos_farois.mod": "dfb072b7fd745c1786714e8df7c2134576336a27a29f174f94f6e358c8a94b67",
+    "sources/corrida_contagem.wav": "e525613a0d8974f2eae45affbd4810858b40c6c83a40be33d8b2639f14d00bc9",
+    "sources/corrida_freio.wav": "97a1cb912699234edc80049c5a792db78baeee0f0b39c00d7a6cb8e9574895e1",
+    "sources/corrida_impacto.wav": "3af161ca79cd3d3b36a61bcc4a65b2f771f9d563bdda27778acf00528711ba9f",
+    "sources/corrida_largada.wav": "6f527371bf9cd5e200db115d335a591ac3b93d50010833b1dd7d8ff34595cba2",
+    "sources/corrida_motor.wav": "b87b4353c590d77746449cac7efa43b364ff9df7681594c50168ae8aee8fff12",
+    "sources/corrida_rota_da_mare.mod": "bc3ffa2025fbda51f5f59c8de9626fff6fe69c144207a2e445ac7c0a6ce1e4da",
+    "sources/dungeon_bloqueio.wav": "797f02a221b2efd7a6e0646bfadc560c39172e493b9f51855e477e45545f536f",
+    "sources/dungeon_celula.wav": "775d2fb9d6cc1349d75a8bebcf61c8b8ebcfd8087486d31128b4e94016b394c4",
+    "sources/dungeon_desativar.wav": "a0b08a7a67e10da747fe66856a5a35569cbbc5f428ee12777a7282f2ee62af0b",
+    "sources/dungeon_giro.wav": "4b5d342075ee489b7b7cbd708cc25e088359228a7e67ec6da637549e025de9fa",
+    "sources/dungeon_impacto.wav": "b0d0e85ff89c003e60461acafae31597a89471eabad04ea3bda3cada7840f2dd",
+    "sources/dungeon_passo.wav": "25d943ae8eaa443c22219e7cef711a84d9aefe35ed02289215e6dfd09f1b1ae6",
+    "sources/dungeon_patrol.mod": "f08ccba90bb2fa82c51beb2925099043dd499dd6b061a2b11bb36b2ce090e159",
+    "sources/dungeon_porta.wav": "a75270d411a6f20088c4d224918f259b027202a52426311e78783e1739116c46",
+    "sources/dungeon_tide.mod": "2c3cf9286a5609a61acb1c5184a5fe5adf857f47311318502884f5d5e6ae1c9a",
+    "sources/farol_arena_mare.mod": "9c30b10a88dcb06d057c77b848f7ae78bfd7cc00f4148a1fdaa5bfe5158af99c",
+    "sources/farol_arena_tatica.mod": "c47c116b49a12211f2ea275c8e0ad5e227887fa58bcb29ac44c738764e69db35",
+    "sources/farol_falesias.mod": "58f8be0591f0cd1fc9750584468f76686bb1a54b74f0859e89d3c6c9ad34c550",
+    "sources/farol_sfx_alarme.wav": "55980ab7f55334a6a180c0fc3f0ab9e4b917fa45bf90878ec9f06b3276b468ed",
+    "sources/farol_sfx_confirmar.wav": "816e79d8d6c1e69284955f88a17970198bf86eb5987dfbcdab86e3050aefb2cb",
+    "sources/farol_sfx_dialogo.wav": "2488391a519a9b22f3c655efb40001833f0ffebaae5ad8239708e2fef2462e28",
+    "sources/farol_sfx_porta.wav": "c8ada6fa696e003266cbc13e70a376312f8aa4a2f7b5aa28e08e83fe541ed111",
+    "sources/farol_sfx_sinal.wav": "3f7102bdb191e64249e8a3cb209d494e954ec9d03cd8fd154ad476bc5eb2b16d",
+    "sources/farol_sfx_tatica_ataque.wav": "249f4d0f862a07f8ff19c738e9ecc2357982194bbe8e99a3ef522a8ffa8bfca9",
+    "sources/farol_sfx_tatica_cancelar.wav": "68551bbdc8b26bd3ce56080da54764715d8792daab75f1514894c0d71049d727",
+    "sources/farol_sfx_tatica_cursor.wav": "c3e84c00664bdcb5cefe1f015444c7abf0c117deca22ecb6048168a4204e0eb2",
+    "sources/farol_sfx_tatica_derrota.wav": "4dbe53664e033e307afcba2cd479e8878843e7bf768ecdcd130690e6c15701d5",
+    "sources/farol_sfx_tatica_impacto.wav": "8bf93316261e4a396fba33f73a0453593b9e8788b5ba525c2b5637e6a02061ed",
+    "sources/farol_sfx_tatica_mover.wav": "e5d13ffe1f844ca076f161c1a33762e3e6cedbba00fb6a946b0817884ed9d865",
+    "sources/farol_sfx_tatica_selecionar.wav": "aec54645c2f9def1b35837ec973f59363848774b6ec79fee8660a3a7c99896eb",
+    "sources/farol_sfx_tatica_turno.wav": "d28a4c67ffc4dfe03507efba2ad084846e65dd47eeb12167a62242437d16262d",
+    "sources/farol_sfx_tatica_vitoria.wav": "6e977d36da7ff24769de2b59358c2c1bfaaa0400a92cd3c5b94b5a7f82c9aebf",
+    "sources/farol_sfx_texto.wav": "cf6bb82a405e50f3fa0cc24d82e1601b9a38ad25c6a3e1155630c498ca9b6cb8",
+    "sources/farol_sfx_vitoria.wav": "1354ea38eebed71d9a538d2e2f45baa431c9869689cc80c02337064454be7252",
+    "sources/farol_tema_principal.mod": "f3aaa4581ef8ddffbf72b4fae251e043e47bee0609c77778a1d7e0be64e3b6a6",
+    "sources/mapa_mar_aberto.mod": "bb869db4ffc0e356d1aa64f88e1e4721a668726d161ade10d8642790606741ad",
+    "sources/memorias_sob_agua.mod": "1ee61899ecc79b0e0220ba7b40181876db92d4f79f0af9c58c5667acf0bef386",
+    "sources/menu_abrir_v1.wav": "007542c9ce8483de94ad678ee36a064085c1210a0ec6c10e0f08700061d8de51",
+    "sources/menu_confirmar_v1.wav": "c6322b84f4bc7422863f2e9c527ee31c6db652266e32e31b580e0ec8a535d419",
+    "sources/menu_indisponivel_v1.wav": "930daa2e4a892839f962dbf8be390d71c3aa5aff95f6db6b38c730f5bf924368",
+    "sources/menu_navegar_v1.wav": "94903a240c0b69460243e8c653d0e0f6a71c313f6f818134b75b7725d0007eae",
+    "sources/menu_voltar_v1.wav": "ff452a8535342476d371db0ca103562e9858d8212852662dd423d508236dc040",
+    "sources/penedos_checkpoint_candidato.wav": "640869e59a0446c531b3449cc8110cfdc89edb40b0a93710f42170032a68c43e",
+    "sources/penedos_impacto_candidato.wav": "7a24e202b258083f7c0d03707fd4c9db4b69e8e6af93ffdcb762728629faeec1",
+    "sources/penedos_impulso_candidato.wav": "059a57a2e28a7e04b31a88654a1315c5aca08d4045719e40520e976047480807",
+    "sources/penedos_item_candidato.wav": "b270388ef72a10f73e94414b5171858b1108e55f57eb79d98b4c4ef51becb747",
+    "sources/penedos_pouso_candidato.wav": "c5b7a82b5b104c5f7ef421e7fb86855aa7e2f5dea6ac7c71ce72c828eda1272a",
+    "sources/penedos_salto_candidato.wav": "75fec5e1ecdf15b5b733ff6287c03257752781fa3e88e32533d9bc0c6e6763aa",
+    "sources/penedos_vento_de_lumen_candidato.mod": "ec393a853c09baf50ef931218b9dec1c8043d128433585e4b7a491f7cb6bb2e9",
+    "sources/radio_lume_pcm.wav": "9a7ade79ec68ba235f48c7adceac6e14d20a29f17478772bad6bd394138f6c1f",
+    "sources/relay_chave.wav": "103a3a421fbddfe166d6bc34533fb1f2d5fca5edf4164da10dd0f88cf1c333ad",
+    "sources/relay_confirmar.wav": "dd3ffaaeaad8ebc482e7412ee8ca9ba0e3226b0240075dddffc627e60e5ccdb3",
+    "sources/relay_cursor.wav": "6789a19411aadde057a91f3ab984e864f657dc7f102b925a04e08be8116a8b50",
+    "sources/relay_dano.wav": "a42bcb5da7b81b10d0f734c3bd6895e74289b007e33ac27f153c883875202a20",
+    "sources/relay_defesa.wav": "b58e1ca618586122820427948f27dc59fae1482dc04fb4ebcb78060b1af10276",
+    "sources/relay_desativar.wav": "aa7796f8f0c310d00b1f8986bd1284f8db283479a9868f013654af04e537c849",
+    "sources/relay_energia.wav": "cee5c1da410841b5877815cb47309a0be8832900d999595610ca3dd245052420",
+    "sources/relay_light.mod": "9cd21dd7a165c6e5caa33ffc88055da0e585e458488a0829b02f5beb7ca5d4a3",
+    "sources/relay_pulse.mod": "bf0add36ea72378ec1eb8e341a43ed97a7ffcfe75e0fb21f01dda922db4ebb08",
+    "sources/tempestade_alerta.wav": "63071c2dcddaca91f315e2c724d09cf26aa4b71ea372757ef6519e552da37875",
+    "sources/tempestade_dano.wav": "3d7da842efc5ed0d68f7c458816ae3063d3d37089b038d5ed6dfdc9b8a11abc7",
+    "sources/tempestade_disparo.wav": "c84be4356e8b654b3c48bc47d1b2c44650a733c64818cbf0cdccc0da9ca05ca8",
+    "sources/tempestade_explosao.wav": "0a5c262a77d86626d1f1300dbfaf9491d99c5d1e254259efb48f8877dd1861a5",
+    "sources/tempestade_farol.mod": "f2c9aa5e40918e15f94e6ca1d25eaafe932e34bfb5c1dce0dfab3defe8c79b7d",
+    "sources/tempestade_modulo.wav": "a177cc75ba44cd6d05b5f0bdcb6a940556564808eb05e5d83e73c8352827d261",
+    "sources/tempestade_travessia.mod": "21f4bae89afc4a02a5c13747dee3898274a0e2282bf63c1228519c413315f27f"
+  }
+}

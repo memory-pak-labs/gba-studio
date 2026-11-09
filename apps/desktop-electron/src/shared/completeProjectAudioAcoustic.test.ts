@@ -35,9 +35,10 @@ describe("gate acústico do projeto completo", () => {
     expect(audioItems.length).toBeGreaterThan(0);
     expect(presentation.items).toHaveLength(audioItems.length);
     const pcm=audioPack?.document.pcm??[];
-    expect(pcm).toEqual([
+    expect(pcm).toHaveLength(58);
+    expect(pcm).toEqual(expect.arrayContaining([
       "radio_lume_pcm", "menu_abrir_v1", "menu_navegar_v1", "menu_confirmar_v1", "menu_voltar_v1", "menu_indisponivel_v1"
-    ].map(name => expect.objectContaining({ name, wav: `${name}.wav` })));
+    ].map(name => expect.objectContaining({ name, wav: `${name}.wav` }))));
     expect(tracker.length + sfx.filter(item => !item.pcm).length + pcm.length).toBe(audioItems.length);
     expect(rooms).toHaveLength(scenes.length);
     const quietInitialScenes = [

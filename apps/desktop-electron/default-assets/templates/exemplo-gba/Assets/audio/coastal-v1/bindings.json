@@ -1,0 +1,520 @@
+[
+  {
+    "id": "gba-audio-farol_tema_principal",
+    "name": "farol_tema_principal",
+    "exportID": "farol_tema_principal",
+    "kind": "Musica",
+    "loops": true
+  },
+  {
+    "id": "gba-audio-farol_enseada",
+    "name": "farol_enseada",
+    "exportID": "farol_enseada",
+    "kind": "Musica",
+    "loops": true
+  },
+  {
+    "id": "gba-audio-farol_falesias",
+    "name": "farol_falesias",
+    "exportID": "farol_falesias",
+    "kind": "Musica",
+    "loops": true
+  },
+  {
+    "id": "gba-audio-farol_memorias",
+    "name": "farol_memorias",
+    "exportID": "farol_memorias",
+    "kind": "Musica",
+    "loops": true
+  },
+  {
+    "id": "gba-audio-farol_sfx_texto",
+    "name": "farol_sfx_texto",
+    "exportID": "farol_sfx_texto",
+    "kind": "SFX",
+    "loops": false
+  },
+  {
+    "id": "gba-audio-farol_sfx_dialogo",
+    "name": "farol_sfx_dialogo",
+    "exportID": "farol_sfx_dialogo",
+    "kind": "SFX",
+    "loops": false
+  },
+  {
+    "id": "gba-audio-farol_sfx_confirmar",
+    "name": "farol_sfx_confirmar",
+    "exportID": "farol_sfx_confirmar",
+    "kind": "SFX",
+    "loops": false
+  },
+  {
+    "id": "gba-audio-farol_sfx_sinal",
+    "name": "farol_sfx_sinal",
+    "exportID": "farol_sfx_sinal",
+    "kind": "SFX",
+    "loops": false
+  },
+  {
+    "id": "gba-audio-farol_sfx_porta",
+    "name": "farol_sfx_porta",
+    "exportID": "farol_sfx_porta",
+    "kind": "SFX",
+    "loops": false
+  },
+  {
+    "id": "gba-audio-farol_sfx_alarme",
+    "name": "farol_sfx_alarme",
+    "exportID": "farol_sfx_alarme",
+    "kind": "SFX",
+    "loops": false
+  },
+  {
+    "id": "gba-audio-farol_sfx_vitoria",
+    "name": "farol_sfx_vitoria",
+    "exportID": "farol_sfx_vitoria",
+    "kind": "SFX",
+    "loops": false
+  },
+  {
+    "id": "music-farol-arena-tatica",
+    "name": "farol_arena_tatica",
+    "exportID": "farol_arena_tatica",
+    "kind": "Musica",
+    "loops": true
+  },
+  {
+    "id": "sfx-tactical-cursor",
+    "name": "farol_sfx_tatica_cursor",
+    "exportID": "farol_sfx_tatica_cursor",
+    "kind": "SFX",
+    "loops": false
+  },
+  {
+    "id": "sfx-tactical-select",
+    "name": "farol_sfx_tatica_selecionar",
+    "exportID": "farol_sfx_tatica_selecionar",
+    "kind": "SFX",
+    "loops": false
+  },
+  {
+    "id": "sfx-tactical-cancel",
+    "name": "farol_sfx_tatica_cancelar",
+    "exportID": "farol_sfx_tatica_cancelar",
+    "kind": "SFX",
+    "loops": false
+  },
+  {
+    "id": "sfx-tactical-move",
+    "name": "farol_sfx_tatica_mover",
+    "exportID": "farol_sfx_tatica_mover",
+    "kind": "SFX",
+    "loops": false
+  },
+  {
+    "id": "sfx-tactical-attack",
+    "name": "farol_sfx_tatica_ataque",
+    "exportID": "farol_sfx_tatica_ataque",
+    "kind": "SFX",
+    "loops": false
+  },
+  {
+    "id": "sfx-tactical-hit",
+    "name": "farol_sfx_tatica_impacto",
+    "exportID": "farol_sfx_tatica_impacto",
+    "kind": "SFX",
+    "loops": false
+  },
+  {
+    "id": "sfx-tactical-turn",
+    "name": "farol_sfx_tatica_turno",
+    "exportID": "farol_sfx_tatica_turno",
+    "kind": "SFX",
+    "loops": false
+  },
+  {
+    "id": "sfx-tactical-victory",
+    "name": "farol_sfx_tatica_vitoria",
+    "exportID": "farol_sfx_tatica_vitoria",
+    "kind": "SFX",
+    "loops": false
+  },
+  {
+    "id": "sfx-tactical-defeat",
+    "name": "farol_sfx_tatica_derrota",
+    "exportID": "farol_sfx_tatica_derrota",
+    "kind": "SFX",
+    "loops": false
+  },
+  {
+    "id": "farol_arena_mare",
+    "name": "farol_arena_mare",
+    "exportID": "farol_arena_mare",
+    "kind": "Musica",
+    "loops": true
+  },
+  {
+    "id": "arena_impacto",
+    "name": "arena_impacto",
+    "exportID": "arena_impacto",
+    "kind": "SFX",
+    "loops": false
+  },
+  {
+    "id": "arena_defesa",
+    "name": "arena_defesa",
+    "exportID": "arena_defesa",
+    "kind": "SFX",
+    "loops": false
+  },
+  {
+    "id": "arena_especial",
+    "name": "arena_especial",
+    "exportID": "arena_especial",
+    "kind": "SFX",
+    "loops": false
+  },
+  {
+    "id": "arena_golpe_ar",
+    "name": "arena_golpe_ar",
+    "exportID": "arena_golpe_ar",
+    "kind": "SFX",
+    "loops": false
+  },
+  {
+    "id": "penedos_vento_de_lumen_candidato",
+    "name": "penedos_vento_de_lumen_candidato",
+    "exportID": "penedos_vento_de_lumen_candidato",
+    "kind": "Musica",
+    "loops": true
+  },
+  {
+    "id": "penedos_salto_candidato",
+    "name": "penedos_salto_candidato",
+    "exportID": "penedos_salto_candidato",
+    "kind": "SFX",
+    "loops": false
+  },
+  {
+    "id": "penedos_pouso_candidato",
+    "name": "penedos_pouso_candidato",
+    "exportID": "penedos_pouso_candidato",
+    "kind": "SFX",
+    "loops": false
+  },
+  {
+    "id": "penedos_impulso_candidato",
+    "name": "penedos_impulso_candidato",
+    "exportID": "penedos_impulso_candidato",
+    "kind": "SFX",
+    "loops": false
+  },
+  {
+    "id": "penedos_impacto_candidato",
+    "name": "penedos_impacto_candidato",
+    "exportID": "penedos_impacto_candidato",
+    "kind": "SFX",
+    "loops": false
+  },
+  {
+    "id": "penedos_item_candidato",
+    "name": "penedos_item_candidato",
+    "exportID": "penedos_item_candidato",
+    "kind": "SFX",
+    "loops": false
+  },
+  {
+    "id": "penedos_checkpoint_candidato",
+    "name": "penedos_checkpoint_candidato",
+    "exportID": "penedos_checkpoint_candidato",
+    "kind": "SFX",
+    "loops": false
+  },
+  {
+    "id": "corrida_circuito_dos_farois",
+    "name": "corrida_circuito_dos_farois",
+    "exportID": "corrida_circuito_dos_farois",
+    "kind": "Musica",
+    "loops": true
+  },
+  {
+    "id": "corrida_rota_da_mare",
+    "name": "corrida_rota_da_mare",
+    "exportID": "corrida_rota_da_mare",
+    "kind": "Musica",
+    "loops": true
+  },
+  {
+    "id": "corrida_contagem",
+    "name": "corrida_contagem",
+    "exportID": "corrida_contagem",
+    "kind": "SFX",
+    "loops": false
+  },
+  {
+    "id": "corrida_largada",
+    "name": "corrida_largada",
+    "exportID": "corrida_largada",
+    "kind": "SFX",
+    "loops": false
+  },
+  {
+    "id": "corrida_motor",
+    "name": "corrida_motor",
+    "exportID": "corrida_motor",
+    "kind": "SFX",
+    "loops": false
+  },
+  {
+    "id": "corrida_freio",
+    "name": "corrida_freio",
+    "exportID": "corrida_freio",
+    "kind": "SFX",
+    "loops": false
+  },
+  {
+    "id": "corrida_impacto",
+    "name": "corrida_impacto",
+    "exportID": "corrida_impacto",
+    "kind": "SFX",
+    "loops": false
+  },
+  {
+    "id": "corrida_checkpoint",
+    "name": "corrida_checkpoint",
+    "exportID": "corrida_checkpoint",
+    "kind": "SFX",
+    "loops": false
+  },
+  {
+    "id": "corrida_chegada",
+    "name": "corrida_chegada",
+    "exportID": "corrida_chegada",
+    "kind": "SFX",
+    "loops": false
+  },
+  {
+    "id": "tempestade_travessia",
+    "name": "tempestade_travessia",
+    "exportID": "tempestade_travessia",
+    "kind": "Musica",
+    "loops": true
+  },
+  {
+    "id": "tempestade_farol",
+    "name": "tempestade_farol",
+    "exportID": "tempestade_farol",
+    "kind": "Musica",
+    "loops": true
+  },
+  {
+    "id": "tempestade_disparo",
+    "name": "tempestade_disparo",
+    "exportID": "tempestade_disparo",
+    "kind": "SFX",
+    "loops": false
+  },
+  {
+    "id": "tempestade_dano",
+    "name": "tempestade_dano",
+    "exportID": "tempestade_dano",
+    "kind": "SFX",
+    "loops": false
+  },
+  {
+    "id": "tempestade_explosao",
+    "name": "tempestade_explosao",
+    "exportID": "tempestade_explosao",
+    "kind": "SFX",
+    "loops": false
+  },
+  {
+    "id": "tempestade_alerta",
+    "name": "tempestade_alerta",
+    "exportID": "tempestade_alerta",
+    "kind": "SFX",
+    "loops": false
+  },
+  {
+    "id": "tempestade_modulo",
+    "name": "tempestade_modulo",
+    "exportID": "tempestade_modulo",
+    "kind": "SFX",
+    "loops": false
+  },
+  {
+    "id": "relay_pulse",
+    "name": "relay_pulse",
+    "exportID": "relay_pulse",
+    "kind": "Musica",
+    "loops": true
+  },
+  {
+    "id": "relay_light",
+    "name": "relay_light",
+    "exportID": "relay_light",
+    "kind": "Musica",
+    "loops": false
+  },
+  {
+    "id": "relay_cursor",
+    "name": "relay_cursor",
+    "exportID": "relay_cursor",
+    "kind": "SFX",
+    "loops": false
+  },
+  {
+    "id": "relay_confirmar",
+    "name": "relay_confirmar",
+    "exportID": "relay_confirmar",
+    "kind": "SFX",
+    "loops": false
+  },
+  {
+    "id": "relay_chave",
+    "name": "relay_chave",
+    "exportID": "relay_chave",
+    "kind": "SFX",
+    "loops": false
+  },
+  {
+    "id": "relay_energia",
+    "name": "relay_energia",
+    "exportID": "relay_energia",
+    "kind": "SFX",
+    "loops": false
+  },
+  {
+    "id": "relay_dano",
+    "name": "relay_dano",
+    "exportID": "relay_dano",
+    "kind": "SFX",
+    "loops": false
+  },
+  {
+    "id": "relay_defesa",
+    "name": "relay_defesa",
+    "exportID": "relay_defesa",
+    "kind": "SFX",
+    "loops": false
+  },
+  {
+    "id": "relay_desativar",
+    "name": "relay_desativar",
+    "exportID": "relay_desativar",
+    "kind": "SFX",
+    "loops": false
+  },
+  {
+    "id": "dungeon_tide",
+    "name": "dungeon_tide",
+    "exportID": "dungeon_tide",
+    "kind": "Musica",
+    "loops": true
+  },
+  {
+    "id": "dungeon_patrol",
+    "name": "dungeon_patrol",
+    "exportID": "dungeon_patrol",
+    "kind": "Musica",
+    "loops": true
+  },
+  {
+    "id": "dungeon_passo",
+    "name": "dungeon_passo",
+    "exportID": "dungeon_passo",
+    "kind": "SFX",
+    "loops": false
+  },
+  {
+    "id": "dungeon_giro",
+    "name": "dungeon_giro",
+    "exportID": "dungeon_giro",
+    "kind": "SFX",
+    "loops": false
+  },
+  {
+    "id": "dungeon_impacto",
+    "name": "dungeon_impacto",
+    "exportID": "dungeon_impacto",
+    "kind": "SFX",
+    "loops": false
+  },
+  {
+    "id": "dungeon_celula",
+    "name": "dungeon_celula",
+    "exportID": "dungeon_celula",
+    "kind": "SFX",
+    "loops": false
+  },
+  {
+    "id": "dungeon_porta",
+    "name": "dungeon_porta",
+    "exportID": "dungeon_porta",
+    "kind": "SFX",
+    "loops": false
+  },
+  {
+    "id": "dungeon_bloqueio",
+    "name": "dungeon_bloqueio",
+    "exportID": "dungeon_bloqueio",
+    "kind": "SFX",
+    "loops": false
+  },
+  {
+    "id": "dungeon_desativar",
+    "name": "dungeon_desativar",
+    "exportID": "dungeon_desativar",
+    "kind": "SFX",
+    "loops": false
+  },
+  {
+    "id": "audio-mapa-mar-aberto",
+    "name": "mapa_mar_aberto",
+    "exportID": "mapa_mar_aberto",
+    "kind": "Musica",
+    "loops": true
+  },
+  {
+    "id": "encore-radio-pcm",
+    "name": "radio-lume-pcm.wav",
+    "exportID": "radio_lume_pcm",
+    "kind": "SFX",
+    "loops": false
+  },
+  {
+    "id": "initial-menu-abrir-v1",
+    "name": "menu-abrir-v1.wav",
+    "exportID": "menu_abrir_v1",
+    "kind": "SFX",
+    "loops": false
+  },
+  {
+    "id": "initial-menu-navegar-v1",
+    "name": "menu-navegar-v1.wav",
+    "exportID": "menu_navegar_v1",
+    "kind": "SFX",
+    "loops": false
+  },
+  {
+    "id": "initial-menu-confirmar-v1",
+    "name": "menu-confirmar-v1.wav",
+    "exportID": "menu_confirmar_v1",
+    "kind": "SFX",
+    "loops": false
+  },
+  {
+    "id": "initial-menu-voltar-v1",
+    "name": "menu-voltar-v1.wav",
+    "exportID": "menu_voltar_v1",
+    "kind": "SFX",
+    "loops": false
+  },
+  {
+    "id": "initial-menu-indisponivel-v1",
+    "name": "menu-indisponivel-v1.wav",
+    "exportID": "menu_indisponivel_v1",
+    "kind": "SFX",
+    "loops": false
+  }
+]

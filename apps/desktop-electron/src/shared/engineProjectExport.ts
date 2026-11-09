@@ -2893,11 +2893,11 @@ export interface AssetcAudioJsonDocument {
  */
 export const GBA_AUDIO_ROM_LAYOUT = {
   sfxToneBytes: 10,
-  sfxAssetBytes: 8,
+  sfxAssetBytes: 16,
   trackerStepBytes: 16,
   trackerPatternBytes: 8,
   trackerOrderEntryBytes: 1,
-  trackerAssetBytes: 28
+  trackerAssetBytes: 32
 } as const;
 
 export function physicalBytesForCompiledTracker(

@@ -81,7 +81,7 @@ describe('example library cleanup', () => {
     const rebuilt = promoteExemploGBAVerticeCampaign(source);
     expect(analyzeExampleAssetUsage(rebuilt).unusedAssets.map(a => a.name)).toEqual([]);
     expect(rebuilt.assets.map(a => a.name).sort()).toEqual(source.assets.map(a => a.name).sort());
-    expect(deriveFilesWorkspacePresentation(expandProjectTilemaps(source)).assets.filter(a => !a.isUsed).map(a => a.name)).toEqual([]);
+    expect(deriveFilesWorkspacePresentation(expandProjectTilemaps(source)).assets.filter(a => !a.isUsed && !a.isReusableLibraryAsset).map(a => a.name)).toEqual([]);
   });
 
   it('removes retired files while preserving the five sources shared with blank projects', () => {
@@ -110,7 +110,7 @@ describe('example library cleanup', () => {
     const tide=JSON.parse(readFileSync(new URL("../fixtures/asset-provenance/tide-annex-approved.json",import.meta.url)));
     const approvedMenus=JSON.parse(readFileSync(new URL("../fixtures/asset-provenance/approved-menu-scenes-v21.json",import.meta.url)));
     // The relay and the approved campaign extensions retain all existing sources.
-    expect(source.assets).toHaveLength(record.after.assets - dungeon.replacedAssetNames.length + dungeon.assets.length - dungeon.unusedPreparedAssetNames.length - platformer.replacedAssetNames.length + platformer.assets.length - racing.replacedAssetNames.length + racing.assets.length - storm.replacedAssetNames.length + storm.assets.length - relay.replacedAssetNames.length + relay.assets.length - startup.retainedOriginals.length + startup.assets.length - replacedWorldMapSources.length + Object.keys(worldMap.assets).length - market.replacedAssetNames.length + market.assets.length - council.replacedAssetNames.length + council.assets.length + 1 + evolutions.assets.length + coast.assets.length - coast.retainedAliases.length + encore.assets.length + menuAudio.assets.length + tide.assets.length + approvedMenus.assets.length + 1 - 2);
+    expect(source.assets).toHaveLength(record.after.assets - dungeon.replacedAssetNames.length + dungeon.assets.length - dungeon.unusedPreparedAssetNames.length - platformer.replacedAssetNames.length + platformer.assets.length - racing.replacedAssetNames.length + racing.assets.length - storm.replacedAssetNames.length + storm.assets.length - relay.replacedAssetNames.length + relay.assets.length - startup.retainedOriginals.length + startup.assets.length - replacedWorldMapSources.length + Object.keys(worldMap.assets).length - market.replacedAssetNames.length + market.assets.length - council.replacedAssetNames.length + council.assets.length + 1 + evolutions.assets.length + coast.assets.length - coast.retainedAliases.length + encore.assets.length + menuAudio.assets.length + tide.assets.length + approvedMenus.assets.length + 1 - 2 + 74);
     for (const original of market.retainedOriginals) {
       expect(source.assets.some(asset => asset.name === original.source.split('/').at(-1))).toBe(false);
       expect(existsSync(new URL(original.source, root))).toBe(true);

@@ -97,17 +97,18 @@ describe("Exemplo GBA audio content", () => {
 
     expect(tacticalNames.every((name) => audioByName.has(name))).toBe(true);
     const tacticalMusic = audioByName.get("farol_arena_tatica");
-    expect(tacticalMusic?.patterns.flatMap((pattern) => pattern.channels).some((channel) => channel.type === "noise")).toBe(true);
+    expect(tacticalMusic?.format).toBe("MOD");
+    expect(tacticalMusic?.sourceAssetID).toBeTruthy();
     expect(audioByName.get("farol_arena_tatica")).toMatchObject({
       kind: "Musica",
-      format: "COMPOSED",
+      format: "MOD",
       loops: true,
       bpm: 112,
       volume: 82
     });
     expect(audioByName.get("farol_sfx_tatica_cursor")).toMatchObject({
       kind: "SFX",
-      format: "COMPOSED",
+      format: "WAV",
       loops: false,
       bpm: 180,
       volume: 78

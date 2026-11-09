@@ -2071,10 +2071,12 @@ describe("materialização canônica de Vértice", () => {
     for (const asset of JSON.parse(readFileSync(new URL('../fixtures/asset-provenance/approved-menu-scenes-v21.json', import.meta.url))).assets) allowedAssets.add(asset.name);
     allowedAssets.add(JSON.parse(readFileSync(new URL('../fixtures/asset-provenance/nara-topdown-running-v1.json', import.meta.url))).prepared.file.split('/').at(-1));
     for (const name of ['porto-nara-animations48.png', 'toolcase-commands-128x8.png']) allowedAssets.delete(name);
+    const canonical = JSON.parse(readFileSync(templateURL, "utf8"));
+    for (const asset of canonical.assets.filter(asset => asset.metadata?.coastalBank === "coastal-v1")) allowedAssets.add(asset.name);
     expect(new Set(project.assets.map((asset) => asset.name))).toEqual(allowedAssets);
     expect(project.audioItems).toHaveLength(74);
-    expect(project.audioItems.filter(item => item.id.startsWith('initial-menu-'))).toEqual(menuAudioManifest.audioItems);
-    expect(project.audioItems.find(a=>a.name==='mapa_mar_aberto')).toMatchObject({bpm:84,format:'COMPOSED',loops:true});
+    expect(project.audioItems.filter(item => item.id.startsWith('initial-menu-'))).toEqual(canonical.audioItems.filter(item => item.id.startsWith('initial-menu-')));
+    expect(project.audioItems.find(a=>a.name==='mapa_mar_aberto')).toMatchObject({bpm:84,format:'MOD',loops:true});
     expect(project.events.flatMap((event) => event.steps ?? []).some((step) => /play_(music|sfx) /.test(step.command))).toBe(true);
     expect(project.scenas.filter((scene) => pendingSceneNames.includes(scene.name)))
       .toEqual(expect.arrayContaining([

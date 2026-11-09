@@ -1,6 +1,7 @@
 import {readFileSync} from 'node:fs';
 import {expect,it} from 'vitest';
 import {parseGBAProjectFile} from '../shared/projectFile.js';
+import {buildAssetcAudioPackGeneration} from '../shared/engineProjectExport.js';
 import {buildEngineExportProjectContract} from './exportEngineProject.js';
 import {extendExampleEncore} from '../../scripts/encore-project.mjs';
 
@@ -15,7 +16,7 @@ it('exports executable training bindings, native PCM and the exact separate radi
   const radio=warehouse.props!.find(a=>a.name==='Rádio de Lúmen')!;
   expect(radio.position).toEqual({x:192,y:80});
   expect(radio.animations![0].frame_metasprites![0].parts[0]).toEqual(expect.objectContaining({x:-16,y:-32,width:32,height:32}));
-  expect(warehouse.hotspots!.find(h=>h.name==='Rádio de Lúmen')!.on_click).toContainEqual({op:'play_pcm_sfx',index:0,volume:12,priority:12});
+  expect(warehouse.hotspots!.find(h=>h.name==='Rádio de Lúmen')!.on_click).toContainEqual({op:'play_pcm_sfx',index:buildAssetcAudioPackGeneration(p)!.document.pcm.findIndex(item=>item.name==='radio_lume_pcm'),volume:12,priority:12});
   const tour=c.topdown_project!.scripts.find(s=>s.name==='encore_epilogue_1_tick')!.script;
   expect(tour).toContainEqual(expect.objectContaining({op:'move_camera',x:1,y:0}));
   const menu=c.topdown_project!.dialogue_lines!.findIndex(d=>d.key==='encore_epilogue_menu');
