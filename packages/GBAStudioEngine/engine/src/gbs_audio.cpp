@@ -395,7 +395,7 @@ void start_tracker_sample(const gbs::TrackerStep& step) {
     if (step.sample_index < 0 && step.volume == 0 && tracker.asset != nullptr &&
         tracker.asset->sustain_sample_channels) return;
     PcmPlayback& playback = pcm_tracker[step.channel - 1u];
-    if (step.sample_index < 0 || tracker.asset == nullptr || tracker.asset->samples == nullptr ||
+    if (step.volume == 0 || step.sample_index < 0 || tracker.asset == nullptr || tracker.asset->samples == nullptr ||
         static_cast<size_t>(step.sample_index) >= tracker.asset->sample_count) {
         reset_pcm_playback(playback);
         return;

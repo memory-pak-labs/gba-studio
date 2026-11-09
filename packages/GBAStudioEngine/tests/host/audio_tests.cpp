@@ -1304,7 +1304,25 @@ void test_pcm_native_cues_preserve_psg_tracker_channels() {
     gbs::audio_init();
 }
 
+void test_authored_pcm_rests_release_their_voice() {
+    const int8_t data[] = { 48, -48, 48, -48 };
+    const gbs::PcmAsset samples[] = { { data, 4, 31536, true } };
+    gbs::TrackerStep steps[] = { {16,262,2,10,0}, {16,64,2,0,0} };
+    for (auto& step : steps) { step.sample_index=0;step.sample_rate_hz=31536;step.sample_only=true; }
+    const gbs::TrackerPattern patterns[] = { {steps,2} };
+    const uint8_t order[] = {0};
+    const gbs::TrackerAsset song = {patterns,1,order,1,false,samples,1,false};
+    gbs::audio_init();
+    assert(gbs::play_tracker_music(song));
+    assert(gbs::audio_runtime_usage().active_voice_count == 1);
+    gbs::audio_update();gbs::audio_update();
+    assert(gbs::audio_is_tracker_music_playing());
+    assert(gbs::audio_runtime_usage().active_voice_count == 0);
+    gbs::stop_tracker_music();
+}
+
 int main() {
+    test_authored_pcm_rests_release_their_voice();
     test_pcm_native_cues_preserve_psg_tracker_channels();
     test_pcm_backed_native_cues_keep_stop_and_validation_contract();
     test_imported_sample_notes_sustain_between_rows();
