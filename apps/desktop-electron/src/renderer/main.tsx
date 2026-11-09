@@ -3727,6 +3727,7 @@ function App(): React.ReactElement {
               presentation={audioPresentation}
               projectPath={session?.path}
               previewStopRequest={audioPreviewStopRequest}
+              previewRevision={session?.project.data}
               sceneOptions={authoringReferenceOptions.rooms}
               focusedAssetName={focusedAssetRequest?.workspace === "Audio" ? focusedAssetRequest.targetName ?? focusedAssetRequest.assetName : null}
               focusRequestID={focusedAssetRequest?.workspace === "Audio" ? focusedAssetRequest.requestID : 0}

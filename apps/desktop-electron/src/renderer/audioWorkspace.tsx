@@ -57,6 +57,7 @@ interface AudioWorkspaceProps {
   presentation: AudioWorkspacePresentation | null;
   projectPath?: string;
   previewStopRequest?: number;
+  previewRevision?: object;
   sceneOptions?: ProjectReferenceOption[];
   focusedAssetName?: string | null;
   focusRequestID?: number | null;
@@ -392,6 +393,7 @@ export function AudioWorkspace({
   presentation,
   projectPath,
   previewStopRequest = 0,
+  previewRevision,
   sceneOptions = [],
   focusedAssetName,
   focusRequestID,
@@ -457,6 +459,10 @@ export function AudioWorkspace({
     detailsButtonRef.current?.focus();
   }
 
+  // Desktop authoring data changes before its worker presentation arrives.
+  // Invalidate on that source revision so a late analysis cannot cancel a
+  // preview that already compiled the newest unsaved data.
+  const playbackRevision = previewRevision ?? presentation;
   useEffect(() => {
     setPlaybackStepIndex(null); setAuditionAudioID(null); setPlaybackStatus("Parado"); setNativeMeter({ peak: 0, underruns: 0 });
     return () => {
@@ -466,7 +472,7 @@ export function AudioWorkspace({
       playbackRef.current = null;
       if (current) { current.stop(); void current.context.close(); }
     };
-  }, [presentation, selectedAudioID, previewScope, previewStopRequest]);
+  }, [playbackRevision, selectedAudioID, previewScope, previewStopRequest]);
   const focusedAudioID = useMemo(() => {
     if (!presentation || !focusedAssetName) return null;
     return presentation.items.find((candidate) => (
@@ -768,13 +774,13 @@ export function AudioWorkspace({
 
   async function playAudioPreview(item: AudioWorkspaceItem): Promise<void> {
     stopAudioPreview(`Preparando ${item.name}`);
-    if (item.errors.length) { setPlaybackStatus(item.errors[0]); return; }
+    if (item.errors.length && !onPrepareEnginePreview) { setPlaybackStatus(item.errors[0]); return; }
     if (onPrepareEnginePreview) {
       const request = playbackRequest.current;
       setNativeMeter({ peak: 0, underruns: 0 });
       try {
         const native = startEngineAudioPreview({
-          prepare: requestID => onPrepareEnginePreview({ requestID, audioID: item.id, scope: previewScope, patternID: item.activePatternID }),
+          prepare: requestID => onPrepareEnginePreview({ requestID, audioID: item.id, scope: previewScope }),
           release: id => onStopEnginePreview?.(id),
           onStep: step => { if (request === playbackRequest.current) setPlaybackStepIndex(step); },
           onMeter: (peak, underruns) => { if (request === playbackRequest.current) setNativeMeter(previous => ({ peak: Math.max(previous.peak, peak), underruns })); },

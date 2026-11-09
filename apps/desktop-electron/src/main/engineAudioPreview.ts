@@ -21,7 +21,9 @@ export function selectAudioPreviewData(request: PrepareAudioPreviewRequest): GBA
   const audio = structuredClone(source);
   const patterns = audioRecords(audio.patterns);
   if (request.scope === "pattern" && patterns.length) {
-    const pattern = patterns.find(item => item.id === (request.patternID ?? audio.activePatternID));
+    const active = typeof audio.activePatternID === "string" && audio.activePatternID.trim() ? audio.activePatternID : undefined;
+    const firstOrdered = Array.isArray(audio.patternOrder) && typeof audio.patternOrder[0] === "string" ? audio.patternOrder[0] : undefined;
+    const pattern = patterns.find(item => item.id === (request.patternID ?? active ?? firstOrdered ?? patterns[0].id));
     if (!pattern) throw new Error("Padrão selecionado não encontrado na música.");
     audio.patterns = [pattern]; audio.patternOrder = [pattern.id];
   }

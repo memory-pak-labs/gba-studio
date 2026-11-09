@@ -67,4 +67,20 @@ describe("visual PCM composer", () => {
     await waitFor(() => expect(screen.getByText("Tocando Tema (loop)")).toHaveTextContent("Tocando Tema"));
     await userEvent.click(screen.getByRole("button", { name: "Parar áudio" })); expect(native.stop).toHaveBeenCalled();
   });
+  it("keeps playback when a delayed presentation catches up and stops on a new source revision", async () => {
+    const data = createAudioItemInProject(blank(), { id: "song", name: "Tema", kind: "Musica", synthesis: "PCM" });
+    const revision = structuredClone(data);
+    const props = handlers({ onPrepareEnginePreview: vi.fn().mockResolvedValue({ ok: true }) });
+    const { rerender } = render(<AudioWorkspace presentation={deriveAudioWorkspacePresentation(data)} previewRevision={revision} {...props} />);
+    await userEvent.click(screen.getByRole("button", { name: "Tocar áudio" }));
+    await waitFor(() => expect(screen.getByText("Tocando Tema (loop)")).toBeInTheDocument());
+    native.stop.mockClear();
+    const analysis = deriveAudioWorkspacePresentation(revision);
+    rerender(<AudioWorkspace presentation={analysis} previewRevision={revision} {...props} />);
+    expect(native.stop).not.toHaveBeenCalled();
+    expect(screen.getByText("Tocando Tema (loop)")).toBeInTheDocument();
+    rerender(<AudioWorkspace presentation={analysis} previewRevision={{ ...revision }} {...props} />);
+    expect(native.stop).toHaveBeenCalledOnce();
+  });
+
 });

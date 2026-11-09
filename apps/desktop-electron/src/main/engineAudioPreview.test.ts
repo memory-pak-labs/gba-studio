@@ -35,6 +35,11 @@ describe("engine audio preview", () => {
     expect(audio.patterns[0].channels.slice(1).every((c: any) => c.muted)).toBe(true);
     expect(song.patterns[0].channels[1].muted).toBeUndefined();
   });
+  it("uses the authored order when an older project has no active pattern field", () => {
+    const data = fixture(); const audio = (data.audioItems as any[])[0]; delete audio.activePatternID;
+    const selected = selectAudioPreviewData({ requestID: "a", data, audioID: "song", scope: "pattern" });
+    expect((selected.audioItems as any[])[0].patterns[0].id).toBe("second");
+  });
   it("rejects missing selections instead of playing another song", () => {
     expect(() => selectAudioPreviewData({ requestID: "a", data: fixture(), audioID: "missing", scope: "sequence" })).toThrow(/áudio/i);
     expect(() => selectAudioPreviewData({ requestID: "a", data: fixture(), audioID: "song", scope: "pattern", patternID: "missing" })).toThrow(/padrão/i);
