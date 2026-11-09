@@ -14,8 +14,8 @@ describe.skipIf(!process.env.GBA_AUDIO_PCM_QA_OUTPUT)("authored PCM ARM/mGBA pro
     const pack = path.resolve("../../packages/GBAStudioEngine/dist/GBAStudioEnginePack");
     const projectPath = path.join(output, "composer.gba-project");
     let data = createAudioItemInProject(createBlankProjectData({ name: "PCM ROM", includeStarterContent: false }), { id: "song", name: "Sixteen", kind: "Musica", synthesis: "PCM" });
-    const song = (data.audioItems as any[])[0]; song.patterns[0].steps = 8;
-    song.patterns[0].channels = Array.from({ length: 16 }, (_, i) => ({ id: `c${i}`, name: `PCM ${i + 1}`, type: "pcm", instrument: "PCM Triangle", envelope: "Short Decay", volume: 12, pan: i % 2 ? 100 : -100, notes: [i % 2 ? "E4" : "C4", "---", "G4", "---", "C5", "---", "E4", "---"] }));
+    const song = (data.audioItems as any[])[0]; song.patterns[0].steps = 64;
+    song.patterns[0].channels = Array.from({ length: 16 }, (_, i) => ({ id: `c${i}`, name: `PCM ${i + 1}`, type: "pcm", instrument: ["PCM Sine", "PCM Triangle", "PCM Square", "PCM Noise"][i % 4], envelope: "Short Decay", volume: 12, pan: i % 2 ? 100 : -100, notes: [i % 2 ? "E4" : "C4", "---", "G4", "---", "C5", "---", "E4", "---"] }));
     data = createAudioItemInProject(data, { id: "synth", name: "Synth", kind: "SFX", synthesis: "PCM" });
     data = updatePcmSfxInProject(data, "synth", { durationMs: 400, frequencyStart: 880, frequencyEnd: 220, noiseMix: 20, releaseMs: 80 });
     await mkdir(path.join(output, "Assets"), { recursive: true });
@@ -44,7 +44,7 @@ describe.skipIf(!process.env.GBA_AUDIO_PCM_QA_OUTPUT)("authored PCM ARM/mGBA pro
           const pcm = new Int16Array(core.HEAPU8.buffer, core._gba_audio_samples(), core._gba_audio_sample_count() * 2);
           for (const value of pcm) peak = Math.max(peak, Math.abs(value));
           for (let i = 0; i < pcm.length; i += 2) if (pcm[i] !== pcm[i + 1]) stereoDifferences++;
-          if (!witness) continue;
+          if (!witness || word(witness + 24) === 2) continue;
           expect(word(witness + 24)).toBe(1); expect(word(witness + 20)).toBe(0);
           voices = Math.max(voices, word(witness + 16));
           const row = word(witness + 8) % ((built.rowFrames ?? 1) * 2);

@@ -72,6 +72,7 @@ extern "C" int gbs_main() {
  gbs::set_audio_channel_volume(gbs::AudioChannel::PcmMusic,${gain("musicVolume")});
  gbs::set_audio_channel_volume(gbs::AudioChannel::Sfx,${gain("sfxVolume")});
  gbs::set_audio_channel_volume(gbs::AudioChannel::PcmSfx,${gain("sfxVolume")});
+ audio_preview[6]=2; // Pending: large tracker validation can cross a video frame.
  audio_preview[0]=0x41555043;audio_preview[1]=0x50434d31;
  audio_preview[6]=${music ? "gbs::play_tracker_music(preview_tracker_assets[0])" : "gbs::play_sfx(preview_sfx_assets[0])"};
  unsigned tail=0;

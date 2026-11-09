@@ -24,7 +24,7 @@ window.addEventListener("message", event => {
       const samples = new Int16Array(core.HEAPU8.buffer, core._gba_audio_samples(), count * 2);
       for (let i = 0; i < count; i++) { left.push(samples[i * 2] / 32768); right.push(samples[i * 2 + 1] / 32768); }
       if (!witness) witness = findWitness();
-      if (witness && !word(witness + 24)) throw new Error("A engine rejeitou o asset de áudio.");
+      if (witness && word(witness + 24) === 0) throw new Error("A engine rejeitou o asset de áudio.");
       if (!witness && videoFrames > 60) throw new Error("A ROM da prévia não iniciou o áudio.");
       if (witness && word(witness + 28)) break;
     }
