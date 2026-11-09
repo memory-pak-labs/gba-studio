@@ -2825,6 +2825,8 @@ continua como etapa posterior.
 export interface AssetcAudioJsonDocument {
   sfx: Array<{
     name: string;
+    pcm?: string;
+    pcm_volume?: number;
     tones: Array<{
       frequency_hz: number;
       duration_frames: number;
@@ -3683,6 +3685,7 @@ function buildAssetcAudioPackGenerationUncached(data: GBAProjectData): AssetcAud
         pcmItem.sample_rate_hz = projectAudioSampleRate;
       }
       pcm.push(pcmItem);
+      sfx.push({ name: exportID, pcm: exportID, pcm_volume: trackerVolumeFromAudioVolume(integerField(audio, "volume", 100)), tones: [] });
     }
   });
 

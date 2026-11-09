@@ -166,6 +166,23 @@ def test_audio_bank_is_shared_by_linked_cpp_translation_units():
         subprocess.run([str(root / "linked")], check=True)
 
 
+def test_pcm_native_cue_alias_compiles_and_rejects_missing_pcm():
+    with tempfile.TemporaryDirectory() as directory:
+        root = Path(directory)
+        document = {"pcm": [{"name": "click", "samples": [20, -20], "sample_rate_hz": 31536}],
+                    "sfx": [{"name": "click", "pcm": "click", "pcm_volume": 11}]}
+        header = ASSETC.emit_audio_header("bank", document, root)
+        (root / "bank.hpp").write_text(header)
+        (root / "test.cpp").write_text('#include "bank.hpp"\nstatic_assert(bank_sfx_assets[0].pcm == &bank_click_asset);\nstatic_assert(bank_sfx_assets[0].pcm_volume == 11);\nint main() {}\n')
+        subprocess.run(["c++", "-std=c++17", "-I", str(ASSETC_PATH.parents[2] / "engine/include"), "-I", str(root), str(root / "test.cpp"), "-o", str(root / "test")], check=True)
+        document["sfx"][0]["pcm"] = "missing"
+        try:
+            ASSETC.emit_audio_header("bank", document, root)
+            assert False, "dangling native cues must be rejected"
+        except SystemExit:
+            pass
+
+
 if __name__ == "__main__":
     test_automatic_wav_conversion_matches_native_mixer_clock()
     test_audio_bank_is_shared_by_linked_cpp_translation_units()

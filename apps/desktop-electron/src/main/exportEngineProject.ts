@@ -853,6 +853,15 @@ function tacticalAudioAssetReference(
   return { asset: audioPack.packAsset.id, index };
 }
 
+function nativeSfxIndex(audioItems: Record<string, unknown>[], audioPack: AssetcAudioPackGeneration | null, reference: string): number {
+  const resolved = resolveAudioPlayback(audioItems, audioPack, reference);
+  const entries = resolved?.op === "play_pcm_sfx" ? audioPack?.document.pcm : resolved?.op === "play_sfx" ? audioPack?.document.sfx : undefined;
+  const name = resolved ? entries?.[resolved.index]?.name : undefined;
+  const index = name ? audioPack?.document.sfx.findIndex(entry => entry.name === name) : undefined;
+  if (index === undefined || index < 0) throw new Error(`Efeito automático requer SFX compilado: ${reference}`);
+  return index;
+}
+
 function tacticalReferenceMatchesBinding(binding: IsoTacticalAssetBinding, reference: string): boolean {
   const baseReference = tacticalAssetBaseReference(reference);
   const candidates = [binding.id, binding.path, tacticalAssetBaseReference(binding.path)]
@@ -5286,7 +5295,7 @@ function compileEventStep(
     case "set_text_sfx": {
       const resolved = resolveAudioPlayback(audioItems, audioPack, operand);
       if (!resolved) throw new Error(`Evento referencia audio inexistente: ${operand}`);
-      return [{ op: "set_text_sfx", sfx: resolved.index }];
+      return [{ op: "set_text_sfx", sfx: nativeSfxIndex(audioItems, audioPack, operand) }];
     }
     case "choice_event":
       // Binding resolvido em compile-time por buildTopdownChoiceGroups (choice_groups[].choices[].script);
@@ -5744,7 +5753,7 @@ function dialogueUiBootCommands(
   for (const candidate of candidates) {
     const resolved = resolveAudioPlayback(audioItems, audioPack, candidate);
     if (!resolved) continue;
-    commands.push({ op: "set_text_sfx", sfx: resolved.index });
+    commands.push({ op: "set_text_sfx", sfx: nativeSfxIndex(audioItems, audioPack, candidate) });
     break;
   }
   return commands;
@@ -5827,7 +5836,7 @@ function compileDialogueTextSfxCommand(
   if (!textSound) return null;
   const resolved = resolveAudioPlayback(audioItems, audioPack, textSound);
   if (!resolved) return null;
-  return { op: "set_text_sfx", sfx: resolved.index };
+  return { op: "set_text_sfx", sfx: nativeSfxIndex(audioItems, audioPack, textSound) };
 }
 
 function dialogueRecordByKey(
@@ -7846,7 +7855,7 @@ function buildDungeonCrawlerRooms(
           || nullableStringField(playerActor, "name")
           || nullableStringField(projectArray(projectArray(child(data,"settings") ?? {},"hudPresets").find(p=>p.id===room.hudPresetId) ?? {},"components").find(c=>c.kind==="text"),"text") || "Player",
         action_sounds:Object.fromEntries(Object.entries(config.presentation.actionSounds).map(([cue,name])=>{
-        const audio=resolveAudioPlayback(audioItems,audioPack,name);if(audio?.op!=="play_sfx")throw new Error(`Dungeon cue must reference PSG SFX: ${name}`);return [cue,audio.index];
+        return [cue,nativeSfxIndex(audioItems,audioPack,name)];
       }))}} : {}),
       battle_enabled: roomFeatureRuntime.battleEnabled,
       video: buildRoomVideoComposition(data, room, tilesetPack),
@@ -8016,9 +8025,7 @@ function buildRacingRooms(
         throw new Error("Câmera da corrida: aumente a distância ou reduza a altura/perspectiva para manter o carro dentro da tela.");
     }
     const actionSounds = Object.fromEntries(Object.entries(config?.actionSounds ?? {}).map(([cue,name]) => {
-      const resolved=resolveAudioPlayback(audioItems,audioPack,name);
-      if(resolved?.op !== "play_sfx") throw new Error(`Corrida actionSounds.${cue} requer SFX PSG compilado: ${name}`);
-      return [cue,resolved.index];
+      return [cue,nativeSfxIndex(audioItems,audioPack,name)];
     }));
     const player = playerPositionForRoom(data, room, index);
     const currentRoomName = roomName(room, index);
@@ -8358,9 +8365,7 @@ function buildBattleRpgProject(
         const authored=config.presentation, hudBackground=hudIndices.get(encounterName);
         if(config.hudAssetName && hudBackground===undefined) throw new Error("Battle RPG presentation requer hudAssetName valido");
         const action_sounds=Object.fromEntries(Object.entries(authored.actionSounds).map(([cue,name])=>{
-          const audio=resolveAudioPlayback(audioItems,audioPack,name);
-          if(audio?.op!=="play_sfx") throw new Error(`Battle RPG actionSounds.${cue} requer SFX PSG: ${name}`);
-          return [cue,audio.index];
+          return [cue,nativeSfxIndex(audioItems,audioPack,name)];
         }));
         const victory=resolveAudioPlayback(audioItems,audioPack,authored.victoryMusic);
         if(authored.victoryMusic && victory?.op!=="run_audio_routine") throw new Error("Battle RPG victoryMusic requer musica tracker compilada");
@@ -8474,9 +8479,7 @@ function buildLutaProject(
       const onVictory = hook("onVictory");
       const onDefeat = hook("onDefeat");
       const actionSounds = Object.fromEntries(Object.entries(config?.actionSounds ?? {}).map(([cue, name]) => {
-        const resolved = resolveAudioPlayback(audioItems, audioPack, name);
-        if (resolved?.op !== "play_sfx") throw new Error(`Luta actionSounds.${cue} requer SFX PSG compilado: ${name}`);
-        return [cue, resolved.index];
+        return [cue, nativeSfxIndex(audioItems, audioPack, name)];
       }));
       const participants = projectArray(data, "actors").flatMap((actor): Array<{ side: "player1" | "player2"; fighter: EngineExportLutaFighter }> => {
         if (entitySceneName(actor, "actor") !== stageName) return [];
@@ -11143,6 +11146,7 @@ function buildEngineExportProjectContractUncached(
     if (runtimeKind === "platformer") cameraZoneFeatures.add("platformer_runtime.platformer_camera_zones");
   });
   features.push(...cameraZoneFeatures);
+  if (audioPack?.document.sfx.some(asset => asset.pcm)) features.push("audio.pcm_sfx_aliases");
   if (audioPack?.document.tracker.some(asset => asset.mod || asset.s3m)) {
     features.push("audio.tracker_pcm_16_channels", "audio.pcm_prepared_gain", "audio.tracker_sample_sustain");
   }

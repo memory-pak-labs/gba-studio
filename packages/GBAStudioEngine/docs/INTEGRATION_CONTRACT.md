@@ -310,3 +310,13 @@ no mGBA embarcado, verifica cada canal individualmente e todos juntos no PCM,
 e registra WAVs, hashes e contadores de avanço e underruns. É uma validação
 focada da preservação dos canais, não uma declaração de compatibilidade total
 com todos os efeitos de tracker ou de validação em GBA físico.
+
+### PCM nos efeitos automáticos
+
+`audio.pcm_sfx_aliases` acrescenta a `SfxAsset` um ponteiro opcional para
+`PcmAsset` e ganho 0–15. O assetc aceita `{ "name": "click", "pcm": "click",
+"pcm_volume": 12 }` na lista `sfx`, com o PCM correspondente na lista `pcm`.
+O descritor compartilha os samples, sem duplicação de ROM. `play_sfx` substitui
+o efeito automático anterior; `stop_sfx` não interrompe PCM disparado diretamente
+por eventos. Texto de diálogo, tática, dungeon, luta e corrida usam o mesmo índice
+SFX para PSG e PCM. Recompile SDK e projetos ao usar este contrato.

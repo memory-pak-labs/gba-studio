@@ -20,9 +20,14 @@ struct SfxTone {
     bool sweep_negative = false;
 };
 
+struct PcmAsset;
+
 struct SfxAsset {
     const SfxTone* tones;
     size_t tone_count;
+    // Native action cues can alias an existing PCM descriptor without copying samples.
+    const PcmAsset* pcm = nullptr;
+    uint8_t pcm_volume = 15;
 };
 
 struct MusicStep {
@@ -264,7 +269,12 @@ constexpr AudioMixCost invalid_audio_mix_cost() {
     };
 }
 
+constexpr AudioMixCost estimate_pcm_asset_cost(const PcmAsset& asset);
+
 constexpr AudioMixCost estimate_sfx_asset_cost(const SfxAsset& asset) {
+    if (asset.pcm != nullptr) {
+        return asset.pcm_volume <= 15 ? estimate_pcm_asset_cost(*asset.pcm) : invalid_audio_mix_cost();
+    }
     if (asset.tones == nullptr || asset.tone_count == 0 || asset.tone_count > 0xFFFFu) {
         return invalid_audio_mix_cost();
     }

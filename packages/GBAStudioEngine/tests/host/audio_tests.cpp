@@ -1245,7 +1245,38 @@ void test_imported_sample_notes_sustain_between_rows() {
     gbs::audio_init();
 }
 
+void test_pcm_backed_native_cues_keep_stop_and_validation_contract() {
+    const int8_t samples[1056] = { 70, -70, 30, -30 };
+    const gbs::PcmAsset pcm = { samples, 1056, 31536, true };
+    const gbs::SfxAsset cue = { nullptr, 0, &pcm, 11 };
+    const gbs::SfxTone tone = { 440, 2, 10, 2, false };
+    const gbs::SfxAsset psg = { &tone, 1 };
+    gbs::audio_init();
+    assert(gbs::is_valid_sfx_asset(cue));
+    assert(gbs::estimate_sfx_asset_cost(cue).valid);
+    assert(gbs::play_pcm_sfx(pcm)); // unrelated scripted effect
+    assert(gbs::play_sfx(cue));    // native action cue
+    assert(gbs::audio_is_sfx_playing());
+    assert(gbs::audio_runtime_usage().active_voice_count == 2);
+    gbs::stop_sfx();
+    assert(!gbs::audio_is_sfx_playing());
+    assert(gbs::audio_runtime_usage().active_voice_count == 1);
+    assert(gbs::play_sfx(cue));
+    assert(gbs::play_sfx(cue)); // replaces the previous native cue
+    assert(gbs::audio_runtime_usage().active_voice_count == 2);
+    assert(gbs::play_sfx(psg));
+    assert(gbs::audio_runtime_usage().active_voice_count == 1);
+    gbs::set_audio_channel_muted(gbs::AudioChannel::Sfx, true);
+    assert(!gbs::play_sfx(cue));
+    const gbs::PcmAsset invalid = { nullptr, 0, 31536, false };
+    const gbs::SfxAsset invalid_cue = { nullptr, 0, &invalid };
+    assert(!gbs::is_valid_sfx_asset(invalid_cue));
+    assert(!gbs::play_sfx(invalid_cue));
+    gbs::audio_init();
+}
+
 int main() {
+    test_pcm_backed_native_cues_keep_stop_and_validation_contract();
     test_imported_sample_notes_sustain_between_rows();
     test_prepared_gain_matches_live_mixing_and_falls_back_exactly();
     test_native_word_mixer_preserves_unaligned_samples_and_short_loops();

@@ -4320,7 +4320,17 @@ def emit_audio_header(name, data, base_dir):
     wav_conversions = {}
     pcm_data_symbols = {}
     sfx_asset_names = []
+    pcm_sfx_aliases = []
     for asset_index, asset in enumerate(sfx_assets):
+        if "pcm" in asset:
+            reference = asset["pcm"]
+            if not isinstance(reference, str) or reference not in [item.get("name") for item in pcm_assets]:
+                raise SystemExit(f"SFX PCM inexistente: {reference}")
+            symbol = f"{name}_{asset.get('name', f'sfx_{asset_index}')}_sfx_proxy"
+            volume = require_int(asset.get("pcm_volume", 15), "pcm_volume", 0, 15)
+            sfx_asset_names.append(symbol)
+            pcm_sfx_aliases.append((symbol, reference, volume))
+            continue
         tones = asset.get("tones", [])
         if not isinstance(tones, list) or not tones:
             raise SystemExit("cada SFX precisa conter ao menos um tone")
@@ -4568,6 +4578,9 @@ def emit_audio_header(name, data, base_dir):
             f"inline constexpr gbs::PcmAsset {symbol}_asset = {{ {symbol}_samples, {len(samples)}, {sample_rate}, {loop_literal}, {loop_start}, {loop_end} }};",
             "",
         ])
+
+    for symbol, reference, volume in pcm_sfx_aliases:
+        lines.append(f"inline constexpr gbs::SfxAsset {symbol}_asset = {{ nullptr, 0, &{name}_{reference}_asset, {volume} }};")
 
     lines.append(f"inline constexpr gbs::SfxAsset {name}_sfx_assets[{max(1, len(sfx_asset_names))}] = {{")
     for symbol in sfx_asset_names:

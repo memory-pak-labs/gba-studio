@@ -279,7 +279,7 @@ export function IsometricTacticalInspector({
       </div>
 
       <fieldset className="isometric-tactical-audio">
-        <legend>{ui("Áudio tático COMPOSED")}</legend>
+        <legend>{ui("Áudio tático")}</legend>
         <label><span>{ui("Música")}</span><input aria-label={ui("Música tática")} onChange={(event) => updatePresentation({ ...presentation, audio: { music: event.currentTarget.value, cues: { ...(presentation.audio?.cues ?? {}) } } })} placeholder={ui("music id")} value={presentation.audio?.music ?? ""} /></label>
         <div className="scene-feature-module-settings">
           {ISO_TACTICAL_AUDIO_CUES.map((cue) => (

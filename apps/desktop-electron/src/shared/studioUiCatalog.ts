@@ -2223,6 +2223,11 @@ export const studioUiMessages: Record<string, readonly [string, string, string]>
     "The {0} reference needs to declare kind {1}; received {2}.",
     "La referencia de {0} necesita declarar el {1} amable; recibió {2}."
   ],
+  "Formato de áudio tático incompatível: {0}.": [
+    "Formato de áudio tático incompatível: {0}.",
+    "Incompatible tactical audio format: {0}.",
+    "Formato de audio táctico incompatible: {0}."
+  ],
   "A referência {0} precisa usar format COMPOSED; formatos PCM/importados não são permitidos em tactical_audio.": [
     "A referência {0} precisa usar format COMPOSED; formatos PCM/importados não são permitidos em tactical_audio.",
     "Reference {0} must use COMPOSED format; PCM/imported formats are not allowed in tactical_audio.",
@@ -4253,10 +4258,10 @@ export const studioUiMessages: Record<string, readonly [string, string, string]>
     "Audio renamed to {0}.",
     "Audio renombrado a {0}."
   ],
-  "Áudio tático COMPOSED": [
-    "Áudio tático COMPOSED",
-    "COMPOSED tactical audio",
-    "Audio táctico COMPOSED"
+  "Áudio tático": [
+    "Áudio tático",
+    "Tactical audio",
+    "Audio táctico"
   ],
   "Aumenta ou reduz a definição das informações textuais.": [
     "Aumenta ou reduz a definição das informações textuais.",

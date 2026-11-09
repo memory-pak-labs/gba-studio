@@ -51,6 +51,7 @@ struct PcmPlayback {
     int8_t pan;
     uint16_t age;
     bool playing;
+    bool native_sfx = false;
 };
 
 struct AudioVolumeState {
@@ -279,6 +280,7 @@ void reset_pcm_playback(PcmPlayback& playback) {
     playback.pan = 0;
     playback.age = 0;
     playback.playing = false;
+    playback.native_sfx = false;
 }
 
 void reset_pcm_sfx_state() {
@@ -948,6 +950,7 @@ PcmPlayback* find_pcm_sfx_slot(uint8_t priority) {
 namespace gbs {
 
 bool is_valid_sfx_asset(const SfxAsset& asset) {
+    if (asset.pcm != nullptr) return asset.pcm_volume <= 15 && is_valid_pcm_asset(*asset.pcm);
     if (asset.tones == nullptr || asset.tone_count == 0) {
         return false;
     }
@@ -1175,6 +1178,16 @@ bool play_sfx(const SfxAsset& asset) {
     }
 
     [[maybe_unused]] const AudioStateLock lock;
+    if (asset.pcm != nullptr) {
+        if (pcm_sfx_muted) return false;
+        stop_sfx();
+        PcmPlayback* slot = find_pcm_sfx_slot(8);
+        if (slot == nullptr) return false;
+        start_pcm_playback(*slot, *asset.pcm, 8, asset.pcm_volume);
+        slot->native_sfx = true;
+        return true;
+    }
+    for (auto& voice : pcm_sfx) if (voice.native_sfx) reset_pcm_playback(voice);
     if (sfx.playing) stop_previous_sfx_channel_if_changed(sfx.tones[sfx.index], asset.tones[0]);
     sfx.tones = asset.tones;
     sfx.tone_count = asset.tone_count;
@@ -1186,6 +1199,7 @@ bool play_sfx(const SfxAsset& asset) {
 
 void stop_sfx() {
     [[maybe_unused]] const AudioStateLock lock;
+    for (auto& voice : pcm_sfx) if (voice.native_sfx) reset_pcm_playback(voice);
     reset_sfx_state();
     gbs_hw_audio_stop_square(1);
     gbs_hw_audio_stop_noise();
@@ -1275,6 +1289,7 @@ bool play_pcm_sfx(const PcmAsset& asset, const PcmSfxOptions& options) {
     }
 
     start_pcm_playback(*slot, asset, options.priority, options.volume, options.sample_rate_hz, options.pan);
+    slot->native_sfx = false;
     return true;
 }
 
@@ -1326,6 +1341,7 @@ void stop_all_pcm_sfx() {
 }
 
 bool audio_is_sfx_playing() {
+    for (const auto& voice : pcm_sfx) if (voice.native_sfx && voice.playing) return true;
     return sfx.playing;
 }
 
