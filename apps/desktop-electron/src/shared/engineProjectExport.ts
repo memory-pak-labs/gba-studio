@@ -1,3 +1,4 @@
+import { isPcmAudio, pcmInstrumentSource, pcmSfxConfig, renderPcmSfx } from "./audioPcm.js";
 import {deriveHudPresetsWorkspacePresentation} from "./hudPresets.js";
 import { usesSinglePlaneBackground } from "./eventTransforms.js";
 import { assertSpriteScaleBudget } from "./spriteScale.js";
@@ -1038,8 +1039,9 @@ export function deriveAudioEngineExportDiagnostics(audioItems: Record<string, un
         audioID,
         audioName,
         level: "ok",
-        message: kind === "SFX"
-          ? "Composição de SFX será exportada para assetc com uma voz."
+        message: isPcmAudio(audio)
+          ? kind === "SFX" ? "Efeito PCM será gerado pelo assetc e reproduzido pelo mixer da engine." : "Música PCM será exportada com até 16 faixas independentes."
+          : kind === "SFX" ? "Composição de SFX será exportada para assetc com uma voz."
           : "Composição tracker será exportada como patterns/order para runtime PSG da engine."
       });
     } else if (kind === "SFX" && format === "WAV") {
@@ -2856,7 +2858,7 @@ export interface AssetcAudioJsonDocument {
     loop?: boolean;
     row_duration_frames?: number;
     native_primary_volume?: number;
-    samples?: Array<{ asset_id: string; wav: string; loop: boolean }>;
+    samples?: Array<{ asset_id: string; wav?: string; samples?: number[]; sample_rate_hz?: number; loop: boolean }>;
     patterns?: Array<{
       steps: Array<{
         channel: number;
@@ -2880,6 +2882,8 @@ export interface AssetcAudioJsonDocument {
     name: string;
     sample_rate_hz?: number;
     wav?: string;
+    samples?: number[];
+    transform?: { duration_ms: number; trim_start_ms: number; pitch_semitones: number; attack_ms: number; release_ms: number };
     loop?: boolean;
   }>;
 }
@@ -3138,12 +3142,58 @@ function patternOrderIndices(audio: Record<string, unknown>, patterns: Record<st
   return order.length > 0 ? order : [0];
 }
 
+function compilePcmMusicaToTracker(audio: Record<string, unknown>, exportID: string): AssetcAudioJsonDocument["tracker"][number] | null {
+  const patterns = recordArray(audio, "patterns");
+  if (!patterns.length) return null;
+  const rowFrames = rowDurationFramesFromBpm(integerField(audio, "bpm", 120));
+  const master = Math.max(0, Math.min(100, integerField(audio, "volume", 80)));
+  const samples: NonNullable<AssetcAudioJsonDocument["tracker"][number]["samples"]> = [];
+  const sampleFor = (channel: Record<string, unknown>): number => {
+    const assetID = String(channel.sampleAssetID ?? "");
+    const instrument = stringField(channel, "instrument", "PCM Sine");
+    const key = assetID || `builtin:${instrument}`;
+    const loop = assetID ? channel.sampleLoop === true : pcmInstrumentSource(instrument).loop;
+    let index = samples.findIndex(s => s.asset_id === key && s.loop === loop);
+    if (index < 0) {
+      index = samples.length;
+      samples.push(assetID ? { asset_id: key, wav: `sample_${normalizeIdentifier(assetID, "instrument")}.wav`, loop }
+        : { asset_id: key, ...pcmInstrumentSource(instrument) });
+    }
+    return index;
+  };
+  const compiled = patterns.map(pattern => {
+    const channels = recordArray(pattern, "channels");
+    const steps: CompiledTrackerStep[] = [];
+    for (let row = 0; row < positiveSpriteInteger(pattern.steps, 64); row++) {
+      for (let index = 0; index < channels.length; index++) {
+        const channel = channels[index];
+        const raw = Array.isArray(channel.notes) ? channel.notes[row] : "";
+        const note = typeof raw === "string" ? raw : "";
+        const frequency = frequencyForEditorNote(note, "pcm");
+        const active = frequency > 0 && !channel.muted;
+        const envelope = trackerEnvelopeFrames(stringField(channel, "envelope", "Soft ADSR"), rowFrames);
+        steps.push({ channel: index + 1, frequency_hz: active ? frequency : 64,
+          duration_frames: index === channels.length - 1 ? rowFrames : 0,
+          volume: active ? trackerVolumeFromAudioVolume(Math.max(0, Math.min(100, integerField(channel, "volume", 65))) * master / 100) : 0,
+          duty: 0, attack_frames: active ? envelope.attack : 0, release_frames: active ? envelope.release : 0,
+          waveform: 0, note: active ? note : "---", sample_only: true, sample_index: sampleFor(channel),
+          sample_pitch_ratio: active ? frequency / (audioSampleRootFrequency(channel.sampleRootNote) ?? 262) : 1,
+          pan: Math.max(-127, Math.min(127, integerField(channel, "pan", 0))) });
+      }
+    }
+    return { steps };
+  });
+  return { name: exportID, loop: booleanField(audio, "loops", false), samples,
+    row_duration_frames: rowFrames, patterns: compiled, order: patternOrderIndices(audio, patterns) };
+}
+
 export function compileComposedMusicaToTracker(
   audio: Record<string, unknown>,
   exportID: string,
   data?: GBAProjectData
 ): AssetcAudioJsonDocument["tracker"][number] | null {
   if (data) audio = resolveAudioInstrumentComposition(data, audio);
+  if (isPcmAudio(audio)) return compilePcmMusicaToTracker(audio, exportID);
   const patterns = recordArray(audio, "patterns");
   if (patterns.length === 0) return null;
 
@@ -3613,6 +3663,22 @@ function buildAssetcAudioPackGenerationUncached(data: GBAProjectData): AssetcAud
     const kind = stringField(audio, "kind", "Audio");
     const exportID = normalizeIdentifier(stringField(audio, "exportID", name), `audio_${index + 1}`);
 
+    if (isPcmAudio(audio) && kind === "SFX") {
+      const config = pcmSfxConfig(audio.pcmSfx);
+      const entry: AssetcAudioJsonDocument["pcm"][number] = { name: exportID, sample_rate_hz: 31536, loop: booleanField(audio, "loops", false) };
+      if (config.source === "sample") {
+        const asset = projectArray(data, "assets").find(a => a.id === config.sampleAssetID);
+        if (!asset || !assetSource(asset)) throw new Error("PCM: sample WAV ausente na biblioteca do projeto.");
+        const wav = `sfx_sample_${normalizeIdentifier(String(asset.id), "sample")}.wav`;
+        entry.wav = wav;
+        entry.transform = { duration_ms: config.durationMs, trim_start_ms: config.trimStartMs, pitch_semitones: config.pitchSemitones, attack_ms: config.attackMs, release_ms: config.releaseMs };
+        if (!sourceCopies.some(c => c.output === `assets/audio/${wav}`)) sourceCopies.push({ id: String(asset.id), name: String(asset.name), kind: String(asset.kind), source: assetSource(asset)!, output: `assets/audio/${wav}` });
+      } else entry.samples = renderPcmSfx(config);
+      pcm.push(entry);
+      sfx.push({ name: exportID, pcm: exportID, pcm_volume: trackerVolumeFromAudioVolume(integerField(audio, "volume", 100)), tones: [] });
+      if (entry.samples) registerPhysicalAudioBytes(audio, index, entry.samples.length + 32 + 16);
+      return;
+    }
     if (audioItemHasComposedPatterns(audio)) {
       if (kind === "Musica") {
         const compiled = compileComposedMusicaToTracker(audio, exportID, data);
@@ -3620,6 +3686,7 @@ function buildAssetcAudioPackGenerationUncached(data: GBAProjectData): AssetcAud
           tracker.push(compiled);
           if (!compiled.samples?.length) registerPhysicalAudioBytes(audio, index, physicalBytesForCompiledTracker(compiled));
           for (const sample of compiled.samples ?? []) {
+            if (!sample.wav) continue;
             const asset = projectArray(data, "assets").find(asset => asset.id === sample.asset_id);
             if (!asset || !assetSource(asset)) throw new Error(`Sample WAV ausente: ${sample.asset_id}`);
             const output = `assets/audio/${sample.wav}`;

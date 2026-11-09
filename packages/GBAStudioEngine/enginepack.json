@@ -1252,6 +1252,7 @@
       "tracker_pcm_16_channels",
       "tracker_sample_sustain",
       "pcm_sfx_aliases",
+      "pcm_composer",
       "pcm_prepared_gain",
       "psg_square_sfx",
       "psg_noise_sfx",

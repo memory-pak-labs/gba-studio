@@ -320,3 +320,18 @@ O descritor compartilha os samples, sem duplicação de ROM. `play_sfx` substitu
 o efeito automático anterior; `stop_sfx` não interrompe PCM disparado diretamente
 por eventos. Texto de diálogo, tática, dungeon, luta e corrida usam o mesmo índice
 SFX para PSG e PCM. Recompile SDK e projetos ao usar este contrato.
+
+### Composição PCM autorada
+
+A capability `audio.pcm_composer` permite instrumentos do tracker declarados com
+`samples` (PCM8 assinado, 1–65535 valores), `sample_rate_hz` (4000–32768) e `loop`,
+além dos instrumentos WAV existentes. Steps `sample_only` mantêm os canais 1–16;
+vozes simultâneas não são remapeadas aos quatro canais PSG. O assetc prepara
+fontes multicanais para 31536 Hz preservando `sample_pitch_ratio` e o panorama.
+
+Um recurso `pcm` WAV pode declarar `transform` com `duration_ms` (10–2000),
+`trim_start_ms`, `pitch_semitones` (-24 a 24), `attack_ms` e `release_ms`.
+O recorte é aplicado antes da afinação; os fades usam a duração resultante.
+A mesma receita e o mesmo assetc devem ser usados pela prévia e pela exportação.
+SFX PCM compostos entram no registro SFX por alias `pcm`, preservando os cues
+nativos e o mixer da engine.

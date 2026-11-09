@@ -183,7 +183,64 @@ def test_pcm_native_cue_alias_compiles_and_rejects_missing_pcm():
             pass
 
 
+def test_authored_pcm_instruments_keep_all_sixteen_lanes_and_pitch():
+    with tempfile.TemporaryDirectory() as directory:
+        root = Path(directory)
+        sample = [int(math.sin(i * math.tau / 64) * 64) for i in range(64)]
+        steps = [{"channel": i + 1, "frequency_hz": 524, "duration_frames": 6 if i == 15 else 0,
+                  "volume": 5, "sample_only": True, "sample_index": 0, "sample_pitch_ratio": 2,
+                  "pan": -127 if i % 2 else 127} for i in range(16)]
+        doc = {"tracker": [{"name": "song", "samples": [{"samples": sample, "sample_rate_hz": 16768, "loop": True}],
+                "patterns": [{"steps": steps}], "order": [0]}]}
+        audio_json = root / "audio.json"
+        audio_json.write_text(json.dumps(doc))
+        first = ASSETC.pack_asset_source_fingerprint({"audio_json": "audio.json"}, root)
+        doc["tracker"][0]["samples"][0]["samples"][0] = 1
+        audio_json.write_text(json.dumps(doc))
+        assert first != ASSETC.pack_asset_source_fingerprint({"audio_json": "audio.json"}, root)
+        header = ASSETC.emit_audio_header("bank", doc, root)
+        assert "{ 16, 524, 6," in header, "lane 16 must remain PCM lane 16"
+        assert "31536" in header, "multichannel sources are prepared for the native mixer clock"
+        (root / "bank.hpp").write_text(header)
+        (root / "test.cpp").write_text('#include "bank.hpp"\n#include <cassert>\nint main(){ auto &step=bank_song_patterns[0].steps[15]; assert(step.channel==16 && step.sample_only); auto &sample=bank_song_asset.samples[step.sample_index]; assert(sample.sample_rate_hz==31536); assert(sample.loop_end_sample>0); }\n')
+        subprocess.run(["c++", "-std=c++17", "-I", str(ASSETC_PATH.parents[2] / "engine/include"), "-I", str(root), str(root / "test.cpp"), "-o", str(root / "test")], check=True)
+        subprocess.run([str(root / "test")], check=True)
+        doc["tracker"][0]["patterns"][0]["steps"][0]["channel"] = 17
+        try:
+            ASSETC.emit_audio_header("bank", doc, root)
+            assert False, "a seventeenth PCM lane must be rejected"
+        except SystemExit:
+            pass
+
+
+def test_authored_sample_sfx_trim_pitch_and_envelope():
+    rate = 31536
+    samples = [int(math.sin(i * math.tau * 220 / rate) * 90) for i in range(rate)]
+    config = {"duration_ms": 200, "trim_start_ms": 100, "pitch_semitones": 12, "attack_ms": 5, "release_ms": 20}
+    converted = ASSETC.transform_pcm_samples(samples, rate, config)
+    assert len(converted) == round(rate * .2)
+    assert converted[0] == converted[-1] == 0
+    assert max(converted) > 50 and min(converted) < -50
+    middle = converted[800:4800]
+    crossings = sum(a <= 0 < b for a, b in zip(middle, middle[1:]))
+    assert abs(crossings * rate / len(middle) - 440) < 12, crossings
+    with tempfile.TemporaryDirectory() as directory:
+        root = Path(directory)
+        write_pcm16(root / "input.wav", [v * 256 for v in samples], rate)
+        header = ASSETC.emit_audio_header("bank", {"pcm": [{"name": "hit", "wav": "input.wav", "sample_rate_hz": rate, "transform": config}], "sfx": [{"name": "hit", "pcm": "hit"}]}, root)
+        assert "bank_hit_samples[6307]" in header
+        assert "&bank_hit_asset" in header
+    try:
+        ASSETC.transform_pcm_samples(samples, rate, {**config, "duration_ms": 60000})
+        assert False, "unbounded authored SFX must be rejected"
+    except SystemExit:
+        pass
+
+
 if __name__ == "__main__":
+    test_authored_pcm_instruments_keep_all_sixteen_lanes_and_pitch()
+    test_authored_sample_sfx_trim_pitch_and_envelope()
+    test_pcm_native_cue_alias_compiles_and_rejects_missing_pcm()
     test_automatic_wav_conversion_matches_native_mixer_clock()
     test_audio_bank_is_shared_by_linked_cpp_translation_units()
     test_shared_wav_bank_deduplicates_conversion_and_pcm_without_stale_cache()

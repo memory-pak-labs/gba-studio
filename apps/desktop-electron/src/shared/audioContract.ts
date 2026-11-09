@@ -1,3 +1,4 @@
+import { isPcmAudio, pcmSfxConfig, pcmSfxErrors } from "./audioPcm.js";
 import { audioInstrumentBank, resolveAudioInstrumentChannel } from "./audioInstruments.js";
 import type { GBAProjectData } from "./projectFile.js";
 
@@ -26,7 +27,7 @@ export function audioPhysicalChannel(type: unknown): number | null {
 }
 
 export function audioComposed(audio: Record<string, unknown>): boolean {
-  return audioRecords(audio.patterns).length > 0 || audioRecords(audio.channels).length > 0;
+  return isPcmAudio(audio) && audio.kind === "SFX" || audioRecords(audio.patterns).length > 0 || audioRecords(audio.channels).length > 0;
 }
 
 export function audioSampleAssets(data: GBAProjectData): Record<string, unknown>[] {
@@ -60,13 +61,21 @@ export function audioContractIssues(audio: Record<string, unknown>, data?: GBAPr
     if (!supported.includes(format)) error(`Formato ${format || "desconhecido"} sem exportação de áudio suportada. Use ${supported.join(" ou ")}.`);
     return issues;
   }
+  const pcm = isPcmAudio(audio);
+  if (pcm && audio.kind === "SFX") {
+    const config = pcmSfxConfig(audio.pcmSfx);
+    for (const issue of pcmSfxErrors(config)) error(issue);
+    if (config.source === "sample" && data && !audioSampleAssets(data).some(a => a.id === config.sampleAssetID)) error("PCM: sample WAV ausente na biblioteca do projeto.");
+    return issues;
+  }
   const patterns = audioRecords(audio.patterns);
   const groups = patterns.length ? patterns : [{ channels: audio.channels, name: "Composição" }];
   for (const pattern of groups) {
     const channels = audioRecords(pattern.channels);
     const label = String(pattern.name ?? "Pattern");
-    const limit = audio.kind === "SFX" ? 1 : 4;
-    if (channels.length > limit) error(`${label}: o compositor ${audio.kind === "SFX" ? "de SFX aceita uma voz" : "PSG aceita até quatro vozes"}. Há ${channels.length} canais.`);
+    const limit = pcm ? 16 : audio.kind === "SFX" ? 1 : 4;
+    if (pcm && channels.length > limit) error(`${label}: o compositor PCM aceita até 16 canais.`);
+    if (!pcm && channels.length > limit) error(`${label}: o compositor ${audio.kind === "SFX" ? "de SFX aceita uma voz" : "PSG aceita até quatro vozes"}. Há ${channels.length} canais.`);
     const used = new Set<number>();
     for (const rawChannel of channels) {
       if (rawChannel.instrumentID && (!data || !audioInstrumentBank(data).some(item => item.id === rawChannel.instrumentID))) error(`${label}: instrumento compartilhado ausente no banco.`);
@@ -77,6 +86,7 @@ export function audioContractIssues(audio: Record<string, unknown>, data?: GBAPr
         if (data && !audioSampleAssets(data).some(asset => asset.id === channel.sampleAssetID)) error(`${label}: sample WAV ausente na biblioteca do projeto.`);
         if (!audioSampleRootFrequency(channel.sampleRootNote)) error(`${label}: nota original do sample inválida. Use C2 a B7.`);
       }
+      if (pcm) { if (channel.type !== "pcm") error(`${label}: escolha um canal PCM.`); continue; }
       const physical = audioPhysicalChannel(channel.type);
       if (!physical) error(`${label}: tipo de canal inválido em ${String(channel.name ?? channel.id ?? "canal")}.`);
       else if (!channel.muted) {

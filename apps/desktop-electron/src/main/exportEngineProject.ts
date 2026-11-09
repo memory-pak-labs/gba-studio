@@ -1,3 +1,4 @@
+import { isPcmAudio } from "../shared/audioPcm.js";
 import { isScaleEvent, parseScaleEvent, usesSinglePlaneBackground } from "../shared/eventTransforms.js";
 import { actorCommandReferences, sceneChangeCommand, sceneChangeCommandParts } from "../shared/sceneChangeCommand.js";
 import { parseEventInstruction, eventWaitFrames } from "../shared/eventExecutionContract.js";
@@ -11146,6 +11147,7 @@ function buildEngineExportProjectContractUncached(
     if (runtimeKind === "platformer") cameraZoneFeatures.add("platformer_runtime.platformer_camera_zones");
   });
   features.push(...cameraZoneFeatures);
+  if (projectArray(data, "audioItems").some(isPcmAudio)) features.push("audio.pcm_composer", "audio.tracker_pcm_16_channels", "audio.pcm_prepared_gain");
   if (audioPack?.document.sfx.some(asset => asset.pcm)) features.push("audio.pcm_sfx_aliases");
   if (audioPack?.document.tracker.some(asset => asset.mod || asset.s3m)) {
     features.push("audio.tracker_pcm_16_channels", "audio.pcm_prepared_gain", "audio.tracker_sample_sustain");

@@ -4249,7 +4249,10 @@ def prepare_multichannel_tracker_samples(patterns, source_samples, native_primar
             sample_index = step.get("sample_index", -1)
             if step.get("sample_only") and 0 <= sample_index < len(source_samples):
                 source = source_samples[sample_index]
-                rate = step.get("sample_rate_hz", 0) or source["sample_rate_hz"]
+                ratio = step.get("sample_pitch_ratio", 1)
+                if not isinstance(ratio, (int, float)) or not math.isfinite(ratio) or not 1 / 64 <= ratio <= 64:
+                    raise SystemExit("sample_pitch_ratio precisa estar entre 1/64 e 64")
+                rate = step.get("sample_rate_hz", 0) or round(source["sample_rate_hz"] * ratio)
                 volume = step["volume"]
                 key = (sample_index, rate, volume)
                 if key not in cache:
@@ -4294,10 +4297,41 @@ def prepare_multichannel_tracker_samples(patterns, source_samples, native_primar
                     prepared_samples.append(prepared_sample)
                 step["sample_index"] = cache[key]
                 step["sample_rate_hz"] = native_rate
-                step["volume"] = 15
+                step["volume"] = 15 if volume else 0
             prepared_steps.append(step)
         prepared_patterns.append({**pattern, "steps": prepared_steps})
     return prepared_patterns, prepared_samples
+
+
+def transform_pcm_samples(samples, sample_rate, config):
+    if not isinstance(config, dict):
+        raise SystemExit("transform PCM precisa ser um objeto")
+    duration = require_int(config.get("duration_ms", 300), "duration_ms", 10, 2000)
+    trim = require_int(config.get("trim_start_ms", 0), "trim_start_ms", 0, 60000)
+    attack = require_int(config.get("attack_ms", 0), "attack_ms", 0, 1000)
+    release = require_int(config.get("release_ms", 0), "release_ms", 0, 1000)
+    semitones = config.get("pitch_semitones", 0)
+    if not isinstance(semitones, (int, float)) or not math.isfinite(semitones) or not -24 <= semitones <= 24:
+        raise SystemExit("pitch_semitones precisa estar entre -24 e 24")
+    if attack + release > duration:
+        raise SystemExit("ataque e finalizacao precisam caber na duracao PCM")
+    start = round(trim * sample_rate / 1000)
+    if start >= len(samples):
+        raise SystemExit("inicio do recorte PCM esta depois do fim do sample")
+    ratio = 2 ** (semitones / 12)
+    count = min(round(duration * sample_rate / 1000), math.ceil((len(samples) - start) / ratio))
+    output = []
+    for index in range(count):
+        position = start + index * ratio
+        left = min(int(position), len(samples) - 1)
+        right = min(left + 1, len(samples) - 1)
+        value = samples[left] + (samples[right] - samples[left]) * (position - left)
+        gain_in = min(1, index * 1000 / sample_rate / attack) if attack else 1
+        gain_out = min(1, (count - 1 - index) * 1000 / sample_rate / release) if release else 1
+        output.append(max(-128, min(127, round(value * gain_in * gain_out))))
+    if output:
+        output[0] = output[-1] = 0
+    return output
 
 
 def emit_audio_header(name, data, base_dir):
@@ -4415,18 +4449,26 @@ def emit_audio_header(name, data, base_dir):
             patterns = asset.get("patterns", [])
             order = asset.get("order", [])
             for sample in asset.get("samples", []):
-                source_path = (base_dir / sample["wav"]).resolve()
-                if source_path not in wav_conversions:
-                    wav_conversions[source_path] = convert_wav_to_pcm8(source_path)
-                samples, rate, auto_start, auto_end = wav_conversions[source_path]
+                if "samples" in sample:
+                    samples = sample["samples"]
+                    if not isinstance(samples, list):
+                        raise SystemExit("instrumento PCM precisa conter uma lista de samples")
+                    samples = [require_int(value, "sample", -128, 127) for value in samples]
+                    rate = require_int(sample.get("sample_rate_hz"), "sample_rate_hz", 4000, 32768)
+                    auto_start, auto_end = 0, 0
+                else:
+                    source_path = (base_dir / sample["wav"]).resolve()
+                    if source_path not in wav_conversions:
+                        wav_conversions[source_path] = convert_wav_to_pcm8(source_path)
+                    samples, rate, auto_start, auto_end = wav_conversions[source_path]
                 if not samples or len(samples) > 65535:
                     raise SystemExit("instrumento WAV precisa conter de 1 a 65535 amostras PCM convertidas")
                 loop = bool(sample.get("loop", False))
                 tracker_samples.append({"samples": samples, "sample_rate_hz": rate,
                     "loop_start_sample": auto_start if loop and auto_end > auto_start else 0,
                     "loop_end_sample": (auto_end if auto_end > auto_start else len(samples)) if loop else 0})
-        if ("mod" in asset or "s3m" in asset) and any(
-                step["channel"] > 4 for pattern in patterns for step in pattern["steps"]):
+        if any(step.get("sample_only") and step["channel"] > 4
+               for pattern in patterns for step in pattern["steps"]):
             patterns, tracker_samples = prepare_multichannel_tracker_samples(patterns, tracker_samples, asset.get("native_primary_volume", 15))
         if not isinstance(patterns, list) or not patterns:
             raise SystemExit("cada tracker precisa conter ao menos um pattern")
@@ -4561,6 +4603,9 @@ def emit_audio_header(name, data, base_dir):
             sample_rate = require_int(target_sample_rate, "sample_rate_hz", 4000, 32768)
             auto_loop_start = 0
             auto_loop_end = 0
+        if "transform" in asset:
+            samples = transform_pcm_samples(samples, sample_rate, asset["transform"])
+            auto_loop_start, auto_loop_end = 0, 0
         loop, loop_start, loop_end = resolve_pcm_loop(asset, samples, auto_loop_start, auto_loop_end)
         loop_literal = "true" if loop else "false"
         lines.append(f"inline constexpr int8_t {symbol}_samples[{len(samples)}] = {{")
