@@ -14,6 +14,12 @@
     "capability_manifest"
   ],
   "properties": {
+    "rumble_cartridge": {
+      "type": "string",
+      "enum": ["none", "chisflash_v1_2"],
+      "default": "none",
+      "description": "Explicit cartridge profile. ChisFlash v1.2 remains experimental; no hardware autodetection."
+    },
     "audio_mixing_rate": {
       "type": "integer",
       "enum": [10512, 21024, 31536],

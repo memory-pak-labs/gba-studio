@@ -21600,6 +21600,9 @@ def emit_export_project(project_data, base_dir, output_dir):
     mixing_rate = project_data.get("audio_mixing_rate", 31536)
     if type(mixing_rate) is not int or mixing_rate not in (10512, 21024, 31536):
         raise SystemExit("Frequência de mixagem precisa ser 10512, 21024 ou 31536 Hz")
+    rumble_cartridge = project_data.get("rumble_cartridge", "none")
+    if rumble_cartridge not in ("none", "chisflash_v1_2"):
+        raise SystemExit("Perfil de vibração do cartucho inválido")
 
     contract = resolve_export_project_contract(project_data)
     template_dir = resolve_project_path(base_dir, project_data.get("template_dir", "."), "template_dir")
@@ -21876,6 +21879,20 @@ def emit_export_project(project_data, base_dir, output_dir):
         build_config["sources"] = list(dict.fromkeys([*sources, "save_type.cpp"]))
     elif selected_save_type != "sram":
         raise SystemExit("save_type precisa ser sram ou flash1m")
+
+    # Always overwrite/link this owned hook, including None, so re-exporting
+    # over a previously enabled project cannot retain a stale cartridge driver.
+    rumble_body = ""
+    if rumble_cartridge == "chisflash_v1_2":
+        rumble_body = "gbs::rumble_configure_cartridge(gbs::RumbleCartridge::ChisFlashV12);"
+    write_text_if_changed(output_dir / "rumble_config.cpp",
+        '#include "gbs/rumble.hpp"\nextern "C" void gbs_project_configure_rumble(void) { ' + rumble_body + ' }\n',
+        encoding="utf-8")
+    build_config = dict(build_config)
+    sources = build_config.get("sources", [])
+    if not isinstance(sources, list) or not all(isinstance(item, str) for item in sources):
+        raise SystemExit("build.sources precisa ser lista de strings")
+    build_config["sources"] = list(dict.fromkeys([*(sources or ["main.cpp"]), "rumble_config.cpp"]))
 
     # The SDK defaults to 31536; only a non-default project needs an override.
     if mixing_rate != 31536:

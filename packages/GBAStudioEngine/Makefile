@@ -580,6 +580,7 @@ host-test: rumble-cartridge-test
 rumble-cartridge-test: $(HOST_BUILD)/rumble_cartridge_tests
 	$(HOST_BUILD)/rumble_cartridge_tests
 	python3 tests/host/rumble_cartridge_boundary_tests.py
+	python3 tests/host/rumble_project_export_tests.py
 $(HOST_BUILD)/rumble_cartridge_tests: tests/host/rumble_cartridge_tests.cpp engine/src/rumble.cpp engine/src/rumble_cartridge.cpp engine/include/gbs/rumble.hpp
 	@mkdir -p $(@D)
 	$(HOST_CXX) $(HOST_CXXFLAGS) -Iengine/src $(filter %.cpp,$^) -o $@

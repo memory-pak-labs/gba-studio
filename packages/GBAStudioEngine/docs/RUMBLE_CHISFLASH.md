@@ -4,6 +4,12 @@ O SDK oferece um driver **experimental**, ativado explicitamente para a placa
 ChisFlash v1.2. Não é um driver genérico de GPIO, não detecta cartuchos e não
 executa escritas de controle no perfil padrão.
 
+No app, escolha **Exportar → Hardware GBA → Vibração do cartucho**.
+O padrão é **Desativada**. Escolher **ChisFlash v1.2 · experimental** instala
+o provider após inicializar cada runtime; os eventos Ligar, Desligar e Vibrar
+por quadros usam esse provider. A escolha é salva no projeto e não modifica
+o modelo original usado para criar a cópia.
+
 ```cpp
 gbs::init();
 gbs::rumble_configure_cartridge(gbs::RumbleCartridge::ChisFlashV12);
@@ -39,7 +45,10 @@ Não altera a configuração do gravador e não grava cartuchos automaticamente.
   símbolos na IWRAM e executa seleção, duração e desativação em uma ROM no mGBA.
 - O mGBA não comprova o acionamento desse motor. Ainda é necessário verificar
   ligar, desligar, duração, troca de cena e save no ChisFlash v1.2 em um GBA.
-- O uso autorado no editor/exportação é uma camada de integração separada.
+- `cartridgeRumble.test.ts`, `rumble_project_export_tests.py` e
+  `cartridgeRumbleRom.integration.test.ts` cobrem configuração, exportação e
+  ligação do hook. Reexportar como Desativada sobre a mesma pasta substitui
+  a configuração anterior, impedindo que um driver antigo continue ligado.
 
 O driver continua experimental até a validação na placa física. Outros
 cartuchos precisam de providers específicos e de identificação própria.

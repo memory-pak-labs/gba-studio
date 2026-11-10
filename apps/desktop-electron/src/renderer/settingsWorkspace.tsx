@@ -476,6 +476,7 @@ function settingControl(
       <label className="settings-edit-row" key={field.key} data-setting-key={field.key} data-setting-section={sectionID}>
         <span>{polishSettingsText(field.label)}</span>
         <select
+          aria-describedby={sectionID === "hardware" && field.key === "rumbleCartridge" ? "rumble-cartridge-description" : undefined}
           disabled={field.readOnly}
           onChange={(event) => onUpdateSetting(
             sectionID,
@@ -1331,6 +1332,7 @@ function SettingsSectionPanel({
           </div>
         ) : null}
         {section.id === "shortcuts" ? <p className="settings-controls-note">{ui("Estes atalhos são salvos neste projeto. Aparência, idioma do aplicativo e pacotes offline são preferências deste dispositivo.")}</p> : null}
+        {section.id === "hardware" ? <p className="settings-controls-note" id="rumble-cartridge-description">{section.editableFields.find(field => field.key === "rumbleCartridge")?.description}</p> : null}
         {section.id === "shortcuts" ? (
           <ShortcutSettingsPanel section={section} onUpdateSetting={onUpdateSetting} />
         ) : null}

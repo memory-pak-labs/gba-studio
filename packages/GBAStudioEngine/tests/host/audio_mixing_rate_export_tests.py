@@ -51,7 +51,7 @@ class MixingRateExportTests(unittest.TestCase):
                         if rate == 31536:
                             self.assertNotIn("audio_config.cpp", build["sources"])
                         else:
-                            self.assertEqual(build["sources"], (sources or ["main.cpp"]) + ["audio_config.cpp"])
+                            self.assertEqual(build["sources"], (sources or ["main.cpp"]) + ["rumble_config.cpp", "audio_config.cpp"])
                             self.assertIn(f"return {rate};", (output / "audio_config.cpp").read_text())
 
     def test_every_native_adapter_consumes_the_request_once(self):
