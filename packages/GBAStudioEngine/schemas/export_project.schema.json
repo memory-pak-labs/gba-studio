@@ -4103,7 +4103,8 @@
             { "type": "null" }
           ]
         },
-        "bitmap": { "type": ["object", "null"] }
+        "bitmap": { "type": ["object", "null"] },
+        "raster": {"type": "object", "properties": {"ripple": {"type": "object", "properties": {"enabled": {"type": "boolean"}, "layer": {"enum": ["BG1", "BG2", "BG3"]}, "amplitude": {"type": "integer", "minimum": 0, "maximum": 16}, "wavelength": {"type": "integer", "minimum": 8, "maximum": 160}, "speed": {"type": "integer", "minimum": 0, "maximum": 8}, "top": {"type": "integer", "minimum": 0, "maximum": 159}, "bottom": {"type": "integer", "minimum": 1, "maximum": 160}}, "additionalProperties": false}, "gradient": {"type": "object", "properties": {"enabled": {"type": "boolean"}, "from": {"type": "string", "pattern": "^#[0-9a-fA-F]{6}$"}, "to": {"type": "string", "pattern": "^#[0-9a-fA-F]{6}$"}, "top": {"type": "integer", "minimum": 0, "maximum": 158}, "bottom": {"type": "integer", "minimum": 2, "maximum": 160}}, "additionalProperties": false}}, "additionalProperties": false}
       },
       "additionalProperties": false
     },

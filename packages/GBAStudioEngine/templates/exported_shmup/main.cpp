@@ -829,6 +829,7 @@ void apply_background() {
     if (background == nullptr) {
         gbs::set_backdrop_color(gbs::rgb15(0, 0, 7));
         apply_scene_composition();
+        gbs::set_scene_raster_effects(gbs::SceneRasterEffects {}, gbs::DisplayMode::Mode0Text);
         return;
     }
     for (size_t layer_index = 0; layer_index < background->layer_count; ++layer_index) {
@@ -874,6 +875,7 @@ void apply_background() {
         background_affine_loaded = true;
     } else {
         apply_scene_composition();
+        gbs::set_scene_raster_effects(background->video.raster, background->video.display_mode);
         background_affine_loaded = project.composition.enabled && project.composition.video.affine_enabled;
     }
 }

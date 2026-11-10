@@ -48,6 +48,7 @@ uint16_t affine_upload_screenblock_base=24;
 uint32_t affine_screenblock_count_for_map_size(uint32_t size) { return size<4 ? (size<2?1: size==2?2:8) : 0; }
 void gbs_hw_enqueue_vblank_dma16(const void* from,volatile uint16_t* to,uint32_t words) { std::memcpy((void*)to,from,words*2); }
 ''' + selector + loader + commit + mode + r'''
+struct {uint8_t enabled;} scene_raster_tables[2];int scene_raster_active=0;
 uint16_t fake_palette[256]{}, fake_control=0, fake_ie=1, fake_status=8, fake_vcount=160;
 uint16_t shadow_bg_enabled_bits=0x500;
 uint8_t render_publication_blocked=0, render_handoff_fallback_active=0;
@@ -68,6 +69,7 @@ void commit_shadow_bg_scroll() {}
 void commit_hblank_bg_scroll() {}
 void commit_pcm_stream_block() {}
 void gbs_audio_vblank_update() {}
+void commit_scene_raster_frame() {}
 void gbs_emit_vblank_interrupt() {}
 ''' + backdrop + palette + fallback + wait + r'''
 int main() {

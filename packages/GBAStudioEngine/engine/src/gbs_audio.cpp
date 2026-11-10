@@ -153,6 +153,20 @@ public:
 #endif
 };
 
+// Observing all voices can span scanlines. Block audio/game mutations while
+// letting the hardware's bounded, audio-independent raster service continue.
+class AudioObserverLock {
+#if defined(__arm__) || defined(__thumb__)
+    uint32_t previous_;
+public:
+    AudioObserverLock() : previous_(gbs_hw_audio_lock_observer_state()) {}
+    ~AudioObserverLock() { gbs_hw_audio_unlock_observer_state(previous_); }
+#else
+public:
+    AudioObserverLock() = default;
+#endif
+};
+
 size_t audio_channel_index(gbs::AudioChannel channel) {
     return static_cast<size_t>(channel);
 }
@@ -1691,7 +1705,7 @@ uint32_t audio_pcm_submitted_block_count() {
 }
 
 AudioRuntimeUsage audio_runtime_usage() {
-    [[maybe_unused]] const AudioStateLock lock;
+    [[maybe_unused]] const AudioObserverLock lock;
     const PcmAsset* active_assets[PCM_MIXER_MAX_ACTIVE_VOICES] = {};
     size_t active_asset_count = 0;
     uint32_t pcm_source_bytes = 0;

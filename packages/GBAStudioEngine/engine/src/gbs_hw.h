@@ -21,6 +21,17 @@ enum {
     GBS_HW_HUD_COMPONENT_FOREGROUND_BAR = 5
 };
 
+typedef struct {
+    int16_t wave[256];
+    uint8_t line_phase[160];
+    uint16_t colors[160];
+    uint8_t enabled, layer, speed, top, bottom;
+} GbsSceneRasterTable;
+GbsSceneRasterTable* gbs_hw_begin_scene_raster_update(void);
+void gbs_hw_submit_scene_raster_update(void);
+void gbs_hw_reset_scene_raster(void);
+void gbs_hw_set_hblank_dispatch_required(int required);
+
 void gbs_hw_init(void);
 void gbs_hw_wait_vblank(void);
 typedef struct {
@@ -109,6 +120,8 @@ void gbs_hw_audio_stop_pcm(void);
 void gbs_hw_audio_start_pcm8_stream(uint32_t sample_rate_hz);
 void gbs_hw_audio_submit_pcm8_stream_block(const uint8_t* samples, uint32_t sample_count);
 uint16_t gbs_hw_audio_lock_state(void);
+uint32_t gbs_hw_audio_lock_observer_state(void);
+void gbs_hw_audio_unlock_observer_state(uint32_t previous);
 void gbs_hw_audio_unlock_state(uint16_t previous);
 void gbs_hw_audio_start_pcm8_stereo_stream(uint32_t sample_rate_hz);
 void gbs_hw_audio_submit_pcm8_stereo_stream_block(const uint8_t* left_samples, const uint8_t* right_samples, uint32_t sample_count);

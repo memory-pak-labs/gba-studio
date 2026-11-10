@@ -4474,7 +4474,7 @@ def assert_isometric_template_updates_surfaces_inside_vblank(repo_root):
 
 def assert_isometric_template_restores_backdrop_after_palette_upload(repo_root):
     template = (repo_root / "examples" / "isometric_basic" / "src" / "main.cpp").read_text(encoding="utf-8")
-    initial = template.split("    load_assets(room_data->video.affine_enabled ? room_data->video : project.video);", 1)[1].split("    for (size_t index = 0; index < max_actor_count", 1)[0]
+    initial = template.split("    load_assets(", 1)[1].split("    for (size_t index = 0; index < max_actor_count", 1)[0]
     changes = template.split("void consume_event_state(gbs::EventState& event_state) {", 1)[1].split("    consume_link_event_outputs(event_state);", 1)[0]
     assert "gbs::consume_event_palette_changes(" in changes
     for region in (initial, changes):

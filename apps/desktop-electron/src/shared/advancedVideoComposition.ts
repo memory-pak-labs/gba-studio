@@ -1,3 +1,4 @@
+import type { SceneRasterEffects } from "./sceneRasterEffects.js";
 import { parseGbaVideoMode, type GbaVideoModeId } from "./gbaVideoModes.js";
 import {
   affineMatrixForScenePresentation,
@@ -27,6 +28,7 @@ export interface AdvancedVideoComposition {
 }
 
 export interface ExportedAdvancedVideoComposition {
+  raster?: SceneRasterEffects;
   display_mode: GbaVideoModeId;
   affine: ({
     asset: string | null;

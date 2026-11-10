@@ -674,6 +674,7 @@
       "64x64"
     ],
     "render_runtime": [
+      "scene_raster_effects",
       "background_parallax",
       "visual_effect_controller",
       "visual_effect_target_layers",

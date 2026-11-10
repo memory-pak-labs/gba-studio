@@ -103,6 +103,16 @@ static uint8_t render_publication_blocked;
 static uint8_t render_handoff_fallback_active;
 static uint16_t shadow_display_mode;
 static uint16_t shadow_backdrop_color;
+static GbsSceneRasterTable scene_raster_tables[2] __attribute__((section(".ewram_bss")));
+static uint8_t scene_raster_active, scene_raster_staging, scene_raster_phase;
+static uint16_t scene_raster_base_x;
+static volatile uint8_t scene_raster_ready;
+static uint8_t hblank_dispatch_required;
+void gbs_hw_set_hblank_dispatch_required(int required) { hblank_dispatch_required = required != 0; }
+extern void gbs_scene_raster_interrupt_state(int enabled);
+static void commit_scene_raster_frame(void);
+static inline void apply_scene_raster_line(unsigned line) __attribute__((always_inline, target("arm")));
+
 static uint8_t shadow_bg_character_base[4];
 static uint8_t shadow_bg_character_base_pending_mask;
 static uint8_t shadow_bg_depth_mask;
@@ -233,6 +243,7 @@ static const uint16_t name_input_palette_colors[16] = {
 extern void gbs_emit_vblank_interrupt(void);
 extern void gbs_dispatch_hardware_interrupts(uint16_t hardware_mask);
 extern void gbs_hw_irq_entry(void);
+extern void gbs_hw_mix_audio_with_hblank(void);
 extern void gbs_bios_vblank_intr_wait(void);
 extern int gbs_bios_cpu_fast_set(const void* source, void* destination, uint32_t word_count, int fill);
 
@@ -272,12 +283,9 @@ static uint16_t interrupt_mask_for_source(int source) {
 
 extern void gbs_profiler_record_irq(uint32_t ticks) __attribute__((weak));
 
-void gbs_hw_irq_dispatch(void) {
-    uint16_t pending = (uint16_t)(REG_IF & REG_IE);
-    if (pending == 0) {
-        return;
-    }
-
+/* The once-per-frame audio/profiler path stays in ROM. Only scanline
+   dispatch needs IWRAM; this preserves the complete example's RAM budget. */
+static __attribute__((noinline)) void gbs_hw_irq_dispatch_slow(uint16_t pending) {
     const uint32_t profiler_start = gbs_hw_frame_counter_ticks();
     REG_IF = pending;
     BIOS_IRQ_FLAGS = (uint16_t)(BIOS_IRQ_FLAGS | pending);
@@ -287,13 +295,43 @@ void gbs_hw_irq_dispatch(void) {
     if ((pending & 1u) != 0) {
         if (window1_hblank_active) rearm_active_window1_hblank();
         else if (affine_hblank_enabled) rearm_active_affine_hblank();
+        commit_scene_raster_frame();
         commit_pcm_stream_block();
-        gbs_audio_vblank_update();
+        /* Mixing may extend into visible scanlines. The assembly wrapper
+           permits only the bounded raster service to preempt it, preserving
+           the IRQ context and using the system stack for nested work. */
+        if (scene_raster_tables[scene_raster_active].enabled && !hblank_dispatch_required && (REG_IE & 2u)) {
+            gbs_hw_mix_audio_with_hblank();
+        } else gbs_audio_vblank_update();
     }
     gbs_dispatch_hardware_interrupts(pending);
     const uint32_t irq_ticks = gbs_hw_frame_counter_ticks() - profiler_start;
     if (pending & 1u) frame_vblank_irq_ticks = irq_ticks;
     if (gbs_profiler_record_irq) gbs_profiler_record_irq(irq_ticks);
+}
+
+__attribute__((section(".iwram.irq_dispatch"), target("arm"), long_call))
+void gbs_hw_irq_dispatch(void) {
+    uint16_t pending = (uint16_t)(REG_IF & REG_IE);
+    if (pending == 0) {
+        return;
+    }
+
+    if ((pending & 2u) && scene_raster_tables[scene_raster_active].enabled) {
+        unsigned line = (unsigned)REG_VCOUNT + ((REG_DISPSTAT & 2u) != 0);
+        if (line == 228u) {
+            scene_raster_phase = (uint8_t)(scene_raster_phase + scene_raster_tables[scene_raster_active].speed);
+            scene_raster_base_x = shadow_bg_scroll_x[scene_raster_tables[scene_raster_active].layer];
+            line = 0;
+        }
+        if (line < 160u) apply_scene_raster_line(line);
+        if (pending == 2u && !hblank_dispatch_required) {
+            REG_IF = pending;
+            BIOS_IRQ_FLAGS = (uint16_t)(BIOS_IRQ_FLAGS | pending);
+            return;
+        }
+    }
+    gbs_hw_irq_dispatch_slow(pending);
 }
 
 static volatile uint16_t* bg_control_register(int layer) {
@@ -406,7 +444,8 @@ static void commit_shadow_bg_scroll(void) {
             continue;
         }
         volatile uint16_t* scroll = (volatile uint16_t*)(0x04000010 + layer * 4);
-        scroll[0] = shadow_bg_scroll_x[layer];
+        const GbsSceneRasterTable* raster = &scene_raster_tables[scene_raster_active];
+        if (!(raster->enabled & 1u) || raster->layer != layer) scroll[0] = shadow_bg_scroll_x[layer];
         scroll[1] = shadow_bg_scroll_y[layer];
     }
     shadow_bg_scroll_pending_mask = 0;
@@ -1008,6 +1047,46 @@ static void write_obj_square_tiles(void) {
     }
 }
 
+GbsSceneRasterTable* gbs_hw_begin_scene_raster_update(void) {
+    const uint16_t ime = gbs_hw_audio_lock_state();
+    scene_raster_ready = 0;
+    scene_raster_staging = scene_raster_active ^ 1u;
+    gbs_hw_audio_unlock_state(ime);
+    return &scene_raster_tables[scene_raster_staging];
+}
+void gbs_hw_submit_scene_raster_update(void) {
+    __asm__ volatile ("" ::: "memory");
+    scene_raster_ready = 1;
+}
+void gbs_hw_reset_scene_raster(void) {
+    const uint16_t ime = gbs_hw_audio_lock_state();
+    scene_raster_ready = 0;
+    scene_raster_tables[0].enabled = scene_raster_tables[1].enabled = 0;
+    scene_raster_phase = 0;
+    gbs_scene_raster_interrupt_state(0);
+    gbs_hw_audio_unlock_state(ime);
+}
+static inline void apply_scene_raster_line(unsigned line) {
+    const GbsSceneRasterTable* table = &scene_raster_tables[scene_raster_active];
+    if (table->enabled & 1u) {
+        int offset = 0;
+        if (line >= table->top && line < table->bottom) offset = table->wave[(uint8_t)(table->line_phase[line] + scene_raster_phase)];
+        REG16(0x04000010u + table->layer * 4u) = (uint16_t)(scene_raster_base_x + offset);
+    }
+    if (table->enabled & 2u) MEM_PALETTE[0] = table->colors[line];
+}
+static void commit_scene_raster_frame(void) {
+    if (scene_raster_ready && !render_publication_blocked && REG_VCOUNT >= 160u) {
+        const GbsSceneRasterTable* previous = &scene_raster_tables[scene_raster_active];
+        if (previous->enabled & 1u) REG16(0x04000010u + previous->layer * 4u) = shadow_bg_scroll_x[previous->layer];
+        if (previous->enabled & 2u) MEM_PALETTE[0] = shadow_backdrop_color;
+        scene_raster_active = scene_raster_staging;
+        scene_raster_ready = 0;
+        scene_raster_phase = 0;
+        gbs_scene_raster_interrupt_state(scene_raster_tables[scene_raster_active].enabled != 0);
+    }
+}
+
 void gbs_hw_init(void) {
     affine_upload_screenblock_base = affine_screenblock_base;
     shadow_display_mode = 0;
@@ -1119,6 +1198,7 @@ void gbs_hw_wait_vblank(void) {
     if ((REG_IE & (1u << 0)) == 0) {
         commit_pcm_stream_block();
         gbs_audio_vblank_update();
+        commit_scene_raster_frame();
         gbs_emit_vblank_interrupt();
     }
     frame_vblank_work_ticks = gbs_hw_frame_counter_ticks() - publication_start + frame_vblank_irq_ticks;
@@ -1190,6 +1270,7 @@ void gbs_hw_enable_interrupt_source(int source) {
     if (mask == 0) {
         return;
     }
+    const uint16_t previous_ime = REG_IME;
     REG_IME = 0;
     if (source == 0) {
         REG_DISPSTAT = (uint16_t)(REG_DISPSTAT | (1u << 3));
@@ -1200,7 +1281,7 @@ void gbs_hw_enable_interrupt_source(int source) {
     }
     REG_IF = mask;
     REG_IE = (uint16_t)(REG_IE | mask);
-    REG_IME = 1;
+    REG_IME = previous_ime;
 }
 
 void gbs_hw_disable_interrupt_source(int source) {
@@ -1209,6 +1290,7 @@ void gbs_hw_disable_interrupt_source(int source) {
         return;
     }
 
+    const uint16_t previous_ime = REG_IME;
     REG_IME = 0;
     REG_IE = (uint16_t)(REG_IE & ~mask);
     if (source == 0) {
@@ -1219,7 +1301,7 @@ void gbs_hw_disable_interrupt_source(int source) {
         REG_DISPSTAT = (uint16_t)(REG_DISPSTAT & ~(1u << 4));
     }
     REG_IF = mask;
-    REG_IME = 1;
+    REG_IME = previous_ime;
 }
 
 void gbs_hw_sio_normal8_init(int internal_clock) {
@@ -1319,7 +1401,7 @@ void gbs_hw_sio_close(void) {
 
 void gbs_hw_set_backdrop(uint16_t color) {
     shadow_backdrop_color = color;
-    MEM_PALETTE[0] = color;
+    if (!(scene_raster_tables[scene_raster_active].enabled & 2u)) MEM_PALETTE[0] = color;
 }
 
 uint16_t gbs_hw_get_backdrop(void) {
@@ -3212,6 +3294,25 @@ void gbs_hw_audio_start_pcm8_stream(uint32_t sample_rate_hz) {
     uint16_t reload = (uint16_t)(65536u - timer_ticks);
     REG16(TIMER_BASE + 1 * 4) = reload;
     REG16(TIMER_BASE + 1 * 4 + 2) = TIMER_ENABLE;
+}
+
+uint32_t gbs_hw_audio_lock_observer_state(void) {
+    const uint16_t ime = REG_IME;
+    REG_IME = 0;
+    const uint16_t ie = REG_IE;
+    if (scene_raster_tables[scene_raster_active].enabled && !hblank_dispatch_required) {
+        /* The bounded raster service never observes or mutates audio state. */
+        REG_IE = ie & 2u;
+        REG_IME = ime;
+    }
+    __asm__ volatile ("" ::: "memory");
+    return (uint32_t)ie | ((uint32_t)ime << 16);
+}
+void gbs_hw_audio_unlock_observer_state(uint32_t previous) {
+    REG_IME = 0;
+    __asm__ volatile ("" ::: "memory");
+    REG_IE = (uint16_t)previous;
+    REG_IME = (uint16_t)(previous >> 16);
 }
 
 uint16_t gbs_hw_audio_lock_state(void) {
