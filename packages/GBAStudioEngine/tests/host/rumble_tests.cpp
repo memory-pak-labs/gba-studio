@@ -60,6 +60,14 @@ void test_gpio_pin_config() {
     assert(!rumble_available());
 }
 
+void test_reinitialization_stops_the_previous_motor() {
+    rumble_set_provider(fake_provider);
+    rumble_on();
+    rumble_init();
+    assert(!motor_enabled);
+    assert(!rumble_active() && !rumble_available());
+}
+
 int main() {
     test_init();
     test_on_off();
@@ -67,5 +75,6 @@ int main() {
     test_on_for_zero();
     test_update_when_inactive();
     test_gpio_pin_config();
+    test_reinitialization_stops_the_previous_motor();
     return 0;
 }
