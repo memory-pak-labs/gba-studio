@@ -4638,6 +4638,7 @@ def compile_extended_tracker(r, song, duty=2):
         r.fail("velocidade, andamento ou volume inválido")
     samples, instruments, count = song["samples"], song["instruments"], song["channels"]
     remembered = [0] * count
+    channel_volumes, channel_pans = [None] * count, [None] * count
     patterns, elapsed = [], 0.0
     for pattern_index in song["order"]:
         pattern, events, origin = song["patterns"][pattern_index], [], round(elapsed)
@@ -4679,10 +4680,13 @@ def compile_extended_tracker(r, song, duty=2):
                         unsupported("mudança de instrumento, volume ou panorama sem nota")
                     continue
                 if note < 0:
+                    if instrument or volume is not None or effect in ((8, 12) if r.format == "XM" else (24,)):
+                        unsupported("instrumento, volume ou panorama junto de note-off/cut")
                     row_notes.append(tracker_sample_cut_note(samples, channel + 1, row_index, 1))
                     continue
                 if not remembered[channel]:
                     r.fail(f"{where}: nota sem instrumento")
+                reset_controls = bool(instrument) or channel_volumes[channel] is None
                 instrument = instruments[remembered[channel] - 1]
                 sample_index = instrument["map"][note]
                 if sample_index is None or not samples[sample_index]["samples"]:
@@ -4694,7 +4698,9 @@ def compile_extended_tracker(r, song, duty=2):
                     pan = instrument.get("pan")
                 if pan is None:
                     pan = song["pans"][channel]
-                gain_volume = sample["volume"]
+                gain_volume = sample["volume"] if reset_controls else channel_volumes[channel]
+                if not reset_controls:
+                    pan = channel_pans[channel]
                 if volume is not None:
                     if r.format == "XM" and volume <= 80:
                         gain_volume = volume - 16
@@ -4708,6 +4714,7 @@ def compile_extended_tracker(r, song, duty=2):
                     gain_volume = parameter
                 if effect == (8 if r.format == "XM" else 24):
                     pan = round((parameter / (255 if r.format == "XM" else 128) * 2 - 1) * 127)
+                channel_volumes[channel], channel_pans[channel] = gain_volume, pan
                 pan = round(pan * song.get("pan_separation", 1))
                 relative = instrument["note_map"][note] - (48 if r.format == "XM" else 60) + sample.get("transpose", 0)
                 rate = round(sample["sample_rate_hz"] * 2 ** (relative / 12))

@@ -177,6 +177,38 @@ class ExtendedTrackerTests(unittest.TestCase):
         with self.assertRaisesRegex(SystemExit, "linha 2.*0F00"):
             self.convert("xm", data)
 
+    def test_note_without_instrument_inherits_volume_and_pan(self):
+        data, _, _ = xm_fixture(channels=1)
+        data[345:350] = bytes([49, 1, 0x30, 8, 0])
+        data[350:355] = bytes([51, 0, 0, 0, 0])
+        steps = self.convert("xm", data)["patterns"][0]["steps"]
+        self.assertEqual([s["volume"] for s in steps[:2]], [8, 8])
+        self.assertEqual([s["pan"] for s in steps[:2]], [-127, -127])
+
+    def test_simple_it_instrument_mapping_and_control_memory(self):
+        data, sample, pattern = it_fixture((0,))
+        instrument = len(data)
+        data.extend(bytes(554))
+        data[instrument:instrument + 4] = b"IMPI"
+        data[instrument + 24], data[instrument + 25] = 128, 128
+        for note in range(120):
+            data[instrument + 64 + note * 2:instrument + 66 + note * 2] = bytes([note, 1])
+        struct.pack_into("<H", data, 34, 1)
+        struct.pack_into("<H", data, 44, 13)
+        struct.pack_into("<III", data, 193, instrument, sample, pattern)
+        with tempfile.TemporaryDirectory() as directory:
+            source = Path(directory) / "instrument.it"
+            source.write_bytes(data)
+            reader, song = ASSETC.read_it_tracker(source)
+            song["patterns"][0][1][0] = (62, 0, None, 0, 0)
+            song["pans"][0] = -127
+            steps = ASSETC.compile_extended_tracker(reader, song)["patterns"][0]["steps"]
+            self.assertEqual([s["volume"] for s in steps[:2]], [11, 11])
+            self.assertEqual([s["pan"] for s in steps[:2]], [-127, -127])
+        data[instrument + 304] = 1
+        with self.assertRaisesRegex(SystemExit, "instrumento 1.*envelope"):
+            self.convert("it", data)
+
 
 if __name__ == "__main__":
     unittest.main()
