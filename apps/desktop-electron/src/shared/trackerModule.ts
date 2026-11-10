@@ -1,5 +1,6 @@
 /** Native tracker cells stay native: editing a note never translates its effects to PSG/PCM recipes. */
-export type TrackerModuleFormat = "MOD" | "S3M";
+import { extendedNoteByte, parseXm, parseIt, writeExtendedModule } from "./extendedTrackerModule.js";
+export type TrackerModuleFormat = "MOD" | "S3M" | "XM" | "IT";
 export interface TrackerModuleCell {
   instrument: number;
   effect: number;
@@ -181,32 +182,38 @@ function parseS3m(bytes: Uint8Array, sourceSha256: string): TrackerModuleSong {
 export function parseTrackerModule(bytes: Uint8Array, format: TrackerModuleFormat, sourceSha256: string): TrackerModuleSong {
   if (bytes.byteLength > 8 * 1024 * 1024) throw new Error("Módulo excede o limite de 8 MiB para edição.");
   if (!/^[a-f0-9]{64}$/.test(sourceSha256)) throw new Error("Hash da fonte do módulo inválido.");
+  if (format === "XM") return parseXm(bytes, sourceSha256);
+  if (format === "IT") return parseIt(bytes, sourceSha256);
   return format === "MOD" ? parseMod(bytes, sourceSha256) : format === "S3M" ? parseS3m(bytes, sourceSha256) : (() => { throw new Error("Formato de módulo não suportado."); })();
 }
 
 export function validateTrackerModuleSong(song: TrackerModuleSong): void {
   const meta = song.trackerModule;
-  if (meta?.version !== 1 || !["MOD", "S3M"].includes(meta.format) || !/^[a-f0-9]{64}$/.test(meta.sourceSha256)) throw new Error("Dados do módulo editável inválidos.");
+  if (meta?.version !== 1 || !["MOD", "S3M", "XM", "IT"].includes(meta.format) || !/^[a-f0-9]{64}$/.test(meta.sourceSha256)) throw new Error("Dados do módulo editável inválidos.");
   integer(song.patterns?.length, 1, meta.format === "MOD" ? 128 : 256, "Quantidade de padrões");
   integer(meta.channelMap?.length, 1, 16, "Canais do módulo");
   if (new Set(meta.channelMap).size !== meta.channelMap.length) throw new Error("Mapa de canais duplicado.");
-  meta.channelMap.forEach(c => integer(c, 0, meta.format === "MOD" ? 15 : 31, "Canal físico"));
+  meta.channelMap.forEach(c => integer(c, 0, meta.format === "IT" ? 63 : meta.format === "S3M" ? 31 : 15, "Canal físico"));
   integer(song.patternOrder?.length, 1, meta.format === "MOD" ? 128 : 256, "Sequência");
   const ids = new Set(song.patterns.map(p => p.id));
   if (ids.size !== song.patterns.length || song.patternOrder.some(id => !ids.has(id))) throw new Error("Sequência referencia padrão ausente ou duplicado.");
   integer(song.bpm, 32, 255, "Andamento");
   for (const pattern of song.patterns) {
-    if (pattern.steps !== 64 || pattern.channels.length !== meta.channelMap.length) throw new Error("Módulos usam 64 linhas e o mesmo número de canais em cada padrão.");
+    integer(pattern.steps, meta.format === "XM" || meta.format === "IT" ? 1 : 64, meta.format === "IT" ? 1024 : meta.format === "XM" ? 256 : 64, "Linhas do padrão");
+    if (pattern.channels.length !== meta.channelMap.length) throw new Error("Padrões precisam ter o mesmo número de canais.");
     for (const channel of [...pattern.channels, ...Object.values(pattern.trackerHiddenChannels ?? {})]) {
-      if (!Array.isArray(channel.notes) || channel.notes.length !== 64 || !Array.isArray(channel.trackerCells) || channel.trackerCells.length !== 64) throw new Error("Células do módulo incompletas.");
-      for (let row = 0; row < 64; row++) {
+      if (!Array.isArray(channel.notes) || channel.notes.length !== pattern.steps || !Array.isArray(channel.trackerCells) || channel.trackerCells.length !== pattern.steps) throw new Error("Células do módulo incompletas.");
+      for (let row = 0; row < pattern.steps; row++) {
         const cell = channel.trackerCells[row]; const note = channel.notes[row];
         if (!cell) throw new Error("Célula do módulo ausente.");
         integer(cell.instrument, 0, meta.format === "MOD" ? 31 : Math.min(255, meta.instruments.length), "Número do instrumento");
         integer(cell.effect, 0, meta.format === "MOD" ? 15 : 255, "Comando"); integer(cell.parameter, 0, 255, "Parâmetro");
         if (cell.volume !== undefined) integer(cell.volume, 0, 255, "Coluna de volume");
         if (meta.format === "MOD") { if (note !== cell.sourceNote) trackerNotePeriod(note); }
-        else if (note !== cell.sourceNote) s3mNoteByte(note);
+        else if (note !== cell.sourceNote) {
+          if (meta.format === "XM" || meta.format === "IT") extendedNoteByte(note, meta.format);
+          else s3mNoteByte(note);
+        }
       }
     }
   }
@@ -214,13 +221,14 @@ export function validateTrackerModuleSong(song: TrackerModuleSong): void {
 function playbackShape(song: TrackerModuleSong): string {
   return JSON.stringify({ channelMap: song.trackerModule.channelMap, bpm: song.bpm,
     order: song.patternOrder.map(id => song.patterns.findIndex(p => p.id === id)),
-    patterns: song.patterns.map(p => ({ channels: p.channels.map(c => ({ notes: c.notes, cells: c.trackerCells })), hidden: p.trackerHiddenChannels })) });
+    patterns: song.patterns.map(p => ({ steps: p.steps, channels: p.channels.map(c => ({ notes: c.notes, cells: c.trackerCells })), hidden: p.trackerHiddenChannels })) });
 }
 const align16 = (n: number) => Math.ceil(n / 16) * 16;
 export function writeTrackerModule(original: Uint8Array, song: TrackerModuleSong): Uint8Array {
   validateTrackerModuleSong(song);
   const source = parseTrackerModule(original, song.trackerModule.format, song.trackerModule.sourceSha256);
   if (playbackShape(source) === playbackShape(song)) return Uint8Array.from(original);
+  if (song.trackerModule.format === "XM" || song.trackerModule.format === "IT") return writeExtendedModule(original, song);
   const count = song.trackerModule.channelMap.length;
   if (song.trackerModule.format === "MOD") {
     const originalChannels = modChannels(original); const originalPatterns = Math.max(...source.trackerModule.originalOrders) + 1;
