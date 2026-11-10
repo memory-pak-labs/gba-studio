@@ -1245,6 +1245,34 @@ void test_imported_sample_notes_sustain_between_rows() {
     gbs::audio_init();
 }
 
+void test_tracker_pcm_controls_preserve_phase_through_silence_and_pitch_changes() {
+    const int8_t data[] = { 10, 20, 30, 40, 50 };
+    const gbs::PcmAsset sample { data, 5, 31536, true };
+    const uint8_t order[] = { 0 };
+    gbs::TrackerStep steps[4] {};
+    for (auto& step : steps) {
+        step = { 1, 440, 1, 15, 2 };
+        step.sample_only = true; step.sample_index = 0; step.sample_rate_hz = 31536;
+        step.sample_continue = true;
+    }
+    steps[0].sample_continue = false; steps[0].duration_frames = 2;
+    steps[1].sample_gain = 128;
+    steps[2].sample_gain = 0;
+    steps[3].sample_rate_hz = 15768; steps[3].duration_frames = 8;
+    const gbs::TrackerPattern pattern { steps, 4 };
+    const gbs::TrackerAsset song { &pattern, 1, order, 1, false, &sample, 1, true };
+    gbs::audio_init(); assert(gbs::play_tracker_music(song));
+    gbs::audio_update(); assert(last_pcm_first_sample == 10);
+    gbs::audio_update(); assert(last_pcm_first_sample == 20); // sample 3, gain 128/255
+    gbs::audio_update(); assert(last_pcm_first_sample == 0);
+    assert(gbs::audio_runtime_usage().active_voice_count == 1); // zero envelope retains phase
+    gbs::audio_update(); assert(last_pcm_first_sample == 50); // sample 4, not a restarted sample 0
+    assert(last_pcm_samples[1] == 30); // half-rate interpolation crosses the loop boundary
+    auto invalid = steps[1]; invalid.sample_only = false;
+    assert(!gbs::is_valid_tracker_step(invalid));
+    gbs::audio_init();
+}
+
 void test_pcm_backed_native_cues_keep_stop_and_validation_contract() {
     const int8_t samples[1056] = { 70, -70, 30, -30 };
     const gbs::PcmAsset pcm = { samples, 1056, 31536, true };
@@ -1322,6 +1350,7 @@ void test_authored_pcm_rests_release_their_voice() {
 }
 
 int main() {
+    test_tracker_pcm_controls_preserve_phase_through_silence_and_pitch_changes();
     test_authored_pcm_rests_release_their_voice();
     test_pcm_native_cues_preserve_psg_tracker_channels();
     test_pcm_backed_native_cues_keep_stop_and_validation_contract();

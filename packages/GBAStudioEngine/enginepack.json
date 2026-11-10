@@ -1253,6 +1253,7 @@
       "tracker_sample_sustain",
       "tracker_xm_pcm_profile",
       "tracker_it_pcm_profile",
+      "tracker_pcm_controls",
       "pcm_sfx_aliases",
       "pcm_composer",
       "pcm_prepared_gain",

@@ -73,6 +73,7 @@ describe("Audio runtime/export smoke", () => {
     expect(contract.requires.features).toContain("audio.pcm_prepared_gain");
     expect(contract.requires.features).toContain("audio.tracker_sample_sustain");
     if (format === "XM" || format === "IT") expect(contract.requires.features).toContain(`audio.tracker_${format.toLowerCase()}_pcm_profile`);
+    if (format === "XM" || format === "IT") expect(contract.requires.features).toContain("audio.tracker_pcm_controls");
     const generated = buildAssetcAudioPackGeneration(project)!;
     expect(generated.document.tracker).toContainEqual(expect.objectContaining({ [format.toLowerCase()]: expect.any(String), native_primary_volume: 12 }));
     expect(JSON.stringify(project)).toBe(before);

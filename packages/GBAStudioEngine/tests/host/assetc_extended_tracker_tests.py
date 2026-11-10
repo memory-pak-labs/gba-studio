@@ -77,6 +77,19 @@ def it_fixture(channels=(0, 4, 63), rows=7, pcm16=False):
 
 
 class ExtendedTrackerTests(unittest.TestCase):
+    def test_preparation_keeps_one_sample_basis_for_live_pitch_controls(self):
+        sample = {"samples": [0, 32, -32, 64, -64] * 8, "sample_rate_hz": 8363, "loop_start_sample": 0, "loop_end_sample": 40}
+        note = {"channel": 5, "frequency_hz": 440, "duration_frames": 2, "volume": 15, "duty": 2, "sample_only": True, "sample_index": 0, "sample_rate_hz": 8363, "sample_gain": 255}
+        control = dict(note, sample_continue=True, sample_rate_hz=9000, sample_gain=128)
+        prepared, samples = ASSETC.prepare_multichannel_tracker_samples([{"steps": [note, control]}], [sample])
+        steps = prepared[0]["steps"]
+        self.assertEqual(len(samples), 1)
+        self.assertEqual(steps[0]["sample_index"], steps[1]["sample_index"])
+        self.assertEqual(steps[1]["sample_rate_hz"], round(31536 * 9000 / 8363))
+        self.assertEqual(steps[1]["sample_gain"], 128)
+        header = ASSETC.emit_audio_header("live", {"tracker": [{"name": "song", "patterns": prepared, "order": [0], "samples": [dict(samples[0], loop=True)]}]}, Path("."))
+        self.assertIn(", true, 128 }", header)
+
     def convert(self, format, data):
         with tempfile.TemporaryDirectory() as directory:
             source = Path(directory) / f"authored.{format}"
