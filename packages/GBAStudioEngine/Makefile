@@ -579,6 +579,15 @@ $(HOST_BUILD)/multiplayer_tests: tests/host/multiplayer_tests.cpp engine/src/gbs
 	@mkdir -p $(@D)
 	$(HOST_CXX) $(HOST_CXXFLAGS) -Iengine/src $^ -o $@
 
+.PHONY: multiplayer-async-test
+host-test: multiplayer-async-test
+multiplayer-async-test: $(HOST_BUILD)/sio_multiplayer_async_tests
+	$(HOST_BUILD)/sio_multiplayer_async_tests
+	python3 tests/host/sio_multiplayer_boundary_tests.py
+$(HOST_BUILD)/sio_multiplayer_async_tests: tests/host/sio_multiplayer_async_tests.cpp engine/src/sio_multiplayer_async.h
+	@mkdir -p $(@D)
+	$(HOST_CXX) $(HOST_CXXFLAGS) -Iengine/src $< -o $@
+
 $(HOST_BUILD)/pseudo_3d_tests: tests/host/pseudo_3d_tests.cpp engine/src/pseudo_3d.cpp
 	@mkdir -p $(@D)
 	$(HOST_CXX) $(HOST_CXXFLAGS) $^ -o $@

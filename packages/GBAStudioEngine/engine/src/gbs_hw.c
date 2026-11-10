@@ -137,6 +137,7 @@ static uint8_t pending_window1_hblank_dirty;
 
 static volatile uint8_t hblank_dma_active_mask;
 static volatile uint8_t keypad_irq_pending;
+static void capture_multiplayer_async(void);
 static uint8_t pcm_dma_block_started;
 static uint32_t pcm_underrun_count;
 static const uint8_t* volatile pcm_pending_left;
@@ -289,6 +290,7 @@ static __attribute__((noinline)) void gbs_hw_irq_dispatch_slow(uint16_t pending)
     const uint32_t profiler_start = gbs_hw_frame_counter_ticks();
     REG_IF = pending;
     BIOS_IRQ_FLAGS = (uint16_t)(BIOS_IRQ_FLAGS | pending);
+    if (pending & 0x80u) capture_multiplayer_async();
     if ((pending & (1u << 12)) != 0) {
         keypad_irq_pending = 1;
     }
@@ -1354,6 +1356,73 @@ int gbs_hw_sio_normal32_transfer(uint32_t outgoing, int internal_clock, uint32_t
 
     *incoming = REG_SIODATA32;
     return 1;
+}
+
+#include "sio_multiplayer_async.h"
+
+static volatile GbsSioMultiplayerAsync sio_multiplayer_async;
+static uint8_t sio_multiplayer_async_active;
+static uint16_t sio_multiplayer_previous_serial_ie;
+#define SIO_MULTIPLAYER_REGS ((volatile GbsSioMultiplayerRegisters*)0x04000120)
+
+static void capture_multiplayer_async(void) {
+    if (sio_multiplayer_async_active)
+        gbs_sio_multiplayer_async_capture(&sio_multiplayer_async, SIO_MULTIPLAYER_REGS);
+}
+
+int gbs_hw_sio_multiplayer_async_open(unsigned baud) {
+    if (baud > 3) return 0;
+    const uint16_t ime = REG_IME;
+    REG_IME = 0;
+    if (!sio_multiplayer_async_active) sio_multiplayer_previous_serial_ie = REG_IE & 0x80u;
+    sio_multiplayer_async_active = 1;
+    REG_RCNT = 0;
+    gbs_sio_multiplayer_async_reset(&sio_multiplayer_async, SIO_MULTIPLAYER_REGS, baud);
+    REG_IF = 0x80u;
+    REG_IE = (uint16_t)(REG_IE | 0x80u);
+    REG_IME = ime;
+    return 1;
+}
+
+int gbs_hw_sio_multiplayer_async_begin(uint16_t outgoing) {
+    if (!sio_multiplayer_async_active) return 0;
+    const uint16_t ime = REG_IME;
+    REG_IME = 0;
+    const int result = gbs_sio_multiplayer_async_begin(&sio_multiplayer_async, SIO_MULTIPLAYER_REGS, outgoing);
+    REG_IME = ime;
+    return result;
+}
+
+int gbs_hw_sio_multiplayer_async_poll(uint16_t received[4], uint8_t* player_id, uint8_t* connected_mask) {
+    if (!sio_multiplayer_async_active || !received || !player_id || !connected_mask) return -1;
+    const uint16_t ime = REG_IME;
+    REG_IME = 0;
+    /* Also consume a completion when the caller deliberately has IME off. */
+    if (REG_IF & 0x80u) {
+        capture_multiplayer_async();
+        REG_IF = 0x80u;
+    }
+    int result = 0;
+    if (sio_multiplayer_async.complete) {
+        result = sio_multiplayer_async.result;
+        for (unsigned i = 0; i < 4; ++i) received[i] = sio_multiplayer_async.received[i];
+        *player_id = sio_multiplayer_async.player_id;
+        *connected_mask = sio_multiplayer_async.connected_mask;
+        sio_multiplayer_async.complete = 0;
+    } else gbs_sio_multiplayer_async_try_start(&sio_multiplayer_async, SIO_MULTIPLAYER_REGS);
+    REG_IME = ime;
+    return result;
+}
+
+void gbs_hw_sio_multiplayer_async_close(void) {
+    if (!sio_multiplayer_async_active) return;
+    const uint16_t ime = REG_IME;
+    REG_IME = 0;
+    sio_multiplayer_async_active = 0;
+    REG_SIOCNT = REG_RCNT = 0;
+    REG_IF = 0x80u;
+    REG_IE = (uint16_t)((REG_IE & ~0x80u) | sio_multiplayer_previous_serial_ie);
+    REG_IME = ime;
 }
 
 int gbs_hw_sio_multiplayer_init(void) {
