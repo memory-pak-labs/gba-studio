@@ -246,6 +246,8 @@ enum class RuntimeKind : uint8_t {
 };
 
 struct EventCommand {
+    // SetVariable: d=1 selects a signed 32-bit literal assembled from c:b;
+    // d=0 retains the original signed 16-bit b operand.
     EventOp op;
     int16_t a;
     int16_t b;

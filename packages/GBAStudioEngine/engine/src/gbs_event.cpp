@@ -609,7 +609,12 @@ EventStepResult execute_event_command(
         break;
     case EventOp::SetVariable:
         if (is_valid_event_variable(command.a)) {
-            state.variables[command.a] = command.b;
+            // Extended literals retain the fixed 10-byte command/save layout.
+            // Signed high half * 65536 + unsigned low half is defined even at
+            // INT32_MIN; no signed shifts or overflowing intermediate values.
+            state.variables[command.a] = command.d == 1
+                ? static_cast<int32_t>(command.c) * 65536 + static_cast<uint16_t>(command.b)
+                : command.b;
         }
         break;
     case EventOp::PlaySfx:

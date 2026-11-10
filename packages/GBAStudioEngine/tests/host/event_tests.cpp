@@ -146,6 +146,23 @@ void test_ready_system_event_ops_update_runtime_state() {
     assert(state.player_bounce_frames == 20);
 }
 
+void test_extended_variable_literals_preserve_all_32_bits() {
+    gbs::EventState state {};gbs::init_event_state(state);
+    const gbs::EventCommand commands[] = {
+        {gbs::EventOp::SetVariable,0,-1,0,1},
+        {gbs::EventOp::SetVariable,1,0,-32768,1},
+        {gbs::EventOp::SetVariable,2,-1,32767,1},
+        {gbs::EventOp::SetVariable,3,32767,-1,1},
+        {gbs::EventOp::SetVariable,4,-1,0}
+    };
+    gbs::run_event_script(state,commands,5);
+    assert(state.variables[0]==65535);
+    assert(state.variables[1]==INT32_MIN);
+    assert(state.variables[2]==INT32_MAX);
+    assert(state.variables[3]==-32769);
+    assert(state.variables[4]==-1);
+}
+
 void test_bound_clock_restores_and_updates_saved_minutes() {
     gbs::EventState state {};
     gbs::init_event_state(state);
@@ -2361,6 +2378,7 @@ void test_decrement_one_crosses_zero_without_changing_other_variables() {
 }
 
 int main() {
+    test_extended_variable_literals_preserve_all_32_bits();
     test_audio_mixing_rate_request_validates_supported_rates();
     test_actor_scale_events_are_per_instance_and_interruptible();
     test_legacy_projectile_request_is_observable_before_another_launch();

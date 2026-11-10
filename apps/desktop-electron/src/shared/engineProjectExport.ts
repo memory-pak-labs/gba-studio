@@ -4,6 +4,7 @@ import { usesSinglePlaneBackground } from "./eventTransforms.js";
 import { assertSpriteScaleBudget } from "./spriteScale.js";
 import { memoizeEngineExport } from "./engineExportContext.js";
 import { sceneChangeCommandParts } from "./sceneChangeCommand.js";
+import { parseLinkCableCommand } from "./linkCableRuntime.js";
 import { spriteColorModeForSheet } from "./spriteColorDepth.js";
 import { decomposeGbaMetaspriteFrame } from "./gbaMetaspriteLayout.js";
 import { resolveAudioInstrumentComposition } from "./audioInstruments.js";
@@ -1441,6 +1442,18 @@ function compiledEventCommand(step: Record<string, unknown>, context: EventComma
       };
     case "multiplayer4_close":
       return { opcode: "MultiplayerClose", targetKind: "None", targetIndex: -1, arg0: 0, arg1: 0, operand: "", rawCommand, enabled };
+    case "multiplayer_queue_open":
+    case "multiplayer_queue_send":
+    case "multiplayer_queue_receive":
+    case "multiplayer_queue_status":
+    case "multiplayer_queue_close": {
+      const parsed = parseLinkCableCommand(rawCommand);
+      const opcodes: Record<string,string> = { multiplayer_queue_open: "MultiplayerQueueOpen", multiplayer_queue_send: "MultiplayerQueueSend", multiplayer_queue_receive: "MultiplayerQueueReceive", multiplayer_queue_status: "MultiplayerQueueStatus", multiplayer_queue_close: "MultiplayerQueueClose" };
+      return { opcode: opcodes[verb]!, targetKind: "None", targetIndex: -1,
+        arg0: parsed?.kind === "queue_open" ? parsed.players : 0,
+        arg1: parsed?.kind === "queue_open" ? parsed.baud : 0,
+        operand: parts.slice(1).join(" "), rawCommand, enabled };
+    }
     case "read_rtc":
       return {
         opcode: "ReadRtc",
@@ -1909,6 +1922,11 @@ enum class EventCommandOpcode {
     MultiplayerSetData,
     MultiplayerTransfer,
     MultiplayerGetData,
+    MultiplayerQueueOpen,
+    MultiplayerQueueSend,
+    MultiplayerQueueReceive,
+    MultiplayerQueueStatus,
+    MultiplayerQueueClose,
     Unknown
 };
 
@@ -2490,6 +2508,11 @@ void run_event_step(const gbastudio_project::EventStepData& step) {
     case gbastudio_project::EventCommandOpcode::MultiplayerSetData:
     case gbastudio_project::EventCommandOpcode::MultiplayerTransfer:
     case gbastudio_project::EventCommandOpcode::MultiplayerGetData:
+    case gbastudio_project::EventCommandOpcode::MultiplayerQueueOpen:
+    case gbastudio_project::EventCommandOpcode::MultiplayerQueueSend:
+    case gbastudio_project::EventCommandOpcode::MultiplayerQueueReceive:
+    case gbastudio_project::EventCommandOpcode::MultiplayerQueueStatus:
+    case gbastudio_project::EventCommandOpcode::MultiplayerQueueClose:
         // Preview records haptics/multiplayer intent; the GBA runtime drives GPIO/SIO.
         break;
     case gbastudio_project::EventCommandOpcode::AddVariable:

@@ -610,6 +610,8 @@ $(HOST_BUILD)/multiplayer_queue_tests: tests/host/multiplayer_queue_tests.cpp en
 host-test: multiplayer-event-test
 multiplayer-event-test: $(HOST_BUILD)/multiplayer_event_tests
 	$(HOST_BUILD)/multiplayer_event_tests
+	python3 tests/host/multiplayer_queue_export_tests.py
+	python3 tests/host/event_integer_export_tests.py
 $(HOST_BUILD)/multiplayer_event_tests: tests/host/multiplayer_event_tests.cpp engine/src/gbs_event.cpp engine/src/gbs_dialogue_locale.cpp $(HOST_EVENT_RUNTIME_SRCS) engine/include/gbs/event.hpp engine/include/gbs/multiplayer.hpp
 	@mkdir -p $(@D)
 	$(HOST_CXX) $(HOST_CXXFLAGS) $(filter %.cpp,$^) -o $@

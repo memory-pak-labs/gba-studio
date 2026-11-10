@@ -41,6 +41,40 @@ medidos em chamadas de update, portanto o jogo deve atualizar regularmente.
 `close` encerra a sessão, limpa suas filas e libera apenas o bit serial de IE,
 preservando os demais interrupt sources e o IME anterior.
 
+## Editor e roteiros
+
+Habilite **Link** em **Exportar → Runtime Universal**. Na biblioteca de eventos,
+em **Diversos → Multijogador**, estão disponíveis cinco ações de **Conexão com
+filas**:
+
+| Ação | Configuração e resultado |
+| --- | --- |
+| Abrir | 2–4 jogadores, velocidade do cabo e timeout de 1–600 quadros. |
+| Enviar mensagem | Lê uma variável (16 bits inferiores); escreve 1 na variável de aceitação quando enfileirou, ou 0 se fechado/cheio. Aceitação não significa entrega. |
+| Receber mensagem | Retira uma mensagem e escreve valor, remetente (0–3) e indicador 1 em variáveis distintas. Sem mensagem, escreve apenas o indicador 0. |
+| Consultar estado | Escreve estado (0 fechado, 1 conectando, 2 conectado, 3 recuperando), jogador local e quantidade de envios pendentes. |
+| Fechar | Limpa as filas e libera a conexão. |
+
+O serviço global é atualizado uma vez por quadro pela engine, inclusive durante
+esperas de eventos. Não exige um módulo separado em cada cena e preserva a fila
+durante a troca entre runtimes. A abertura da API raw encerra a conexão com filas;
+não misture os dois protocolos em uma partida.
+
+```text
+set_variable net.message 65535
+multiplayer_queue_open 2 115200 30
+multiplayer_queue_send net.message net.accepted
+multiplayer_queue_receive net.value net.sender net.received
+multiplayer_queue_status net.state net.local net.pending
+multiplayer_queue_close
+```
+
+O simulador de scripts representa a conexão sem cabo: pode aceitar um envio na
+fila, mas não inventa outro jogador, eco local ou confirmação de entrega. A ROM
+usa o transporte SIO real. O teste de exportação verifica os comandos e o valor
+65535 na memória da ROM; `SetVariable` preserva constantes assinadas de 32 bits
+sem alterar o tamanho do comando nativo.
+
 ## Limites
 
 - Todos os GBAs precisam executar este protocolo, com a mesma quantidade de
@@ -70,6 +104,7 @@ Em `apps/desktop-electron`,
 executa uma ROM no mGBA sem cabo: verifica avanço dos quadros, recuperação,
 retenção do envio e liberação de SIO. Remove sua compilação temporária ao sair.
 Entrega com múltiplas instâncias no mGBA e com GBAs físicos permanece uma
-validação separada. Esta API de SDK não acrescenta ainda controles ao editor.
+validação separada. O teste opt-in `multiplayerQueueRom.integration.test.ts`
+exporta os eventos do editor, compila e verifica a recuperação sem cabo no mGBA.
 
 Referência de registradores: [GBATEK, SIO Multi-Player Mode](https://mgba-emu.github.io/gbatek/#sio-multi-player-mode).

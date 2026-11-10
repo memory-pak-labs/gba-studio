@@ -1,9 +1,11 @@
 import { lutaEventVerbs } from "./lutaEventCommands.js";
+import { QUEUED_MULTIPLAYER_VERBS } from "./linkCableRuntime.js";
 
 export type NativeEventCommandExportHandling = "runtime" | "structural" | "editor-only";
 
 const nativeEventCommandExportHandlingByVerb = new Map<string, NativeEventCommandExportHandling>([
   ...lutaEventVerbs.map(verb => [verb, "runtime"] as const),
+  ...QUEUED_MULTIPLAYER_VERBS.map(verb => [verb, "runtime"] as const),
   ...([
     "set_actor_scale", "animate_actor_scale", "reset_actor_scale",
     "set_background_scale", "animate_background_scale", "reset_background_scale",

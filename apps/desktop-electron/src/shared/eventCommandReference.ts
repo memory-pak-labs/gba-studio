@@ -4244,6 +4244,86 @@ export const eventCommandAuthoring: Readonly<Record<string, EventCommandAuthorin
     },
     "adaptation": null
   },
+  "misc.multiplayer_queue_open": {
+    "title": "Conexão com filas: Abrir",
+    "category": "Diversos",
+    "section": "Multijogador",
+    "groups": [
+      {
+        "category": "Diversos",
+        "section": "Multijogador"
+      }
+    ],
+    "aliases": [
+      "Conexão com filas: Abrir"
+    ],
+    "reference": null,
+    "adaptation": null
+  },
+  "misc.multiplayer_queue_send": {
+    "title": "Conexão com filas: Enviar mensagem",
+    "category": "Diversos",
+    "section": "Multijogador",
+    "groups": [
+      {
+        "category": "Diversos",
+        "section": "Multijogador"
+      }
+    ],
+    "aliases": [
+      "Conexão com filas: Enviar mensagem"
+    ],
+    "reference": null,
+    "adaptation": null
+  },
+  "misc.multiplayer_queue_receive": {
+    "title": "Conexão com filas: Receber mensagem",
+    "category": "Diversos",
+    "section": "Multijogador",
+    "groups": [
+      {
+        "category": "Diversos",
+        "section": "Multijogador"
+      }
+    ],
+    "aliases": [
+      "Conexão com filas: Receber mensagem"
+    ],
+    "reference": null,
+    "adaptation": null
+  },
+  "misc.multiplayer_queue_status": {
+    "title": "Conexão com filas: Consultar estado",
+    "category": "Diversos",
+    "section": "Multijogador",
+    "groups": [
+      {
+        "category": "Diversos",
+        "section": "Multijogador"
+      }
+    ],
+    "aliases": [
+      "Conexão com filas: Consultar estado"
+    ],
+    "reference": null,
+    "adaptation": null
+  },
+  "misc.multiplayer_queue_close": {
+    "title": "Conexão com filas: Fechar",
+    "category": "Diversos",
+    "section": "Multijogador",
+    "groups": [
+      {
+        "category": "Diversos",
+        "section": "Multijogador"
+      }
+    ],
+    "aliases": [
+      "Conexão com filas: Fechar"
+    ],
+    "reference": null,
+    "adaptation": null
+  },
   "misc.rumble_on": {
     "title": "Rumble: Ligar",
     "category": "Diversos",

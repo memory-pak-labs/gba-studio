@@ -4037,8 +4037,24 @@ function appendRecognizedScript(
   if (verb === "advance_campaign") {
     return advancePreviewCampaign(state, eventName, command);
   }
-  const linkCommand = parseLinkCableCommand(command);
+  let linkCommand: ReturnType<typeof parseLinkCableCommand>;
+  try { linkCommand = parseLinkCableCommand(command); }
+  catch (error) { return updateDebug(appendLog(state,eventName,command,"skipped",error instanceof Error ? error.message : String(error))); }
   if (linkCommand) {
+    if (linkCommand.kind === "queue_open" || linkCommand.kind === "queue_send" || linkCommand.kind === "queue_receive" || linkCommand.kind === "queue_status" || linkCommand.kind === "queue_close") {
+      if (linkCommand.kind === "queue_open" && !state.runtimeCapabilities.capabilities.some(capability => capability.id === "link" && capability.enabled))
+        return updateDebug(appendLog(state,eventName,command,"skipped","Ative Link em Exportar → Runtime Universal para abrir uma conexão com filas."));
+      const linkCable = applyLinkCablePreviewCommand(state.linkCable ?? defaultLinkCablePreviewState(), command, key => Number(state.variables[key] ?? 0));
+      let next: PreviewRuntimeState = { ...state, linkCable };
+      if (linkCommand.kind === "queue_send") next = setRuntimeVariable(next,linkCommand.varAccepted,linkCable.queue.accepted ? 1 : 0);
+      if (linkCommand.kind === "queue_receive") next = setRuntimeVariable(next,linkCommand.varReceived,0);
+      if (linkCommand.kind === "queue_status") {
+        next = setRuntimeVariable(next,linkCommand.varState,linkCable.queue.state);
+        next = setRuntimeVariable(next,linkCommand.varPlayer,0);
+        next = setRuntimeVariable(next,linkCommand.varPending,linkCable.queue.pending.length);
+      }
+      return updateDebug(appendLog(next,eventName,command,"script","Simulação sem pares: envios permanecem na fila até a conexão real."));
+    }
     if (linkCommand.kind === "rumble_on" || linkCommand.kind === "rumble_on_for" || linkCommand.kind === "rumble_off") {
       const linkCable = applyLinkCablePreviewCommand(state.linkCable ?? defaultLinkCablePreviewState(), command);
       const nextState: PreviewRuntimeState = { ...state, linkCable };

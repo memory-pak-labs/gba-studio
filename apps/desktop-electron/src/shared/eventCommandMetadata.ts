@@ -3,6 +3,10 @@ import { TILE_REPLACEMENT_COLLISIONS } from "./tileReplacement.js";
 
 /** Authoring metadata only. Never rewrites a command or its serialized arguments. */
 const parameterLabels: Record<string, string[]> = {
+  multiplayer_queue_open: ["Jogadores", "Velocidade do cabo (bps)", "Tempo limite (quadros)"],
+  multiplayer_queue_send: ["Variável da mensagem", "Variável de aceitação"],
+  multiplayer_queue_receive: ["Variável da mensagem", "Variável do remetente", "Variável de recebimento"],
+  multiplayer_queue_status: ["Variável do estado", "Variável do jogador local", "Variável dos envios pendentes"],
   ...Object.fromEntries(scaleEventVerbs.map(verb => [verb, [verb.includes("actor") ? "Ator" : "Camada affine", ...(verb.startsWith("reset_") ? [] : ["Escala X (%)", "Escala Y (%)"]), ...(verb.startsWith("animate_") ? ["Duração (quadros)"] : [])]])),
   lantern: ["Ator", "Largura (pixels, 8–240)", "Altura (pixels, 8–160)", "Escuridão (0–100%)", "Duração (quadros, 1–3600)", "Formato opcional (circle)"],
   reveal_area: ["Ator", "Largura inicial (pixels, 8–240)", "Altura inicial (pixels, 8–160)", "Escuridão (0–100%)", "Duração (quadros, 1–3600)", "Formato opcional (circle)"],
@@ -61,6 +65,11 @@ const parameterLabels: Record<string, string[]> = {
 };
 
 const descriptions: Record<string, string> = {
+  multiplayer_queue_open: "Abre uma conexão para 2–4 jogadores sem bloquear o jogo. Ative Link em Exportar → Runtime Universal. Todos precisam usar a mesma velocidade e quantidade de jogadores. Reconexão preserva a fila; o estado da partida precisa ser sincronizado pelo jogo.",
+  multiplayer_queue_send: "Enfileira o valor de 16 bits da variável (0–65535). A variável de aceitação recebe 1 se entrou na fila ou 0 se estiver cheia/fechada. Aceitação não confirma entrega: a mensagem permanece pendente até todos os pares confirmarem.",
+  multiplayer_queue_receive: "Retira uma mensagem da fila e guarda seu valor e remetente (0–3). A variável de recebimento recebe 1 quando há mensagem; se não houver, recebe 0 e preserva valor/remetente. Use variáveis diferentes.",
+  multiplayer_queue_status: "Guarda o estado (0 fechada, 1 conectando, 2 conectada, 3 recuperando), o jogador local (0–3) e a quantidade de envios ainda sem confirmação. Sem cabo, a simulação não recebe nem confirma mensagens.",
+  multiplayer_queue_close: "Fecha a conexão e limpa suas filas de envio e recebimento. A porta fica disponível para outro modo de comunicação.",
   set_audio_mixing_rate: "Altera a saída PCM no próximo bloco de áudio, preservando a posição e a afinação das vozes ativas. 31.536 Hz é o padrão; taxas menores reduzem a banda de áudio e o custo de processamento. Não altera a conversão dos WAVs nem os canais PSG.",
   ...Object.fromEntries(scaleEventVerbs.map(verb => [verb, verb.includes("actor") ? "Aplica escala visual apenas à instância do ator (50–200%), preservando a colisão e a escala ao trocar a animação. A transição segue em paralelo; use Aguardar para encadear." : "Aplica escala relativa à composição affine inicial (50–400%) ou ao piso nativo da Corrida em perspectiva. A colisão permanece igual. A transição segue em paralelo; use Aguardar para encadear."])),
   lantern: "Ilumina uma área ao redor do ator e escurece o exterior. Acrescente circle após a duração para luz circular, com largura e altura iguais. Fades e máscaras têm prioridade; o círculo compartilha DMA0 com efeitos raster.",
@@ -135,6 +144,8 @@ export function eventCommandParameterLabel(verb: string, tokenIndex: number, fal
 }
 
 export function eventCommandParameterChoices(verb: string, tokenIndex: number): string[] | null {
+  if (verb === "multiplayer_queue_open" && tokenIndex === 1) return ["2", "3", "4"];
+  if (verb === "multiplayer_queue_open" && tokenIndex === 2) return ["9600", "38400", "57600", "115200"];
   if (verb === "set_audio_mixing_rate" && tokenIndex === 1) return ["10512", "21024", "31536"];
   if (scaleEventVerbs.some(v => v === verb && v.includes("background")) && tokenIndex === 1) return ["BG2", "BG3"];
   if ((verb === "replace_tile" && tokenIndex === 5) || (verb === "replace_tile_sequence" && tokenIndex === 6)) return TILE_REPLACEMENT_COLLISIONS;

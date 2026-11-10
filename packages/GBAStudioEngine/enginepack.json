@@ -1336,6 +1336,7 @@
       "runtime_audio_telemetry"
     ],
     "events": [
+      "variable_int32_literal",
       "named_animation_keys",
       "room_enter",
       "room_exit",
@@ -1441,6 +1442,11 @@
       "multiplayer_set_data",
       "multiplayer_transfer",
       "multiplayer_get_data",
+      "multiplayer_queue_open",
+      "multiplayer_queue_send",
+      "multiplayer_queue_receive",
+      "multiplayer_queue_status",
+      "multiplayer_queue_close",
       "launch_projectile",
       "launch_projectile_slot",
       "load_game",
