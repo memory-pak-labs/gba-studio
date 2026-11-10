@@ -102,7 +102,7 @@ int main(){
  checkpoint.scripts.queued[0].hash ^= 1; assert(!restore_cutscene_checkpoint(checkpoint));
 }
 '''
-sources=['gbs_event.cpp','gbs_dialogue_locale.cpp','gbs_runtime.cpp','gbs_rtc.cpp','gbs_link.cpp','rumble.cpp','deferred_work.cpp','gbs_engine_global.cpp','gbs_animation.cpp']
+sources=['gbs_event.cpp','gbs_dialogue_locale.cpp','gbs_runtime.cpp','gbs_rtc.cpp','gbs_link.cpp', 'gbs_multiplayer.cpp', 'gbs_multiplayer_events.cpp','rumble.cpp','deferred_work.cpp','gbs_engine_global.cpp','gbs_animation.cpp']
 with tempfile.TemporaryDirectory(prefix='cutscene-timing-') as tmp:
  p=Path(tmp);(p/'test.cpp').write_text(code)
  cmd=['c++','-std=c++17','-ffunction-sections','-fdata-sections','-I'+str(r/'engine/include'),str(p/'test.cpp')]+[str(r/'engine/src'/x) for x in sources]+[str(r/'tests/host/hw_stubs.cpp')]+['-Wl,-dead_strip' if sys.platform=='darwin' else '-Wl,--gc-sections','-o',str(p/'test')]

@@ -486,7 +486,8 @@
       "link_timeout",
       "link_queued_messages",
       "link_automatic_recovery",
-      "link_nonblocking_irq"
+      "link_nonblocking_irq",
+      "link_queued_events"
     ],
     "rumble": [
       "rumble_provider_opt_in",

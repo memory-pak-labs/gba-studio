@@ -72,4 +72,12 @@ bool multiplayer_queue_receive(MultiplayerQueue&, MultiplayerMessage&);
 uint8_t multiplayer_queue_pending_send(const MultiplayerQueue&);
 uint8_t multiplayer_queue_pending_receive(const MultiplayerQueue&);
 
+// Project-wide connection used by authored events. The core updates it once
+// per frame and rebinds it after runtime initialization without clearing queues.
+MultiplayerQueue& multiplayer_connection();
+bool multiplayer_open_connection(const MultiplayerConfig&);
+void multiplayer_close_connection();
+void multiplayer_resume_connection();
+void multiplayer_update_connection();
+
 } // namespace gbs

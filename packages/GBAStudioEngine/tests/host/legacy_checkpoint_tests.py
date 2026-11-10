@@ -149,7 +149,7 @@ int main() {{
 
 sources = ["engine/src/gbs_event.cpp", "engine/src/gbs_dialogue_locale.cpp", "engine/src/gbs_save.cpp",
            "engine/src/gbs_info.cpp", "engine/src/gbs_runtime_save_restore.cpp", "engine/src/gbs_runtime.cpp",
-           "engine/src/gbs_rtc.cpp", "engine/src/gbs_link.cpp", "engine/src/rumble.cpp",
+           "engine/src/gbs_rtc.cpp", "engine/src/gbs_link.cpp", "engine/src/gbs_multiplayer.cpp", "engine/src/gbs_multiplayer_events.cpp", "engine/src/rumble.cpp",
            "engine/src/deferred_work.cpp", "engine/src/gbs_engine_global.cpp", "tests/host/hw_stubs.cpp"]
 selected = sys.argv[1:] or list(codes)
 for kind in selected:

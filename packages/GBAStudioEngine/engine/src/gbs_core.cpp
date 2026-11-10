@@ -120,6 +120,7 @@ void init() {
     input_repeat_init(input_repeat_state());
     rumble_init();
     gbs_project_configure_rumble();
+    multiplayer_resume_connection();
     g_frame_count = 0;
     last_timing = FrameTiming {};
     current_context = FrameContext {};
@@ -143,6 +144,7 @@ void wait_vblank() {
         input_update_repeat(input_repeat_state(), current_context.input);
     }
     deferred_work_drain(deferred_work_queue());
+    multiplayer_update_connection();
     rumble_update();
     audio_update();
     render_scene_transition_visual_effects();

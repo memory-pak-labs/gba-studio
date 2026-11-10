@@ -18,23 +18,24 @@ let core;
 try {
   fs.writeFileSync(path.join(temporary,'main.cpp'),`#include "gbs/engine.hpp"
 extern "C" { volatile uint32_t queue_witness[13]={}; }
-static gbs::MultiplayerQueue connection;
+static gbs::EventState events;
 extern "C" int gbs_main() {
  gbs::init();
  const auto ie=*reinterpret_cast<volatile uint16_t*>(0x04000200);
  const auto ime=*reinterpret_cast<volatile uint16_t*>(0x04000208);
- gbs::MultiplayerConfig config;config.timeout_frames=4;config.retry_frames=2;
- queue_witness[8]=gbs::multiplayer_queue_open(connection,config);
- gbs::multiplayer_queue_send(connection,0xFFFF);
+ auto& connection=gbs::multiplayer_connection();gbs::init_event_state(events);
+ events.variables[0]=65535;
+ const gbs::EventCommand start[]={{gbs::EventOp::MultiplayerQueueOpen,2,3,4},{gbs::EventOp::MultiplayerQueueSend,0,1,0}};
+ gbs::run_event_script(events,start,2);queue_witness[8]=events.variables[1];
  for(unsigned frame=0;;++frame) {
   if(frame<120) {
-   gbs::multiplayer_queue_update(connection);
+   // Authored events use the project-wide service, updated by wait_vblank.
    queue_witness[1]=static_cast<unsigned>(connection.state);
    queue_witness[2]=gbs::multiplayer_queue_pending_send(connection);
    queue_witness[3]=connection.recoveries;
    queue_witness[4]=*reinterpret_cast<volatile uint16_t*>(0x04000200)&128;
   } else if(frame==120) {
-   gbs::multiplayer_queue_close(connection);
+   const gbs::EventCommand close{gbs::EventOp::MultiplayerQueueClose,0,0,0};gbs::run_event_script(events,&close,1);
    queue_witness[5]=(*reinterpret_cast<volatile uint16_t*>(0x04000200)==ie && *reinterpret_cast<volatile uint16_t*>(0x04000208)==ime);
    queue_witness[6]=static_cast<unsigned>(connection.state);
    queue_witness[7]=sizeof(connection);

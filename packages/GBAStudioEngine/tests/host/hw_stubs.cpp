@@ -7,6 +7,10 @@ void gbs_hw_sio_normal8_init(int) {}
 int gbs_hw_sio_normal8_transfer(uint8_t, int, uint32_t, uint8_t*) { return 0; }
 int gbs_hw_sio_normal32_transfer(uint32_t, int, uint32_t, uint32_t*) { return 0; }
 int gbs_hw_sio_multiplayer_init(void) { return 1; }
+int gbs_hw_sio_multiplayer_async_open(unsigned) { return 1; }
+int gbs_hw_sio_multiplayer_async_begin(uint16_t) { return 1; }
+int gbs_hw_sio_multiplayer_async_poll(uint16_t[4],uint8_t*,uint8_t*) { return 0; }
+void gbs_hw_sio_multiplayer_async_close(void) {}
 int gbs_hw_sio_multiplayer_transfer(uint16_t outgoing, uint32_t, uint16_t received[4],
                                     uint8_t* player_id, uint8_t* connected_mask) {
     if (received) for (int index = 0; index < 4; ++index) received[index] = outgoing;

@@ -1,8 +1,15 @@
 #include "gbs/multiplayer.hpp"
 #include "gbs_hw.h"
+#include <new>
 
 namespace gbs {
 namespace {
+alignas(MultiplayerQueue) unsigned char connection_storage[sizeof(MultiplayerQueue)]
+#if defined(__arm__)
+    __attribute__((section(".ewram_bss")))
+#endif
+;
+bool connection_constructed = false, connection_rebind = false;
 MultiplayerQueue* native_owner = nullptr;
 bool native_open(void* owner, MultiplayerBaud baud) {
     if (native_owner && native_owner != owner) return false;
@@ -241,5 +248,44 @@ bool multiplayer_queue_receive(MultiplayerQueue& q, MultiplayerMessage& message)
 }
 uint8_t multiplayer_queue_pending_send(const MultiplayerQueue& q) { return q.send_count; }
 uint8_t multiplayer_queue_pending_receive(const MultiplayerQueue& q) { return q.receive_count; }
+
+MultiplayerQueue& multiplayer_connection() {
+    if (!connection_constructed) {
+        // Placement construction in owned EWRAM; no heap and no nonzero data
+        // initializer in a NOLOAD section. The object survives mixed overlays.
+        new (connection_storage) MultiplayerQueue{};
+        connection_constructed = true;
+    }
+    return *reinterpret_cast<MultiplayerQueue*>(connection_storage);
+}
+
+bool multiplayer_open_connection(const MultiplayerConfig& config) {
+    connection_rebind = multiplayer_queue_open(multiplayer_connection(), config);
+    return connection_rebind;
+}
+
+void multiplayer_close_connection() {
+    multiplayer_queue_close(multiplayer_connection());
+    connection_rebind = false;
+}
+
+void multiplayer_resume_connection() {
+    if (active(multiplayer_connection())) connection_rebind = true;
+}
+
+void multiplayer_update_connection() {
+    auto& q = multiplayer_connection();
+    if (connection_rebind && active(q)) {
+        // Old raw-link close requests are consumed by the runtime before the
+        // core's frame update. Rebind after them, before starting queued I/O.
+        q.transport_ready = q.transport.open(q.transport.user_data, q.config.baud);
+        reset_stream(q);
+        q.connected_mask = q.acknowledged_mask = 0;
+        q.retry_left = q.transport_ready ? 0 : q.config.retry_frames;
+        q.state = q.ever_connected ? MultiplayerConnectionState::Recovering : MultiplayerConnectionState::Connecting;
+        connection_rebind = false;
+    }
+    multiplayer_queue_update(q);
+}
 
 } // namespace gbs

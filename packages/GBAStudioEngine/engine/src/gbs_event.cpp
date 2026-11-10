@@ -7,6 +7,8 @@ extern "C" __attribute__((weak)) void gbs_debug_record_event(const void*, unsign
 #include "gbs/dialogue.hpp"
 #include "gbs/link.hpp"
 #include "gbs/rumble.hpp"
+#include "gbs/multiplayer.hpp"
+#include "gbs/multiplayer_events.hpp"
 
 namespace gbs {
 
@@ -1204,21 +1206,28 @@ EventStepResult execute_event_command(
         state.player_bounce_frames = clamp_int(command.b, 1, 120);
         break;
     case EventOp::LinkHost:
+        multiplayer_close_connection();
         state.link_request = 1;
         state.link_script = command.a < 0 ? -1 : command.a;
         state.link_timeout_frames = clamp_int(command.b, 1, 600);
         break;
     case EventOp::LinkJoin:
+        multiplayer_close_connection();
         state.link_request = 2;
         state.link_script = command.a < 0 ? -1 : command.a;
         state.link_timeout_frames = clamp_int(command.b, 1, 600);
         break;
     case EventOp::LinkClose:
+        multiplayer_close_connection();
         state.link_request = 3;
         state.link_script = -1;
         state.link_timeout_frames = 0;
         break;
     case EventOp::LinkTransfer:
+        if (multiplayer_connection().state != MultiplayerConnectionState::Closed) {
+            state.link_last_transfer_ok = false;
+            break;
+        }
         state.link_request = 4;
         state.link_transfer_variable = clamp_int(command.a, 0, 15);
         state.link_transfer_value = clamp_int(command.b, 0, 255);
@@ -1570,16 +1579,29 @@ EventStepResult execute_event_command(
         rumble_off();
         break;
     case EventOp::MultiplayerOpen:
+        multiplayer_close_connection();
         multiplayer_open(state.multiplayer_session, static_cast<uint8_t>(clamp_int(command.a, 2, 4)));
         break;
     case EventOp::MultiplayerClose:
+        multiplayer_close_connection();
         multiplayer_close(state.multiplayer_session);
         break;
     case EventOp::MultiplayerSetData:
         multiplayer_set_data(state.multiplayer_session, static_cast<uint16_t>(command.a & 0xFFFF));
         break;
     case EventOp::MultiplayerTransfer:
+        if (multiplayer_connection().state != MultiplayerConnectionState::Closed) {
+            state.multiplayer_session.sync_ok = false;
+            break;
+        }
         multiplayer_transfer(state.multiplayer_session);
+        break;
+    case EventOp::MultiplayerQueueOpen:
+    case EventOp::MultiplayerQueueSend:
+    case EventOp::MultiplayerQueueReceive:
+    case EventOp::MultiplayerQueueStatus:
+    case EventOp::MultiplayerQueueClose:
+        execute_multiplayer_queue_event(state, command);
         break;
     case EventOp::MultiplayerGetData: {
         const uint8_t player_id = state.multiplayer_session.player_id;

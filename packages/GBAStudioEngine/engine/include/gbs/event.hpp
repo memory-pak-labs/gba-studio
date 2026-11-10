@@ -181,7 +181,12 @@ enum class EventOp : uint8_t {
     MoveActorRelative = 165,
     SetActorScale = 166,
     SetBackgroundScale = 167,
-    SetAudioMixingRate = 168
+    SetAudioMixingRate = 168,
+    MultiplayerQueueOpen = 169,
+    MultiplayerQueueSend = 170,
+    MultiplayerQueueReceive = 171,
+    MultiplayerQueueStatus = 172,
+    MultiplayerQueueClose = 173
 };
 
 enum class VisualEffectKind : uint8_t {
