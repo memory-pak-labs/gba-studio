@@ -39,7 +39,7 @@ describe("visual PCM composer", () => {
     if (kind === "song") fireEvent.click(screen.getByText("Editar sample WAV"));
     expect(screen.getByRole("region", { name: "Editor visual de WAV" })).toBeInTheDocument();
     if (kind === "song") {
-      fireEvent.click(screen.getByRole("button", { name: "Piano Roll", exact: true }));
+      fireEvent.click(screen.getByRole("button", { name: "Piano Roll" }));
       expect(screen.queryByRole("region", { name: "Editor visual de WAV" })).not.toBeInTheDocument();
       fireEvent.click(screen.getByRole("button", { name: "Editar sample WAV" }));
       expect(screen.getByRole("region", { name: "Editor visual de WAV" })).toBeInTheDocument();
