@@ -78,6 +78,16 @@ def it_fixture(channels=(0, 4, 63), rows=7, pcm16=False):
 
 
 class ExtendedTrackerTests(unittest.TestCase):
+    def test_native_live_pitch_uses_the_original_pcm_once(self):
+        sample = {"samples": [0, 32, -32, 64, -64] * 8, "sample_rate_hz": 8363, "loop_start_sample": 0, "loop_end_sample": 40}
+        note = {"channel": 5, "frequency_hz": 440, "duration_frames": 2, "volume": 15, "duty": 2, "sample_only": True, "sample_index": 0, "sample_rate_hz": 8363, "sample_gain": 255, "sample_linear_pan": True}
+        control = dict(note, sample_continue=True, sample_rate_hz=9000, sample_gain=128)
+        prepared, samples = ASSETC.prepare_multichannel_tracker_samples([{"steps": [note, control]}], [sample])
+        self.assertEqual(len(samples), 1)
+        self.assertEqual(samples[0]["samples"], sample["samples"])
+        self.assertEqual([s["sample_rate_hz"] for s in prepared[0]["steps"]], [8363, 9000])
+        self.assertEqual([s["sample_index"] for s in prepared[0]["steps"]], [0, 0])
+
     def test_preparation_keeps_one_sample_basis_for_live_pitch_controls(self):
         sample = {"samples": [0, 32, -32, 64, -64] * 8, "sample_rate_hz": 8363, "loop_start_sample": 0, "loop_end_sample": 40}
         note = {"channel": 5, "frequency_hz": 440, "duration_frames": 2, "volume": 15, "duty": 2, "sample_only": True, "sample_index": 0, "sample_rate_hz": 8363, "sample_gain": 255}

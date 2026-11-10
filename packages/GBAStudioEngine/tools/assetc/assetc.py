@@ -4246,6 +4246,19 @@ def prepare_multichannel_tracker_samples(patterns, source_samples, native_primar
     prepared_patterns = []
     cache = {}
     active_samples = {}
+    # Native XM/IT pitch controls must interpolate the original PCM once.
+    # Baking a note first and then changing its rate both repeats work in the
+    # mixer and applies two rounds of interpolation to the same signal.
+    live_pitch_channels, note_rates = set(), {}
+    for pattern in patterns:
+        for step in pattern["steps"]:
+            if not step.get("sample_only"):
+                continue
+            channel, rate = step["channel"], step.get("sample_rate_hz", 0)
+            if not step.get("sample_continue"):
+                note_rates[channel] = rate
+            elif step.get("sample_linear_pan") and rate and rate != note_rates.get(channel):
+                live_pitch_channels.add(channel)
     for pattern in patterns:
         prepared_steps = []
         for original in pattern["steps"]:
@@ -4257,6 +4270,19 @@ def prepare_multichannel_tracker_samples(patterns, source_samples, native_primar
                 if not isinstance(ratio, (int, float)) or not math.isfinite(ratio) or not 1 / 64 <= ratio <= 64:
                     raise SystemExit("sample_pitch_ratio precisa estar entre 1/64 e 64")
                 rate = step.get("sample_rate_hz", 0) or round(source["sample_rate_hz"] * ratio)
+                if step["channel"] in live_pitch_channels and 4000 <= source["sample_rate_hz"] <= 32768:
+                    basis = active_samples.get(step["channel"])
+                    if step.get("sample_continue") and (basis is None or basis[0] != sample_index):
+                        raise SystemExit("controle PCM sem nota anterior com o mesmo sample")
+                    key = ("live", sample_index)
+                    if key not in cache:
+                        cache[key] = len(prepared_samples)
+                        prepared_samples.append(dict(source))
+                    step["sample_index"] = cache[key]
+                    step["sample_rate_hz"] = rate
+                    active_samples[step["channel"]] = (sample_index, cache[key], rate)
+                    prepared_steps.append(step)
+                    continue
                 if step.get("sample_continue"):
                     basis = active_samples.get(step["channel"])
                     if basis is None or basis[0] != sample_index:
