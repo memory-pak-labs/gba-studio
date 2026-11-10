@@ -3,6 +3,7 @@ extern "C" __attribute__((weak)) void gbs_debug_record_event(const void*, unsign
 #include "gbs/event.hpp"
 #include "gbs/runtime.hpp"
 #include "gbs/assets.hpp"
+#include "gbs/audio.hpp"
 #include "gbs/dialogue.hpp"
 #include "gbs/link.hpp"
 #include "gbs/rumble.hpp"
@@ -1156,6 +1157,12 @@ EventStepResult execute_event_command(
         state.audio_mute_channel = clamp_int(command.a, 0, 4);
         state.audio_mute_enabled = command.b != 0;
         break;
+    case EventOp::SetAudioMixingRate:
+        if (is_valid_audio_mixing_rate(static_cast<uint32_t>(command.a))) {
+            state.audio_mixing_rate_changed = true;
+            state.audio_mixing_rate_hz = command.a;
+        }
+        break;
     case EventOp::SetAudioVolume:
         state.audio_volume_changed = true;
         state.audio_volume_channel = clamp_int(command.a, 0, 4);
@@ -1860,6 +1867,8 @@ void init_event_state(EventState& state) {
     state.audio_mute_changed = false;
     state.audio_mute_channel = 0;
     state.audio_mute_enabled = false;
+    state.audio_mixing_rate_changed = false;
+    state.audio_mixing_rate_hz = 31536;
     state.audio_volume_changed = false;
     state.audio_volume_channel = 0;
     state.audio_volume = 15;

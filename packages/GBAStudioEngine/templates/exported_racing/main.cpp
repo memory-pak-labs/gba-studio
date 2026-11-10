@@ -503,6 +503,10 @@ void consume_event_state() {
         );
         event_state.audio_mute_changed = false;
     }
+    if (event_state.audio_mixing_rate_changed) {
+        gbs::set_audio_mixing_rate(static_cast<uint32_t>(event_state.audio_mixing_rate_hz));
+        event_state.audio_mixing_rate_changed = false;
+    }
     if (event_state.audio_volume_changed) {
         gbs::set_audio_channel_volume(
             gbs::audio_channel_from_event_value(event_state.audio_volume_channel),

@@ -504,6 +504,38 @@ void test_tracker_timbre_envelope_and_sample_trigger_are_rendered() {
     assert(!gbs::audio_is_pcm_streaming());
 }
 
+void test_mixing_rate_changes_keep_the_source_cursor_and_pitch() {
+    static int8_t source[4096];
+    for (int i = 0; i < 4096; ++i) source[i] = static_cast<int8_t>((i * 37) % 121 - 60);
+    const gbs::PcmAsset sample {source,4096,8363,true,3,4096};
+    gbs::TrackerStep note {1,440,255,15,2}; note.sample_only=true; note.sample_index=0; note.sample_gain=32; note.sample_linear_pan=true; note.pan=20;
+    const uint8_t order[] = {0}; const gbs::TrackerPattern pattern {&note,1};
+    const gbs::TrackerAsset song {&pattern,1,order,1,false,&sample,1,true};
+    gbs::audio_init(); assert(gbs::audio_mixing_rate_hz()==31536);
+    assert(gbs::set_audio_channel_volume(gbs::AudioChannel::Music,12)); assert(gbs::play_tracker_music(song));
+    const uint32_t rates[] = {31536,21024,10512,31536,10512,21024,31536};
+    uint64_t position=0;
+    for (uint32_t rate : rates) {
+        assert(gbs::set_audio_mixing_rate(rate)); assert(gbs::audio_mixing_rate_hz()==rate);
+        for (int block=0;block<4;++block) {
+            gbs::audio_update(); const uint32_t count=rate/10512*176;
+            assert(gbs::audio_mixer_output_samples_per_frame()==count); assert(last_pcm_sample_count==count);
+            for (uint32_t i=0;i<count;++i) {
+                const uint32_t index=position>>16, next=index+1<4096?index+1:3;
+                int value=source[index]+(((source[next]-source[index])*static_cast<int32_t>(position&65535))>>16);
+                value=(value*32/255)*12/15;
+                assert(last_pcm_samples[i]==value*107/255); assert(last_pcm_right_samples[i]==value*148/255);
+                position+=(8363ull<<16)/rate;
+                if(position>=(4096ull<<16))position-=4093ull<<16;
+            }
+            assert(gbs::audio_runtime_usage().active_voice_count==1);
+        }
+    }
+    assert(!gbs::set_audio_mixing_rate(16000)); assert(gbs::audio_mixing_rate_hz()==31536);
+    assert(gbs::set_audio_mixing_rate(10512)); gbs::audio_init(true); assert(gbs::audio_mixing_rate_hz()==10512);
+    gbs::audio_init(); assert(gbs::audio_mixing_rate_hz()==31536);
+}
+
 void test_sample_instrument_uses_pcm_only_and_applies_envelope() {
     reset_hw_counts();
     gbs::audio_init();
@@ -1198,6 +1230,14 @@ void test_sixteen_sample_channels_mix_without_psg_or_aliasing() {
     assert(square_starts == 0 && wave_starts == 0 && noise_starts == 0);
     assert(gbs::play_pcm_sfx(sample, 8, 15));
     assert(gbs::audio_runtime_usage().active_voice_count == 17);
+    const uint32_t rates[] = {10512, 21024, 31536, 10512};
+    for (const uint32_t rate : rates) {
+        assert(gbs::set_audio_mixing_rate(rate));
+        gbs::audio_update();
+        assert(gbs::audio_runtime_usage().active_voice_count == 17);
+        assert(last_pcm_sample_count == rate / 10512 * 176);
+        assert(pcm_stream_starts == 1); // The active DMA stream is not restarted.
+    }
     assert(!gbs::play_pcm_sfx(sample, 7, 15));
     gbs::stop_tracker_music();
     assert(gbs::audio_runtime_usage().active_voice_count == 1);
@@ -1590,6 +1630,7 @@ void test_authored_pcm_rests_release_their_voice() {
 }
 
 int main() {
+    test_mixing_rate_changes_keep_the_source_cursor_and_pitch();
     test_prepared_mix_maps_match_the_scalar_path_through_pitch_and_gain_changes();
     test_long_prepan_map_matches_scalar_at_gain_pan_and_position_carry();
     test_sixteen_low_gain_modulated_voices_keep_the_frozen_output();

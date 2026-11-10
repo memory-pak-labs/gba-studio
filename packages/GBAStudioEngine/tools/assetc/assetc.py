@@ -10127,6 +10127,7 @@ def event_op_from_json(value):
         "set_background_palette": "SetBackgroundPalette",
         "set_sprite_palette": "SetSpritePalette",
         "mute_audio_channel": "MuteAudioChannel",
+        "set_audio_mixing_rate": "SetAudioMixingRate",
         "set_audio_volume": "SetAudioVolume",
         "fade_audio_volume": "FadeAudioVolume",
         "run_audio_routine": "RunAudioRoutine",
@@ -11235,6 +11236,11 @@ def event_command_from_json(command, description, animation_lookup=None, actor_a
             1 if event_bool(command, ["muted", "mute", "value", "enabled"], True) else 0,
             0,
         )
+    if op == "SetAudioMixingRate":
+        rate = command.get("rate")
+        if type(rate) is not int or rate not in (10512, 21024, 31536):
+            raise SystemExit("Frequência de mixagem precisa ser 10512, 21024 ou 31536 Hz")
+        return (op, rate, 0, 0)
     if op == "SetAudioVolume":
         return (
             op,
@@ -21553,6 +21559,10 @@ def emit_export_project(project_data, base_dir, output_dir):
     if backend != "gbastudio_engine":
         raise SystemExit("backend precisa ser gbastudio_engine")
 
+    mixing_rate = project_data.get("audio_mixing_rate", 31536)
+    if type(mixing_rate) is not int or mixing_rate not in (10512, 21024, 31536):
+        raise SystemExit("Frequência de mixagem precisa ser 10512, 21024 ou 31536 Hz")
+
     contract = resolve_export_project_contract(project_data)
     template_dir = resolve_project_path(base_dir, project_data.get("template_dir", "."), "template_dir")
     previous_asset_report = None
@@ -21828,6 +21838,18 @@ def emit_export_project(project_data, base_dir, output_dir):
         build_config["sources"] = list(dict.fromkeys([*sources, "save_type.cpp"]))
     elif selected_save_type != "sram":
         raise SystemExit("save_type precisa ser sram ou flash1m")
+
+    # The SDK defaults to 31536; only a non-default project needs an override.
+    if mixing_rate != 31536:
+        write_text_if_changed(output_dir / "audio_config.cpp",
+            '#include <stdint.h>\nextern "C" uint32_t gbs_project_audio_mixing_rate(void) { return ' + str(mixing_rate) + '; }\n',
+            encoding="utf-8",
+        )
+        build_config = dict(build_config)
+        sources = build_config.get("sources", [])
+        if not isinstance(sources, list) or not all(isinstance(item, str) for item in sources):
+            raise SystemExit("build.sources precisa ser lista de strings")
+        build_config["sources"] = list(dict.fromkeys([*(sources or ["main.cpp"]), "audio_config.cpp"]))
 
     manifest = {
         "schema": int(project_data.get("schema", 1)),

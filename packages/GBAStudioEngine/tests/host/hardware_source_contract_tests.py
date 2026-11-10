@@ -988,6 +988,18 @@ int main(void){dispatch();dispatch();assert(arms==2);assert(irq_ticks==2);assert
             self.event_source,
         )
 
+    def test_pcm_rate_switch_is_queued_with_its_block_and_resets_at_commit(self) -> None:
+        submit = function_body(self.source, "gbs_hw_audio_submit_pcm8_stereo_stream_block")
+        commit = function_body(self.source, "commit_pcm_stream_block")
+        for count in (176,352,528): self.assertIn(str(count)+"u",submit)
+        self.assertIn("pcm_pending_sample_count =",submit)
+        self.assertNotIn("gbs_hw_timer_stop",submit)
+        self.assertIn("pcm_pending_sample_count != pcm_stream_sample_count",commit)
+        self.assertIn("280896u / pcm_pending_sample_count",commit)
+        self.assertIn("gbs_hw_timer_stop(1)",commit)
+        self.assertIn("1u << 11",commit)
+        self.assertIn("1u << 15",commit)
+
     def test_pcm_mix_buffers_are_kept_in_ewram_on_arm(self) -> None:
         self.assertIn(
             '#define GBS_AUDIO_EWRAM __attribute__((section(".ewram_bss")))',

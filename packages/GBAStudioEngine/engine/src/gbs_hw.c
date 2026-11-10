@@ -132,6 +132,8 @@ static uint32_t pcm_underrun_count;
 static const uint8_t* volatile pcm_pending_left;
 static const uint8_t* volatile pcm_pending_right;
 static volatile uint8_t pcm_pending_ready;
+static volatile uint16_t pcm_pending_sample_count;
+static uint16_t pcm_stream_sample_count;
 static uint8_t pcm_stereo_stream;
 static uint8_t pcm_timer_running;
 static uint8_t pcm_stop_after_pending;
@@ -3225,8 +3227,8 @@ void gbs_hw_audio_unlock_state(uint16_t previous) {
 }
 
 void gbs_hw_audio_start_pcm8_stereo_stream(uint32_t sample_rate_hz) {
-    if (sample_rate_hz < 4000u) sample_rate_hz = 4000u;
-    if (sample_rate_hz > 32768u) sample_rate_hz = 32768u;
+    if (sample_rate_hz != 10512u && sample_rate_hz != 21024u && sample_rate_hz != 31536u) return;
+    pcm_stream_sample_count = (uint16_t)(sample_rate_hz / 10512u * 176u);
 
     volatile uint32_t* dma_a = (volatile uint32_t*)(DMA_BASE + 1 * 12);
     volatile uint32_t* dma_b = (volatile uint32_t*)(DMA_BASE + 2 * 12);
@@ -3272,11 +3274,12 @@ void gbs_hw_audio_submit_pcm8_stream_block(const uint8_t* samples, uint32_t samp
 }
 
 void gbs_hw_audio_submit_pcm8_stereo_stream_block(const uint8_t* left_samples, const uint8_t* right_samples, uint32_t sample_count) {
-    if (left_samples == 0 || right_samples == 0 || sample_count != 528u) return;
+    if (left_samples == 0 || right_samples == 0 || (sample_count != 176u && sample_count != 352u && sample_count != 528u)) return;
     const uint16_t ime = REG_IME;
     REG_IME = 0;
     pcm_pending_left = left_samples;
     pcm_pending_right = right_samples;
+    pcm_pending_sample_count = (uint16_t)sample_count;
     pcm_pending_ready = 1;
     pcm_stop_after_pending = 0;
     REG_IME = ime;
@@ -3304,6 +3307,16 @@ static void commit_pcm_stream_block(void) {
     if (pcm_dma_block_started && ((dma_a[2] & DMA_ENABLE) == 0u || (dma_b[2] & DMA_ENABLE) == 0u)) ++pcm_underrun_count;
     dma_a[2] = 0;
     dma_b[2] = 0;
+    if (pcm_pending_sample_count != pcm_stream_sample_count) {
+        // Commit the timer change with the corresponding buffer, never while
+        // the old frame is playing. Discard only its prefetched padding.
+        gbs_hw_timer_stop(1);
+        pcm_timer_running = 0;
+        REG_SOUNDCNT_H = (uint16_t)(REG_SOUNDCNT_H | (1u << 11) | (1u << 15));
+        REG_SOUNDCNT_H = (uint16_t)(REG_SOUNDCNT_H & ~((1u << 11) | (1u << 15)));
+        REG16(TIMER_BASE + 1 * 4) = (uint16_t)(65536u - 280896u / pcm_pending_sample_count);
+        pcm_stream_sample_count = pcm_pending_sample_count;
+    }
     dma_a[0] = (uint32_t)pcm_pending_right;
     dma_a[1] = (uint32_t)&REG_FIFO_A;
     dma_b[0] = (uint32_t)pcm_pending_left;

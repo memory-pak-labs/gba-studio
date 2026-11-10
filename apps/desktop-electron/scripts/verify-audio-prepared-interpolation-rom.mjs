@@ -19,10 +19,13 @@ const wasm = new WebAssembly.Module(wasmBytes);
 const hash = bytes => createHash('sha256').update(bytes).digest('hex');
 fs.mkdirSync(output, { recursive: true });
 execFileSync(python, [path.join(engine, 'tests/host/tracker_stress_fixtures.py'), output, '--pitch-channels', '16', '--sample-length', process.env.GBA_TRACKER_SAMPLE_LENGTH ?? '128']);
+const mixingRates = (process.env.GBA_AUDIO_MIXING_RATES ?? '31536').split(',').map(Number);
+assert.ok(mixingRates.length && mixingRates.every(rate => [10512, 21024, 31536].includes(rate)), 'supported mixing rates');
 const evidence = { passed: false, engineLibrarySha256: hash(fs.readFileSync(path.join(pack, 'lib/libgbastudio_engine.a'))), wasmSha256: hash(wasmBytes), cases: [] };
 try {
-  for (const format of ['xm', 'it']) {
-    const dir = path.join(output, format); fs.mkdirSync(dir, { recursive: true });
+  for (const format of ['xm', 'it']) for (const mixingRate of mixingRates) {
+    const outputCount = mixingRate / 10512 * 176;
+    const dir = path.join(output, mixingRates.length === 1 && mixingRate === 31536 ? format : `${format}-${mixingRate}`); fs.mkdirSync(dir, { recursive: true });
     fs.copyFileSync(path.join(output, `load-effects.${format}`), path.join(dir, `load-effects.${format}`));
     fs.writeFileSync(path.join(dir, 'audio.json'), JSON.stringify({ tracker: [{ name: 'song', [format]: `load-effects.${format}`, loop: true, native_primary_volume: 12 }] }));
     execFileSync(python, [path.join(pack, 'tools/assetc'), path.join(dir, 'audio.json'), '--audio-json', '-o', path.join(dir, 'song.hpp'), '--name', 'channels']);
@@ -40,6 +43,7 @@ try {
 extern "C" { volatile unsigned gain_witness[4] = {}; }
 extern "C" int gbs_main() {
     gbs::init();
+    gbs::set_audio_mixing_rate(${mixingRate});
     const bool prepared = (*reinterpret_cast<volatile uint16_t*>(0x04000130) & 1u) == 0;
     const auto& song = prepared ? channels_song_asset : scalar_song_asset;
     gbs::set_audio_channel_volume(gbs::AudioChannel::Music, 12);
@@ -64,7 +68,7 @@ extern "C" int gbs_main() {
     // This diagnostic reads private ARM state when the scalar reference
     // starves the game's telemetry. Fail if its layout needs refreshing.
     const trackerSymbol = symbols.split('\n').find(line => line.endsWith('::pcm_tracker'));
-    assert.equal(parseInt(trackerSymbol.trim().split(/\s+/)[1], 16), 16 * 32, 'private ARM voice array layout');
+    assert.equal(parseInt(trackerSymbol.trim().split(/\s+/)[1], 16), 16 * 36, 'private ARM voice array layout');
     const runs = [];
     for (const prepared of [false, true]) {
       const core = await createMGBA({ print() {}, printErr() {}, instantiateWasm(imports, done) { const instance = new WebAssembly.Instance(wasm, imports); done(instance); return instance.exports; } });
@@ -88,17 +92,17 @@ extern "C" int gbs_main() {
           // buffers remain readable, so compare both rather than dropping one.
           assert.ok(count - previous <= 2, 'both completed blocks remain resident');
           for (let completed = previous + 1; completed <= count && blocks.length < 360; ++completed) {
-            const pcm = Buffer.alloc(528 * 2);
+            const pcm = Buffer.alloc(outputCount * 2);
             const base = buffers + ((completed - 1) % 2) * 2 * (528 + 32);
-            for (let side = 0; side < 2; ++side) for (let sample = 0; sample < 528; sample += 2) pcm.writeUInt16LE(read16(base + side * (528 + 32) + sample), side * 528 + sample);
+            for (let side = 0; side < 2; ++side) for (let sample = 0; sample < outputCount; sample += 2) pcm.writeUInt16LE(read16(base + side * (528 + 32) + sample), side * outputCount + sample);
             blocks.push(pcm);
           }
           previous = count;
         }
-        console.log(JSON.stringify({format,prepared,blocks:blocks.length,gameFrames:read32(witness),accepted:read32(witness+12)}));
+        console.log(JSON.stringify({format,mixingRate,prepared,blocks:blocks.length,gameFrames:read32(witness),accepted:read32(witness+12)}));
         assert.equal(blocks.length, 360, 'six seconds of native mixer blocks');
         assert.equal(read32(witness + 12), 1, 'tracker accepted');
-        const voices = Array.from({ length: 16 }, (_, i) => read16(trackerVoices + i * 32 + 22) & 255).filter(Boolean).length;
+        const voices = Array.from({ length: 16 }, (_, i) => read16(trackerVoices + i * 36 + 22) & 255).filter(Boolean).length;
         assert.equal(voices, 16, 'all sixteen mixer voices remain active');
         assert.equal(read32(witness + 8), 0, 'no PCM underruns');
         runs.push({ prepared, frames: read32(witness), videoFrames, firstBlockFrame, blocks: Buffer.concat(blocks) });
@@ -106,8 +110,8 @@ extern "C" int gbs_main() {
     }
     assert.deepEqual(runs[1].blocks, runs[0].blocks, 'prepared intervals and scalar interpolation produce byte-identical PCM on ARM');
     assert.ok(runs[1].frames >= 350, 'prepared mixer sustains the isolated ROM cadence');
-    evidence.cases.push({ format, romSha256: hash(rom), pcmSha256: hash(runs[0].blocks), comparedBytes: runs[0].blocks.length, runs: runs.map(({ prepared, frames, videoFrames, firstBlockFrame }) => ({ prepared, frames, videoFrames, firstBlockFrame })) });
+    evidence.cases.push({ format, mixingRate, romSha256: hash(rom), pcmSha256: hash(runs[0].blocks), comparedBytes: runs[0].blocks.length, runs: runs.map(({ prepared, frames, videoFrames, firstBlockFrame }) => ({ prepared, frames, videoFrames, firstBlockFrame })) });
   }
   evidence.passed = true;
-  console.log('PASS: XM/IT prepared interpolation equals scalar ARM mixing; 16 modulated voices, 31536 Hz, cartridge timing configured');
+  console.log('PASS: XM/IT prepared interpolation equals scalar ARM mixing; 16 modulated voices at all selected mixing rates, cartridge timing configured');
 } finally { fs.writeFileSync(path.join(output, 'evidence.json'), JSON.stringify(evidence, null, 2) + '\n'); }

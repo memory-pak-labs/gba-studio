@@ -138,6 +138,14 @@ static_assert(sizeof(TrackerStep) == 36 && sizeof(TrackerPattern) == 8 && sizeof
 // The block is also a multiple of the FIFO DMA's 16-byte burst.
 constexpr uint32_t PCM_MIXER_SAMPLE_RATE_HZ = 31536;
 constexpr uint16_t PCM_MIXER_SAMPLES_PER_FRAME = 528;
+constexpr bool is_valid_audio_mixing_rate(uint32_t rate_hz) {
+    return rate_hz == 10512 || rate_hz == 21024 || rate_hz == 31536;
+}
+// Applied to the next mixed block; active voices keep their source cursor.
+bool set_audio_mixing_rate(uint32_t rate_hz);
+uint32_t audio_mixing_rate_hz();
+uint16_t audio_mixer_output_samples_per_frame();
+
 constexpr size_t PCM_MIXER_MAX_SFX_VOICES = 4;
 constexpr size_t TRACKER_MAX_SAMPLE_CHANNELS = 16;
 // Up to sixteen independent sample channels and one effect at full music load.

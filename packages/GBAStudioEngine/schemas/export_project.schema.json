@@ -14,6 +14,12 @@
     "capability_manifest"
   ],
   "properties": {
+    "audio_mixing_rate": {
+      "type": "integer",
+      "enum": [10512, 21024, 31536],
+      "default": 31536,
+      "description": "Frame-aligned Direct Sound output rate, independent of WAV conversion."
+    },
     "schema": {
       "type": "integer",
       "minimum": 1

@@ -65,7 +65,7 @@ O exportador futuro deve chamar `assetc` para gerar headers C++ com:
 - Spritesheets nos 12 formatos OBJ nativos do GBA entre `8x8` e `64x64`, emitidas como um OBJ por frame com `SpriteAnimation` quando `--sprite-width`/`--sprite-height` forem informados. `--sprite-bpp 4|8` seleciona a profundidade; em 8bpp o `destination_tile` precisa ser par, cada tile logico consome 64 bytes e dois indices fisicos, e a paleta deve usar o banco OBJ global 0. Dimensoes fora desses pares exigem decomposicao explicita em metasprite.
 - Audio PSG/tracker/PCM via JSON pequeno usando `assetc --audio-json`, gerando `SfxAsset`, `MusicAsset`, `TrackerAsset` e `PcmAsset`. `tracker[].mod` pode importar MOD ProTracker 4 canais subset para `TrackerAsset`, incluindo volume/finetune de sample, `0xy` arpeggio, `1xx`/`2xx` slides aproximados, `3xx` portamento aproximado, `4xy` vibrato aproximado, `7xy` tremolo aproximado, `Bxx` pattern jump, `Dxx` pattern break e efeitos basicos `Axy`/`Cxx`/`Fxx`, com `Fxx > 32` como BPM aproximado; `tracker[].s3m` pode importar S3M subset com notas, order table, volume de instrumento, volume column, `Axx`, `Bxx` pattern jump, `Cxx` pattern break, `Txx`, `Dxy`, slides aproximados `Exx`/`Fxx`, `Gxx` portamento aproximado, `Hxy` vibrato aproximado e `Rxy` tremolo aproximado; `tracker[].vgm` pode importar VGM SN76489 subset com writes PSG, waits basicos, mudancas de volume e noise channel, pulando Game Gear stereo byte e data blocks auxiliares. PCM Direct Sound continua assinado em 8 bits e `PcmSfxOptions::pan` distribui SFX entre FIFO A/B.
 - Instrumentos WAV do piano roll usam `tracker[].samples[]` (`asset_id`, `wav`, `loop`) e steps com `sample_index`, `sample_pitch_ratio` e `sample_only: true`. O sample toca no mixer PCM sem duplicar a nota em PSG; a nota original do WAV determina a transposição. A exportação exige a capability `audio.tracker_sample_instruments`. Samples precisam conter 1 a 65.535 amostras após conversão; WAVs longos são rejeitados.
-- No GBA, o relógio de áudio avança em VBlank independentemente dos frames de renderização. O mixer produz 528 amostras por frame a aproximadamente 31.536 Hz (timer de 532 ciclos), publica o bloco anterior antes de preparar o próximo e usa FIFO DMA com repetição. Mutações do playback são publicadas em seções críticas curtas; validação dos assets ocorre fora delas. `audio_update()` continua avançando um frame nos testes host.
+- No GBA, o relógio de áudio avança em VBlank independentemente dos frames de renderização. Por padrão, o mixer produz 528 amostras por frame a aproximadamente 31.536 Hz (timer de 532 ciclos); também aceita 21.024 Hz (352 amostras, 798 ciclos) e 10.512 Hz (176 amostras, 1.596 ciclos). O mixer publica o bloco anterior antes de preparar o próximo e usa FIFO DMA com repetição. Mutações do playback são publicadas em seções críticas curtas; validação dos assets ocorre fora delas. `audio_update()` continua avançando um frame nos testes host.
 - WAV PCM mono/stereo 8/16-bit pode ser referenciado por `pcm[].wav` relativo ao JSON exportado. Samples MOD ProTracker podem ser extraidos para `PcmAsset` com `pcm[].mod_sample` e `sample_index`; samples S3M 8/16-bit mono/stereo nao comprimidos podem ser extraidos com `pcm[].s3m_sample` e `instrument_index`, com downmix stereo para mono. `pcm[].loop_start_sample` e `pcm[].loop_end_sample` podem ser declarados pelo exportador; quando omitidos, loops nativos de samples MOD/S3M sao preservados automaticamente.
 
 Opcoes atuais relevantes:
@@ -372,7 +372,7 @@ longa não garante desempenho para qualquer timbre ou configuração.
 Um ganho global não preparado ou mapa que excede os limites usa o interpolador original. Alterações globais de volume continuam funcionando.
 O publicador usa escritas estéreo de quatro bytes somente quando o limite
 teórico de todas as vozes está na região identidade do limitador; nos demais
-casos mantém o limitador existente. A frequência permanece em 31536 Hz e todos
+casos mantém o limitador existente. A frequência padrão permanece em 31536 Hz e todos
 os canais permanecem independentes.
 
 O limite de 16 canais é de representação/vozes, não uma garantia de CPU para
@@ -469,3 +469,29 @@ O recorte é aplicado antes da afinação; os fades usam a duração resultante.
 A mesma receita e o mesmo assetc devem ser usados pela prévia e pela exportação.
 SFX PCM compostos entram no registro SFX por alias `pcm`, preservando os cues
 nativos e o mixer da engine.
+
+## Frequência de mixagem configurável
+
+A capability `audio.configurable_mixing_rate` oferece
+`gbs::set_audio_mixing_rate(hz)`, `gbs::audio_mixing_rate_hz()` e
+`gbs::audio_mixer_output_samples_per_frame()`. Valores aceitos: 10512, 21024 e
+31536. Uma solicitação inválida retorna `false` sem modificar o playback.
+Os tamanhos constantes `PCM_MIXER_*` continuam descrevendo o padrão e a
+alocação máxima; o getter informa o tamanho do bloco atual.
+
+`export_project.json.audio_mixing_rate` configura o início da ROM (padrão
+31536). O `assetc` gera `audio_config.cpp` e o inclui em `build.sources` para
+valores diferentes do padrão, inclusive na exportação mista. O hook C
+`gbs_project_audio_mixing_rate()` é resolvido no link e mantém 31536 para
+usos independentes do SDK. Não confundir com a taxa de conversão dos WAVs.
+
+O evento `set_audio_mixing_rate` recebe `rate` e gera `SetAudioMixingRate` (168).
+Todos os 13 adaptadores consomem a solicitação. Posições de origem e vozes são
+preservadas, e os passos são recalculados para a nova saída. Timer 1, FIFO A/B e
+DMA mudam juntos na publicação do bloco seguinte; a saída mantém um bloco por
+VBlank em todas as taxas. A configuração e o evento não afetam PSG.
+
+As taxas escolhidas mantêm blocos múltiplos de 16 e 280.896 ciclos por quadro.
+Referências de hardware: [GBATEK Direct Sound](https://mgba-emu.github.io/gbatek/#gbsoundfifoadirectsoundchannelafifodata)
+e [Tonc](https://gbadev.net/tonc/sndsqr.html). Butano é referência de capacidade;
+a troca ativa é uma implementação própria desta engine.
