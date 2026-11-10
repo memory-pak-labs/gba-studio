@@ -9,6 +9,24 @@ import { SceneCompositionInspector } from "./SceneCompositionInspector";
 describe("SceneCompositionInspector", () => {
   afterEach(() => cleanup());
 
+  it("authors waves and background gradients without editing raw scanline tables", () => {
+    const changed = vi.fn();
+    function Harness() {
+      const [value, setValue] = useState<SceneCompositionConfig>({ ...defaultSceneComposition(), enabled: true });
+      return <SceneCompositionInspector assetOptions={[]} onChange={next => { changed(next); setValue(next); }} sceneType="topdown" value={value} />;
+    }
+    render(<Harness/>);
+    expect(screen.getByLabelText("Prévia demonstrativa de ondulação e gradiente")).toHaveAttribute("width", "240");
+    fireEvent.click(screen.getByRole("checkbox", { name: /^Ondulação$/ }));
+    fireEvent.change(screen.getByRole("combobox", { name: "Camada da ondulação" }), { target: { value: "BG3" } });
+    fireEvent.click(screen.getByRole("checkbox", { name: /^Gradiente de fundo$/ }));
+    fireEvent.change(screen.getByLabelText("Cor inicial do gradiente"), { target: { value: "#204060" } });
+    const result = changed.mock.calls.at(-1)![0] as SceneCompositionConfig;
+    expect(result.effects.raster?.ripple).toMatchObject({ enabled: true, layer: "BG3" });
+    expect(result.effects.raster?.gradient).toMatchObject({ enabled: true, from: "#204060" });
+    expect(result.effects.hblank.enabled).toBe(false);
+  });
+
   it("mantém o modo tiled desabilitado até o opt-in explícito", () => {
     render(
       <SceneCompositionInspector
