@@ -48,7 +48,7 @@ const pitches = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"
 const emptyCell = (): TrackerModuleCell => ({ instrument: 0, effect: 0, parameter: 0 });
 const noteMidi = (note: string): number | null => {
   const match = /^([A-G]#?)([0-9])$/.exec(note);
-  return match ? (Number(match[2]) + 1) * 12 + pitches.indexOf(match[1]) : null;
+  return match && pitches.includes(match[1]) ? (Number(match[2]) + 1) * 12 + pitches.indexOf(match[1]) : null;
 };
 const midiNote = (midi: number): string => `${pitches[((midi % 12) + 12) % 12]}${Math.floor(midi / 12) - 1}`;
 export function trackerPeriodNote(period: number): string { return period ? midiNote(Math.round(60 + 12 * Math.log2(428 / period))) : "---"; }
@@ -155,8 +155,10 @@ function parseS3m(bytes: Uint8Array, sourceSha256: string): TrackerModuleSong {
     const pattern = makePattern(p, channelMap.length); const hidden: Record<string, TrackerModuleChannel> = {};
     const offset = h.data.getUint16(h.patternTable + p * 2, true) * 16;
     if (!offset) return pattern;
-    checked(bytes, offset, 2); const length = h.data.getUint16(offset, true); checked(bytes, offset + 2, length);
-    let cursor = offset + 2, row = 0; const end = cursor + length;
+    checked(bytes, offset, 2); const length = h.data.getUint16(offset, true);
+    if (length < 2) throw new Error("Tamanho de padrão S3M inválido.");
+    checked(bytes, offset, length);
+    let cursor = offset + 2, row = 0; const end = offset + length;
     const byte = () => { if (cursor >= end) throw new Error("Célula S3M truncada."); return bytes[cursor++]; };
     while (cursor < end && row < 64) {
       const token = byte(); if (!token) { row++; continue; }
@@ -287,6 +289,6 @@ export function writeTrackerModule(original: Uint8Array, song: TrackerModuleSong
     }
   }
   payloads.forEach((payload, i) => { const offset = patternOffsets[i]; integer(offset / 16, 0, 65535, "Ponteiro de padrão S3M");
-    data.setUint16(patternTable + i * 2, offset / 16, true); data.setUint16(offset, payload.length, true); output.set(payload, offset + 2); });
+    data.setUint16(patternTable + i * 2, offset / 16, true); data.setUint16(offset, payload.length + 2, true); output.set(payload, offset + 2); });
   return output;
 }

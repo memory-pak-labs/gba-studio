@@ -105,4 +105,14 @@ describe("native tracker module editing", () => {
     expect(result.slice(sampleOffset, sampleOffset + 64)).toEqual(bytes.slice(-64));
     expect(parse(result, "MOD").trackerModule.instruments[0].length).toBe(64);
   });
+
+  it("writes the standard S3M packed length including its two-byte length field", () => {
+    const bytes = makeEditableS3mFixture(); const song = parse(bytes, "S3M"); song.patterns[0].channels[0].notes[0] = "D4";
+    const output = writeTrackerModule(bytes, song); const data = new DataView(output.buffer);
+    const pattern = data.getUint16(102, true) * 16; let cursor = pattern + 2, rows = 0;
+    while (rows < 64) { const token = output[cursor++]; if (!token) { rows++; continue; }
+      if (token & 32) cursor += 2; if (token & 64) cursor++; if (token & 128) cursor += 2;
+    }
+    expect(data.getUint16(pattern, true)).toBe(cursor - pattern);
+  });
 });

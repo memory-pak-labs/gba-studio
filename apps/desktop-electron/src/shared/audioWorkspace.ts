@@ -19,6 +19,7 @@ export type AudioWorkspaceMode = "basic" | "complete";
 export type AudioComposerTab = "piano" | "tracker" | "sequence";
 
 export interface AudioWorkspaceItem {
+  trackerModule?: import("./trackerModule.js").TrackerModuleMetadata;
   synthesis?: "PCM" | "PSG";
   pcmSfx?: PcmSfxConfig;
   id: string;
@@ -134,6 +135,7 @@ export interface AudioWorkspacePreviewCell {
 }
 
 export interface AudioWorkspacePreviewRow {
+  trackerCells?: import("./trackerModule.js").TrackerModuleCell[];
   instrumentID?: string;
   pan?: number;
   sampleAssetID?: string | null;
@@ -1023,6 +1025,7 @@ export function deriveAudioPreviewRows(
     const cells = noteCells(channel.notes, safeMaxSteps);
     return {
       id: nullableString(channel.id) ?? `channel-${index + 1}`,
+      ...(Array.isArray(channel.trackerCells) ? { trackerCells: channel.trackerCells as import("./trackerModule.js").TrackerModuleCell[] } : {}),
       label: nullableString(channel.name) ?? `Canal ${index + 1}`,
       type,
       ...(channel.instrumentID ? { instrumentID: String(channel.instrumentID) } : {}),
@@ -2305,6 +2308,7 @@ export function deriveAudioWorkspacePresentation(data: GBAProjectData): AudioWor
         name,
         kind,
         synthesis: isPcmAudio(audio) ? "PCM" : "PSG",
+        ...(audio.trackerModule ? { trackerModule: audio.trackerModule as import("./trackerModule.js").TrackerModuleMetadata } : {}),
         ...(isPcmAudio(audio) && kind === "SFX" ? { pcmSfx: pcmSfxConfig(audio.pcmSfx) } : {}),
         format,
         assignedScene: nullableString(audio.assignedScene),

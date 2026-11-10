@@ -25,7 +25,8 @@ export function selectAudioPreviewData(request: PrepareAudioPreviewRequest): GBA
     const firstOrdered = Array.isArray(audio.patternOrder) && typeof audio.patternOrder[0] === "string" ? audio.patternOrder[0] : undefined;
     const pattern = patterns.find(item => item.id === (request.patternID ?? active ?? firstOrdered ?? patterns[0].id));
     if (!pattern) throw new Error("Padrão selecionado não encontrado na música.");
-    audio.patterns = [pattern]; audio.patternOrder = [pattern.id];
+    if (!audio.trackerModule) audio.patterns = [pattern];
+    audio.patternOrder = [pattern.id];
   }
   for (const group of [audio, ...audioRecords(audio.patterns)]) {
     const channels = audioRecords(group.channels);
@@ -99,6 +100,7 @@ extern "C" int gbs_main() {
 }
 `;
   const fingerprint = createHash("sha256").update(cpp).update(JSON.stringify(pack.document));
+  if (audio.trackerModule) fingerprint.update(JSON.stringify(pack.sourceCopies.map(asset => asset.trackerModule)));
   for (const file of [options.assetcPath, path.join(options.enginePackPath, "enginepack.json"), path.join(options.enginePackPath, "lib/libgbastudio_engine.a")]) fingerprint.update(await readFile(file));
   for (const source of pack.sourceCopies) {
     if (!request.projectPath) throw new Error("Salve o projeto para ouvir os samples WAV.");

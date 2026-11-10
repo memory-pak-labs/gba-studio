@@ -1,6 +1,7 @@
 import { isPcmAudio, pcmSfxConfig, pcmSfxErrors } from "./audioPcm.js";
 import { audioInstrumentBank, resolveAudioInstrumentChannel } from "./audioInstruments.js";
 import type { GBAProjectData } from "./projectFile.js";
+import { isTrackerModule, validateTrackerModuleSong, type TrackerModuleSong } from "./trackerModule.js";
 
 export function audioRecords(value: unknown): Record<string, unknown>[] {
   return Array.isArray(value) ? value.filter((item): item is Record<string, unknown> => Boolean(item) && typeof item === "object" && !Array.isArray(item)) : [];
@@ -52,6 +53,12 @@ export interface AudioContractIssue {
 export function audioContractIssues(audio: Record<string, unknown>, data?: GBAProjectData): AudioContractIssue[] {
   const issues: AudioContractIssue[] = [];
   const error = (message: string) => issues.push({ level: "error", message });
+  if (isTrackerModule(audio)) {
+    try { validateTrackerModuleSong(audio as unknown as TrackerModuleSong); }
+    catch (cause) { error(cause instanceof Error ? cause.message : "Módulo editável inválido."); }
+    if (data && !audioSourceAsset(data, audio)) error("Fonte do módulo editável ausente na biblioteca.");
+    return issues;
+  }
   if (!audioComposed(audio)) {
     const asset = data ? audioSourceAsset(data, audio) : null;
     const source = asset?.metadata as Record<string, unknown> | undefined;

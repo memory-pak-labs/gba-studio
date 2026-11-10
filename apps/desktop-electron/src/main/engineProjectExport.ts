@@ -1,4 +1,6 @@
 import { execFile, type ExecFileOptionsWithStringEncoding } from "node:child_process";
+import { createHash } from "node:crypto";
+import { writeTrackerModule } from "../shared/trackerModule.js";
 import { access, mkdir, readdir, readFile, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { promisify } from "node:util";
@@ -125,7 +127,11 @@ async function copyGeneratedAsset(destination: string, projectPath: string, asse
   const sourceFile = await resolveGeneratedAssetSource(projectPath, asset);
   const destinationFile = safeDestinationPath(destination, asset.output);
   await mkdir(path.dirname(destinationFile), { recursive: true });
-  await writeFileIfChanged(destinationFile, await readFile(sourceFile));
+  const bytes = await readFile(sourceFile);
+  if (asset.trackerModule && createHash("sha256").update(bytes).digest("hex") !== asset.trackerModule.trackerModule.sourceSha256) {
+    throw new Error("A fonte do módulo foi alterada fora do editor. Importe uma nova cópia antes de exportar.");
+  }
+  await writeFileIfChanged(destinationFile, asset.trackerModule ? Buffer.from(writeTrackerModule(bytes, asset.trackerModule)) : bytes);
   return destinationFile;
 }
 
@@ -273,7 +279,9 @@ async function writeLockedEngineSchemaExport(options: WriteEngineSchemaExportOpt
   const fingerprintOptions = options.projectPath ? {
         projectPath: options.projectPath,
         contract,
-        audio: options.prepared.audioPack?.document,
+        audio: options.prepared.audioPack?.sourceCopies.some(asset => asset.trackerModule)
+          ? { document: options.prepared.audioPack.document, editableModules: options.prepared.audioPack.sourceCopies.filter(asset => asset.trackerModule).map(asset => ({ output: asset.output, song: asset.trackerModule })) }
+          : options.prepared.audioPack?.document,
         sourcePaths,
         engineDependencyPaths: [
           templateDirectory,

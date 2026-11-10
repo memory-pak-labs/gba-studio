@@ -45,6 +45,8 @@ import {
   type SpriteStateContract
 } from "./spriteAnimationState.js";
 
+import { validateTrackerModuleSong } from "./trackerModule.js";
+
 export interface EngineProjectExportFile {
   path: string;
   contents: string;
@@ -57,6 +59,7 @@ export interface EngineProjectExportAsset {
   source: string;
   output: string;
   bundledDefaultAsset?: string;
+  trackerModule?: import("./trackerModule.js").TrackerModuleSong;
 }
 
 export interface EngineProjectExport {
@@ -3192,6 +3195,7 @@ export function compileComposedMusicaToTracker(
   exportID: string,
   data?: GBAProjectData
 ): AssetcAudioJsonDocument["tracker"][number] | null {
+  if (audio.trackerModule) return null;
   if (data) audio = resolveAudioInstrumentComposition(data, audio);
   if (isPcmAudio(audio)) return compilePcmMusicaToTracker(audio, exportID);
   const patterns = recordArray(audio, "patterns");
@@ -3662,6 +3666,20 @@ function buildAssetcAudioPackGenerationUncached(data: GBAProjectData): AssetcAud
     const name = stringField(audio, "name", `audio-${index + 1}`);
     const kind = stringField(audio, "kind", "Audio");
     const exportID = normalizeIdentifier(stringField(audio, "exportID", name), `audio_${index + 1}`);
+
+    if (audio.trackerModule) {
+      const song = audio as unknown as import("./trackerModule.js").TrackerModuleSong;
+      validateTrackerModuleSong(song);
+      const asset = audioSourceAsset(data, audio); const source = asset && assetSource(asset);
+      if (!asset || !source) throw new Error("Fonte do módulo editável ausente na biblioteca.");
+      const extension = song.trackerModule.format.toLowerCase();
+      const file = `${exportID}_module.${extension}`;
+      sourceCopies.push({ id: String(asset.id), name, kind: "Audio", source, output: `assets/audio/${file}`, trackerModule: song });
+      const projectVolume = integerField(child(settings(data), "audio"), "musicVolume", 100);
+      tracker.push({ name: exportID, [extension]: file, loop: booleanField(audio, "loops", false), row_duration_frames: 4,
+        native_primary_volume: trackerVolumeFromAudioVolume(projectVolume * integerField(audio, "volume", 100) / 100) });
+      return;
+    }
 
     if (isPcmAudio(audio) && kind === "SFX") {
       const config = pcmSfxConfig(audio.pcmSfx);

@@ -31,8 +31,8 @@ export function makeEditableS3mFixture(): Uint8Array {
   view.setUint32(544, 8363, true); bytes.set(text.encode("Fixture PCM"), 560); bytes.set(text.encode("SCRS"), 588);
   const p0 = [0xa0, 0x40, 1, 1, 6, 0x81, 8, 0x12, 0, 0xe3, 0x51, 1, 39, 8, 0x47, 0, 0x31, 254, 0, 0, ...Array(61).fill(0)];
   const p1 = [0x20, 0x44, 1, 0, ...Array(63).fill(0)];
-  view.setUint16(640, p0.length, true); bytes.set(p0, 642);
-  view.setUint16(1024, p1.length, true); bytes.set(p1, 1026);
+  view.setUint16(640, p0.length + 2, true); bytes.set(p0, 642);
+  view.setUint16(1024, p1.length + 2, true); bytes.set(p1, 1026);
   for (let i = 0; i < 64; i++) bytes[1536 + i] = Math.round(Math.sin(i * Math.PI / 16) * 90) & 255;
   return bytes;
 }
