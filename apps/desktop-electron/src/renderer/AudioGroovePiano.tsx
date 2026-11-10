@@ -14,16 +14,16 @@ const percussionLabel = (pitch: string): string => pitch === "H" ? "Chimbal" : p
 
 const pitchNames = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"];
 const midiPitch = (note: string): number | null => {
-  const match = /^([A-G]#?)([2-7])$/.exec(note);
+  const match = /^([A-G]#?)([0-9])$/.exec(note);
   return match ? (Number(match[2]) + 1) * 12 + pitchNames.indexOf(match[1]) : null;
 };
-export function groovePitchRows(type: string, notes: Array<string | null>): string[] {
+export function groovePitchRows(type: string, notes: Array<string | null>, nativeModule = false): string[] {
   if (/noise|sfx/i.test(type)) return deriveAudioPianoPitchRows(type, notes);
   const values = notes.flatMap(note => { const value = midiPitch(note ?? ""); return value === null ? [] : [value]; });
   if (!values.length) return deriveAudioPianoPitchRows(type);
   const lowest = Math.min(...values), highest = Math.max(...values);
-  const low = Math.max(36, Math.min(lowest - 1, highest - 12));
-  const high = Math.min(107, Math.max(low + 12, highest + 1));
+  const low = nativeModule ? Math.max(12, lowest - 6) : Math.max(36, Math.min(lowest - 1, highest - 12));
+  const high = Math.min(nativeModule ? 131 : 107, Math.max(low + 12, highest + (nativeModule ? 6 : 1)));
   return Array.from({ length: high - low + 1 }, (_, index) => {
     const value = high - index; return `${pitchNames[value % 12]}${Math.floor(value / 12) - 1}`;
   });
@@ -60,11 +60,11 @@ export function AudioGroovePiano({ item, instruments, samples, selectedCell, sel
       <header><strong>{item.previewRows.length}/16 {ui("faixas")}</strong><button type="button" aria-label={ui("Adicionar faixa")} title={ui("Adicionar faixa")} disabled={item.previewRows.length >= 16} onClick={onCreateChannel}><Plus size={16} /></button></header>
       <div>{item.previewRows.map((row, index) => <div key={row.id} className={row.id === selectedChannelID ? "pcm-track selected" : "pcm-track"}>
         <button type="button" aria-label={ui("Selecionar canal {0}", { 0: row.label })} aria-pressed={row.id === selectedChannelID} onClick={() => onSelectCell({ audioID: item.id, channelID: row.id, stepIndex: selectedStep ?? firstStep })}>
-          <span>{index + 1}</span><strong>{row.label}</strong><small>{instruments?.find(instrument => instrument.id === row.instrumentID)?.name
+          <span>{index + 1}</span><strong>{row.label}</strong><small>{item.trackerModule ? ui("Samples do módulo") : instruments?.find(instrument => instrument.id === row.instrumentID)?.name
             ?? samples?.find(sample => sample.id === row.sampleAssetID)?.name ?? row.instrument ?? "PCM"}</small>
         </button>
-        <div><button type="button" aria-label={ui("Silenciar {0}", { 0: row.label })} aria-pressed={row.isMuted} onClick={() => onUpdateChannel(row.id, { muted: !row.isMuted })}>M</button>
-          <button type="button" aria-label={ui("Solo de {0}", { 0: row.label })} title={ui("Solo afeta apenas a prévia")} aria-pressed={row.isSolo} onClick={() => onUpdateChannel(row.id, { solo: !row.isSolo })}>S</button></div>
+        {!item.trackerModule ? <div><button type="button" aria-label={ui("Silenciar {0}", { 0: row.label })} aria-pressed={row.isMuted} onClick={() => onUpdateChannel(row.id, { muted: !row.isMuted })}>M</button>
+          <button type="button" aria-label={ui("Solo de {0}", { 0: row.label })} title={ui("Solo afeta apenas a prévia")} aria-pressed={row.isSolo} onClick={() => onUpdateChannel(row.id, { solo: !row.isSolo })}>S</button></div> : null}
       </div>)}</div>
     </aside> : null}
     <div className={pcm ? "audio-groove-piano pcm-piano" : "audio-groove-piano"} aria-label={ui("Piano roll de {0}", { 0: item.name })} style={timelineStyle}>
@@ -82,7 +82,7 @@ export function AudioGroovePiano({ item, instruments, samples, selectedCell, sel
     </div>
     <div className="audio-groove-lanes">
       {rows.map(row => {
-        const pitches = groovePitchRows(row.type, row.cells.map(cell => cell.note));
+        const pitches = groovePitchRows(row.type, row.cells.map(cell => cell.note), Boolean(item.trackerModule));
         const cells = row.cells.slice(firstStep, firstStep + count);
         const selected = selectedChannelID === row.id;
         const style = { "--groove-pitches": pitches.length } as CSSProperties;

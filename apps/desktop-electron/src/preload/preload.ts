@@ -20,6 +20,7 @@ import type { WindowDocumentState } from "../shared/windowDocumentState.js";
 import { cartridgeWriterChannels, type CartridgeProgress } from "../shared/cartridgeWriter.js";
 
 const api: GBAStudioDesktopAPI = {
+  readTrackerModule: request => ipcRenderer.invoke(ipcChannels.readTrackerModule, request),
   cartridgeWriter: {
     status: () => ipcRenderer.invoke(cartridgeWriterChannels.status),
     install: () => ipcRenderer.invoke(cartridgeWriterChannels.install),

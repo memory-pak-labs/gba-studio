@@ -27,6 +27,7 @@ import { inspectEnginePack, readEnginePackVersion, runSelectedEnginePackBuild, r
 import { copyFilesIntoProjectAssets, copyReferenceImageIntoProjectAssets, reimportFileIntoProjectAsset } from "./importAssets.js";
 import { importGifAnimationIntoProjectAssets } from "./gifAnimationImport.js";
 import { inspectAssetFile } from "./inspectAssetFile.js";
+import { readTrackerModuleForEditing } from "./trackerModuleImport.js";
 import { prepareTiledMapImport } from "./importTiledMap.js";
 import {
   fetchPluginRepository,
@@ -685,6 +686,7 @@ ipcMain.handle(ipcChannels.importAssets, async (_event, request: ImportAssetsReq
 ipcMain.handle(ipcChannels.inspectAssetFile, async (_event, request: InspectAssetFileRequest) => {
   return inspectAssetFile(request);
 });
+ipcMain.handle(ipcChannels.readTrackerModule, (_event, request: import("../shared/trackerModuleEditing.js").ReadTrackerModuleRequest) => readTrackerModuleForEditing(request));
 
 ipcMain.handle(ipcChannels.importTiledMap, async (_event, request: ImportTiledMapRequest) => {
   if (!request.projectPath) {

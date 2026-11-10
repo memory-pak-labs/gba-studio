@@ -3,6 +3,9 @@ import type { ImportedAssetFile } from "../shared/ipc.js";
 import { summarizeGBAProject, type ParsedGBAProject } from "../shared/projectFile.js";
 import { setActiveRoomInProject } from "../shared/roomsWorkspace.js";
 import { pushProjectHistory, redoProjectHistory, undoProjectHistory } from "../shared/projectHistory.js";
+import { audioRecords, audioSourceAsset } from "../shared/audioContract.js";
+import { createEditableTrackerCopyInProject } from "../shared/trackerModuleEditing.js";
+import type { TrackerModuleSong } from "../shared/trackerModule.js";
 
 export interface ProjectSession {
   /** Identity is local to this open session and is never written to the project. */
@@ -13,6 +16,20 @@ export interface ProjectSession {
   savedData?: ParsedGBAProject["data"];
   redoStack: ParsedGBAProject["data"][];
   undoStack: ParsedGBAProject["data"][];
+}
+
+/** A module read may finish after unrelated edits, another project, or a source replacement. */
+export function commitEditableTrackerImport(current: ProjectSession | null, requested: ProjectSession, audioID: string, song: TrackerModuleSong, id: string): ProjectSession | null {
+  if (!current || !requested.identity || current.identity !== requested.identity || current.path !== requested.path) return current;
+  const source = (session: ProjectSession) => {
+    const audio = audioRecords(session.project.data.audioItems).find(item => item.id === audioID);
+    const asset = audio && audioSourceAsset(session.project.data, audio);
+    return asset ? JSON.stringify([asset.id, (asset.metadata as Record<string, unknown> | undefined)?.source]) : null;
+  };
+  if (!source(requested) || source(requested) !== source(current)) return current;
+  const data = createEditableTrackerCopyInProject(current.project.data, audioID, song, id);
+  const history = pushProjectHistory({ present: current.project.data, undoStack: current.undoStack, redoStack: current.redoStack }, data);
+  return { ...current, dirty: true, project: { data: history.present, summary: summarizeGBAProject(history.present) }, undoStack: history.undoStack, redoStack: history.redoStack };
 }
 
 /** Scene navigation changes only a redundant active-scene mirror, not project content. */

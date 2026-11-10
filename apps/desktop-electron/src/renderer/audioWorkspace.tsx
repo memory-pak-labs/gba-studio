@@ -2,6 +2,8 @@ import { PCM_INSTRUMENTS, type PcmSfxConfig } from "../shared/audioPcm.js";
 import type { PrepareAudioPreviewRequest, EngineAudioPreviewResult } from "../shared/audioPreview.js";
 import { startEngineAudioPreview } from "./engineAudioPreview.js";
 import { PcmSfxEditor } from "./PcmSfxEditor.js";
+import { TrackerModuleComposer } from "./TrackerModuleComposer.js";
+import type { TrackerModuleEdit } from "../shared/trackerModuleEditing.js";
 import { uiText as ui, useStudioUiText } from "./studioUiText";
 import { wavSampleLoop } from "../shared/wavSampleLoop";
 import { Play, Square, Plus, Minus, Search, Upload, Music2, AudioLines, ListFilter, AlertTriangle, SlidersHorizontal, X } from "lucide-react";
@@ -51,6 +53,8 @@ const composerTabs: { id: AudioComposerTab; label: string }[] = [
 ];
 
 interface AudioWorkspaceProps {
+  onCreateEditableTracker?(audioID: string): void | Promise<void>;
+  onUpdateTrackerModule?(audioID: string, edit: TrackerModuleEdit): void;
   onCreateAudioInstrument?(audioID: string, channelID: string): void;
   onUpdateAudioInstrument?(id: string, fields: UpdateAudioInstrumentFields): void;
   onRemoveAudioInstrument?(id: string): void;
@@ -389,6 +393,7 @@ function audioStepTracker(
 }
 
 export function AudioWorkspace({
+  onCreateEditableTracker, onUpdateTrackerModule,
   onCreateAudioInstrument, onUpdateAudioInstrument, onRemoveAudioInstrument,
   presentation,
   projectPath,
@@ -441,6 +446,7 @@ export function AudioWorkspace({
   const [playbackStepIndex, setPlaybackStepIndex] = useState<number | null>(null);
   const [auditionAudioID, setAuditionAudioID] = useState<string | null>(null);
   const [creationAssistantOpen, setCreationAssistantOpen] = useState(false);
+  const [creatingModuleCopy, setCreatingModuleCopy] = useState(false);
   const [detailsOpen, setDetailsOpen] = useState(false);
   const detailsID = useId();
   const detailsButtonRef = useRef<HTMLButtonElement>(null);
@@ -559,6 +565,11 @@ export function AudioWorkspace({
       )) return;
 
       event.preventDefault();
+      if (selectedItem?.trackerModule) {
+        const patternID = selectedItem.activePatternID;
+        if (patternID) onUpdateTrackerModule?.(cell.audioID, { type: "cell", patternID, channelID: cell.channelID, row: cell.stepIndex, fields: { note: "" } });
+        return;
+      }
       onSetAudioChannelNote(
         cell.audioID,
         cell.channelID,
@@ -569,7 +580,7 @@ export function AudioWorkspace({
 
     window.addEventListener("keydown", handlePianoRollDelete);
     return () => window.removeEventListener("keydown", handlePianoRollDelete);
-  }, [onSetAudioChannelNote, presentation, selectedCell]);
+  }, [onSetAudioChannelNote, onUpdateTrackerModule, presentation, selectedCell]);
 
   function createFromAssistant(kind: "Musica" | "SFX", synthesis?: "PCM" | "PSG"): void {
     if (synthesis) onCreateAudio(kind, synthesis); else onCreateAudio(kind);
@@ -677,6 +688,9 @@ export function AudioWorkspace({
   }
   const selectedRow = activeItem?.previewRows.find(row => selectedCell?.audioID === activeItem.id && row.id === selectedCell.channelID) ?? activeItem?.previewRows[0];
   const channelMixing = deriveAudioChannelMixing(activeItem, selectedRow?.id ?? null);
+  const moduleTempoLocked = activeItem?.trackerModule?.format === "MOD";
+  const minTempo = activeItem?.trackerModule ? 32 : 40;
+  const maxTempo = activeItem?.trackerModule ? 255 : activeItem?.kind === "SFX" ? 360 : 240;
   function updateInstrumentControls(fields: { envelope?: string; sampleRootNote?: string; sampleLoop?: boolean }): void {
     if (!activeItem || !selectedRow) return;
     if (selectedRow.instrumentID) onUpdateAudioInstrument?.(selectedRow.instrumentID, fields);
@@ -980,9 +994,9 @@ export function AudioWorkspace({
             <div className="audio-groove-song-title"><h3>{activeItem?.name ?? ui("Sem áudio")}</h3><span>{activeItem?.kind === "Musica" ? ui("Música") : activeItem?.kind === "SFX" ? ui("Efeito sonoro") : ui("Áudio")}</span></div>
             <button aria-label={ui("Tocar áudio")} className="audio-transport-play" disabled={!activeItem} onClick={() => activeItem && playAudioPreview(activeItem)} title={ui("Tocar áudio")} type="button"><Play size={22} fill="currentColor" /></button>
             <button aria-label={ui("Parar áudio")} disabled={!auditionAudioID && !playbackStatus.startsWith("Preparando")} onClick={() => stopAudioPreview()} title={ui("Parar áudio")} type="button"><Square size={18} fill="currentColor" /></button>
-            {!activeItem?.pcmSfx ? <div className="audio-groove-tempo"><label><span className="studio-visually-hidden">{ui("BPM")}</span><input type="number" aria-label={ui("BPM")} min={40} max={activeItem?.kind === "SFX" ? 360 : 240} value={activeItem?.bpm ?? 120} disabled={!activeItem || activeItem.origin !== "Composto"} onChange={event => activeItem && Number.isFinite(event.currentTarget.valueAsNumber) && onUpdateAudioFields(activeItem.id, { bpm: Math.max(40, Math.min(activeItem.kind === "SFX" ? 360 : 240, event.currentTarget.valueAsNumber)) })} /><span>{ui("BPM")}</span></label>
-              <button type="button" aria-label={ui("Diminuir BPM")} disabled={!activeItem || activeItem.origin !== "Composto" || (activeItem.bpm ?? 120) <= 40} onClick={() => activeItem && onUpdateAudioFields(activeItem.id, { bpm: (activeItem.bpm ?? 120) - 1 })}><Minus size={14} /></button>
-              <button type="button" aria-label={ui("Aumentar BPM")} disabled={!activeItem || activeItem.origin !== "Composto" || (activeItem.bpm ?? 120) >= (activeItem.kind === "SFX" ? 360 : 240)} onClick={() => activeItem && onUpdateAudioFields(activeItem.id, { bpm: (activeItem.bpm ?? 120) + 1 })}><Plus size={14} /></button>
+            {!activeItem?.pcmSfx ? <div className="audio-groove-tempo"><label><span className="studio-visually-hidden">{ui("BPM")}</span><input type="number" aria-label={ui("BPM")} min={minTempo} max={maxTempo} value={activeItem?.bpm ?? 120} disabled={!activeItem || activeItem.origin !== "Composto" || moduleTempoLocked} onChange={event => activeItem && Number.isFinite(event.currentTarget.valueAsNumber) && onUpdateAudioFields(activeItem.id, { bpm: Math.max(minTempo, Math.min(maxTempo, event.currentTarget.valueAsNumber)) })} /><span>{ui("BPM")}</span></label>
+              <button type="button" aria-label={ui("Diminuir BPM")} disabled={!activeItem || activeItem.origin !== "Composto" || moduleTempoLocked || (activeItem.bpm ?? 120) <= minTempo} onClick={() => activeItem && onUpdateAudioFields(activeItem.id, { bpm: (activeItem.bpm ?? 120) - 1 })}><Minus size={14} /></button>
+              <button type="button" aria-label={ui("Aumentar BPM")} disabled={!activeItem || activeItem.origin !== "Composto" || moduleTempoLocked || (activeItem.bpm ?? 120) >= maxTempo} onClick={() => activeItem && onUpdateAudioFields(activeItem.id, { bpm: (activeItem.bpm ?? 120) + 1 })}><Plus size={14} /></button>
             </div> : null}
             <label className="audio-groove-switch"><input type="checkbox" aria-label={ui("Loop")} checked={activeItem?.loops ?? false} disabled={!activeItem || activeItem.kind === "SFX" && activeItem.origin === "Composto" && !activeItem.pcmSfx} onChange={event => activeItem && onUpdateAudioFields(activeItem.id, { loops: event.currentTarget.checked })} /><span>{ui("Repetir")}</span></label>
             {activeItem?.origin === "Composto" && !activeItem.pcmSfx ? <div className="audio-groove-preview-scope" aria-label={ui("Trecho da prévia")}><span>{ui("Prévia")}</span><button type="button" aria-pressed={previewScope === "pattern"} onClick={() => setPreviewScope("pattern")}>{ui("Padrão")}</button><button type="button" aria-pressed={previewScope === "sequence"} onClick={() => setPreviewScope("sequence")}>{ui("Música")}</button></div> : null}
@@ -990,7 +1004,9 @@ export function AudioWorkspace({
           {activeItem?.pcmSfx ? <>
             <PcmSfxEditor config={activeItem.pcmSfx} samples={presentation.sampleInstruments ?? []} onChange={config => onUpdatePcmSfx?.(activeItem.id, config)} onEditing={() => { if (nativeRef.current) stopAudioPreview(); }} />
             <div className="audio-groove-dock"><label className="audio-groove-slider"><span>{ui("Volume geral")} <output>{activeItem.volume ?? 80}%</output></span><input aria-label={ui("Volume geral")} type="range" min={0} max={100} value={activeItem.volume ?? 80} onChange={event => onUpdateAudioFields(activeItem.id, { volume: event.currentTarget.valueAsNumber })} /></label><button ref={detailsButtonRef} type="button" aria-controls={detailsID} aria-expanded={detailsOpen} onClick={() => setDetailsOpen(!detailsOpen)}>{ui("Detalhes")}</button></div>
-          </> : activeItem?.origin === "Composto" ? <>
+          </> : activeItem?.trackerModule ? <TrackerModuleComposer item={activeItem} mode={composerTab} onMode={setComposerTab}
+            selectedCell={selectedCell} onSelect={setSelectedCell} onEdit={edit => onUpdateTrackerModule?.(activeItem.id, edit)} onDetails={() => setDetailsOpen(!detailsOpen)} />
+          : activeItem?.origin === "Composto" ? <>
             <div className="audio-groove-patterns" aria-label={ui("Padrões de {0}", { 0: activeItem.name })}>
               {activeItem.patterns.map(pattern => <button type="button" key={pattern.id} aria-pressed={activeItem.activePatternID === pattern.id} className={activeItem.activePatternID === pattern.id ? "active" : ""} onClick={() => { setSelectedCell(null); onSetActivePattern(activeItem.id, pattern.id); }} onContextMenu={event => openPatternContextMenu(event, pattern.id, pattern.name)}>{pattern.name}</button>)}
               <button aria-label={ui("Criar padrão")} title={ui("Criar padrão")} onClick={() => onCreateAudioPattern(activeItem.id)} type="button"><Plus size={16} /></button>
@@ -1018,7 +1034,12 @@ export function AudioWorkspace({
               {channelMixing.sampleAssetID ? <label className="audio-groove-switch"><input aria-label={ui("Repetir sample")} type="checkbox" checked={channelMixing.sampleLoop} onChange={event => updateInstrumentControls({ sampleLoop: event.currentTarget.checked })} /><span>{ui("Repetir sample")}</span></label> : null}
               <button ref={detailsButtonRef} className="audio-groove-details-button" type="button" aria-controls={detailsID} aria-expanded={detailsOpen} onClick={() => setDetailsOpen(!detailsOpen)}><SlidersHorizontal size={16} />{ui("Detalhes")}</button>
             </div>
-          </> : <div className="audio-empty-composer"><strong>{ui("Áudio importado")}</strong><p>{onPrepareEnginePreview ? ui("Tocar reproduz o áudio pela engine da ROM.") : activeItem?.format === "WAV" ? ui("Tocar reproduz o arquivo WAV original.") : ui("A prévia deste formato está disponível no Play do jogo.")}</p><button ref={detailsButtonRef} type="button" aria-controls={detailsID} aria-expanded={detailsOpen} onClick={() => setDetailsOpen(!detailsOpen)}>{ui("Detalhes")}</button></div>}
+          </> : <div className="audio-empty-composer"><strong>{ui("Áudio importado")}</strong><p>{onPrepareEnginePreview ? ui("Tocar reproduz o áudio pela engine da ROM.") : activeItem?.format === "WAV" ? ui("Tocar reproduz o arquivo WAV original.") : ui("A prévia deste formato está disponível no Play do jogo.")}</p>
+            {activeItem?.kind === "Musica" && ["MOD", "S3M"].includes(activeItem.format) ? <>
+              <button type="button" disabled={creatingModuleCopy || !projectPath || !onCreateEditableTracker} onClick={async () => { setCreatingModuleCopy(true); try { await onCreateEditableTracker?.(activeItem.id); } finally { setCreatingModuleCopy(false); } }}>{ui(creatingModuleCopy ? "Preparando cópia…" : "Criar cópia editável")}</button>
+              <p>{ui("O arquivo original permanece intacto.")}</p>
+            </> : null}
+            <button ref={detailsButtonRef} type="button" aria-controls={detailsID} aria-expanded={detailsOpen} onClick={() => setDetailsOpen(!detailsOpen)}>{ui("Detalhes")}</button></div>}
           <div className="audio-groove-status" role="status"><span>{ui(playbackStatus)}{playbackStepIndex !== null ? ` · ${playbackStepIndex + 1}/${previewPlan?.stepCount ?? activeItem?.stepCount}` : ""}{activeItem?.errors.length ? ui(" · Áudio bloqueado — consulte Detalhes") : ""}</span><span>{onPrepareEnginePreview ? `${ui("Prévia da engine")} · ${ui("Pico")} ${Math.round(nativeMeter.peak * 100)}%${nativeMeter.underruns ? ` · ${ui("Interrupções")} ${nativeMeter.underruns}` : ""}` : ui("Espaço: tocar / parar · Delete: apagar nota")}</span></div>
         </section>
           {activeItem && detailsOpen ? <aside id={detailsID} className="audio-groove-details" aria-label={ui("Dados de {0}", { 0: activeItem.name })} onKeyDown={event => {
@@ -1026,8 +1047,8 @@ export function AudioWorkspace({
           }}>
             <header className="audio-groove-details-header"><h4>{ui("Detalhes da composição")}</h4><button ref={detailsCloseRef} type="button" aria-label={ui("Fechar detalhes")} onClick={closeDetails}><X size={18} /></button></header>
             <div className="audio-groove-details-body">
-            <div className="audio-actions"><button type="button" onClick={() => onRenameAudio(activeItem.id, activeItem.name)}>{ui("Renomear")}</button><button type="button" onClick={() => onDuplicateAudio(activeItem.id, activeItem.name)}>{ui("Duplicar")}</button><button type="button" onClick={() => onNormalizeAudio(activeItem.id)}>{ui("Corrigir parâmetros")}</button><button type="button" onClick={() => onExportAudio(activeItem.id, activeItem.name)}>{ui("Exportar JSON")}</button><button type="button" className="danger-button" onClick={() => onRemoveAudio(activeItem.id, activeItem.name)}>{ui("Remover")}</button></div>
-            {activeItem.origin === "Composto" && !activeItem.pcmSfx ? <>
+            <div className="audio-actions"><button type="button" onClick={() => onRenameAudio(activeItem.id, activeItem.name)}>{ui("Renomear")}</button><button type="button" onClick={() => onDuplicateAudio(activeItem.id, activeItem.name)}>{ui("Duplicar")}</button>{!activeItem.trackerModule ? <button type="button" onClick={() => onNormalizeAudio(activeItem.id)}>{ui("Corrigir parâmetros")}</button> : null}<button type="button" onClick={() => onExportAudio(activeItem.id, activeItem.name)}>{ui("Exportar JSON")}</button><button type="button" className="danger-button" onClick={() => onRemoveAudio(activeItem.id, activeItem.name)}>{ui("Remover")}</button></div>
+            {activeItem.origin === "Composto" && !activeItem.pcmSfx && !activeItem.trackerModule ? <>
               <div className="audio-groove-note-tools" role="toolbar" aria-label={ui("Ferramentas do piano roll")}>
                 <button type="button" onClick={() => onApplyAudioPatternPreset(activeItem.id)}>{ui("Preset do pattern")}</button><button type="button" disabled={activeItem.previewRows.length >= (activeItem.synthesis === "PCM" ? 16 : activeItem.kind === "SFX" ? 1 : 4)} onClick={() => onCreateAudioChannel(activeItem.id, activeItem.activePatternID)}>{ui("Novo canal")}</button>
                 <button type="button" disabled={!selectedCell} onClick={() => selectedCell && onUpdateAudioChannelNote(activeItem.id, selectedCell.channelID, selectedCell.stepIndex, selectedRow?.cells[selectedCell.stepIndex]?.note ?? null)}>{ui("Editar nota")}</button>

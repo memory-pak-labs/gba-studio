@@ -5,7 +5,7 @@ import { isTrackerModule, trackerNotePeriod, validateTrackerModuleSong, type Tra
 export interface ReadTrackerModuleRequest { projectPath: string; data: GBAProjectData; audioID: string }
 export interface ReadTrackerModuleResult { song?: TrackerModuleSong; error?: string }
 export type TrackerModuleEdit =
-  | { type: "cell"; patternID: string; channelID: string; row: number; fields: Partial<TrackerModuleCell> & { note?: string; clear?: boolean } }
+  | { type: "cell"; patternID: string; channelID: string; row: number; fields: Partial<TrackerModuleCell> & { note?: string; clear?: boolean; clearVolume?: boolean } }
   | { type: "move-cell"; patternID: string; channelID: string; row: number; direction: -1 | 1 }
   | { type: "pattern-select"; patternID: string }
   | { type: "pattern-add"; id: string; name: string; sourcePatternID?: string }
@@ -65,6 +65,7 @@ export function editTrackerModuleInProject(data: GBAProjectData, audioID: string
       }
       if (fields.instrument !== undefined) { assertInt(fields.instrument, meta.format === "MOD" ? 31 : meta.instruments.length, "Instrumento"); cell.instrument = fields.instrument; }
       if (fields.volume !== undefined) { if (meta.format !== "S3M") throw new Error("MOD controla volume pelo comando Cxx."); assertInt(fields.volume, 64, "Volume"); cell.volume = fields.volume; }
+      if (fields.clearVolume) delete cell.volume;
       if (fields.effect !== undefined) { assertInt(fields.effect, meta.format === "MOD" ? 15 : 255, "Efeito"); cell.effect = fields.effect; }
       if (fields.parameter !== undefined) { assertInt(fields.parameter, 255, "Parâmetro"); cell.parameter = fields.parameter; }
       break;
