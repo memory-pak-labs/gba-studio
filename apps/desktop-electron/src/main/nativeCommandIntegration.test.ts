@@ -124,10 +124,11 @@ describe("native command integration", () => {
 
   it("classifies every catalog entry without mistaking pending handlers for native support", () => {
     const matrix = buildEventCommandSupportMatrix();
-    expect(matrix).toHaveLength(210);
+    expect(matrix).toHaveLength(211);
     expect(matrix.filter(entry => entry.status === "unknown")).toEqual([]);
     expect(matrix.filter(entry => entry.status === "pending")).toHaveLength(0);
     expect(matrix.filter(entry => entry.status === "not-applicable")).toHaveLength(2);
+    expect(eventCommandSupport("set_audio_mixing_rate").status).toBe("native");
     expect(eventCommandSupport("open_code_lock").status).toBe("native");
     expect(eventCommandSupport("luta_start_match").status).toBe("native");
   });

@@ -6,9 +6,9 @@ import { deriveEventsWorkspacePresentation, filterEventsCommandSuggestions, prep
 
 describe("GB Studio event authoring vocabulary", () => {
   it("preserves every historical ID and explicitly records the new authoring contracts", () => {
-    const additions = ["scene.lantern", "scene.reveal_area", "scene.clear_visibility", "scene.set_map_state", "actor.set_scale", "actor.animate_scale", "actor.reset_scale", "background.set_scale", "background.animate_scale", "background.reset_scale"];
+    const additions = ["audio.set_mixing_rate", "scene.lantern", "scene.reveal_area", "scene.clear_visibility", "scene.set_map_state", "actor.set_scale", "actor.animate_scale", "actor.reset_scale", "background.set_scale", "background.animate_scale", "background.reset_scale"];
     const identity = JSON.stringify(eventCommandCatalog.filter(d => !additions.includes(d.id)).map(d => d.id));
-    expect(eventCommandCatalog).toHaveLength(210);
+    expect(eventCommandCatalog).toHaveLength(211);
     expect(eventCommandCatalog.filter(d => additions.includes(d.id)).map(d => d.id).sort()).toEqual([...additions].sort());
     expect(createHash("sha256").update(identity).digest("hex")).toBe("5b43298c2f390e41100e4381382c7dce4f1adba5faeff8fa073d867a15a735a8");
   });
