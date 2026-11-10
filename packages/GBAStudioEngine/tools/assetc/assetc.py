@@ -3623,9 +3623,9 @@ def convert_s3m_sample_to_pcm8(path, instrument_index, target_sample_rate=None):
     if instrument_type != 1:
         raise SystemExit(f"{path}: instrumento S3M {index + 1} nao e sample PCM")
     sample_paragraph = (
-        info["data"][instrument_offset + 13] |
-        (info["data"][instrument_offset + 14] << 8) |
-        (info["data"][instrument_offset + 15] << 16)
+        (info["data"][instrument_offset + 13] << 16) |
+        info["data"][instrument_offset + 14] |
+        (info["data"][instrument_offset + 15] << 8)
     )
     sample_offset = sample_paragraph * 16
     sample_length = struct.unpack_from("<I", info["data"], instrument_offset + 16)[0]
@@ -3647,15 +3647,18 @@ def convert_s3m_sample_to_pcm8(path, instrument_index, target_sample_rate=None):
         raise SystemExit(f"{path}: dados do sample S3M {index + 1} incompletos")
 
     samples = []
+    signed = struct.unpack_from("<H", info["data"], 42)[0] == 1
     for frame_index in range(sample_length):
         channel_values = []
         frame_offset = sample_offset + frame_index * channel_count * bytes_per_sample
         for channel in range(channel_count):
             channel_offset = frame_offset + channel * bytes_per_sample
             if is_16_bit:
-                value = struct.unpack_from("<h", info["data"], channel_offset)[0] // 256
+                raw = struct.unpack_from("<h" if signed else "<H", info["data"], channel_offset)[0]
+                value = (raw - (0 if signed else 32768)) // 256
             else:
-                value = info["data"][channel_offset] - 128
+                raw = info["data"][channel_offset]
+                value = (raw if raw < 128 else raw - 256) if signed else raw - 128
             channel_values.append(value)
         samples.append(sum(channel_values) // len(channel_values))
     if len(samples) > 0xFFFF:
@@ -3936,8 +3939,8 @@ def parse_s3m_tracker(path, row_duration_frames=4, volume=8, duty=2):
         if len(data) < pattern_offset + 2:
             raise SystemExit(f"{path}: pattern S3M {pattern_index} fora do arquivo")
         packed_length = struct.unpack_from("<H", data, pattern_offset)[0]
-        packed = data[pattern_offset + 2:pattern_offset + 2 + packed_length]
-        if len(packed) < packed_length:
+        packed = data[pattern_offset + 2:pattern_offset + packed_length]
+        if packed_length < 2 or len(packed) < packed_length - 2:
             raise SystemExit(f"{path}: pattern S3M {pattern_index} incompleto")
 
         row = 0

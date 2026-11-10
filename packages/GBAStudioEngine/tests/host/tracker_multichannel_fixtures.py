@@ -37,7 +37,7 @@ def write_s3m(path, channels=tuple(range(16)), disabled=(), varied_volume=False,
     struct.pack_into("<HH", data, 0x61, 8, 16)
     instrument = memoryview(data)[0x80:0xd0]
     instrument[0] = 1
-    instrument[13] = 32  # sample at 0x200
+    instrument[14] = 32  # sample at 0x200; byte 13 contains the high word
     struct.pack_into("<III", instrument, 16, 64, 0, 64)
     instrument[28] = 32
     instrument[31] = 1  # forward loop
@@ -55,7 +55,7 @@ def write_s3m(path, channels=tuple(range(16)), disabled=(), varied_volume=False,
         packed += bytes(48)
     else:
         packed += bytes(64)
-    data += struct.pack("<H", len(packed)) + packed
+    data += struct.pack("<H", len(packed) + 2) + packed
     data += bytes(0x200 - len(data))
     data += bytes([4] * 32 + [252] * 32)
     path.write_bytes(data)

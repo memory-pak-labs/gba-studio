@@ -66,7 +66,7 @@ class TrackerMultichannelTests(unittest.TestCase):
             data = bytearray(s3m.read_bytes())
             packed = data[0x102:0x142] + bytes(4) + bytes([0x6f, 0x46, 0, 32]) + bytes(60)
             import struct
-            struct.pack_into("<H", data, 0x100, len(packed))
+            struct.pack_into("<H", data, 0x100, len(packed) + 2)
             data[0x102:0x102 + len(packed)] = packed
             s3m.write_bytes(data)
             song = ASSETC.parse_s3m_tracker(s3m)
@@ -134,7 +134,7 @@ class TrackerMultichannelTests(unittest.TestCase):
             write_s3m(path)
             data = path.read_bytes()
             packed = data[0x102:0x142] + bytes(16) + bytes([0x20, 254, 0, 0x85, 19, 0xC0]) + bytes(48)
-            pattern = struct.pack("<H", len(packed)) + packed
+            pattern = struct.pack("<H", len(packed) + 2) + packed
             path.write_bytes(data[:0x100] + pattern + bytes(0x100-len(pattern)) + data[0x200:])
             song = ASSETC.parse_s3m_tracker(path)
             cuts = song["patterns"][0]["steps"][16:]
