@@ -268,11 +268,14 @@ suporte dos demais efeitos de tracker.
 
 ### Perfil PCM nativo de XM e IT
 
-`audio.tracker_pcm_controls` identifica os campos `TrackerStep.sample_continue`
-e `sample_gain`. O primeiro atualiza afinação, volume e panorama da voz sem
+`audio.tracker_pcm_controls` identifica os campos `TrackerStep.sample_continue`,
+`sample_gain` e `sample_linear_pan`. O primeiro atualiza afinação, volume e panorama da voz sem
 reiniciar o cursor; o segundo aplica ganho linear de 0 a 255. Ganho zero pode
 manter uma voz silenciosa em andamento durante um envelope. O ganho padrão é
-255 e uma nota normal continua reiniciando o sample. Os campos ocupam o padding
+255 e uma nota normal continua reiniciando o sample. O terceiro seleciona a
+distribuição linear dos trackers: centro com metade do ganho em cada lado,
+extremos com ganho completo em um lado, com coeficientes de 8 bits. Outros
+assets conservam a distribuição anterior por padrão. Os campos ocupam o padding
 do descritor ARM de 24 bytes, mas SDK, conversor e biblioteca precisam ser
 recompilados juntos. A preparação multicanal mantém o sample de referência de
 cada nota ao mudar sua taxa, evitando trocar o cursor para outra versão do PCM.

@@ -5041,6 +5041,7 @@ class ExtendedTrackerReplay:
         signature = (payload["sample_index"], payload["sample_rate_hz"], payload["sample_gain"], payload["pan"])
         changed = channel.trigger or signature != channel.signature
         payload["sample_continue"] = not channel.trigger
+        payload["sample_linear_pan"] = True
         channel.signature, channel.trigger = signature, False
         for kind, position in channel.envelope_ticks.items():
             channel.envelope_ticks[kind] = advance_tracker_envelope(descriptor.get(kind + "_env"), position, channel.held)
@@ -5345,12 +5346,14 @@ def emit_audio_header(name, data, base_dir):
                         sample_rate = max(1, round(tracker_samples[sample_index]["sample_rate_hz"] * ratio))
                 pan = require_int(step.get("pan", 0), "pan", -127, 127)
                 suffix = ", 0, 0, false, true" if sample_only else ""
-                if "sample_gain" in step or "sample_continue" in step:
+                if "sample_gain" in step or "sample_continue" in step or "sample_linear_pan" in step:
                     if not sample_only:
                         raise SystemExit("controle PCM requer sample_only")
                     gain = require_int(step.get("sample_gain", 255), "sample_gain", 0, 255)
                     continuing = "true" if bool(step.get("sample_continue", False)) else "false"
                     suffix += f", {continuing}, {gain}"
+                    if "sample_linear_pan" in step:
+                        suffix += ", true" if bool(step["sample_linear_pan"]) else ", false"
                 lines.append(
                     f"    {{ {channel}, {frequency}, {duration}, {volume}, {duty}, {attack}, {release}, "
                     f"{waveform}, {sample_index}, {sample_rate}, {pan}{suffix} }},"

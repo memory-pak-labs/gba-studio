@@ -1273,6 +1273,31 @@ void test_tracker_pcm_controls_preserve_phase_through_silence_and_pitch_changes(
     gbs::audio_init();
 }
 
+void test_native_tracker_linear_pan_preserves_the_stereo_balance() {
+    const int8_t data[] = { 80, -80 };
+    const gbs::PcmAsset sample { data, 2, 31536, true };
+    const uint8_t order[] = { 0 };
+    gbs::TrackerStep steps[4] {};
+    for (auto& step : steps) {
+        step = { 1, 440, 1, 15, 2 };
+        step.sample_only = true; step.sample_index = 0; step.sample_rate_hz = 31536;
+        step.sample_continue = true; step.sample_linear_pan = true;
+    }
+    steps[0].sample_continue = false; steps[0].duration_frames = 2;
+    steps[1].pan = -127;
+    steps[2].pan = 127;
+    steps[3].pan = 63; steps[3].duration_frames = 8;
+    const gbs::TrackerPattern pattern { steps, 4 };
+    const gbs::TrackerAsset song { &pattern, 1, order, 1, false, &sample, 1, true };
+    gbs::audio_init(); assert(gbs::play_tracker_music(song));
+    gbs::audio_update(); assert(last_pcm_first_sample == 40 && last_pcm_right_first_sample == 40);
+    gbs::audio_update(); assert(last_pcm_first_sample == 80 && last_pcm_right_first_sample == 0);
+    gbs::audio_update(); assert(last_pcm_first_sample == 0 && last_pcm_right_first_sample == 80);
+    gbs::audio_update(); assert(last_pcm_first_sample == 20 && last_pcm_right_first_sample == 59);
+    assert(last_pcm_samples[1] == -20 && last_pcm_right_samples[1] == -59);
+    gbs::audio_init();
+}
+
 void test_pcm_backed_native_cues_keep_stop_and_validation_contract() {
     const int8_t samples[1056] = { 70, -70, 30, -30 };
     const gbs::PcmAsset pcm = { samples, 1056, 31536, true };
@@ -1350,6 +1375,7 @@ void test_authored_pcm_rests_release_their_voice() {
 }
 
 int main() {
+    test_native_tracker_linear_pan_preserves_the_stereo_balance();
     test_tracker_pcm_controls_preserve_phase_through_silence_and_pitch_changes();
     test_authored_pcm_rests_release_their_voice();
     test_pcm_native_cues_preserve_psg_tracker_channels();

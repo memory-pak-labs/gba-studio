@@ -80,6 +80,7 @@ struct TrackerStep {
     // Tick controls update a running voice without retriggering its sample.
     bool sample_continue = false;
     uint8_t sample_gain = 255;
+    bool sample_linear_pan = false;
 };
 
 struct TrackerPattern {
@@ -217,7 +218,7 @@ constexpr bool is_valid_tracker_channel(uint8_t channel) {
 }
 
 constexpr bool is_valid_tracker_step(const TrackerStep& step) {
-    return (!step.sample_continue || step.sample_only) &&
+    return (!(step.sample_continue || step.sample_linear_pan) || step.sample_only) &&
            (step.sample_only ? step.channel >= 1 && step.channel <= TRACKER_MAX_SAMPLE_CHANNELS
                                     && step.frequency_hz >= 16 && step.frequency_hz <= 32767
                              : is_valid_tracker_channel(step.channel) &&

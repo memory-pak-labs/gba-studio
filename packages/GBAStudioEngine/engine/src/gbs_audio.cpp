@@ -53,6 +53,7 @@ struct PcmPlayback {
     bool playing;
     bool native_sfx = false;
     uint8_t sample_gain = 255;
+    bool sample_linear_pan = false;
 };
 
 struct AudioVolumeState {
@@ -283,6 +284,7 @@ void reset_pcm_playback(PcmPlayback& playback) {
     playback.playing = false;
     playback.native_sfx = false;
     playback.sample_gain = 255;
+    playback.sample_linear_pan = false;
 }
 
 void reset_pcm_sfx_state() {
@@ -391,6 +393,7 @@ void start_pcm_playback(PcmPlayback& playback, const gbs::PcmAsset& asset, uint8
     playback.age = pcm_voice_age++;
     playback.playing = true;
     playback.sample_gain = 255;
+    playback.sample_linear_pan = false;
 }
 
 void start_tracker_sample(const gbs::TrackerStep& step) {
@@ -404,6 +407,7 @@ void start_tracker_sample(const gbs::TrackerStep& step) {
         playback.volume = step.volume;
         playback.pan = step.pan;
         playback.sample_gain = step.sample_gain;
+        playback.sample_linear_pan = step.sample_linear_pan;
         return;
     }
     if (step.volume == 0 || step.sample_index < 0 || tracker.asset == nullptr || tracker.asset->samples == nullptr ||
@@ -420,6 +424,7 @@ void start_tracker_sample(const gbs::TrackerStep& step) {
         step.pan
     );
     playback.sample_gain = step.sample_gain;
+    playback.sample_linear_pan = step.sample_linear_pan;
 }
 
 void update_sfx() {
@@ -644,19 +649,19 @@ __attribute__((always_inline)) inline int32_t scale_pcm_sample(int32_t sample, u
 // Reuse exact integer gain results across a block and voices with the same mix.
 // Interpolation stays in the inner loop; only the repeated gain arithmetic moves.
 // Cache only gain values, never asset data; changed settings replace the table.
-uint8_t pcm_gain_key[5] {};
+uint8_t pcm_gain_key[6] {};
 bool pcm_gain_key_valid = false;
 bool pcm_block_stereo = false;
-GBS_AUDIO_HOT_CODE void prepare_pcm_gain_table(uint8_t volume, uint8_t primary, uint8_t pcm, uint8_t pan, uint8_t fine_gain) {
+GBS_AUDIO_HOT_CODE void prepare_pcm_gain_table(uint8_t volume, uint8_t primary, uint8_t pcm, uint8_t pan, uint8_t fine_gain, bool linear_pan) {
     if (pcm_gain_key_valid && pcm_gain_key[0] == volume && pcm_gain_key[1] == primary &&
-        pcm_gain_key[2] == pcm && pcm_gain_key[3] == pan && pcm_gain_key[4] == fine_gain) return;
+        pcm_gain_key[2] == pcm && pcm_gain_key[3] == pan && pcm_gain_key[4] == fine_gain && pcm_gain_key[5] == linear_pan) return;
     for (int source = -128; source <= 127; ++source) {
         const int32_t fine_sample = fine_gain == 255 ? source : source * fine_gain / 255;
         const int32_t sample = scale_pcm_sample(scale_pcm_sample(scale_pcm_sample(fine_sample, volume), primary), pcm);
-        pcm_gain_left[source + 128] = static_cast<int8_t>(scale_pcm_sample(sample, pan));
+        pcm_gain_left[source + 128] = static_cast<int8_t>(linear_pan ? sample * pan / 255 : scale_pcm_sample(sample, pan));
     }
     pcm_gain_key[0] = volume; pcm_gain_key[1] = primary; pcm_gain_key[2] = pcm;
-    pcm_gain_key[3] = pan; pcm_gain_key[4] = fine_gain; pcm_gain_key_valid = true;
+    pcm_gain_key[3] = pan; pcm_gain_key[4] = fine_gain; pcm_gain_key[5] = linear_pan; pcm_gain_key_valid = true;
 }
 
 // Keep only the sample loops in fast RAM; loop boundaries and playback state
@@ -791,15 +796,16 @@ void mix_pcm_voice_block(const MixVoice& voice, bool right) {
     const uint8_t pcm_gain = channel_volume(voice.pcm);
     // Unity gain needs no table lookup; other mixes reuse exact integer gains.
     const uint8_t pan = right ? voice.pan.right : voice.pan.left;
-    if (playback.sample_gain == 255 && playback.volume == 15 && primary_gain == 15 && pcm_gain == 15 && pan == 15) {
+    const uint8_t unity_pan = playback.sample_linear_pan ? 255 : 15;
+    if (playback.sample_gain == 255 && playback.volume == 15 && primary_gain == 15 && pcm_gain == 15 && pan == unity_pan) {
         mix_pcm_voice_samples(playback, nullptr);
-    } else if (playback.sample_gain == 255 && playback.volume == 15 && pcm_gain == 15 && pan == 15 &&
+    } else if (playback.sample_gain == 255 && playback.volume == 15 && pcm_gain == 15 && pan == unity_pan &&
         playback.step_fp == 65536u && (playback.position_fp & 0xFFFFu) == 0 &&
         playback.asset->native_gain_samples != nullptr &&
         playback.asset->native_gain_primary_volume == primary_gain) {
         mix_pcm_voice_samples(playback, nullptr, playback.asset->native_gain_samples);
     } else {
-        prepare_pcm_gain_table(playback.volume, primary_gain, pcm_gain, pan, playback.sample_gain);
+        prepare_pcm_gain_table(playback.volume, primary_gain, pcm_gain, pan, playback.sample_gain, playback.sample_linear_pan);
         mix_pcm_voice_samples(playback, pcm_gain_left);
     }
 }
@@ -857,7 +863,12 @@ void update_pcm_mixer() {
         if (playback.playing) voices[voice_count++] = { &playback, gbs::AudioChannel::Sfx, gbs::AudioChannel::PcmSfx, gbs::pcm_pan_gains(playback.pan), playback.position_fp };
     }
     for (PcmPlayback& playback : pcm_tracker) {
-        if (playback.playing) voices[voice_count++] = { &playback, gbs::AudioChannel::Music, gbs::AudioChannel::PcmMusic, gbs::pcm_pan_gains(playback.pan), playback.position_fp };
+        if (playback.playing) {
+            const auto pan = playback.sample_linear_pan
+                ? gbs::PcmPanGains { static_cast<uint8_t>((255 * (127 - playback.pan) + 127) / 254), static_cast<uint8_t>((255 * (127 + playback.pan) + 127) / 254) }
+                : gbs::pcm_pan_gains(playback.pan);
+            voices[voice_count++] = { &playback, gbs::AudioChannel::Music, gbs::AudioChannel::PcmMusic, pan, playback.position_fp };
+        }
     }
     pcm_block_stereo = false;
     for (size_t index = 0; index < voice_count; ++index) {
