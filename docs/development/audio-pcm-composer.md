@@ -19,6 +19,39 @@ compartilhado. Afinação, envelope e repetição desse instrumento são compart
 volume e panorama permanecem individuais. Importe WAVs ou um SoundFont pelo botão
 de importação já existente para ampliar o banco.
 
+## Editar MOD e S3M importados
+
+Selecione uma música MOD ou S3M da biblioteca e use **Criar cópia editável** em
+um projeto salvo no aplicativo desktop. A cópia recebe outro nome e identidade;
+o item importado, o arquivo de origem e os vínculos existentes continuam iguais.
+Associe a cópia às cenas ou aos eventos em que deseja ouvir a versão modificada.
+
+O **Piano Roll** insere e seleciona notas nos canais PCM do módulo, até 16.
+O **Tracker** mostra as 64 linhas de cada padrão e permite editar nota,
+instrumento, efeito e parâmetro. Os instrumentos são os samples incorporados
+ao arquivo de origem. Os comandos e parâmetros usam hexadecimal; no S3M,
+o Tracker também mostra a coluna de volume e o corte de nota `OFF`.
+O campo de efeito usa o número hexadecimal do comando S3M; a célula mostra
+sua letra, por exemplo `01` / parâmetro `06` aparece como `A06`.
+
+Confirme campos de texto com Enter ou ao sair do campo. **Limpar nota** mantém
+instrumento e comandos; **Limpar célula** remove todos os dados daquele passo.
+Mover uma célula transporta também seus comandos. A aba **Sequência** permite
+duplicar, remover e renomear padrões e organizar sua ordem de reprodução.
+Adicionar ou remover um canal aplica a mudança a todos os padrões do módulo.
+As operações usam desfazer/refazer e são salvas no próprio `.gba-project`.
+
+No MOD, velocidade e andamento permanecem nos comandos `Fxx` do Tracker;
+o controle superior de BPM fica desabilitado. No S3M, o BPM inicial pode ser
+editado, preservando os comandos de andamento existentes. Esta edição não
+inclui desenho de ondas, troca dos samples incorporados, XM, IT ou síntese OPL.
+
+A prévia e a exportação geram um novo módulo nativo em sua pasta de trabalho,
+preservando os samples e comandos originais. O arquivo de origem nunca é
+reescrito. Se ele for substituído externamente, a exportação informa a mudança
+em vez de aplicar a edição sobre outro arquivo. Crie uma nova cópia editável
+a partir da nova fonte para continuar.
+
 ## Efeitos
 
 O designer de SFX PCM oferece cinco formas de onda, varredura de frequência,
@@ -73,3 +106,18 @@ npx vitest run src/main/authoredPcmProjectRom.integration.test.ts
 
 Editor, PCM emitido pelo emulador e execução em um GBA físico são verificações
 distintas. Nenhum teste de emulação comprova sozinho o hardware físico.
+
+A prova específica de módulos recebe o snapshot salvo pelo teste visual e o
+arquivo original `qa_native_source.s3m` no mesmo diretório. Ela compara o PCM
+do original com uma cópia sem edições, confirma que notas editadas mudam a
+reprodução, verifica a invalidação do cache e executa as cópias MOD/S3M na
+exportação normal de Porto Lúmen:
+
+```sh
+GBA_TRACKER_UI_SNAPSHOT=/caminho/qa/project-snapshot.json \
+GBA_TRACKER_ROM_PROOF=/caminho/evidencias \
+npx vitest run src/main/trackerModuleRom.integration.test.ts
+```
+
+Use `TMPDIR` exclusivo com orçamento de espaço e remova os builds descartáveis
+ao finalizar. O teste conserva apenas medições e hashes no diretório de evidências.
