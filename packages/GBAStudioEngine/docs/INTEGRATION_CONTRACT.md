@@ -275,9 +275,9 @@ manter uma voz silenciosa em andamento durante um envelope. O ganho padrão é
 255 e uma nota normal continua reiniciando o sample. O terceiro seleciona a
 distribuição linear dos trackers: centro com metade do ganho em cada lado,
 extremos com ganho completo em um lado, com coeficientes de 8 bits. Outros
-assets conservam a distribuição anterior por padrão. Os campos ocupam o padding
-do descritor ARM de 24 bytes, mas SDK, conversor e biblioteca precisam ser
-recompilados juntos. A preparação multicanal mantém o sample de referência de
+assets conservam a distribuição anterior por padrão. O descritor ARM atual
+`TrackerStep` ocupa 36 bytes e `PcmAsset` ocupa 44 bytes. SDK, conversor,
+biblioteca e todo o código exportado precisam ser recompilados juntos. A preparação multicanal mantém o sample de referência de
 cada nota ao mudar sua taxa, evitando trocar o cursor para outra versão do PCM.
 Em canais XM/IT com afinação dinâmica e fonte entre 4000 e 32768 Hz, preserva
 o PCM original e suas taxas explícitas para interpolá-lo uma única vez.
@@ -341,19 +341,42 @@ A saída mantém o arredondamento e o limitador existentes. A reserva de scratch
 é de até 6,6 KiB, e dois buffers de publicação gráfica ficam em EWRAM; os
 limites do linker e a reserva de pilha continuam obrigatórios.
 
+`audio.pcm_prepared_interpolation` antecipa o cálculo exato da interpolação e
+cadeia de ganhos para loops curtos de XM/IT. `PcmInterpolationInterval` ocupa
+8 bytes: limite exclusivo de posição Q16 e contribuição estéreo empacotada.
+`PcmInterpolationMap` ocupa 12 bytes: chave de ganho/panorama, intervalos,
+contagem e índice do loop. Os limites são 128 amostras por loop, 128 intervalos
+por mapa e 256 mapas por sample; os arrays ficam na ROM e seus bytes entram no
+diagnóstico. `interpolation_source_bytes` é uma contagem validada para evitar
+percorrer esses arrays a cada quadro. São calculados a partir do PCM original
+imutável, com os mesmos arredondamentos inteiros; nenhuma amostra é aproximada.
+`TrackerStep.sample_step_fp` e `sample_step_reciprocal` evitam divisões durante
+controles de pitch e `prepared_mix_map` aponta para um mapa do próprio sample.
+O validador confere a taxa, o recíproco, o ponteiro, os limites, os ganhos e os
+bytes. Um ganho/panorama não preparado, loop longo ou mapa que excede os limites
+usa o interpolador original. Alterações globais de volume continuam funcionando.
+O publicador usa escritas estéreo de quatro bytes somente quando o limite
+teórico de todas as vozes está na região identidade do limitador; nos demais
+casos mantém o limitador existente. A frequência permanece em 31536 Hz e todos
+os canais permanecem independentes.
+
 O limite de 16 canais é de representação/vozes, não uma garantia de CPU para
 qualquer combinação de efeitos e cena. A regressão ARM
 `make audio-mixer-kernel-rom` verifica alinhamento, caudas e saída inteira do
-kernel nativo em ROM; `audio_kernel_witness[2] == 1` e `[3] == 136` indicam êxito.
+kernel nativo, acumulação constante, publicação estéreo e interpolação preparada
+em ROM; `audio_kernel_witness[2] == 1` e `[3] == 282` indicam êxito.
 O benchmark opt-in
 `extendedTrackerSceneRom.integration.test.ts` usa módulos autorais gerados por
-`python3 tests/host/tracker_stress_fixtures.py /tmp/qa-tracker --pitch-channels 4`
+`python3 tests/host/tracker_stress_fixtures.py /tmp/qa-tracker --pitch-channels 16`
 (na raiz da engine). Em `apps/desktop-electron`, execute
 `GBA_TRACKER_SCENE_QA=/tmp/qa-cenas GBA_TRACKER_SCENE_SOURCES=/tmp/qa-tracker npm exec vitest run src/main/extendedTrackerSceneRom.integration.test.ts`.
 O teste preserva as fontes, apaga seu projeto temporário/cache ao encerrar e compara a cadência com a mesma
-cena sem música e falha abaixo de metade dessa referência. A carga extrema de
-16 vozes com interpolação e modulação contínuas ainda excede o orçamento do
-GBA; não constitui um perfil de desempenho aprovado. Reduzir a fidelidade
+cena sem música e exige metade dessa referência, com tolerância de uma
+atualização na borda da janela. XM e IT são testados nas três cenas com
+16 vozes, quatro fontes PCM, envelopes e modulação contínua de pitch em todos
+os canais. O teste exige também publicação contínua dos blocos PCM: apenas
+um contador de underruns zerado não detecta uma IRQ sobrecarregada que impede
+o jogo de avançar. Reduzir a fidelidade
 silenciosamente ou descartar canais não é uma solução adotada pelo pipeline.
 `audio.pcm_prepared_gain` acrescenta uma variante opcional de PCM com o volume
 primário configurado no projeto. O descritor `PcmAsset` conserva os samples
@@ -376,8 +399,16 @@ A regressão sintética usa fontes MOD/S3M geradas pelo próprio teste. Depois d
 ```sh
 node scripts/verify-tracker-multichannel-rom.mjs ../../packages/GBAStudioEngine/dist/GBAStudioEnginePack /caminho/qa/tracker
 node scripts/verify-audio-prepared-gain-rom.mjs ../../packages/GBAStudioEngine/dist/GBAStudioEnginePack /caminho/qa/gain
+node scripts/verify-audio-prepared-interpolation-rom.mjs ../../packages/GBAStudioEngine/dist/GBAStudioEnginePack /caminho/qa/interpolation
 node scripts/verify-scene-tracker-cadence.mjs /caminho/qa/porto/build/exemplo.gba /caminho/qa/cadence
 ```
+
+A regressão de interpolação compara byte a byte 360 blocos PCM estéreo por
+formato XM/IT, com 16 vozes moduladas e quatro samples. A referência escalar
+pode sobrecarregar a IRQ: os blocos são comparados pela ordem de publicação,
+não pelo tempo do jogo. O leitor preserva ambas as metades do ping-pong quando
+uma borda expõe dois blocos. A versão preparada precisa manter a cadência
+da ROM isolada. Essa prova complementa o teste de gameplay nas três cenas.
 
 A regressão de ganho compara byte a byte 360 blocos PCM estéreo por formato,
 alternando entre a variante e o cálculo original na mesma ROM ARM, e verifica

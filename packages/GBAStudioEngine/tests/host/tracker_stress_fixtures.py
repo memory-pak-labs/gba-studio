@@ -2,7 +2,7 @@
 """Generate deterministic QA music; PCM is synthesized here, with no imported assets.
 
 python3 tests/host/tracker_stress_fixtures.py /tmp/owned-fixtures --pitch-channels 4
-Use --pitch-channels 16 separately to probe the CPU overload boundary.
+Use --pitch-channels 16 to require continuous pitch effects on every voice.
 """
 import sys,struct,pathlib
 sys.path.insert(0,str(pathlib.Path(__file__).resolve().parent))
@@ -13,7 +13,7 @@ parser.add_argument('output',type=pathlib.Path);parser.add_argument('--pitch-cha
 args=parser.parse_args();root=args.output;root.mkdir(parents=True,exist_ok=True);rows=192
 waveforms=[[round(80*math.sin(i*math.pi/16+phase)) for i in range(128)] for phase in [0,0.4,0.8,1.2]]
 # Four separately authored samples and sixteen distinct pitches.
-notes=[37,41,44,49,53,56,61,65,38,42,45,50,54,57,62,66]
+notes=[37,41,44,49,53,56,61,65,38,42,45,50,54,57,62,67]
 sample_map=[n%4 for n in range(96)]
 for load in ['static','effects']:
  b,ins,_=xm_fixture(channels=16,rows=rows);b=b[:ins+263]+bytearray(4*40+4*128);struct.pack_into('<H',b,ins+27,4);b[ins+33:ins+129]=bytes(sample_map);b[345:ins]=bytes(ins-345)

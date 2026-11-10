@@ -12,7 +12,7 @@ describe("composed audio physical budget", () => {
     expect(GBA_AUDIO_ROM_LAYOUT).toEqual({
       sfxToneBytes: 14,
       sfxAssetBytes: 16,
-      trackerStepBytes: 24,
+      trackerStepBytes: 36,
       trackerPatternBytes: 8,
       trackerOrderEntryBytes: 1,
       trackerAssetBytes: 32
@@ -25,7 +25,7 @@ describe("composed audio physical budget", () => {
       name: "theme",
       patterns: [{ id: "intro", steps: 1, channels: [{ type: "pulse1", notes: ["C4"] }] }],
       patternOrder: ["intro"]
-    })).toBe(65);
+    })).toBe(77);
 
     expect(estimateComposedAudioPhysicalBytes({
       kind: "SFX",

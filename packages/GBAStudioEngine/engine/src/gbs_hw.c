@@ -690,7 +690,7 @@ static uint16_t name_input_glyph_tile_entry(unsigned tile_index) {
 
 static unsigned dialogue_bg_tile_for_codepoint(uint32_t codepoint);
 static unsigned dialogue_obj_tile_for_codepoint(uint32_t codepoint, unsigned slot);
-static uint16_t resident_font_glyphs[GBS_TEXT_RESIDENT_GLYPHS];
+static uint16_t resident_font_glyphs[GBS_TEXT_RESIDENT_GLYPHS] __attribute__((section(".ewram_bss")));
 static uint8_t resident_font_slots[GBS_TEXT_GLYPH_COUNT];
 
 static void rebuild_resident_font_slots(void) {

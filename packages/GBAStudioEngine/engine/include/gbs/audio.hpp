@@ -47,9 +47,22 @@ struct MusicAsset {
     bool loop;
 };
 
+// Exact quantized output intervals for an exported gain/pan configuration.
+struct PcmInterpolationInterval { uint32_t end, gain; };
+struct PcmInterpolationMap {
+    uint32_t mix_key;
+    const PcmInterpolationInterval* intervals;
+    uint16_t interval_count, loop_index;
+};
+constexpr uint32_t pcm_interpolation_mix_key(uint8_t volume, uint8_t primary, uint8_t pcm, uint8_t fine_gain, int8_t pan, bool linear) {
+    return fine_gain | (static_cast<uint32_t>(static_cast<uint8_t>(pan)) << 8) |
+        (static_cast<uint32_t>(volume) << 16) | (static_cast<uint32_t>(primary) << 20) |
+        (static_cast<uint32_t>(pcm) << 24) | (static_cast<uint32_t>(linear) << 28);
+}
+
 struct PcmAsset {
     // Source samples are signed int8_t centered at zero.
-    // The mixer biases them to unsigned FIFO bytes (centered at 0x80) when submitting.
+    // FIFO bytes stay signed; stereo accumulator biases are internal only.
     const int8_t* samples;
     size_t sample_count;
     uint32_t sample_rate_hz;
@@ -59,6 +72,11 @@ struct PcmAsset {
     // Optional ROM variant, identical to applying this primary gain at 1:1 rate.
     const int8_t* native_gain_samples = nullptr;
     uint8_t native_gain_primary_volume = 15;
+    // Generated from immutable source PCM. Absent configurations use the normal
+    // resampler; callers supplying maps must keep them coherent with samples.
+    const PcmInterpolationMap* interpolation_maps = nullptr;
+    uint16_t interpolation_map_count = 0;
+    uint32_t interpolation_source_bytes = 0;
 };
 
 struct TrackerStep {
@@ -81,6 +99,11 @@ struct TrackerStep {
     bool sample_continue = false;
     uint8_t sample_gain = 255;
     bool sample_linear_pan = false;
+    // Optional exact export-time pitch; zero selects the runtime calculation.
+    uint32_t sample_step_fp = 0;
+    uint32_t sample_step_reciprocal = 0;
+    // If present, belongs to the referenced sample and matches this control.
+    const PcmInterpolationMap* prepared_mix_map = nullptr;
 };
 
 struct TrackerPattern {
@@ -103,8 +126,9 @@ struct TrackerAsset {
 #if defined(__arm__) || defined(__thumb__)
 // Shared with the editor's GBA_AUDIO_ROM_LAYOUT. An ABI change must update
 // its physical estimates rather than silently undercounting ROM descriptors.
+static_assert(sizeof(PcmAsset) == 44 && sizeof(PcmInterpolationMap) == 12, "Update prepared PCM SDK/library together");
 static_assert(sizeof(SfxTone) == 14 && sizeof(SfxAsset) == 16, "Update SFX ROM layout estimates");
-static_assert(sizeof(TrackerStep) == 24 && sizeof(TrackerPattern) == 8 && sizeof(TrackerAsset) == 32,
+static_assert(sizeof(TrackerStep) == 36 && sizeof(TrackerPattern) == 8 && sizeof(TrackerAsset) == 32,
               "Update tracker ROM layout estimates");
 #endif
 
@@ -217,8 +241,15 @@ constexpr bool is_valid_tracker_channel(uint8_t channel) {
     return channel >= 1 && channel <= 4;
 }
 
+constexpr bool is_valid_prepared_tracker_pitch(const TrackerStep& step) {
+    if (!step.sample_step_fp) return step.sample_step_reciprocal == 0;
+    if (!step.sample_only || step.sample_rate_hz == 0 || step.sample_rate_hz > 2097152) return false;
+    const uint32_t rate = static_cast<uint32_t>((static_cast<uint64_t>(step.sample_rate_hz) << 16) / PCM_MIXER_SAMPLE_RATE_HZ);
+    return step.sample_step_fp == (rate ? rate : 1u) && step.sample_step_reciprocal == 0xFFFFFFFFu / step.sample_step_fp;
+}
+
 constexpr bool is_valid_tracker_step(const TrackerStep& step) {
-    return (!(step.sample_continue || step.sample_linear_pan) || step.sample_only) &&
+    return is_valid_prepared_tracker_pitch(step) && (!(step.sample_continue || step.sample_linear_pan) || step.sample_only) &&
            (step.sample_only ? step.channel >= 1 && step.channel <= TRACKER_MAX_SAMPLE_CHANNELS
                                     && step.frequency_hz >= 16 && step.frequency_hz <= 32767
                              : is_valid_tracker_channel(step.channel) &&
@@ -246,13 +277,50 @@ constexpr bool is_valid_pcm_loop(const PcmAsset& asset) {
             pcm_loop_end_sample(asset) <= asset.sample_count);
 }
 
+constexpr bool is_valid_pcm_interpolation_maps(const PcmAsset& asset) {
+    if (asset.interpolation_map_count == 0) return asset.interpolation_source_bytes == 0;
+    if (!asset.loop || asset.interpolation_maps == nullptr || asset.interpolation_map_count > 256 || pcm_loop_end_sample(asset) > 128) return false;
+    uint32_t bytes = static_cast<uint32_t>(asset.interpolation_map_count) * 12u;
+    for (size_t i = 0; i < asset.interpolation_map_count; ++i) {
+        const auto& map = asset.interpolation_maps[i];
+        if (map.mix_key > 0x1fffffffu || ((map.mix_key >> 8) & 255u) == 128u ||
+            (i && map.mix_key <= asset.interpolation_maps[i - 1].mix_key) ||
+            map.intervals == nullptr || map.interval_count == 0 || map.interval_count > 128 || map.loop_index >= map.interval_count) return false;
+        bytes += static_cast<uint32_t>(map.interval_count) * 8u;
+        // A prepared table must respect the same contraction as the scalar
+        // mixer; otherwise its peak bound could incorrectly bypass limiting.
+        int peak = 128 * static_cast<int>(map.mix_key & 255u) / 255;
+        peak = peak * static_cast<int>((map.mix_key >> 16) & 15u) / 15;
+        peak = peak * static_cast<int>((map.mix_key >> 20) & 15u) / 15;
+        peak = peak * static_cast<int>((map.mix_key >> 24) & 15u) / 15;
+        const int pan = static_cast<int8_t>(map.mix_key >> 8);
+        const bool linear = (map.mix_key & (1u << 28)) != 0;
+        const auto discrete = pcm_pan_gains(pan);
+        const int left_bound = linear ? peak * ((255 * (127 - pan) + 127) / 254) / 255 : peak * discrete.left / 15;
+        const int right_bound = linear ? peak * ((255 * (127 + pan) + 127) / 254) / 255 : peak * discrete.right / 15;
+        uint32_t previous = 0;
+        for (size_t j = 0; j < map.interval_count; ++j) {
+            const auto interval = map.intervals[j];
+            const int left = static_cast<int16_t>(interval.gain);
+            const int right = static_cast<int16_t>(interval.gain >> 16) + (left < 0);
+            if (interval.end <= previous || interval.end > (pcm_loop_end_sample(asset) << 16) || left < -left_bound || left > left_bound || right < -right_bound || right > right_bound || left > 127 || right > 127) return false;
+            previous = interval.end;
+        }
+        const uint32_t loop_start = static_cast<uint32_t>(asset.loop_start_sample) << 16;
+        if (previous != (pcm_loop_end_sample(asset) << 16) || map.intervals[map.loop_index].end <= loop_start ||
+            (map.loop_index && map.intervals[map.loop_index - 1].end > loop_start)) return false;
+    }
+    return !asset.interpolation_source_bytes || asset.interpolation_source_bytes == bytes;
+}
+
 constexpr bool is_valid_pcm_asset_constexpr(const PcmAsset& asset) {
     return asset.samples != nullptr &&
            asset.sample_count > 0 &&
            asset.sample_count <= 0xFFFFu &&
            is_valid_pcm_sample_rate(asset.sample_rate_hz) &&
            is_valid_pcm_loop(asset) &&
-           (asset.native_gain_samples == nullptr || is_valid_pcm_volume(asset.native_gain_primary_volume));
+           (asset.native_gain_samples == nullptr || is_valid_pcm_volume(asset.native_gain_primary_volume)) &&
+           is_valid_pcm_interpolation_maps(asset);
 }
 
 bool is_valid_sfx_asset(const SfxAsset& asset);
@@ -399,7 +467,12 @@ constexpr AudioMixCost estimate_tracker_asset_cost(const TrackerAsset& asset) {
 
 constexpr uint32_t pcm_asset_source_bytes(const PcmAsset& asset) {
     const bool separate_gain_data = asset.native_gain_samples != nullptr && asset.native_gain_samples != asset.samples;
-    return static_cast<uint32_t>(asset.sample_count) * (separate_gain_data ? 2u : 1u);
+    uint32_t bytes = static_cast<uint32_t>(asset.sample_count) * (separate_gain_data ? 2u : 1u);
+    if (asset.interpolation_source_bytes) return bytes + asset.interpolation_source_bytes;
+    if (asset.interpolation_maps != nullptr) for (size_t i = 0; i < asset.interpolation_map_count; ++i) {
+        bytes += 12u + static_cast<uint32_t>(asset.interpolation_maps[i].interval_count) * 8u;
+    }
+    return bytes;
 }
 
 constexpr uint32_t estimate_pcm_output_sample_count(const PcmAsset& asset) {

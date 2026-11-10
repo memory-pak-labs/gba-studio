@@ -5,7 +5,11 @@ namespace {
 
 gbs::DebugAssertion assertion_state {};
 gbs::DebugFrameStats frame_stats {};
+#if defined(__arm__) || defined(__thumb__)
+gbs::DebugCounter counters[gbs::debug_counter_count] __attribute__((section(".ewram_bss"))) {};
+#else
 gbs::DebugCounter counters[gbs::debug_counter_count] {};
+#endif
 char overlay_buffer[26 * 7 + 1] {};
 int32_t active_runtime_kind = -1;
 bool event_trace_enabled = true;

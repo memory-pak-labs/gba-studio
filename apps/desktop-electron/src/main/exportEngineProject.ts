@@ -11154,7 +11154,7 @@ function buildEngineExportProjectContractUncached(
   }
   if (audioPack?.document.tracker.some(asset => asset.xm)) features.push("audio.tracker_xm_pcm_profile");
   if (audioPack?.document.tracker.some(asset => asset.it)) features.push("audio.tracker_it_pcm_profile");
-  if (audioPack?.document.tracker.some(asset => asset.xm || asset.it)) features.push("audio.tracker_pcm_controls");
+  if (audioPack?.document.tracker.some(asset => asset.xm || asset.it)) features.push("audio.tracker_pcm_controls", "audio.pcm_prepared_interpolation");
   if (audioPack?.document.tracker.some(tracker => tracker.samples?.length)) features.push("audio.tracker_sample_instruments");
   const hasTacticalIsometricRoom = rooms.some((room) => (
     resolveSceneRuntimeExport(roomSceneType(room)).kind === "isometric" &&

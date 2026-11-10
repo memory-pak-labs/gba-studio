@@ -78,6 +78,25 @@ def it_fixture(channels=(0, 4, 63), rows=7, pcm16=False):
 
 
 class ExtendedTrackerTests(unittest.TestCase):
+    def test_prepared_intervals_match_every_fraction_and_the_loop_seam(self):
+        sample = {"samples": [-127, -83, 72, 126], "sample_rate_hz": 8363, "loop_start_sample": 1, "loop_end_sample": 4}
+        for pan in (-127, 0, 20, 127):
+            result = ASSETC.build_pcm_interpolation_map(sample, 15, 12, 15, 13, pan, True)
+            self.assertIsNotNone(result)
+            intervals = result["intervals"]
+            cursor = 0
+            for position in range(4 * 65536):
+                while intervals[cursor][0] <= position: cursor += 1
+                index, fraction = position >> 16, position & 65535
+                following = index + 1 if index < 3 else 1
+                value = sample["samples"][index] + (((sample["samples"][following] - sample["samples"][index]) * fraction) >> 16)
+                value = int(int(value * 13 / 255) * 12 / 15)
+                left = int(value * ((255 * (127 - pan) + 127) // 254) / 255)
+                right = int(value * ((255 * (127 + pan) + 127) // 254) / 255)
+                expected = (right * 65536 + left) & 0xffffffff
+                if intervals[cursor][1] != expected: self.fail(f"pan={pan}, position={position}: prepared gain differs")
+            self.assertGreater(intervals[result["loop_index"]][0], 65536)
+
     def test_native_live_pitch_uses_the_original_pcm_once(self):
         sample = {"samples": [0, 32, -32, 64, -64] * 8, "sample_rate_hz": 8363, "loop_start_sample": 0, "loop_end_sample": 40}
         note = {"channel": 5, "frequency_hz": 440, "duration_frames": 2, "volume": 15, "duty": 2, "sample_only": True, "sample_index": 0, "sample_rate_hz": 8363, "sample_gain": 255, "sample_linear_pan": True}

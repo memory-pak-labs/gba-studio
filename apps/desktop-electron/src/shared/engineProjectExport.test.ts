@@ -1171,9 +1171,9 @@ describe("Engine project export", () => {
     expect(pack?.physicalBudget).toEqual({
       schema: 1,
       audio_bytes_by_item: {
-        "audio-battle": 137,
-        "audio:0": 137,
-        battle_theme: 137
+        "audio-battle": 185,
+        "audio:0": 185,
+        battle_theme: 185
       }
     });
   });

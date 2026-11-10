@@ -252,9 +252,18 @@ int main(void) {
         self.assertIn("commit_shadow_oam_full();", init_body)
 
     def test_render_publication_buffers_leave_iwram_for_audio(self) -> None:
-        for name in ("shadow_oam", "hud_layout_previous_rects"):
+        for name in ("shadow_oam", "hud_layout_previous_rects", "resident_font_glyphs"):
             declaration = next(line for line in self.source.splitlines() if line.startswith("static ") and name + "[" in line)
             self.assertIn('section(".ewram_bss")', declaration)
+
+    def test_cold_diagnostics_leave_fast_ram_for_audio(self) -> None:
+        debug = (ROOT / "engine/src/gbs_debug.cpp").read_text()
+        self.assertRegex(debug, r'counters\[gbs::debug_counter_count\] __attribute__\(\(section\(".ewram_bss"\)\)\)')
+
+    def test_frequent_font_lookups_remain_in_iwram(self) -> None:
+        for name in ("resident_font_slots", "hud_pixel_text_glyphs"):
+            declaration = next(line for line in self.source.splitlines() if line.startswith("static ") and name + "[" in line)
+            self.assertNotIn('section(".ewram_bss")', declaration)
 
     def test_render_publication_gate_defers_all_shadow_state_until_vram_is_ready(self) -> None:
         wait_body = function_body(self.source, "gbs_hw_wait_vblank")

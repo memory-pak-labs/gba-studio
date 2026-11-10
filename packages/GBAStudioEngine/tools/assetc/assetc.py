@@ -4233,6 +4233,53 @@ def parse_vgm_tracker(path, duty=2):
     }
 
 
+def build_pcm_interpolation_map(sample, volume, primary, pcm, fine_gain, pan, linear):
+    """Exact output plateaus of floor-linear PCM, bounded for short loops."""
+    data = sample["samples"]
+    start, end = sample.get("loop_start_sample", 0), sample.get("loop_end_sample", 0)
+    if not 0 <= start < end <= min(128, len(data)):
+        return None
+    def trunc(n, d):
+        return -(abs(n) // d) if n < 0 else n // d
+    if linear:
+        left_pan, right_pan, divisor = (255 * (127 - pan) + 127) // 254, (255 * (127 + pan) + 127) // 254, 255
+    else:
+        opposite = 15 * (127 - abs(pan)) // 127
+        left_pan, right_pan, divisor = (15 if pan < 0 else opposite), (opposite if pan < 0 else 15), 15
+    gains = []
+    for source in range(-128, 128):
+        v = trunc(source * fine_gain, 255)
+        for level in (volume, primary, pcm): v = trunc(v * level, 15)
+        left, right = trunc(v * left_pan, divisor), trunc(v * right_pan, divisor)
+        gains.append((right * 65536 + left) & 0xffffffff)
+    intervals = []
+    current_gain = gains[data[0] + 128]
+    for i in range(end):
+        original, target = data[i], data[i + 1 if i + 1 < end else start]
+        direction = 1 if target > original else -1
+        slope, cursor = abs(target - original), original
+        gain, final = gains[cursor + 128], gains[target + 128]
+        while gain != final:
+            lo, hi = 1, abs(target - cursor)
+            while lo < hi:
+                mid = (lo + hi) // 2
+                if gains[cursor + direction * mid + 128] == gain: lo = mid + 1
+                else: hi = mid
+            cursor += direction * lo
+            distance = abs(cursor - original)
+            fraction = (distance * 65536 + slope - 1) // slope if direction > 0 else ((distance - 1) * 65536) // slope + 1
+            boundary = i * 65536 + fraction
+            gain = gains[cursor + 128]
+            if boundary < end * 65536:
+                if len(intervals) >= 127: return None
+                intervals.append((boundary, current_gain))
+                current_gain = gain
+    intervals.append((end * 65536, current_gain))
+    loop_index = next(i for i, interval in enumerate(intervals) if interval[0] > start * 65536)
+    key = fine_gain | ((pan & 255) << 8) | (volume << 16) | (primary << 20) | (pcm << 24) | (int(linear) << 28)
+    return {"key": key, "intervals": intervals, "loop_index": loop_index}
+
+
 def prepare_multichannel_tracker_samples(patterns, source_samples, native_primary_volume=15):
     """Move pitched linear resampling to export time, retaining every voice.
 
@@ -4339,6 +4386,18 @@ def prepare_multichannel_tracker_samples(patterns, source_samples, native_primar
                 step["volume"] = 15 if volume else 0
             prepared_steps.append(step)
         prepared_patterns.append({**pattern, "steps": prepared_steps})
+    configurations = {}
+    for pattern in prepared_patterns:
+        for step in pattern["steps"]:
+            index = step.get("sample_index", -1)
+            if step.get("sample_only") and step.get("sample_linear_pan") and 0 <= index < len(prepared_samples):
+                configurations.setdefault(index, set()).add((step["volume"], step.get("sample_gain", 255), step.get("pan", 0)))
+    for index, settings in configurations.items():
+        maps = []
+        for volume, gain, pan in sorted(settings)[:256]:
+            prepared = build_pcm_interpolation_map(prepared_samples[index], volume, native_primary_volume, 15, gain, pan, True)
+            if prepared is not None: maps.append(prepared)
+        if maps: prepared_samples[index]["interpolation_maps"] = sorted(maps, key=lambda m: m["key"])
     return prepared_patterns, prepared_samples
 
 
@@ -5330,6 +5389,18 @@ def emit_audio_header(name, data, base_dir):
                             lines.append("    " + ", ".join(str(value) for value in gain_data[offset:offset + 16]) + ",")
                         lines.append("};")
                 gain_data_symbols.append(gain_symbol)
+            for sample_index, sample_asset in enumerate(tracker_samples):
+                maps = sample_asset.get("interpolation_maps", [])
+                for map_index, mapping in enumerate(maps):
+                    interval_symbol = f"{symbol}_sample_{sample_index}_mix_{map_index}"
+                    lines.append(f"inline constexpr gbs::PcmInterpolationInterval {interval_symbol}[{len(mapping['intervals'])}] = {{")
+                    lines.extend(f"    {{ {end}u, {gain}u }}," for end, gain in mapping["intervals"])
+                    lines.append("};")
+                if maps:
+                    lines.append(f"inline constexpr gbs::PcmInterpolationMap {symbol}_sample_{sample_index}_mix_maps[{len(maps)}] = {{")
+                    for map_index, mapping in enumerate(maps):
+                        lines.append(f"    {{ {mapping['key']}u, {symbol}_sample_{sample_index}_mix_{map_index}, {len(mapping['intervals'])}, {mapping['loop_index']} }},")
+                    lines.append("};")
             lines.append(f"inline constexpr gbs::PcmAsset {symbol}_sample_assets[{len(tracker_samples)}] = {{")
             for sample_index, sample_asset in enumerate(tracker_samples):
                 sample_data = sample_asset["samples"]
@@ -5337,6 +5408,11 @@ def emit_audio_header(name, data, base_dir):
                 loop_end = sample_asset.get("loop_end_sample", 0)
                 loop_literal = "true" if loop_end > loop_start else "false"
                 gain_suffix = f", {gain_data_symbols[sample_index]}, {sample_asset['native_gain_primary_volume']}" if gain_data_symbols[sample_index] else ""
+                maps = sample_asset.get("interpolation_maps", [])
+                if maps:
+                    if not gain_suffix: gain_suffix = ", nullptr, 15"
+                    map_bytes = sum(12 + len(m["intervals"]) * 8 for m in maps)
+                    gain_suffix += f", {symbol}_sample_{sample_index}_mix_maps, {len(maps)}, {map_bytes}u"
                 lines.append(
                     f"    {{ {sample_data_symbols[sample_index]}, {len(sample_data)}, {sample_asset['sample_rate_hz']}, "
                     f"{loop_literal}, {loop_start}, {loop_end}{gain_suffix} }},"
@@ -5381,6 +5457,14 @@ def emit_audio_header(name, data, base_dir):
                     suffix += f", {continuing}, {gain}"
                     if "sample_linear_pan" in step:
                         suffix += ", true" if bool(step["sample_linear_pan"]) else ", false"
+                        if step["sample_linear_pan"] and sample_rate:
+                            pitch_step = max(1, sample_rate * 65536 // 31536)
+                            suffix += f", {pitch_step}u, {0xffffffff // pitch_step}u"
+                            primary = asset.get("native_primary_volume", 15)
+                            key = gain | ((pan & 255) << 8) | (volume << 16) | (primary << 20) | (15 << 24) | (1 << 28)
+                            maps = tracker_samples[sample_index].get("interpolation_maps", [])
+                            mapping_index = next((i for i, m in enumerate(maps) if m["key"] == key), None)
+                            suffix += f", {symbol}_sample_{sample_index}_mix_maps + {mapping_index}" if mapping_index is not None else ", nullptr"
                 lines.append(
                     f"    {{ {channel}, {frequency}, {duration}, {volume}, {duty}, {attack}, {release}, "
                     f"{waveform}, {sample_index}, {sample_rate}, {pan}{suffix} }},"

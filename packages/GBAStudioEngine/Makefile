@@ -583,9 +583,9 @@ $(HOST_BUILD)/pseudo_3d_tests: tests/host/pseudo_3d_tests.cpp engine/src/pseudo_
 	@mkdir -p $(@D)
 	$(HOST_CXX) $(HOST_CXXFLAGS) $^ -o $@
 
-$(HOST_BUILD)/audio_tests: tests/host/audio_tests.cpp engine/src/gbs_audio.cpp
+$(HOST_BUILD)/audio_tests: tests/host/audio_tests.cpp engine/src/gbs_audio.cpp engine/include/gbs/audio.hpp
 	@mkdir -p $(@D)
-	$(HOST_CXX) $(HOST_CXXFLAGS) -Iengine/src $^ -o $@
+	$(HOST_CXX) $(HOST_CXXFLAGS) -Iengine/src $(filter %.cpp,$^) -o $@
 
 $(HOST_BUILD)/math_tests: tests/host/math_tests.cpp engine/src/gbs_math.cpp
 	@mkdir -p $(@D)

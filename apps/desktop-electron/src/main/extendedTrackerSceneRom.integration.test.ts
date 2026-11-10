@@ -68,7 +68,7 @@ describe.skipIf(!output || !sources)("XM/IT envelopes and effects in example sce
           await cp(destination, path.join(path.resolve(process.env.GBA_TRACKER_RETAIN_BUILD), scene), { recursive: true });
         }
         let baselineUpdates: number[] = [];
-        for (const mode of scene === "porto_lumen" ? ["off", "static", "effects", "it"] : ["off", "static", "effects"]) {
+        for (const mode of ["off", "static", "effects", "it"]) {
           const core = await create({ print() {}, printErr() {}, instantiateWasm(imports: WebAssembly.Imports, done: (instance: WebAssembly.Instance) => void) { const instance = new WebAssembly.Instance(wasm, imports); done(instance); return instance.exports; } });
           const recorder = createNativeAudioRecorder(core, qa);
           const windows = []; let peak = 0, underruns = 0, minVoices = 99;
@@ -106,9 +106,13 @@ describe.skipIf(!output || !sources)("XM/IT envelopes and effects in example sce
             expect(underruns).toBe(0);
             if (mode !== "off") { expect(minVoices).toBe(16); expect(peak).toBeGreaterThan(100); }
             if (mode === "off") baselineUpdates = windows.map(w => w.gameUpdates);
-            // Aim for >= half the no-music cadence (~30 Hz). A small tolerance
-            // accounts for scene work at a boundary; raw counts remain in JSON.
-            expect.soft(windows.every((w, i) => w.gameUpdates >= Math.floor(baselineUpdates[i] * 0.49)), `${scene}/${mode}: cadence`).toBe(true);
+            // Require half the no-music cadence (~30 Hz), allowing one update
+            // at a window boundary. Also guard audio submission: an overloaded
+            // IRQ can starve the main loop without incrementing underruns.
+            if (mode !== "off") for (const w of windows) {
+              expect(w.end.audio.pcmSubmittedBlocks - w.start.audio.pcmSubmittedBlocks).toBeGreaterThanOrEqual(238);
+            }
+            expect.soft(windows.every((w, i) => w.gameUpdates >= Math.floor(baselineUpdates[i] / 2) - 1), `${scene}/${mode}: cadence`).toBe(true);
           } finally { core._gba_destroy(); }
         }
       }
