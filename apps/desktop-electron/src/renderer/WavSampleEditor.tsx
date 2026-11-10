@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { decodeWav, renderWavEdit, validateWavEdit, wavPeaks, WAV_EDITOR_MAX_BYTES, type WavData, type WavEdit, type WavEditorSource, type WavOperation, type WavRange } from "../shared/wavEditing.js";
 import { resolveAudioPreviewSourceURL } from "./audioPreviewPlayback.js";
 import { useStudioUiText } from "./studioUiText.js";
@@ -75,11 +75,14 @@ export function WavSampleEditor({ source, projectPath, onChange, onEditing }: Pr
   }, [loaded, key, source.edit]);
   const count = state?.wav?.channels[0].length ?? 1;
   const trimStart = state?.edit?.trimStart;
-  useEffect(() => { setSelection({ start: 0, end: count }); setZoom(1); setViewStart(0); setDragLoop(null); gesture.current = null; }, [key, count, trimStart]);
+  useLayoutEffect(() => { setSelection({ start: 0, end: count }); setZoom(1); setViewStart(0); setDragLoop(null); gesture.current = null; }, [key, count, trimStart]);
   const viewCount = Math.max(1, Math.ceil(count / zoom)), start = Math.min(viewStart, count - viewCount), end = start + viewCount;
   const paths = useMemo(() => state?.wav?.channels.map(samples => {
     const peaks = wavPeaks(samples.subarray(start, end), 800);
-    return peaks.map((p, i) => `M${i * 1000 / peaks.length},${50 - p.min * 44}V${50 - p.max * 44}`).join("");
+    // A bucket containing one sample has a zero-length vertical stroke.
+    // Connect the centers too, so short clips and high zoom remain visible.
+    const centers = peaks.length === 1 ? `M0,${50 - peaks[0].min * 44}H1000` : peaks.map((p, i) => `${i ? "L" : "M"}${i * 1000 / peaks.length},${50 - (p.min + p.max) * 22}`).join("");
+    return centers + peaks.map((p, i) => `M${i * 1000 / peaks.length},${50 - p.min * 44}V${50 - p.max * 44}`).join("");
   }) ?? [], [state, start, end]);
   const selected = { start: Math.max(0, Math.min(count - 1, selection.start)), end: Math.max(selection.start + 1, Math.min(count, selection.end)) };
   function commit(edit: WavEdit | null): void { onEditing(); onChange(source.id, edit); }

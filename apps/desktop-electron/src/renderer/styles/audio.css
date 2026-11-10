@@ -3010,7 +3010,7 @@
 .wav-sample-editor button:not(:disabled):hover { border-color: var(--studio-color-accent); }
 .wav-editor-waveframes { position: relative; border: 1px solid var(--studio-color-border); border-radius: var(--studio-radius-md); overflow: hidden; background: var(--studio-color-surface-muted); flex-shrink: 0; }
 .wav-editor-wave { display: block; width: 100%; height: 220px; cursor: crosshair; touch-action: none; user-select: none; }
-.wav-editor-samples { stroke: var(--studio-color-accent); stroke-width: 1; vector-effect: non-scaling-stroke; }
+.wav-editor-samples { fill: none; stroke: var(--studio-color-accent); stroke-width: 1; vector-effect: non-scaling-stroke; }
 .wav-editor-axis { stroke: var(--studio-color-border); }
 .wav-editor-channel-labels { position: absolute; inset: 0 0 auto; height: 220px; display: flex; flex-direction: column; pointer-events: none; color: var(--studio-color-text-secondary); }
 .wav-editor-channel-labels span { flex: 1; padding: 8px; }
