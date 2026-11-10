@@ -279,6 +279,8 @@ assets conservam a distribuição anterior por padrão. Os campos ocupam o paddi
 do descritor ARM de 24 bytes, mas SDK, conversor e biblioteca precisam ser
 recompilados juntos. A preparação multicanal mantém o sample de referência de
 cada nota ao mudar sua taxa, evitando trocar o cursor para outra versão do PCM.
+Em canais XM/IT com afinação dinâmica e fonte entre 4000 e 32768 Hz, preserva
+o PCM original e suas taxas explícitas para interpolá-lo uma única vez.
 
 `audio.tracker_xm_pcm_profile` e `audio.tracker_it_pcm_profile` identificam os
 conversores próprios do `assetc`; projetos que usam esses formatos exigem as
@@ -332,6 +334,27 @@ podem repetir ciclos para limitar a diferença de afinação a 0,01%. A saída
 continua sujeita ao limite de 65535 amostras por instrumento convertido e ao
 orçamento de ROM; ultrapassar esses limites gera um erro, sem descartar canais.
 Isso pode aumentar o tamanho da ROM em troca de reduzir o trabalho por frame.
+Canais XM/IT com afinação dinâmica usam a exceção descrita acima. O mixer
+compartilha a interpolação entre os lados estéreo, acumula duas faixas de 16
+bits em uma palavra e usa uma janela de origem limitada a 512 bytes em IWRAM.
+A saída mantém o arredondamento e o limitador existentes. A reserva de scratch
+é de até 6,6 KiB, e dois buffers de publicação gráfica ficam em EWRAM; os
+limites do linker e a reserva de pilha continuam obrigatórios.
+
+O limite de 16 canais é de representação/vozes, não uma garantia de CPU para
+qualquer combinação de efeitos e cena. A regressão ARM
+`make audio-mixer-kernel-rom` verifica alinhamento, caudas e saída inteira do
+kernel nativo em ROM; `audio_kernel_witness[2] == 1` e `[3] == 136` indicam êxito.
+O benchmark opt-in
+`extendedTrackerSceneRom.integration.test.ts` usa módulos autorais gerados por
+`python3 tests/host/tracker_stress_fixtures.py /tmp/qa-tracker --pitch-channels 4`
+(na raiz da engine). Em `apps/desktop-electron`, execute
+`GBA_TRACKER_SCENE_QA=/tmp/qa-cenas GBA_TRACKER_SCENE_SOURCES=/tmp/qa-tracker npm exec vitest run src/main/extendedTrackerSceneRom.integration.test.ts`.
+O teste preserva as fontes, apaga seu projeto temporário/cache ao encerrar e compara a cadência com a mesma
+cena sem música e falha abaixo de metade dessa referência. A carga extrema de
+16 vozes com interpolação e modulação contínuas ainda excede o orçamento do
+GBA; não constitui um perfil de desempenho aprovado. Reduzir a fidelidade
+silenciosamente ou descartar canais não é uma solução adotada pelo pipeline.
 `audio.pcm_prepared_gain` acrescenta uma variante opcional de PCM com o volume
 primário configurado no projeto. O descritor `PcmAsset` conserva os samples
 originais; a variante só é usada na taxa nativa, com os demais ganhos unitários.
