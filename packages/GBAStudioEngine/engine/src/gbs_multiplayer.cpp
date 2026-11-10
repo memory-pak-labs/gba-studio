@@ -213,7 +213,7 @@ void multiplayer_queue_update(MultiplayerQueue& q) {
             q.packet_size = 0;
         }
     }
-    if (q.connected_mask != all_players(q) && ++q.missing_frames >= q.config.timeout_frames) { recover(q); return; }
+    if (result > 0 && q.connected_mask != all_players(q) && ++q.missing_frames >= q.config.timeout_frames) { recover(q); return; }
     if (q.waiting) {
         if (++q.waiting_frames >= q.config.timeout_frames) recover(q);
         return;

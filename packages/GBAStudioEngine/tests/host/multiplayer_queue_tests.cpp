@@ -21,14 +21,14 @@ struct Cable {
     gbs::MultiplayerQueue queue[4] {};
     uint8_t present;
     unsigned count, tick = 0, corrupt = 0, errors = 0, lose = 0;
-    explicit Cable(unsigned players) : present((1u << players)-1), count(players) {
+    explicit Cable(unsigned players, unsigned timeout=8) : present((1u << players)-1), count(players) {
         for (unsigned i=0;i<count;++i) {
             port[i] = Port{this,i};
             const gbs::MultiplayerTransport transport{open, begin, poll, close, &port[i]};
             gbs::MultiplayerConfig config;
             config.players = players;
             config.session_id = 10+i;
-            config.timeout_frames = 8;
+            config.timeout_frames = timeout;
             config.retry_frames = 2;
             assert(gbs::multiplayer_queue_open(queue[i], config, transport));
         }
@@ -88,6 +88,13 @@ void gbs_hw_sio_multiplayer_async_close() {}
 
 int main() {
     static_assert(sizeof(gbs::MultiplayerQueue) <= 384, "Keep queued link storage bounded");
+    {
+        Cable c(2,1);
+        assert(gbs::multiplayer_queue_send(c.queue[0],7));
+        c.frames(100);
+        assert(c.queue[0].state == gbs::MultiplayerConnectionState::Connected);
+        assert(gbs::multiplayer_queue_pending_send(c.queue[0]) == 0);
+    }
     {
         Cable c(2);
         assert(gbs::multiplayer_queue_send(c.queue[0],0));
