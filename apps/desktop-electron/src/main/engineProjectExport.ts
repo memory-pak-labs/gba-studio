@@ -1,7 +1,8 @@
 import { execFile, type ExecFileOptionsWithStringEncoding } from "node:child_process";
 import { createHash } from "node:crypto";
 import { writeTrackerModule } from "../shared/trackerModule.js";
-import { access, mkdir, readdir, readFile, rm, writeFile } from "node:fs/promises";
+import { decodeWav, encodeWav, renderWavEdit } from "../shared/wavEditing.js";
+import { access, mkdir, readdir, readFile, rm, stat, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { promisify } from "node:util";
 import { fileURLToPath } from "node:url";
@@ -127,11 +128,23 @@ async function copyGeneratedAsset(destination: string, projectPath: string, asse
   const sourceFile = await resolveGeneratedAssetSource(projectPath, asset);
   const destinationFile = safeDestinationPath(destination, asset.output);
   await mkdir(path.dirname(destinationFile), { recursive: true });
+  if (asset.wavEdit) {
+    const sourceInfo = await stat(sourceFile);
+    const destinationInfo = await stat(destinationFile).catch(error => { if (error.code === "ENOENT") return null; throw error; });
+    if (destinationInfo && sourceInfo.dev === destinationInfo.dev && sourceInfo.ino === destinationInfo.ino) {
+      throw new Error("Exporte o WAV editado para uma pasta diferente do original.");
+    }
+  }
   const bytes = await readFile(sourceFile);
   if (asset.trackerModule && createHash("sha256").update(bytes).digest("hex") !== asset.trackerModule.trackerModule.sourceSha256) {
     throw new Error("A fonte do módulo foi alterada fora do editor. Importe uma nova cópia antes de exportar.");
   }
-  await writeFileIfChanged(destinationFile, asset.trackerModule ? Buffer.from(writeTrackerModule(bytes, asset.trackerModule)) : bytes);
+  if (asset.wavEdit && createHash("sha256").update(bytes).digest("hex") !== asset.wavEdit.sourceSha256) {
+    throw new Error("A fonte WAV foi alterada fora do editor. Restaure o original ou remova as edições antes de exportar.");
+  }
+  const output = asset.wavEdit ? Buffer.from(encodeWav(renderWavEdit(decodeWav(bytes), asset.wavEdit)))
+    : asset.trackerModule ? Buffer.from(writeTrackerModule(bytes, asset.trackerModule)) : bytes;
+  await writeFileIfChanged(destinationFile, output);
   return destinationFile;
 }
 
@@ -279,8 +292,8 @@ async function writeLockedEngineSchemaExport(options: WriteEngineSchemaExportOpt
   const fingerprintOptions = options.projectPath ? {
         projectPath: options.projectPath,
         contract,
-        audio: options.prepared.audioPack?.sourceCopies.some(asset => asset.trackerModule)
-          ? { document: options.prepared.audioPack.document, editableModules: options.prepared.audioPack.sourceCopies.filter(asset => asset.trackerModule).map(asset => ({ output: asset.output, song: asset.trackerModule })) }
+        audio: options.prepared.audioPack?.sourceCopies.some(asset => asset.trackerModule || asset.wavEdit)
+          ? { document: options.prepared.audioPack.document, editableModules: options.prepared.audioPack.sourceCopies.filter(asset => asset.trackerModule).map(asset => ({ output: asset.output, song: asset.trackerModule })), wavEdits: options.prepared.audioPack.sourceCopies.filter(asset => asset.wavEdit).map(asset => ({ output: asset.output, edit: asset.wavEdit })) }
           : options.prepared.audioPack?.document,
         sourcePaths,
         engineDependencyPaths: [

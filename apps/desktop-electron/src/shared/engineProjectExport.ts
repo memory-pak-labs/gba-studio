@@ -46,6 +46,7 @@ import {
 } from "./spriteAnimationState.js";
 
 import { validateTrackerModuleSong } from "./trackerModule.js";
+import { validateWavEdit, type WavEdit } from "./wavEditing.js";
 
 export interface EngineProjectExportFile {
   path: string;
@@ -60,6 +61,7 @@ export interface EngineProjectExportAsset {
   output: string;
   bundledDefaultAsset?: string;
   trackerModule?: import("./trackerModule.js").TrackerModuleSong;
+  wavEdit?: WavEdit;
 }
 
 export interface EngineProjectExport {
@@ -3776,6 +3778,17 @@ function buildAssetcAudioPackGenerationUncached(data: GBAProjectData): AssetcAud
   });
 
   if (tracker.length === 0 && pcm.length === 0 && sfx.length === 0) return null;
+
+  // Every use of a WAV (imported effect, instrument or PCM designer) stages
+  // the same non-destructive recipe before assetc performs GBA conversion.
+  for (const copy of sourceCopies) {
+    const asset = projectArray(data, "assets").find(asset => asset.id === copy.id);
+    const edit = child(asset ?? {}, "metadata")?.wavEdit;
+    if (edit !== undefined && /\.wav$/i.test(copy.source)) {
+      validateWavEdit(edit);
+      copy.wavEdit = edit;
+    }
+  }
 
   return {
     document: { sfx, music: [], tracker, pcm },
