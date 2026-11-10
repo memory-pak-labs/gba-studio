@@ -7,7 +7,8 @@ import { decodeWav, encodeWav, type WavEdit } from "../shared/wavEditing.js";
 import { buildAssetcAudioPackGeneration } from "../shared/engineProjectExport.js";
 import { createAudioItemInProject } from "../shared/audioWorkspace.js";
 import { createBlankProjectData } from "../shared/newProject.js";
-import { writeEngineProjectExport } from "./engineProjectExport.js";
+import { writeEngineProjectExport, writeEngineSchemaExport } from "./engineProjectExport.js";
+import { prepareEngineProjectExport } from "./exportEngineProject.js";
 
 const roots: string[] = [];
 afterEach(async () => { await Promise.all(roots.splice(0).map(root => rm(root, { recursive: true, force: true }))); });
@@ -25,6 +26,20 @@ function project() {
   return data;
 }
 describe("WAV source edits in all export paths", () => {
+  it("keeps audio recipes after generic assets are staged in the normal game exporter", async () => {
+    const root = await mkdtemp(path.join(os.tmpdir(), "wav-edits-game-")); roots.push(root);
+    await writeFile(path.join(root, "bell.wav"), original);
+    const data = createBlankProjectData({ name: "WAV game", includeStarterContent: false, sceneType: "cutscene" });
+    data.assets = project().assets; data.audioItems = [{ id: "fx", name: "Bell", kind: "SFX", sourceAssetID: "wav" }];
+    const prepared = prepareEngineProjectExport(data, { enginePackPath: path.join(root, "pack") });
+    expect(prepared.error).toBeUndefined();
+    // Stop at tool invocation: this standard host test isolates staging, without
+    // requiring ARM tools. The opt-in ROM proof exercises assetc and gbsbuild.
+    await expect(writeEngineSchemaExport({ destination: path.join(root, "export"), projectPath: path.join(root, "game.gba-project"), prepared: prepared.generated!, assetcPath: path.join(root, "missing-assetc"), cacheEnabled: false })).rejects.toThrow();
+    const staged = decodeWav(await readFile(path.join(root, "export/assets/audio/bell.wav")));
+    expect(staged.channels[0].length).toBe(5); expect(staged.loop).toEqual({ start: 1, end: 4 });
+    expect(hash(await readFile(path.join(root, "bell.wav")))).toBe(hash(original));
+  });
   it("carries recipes for imported WAVs, song samples and authored PCM effects", () => {
     const pack = buildAssetcAudioPackGeneration(project())!;
     expect(pack.sourceCopies).toHaveLength(3);

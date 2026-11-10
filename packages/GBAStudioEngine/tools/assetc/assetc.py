@@ -4337,6 +4337,20 @@ def transform_pcm_samples(samples, sample_rate, config):
     return output
 
 
+def transform_pcm_loop(loop_start, loop_end, sample_rate, config, output_count):
+    if loop_end <= loop_start:
+        return 0, 0
+    trim = round(config.get("trim_start_ms", 0) * sample_rate / 1000)
+    ratio = 2 ** (config.get("pitch_semitones", 0) / 12)
+    # Output frame i reads input trim+i*ratio. Map the inclusive start and
+    # exclusive end, retaining the part surviving the SFX duration.
+    start = max(0, math.ceil((loop_start - trim) / ratio))
+    end = min(output_count, math.ceil((loop_end - trim) / ratio))
+    if start >= end:
+        raise SystemExit("o recorte do SFX removeu a regiao de loop WAV; ajuste o inicio, a duracao ou o loop")
+    return start, end
+
+
 def emit_audio_header(name, data, base_dir):
     sfx_assets = data.get("sfx", [])
     music_assets = data.get("music", [])
@@ -4608,7 +4622,7 @@ def emit_audio_header(name, data, base_dir):
             auto_loop_end = 0
         if "transform" in asset:
             samples = transform_pcm_samples(samples, sample_rate, asset["transform"])
-            auto_loop_start, auto_loop_end = 0, 0
+            auto_loop_start, auto_loop_end = transform_pcm_loop(auto_loop_start, auto_loop_end, sample_rate, asset["transform"], len(samples)) if asset.get("loop", False) else (0, 0)
         loop, loop_start, loop_end = resolve_pcm_loop(asset, samples, auto_loop_start, auto_loop_end)
         loop_literal = "true" if loop else "false"
         lines.append(f"inline constexpr int8_t {symbol}_samples[{len(samples)}] = {{")

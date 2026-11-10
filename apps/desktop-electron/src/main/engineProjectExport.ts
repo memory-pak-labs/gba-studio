@@ -379,19 +379,15 @@ async function writeLockedEngineSchemaExport(options: WriteEngineSchemaExportOpt
     const jsonPath = safeDestinationPath(options.destination, options.prepared.audioPack.packAsset.audio_json);
     await mkdir(path.dirname(jsonPath), { recursive: true });
     await writeFileIfChanged(jsonPath, `${JSON.stringify(options.prepared.audioPack.document, null, 2)}\n`);
-
-    if (options.projectPath) {
-      for (const asset of options.prepared.audioPack.sourceCopies) {
-        await copyGeneratedAsset(options.destination, options.projectPath, asset);
-      }
-    }
   }
 
   const contractPath = safeDestinationPath(options.destination, "export_project.json");
   await writeFileIfChanged(contractPath, `${JSON.stringify(contract, null, 2)}\n`);
 
   if (options.projectPath) {
-    for (const asset of options.prepared.assets) {
+    // Generic project assets can share an output path with an audio source.
+    // Stage audio last so a raw copy cannot overwrite a processed WAV/module.
+    for (const asset of [...options.prepared.assets, ...(options.prepared.audioPack?.sourceCopies ?? [])]) {
       await copyGeneratedAsset(options.destination, options.projectPath, asset);
     }
   }

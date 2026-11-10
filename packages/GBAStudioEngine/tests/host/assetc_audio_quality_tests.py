@@ -237,7 +237,33 @@ def test_authored_sample_sfx_trim_pitch_and_envelope():
         pass
 
 
+def test_transformed_sfx_keeps_wav_loop_after_trim_pitch_and_resampling():
+    with tempfile.TemporaryDirectory() as directory:
+        root = Path(directory)
+        source = root / "loop.wav"
+        write_pcm16(source, [12000] * 128, 16000)
+        raw = bytearray(source.read_bytes())
+        smpl = bytearray(60)
+        struct.pack_into("<I", smpl, 28, 1)
+        struct.pack_into("<II", smpl, 44, 16, 111)
+        raw += b"smpl" + struct.pack("<I", len(smpl)) + smpl
+        struct.pack_into("<I", raw, 4, len(raw) - 8)
+        source.write_bytes(raw)
+        config = {"duration_ms": 10, "trim_start_ms": 1, "pitch_semitones": 12}
+        doc = {"pcm": [{"name": "hit", "wav": "loop.wav", "sample_rate_hz": 8000, "loop": True, "transform": config}]}
+        header = ASSETC.emit_audio_header("bank", doc, root)
+        assert "bank_hit_samples, 28, 8000, true, 0, 24 }" in header, "trim/pitch discarded the smpl region"
+        assert ASSETC.transform_pcm_loop(16, 100, 8000, {"trim_start_ms": 0, "pitch_semitones": 0}, 80) == (16, 80)
+        assert ASSETC.transform_pcm_loop(16, 100, 8000, {"trim_start_ms": 1, "pitch_semitones": -12}, 200) == (16, 184)
+        try:
+            ASSETC.transform_pcm_loop(16, 100, 8000, {"trim_start_ms": 15}, 80)
+            assert False, "a cut that removes the entire loop must be rejected"
+        except SystemExit:
+            pass
+
+
 if __name__ == "__main__":
+    test_transformed_sfx_keeps_wav_loop_after_trim_pitch_and_resampling()
     test_authored_pcm_instruments_keep_all_sixteen_lanes_and_pitch()
     test_authored_sample_sfx_trim_pitch_and_envelope()
     test_pcm_native_cue_alias_compiles_and_rejects_missing_pcm()
