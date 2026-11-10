@@ -1590,3 +1590,11 @@
 .pcm-sfx-waveform figcaption {
   font-size: var(--studio-font-size-xs);
 }
+
+/* WAV waveform editor: typography uses the shared token layer. */
+.wav-sample-editor h4 { font-size: var(--studio-font-size-md); }
+.wav-editor-help, .wav-sample-editor footer { font-size: var(--studio-font-size-sm); }
+.wav-editor-channel-labels { font-size: var(--studio-font-size-xs); }
+.wav-editor-ruler { font-size: var(--studio-font-size-xs); }
+.wav-editor-ranges output { font-size: var(--studio-font-size-sm); }
+.wav-editor-pan { font-size: var(--studio-font-size-sm); }

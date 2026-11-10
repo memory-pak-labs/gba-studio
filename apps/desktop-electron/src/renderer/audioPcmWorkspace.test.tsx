@@ -38,6 +38,12 @@ describe("visual PCM composer", () => {
     render(<AudioWorkspace presentation={deriveAudioWorkspacePresentation(data)} {...handlers({ onUpdateWavEdit: vi.fn() })} />);
     if (kind === "song") fireEvent.click(screen.getByText("Editar sample WAV"));
     expect(screen.getByRole("region", { name: "Editor visual de WAV" })).toBeInTheDocument();
+    if (kind === "song") {
+      fireEvent.click(screen.getByRole("button", { name: "Piano Roll", exact: true }));
+      expect(screen.queryByRole("region", { name: "Editor visual de WAV" })).not.toBeInTheDocument();
+      fireEvent.click(screen.getByRole("button", { name: "Editar sample WAV" }));
+      expect(screen.getByRole("region", { name: "Editor visual de WAV" })).toBeInTheDocument();
+    }
     if (kind === "imported") {
       fireEvent.keyDown(screen.getByRole("button", { name: "Recarregar WAV" }), { key: "ArrowRight" });
       expect(screen.getByRole("heading", { name: "Bell" })).toBeInTheDocument();

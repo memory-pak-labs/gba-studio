@@ -2999,9 +2999,9 @@
 .pcm-sfx-editor select { max-width: 320px; }
 .wav-sample-editor { display: flex; flex-direction: column; gap: var(--studio-space-3); min-width: 0; min-height: 200px; flex: 1; overflow-y: auto; padding: var(--studio-space-4); border: 1px solid var(--studio-color-border); border-radius: var(--studio-radius-lg); background: var(--studio-color-surface); color: var(--studio-color-text-primary); }
 .wav-sample-editor header, .wav-sample-editor footer { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: var(--studio-space-3); }
-.wav-sample-editor h4 { margin: 0; font-size: var(--studio-font-size-md); }
+.wav-sample-editor h4 { margin: 0; }
 .wav-sample-editor p { margin: 0; overflow-wrap: anywhere; }
-.wav-editor-help, .wav-sample-editor footer { color: var(--studio-color-text-secondary); font-size: var(--studio-font-size-sm); }
+.wav-editor-help, .wav-sample-editor footer { color: var(--studio-color-text-secondary); }
 .wav-editor-zoom, .wav-editor-actions, .wav-editor-ranges { display: flex; flex-wrap: wrap; align-items: end; gap: var(--studio-space-2); }
 .wav-editor-zoom { align-items: center; }
 .wav-editor-zoom button { min-width: 32px; }
@@ -3012,25 +3012,23 @@
 .wav-editor-wave { display: block; width: 100%; height: 220px; cursor: crosshair; touch-action: none; user-select: none; }
 .wav-editor-samples { stroke: var(--studio-color-accent); stroke-width: 1; vector-effect: non-scaling-stroke; }
 .wav-editor-axis { stroke: var(--studio-color-border); }
-.wav-editor-channel-labels { position: absolute; inset: 0 0 auto; height: 220px; display: flex; flex-direction: column; pointer-events: none; font-size: var(--studio-font-size-xs); color: var(--studio-color-text-secondary); }
+.wav-editor-channel-labels { position: absolute; inset: 0 0 auto; height: 220px; display: flex; flex-direction: column; pointer-events: none; color: var(--studio-color-text-secondary); }
 .wav-editor-channel-labels span { flex: 1; padding: 8px; }
 .wav-editor-selection { fill: var(--studio-color-accent); fill-opacity: .12; stroke: var(--studio-color-accent); stroke-width: 1; pointer-events: none; }
-.wav-editor-loop-region { fill: #19a778; fill-opacity: .1; stroke: #17825f; stroke-width: 1; stroke-dasharray: 5 4; pointer-events: none; }
+.wav-editor-loop-region { fill: var(--studio-color-ok); fill-opacity: .1; stroke: var(--studio-color-ok-text); stroke-width: 1; stroke-dasharray: 5 4; pointer-events: none; }
 .wav-editor-loop-handle { cursor: ew-resize; }
-.wav-editor-loop-handle rect { fill: #17825f; fill-opacity: .14; }
-.wav-editor-loop-handle path { stroke: #17825f; stroke-width: 2; }
+.wav-editor-loop-handle rect { fill: var(--studio-color-ok-text); fill-opacity: .14; }
+.wav-editor-loop-handle path { stroke: var(--studio-color-ok-text); stroke-width: 2; }
 .wav-editor-loop-handle:focus-visible rect { stroke: var(--studio-color-accent); stroke-width: 3; }
-.wav-editor-ruler { display: flex; justify-content: space-between; padding: 4px 8px; font-size: var(--studio-font-size-xs); color: var(--studio-color-text-secondary); }
+.wav-editor-ruler { display: flex; justify-content: space-between; padding: 4px 8px; color: var(--studio-color-text-secondary); }
 .wav-editor-ranges label { display: grid; gap: 4px; flex: 0 1 170px; min-width: 0; }
 .wav-editor-ranges input { width: 100%; box-sizing: border-box; min-height: 34px; padding: 6px 8px; border: 1px solid var(--studio-color-border); border-radius: var(--studio-radius-md); background: var(--studio-color-surface); color: inherit; font: inherit; }
-.wav-editor-ranges output { padding: 8px 0; color: var(--studio-color-text-secondary); font-size: var(--studio-font-size-sm); }
-.wav-editor-pan { display: flex; gap: var(--studio-space-3); align-items: center; font-size: var(--studio-font-size-sm); }
+.wav-editor-ranges output { padding: 8px 0; color: var(--studio-color-text-secondary); }
+.wav-editor-pan { display: flex; gap: var(--studio-space-3); align-items: center; }
 .wav-editor-pan input { flex: 1; min-width: 0; accent-color: var(--studio-color-accent); }
 .wav-sample-editor button:focus-visible, .wav-sample-editor input:focus-visible { outline: 2px solid var(--studio-color-accent); outline-offset: 2px; }
 .wav-editor-reset { align-self: start; }
 .pcm-sfx-editor .wav-sample-editor { margin-top: var(--studio-space-4); overflow: visible; }
-.wav-track-editor { max-height: 55%; overflow: auto; flex-shrink: 0; border-top: 1px solid var(--studio-color-border); }
-.wav-track-editor summary { padding: var(--studio-space-2); cursor: pointer; }
 .pcm-sfx-editor input:focus-visible, .pcm-sfx-editor select:focus-visible { outline: 2px solid var(--studio-color-accent); outline-offset: 2px; }
 
 .audio-native-composer { display: flex; flex: 1; flex-direction: column; min-width: 0; min-height: 0; gap: var(--studio-space-2); }

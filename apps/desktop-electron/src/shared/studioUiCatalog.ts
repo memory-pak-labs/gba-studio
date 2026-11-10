@@ -1,5 +1,8 @@
 /** Application copy only. Tuple order: pt-BR, en-US, es-ES. Keep project data out of this catalog. */
 export const studioUiMessages: Record<string, readonly [string, string, string]> = {
+  "Fade-in": ["Fade-in", "Fade-in", "Fade-in"],
+  "Fade-out": ["Fade-out", "Fade-out", "Fade-out"],
+  "Estéreo": ["Estéreo", "Stereo", "Estéreo"],
   "Recarregar WAV": ["Recarregar WAV", "Reload WAV", "Recargar WAV"],
   "Seleção": ["Seleção", "Selection", "Selección"],
   "Editor visual de WAV": ["Editor visual de WAV", "Visual WAV editor", "Editor visual de WAV"],

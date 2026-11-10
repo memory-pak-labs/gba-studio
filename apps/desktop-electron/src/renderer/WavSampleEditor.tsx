@@ -138,8 +138,8 @@ export function WavSampleEditor({ source, projectPath, onChange, onEditing }: Pr
       <div className="wav-editor-actions">
         <button type="button" onClick={() => setSelection({ start: 0, end: count })}>{ui("Selecionar tudo")}</button>
         <button type="button" disabled={selected.start === 0 && selected.end === count} onClick={() => { const e = state.edit!; const trimStart = e.trimStart + selected.start, trimEnd = e.trimStart + selected.end; commit({ ...e, trimStart, trimEnd, loop: e.loop && e.loop.start >= trimStart && e.loop.end <= trimEnd ? e.loop : null }); }}>{ui("Recortar à seleção")}</button>
-        <button type="button" disabled={state.edit.operations.length >= 128} onClick={() => apply("fadeIn")}>Fade-in</button>
-        <button type="button" disabled={state.edit.operations.length >= 128} onClick={() => apply("fadeOut")}>Fade-out</button>
+        <button type="button" disabled={state.edit.operations.length >= 128} onClick={() => apply("fadeIn")}>{ui("Fade-in")}</button>
+        <button type="button" disabled={state.edit.operations.length >= 128} onClick={() => apply("fadeOut")}>{ui("Fade-out")}</button>
         <button type="button" disabled={state.edit.operations.length >= 128} onClick={() => apply("normalize")}>{ui("Normalizar seleção")}</button>
         <button type="button" onClick={() => setLoop(selected)}>{ui("Definir loop pela seleção")}</button>
       </div>
