@@ -1468,6 +1468,32 @@ void gbs_hw_sio_close(void) {
     REG_SIODATA8 = 0xFFFF;
 }
 
+/* ChisBread/ChisFlashGBARumbleCollect, patcher/payload.c documents the v1.2
+   unlock sequence and motor bit. This is NOT GPIO rumble and NOT a detection
+   probe. Only rumble_configure_cartridge(ChisFlashV12) opts into these writes.
+   Keep execution off the cartridge bus while changing its control registers. */
+static uint8_t chisflash_rumble_prepared;
+__attribute__((section(".iwram.chisflash_rumble"), long_call))
+int gbs_hw_chisflash_rumble_prepare(void) {
+    const uint16_t ime = REG_IME;
+    REG_IME = 0;
+    REG16(0x09FE0000) = 0xD200;
+    REG16(0x08000000) = 0x1500;
+    REG16(0x08020000) = 0xD200;
+    REG16(0x08040000) = 0x1500;
+    REG16(0x09E20000) = 0x00F1;
+    REG16(0x09FC0000) = 0x1500;
+    *(volatile uint8_t*)0x08001000 = 0;
+    chisflash_rumble_prepared = 1;
+    REG_IME = ime;
+    return 1;
+}
+
+__attribute__((section(".iwram.chisflash_rumble"), long_call))
+void gbs_hw_chisflash_rumble_set(int enabled) {
+    if (chisflash_rumble_prepared) *(volatile uint8_t*)0x08001000 = enabled ? 2 : 0;
+}
+
 void gbs_hw_set_backdrop(uint16_t color) {
     shadow_backdrop_color = color;
     if (!(scene_raster_tables[scene_raster_active].enabled & 2u)) MEM_PALETTE[0] = color;

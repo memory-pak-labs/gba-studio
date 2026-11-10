@@ -185,6 +185,9 @@ int gbs_hw_sio_multiplayer_async_open(unsigned baud);
 int gbs_hw_sio_multiplayer_async_begin(uint16_t outgoing);
 int gbs_hw_sio_multiplayer_async_poll(uint16_t received[4], uint8_t* player_id, uint8_t* connected_mask);
 void gbs_hw_sio_multiplayer_async_close(void);
+/* Explicit ChisFlash v1.2 board profile only; never called for unknown carts. */
+int gbs_hw_chisflash_rumble_prepare(void);
+void gbs_hw_chisflash_rumble_set(int enabled);
 int gbs_hw_sio_multiplayer_transfer(uint16_t outgoing, uint32_t timeout_frames,
                                     uint16_t received[4], uint8_t* player_id,
                                     uint8_t* connected_mask);

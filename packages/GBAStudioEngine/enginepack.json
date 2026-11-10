@@ -492,7 +492,8 @@
       "rumble_provider_opt_in",
       "rumble_timed_frames",
       "rumble_frame_update",
-      "rumble_safe_unavailable_default"
+      "rumble_safe_unavailable_default",
+      "rumble_chisflash_v12_opt_in"
     ],
     "deferred_work": [
       "deferred_work_post_isr",

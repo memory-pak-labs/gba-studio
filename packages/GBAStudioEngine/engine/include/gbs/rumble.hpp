@@ -15,6 +15,11 @@ struct RumbleProvider {
 
 void rumble_set_provider(const RumbleProvider& provider);
 
+enum class RumbleCartridge : uint8_t { None, ChisFlashV12 };
+// Explicit hardware selection; never probes an unknown cartridge. None is the
+// default. ChisFlashV12 is experimental until validated on the physical board.
+bool rumble_configure_cartridge(RumbleCartridge cartridge);
+
 // ============================================================
 // Rumble / Vibration Support
 // ============================================================
@@ -46,7 +51,7 @@ void rumble_update();
 // Returns true if the rumble motor is currently active.
 bool rumble_active();
 
-// Returns true if rumble hardware is detected/available.
+// Provider availability, not proof of physical hardware detection.
 bool rumble_available();
 
 } // namespace gbs
