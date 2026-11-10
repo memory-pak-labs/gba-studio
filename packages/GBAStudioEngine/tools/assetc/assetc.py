@@ -4417,6 +4417,37 @@ class ExtendedTrackerReader:
         return {"samples": pcm, "sample_rate_hz": rate, "loop_start_sample": start, "loop_end_sample": end}
 
 
+def read_tracker_envelope(r, instrument, kind, number=1):
+    """Decode native nodes; disabled envelopes do not interpret unused bytes."""
+    if r.format == "XM":
+        offset, count_at, flags_at, sustain_at = (129, 225, 233, 227) if kind == "volume" else (177, 226, 234, 230)
+        flags = r.number(instrument + flags_at)
+        if not flags & 1:
+            return None
+        count, limit = r.number(instrument + count_at), 12
+        points = [(r.number(instrument + offset + i * 4, 2), r.number(instrument + offset + i * 4 + 2, 2) - (32 if kind == "pan" else 0)) for i in range(min(count, limit))]
+        sustain = (r.number(instrument + sustain_at),) * 2 if flags & 2 else None
+        loop = (r.number(instrument + sustain_at + 1), r.number(instrument + sustain_at + 2)) if flags & 4 else None
+    else:
+        at = instrument + {"volume": 304, "pan": 386, "pitch": 468}[kind]
+        flags = r.number(at)
+        if not flags & 1:
+            return None
+        if kind == "pitch" and flags & 128:
+            r.fail(f"instrumento {number}: envelope de filtro IT ainda não suportado na ROM")
+        count, limit = r.number(at + 1), 25
+        points = [(r.number(at + 7 + i * 3, 2), struct.unpack("b", r.block(at + 6 + i * 3, 1))[0]) for i in range(min(count, limit))]
+        sustain = (r.number(at + 4), r.number(at + 5)) if flags & 4 else None
+        loop = (r.number(at + 2), r.number(at + 3)) if flags & 2 else None
+    low, high = (0, 64) if kind == "volume" else (-32, 32)
+    if not 1 <= count <= limit or points[0][0] != 0 or any(a[0] >= b[0] for a, b in zip(points, points[1:])) or any(not low <= y <= high for _, y in points):
+        r.fail(f"instrumento {number}: envelope de {kind} inválido: revise quantidade, ordem e valores dos nós")
+    for region in (sustain, loop):
+        if region and not 0 <= region[0] <= region[1] < count:
+            r.fail(f"instrumento {number}: envelope de {kind}: loop/sustain fora dos nós")
+    return {"points": points, "sustain": sustain, "loop": loop, "carry": r.format == "IT" and bool(flags & 8)}
+
+
 def read_xm_tracker(path):
     r = ExtendedTrackerReader(path, "XM")
     if r.block(0, 17) != b"Extended Module: " or r.number(37) != 26 or r.number(58, 2) != 0x104:
@@ -4464,6 +4495,7 @@ def read_xm_tracker(path):
         patterns.append([[(None, 0, None, 0, 0)] * channels for _ in range(64)])
     samples, instruments = [], []
     for index in range(instruments_count):
+        instrument_at = at
         size, count = r.number(at, 4), r.number(at + 27, 2)
         if size < 29 or count > 16:
             r.fail(f"instrumento {index + 1} inválido")
@@ -4472,8 +4504,6 @@ def read_xm_tracker(path):
         if count:
             if size < 243:
                 r.fail("cabeçalho de instrumento truncado")
-            if r.number(at + 233) & 1 or r.number(at + 234) & 1:
-                r.fail(f"instrumento {index + 1}: envelope ainda não suportado na ROM")
             if r.number(at + 237) or r.number(at + 238):
                 r.fail(f"instrumento {index + 1}: vibrato automático ainda não suportado na ROM")
             sample_header = r.number(at + 29, 4)
@@ -4503,9 +4533,13 @@ def read_xm_tracker(path):
             at = data_at
         else:
             at += size
-        instruments.append({"map": mapping, "volume": 1, "note_map": list(range(96))})
+        instruments.append({"map": mapping, "volume": 1, "note_map": list(range(96)),
+                            "volume_env": read_tracker_envelope(r, instrument_at, "volume", index + 1) if count else None,
+                            "pan_env": read_tracker_envelope(r, instrument_at, "pan", index + 1) if count else None,
+                            "fadeout": r.number(instrument_at + 239, 2) / 65536 if count else 0})
     return r, {"patterns": patterns, "order": order, "channels": channels, "samples": samples, "instruments": instruments,
-               "speed": r.number(76, 2), "tempo": r.number(78, 2), "global_volume": 1, "channel_volumes": [64] * channels, "pans": [0] * channels}
+               "speed": r.number(76, 2), "tempo": r.number(78, 2), "global_volume": 1, "channel_volumes": [64] * channels, "pans": [0] * channels,
+               "linear_slides": bool(r.number(74, 2) & 1)}
 
 
 def read_it_tracker(path):
@@ -4574,11 +4608,11 @@ def read_it_tracker(path):
             if r.number(64 + channel) & 128 == 0:
                 if cell[0] is not None or cell[1] or cell[2] is not None or cell[3] or cell[4]:
                     used.add(channel)
-                if cell[0] is not None and 120 <= cell[0] < 254:
-                    r.fail(f"padrão {index + 1}, linha {row + 1}, canal {channel + 1}: note fade ainda não suportado na ROM")
                 if cell[0] is not None and cell[0] >= 120:
-                    cell[0] = -1
+                    cell[0] = -1 if cell[0] == 255 else -2 if cell[0] == 254 else -3
                 cells[row][channel] = tuple(cell)
+            elif cell[3] or cell[4]:
+                r.fail(f"padrão {index + 1}, linha {row + 1}, canal {channel + 1}: efeitos em canal desativado ainda não suportados")
         if cursor != length:
             r.fail("padrão IT contém dados excedentes")
         patterns.append(cells)
@@ -4619,15 +4653,21 @@ def read_it_tracker(path):
             if not loc or r.block(loc, 4) != b"IMPI":
                 r.fail(f"instrumento {index + 1}: cabeçalho inválido")
             r.block(loc, 554)
-            if r.number(loc + 17) or r.number(loc + 18) or r.number(loc + 19) or r.number(loc + 20, 2) or r.number(loc + 22) or any(r.number(loc + off) & 1 for off in (304, 386, 468)) or any(r.number(loc + off) for off in (26, 27, 28, 29)):
-                r.fail(f"instrumento {index + 1}: NNA, envelopes ou variações ainda não suportados na ROM")
+            if r.number(loc + 17) or r.number(loc + 18) or r.number(loc + 19) or any(r.number(loc + off) for off in (26, 27)):
+                r.fail(f"instrumento {index + 1}: NNA, duplicação ou variações aleatórias ainda não suportados na ROM")
+            if r.number(loc + 22):
+                r.fail(f"instrumento {index + 1}: separação de panorama por nota ainda não suportada na ROM")
+            if r.number(loc + 58) & 128 or r.number(loc + 59) & 128:
+                r.fail(f"instrumento {index + 1}: filtro IT ainda não suportado na ROM")
             mapping = [r.number(loc + 65 + note * 2) - 1 for note in range(120)]
             notes = [r.number(loc + 64 + note * 2) for note in range(120)]
             if any(sample >= len(samples) for sample in mapping) or any(note >= 120 for note in notes):
                 r.fail(f"instrumento {index + 1}: mapa de notas/samples inválido")
             pan = r.number(loc + 25)
             instruments.append({"map": [sample if sample >= 0 else None for sample in mapping], "note_map": notes, "volume": r.number(loc + 24) / 128,
-                                "pan": None if pan & 128 else round(((pan & 127) - 32) * 127 / 32)})
+                                "pan": None if pan & 128 else round(((pan & 127) - 32) * 127 / 32),
+                                "volume_env": read_tracker_envelope(r, loc, "volume", index + 1), "pan_env": read_tracker_envelope(r, loc, "pan", index + 1),
+                                "pitch_env": read_tracker_envelope(r, loc, "pitch", index + 1), "fadeout": r.number(loc + 20, 2) / 1024})
     else:
         instruments = [{"map": [i] * 120, "note_map": list(range(120)), "volume": 1} for i in range(len(samples))]
     pans = []
@@ -4638,126 +4678,442 @@ def read_it_tracker(path):
         pans.append(round((pan - 32) * 127 / 32))
     return r, {"patterns": patterns, "order": order, "channels": len(channel_map), "samples": samples, "instruments": instruments,
                "speed": r.number(50), "tempo": r.number(51), "global_volume": r.number(48) / 128,
-               "channel_volumes": [r.number(128 + channel) for channel in channel_map], "pans": pans, "pan_separation": r.number(52) / 128}
+               "channel_volumes": [r.number(128 + channel) for channel in channel_map], "pans": pans, "pan_separation": r.number(52) / 128,
+               "linear_slides": bool(r.number(44, 2) & 8), "old_effects": bool(r.number(44, 2) & 16)}
+
+
+def tracker_envelope_value(envelope, tick, default):
+    if envelope is None:
+        return default
+    points = envelope["points"]
+    for index, (end, value) in enumerate(points):
+        if tick <= end:
+            if index == 0:
+                return value
+            begin, previous = points[index - 1]
+            return previous + (value - previous) * (tick - begin) / (end - begin)
+    return points[-1][1]
+
+
+def advance_tracker_envelope(envelope, tick, held):
+    if envelope is None:
+        return tick
+    region = envelope["sustain"] if held and envelope["sustain"] else envelope["loop"]
+    if region:
+        begin, end = (envelope["points"][i][0] for i in region)
+        if tick >= end:
+            return begin
+    return min(65535, tick + 1)
+
+
+class TrackerReplayChannel:
+    def __init__(self, pan, channel_volume):
+        self.instrument = 0
+        self.sample = None
+        self.rate = 0.0
+        self.target = 0.0
+        self.volume = 64
+        self.pan = pan
+        self.channel_volume = channel_volume
+        self.held = True
+        self.fading = False
+        self.fade = 1.0
+        self.envelope_ticks = {"volume": 0, "pan": 0, "pitch": 0}
+        self.memory = {}
+        self.vibrato_speed = self.vibrato_depth = self.vibrato_phase = 0
+        self.tremolo_speed = self.tremolo_depth = self.tremolo_phase = 0
+        self.tremor_tick = 0
+        self.tremor_gate = True
+        self.signature = None
+        self.trigger = False
+        self.cut = False
+
+
+class ExtendedTrackerReplay:
+    # Tracker ticks are mapped cumulatively to the physical GBA frame clock.
+    FRAMES_PER_SECOND = 16777216 / 280896
+    XM_EFFECTS = {0: "arp", 1: "up", 2: "down", 3: "porta", 4: "vibrato", 5: "porta_volume", 6: "vibrato_volume", 7: "tremolo", 8: "pan", 10: "volume_slide", 12: "volume", 15: "tempo", 16: "global_volume", 17: "global_slide", 20: "keyoff", 21: "envelope_position", 25: "pan_slide", 27: "retrigger", 29: "tremor", 33: "extra_porta"}
+    IT_EFFECTS = {0: "none", 1: "speed", 4: "volume_slide", 5: "down", 6: "up", 7: "porta", 8: "vibrato", 9: "tremor", 10: "arp", 11: "vibrato_volume", 12: "porta_volume", 13: "channel_volume", 14: "channel_slide", 16: "pan_slide", 17: "retrigger", 18: "tremolo", 20: "it_tempo", 21: "fine_vibrato", 22: "global_volume", 23: "global_slide", 24: "pan"}
+
+    def __init__(self, reader, song, duty):
+        self.reader, self.song, self.duty = reader, song, duty
+        self.speed, self.tempo = song["speed"], song["tempo"]
+        self.global_volume = song["global_volume"]
+        if not 1 <= self.speed <= 255 or not 32 <= self.tempo <= 255 or not 0 <= self.global_volume <= 1 or any(v > 64 for v in song["channel_volumes"]):
+            reader.fail("velocidade, andamento ou volume inválido")
+        self.channels = [TrackerReplayChannel(pan, volume) for pan, volume in zip(song["pans"], song["channel_volumes"])]
+        self.samples = list(song["samples"])
+        self.elapsed = 0.0
+        self.location = ""
+
+    def fail(self, detail):
+        self.reader.fail(f"{self.location}: {detail}")
+
+    def instrument(self, channel):
+        return self.song["instruments"][channel.instrument - 1] if channel.instrument else {}
+
+    def memory(self, channel, key, value):
+        if value:
+            channel.memory[key] = value
+        return channel.memory.get(key, 0)
+
+    def effect(self, channel, effect, parameter):
+        xm = self.reader.format == "XM"
+        if effect == (14 if xm else 19):
+            sub, value = parameter >> 4, parameter & 15
+            commands = ({1: "fine_up", 2: "fine_down", 9: "simple_retrigger", 10: "fine_volume_up", 11: "fine_volume_down", 12: "cut", 13: "delay", 14: "pattern_delay"} if xm else {8: "nibble_pan", 12: "cut", 13: "delay", 14: "pattern_delay"})
+            key = commands.get(sub)
+            if key is None:
+                self.fail(f"efeito especial {effect:02X}{parameter:02X} ainda não suportado")
+            if key in ("fine_up", "fine_down", "fine_volume_up", "fine_volume_down"):
+                value = self.memory(channel, key, value)
+            return key, value
+        key = (self.XM_EFFECTS if xm else self.IT_EFFECTS).get(effect)
+        if key is None:
+            self.fail(f"efeito {effect:02X}{parameter:02X} ainda não suportado")
+        if xm and key == "arp" and not parameter:
+            return "none", 0
+        if key == "extra_porta":
+            if parameter >> 4 not in (1, 2):
+                self.fail("portamento extra-fino inválido")
+            parameter = (parameter & 240) | self.memory(channel, "extra_porta_" + str(parameter >> 4), parameter & 15)
+        if key == "it_tempo":
+            parameter = self.memory(channel, key, parameter)
+        if key in ("vibrato", "fine_vibrato", "tremolo"):
+            prefix = "tremolo" if key == "tremolo" else "vibrato"
+            if parameter >> 4:
+                setattr(channel, prefix + "_speed", parameter >> 4)
+            if parameter & 15:
+                setattr(channel, prefix + "_depth", parameter & 15)
+        elif key in ("up", "down", "porta", "volume_slide", "porta_volume", "vibrato_volume", "pan_slide", "global_slide", "channel_slide", "retrigger", "tremor") or not xm and key == "arp":
+            memory_key = "volume_slide" if key in ("porta_volume", "vibrato_volume") else key
+            if not xm and key in ("up", "down"):
+                memory_key = "pitch_slide"
+            parameter = self.memory(channel, memory_key, parameter)
+        return key, parameter
+
+    def slide_pitch(self, channel, amount):
+        if not channel.rate:
+            return
+        if self.song.get("linear_slides"):
+            channel.rate *= 2 ** (amount / 192)
+        else:
+            period = 8363 * 1712 / channel.rate
+            channel.rate = 8363 * 1712 / max(1, min(65535, period - amount * 4))
+        channel.rate = max(1, min(2097152, channel.rate))
+
+    def portamento(self, channel, amount):
+        if channel.target and channel.rate:
+            old = channel.rate
+            self.slide_pitch(channel, amount if channel.target > old else -amount)
+            if (old - channel.target) * (channel.rate - channel.target) <= 0:
+                channel.rate = channel.target
+
+    def volume_slide(self, value, parameter, tick, limit=64, scale=1):
+        high, low = parameter >> 4, parameter & 15
+        if self.reader.format == "IT" and high and low == 15:
+            return min(limit, value + high * scale) if tick == 0 else value
+        if self.reader.format == "IT" and high == 15 and low:
+            return max(0, value - low * scale) if tick == 0 else value
+        if tick == 0:
+            return value
+        delta = high if high else -low
+        return max(0, min(limit, value + delta * scale))
+
+    def note(self, channel, note, instrument, porta):
+        previous_instrument = channel.instrument
+        if instrument:
+            if instrument > len(self.song["instruments"]):
+                self.fail("instrumento ausente")
+            channel.instrument = instrument
+        descriptor = self.instrument(channel)
+        if note is not None and note < 0:
+            if note == -2:
+                channel.cut = True; channel.sample = None
+            elif note == -3:
+                channel.fading = True
+            else:
+                channel.held = False
+                if self.reader.format == "XM":
+                    channel.fading = bool(descriptor.get("volume_env"))
+                    if not channel.fading:
+                        channel.cut = True; channel.sample = None
+                elif not descriptor.get("volume_env") or descriptor["volume_env"].get("loop"):
+                    channel.fading = True
+                    if not descriptor.get("fadeout"):
+                        channel.cut = True; channel.sample = None
+            return
+        if note is None:
+            if instrument and channel.sample is not None:
+                sample = self.samples[channel.sample]
+                channel.volume = sample["volume"]
+                pan = sample.get("pan") if sample.get("pan") is not None else descriptor.get("pan")
+                if pan is not None:
+                    channel.pan = pan
+            return
+        if not channel.instrument:
+            self.fail("nota sem instrumento")
+        sample_index = descriptor["map"][note]
+        if sample_index is None or not self.samples[sample_index]["samples"]:
+            channel.cut = True; channel.sample = None
+            return
+        sample = self.samples[sample_index]
+        relative = descriptor["note_map"][note] - (48 if self.reader.format == "XM" else 60) + sample.get("transpose", 0)
+        rate = sample["sample_rate_hz"] * 2 ** (relative / 12)
+        if not 1 <= rate <= 2097152:
+            self.fail("frequência da nota fora do intervalo da engine")
+        if porta and channel.sample is not None:
+            channel.target = rate
+            if sample_index != channel.sample:
+                self.fail("troca de sample durante portamento ainda não suportada")
+            return
+        if instrument or channel.sample is None:
+            channel.volume = sample["volume"]
+            pan = sample.get("pan")
+            if pan is None:
+                pan = descriptor.get("pan")
+            if pan is not None:
+                channel.pan = pan
+        channel.sample, channel.rate = sample_index, rate
+        channel.held, channel.fading, channel.fade = True, False, 1.0
+        for kind in channel.envelope_ticks:
+            envelope = descriptor.get(kind + "_env")
+            if channel.instrument != previous_instrument or not envelope or not envelope.get("carry"):
+                channel.envelope_ticks[kind] = 0
+        channel.vibrato_phase = channel.tremolo_phase = 0
+        channel.tremor_tick, channel.tremor_gate = 0, True
+        channel.trigger = True
+
+    def volume_column(self, channel, value, tick):
+        if value is None:
+            return
+        xm = self.reader.format == "XM"
+        if xm:
+            high, low = value >> 4, value & 15
+            if 16 <= value <= 80:
+                if tick == 0: channel.volume = value - 16
+            elif high in (6, 7, 8, 9):
+                if (tick > 0 and high in (6, 7)) or (tick == 0 and high in (8, 9)):
+                    channel.volume = max(0, min(64, channel.volume + (low if high in (7, 9) else -low)))
+            elif high == 10:
+                if low: channel.vibrato_speed = low
+            elif high == 11:
+                if low: channel.vibrato_depth = low
+            elif high == 12:
+                if tick == 0: channel.pan = round((low / 15 * 2 - 1) * 127)
+            elif high in (13, 14):
+                if tick > 0: channel.pan = max(-127, min(127, channel.pan + (low if high == 14 else -low) * 127 / 128))
+            elif high == 15:
+                amount = self.memory(channel, "porta", low * 16)
+                if tick > 0: self.portamento(channel, amount)
+            else:
+                self.fail(f"coluna de volume {value:02X} ainda não suportada")
+        else:
+            if 0 <= value <= 64:
+                if tick == 0: channel.volume = value
+            elif 65 <= value <= 104:
+                kind = (value - 65) // 10; amount = (value - 65) % 10
+                if tick == 0 and kind < 2 or tick > 0 and kind >= 2:
+                    channel.volume = max(0, min(64, channel.volume + amount * (1 if kind % 2 == 0 else -1)))
+            elif 105 <= value <= 124:
+                if tick > 0: self.slide_pitch(channel, ((value - 105) % 10) * (4 if value >= 115 else -4))
+            elif 128 <= value <= 192:
+                if tick == 0: channel.pan = round(((value - 128) / 64 * 2 - 1) * 127)
+            elif 193 <= value <= 202:
+                amount = self.memory(channel, "porta", [0, 1, 4, 8, 16, 32, 64, 96, 128, 255][value - 193])
+                if tick > 0: self.portamento(channel, amount)
+            elif 203 <= value <= 212:
+                if value > 203: channel.vibrato_depth = value - 203
+            else:
+                self.fail(f"coluna de volume {value:02X} ainda não suportada")
+
+    def controls(self, channel, key, parameter, tick):
+        if key == "volume" and tick == 0:
+            if parameter > 64: self.fail("volume inválido")
+            channel.volume = parameter
+        elif key in ("pan", "nibble_pan") and tick == 0:
+            limit = 255 if self.reader.format == "XM" else 128
+            if key == "nibble_pan": limit = 15
+            if parameter > limit: self.fail("panorama/surround ainda não suportado")
+            channel.pan = round((parameter / limit * 2 - 1) * 127)
+        elif key == "channel_volume" and tick == 0:
+            if parameter > 64: self.fail("volume de canal inválido")
+            channel.channel_volume = parameter
+        elif key == "channel_slide":
+            channel.channel_volume = self.volume_slide(channel.channel_volume, parameter, tick)
+        elif key in ("volume_slide", "porta_volume", "vibrato_volume"):
+            channel.volume = self.volume_slide(channel.volume, parameter, tick)
+        elif key == "pan_slide":
+            # Tracker Pxy uses x for left and y for right (opposite volume slides).
+            reversed_parameter = ((parameter & 15) << 4) | (parameter >> 4)
+            scale = 127 / 128
+            channel.pan = self.volume_slide(channel.pan + 127, reversed_parameter, tick, 254, scale) - 127
+        elif key in ("fine_volume_up", "fine_volume_down") and tick == 0:
+            channel.volume = max(0, min(64, channel.volume + parameter * (1 if key.endswith("up") else -1)))
+        if key in ("up", "down", "fine_up", "fine_down", "extra_porta"):
+            amount, fine = parameter, key.startswith("fine")
+            direction = 1 if key in ("up", "fine_up") else -1
+            if key == "extra_porta":
+                direction, amount, fine = (1 if parameter >> 4 == 1 else -1), (parameter & 15) / 4, True
+            elif self.reader.format == "IT" and parameter >= 224:
+                fine = True
+                amount = (parameter & 15) / (4 if parameter < 240 else 1)
+            if tick == 0 and fine or tick > 0 and not fine:
+                self.slide_pitch(channel, amount * direction)
+        if tick > 0 and key in ("porta", "porta_volume"):
+            self.portamento(channel, channel.memory.get("porta", 0))
+        if key == "keyoff" and tick == parameter:
+            self.note(channel, -1, 0, False)
+        elif key == "cut" and tick == parameter:
+            channel.cut = True; channel.sample = None
+        elif key == "envelope_position" and tick == 0:
+            channel.envelope_ticks = {kind: parameter for kind in channel.envelope_ticks}
+        elif key in ("simple_retrigger", "retrigger") and tick > 0 and parameter & 15 and tick % (parameter & 15) == 0:
+            mode = parameter >> 4 if key == "retrigger" else 0
+            if 1 <= mode <= 5: channel.volume -= [0, 1, 2, 4, 8, 16][mode]
+            elif mode == 6: channel.volume *= 2 / 3
+            elif mode == 7: channel.volume /= 2
+            elif 9 <= mode <= 13: channel.volume += [1, 2, 4, 8, 16][mode - 9]
+            elif mode == 14: channel.volume *= 1.5
+            elif mode == 15: channel.volume *= 2
+            channel.volume = max(0, min(64, channel.volume)); channel.trigger = True
+
+    def emit(self, channel, index, key, parameter, volume_column):
+        if channel.cut:
+            sample_index = next((i for i, sample in enumerate(self.samples) if sample.get("note_cut")), None)
+            if sample_index is None:
+                sample_index = len(self.samples)
+                self.samples.append({"samples": [0], "sample_rate_hz": 31536, "loop_start_sample": 0, "loop_end_sample": 0, "note_cut": True})
+            channel.cut = False; channel.signature = None
+            return {"channel": index + 1, "frequency_hz": 440, "volume": 0, "duty": self.duty, "sample_index": sample_index, "sample_rate_hz": 31536, "sample_only": True}
+        if channel.sample is None:
+            return None
+        descriptor = self.instrument(channel); sample = self.samples[channel.sample]
+        volume, pan, rate = channel.volume, channel.pan, channel.rate
+        tick = self.tick
+        if key == "arp":
+            phase = tick % 3
+            if self.reader.format == "XM" and tick:
+                remaining = self.speed - tick
+                phase = 0 if remaining == 16 else 2 if remaining > 16 else remaining % 3
+            rate *= 2 ** (((0, parameter >> 4, parameter & 15)[phase]) / 12)
+        vib = key in ("vibrato", "vibrato_volume", "fine_vibrato") or volume_column is not None and ((self.reader.format == "XM" and volume_column >> 4 == 11) or (self.reader.format == "IT" and 203 <= volume_column <= 212))
+        if vib:
+            modern_it = self.reader.format == "IT" and not self.song.get("old_effects")
+            wave = int(math.sin(channel.vibrato_phase) * 255) if channel.vibrato_speed else 0
+            depth = channel.vibrato_depth * (1 if key == "fine_vibrato" else 4)
+            units = int(wave * depth / (1024 if modern_it else 512))
+            direction = 1 if modern_it else -1
+            if self.song.get("linear_slides"):
+                rate *= 2 ** (direction * units / 192)
+            else:
+                period = 8363 * 428 / rate
+                rate = 8363 * 428 / max(1, period - direction * units)
+            if tick or modern_it:
+                channel.vibrato_phase = (channel.vibrato_phase + channel.vibrato_speed * math.tau / 64) % math.tau
+        if key == "tremolo":
+            wave = int(math.sin(channel.tremolo_phase) * 255) if channel.tremolo_speed else 0
+            volume = max(0, min(64, volume + int(wave * channel.tremolo_depth / 64)))
+            if tick or self.reader.format == "IT":
+                channel.tremolo_phase = (channel.tremolo_phase + channel.tremolo_speed * math.tau / 64) % math.tau
+        elif key == "tremor":
+            on, off = (parameter >> 4) + 1, (parameter & 15) + 1
+            if self.reader.format == "IT" and not self.song.get("old_effects"): on, off = max(1, on - 1), max(1, off - 1)
+            if tick or self.reader.format == "IT":
+                channel.tremor_gate = channel.tremor_tick % (on + off) < on
+                channel.tremor_tick += 1
+            if not channel.tremor_gate: volume = 0
+        if self.reader.format == "XM" and not channel.tremor_gate:
+            volume = 0
+        envelope_volume = tracker_envelope_value(descriptor.get("volume_env"), channel.envelope_ticks["volume"], 64)
+        envelope_pan = tracker_envelope_value(descriptor.get("pan_env"), channel.envelope_ticks["pan"], 0)
+        envelope_pitch = tracker_envelope_value(descriptor.get("pitch_env"), channel.envelope_ticks["pitch"], 0)
+        if self.reader.format == "IT" and descriptor.get("volume_env"):
+            env = descriptor["volume_env"]
+            if not env.get("loop") and channel.envelope_ticks["volume"] >= env["points"][-1][0]: channel.fading = True
+        if channel.fading: channel.fade = max(0, channel.fade - descriptor.get("fadeout", 0))
+        gain = volume / 64 * sample.get("gain", 1) * descriptor.get("volume", 1) * self.global_volume * channel.channel_volume / 64 * envelope_volume / 64 * channel.fade
+        pan += envelope_pan * (127 - abs(pan)) / 32
+        rate *= 2 ** (envelope_pitch / 24)  # IT pitch node unit: half a semitone.
+        payload = {"channel": index + 1, "frequency_hz": 440, "volume": 15, "duty": self.duty, "sample_only": True, "sample_index": channel.sample,
+                   "sample_rate_hz": max(1, min(2097152, round(rate))), "sample_gain": max(0, min(255, round(gain * 255))),
+                   "pan": max(-127, min(127, round(pan * self.song.get("pan_separation", 1))))}
+        signature = (payload["sample_index"], payload["sample_rate_hz"], payload["sample_gain"], payload["pan"])
+        changed = channel.trigger or signature != channel.signature
+        payload["sample_continue"] = not channel.trigger
+        channel.signature, channel.trigger = signature, False
+        for kind, position in channel.envelope_ticks.items():
+            channel.envelope_ticks[kind] = advance_tracker_envelope(descriptor.get(kind + "_env"), position, channel.held)
+        return payload if changed else None
+
+    def compile(self):
+        patterns = []
+        for pattern_index in self.song["order"]:
+            events, origin = [], round(self.elapsed)
+            for row_index, cells in enumerate(self.song["patterns"][pattern_index]):
+                decoded = []
+                for index, (note, instrument, volume, effect, parameter) in enumerate(cells):
+                    self.location = f"padrão {pattern_index + 1}, linha {row_index + 1}, canal {index + 1}"
+                    channel = self.channels[index]; key, parameter = self.effect(channel, effect, parameter)
+                    decoded.append((key, parameter))
+                    if key == "tempo":
+                        if not parameter: self.fail("efeito 0F00 não suportado")
+                        if parameter < 32: self.speed = parameter
+                        else: self.tempo = parameter
+                    elif key == "speed" and parameter: self.speed = parameter
+                    elif key == "it_tempo" and parameter >= 32: self.tempo = parameter
+                    elif key == "global_volume":
+                        limit = 64 if self.reader.format == "XM" else 128
+                        if parameter > limit: self.fail("volume global inválido")
+                        self.global_volume = parameter / limit
+                delay = max([value for key, value in decoded if key == "pattern_delay"] or [0])
+                for absolute_tick in range(self.speed * (delay + 1)):
+                    self.tick = absolute_tick % self.speed
+                    for index, (note, instrument, volume, _, _) in enumerate(cells):
+                        self.location = f"padrão {pattern_index + 1}, linha {row_index + 1}, canal {index + 1}"
+                        channel = self.channels[index]; key, parameter = decoded[index]
+                        if key == "global_slide":
+                            limit = 64 if self.reader.format == "XM" else 128
+                            self.global_volume = self.volume_slide(self.global_volume * limit, parameter, self.tick, limit) / limit
+                        elif key == "it_tempo" and parameter < 32 and self.tick > 0:
+                            self.tempo = max(32, min(255, self.tempo + (parameter & 15) * (1 if parameter >> 4 else -1)))
+                    for index, (note, instrument, volume, _, _) in enumerate(cells):
+                        self.location = f"padrão {pattern_index + 1}, linha {row_index + 1}, canal {index + 1}"
+                        channel = self.channels[index]; key, parameter = decoded[index]
+                        porta_column = volume is not None and (volume >> 4 == 15 if self.reader.format == "XM" else 193 <= volume <= 202)
+                        trigger_tick = parameter if key == "delay" else 0
+                        if absolute_tick == trigger_tick:
+                            self.note(channel, note, instrument, key in ("porta", "porta_volume") or porta_column)
+                        if key != "delay" or absolute_tick >= trigger_tick:
+                            volume_tick = 0 if key == "delay" and absolute_tick == trigger_tick else self.tick
+                            self.volume_column(channel, volume, volume_tick)
+                        self.controls(channel, key, parameter, self.tick)
+                        step = self.emit(channel, index, key, parameter, volume)
+                        if step: events.append((round(self.elapsed) - origin, step))
+                    self.elapsed += self.FRAMES_PER_SECOND * 2.5 / self.tempo
+            end = round(self.elapsed) - origin
+            steps = []
+            if not events or events[0][0] > 0:
+                events.insert(0, (0, {"channel": 1, "frequency_hz": 64, "volume": 0, "duty": self.duty}))
+            for i, (frame, step) in enumerate(events):
+                duration = (events[i + 1][0] if i + 1 < len(events) else end) - frame
+                steps.append(dict(step, duration_frames=min(255, duration)))
+                remaining = duration - min(255, duration)
+                while remaining > 0:
+                    chunk = min(255, remaining)
+                    steps.append({"channel": 1, "frequency_hz": 64, "volume": 0, "duty": self.duty, "duration_frames": chunk})
+                    remaining -= chunk
+            patterns.append({"steps": steps})
+        used = sorted({step["sample_index"] for pattern in patterns for step in pattern["steps"] if step.get("sample_only")})
+        mapping = {old: new for new, old in enumerate(used)}
+        for pattern in patterns:
+            for step in pattern["steps"]:
+                if step.get("sample_only"): step["sample_index"] = mapping[step["sample_index"]]
+        return {"patterns": patterns, "order": list(range(len(patterns))), "samples": [self.samples[i] for i in used]}
 
 
 def compile_extended_tracker(r, song, duty=2):
-    """Keep channel state across order occurrences and retain all silent time."""
-    speed, tempo = song["speed"], song["tempo"]
-    if not 1 <= speed <= 255 or not 32 <= tempo <= 255 or not 0 <= song["global_volume"] <= 1 or any(v > 64 for v in song["channel_volumes"]):
-        r.fail("velocidade, andamento ou volume inválido")
-    samples, instruments, count = song["samples"], song["instruments"], song["channels"]
-    remembered = [0] * count
-    channel_volumes, channel_pans = [None] * count, [None] * count
-    patterns, elapsed = [], 0.0
-    for pattern_index in song["order"]:
-        pattern, events, origin = song["patterns"][pattern_index], [], round(elapsed)
-        for row_index, cells in enumerate(pattern):
-            # Global speed/tempo is applied before timing or notes in this row.
-            for note, instrument, volume, effect, parameter in cells:
-                if r.format == "XM" and effect == 15 and parameter:
-                    if parameter < 32:
-                        speed = parameter
-                    else:
-                        tempo = parameter
-                elif r.format == "IT" and effect == 1 and parameter:
-                    speed = parameter
-                elif r.format == "IT" and effect == 20 and parameter >= 32:
-                    tempo = parameter
-            frame, row_notes = round(elapsed) - origin, []
-            for channel, (note, instrument, volume, effect, parameter) in enumerate(cells):
-                where = f"padrão {pattern_index + 1}, linha {row_index + 1}, canal {channel + 1}"
-                def unsupported(detail):
-                    r.fail(f"{where}: {detail} ainda não suportado na ROM")
-                if r.format == "XM":
-                    if effect not in (0, 8, 12, 15) or effect == 0 and parameter or effect == 15 and not parameter:
-                        unsupported(f"efeito {effect:02X}{parameter:02X}")
-                    if volume is not None and not 16 <= volume <= 80 and not 192 <= volume <= 207:
-                        unsupported(f"coluna de volume {volume:02X}")
-                else:
-                    if effect not in (0, 1, 20, 24) or effect == 20 and parameter < 32:
-                        unsupported(f"efeito {effect:02X}{parameter:02X}")
-                    if volume is not None and volume > 64 and not 128 <= volume <= 192:
-                        unsupported(f"coluna de volume {volume:02X}")
-                    if effect == 24 and parameter > 128:
-                        unsupported("surround")
-                if instrument:
-                    if instrument > len(instruments):
-                        r.fail(f"{where}: instrumento ausente")
-                    remembered[channel] = instrument
-                if note is None:
-                    if instrument or volume is not None or effect in ((8, 12) if r.format == "XM" else (24,)):
-                        unsupported("mudança de instrumento, volume ou panorama sem nota")
-                    continue
-                if note < 0:
-                    if instrument or volume is not None or effect in ((8, 12) if r.format == "XM" else (24,)):
-                        unsupported("instrumento, volume ou panorama junto de note-off/cut")
-                    row_notes.append(tracker_sample_cut_note(samples, channel + 1, row_index, 1))
-                    continue
-                if not remembered[channel]:
-                    r.fail(f"{where}: nota sem instrumento")
-                reset_controls = bool(instrument) or channel_volumes[channel] is None
-                instrument = instruments[remembered[channel] - 1]
-                sample_index = instrument["map"][note]
-                if sample_index is None or not samples[sample_index]["samples"]:
-                    row_notes.append(tracker_sample_cut_note(samples, channel + 1, row_index, 1))
-                    continue
-                sample = samples[sample_index]
-                pan = sample.get("pan")
-                if pan is None:
-                    pan = instrument.get("pan")
-                if pan is None:
-                    pan = song["pans"][channel]
-                gain_volume = sample["volume"] if reset_controls else channel_volumes[channel]
-                if not reset_controls:
-                    pan = channel_pans[channel]
-                if volume is not None:
-                    if r.format == "XM" and volume <= 80:
-                        gain_volume = volume - 16
-                    elif r.format == "IT" and volume <= 64:
-                        gain_volume = volume
-                    else:
-                        pan = round(((volume - (192 if r.format == "XM" else 128)) / (15 if r.format == "XM" else 64) * 2 - 1) * 127)
-                if r.format == "XM" and effect == 12:
-                    if parameter > 64:
-                        r.fail(f"{where}: volume inválido")
-                    gain_volume = parameter
-                if effect == (8 if r.format == "XM" else 24):
-                    pan = round((parameter / (255 if r.format == "XM" else 128) * 2 - 1) * 127)
-                channel_volumes[channel], channel_pans[channel] = gain_volume, pan
-                pan = round(pan * song.get("pan_separation", 1))
-                relative = instrument["note_map"][note] - (48 if r.format == "XM" else 60) + sample.get("transpose", 0)
-                rate = round(sample["sample_rate_hz"] * 2 ** (relative / 12))
-                if not 1 <= rate <= 2097152:
-                    r.fail(f"{where}: frequência da nota fora do intervalo da engine")
-                gain = sample.get("gain", 1) * instrument["volume"] * song["global_volume"] * song["channel_volumes"][channel] / 64
-                row_notes.append({"channel": channel + 1, "frequency_hz": 440, "volume": max(0, min(15, round(gain_volume / 64 * gain * 15))),
-                                  "sample_index": sample_index, "sample_rate_hz": rate, "sample_only": True, "pan": max(-127, min(127, pan))})
-            if row_notes:
-                events.append((frame, row_notes))
-            elapsed += speed * 150 / tempo
-        end = round(elapsed) - origin
-        if not events or events[0][0] > 0:
-            events.insert(0, (0, []))
-        steps = []
-        for index, (frame, notes) in enumerate(events):
-            duration = (events[index + 1][0] if index + 1 < len(events) else end) - frame
-            for i, note in enumerate(notes):
-                step = dict(note, duty=duty, sample_only=True, duration_frames=min(255, duration) if i == len(notes) - 1 else 0)
-                steps.append(step)
-            remaining = duration - (min(255, duration) if notes else 0)
-            while remaining > 0:
-                chunk = min(255, remaining)
-                steps.append({"channel": 1, "frequency_hz": 64, "duration_frames": chunk, "volume": 0, "duty": duty})
-                remaining -= chunk
-        patterns.append({"steps": steps})
-    used_samples = sorted({step["sample_index"] for pattern in patterns for step in pattern["steps"] if step.get("sample_only")})
-    sample_map = {old: new for new, old in enumerate(used_samples)}
-    for pattern in patterns:
-        for step in pattern["steps"]:
-            if step.get("sample_only"):
-                step["sample_index"] = sample_map[step["sample_index"]]
-    return {"patterns": patterns, "order": list(range(len(patterns))), "samples": [samples[index] for index in used_samples]}
+    return ExtendedTrackerReplay(r, song, duty).compile()
 
 
 def parse_xm_tracker(path, row_duration_frames=4, volume=8, duty=2):

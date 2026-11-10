@@ -24,6 +24,7 @@ def xm_fixture(channels=16, rows=5, pcm16=False):
     out = bytearray(sample + 40 + count)
     out[:17] = b"Extended Module: "
     out[37] = 26
+    out[38:58] = b"FastTracker v2.00".ljust(20, b" ")
     struct.pack_into("<HIHHHHHHHH", out, 58, 0x104, 276, 1, 0, channels, 1, 1, 1, 6, 125)
     struct.pack_into("<IBHH", out, 336, 9, 0, rows, len(pattern))
     out[345:instrument] = pattern
@@ -124,17 +125,17 @@ class ExtendedTrackerTests(unittest.TestCase):
     def test_long_empty_rows_are_not_truncated_to_255_frames(self):
         data, _, _ = xm_fixture(channels=1, rows=100)
         song = self.convert("xm", data)
-        self.assertEqual(sum(s["duration_frames"] for s in song["patterns"][0]["steps"]), 720)
+        self.assertEqual(sum(s["duration_frames"] for s in song["patterns"][0]["steps"]), round(100 * 6 * 2.5 / 125 * 16777216 / 280896))
         self.assertTrue(all(s["duration_frames"] <= 255 for s in song["patterns"][0]["steps"]))
 
     def test_unsupported_features_fail_with_location_instead_of_disappearing(self):
         data, instrument, _ = xm_fixture()
         data[instrument + 233] = 1
-        with self.assertRaisesRegex(SystemExit, "XM.*instrumento 1.*envelope"):
+        with self.assertRaisesRegex(SystemExit, "XM.*envelope"):
             self.convert("xm", data)
         data, _, _ = xm_fixture()
-        data[348:350] = bytes([4, 0x47])
-        with self.assertRaisesRegex(SystemExit, "XM.*padrão 1.*linha 1.*canal 1.*04"):
+        data[348:350] = bytes([255, 0x47])
+        with self.assertRaisesRegex(SystemExit, "XM.*padrão 1.*linha 1.*canal 1.*FF"):
             self.convert("xm", data)
         data, sample, _ = it_fixture()
         data[sample + 18] |= 8
@@ -153,7 +154,7 @@ class ExtendedTrackerTests(unittest.TestCase):
         steps = song["patterns"][0]["steps"]
         self.assertEqual(steps[0]["volume"], 0)
         self.assertEqual(steps[0]["duration_frames"], 14)
-        self.assertEqual(sum(s["duration_frames"] for s in steps), 602)
+        self.assertEqual(sum(s["duration_frames"] for s in steps), round((2 * 6 * 2.5 / 125 + 98 * 6 * 2.5 / 150) * 16777216 / 280896))
 
     def test_sample_state_survives_order_boundaries(self):
         data, instrument, _ = xm_fixture(channels=1, rows=5)
@@ -181,11 +182,12 @@ class ExtendedTrackerTests(unittest.TestCase):
         with self.assertRaisesRegex(SystemExit, "16 canais"):
             self.convert("it", it_fixture(tuple(range(17)))[0])
 
-    def test_volume_without_note_and_f00_are_not_silently_lost(self):
+    def test_volume_without_note_updates_gain_and_f00_stays_explicit(self):
         data, _, _ = xm_fixture(channels=1)
         data[350:355] = bytes([0, 0, 0x30, 0, 0])
-        with self.assertRaisesRegex(SystemExit, "linha 2.*sem nota"):
-            self.convert("xm", data)
+        steps = self.convert("xm", data)["patterns"][0]["steps"]
+        self.assertTrue(steps[1]["sample_continue"])
+        self.assertEqual(steps[1]["sample_gain"], 128)
         data[350:355] = bytes([0, 0, 0, 15, 0])
         with self.assertRaisesRegex(SystemExit, "linha 2.*0F00"):
             self.convert("xm", data)
@@ -195,7 +197,7 @@ class ExtendedTrackerTests(unittest.TestCase):
         data[345:350] = bytes([49, 1, 0x30, 8, 0])
         data[350:355] = bytes([51, 0, 0, 0, 0])
         steps = self.convert("xm", data)["patterns"][0]["steps"]
-        self.assertEqual([s["volume"] for s in steps[:2]], [8, 8])
+        self.assertEqual([s["sample_gain"] for s in steps[:2]], [128, 128])
         self.assertEqual([s["pan"] for s in steps[:2]], [-127, -127])
 
     def test_simple_it_instrument_mapping_and_control_memory(self):
@@ -216,7 +218,7 @@ class ExtendedTrackerTests(unittest.TestCase):
             song["patterns"][0][1][0] = (62, 0, None, 0, 0)
             song["pans"][0] = -127
             steps = ASSETC.compile_extended_tracker(reader, song)["patterns"][0]["steps"]
-            self.assertEqual([s["volume"] for s in steps[:2]], [11, 11])
+            self.assertEqual([s["sample_gain"] for s in steps[:2]], [191, 191])
             self.assertEqual([s["pan"] for s in steps[:2]], [-127, -127])
         data[instrument + 304] = 1
         with self.assertRaisesRegex(SystemExit, "instrumento 1.*envelope"):

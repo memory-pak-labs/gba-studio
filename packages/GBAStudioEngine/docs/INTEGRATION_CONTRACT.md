@@ -280,28 +280,39 @@ cada nota ao mudar sua taxa, evitando trocar o cursor para outra versão do PCM.
 `audio.tracker_xm_pcm_profile` e `audio.tracker_it_pcm_profile` identificam os
 conversores próprios do `assetc`; projetos que usam esses formatos exigem as
 respectivas capacidades no Engine Pack. Não dependem do Maxmod ou de um player
-externo. Este é um perfil inicial, não compatibilidade completa com trackers.
+externo. Este é um perfil delimitado, não compatibilidade completa com trackers.
 
 - XM 1.04: até 16 canais, padrões de 1 a 256 linhas, mapa de samples por nota,
   PCM delta de 8/16 bits, afinação relativa/fina, volume e panorama na nota,
-  loops normais e bidirecionais, note-off e comando Fxx de velocidade/andamento.
-  Cxx/8xx e volume direto/panorama da coluna de volume exigem nota na mesma linha.
+  loops normais e bidirecionais, note-off, envelopes de volume/panorama com
+  sustain/loop e fadeout do instrumento. Efeitos: arpejo FT2, slides de pitch
+  normais/finos/extra-finos, portamento, vibrato senoidal, tremolo, tremor,
+  slides de volume/panorama, volume global e seu slide, key-off, posição de
+  envelope, atraso/corte/retrigger de nota e atraso de padrão; Fxx controla
+  velocidade/andamento. A memória dos parâmetros continua entre linhas.
 - IT 2.x: até 16 canais PCM usados, inclusive índices físicos com lacunas até 63,
   máscaras e reutilização de campos, padrões de 1 a 1024 linhas, PCM mono sem
   compressão de 8/16 bits (signed/unsigned/delta), sample C5, volumes iniciais,
-  mapas simples de instrumento, loops normais/bidirecionais, note-off/cut,
-  Axx, Txx absoluto e X00–X80 na nota. Volume/panorama direto na coluna também
-  exige nota. Instrumentos precisam usar NNA=cut, sem envelopes/fadeout,
+  mapas simples de instrumento, loops normais/bidirecionais, note-off/cut/fade,
+  envelopes de volume/panorama/pitch com sustain/loop/carry e fadeout.
+  Efeitos: Axx, Dxy–Nxy, Pxy–Rxy, Txx–Xxx, S8x, SCx, SDx e SEx, incluindo
+  andamento relativo, vibrato fino e slides finos. Volume/panorama também
+  podem mudar sem uma nota nova. Instrumentos precisam usar NNA=cut, sem
   separação de panorama por pitch ou variações aleatórias.
 - Samples convertidos: no máximo 65535 amostras por sample, inclusive após
   expandir loop bidirecional. Cada ocorrência na sequência é compilada com
   estado de instrumento herdado; pausas longas são divididas sem perder duração.
-  A quantização para quadros acumula a fração temporal entre linhas e padrões.
+  A quantização para quadros acumula a fração temporal entre ticks e padrões
+  usando o relógio físico do GBA. Envelopes usam ganho de 8 bits; controles
+  são publicados por VBlank, não em resolução de amostra. Mudanças de pitch
+  usam interpolação linear no mixer e podem aumentar o custo de CPU.
 
-Envelopes, vibrato, portamento, slides, jumps/breaks, note fade, sustain loops,
+Jumps/breaks, loops de padrão, offsets de sample, seleção de waveform,
+vibrato automático, filtro de instrumento, sustain loops de sample,
 PCM estéreo/comprimido de IT e outros comandos fora desse perfil geram erro
 explícito. O erro indica formato e, para células, padrão/linha/canal. Esses
-recursos não são apagados nem aproximados durante a exportação.
+recursos não são apagados durante a exportação. Efeitos em canais IT
+desativados também são rejeitados para não perder comandos globais.
 
 O editor cria um item independente vinculado ao hash da fonte, preserva células
 nativas e bytes dos instrumentos/samples e guarda edições no `.gba-project`.
