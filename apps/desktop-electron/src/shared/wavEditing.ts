@@ -2,6 +2,7 @@ import type { GBAProjectData } from "./projectFile.js";
 
 export const WAV_EDITOR_MAX_BYTES = 16 * 1024 * 1024;
 export interface WavRange { start: number; end: number }
+export interface WavEditorSource { id: string; name: string; source?: string; edit?: WavEdit }
 export interface WavData { sampleRate: number; channels: Float32Array[]; loop: WavRange | null }
 export interface WavOperation extends WavRange { type: "fadeIn" | "fadeOut" | "normalize" }
 /** Positions are source frames, end-exclusive. The source file is never modified. */
@@ -112,6 +113,7 @@ export function updateWavEditInProject(data: GBAProjectData, assetID: string, ed
   const asset = assets.find(a => a.id === assetID);
   if (!asset || !/\.wav$/i.test(String(asset.name))) return data;
   const metadata = { ...(asset.metadata as Record<string, unknown>) };
+  if (JSON.stringify(metadata.wavEdit ?? null) === JSON.stringify(edit)) return data;
   if (edit) metadata.wavEdit = edit; else delete metadata.wavEdit;
   return { ...data, assets: assets.map(a => a === asset ? { ...a, metadata } : a) };
 }

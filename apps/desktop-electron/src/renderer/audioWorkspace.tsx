@@ -2,6 +2,8 @@ import { PCM_INSTRUMENTS, type PcmSfxConfig } from "../shared/audioPcm.js";
 import type { PrepareAudioPreviewRequest, EngineAudioPreviewResult } from "../shared/audioPreview.js";
 import { startEngineAudioPreview } from "./engineAudioPreview.js";
 import { PcmSfxEditor } from "./PcmSfxEditor.js";
+import { WavSampleEditor } from "./WavSampleEditor.js";
+import type { WavEdit } from "../shared/wavEditing.js";
 import { TrackerModuleComposer } from "./TrackerModuleComposer.js";
 import type { TrackerModuleEdit } from "../shared/trackerModuleEditing.js";
 import { uiText as ui, useStudioUiText } from "./studioUiText";
@@ -9,7 +11,7 @@ import { wavSampleLoop } from "../shared/wavSampleLoop";
 import { Play, Square, Plus, Minus, Search, Upload, Music2, AudioLines, ListFilter, AlertTriangle, SlidersHorizontal, X } from "lucide-react";
 import { AudioGroovePiano, grooveTrackName, grooveHardwareLabel, grooveTrackTone } from "./AudioGroovePiano";
 import type { UpdateAudioInstrumentFields } from "../shared/audioInstruments.js";
-import { resolveAudioPreviewSourceURL, startComposedAudioPreview } from "./audioPreviewPlayback";
+import { editedWavPreviewBytes, resolveAudioPreviewSourceURL, startComposedAudioPreview } from "./audioPreviewPlayback";
 import { type CSSProperties, useEffect, useId, useMemo, useRef, useState } from "react";
 import {
   deriveAudioChannelMixing,
@@ -53,6 +55,7 @@ const composerTabs: { id: AudioComposerTab; label: string }[] = [
 ];
 
 interface AudioWorkspaceProps {
+  onUpdateWavEdit?(assetID: string, edit: WavEdit | null): void;
   onCreateEditableTracker?(audioID: string): void | Promise<void>;
   onUpdateTrackerModule?(audioID: string, edit: TrackerModuleEdit): void;
   onCreateAudioInstrument?(audioID: string, channelID: string): void;
@@ -393,6 +396,7 @@ function audioStepTracker(
 }
 
 export function AudioWorkspace({
+  onUpdateWavEdit,
   onCreateEditableTracker, onUpdateTrackerModule,
   onCreateAudioInstrument, onUpdateAudioInstrument, onRemoveAudioInstrument,
   presentation,
@@ -556,6 +560,7 @@ export function AudioWorkspace({
     function handlePianoRollDelete(event: KeyboardEvent): void {
       if (event.key !== "Delete" && event.key !== "Backspace") return;
       const target = event.target;
+      if (target instanceof Element && target.closest(".wav-sample-editor")) return;
       if (target instanceof HTMLElement && (
         target.isContentEditable
         || target.closest(".audio-groove-details")
@@ -688,6 +693,9 @@ export function AudioWorkspace({
   }
   const selectedRow = activeItem?.previewRows.find(row => selectedCell?.audioID === activeItem.id && row.id === selectedCell.channelID) ?? activeItem?.previewRows[0];
   const channelMixing = deriveAudioChannelMixing(activeItem, selectedRow?.id ?? null);
+  const wavAssetID = activeItem?.pcmSfx?.source === "sample" ? activeItem.pcmSfx.sampleAssetID : activeItem?.format === "WAV" ? activeItem.sourceAssetID : channelMixing.sampleAssetID;
+  const wavSource = presentation.sampleInstruments?.find(source => source.id === wavAssetID);
+  const wavEditor = wavSource && onUpdateWavEdit ? <WavSampleEditor key={wavSource.id} source={wavSource} projectPath={projectPath} onChange={onUpdateWavEdit} onEditing={() => stopAudioPreview()} /> : null;
   const moduleTempoLocked = activeItem?.trackerModule?.format === "MOD";
   const minTempo = activeItem?.trackerModule ? 32 : 40;
   const maxTempo = activeItem?.trackerModule ? 255 : activeItem?.kind === "SFX" ? 360 : 240;
@@ -827,9 +835,12 @@ export function AudioWorkspace({
         if (!url) throw new Error("Salve o projeto para ouvir o arquivo importado.");
         const response = await fetch(url, { signal: abort.signal });
         if (!response.ok) throw new Error("Não foi possível abrir o arquivo de áudio.");
-        const buffer = await context.decodeAudioData(await response.arrayBuffer());
+        const bytes = await editedWavPreviewBytes(await response.arrayBuffer(), presentation?.sampleInstruments?.find(sample => sample.id === item.sourceAssetID)?.edit);
+        const loop = wavSampleLoop(bytes);
+        const buffer = await context.decodeAudioData(bytes);
         if (request !== playbackRequest.current) return;
         const source = context.createBufferSource(); source.buffer = buffer; source.loop = item.loops;
+        if (loop) { source.loopStart = loop.start; source.loopEnd = loop.end; }
         source.connect(context.destination); source.onended = ended;
         playbackRef.current = { context, stop: () => { abort.abort(); source.onended = null; source.stop(); } };
         source.start();
@@ -843,7 +854,7 @@ export function AudioWorkspace({
           if (!url) throw new Error("Salve o projeto para ouvir o sample.");
           const response = await fetch(url, { signal: abort.signal });
           if (!response.ok) throw new Error("Não foi possível abrir o sample WAV.");
-          const bytes = await response.arrayBuffer();
+          const bytes = await editedWavPreviewBytes(await response.arrayBuffer(), presentation?.sampleInstruments?.find(sample => sample.source === source)?.edit);
           const loop = wavSampleLoop(bytes);
           if (loop) sampleLoops.set(source, loop);
           sampleBuffers.set(source, await context.decodeAudioData(bytes));
@@ -897,6 +908,7 @@ export function AudioWorkspace({
       aria-label={ui("Workspace Áudio")}
       onKeyDown={(event) => {
         const target = event.target as HTMLElement;
+        if (target.closest(".wav-sample-editor")) return;
         if (target.matches("input, textarea, select") || target.isContentEditable || target.closest(".audio-groove-details")) return;
         if (event.key === " ") {
           event.preventDefault();
@@ -1002,7 +1014,7 @@ export function AudioWorkspace({
             {activeItem?.origin === "Composto" && !activeItem.pcmSfx ? <div className="audio-groove-preview-scope" aria-label={ui("Trecho da prévia")}><span>{ui("Prévia")}</span><button type="button" aria-pressed={previewScope === "pattern"} onClick={() => setPreviewScope("pattern")}>{ui("Padrão")}</button><button type="button" aria-pressed={previewScope === "sequence"} onClick={() => setPreviewScope("sequence")}>{ui("Música")}</button></div> : null}
           </div>
           {activeItem?.pcmSfx ? <>
-            <PcmSfxEditor config={activeItem.pcmSfx} samples={presentation.sampleInstruments ?? []} onChange={config => onUpdatePcmSfx?.(activeItem.id, config)} onEditing={() => { if (nativeRef.current) stopAudioPreview(); }} />
+            <PcmSfxEditor config={activeItem.pcmSfx} samples={presentation.sampleInstruments ?? []} sampleEditor={wavEditor} onChange={config => onUpdatePcmSfx?.(activeItem.id, config)} onEditing={() => { if (nativeRef.current) stopAudioPreview(); }} />
             <div className="audio-groove-dock"><label className="audio-groove-slider"><span>{ui("Volume geral")} <output>{activeItem.volume ?? 80}%</output></span><input aria-label={ui("Volume geral")} type="range" min={0} max={100} value={activeItem.volume ?? 80} onChange={event => onUpdateAudioFields(activeItem.id, { volume: event.currentTarget.valueAsNumber })} /></label><button ref={detailsButtonRef} type="button" aria-controls={detailsID} aria-expanded={detailsOpen} onClick={() => setDetailsOpen(!detailsOpen)}>{ui("Detalhes")}</button></div>
           </> : activeItem?.trackerModule ? <TrackerModuleComposer item={activeItem} mode={composerTab} onMode={setComposerTab}
             selectedCell={selectedCell} onSelect={setSelectedCell} onEdit={edit => onUpdateTrackerModule?.(activeItem.id, edit)} onDetails={() => setDetailsOpen(!detailsOpen)} />
@@ -1034,7 +1046,8 @@ export function AudioWorkspace({
               {channelMixing.sampleAssetID ? <label className="audio-groove-switch"><input aria-label={ui("Repetir sample")} type="checkbox" checked={channelMixing.sampleLoop} onChange={event => updateInstrumentControls({ sampleLoop: event.currentTarget.checked })} /><span>{ui("Repetir sample")}</span></label> : null}
               <button ref={detailsButtonRef} className="audio-groove-details-button" type="button" aria-controls={detailsID} aria-expanded={detailsOpen} onClick={() => setDetailsOpen(!detailsOpen)}><SlidersHorizontal size={16} />{ui("Detalhes")}</button>
             </div>
-          </> : <div className="audio-empty-composer"><strong>{ui("Áudio importado")}</strong><p>{onPrepareEnginePreview ? ui("Tocar reproduz o áudio pela engine da ROM.") : activeItem?.format === "WAV" ? ui("Tocar reproduz o arquivo WAV original.") : ui("A prévia deste formato está disponível no Play do jogo.")}</p>
+            {wavEditor ? <details className="wav-track-editor"><summary>{ui("Editar sample WAV")}</summary>{wavEditor}</details> : null}
+          </> : activeItem?.format === "WAV" && wavEditor ? wavEditor : <div className="audio-empty-composer"><strong>{ui("Áudio importado")}</strong><p>{onPrepareEnginePreview ? ui("Tocar reproduz o áudio pela engine da ROM.") : activeItem?.format === "WAV" ? ui("Tocar reproduz o arquivo WAV original.") : ui("A prévia deste formato está disponível no Play do jogo.")}</p>
             {activeItem?.kind === "Musica" && ["MOD", "S3M"].includes(activeItem.format) ? <>
               <button type="button" disabled={creatingModuleCopy || !projectPath || !onCreateEditableTracker} onClick={async () => { setCreatingModuleCopy(true); try { await onCreateEditableTracker?.(activeItem.id); } finally { setCreatingModuleCopy(false); } }}>{ui(creatingModuleCopy ? "Preparando cópia…" : "Criar cópia editável")}</button>
               <p>{ui("O arquivo original permanece intacto.")}</p>

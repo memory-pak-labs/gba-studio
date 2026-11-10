@@ -49,7 +49,7 @@ describe("sample instruments in the piano roll", () => {
   it("keeps sample references when assets are renamed and protects referenced WAVs from deletion", () => {
     const data = updateAudioChannelFieldsInProject(fixture(), "song", { channelID: "voice", sampleAssetID: "wav-a" });
     const renamed = renameAssetInProject(data, "wav-a", "Piano novo.wav");
-    expect(deriveAudioWorkspacePresentation(renamed).sampleInstruments).toContainEqual({ id: "wav-a", name: "Piano novo.wav" });
+    expect(deriveAudioWorkspacePresentation(renamed).sampleInstruments).toContainEqual({ id: "wav-a", name: "Piano novo.wav", source: "assets/Piano suave.wav" });
     expect(projectReferenceDeletionGuard(renamed, { kind: "asset", id: "wav-a", name: "Piano novo.wav" }).canDelete).toBe(false);
     expect(buildAssetcAudioPackGeneration(renamed)?.sourceCopies[0].source).toBe("assets/Piano suave.wav");
   });

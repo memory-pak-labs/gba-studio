@@ -1,5 +1,13 @@
 import type { AudioPreviewPlaybackNote, AudioPreviewPlaybackPlan } from "../shared/audioWorkspace.js";
 import { desktopAssetURL } from "../shared/spriteAssetURL.js";
+import { decodeWav, encodeWav, renderWavEdit, type WavEdit } from "../shared/wavEditing.js";
+
+export async function editedWavPreviewBytes(bytes: ArrayBuffer, edit?: WavEdit): Promise<ArrayBuffer> {
+  if (!edit) return bytes;
+  const hash = Array.from(new Uint8Array(await crypto.subtle.digest("SHA-256", bytes)), b => b.toString(16).padStart(2, "0")).join("");
+  if (hash !== edit.sourceSha256) throw new Error("A fonte WAV foi alterada fora do editor.");
+  return Uint8Array.from(encodeWav(renderWavEdit(decodeWav(new Uint8Array(bytes)), edit))).buffer;
+}
 
 export function resolveAudioPreviewSourceURL(projectPath: string | undefined, source: string | null): string | null {
   if (!projectPath || !source) return null;

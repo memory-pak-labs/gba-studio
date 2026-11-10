@@ -1,4 +1,5 @@
 import { updatePcmSfxInProject } from "../shared/audioPcm.js";
+import { updateWavEditInProject } from "../shared/wavEditing.js";
 import { uiText as ui, useStudioUiText } from "./studioUiText";
 import { AppUpdateNotice } from "./AppUpdateNotice";
 import { appUpdateText } from "./appUpdateText";
@@ -3749,6 +3750,7 @@ function App(): React.ReactElement {
             />
           ) : selectedWorkspace === "Audio" ? (
             <AudioWorkspace
+              onUpdateWavEdit={(id, edit) => { if (session) updateProjectData(updateWavEditInProject(session.project.data, id, edit)); }}
               onCreateEditableTracker={createEditableTracker}
               onUpdateTrackerModule={updateTrackerModule}
               presentation={audioPresentation}

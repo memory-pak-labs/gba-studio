@@ -3,13 +3,14 @@ import { PCM_WAVEFORMS, renderPcmSfx, type PcmSfxConfig } from "../shared/audioP
 import { useStudioUiText } from "./studioUiText";
 
 interface Props {
+  sampleEditor?: React.ReactNode;
   config: PcmSfxConfig;
   samples: Array<{ id: string; name: string }>;
   onChange(config: PcmSfxConfig): void;
   onEditing(): void;
 }
 const waveformNames = { sine: "Senoidal", triangle: "Triangular", square: "Quadrada", saw: "Dente de serra", noise: "Ruído" };
-export function PcmSfxEditor({ config, samples, onChange, onEditing }: Props): React.ReactElement {
+export function PcmSfxEditor({ config, samples, onChange, onEditing, sampleEditor }: Props): React.ReactElement {
   const ui = useStudioUiText();
   const [draft, setDraft] = useState(config);
   const current = useRef(config);
@@ -54,10 +55,10 @@ export function PcmSfxEditor({ config, samples, onChange, onEditing }: Props): R
         <option value="synth">{ui("Sintetizador PCM")}</option><option value="sample" disabled={!samples.length}>{ui("Sample WAV")}</option>
       </select></label>
     </header>
-    <figure className="pcm-sfx-waveform"><svg viewBox="0 0 320 120" preserveAspectRatio="none" role="img" aria-label={ui(draft.source === "synth" ? "Forma de onda do efeito" : "Envelope do sample")}>
+    {draft.source === "synth" || !sampleEditor ? <figure className="pcm-sfx-waveform"><svg viewBox="0 0 320 120" preserveAspectRatio="none" role="img" aria-label={ui(draft.source === "synth" ? "Forma de onda do efeito" : "Envelope do sample")}>
       <path d="M0 60H320" className="pcm-wave-axis" />
       {draft.source === "synth" ? <polyline points={waveform} /> : <path d={`M0 112 L${320 * draft.attackMs / draft.durationMs} 8 H${320 * (1 - draft.releaseMs / draft.durationMs)} L320 112`} />}
-    </svg><figcaption>{ui(draft.source === "synth" ? "Forma de onda PCM" : "Envelope do sample")} · {draft.durationMs} ms</figcaption></figure>
+    </svg><figcaption>{ui(draft.source === "synth" ? "Forma de onda PCM" : "Envelope do sample")} · {draft.durationMs} ms</figcaption></figure> : null}
     <div className="pcm-sfx-controls">
       {draft.source === "synth" ? <label>{ui("Forma de onda")}<select aria-label={ui("Forma de onda")} value={draft.waveform} onChange={event => { onEditing(); change({ waveform: event.currentTarget.value as PcmSfxConfig["waveform"] }, true); }}>{PCM_WAVEFORMS.map(wave => <option value={wave} key={wave}>{ui(waveformNames[wave])}</option>)}</select></label>
         : <label>{ui("Sample WAV")}<select aria-label={ui("Sample WAV")} value={draft.sampleAssetID ?? ""} onChange={event => { onEditing(); change({ sampleAssetID: event.currentTarget.value }, true); }}>{samples.map(sample => <option key={sample.id} value={sample.id}>{sample.name}</option>)}</select></label>}
@@ -67,6 +68,7 @@ export function PcmSfxEditor({ config, samples, onChange, onEditing }: Props): R
       {control("attackMs", "Ataque do efeito", 0, Math.min(1000, draft.durationMs - draft.releaseMs), "ms")}
       {control("releaseMs", "Finalização do efeito", 0, Math.min(1000, draft.durationMs - draft.attackMs), "ms")}
     </div>
+    {draft.source === "sample" ? sampleEditor : null}
     {!samples.length ? <p>{ui("Importe um WAV para usar seus próprios samples.")}</p> : null}
   </section>;
 }

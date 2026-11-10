@@ -19,6 +19,7 @@ export type AudioWorkspaceMode = "basic" | "complete";
 export type AudioComposerTab = "piano" | "tracker" | "sequence";
 
 export interface AudioWorkspaceItem {
+  sourceAssetID?: string;
   trackerModule?: import("./trackerModule.js").TrackerModuleMetadata;
   synthesis?: "PCM" | "PSG";
   pcmSfx?: PcmSfxConfig;
@@ -230,7 +231,7 @@ export interface AudioWorkspaceSummaryCard {
 
 export interface AudioWorkspacePresentation {
   instruments?: Array<import("./audioInstruments.js").AudioInstrument & { usageCount: number }>;
-  sampleInstruments?: Array<{ id: string; name: string }>;
+  sampleInstruments?: import("./wavEditing.js").WavEditorSource[];
   items: AudioWorkspaceItem[];
   kindCounts: AudioWorkspaceCount[];
   formatCounts: AudioWorkspaceFormatCount[];
@@ -2321,6 +2322,7 @@ export function deriveAudioWorkspacePresentation(data: GBAProjectData): AudioWor
         exportID: stringField(audio.exportID, defaultExportID(name)),
         volume: integerField(audio.volume),
         source,
+        ...(sourceAsset ? { sourceAssetID: String(sourceAsset.id) } : {}),
         origin: isPcmAudio(audio) ? "Composto" : originForAudio(kind, patternCount(audio) > 0 || previewChannels.length > 0 ? null : source),
         runtimeCommand: runtimeCommand(kind, name),
         usageCount: usages.length,
@@ -2366,7 +2368,7 @@ export function deriveAudioWorkspacePresentation(data: GBAProjectData): AudioWor
   return {
     items,
     instruments: audioInstrumentBank(data).map(item => ({ ...item, usageCount: audioInstrumentUsageCount(data, item.id) })),
-    sampleInstruments: audioSampleAssets(data).map(asset => ({ id: String(asset.id), name: String(asset.name) })),
+    sampleInstruments: audioSampleAssets(data).map(asset => ({ id: String(asset.id), name: String(asset.name), source: String((asset.metadata as Record<string, unknown>).source), ...((asset.metadata as Record<string, unknown>).wavEdit ? { edit: (asset.metadata as Record<string, unknown>).wavEdit as import("./wavEditing.js").WavEdit } : {}) })),
     kindCounts: countBy(items.map((item) => item.kind), "kind"),
     formatCounts: countBy(items.map((item) => item.format), "format"),
     summary,

@@ -25,6 +25,24 @@ const blank = () => createBlankProjectData({ name: "Compositor", includeStarterC
 afterEach(() => { cleanup(); vi.clearAllMocks(); });
 
 describe("visual PCM composer", () => {
+  it.each(["imported", "sfx", "song"])("opens the shared visual WAV editor for %s audio", kind => {
+    let data = blank();
+    if (kind === "imported") data.audioItems = [{ id: "fx", kind: "SFX", name: "Bell", sourceAssetID: "wav" }, { id: "other", kind: "SFX", name: "Other", sourceAssetID: "wav" }];
+    else {
+      data = createAudioItemInProject(data, { id: "pcm", name: "PCM", kind: kind === "sfx" ? "SFX" : "Musica", synthesis: "PCM" });
+      const item = (data.audioItems as any[])[0];
+      if (kind === "sfx") { item.pcmSfx.source = "sample"; item.pcmSfx.sampleAssetID = "wav"; }
+      else item.patterns[0].channels[0].sampleAssetID = "wav";
+    }
+    data.assets = [{ id: "wav", name: "Bell.wav", kind: "Audio", metadata: { source: "Assets/Bell.wav" } }];
+    render(<AudioWorkspace presentation={deriveAudioWorkspacePresentation(data)} {...handlers({ onUpdateWavEdit: vi.fn() })} />);
+    if (kind === "song") fireEvent.click(screen.getByText("Editar sample WAV"));
+    expect(screen.getByRole("region", { name: "Editor visual de WAV" })).toBeInTheDocument();
+    if (kind === "imported") {
+      fireEvent.keyDown(screen.getByRole("button", { name: "Recarregar WAV" }), { key: "ArrowRight" });
+      expect(screen.getByRole("heading", { name: "Bell" })).toBeInTheDocument();
+    }
+  });
   it("offers PCM music and effects as explicit creation choices", async () => {
     const create = vi.fn();
     render(<AudioWorkspace presentation={deriveAudioWorkspacePresentation(blank())} {...handlers({ onCreateAudio: create })} />);
