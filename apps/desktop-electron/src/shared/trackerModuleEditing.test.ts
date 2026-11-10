@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { createHash } from "node:crypto";
 import { makeEditableModFixture, makeEditableS3mFixture } from "./trackerModuleFixtures.js";
-import { parseTrackerModule } from "./trackerModule.js";
+import { parseTrackerModule, writeTrackerModule } from "./trackerModule.js";
 import { createEditableTrackerCopyInProject, editTrackerModuleInProject, trackerModuleSong } from "./trackerModuleEditing.js";
 import { deriveAudioWorkspacePresentation } from "./audioWorkspace.js";
 
@@ -14,6 +14,18 @@ function setup(channels = 16) {
   return { data, copy, song: trackerModuleSong((copy.audioItems as Record<string, unknown>[])[1]) };
 }
 describe("editable tracker project commands", () => {
+  it("does not reuse a S3M channel carrying preserved hidden commands", () => {
+    const bytes = makeEditableS3mFixture(); const digest = createHash("sha256").update(bytes).digest("hex");
+    const song = parseTrackerModule(bytes, "S3M", digest);
+    const data = { audioItems: [{ id: "original", name: "Tema", kind: "Musica", sourceAssetID: "asset" }], assets: [{ id: "asset", name: "source.s3m", kind: "Audio", metadata: { source: "Assets/source.s3m" } }] };
+    const copy = createEditableTrackerCopyInProject(data, "original", song, "editable");
+    const added = editTrackerModuleInProject(copy, "editable", { type: "channel-add", id: "extra" });
+    const next = trackerModuleSong((added.audioItems as Record<string, unknown>[])[1]);
+    expect(next.trackerModule.channelMap).toEqual([0, 3, 17, 2]);
+    const exported = writeTrackerModule(bytes, next);
+    const again = parseTrackerModule(exported, "S3M", createHash("sha256").update(exported).digest("hex"));
+    expect(again.patterns[0].trackerHiddenChannels).toEqual(song.patterns[0].trackerHiddenChannels);
+  });
   it("accepts the native S3M tempo range", () => {
     const bytes = makeEditableS3mFixture(); const song = parseTrackerModule(bytes, "S3M", createHash("sha256").update(bytes).digest("hex"));
     song.bpm = 32;

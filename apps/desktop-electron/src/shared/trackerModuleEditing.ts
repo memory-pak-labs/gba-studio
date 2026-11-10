@@ -102,7 +102,10 @@ export function editTrackerModuleInProject(data: GBAProjectData, audioID: string
     }
     case "channel-add": {
       if (meta.channelMap.length >= 16) return data;
-      const index = meta.channelMap.length; const physical = Array.from({ length: 32 }, (_, i) => i).find(i => !meta.channelMap.includes(i))!;
+      const index = meta.channelMap.length;
+      const hidden = new Set(song.patterns.flatMap(pattern => Object.keys(pattern.trackerHiddenChannels ?? {}).map(Number)));
+      const physical = Array.from({ length: 32 }, (_, i) => i).find(i => !meta.channelMap.includes(i) && !hidden.has(i));
+      if (physical === undefined) throw new Error("Nenhum canal físico livre sem substituir comandos preservados.");
       meta.channelMap.push(physical); song.patterns.forEach(p => p.channels.push(emptyChannel(`${p.id}-${edit.id}`, index))); break;
     }
     case "channel-remove": {
