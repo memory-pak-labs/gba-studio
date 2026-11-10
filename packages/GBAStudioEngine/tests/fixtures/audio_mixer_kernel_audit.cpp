@@ -78,6 +78,28 @@ extern "C" __attribute__((target("arm"))) int gbs_main() {
         }
         ++cases;
     }
+    // The long-loop Q16 addition can carry past 32 bits before wrapping.
+    static int8_t long_source[65535] __attribute__((section(".ewram_bss")));
+    for (auto& value : long_source) value = -1;
+    const gbs::PcmAsset long_asset {long_source,65535,8363,true,3,65535};
+    const gbs::PcmInterpolationInterval long_interval {65535u << 16,0xfffeffffu};
+    const gbs::PcmInterpolationMap long_map {gbs::PCM_INTERPOLATION_PRE_PAN,&long_interval,1,0};
+    PcmPlayback long_voice {}; long_voice.asset = &long_asset; long_voice.position_fp = 0x70000000u;
+    for (int n = -128; n < 128; ++n) pcm_stereo_gain[n + 128] = static_cast<uint32_t>(n * 65537);
+    for (int frame = 0; frame < 20; ++frame) {
+        long_voice.step_fp = static_cast<uint32_t>((2097152ull << 16) / 31536);
+        long_voice.step_reciprocal = 0xffffffffu / long_voice.step_fp;
+        uint64_t expected_position = long_voice.position_fp + 528ull * long_voice.step_fp;
+        if (expected_position >= (65535ull << 16)) expected_position -= (65532ull << 16);
+        clear_pcm_accumulator(); mix_pcm_prepared_block(long_voice,long_map);
+        if (long_voice.position_fp != expected_position) {
+            audio_kernel_witness[2] = 0xdead; audio_kernel_witness[3] = cases; for (;;) {}
+        }
+        for (size_t i = 0; i < 528; ++i) if (pcm_mix_accumulator[i] != pcm_stereo_bias + 0xfffeffffu) {
+            audio_kernel_witness[2] = 0xdead; audio_kernel_witness[3] = cases; for (;;) {}
+        }
+        ++cases;
+    }
     audio_kernel_witness[3] = cases;
     audio_kernel_witness[2] = 1;
     for (;;) {}

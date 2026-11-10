@@ -814,7 +814,8 @@ __attribute__((always_inline)) inline void mix_pcm_constant_run(uint32_t* output
 }
 
 GBS_AUDIO_HOT_CODE void mix_pcm_prepared_block(PcmPlayback& playback, const gbs::PcmInterpolationMap& cache) {
-    const uint32_t step = playback.step_fp, reciprocal = playback.step_reciprocal + 1u;
+    const uint32_t step = playback.step_fp, reciprocal = playback.step_reciprocal;
+    const bool pre_pan = (cache.mix_key & gbs::PCM_INTERPOLATION_PRE_PAN) != 0;
     const uint32_t loop_end = static_cast<uint32_t>(gbs::pcm_loop_end_sample(*playback.asset)) << 16;
     const uint32_t loop_length = loop_end - (static_cast<uint32_t>(playback.asset->loop_start_sample) << 16);
     const auto* const intervals = cache.intervals;
@@ -829,18 +830,20 @@ GBS_AUDIO_HOT_CODE void mix_pcm_prepared_block(PcmPlayback& playback, const gbs:
     uint32_t interval_end = intervals[interval].end;
     size_t output = 0;
     while (output < gbs::PCM_MIXER_SAMPLES_PER_FRAME) {
-        const uint32_t gain = intervals[interval].gain;
-        // ceil(distance/step) = floor((distance-1)/step)+1. The rounded-up
-        // reciprocal can overestimate by only one in this bounded short loop.
+        const uint32_t raw_gain = intervals[interval].gain;
+        const uint32_t gain = pre_pan ? pcm_stereo_gain[static_cast<int16_t>(raw_gain) + 128] : raw_gain;
+        // floor((distance-1)/step)+1, using a downward reciprocal.
+        // The product cannot overflow, even at the 65535-sample boundary;
+        // one remainder correction gives the exact ceiling.
         const uint32_t distance = interval_end - position - 1u;
         uint32_t run = static_cast<uint32_t>((static_cast<uint64_t>(distance) * reciprocal) >> 32);
-        run -= run * step > distance;
-        ++run;
+        run += (distance - run * step >= step) + 1u;
         const size_t remaining = gbs::PCM_MIXER_SAMPLES_PER_FRAME - output;
         if (run > remaining) run = static_cast<uint32_t>(remaining);
         mix_pcm_constant_run(pcm_mix_accumulator + output, run, gain);
-        position += run * step; output += run;
-        const bool wrapped = position >= loop_end;
+        const uint32_t next = position + run * step;
+        const bool wrapped = next < position || next >= loop_end;
+        position = next; output += run;
         if (wrapped) position -= loop_length;
         if (output == gbs::PCM_MIXER_SAMPLES_PER_FRAME) break;
         // An unclamped run has crossed its interval by construction.
@@ -975,9 +978,16 @@ void mix_pcm_voice_block(const MixVoice& voice) {
     if (playback.asset->interpolation_maps != nullptr && playback.asset->interpolation_map_count &&
         playback.step_fp <= ((gbs::pcm_loop_end_sample(*playback.asset) - playback.asset->loop_start_sample) << 16)) {
         const uint32_t key = gbs::pcm_interpolation_mix_key(playback.volume, primary, pcm, playback.sample_gain, playback.pan, playback.sample_linear_pan);
+        const uint32_t mono_key = (key & 0x0fff00ffu) | gbs::PCM_INTERPOLATION_PRE_PAN;
         const auto* map = playback.prepared_mix_map;
-        if (map == nullptr || map->mix_key != key) map = find_pcm_interpolation_map(*playback.asset, key);
-        if (map != nullptr) { mix_pcm_prepared_block(playback, *map); return; }
+        if (map == nullptr || (map->mix_key != key && map->mix_key != mono_key)) {
+            map = find_pcm_interpolation_map(*playback.asset, key);
+            if (map == nullptr) map = find_pcm_interpolation_map(*playback.asset, mono_key);
+        }
+        if (map != nullptr) {
+            if (map->mix_key & gbs::PCM_INTERPOLATION_PRE_PAN) prepare_pcm_gain_table(15, 15, 15, voice.pan, 255, playback.sample_linear_pan);
+            mix_pcm_prepared_block(playback, *map); return;
+        }
     }
     prepare_pcm_gain_table(playback.volume, prepared ? 15 : primary, pcm, voice.pan, playback.sample_gain, playback.sample_linear_pan);
     const bool unity = playback.sample_gain == 255 && playback.volume == 15 && pcm == 15 &&
@@ -1233,7 +1243,7 @@ bool is_valid_tracker_asset(const TrackerAsset& asset) {
                     const uintptr_t base = reinterpret_cast<uintptr_t>(sample.interpolation_maps);
                     if (sample.interpolation_maps == nullptr || pointer < base || pointer - base >= sample.interpolation_map_count * sizeof(PcmInterpolationMap) ||
                         (pointer - base) % sizeof(PcmInterpolationMap) != 0) return false;
-                    constexpr uint32_t mask = 0x100fffffu;
+                    const uint32_t mask = (step.prepared_mix_map->mix_key & gbs::PCM_INTERPOLATION_PRE_PAN) ? 0x000f00ffu : 0x100fffffu;
                     if ((step.prepared_mix_map->mix_key & mask) != (pcm_interpolation_mix_key(step.volume, 0, 0, step.sample_gain, step.pan, step.sample_linear_pan) & mask)) return false;
                 }
                 bool checked = false;

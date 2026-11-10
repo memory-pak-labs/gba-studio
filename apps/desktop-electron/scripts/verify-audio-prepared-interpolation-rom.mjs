@@ -18,7 +18,7 @@ const wasmBytes = fs.readFileSync(new URL('../static/WebPlayer/player/mgba-core.
 const wasm = new WebAssembly.Module(wasmBytes);
 const hash = bytes => createHash('sha256').update(bytes).digest('hex');
 fs.mkdirSync(output, { recursive: true });
-execFileSync(python, [path.join(engine, 'tests/host/tracker_stress_fixtures.py'), output, '--pitch-channels', '16']);
+execFileSync(python, [path.join(engine, 'tests/host/tracker_stress_fixtures.py'), output, '--pitch-channels', '16', '--sample-length', process.env.GBA_TRACKER_SAMPLE_LENGTH ?? '128']);
 const evidence = { passed: false, engineLibrarySha256: hash(fs.readFileSync(path.join(pack, 'lib/libgbastudio_engine.a'))), wasmSha256: hash(wasmBytes), cases: [] };
 try {
   for (const format of ['xm', 'it']) {
@@ -52,7 +52,7 @@ extern "C" int gbs_main() {
     }
 }
 `);
-    fs.writeFileSync(path.join(dir, 'gbastudio_project.json'), JSON.stringify({ schema: 1, backend: 'gbastudio_engine', kind: 'topdown', entry: 'main.cpp', build: { target: 'gain', make_target: 'all' }, requires: { engine_pack: '>=2.27.0', features: ['audio.tracker_pcm_16_channels', 'audio.pcm_prepared_interpolation', `audio.tracker_${format}_pcm_profile`, 'audio.tracker_pcm_controls', 'audio.tracker_sample_sustain'] } }));
+    fs.writeFileSync(path.join(dir, 'gbastudio_project.json'), JSON.stringify({ schema: 1, backend: 'gbastudio_engine', kind: 'topdown', entry: 'main.cpp', build: { target: 'gain', make_target: 'all' }, requires: { engine_pack: '>=2.27.0', features: ['audio.tracker_pcm_16_channels', 'audio.pcm_prepared_interpolation', 'audio.pcm_long_interpolation', `audio.tracker_${format}_pcm_profile`, 'audio.tracker_pcm_controls', 'audio.tracker_sample_sustain'] } }));
     execFileSync(python, [path.join(pack, 'tools/gbsbuild'), '--engine-pack', pack, '--project-dir', dir], { stdio: 'pipe' });
     const rom = fs.readFileSync(path.join(dir, 'build/gain.gba'));
     const symbols = execFileSync(path.join(arm, 'arm-none-eabi-nm'), ['-C', '-S', path.join(dir, 'build/gain.elf')], { encoding: 'utf8', maxBuffer: 16 * 1024 * 1024 });
@@ -75,12 +75,15 @@ extern "C" int gbs_main() {
         core._gba_set_keys(prepared ? 1 : 0);
         const read16 = a => core._gba_audio_register(a);
         const read32 = a => (read16(a) | (read16(a + 2) << 16)) >>> 0;
-        const blocks = []; let previous = 0;
-        for (let frame = 0; frame < 600 && blocks.length < 360; ++frame) {
-          core._gba_run_frame();
+        const blocks = []; let previous = 0, videoFrames = 0, firstBlockFrame = null;
+        // Allow long-table validation at boot and a slower scalar reference.
+        // Optimized cadence remains a separate assertion and scene gate.
+        for (let frame = 0; frame < 1200 && blocks.length < 360; ++frame) {
+          core._gba_run_frame(); videoFrames = frame + 1;
           assert.equal(read16(0x04000204), 0x4317, 'standard cartridge timing and prefetch at boot');
           const count = read32(submitted);
           if (!count || count === previous) continue;
+          if (firstBlockFrame === null) firstBlockFrame = videoFrames;
           // A replay boundary may expose two completions. Both ping-pong
           // buffers remain readable, so compare both rather than dropping one.
           assert.ok(count - previous <= 2, 'both completed blocks remain resident');
@@ -92,17 +95,18 @@ extern "C" int gbs_main() {
           }
           previous = count;
         }
+        console.log(JSON.stringify({format,prepared,blocks:blocks.length,gameFrames:read32(witness),accepted:read32(witness+12)}));
         assert.equal(blocks.length, 360, 'six seconds of native mixer blocks');
         assert.equal(read32(witness + 12), 1, 'tracker accepted');
         const voices = Array.from({ length: 16 }, (_, i) => read16(trackerVoices + i * 32 + 22) & 255).filter(Boolean).length;
         assert.equal(voices, 16, 'all sixteen mixer voices remain active');
         assert.equal(read32(witness + 8), 0, 'no PCM underruns');
-        runs.push({ prepared, frames: read32(witness), blocks: Buffer.concat(blocks) });
+        runs.push({ prepared, frames: read32(witness), videoFrames, firstBlockFrame, blocks: Buffer.concat(blocks) });
       } finally { core._gba_destroy(); }
     }
     assert.deepEqual(runs[1].blocks, runs[0].blocks, 'prepared intervals and scalar interpolation produce byte-identical PCM on ARM');
     assert.ok(runs[1].frames >= 350, 'prepared mixer sustains the isolated ROM cadence');
-    evidence.cases.push({ format, romSha256: hash(rom), pcmSha256: hash(runs[0].blocks), comparedBytes: runs[0].blocks.length, runs: runs.map(({ prepared, frames }) => ({ prepared, frames })) });
+    evidence.cases.push({ format, romSha256: hash(rom), pcmSha256: hash(runs[0].blocks), comparedBytes: runs[0].blocks.length, runs: runs.map(({ prepared, frames, videoFrames, firstBlockFrame }) => ({ prepared, frames, videoFrames, firstBlockFrame })) });
   }
   evidence.passed = true;
   console.log('PASS: XM/IT prepared interpolation equals scalar ARM mixing; 16 modulated voices, 31536 Hz, cartridge timing configured');

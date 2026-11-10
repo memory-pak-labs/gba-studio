@@ -259,6 +259,7 @@ int main(void) {
     def test_cold_diagnostics_leave_fast_ram_for_audio(self) -> None:
         debug = (ROOT / "engine/src/gbs_debug.cpp").read_text()
         self.assertRegex(debug, r'counters\[gbs::debug_counter_count\] __attribute__\(\(section\(".ewram_bss"\)\)\)')
+        self.assertRegex(debug, r'overlay_buffer\[26 \* 7 \+ 1\] __attribute__\(\(section\(".ewram_bss"\)\)\)')
 
     def test_frequent_font_lookups_remain_in_iwram(self) -> None:
         for name in ("resident_font_slots", "hud_pixel_text_glyphs"):

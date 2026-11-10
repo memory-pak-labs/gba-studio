@@ -47,6 +47,8 @@ struct MusicAsset {
     bool loop;
 };
 
+constexpr uint32_t PCM_INTERPOLATION_PRE_PAN = 1u << 29;
+
 // Exact quantized output intervals for an exported gain/pan configuration.
 struct PcmInterpolationInterval { uint32_t end, gain; };
 struct PcmInterpolationMap {
@@ -279,13 +281,14 @@ constexpr bool is_valid_pcm_loop(const PcmAsset& asset) {
 
 constexpr bool is_valid_pcm_interpolation_maps(const PcmAsset& asset) {
     if (asset.interpolation_map_count == 0) return asset.interpolation_source_bytes == 0;
-    if (!asset.loop || asset.interpolation_maps == nullptr || asset.interpolation_map_count > 256 || pcm_loop_end_sample(asset) > 128) return false;
+    if (!asset.loop || asset.interpolation_maps == nullptr || asset.interpolation_map_count > 256 || pcm_loop_end_sample(asset) > 65535) return false;
     uint32_t bytes = static_cast<uint32_t>(asset.interpolation_map_count) * 12u;
     for (size_t i = 0; i < asset.interpolation_map_count; ++i) {
         const auto& map = asset.interpolation_maps[i];
-        if (map.mix_key > 0x1fffffffu || ((map.mix_key >> 8) & 255u) == 128u ||
+        if (map.mix_key > 0x3fffffffu || ((map.mix_key >> 8) & 255u) == 128u ||
             (i && map.mix_key <= asset.interpolation_maps[i - 1].mix_key) ||
-            map.intervals == nullptr || map.interval_count == 0 || map.interval_count > 128 || map.loop_index >= map.interval_count) return false;
+            map.intervals == nullptr || map.interval_count == 0 || (!(map.mix_key & (1u << 29)) && (map.interval_count > 128 || pcm_loop_end_sample(asset) > 128)) || map.loop_index >= map.interval_count) return false;
+        if ((map.mix_key & PCM_INTERPOLATION_PRE_PAN) && (map.mix_key & 0x1000ff00u)) return false;
         bytes += static_cast<uint32_t>(map.interval_count) * 8u;
         // A prepared table must respect the same contraction as the scalar
         // mixer; otherwise its peak bound could incorrectly bypass limiting.
@@ -303,6 +306,7 @@ constexpr bool is_valid_pcm_interpolation_maps(const PcmAsset& asset) {
             const auto interval = map.intervals[j];
             const int left = static_cast<int16_t>(interval.gain);
             const int right = static_cast<int16_t>(interval.gain >> 16) + (left < 0);
+            if ((map.mix_key & PCM_INTERPOLATION_PRE_PAN) && left != right) return false;
             if (interval.end <= previous || interval.end > (pcm_loop_end_sample(asset) << 16) || left < -left_bound || left > left_bound || right < -right_bound || right > right_bound || left > 127 || right > 127) return false;
             previous = interval.end;
         }

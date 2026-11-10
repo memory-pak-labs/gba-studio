@@ -1393,6 +1393,49 @@ void test_prepared_mix_maps_match_the_scalar_path_through_pitch_and_gain_changes
     gbs::audio_init();
 }
 
+void test_long_prepan_map_matches_scalar_at_gain_pan_and_position_carry() {
+    static int8_t source[65535];
+    for (size_t i = 0; i < 65535; ++i) source[i] = i < 32767 ? -80 : 80;
+    gbs::PcmInterpolationInterval intervals[128] {};
+    uint16_t count = 0; uint32_t previous = static_cast<uint32_t>(-8 * 65537);
+    const uint32_t edges[] = {32766u,65534u};
+    for (uint32_t edge : edges) {
+        for (uint32_t fraction = 0; fraction <= 65536; ++fraction) {
+            const int from = source[edge], to = source[edge == 65534 ? 3 : edge + 1];
+            const int value = ((from + (((to - from) * static_cast<int32_t>(fraction)) >> 16)) * 32 / 255) * 12 / 15;
+            const uint32_t gain = static_cast<uint32_t>(value * 65537);
+            if (gain != previous) { intervals[count++] = { (edge << 16) + fraction, previous }; previous = gain; }
+        }
+    }
+    intervals[count++] = {65535u << 16, previous};
+    const gbs::PcmInterpolationMap map {gbs::PCM_INTERPOLATION_PRE_PAN | gbs::pcm_interpolation_mix_key(15,12,15,32,0,false), intervals, count, 0};
+    gbs::PcmAsset sample {source, 65535, 8363, true, 3, 65535};
+    gbs::TrackerStep steps[8] {}; const uint32_t rates[] = {1,4000,19710,31536,65536,2097152,2097152,2097152};
+    for (int i = 0; i < 8; ++i) {
+        steps[i] = {1,440,16,15,2}; steps[i].sample_only = true; steps[i].sample_index = 0;
+        steps[i].sample_rate_hz = rates[i]; steps[i].sample_gain = 32;
+        steps[i].sample_linear_pan = true; steps[i].sample_continue = i != 0;
+        steps[i].pan = static_cast<int8_t>(i % 3 == 0 ? -127 : i % 3 == 1 ? 0 : 127);
+    }
+    const gbs::TrackerPattern pattern {steps,8}; const uint8_t order[] = {0};
+    const gbs::TrackerAsset song {&pattern,1,order,1,false,&sample,1,true};
+    static int8_t expected[127][2][528];
+    for (int prepared = 0; prepared <= 1; ++prepared) {
+        sample.interpolation_maps = prepared ? &map : nullptr; sample.interpolation_map_count = prepared ? 1 : 0;
+        for (auto& step : steps) step.prepared_mix_map = prepared ? &map : nullptr;
+        gbs::audio_init(); assert(gbs::set_audio_channel_volume(gbs::AudioChannel::Music,12));
+        assert(gbs::play_tracker_music(song));
+        for (int block = 0; block < 127; ++block) {
+            if (block == 101) assert(gbs::set_audio_channel_volume(gbs::AudioChannel::Music,9));
+            gbs::audio_update(); const int8_t* sides[] = {last_pcm_samples,last_pcm_right_samples};
+            for (int side = 0; side < 2; ++side) for (int i = 0; i < 528; ++i) {
+                if (prepared) assert(sides[side][i] == expected[block][side][i]); else expected[block][side][i] = sides[side][i];
+            }
+        }
+    }
+    gbs::audio_init();
+}
+
 void test_sixteen_low_gain_modulated_voices_keep_the_frozen_output() {
     alignas(4) int8_t data[4][128];
     gbs::PcmAsset samples[4] {};
@@ -1548,6 +1591,7 @@ void test_authored_pcm_rests_release_their_voice() {
 
 int main() {
     test_prepared_mix_maps_match_the_scalar_path_through_pitch_and_gain_changes();
+    test_long_prepan_map_matches_scalar_at_gain_pan_and_position_carry();
     test_sixteen_low_gain_modulated_voices_keep_the_frozen_output();
     test_all_pcm_pan_positions_keep_the_original_rounding();
     test_pcm_source_cache_observes_mutations_between_audio_blocks();

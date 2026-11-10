@@ -78,6 +78,30 @@ def it_fixture(channels=(0, 4, 63), rows=7, pcm16=False):
 
 
 class ExtendedTrackerTests(unittest.TestCase):
+    def test_long_native_samples_do_not_expand_past_the_pcm_limit(self):
+        sample = {"samples": [0, 20, -20, 40, -40] * 3276 + [0] * 4, "sample_rate_hz": 8363, "loop_start_sample": 0, "loop_end_sample": 16384}
+        step = {"channel": 5, "frequency_hz": 440, "duration_frames": 2, "volume": 15, "duty": 2, "sample_only": True, "sample_index": 0, "sample_rate_hz": 4182, "sample_gain": 20, "sample_linear_pan": True}
+        patterns, samples = ASSETC.prepare_multichannel_tracker_samples([{"steps": [step]}], [sample])
+        self.assertEqual(samples[0]["samples"], sample["samples"])
+        self.assertEqual(patterns[0]["steps"][0]["sample_rate_hz"], 4182)
+
+    def test_long_sample_maps_preserve_every_gain_and_share_pan(self):
+        data = [round(70 * math.sin(i / 11.13) * (1 - i / 8192)) for i in range(4096)]
+        sample = {"samples": data, "sample_rate_hz": 8363, "loop_start_sample": 3, "loop_end_sample": 4096}
+        result = ASSETC.build_pcm_interpolation_map(sample, 15, 12, 15, 23, 0, False, pre_pan=True)
+        self.assertIsNotNone(result)
+        self.assertTrue(result["key"] & (1 << 29))
+        self.assertGreater(len(result["intervals"]), 128)
+        import bisect
+        ends = [end for end, _ in result["intervals"]]
+        for i in range(12000):
+            pos = (i * 7919 * 1237) % (4096 * 65536)
+            index, fraction = pos >> 16, pos & 65535
+            following = index + 1 if index < 4095 else 3
+            value = data[index] + (((data[following] - data[index]) * fraction) >> 16)
+            value = int(int(value * 23 / 255) * 12 / 15)
+            self.assertEqual(result["intervals"][bisect.bisect_right(ends, pos)][1], (value * 65537) & 0xffffffff)
+
     def test_prepared_intervals_match_every_fraction_and_the_loop_seam(self):
         sample = {"samples": [-127, -83, 72, 126], "sample_rate_hz": 8363, "loop_start_sample": 1, "loop_end_sample": 4}
         for pan in (-127, 0, 20, 127):

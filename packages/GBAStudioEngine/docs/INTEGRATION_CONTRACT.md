@@ -353,8 +353,23 @@ imutável, com os mesmos arredondamentos inteiros; nenhuma amostra é aproximada
 `TrackerStep.sample_step_fp` e `sample_step_reciprocal` evitam divisões durante
 controles de pitch e `prepared_mix_map` aponta para um mapa do próprio sample.
 O validador confere a taxa, o recíproco, o ponteiro, os limites, os ganhos e os
-bytes. Um ganho/panorama não preparado, loop longo ou mapa que excede os limites
-usa o interpolador original. Alterações globais de volume continuam funcionando.
+bytes.
+
+`audio.pcm_long_interpolation` estende esse caminho a loops com até 65535
+amostras. O bit `PCM_INTERPOLATION_PRE_PAN` (29) marca intervalos exatos após a
+cadeia de volume, antes do panorama. O ganho mono aparece igualmente nas duas
+faixas do intervalo. O panorama é aplicado por uma pequena tabela compartilhada,
+com o mesmo truncamento inteiro do mixer original; assim a mesma sequência de
+intervalos atende todas as posições de panorama de uma configuração de volume.
+Esse formato permite até 65535 intervalos por mapa, sem alterar o tamanho dos
+descritores. Flags, ganho mono e limites são validados. Arrays idênticos são
+compartilhados entre os módulos do mesmo header para reduzir ROM. O assetc
+conserva a fonte e a taxa original dos samples longos do perfil PCM nativo,
+evita expansão acima de 65535 amostras e continua interpolando uma única vez.
+Os tamanhos e o limite físico de ROM continuam obrigatórios; uma fonte mais
+longa não garante desempenho para qualquer timbre ou configuração.
+
+Um ganho global não preparado ou mapa que excede os limites usa o interpolador original. Alterações globais de volume continuam funcionando.
 O publicador usa escritas estéreo de quatro bytes somente quando o limite
 teórico de todas as vozes está na região identidade do limitador; nos demais
 casos mantém o limitador existente. A frequência permanece em 31536 Hz e todos
@@ -364,7 +379,7 @@ O limite de 16 canais é de representação/vozes, não uma garantia de CPU para
 qualquer combinação de efeitos e cena. A regressão ARM
 `make audio-mixer-kernel-rom` verifica alinhamento, caudas e saída inteira do
 kernel nativo, acumulação constante, publicação estéreo e interpolação preparada
-em ROM; `audio_kernel_witness[2] == 1` e `[3] == 282` indicam êxito.
+em ROM; `audio_kernel_witness[2] == 1` e `[3] == 302` indicam êxito.
 O benchmark opt-in
 `extendedTrackerSceneRom.integration.test.ts` usa módulos autorais gerados por
 `python3 tests/host/tracker_stress_fixtures.py /tmp/qa-tracker --pitch-channels 16`
@@ -402,6 +417,12 @@ node scripts/verify-audio-prepared-gain-rom.mjs ../../packages/GBAStudioEngine/d
 node scripts/verify-audio-prepared-interpolation-rom.mjs ../../packages/GBAStudioEngine/dist/GBAStudioEnginePack /caminho/qa/interpolation
 node scripts/verify-scene-tracker-cadence.mjs /caminho/qa/porto/build/exemplo.gba /caminho/qa/cadence
 ```
+
+O gerador aceita `--sample-length 4096` ou `--sample-length 16384` para fontes
+longas autorais com quatro timbres que variam ao longo do sample; mantenha `--pitch-channels 16`.
+Para a comparação ARM, use `GBA_TRACKER_SAMPLE_LENGTH=16384` antes do comando
+`verify-audio-prepared-interpolation-rom.mjs`. O benchmark das cenas recebe essas
+mesmas fontes pelo diretório `GBA_TRACKER_SCENE_SOURCES`.
 
 A regressão de interpolação compara byte a byte 360 blocos PCM estéreo por
 formato XM/IT, com 16 vozes moduladas e quatro samples. A referência escalar

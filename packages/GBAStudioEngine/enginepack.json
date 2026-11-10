@@ -1258,6 +1258,7 @@
       "pcm_composer",
       "pcm_prepared_gain",
       "pcm_prepared_interpolation",
+      "pcm_long_interpolation",
       "psg_square_sfx",
       "psg_noise_sfx",
       "psg_square_music",
