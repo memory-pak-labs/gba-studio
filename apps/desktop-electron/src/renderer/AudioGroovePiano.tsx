@@ -45,6 +45,9 @@ export function AudioGroovePiano({ item, instruments, samples, selectedCell, sel
   const ui = useStudioUiText();
   const [page, setPage] = useState(0);
   useEffect(() => setPage(0), [item.id, item.activePatternID]);
+  useEffect(() => {
+    if (item.trackerModule && selectedCell?.audioID === item.id && selectedCell.stepIndex < item.stepCount) setPage(Math.floor(selectedCell.stepIndex / 16));
+  }, [item.id, item.activePatternID, item.stepCount, selectedCell?.audioID, selectedCell?.stepIndex]);
   const pageSize = 16;
   const pages = Math.max(1, Math.ceil(item.stepCount / pageSize));
   const currentPage = Math.min(page, pages - 1);

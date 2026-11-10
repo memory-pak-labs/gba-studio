@@ -5,6 +5,7 @@ import os from "node:os";
 import { createHash } from "node:crypto";
 import { readTrackerModuleForEditing } from "./trackerModuleImport.js";
 import { makeEditableModFixture } from "../shared/trackerModuleFixtures.js";
+import { makeXmFixture, makeItFixture } from "../shared/extendedTrackerFixtures.js";
 const roots: string[] = [];
 afterEach(async () => { for (const root of roots.splice(0)) await rm(root, { recursive: true, force: true }); });
 async function setup() {
@@ -14,6 +15,13 @@ async function setup() {
     audioItems: [{ id: "a", kind: "Musica", sourceAssetID: "s" }], assets: [{ id: "s", name: "source.mod", kind: "Audio", metadata: { source: "source.mod" } }] } } };
 }
 describe("read-only tracker import", () => {
+  it.each(["XM", "IT"] as const)("opens a read-only native %s source", async format => {
+    const { root, request } = await setup(); const bytes = format === "XM" ? makeXmFixture() : makeItFixture();
+    const source = `source.${format.toLowerCase()}`; await writeFile(path.join(root, source), bytes);
+    request.data.assets[0].name = source; request.data.assets[0].metadata.source = source;
+    const result = await readTrackerModuleForEditing(request); expect(result.error).toBeUndefined(); expect(result.song?.format).toBe(format);
+    expect(await readFile(path.join(root, source))).toEqual(Buffer.from(bytes));
+  });
   it("reads the source, instruments and 16 tracks and does not write to it", async () => {
     const { root, original, request } = await setup(); const result = await readTrackerModuleForEditing(request);
     expect(result.error).toBeUndefined(); expect(result.song?.patterns[0].channels).toHaveLength(16);

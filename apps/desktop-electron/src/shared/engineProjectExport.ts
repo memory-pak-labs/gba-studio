@@ -1056,7 +1056,7 @@ export function deriveAudioEngineExportDiagnostics(audioItems: Record<string, un
         level: "ok",
         message: "SFX WAV sera resolvido pela engine via assetc (pcm/wav)."
       });
-    } else if (kind === "Musica" && ["MOD", "S3M"].includes(format)) {
+    } else if (kind === "Musica" && ["MOD", "S3M", "XM", "IT"].includes(format)) {
       diagnostics.push({
         audioID,
         audioName,
@@ -2860,6 +2860,8 @@ export interface AssetcAudioJsonDocument {
     name: string;
     mod?: string;
     s3m?: string;
+    xm?: string;
+    it?: string;
     loop?: boolean;
     row_duration_frames?: number;
     native_primary_volume?: number;
@@ -3305,9 +3307,11 @@ export function compileComposedSfxToAssetc(
   };
 }
 
-function trackerSourceKeyForFormat(format: string): "mod" | "s3m" | null {
+function trackerSourceKeyForFormat(format: string): "mod" | "s3m" | "xm" | "it" | null {
   if (format === "MOD") return "mod";
   if (format === "S3M") return "s3m";
+  if (format === "XM") return "xm";
+  if (format === "IT") return "it";
   return null;
 }
 

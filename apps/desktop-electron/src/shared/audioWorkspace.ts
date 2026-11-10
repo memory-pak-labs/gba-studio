@@ -1020,7 +1020,7 @@ export function deriveAudioPreviewRows(
   defaultVolume = 80
 ): AudioWorkspacePreviewRow[] {
   const safeMaxRows = clampedInteger(maxRows, 1, Math.max(16, channels.length));
-  const safeMaxSteps = clampedInteger(maxSteps, 1, 64);
+  const safeMaxSteps = clampedInteger(maxSteps, 1, 1024);
   return channels.slice(0, safeMaxRows).map((channel, index) => {
     const type = stringField(channel.type, "audio");
     const cells = noteCells(channel.notes, safeMaxSteps);
@@ -1077,7 +1077,7 @@ export function deriveAudioPlaybackExportStatus(item: {
 }): { playbackBadge: AudioWorkspacePlaybackBadge; playbackLabel: string } {
   const format = item.format.toUpperCase();
   if (item.origin === "Importado" && item.source) {
-    if (item.kind === "Musica" && ["MOD", "S3M"].includes(format)) {
+    if (item.kind === "Musica" && ["MOD", "S3M", "XM", "IT"].includes(format)) {
       return {
         playbackBadge: "Compatível",
         playbackLabel: "Formato aceito pelo assetc; a compilação verifica o arquivo."
@@ -1109,7 +1109,7 @@ function formatWarnings(kind: string, format: string, hasComposedContent: boolea
     return [];
   }
 
-  if (kind === "Musica" && !["MOD", "S3M", "VGM", "XM"].includes(format)) {
+  if (kind === "Musica" && !["MOD", "S3M", "VGM", "XM", "IT"].includes(format)) {
     return [`Formato incomum para Musica: ${format}.`];
   }
 
@@ -1591,7 +1591,7 @@ function previewChannelsForAudio(audio: Record<string, unknown>): { channels: Re
     const steps = integerField(activePattern.steps) ?? 64;
     return {
       channels: patternChannels(activePattern),
-      maxSteps: clampedInteger(steps, 1, 64)
+      maxSteps: clampedInteger(steps, 1, audio.trackerModule ? 1024 : 64)
     };
   }
 
@@ -1615,7 +1615,7 @@ function activePatternPresentation(audio: Record<string, unknown>, patterns: Aud
   const patternIndex = patternRecords.indexOf(activePattern);
   const activePatternID = patternID(activePattern, patternIndex >= 0 ? patternIndex : 0);
   const activePatternName = patternName(activePattern, patternIndex >= 0 ? patternIndex : 0);
-  const stepCount = clampedInteger(integerField(activePattern.steps) ?? 64, 1, 64);
+  const stepCount = clampedInteger(integerField(activePattern.steps) ?? 64, 1, audio.trackerModule ? 1024 : 64);
   return { activePatternID, activePatternName, stepCount };
 }
 
@@ -2237,7 +2237,7 @@ export function normalizeAudioInProject(
 function audioPlaybackFamily(data: GBAProjectData, audio: Record<string, unknown>): string {
   if (audioComposed(audio)) return "psg";
   const format = audioSourceFormat(data, audio);
-  if (format === "MOD" || format === "S3M") return "tracker";
+  if (["MOD", "S3M", "XM", "IT"].includes(format)) return "tracker";
   return format;
 }
 

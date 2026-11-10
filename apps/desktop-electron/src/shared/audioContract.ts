@@ -64,7 +64,7 @@ export function audioContractIssues(audio: Record<string, unknown>, data?: GBAPr
     const source = asset?.metadata as Record<string, unknown> | undefined;
     if (data && !source?.source) error("Arquivo de áudio ausente na biblioteca do projeto.");
     const format = audioSourceFormat(data, audio);
-    const supported = audio.kind === "SFX" ? ["WAV"] : ["MOD", "S3M"];
+    const supported = audio.kind === "SFX" ? ["WAV"] : ["MOD", "S3M", "XM", "IT"];
     if (!supported.includes(format)) error(`Formato ${format || "desconhecido"} sem exportação de áudio suportada. Use ${supported.join(" ou ")}.`);
     return issues;
   }

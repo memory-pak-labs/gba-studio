@@ -1051,7 +1051,7 @@ export function AudioWorkspace({
               <button ref={detailsButtonRef} className="audio-groove-details-button" type="button" aria-controls={detailsID} aria-expanded={detailsOpen} onClick={() => setDetailsOpen(!detailsOpen)}><SlidersHorizontal size={16} />{ui("Detalhes")}</button>
             </div>
           </> : activeItem?.format === "WAV" && wavEditor ? wavEditor : <div className="audio-empty-composer"><strong>{ui("Áudio importado")}</strong><p>{onPrepareEnginePreview ? ui("Tocar reproduz o áudio pela engine da ROM.") : activeItem?.format === "WAV" ? ui("Tocar reproduz o arquivo WAV original.") : ui("A prévia deste formato está disponível no Play do jogo.")}</p>
-            {activeItem?.kind === "Musica" && ["MOD", "S3M"].includes(activeItem.format) ? <>
+            {activeItem?.kind === "Musica" && ["MOD", "S3M", "XM", "IT"].includes(activeItem.format) ? <>
               <button type="button" disabled={creatingModuleCopy || !projectPath || !onCreateEditableTracker} onClick={async () => { setCreatingModuleCopy(true); try { await onCreateEditableTracker?.(activeItem.id); } finally { setCreatingModuleCopy(false); } }}>{ui(creatingModuleCopy ? "Preparando cópia…" : "Criar cópia editável")}</button>
               <p>{ui("O arquivo original permanece intacto.")}</p>
             </> : null}

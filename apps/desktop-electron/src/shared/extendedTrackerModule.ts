@@ -164,6 +164,7 @@ export function writeExtendedModule(original: Uint8Array, song: TrackerModuleSon
   const base = Math.ceil((tableEnd + extra.length + chunks.reduce((n, b) => n + b.length, 0)) / 16) * 16;
   const out = new Uint8Array(base + original.length), v = dataView(out); out.set(original.subarray(0, 192)); out.set(orders, 192); out.set(extra, tableEnd); out.set(original, base);
   v.setUint16(32, orders.length, true); v.setUint16(38, chunks.length, true); out[51] = song.bpm;
+  for (const channel of song.trackerModule.channelMap) out[64 + channel] &= 127;
   const message = h.v.getUint32(56, true); if (message) v.setUint32(56, base + message, true);
   let table = 192 + orders.length;
   for (const ptr of h.instruments) { v.setUint32(table, ptr ? ptr + base : 0, true); table += 4; }

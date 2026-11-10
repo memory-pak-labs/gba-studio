@@ -11149,9 +11149,11 @@ function buildEngineExportProjectContractUncached(
   features.push(...cameraZoneFeatures);
   if (projectArray(data, "audioItems").some(isPcmAudio)) features.push("audio.pcm_composer", "audio.tracker_pcm_16_channels", "audio.pcm_prepared_gain");
   if (audioPack?.document.sfx.some(asset => asset.pcm)) features.push("audio.pcm_sfx_aliases");
-  if (audioPack?.document.tracker.some(asset => asset.mod || asset.s3m)) {
+  if (audioPack?.document.tracker.some(asset => asset.mod || asset.s3m || asset.xm || asset.it)) {
     features.push("audio.tracker_pcm_16_channels", "audio.pcm_prepared_gain", "audio.tracker_sample_sustain");
   }
+  if (audioPack?.document.tracker.some(asset => asset.xm)) features.push("audio.tracker_xm_pcm_profile");
+  if (audioPack?.document.tracker.some(asset => asset.it)) features.push("audio.tracker_it_pcm_profile");
   if (audioPack?.document.tracker.some(tracker => tracker.samples?.length)) features.push("audio.tracker_sample_instruments");
   const hasTacticalIsometricRoom = rooms.some((room) => (
     resolveSceneRuntimeExport(roomSceneType(room)).kind === "isometric" &&

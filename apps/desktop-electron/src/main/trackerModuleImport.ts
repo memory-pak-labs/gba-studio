@@ -12,7 +12,7 @@ export async function readTrackerModuleForEditing(request: ReadTrackerModuleRequ
     const asset = audio && audioSourceAsset(request.data, audio);
     const source = (asset?.metadata as Record<string, unknown> | undefined)?.source;
     const format = audio && audioSourceFormat(request.data, audio);
-    if (!audio || audio.kind !== "Musica" || !["MOD", "S3M"].includes(format ?? "") || typeof source !== "string") throw new Error("Selecione uma música MOD ou S3M importada.");
+    if (!audio || audio.kind !== "Musica" || !["MOD", "S3M", "XM", "IT"].includes(format ?? "") || typeof source !== "string") throw new Error("Selecione uma música MOD, S3M, XM ou IT importada.");
     const root = await realpath(path.dirname(request.projectPath));
     const candidate = path.resolve(root, source); const relative = path.relative(root, candidate);
     if (path.isAbsolute(source) || relative.startsWith("..") || path.isAbsolute(relative)) throw new Error("A fonte precisa estar dentro da pasta do projeto.");

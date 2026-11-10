@@ -1,6 +1,7 @@
 import type { GBAProjectData } from "./projectFile.js";
 import { audioRecords, audioSourceAsset, audioSourceFormat } from "./audioContract.js";
 import { isTrackerModule, trackerNotePeriod, validateTrackerModuleSong, type TrackerModuleSong, type TrackerModuleCell, type TrackerModuleChannel } from "./trackerModule.js";
+import { extendedNoteByte } from "./extendedTrackerModule.js";
 
 export interface ReadTrackerModuleRequest { projectPath: string; data: GBAProjectData; audioID: string }
 export interface ReadTrackerModuleResult { song?: TrackerModuleSong; error?: string }
@@ -22,7 +23,7 @@ export function createEditableTrackerCopyInProject(data: GBAProjectData, audioID
   validateTrackerModuleSong(song);
   const source = audioRecords(data.audioItems).find(a => a.id === audioID);
   const asset = source && audioSourceAsset(data, source);
-  if (!source || source.kind !== "Musica" || !asset || isTrackerModule(source) || audioSourceFormat(data, source) !== song.format) throw new Error("Selecione uma música MOD ou S3M importada.");
+  if (!source || source.kind !== "Musica" || !asset || isTrackerModule(source) || audioSourceFormat(data, source) !== song.format) throw new Error("Selecione uma música MOD, S3M, XM ou IT importada.");
   const items = audioRecords(data.audioItems);
   if (!id.trim() || items.some(a => a.id === id)) throw new Error("Identificador de áudio já usado.");
   const base = `${String(source.name)} (editável)`; let name = base, suffix = 2;
@@ -33,12 +34,13 @@ export function createEditableTrackerCopyInProject(data: GBAProjectData, audioID
   return { ...data, audioItems: [...items, copy] };
 }
 
-function emptyChannel(id: string, index: number): TrackerModuleChannel {
-  return { id, name: `Canal ${index + 1}`, type: "pcm", notes: Array(64).fill("---"),
-    trackerCells: Array.from({ length: 64 }, () => ({ instrument: 0, effect: 0, parameter: 0 })) };
+function emptyChannel(id: string, index: number, rows = 64): TrackerModuleChannel {
+  return { id, name: `Canal ${index + 1}`, type: "pcm", notes: Array(rows).fill("---"),
+    trackerCells: Array.from({ length: rows }, () => ({ instrument: 0, effect: 0, parameter: 0 })) };
 }
 function assertNote(note: string, song: TrackerModuleSong): void {
   if (song.trackerModule.format === "MOD") trackerNotePeriod(note);
+  else if (song.trackerModule.format === "XM" || song.trackerModule.format === "IT") extendedNoteByte(note, song.trackerModule.format);
   else if (!["---", "OFF"].includes(note) && !/^(?:C#?|D#?|E|F#?|G#?|A#?|B)[0-9]$/.test(note)) throw new Error("Use uma nota de C0 a B9 ou OFF.");
 }
 function assertInt(value: number, max: number, label: string): void {
@@ -52,26 +54,26 @@ export function editTrackerModuleInProject(data: GBAProjectData, audioID: string
   if ("patternID" in edit && !pattern) return data;
   switch (edit.type) {
     case "cell": {
-      assertInt(edit.row, 63, "Linha"); const channel = pattern!.channels.find(c => c.id === edit.channelID); if (!channel) return data;
+      assertInt(edit.row, pattern!.steps - 1, "Linha"); const channel = pattern!.channels.find(c => c.id === edit.channelID); if (!channel) return data;
       const cell = channel.trackerCells[edit.row]; const fields = edit.fields;
       if (fields.clear) { channel.notes[edit.row] = "---"; channel.trackerCells[edit.row] = { instrument: 0, effect: 0, parameter: 0 }; break; }
       if (fields.note !== undefined) {
         const note = fields.note.trim().toUpperCase() || "---"; assertNote(note, song);
-        if (note !== "---" && note !== "OFF" && channel.notes[edit.row] === "---" && !cell.instrument && fields.instrument === undefined) {
+        if (!["---", "OFF", "CUT", "FADE"].includes(note) && channel.notes[edit.row] === "---" && !cell.instrument && fields.instrument === undefined) {
           cell.instrument = channel.trackerCells.slice(0, edit.row).reverse().find(c => c.instrument)?.instrument
             ?? meta.instruments.find(instrument => instrument.length > 0)?.number ?? 0;
         }
         channel.notes[edit.row] = note;
       }
       if (fields.instrument !== undefined) { assertInt(fields.instrument, meta.format === "MOD" ? 31 : Math.min(255, meta.instruments.length), "Instrumento"); cell.instrument = fields.instrument; }
-      if (fields.volume !== undefined) { if (meta.format !== "S3M") throw new Error("MOD controla volume pelo comando Cxx."); assertInt(fields.volume, 64, "Volume"); cell.volume = fields.volume; }
+      if (fields.volume !== undefined) { if (meta.format === "MOD") throw new Error("MOD controla volume pelo comando Cxx."); assertInt(fields.volume, meta.format === "S3M" ? 64 : 255, "Volume"); cell.volume = fields.volume; }
       if (fields.clearVolume) delete cell.volume;
       if (fields.effect !== undefined) { assertInt(fields.effect, meta.format === "MOD" ? 15 : 255, "Efeito"); cell.effect = fields.effect; }
       if (fields.parameter !== undefined) { assertInt(fields.parameter, 255, "Parâmetro"); cell.parameter = fields.parameter; }
       break;
     }
     case "move-cell": {
-      const row = edit.row, target = row + edit.direction; assertInt(row, 63, "Linha"); assertInt(target, 63, "Destino");
+      const row = edit.row, target = row + edit.direction; assertInt(row, pattern!.steps - 1, "Linha"); assertInt(target, pattern!.steps - 1, "Destino");
       const channel = pattern!.channels.find(c => c.id === edit.channelID); if (!channel) return data;
       const targetCell = channel.trackerCells[target];
       if (channel.notes[target] !== "---" || targetCell.instrument || targetCell.effect || targetCell.parameter || targetCell.volume !== undefined) return data;
@@ -104,9 +106,9 @@ export function editTrackerModuleInProject(data: GBAProjectData, audioID: string
       if (meta.channelMap.length >= 16) return data;
       const index = meta.channelMap.length;
       const hidden = new Set(song.patterns.flatMap(pattern => Object.keys(pattern.trackerHiddenChannels ?? {}).map(Number)));
-      const physical = Array.from({ length: 32 }, (_, i) => i).find(i => !meta.channelMap.includes(i) && !hidden.has(i));
+      const physical = Array.from({ length: meta.format === "IT" ? 64 : meta.format === "S3M" ? 32 : 16 }, (_, i) => i).find(i => !meta.channelMap.includes(i) && !hidden.has(i));
       if (physical === undefined) throw new Error("Nenhum canal físico livre sem substituir comandos preservados.");
-      meta.channelMap.push(physical); song.patterns.forEach(p => p.channels.push(emptyChannel(`${p.id}-${edit.id}`, index))); break;
+      meta.channelMap.push(physical); song.patterns.forEach(p => p.channels.push(emptyChannel(`${p.id}-${edit.id}`, index, p.steps))); break;
     }
     case "channel-remove": {
       if (meta.channelMap.length <= 1) return data;

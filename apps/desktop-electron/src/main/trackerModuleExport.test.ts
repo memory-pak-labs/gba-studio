@@ -5,6 +5,7 @@ import os from "node:os";
 import path from "node:path";
 import { parseTrackerModule } from "../shared/trackerModule.js";
 import { makeEditableModFixture, makeEditableS3mFixture } from "../shared/trackerModuleFixtures.js";
+import { makeXmFixture, makeItFixture } from "../shared/extendedTrackerFixtures.js";
 import { buildAssetcAudioPackGeneration } from "../shared/engineProjectExport.js";
 import { writeEngineProjectExport } from "./engineProjectExport.js";
 
@@ -13,15 +14,15 @@ afterEach(async () => { await Promise.all(roots.splice(0).map(root => rm(root, {
 const hash = (bytes: Uint8Array) => createHash("sha256").update(bytes).digest("hex");
 
 describe("editable native module export", () => {
-  it.each(["MOD", "S3M"] as const)("exports edited %s through its native importer and leaves the source intact", async format => {
+  it.each(["MOD", "S3M", "XM", "IT"] as const)("exports edited %s through its native importer and leaves the source intact", async format => {
     const root = await mkdtemp(path.join(os.tmpdir(), "tracker-edit-export-")); roots.push(root);
-    const original = format === "MOD" ? makeEditableModFixture(16) : makeEditableS3mFixture();
+    const original = format === "MOD" ? makeEditableModFixture(16) : format === "S3M" ? makeEditableS3mFixture() : format === "XM" ? makeXmFixture() : makeItFixture();
     await writeFile(path.join(root, `original.${format.toLowerCase()}`), original);
     const song = parseTrackerModule(original, format, hash(original)); song.patterns[0].channels[0].notes[0] = "D4";
     const data = { audioItems: [{ ...song, id: "edited", name: "Edited", kind: "Musica", exportID: "edited", sourceAssetID: "source", volume: 100, loops: true }],
       assets: [{ id: "source", name: `original.${format.toLowerCase()}`, kind: "Audio", metadata: { source: `original.${format.toLowerCase()}` } }] };
     const pack = buildAssetcAudioPackGeneration(data)!;
-    expect(pack.document.tracker[0][format === "MOD" ? "mod" : "s3m"]).toBe(`edited_module.${format.toLowerCase()}`);
+    expect(pack.document.tracker[0][format.toLowerCase() as "mod" | "s3m" | "xm" | "it"]).toBe(`edited_module.${format.toLowerCase()}`);
     expect(pack.document.tracker[0].patterns).toBeUndefined();
     await writeEngineProjectExport({ destination: path.join(root, "export"), projectPath: path.join(root, "project.gba-project"), generated: { target: "test", files: [], assets: pack.sourceCopies } });
     const output = await readFile(path.join(root, "export/assets/audio", `edited_module.${format.toLowerCase()}`));

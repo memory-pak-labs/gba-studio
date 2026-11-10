@@ -1,5 +1,8 @@
 /** Application copy only. Tuple order: pt-BR, en-US, es-ES. Keep project data out of this catalog. */
 export const studioUiMessages: Record<string, readonly [string, string, string]> = {
+  "Volume/comando (hex)": ["Volume/comando (hex)", "Volume/command (hex)", "Volumen/comando (hex)"],
+  "Páginas do Tracker": ["Páginas do Tracker", "Tracker pages", "Páginas del Tracker"],
+  "Prévia e ROM: perfil PCM básico. Envelopes e efeitos incompatíveis são informados ao gerar o áudio.": ["Prévia e ROM: perfil PCM básico. Envelopes e efeitos incompatíveis são informados ao gerar o áudio.", "Preview and ROM: basic PCM profile. Unsupported envelopes and effects are reported when generating audio.", "Previa y ROM: perfil PCM básico. Los envelopes y efectos incompatibles se indican al generar el audio."],
   "Fade-in": ["Fade-in", "Fade-in", "Fade-in"],
   "Fade-out": ["Fade-out", "Fade-out", "Fade-out"],
   "Estéreo": ["Estéreo", "Stereo", "Estéreo"],

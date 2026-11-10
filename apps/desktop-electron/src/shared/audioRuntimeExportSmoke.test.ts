@@ -58,7 +58,7 @@ function buildAudioRuntimeExportProject() {
 }
 
 describe("Audio runtime/export smoke", () => {
-  it.each(["MOD", "S3M"])("requires multichannel playback for imported %s", (format) => {
+  it.each(["MOD", "S3M", "XM", "IT"])("requires multichannel playback for imported %s", (format) => {
     const project = buildFunctionalP0Project();
     project.assets = (project.assets as Record<string, unknown>[]).map(asset => asset.id === "asset-theme"
       ? { ...asset, name: `channels.${format.toLowerCase()}`, metadata: { source: `Assets/audio/channels.${format.toLowerCase()}` } } : asset);
@@ -72,6 +72,7 @@ describe("Audio runtime/export smoke", () => {
     expect(contract.requires.features).toContain("audio.tracker_pcm_16_channels");
     expect(contract.requires.features).toContain("audio.pcm_prepared_gain");
     expect(contract.requires.features).toContain("audio.tracker_sample_sustain");
+    if (format === "XM" || format === "IT") expect(contract.requires.features).toContain(`audio.tracker_${format.toLowerCase()}_pcm_profile`);
     const generated = buildAssetcAudioPackGeneration(project)!;
     expect(generated.document.tracker).toContainEqual(expect.objectContaining({ [format.toLowerCase()]: expect.any(String), native_primary_volume: 12 }));
     expect(JSON.stringify(project)).toBe(before);
