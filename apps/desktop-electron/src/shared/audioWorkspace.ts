@@ -1123,6 +1123,7 @@ function makeWarnings(item: {
   kind: string;
   format: string;
   hasComposedContent: boolean;
+  nativeModule?: boolean;
   usageCount: number;
   bpm: number | null;
   patternSequence: AudioWorkspacePatternSequenceSlot[];
@@ -1132,8 +1133,10 @@ function makeWarnings(item: {
     warnings.push("Áudio sem uso em cenas ou eventos.");
   }
   warnings.push(...formatWarnings(item.kind, item.format, item.hasComposedContent));
-  if (item.bpm !== null && (item.bpm < 40 || item.bpm > (item.kind === "SFX" ? 360 : 240))) {
-    warnings.push(`BPM fora da faixa 40-${item.kind === "SFX" ? 360 : 240}.`);
+  const minBpm = item.nativeModule ? 32 : 40;
+  const maxBpm = item.nativeModule ? 255 : item.kind === "SFX" ? 360 : 240;
+  if (item.bpm !== null && (item.bpm < minBpm || item.bpm > maxBpm)) {
+    warnings.push(`BPM fora da faixa ${minBpm}-${maxBpm}.`);
   }
   for (const slot of item.patternSequence.filter((slot) => slot.isMissing)) {
     warnings.push(`Sequencia referencia padrao ausente no slot ${slot.index + 1}: ${slot.patternID}.`);
@@ -2288,6 +2291,7 @@ export function deriveAudioWorkspacePresentation(data: GBAProjectData): AudioWor
         kind,
         format,
         hasComposedContent: audioComposed(audio),
+        nativeModule: Boolean(audio.trackerModule),
         usageCount: usages.length,
         bpm: normalizedBPM,
         patternSequence

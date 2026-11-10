@@ -202,7 +202,7 @@ export function validateTrackerModuleSong(song: TrackerModuleSong): void {
       for (let row = 0; row < 64; row++) {
         const cell = channel.trackerCells[row]; const note = channel.notes[row];
         if (!cell) throw new Error("Célula do módulo ausente.");
-        integer(cell.instrument, 0, meta.format === "MOD" ? 31 : meta.instruments.length, "Número do instrumento");
+        integer(cell.instrument, 0, meta.format === "MOD" ? 31 : Math.min(255, meta.instruments.length), "Número do instrumento");
         integer(cell.effect, 0, meta.format === "MOD" ? 15 : 255, "Comando"); integer(cell.parameter, 0, 255, "Parâmetro");
         if (cell.volume !== undefined) integer(cell.volume, 0, 255, "Coluna de volume");
         if (meta.format === "MOD") { if (note !== cell.sourceNote) trackerNotePeriod(note); }

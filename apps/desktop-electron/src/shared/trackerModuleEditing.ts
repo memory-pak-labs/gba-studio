@@ -63,7 +63,7 @@ export function editTrackerModuleInProject(data: GBAProjectData, audioID: string
         }
         channel.notes[edit.row] = note;
       }
-      if (fields.instrument !== undefined) { assertInt(fields.instrument, meta.format === "MOD" ? 31 : meta.instruments.length, "Instrumento"); cell.instrument = fields.instrument; }
+      if (fields.instrument !== undefined) { assertInt(fields.instrument, meta.format === "MOD" ? 31 : Math.min(255, meta.instruments.length), "Instrumento"); cell.instrument = fields.instrument; }
       if (fields.volume !== undefined) { if (meta.format !== "S3M") throw new Error("MOD controla volume pelo comando Cxx."); assertInt(fields.volume, 64, "Volume"); cell.volume = fields.volume; }
       if (fields.clearVolume) delete cell.volume;
       if (fields.effect !== undefined) { assertInt(fields.effect, meta.format === "MOD" ? 15 : 255, "Efeito"); cell.effect = fields.effect; }

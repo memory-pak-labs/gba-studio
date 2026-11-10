@@ -2,12 +2,19 @@ import { describe, expect, it } from "vitest";
 import { createHash } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import path from "node:path";
-import { parseTrackerModule, writeTrackerModule } from "./trackerModule.js";
+import { parseTrackerModule, validateTrackerModuleSong, writeTrackerModule } from "./trackerModule.js";
 import { makeEditableModFixture, makeEditableS3mFixture } from "./trackerModuleFixtures.js";
 
 const parse = (bytes: Uint8Array, format: "MOD" | "S3M") => parseTrackerModule(bytes, format, createHash("sha256").update(bytes).digest("hex"));
 
 describe("native tracker module editing", () => {
+  it("rejects a S3M instrument number that would wrap around its one-byte cell", () => {
+    const song = parse(makeEditableS3mFixture(), "S3M");
+    const instrument = song.trackerModule.instruments[0];
+    song.trackerModule.instruments = Array.from({ length: 256 }, (_, i) => ({ ...instrument, number: i + 1 }));
+    song.patterns[0].channels[0].trackerCells[0].instrument = 256;
+    expect(() => validateTrackerModuleSong(song)).toThrow(/instrumento/i);
+  });
   it("round-trips the approved Exemplo GBA modules without modifying their bytes", async () => {
     const root = path.resolve("default-assets/templates/exemplo-gba");
     const data = JSON.parse(await readFile(path.join(root, "exemplo-gba.gba-project"), "utf8"));

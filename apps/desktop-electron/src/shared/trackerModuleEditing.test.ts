@@ -1,8 +1,9 @@
 import { describe, expect, it } from "vitest";
 import { createHash } from "node:crypto";
-import { makeEditableModFixture } from "./trackerModuleFixtures.js";
+import { makeEditableModFixture, makeEditableS3mFixture } from "./trackerModuleFixtures.js";
 import { parseTrackerModule } from "./trackerModule.js";
 import { createEditableTrackerCopyInProject, editTrackerModuleInProject, trackerModuleSong } from "./trackerModuleEditing.js";
+import { deriveAudioWorkspacePresentation } from "./audioWorkspace.js";
 
 function setup(channels = 16) {
   const bytes = makeEditableModFixture(channels); const song = parseTrackerModule(bytes, "MOD", createHash("sha256").update(bytes).digest("hex"));
@@ -13,6 +14,13 @@ function setup(channels = 16) {
   return { data, copy, song: trackerModuleSong((copy.audioItems as Record<string, unknown>[])[1]) };
 }
 describe("editable tracker project commands", () => {
+  it("accepts the native S3M tempo range", () => {
+    const bytes = makeEditableS3mFixture(); const song = parseTrackerModule(bytes, "S3M", createHash("sha256").update(bytes).digest("hex"));
+    song.bpm = 32;
+    const data = { audioItems: [{ id: "original", name: "Tema", kind: "Musica", sourceAssetID: "asset" }], assets: [{ id: "asset", name: "source.s3m", kind: "Audio", metadata: { source: "Assets/source.s3m" } }] };
+    const copy = createEditableTrackerCopyInProject(data, "original", song, "editable");
+    expect(deriveAudioWorkspacePresentation(copy).items.find(item => item.id === "editable")!.warnings.filter(message => /BPM/.test(message))).toEqual([]);
+  });
   it("creates an independent editable item and keeps the original item, asset and scene references", () => {
     const { data, copy } = setup(); expect(copy.audioItems).toHaveLength(2);
     expect((copy.audioItems as unknown[])[0]).toEqual(data.audioItems[0]);
