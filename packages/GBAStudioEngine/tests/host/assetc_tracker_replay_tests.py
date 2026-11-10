@@ -183,6 +183,14 @@ class TrackerReplayTests(unittest.TestCase):
         controls = tick_controls("it", it_song({0: [60, 1, None, 4, 0xF3]}, rows=1))
         self.assertEqual([s["sample_gain"] for s in controls], [round(61 / 64 * 255)] * 6)
 
+    def test_it_portamento_shares_pitch_memory_only_when_compatible_gxx_is_off(self):
+        data = it_song({0: [60, 1, None, 6, 4], 1: [64, 0, None, 7, 0], 2: [None, 0, None, 7, 0]}, rows=3)
+        controls = tick_controls("it", data)
+        self.assertEqual(controls[-1]["sample_rate_hz"], round(8363 * 2 ** (60 / 192)))
+        struct.pack_into("<H", data, 44, 13 | 32)
+        separate = tick_controls("it", data)
+        self.assertEqual(separate[-1]["sample_rate_hz"], separate[5]["sample_rate_hz"])
+
     def test_global_volume_slide_precedes_voice_gain(self):
         controls = tick_controls("xm", xm_song({0: [49, 1, 0, 17, 1]}, rows=1))
         self.assertEqual([s["sample_gain"] for s in controls], [round((64 - i) / 64 * 255) for i in range(6)])

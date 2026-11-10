@@ -4679,7 +4679,7 @@ def read_it_tracker(path):
     return r, {"patterns": patterns, "order": order, "channels": len(channel_map), "samples": samples, "instruments": instruments,
                "speed": r.number(50), "tempo": r.number(51), "global_volume": r.number(48) / 128,
                "channel_volumes": [r.number(128 + channel) for channel in channel_map], "pans": pans, "pan_separation": r.number(52) / 128,
-               "linear_slides": bool(r.number(44, 2) & 8), "old_effects": bool(r.number(44, 2) & 16)}
+               "linear_slides": bool(r.number(44, 2) & 8), "old_effects": bool(r.number(44, 2) & 16), "compatible_porta": bool(r.number(44, 2) & 32)}
 
 
 def tracker_envelope_value(envelope, tick, default):
@@ -4787,7 +4787,7 @@ class ExtendedTrackerReplay:
                 setattr(channel, prefix + "_depth", parameter & 15)
         elif key in ("up", "down", "porta", "volume_slide", "porta_volume", "vibrato_volume", "pan_slide", "global_slide", "channel_slide", "retrigger", "tremor") or not xm and key == "arp":
             memory_key = "volume_slide" if key in ("porta_volume", "vibrato_volume") else key
-            if not xm and key in ("up", "down"):
+            if not xm and (key in ("up", "down") or key == "porta" and not self.song.get("compatible_porta")):
                 memory_key = "pitch_slide"
             parameter = self.memory(channel, memory_key, parameter)
         return key, parameter
@@ -4961,7 +4961,8 @@ class ExtendedTrackerReplay:
             if tick == 0 and fine or tick > 0 and not fine:
                 self.slide_pitch(channel, amount * direction)
         if tick > 0 and key in ("porta", "porta_volume"):
-            self.portamento(channel, channel.memory.get("porta", 0))
+            memory_key = "pitch_slide" if self.reader.format == "IT" and not self.song.get("compatible_porta") else "porta"
+            self.portamento(channel, parameter if key == "porta" else channel.memory.get(memory_key, 0))
         if key == "keyoff" and tick == parameter:
             self.note(channel, -1, 0, False)
         elif key == "cut" and tick == parameter:
