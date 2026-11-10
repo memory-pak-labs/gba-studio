@@ -338,6 +338,24 @@ $(ISOMETRIC_GBA): $(ISOMETRIC_ELF)
 	$(GBAFIX) $@ -tGBS_ISO -cGBS0 -m00 -r00 >/dev/null
 	@echo "ROM gerada: $@"
 
+# Opt-in ARM regression: inspect audio_kernel_witness in mGBA after boot.
+# [2] == 1 and [3] == 136 prove exact LUT output for all alignment/tail cases.
+.PHONY: audio-mixer-kernel-rom
+audio-mixer-kernel-rom: check-toolchain $(GBA_BUILD)/tests/audio_mixer_kernel.gba
+
+$(GBA_BUILD)/tests/audio_mixer_kernel.o: tests/fixtures/audio_mixer_kernel_audit.cpp engine/src/gbs_audio.cpp engine/include/gbs/audio.hpp
+	@mkdir -p $(@D)
+	$(ARM_CXX) $(GBA_CXXFLAGS) -c $< -o $@
+
+$(GBA_BUILD)/tests/audio_mixer_kernel.elf: $(GBA_BUILD)/tests/audio_mixer_kernel.o $(ENGINE_LIB)
+	$(ARM_CXX) $(GBA_LDFLAGS) -Wl,-Map,$(GBA_BUILD)/tests/audio_mixer_kernel.map $^ -lgcc -o $@
+
+$(GBA_BUILD)/tests/audio_mixer_kernel.gba: $(GBA_BUILD)/tests/audio_mixer_kernel.elf
+	$(ARM_OBJCOPY) -O binary $< $@
+	$(GBAFIX) $@ -tGBS_AUDIO_TEST -cGBS0 -m00 -r00 >/dev/null
+
+-include $(GBA_BUILD)/tests/audio_mixer_kernel.d
+
 $(HOST_BUILD)/topdown_tests: tests/host/topdown_tests.cpp engine/src/gbs_topdown.cpp engine/src/gbs_event.cpp engine/src/gbs_dialogue_locale.cpp $(HOST_EVENT_RUNTIME_SRCS) engine/include/gbs/topdown.hpp engine/include/gbs/project.hpp
 	@mkdir -p $(@D)
 	$(HOST_CXX) $(HOST_CXXFLAGS) $(filter %.cpp,$^) -o $@

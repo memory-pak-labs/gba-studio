@@ -75,7 +75,8 @@ static void gbs_hw_draw_hud_choice_selector(int x, int y);
 #define MEM_WAVE_RAM ((volatile uint32_t*)0x04000090)
 #define MEM_IRQ_HANDLER (*(void (**)(void))0x03007FFC)
 
-static uint16_t shadow_oam[128 * 4];
+/* DMA/publication buffers use EWRAM; reserve IWRAM for the audio kernels. */
+static uint16_t shadow_oam[128 * 4] __attribute__((section(".ewram_bss"), aligned(4)));
 static uint32_t published_oam_enabled;
 static GbsOamOccupancy staged_oam = {{0xffffffffu,0xffffffffu,0xffffffffu,0xffffffffu}};
 static uint16_t dialogue_ordered_oam[128 * 4] __attribute__((section(".ewram_bss")));
@@ -717,7 +718,7 @@ struct HudLayoutRect {
     int width;
     int height;
 };
-static struct HudLayoutRect hud_layout_previous_rects[HUD_LAYOUT_MAX_COMPONENTS];
+static struct HudLayoutRect hud_layout_previous_rects[HUD_LAYOUT_MAX_COMPONENTS] __attribute__((section(".ewram_bss")));
 static int hud_layout_previous_count = 0;
 static int hud_layout_current_count = 0;
 static unsigned hud_pixel_text_obj_count = 0;

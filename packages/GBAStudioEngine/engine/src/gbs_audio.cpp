@@ -46,6 +46,7 @@ struct PcmPlayback {
     const gbs::PcmAsset* asset;
     uint32_t position_fp;
     uint32_t step_fp;
+    uint32_t step_reciprocal;
     uint8_t volume;
     uint8_t priority;
     int8_t pan;
@@ -72,11 +73,13 @@ PcmPlayback pcm_music {};
 #if defined(__arm__) || defined(__thumb__)
 #define GBS_AUDIO_EWRAM __attribute__((section(".ewram_bss")))
 #define GBS_AUDIO_FAST_RAM __attribute__((section(".iwram.audio_scratch")))
-#define GBS_AUDIO_HOT_CODE __attribute__((section(".iwram"), target("arm"), optimize("O2"), noinline, long_call))
+#define GBS_AUDIO_HOT_CODE __attribute__((section(".iwram"), target("arm"), optimize("O2"), noinline, noclone, long_call))
+#define GBS_AUDIO_BLOCK_CODE __attribute__((target("arm"), optimize("O2"), noinline, long_call))
 #else
 #define GBS_AUDIO_EWRAM
 #define GBS_AUDIO_FAST_RAM
 #define GBS_AUDIO_HOT_CODE
+#define GBS_AUDIO_BLOCK_CODE __attribute__((noinline))
 #endif
 // Expanded tracker state stays out of the scarce IWRAM used by hot code.
 TrackerChannelPlayback tracker_channels[gbs::TRACKER_MAX_SAMPLE_CHANNELS] GBS_AUDIO_EWRAM {};
@@ -86,14 +89,20 @@ struct MixVoice {
     gbs::AudioChannel primary;
     gbs::AudioChannel pcm;
     gbs::PcmPanGains pan;
-    uint32_t start_position;
 };
 // The IRQ stack is small; scratch voices live in EWRAM, like the mix buffers.
 MixVoice pcm_mix_voices[gbs::PCM_MIXER_MAX_ACTIVE_VOICES] GBS_AUDIO_EWRAM {};
-// One accumulator serves both sides; stereo replays the same voice positions.
-int16_t pcm_mix_accumulator[gbs::PCM_MIXER_SAMPLES_PER_FRAME] GBS_AUDIO_FAST_RAM {};
+// One packed stereo accumulator shares resampling and accumulation; a small
+// source window avoids repeated byte reads from ROM without changing samples.
+uint32_t pcm_mix_accumulator[gbs::PCM_MIXER_SAMPLES_PER_FRAME] GBS_AUDIO_FAST_RAM {};
 alignas(4) uint8_t pcm_mix_buffers[2][2][gbs::PCM_MIXER_SAMPLES_PER_FRAME + 32] GBS_AUDIO_EWRAM {};
-int8_t pcm_gain_left[256] GBS_AUDIO_FAST_RAM {};
+uint32_t pcm_stereo_gain[256] GBS_AUDIO_FAST_RAM {};
+alignas(4) int8_t pcm_source_window[512] GBS_AUDIO_FAST_RAM {};
+const int8_t* pcm_cached_source = nullptr;
+const int8_t* pcm_cached_data = nullptr;
+size_t pcm_cached_count = 0;
+uint16_t pcm_cached_loop_start = 0, pcm_cached_loop_end = 0;
+bool pcm_cache_padded = false;
 #undef GBS_AUDIO_EWRAM
 #undef GBS_AUDIO_FAST_RAM
 uint8_t pcm_mix_buffer_index = 0;
@@ -277,6 +286,7 @@ void reset_pcm_playback(PcmPlayback& playback) {
     playback.asset = nullptr;
     playback.position_fp = 0;
     playback.step_fp = 0;
+    playback.step_reciprocal = 0;
     playback.volume = 0;
     playback.priority = 0;
     playback.pan = 0;
@@ -359,9 +369,15 @@ void update_audio_volume_fades() {
     refresh_active_psg_outputs(music_changed, sfx_changed);
 }
 
+#if defined(__arm__) || defined(__thumb__)
+__attribute__((target("arm"), optimize("O2"), noinline, long_call))
+#endif
 uint32_t pcm_step_for_asset(const gbs::PcmAsset& asset, uint32_t sample_rate_hz) {
     const uint32_t playback_rate_hz = sample_rate_hz == 0 ? asset.sample_rate_hz : sample_rate_hz;
-    uint32_t step = static_cast<uint32_t>((static_cast<uint64_t>(playback_rate_hz) << 16) / gbs::PCM_MIXER_SAMPLE_RATE_HZ);
+    static_assert(gbs::PCM_MIXER_SAMPLE_RATE_HZ == 31536, "PCM rate reduction");
+    // 65536/31536 == 4096/1971. Split the quotient so both exact divisions
+    // stay in 32 bits, avoiding a 64-bit division for every tracker control.
+    uint32_t step = (playback_rate_hz / 1971u) * 4096u + ((playback_rate_hz % 1971u) * 4096u) / 1971u;
     if (step == 0) {
         step = 1;
     }
@@ -387,6 +403,7 @@ void start_pcm_playback(PcmPlayback& playback, const gbs::PcmAsset& asset, uint8
     playback.asset = &asset;
     playback.position_fp = 0;
     playback.step_fp = pcm_step_for_asset(asset, sample_rate_hz);
+    playback.step_reciprocal = 0xFFFFFFFFu / playback.step_fp;
     playback.volume = volume;
     playback.priority = priority;
     playback.pan = pan;
@@ -403,7 +420,11 @@ void start_tracker_sample(const gbs::TrackerStep& step) {
     PcmPlayback& playback = pcm_tracker[step.channel - 1u];
     if (step.sample_continue) {
         if (!playback.playing || playback.asset == nullptr) return;
-        playback.step_fp = pcm_step_for_asset(*playback.asset, step.sample_rate_hz);
+        const uint32_t next_step = pcm_step_for_asset(*playback.asset, step.sample_rate_hz);
+        if (next_step != playback.step_fp) {
+            playback.step_fp = next_step;
+            playback.step_reciprocal = 0xFFFFFFFFu / next_step;
+        }
         playback.volume = step.volume;
         playback.pan = step.pan;
         playback.sample_gain = step.sample_gain;
@@ -646,87 +667,113 @@ __attribute__((always_inline)) inline int32_t scale_pcm_sample(int32_t sample, u
     return product < 0 ? -scaled : scaled;
 }
 
-// Reuse exact integer gain results across a block and voices with the same mix.
-// Interpolation stays in the inner loop; only the repeated gain arithmetic moves.
-// Cache only gain values, never asset data; changed settings replace the table.
-uint8_t pcm_gain_key[6] {};
+// A biased pair of 16-bit lanes accumulates stereo with one 32-bit add. The
+// left-negative correction cancels its carry into the right lane. Seventeen
+// signed 8-bit voices cannot cross either lane's bias or overflow its range.
+static_assert(gbs::PCM_MIXER_MAX_ACTIVE_VOICES * 128 < 32768, "packed PCM lane budget");
+constexpr uint32_t pcm_stereo_bias = 0x80008000u;
+uint8_t pcm_gain_key[7] {};
 bool pcm_gain_key_valid = false;
-bool pcm_block_stereo = false;
-GBS_AUDIO_HOT_CODE void prepare_pcm_gain_table(uint8_t volume, uint8_t primary, uint8_t pcm, uint8_t pan, uint8_t fine_gain, bool linear_pan) {
-    if (pcm_gain_key_valid && pcm_gain_key[0] == volume && pcm_gain_key[1] == primary &&
-        pcm_gain_key[2] == pcm && pcm_gain_key[3] == pan && pcm_gain_key[4] == fine_gain && pcm_gain_key[5] == linear_pan) return;
+GBS_AUDIO_HOT_CODE void prepare_pcm_gain_table(uint8_t volume, uint8_t primary, uint8_t pcm, gbs::PcmPanGains pan, uint8_t fine_gain, bool linear_pan) {
+    if (pcm_gain_key_valid && pcm_gain_key[0] == volume && pcm_gain_key[1] == primary && pcm_gain_key[2] == pcm &&
+        pcm_gain_key[3] == pan.left && pcm_gain_key[4] == pan.right && pcm_gain_key[5] == fine_gain && pcm_gain_key[6] == linear_pan) return;
     for (int source = -128; source <= 127; ++source) {
-        const int32_t fine_sample = fine_gain == 255 ? source : source * fine_gain / 255;
-        const int32_t sample = scale_pcm_sample(scale_pcm_sample(scale_pcm_sample(fine_sample, volume), primary), pcm);
-        pcm_gain_left[source + 128] = static_cast<int8_t>(linear_pan ? sample * pan / 255 : scale_pcm_sample(sample, pan));
+        const int32_t fine = fine_gain == 255 ? source : source * fine_gain / 255;
+        const int32_t sample = scale_pcm_sample(scale_pcm_sample(scale_pcm_sample(fine, volume), primary), pcm);
+        const int32_t left = linear_pan ? sample * pan.left / 255 : scale_pcm_sample(sample, pan.left);
+        const int32_t right = linear_pan ? sample * pan.right / 255 : scale_pcm_sample(sample, pan.right);
+        pcm_stereo_gain[source + 128] = static_cast<uint16_t>(left) |
+            (static_cast<uint32_t>(static_cast<uint16_t>(right - (left < 0 ? 1 : 0))) << 16);
     }
     pcm_gain_key[0] = volume; pcm_gain_key[1] = primary; pcm_gain_key[2] = pcm;
-    pcm_gain_key[3] = pan; pcm_gain_key[4] = fine_gain; pcm_gain_key[5] = linear_pan; pcm_gain_key_valid = true;
+    pcm_gain_key[3] = pan.left; pcm_gain_key[4] = pan.right; pcm_gain_key[5] = fine_gain; pcm_gain_key[6] = linear_pan;
+    pcm_gain_key_valid = true;
 }
 
-// Keep only the sample loops in fast RAM; loop boundaries and playback state
-// are handled once per run, outside the inner sample loop.
-GBS_AUDIO_HOT_CODE void mix_pcm_native_run(const int8_t* samples, const int8_t* gains, int16_t* output, size_t count) {
-    // The ROM bus is 16-bit. One aligned word fetch serves four samples,
-    // avoiding four slow byte transactions without changing signed PCM/gain.
+GBS_AUDIO_HOT_CODE void mix_pcm_native_run(const int8_t* samples, uint32_t* output, size_t count, [[maybe_unused]] bool unity = false) {
     while (count && (reinterpret_cast<uintptr_t>(samples) & 3u)) {
-        *output++ += gains == nullptr ? *samples : gains[*samples + 128];
-        ++samples;
-        --count;
+        *output++ += pcm_stereo_gain[*samples++ + 128]; --count;
     }
     if (count == 0) return;
     const auto* words = static_cast<const uint32_t*>(__builtin_assume_aligned(samples, 4));
-    if (gains == nullptr) {
-        for (; count >= 4; count -= 4, output += 4) {
-            uint32_t packed;
-            __builtin_memcpy(&packed, words++, sizeof(packed));
-            output[0] += static_cast<int8_t>(packed);
-            output[1] += static_cast<int8_t>(packed >> 8);
-            output[2] += static_cast<int8_t>(packed >> 16);
-            output[3] += static_cast<int8_t>(packed >> 24);
-        }
-    } else {
-        for (; count >= 4; count -= 4, output += 4) {
-            uint32_t packed;
-            __builtin_memcpy(&packed, words++, sizeof(packed));
-            output[0] += gains[(packed & 255u) ^ 128u];
-            output[1] += gains[((packed >> 8) & 255u) ^ 128u];
-            output[2] += gains[((packed >> 16) & 255u) ^ 128u];
-            output[3] += gains[(packed >> 24) ^ 128u];
-        }
+#if defined(__arm__) || defined(__thumb__)
+    size_t groups = count / 4;
+    if (groups && unity) {
+        // Legacy centered PCM retains its no-LUT fast path. s + (s << 16)
+        // encodes both signed lanes, including the left-negative carry fix.
+        asm volatile(
+            "1: ldr r4, [%[input]], #4\n" "ldmia %[output], {r5-r8}\n"
+            "mov r9, r4, lsl #24\n" "mov r9, r9, asr #24\n" "add r5, r5, r9\n" "add r5, r5, r9, lsl #16\n"
+            "mov r9, r4, lsl #16\n" "mov r9, r9, asr #24\n" "add r6, r6, r9\n" "add r6, r6, r9, lsl #16\n"
+            "mov r9, r4, lsl #8\n" "mov r9, r9, asr #24\n" "add r7, r7, r9\n" "add r7, r7, r9, lsl #16\n"
+            "mov r9, r4, asr #24\n" "add r8, r8, r9\n" "add r8, r8, r9, lsl #16\n"
+            "stmia %[output]!, {r5-r8}\n" "subs %[groups], %[groups], #1\n" "bne 1b\n"
+            : [input] "+&r" (words), [output] "+&r" (output), [groups] "+&r" (groups)
+            : : "r4", "r5", "r6", "r7", "r8", "r9", "cc", "memory");
+    } else if (groups) {
+        // Block transfers amortize IWRAM read/write cycles over four outputs.
+        // Bias all source bytes once, retaining the exact signed LUT indices.
+        asm volatile(
+            "1: ldr r4, [%[input]], #4\n"
+            "eor r4, r4, %[bias]\n"
+            "ldmia %[output], {r5-r8}\n"
+            "and r9, r4, #255\n" "ldr r10, [%[gain], r9, lsl #2]\n" "add r5, r5, r10\n"
+            "mov r9, r4, lsr #8\n" "and r9, r9, #255\n" "ldr r10, [%[gain], r9, lsl #2]\n" "add r6, r6, r10\n"
+            "mov r9, r4, lsr #16\n" "and r9, r9, #255\n" "ldr r10, [%[gain], r9, lsl #2]\n" "add r7, r7, r10\n"
+            "mov r9, r4, lsr #24\n" "ldr r10, [%[gain], r9, lsl #2]\n" "add r8, r8, r10\n"
+            "stmia %[output]!, {r5-r8}\n"
+            "subs %[groups], %[groups], #1\n" "bne 1b\n"
+            : [input] "+&r" (words), [output] "+&r" (output), [groups] "+&r" (groups)
+            : [gain] "r" (pcm_stereo_gain), [bias] "r" (0x80808080u)
+            : "r4", "r5", "r6", "r7", "r8", "r9", "r10", "cc", "memory");
     }
+    count %= 4;
+#else
+    for (; count >= 4; count -= 4, output += 4) {
+        uint32_t packed; __builtin_memcpy(&packed, words++, sizeof(packed));
+        output[0] += pcm_stereo_gain[(packed & 255u) ^ 128u];
+        output[1] += pcm_stereo_gain[((packed >> 8) & 255u) ^ 128u];
+        output[2] += pcm_stereo_gain[((packed >> 16) & 255u) ^ 128u];
+        output[3] += pcm_stereo_gain[(packed >> 24) ^ 128u];
+    }
+#endif
     samples = reinterpret_cast<const int8_t*>(words);
-    for (size_t index = 0; index < count; ++index) {
-        output[index] += gains == nullptr ? samples[index] : gains[samples[index] + 128];
-    }
+    for (size_t i = 0; i < count; ++i) output[i] += pcm_stereo_gain[samples[i] + 128];
 }
 
-GBS_AUDIO_HOT_CODE void mix_pcm_interpolated_run(const int8_t* samples, const int8_t* gains, uint32_t position, uint32_t step, int16_t* output, size_t count) {
-    // Hoist gain routing out of the sample loop. Both paths retain the exact
-    // 16.16 linear interpolation; sixteen voices cannot afford a branch and
-    // conditional sign conversion for every sample.
-    if (gains == nullptr) {
-        for (int16_t* end = output + count; output != end; ++output) {
-            const uint32_t index = position >> 16;
-            const int32_t current = samples[index];
-            const int32_t sample = current + (((samples[index + 1u] - current) * static_cast<int32_t>(position & 0xFFFFu)) >> 16);
-            *output += sample;
-            position += step;
-        }
-    } else {
-        for (int16_t* end = output + count; output != end; ++output) {
-            const uint32_t index = position >> 16;
-            const int32_t current = samples[index];
-            const int32_t sample = current + (((samples[index + 1u] - current) * static_cast<int32_t>(position & 0xFFFFu)) >> 16);
-            *output += gains[sample + 128];
-            position += step;
-        }
-    }
+GBS_AUDIO_HOT_CODE uint32_t mix_pcm_interpolated_run(const int8_t* samples, uint32_t position, uint32_t step, uint32_t* output, size_t count, uint32_t wrap_end = 0xFFFFFFFFu, uint32_t wrap_length = 0) {
+    const auto mix = [&](size_t i) {
+        const uint32_t index = position >> 16;
+        const int32_t current = samples[index];
+        const int32_t sample = current + (((samples[index + 1u] - current) * static_cast<int32_t>(position & 0xFFFFu)) >> 16);
+        output[i] += pcm_stereo_gain[sample + 128];
+        position += step;
+        if (position >= wrap_end) position -= wrap_length;
+    };
+    for (; count >= 4; count -= 4, output += 4) { mix(0); mix(1); mix(2); mix(3); }
+    for (size_t i = 0; i < count; ++i) mix(i);
+    return position;
 }
 
-GBS_AUDIO_HOT_CODE void mix_pcm_voice_samples(PcmPlayback& playback, const int8_t* gains, const int8_t* prepared_samples = nullptr) {
+GBS_AUDIO_HOT_CODE int8_t* cache_pcm_source_window(const int8_t* source, size_t count) {
+    // Match alignment without reading before/after the source asset.
+    auto* begin = pcm_source_window + (reinterpret_cast<uintptr_t>(source) & 3u);
+    auto* destination = begin;
+    while (count && (reinterpret_cast<uintptr_t>(source) & 3u)) { *destination++ = *source++; --count; }
+    if (count == 0) return begin;
+    auto* aligned_source = static_cast<const int8_t*>(__builtin_assume_aligned(source, 4));
+    auto* aligned_destination = static_cast<int8_t*>(__builtin_assume_aligned(destination, 4));
+    for (; count >= 4; count -= 4, aligned_source += 4, aligned_destination += 4) {
+        uint32_t packed; __builtin_memcpy(&packed, aligned_source, 4); __builtin_memcpy(aligned_destination, &packed, 4);
+    }
+    for (size_t i = 0; i < count; ++i) aligned_destination[i] = aligned_source[i];
+    return begin;
+}
+
+// Only the per-sample kernels occupy IWRAM. Boundary/state work stays in ROM.
+GBS_AUDIO_BLOCK_CODE void mix_pcm_voice_samples(PcmPlayback& playback, const int8_t* prepared_samples, bool unity) {
     const gbs::PcmAsset& asset = *playback.asset;
-    const int8_t* const samples = prepared_samples != nullptr ? prepared_samples : asset.samples;
+    const int8_t* samples = prepared_samples != nullptr ? prepared_samples : asset.samples;
     const uint32_t count = static_cast<uint32_t>(asset.sample_count);
     const uint32_t loop_start = static_cast<uint32_t>(asset.loop_start_sample);
     const uint32_t loop_end = static_cast<uint32_t>(gbs::pcm_loop_end_sample(asset));
@@ -734,20 +781,31 @@ GBS_AUDIO_HOT_CODE void mix_pcm_voice_samples(PcmPlayback& playback, const int8_
     const uint32_t step = playback.step_fp;
     uint32_t position = playback.position_fp;
     size_t output = 0;
-    // At 1:1 rate every input sample maps to one output sample, including the
-    // terminal sample. Avoid general resampling division and 64-bit carries.
     if (step == 65536u && (position & 0xFFFFu) == 0) {
         uint32_t index = position >> 16;
         while (output < gbs::PCM_MIXER_SAMPLES_PER_FRAME) {
             if (index >= count) { playback.playing = false; break; }
             const size_t remaining = gbs::PCM_MIXER_SAMPLES_PER_FRAME - output;
             const size_t run = boundary - index < remaining ? boundary - index : remaining;
-            mix_pcm_native_run(samples + index, gains, pcm_mix_accumulator + output, run);
-            index += run;
-            output += run;
+            mix_pcm_native_run(samples + index, pcm_mix_accumulator + output, run, unity);
+            index += run; output += run;
             if (asset.loop && index == loop_end) index = loop_start;
         }
         playback.position_fp = index << 16;
+        return;
+    }
+    // A short loop can stay in fast RAM for the entire block. Pad its seam
+    // once, then wrap with one conditional subtraction instead of dispatching
+    // back through the generic boundary machinery for every cycle.
+    if (asset.loop && count <= sizeof(pcm_source_window) - 4u && step <= ((loop_end - loop_start) << 16) && position < (loop_end << 16)) {
+        if (pcm_cached_source != samples || pcm_cached_count != count || !pcm_cache_padded ||
+            pcm_cached_loop_start != loop_start || pcm_cached_loop_end != loop_end) {
+            auto* cached = cache_pcm_source_window(samples, count);
+            cached[loop_end] = cached[loop_start];
+            pcm_cached_data = cached; pcm_cached_source = samples; pcm_cached_count = count;
+            pcm_cached_loop_start = static_cast<uint16_t>(loop_start); pcm_cached_loop_end = static_cast<uint16_t>(loop_end); pcm_cache_padded = true;
+        }
+        playback.position_fp = mix_pcm_interpolated_run(pcm_cached_data, position, step, pcm_mix_accumulator, gbs::PCM_MIXER_SAMPLES_PER_FRAME, loop_end << 16, (loop_end - loop_start) << 16);
         return;
     }
     while (output < gbs::PCM_MIXER_SAMPLES_PER_FRAME) {
@@ -755,59 +813,70 @@ GBS_AUDIO_HOT_CODE void mix_pcm_voice_samples(PcmPlayback& playback, const int8_
         const bool terminal = (position >> 16) == boundary - 1u;
         const uint32_t run_boundary = terminal ? boundary : boundary - 1u;
         const uint32_t distance = (run_boundary << 16) - position;
-        const uint32_t until_boundary = distance / step + (distance % step != 0 ? 1u : 0u);
+        // The reciprocal underestimates floor(distance/step) by at most one.
+        // Two bounded corrections give the exact ceiling without a divide.
+        uint32_t until_boundary = static_cast<uint32_t>((static_cast<uint64_t>(distance) * playback.step_reciprocal) >> 32);
+        const uint32_t remainder = distance - until_boundary * step;
+        until_boundary += (remainder != 0) + (remainder > step);
         const size_t remaining = gbs::PCM_MIXER_SAMPLES_PER_FRAME - output;
-        const size_t run = until_boundary < remaining ? until_boundary : remaining;
+        size_t run = until_boundary < remaining ? until_boundary : remaining;
         const uint32_t start = position;
-        if (step == 65536u && (position & 0xFFFFu) == 0) {
-            mix_pcm_native_run(samples + (position >> 16), gains, pcm_mix_accumulator + output, run);
+        if (!terminal) {
+            const uint32_t first = position >> 16;
+            const int8_t* input;
+            uint32_t input_position;
+            if (count <= sizeof(pcm_source_window) - 3u) {
+                if (pcm_cached_source != samples || pcm_cached_count != count || pcm_cache_padded) {
+                    pcm_cached_data = cache_pcm_source_window(samples, count);
+                    pcm_cached_source = samples; pcm_cached_count = count;
+                    pcm_cache_padded = false;
+                }
+                input = pcm_cached_data; input_position = position;
+            } else {
+                pcm_cached_source = nullptr;
+                const auto span_for = [&](size_t length) { return ((static_cast<uint64_t>(position) + static_cast<uint64_t>(length - 1u) * step) >> 16) - first + 2u; };
+                while (run > 1 && span_for(run) > sizeof(pcm_source_window) - 3u) run = (run + 1u) / 2u;
+                input = cache_pcm_source_window(samples + first, span_for(run)); input_position = position - (first << 16);
+            }
+            mix_pcm_interpolated_run(input, input_position, step, pcm_mix_accumulator + output, run);
             output += run;
-            position += static_cast<uint32_t>(run) << 16;
-        } else if (!terminal) {
-            mix_pcm_interpolated_run(samples, gains, position, step, pcm_mix_accumulator + output, run);
-            output += run;
-            position += static_cast<uint32_t>(run) * step;
         } else {
             const int32_t current = samples[boundary - 1u];
             const int32_t difference = asset.loop ? samples[loop_start] - current : 0;
             for (size_t end = output + run; output < end; ++output) {
                 const int32_t sample = current + ((difference * static_cast<int32_t>(position & 0xFFFFu)) >> 16);
-                pcm_mix_accumulator[output] += gains == nullptr ? sample : gains[sample + 128];
+                pcm_mix_accumulator[output] += pcm_stereo_gain[sample + 128];
                 position += step;
             }
         }
-        // Handle a boundary once per run, including 16.16 carry at 65535 samples.
-        const uint64_t next = static_cast<uint64_t>(start) + static_cast<uint64_t>(run) * step;
-        if (asset.loop && (next >> 16) >= loop_end) {
-            const uint32_t overflow = static_cast<uint32_t>(next >> 16) - loop_end;
-            position = ((loop_start + overflow % (loop_end - loop_start)) << 16) | (next & 0xFFFFu);
+        // The validated <= 2,097,152 Hz override times one block fits in
+        // 32 bits. Detect the addition carry explicitly at the 65535 boundary.
+        static_assert((2097152ull * 65536 / 31536) * gbs::PCM_MIXER_SAMPLES_PER_FRAME < (1ull << 32), "PCM block advance");
+        const uint32_t next = start + static_cast<uint32_t>(run) * step;
+        const uint32_t next_index = (next >> 16) + (next < start ? 65536u : 0u);
+        if (asset.loop && next_index >= loop_end) {
+            uint32_t overflow = next_index - loop_end;
+            const uint32_t loop_length = loop_end - loop_start;
+            if (overflow >= loop_length) overflow %= loop_length;
+            position = ((loop_start + overflow) << 16) | (next & 0xFFFFu);
         } else {
-            const uint64_t end = static_cast<uint64_t>(count) << 16;
-            position = static_cast<uint32_t>(next < end ? next : end);
+            position = next_index < count ? next : count << 16;
         }
     }
     playback.position_fp = position;
 }
 
-void mix_pcm_voice_block(const MixVoice& voice, bool right) {
-    PcmPlayback& playback = *voice.playback;
+void mix_pcm_voice_block(const MixVoice& voice) {
+    auto& playback = *voice.playback;
     if (!playback.playing || playback.asset == nullptr) return;
-    const uint8_t primary_gain = channel_volume(voice.primary);
-    const uint8_t pcm_gain = channel_volume(voice.pcm);
-    // Unity gain needs no table lookup; other mixes reuse exact integer gains.
-    const uint8_t pan = right ? voice.pan.right : voice.pan.left;
-    const uint8_t unity_pan = playback.sample_linear_pan ? 255 : 15;
-    if (playback.sample_gain == 255 && playback.volume == 15 && primary_gain == 15 && pcm_gain == 15 && pan == unity_pan) {
-        mix_pcm_voice_samples(playback, nullptr);
-    } else if (playback.sample_gain == 255 && playback.volume == 15 && pcm_gain == 15 && pan == unity_pan &&
+    const auto primary = channel_volume(voice.primary), pcm = channel_volume(voice.pcm);
+    const bool prepared = playback.sample_gain == 255 && playback.volume == 15 && pcm == 15 &&
         playback.step_fp == 65536u && (playback.position_fp & 0xFFFFu) == 0 &&
-        playback.asset->native_gain_samples != nullptr &&
-        playback.asset->native_gain_primary_volume == primary_gain) {
-        mix_pcm_voice_samples(playback, nullptr, playback.asset->native_gain_samples);
-    } else {
-        prepare_pcm_gain_table(playback.volume, primary_gain, pcm_gain, pan, playback.sample_gain, playback.sample_linear_pan);
-        mix_pcm_voice_samples(playback, pcm_gain_left);
-    }
+        playback.asset->native_gain_samples != nullptr && playback.asset->native_gain_primary_volume == primary;
+    prepare_pcm_gain_table(playback.volume, prepared ? 15 : primary, pcm, voice.pan, playback.sample_gain, playback.sample_linear_pan);
+    const bool unity = playback.sample_gain == 255 && playback.volume == 15 && pcm == 15 &&
+        (prepared || primary == 15) && !playback.sample_linear_pan && voice.pan.left == 15 && voice.pan.right == 15;
+    mix_pcm_voice_samples(playback, prepared ? playback.asset->native_gain_samples : nullptr, unity);
 }
 
 constexpr size_t pcm_max_mixed_magnitude = gbs::PCM_MIXER_MAX_ACTIVE_VOICES * 128;
@@ -823,6 +892,7 @@ struct PcmLimiterTable {
 constexpr PcmLimiterTable pcm_limiter {};
 __attribute__((always_inline)) inline int8_t clamp_pcm_sample(int32_t sample) {
     const size_t magnitude = static_cast<size_t>(sample < 0 ? -sample : sample);
+    if (magnitude <= 96) return static_cast<int8_t>(sample);
     const int32_t limited = pcm_limiter.values[magnitude > pcm_max_mixed_magnitude ? pcm_max_mixed_magnitude : magnitude];
     return static_cast<int8_t>(sample < 0 ? -limited : limited);
 }
@@ -832,17 +902,43 @@ constexpr uint8_t encode_pcm_fifo_sample(int8_t sample) {
 }
 
 GBS_AUDIO_HOT_CODE void clear_pcm_accumulator() {
-    for (size_t index = 0; index < gbs::PCM_MIXER_SAMPLES_PER_FRAME; ++index) pcm_mix_accumulator[index] = 0;
+    for (auto& value : pcm_mix_accumulator) value = pcm_stereo_bias;
 }
 
-GBS_AUDIO_HOT_CODE void write_pcm_mix_side(uint8_t* output, uint8_t* mono_mirror) {
-    for (size_t index = 0; index < gbs::PCM_MIXER_SAMPLES_PER_FRAME; ++index) {
-        output[index] = encode_pcm_fifo_sample(clamp_pcm_sample(pcm_mix_accumulator[index]));
-        if (mono_mirror != nullptr) mono_mirror[index] = output[index];
+GBS_AUDIO_HOT_CODE void write_pcm_mix_stereo(uint8_t* left_buffer, uint8_t* right_buffer, bool mono) {
+    if (mono) {
+        for (size_t i = 0; i < gbs::PCM_MIXER_SAMPLES_PER_FRAME; ++i) {
+            const int32_t left = static_cast<int32_t>(pcm_mix_accumulator[i] & 65535u) - 32768;
+            const uint8_t value = encode_pcm_fifo_sample(clamp_pcm_sample(left));
+            left_buffer[i] = value; right_buffer[i] = value;
+        }
+        return;
+    }
+    for (size_t i = 0; i < gbs::PCM_MIXER_SAMPLES_PER_FRAME; ++i) {
+        const uint32_t value = pcm_mix_accumulator[i];
+        const int32_t left = static_cast<int32_t>(value & 65535u) - 32768;
+        const int32_t right = static_cast<int32_t>(value >> 16) - 32768;
+        left_buffer[i] = encode_pcm_fifo_sample(clamp_pcm_sample(left));
+        right_buffer[i] = encode_pcm_fifo_sample(clamp_pcm_sample(right));
     }
 }
 
+gbs::PcmPanGains pcm_playback_pan(const PcmPlayback& playback) {
+    const int pan = playback.pan;
+    if (playback.sample_linear_pan) {
+        // Exact round(255*x/254), x in [0,254], without a software divide.
+        return { static_cast<uint8_t>(127 - pan + (pan <= 0)), static_cast<uint8_t>(127 + pan + (pan >= 0)) };
+    }
+    const uint32_t numerator = static_cast<uint32_t>(15 * (127 - (pan < 0 ? -pan : pan)));
+    // Exact floor(n/127) for n in [0,1905].
+    const uint8_t opposite = static_cast<uint8_t>((numerator + 1u + (numerator >> 7)) >> 7);
+    return pan < 0 ? gbs::PcmPanGains { 15, opposite } : gbs::PcmPanGains { opposite, 15 };
+}
+
 void update_pcm_mixer() {
+    // Cache asset bytes only within this block. Mutable source buffers remain
+    // observable on the next update, and all voices can share a short sample.
+    pcm_cached_source = nullptr;
     cleanup_finished_pcm();
     if (!any_pcm_playing()) {
         if (pcm_output_active) {
@@ -858,36 +954,23 @@ void update_pcm_mixer() {
 
     MixVoice* const voices = pcm_mix_voices;
     size_t voice_count = 0;
-    if (pcm_music.playing) voices[voice_count++] = { &pcm_music, gbs::AudioChannel::Music, gbs::AudioChannel::PcmMusic, { 15, 15 }, pcm_music.position_fp };
+    if (pcm_music.playing) voices[voice_count++] = { &pcm_music, gbs::AudioChannel::Music, gbs::AudioChannel::PcmMusic, { 15, 15 } };
     for (PcmPlayback& playback : pcm_sfx) {
-        if (playback.playing) voices[voice_count++] = { &playback, gbs::AudioChannel::Sfx, gbs::AudioChannel::PcmSfx, gbs::pcm_pan_gains(playback.pan), playback.position_fp };
+        if (playback.playing) voices[voice_count++] = { &playback, gbs::AudioChannel::Sfx, gbs::AudioChannel::PcmSfx, pcm_playback_pan(playback) };
     }
     for (PcmPlayback& playback : pcm_tracker) {
         if (playback.playing) {
-            const auto pan = playback.sample_linear_pan
-                ? gbs::PcmPanGains { static_cast<uint8_t>((255 * (127 - playback.pan) + 127) / 254), static_cast<uint8_t>((255 * (127 + playback.pan) + 127) / 254) }
-                : gbs::pcm_pan_gains(playback.pan);
-            voices[voice_count++] = { &playback, gbs::AudioChannel::Music, gbs::AudioChannel::PcmMusic, pan, playback.position_fp };
+            const auto pan = pcm_playback_pan(playback);
+            voices[voice_count++] = { &playback, gbs::AudioChannel::Music, gbs::AudioChannel::PcmMusic, pan };
         }
     }
-    pcm_block_stereo = false;
-    for (size_t index = 0; index < voice_count; ++index) {
-        if (voices[index].pan.left != voices[index].pan.right) pcm_block_stereo = true;
+    clear_pcm_accumulator();
+    bool mono = true;
+    for (size_t i = 0; i < voice_count; ++i) {
+        if (voices[i].pan.left != voices[i].pan.right) mono = false;
+        mix_pcm_voice_block(voices[i]);
     }
-    // Accumulate one side at a time to avoid a second 1056-byte scratch block.
-    // Restore initial positions for the right pass; both passes advance identically.
-    for (unsigned side = 0; side < (pcm_block_stereo ? 2u : 1u); ++side) {
-        clear_pcm_accumulator();
-        for (size_t index = 0; index < voice_count; ++index) {
-            if (side != 0) {
-                voices[index].playback->position_fp = voices[index].start_position;
-                voices[index].playback->playing = true;
-            }
-            mix_pcm_voice_block(voices[index], side != 0);
-        }
-        uint8_t* output = side == 0 ? left_buffer : right_buffer;
-        write_pcm_mix_side(output, pcm_block_stereo ? nullptr : right_buffer);
-    }
+    write_pcm_mix_stereo(left_buffer, right_buffer, mono);
 
     // FIFO can prefetch one burst beyond the frame boundary. Hold the final
     // value in owned padding; the VBlank handler bounds each DMA to one frame.
@@ -1447,7 +1530,7 @@ AudioRuntimeUsage audio_runtime_usage() {
         add_playback(pcm_tracker[index]);
     }
 
-    const uint32_t mixer_buffer_bytes = static_cast<uint32_t>(sizeof(pcm_mix_buffers) + sizeof(pcm_mix_accumulator) + sizeof(pcm_mix_voices) + sizeof(pcm_gain_left));
+    const uint32_t mixer_buffer_bytes = static_cast<uint32_t>(sizeof(pcm_mix_buffers) + sizeof(pcm_mix_accumulator) + sizeof(pcm_source_window) + sizeof(pcm_mix_voices) + sizeof(pcm_stereo_gain));
     const uint64_t total_bytes = static_cast<uint64_t>(pcm_source_bytes) + mixer_buffer_bytes;
     return AudioRuntimeUsage {
         total_bytes > 0xFFFFFFFFu ? 0xFFFFFFFFu : static_cast<uint32_t>(total_bytes),

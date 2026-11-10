@@ -251,6 +251,11 @@ int main(void) {
         self.assertLess(wait_body.index("commit_shadow_oam();"), wait_body.index("gbs_emit_vblank_interrupt"))
         self.assertIn("commit_shadow_oam_full();", init_body)
 
+    def test_render_publication_buffers_leave_iwram_for_audio(self) -> None:
+        for name in ("shadow_oam", "hud_layout_previous_rects"):
+            declaration = next(line for line in self.source.splitlines() if line.startswith("static ") and name + "[" in line)
+            self.assertIn('section(".ewram_bss")', declaration)
+
     def test_render_publication_gate_defers_all_shadow_state_until_vram_is_ready(self) -> None:
         wait_body = function_body(self.source, "gbs_hw_wait_vblank")
         map_body = function_body(self.source, "gbs_hw_load_bg_tilemap")
@@ -986,9 +991,8 @@ int main(void){dispatch();dispatch();assert(arms==2);assert(irq_ticks==2);assert
     def test_pcm_mixer_preserves_signed_samples_for_fifo_bytes(self) -> None:
         self.assertIn("uint8_t encode_pcm_fifo_sample(int8_t sample)", self.audio_source)
         self.assertIn("return static_cast<uint8_t>(sample);", self.audio_source)
-        self.assertIn("encode_pcm_fifo_sample(clamp_pcm_sample(pcm_mix_accumulator[index]))", self.audio_source)
-        self.assertIn("uint8_t* output = side == 0 ? left_buffer : right_buffer;", self.audio_source)
-        self.assertIn("write_pcm_mix_side(output, pcm_block_stereo ? nullptr : right_buffer)", self.audio_source)
+        self.assertIn("left_buffer[i] = encode_pcm_fifo_sample(clamp_pcm_sample(left))", self.audio_source)
+        self.assertIn("right_buffer[i] = encode_pcm_fifo_sample(clamp_pcm_sample(right))", self.audio_source)
 
 
 if __name__ == "__main__":
