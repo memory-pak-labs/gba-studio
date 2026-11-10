@@ -1,3 +1,4 @@
+import { projectAudioMixingRate, requireAudioMixingRate } from "../shared/audioMixing.js";
 import { isPcmAudio } from "../shared/audioPcm.js";
 import { isScaleEvent, parseScaleEvent, usesSinglePlaneBackground } from "../shared/eventTransforms.js";
 import { actorCommandReferences, sceneChangeCommand, sceneChangeCommandParts } from "../shared/sceneChangeCommand.js";
@@ -272,6 +273,7 @@ export interface EngineExportProjectEventCommand {
   channel?: "music" | "sfx" | "pcm_music" | "pcm_sfx" | "all" | string;
   muted?: boolean;
   volume?: number;
+  rate?: number;
   priority?: number;
   actor?: number;
   other_actor?: number;
@@ -2332,6 +2334,7 @@ export interface EngineExportAssetPack {
 }
 
 export interface EngineExportProjectContract {
+  audio_mixing_rate: number;
   schema: 1;
   backend: "gbastudio_engine";
   kind: "topdown" | "platformer" | "isometric" | "dungeon_crawler" | "racing" | "battle_rpg" | "luta" | "point_click" | "shmup" | "visual_novel" | "menu" | "cutscene" | "world_map" | "mixed";
@@ -4728,6 +4731,8 @@ function compileEventStep(
     }
     case "mute_audio_channel":
       return [{ op: "mute_audio_channel", channel: operand || "music", muted: booleanPart(parts[2], true) }];
+    case "set_audio_mixing_rate":
+      return [{ op: "set_audio_mixing_rate", rate: requireAudioMixingRate(Number(parts[1])) }];
     case "set_audio_volume":
       return [{ op: "set_audio_volume", channel: operand || "all", volume: hardwareAudioVolume(parts[2]) }];
     case "fade_audio_volume":
@@ -11147,6 +11152,7 @@ function buildEngineExportProjectContractUncached(
     if (runtimeKind === "platformer") cameraZoneFeatures.add("platformer_runtime.platformer_camera_zones");
   });
   features.push(...cameraZoneFeatures);
+  if (projectAudioMixingRate(data) !== 31536 || projectArray(data, "events").some(event => JSON.stringify(event).includes("set_audio_mixing_rate"))) features.push("audio.configurable_mixing_rate");
   if (projectArray(data, "audioItems").some(isPcmAudio)) features.push("audio.pcm_composer", "audio.tracker_pcm_16_channels", "audio.pcm_prepared_gain");
   if (audioPack?.document.sfx.some(asset => asset.pcm)) features.push("audio.pcm_sfx_aliases");
   if (audioPack?.document.tracker.some(asset => asset.mod || asset.s3m || asset.xm || asset.it)) {
@@ -11357,6 +11363,7 @@ function buildEngineExportProjectContractUncached(
     schema: 1,
     backend: "gbastudio_engine",
     kind,
+    audio_mixing_rate: projectAudioMixingRate(data),
     runtime_profile: isMixedRuntime ? "mixed" : resolution.runtimeProfile,
     runtime_contract: runtimeContract,
     runtime_capabilities: runtimeCapabilities,

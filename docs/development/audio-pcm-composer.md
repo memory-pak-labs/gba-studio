@@ -19,6 +19,20 @@ compartilhado. Afinação, envelope e repetição desse instrumento são compart
 volume e panorama permanecem individuais. Importe WAVs ou um SoundFont pelo botão
 de importação já existente para ampliar o banco.
 
+## Frequência de mixagem PCM
+
+Em **Exportar → Áudio → Frequência de mixagem**, escolha 10.512, 21.024 ou
+31.536 Hz. O padrão permanece em 31.536 Hz. Esse ajuste define a saída PCM da
+engine e da prévia do workspace Áudio; **Sample rate** continua definindo a
+conversão dos WAVs. Frequências menores reduzem a banda de áudio e o custo de
+processamento. Não há redução automática da frequência.
+
+O evento **Definir frequência de mixagem**, em **Música e efeitos sonoros →
+Mixagem**, aplica `set_audio_mixing_rate 21024`, por exemplo, ao próximo bloco.
+A troca preserva a posição e a afinação dos samples ativos, incluindo os SFX,
+e não altera os canais PSG. A frequência permanece nas transições entre cenas;
+um novo início da ROM reaplica o valor salvo nos ajustes do projeto.
+
 ## Editar MOD e S3M importados
 
 Selecione uma música MOD ou S3M da biblioteca e use **Criar cópia editável** em

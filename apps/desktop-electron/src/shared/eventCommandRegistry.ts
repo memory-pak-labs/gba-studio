@@ -48,6 +48,7 @@ const nativeEventCommandExportHandlingByVerb = new Map<string, NativeEventComman
     "play_music",
     "play_sfx",
     "mute_audio_channel",
+    "set_audio_mixing_rate",
     "set_audio_volume",
     "fade_audio_volume",
     "call_event",

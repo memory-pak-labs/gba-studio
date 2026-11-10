@@ -39,6 +39,7 @@ const parameterLabels: Record<string, string[]> = {
   remove_platform_callback: ["Callback"], set_platform_state: ["Estado"],
   pause_scene_type: ["Lógica da cena"], resume_scene_type: ["Lógica da cena"], run_audio_routine: ["Música tracker"],
   fade_in: ["Duração (quadros)"], fade_out: ["Duração (quadros)"],
+  set_audio_mixing_rate: ["Frequência de mixagem (Hz)"],
   play_music: ["Música"], play_sfx: ["Efeito sonoro"], set_music_volume: ["Volume"],
   fade_audio_volume: ["Canal", "Volume da cena (%)", "Duração (quadros)", "Variável do volume preferido (opcional)", "Variável do volume geral (opcional)"],
   show_dialogue: ["Diálogo"], show_choice: ["Diálogo de escolhas", "Variável de resposta"],
@@ -60,6 +61,7 @@ const parameterLabels: Record<string, string[]> = {
 };
 
 const descriptions: Record<string, string> = {
+  set_audio_mixing_rate: "Altera a saída PCM no próximo bloco de áudio, preservando a posição e a afinação das vozes ativas. 31.536 Hz é o padrão; taxas menores reduzem a banda de áudio e o custo de processamento. Não altera a conversão dos WAVs nem os canais PSG.",
   ...Object.fromEntries(scaleEventVerbs.map(verb => [verb, verb.includes("actor") ? "Aplica escala visual apenas à instância do ator (50–200%), preservando a colisão e a escala ao trocar a animação. A transição segue em paralelo; use Aguardar para encadear." : "Aplica escala relativa à composição affine inicial (50–400%) ou ao piso nativo da Corrida em perspectiva. A colisão permanece igual. A transição segue em paralelo; use Aguardar para encadear."])),
   lantern: "Ilumina uma área ao redor do ator e escurece o exterior. Acrescente circle após a duração para luz circular, com largura e altura iguais. Fades e máscaras têm prioridade; o círculo compartilha DMA0 com efeitos raster.",
   reveal_area: "Expande a área ao redor do ator até revelar a tela. Acrescente circle após a duração para uma abertura circular, com largura e altura iniciais iguais. Ao terminar, remove o escurecimento.",
@@ -133,6 +135,7 @@ export function eventCommandParameterLabel(verb: string, tokenIndex: number, fal
 }
 
 export function eventCommandParameterChoices(verb: string, tokenIndex: number): string[] | null {
+  if (verb === "set_audio_mixing_rate" && tokenIndex === 1) return ["10512", "21024", "31536"];
   if (scaleEventVerbs.some(v => v === verb && v.includes("background")) && tokenIndex === 1) return ["BG2", "BG3"];
   if ((verb === "replace_tile" && tokenIndex === 5) || (verb === "replace_tile_sequence" && tokenIndex === 6)) return TILE_REPLACEMENT_COLLISIONS;
   if(verb==="set_adventure_state" && tokenIndex===1) return ["ground","dash","knockback","blank","run","push"];

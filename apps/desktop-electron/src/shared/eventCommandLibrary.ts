@@ -1108,6 +1108,14 @@ const historicalEventCommandDefinitions: EventCommandDefinition[] = [
     "commandTemplate": "mute_audio_channel music true"
   },
   {
+    "id": "audio.set_mixing_rate",
+    "title": "Definir frequência de mixagem",
+    "category": "Música e efeitos sonoros",
+    "section": "Mixagem",
+    "isFavorite": false,
+    "commandTemplate": "set_audio_mixing_rate 31536"
+  },
+  {
     "id": "audio.set_volume",
     "title": "Definir volume do canal",
     "category": "Música e efeitos sonoros",

@@ -1,3 +1,4 @@
+import { projectAudioMixingRate } from "../shared/audioMixing.js";
 import { resolveAudioPlayback } from "./exportEngineProject.js";
 import { createHash } from "node:crypto";
 import { execFile } from "node:child_process";
@@ -82,6 +83,7 @@ export async function buildAudioPreviewRom(request: PrepareAudioPreviewRequest, 
 extern "C" { volatile uint32_t audio_preview[8] __attribute__((section(".ewram_bss"))) = {}; }
 extern "C" int gbs_main() {
  gbs::init();
+ gbs::set_audio_mixing_rate(${projectAudioMixingRate(data)});
  gbs::set_audio_channel_volume(gbs::AudioChannel::Music,${gain("musicVolume")});
  gbs::set_audio_channel_volume(gbs::AudioChannel::PcmMusic,${gain("musicVolume")});
  gbs::set_audio_channel_volume(gbs::AudioChannel::Sfx,${gain("sfxVolume")});
@@ -114,6 +116,7 @@ extern "C" int gbs_main() {
   const directory = await mkdtemp(path.join(options.tempRoot ?? tmpdir(), "gba-studio-audio-preview-"));
   try {
     const features = isPcmAudio(audio) ? ["audio.pcm_composer", "audio.tracker_pcm_16_channels", "audio.pcm_prepared_gain"] : [];
+    features.push("audio.configurable_mixing_rate");
     const manifest = { schema: 1, backend: "gbastudio_engine", kind: "topdown", entry: "main.cpp", build: { target: "audio_preview", make_target: "all" }, requires: { engine_pack: ">=2.27.0", features } };
     await writeEngineProjectExport({ destination: directory, projectPath: request.projectPath,
       generated: { target: "audio_preview", assets: pack.sourceCopies, files: [
