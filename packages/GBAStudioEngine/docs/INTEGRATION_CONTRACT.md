@@ -257,7 +257,7 @@ resta uma voz de efeito; composições menores conservam o orçamento anterior.
 A quantidade ampliada de estado dos canais reside em EWRAM.
 
 `audio.tracker_sample_sustain` identifica descritores `TrackerAsset` com
-`sustain_sample_channels`. O `assetc` ativa esse campo em MOD/S3M: uma linha
+`sustain_sample_channels`. O `assetc` ativa esse campo em MOD/S3M/XM/IT: uma linha
 sem nota para um canal conserva o sample e sua posição, até terminar, receber
 uma nova nota ou parar a música. Tracks do compositor mantêm o contrato de
 pausa por linha, com o campo falso por padrão. Recompile todo o projeto junto
@@ -265,6 +265,42 @@ com o SDK ao atualizar esse descritor. Cortes imediatos MOD `C00`/`EC0` e S3M
 nota 254/`SC0` substituem o canal por silêncio de uma amostra, liberando a voz;
 a ausência de nota continua sem cortar os outros canais. Isso não amplia o
 suporte dos demais efeitos de tracker.
+
+### Perfil PCM nativo de XM e IT
+
+`audio.tracker_xm_pcm_profile` e `audio.tracker_it_pcm_profile` identificam os
+conversores próprios do `assetc`; projetos que usam esses formatos exigem as
+respectivas capacidades no Engine Pack. Não dependem do Maxmod ou de um player
+externo. Este é um perfil inicial, não compatibilidade completa com trackers.
+
+- XM 1.04: até 16 canais, padrões de 1 a 256 linhas, mapa de samples por nota,
+  PCM delta de 8/16 bits, afinação relativa/fina, volume e panorama na nota,
+  loops normais e bidirecionais, note-off e comando Fxx de velocidade/andamento.
+  Cxx/8xx e volume direto/panorama da coluna de volume exigem nota na mesma linha.
+- IT 2.x: até 16 canais PCM usados, inclusive índices físicos com lacunas até 63,
+  máscaras e reutilização de campos, padrões de 1 a 1024 linhas, PCM mono sem
+  compressão de 8/16 bits (signed/unsigned/delta), sample C5, volumes iniciais,
+  mapas simples de instrumento, loops normais/bidirecionais, note-off/cut,
+  Axx, Txx absoluto e X00–X80 na nota. Volume/panorama direto na coluna também
+  exige nota. Instrumentos precisam usar NNA=cut, sem envelopes/fadeout,
+  separação de panorama por pitch ou variações aleatórias.
+- Samples convertidos: no máximo 65535 amostras por sample, inclusive após
+  expandir loop bidirecional. Cada ocorrência na sequência é compilada com
+  estado de instrumento herdado; pausas longas são divididas sem perder duração.
+  A quantização para quadros acumula a fração temporal entre linhas e padrões.
+
+Envelopes, vibrato, portamento, slides, jumps/breaks, note fade, sustain loops,
+PCM estéreo/comprimido de IT e outros comandos fora desse perfil geram erro
+explícito. O erro indica formato e, para células, padrão/linha/canal. Esses
+recursos não são apagados nem aproximados durante a exportação.
+
+O editor cria um item independente vinculado ao hash da fonte, preserva células
+nativas e bytes dos instrumentos/samples e guarda edições no `.gba-project`.
+A regravação produz somente a cópia de exportação. Ler ou editar um módulo não
+garante sua compatibilidade com o perfil: a prévia pela engine e a exportação
+validam o conteúdo. Plugins e extensões específicas de outros trackers não
+fazem parte deste contrato. Editor, ROM em emulador e GBA físico exigem provas
+separadas.
 
 Para importações com mais de quatro canais, a exportação antecipa a
 reamostragem linear e o ganho estático de cada combinação instrumento/nota

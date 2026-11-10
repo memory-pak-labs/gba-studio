@@ -4351,6 +4351,408 @@ def transform_pcm_loop(loop_start, loop_end, sample_rate, config, output_count):
     return start, end
 
 
+class ExtendedTrackerReader:
+    """Bounds-checked native XM 1.04 / IT PCM profile, without external players.
+
+    Format references: MilkyTracker xm-form.txt; Impulse Tracker ITTECH.TXT.
+    Unsupported playback semantics are errors, not silently dropped commands.
+    """
+    def __init__(self, path, format):
+        with Path(path).open("rb") as source:
+            self.data = source.read(8 * 1024 * 1024 + 1)
+        self.format = format
+        if len(self.data) > 8 * 1024 * 1024:
+            self.fail("arquivo excede 8 MiB")
+
+    def fail(self, message):
+        raise SystemExit(f"{self.format}: {message}")
+
+    def block(self, offset, size):
+        if offset < 0 or size < 0 or offset + size > len(self.data):
+            self.fail("módulo truncado ou ponteiro inválido")
+        return self.data[offset:offset + size]
+
+    def number(self, offset, size=1):
+        return int.from_bytes(self.block(offset, size), "little")
+
+    def pcm(self, offset, frames, bits=8, delta=False, signed=True, big_endian=False):
+        if not 1 <= frames <= 65535:
+            self.fail("sample precisa conter de 1 a 65535 amostras PCM")
+        width, mask, previous = bits // 8, (1 << bits) - 1, 0
+        raw, values = self.block(offset, frames * width), []
+        for index in range(frames):
+            value = int.from_bytes(raw[index * width:(index + 1) * width], "big" if big_endian else "little")
+            if delta:
+                value = (previous + value) & mask
+                previous = value
+            if signed:
+                if value & (1 << (bits - 1)):
+                    value -= 1 << bits
+            else:
+                value -= 1 << (bits - 1)
+            values.append(max(-128, min(127, value // (256 if bits == 16 else 1))))
+        return values
+
+    def sample(self, pcm, start, end, loop, pingpong=False, rate=8363):
+        if loop:
+            if not 0 <= start < end <= len(pcm):
+                self.fail("loop de sample fora do intervalo")
+            if pingpong and end - start > 1:
+                pcm = pcm[:end] + pcm[start + 1:end - 1][::-1]
+                end = len(pcm)
+                if end > 65535:
+                    self.fail("loop bidirecional convertido excede 65535 amostras")
+        else:
+            start, end = 0, 0
+        return {"samples": pcm, "sample_rate_hz": rate, "loop_start_sample": start, "loop_end_sample": end}
+
+
+def read_xm_tracker(path):
+    r = ExtendedTrackerReader(path, "XM")
+    if r.block(0, 17) != b"Extended Module: " or r.number(37) != 26 or r.number(58, 2) != 0x104:
+        r.fail("use XM 1.04 com cabeçalho válido")
+    header, count, channels = r.number(60, 4), r.number(64, 2), r.number(68, 2)
+    patterns_count, instruments_count = r.number(70, 2), r.number(72, 2)
+    if not 1 <= channels <= 16 or not 1 <= count <= 256 or patterns_count > 256 or instruments_count > 128 or header < 20 + count:
+        r.fail("cabeçalho inválido; a engine aceita até 16 canais PCM")
+    r.block(60, header)
+    order = list(r.block(80, count))
+    patterns, at = [], 60 + header
+    for index in range(patterns_count):
+        size, rows, length = r.number(at, 4), r.number(at + 5, 2), r.number(at + 7, 2)
+        if size < 9 or r.number(at + 4) or not 1 <= rows <= 256:
+            r.fail(f"padrão {index + 1} inválido")
+        packed, cursor = r.block(at + size, length), 0
+        cells = []
+        for row in range(rows):
+            cells.append([])
+            for channel in range(channels):
+                values = [0] * 5
+                if length:
+                    if cursor >= length:
+                        r.fail("padrão XM truncado")
+                    first = packed[cursor]
+                    cursor += 1
+                    if first & 128:
+                        fields = [i for i in range(5) if first & (1 << i)]
+                    else:
+                        values[0], fields = first, range(1, 5)
+                    for field in fields:
+                        if cursor >= length:
+                            r.fail("célula XM truncada")
+                        values[field] = packed[cursor]
+                        cursor += 1
+                note, instrument, volume, effect, parameter = values
+                if note > 97:
+                    r.fail("nota XM inválida")
+                cells[-1].append((None if not note else -1 if note == 97 else note - 1, instrument, volume or None, effect, parameter))
+        if cursor != length:
+            r.fail("padrão XM contém dados excedentes")
+        patterns.append(cells)
+        at += size + length
+    while len(patterns) <= max(order):
+        patterns.append([[(None, 0, None, 0, 0)] * channels for _ in range(64)])
+    samples, instruments = [], []
+    for index in range(instruments_count):
+        size, count = r.number(at, 4), r.number(at + 27, 2)
+        if size < 29 or count > 16:
+            r.fail(f"instrumento {index + 1} inválido")
+        r.block(at, size)
+        mapping = [None] * 96
+        if count:
+            if size < 243:
+                r.fail("cabeçalho de instrumento truncado")
+            if r.number(at + 233) & 1 or r.number(at + 234) & 1:
+                r.fail(f"instrumento {index + 1}: envelope ainda não suportado na ROM")
+            if r.number(at + 237) or r.number(at + 238):
+                r.fail(f"instrumento {index + 1}: vibrato automático ainda não suportado na ROM")
+            sample_header = r.number(at + 29, 4)
+            if sample_header < 40:
+                r.fail("cabeçalho de sample inválido")
+            r.block(at + size, count * sample_header)
+            data_at = at + size + count * sample_header
+            first_sample = len(samples)
+            for sample in range(count):
+                loc = at + size + sample * sample_header
+                length, start, loop_length = (r.number(loc + k, 4) for k in (0, 4, 8))
+                flags, volume, pan = r.number(loc + 14), r.number(loc + 12), r.number(loc + 15)
+                width = 2 if flags & 16 else 1
+                if flags & ~19 or flags & 3 == 3 or length % width or start % width or loop_length % width or volume > 64:
+                    r.fail(f"instrumento {index + 1}, sample {sample + 1}: formato PCM inválido")
+                fine = struct.unpack("b", r.block(loc + 13, 1))[0]
+                relative = struct.unpack("b", r.block(loc + 16, 1))[0]
+                pcm = r.pcm(data_at, length // width, width * 8, delta=True) if length else []
+                item = r.sample(pcm, start // width, (start + loop_length) // width, bool(flags & 3), flags & 3 == 2)
+                item.update(volume=volume, pan=round((pan - 128) * 127 / 128), transpose=relative + fine / 128)
+                samples.append(item)
+                data_at += length
+            for note, sample in enumerate(r.block(at + 33, 96)):
+                if sample >= count:
+                    r.fail(f"instrumento {index + 1}: mapa de samples inválido")
+                mapping[note] = first_sample + sample
+            at = data_at
+        else:
+            at += size
+        instruments.append({"map": mapping, "volume": 1, "note_map": list(range(96))})
+    return r, {"patterns": patterns, "order": order, "channels": channels, "samples": samples, "instruments": instruments,
+               "speed": r.number(76, 2), "tempo": r.number(78, 2), "global_volume": 1, "channel_volumes": [64] * channels, "pans": [0] * channels}
+
+
+def read_it_tracker(path):
+    r = ExtendedTrackerReader(path, "IT")
+    if r.block(0, 4) != b"IMPM":
+        r.fail("assinatura IMPM ausente")
+    counts = [r.number(at, 2) for at in (32, 34, 36, 38)]
+    orders, instrument_count, sample_count, pattern_count = counts
+    if not 1 <= orders <= 256 or instrument_count > 255 or sample_count > 255 or not 1 <= pattern_count <= 256:
+        r.fail("cabeçalho inválido")
+    r.block(192, orders + 4 * sum(counts[1:]))
+    raw_order = list(r.block(192, orders))
+    order = []
+    for value in raw_order:
+        if value == 255:
+            break
+        if value != 254:
+            if value >= pattern_count:
+                r.fail("sequência referencia padrão ausente")
+            order.append(value)
+    if not order:
+        r.fail("sequência vazia")
+    at = 192 + orders
+    pointers = [r.number(at + index * 4, 4) for index in range(sum(counts[1:]))]
+    instruments_at = pointers[:instrument_count]
+    samples_at = pointers[instrument_count:instrument_count + sample_count]
+    patterns_at = pointers[instrument_count + sample_count:]
+    patterns, used = [], set()
+    for index, loc in enumerate(patterns_at):
+        if not loc:
+            patterns.append([{} for _ in range(64)])
+            continue
+        length, rows = r.number(loc, 2), r.number(loc + 2, 2)
+        if not 1 <= rows <= 1024:
+            r.fail(f"padrão {index + 1}: quantidade de linhas inválida")
+        packed, cursor, row = r.block(loc + 8, length), 0, 0
+        masks, previous = [0] * 64, [[None, 0, None, 0, 0] for _ in range(64)]
+        cells = [{} for _ in range(rows)]
+        def byte():
+            nonlocal cursor
+            if cursor >= length:
+                r.fail("padrão IT truncado")
+            value = packed[cursor]
+            cursor += 1
+            return value
+        while row < rows:
+            token = byte()
+            if not token:
+                row += 1
+                continue
+            channel = (token - 1) & 63
+            if token & 128:
+                masks[channel] = byte()
+            mask, last = masks[channel], previous[channel]
+            cell = [None, 0, None, 0, 0]
+            for field, fresh, repeated in ((0, 1, 16), (1, 2, 32), (2, 4, 64)):
+                if mask & fresh:
+                    cell[field] = last[field] = byte()
+                elif mask & repeated:
+                    cell[field] = last[field]
+            if mask & 8:
+                cell[3] = last[3] = byte()
+                cell[4] = last[4] = byte()
+            elif mask & 128:
+                cell[3:5] = last[3:5]
+            if r.number(64 + channel) & 128 == 0:
+                if cell[0] is not None or cell[1] or cell[2] is not None or cell[3] or cell[4]:
+                    used.add(channel)
+                if cell[0] is not None and 120 <= cell[0] < 254:
+                    r.fail(f"padrão {index + 1}, linha {row + 1}, canal {channel + 1}: note fade ainda não suportado na ROM")
+                if cell[0] is not None and cell[0] >= 120:
+                    cell[0] = -1
+                cells[row][channel] = tuple(cell)
+        if cursor != length:
+            r.fail("padrão IT contém dados excedentes")
+        patterns.append(cells)
+    channel_map = sorted(used) or [0]
+    if len(channel_map) > 16:
+        r.fail("a engine aceita até 16 canais PCM")
+    patterns = [[ [row.get(channel, (None, 0, None, 0, 0)) for channel in channel_map] for row in pattern] for pattern in patterns]
+    samples = []
+    for index, loc in enumerate(samples_at):
+        if not loc:
+            samples.append({"samples": [], "volume": 0})
+            continue
+        if r.block(loc, 4) != b"IMPS":
+            r.fail(f"sample {index + 1}: assinatura inválida")
+        r.block(loc, 80)
+        flags, convert, length = r.number(loc + 18), r.number(loc + 46), r.number(loc + 48, 4)
+        if flags & 8:
+            r.fail(f"sample {index + 1}: compressão IT ainda não suportada na ROM")
+        if flags & (4 | 32 | 128) or convert & ~7:
+            r.fail(f"sample {index + 1}: estéreo, sustain ou conversão especial ainda não suportados na ROM")
+        if any(r.block(loc + 76, 4)):
+            r.fail(f"sample {index + 1}: vibrato automático ainda não suportado na ROM")
+        pcm = r.pcm(r.number(loc + 72, 4), length, 16 if flags & 2 else 8, bool(convert & 4), bool(convert & 1), bool(convert & 2)) if length and flags & 1 else []
+        start, end, rate = r.number(loc + 52, 4), r.number(loc + 56, 4), r.number(loc + 60, 4)
+        if not 1 <= rate <= 2097152:
+            r.fail(f"sample {index + 1}: frequência inválida")
+        item = r.sample(pcm, start, end, bool(flags & 16), bool(flags & 64), rate)
+        global_volume, default_volume, pan = r.number(loc + 17), r.number(loc + 19), r.number(loc + 47)
+        if global_volume > 64 or default_volume > 64 or pan & 127 > 64:
+            r.fail(f"sample {index + 1}: volume/panorama inválido")
+        item.update(volume=default_volume, gain=global_volume / 64, pan=round(((pan & 127) - 32) * 127 / 32) if pan & 128 else None, transpose=0)
+        samples.append(item)
+    instruments = []
+    if r.number(44, 2) & 4:
+        if r.number(42, 2) < 0x200:
+            r.fail("instrumentos anteriores a IT 2.00 ainda não suportados na ROM")
+        for index, loc in enumerate(instruments_at):
+            if not loc or r.block(loc, 4) != b"IMPI":
+                r.fail(f"instrumento {index + 1}: cabeçalho inválido")
+            r.block(loc, 554)
+            if r.number(loc + 17) or r.number(loc + 18) or r.number(loc + 19) or r.number(loc + 20, 2) or r.number(loc + 22) or any(r.number(loc + off) & 1 for off in (304, 386, 468)) or any(r.number(loc + off) for off in (26, 27, 28, 29)):
+                r.fail(f"instrumento {index + 1}: NNA, envelopes ou variações ainda não suportados na ROM")
+            mapping = [r.number(loc + 65 + note * 2) - 1 for note in range(120)]
+            notes = [r.number(loc + 64 + note * 2) for note in range(120)]
+            if any(sample >= len(samples) for sample in mapping) or any(note >= 120 for note in notes):
+                r.fail(f"instrumento {index + 1}: mapa de notas/samples inválido")
+            pan = r.number(loc + 25)
+            instruments.append({"map": [sample if sample >= 0 else None for sample in mapping], "note_map": notes, "volume": r.number(loc + 24) / 128,
+                                "pan": None if pan & 128 else round(((pan & 127) - 32) * 127 / 32)})
+    else:
+        instruments = [{"map": [i] * 120, "note_map": list(range(120)), "volume": 1} for i in range(len(samples))]
+    pans = []
+    for channel in channel_map:
+        pan = r.number(64 + channel) & 127
+        if pan > 64:
+            r.fail(f"canal {channel + 1}: surround ainda não suportado na ROM")
+        pans.append(round((pan - 32) * 127 / 32))
+    return r, {"patterns": patterns, "order": order, "channels": len(channel_map), "samples": samples, "instruments": instruments,
+               "speed": r.number(50), "tempo": r.number(51), "global_volume": r.number(48) / 128,
+               "channel_volumes": [r.number(128 + channel) for channel in channel_map], "pans": pans, "pan_separation": r.number(52) / 128}
+
+
+def compile_extended_tracker(r, song, duty=2):
+    """Keep channel state across order occurrences and retain all silent time."""
+    speed, tempo = song["speed"], song["tempo"]
+    if not 1 <= speed <= 255 or not 32 <= tempo <= 255 or not 0 <= song["global_volume"] <= 1 or any(v > 64 for v in song["channel_volumes"]):
+        r.fail("velocidade, andamento ou volume inválido")
+    samples, instruments, count = song["samples"], song["instruments"], song["channels"]
+    remembered = [0] * count
+    patterns, elapsed = [], 0.0
+    for pattern_index in song["order"]:
+        pattern, events, origin = song["patterns"][pattern_index], [], round(elapsed)
+        for row_index, cells in enumerate(pattern):
+            # Global speed/tempo is applied before timing or notes in this row.
+            for note, instrument, volume, effect, parameter in cells:
+                if r.format == "XM" and effect == 15 and parameter:
+                    if parameter < 32:
+                        speed = parameter
+                    else:
+                        tempo = parameter
+                elif r.format == "IT" and effect == 1 and parameter:
+                    speed = parameter
+                elif r.format == "IT" and effect == 20 and parameter >= 32:
+                    tempo = parameter
+            frame, row_notes = round(elapsed) - origin, []
+            for channel, (note, instrument, volume, effect, parameter) in enumerate(cells):
+                where = f"padrão {pattern_index + 1}, linha {row_index + 1}, canal {channel + 1}"
+                def unsupported(detail):
+                    r.fail(f"{where}: {detail} ainda não suportado na ROM")
+                if r.format == "XM":
+                    if effect not in (0, 8, 12, 15) or effect == 0 and parameter or effect == 15 and not parameter:
+                        unsupported(f"efeito {effect:02X}{parameter:02X}")
+                    if volume is not None and not 16 <= volume <= 80 and not 192 <= volume <= 207:
+                        unsupported(f"coluna de volume {volume:02X}")
+                else:
+                    if effect not in (0, 1, 20, 24) or effect == 20 and parameter < 32:
+                        unsupported(f"efeito {effect:02X}{parameter:02X}")
+                    if volume is not None and volume > 64 and not 128 <= volume <= 192:
+                        unsupported(f"coluna de volume {volume:02X}")
+                    if effect == 24 and parameter > 128:
+                        unsupported("surround")
+                if instrument:
+                    if instrument > len(instruments):
+                        r.fail(f"{where}: instrumento ausente")
+                    remembered[channel] = instrument
+                if note is None:
+                    if instrument or volume is not None or effect in ((8, 12) if r.format == "XM" else (24,)):
+                        unsupported("mudança de instrumento, volume ou panorama sem nota")
+                    continue
+                if note < 0:
+                    row_notes.append(tracker_sample_cut_note(samples, channel + 1, row_index, 1))
+                    continue
+                if not remembered[channel]:
+                    r.fail(f"{where}: nota sem instrumento")
+                instrument = instruments[remembered[channel] - 1]
+                sample_index = instrument["map"][note]
+                if sample_index is None or not samples[sample_index]["samples"]:
+                    row_notes.append(tracker_sample_cut_note(samples, channel + 1, row_index, 1))
+                    continue
+                sample = samples[sample_index]
+                pan = sample.get("pan")
+                if pan is None:
+                    pan = instrument.get("pan")
+                if pan is None:
+                    pan = song["pans"][channel]
+                gain_volume = sample["volume"]
+                if volume is not None:
+                    if r.format == "XM" and volume <= 80:
+                        gain_volume = volume - 16
+                    elif r.format == "IT" and volume <= 64:
+                        gain_volume = volume
+                    else:
+                        pan = round(((volume - (192 if r.format == "XM" else 128)) / (15 if r.format == "XM" else 64) * 2 - 1) * 127)
+                if r.format == "XM" and effect == 12:
+                    if parameter > 64:
+                        r.fail(f"{where}: volume inválido")
+                    gain_volume = parameter
+                if effect == (8 if r.format == "XM" else 24):
+                    pan = round((parameter / (255 if r.format == "XM" else 128) * 2 - 1) * 127)
+                pan = round(pan * song.get("pan_separation", 1))
+                relative = instrument["note_map"][note] - (48 if r.format == "XM" else 60) + sample.get("transpose", 0)
+                rate = round(sample["sample_rate_hz"] * 2 ** (relative / 12))
+                if not 1 <= rate <= 2097152:
+                    r.fail(f"{where}: frequência da nota fora do intervalo da engine")
+                gain = sample.get("gain", 1) * instrument["volume"] * song["global_volume"] * song["channel_volumes"][channel] / 64
+                row_notes.append({"channel": channel + 1, "frequency_hz": 440, "volume": max(0, min(15, round(gain_volume / 64 * gain * 15))),
+                                  "sample_index": sample_index, "sample_rate_hz": rate, "sample_only": True, "pan": max(-127, min(127, pan))})
+            if row_notes:
+                events.append((frame, row_notes))
+            elapsed += speed * 150 / tempo
+        end = round(elapsed) - origin
+        if not events or events[0][0] > 0:
+            events.insert(0, (0, []))
+        steps = []
+        for index, (frame, notes) in enumerate(events):
+            duration = (events[index + 1][0] if index + 1 < len(events) else end) - frame
+            for i, note in enumerate(notes):
+                step = dict(note, duty=duty, sample_only=True, duration_frames=min(255, duration) if i == len(notes) - 1 else 0)
+                steps.append(step)
+            remaining = duration - (min(255, duration) if notes else 0)
+            while remaining > 0:
+                chunk = min(255, remaining)
+                steps.append({"channel": 1, "frequency_hz": 64, "duration_frames": chunk, "volume": 0, "duty": duty})
+                remaining -= chunk
+        patterns.append({"steps": steps})
+    used_samples = sorted({step["sample_index"] for pattern in patterns for step in pattern["steps"] if step.get("sample_only")})
+    sample_map = {old: new for new, old in enumerate(used_samples)}
+    for pattern in patterns:
+        for step in pattern["steps"]:
+            if step.get("sample_only"):
+                step["sample_index"] = sample_map[step["sample_index"]]
+    return {"patterns": patterns, "order": list(range(len(patterns))), "samples": [samples[index] for index in used_samples]}
+
+
+def parse_xm_tracker(path, row_duration_frames=4, volume=8, duty=2):
+    r, song = read_xm_tracker(path)
+    return compile_extended_tracker(r, song, require_int(duty, "duty", 0, 3))
+
+
+def parse_it_tracker(path, row_duration_frames=4, volume=8, duty=2):
+    r, song = read_it_tracker(path)
+    return compile_extended_tracker(r, song, require_int(duty, "duty", 0, 3))
+
+
 def emit_audio_header(name, data, base_dir):
     sfx_assets = data.get("sfx", [])
     music_assets = data.get("music", [])
@@ -4454,6 +4856,11 @@ def emit_audio_header(name, data, base_dir):
             patterns = converted["patterns"]
             order = converted["order"]
             tracker_samples = converted.get("samples", [])
+        elif "xm" in asset or "it" in asset:
+            key = "xm" if "xm" in asset else "it"
+            parser = parse_xm_tracker if key == "xm" else parse_it_tracker
+            converted = parser(base_dir / asset[key], duty=asset.get("duty", 2))
+            patterns, order, tracker_samples = converted["patterns"], converted["order"], converted["samples"]
         elif "vgm" in asset:
             vgm_path = base_dir / asset["vgm"]
             converted = parse_vgm_tracker(
@@ -4585,7 +4992,7 @@ def emit_audio_header(name, data, base_dir):
             pattern_index = require_int(order_entry, "order", 0, len(pattern_symbols) - 1)
             lines.append(f"    {pattern_index},")
         loop = "true" if bool(asset.get("loop", False)) else "false"
-        sustain = "true" if "mod" in asset or "s3m" in asset else "false"
+        sustain = "true" if any(key in asset for key in ("mod", "s3m", "xm", "it")) else "false"
         lines.extend([
             "};",
             f"inline constexpr gbs::TrackerAsset {symbol}_asset = {{ {symbol}_patterns, {len(pattern_symbols)}, {symbol}_order, {len(order)}, {loop}, "
