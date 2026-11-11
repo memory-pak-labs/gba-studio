@@ -1032,7 +1032,7 @@ describe("Events workspace presentation", () => {
       "add_variable value 1",
       "if_variable value 10",
       "show_dialogue intro",
-      "show_choice intro",
+      "show_choice",
       "play_music theme.mod",
       "play_sfx theme.mod",
       "change_scene shop",
@@ -2283,8 +2283,8 @@ describe("Events workspace presentation", () => {
       steps: null
     });
     expect(suggestionsByID.get("command:dialogue.show")).toMatchObject({
-      command: "show_dialogue intro_001",
-      targetName: "intro_001",
+      command: "show_dialogue",
+      targetName: null,
       badge: "OK ROM",
       isRecipe: false
     });

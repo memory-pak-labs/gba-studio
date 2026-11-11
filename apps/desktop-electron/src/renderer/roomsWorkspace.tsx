@@ -1,3 +1,5 @@
+import { roomEntityFieldValidation } from "../shared/roomEntityFieldValidation";
+import { useWorkspaceState, useWorkspaceRef, useWorkspaceChangeEffect } from "./workspaceSessionState";
 import {RacingTrackOverlay} from "./RacingTrackOverlay";
 import {RacingTrackInspector} from "./RacingTrackInspector";
 import type {RacingTrackSelection} from "../shared/racingTrackEditing";
@@ -382,6 +384,7 @@ interface RoomsWorkspaceProps {
   projectPath?: string;
   sceneMapZoom?: number;
   assetRefreshToken?: number;
+  focusedEntityField?: "x" | "y" | "width" | "height";
   focusedTargetID?: string | null;
   focusedTargetName?: string | null;
   focusRequestID?: number | null;
@@ -2620,26 +2623,6 @@ function roomDetailsEditor(
   return (
     <div className="room-detail-editor" aria-label={ui("Editar {0}", { 0: roomLabel })}>
       {activeTab === "scene" ? <>
-      {["topdown", "platformer"].includes(room.sceneType) ? <MapStatesInspector value={room.mapStates ?? []}
-        width={room.width} height={room.height} sceneName={room.name}
-        onChange={mapStates => onUpdateRoomFields(room.id, { mapStates })} /> : null}
-      {resolvedRuntime.type === "racing" ? <RacingSceneInspector
-        onEditTrack={onEditRacingTrack}
-        config={normalizeRacingSceneConfig(resolvedRuntime.config)} width={room.width} height={room.height}
-        background={room.background??""} assets={backgroundOptions}
-        onChange={patch=>onUpdateRoomFields(room.id,{runtime:{type:"racing",config:{...runtime.config,...patch}},
-          ...(patch.pseudo3dVisuals?.floorTilemapId ? {backgroundAssetName:patch.pseudo3dVisuals.floorTilemapId} : {})})}
-        onPrepare={track=>onUpdateRoomFields(room.id,{...(normalizeRacingSceneConfig(resolvedRuntime.config).presentation==="pseudo3d"?{width:64,height:64}:{}),
-          runtime:{type:"racing",config:{...runtime.config,topdownTrack:track}}})}
-      /> : null}
-      {projectData ? <SceneRuntimeResourcesInspector sceneType={room.sceneType} roomName={room.name}
-        background={room.background ?? ""} config={resolvedRuntime.config} data={projectData}
-        onChange={config => onUpdateRoomFields(room.id, {
-          runtime: normalizeSceneRuntime(room.sceneType, { type: room.sceneType, config }),
-          ...(room.sceneType === "isometric" && config.pagedSurface?.backgroundAsset ? {
-            backgroundAssetName: config.pagedSurface.backgroundAsset, cameraMode: "follow_player"
-          } : {})
-        })} /> : null}
       <InspectorSection
         ariaLabel={ui("Essencial da cena")}
         className="room-detail-editor-span-2 scene-inspector-group scene-inspector-essential"
@@ -2665,7 +2648,6 @@ function roomDetailsEditor(
           </select>
         </label>
         {isometricCompositionMode ? <p className="room-detail-section-help">{ui("Este cenário possui uma composição de ")}{isometricCompositionMode === "adventure" ? ui("aventura") : ui("batalha tática")}{ui(". Para o outro tipo, crie uma cena usando Modelos.")}</p> : null}
-        {scenePreflight ? <SceneInspectorHealthSummary onOpenHealth={onOpenProjectHealth} report={scenePreflight} /> : null}
         <div className="scene-inspector-essential-fields">
           <label>
             <span>{["isometric", "dungeonCrawler"].includes(room.sceneType) ? ui("Largura (células)") : ui("Largura (tiles)")}</span>
@@ -2699,7 +2681,29 @@ function roomDetailsEditor(
             </select>
           </label>
         </div>
+        {scenePreflight ? <SceneInspectorHealthSummary onOpenHealth={onOpenProjectHealth} report={scenePreflight} /> : null}
       </InspectorSection>
+      {["topdown", "platformer"].includes(room.sceneType) ? <MapStatesInspector value={room.mapStates ?? []}
+        width={room.width} height={room.height} sceneName={room.name}
+        onChange={mapStates => onUpdateRoomFields(room.id, { mapStates })} /> : null}
+      {resolvedRuntime.type === "racing" ? <RacingSceneInspector
+        onEditTrack={onEditRacingTrack}
+        config={normalizeRacingSceneConfig(resolvedRuntime.config)} width={room.width} height={room.height}
+        background={room.background??""} assets={backgroundOptions}
+        onChange={patch=>onUpdateRoomFields(room.id,{runtime:{type:"racing",config:{...runtime.config,...patch}},
+          ...(patch.pseudo3dVisuals?.floorTilemapId ? {backgroundAssetName:patch.pseudo3dVisuals.floorTilemapId} : {})})}
+        onPrepare={track=>onUpdateRoomFields(room.id,{...(normalizeRacingSceneConfig(resolvedRuntime.config).presentation==="pseudo3d"?{width:64,height:64}:{}),
+          runtime:{type:"racing",config:{...runtime.config,topdownTrack:track}}})}
+      /> : null}
+      {projectData ? <SceneRuntimeResourcesInspector sceneType={room.sceneType} roomName={room.name}
+        background={room.background ?? ""} config={resolvedRuntime.config} data={projectData}
+        onChange={config => onUpdateRoomFields(room.id, {
+          runtime: normalizeSceneRuntime(room.sceneType, { type: room.sceneType, config }),
+          ...(room.sceneType === "isometric" && config.pagedSurface?.backgroundAsset ? {
+            backgroundAssetName: config.pagedSurface.backgroundAsset, cameraMode: "follow_player"
+          } : {})
+        })} /> : null}
+
 
       </> : null}
 
@@ -3469,6 +3473,7 @@ function RoomEntitiesEditor({
   const isMixedGroupEventContext = activeTab === "events" && hasMixedEntitySelection;
   const selectedEntityKey = selectedVisibleKeys.at(-1) ?? null;
   const selectedEntity = visibleEntities.find((entity) => entityKey(entity) === selectedEntityKey) ?? visibleEntities[0] ?? null;
+  const geometryFields = selectedEntity ? roomEntityFieldValidation(selectedEntity, room) : null;
   const selectedEntitySource = selectedEntity ? sourceRecordForRoomEntity(projectData, selectedEntity) : null;
   const ownerScene = Array.isArray(projectData?.scenas) ? projectData.scenas.find((scene) => scene.name === room.name) as Record<string, unknown> | undefined : undefined;
   const menuRuntimeConfig = room.runtime?.type === "menu" ? normalizeMenuSceneConfig(room.runtime.config) : null;
@@ -3536,11 +3541,11 @@ function RoomEntitiesEditor({
 
   return (
     <div className="room-entities-editor" aria-label={ui("Atores e triggers de {0}", { 0: roomLabel })}>
-      {activeTab !== "events" ? <div className="room-entities-header">
+      {activeTab !== "events" && (!isGeneralTab || resolvedSelectedKeys.length > 1 || !selectedEntity) ? <div className="room-entities-header">
         {resolvedSelectedKeys.length > 1 || !selectedEntity ? <strong>{inspectorKind === "actor" ? ui("Atores") : inspectorKind === "trigger" ? ui("Gatilhos") : ui("Atores e gatilhos")}</strong> : null}
         <div className="room-entity-batch-actions">
           {resolvedSelectedKeys.length > 1 || !selectedEntity ? <span>{resolvedSelectedKeys.length > 0 ? `${resolvedSelectedKeys.length}/${visibleEntities.length}` : visibleEntities.length}</span> : null}
-          {isPositionTab ? <div className="room-entity-tool-segment" role="group" aria-label={ui("Ferramenta de entidade")}>
+          {isPositionTab && !isGeneralTab ? <div className="room-entity-tool-segment" role="group" aria-label={ui("Ferramenta de entidade")}>
             {entityTools.map((tool) => (
               <button
                 aria-pressed={selectedEntityTool === tool.id}
@@ -3579,10 +3584,7 @@ function RoomEntitiesEditor({
               <button disabled={selectedVisibleKeys.length < 3} onClick={() => onDistributeRoomEntities(room.id, selectedVisibleKeys, "y")} type="button">{ui("Distribuir Y")}</button>
             </>
           ) : null}
-          {isGeneralTab ? <>
-            <button disabled={!canNudgeSelection || hasLockedSelection} onClick={() => onDuplicateRoomEntities(room.id, selectedVisibleKeys)} type="button">{ui("Duplicar")}</button>
-            <button className="danger-button" disabled={!canNudgeSelection || hasLockedSelection} onClick={() => onRemoveRoomEntities(room.id, selectedVisibleKeys)} type="button">{ui("Remover")}</button>
-          </> : null}
+
         </div>
       </div> : null}
       {isTriggerInspector && !selectedEntity ? (
@@ -3658,14 +3660,6 @@ function RoomEntitiesEditor({
                   ))}
                 </select>
               </label> : null}
-              {isPositionTab ? (
-                <InspectorVector2
-                  onChange={(axis, value) => onUpdateRoomEntity(selectedEntity.kind, selectedEntity.id, axis === "x" ? { x: value } : { y: value })}
-                  values={{ x: selectedEntity.x, y: selectedEntity.y }}
-                />
-              ) : null}
-              {activeTab === "area" || activeTab === "trigger" ? entityNumberInput("W", selectedEntity.width, (value) => onUpdateRoomEntity(selectedEntity.kind, selectedEntity.id, { width: value }), 1) : null}
-              {activeTab === "area" || activeTab === "trigger" ? entityNumberInput("H", selectedEntity.height, (value) => onUpdateRoomEntity(selectedEntity.kind, selectedEntity.id, { height: value }), 1) : null}
               {activeTab === "trigger" && selectedEntity.kind === "trigger" && room.sceneType === "pointAndClick" && projectData ? (
                 <PointClickTargetInspector key={selectedEntity.id} data={projectData} value={selectedEntitySource?.pointClick}
                   onChange={pointClick => onUpdateRoomEntity("trigger", selectedEntity.id, { pointClick })} />
@@ -3704,6 +3698,29 @@ function RoomEntitiesEditor({
                   {actorAnimationDirections.map((direction) => <option key={direction} value={direction}>{actorAnimationTokenLabel(direction, actorAnimationDirectionLabels)}</option>)}
                 </select>
               </label> : null}
+              {isPositionTab ? (
+                <InspectorVector2
+                  onChange={(axis, value) => onUpdateRoomEntity(selectedEntity.kind, selectedEntity.id, axis === "x" ? { x: value } : { y: value })}
+                  constraints={geometryFields?.limits} errors={geometryFields?.errors} unit={geometryFields?.unit}
+                  values={{ x: selectedEntity.x, y: selectedEntity.y }}
+                />
+              ) : null}
+              {activeTab === "area" || activeTab === "trigger" ? <InspectorNumber label="Largura" dataField="width" unit={geometryFields?.unit} preserveInvalidValue validationMessage={geometryFields?.errors.width} min={1} max={room.width} value={selectedEntity.width} onChange={value => onUpdateRoomEntity(selectedEntity.kind, selectedEntity.id, { width: value })} /> : null}
+              {activeTab === "area" || activeTab === "trigger" ? <InspectorNumber label="Altura" dataField="height" unit={geometryFields?.unit} preserveInvalidValue validationMessage={geometryFields?.errors.height} min={1} max={room.height} value={selectedEntity.height} onChange={value => onUpdateRoomEntity(selectedEntity.kind, selectedEntity.id, { height: value })} /> : null}
+          {isGeneralTab ? <div className="room-entity-tool-segment" role="group" aria-label={ui("Ferramenta de entidade")}>
+            {entityTools.map((tool) => (
+              <button
+                aria-pressed={selectedEntityTool === tool.id}
+                className={selectedEntityTool === tool.id ? "active" : ""}
+                disabled={!selectedEntity || hasLockedSelection}
+                key={tool.id}
+                onClick={() => setSelectedEntityTool(tool.id)}
+                type="button"
+              >
+                {ui(tool.label)}
+              </button>
+            ))}
+          </div> : null}
               {activeTab === "sprite" && selectedEntity.kind === "actor" ? (
                 <div className="room-actor-animation-selectors">
                   <label>
@@ -3773,7 +3790,7 @@ function RoomEntitiesEditor({
                 <InspectorSection
                   ariaLabel={ui("Vida do ator")}
                   className="room-actor-battle-section"
-                  defaultOpen
+                  defaultOpen={false}
                   persistKey={`rooms.entity.${selectedEntity.id}.health`}
                   title={ui("Vida do ator")}
                 >
@@ -7241,6 +7258,7 @@ export function RoomsWorkspace({
   sceneMapZoom,
   assetRefreshToken = 0,
   focusedTargetID,
+  focusedEntityField,
   focusedTargetName,
   focusRequestID,
   focusInspectorTab,
@@ -7313,41 +7331,41 @@ export function RoomsWorkspace({
   onResetPrefabOverrides
 }: RoomsWorkspaceProps): React.ReactElement {
   const ui = useStudioUiText();
-  const [selectedTileID, setSelectedTileID] = useState(1);
-  const [selectedTileStamp, setSelectedTileStamp] = useState<RoomTileStamp>({
+  const [selectedTileID, setSelectedTileID] = useWorkspaceState("rooms.selectedTileID", 1);
+  const [selectedTileStamp, setSelectedTileStamp] = useWorkspaceState<RoomTileStamp>("rooms.selectedTileStamp", {
     height: 1,
     tileIDs: [1],
     width: 1
   });
-  const [selectedTool, setSelectedTool] = useState<RoomTilePaintTool>("brush");
-  const [ghostPreviewEnabled, setGhostPreviewEnabled] = useState(true);
-  const [ghostOpacity, setGhostOpacity] = useState(0.65);
-  const [selectedEditMode, setSelectedEditMode] = useState<RoomCanvasEditMode>("select");
-  const [selectedToolPanelMode, setSelectedToolPanelMode] = useState<RoomEditorToolPanelMode>("select");
-  const [selectedCollisionType, setSelectedCollisionType] = useState<RoomCollisionType>("solid");
-  const [collisionPlacementMode, setCollisionPlacementMode] = useState<RoomCollisionPlacementMode>("brush");
-  const [selectedHeightLevel, setSelectedHeightLevel] = useState(0);
-  const [collisionHoverPreviewEnabled, setCollisionHoverPreviewEnabled] = useState(true);
-  const [selectedEntityTool, setSelectedEntityTool] = useState<RoomEntityCanvasTool>("move");
-  const [selectedHudComponentID, setSelectedHudComponentID] = useState<string | null>(null);
-  const [selectedRacingElement,setSelectedRacingElement]=useState<{roomID:string;selection:RacingTrackSelection}|null>(null);
-  const [racingAreaMode,setRacingAreaMode]=useState<"gates"|"events">("gates");
-  const [hudLibraryPresetID, setHudLibraryPresetID] = useState<string | null>(null);
-  const [editingSharedHudID, setEditingSharedHudID] = useState<string | null>(null);
-  const [hudViewMode, setHudViewMode] = useState<"edit" | "preview">("edit");
-  const [hudMenuScreenID, setHudMenuScreenID] = useState("");
-  const [sceneMenuScreenID, setSceneMenuScreenID] = useState("");
-  const [sceneMenuItemIndex, setSceneMenuItemIndex] = useState(0);
+  const [selectedTool, setSelectedTool] = useWorkspaceState<RoomTilePaintTool>("rooms.selectedTool", "brush");
+  const [ghostPreviewEnabled, setGhostPreviewEnabled] = useWorkspaceState("rooms.ghostPreviewEnabled", true);
+  const [ghostOpacity, setGhostOpacity] = useWorkspaceState("rooms.ghostOpacity", 0.65);
+  const [selectedEditMode, setSelectedEditMode] = useWorkspaceState<RoomCanvasEditMode>("rooms.selectedEditMode", "select");
+  const [selectedToolPanelMode, setSelectedToolPanelMode] = useWorkspaceState<RoomEditorToolPanelMode>("rooms.selectedToolPanelMode", "select");
+  const [selectedCollisionType, setSelectedCollisionType] = useWorkspaceState<RoomCollisionType>("rooms.selectedCollisionType", "solid");
+  const [collisionPlacementMode, setCollisionPlacementMode] = useWorkspaceState<RoomCollisionPlacementMode>("rooms.collisionPlacementMode", "brush");
+  const [selectedHeightLevel, setSelectedHeightLevel] = useWorkspaceState("rooms.selectedHeightLevel", 0);
+  const [collisionHoverPreviewEnabled, setCollisionHoverPreviewEnabled] = useWorkspaceState("rooms.collisionHoverPreviewEnabled", true);
+  const [selectedEntityTool, setSelectedEntityTool] = useWorkspaceState<RoomEntityCanvasTool>("rooms.selectedEntityTool", "move");
+  const [selectedHudComponentID, setSelectedHudComponentID] = useWorkspaceState<string | null>("rooms.selectedHudComponentID", null);
+  const [selectedRacingElement,setSelectedRacingElement]=useWorkspaceState<{roomID:string;selection:RacingTrackSelection}|null>("rooms.selectedRacingElement", null);
+  const [racingAreaMode,setRacingAreaMode]=useWorkspaceState<"gates"|"events">("rooms.racingAreaMode", "gates");
+  const [hudLibraryPresetID, setHudLibraryPresetID] = useWorkspaceState<string | null>("rooms.hudLibraryPresetID", null);
+  const [editingSharedHudID, setEditingSharedHudID] = useWorkspaceState<string | null>("rooms.editingSharedHudID", null);
+  const [hudViewMode, setHudViewMode] = useWorkspaceState<"edit" | "preview">("rooms.hudViewMode", "edit");
+  const [hudMenuScreenID, setHudMenuScreenID] = useWorkspaceState("rooms.hudMenuScreenID", "");
+  const [sceneMenuScreenID, setSceneMenuScreenID] = useWorkspaceState("rooms.sceneMenuScreenID", "");
+  const [sceneMenuItemIndex, setSceneMenuItemIndex] = useWorkspaceState("rooms.sceneMenuItemIndex", 0);
   const [dialoguePreviewKey, setDialoguePreviewKey] = useState<string | null>(null);
-  const [canvasLayerVisibility, setCanvasLayerVisibilityState] = useState(defaultCanvasLayerVisibility);
-  const [canvasLayerLocks, setCanvasLayerLocks] = useState(defaultCanvasLayerLocks);
-  const [selectedConnectionTarget, setSelectedConnectionTarget] = useState("");
-  const [connectionEventName, setConnectionEventName] = useState("");
-  const [selectedEntityKeys, setSelectedEntityKeys] = useState<string[]>([]);
-  const [selectedConnectionIndex, setSelectedConnectionIndex] = useState<number | null>(null);
-  const [selectedCameraZoneID, setSelectedCameraZoneID] = useState<string | null>(null);
-  const [selectedConnectionZoneSide, setSelectedConnectionZoneSide] = useState<"exit" | "entry">("exit");
-  const [selectedSceneMapRoomName, setSelectedSceneMapRoomName] = useState<string | null>(null);
+  const [canvasLayerVisibility, setCanvasLayerVisibilityState] = useWorkspaceState("rooms.canvasLayerVisibility", defaultCanvasLayerVisibility);
+  const [canvasLayerLocks, setCanvasLayerLocks] = useWorkspaceState("rooms.canvasLayerLocks", defaultCanvasLayerLocks);
+  const [selectedConnectionTarget, setSelectedConnectionTarget] = useWorkspaceState("rooms.selectedConnectionTarget", "");
+  const [connectionEventName, setConnectionEventName] = useWorkspaceState("rooms.connectionEventName", "");
+  const [selectedEntityKeys, setSelectedEntityKeys] = useWorkspaceState<string[]>("rooms.selectedEntityKeys", []);
+  const [selectedConnectionIndex, setSelectedConnectionIndex] = useWorkspaceState<number | null>("rooms.selectedConnectionIndex", null);
+  const [selectedCameraZoneID, setSelectedCameraZoneID] = useWorkspaceState<string | null>("rooms.selectedCameraZoneID", null);
+  const [selectedConnectionZoneSide, setSelectedConnectionZoneSide] = useWorkspaceState<"exit" | "entry">("rooms.selectedConnectionZoneSide", "exit");
+  const [selectedSceneMapRoomName, setSelectedSceneMapRoomName] = useWorkspaceState<string | null>("rooms.selectedSceneMapRoomName", null);
   const [newNoteFocusID, setNewNoteFocusID] = useState<string | null>(null);
   const [noteMenu, setNoteMenu] = useState<{ left: number; top: number; x: number; y: number } | null>(null);
   const sceneNotes = useMemo(() => projectData ? readSceneNotes(projectData) : [], [projectData]);
@@ -7357,12 +7375,12 @@ export function RoomsWorkspace({
     window.addEventListener("keydown", close);
     return () => window.removeEventListener("keydown", close);
   }, [noteMenu]);
-  const [overviewView, setOverviewView] = useState<{ path?: string; mode: SceneMapViewMode } | null>(null);
+  const [overviewView, setOverviewView] = useWorkspaceState<{ path?: string; mode: SceneMapViewMode } | null>("rooms.overviewView", null);
   const overviewMode = overviewView && overviewView.path === projectPath ? overviewView.mode : readSceneMapViewMode(projectPath);
-  const [diagramNavigation, setDiagramNavigation] = useState<{ path?: string; zoom: number; positions: Record<string, SceneMapPosition> } | null>(null);
+  const [diagramNavigation, setDiagramNavigation] = useWorkspaceState<{ path?: string; zoom: number; positions: Record<string, SceneMapPosition> } | null>("rooms.diagramNavigation", null);
   const diagramZoom = diagramNavigation && diagramNavigation.path === projectPath ? diagramNavigation.zoom : 1;
   const diagramOverrides = useMemo(() => diagramNavigation && diagramNavigation.path === projectPath ? diagramNavigation.positions : readSceneDiagramPositions(projectPath), [diagramNavigation, projectPath]);
-  const [selectedCanvasCell, setSelectedCanvasCell] = useState<SelectedRoomCellState | null>(null);
+  const [selectedCanvasCell, setSelectedCanvasCell] = useWorkspaceState<SelectedRoomCellState | null>("rooms.selectedCanvasCell", null);
   const canvasStageRef = useRef<HTMLElement | null>(null);
   const canvasScrollRef = useRef<HTMLDivElement | null>(null);
   const canvasPointerRef = useRef<{ x: number; y: number } | null>(null);
@@ -7370,57 +7388,57 @@ export function RoomsWorkspace({
   const canvasWheelHandlerRef = useRef<(event: WheelEvent) => void>(() => undefined);
   const focusViewportHostRef = useRef<HTMLDivElement | null>(null);
   const [focusSceneMapRoomID, setFocusSceneMapRoomID] = useState<string | null>(null);
-  const [focusedSceneEditorRoomID, setFocusedSceneEditorRoomID] = useState<string | null>(null);
+  const [focusedSceneEditorRoomID, setFocusedSceneEditorRoomID] = useWorkspaceState<string | null>("rooms.focusedSceneEditorRoomID", null);
   const [pendingCreatedSceneFocusID, setPendingCreatedSceneFocusID] = useState<string | null>(null);
-  const [focusSceneZoom, setFocusSceneZoom] = useState(1);
-  useEffect(() => { setFocusSceneZoom(1); }, [focusedSceneEditorRoomID]);
+  const [focusSceneZoom, setFocusSceneZoom] = useWorkspaceState("rooms.focusSceneZoom", 1);
+  useWorkspaceChangeEffect(() => { setFocusSceneZoom(1); }, [focusedSceneEditorRoomID]);
   const [focusViewportAvailableSize, setFocusViewportAvailableSize] = useState<{ height: number; width: number }>({
     height: GBA_VIEWPORT_PIXELS.height,
     width: GBA_VIEWPORT_PIXELS.width
   });
   const [focusMinimapViewport, setFocusMinimapViewport] = useState({ height: 0, left: 0, top: 0, width: 0 });
-  const [focusMinimapVisible, setFocusMinimapVisible] = useState(true);
-  const [focusViewMode, setFocusViewMode] = useState<"viewport" | "map">("viewport");
+  const [focusMinimapVisible, setFocusMinimapVisible] = useWorkspaceState("rooms.focusMinimapVisible", true);
+  const [focusViewMode, setFocusViewMode] = useWorkspaceState<"viewport" | "map">("rooms.focusViewMode", "viewport");
   const focusViewModeRef = useRef(focusViewMode);
   focusViewModeRef.current = focusViewMode;
   const focusViewportScaleRef = useRef(1);
-  const [focusCameraOrigin, setFocusCameraOrigin] = useState({ left: 0, top: 0 });
+  const [focusCameraOrigin, setFocusCameraOrigin] = useWorkspaceState("rooms.focusCameraOrigin", { left: 0, top: 0 });
   const focusCameraOriginRef = useRef(focusCameraOrigin);
   focusCameraOriginRef.current = focusCameraOrigin;
-  const focusInitialCameraRoomRef = useRef<string | null>(null);
+  const focusInitialCameraRoomRef = useWorkspaceRef<string | null>("rooms.focusInitialCameraRoomRef", null);
   const [sceneMapDragPreview, setSceneMapDragPreview] = useState<{ position: SceneMapPosition; roomName: string } | null>(null);
   const [isCanvasPanning, setIsCanvasPanning] = useState(false);
   const [roomNamePrompt, setRoomNamePrompt] = useState<RoomNamePromptState | null>(null);
   const [explorerContextMenu, setExplorerContextMenu] = useState<ExplorerContextMenuState | null>(null);
-  const [sceneSearchQuery, setSceneSearchQuery] = useState("");
-  const [sceneMultiSelectMode, setSceneMultiSelectMode] = useState(false);
-  const [selectedSceneIDs, setSelectedSceneIDs] = useState<Set<string>>(new Set());
-  const [lastSelectedSceneID, setLastSelectedSceneID] = useState<string | null>(null);
-  const [expandedSceneGroupIDs, setExpandedSceneGroupIDs] = useState<Set<string>>(new Set());
+  const [sceneSearchQuery, setSceneSearchQuery] = useWorkspaceState("rooms.sceneSearchQuery", "");
+  const [sceneMultiSelectMode, setSceneMultiSelectMode] = useWorkspaceState("rooms.sceneMultiSelectMode", false);
+  const [selectedSceneIDs, setSelectedSceneIDs] = useWorkspaceState<Set<string>>("rooms.selectedSceneIDs", new Set());
+  const [lastSelectedSceneID, setLastSelectedSceneID] = useWorkspaceState<string | null>("rooms.lastSelectedSceneID", null);
+  const [expandedSceneGroupIDs, setExpandedSceneGroupIDs] = useWorkspaceState<Set<string>>("rooms.expandedSceneGroupIDs", new Set());
   const [draggedSceneID, setDraggedSceneID] = useState<string | null>(null);
   const [draggedSceneIDs, setDraggedSceneIDs] = useState<string[]>([]);
   const [dragOverSceneID, setDragOverSceneID] = useState<string | null>(null);
   const [dragOverSceneGroupID, setDragOverSceneGroupID] = useState<string | null>(null);
-  const [railExpanded, setRailExpanded] = useState<EditorRailExpandState>(defaultEditorRailExpandState);
-  const [expandedSceneIDs, setExpandedSceneIDs] = useState<Set<string>>(
+  const [railExpanded, setRailExpanded] = useWorkspaceState<EditorRailExpandState>("rooms.railExpanded", defaultEditorRailExpandState);
+  const [expandedSceneIDs, setExpandedSceneIDs] = useWorkspaceState<Set<string>>("rooms.expandedSceneIDs",
     () => new Set(presentation?.rooms.filter((room) => room.isActive).map((room) => room.id) ?? [])
   );
-  const [navigatorTab, setNavigatorTab] = useState<"project" | "prefabs" | "logic">("project");
-  const [prefabQuery, setPrefabQuery] = useState("");
-  const [selectedArrivalID, setSelectedArrivalID] = useState<string | null>(null);
-  const [testArrivalID, setTestArrivalID] = useState<string>("");
-  useEffect(() => { setSelectedArrivalID(null); setTestArrivalID(""); }, [focusedSceneEditorRoomID]);
-  const [logicSelection, setLogicSelection] = useState<LogicSelection | null>(null);
-  useEffect(() => { setLogicSelection(null); setNavigatorTab("project"); }, [projectPath]);
-  const [inspectorTabByContext, setInspectorTabByContext] = useState<Partial<Record<RoomInspectorContextKind, RoomInspectorTabID>>>({});
-  const appliedFocusRequestKey = useRef<string | null>(null);
-  const appliedEventFocusRequestID = useRef<number | null>(null);
+  const [navigatorTab, setNavigatorTab] = useWorkspaceState<"project" | "prefabs" | "logic">("rooms.navigatorTab", "project");
+  const [prefabQuery, setPrefabQuery] = useWorkspaceState("rooms.prefabQuery", "");
+  const [selectedArrivalID, setSelectedArrivalID] = useWorkspaceState<string | null>("rooms.selectedArrivalID", null);
+  const [testArrivalID, setTestArrivalID] = useWorkspaceState<string>("rooms.testArrivalID", "");
+  useWorkspaceChangeEffect(() => { setSelectedArrivalID(null); setTestArrivalID(""); }, [focusedSceneEditorRoomID]);
+  const [logicSelection, setLogicSelection] = useWorkspaceState<LogicSelection | null>("rooms.logicSelection", null);
+  useWorkspaceChangeEffect(() => { setLogicSelection(null); setNavigatorTab("project"); }, [projectPath]);
+  const [inspectorTabByContext, setInspectorTabByContext] = useWorkspaceState<Partial<Record<RoomInspectorContextKind, RoomInspectorTabID>>>("rooms.inspectorTabByContext", {});
+  const appliedFocusRequestKey = useWorkspaceRef<string | null>("rooms.appliedFocusRequestKey", null);
+  const appliedEventFocusRequestID = useWorkspaceRef<number | null>("rooms.appliedEventFocusRequestID", null);
   const canvasWorldRef = useRef<HTMLDivElement | null>(null);
   const sceneMapCardDrag = useRef<SceneMapCardDragState | null>(null);
   const sceneMapCardFrameRefs = useRef<Record<string, HTMLDivElement | null>>({});
   const canvasPanDrag = useRef<CanvasPanDragState | null>(null);
 
-  useEffect(() => {
+  useWorkspaceChangeEffect(() => {
     setSelectedHudComponentID(null);
     setHudLibraryPresetID(null);
     setEditingSharedHudID(null);
@@ -7457,19 +7475,20 @@ export function RoomsWorkspace({
     if (!presentation || (!focusedTargetID && !focusedTargetName)) return;
     const requestKey = `${focusRequestID ?? "none"}:${focusedTargetID ?? ""}:${focusedTargetName ?? ""}`;
     if (appliedFocusRequestKey.current === requestKey) return;
+    const entity = presentation.entities.find(candidate => candidate.id === focusedTargetID);
     const room = presentation.rooms.find((candidate) => (
-      candidate.id === focusedTargetID ||
-      candidate.name === focusedTargetName
+      candidate.id === focusedTargetID || candidate.name === focusedTargetName || candidate.name === entity?.roomName
     ));
     if (!room) return;
 
     appliedFocusRequestKey.current = requestKey;
-    if (focusInspectorTab) {
+    if (focusInspectorTab || entity) {
       setFocusedSceneEditorRoomID(room.id);
       setSelectedSceneMapRoomName(room.name);
       setSelectedConnectionIndex(null);
     }
-    setSelectedEntityKeys([]);
+    setSelectedEntityKeys(entity ? [entityKey(entity)] : []);
+    if (entity) setInspectorTabByContext(current => ({ ...current, [entity.kind]: entity.kind }));
     setSelectedCanvasCell(null);
     const focusCollision = focusInspectorTab === "collision" && sceneTypeProfile(room.sceneType).editorTools.includes("collision");
     setSelectedEditMode(focusCollision ? "collision" : "select");
@@ -7479,6 +7498,16 @@ export function RoomsWorkspace({
       onSetActiveRoom(room.id, room.name);
     }
   }, [focusRequestID, focusedTargetID, focusedTargetName, focusInspectorTab, presentation]);
+
+  useEffect(() => {
+    if (!focusedEntityField || !focusedTargetID) return;
+    let second = 0;
+    const first = requestAnimationFrame(() => { second = requestAnimationFrame(() => {
+      const input = document.querySelector<HTMLInputElement>(`.rooms-inspector [data-entity-field="${focusedEntityField}"]`);
+      input?.scrollIntoView({ block: "center" }); input?.focus({ preventScroll: true });
+    }); });
+    return () => { cancelAnimationFrame(first); cancelAnimationFrame(second); };
+  }, [focusedEntityField, focusedTargetID, focusRequestID]);
 
   const activeRoom = presentation?.rooms.find((room) => room.isActive) ?? presentation?.rooms[0] ?? null;
   const preflightSceneName = presentation?.rooms.find(room => room.name === selectedSceneMapRoomName)?.name ?? activeRoom?.name;
@@ -10294,7 +10323,7 @@ export function RoomsWorkspace({
                 onPointerMoveCapture={rememberCanvasPointer}
                 onPointerUp={endRoomsCanvasPan}
                 onPointerCancel={endRoomsCanvasPan}
-                ref={canvasScrollRef}
+                ref={canvasScrollRef} data-workspace-scroll="rooms-canvas"
                 style={focusViewportGeometry ? {
                   height: `${focusViewportGeometry.viewportHeight}px`,
                   width: `${focusViewportGeometry.viewportWidth}px`
@@ -10588,11 +10617,30 @@ export function RoomsWorkspace({
                     <p>{inspectorSubtitle}</p>
                   </div>
                   <div className="rooms-inspector-header-badges">
+                    {inspectorContext.kind === "entity" ? <details className="inspector-actions-menu" key={selectedEntityKeys.join(",")}
+                      onKeyDown={event => { if (event.key === "Escape") { event.stopPropagation(); event.preventDefault(); event.currentTarget.open = false; event.currentTarget.querySelector("summary")?.focus(); } }}>
+                      <summary aria-label={ui("Ações do item selecionado")} title={ui("Ações do item selecionado")}><MoreHorizontal aria-hidden="true" size={18} /></summary>
+                      <div role="menu" aria-label={ui("Manutenção da seleção")}>
+                        <button type="button" role="menuitem" disabled={selectedEntityKeys.some(key => lockedEntityKeys.has(key))}
+                          onClick={event => { event.currentTarget.closest("details")?.removeAttribute("open"); onDuplicateRoomEntities(inspectorRoom.id, selectedEntityKeys); }}>{ui("Duplicar")}</button>
+                        <button type="button" role="menuitem" className="danger-button" disabled={selectedEntityKeys.some(key => lockedEntityKeys.has(key))}
+                          onClick={event => { event.currentTarget.closest("details")?.removeAttribute("open"); onRemoveRoomEntities(inspectorRoom.id, selectedEntityKeys); }}>{ui("Remover")}</button>
+                      </div>
+                    </details> : null}
                     {inspectorRoleBadge ? <em>{inspectorRoleBadge}</em> : null}
                     {inspectorContext.kind === "room" && markerText(inspectorRoom.isActive, inspectorRoom.isStart) ? <em>{markerText(inspectorRoom.isActive, inspectorRoom.isStart)?.split(" · ").map(part => ui(part)).join(" · ")}</em> : null}
                     {focusedEditorRoom && inspectorContext.kind !== "room" ? <button className="room-inspector-scene-return" aria-label={ui("Propriedades da cena")}
                       title={ui("Propriedades da cena")} onClick={openFocusedSceneInspector} type="button"><MapIcon aria-hidden="true" size={15}/></button> : null}
                   </div>
+                </div>
+                <div className="inspector-editing-scope" aria-label={ui("Alcance das alterações")}>
+                  {activeInspectorTab === "hud" && (hudLibraryPreset ?? hudAppliedBinding?.preset ?? inspectorHudBinding?.preset) ? (() => {
+                    const preset = (hudLibraryPreset ?? hudAppliedBinding?.preset ?? inspectorHudBinding?.preset)!;
+                    const count = projectData ? hudPresetUsages(projectData, preset.id).length : 0;
+                    const shared = preset.id === hudPresentation?.activePresetId || (projectData && hudPresetUsages(projectData, preset.id).some(use => use.id !== inspectorRoom.id));
+                    return <><strong>{preset.name}</strong><span>{hudLibraryPreset ? ui("Prévia da biblioteca · ") : ""}{preset.builtIn ? ui("Modelo integrado · personalize para editar") : shared ? ui("Preset compartilhado · {0} cena(s)", { 0: count }) : ui("Somente nesta cena")}</span></>;
+                  })() : activeInspectorTab === "dialogues" ? <span>{ui("Falas compartilhadas no projeto")}</span>
+                    : <span>{ui("Somente nesta cena")}</span>}
                 </div>
                 {visibleInspectorTabs.length ? <RoomInspectorNavigation
                   key={inspectorContextKind}
@@ -10614,6 +10662,7 @@ export function RoomsWorkspace({
               <div
                 aria-labelledby={activeInspectorTab ? `rooms-inspector-tab-${activeInspectorTab}` : undefined}
                 className="rooms-inspector-tab-panel"
+                data-workspace-scroll="rooms-inspector-panel"
                 id={activeInspectorTab ? `rooms-inspector-panel-${activeInspectorTab}` : undefined}
                 role={activeInspectorTab ? "tabpanel" : undefined}
               >

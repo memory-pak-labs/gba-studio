@@ -105,6 +105,29 @@ async function openCanvasLayers(user: ReturnType<typeof userEvent.setup>): Promi
 }
 
 describe("RoomsWorkspace React smoke", () => {
+  it("puts essential scene fields before map states and keeps actor maintenance in its header", async () => {
+    const user = userEvent.setup();
+    const project = createBlankProjectWithScene({ name: "Inspector hierarchy" });
+    const room = deriveRoomsWorkspacePresentation(project).rooms[0]!;
+    project.actors = [{ id: "player", name: "Player", roomName: room.name, x: 1, y: 1 }, { id: "guard", name: "Guard", roomName: room.name, x: 2, y: 3 }];
+    const handlers = roomsWorkspaceHandlers();
+    const { container } = render(<RoomsWorkspace projectData={project} presentation={deriveRoomsWorkspacePresentation(project)} {...handlers} />);
+    await openSceneInspector(user);
+    const essential = screen.getByRole("region", { name: "Essencial da cena" });
+    const states = screen.getByRole("region", { name: "Estados de mapa" });
+    expect(essential.compareDocumentPosition(states) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    await focusActiveScene(user);
+    await user.click(screen.getByRole("button", { name: "Ator Guard" }));
+    expect(screen.getByLabelText("Alcance das alterações")).toHaveTextContent("Somente nesta cena");
+    const sprite = screen.getByLabelText("Sprite do ator");
+    const position = screen.getByRole("spinbutton", { name: "X" });
+    expect(sprite.compareDocumentPosition(position) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(container.querySelector('details.room-actor-battle-section')).not.toHaveAttribute("open");
+    await user.click(screen.getByLabelText("Ações do item selecionado"));
+    await user.click(screen.getByRole("menuitem", { name: "Duplicar" }));
+    expect(handlers.onDuplicateRoomEntities).toHaveBeenCalledWith(room.id, ["actor:guard"]);
+  });
+
   it("commits an entity name from the Object inspector", async () => {
     const user=userEvent.setup();
     const project=createBlankProjectWithScene({name:"Entity names"});
@@ -2281,8 +2304,8 @@ describe("RoomsWorkspace React smoke", () => {
 
     expect(screen.getByRole("tab", { name: "Objeto" })).toHaveAttribute("aria-selected", "true");
     expect(screen.getByLabelText("X")).toHaveValue(2);
-    expect(screen.getByLabelText("W")).toHaveValue(2);
-    expect(screen.getByLabelText("H")).toHaveValue(1);
+    expect(screen.getByLabelText("Largura")).toHaveValue(2);
+    expect(screen.getByLabelText("Altura")).toHaveValue(1);
     expect(screen.queryByRole("tab", { name: "Área" })).not.toBeInTheDocument();
     expect(screen.queryByText("Atributos do trigger")).not.toBeInTheDocument();
     expect(screen.queryByText("Trigger selecionado")).not.toBeInTheDocument();

@@ -1,3 +1,4 @@
+import { useWorkspaceState, useWorkspaceRef, useWorkspaceChangeEffect } from "./workspaceSessionState";
 import { readStoredLocale } from "./i18n";
 import { uiText as ui, useStudioUiText } from "./studioUiText";
 import { useEffect, useMemo, useRef, useState, type CSSProperties, type Dispatch, type KeyboardEvent, type MouseEvent, type PointerEvent, type SetStateAction } from "react";
@@ -1859,30 +1860,30 @@ export function SpritesWorkspace({
 }: SpritesWorkspaceProps): React.ReactElement {
   const ui = useStudioUiText();
   const [sheetImageSizes, setSheetImageSizes] = useState<Record<string, { width: number; height: number }>>({});
-  const [selectedAnimationID, setSelectedAnimationID] = useState<string | null>(null);
-  const [selectedSheetName, setSelectedSheetName] = useState<string | null>(null);
+  const [selectedAnimationID, setSelectedAnimationID] = useWorkspaceState<string | null>("sprites.selectedAnimationID", null);
+  const [selectedSheetName, setSelectedSheetName] = useWorkspaceState<string | null>("sprites.selectedSheetName", null);
   const [contextMenu, setContextMenu] = useState<SpriteContextMenuState | null>(null);
-  const [selectedMetaspriteFrameIndex, setSelectedMetaspriteFrameIndex] = useState(0);
-  const [selectedMetaspriteTileIndex, setSelectedMetaspriteTileIndex] = useState(0);
-  const [selectedMetaspriteTileIndexes, setSelectedMetaspriteTileIndexes] = useState<number[]>([]);
-  const [spriteSheetInteractionMode, setSpriteSheetInteractionMode] = useState<SpriteSheetInteractionMode>("frames");
-  const [activeSpriteMode, setActiveSpriteMode] = useState<SpriteAnimatorMode>("select");
-  const [activeInspectorTab, setActiveInspectorTab] = useState<SpriteInspectorTab>("animation");
-  const [spriteCanvasZoom, setSpriteCanvasZoom] = useState(8);
+  const [selectedMetaspriteFrameIndex, setSelectedMetaspriteFrameIndex] = useWorkspaceState("sprites.selectedMetaspriteFrameIndex", 0);
+  const [selectedMetaspriteTileIndex, setSelectedMetaspriteTileIndex] = useWorkspaceState("sprites.selectedMetaspriteTileIndex", 0);
+  const [selectedMetaspriteTileIndexes, setSelectedMetaspriteTileIndexes] = useWorkspaceState<number[]>("sprites.selectedMetaspriteTileIndexes", []);
+  const [spriteSheetInteractionMode, setSpriteSheetInteractionMode] = useWorkspaceState<SpriteSheetInteractionMode>("sprites.spriteSheetInteractionMode", "frames");
+  const [activeSpriteMode, setActiveSpriteMode] = useWorkspaceState<SpriteAnimatorMode>("sprites.activeSpriteMode", "select");
+  const [activeInspectorTab, setActiveInspectorTab] = useWorkspaceState<SpriteInspectorTab>("sprites.activeInspectorTab", "animation");
+  const [spriteCanvasZoom, setSpriteCanvasZoom] = useWorkspaceState("sprites.spriteCanvasZoom", 8);
   const [composerStageSize, setComposerStageSize] = useState<{ width: number; height: number } | null>(null);
-  const pendingSpriteCanvasAutoFitRef = useRef(true);
+  const pendingSpriteCanvasAutoFitRef = useWorkspaceRef("sprites.pendingAutoFit", true);
   const activeSheetButtonRef = useRef<HTMLButtonElement>(null);
-  const [showSpriteGrid, setShowSpriteGrid] = useState(true);
-  const [showSpriteOrigin, setShowSpriteOrigin] = useState(true);
-  const [showSpriteHitbox, setShowSpriteHitbox] = useState(true);
-  const [showSpriteOnionSkin, setShowSpriteOnionSkin] = useState(false);
+  const [showSpriteGrid, setShowSpriteGrid] = useWorkspaceState("sprites.showSpriteGrid", true);
+  const [showSpriteOrigin, setShowSpriteOrigin] = useWorkspaceState("sprites.showSpriteOrigin", true);
+  const [showSpriteHitbox, setShowSpriteHitbox] = useWorkspaceState("sprites.showSpriteHitbox", true);
+  const [showSpriteOnionSkin, setShowSpriteOnionSkin] = useWorkspaceState("sprites.showSpriteOnionSkin", false);
   const [isSpritePlaybackRunning, setIsSpritePlaybackRunning] = useState(false);
   const [animationElapsedMs, setAnimationElapsedMs] = useState(0);
-  const [searchQuery, setSearchQuery] = useState("");
-  const [validationOpen, setValidationOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useWorkspaceState("sprites.searchQuery", "");
+  const [validationOpen, setValidationOpen] = useWorkspaceState("sprites.validationOpen", false);
   const [paintBrushByAnimation, setPaintBrushByAnimation] = useState<Record<string, SpritePaintBrushState>>({});
-  const [paletteSourceKind, setPaletteSourceKind] = useState<SpritePaletteSourceKind>("sheet");
-  const [paletteReferenceId, setPaletteReferenceId] = useState<string | null>(null);
+  const [paletteSourceKind, setPaletteSourceKind] = useWorkspaceState<SpritePaletteSourceKind>("sprites.paletteSourceKind", "sheet");
+  const [paletteReferenceId, setPaletteReferenceId] = useWorkspaceState<string | null>("sprites.paletteReferenceId", null);
   const playbackDirectionRef = useRef<1 | -1>(1);
   const activeSelection = useMemo(
     () => presentation ? resolveActiveSpriteAnimation(presentation, selectedAnimationID) : null,
@@ -1921,8 +1922,12 @@ export function SpritesWorkspace({
     return resolveSpriteWorkspaceCanvasFrame(autoFitPreviewAnimation, frameIndex);
   }, [autoFitPreviewAnimation, selectedMetaspriteFrameIndex]);
 
+  const appliedAssetFocus = useWorkspaceRef("sprites.appliedAssetFocus", "");
   useEffect(() => {
     if (!presentation || !focusedAssetName) return;
+    const request = `${focusRequestID ?? 0}:${focusedAssetName}`;
+    if (appliedAssetFocus.current === request) return;
+    appliedAssetFocus.current = request;
     const sheet = presentation.spriteSheets.find((candidate) => candidate.name === focusedAssetName);
     const reference = presentation.references.find((candidate) => (
       candidate.assetName === focusedAssetName ||
@@ -1956,7 +1961,7 @@ export function SpritesWorkspace({
     }
   }, [activeSpriteMode, spriteSheetInteractionMode]);
 
-  useEffect(() => {
+  useWorkspaceChangeEffect(() => {
     pendingSpriteCanvasAutoFitRef.current = true;
   }, [autoFitPreviewAnimation?.id, autoFitPreviewFrame?.width, autoFitPreviewFrame?.height, selectedSheetName]);
 
@@ -2259,7 +2264,7 @@ export function SpritesWorkspace({
       )}
 
       <div className="sprites-layout">
-        <aside className="sprites-rail" aria-label={ui("Biblioteca de sprites")}>
+        <aside data-workspace-scroll="sprites-rail" className="sprites-rail" aria-label={ui("Biblioteca de sprites")}>
           <div className="sprite-library-title sprites-library-heading">
             <strong>{ui("Sprites")}</strong><span>{presentation.spriteSheets.length}</span>
             <button aria-label={ui("Adicionar ator por PNG")} className="sprite-library-add-button" onClick={() => void onImportSpriteSheets()} title={ui("Importar sprite por PNG")} type="button"><Plus size={16} /></button>
@@ -2472,7 +2477,7 @@ export function SpritesWorkspace({
           {activeSheet ? (
             <SpritesEditorCenter
               bottomPane={(onCollapse) => (
-                <div className="sprites-editor-bottom-content is-stacked">
+                <div data-workspace-scroll="sprites-editor-bottom-content" className="sprites-editor-bottom-content is-stacked">
                   <section className="sprites-editor-tiles-row" aria-label={ui("Paleta de tiles")}>
                     <div className="sprites-editor-row-label">
                       <span>{paletteSourceKind === "reference" ? ui("Referência visual") : ui("Folha de sprites")}</span>
@@ -2602,7 +2607,7 @@ export function SpritesWorkspace({
               </div>
               <div
                 aria-labelledby={`sprites-inspector-tab-${activeInspectorTab}`}
-                className="sprites-inspector-tab-panel"
+                data-workspace-scroll="sprites-inspector-tab-panel" className="sprites-inspector-tab-panel"
                 id={`sprites-inspector-panel-${activeInspectorTab}`}
                 role="tabpanel"
               >

@@ -618,7 +618,7 @@
 .event-node-title {
   font-size: var(--studio-font-size-md);
 }
-.audio-creation-assistant > button span,
+.audio-creation-assistant button span,
 .audio-shortcuts,
 .audio-narrative-placement span,
 .settings-search label,
@@ -1598,3 +1598,7 @@
 .wav-editor-ruler { font-size: var(--studio-font-size-xs); }
 .wav-editor-ranges output { font-size: var(--studio-font-size-sm); }
 .wav-editor-pan { font-size: var(--studio-font-size-sm); }
+
+/* Context, validation and shared resource scope in the editor. */
+.dialogue-scope-notice, .project-problem-technical summary { font-size: var(--studio-font-size-xs); }
+.inspector-editing-scope, .audio-card-header em { font-size: var(--studio-font-size-2xs); }

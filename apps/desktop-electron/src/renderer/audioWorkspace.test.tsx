@@ -267,8 +267,36 @@ describe("AudioWorkspace React", () => {
     expect(screen.getByText(/Espaço.*tocar.*parar/)).toBeInTheDocument();
 
     await user.click(screen.getByRole("button", { name: "Criar áudio" }));
-    await user.click(screen.getByRole("button", { name: "Música em loop" }));
-    expect(onCreateAudio).toHaveBeenCalledWith("Musica");
+    await user.click(screen.getByText("Mais opções"));
+    await user.click(screen.getByRole("button", { name: "Música PSG" }));
+    expect(onCreateAudio).toHaveBeenCalledWith("Musica", "PSG");
+  });
+
+  it("ancora Novo áudio no botão e mantém o painel dentro da janela", async () => {
+    const user = userEvent.setup();
+    const project = createAudioItemInProject(createBlankProjectData({ name: "Menu ancorado" }), {
+      id: "theme", kind: "Musica", name: "Tema"
+    });
+    render(<AudioWorkspace presentation={deriveAudioWorkspacePresentation(project)} {...audioWorkspaceHandlers()} />);
+    const trigger = screen.getByRole("button", { name: "Criar áudio" });
+    let bounds = { left: 180, top: 80, right: 214, bottom: 114, width: 34, height: 34 } as DOMRect;
+    const measure = vi.spyOn(trigger, "getBoundingClientRect").mockImplementation(() => bounds);
+    try {
+      await user.click(trigger);
+      const panel = screen.getByRole("dialog", { name: "Assistente de criação de áudio" });
+      expect(trigger).toHaveAttribute("aria-expanded", "true");
+      expect(panel).toHaveStyle({ left: "180px", top: "122px" });
+      bounds = { left: window.innerWidth - 50, top: window.innerHeight - 50, bottom: window.innerHeight - 16 } as DOMRect;
+      fireEvent.resize(window);
+      expect(parseFloat(panel.style.left) + 360).toBeLessThanOrEqual(window.innerWidth - 12);
+      expect(parseFloat(panel.style.top)).toBeLessThan(bounds.top);
+      await user.keyboard("{Escape}");
+      expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+      expect(trigger).toHaveFocus();
+      await user.click(trigger);
+      fireEvent.pointerDown(document.body);
+      expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    } finally { measure.mockRestore(); }
   });
 
   it("atribui musica a uma cena escolhida pelo nome", async () => {

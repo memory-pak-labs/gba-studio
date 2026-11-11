@@ -143,9 +143,10 @@ export function ProjectProblemsDrawer({ isOpen, onClose, onOpenProblem, problems
                     <span className="project-problem-content">
                       {problem.targetName && !problem.message.includes(problem.targetName) ? <strong>{problem.targetName}</strong> : null}
                       <span>{ui(problem.message)}</span>
-                      {problem.detail ? <small>{ui(problem.detail)}</small> : null}
+                      {problem.targetField ? <small>{ui("Ir ao campo")}</small> : problem.detail ? <small>{ui(problem.detail)}</small> : null}
                     </span>
                   </button>
+                  {problem.targetField && problem.detail ? <details className="project-problem-technical"><summary>{ui("Detalhes técnicos")}</summary><p>{ui(problem.detail)}</p></details> : null}
                   {problem.severity === "warning" ? (
                     <button
                       aria-label={t("shell.ignoreWarning", { message: ui(problem.message) })}

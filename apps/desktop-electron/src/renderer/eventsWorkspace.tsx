@@ -1,3 +1,6 @@
+import { EventDialogueParameter } from "./EventDialogueParameter";
+import type { DialogueEventTarget } from "../shared/dialogueAuthoring";
+import type { UpdateDialogueFields } from "../shared/dialoguesWorkspace";
 import { eventExecutionContract } from "../shared/eventExecutionContract";
 import { sceneChangeCommand, sceneChangeCommandParts } from "../shared/sceneChangeCommand";
 import { uiText as ui, useStudioUiText } from "./studioUiText";
@@ -90,6 +93,9 @@ import {
 export interface EventsWorkspaceProps {
   presentation: EventsWorkspacePresentation | null;
   projectData: GBAProjectData;
+  projectPath?: string;
+  onCreateDialogue?(target: DialogueEventTarget): Promise<string | null>;
+  onUpdateDialogue?(key: string, fields: UpdateDialogueFields): void;
   variables?: ProjectVariableEntry[];
   focusedEventName?: string | null;
   focusedEventRequestID?: number;
@@ -161,7 +167,7 @@ function commandWithParameterValue(command: string, parameter: EventsWorkspaceCo
   while (parts.length <= parameter.tokenIndex) {
     parts.push("");
   }
-  parts[parameter.tokenIndex] = safeValue || parameter.defaultValue || parameter.value;
+  parts[parameter.tokenIndex] = parameter.kind === "dialogue" || parameter.kind === "choiceDialogue" ? safeValue : safeValue || parameter.defaultValue || parameter.value;
   if (parts[0] === "change_scene" && (parameter.tokenIndex === 2 || parameter.tokenIndex === 3) && safeValue) {
     while (parts.length < 4) parts.push("");
     if (!parts[2]) parts[2] = "0";
@@ -302,8 +308,12 @@ function CommandSuggestionAccordion({
 
 function commandParameterInput(
   parameter: EventsWorkspaceCommandParameter,
-  onChange: (value: string) => void
+  onChange: (value: string) => void,
+  context: { props: EventsWorkspaceProps; target: DialogueEventTarget }
 ): React.ReactElement {
+  if (parameter.kind === "dialogue" || parameter.kind === "choiceDialogue") return <EventDialogueParameter
+    parameter={parameter} projectData={context.props.projectData} projectPath={context.props.projectPath} target={context.target}
+    onChange={onChange} onCreate={context.props.onCreateDialogue} onUpdate={context.props.onUpdateDialogue} />;
   const commonLabel = ui("{0} do evento", { 0: ui(parameter.label) });
   if (parameter.kind === "value" && parameter.options.some(option => option.startsWith("const("))) {
     const listID = `constant-values-${parameter.id}`;
@@ -857,7 +867,7 @@ function eventEditor(
                           props.onUpdateEventStep(event.id, step.index, {
                             command: commandWithParameterValue(step.command, parameter, value, step.commandParameters)
                           });
-                        })}
+                        }, { props, target: { eventID: event.id, stepIndex: step.index, command: step.command, tokenIndex: parameter.tokenIndex } })}
                       </Fragment>
                     ))}
                   </div>
@@ -958,7 +968,7 @@ function EventBlockInspector({
             <Fragment key={`${event.id}-${selectedStep.index}-${parameter.id}`}>
               {commandParameterInput(parameter, (value) => editorProps.onUpdateEventStep(event.id, selectedStep.index, {
                 command: commandWithParameterValue(selectedStep.command, parameter, value, selectedStep.commandParameters)
-              }))}
+              }), { props: editorProps, target: { eventID: event.id, stepIndex: selectedStep.index, command: selectedStep.command, tokenIndex: parameter.tokenIndex } })}
             </Fragment>
           ))}
         </div>
@@ -1029,6 +1039,7 @@ export function EventInspectorPanel({
   triggerLabel,
   presentation,
   projectData,
+  projectPath, onCreateDialogue, onUpdateDialogue,
   variables = [],
   onCreateEvent,
   onCreateVariable,
@@ -1163,6 +1174,7 @@ export function EventInspectorPanel({
   const editorProps: EventEditorProps = {
     presentation,
     projectData,
+    projectPath, onCreateDialogue, onUpdateDialogue,
     variables,
     onCreateEvent,
     onCreateVariable,
@@ -2529,6 +2541,7 @@ function EventGraphCanvas({
 export function EventsWorkspace({
   presentation,
   projectData,
+  projectPath, onCreateDialogue, onUpdateDialogue,
   variables = [],
   focusedEventName,
   focusedEventRequestID,
@@ -2807,6 +2820,7 @@ export function EventsWorkspace({
   const eventEditorProps = {
     presentation,
     projectData,
+    projectPath, onCreateDialogue, onUpdateDialogue,
     onCreateEvent,
     onUpdateEventFields,
     onAddEventStep,
@@ -3246,7 +3260,7 @@ export function EventsWorkspace({
                     <div className="event-command-parameter-row" key={`${selectedStepEvent.id}-${selectedStep.index}-${parameter.id}`}>
                       {commandParameterInput(parameter, (value) => onUpdateEventStep(selectedStepEvent.id, selectedStep.index, {
                         command: commandWithParameterValue(selectedStep.command, parameter, value, selectedStep.commandParameters)
-                      }))}
+                      }), { props: eventEditorProps, target: { eventID: selectedStepEvent.id, stepIndex: selectedStep.index, command: selectedStep.command, tokenIndex: parameter.tokenIndex } })}
                       {!parameter.isKnownValue && parameter.options.length ? (
                         <small>{ui("Valor fora dos recursos atuais.")}</small>
                       ) : null}

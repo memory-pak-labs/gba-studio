@@ -21,6 +21,9 @@ interface InspectorFieldProps {
 
 export interface InspectorNumberProps extends InspectorFieldProps {
   ariaLabel?: string;
+  preserveInvalidValue?: boolean;
+  validationMessage?: string;
+  dataField?: string;
   defaultValue?: number;
   disabled?: boolean;
   max?: number;
@@ -90,6 +93,7 @@ function InspectorPresets({
 
 export function InspectorNumber({
   ariaLabel,
+  preserveInvalidValue = false, validationMessage, dataField,
   className,
   description,
   disabled,
@@ -106,12 +110,13 @@ export function InspectorNumber({
   const ui = useStudioUiText();
   const inputID = useId();
   const descriptionID = useId();
+  const errorID = useId();
   const [draft, setDraft] = useState<string | null>(null);
-  const normalizedValue = clampInspectorValue(value, min, max);
+  const normalizedValue = preserveInvalidValue ? value : clampInspectorValue(value, min, max);
   const constraintText = inspectorConstraintText(min, max, step);
   const helpText = [constraintText, ui(description)].filter(Boolean).join(" · ");
   const hasOutOfRangeValue = Number.isFinite(value) && ((min !== undefined && value < min) || (max !== undefined && value > max));
-  const applyValue = (nextValue: number): void => onChange(clampInspectorValue(nextValue, min, max));
+  const applyValue = (nextValue: number): void => onChange(preserveInvalidValue ? nextValue : clampInspectorValue(nextValue, min, max));
   return (
     <label className={className ? `inspector-field inspector-number-field ${className}` : "inspector-field inspector-number-field"}>
       <span className="inspector-field-heading">
@@ -131,8 +136,9 @@ export function InspectorNumber({
       <span className="inspector-control-line">
         <input
           aria-label={ui(ariaLabel ?? label)}
-          aria-describedby={helpText ? descriptionID : undefined}
-          aria-invalid={hasOutOfRangeValue || undefined}
+          aria-describedby={[helpText ? descriptionID : "", validationMessage ? errorID : ""].filter(Boolean).join(" ") || undefined}
+          aria-invalid={Boolean(validationMessage) || hasOutOfRangeValue || undefined}
+          data-entity-field={dataField}
           disabled={disabled}
           id={inputID}
           max={max}
@@ -149,6 +155,7 @@ export function InspectorNumber({
         />
         {unit ? <span className="inspector-field-unit">{unit}</span> : null}
       </span>
+      {validationMessage ? <small id={errorID} className="field-validation-error" role="alert">{ui(validationMessage)}</small> : null}
       {presets ? <InspectorPresets disabled={disabled} label={label} onChange={applyValue} presets={presets} value={normalizedValue} /> : null}
       {helpText ? <small className="inspector-field-description" id={descriptionID}>{helpText}</small> : null}
     </label>
@@ -311,15 +318,18 @@ export interface InspectorVector2Props {
   labels?: [string, string];
   onChange: (axis: "x" | "y", value: number) => void;
   values: { x: number; y: number };
+  constraints?: Record<"x" | "y", { min: number; max: number }>;
+  errors?: Partial<Record<"x" | "y", string>>;
+  unit?: string;
 }
 
-export function InspectorVector2({ legend = "Posição", labels = ["X", "Y"], onChange, values }: InspectorVector2Props): React.ReactElement {
+export function InspectorVector2({ legend = "Posição", labels = ["X", "Y"], onChange, values, constraints, errors, unit }: InspectorVector2Props): React.ReactElement {
   const ui = useStudioUiText();
   return (
     <fieldset className="inspector-vector2">
       <legend>{ui(legend)}</legend>
-      <InspectorNumber label={labels[0]} onChange={(value) => onChange("x", value)} value={values.x} />
-      <InspectorNumber label={labels[1]} onChange={(value) => onChange("y", value)} value={values.y} />
+      <InspectorNumber label={labels[0]} {...constraints?.x} unit={unit} preserveInvalidValue={Boolean(constraints)} validationMessage={errors?.x} dataField="x" onChange={(value) => onChange("x", value)} value={values.x} />
+      <InspectorNumber label={labels[1]} {...constraints?.y} unit={unit} preserveInvalidValue={Boolean(constraints)} validationMessage={errors?.y} dataField="y" onChange={(value) => onChange("y", value)} value={values.y} />
     </fieldset>
   );
 }

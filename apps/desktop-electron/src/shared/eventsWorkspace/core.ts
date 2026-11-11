@@ -2363,9 +2363,9 @@ function commandTemplateContext(options: EventCommandResourceOptions): EventComm
     animation: firstOption(options.animation, "idle"),
     animationState: firstOption(options.animationState, "state_id"),
     background: firstOption(options.background, "background.png"),
-    choiceDialogue: firstOption(options.choiceDialogue, firstOption(options.dialogue, "intro_001")),
+    choiceDialogue: firstOption(options.choiceDialogue, ""),
     currentRoom: firstOption(options.currentRoom, "room_name"),
-    dialogue: firstOption(options.dialogue, "intro_001"),
+    dialogue: firstOption(options.dialogue, ""),
     event: firstOption(options.event, "intro_001"),
     music: firstOption(options.music, "theme.mod"),
     room: options.room[1] ?? firstOption(options.room, "room_name"),
@@ -2377,6 +2377,7 @@ function commandTemplateContext(options: EventCommandResourceOptions): EventComm
 }
 
 function resolveCommandTemplate(template: string, context: EventCommandTemplateContext): string {
+  if ((template.includes("{dialogue}") && !context.dialogue) || (template.includes("{choiceDialogue}") && !context.choiceDialogue)) return template.split(/\s+/)[0];
   const defaults: Record<string, string> = {
     stage: context.currentRoom, winner: "player1", amount: "0", style: "a-ism",
     move_id: "super", enabled: "true", seconds: "60", count: "2"

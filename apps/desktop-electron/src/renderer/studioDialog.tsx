@@ -3,6 +3,7 @@ import { X } from "lucide-react";
 import React, { createContext, useCallback, useContext, useEffect, useRef, useState } from "react";
 
 import { StudioButton } from "./studioUi";
+import { useModalFocus } from "./useModalFocus";
 
 export type StudioDialogVariant = "default" | "danger";
 
@@ -72,6 +73,8 @@ function StudioDialogSurface({
   const [promptValue, setPromptValue] = useState(state.kind === "prompt" ? state.defaultValue : "");
   const inputRef = useRef<HTMLInputElement>(null);
   const cancelRef = useRef<HTMLButtonElement>(null);
+  const surfaceRef = useRef<HTMLElement>(null);
+  useModalFocus(surfaceRef, state.kind === "prompt" ? inputRef : cancelRef);
   const [resolution, setResolution] = useState<"replace" | "unlink" | "">("");
   const [replacement, setReplacement] = useState("");
 
@@ -91,23 +94,6 @@ function StudioDialogSurface({
     });
     return () => window.cancelAnimationFrame(frame);
   }, [state]);
-
-  useEffect(() => {
-    function handleKeyDown(event: KeyboardEvent): void {
-      if (event.key === "Escape") {
-        event.preventDefault();
-        if (state.kind === "confirm") {
-          state.resolve(false);
-        } else {
-          state.resolve(null);
-        }
-        onClose();
-      }
-    }
-
-    window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [onClose, state]);
 
   const title = state.options.title ?? (state.kind === "prompt" ? "Informe o valor" : "Confirmar acao");
   const canResolveDeletion = state.kind === "deletion" && (
@@ -149,9 +135,15 @@ function StudioDialogSurface({
   return (
     <div className="modal-backdrop studio-dialog-backdrop" role="presentation" onMouseDown={handleCancel}>
       <section
+        ref={surfaceRef}
+        tabIndex={-1}
         aria-labelledby="studio-dialog-title"
         aria-modal="true"
         className="modal-card studio-dialog-card"
+        onKeyDown={(event) => {
+          event.stopPropagation();
+          if (event.key === "Escape") { event.preventDefault(); handleCancel(); }
+        }}
         onMouseDown={(event) => event.stopPropagation()}
         role="dialog"
       >
@@ -241,12 +233,16 @@ export function StudioDialogProvider({ children }: { children: React.ReactNode }
   const ui = useStudioUiText();
   const [dialogState, setDialogState] = useState<DialogState | null>(null);
   const queueRef = useRef<DialogState[]>([]);
+  const activeDialogRef = useRef<DialogState | null>(null);
+  const dialogSequenceRef = useRef(0);
 
   const pumpQueue = useCallback(() => {
-    setDialogState((current) => {
-      if (current) return current;
-      return queueRef.current.shift() ?? null;
-    });
+    if (activeDialogRef.current) return;
+    // Dequeue once in the action, never in a state updater replayed by StrictMode.
+    const next = queueRef.current.shift() ?? null;
+    activeDialogRef.current = next;
+    if (next) dialogSequenceRef.current++;
+    setDialogState(next);
   }, []);
 
   const enqueueDialog = useCallback((state: DialogState) => {
@@ -255,6 +251,7 @@ export function StudioDialogProvider({ children }: { children: React.ReactNode }
   }, [pumpQueue]);
 
   const closeDialog = useCallback(() => {
+    activeDialogRef.current = null;
     setDialogState(null);
     window.setTimeout(() => pumpQueue(), 0);
   }, [pumpQueue]);
@@ -283,7 +280,7 @@ export function StudioDialogProvider({ children }: { children: React.ReactNode }
   return (
     <StudioDialogContext.Provider value={value.current}>
       {children}
-      {dialogState ? <StudioDialogSurface state={dialogState} onClose={closeDialog} /> : null}
+      {dialogState ? <StudioDialogSurface key={dialogSequenceRef.current} state={dialogState} onClose={closeDialog} /> : null}
     </StudioDialogContext.Provider>
   );
 }
