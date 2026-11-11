@@ -23,6 +23,12 @@ _start:
     msr cpsr_c, r1
     ldr sp, =__stack_top
 
+    @ Standard cartridge timing: WS0 3/1, SRAM 8, WS2 8/8, prefetch on.
+    @ Configure before copying ROM data or entering C/C++ code.
+    ldr r0, =0x04000204
+    ldr r1, =0x4317
+    strh r1, [r0]
+
     ldr r0, =__data_load
     ldr r1, =__data_start
     ldr r2, =__data_end

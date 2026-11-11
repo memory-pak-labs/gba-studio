@@ -398,7 +398,8 @@ void test_tracker_music_order_loop_and_stop() {
     };
     const uint8_t order[] = { 0, 1 };
 
-    assert(gbs::play_tracker_music(gbs::TrackerAsset { patterns, 2, order, 2, true }));
+    const gbs::TrackerAsset tracker_asset_1 { patterns, 2, order, 2, true };
+    assert(gbs::play_tracker_music(tracker_asset_1));
     assert(gbs::audio_is_tracker_music_playing());
     assert(square_starts == 1);
 
@@ -432,7 +433,8 @@ void test_tracker_row_starts_all_channels_before_waiting() {
 
     assert(gbs::is_valid_tracker_step(steps[0]));
     assert(gbs::is_valid_tracker_asset(gbs::TrackerAsset { patterns, 1, order, 1, true }));
-    assert(gbs::play_tracker_music(gbs::TrackerAsset { patterns, 1, order, 1, true }));
+    const gbs::TrackerAsset tracker_asset_2 { patterns, 1, order, 1, true };
+    assert(gbs::play_tracker_music(tracker_asset_2));
     assert(square_starts == 2);
     assert(wave_starts == 1);
     assert(noise_starts == 1);
@@ -502,6 +504,38 @@ void test_tracker_timbre_envelope_and_sample_trigger_are_rendered() {
     assert(!gbs::audio_is_pcm_streaming());
 }
 
+void test_mixing_rate_changes_keep_the_source_cursor_and_pitch() {
+    static int8_t source[4096];
+    for (int i = 0; i < 4096; ++i) source[i] = static_cast<int8_t>((i * 37) % 121 - 60);
+    const gbs::PcmAsset sample {source,4096,8363,true,3,4096};
+    gbs::TrackerStep note {1,440,255,15,2}; note.sample_only=true; note.sample_index=0; note.sample_gain=32; note.sample_linear_pan=true; note.pan=20;
+    const uint8_t order[] = {0}; const gbs::TrackerPattern pattern {&note,1};
+    const gbs::TrackerAsset song {&pattern,1,order,1,false,&sample,1,true};
+    gbs::audio_init(); assert(gbs::audio_mixing_rate_hz()==31536);
+    assert(gbs::set_audio_channel_volume(gbs::AudioChannel::Music,12)); assert(gbs::play_tracker_music(song));
+    const uint32_t rates[] = {31536,21024,10512,31536,10512,21024,31536};
+    uint64_t position=0;
+    for (uint32_t rate : rates) {
+        assert(gbs::set_audio_mixing_rate(rate)); assert(gbs::audio_mixing_rate_hz()==rate);
+        for (int block=0;block<4;++block) {
+            gbs::audio_update(); const uint32_t count=rate/10512*176;
+            assert(gbs::audio_mixer_output_samples_per_frame()==count); assert(last_pcm_sample_count==count);
+            for (uint32_t i=0;i<count;++i) {
+                const uint32_t index=position>>16, next=index+1<4096?index+1:3;
+                int value=source[index]+(((source[next]-source[index])*static_cast<int32_t>(position&65535))>>16);
+                value=(value*32/255)*12/15;
+                assert(last_pcm_samples[i]==value*107/255); assert(last_pcm_right_samples[i]==value*148/255);
+                position+=(8363ull<<16)/rate;
+                if(position>=(4096ull<<16))position-=4093ull<<16;
+            }
+            assert(gbs::audio_runtime_usage().active_voice_count==1);
+        }
+    }
+    assert(!gbs::set_audio_mixing_rate(16000)); assert(gbs::audio_mixing_rate_hz()==31536);
+    assert(gbs::set_audio_mixing_rate(10512)); gbs::audio_init(true); assert(gbs::audio_mixing_rate_hz()==10512);
+    gbs::audio_init(); assert(gbs::audio_mixing_rate_hz()==31536);
+}
+
 void test_sample_instrument_uses_pcm_only_and_applies_envelope() {
     reset_hw_counts();
     gbs::audio_init();
@@ -530,16 +564,21 @@ void test_sample_instrument_uses_pcm_only_and_applies_envelope() {
 void test_block_resampler_matches_scalar_reference_at_loop_and_carry_boundaries() {
     static int8_t samples[65535];
     for (size_t i = 0; i < 65535; ++i) samples[i] = static_cast<int8_t>((i * 37) % 161 - 80);
-    const uint32_t rates[] = { 4000, 12000, gbs::PCM_MIXER_SAMPLE_RATE_HZ, 32768 };
+    const uint32_t rates[] = { 1, 4000, 5912, 5913, 5914, 12000, 19709, 19710, 19711, gbs::PCM_MIXER_SAMPLE_RATE_HZ, 32768, 2097152 };
     const size_t lengths[] = { 4, 3277, 65535 };
     for (uint32_t rate : rates) for (size_t length : lengths) for (int loop = 0; loop <= 1; ++loop) {
         gbs::audio_init();
         const size_t loop_start = length > 4 ? 2 : 0;
         const size_t loop_end = length;
-        const gbs::PcmAsset asset { samples, length, rate, loop != 0, loop_start, loop_end };
-        assert(gbs::set_audio_channel_volume(gbs::AudioChannel::Sfx, 11));
-        assert(gbs::set_audio_channel_volume(gbs::AudioChannel::PcmSfx, 9));
-        assert(gbs::play_pcm_sfx(asset, gbs::PcmSfxOptions { 12, 8, 0, 63 }));
+        const gbs::PcmAsset asset { samples, length, 31536, loop != 0, loop_start, loop_end };
+        assert(gbs::set_audio_channel_volume(gbs::AudioChannel::Music, 11));
+        assert(gbs::set_audio_channel_volume(gbs::AudioChannel::PcmMusic, 9));
+        gbs::TrackerStep note { 1, 440, 255, 12, 2 };
+        note.sample_only = true; note.sample_index = 0; note.sample_rate_hz = rate; note.pan = 63;
+        const uint8_t order[] = { 0 };
+        const gbs::TrackerPattern pattern { &note, 1 };
+        const gbs::TrackerAsset song { &pattern, 1, order, 1, false, &asset, 1, true };
+        assert(gbs::play_tracker_music(song));
         const auto gains = gbs::pcm_pan_gains(63);
         const uint32_t step = static_cast<uint32_t>((static_cast<uint64_t>(rate) << 16) / gbs::PCM_MIXER_SAMPLE_RATE_HZ);
         uint64_t position = 0;
@@ -594,7 +633,8 @@ void test_tracker_music_without_loop_finishes() {
     };
     const uint8_t order[] = { 0 };
 
-    assert(gbs::play_tracker_music(gbs::TrackerAsset { patterns, 1, order, 1, false }));
+    const gbs::TrackerAsset tracker_asset_3 { patterns, 1, order, 1, false };
+    assert(gbs::play_tracker_music(tracker_asset_3));
     gbs::audio_update();
     assert(!gbs::audio_is_tracker_music_playing());
 }
@@ -612,7 +652,8 @@ void test_simple_music_stops_tracker_music() {
         { 440, 1, 4, 1 }
     };
 
-    assert(gbs::play_tracker_music(gbs::TrackerAsset { patterns, 1, order, 1, true }));
+    const gbs::TrackerAsset tracker_asset_4 { patterns, 1, order, 1, true };
+    assert(gbs::play_tracker_music(tracker_asset_4));
     assert(gbs::audio_is_tracker_music_playing());
     assert(gbs::play_music(gbs::MusicAsset { music_steps, 1, false }));
     assert(!gbs::audio_is_tracker_music_playing());
@@ -672,7 +713,8 @@ void test_audio_bus_volume_and_timed_fade_apply_to_psg_and_pcm() {
     const int8_t pcm_samples[400] = { 120 };
     assert(gbs::set_audio_channel_volume(gbs::AudioChannel::Music, 15));
     assert(gbs::set_audio_channel_volume(gbs::AudioChannel::PcmMusic, 8));
-    assert(gbs::play_pcm_music(gbs::PcmAsset { pcm_samples, 400, 12000, true }, 15));
+    const gbs::PcmAsset pcm_asset { pcm_samples, 400, 12000, true };
+    assert(gbs::play_pcm_music(pcm_asset, 15));
     gbs::audio_update();
     assert(last_pcm_first_sample == 64);
 
@@ -1024,8 +1066,9 @@ void test_audio_runtime_usage_reports_active_pcm_memory() {
     assert(empty.active_voice_count == 0);
     assert(empty.bytes == empty.mixer_buffer_bytes);
     assert(empty.pcm_underrun_count == 0);
-    // Keep mixer scratch below 3.8 KB on both the ARM and 64-bit host ABI.
-    assert(empty.mixer_buffer_bytes <= 3800);
+    // A packed stereo accumulator and a bounded source window replace duplicate
+    // interpolation/ROM reads, within 6.6 KB on ARM and the 64-bit host ABI.
+    assert(empty.mixer_buffer_bytes <= 6600);
 
     assert(gbs::play_pcm_music(asset));
     assert(gbs::play_pcm_sfx(asset));
@@ -1105,7 +1148,504 @@ static_assert(gbs::is_valid_tracker_step(gbs::TrackerStep {3, 32, 1, 8, 0}), "Wa
 static_assert(!gbs::is_valid_tracker_step(gbs::TrackerStep {3, 31, 1, 8, 0}), "Wave frequency below hardware range");
 static_assert(!gbs::is_valid_tracker_step(gbs::TrackerStep {1, 49, 1, 8, 0}), "Square retains its own frequency range");
 
+void test_prepared_gain_matches_live_mixing_and_falls_back_exactly() {
+    alignas(4) int8_t samples[33], prepared[33];
+    for (size_t i = 0; i < 33; ++i) {
+        samples[i] = static_cast<int8_t>((i * 37) % 255 - 127);
+        prepared[i] = static_cast<int8_t>(samples[i] * 12 / 15);
+    }
+    const gbs::PcmAsset raw { samples, 33, gbs::PCM_MIXER_SAMPLE_RATE_HZ, true, 2, 31 };
+    const gbs::PcmAsset optimized { samples, 33, gbs::PCM_MIXER_SAMPLE_RATE_HZ, true, 2, 31, prepared, 12 };
+    const int pans[] = { -127, 0, 63, 127 };
+    const uint32_t rates[] = { 12000, gbs::PCM_MIXER_SAMPLE_RATE_HZ };
+    int8_t reference[2][gbs::PCM_MIXER_SAMPLES_PER_FRAME];
+    for (uint8_t primary = 0; primary <= 15; ++primary) {
+        for (uint8_t pcm = 8; pcm <= 15; pcm += 7) for (uint8_t volume = 7; volume <= 15; volume += 8) {
+            for (int pan : pans) for (uint32_t rate : rates) {
+                gbs::audio_init();
+                gbs::set_audio_channel_volume(gbs::AudioChannel::Sfx, primary);
+                gbs::set_audio_channel_volume(gbs::AudioChannel::PcmSfx, pcm);
+                assert(gbs::play_pcm_sfx(raw, gbs::PcmSfxOptions { volume, 8, rate, static_cast<int8_t>(pan) }));
+                gbs::audio_update(); gbs::audio_update();
+                for (size_t i = 0; i < gbs::PCM_MIXER_SAMPLES_PER_FRAME; ++i) {
+                    reference[0][i] = last_pcm_samples[i];
+                    reference[1][i] = last_pcm_right_samples[i];
+                }
+                gbs::audio_init();
+                gbs::set_audio_channel_volume(gbs::AudioChannel::Sfx, primary);
+                gbs::set_audio_channel_volume(gbs::AudioChannel::PcmSfx, pcm);
+                assert(gbs::play_pcm_sfx(optimized, gbs::PcmSfxOptions { volume, 8, rate, static_cast<int8_t>(pan) }));
+                gbs::audio_update(); gbs::audio_update();
+                for (size_t i = 0; i < gbs::PCM_MIXER_SAMPLES_PER_FRAME; ++i) {
+                    assert(reference[0][i] == last_pcm_samples[i]);
+                    assert(reference[1][i] == last_pcm_right_samples[i]);
+                }
+            }
+        }
+    }
+    assert(gbs::estimate_pcm_asset_cost(optimized).pcm_bytes == 66);
+    assert(gbs::pcm_asset_source_bytes(raw) == 33);
+    auto invalid = optimized;
+    invalid.native_gain_primary_volume = 16;
+    assert(!gbs::is_valid_pcm_asset(invalid));
+    gbs::audio_init();
+}
+
+void test_native_word_mixer_preserves_unaligned_samples_and_short_loops() {
+    alignas(4) int8_t samples[16];
+    for (int i = 0; i < 16; ++i) samples[i] = static_cast<int8_t>((i * 19) % 101 - 50);
+    for (size_t offset = 0; offset < 4; ++offset) for (size_t length = 1; length < 10; ++length) {
+        for (uint8_t volume = 11; volume <= 15; volume += 4) {
+            gbs::audio_init();
+            const gbs::PcmAsset asset { samples + offset, length, gbs::PCM_MIXER_SAMPLE_RATE_HZ, true };
+            assert(gbs::play_pcm_sfx(asset, 8, volume));
+            gbs::audio_update();
+            for (size_t index = 0; index < gbs::PCM_MIXER_SAMPLES_PER_FRAME; ++index) {
+                assert(last_pcm_samples[index] == samples[offset + index % length] * volume / 15);
+            }
+        }
+    }
+}
+
+void test_sixteen_sample_channels_mix_without_psg_or_aliasing() {
+    const int8_t samples[] = { 1, 1, 1, 1 };
+    const gbs::PcmAsset sample { samples, 4, 8000, true };
+    const uint8_t order[] = { 0 };
+    gbs::TrackerStep steps[16] {};
+    for (uint8_t channel = 1; channel <= 16; ++channel) {
+        steps[channel - 1] = { channel, 262, static_cast<uint8_t>(channel == 16 ? 4 : 0), 15, 2 };
+        steps[channel - 1].sample_index = 0;
+        steps[channel - 1].sample_only = true;
+        steps[channel - 1].sample_rate_hz = 8000;
+    }
+    const gbs::TrackerPattern patterns[] = { { steps, 16 } };
+    const gbs::TrackerAsset asset { patterns, 1, order, 1, true, &sample, 1 };
+    assert(gbs::is_valid_tracker_asset(asset));
+    gbs::audio_init();
+    reset_hw_counts();
+    assert(gbs::play_tracker_music(asset));
+    gbs::audio_update();
+    assert(gbs::audio_runtime_usage().active_voice_count == 16);
+    assert(last_pcm_first_sample == 16);
+    assert(square_starts == 0 && wave_starts == 0 && noise_starts == 0);
+    assert(gbs::play_pcm_sfx(sample, 8, 15));
+    assert(gbs::audio_runtime_usage().active_voice_count == 17);
+    const uint32_t rates[] = {10512, 21024, 31536, 10512};
+    for (const uint32_t rate : rates) {
+        assert(gbs::set_audio_mixing_rate(rate));
+        gbs::audio_update();
+        assert(gbs::audio_runtime_usage().active_voice_count == 17);
+        assert(last_pcm_sample_count == rate / 10512 * 176);
+        assert(pcm_stream_starts == 1); // The active DMA stream is not restarted.
+    }
+    assert(!gbs::play_pcm_sfx(sample, 7, 15));
+    gbs::stop_tracker_music();
+    assert(gbs::audio_runtime_usage().active_voice_count == 1);
+    gbs::stop_pcm_sfx();
+    assert(gbs::audio_runtime_usage().active_voice_count == 0);
+    auto invalid = steps[15];
+    invalid.channel = 17;
+    assert(!gbs::is_valid_tracker_step(invalid));
+    invalid.channel = 5;
+    invalid.sample_only = false;
+    assert(!gbs::is_valid_tracker_step(invalid));
+}
+
+void test_imported_sample_notes_sustain_between_rows() {
+    const int8_t data[] = { 1, 2, 3, 4, 5 };
+    const gbs::PcmAsset sample { data, 5, gbs::PCM_MIXER_SAMPLE_RATE_HZ, true };
+    const int8_t silence[] = { 0 };
+    const gbs::PcmAsset samples[] = { sample, { silence, 1, gbs::PCM_MIXER_SAMPLE_RATE_HZ, false } };
+    const uint8_t order[] = { 0 };
+    gbs::TrackerStep steps[19] {};
+    for (uint8_t channel = 1; channel <= 16; ++channel) {
+        auto& step = steps[channel - 1];
+        step = { channel, 262, static_cast<uint8_t>(channel == 16 ? 2 : 0), 15, 2 };
+        step.sample_only = true; step.sample_index = 0;
+    }
+    steps[16] = steps[15];
+    steps[16].duration_frames = 2;
+    steps[17] = { 2, 64, 8, 0, 2 }; // assetc placeholder for an empty module pattern
+    steps[18] = { 16, 64, 8, 0, 2 };
+    steps[18].sample_only = true; steps[18].sample_index = 1;
+    const gbs::TrackerPattern pattern { steps, 19 };
+    gbs::TrackerAsset song { &pattern, 1, order, 1, true, samples, 2, true };
+    gbs::audio_init(); assert(gbs::play_tracker_music(song));
+    assert(gbs::audio_runtime_usage().active_voice_count == 16);
+    gbs::audio_update(); gbs::audio_update();
+    assert(gbs::audio_runtime_usage().active_voice_count == 16);
+    // The first fifteen voices retain their phase (528 % 5 == 3),
+    // while channel sixteen's explicit new note restarts at sample zero.
+    assert(last_pcm_first_sample == 15 * 4 + 1);
+    gbs::audio_update(); gbs::audio_update();
+    assert(gbs::audio_runtime_usage().active_voice_count == 16);
+    assert(last_pcm_first_sample == 15 * 5 + 2);
+    for (int frame = 0; frame < 8; ++frame) gbs::audio_update();
+    assert(gbs::audio_runtime_usage().active_voice_count == 15);
+    gbs::stop_tracker_music();
+    assert(gbs::audio_runtime_usage().active_voice_count == 0);
+    song.sustain_sample_channels = false;
+    gbs::audio_init(); assert(gbs::play_tracker_music(song));
+    gbs::audio_update(); gbs::audio_update();
+    assert(gbs::audio_runtime_usage().active_voice_count == 1);
+    gbs::audio_init();
+}
+
+void test_tracker_pcm_controls_preserve_phase_through_silence_and_pitch_changes() {
+    const int8_t data[] = { 10, 20, 30, 40, 50 };
+    const gbs::PcmAsset sample { data, 5, 31536, true };
+    const uint8_t order[] = { 0 };
+    gbs::TrackerStep steps[4] {};
+    for (auto& step : steps) {
+        step = { 1, 440, 1, 15, 2 };
+        step.sample_only = true; step.sample_index = 0; step.sample_rate_hz = 31536;
+        step.sample_continue = true;
+    }
+    steps[0].sample_continue = false; steps[0].duration_frames = 2;
+    steps[1].sample_gain = 128;
+    steps[2].sample_gain = 0;
+    steps[3].sample_rate_hz = 15768; steps[3].duration_frames = 8;
+    const gbs::TrackerPattern pattern { steps, 4 };
+    const gbs::TrackerAsset song { &pattern, 1, order, 1, false, &sample, 1, true };
+    gbs::audio_init(); assert(gbs::play_tracker_music(song));
+    gbs::audio_update(); assert(last_pcm_first_sample == 10);
+    gbs::audio_update(); assert(last_pcm_first_sample == 20); // sample 3, gain 128/255
+    gbs::audio_update(); assert(last_pcm_first_sample == 0);
+    assert(gbs::audio_runtime_usage().active_voice_count == 1); // zero envelope retains phase
+    gbs::audio_update(); assert(last_pcm_first_sample == 50); // sample 4, not a restarted sample 0
+    assert(last_pcm_samples[1] == 30); // half-rate interpolation crosses the loop boundary
+    auto invalid = steps[1]; invalid.sample_only = false;
+    assert(!gbs::is_valid_tracker_step(invalid));
+    gbs::audio_init();
+}
+
+void test_native_tracker_linear_pan_preserves_the_stereo_balance() {
+    const int8_t data[] = { 80, -80 };
+    const gbs::PcmAsset sample { data, 2, 31536, true };
+    const uint8_t order[] = { 0 };
+    gbs::TrackerStep steps[4] {};
+    for (auto& step : steps) {
+        step = { 1, 440, 1, 15, 2 };
+        step.sample_only = true; step.sample_index = 0; step.sample_rate_hz = 31536;
+        step.sample_continue = true; step.sample_linear_pan = true;
+    }
+    steps[0].sample_continue = false; steps[0].duration_frames = 2;
+    steps[1].pan = -127;
+    steps[2].pan = 127;
+    steps[3].pan = 63; steps[3].duration_frames = 8;
+    const gbs::TrackerPattern pattern { steps, 4 };
+    const gbs::TrackerAsset song { &pattern, 1, order, 1, false, &sample, 1, true };
+    gbs::audio_init(); assert(gbs::play_tracker_music(song));
+    gbs::audio_update(); assert(last_pcm_first_sample == 40 && last_pcm_right_first_sample == 40);
+    gbs::audio_update(); assert(last_pcm_first_sample == 80 && last_pcm_right_first_sample == 0);
+    gbs::audio_update(); assert(last_pcm_first_sample == 0 && last_pcm_right_first_sample == 80);
+    gbs::audio_update(); assert(last_pcm_first_sample == 20 && last_pcm_right_first_sample == 59);
+    assert(last_pcm_samples[1] == -20 && last_pcm_right_samples[1] == -59);
+    gbs::audio_init();
+}
+
+void test_all_pcm_pan_positions_keep_the_original_rounding() {
+    int8_t data[528]; for (auto& value : data) value = 64;
+    const gbs::PcmAsset sample { data, 528, 31536, true };
+    const uint8_t order[] = { 0 };
+    for (int pan = -127; pan <= 127; ++pan) {
+        gbs::TrackerStep step { 1, 440, 8, 15, 2 };
+        step.sample_only = true; step.sample_index = 0; step.pan = static_cast<int8_t>(pan); step.sample_linear_pan = true;
+        const gbs::TrackerPattern pattern { &step, 1 };
+        const gbs::TrackerAsset song { &pattern, 1, order, 1, false, &sample, 1, true };
+        gbs::audio_init(); assert(gbs::play_tracker_music(song)); gbs::audio_update();
+        const int left = (255 * (127 - pan) + 127) / 254;
+        const int right = (255 * (127 + pan) + 127) / 254;
+        assert(last_pcm_first_sample == 64 * left / 255);
+        assert(last_pcm_right_first_sample == 64 * right / 255);
+        gbs::audio_init(); assert(gbs::play_pcm_sfx(sample, gbs::PcmSfxOptions { 15, 0, 0, static_cast<int8_t>(pan) })); gbs::audio_update();
+        const auto expected = gbs::pcm_pan_gains(static_cast<int8_t>(pan));
+        assert(last_pcm_first_sample == 64 * expected.left / 15);
+        assert(last_pcm_right_first_sample == 64 * expected.right / 15);
+    }
+    gbs::audio_init();
+}
+
+void test_prepared_mix_maps_match_the_scalar_path_through_pitch_and_gain_changes() {
+    const int8_t source[] = { -80, 80 };
+    gbs::PcmInterpolationInterval intervals[128] {};
+    uint16_t count = 0;
+    uint32_t previous = 0;
+    for (uint32_t position = 0; position < 2u * 65536; ++position) {
+        const uint32_t index = position >> 16;
+        int value = source[index] + (((source[1u - index] - source[index]) * static_cast<int32_t>(position & 65535)) >> 16);
+        value = ((value * 32) / 255 * 12) / 15;
+        const int left = value * ((255 * (127 - 20) + 127) / 254) / 255;
+        const int right = value * ((255 * (127 + 20) + 127) / 254) / 255;
+        const uint32_t gain = static_cast<uint32_t>(right * 65536 + left);
+        if (position && gain != previous) { assert(count < 127); intervals[count++] = { position, previous }; }
+        previous = gain;
+    }
+    intervals[count++] = { 2u * 65536, previous };
+    const gbs::PcmInterpolationMap map { gbs::pcm_interpolation_mix_key(15, 12, 15, 32, 20, true), intervals, count, 0 };
+    gbs::PcmAsset sample { source, 2, 8363, true };
+    gbs::TrackerStep steps[4] {};
+    const uint8_t gains[] = { 32, 0, 32, 63 };
+    for (int i = 0; i < 4; ++i) {
+        steps[i] = { 1, 440, 3, 15, 2 };
+        steps[i].sample_only = true; steps[i].sample_index = 0;
+        steps[i].sample_rate_hz = 8363 + i * 1000; steps[i].sample_gain = gains[i];
+        steps[i].pan = 20; steps[i].sample_linear_pan = true; steps[i].sample_continue = i != 0;
+    }
+    const gbs::TrackerPattern pattern { steps, 4 };
+    const uint8_t order[] = { 0 };
+    const gbs::TrackerAsset song { &pattern, 1, order, 1, false, &sample, 1, true };
+    static int8_t expected[16][2][528];
+    for (int prepared = 0; prepared <= 1; ++prepared) {
+        sample.interpolation_maps = prepared ? &map : nullptr; sample.interpolation_map_count = prepared ? 1 : 0;
+        sample.interpolation_source_bytes = prepared ? 12u + static_cast<uint32_t>(count) * 8u : 0;
+        for (auto& step : steps) {
+            step.sample_step_fp = prepared ? static_cast<uint32_t>((static_cast<uint64_t>(step.sample_rate_hz) << 16) / 31536) : 0;
+            step.sample_step_reciprocal = prepared ? 0xffffffffu / step.sample_step_fp : 0;
+            step.prepared_mix_map = prepared && step.sample_gain == 32 ? &map : nullptr;
+        }
+        assert(gbs::is_valid_pcm_asset(sample));
+        gbs::audio_init(); assert(gbs::set_audio_channel_volume(gbs::AudioChannel::Music, 12));
+        assert(gbs::play_tracker_music(song));
+        for (int frame = 0; frame < 16; ++frame) {
+            gbs::audio_update(); const int8_t* sides[] = { last_pcm_samples, last_pcm_right_samples };
+            for (int side = 0; side < 2; ++side) for (int i = 0; i < 528; ++i) {
+                if (prepared) assert(sides[side][i] == expected[frame][side][i]); else expected[frame][side][i] = sides[side][i];
+            }
+        }
+    }
+    auto foreign = map;
+    steps[0].prepared_mix_map = &foreign; assert(!gbs::is_valid_tracker_asset(song)); steps[0].prepared_mix_map = &map;
+    ++steps[0].sample_step_reciprocal; assert(!gbs::is_valid_tracker_asset(song)); --steps[0].sample_step_reciprocal;
+    ++sample.interpolation_source_bytes; assert(!gbs::is_valid_pcm_asset(sample)); --sample.interpolation_source_bytes;
+    const uint32_t original_gain = intervals[0].gain;
+    intervals[0].gain = 127u; assert(!gbs::is_valid_pcm_asset(sample));
+    intervals[0].gain = original_gain;
+    auto invalid = map; invalid.loop_index = count;
+    sample.interpolation_maps = &invalid;
+    assert(!gbs::is_valid_pcm_asset(sample));
+    // Invalid unused samples retain the existing lazy-reference contract.
+    const gbs::PcmAsset bank[] = { sample, { source, 2, 8363, true } };
+    for (auto& step : steps) { step.sample_index = 1; step.prepared_mix_map = nullptr; }
+    const gbs::TrackerAsset unused { &pattern, 1, order, 1, false, bank, 2, true };
+    assert(gbs::is_valid_tracker_asset(unused));
+    steps[1].sample_index = 0; assert(!gbs::is_valid_tracker_asset(unused));
+    gbs::audio_init();
+}
+
+void test_long_prepan_map_matches_scalar_at_gain_pan_and_position_carry() {
+    static int8_t source[65535];
+    for (size_t i = 0; i < 65535; ++i) source[i] = i < 32767 ? -80 : 80;
+    gbs::PcmInterpolationInterval intervals[128] {};
+    uint16_t count = 0; uint32_t previous = static_cast<uint32_t>(-8 * 65537);
+    const uint32_t edges[] = {32766u,65534u};
+    for (uint32_t edge : edges) {
+        for (uint32_t fraction = 0; fraction <= 65536; ++fraction) {
+            const int from = source[edge], to = source[edge == 65534 ? 3 : edge + 1];
+            const int value = ((from + (((to - from) * static_cast<int32_t>(fraction)) >> 16)) * 32 / 255) * 12 / 15;
+            const uint32_t gain = static_cast<uint32_t>(value * 65537);
+            if (gain != previous) { intervals[count++] = { (edge << 16) + fraction, previous }; previous = gain; }
+        }
+    }
+    intervals[count++] = {65535u << 16, previous};
+    const gbs::PcmInterpolationMap map {gbs::PCM_INTERPOLATION_PRE_PAN | gbs::pcm_interpolation_mix_key(15,12,15,32,0,false), intervals, count, 0};
+    gbs::PcmAsset sample {source, 65535, 8363, true, 3, 65535};
+    gbs::TrackerStep steps[8] {}; const uint32_t rates[] = {1,4000,19710,31536,65536,2097152,2097152,2097152};
+    for (int i = 0; i < 8; ++i) {
+        steps[i] = {1,440,16,15,2}; steps[i].sample_only = true; steps[i].sample_index = 0;
+        steps[i].sample_rate_hz = rates[i]; steps[i].sample_gain = 32;
+        steps[i].sample_linear_pan = true; steps[i].sample_continue = i != 0;
+        steps[i].pan = static_cast<int8_t>(i % 3 == 0 ? -127 : i % 3 == 1 ? 0 : 127);
+    }
+    const gbs::TrackerPattern pattern {steps,8}; const uint8_t order[] = {0};
+    const gbs::TrackerAsset song {&pattern,1,order,1,false,&sample,1,true};
+    static int8_t expected[127][2][528];
+    for (int prepared = 0; prepared <= 1; ++prepared) {
+        sample.interpolation_maps = prepared ? &map : nullptr; sample.interpolation_map_count = prepared ? 1 : 0;
+        for (auto& step : steps) step.prepared_mix_map = prepared ? &map : nullptr;
+        gbs::audio_init(); assert(gbs::set_audio_channel_volume(gbs::AudioChannel::Music,12));
+        assert(gbs::play_tracker_music(song));
+        for (int block = 0; block < 127; ++block) {
+            if (block == 101) assert(gbs::set_audio_channel_volume(gbs::AudioChannel::Music,9));
+            gbs::audio_update(); const int8_t* sides[] = {last_pcm_samples,last_pcm_right_samples};
+            for (int side = 0; side < 2; ++side) for (int i = 0; i < 528; ++i) {
+                if (prepared) assert(sides[side][i] == expected[block][side][i]); else expected[block][side][i] = sides[side][i];
+            }
+        }
+    }
+    gbs::audio_init();
+}
+
+void test_sixteen_low_gain_modulated_voices_keep_the_frozen_output() {
+    alignas(4) int8_t data[4][128];
+    gbs::PcmAsset samples[4] {};
+    for (int source = 0; source < 4; ++source) {
+        for (int i = 0; i < 128; ++i) {
+            const int phase = (i + source * 5) % 32;
+            data[source][i] = static_cast<int8_t>(phase < 16 ? -64 + phase * 8 : 64 - (phase - 16) * 8);
+        }
+        samples[source] = { data[source], 128, 8363, true, 3, 123 };
+    }
+    gbs::TrackerStep steps[12 * 16] {};
+    for (int frame = 0; frame < 12; ++frame) for (int channel = 0; channel < 16; ++channel) {
+        auto& step = steps[frame * 16 + channel];
+        step = { static_cast<uint8_t>(channel + 1), 440, static_cast<uint8_t>(channel == 15 ? 1 : 0), 15, 2 };
+        step.sample_only = true; step.sample_index = channel % 4;
+        step.sample_rate_hz = 7000 + channel * 800 + ((frame % 5) - 2) * 123;
+        step.sample_gain = static_cast<uint8_t>((frame * 7 + channel * 3) % 64 + 1);
+        step.pan = static_cast<int8_t>(-121 + channel * 15 + (frame % 3) * 2);
+        step.sample_linear_pan = true; step.sample_continue = frame != 0;
+    }
+    const uint8_t order[] = { 0 };
+    const gbs::TrackerPattern pattern { steps, 12 * 16 };
+    const gbs::TrackerAsset song { &pattern, 1, order, 1, false, samples, 4, true };
+    gbs::audio_init(); assert(gbs::play_tracker_music(song));
+    uint32_t hash = 2166136261u;
+    for (int frame = 0; frame < 12; ++frame) {
+        gbs::audio_update();
+        const int8_t* sides[] = { last_pcm_samples, last_pcm_right_samples };
+        for (auto* side : sides) {
+            for (size_t i = 0; i < gbs::PCM_MIXER_SAMPLES_PER_FRAME; ++i) hash = (hash ^ static_cast<uint8_t>(side[i])) * 16777619u;
+        }
+    }
+    // Frozen before gain-plateau batching, including per-frame pitch/pan changes.
+    assert(hash == 2484089467u);
+    gbs::audio_init();
+}
+
+void test_pcm_source_cache_observes_mutations_between_audio_blocks() {
+    int8_t data[4] = { 30, 30, 30, 30 };
+    const gbs::PcmAsset sample { data, 4, 15768, true };
+    gbs::audio_init(); assert(gbs::play_pcm_sfx(sample));
+    gbs::audio_update(); assert(last_pcm_first_sample == 30);
+    for (auto& value : data) value = -40;
+    gbs::audio_update(); assert(last_pcm_first_sample == -40);
+    assert(last_pcm_right_first_sample == -40);
+    gbs::audio_init();
+}
+
+void test_sixteen_voice_stereo_resampling_matches_the_frozen_mixer_output() {
+    alignas(4) int8_t data[38];
+    for (int i = 0; i < 38; ++i) data[i] = static_cast<int8_t>((i * 37) % 127 - 63);
+    const gbs::PcmAsset sample { data + 1, 35, 31536, true, 3, 33 };
+    const uint8_t order[] = { 0 };
+    gbs::TrackerStep steps[16] {};
+    for (int i = 0; i < 16; ++i) {
+        auto& s = steps[i];
+        s = { static_cast<uint8_t>(i + 1), 440, static_cast<uint8_t>(i == 15 ? 24 : 0), static_cast<uint8_t>(7 + i % 9), 2 };
+        s.sample_only = true; s.sample_index = 0; s.sample_rate_hz = 10000 + i * 1600;
+        s.sample_gain = static_cast<uint8_t>(80 + i * 11); s.pan = static_cast<int8_t>(-121 + i * 15); s.sample_linear_pan = true;
+    }
+    const gbs::TrackerPattern pattern { steps, 16 };
+    const gbs::TrackerAsset song { &pattern, 1, order, 1, false, &sample, 1, true };
+    gbs::audio_init(); assert(gbs::play_tracker_music(song));
+    uint32_t hash = 2166136261u;
+    const int8_t* sides[] = { last_pcm_samples, last_pcm_right_samples };
+    for (int frame = 0; frame < 8; ++frame) {
+        gbs::audio_update();
+        for (auto* side : sides) for (size_t i = 0; i < gbs::PCM_MIXER_SAMPLES_PER_FRAME; ++i) {
+            hash = (hash ^ static_cast<uint8_t>(side[i])) * 16777619u;
+        }
+    }
+    // Captured from the two-pass mixer before optimization, including limiter,
+    // fractional loop boundaries, all sixteen gains and both stereo outputs.
+    assert(hash == 2714672778u);
+    gbs::audio_init();
+}
+
+void test_pcm_backed_native_cues_keep_stop_and_validation_contract() {
+    const int8_t samples[1056] = { 70, -70, 30, -30 };
+    const gbs::PcmAsset pcm = { samples, 1056, 31536, true };
+    const gbs::SfxAsset cue = { nullptr, 0, &pcm, 11 };
+    const gbs::SfxTone tone = { 440, 2, 10, 2, false };
+    const gbs::SfxAsset psg = { &tone, 1 };
+    gbs::audio_init();
+    assert(gbs::is_valid_sfx_asset(cue));
+    assert(gbs::estimate_sfx_asset_cost(cue).valid);
+    assert(gbs::play_pcm_sfx(pcm)); // unrelated scripted effect
+    assert(gbs::play_sfx(cue));    // native action cue
+    assert(gbs::audio_is_sfx_playing());
+    assert(gbs::audio_runtime_usage().active_voice_count == 2);
+    gbs::stop_sfx();
+    assert(!gbs::audio_is_sfx_playing());
+    assert(gbs::audio_runtime_usage().active_voice_count == 1);
+    assert(gbs::play_sfx(cue));
+    assert(gbs::play_sfx(cue)); // replaces the previous native cue
+    assert(gbs::audio_runtime_usage().active_voice_count == 2);
+    assert(gbs::play_sfx(psg));
+    assert(gbs::audio_runtime_usage().active_voice_count == 1);
+    gbs::set_audio_channel_muted(gbs::AudioChannel::Sfx, true);
+    assert(!gbs::play_sfx(cue));
+    const gbs::PcmAsset invalid = { nullptr, 0, 31536, false };
+    const gbs::SfxAsset invalid_cue = { nullptr, 0, &invalid };
+    assert(!gbs::is_valid_sfx_asset(invalid_cue));
+    assert(!gbs::play_sfx(invalid_cue));
+    gbs::audio_init();
+}
+
+void test_pcm_native_cues_preserve_psg_tracker_channels() {
+    const int8_t samples[1056] = { 70, -70, 30, -30 };
+    const gbs::PcmAsset pcm = { samples, 1056, 31536, true };
+    const gbs::SfxAsset cue = { nullptr, 0, &pcm, 11 };
+    const gbs::TrackerStep steps[] = { { 1, 440, 0, 10, 2 }, { 4, 100, 20, 10, 2 } };
+    const gbs::TrackerPattern patterns[] = { { steps, 2 } };
+    const uint8_t order[] = { 0 };
+    const gbs::TrackerAsset song = { patterns, 1, order, 1, true };
+    gbs::audio_init();
+    assert(gbs::play_tracker_music(song));
+    reset_hw_counts();
+    assert(gbs::play_sfx(cue));
+    assert(gbs::audio_is_tracker_music_playing());
+    assert(square_stops == 0 && noise_stops == 0 && wave_stops == 0);
+    gbs::stop_sfx();
+    assert(!gbs::audio_is_sfx_playing());
+    assert(square_stops == 0 && noise_stops == 0 && wave_stops == 0);
+    // A rejected lower-priority PCM cue must leave a currently playing PSG SFX intact.
+    const gbs::SfxTone tone = { 330, 10, 10, 2, false };
+    const gbs::SfxAsset psg = { &tone, 1 };
+    for (int i = 0; i < 4; ++i) assert(gbs::play_pcm_sfx(pcm, 12, 15));
+    assert(gbs::play_sfx(psg));
+    reset_hw_counts();
+    assert(!gbs::play_sfx(cue));
+    assert(gbs::audio_is_sfx_playing());
+    assert(square_stops == 0 && noise_stops == 0);
+    gbs::audio_init();
+}
+
+void test_authored_pcm_rests_release_their_voice() {
+    const int8_t data[] = { 48, -48, 48, -48 };
+    const gbs::PcmAsset samples[] = { { data, 4, 31536, true } };
+    gbs::TrackerStep steps[] = { {16,262,2,10,0}, {16,64,2,0,0} };
+    for (auto& step : steps) { step.sample_index=0;step.sample_rate_hz=31536;step.sample_only=true; }
+    const gbs::TrackerPattern patterns[] = { {steps,2} };
+    const uint8_t order[] = {0};
+    const gbs::TrackerAsset song = {patterns,1,order,1,false,samples,1,false};
+    gbs::audio_init();
+    assert(gbs::play_tracker_music(song));
+    assert(gbs::audio_runtime_usage().active_voice_count == 1);
+    gbs::audio_update();gbs::audio_update();
+    assert(gbs::audio_is_tracker_music_playing());
+    assert(gbs::audio_runtime_usage().active_voice_count == 0);
+    gbs::stop_tracker_music();
+}
+
 int main() {
+    test_mixing_rate_changes_keep_the_source_cursor_and_pitch();
+    test_prepared_mix_maps_match_the_scalar_path_through_pitch_and_gain_changes();
+    test_long_prepan_map_matches_scalar_at_gain_pan_and_position_carry();
+    test_sixteen_low_gain_modulated_voices_keep_the_frozen_output();
+    test_all_pcm_pan_positions_keep_the_original_rounding();
+    test_pcm_source_cache_observes_mutations_between_audio_blocks();
+    test_sixteen_voice_stereo_resampling_matches_the_frozen_mixer_output();
+    test_native_tracker_linear_pan_preserves_the_stereo_balance();
+    test_tracker_pcm_controls_preserve_phase_through_silence_and_pitch_changes();
+    test_authored_pcm_rests_release_their_voice();
+    test_pcm_native_cues_preserve_psg_tracker_channels();
+    test_pcm_backed_native_cues_keep_stop_and_validation_contract();
+    test_imported_sample_notes_sustain_between_rows();
+    test_prepared_gain_matches_live_mixing_and_falls_back_exactly();
+    test_native_word_mixer_preserves_unaligned_samples_and_short_loops();
+    test_sixteen_sample_channels_mix_without_psg_or_aliasing();
     test_equal_priority_pcm_effect_age_survives_counter_rollover();
     test_stopping_pcm_effect_or_music_keeps_sample_tracker_stream_running();
     test_shared_pcm_budget_preserves_music_and_prioritizes_effects();

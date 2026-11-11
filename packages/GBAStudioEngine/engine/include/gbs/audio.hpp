@@ -20,9 +20,14 @@ struct SfxTone {
     bool sweep_negative = false;
 };
 
+struct PcmAsset;
+
 struct SfxAsset {
     const SfxTone* tones;
     size_t tone_count;
+    // Native action cues can alias an existing PCM descriptor without copying samples.
+    const PcmAsset* pcm = nullptr;
+    uint8_t pcm_volume = 15;
 };
 
 struct MusicStep {
@@ -42,15 +47,38 @@ struct MusicAsset {
     bool loop;
 };
 
+constexpr uint32_t PCM_INTERPOLATION_PRE_PAN = 1u << 29;
+
+// Exact quantized output intervals for an exported gain/pan configuration.
+struct PcmInterpolationInterval { uint32_t end, gain; };
+struct PcmInterpolationMap {
+    uint32_t mix_key;
+    const PcmInterpolationInterval* intervals;
+    uint16_t interval_count, loop_index;
+};
+constexpr uint32_t pcm_interpolation_mix_key(uint8_t volume, uint8_t primary, uint8_t pcm, uint8_t fine_gain, int8_t pan, bool linear) {
+    return fine_gain | (static_cast<uint32_t>(static_cast<uint8_t>(pan)) << 8) |
+        (static_cast<uint32_t>(volume) << 16) | (static_cast<uint32_t>(primary) << 20) |
+        (static_cast<uint32_t>(pcm) << 24) | (static_cast<uint32_t>(linear) << 28);
+}
+
 struct PcmAsset {
     // Source samples are signed int8_t centered at zero.
-    // The mixer biases them to unsigned FIFO bytes (centered at 0x80) when submitting.
+    // FIFO bytes stay signed; stereo accumulator biases are internal only.
     const int8_t* samples;
     size_t sample_count;
     uint32_t sample_rate_hz;
     bool loop;
     size_t loop_start_sample = 0;
     size_t loop_end_sample = 0;
+    // Optional ROM variant, identical to applying this primary gain at 1:1 rate.
+    const int8_t* native_gain_samples = nullptr;
+    uint8_t native_gain_primary_volume = 15;
+    // Generated from immutable source PCM. Absent configurations use the normal
+    // resampler; callers supplying maps must keep them coherent with samples.
+    const PcmInterpolationMap* interpolation_maps = nullptr;
+    uint16_t interpolation_map_count = 0;
+    uint32_t interpolation_source_bytes = 0;
 };
 
 struct TrackerStep {
@@ -69,6 +97,15 @@ struct TrackerStep {
     uint8_t sweep_time = 0;
     bool sweep_negative = false;
     bool sample_only = false;
+    // Tick controls update a running voice without retriggering its sample.
+    bool sample_continue = false;
+    uint8_t sample_gain = 255;
+    bool sample_linear_pan = false;
+    // Optional exact export-time pitch; zero selects the runtime calculation.
+    uint32_t sample_step_fp = 0;
+    uint32_t sample_step_reciprocal = 0;
+    // If present, belongs to the referenced sample and matches this control.
+    const PcmInterpolationMap* prepared_mix_map = nullptr;
 };
 
 struct TrackerPattern {
@@ -84,15 +121,37 @@ struct TrackerAsset {
     bool loop;
     const PcmAsset* samples = nullptr;
     size_t sample_count = 0;
+    // Imported module rests keep sample tails until a new note replaces them.
+    bool sustain_sample_channels = false;
 };
+
+#if defined(__arm__) || defined(__thumb__)
+// Shared with the editor's GBA_AUDIO_ROM_LAYOUT. An ABI change must update
+// its physical estimates rather than silently undercounting ROM descriptors.
+static_assert(sizeof(PcmAsset) == 44 && sizeof(PcmInterpolationMap) == 12, "Update prepared PCM SDK/library together");
+static_assert(sizeof(SfxTone) == 14 && sizeof(SfxAsset) == 16, "Update SFX ROM layout estimates");
+static_assert(sizeof(TrackerStep) == 36 && sizeof(TrackerPattern) == 8 && sizeof(TrackerAsset) == 32,
+              "Update tracker ROM layout estimates");
+#endif
 
 // 532 timer ticks * 528 samples = 280896 GBA cycles per video frame.
 // The block is also a multiple of the FIFO DMA's 16-byte burst.
 constexpr uint32_t PCM_MIXER_SAMPLE_RATE_HZ = 31536;
 constexpr uint16_t PCM_MIXER_SAMPLES_PER_FRAME = 528;
+constexpr bool is_valid_audio_mixing_rate(uint32_t rate_hz) {
+    return rate_hz == 10512 || rate_hz == 21024 || rate_hz == 31536;
+}
+// Applied to the next mixed block; active voices keep their source cursor.
+bool set_audio_mixing_rate(uint32_t rate_hz);
+uint32_t audio_mixing_rate_hz();
+uint16_t audio_mixer_output_samples_per_frame();
+
 constexpr size_t PCM_MIXER_MAX_SFX_VOICES = 4;
-// Music keeps its channels; SFX share the remaining measured mixer budget.
-constexpr size_t PCM_MIXER_MAX_ACTIVE_VOICES = 5;
+constexpr size_t TRACKER_MAX_SAMPLE_CHANNELS = 16;
+// Up to sixteen independent sample channels and one effect at full music load.
+// The existing five-voice budget remains in effect for smaller arrangements.
+constexpr size_t PCM_MIXER_BASE_VOICE_BUDGET = 5;
+constexpr size_t PCM_MIXER_MAX_ACTIVE_VOICES = TRACKER_MAX_SAMPLE_CHANNELS + 1;
 
 struct PcmSfxOptions {
     uint8_t volume = 15;
@@ -192,9 +251,19 @@ constexpr bool is_valid_tracker_channel(uint8_t channel) {
     return channel >= 1 && channel <= 4;
 }
 
+constexpr bool is_valid_prepared_tracker_pitch(const TrackerStep& step) {
+    if (!step.sample_step_fp) return step.sample_step_reciprocal == 0;
+    if (!step.sample_only || step.sample_rate_hz == 0 || step.sample_rate_hz > 2097152) return false;
+    const uint32_t rate = static_cast<uint32_t>((static_cast<uint64_t>(step.sample_rate_hz) << 16) / PCM_MIXER_SAMPLE_RATE_HZ);
+    return step.sample_step_fp == (rate ? rate : 1u) && step.sample_step_reciprocal == 0xFFFFFFFFu / step.sample_step_fp;
+}
+
 constexpr bool is_valid_tracker_step(const TrackerStep& step) {
-    return is_valid_tracker_channel(step.channel) &&
-           (step.channel == 3 ? step.frequency_hz >= 32 && step.frequency_hz <= 4095 : is_valid_audio_frequency(step.frequency_hz)) &&
+    return is_valid_prepared_tracker_pitch(step) && (!(step.sample_continue || step.sample_linear_pan) || step.sample_only) &&
+           (step.sample_only ? step.channel >= 1 && step.channel <= TRACKER_MAX_SAMPLE_CHANNELS
+                                    && step.frequency_hz >= 16 && step.frequency_hz <= 32767
+                             : is_valid_tracker_channel(step.channel) &&
+                               (step.channel == 3 ? step.frequency_hz >= 32 && step.frequency_hz <= 4095 : is_valid_audio_frequency(step.frequency_hz))) &&
            is_valid_audio_volume(step.volume) &&
            is_valid_audio_duty(step.duty) &&
            is_valid_pcm_pan(step.pan);
@@ -218,12 +287,52 @@ constexpr bool is_valid_pcm_loop(const PcmAsset& asset) {
             pcm_loop_end_sample(asset) <= asset.sample_count);
 }
 
+constexpr bool is_valid_pcm_interpolation_maps(const PcmAsset& asset) {
+    if (asset.interpolation_map_count == 0) return asset.interpolation_source_bytes == 0;
+    if (!asset.loop || asset.interpolation_maps == nullptr || asset.interpolation_map_count > 256 || pcm_loop_end_sample(asset) > 65535) return false;
+    uint32_t bytes = static_cast<uint32_t>(asset.interpolation_map_count) * 12u;
+    for (size_t i = 0; i < asset.interpolation_map_count; ++i) {
+        const auto& map = asset.interpolation_maps[i];
+        if (map.mix_key > 0x3fffffffu || ((map.mix_key >> 8) & 255u) == 128u ||
+            (i && map.mix_key <= asset.interpolation_maps[i - 1].mix_key) ||
+            map.intervals == nullptr || map.interval_count == 0 || (!(map.mix_key & (1u << 29)) && (map.interval_count > 128 || pcm_loop_end_sample(asset) > 128)) || map.loop_index >= map.interval_count) return false;
+        if ((map.mix_key & PCM_INTERPOLATION_PRE_PAN) && (map.mix_key & 0x1000ff00u)) return false;
+        bytes += static_cast<uint32_t>(map.interval_count) * 8u;
+        // A prepared table must respect the same contraction as the scalar
+        // mixer; otherwise its peak bound could incorrectly bypass limiting.
+        int peak = 128 * static_cast<int>(map.mix_key & 255u) / 255;
+        peak = peak * static_cast<int>((map.mix_key >> 16) & 15u) / 15;
+        peak = peak * static_cast<int>((map.mix_key >> 20) & 15u) / 15;
+        peak = peak * static_cast<int>((map.mix_key >> 24) & 15u) / 15;
+        const int pan = static_cast<int8_t>(map.mix_key >> 8);
+        const bool linear = (map.mix_key & (1u << 28)) != 0;
+        const auto discrete = pcm_pan_gains(pan);
+        const int left_bound = linear ? peak * ((255 * (127 - pan) + 127) / 254) / 255 : peak * discrete.left / 15;
+        const int right_bound = linear ? peak * ((255 * (127 + pan) + 127) / 254) / 255 : peak * discrete.right / 15;
+        uint32_t previous = 0;
+        for (size_t j = 0; j < map.interval_count; ++j) {
+            const auto interval = map.intervals[j];
+            const int left = static_cast<int16_t>(interval.gain);
+            const int right = static_cast<int16_t>(interval.gain >> 16) + (left < 0);
+            if ((map.mix_key & PCM_INTERPOLATION_PRE_PAN) && left != right) return false;
+            if (interval.end <= previous || interval.end > (pcm_loop_end_sample(asset) << 16) || left < -left_bound || left > left_bound || right < -right_bound || right > right_bound || left > 127 || right > 127) return false;
+            previous = interval.end;
+        }
+        const uint32_t loop_start = static_cast<uint32_t>(asset.loop_start_sample) << 16;
+        if (previous != (pcm_loop_end_sample(asset) << 16) || map.intervals[map.loop_index].end <= loop_start ||
+            (map.loop_index && map.intervals[map.loop_index - 1].end > loop_start)) return false;
+    }
+    return !asset.interpolation_source_bytes || asset.interpolation_source_bytes == bytes;
+}
+
 constexpr bool is_valid_pcm_asset_constexpr(const PcmAsset& asset) {
     return asset.samples != nullptr &&
            asset.sample_count > 0 &&
            asset.sample_count <= 0xFFFFu &&
            is_valid_pcm_sample_rate(asset.sample_rate_hz) &&
-           is_valid_pcm_loop(asset);
+           is_valid_pcm_loop(asset) &&
+           (asset.native_gain_samples == nullptr || is_valid_pcm_volume(asset.native_gain_primary_volume)) &&
+           is_valid_pcm_interpolation_maps(asset);
 }
 
 bool is_valid_sfx_asset(const SfxAsset& asset);
@@ -253,7 +362,12 @@ constexpr AudioMixCost invalid_audio_mix_cost() {
     };
 }
 
+constexpr AudioMixCost estimate_pcm_asset_cost(const PcmAsset& asset);
+
 constexpr AudioMixCost estimate_sfx_asset_cost(const SfxAsset& asset) {
+    if (asset.pcm != nullptr) {
+        return asset.pcm_volume <= 15 ? estimate_pcm_asset_cost(*asset.pcm) : invalid_audio_mix_cost();
+    }
     if (asset.tones == nullptr || asset.tone_count == 0 || asset.tone_count > 0xFFFFu) {
         return invalid_audio_mix_cost();
     }
@@ -363,6 +477,16 @@ constexpr AudioMixCost estimate_tracker_asset_cost(const TrackerAsset& asset) {
     };
 }
 
+constexpr uint32_t pcm_asset_source_bytes(const PcmAsset& asset) {
+    const bool separate_gain_data = asset.native_gain_samples != nullptr && asset.native_gain_samples != asset.samples;
+    uint32_t bytes = static_cast<uint32_t>(asset.sample_count) * (separate_gain_data ? 2u : 1u);
+    if (asset.interpolation_source_bytes) return bytes + asset.interpolation_source_bytes;
+    if (asset.interpolation_maps != nullptr) for (size_t i = 0; i < asset.interpolation_map_count; ++i) {
+        bytes += 12u + static_cast<uint32_t>(asset.interpolation_maps[i].interval_count) * 8u;
+    }
+    return bytes;
+}
+
 constexpr uint32_t estimate_pcm_output_sample_count(const PcmAsset& asset) {
     return static_cast<uint32_t>(
         (static_cast<uint64_t>(asset.sample_count) * PCM_MIXER_SAMPLE_RATE_HZ + asset.sample_rate_hz - 1u) /
@@ -380,8 +504,8 @@ constexpr AudioMixCost estimate_pcm_asset_cost(const PcmAsset& asset) {
         ? invalid_audio_mix_cost()
         : AudioMixCost {
             true,
-            static_cast<uint32_t>(asset.sample_count),
-            static_cast<uint32_t>(asset.sample_count),
+            pcm_asset_source_bytes(asset),
+            pcm_asset_source_bytes(asset),
             0,
             estimate_pcm_mixer_frame_count(asset),
             0,

@@ -8,6 +8,7 @@ import { deriveEventsWorkspacePresentation } from "../src/shared/eventsWorkspace
 import { deriveAudioWorkspacePresentation } from "../src/shared/audioWorkspace.js";
 import { buildAssetcAudioPackGeneration } from "../src/shared/engineProjectExport.js";
 import { parseGBAProjectFile, serializeGBAProjectFile } from "../src/shared/projectFile.js";
+import { preserveExemploCoastalAudio } from "./exemplo-coastal-audio.mjs";
 import { promoteExemploGBAAudio } from "./exemplo-gba-audio.mjs";
 import { promotePlatformerV7 } from "./promote-platformer-v7.mjs";
 import { promotePlatformerV8 } from "./promote-platformer-v8.mjs";
@@ -156,6 +157,7 @@ const imported = useCurrentTemplate ? null : await importGBStudioProject(sourceP
 try {
   // O template distribuído é a única fonte autoritativa.
   const promoted = parseGBAProjectFile(await readFile(templateProjectPath, "utf8"));
+  const approvedAudioSource = structuredClone(promoted.data);
   const promotedImport = promoted.data.gbStudioImport as Record<string, unknown> | undefined;
   const freshImport = (imported?.project ?? promoted).data.gbStudioImport as Record<string, unknown> | undefined;
   const alreadyVertice = isVerticeShowcaseProject(promoted.data);
@@ -214,6 +216,7 @@ try {
     uiDialogs!.boxImage = "";
   }
 
+  promoted.data = preserveExemploCoastalAudio(approvedAudioSource, promoted.data);
   promoted.data = pruneObsoleteExampleScripts(promoted.data);
   const presentation = deriveEventsWorkspacePresentation(promoted.data);
   const audio = deriveAudioWorkspacePresentation(promoted.data);

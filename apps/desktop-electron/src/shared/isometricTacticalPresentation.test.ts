@@ -226,9 +226,13 @@ describe("isometric tactical presentation contract", () => {
     expect(issues.filter((issue) => issue.module === "tactical_units")).toHaveLength(1);
   });
 
-  it("requires composed tracker audio with a matching kind for music and cues", () => {
+  it("accepts supported trackers and PCM cues with matching kinds", () => {
     expect(validateIsometricTacticalAudioCatalog(tacticalAudioItems, fullPresentation, ["tactical_audio"])).toEqual([]);
 
+    for (const format of ["MOD", "S3M"]) {
+      const imported = tacticalAudioItems.map(audio => ({ ...audio, format: audio.kind === "Musica" ? format : "WAV" }));
+      expect(validateIsometricTacticalAudioCatalog(imported, fullPresentation, ["tactical_audio"])).toEqual([]);
+    }
     const pcmMusic = tacticalAudioItems.map((audio) => (
       audio.id === "music" ? { ...audio, format: "WAV" } : audio
     ));

@@ -1226,6 +1226,10 @@ void consume_event_state() {
         gbs::set_audio_channel_muted(gbs::audio_channel_from_event_value(event_state.audio_mute_channel), event_state.audio_mute_enabled);
         event_state.audio_mute_changed = false;
     }
+    if (event_state.audio_mixing_rate_changed) {
+        gbs::set_audio_mixing_rate(static_cast<uint32_t>(event_state.audio_mixing_rate_hz));
+        event_state.audio_mixing_rate_changed = false;
+    }
     if (event_state.audio_volume_changed) {
         gbs::set_audio_channel_volume(gbs::audio_channel_from_event_value(event_state.audio_volume_channel), static_cast<uint8_t>(event_state.audio_volume));
         event_state.audio_volume_changed = false;

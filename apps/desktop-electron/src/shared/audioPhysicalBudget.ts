@@ -1,3 +1,4 @@
+import { isPcmAudio } from "./audioPcm.js";
 import {
   compileComposedMusicaToTracker,
   compileComposedSfxToAssetc,
@@ -40,7 +41,7 @@ function exportIDForAudio(audio: Record<string, unknown>): string {
  * this helper only handles composed Musica and SFX items.
  */
 export function estimateComposedAudioPhysicalBytes(audio: Record<string, unknown>): number | null {
-  if (!hasComposedAudioContent(audio)) return null;
+  if (isPcmAudio(audio) || !hasComposedAudioContent(audio)) return null;
   // Sample bytes depend on conversion of the actual WAV, measured by assetc.
   if (recordArray(audio.patterns).some(pattern => recordArray(pattern.channels).some(channel => channel.sampleAssetID))) return null;
 

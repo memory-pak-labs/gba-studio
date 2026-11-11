@@ -75,7 +75,8 @@ static void gbs_hw_draw_hud_choice_selector(int x, int y);
 #define MEM_WAVE_RAM ((volatile uint32_t*)0x04000090)
 #define MEM_IRQ_HANDLER (*(void (**)(void))0x03007FFC)
 
-static uint16_t shadow_oam[128 * 4];
+/* DMA/publication buffers use EWRAM; reserve IWRAM for the audio kernels. */
+static uint16_t shadow_oam[128 * 4] __attribute__((section(".ewram_bss"), aligned(4)));
 static uint32_t published_oam_enabled;
 static GbsOamOccupancy staged_oam = {{0xffffffffu,0xffffffffu,0xffffffffu,0xffffffffu}};
 static uint16_t dialogue_ordered_oam[128 * 4] __attribute__((section(".ewram_bss")));
@@ -131,6 +132,8 @@ static uint32_t pcm_underrun_count;
 static const uint8_t* volatile pcm_pending_left;
 static const uint8_t* volatile pcm_pending_right;
 static volatile uint8_t pcm_pending_ready;
+static volatile uint16_t pcm_pending_sample_count;
+static uint16_t pcm_stream_sample_count;
 static uint8_t pcm_stereo_stream;
 static uint8_t pcm_timer_running;
 static uint8_t pcm_stop_after_pending;
@@ -689,7 +692,7 @@ static uint16_t name_input_glyph_tile_entry(unsigned tile_index) {
 
 static unsigned dialogue_bg_tile_for_codepoint(uint32_t codepoint);
 static unsigned dialogue_obj_tile_for_codepoint(uint32_t codepoint, unsigned slot);
-static uint16_t resident_font_glyphs[GBS_TEXT_RESIDENT_GLYPHS];
+static uint16_t resident_font_glyphs[GBS_TEXT_RESIDENT_GLYPHS] __attribute__((section(".ewram_bss")));
 static uint8_t resident_font_slots[GBS_TEXT_GLYPH_COUNT];
 
 static void rebuild_resident_font_slots(void) {
@@ -717,7 +720,7 @@ struct HudLayoutRect {
     int width;
     int height;
 };
-static struct HudLayoutRect hud_layout_previous_rects[HUD_LAYOUT_MAX_COMPONENTS];
+static struct HudLayoutRect hud_layout_previous_rects[HUD_LAYOUT_MAX_COMPONENTS] __attribute__((section(".ewram_bss")));
 static int hud_layout_previous_count = 0;
 static int hud_layout_current_count = 0;
 static unsigned hud_pixel_text_obj_count = 0;
@@ -3224,8 +3227,8 @@ void gbs_hw_audio_unlock_state(uint16_t previous) {
 }
 
 void gbs_hw_audio_start_pcm8_stereo_stream(uint32_t sample_rate_hz) {
-    if (sample_rate_hz < 4000u) sample_rate_hz = 4000u;
-    if (sample_rate_hz > 32768u) sample_rate_hz = 32768u;
+    if (sample_rate_hz != 10512u && sample_rate_hz != 21024u && sample_rate_hz != 31536u) return;
+    pcm_stream_sample_count = (uint16_t)(sample_rate_hz / 10512u * 176u);
 
     volatile uint32_t* dma_a = (volatile uint32_t*)(DMA_BASE + 1 * 12);
     volatile uint32_t* dma_b = (volatile uint32_t*)(DMA_BASE + 2 * 12);
@@ -3271,11 +3274,12 @@ void gbs_hw_audio_submit_pcm8_stream_block(const uint8_t* samples, uint32_t samp
 }
 
 void gbs_hw_audio_submit_pcm8_stereo_stream_block(const uint8_t* left_samples, const uint8_t* right_samples, uint32_t sample_count) {
-    if (left_samples == 0 || right_samples == 0 || sample_count != 528u) return;
+    if (left_samples == 0 || right_samples == 0 || (sample_count != 176u && sample_count != 352u && sample_count != 528u)) return;
     const uint16_t ime = REG_IME;
     REG_IME = 0;
     pcm_pending_left = left_samples;
     pcm_pending_right = right_samples;
+    pcm_pending_sample_count = (uint16_t)sample_count;
     pcm_pending_ready = 1;
     pcm_stop_after_pending = 0;
     REG_IME = ime;
@@ -3303,6 +3307,16 @@ static void commit_pcm_stream_block(void) {
     if (pcm_dma_block_started && ((dma_a[2] & DMA_ENABLE) == 0u || (dma_b[2] & DMA_ENABLE) == 0u)) ++pcm_underrun_count;
     dma_a[2] = 0;
     dma_b[2] = 0;
+    if (pcm_pending_sample_count != pcm_stream_sample_count) {
+        // Commit the timer change with the corresponding buffer, never while
+        // the old frame is playing. Discard only its prefetched padding.
+        gbs_hw_timer_stop(1);
+        pcm_timer_running = 0;
+        REG_SOUNDCNT_H = (uint16_t)(REG_SOUNDCNT_H | (1u << 11) | (1u << 15));
+        REG_SOUNDCNT_H = (uint16_t)(REG_SOUNDCNT_H & ~((1u << 11) | (1u << 15)));
+        REG16(TIMER_BASE + 1 * 4) = (uint16_t)(65536u - 280896u / pcm_pending_sample_count);
+        pcm_stream_sample_count = pcm_pending_sample_count;
+    }
     dma_a[0] = (uint32_t)pcm_pending_right;
     dma_a[1] = (uint32_t)&REG_FIFO_A;
     dma_b[0] = (uint32_t)pcm_pending_left;

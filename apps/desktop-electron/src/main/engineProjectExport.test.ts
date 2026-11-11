@@ -24,6 +24,10 @@ import { saveProjectFileAtomically } from "./projectPersistence.js";
 import { copyCurrentTechnicalAsset } from "./currentTechnicalAssets.js";
 import type { GBAProjectData } from "../shared/projectFile.js";
 
+// Cold ARM builds include asset preparation and cross-compilation. Their
+// assertions verify exported ROMs; host build duration is not a performance gate.
+const armRomTestTimeout = 120_000;
+const armTemplateMatrixTimeout = 300_000;
 const temporaryRoots: string[] = [];
 const execFileAsync = promisify(execFile);
 const localEnginePackPath = process.env.GBA_STUDIO_ENGINE_PACK_SOURCE || path.join(process.cwd(), "../../packages/GBAStudioEngine/dist/GBAStudioEnginePack");
@@ -206,7 +210,7 @@ async function assertNativeVisualExportArtifacts(destination: string, expectedTa
       tracker?: unknown[];
     };
     expect(audioPack.pcm).toHaveLength(1);
-    expect(audioPack.sfx).toHaveLength(0);
+    expect(audioPack.sfx).toEqual([expect.objectContaining({ name: "confirm", pcm: "confirm" })]);
     expect(audioPack.tracker).toHaveLength(1);
     const generatedExport = JSON.parse(await readFile(path.join(destination, "export_project.json"), "utf8")) as {
       topdown_project?: { scripts?: Array<{ name?: string; script?: Array<{ op?: string }> }> };
@@ -787,7 +791,7 @@ describe("Engine project export writer", () => {
       "--json"
     ], { maxBuffer: 8 * 1024 * 1024 });
     expect(JSON.parse(schemaValidation.stdout) as { ok?: boolean }).toMatchObject({ ok: true });
-  }, 20_000);
+  }, armRomTestTimeout);
 
   it.runIf(existsSync(localAssetcPath) && existsSync(localGbsdoctorPath) && existsSync(localGbsbuildPath))("exports a platformer start room through assetc into a buildable native platformer ROM", async () => {
     const root = await mkdtemp(path.join(os.tmpdir(), "gbastudio-electron-platformer-export-real-"));
@@ -1285,7 +1289,7 @@ describe("Engine project export writer", () => {
         }
       }
     },
-    60_000
+    armTemplateMatrixTimeout
   );
 
   it.runIf(existsSync(localAssetcPath) && existsSync(localGbsdoctorPath) && existsSync(localGbsbuildPath))("exports topdown, platformer and isometric rooms into one buildable mixed runtime ROM", async () => {
@@ -1423,7 +1427,7 @@ describe("Engine project export writer", () => {
     });
     expect(build.exitCode).toBe(0);
     expect(existsSync(path.join(destination, "build", "mixed_runtime_export.gba"))).toBe(true);
-  }, 20_000);
+  }, armRomTestTimeout);
 
   it.runIf(existsSync(localAssetcPath) && existsSync(localGbsdoctorPath) && existsSync(localGbsbuildPath))("materializes the bundled isometric tilemap and builds a native ROM", async () => {
     const root = isometricAnimationEvidenceDir
@@ -1502,7 +1506,7 @@ describe("Engine project export writer", () => {
     });
     expect(build.exitCode, build.stderr ?? build.error).toBe(0);
     expect(existsSync(path.join(destination, "build", "isometric_demo.gba"))).toBe(true);
-  }, 20_000);
+  }, armRomTestTimeout);
 
   it.runIf(existsSync(localGbsdoctorPath) && existsSync(localGbsbuildPath))("exports the real migration fixture into a buildable runtime overlay ROM", async () => {
     const root = fixtureEvidenceDir
@@ -1658,7 +1662,7 @@ describe("Engine project export writer", () => {
     });
 
     await assertNativeVisualExportArtifacts(destination, "electron_p0_functional");
-  }, 20_000);
+  }, armRomTestTimeout);
 
   it.runIf(existsSync(localAssetcPath) && existsSync(localGbsdoctorPath) && existsSync(localGbsbuildPath))("exports the runtime canary through assetc into a buildable native ROM", async () => {
     const root = runtimeCanaryEvidenceDir
@@ -1689,7 +1693,7 @@ describe("Engine project export writer", () => {
     });
 
     await assertNativeVisualExportArtifacts(destination, "runtime_canary");
-  }, 20_000);
+  }, armRomTestTimeout);
 
   it("rejects generated file paths that try to leave the destination", async () => {
     const destination = await mkdtemp(path.join(os.tmpdir(), "gbastudio-electron-export-"));

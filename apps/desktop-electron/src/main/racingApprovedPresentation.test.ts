@@ -11,7 +11,7 @@ describe('approved racing feedback authoring', () => {
         expect(normalizeRacingSceneConfig({ actionSounds: sounds }).actionSounds).toEqual(sounds);
         expect((normalizeSceneRuntime('racing', { type: 'racing', config: { actionSounds: sounds } }) as any).config.actionSounds).toEqual(sounds);
     });
-    it('exports only PSG sounds and preserves seven-pixel HUD text', () => {
+    it('exports compatible SFX and preserves seven-pixel HUD text', () => {
         const p = JSON.parse(readFileSync('default-assets/templates/exemplo-gba/exemplo-gba.gba-project', 'utf8'));
         const audio = JSON.parse(readFileSync('fixtures/asset-provenance/racing-approved-manifest.json', 'utf8')).audioItems;
         p.audioItems.push(...audio.filter((a: any) => !p.audioItems.some((b: any) => b.id === a.id)));
@@ -27,6 +27,6 @@ describe('approved racing feedback authoring', () => {
         expect(Object.values(room.action_sounds!).every(i => Number.isInteger(i) && i >= 0)).toBe(true);
         for (const rows of [p.rooms, p.scenas])
             rows.find((r: any) => r.name === 'circuito_final').runtime.config.actionSounds.accelerate = 'corrida_circuito_dos_farois';
-        expect(() => buildEngineExportProjectContract(p)).toThrow(/SFX PSG/);
+        expect(() => buildEngineExportProjectContract(p)).toThrow(/SFX compilado/);
     });
 });

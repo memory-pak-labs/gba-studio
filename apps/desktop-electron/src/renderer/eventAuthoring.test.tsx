@@ -30,6 +30,17 @@ const callbacks = () => ({
 describe("event authoring flows", () => {
   afterEach(() => { cleanup(); localStorage.clear(); });
 
+  it("offers supported mixer frequencies in the event card", async () => {
+    const data = { events: [{ id: "mix", name: "mix", category: "Cena", steps: [{ command: "set_audio_mixing_rate 31536" }] }] };
+    const props = callbacks();
+    render(<EventInspectorPanel {...props} projectData={data} presentation={deriveEventsWorkspacePresentation(data)} eventName="mix" triggerLabel="Ao iniciar" />);
+    await userEvent.setup().click(screen.getByRole("button", { name: "Passo 1: Definir frequência de mixagem" }));
+    const rate = screen.getByLabelText("Frequência de mixagem (Hz) do evento");
+    expect(within(rate).getAllByRole("option").map(option => (option as HTMLOptionElement).value)).toEqual(["10512", "21024", "31536"]);
+    fireEvent.change(rate, { target: { value: "21024" } });
+    expect(props.onUpdateEventStep).toHaveBeenLastCalledWith("mix", 0, { command: "set_audio_mixing_rate 21024" });
+  });
+
   it("edits an optional scene arrival without shifting coordinates", async () => {
     const data = { scenas: [{ name: "Caverna" }], events: [{ id: "go", name: "go", category: "Cena", steps: [{ command: "change_scene Caverna" }] }] };
     const props = callbacks();

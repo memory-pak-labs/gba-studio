@@ -65,7 +65,7 @@ describe("Exemplo template full-project smoke contract", () => {
     const source = await readFile(new URL("./smoke-electron-exemplo-template.mjs", import.meta.url), "utf8");
     expect(source).not.toContain("runtimeSceneBuilds");
     expect(source).not.toContain("representativeRuntimes");
-    expect(source.match(/clickButtonByAriaLabel\(cdp, "Executar ROM"\)/g)).toHaveLength(1);
+    expect(source.match(/clickButtonByAriaLabel\(cdp, "Executar ROM", 15_000\)/g)).toHaveLength(1);
     expect(source).toContain('"play-full-project"');
     expect(source).toContain('"single-canonical-example-project"');
     expect(source).toContain('"mixed-runtime-all-13-scene-types"');

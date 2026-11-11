@@ -1574,3 +1574,27 @@
 .studio-deletion-choices legend {
   font-weight: var(--studio-font-weight-semibold);
 }
+
+/* PCM authoring follows the application font scale. */
+.pcm-track small,
+.pcm-track > div button,
+.pcm-piano .audio-groove-page-controls {
+  font-size: var(--studio-font-size-2xs);
+}
+
+.pcm-sfx-editor p,
+.pcm-sfx-editor label {
+  font-size: var(--studio-font-size-sm);
+}
+
+.pcm-sfx-waveform figcaption {
+  font-size: var(--studio-font-size-xs);
+}
+
+/* WAV waveform editor: typography uses the shared token layer. */
+.wav-sample-editor h4 { font-size: var(--studio-font-size-md); }
+.wav-editor-help, .wav-sample-editor footer { font-size: var(--studio-font-size-sm); }
+.wav-editor-channel-labels { font-size: var(--studio-font-size-xs); }
+.wav-editor-ruler { font-size: var(--studio-font-size-xs); }
+.wav-editor-ranges output { font-size: var(--studio-font-size-sm); }
+.wav-editor-pan { font-size: var(--studio-font-size-sm); }

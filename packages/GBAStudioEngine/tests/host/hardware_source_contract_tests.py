@@ -251,6 +251,21 @@ int main(void) {
         self.assertLess(wait_body.index("commit_shadow_oam();"), wait_body.index("gbs_emit_vblank_interrupt"))
         self.assertIn("commit_shadow_oam_full();", init_body)
 
+    def test_render_publication_buffers_leave_iwram_for_audio(self) -> None:
+        for name in ("shadow_oam", "hud_layout_previous_rects", "resident_font_glyphs"):
+            declaration = next(line for line in self.source.splitlines() if line.startswith("static ") and name + "[" in line)
+            self.assertIn('section(".ewram_bss")', declaration)
+
+    def test_cold_diagnostics_leave_fast_ram_for_audio(self) -> None:
+        debug = (ROOT / "engine/src/gbs_debug.cpp").read_text()
+        self.assertRegex(debug, r'counters\[gbs::debug_counter_count\] __attribute__\(\(section\(".ewram_bss"\)\)\)')
+        self.assertRegex(debug, r'overlay_buffer\[26 \* 7 \+ 1\] __attribute__\(\(section\(".ewram_bss"\)\)\)')
+
+    def test_frequent_font_lookups_remain_in_iwram(self) -> None:
+        for name in ("resident_font_slots", "hud_pixel_text_glyphs"):
+            declaration = next(line for line in self.source.splitlines() if line.startswith("static ") and name + "[" in line)
+            self.assertNotIn('section(".ewram_bss")', declaration)
+
     def test_render_publication_gate_defers_all_shadow_state_until_vram_is_ready(self) -> None:
         wait_body = function_body(self.source, "gbs_hw_wait_vblank")
         map_body = function_body(self.source, "gbs_hw_load_bg_tilemap")
@@ -973,6 +988,18 @@ int main(void){dispatch();dispatch();assert(arms==2);assert(irq_ticks==2);assert
             self.event_source,
         )
 
+    def test_pcm_rate_switch_is_queued_with_its_block_and_resets_at_commit(self) -> None:
+        submit = function_body(self.source, "gbs_hw_audio_submit_pcm8_stereo_stream_block")
+        commit = function_body(self.source, "commit_pcm_stream_block")
+        for count in (176,352,528): self.assertIn(str(count)+"u",submit)
+        self.assertIn("pcm_pending_sample_count =",submit)
+        self.assertNotIn("gbs_hw_timer_stop",submit)
+        self.assertIn("pcm_pending_sample_count != pcm_stream_sample_count",commit)
+        self.assertIn("280896u / pcm_pending_sample_count",commit)
+        self.assertIn("gbs_hw_timer_stop(1)",commit)
+        self.assertIn("1u << 11",commit)
+        self.assertIn("1u << 15",commit)
+
     def test_pcm_mix_buffers_are_kept_in_ewram_on_arm(self) -> None:
         self.assertIn(
             '#define GBS_AUDIO_EWRAM __attribute__((section(".ewram_bss")))',
@@ -986,9 +1013,8 @@ int main(void){dispatch();dispatch();assert(arms==2);assert(irq_ticks==2);assert
     def test_pcm_mixer_preserves_signed_samples_for_fifo_bytes(self) -> None:
         self.assertIn("uint8_t encode_pcm_fifo_sample(int8_t sample)", self.audio_source)
         self.assertIn("return static_cast<uint8_t>(sample);", self.audio_source)
-        self.assertIn("encode_pcm_fifo_sample(clamp_pcm_sample(pcm_mix_accumulator[index]))", self.audio_source)
-        self.assertIn("uint8_t* output = side == 0 ? left_buffer : right_buffer;", self.audio_source)
-        self.assertIn("write_pcm_mix_side(output, pcm_block_stereo ? nullptr : right_buffer)", self.audio_source)
+        self.assertIn("left_buffer[i] = encode_pcm_fifo_sample(clamp_pcm_sample(left))", self.audio_source)
+        self.assertIn("right_buffer[i] = encode_pcm_fifo_sample(clamp_pcm_sample(right))", self.audio_source)
 
 
 if __name__ == "__main__":

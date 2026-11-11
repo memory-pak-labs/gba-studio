@@ -1819,6 +1819,12 @@
   padding-top: 0;
 }
 
+.room-editor-tool-rail.is-scene-focus .room-editor-tool-rail-zoom > strong {
+  height: auto;
+  overflow: visible;
+  position: static;
+}
+
 .room-editor-tool-rail.is-scene-focus {
   justify-content: flex-start;
   min-height: 0;

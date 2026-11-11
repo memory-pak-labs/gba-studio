@@ -124,7 +124,7 @@ it("o JSON conserva o mesmo áudio compilado de toda a composição", () => {
 });
 
 it("não dá diagnóstico de exportação OK a um formato importado não suportado", () => {
-  const data = { assets: [{ id: "xm", name: "tema.xm", kind: "Musica", metadata: { source: "Assets/music/tema.xm" } }], audioItems: [{ id: "a", name: "tema.xm", kind: "Musica", format: "XM" }] };
+  const data = { assets: [{ id: "mp3", name: "tema.mp3", kind: "Musica", metadata: { source: "Assets/music/tema.mp3" } }], audioItems: [{ id: "a", name: "tema.mp3", kind: "Musica", format: "MP3" }] };
   const result = deriveAudioWorkspacePresentation(data);
   expect(result.items[0].status).toBe("Bloqueado");
   expect(result.exportDiagnostics.some(diagnostic => diagnostic.level === "ok")).toBe(false);

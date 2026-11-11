@@ -36,6 +36,18 @@ function settingsHandlers(overrides: Record<string, unknown> = {}) {
 }
 
 describe("SettingsWorkspace React", () => {
+  it("edits PCM output frequency separately from WAV conversion", async () => {
+    const user = userEvent.setup();
+    const onUpdateSetting = vi.fn();
+    render(<SettingsWorkspace scope="export" presentation={deriveSettingsWorkspacePresentation({ settings: { audio: { sampleRate: 22050 } } })} {...settingsHandlers({ onUpdateSetting })} />);
+    await user.click(screen.getByRole("button", { name: "Seção de ajustes: Áudio" }));
+    const mixing = screen.getByRole("combobox", { name: "Frequência de mixagem" });
+    expect(mixing).toHaveValue("31536");
+    expect(within(mixing).getAllByRole("option").map(option => (option as HTMLOptionElement).value)).toEqual(["10512", "21024", "31536"]);
+    await user.selectOptions(mixing, "21024");
+    expect(onUpdateSetting).toHaveBeenCalledWith("audio", "mixingRate", 21024);
+    expect(screen.getByRole("combobox", { name: "Sample rate" })).toHaveValue("22050");
+  });
   it("allows eight RPG enemies and limits the party to four engine slots", async () => {
     const user = userEvent.setup();
     const onUpdateSetting = vi.fn();

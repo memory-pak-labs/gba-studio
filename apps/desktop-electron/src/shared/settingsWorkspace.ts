@@ -1,3 +1,4 @@
+import { AUDIO_MIXING_RATES, DEFAULT_AUDIO_MIXING_RATE, isAudioMixingRate } from "./audioMixing.js";
 import type { GBAProjectData } from "./projectFile.js";
 import type { SettingsPathValidationTarget } from "./ipc.js";
 import { isEditableSettingsField, isSettingsInformationField, isSupportedSettingsField } from "./settingsFieldPolicy.js";
@@ -541,7 +542,8 @@ const SETTINGS_FIELD_DEFINITIONS: Record<SettingsSectionID, SettingsFieldDefinit
     { key: "audioEngine", label: "Engine", type: "text", defaultValue: "gbastudio_engine_audio" },
     { key: "audioMode", label: "Modo", type: "text", defaultValue: "chiptune_pcm" },
     { key: "defaultMusicFormat", label: "Formato musica", type: "text", defaultValue: "gba_studio_chiptune" },
-    { key: "sampleRate", label: "Sample rate", type: "number", defaultValue: 0 },
+    { key: "sampleRate", label: "Sample rate", description: "Taxa de conversão dos samples WAV importados. Automático escolhe uma taxa adequada à engine; este campo não define a frequência de mixagem.", type: "number", defaultValue: 0 },
+    { key: "mixingRate", label: "Frequência de mixagem", description: "Saída PCM da engine e da prévia. O padrão é 31.536 Hz. Taxas menores reduzem a banda de áudio e o custo de processamento. Pode ser alterada por evento.", type: "number", defaultValue: DEFAULT_AUDIO_MIXING_RATE },
     { key: "masterVolume", label: "Master", type: "number", defaultValue: 100, minimum: 0, maximum: 127, step: 1, range: true, unit: "nível" },
     { key: "musicVolume", label: "Musica", type: "number", defaultValue: 80, minimum: 0, maximum: 127, step: 1, range: true, unit: "nível" },
     { key: "sfxVolume", label: "SFX", type: "number", defaultValue: 90, minimum: 0, maximum: 127, step: 1, range: true, unit: "nível" },
@@ -1214,6 +1216,9 @@ function editableFieldOptions(sectionID: SettingsSectionID, key: string, data: G
   if ((sectionID === "visualNovel" || sectionID === "cutscene") && key === "backgroundIndex") {
     return [{ value: -1, label: "Sem fundo" }, ...backgroundReferenceOptions(data)];
   }
+  if (sectionID === "audio" && key === "mixingRate") {
+    return AUDIO_MIXING_RATES.map(value => ({ value, label: `${value.toLocaleString("pt-BR")} Hz${value === DEFAULT_AUDIO_MIXING_RATE ? " · padrão" : ""}` }));
+  }
   if (sectionID === "audio" && key === "sampleRate") {
     const savedRate = nestedValue(child(settingsRecord(data), "audio"), "sampleRate");
     return [
@@ -1472,6 +1477,10 @@ function settingsDiagnostics(options: {
     diagnostics.push(diagnostic("export-folder", "Export", "Pasta de exportacao nao definida.", "warning"));
   }
 
+  const mixingRate = nestedValue(child(settingsRecord(options.data), "audio"), "mixingRate");
+  if (mixingRate !== undefined && !isAudioMixingRate(mixingRate)) {
+    diagnostics.push(diagnostic("mixing-rate", "Mixagem PCM", "Frequência de mixagem inválida: escolha 10.512, 21.024 ou 31.536 Hz.", "warning"));
+  }
   const pcmRate = nestedValue(child(settingsRecord(options.data), "audio"), "sampleRate");
   if (pcmRate !== undefined && pcmRate !== 0 && (typeof pcmRate !== "number" || !Number.isInteger(pcmRate) || pcmRate < 4000 || pcmRate > 32768)) {
     diagnostics.push(diagnostic("pcm-rate", "Áudio PCM", "Taxa PCM inválida: selecione Automático ou uma taxa entre 4.000 e 32.768 Hz.", "warning"));
@@ -1490,6 +1499,8 @@ export function updateSettingsFieldInProject(
   if (!knownField || !isEditableSettingsField(sectionID, fieldKey)) return data;
   if (sectionID === "audio" && fieldKey === "sampleRate"
     && (typeof value !== "number" || !Number.isInteger(value) || (value !== 0 && (value < 4000 || value > 32768)))) return data;
+
+  if (sectionID === "audio" && fieldKey === "mixingRate" && !isAudioMixingRate(value)) return data;
 
   const next = cloneProjectData(data);
   const settings = isRecord(next.settings) ? next.settings : {};
@@ -1881,13 +1892,14 @@ export function deriveSettingsWorkspacePresentation(data: GBAProjectData): Setti
       "audio",
       "Assets e Conteudo",
       "Audio",
-      "Taxa de conversão PCM; música e SFX no workspace Áudio",
+      "Conversão de samples e mixagem PCM; música e SFX no workspace Áudio",
       audio,
       [
         item("Engine", stringField(audio, "audioEngine", "Nao definido"), stringField(audio, "audioEngine", "").includes("engine") ? "ok" : "muted"),
         item("Modo", stringField(audio, "audioMode", "Nao definido")),
         item("Formato musica", stringField(audio, "defaultMusicFormat", "Nao definido")),
         item("Sample rate", numberField(audio, "sampleRate")),
+        item("Frequência de mixagem", `${nestedValue(audio, "mixingRate") ?? DEFAULT_AUDIO_MIXING_RATE} Hz`),
         item("Master", numberField(audio, "masterVolume")),
         item("Musica", numberField(audio, "musicVolume")),
         item("SFX", numberField(audio, "sfxVolume")),

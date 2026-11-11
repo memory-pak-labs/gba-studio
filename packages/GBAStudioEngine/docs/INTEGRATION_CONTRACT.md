@@ -65,7 +65,7 @@ O exportador futuro deve chamar `assetc` para gerar headers C++ com:
 - Spritesheets nos 12 formatos OBJ nativos do GBA entre `8x8` e `64x64`, emitidas como um OBJ por frame com `SpriteAnimation` quando `--sprite-width`/`--sprite-height` forem informados. `--sprite-bpp 4|8` seleciona a profundidade; em 8bpp o `destination_tile` precisa ser par, cada tile logico consome 64 bytes e dois indices fisicos, e a paleta deve usar o banco OBJ global 0. Dimensoes fora desses pares exigem decomposicao explicita em metasprite.
 - Audio PSG/tracker/PCM via JSON pequeno usando `assetc --audio-json`, gerando `SfxAsset`, `MusicAsset`, `TrackerAsset` e `PcmAsset`. `tracker[].mod` pode importar MOD ProTracker 4 canais subset para `TrackerAsset`, incluindo volume/finetune de sample, `0xy` arpeggio, `1xx`/`2xx` slides aproximados, `3xx` portamento aproximado, `4xy` vibrato aproximado, `7xy` tremolo aproximado, `Bxx` pattern jump, `Dxx` pattern break e efeitos basicos `Axy`/`Cxx`/`Fxx`, com `Fxx > 32` como BPM aproximado; `tracker[].s3m` pode importar S3M subset com notas, order table, volume de instrumento, volume column, `Axx`, `Bxx` pattern jump, `Cxx` pattern break, `Txx`, `Dxy`, slides aproximados `Exx`/`Fxx`, `Gxx` portamento aproximado, `Hxy` vibrato aproximado e `Rxy` tremolo aproximado; `tracker[].vgm` pode importar VGM SN76489 subset com writes PSG, waits basicos, mudancas de volume e noise channel, pulando Game Gear stereo byte e data blocks auxiliares. PCM Direct Sound continua assinado em 8 bits e `PcmSfxOptions::pan` distribui SFX entre FIFO A/B.
 - Instrumentos WAV do piano roll usam `tracker[].samples[]` (`asset_id`, `wav`, `loop`) e steps com `sample_index`, `sample_pitch_ratio` e `sample_only: true`. O sample toca no mixer PCM sem duplicar a nota em PSG; a nota original do WAV determina a transposição. A exportação exige a capability `audio.tracker_sample_instruments`. Samples precisam conter 1 a 65.535 amostras após conversão; WAVs longos são rejeitados.
-- No GBA, o relógio de áudio avança em VBlank independentemente dos frames de renderização. O mixer produz 528 amostras por frame a aproximadamente 31.536 Hz (timer de 532 ciclos), publica o bloco anterior antes de preparar o próximo e usa FIFO DMA com repetição. Mutações do playback são publicadas em seções críticas curtas; validação dos assets ocorre fora delas. `audio_update()` continua avançando um frame nos testes host.
+- No GBA, o relógio de áudio avança em VBlank independentemente dos frames de renderização. Por padrão, o mixer produz 528 amostras por frame a aproximadamente 31.536 Hz (timer de 532 ciclos); também aceita 21.024 Hz (352 amostras, 798 ciclos) e 10.512 Hz (176 amostras, 1.596 ciclos). O mixer publica o bloco anterior antes de preparar o próximo e usa FIFO DMA com repetição. Mutações do playback são publicadas em seções críticas curtas; validação dos assets ocorre fora delas. `audio_update()` continua avançando um frame nos testes host.
 - WAV PCM mono/stereo 8/16-bit pode ser referenciado por `pcm[].wav` relativo ao JSON exportado. Samples MOD ProTracker podem ser extraidos para `PcmAsset` com `pcm[].mod_sample` e `sample_index`; samples S3M 8/16-bit mono/stereo nao comprimidos podem ser extraidos com `pcm[].s3m_sample` e `instrument_index`, com downmix stereo para mono. `pcm[].loop_start_sample` e `pcm[].loop_end_sample` podem ser declarados pelo exportador; quando omitidos, loops nativos de samples MOD/S3M sao preservados automaticamente.
 
 Opcoes atuais relevantes:
@@ -236,3 +236,262 @@ GBA Studio conseguir, no mesmo fluxo:
 
 Uma room top-down ou ROM isolada continua util como teste de componente, mas
 nao comprova mais paridade do produto completo.
+
+
+## Importação de música com múltiplos canais PCM
+
+`audio.tracker_pcm_16_channels` identifica o importador e runtime que conservam
+até 16 canais de samples em MOD (`nCHN`/`nnCH`, além das assinaturas de quatro
+canais existentes) e S3M. Canais PCM são independentes das quatro vozes PSG;
+o compositor PSG mantém seu contrato de quatro vozes de hardware.
+
+O S3M usa um mapeamento estável dos canais PCM habilitados, inclusive quando
+existem lacunas entre seus índices. Canais desabilitados não geram notas.
+Mais de 16 canais habilitados é um erro explícito: nunca há redução por `% 4`.
+O MOD também rejeita explicitamente assinaturas com mais de 16 canais.
+
+Os passos importados com instrumento usam `sample_only`, conservam o índice
+do sample e sua taxa de reprodução e não adicionam uma voz PSG sobre o PCM.
+O mixer reserva até 17 vozes simultâneas: com os 16 canais de música ativos,
+resta uma voz de efeito; composições menores conservam o orçamento anterior.
+A quantidade ampliada de estado dos canais reside em EWRAM.
+
+`audio.tracker_sample_sustain` identifica descritores `TrackerAsset` com
+`sustain_sample_channels`. O `assetc` ativa esse campo em MOD/S3M/XM/IT: uma linha
+sem nota para um canal conserva o sample e sua posição, até terminar, receber
+uma nova nota ou parar a música. Tracks do compositor mantêm o contrato de
+pausa por linha, com o campo falso por padrão. Recompile todo o projeto junto
+com o SDK ao atualizar esse descritor. Cortes imediatos MOD `C00`/`EC0` e S3M
+nota 254/`SC0` substituem o canal por silêncio de uma amostra, liberando a voz;
+a ausência de nota continua sem cortar os outros canais. Isso não amplia o
+suporte dos demais efeitos de tracker.
+
+### Perfil PCM nativo de XM e IT
+
+`audio.tracker_pcm_controls` identifica os campos `TrackerStep.sample_continue`,
+`sample_gain` e `sample_linear_pan`. O primeiro atualiza afinação, volume e panorama da voz sem
+reiniciar o cursor; o segundo aplica ganho linear de 0 a 255. Ganho zero pode
+manter uma voz silenciosa em andamento durante um envelope. O ganho padrão é
+255 e uma nota normal continua reiniciando o sample. O terceiro seleciona a
+distribuição linear dos trackers: centro com metade do ganho em cada lado,
+extremos com ganho completo em um lado, com coeficientes de 8 bits. Outros
+assets conservam a distribuição anterior por padrão. O descritor ARM atual
+`TrackerStep` ocupa 36 bytes e `PcmAsset` ocupa 44 bytes. SDK, conversor,
+biblioteca e todo o código exportado precisam ser recompilados juntos. A preparação multicanal mantém o sample de referência de
+cada nota ao mudar sua taxa, evitando trocar o cursor para outra versão do PCM.
+Em canais XM/IT com afinação dinâmica e fonte entre 4000 e 32768 Hz, preserva
+o PCM original e suas taxas explícitas para interpolá-lo uma única vez.
+
+`audio.tracker_xm_pcm_profile` e `audio.tracker_it_pcm_profile` identificam os
+conversores próprios do `assetc`; projetos que usam esses formatos exigem as
+respectivas capacidades no Engine Pack. Não dependem do Maxmod ou de um player
+externo. Este é um perfil delimitado, não compatibilidade completa com trackers.
+
+- XM 1.04: até 16 canais, padrões de 1 a 256 linhas, mapa de samples por nota,
+  PCM delta de 8/16 bits, afinação relativa/fina, volume e panorama na nota,
+  loops normais e bidirecionais, note-off, envelopes de volume/panorama com
+  sustain/loop e fadeout do instrumento. Efeitos: arpejo FT2, slides de pitch
+  normais/finos/extra-finos, portamento, vibrato senoidal, tremolo, tremor,
+  slides de volume/panorama, volume global e seu slide, key-off, posição de
+  envelope, atraso/corte/retrigger de nota e atraso de padrão; Fxx controla
+  velocidade/andamento. A memória dos parâmetros continua entre linhas.
+- IT 2.x: até 16 canais PCM usados, inclusive índices físicos com lacunas até 63,
+  máscaras e reutilização de campos, padrões de 1 a 1024 linhas, PCM mono sem
+  compressão de 8/16 bits (signed/unsigned/delta), sample C5, volumes iniciais,
+  mapas simples de instrumento, loops normais/bidirecionais, note-off/cut/fade,
+  envelopes de volume/panorama/pitch com sustain/loop/carry e fadeout.
+  Efeitos: Axx, Dxy–Nxy, Pxy–Rxy, Txx–Xxx, S8x, SCx, SDx e SEx, incluindo
+  andamento relativo, vibrato fino e slides finos. Volume/panorama também
+  podem mudar sem uma nota nova. Instrumentos precisam usar NNA=cut, sem
+  separação de panorama por pitch ou variações aleatórias.
+- Samples convertidos: no máximo 65535 amostras por sample, inclusive após
+  expandir loop bidirecional. Cada ocorrência na sequência é compilada com
+  estado de instrumento herdado; pausas longas são divididas sem perder duração.
+  A quantização para quadros acumula a fração temporal entre ticks e padrões
+  usando o relógio físico do GBA. Envelopes usam ganho de 8 bits; controles
+  são publicados por VBlank, não em resolução de amostra. Mudanças de pitch
+  usam interpolação linear no mixer e podem aumentar o custo de CPU.
+
+Jumps/breaks, loops de padrão, offsets de sample, seleção de waveform,
+vibrato automático, filtro de instrumento, sustain loops de sample,
+PCM estéreo/comprimido de IT e outros comandos fora desse perfil geram erro
+explícito. O erro indica formato e, para células, padrão/linha/canal. Esses
+recursos não são apagados durante a exportação. Efeitos em canais IT
+desativados também são rejeitados para não perder comandos globais.
+
+O editor cria um item independente vinculado ao hash da fonte, preserva células
+nativas e bytes dos instrumentos/samples e guarda edições no `.gba-project`.
+A regravação produz somente a cópia de exportação. Ler ou editar um módulo não
+garante sua compatibilidade com o perfil: a prévia pela engine e a exportação
+validam o conteúdo. Plugins e extensões específicas de outros trackers não
+fazem parte deste contrato. Editor, ROM em emulador e GBA físico exigem provas
+separadas.
+
+Para importações com mais de quatro canais, a exportação antecipa a
+reamostragem linear e o ganho estático de cada combinação instrumento/nota
+para 31536 Hz. Loops
+podem repetir ciclos para limitar a diferença de afinação a 0,01%. A saída
+continua sujeita ao limite de 65535 amostras por instrumento convertido e ao
+orçamento de ROM; ultrapassar esses limites gera um erro, sem descartar canais.
+Isso pode aumentar o tamanho da ROM em troca de reduzir o trabalho por frame.
+Canais XM/IT com afinação dinâmica usam a exceção descrita acima. O mixer
+compartilha a interpolação entre os lados estéreo, acumula duas faixas de 16
+bits em uma palavra e usa uma janela de origem limitada a 512 bytes em IWRAM.
+A saída mantém o arredondamento e o limitador existentes. A reserva de scratch
+é de até 6,6 KiB, e dois buffers de publicação gráfica ficam em EWRAM; os
+limites do linker e a reserva de pilha continuam obrigatórios.
+
+`audio.pcm_prepared_interpolation` antecipa o cálculo exato da interpolação e
+cadeia de ganhos para loops curtos de XM/IT. `PcmInterpolationInterval` ocupa
+8 bytes: limite exclusivo de posição Q16 e contribuição estéreo empacotada.
+`PcmInterpolationMap` ocupa 12 bytes: chave de ganho/panorama, intervalos,
+contagem e índice do loop. Os limites são 128 amostras por loop, 128 intervalos
+por mapa e 256 mapas por sample; os arrays ficam na ROM e seus bytes entram no
+diagnóstico. `interpolation_source_bytes` é uma contagem validada para evitar
+percorrer esses arrays a cada quadro. São calculados a partir do PCM original
+imutável, com os mesmos arredondamentos inteiros; nenhuma amostra é aproximada.
+`TrackerStep.sample_step_fp` e `sample_step_reciprocal` evitam divisões durante
+controles de pitch e `prepared_mix_map` aponta para um mapa do próprio sample.
+O validador confere a taxa, o recíproco, o ponteiro, os limites, os ganhos e os
+bytes.
+
+`audio.pcm_long_interpolation` estende esse caminho a loops com até 65535
+amostras. O bit `PCM_INTERPOLATION_PRE_PAN` (29) marca intervalos exatos após a
+cadeia de volume, antes do panorama. O ganho mono aparece igualmente nas duas
+faixas do intervalo. O panorama é aplicado por uma pequena tabela compartilhada,
+com o mesmo truncamento inteiro do mixer original; assim a mesma sequência de
+intervalos atende todas as posições de panorama de uma configuração de volume.
+Esse formato permite até 65535 intervalos por mapa, sem alterar o tamanho dos
+descritores. Flags, ganho mono e limites são validados. Arrays idênticos são
+compartilhados entre os módulos do mesmo header para reduzir ROM. O assetc
+conserva a fonte e a taxa original dos samples longos do perfil PCM nativo,
+evita expansão acima de 65535 amostras e continua interpolando uma única vez.
+Os tamanhos e o limite físico de ROM continuam obrigatórios; uma fonte mais
+longa não garante desempenho para qualquer timbre ou configuração.
+
+Um ganho global não preparado ou mapa que excede os limites usa o interpolador original. Alterações globais de volume continuam funcionando.
+O publicador usa escritas estéreo de quatro bytes somente quando o limite
+teórico de todas as vozes está na região identidade do limitador; nos demais
+casos mantém o limitador existente. A frequência padrão permanece em 31536 Hz e todos
+os canais permanecem independentes.
+
+O limite de 16 canais é de representação/vozes, não uma garantia de CPU para
+qualquer combinação de efeitos e cena. A regressão ARM
+`make audio-mixer-kernel-rom` verifica alinhamento, caudas e saída inteira do
+kernel nativo, acumulação constante, publicação estéreo e interpolação preparada
+em ROM; `audio_kernel_witness[2] == 1` e `[3] == 302` indicam êxito.
+O benchmark opt-in
+`extendedTrackerSceneRom.integration.test.ts` usa módulos autorais gerados por
+`python3 tests/host/tracker_stress_fixtures.py /tmp/qa-tracker --pitch-channels 16`
+(na raiz da engine). Em `apps/desktop-electron`, execute
+`GBA_TRACKER_SCENE_QA=/tmp/qa-cenas GBA_TRACKER_SCENE_SOURCES=/tmp/qa-tracker npm exec vitest run src/main/extendedTrackerSceneRom.integration.test.ts`.
+O teste preserva as fontes, apaga seu projeto temporário/cache ao encerrar e compara a cadência com a mesma
+cena sem música e exige metade dessa referência, com tolerância de uma
+atualização na borda da janela. XM e IT são testados nas três cenas com
+16 vozes, quatro fontes PCM, envelopes e modulação contínua de pitch em todos
+os canais. O teste exige também publicação contínua dos blocos PCM: apenas
+um contador de underruns zerado não detecta uma IRQ sobrecarregada que impede
+o jogo de avançar. Reduzir a fidelidade
+silenciosamente ou descartar canais não é uma solução adotada pelo pipeline.
+`audio.pcm_prepared_gain` acrescenta uma variante opcional de PCM com o volume
+primário configurado no projeto. O descritor `PcmAsset` conserva os samples
+originais; a variante só é usada na taxa nativa, com os demais ganhos unitários.
+Fades, panorama e mudanças de volume continuam pelo cálculo original. O ganho
+inteiro é idêntico, incluindo o arredondamento de samples negativos, e ambas as
+variantes entram no diagnóstico de bytes de origem. Esse descritor exige
+recompilar todo o código exportado junto com o SDK atualizado.
+
+O startup configura `WAITCNT=0x4317` antes de copiar dados da ROM: WS0 3/1,
+SRAM 8, WS2 8/8 e prefetch habilitado, conforme os tempos de cartucho descritos
+no [GBATEK](https://mgba-emu.github.io/gbatek/#gbasystemcontrol).
+Isso não altera a frequência do áudio nem a quantidade de canais.
+Dezesseis canais não garantem a cadência de qualquer cena: o orçamento de CPU
+deve ser medido com gameplay, efeitos e renderização do projeto real.
+
+A regressão sintética usa fontes MOD/S3M geradas pelo próprio teste. Depois de
+`make package`, em `apps/desktop-electron`, execute:
+
+```sh
+node scripts/verify-tracker-multichannel-rom.mjs ../../packages/GBAStudioEngine/dist/GBAStudioEnginePack /caminho/qa/tracker
+node scripts/verify-audio-prepared-gain-rom.mjs ../../packages/GBAStudioEngine/dist/GBAStudioEnginePack /caminho/qa/gain
+node scripts/verify-audio-prepared-interpolation-rom.mjs ../../packages/GBAStudioEngine/dist/GBAStudioEnginePack /caminho/qa/interpolation
+node scripts/verify-scene-tracker-cadence.mjs /caminho/qa/porto/build/exemplo.gba /caminho/qa/cadence
+```
+
+O gerador aceita `--sample-length 4096` ou `--sample-length 16384` para fontes
+longas autorais com quatro timbres que variam ao longo do sample; mantenha `--pitch-channels 16`.
+Para a comparação ARM, use `GBA_TRACKER_SAMPLE_LENGTH=16384` antes do comando
+`verify-audio-prepared-interpolation-rom.mjs`. O benchmark das cenas recebe essas
+mesmas fontes pelo diretório `GBA_TRACKER_SCENE_SOURCES`.
+
+A regressão de interpolação compara byte a byte 360 blocos PCM estéreo por
+formato XM/IT, com 16 vozes moduladas e quatro samples. A referência escalar
+pode sobrecarregar a IRQ: os blocos são comparados pela ordem de publicação,
+não pelo tempo do jogo. O leitor preserva ambas as metades do ping-pong quando
+uma borda expõe dois blocos. A versão preparada precisa manter a cadência
+da ROM isolada. Essa prova complementa o teste de gameplay nas três cenas.
+
+A regressão de ganho compara byte a byte 360 blocos PCM estéreo por formato,
+alternando entre a variante e o cálculo original na mesma ROM ARM, e verifica
+o registrador de wait states. A regressão de cena requer uma cópia exportada
+com início em Porto Lúmen e música sustentada de 16 canais; mede 240 quadros
+parado, andando à direita e após soltar o comando, com mínimo de 117 atualizações
+do jogo em cada janela (cadência de 30 Hz). Os resultados não provam execução
+em um GBA físico.
+
+Ela importa os arquivos pelo `assetc`, compila com `gbsbuild`, executa as ROMs
+no mGBA embarcado, verifica cada canal individualmente e todos juntos no PCM,
+e registra WAVs, hashes e contadores de avanço e underruns. É uma validação
+focada da preservação dos canais, não uma declaração de compatibilidade total
+com todos os efeitos de tracker ou de validação em GBA físico.
+
+### PCM nos efeitos automáticos
+
+`audio.pcm_sfx_aliases` acrescenta a `SfxAsset` um ponteiro opcional para
+`PcmAsset` e ganho 0–15. O assetc aceita `{ "name": "click", "pcm": "click",
+"pcm_volume": 12 }` na lista `sfx`, com o PCM correspondente na lista `pcm`.
+O descritor compartilha os samples, sem duplicação de ROM. `play_sfx` substitui
+o efeito automático anterior; `stop_sfx` não interrompe PCM disparado diretamente
+por eventos. Texto de diálogo, tática, dungeon, luta e corrida usam o mesmo índice
+SFX para PSG e PCM. Recompile SDK e projetos ao usar este contrato.
+
+### Composição PCM autorada
+
+A capability `audio.pcm_composer` permite instrumentos do tracker declarados com
+`samples` (PCM8 assinado, 1–65535 valores), `sample_rate_hz` (4000–32768) e `loop`,
+além dos instrumentos WAV existentes. Steps `sample_only` mantêm os canais 1–16;
+vozes simultâneas não são remapeadas aos quatro canais PSG. O assetc prepara
+fontes multicanais para 31536 Hz preservando `sample_pitch_ratio` e o panorama.
+
+Um recurso `pcm` WAV pode declarar `transform` com `duration_ms` (10–2000),
+`trim_start_ms`, `pitch_semitones` (-24 a 24), `attack_ms` e `release_ms`.
+O recorte é aplicado antes da afinação; os fades usam a duração resultante.
+A mesma receita e o mesmo assetc devem ser usados pela prévia e pela exportação.
+SFX PCM compostos entram no registro SFX por alias `pcm`, preservando os cues
+nativos e o mixer da engine.
+
+## Frequência de mixagem configurável
+
+A capability `audio.configurable_mixing_rate` oferece
+`gbs::set_audio_mixing_rate(hz)`, `gbs::audio_mixing_rate_hz()` e
+`gbs::audio_mixer_output_samples_per_frame()`. Valores aceitos: 10512, 21024 e
+31536. Uma solicitação inválida retorna `false` sem modificar o playback.
+Os tamanhos constantes `PCM_MIXER_*` continuam descrevendo o padrão e a
+alocação máxima; o getter informa o tamanho do bloco atual.
+
+`export_project.json.audio_mixing_rate` configura o início da ROM (padrão
+31536). O `assetc` gera `audio_config.cpp` e o inclui em `build.sources` para
+valores diferentes do padrão, inclusive na exportação mista. O hook C
+`gbs_project_audio_mixing_rate()` é resolvido no link e mantém 31536 para
+usos independentes do SDK. Não confundir com a taxa de conversão dos WAVs.
+
+O evento `set_audio_mixing_rate` recebe `rate` e gera `SetAudioMixingRate` (168).
+Todos os 13 adaptadores consomem a solicitação. Posições de origem e vozes são
+preservadas, e os passos são recalculados para a nova saída. Timer 1, FIFO A/B e
+DMA mudam juntos na publicação do bloco seguinte; a saída mantém um bloco por
+VBlank em todas as taxas. A configuração e o evento não afetam PSG.
+
+As taxas escolhidas mantêm blocos múltiplos de 16 e 280.896 ciclos por quadro.
+Referências de hardware: [GBATEK Direct Sound](https://mgba-emu.github.io/gbatek/#gbsoundfifoadirectsoundchannelafifodata)
+e [Tonc](https://gbadev.net/tonc/sndsqr.html). Butano é referência de capacidade;
+a troca ativa é uma implementação própria desta engine.

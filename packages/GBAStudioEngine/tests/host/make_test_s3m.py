@@ -32,9 +32,9 @@ def build_sample_instrument(name, sample_offset, sample_length, sample_rate, fla
     instrument[0] = 1
     instrument[1:13] = name[:12].ljust(12, b"\0")
     sample_parapointer = sample_offset // 16
-    instrument[13] = sample_parapointer & 0xFF
-    instrument[14] = (sample_parapointer >> 8) & 0xFF
-    instrument[15] = (sample_parapointer >> 16) & 0xFF
+    instrument[13] = (sample_parapointer >> 16) & 0xFF
+    instrument[14] = sample_parapointer & 0xFF
+    instrument[15] = (sample_parapointer >> 8) & 0xFF
     struct.pack_into("<I", instrument, 16, sample_length)
     struct.pack_into("<I", instrument, 20, loop_begin)
     struct.pack_into("<I", instrument, 24, loop_end)
@@ -119,7 +119,7 @@ def main():
     append_note(pattern, 0, 0x43, volume=48, command=7, info=8)
     append_row_end(pattern, 32)
 
-    data.extend(struct.pack("<H", len(pattern)))
+    data.extend(struct.pack("<H", len(pattern) + 2))
     data.extend(pattern)
     while len(data) < pattern2_offset:
         data.append(0)
@@ -130,7 +130,7 @@ def main():
     append_note(pattern, 1, 255, volume=None, command=3, info=0)
     append_row_end(pattern, 55)
 
-    data.extend(struct.pack("<H", len(pattern)))
+    data.extend(struct.pack("<H", len(pattern) + 2))
     data.extend(pattern)
 
     while len(data) < pattern3_offset:
@@ -142,7 +142,7 @@ def main():
     append_note(pattern, 1, 255, volume=None, command=2, info=4)
     append_row_end(pattern, 55)
 
-    data.extend(struct.pack("<H", len(pattern)))
+    data.extend(struct.pack("<H", len(pattern) + 2))
     data.extend(pattern)
 
     while len(data) < pattern4_offset:
@@ -152,12 +152,12 @@ def main():
     append_note(pattern, 0, 0x43, volume=48)
     append_row_end(pattern, 63)
 
-    data.extend(struct.pack("<H", len(pattern)))
+    data.extend(struct.pack("<H", len(pattern) + 2))
     data.extend(pattern)
 
     while len(data) < sample_offset:
         data.append(0)
-    data.extend(bytes([128, 160, 224, 255, 0, 32, 64, 96]))
+    data.extend(bytes([0, 32, 96, 127, 128, 160, 192, 224]))
     while len(data) < sample2_offset:
         data.append(0)
     stereo16 = [

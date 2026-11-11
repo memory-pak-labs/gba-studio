@@ -180,7 +180,8 @@ enum class EventOp : uint8_t {
     MoveActorTo = 164,
     MoveActorRelative = 165,
     SetActorScale = 166,
-    SetBackgroundScale = 167
+    SetBackgroundScale = 167,
+    SetAudioMixingRate = 168
 };
 
 enum class VisualEffectKind : uint8_t {
@@ -554,6 +555,8 @@ struct EventState {
     bool audio_mute_changed;
     int audio_mute_channel;
     bool audio_mute_enabled;
+    bool audio_mixing_rate_changed;
+    int audio_mixing_rate_hz;
     bool audio_volume_changed;
     int audio_volume_channel;
     int audio_volume;

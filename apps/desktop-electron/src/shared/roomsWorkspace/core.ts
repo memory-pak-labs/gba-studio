@@ -3895,8 +3895,9 @@ function applyApprovedIsometricPreset(data: GBAProjectData, room: Record<string,
   const animations = projectRecords(template, "animations").filter(animation => sprites.has(animation.spriteSheet));
   const states = projectRecords(template, "animationStates").filter(state => sprites.has(state.spriteSheet));
   const references = JSON.stringify({room, actors, animations});
-  const assets = projectRecords(template, "assets").filter(asset => typeof asset.name === "string" && references.includes(JSON.stringify(asset.name)));
   const audio = projectRecords(template, "audioItems").filter(item => typeof item.name === "string" && references.includes(JSON.stringify(item.name)));
+  const audioSourceIDs = new Set(audio.map(item => item.sourceAssetID));
+  const assets = projectRecords(template, "assets").filter(asset => audioSourceIDs.has(asset.id) || typeof asset.name === "string" && references.includes(JSON.stringify(asset.name)));
   for (const [key, records] of [["assets", assets], ["animations", animations], ["animationStates", states], ["audioItems", audio]] as const) {
     const current = projectRecords(data, key);
     data[key] = [...current, ...records.filter(record => !current.some(existing => (

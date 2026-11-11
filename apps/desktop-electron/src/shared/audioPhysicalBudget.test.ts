@@ -10,12 +10,12 @@ import {
 describe("composed audio physical budget", () => {
   it("uses the target ARM audio structure layout", () => {
     expect(GBA_AUDIO_ROM_LAYOUT).toEqual({
-      sfxToneBytes: 10,
-      sfxAssetBytes: 8,
-      trackerStepBytes: 16,
+      sfxToneBytes: 14,
+      sfxAssetBytes: 16,
+      trackerStepBytes: 36,
       trackerPatternBytes: 8,
       trackerOrderEntryBytes: 1,
-      trackerAssetBytes: 28
+      trackerAssetBytes: 32
     });
   });
 
@@ -25,13 +25,13 @@ describe("composed audio physical budget", () => {
       name: "theme",
       patterns: [{ id: "intro", steps: 1, channels: [{ type: "pulse1", notes: ["C4"] }] }],
       patternOrder: ["intro"]
-    })).toBe(53);
+    })).toBe(77);
 
     expect(estimateComposedAudioPhysicalBytes({
       kind: "SFX",
       name: "hit",
       channels: [{ type: "noise", notes: ["K"] }]
-    })).toBe(18);
+    })).toBe(30);
   });
 
   it("does not claim a physical size for audio without composed content", () => {
@@ -39,7 +39,7 @@ describe("composed audio physical budget", () => {
     expect(estimateComposedAudioPhysicalBytes({ kind: "WAV", name: "imported" })).toBeNull();
   });
 
-  it("keeps the tactical candidate music and nine cues below the physical audio budget", () => {
+  it("defers imported tactical music and cues to the compiled assetc budget", () => {
     const project = JSON.parse(readFileSync(new URL(
       "../../default-assets/templates/exemplo-gba/exemplo-gba.gba-project",
       import.meta.url
@@ -53,8 +53,8 @@ describe("composed audio physical budget", () => {
     expect(items).toHaveLength(10);
     expect(items.filter((item) => item.kind === "Musica")).toHaveLength(1);
     expect(items.filter((item) => item.kind === "SFX")).toHaveLength(9);
-    expect(sizes.every((size): size is number => typeof size === "number")).toBe(true);
-    const physicalSizes = sizes.filter((size): size is number => typeof size === "number");
-    expect(physicalSizes.reduce((total, size) => total + size, 0)).toBeLessThan(65535);
+    expect(sizes).toEqual(Array(10).fill(null));
+    expect(items.filter(item => item.kind === "Musica").every(item => item.format === "MOD")).toBe(true);
+    expect(items.filter(item => item.kind === "SFX").every(item => item.format === "WAV")).toBe(true);
   });
 });
