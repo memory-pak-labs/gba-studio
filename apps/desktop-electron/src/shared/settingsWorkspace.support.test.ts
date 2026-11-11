@@ -31,7 +31,10 @@ describe("settings with operational consumers", () => {
     expect(sections.find(s => s.id === "pointAndClick")!.editableFields.map(f => f.key)).toEqual(["cursorSpeed", "hotspotPadding"]);
     expect(sections.find(s => s.id === "shmup")!.editableFields.map(f => f.key)).toEqual(["scrollSpeed", "playerSpeed", "fireRate"]);
     expect(sections.find(s => s.id === "audio")!.editableFields.map(f => f.key)).toEqual(["sampleRate", "mixingRate"]);
-    expect(sections.find(s => s.id === "hardware")!.editableFields.every(f => f.readOnly)).toBe(true);
+    const hardware = sections.find(s => s.id === "hardware")!.editableFields;
+    expect(hardware.filter(f => !f.readOnly).map(f => f.key)).toEqual(["rumbleCartridge"]);
+    expect(hardware.filter(f => f.key !== "rumbleCartridge").every(f => f.readOnly)).toBe(true);
+    expect(updateSettingsFieldInProject({ settings: {} }, "hardware", "rumbleCartridge", "none")).toMatchObject({ settings: { hardware: { rumbleCartridge: "none" } } });
     expect(sections.find(s => s.id === "build")!.editableFields.some(f => f.key === "runEmulatorAfterBuild")).toBe(false);
     expect(sections.find(s => s.id === "build")!.editableFields.find(f => f.key === "compilerPath")?.readOnly).toBe(true);
   });
