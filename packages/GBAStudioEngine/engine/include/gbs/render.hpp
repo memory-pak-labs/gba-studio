@@ -223,6 +223,20 @@ struct Bitmap8Asset {
     uint16_t height;
 };
 
+struct SceneRipple {
+    bool enabled = false;
+    BackgroundLayer layer = BackgroundLayer::BG2;
+    uint8_t amplitude = 4, wavelength = 32, speed = 2, top = 80, bottom = 160;
+};
+struct SceneGradient {
+    bool enabled = false;
+    uint16_t from = 0x5167, to = 0x7f76;
+    uint8_t top = 0, bottom = 80;
+};
+struct SceneRasterEffects { SceneRipple ripple {}; SceneGradient gradient {}; };
+constexpr bool has_scene_raster_effects(const SceneRasterEffects& effects) { return effects.ripple.enabled || effects.gradient.enabled; }
+bool set_scene_raster_effects(const SceneRasterEffects& effects, DisplayMode mode);
+
 struct VideoComposition {
     DisplayMode display_mode;
     bool affine_enabled;
@@ -236,6 +250,7 @@ struct VideoComposition {
     const PaletteAsset* bitmap_palette;
     uint8_t bitmap_page;
     bool affine_wrap = true;
+    SceneRasterEffects raster {};
 };
 
 constexpr VideoComposition default_video_composition() {

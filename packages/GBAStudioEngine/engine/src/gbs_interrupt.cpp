@@ -1,5 +1,11 @@
 #include "gbs/interrupt.hpp"
 
+#if defined(__arm__) || defined(__thumb__)
+#define GBS_INTERRUPT_EWRAM __attribute__((section(".ewram_bss")))
+#else
+#define GBS_INTERRUPT_EWRAM
+#endif
+
 namespace {
 
 constexpr int source_count = 7;
@@ -9,7 +15,7 @@ struct InternalInterruptSlot {
     gbs::InternalInterruptHandle handle = gbs::invalid_internal_interrupt_handle;
     gbs::InterruptCallback callback = nullptr;
 };
-InternalInterruptSlot internal_callbacks[source_count][internal_callback_count] = {};
+InternalInterruptSlot internal_callbacks[source_count][internal_callback_count] GBS_INTERRUPT_EWRAM = {};
 uint8_t internal_enable_counts[source_count] = {};
 gbs::InternalInterruptHandle next_internal_callback_handle = 1;
 uint16_t enabled_mask = 0;
@@ -37,15 +43,30 @@ bool internal_callback_handle_in_use(gbs::InterruptSource source, gbs::InternalI
 #if defined(__arm__) || defined(__thumb__)
 extern "C" void gbs_hw_enable_interrupt_source(int source);
 extern "C" void gbs_hw_disable_interrupt_source(int source);
+extern "C" void gbs_hw_set_hblank_dispatch_required(int required);
 #else
 void gbs_hw_enable_interrupt_source(int) {
 }
 
 void gbs_hw_disable_interrupt_source(int) {
 }
+void gbs_hw_set_hblank_dispatch_required(int) {}
 #endif
 
+void synchronize_hblank_dispatch(gbs::InterruptSource source) {
+    if (source == gbs::InterruptSource::HBlank) {
+        bool required = (enabled_mask & gbs::interrupt_mask(source)) && callbacks[index_for(source)] != nullptr;
+        if (internal_enabled_mask & gbs::interrupt_mask(source)) {
+            for (const auto& slot : internal_callbacks[index_for(source)]) required = required || slot.callback != nullptr;
+        }
+        gbs_hw_set_hblank_dispatch_required(required);
+    }
+
+}
+
 void synchronize_hardware_interrupt(gbs::InterruptSource source) {
+    synchronize_hblank_dispatch(source);
+
     if (source_has_enabled_handler(source)) {
         gbs_hw_enable_interrupt_source(index_for(source));
     } else {
@@ -62,6 +83,7 @@ void set_interrupt_callback(InterruptSource source, InterruptCallback callback) 
         return;
     }
     callbacks[index_for(source)] = callback;
+    synchronize_hblank_dispatch(source);
 }
 
 void enable_interrupt(InterruptSource source) {
@@ -124,6 +146,7 @@ InternalInterruptHandle add_internal_interrupt_callback(InterruptSource source, 
                 ? 1
                 : static_cast<InternalInterruptHandle>(candidate + 1);
             internal_callbacks[index][slot] = InternalInterruptSlot { candidate, callback };
+            synchronize_hblank_dispatch(source);
             return candidate;
         }
     }
@@ -138,6 +161,7 @@ void remove_internal_interrupt_callback(InterruptSource source, InternalInterrup
     for (int slot = 0; slot < internal_callback_count; ++slot) {
         if (internal_callbacks[index][slot].handle == handle) {
             internal_callbacks[index][slot] = InternalInterruptSlot {};
+            synchronize_hblank_dispatch(source);
             return;
         }
     }
@@ -152,6 +176,7 @@ void set_internal_interrupt_callback(InterruptSource source, InterruptCallback c
         internal_callbacks[index][slot] = InternalInterruptSlot {};
     }
     add_internal_interrupt_callback(source, callback);
+    synchronize_hblank_dispatch(source);
 }
 
 void enable_internal_interrupt(InterruptSource source) {

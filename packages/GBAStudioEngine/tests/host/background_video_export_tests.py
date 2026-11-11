@@ -13,6 +13,25 @@ profiles = [('menu','screens'), ('cutscene','scenes'), ('visual_novel','scenes')
 video = {'display_mode':1, 'affine':{'layer':'bg2','asset':'qa_affine', 'pa':384, 'pd':512}}
 
 class BackgroundVideoExportTests(unittest.TestCase):
+    def test_empty_shmup_background_resets_scene_effects(self):
+        source = (root / 'templates/exported_shmup/main.cpp').read_text()
+        loader = source.split('void apply_background() {', 1)[1]
+        empty = loader.split('if (background == nullptr) {', 1)[1].split('return;', 1)[0]
+        self.assertIn('set_scene_raster_effects(gbs::SceneRasterEffects {}, gbs::DisplayMode::Mode0Text)', empty)
+
+    def test_raster_settings_are_emitted_and_invalid_modes_are_rejected(self):
+        raster = {'ripple': {'enabled': True, 'layer': 'BG2', 'amplitude': 8, 'wavelength': 32, 'speed': 4, 'top': 40, 'bottom': 120},
+                  'gradient': {'enabled': True, 'from': '#000000', 'to': '#ffffff', 'top': 0, 'bottom': 32}}
+        literal = assetc.video_composition_literal({'video': {'display_mode': 0, 'raster': raster}}, 'test')
+        self.assertIn('gbs::SceneRipple { true, gbs::BackgroundLayer::BG2, 8, 32, 4, 40, 120 }', literal)
+        self.assertIn('gbs::SceneGradient { true, 0, 32767, 0, 32 }', literal)
+        with self.assertRaises(SystemExit):
+            assetc.video_composition_literal({'video': {'display_mode': 1, 'raster': raster}}, 'test')
+        raster['ripple']['enabled'] = False
+        raster['gradient']['from'] = 'red'
+        with self.assertRaises(SystemExit):
+            assetc.video_composition_literal({'video': {'display_mode': 0, 'raster': raster}}, 'test')
+
     def test_every_generator_retains_the_scene_video(self):
         for kind, rows in profiles:
             with self.subTest(kind=kind):

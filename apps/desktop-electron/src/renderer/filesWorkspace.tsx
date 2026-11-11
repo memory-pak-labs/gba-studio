@@ -1,3 +1,4 @@
+import { useWorkspaceState, useWorkspaceChangeEffect } from "./workspaceSessionState";
 import { readStoredLocale } from "./i18n";
 import { uiText as ui, useStudioUiText } from "./studioUiText";
 import { AlertTriangle, Boxes, Check, CheckCircle2, ChevronDown, FileImage, Grid3X3, Image, MessageSquare, MoreHorizontal, Package, Search, UserRound, Folder, FolderOpen, List, LayoutGrid, Replace, ExternalLink, Type } from "lucide-react";
@@ -31,6 +32,7 @@ export interface FilesWorkspaceOpenRequest {
   targetName?: string;
   usageKind?: string;
   workspace: FilesWorkspaceName;
+  targetField?: "x" | "y" | "width" | "height";
 }
 
 interface FilesWorkspaceProps {
@@ -74,14 +76,14 @@ export function FilesWorkspace({
 }: FilesWorkspaceProps): React.ReactElement {
   const ui = useStudioUiText();
   const { t } = useStudioI18n();
-  const [searchQuery, setSearchQuery] = useState("");
-  const [selectedKind, setSelectedKind] = useState("");
-  const [usageFilter, setUsageFilter] = useState<FilesWorkspaceUsageFilter>("all");
-  const [viewMode, setViewMode] = useState<"list" | "grid">("grid");
-  const [selectedFolder, setSelectedFolder] = useState("");
-  const [selectionMode, setSelectionMode] = useState(false);
-  const [previewZoom, setPreviewZoom] = useState<"fit" | 1 | 2>("fit");
-  const [technicalOpen, setTechnicalOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useWorkspaceState("files.searchQuery", "");
+  const [selectedKind, setSelectedKind] = useWorkspaceState("files.selectedKind", "");
+  const [usageFilter, setUsageFilter] = useWorkspaceState<FilesWorkspaceUsageFilter>("files.usageFilter", "all");
+  const [viewMode, setViewMode] = useWorkspaceState<"list" | "grid">("files.viewMode", "grid");
+  const [selectedFolder, setSelectedFolder] = useWorkspaceState("files.selectedFolder", "");
+  const [selectionMode, setSelectionMode] = useWorkspaceState("files.selectionMode", false);
+  const [previewZoom, setPreviewZoom] = useWorkspaceState<"fit" | 1 | 2>("files.previewZoom", "fit");
+  const [technicalOpen, setTechnicalOpen] = useWorkspaceState("files.technicalOpen", false);
   const [fileInfoFailed, setFileInfoFailed] = useState(false);
   const [commandMenu, setCommandMenu] = useState<{ state: StudioContextMenuState; actions: StudioContextMenuAction[] } | null>(null);
   const menuTriggerRef = useRef<HTMLButtonElement | null>(null);
@@ -89,10 +91,10 @@ export function FilesWorkspace({
     setCommandMenu(null);
     menuTriggerRef.current?.focus();
   }, []);
-  const [selectedAssetID, setSelectedAssetID] = useState<string | null>(null);
-  const [selectedAssetIDs, setSelectedAssetIDs] = useState<Set<string>>(() => new Set());
+  const [selectedAssetID, setSelectedAssetID] = useWorkspaceState<string | null>("files.selectedAssetID", null);
+  const [selectedAssetIDs, setSelectedAssetIDs] = useWorkspaceState<Set<string>>("files.selectedAssetIDs", () => new Set());
   const [contextMenu, setContextMenu] = useState<AssetContextMenuState | null>(null);
-  const [collapsedGroupIDs, setCollapsedGroupIDs] = useState<Set<string>>(() => new Set());
+  const [collapsedGroupIDs, setCollapsedGroupIDs] = useWorkspaceState<Set<string>>("files.collapsedGroupIDs", () => new Set());
   const [previewLoadFailed, setPreviewLoadFailed] = useState(false);
   const [activeFileInfo, setActiveFileInfo] = useState<InspectAssetFileResult | null>(null);
   const openRequestSequence = useRef(0);
@@ -135,7 +137,7 @@ export function FilesWorkspace({
     const bounds = event.currentTarget.getBoundingClientRect();
     setCommandMenu({ state: { label, x: bounds.right - 188, y: bounds.bottom + 4 }, actions });
   };
-  useEffect(() => {
+  useWorkspaceChangeEffect(() => {
     setPreviewLoadFailed(false);
     setPreviewZoom("fit");
     setTechnicalOpen(false);
@@ -229,7 +231,7 @@ export function FilesWorkspace({
       ) : null}
       {commandMenu ? <StudioContextMenu actions={commandMenu.actions} onClose={closeCommandMenu} state={commandMenu.state} /> : null}
       <div className="files-layout">
-        <aside className="files-navigation" aria-label={t("files.library")}>
+        <aside data-workspace-scroll="files-navigation" className="files-navigation" aria-label={t("files.library")}>
           <h3>{t("files.navigation.library")}</h3>
           <nav aria-label={t("files.kindCategories")} className="files-category-list">
             {categoryChips.map(chip => (
@@ -274,7 +276,7 @@ export function FilesWorkspace({
             </button>
           ) : null}
         </aside>
-        <section className="files-gallery" aria-label={t("files.assetList")}>
+        <section data-workspace-scroll="files-gallery" className="files-gallery" aria-label={t("files.assetList")}>
           <div className="files-filter-bar" aria-label={t("files.filters")}>
             <div className="files-filter-heading">
               <div className="files-filter-heading-copy">
@@ -424,7 +426,7 @@ export function FilesWorkspace({
           </div>
         </section>
 
-        <section className="files-details-panel" aria-label={t("files.preview")}>
+        <section data-workspace-scroll="files-details" className="files-details-panel" aria-label={t("files.preview")}>
           {activeAsset ? (
             <>
               <header className="files-preview-header">

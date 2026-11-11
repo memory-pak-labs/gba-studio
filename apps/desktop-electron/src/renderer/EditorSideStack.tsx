@@ -219,7 +219,7 @@ export function EditorSideStack({
         {collapseInspectorPane ? null : (
           <section
             aria-label={ui("Inspector")}
-            className="editor-side-stack-pane editor-side-stack-inspector rooms-inspector inspector-readable"
+            data-workspace-scroll={`${workspaceId}.inspector`} className="editor-side-stack-pane editor-side-stack-inspector rooms-inspector inspector-readable"
             style={{ flexGrow: hideProjectPane ? 1 : splitRatio }}
           >
             {inspectorPane}

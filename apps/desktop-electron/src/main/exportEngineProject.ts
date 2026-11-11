@@ -1,4 +1,6 @@
+import { hasSceneRasterEffects, normalizeSceneRasterEffects } from "../shared/sceneRasterEffects.js";
 import { projectAudioMixingRate, requireAudioMixingRate } from "../shared/audioMixing.js";
+import { projectCartridgeRumbleProfile, type CartridgeRumbleProfile } from "../shared/cartridgeRumble.js";
 import { isPcmAudio } from "../shared/audioPcm.js";
 import { isScaleEvent, parseScaleEvent, usesSinglePlaneBackground } from "../shared/eventTransforms.js";
 import { actorCommandReferences, sceneChangeCommand, sceneChangeCommandParts } from "../shared/sceneChangeCommand.js";
@@ -168,7 +170,7 @@ import {
   type ProjectPluginRegistry
 } from "../shared/gbaStudioPlugins.js";
 import { unsupportedNativeEventCommandVerbs } from "../shared/eventCommandRegistry.js";
-import { parseLinkCableCommand, toEngineLinkCableCommand } from "../shared/linkCableRuntime.js";
+import { hasQueuedMultiplayerCommands, parseLinkCableCommand, toEngineLinkCableCommand } from "../shared/linkCableRuntime.js";
 import {
   exportSceneMetatileAuthoring,
   resolveSceneMetatileAuthoring,
@@ -2334,6 +2336,7 @@ export interface EngineExportAssetPack {
 }
 
 export interface EngineExportProjectContract {
+  rumble_cartridge: CartridgeRumbleProfile;
   audio_mixing_rate: number;
   schema: 1;
   backend: "gbastudio_engine";
@@ -2739,7 +2742,17 @@ function assertFixedUiAffineSource(room: Record<string, unknown>, asset: Record<
     throw new Error(`Cena ${roomName(room,0)}: fundo affine com interface fixa permite no máximo 512x512 pixels.`);
 }
 
-function buildRoomVideoComposition(
+function buildRoomVideoComposition(data: GBAProjectData, room: Record<string, unknown>, tilesetPack: AssetcTilesetPackGeneration | null): ExportedAdvancedVideoComposition {
+  const video = buildRoomVideoCompositionBase(data, room, tilesetPack);
+  const composition = roomSceneComposition(room);
+  if (!composition.enabled || !hasSceneRasterEffects(composition.effects.raster)) return video;
+  const raster = normalizeSceneRasterEffects(composition.effects.raster);
+  if (raster.ripple.enabled && ((video.display_mode !== 0 && !(video.display_mode === 1 && raster.ripple.layer === "BG1")) || (roomSceneType(room) === "racing" && raster.ripple.layer !== "BG1" && racingSceneConfigFromRuntime(room.runtime,data.settings)?.presentation === "pseudo3d")))
+    throw new Error(`Cena ${roomName(room,0)}: a ondulação exige uma camada regular livre; o plano affine/perspectiva já controla BG2.`);
+  return { ...video, raster };
+}
+
+function buildRoomVideoCompositionBase(
   data: GBAProjectData,
   room: Record<string, unknown>,
   tilesetPack: AssetcTilesetPackGeneration | null
@@ -3160,7 +3173,7 @@ function assertAdvancedCapabilityUsage(
 ): void {
   const linkUsed = projectEventCommandStrings(data).some((command) => {
     const verb = command.trim().split(/\s+/, 1)[0] ?? "";
-    return verb.startsWith("multiplayer_") || verb.startsWith("multiplayer4_");
+    return !verb.startsWith("multiplayer_queue_") && (verb.startsWith("multiplayer_") || verb.startsWith("multiplayer4_"));
   });
   if (linkUsed && !runtimeCapabilities.capabilities.some((capability) => capability.id === "link" && capability.enabled)) {
     throw new Error("Eventos multiplayer exigem a capability universal link habilitada no projeto.");
@@ -4042,6 +4055,9 @@ function buildEventValueRegistries(
     for (const step of eventSteps(event)) {
       const parts = commandParts(stringField(step, "command", "noop"));
       const verb = parts[0] ?? "noop";
+      if (["multiplayer_queue_send", "multiplayer_queue_receive", "multiplayer_queue_status"].includes(verb)) {
+        parts.slice(1).forEach(key => variableKeys.add(key));
+      }
       if (EVENT_TEXT_VARIABLE_KEY_VERBS.has(verb) && parts[1]) {
         textVariableKeys.add(parts[1]);
       } else if (EVENT_VARIABLE_KEY_VERBS.has(verb) && parts[1]) {
@@ -4843,7 +4859,12 @@ function compileEventStep(
     case "multiplayer4_set":
     case "multiplayer4_sync":
     case "multiplayer4_read":
-    case "multiplayer4_close": {
+    case "multiplayer4_close":
+    case "multiplayer_queue_open":
+    case "multiplayer_queue_send":
+    case "multiplayer_queue_receive":
+    case "multiplayer_queue_status":
+    case "multiplayer_queue_close": {
       const linkCommand = parseLinkCableCommand(rawCommand);
       if (!linkCommand) return [];
       return [toEngineLinkCableCommand(linkCommand, {
@@ -8987,7 +9008,7 @@ function buildShmupProject(
     const affineEnabled = shmupComposition.config.video.affine !== null;
     const roomWidthTiles = shmupComposition.config.world.widthTiles;
     const roomHeightTiles = shmupComposition.config.world.heightTiles;
-    const backgroundVideo = affineEnabled
+    const backgroundVideo = affineEnabled || (sceneComposition.enabled && hasSceneRasterEffects(sceneComposition.effects.raster))
       ? buildRoomVideoComposition(data, room, tilesetPack)
       : undefined;
     const collisionTypes = paddedCollisionTypes(room.collisionTypes, roomWidthTiles * roomHeightTiles);
@@ -10998,6 +11019,12 @@ function buildEngineExportProjectContractUncached(
   const runtimeContract = buildRuntimeContract(data, isMixedRuntime);
   const projectSaveConfig = buildProjectSaveConfig(data);
   const runtimeCapabilities = buildProjectRuntimeCapabilityManifest(data, projectSaveConfig);
+  if (hasQueuedMultiplayerCommands(data)) {
+    const link = runtimeCapabilities.capabilities.find(capability => capability.id === "link");
+    if (link) link.settings.max_peers = 4;
+  }
+  if (hasQueuedMultiplayerCommands(data, ["multiplayer_queue_open"]) && !runtimeCapabilities.capabilities.some(capability => capability.id === "link" && capability.enabled))
+    throw new Error("Ative Link em Exportar → Runtime Universal para abrir uma conexão com filas.");
   const capabilityManifest = buildSceneCapabilityManifest(data);
   assertAdvancedCapabilityUsage(data, capabilityManifest, pluginRegistry, runtimeCapabilities);
   const sceneContracts = buildSceneContracts(data);
@@ -11152,7 +11179,15 @@ function buildEngineExportProjectContractUncached(
     if (runtimeKind === "platformer") cameraZoneFeatures.add("platformer_runtime.platformer_camera_zones");
   });
   features.push(...cameraZoneFeatures);
+  if (rooms.some(room => { const c = roomSceneComposition(room); return c.enabled && hasSceneRasterEffects(c.effects.raster); })) features.push("render_runtime.scene_raster_effects");
   if (projectAudioMixingRate(data) !== 31536 || projectArray(data, "events").some(event => JSON.stringify(event).includes("set_audio_mixing_rate"))) features.push("audio.configurable_mixing_rate");
+  if (projectCartridgeRumbleProfile(data) !== "none") features.push("rumble.rumble_project_configuration", "rumble.rumble_chisflash_v12_opt_in");
+  if (hasQueuedMultiplayerCommands(data)) features.push("link.link_queued_events", "link.link_queued_messages", "link.link_nonblocking_irq", "link.link_automatic_recovery");
+  if (projectEventCommandStrings(data).some(command => {
+    const parts = commandParts(resolveProjectConstantCommand(data, command));
+    const value = Number(parts[2]);
+    return parts[0] === "set_variable" && (value < -32768 || value > 32767);
+  })) features.push("events.variable_int32_literal");
   if (projectArray(data, "audioItems").some(isPcmAudio)) features.push("audio.pcm_composer", "audio.tracker_pcm_16_channels", "audio.pcm_prepared_gain");
   if (audioPack?.document.sfx.some(asset => asset.pcm)) features.push("audio.pcm_sfx_aliases");
   if (audioPack?.document.tracker.some(asset => asset.mod || asset.s3m || asset.xm || asset.it)) {
@@ -11364,6 +11399,7 @@ function buildEngineExportProjectContractUncached(
     backend: "gbastudio_engine",
     kind,
     audio_mixing_rate: projectAudioMixingRate(data),
+    rumble_cartridge: projectCartridgeRumbleProfile(data),
     runtime_profile: isMixedRuntime ? "mixed" : resolution.runtimeProfile,
     runtime_contract: runtimeContract,
     runtime_capabilities: runtimeCapabilities,

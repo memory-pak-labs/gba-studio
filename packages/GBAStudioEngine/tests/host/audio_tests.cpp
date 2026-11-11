@@ -1433,22 +1433,22 @@ void test_prepared_mix_maps_match_the_scalar_path_through_pitch_and_gain_changes
     gbs::audio_init();
 }
 
-void test_long_prepan_map_matches_scalar_at_gain_pan_and_position_carry() {
+void check_long_prepan_map_matches_scalar_at_gain_pan_and_position_carry(int table_primary) {
     static int8_t source[65535];
     for (size_t i = 0; i < 65535; ++i) source[i] = i < 32767 ? -80 : 80;
     gbs::PcmInterpolationInterval intervals[128] {};
-    uint16_t count = 0; uint32_t previous = static_cast<uint32_t>(-8 * 65537);
+    uint16_t count = 0; uint32_t previous = static_cast<uint32_t>((-80 * 32 / 255 * table_primary / 15) * 65537);
     const uint32_t edges[] = {32766u,65534u};
     for (uint32_t edge : edges) {
         for (uint32_t fraction = 0; fraction <= 65536; ++fraction) {
             const int from = source[edge], to = source[edge == 65534 ? 3 : edge + 1];
-            const int value = ((from + (((to - from) * static_cast<int32_t>(fraction)) >> 16)) * 32 / 255) * 12 / 15;
+            const int value = ((from + (((to - from) * static_cast<int32_t>(fraction)) >> 16)) * 32 / 255) * table_primary / 15;
             const uint32_t gain = static_cast<uint32_t>(value * 65537);
             if (gain != previous) { intervals[count++] = { (edge << 16) + fraction, previous }; previous = gain; }
         }
     }
     intervals[count++] = {65535u << 16, previous};
-    const gbs::PcmInterpolationMap map {gbs::PCM_INTERPOLATION_PRE_PAN | gbs::pcm_interpolation_mix_key(15,12,15,32,0,false), intervals, count, 0};
+    const gbs::PcmInterpolationMap map {gbs::PCM_INTERPOLATION_PRE_PAN | gbs::pcm_interpolation_mix_key(15,table_primary,15,32,0,false), intervals, count, 0};
     gbs::PcmAsset sample {source, 65535, 8363, true, 3, 65535};
     gbs::TrackerStep steps[8] {}; const uint32_t rates[] = {1,4000,19710,31536,65536,2097152,2097152,2097152};
     for (int i = 0; i < 8; ++i) {
@@ -1466,6 +1466,10 @@ void test_long_prepan_map_matches_scalar_at_gain_pan_and_position_carry() {
         gbs::audio_init(); assert(gbs::set_audio_channel_volume(gbs::AudioChannel::Music,12));
         assert(gbs::play_tracker_music(song));
         for (int block = 0; block < 127; ++block) {
+            if(block>=85 && block<101) {
+                assert(gbs::set_audio_channel_volume(gbs::AudioChannel::Music,static_cast<uint8_t>(block-85)));
+                assert(gbs::set_audio_channel_volume(gbs::AudioChannel::PcmMusic,static_cast<uint8_t>(100-block)));
+            }
             if (block == 101) assert(gbs::set_audio_channel_volume(gbs::AudioChannel::Music,9));
             gbs::audio_update(); const int8_t* sides[] = {last_pcm_samples,last_pcm_right_samples};
             for (int side = 0; side < 2; ++side) for (int i = 0; i < 528; ++i) {
@@ -1474,6 +1478,11 @@ void test_long_prepan_map_matches_scalar_at_gain_pan_and_position_carry() {
         }
     }
     gbs::audio_init();
+}
+
+void test_long_prepan_map_matches_scalar_at_gain_pan_and_position_carry() {
+    check_long_prepan_map_matches_scalar_at_gain_pan_and_position_carry(12);
+    check_long_prepan_map_matches_scalar_at_gain_pan_and_position_carry(15);
 }
 
 void test_sixteen_low_gain_modulated_voices_keep_the_frozen_output() {

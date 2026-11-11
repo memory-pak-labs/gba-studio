@@ -23,11 +23,7 @@ void rumble_set_provider(const RumbleProvider& provider) {
 }
 
 void rumble_init() {
-    s_rumble_active = false;
-    s_rumble_timer = 0;
-
-    s_provider = RumbleProvider {};
-    s_rumble_available = false;
+    rumble_set_provider(RumbleProvider {});
 }
 
 void rumble_on() {

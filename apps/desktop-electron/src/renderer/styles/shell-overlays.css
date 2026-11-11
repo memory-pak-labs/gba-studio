@@ -228,3 +228,6 @@
 .workspace-navigation-trail > strong {
   color: var(--studio-color-text-muted);
 }
+
+.project-problem-row:has(.project-problem-technical) { flex-direction: column; }
+.project-problem-row:has(.project-problem-technical) > button:first-child { width: 100%; }

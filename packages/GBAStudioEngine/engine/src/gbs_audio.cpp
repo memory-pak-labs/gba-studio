@@ -153,6 +153,20 @@ public:
 #endif
 };
 
+// Observing all voices can span scanlines. Block audio/game mutations while
+// letting the hardware's bounded, audio-independent raster service continue.
+class AudioObserverLock {
+#if defined(__arm__) || defined(__thumb__)
+    uint32_t previous_;
+public:
+    AudioObserverLock() : previous_(gbs_hw_audio_lock_observer_state()) {}
+    ~AudioObserverLock() { gbs_hw_audio_unlock_observer_state(previous_); }
+#else
+public:
+    AudioObserverLock() = default;
+#endif
+};
+
 size_t audio_channel_index(gbs::AudioChannel channel) {
     return static_cast<size_t>(channel);
 }
@@ -996,13 +1010,21 @@ void mix_pcm_voice_block(const MixVoice& voice) {
         playback.step_fp <= ((gbs::pcm_loop_end_sample(*playback.asset) - playback.asset->loop_start_sample) << 16)) {
         const uint32_t key = gbs::pcm_interpolation_mix_key(playback.volume, primary, pcm, playback.sample_gain, playback.pan, playback.sample_linear_pan);
         const uint32_t mono_key = (key & 0x0fff00ffu) | gbs::PCM_INTERPOLATION_PRE_PAN;
+        // A pre-pan table at unity bus gains retains the exact value before
+        // primary/PCM volume truncation. Apply those stages at runtime so a
+        // volume change does not force long samples back to scalar mixing.
+        const uint32_t neutral_key = mono_key | 0x0ff00000u;
         const auto* map = playback.prepared_mix_map;
-        if (map == nullptr || (map->mix_key != key && map->mix_key != mono_key)) {
+        if (map == nullptr || (map->mix_key != key && map->mix_key != mono_key && map->mix_key != neutral_key)) {
             map = find_pcm_interpolation_map(*playback.asset, key);
             if (map == nullptr) map = find_pcm_interpolation_map(*playback.asset, mono_key);
+            if (map == nullptr) map = find_pcm_interpolation_map(*playback.asset, neutral_key);
         }
         if (map != nullptr) {
-            if (map->mix_key & gbs::PCM_INTERPOLATION_PRE_PAN) prepare_pcm_gain_table(15, 15, 15, voice.pan, 255, playback.sample_linear_pan);
+            if (map->mix_key & gbs::PCM_INTERPOLATION_PRE_PAN) {
+                const bool neutral = map->mix_key == neutral_key;
+                prepare_pcm_gain_table(15, neutral ? primary : 15, neutral ? pcm : 15, voice.pan, 255, playback.sample_linear_pan);
+            }
             mix_pcm_prepared_block(playback, *map); return;
         }
     }
@@ -1691,7 +1713,7 @@ uint32_t audio_pcm_submitted_block_count() {
 }
 
 AudioRuntimeUsage audio_runtime_usage() {
-    [[maybe_unused]] const AudioStateLock lock;
+    [[maybe_unused]] const AudioObserverLock lock;
     const PcmAsset* active_assets[PCM_MIXER_MAX_ACTIVE_VOICES] = {};
     size_t active_asset_count = 0;
     uint32_t pcm_source_bytes = 0;

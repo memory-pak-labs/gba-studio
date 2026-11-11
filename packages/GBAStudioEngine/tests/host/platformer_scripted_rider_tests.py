@@ -66,7 +66,7 @@ int main() {
 }
 '''
 sources = ["gbs_event.cpp", "gbs_dialogue_locale.cpp", "gbs_platformer.cpp", "gbs_topdown.cpp",
-           "gbs_isometric.cpp", "gbs_runtime.cpp", "gbs_rtc.cpp", "gbs_link.cpp", "rumble.cpp",
+           "gbs_isometric.cpp", "gbs_runtime.cpp", "gbs_rtc.cpp", "gbs_link.cpp", "gbs_multiplayer.cpp", "gbs_multiplayer_events.cpp", "rumble.cpp",
            "deferred_work.cpp", "gbs_engine_global.cpp"]
 with tempfile.TemporaryDirectory(prefix="gbs-scripted-rider-") as directory:
     temp=Path(directory);(temp/"test.cpp").write_text(code)

@@ -11889,3 +11889,8 @@ body.room-scene-map-card-dragging .room-stage-card-frame.is-dragging {
 
 .room-menu-text-input-choice { display: grid; gap: 4px; min-width: 0; }
 .room-menu-text-input-choice select { min-width: 0; width: 100%; }
+
+.scene-raster-preview { display: flex; gap: 12px; align-items: start; margin-bottom: 16px; flex-wrap: wrap; }
+.scene-raster-preview canvas { width: min(100%, 240px); height: auto; image-rendering: pixelated; border: 1px solid var(--border); border-radius: 8px; }
+.scene-raster-preview > div { flex: 1 1 160px; min-width: 0; }
+.scene-raster-editor input[type="color"] { width: 100%; min-height: 36px; cursor: pointer; }

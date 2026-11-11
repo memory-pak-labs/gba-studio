@@ -1,3 +1,4 @@
+import { normalizeSceneRasterEffects, sceneRasterEffectIssues, type SceneRasterEffects } from "./sceneRasterEffects.js";
 import { usesSinglePlaneBackground } from "./eventTransforms.js";
 import type { GbaVideoModeId } from "./gbaVideoModes.js";
 import {
@@ -90,6 +91,7 @@ export interface SceneCompositionHBlankKeyframe {
 }
 
 export interface SceneCompositionEffects {
+  raster?: SceneRasterEffects;
   blend: SceneCompositionBlend;
   mosaic: SceneCompositionMosaic;
   window0: SceneCompositionWindow;
@@ -161,6 +163,7 @@ export interface ExportedSceneComposition {
     } | null;
   }>;
   effects: {
+    raster?: SceneRasterEffects;
     blend: {
       enabled: boolean;
       mode: SceneCompositionBlendMode;
@@ -344,6 +347,7 @@ function normalizeEffects(value: unknown): SceneCompositionEffects {
     : [];
   const timeline = normalizeHBlankTimeline(hblankSource.timeline ?? hblankSource.hblankTimeline);
   return {
+    ...(source.raster !== undefined ? { raster: normalizeSceneRasterEffects(source.raster) } : {}),
     blend: {
       enabled: booleanValue(blendSource.enabled, false),
       mode: enumValue(blendSource.mode, ["none", "alpha", "brighten", "darken"] as const, "none"),
@@ -475,6 +479,7 @@ export function sceneCompositionIssues(value: unknown, profile = "shmup"): Scene
     if (layer.kind === "bitmap" && layer.layer !== "BITMAP") issues.push(issue("INVALID_BITMAP_LAYER", `A camada bitmap ${layer.id} deve usar o plano BITMAP.`, layer.id, "layer"));
   }
   const effects = composition.effects;
+  for (const message of sceneRasterEffectIssues(isRecord(value.effects) ? value.effects.raster : undefined, composition.mode, effects.hblank.enabled)) issues.push(issue("INVALID_EFFECT", message, undefined, "effects.raster"));
   if (effects.blend.enabled && (effects.blend.mode === "none" || effects.blend.firstTargets.length === 0)) {
     issues.push(issue("INVALID_EFFECT", "Blending habilitado precisa de modo e alvos de primeira camada.", undefined, "effects.blend"));
   }
@@ -588,6 +593,7 @@ export function exportSceneComposition(value: unknown): ExportedSceneComposition
       } : null
     })),
     effects: {
+      ...(composition.effects.raster ? { raster: normalizeSceneRasterEffects(composition.effects.raster) } : {}),
       blend: {
         enabled: composition.effects.blend.enabled,
         mode: composition.effects.blend.mode,

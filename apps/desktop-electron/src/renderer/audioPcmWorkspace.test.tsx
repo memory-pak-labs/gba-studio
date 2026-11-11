@@ -25,7 +25,7 @@ const blank = () => createBlankProjectData({ name: "Compositor", includeStarterC
 afterEach(() => { cleanup(); vi.clearAllMocks(); });
 
 describe("visual PCM composer", () => {
-  it.each(["imported", "sfx", "song"])("opens the shared visual WAV editor for %s audio", kind => {
+  it.each(["imported", "sfx", "song"])("opens sample tools only from the selected %s audio context", kind => {
     let data = blank();
     if (kind === "imported") data.audioItems = [{ id: "fx", kind: "SFX", name: "Bell", sourceAssetID: "wav" }, { id: "other", kind: "SFX", name: "Other", sourceAssetID: "wav" }];
     else {
@@ -36,25 +36,82 @@ describe("visual PCM composer", () => {
     }
     data.assets = [{ id: "wav", name: "Bell.wav", kind: "Audio", metadata: { source: "Assets/Bell.wav" } }];
     render(<AudioWorkspace presentation={deriveAudioWorkspacePresentation(data)} {...handlers({ onUpdateWavEdit: vi.fn() })} />);
-    if (kind === "song") fireEvent.click(screen.getByText("Editar sample WAV"));
-    expect(screen.getByRole("region", { name: "Editor visual de WAV" })).toBeInTheDocument();
+    expect(screen.queryByRole("region", { name: "Editor de samples" })).not.toBeInTheDocument();
+    const editSample = screen.getByRole("button", { name: "Editar sample" });
+    expect(fireEvent.keyDown(editSample, { key: " ", code: "Space" })).toBe(true);
     if (kind === "song") {
-      fireEvent.click(screen.getByRole("button", { name: "Piano Roll" }));
-      expect(screen.queryByRole("region", { name: "Editor visual de WAV" })).not.toBeInTheDocument();
-      fireEvent.click(screen.getByRole("button", { name: "Editar sample WAV" }));
-      expect(screen.getByRole("region", { name: "Editor visual de WAV" })).toBeInTheDocument();
+      const modes = within(screen.getByRole("group", { name: "Modo do compositor" }));
+      expect(modes.queryByRole("button", { name: /sample/ })).not.toBeInTheDocument();
+      expect(within(screen.getByRole("group", { name: "Controles da faixa" })).getByRole("button", { name: "Editar sample" })).toBe(editSample);
+      fireEvent.click(modes.getByRole("button", { name: "Tracker" }));
+    }
+    fireEvent.click(editSample);
+    expect(screen.getByRole("region", { name: "Editor de samples" })).toBeInTheDocument();
+    if (kind === "song") {
+      fireEvent.click(screen.getByRole("button", { name: "Voltar ao compositor" }));
+      expect(screen.queryByRole("region", { name: "Editor de samples" })).not.toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "Tracker" })).toHaveAttribute("aria-pressed", "true");
+      fireEvent.click(screen.getByRole("button", { name: "Editar sample" }));
+      fireEvent.change(screen.getByRole("combobox", { name: "Instrumento do canal" }), { target: { value: "PCM Sine" } });
+      expect(screen.queryByRole("region", { name: "Editor de samples" })).not.toBeInTheDocument();
+    }
+    if (kind === "sfx") {
+      expect(screen.getByRole("slider", { name: "Duração do efeito" })).toBeInTheDocument();
+      expect(screen.getByRole("img", { name: "Envelope do sample" })).toBeInTheDocument();
+      fireEvent.click(screen.getByRole("button", { name: "Fechar editor de samples" }));
+      expect(screen.queryByRole("region", { name: "Editor de samples" })).not.toBeInTheDocument();
     }
     if (kind === "imported") {
       fireEvent.keyDown(screen.getByRole("button", { name: "Recarregar WAV" }), { key: "ArrowRight" });
       expect(screen.getByRole("heading", { name: "Bell" })).toBeInTheDocument();
+      fireEvent.click(screen.getByRole("button", { name: "Voltar ao áudio" }));
+      expect(screen.queryByRole("region", { name: "Editor de samples" })).not.toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "Nova música PCM" })).toBeInTheDocument();
     }
   });
-  it("offers PCM music and effects as explicit creation choices", async () => {
+  it("starts PCM composition from a recorded WAV without changing the source", () => {
+    const data = blank();
+    data.audioItems = [{ id: "bell", kind: "SFX", name: "Bell", sourceAssetID: "wav" }];
+    data.assets = [{ id: "wav", name: "Bell.wav", kind: "Audio", metadata: { source: "Assets/Bell.wav" } }];
+    const before = structuredClone(data), create = vi.fn();
+    render(<AudioWorkspace presentation={deriveAudioWorkspacePresentation(data)} {...handlers({ onCreateAudio: create, onUpdateWavEdit: vi.fn() })} />);
+    fireEvent.click(screen.getByRole("button", { name: "Nova música PCM" }));
+    expect(create).toHaveBeenCalledExactlyOnceWith("Musica", "PCM");
+    expect(data).toEqual(before);
+  });
+  it.each([
+    ["Música PCM", "Musica", "PCM", false],
+    ["Efeito PCM", "SFX", "PCM", false],
+    ["Música PSG", "Musica", "PSG", true],
+    ["Efeito PSG", "SFX", "PSG", true]
+  ] as const)("creates %s from the appropriate menu group", async (label, kind, synthesis, secondary) => {
+    const user = userEvent.setup();
     const create = vi.fn();
     render(<AudioWorkspace presentation={deriveAudioWorkspacePresentation(blank())} {...handlers({ onCreateAudio: create })} />);
-    await userEvent.click(screen.getByRole("button", { name: "Criar música" }));
-    await userEvent.click(screen.getByRole("button", { name: "Música PCM" }));
-    expect(create).toHaveBeenCalledWith("Musica", "PCM");
+    await user.click(screen.getByRole("button", { name: "Criar música" }));
+    const menu = within(screen.getByRole("dialog", { name: "Assistente de criação de áudio" }));
+    for (const name of ["Música PCM", "Efeito PCM", "Importar áudio"]) {
+      expect(menu.getByRole("button", { name })).toBeVisible();
+    }
+    expect(menu.getByRole("button", { name: "Música PSG", hidden: true })).not.toBeVisible();
+    expect(menu.getByRole("button", { name: "Efeito PSG", hidden: true })).not.toBeVisible();
+    if (secondary) await user.click(menu.getByText("Mais opções"));
+    await user.click(menu.getByRole("button", { name: label }));
+    expect(create).toHaveBeenCalledExactlyOnceWith(kind, synthesis);
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Criar música" }));
+    expect(screen.getByRole("button", { name: "Música PSG", hidden: true })).not.toBeVisible();
+  });
+  it("opens audio import from the primary menu and closes the assistant", async () => {
+    const onImportAudio = vi.fn();
+    const project = createAudioItemInProject(blank(), { id: "song", name: "Tema", kind: "Musica", synthesis: "PCM" });
+    render(<AudioWorkspace presentation={deriveAudioWorkspacePresentation(project)} {...handlers({ onImportAudio })} />);
+    await userEvent.click(screen.getByRole("button", { name: "Criar áudio" }));
+    const menu = within(screen.getByRole("dialog", { name: "Assistente de criação de áudio" }));
+    expect(fireEvent.keyDown(menu.getByText("Mais opções"), { key: " ", code: "Space" })).toBe(true);
+    await userEvent.click(menu.getByRole("button", { name: "Importar áudio" }));
+    expect(onImportAudio).toHaveBeenCalledOnce();
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
   });
   it("keeps sixteen lanes reachable while editing one full piano at a time", async () => {
     const data = createAudioItemInProject(blank(), { id: "song", name: "Tema", kind: "Musica", synthesis: "PCM" });

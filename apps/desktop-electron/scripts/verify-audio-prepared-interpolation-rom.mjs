@@ -21,13 +21,15 @@ fs.mkdirSync(output, { recursive: true });
 execFileSync(python, [path.join(engine, 'tests/host/tracker_stress_fixtures.py'), output, '--pitch-channels', '16', '--sample-length', process.env.GBA_TRACKER_SAMPLE_LENGTH ?? '128']);
 const mixingRates = (process.env.GBA_AUDIO_MIXING_RATES ?? '31536').split(',').map(Number);
 assert.ok(mixingRates.length && mixingRates.every(rate => [10512, 21024, 31536].includes(rate)), 'supported mixing rates');
+const mapVolume = Number(process.env.GBA_AUDIO_MAP_VOLUME ?? 12);
+assert.ok(Number.isInteger(mapVolume) && mapVolume >= 0 && mapVolume <= 15, 'prepared bus volume');
 const evidence = { passed: false, engineLibrarySha256: hash(fs.readFileSync(path.join(pack, 'lib/libgbastudio_engine.a'))), wasmSha256: hash(wasmBytes), cases: [] };
 try {
   for (const format of ['xm', 'it']) for (const mixingRate of mixingRates) {
     const outputCount = mixingRate / 10512 * 176;
     const dir = path.join(output, mixingRates.length === 1 && mixingRate === 31536 ? format : `${format}-${mixingRate}`); fs.mkdirSync(dir, { recursive: true });
     fs.copyFileSync(path.join(output, `load-effects.${format}`), path.join(dir, `load-effects.${format}`));
-    fs.writeFileSync(path.join(dir, 'audio.json'), JSON.stringify({ tracker: [{ name: 'song', [format]: `load-effects.${format}`, loop: true, native_primary_volume: 12 }] }));
+    fs.writeFileSync(path.join(dir, 'audio.json'), JSON.stringify({ tracker: [{ name: 'song', [format]: `load-effects.${format}`, loop: true, native_primary_volume: mapVolume }] }));
     execFileSync(python, [path.join(pack, 'tools/assetc'), path.join(dir, 'audio.json'), '--audio-json', '-o', path.join(dir, 'song.hpp'), '--name', 'channels']);
     // Keep the scalar descriptors in ROM too: the full tick stream exceeds
     // EWRAM, and copying it at boot would distort the comparison.
@@ -110,7 +112,7 @@ extern "C" int gbs_main() {
     }
     assert.deepEqual(runs[1].blocks, runs[0].blocks, 'prepared intervals and scalar interpolation produce byte-identical PCM on ARM');
     assert.ok(runs[1].frames >= 350, 'prepared mixer sustains the isolated ROM cadence');
-    evidence.cases.push({ format, mixingRate, romSha256: hash(rom), pcmSha256: hash(runs[0].blocks), comparedBytes: runs[0].blocks.length, runs: runs.map(({ prepared, frames, videoFrames, firstBlockFrame }) => ({ prepared, frames, videoFrames, firstBlockFrame })) });
+    evidence.cases.push({ format, mixingRate, mapVolume, playbackVolume:12, romSha256: hash(rom), pcmSha256: hash(runs[0].blocks), comparedBytes: runs[0].blocks.length, runs: runs.map(({ prepared, frames, videoFrames, firstBlockFrame }) => ({ prepared, frames, videoFrames, firstBlockFrame })) });
   }
   evidence.passed = true;
   console.log('PASS: XM/IT prepared interpolation equals scalar ARM mixing; 16 modulated voices at all selected mixing rates, cartridge timing configured');

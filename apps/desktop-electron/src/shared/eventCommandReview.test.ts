@@ -27,10 +27,10 @@ describe("reviewed event block catalog", () => {
   });
   it("retains all historical definitions with every GBA integration resolved", () => {
     const matrix=buildEventCommandSupportMatrix();
-    expect(matrix).toHaveLength(211);
+    expect(matrix).toHaveLength(216);
     expect(matrix.find(d=>d.id === "audio.set_mixing_rate")).toMatchObject({verb:"set_audio_mixing_rate",status:"native"});
     expect(matrix.filter(d=>d.status === "pending")).toEqual([]);
-    expect(matrix.filter(d=>d.status === "native")).toHaveLength(201);
+    expect(matrix.filter(d=>d.status === "native")).toHaveLength(206);
     expect(matrix.filter(d=>d.status === "not-applicable")).toHaveLength(2);
   });
   it("explains an old menu block using its product name and actual integration boundary, preserving saved commands", () => {
@@ -38,7 +38,7 @@ describe("reviewed event block catalog", () => {
     const before = JSON.stringify(data);
     const step = deriveEventsWorkspacePresentation(data).groups.flatMap(g => g.events)[0]!.steps[0]!;
     expect(step).toMatchObject({ commandLabel: "Exibir menu", commandBadge: "Parâmetros incompletos", commandAvailability: expect.stringContaining("opções") });
-    expect(step.paletteSuggestions.some(item=>item.command.startsWith("open_menu "))).toBe(true);
+    expect(step.paletteSuggestions.some(item=>item.command === "open_menu")).toBe(true);
     expect(JSON.stringify(data)).toBe(before);
     expect(JSON.parse(prepareEventExport(data, "review")!.contents).event.steps[0].command).toBe("open_menu");
   });

@@ -1,8 +1,9 @@
 # Compositor PCM no workspace Áudio
 
-Em **Áudio → Criar áudio**, escolha **Música PCM** ou **SFX PCM**. As opções
-**Música em loop** e **SFX curto** mantêm o compositor PSG existente. Nenhum áudio
-anterior é convertido automaticamente.
+Em **Áudio → Criar áudio**, escolha **Música PCM**, **Efeito PCM** ou
+**Importar áudio**. Em **Mais opções**, **Música PSG** e **Efeito PSG** mantêm
+o compositor de síntese existente. Nenhum áudio anterior é convertido
+automaticamente.
 
 ## Música
 

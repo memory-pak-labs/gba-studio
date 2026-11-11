@@ -40,6 +40,9 @@ namespace gbs {
 // Fail if unrelated hardware operations are invoked by the save regression.
 // PE/COFF linkers can retain these event handlers even when ELF/Mach-O discard them.
 bool runtime_read_rtc_datetime(RtcDateTime&) { std::abort(); }
+void execute_multiplayer_queue_event(EventState&,const EventCommand&) { std::abort(); }
+MultiplayerQueue& multiplayer_connection() { std::abort(); }
+void multiplayer_close_connection() { std::abort(); }
 void rumble_on() { std::abort(); }
 void rumble_on_for(uint16_t) { std::abort(); }
 void rumble_off() { std::abort(); }

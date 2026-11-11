@@ -1,3 +1,5 @@
+import { DialogueAuthoringFields } from "./DialogueAuthoringFields";
+import { useWorkspaceState, useWorkspaceRef, useWorkspaceChangeEffect } from "./workspaceSessionState";
 import { uiText as ui, useStudioUiText } from "./studioUiText";
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
@@ -20,7 +22,7 @@ import { resolveAssetURL } from "../shared/spriteAssetURL";
 import { WorkspaceEmptyState } from "./studioUi";
 import { dialogueDisplayTitle, dialogueReviewBackground, dialogueReviewScenes } from "./dialoguesWorkspaceReview";
 import { resolveSceneDialogueUiSettings } from "../shared/interfaceThemes";
-import { MessageSquare, Search, ChevronLeft, ChevronRight, Play, Square, ExternalLink } from "lucide-react";
+import { MessageSquare, Search, ChevronLeft, ChevronRight, Play, Square, ExternalLink, Plus } from "lucide-react";
 import { dialoguePreviewLayoutForSettings } from "../shared/sceneRuntimeExport";
 import { DialoguePreviewSnapshot, deriveDialoguePreviewPages } from "./dialoguePreviewSnapshot";
 import type { DialogueUiSettingsContract } from "../shared/sceneRuntimeExport";
@@ -144,21 +146,21 @@ export function DialoguesWorkspace({
 }: DialoguesWorkspaceProps): React.ReactElement {
   const ui = useStudioUiText();
   const { t } = useStudioI18n();
-  const [searchQuery, setSearchQuery] = useState("");
-  const [statusFilter, setStatusFilter] = useState<DialoguesWorkspaceStatusFilter>("all");
-  const [characterFilter, setCharacterFilter] = useState("");
-  const [selectedKey, setSelectedKey] = useState<string | null>(null);
-  const appliedFocusRequest = useRef<string | null>(null);
-  const [validationOpen, setValidationOpen] = useState(false);
-  const [authoringMode, setAuthoringMode] = useState<"review" | "translation">("review");
+  const [searchQuery, setSearchQuery] = useWorkspaceState("dialogues.searchQuery", "");
+  const [statusFilter, setStatusFilter] = useWorkspaceState<DialoguesWorkspaceStatusFilter>("dialogues.statusFilter", "all");
+  const [characterFilter, setCharacterFilter] = useWorkspaceState("dialogues.characterFilter", "");
+  const [selectedKey, setSelectedKey] = useWorkspaceState<string | null>("dialogues.selectedKey", null);
+  const appliedFocusRequest = useWorkspaceRef<string | null>("dialogues.appliedFocusRequest", null);
+  const [validationOpen, setValidationOpen] = useWorkspaceState("dialogues.validationOpen", false);
+  const [authoringMode, setAuthoringMode] = useWorkspaceState<"review" | "translation">("dialogues.authoringMode", "review");
   const [translationBusyKey, setTranslationBusyKey] = useState<string | null>(null);
   const [translationError, setTranslationError] = useState("");
-  const [previewLocale, setPreviewLocale] = useState<string | null>(null);
-  const [pageIndex, setPageIndex] = useState(0);
-  const [previewZoom, setPreviewZoom] = useState<"fit" | "1" | "2">("fit");
+  const [previewLocale, setPreviewLocale] = useWorkspaceState<string | null>("dialogues.previewLocale", null);
+  const [pageIndex, setPageIndex] = useWorkspaceState("dialogues.pageIndex", 0);
+  const [previewZoom, setPreviewZoom] = useWorkspaceState<"fit" | "1" | "2">("dialogues.previewZoom", "fit");
   const [testingText, setTestingText] = useState(false);
   const [visibleCharacters, setVisibleCharacters] = useState<number | undefined>();
-  const [previewSceneID, setPreviewSceneID] = useState<string | null>(null);
+  const [previewSceneID, setPreviewSceneID] = useWorkspaceState<string | null>("dialogues.previewSceneID", null);
   const scenes = useMemo(() => dialogueReviewScenes(projectData), [projectData]);
   const visibleDialogues = useMemo(() => {
     const dialogues = presentation?.dialogues ?? [];
@@ -274,7 +276,7 @@ export function DialoguesWorkspace({
     [dialogueSettings, previewSpeaker, previewPortraitSlot, dialoguePortraitURL, dialoguePortraitFrame?.width, dialoguePortraitFrame?.height, shownText, shownChoices.join("\n")]);
   const currentPage = Math.min(pageIndex, previewPages.length - 1);
   const page = previewPages[currentPage];
-  useEffect(() => {
+  useWorkspaceChangeEffect(() => {
     setPageIndex(0); setTestingText(false); setVisibleCharacters(undefined);
   }, [activeDialogue?.key, language, shownText, dialogueSettings, previewSceneID]);
   useEffect(() => {
@@ -340,7 +342,10 @@ export function DialoguesWorkspace({
     <section aria-label={t("dialogues.workspaceAria")} className="dialogues-workspace">
       <div className="dialogues-layout dialogues-review-layout">
         <aside className="dialogues-rail" aria-label={t("dialogues.library")}>
-          <div className="dialogues-panel-title"><h3>{t("workspace.dialogues")}</h3><span>{presentation.dialogues.length}</span>{onCreateDialogue ? <button type="button" onClick={() => void onCreateDialogue()}>{t("dialogues.actions.create")}</button> : null}</div>
+          <div className="dialogues-panel-title">
+            <h3>{t("workspace.dialogues")}</h3><span>{presentation.dialogues.length}</span>
+            {onCreateDialogue ? <button aria-label={t("dialogues.actions.create")} className="dialogues-create-button" title={t("dialogues.actions.create")} type="button" onClick={async () => { const key = await onCreateDialogue(); if (key) { setSearchQuery(""); setStatusFilter("all"); setCharacterFilter(""); setSelectedKey(key); setAuthoringMode("review"); setPreviewLocale(sourceLocale); } }}><Plus aria-hidden="true" size={18}/></button> : null}
+          </div>
           <label className="dialogues-search dialogues-review-search"><Search aria-hidden="true" size={16}/><input aria-label={t("dialogues.search")} onChange={event => setSearchQuery(event.currentTarget.value)} placeholder={t("dialogues.searchPlaceholder")} type="search" value={searchQuery}/></label>
           <select className="dialogues-character-filter" aria-label={t("dialogues.filter.character")} onChange={event => setCharacterFilter(event.currentTarget.value)} value={characterFilter}>
             <option value="">{t("dialogues.filter.allCharacters")}</option>
@@ -375,11 +380,18 @@ export function DialoguesWorkspace({
             <select aria-label={t("dialogues.review.previewLanguage")} onChange={event => setPreviewLocale(event.currentTarget.value)} value={language}>{presentation.localization.enabledLocales.map(locale => <option key={locale} value={locale}>{projectLocaleLabel(locale)}</option>)}</select>
           </div>
           {validationOpen ? <div className="dialogues-validation-panel" aria-label={t("dialogues.diagnostics")}>{validationIssues.map(issue => <button className={issue.severity === "error" ? "danger-chip" : issue.severity === "warning" ? "warning-chip" : ""} key={issue.id} onClick={() => { if (issue.dialogueKey) { setSearchQuery(""); setStatusFilter("all"); setCharacterFilter(""); setSelectedKey(issue.dialogueKey); } }} type="button">{ui(issue.message)}</button>)}</div> : null}
-          <div className="dialogues-review-content">
+          <div data-workspace-scroll="dialogues-review-content" className="dialogues-review-content">
           {activeDialogue && authoringMode === "review" ? (
             <section id="dialogues-authoring-panel-review" role="tabpanel" aria-labelledby="dialogues-authoring-tab-review" className="dialogues-text-panel">
               <h3>{t("dialogues.review.textTitle")}</h3>
-              <p className="dialogues-script-text">{shownText || "—"}</p>
+              <>
+                <p className="dialogue-scope-notice">{ui("Fala compartilhada · {0} uso(s). Alterações afetam todos os usos.", { 0: activeDialogue.usages.length })}</p>
+                <p className="muted">{ui("Texto original · {0}", { 0: projectLocaleLabel(sourceLocale) })}</p>
+                <DialogueAuthoringFields dialogue={activeDialogue} onChange={fields => onUpdateDialogue(activeDialogue.key, fields)}
+                  assetOptions={(Array.isArray(projectData?.assets) ? projectData.assets : []).filter(item => item.kind === "Portrait" || item.kind === "Emote").map(item => String(item.name))}
+                  sfxOptions={(Array.isArray(projectData?.assets) ? projectData.assets : []).filter(item => item.kind === "SFX").map(item => String(item.name))} />
+              </>
+              {language !== sourceLocale ? <p className="dialogues-script-text">{shownText || "—"}</p> : null}
               {language !== sourceLocale && !activeDialogue.translations[language as ProjectLocale] ? <p role="status" className="muted">{t("dialogues.review.translationFallback")}</p> : null}
               <div className="dialogues-pages-heading"><h3>{t("dialogues.review.pages")}</h3><span>{t("dialogues.review.pageCount", { count: previewPages.length })}</span></div>
               <div className="dialogues-page-list" aria-label={t("dialogues.review.pages")}>{previewPages.map((item, index) => <button aria-pressed={currentPage === index} aria-label={t("dialogues.review.page", { page: index + 1 })} key={index} onClick={() => selectPage(index)} type="button"><strong>{index + 1}</strong><span>{item.lines.join(" ") || "—"}</span></button>)}</div>

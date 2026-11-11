@@ -1,3 +1,4 @@
+import { useWorkspaceState, useWorkspaceRef, useWorkspaceChangeEffect } from "./workspaceSessionState";
 import { uiText as ui, useStudioUiText } from "./studioUiText";
 import type { SceneActionHandler, SceneActionAuditEntry } from "../shared/sceneActionRouting.js";
 import { Fragment, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
@@ -476,6 +477,7 @@ function settingControl(
       <label className="settings-edit-row" key={field.key} data-setting-key={field.key} data-setting-section={sectionID}>
         <span>{polishSettingsText(field.label)}</span>
         <select
+          aria-describedby={sectionID === "hardware" && field.key === "rumbleCartridge" ? "rumble-cartridge-description" : undefined}
           disabled={field.readOnly}
           onChange={(event) => onUpdateSetting(
             sectionID,
@@ -1331,6 +1333,7 @@ function SettingsSectionPanel({
           </div>
         ) : null}
         {section.id === "shortcuts" ? <p className="settings-controls-note">{ui("Estes atalhos são salvos neste projeto. Aparência, idioma do aplicativo e pacotes offline são preferências deste dispositivo.")}</p> : null}
+        {section.id === "hardware" ? <p className="settings-controls-note" id="rumble-cartridge-description">{section.editableFields.find(field => field.key === "rumbleCartridge")?.description}</p> : null}
         {section.id === "shortcuts" ? (
           <ShortcutSettingsPanel section={section} onUpdateSetting={onUpdateSetting} />
         ) : null}
@@ -1411,9 +1414,9 @@ export function SettingsWorkspace({
   const isSceneWorkspace = scope === "scene";
   const isDiscreteWorkspace = isGlobalWorkspace || isSceneWorkspace || isExportWorkspace;
   const workspaceClassName = `settings-workspace${isGlobalWorkspace ? " settings-workspace-global" : isSceneWorkspace ? " settings-workspace-scene" : isExportWorkspace ? " settings-workspace-export" : ""}`;
-  const [selectedSectionID, setSelectedSectionID] = useState<SettingsNavigationSectionID>(isSceneWorkspace ? "topdown" : isExportWorkspace ? "general" : "interface");
-  const appliedExportFocus = useRef("");
-  const [searchQuery, setSearchQuery] = useState("");
+  const [selectedSectionID, setSelectedSectionID] = useWorkspaceState<SettingsNavigationSectionID>(`settings.${scope}.selectedSectionID`, isSceneWorkspace ? "topdown" : isExportWorkspace ? "general" : "interface");
+  const appliedExportFocus = useWorkspaceRef(`settings.${scope}.appliedFocus`, "");
+  const [searchQuery, setSearchQuery] = useWorkspaceState(`settings.${scope}.searchQuery`, "");
   const [resetConfirmationSectionID, setResetConfirmationSectionID] = useState<SettingsSectionID | null>(null);
   const visibleSections = useMemo(
     () => presentation ? isExportWorkspace ? deriveExportSettingsSections(presentation) : deriveSettingsSectionsForScope(presentation, scope) : [],
@@ -1448,7 +1451,7 @@ export function SettingsWorkspace({
       ? [{ sectionID: "health" as const, title: "Saúde do projeto", detail: "Preflight do projeto e da ROM" }] : [];
     return [...localResults, ...projectResults, ...healthResults];
   }, [hasPluginsSection, isGlobalWorkspace, isExportWorkspace, presentation, searchQuery, visibleSections, ui]);
-  useEffect(() => {
+  useWorkspaceChangeEffect(() => {
     setSearchQuery("");
     setResetConfirmationSectionID(null);
     setSelectedSectionID(initialSectionID);
@@ -1456,7 +1459,7 @@ export function SettingsWorkspace({
   useEffect(() => {
     if (!presentation || !focusedSectionID) return;
     const focusKey = `${projectPath ?? ""}:${focusedSectionID}:${focusRequestID ?? 0}`;
-    if (isExportWorkspace && appliedExportFocus.current === focusKey) return;
+    if (appliedExportFocus.current === focusKey) return;
     if (isExportWorkspace && focusedSectionID === "health") {
       appliedExportFocus.current = focusKey;
       setSelectedSectionID("health");
@@ -1464,13 +1467,14 @@ export function SettingsWorkspace({
       return;
     }
     if (isGlobalWorkspace && [...DEVICE_SETTINGS_SECTIONS, ...(hasPluginsSection ? [PLUGINS_SETTINGS_SECTION] : [])].some(section => section.sectionID === focusedSectionID)) {
+      appliedExportFocus.current = focusKey;
       setSelectedSectionID(focusedSectionID as SettingsNavigationSectionID);
       scrollToSettingsSection(focusedSectionID as SettingsNavigationSectionID);
       return;
     }
     const section = visibleSections.find((item) => item.id === focusedSectionID);
     if (!section) return;
-    if (isExportWorkspace) appliedExportFocus.current = focusKey;
+    appliedExportFocus.current = focusKey;
     setSelectedSectionID(section.id);
     scrollToSettingsSection(section.id);
   }, [focusedSectionID, focusRequestID, hasPluginsSection, isExportWorkspace, isGlobalWorkspace, presentation, projectPath, visibleSections]);
@@ -1577,7 +1581,7 @@ export function SettingsWorkspace({
       <section className={workspaceClassName} aria-label={ui("Workspace {0}", { 0: ui(workspaceTitle) })}>
         <h3 className="studio-visually-hidden">{ui(workspaceTitle)}</h3>
         <div className="settings-layout">
-          <aside className="settings-nav" aria-label={ui("Seções de {0}", { 0: workspaceTitle.toLocaleLowerCase("pt-BR") })}>
+          <aside data-workspace-scroll="settings-nav" className="settings-nav" aria-label={ui("Seções de {0}", { 0: workspaceTitle.toLocaleLowerCase("pt-BR") })}>
             <div className="settings-nav-title">
               <strong>{ui(workspaceTitle)}</strong>
               <span>{isGlobalWorkspace ? ui("2 seções") : ui("Sem projeto")}</span>
@@ -1594,7 +1598,7 @@ export function SettingsWorkspace({
               ) : null}
             </div>
           </aside>
-          <main className="settings-main-panel" onScroll={(event) => updateActiveSectionFromScroll(event.currentTarget)}>
+          <main data-workspace-scroll="settings-main-panel" className="settings-main-panel" onScroll={(event) => updateActiveSectionFromScroll(event.currentTarget)}>
             {isGlobalWorkspace ? <div className="settings-continuous-page">
               {selectedSectionID === "interface" ? <SettingsInterfaceSection /> : null}
               {selectedSectionID === "translationPacks" ? <SettingsTranslationSection /> : null}
@@ -1618,7 +1622,7 @@ export function SettingsWorkspace({
       <h3 className="studio-visually-hidden">{ui(workspaceTitle)}</h3>
 
       <div className="settings-layout">
-        <aside className="settings-nav" aria-label={ui("Seções de {0}", { 0: workspaceTitle.toLocaleLowerCase("pt-BR") })}>
+        <aside data-workspace-scroll="settings-nav" className="settings-nav" aria-label={ui("Seções de {0}", { 0: workspaceTitle.toLocaleLowerCase("pt-BR") })}>
           <div className="settings-nav-title">
             <strong>{ui(workspaceTitle)}</strong>
             <span>{isGlobalWorkspace ? ui("{0} seções", { 0: visibleSections.length + DEVICE_SETTINGS_SECTIONS.length + (hasPluginsSection ? 1 : 0) }) : isExportWorkspace ? ui("{0} seções", { 0: visibleSections.length + 1 }) : ui("{0} seções", { 0: visibleSections.length })}</span>
@@ -1664,7 +1668,7 @@ export function SettingsWorkspace({
 
         </aside>
 
-        <main className="settings-main-panel" onScroll={(event) => updateActiveSectionFromScroll(event.currentTarget)}>
+        <main data-workspace-scroll="settings-main-panel" className="settings-main-panel" onScroll={(event) => updateActiveSectionFromScroll(event.currentTarget)}>
           {isExportWorkspace && presentation.summary.warnings.length ? (
               <div className="settings-warning-strip">
                 {presentation.summary.warnings.map((warning) => (

@@ -18,6 +18,7 @@
 #include "gbs/isometric.hpp"
 #include "gbs/math.hpp"
 #include "gbs/menu.hpp"
+#include "gbs/multiplayer.hpp"
 #include "gbs/platformer.hpp"
 #include "gbs/point_click.hpp"
 #include "gbs/pseudo_3d.hpp"

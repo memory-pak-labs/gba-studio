@@ -1,4 +1,5 @@
 import { mapAuthoredEventCommands } from "../authoredEventCommands.js";
+import { parseLinkCableCommand, QUEUED_MULTIPLAYER_VERBS } from "../linkCableRuntime.js";
 import { retargetNativeEventCommand } from "../eventCommandRegistry.js";
 import { eventCommandCategory, eventCommandDescription, eventCommandParameterChoices, eventCommandParameterLabel, normalizeEventSearch } from "../eventCommandMetadata.js";
 import { sceneChangeCommand, sceneChangeCommandParts } from "../sceneChangeCommand.js";
@@ -834,7 +835,8 @@ function commandParametersForCommand(
     const templatePart = templateParts[tokenIndex];
     const placeholder = commandParameterPlaceholder(templatePart);
     const isOtherActor = tokenIndex === 2 && (parts[0] === "if_actor_distance" || parts[0] === "if_actor_relative");
-    const kind = isOtherActor ? "actor" : commandParameterKind(placeholder);
+    const isQueueVariable = ["multiplayer_queue_send", "multiplayer_queue_receive", "multiplayer_queue_status"].includes(parts[0] ?? "");
+    const kind = isOtherActor ? "actor" : isQueueVariable ? "variable" : commandParameterKind(placeholder);
     const baseID = placeholder ?? `arg${tokenIndex}`;
     const occurrence = seenIDs.get(baseID) ?? 0;
     seenIDs.set(baseID, occurrence + 1);
@@ -2105,6 +2107,9 @@ function missingResourceReferences(command: string, data: GBAProjectData, eventN
   const parts = commandParts(command);
   const verb = parts[0] ?? "noop";
   const missing: string[] = [];
+  if ((QUEUED_MULTIPLAYER_VERBS as readonly string[]).includes(verb)) {
+    try { parseLinkCableCommand(command); } catch (error) { missing.push(error instanceof Error ? error.message : String(error)); }
+  }
   try { resolveProjectConstantCommand(data, command); } catch (error) { missing.push(error instanceof Error ? error.message : String(error)); }
 
   const integrationIssue = eventCommandIntegrationIssue(command);
@@ -2358,9 +2363,9 @@ function commandTemplateContext(options: EventCommandResourceOptions): EventComm
     animation: firstOption(options.animation, "idle"),
     animationState: firstOption(options.animationState, "state_id"),
     background: firstOption(options.background, "background.png"),
-    choiceDialogue: firstOption(options.choiceDialogue, firstOption(options.dialogue, "intro_001")),
+    choiceDialogue: firstOption(options.choiceDialogue, ""),
     currentRoom: firstOption(options.currentRoom, "room_name"),
-    dialogue: firstOption(options.dialogue, "intro_001"),
+    dialogue: firstOption(options.dialogue, ""),
     event: firstOption(options.event, "intro_001"),
     music: firstOption(options.music, "theme.mod"),
     room: options.room[1] ?? firstOption(options.room, "room_name"),
@@ -2372,6 +2377,7 @@ function commandTemplateContext(options: EventCommandResourceOptions): EventComm
 }
 
 function resolveCommandTemplate(template: string, context: EventCommandTemplateContext): string {
+  if ((template.includes("{dialogue}") && !context.dialogue) || (template.includes("{choiceDialogue}") && !context.choiceDialogue)) return template.split(/\s+/)[0];
   const defaults: Record<string, string> = {
     stage: context.currentRoom, winner: "player1", amount: "0", style: "a-ism",
     move_id: "super", enabled: "true", seconds: "60", count: "2"

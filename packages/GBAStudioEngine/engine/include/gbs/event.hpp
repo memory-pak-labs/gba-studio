@@ -181,7 +181,12 @@ enum class EventOp : uint8_t {
     MoveActorRelative = 165,
     SetActorScale = 166,
     SetBackgroundScale = 167,
-    SetAudioMixingRate = 168
+    SetAudioMixingRate = 168,
+    MultiplayerQueueOpen = 169,
+    MultiplayerQueueSend = 170,
+    MultiplayerQueueReceive = 171,
+    MultiplayerQueueStatus = 172,
+    MultiplayerQueueClose = 173
 };
 
 enum class VisualEffectKind : uint8_t {
@@ -241,6 +246,8 @@ enum class RuntimeKind : uint8_t {
 };
 
 struct EventCommand {
+    // SetVariable: d=1 selects a signed 32-bit literal assembled from c:b;
+    // d=0 retains the original signed 16-bit b operand.
     EventOp op;
     int16_t a;
     int16_t b;

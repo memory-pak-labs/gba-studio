@@ -106,8 +106,8 @@ export function WavSampleEditor({ source, projectPath, onChange, onEditing }: Pr
   const x = (frame: number) => (frame - start) / viewCount * 1000;
   const loop = dragLoop ?? state?.wav?.loop;
   const error = loadError || state?.error;
-  return <section className="wav-sample-editor" aria-label={ui("Editor visual de WAV")}>
-    <header><div><h4>{ui("Editor visual de WAV")}</h4><p>{source.name}</p></div><div className="wav-editor-zoom">
+  return <section className="wav-sample-editor" aria-label={ui("Editor de samples")}>
+    <header><div><h4>{ui("Editor de samples")}</h4><p>{source.name}</p></div><div className="wav-editor-zoom">
       <button type="button" onClick={() => { onEditing(); setReload(r => r + 1); }}>{ui("Recarregar WAV")}</button>
       <button type="button" aria-label={ui("Reduzir zoom da forma de onda")} disabled={zoom === 1} onClick={() => setZoom(z => Math.max(1, z / 2))}>−</button><output>{zoom}×</output>
       <button type="button" aria-label={ui("Ampliar forma de onda")} disabled={zoom >= 64} onClick={() => setZoom(z => Math.min(64, z * 2))}>+</button>

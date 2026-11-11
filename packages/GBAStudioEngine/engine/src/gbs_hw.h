@@ -21,6 +21,17 @@ enum {
     GBS_HW_HUD_COMPONENT_FOREGROUND_BAR = 5
 };
 
+typedef struct {
+    int16_t wave[256];
+    uint8_t line_phase[160];
+    uint16_t colors[160];
+    uint8_t enabled, layer, speed, top, bottom;
+} GbsSceneRasterTable;
+GbsSceneRasterTable* gbs_hw_begin_scene_raster_update(void);
+void gbs_hw_submit_scene_raster_update(void);
+void gbs_hw_reset_scene_raster(void);
+void gbs_hw_set_hblank_dispatch_required(int required);
+
 void gbs_hw_init(void);
 void gbs_hw_wait_vblank(void);
 typedef struct {
@@ -109,6 +120,8 @@ void gbs_hw_audio_stop_pcm(void);
 void gbs_hw_audio_start_pcm8_stream(uint32_t sample_rate_hz);
 void gbs_hw_audio_submit_pcm8_stream_block(const uint8_t* samples, uint32_t sample_count);
 uint16_t gbs_hw_audio_lock_state(void);
+uint32_t gbs_hw_audio_lock_observer_state(void);
+void gbs_hw_audio_unlock_observer_state(uint32_t previous);
 void gbs_hw_audio_unlock_state(uint16_t previous);
 void gbs_hw_audio_start_pcm8_stereo_stream(uint32_t sample_rate_hz);
 void gbs_hw_audio_submit_pcm8_stereo_stream_block(const uint8_t* left_samples, const uint8_t* right_samples, uint32_t sample_count);
@@ -165,6 +178,17 @@ void gbs_hw_sio_normal8_init(int internal_clock);
 int gbs_hw_sio_normal8_transfer(uint8_t outgoing, int internal_clock, uint32_t timeout_frames, uint8_t* incoming);
 int gbs_hw_sio_normal32_transfer(uint32_t outgoing, int internal_clock, uint32_t timeout_frames, uint32_t* incoming);
 int gbs_hw_sio_multiplayer_init(void);
+/* Queued-link transport: open/reopen, one non-blocking transfer, poll and close.
+   poll returns 0 pending, 1 completed, -1 serial error. Call once per frame.
+   This transport owns SIO until close; do not mix it with raw Link sessions. */
+int gbs_hw_sio_multiplayer_async_open(unsigned baud);
+int gbs_hw_sio_multiplayer_async_begin(uint16_t outgoing);
+int gbs_hw_sio_multiplayer_async_begin_batch(const uint16_t* words, unsigned count);
+int gbs_hw_sio_multiplayer_async_poll(uint16_t received[4], uint8_t* player_id, uint8_t* connected_mask);
+void gbs_hw_sio_multiplayer_async_close(void);
+/* Explicit ChisFlash v1.2 board profile only; never called for unknown carts. */
+int gbs_hw_chisflash_rumble_prepare(void);
+void gbs_hw_chisflash_rumble_set(int enabled);
 int gbs_hw_sio_multiplayer_transfer(uint16_t outgoing, uint32_t timeout_frames,
                                     uint16_t received[4], uint8_t* player_id,
                                     uint8_t* connected_mask);

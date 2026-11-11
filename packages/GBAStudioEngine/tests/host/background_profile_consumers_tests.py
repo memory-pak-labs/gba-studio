@@ -23,9 +23,10 @@ common=r'''
 #include "gbs/scene_script_runner.hpp"
 bool selected_affine=false, wrapped=false;
 uint16_t observed_backdrop=17;
-int map_uploads=0;bool bg1_enabled=false;
+int map_uploads=0,raster_calls=0;bool bg1_enabled=false,gradient_observed=false;
 namespace gbs {
 bool apply_video_composition(const VideoComposition&) { return true; }
+bool set_scene_raster_effects(const SceneRasterEffects& effects, DisplayMode) { ++raster_calls;gradient_observed=effects.gradient.enabled;return true; }
 bool apply_scene_background_video(const VideoComposition& video) { selected_affine=video.affine_enabled;if(selected_affine)bg1_enabled=false; return true; }
 bool load_palette(const PaletteAsset&,bool) { return true; }
 bool load_tiles(const TileAsset&) { return true; }
@@ -73,9 +74,10 @@ int main() {
  const gbs::AffineTileAsset floor{tiles,1,0};const gbs::AffineTileMapAsset tilemap{map,16,16};const gbs::PaletteAsset palette{colors,1,0};
  const gbs::RacingPseudo3DVisualData visual{48,nullptr,nullptr,nullptr,&floor,&tilemap,&palette,nullptr,nullptr,nullptr};
  gbs::RacingRoomData room{};room.config.pseudo3d.presentation=gbs::RacingPresentation::Pseudo3D;room.pseudo3d_visual=&visual;
+ room.video.raster.gradient.enabled=true;
  project.rooms=&room;project.room_count=1;
  assert(gbs::is_valid_racing_pseudo3d_visual_data(visual));
- apply_room_visuals();assert(wrapped); // a linear course starts at negative texture Y
+ apply_room_visuals();assert(wrapped);assert(raster_calls==1 && gradient_observed); // a linear course starts at negative texture Y
  gbs::RacingTopdownTrackData circuit{};circuit.checkpoint_count=1;room.topdown_track=&circuit;
  apply_room_visuals();assert(!wrapped); // circuit source coordinates retain finite map edges
 }

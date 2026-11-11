@@ -60,7 +60,7 @@ export function WorkspaceExplorerRail({
           <ChevronLeft aria-hidden="true" size={14} strokeWidth={2.4} />
         )}
       </button>
-      <div className="workspace-explorer-rail-body">
+      <div data-workspace-scroll="workspace-explorer" className="workspace-explorer-rail-body">
         {children}
       </div>
     </aside>

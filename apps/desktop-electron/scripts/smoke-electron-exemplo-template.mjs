@@ -113,8 +113,8 @@ async function assertSelectedEntityInspector(cdp, kind, entityName) {
         const field = number(label);
         return field && !field.disabled && Number.isFinite(Number(field.value));
       });
-      const dimensions = ['W', 'H'].every(label => {
-        const field = number(label);
+      const dimensions = ['width', 'height'].every(fieldName => {
+        const field = panel?.querySelector('input[data-entity-field="' + fieldName + '"]');
         return field && !field.disabled && Number(field.value) >= 1;
       });
       return {
@@ -780,22 +780,32 @@ async function editEventInWorkspace(cdp) {
     if (!selectedStep?.ok) {
       throw new Error(`O novo comando do evento não ficou selecionável no Editor: ${JSON.stringify(selectedStep)}`);
     }
-    await waitForText(cdp, (text) => text.includes("Mostrar diálogo com nome") && text.includes("Alvo"), "parâmetros do novo evento de diálogo");
-    const parameterEdit = await evaluate(cdp, `
+    await waitForText(cdp, (text) => text.includes("Mostrar diálogo com nome") && text.includes("Criar fala"), "parâmetros do novo evento de diálogo");
+    const dialoguePickerOpened = await evaluate(cdp, `
       (() => {
-        const inlineEditor = document.querySelector('.event-build-panel .event-block-inspector-parameters');
-        const control = inlineEditor?.querySelector('input, select');
-        if (!control || control.value !== 'intro_001') {
-          return { ok: false, values: Array.from(inlineEditor?.querySelectorAll('input, select') ?? []).map((item) => item.value) };
-        }
-        const prototype = control instanceof HTMLSelectElement
-          ? window.HTMLSelectElement.prototype : window.HTMLInputElement.prototype;
-        Object.getOwnPropertyDescriptor(prototype, 'value')?.set?.call(control, ${JSON.stringify(editedEventDialogue)});
-        control.dispatchEvent(new Event('input', { bubbles: true }));
-        control.dispatchEvent(new Event('change', { bubbles: true }));
-        return { ok: true };
+        const control = document.querySelector('.event-build-panel .event-block-inspector-parameters .event-dialogue-parameter input[role="combobox"]');
+        if (!control || control.disabled) return false;
+        control.click();
+        return true;
       })()
     `);
+    if (!dialoguePickerOpened) throw new Error("O seletor de fala do evento não abriu.");
+    const parameterEdit = await evaluate(cdp, `
+      new Promise(resolve => {
+        const deadline = Date.now() + 5_000;
+        const select = () => {
+          const options = Array.from(document.querySelectorAll('.event-dialogue-parameter [role="option"]'));
+          const option = options.find(item => item.querySelector('strong')?.textContent?.trim() === ${JSON.stringify(editedEventDialogue)});
+          if (option && !option.disabled) {
+            option.click();
+            resolve({ ok: true });
+          } else if (Date.now() >= deadline) {
+            resolve({ ok: false, values: options.map(item => item.querySelector('strong')?.textContent?.trim()) });
+          } else setTimeout(select, 100);
+        };
+        select();
+      })
+    `, true);
     if (!parameterEdit?.ok) throw new Error(`Chave do novo diálogo indisponível: ${JSON.stringify(parameterEdit)}`);
     const updatedStep = await evaluate(cdp, `
       new Promise((resolve) => {
@@ -1831,7 +1841,14 @@ async function main() {
       // Imported modules keep their source. Exercise the composer on a new item
       // created through the real UI, instead of replacing the approved soundtrack.
       await clickButtonByAriaLabel(cdp, "Criar áudio");
-      await clickButtonByAriaLabel(cdp, "Música em loop");
+      const moreAudioOptions = await evaluate(cdp, `(() => {
+        const summary = document.querySelector('.audio-creation-assistant .audio-creation-more summary');
+        if (!summary) return false;
+        summary.click();
+        return true;
+      })()`);
+      if (!moreAudioOptions) throw new Error("Mais opções de áudio indisponível.");
+      await clickButtonByAriaLabel(cdp, "Música PSG");
       await waitForText(cdp, text => text.includes("Áudio criado:"), "criação de música na cópia do projeto");
       await selectAudioLibraryItem(cdp, "nova_musica.mod");
       await waitForText(cdp, (text) => text.includes("Piano Roll") && text.includes("Prévia"), "compositor da música nova");

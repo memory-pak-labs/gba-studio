@@ -1,6 +1,7 @@
 import { uiText as ui, useStudioUiText } from "./studioUiText";
 import { ChevronRight, ExternalLink } from "lucide-react";
 import { useEffect, useState, type ReactNode } from "react";
+import { DialogueAuthoringFields } from "./DialogueAuthoringFields";
 import { InspectorInfoTip } from "./InspectorControls";
 
 import type {
@@ -66,27 +67,6 @@ function usageLabel(usage: DialogueSceneUsage): string {
   return "Referência direta da cena";
 }
 
-function DialogueAssetSelect({
-  ariaLabel,
-  currentValue,
-  options,
-  onChange
-}: {
-  ariaLabel: string;
-  currentValue: string;
-  options: string[];
-  onChange(value: string): void;
-}): React.ReactElement {
-  const ui = useStudioUiText();
-  const values = uniqueValues([currentValue, ...options]);
-  return (
-    <select aria-label={ui(ariaLabel)} onChange={(event) => onChange(event.currentTarget.value)} value={currentValue}>
-      <option value="">{ui("Nenhum")}</option>
-      {values.map((value) => <option key={value} value={value}>{value}</option>)}
-    </select>
-  );
-}
-
 export function RoomDialoguesInspector({
   selectionName,
   actorOptions = [],
@@ -107,7 +87,6 @@ export function RoomDialoguesInspector({
   const [selectedKey, setSelectedKey] = useState(dialogues[0]?.key ?? "");
   const allDialogues = [...dialogues, ...catalog.filter(item => !dialogues.some(local => local.key === item.key))];
   const selectedDialogue = allDialogues.find((dialogue) => dialogue.key === selectedKey) ?? dialogues[0] ?? null;
-  const characterProfile = characterProfiles.find(profile => profile.name === selectedDialogue?.character);
   const [libraryQuery, setLibraryQuery] = useState("");
   const [previewSpeech, setPreviewSpeech] = useState(true);
   useEffect(() => { if (focusedDialogueKey) { setSelectedKey(focusedDialogueKey); setMode("speech"); } }, [focusedDialogueKey, focusRequestID]);
@@ -188,10 +167,10 @@ export function RoomDialoguesInspector({
 
       {selectedDialogue ? (
         <section className="room-dialogue-editor" aria-label={ui("Editar diálogo {0}", { 0: selectedDialogue.key })}>
-          <div className="room-dialogue-editor-heading">
+          <div className="room-dialogue-editor-heading dialogue-editing-scope">
             <div>
               <strong>{ui("Editar diálogo")}</strong>
-              <small>{selectedDialogue.key}</small>
+              <small>{selectedDialogue.key} · {ui("Catálogo do projeto")}</small>
             </div>
             <span>{selectedDialogue.sceneUsages?.map(usageLabel).filter((value, index, values) => values.indexOf(value) === index).join(" · ") || ui("Referência da cena")}</span>
           </div>
@@ -203,118 +182,9 @@ export function RoomDialoguesInspector({
             {onNormalizeDialogue ? <button type="button" onClick={() => onNormalizeDialogue(selectedDialogue.key)}>{ui("Normalizar texto")}</button> : null}
             {onRemoveDialogue ? <button type="button" onClick={() => onRemoveDialogue(selectedDialogue.key)}>{ui("Remover fala")}</button> : null}
           </div>
-          <label>
-            <span>{ui("Personagem")}</span>
-            <input
-              aria-label={ui("Ator ou personagem do diálogo")}
-              list="room-dialogue-character-options"
-              onChange={(event) => updateDialogue({ character: event.currentTarget.value })}
-              value={selectedDialogue.character}
-            />
-            <datalist id="room-dialogue-character-options">
-              {uniqueValues(dialogues.map((dialogue) => dialogue.character)).map((character) => <option key={character} value={character} />)}
-            </datalist>
-          </label>
-
-          {characterProfile ? <button type="button" onClick={() => updateDialogue({ portrait: characterProfile.portrait, emote: characterProfile.emote, textSound: characterProfile.textSound, confirmSound: characterProfile.confirmSound })}>{ui("Aplicar padrões de ")}{characterProfile.name}</button> : null}
-          <label>
-            <span>{ui("Fonte da fala")}</span>
-            <select
-              aria-label={ui("Ator da cena do diálogo")}
-              onChange={(event) => updateDialogue({ actorId: event.currentTarget.value })}
-              value={selectedDialogue.actorId ?? ""}
-            >
-              <option value="">{ui("Personagem / sem ator")}</option>
-              {selectedDialogue.actorId && !actorOptions.some((actor) => actor.id === selectedDialogue.actorId) ? (
-                <option value={selectedDialogue.actorId}>{ui("Ator não encontrado · ")}{selectedDialogue.actorId}</option>
-              ) : null}
-              {actorOptions.map((actor) => <option key={actor.id} value={actor.id}>{ui("Ator · ")}{actor.name}</option>)}
-            </select>
-            <small className={selectedDialogue.actorBindingStatus === "missing" ? "room-dialogue-actor-status is-missing" : "room-dialogue-actor-status"}>
-              {selectedDialogue.actorBindingStatus === "resolved"
-                ? ui("Instância vinculada: {0}", { 0: selectedDialogue.actorName || selectedDialogue.actorId })
-                : selectedDialogue.actorBindingStatus === "missing"
-                  ? ui("O ator vinculado não pertence a esta cena.")
-                  : ui("A fala não depende de uma instância física da cena.")}
-            </small>
-          </label>
-
-          <div className="room-dialogue-field-grid">
-            <label>
-              <span>{ui("Retrato")}</span>
-              <DialogueAssetSelect
-                ariaLabel={ui("Retrato do diálogo")}
-                currentValue={selectedDialogue.portrait ?? ""}
-                onChange={(portrait) => updateDialogue({ portrait })}
-                options={assetOptions}
-              />
-            </label>
-            <label>
-              <span>{ui("Posição do retrato")}</span>
-              <select
-                aria-label={ui("Posição do retrato")}
-                onChange={(event) => updateDialogue({ portraitSlot: event.currentTarget.value })}
-                value={selectedDialogue.portraitSlot ?? ""}
-              >
-                <option value="">{ui("Padrão")}</option>
-                <option value="left">{ui("Esquerda")}</option>
-                <option value="right">{ui("Direita")}</option>
-              </select>
-            </label>
-            <label>
-              <span>{ui("Emote")}</span>
-              <DialogueAssetSelect
-                ariaLabel={ui("Emote do diálogo")}
-                currentValue={selectedDialogue.emote ?? ""}
-                onChange={(emote) => updateDialogue({ emote })}
-                options={assetOptions}
-              />
-            </label>
-            <label>
-              <span>{ui("Som do texto")}</span>
-              <DialogueAssetSelect
-                ariaLabel={ui("Som do texto")}
-                currentValue={selectedDialogue.textSound ?? ""}
-                onChange={(textSound) => updateDialogue({ textSound })}
-                options={sfxOptions}
-              />
-            </label>
-            <label>
-              <span>{ui("Som de confirmação")}</span>
-              <DialogueAssetSelect
-                ariaLabel={ui("Som de confirmação")}
-                currentValue={selectedDialogue.confirmSound ?? ""}
-                onChange={(confirmSound) => updateDialogue({ confirmSound })}
-                options={sfxOptions}
-              />
-            </label>
-          </div>
-
-          <div className="hud-authoring-actions">
-            <select aria-label={ui("Inserir variável no diálogo")} value="" onChange={event => { if (event.currentTarget.value) updateDialogue({ text: `${selectedDialogue.text}{${event.currentTarget.value}}` }); }}><option value="">{ui("Inserir variável…")}</option>{variables.map(name => <option key={name} value={name}>{name}</option>)}</select>
-            <button type="button" onClick={() => updateDialogue({ text: `${selectedDialogue.text}{pause:30}` })}>{ui("Inserir pausa")}</button>
-            <button type="button" onClick={() => updateDialogue({ text: `${selectedDialogue.text}{color:accent}` })}>{ui("Inserir cor")}</button>
-          </div>
-          <label className="room-dialogue-text-field">
-            <span>{ui("Texto da fala")}</span>
-            <textarea
-              aria-label={ui("Texto do diálogo")}
-              onChange={(event) => updateDialogue({ text: event.currentTarget.value })}
-              rows={5}
-              value={selectedDialogue.text}
-            />
-          </label>
-
-          <label className="room-dialogue-text-field">
-            <span>{ui("Escolhas ")}<small>{ui("(uma por linha)")}</small></span>
-            <textarea
-              aria-label={ui("Escolhas do diálogo")}
-              onChange={(event) => updateDialogue({ choices: event.currentTarget.value.split("\n") })}
-              rows={3}
-              value={selectedDialogue.choices.map((choice) => choice.label).join("\n")}
-            />
-          </label>
-
+          <DialogueAuthoringFields dialogue={selectedDialogue} onChange={updateDialogue} actorOptions={actorOptions}
+            assetOptions={assetOptions} sfxOptions={sfxOptions} variables={variables}
+            characterProfiles={characterProfiles} characterOptions={dialogues.map(item => item.character)} />
           {usages[selectedDialogue.key]?.length ? <details><summary>{ui("Eventos e destinos das escolhas")}</summary>{usages[selectedDialogue.key].map((usage, index) => <button type="button" key={index} onClick={() => onOpenDialogueEvent?.(usage.targetEventName ?? usage.eventName)}>{usage.targetEventName ?? usage.eventName} · {usage.command}</button>)}</details> : null}
           {selectedDialogue.warnings?.some(warning => /nao encontrado/.test(warning)) ? <button type="button" onClick={() => updateDialogue({ ...(selectedDialogue.warnings?.includes("Retrato nao encontrado") ? { portrait: "" } : {}), ...(selectedDialogue.warnings?.includes("Emote nao encontrado") ? { emote: "" } : {}), ...(selectedDialogue.warnings?.includes("Som de texto nao encontrado") ? { textSound: "" } : {}), ...(selectedDialogue.warnings?.includes("Som de confirmar nao encontrado") ? { confirmSound: "" } : {}) })}>{ui("Limpar referências inválidas")}</button> : null}
           {selectedDialogue.warnings?.length ? <p className="room-dialogue-warning" role="alert">{selectedDialogue.warnings.map(warning => ui(warning)).join(" · ")}</p> : null}

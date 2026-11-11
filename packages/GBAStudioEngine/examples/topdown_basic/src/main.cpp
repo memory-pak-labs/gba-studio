@@ -1057,7 +1057,7 @@ void load_active_room_visual_tilemap() {
 
 void apply_active_room_video() {
     const gbs::TopDownRoomData& room_data = project.rooms[current_room];
-    const gbs::VideoComposition& composition = room_data.video.affine_enabled
+    const gbs::VideoComposition& composition = (room_data.video.affine_enabled || gbs::has_scene_raster_effects(room_data.video.raster))
         ? room_data.video
         : project.video;
     gbs::apply_video_composition(composition);

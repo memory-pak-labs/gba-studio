@@ -4397,8 +4397,12 @@ def prepare_multichannel_tracker_samples(patterns, source_samples, native_primar
         long_sample = len(prepared_samples[index]["samples"]) > 128
         if long_sample: settings = {(volume, gain, 0) for volume, gain, _ in settings}
         for volume, gain, pan in sorted(settings)[:256]:
-            prepared = build_pcm_interpolation_map(prepared_samples[index], volume, native_primary_volume, 15, gain, pan, not long_sample, pre_pan=long_sample)
-            if prepared is not None: maps.append(prepared)
+            # Keep the native gain's compact intervals plus a lossless unity
+            # pre-pan representation for subsequent bus-volume changes.
+            primaries = {native_primary_volume, 15} if long_sample else {native_primary_volume}
+            for primary in sorted(primaries):
+                prepared = build_pcm_interpolation_map(prepared_samples[index], volume, primary, 15, gain, pan, not long_sample, pre_pan=long_sample)
+                if prepared is not None: maps.append(prepared)
         if maps: prepared_samples[index]["interpolation_maps"] = sorted(maps, key=lambda m: m["key"])
     return prepared_patterns, prepared_samples
 
@@ -10098,6 +10102,11 @@ def event_op_from_json(value):
         "multiplayer_set_data": "MultiplayerSetData",
         "multiplayer_sync": "MultiplayerTransfer",
         "multiplayer_read": "MultiplayerGetData",
+        "multiplayer_queue_open": "MultiplayerQueueOpen",
+        "multiplayer_queue_send": "MultiplayerQueueSend",
+        "multiplayer_queue_receive": "MultiplayerQueueReceive",
+        "multiplayer_queue_status": "MultiplayerQueueStatus",
+        "multiplayer_queue_close": "MultiplayerQueueClose",
         "call_script": "CallScript",
         "show_choice": "ShowChoice",
         "choice": "ShowChoice",
@@ -10764,7 +10773,16 @@ def event_command_from_json(command, description, animation_lookup=None, actor_a
             0,
         )
         return (op, runtime, 0, 0)
-    if op in ("SetVariable", "AddVariable", "MultiplyVariable", "DivideVariable", "ModuloVariable"):
+    if op == "SetVariable":
+        variable = event_int(command, ["variable", "var"], 0)
+        value = event_int(command, ["value"], 0)
+        if not -2147483648 <= value <= 2147483647:
+            raise SystemExit("Valor de variável fora do intervalo inteiro de 32 bits")
+        if value < -32768 or value > 32767:
+            signed16 = lambda half: ((half + 32768) % 65536) - 32768
+            return (op, variable, signed16(value), signed16(value >> 16), 1)
+        return (op, variable, value, 0)
+    if op in ("AddVariable", "MultiplyVariable", "DivideVariable", "ModuloVariable"):
         return (
             op,
             event_int(command, ["variable", "var"], 0),
@@ -10815,6 +10833,23 @@ def event_command_from_json(command, description, animation_lookup=None, actor_a
         return (op, max(1, min(255, event_int(command, ["frames", "duration"], 60))), 0, 0)
     if op == "RumbleOff":
         return (op, 0, 0, 0)
+    if op.startswith("MultiplayerQueue"):
+        if op == "MultiplayerQueueClose":
+            return (op, 0, 0, 0)
+        if op == "MultiplayerQueueOpen":
+            players, baud, frames = (command.get(key) for key in ("players", "baud", "timeout_frames"))
+            if (type(players) is not int or players not in (2, 3, 4) or
+                    type(baud) is not int or baud not in (9600, 38400, 57600, 115200) or
+                    type(frames) is not int or not 1 <= frames <= 600):
+                raise SystemExit("Configuração inválida da conexão com filas")
+            return (op, players, (9600, 38400, 57600, 115200).index(baud), frames)
+        fields = {"MultiplayerQueueSend": ("var_value", "var_accepted"),
+                  "MultiplayerQueueReceive": ("var_value", "var_player", "var_received"),
+                  "MultiplayerQueueStatus": ("var_state", "var_player", "var_pending")}[op]
+        values = [command.get(key) for key in fields]
+        if any(type(value) is not int or not 0 <= value < 64 for value in values) or len(set(values)) != len(values):
+            raise SystemExit("Conexão com filas requer variáveis diferentes nos slots 0–63")
+        return tuple([op, *values, *([0] if len(values) == 2 else [])])
     if op == "MultiplayerOpen":
         return (op, max(2, min(4, event_int(command, ["players", "player_count"], 2))), 0, 0)
     if op == "MultiplayerClose":
@@ -14859,6 +14894,43 @@ def emit_topdown_resource_banks(output, topdown_project, asset_report=None):
     return emit_project_resource_banks(output, topdown_project, "topdown_project", asset_report)
 
 
+def scene_raster_effects_literal(value, mode):
+    if value is None:
+        return "gbs::SceneRasterEffects {}"
+    if not isinstance(value, dict):
+        raise SystemExit("video.raster precisa ser objeto")
+    ripple, gradient = value.get("ripple", {}), value.get("gradient", {})
+    if not isinstance(ripple, dict) or not isinstance(gradient, dict):
+        raise SystemExit("ripple e gradient precisam ser objetos")
+    def number(source, key, default, low, high):
+        value = source.get(key, default)
+        if type(value) is not int or not low <= value <= high:
+            raise SystemExit(f"video.raster.{key} precisa ser inteiro entre {low} e {high}")
+        return value
+    def color(value):
+        if not isinstance(value, str) or not re.fullmatch(r"#[0-9a-fA-F]{6}", value):
+            raise SystemExit("video.raster.gradient precisa de cores #rrggbb")
+        rgb = int(value[1:], 16)
+        return ((rgb >> 19) & 31) | (((rgb >> 11) & 31) << 5) | (((rgb >> 3) & 31) << 10)
+    r, g = ripple.get("enabled") is True, gradient.get("enabled") is True
+    layer = str(ripple.get("layer", "BG2")).upper()
+    amplitude = number(ripple, "amplitude", 4, 0, 16)
+    wavelength = number(ripple, "wavelength", 32, 8, 160)
+    speed = number(ripple, "speed", 2, 0, 8)
+    top, bottom = number(ripple, "top", 80, 0, 159), number(ripple, "bottom", 160, 1, 160)
+    start, end = number(gradient, "top", 0, 0, 158), number(gradient, "bottom", 80, 2, 160)
+    if layer not in ("BG1", "BG2", "BG3") or (r and (top >= bottom or (mode != 0 and not (mode == 1 and layer == "BG1")))):
+        raise SystemExit("Ondulação requer faixa válida e camada regular compatível com o modo")
+    if g and mode not in (0, 1, 2):
+        raise SystemExit("Gradiente de fundo requer modo tiled ou affine")
+    if g and end - start < 2:
+        raise SystemExit("Gradiente requer ao menos duas linhas")
+    first, last = color(gradient.get("from", "#3858a0")), color(gradient.get("to", "#b0d8f8"))
+    return ("gbs::SceneRasterEffects { "
+            f"gbs::SceneRipple {{ {'true' if r else 'false'}, gbs::BackgroundLayer::{layer}, {amplitude}, {wavelength}, {speed}, {top}, {bottom} }}, "
+            f"gbs::SceneGradient {{ {'true' if g else 'false'}, {first}, {last}, {start}, {end} }} }}")
+
+
 def video_composition_literal(project, description, asset_report=None):
     video = project.get("video", {})
     if video is None:
@@ -14917,7 +14989,8 @@ def video_composition_literal(project, description, asset_report=None):
         f"gbs::AffineBgTransform {{ {', '.join(str(value) for value in transform)} }}, "
         f"{affine_tiles}, {affine_tilemap}, {affine_palette}, "
         f"{bitmap16}, {bitmap8}, {bitmap_palette}, static_cast<uint8_t>({page}), "
-        f"{'true' if bool(affine.get('wrap', True)) else 'false'} "
+        f"{'true' if bool(affine.get('wrap', True)) else 'false'}, "
+        f"{scene_raster_effects_literal(video.get('raster'), mode)} "
         "}"
     )
 
@@ -21562,6 +21635,9 @@ def emit_export_project(project_data, base_dir, output_dir):
     mixing_rate = project_data.get("audio_mixing_rate", 31536)
     if type(mixing_rate) is not int or mixing_rate not in (10512, 21024, 31536):
         raise SystemExit("Frequência de mixagem precisa ser 10512, 21024 ou 31536 Hz")
+    rumble_cartridge = project_data.get("rumble_cartridge", "none")
+    if rumble_cartridge not in ("none", "chisflash_v1_2"):
+        raise SystemExit("Perfil de vibração do cartucho inválido")
 
     contract = resolve_export_project_contract(project_data)
     template_dir = resolve_project_path(base_dir, project_data.get("template_dir", "."), "template_dir")
@@ -21838,6 +21914,20 @@ def emit_export_project(project_data, base_dir, output_dir):
         build_config["sources"] = list(dict.fromkeys([*sources, "save_type.cpp"]))
     elif selected_save_type != "sram":
         raise SystemExit("save_type precisa ser sram ou flash1m")
+
+    # Always overwrite/link this owned hook, including None, so re-exporting
+    # over a previously enabled project cannot retain a stale cartridge driver.
+    rumble_body = ""
+    if rumble_cartridge == "chisflash_v1_2":
+        rumble_body = "gbs::rumble_configure_cartridge(gbs::RumbleCartridge::ChisFlashV12);"
+    write_text_if_changed(output_dir / "rumble_config.cpp",
+        '#include "gbs/rumble.hpp"\nextern "C" void gbs_project_configure_rumble(void) { ' + rumble_body + ' }\n',
+        encoding="utf-8")
+    build_config = dict(build_config)
+    sources = build_config.get("sources", [])
+    if not isinstance(sources, list) or not all(isinstance(item, str) for item in sources):
+        raise SystemExit("build.sources precisa ser lista de strings")
+    build_config["sources"] = list(dict.fromkeys([*(sources or ["main.cpp"]), "rumble_config.cpp"]))
 
     # The SDK defaults to 31536; only a non-default project needs an override.
     if mixing_rate != 31536:

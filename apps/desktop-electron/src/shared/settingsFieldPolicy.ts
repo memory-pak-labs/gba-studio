@@ -8,7 +8,7 @@ const supportedFields: Partial<Record<SettingsSectionID, readonly string[]>> = {
   controls: ["up", "down", "left", "right", "aButton", "bButton", "lButton", "rButton", "startButton", "selectButton"],
   general: ["gameTitle", "author", "version", "startScene", "startPlayer", "exportFolder"],
   build: ["romFileName", "gameCode", "makerCode", "romVersion", "exportFormat", "engineBackend", "enginePackPath", "toolchain", "compilerPath", "splitProjectResources", "compactTilemaps", "persistentBuildCache"],
-  hardware: ["resolution", "tileSize", "spritesPerScene", "vramBudget"],
+  hardware: ["resolution", "tileSize", "spritesPerScene", "vramBudget", "rumbleCartridge"],
   // exportEngineProject reads these directly, rather than resolveSceneRuntime.
   topdown: ["interactButton", "gridSize", "walkSpeed"],
   platformer: ["interactButton", "jumpButton", "runButton", "walkSpeed", "gravity", "maxFallSpeed", "airControl", "changeDirectionInAir", "jumpMinHeight", "jumpFrames", "coyoteTime", "jumpBuffer", "doubleJump", "wallJump", "wallSlide", "ladders", "dropThrough", "cameraDeadzoneX", "dash", "dashStyle", "dashRechargeFrames", "acceleration"],

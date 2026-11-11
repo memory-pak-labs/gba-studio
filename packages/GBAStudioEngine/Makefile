@@ -34,7 +34,7 @@ GBA_ASFLAGS := $(GBA_ARCH) -x assembler-with-cpp
 GBA_LDFLAGS := $(GBA_ARCH) -nostartfiles -Wl,--gc-sections -T engine/startup/gba.ld
 
 HOST_CXXFLAGS := -std=c++17 -Wall -Wextra -Werror -Iengine/include
-HOST_EVENT_RUNTIME_SRCS := engine/src/gbs_runtime.cpp engine/src/gbs_rtc.cpp engine/src/gbs_link.cpp engine/src/rumble.cpp engine/src/deferred_work.cpp engine/src/gbs_engine_global.cpp tests/host/hw_stubs.cpp
+HOST_EVENT_RUNTIME_SRCS := engine/src/gbs_runtime.cpp engine/src/gbs_rtc.cpp engine/src/gbs_link.cpp engine/src/rumble.cpp engine/src/deferred_work.cpp engine/src/gbs_engine_global.cpp tests/host/hw_stubs.cpp engine/src/gbs_multiplayer_events.cpp engine/src/gbs_multiplayer.cpp
 
 .PHONY: racing-challenge-test menu-presentation-test
 host-test: racing-challenge-test menu-presentation-test
@@ -72,7 +72,7 @@ $(MOTION_HOST_BINARIES): $(HOST_BUILD)/%: tests/host/%.cpp $(MOTION_HOST_SRCS) $
 	$(HOST_CXX) $(HOST_CXXFLAGS) $< $(MOTION_HOST_SRCS) -o $@
 
 ENGINE_C_SRCS := engine/src/gbs_hw.c engine/src/gbs_text.c engine/src/gbs_portrait_tab.c
-ENGINE_CPP_SRCS := engine/src/gbs_core.cpp engine/src/gbs_input.cpp engine/src/gbs_render.cpp engine/src/gbs_math.cpp engine/src/gbs_bios.cpp engine/src/gbs_rtc.cpp engine/src/gbs_random.cpp engine/src/gbs_format.cpp engine/src/gbs_info.cpp engine/src/gbs_tween.cpp engine/src/gbs_visual_effects.cpp engine/src/gbs_topdown.cpp engine/src/gbs_platformer.cpp engine/src/gbs_isometric.cpp engine/src/gbs_dungeon_crawler.cpp engine/src/gbs_racing.cpp engine/src/gbs_battle_rpg.cpp engine/src/gbs_luta.cpp engine/src/gbs_event.cpp engine/src/gbs_dialogue.cpp engine/src/gbs_dialogue_locale.cpp engine/src/gbs_ui.cpp engine/src/gbs_audio.cpp engine/src/gbs_animation.cpp engine/src/gbs_compression.cpp engine/src/gbs_dma.cpp engine/src/gbs_timer.cpp engine/src/gbs_interrupt.cpp engine/src/gbs_resource_manager.cpp engine/src/gbs_save.cpp engine/src/gbs_runtime_save_restore.cpp engine/src/gbs_debug.cpp engine/src/gbs_link.cpp engine/src/gbs_runtime.cpp engine/src/hblank_effect.cpp engine/src/action.cpp engine/src/profiler.cpp engine/src/camera.cpp engine/src/palette.cpp engine/src/deferred_work.cpp engine/src/audio_engine.cpp engine/src/containers.cpp engine/src/typewriter.cpp engine/src/input_advanced.cpp engine/src/hbe_presets.cpp engine/src/rumble.cpp engine/src/pseudo_3d.cpp engine/src/gbs_engine_global.cpp
+ENGINE_CPP_SRCS := engine/src/gbs_core.cpp engine/src/gbs_input.cpp engine/src/gbs_render.cpp engine/src/gbs_math.cpp engine/src/gbs_bios.cpp engine/src/gbs_rtc.cpp engine/src/gbs_random.cpp engine/src/gbs_format.cpp engine/src/gbs_info.cpp engine/src/gbs_tween.cpp engine/src/gbs_visual_effects.cpp engine/src/gbs_topdown.cpp engine/src/gbs_platformer.cpp engine/src/gbs_isometric.cpp engine/src/gbs_dungeon_crawler.cpp engine/src/gbs_racing.cpp engine/src/gbs_battle_rpg.cpp engine/src/gbs_luta.cpp engine/src/gbs_event.cpp engine/src/gbs_dialogue.cpp engine/src/gbs_dialogue_locale.cpp engine/src/gbs_ui.cpp engine/src/gbs_audio.cpp engine/src/gbs_animation.cpp engine/src/gbs_compression.cpp engine/src/gbs_dma.cpp engine/src/gbs_timer.cpp engine/src/gbs_interrupt.cpp engine/src/gbs_resource_manager.cpp engine/src/gbs_save.cpp engine/src/gbs_runtime_save_restore.cpp engine/src/gbs_debug.cpp engine/src/gbs_link.cpp engine/src/gbs_multiplayer.cpp engine/src/gbs_runtime.cpp engine/src/hblank_effect.cpp engine/src/action.cpp engine/src/profiler.cpp engine/src/camera.cpp engine/src/palette.cpp engine/src/deferred_work.cpp engine/src/audio_engine.cpp engine/src/containers.cpp engine/src/typewriter.cpp engine/src/input_advanced.cpp engine/src/hbe_presets.cpp engine/src/rumble.cpp engine/src/rumble_cartridge.cpp engine/src/pseudo_3d.cpp engine/src/gbs_engine_global.cpp engine/src/gbs_multiplayer_events.cpp
 ENGINE_ASM_SRCS := engine/startup/crt0.S engine/startup/irq.S
 
 ENGINE_C_OBJS := $(patsubst engine/src/%.c,$(GBA_BUILD)/engine/%.o,$(ENGINE_C_SRCS))
@@ -461,7 +461,7 @@ $(HOST_BUILD)/world_map_tests: tests/host/world_map_tests.cpp
 	@mkdir -p $(@D)
 	$(HOST_CXX) $(HOST_CXXFLAGS) $^ -o $@
 
-$(HOST_BUILD)/hardware_core_tests: engine/src/frame_video_stats.h engine/src/gbs_hw.h engine/include/gbs/debug.hpp tests/host/hardware_core_tests.cpp engine/src/profiler.cpp engine/src/gbs_core.cpp engine/src/gbs_runtime.cpp engine/src/gbs_rtc.cpp engine/src/gbs_input.cpp engine/src/gbs_interrupt.cpp engine/src/gbs_dma.cpp engine/src/gbs_debug.cpp engine/src/gbs_timer.cpp engine/src/rumble.cpp engine/src/deferred_work.cpp engine/src/gbs_engine_global.cpp engine/src/input_advanced.cpp tests/host/hw_stubs.cpp
+$(HOST_BUILD)/hardware_core_tests: engine/src/frame_video_stats.h engine/src/gbs_hw.h engine/include/gbs/debug.hpp tests/host/hardware_core_tests.cpp engine/src/profiler.cpp engine/src/gbs_core.cpp engine/src/gbs_runtime.cpp engine/src/gbs_rtc.cpp engine/src/gbs_input.cpp engine/src/gbs_interrupt.cpp engine/src/gbs_dma.cpp engine/src/gbs_debug.cpp engine/src/gbs_timer.cpp engine/src/rumble.cpp engine/src/deferred_work.cpp engine/src/gbs_engine_global.cpp engine/src/input_advanced.cpp tests/host/hw_stubs.cpp engine/src/gbs_multiplayer.cpp
 	@mkdir -p $(@D)
 	$(HOST_CXX) $(HOST_CXXFLAGS) -DGBS_ENABLE_PROFILER_SCOPES $(filter %.cpp,$^) -o $@
 
@@ -575,9 +575,46 @@ $(HOST_BUILD)/rumble_tests: tests/host/rumble_tests.cpp engine/src/rumble.cpp
 	@mkdir -p $(@D)
 	$(HOST_CXX) $(HOST_CXXFLAGS) $^ -o $@
 
+.PHONY: rumble-cartridge-test
+host-test: rumble-cartridge-test
+rumble-cartridge-test: $(HOST_BUILD)/rumble_cartridge_tests
+	$(HOST_BUILD)/rumble_cartridge_tests
+	python3 tests/host/rumble_cartridge_boundary_tests.py
+	python3 tests/host/rumble_project_export_tests.py
+$(HOST_BUILD)/rumble_cartridge_tests: tests/host/rumble_cartridge_tests.cpp engine/src/rumble.cpp engine/src/rumble_cartridge.cpp engine/include/gbs/rumble.hpp
+	@mkdir -p $(@D)
+	$(HOST_CXX) $(HOST_CXXFLAGS) -Iengine/src $(filter %.cpp,$^) -o $@
+
 $(HOST_BUILD)/multiplayer_tests: tests/host/multiplayer_tests.cpp engine/src/gbs_link.cpp
 	@mkdir -p $(@D)
 	$(HOST_CXX) $(HOST_CXXFLAGS) -Iengine/src $^ -o $@
+
+.PHONY: multiplayer-async-test
+host-test: multiplayer-async-test
+multiplayer-async-test: $(HOST_BUILD)/sio_multiplayer_async_tests
+	$(HOST_BUILD)/sio_multiplayer_async_tests
+	python3 tests/host/sio_multiplayer_boundary_tests.py
+$(HOST_BUILD)/sio_multiplayer_async_tests: tests/host/sio_multiplayer_async_tests.cpp engine/src/sio_multiplayer_async.h
+	@mkdir -p $(@D)
+	$(HOST_CXX) $(HOST_CXXFLAGS) -Iengine/src $< -o $@
+
+.PHONY: multiplayer-queue-test
+host-test: multiplayer-queue-test
+multiplayer-queue-test: $(HOST_BUILD)/multiplayer_queue_tests
+	$(HOST_BUILD)/multiplayer_queue_tests
+$(HOST_BUILD)/multiplayer_queue_tests: tests/host/multiplayer_queue_tests.cpp engine/src/gbs_multiplayer.cpp engine/include/gbs/multiplayer.hpp
+	@mkdir -p $(@D)
+	$(HOST_CXX) $(HOST_CXXFLAGS) -Iengine/src $(filter %.cpp,$^) -o $@
+
+.PHONY: multiplayer-event-test
+host-test: multiplayer-event-test
+multiplayer-event-test: $(HOST_BUILD)/multiplayer_event_tests
+	$(HOST_BUILD)/multiplayer_event_tests
+	python3 tests/host/multiplayer_queue_export_tests.py
+	python3 tests/host/event_integer_export_tests.py
+$(HOST_BUILD)/multiplayer_event_tests: tests/host/multiplayer_event_tests.cpp engine/src/gbs_event.cpp engine/src/gbs_dialogue_locale.cpp $(HOST_EVENT_RUNTIME_SRCS) engine/include/gbs/event.hpp engine/include/gbs/multiplayer.hpp
+	@mkdir -p $(@D)
+	$(HOST_CXX) $(HOST_CXXFLAGS) $(filter %.cpp,$^) -o $@
 
 $(HOST_BUILD)/pseudo_3d_tests: tests/host/pseudo_3d_tests.cpp engine/src/pseudo_3d.cpp
 	@mkdir -p $(@D)
