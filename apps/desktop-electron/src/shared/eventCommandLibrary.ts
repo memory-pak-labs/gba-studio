@@ -873,7 +873,7 @@ const historicalEventCommandDefinitions: EventCommandDefinition[] = [
     "category": "Diálogo e menus",
     "section": "Sistemas prontos",
     "isFavorite": false,
-    "commandTemplate": "show_dialogue_speaker intro_001 Narrador"
+    "commandTemplate": "show_dialogue_speaker {dialogue} Narrador"
   },
   {
     "id": "hud.stat_set",

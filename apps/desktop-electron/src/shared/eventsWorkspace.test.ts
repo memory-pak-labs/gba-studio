@@ -2283,8 +2283,8 @@ describe("Events workspace presentation", () => {
       steps: null
     });
     expect(suggestionsByID.get("command:dialogue.show")).toMatchObject({
-      command: "show_dialogue intro_001",
-      targetName: "intro_001",
+      command: "show_dialogue",
+      targetName: null,
       badge: "OK ROM",
       isRecipe: false
     });

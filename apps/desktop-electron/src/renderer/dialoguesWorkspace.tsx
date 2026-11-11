@@ -1,3 +1,4 @@
+import { DialogueAuthoringFields } from "./DialogueAuthoringFields";
 import { useWorkspaceState, useWorkspaceRef, useWorkspaceChangeEffect } from "./workspaceSessionState";
 import { uiText as ui, useStudioUiText } from "./studioUiText";
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -343,7 +344,7 @@ export function DialoguesWorkspace({
         <aside className="dialogues-rail" aria-label={t("dialogues.library")}>
           <div className="dialogues-panel-title">
             <h3>{t("workspace.dialogues")}</h3><span>{presentation.dialogues.length}</span>
-            {onCreateDialogue ? <button aria-label={t("dialogues.actions.create")} className="dialogues-create-button" title={t("dialogues.actions.create")} type="button" onClick={() => void onCreateDialogue()}><Plus aria-hidden="true" size={18}/></button> : null}
+            {onCreateDialogue ? <button aria-label={t("dialogues.actions.create")} className="dialogues-create-button" title={t("dialogues.actions.create")} type="button" onClick={async () => { const key = await onCreateDialogue(); if (key) { setSearchQuery(""); setStatusFilter("all"); setCharacterFilter(""); setSelectedKey(key); setAuthoringMode("review"); setPreviewLocale(sourceLocale); } }}><Plus aria-hidden="true" size={18}/></button> : null}
           </div>
           <label className="dialogues-search dialogues-review-search"><Search aria-hidden="true" size={16}/><input aria-label={t("dialogues.search")} onChange={event => setSearchQuery(event.currentTarget.value)} placeholder={t("dialogues.searchPlaceholder")} type="search" value={searchQuery}/></label>
           <select className="dialogues-character-filter" aria-label={t("dialogues.filter.character")} onChange={event => setCharacterFilter(event.currentTarget.value)} value={characterFilter}>
@@ -383,7 +384,14 @@ export function DialoguesWorkspace({
           {activeDialogue && authoringMode === "review" ? (
             <section id="dialogues-authoring-panel-review" role="tabpanel" aria-labelledby="dialogues-authoring-tab-review" className="dialogues-text-panel">
               <h3>{t("dialogues.review.textTitle")}</h3>
-              <p className="dialogues-script-text">{shownText || "—"}</p>
+              <>
+                <p className="dialogue-scope-notice">{ui("Fala compartilhada · {0} uso(s). Alterações afetam todos os usos.", { 0: activeDialogue.usages.length })}</p>
+                <p className="muted">{ui("Texto original · {0}", { 0: projectLocaleLabel(sourceLocale) })}</p>
+                <DialogueAuthoringFields dialogue={activeDialogue} onChange={fields => onUpdateDialogue(activeDialogue.key, fields)}
+                  assetOptions={(Array.isArray(projectData?.assets) ? projectData.assets : []).filter(item => item.kind === "Portrait" || item.kind === "Emote").map(item => String(item.name))}
+                  sfxOptions={(Array.isArray(projectData?.assets) ? projectData.assets : []).filter(item => item.kind === "SFX").map(item => String(item.name))} />
+              </>
+              {language !== sourceLocale ? <p className="dialogues-script-text">{shownText || "—"}</p> : null}
               {language !== sourceLocale && !activeDialogue.translations[language as ProjectLocale] ? <p role="status" className="muted">{t("dialogues.review.translationFallback")}</p> : null}
               <div className="dialogues-pages-heading"><h3>{t("dialogues.review.pages")}</h3><span>{t("dialogues.review.pageCount", { count: previewPages.length })}</span></div>
               <div className="dialogues-page-list" aria-label={t("dialogues.review.pages")}>{previewPages.map((item, index) => <button aria-pressed={currentPage === index} aria-label={t("dialogues.review.page", { page: index + 1 })} key={index} onClick={() => selectPage(index)} type="button"><strong>{index + 1}</strong><span>{item.lines.join(" ") || "—"}</span></button>)}</div>

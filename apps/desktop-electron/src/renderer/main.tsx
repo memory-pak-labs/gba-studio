@@ -1,3 +1,5 @@
+import { DialogueComposerDialog } from "./DialogueComposerDialog";
+import { createAuthoredDialogue, type AuthoredDialogue, type DialogueEventTarget } from "../shared/dialogueAuthoring";
 import { WorkspaceSessionScope, WorkspaceScrollMemory } from "./workspaceSessionState";
 import { updatePcmSfxInProject } from "../shared/audioPcm.js";
 import { updateWavEditInProject } from "../shared/wavEditing.js";
@@ -355,6 +357,7 @@ function App(): React.ReactElement {
   const ui = useStudioUiText();
   const { t, locale } = useStudioI18n();
   const [session, setSession] = useState<ProjectSession | null>(null);
+  const [dialogueCreation, setDialogueCreation] = useState<{ path?: string; target?: DialogueEventTarget; resolve(value: string | null): void } | null>(null);
   const dialogueSessionRef = useRef(session);
   dialogueSessionRef.current = session;
   const preparingUpdateRef = useRef(false);
@@ -2967,21 +2970,21 @@ function App(): React.ReactElement {
     setStatus(ui("Fala aberta no Editor: {0}.", { 0: key }));
   }
 
-  async function createDialogue(): Promise<string | null> {
-    const current = dialogueSessionRef.current;
-    if (!current) return null;
-    const dialogueCount = Array.isArray(current.project.data.dialogues) ? current.project.data.dialogues.length : 0;
-    const key = await prompt("Chave do diálogo", `dialogue_${dialogueCount + 1}`);
-    const trimmedKey = key?.trim();
-    const latest = dialogueSessionRef.current;
-    if (!trimmedKey || !latest || latest.path !== current.path) return null;
-    if (Array.isArray(latest.project.data.dialogues) && latest.project.data.dialogues.some(item => item.key === trimmedKey)) {
-      setStatus(ui("A chave {0} já existe. Escolha outra para criar uma fala.", { 0: trimmedKey })); return null;
+  function createDialogue(target?: DialogueEventTarget): Promise<string | null> {
+    if (!session) return Promise.resolve(null);
+    return new Promise(resolve => setDialogueCreation({ path: session.path, target, resolve }));
+  }
+
+  function finishDialogueCreation(fields?: AuthoredDialogue): void {
+    const request = dialogueCreation, current = dialogueSessionRef.current;
+    if (!request) return;
+    if (!fields || !current || current.path !== request.path) {
+      request.resolve(null); setDialogueCreation(null); return;
     }
-    const nextData = createDialogueInProject(latest.project.data, { key: trimmedKey, character: "Narrador", text: "Nova fala.", choices: [] });
-    updateProjectData(nextData);
-    setStatus(ui("Fala criada no catálogo: {0}. Vincule a chave em um evento para executá-la.", { 0: trimmedKey }));
-    return trimmedKey;
+    const next = createAuthoredDialogue(current.project.data, fields, request.target);
+    updateProjectData(next);
+    setStatus(ui("Fala criada: {0}.", { 0: fields.key.trim() }));
+    request.resolve(fields.key.trim()); setDialogueCreation(null);
   }
 
   function updateDialogue(key: string, fields: UpdateDialogueFields): void {
@@ -3673,6 +3676,9 @@ function App(): React.ReactElement {
               onUpdateDialogue={updateDialogue}
               renderEventInspector={(eventName, triggerLabel) => (
                 <EventInspectorPanel
+                  projectPath={session.path}
+                  onCreateDialogue={createDialogue}
+                  onUpdateDialogue={updateDialogue}
                   eventName={eventName}
                   onAddEventStep={addEventStep}
                   onInsertEventSteps={insertEventSteps}
@@ -3741,7 +3747,7 @@ function App(): React.ReactElement {
               focusedDialogueKey={focusedAssetRequest?.workspace === selectedWorkspace ? focusedAssetRequest.targetName ?? null : null}
               focusRequestID={focusedAssetRequest?.workspace === selectedWorkspace ? focusedAssetRequest.requestID : 0}
               onEditDialogue={openDialogueInEditor}
-              onCreateDialogue={async () => { const key = await createDialogue(); if (key) openDialogueInEditor(key); return key; }}
+              onCreateDialogue={() => createDialogue()}
 
 
 
@@ -3919,6 +3925,8 @@ function App(): React.ReactElement {
         frameBudget={romPlayerTelemetry?.state === "running" ? romPlayerTelemetry.stats?.runtimeState?.frameBudget : null}
         activeSceneName={hardwareProfiler?.activeRoomName}
       />
+      {dialogueCreation ? <DialogueComposerDialog projectData={session.project.data} projectPath={session.path}
+        onSave={finishDialogueCreation} onCancel={() => finishDialogueCreation()} /> : null}
       <StudioStatusBar message={status} workspace={selectedWorkspace} isBusy={statusBusy} />
       {pluginCatalogOpen && session?.path ? (
         <PluginCatalogModal
