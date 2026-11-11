@@ -227,6 +227,7 @@ void multiplayer_queue_update(MultiplayerQueue& q) {
             --q.send_count;
             q.in_flight = false;
             q.sequence = (q.sequence + 1) & 1023;
+            q.retry_left = 0; // Acknowledged: the next message needs no retry delay.
             // An ACK can arrive while an old retransmission is in progress.
             q.packet_size = 0;
         }

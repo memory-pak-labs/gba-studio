@@ -246,6 +246,15 @@ int main() {
         }
     }
     {
+        Cable c(2);
+        c.queue[0].config.retry_frames = 60;
+        for (unsigned value=0;value<3;++value) assert(gbs::multiplayer_queue_send(c.queue[0],value));
+        c.frames(40);
+        // Retry cooldown belongs to the unacknowledged message, not its
+        // successor. A confirmed message must not hold the next one idle.
+        assert(gbs::multiplayer_queue_pending_send(c.queue[0])==0);
+    }
+    {
         gbs::MultiplayerQueue a {}, b {};
         assert(gbs::multiplayer_queue_open(a));
         assert(!gbs::multiplayer_queue_open(b)); // Only one native serial owner.
