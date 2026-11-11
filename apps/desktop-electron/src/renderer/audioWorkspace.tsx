@@ -1,3 +1,4 @@
+import { useWorkspaceState, useWorkspaceRef, useWorkspaceChangeEffect } from "./workspaceSessionState";
 import { PCM_INSTRUMENTS, type PcmSfxConfig } from "../shared/audioPcm.js";
 import type { PrepareAudioPreviewRequest, EngineAudioPreviewResult } from "../shared/audioPreview.js";
 import { startEngineAudioPreview } from "./engineAudioPreview.js";
@@ -435,19 +436,19 @@ export function AudioWorkspace({
   onRemoveAudio
 }: AudioWorkspaceProps): React.ReactElement {
   const ui = useStudioUiText();
-  const [selectedCell, setSelectedCell] = useState<SelectedAudioCell | null>(null);
-  const [selectedAudioID, setSelectedAudioID] = useState<string | null>(null);
-  const [sampleEditorTarget, setSampleEditorTarget] = useState<string | null>(null);
-  useEffect(() => setSampleEditorTarget(null), [selectedAudioID]);
+  const [selectedCell, setSelectedCell] = useWorkspaceState<SelectedAudioCell | null>("audio.selectedCell", null);
+  const [selectedAudioID, setSelectedAudioID] = useWorkspaceState<string | null>("audio.selectedAudioID", null);
+  const [sampleEditorTarget, setSampleEditorTarget] = useWorkspaceState<string | null>("audio.sampleEditorTarget", null);
+  useWorkspaceChangeEffect(() => setSampleEditorTarget(null), [selectedAudioID]);
   const [contextMenu, setContextMenu] = useState<AudioContextMenuState | null>(null);
-  const [searchQuery, setSearchQuery] = useState("");
-  const [selectedKind, setSelectedKind] = useState("");
-  const [selectedFormat, setSelectedFormat] = useState("");
-  const [selectedOrigin, setSelectedOrigin] = useState<AudioWorkspaceOriginFilter>("");
-  const [sortOption, setSortOption] = useState<AudioWorkspaceSortOption>("name-asc");
-  const [filterStatus, setFilterStatus] = useState<AudioWorkspaceFilterStatus>("");
-  const [filtersOpen, setFiltersOpen] = useState(false);
-  const [composerTab, setComposerTab] = useState<AudioComposerTab>("piano");
+  const [searchQuery, setSearchQuery] = useWorkspaceState("audio.searchQuery", "");
+  const [selectedKind, setSelectedKind] = useWorkspaceState("audio.selectedKind", "");
+  const [selectedFormat, setSelectedFormat] = useWorkspaceState("audio.selectedFormat", "");
+  const [selectedOrigin, setSelectedOrigin] = useWorkspaceState<AudioWorkspaceOriginFilter>("audio.selectedOrigin", "");
+  const [sortOption, setSortOption] = useWorkspaceState<AudioWorkspaceSortOption>("audio.sortOption", "name-asc");
+  const [filterStatus, setFilterStatus] = useWorkspaceState<AudioWorkspaceFilterStatus>("audio.filterStatus", "");
+  const [filtersOpen, setFiltersOpen] = useWorkspaceState("audio.filtersOpen", false);
+  const [composerTab, setComposerTab] = useWorkspaceState<AudioComposerTab>("audio.composerTab", "piano");
   const [playbackStatus, setPlaybackStatus] = useState("Parado");
   const [playbackStepIndex, setPlaybackStepIndex] = useState<number | null>(null);
   const [auditionAudioID, setAuditionAudioID] = useState<string | null>(null);
@@ -497,12 +498,12 @@ export function AudioWorkspace({
     };
   }, [creationAssistantOpen]);
   const [creatingModuleCopy, setCreatingModuleCopy] = useState(false);
-  const [detailsOpen, setDetailsOpen] = useState(false);
+  const [detailsOpen, setDetailsOpen] = useWorkspaceState("audio.detailsOpen", false);
   const detailsID = useId();
   const sampleEditorPanelID = useId();
   const detailsButtonRef = useRef<HTMLButtonElement>(null);
   const detailsCloseRef = useRef<HTMLButtonElement>(null);
-  const [previewScope, setPreviewScope] = useState<"pattern" | "sequence">("pattern");
+  const [previewScope, setPreviewScope] = useWorkspaceState<"pattern" | "sequence">("audio.previewScope", "pattern");
   const playbackRef = useRef<{ context: AudioContext; stop(): void } | null>(null);
   const playbackRequest = useRef(0);
   const nativeRef = useRef<ReturnType<typeof startEngineAudioPreview> | null>(null);
@@ -578,8 +579,12 @@ export function AudioWorkspace({
     [presentation, selectedAudioID]
   );
 
+  const appliedAudioFocus = useWorkspaceRef("audio.appliedFocus", "");
   useEffect(() => {
     if (!focusedAudioID) return;
+    const request = `${focusRequestID ?? 0}:${focusedAudioID}`;
+    if (appliedAudioFocus.current === request) return;
+    appliedAudioFocus.current = request;
 
     setSearchQuery("");
     setSelectedKind("");
@@ -711,7 +716,7 @@ export function AudioWorkspace({
             </section>
           </aside>
 
-          <section className="audio-composer-stage audio-composer-empty-state" aria-label={ui("Compositor de áudio")}>
+          <section data-workspace-scroll="audio-composer-stage" className="audio-composer-stage audio-composer-empty-state" aria-label={ui("Compositor de áudio")}>
             <div className="audio-empty-composer">
               <span>{ui("Compositor de áudio")}</span>
               <p>{ui("Crie ou importe um áudio para começar a compor.")}</p>
@@ -1051,7 +1056,7 @@ export function AudioWorkspace({
             <label>{ui("Status")}<select value={filterStatus} onChange={event => setFilterStatus(event.currentTarget.value as AudioWorkspaceFilterStatus)}><option value="">{ui("Todos")}</option><option value="OK">{ui("OK")}</option><option value="Atencao">{ui("Atenção")}</option><option value="Bloqueado">{ui("Bloqueado")}</option></select></label>
             <label>{ui("Ordenar")}<select value={sortOption} onChange={event => setSortOption(event.currentTarget.value as AudioWorkspaceSortOption)}><option value="name-asc">{ui("Nome A–Z")}</option><option value="name-desc">{ui("Nome Z–A")}</option><option value="bpm-desc">{ui("BPM")}</option><option value="usage-desc">{ui("Uso no jogo")}</option></select></label>
           </div> : null}
-          <div className="audio-groove-library-list" role="list" aria-label={ui("Lista de áudio")}>
+          <div data-workspace-scroll="audio-groove-library-list" className="audio-groove-library-list" role="list" aria-label={ui("Lista de áudio")}>
             {[{ kind: "Musica", label: "Músicas" }, { kind: "SFX", label: "Efeitos sonoros" }, { kind: "Audio", label: "Áudio" }].map(group => {
               const items = visibleItems.filter(item => item.kind === group.kind || group.kind === "Audio" && !["Musica", "SFX"].includes(item.kind));
               return items.length ? <div key={group.kind} className="audio-groove-library-group"><span>{group.kind === "Musica" ? <Music2 size={16} /> : <AudioLines size={16} />}{ui(group.label)}</span>
@@ -1069,7 +1074,7 @@ export function AudioWorkspace({
           <small className="muted">{visibleItems.length} {ui(" de ")}{presentation.items.length} {ui(" visíveis")}</small>
           {activeFilterCount ? <button type="button" onClick={() => { setSearchQuery(""); setSelectedKind(""); setSelectedFormat(""); setSelectedOrigin(""); setFilterStatus(""); }}>{ui("Limpar filtros")}</button> : null}
         </aside>
-        <section className="audio-composer-stage audio-groove-composer" aria-label={ui("Compositor de áudio")}>
+        <section data-workspace-scroll="audio-composer-stage" className="audio-composer-stage audio-groove-composer" aria-label={ui("Compositor de áudio")}>
           <div className="audio-groove-transport" role="toolbar" aria-label={ui("Transporte de áudio")}>
             <div className="audio-groove-song-title"><h3>{activeItem?.name ?? ui("Sem áudio")}</h3><span>{activeItem?.kind === "Musica" ? ui("Música") : activeItem?.kind === "SFX" ? ui("Efeito sonoro") : ui("Áudio")}</span></div>
             <button aria-label={ui("Tocar áudio")} className="audio-transport-play" disabled={!activeItem} onClick={() => activeItem && playAudioPreview(activeItem)} title={ui("Tocar áudio")} type="button"><Play size={22} fill="currentColor" /></button>

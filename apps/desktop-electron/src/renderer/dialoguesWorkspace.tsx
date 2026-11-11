@@ -1,3 +1,4 @@
+import { useWorkspaceState, useWorkspaceRef, useWorkspaceChangeEffect } from "./workspaceSessionState";
 import { uiText as ui, useStudioUiText } from "./studioUiText";
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
@@ -144,21 +145,21 @@ export function DialoguesWorkspace({
 }: DialoguesWorkspaceProps): React.ReactElement {
   const ui = useStudioUiText();
   const { t } = useStudioI18n();
-  const [searchQuery, setSearchQuery] = useState("");
-  const [statusFilter, setStatusFilter] = useState<DialoguesWorkspaceStatusFilter>("all");
-  const [characterFilter, setCharacterFilter] = useState("");
-  const [selectedKey, setSelectedKey] = useState<string | null>(null);
-  const appliedFocusRequest = useRef<string | null>(null);
-  const [validationOpen, setValidationOpen] = useState(false);
-  const [authoringMode, setAuthoringMode] = useState<"review" | "translation">("review");
+  const [searchQuery, setSearchQuery] = useWorkspaceState("dialogues.searchQuery", "");
+  const [statusFilter, setStatusFilter] = useWorkspaceState<DialoguesWorkspaceStatusFilter>("dialogues.statusFilter", "all");
+  const [characterFilter, setCharacterFilter] = useWorkspaceState("dialogues.characterFilter", "");
+  const [selectedKey, setSelectedKey] = useWorkspaceState<string | null>("dialogues.selectedKey", null);
+  const appliedFocusRequest = useWorkspaceRef<string | null>("dialogues.appliedFocusRequest", null);
+  const [validationOpen, setValidationOpen] = useWorkspaceState("dialogues.validationOpen", false);
+  const [authoringMode, setAuthoringMode] = useWorkspaceState<"review" | "translation">("dialogues.authoringMode", "review");
   const [translationBusyKey, setTranslationBusyKey] = useState<string | null>(null);
   const [translationError, setTranslationError] = useState("");
-  const [previewLocale, setPreviewLocale] = useState<string | null>(null);
-  const [pageIndex, setPageIndex] = useState(0);
-  const [previewZoom, setPreviewZoom] = useState<"fit" | "1" | "2">("fit");
+  const [previewLocale, setPreviewLocale] = useWorkspaceState<string | null>("dialogues.previewLocale", null);
+  const [pageIndex, setPageIndex] = useWorkspaceState("dialogues.pageIndex", 0);
+  const [previewZoom, setPreviewZoom] = useWorkspaceState<"fit" | "1" | "2">("dialogues.previewZoom", "fit");
   const [testingText, setTestingText] = useState(false);
   const [visibleCharacters, setVisibleCharacters] = useState<number | undefined>();
-  const [previewSceneID, setPreviewSceneID] = useState<string | null>(null);
+  const [previewSceneID, setPreviewSceneID] = useWorkspaceState<string | null>("dialogues.previewSceneID", null);
   const scenes = useMemo(() => dialogueReviewScenes(projectData), [projectData]);
   const visibleDialogues = useMemo(() => {
     const dialogues = presentation?.dialogues ?? [];
@@ -274,7 +275,7 @@ export function DialoguesWorkspace({
     [dialogueSettings, previewSpeaker, previewPortraitSlot, dialoguePortraitURL, dialoguePortraitFrame?.width, dialoguePortraitFrame?.height, shownText, shownChoices.join("\n")]);
   const currentPage = Math.min(pageIndex, previewPages.length - 1);
   const page = previewPages[currentPage];
-  useEffect(() => {
+  useWorkspaceChangeEffect(() => {
     setPageIndex(0); setTestingText(false); setVisibleCharacters(undefined);
   }, [activeDialogue?.key, language, shownText, dialogueSettings, previewSceneID]);
   useEffect(() => {
@@ -378,7 +379,7 @@ export function DialoguesWorkspace({
             <select aria-label={t("dialogues.review.previewLanguage")} onChange={event => setPreviewLocale(event.currentTarget.value)} value={language}>{presentation.localization.enabledLocales.map(locale => <option key={locale} value={locale}>{projectLocaleLabel(locale)}</option>)}</select>
           </div>
           {validationOpen ? <div className="dialogues-validation-panel" aria-label={t("dialogues.diagnostics")}>{validationIssues.map(issue => <button className={issue.severity === "error" ? "danger-chip" : issue.severity === "warning" ? "warning-chip" : ""} key={issue.id} onClick={() => { if (issue.dialogueKey) { setSearchQuery(""); setStatusFilter("all"); setCharacterFilter(""); setSelectedKey(issue.dialogueKey); } }} type="button">{ui(issue.message)}</button>)}</div> : null}
-          <div className="dialogues-review-content">
+          <div data-workspace-scroll="dialogues-review-content" className="dialogues-review-content">
           {activeDialogue && authoringMode === "review" ? (
             <section id="dialogues-authoring-panel-review" role="tabpanel" aria-labelledby="dialogues-authoring-tab-review" className="dialogues-text-panel">
               <h3>{t("dialogues.review.textTitle")}</h3>

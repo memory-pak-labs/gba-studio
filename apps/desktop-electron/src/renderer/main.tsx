@@ -1,3 +1,4 @@
+import { WorkspaceSessionScope, WorkspaceScrollMemory } from "./workspaceSessionState";
 import { updatePcmSfxInProject } from "../shared/audioPcm.js";
 import { updateWavEditInProject } from "../shared/wavEditing.js";
 import { uiText as ui, useStudioUiText } from "./studioUiText";
@@ -349,6 +350,7 @@ const projectActionIcons: Record<ProjectActionID, React.ReactElement> = {
 type ToolbarMenuActionID = "save" | "open" | "commands" | "focus" | "diagnostics";
 
 function App(): React.ReactElement {
+  const workspaceContentRef = useRef<HTMLElement>(null);
   const windowFullscreen = useWindowFullscreen();
   const ui = useStudioUiText();
   const { t, locale } = useStudioI18n();
@@ -3325,7 +3327,7 @@ function App(): React.ReactElement {
   }
 
   return (
-    <main className={`app-shell${focusMode ? " focus-mode" : ""}`}>
+    <WorkspaceSessionScope projectKey={session.path ?? "unsaved"}><main className={`app-shell${focusMode ? " focus-mode" : ""}`}>
       <AppUpdateNotice onRestart={restartAndUpdate} />
       <header className={`app-topbar${window.gbaStudio.platform === "darwin" ? " native-macos-titlebar" : ""}${windowFullscreen ? " is-fullscreen" : ""}`}>
         <div className="topbar-brand">
@@ -3520,7 +3522,8 @@ function App(): React.ReactElement {
         </div>
       </header>
 
-      <section className="content">
+      <section className="content" ref={workspaceContentRef} data-workspace-scroll="content">
+        <WorkspaceScrollMemory rootRef={workspaceContentRef} workspace={selectedWorkspace}/>
         <section className="work-area">
           {navigationTrail ? (
             <WorkspaceNavigationTrail
@@ -3803,7 +3806,7 @@ function App(): React.ReactElement {
               onRemoveAudio={removeAudio}
             />
           ) : selectedWorkspace === "Ajustes" || selectedWorkspace === "Cenas" || selectedWorkspace === "Exportar" ? (
-            <SettingsWorkspace
+            <SettingsWorkspace key={selectedWorkspace}
               cartridgeProject={session?.project ?? null}
               scope={selectedWorkspace === "Cenas" ? "scene" : selectedWorkspace === "Exportar" ? "export" : "global"}
               title={selectedWorkspace === "Cenas" ? ui("Cenas") : selectedWorkspace === "Exportar" ? ui("Exportar") : ui("Ajustes")}
@@ -3928,7 +3931,7 @@ function App(): React.ReactElement {
           setStatus={setStatus}
         />
       ) : null}
-    </main>
+    </main></WorkspaceSessionScope>
   );
 }
 

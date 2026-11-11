@@ -68,7 +68,7 @@ export function WorkspaceInspectorRail({
       ) : null}
       <div
         aria-label={ui("{0} conteúdo rolável", { 0: ui(ariaLabel) })}
-        className="workspace-inspector-rail-body"
+        className="workspace-inspector-rail-body" data-workspace-scroll="workspace-inspector"
         data-scroll-owner="inspector"
         tabIndex={0}
       >

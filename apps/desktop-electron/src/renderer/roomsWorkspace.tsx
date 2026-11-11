@@ -1,3 +1,4 @@
+import { useWorkspaceState, useWorkspaceRef, useWorkspaceChangeEffect } from "./workspaceSessionState";
 import {RacingTrackOverlay} from "./RacingTrackOverlay";
 import {RacingTrackInspector} from "./RacingTrackInspector";
 import type {RacingTrackSelection} from "../shared/racingTrackEditing";
@@ -7313,41 +7314,41 @@ export function RoomsWorkspace({
   onResetPrefabOverrides
 }: RoomsWorkspaceProps): React.ReactElement {
   const ui = useStudioUiText();
-  const [selectedTileID, setSelectedTileID] = useState(1);
-  const [selectedTileStamp, setSelectedTileStamp] = useState<RoomTileStamp>({
+  const [selectedTileID, setSelectedTileID] = useWorkspaceState("rooms.selectedTileID", 1);
+  const [selectedTileStamp, setSelectedTileStamp] = useWorkspaceState<RoomTileStamp>("rooms.selectedTileStamp", {
     height: 1,
     tileIDs: [1],
     width: 1
   });
-  const [selectedTool, setSelectedTool] = useState<RoomTilePaintTool>("brush");
-  const [ghostPreviewEnabled, setGhostPreviewEnabled] = useState(true);
-  const [ghostOpacity, setGhostOpacity] = useState(0.65);
-  const [selectedEditMode, setSelectedEditMode] = useState<RoomCanvasEditMode>("select");
-  const [selectedToolPanelMode, setSelectedToolPanelMode] = useState<RoomEditorToolPanelMode>("select");
-  const [selectedCollisionType, setSelectedCollisionType] = useState<RoomCollisionType>("solid");
-  const [collisionPlacementMode, setCollisionPlacementMode] = useState<RoomCollisionPlacementMode>("brush");
-  const [selectedHeightLevel, setSelectedHeightLevel] = useState(0);
-  const [collisionHoverPreviewEnabled, setCollisionHoverPreviewEnabled] = useState(true);
-  const [selectedEntityTool, setSelectedEntityTool] = useState<RoomEntityCanvasTool>("move");
-  const [selectedHudComponentID, setSelectedHudComponentID] = useState<string | null>(null);
-  const [selectedRacingElement,setSelectedRacingElement]=useState<{roomID:string;selection:RacingTrackSelection}|null>(null);
-  const [racingAreaMode,setRacingAreaMode]=useState<"gates"|"events">("gates");
-  const [hudLibraryPresetID, setHudLibraryPresetID] = useState<string | null>(null);
-  const [editingSharedHudID, setEditingSharedHudID] = useState<string | null>(null);
-  const [hudViewMode, setHudViewMode] = useState<"edit" | "preview">("edit");
-  const [hudMenuScreenID, setHudMenuScreenID] = useState("");
-  const [sceneMenuScreenID, setSceneMenuScreenID] = useState("");
-  const [sceneMenuItemIndex, setSceneMenuItemIndex] = useState(0);
+  const [selectedTool, setSelectedTool] = useWorkspaceState<RoomTilePaintTool>("rooms.selectedTool", "brush");
+  const [ghostPreviewEnabled, setGhostPreviewEnabled] = useWorkspaceState("rooms.ghostPreviewEnabled", true);
+  const [ghostOpacity, setGhostOpacity] = useWorkspaceState("rooms.ghostOpacity", 0.65);
+  const [selectedEditMode, setSelectedEditMode] = useWorkspaceState<RoomCanvasEditMode>("rooms.selectedEditMode", "select");
+  const [selectedToolPanelMode, setSelectedToolPanelMode] = useWorkspaceState<RoomEditorToolPanelMode>("rooms.selectedToolPanelMode", "select");
+  const [selectedCollisionType, setSelectedCollisionType] = useWorkspaceState<RoomCollisionType>("rooms.selectedCollisionType", "solid");
+  const [collisionPlacementMode, setCollisionPlacementMode] = useWorkspaceState<RoomCollisionPlacementMode>("rooms.collisionPlacementMode", "brush");
+  const [selectedHeightLevel, setSelectedHeightLevel] = useWorkspaceState("rooms.selectedHeightLevel", 0);
+  const [collisionHoverPreviewEnabled, setCollisionHoverPreviewEnabled] = useWorkspaceState("rooms.collisionHoverPreviewEnabled", true);
+  const [selectedEntityTool, setSelectedEntityTool] = useWorkspaceState<RoomEntityCanvasTool>("rooms.selectedEntityTool", "move");
+  const [selectedHudComponentID, setSelectedHudComponentID] = useWorkspaceState<string | null>("rooms.selectedHudComponentID", null);
+  const [selectedRacingElement,setSelectedRacingElement]=useWorkspaceState<{roomID:string;selection:RacingTrackSelection}|null>("rooms.selectedRacingElement", null);
+  const [racingAreaMode,setRacingAreaMode]=useWorkspaceState<"gates"|"events">("rooms.racingAreaMode", "gates");
+  const [hudLibraryPresetID, setHudLibraryPresetID] = useWorkspaceState<string | null>("rooms.hudLibraryPresetID", null);
+  const [editingSharedHudID, setEditingSharedHudID] = useWorkspaceState<string | null>("rooms.editingSharedHudID", null);
+  const [hudViewMode, setHudViewMode] = useWorkspaceState<"edit" | "preview">("rooms.hudViewMode", "edit");
+  const [hudMenuScreenID, setHudMenuScreenID] = useWorkspaceState("rooms.hudMenuScreenID", "");
+  const [sceneMenuScreenID, setSceneMenuScreenID] = useWorkspaceState("rooms.sceneMenuScreenID", "");
+  const [sceneMenuItemIndex, setSceneMenuItemIndex] = useWorkspaceState("rooms.sceneMenuItemIndex", 0);
   const [dialoguePreviewKey, setDialoguePreviewKey] = useState<string | null>(null);
-  const [canvasLayerVisibility, setCanvasLayerVisibilityState] = useState(defaultCanvasLayerVisibility);
-  const [canvasLayerLocks, setCanvasLayerLocks] = useState(defaultCanvasLayerLocks);
-  const [selectedConnectionTarget, setSelectedConnectionTarget] = useState("");
-  const [connectionEventName, setConnectionEventName] = useState("");
-  const [selectedEntityKeys, setSelectedEntityKeys] = useState<string[]>([]);
-  const [selectedConnectionIndex, setSelectedConnectionIndex] = useState<number | null>(null);
-  const [selectedCameraZoneID, setSelectedCameraZoneID] = useState<string | null>(null);
-  const [selectedConnectionZoneSide, setSelectedConnectionZoneSide] = useState<"exit" | "entry">("exit");
-  const [selectedSceneMapRoomName, setSelectedSceneMapRoomName] = useState<string | null>(null);
+  const [canvasLayerVisibility, setCanvasLayerVisibilityState] = useWorkspaceState("rooms.canvasLayerVisibility", defaultCanvasLayerVisibility);
+  const [canvasLayerLocks, setCanvasLayerLocks] = useWorkspaceState("rooms.canvasLayerLocks", defaultCanvasLayerLocks);
+  const [selectedConnectionTarget, setSelectedConnectionTarget] = useWorkspaceState("rooms.selectedConnectionTarget", "");
+  const [connectionEventName, setConnectionEventName] = useWorkspaceState("rooms.connectionEventName", "");
+  const [selectedEntityKeys, setSelectedEntityKeys] = useWorkspaceState<string[]>("rooms.selectedEntityKeys", []);
+  const [selectedConnectionIndex, setSelectedConnectionIndex] = useWorkspaceState<number | null>("rooms.selectedConnectionIndex", null);
+  const [selectedCameraZoneID, setSelectedCameraZoneID] = useWorkspaceState<string | null>("rooms.selectedCameraZoneID", null);
+  const [selectedConnectionZoneSide, setSelectedConnectionZoneSide] = useWorkspaceState<"exit" | "entry">("rooms.selectedConnectionZoneSide", "exit");
+  const [selectedSceneMapRoomName, setSelectedSceneMapRoomName] = useWorkspaceState<string | null>("rooms.selectedSceneMapRoomName", null);
   const [newNoteFocusID, setNewNoteFocusID] = useState<string | null>(null);
   const [noteMenu, setNoteMenu] = useState<{ left: number; top: number; x: number; y: number } | null>(null);
   const sceneNotes = useMemo(() => projectData ? readSceneNotes(projectData) : [], [projectData]);
@@ -7357,12 +7358,12 @@ export function RoomsWorkspace({
     window.addEventListener("keydown", close);
     return () => window.removeEventListener("keydown", close);
   }, [noteMenu]);
-  const [overviewView, setOverviewView] = useState<{ path?: string; mode: SceneMapViewMode } | null>(null);
+  const [overviewView, setOverviewView] = useWorkspaceState<{ path?: string; mode: SceneMapViewMode } | null>("rooms.overviewView", null);
   const overviewMode = overviewView && overviewView.path === projectPath ? overviewView.mode : readSceneMapViewMode(projectPath);
-  const [diagramNavigation, setDiagramNavigation] = useState<{ path?: string; zoom: number; positions: Record<string, SceneMapPosition> } | null>(null);
+  const [diagramNavigation, setDiagramNavigation] = useWorkspaceState<{ path?: string; zoom: number; positions: Record<string, SceneMapPosition> } | null>("rooms.diagramNavigation", null);
   const diagramZoom = diagramNavigation && diagramNavigation.path === projectPath ? diagramNavigation.zoom : 1;
   const diagramOverrides = useMemo(() => diagramNavigation && diagramNavigation.path === projectPath ? diagramNavigation.positions : readSceneDiagramPositions(projectPath), [diagramNavigation, projectPath]);
-  const [selectedCanvasCell, setSelectedCanvasCell] = useState<SelectedRoomCellState | null>(null);
+  const [selectedCanvasCell, setSelectedCanvasCell] = useWorkspaceState<SelectedRoomCellState | null>("rooms.selectedCanvasCell", null);
   const canvasStageRef = useRef<HTMLElement | null>(null);
   const canvasScrollRef = useRef<HTMLDivElement | null>(null);
   const canvasPointerRef = useRef<{ x: number; y: number } | null>(null);
@@ -7370,57 +7371,57 @@ export function RoomsWorkspace({
   const canvasWheelHandlerRef = useRef<(event: WheelEvent) => void>(() => undefined);
   const focusViewportHostRef = useRef<HTMLDivElement | null>(null);
   const [focusSceneMapRoomID, setFocusSceneMapRoomID] = useState<string | null>(null);
-  const [focusedSceneEditorRoomID, setFocusedSceneEditorRoomID] = useState<string | null>(null);
+  const [focusedSceneEditorRoomID, setFocusedSceneEditorRoomID] = useWorkspaceState<string | null>("rooms.focusedSceneEditorRoomID", null);
   const [pendingCreatedSceneFocusID, setPendingCreatedSceneFocusID] = useState<string | null>(null);
-  const [focusSceneZoom, setFocusSceneZoom] = useState(1);
-  useEffect(() => { setFocusSceneZoom(1); }, [focusedSceneEditorRoomID]);
+  const [focusSceneZoom, setFocusSceneZoom] = useWorkspaceState("rooms.focusSceneZoom", 1);
+  useWorkspaceChangeEffect(() => { setFocusSceneZoom(1); }, [focusedSceneEditorRoomID]);
   const [focusViewportAvailableSize, setFocusViewportAvailableSize] = useState<{ height: number; width: number }>({
     height: GBA_VIEWPORT_PIXELS.height,
     width: GBA_VIEWPORT_PIXELS.width
   });
   const [focusMinimapViewport, setFocusMinimapViewport] = useState({ height: 0, left: 0, top: 0, width: 0 });
-  const [focusMinimapVisible, setFocusMinimapVisible] = useState(true);
-  const [focusViewMode, setFocusViewMode] = useState<"viewport" | "map">("viewport");
+  const [focusMinimapVisible, setFocusMinimapVisible] = useWorkspaceState("rooms.focusMinimapVisible", true);
+  const [focusViewMode, setFocusViewMode] = useWorkspaceState<"viewport" | "map">("rooms.focusViewMode", "viewport");
   const focusViewModeRef = useRef(focusViewMode);
   focusViewModeRef.current = focusViewMode;
   const focusViewportScaleRef = useRef(1);
-  const [focusCameraOrigin, setFocusCameraOrigin] = useState({ left: 0, top: 0 });
+  const [focusCameraOrigin, setFocusCameraOrigin] = useWorkspaceState("rooms.focusCameraOrigin", { left: 0, top: 0 });
   const focusCameraOriginRef = useRef(focusCameraOrigin);
   focusCameraOriginRef.current = focusCameraOrigin;
-  const focusInitialCameraRoomRef = useRef<string | null>(null);
+  const focusInitialCameraRoomRef = useWorkspaceRef<string | null>("rooms.focusInitialCameraRoomRef", null);
   const [sceneMapDragPreview, setSceneMapDragPreview] = useState<{ position: SceneMapPosition; roomName: string } | null>(null);
   const [isCanvasPanning, setIsCanvasPanning] = useState(false);
   const [roomNamePrompt, setRoomNamePrompt] = useState<RoomNamePromptState | null>(null);
   const [explorerContextMenu, setExplorerContextMenu] = useState<ExplorerContextMenuState | null>(null);
-  const [sceneSearchQuery, setSceneSearchQuery] = useState("");
-  const [sceneMultiSelectMode, setSceneMultiSelectMode] = useState(false);
-  const [selectedSceneIDs, setSelectedSceneIDs] = useState<Set<string>>(new Set());
-  const [lastSelectedSceneID, setLastSelectedSceneID] = useState<string | null>(null);
-  const [expandedSceneGroupIDs, setExpandedSceneGroupIDs] = useState<Set<string>>(new Set());
+  const [sceneSearchQuery, setSceneSearchQuery] = useWorkspaceState("rooms.sceneSearchQuery", "");
+  const [sceneMultiSelectMode, setSceneMultiSelectMode] = useWorkspaceState("rooms.sceneMultiSelectMode", false);
+  const [selectedSceneIDs, setSelectedSceneIDs] = useWorkspaceState<Set<string>>("rooms.selectedSceneIDs", new Set());
+  const [lastSelectedSceneID, setLastSelectedSceneID] = useWorkspaceState<string | null>("rooms.lastSelectedSceneID", null);
+  const [expandedSceneGroupIDs, setExpandedSceneGroupIDs] = useWorkspaceState<Set<string>>("rooms.expandedSceneGroupIDs", new Set());
   const [draggedSceneID, setDraggedSceneID] = useState<string | null>(null);
   const [draggedSceneIDs, setDraggedSceneIDs] = useState<string[]>([]);
   const [dragOverSceneID, setDragOverSceneID] = useState<string | null>(null);
   const [dragOverSceneGroupID, setDragOverSceneGroupID] = useState<string | null>(null);
-  const [railExpanded, setRailExpanded] = useState<EditorRailExpandState>(defaultEditorRailExpandState);
-  const [expandedSceneIDs, setExpandedSceneIDs] = useState<Set<string>>(
+  const [railExpanded, setRailExpanded] = useWorkspaceState<EditorRailExpandState>("rooms.railExpanded", defaultEditorRailExpandState);
+  const [expandedSceneIDs, setExpandedSceneIDs] = useWorkspaceState<Set<string>>("rooms.expandedSceneIDs",
     () => new Set(presentation?.rooms.filter((room) => room.isActive).map((room) => room.id) ?? [])
   );
-  const [navigatorTab, setNavigatorTab] = useState<"project" | "prefabs" | "logic">("project");
-  const [prefabQuery, setPrefabQuery] = useState("");
-  const [selectedArrivalID, setSelectedArrivalID] = useState<string | null>(null);
-  const [testArrivalID, setTestArrivalID] = useState<string>("");
-  useEffect(() => { setSelectedArrivalID(null); setTestArrivalID(""); }, [focusedSceneEditorRoomID]);
-  const [logicSelection, setLogicSelection] = useState<LogicSelection | null>(null);
-  useEffect(() => { setLogicSelection(null); setNavigatorTab("project"); }, [projectPath]);
-  const [inspectorTabByContext, setInspectorTabByContext] = useState<Partial<Record<RoomInspectorContextKind, RoomInspectorTabID>>>({});
-  const appliedFocusRequestKey = useRef<string | null>(null);
-  const appliedEventFocusRequestID = useRef<number | null>(null);
+  const [navigatorTab, setNavigatorTab] = useWorkspaceState<"project" | "prefabs" | "logic">("rooms.navigatorTab", "project");
+  const [prefabQuery, setPrefabQuery] = useWorkspaceState("rooms.prefabQuery", "");
+  const [selectedArrivalID, setSelectedArrivalID] = useWorkspaceState<string | null>("rooms.selectedArrivalID", null);
+  const [testArrivalID, setTestArrivalID] = useWorkspaceState<string>("rooms.testArrivalID", "");
+  useWorkspaceChangeEffect(() => { setSelectedArrivalID(null); setTestArrivalID(""); }, [focusedSceneEditorRoomID]);
+  const [logicSelection, setLogicSelection] = useWorkspaceState<LogicSelection | null>("rooms.logicSelection", null);
+  useWorkspaceChangeEffect(() => { setLogicSelection(null); setNavigatorTab("project"); }, [projectPath]);
+  const [inspectorTabByContext, setInspectorTabByContext] = useWorkspaceState<Partial<Record<RoomInspectorContextKind, RoomInspectorTabID>>>("rooms.inspectorTabByContext", {});
+  const appliedFocusRequestKey = useWorkspaceRef<string | null>("rooms.appliedFocusRequestKey", null);
+  const appliedEventFocusRequestID = useWorkspaceRef<number | null>("rooms.appliedEventFocusRequestID", null);
   const canvasWorldRef = useRef<HTMLDivElement | null>(null);
   const sceneMapCardDrag = useRef<SceneMapCardDragState | null>(null);
   const sceneMapCardFrameRefs = useRef<Record<string, HTMLDivElement | null>>({});
   const canvasPanDrag = useRef<CanvasPanDragState | null>(null);
 
-  useEffect(() => {
+  useWorkspaceChangeEffect(() => {
     setSelectedHudComponentID(null);
     setHudLibraryPresetID(null);
     setEditingSharedHudID(null);
@@ -10294,7 +10295,7 @@ export function RoomsWorkspace({
                 onPointerMoveCapture={rememberCanvasPointer}
                 onPointerUp={endRoomsCanvasPan}
                 onPointerCancel={endRoomsCanvasPan}
-                ref={canvasScrollRef}
+                ref={canvasScrollRef} data-workspace-scroll="rooms-canvas"
                 style={focusViewportGeometry ? {
                   height: `${focusViewportGeometry.viewportHeight}px`,
                   width: `${focusViewportGeometry.viewportWidth}px`
@@ -10614,6 +10615,7 @@ export function RoomsWorkspace({
               <div
                 aria-labelledby={activeInspectorTab ? `rooms-inspector-tab-${activeInspectorTab}` : undefined}
                 className="rooms-inspector-tab-panel"
+                data-workspace-scroll="rooms-inspector-panel"
                 id={activeInspectorTab ? `rooms-inspector-panel-${activeInspectorTab}` : undefined}
                 role={activeInspectorTab ? "tabpanel" : undefined}
               >
