@@ -58,7 +58,13 @@ As operações usam desfazer/refazer e são salvas no próprio `.gba-project`.
 No MOD, velocidade e andamento permanecem nos comandos `Fxx` do Tracker;
 o controle superior de BPM fica desabilitado. No S3M, o BPM inicial pode ser
 editado, preservando os comandos de andamento existentes. Esta edição não
-inclui desenho de ondas, troca dos samples incorporados, XM, IT ou síntese OPL.
+inclui desenho de ondas, troca dos samples incorporados ou síntese OPL.
+
+Módulos **XM e IT** também podem receber cópias editáveis no Piano Roll e no
+Tracker. A reprodução segue o perfil PCM, os envelopes e os efeitos suportados
+pela engine, descritos no [contrato de integração](../../packages/GBAStudioEngine/docs/INTEGRATION_CONTRACT.md).
+Esse perfil não representa suporte irrestrito a todas as extensões desses
+formatos. A fonte permanece preservada, como nos módulos MOD e S3M.
 
 A prévia e a exportação geram um novo módulo nativo em sua pasta de trabalho,
 preservando os samples e comandos originais. O arquivo de origem nunca é
