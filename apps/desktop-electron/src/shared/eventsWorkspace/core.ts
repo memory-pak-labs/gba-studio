@@ -2363,7 +2363,7 @@ function commandTemplateContext(options: EventCommandResourceOptions): EventComm
     animation: firstOption(options.animation, "idle"),
     animationState: firstOption(options.animationState, "state_id"),
     background: firstOption(options.background, "background.png"),
-    choiceDialogue: firstOption(options.choiceDialogue, firstOption(options.dialogue, "")),
+    choiceDialogue: firstOption(options.choiceDialogue, ""),
     currentRoom: firstOption(options.currentRoom, "room_name"),
     dialogue: firstOption(options.dialogue, ""),
     event: firstOption(options.event, "intro_001"),

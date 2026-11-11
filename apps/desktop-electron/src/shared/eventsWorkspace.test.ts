@@ -1032,7 +1032,7 @@ describe("Events workspace presentation", () => {
       "add_variable value 1",
       "if_variable value 10",
       "show_dialogue intro",
-      "show_choice intro",
+      "show_choice",
       "play_music theme.mod",
       "play_sfx theme.mod",
       "change_scene shop",

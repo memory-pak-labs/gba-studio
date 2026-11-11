@@ -25,4 +25,12 @@ describe("contextual dialogue authoring", () => {
     expect(suggestions).toHaveLength(1);
     expect(suggestions[0].command.trim()).toBe("show_dialogue");
   });
+  it("keeps a choice event pending when the catalogue has only speeches without choices", () => {
+    const presentation = deriveEventsWorkspacePresentation(data);
+    expect(presentation.commandPalette.find(item => item.id === "command:dialogue.choice")?.command).toBe("show_choice");
+    expect(() => createAuthoredDialogue(data, { key: "nova", text: "Texto sem opções" }, {
+      eventID: "event-1", stepIndex: 0, command: "show_dialogue", tokenIndex: 1, requiresChoices: true
+    })).toThrow(/pelo menos uma escolha/);
+    expect(data.dialogues).toHaveLength(1);
+  });
 });
