@@ -2892,6 +2892,7 @@
 }
 .dialogues-review-layout .dialogues-panel-title { display: flex; justify-content: start; gap: var(--studio-space-3); }
 .dialogues-review-layout .dialogues-panel-title h3 { margin: 0; }
+.dialogues-review-layout .dialogues-create-button { display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0; margin-inline-start: auto; }
 .dialogues-panel-title > span { border-radius: var(--studio-radius-pill); padding: 2px 8px; background: var(--studio-color-surface-muted); color: var(--studio-color-text-secondary); }
 .dialogues-review-layout .dialogues-review-search { position: relative; display: block; }
 .dialogues-review-search > svg { position: absolute; top: 50%; left: 10px; transform: translateY(-50%); color: var(--studio-color-text-secondary); pointer-events: none; }

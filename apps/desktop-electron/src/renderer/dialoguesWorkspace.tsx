@@ -20,7 +20,7 @@ import { resolveAssetURL } from "../shared/spriteAssetURL";
 import { WorkspaceEmptyState } from "./studioUi";
 import { dialogueDisplayTitle, dialogueReviewBackground, dialogueReviewScenes } from "./dialoguesWorkspaceReview";
 import { resolveSceneDialogueUiSettings } from "../shared/interfaceThemes";
-import { MessageSquare, Search, ChevronLeft, ChevronRight, Play, Square, ExternalLink } from "lucide-react";
+import { MessageSquare, Search, ChevronLeft, ChevronRight, Play, Square, ExternalLink, Plus } from "lucide-react";
 import { dialoguePreviewLayoutForSettings } from "../shared/sceneRuntimeExport";
 import { DialoguePreviewSnapshot, deriveDialoguePreviewPages } from "./dialoguePreviewSnapshot";
 import type { DialogueUiSettingsContract } from "../shared/sceneRuntimeExport";
@@ -340,7 +340,10 @@ export function DialoguesWorkspace({
     <section aria-label={t("dialogues.workspaceAria")} className="dialogues-workspace">
       <div className="dialogues-layout dialogues-review-layout">
         <aside className="dialogues-rail" aria-label={t("dialogues.library")}>
-          <div className="dialogues-panel-title"><h3>{t("workspace.dialogues")}</h3><span>{presentation.dialogues.length}</span>{onCreateDialogue ? <button type="button" onClick={() => void onCreateDialogue()}>{t("dialogues.actions.create")}</button> : null}</div>
+          <div className="dialogues-panel-title">
+            <h3>{t("workspace.dialogues")}</h3><span>{presentation.dialogues.length}</span>
+            {onCreateDialogue ? <button aria-label={t("dialogues.actions.create")} className="dialogues-create-button" title={t("dialogues.actions.create")} type="button" onClick={() => void onCreateDialogue()}><Plus aria-hidden="true" size={18}/></button> : null}
+          </div>
           <label className="dialogues-search dialogues-review-search"><Search aria-hidden="true" size={16}/><input aria-label={t("dialogues.search")} onChange={event => setSearchQuery(event.currentTarget.value)} placeholder={t("dialogues.searchPlaceholder")} type="search" value={searchQuery}/></label>
           <select className="dialogues-character-filter" aria-label={t("dialogues.filter.character")} onChange={event => setCharacterFilter(event.currentTarget.value)} value={characterFilter}>
             <option value="">{t("dialogues.filter.allCharacters")}</option>
