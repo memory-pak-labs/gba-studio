@@ -483,7 +483,10 @@
       "link_session_multiplayer4",
       "link_transfer_byte",
       "link_transfer_multiplayer16",
-      "link_timeout"
+      "link_timeout",
+      "link_queued_messages",
+      "link_automatic_recovery",
+      "link_nonblocking_irq"
     ],
     "rumble": [
       "rumble_provider_opt_in",

@@ -851,6 +851,7 @@ int scene_raster_active,hblank_dispatch_required;int keypad_irq_pending,arms;
 static int affine_hblank_enabled=1;
 static int window1_hblank_active=0;
 static int window_arms;
+static void capture_multiplayer_async(void){}
 static void rearm_active_window1_hblank(void){++window_arms;}
 static uint32_t ticks,irq_ticks,frame_vblank_irq_ticks;
 uint32_t gbs_hw_frame_counter_ticks(void){return ticks++;}

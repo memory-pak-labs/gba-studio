@@ -178,6 +178,13 @@ void gbs_hw_sio_normal8_init(int internal_clock);
 int gbs_hw_sio_normal8_transfer(uint8_t outgoing, int internal_clock, uint32_t timeout_frames, uint8_t* incoming);
 int gbs_hw_sio_normal32_transfer(uint32_t outgoing, int internal_clock, uint32_t timeout_frames, uint32_t* incoming);
 int gbs_hw_sio_multiplayer_init(void);
+/* Queued-link transport: open/reopen, one non-blocking transfer, poll and close.
+   poll returns 0 pending, 1 completed, -1 serial error. Call once per frame.
+   This transport owns SIO until close; do not mix it with raw Link sessions. */
+int gbs_hw_sio_multiplayer_async_open(unsigned baud);
+int gbs_hw_sio_multiplayer_async_begin(uint16_t outgoing);
+int gbs_hw_sio_multiplayer_async_poll(uint16_t received[4], uint8_t* player_id, uint8_t* connected_mask);
+void gbs_hw_sio_multiplayer_async_close(void);
 int gbs_hw_sio_multiplayer_transfer(uint16_t outgoing, uint32_t timeout_frames,
                                     uint16_t received[4], uint8_t* player_id,
                                     uint8_t* connected_mask);
