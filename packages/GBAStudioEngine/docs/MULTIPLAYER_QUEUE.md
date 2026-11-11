@@ -2,16 +2,27 @@
 
 `gbs/multiplayer.hpp` oferece uma conexão com filas para dois a quatro GBAs.
 O transporte padrão usa SIO Multiplayer com conclusão por IRQ; cada atualização
-faz no máximo oito polls e inicia uma transferência. Não há espera ocupada,
+faz no máximo dezesseis polls e prepara um lote de até quatro palavras. Não há espera ocupada,
 alocação dinâmica ou execução de roteiros no interrupt handler.
 
-A IRQ guarda até oito snapshots em ordem, inclusive clocks recebidos entre o
+A IRQ guarda até dezesseis snapshots em ordem, inclusive clocks recebidos entre o
 poll e o próximo envio. Um resultado de entrada não avança a palavra de saída;
 somente a conclusão do envio local faz isso. Se o filho prepara uma palavra
 enquanto a transferência do pai está ocupada, a IRQ carrega essa palavra para
 o próximo clock. Overflow do buffer solicita recuperação em vez de sobrescrever
 dados ainda não lidos. Palavras intermediárias repetidas mantêm a fase do parser
 e continuam sujeitas ao CRC do pacote completo.
+
+No GBA, a submissão copia o restante do pacote atual para um buffer fixo na EWRAM,
+preservando a reserva de pilhas da IWRAM. A IRQ
+avança somente essas palavras preparadas e inicia no máximo quatro clocks por
+submissão, sem interpretar eventos ou calcular CRC. O último clock encerra o
+lote; não há laço de espera pelo cabo. A aplicação só avança o cursor de saída
+nas conclusões correspondentes, incluindo lotes completados em updates distintos.
+Uma conclusão parcial renova o timeout; ele só avança em updates sem progresso.
+Transports de teste podem fornecer `begin_batch`; sem ele, o envio continua
+palavra por palavra. Uma confirmação completa libera imediatamente a próxima
+mensagem, sem herdar o prazo de retransmissão da mensagem já entregue.
 
 ```cpp
 gbs::MultiplayerQueue connection;
@@ -95,9 +106,10 @@ sem alterar o tamanho do comando nativo.
   após desligar o console. Use outro `session_id` (1–4095) ao reiniciar um jogo.
 - Reconectar o cabo não recompõe o mundo do jogo: posições, inventário,
   autoridade e entrada de um novo jogador exigem sincronização da aplicação.
-- O framing prioriza confirmação e integridade; uma palavra por update não
-  promete envio de estados completos a 30/60 Hz. Transmita eventos compactos;
-  maior throughput exige agendamento adicional validado no cabo.
+- O framing prioriza confirmação e integridade. O lote nativo de até quatro
+  palavras não promete sincronização de mundos completos a 30/60 Hz.
+  Transmita eventos compactos; a cadência real depende dos participantes,
+  velocidade do cabo, atualizações da aplicação e confirmação de todos.
 - CRC-8 detecta corrupção acidental; não autentica participantes.
 
 ## Verificação
@@ -114,6 +126,9 @@ executa uma ROM no mGBA sem cabo: verifica avanço dos quadros, recuperação,
 retenção do envio e liberação de SIO. Remove sua compilação temporária ao sair.
 O teste opt-in `multiplayerQueueRom.integration.test.ts`
 exporta os eventos do editor, compila e verifica a recuperação sem cabo no mGBA.
+Com `GBA_QUEUE_ROM_EXAMPLE=1`, usa uma cópia do Exemplo GBA completo em Porto
+Lúmen e confirma também que o buffer serial foi alocado na EWRAM. Essa execução
+comprova a exportação e a recuperação sem cabo, não a vazão em cenas exigentes.
 
 ### Núcleos nativos conectados
 
@@ -146,18 +161,25 @@ node scripts/verify-multiplayer-linked-rom.mjs \
   "$mgbaQaRoot/source" "$mgbaQaRoot/build" CAMINHO_DAS_EVIDENCIAS
 ```
 
+Um quinto argumento opcional, `BASELINE_JSON`, compara os casos saturados a
+115200 bps. Exige pelo menos 3× mais vazão e 3× menos tempo médio de confirmação
+por terminal com dois/quatro participantes, mantendo a mesma carga e o mesmo
+commit mGBA. Primeiro gere a baseline com o Engine Pack de referência; depois
+execute a candidata passando o `evidence.json` da baseline.
+
 O verificador remove seus executáveis e projetos temporários, inclusive em
 falhas; fonte/build mGBA são entradas externas e permanecem intactos. Nesta
 validação local, o diretório temporário criado para fonte/build também foi
 removido ao terminar. Receita validada no macOS Apple Silicon, sem janelas Qt.
 
-Resultado de referência, fila saturada a 115200 bps: cerca de 7,5 broadcasts/s
-por terminal com dois participantes e 2,3 com quatro. O tempo médio de entrada
-na fila até a confirmação de todos foi 60,5 e 194–200 updates, respectivamente,
-incluindo espera atrás de outras mensagens. Esses números medem uma ROM de QA
+Resultado em fila saturada a 115200 bps: a submissão de pacotes passou de 7,5
+para 29,6 broadcasts/s por terminal com dois participantes e de 2,3 para cerca
+de 10 com quatro. O tempo médio entre enfileirar e confirmar passou de 60,5
+para 15,25 updates com dois, e de 194–200 para 44,9–45,4 com quatro, incluindo
+espera atrás de outras mensagens. Esses números medem uma ROM de QA
 pequena, não o desempenho do Exemplo completo, áudio ou de um aparelho físico.
-A vazão continua limitada a um novo clock por update; mensagens de controle
-frequentes exigem uma etapa própria de otimização, mantendo confirmação e CRC.
+O limite de quatro palavras por lote contém o trabalho da IRQ e o uso de RAM;
+transmissões mais frequentes ou mensagens maiores exigem medição específica.
 
 A prova de cabo, reconexão e entrega em GBAs físicos continua pendente. Troca
 de host/IDs, reinício do console e entrada de outro jogador exigem ressincronizar

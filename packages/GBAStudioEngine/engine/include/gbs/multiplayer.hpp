@@ -6,7 +6,8 @@ namespace gbs {
 
 constexpr uint8_t multiplayer_send_capacity = 8;
 constexpr uint8_t multiplayer_receive_capacity = 16;
-constexpr uint8_t multiplayer_poll_budget = 8;
+constexpr uint8_t multiplayer_poll_budget = 16;
+constexpr uint8_t multiplayer_batch_words = 4;
 
 enum class MultiplayerBaud : uint8_t { Bps9600, Bps38400, Bps57600, Bps115200 };
 enum class MultiplayerConnectionState : uint8_t { Closed, Connecting, Connected, Recovering };
@@ -34,6 +35,8 @@ struct MultiplayerTransport {
     int (*poll)(void*, uint16_t[4], uint8_t&, uint8_t&) = nullptr;
     void (*close)(void*) = nullptr;
     void* user_data = nullptr;
+    // Optional atomic copy of 1–4 words. Each word yields its own completion.
+    bool (*begin_batch)(void*, const uint16_t*, uint8_t) = nullptr;
 };
 
 struct MultiplayerPeer {
@@ -58,13 +61,14 @@ struct MultiplayerQueue {
     uint16_t sequence = 0, waiting_frames = 0, missing_frames = 0, retry_left = 0;
     uint8_t send_head = 0, send_count = 0, receive_head = 0, receive_count = 0;
     uint8_t packet_size = 0, packet_index = 0, acknowledged_mask = 0, next_ack = 0;
+    uint8_t transmit_remaining = 0;
     bool waiting = false, in_flight = false, prefer_data = true, ever_connected = false, transport_ready = false;
     uint32_t recoveries = 0, corrupt_packets = 0, receive_full_count = 0;
 };
 
 bool multiplayer_queue_open(MultiplayerQueue&, const MultiplayerConfig& = {}, const MultiplayerTransport& = {});
 void multiplayer_queue_close(MultiplayerQueue&);
-// Bounded, non-blocking update: at most eight polls and one begin per call.
+// Bounded update: at most sixteen polls and one submission (1–4 words).
 // Reconnects automatically, retaining queued messages and duplicate detection.
 void multiplayer_queue_update(MultiplayerQueue&);
 // Broadcast a full 16-bit value to every configured peer. False means closed

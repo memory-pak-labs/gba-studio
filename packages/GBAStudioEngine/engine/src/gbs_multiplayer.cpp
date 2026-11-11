@@ -18,6 +18,11 @@ bool native_open(void* owner, MultiplayerBaud baud) {
     return true;
 }
 bool native_begin(void*, uint16_t value) { return gbs_hw_sio_multiplayer_async_begin(value) != 0; }
+#if defined(__arm__)
+bool native_begin_batch(void*, const uint16_t* words, uint8_t count) {
+    return gbs_hw_sio_multiplayer_async_begin_batch(words,count) != 0;
+}
+#endif
 int native_poll(void*, uint16_t data[4], uint8_t& id, uint8_t& mask) {
     return gbs_hw_sio_multiplayer_async_poll(data, &id, &mask);
 }
@@ -51,6 +56,7 @@ void reset_stream(MultiplayerQueue& q) {
     q.waiting = false;
     q.waiting_frames = q.missing_frames = 0;
     q.packet_size = q.packet_index = 0;
+    q.transmit_remaining = 0;
     for (auto& peer : q.peers) peer.phase = 0;
 }
 
@@ -167,8 +173,12 @@ bool multiplayer_queue_open(MultiplayerQueue& q, const MultiplayerConfig& config
     if (config.players < 2 || config.players > 4 || static_cast<unsigned>(config.baud) > 3 ||
             !config.timeout_frames || !config.retry_frames || !config.session_id || config.session_id > 4095) return false;
     MultiplayerTransport transport = requested;
-    if (!transport.open && !transport.begin && !transport.poll && !transport.close)
+    if (!transport.open && !transport.begin && !transport.poll && !transport.close && !transport.begin_batch) {
         transport = MultiplayerTransport{native_open, native_begin, native_poll, native_close, &q};
+#if defined(__arm__)
+        transport.begin_batch = native_begin_batch;
+#endif
+    }
     if (transport.open == native_open && native_owner && native_owner != &q) return false;
     if (!transport.open || !transport.begin || !transport.poll || !transport.close) return false;
     multiplayer_queue_close(q);
@@ -195,7 +205,7 @@ void multiplayer_queue_update(MultiplayerQueue& q) {
         }
         return;
     }
-    bool received_any = false;
+    bool received_any = false, transmit_progress = false;
     for (unsigned poll = 0; poll < multiplayer_poll_budget; ++poll) {
         uint16_t values[4] {};
         uint8_t id = 0, mask = 0;
@@ -203,8 +213,11 @@ void multiplayer_queue_update(MultiplayerQueue& q) {
         if (result < 0 || (result > 0 && id >= q.config.players)) { recover(q); return; }
         if (!result) break;
         received_any = true;
-        if (result == 1) {
-            q.waiting = false;
+        const bool sent_word = result == 1 && q.transmit_remaining;
+        if (sent_word) {
+            transmit_progress = true;
+            --q.transmit_remaining;
+            q.waiting = q.transmit_remaining != 0;
             q.waiting_frames = 0;
         }
         // A role change invalidates ACK routing; retained messages are retried.
@@ -221,7 +234,7 @@ void multiplayer_queue_update(MultiplayerQueue& q) {
             q.ever_connected = true;
             q.missing_frames = 0;
         } else q.state = q.ever_connected ? MultiplayerConnectionState::Recovering : MultiplayerConnectionState::Connecting;
-        if (result == 1 && q.packet_size && ++q.packet_index == q.packet_size) q.packet_size = 0;
+        if (sent_word && q.packet_size && ++q.packet_index == q.packet_size) q.packet_size = 0;
         if (q.in_flight && (q.acknowledged_mask & remote_players(q)) == remote_players(q)) {
             q.send_head = (q.send_head + 1) % multiplayer_send_capacity;
             --q.send_count;
@@ -234,11 +247,16 @@ void multiplayer_queue_update(MultiplayerQueue& q) {
     }
     if (received_any && q.connected_mask != all_players(q) && ++q.missing_frames >= q.config.timeout_frames) { recover(q); return; }
     if (q.waiting) {
-        if (++q.waiting_frames >= q.config.timeout_frames) recover(q);
+        if (!transmit_progress && ++q.waiting_frames >= q.config.timeout_frames) recover(q);
         return;
     }
     if (!q.packet_size) make_packet(q);
-    if (q.transport.begin(q.transport.user_data, q.packet[q.packet_index])) {
+    const uint8_t words = q.transport.begin_batch ? q.packet_size-q.packet_index : 1;
+    const bool began = q.transport.begin_batch
+        ? q.transport.begin_batch(q.transport.user_data,&q.packet[q.packet_index],words)
+        : q.transport.begin(q.transport.user_data,q.packet[q.packet_index]);
+    if (began) {
+        q.transmit_remaining = words;
         q.waiting = true;
         q.waiting_frames = 0;
     } else if (++q.waiting_frames >= q.config.timeout_frames) recover(q);

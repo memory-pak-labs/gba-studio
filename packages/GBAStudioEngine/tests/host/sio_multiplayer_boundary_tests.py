@@ -48,8 +48,18 @@ int main(void) {
     gbs_hw_sio_multiplayer_async_close();
     assert(REG_IME == 0 && REG_IE == 0x16);
     assert(gbs_hw_sio_multiplayer_async_poll(data, &id, &mask) == -1);
+    const uint16_t words[4] = {0x8001,0x9000,0xA123,0xB045};
+    assert(!gbs_hw_sio_multiplayer_async_begin_batch(words,4));
     REG_IME = 1; REG_IE = 0x81;
     assert(gbs_hw_sio_multiplayer_async_open(0));
+    REG_IF = 0; registers.control = 0x600B;
+    assert(gbs_hw_sio_multiplayer_async_begin_batch(words,4));
+    assert(REG_IME == 1 && REG_IE == 0x81);
+    for (unsigned word=0;word<4;++word) {
+        assert(registers.send == words[word]);
+        registers.control=0x600B;capture_multiplayer_async();
+    }
+    for (unsigned word=0;word<4;++word) assert(gbs_hw_sio_multiplayer_async_poll(data,&id,&mask)==1);
     gbs_hw_sio_multiplayer_async_close();
     assert(REG_IE == 0x81 && REG_IME == 1);
 }

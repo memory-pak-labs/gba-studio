@@ -56,6 +56,11 @@ describe.skipIf(!output)("authored queued multiplayer in ROM",()=>{
       const symbols=execFileSync(tool("nm"),["-C",romPath.replace(/\.gba$/,".elf")],{encoding:"utf8",maxBuffer:16*1024*1024});
       const symbol=(name:string)=>{const line=symbols.split("\n").find(line=>line.endsWith("::"+name));expect(line,name).toBeDefined();return parseInt(line!.split(" ")[0],16);};
       const connection=symbol("connection_storage");
+      const serialLine=symbols.split("\n").find(line=>line.endsWith(" sio_multiplayer_async"));
+      expect(serialLine).toBeDefined();
+      const serial=parseInt(serialLine!.split(" ")[0]!,16);
+      expect(serial).toBeGreaterThanOrEqual(0x02000000);expect(serial).toBeLessThan(0x02040000);
+      evidence.serialBufferAddress=serial;
       // Mixed ROMs contain an anonymous event_state per runtime. Resolve the
       // local symbol under its ELF file entry, not the first same-named state.
       const table=execFileSync(tool("objdump"),["-t","-C",romPath.replace(/\.gba$/,".elf")],{encoding:"utf8",maxBuffer:16*1024*1024});

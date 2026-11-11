@@ -18,18 +18,21 @@ struct Port {
     uint16_t outgoing = 0, incoming[4] = {};
     uint8_t mask = 0;
     std::deque<Snapshot> snapshots {};
+    std::deque<uint16_t> transmit {};
+    unsigned begins = 0;
 };
 struct Cable {
     Port port[4];
     gbs::MultiplayerQueue queue[4] {};
     uint8_t present;
     unsigned count, tick = 0, corrupt = 0, errors = 0, lose = 0;
-    bool free_running = false;
+    bool free_running = false, batch_mode = false;
+    unsigned clocks_per_frame = gbs::multiplayer_batch_words;
     unsigned update_every[4] = {1, 1, 1, 1};
-    explicit Cable(unsigned players, unsigned timeout=8) : present((1u << players)-1), count(players) {
+    explicit Cable(unsigned players, unsigned timeout=8, bool batch=false) : present((1u << players)-1), count(players), batch_mode(batch) {
         for (unsigned i=0;i<count;++i) {
             port[i] = Port{this,i};
-            const gbs::MultiplayerTransport transport{open, begin, poll, close, &port[i]};
+            const gbs::MultiplayerTransport transport{open, begin, poll, close, &port[i],batch?begin_batch:nullptr};
             gbs::MultiplayerConfig config;
             config.players = players;
             config.session_id = 10+i;
@@ -44,10 +47,18 @@ struct Cable {
     }
     static bool begin(void* data,uint16_t value) {
         auto& p=*static_cast<Port*>(data);
+        ++p.begins;
         if(!p.opened)return false;
         assert(!p.armed && !p.ready);
         assert(value != 0xFFFF);
         p.armed=true;p.outgoing=value;return true;
+    }
+    static bool begin_batch(void* data,const uint16_t* words,uint8_t count) {
+        auto& p=*static_cast<Port*>(data);++p.begins;
+        assert(count>0 && count<=gbs::multiplayer_batch_words);
+        if(!p.opened||p.armed||!p.transmit.empty())return false;
+        for(unsigned i=0;i<count;++i)p.transmit.push_back(words[i]);
+        p.outgoing=p.transmit.front();p.armed=true;return true;
     }
     static int poll(void* data,uint16_t values[4],uint8_t& id,uint8_t& mask) {
         auto& p=*static_cast<Port*>(data);++p.polls;
@@ -66,14 +77,38 @@ struct Cable {
     static void close(void* data) {
         auto& p=*static_cast<Port*>(data);p.opened=p.armed=p.ready=false;
         p.snapshots.clear();
+        p.transmit.clear();
     }
     void frame() {
         ++tick;
         for(unsigned i=0;i<count;++i) {
             if (tick % update_every[i]) continue;
             unsigned before=port[i].polls;
+            unsigned begins=port[i].begins;
             gbs::multiplayer_queue_update(queue[i]);
             assert(port[i].polls-before <= gbs::multiplayer_poll_budget);
+            assert(port[i].begins-begins<=1);
+        }
+        if(batch_mode) {
+            if(lose){--lose;return;}
+            for(unsigned clock=0;clock<clocks_per_frame && port[0].armed;++clock) {
+                for(unsigned i=0;i<count;++i)if(present&(1u<<i)) {
+                    auto& p=port[i];Port::Snapshot snapshot {};
+                    snapshot.mask=present;snapshot.result=errors?-1:(p.armed?1:2);
+                    for(unsigned j=0;j<4;++j)snapshot.values[j]=(present&(1u<<j))?port[j].outgoing:0xFFFF;
+                    if(corrupt&&i==1)snapshot.values[0]^=0x10;
+                    p.snapshots.push_back(snapshot);
+                }
+                for(unsigned i=0;i<count;++i)if((present&(1u<<i))&&port[i].armed) {
+                    auto& p=port[i];
+                    if(!p.transmit.empty())p.transmit.pop_front();
+                    p.armed=!p.transmit.empty();
+                    if(p.armed)p.outgoing=p.transmit.front();
+                }
+                if(corrupt)--corrupt;
+                if(errors)--errors;
+            }
+            return;
         }
         uint8_t active=0;
         for(unsigned i=0;i<count;++i)
@@ -139,8 +174,8 @@ int main() {
         assert(!gbs::multiplayer_queue_receive(c.queue[1],message));
         assert(!gbs::multiplayer_queue_receive(c.queue[0],message));
     }
-    {
-        Cable c(4);
+    for(bool batch : {false,true}) {
+        Cable c(4,8,batch);
         for(unsigned i=0;i<4;++i)for(unsigned j=0;j<3;++j)
             assert(gbs::multiplayer_queue_send(c.queue[i],100*i+j));
         c.corrupt=40;c.errors=3;c.lose=20;
@@ -174,8 +209,8 @@ int main() {
         }
         assert(!gbs::multiplayer_queue_receive(c.queue[1],m));
     }
-    {
-        Cable c(2);
+    for(bool grouped : {false,true}) {
+        Cable c(2,8,grouped);
         for(unsigned batch=0;batch<2;++batch) {
             for(unsigned i=0;i<8;++i)assert(gbs::multiplayer_queue_send(c.queue[0],batch*8+i));
             c.frames(300);
@@ -226,8 +261,8 @@ int main() {
             assert(received==1 && gbs::multiplayer_queue_pending_send(c.queue[0])==0);
         }
     }
-    for (unsigned players : {2u,4u}) {
-        Cable c(players);
+    for(bool batch : {false,true}) for (unsigned players : {2u,4u}) {
+        Cable c(players,8,batch);
         c.free_running = true;
         for (unsigned i=0;i<players;++i) c.update_every[i]=i+1;
         for (unsigned sender=0;sender<players;++sender)
@@ -253,6 +288,35 @@ int main() {
         // Retry cooldown belongs to the unacknowledged message, not its
         // successor. A confirmed message must not hold the next one idle.
         assert(gbs::multiplayer_queue_pending_send(c.queue[0])==0);
+    }
+    {
+        Cable c(4,8,true);unsigned next[4][4]={};
+        for(unsigned sender=0;sender<4;++sender)for(unsigned n=0;n<8;++n)
+            assert(gbs::multiplayer_queue_send(c.queue[sender],sender*100+n));
+        for(unsigned frame=0;frame<60;++frame) {
+            c.frame();
+            for(unsigned receiver=0;receiver<4;++receiver) {
+                gbs::MultiplayerMessage message;
+                while(gbs::multiplayer_queue_receive(c.queue[receiver],message)) {
+                    assert(message.player_id!=receiver);
+                    assert(message.value==100*message.player_id+next[receiver][message.player_id]++);
+                }
+            }
+        }
+        for(unsigned receiver=0;receiver<4;++receiver) {
+            assert(gbs::multiplayer_queue_pending_send(c.queue[receiver])==0);
+            for(unsigned sender=0;sender<4;++sender)assert(next[receiver][sender]==(sender==receiver?0u:8u));
+        }
+    }
+    {
+        Cable c(2,1,true);c.clocks_per_frame=1;
+        assert(gbs::multiplayer_queue_send(c.queue[0],65535));
+        c.frames(80);
+        // A slow baud can span multiple updates. Progress within a packet
+        // refreshes the timeout rather than immediately expiring timeout=1.
+        assert(gbs::multiplayer_queue_pending_send(c.queue[0])==0);
+        gbs::MultiplayerMessage message;
+        assert(gbs::multiplayer_queue_receive(c.queue[1],message)&&message.value==65535);
     }
     {
         gbs::MultiplayerQueue a {}, b {};

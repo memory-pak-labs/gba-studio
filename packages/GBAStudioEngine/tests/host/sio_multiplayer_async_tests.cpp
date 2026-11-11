@@ -6,7 +6,7 @@
 int main() {
     static_assert(offsetof(GbsSioMultiplayerRegisters, control) == 8);
     static_assert(offsetof(GbsSioMultiplayerRegisters, send) == 10);
-    static_assert(sizeof(GbsSioMultiplayerAsync) <= 128);
+    static_assert(sizeof(GbsSioMultiplayerAsync) <= 256);
     GbsSioMultiplayerAsync state {};
     GbsSioMultiplayerRegisters regs {};
     uint16_t values[4] {}; uint8_t id=0,mask=0;
@@ -84,4 +84,32 @@ int main() {
     gbs_sio_multiplayer_async_capture(&state,&regs);
     assert(poll()==-1 && mask==0);
     for (unsigned i=0;i<4;++i) assert(values[i]==0);
+
+    // One bounded submission can complete a full four-word protocol packet.
+    uint16_t packet[]={0x8001,0x9000,0xA123,0xB045};
+    const uint16_t expected[]={0x8001,0x9000,0xA123,0xB045};
+    gbs_sio_multiplayer_async_reset(&state,&regs,3);regs.control=0x600B;
+    assert(!gbs_sio_multiplayer_async_begin_batch(&state,&regs,packet,0));
+    assert(!gbs_sio_multiplayer_async_begin_batch(&state,&regs,packet,5));
+    assert(gbs_sio_multiplayer_async_begin_batch(&state,&regs,packet,4));
+    packet[1]=0; // Submission copies the caller's words before returning.
+    assert(!gbs_sio_multiplayer_async_begin_batch(&state,&regs,expected,1));
+    for(unsigned word=0;word<4;++word) {
+        assert(regs.send==expected[word] && (regs.control&0x80));
+        regs.control=0x600B;regs.multi[0]=expected[word];
+        gbs_sio_multiplayer_async_capture(&state,&regs);
+    }
+    assert(!(regs.control&0x80));
+    for(unsigned word=0;word<4;++word) {
+        assert(poll()==1 && values[0]==expected[word]);
+        assert(state.transmit_pending==3-word);
+    }
+    assert(!poll() && !state.transmit_pending);
+
+    // A peripheral error stops the chain; only a new open retries the packet.
+    gbs_sio_multiplayer_async_reset(&state,&regs,3);regs.control=0x600B;
+    assert(gbs_sio_multiplayer_async_begin_batch(&state,&regs,expected,4));
+    regs.control=0x604B;
+    gbs_sio_multiplayer_async_capture(&state,&regs);
+    assert(poll()==-1 && !state.armed && !(regs.control&0x80));
 }

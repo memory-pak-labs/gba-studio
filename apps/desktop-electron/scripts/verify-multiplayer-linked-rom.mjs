@@ -8,8 +8,8 @@ import {execFileSync} from 'node:child_process';
 import {createHash} from 'node:crypto';
 
 // Uses upstream native cores and SIO lockstep. No register/receipt injection.
-const [packArg,sourceArg,buildArg,outputArg]=process.argv.slice(2);
-assert.ok(outputArg,'usage: verify-multiplayer-linked-rom.mjs ENGINE_PACK MGBA_SOURCE MGBA_NATIVE_BUILD EVIDENCE');
+const [packArg,sourceArg,buildArg,outputArg,baselineArg]=process.argv.slice(2);
+assert.ok(outputArg,'usage: verify-multiplayer-linked-rom.mjs ENGINE_PACK MGBA_SOURCE MGBA_NATIVE_BUILD EVIDENCE [BASELINE_JSON]');
 const pack=path.resolve(packArg),source=path.resolve(sourceArg),build=path.resolve(buildArg),output=path.resolve(outputArg);
 const fixtures=path.join(path.dirname(fileURLToPath(import.meta.url)),'fixtures');
 const run=(bin,args,options={})=>execFileSync(bin,args,{encoding:'utf8',maxBuffer:16*1024*1024,timeout:60000,...options});
@@ -51,6 +51,25 @@ try {
       assert.equal(item.peers.length,players);item.passed=true;
     }
     fs.rmSync(project,{recursive:true,force:true});
+  }
+  if(baselineArg) {
+    const baseline=JSON.parse(fs.readFileSync(path.resolve(baselineArg),'utf8'));
+    assert.equal(baseline.passed,true);assert.equal(baseline.revision,revision);
+    report.comparison=[];
+    for(const players of [2,4]) {
+      const selected=cases=>cases.find(item=>item.players===players&&item.baud===115200&&!item.disconnect&&item.schedule===0);
+      const before=selected(baseline.cases),after=selected(report.cases);
+      assert.equal(before?.passed,true);assert.equal(before.peers.length,players);
+      for(const peer of after.peers) {
+        const old=before.peers.find(item=>item.id===peer.id);assert.ok(old);
+        assert.equal(old.errors,0);assert.equal(old.pending,0);assert.ok(old.fullRejections>0);
+        assert.equal(peer.enqueued,old.enqueued);assert.equal(peer.received,old.received);
+        const gain=peer.broadcastsPerEmulatedSecond/old.broadcastsPerEmulatedSecond;
+        const latency=old.meanAckFrames/peer.meanAckFrames;
+        report.comparison.push({players,id:peer.id,before:old.broadcastsPerEmulatedSecond,after:peer.broadcastsPerEmulatedSecond,gain,latencyImprovement:latency});
+        assert.ok(gain>=3&&latency>=3,'packet submission must improve saturated throughput and ACK latency by at least 3x');
+      }
+    }
   }
   report.passed=true;
 } finally {
