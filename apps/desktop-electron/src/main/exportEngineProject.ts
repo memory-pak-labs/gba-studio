@@ -1,5 +1,6 @@
 import { hasSceneRasterEffects, normalizeSceneRasterEffects } from "../shared/sceneRasterEffects.js";
 import { projectAudioMixingRate, requireAudioMixingRate } from "../shared/audioMixing.js";
+import { projectCartridgeRumbleProfile, type CartridgeRumbleProfile } from "../shared/cartridgeRumble.js";
 import { isPcmAudio } from "../shared/audioPcm.js";
 import { isScaleEvent, parseScaleEvent, usesSinglePlaneBackground } from "../shared/eventTransforms.js";
 import { actorCommandReferences, sceneChangeCommand, sceneChangeCommandParts } from "../shared/sceneChangeCommand.js";
@@ -2335,6 +2336,7 @@ export interface EngineExportAssetPack {
 }
 
 export interface EngineExportProjectContract {
+  rumble_cartridge: CartridgeRumbleProfile;
   audio_mixing_rate: number;
   schema: 1;
   backend: "gbastudio_engine";
@@ -11165,6 +11167,7 @@ function buildEngineExportProjectContractUncached(
   features.push(...cameraZoneFeatures);
   if (rooms.some(room => { const c = roomSceneComposition(room); return c.enabled && hasSceneRasterEffects(c.effects.raster); })) features.push("render_runtime.scene_raster_effects");
   if (projectAudioMixingRate(data) !== 31536 || projectArray(data, "events").some(event => JSON.stringify(event).includes("set_audio_mixing_rate"))) features.push("audio.configurable_mixing_rate");
+  if (projectCartridgeRumbleProfile(data) !== "none") features.push("rumble.rumble_project_configuration", "rumble.rumble_chisflash_v12_opt_in");
   if (projectArray(data, "audioItems").some(isPcmAudio)) features.push("audio.pcm_composer", "audio.tracker_pcm_16_channels", "audio.pcm_prepared_gain");
   if (audioPack?.document.sfx.some(asset => asset.pcm)) features.push("audio.pcm_sfx_aliases");
   if (audioPack?.document.tracker.some(asset => asset.mod || asset.s3m || asset.xm || asset.it)) {
@@ -11376,6 +11379,7 @@ function buildEngineExportProjectContractUncached(
     backend: "gbastudio_engine",
     kind,
     audio_mixing_rate: projectAudioMixingRate(data),
+    rumble_cartridge: projectCartridgeRumbleProfile(data),
     runtime_profile: isMixedRuntime ? "mixed" : resolution.runtimeProfile,
     runtime_contract: runtimeContract,
     runtime_capabilities: runtimeCapabilities,

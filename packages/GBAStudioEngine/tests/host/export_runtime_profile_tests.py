@@ -80,7 +80,7 @@ def assert_flash1m_save_export(repo_root, build_dir):
     manifest_path.write_text(json.dumps(project), encoding="utf-8")
     run_assetc(repo_root, manifest_path, output_dir)
     manifest = json.loads((output_dir / "gbastudio_project.json").read_text(encoding="utf-8"))
-    assert manifest["build"]["sources"] == ["main.cpp", "save_type.cpp"]
+    assert manifest["build"]["sources"] == ["main.cpp", "save_type.cpp", "rumble_config.cpp"]
     assert "FLASH1M_V103" in (output_dir / "save_type.cpp").read_text(encoding="utf-8")
     header = (output_dir / "gbastudio_project_data.hpp").read_text(encoding="utf-8")
     assert "static_cast<uint32_t>(4096)" in header
@@ -1925,7 +1925,7 @@ def assert_mixed_runtime_dispatch_export(repo_root, build_dir):
     assert "gbs::RuntimeSceneRegistry runtime_registry" in mixed_header
     output_manifest = json.loads((output_dir / "gbastudio_project.json").read_text(encoding="utf-8"))
     assert output_manifest["runtime_adapter"]["base_runtime"] == "mixed"
-    assert output_manifest["build"]["sources"] == manifest["build"]["sources"]
+    assert output_manifest["build"]["sources"] == [*manifest["build"]["sources"], "rumble_config.cpp"]
 
     export_schema = json.loads((repo_root / "schemas" / "export_project.schema.json").read_text(encoding="utf-8"))
     project_schema = json.loads((repo_root / "schemas" / "gbastudio_project.schema.json").read_text(encoding="utf-8"))

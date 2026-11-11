@@ -12,6 +12,9 @@
 
 // Focused host consumers may not provide the native hardware sampler.
 extern "C" int __attribute__((weak)) gbs_hw_frame_video_stats(GbsHwFrameVideoStats*) { return 0; }
+// Generated projects may opt into a known cartridge driver after core init.
+// The default never probes or writes an unknown cartridge.
+extern "C" void __attribute__((weak)) gbs_project_configure_rumble(void) {}
 
 namespace {
 uint32_t g_frame_count = 0;
@@ -116,6 +119,7 @@ void init() {
     deferred_work_init(deferred_work_queue());
     input_repeat_init(input_repeat_state());
     rumble_init();
+    gbs_project_configure_rumble();
     g_frame_count = 0;
     last_timing = FrameTiming {};
     current_context = FrameContext {};

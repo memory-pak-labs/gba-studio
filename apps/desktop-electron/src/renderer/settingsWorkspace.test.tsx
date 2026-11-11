@@ -122,7 +122,8 @@ describe("SettingsWorkspace React", () => {
     expect(screen.getByRole("button", { name: "gbsbuild dry-run" })).toBeEnabled();
     await user.click(screen.getByRole("button", { name: "Seção de ajustes: Hardware GBA" }));
     expect(screen.getByLabelText("Resolução")).toHaveTextContent("240 x 160");
-    expect(screen.queryByRole("button", { name: "Restaurar padrão de Hardware GBA" })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Restaurar padrão de Hardware GBA" })).toBeEnabled();
+    expect(screen.getByRole("combobox", { name: "Vibração do cartucho" })).toHaveValue("none");
     await user.click(screen.getByRole("button", { name: "Seção de ajustes: Áudio" }));
     expect(screen.getByRole("combobox", { name: "Sample rate" })).toHaveValue("15768");
   });

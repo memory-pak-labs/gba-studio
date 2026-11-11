@@ -1,4 +1,5 @@
 import { AUDIO_MIXING_RATES, DEFAULT_AUDIO_MIXING_RATE, isAudioMixingRate } from "./audioMixing.js";
+import { isCartridgeRumbleProfile } from "./cartridgeRumble.js";
 import type { GBAProjectData } from "./projectFile.js";
 import type { SettingsPathValidationTarget } from "./ipc.js";
 import { isEditableSettingsField, isSettingsInformationField, isSupportedSettingsField } from "./settingsFieldPolicy.js";
@@ -283,6 +284,7 @@ const SETTINGS_FIELD_DEFINITIONS: Record<SettingsSectionID, SettingsFieldDefinit
     { key: "persistentBuildCache", label: "Cache incremental persistente", type: "boolean", defaultValue: true }
   ],
   hardware: [
+    { key: "rumbleCartridge", label: "Vibração do cartucho", description: "Selecione somente o cartucho identificado. O ChisFlash v1.2 é experimental e requer validação no GBA físico. Desativada não instala um driver.", type: "text", defaultValue: "none" },
     { key: "graphicsMode", label: "Modo grafico", type: "text", defaultValue: "Mode 0 - Tilemaps" },
     { key: "resolution", label: "Resolucao", type: "text", defaultValue: "240 x 160" },
     { key: "tileSize", label: "Tile", type: "text", defaultValue: "8 px" },
@@ -1219,6 +1221,9 @@ function editableFieldOptions(sectionID: SettingsSectionID, key: string, data: G
   if (sectionID === "audio" && key === "mixingRate") {
     return AUDIO_MIXING_RATES.map(value => ({ value, label: `${value.toLocaleString("pt-BR")} Hz${value === DEFAULT_AUDIO_MIXING_RATE ? " · padrão" : ""}` }));
   }
+  if (sectionID === "hardware" && key === "rumbleCartridge") {
+    return [{ value: "none", label: "Desativada" }, { value: "chisflash_v1_2", label: "ChisFlash v1.2 · experimental" }];
+  }
   if (sectionID === "audio" && key === "sampleRate") {
     const savedRate = nestedValue(child(settingsRecord(data), "audio"), "sampleRate");
     return [
@@ -1501,6 +1506,7 @@ export function updateSettingsFieldInProject(
     && (typeof value !== "number" || !Number.isInteger(value) || (value !== 0 && (value < 4000 || value > 32768)))) return data;
 
   if (sectionID === "audio" && fieldKey === "mixingRate" && !isAudioMixingRate(value)) return data;
+  if (sectionID === "hardware" && fieldKey === "rumbleCartridge" && !isCartridgeRumbleProfile(value)) return data;
 
   const next = cloneProjectData(data);
   const settings = isRecord(next.settings) ? next.settings : {};
@@ -1738,7 +1744,7 @@ export function deriveSettingsWorkspacePresentation(data: GBAProjectData): Setti
         item("Rodar emulador", runAfterBuild, runAfterBuild ? "ok" : "muted")
       ]
     ),
-    makeSection("hardware", "Projeto", "Hardware GBA", "Limites físicos fixos", hardware, [
+    makeSection("hardware", "Projeto", "Hardware GBA", "Limites físicos e cartucho", hardware, [
       item("Modo grafico", stringField(hardware, "graphicsMode", "Mode 0 - Tilemaps")),
       item("Resolucao", stringField(hardware, "resolution", "240 x 160")),
       item("Tile", stringField(hardware, "tileSize", "8 px")),
