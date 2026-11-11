@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { execFileSync } from "node:child_process";
-import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
+import { createHash } from "node:crypto";
+import { mkdir, readFile, realpath, rm, writeFile } from "node:fs/promises";
+import os from "node:os";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
 import { createBlankProjectData } from "../shared/newProject.js";
@@ -21,12 +23,15 @@ describe.skipIf(!output)("cartridge profile in exported ROM", () => {
     const { default: create } = await import(/* @vite-ignore */ pathToFileURL(path.resolve("static/WebPlayer/player/mgba-core.mjs")).href);
     const wasm = new WebAssembly.Module(await readFile("static/WebPlayer/player/mgba-core.wasm"));
     const evidence: unknown[] = [];
+    let ownedCache: string | undefined;
     try {
       for (const profile of ["none", "chisflash_v1_2", "none"]) {
         (data.settings as any).hardware.rumbleCartridge = profile;
         const prepared = prepareEngineProjectExport(data, { enginePackPath: pack });
         expect(prepared.error).toBeUndefined(); expect(prepared.generated).toBeDefined();
         await writeEngineSchemaExport({ prepared: prepared.generated!, projectPath, destination, assetcPath: path.join(pack, "tools/assetc"), cacheEnabled: false });
+        const identity = createHash("sha256").update(JSON.stringify([await realpath(destination),path.resolve(destination,"build"),await realpath(pack)])).digest("hex");
+        ownedCache = path.join(os.tmpdir(),"gbastudio-engine-build-cache",identity);
         const config = await readFile(path.join(destination, "rumble_config.cpp"), "utf8");
         expect(config.includes("ChisFlashV12")).toBe(profile !== "none");
         const build = await runGbsbuild({ enginePackPath: pack, gbsbuildPath: path.join(pack, "tools/gbsbuild"), projectDir: destination });
@@ -53,6 +58,7 @@ describe.skipIf(!output)("cartridge profile in exported ROM", () => {
     } finally {
       await writeFile(path.join(root, "evidence.json"), JSON.stringify(evidence, null, 2));
       await rm(destination, { recursive: true, force: true });
+      if (ownedCache) await rm(ownedCache, { recursive: true, force: true });
     }
   }, 180_000);
 });

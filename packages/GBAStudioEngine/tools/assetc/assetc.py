@@ -4397,8 +4397,12 @@ def prepare_multichannel_tracker_samples(patterns, source_samples, native_primar
         long_sample = len(prepared_samples[index]["samples"]) > 128
         if long_sample: settings = {(volume, gain, 0) for volume, gain, _ in settings}
         for volume, gain, pan in sorted(settings)[:256]:
-            prepared = build_pcm_interpolation_map(prepared_samples[index], volume, native_primary_volume, 15, gain, pan, not long_sample, pre_pan=long_sample)
-            if prepared is not None: maps.append(prepared)
+            # Keep the native gain's compact intervals plus a lossless unity
+            # pre-pan representation for subsequent bus-volume changes.
+            primaries = {native_primary_volume, 15} if long_sample else {native_primary_volume}
+            for primary in sorted(primaries):
+                prepared = build_pcm_interpolation_map(prepared_samples[index], volume, primary, 15, gain, pan, not long_sample, pre_pan=long_sample)
+                if prepared is not None: maps.append(prepared)
         if maps: prepared_samples[index]["interpolation_maps"] = sorted(maps, key=lambda m: m["key"])
     return prepared_patterns, prepared_samples
 
@@ -10098,6 +10102,11 @@ def event_op_from_json(value):
         "multiplayer_set_data": "MultiplayerSetData",
         "multiplayer_sync": "MultiplayerTransfer",
         "multiplayer_read": "MultiplayerGetData",
+        "multiplayer_queue_open": "MultiplayerQueueOpen",
+        "multiplayer_queue_send": "MultiplayerQueueSend",
+        "multiplayer_queue_receive": "MultiplayerQueueReceive",
+        "multiplayer_queue_status": "MultiplayerQueueStatus",
+        "multiplayer_queue_close": "MultiplayerQueueClose",
         "call_script": "CallScript",
         "show_choice": "ShowChoice",
         "choice": "ShowChoice",
@@ -10764,7 +10773,16 @@ def event_command_from_json(command, description, animation_lookup=None, actor_a
             0,
         )
         return (op, runtime, 0, 0)
-    if op in ("SetVariable", "AddVariable", "MultiplyVariable", "DivideVariable", "ModuloVariable"):
+    if op == "SetVariable":
+        variable = event_int(command, ["variable", "var"], 0)
+        value = event_int(command, ["value"], 0)
+        if not -2147483648 <= value <= 2147483647:
+            raise SystemExit("Valor de variável fora do intervalo inteiro de 32 bits")
+        if value < -32768 or value > 32767:
+            signed16 = lambda half: ((half + 32768) % 65536) - 32768
+            return (op, variable, signed16(value), signed16(value >> 16), 1)
+        return (op, variable, value, 0)
+    if op in ("AddVariable", "MultiplyVariable", "DivideVariable", "ModuloVariable"):
         return (
             op,
             event_int(command, ["variable", "var"], 0),
@@ -10815,6 +10833,23 @@ def event_command_from_json(command, description, animation_lookup=None, actor_a
         return (op, max(1, min(255, event_int(command, ["frames", "duration"], 60))), 0, 0)
     if op == "RumbleOff":
         return (op, 0, 0, 0)
+    if op.startswith("MultiplayerQueue"):
+        if op == "MultiplayerQueueClose":
+            return (op, 0, 0, 0)
+        if op == "MultiplayerQueueOpen":
+            players, baud, frames = (command.get(key) for key in ("players", "baud", "timeout_frames"))
+            if (type(players) is not int or players not in (2, 3, 4) or
+                    type(baud) is not int or baud not in (9600, 38400, 57600, 115200) or
+                    type(frames) is not int or not 1 <= frames <= 600):
+                raise SystemExit("Configuração inválida da conexão com filas")
+            return (op, players, (9600, 38400, 57600, 115200).index(baud), frames)
+        fields = {"MultiplayerQueueSend": ("var_value", "var_accepted"),
+                  "MultiplayerQueueReceive": ("var_value", "var_player", "var_received"),
+                  "MultiplayerQueueStatus": ("var_state", "var_player", "var_pending")}[op]
+        values = [command.get(key) for key in fields]
+        if any(type(value) is not int or not 0 <= value < 64 for value in values) or len(set(values)) != len(values):
+            raise SystemExit("Conexão com filas requer variáveis diferentes nos slots 0–63")
+        return tuple([op, *values, *([0] if len(values) == 2 else [])])
     if op == "MultiplayerOpen":
         return (op, max(2, min(4, event_int(command, ["players", "player_count"], 2))), 0, 0)
     if op == "MultiplayerClose":

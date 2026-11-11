@@ -537,7 +537,7 @@ int main() {
 '''
         run_cpp(code, ['engine/src/gbs_event.cpp', 'engine/src/gbs_dialogue_locale.cpp',
                       'engine/src/gbs_runtime.cpp', 'engine/src/gbs_rtc.cpp',
-                      'engine/src/gbs_link.cpp', 'engine/src/rumble.cpp',
+                      'engine/src/gbs_link.cpp', 'engine/src/gbs_multiplayer.cpp', 'engine/src/gbs_multiplayer_events.cpp', 'engine/src/rumble.cpp',
                       'engine/src/deferred_work.cpp', 'engine/src/gbs_engine_global.cpp',
                       'tests/host/hw_stubs.cpp'])
 
@@ -615,7 +615,7 @@ int main() {
 '''
                 run_cpp(code, ['engine/src/gbs_event.cpp', 'engine/src/gbs_dialogue_locale.cpp',
                                'engine/src/gbs_runtime.cpp', 'engine/src/gbs_rtc.cpp',
-                               'engine/src/gbs_link.cpp', 'engine/src/rumble.cpp',
+                               'engine/src/gbs_link.cpp', 'engine/src/gbs_multiplayer.cpp', 'engine/src/gbs_multiplayer_events.cpp', 'engine/src/rumble.cpp',
                                'engine/src/deferred_work.cpp', 'engine/src/gbs_engine_global.cpp',
                                'tests/host/hw_stubs.cpp'])
 

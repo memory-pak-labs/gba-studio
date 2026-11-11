@@ -1360,7 +1360,11 @@ int gbs_hw_sio_normal32_transfer(uint32_t outgoing, int internal_clock, uint32_t
 
 #include "sio_multiplayer_async.h"
 
-static volatile GbsSioMultiplayerAsync sio_multiplayer_async;
+static volatile GbsSioMultiplayerAsync sio_multiplayer_async
+#if defined(__arm__)
+    __attribute__((section(".ewram_bss")))
+#endif
+;
 static uint8_t sio_multiplayer_async_active;
 static uint16_t sio_multiplayer_previous_serial_ie;
 #define SIO_MULTIPLAYER_REGS ((volatile GbsSioMultiplayerRegisters*)0x04000120)
@@ -1384,13 +1388,17 @@ int gbs_hw_sio_multiplayer_async_open(unsigned baud) {
     return 1;
 }
 
-int gbs_hw_sio_multiplayer_async_begin(uint16_t outgoing) {
+int gbs_hw_sio_multiplayer_async_begin_batch(const uint16_t* words, unsigned count) {
     if (!sio_multiplayer_async_active) return 0;
     const uint16_t ime = REG_IME;
     REG_IME = 0;
-    const int result = gbs_sio_multiplayer_async_begin(&sio_multiplayer_async, SIO_MULTIPLAYER_REGS, outgoing);
+    const int result = gbs_sio_multiplayer_async_begin_batch(&sio_multiplayer_async, SIO_MULTIPLAYER_REGS, words, count);
     REG_IME = ime;
     return result;
+}
+
+int gbs_hw_sio_multiplayer_async_begin(uint16_t outgoing) {
+    return gbs_hw_sio_multiplayer_async_begin_batch(&outgoing,1);
 }
 
 int gbs_hw_sio_multiplayer_async_poll(uint16_t received[4], uint8_t* player_id, uint8_t* connected_mask) {
@@ -1402,14 +1410,8 @@ int gbs_hw_sio_multiplayer_async_poll(uint16_t received[4], uint8_t* player_id, 
         capture_multiplayer_async();
         REG_IF = 0x80u;
     }
-    int result = 0;
-    if (sio_multiplayer_async.complete) {
-        result = sio_multiplayer_async.result;
-        for (unsigned i = 0; i < 4; ++i) received[i] = sio_multiplayer_async.received[i];
-        *player_id = sio_multiplayer_async.player_id;
-        *connected_mask = sio_multiplayer_async.connected_mask;
-        sio_multiplayer_async.complete = 0;
-    } else gbs_sio_multiplayer_async_try_start(&sio_multiplayer_async, SIO_MULTIPLAYER_REGS);
+    const int result = gbs_sio_multiplayer_async_poll(&sio_multiplayer_async, received, player_id, connected_mask);
+    if (!result) gbs_sio_multiplayer_async_try_start(&sio_multiplayer_async, SIO_MULTIPLAYER_REGS);
     REG_IME = ime;
     return result;
 }

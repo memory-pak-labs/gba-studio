@@ -1,8 +1,15 @@
 #include "gbs/multiplayer.hpp"
 #include "gbs_hw.h"
+#include <new>
 
 namespace gbs {
 namespace {
+alignas(MultiplayerQueue) unsigned char connection_storage[sizeof(MultiplayerQueue)]
+#if defined(__arm__)
+    __attribute__((section(".ewram_bss")))
+#endif
+;
+bool connection_constructed = false, connection_rebind = false;
 MultiplayerQueue* native_owner = nullptr;
 bool native_open(void* owner, MultiplayerBaud baud) {
     if (native_owner && native_owner != owner) return false;
@@ -11,6 +18,11 @@ bool native_open(void* owner, MultiplayerBaud baud) {
     return true;
 }
 bool native_begin(void*, uint16_t value) { return gbs_hw_sio_multiplayer_async_begin(value) != 0; }
+#if defined(__arm__)
+bool native_begin_batch(void*, const uint16_t* words, uint8_t count) {
+    return gbs_hw_sio_multiplayer_async_begin_batch(words,count) != 0;
+}
+#endif
 int native_poll(void*, uint16_t data[4], uint8_t& id, uint8_t& mask) {
     return gbs_hw_sio_multiplayer_async_poll(data, &id, &mask);
 }
@@ -44,6 +56,7 @@ void reset_stream(MultiplayerQueue& q) {
     q.waiting = false;
     q.waiting_frames = q.missing_frames = 0;
     q.packet_size = q.packet_index = 0;
+    q.transmit_remaining = 0;
     for (auto& peer : q.peers) peer.phase = 0;
 }
 
@@ -86,6 +99,12 @@ void consume(MultiplayerQueue& q, uint8_t sender, uint16_t word) {
         if (value) q.connected_mask |= static_cast<uint8_t>(1u << sender);
         return;
     }
+    // A child may run its main loop after the parent's next transfer. Its
+    // send register then repeats a word already consumed. Keep the current
+    // parser phase for identical middle words; CRC still checks the frame.
+    if ((kind == 9 && peer.phase == 2 && value == peer.sequence) ||
+            (kind == 10 && peer.phase == 3 && value == peer.value) ||
+            (kind == 13 && peer.phase == 5 && value == peer.epoch)) return;
     if (kind == 9 && peer.phase == 1 && value <= 1023) { peer.sequence = value; peer.phase = 2; return; }
     if (kind == 10 && peer.phase == 2) { peer.value = value; peer.phase = 3; return; }
     if (kind == 11 && peer.phase == 3) {
@@ -154,8 +173,12 @@ bool multiplayer_queue_open(MultiplayerQueue& q, const MultiplayerConfig& config
     if (config.players < 2 || config.players > 4 || static_cast<unsigned>(config.baud) > 3 ||
             !config.timeout_frames || !config.retry_frames || !config.session_id || config.session_id > 4095) return false;
     MultiplayerTransport transport = requested;
-    if (!transport.open && !transport.begin && !transport.poll && !transport.close)
+    if (!transport.open && !transport.begin && !transport.poll && !transport.close && !transport.begin_batch) {
         transport = MultiplayerTransport{native_open, native_begin, native_poll, native_close, &q};
+#if defined(__arm__)
+        transport.begin_batch = native_begin_batch;
+#endif
+    }
     if (transport.open == native_open && native_owner && native_owner != &q) return false;
     if (!transport.open || !transport.begin || !transport.poll || !transport.close) return false;
     multiplayer_queue_close(q);
@@ -182,13 +205,21 @@ void multiplayer_queue_update(MultiplayerQueue& q) {
         }
         return;
     }
-    uint16_t values[4] {};
-    uint8_t id = 0, mask = 0;
-    const int result = q.transport.poll(q.transport.user_data, values, id, mask);
-    if (result < 0 || (result > 0 && id >= q.config.players)) { recover(q); return; }
-    if (result > 0) {
-        q.waiting = false;
-        q.waiting_frames = 0;
+    bool received_any = false, transmit_progress = false;
+    for (unsigned poll = 0; poll < multiplayer_poll_budget; ++poll) {
+        uint16_t values[4] {};
+        uint8_t id = 0, mask = 0;
+        const int result = q.transport.poll(q.transport.user_data, values, id, mask);
+        if (result < 0 || (result > 0 && id >= q.config.players)) { recover(q); return; }
+        if (!result) break;
+        received_any = true;
+        const bool sent_word = result == 1 && q.transmit_remaining;
+        if (sent_word) {
+            transmit_progress = true;
+            --q.transmit_remaining;
+            q.waiting = q.transmit_remaining != 0;
+            q.waiting_frames = 0;
+        }
         // A role change invalidates ACK routing; retained messages are retried.
         if (id != q.player_id) { q.acknowledged_mask = 0; for (auto& p : q.peers) p.phase = 0; }
         q.player_id = id;
@@ -203,23 +234,29 @@ void multiplayer_queue_update(MultiplayerQueue& q) {
             q.ever_connected = true;
             q.missing_frames = 0;
         } else q.state = q.ever_connected ? MultiplayerConnectionState::Recovering : MultiplayerConnectionState::Connecting;
-        if (q.packet_size && ++q.packet_index == q.packet_size) q.packet_size = 0;
+        if (sent_word && q.packet_size && ++q.packet_index == q.packet_size) q.packet_size = 0;
         if (q.in_flight && (q.acknowledged_mask & remote_players(q)) == remote_players(q)) {
             q.send_head = (q.send_head + 1) % multiplayer_send_capacity;
             --q.send_count;
             q.in_flight = false;
             q.sequence = (q.sequence + 1) & 1023;
+            q.retry_left = 0; // Acknowledged: the next message needs no retry delay.
             // An ACK can arrive while an old retransmission is in progress.
             q.packet_size = 0;
         }
     }
-    if (q.connected_mask != all_players(q) && ++q.missing_frames >= q.config.timeout_frames) { recover(q); return; }
+    if (received_any && q.connected_mask != all_players(q) && ++q.missing_frames >= q.config.timeout_frames) { recover(q); return; }
     if (q.waiting) {
-        if (++q.waiting_frames >= q.config.timeout_frames) recover(q);
+        if (!transmit_progress && ++q.waiting_frames >= q.config.timeout_frames) recover(q);
         return;
     }
     if (!q.packet_size) make_packet(q);
-    if (q.transport.begin(q.transport.user_data, q.packet[q.packet_index])) {
+    const uint8_t words = q.transport.begin_batch ? q.packet_size-q.packet_index : 1;
+    const bool began = q.transport.begin_batch
+        ? q.transport.begin_batch(q.transport.user_data,&q.packet[q.packet_index],words)
+        : q.transport.begin(q.transport.user_data,q.packet[q.packet_index]);
+    if (began) {
+        q.transmit_remaining = words;
         q.waiting = true;
         q.waiting_frames = 0;
     } else if (++q.waiting_frames >= q.config.timeout_frames) recover(q);
@@ -241,5 +278,44 @@ bool multiplayer_queue_receive(MultiplayerQueue& q, MultiplayerMessage& message)
 }
 uint8_t multiplayer_queue_pending_send(const MultiplayerQueue& q) { return q.send_count; }
 uint8_t multiplayer_queue_pending_receive(const MultiplayerQueue& q) { return q.receive_count; }
+
+MultiplayerQueue& multiplayer_connection() {
+    if (!connection_constructed) {
+        // Placement construction in owned EWRAM; no heap and no nonzero data
+        // initializer in a NOLOAD section. The object survives mixed overlays.
+        new (connection_storage) MultiplayerQueue{};
+        connection_constructed = true;
+    }
+    return *reinterpret_cast<MultiplayerQueue*>(connection_storage);
+}
+
+bool multiplayer_open_connection(const MultiplayerConfig& config) {
+    connection_rebind = multiplayer_queue_open(multiplayer_connection(), config);
+    return connection_rebind;
+}
+
+void multiplayer_close_connection() {
+    multiplayer_queue_close(multiplayer_connection());
+    connection_rebind = false;
+}
+
+void multiplayer_resume_connection() {
+    if (active(multiplayer_connection())) connection_rebind = true;
+}
+
+void multiplayer_update_connection() {
+    auto& q = multiplayer_connection();
+    if (connection_rebind && active(q)) {
+        // Old raw-link close requests are consumed by the runtime before the
+        // core's frame update. Rebind after them, before starting queued I/O.
+        q.transport_ready = q.transport.open(q.transport.user_data, q.config.baud);
+        reset_stream(q);
+        q.connected_mask = q.acknowledged_mask = 0;
+        q.retry_left = q.transport_ready ? 0 : q.config.retry_frames;
+        q.state = q.ever_connected ? MultiplayerConnectionState::Recovering : MultiplayerConnectionState::Connecting;
+        connection_rebind = false;
+    }
+    multiplayer_queue_update(q);
+}
 
 } // namespace gbs

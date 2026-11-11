@@ -6,6 +6,8 @@ namespace gbs {
 
 constexpr uint8_t multiplayer_send_capacity = 8;
 constexpr uint8_t multiplayer_receive_capacity = 16;
+constexpr uint8_t multiplayer_poll_budget = 16;
+constexpr uint8_t multiplayer_batch_words = 4;
 
 enum class MultiplayerBaud : uint8_t { Bps9600, Bps38400, Bps57600, Bps115200 };
 enum class MultiplayerConnectionState : uint8_t { Closed, Connecting, Connected, Recovering };
@@ -28,9 +30,13 @@ struct MultiplayerMessage { uint16_t value = 0; uint8_t player_id = 0; };
 struct MultiplayerTransport {
     bool (*open)(void*, MultiplayerBaud) = nullptr;
     bool (*begin)(void*, uint16_t) = nullptr;
+    // 0: empty; 1: completed local send; 2: incoming clock without a new
+    // local word; negative: error. A received-only clock never advances TX.
     int (*poll)(void*, uint16_t[4], uint8_t&, uint8_t&) = nullptr;
     void (*close)(void*) = nullptr;
     void* user_data = nullptr;
+    // Optional atomic copy of 1–4 words. Each word yields its own completion.
+    bool (*begin_batch)(void*, const uint16_t*, uint8_t) = nullptr;
 };
 
 struct MultiplayerPeer {
@@ -55,13 +61,14 @@ struct MultiplayerQueue {
     uint16_t sequence = 0, waiting_frames = 0, missing_frames = 0, retry_left = 0;
     uint8_t send_head = 0, send_count = 0, receive_head = 0, receive_count = 0;
     uint8_t packet_size = 0, packet_index = 0, acknowledged_mask = 0, next_ack = 0;
+    uint8_t transmit_remaining = 0;
     bool waiting = false, in_flight = false, prefer_data = true, ever_connected = false, transport_ready = false;
     uint32_t recoveries = 0, corrupt_packets = 0, receive_full_count = 0;
 };
 
 bool multiplayer_queue_open(MultiplayerQueue&, const MultiplayerConfig& = {}, const MultiplayerTransport& = {});
 void multiplayer_queue_close(MultiplayerQueue&);
-// Bounded, non-blocking update: at most one poll and one begin per invocation.
+// Bounded update: at most sixteen polls and one submission (1–4 words).
 // Reconnects automatically, retaining queued messages and duplicate detection.
 void multiplayer_queue_update(MultiplayerQueue&);
 // Broadcast a full 16-bit value to every configured peer. False means closed
@@ -71,5 +78,13 @@ bool multiplayer_queue_send(MultiplayerQueue&, uint16_t value);
 bool multiplayer_queue_receive(MultiplayerQueue&, MultiplayerMessage&);
 uint8_t multiplayer_queue_pending_send(const MultiplayerQueue&);
 uint8_t multiplayer_queue_pending_receive(const MultiplayerQueue&);
+
+// Project-wide connection used by authored events. The core updates it once
+// per frame and rebinds it after runtime initialization without clearing queues.
+MultiplayerQueue& multiplayer_connection();
+bool multiplayer_open_connection(const MultiplayerConfig&);
+void multiplayer_close_connection();
+void multiplayer_resume_connection();
+void multiplayer_update_connection();
 
 } // namespace gbs

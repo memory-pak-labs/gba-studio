@@ -8,7 +8,7 @@ import tempfile
 
 root = Path(__file__).resolve().parents[2]
 sources = ["gbs_event.cpp", "gbs_dialogue_locale.cpp", "gbs_runtime.cpp", "gbs_rtc.cpp",
-           "gbs_link.cpp", "rumble.cpp", "deferred_work.cpp", "gbs_engine_global.cpp", "gbs_animation.cpp"]
+           "gbs_link.cpp", "gbs_multiplayer.cpp", "gbs_multiplayer_events.cpp", "rumble.cpp", "deferred_work.cpp", "gbs_engine_global.cpp", "gbs_animation.cpp"]
 
 
 def block(text, start):

@@ -1508,6 +1508,36 @@ const historicalEventCommandDefinitions: EventCommandDefinition[] = [
     "commandTemplate": "multiplayer_transfer net.value 0 120"
   },
   {
+    "id": "misc.multiplayer_queue_open",
+    "title": "Conexão com filas: Abrir",
+    "category": "Diversos", "section": "Multijogador", "isFavorite": false,
+    "commandTemplate": "multiplayer_queue_open 2 115200 30"
+  },
+  {
+    "id": "misc.multiplayer_queue_send",
+    "title": "Conexão com filas: Enviar mensagem",
+    "category": "Diversos", "section": "Multijogador", "isFavorite": false,
+    "commandTemplate": "multiplayer_queue_send net.message net.accepted"
+  },
+  {
+    "id": "misc.multiplayer_queue_receive",
+    "title": "Conexão com filas: Receber mensagem",
+    "category": "Diversos", "section": "Multijogador", "isFavorite": false,
+    "commandTemplate": "multiplayer_queue_receive net.value net.sender net.received"
+  },
+  {
+    "id": "misc.multiplayer_queue_status",
+    "title": "Conexão com filas: Consultar estado",
+    "category": "Diversos", "section": "Multijogador", "isFavorite": false,
+    "commandTemplate": "multiplayer_queue_status net.state net.local net.pending"
+  },
+  {
+    "id": "misc.multiplayer_queue_close",
+    "title": "Conexão com filas: Fechar",
+    "category": "Diversos", "section": "Multijogador", "isFavorite": false,
+    "commandTemplate": "multiplayer_queue_close"
+  },
+  {
     "id": "misc.rumble_on",
     "title": "Rumble: Ligar",
     "category": "Diversos",

@@ -12,6 +12,7 @@ const actorReferenceCommands = new Set([
 ]);
 
 const twoActorReferenceCommands = new Set(["if_actor_distance", "if_actor_relative"]);
+const queuedVariableReferenceCommands = new Set(["multiplayer_queue_send", "multiplayer_queue_receive", "multiplayer_queue_status"]);
 
 /** Actor operands only, using the same quoting rules as the command compiler. */
 export function actorCommandReferences(command: string, actorNames: readonly string[] = []): string[] {
@@ -23,7 +24,7 @@ export function actorCommandReferences(command: string, actorNames: readonly str
 function hasQuotedFirstReference(verb: string): boolean {
   return verb === "change_scene" || verb === "luta_start_match" || verb === "if_scene"
     || verb === "play_music" || verb === "play_sfx" || verb === "run_audio_routine" || verb === "set_text_sfx"
-    || actorReferenceCommands.has(verb);
+    || actorReferenceCommands.has(verb) || queuedVariableReferenceCommands.has(verb);
 }
 
 function quotedOperands(value: string): string[] {
@@ -41,6 +42,7 @@ function quotedOperands(value: string): string[] {
 /** Keep quoted actor/resource operands intact; free-text commands retain their own grammar. */
 export function sceneChangeCommandParts(command: string, actorNames: readonly string[] = []): string[] {
   const verb = command.trim().split(/\s+/, 1)[0] ?? "";
+  if (queuedVariableReferenceCommands.has(verb)) return [verb, ...quotedOperands(command.trim().slice(verb.length).trim())];
   if (twoActorReferenceCommands.has(verb)) {
     let remainder = command.trim().slice(verb.length).trim();
     const references: string[] = [];

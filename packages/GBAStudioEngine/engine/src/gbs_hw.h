@@ -183,6 +183,7 @@ int gbs_hw_sio_multiplayer_init(void);
    This transport owns SIO until close; do not mix it with raw Link sessions. */
 int gbs_hw_sio_multiplayer_async_open(unsigned baud);
 int gbs_hw_sio_multiplayer_async_begin(uint16_t outgoing);
+int gbs_hw_sio_multiplayer_async_begin_batch(const uint16_t* words, unsigned count);
 int gbs_hw_sio_multiplayer_async_poll(uint16_t received[4], uint8_t* player_id, uint8_t* connected_mask);
 void gbs_hw_sio_multiplayer_async_close(void);
 /* Explicit ChisFlash v1.2 board profile only; never called for unknown carts. */

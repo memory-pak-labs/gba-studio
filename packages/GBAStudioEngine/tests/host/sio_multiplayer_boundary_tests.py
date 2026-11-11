@@ -36,6 +36,13 @@ int main(void) {
     assert(gbs_hw_sio_multiplayer_async_poll(data, &id, &mask) == 1);
     assert(id == 1 && mask == 3 && data[0] == 0x1111);
     assert(!gbs_hw_sio_multiplayer_async_poll(data, &id, &mask));
+    // A serial completion between main-loop poll and begin must be retained.
+    REG_IME = 0;
+    registers.multi[0] = 0xD001;
+    REG_IF = 0x80;
+    assert(gbs_hw_sio_multiplayer_async_poll(data, &id, &mask) == 2);
+    assert(data[0] == 0xD001 && REG_IME == 0 && REG_IE == 0x92);
+    REG_IF = 0;
     // Recovery retains original ownership, unrelated IE bits and caller IME.
     REG_IME = 0; REG_IE |= 4;
     assert(gbs_hw_sio_multiplayer_async_open(2));
@@ -45,8 +52,18 @@ int main(void) {
     assert(REG_IME == 0 && REG_IE == 0x16);
     assert(REG_RCNT == 0 && REG_SIOCNT == 0);
     assert(gbs_hw_sio_multiplayer_async_poll(data, &id, &mask) == -1);
+    const uint16_t words[4] = {0x8001,0x9000,0xA123,0xB045};
+    assert(!gbs_hw_sio_multiplayer_async_begin_batch(words,4));
     REG_IME = 1; REG_IE = 0x81;
     assert(gbs_hw_sio_multiplayer_async_open(0));
+    REG_IF = 0; registers.control = 0x600B;
+    assert(gbs_hw_sio_multiplayer_async_begin_batch(words,4));
+    assert(REG_IME == 1 && REG_IE == 0x81);
+    for (unsigned word=0;word<4;++word) {
+        assert(registers.send == words[word]);
+        registers.control=0x600B;capture_multiplayer_async();
+    }
+    for (unsigned word=0;word<4;++word) assert(gbs_hw_sio_multiplayer_async_poll(data,&id,&mask)==1);
     gbs_hw_sio_multiplayer_async_close();
     assert(REG_IE == 0x81 && REG_IME == 1);
     assert(REG_RCNT == 0 && REG_SIOCNT == 0);
