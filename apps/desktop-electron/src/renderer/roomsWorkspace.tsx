@@ -1,3 +1,4 @@
+import { roomEntityFieldValidation } from "../shared/roomEntityFieldValidation";
 import { useWorkspaceState, useWorkspaceRef, useWorkspaceChangeEffect } from "./workspaceSessionState";
 import {RacingTrackOverlay} from "./RacingTrackOverlay";
 import {RacingTrackInspector} from "./RacingTrackInspector";
@@ -383,6 +384,7 @@ interface RoomsWorkspaceProps {
   projectPath?: string;
   sceneMapZoom?: number;
   assetRefreshToken?: number;
+  focusedEntityField?: "x" | "y" | "width" | "height";
   focusedTargetID?: string | null;
   focusedTargetName?: string | null;
   focusRequestID?: number | null;
@@ -3470,6 +3472,7 @@ function RoomEntitiesEditor({
   const isMixedGroupEventContext = activeTab === "events" && hasMixedEntitySelection;
   const selectedEntityKey = selectedVisibleKeys.at(-1) ?? null;
   const selectedEntity = visibleEntities.find((entity) => entityKey(entity) === selectedEntityKey) ?? visibleEntities[0] ?? null;
+  const geometryFields = selectedEntity ? roomEntityFieldValidation(selectedEntity, room) : null;
   const selectedEntitySource = selectedEntity ? sourceRecordForRoomEntity(projectData, selectedEntity) : null;
   const ownerScene = Array.isArray(projectData?.scenas) ? projectData.scenas.find((scene) => scene.name === room.name) as Record<string, unknown> | undefined : undefined;
   const menuRuntimeConfig = room.runtime?.type === "menu" ? normalizeMenuSceneConfig(room.runtime.config) : null;
@@ -3662,11 +3665,12 @@ function RoomEntitiesEditor({
               {isPositionTab ? (
                 <InspectorVector2
                   onChange={(axis, value) => onUpdateRoomEntity(selectedEntity.kind, selectedEntity.id, axis === "x" ? { x: value } : { y: value })}
+                  constraints={geometryFields?.limits} errors={geometryFields?.errors} unit={geometryFields?.unit}
                   values={{ x: selectedEntity.x, y: selectedEntity.y }}
                 />
               ) : null}
-              {activeTab === "area" || activeTab === "trigger" ? entityNumberInput("W", selectedEntity.width, (value) => onUpdateRoomEntity(selectedEntity.kind, selectedEntity.id, { width: value }), 1) : null}
-              {activeTab === "area" || activeTab === "trigger" ? entityNumberInput("H", selectedEntity.height, (value) => onUpdateRoomEntity(selectedEntity.kind, selectedEntity.id, { height: value }), 1) : null}
+              {activeTab === "area" || activeTab === "trigger" ? <InspectorNumber label="Largura" dataField="width" unit={geometryFields?.unit} preserveInvalidValue validationMessage={geometryFields?.errors.width} min={1} max={room.width} value={selectedEntity.width} onChange={value => onUpdateRoomEntity(selectedEntity.kind, selectedEntity.id, { width: value })} /> : null}
+              {activeTab === "area" || activeTab === "trigger" ? <InspectorNumber label="Altura" dataField="height" unit={geometryFields?.unit} preserveInvalidValue validationMessage={geometryFields?.errors.height} min={1} max={room.height} value={selectedEntity.height} onChange={value => onUpdateRoomEntity(selectedEntity.kind, selectedEntity.id, { height: value })} /> : null}
               {activeTab === "trigger" && selectedEntity.kind === "trigger" && room.sceneType === "pointAndClick" && projectData ? (
                 <PointClickTargetInspector key={selectedEntity.id} data={projectData} value={selectedEntitySource?.pointClick}
                   onChange={pointClick => onUpdateRoomEntity("trigger", selectedEntity.id, { pointClick })} />
@@ -7242,6 +7246,7 @@ export function RoomsWorkspace({
   sceneMapZoom,
   assetRefreshToken = 0,
   focusedTargetID,
+  focusedEntityField,
   focusedTargetName,
   focusRequestID,
   focusInspectorTab,
@@ -7458,19 +7463,20 @@ export function RoomsWorkspace({
     if (!presentation || (!focusedTargetID && !focusedTargetName)) return;
     const requestKey = `${focusRequestID ?? "none"}:${focusedTargetID ?? ""}:${focusedTargetName ?? ""}`;
     if (appliedFocusRequestKey.current === requestKey) return;
+    const entity = presentation.entities.find(candidate => candidate.id === focusedTargetID);
     const room = presentation.rooms.find((candidate) => (
-      candidate.id === focusedTargetID ||
-      candidate.name === focusedTargetName
+      candidate.id === focusedTargetID || candidate.name === focusedTargetName || candidate.name === entity?.roomName
     ));
     if (!room) return;
 
     appliedFocusRequestKey.current = requestKey;
-    if (focusInspectorTab) {
+    if (focusInspectorTab || entity) {
       setFocusedSceneEditorRoomID(room.id);
       setSelectedSceneMapRoomName(room.name);
       setSelectedConnectionIndex(null);
     }
-    setSelectedEntityKeys([]);
+    setSelectedEntityKeys(entity ? [entityKey(entity)] : []);
+    if (entity) setInspectorTabByContext(current => ({ ...current, [entity.kind]: entity.kind }));
     setSelectedCanvasCell(null);
     const focusCollision = focusInspectorTab === "collision" && sceneTypeProfile(room.sceneType).editorTools.includes("collision");
     setSelectedEditMode(focusCollision ? "collision" : "select");
@@ -7480,6 +7486,16 @@ export function RoomsWorkspace({
       onSetActiveRoom(room.id, room.name);
     }
   }, [focusRequestID, focusedTargetID, focusedTargetName, focusInspectorTab, presentation]);
+
+  useEffect(() => {
+    if (!focusedEntityField || !focusedTargetID) return;
+    let second = 0;
+    const first = requestAnimationFrame(() => { second = requestAnimationFrame(() => {
+      const input = document.querySelector<HTMLInputElement>(`.rooms-inspector [data-entity-field="${focusedEntityField}"]`);
+      input?.scrollIntoView({ block: "center" }); input?.focus({ preventScroll: true });
+    }); });
+    return () => { cancelAnimationFrame(first); cancelAnimationFrame(second); };
+  }, [focusedEntityField, focusedTargetID, focusRequestID]);
 
   const activeRoom = presentation?.rooms.find((room) => room.isActive) ?? presentation?.rooms[0] ?? null;
   const preflightSceneName = presentation?.rooms.find(room => room.name === selectedSceneMapRoomName)?.name ?? activeRoom?.name;

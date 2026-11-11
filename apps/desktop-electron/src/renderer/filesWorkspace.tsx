@@ -32,6 +32,7 @@ export interface FilesWorkspaceOpenRequest {
   targetName?: string;
   usageKind?: string;
   workspace: FilesWorkspaceName;
+  targetField?: "x" | "y" | "width" | "height";
 }
 
 interface FilesWorkspaceProps {

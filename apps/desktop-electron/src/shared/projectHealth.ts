@@ -1,3 +1,4 @@
+import { roomEntityProblems } from "./roomEntityProblems.js";
 import {
   formatGBAEntityEventProjectionIssue,
   validateGBAEntityEventProjection
@@ -58,6 +59,7 @@ export interface ProjectDiagnostic {
   sceneName?: string;
   targetID?: string;
   targetName?: string;
+  targetField?: "x" | "y" | "width" | "height";
   message: string;
   detail?: string;
   fixAction?: "open_editor" | "open_files" | "open_sprites" | "open_dialogues" | "open_audio" | "open_export" | "open_settings";
@@ -326,6 +328,8 @@ function addWorkspaceDiagnostics(data: GBAProjectData, diagnostics: ProjectDiagn
 
   const roomsPresentation = deriveRoomsWorkspacePresentation(data);
   for (const issue of deriveRoomsWorkspaceValidationIssues(roomsPresentation)) {
+    if (diagnostics.some(problem => problem.code.startsWith("room-entity.field.") && problem.sceneName === issue.roomName
+      && (issue.message === `${issue.roomName}: Ator fora da grade da cena: ${problem.targetName}.` || issue.message === `${issue.roomName}: Trigger fora da grade da cena: ${problem.targetName}.`))) continue;
     addDiagnostic(diagnostics, {
       id: `rooms-${issue.id}`,
       code: `rooms.${issue.severity}`,
@@ -454,9 +458,17 @@ function addGbaHardwareDiagnostics(data: GBAProjectData, diagnostics: ProjectDia
   }
 }
 
-function addContractDiagnostics(contract: ProjectContractDiagnostics, diagnostics: ProjectDiagnostic[]): void {
+function addContractDiagnostics(contract: ProjectContractDiagnostics, diagnostics: ProjectDiagnostic[], data: GBAProjectData): void {
   if (contract.ok) return;
+  const concrete = roomEntityProblems(data);
+  for (const { issue, entity, room, field, message } of concrete) addDiagnostic(diagnostics, {
+    id: `room-entity-${issue.source}-${entity.id}`, code: `room-entity.field.${field}`, severity: "error", scope: "scene", workspace: "Editor",
+    targetID: String(entity.id), targetName: issue.itemName, targetField: field, sceneName: String(room.name), message,
+    detail: `Contrato roomEntities · ${issue.source}[${issue.itemIndex}] · ${issue.invalidFields.join(", ")}. A exportação permanece bloqueada até corrigir.`, fixAction: "open_editor"
+  });
   for (const item of contract.validatorCounts) {
+    const count = item.count - (item.validator === "roomEntities" ? concrete.length : 0);
+    if (count === 0) continue;
     addDiagnostic(diagnostics, {
       id: `contract-${item.validator}`,
       code: "contract.invalid",
@@ -464,7 +476,7 @@ function addContractDiagnostics(contract: ProjectContractDiagnostics, diagnostic
       scope: "export",
       workspace: "Exportar",
       targetName: item.validator,
-      message: `O contrato ${item.validator} possui ${item.count} pendência(s).`,
+      message: `O contrato ${item.validator} possui ${count} pendência(s).`,
       detail: contract.detail,
       fixAction: "open_export"
     });
@@ -477,7 +489,7 @@ export function deriveProjectHealthReport(
 ): ProjectHealthReport {
   const diagnostics: ProjectDiagnostic[] = [];
   const contract = deriveProjectContractDiagnostics(data);
-  addContractDiagnostics(contract, diagnostics);
+  addContractDiagnostics(contract, diagnostics, data);
 
   const scenes = sceneCollection(data).map((scene, index) => (
     addSceneDiagnostics(diagnostics, data, scene, index, options.assetPackReport)

@@ -19,6 +19,8 @@ export interface ProjectProblem {
   workspace: ProjectProblemWorkspace;
   targetID?: string;
   targetName?: string;
+  targetField?: "x" | "y" | "width" | "height";
+  sceneName?: string;
 }
 
 const workspaceOrder: ProjectProblemWorkspace[] = ["Arquivos", "Editor", "Sprites", "Dialogos", "Audio", "Exportar", "Ajustes"];
@@ -42,7 +44,8 @@ export function projectProblemsFromHealthReport(report: ProjectHealthReport): Pr
       severity: diagnostic.severity,
       workspace: diagnostic.workspace,
       targetID: diagnostic.targetID,
-      targetName: diagnostic.targetName
+      targetName: diagnostic.targetName,
+      targetField: diagnostic.targetField, sceneName: diagnostic.sceneName
     }))
     .sort((left, right) => (
       severityRank(left.severity) - severityRank(right.severity)

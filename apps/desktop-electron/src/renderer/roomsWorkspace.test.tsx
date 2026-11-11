@@ -2281,8 +2281,8 @@ describe("RoomsWorkspace React smoke", () => {
 
     expect(screen.getByRole("tab", { name: "Objeto" })).toHaveAttribute("aria-selected", "true");
     expect(screen.getByLabelText("X")).toHaveValue(2);
-    expect(screen.getByLabelText("W")).toHaveValue(2);
-    expect(screen.getByLabelText("H")).toHaveValue(1);
+    expect(screen.getByLabelText("Largura")).toHaveValue(2);
+    expect(screen.getByLabelText("Altura")).toHaveValue(1);
     expect(screen.queryByRole("tab", { name: "Área" })).not.toBeInTheDocument();
     expect(screen.queryByText("Atributos do trigger")).not.toBeInTheDocument();
     expect(screen.queryByText("Trigger selecionado")).not.toBeInTheDocument();

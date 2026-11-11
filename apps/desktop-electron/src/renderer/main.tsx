@@ -3275,6 +3275,7 @@ function App(): React.ReactElement {
         label: problem.targetName ?? problem.message,
         requestID,
         targetID: problem.targetID,
+        targetField: problem.targetField,
         targetName: problem.targetName,
         workspace: problem.workspace
       });
@@ -3582,6 +3583,7 @@ function App(): React.ReactElement {
               projectData={projectData}
               presentation={roomsPresentation}
               projectPath={session?.path}
+              focusedEntityField={focusedAssetRequest?.workspace === "Editor" ? focusedAssetRequest.targetField : undefined}
               focusedTargetID={focusedAssetRequest?.workspace === "Editor" ? focusedAssetRequest.targetID ?? null : null}
               focusedTargetName={focusedAssetRequest?.workspace === "Editor" ? focusedAssetRequest.targetName ?? null : null}
               focusRequestID={focusedAssetRequest?.workspace === "Editor" ? focusedAssetRequest.requestID : 0}
