@@ -6,9 +6,41 @@
 #include "gbs/event_render.hpp"
 #include "gbs/interrupt.hpp"
 #include "gbs/render.hpp"
+#include "../../engine/src/gbs_hw.h"
 #include "gbs/tile_edits.hpp"
 
 namespace {
+
+GbsSceneRasterTable raster_table {};
+bool raster_submitted = false;
+void test_scene_raster_tables_preserve_rgb555_and_wave_ranges() {
+    gbs::SceneRasterEffects effects {};
+    effects.ripple.enabled = true;
+    effects.ripple.amplitude = 8;
+    effects.ripple.wavelength = 32;
+    effects.ripple.top = 40;
+    effects.ripple.bottom = 120;
+    effects.gradient.enabled = true;
+    effects.gradient.from = 0;
+    effects.gradient.to = 32767;
+    effects.gradient.top = 0;
+    effects.gradient.bottom = 32;
+    assert(gbs::set_scene_raster_effects(effects, gbs::DisplayMode::Mode0Text));
+    assert(raster_submitted && raster_table.enabled == 3);
+    assert(raster_table.wave[64] == 8 && raster_table.wave[192] == -8);
+    assert(raster_table.line_phase[48] == 64);
+    assert(raster_table.colors[0] == 0 && raster_table.colors[31] == 32767 && raster_table.colors[159] == 32767);
+    raster_submitted = false;
+    // Reapplying a composition while rendering must preserve animation phase.
+    assert(gbs::set_scene_raster_effects(effects, gbs::DisplayMode::Mode0Text));
+    assert(!raster_submitted);
+    assert(!gbs::set_scene_raster_effects(effects, gbs::DisplayMode::Mode1TextAffine));
+    assert(!raster_submitted);
+    effects.ripple.enabled = false;
+    assert(gbs::set_scene_raster_effects(effects, gbs::DisplayMode::Mode1TextAffine));
+    effects.gradient.bottom = 1;
+    assert(!gbs::set_scene_raster_effects(effects, gbs::DisplayMode::Mode0Text));
+}
 
 int bg_layer_enabled[4] {};
 int bg_layer_priority[4] {};
@@ -1189,6 +1221,7 @@ void test_perspective_scale_keeps_the_horizon_and_dma_reset_line() {
 }
 
 int main() {
+    test_scene_raster_tables_preserve_rgb555_and_wave_ranges();
     test_map_markers_follow_the_scaled_image_and_camera();
     test_perspective_scale_keeps_the_horizon_and_dma_reset_line();
     test_scene_background_video_keeps_the_fixed_ui_plane();
@@ -1243,3 +1276,7 @@ extern "C" void gbs_hw_start_hblank_affine(int layer,const uint32_t* words) {
     affine_dma_layer=layer;for(int i=0;i<644;++i)affine_dma_words[i]=words[i];
 }
 extern "C" uint32_t* gbs_hw_hblank_affine_buffer() { return affine_dma_words; }
+
+extern "C" GbsSceneRasterTable* gbs_hw_begin_scene_raster_update() { return &raster_table; }
+extern "C" void gbs_hw_submit_scene_raster_update() { raster_submitted = true; }
+extern "C" void gbs_hw_reset_scene_raster() {}

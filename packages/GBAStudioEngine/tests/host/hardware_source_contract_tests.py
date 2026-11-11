@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
 from pathlib import Path
 import re
+import os
+import shutil
 import subprocess
 import tempfile
 import unittest
@@ -22,7 +24,7 @@ ISOMETRIC_SOURCE = ROOT / "engine" / "src" / "gbs_isometric.cpp"
 
 
 def function_body(source: str, name: str) -> str:
-    definition = re.search(r"\bvoid\s+" + re.escape(name) + r"\([^;{}]*\)\s*\{", source)
+    definition = re.search(r"\b(?:void|uint16_t|uint32_t)\s+" + re.escape(name) + r"\([^;{}]*\)\s*\{", source)
     if definition is None:
         raise AssertionError(f"definicao ausente para {name}")
     opening = definition.end() - 1
@@ -38,6 +40,53 @@ def function_body(source: str, name: str) -> str:
 
 
 class HardwareSourceContractTests(unittest.TestCase):
+    def test_gradient_preserves_its_scanline_color_when_the_scene_sets_backdrop(self):
+        code = """#include <stdint.h>
+#include <assert.h>
+uint16_t shadow_backdrop_color, palette[1];
+#define MEM_PALETTE palette
+struct {uint8_t enabled;} scene_raster_tables[2];int scene_raster_active;
+void set_backdrop(uint16_t color)""" + function_body(self.source, "gbs_hw_set_backdrop") + """
+int main(){palette[0]=31;scene_raster_tables[0].enabled=2;set_backdrop(17);assert(shadow_backdrop_color==17&&palette[0]==31);
+scene_raster_tables[0].enabled=0;set_backdrop(23);assert(shadow_backdrop_color==23&&palette[0]==23);}
+"""
+        with tempfile.TemporaryDirectory(prefix="gbs-gradient-owner-") as temp:
+            source=Path(temp)/"owner.c";binary=Path(temp)/"owner";source.write_text(code)
+            subprocess.run(["cc",str(source),"-o",str(binary)],check=True)
+            subprocess.run([str(binary)],check=True)
+
+    def test_audio_observer_only_allows_the_bounded_raster_service_and_restores_irq_state(self):
+        code = """#include <stdint.h>
+#include <assert.h>
+uint16_t REG_IME,REG_IE;
+struct {int enabled;} scene_raster_tables[2];
+int scene_raster_active,hblank_dispatch_required;
+uint32_t lock(void)""" + function_body(self.source, "gbs_hw_audio_lock_observer_state") + """
+void unlock(uint32_t previous)""" + function_body(self.source, "gbs_hw_audio_unlock_observer_state") + """
+int main(void){for(int ime=0;ime<2;++ime)for(int enabled=0;enabled<2;++enabled)for(int callbacks=0;callbacks<2;++callbacks){
+REG_IME=ime;REG_IE=0x1007;scene_raster_tables[0].enabled=enabled;hblank_dispatch_required=callbacks;
+uint32_t previous=lock();if(enabled&&!callbacks){assert(REG_IE==2);assert(REG_IME==ime);}else{assert(REG_IE==0x1007);assert(REG_IME==0);}
+unlock(previous);assert(REG_IE==0x1007);assert(REG_IME==ime);}}
+"""
+        with tempfile.TemporaryDirectory(prefix="gbs-audio-observer-") as temp:
+            source=Path(temp)/"observer.c";binary=Path(temp)/"observer";source.write_text(code)
+            subprocess.run(["cc",str(source),"-o",str(binary)],check=True)
+            subprocess.run([str(binary)],check=True)
+
+    def test_interrupt_configuration_preserves_the_callers_ime(self):
+        code = '''#include <stdint.h>
+#include <assert.h>
+uint16_t REG_IME,REG_IE,REG_IF,REG_DISPSTAT,REG_KEYCNT;
+uint16_t interrupt_mask_for_source(int source){return source==6?2:1;}
+void enable(int source) ENABLE
+void disable(int source) DISABLE
+int main(void){for(int previous=0;previous<2;++previous){REG_IME=previous;enable(6);assert(REG_IME==previous);disable(6);assert(REG_IME==previous);}}
+'''.replace('ENABLE',function_body(self.source,'gbs_hw_enable_interrupt_source')).replace('DISABLE',function_body(self.source,'gbs_hw_disable_interrupt_source'))
+        with tempfile.TemporaryDirectory() as directory:
+            source=Path(directory)/'ime.c';source.write_text(code);binary=Path(directory)/'ime'
+            subprocess.run(['cc',str(source),'-o',str(binary)],check=True)
+            subprocess.run([str(binary)],check=True)
+
     def test_circular_window_publishes_complete_rows_and_rearms_after_missed_frames(self):
         source = HARDWARE_SOURCE.read_text()
         start = function_body(source, "gbs_hw_start_hblank_window1")
@@ -353,7 +402,7 @@ int main(void) {
     def test_fifo_stream_publishes_in_vblank_and_bounds_dma_when_a_frame_is_late(self) -> None:
         submit = function_body(self.source, "gbs_hw_audio_submit_pcm8_stereo_stream_block")
         commit = function_body(self.source, "commit_pcm_stream_block")
-        dispatch = function_body(self.source, "gbs_hw_irq_dispatch")
+        dispatch = function_body(self.source, "gbs_hw_irq_dispatch_slow")
         self.assertIn("sample_count != 528u", submit)
         self.assertIn("REG_IME = 0", submit)
         self.assertIn("REG_IME = ime", submit)
@@ -791,9 +840,14 @@ int main() {
 
     def test_vblank_rearms_the_last_complete_affine_table_even_when_render_misses_a_frame(self):
         irq = function_body(self.source, "gbs_hw_irq_dispatch")
+        slow = function_body(self.source, "gbs_hw_irq_dispatch_slow")
         code = """#include <stdint.h>
 #include <assert.h>
-uint16_t REG_IF=1,REG_IE=1,BIOS_IRQ_FLAGS=0;int keypad_irq_pending,arms;
+uint16_t REG_IF=1,REG_IE=1,BIOS_IRQ_FLAGS=0,REG_VCOUNT=0,REG_DISPSTAT=0;
+struct { int enabled, speed, layer; } scene_raster_tables[2];
+uint16_t scene_raster_base_x,shadow_bg_scroll_x[4];
+uint8_t scene_raster_phase;
+int scene_raster_active,hblank_dispatch_required;int keypad_irq_pending,arms;
 static int affine_hblank_enabled=1;
 static int window1_hblank_active=0;
 static int window_arms;
@@ -803,7 +857,10 @@ uint32_t gbs_hw_frame_counter_ticks(void){return ticks++;}
 void record_irq(uint32_t elapsed){irq_ticks+=elapsed;}
 void (*gbs_profiler_record_irq)(uint32_t)=record_irq;
 static void rearm_active_affine_hblank(void){++arms;}
+void gbs_hw_mix_audio_with_hblank(void){}
+void commit_scene_raster_frame(void){} void apply_scene_raster_line(unsigned line){}
 void commit_pcm_stream_block(void){} void gbs_audio_vblank_update(void){} void gbs_dispatch_hardware_interrupts(uint16_t flags){}
+static void gbs_hw_irq_dispatch_slow(uint16_t pending)"""+slow+"""
 void dispatch(void) {"""+irq+"""}
 int main(void){dispatch();dispatch();assert(arms==2);assert(irq_ticks==2);assert(frame_vblank_irq_ticks==1);REG_IF=0;dispatch();assert(arms==2);assert(irq_ticks==2);REG_IF=1;window1_hblank_active=1;dispatch();dispatch();assert(window_arms==2 && arms==2);}
 """
@@ -920,13 +977,32 @@ int main(void){dispatch();dispatch();assert(arms==2);assert(irq_ticks==2);assert
         self.assertIn("REG_IME = 0", body)
         self.assertIn("REG_DISPSTAT = (uint16_t)(REG_DISPSTAT | (1u << 3))", body)
         self.assertIn("REG_IE = (uint16_t)(REG_IE | mask)", body)
-        self.assertIn("REG_IME = 1", body)
+        self.assertIn("REG_IME = previous_ime", body)
         self.assertNotIn("if (source == 0) {\n        REG_DISPSTAT", body.split("REG_IME = 0", 1)[0])
 
     def test_keypad_interrupt_selects_real_buttons_before_enabling_irq(self) -> None:
         body = function_body(self.source, "gbs_hw_enable_interrupt_source")
 
         self.assertIn("REG_KEYCNT = (uint16_t)(0x03FFu | (1u << 14))", body)
+
+    def test_linked_irq_stack_keeps_bios_work_area_and_saved_lr_separate(self) -> None:
+        toolchain = Path(os.environ.get("DEVKITARM", "/opt/devkitpro/devkitARM")) / "bin"
+        compiler = shutil.which("arm-none-eabi-gcc") or str(toolchain / "arm-none-eabi-gcc")
+        if not Path(compiler).exists():
+            self.skipTest("ARM toolchain not installed")
+        with tempfile.TemporaryDirectory(prefix="gbs-irq-stack-") as temp:
+            source = Path(temp) / "entry.S"
+            binary = Path(temp) / "entry.elf"
+            source.write_text(".arm\n.global _start\n_start: b _start\n")
+            subprocess.run([compiler, "-nostdlib", "-mcpu=arm7tdmi", "-Wl,-T," + str(LINKER_SCRIPT),
+                            str(source), "-o", str(binary)], check=True, capture_output=True)
+            symbols = subprocess.check_output([str(Path(compiler).with_name("arm-none-eabi-nm")), str(binary)], text=True)
+            top = int(next(line.split()[0] for line in symbols.splitlines() if line.endswith(" __irq_stack_top")), 16)
+            # The BIOS trampoline pushes r0-r3, r12, lr before our handler.
+            # Its saved lr must never alias the BIOS flags at 0x03007ff8.
+            self.assertLessEqual(top, 0x03007FA0)
+            self.assertEqual(top % 8, 0)
+            self.assertNotEqual(top - 4, 0x03007FF8)
 
     def test_linker_reserves_stacks_and_rejects_iwram_overlap(self) -> None:
         self.assertIn("__irq_stack_size = 0x200", self.linker_script)
@@ -936,7 +1012,7 @@ int main(void){dispatch();dispatch();assert(arms==2);assert(irq_ticks==2);assert
             "__irq_handler_slot = ORIGIN(IWRAM) + LENGTH(IWRAM) - 4",
             self.linker_script,
         )
-        self.assertIn("__irq_stack_top = __irq_handler_slot", self.linker_script)
+        self.assertIn("__irq_stack_top = ORIGIN(IWRAM) + LENGTH(IWRAM) - 0x60", self.linker_script)
         self.assertIn("__stack_bottom = __stack_top - __system_stack_size", self.linker_script)
         self.assertIn("ASSERT(__bss_end <= __stack_bottom", self.linker_script)
 
@@ -946,10 +1022,9 @@ int main(void){dispatch();dispatch();assert(arms==2);assert(irq_ticks==2);assert
         self.assertLess(self.startup_source.index(clear_mask), self.startup_source.index("orr r1, r0, #0x12"))
 
     def test_irq_entry_returns_through_bios_trampoline(self) -> None:
-        self.assertIn("stmdb sp!, {r4-r11, lr}", self.irq_source)
-        self.assertIn("bl gbs_hw_irq_dispatch", self.irq_source)
-        self.assertIn("ldmia sp!, {r4-r11, lr}", self.irq_source)
-        self.assertIn("bx lr", self.irq_source)
+        entry = self.irq_source.split(".size gbs_hw_irq_entry", 1)[0]
+        self.assertIn("b gbs_hw_irq_dispatch", entry)
+        self.assertNotIn("stmdb sp!", entry)
         self.assertNotIn("subs pc, lr, #4", self.irq_source)
 
     def test_large_render_staging_buffers_are_kept_in_ewram(self) -> None:

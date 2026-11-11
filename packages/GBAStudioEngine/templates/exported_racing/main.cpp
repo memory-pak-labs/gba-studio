@@ -239,6 +239,7 @@ void apply_room_visuals() {
         gbs::set_backdrop_color(gbs::rgb15(4, 10, 18));
         gbs::apply_video_composition(gbs::default_video_composition());
         gbs::set_display_mode(gbs::DisplayMode::Mode1TextAffine);
+        gbs::set_scene_raster_effects(room.video.raster, gbs::DisplayMode::Mode1TextAffine);
         previous_pseudo3d_player_marker = gbs::Vec2i { -1, -1 };
         previous_pseudo3d_rival_marker = gbs::Vec2i { -1, -1 };
         if (visual == nullptr) {

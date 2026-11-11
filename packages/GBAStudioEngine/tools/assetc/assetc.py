@@ -14859,6 +14859,43 @@ def emit_topdown_resource_banks(output, topdown_project, asset_report=None):
     return emit_project_resource_banks(output, topdown_project, "topdown_project", asset_report)
 
 
+def scene_raster_effects_literal(value, mode):
+    if value is None:
+        return "gbs::SceneRasterEffects {}"
+    if not isinstance(value, dict):
+        raise SystemExit("video.raster precisa ser objeto")
+    ripple, gradient = value.get("ripple", {}), value.get("gradient", {})
+    if not isinstance(ripple, dict) or not isinstance(gradient, dict):
+        raise SystemExit("ripple e gradient precisam ser objetos")
+    def number(source, key, default, low, high):
+        value = source.get(key, default)
+        if type(value) is not int or not low <= value <= high:
+            raise SystemExit(f"video.raster.{key} precisa ser inteiro entre {low} e {high}")
+        return value
+    def color(value):
+        if not isinstance(value, str) or not re.fullmatch(r"#[0-9a-fA-F]{6}", value):
+            raise SystemExit("video.raster.gradient precisa de cores #rrggbb")
+        rgb = int(value[1:], 16)
+        return ((rgb >> 19) & 31) | (((rgb >> 11) & 31) << 5) | (((rgb >> 3) & 31) << 10)
+    r, g = ripple.get("enabled") is True, gradient.get("enabled") is True
+    layer = str(ripple.get("layer", "BG2")).upper()
+    amplitude = number(ripple, "amplitude", 4, 0, 16)
+    wavelength = number(ripple, "wavelength", 32, 8, 160)
+    speed = number(ripple, "speed", 2, 0, 8)
+    top, bottom = number(ripple, "top", 80, 0, 159), number(ripple, "bottom", 160, 1, 160)
+    start, end = number(gradient, "top", 0, 0, 158), number(gradient, "bottom", 80, 2, 160)
+    if layer not in ("BG1", "BG2", "BG3") or (r and (top >= bottom or (mode != 0 and not (mode == 1 and layer == "BG1")))):
+        raise SystemExit("Ondulação requer faixa válida e camada regular compatível com o modo")
+    if g and mode not in (0, 1, 2):
+        raise SystemExit("Gradiente de fundo requer modo tiled ou affine")
+    if g and end - start < 2:
+        raise SystemExit("Gradiente requer ao menos duas linhas")
+    first, last = color(gradient.get("from", "#3858a0")), color(gradient.get("to", "#b0d8f8"))
+    return ("gbs::SceneRasterEffects { "
+            f"gbs::SceneRipple {{ {'true' if r else 'false'}, gbs::BackgroundLayer::{layer}, {amplitude}, {wavelength}, {speed}, {top}, {bottom} }}, "
+            f"gbs::SceneGradient {{ {'true' if g else 'false'}, {first}, {last}, {start}, {end} }} }}")
+
+
 def video_composition_literal(project, description, asset_report=None):
     video = project.get("video", {})
     if video is None:
@@ -14917,7 +14954,8 @@ def video_composition_literal(project, description, asset_report=None):
         f"gbs::AffineBgTransform {{ {', '.join(str(value) for value in transform)} }}, "
         f"{affine_tiles}, {affine_tilemap}, {affine_palette}, "
         f"{bitmap16}, {bitmap8}, {bitmap_palette}, static_cast<uint8_t>({page}), "
-        f"{'true' if bool(affine.get('wrap', True)) else 'false'} "
+        f"{'true' if bool(affine.get('wrap', True)) else 'false'}, "
+        f"{scene_raster_effects_literal(video.get('raster'), mode)} "
         "}"
     )
 

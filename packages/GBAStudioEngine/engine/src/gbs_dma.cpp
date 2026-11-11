@@ -19,9 +19,15 @@ __attribute__((weak)) void begin_render_publication_transaction() {}
 void begin_render_publication_transaction();
 #endif
 
+#if defined(__arm__) || defined(__thumb__)
+#define GBS_DMA_EWRAM __attribute__((section(".ewram_bss")))
+#else
+#define GBS_DMA_EWRAM
+#endif
+
 namespace {
 
-DmaTransfer vblank_queue[dma_vblank_queue_capacity] {};
+DmaTransfer vblank_queue[dma_vblank_queue_capacity] GBS_DMA_EWRAM {};
 size_t vblank_queue_count = 0;
 uint32_t vblank_queue_submitted = 0;
 uint32_t vblank_queue_flushed = 0;

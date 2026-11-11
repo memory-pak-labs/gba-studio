@@ -2524,7 +2524,7 @@ bool restore_isometric_runtime_state(
     if (!restore_iso_temporal_checkpoint(universal_save, event_state.current_room, actors, actor_count, event_state)) return false;
     current_room = event_state.current_room;
     room_data = &project.rooms[current_room];
-    gbs::apply_scene_background_video(room_data->video.affine_enabled ? room_data->video : project.video);
+    gbs::apply_scene_background_video((room_data->video.affine_enabled || gbs::has_scene_raster_effects(room_data->video.raster)) ? room_data->video : project.video);
     gbs::SaveInfo info = gbs::inspect_save_slot(gbastudio_isometric_project::save_bank, static_cast<size_t>(slot_index));
     isometric_save_sequence = info.sequence;
     return true;
@@ -2578,7 +2578,7 @@ bool apply_iso_event_room_change(
     gbs::clear_iso_event_scheduler(iso_event_scheduler);
     current_room = target_room;
     room_data = &project_data.rooms[current_room];
-    gbs::apply_scene_background_video(room_data->video.affine_enabled ? room_data->video : project_data.video);
+    gbs::apply_scene_background_video((room_data->video.affine_enabled || gbs::has_scene_raster_effects(room_data->video.raster)) ? room_data->video : project_data.video);
     for (size_t index = 0; index < actor_capacity; ++index) {
         actors[index] = gbs::IsoActor {};
         iso_actor_touching_player[index] = false;
@@ -2687,7 +2687,7 @@ int initialize_isometric_runtime() {
         }
     }
 
-    load_assets(room_data->video.affine_enabled ? room_data->video : project.video);
+    load_assets((room_data->video.affine_enabled || gbs::has_scene_raster_effects(room_data->video.raster)) ? room_data->video : project.video);
     // Restore native transparent corners, but preserve an affine image palette.
     if (!room_data->video.affine_enabled && !project.video.affine_enabled) {
         gbs::set_backdrop_color(project.backdrop_color);

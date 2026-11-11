@@ -1,3 +1,4 @@
+import { hasSceneRasterEffects, normalizeSceneRasterEffects } from "../shared/sceneRasterEffects.js";
 import { projectAudioMixingRate, requireAudioMixingRate } from "../shared/audioMixing.js";
 import { isPcmAudio } from "../shared/audioPcm.js";
 import { isScaleEvent, parseScaleEvent, usesSinglePlaneBackground } from "../shared/eventTransforms.js";
@@ -2739,7 +2740,17 @@ function assertFixedUiAffineSource(room: Record<string, unknown>, asset: Record<
     throw new Error(`Cena ${roomName(room,0)}: fundo affine com interface fixa permite no máximo 512x512 pixels.`);
 }
 
-function buildRoomVideoComposition(
+function buildRoomVideoComposition(data: GBAProjectData, room: Record<string, unknown>, tilesetPack: AssetcTilesetPackGeneration | null): ExportedAdvancedVideoComposition {
+  const video = buildRoomVideoCompositionBase(data, room, tilesetPack);
+  const composition = roomSceneComposition(room);
+  if (!composition.enabled || !hasSceneRasterEffects(composition.effects.raster)) return video;
+  const raster = normalizeSceneRasterEffects(composition.effects.raster);
+  if (raster.ripple.enabled && ((video.display_mode !== 0 && !(video.display_mode === 1 && raster.ripple.layer === "BG1")) || (roomSceneType(room) === "racing" && raster.ripple.layer !== "BG1" && racingSceneConfigFromRuntime(room.runtime,data.settings)?.presentation === "pseudo3d")))
+    throw new Error(`Cena ${roomName(room,0)}: a ondulação exige uma camada regular livre; o plano affine/perspectiva já controla BG2.`);
+  return { ...video, raster };
+}
+
+function buildRoomVideoCompositionBase(
   data: GBAProjectData,
   room: Record<string, unknown>,
   tilesetPack: AssetcTilesetPackGeneration | null
@@ -8987,7 +8998,7 @@ function buildShmupProject(
     const affineEnabled = shmupComposition.config.video.affine !== null;
     const roomWidthTiles = shmupComposition.config.world.widthTiles;
     const roomHeightTiles = shmupComposition.config.world.heightTiles;
-    const backgroundVideo = affineEnabled
+    const backgroundVideo = affineEnabled || (sceneComposition.enabled && hasSceneRasterEffects(sceneComposition.effects.raster))
       ? buildRoomVideoComposition(data, room, tilesetPack)
       : undefined;
     const collisionTypes = paddedCollisionTypes(room.collisionTypes, roomWidthTiles * roomHeightTiles);
@@ -11152,6 +11163,7 @@ function buildEngineExportProjectContractUncached(
     if (runtimeKind === "platformer") cameraZoneFeatures.add("platformer_runtime.platformer_camera_zones");
   });
   features.push(...cameraZoneFeatures);
+  if (rooms.some(room => { const c = roomSceneComposition(room); return c.enabled && hasSceneRasterEffects(c.effects.raster); })) features.push("render_runtime.scene_raster_effects");
   if (projectAudioMixingRate(data) !== 31536 || projectArray(data, "events").some(event => JSON.stringify(event).includes("set_audio_mixing_rate"))) features.push("audio.configurable_mixing_rate");
   if (projectArray(data, "audioItems").some(isPcmAudio)) features.push("audio.pcm_composer", "audio.tracker_pcm_16_channels", "audio.pcm_prepared_gain");
   if (audioPack?.document.sfx.some(asset => asset.pcm)) features.push("audio.pcm_sfx_aliases");

@@ -267,7 +267,8 @@ SECTIONS
     __svc_stack_size = 0x100;
     __system_stack_size = 0x2000;
     __irq_handler_slot = ORIGIN(IWRAM) + LENGTH(IWRAM) - 4;
-    __irq_stack_top = __irq_handler_slot;
+    /* 0x03007fa0..0x03007fff belongs to BIOS IntrWait/IRQ work data. */
+    __irq_stack_top = ORIGIN(IWRAM) + LENGTH(IWRAM) - 0x60;
     __irq_stack_bottom = __irq_stack_top - __irq_stack_size;
     __svc_stack_top = __irq_stack_bottom;
     __svc_stack_bottom = __svc_stack_top - __svc_stack_size;

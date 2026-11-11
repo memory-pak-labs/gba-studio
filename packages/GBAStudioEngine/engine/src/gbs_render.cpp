@@ -8,6 +8,9 @@
 #include "gbs/tile_edits.hpp"
 
 #if !defined(__arm__) && !defined(__thumb__)
+extern "C" __attribute__((weak)) GbsSceneRasterTable* gbs_hw_begin_scene_raster_update() { static GbsSceneRasterTable table {}; return &table; }
+extern "C" __attribute__((weak)) void gbs_hw_submit_scene_raster_update() {}
+extern "C" __attribute__((weak)) void gbs_hw_reset_scene_raster() {}
 // Pure render host fixtures omit the DMA transport. Full queue tests link the
 // strong implementation, which replaces this no-queue host stub.
 namespace gbs {
@@ -18,7 +21,21 @@ __attribute__((weak)) bool dma_wait_for_destination(const volatile void*, size_t
 
 namespace gbs {
 
+extern "C" void gbs_scene_raster_interrupt_state(int enabled) {
+#if defined(__arm__) || defined(__thumb__)
+    static bool acquired = false;
+    if (enabled && !acquired) { gbs::enable_internal_interrupt(gbs::InterruptSource::HBlank); acquired = true; }
+    else if (!enabled && acquired) { gbs::disable_internal_interrupt(gbs::InterruptSource::HBlank); acquired = false; }
+#else
+    (void)enabled;
+#endif
+}
+
 namespace {
+
+bool scene_raster_cached = false;
+SceneRasterEffects cached_scene_raster {};
+DisplayMode cached_scene_raster_mode {};
 
 #if defined(__arm__) || defined(__thumb__)
 #define GBS_RENDER_EWRAM __attribute__((section(".ewram_bss")))
@@ -117,6 +134,8 @@ bool decode_huffman_runtime(const HuffmanAsset& asset, uint8_t* output, size_t o
 } // namespace
 
 void render_init() {
+    scene_raster_cached = false;
+    gbs_hw_reset_scene_raster();
     gbs_hw_demo_tiles();
     hide_all_sprites();
 }
@@ -683,6 +702,42 @@ bool scale_perspective_background(HBlankAffineRasterLine* lines, size_t count, u
     return true;
 }
 
+bool set_scene_raster_effects(const SceneRasterEffects& effects, DisplayMode mode) {
+    const auto& r = effects.ripple; const auto& g = effects.gradient;
+    if (r.enabled && (r.amplitude > 16 || r.wavelength < 8 || r.wavelength > 160 || r.speed > 8 ||
+        r.top >= r.bottom || r.bottom > 160 || r.layer == BackgroundLayer::BG0 || !is_valid_background_layer(r.layer) ||
+        (mode != DisplayMode::Mode0Text && !(mode == DisplayMode::Mode1TextAffine && r.layer == BackgroundLayer::BG1)))) return false;
+    if (g.enabled && (static_cast<int>(mode) > 2 || g.from > 32767 || g.to > 32767 || g.bottom > 160 || g.bottom < g.top + 2)) return false;
+    const auto& old_r = cached_scene_raster.ripple;
+    const auto& old_g = cached_scene_raster.gradient;
+    if (scene_raster_cached && mode == cached_scene_raster_mode &&
+        r.enabled == old_r.enabled && r.layer == old_r.layer && r.amplitude == old_r.amplitude &&
+        r.wavelength == old_r.wavelength && r.speed == old_r.speed && r.top == old_r.top && r.bottom == old_r.bottom &&
+        g.enabled == old_g.enabled && g.from == old_g.from && g.to == old_g.to && g.top == old_g.top && g.bottom == old_g.bottom) return true;
+    GbsSceneRasterTable* table = gbs_hw_begin_scene_raster_update();
+    table->enabled = (r.enabled ? 1 : 0) | (g.enabled ? 2 : 0);
+    table->layer = static_cast<uint8_t>(r.enabled ? r.layer : BackgroundLayer::BG2); table->speed = r.speed; table->top = r.top; table->bottom = r.bottom;
+    if (r.enabled) {
+        for (unsigned phase = 0; phase < 256; ++phase) {
+            const int value = fixed_sin(static_cast<Angle>(phase << 8)).raw() * r.amplitude;
+            table->wave[phase] = static_cast<int16_t>((value + (value >= 0 ? 128 : -128)) / 256);
+        }
+        for (unsigned y = r.top; y < r.bottom; ++y) table->line_phase[y] = static_cast<uint8_t>((y-r.top)*256/r.wavelength);
+    }
+    if (g.enabled) {
+        const unsigned span = g.bottom - g.top - 1;
+        for (unsigned y = 0; y < 160; ++y) {
+            const unsigned distance = y <= g.top ? 0 : y >= g.bottom - 1u ? span : y-g.top;
+            uint16_t color = 0;
+            for (unsigned shift = 0; shift <= 10; shift += 5) color |= static_cast<uint16_t>((((g.from >> shift)&31)*(span-distance)+((g.to >> shift)&31)*distance)/span << shift);
+            table->colors[y] = color;
+        }
+    }
+    gbs_hw_submit_scene_raster_update();
+    cached_scene_raster = effects; cached_scene_raster_mode = mode; scene_raster_cached = true;
+    return true;
+}
+
 bool apply_video_composition(const VideoComposition& composition) {
     if (!is_valid_display_mode(composition.display_mode)) {
         return false;
@@ -727,7 +782,7 @@ bool apply_video_composition(const VideoComposition& composition) {
     if (bitmap_loaded && is_bitmap_display_mode(composition.display_mode)) {
         set_display_frame_page(composition.bitmap_page);
     }
-    return bitmap_loaded;
+    return bitmap_loaded && set_scene_raster_effects(composition.raster, composition.display_mode);
 }
 
 bool apply_scene_background_video(const VideoComposition& composition) {
